@@ -57,10 +57,13 @@ describe('Pass 66 tactical UI overhaul', () => {
     expect(css).toContain("#menu-preview-frame[data-frame='cat'] .preview-cockpit-hud");
   });
 
-  it('keeps open room chat above desktop vitals and outside touch-control rails', () => {
-    expect(css).toContain('#text-chat[data-context="game"]');
+  it('keeps visible room chat above desktop vitals and outside touch-control rails', () => {
+    expect(css).toContain('#text-chat[data-context="game"][data-visible="true"]');
     expect(css).toContain('bottom: clamp(232px, 18vh, 340px);');
+    expect(css).toContain('body:not(.mtc-live) #text-chat[data-context="game"][data-visible="true"]');
+    expect(css).toContain('bottom: 320px;');
     expect(css).toContain('bottom: calc(var(--mtc-safe-bottom) + var(--mtc-stick-size) + 112px);');
+    expect(css).toContain('body.mtc-live #text-chat[data-context="game"][data-visible="true"]');
     expect(css).toContain('body.mtc-live #text-chat[data-open="true"] #text-chat-log');
     expect(css).toContain('max-height: 72px;');
     expect(css).toContain('left: calc(var(--mtc-safe-left) + var(--mtc-stick-size) + var(--mtc-action-width) + 16px);');

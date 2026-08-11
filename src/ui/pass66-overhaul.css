@@ -1184,7 +1184,7 @@ body.mtc-live {
     padding: 7px 10px;
   }
 
-  body.mtc-live #text-chat[data-open="true"] {
+  body.mtc-live #text-chat[data-context="game"][data-visible="true"] {
     z-index: 95;
     left: var(--mtc-safe-left);
     right: auto;
@@ -1196,17 +1196,21 @@ body.mtc-live {
     max-height: 72px;
   }
 
-  /* HF-275: keep live room chat visibly above the complete lower-left operator
-     console instead of merely clearing its health number. Lobby chat retains its
-     in-flow placement and touch chat retains the dedicated control-safe rules. */
-  @media (min-width: 701px) {
-    #text-chat[data-context="game"] {
-      bottom: clamp(232px, 18vh, 340px);
+  /* HF-275: keep incoming/recent room chat as well as the open composer above
+     the complete lower-left operator console. Lobby chat retains its in-flow
+     placement and touch chat retains the dedicated control-safe rules. */
+  #text-chat[data-context="game"][data-visible="true"] {
+    bottom: clamp(232px, 18vh, 340px);
+  }
+
+  @media (max-width: 700px) {
+    body:not(.mtc-live) #text-chat[data-context="game"][data-visible="true"] {
+      bottom: 320px;
     }
   }
 
   @media (orientation: landscape) {
-    body.mtc-live #text-chat[data-open="true"] {
+    body.mtc-live #text-chat[data-context="game"][data-visible="true"] {
       left: calc(var(--mtc-safe-left) + var(--mtc-stick-size) + var(--mtc-action-width) + 16px);
       bottom: calc(var(--mtc-safe-bottom) + var(--mtc-stick-size) + 8px);
       width: min(360px, calc(100vw - var(--mtc-stick-size) - var(--mtc-stick-size) - var(--mtc-action-width) - var(--mtc-action-width) - 48px));

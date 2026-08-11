@@ -23,6 +23,7 @@ let peerServer: OwnedPeerServer | null = null;
 test.describe.configure({ timeout: 360_000 });
 
 test.beforeAll(async () => {
+  if (process.env.PASS70_VERIFY_CROSS_BROWSER !== '1') return;
   peerServer = await startOwnedPeerServer(peerPort, process.env.PASS70_CROSS_BROWSER_PEER_PATH);
 });
 
@@ -139,18 +140,44 @@ async function sampleBrowserAudioListenerCapabilities(page: Page): Promise<Recor
 }
 
 type EngineKind = 'chromium' | 'firefox' | 'webkit' | 'chrome' | 'edge';
+type ListenerPoseMode = 'modern-audio-param' | 'legacy-setters' | 'hybrid' | 'unavailable';
 const supportedEngines: readonly EngineKind[] = ['chromium', 'firefox', 'webkit', 'chrome', 'edge'];
+const verifyCrossBrowser = process.env.PASS70_VERIFY_CROSS_BROWSER === '1';
 const verifyFirefox = process.env.PASS70_VERIFY_FIREFOX === '1';
+const expectedSourceSha = process.env.PASS70_CROSS_BROWSER_SOURCE_SHA ?? null;
+if (verifyCrossBrowser && !/^[a-f0-9]{40}$/u.test(expectedSourceSha ?? '')) {
+  throw new Error('PASS70_VERIFY_CROSS_BROWSER requires exact PASS70_CROSS_BROWSER_SOURCE_SHA provenance');
+}
+const configuredEngineMatrix = (process.env.PASS70_ENGINE_MATRIX ?? supportedEngines.join(','))
+  .split(',')
+  .map((entry) => entry.trim())
+  .filter(Boolean);
+if (configuredEngineMatrix.some((entry) => !supportedEngines.includes(entry as EngineKind))) {
+  throw new Error(`Unsupported PASS70_ENGINE_MATRIX: ${configuredEngineMatrix.join(',')}`);
+}
+const engineMatrix = new Set(configuredEngineMatrix as EngineKind[]);
 const configuredCrossGuest = process.env.PASS70_CROSS_GUEST_ENGINE ?? 'firefox';
 if (!supportedEngines.includes(configuredCrossGuest as EngineKind)) {
   throw new Error(`Unsupported PASS70_CROSS_GUEST_ENGINE: ${configuredCrossGuest}`);
 }
 const crossGuestEngine = configuredCrossGuest as EngineKind;
 
-function expectedListenerPoseMode(kind: EngineKind): 'modern-audio-param' | 'legacy-setters' | 'unavailable' {
-  if (kind === 'firefox') return 'legacy-setters';
-  if (kind === 'webkit') return 'unavailable';
-  return 'modern-audio-param';
+function listenerPoseModeFromCapabilities(capabilities: Record<string, any>): ListenerPoseMode {
+  const properties = capabilities.properties ?? {};
+  const methods = capabilities.methods ?? {};
+  const audioParam = (name: string) => (
+    properties[name]?.propertyType === 'object' && properties[name]?.valueType === 'number'
+  );
+  const modernPosition = ['positionX', 'positionY', 'positionZ'].every(audioParam);
+  const modernOrientation = [
+    'forwardX', 'forwardY', 'forwardZ', 'upX', 'upY', 'upZ',
+  ].every(audioParam);
+  const legacyPosition = methods.setPosition === 'function';
+  const legacyOrientation = methods.setOrientation === 'function';
+  if ((!modernPosition && !legacyPosition) || (!modernOrientation && !legacyOrientation)) return 'unavailable';
+  if (modernPosition && modernOrientation) return 'modern-audio-param';
+  if (!modernPosition && !modernOrientation) return 'legacy-setters';
+  return 'hybrid';
 }
 
 async function openEngineBrowser(kind: EngineKind): Promise<Browser> {
@@ -186,6 +213,9 @@ async function newPageWithDeadline(context: BrowserContext, label: string): Prom
 for (const kind of ['firefox', 'chromium', 'webkit', 'chrome', 'edge'] as const) {
   test(`one-bot Skirmish starts, plays and weapon-reloads in ${kind}`, async ({ browserName }, testInfo) => {
     test.skip(browserName !== 'chromium', 'The explicit engine matrix is owned once by the Chromium project.');
+    test.skip(!verifyCrossBrowser,
+      'Run the explicit Pass 70 cross-browser verifier; ordinary Chromium projects do not launch external engines.');
+    test.skip(!engineMatrix.has(kind), `${kind} is not selected by PASS70_ENGINE_MATRIX.`);
     test.skip(kind === 'firefox' && !verifyFirefox,
       'Set PASS70_VERIFY_FIREFOX=1 to run the real fail-closed Firefox start/play/reload lane.');
     const baseUrl = String(testInfo.project.use.baseURL);
@@ -200,6 +230,7 @@ for (const kind of ['firefox', 'chromium', 'webkit', 'chrome', 'edge'] as const)
       const listenerCapabilities = await sampleBrowserAudioListenerCapabilities(page);
       const receiptPath = testInfo.outputPath(`pass70-${kind}-one-bot-receipt.json`);
       await writeFile(receiptPath, JSON.stringify({
+        sourceSha: expectedSourceSha,
         engine: kind,
         browserVersion: browser.version(),
         listenerCapabilities,
@@ -208,20 +239,8 @@ for (const kind of ['firefox', 'chromium', 'webkit', 'chrome', 'edge'] as const)
       await testInfo.attach(`${kind}-one-bot-receipt`, { path: receiptPath, contentType: 'application/json' });
       expect(first).toMatchObject({ botCount: 1, runtimeError: '', systemPaused: false, reloading: false, matchPhase: 'active' });
       expect(first.frameDelta).toBeGreaterThan(20);
-      expect(first.audioListenerMode).toBe(expectedListenerPoseMode(kind));
-      if (kind === 'webkit') {
-        expect(first.audioContext).toEqual({ source: 'standard', state: 'running' });
-        expect(listenerCapabilities).toMatchObject({
-          gameContext: { source: 'standard', state: 'running' },
-          constructorSource: 'standard',
-          properties: Object.fromEntries([
-            'positionX', 'positionY', 'positionZ',
-            'forwardX', 'forwardY', 'forwardZ',
-            'upX', 'upY', 'upZ',
-          ].map((name) => [name, { propertyType: 'undefined', valueType: 'undefined' }])),
-          methods: { setPosition: 'undefined', setOrientation: 'undefined' },
-        });
-      }
+      expect(first.audioListenerMode).toBe(listenerPoseModeFromCapabilities(listenerCapabilities));
+      expect(first.audioContext).toEqual({ source: 'standard', state: 'running' });
 
       if (kind === 'firefox') {
         await page.reload({ waitUntil: 'domcontentloaded' });
@@ -233,7 +252,8 @@ for (const kind of ['firefox', 'chromium', 'webkit', 'chrome', 'edge'] as const)
         const reloaded = await startOneBotSkirmish(page);
         expect(reloaded).toMatchObject({ botCount: 1, runtimeError: '', systemPaused: false, matchPhase: 'active' });
         expect(reloaded.frameDelta).toBeGreaterThan(20);
-        expect(reloaded.audioListenerMode).toBe('legacy-setters');
+        const reloadedCapabilities = await sampleBrowserAudioListenerCapabilities(page);
+        expect(reloaded.audioListenerMode).toBe(listenerPoseModeFromCapabilities(reloadedCapabilities));
       }
 
       const screenshot = testInfo.outputPath(`pass70-${kind}-one-bot.png`);
@@ -338,6 +358,8 @@ async function auditChatLayout(page: Page, viewport: { width: number; height: nu
 
 test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejoin and host renderer recovery`, async ({ browserName }, testInfo) => {
   test.skip(browserName !== 'chromium', 'The explicit cross-engine pair is owned once by the Chromium project.');
+  test.skip(!verifyCrossBrowser,
+    'Run the explicit Pass 70 cross-browser verifier; ordinary Chromium projects do not launch external engines.');
   test.skip(crossGuestEngine === 'firefox' && !verifyFirefox,
     'Set PASS70_VERIFY_FIREFOX=1 to run the real fail-closed Firefox cross-engine lifecycle lane.');
   const baseUrl = String(testInfo.project.use.baseURL);
@@ -374,6 +396,8 @@ test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejo
     await Promise.all([host, guest].map((page) => page.waitForFunction(() => (
       (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch?.members.length === 2
     ), undefined, { timeout: 60_000 })));
+    await host.locator('#lobby-arena').selectOption('rustworks-1v1');
+    await expect(guest.locator('#lobby-arena')).toHaveValue('rustworks-1v1');
     await host.locator('#lobby-bots').selectOption('0');
     await host.click('#lobby-ready');
     await guest.click('#lobby-ready');
@@ -400,6 +424,41 @@ test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejo
     await host.locator('#text-chat-input').fill(chatMessage);
     await host.keyboard.press('Enter');
     await expect(guest.locator('#text-chat-log')).toContainText(chatMessage);
+    await expect(guest.locator('#text-chat')).toHaveAttribute('data-context', 'game');
+    await expect(guest.locator('#text-chat')).toHaveAttribute('data-visible', 'true');
+    await expect(guest.locator('#text-chat')).toHaveAttribute('data-open', 'false');
+    const closedDesktopChat = await auditChatLayout(guest, { width: 1_280, height: 720 });
+    expect(closedDesktopChat).toMatchObject({
+      viewport: [1_280, 720], context: 'game', open: 'false', collisions: [], withinViewport: true,
+    });
+    expect(Number(closedDesktopChat.gapAboveOperator)).toBeGreaterThanOrEqual(16);
+    expect(Number(closedDesktopChat.bottomInset)).toBeGreaterThanOrEqual(232);
+    const closedNarrowChat = await auditChatLayout(guest, { width: 600, height: 720 });
+    expect(closedNarrowChat).toMatchObject({
+      viewport: [600, 720], context: 'game', open: 'false', collisions: [], withinViewport: true,
+    });
+    const closedTouchState = await guest.evaluate(() => {
+      const controls = document.querySelector<HTMLElement>('#mobile-touch-controls');
+      const state = { bodyHadClass: document.body.classList.contains('mtc-live'), controlsHidden: controls?.hidden ?? true };
+      document.body.classList.add('mtc-live');
+      if (controls) controls.hidden = false;
+      return state;
+    });
+    const closedMobileChat = await auditChatLayout(guest, { width: 390, height: 844 });
+    expect(closedMobileChat).toMatchObject({
+      viewport: [390, 844], context: 'game', open: 'false', collisions: [], withinViewport: true,
+    });
+    const closedMobileLandscapeChat = await auditChatLayout(guest, { width: 844, height: 390 });
+    expect(closedMobileLandscapeChat).toMatchObject({
+      viewport: [844, 390], context: 'game', open: 'false', collisions: [], withinViewport: true,
+    });
+    await guest.evaluate(({ bodyHadClass, controlsHidden }) => {
+      const controls = document.querySelector<HTMLElement>('#mobile-touch-controls');
+      document.body.classList.toggle('mtc-live', bodyHadClass);
+      if (controls) controls.hidden = controlsHidden;
+    }, closedTouchState);
+    await guest.setViewportSize({ width: 1_280, height: 720 });
+
     await host.keyboard.press('Enter');
     await expect(host.locator('#text-chat')).toHaveAttribute('data-open', 'true');
     const desktopChat = await auditChatLayout(host, { width: 1_280, height: 720 });
@@ -426,23 +485,56 @@ test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejo
     await host.keyboard.press('Escape');
     await expect(host.locator('#text-chat')).toHaveAttribute('data-open', 'false');
 
+    const [hostListenerCapabilities, guestListenerCapabilities] = await Promise.all([
+      sampleBrowserAudioListenerCapabilities(host),
+      sampleBrowserAudioListenerCapabilities(guest),
+    ]);
+    const guestPosition = await guest.evaluate(() => (
+      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.position as [number, number, number]
+    ));
+    await host.evaluate(([x, y, z]) => {
+      const debug = (window as any).__ATOMIC_ACRES_DEBUG__;
+      debug.teleportPlayer(x, y, z + 5, 0, 0);
+    }, guestPosition);
+    await host.waitForFunction(([x, _y, z]) => {
+      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+      const remote = state.remotePlayers[0];
+      return remote && Math.abs(remote.authoritativePosition[0] - x) < 0.5
+        && Math.abs(remote.authoritativePosition[2] - z) < 0.5
+        && Math.abs(state.player.position[0] - x) < 0.5
+        && Math.abs(state.player.position[2] - (z + 5)) < 0.5;
+    }, guestPosition, { timeout: 15_000 });
     await Promise.all([host, guest].map((page) => page.evaluate(() => {
       const debug = (window as any).__ATOMIC_ACRES_DEBUG__;
       debug.setRenderPaused(false);
-      debug.setAmmo('carbine', 30, 120);
-      debug.setAds(false);
-    })));
-    await Promise.all([host, guest].map((page) => page.waitForTimeout(1_500)));
-    await Promise.all([startFrameProbe(host), startFrameProbe(guest)]);
-    await Promise.all([host, guest].map((page) => page.evaluate(() => {
-      const debug = (window as any).__ATOMIC_ACRES_DEBUG__;
+      debug.equipWeapon('carbine');
+      debug.setAmmo('carbine', 2, 120);
       debug.setAds(true);
-      debug.setTriggerHeld(true);
     })));
-    await host.waitForTimeout(4_000);
+    await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.aimAtRemoteWithOffset(0, 0));
+    await host.waitForTimeout(750);
+    const combatBefore = await Promise.all([
+      host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers[0]?.hp),
+      guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.hp),
+    ]);
+    expect(Math.abs(Number(combatBefore[0]) - Number(combatBefore[1]))).toBeLessThanOrEqual(1);
+    await Promise.all([startFrameProbe(host), startFrameProbe(guest)]);
+    await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.fireOnce());
+    let combatAfter = { hostAuthorityHp: Number.NaN, guestHp: Number.NaN };
+    await expect.poll(async () => {
+      const [hostAuthorityHp, guestHp] = await Promise.all([
+        host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers[0]?.hp),
+        guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.hp),
+      ]);
+      combatAfter = { hostAuthorityHp: Number(hostAuthorityHp), guestHp: Number(guestHp) };
+      return {
+        damaged: combatAfter.guestHp < Number(combatBefore[1]),
+        converged: Math.abs(combatAfter.hostAuthorityHp - combatAfter.guestHp) <= 1,
+      };
+    }, { timeout: 15_000 }).toEqual({ damaged: true, converged: true });
+    await host.waitForTimeout(3_000);
     await Promise.all([host, guest].map((page) => page.evaluate(() => {
       const debug = (window as any).__ATOMIC_ACRES_DEBUG__;
-      debug.setTriggerHeld(false);
       debug.setAds(false);
     })));
     const [hostFrame, guestFrame] = await Promise.all([stopFrameProbe(host), stopFrameProbe(guest)]);
@@ -452,16 +544,32 @@ test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejo
       expect(probe.runtimeError, `${label}: runtime errors`).toBe('');
       expect(probe.systemPaused, `${label}: no fatal pause`).toBe(false);
       expect(probe.listenerPoseMode, `${label}: exact listener compatibility path`)
-        .toBe(label === 'host' ? 'modern-audio-param' : expectedListenerPoseMode(crossGuestEngine));
+        .toBe(listenerPoseModeFromCapabilities(
+          label === 'host' ? hostListenerCapabilities : guestListenerCapabilities,
+        ));
       expect(Number(probe.audioVoices)).toBeLessThanOrEqual(Number(probe.audioVoiceCap));
       expect((probe.readiness as any).ready).toBe(true);
     }
     const crossEngineReceiptPath = testInfo.outputPath('pass70-cross-engine-ui-frame-receipt.json');
     await writeFile(crossEngineReceiptPath, JSON.stringify({
+      sourceSha: expectedSourceSha,
       guestEngine: crossGuestEngine,
       initialMemberIds,
       remoteReadability,
-      chat: { desktop: desktopChat, mobile: mobileChat, mobileLandscape: mobileLandscapeChat },
+      listenerCapabilities: { host: hostListenerCapabilities, guest: guestListenerCapabilities },
+      combat: {
+        before: { hostAuthorityHp: combatBefore[0], guestHp: combatBefore[1] },
+        after: combatAfter,
+      },
+      chat: {
+        closedDesktop: closedDesktopChat,
+        closedNarrow: closedNarrowChat,
+        closedMobile: closedMobileChat,
+        closedMobileLandscape: closedMobileLandscapeChat,
+        desktop: desktopChat,
+        mobile: mobileChat,
+        mobileLandscape: mobileLandscapeChat,
+      },
       frames: { host: hostFrame, guest: guestFrame },
     }, null, 2), 'utf8');
     await testInfo.attach('cross-engine-ui-frame-receipt', {
@@ -469,9 +577,6 @@ test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejo
       contentType: 'application/json',
     });
 
-    const guestPosition = await guest.evaluate(() => (
-      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.position as [number, number, number]
-    ));
     await host.evaluate(([x, y, z]) => {
       const debug = (window as any).__ATOMIC_ACRES_DEBUG__;
       debug.teleportPlayer(x, y, z + 5, 0, 0);
