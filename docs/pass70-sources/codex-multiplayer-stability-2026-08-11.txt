@@ -1,0 +1,21 @@
+Pass 69 is improved, but I would not call multiplayer fully stable yet.
+Tested exact live source 685ed7865018e107df5acf6cb6f7498b4468940c for 7,219 seconds—just over two hours—with 64 isolated host/guest cycles:
+Guest reload/rejoin: 64/64 passed
+Host crash/resume: 63/64 passed
+Total: 127 passes, 1 failure
+Confirmed issues:
+Major: Guest Railgun pickup does not converge to host authority. Reproduced twice: guest reports “held,” while host still reports “available.”
+Major-impact intermittent: One host-resume attempt failed to restore the active room within 90 seconds—1/64 attempts.
+Minor: Gun Range advertises a two-minute match but starts with approximately five minutes.
+Minor: Gun Range canvas accessibility label still says “Nuke Town multiplayer arena.”
+Several supported soak/release wrappers remain hard-coded to Pass 66 or use obsolete test fixtures.
+Working correctly:
+Hosting, joining, readying and starting
+Guest rejoin and identity preservation
+Host recovery in 63/64 attempts
+Shooting, grenades and FN P90 pickup through Use/Interact
+Target accuracy and remote damage/death/drop replication
+Hosted bots, room chat, rematches and synchronized lobby return
+Network impairment matrix passed with no duplicate effects
+One death-drop scavenging timeout remains unconfirmed because later retries encountered earlier startup timeouts.
+Full evidence report: C:\Users\david\Documents\Codex\2026-08-11\https-daveinturkey15-byte-github-io-atomic\outputs\pass69-lobby-stability-report.md

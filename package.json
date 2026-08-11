@@ -60,7 +60,7 @@
     "qa:pass63": "playwright test tests/e2e/pass63-project-map.spec.ts tests/e2e/pass63-atomic-visuals.spec.ts tests/e2e/pass63-skyline-terminal-openings.spec.ts tests/e2e/pass63-text-chat.spec.ts tests/e2e/rustworks-refinement.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:pass63:text-chat": "playwright test tests/e2e/pass63-text-chat.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:multiplayer:stability": "node --test scripts/qa/pass66-multiplayer-stability-contract.test.mjs && npm run qa:pass66:owned-browser-verifier-contract && node scripts/qa/run-pass66-owned-browser-verifier.mjs multiplayer-stability",
-    "qa:pass66:multiplayer-stability": "npm run qa:multiplayer:stability",
+    "qa:pass66:multiplayer-stability": "node --test scripts/qa/pass66-multiplayer-stability-contract.test.mjs && npm run qa:pass66:owned-browser-verifier-contract && node scripts/qa/run-pass66-owned-browser-verifier.mjs multiplayer-stability",
     "qa:pass66:host-recovery": "npm run qa:pass66:multiplayer-stability",
     "qa:pass66:owner-feedback-multiplayer-ui": "npm run qa:pass66:multiplayer-stability",
     "qa:pass66:timed-map-weapons-multiplayer-rejoin": "npm run qa:pass66:multiplayer-stability",
