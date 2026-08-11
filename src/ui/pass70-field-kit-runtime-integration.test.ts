@@ -34,6 +34,8 @@ describe('HF-249/HF-250/HF-251 Field Kit runtime integration', () => {
     const selectSavedPreset = save.indexOf("selected: { kind: 'custom', presetId: submittedPresetId } as SelectedLoadoutRef");
     const persist = save.indexOf('if (!persistLoadoutState(candidate))');
     const close = save.indexOf('manager.hidden = true');
+    const reenable = save.indexOf('saveButton.disabled = false');
+    const restoreFailureFocus = save.indexOf('if (!manager.hidden) saveButton.focus()');
     expect(save).toContain('if (manager.hidden || loadoutSaveInFlight) return;');
     expect(save).toContain('YOUR EDITS ARE STILL HERE');
     expect(save).toContain("setLoadoutSaveStatus('SAVE FAILED");
@@ -43,5 +45,7 @@ describe('HF-249/HF-250/HF-251 Field Kit runtime integration', () => {
     expect(close).toBeGreaterThan(persist);
     expect(save.slice(persist, close)).toContain('return;');
     expect(save.match(/manager\.hidden = true/gu)).toHaveLength(1);
+    expect(reenable).toBeGreaterThan(close);
+    expect(restoreFailureFocus).toBeGreaterThan(reenable);
   });
 });

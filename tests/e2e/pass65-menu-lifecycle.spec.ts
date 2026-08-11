@@ -287,7 +287,7 @@ async function openMultiplayerPeer(context: BrowserContext, name: string, seed: 
 }
 
 test.describe('Pass 65 active-match menu lifecycle', () => {
-  test('persists exactly three custom loadouts with primary, secondary, and one grenade', async ({ page }) => {
+  test('persists, reloads and deploys the saved Custom 2 without a compensating selection click', async ({ page }) => {
     await ready(page);
     await page.locator('[data-menu-tab="kit"]').click();
     await expect(page.locator('[data-kit-id]')).toHaveCount(4);
@@ -302,7 +302,6 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
     await page.locator('#loadout-secondary').selectOption('explosive-crossbow');
     await page.locator('#loadout-grenade').selectOption('smoke');
     await page.locator('#loadout-save').click();
-    await page.locator('[data-custom-preset-id="custom-2"]').click();
 
     const selected = page.locator('[data-custom-preset-id="custom-2"]');
     await expect(selected).toHaveAttribute('aria-pressed', 'true');
@@ -325,6 +324,25 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
     await page.locator('[data-menu-tab="kit"]').click();
     await expect(page.locator('[data-custom-preset-id="custom-2"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('[data-custom-preset-id="custom-2"] [data-custom-name]')).toHaveText('Night Ops');
+    expect(await page.evaluate(() => {
+      const profile = JSON.parse(localStorage.getItem('atomic-acres.player-profile.v1') ?? 'null') as {
+        loadout?: { selected?: unknown };
+      } | null;
+      return profile?.loadout?.selected;
+    })).toEqual({ kind: 'custom', presetId: 'custom-2' });
+
+    await installPointerLockHarness(page, 'resolve');
+    await page.locator('[data-menu-tab="deploy"]').click();
+    await startFromMenu(page);
+    expect(await page.evaluate(() => {
+      const player = window.__ATOMIC_ACRES_DEBUG__.snapshot().player as Record<string, unknown>;
+      return {
+        primary: player.primaryWeapon,
+        secondary: player.secondaryWeapon,
+        grenade: player.selectedGrenade,
+        grenades: player.grenades,
+      };
+    })).toEqual({ primary: 'minigun', secondary: 'explosive-crossbow', grenade: 'smoke', grenades: 1 });
   });
 
   test('keeps pre-match helo/cat preview ownership and reduced-motion accessibility', async ({ page }) => {

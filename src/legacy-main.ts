@@ -8268,6 +8268,7 @@ function saveManagedPreset(): void {
   } finally {
     loadoutSaveInFlight = false;
     saveButton.disabled = false;
+    if (!manager.hidden) saveButton.focus();
   }
 }
 

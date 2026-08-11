@@ -198,6 +198,7 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
     await expect(page.locator('#loadout-preset-name')).toHaveValue('Unsaved Edits Stay');
     await expect(page.locator('#loadout-save-status')).toBeVisible();
     await expect(page.locator('#loadout-save-status')).toContainText('YOUR EDITS ARE STILL HERE');
+    await expect(page.locator('#loadout-save')).toBeFocused();
     await expect(page.locator('[data-custom-preset-id="custom-3"] [data-custom-name]')).not.toHaveText('Unsaved Edits Stay');
     await expect(page.locator('[data-custom-preset-id="custom-2"]')).toHaveAttribute('aria-current', 'true');
     await expect(page.locator('[data-custom-preset-id="custom-3"]')).not.toHaveAttribute('aria-current', /.+/u);
