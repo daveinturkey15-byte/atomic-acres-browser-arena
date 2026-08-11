@@ -17,6 +17,10 @@ import {
   type BrowserDiagnostics,
   type OwnedPeerServer,
 } from './pass66-e2e-support';
+import {
+  evaluatePass70BrowserAudioEvidence,
+  pass70ListenerPoseModeFromCapabilities,
+} from '../../scripts/qa/pass70-cross-browser-audio-evidence-contract.mjs';
 
 const peerPort = Number(process.env.PASS70_CROSS_BROWSER_PEER_PORT ?? 9_089);
 let peerServer: OwnedPeerServer | null = null;
@@ -141,7 +145,6 @@ async function sampleBrowserAudioListenerCapabilities(page: Page): Promise<Recor
 }
 
 type EngineKind = 'chromium' | 'firefox' | 'webkit' | 'chrome' | 'edge' | 'opera';
-type ListenerPoseMode = 'modern-audio-param' | 'legacy-setters' | 'hybrid' | 'unavailable';
 const supportedEngines: readonly EngineKind[] = ['chromium', 'firefox', 'webkit', 'chrome', 'edge', 'opera'];
 const verifyCrossBrowser = process.env.PASS70_VERIFY_CROSS_BROWSER === '1';
 const verifyFirefox = process.env.PASS70_VERIFY_FIREFOX === '1';
@@ -168,24 +171,6 @@ if (!supportedEngines.includes(configuredCrossGuest as EngineKind)) {
   throw new Error(`Unsupported PASS70_CROSS_GUEST_ENGINE: ${configuredCrossGuest}`);
 }
 const crossGuestEngine = configuredCrossGuest as EngineKind;
-
-function listenerPoseModeFromCapabilities(capabilities: Record<string, any>): ListenerPoseMode {
-  const properties = capabilities.properties ?? {};
-  const methods = capabilities.methods ?? {};
-  const audioParam = (name: string) => (
-    properties[name]?.propertyType === 'object' && properties[name]?.valueType === 'number'
-  );
-  const modernPosition = ['positionX', 'positionY', 'positionZ'].every(audioParam);
-  const modernOrientation = [
-    'forwardX', 'forwardY', 'forwardZ', 'upX', 'upY', 'upZ',
-  ].every(audioParam);
-  const legacyPosition = methods.setPosition === 'function';
-  const legacyOrientation = methods.setOrientation === 'function';
-  if ((!modernPosition && !legacyPosition) || (!modernOrientation && !legacyOrientation)) return 'unavailable';
-  if (modernPosition && modernOrientation) return 'modern-audio-param';
-  if (!modernPosition && !modernOrientation) return 'legacy-setters';
-  return 'hybrid';
-}
 
 async function openEngineBrowser(kind: EngineKind): Promise<Browser> {
   if (kind === 'chromium') return chromium.launch({ headless: true });
@@ -223,7 +208,7 @@ async function newPageWithDeadline(context: BrowserContext, label: string): Prom
 }
 
 for (const kind of ['firefox', 'chromium', 'webkit', 'chrome', 'edge', 'opera'] as const) {
-  test(`one-bot Skirmish starts, plays and weapon-reloads in ${kind}`, async ({ browserName }, testInfo) => {
+  test(`one-bot Skirmish starts, plays and weapon-reloads in ${kind}; audio evidence fails closed`, async ({ browserName }, testInfo) => {
     test.skip(browserName !== 'chromium', 'The explicit engine matrix is owned once by the Chromium project.');
     test.skip(!verifyCrossBrowser,
       'Run the explicit Pass 70 cross-browser verifier; ordinary Chromium projects do not launch external engines.');
@@ -242,6 +227,14 @@ for (const kind of ['firefox', 'chromium', 'webkit', 'chrome', 'edge', 'opera'] 
       await preparePlayer(page, baseUrl, `${kind} Solo`, `pass70-${kind}-solo`);
       const first = await startOneBotSkirmish(page);
       const listenerCapabilities = await sampleBrowserAudioListenerCapabilities(page);
+      const audioEvidenceLedger = evaluatePass70BrowserAudioEvidence({
+        engine: kind,
+        harness: `playwright-${kind}`,
+        hostPlatform: process.platform,
+        gameContext: first.audioContext as Record<string, unknown>,
+        audioListenerMode: String(first.audioListenerMode),
+        listenerCapabilities,
+      });
       const receiptPath = testInfo.outputPath(`pass70-${kind}-one-bot-receipt.json`);
       await writeFile(receiptPath, JSON.stringify({
         sourceSha: expectedSourceSha,
@@ -250,14 +243,19 @@ for (const kind of ['firefox', 'chromium', 'webkit', 'chrome', 'edge', 'opera'] 
           ? { executablePath: operaExecutablePath, sha256: operaBinarySha256 }
           : null,
         browserVersion: browser.version(),
+        engineQualification: kind === 'webkit'
+          ? `Playwright WebKit host=${process.platform}; not native Safari. Native Safari audio remains external HITL.`
+          : 'Playwright browser-engine evidence; no claim about native Safari.',
+        audioEvidenceLedger,
         listenerCapabilities,
         ...first,
       }, null, 2), 'utf8');
       await testInfo.attach(`${kind}-one-bot-receipt`, { path: receiptPath, contentType: 'application/json' });
       expect(first).toMatchObject({ botCount: 1, runtimeError: '', systemPaused: false, reloading: false, matchPhase: 'active' });
       expect(first.frameDelta).toBeGreaterThan(20);
-      expect(first.audioListenerMode).toBe(listenerPoseModeFromCapabilities(listenerCapabilities));
-      expect(first.audioContext).toEqual({ source: 'standard', state: 'running' });
+      expect(audioEvidenceLedger.failures, audioEvidenceLedger.qualification).toEqual([]);
+      expect(audioEvidenceLedger.verdict).toBe('PASS');
+      expect(first.audioListenerMode).toBe(audioEvidenceLedger.expectedListenerMode);
       if (kind === 'opera') expect(first.userAgent).toMatch(/\bOPR\//u);
 
       if (kind === 'firefox') {
@@ -271,7 +269,7 @@ for (const kind of ['firefox', 'chromium', 'webkit', 'chrome', 'edge', 'opera'] 
         expect(reloaded).toMatchObject({ botCount: 1, runtimeError: '', systemPaused: false, matchPhase: 'active' });
         expect(reloaded.frameDelta).toBeGreaterThan(20);
         const reloadedCapabilities = await sampleBrowserAudioListenerCapabilities(page);
-        expect(reloaded.audioListenerMode).toBe(listenerPoseModeFromCapabilities(reloadedCapabilities));
+        expect(reloaded.audioListenerMode).toBe(pass70ListenerPoseModeFromCapabilities(reloadedCapabilities));
       }
 
       const screenshot = testInfo.outputPath(`pass70-${kind}-one-bot.png`);
@@ -285,7 +283,7 @@ for (const kind of ['firefox', 'chromium', 'webkit', 'chrome', 'edge', 'opera'] 
   });
 }
 
-test('iPhone 15-class touch/WebKit starts one-bot Skirmish and survives ADS/reload', async ({ browserName }, testInfo) => {
+test('Playwright iPhone 15 touch/WebKit starts one-bot Skirmish and survives ADS/reload; native Safari remains external', async ({ browserName }, testInfo) => {
   test.skip(browserName !== 'chromium', 'The explicit engine matrix is owned once by the Chromium project.');
   test.skip(!verifyCrossBrowser,
     'Run the explicit Pass 70 cross-browser verifier; ordinary Chromium projects do not launch external engines.');
@@ -404,6 +402,14 @@ test('iPhone 15-class touch/WebKit starts one-bot Skirmish and survives ADS/relo
       };
     });
     const listenerCapabilities = await sampleBrowserAudioListenerCapabilities(page);
+    const audioEvidenceLedger = evaluatePass70BrowserAudioEvidence({
+      engine: 'webkit',
+      harness: 'playwright-webkit',
+      hostPlatform: process.platform,
+      gameContext: first.audioContext as Record<string, unknown>,
+      audioListenerMode: String(first.audioListenerMode),
+      listenerCapabilities,
+    });
     const layout = await page.evaluate(() => {
       const visibleBounds = (selector: string) => {
         const node = document.querySelector<HTMLElement>(selector);
@@ -448,6 +454,21 @@ test('iPhone 15-class touch/WebKit starts one-bot Skirmish and survives ADS/relo
         horizontalOverflowPx: Math.max(0, document.documentElement.scrollWidth - innerWidth),
       };
     });
+    const receiptPath = testInfo.outputPath('pass70-iphone15-webkit-receipt.json');
+    await writeFile(receiptPath, JSON.stringify({
+      sourceSha: expectedSourceSha,
+      device: 'Playwright iPhone 15 descriptor',
+      qualification: `Playwright WebKit host=${process.platform}; touch/layout/playability only, not native iOS Safari or native Safari audio`,
+      nativeSafariResidual: 'External HITL on an iPhone 15+ is required for native Safari audio and long-session gameplay.',
+      sustainedAdsInput: 'synthetic touch PointerEvent on the production ADS control after a trusted touchscreen tap',
+      browserVersion: browser.version(),
+      audioEvidenceLedger,
+      listenerCapabilities,
+      layout,
+      frameProbe,
+      ...first,
+    }, null, 2), 'utf8');
+    await testInfo.attach('iphone15-webkit-receipt', { path: receiptPath, contentType: 'application/json' });
     expect(first).toMatchObject({ botCount: 1, runtimeError: '', systemPaused: false, reloading: false, matchPhase: 'active' });
     expect(frameProbe.frames).toBeGreaterThan(30);
     expect(frameProbe.maxGapMs).toBeLessThan(500);
@@ -459,8 +480,9 @@ test('iPhone 15-class touch/WebKit starts one-bot Skirmish and survives ADS/relo
       expect.objectContaining({ control: 'fire', type: 'pointerdown', pointerType: 'touch', trusted: true, ammo: actionBefore.ammo - 1 }),
       expect.objectContaining({ control: 'reload', type: 'pointerdown', pointerType: 'touch', trusted: true, reloading: true }),
     ]));
-    expect(first.audioContext).toEqual({ source: 'standard', state: 'running' });
-    expect(first.audioListenerMode).toBe(listenerPoseModeFromCapabilities(listenerCapabilities));
+    expect(audioEvidenceLedger.failures, audioEvidenceLedger.qualification).toEqual([]);
+    expect(audioEvidenceLedger.verdict).toBe('PASS');
+    expect(first.audioListenerMode).toBe(audioEvidenceLedger.expectedListenerMode);
     expect(first.userAgent).toMatch(/iPhone.*AppleWebKit.*Mobile.*Safari/u);
     expect(layout).toMatchObject({
       viewport: [393, 659], screen: [393, 852], devicePixelRatio: 3,
@@ -477,19 +499,6 @@ test('iPhone 15-class touch/WebKit starts one-bot Skirmish and survives ADS/relo
       expect(surface.right).toBeLessThanOrEqual(393);
       expect(surface.bottom).toBeLessThanOrEqual(659);
     }
-    const receiptPath = testInfo.outputPath('pass70-iphone15-webkit-receipt.json');
-    await writeFile(receiptPath, JSON.stringify({
-      sourceSha: expectedSourceSha,
-      device: 'Playwright iPhone 15 descriptor',
-      qualification: 'Windows WebKit emulation; not native iOS Safari',
-      sustainedAdsInput: 'synthetic touch PointerEvent on the production ADS control after a trusted touchscreen tap',
-      browserVersion: browser.version(),
-      listenerCapabilities,
-      layout,
-      frameProbe,
-      ...first,
-    }, null, 2), 'utf8');
-    await testInfo.attach('iphone15-webkit-receipt', { path: receiptPath, contentType: 'application/json' });
     const screenshot = testInfo.outputPath('pass70-iphone15-webkit.png');
     await page.screenshot({ path: screenshot, animations: 'disabled' });
     await testInfo.attach('iphone15-webkit', { path: screenshot, contentType: 'image/png' });
@@ -779,7 +788,7 @@ test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejo
       expect(probe.runtimeError, `${label}: runtime errors`).toBe('');
       expect(probe.systemPaused, `${label}: no fatal pause`).toBe(false);
       expect(probe.listenerPoseMode, `${label}: exact listener compatibility path`)
-        .toBe(listenerPoseModeFromCapabilities(
+        .toBe(pass70ListenerPoseModeFromCapabilities(
           label === 'host' ? hostListenerCapabilities : guestListenerCapabilities,
         ));
       expect(Number(probe.audioVoices)).toBeLessThanOrEqual(Number(probe.audioVoiceCap));
