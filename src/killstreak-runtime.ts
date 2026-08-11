@@ -43,12 +43,19 @@ export const CARPET_BOMB_SHELL_DROP_LEAD_MS = 420;
 export const CARPET_BOMBER_PREVIOUS_MAX_DAMAGE = 80;
 export const CARPET_BOMBER_DAMAGE_MULTIPLIER = 3;
 export const CARPET_BOMBER_MAX_DAMAGE = CARPET_BOMBER_PREVIOUS_MAX_DAMAGE * CARPET_BOMBER_DAMAGE_MULTIPLIER;
+export const CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS = 5_000;
 /** Recipient-snapshot presentation bounds; these are not gameplay ranges. */
 export const CARE_TARGET_MARKER_MAX_LIFETIME_MS = CARE_AIRCRAFT_DROP_DELAY_MS + CARE_CRATE_DESCENT_MS;
 export const CARPET_TARGET_MARKER_MAX_LIFETIME_MS = 1_000;
 export const SUPPORT_TARGET_CORRIDOR_MAX_LENGTH_M = 200;
 export const SUPPORT_TARGET_CORRIDOR_MAX_HALF_WIDTH_M = 12;
 export const MAX_ACTIVE_SUPPORT_ENTITIES = 32;
+/**
+ * A Carpet activation owns one reservation until its last emitted impact and
+ * every five-second residual-fire patch have expired. Aircraft expiry does not
+ * release this separate authority budget.
+ */
+export const MAX_ACTIVE_CARPET_BOMBER_RESERVATIONS = MAX_ACTIVE_SUPPORT_ENTITIES;
 export const MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP = 64;
 export const MAX_REPLICATED_KILLSTREAK_STREAK = 100_000;
 /** Recipient-protocol bound for a single banked reward count. */
@@ -233,7 +240,7 @@ type CarpetBomberActivation = {
   ownerId: string;
   team: 0 | 1;
   createdAtMs: number;
-  expiresAtMs: number;
+  authorityReleaseAtMs: number | null;
   impacts: readonly SupportVec3[];
   impactAtMs: number[];
   anchor: SupportVec3;
@@ -916,7 +923,7 @@ export class HostKillstreakRuntime {
     this.revision += 1;
   }
 
-  /** Host-owned attribution retained while a Carpet Bomber is producing impacts. */
+  /** Host-owned attribution retained through the final residual-fire expiry. */
   carpetBomberOwner(activationId: string): Readonly<{ ownerId: string; team: 0 | 1 }> | null {
     const activation = this.carpetBombers.get(activationId);
     if (activation) return Object.freeze({ ownerId: activation.ownerId, team: activation.team });
@@ -926,6 +933,10 @@ export class HostKillstreakRuntime {
       }
     }
     return null;
+  }
+
+  carpetBomberReservationCount(): number {
+    return this.carpetBombers.size;
   }
 
   /**
@@ -1156,7 +1167,15 @@ export class HostKillstreakRuntime {
       if (entity.ownerId === actorId) this.expireEntity(entity.id);
     }
     for (const [activationId, activation] of this.carpetBombers) {
-      if (activation.ownerId === actorId) this.carpetBombers.delete(activationId);
+      if (activation.ownerId !== actorId) continue;
+      if (activation.authorityReleaseAtMs === null) {
+        this.carpetBombers.delete(activationId);
+        continue;
+      }
+      // Permanently leaving cancels deferred ordnance, but an already-emitted
+      // residual-fire lane retains its owner and reservation until expiry.
+      activation.nextDropOrdinal = activation.impacts.length;
+      activation.nextImpactOrdinal = activation.impacts.length;
     }
     for (const [activationId, activation] of this.timedActivations) {
       if (activation.ownerId === actorId) this.timedActivations.delete(activationId);
@@ -1241,6 +1260,8 @@ export class HostKillstreakRuntime {
       : actualId === 'care-package' ? 2
       : actualId === 'chopper' || actualId === 'piloted-drone' || actualId === 'carpet-bomber' ? 1 : 0;
     if (this.entities.size + entityNeed > MAX_ACTIVE_SUPPORT_ENTITIES) return reject('support-entity-cap');
+    if (actualId === 'carpet-bomber'
+      && this.carpetBombers.size >= MAX_ACTIVE_CARPET_BOMBER_RESERVATIONS) return reject('carpet-reservation-cap');
     if ([...this.entities.values()].some((entity) => entity.ownerId === actor.actorId
       && (actualId === 'chopper' && entity.kind === 'chopper'
         || actualId === 'piloted-drone' && entity.kind === 'drone' && entity.mode === 'piloted'
@@ -1325,7 +1346,7 @@ export class HostKillstreakRuntime {
       const pathEnd: SupportVec3 = plan.pathEnd;
       this.carpetBombers.set(activationId, {
         activationId, ownerId: actor.actorId, team: actor.team,
-        createdAtMs: nowMs, expiresAtMs: nowMs + 12_000, impacts,
+        createdAtMs: nowMs, authorityReleaseAtMs: null, impacts,
         impactAtMs: impacts.map((_, ordinal) => nowMs + CARPET_TARGET_MARKER_MAX_LIFETIME_MS + ordinal * 180),
         anchor: groundAnchor, pathStart, pathEnd, halfWidthM: plan.halfWidthM,
         nextDropOrdinal: 0, nextImpactOrdinal: 0,
@@ -1735,7 +1756,6 @@ export class HostKillstreakRuntime {
           for (let pending = ordinal; pending < bomber.impactAtMs.length; pending += 1) {
             bomber.impactAtMs[pending] += scheduleShiftMs;
           }
-          bomber.expiresAtMs = Math.max(bomber.expiresAtMs, bomber.impactAtMs.at(-1)! + 1_000);
         }
         const impactAtMs = bomber.impactAtMs[ordinal]!;
         bomber.nextDropOrdinal += 1;
@@ -1756,6 +1776,7 @@ export class HostKillstreakRuntime {
         const position = bomber.impacts[ordinal];
         const impactAtMs = bomber.impactAtMs[ordinal]!;
         bomber.nextImpactOrdinal += 1;
+        bomber.authorityReleaseAtMs = canonicalNowMs + CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS;
         impactEvents.push(Object.freeze({
           activationId,
           source: 'carpet-bomber',
@@ -1779,7 +1800,9 @@ export class HostKillstreakRuntime {
           true,
         );
       }
-      if (canonicalNowMs >= bomber.expiresAtMs || bomber.nextImpactOrdinal >= bomber.impacts.length) this.carpetBombers.delete(activationId);
+      if (bomber.nextImpactOrdinal >= bomber.impacts.length
+        && bomber.authorityReleaseAtMs !== null
+        && canonicalNowMs >= bomber.authorityReleaseAtMs) this.carpetBombers.delete(activationId);
     }
 
     for (const entity of this.entities.values()) {

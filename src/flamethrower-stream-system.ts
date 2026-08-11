@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Team } from './protocol';
+import { CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS } from './killstreak-runtime';
 import { FLAMETHROWER_EFFECT } from './special-weapon-effects';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 
@@ -10,7 +11,7 @@ import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 const HARDWARE_PARTICLES_PER_EMISSION = 4;
 const SOFTWARE_PARTICLES_PER_EMISSION = 2;
 const MIN_STREAM_DISTANCE_M = 0.35;
-export const FLAMETHROWER_GROUND_FIRE_DURATION_MS = 5_000;
+export const FLAMETHROWER_GROUND_FIRE_DURATION_MS = CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS;
 export const FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS = 500;
 export const FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE = 5;
 const GROUND_FIRE_POOL_CAPACITY = 24;

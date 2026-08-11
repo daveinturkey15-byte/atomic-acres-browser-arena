@@ -1662,6 +1662,17 @@ function resetCarpetGroundFireAuthorityTelemetry(): void {
   carpetGroundFireAuthorityTelemetry.maximumActive = 0;
 }
 
+function clearGroundFireAuthorityForMatchTerminal(): void {
+  flamethrowerStreamPresentation.clear();
+  flamethrowerGroundFires.clear();
+  carpetGroundFires.clear();
+  pendingCarpetGroundFireDamageEvents.length = 0;
+  flamethrowerGroundFireBotSnapshot.length = 0;
+  flamethrowerGroundFireBotSnapshotReady = false;
+  carpetGroundFireGuestPresentation.clear();
+  resetCarpetGroundFireAuthorityTelemetry();
+}
+
 function sendCarpetGroundFirePresentationSnapshot(
   forPlayerId: string,
   nowHostTimeMs = performance.now(),
@@ -21137,6 +21148,9 @@ function updateMatchState(now: number): void {
       refreshLocalKillstreakSnapshot(now);
       if (network.role === 'host') broadcastKillstreakState(now);
     }
+    // The frame continues rendering after `ended`; terminate every ground-fire
+    // authority and presentation lane before its unconditional frame update.
+    clearGroundFireAuthorityForMatchTerminal();
     clearGrenades();
     clearFieldSupport();
     const privateMatch = gameMode !== 'solo';

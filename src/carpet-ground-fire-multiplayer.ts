@@ -1,14 +1,12 @@
 import {
   CARPET_BOMBER_IMPACT_COUNT,
-  MAX_ACTIVE_SUPPORT_ENTITIES,
+  CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS,
+  MAX_ACTIVE_CARPET_BOMBER_RESERVATIONS,
   type KillstreakImpactEvent,
 } from './killstreak-runtime';
-import {
-  FLAMETHROWER_GROUND_FIRE_DURATION_MS,
-  type CarpetGroundFirePresentationSnapshot,
-} from './flamethrower-stream-system';
+import type { CarpetGroundFirePresentationSnapshot } from './flamethrower-stream-system';
 
-export const MAX_CONCURRENT_CARPET_BOMBER_ACTIVATIONS = MAX_ACTIVE_SUPPORT_ENTITIES;
+export const MAX_CONCURRENT_CARPET_BOMBER_ACTIVATIONS = MAX_ACTIVE_CARPET_BOMBER_RESERVATIONS;
 export const CARPET_GROUND_FIRE_AUTHORITY_CAPACITY = MAX_CONCURRENT_CARPET_BOMBER_ACTIVATIONS
   * CARPET_BOMBER_IMPACT_COUNT;
 export const CARPET_GROUND_FIRE_STATE_CHUNK_SIZE = 64;
@@ -90,7 +88,7 @@ export class CarpetGroundFireGuestPresentationAdmission {
     if (!Number.isSafeInteger(matchEpoch) || matchEpoch < 0
       || !validSnapshot(snapshot) || !Number.isFinite(nowHostTimeMs)) return null;
     const remainingMs = Math.min(
-      FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+      CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS,
       snapshot.expiresAtHostTimeMs - nowHostTimeMs,
     );
     if (remainingMs <= 0

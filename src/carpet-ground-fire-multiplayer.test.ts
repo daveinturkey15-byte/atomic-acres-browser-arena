@@ -17,8 +17,11 @@ import {
 } from './carpet-ground-fire-multiplayer';
 import {
   CARPET_BOMBER_IMPACT_COUNT,
+  CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS,
+  MAX_ACTIVE_CARPET_BOMBER_RESERVATIONS,
   MAX_ACTIVE_SUPPORT_ENTITIES,
   HostKillstreakRuntime,
+  type KillstreakWorld,
   type KillstreakImpactEvent,
   type KillstreakTarget,
 } from './killstreak-runtime';
@@ -37,6 +40,13 @@ const impact = (overrides: Partial<KillstreakImpactEvent> = {}): KillstreakImpac
   };
   return Object.freeze({ ...base, ...overrides }) as KillstreakImpactEvent;
 };
+
+const DELAYED_FRAME_WORLD: KillstreakWorld = Object.freeze({
+  bounds: Object.freeze({ minX: -40, maxX: 40, minZ: -45, maxZ: 45, floorY: 0, ceilingY: 40 }),
+  targets: Object.freeze([]),
+  hasLineOfSight: () => true,
+  isFlightPositionValid: () => true,
+});
 
 describe('Pass 70 hosted Carpet Bomber residual fire', () => {
   it('applies exactly 10 DPS for five seconds to an in-radius hosted human through canonical receipts', () => {
@@ -104,7 +114,8 @@ describe('Pass 70 hosted Carpet Bomber residual fire', () => {
   });
 
   it('reserves independent authority for every admitted Carpet impact even when Flamethrower is saturated', () => {
-    expect(MAX_CONCURRENT_CARPET_BOMBER_ACTIVATIONS).toBe(MAX_ACTIVE_SUPPORT_ENTITIES);
+    expect(MAX_CONCURRENT_CARPET_BOMBER_ACTIVATIONS).toBe(MAX_ACTIVE_CARPET_BOMBER_RESERVATIONS);
+    expect(MAX_ACTIVE_CARPET_BOMBER_RESERVATIONS).toBe(MAX_ACTIVE_SUPPORT_ENTITIES);
     expect(CARPET_GROUND_FIRE_AUTHORITY_CAPACITY).toBe(
       MAX_ACTIVE_SUPPORT_ENTITIES * CARPET_BOMBER_IMPACT_COUNT,
     );
@@ -166,6 +177,145 @@ describe('Pass 70 hosted Carpet Bomber residual fire', () => {
       pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
       damageSource: 'carpet-bomber', activationId: 'ks-overflow-activation', impactOrdinal: 0,
     })).toBe('exhausted');
+  });
+
+  it('retains all 32 reservations and owners across an exact seven-second delayed-frame two-wave adversary', () => {
+    const runtime = new HostKillstreakRuntime(73);
+    const authorityPool = new FlamethrowerGroundFirePool(CARPET_GROUND_FIRE_AUTHORITY_CAPACITY);
+    const loadout = parseKillstreakLoadout({
+      schemaVersion: 1,
+      slots: ['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke'],
+    });
+    const actorIds = Array.from(
+      { length: MAX_ACTIVE_CARPET_BOMBER_RESERVATIONS },
+      (_, index) => `delayed-owner-${index.toString().padStart(2, '0')}`,
+    );
+    const firstWaveOwners = new Map<string, Readonly<{ ownerId: string; team: 0 | 1 }>>();
+    for (const [index, actorId] of actorIds.entries()) {
+      const team = index % 2 as 0 | 1;
+      runtime.registerActor(actorId, team, 1, loadout);
+      expect(runtime.grantTrainingReward(actorId, 1, 'carpet-bomber', {
+        arenaId: 'gun-range', stationKind: 'secure-test-bay', authorityRole: 'host',
+      })).toEqual({ accepted: true, reason: 'accepted' });
+      const admission = runtime.activate({
+        by: actorId, matchEpoch: 73, lifeId: 1, sequence: 1, slot: 1,
+        activationId: `delayed-wave-one-${index}`, expectedId: 'carpet-bomber',
+        anchor: [0, 0, 0],
+      }, 1_000, DELAYED_FRAME_WORLD);
+      expect(admission).toMatchObject({ accepted: true, activatedId: 'carpet-bomber' });
+      firstWaveOwners.set(admission.activationId!, Object.freeze({ ownerId: actorId, team }));
+    }
+    expect(runtime.carpetBomberReservationCount()).toBe(MAX_ACTIVE_CARPET_BOMBER_RESERVATIONS);
+    runtime.advance(1_000, DELAYED_FRAME_WORLD);
+
+    // Exactly one aircraft lifetime later, the delayed host step expires all
+    // aircraft while shifting their still-pending impact schedules forward.
+    runtime.advance(8_000, DELAYED_FRAME_WORLD);
+    expect(runtime.snapshotFor(actorIds[0]!, 8_000).entities).toHaveLength(0);
+    expect(runtime.carpetBomberReservationCount()).toBe(MAX_ACTIVE_CARPET_BOMBER_RESERVATIONS);
+    for (const [index, actorId] of actorIds.entries()) {
+      expect(runtime.grantTrainingReward(actorId, 1, 'carpet-bomber', {
+        arenaId: 'gun-range', stationKind: 'secure-test-bay', authorityRole: 'host',
+      })).toEqual({ accepted: true, reason: 'accepted' });
+      expect(runtime.activate({
+        by: actorId, matchEpoch: 73, lifeId: 1, sequence: 2, slot: 1,
+        activationId: `delayed-wave-two-${index}`, expectedId: 'carpet-bomber',
+        anchor: [0, 0, 0],
+      }, 8_001, DELAYED_FRAME_WORLD)).toMatchObject({
+        accepted: false,
+        reason: 'carpet-reservation-cap',
+      });
+    }
+
+    const seenImpactIdentities = new Set<string>();
+    const finalImpactAtByActivation = new Map<string, number>();
+    let actionNonce = 0;
+    let simulationNow = 8_020;
+    for (; simulationNow <= 30_000
+      && seenImpactIdentities.size < CARPET_GROUND_FIRE_AUTHORITY_CAPACITY;
+      simulationNow += 20) {
+      authorityPool.update(
+        simulationNow,
+        FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
+        () => undefined,
+      );
+      const step = runtime.advance(simulationNow, DELAYED_FRAME_WORLD);
+      for (const event of step.impactEvents) {
+        if (event.phase !== 'impact') continue;
+        const expectedOwner = firstWaveOwners.get(event.activationId);
+        expect(runtime.carpetBomberOwner(event.activationId)).toEqual(expectedOwner);
+        expect(authorityPool.ignite({
+          ownerId: expectedOwner!.ownerId,
+          ownerTeam: expectedOwner!.team,
+          point: new THREE.Vector3(...event.position),
+          actionNonce: ++actionNonce,
+          now: simulationNow,
+          durationMs: CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS,
+          pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
+          damageSource: 'carpet-bomber',
+          activationId: event.activationId,
+          impactOrdinal: event.ordinal,
+        })).toBe('created');
+        seenImpactIdentities.add(`${event.activationId}:${event.ordinal}`);
+        finalImpactAtByActivation.set(event.activationId, simulationNow);
+      }
+    }
+    expect(seenImpactIdentities.size).toBe(CARPET_GROUND_FIRE_AUTHORITY_CAPACITY);
+    expect(finalImpactAtByActivation.size).toBe(MAX_ACTIVE_CARPET_BOMBER_RESERVATIONS);
+    const [lastActivationId, lastImpactAt] = [...finalImpactAtByActivation.entries()]
+      .sort((left, right) => right[1] - left[1])[0]!;
+    expect(runtime.carpetBomberOwner(lastActivationId)).toEqual(firstWaveOwners.get(lastActivationId));
+
+    runtime.advance(lastImpactAt + CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS - 1, DELAYED_FRAME_WORLD);
+    expect(runtime.carpetBomberOwner(lastActivationId)).toEqual(firstWaveOwners.get(lastActivationId));
+    runtime.advance(lastImpactAt + CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS, DELAYED_FRAME_WORLD);
+    authorityPool.update(
+      lastImpactAt + CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS,
+      FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
+      () => undefined,
+    );
+    expect(runtime.carpetBomberOwner(lastActivationId)).toBeNull();
+    expect(runtime.carpetBomberReservationCount()).toBe(0);
+    expect(authorityPool.activeCount()).toBe(0);
+
+    for (const [index, actorId] of actorIds.entries()) {
+      expect(runtime.activate({
+        by: actorId, matchEpoch: 73, lifeId: 1, sequence: 2, slot: 1,
+        activationId: `delayed-wave-two-${index}`, expectedId: 'carpet-bomber',
+        anchor: [0, 0, 0],
+      }, lastImpactAt + CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS + 1, DELAYED_FRAME_WORLD))
+        .toMatchObject({ accepted: true, activatedId: 'carpet-bomber' });
+    }
+    expect(runtime.carpetBomberReservationCount()).toBe(MAX_ACTIVE_CARPET_BOMBER_RESERVATIONS);
+  });
+
+  it('cancels deferred ordnance but retains an emitted residual reservation when its owner permanently leaves', () => {
+    const runtime = new HostKillstreakRuntime(73);
+    const actorId = 'departing-carpet-owner';
+    runtime.registerActor(actorId, 1, 1, parseKillstreakLoadout({
+      schemaVersion: 1,
+      slots: ['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke'],
+    }));
+    runtime.grantTrainingReward(actorId, 1, 'carpet-bomber', {
+      arenaId: 'gun-range', stationKind: 'secure-test-bay', authorityRole: 'host',
+    });
+    const activation = runtime.activate({
+      by: actorId, matchEpoch: 73, lifeId: 1, sequence: 1, slot: 1,
+      activationId: 'departing-carpet-request', expectedId: 'carpet-bomber', anchor: [0, 0, 0],
+    }, 1_000, DELAYED_FRAME_WORLD);
+    runtime.advance(1_000, DELAYED_FRAME_WORLD);
+    runtime.advance(1_580, DELAYED_FRAME_WORLD);
+    expect(runtime.advance(2_000, DELAYED_FRAME_WORLD).impactEvents)
+      .toContainEqual(expect.objectContaining({ activationId: activation.activationId, phase: 'impact', ordinal: 0 }));
+
+    runtime.unregisterActor(actorId);
+    expect(runtime.carpetBomberReservationCount()).toBe(1);
+    expect(runtime.carpetBomberOwner(activation.activationId!)).toEqual({ ownerId: actorId, team: 1 });
+    expect(runtime.advance(6_999, DELAYED_FRAME_WORLD).impactEvents).toEqual([]);
+    expect(runtime.carpetBomberReservationCount()).toBe(1);
+    runtime.advance(7_000, DELAYED_FRAME_WORLD);
+    expect(runtime.carpetBomberReservationCount()).toBe(0);
+    expect(runtime.carpetBomberOwner(activation.activationId!)).toBeNull();
   });
 
   it('deduplicates Carpet authority identity so a replay cannot double the ten damage pulses', () => {
@@ -278,5 +428,19 @@ describe('Pass 70 hosted Carpet Bomber residual fire', () => {
     const resumeEnd = main.indexOf('\nfunction acceptGuestResumeAck(', resumeStart);
     expect(main.slice(resumeStart, resumeEnd)).toContain('sendCarpetGroundFirePresentationSnapshot(playerId');
     expect(main).toContain('Active support entities deliberately terminate across host replacement');
+
+    const terminalClearStart = main.indexOf('function clearGroundFireAuthorityForMatchTerminal(');
+    const terminalClearEnd = main.indexOf('\nfunction sendCarpetGroundFirePresentationSnapshot(', terminalClearStart);
+    const terminalClear = main.slice(terminalClearStart, terminalClearEnd);
+    expect(terminalClear).toContain('flamethrowerStreamPresentation.clear()');
+    expect(terminalClear).toContain('flamethrowerGroundFires.clear()');
+    expect(terminalClear).toContain('carpetGroundFires.clear()');
+    expect(terminalClear).toContain('pendingCarpetGroundFireDamageEvents.length = 0');
+    expect(terminalClear).toContain('carpetGroundFireGuestPresentation.clear()');
+    expect(terminalClear).toContain('resetCarpetGroundFireAuthorityTelemetry()');
+    const matchStateStart = main.indexOf('function updateMatchState(');
+    const endedStart = main.indexOf("if (matchState.phase === 'ended') {", matchStateStart);
+    const endedEnd = main.indexOf('\n    const privateMatch = ', endedStart);
+    expect(main.slice(endedStart, endedEnd)).toContain('clearGroundFireAuthorityForMatchTerminal()');
   });
 });
