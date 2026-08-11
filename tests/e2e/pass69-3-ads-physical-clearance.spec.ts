@@ -124,7 +124,8 @@ test('carbine and Mini Uzi expose a physical ADS corridor without fading their o
     }, weapon);
     await page.waitForFunction((weaponId) => {
       const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-      return state.player.weapon === weaponId
+      return state.weaponReady === true
+        && state.player.weapon === weaponId
         && state.weaponPresentation.weapon === weaponId
         && state.weaponPresentation.adsProgress < 0.02
         && (state.weaponPresentation as any).opticMaterialSemantics.materialCount > 0;
@@ -235,7 +236,9 @@ test('carbine and Mini Uzi expose a physical ADS corridor without fading their o
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.equipWeapon('pistol'));
   await page.waitForFunction(() => {
     const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-    return state.player.weapon === 'pistol' && state.weaponPresentation.weapon === 'pistol';
+    return state.weaponReady === true
+      && state.player.weapon === 'pistol'
+      && state.weaponPresentation.weapon === 'pistol';
   });
   const afterSwitch = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot() as any);
   const switchedMaterials = opticMaterialsFor(afterSwitch);
@@ -245,7 +248,9 @@ test('carbine and Mini Uzi expose a physical ADS corridor without fading their o
     await page.evaluate((weaponId) => window.__ATOMIC_ACRES_DEBUG__.equipWeapon(weaponId), weapon);
     await page.waitForFunction((weaponId) => {
       const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-      return state.player.weapon === weaponId && state.weaponPresentation.weapon === weaponId;
+      return state.weaponReady === true
+        && state.player.weapon === weaponId
+        && state.weaponPresentation.weapon === weaponId;
     }, weapon);
     const reEquipped = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot() as any);
     expect(opticMaterialsFor(reEquipped), `${weapon}: switch-back preserves exact material semantics`)

@@ -58,6 +58,7 @@ describe('Pass 69.3 physical ADS evidence boundary', () => {
       "evidenceScope: 'live-physical-viewmodel-clearance'",
       "expect(hipMaterials.contract).toBe('semantic-first-person-optic-window-v1')",
       "expect(hipMaterials.markedMaterialCount, `${weapon}: no fallback or unprocessed visible material`)",
+      'return state.weaponReady === true',
       "expect(adsMaterials, `${weapon}: ADS does not mutate any material semantics`).toEqual(hipMaterials)",
       "expect(hipMaterials.opticWindowCount, `${weapon}: exact semantic lens expectation`).toBe(weapon === 'carbine' ? 1 : 0)",
       "contract: 'camera-ndc-centre-reticle-window-rays-v2'",
