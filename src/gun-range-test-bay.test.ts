@@ -4,14 +4,18 @@ import { PASS65_KILLSTREAK_CATALOG } from './killstreak-catalog';
 import { WEAPON_IDS } from './protocol';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
+  GUN_RANGE_TEST_BAY_DOOR_BALLISTIC_ID,
   GUN_RANGE_TEST_BAY_DOOR_OPEN_MS,
+  GUN_RANGE_TEST_BAY_STRUCTURE,
   advanceGunRangeTestBayDoor,
   createGunRangeTestBayDoorState,
+  gunRangeTestBayDoorDynamicBallisticSurfaces,
   gunRangeTestBayDoorDynamicColliders,
   gunRangeTestBayDoorLeafBounds,
   gunRangeTestBayDummyPose,
   gunRangeTestBayRenderedDummyPose,
   gunRangeTestBayFrozenTimer,
+  gunRangeTestBayStructureBounds,
   nearestGunRangeTestBaySupportStation,
   nearestGunRangeTestBayWeaponStation,
 } from './gun-range-test-bay';
@@ -40,6 +44,25 @@ describe('Gun Range grey test-bay authority', () => {
     expect(GUN_RANGE_TEST_BAY_CONTRACT.corridor.clearWidthM).toBeGreaterThanOrEqual(7);
     expect(GUN_RANGE_TEST_BAY_CONTRACT.corridor.clearHeightM).toBeGreaterThanOrEqual(4.5);
     expect(GUN_RANGE_TEST_BAY_CONTRACT.bay.clearFloorAreaM2).toBeGreaterThan(3_000);
+    expect(GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds).toEqual({
+      minX: 52, maxX: 100, minY: 0, maxY: 25.175, minZ: -26, maxZ: 38,
+    });
+  });
+
+  it('defines unique finite core structure with no authority-only duplicate list', () => {
+    expect(new Set(GUN_RANGE_TEST_BAY_STRUCTURE.map(({ id }) => id)).size).toBe(GUN_RANGE_TEST_BAY_STRUCTURE.length);
+    for (const definition of GUN_RANGE_TEST_BAY_STRUCTURE) {
+      const bounds = gunRangeTestBayStructureBounds(definition);
+      expect(Object.values(bounds).every(Number.isFinite), definition.id).toBe(true);
+      expect(bounds.maxX).toBeGreaterThan(bounds.minX);
+      expect(bounds.maxY!).toBeGreaterThan(bounds.minY!);
+      expect(bounds.maxZ).toBeGreaterThan(bounds.minZ);
+    }
+    expect(GUN_RANGE_TEST_BAY_STRUCTURE.filter(({ material }) => material === 'floor').map(({ id }) => id)).toEqual([
+      'gun-range-test-bay-corridor-floor',
+      'gun-range-test-bay-floor',
+    ]);
+    expect(GUN_RANGE_TEST_BAY_STRUCTURE.some(({ id }) => id === 'gun-range-test-bay-door-bulkhead')).toBe(true);
   });
 
   it('projects every canonical weapon and killstreak into one deterministic station plan', () => {
@@ -92,10 +115,20 @@ describe('Gun Range grey test-bay authority', () => {
     const movingBounds = gunRangeTestBayDoorLeafBounds(halfway.state);
     expect(movingBounds.minY).toBeCloseTo((closedBounds.minY ?? 0) + GUN_RANGE_TEST_BAY_CONTRACT.door.travelM / 2);
     expect(gunRangeTestBayDoorDynamicColliders(halfway.state)).toHaveLength(1);
+    expect(gunRangeTestBayDoorDynamicBallisticSurfaces(halfway.state)).toEqual([
+      expect.objectContaining({
+        id: GUN_RANGE_TEST_BAY_DOOR_BALLISTIC_ID,
+        name: 'gun-range-test-bay-secure-door-leaf',
+        material: 'structural-metal',
+        classification: 'explicit',
+        bounds: movingBounds,
+      }),
+    ]);
 
     const opened = advanceGunRangeTestBayDoor(halfway.state, 500 + GUN_RANGE_TEST_BAY_DOOR_OPEN_MS, near);
     expect(opened.state).toMatchObject({ phase: 'open', openness: 1, thumpSequence: 1 });
     expect(gunRangeTestBayDoorDynamicColliders(opened.state)).toHaveLength(0);
+    expect(gunRangeTestBayDoorDynamicBallisticSurfaces(opened.state)).toHaveLength(0);
 
     const retained = advanceGunRangeTestBayDoor(opened.state, 1_500, { x: 54.5, y: 1.7, z: 12 });
     expect(retained.state.phase).toBe('open');

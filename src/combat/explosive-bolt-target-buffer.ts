@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export type ExplosiveBoltTargetKind = 'player' | 'remote' | 'bot';
+export type ExplosiveBoltTargetKind = 'player' | 'remote' | 'bot' | 'practice-target';
 
 /**
  * A target snapshot leased from {@link ExplosiveBoltTargetBuffer}.

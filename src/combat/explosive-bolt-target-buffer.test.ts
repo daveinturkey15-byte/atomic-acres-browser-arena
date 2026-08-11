@@ -6,19 +6,22 @@ type TestTeam = 0 | 1;
 const source = readFileSync(new URL('./explosive-bolt-target-buffer.ts', import.meta.url), 'utf8');
 
 describe('ExplosiveBoltTargetBuffer', () => {
-  it('preserves authored player, remote, and bot order and exact target fields', () => {
+  it('preserves authored player, remote, bot, and practice-target order and exact target fields', () => {
     const buffer = new ExplosiveBoltTargetBuffer<TestTeam>();
     buffer.append('local', 0, 7, 'player', { x: 1, y: 2, z: 3 }, -0.62);
     buffer.append('remote', 1, 8, 'remote', { x: 4, y: 5, z: 6 }, 1);
     buffer.append('bot', 0, 9, 'bot', { x: 7, y: 8, z: 9 }, 1);
+    buffer.append('test-dummy-alpha', 1, 10, 'practice-target', { x: 10, y: 0, z: 12 }, 1.05);
 
-    expect(buffer.length).toBe(3);
+    expect(buffer.length).toBe(4);
     expect(buffer.at(0)).toMatchObject({ id: 'local', team: 0, lifeId: 7, kind: 'player' });
     expect(buffer.at(0).position.toArray()).toEqual([1, 1.38, 3]);
     expect(buffer.at(1)).toMatchObject({ id: 'remote', team: 1, lifeId: 8, kind: 'remote' });
     expect(buffer.at(1).position.toArray()).toEqual([4, 6, 6]);
     expect(buffer.at(2)).toMatchObject({ id: 'bot', team: 0, lifeId: 9, kind: 'bot' });
     expect(buffer.at(2).position.toArray()).toEqual([7, 9, 9]);
+    expect(buffer.at(3)).toMatchObject({ id: 'test-dummy-alpha', team: 1, lifeId: 10, kind: 'practice-target' });
+    expect(buffer.at(3).position.toArray()).toEqual([10, 1.05, 12]);
     expect(buffer.findIndex('remote', 8)).toBe(1);
     expect(buffer.findIndex('remote', 7)).toBe(-1);
   });

@@ -2847,6 +2847,7 @@ function invalidateActiveWorldCollisionCache(): void {
 }
 
 let gunRangeTestBayDoorColliders: readonly DynamicWorldCollider[] = [];
+let gunRangeTestBayDoorBallisticSurfaces: readonly BallisticSurface[] = [];
 let gunRangeTestBayDoorColliderArena: THREE.Object3D | null = null;
 let gunRangeTestBayPlayerWasInside = false;
 
@@ -3237,9 +3238,12 @@ function activeBallisticSurfaces(activeArena: ArenaMap = arena): readonly Ballis
     (surface) => (!surface.breakableWindowId || !brokenWindowIds.has(surface.breakableWindowId))
       && !replacedHouseSurfaces.has(surface.id),
   );
+  const doorSurfaces = activeArena === arena && selectedArena.id === 'gun-range'
+    ? gunRangeTestBayDoorBallisticSurfaces
+    : [];
   return activeArena === arena && interactiveWorldRuntime
-    ? [...staticSurfaces, ...interactiveWorldRuntime.collisions().ballisticSurfaces]
-    : staticSurfaces;
+    ? [...staticSurfaces, ...doorSurfaces, ...interactiveWorldRuntime.collisions().ballisticSurfaces]
+    : [...staticSurfaces, ...doorSurfaces];
 }
 
 function activeRaycastMeshes(activeArena: ArenaMap = arena): THREE.Object3D[] {
@@ -15748,6 +15752,7 @@ function melee(): void {
 }
 
 const explosiveBoltTargetBuffer = new ExplosiveBoltTargetBuffer<Team>();
+const explosiveBoltPracticeTargetPositionScratch = new THREE.Vector3();
 
 function fillExplosiveBoltTargets(ownerId: string, ownerTeam: Team): number {
   explosiveBoltTargetBuffer.reset();
@@ -15762,6 +15767,20 @@ function fillExplosiveBoltTargets(ownerId: string, ownerTeam: Team): number {
   for (const bot of bots.values()) {
     if (bot.id === ownerId || !bot.alive || !areCombatantsHostile(ownerId, ownerTeam, bot.id, bot.team)) continue;
     explosiveBoltTargetBuffer.append(bot.id, bot.team, bot.continuity, 'bot', bot.position, 1);
+  }
+  if (selectedArena.id === 'gun-range') {
+    for (const target of arena.targets) {
+      if (!target.active || target.kind !== 'training-dummy') continue;
+      target.root.getWorldPosition(explosiveBoltPracticeTargetPositionScratch);
+      explosiveBoltTargetBuffer.append(
+        target.id,
+        ownerTeam,
+        Math.max(0, Math.floor(target.respawnAt)),
+        'practice-target',
+        explosiveBoltPracticeTargetPositionScratch,
+        1.05,
+      );
+    }
   }
   return explosiveBoltTargetBuffer.length;
 }
@@ -15970,6 +15989,16 @@ function applyExplosiveBoltTargetDamage(
     ), 'explosive-crossbow');
     if (bot) applyBotDamage(bot, authoredDamage, 'body', cause, bolt.ownerId, {
       distanceMeters: explosiveBoltTargetDistance(origin, targetX, targetY, targetZ),
+    });
+    return;
+  }
+  if (targetKind === 'practice-target') {
+    const practiceTarget = selectedArena.id === 'gun-range'
+      ? arena.targets.find((candidate) => candidate.id === targetId && candidate.kind === 'training-dummy')
+      : undefined;
+    if (practiceTarget?.active) hitPracticeTarget(practiceTarget.id, boundedDamage, 'body', {
+      distanceMeters: explosiveBoltTargetDistance(origin, targetX, targetY, targetZ),
+      weaponOrEffect: 'explosive-crossbow',
     });
     return;
   }
@@ -23400,6 +23429,7 @@ function frame(now: number, scheduleNext = true): void {
       const doorArenaChanged = gunRangeTestBayDoorColliderArena !== arena.root;
       gunRangeTestBayDoorColliderArena = arena.root;
       gunRangeTestBayDoorColliders = doorFrame.dynamicColliders;
+      gunRangeTestBayDoorBallisticSurfaces = doorFrame.dynamicBallisticSurfaces;
       if (doorFrame.audioIntent) {
         const trigger = GUN_RANGE_TEST_BAY_CONTRACT.door.trigger;
         audio.testBayDoorThump(player.position.distanceTo(new THREE.Vector3(trigger.x, trigger.y, trigger.z)));

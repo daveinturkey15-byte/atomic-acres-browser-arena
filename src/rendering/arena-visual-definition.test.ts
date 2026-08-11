@@ -44,6 +44,8 @@ describe('Pass 64 arena visual definitions', () => {
     const neonLanes = definition.reviewCameras.find((entry) => entry.id === 'gun-range-neon-lanes');
     const lateralTargets = definition.reviewCameras.find((entry) => entry.id === 'gun-range-lateral-targets');
     const testBayCorridor = definition.reviewCameras.find((entry) => entry.id === 'gun-range-test-bay-corridor');
+    const testBayDoorApproach = definition.reviewCameras.find((entry) => entry.id === 'gun-range-test-bay-door-approach');
+    const testBayDoorBayFace = definition.reviewCameras.find((entry) => entry.id === 'gun-range-test-bay-door-bay-face');
     const testBayOverview = definition.reviewCameras.find((entry) => entry.id === 'gun-range-test-bay-overview');
     expect(overview).toBeDefined();
     expect(overview!.position[1]).toBeLessThan(7.1);
@@ -63,6 +65,16 @@ describe('Pass 64 arena visual definitions', () => {
       position: [24, 2.25, 10.25],
       target: [51.5, 2.15, 12],
       purpose: 'geometry',
+    });
+    expect(testBayDoorApproach).toMatchObject({
+      position: [44.5, 2.3, 10.1],
+      target: [51.5, 3.05, 12],
+      purpose: 'geometry',
+    });
+    expect(testBayDoorBayFace).toMatchObject({
+      position: [59, 2.55, 13.9],
+      target: [51.5, 3.05, 12],
+      purpose: 'light-occlusion',
     });
     expect(testBayOverview).toMatchObject({
       position: [92, 4.3, 34],

@@ -33,6 +33,13 @@ test('renders the five-second Gun Range tunnel, grey test bay, and slow unarmed 
   expect(first.targets.every((target: { active: boolean; health: number; maxHealth: number; visible: boolean }) => (
     target.active && target.visible && target.health === 300 && target.maxHealth === 300
   ))).toBe(true);
+  const output = resolve(process.cwd(), 'artifacts/pass66/gun-range-test-bay');
+  mkdirSync(output, { recursive: true });
+  const setReviewCameraAndWait = async (cameraId: string): Promise<void> => {
+    expect(await page.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.setArenaReviewCamera(id), cameraId)).toBe(true);
+    const beforeFrame = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount);
+    await page.waitForFunction((frame) => window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount > frame, beforeFrame);
+  };
 
   // The secure leaf begins as real movement authority, then travels clear when
   // the player reaches its proximity trigger. This proves the main-loop/Rapier
@@ -40,10 +47,16 @@ test('renders the five-second Gun Range tunnel, grey test bay, and slow unarmed 
   await expect.poll(async () => page.evaluate(() => (
     window.__ATOMIC_ACRES_DEBUG__.collisionProbeAt(51.5, 1.7, 12)
   ))).toBe(true);
+  await setReviewCameraAndWait('gun-range-test-bay-door-approach');
+  await page.screenshot({ path: resolve(output, 'gun-range-test-bay-door-closed-approach-2560x1440.png'), animations: 'disabled' });
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(null));
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(48.75, 1.7, 12, -Math.PI / 2, 0));
   await expect.poll(async () => page.evaluate(() => (
     window.__ATOMIC_ACRES_DEBUG__.collisionProbeAt(51.5, 1.7, 12)
   )), { timeout: 3_000 }).toBe(false);
+  await setReviewCameraAndWait('gun-range-test-bay-door-bay-face');
+  await page.screenshot({ path: resolve(output, 'gun-range-test-bay-door-open-bay-face-2560x1440.png'), animations: 'disabled' });
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(null));
 
   await page.waitForTimeout(750);
   const secondPositions = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().rangePractice.targets
@@ -323,12 +336,13 @@ test('renders the five-second Gun Range tunnel, grey test bay, and slow unarmed 
   await expect(page.locator('#gunner-cockpit-hud')).toBeHidden();
   await expect(page.locator('html')).toHaveAttribute('data-killstreak-possession', 'none');
 
-  const output = resolve(process.cwd(), 'artifacts/pass66/gun-range-test-bay');
-  mkdirSync(output, { recursive: true });
-  for (const cameraId of ['gun-range-test-bay-corridor', 'gun-range-test-bay-overview']) {
-    expect(await page.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.setArenaReviewCamera(id), cameraId)).toBe(true);
-    const beforeFrame = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount);
-    await page.waitForFunction((frame) => window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount > frame, beforeFrame);
+  for (const cameraId of [
+    'gun-range-test-bay-corridor',
+    'gun-range-test-bay-door-approach',
+    'gun-range-test-bay-door-bay-face',
+    'gun-range-test-bay-overview',
+  ]) {
+    await setReviewCameraAndWait(cameraId);
     const review = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().render.playableScene.deterministicReview);
     expect(review.cameraId).toBe(cameraId);
     await page.screenshot({ path: resolve(output, `${cameraId}-2560x1440.png`), animations: 'disabled' });
