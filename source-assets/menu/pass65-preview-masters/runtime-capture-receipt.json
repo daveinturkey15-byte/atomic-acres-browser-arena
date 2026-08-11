@@ -1,9 +1,9 @@
 {
   "schemaVersion": 4,
   "captureId": "pass66-authoritative-runtime-menu-preview-capture-v2",
-  "generatedAt": "2026-08-02",
+  "generatedAt": "2026-08-11",
   "recipeId": "pass66-authoritative-runtime-menu-preview-v2",
-  "recipeDigest": "08fad728ae8a1c2726781903ba3a079a8245ddb0120434aee14163bde57423e0",
+  "recipeDigest": "2f009b8d8db81f33de0d7bbace848f3e51cc13de3932a3a209e0c716d1c3e778",
   "source": "authoritative-runtime-arena",
   "backendRequired": "webgpu",
   "viewport": [
@@ -272,11 +272,11 @@
     "captureTools": [
       {
         "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-        "sha256": "73c9b7ca78b73b5a7e1a24323afbddca4a176594367c5fe1d95a56e5c04cafb9"
+        "sha256": "0cf83fd5e94434951bc6949d90a6aa5db3625707e3cf0298d0a8d59dcc47ef88"
       },
       {
         "path": "scripts/assets/pass65-menu-preview-integrity.mjs",
-        "sha256": "dfe3286f6003f810e1abefa875d39c661453b54d39f2c0e8d6724c0b65590da1"
+        "sha256": "9125ec7ef5d8aea18ff75c33c68dfec20160926c86e40a783ab766177a5c6b1d"
       },
       {
         "path": "scripts/assets/pass65-menu-preview-integrity.d.mts",
@@ -407,9 +407,9 @@
         "public/assets/original/skies/terminal-airport-dawn.webp",
         "public/assets/third-party/quaternius/animated-guns"
       ],
-      "fileCount": 1037,
-      "totalBytes": 112418971,
-      "treeSha256": "bf97e55dfb3857a04a26f7fca568f6cbec8bfaeda84e6aff05bf62d47d69dac3",
+      "fileCount": 1069,
+      "totalBytes": 112718512,
+      "treeSha256": "48d248481fac258454ae273757938f948ebe72a944d5063cecf8e26e107f5dc2",
       "files": [
         {
           "path": "public/assets/original/models/atomic-acres-blender-arena.glb",
@@ -423,13 +423,13 @@
         },
         {
           "path": "public/assets/original/models/operators/pass65-first-person-arms-lod0.glb",
-          "sizeBytes": 406008,
-          "sha256": "953a113e4cfd1f79f0394a7e8b1c601590edc85be52906eb5397e7291ab5a707"
+          "sizeBytes": 343572,
+          "sha256": "ff4db4971cab4ca8bca20941ad090eb12b3d94b21b6e981904895e19f15885a6"
         },
         {
           "path": "public/assets/original/models/operators/pass65-first-person-arms-lod1.glb",
-          "sizeBytes": 387520,
-          "sha256": "addd8e4da4dc4659a6b84ece3a084360c495cfd1876b6f68dcccc058346bfaa0"
+          "sizeBytes": 327824,
+          "sha256": "9672274b3832d5021ec069791a91bb75127e465088ca992b997e99a8c86fd04c"
         },
         {
           "path": "public/assets/original/models/operators/pass65-third-person-operator-lod0.glb",
@@ -523,18 +523,18 @@
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-          "sizeBytes": 951740,
-          "sha256": "fba45762d0fb0cb7cc68a58e791b50fc8243a03489ca528d3273e2fba5e1afcb"
+          "sizeBytes": 958824,
+          "sha256": "990ac82639ccc68e6dd480710355d16e1e5a7e3100cf10d218e26122895d303c"
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod1.glb",
-          "sizeBytes": 844688,
-          "sha256": "c737b8b6c332ecf414890a170c07852197b6223178947ff17c1b0ec01ae8237d"
+          "sizeBytes": 835504,
+          "sha256": "e3a3abd354d3251102f52e83b2988ee2518aba4a4af24bcab4caa6a93a2457c2"
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod2.glb",
-          "sizeBytes": 562896,
-          "sha256": "a96352c773caf04c8649253d22fa2420a14963d7344b94b9a928aa1b867c5115"
+          "sizeBytes": 565304,
+          "sha256": "a4253fea3264fabe205b0384e8c2a77cb4f78ab737ce64b543396dd88bb9a514"
         },
         {
           "path": "public/assets/original/models/weapons/pass65-crossbow/pass65-crossbow-drop-lod0.glb",
@@ -1258,8 +1258,8 @@
         },
         {
           "path": "public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-baseColor.png",
-          "sizeBytes": 1098631,
-          "sha256": "31525a7731899098f1142756cb503f14e7af6930165c3035ba812ab25b5680ea"
+          "sizeBytes": 760659,
+          "sha256": "079a08dd975d6ae93e6d70b7423a165b0991608ed630cae47bf91cf012939b5d"
         },
         {
           "path": "public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-metallic.png",
@@ -1678,8 +1678,8 @@
         },
         {
           "path": "public/assets/original/textures/support/pass65-chopper-albedo.png",
-          "sizeBytes": 216502,
-          "sha256": "3e99137cf87a5968a68cf675fc7ade2598341f8871ecd32bf51a0e54683dfef2"
+          "sizeBytes": 229357,
+          "sha256": "245e185d4578825299e5b7ec2f03ae9af653b5b9e0db1f18cc5120d885920737"
         },
         {
           "path": "public/assets/original/textures/support/pass65-chopper-emissive.png",
@@ -2713,8 +2713,8 @@
         },
         {
           "path": "src/acceptance-gate.test.ts",
-          "sizeBytes": 8360,
-          "sha256": "ae93a3c2c984088dd862b0e4e796a5bc70b6c367f89135c9af969c498747cd32"
+          "sizeBytes": 8478,
+          "sha256": "8bcd8c19fb509298aae0b703bde238c5a7fcf5936458cc92fe50968ff62efb37"
         },
         {
           "path": "src/adaptive-quality.test.ts",
@@ -2728,8 +2728,8 @@
         },
         {
           "path": "src/additional-maps-rigged-dummy.test.ts",
-          "sizeBytes": 3424,
-          "sha256": "b8c7947d6fe37fe1c3e23d73e24e2ad625c994d7fb8378df88ae06d392afc8b6"
+          "sizeBytes": 22103,
+          "sha256": "d2a856826c200c6187c997383486af121753717b8698ec1c2058880e1bba1bde"
         },
         {
           "path": "src/additional-maps.test.ts",
@@ -2738,18 +2738,18 @@
         },
         {
           "path": "src/additional-maps.ts",
-          "sizeBytes": 175958,
-          "sha256": "0d8903715c7d3af80764bd6f2384cf0a0291c201ea7ea41284f6b6fc5285175f"
+          "sizeBytes": 177796,
+          "sha256": "e26439c256aa7e375d0e0ea8d9c0dde4c88609dadf7818f5937d399d871a29db"
         },
         {
           "path": "src/admission-debug-contract.test.ts",
-          "sizeBytes": 7202,
-          "sha256": "a84cca23d245b1f51a368ef93a9cc072bc38a296ce7e4351852ac7e1a77d584c"
+          "sizeBytes": 7221,
+          "sha256": "7b566b082400528c0f4732ac24ff66cd2b5f32ea845f85da6b23ebe96ed81ec8"
         },
         {
           "path": "src/ads-physical-aperture.test.ts",
-          "sizeBytes": 3450,
-          "sha256": "2c222f18599dfa5d5686d3232ac6188098dab42c7590b936ecb1e54694035a0a"
+          "sizeBytes": 3923,
+          "sha256": "a8d4d36e9edb40c325b8836ffd3260cc0da5c35dc83e7cc9445d5127392c1372"
         },
         {
           "path": "src/ads-sight-profile.test.ts",
@@ -2763,8 +2763,8 @@
         },
         {
           "path": "src/arena-contrast-lighting.test.ts",
-          "sizeBytes": 13472,
-          "sha256": "04112bd0264dc4dd3f1526d565fcd40d6702bb22336e11ef2fb6d2c6ef0b41a0"
+          "sizeBytes": 13589,
+          "sha256": "db9298e5426350cf00e763cc83434dc835382066916ab9123d6c78f6a969781c"
         },
         {
           "path": "src/arena-contrast-lighting.ts",
@@ -2813,13 +2813,13 @@
         },
         {
           "path": "src/art-kit.test.ts",
-          "sizeBytes": 10604,
-          "sha256": "478c48ed9c63a2efbfe05699cdef285bbbbd2bf4668b8f9caebcbed8eafc3325"
+          "sizeBytes": 14240,
+          "sha256": "131b6105c6f4f93a3eaefb177501f2d80a80811f6471b828f01f3dc4d2fbb30c"
         },
         {
           "path": "src/art-kit.ts",
-          "sizeBytes": 81970,
-          "sha256": "94e1d8eb059decbaf914e3be4763c5e2011ff76931d2fd969bf1ed049c403cb0"
+          "sizeBytes": 98828,
+          "sha256": "ef31f08f413db5eb2a1fc6306e16ed825a88ec26a614042ea6269b09dd9c1851"
         },
         {
           "path": "src/assets-manifest.test.ts",
@@ -2938,8 +2938,8 @@
         },
         {
           "path": "src/blender-authoring-fail-closed.test.ts",
-          "sizeBytes": 2177,
-          "sha256": "6f6cdbefe5d8c811d37e6cba07254cf529972818d29b96de5b970195207d46e9"
+          "sizeBytes": 2189,
+          "sha256": "3f87f9ac66e273fc77feb32dba6f37ba55d0abba48b1ae639e177540f0c4bf6b"
         },
         {
           "path": "src/blender-environment.test.ts",
@@ -2968,8 +2968,8 @@
         },
         {
           "path": "src/bootstrap.ts",
-          "sizeBytes": 4029,
-          "sha256": "7314eb92dfe6c3560809888ca0caefbac8885989f826e0a5f2da4b9d1fcee52c"
+          "sizeBytes": 4257,
+          "sha256": "70796d80e907f3a4bc90a9e713ae065f8ef9452f0a427b06d2e8bc19fc00d61d"
         },
         {
           "path": "src/bot-ai.test.ts",
@@ -3052,24 +3052,34 @@
           "sha256": "a7373a10f6ca90b07a57f38980adc6c291cd9227c13e5d253e34f57bae2b33af"
         },
         {
+          "path": "src/carpet-ground-fire-multiplayer.test.ts",
+          "sizeBytes": 22915,
+          "sha256": "217384ca3170b35543dae8b10386c3dad1fd5b1da432ad966d8abf7b1f71bb9e"
+        },
+        {
+          "path": "src/carpet-ground-fire-multiplayer.ts",
+          "sizeBytes": 4243,
+          "sha256": "674dbf6139809808d04c4b073620478b028d3c9daa8522c60b4a7413af3b2183"
+        },
+        {
           "path": "src/changelog.test.ts",
-          "sizeBytes": 4980,
-          "sha256": "8dd5aa024ffa4cba035613a5c337946c7ae3cae544dc0e9d0921ea01cdf070b2"
+          "sizeBytes": 5657,
+          "sha256": "abc7e1288b2c27f950fa4b3d5a9d0fce9679d69c8738b07000f5f264523498d2"
         },
         {
           "path": "src/changelog.ts",
-          "sizeBytes": 30409,
-          "sha256": "a4ba4a078069f16dc9478ce5dc60fa24e59755b859f8ed67293b880f09267902"
+          "sizeBytes": 33228,
+          "sha256": "38db935a75a754f94e9ccb1a2465f195465cd869e0bf1710866840005dea26a7"
         },
         {
           "path": "src/character-presentation-contract.test.ts",
-          "sizeBytes": 5875,
-          "sha256": "bab0b1d8f38d1868f93097e8fdeb0e2156d4884ac6af0446b603b2550d3f259d"
+          "sizeBytes": 6883,
+          "sha256": "4d878574e0bb73a165770bff99330f6c58ee8b6b7653c3a9e97d9f47cefe066c"
         },
         {
           "path": "src/character-presentation-contract.ts",
-          "sizeBytes": 5585,
-          "sha256": "e1f822a557711728b9ebebb41ca5d1274272df6887f51c82997eb88765e2d15e"
+          "sizeBytes": 5923,
+          "sha256": "c2fd22e3086cc3b9b482e75e85fad36bd7db263dddb4d64ee98a0e3dd167b757"
         },
         {
           "path": "src/chopper-gunner-fire-ray.test.ts",
@@ -3128,13 +3138,13 @@
         },
         {
           "path": "src/combat/explosive-bolt-target-buffer.test.ts",
-          "sizeBytes": 4241,
-          "sha256": "5466b4416a9f2b8e712bf3f0e71a34cacc269e6eb22744816c1e5f85a4b0e13f"
+          "sizeBytes": 4536,
+          "sha256": "608e38ab1ebd2b0059f41d8b05cdf46eb51f9a2f380f12c747c21a064cb50b93"
         },
         {
           "path": "src/combat/explosive-bolt-target-buffer.ts",
-          "sizeBytes": 2195,
-          "sha256": "023527fb5e57231e0076f69ebd5159aaf99bbb413c2913e9fa094e4e2ef1b0aa"
+          "sizeBytes": 2215,
+          "sha256": "4a336c329076e31f6d0ece19906a5b56189a110d9f0ac1fd3900e53b3ae7d3da"
         },
         {
           "path": "src/combat/fixtures/pass64-legacy-weapons.json",
@@ -3149,7 +3159,7 @@
         {
           "path": "src/combat/legacy-weapon-adapter.test.ts",
           "sizeBytes": 6391,
-          "sha256": "4f88f03e809b71a8b041526bbe5867ad79fcbaf32a372e2fd30eb8b53b19f881"
+          "sha256": "883e753d9458324cba71838edb4c45a6d760cc5946ee31a07db55ce71dea547c"
         },
         {
           "path": "src/combat/legacy-weapon-adapter.ts",
@@ -3179,7 +3189,7 @@
         {
           "path": "src/combat/weapon-catalog.test.ts",
           "sizeBytes": 7571,
-          "sha256": "3bbefd7ae80570c4088cd253da552d69dcc832bafcad4d3f140c4ee0712c4827"
+          "sha256": "6dae2348411d4bcb2f91e73f613e41087eddd1caeee83f108127a0c169379aa9"
         },
         {
           "path": "src/combat/weapon-catalog.ts",
@@ -3243,8 +3253,8 @@
         },
         {
           "path": "src/debug-capture-main-integration.test.ts",
-          "sizeBytes": 1453,
-          "sha256": "c93303e69482c307cdb51e8d578bd9b49d74895618f3b6d07086c533d4cd50ed"
+          "sizeBytes": 1707,
+          "sha256": "3cca246c8965daf37574f8305c285c3c9a213e49b08e2f386047527921afcd1f"
         },
         {
           "path": "src/deployment-loading-progress.test.ts",
@@ -3327,6 +3337,16 @@
           "sha256": "6406e060fc6e774de07fb3423cc3e0651e5fda33a1a12e342e235720305071d5"
         },
         {
+          "path": "src/dmr-thermal-prewarm-lifecycle.test.ts",
+          "sizeBytes": 2264,
+          "sha256": "d36b850c4e1a2b29053372d338b7a51fd187180fa7c6c2533d9281178366bd94"
+        },
+        {
+          "path": "src/dmr-thermal-prewarm-lifecycle.ts",
+          "sizeBytes": 564,
+          "sha256": "7baadfd3809f063572fcec08d119c2e8ef258f14e569ae378708e0c5dec1bb92"
+        },
+        {
           "path": "src/environment-assets.test.ts",
           "sizeBytes": 5488,
           "sha256": "8093600af4d4a12572fd9e19d9189203dfde59169a841792d3e581404d79cc2b"
@@ -3353,23 +3373,23 @@
         },
         {
           "path": "src/flamethrower-stream-system.test.ts",
-          "sizeBytes": 6467,
-          "sha256": "ca1f1dde5340523345c9f599772a73fe7992c2495f492ba4f8f01f12f79007ed"
+          "sizeBytes": 11552,
+          "sha256": "688b88dab93655226b1803143efdf2667525b7d4db85752a9bd21caf2aad7e4c"
         },
         {
           "path": "src/flamethrower-stream-system.ts",
-          "sizeBytes": 22793,
-          "sha256": "e08415f4eae67edc09d4578ec9c1eae58edc642e331ce0d6d760282d18fed2c4"
+          "sizeBytes": 28537,
+          "sha256": "c30fefc50b04d1d419a180ed18d5f681ed41a03ecbe6c272f9fb7e58fca471c6"
         },
         {
           "path": "src/flare-authority-checkpoint.test.ts",
-          "sizeBytes": 5360,
-          "sha256": "ebe90478847bba0821fa0b7848f3a242b598e81f68812e7cf36bd23f884fba0b"
+          "sizeBytes": 5767,
+          "sha256": "f41ca22b8b449aef8eeb70b51c1ad12d628a9e0af8cd12b217936a585a18c019"
         },
         {
           "path": "src/flare-authority-checkpoint.ts",
-          "sizeBytes": 13055,
-          "sha256": "10936f34d6e4d577375889a0d4990d5c5088515339a9e73bd66917c10532d061"
+          "sizeBytes": 13161,
+          "sha256": "66bc3f4d8927fa0f6105791eac1a12d66d89270c7b018273c4dfc086ddcb2fde"
         },
         {
           "path": "src/flare-presentation-protocol.test.ts",
@@ -3383,13 +3403,13 @@
         },
         {
           "path": "src/flare-projectile-system.test.ts",
-          "sizeBytes": 13607,
-          "sha256": "04ff82d688b6011f517fffc8f077ab0ca0a984f9c349fef81e86dbd0e95cc3fc"
+          "sizeBytes": 20771,
+          "sha256": "bd41ce9070b14a3bab8f993b8198a53d9d89fd2d962d585f562dee10b7bbbff9"
         },
         {
           "path": "src/flare-projectile-system.ts",
-          "sizeBytes": 34487,
-          "sha256": "782739c24b2980b98db141d5b152de790d4f798e0007513e8c66e035fec17381"
+          "sizeBytes": 38678,
+          "sha256": "04016d9a76d381b83279c518bceaf9ecfaec12d2c0c0c4aaec10ad12440bd3f7"
         },
         {
           "path": "src/flash-authority.integration.test.ts",
@@ -3642,6 +3662,16 @@
           "sha256": "18e8afe2efe6596e60210570d1326bd1cb42be1cc6811462e5e72cf6525094ba"
         },
         {
+          "path": "src/gun-range-match-clock-authority.test.ts",
+          "sizeBytes": 4976,
+          "sha256": "d18cfcc4fdeba6dddce6fd2ff67285a53cac8f8c561685bb3e3fbdc897f2e146"
+        },
+        {
+          "path": "src/gun-range-match-clock-authority.ts",
+          "sizeBytes": 6807,
+          "sha256": "6093fc50b60a4fe29a0885e9c02090b8647cf1e415eabfab7362a235cb5b7dcf"
+        },
+        {
           "path": "src/gun-range-rack-presentation.test.ts",
           "sizeBytes": 11816,
           "sha256": "a8ec3b90396b4e636e3f97a80864e0fcf0c82ea8a8e5f7d25855a4d44abcec87"
@@ -3662,14 +3692,29 @@
           "sha256": "22dcf1d2b4c5016e8f9b95616fa518b9b1c348360b15d866c29ef2e2508569be"
         },
         {
+          "path": "src/gun-range-test-bay-main-integration.test.ts",
+          "sizeBytes": 5725,
+          "sha256": "63ecbcfe8b411068bf468e1b1ad2a7f1495631d67e941244d18b60a15337f6c8"
+        },
+        {
+          "path": "src/gun-range-test-bay-world-main-integration.test.ts",
+          "sizeBytes": 2435,
+          "sha256": "309a7ff755d37318afc390258ab06f5313846d4767958d37c8a9ff062ca28a80"
+        },
+        {
+          "path": "src/gun-range-test-bay-world.test.ts",
+          "sizeBytes": 10772,
+          "sha256": "fbe51a918108c0aea519ec1fd1e3a6899c71fe4385594f2e8da0de94e469cf6c"
+        },
+        {
           "path": "src/gun-range-test-bay.test.ts",
-          "sizeBytes": 5756,
-          "sha256": "ad54d4936b9b5f5e3c8448bdb2c4adeaa7a1f573f8cd7b66a7fb99fe44c632f1"
+          "sizeBytes": 8827,
+          "sha256": "092e9ff0641cd5f4cd2c2b578470523c2590d312d9e9238ff66c51728572c02f"
         },
         {
           "path": "src/gun-range-test-bay.ts",
-          "sizeBytes": 9670,
-          "sha256": "375405611c4582cc4eca56047b37a864bba46f7c32d4609006d695cddbbd8f8a"
+          "sizeBytes": 16374,
+          "sha256": "35f7b11082db233b6ef3b39a39bcef38197ec27c41c8d985c2e4f443c3110cc9"
         },
         {
           "path": "src/handicap.test.ts",
@@ -3728,18 +3773,18 @@
         },
         {
           "path": "src/host-match-checkpoint.test.ts",
-          "sizeBytes": 20413,
-          "sha256": "3b71886bf9280081ecb84e4efa48e3fbc5f280dab80c577e1e90e1cf232878dc"
+          "sizeBytes": 21723,
+          "sha256": "8310a3c3cb89030081255da9face56a36e88573257612fb667f445a657d73a88"
         },
         {
           "path": "src/host-match-checkpoint.ts",
-          "sizeBytes": 36583,
-          "sha256": "4d3f1ba94b26663e9fad21bbaefbc2cac30dcb0b571669975f18eb0a048386a1"
+          "sizeBytes": 37535,
+          "sha256": "24a2475c45732a5addfee49f2a3da0c780959e89084d883603b80bad6fb133be"
         },
         {
           "path": "src/host-match-recovery-main-integration.test.ts",
-          "sizeBytes": 16083,
-          "sha256": "5b748ba2037a18f9d832b11447da25710b80655ee00ea69c8baca910ce629385"
+          "sizeBytes": 16284,
+          "sha256": "5f8a65d03fdea3cf983c34267470a43f4e144ae7bfcae5462246616120a53aea"
         },
         {
           "path": "src/host-time.test.ts",
@@ -3858,13 +3903,13 @@
         },
         {
           "path": "src/impact-presentation.test.ts",
-          "sizeBytes": 8916,
-          "sha256": "66ce6075c9a780f8793fd455a151eac24cbe67623e400e087b23b1708e2004dc"
+          "sizeBytes": 12868,
+          "sha256": "543fac27f20a636977625f117e390c188d4abd3311c912ccc2c950ad6caaa3eb"
         },
         {
           "path": "src/impact-presentation.ts",
-          "sizeBytes": 19716,
-          "sha256": "0a2ee813cf35b36d14dbe5e4cbe81d22731df1394a34f29c6726ed6803bec103"
+          "sizeBytes": 20560,
+          "sha256": "8974dda0f8d3d57e5d300d1eabd300b884eea3aa410ef33aa2e1c0c4d6691649"
         },
         {
           "path": "src/interaction-arbitration.test.ts",
@@ -4003,8 +4048,8 @@
         },
         {
           "path": "src/killstreak-host-checkpoint-integration.test.ts",
-          "sizeBytes": 3952,
-          "sha256": "4fc801216a804f734f05142b98820a8c49f329233e6194a3b8399f3121b035af"
+          "sizeBytes": 4082,
+          "sha256": "2e440a904c85360d0db50a70c91cbe981c92b672303098f7b4378e7d85a6d592"
         },
         {
           "path": "src/killstreak-loadout.test.ts",
@@ -4018,18 +4063,18 @@
         },
         {
           "path": "src/killstreak-main-integration.test.ts",
-          "sizeBytes": 27889,
-          "sha256": "b6626ca1187b1f863673c093839e9118684585f8ed36e493c2923595d185fb88"
+          "sizeBytes": 30377,
+          "sha256": "2c7e823a8952f9098eaeec4c7b7cdb53ec4e4330b198d1f9fc3774e7f2a306ec"
         },
         {
           "path": "src/killstreak-presentation.test.ts",
-          "sizeBytes": 51517,
-          "sha256": "8687c62665ab326925cb250349fbb527856b6b69f47374a94ecc26642b561bee"
+          "sizeBytes": 53606,
+          "sha256": "d2f0fcc77b7c2e19f942febe45407fed84d61c76cafea0502c0732e7eec990f4"
         },
         {
           "path": "src/killstreak-presentation.ts",
-          "sizeBytes": 135032,
-          "sha256": "c1be36164c86973640ccfcd1bb06712a0e44bba63615bcdbf467e82bfe83d793"
+          "sizeBytes": 145058,
+          "sha256": "a6b9c973646825ef40a24cfac559c123e7368418c2bd97d06d0e695f4ba14d3c"
         },
         {
           "path": "src/killstreak-protocol.test.ts",
@@ -4038,8 +4083,8 @@
         },
         {
           "path": "src/killstreak-protocol.ts",
-          "sizeBytes": 25519,
-          "sha256": "747bf7db6fb8b8959c58d4066b0440c1c2ae877076247592a2d9d269459f90bf"
+          "sizeBytes": 28278,
+          "sha256": "179eb2316b04d73901fe3c23b8fa605502ce51a7ddec6c883f4b2b3268c396a5"
         },
         {
           "path": "src/killstreak-reconnect-checkpoint.test.ts",
@@ -4048,8 +4093,8 @@
         },
         {
           "path": "src/killstreak-replacement-authority-main-integration.test.ts",
-          "sizeBytes": 3929,
-          "sha256": "380f9612de1127114281542d8e5ae388ff6af3a8cc8f06484b0568fbed59cf9e"
+          "sizeBytes": 3945,
+          "sha256": "4432301738e3cb463850854e1506579346fe0200f122945117d46b9baa492cbb"
         },
         {
           "path": "src/killstreak-runtime.test.ts",
@@ -4058,8 +4103,8 @@
         },
         {
           "path": "src/killstreak-runtime.ts",
-          "sizeBytes": 116409,
-          "sha256": "be44f73de993ad849c6e99c0088a819e4f8b7011c09f387161bb9e9f95f20191"
+          "sizeBytes": 119726,
+          "sha256": "4728f67d794cc37002123fe774a78bf96d9f472bb99909c31b373d0526b85ea5"
         },
         {
           "path": "src/killstreak-slot-possession.test.ts",
@@ -4103,8 +4148,8 @@
         },
         {
           "path": "src/legacy-main.ts",
-          "sizeBytes": 1192418,
-          "sha256": "632716bd158f0a9a7ecf06c46b7bc437a2516d6774f25275970de6735da9ef7f"
+          "sizeBytes": 1262091,
+          "sha256": "40a6b9a8929c1d54e84f865bcba908e4ba784792ce7c46112c4da66b11733f1f"
         },
         {
           "path": "src/loadout-preset-schema.test.ts",
@@ -4143,13 +4188,13 @@
         },
         {
           "path": "src/map-selection.test.ts",
-          "sizeBytes": 4047,
-          "sha256": "987c3f2952fc5d4e2340793b8cdd2516ef130ad9f8b2da6172815920419f3779"
+          "sizeBytes": 4568,
+          "sha256": "44b0cbabae1310ffbd15ba6ca63cd18582506f9ee2eb230306c50ddad88a914c"
         },
         {
           "path": "src/map-selection.ts",
-          "sizeBytes": 5241,
-          "sha256": "b512da6670c38afe28d2b2cc99bdc32bb71d49ecc08e068b1505da411a360a2c"
+          "sizeBytes": 5591,
+          "sha256": "09cc4cca4f1c67731ec04e8ae422906955b932c4dacae68bca8e0fb78b934939"
         },
         {
           "path": "src/map.test.ts",
@@ -4303,8 +4348,8 @@
         },
         {
           "path": "src/network-connection-attempt.test.ts",
-          "sizeBytes": 8665,
-          "sha256": "91d246dd8bebfc9dd1078741d7f5e98f650c0ff8f6a2be1597ccf984b7a7ba84"
+          "sizeBytes": 10077,
+          "sha256": "86ad16fd541f517a8a79165441e3584d17717b6efa61accd5c48115a44d5ada3"
         },
         {
           "path": "src/network-fairness.test.ts",
@@ -4318,8 +4363,8 @@
         },
         {
           "path": "src/network-lifecycle.test.ts",
-          "sizeBytes": 32994,
-          "sha256": "bd45d82c9607e30fc3882ea28a4508b051216c703593d041bac6d151fb766923"
+          "sizeBytes": 33170,
+          "sha256": "b6f458ec950f8b4b1570b29408f00337ddb83ae784d28e7513dc8ae856720d4e"
         },
         {
           "path": "src/network-sync.test.ts",
@@ -4333,18 +4378,18 @@
         },
         {
           "path": "src/network.ts",
-          "sizeBytes": 62087,
-          "sha256": "806974f8de84fca8fe755c5b57f3d2e3783dd6a9a37892640a8fd80e89f513c3"
+          "sizeBytes": 62697,
+          "sha256": "27501f39ccbb8ac5b5c0832b51b0a685d6443575ba8c4d75326813f2daeb1635"
         },
         {
           "path": "src/operator-model.test.ts",
-          "sizeBytes": 6689,
-          "sha256": "40d9f5da494a9871ba45335937884dd70edd5a6fa0458b6a77f717f7d8ba6f98"
+          "sizeBytes": 28081,
+          "sha256": "942d59697c887a177297a5114dd53c26b24accd11dc3097ab25172364ef4c590"
         },
         {
           "path": "src/operator-model.ts",
-          "sizeBytes": 44860,
-          "sha256": "aaf4376a9b2cc865d40de9d1ece5bddf2e9a7345e25f2c0505c6da7a328ef479"
+          "sizeBytes": 87134,
+          "sha256": "35926c67b750a9f991ba22f7dc11ba5ff07cb03851e9fe1e21957f3ac6baf131"
         },
         {
           "path": "src/overdrive.test.ts",
@@ -4463,8 +4508,8 @@
         },
         {
           "path": "src/pass65-weapon-runtime-behavior.test.ts",
-          "sizeBytes": 44499,
-          "sha256": "70b9dbbc61c136bf5fac30aa7e700091220f853dc93e363a29d0213aae7295ff"
+          "sizeBytes": 55154,
+          "sha256": "3be6a664615f98e75c8d7f531020633016bf88687762ceb55288e23c61890730"
         },
         {
           "path": "src/pass66-audio-long-run-runner.test.ts",
@@ -4473,8 +4518,8 @@
         },
         {
           "path": "src/pass66-owned-browser-verifier-runner.test.ts",
-          "sizeBytes": 6527,
-          "sha256": "c105af8ebc4104d7cc8e87c019b7fcf8d390856cdee4f1dee7eca2346a93e36f"
+          "sizeBytes": 6673,
+          "sha256": "97c25b5a8671cfa3b84afa3f2e6fc89a0b14bcde43693ffa9ff4c753c09ab101"
         },
         {
           "path": "src/pass66-pass63-multiplayer-comparator-contract.test.ts",
@@ -4488,8 +4533,23 @@
         },
         {
           "path": "src/pass66-standalone-browser-source-binding.test.ts",
-          "sizeBytes": 2650,
-          "sha256": "984a24fdd484eab3415aba524c24b67abb884389a65d052e812ff7f34c68b693"
+          "sizeBytes": 2886,
+          "sha256": "599a06e7625072d69273357fa36176a4bc6b12c260c802e4e01d4de5ccb4c449"
+        },
+        {
+          "path": "src/pass69-3-ads-physical-clearance-runner.test.ts",
+          "sizeBytes": 5479,
+          "sha256": "d33918ce1d720659c0b7bccee26c949806aa53a33c7c472de49ffba24727049e"
+        },
+        {
+          "path": "src/pass69-3-authored-near-plane-catalog-runner.test.ts",
+          "sizeBytes": 11634,
+          "sha256": "0e212f5b924ca165c0ce5df588b82e634cb2f5b92c4a01adfe3184578a159fcb"
+        },
+        {
+          "path": "src/pass69-3-frame-hitch-runner.test.ts",
+          "sizeBytes": 8898,
+          "sha256": "4514be62db202592622168fadc7bb226bb5e3ad7117b0419d18b5b6cb4b37ac4"
         },
         {
           "path": "src/pass69-3-menu-preview-authoring-integration.test.ts",
@@ -4497,9 +4557,59 @@
           "sha256": "737d102bb4d5c7cefd1f94eb55bf68655cd9e5e9d952a605bcbcfd92db14fa38"
         },
         {
+          "path": "src/pass69-3-rigged-bot-live-runner.test.ts",
+          "sizeBytes": 35649,
+          "sha256": "6e29ae664d0b79d912775675d4d6984fddc0d1494ce80bdfbfcf1938741f37a4"
+        },
+        {
+          "path": "src/pass69-3-support-aircraft-live-runner.test.ts",
+          "sizeBytes": 7056,
+          "sha256": "42514668aa1cd6d42aeb11d0a1245754a6bb18d870d95a83770ae27e1403c1d6"
+        },
+        {
+          "path": "src/pass70-chopper-gunner-contract.test.ts",
+          "sizeBytes": 5257,
+          "sha256": "2761a371e4f5bcdd7dfa204c869337d6a7a6bc29238fc152c61b20c9ef6990ba"
+        },
+        {
+          "path": "src/pass70-crossbow-loaded-bolt-clearance.test.ts",
+          "sizeBytes": 7170,
+          "sha256": "d478465e56f62d7aa64b57f4f7466fd957c74d57d79e3bfbea6d9c7f10c29971"
+        },
+        {
+          "path": "src/pass70-drone-swarm-logo.test.ts",
+          "sizeBytes": 4295,
+          "sha256": "600cb891445e80f14d3231f0e5a52c48270cb9cfb99d5d3f715bc32a99cf28e6"
+        },
+        {
+          "path": "src/pass70-drone-swarm-logo.ts",
+          "sizeBytes": 6922,
+          "sha256": "b6caa4b431f5d4e977f7facb630f0d7262ab19ba36318335cc22a8b31be9b3e6"
+        },
+        {
+          "path": "src/pass70-multiplayer-regressions.test.ts",
+          "sizeBytes": 1809,
+          "sha256": "ab374de9f6e9486d011d51cf062a6b7041bdd7fb598bf53b3f540e6c7cc3832f"
+        },
+        {
+          "path": "src/pass70-optic-material-contract.test.ts",
+          "sizeBytes": 7037,
+          "sha256": "885cec729a8f4766118f766e77388c2522d5e52e7f18ca67d7ccfeeaa4e95637"
+        },
+        {
+          "path": "src/pass70-start-benchmark.test.ts",
+          "sizeBytes": 1974,
+          "sha256": "988386db49f504c20734c07fd9c86a1f2557ebdb51d44e277577846d237ce904"
+        },
+        {
+          "path": "src/pass70-weapon-contact-scope-integration.test.ts",
+          "sizeBytes": 2765,
+          "sha256": "469747457233020fcb44e63625e659aef716dcf5fb0073a8dfcf1636a6a8c0c1"
+        },
+        {
           "path": "src/persistent-window-debris-integration.test.ts",
-          "sizeBytes": 4608,
-          "sha256": "246ee2dc28f369605081148e81ae6924a81af92e72be2bf49369a524c49f51d1"
+          "sizeBytes": 5911,
+          "sha256": "ae1b1776bcc111d9210049d2918a2192b4f3d6643f4b11209cca10d470abf6a8"
         },
         {
           "path": "src/physics.test.ts",
@@ -4553,8 +4663,8 @@
         },
         {
           "path": "src/presentation-prewarm-contract.test.ts",
-          "sizeBytes": 63133,
-          "sha256": "c974f30eab44ea5bc07b19e91666d9bd209f54dd6ef06645c42253a02f6f95ea"
+          "sizeBytes": 81085,
+          "sha256": "d3866f0ea1efbb769898da607287b296697e7dc28ac0f6cb762b806e0d3c8cb9"
         },
         {
           "path": "src/presentation-scheduling-lifecycle.test.ts",
@@ -4578,13 +4688,13 @@
         },
         {
           "path": "src/private-match.test.ts",
-          "sizeBytes": 9213,
-          "sha256": "eb569bee6d9febfee7f6c86991c1a01e6386a5e57565722047d5d98e5ccd8f7a"
+          "sizeBytes": 9735,
+          "sha256": "4d52eedfe2f10eb046dfafb254567849cb2de9e116488139b78222e4b5556fac"
         },
         {
           "path": "src/private-match.ts",
-          "sizeBytes": 11228,
-          "sha256": "18797455e8fe9f58093fe26de39ed1b8e04e05b825568d9c0004fc7c94e5a0b0"
+          "sizeBytes": 11770,
+          "sha256": "e3dc8af5b9eda7a3365a3fac67a12c6f3b1717e6cdda5dcfe25099945a05b3b0"
         },
         {
           "path": "src/production-receipt.test.ts",
@@ -4593,23 +4703,23 @@
         },
         {
           "path": "src/project-map.test.ts",
-          "sizeBytes": 3631,
-          "sha256": "6f41a43ce1dbaa5f3a2e8986a1fb4130aed48abb4f5d1361f5ce8acc42b9c363"
+          "sizeBytes": 3750,
+          "sha256": "f8ea1e23063f717df828fdb6cf5aa8ce48f2142d1d5dc464154620c0b45bab0f"
         },
         {
           "path": "src/project-map.ts",
-          "sizeBytes": 16256,
-          "sha256": "c82344d8f71278703b243b62c9d56e68e8a127d1dae4c1dbc726d58e5a08d497"
+          "sizeBytes": 16083,
+          "sha256": "3486b67233d5fb989ff18c45e09307a066d59d49781aa4b210a046c9d992a807"
         },
         {
           "path": "src/protocol.test.ts",
-          "sizeBytes": 33503,
-          "sha256": "38b26ed81d36079377d836dab28ce8068f9fae6ecf61809482ad271941d335d0"
+          "sizeBytes": 33529,
+          "sha256": "787cb754153af3e6aacd222665b8db85f0d1e967bd7bb23fc05b56beb9db8b69"
         },
         {
           "path": "src/protocol.ts",
           "sizeBytes": 64406,
-          "sha256": "b42da5c2ce3404ce15e662088c379d20dfb9f1e445b5021bcb71e0ed04b11761"
+          "sha256": "1e4bbe0025bdc4ed871456e21e968ca2d2817729409fa3ce0713faeed5cd4805"
         },
         {
           "path": "src/railgun-authority.test.ts",
@@ -4637,6 +4747,16 @@
           "sha256": "cfed257eb2a4d5589e0ebfa198250bc54666a57fe2833ba7588136e20bb9d9bf"
         },
         {
+          "path": "src/railgun-scope-state.test.ts",
+          "sizeBytes": 1794,
+          "sha256": "b99e571e5829be22e9d7ebff5fc31919496962e96a075a378bdc757fcc5f8c1f"
+        },
+        {
+          "path": "src/railgun-scope-state.ts",
+          "sizeBytes": 2259,
+          "sha256": "809c7fa447818b729a5cd14876b9ec5f1b019da033ba1d0346b735ccae42dfd1"
+        },
+        {
           "path": "src/release-benchmark.test.ts",
           "sizeBytes": 1436,
           "sha256": "4165aa6e7e22dd635a2fc94e8cefbc7c352ffc2910f4683423a345a1da375ada"
@@ -4648,28 +4768,28 @@
         },
         {
           "path": "src/release-channel.test.ts",
-          "sizeBytes": 2607,
-          "sha256": "fa78915c1950e13db9d8c39220a7fa9f5cc3ac6195dbe41cd82c229815a999a4"
+          "sizeBytes": 2618,
+          "sha256": "289bd76a1d335e0b48b22d084b9a5c629da0f19706788de403e0498d23c04138"
         },
         {
           "path": "src/release-channel.ts",
-          "sizeBytes": 1653,
-          "sha256": "cae6203817ef3449566d9d93180b3b4669cd343aa99d9de091914c64660f0f4a"
+          "sizeBytes": 1914,
+          "sha256": "a056bb2638554e059fb134b7554bd76c85d4736a9b7ae8a6c147dd46386578cd"
         },
         {
           "path": "src/release-identity.ts",
-          "sizeBytes": 676,
-          "sha256": "d4c3e7ee81f078062a4f9ba1ed5ffc2e7afcf6b1b8d9823f15e9c2595cef2bcf"
+          "sizeBytes": 645,
+          "sha256": "7a17fb7991fa2e26be634e54bdc0e4b47e1426e2b711ae0adddc9f1f66fcf587"
         },
         {
           "path": "src/release-pipeline.test.ts",
-          "sizeBytes": 17688,
-          "sha256": "20610ffbd4910f14538050744f480a3a076c2e38c791c41140590bc17d5c6afc"
+          "sizeBytes": 21131,
+          "sha256": "93709ceb10f55eee9f19961bebcb17c9c5b2eb0675fe3da7893cd87448c5961a"
         },
         {
           "path": "src/release-topology.test.ts",
-          "sizeBytes": 7864,
-          "sha256": "796e6278f7023b2007fcaa78c06ac6cff98d29d94cbc39e0aa12cd49080f5266"
+          "sizeBytes": 8649,
+          "sha256": "8cfb43e87a5b05a9ea3decb65cd048929f2bf37adff9735e657caf85d5e4aa92"
         },
         {
           "path": "src/remote-grenade-admission.test.ts",
@@ -4798,8 +4918,8 @@
         },
         {
           "path": "src/rendering/arena-visual-definition.test.ts",
-          "sizeBytes": 22840,
-          "sha256": "1244130cbf22420739f609477f0fef738ab69c62332bef60a8a80cd7fc8363d6"
+          "sizeBytes": 23390,
+          "sha256": "a5d4fc579ed4f1543215446ce7d28318e73b353b33549b83e2c6796f34521d11"
         },
         {
           "path": "src/rendering/arena-visual-definition.ts",
@@ -4818,8 +4938,8 @@
         },
         {
           "path": "src/rendering/arenas/gun-range.ts",
-          "sizeBytes": 6787,
-          "sha256": "08658fe8a97c68b811f3c54bb33f2bdca518d12ed7cbfca7d8c709280ce9a06e"
+          "sizeBytes": 7873,
+          "sha256": "d277af61b26828c5eb8caa3597d04beeba4a725d6b9bb9c7276e967bee7d9920"
         },
         {
           "path": "src/rendering/arenas/rustworks-1v1.ts",
@@ -4900,6 +5020,36 @@
           "path": "src/rendering/tsl-migration-inventory.ts",
           "sizeBytes": 6114,
           "sha256": "2503b3f23b353d55966520867270e58c914a5f7a0c184743353402337f4438b0"
+        },
+        {
+          "path": "src/rigged-bot-visual-evidence-contract.test.ts",
+          "sizeBytes": 18173,
+          "sha256": "fe72e7f59c8459a65de5e260e0c162f12db613f9f42453f958a33bfd050e4681"
+        },
+        {
+          "path": "src/rigged-bot-visual-evidence-contract.ts",
+          "sizeBytes": 24701,
+          "sha256": "9095899f45bfc61a80fc7e7440025ae16b6a2ff9cb066bb3d35ca7de306d4676"
+        },
+        {
+          "path": "src/rigged-evidence-occlusion.test.ts",
+          "sizeBytes": 79161,
+          "sha256": "71b859f3a892dd4c01f7c453af9b7b4ac2917e47aaa29c503087539f3bc0a46b"
+        },
+        {
+          "path": "src/rigged-evidence-occlusion.ts",
+          "sizeBytes": 94970,
+          "sha256": "b1304067755732e3888fa6f1c09bb13547fbb3e944dbb45892ab161666002df9"
+        },
+        {
+          "path": "src/rigged-hand-evidence.test.ts",
+          "sizeBytes": 3430,
+          "sha256": "aace460dbd89113bb906a9014765f9682a5a49d086205ef7642d09102ef595b9"
+        },
+        {
+          "path": "src/rigged-hand-evidence.ts",
+          "sizeBytes": 7135,
+          "sha256": "849599319dee251aa71f9577f22f64b9e5b91c6f7e3c3f161897c56d05632a43"
         },
         {
           "path": "src/room-chat-presentation.test.ts",
@@ -5078,13 +5228,13 @@
         },
         {
           "path": "src/special-weapon-effects.test.ts",
-          "sizeBytes": 2190,
-          "sha256": "5e76b1a7db32f2fc0c17158cf2fcea89fb90935c4a46b6f0bab550bdbae5c7bb"
+          "sizeBytes": 2189,
+          "sha256": "5d457dadbba554934cc675e49b0fbb29128153076d5f47fb4a1de8f1beb9b882"
         },
         {
           "path": "src/special-weapon-effects.ts",
-          "sizeBytes": 3366,
-          "sha256": "cbede964520459fcbfce7cb67c07e185cd9bcf109708df37f9a4175b6d319cf3"
+          "sizeBytes": 3279,
+          "sha256": "988f4720f2b7b8b7be6a3cc26dbea93b1e45f3fc2a0ec4c0e87ba6f5bab54c4f"
         },
         {
           "path": "src/stable-bone-orientation.test.ts",
@@ -5168,18 +5318,18 @@
         },
         {
           "path": "src/support-vehicle-presentation-contract.test.ts",
-          "sizeBytes": 4073,
-          "sha256": "0955fbae488d57ac906dba72551b3cbcd1233020542b1756fe9f5b2baeb520a6"
+          "sizeBytes": 4456,
+          "sha256": "13cf506d775338ec8f258519cb8315c85042d9ea6b410ed12e31d802e9f1f542"
         },
         {
           "path": "src/support-vehicle-presentation-contract.ts",
-          "sizeBytes": 4131,
-          "sha256": "c5bf354a1f28d801035f92c55a6dd1a595f4e9119ea52f644da6e0534bad2d09"
+          "sizeBytes": 5049,
+          "sha256": "9f51b8397470b3b11f6157860d4dd9d85765749ab0adc147e63638f1c57bf46c"
         },
         {
           "path": "src/surface-impact-registry.test.ts",
-          "sizeBytes": 3617,
-          "sha256": "abfe95ec158ea56a3d2a8baa93199c285f581c321555d056e621d4c3833985f4"
+          "sizeBytes": 4536,
+          "sha256": "4d3e0bd7f36fe3112d06a557bf3f1619b1537f1c2a29e6ac2febf106afb32e67"
         },
         {
           "path": "src/surface-impact-registry.ts",
@@ -5188,8 +5338,8 @@
         },
         {
           "path": "src/test-bay-teleport-killstreak-main-integration.test.ts",
-          "sizeBytes": 2818,
-          "sha256": "88bedc20eaffdbe9cf663b3819c1d740c70532938e09f157d42246318a8a2896"
+          "sizeBytes": 4813,
+          "sha256": "56b190e07700b238ab64de87f5d09bb252b295b2977686772648627ccb2096d0"
         },
         {
           "path": "src/text-chat-ui.test.ts",
@@ -5228,8 +5378,8 @@
         },
         {
           "path": "src/timed-map-weapon-main-integration.test.ts",
-          "sizeBytes": 11336,
-          "sha256": "1b83c7c14f2a4196199ff525df662f4a4434bcab19a30f1391b34129cf71294f"
+          "sizeBytes": 13209,
+          "sha256": "428776cca9d4f71da88b4f376751ef77aeebffafd69a0ef28ccfe1957385eb8c"
         },
         {
           "path": "src/timed-map-weapon-presentation.test.ts",
@@ -5283,13 +5433,13 @@
         },
         {
           "path": "src/ui/field-kit-weapon-presentation.test.ts",
-          "sizeBytes": 3070,
-          "sha256": "547a7a4e9a15499aa84203314ba7e79b4c3458f7ecb489bfe7ae993f1e981e3d"
+          "sizeBytes": 4154,
+          "sha256": "9385c384f3dbeffdac0860caf956ae6eaea942edfb925b87cb7e34144fe9177f"
         },
         {
           "path": "src/ui/field-kit-weapon-presentation.ts",
-          "sizeBytes": 9152,
-          "sha256": "b9b5faf7784cff2e75b34eae47d3b3093fe73876edc5945e34cc73916820a524"
+          "sizeBytes": 9480,
+          "sha256": "f968643a012fa6462eadc7f0b69c760283f63250e051a670a7c8a5b0fa0dcc42"
         },
         {
           "path": "src/ui/killstreak-demo-presentation.test.ts",
@@ -5334,22 +5484,22 @@
         {
           "path": "src/ui/menu-preview-video.test.ts",
           "sizeBytes": 5585,
-          "sha256": "b0861be0529e5eb28e111690eee110c5d71ad669edc520ff4b767b4cba050d95"
+          "sha256": "668f9535fd645bd57705e44f09f0be5fb3628ffc64f6e66b43896fc2a43cf6f8"
         },
         {
           "path": "src/ui/menu-preview-video.ts",
           "sizeBytes": 14106,
-          "sha256": "423fac3d1d070326b0b0b6aa6d4cdedf8dfb498a651e08a633a5aca67c08773b"
+          "sha256": "92227df8d41cc6b51df8ba6c796de0815dd0f9b805992fa5afab828941dcbddc"
         },
         {
           "path": "src/ui/pass64-shell.test.ts",
-          "sizeBytes": 6426,
-          "sha256": "0b83f519c3b3584724b66620e52ab74decbaaa2913ec0aa073a872eb51475ab8"
+          "sizeBytes": 6787,
+          "sha256": "5ba0fd5fb79cefa0fa8392106433639f6c6a4915e08297eb2990e36281fe1f70"
         },
         {
           "path": "src/ui/pass64-shell.ts",
-          "sizeBytes": 32355,
-          "sha256": "dd3efa851547c9b36bb17ce0dd3027d32a84b32cc5558770e7a0749f0a5a954f"
+          "sizeBytes": 32956,
+          "sha256": "c1321b3e890b01aceed58cebe40857534f291c0d7019b294b6390e7bdc93b04c"
         },
         {
           "path": "src/ui/pass65-hud-layout.test.ts",
@@ -5358,28 +5508,33 @@
         },
         {
           "path": "src/ui/pass65-hud.css",
-          "sizeBytes": 27119,
-          "sha256": "8609c41e8053b3eea65acfcf252c24b93d693d95e5820b9d958d9709fc28d836"
+          "sizeBytes": 30766,
+          "sha256": "95eba97b8172c6ae5fcac5ee81621aadb2147819d34f085a01cca3639424cf7a"
         },
         {
           "path": "src/ui/pass66-overhaul.css",
-          "sizeBytes": 50764,
-          "sha256": "320d570af0655e8aa8b1fdbbc6987db48234955b546c417d3a12ece1628d81a1"
+          "sizeBytes": 50892,
+          "sha256": "2283129be03cbd0b2d7071f6473c8b984a5ffc47d98b9708e278ca7f76890511"
         },
         {
           "path": "src/ui/pass66-overhaul.test.ts",
-          "sizeBytes": 4254,
-          "sha256": "c1adf3edae95b62f39c716efad029836dacb2215308d04ff6663290922dc8478"
+          "sizeBytes": 4202,
+          "sha256": "5afbf34bd980de085cf305e4088651d1fd9ff06554b61263f9cfe0869fc80a4d"
         },
         {
           "path": "src/ui/pass66-readability.css",
-          "sizeBytes": 22489,
-          "sha256": "415b43833712f243dbdbe36f0a51c6fb9249572bfb023da043942b90dee59bcb"
+          "sizeBytes": 22950,
+          "sha256": "a484635751fc12ba5c0b608c911a35e7bcd59acfd6b301ad69e553c16efeddfb"
         },
         {
           "path": "src/ui/pass66-readability.test.ts",
-          "sizeBytes": 2493,
-          "sha256": "c9e752a361c3aa6201d685b82cf1d244491ff54bebe8710400e9e7a8550bdd2a"
+          "sizeBytes": 2664,
+          "sha256": "23ca97458ae9a80ad98f4c491811b9b09b0e9854748b2acb5b89e18384b9b2bd"
+        },
+        {
+          "path": "src/ui/pass70-field-kit-runtime-integration.test.ts",
+          "sizeBytes": 2422,
+          "sha256": "1df098e636f4cf26c248f5e8a1fae38a4b84c8de4460b7e3ec6dd25fc27b83e3"
         },
         {
           "path": "src/ui/project-map-dialog.css",
@@ -5388,8 +5543,8 @@
         },
         {
           "path": "src/ui/project-map-dialog.test.ts",
-          "sizeBytes": 1458,
-          "sha256": "90f6409637b82ab13dba7c84cc9fa0f9f239f517cac702a807fdf53dfa177a2f"
+          "sizeBytes": 2054,
+          "sha256": "f910a99aa0ef506885a4bea38ed2ff46321aa77cd19b280841d3aa6a45ae06a2"
         },
         {
           "path": "src/ui/project-map-dialog.ts",
@@ -5398,8 +5553,8 @@
         },
         {
           "path": "src/ui/release-history-dialog.ts",
-          "sizeBytes": 3083,
-          "sha256": "393d245a44ee65edb522a7c7faa73f455f659c8e6475ac6b62e5961b72c35731"
+          "sizeBytes": 3800,
+          "sha256": "afd673a0c405a9b5afbc45fa65d6f6a81b180c60378c6fa10fbe78d8141114f1"
         },
         {
           "path": "src/ui/surface-registry.test.ts",
@@ -5413,8 +5568,8 @@
         },
         {
           "path": "src/ui/tactical-ui.css",
-          "sizeBytes": 84851,
-          "sha256": "b50a22556dd87c5135e19c0af0af8f02067a1e26fcb824868be7a72b310ec8cc"
+          "sizeBytes": 87063,
+          "sha256": "d8706ef88e7595d7a73de187391f8cb95f9de00ce5878c1eec57f8cb25b07e15"
         },
         {
           "path": "src/vertical-navigation.test.ts",
@@ -5458,8 +5613,8 @@
         },
         {
           "path": "src/weapon-asset-production-contract.test.ts",
-          "sizeBytes": 10368,
-          "sha256": "b59b53f29c62cc45f17e71515c0fe739f2c4510e9816fbb06be63cd805080a71"
+          "sizeBytes": 10700,
+          "sha256": "3a0749f8f45dfb989ddf6b8bd72b12be94e78c644629b360c39de28881bee6ef"
         },
         {
           "path": "src/weapon-audio-profiles.test.ts",
@@ -5497,44 +5652,49 @@
           "sha256": "8d0b545c541ce9713a1a636ddc85610c6b345043899fb2cf6f76f718f20c5081"
         },
         {
+          "path": "src/weapon-first-fire-prewarm.test.ts",
+          "sizeBytes": 7674,
+          "sha256": "c061a38d1c0ba53f54e3ceac6eb746dab25106f6ed12398fff6142a490153cbd"
+        },
+        {
           "path": "src/weapon-model.ts",
-          "sizeBytes": 32918,
-          "sha256": "8279ba2a2ff627eb8aff742d62a819d543d64bfbd9e631bd4326f4e71cbe8589"
+          "sizeBytes": 39751,
+          "sha256": "28233626e07f6bebc6bfd1cd76492378df064db192280cb76d75d9d41b2e6dbf"
         },
         {
           "path": "src/weapon-presentation-anatomy.test.ts",
-          "sizeBytes": 12893,
-          "sha256": "d15070d3ae636e6a45c40a6c9391511a3dd89ea445ad0c40b750e4b3226734fe"
+          "sizeBytes": 16623,
+          "sha256": "da99583ab185af04478658743713eaa46b6628be624adc80282d5330e3532ac2"
         },
         {
           "path": "src/weapon-presentation-state.test.ts",
-          "sizeBytes": 4449,
-          "sha256": "90388b36a731956c360ed9d7c3975c6d37b63e19f7f6340ebf1279113437d4d9"
+          "sizeBytes": 6513,
+          "sha256": "402d2003cdc2209f09c47eb1ebbc3d70c5c4ea2de651ba00b8d7e6de04d21e73"
         },
         {
           "path": "src/weapon-presentation-state.ts",
-          "sizeBytes": 6544,
-          "sha256": "f86664c8a703751066c5e92d7d79ca926d6e819714f9ba63359e83e47cf2dfaa"
+          "sizeBytes": 11915,
+          "sha256": "2f96384e4dbf348c32848856bd4137f8ff33b956f61416eb5dde6d543e8a1c41"
         },
         {
           "path": "src/weapon-presentation.ts",
-          "sizeBytes": 170875,
-          "sha256": "00f36bd21b23a51ade1c827da1e2b04991b41896997b20f1ac132b04d697f6e2"
+          "sizeBytes": 188591,
+          "sha256": "101c9a5fa53ff76a49d4ba2125feb5432ec6fd5da505bbda84c4368bef73b0e2"
         },
         {
           "path": "src/weapon-prewarm-catalog.test.ts",
-          "sizeBytes": 1404,
-          "sha256": "ddb52c6cad62694846d0315719388c030d0a96ff8a15e45cc4c05ba2e62e6ada"
+          "sizeBytes": 2098,
+          "sha256": "67a9406f0a848201e59bed001f691cfb0fe19a2a21bb5f2e6306f0bf7a0343f6"
         },
         {
           "path": "src/weapon-prewarm-catalog.ts",
-          "sizeBytes": 1634,
-          "sha256": "d969af387aca1a2eb541925c1e0310561678650d6a0c8239692115e85c7883ce"
+          "sizeBytes": 2271,
+          "sha256": "7be4077b35a4fdcc01a8e55f1236c4e8ea5275f282c8d6080d8c142cdd31ce1b"
         },
         {
           "path": "src/weapon-runtime-corpus.test.ts",
-          "sizeBytes": 9435,
-          "sha256": "9633cad8fc5b1602cf5d863200a0acbd6c1e7b7257316c8221a549a45d0cf4a9"
+          "sizeBytes": 9688,
+          "sha256": "a68fe125f01bf4aa21d197cafe087e2d62fc60d2883c03288ecbc25d82436164"
         },
         {
           "path": "src/webgl-shadow-compatibility.test.ts",
@@ -5563,13 +5723,13 @@
         },
         {
           "path": "src/window-glass-debris-presentation.test.ts",
-          "sizeBytes": 7144,
-          "sha256": "cb345fd690827a10011bac678bc4dd7459dd08dc0728e051337f0cf90e19a115"
+          "sizeBytes": 8812,
+          "sha256": "af79f6ea0f64dbe596be14de89dc9b52d18d5b34ea8c870f6b3c39f990edcdcc"
         },
         {
           "path": "src/window-glass-debris-presentation.ts",
-          "sizeBytes": 9595,
-          "sha256": "f95d9da13a1ab279425d9378f433a78735f33762f69da5116c4a5f234108e348"
+          "sizeBytes": 10374,
+          "sha256": "6bea79c81abf6da323db180b5c8b75687e38caf772af5a0a924072e015f3ffba"
         },
         {
           "path": "src/world-identity-presentation.test.ts",
@@ -5621,8 +5781,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:atomic-acres",
         "fileCount": 240,
-        "totalBytes": 991477870,
-        "sha256": "93957347589849a26cf2b598228fa8f90205dccdeed1e349969338749275782b",
+        "totalBytes": 991469748,
+        "sha256": "3fd3d0e79b61c121f8cf96eede3239bcdf865ba9b76136c67fc85add2abb82fd",
         "frameRoster": [
           1,
           2,
@@ -5884,7 +6044,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "feaad067d8937ca780357dc009ad16805d6290db103055848ad5b9993f8005e2",
+          "pngSha256": "d003c0c71721c6b24439ab618078c2b09bfa96c17912e6e447964b062d2ce5ca",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.021080999904208714,
@@ -6076,7 +6236,7 @@
           "fixedVisualTimeMs": 70991.63179916318,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "453ae268bf764fa1ef20dcf154e514e6b18174f0473b61641d18a910dbb29c59",
+          "pngSha256": "42d1e0231bd093d51223b5a8f0b26c8582e5b15e951b866c041a5555b54e740b",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.037695002555847165,
@@ -6140,7 +6300,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "feaad067d8937ca780357dc009ad16805d6290db103055848ad5b9993f8005e2",
+          "pngSha256": "d003c0c71721c6b24439ab618078c2b09bfa96c17912e6e447964b062d2ce5ca",
           "seamSourceFrame": 1,
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
@@ -6211,8 +6371,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:skyline-terminal",
         "fileCount": 240,
-        "totalBytes": 556160939,
-        "sha256": "84492f3b00469e8b8c86c4fe94e7c43477e55fd135ea9f15cd9125baf8a17ce3",
+        "totalBytes": 556160938,
+        "sha256": "9c7da71a8892d9d9ffb1fa7e67d7c5def6ad3830406b8bebd3f82de4b4a38a6b",
         "frameRoster": [
           1,
           2,
@@ -6801,8 +6961,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:rustworks-1v1",
         "fileCount": 240,
-        "totalBytes": 658823727,
-        "sha256": "62374fe6e0dae990542bcafc3f6d7da0aa81b94580cba86526d0801249683d87",
+        "totalBytes": 658822443,
+        "sha256": "998afc0a456df24debb98b5058cc8d2565a610cc3615ed62c425ae785f1eb13e",
         "frameRoster": [
           1,
           2,
@@ -7380,8 +7540,8 @@
         "gun-range"
       ],
       "residentArenaRoots": 1,
-      "colliders": 30,
-      "raycastMeshes": 75,
+      "colliders": 37,
+      "raycastMeshes": 78,
       "targets": 20,
       "viewmodelHidden": true,
       "firstFrame": 1,
