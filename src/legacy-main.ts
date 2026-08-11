@@ -20186,9 +20186,34 @@ function deactivateRailgunScopePresentation(): void {
   weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
 }
 
+function synchronizeRailgunScopeLifecycle(): void {
+  // Scope ownership is a frame-level presentation lifecycle, not part of
+  // character simulation. Death, match end, menus and authority recovery can
+  // all suspend updatePhysics while rendering continues, so they must clear
+  // the overlay/thermal/viewmodel suppression before updateRailgun consumes it.
+  if (!playerSimulationEnabled()) {
+    deactivateRailgunScopePresentation();
+    return;
+  }
+  railgunScopeState = deriveRailgunScopePresentation({
+    alive: player.alive,
+    localHolder: localHoldsRailgun(),
+    weapon: player.weapon,
+    adsHeld,
+    adsProgress: weaponView.adsProgress(),
+    baseFov: preferredFov,
+    cameraFov: camera.fov,
+  });
+  railgunScopeActive = railgunScopeState.active;
+  hudRoot.classList.toggle('railgun-scope-active', railgunScopeActive);
+  synchronizeWeaponViewmodelPresentation();
+}
+
 function shouldShowWeaponViewmodel(): boolean {
   return gameStarted
     && player.alive
+    && matchState.phase !== 'ended'
+    && menu.classList.contains('hidden')
     && !localKillstreakActorSnapshot()?.possession
     && !sniperScopeActive
     && !dmrThermalActive
@@ -20395,18 +20420,6 @@ function updatePhysics(dt: number): void {
     && weaponView.adsProgress() >= 0.9
     && Math.abs(camera.fov - aimingFov) < 0.35;
   hudRoot.classList.toggle('dmr-thermal-active', dmrThermalActive);
-  railgunScopeState = deriveRailgunScopePresentation({
-    alive: player.alive,
-    localHolder: localHoldsRailgun(),
-    weapon: player.weapon,
-    adsHeld,
-    adsProgress: weaponView.adsProgress(),
-    baseFov: preferredFov,
-    cameraFov: camera.fov,
-  });
-  railgunScopeActive = railgunScopeState.active;
-  hudRoot.classList.toggle('railgun-scope-active', railgunScopeActive);
-  synchronizeWeaponViewmodelPresentation();
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
   camera.rotation.y = player.yaw + recoilCamera.yaw;
@@ -23404,6 +23417,7 @@ function frame(now: number, scheduleNext = true): void {
     updateFieldSupport(frameDt, now);
     updatePass65KillstreakRuntime(now);
     updateOverdrive(now);
+    synchronizeRailgunScopeLifecycle();
     updateRailgun(now);
     updateTimedMapWeapons(now);
     updateDmrThermal();

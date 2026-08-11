@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { WEAPON_IDS, type WeaponId } from '../../src/protocol';
+import { HIP_VIEWMODEL_SCALE } from '../../src/weapon-presentation';
 
 declare global {
   interface Window {
@@ -63,8 +64,11 @@ test('Pass 70 keeps every catalog viewmodel clear of prone wall/floor contact wi
   await page.evaluate(({ position, yaw }) => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
     api.teleportPlayer(position[0], position[1], position[2], yaw, 0);
-    api.setStance('prone');
   }, CONTACT_FIXTURE);
+  await page.waitForFunction(() => (
+    window.__ATOMIC_ACRES_DEBUG__.snapshot().weaponPresentation.surfaceRetreat > 0.15
+  ), undefined, { timeout: 10_000 });
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setStance('prone'));
   await page.waitForFunction(() => {
     const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
     return state.player.stance === 'prone'
@@ -85,7 +89,13 @@ test('Pass 70 keeps every catalog viewmodel clear of prone wall/floor contact wi
     expect(presentation.contactResponse.obstructionBlend, weapon).toBeGreaterThan(0.25);
     expect(presentation.contactResponse.pitchRadians, weapon).toBeGreaterThan(0.14);
     expect(presentation.viewmodelViewport.rootScale, weapon).toBeGreaterThanOrEqual(0.55);
-    expect(presentation.viewmodelViewport.rootScale, weapon).toBeLessThan(0.82);
+    expect(presentation.viewmodelViewport.rootScale, weapon).toBeCloseTo(
+      HIP_VIEWMODEL_SCALE
+        * presentation.viewmodelViewport.scaleMultiplier
+        * presentation.contactResponse.scale,
+      8,
+    );
+    expect(presentation.viewmodelViewport.rootScale, weapon).toBeLessThan(1);
     expect(presentation.viewmodelViewport.rootRotation.every(Number.isFinite), weapon).toBe(true);
     assertFraming(presentation.weaponFraming, `${weapon}/weapon`);
     assertFraming(presentation.armFraming, `${weapon}/arms`);

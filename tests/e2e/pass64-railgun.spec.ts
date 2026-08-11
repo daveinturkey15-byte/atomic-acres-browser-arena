@@ -196,6 +196,54 @@ test('railgun restores its through-wall thermal scope, exits ADS, and enforces r
   ).__ATOMIC_ACRES_DEBUG__.snapshot());
   expect(swapped.railgunScope).toMatchObject({ active: false, viewmodelVisible: true });
   expect(swapped.weaponPresentation.weapon).toBe('pistol');
+
+  // Death is a render-lifecycle transition, not a pointer-lock side effect.
+  // Re-enter the settled scope while this Playwright page remains unlocked,
+  // then prove the very next rendered state clears every fullscreen surface.
+  await page.evaluate(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    api.setAds(false);
+    api.equipWeapon('railgun');
+  });
+  await page.waitForFunction(() => {
+    const railgun = window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun;
+    return railgun.adsResetRequired === false && railgun.chamberReadyAtHostTimeMs === 0;
+  });
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
+  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgunScope.active === true);
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.damage(999));
+  await page.waitForFunction(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    return state.player.alive === false
+      && state.railgunScope.active === false
+      && state.railgun.thermalVisible === false
+      && state.railgun.presentation.thermalContacts === 0
+      && state.weaponPresentation.fullscreenSuppression.active === false
+      && state.railgunScope.viewmodelVisible === false;
+  });
+
+  // Match end owns the same cleanup even when the player survives. Respawn and
+  // reacquire through the real pickup helper so stale held-state cannot mask it.
+  await page.evaluate(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    api.respawn();
+    const staged = api.stageRailgunSpawn(0);
+    api.teleportPlayer(...staged.pickupPosition);
+    api.interactRailgun();
+    api.setAds(true);
+  });
+  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgunScope.active === true);
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.endMatch());
+  await page.waitForFunction(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    return state.matchPhase === 'ended'
+      && state.player.alive === true
+      && state.railgunScope.active === false
+      && state.railgun.thermalVisible === false
+      && state.railgun.presentation.thermalContacts === 0
+      && state.weaponPresentation.fullscreenSuppression.active === false
+      && state.railgunScope.viewmodelVisible === false;
+  });
   if (renderer === 'webgpu') {
     expect(second.state.render.runtime).toMatchObject({
       actualBackend: 'webgpu', deviceLost: false, uncapturedErrors: 0, presentation: { status: 'healthy' },

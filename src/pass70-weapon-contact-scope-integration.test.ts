@@ -20,6 +20,9 @@ describe('Pass 70 contact and Railgun scope integration contracts', () => {
   it('coordinates one settled Railgun scope lifecycle across FOV, thermal and viewmodel suppression', () => {
     const runtime = read('./legacy-main.ts');
     expect(runtime).toContain('railgunScopeState = deriveRailgunScopePresentation({');
+    expect(runtime).toContain('function synchronizeRailgunScopeLifecycle(): void {');
+    expect(runtime).toContain('if (!playerSimulationEnabled()) {');
+    expect(runtime).toContain('synchronizeRailgunScopeLifecycle();\n    updateRailgun(now);');
     expect(runtime).toContain('const thermalActive = railgunScopeActive;');
     expect(runtime).toContain('sniperScopeActive || dmrThermalActive || railgunScopeActive');
     expect(runtime).toContain("hudRoot.classList.toggle('railgun-scope-active', railgunScopeActive)");
