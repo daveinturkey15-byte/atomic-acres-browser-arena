@@ -31,11 +31,14 @@ describe('HF-249/HF-250/HF-251 Field Kit runtime integration', () => {
 
   it('closes only after verified persistence and keeps failure feedback inside the open manager', () => {
     const save = functionSource('saveManagedPreset', '\ndocument.querySelectorAll<HTMLButtonElement>');
+    const selectSavedPreset = save.indexOf("selected: { kind: 'custom', presetId: submittedPresetId } as SelectedLoadoutRef");
     const persist = save.indexOf('if (!persistLoadoutState(candidate))');
     const close = save.indexOf('manager.hidden = true');
     expect(save).toContain('if (manager.hidden || loadoutSaveInFlight) return;');
     expect(save).toContain('YOUR EDITS ARE STILL HERE');
     expect(save).toContain("setLoadoutSaveStatus('SAVE FAILED");
+    expect(selectSavedPreset).toBeGreaterThanOrEqual(0);
+    expect(persist).toBeGreaterThan(selectSavedPreset);
     expect(persist).toBeGreaterThanOrEqual(0);
     expect(close).toBeGreaterThan(persist);
     expect(save.slice(persist, close)).toContain('return;');

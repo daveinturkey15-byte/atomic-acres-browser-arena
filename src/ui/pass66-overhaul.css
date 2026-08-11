@@ -307,7 +307,7 @@
   .kit-heading small { max-width: 42ch; color: var(--p66-amber); font-size: 11px; line-height: 1.45; }
 
   .curated-kit-grid,
-  .custom-kit-grid { grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 14px; }
+  .custom-kit-grid { grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 14px; }
   .custom-kit-grid { margin-top: 14px; }
   .kit-card,
   .custom-kit-grid .kit-card,

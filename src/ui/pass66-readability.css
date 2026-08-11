@@ -277,8 +277,11 @@
 
 .weapon-menu-still {
   position: relative;
+  align-self: start;
+  width: 100%;
   min-width: 0;
-  min-height: 178px;
+  min-height: 0;
+  aspect-ratio: 4 / 3;
   overflow: hidden;
   border: 1px solid rgba(112, 238, 225, 0.24);
   background: #0b141a;
@@ -289,8 +292,9 @@
   display: block;
   width: 100%;
   height: 100%;
-  min-height: 178px;
-  object-fit: cover;
+  min-height: 0;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
   object-position: center;
   filter: saturate(0.82) contrast(1.06) brightness(0.88);
 }
@@ -643,7 +647,7 @@ html[data-reduced-motion='true'] .killstreak-demo-choreography::after,
 
 @media (max-width: 1180px) {
   .weapon-menu-presentation { grid-template-columns: 1fr; }
-  .weapon-menu-still { min-height: 160px; max-height: 210px; }
+  .weapon-menu-still { min-height: 0; max-height: none; }
   .killstreak-loadout-layout { grid-template-columns: minmax(0, 1fr) minmax(280px, 0.72fr); }
 }
 
@@ -673,7 +677,7 @@ html[data-reduced-motion='true'] .killstreak-demo-choreography::after,
   #menu-panel-kit .kit-card:not(.manage-kit-card) { min-height: 0; }
   .weapon-menu-presentation { grid-template-columns: 1fr; }
   .weapon-menu-metrics { grid-template-columns: 1fr; }
-  .weapon-menu-still { min-height: 130px; max-height: 170px; }
+  .weapon-menu-still { min-height: 0; max-height: none; }
 
   .killstreak-slot-grid { grid-template-columns: 1fr; }
   .killstreak-slot-card:nth-child(5) { grid-column: auto; }

@@ -8252,6 +8252,7 @@ function saveManagedPreset(): void {
     });
     const candidate = {
       ...loadoutState,
+      selected: { kind: 'custom', presetId: submittedPresetId } as SelectedLoadoutRef,
       customPresets: loadoutState.customPresets.map((preset) => preset.id === submittedPresetId ? updated : preset),
     };
     if (!persistLoadoutState(candidate)) {

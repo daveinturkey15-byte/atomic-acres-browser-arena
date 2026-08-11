@@ -41,6 +41,20 @@ test('keeps Pass 70 Field Kit values, bars and selection semantics readable on t
       panelOverflowX: panel.scrollWidth - panel.clientWidth,
     };
   })).toEqual({ pageOverflowX: 0, panelOverflowX: 0 });
+  expect(await page.locator('#menu-panel-kit .kit-grid').evaluateAll((grids) => grids.every((grid) => (
+    getComputedStyle(grid).gridTemplateColumns.split(' ').length === 1
+  )))).toBe(true);
+  expect(await page.locator('#menu-panel-kit [data-weapon-still]').evaluateAll((images) => images.every((node) => {
+    const image = node as HTMLImageElement;
+    const bounds = image.getBoundingClientRect();
+    const sourceWidth = image.naturalWidth || Number(image.getAttribute('width'));
+    const sourceHeight = image.naturalHeight || Number(image.getAttribute('height'));
+    return getComputedStyle(image).objectFit === 'contain'
+      && Math.abs((sourceWidth / sourceHeight) - (bounds.width / bounds.height)) <= 0.02;
+  }))).toBe(true);
+  expect(await page.locator('#menu-panel-kit .kit-card').evaluateAll((cards) => cards.every((card) => (
+    card.getBoundingClientRect().height <= 900
+  )))).toBe(true);
 
   const customThree = page.locator('[data-custom-preset-id="custom-3"]');
   await customThree.tap();

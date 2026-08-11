@@ -63,6 +63,26 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
     await expect.poll(async () => page.locator('#menu-panel-kit [data-weapon-still]').evaluateAll((images) => (
       images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0)
     ))).toBe(true);
+    for (const viewport of [{ width: 1600, height: 900 }, { width: 1280, height: 720 }]) {
+      await page.setViewportSize(viewport);
+      expect(await page.locator('#menu-panel-kit .kit-grid').evaluateAll((grids) => grids.every((grid) => (
+        getComputedStyle(grid).gridTemplateColumns.split(' ').length === 2
+          && grid.scrollWidth <= grid.clientWidth + 1
+      )))).toBe(true);
+      expect(await page.locator('#menu-panel-kit [data-weapon-still]').evaluateAll((images) => images.every((node) => {
+        const image = node as HTMLImageElement;
+        const bounds = image.getBoundingClientRect();
+        const naturalRatio = image.naturalWidth / image.naturalHeight;
+        const renderedRatio = bounds.width / bounds.height;
+        return getComputedStyle(image).objectFit === 'contain'
+          && bounds.width >= 120
+          && Math.abs(naturalRatio - renderedRatio) <= 0.02;
+      }))).toBe(true);
+      expect(await page.locator('#menu-panel-kit .kit-card').evaluateAll((cards) => cards.every((card) => (
+        card.getBoundingClientRect().height <= 720
+      )))).toBe(true);
+    }
+    await page.setViewportSize({ width: 1600, height: 900 });
     await expect(page.locator('#menu-panel-kit')).not.toContainText('ASSET-BACKED STILL');
 
     await page.locator('[data-custom-modify="custom-1"]').click();
@@ -144,9 +164,26 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
     await expect(page.locator('[data-custom-preset-id="custom-2"]')).toBeFocused();
     const afterRevision = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null').revision, PLAYER_PROFILE_STORAGE_KEY);
     expect(afterRevision).toBe(beforeRevision + 1);
+    await expect(page.locator('[data-custom-preset-id="custom-2"]')).toHaveAttribute('aria-current', 'true');
+    await expect(page.locator('[data-custom-preset-id="custom-2"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#menu-panel-kit .kit-card[aria-current="true"]')).toHaveCount(1);
+    await expect(page.locator('#selected-kit-summary strong')).toHaveText('Single Commit');
+    expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null').loadout.selected, PLAYER_PROFILE_STORAGE_KEY))
+      .toEqual({ kind: 'custom', presetId: 'custom-2' });
+    expect(await page.evaluate(() => {
+      const player = window.__ATOMIC_ACRES_DEBUG__.snapshot().player;
+      return { primary: player.primaryWeapon, secondary: player.secondaryWeapon, grenade: player.selectedGrenade };
+    })).toEqual({ primary: 'mp5', secondary: 'machine-pistol', grenade: 'smoke' });
 
     await page.locator('[data-custom-modify="custom-3"]').click();
     await page.locator('#loadout-preset-name').fill('Unsaved Edits Stay');
+    const beforeFailedSave = await page.evaluate((key) => ({
+      profile: localStorage.getItem(key),
+      player: (() => {
+        const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot().player;
+        return { primary: snapshot.primaryWeapon, secondary: snapshot.secondaryWeapon, grenade: snapshot.selectedGrenade };
+      })(),
+    }), PLAYER_PROFILE_STORAGE_KEY);
     await page.evaluate((key) => {
       const storagePrototype = Storage.prototype;
       const original = storagePrototype.setItem;
@@ -162,6 +199,15 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
     await expect(page.locator('#loadout-save-status')).toBeVisible();
     await expect(page.locator('#loadout-save-status')).toContainText('YOUR EDITS ARE STILL HERE');
     await expect(page.locator('[data-custom-preset-id="custom-3"] [data-custom-name]')).not.toHaveText('Unsaved Edits Stay');
+    await expect(page.locator('[data-custom-preset-id="custom-2"]')).toHaveAttribute('aria-current', 'true');
+    await expect(page.locator('[data-custom-preset-id="custom-3"]')).not.toHaveAttribute('aria-current', /.+/u);
+    expect(await page.evaluate((key) => ({
+      profile: localStorage.getItem(key),
+      player: (() => {
+        const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot().player;
+        return { primary: snapshot.primaryWeapon, secondary: snapshot.secondaryWeapon, grenade: snapshot.selectedGrenade };
+      })(),
+    }), PLAYER_PROFILE_STORAGE_KEY)).toEqual(beforeFailedSave);
     await page.evaluate(() => {
       const restore = (window as typeof window & { __PASS70_RESTORE_SET_ITEM__?: typeof Storage.prototype.setItem }).__PASS70_RESTORE_SET_ITEM__;
       if (restore) Storage.prototype.setItem = restore;
