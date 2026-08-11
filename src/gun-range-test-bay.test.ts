@@ -4,6 +4,7 @@ import { PASS65_KILLSTREAK_CATALOG } from './killstreak-catalog';
 import { WEAPON_IDS } from './protocol';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
+  GUN_RANGE_TEST_BAY_DEFAULT_TIMER_DURATION_MS,
   GUN_RANGE_TEST_BAY_DOOR_OPEN_MS,
   advanceGunRangeTestBayDoor,
   createGunRangeTestBayDoorState,
@@ -11,11 +12,22 @@ import {
   gunRangeTestBayDoorLeafBounds,
   gunRangeTestBayDummyPose,
   gunRangeTestBayRenderedDummyPose,
+  gunRangeTestBayFrozenTimer,
   nearestGunRangeTestBaySupportStation,
   nearestGunRangeTestBayWeaponStation,
 } from './gun-range-test-bay';
 
 describe('Gun Range grey test-bay authority', () => {
+  it('re-anchors the full timer duration on every in-bay update', () => {
+    const first = gunRangeTestBayFrozenTimer(1_000);
+    const later = gunRangeTestBayFrozenTimer(8_250);
+    expect(first.endsAt - first.phaseStartedAt).toBe(GUN_RANGE_TEST_BAY_DEFAULT_TIMER_DURATION_MS);
+    expect(later.endsAt - later.phaseStartedAt).toBe(GUN_RANGE_TEST_BAY_DEFAULT_TIMER_DURATION_MS);
+    expect(later.endsAt).toBe(8_250 + GUN_RANGE_TEST_BAY_DEFAULT_TIMER_DURATION_MS);
+    expect(() => gunRangeTestBayFrozenTimer(Number.NaN)).toThrow(TypeError);
+    expect(() => gunRangeTestBayFrozenTimer(0, 0)).toThrow(TypeError);
+  });
+
   it('authors a five-second ordinary-walk corridor from the existing range shell', () => {
     const ordinaryWalk = movementProfile({
       crouched: false,

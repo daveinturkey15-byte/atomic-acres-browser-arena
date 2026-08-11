@@ -9,6 +9,7 @@ export const GUN_RANGE_TEST_BAY_DOOR_OPEN_MS = 720;
 export const GUN_RANGE_TEST_BAY_DOOR_TRIGGER_RADIUS_M = 4.2;
 export const GUN_RANGE_TEST_BAY_DOOR_RELEASE_RADIUS_M = 6.4;
 export const GUN_RANGE_TEST_BAY_STATION_INTERACTION_RANGE_M = 2.8;
+export const GUN_RANGE_TEST_BAY_DEFAULT_TIMER_DURATION_MS = 120_000;
 
 const WALK_SPEED_MPS = movementProfile({
   crouched: false,
@@ -114,6 +115,22 @@ export type GunRangeTestBayDoorStep = Readonly<{
   audioIntent: 'secure-door-opening-thump' | null;
   collisionChanged: boolean;
 }>;
+
+export type GunRangeTestBayFrozenTimer = Readonly<{
+  phaseStartedAt: number;
+  endsAt: number;
+}>;
+
+/** Keep the range clock at its full duration while the player remains in the test bay. */
+export function gunRangeTestBayFrozenTimer(
+  nowMs: number,
+  durationMs = GUN_RANGE_TEST_BAY_DEFAULT_TIMER_DURATION_MS,
+): GunRangeTestBayFrozenTimer {
+  if (!Number.isFinite(nowMs) || nowMs < 0 || !Number.isFinite(durationMs) || durationMs <= 0) {
+    throw new TypeError('test-bay timer requires finite non-negative time and positive duration');
+  }
+  return Object.freeze({ phaseStartedAt: nowMs, endsAt: nowMs + durationMs });
+}
 
 function distanceToDoorTrigger(position: Readonly<Point3>): number {
   const trigger = GUN_RANGE_TEST_BAY_CONTRACT.door.trigger;

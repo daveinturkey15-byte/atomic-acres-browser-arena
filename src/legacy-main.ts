@@ -67,6 +67,8 @@ import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRu
 import { RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES } from './rigged-bot-visual-evidence-contract';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
+  GUN_RANGE_TEST_BAY_DEFAULT_TIMER_DURATION_MS,
+  gunRangeTestBayFrozenTimer,
   nearestGunRangeTestBaySupportStation,
   nearestGunRangeTestBayWeaponStation,
 } from './gun-range-test-bay';
@@ -2844,8 +2846,6 @@ function invalidateActiveWorldCollisionCache(): void {
 
 let gunRangeTestBayDoorColliders: readonly DynamicWorldCollider[] = [];
 let gunRangeTestBayDoorColliderArena: THREE.Object3D | null = null;
-let gunRangeTestBayTimerResetLastEpoch = -1;
-let gunRangeTestBayPlayerWasInside = false;
 
 function activeGunRangeTestBayDoorColliders(activeArena: ArenaMap = arena): readonly DynamicWorldCollider[] {
   return activeArena === arena && selectedArena.id === 'gun-range'
@@ -21090,15 +21090,12 @@ function updateHud(now: number): void {
       const bay = GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds;
       const inBay = player.position.x >= bay.minX && player.position.x <= bay.maxX
         && player.position.z >= bay.minZ && player.position.z <= bay.maxZ;
-      const entered = inBay && !gunRangeTestBayPlayerWasInside;
-      gunRangeTestBayPlayerWasInside = inBay;
-      if (entered || inBay && gunRangeTestBayTimerResetLastEpoch !== interactiveWorldMatchEpoch) {
-        gunRangeTestBayTimerResetLastEpoch = interactiveWorldMatchEpoch;
+      if (inBay) {
         const rules = currentMatchRules();
-        const durationMs = rules.durationMs ?? 120_000;
+        const durationMs = rules.durationMs ?? GUN_RANGE_TEST_BAY_DEFAULT_TIMER_DURATION_MS;
         // Freeze at the full duration: reset on every fresh entry, then keep
         // the end anchored to now while inside so the clock never counts down.
-        matchState = { phase: 'active', phaseStartedAt: now, endsAt: now + durationMs, winner: null };
+        matchState = { phase: 'active', ...gunRangeTestBayFrozenTimer(now, durationMs), winner: null };
       }
     }
     updateMatchState(now);
