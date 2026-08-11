@@ -47,13 +47,13 @@ describe('Blender authoring process contract', () => {
   it('pins the hashed operator-arms contact receipt to LF bytes', () => {
     const repository = path.resolve(import.meta.dirname, '..');
     const runner = readFileSync(path.join(repository, 'scripts/blender/run-authoring.mjs'), 'utf8');
-    const builder = readFileSync(
-      path.join(repository, 'scripts/blender/build-pass65-djmaesen-first-person-arms.py'),
+    const exporter = readFileSync(
+      path.join(repository, 'scripts/blender/export-pass69-3-first-person-operator-arms.py'),
       'utf8',
     );
 
-    expect(runner).toContain("assertLfOnly(`${reviews}/weapon-contact-receipt.json`");
+    expect(runner).toContain("`${reviews}/pass69-3-first-person-arms-contact-receipt.json`");
     expect(runner).toContain('bytes.includes(13)');
-    expect(builder).toContain('newline="\\n"');
+    expect(exporter).toContain('newline="\\n"');
   });
 });
