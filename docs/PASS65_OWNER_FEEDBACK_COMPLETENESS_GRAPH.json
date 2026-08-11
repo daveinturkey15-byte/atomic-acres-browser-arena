@@ -332,13 +332,30 @@
       "outcomeProjectionSha256": "52348743a221e7821349f522368f367f2a998487e09081ad99aa9850957172fe"
     },
     {
+      "id": "SRC-CODEX-P70-AUG11-HITL2-001",
+      "kind": "codex-owner-feedback",
+      "externalLocator": "codex-task:pass70-owner-hitl2-2026-08-11#feedback-and-screenshot",
+      "rawByteLength": 1335,
+      "rawSha256": "04bf8e68e8b1cc7e7eb2fd6b5cf14b5c5c148e60649d889094e1739e0f41f942",
+      "rawEndsWithCrLf": false,
+      "normalizedRepositoryPath": "docs/pass70-sources/codex-owner-hitl2-2026-08-11.txt",
+      "normalization": "UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged",
+      "normalizedByteLength": 1322,
+      "normalizedSha256": "b474d4b73abd16d481fa5b55f4b4206efe9daf342259ca4beb7a74865a67e1d7",
+      "outcomeCollection": "codexPass70August11Hitl2Outcomes",
+      "outcomeIdPrefix": "P70HITL2",
+      "outcomeCount": 19,
+      "lineAtomCounts": {"1":3,"3":4,"5":2,"7":2,"9":1,"11":1,"13":4,"15":2},
+      "outcomeProjectionSha256": "965e8260dd170ad173dddebbd9ed14dff914891bbca663e939e647c180dacf51"
+    },
+    {
       "id": "SRC-CORRECTION-LEDGER-001",
       "kind": "canonical-correction-ledger",
       "repositoryPath": "docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md",
       "ledgerVersion": 1,
-      "latestFeedbackId": "HF-259",
-      "outcomeCount": 259,
-      "stateIndependentOutcomeSha256": "3012bceb287d83426c3a03f4fcc3acc27dc3612a1e7d37bd3ed02498cfec03a1"
+      "latestFeedbackId": "HF-271",
+      "outcomeCount": 271,
+      "stateIndependentOutcomeSha256": "17073a3d96d5afcebcb9c28ab87d308fe9b9b9de1ca6bd5d9e5e6bcb7288017e"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -1022,7 +1039,7 @@
     "outcomeIdTemplate": "CORR-{feedbackId}",
     "sourceLocatorTemplate": "{feedbackId}.observation",
     "feedbackIdStart": "HF-001",
-    "feedbackIdEnd": "HF-259"
+    "feedbackIdEnd": "HF-271"
   },
   "supersessions": [
     {
@@ -7429,7 +7446,19 @@
     {"id":"HF-256","sourceOutcomeIds":["CORR-HF-256","P70AUG11MP-010"],"planningRequirementIds":["R108","R200","R201","R202","R203","R204","R205","R600","R609"],"canonicalOwner":"Arena accessibility projection","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MULTIPLAYER-STABILITY","T-HUD-E2E"],"artifactRefs":[]}},
     {"id":"HF-257","sourceOutcomeIds":["CORR-HF-257","P70AUG11MP-011"],"planningRequirementIds":["R003","R304","R307","R600","R604","R608","R610","R613"],"canonicalOwner":"Multiplayer QA/release tooling","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MULTIPLAYER-STABILITY","T-NETWORK","T-RELEASE-SHELL"],"artifactRefs":[]}},
     {"id":"HF-258","sourceOutcomeIds":["CORR-HF-258","P70AUG11MP-001","P70AUG11MP-002","P70AUG11MP-003","P70AUG11MP-004","P70AUG11MP-005","P70AUG11MP-013","P70AUG11MP-014","P70AUG11MP-015","P70AUG11MP-016","P70AUG11MP-017","P70AUG11MP-018","P70AUG11MP-019"],"planningRequirementIds":["R002","R003","R004","R304","R307","R600","R604","R608","R610","R613"],"canonicalOwner":"Multiplayer release benchmark","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MULTIPLAYER-STABILITY","T-PASS63-MULTIPLAYER-COMPARATOR","T-NETWORK"],"artifactRefs":[]}},
-    {"id":"HF-259","sourceOutcomeIds":["CORR-HF-259","P70AUG11MP-020"],"planningRequirementIds":["R109","R232","R304","R307","R600","R604","R608","R610"],"canonicalOwner":"Multiplayer death-drop authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MULTIPLAYER-STABILITY","T-INTERACTION","T-NETWORK"],"artifactRefs":[]}}
+    {"id":"HF-259","sourceOutcomeIds":["CORR-HF-259","P70AUG11MP-020"],"planningRequirementIds":["R109","R232","R304","R307","R600","R604","R608","R610"],"canonicalOwner":"Multiplayer death-drop authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MULTIPLAYER-STABILITY","T-INTERACTION","T-NETWORK"],"artifactRefs":[]}},
+    {"id":"HF-260","sourceOutcomeIds":["CORR-HF-260","P70HITL2-001","P70HITL2-002"],"planningRequirementIds":["R108","R200","R201","R202","R203","R204","R205","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R600","R608","R609"],"canonicalOwner":"Loadout UI/weapon-art presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FIELD-KIT-MENU","T-PASS70-FIELD-KIT-UNIT","T-PASS70-FIELD-KIT-BROWSER","T-HUD-E2E","T-HUD-UNIT"],"artifactRefs":[]}},
+    {"id":"HF-261","sourceOutcomeIds":["CORR-HF-261","P70HITL2-003"],"planningRequirementIds":["R201","R202","R205","R306","R600","R609"],"canonicalOwner":"Loadout persistence/selection authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FIELD-KIT-MENU","T-PASS70-FIELD-KIT-UNIT","T-PASS70-FIELD-KIT-BROWSER","T-HUD-E2E","T-HUD-UNIT","T-PERSISTENCE"],"artifactRefs":[]}},
+    {"id":"HF-262","sourceOutcomeIds":["CORR-HF-262","P70HITL2-004","P70HITL2-005","P70HITL2-006"],"planningRequirementIds":["R105","R108","R110","R232","R307","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R605","R608","R610"],"canonicalOwner":"Viewmodel contact/framing forge","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-VIEWMODEL-FRAMING","T-PASS69-3-NEAR-PLANE","T-PRONE-CONTACT-MATRIX","T-WEAPON-PRESENTATION"],"artifactRefs":[]}},
+    {"id":"HF-263","sourceOutcomeIds":["CORR-HF-263","P70HITL2-007","P70HITL2-008","P70HITL2-009"],"planningRequirementIds":["R105","R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R608","R609"],"canonicalOwner":"First-person rig/grip authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-VIEWMODEL-FRAMING","T-WEAPON-PRESENTATION","T-WEAPON-ASSET-GATE"],"artifactRefs":[]}},
+    {"id":"HF-264","sourceOutcomeIds":["CORR-HF-264","P70HITL2-010"],"planningRequirementIds":["R108","R113","R115","R304","R504","R509","R511","R608","R609"],"canonicalOwner":"Support vehicle asset/presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-SUPPORT-VEHICLE-GATE","T-SUPPORT-VISUAL-E2E","T-SUPPORT-FORWARD","T-PROVENANCE","T-PASS69-3-SUPPORT-AIRCRAFT-LIVE"],"artifactRefs":[]}},
+    {"id":"HF-265","sourceOutcomeIds":["CORR-HF-265","P70HITL2-011"],"planningRequirementIds":["R113","R304","R504","R608","R609"],"canonicalOwner":"Support HUD/cockpit presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-SUPPORT-OPERATE-PROMPT","T-SUPPORT-RUNTIME","T-SUPPORT-VISUAL-E2E","T-VIEWMODEL-FRAMING"],"artifactRefs":[]}},
+    {"id":"HF-266","sourceOutcomeIds":["CORR-HF-266","P70HITL2-012"],"planningRequirementIds":["R105","R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R236","R608","R609"],"canonicalOwner":"Railgun optic/lens presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RAILGUN","T-ADS-SIGHT-CATALOG","T-SCOPED-ADS","T-WEAPON-PRESENTATION","T-PASS70-OPTIC-MATERIAL"],"artifactRefs":[]}},
+    {"id":"HF-267","sourceOutcomeIds":["CORR-HF-267","P70HITL2-013"],"planningRequirementIds":["R110","R304","R608","R609"],"canonicalOwner":"Gun Range environment/lighting forge","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-GUN-RANGE-TEST-BAY","T-ADDITIONAL-MAPS","T-PROFILE-AUTHORITY-E2E"],"artifactRefs":[]}},
+    {"id":"HF-268","sourceOutcomeIds":["CORR-HF-268","P70HITL2-014"],"planningRequirementIds":["R105","R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R608"],"canonicalOwner":"Flare Gun asset/presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-WEAPON-PRESENTATION","T-WEAPON-ASSET-GATE","T-TIMED-MAP-WEAPONS"],"artifactRefs":[]}},
+    {"id":"HF-269","sourceOutcomeIds":["CORR-HF-269","P70HITL2-015"],"planningRequirementIds":["R109","R232","R236","R304","R510","R600","R610"],"canonicalOwner":"Timed weapon/human-hit authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-TIMED-MAP-WEAPONS","T-PASS69-3-FLAME-FLARE-POOL","T-MULTIPLAYER-STABILITY","T-NETWORK"],"artifactRefs":[]}},
+    {"id":"HF-270","sourceOutcomeIds":["CORR-HF-270","P70HITL2-016","P70HITL2-017"],"planningRequirementIds":["R110","R304","R307","R600","R604","R608","R610"],"canonicalOwner":"Gun Range multiplayer clock authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-GUN-RANGE-TEST-BAY","T-MULTIPLAYER-STABILITY","T-NETWORK","T-ADDITIONAL-MAPS"],"artifactRefs":[]}},
+    {"id":"HF-271","sourceOutcomeIds":["CORR-HF-271","P70HITL2-018","P70HITL2-019"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"],"canonicalOwner":"Pass 70 integration/HITL lineage","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OWNER-GATE","T-RELEASE-SHELL","T-PASS70-START-BENCHMARK"],"artifactRefs":[]}}
   ],
   "desktopUntitledOutcomes": [
     {
@@ -9166,5 +9195,26 @@
     {"id":"P70AUG11MP-019","sourceLocator":"L19#1","normalizedOutcome":"Preserve the adverse-network matrix with zero duplicate side effects in the final Pass 70 comparator.","feedbackIds":["HF-258"],"planningRequirementIds":["R002","R003","R004","R304","R307","R600","R604","R608","R610","R613"]},
     {"id":"P70AUG11MP-020","sourceLocator":"L20#1","normalizedOutcome":"Confirm or disprove death-drop scavenging separately from unrelated startup timeouts.","feedbackIds":["HF-259"],"planningRequirementIds":["R109","R232","R304","R307","R600","R604","R608","R610"]},
     {"id":"P70AUG11MP-021","sourceLocator":"L21#1","normalizedOutcome":"Retain the supplied Pass 69 evidence-report path as provenance rather than a separate runtime requirement.","feedbackIds":[],"planningRequirementIds":[],"disposition":"excluded-nonproduct","exclusionReason":"The line is an evidence locator for the projected comparator and issue outcomes, not an independent product behavior."}
+  ],
+  "codexPass70August11Hitl2Outcomes": [
+    {"id":"P70HITL2-001","sourceLocator":"L1#1","normalizedOutcome":"Field Kit and Custom weapon images must preserve their authored aspect ratio and never appear squashed.","feedbackIds":["HF-260"],"planningRequirementIds":["R108","R200","R201","R202","R203","R204","R205","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R600","R608","R609"]},
+    {"id":"P70HITL2-002","sourceLocator":"L1#2","normalizedOutcome":"Use available selection space more effectively, with two cards per row where three would compress the weapon art.","feedbackIds":["HF-260"],"planningRequirementIds":["R108","R200","R201","R202","R203","R204","R205","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R600","R608","R609"]},
+    {"id":"P70HITL2-003","sourceLocator":"L1#3","normalizedOutcome":"Finishing a Custom loadout must equip that Custom slot instead of leaving a default Field Kit active.","feedbackIds":["HF-261"],"planningRequirementIds":["R201","R202","R205","R306","R600","R609"]},
+    {"id":"P70HITL2-004","sourceLocator":"L3#1","normalizedOutcome":"First-person weapons must not clip through nearby walls.","feedbackIds":["HF-262"],"planningRequirementIds":["R105","R108","R110","R232","R307","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R605","R608","R610"]},
+    {"id":"P70HITL2-005","sourceLocator":"L3#2","normalizedOutcome":"First-person weapons and arms must not clip through the floor, including while prone.","feedbackIds":["HF-262"],"planningRequirementIds":["R105","R108","R110","R232","R307","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R605","R608","R610"]},
+    {"id":"P70HITL2-006","sourceLocator":"L3#3","normalizedOutcome":"Forearms must continue naturally off the bottom of the screen rather than terminate or float visibly in the viewport.","feedbackIds":["HF-262"],"planningRequirementIds":["R105","R108","R110","R232","R307","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R605","R608","R610"]},
+    {"id":"P70HITL2-007","sourceLocator":"L3#4","normalizedOutcome":"First-person grips must read as normal human poses rather than inverted or anatomically implausible arm configurations.","feedbackIds":["HF-263"],"planningRequirementIds":["R105","R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R608","R609"]},
+    {"id":"P70HITL2-008","sourceLocator":"L5#1","normalizedOutcome":"Handguns must use a one-handed first-person grip instead of a two-handed grip.","feedbackIds":["HF-263"],"planningRequirementIds":["R105","R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R608","R609"]},
+    {"id":"P70HITL2-009","sourceLocator":"L5#2","normalizedOutcome":"Correct mirrored, back-to-front or reversed first-person arm rigging consistently across the full weapon catalog.","feedbackIds":["HF-263"],"planningRequirementIds":["R105","R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R608","R609"]},
+    {"id":"P70HITL2-010","sourceLocator":"L7#1","normalizedOutcome":"Chopper Gunner possession must show the current complete authored model rather than an old or incomplete vehicle asset.","feedbackIds":["HF-264"],"planningRequirementIds":["R108","R113","R115","R304","R504","R509","R511","R608","R609"]},
+    {"id":"P70HITL2-011","sourceLocator":"L7#2","normalizedOutcome":"Chopper Gunner HUD and cockpit presentation must keep the centre view clear and remove opaque obstructing assets while matching the supplied reference intent.","feedbackIds":["HF-265"],"planningRequirementIds":["R113","R304","R504","R608","R609"]},
+    {"id":"P70HITL2-012","sourceLocator":"L9#1","normalizedOutcome":"Preserve the accepted Railgun ADS and scope behavior while making the physical pre-ADS rifle optic lens clear instead of an opaque block.","feedbackIds":["HF-266"],"planningRequirementIds":["R105","R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R236","R608","R609"]},
+    {"id":"P70HITL2-013","sourceLocator":"L11#1","normalizedOutcome":"Give the Gun Range killstreak-room door authored textures, mapping and practical lighting with a high-quality futuristic Danger Room or Cerebro-like finish rather than a dark black slab.","feedbackIds":["HF-267"],"planningRequirementIds":["R110","R304","R608","R609"]},
+    {"id":"P70HITL2-014","sourceLocator":"L13#1","normalizedOutcome":"Make the Flare Gun presentation three to five times wider than the current undersized model.","feedbackIds":["HF-268"],"planningRequirementIds":["R105","R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R608"]},
+    {"id":"P70HITL2-015","sourceLocator":"L13#2","normalizedOutcome":"A Flare projectile must deal its direct-hit damage exactly once when it collides with a human before continuing to its ground-fire impact.","feedbackIds":["HF-269"],"planningRequirementIds":["R109","R232","R236","R304","R510","R600","R610"]},
+    {"id":"P70HITL2-016","sourceLocator":"L13#3","normalizedOutcome":"Gun Range matches must start and reset to exactly two minutes.","feedbackIds":["HF-270"],"planningRequirementIds":["R110","R304","R307","R600","R604","R608","R610"]},
+    {"id":"P70HITL2-017","sourceLocator":"L13#4","normalizedOutcome":"The shared Gun Range clock must pause while any admitted alive participant is inside the killstreak room, whether that participant is the host or a guest.","feedbackIds":["HF-270"],"planningRequirementIds":["R110","R304","R307","R600","R604","R608","R610"]},
+    {"id":"P70HITL2-018","sourceLocator":"L15#1","normalizedOutcome":"Preserve every other accepted Pass 70 behavior while applying this correction round.","feedbackIds":["HF-271"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"]},
+    {"id":"P70HITL2-019","sourceLocator":"L15#2","normalizedOutcome":"After the corrections are integrated and verified, provide another clean exact-SHA local HITL candidate without publishing it.","feedbackIds":["HF-271"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"]}
   ]
 }
