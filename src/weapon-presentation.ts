@@ -23,6 +23,9 @@ import { reloadActionEvents, reloadPoseAt, viewmodelReloadStageAt, type ReloadPo
 import { advanceAdsBlend, advanceWeaponHeat, fireCycleAt } from './weapon-presentation-state';
 import { weaponFamilyPresentation } from './weapon-family-presentation';
 import {
+  PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT,
+  PASS70_FIRST_PERSON_OPTIC_WINDOW_OPACITY,
+  capturePass70FirstPersonMaterialState,
   createPass65CrossbowModel,
   createPass65FieldKnifeModel,
   createPass65WeaponModel,
@@ -78,15 +81,6 @@ type RiggedViewArm = FirstPersonArmChain & {
   bindShoulderPosition: THREE.Vector3;
   bindShoulderScale: THREE.Vector3;
 };
-type AdsClearanceMaterial = Readonly<{
-  material: THREE.Material;
-  originalOpacity: number;
-  originalTransparent: boolean;
-  originalDepthWrite: boolean;
-  targetOpacity: number;
-  surface: 'lens' | 'primary' | 'gunmetal' | 'polymer' | 'rubber' | 'accent' | 'other-static';
-}>;
-
 type ViewArmRig = {
   side: 'left' | 'right';
   shoulder: THREE.Group;
@@ -376,9 +370,9 @@ const FIRST_PERSON_ADS_BORE_RADIUS: Readonly<Partial<Record<WeaponId, number>>> 
 });
 const FIRST_PERSON_ADS_SIGHT_PICTURE_RETREAT: Readonly<Partial<Record<WeaponId, number>>> = Object.freeze({
   // The authored muzzle/front-sight geometry extends close to the camera when
-  // its rear socket is centred. A bounded ADS-only retreat keeps the complete
-  // ghosted silhouette and opaque arms below the sight window without changing
-  // the hip silhouette, source model scale, sockets or authoritative aim ray.
+  // its rear socket is centred. A bounded ADS-only retreat keeps the opaque
+  // authored silhouette and arms below the physical sight window without
+  // changing the source model, sockets or authoritative aim ray.
   carbine: 0.26,
   'mini-uzi': 0.3,
 });
@@ -2751,94 +2745,6 @@ export class WeaponPresentation {
     this.root.updateWorldMatrix(true, true);
   }
 
-  private readonly adsClearanceMaterials = new WeakMap<THREE.Object3D, ReadonlyArray<AdsClearanceMaterial>>();
-  private adsClearanceWeapon: WeaponId | null = null;
-  private adsClearanceBlend = 0;
-
-  /**
-   * Ghosts the complete static HK416/Mini Uzi silhouette only while ADS is
-   * settled. These release GLBs merge the receiver, optic frame, polymer and
-   * stock surfaces into material batches; treating only Primary_PBR/Lens left
-   * the other batches as a large opaque wall around the physical sight bore.
-   * Action and magazine batches stay solid, and every per-viewmodel material
-   * clone is restored exactly on ADS release or weapon switch.
-   */
-  private applyAdsOpticClearance(adsBlend: number): void {
-    const restore = (weapon: WeaponId | null) => {
-      if (!weapon) return;
-      const previous = this.models.get(weapon);
-      if (!previous) return;
-      for (const entry of this.adsClearanceMaterials.get(previous) ?? []) {
-        const transparentChanged = entry.material.transparent !== entry.originalTransparent;
-        const depthWriteChanged = entry.material.depthWrite !== entry.originalDepthWrite;
-        entry.material.opacity = entry.originalOpacity;
-        entry.material.transparent = entry.originalTransparent;
-        entry.material.depthWrite = entry.originalDepthWrite;
-        if (transparentChanged || depthWriteChanged) entry.material.needsUpdate = true;
-      }
-    };
-    if (this.adsClearanceWeapon !== this.active) restore(this.adsClearanceWeapon);
-    this.adsClearanceWeapon = this.active;
-    const model = this.mountedModel();
-    if (!model || (this.active !== 'carbine' && this.active !== 'mini-uzi')) {
-      this.adsClearanceBlend = 0;
-      return;
-    }
-    let materials = this.adsClearanceMaterials.get(model);
-    if (!materials) {
-      const collected: AdsClearanceMaterial[] = [];
-      const seen = new Set<THREE.Material>();
-      model.traverse((node) => {
-        if (!(node instanceof THREE.Mesh) || !node.name.includes('Runtime_static')) return;
-        const surface: AdsClearanceMaterial['surface'] = node.name.includes('_Lens')
-          ? 'lens'
-          : node.name.includes('_Primary_PBR')
-            ? 'primary'
-            : node.name.includes('_Gunmetal')
-              ? 'gunmetal'
-              : node.name.includes('_Polymer_PBR')
-                ? 'polymer'
-                : node.name.includes('_Rubber')
-                  ? 'rubber'
-                  : node.name.includes('_Accent') ? 'accent' : 'other-static';
-        const targetOpacity = surface === 'lens'
-          ? 0.025
-          : surface === 'accent'
-            ? 0.14
-            : surface === 'polymer' || surface === 'rubber'
-              ? 0.1
-              : surface === 'gunmetal' ? 0.09 : 0.07;
-        const candidates = Array.isArray(node.material) ? node.material : [node.material];
-        for (const material of candidates) {
-          if (seen.has(material)) continue;
-          seen.add(material);
-          collected.push(Object.freeze({
-            material,
-            originalOpacity: material.opacity,
-            originalTransparent: material.transparent,
-            originalDepthWrite: material.depthWrite,
-            targetOpacity,
-            surface,
-          }));
-        }
-      });
-      materials = Object.freeze(collected);
-      this.adsClearanceMaterials.set(model, materials);
-    }
-    const clearance = THREE.MathUtils.smoothstep(adsBlend, 0.58, 0.94);
-    this.adsClearanceBlend = clearance;
-    for (const entry of materials) {
-      const transparent = clearance > 0.01 ? true : entry.originalTransparent;
-      const depthWrite = clearance > 0.08 ? false : entry.originalDepthWrite;
-      if (entry.material.transparent !== transparent || entry.material.depthWrite !== depthWrite) {
-        entry.material.transparent = transparent;
-        entry.material.depthWrite = depthWrite;
-        entry.material.needsUpdate = true;
-      }
-      entry.material.opacity = THREE.MathUtils.lerp(entry.originalOpacity, entry.targetOpacity, clearance);
-    }
-  }
-
   presentationState() {
     const model = this.mountedModel();
     const requiredDetails = weaponFamilyPresentation(this.active).requiredDetails;
@@ -2887,23 +2793,17 @@ export class WeaponPresentation {
         && (importedModel.sightForwardDot ?? -1) > 0.995
         && (importedModel.muzzleForwardDot ?? -1) > 0.85
       : requiredDetails.every((name) => model?.getObjectByName(name) !== undefined);
-    const adsClearanceCatalog = (['carbine', 'mini-uzi'] as const).map((weapon) => {
-      const weaponModel = this.models.get(weapon);
-      const entries = weaponModel ? (this.adsClearanceMaterials.get(weaponModel) ?? []) : [];
-      return {
-        weapon,
-        materialCount: entries.length,
-        transparentCount: entries.filter((entry) => entry.material.transparent).length,
-        nonOpaqueCount: entries.filter((entry) => entry.material.opacity < 1).length,
-        depthWriteDisabledCount: entries.filter((entry) => !entry.material.depthWrite).length,
-        restoredCount: entries.filter((entry) => entry.material.opacity === entry.originalOpacity
-          && entry.material.transparent === entry.originalTransparent
-          && entry.material.depthWrite === entry.originalDepthWrite).length,
-        maximumOpacity: entries.reduce((maximum, entry) => Math.max(maximum, entry.material.opacity), 0),
-        maximumTargetOpacity: entries.reduce((maximum, entry) => Math.max(maximum, entry.targetOpacity), 0),
-        surfaces: [...new Set(entries.map((entry) => entry.surface))].sort(),
-      };
-    });
+    const opticMaterialSemantics = model ? capturePass70FirstPersonMaterialState(model) : {
+      contract: PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT,
+      materialCount: 0,
+      markedMaterialCount: 0,
+      opticWindowCount: 0,
+      opaqueBodyCount: 0,
+      presentationDetailCount: 0,
+      invalidOpticWindowCount: 0,
+      invalidOpaqueBodyCount: 0,
+      opticWindows: [],
+    };
     const opaqueSightWindowHits = (() => {
       if (!model || (this.active !== 'carbine' && this.active !== 'mini-uzi')) {
         return {
@@ -2962,13 +2862,10 @@ export class WeaponPresentation {
       firstPersonRearStockTrim: model?.userData.firstPersonRearStockTrim ?? null,
       firstPersonRearOccluderTrim: model?.userData.firstPersonRearOccluderTrim ?? null,
       firstPersonAdsSightBore: model?.userData.firstPersonAdsSightBore ?? null,
-      adsMaterialClearance: {
-        contract: 'static-silhouette-ads-translucency-v2',
-        active: this.active === 'carbine' || this.active === 'mini-uzi',
-        blend: this.adsClearanceBlend,
+      opticMaterialSemantics: {
+        ...opticMaterialSemantics,
+        clearWindowOpacity: PASS70_FIRST_PERSON_OPTIC_WINDOW_OPACITY,
         sightPictureRetreat: this.adsBlend * (FIRST_PERSON_ADS_SIGHT_PICTURE_RETREAT[this.active] ?? 0),
-        materialCount: model ? (this.adsClearanceMaterials.get(model)?.length ?? 0) : 0,
-        catalog: adsClearanceCatalog,
       },
       adsOpaqueSightWindow: opaqueSightWindowHits,
       flamethrowerHeldFireClearance: {
@@ -3489,11 +3386,9 @@ export class WeaponPresentation {
     this.swayX = THREE.MathUtils.lerp(this.swayX, 0, smoothing(7));
     this.swayY = THREE.MathUtils.lerp(this.swayY, 0, smoothing(7));
     this.adsBlend = advanceAdsBlend(this.adsBlend, pose.ads, pose.dt, this.active);
-    // Authored holo-optic rifles (carbine, M4A1, AK-47) mount their optic
-    // housing above the iron-sight socket the ADS camera centres on. Shoulder
-    // the housing out of the sightline while aiming so the centred sight
-    // picture is unobstructed; it returns when the weapon lowers.
-    this.applyAdsOpticClearance(this.adsBlend);
+    // The physical aperture and bounded retreat own ADS clearance. Weapon
+    // receivers, stocks and hands remain opaque; only semantically named lens
+    // materials are clear from model instantiation onward.
     this.root.scale.setScalar(THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend) * viewmodelScreenScale(this.camera));
     this.sprintBlend = THREE.MathUtils.lerp(this.sprintBlend, pose.sprinting ? 1 : 0, smoothing(13));
     this.muzzleFlash.visible = this.muzzleLight.intensity > 0.45;

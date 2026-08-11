@@ -16,6 +16,7 @@ import {
   meleeImportedWeapon,
   releasePass65WeaponModel,
   PASS65_AUTHORED_WEAPON_URLS,
+  PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT,
   updateImportedWeapon,
 } from './weapon-model';
 import { weaponFinishProfile } from './weapon-finish';
@@ -85,6 +86,8 @@ function materialBatchKey(material: THREE.Material): string {
     depthWrite: material.depthWrite,
     polygonOffset: material.polygonOffset,
     polygonOffsetFactor: material.polygonOffsetFactor,
+    firstPersonMaterialContract: material.userData.pass70FirstPersonMaterialContract,
+    firstPersonSurface: material.userData.pass70FirstPersonSurface,
   });
 }
 
@@ -118,13 +121,18 @@ export function batchStaticMeshes(
     const preserveMappedMaterial = materialMode === 'texture-lit' && Boolean(sourceMaterial.map);
     const vertexPalette = materialMode === 'vertex-lit';
     const classification = classify(node);
+    const firstPersonMaterialContract = node.material.userData.pass70FirstPersonMaterialContract;
+    const firstPersonSurface = node.material.userData.pass70FirstPersonSurface;
     const displayColor = batchDisplayColor(node.material);
     const opacityKey = node.material.transparent ? `t${node.material.opacity.toFixed(2)}` : 'opaque';
+    const firstPersonSemanticKey = firstPersonMaterialContract === PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT
+      ? `${firstPersonMaterialContract}:${String(firstPersonSurface)}`
+      : '';
     const key = vertexPalette
-      ? `vertex:${opacityKey}:${classification}`
+      ? `vertex:${opacityKey}:${firstPersonSemanticKey}:${classification}`
       : simplifyMaterials && !preserveMappedMaterial
-      ? `${displayColor.getHexString()}:${opacityKey}:${classification}`
-      : `${materialBatchKey(node.material)}:${classification}`;
+      ? `${displayColor.getHexString()}:${opacityKey}:${firstPersonSemanticKey}:${classification}`
+      : `${materialBatchKey(node.material)}:${firstPersonSemanticKey}:${classification}`;
     let entry = groups.get(key);
     if (!entry) {
       const material = preserveMappedMaterial
@@ -153,6 +161,11 @@ export function batchStaticMeshes(
               depthWrite: !node.material.transparent,
             })
           : node.material;
+      if (firstPersonMaterialContract === PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT) {
+        material.name = node.material.name;
+        material.userData.pass70FirstPersonMaterialContract = firstPersonMaterialContract;
+        material.userData.pass70FirstPersonSurface = firstPersonSurface;
+      }
       entry = {
         material,
         classification,

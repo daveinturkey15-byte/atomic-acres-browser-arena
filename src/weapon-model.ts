@@ -394,6 +394,138 @@ export async function prewarmPass65RuntimeWeaponCorpus(
   return operation;
 }
 
+export const PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT = 'semantic-first-person-optic-window-v1' as const;
+export const PASS70_FIRST_PERSON_OPTIC_WINDOW_OPACITY = 0.1;
+
+export function isFirstPersonOpticWindowSurface(nodeName: string, materialName: string): boolean {
+  const materialSemantic = materialName.trim().toLowerCase();
+  if (/(?:^|[_\-\s])(?:optic)?lens$/u.test(materialSemantic)
+    || /(?:^|[_\-\s])(?:optic|scope|sight)(?:glass|window)$/u.test(materialSemantic)) return true;
+  if (materialSemantic !== '') return false;
+  const nodeSemantic = nodeName.trim().toLowerCase();
+  return /(?:^|[_\-\s])(?:optic)?lens(?:$|[_\-\s])/u.test(nodeSemantic)
+    || /(?:^|[_\-\s])(?:optic|scope|sight)(?:glass|window)(?:$|[_\-\s])/u.test(nodeSemantic);
+}
+
+function isFirstPersonPresentationDetailSurface(nodeName: string, materialName: string): boolean {
+  return /reticle/u.test(`${nodeName} ${materialName}`.toLowerCase());
+}
+
+export function applyPass70WeaponMaterialSemantics(
+  material: THREE.Material,
+  nodeName: string,
+  sourceMaterialName: string,
+  variant: Pass65WeaponVariant,
+): 'optic-window' | 'opaque-body' | 'presentation-detail' | 'non-first-person' {
+  material.name = sourceMaterialName;
+  if (variant !== 'first-person') {
+    material.transparent = false;
+    material.opacity = 1;
+    material.depthWrite = true;
+    return 'non-first-person';
+  }
+
+  const surface = isFirstPersonOpticWindowSurface(nodeName, sourceMaterialName)
+    ? 'optic-window'
+    : isFirstPersonPresentationDetailSurface(nodeName, sourceMaterialName)
+      ? 'presentation-detail'
+      : 'opaque-body';
+  const opticWindow = surface === 'optic-window';
+  material.transparent = opticWindow;
+  material.opacity = opticWindow ? PASS70_FIRST_PERSON_OPTIC_WINDOW_OPACITY : 1;
+  material.depthTest = true;
+  material.depthWrite = !opticWindow;
+  material.alphaTest = opticWindow ? 0 : material.alphaTest;
+  material.userData.pass70FirstPersonMaterialContract = PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT;
+  material.userData.pass70FirstPersonSurface = surface;
+  if (opticWindow && material instanceof THREE.MeshStandardMaterial) {
+    material.metalness = 0.04;
+    material.roughness = 0.12;
+  }
+  return surface;
+}
+
+export type Pass70FirstPersonMaterialState = Readonly<{
+  contract: typeof PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT;
+  materialCount: number;
+  markedMaterialCount: number;
+  opticWindowCount: number;
+  opaqueBodyCount: number;
+  presentationDetailCount: number;
+  invalidOpticWindowCount: number;
+  invalidOpaqueBodyCount: number;
+  opticWindows: readonly Readonly<{
+    mesh: string;
+    material: string;
+    opacity: number;
+    transparent: boolean;
+    depthWrite: boolean;
+  }>[];
+}>;
+
+export function capturePass70FirstPersonMaterialState(root: THREE.Object3D): Pass70FirstPersonMaterialState {
+  const seen = new Set<THREE.Material>();
+  const opticWindows: Array<{
+    mesh: string;
+    material: string;
+    opacity: number;
+    transparent: boolean;
+    depthWrite: boolean;
+  }> = [];
+  let materialCount = 0;
+  let markedMaterialCount = 0;
+  let opticWindowCount = 0;
+  let opaqueBodyCount = 0;
+  let presentationDetailCount = 0;
+  let invalidOpticWindowCount = 0;
+  let invalidOpaqueBodyCount = 0;
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    let ancestor: THREE.Object3D | null = node;
+    while (ancestor && ancestor !== root.parent) {
+      if (!ancestor.visible) return;
+      ancestor = ancestor.parent;
+    }
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const material of materials) {
+      if (seen.has(material)) continue;
+      seen.add(material);
+      materialCount += 1;
+      const marked = material.userData.pass70FirstPersonMaterialContract === PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT;
+      if (marked) markedMaterialCount += 1;
+      if (marked && material.userData.pass70FirstPersonSurface === 'optic-window') {
+        opticWindowCount += 1;
+        opticWindows.push({
+          mesh: node.name,
+          material: material.name,
+          opacity: material.opacity,
+          transparent: material.transparent,
+          depthWrite: material.depthWrite,
+        });
+        if (!material.transparent
+          || material.opacity !== PASS70_FIRST_PERSON_OPTIC_WINDOW_OPACITY
+          || material.depthWrite) invalidOpticWindowCount += 1;
+      } else if (marked && material.userData.pass70FirstPersonSurface === 'presentation-detail') {
+        presentationDetailCount += 1;
+      } else {
+        opaqueBodyCount += 1;
+        if (material.transparent || material.opacity !== 1 || !material.depthWrite) invalidOpaqueBodyCount += 1;
+      }
+    }
+  });
+  return Object.freeze({
+    contract: PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT,
+    materialCount,
+    markedMaterialCount,
+    opticWindowCount,
+    opaqueBodyCount,
+    presentationDetailCount,
+    invalidOpticWindowCount,
+    invalidOpaqueBodyCount,
+    opticWindows: Object.freeze(opticWindows.map((entry) => Object.freeze(entry))),
+  });
+}
+
 function flattenMaterial(material: THREE.Material): THREE.Material {
   const source = material as THREE.MeshStandardMaterial;
   // Reduced-render mode must not read as a missing asset: preserve the full
@@ -401,7 +533,7 @@ function flattenMaterial(material: THREE.Material): THREE.Material {
   // maps). The performance win in this mode comes from batched draw calls and
   // disabled shadow casting, not from degrading the most-seen surface in the
   // game to a flat unlit colour.
-  return new THREE.MeshStandardMaterial({
+  const flattened = new THREE.MeshStandardMaterial({
     color: source.color?.clone() ?? new THREE.Color(0x303944),
     map: source.map ?? null,
     normalMap: source.normalMap ?? null,
@@ -418,6 +550,8 @@ function flattenMaterial(material: THREE.Material): THREE.Material {
     side: source.side,
     depthWrite: true,
   });
+  flattened.name = source.name;
+  return flattened;
 }
 
 function instantiateWeaponAsset(
@@ -436,14 +570,23 @@ function instantiateWeaponAsset(
     if (!(node instanceof THREE.Mesh)) return;
     node.castShadow = !flattenMaterials;
     node.receiveShadow = !flattenMaterials;
+    let containsOpticWindow = false;
     const prepare = (material: THREE.Material) => {
       const result = flattenMaterials ? flattenMaterial(material) : material.clone();
-      result.transparent = false;
-      result.opacity = 1;
-      result.depthWrite = true;
+      if (applyPass70WeaponMaterialSemantics(result, node.name, material.name, variant) === 'optic-window') {
+        containsOpticWindow = true;
+      }
       return result;
     };
     node.material = Array.isArray(node.material) ? node.material.map(prepare) : prepare(node.material);
+    if (containsOpticWindow) {
+      // Reduced mode batches static bodies, but a semantic lens must retain its
+      // own clear material and cannot be replaced by an unmarked opaque batch.
+      node.userData.dynamic = true;
+      node.userData.pass70FirstPersonOpticWindow = true;
+      node.castShadow = false;
+      node.receiveShadow = false;
+    }
     node.userData.presentationOnly = true;
   });
   cloneMeshGeometriesForOwner(visual, `pass65-${id}-${variant}`);

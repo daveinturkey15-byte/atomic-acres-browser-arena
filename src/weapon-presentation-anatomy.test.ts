@@ -78,7 +78,7 @@ describe('first-person anatomical presentation', () => {
     const state = presentation.presentationState();
     expect(state.adsProgress).toBeGreaterThan(0.999);
     expect(presentation.root.scale.x).toBeCloseTo(0.76, 3);
-    expect(state.adsMaterialClearance.sightPictureRetreat).toBeCloseTo(0.26, 3);
+    expect(state.opticMaterialSemantics.sightPictureRetreat).toBeCloseTo(0.26, 3);
     expect(state.viewmodelViewport.rootPosition[2]).toBeLessThan(-1.25);
     expect(state.sightOffset?.[0]).toBeCloseTo(0, 3);
     expect(state.sightOffset?.[1]).toBeCloseTo(0, 3);
