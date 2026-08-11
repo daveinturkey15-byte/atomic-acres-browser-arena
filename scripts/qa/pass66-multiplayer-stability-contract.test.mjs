@@ -302,11 +302,14 @@ test('Qoder death-drop staging proves host authority before natural expiry witho
   const pickupAt = deathDrop.indexOf('), approach.pickup);', middleAt);
   const hostProjectionAt = deathDrop.indexOf('let hostPostScavengeProjection', pickupAt);
   const guestInventoryAt = deathDrop.indexOf('let inventoryAfterScavenge', hostProjectionAt);
+  const ttlMarginAt = deathDrop.indexOf('projection.expiresInMs >= DEATH_DROP_AUTHORITY_TTL_MARGIN_MS', hostProjectionAt);
+  const capturedProjectionAt = deathDrop.indexOf('hostPostScavengeProjection = projection', ttlMarginAt);
   const laterInventoryAt = deathDrop.indexOf('const [laterHostInventory, laterGuestInventory]', guestInventoryAt);
   const exactOnceEvidenceAt = deathDrop.indexOf("attachRejoinEvidence('qoder-death-drop-exact-once'", laterInventoryAt);
   assert.ok(dropObservedAt >= 0 && initialParallelAt > dropObservedAt && fireAt > initialParallelAt);
   assert.ok(reloadAt > fireAt && reloadParallelAt > reloadAt && middleAt > reloadParallelAt && pickupAt > middleAt);
-  assert.ok(hostProjectionAt > pickupAt && guestInventoryAt > hostProjectionAt && laterInventoryAt > guestInventoryAt);
+  assert.ok(hostProjectionAt > pickupAt && ttlMarginAt > hostProjectionAt && capturedProjectionAt > ttlMarginAt);
+  assert.ok(guestInventoryAt > capturedProjectionAt && laterInventoryAt > guestInventoryAt);
   assert.ok(exactOnceEvidenceAt > laterInventoryAt);
   assert.doesNotMatch(deathDrop.slice(laterInventoryAt, exactOnceEvidenceAt), /deathDrops/u);
 
@@ -318,10 +321,14 @@ test('Qoder death-drop staging proves host authority before natural expiry witho
   assert.match(deathDrop, /projection\.weaponAvailable === true/u);
   assert.match(deathDrop, /projection\.hostInventory\?\.reserve === 120/u);
   assert.match(deathDrop, /projection\.hostInventory\?\.grenades === 1/u);
-  assert.match(deathDrop, /projection\.expiresInMs > 0/u);
-  assert.match(deathDrop, /expect\(hostPostScavengeProjection\.expiresInMs\)\.toBeGreaterThan\(0\)/u);
-  assert.match(deathDrop, /wallClockRemainingTtlMs/u);
-  assert.match(deathDrop, /expect\(wallClockRemainingTtlMs\)\.toBeGreaterThan\(0\)/u);
+  assert.match(source, /DEATH_DROP_AUTHORITY_TTL_MARGIN_MS = 5_000/u);
+  assert.match(deathDrop, /projection\.expiresInMs >= DEATH_DROP_AUTHORITY_TTL_MARGIN_MS/u);
+  assert.match(
+    deathDrop,
+    /expect\(hostPostScavengeProjection\.expiresInMs\)\s+\.toBeGreaterThanOrEqual\(DEATH_DROP_AUTHORITY_TTL_MARGIN_MS\)/u,
+  );
+  assert.match(deathDrop, /nonAuthoritativeWallClockRemainingTtlEstimateMs/u);
+  assert.doesNotMatch(deathDrop, /expect\([^)]*WallClock[^)]*\)/u);
   assert.match(deathDrop, /qoder-death-drop-authority-before-expiry/u);
   assert.doesNotMatch(deathDrop, /const inventoryAfterScavenge = await guest\.evaluate/u);
   assert.match(deathDrop, /waitForTimeout\(750\)/u);

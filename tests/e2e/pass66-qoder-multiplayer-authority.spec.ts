@@ -14,6 +14,7 @@ const REJOIN_PRESENTATION_SAMPLE_INTERVAL_MS = 500;
 const REJOIN_PRESENTATION_TRACE_INTERVAL_MS = 5_000;
 const HOST_RECOVERY_END_TO_END_TIMEOUT_MS = 90_000;
 const GUEST_RENDER_RESUME_FRAME_TIMEOUT_MS = 10_000;
+const DEATH_DROP_AUTHORITY_TTL_MARGIN_MS = 5_000;
 const REMOTE_STAGE_ACK_TIMEOUT_MS = 10_000;
 
 type Position3 = readonly [number, number, number];
@@ -795,12 +796,13 @@ test('a guest death-drop scavenge converges through host authority exactly once'
         && projection.weaponAvailable === true
         && projection.hostInventory?.reserve === 120
         && projection.hostInventory?.grenades === 1
-        && projection.expiresInMs > 0) hostPostScavengeProjection = projection;
+        && projection.expiresInMs >= DEATH_DROP_AUTHORITY_TTL_MARGIN_MS) hostPostScavengeProjection = projection;
       return hostPostScavengeProjection !== null;
     }).toBe(true);
     const hostPostScavengeObservedAtEpochMs = Date.now();
     const wallClockElapsedSinceDropObservationMs = hostPostScavengeObservedAtEpochMs - dropObservedAtEpochMs;
-    const wallClockRemainingTtlMs = hostDrop.expiresInMs - wallClockElapsedSinceDropObservationMs;
+    const nonAuthoritativeWallClockRemainingTtlEstimateMs = hostDrop.expiresInMs
+      - wallClockElapsedSinceDropObservationMs;
     expect(hostPostScavengeProjection).toMatchObject({
       remotePresent: true,
       dropPresent: true,
@@ -808,8 +810,8 @@ test('a guest death-drop scavenge converges through host authority exactly once'
       weaponAvailable: true,
       hostInventory: { reserve: 120, grenades: 1 },
     });
-    expect(hostPostScavengeProjection.expiresInMs).toBeGreaterThan(0);
-    expect(wallClockRemainingTtlMs).toBeGreaterThan(0);
+    expect(hostPostScavengeProjection.expiresInMs)
+      .toBeGreaterThanOrEqual(DEATH_DROP_AUTHORITY_TTL_MARGIN_MS);
     await attachRejoinEvidence('qoder-death-drop-authority-before-expiry', {
       drop: {
         id: hostDrop.id,
@@ -819,7 +821,7 @@ test('a guest death-drop scavenge converges through host authority exactly once'
       authorityObservation: {
         observedAtEpochMs: hostPostScavengeObservedAtEpochMs,
         wallClockElapsedSinceDropObservationMs,
-        wallClockRemainingTtlMs,
+        nonAuthoritativeWallClockRemainingTtlEstimateMs,
       },
       hostPostScavengeProjection,
     });
