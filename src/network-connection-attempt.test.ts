@@ -4,6 +4,7 @@ import {
   ArenaNetwork,
   type ArenaPeerFactory,
   hostConnectionAttemptKey,
+  hostRoomReclaimAction,
   joinConnectionAttemptKey,
 } from './network';
 
@@ -198,6 +199,36 @@ describe('ArenaNetwork exactly-once connection attempts', () => {
     expect(network.pendingConnectionAttempt()).toEqual(logicalAttempt);
 
     harness.peers[1].emit('open', 'retained-room');
+    expect(onReady).toHaveBeenCalledOnce();
+    expect(network.pendingConnectionAttempt()).toBeNull();
+  });
+
+  it('reclaims the exact retained room after a long signalling release without opening a fresh room', () => {
+    vi.useFakeTimers();
+    installTimerWindow();
+    const harness = fakePeerFactory();
+    const onReady = vi.fn();
+    const network = new ArenaNetwork(() => undefined, () => undefined, () => undefined, harness.factory);
+
+    network.host(onReady, 'retained-room', true);
+    const logicalAttempt = network.pendingConnectionAttempt();
+    let waitedMs = 0;
+    for (let attempt = 0; attempt <= 16; attempt += 1) {
+      const reclaim = hostRoomReclaimAction(true, attempt);
+      expect(reclaim.action).toBe('retry');
+      if (reclaim.action !== 'retry') throw new Error(`unexpected reclaim decision at ${attempt}`);
+      harness.peers[attempt]!.emit('error', peerError('unavailable-id', 'room is still releasing'));
+      vi.advanceTimersByTime(reclaim.delayMs);
+      waitedMs += reclaim.delayMs;
+      expect(network.pendingConnectionAttempt()).toEqual(logicalAttempt);
+    }
+
+    expect(waitedMs).toBe(57_100);
+    expect(harness.peers).toHaveLength(18);
+    expect(harness.preferredIds).toEqual(Array.from({ length: 18 }, () => 'retained-room'));
+    harness.peers.at(-1)!.emit('open', 'retained-room');
+
+    expect(network.roomCode).toBe('retained-room');
     expect(onReady).toHaveBeenCalledOnce();
     expect(network.pendingConnectionAttempt()).toBeNull();
   });

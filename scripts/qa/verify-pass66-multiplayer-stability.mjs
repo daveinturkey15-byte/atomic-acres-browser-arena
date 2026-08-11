@@ -15,19 +15,20 @@ import {
 const root = resolve(process.cwd());
 const environmentFailures = multiplayerStabilityEnvironmentFailures(process.env);
 if (environmentFailures.length > 0) {
-  throw new Error(`Multiplayer stability QA must run through the clean-SHA owned Pass 66 verifier wrapper: ${environmentFailures.join('; ')}`);
+  throw new Error(`Multiplayer stability QA must run through the clean-SHA owned verifier wrapper: ${environmentFailures.join('; ')}`);
 }
 
 const baseUrl = process.env.QA_BASE_URL;
-const sourceSha = process.env.PASS66_OWNED_SOURCE_SHA;
-const treeSha256 = process.env.PASS66_OWNED_TREE_SHA256;
-const exactRootFileCount = Number(process.env.PASS66_OWNED_FILE_COUNT);
-const receiptPath = process.env.PASS66_OWNED_RECEIPT_PATH;
+const releasePass = process.env.QA_OWNED_RELEASE_PASS;
+const sourceSha = process.env.QA_OWNED_SOURCE_SHA;
+const treeSha256 = process.env.QA_OWNED_TREE_SHA256;
+const exactRootFileCount = Number(process.env.QA_OWNED_FILE_COUNT);
+const receiptPath = process.env.QA_OWNED_RECEIPT_PATH;
 if (existsSync(receiptPath)) {
   throw new Error(`Multiplayer stability verifier refuses a stale receipt: ${receiptPath}`);
 }
 
-const expectedCandidate = { sourceSha, treeSha256, exactRootFileCount };
+const expectedCandidate = { releasePass, sourceSha, treeSha256, exactRootFileCount };
 
 async function readServedCandidate() {
   const response = await fetch(new URL('channel-provenance.json', baseUrl), {
@@ -183,13 +184,14 @@ async function main() {
   }
 
   const receipt = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     status: 'PASS',
     gate: 'multiplayer-stability',
+    releasePass,
     sourceSha,
     servedCandidate,
     servedCandidateAfter,
-    schema: 'atomic-acres/pass66-multiplayer-stability@1',
+    schema: 'atomic-acres/multiplayer-stability@2',
     runner: {
       browser: 'chromium',
       workers: 1,

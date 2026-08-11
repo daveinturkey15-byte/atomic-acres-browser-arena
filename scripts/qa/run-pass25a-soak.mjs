@@ -28,10 +28,20 @@ try {
     if (path === '/favicon.ico') return;
     errors.push(`HTTP ${response.status()} ${response.url()}`);
   });
-  await page.goto(`${baseUrl}?render=performance&seed=pass25a-soak`);
+  const candidateUrl = new URL(baseUrl);
+  candidateUrl.searchParams.set('release', 'latest');
+  candidateUrl.searchParams.set('render', 'performance');
+  candidateUrl.searchParams.set('seed', 'pass25a-soak');
+  await page.goto(candidateUrl.toString());
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
-  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.startSolo());
-  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: 15_000 });
+  await page.waitForFunction(
+    () => [...document.querySelectorAll('.map-card[data-arena-id]')].some((button) => !button.disabled),
+    undefined,
+    { timeout: 60_000 },
+  );
+  await page.fill('#player-name', 'Soak Operator');
+  await page.click('#solo');
+  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
   const contextRecoveryExercised = await page.evaluate(() => {
     const canvas = document.querySelector('#game');
     const gl = canvas?.getContext('webgl2');

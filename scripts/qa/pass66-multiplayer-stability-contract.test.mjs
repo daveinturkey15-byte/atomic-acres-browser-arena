@@ -18,7 +18,7 @@ const exactRootFileCount = 12;
 const candidate = {
   schemaVersion: 4,
   channel: 'the-big-one',
-  releasePass: 'PASS 66',
+  releasePass: 'PASS 70',
   path: 'channels/the-big-one',
   sourceSha,
   treeSha256,
@@ -27,13 +27,14 @@ const candidate = {
 
 function validEnvironment() {
   return {
-    PASS66_OWNED_GATE: 'multiplayer-stability',
+    QA_OWNED_GATE: 'multiplayer-stability',
+    QA_OWNED_RELEASE_PASS: 'PASS 70',
     QA_BASE_URL: 'http://127.0.0.1:4530/channels/the-big-one/',
     BASE_URL: 'http://127.0.0.1:4530/channels/the-big-one/',
-    PASS66_OWNED_SOURCE_SHA: sourceSha,
-    PASS66_OWNED_TREE_SHA256: treeSha256,
-    PASS66_OWNED_FILE_COUNT: String(exactRootFileCount),
-    PASS66_OWNED_RECEIPT_PATH: resolve('artifacts/pass66/multiplayer-stability/receipt.json'),
+    QA_OWNED_SOURCE_SHA: sourceSha,
+    QA_OWNED_TREE_SHA256: treeSha256,
+    QA_OWNED_FILE_COUNT: String(exactRootFileCount),
+    QA_OWNED_RECEIPT_PATH: resolve('artifacts/multiplayer/stability/receipt.json'),
   };
 }
 
@@ -79,16 +80,16 @@ test('owned multiplayer verifier environment fails closed on route or source amb
   }).join('\n'), /exactly match/u);
   assert.match(multiplayerStabilityEnvironmentFailures({
     ...environment,
-    PASS66_OWNED_SOURCE_SHA: 'stale',
+    QA_OWNED_SOURCE_SHA: 'stale',
   }).join('\n'), /source SHA/u);
   assert.match(multiplayerStabilityEnvironmentFailures({
     ...environment,
-    PASS66_OWNED_RECEIPT_PATH: 'relative/receipt.json',
+    QA_OWNED_RECEIPT_PATH: 'relative/receipt.json',
   }).join('\n'), /absolute/u);
 });
 
-test('served provenance requires the exact Pass 66 candidate identity', () => {
-  const expected = { sourceSha, treeSha256, exactRootFileCount };
+test('served provenance requires the exact configured candidate identity', () => {
+  const expected = { releasePass: 'PASS 70', sourceSha, treeSha256, exactRootFileCount };
   assert.deepEqual(multiplayerServedCandidateFailures(candidate, expected), []);
   assert.match(multiplayerServedCandidateFailures({
     ...candidate,
@@ -146,10 +147,11 @@ test('all five runtime specs bind their navigated page through the shared exact-
 test('final receipt binds exact runtime, test matrix and five physical peer identities', () => {
   const baseUrl = 'http://127.0.0.1:4530/channels/the-big-one/';
   const receipt = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     status: 'PASS',
     gate: 'multiplayer-stability',
-    schema: 'atomic-acres/pass66-multiplayer-stability@1',
+    releasePass: 'PASS 70',
+    schema: 'atomic-acres/multiplayer-stability@2',
     sourceSha,
     servedCandidate: candidate,
     servedCandidateAfter: candidate,
@@ -177,7 +179,7 @@ test('final receipt binds exact runtime, test matrix and five physical peer iden
     playwright: summarizeMultiplayerPlaywrightReport(validReport()),
     errors: [],
   };
-  const expected = { sourceSha, treeSha256, exactRootFileCount, baseUrl };
+  const expected = { releasePass: 'PASS 70', sourceSha, treeSha256, exactRootFileCount, baseUrl };
   assert.deepEqual(multiplayerStabilityReceiptFailures(receipt, expected), []);
   assert.match(multiplayerStabilityReceiptFailures({
     ...receipt,

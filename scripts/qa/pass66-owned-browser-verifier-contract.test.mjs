@@ -34,6 +34,18 @@ test('accepts only the exact staged Pass 66 candidate identity', () => {
   }, sourceSha).join('\n'), /tree digest/u);
 });
 
+test('accepts a current multiplayer release pass without weakening staged source identity', () => {
+  const topology = {
+    schemaVersion: 4,
+    sourceSha,
+    releasePass: 'PASS 70',
+    root: { kind: 'chooser-only' },
+    channels: { experimental: { ...candidate, releasePass: 'PASS 70' } },
+  };
+  assert.deepEqual(stagedTopologyFailures(topology, sourceSha, 'PASS 70'), []);
+  assert.match(stagedTopologyFailures(topology, sourceSha, 'PASS 69').join('\n'), /releasePass/u);
+});
+
 test('rejects stale or incomplete installed-Firefox receipts', () => {
   const cycle = {
     label: 'cold', backend: 'webgl2', webglVersion: 'WebGL 2.0', contextState: 'ready',
@@ -214,15 +226,17 @@ test('requires one byte-bound top-panel action surface for both supports across 
 });
 
 test('requires the exact nine-test multiplayer matrix and five tokenized peer identities', () => {
+  const currentCandidate = { ...candidate, releasePass: 'PASS 70' };
   const baseUrl = 'http://127.0.0.1:4530/channels/the-big-one/';
   const receipt = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     status: 'PASS',
     gate: 'multiplayer-stability',
-    schema: 'atomic-acres/pass66-multiplayer-stability@1',
+    releasePass: 'PASS 70',
+    schema: 'atomic-acres/multiplayer-stability@2',
     sourceSha,
-    servedCandidate: candidate,
-    servedCandidateAfter: candidate,
+    servedCandidate: currentCandidate,
+    servedCandidateAfter: currentCandidate,
     runner: {
       browser: 'chromium', workers: 1, retries: 0, externalPreview: true, baseUrl,
       args: [
@@ -259,7 +273,7 @@ test('requires the exact nine-test multiplayer matrix and five tokenized peer id
     errors: [],
   };
   const expected = {
-    gate: 'multiplayer-stability', sourceSha, treeSha256,
+    gate: 'multiplayer-stability', releasePass: 'PASS 70', sourceSha, treeSha256,
     exactRootFileCount: 12, baseUrl,
   };
   assert.deepEqual(ownedBrowserVerifierReceiptFailures(receipt, expected), []);

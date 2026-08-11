@@ -163,7 +163,7 @@ export async function readPersistedClientRuntimeLog(page: Page): Promise<unknown
 type OwnedCandidateIdentity = Readonly<{
   schemaVersion: 4;
   channel: 'the-big-one';
-  releasePass: 'PASS 66';
+  releasePass: string;
   path: 'channels/the-big-one';
   sourceSha: string;
   treeSha256: string;
@@ -177,17 +177,19 @@ type OwnedCandidateIdentity = Readonly<{
  * Stable, a stale dist, or any channel whose provenance differs from S0.
  */
 export async function assertPass66OwnedCandidatePage(page: Page): Promise<void> {
-  const gate = process.env.PASS66_OWNED_GATE;
+  const gate = process.env.QA_OWNED_GATE ?? process.env.PASS66_OWNED_GATE;
   if (gate === undefined) return;
   if (gate !== 'multiplayer-stability') {
-    throw new Error(`Pass 66 multiplayer candidate binding received unexpected owned gate ${gate}`);
+    throw new Error(`Multiplayer candidate binding received unexpected owned gate ${gate}`);
   }
   const expected = {
-    sourceSha: process.env.PASS66_OWNED_SOURCE_SHA ?? '',
-    treeSha256: process.env.PASS66_OWNED_TREE_SHA256 ?? '',
-    exactRootFileCount: Number(process.env.PASS66_OWNED_FILE_COUNT ?? Number.NaN),
+    releasePass: process.env.QA_OWNED_RELEASE_PASS ?? 'PASS 66',
+    sourceSha: process.env.QA_OWNED_SOURCE_SHA ?? process.env.PASS66_OWNED_SOURCE_SHA ?? '',
+    treeSha256: process.env.QA_OWNED_TREE_SHA256 ?? process.env.PASS66_OWNED_TREE_SHA256 ?? '',
+    exactRootFileCount: Number(process.env.QA_OWNED_FILE_COUNT ?? process.env.PASS66_OWNED_FILE_COUNT ?? Number.NaN),
   };
-  if (!/^[a-f0-9]{40}$/u.test(expected.sourceSha)
+  if (!/^PASS \d+(?:\.\d+)?$/u.test(expected.releasePass)
+    || !/^[a-f0-9]{40}$/u.test(expected.sourceSha)
     || !/^[a-f0-9]{64}$/u.test(expected.treeSha256)
     || !Number.isSafeInteger(expected.exactRootFileCount)
     || expected.exactRootFileCount < 2) {
@@ -207,7 +209,7 @@ export async function assertPass66OwnedCandidatePage(page: Page): Promise<void> 
     if (!response.ok) throw new Error(`Candidate provenance returned HTTP ${response.status}`);
     const provenance = await response.json() as OwnedCandidateIdentity;
     if (provenance?.schemaVersion !== 4 || provenance.channel !== 'the-big-one'
-      || provenance.releasePass !== 'PASS 66' || provenance.path !== 'channels/the-big-one'
+      || provenance.releasePass !== ownedIdentity.releasePass || provenance.path !== 'channels/the-big-one'
       || provenance.sourceSha !== ownedIdentity.sourceSha
       || provenance.treeSha256 !== ownedIdentity.treeSha256
       || provenance.exactRootFileCount !== ownedIdentity.exactRootFileCount) {

@@ -21,18 +21,18 @@ function ownedPeerFailures(value, expected, label) {
   return [];
 }
 
-export function stagedTopologyFailures(value, expectedSourceSha) {
+export function stagedTopologyFailures(value, expectedSourceSha, expectedReleasePass = 'PASS 66') {
   const errors = [];
   if (!SHA40.test(expectedSourceSha ?? '')) errors.push('expected source SHA is invalid');
   if (!record(value)) return [...errors, 'topology receipt must be an object'];
   if (value.schemaVersion !== 4) errors.push('topology schemaVersion must be 4');
   if (value.sourceSha !== expectedSourceSha) errors.push('topology sourceSha mismatch');
-  if (value.releasePass !== 'PASS 66') errors.push('topology releasePass must be PASS 66');
+  if (value.releasePass !== expectedReleasePass) errors.push(`topology releasePass must be ${expectedReleasePass}`);
   if (value.root?.kind !== 'chooser-only') errors.push('topology root must remain chooser-only');
   const candidate = value.channels?.experimental;
   if (!record(candidate)) return [...errors, 'topology experimental channel is missing'];
   if (candidate.schemaVersion !== 4 || candidate.channel !== 'the-big-one'
-    || candidate.releasePass !== 'PASS 66' || candidate.sourceSha !== expectedSourceSha
+    || candidate.releasePass !== expectedReleasePass || candidate.sourceSha !== expectedSourceSha
     || candidate.path !== 'channels/the-big-one') {
     errors.push('topology experimental identity mismatch');
   }
@@ -47,7 +47,7 @@ export function servedCandidateFailures(value, expected) {
   if (!record(value)) return ['served candidate provenance must be an object'];
   const errors = [];
   if (value.schemaVersion !== 4 || value.channel !== 'the-big-one'
-    || value.releasePass !== 'PASS 66' || value.path !== 'channels/the-big-one') {
+    || value.releasePass !== (expected.releasePass ?? 'PASS 66') || value.path !== 'channels/the-big-one') {
     errors.push('served candidate identity mismatch');
   }
   if (value.sourceSha !== expected.sourceSha) errors.push('served candidate sourceSha mismatch');
@@ -59,7 +59,10 @@ export function servedCandidateFailures(value, expected) {
 export function ownedBrowserVerifierReceiptFailures(value, expected) {
   if (!record(value)) return ['owned browser verifier receipt must be an object'];
   const errors = [];
-  if (value.schemaVersion !== 1) errors.push('receipt schemaVersion must be 1');
+  const expectedSchemaVersion = expected.gate === 'multiplayer-stability' ? 2 : 1;
+  if (value.schemaVersion !== expectedSchemaVersion) {
+    errors.push(`receipt schemaVersion must be ${expectedSchemaVersion}`);
+  }
   if (value.status !== 'PASS') errors.push('receipt status must be PASS');
   if (value.gate !== expected.gate) errors.push('receipt gate mismatch');
   if (value.sourceSha !== expected.sourceSha) errors.push('receipt sourceSha mismatch');
@@ -185,9 +188,9 @@ export function ownedBrowserVerifierReceiptFailures(value, expected) {
   return errors;
 }
 
-export function assertStagedTopology(value, expectedSourceSha) {
-  const failures = stagedTopologyFailures(value, expectedSourceSha);
-  if (failures.length > 0) throw new Error(`Invalid staged Pass 66 topology: ${failures.join('; ')}`);
+export function assertStagedTopology(value, expectedSourceSha, expectedReleasePass = 'PASS 66') {
+  const failures = stagedTopologyFailures(value, expectedSourceSha, expectedReleasePass);
+  if (failures.length > 0) throw new Error(`Invalid staged ${expectedReleasePass} topology: ${failures.join('; ')}`);
   return value.channels.experimental;
 }
 

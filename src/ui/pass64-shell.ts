@@ -2,7 +2,7 @@ import { WEAPONS } from '../gameplay';
 import { FIELD_KITS } from '../loadout';
 import { WEAPON_CATALOG } from '../combat/weapon-catalog';
 import { GRENADE_CATALOG } from '../combat/grenade-catalog';
-import { ARENA_SELECTIONS, soloLaunchLabel } from '../map-selection';
+import { ARENA_SELECTIONS, arenaCanvasLabel, soloLaunchLabel } from '../map-selection';
 import { CHAT_TEXT_MAX_CHARS } from '../text-chat';
 import { AUDIO_BUS_IDS } from '../pass65-settings';
 import { PASS65_KILLSTREAK_CATALOG } from '../killstreak-catalog';
@@ -409,7 +409,7 @@ function hudMarkup(): string {
 }
 
 export function renderPass64Shell(model: Pass64ShellViewModel): string {
-  return `<canvas id="game" aria-label="Nuke Town multiplayer arena"></canvas>
+  return `<canvas id="game" aria-label="${arenaCanvasLabel(ARENA_SELECTIONS[0]!)}"></canvas>
     <div id="match-pause-backdrop" class="match-pause-backdrop" aria-hidden="true" hidden data-frame-provenance="game-canvas-css-compositor" data-capture-status="empty" data-contract="game-canvas-css-compositor-v1" data-periodic-readback-count="0" data-source-capture-attempt-count="0" data-source-capture-count="0" data-presentation-count="0" data-fallback-count="0"></div>
     <div id="color-grade"></div><div id="film-grain"></div>
     <div id="vignette"></div><div id="low-health-vignette" aria-hidden="true"></div><div id="damage-flash"></div><div id="damage-direction" aria-hidden="true"></div><div id="ordnance-flash" hidden></div><div id="killstreak-logo-flash" hidden></div>

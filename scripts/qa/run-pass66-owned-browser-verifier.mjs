@@ -42,7 +42,7 @@ const targets = Object.freeze({
     verifier: 'scripts/qa/verify-pass66-multiplayer-stability.mjs',
     previewPort: 4530,
     peerPort: null,
-    receipt: 'artifacts/pass66/multiplayer-stability/receipt.json',
+    receipt: 'artifacts/multiplayer/stability/receipt.json',
   }),
 });
 
@@ -51,6 +51,11 @@ const target = targets[gate];
 if (!target) throw new Error(`Owned Pass 66 browser verifier must be one of ${Object.keys(targets).join(', ')}; received ${gate || '(missing)'}`);
 
 const root = process.cwd();
+const configuredReleasePass = JSON.parse(readFileSync(resolve(root, 'release-channels.json'), 'utf8'))?.experimental?.pass;
+const releasePass = gate === 'multiplayer-stability' ? configuredReleasePass : 'PASS 66';
+if (!/^PASS \d+(?:\.\d+)?$/u.test(releasePass ?? '')) {
+  throw new Error(`Owned ${gate} verifier could not resolve an experimental release pass`);
+}
 const receiptPath = resolve(root, target.receipt);
 if (target.evidenceRoot) rmSync(resolve(root, target.evidenceRoot), { recursive: true, force: true });
 mkdirSync(dirname(receiptPath), { recursive: true });
@@ -238,7 +243,7 @@ try {
     env: {
       ...buildEnvironment,
       SOURCE_SHA: sourceSha,
-      RELEASE_PASS: 'PASS 66',
+      RELEASE_PASS: releasePass,
       RELEASE_DIST_ROOT: temporaryDist,
       RELEASE_TOPOLOGY_RECEIPT_PATH: topologyReceiptPath,
     },
@@ -246,7 +251,7 @@ try {
     windowsHide: true,
   });
   const topology = JSON.parse(readFileSync(topologyReceiptPath, 'utf8'));
-  const candidate = assertStagedTopology(topology, sourceSha);
+  const candidate = assertStagedTopology(topology, sourceSha, releasePass);
 
   server = await preview({
     build: { outDir: temporaryDist },
@@ -259,6 +264,12 @@ try {
     NODE_ENV: 'production',
     QA_BASE_URL: baseUrl,
     BASE_URL: baseUrl,
+    QA_OWNED_GATE: gate,
+    QA_OWNED_RELEASE_PASS: releasePass,
+    QA_OWNED_SOURCE_SHA: sourceSha,
+    QA_OWNED_TREE_SHA256: candidate.treeSha256,
+    QA_OWNED_FILE_COUNT: String(candidate.exactRootFileCount),
+    QA_OWNED_RECEIPT_PATH: receiptPath,
     PASS66_OWNED_GATE: gate,
     PASS66_OWNED_SOURCE_SHA: sourceSha,
     PASS66_OWNED_TREE_SHA256: candidate.treeSha256,
@@ -294,6 +305,7 @@ try {
   }
   assertOwnedBrowserVerifierReceipt(receipt, {
     gate,
+    releasePass,
     sourceSha,
     treeSha256: candidate.treeSha256,
     exactRootFileCount: candidate.exactRootFileCount,

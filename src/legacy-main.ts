@@ -262,7 +262,16 @@ import {
   glassAuthorityProjection,
   type GlassImpactProfile,
 } from './glass-authority';
-import { activeSoloBotTarget, arenaSelection, soloLaunchLabel, ARENA_SELECTIONS, type ArenaId, type ArenaSelection } from './map-selection';
+import {
+  activeSoloBotTarget,
+  arenaCanvasLabel,
+  arenaSelection,
+  hostedArenaDurationMs,
+  soloLaunchLabel,
+  ARENA_SELECTIONS,
+  type ArenaId,
+  type ArenaSelection,
+} from './map-selection';
 import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
 import { authoredElevationAt, authoredVerticalRouteTarget, type ArenaVerticalNavigation } from './vertical-navigation';
 import { sourceScreenAngle } from './directional-hud';
@@ -22337,6 +22346,7 @@ function syncArenaSelectionUi(): void {
     ? `${selectedArena.titleLead} <span>${selectedArena.titleAccent}</span>`
     : selectedArena.titleLead;
   element<HTMLElement>('#arena-lede').textContent = selectedArena.menuLede;
+  canvas.setAttribute('aria-label', arenaCanvasLabel(selectedArena));
   renderFieldKitSelection();
 }
 
@@ -23084,6 +23094,7 @@ const updateLobbyConfigFromUi = (): void => {
     capacity,
     hostedBotCount,
     autoBalance: !rangeLobby && mode === 'tdm' && element<HTMLInputElement>('#lobby-auto-balance').checked,
+    durationMs: hostedArenaDurationMs(arenaSelection(arenaId)),
   });
 };
 element<HTMLSelectElement>('#lobby-arena').addEventListener('change', updateLobbyConfigFromUi);
@@ -24978,6 +24989,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       capacity: privateLobbySnapshot.config.capacity,
       hostedBotCount: privateLobbySnapshot.config.hostedBotCount,
       autoBalance: privateLobbySnapshot.config.autoBalance,
+      durationMs: privateLobbySnapshot.config.durationMs,
       members: privateLobbySnapshot.members.map((member) => ({ ...member })),
       scores: [...authoritativeScores.values()].map((score) => ({ ...score })),
       activeAtHostTimeMs: privateMatchActiveAtHostTimeMs,
@@ -27315,13 +27327,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     if (!player.alive) return 'rejected: player-dead';
     if (matchState.phase !== 'active') return `rejected: phase-${matchState.phase}`;
     if (!railgunPickupNearby()) return `rejected: pickup-not-nearby status=${railgunState.status}`;
-    const claimed = claimRailgun(railgunState, player.id, railgunState.generation);
-    if (!claimed.accepted) return 'rejected: claim-not-accepted';
-    dropHeldTimedMapWeapons(player.id, player.position.clone().add(new THREE.Vector3(0, 0.3, 0)));
-    applyRailgunState(claimed.state);
-    recordMatchDiagnostic('railgun-pickup', 'accepted', { actorId: player.id, weaponOrEffect: 'railgun', position: player.position.toArray(), reason: 'host-authoritative-pickup' });
-    broadcastRailgunState();
-    return true;
+    // QA must cross the same ownership boundary as the real Use/Interact input.
+    // The previous shortcut mutated a guest locally and could manufacture a
+    // held-on-guest / available-on-host split that production never authored.
+    return interactWithRailgunPickup();
   },
   degradeStateChannel: () => localMultiplayerQa && network.degradeStateChannelForQa(),
   endMatch: () => {

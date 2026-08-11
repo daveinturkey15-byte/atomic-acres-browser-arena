@@ -69,16 +69,19 @@ function canonicalSpecPath(value) {
 export function multiplayerStabilityEnvironmentFailures(environment) {
   const errors = [];
   const baseUrl = environment.QA_BASE_URL ?? '';
-  if (environment.PASS66_OWNED_GATE !== 'multiplayer-stability') {
+  if (environment.QA_OWNED_GATE !== 'multiplayer-stability') {
     errors.push('owned gate must be multiplayer-stability');
+  }
+  if (!/^PASS \d+(?:\.\d+)?$/u.test(environment.QA_OWNED_RELEASE_PASS ?? '')) {
+    errors.push('owned release pass is invalid');
   }
   if (!OWNED_CANDIDATE_URL.test(baseUrl)) errors.push('QA_BASE_URL must be the owned candidate channel route');
   if (environment.BASE_URL !== baseUrl) errors.push('BASE_URL must exactly match QA_BASE_URL');
-  if (!SHA40.test(environment.PASS66_OWNED_SOURCE_SHA ?? '')) errors.push('owned source SHA is invalid');
-  if (!SHA256.test(environment.PASS66_OWNED_TREE_SHA256 ?? '')) errors.push('owned tree digest is invalid');
-  const fileCount = Number(environment.PASS66_OWNED_FILE_COUNT ?? Number.NaN);
+  if (!SHA40.test(environment.QA_OWNED_SOURCE_SHA ?? '')) errors.push('owned source SHA is invalid');
+  if (!SHA256.test(environment.QA_OWNED_TREE_SHA256 ?? '')) errors.push('owned tree digest is invalid');
+  const fileCount = Number(environment.QA_OWNED_FILE_COUNT ?? Number.NaN);
   if (!Number.isSafeInteger(fileCount) || fileCount < 2) errors.push('owned file count is invalid');
-  if (!isAbsolute(environment.PASS66_OWNED_RECEIPT_PATH ?? '')) errors.push('owned receipt path must be absolute');
+  if (!isAbsolute(environment.QA_OWNED_RECEIPT_PATH ?? '')) errors.push('owned receipt path must be absolute');
   return errors;
 }
 
@@ -86,7 +89,7 @@ export function multiplayerServedCandidateFailures(value, expected) {
   if (!record(value)) return ['served candidate provenance must be an object'];
   const errors = [];
   if (value.schemaVersion !== 4 || value.channel !== 'the-big-one'
-    || value.releasePass !== 'PASS 66' || value.path !== 'channels/the-big-one') {
+    || value.releasePass !== expected.releasePass || value.path !== 'channels/the-big-one') {
     errors.push('served candidate identity mismatch');
   }
   if (value.sourceSha !== expected.sourceSha) errors.push('served candidate source SHA mismatch');
@@ -172,7 +175,7 @@ export function multiplayerPlaywrightReportFailures(value) {
 
 export function summarizeMultiplayerPlaywrightReport(value) {
   const failures = multiplayerPlaywrightReportFailures(value);
-  if (failures.length > 0) throw new Error(`Invalid Pass 66 multiplayer Playwright report: ${failures.join('; ')}`);
+  if (failures.length > 0) throw new Error(`Invalid multiplayer Playwright report: ${failures.join('; ')}`);
   const collected = [];
   collectReportSpecs(value.suites, undefined, collected, []);
   return {
@@ -203,9 +206,10 @@ export function summarizeMultiplayerPlaywrightReport(value) {
 export function multiplayerStabilityReceiptFailures(value, expected) {
   if (!record(value)) return ['multiplayer stability receipt must be an object'];
   const errors = [];
-  if (value.schemaVersion !== 1 || value.status !== 'PASS'
+  if (value.schemaVersion !== 2 || value.status !== 'PASS'
     || value.gate !== 'multiplayer-stability'
-    || value.schema !== 'atomic-acres/pass66-multiplayer-stability@1') {
+    || value.schema !== 'atomic-acres/multiplayer-stability@2'
+    || value.releasePass !== expected.releasePass) {
     errors.push('multiplayer stability receipt identity mismatch');
   }
   if (value.sourceSha !== expected.sourceSha) errors.push('multiplayer stability source SHA mismatch');
