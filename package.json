@@ -47,6 +47,8 @@
     "qa:pass70:weapon-contact-scope:browser": "npm run qa:playwright-topology -- tests/e2e/pass70-weapon-contact-scope.spec.ts tests/e2e/pass64-railgun.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:pass70:cross-browser": "node scripts/qa/run-pass70-cross-browser.mjs available",
     "qa:pass70:firefox": "node scripts/qa/run-pass70-cross-browser.mjs firefox",
+    "qa:pass70:firefox-geckodriver:contract": "node --test scripts/qa/pass70-firefox-geckodriver-contract.test.mjs",
+    "qa:pass70:firefox-geckodriver": "npm run qa:pass70:firefox-geckodriver:contract && node scripts/qa/run-pass70-firefox-geckodriver.mjs",
     "qa:pass70:iphone15-webkit": "node scripts/qa/run-pass70-cross-browser.mjs iphone15",
     "qa:pass70:opera": "node scripts/qa/run-pass70-cross-browser.mjs opera",
     "qa:pass64:diagnostics:collector": "tsx scripts/qa/collect-pass64-match-diagnostics.ts",
