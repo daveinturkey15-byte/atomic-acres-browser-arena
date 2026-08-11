@@ -9,6 +9,7 @@ vi.mock('./art-kit', async (importOriginal) => {
     name = 'operator',
     _flattenMaterials = false,
     weaponId: WeaponId | null = 'carbine',
+    appearance: 'team' | 'neon-purple' = 'team',
   ): THREE.Group => {
     const root = new THREE.Group();
     root.name = name;
@@ -87,7 +88,13 @@ vi.mock('./art-kit', async (importOriginal) => {
     }
     geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(indices, 4));
     geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(weights, 4));
-    const body = new THREE.SkinnedMesh(geometry, new THREE.MeshBasicMaterial());
+    const bodyMaterial = new THREE.MeshStandardMaterial({
+      color: appearance === 'neon-purple' ? 0xd85cff : 0x2d7882,
+      emissive: appearance === 'neon-purple' ? 0x7d16bd : 0x061a1d,
+      emissiveIntensity: appearance === 'neon-purple' ? 1.2 : 0.14,
+    });
+    bodyMaterial.name = 'swat';
+    const body = new THREE.SkinnedMesh(geometry, bodyMaterial);
     body.name = 'Swat_Body';
     body.add(hips);
     body.bind(new THREE.Skeleton(skeletonBones));
@@ -167,6 +174,7 @@ vi.mock('./art-kit', async (importOriginal) => {
       rightWristBone: armBones[5].bone,
       armPoseBeforeIk: [],
     };
+    root.userData.operatorAppearance = appearance;
     return root;
   };
   return { ...actual, buildOperator: vi.fn(buildTrainingOperator) };
@@ -222,6 +230,13 @@ describe('Gun Range rigged training-dummy presentation', () => {
     expect(operator?.parent).toBe(presentation.root);
     expect(operator?.userData.operatorRig.weaponId).toBeNull();
     expect(operator?.getObjectByName('weapon-socket')?.children).toHaveLength(0);
+    expect(operator?.userData.operatorAppearance).toBe('neon-purple');
+    expect(operator?.userData.botEmissiveBrightnessScale).toBe(0.5);
+    expect(operator?.userData.botEmissiveMaterialsAdjusted).toBe(1);
+    const bodyMaterial = (operator?.getObjectByName('Swat_Body') as THREE.SkinnedMesh).material as THREE.MeshStandardMaterial;
+    expect(bodyMaterial.color.getHex()).toBe(0xd85cff);
+    expect(bodyMaterial.emissive.getHex()).toBe(0x7d16bd);
+    expect(bodyMaterial.emissiveIntensity).toBeCloseTo(0.6);
     const armBones = ['UpperArmL', 'LowerArmL', 'WristL', 'UpperArmR', 'LowerArmR', 'WristR']
       .map((name) => operator?.getObjectByName(name) as THREE.Bone);
     expect(armBones[1].parent).toBe(armBones[0]);

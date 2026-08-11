@@ -21,6 +21,7 @@ import type { DynamicWorldCollider } from './physics';
 import type { Team } from './protocol';
 import { createRustworksWelshFlag } from './rustworks-flag';
 import { makeEmissiveOnly } from './rendering/light-occlusion';
+import { applyBotEmissiveBrightness } from './operator-model';
 
 type Builder = {
   root: THREE.Group;
@@ -1606,7 +1607,7 @@ function gunRangeTrainingDummy(
   // pre-load fixture and is replaced as soon as the shared rig is ready.
   const rigged = (() => {
     try {
-      return buildOperator(index % 2 === 0 ? 1 : 0, `gun-range-${definition.id}`, false, null, 'team');
+      return buildOperator(index % 2 === 0 ? 1 : 0, `gun-range-${definition.id}`, false, null, 'neon-purple');
     } catch {
       // Canonical rig not loaded yet (e.g. headless/unit environments): fall
       // back to the painted training robot below. Live deployment always loads
@@ -1615,6 +1616,9 @@ function gunRangeTrainingDummy(
     }
   })();
   if (rigged) {
+    // Use the same bounded emissive colour treatment as live combat bots so
+    // unarmed test-bay targets remain readable in every graphics profile.
+    applyBotEmissiveBrightness(rigged);
     rigged.position.set(0, 0, 0);
     rigged.userData.targetRoot = root;
     rigged.userData.targetId = definition.id;

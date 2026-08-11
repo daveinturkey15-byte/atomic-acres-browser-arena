@@ -158,10 +158,10 @@ const evidenceLookAtCamera = (id, position, cameraTarget, fov) => {
   });
 };
 const fixedDummyActors = Object.freeze([
-  Object.freeze({ id: 'test-dummy-alpha', position: Object.freeze([63, 0, -16]), yaw: Math.PI / 2 }),
-  Object.freeze({ id: 'test-dummy-bravo', position: Object.freeze([72.56, Math.abs(Math.sin(1)) * 0.025, -6]), yaw: Math.PI / 2 }),
-  Object.freeze({ id: 'test-dummy-charlie', position: Object.freeze([72.52, Math.abs(Math.sin(2)) * 0.025, 4]), yaw: -Math.PI / 2 }),
-  Object.freeze({ id: 'test-dummy-delta', position: Object.freeze([64.88, Math.abs(Math.sin(3)) * 0.025, 14]), yaw: -Math.PI / 2 }),
+  Object.freeze({ id: 'test-dummy-alpha', position: Object.freeze([63, 0, -16]), yaw: -Math.PI / 2 }),
+  Object.freeze({ id: 'test-dummy-bravo', position: Object.freeze([72.56, Math.abs(Math.sin(1)) * 0.025, -6]), yaw: -Math.PI / 2 }),
+  Object.freeze({ id: 'test-dummy-charlie', position: Object.freeze([72.52, Math.abs(Math.sin(2)) * 0.025, 4]), yaw: Math.PI / 2 }),
+  Object.freeze({ id: 'test-dummy-delta', position: Object.freeze([64.88, Math.abs(Math.sin(3)) * 0.025, 14]), yaw: Math.PI / 2 }),
 ]);
 const expectedSkinnedMeshNames = Object.freeze([
   'Cube018',

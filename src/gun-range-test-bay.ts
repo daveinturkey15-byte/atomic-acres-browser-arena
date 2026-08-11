@@ -245,13 +245,17 @@ export function gunRangeTestBayDummyPose(
   const cycle = (((nowMs / 1_000) / (oneWaySeconds * 2) + definition.phase) % 1 + 1) % 1;
   const forward = cycle < 0.5;
   const alpha = forward ? cycle * 2 : (1 - cycle) * 2;
+  const travelX = forward ? dx : -dx;
+  const travelZ = forward ? dz : -dz;
   return Object.freeze({
     position: Object.freeze({
       x: definition.start.x + dx * alpha,
       y: definition.start.y + dy * alpha,
       z: definition.start.z + dz * alpha,
     }),
-    yawRadians: Math.atan2(forward ? dx : -dx, forward ? dz : -dz),
+    // Atomic Acres operators face local -Z. Point that authored forward axis
+    // along the current leg of the route instead of using Three's +Z basis.
+    yawRadians: Math.atan2(-travelX, -travelZ),
   });
 }
 

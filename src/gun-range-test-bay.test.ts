@@ -124,9 +124,17 @@ describe('Gun Range grey test-bay authority', () => {
       )).toBeLessThanOrEqual(dummy.speedMps * 0.016 + 1e-9);
       for (const now of [0, 1_000, 5_000, 15_000, 30_000]) {
         const pose = gunRangeTestBayDummyPose(dummy, now);
+        const nextPose = gunRangeTestBayDummyPose(dummy, now + 1);
+        const motionX = nextPose.position.x - pose.position.x;
+        const motionZ = nextPose.position.z - pose.position.z;
+        const motionLength = Math.hypot(motionX, motionZ);
+        const operatorForwardX = -Math.sin(pose.yawRadians);
+        const operatorForwardZ = -Math.cos(pose.yawRadians);
         expect(pose.position.x).toBeGreaterThanOrEqual(Math.min(dummy.start.x, dummy.end.x));
         expect(pose.position.x).toBeLessThanOrEqual(Math.max(dummy.start.x, dummy.end.x));
         expect(Number.isFinite(pose.yawRadians)).toBe(true);
+        expect(motionLength).toBeGreaterThan(0);
+        expect((operatorForwardX * motionX + operatorForwardZ * motionZ) / motionLength).toBeGreaterThan(0.999999);
       }
     }
   });
