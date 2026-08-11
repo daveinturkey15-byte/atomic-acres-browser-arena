@@ -51,15 +51,15 @@ describe('authenticated replacement authority integration', () => {
     const remoteActivationStart = source.indexOf("if (message.type === 'killstreak-activate-intent') {");
     const remoteActivationEnd = source.indexOf("if (message.type === 'killstreak-control-intent')", remoteActivationStart);
     const remoteActivation = source.slice(remoteActivationStart, remoteActivationEnd);
-    expect(remoteActivation.indexOf('persistActiveHostMatchCheckpoint();'))
+    expect(remoteActivation.indexOf('persistActiveHostMatchCheckpoint(true);'))
       .toBeGreaterThan(remoteActivation.indexOf('if (admission.accepted) {'));
-    expect(remoteActivation.indexOf('persistActiveHostMatchCheckpoint();'))
+    expect(remoteActivation.indexOf('persistActiveHostMatchCheckpoint(true);'))
       .toBeLessThan(remoteActivation.indexOf('broadcastKillstreakState();'));
 
     const localActivation = functionBody('requestKillstreakActivation', 'requestKillstreakControl');
-    expect(localActivation.indexOf('persistActiveHostMatchCheckpoint();'))
+    expect(localActivation.indexOf('persistActiveHostMatchCheckpoint(true);'))
       .toBeGreaterThan(localActivation.indexOf('if (!admission.accepted)'));
-    expect(localActivation.indexOf('persistActiveHostMatchCheckpoint();'))
+    expect(localActivation.indexOf('persistActiveHostMatchCheckpoint(true);'))
       .toBeLessThan(localActivation.indexOf('broadcastKillstreakState(now);'));
   });
 });

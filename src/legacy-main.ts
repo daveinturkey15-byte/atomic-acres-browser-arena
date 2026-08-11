@@ -5908,6 +5908,8 @@ function createHostMatchCheckpoint(
 
 let lastHostCheckpointPersistAtEpochMs = 0;
 let hostCheckpointPersistScheduled = false;
+const HOST_CHECKPOINT_PERSIST_INTERVAL_MS = 2_000;
+const HOST_CHECKPOINT_IDLE_TIMEOUT_MS = 250;
 /**
  * Persist the bounded host checkpoint. Serializing the entire match state
  * (bots, inventories, flare projectiles) and writing localStorage on the shot
@@ -5930,11 +5932,22 @@ function persistActiveHostMatchCheckpoint(force = false): boolean {
     const deferredStorage = clientPersistentStorage();
     if (!deferredStorage) return;
     const nowEpochMs = Date.now();
-    if (nowEpochMs - lastHostCheckpointPersistAtEpochMs < 2_000) return;
+    const remainingThrottleMs = HOST_CHECKPOINT_PERSIST_INTERVAL_MS
+      - (nowEpochMs - lastHostCheckpointPersistAtEpochMs);
+    if (remainingThrottleMs > 0) {
+      // Keep one coalesced dirty write alive. Dropping it here made a mutation
+      // just after the prior checkpoint wait for a second interval tick.
+      hostCheckpointPersistScheduled = true;
+      window.setTimeout(() => {
+        hostCheckpointPersistScheduled = false;
+        persistActiveHostMatchCheckpoint();
+      }, remainingThrottleMs);
+      return;
+    }
     lastHostCheckpointPersistAtEpochMs = nowEpochMs;
     const checkpoint = createHostMatchCheckpoint();
     if (checkpoint) saveHostMatchCheckpoint(deferredStorage, checkpoint);
-  });
+  }, HOST_CHECKPOINT_IDLE_TIMEOUT_MS);
   return true;
 }
 
@@ -8599,7 +8612,7 @@ function onNetworkMessage(message: GameMessage): void {
       // Charge consumption, sender sequence and replay ID must be durable before
       // any presentation/broadcast work; a renderer crash in the old 2s timer
       // window otherwise restored a spent charge and forgot the accepted ID.
-      persistActiveHostMatchCheckpoint();
+      persistActiveHostMatchCheckpoint(true);
       if (admission.activationId && admission.activatedId && isLegacyOffensiveSupport(admission.activatedId)) {
         const state = remoteSupportAuthorities.get(message.by) ?? createRemoteSupportAuthorityState();
         remoteSupportAuthorities.set(message.by, registerRemoteSupportActivation(state, {
@@ -18172,7 +18185,7 @@ function requestKillstreakActivation(
     addFeed(`${GAMEPAD_SUPPORT_LABELS[id]} REJECTED · ${admission.reason.toUpperCase()}`, 'coral');
     return null;
   }
-  persistActiveHostMatchCheckpoint();
+  persistActiveHostMatchCheckpoint(true);
   // Host authority is already committed and remote projections are broadcast
   // below. Coalesce the local immutable projection into the next active frame:
   // consecutive support keys otherwise allocate an intermediate chopper-only

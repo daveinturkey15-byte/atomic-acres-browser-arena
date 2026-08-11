@@ -110,6 +110,8 @@ describe('same-browser hosted active-match recovery integration', () => {
     expect(forcedBranch).toContain('saveHostMatchCheckpoint(storage, checkpoint)');
     expect(deferredBranch).toContain('createHostMatchCheckpoint()');
     expect(deferredBranch).toContain('saveHostMatchCheckpoint(deferredStorage, checkpoint)');
+    expect(deferredBranch).toContain('remainingThrottleMs');
+    expect(deferredBranch).toContain('persistActiveHostMatchCheckpoint();');
     const nonForcedPrelude = persist.slice(
       persist.indexOf('if (hostCheckpointPersistScheduled)'),
       persist.indexOf('scheduleBrowserPreparationIdleTask'),

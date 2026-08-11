@@ -312,12 +312,15 @@ test('an active flare repairs a rejoining guest without duplicate replicas', asy
       .find((replica: { ownerId: string }) => replica.ownerId === hostId)
   ), hostId);
   expect(activeBeforeGuestRejoin).toBeTruthy();
-  const persistedBeforeGuestRejoin = await host.evaluate(() => {
+  await expect.poll(async () => host.evaluate(() => {
     const raw = localStorage.getItem('atomic-acres:host-match-checkpoint:v3');
-    return raw ? JSON.parse(raw) : null;
-  });
-  expect(persistedBeforeGuestRejoin?.flareProjectiles?.effects).toHaveLength(1);
-  expect(persistedBeforeGuestRejoin?.flareShotFeedback).toEqual([]);
+    if (!raw) return null;
+    const checkpoint = JSON.parse(raw);
+    return {
+      effectCount: checkpoint.flareProjectiles?.effects?.length ?? 0,
+      feedbackCount: checkpoint.flareShotFeedback?.length ?? 0,
+    };
+  }), { timeout: 2_500, intervals: [25, 50, 100] }).toEqual({ effectCount: 1, feedbackCount: 0 });
   await host.evaluate(([x, y, z]) => (
     window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y, z, 0, 0)
   ), definition.spawnPosition);
