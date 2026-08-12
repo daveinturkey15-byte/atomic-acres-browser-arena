@@ -152,10 +152,19 @@ jobs:
         env:
           VITE_MATCH_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}
           VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
-      - if: needs.classify-change.outputs.mode != 'none'
+      - name: Run bounded browser groups
+        if: needs.classify-change.outputs.mode != 'none'
         env:
           QA_E2E_GROUPS: ${{ needs.classify-change.outputs.windows_groups }}
         run: npm run test:e2e:bounded
+      - name: Run Pass 64 HUD browser contracts
+        if: needs.classify-change.outputs.mode == 'full'
+        timeout-minutes: 10
+        run: node node_modules/@playwright/test/cli.js test tests/e2e/pass64-hud-menu.spec.ts --project=chromium --workers=1 --retries=0
+      - name: Run Pass 65 menu lifecycle contracts
+        if: needs.classify-change.outputs.mode == 'full'
+        timeout-minutes: 13
+        run: node node_modules/@playwright/test/cli.js test tests/e2e/pass65-menu-lifecycle.spec.ts --project=chromium --workers=1 --retries=0
 
   bounded-browser-linux:
     needs: [classify-change, static-and-unit]

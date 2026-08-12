@@ -50,4 +50,10 @@ describe('release change impact', () => {
     expect(output.windows_groups.split(',')).toContain('release-shell');
     expect(output.linux_groups.split(',')).toContain('release-shell');
   });
+
+  it('leaves the passing Linux HUD batch intact and removes it from the split Windows runner', () => {
+    const output = outputsFor(classifyPaths(['src/network.ts']));
+    expect(output.windows_groups.split(',')).not.toContain('pass64-hud-contracts');
+    expect(output.linux_groups.split(',')).toContain('pass64-hud-contracts');
+  });
 });

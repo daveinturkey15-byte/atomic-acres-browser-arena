@@ -167,6 +167,19 @@ describe('production release workflow', () => {
     expect(verifyWorkflow).toContain('scripts/release/workflow-metrics.mjs');
   });
 
+  it('runs the Windows HUD and lifecycle files in separate fail-closed browser processes', () => {
+    const windowsJob = verifyWorkflow.slice(
+      verifyWorkflow.indexOf('bounded-browser-windows:'),
+      verifyWorkflow.indexOf('bounded-browser-linux:'),
+    );
+    expect(windowsJob).toContain('name: Run Pass 64 HUD browser contracts');
+    expect(windowsJob).toContain('timeout-minutes: 10');
+    expect(windowsJob).toContain('node node_modules/@playwright/test/cli.js test tests/e2e/pass64-hud-menu.spec.ts --project=chromium --workers=1 --retries=0');
+    expect(windowsJob).toContain('name: Run Pass 65 menu lifecycle contracts');
+    expect(windowsJob).toContain('timeout-minutes: 13');
+    expect(windowsJob).toContain('node node_modules/@playwright/test/cli.js test tests/e2e/pass65-menu-lifecycle.spec.ts --project=chromium --workers=1 --retries=0');
+  });
+
   it('owns and closes the local preview lifecycle for every catalogued Playwright gate', () => {
     expect(packageJson.scripts['qa:playwright-topology']).toBe('node scripts/qa/run-playwright-with-topology.mjs');
     expect(playwrightConfig).toContain("const externalPreview = process.env.QA_EXTERNAL_PREVIEW === '1'");
