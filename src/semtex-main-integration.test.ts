@@ -33,4 +33,19 @@ describe('Semtex live-stick runtime integration', () => {
     expect(block).not.toMatch(/blastDamage\([^\n]+\)\s*\*\s*\([^\n]+\?\s*2\s*:\s*1\)/);
     expect(block.match(/semtexBlastDamage\(/g)).toHaveLength(1);
   });
+
+  it('projects the exact local Semtex victim into the centered 500 ms urgent HUD lane', () => {
+    const armStart = source.indexOf('function armImpactGrenade(');
+    const armEnd = source.indexOf('\nfunction updateGrenades(', armStart);
+    const arm = source.slice(armStart, armEnd);
+    expect(arm).toContain('if (targetId === player.id) {');
+    expect(arm).toContain("presentStickyVictimUrgentAlert('semtex', targetId, targetLifeId, grenade.actionNonce, now)");
+
+    const alertStart = source.indexOf('function presentStickyVictimUrgentAlert(');
+    const alertEnd = source.indexOf('\nconst hostTriggerAuthorities', alertStart);
+    const alert = source.slice(alertStart, alertEnd);
+    expect(alert).toContain('targetId !== player.id || targetLifeId !== localContinuity');
+    expect(alert).toContain("warning.style.setProperty('--sticky-warning-duration', `${STICKY_VICTIM_URGENT_ALERT_DURATION_MS}ms`)");
+    expect(alert).toContain('Math.max(0, alert.expiresAtMs - performance.now())');
+  });
 });

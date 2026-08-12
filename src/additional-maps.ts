@@ -1863,6 +1863,17 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   doorAssembly.userData.authorityId = GUN_RANGE_TEST_BAY_CONTRACT.door.id;
   doorAssembly.userData.structure = 'static-frame-with-dynamic-leaf';
   doorAssembly.userData.practicalIds = Object.freeze(['test-bay-door-approach-key', 'test-bay-door-bay-key']);
+  doorAssembly.userData.fixtureDepthPlanes = Object.freeze({
+    leafHalfThicknessM: 0.35,
+    armourFaceM: 0.358,
+    braceFaceM: 0.37,
+    spineFaceM: 0.382,
+    detailFaceM: 0.394,
+    emissiveFaceM: 0.406,
+    emissiveSecondaryFaceM: 0.418,
+    minimumGapM: 0.004,
+  });
+  doorAssembly.userData.emissiveIndicatorAnimation = 'static';
   root.add(doorAssembly);
 
   const structureMaterials = {
@@ -2000,23 +2011,32 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     fixture.userData.presentationBatchCandidate = false;
     fixture.userData.dynamic = true;
     fixture.userData.doorAssemblyRole = role;
+    fixture.userData.depthPlaneX = position[0];
     secureDoor.add(fixture);
     return fixture;
   };
-  attachDoorFixture('gun-range-test-bay-door-edge-north', [0, 0, -3.74], [0.7, 6.5, 0.12], doorStatusRangeMaterial, 'edge');
-  attachDoorFixture('gun-range-test-bay-door-edge-south', [0, 0, 3.74], [0.7, 6.5, 0.12], doorStatusBayMaterial, 'edge');
-  attachDoorFixture('gun-range-test-bay-door-armour-range-face', [-0.355, 0.12, 0], [0.035, 4.9, 5.8], secureDoorPanelMaterial, 'armour-panel');
-  attachDoorFixture('gun-range-test-bay-door-armour-bay-face', [0.355, 0.12, 0], [0.035, 4.9, 5.8], secureDoorPanelMaterial, 'armour-panel');
-  for (const [face, x] of [['range', -0.378], ['bay', 0.378]] as const) {
-    attachDoorFixture(`gun-range-test-bay-door-brace-${face}-upper`, [x, 1.72, 0], [0.045, 0.18, 6.25], secureDoorMaterial, 'brace');
-    attachDoorFixture(`gun-range-test-bay-door-brace-${face}-lower`, [x, -1.52, 0], [0.045, 0.18, 6.25], secureDoorMaterial, 'brace');
-    attachDoorFixture(`gun-range-test-bay-door-spine-${face}`, [x, 0.12, 0], [0.048, 4.9, 0.34], doorInlayMaterial, 'brace');
+  // Every decorative layer occupies its own non-overlapping depth interval.
+  // The previous values embedded the cyan/amber bars inside the leaf and each
+  // other, producing deterministic z-fighting whenever the door moved.
+  attachDoorFixture('gun-range-test-bay-door-edge-north', [0, 0, -3.86], [0.7, 6.5, 0.12], doorStatusRangeMaterial, 'edge');
+  attachDoorFixture('gun-range-test-bay-door-edge-south', [0, 0, 3.86], [0.7, 6.5, 0.12], doorStatusBayMaterial, 'edge');
+  attachDoorFixture('gun-range-test-bay-door-armour-range-face', [-0.358, 0.12, 0], [0.008, 4.9, 5.8], secureDoorPanelMaterial, 'armour-panel');
+  attachDoorFixture('gun-range-test-bay-door-armour-bay-face', [0.358, 0.12, 0], [0.008, 4.9, 5.8], secureDoorPanelMaterial, 'armour-panel');
+  for (const [face, sign] of [['range', -1], ['bay', 1]] as const) {
+    const braceX = sign * 0.37;
+    const spineX = sign * 0.382;
+    const detailX = sign * 0.394;
+    const emissiveX = sign * 0.406;
+    const emissiveSecondaryX = sign * 0.418;
+    attachDoorFixture(`gun-range-test-bay-door-brace-${face}-upper`, [braceX, 1.72, 0], [0.008, 0.18, 6.25], secureDoorMaterial, 'brace');
+    attachDoorFixture(`gun-range-test-bay-door-brace-${face}-lower`, [braceX, -1.52, 0], [0.008, 0.18, 6.25], secureDoorMaterial, 'brace');
+    attachDoorFixture(`gun-range-test-bay-door-spine-${face}`, [spineX, 0.12, 0], [0.008, 4.9, 0.34], doorInlayMaterial, 'brace');
     for (const [vertical, y] of [['upper', 1.72], ['lower', -1.48]] as const) {
       for (const [side, z] of [['north', -2.42], ['south', 2.42]] as const) {
         attachDoorFixture(
           `gun-range-test-bay-door-armour-tile-${face}-${vertical}-${side}`,
-          [x + (face === 'range' ? -0.004 : 0.004), y, z],
-          [0.026, 1.12, 1.18],
+          [detailX, y, z],
+          [0.008, 1.12, 1.18],
           doorArmourPlateMaterial,
           'armour-panel',
         );
@@ -2025,38 +2045,39 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     for (const [side, z] of [['north', -1.42], ['south', 1.42]] as const) {
       attachDoorFixture(
         `gun-range-test-bay-door-glass-${face}-${side}`,
-        [x + (face === 'range' ? -0.004 : 0.004), 0.28, z],
-        [0.026, 2.65, 0.62],
+        [detailX, 0.28, z],
+        [0.008, 2.65, 0.62],
         doorGlassMaterial,
         'glass',
       );
     }
     const chevronUpper = attachDoorFixture(
       `gun-range-test-bay-door-chevron-${face}-upper`,
-      [x, 0.55, 0],
-      [0.05, 0.13, 3.2],
+      [emissiveSecondaryX, 0.55, 0],
+      [0.008, 0.13, 3.2],
       face === 'range' ? doorStatusRangeMaterial : doorStatusBayMaterial,
       'glyph',
     );
     chevronUpper.rotation.x = Math.PI / 7;
     const chevronLower = attachDoorFixture(
       `gun-range-test-bay-door-chevron-${face}-lower`,
-      [x, 0.55, 0],
-      [0.05, 0.13, 3.2],
+      [emissiveX, 0.55, 0],
+      [0.008, 0.13, 3.2],
       face === 'range' ? doorStatusRangeMaterial : doorStatusBayMaterial,
       'glyph',
     );
     chevronLower.rotation.x = -Math.PI / 7;
   }
-  // One flush emissive indicator per face keeps the moving entrance readable
-  // from the range and bay without introducing an unoccluded runtime light.
-  attachDoorFixture('gun-range-test-bay-door-status-range-face', [-0.335, -2.3, 0], [0.04, 0.82, 1.45], doorStatusRangeMaterial, 'status-light');
-  attachDoorFixture('gun-range-test-bay-door-status-bay-face', [0.335, -2.3, 0], [0.04, 0.82, 1.45], doorStatusBayMaterial, 'status-light');
+  // One static emissive indicator per face keeps the moving entrance readable
+  // without an unoccluded light or any per-frame intensity animation.
+  attachDoorFixture('gun-range-test-bay-door-status-range-face', [-0.406, -2.3, 0], [0.008, 0.82, 1.45], doorStatusRangeMaterial, 'status-light');
+  attachDoorFixture('gun-range-test-bay-door-status-bay-face', [0.406, -2.3, 0], [0.008, 0.82, 1.45], doorStatusBayMaterial, 'status-light');
+  doorAssembly.userData.statusLightMaterials = Object.freeze([doorStatusRangeMaterial, doorStatusBayMaterial]);
   const practicalHousing = box(builder, 'gun-range-test-bay-door-practical-housing', [51.12, 6.78, 12], [0.12, 0.42, 2.6], secureDoorMaterial, { solid: false, shots: false, cast: false });
   practicalHousing.userData.doorAssemblyRole = 'practical-housing';
   practicalHousing.userData.presentationBatchCandidate = false;
   doorAssembly.add(practicalHousing);
-  const practicalEmitter = box(builder, 'gun-range-test-bay-door-practical-emitter', [51.05, 6.7, 12], [0.04, 0.16, 1.9], testBayCyan, { solid: false, shots: false, cast: false });
+  const practicalEmitter = box(builder, 'gun-range-test-bay-door-practical-emitter', [51.04, 6.7, 12], [0.04, 0.16, 1.9], testBayCyan, { solid: false, shots: false, cast: false });
   practicalEmitter.userData.doorAssemblyRole = 'practical-emitter';
   practicalEmitter.userData.practicalId = 'test-bay-door-approach-key';
   practicalEmitter.userData.presentationBatchCandidate = false;

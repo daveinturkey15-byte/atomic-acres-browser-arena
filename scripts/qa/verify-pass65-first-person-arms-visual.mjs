@@ -75,8 +75,10 @@ function presentationViolations(label, state) {
     if (policy?.contract !== 'right-firing-hand-handgun-support-reload-only-v1') violations.push(`${label}: hand policy is missing`);
     if (activeArms.length !== policy?.activeChainCount) violations.push(`${label}: ${activeArms.length} active chains do not match policy ${policy?.activeChainCount}`);
     if (policy?.activeChainCount === 1) {
-      if (stowedArms.length !== 1 || stowedArms[0]?.side !== 'left' || stowedArms[0]?.supportChainScale > 0.001) {
-        violations.push(`${label}: one-hand sidearm did not stow only the left support chain`);
+      if (stowedArms.length !== 1 || stowedArms[0]?.side !== 'left'
+        || Math.abs(stowedArms[0]?.supportChainScale - 1) > 1e-6
+        || stowedArms[0]?.stowedWithoutScaling !== true) {
+        violations.push(`${label}: one-hand sidearm did not stow the intact left support chain`);
       }
     } else if (stowedArms.length !== 0) {
       violations.push(`${label}: a two-hand grip unexpectedly stowed an arm`);
@@ -91,7 +93,7 @@ function presentationViolations(label, state) {
       // skinned cuff itself already crosses the bottom edge; native captures
       // are the falsifier for visible floating sleeves.
       if (!finiteArray(arm.shoulderEntryNdc) || arm.shoulderEntryNdc[1] > -0.98) violations.push(`${label}/${arm.side}: sleeve entry ${JSON.stringify(arm.shoulderEntryNdc)} does not continue below frame`);
-      if (!Number.isFinite(arm.segmentLengthScale) || arm.segmentLengthScale < 1 || arm.segmentLengthScale > 2.4) violations.push(`${label}/${arm.side}: invalid authored segment scale ${arm.segmentLengthScale}`);
+      if (arm.segmentLengthScale !== 1 || arm.bindOffsetsPreserved !== true) violations.push(`${label}/${arm.side}: authored segment length changed ${arm.segmentLengthScale}`);
       for (const key of ['shoulder', 'elbow', 'wrist', 'palm', 'palmQuaternion', 'palmTargetQuaternion', 'target', 'shoulderQuaternion', 'elbowQuaternion']) {
         if (!finiteArray(arm[key])) violations.push(`${label}/${arm.side}: nonfinite ${key}`);
       }

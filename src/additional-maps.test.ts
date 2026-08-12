@@ -853,12 +853,70 @@ describe('additional authored maps', () => {
       const fixtures = fixtureNames.map((name) => map.root.getObjectByName(name) as THREE.Mesh);
       expect(fixtures.every((fixture) => fixture.parent === leaf && fixture.userData.dynamic === true)).toBe(true);
       expect(map.root.children.some((child) => fixtureNames.includes(child.name))).toBe(false);
-      expect(fixtures.slice(0, 2).map((fixture) => Math.abs(fixture.position.z))).toEqual([3.74, 3.74]);
+      expect(fixtures.slice(0, 2).map((fixture) => Math.abs(fixture.position.z))).toEqual([3.86, 3.86]);
       expect(fixtures.slice(2).map((fixture) => Math.sign(fixture.position.x))).toEqual([-1, 1]);
       expect(fixtures.slice(2).every((fixture) => (
         fixture.userData.doorAssemblyRole === 'status-light'
         && (fixture.material as THREE.MeshStandardMaterial).emissiveIntensity > 3
       ))).toBe(true);
+
+      const assembly = map.root.getObjectByName('gun-range-test-bay-secure-door-assembly') as THREE.Group;
+      expect(assembly.userData.fixtureDepthPlanes).toEqual({
+        leafHalfThicknessM: 0.35,
+        armourFaceM: 0.358,
+        braceFaceM: 0.37,
+        spineFaceM: 0.382,
+        detailFaceM: 0.394,
+        emissiveFaceM: 0.406,
+        emissiveSecondaryFaceM: 0.418,
+        minimumGapM: 0.004,
+      });
+      expect(assembly.userData.emissiveIndicatorAnimation).toBe('static');
+
+      const exactWorldBounds = (mesh: THREE.Mesh): THREE.Box3 => {
+        mesh.geometry.computeBoundingBox();
+        return mesh.geometry.boundingBox!.clone().applyMatrix4(mesh.matrixWorld);
+      };
+      const overlapsWithVolume = (left: THREE.Box3, right: THREE.Box3): boolean => {
+        const intersection = left.clone().intersect(right);
+        const size = intersection.getSize(new THREE.Vector3());
+        return size.x > 1e-7 && size.y > 1e-7 && size.z > 1e-7;
+      };
+      map.root.updateMatrixWorld(true);
+      const leafBounds = exactWorldBounds(leaf);
+      const leafFixtures = leaf.children.filter((child): child is THREE.Mesh => child instanceof THREE.Mesh);
+      for (const fixture of leafFixtures) {
+        expect(overlapsWithVolume(leafBounds, exactWorldBounds(fixture)), fixture.name).toBe(false);
+      }
+      for (let left = 0; left < leafFixtures.length; left += 1) {
+        for (let right = left + 1; right < leafFixtures.length; right += 1) {
+          expect(
+            overlapsWithVolume(exactWorldBounds(leafFixtures[left]!), exactWorldBounds(leafFixtures[right]!)),
+            `${leafFixtures[left]!.name} overlaps ${leafFixtures[right]!.name}`,
+          ).toBe(false);
+        }
+      }
+      const practicals = [
+        'gun-range-test-bay-door-practical-housing',
+        'gun-range-test-bay-door-practical-emitter',
+        'gun-range-test-bay-door-bay-practical-housing',
+        'gun-range-test-bay-door-bay-practical-emitter',
+      ].map((name) => map.root.getObjectByName(name) as THREE.Mesh);
+      expect(overlapsWithVolume(exactWorldBounds(practicals[0]!), exactWorldBounds(practicals[1]!))).toBe(false);
+      expect(overlapsWithVolume(exactWorldBounds(practicals[2]!), exactWorldBounds(practicals[3]!))).toBe(false);
+
+      const statusMaterials = assembly.userData.statusLightMaterials as THREE.MeshStandardMaterial[];
+      const statusBefore = statusMaterials.map((material) => ({
+        color: material.color.getHex(),
+        emissive: material.emissive.getHex(),
+        intensity: material.emissiveIntensity,
+      }));
+      for (const nowMs of [0, 8_000, 34_000]) updateGunRangePresentation(map.root, nowMs);
+      expect(statusMaterials.map((material) => ({
+        color: material.color.getHex(),
+        emissive: material.emissive.getHex(),
+        intensity: material.emissiveIntensity,
+      }))).toEqual(statusBefore);
 
       map.root.updateMatrixWorld(true);
       const before = fixtures[2].getWorldPosition(new THREE.Vector3());

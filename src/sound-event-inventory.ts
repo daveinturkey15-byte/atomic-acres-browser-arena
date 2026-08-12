@@ -245,7 +245,7 @@ type PlannedEventInput = Readonly<{
 }>;
 
 export const RUNTIME_AUDIO_NON_EVENT_METHODS = Object.freeze([
-  'configure', 'dispose', 'prepareCombat', 'resume', 'suspend', 'telemetry', 'unlock', 'updateListener',
+  'configure', 'dispose', 'prepareCombat', 'prepareGlassImpact', 'resume', 'suspend', 'telemetry', 'unlock', 'updateListener',
 ] as const);
 
 export type RuntimeSoundCallsiteContractEntry = Readonly<{
@@ -296,7 +296,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('empty', '', 3, ['weapon.dry-fire']),
   runtimeCallsite('explosion', 'afterPresentationDetach', 1, ['ordnance.frag-explosion']),
   runtimeCallsite('explosion', 'detonatedAt', 1, ['ordnance.frag-explosion']),
-  runtimeCallsite('explosion', 'now', 2, ['support.legacy-explosion']),
+  runtimeCallsite('explosion', 'now', 3, ['support.legacy-explosion']),
   runtimeCallsite('explosion', 'presentedAt', 1, ['support.legacy-explosion']),
   runtimeCallsite('explosion', 'started', 1, ['support.legacy-explosion']),
   runtimeCallsite('flashbang', 'presentation.audioGain', 1, ['ordnance.flash-detonation', 'ordnance.flash-recovery']),

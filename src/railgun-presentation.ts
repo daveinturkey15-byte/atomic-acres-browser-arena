@@ -440,10 +440,18 @@ export class RailgunPresentation {
    * shared exact-operator reveal receives the same already-authorized contact
    * set in legacy-main; no pawn geometry or DOM body marker is created here.
    */
-  updateThermal(_camera: THREE.Camera, contacts: readonly RailgunThermalContact[], active: boolean): void {
-    this.thermalRoot.hidden = !active;
-    this.visibleThermalContacts = active ? contacts.length : 0;
-    if (!active) this.syncExactOperatorReveal(false, null);
+  updateThermal(
+    _camera: THREE.Camera,
+    contacts: readonly RailgunThermalContact[],
+    opticActive: boolean,
+    revealActive = opticActive,
+  ): void {
+    // The clear aperture/viewmodel wait for a settled magnified scope. Exact
+    // through-wall operators instead follow the already-admitted ADS hold, so
+    // camera easing cannot suppress the weapon's defining capability.
+    this.thermalRoot.hidden = !opticActive;
+    this.visibleThermalContacts = revealActive ? contacts.length : 0;
+    if (!revealActive) this.syncExactOperatorReveal(false, null);
   }
 
   /** Bind Railgun compatibility telemetry to the actual shared render layers. */

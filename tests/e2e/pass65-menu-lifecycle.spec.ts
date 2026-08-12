@@ -203,6 +203,146 @@ function collectUnexpectedBrowserErrors(page: Page, label: string): string[] {
   return errors;
 }
 
+async function deadlineBound<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolvePromise, rejectPromise) => {
+    const timer = setTimeout(() => rejectPromise(new Error(message)), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolvePromise(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        rejectPromise(error);
+      },
+    );
+  });
+}
+
+async function multiplayerAdmissionDiagnostic(page: Page, role: 'host' | 'guest'): Promise<Record<string, unknown>> {
+  if (page.isClosed()) return { role, pageClosed: true };
+  try {
+    const diagnostic = page.evaluate((peerRole) => {
+      const debug = window.__ATOMIC_ACRES_DEBUG__;
+      let admission: unknown = null;
+      let snapshot: Record<string, any> | undefined;
+      try { admission = debug?.admissionState() ?? null; } catch { admission = 'unavailable'; }
+      try { snapshot = debug?.snapshot() as unknown as Record<string, any> | undefined; } catch { snapshot = undefined; }
+      return {
+        role: peerRole,
+        pageClosed: false,
+        url: location.href,
+        visibilityState: document.visibilityState,
+        hidden: document.hidden,
+        // This multiplayer test owns a deterministic, mutually exclusive focus
+        // lease because both peers share one headless GPU process.
+        harnessHasFocus: document.hasFocus(),
+        admission,
+        bootstrap: snapshot?.bootstrap ? {
+          stage: snapshot.bootstrap.stage ?? snapshot.bootstrap.bootstrapStage ?? null,
+          error: snapshot.bootstrap.error ?? null,
+          matchAdmissionCadence: snapshot.bootstrap.matchAdmissionCadence ?? null,
+        } : null,
+        privateMatch: snapshot?.privateMatch ?? null,
+        presentationScheduling: snapshot?.presentationScheduling ?? null,
+        menuLifecycle: snapshot?.menuLifecycle ?? null,
+        networkStatus: document.querySelector<HTMLElement>('#network-status')?.textContent?.trim() ?? null,
+        networkStatusKind: document.querySelector<HTMLElement>('#network-status')?.dataset.kind ?? null,
+      };
+    }, role);
+    return await deadlineBound(diagnostic, 1_500, `${role} diagnostic timed out after 1500ms`);
+  } catch (error) {
+    return {
+      role,
+      pageClosed: page.isClosed(),
+      diagnosticError: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function waitForForegroundGameStart(options: Readonly<{
+  page: Page;
+  otherPage: Page;
+  role: 'host' | 'guest';
+  timeoutMs: number;
+  host: Page;
+  guest: Page;
+  hostErrors: string[];
+  guestErrors: string[];
+  testInfo: TestInfo;
+}>): Promise<void> {
+  const startedAtMs = performance.now();
+  const deadlineAtMs = startedAtMs + options.timeoutMs;
+  const requireRemainingMs = (stage: string): number => {
+    const remainingMs = deadlineAtMs - performance.now();
+    if (remainingMs <= 0) throw new Error(`${options.role} ${stage} exhausted its ${options.timeoutMs}ms admission deadline`);
+    return remainingMs;
+  };
+  try {
+    await deadlineBound(
+      setHarness(options.otherPage, { focused: false }),
+      requireRemainingMs('release peer focus'),
+      `${options.role} peer-focus release timed out`,
+    );
+    await deadlineBound(
+      options.otherPage.evaluate(() => window.dispatchEvent(new Event('blur'))),
+      requireRemainingMs('publish peer blur'),
+      `${options.role} peer-blur publication timed out`,
+    );
+    await deadlineBound(
+      setHarness(options.page, { focused: true }),
+      requireRemainingMs('claim focus'),
+      `${options.role} focus claim timed out`,
+    );
+    await deadlineBound(
+      options.page.bringToFront(),
+      requireRemainingMs('bringToFront'),
+      `${options.role} bringToFront timed out`,
+    );
+    await deadlineBound(
+      options.page.evaluate(() => window.dispatchEvent(new Event('focus'))),
+      requireRemainingMs('publish focus'),
+      `${options.role} focus publication timed out`,
+    );
+    await options.page.waitForFunction(
+      () => document.visibilityState === 'visible'
+        && document.hidden === false
+        && document.hasFocus() === true,
+      undefined,
+      { timeout: Math.min(5_000, requireRemainingMs('visibility proof')) },
+    );
+    await options.page.waitForFunction(
+      () => window.__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true,
+      undefined,
+      { timeout: requireRemainingMs('game-start proof') },
+    );
+  } catch (error) {
+    const [hostDiagnostic, guestDiagnostic] = await Promise.all([
+      multiplayerAdmissionDiagnostic(options.host, 'host'),
+      multiplayerAdmissionDiagnostic(options.guest, 'guest'),
+    ]);
+    const payload = JSON.stringify({
+      failedRole: options.role,
+      peerTimeoutMs: options.timeoutMs,
+      elapsedMs: performance.now() - startedAtMs,
+      host: hostDiagnostic,
+      guest: guestDiagnostic,
+      browserErrors: [...options.hostErrors, ...options.guestErrors],
+    }, null, 2);
+    console.error(`[pass65 multiplayer admission failure]\n${payload}`);
+    try {
+      await options.testInfo.attach(`multiplayer-${options.role}-admission-timeout`, {
+        body: Buffer.from(payload),
+        contentType: 'application/json',
+      });
+    } catch (attachmentError) {
+      console.error(`[pass65 multiplayer admission attachment failure] ${attachmentError instanceof Error ? attachmentError.message : String(attachmentError)}`);
+    }
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`${options.role} foreground match admission failed within ${options.timeoutMs}ms: ${reason}`);
+  }
+}
+
 async function installGameCanvasReadbackTripwire(page: Page): Promise<void> {
   await page.evaluate(() => {
     const gameCanvas = document.querySelector<HTMLCanvasElement>('#game');
@@ -676,14 +816,22 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
     expect(browserErrors).toEqual([]);
   });
 
-  test('keeps synchronized host and guest countdowns hidden until active play and resumes deliberately', async ({ browser }) => {
+  test('keeps synchronized host and guest countdowns hidden until active play and resumes deliberately', async ({ browser }, testInfo) => {
     test.setTimeout(120_000);
+    const testDeadlineAtMs = performance.now() + 120_000;
+    const admissionCleanupReserveMs = 7_500;
+    const boundedPeerAdmissionMs = (): number => {
+      const remainingMs = testDeadlineAtMs - performance.now() - admissionCleanupReserveMs;
+      if (remainingMs <= 0) throw new Error('Multiplayer admission exhausted the 120000ms test deadline before peer admission');
+      return Math.min(45_000, remainingMs);
+    };
     const context = await browser.newContext({ viewport: { width: 1_280, height: 720 }, deviceScaleFactor: 1 });
     const errors: string[] = [];
     let host: Page | null = null;
     let guest: Page | null = null;
     let hostErrors: string[] = [];
     let guestErrors: string[] = [];
+    let primaryFailure: unknown = null;
     try {
       [host, guest] = await Promise.all([
         openMultiplayerPeer(context, 'HOST LIFECYCLE', 'pass65-lifecycle-host'),
@@ -712,12 +860,36 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
         expect.objectContaining({ surface: 'pre-match', matchStartCount: 0, pauseOpenCount: 0, visibilityChangeCount: 0 }),
       ]);
 
+      // Final presentation admission intentionally requires a focused rAF. Give
+      // exactly one co-located peer the harness focus lease at a time so Linux and
+      // Windows do not contend for one headless GPU as though both tabs were
+      // independently foregrounded machines.
+      await setHarness(guest, { focused: false });
+      await guest.evaluate(() => window.dispatchEvent(new Event('blur')));
+      await host.bringToFront();
       await host.locator('#lobby-start').click();
-      await Promise.all([host, guest].map((peer) => peer.waitForFunction(
-        () => window.__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true,
-        undefined,
-        { timeout: 45_000 },
-      )));
+      await waitForForegroundGameStart({
+        page: host,
+        otherPage: guest,
+        role: 'host',
+        timeoutMs: boundedPeerAdmissionMs(),
+        host,
+        guest,
+        hostErrors,
+        guestErrors,
+        testInfo,
+      });
+      await waitForForegroundGameStart({
+        page: guest,
+        otherPage: host,
+        role: 'guest',
+        timeoutMs: boundedPeerAdmissionMs(),
+        host,
+        guest,
+        hostErrors,
+        guestErrors,
+        testInfo,
+      });
       await Promise.all([host, guest].map((peer) => peer.waitForFunction(
         () => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active',
         undefined,
@@ -764,8 +936,16 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
       });
       errors.push(...hostErrors, ...guestErrors);
       expect(errors).toEqual([]);
+    } catch (error) {
+      primaryFailure = error;
+      throw error;
     } finally {
-      await context.close();
+      try {
+        await context.close();
+      } catch (cleanupError) {
+        if (primaryFailure === null) throw cleanupError;
+        console.error(`[pass65 multiplayer cleanup failure] ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`);
+      }
     }
   });
 

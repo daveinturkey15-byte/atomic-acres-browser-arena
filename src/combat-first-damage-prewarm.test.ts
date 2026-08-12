@@ -40,7 +40,7 @@ describe('HF-282 first-combat preparation contract', () => {
   });
 
   it('prepares three muted tonal sources during unlock and before deployment admission', () => {
-    const prepare = between(audioSource, '\n  prepareCombat(): boolean {', '\n  setLowHealthFeedback(');
+    const prepare = between(audioSource, '\n  prepareCombat(): boolean {', '\n  prepareGlassImpact(');
     expect(prepare.match(/this\.context\.createOscillator\(\)/g)).toHaveLength(3);
     expect(prepare).not.toContain('createBufferSource(');
     expect(prepare).not.toContain('.loop = true');

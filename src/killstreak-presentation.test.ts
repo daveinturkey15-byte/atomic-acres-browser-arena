@@ -389,7 +389,7 @@ const snapshot = (
   sensorContacts: KillstreakRecipientSnapshot['sensorContacts'] = [],
   placementMarkers: KillstreakRecipientSnapshot['placementMarkers'] = [],
 ): KillstreakRecipientSnapshot => ({
-  schemaVersion: 2,
+  schemaVersion: 3,
   matchEpoch: 1,
   revision: 1,
   actors: [],
@@ -413,6 +413,8 @@ const snapshot = (
     reserveClips: null,
     gunProfileId: index <= 2 ? null : DRONE_SWARM_GUN_PROFILE_ID,
     gunController: index === 0 ? 'ai' : null,
+    missileAmmo: index === 0 ? 6 : null,
+    missileCooldownMs: index === 0 ? 0 : null,
     captureActorId: null,
     captureProgress: null,
     revealedReward: null,

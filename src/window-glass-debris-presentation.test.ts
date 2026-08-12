@@ -134,6 +134,8 @@ describe('persistent window glass debris presentation', () => {
     expect(prewarm).toContain('root.quaternion.copy(state.quaternion);');
     expect(prewarm).toContain('root.scale.copy(state.scale);');
     expect(prewarm).toContain('shards.instanceMatrix.array.set(state.instanceMatrix);');
+    expect(prewarm).toContain('characterPhysics.prewarmMajorDebrisBodies(arena.breakableWindows.map((window) => {');
+    expect(prewarm).toContain('id: persistentWindowDebrisId(window.id), halfExtents: pooled.halfExtents');
     expect(block).toContain('pooledWindowDebris.get(windowDebrisPoolKey(arena.id, window.id))');
     expect(block).not.toContain('createFracturedWindowDebrisVisual({');
     expect(block).not.toContain('new THREE.BoxGeometry');
@@ -162,5 +164,22 @@ describe('persistent window glass debris presentation', () => {
     expect(flareFirstShot).toBeGreaterThan(restoreViewmodelFill);
     const preFlareWorldWave = prewarm.slice(disableViewmodelFill, flarePointLight);
     expect(preFlareWorldWave).not.toContain('flareProjectileSystem.prewarm(');
+  });
+
+  it('prewarms the exact glass Web Audio graph before deployment and uses it on the breach path', () => {
+    const runtime = readFileSync('src/legacy-main.ts', 'utf8');
+    const audio = readFileSync('src/audio.ts', 'utf8');
+    const matchStart = runtime.slice(runtime.indexOf('async function startGame('), runtime.indexOf('\nfunction randomNonce()'));
+    const breach = runtime.slice(runtime.indexOf('function breakHouseWindow('), runtime.indexOf('\nfunction breakWindowsAlongBallisticTrace('));
+    expect(matchStart).toContain("document.documentElement.dataset.glassImpactAudioPrewarm = audio.prepareGlassImpact() ? 'ready' : 'unavailable';");
+    expect(matchStart.indexOf('audio.prepareGlassImpact()')).toBeLessThan(matchStart.indexOf('prepareDeploymentTransition()'));
+    expect(breach).toContain("audio.impact('glass', point.distanceTo(camera.position));");
+    const prewarm = audio.slice(audio.indexOf('prepareGlassImpact(): boolean {'), audio.indexOf('\n  setLowHealthFeedback('));
+    expect(prewarm).toContain("filter.type = 'bandpass';");
+    expect(prewarm).toContain('filter.frequency.value = 5_200;');
+    expect(prewarm).toContain("tone.type = 'triangle';");
+    expect(prewarm).toContain('tone.frequency.value = 1_460;');
+    expect(prewarm).toContain('noiseGain.gain.value = 0;');
+    expect(prewarm).toContain('toneGain.gain.value = 0;');
   });
 });

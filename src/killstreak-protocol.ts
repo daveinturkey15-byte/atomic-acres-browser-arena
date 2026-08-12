@@ -14,9 +14,13 @@ import {
   CARE_TARGET_MARKER_MAX_LIFETIME_MS,
   CARPET_BOMBER_IMPACT_COUNT,
   CARPET_TARGET_MARKER_MAX_LIFETIME_MS,
+  CHOPPER_MISSILE_CAPACITY,
+  CHOPPER_MISSILE_CADENCE_MS,
+  CHOPPER_MISSILE_FLIGHT_MS,
   MAX_RETAINED_CARE_REWARDS,
   MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD,
   MAX_REPLICATED_KILLSTREAK_STREAK,
+  MAX_SUPPORT_IMPACT_EVENTS_PER_STEP,
   SUPPORT_TARGET_CORRIDOR_MAX_HALF_WIDTH_M,
   SUPPORT_TARGET_CORRIDOR_MAX_LENGTH_M,
 } from './killstreak-runtime';
@@ -293,7 +297,8 @@ function isActorSnapshot(value: unknown): boolean {
 function isEntitySnapshot(value: unknown): boolean {
   if (!object(value) || !exactKeys(value, [
     'id', 'activationId', 'ownerId', 'team', 'kind', 'mode', 'phase', 'position', 'velocity', 'attitude', 'health', 'expiresInMs',
-    'magazine', 'reserveClips', 'gunProfileId', 'gunController', 'captureActorId', 'captureProgress', 'revealedReward', 'revision',
+    'magazine', 'reserveClips', 'gunProfileId', 'gunController', 'missileAmmo', 'missileCooldownMs',
+    'captureActorId', 'captureProgress', 'revealedReward', 'revision',
   ]) || !hostEntityId(value.id) || !activationId(value.activationId) || !actorId(value.ownerId)
     || (value.team !== 0 && value.team !== 1)
     || (value.kind !== 'aircraft' && value.kind !== 'chopper' && value.kind !== 'drone' && value.kind !== 'care-crate')
@@ -313,8 +318,10 @@ function isEntitySnapshot(value: unknown): boolean {
     : value.phase === 'inbound' || value.phase === 'descending' || value.phase === 'landed' || value.phase === 'capturing';
   if (!phaseValid) return false;
   if (value.kind === 'chopper') {
-    if (value.gunController !== 'ai' && value.gunController !== 'owner-player') return false;
-  } else if (value.gunController !== null) return false;
+    if ((value.gunController !== 'ai' && value.gunController !== 'owner-player')
+      || !safeCounter(value.missileAmmo, CHOPPER_MISSILE_CAPACITY)
+      || !finite(value.missileCooldownMs, 0, CHOPPER_MISSILE_CADENCE_MS)) return false;
+  } else if (value.gunController !== null || value.missileAmmo !== null || value.missileCooldownMs !== null) return false;
   if (value.kind === 'care-crate') {
     const capturing = value.phase === 'capturing';
     if (capturing
@@ -367,7 +374,7 @@ function isPlacementMarker(value: unknown): value is KillstreakPlacementMarkerSn
 
 function isRecipientSnapshot(value: unknown): value is KillstreakRecipientSnapshot {
   if (!object(value) || !exactKeys(value, ['schemaVersion', 'matchEpoch', 'revision', 'actors', 'entities', 'sensorContacts', 'placementMarkers'])
-    || value.schemaVersion !== 2 || !safeCounter(value.matchEpoch) || !safeCounter(value.revision)
+    || value.schemaVersion !== 3 || !safeCounter(value.matchEpoch) || !safeCounter(value.revision)
     || !Array.isArray(value.actors) || value.actors.length > 6 || !value.actors.every(isActorSnapshot)
     || !Array.isArray(value.entities) || value.entities.length > 32 || !value.entities.every(isEntitySnapshot)
     || !Array.isArray(value.sensorContacts) || value.sensorContacts.length > 16 || !value.sensorContacts.every(isSensorContact)
@@ -426,16 +433,20 @@ function isDamageEvent(value: unknown): value is KillstreakDamageEvent {
 }
 
 function isImpactEvent(value: unknown): value is KillstreakImpactEvent {
-  return object(value)
-    && exactKeys(value, ['activationId', 'source', 'ordinal', 'phase', 'position', 'impactAtMs', 'atMs'])
-    && activationId(value.activationId)
-    && value.source === 'carpet-bomber'
-    && typeof value.ordinal === 'number' && Number.isSafeInteger(value.ordinal) && value.ordinal >= 0 && value.ordinal < 20
-    && (value.phase === 'drop' || value.phase === 'impact')
-    && vec3(value.position)
-    && finite(value.impactAtMs, 0, Number.MAX_SAFE_INTEGER)
-    && finite(value.atMs, 0, Number.MAX_SAFE_INTEGER)
-    && (value.phase === 'drop' ? value.atMs <= value.impactAtMs : value.atMs >= value.impactAtMs);
+  if (!object(value)) return false;
+  if (!exactKeys(value, ['activationId', 'source', 'ordinal', 'phase', 'position', 'impactAtMs', 'atMs'])
+    || !activationId(value.activationId)
+    || (value.source !== 'carpet-bomber' && value.source !== 'chopper')
+    || typeof value.ordinal !== 'number' || !Number.isSafeInteger(value.ordinal) || value.ordinal < 0
+    || value.ordinal >= (value.source === 'chopper' ? CHOPPER_MISSILE_CAPACITY : CARPET_BOMBER_IMPACT_COUNT)
+    || (value.phase !== 'drop' && value.phase !== 'impact')
+    || !vec3(value.position)
+    || !finite(value.impactAtMs, 0, Number.MAX_SAFE_INTEGER)
+    || !finite(value.atMs, 0, Number.MAX_SAFE_INTEGER)) return false;
+  if (value.source === 'chopper') return value.phase === 'drop'
+    ? value.impactAtMs - value.atMs === CHOPPER_MISSILE_FLIGHT_MS
+    : value.atMs === value.impactAtMs;
+  return value.phase === 'drop' ? value.atMs <= value.impactAtMs : value.atMs >= value.impactAtMs;
 }
 
 function isCarpetGroundFirePresentationSnapshot(value: unknown): value is CarpetGroundFirePresentationSnapshot {
@@ -468,7 +479,7 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
   }
   if (value.type === 'killstreak-control-intent') {
     return exactKeys(value, ['type', 'by', 'matchEpoch', 'lifeId', 'sequence', 'entityId', 'action', 'nonce'], [
-      'yawQ', 'pitchQ', 'thrustQ', 'strafeQ', 'verticalQ', 'fire', 'timing',
+      'yawQ', 'pitchQ', 'thrustQ', 'strafeQ', 'verticalQ', 'fire', 'missileFire', 'timing',
     ]) && baseIntent(value) && hostEntityId(value.entityId)
       && (value.action === 'toggle-chopper-gunner' || value.action === 'toggle-piloted-drone' || value.action === 'pilot-control' || value.action === 'exit-piloted-drone')
       && (value.yawQ === undefined || finite(value.yawQ, -Math.PI, Math.PI))
@@ -477,6 +488,7 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
       && (value.strafeQ === undefined || finite(value.strafeQ, -1, 1))
       && (value.verticalQ === undefined || finite(value.verticalQ, -1, 1))
       && (value.fire === undefined || typeof value.fire === 'boolean')
+      && (value.missileFire === undefined || (value.action === 'pilot-control' && typeof value.missileFire === 'boolean'))
       && timing(value.timing);
   }
   if (value.type === 'killstreak-care-capture-intent') {
@@ -533,7 +545,7 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
       && actorId(value.by) && safeCounter(value.matchEpoch) && safeCounter(value.revision)
       && Array.isArray(value.events) && value.events.length <= 64 && value.events.every(isDamageEvent)
       && new Set(value.events.map((event) => (event as KillstreakDamageEvent).resultId)).size === value.events.length
-      && Array.isArray(value.impacts) && value.impacts.length <= 40 && value.impacts.every(isImpactEvent)
+      && Array.isArray(value.impacts) && value.impacts.length <= MAX_SUPPORT_IMPACT_EVENTS_PER_STEP && value.impacts.every(isImpactEvent)
       && new Set(value.impacts.map((impact) => {
         const event = impact as KillstreakImpactEvent;
         return `${event.activationId}:${event.ordinal}:${event.phase}`;

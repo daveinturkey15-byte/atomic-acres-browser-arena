@@ -33,6 +33,13 @@ export const ADRENALINE_MOVEMENT_MULTIPLIER = 1.1;
 export const ADRENALINE_RELOAD_DURATION_MULTIPLIER = 0.9;
 export const CHOPPER_DURATION_MS = 30_000;
 export const CHOPPER_HEALTH = 800;
+/** One finite operator payload per Chopper activation; the 30 mm cannon remains belt-fed. */
+export const CHOPPER_MISSILE_CAPACITY = 6;
+export const CHOPPER_MISSILE_CADENCE_MS = 1_000;
+export const CHOPPER_MISSILE_FLIGHT_MS = 780;
+export const CHOPPER_MISSILE_MAX_RANGE_M = 120;
+export const CHOPPER_MISSILE_BLAST_RADIUS_M = 4.5;
+export const CHOPPER_MISSILE_MAX_DAMAGE = 240;
 export const PILOTED_DRONE_DURATION_MS = DRONE_SUPPORT_DEFINITIONS.piloted.lifetimeMs;
 export const DRONE_SWARM_DURATION_MS = DRONE_SUPPORT_DEFINITIONS.swarm.lifetimeMs;
 export const DRONE_SWARM_COUNT = 24;
@@ -44,6 +51,7 @@ export const CARE_AIRCRAFT_DURATION_MS = 7_000;
 export const CARE_AIRCRAFT_DROP_DELAY_MS = 800;
 export const CARE_CRATE_DESCENT_MS = 5_200;
 export const CARPET_BOMBER_IMPACT_COUNT = 20;
+export const MAX_SUPPORT_IMPACT_EVENTS_PER_STEP = CARPET_BOMBER_IMPACT_COUNT * 2;
 export const CARPET_BOMB_SHELL_DROP_LEAD_MS = 420;
 export const CARPET_BOMBER_PREVIOUS_MAX_DAMAGE = 80;
 export const CARPET_BOMBER_DAMAGE_MULTIPLIER = 3;
@@ -235,6 +243,15 @@ type ChopperEntity = EntityBase & {
   aimYaw: number;
   aimPitch: number;
   pendingPlayerFire: boolean;
+  pendingPlayerMissile: Readonly<{ aimYaw: number; aimPitch: number }> | null;
+  missilesRemaining: number;
+  nextMissileAtMs: number;
+  nextMissileOrdinal: number;
+  pendingMissiles: Array<Readonly<{
+    ordinal: number;
+    position: SupportVec3;
+    impactAtMs: number;
+  }>>;
 };
 
 type DroneEntity = EntityBase & {
@@ -360,6 +377,8 @@ export type KillstreakControlIntent = Readonly<{
   strafeQ?: number;
   verticalQ?: number;
   fire?: boolean;
+  /** Edge-triggered RMB request. It is never interpreted as a held fire state. */
+  missileFire?: boolean;
 }>;
 
 export type KillstreakAdmission = Readonly<{
@@ -428,6 +447,8 @@ export type KillstreakEntitySnapshot = Readonly<{
   reserveClips: number | null;
   gunProfileId: DroneGunProfileId | null;
   gunController: 'ai' | 'owner-player' | null;
+  missileAmmo: number | null;
+  missileCooldownMs: number | null;
   captureActorId: string | null;
   captureProgress: number | null;
   revealedReward: Pass65KillstreakId | null;
@@ -435,7 +456,7 @@ export type KillstreakEntitySnapshot = Readonly<{
 }>;
 
 export type KillstreakRecipientSnapshot = Readonly<{
-  schemaVersion: 2;
+  schemaVersion: 3;
   matchEpoch: number;
   revision: number;
   actors: readonly KillstreakActorSnapshot[];
@@ -672,6 +693,38 @@ export function chopperGunnerAuthoritativeRay(
     direction: supportForwardFromYawPitch(aimYaw, aimPitch),
     tracerOrigin: translatedSupportOffset(position, attitude, CHOPPER_GUNNER_RAY_POLICY.muzzleSocketLocalM),
   });
+}
+
+/**
+ * Resolves the possessed gunner's centre ray onto host-owned terrain. Clients
+ * send only yaw/pitch; bounds and ground height remain authoritative here.
+ * An upward/horizon ray deterministically falls back to the last in-bounds
+ * ground sample instead of accepting a client-authored impact coordinate.
+ */
+export function chopperMissileGroundTarget(
+  position: SupportVec3,
+  attitude: SupportVec3,
+  aimYaw: number,
+  aimPitch: number,
+  world: KillstreakWorld,
+): SupportVec3 {
+  const ray = chopperGunnerAuthoritativeRay(position, attitude, aimYaw, aimPitch);
+  const margin = 0.05;
+  let targetX = clamp(ray.origin[0], world.bounds.minX + margin, world.bounds.maxX - margin);
+  let targetZ = clamp(ray.origin[2], world.bounds.minZ + margin, world.bounds.maxZ - margin);
+  let targetY = supportGroundHeight(world, targetX, targetZ);
+  for (let distanceM = 0.5; distanceM <= CHOPPER_MISSILE_MAX_RANGE_M; distanceM += 0.5) {
+    const x = ray.origin[0] + ray.direction[0] * distanceM;
+    const z = ray.origin[2] + ray.direction[2] * distanceM;
+    if (x < world.bounds.minX + margin || x > world.bounds.maxX - margin
+      || z < world.bounds.minZ + margin || z > world.bounds.maxZ - margin) break;
+    const y = supportGroundHeight(world, x, z);
+    targetX = x;
+    targetY = y;
+    targetZ = z;
+    if (ray.origin[1] + ray.direction[1] * distanceM <= y + 0.08) break;
+  }
+  return Object.freeze([targetX, targetY, targetZ] as const);
 }
 
 function hostileTargets(world: KillstreakWorld, ownerId: string, team: 0 | 1): KillstreakTarget[] {
@@ -1247,6 +1300,7 @@ export class HostKillstreakRuntime {
       if (entity.kind === 'chopper' && entity.ownerId === actorId && entity.gunController !== 'ai') {
         entity.gunController = 'ai';
         entity.pendingPlayerFire = false;
+        entity.pendingPlayerMissile = null;
         entity.revision += 1;
       } else if (entity.kind === 'care-crate' && entity.captureActorId === actorId) {
         entity.phase = 'landed';
@@ -1274,6 +1328,7 @@ export class HostKillstreakRuntime {
       if (entity.kind === 'chopper' && entity.ownerId === actorId && entity.gunController !== 'ai') {
         entity.gunController = 'ai';
         entity.pendingPlayerFire = false;
+        entity.pendingPlayerMissile = null;
         entity.revision += 1;
       } else if (entity.kind === 'care-crate' && entity.captureActorId === actorId) {
         entity.phase = 'landed';
@@ -1503,6 +1558,8 @@ export class HostKillstreakRuntime {
         position: [centre[0], centre[1], centre[2]], velocity: [0, 0, 0], attitude: [0, 0, 0], health: CHOPPER_HEALTH, revision: 0,
         kind: 'chopper', phase: 'inbound', seed, routeCentre: centre, gunController: 'ai',
         nextShotAtMs: nowMs + 600, aimYaw: 0, aimPitch: 0, pendingPlayerFire: false,
+        pendingPlayerMissile: null, missilesRemaining: CHOPPER_MISSILE_CAPACITY,
+        nextMissileAtMs: nowMs, nextMissileOrdinal: 0, pendingMissiles: [],
       };
       const pose = chopperRoutePose(seed, nowMs, nowMs, centre, world.bounds);
       chopper.position = resolveFlightPosition(centre, pose.position, 1.25, world);
@@ -1783,6 +1840,7 @@ export class HostKillstreakRuntime {
       } else {
         entity.gunController = 'ai';
         entity.pendingPlayerFire = false;
+        entity.pendingPlayerMissile = null;
         this.restoreActorControl(actor, false);
       }
       entity.revision += 1;
@@ -1819,7 +1877,8 @@ export class HostKillstreakRuntime {
       entity.sensorContacts.length = 0;
       this.restoreActorControl(actor, false);
     } else {
-      if (![intent.yawQ, intent.pitchQ, intent.thrustQ, intent.strafeQ, intent.verticalQ].every((value) => value === undefined || Number.isFinite(value))) {
+      if (![intent.yawQ, intent.pitchQ, intent.thrustQ, intent.strafeQ, intent.verticalQ].every((value) => value === undefined || Number.isFinite(value))
+        || (intent.missileFire !== undefined && typeof intent.missileFire !== 'boolean')) {
         return reject('invalid-control-value');
       }
       if (entity.kind === 'chopper') {
@@ -1829,7 +1888,18 @@ export class HostKillstreakRuntime {
         // Fire is a held-state intent. Assignment (rather than OR-latching)
         // makes release authoritative and lets the host apply the slow cadence.
         entity.pendingPlayerFire = intent.fire === true;
+        // Missile fire is an edge request, never a held-state latch. Repeated
+        // RMB packets during cooldown are accepted as control updates but are
+        // deliberately not queued for a later automatic launch.
+        if (intent.missileFire === true
+          && entity.pendingPlayerMissile === null
+          && entity.missilesRemaining > 0
+          && nowMs >= entity.nextMissileAtMs) entity.pendingPlayerMissile = Object.freeze({
+            aimYaw: entity.aimYaw,
+            aimPitch: entity.aimPitch,
+          });
       } else if (entity.kind === 'drone' && entity.mode === 'piloted') {
+        if (intent.missileFire === true) return reject('missile-unavailable');
         if (actor.possession?.kind !== 'piloted-drone' || actor.possession.entityId !== entity.id) return reject('not-drone-controller');
         entity.yaw = clamp(intent.yawQ ?? entity.yaw, -Math.PI, Math.PI);
         entity.pitch = clamp(intent.pitchQ ?? entity.pitch, -1.2, 1.2);
@@ -1852,6 +1922,7 @@ export class HostKillstreakRuntime {
       if (chopper?.kind === 'chopper') {
         chopper.gunController = 'ai';
         chopper.pendingPlayerFire = false;
+        chopper.pendingPlayerMissile = null;
       }
     }
     if (forceAll && possession?.kind === 'piloted-drone') {
@@ -1988,7 +2059,7 @@ export class HostKillstreakRuntime {
         && bomber.nextDropOrdinal < bomber.impacts.length
         && routeProgress + 0.002 >= bomber.dropRouteProgress[bomber.nextDropOrdinal]!
         && canonicalNowMs >= bomber.impactAtMs[bomber.nextDropOrdinal]! - CARPET_BOMB_SHELL_DROP_LEAD_MS
-        && impactEvents.length < CARPET_BOMBER_IMPACT_COUNT * 2) {
+        && impactEvents.length < MAX_SUPPORT_IMPACT_EVENTS_PER_STEP) {
         const ordinal = bomber.nextDropOrdinal;
         const minimumImpactAtMs = canonicalNowMs + CARPET_BOMB_SHELL_DROP_LEAD_MS;
         const scheduleShiftMs = Math.max(0, minimumImpactAtMs - bomber.impactAtMs[ordinal]!);
@@ -2011,7 +2082,7 @@ export class HostKillstreakRuntime {
       }
       while (bomber.nextImpactOrdinal < bomber.nextDropOrdinal
         && canonicalNowMs >= bomber.impactAtMs[bomber.nextImpactOrdinal]!
-        && impactEvents.length < CARPET_BOMBER_IMPACT_COUNT * 2) {
+        && impactEvents.length < MAX_SUPPORT_IMPACT_EVENTS_PER_STEP) {
         const ordinal = bomber.nextImpactOrdinal;
         const position = bomber.impacts[ordinal];
         const impactAtMs = bomber.impactAtMs[ordinal]!;
@@ -2058,7 +2129,7 @@ export class HostKillstreakRuntime {
       if (entity.kind === 'aircraft') {
         if (entity.variant !== 'carpet') this.advanceAircraft(entity, canonicalNowMs, dt, world);
       } else if (entity.kind === 'care-crate') this.advanceCareCrate(entity, canonicalNowMs, dt, world);
-      else if (entity.kind === 'chopper') this.advanceChopper(entity, canonicalNowMs, dt, world, damageEvents);
+      else if (entity.kind === 'chopper') this.advanceChopper(entity, canonicalNowMs, dt, world, damageEvents, impactEvents);
       else this.advanceDrone(entity, canonicalNowMs, dt, world, damageEvents);
     }
     this.enforceSwarmSeparation(dt, world);
@@ -2164,6 +2235,7 @@ export class HostKillstreakRuntime {
     dt: number,
     world: KillstreakWorld,
     damageEvents: KillstreakDamageEvent[],
+    impactEvents: KillstreakImpactEvent[],
   ): void {
     const elapsed = clamp((nowMs - entity.createdAtMs) / CHOPPER_DURATION_MS, 0, 1);
     entity.phase = elapsed < 0.08 ? 'inbound' : elapsed > 0.9 ? 'outbound' : 'orbiting';
@@ -2186,10 +2258,72 @@ export class HostKillstreakRuntime {
     entity.position = next;
     entity.attitude = attitudeFromMotion(previous, next, pose.attitude);
     entity.revision += 1;
-    const shouldFire = entity.gunController === 'ai' ? nowMs >= entity.nextShotAtMs : entity.pendingPlayerFire && nowMs >= entity.nextShotAtMs;
-    if (!shouldFire || damageEvents.length >= MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP) return;
     const owner = this.actors.get(entity.ownerId);
     if (!owner) return;
+
+    if (entity.pendingMissiles.length > 0) {
+      const pending: ChopperEntity['pendingMissiles'] = [];
+      for (const missile of entity.pendingMissiles) {
+        if (nowMs < missile.impactAtMs || impactEvents.length >= MAX_SUPPORT_IMPACT_EVENTS_PER_STEP) {
+          pending.push(missile);
+          continue;
+        }
+        impactEvents.push(Object.freeze({
+          activationId: entity.activationId,
+          source: 'chopper',
+          ordinal: missile.ordinal,
+          phase: 'impact',
+          position: missile.position,
+          impactAtMs: missile.impactAtMs,
+          atMs: missile.impactAtMs,
+        }));
+        this.damageAround(
+          owner,
+          entity.activationId,
+          'chopper',
+          missile.position,
+          CHOPPER_MISSILE_BLAST_RADIUS_M,
+          CHOPPER_MISSILE_MAX_DAMAGE,
+          nowMs,
+          world,
+          damageEvents,
+        );
+      }
+      entity.pendingMissiles = pending;
+    }
+
+    if (entity.pendingPlayerMissile !== null
+      && entity.gunController !== 'ai'
+      && impactEvents.length < MAX_SUPPORT_IMPACT_EVENTS_PER_STEP) {
+      const request = entity.pendingPlayerMissile;
+      entity.pendingPlayerMissile = null;
+      entity.missilesRemaining -= 1;
+      entity.nextMissileAtMs = nowMs + CHOPPER_MISSILE_CADENCE_MS;
+      const ordinal = entity.nextMissileOrdinal;
+      entity.nextMissileOrdinal += 1;
+      const position = chopperMissileGroundTarget(
+        firingPosition,
+        firingAttitude,
+        request.aimYaw,
+        request.aimPitch,
+        world,
+      );
+      const impactAtMs = nowMs + CHOPPER_MISSILE_FLIGHT_MS;
+      entity.pendingMissiles.push(Object.freeze({ ordinal, position, impactAtMs }));
+      impactEvents.push(Object.freeze({
+        activationId: entity.activationId,
+        source: 'chopper',
+        ordinal,
+        phase: 'drop',
+        position,
+        impactAtMs,
+        atMs: nowMs,
+      }));
+      entity.revision += 1;
+    }
+
+    const shouldFire = entity.gunController === 'ai' ? nowMs >= entity.nextShotAtMs : entity.pendingPlayerFire && nowMs >= entity.nextShotAtMs;
+    if (!shouldFire || damageEvents.length >= MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP) return;
     if (entity.gunController === 'ai') {
       const target = this.nearestVisibleTarget(firingPosition, owner.actorId, owner.team, world);
       if (target) {
@@ -2723,7 +2857,7 @@ export class HostKillstreakRuntime {
     // Ground impacts sit exactly on the floor collider. Lift only the LOS
     // query so the floor cannot self-occlude the blast; the event keeps the
     // exact admitted impact origin for presentation and recipient validation.
-    const visibilityOrigin: SupportVec3 = source === 'carpet-bomber'
+    const visibilityOrigin: SupportVec3 = source === 'carpet-bomber' || source === 'chopper'
       ? [origin[0], Math.min(world.bounds.ceilingY, origin[1] + 0.08), origin[2]]
       : origin;
     for (const target of candidates) {
@@ -2797,7 +2931,11 @@ export class HostKillstreakRuntime {
     }
     const actor = this.actors.get(entity.ownerId);
     if (actor?.possession?.entityId === entityId) this.restoreActorControl(actor, false);
-    if (entity.kind === 'chopper' && entity.gunController !== 'ai') entity.gunController = 'ai';
+    if (entity.kind === 'chopper' && entity.gunController !== 'ai') {
+      entity.gunController = 'ai';
+      entity.pendingPlayerFire = false;
+      entity.pendingPlayerMissile = null;
+    }
     this.revision += 1;
   }
 
@@ -2845,6 +2983,10 @@ export class HostKillstreakRuntime {
         reserveClips: entity.kind === 'drone' ? entity.reserveClips : null,
         gunProfileId: entity.kind === 'drone' ? entity.gunProfileId : null,
         gunController: entity.kind === 'chopper' ? entity.gunController === 'ai' ? 'ai' : 'owner-player' : null,
+        missileAmmo: entity.kind === 'chopper' ? entity.missilesRemaining : null,
+        missileCooldownMs: entity.kind === 'chopper'
+          ? Math.min(CHOPPER_MISSILE_CADENCE_MS, Math.max(0, entity.nextMissileAtMs - nowMs))
+          : null,
         captureActorId: entity.kind === 'care-crate' ? entity.captureActorId : null,
         captureProgress,
         revealedReward: null,
@@ -2894,7 +3036,7 @@ export class HostKillstreakRuntime {
       }));
     }
     return Object.freeze({
-      schemaVersion: 2,
+      schemaVersion: 3,
       matchEpoch: this.matchEpoch,
       revision: this.revision,
       actors: Object.freeze(actors),
