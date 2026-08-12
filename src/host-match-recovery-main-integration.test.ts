@@ -75,8 +75,46 @@ describe('same-browser hosted active-match recovery integration', () => {
     const lobbyAdmission = functionBody('acceptLobbyState', 'authorizeRedeploy');
     expect(lobbyAdmission).not.toContain('enteringActiveLobby');
     expect(lobbyAdmission).not.toContain('sendClientWorldRepairReady');
+    const hostAdmission = functionBody('admitLobbyJoin', 'updateHostReady');
+    const confirmAt = hostAdmission.indexOf(
+      'network.confirmPlayerAdmission(message.playerId, message.resumeToken, message.connectionEpoch)',
+    );
+    const connectedAt = hostAdmission.indexOf('hostLobbyMembers.set(message.playerId, restored);');
+    const lobbyAt = hostAdmission.indexOf('broadcastHostLobby(currentPhase);');
+    const receiverReadyAt = hostAdmission.indexOf(
+      'sendKillstreakStateToPlayer(message.playerId, performance.now(), true);',
+    );
+    const lobbyStartAt = hostAdmission.indexOf("type: 'lobby-start'");
+    expect(confirmAt).toBeGreaterThanOrEqual(0);
+    expect(connectedAt).toBeGreaterThan(confirmAt);
+    expect(lobbyAt).toBeGreaterThan(connectedAt);
+    expect(receiverReadyAt).toBeGreaterThan(lobbyAt);
+    expect(lobbyStartAt).toBeGreaterThan(receiverReadyAt);
+    const activeAdmissionRepair = hostAdmission.slice(lobbyAt, lobbyStartAt);
+    expect(activeAdmissionRepair).toContain('if (gameStarted)');
+    expect(activeAdmissionRepair).not.toContain('broadcastKillstreakState(');
+    expect(activeAdmissionRepair).not.toContain('remotes');
     expect(main).toContain('broadcastHostedBotState(true)');
-    expect(main).toContain('broadcastKillstreakState(performance.now(), true)');
+  });
+
+  it('targets receiver-ready proof when recovery has retained authority but no live remote', () => {
+    const admission = functionBody('admitLobbyJoin', 'updateHostReady');
+    const proof = 'sendKillstreakStateToPlayer(message.playerId, performance.now(), true);';
+    expect(admission.match(new RegExp(proof.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(1);
+    expect(admission).not.toContain('if (gameStarted) broadcastKillstreakState(');
+
+    const targeted = functionBody('sendKillstreakStateToPlayer', 'broadcastKillstreakState');
+    expect(targeted).toContain('forPlayerId,');
+    expect(targeted).toContain('snapshot: killstreakRuntime.snapshotFor(forPlayerId, now)');
+    expect(targeted).toContain('network.sendToPlayer(forPlayerId, message)');
+    expect(targeted).toContain('network.sendStateCommitReliablyToPlayer(forPlayerId, message)');
+    expect(targeted.indexOf('network.sendToPlayer(forPlayerId, message)'))
+      .toBeLessThan(targeted.indexOf('network.sendStateCommitReliablyToPlayer(forPlayerId, message)'));
+    expect(targeted).not.toContain('remotes');
+
+    const restore = functionBody('restoreRecoveredHostRuntime', 'initializeFreshHostLobby');
+    expect(restore).toContain('retainedRemoteAuthorities.set(guest.snapshot.id');
+    expect(restore).not.toContain('remotes.set(');
   });
 
   it('lets exact resume liveness supersede a retired document without treating pose silence as a disconnect', () => {

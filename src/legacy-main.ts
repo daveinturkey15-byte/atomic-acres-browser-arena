@@ -7411,7 +7411,7 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
     // world repair is sent; its normal post-admission `join` message is that
     // readiness handshake (handled in onNetworkMessage below).
     broadcastHostLobby(currentPhase);
-    if (gameStarted) broadcastKillstreakState(performance.now(), true);
+    if (gameStarted) sendKillstreakStateToPlayer(message.playerId, performance.now(), true);
     sendTextChatHistory(message.playerId);
     if (privateMatchActiveAtHostTimeMs !== null && privateMatchActiveAtEpochMs !== null && currentPhase !== 'waiting') {
       network.sendToPlayer(message.playerId, {
