@@ -968,9 +968,14 @@ test('host-authoritative facing flash and semantic smoke break bot lock while th
     await guest.waitForTimeout(500);
     expect(await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.hp)).toBe(flash.targetHealthAfterEffect);
 
+    await expect.poll(async () => host.evaluate((botId) => {
+      const bot = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().bots.find((candidate: any) => candidate.id === botId);
+      return bot?.perception.blindRemainingMs ?? null;
+    }, flash.botId)).toBe(0);
     const smoke = await host.evaluate(() => (
       (window as any).__ATOMIC_ACRES_DEBUG__.stageBotPerceptionAgainstRemote('smoke')
     ));
+    expect(smoke, 'Smoke perception staging returned null after flash blindness reached zero').not.toBeNull();
     expect(smoke).toMatchObject({ effect: 'smoke', preLockId: smoke.targetId, postLockId: null, canFire: false });
     expect(smoke.volumeId).toMatch(/^smoke-/);
     expect(smoke.aimErrorRadians).toBeGreaterThan(0);

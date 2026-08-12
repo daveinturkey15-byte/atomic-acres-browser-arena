@@ -379,6 +379,25 @@ test('Qoder death-drop staging proves host authority before natural expiry witho
   assert.match(deathDrop, /expect\(laterGuestInventory\)\.toEqual\(inventoryAfterScavenge\)/u);
 });
 
+test('Qoder perception stages smoke only after the exact flashed bot is no longer blind', () => {
+  const source = readFileSync('tests/e2e/pass66-qoder-multiplayer-authority.spec.ts', 'utf8');
+  const perceptionStart = source.indexOf("test('host-authoritative facing flash and semantic smoke");
+  assert.ok(perceptionStart >= 0);
+  const perception = source.slice(perceptionStart);
+  const flashAt = perception.indexOf("stageBotPerceptionAgainstRemote('flash')");
+  const zeroBlindPollAt = perception.indexOf('await expect.poll(async () => host.evaluate((botId) => {', flashAt);
+  const zeroBlindProofAt = perception.indexOf(')).toBe(0);', zeroBlindPollAt);
+  const smokeAt = perception.indexOf("stageBotPerceptionAgainstRemote('smoke')", zeroBlindProofAt);
+  const nullGuardAt = perception.indexOf("expect(smoke, 'Smoke perception staging returned null after flash blindness reached zero').not.toBeNull();", smokeAt);
+  const firstSmokeDereferenceAt = perception.indexOf('preLockId: smoke.targetId', nullGuardAt);
+  assert.ok(flashAt >= 0 && zeroBlindPollAt > flashAt && zeroBlindProofAt > zeroBlindPollAt);
+  assert.ok(smokeAt > zeroBlindProofAt && nullGuardAt > smokeAt && firstSmokeDereferenceAt > nullGuardAt);
+  const zeroBlindPoll = perception.slice(zeroBlindPollAt, zeroBlindProofAt);
+  assert.match(zeroBlindPoll, /candidate\.id === botId/u);
+  assert.match(zeroBlindPoll, /bot\?\.perception\.blindRemainingMs \?\? null/u);
+  assert.match(zeroBlindPoll, /\},\s*flash\.botId/u);
+});
+
 test('final receipt binds exact runtime, test matrix and five physical peer identities', () => {
   const baseUrl = 'http://127.0.0.1:4530/channels/the-big-one/';
   const receipt = {
