@@ -389,7 +389,7 @@ const snapshot = (
   sensorContacts: KillstreakRecipientSnapshot['sensorContacts'] = [],
   placementMarkers: KillstreakRecipientSnapshot['placementMarkers'] = [],
 ): KillstreakRecipientSnapshot => ({
-  schemaVersion: 2,
+  schemaVersion: 3,
   matchEpoch: 1,
   revision: 1,
   actors: [],

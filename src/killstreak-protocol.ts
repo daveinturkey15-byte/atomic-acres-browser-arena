@@ -374,7 +374,7 @@ function isPlacementMarker(value: unknown): value is KillstreakPlacementMarkerSn
 
 function isRecipientSnapshot(value: unknown): value is KillstreakRecipientSnapshot {
   if (!object(value) || !exactKeys(value, ['schemaVersion', 'matchEpoch', 'revision', 'actors', 'entities', 'sensorContacts', 'placementMarkers'])
-    || value.schemaVersion !== 2 || !safeCounter(value.matchEpoch) || !safeCounter(value.revision)
+    || value.schemaVersion !== 3 || !safeCounter(value.matchEpoch) || !safeCounter(value.revision)
     || !Array.isArray(value.actors) || value.actors.length > 6 || !value.actors.every(isActorSnapshot)
     || !Array.isArray(value.entities) || value.entities.length > 32 || !value.entities.every(isEntitySnapshot)
     || !Array.isArray(value.sensorContacts) || value.sensorContacts.length > 16 || !value.sensorContacts.every(isSensorContact)

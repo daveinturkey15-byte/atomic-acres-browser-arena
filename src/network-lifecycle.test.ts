@@ -594,7 +594,7 @@ describe('guest event connection lifecycle', () => {
     expect(hostRoomReclaimAction(true, -1)).toEqual({ action: 'fail', delayMs: 0 });
   });
 
-  it('rejects a pre-v5 initial lobby handshake as a protocol mismatch', () => {
+  it('rejects a predecessor-version initial lobby handshake as a protocol mismatch', () => {
     const join = {
       type: 'lobby-join',
       protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
@@ -606,8 +606,9 @@ describe('guest event connection lifecycle', () => {
       nonce: 1,
     };
     expect(initialLobbyJoinHasProtocolMismatch(join)).toBe(false);
-    expect(initialLobbyJoinHasProtocolMismatch({ ...join, protocolVersion: 4 })).toBe(true);
-    expect(initialLobbyJoinHasProtocolMismatch({ type: 'chat-submit', protocolVersion: 4 })).toBe(false);
+    const predecessorVersion = MULTIPLAYER_PROTOCOL_VERSION - 1;
+    expect(initialLobbyJoinHasProtocolMismatch({ ...join, protocolVersion: predecessorVersion })).toBe(true);
+    expect(initialLobbyJoinHasProtocolMismatch({ type: 'chat-submit', protocolVersion: predecessorVersion })).toBe(false);
   });
 
   it('keeps movement flowing over the reliable event lane when the transient lane degrades', () => {

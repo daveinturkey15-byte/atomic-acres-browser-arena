@@ -456,7 +456,7 @@ export type KillstreakEntitySnapshot = Readonly<{
 }>;
 
 export type KillstreakRecipientSnapshot = Readonly<{
-  schemaVersion: 2;
+  schemaVersion: 3;
   matchEpoch: number;
   revision: number;
   actors: readonly KillstreakActorSnapshot[];
@@ -3036,7 +3036,7 @@ export class HostKillstreakRuntime {
       }));
     }
     return Object.freeze({
-      schemaVersion: 2,
+      schemaVersion: 3,
       matchEpoch: this.matchEpoch,
       revision: this.revision,
       actors: Object.freeze(actors),
