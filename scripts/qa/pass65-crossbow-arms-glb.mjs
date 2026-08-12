@@ -56,6 +56,7 @@ const DJMAESEN_SOURCE_UID = '08ec4403a47645d8ad80633abf13d39d';
 export const REQUIRED_ARM_SOCKETS = Object.freeze([
   'right-hand-grip-socket', 'left-hand-grip-socket',
   'right-wrist-knife-socket', 'left-hand-grenade-socket',
+  'right-palm-contact', 'left-palm-contact',
 ]);
 
 export const REQUIRED_ARM_BLEND_PAIRS = Object.freeze([
@@ -241,6 +242,18 @@ export function auditOperatorArmsGlb(json, lod, bytes) {
     && deliveryRoot?.extras?.shoulder_entry_contract === 'weighted-capped-fps-frame-edge-sleeve-v2'
     && deliveryRoot?.extras?.glove_construction_contract === 'opaque-uv-preserved-scaled-anatomical-hand-v2'
     && deliveryRoot?.extras?.weapon_grip_review_contract === 'seven-view-actual-weapon-contact-v2';
+  const manualPass70Contract = licensedDerivative
+    && deliveryRoot?.extras?.creator === 'DJMaesen; Atomic Acres integration'
+    && deliveryRoot?.extras?.license === 'CC-BY-4.0'
+    && deliveryRoot?.extras?.source_mirror_commit === '96fdc4c94ba6c37786b0af6e8caf44b6cf2913f0'
+    && deliveryRoot?.extras?.visual_revision === 'pass70-manual-anatomical-viewmodel-v1'
+    && deliveryRoot?.extras?.limb_profile_contract === 'manual-continuous-cuff-forearm-deformation-v1'
+    && deliveryRoot?.extras?.hand_pose_contract === 'manual-separated-articulated-digit-contact-v1'
+    && deliveryRoot?.extras?.shoulder_entry_contract === 'weighted-capped-fps-frame-edge-sleeve-v2'
+    && deliveryRoot?.extras?.glove_construction_contract === 'opaque-manual-cuff-palm-digit-continuity-v1'
+    && deliveryRoot?.extras?.palm_contact_contract === 'authored-wrist-parented-full-transform-v1'
+    && deliveryRoot?.extras?.manual_master_contract === 'checked-in-editable-blend-export-only-v1'
+    && deliveryRoot?.extras?.weapon_grip_review_contract === 'seven-view-actual-weapon-contact-v2';
   const legacyContract = !licensedDerivative
     && deliveryRoot?.extras?.visual_revision === 'continuous-manifold-viewmodel-v6'
     && deliveryRoot?.extras?.limb_profile_contract === 'continuous-shoulder-elbow-wrist-manifold-shell-v6'
@@ -248,18 +261,19 @@ export function auditOperatorArmsGlb(json, lod, bytes) {
     && deliveryRoot?.extras?.shoulder_entry_contract === 'full-profile-frame-edge-sleeve-v6'
     && deliveryRoot?.extras?.glove_construction_contract === 'opaque-continuous-palm-wrapped-fingers-cloth-v6'
     && deliveryRoot?.extras?.weapon_grip_review_contract === 'all-family-runtime-plus-m4-contact-v5';
-  if (!(licensedContract || legacyContract)
+  if (!(licensedContract || manualPass70Contract || legacyContract)
     || deliveryRoot?.extras?.runtime_animation_contract !== 'authored-fingers-under-runtime-chain-ik-v1'
     || deliveryRoot?.extras?.finger_segment_count !== 30
     || deliveryRoot?.extras?.weapon_grip_review_frames !== (licensedDerivative ? 7 : 3)) {
-    failures.push(`${label}: accepted licensed-v7 or legacy-v6 silhouette, hand, glove, animation and grip-review contract missing`);
+    failures.push(`${label}: accepted Pass70 manual, licensed-v8 or legacy-v6 silhouette, hand, glove, animation and grip-review contract missing`);
   }
   const blendedVertexCount = Number(deliveryRoot?.extras?.blended_vertex_count);
   const multiBoneWeightedParts = Number(deliveryRoot?.extras?.multi_bone_weighted_part_count);
   const blendedJointPairs = String(deliveryRoot?.extras?.blended_joint_pairs_csv ?? '').split(',').filter(Boolean);
   if (!Number.isInteger(blendedVertexCount) || blendedVertexCount < 240
     || !Number.isInteger(multiBoneWeightedParts) || multiBoneWeightedParts < (licensedDerivative ? 4 : 24)
-    || deliveryRoot?.extras?.weighting_contract !== 'adjacent-bone-normalized-blend-v5'
+    || !['adjacent-bone-normalized-blend-v5', 'manual-adjacent-joint-normalized-blend-v1']
+      .includes(deliveryRoot?.extras?.weighting_contract)
     || REQUIRED_ARM_BLEND_PAIRS.some((pair) => !blendedJointPairs.includes(pair))) {
     failures.push(`${label}: genuine adjacent-bone elbow/wrist/knuckle weighting receipt missing`);
   }
@@ -285,6 +299,23 @@ export function auditOperatorArmsGlb(json, lod, bytes) {
     } else {
       const position = index < 0 ? null : nodeWorldTranslation(json, index);
       if (!position || position[2] > -0.55) failures.push(`${label}: ${socketName} is not forward on local -Z`);
+    }
+  }
+  for (const [contactName, expectedParent] of [['right-palm-contact', 'WristR'], ['left-palm-contact', 'WristL']]) {
+    const index = nodes.findIndex((node) => node.name === contactName);
+    const contact = index < 0 ? null : nodes[index];
+    const parentName = index < 0 ? null : nodes[parents.get(index)]?.name ?? null;
+    const rotation = contact?.rotation ?? [0, 0, 0, 1];
+    const rotationLength = Math.hypot(...rotation);
+    const scale = contact?.scale ?? [1, 1, 1];
+    if (parentName !== expectedParent
+      || Math.abs(rotationLength - 1) > 1e-4
+      || scale.some((value) => !Number.isFinite(value))
+      || scale.reduce((product, value) => product * value, 1) <= 0
+      || contact?.extras?.positive_determinant !== true
+      || contact?.extras?.palm_forward_axis !== '+Y'
+      || contact?.extras?.palm_up_axis !== '+Z') {
+      failures.push(`${label}: ${contactName} must be a finite positive-determinant full transform under ${expectedParent}`);
     }
   }
   const meshNodeEntries = nodes.map((node, index) => ({ node, index }))

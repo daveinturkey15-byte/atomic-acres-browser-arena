@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { PLAYER_PROFILE_STORAGE_KEY } from '../../src/player-profile';
 
 async function ready(page: Page): Promise<void> {
   await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&externalServices=off&seed=pass66-menu-correction&previewTime=0');
@@ -30,11 +31,16 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
     await ready(page);
     await page.locator('#menu-tab-kit').click();
 
-    const presentations = page.locator('#menu-panel-kit [data-weapon-presentation]');
+    const presentations = page.locator('#menu-panel-kit .kit-card [data-weapon-presentation]');
     await expect(presentations).toHaveCount(7);
-    await expect(page.locator('#menu-panel-kit [data-weapon-metric]')).toHaveCount(28);
+    await expect(page.locator('#menu-panel-kit .kit-card [data-weapon-dps]')).toHaveCount(7);
+    await expect(page.locator('#menu-panel-kit .kit-card [data-weapon-metric]')).toHaveCount(35);
     expect(await presentations.evaluateAll((roots) => roots.every((root) => (
-      root.querySelectorAll('[data-weapon-metric]').length === 4
+      root.querySelectorAll('[data-weapon-dps]').length === 1
+        && root.querySelectorAll('[data-weapon-dps] [data-weapon-metric-fill]').length === 0
+        && root.querySelectorAll('[data-weapon-metric]').length === 5
+        && [...root.querySelectorAll<HTMLElement>('[data-weapon-metric]')]
+          .map((row) => row.dataset.weaponMetric).join(',') === 'damage,fire-rate,effective-range,control,piercing'
     )))).toBe(true);
     expect(await presentations.evaluateAll((roots) => roots.every((root) => {
       const deck = root.querySelector<HTMLElement>('.weapon-menu-stat-deck');
@@ -57,20 +63,43 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
     await expect.poll(async () => page.locator('#menu-panel-kit [data-weapon-still]').evaluateAll((images) => (
       images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0)
     ))).toBe(true);
+    for (const viewport of [{ width: 1600, height: 900 }, { width: 1280, height: 720 }]) {
+      await page.setViewportSize(viewport);
+      expect(await page.locator('#menu-panel-kit .kit-grid').evaluateAll((grids) => grids.every((grid) => (
+        getComputedStyle(grid).gridTemplateColumns.split(' ').length === 2
+          && grid.scrollWidth <= grid.clientWidth + 1
+      )))).toBe(true);
+      expect(await page.locator('#menu-panel-kit [data-weapon-still]').evaluateAll((images) => images.every((node) => {
+        const image = node as HTMLImageElement;
+        const bounds = image.getBoundingClientRect();
+        const naturalRatio = image.naturalWidth / image.naturalHeight;
+        const renderedRatio = bounds.width / bounds.height;
+        return getComputedStyle(image).objectFit === 'contain'
+          && bounds.width >= 120
+          && Math.abs(naturalRatio - renderedRatio) <= 0.02;
+      }))).toBe(true);
+      expect(await page.locator('#menu-panel-kit .kit-card').evaluateAll((cards) => cards.every((card) => (
+        card.getBoundingClientRect().height <= 720
+      )))).toBe(true);
+    }
+    await page.setViewportSize({ width: 1600, height: 900 });
     await expect(page.locator('#menu-panel-kit')).not.toContainText('ASSET-BACKED STILL');
 
     await page.locator('[data-custom-modify="custom-1"]').click();
     await page.locator('#loadout-manage-preset').selectOption('custom-1');
     await page.locator('#loadout-primary').selectOption('ak-47');
+    await expect(page.locator('#loadout-inspector [data-weapon-dps]')).toBeVisible();
+    await expect(page.locator('#loadout-inspector [data-weapon-dps-value]')).toHaveText('350');
+    await expect(page.locator('#loadout-inspector [data-weapon-metric]')).toHaveCount(5);
+    await expect(page.locator('#loadout-inspector [data-weapon-metric="piercing"] [data-weapon-metric-value]'))
+      .toContainText('PWR');
     await page.locator('#loadout-save').click();
+    await expect(page.locator('#loadout-manager')).toBeHidden();
     await expect(page.locator('[data-custom-preset-id="custom-1"] [data-weapon-presentation]'))
       .toHaveAttribute('data-weapon-id', 'ak-47');
     await expect(page.locator('[data-custom-preset-id="custom-1"] [data-weapon-stat-name]')).toHaveText('AK-47');
     await expect(page.locator('[data-custom-preset-id="custom-1"] [data-weapon-metric="fire-rate"] [data-weapon-metric-value]'))
       .toHaveText('600 RPM');
-    await expect(page.locator('#loadout-inspector [data-loadout-stat]')).toHaveCount(5);
-    await expect(page.locator('#loadout-inspector .loadout-inspector-dps')).toBeVisible();
-    await expect(page.locator('#loadout-inspector [data-loadout-value="dps"]')).toHaveText('350');
 
     const idleCustomCardStyle = await page.locator('[data-custom-preset-id="custom-2"]').evaluate((card) => {
       const title = card.querySelector('strong')!;
@@ -87,10 +116,104 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
     expect(idleCustomCardStyle.titleColor).toBe('rgb(255, 255, 255)');
     expect(idleCustomCardStyle.descriptionColor).toBe('rgb(196, 216, 213)');
 
-    const output = resolve(process.cwd(), 'artifacts/pass66/ui-correction');
+    await page.locator('[data-custom-modify="custom-1"]').click();
+    await expect(page.locator('#loadout-manager')).toBeVisible();
+    const output = resolve(process.cwd(), 'artifacts/pass70/field-kit-ui');
     mkdirSync(output, { recursive: true });
-    await page.screenshot({ path: resolve(output, 'field-kit-1600x900.png'), animations: 'disabled' });
-    await testInfo.attach('field-kit-1600x900', { path: resolve(output, 'field-kit-1600x900.png'), contentType: 'image/png' });
+    await page.screenshot({ path: resolve(output, 'field-kit-desktop-1600x900.png'), animations: 'disabled' });
+    await testInfo.attach('field-kit-desktop-1600x900', { path: resolve(output, 'field-kit-desktop-1600x900.png'), contentType: 'image/png' });
+  });
+
+  test('keeps exactly one text-and-semantic selected loadout through keyboard changes', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await ready(page);
+    await page.locator('#menu-tab-kit').click();
+
+    const current = page.locator('#menu-panel-kit .kit-card[aria-current="true"]');
+    await expect(current).toHaveCount(1);
+    const runner = page.locator('[data-kit-id="runner"]');
+    await runner.focus();
+    await page.keyboard.press('Enter');
+    await expect(runner).toHaveAttribute('aria-current', 'true');
+    await expect(runner).toHaveAttribute('aria-pressed', 'true');
+    await expect(runner.locator('em')).toBeVisible();
+    await expect(runner.locator('em')).toContainText('SELECTED');
+    await expect(current).toHaveCount(1);
+    expect(await runner.evaluate((card) => document.activeElement === card)).toBe(true);
+
+    const custom = page.locator('[data-custom-preset-id="custom-2"]');
+    await custom.click();
+    await expect(custom).toHaveAttribute('aria-current', 'true');
+    await expect(custom.locator('em')).toBeVisible();
+    await expect(runner).not.toHaveAttribute('aria-current', /.+/u);
+    await expect(current).toHaveCount(1);
+  });
+
+  test('closes only after verified save, rejects duplicate commits and retains edits on storage failure', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await ready(page);
+    await page.locator('#menu-tab-kit').click();
+    await page.locator('[data-custom-modify="custom-2"]').click();
+    await page.locator('#loadout-preset-name').fill('Single Commit');
+    const beforeRevision = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null').revision, PLAYER_PROFILE_STORAGE_KEY);
+    await page.locator('#loadout-save').evaluate((button: HTMLButtonElement) => {
+      button.click();
+      button.click();
+    });
+    await expect(page.locator('#loadout-manager')).toBeHidden();
+    await expect(page.locator('[data-custom-preset-id="custom-2"]')).toBeFocused();
+    const afterRevision = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null').revision, PLAYER_PROFILE_STORAGE_KEY);
+    expect(afterRevision).toBe(beforeRevision + 1);
+    await expect(page.locator('[data-custom-preset-id="custom-2"]')).toHaveAttribute('aria-current', 'true');
+    await expect(page.locator('[data-custom-preset-id="custom-2"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#menu-panel-kit .kit-card[aria-current="true"]')).toHaveCount(1);
+    await expect(page.locator('#selected-kit-summary strong')).toHaveText('Single Commit');
+    expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null').loadout.selected, PLAYER_PROFILE_STORAGE_KEY))
+      .toEqual({ kind: 'custom', presetId: 'custom-2' });
+    expect(await page.evaluate(() => {
+      const player = window.__ATOMIC_ACRES_DEBUG__.snapshot().player;
+      return { primary: player.primaryWeapon, secondary: player.secondaryWeapon, grenade: player.selectedGrenade };
+    })).toEqual({ primary: 'mp5', secondary: 'machine-pistol', grenade: 'smoke' });
+
+    await page.locator('[data-custom-modify="custom-3"]').click();
+    await page.locator('#loadout-preset-name').fill('Unsaved Edits Stay');
+    const beforeFailedSave = await page.evaluate((key) => ({
+      profile: localStorage.getItem(key),
+      player: (() => {
+        const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot().player;
+        return { primary: snapshot.primaryWeapon, secondary: snapshot.secondaryWeapon, grenade: snapshot.selectedGrenade };
+      })(),
+    }), PLAYER_PROFILE_STORAGE_KEY);
+    await page.evaluate((key) => {
+      const storagePrototype = Storage.prototype;
+      const original = storagePrototype.setItem;
+      (window as typeof window & { __PASS70_RESTORE_SET_ITEM__?: typeof original }).__PASS70_RESTORE_SET_ITEM__ = original;
+      storagePrototype.setItem = function blockedSetItem(storageKey: string, value: string): void {
+        if (storageKey === key) throw new Error('pass70-storage-fault');
+        original.call(this, storageKey, value);
+      };
+    }, PLAYER_PROFILE_STORAGE_KEY);
+    await page.locator('#loadout-save').click();
+    await expect(page.locator('#loadout-manager')).toBeVisible();
+    await expect(page.locator('#loadout-preset-name')).toHaveValue('Unsaved Edits Stay');
+    await expect(page.locator('#loadout-save-status')).toBeVisible();
+    await expect(page.locator('#loadout-save-status')).toContainText('YOUR EDITS ARE STILL HERE');
+    await expect(page.locator('#loadout-save')).toBeFocused();
+    await expect(page.locator('[data-custom-preset-id="custom-3"] [data-custom-name]')).not.toHaveText('Unsaved Edits Stay');
+    await expect(page.locator('[data-custom-preset-id="custom-2"]')).toHaveAttribute('aria-current', 'true');
+    await expect(page.locator('[data-custom-preset-id="custom-3"]')).not.toHaveAttribute('aria-current', /.+/u);
+    expect(await page.evaluate((key) => ({
+      profile: localStorage.getItem(key),
+      player: (() => {
+        const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot().player;
+        return { primary: snapshot.primaryWeapon, secondary: snapshot.secondaryWeapon, grenade: snapshot.selectedGrenade };
+      })(),
+    }), PLAYER_PROFILE_STORAGE_KEY)).toEqual(beforeFailedSave);
+    await page.evaluate(() => {
+      const restore = (window as typeof window & { __PASS70_RESTORE_SET_ITEM__?: typeof Storage.prototype.setItem }).__PASS70_RESTORE_SET_ITEM__;
+      if (restore) Storage.prototype.setItem = restore;
+      delete (window as typeof window & { __PASS70_RESTORE_SET_ITEM__?: typeof Storage.prototype.setItem }).__PASS70_RESTORE_SET_ITEM__;
+    });
   });
 
   test('previews the equipped streak on hover/focus without gameplay render ownership', async ({ page }, testInfo) => {

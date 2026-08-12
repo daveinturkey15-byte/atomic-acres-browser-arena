@@ -214,6 +214,10 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     for (const id of ['test-dummy-alpha', 'test-dummy-bravo', 'test-dummy-charlie', 'test-dummy-delta']) {
       expect(runner).toContain(`'${id}'`);
     }
+    expect(runner).toContain("id: 'test-dummy-alpha', position: Object.freeze([63, 0, -16]), yaw: -Math.PI / 2");
+    expect(runner).toContain("id: 'test-dummy-bravo', position: Object.freeze([72.56, Math.abs(Math.sin(1)) * 0.025, -6]), yaw: -Math.PI / 2");
+    expect(runner).toContain("id: 'test-dummy-charlie', position: Object.freeze([72.52, Math.abs(Math.sin(2)) * 0.025, 4]), yaw: Math.PI / 2");
+    expect(runner).toContain("id: 'test-dummy-delta', position: Object.freeze([64.88, Math.abs(Math.sin(3)) * 0.025, 14]), yaw: Math.PI / 2");
     expect(runner).toContain('receipt.gunRangeDummies?.entries?.length === expectedDummyIds.length');
     expect(runner).toContain('motionValid(entry?.first, entry?.second, entry?.motion, true)');
     const botSnapshot = legacy.slice(legacy.indexOf('bots: [...bots.values()].map((bot) => {'), legacy.indexOf('botEscalation:', legacy.indexOf('bots: [...bots.values()].map((bot) => {')));

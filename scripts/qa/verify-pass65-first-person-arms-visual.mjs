@@ -25,6 +25,8 @@ const representatives = Object.freeze([
   { family: 'long-gun', weapon: 'm4a1' },
   { family: 'heavy', weapon: 'minigun' },
   { family: 'crossbow', weapon: 'explosive-crossbow' },
+  { family: 'railgun', weapon: 'railgun' },
+  { family: 'flare-handgun', weapon: 'flare-gun' },
 ]);
 const route = `http://127.0.0.1:${port}/?release=latest&renderer=webgpu&render=blender&map=gun-range&grass=off&mist=off&seed=650085`;
 
@@ -67,14 +69,55 @@ function presentationViolations(label, state) {
       }
     }
   } else {
-    for (const arm of presentation.riggedArms) {
-      if (!arm.finite || !arm.bindOffsetsPreserved || !arm.withinStableReach) violations.push(`${label}/${arm.side}: unstable or nonfinite IK`);
-      if (!Number.isFinite(arm.contactError) || arm.contactError > 0.02) violations.push(`${label}/${arm.side}: hand contact error ${arm.contactError}`);
+    const policy = presentation.riggedArms.find((arm) => arm.handPolicy)?.handPolicy;
+    const activeArms = presentation.riggedArms.filter((arm) => arm.active === true);
+    const stowedArms = presentation.riggedArms.filter((arm) => arm.stowed === true);
+    if (policy?.contract !== 'right-firing-hand-handgun-support-reload-only-v1') violations.push(`${label}: hand policy is missing`);
+    if (activeArms.length !== policy?.activeChainCount) violations.push(`${label}: ${activeArms.length} active chains do not match policy ${policy?.activeChainCount}`);
+    if (policy?.activeChainCount === 1) {
+      if (stowedArms.length !== 1 || stowedArms[0]?.side !== 'left' || stowedArms[0]?.supportChainScale > 0.001) {
+        violations.push(`${label}: one-hand sidearm did not stow only the left support chain`);
+      }
+    } else if (stowedArms.length !== 0) {
+      violations.push(`${label}: a two-hand grip unexpectedly stowed an arm`);
+    }
+    for (const arm of activeArms) {
+      if (!arm.finite || !arm.withinStableReach || arm.authoredSegmentDirectionsPreserved !== true) violations.push(`${label}/${arm.side}: unstable or nonfinite authored-chain IK`);
+      if (!Number.isFinite(arm.contactError) || arm.contactError > 0.01) violations.push(`${label}/${arm.side}: authored palm contact error ${arm.contactError}`);
+      if (!Number.isFinite(arm.palmOrientationError) || arm.palmOrientationError > 0.2) violations.push(`${label}/${arm.side}: palm orientation error ${arm.palmOrientationError}`);
       if (!Number.isFinite(arm.socketReachRatio) || arm.socketReachRatio > 1.04) violations.push(`${label}/${arm.side}: authored socket reach ratio ${arm.socketReachRatio}`);
-      if (!Number.isFinite(arm.gripSocketCalibration) || arm.gripSocketCalibration > 0.015) violations.push(`${label}/${arm.side}: grip calibration ${arm.gripSocketCalibration}m exceeds authored tolerance`);
-      for (const key of ['shoulder', 'elbow', 'wrist', 'target', 'shoulderQuaternion', 'elbowQuaternion']) {
+      if (!Number.isFinite(arm.gripSocketCalibration) || arm.gripSocketCalibration > 0.01) violations.push(`${label}/${arm.side}: grip calibration ${arm.gripSocketCalibration}m exceeds authored tolerance`);
+      // The bone origin can sit a few pixels inside the viewport while the
+      // skinned cuff itself already crosses the bottom edge; native captures
+      // are the falsifier for visible floating sleeves.
+      if (!finiteArray(arm.shoulderEntryNdc) || arm.shoulderEntryNdc[1] > -0.98) violations.push(`${label}/${arm.side}: sleeve entry ${JSON.stringify(arm.shoulderEntryNdc)} does not continue below frame`);
+      if (!Number.isFinite(arm.segmentLengthScale) || arm.segmentLengthScale < 1 || arm.segmentLengthScale > 2.4) violations.push(`${label}/${arm.side}: invalid authored segment scale ${arm.segmentLengthScale}`);
+      for (const key of ['shoulder', 'elbow', 'wrist', 'palm', 'palmQuaternion', 'palmTargetQuaternion', 'target', 'shoulderQuaternion', 'elbowQuaternion']) {
         if (!finiteArray(arm[key])) violations.push(`${label}/${arm.side}: nonfinite ${key}`);
       }
+    }
+  }
+  if (presentation.weapon === 'railgun') {
+    const optic = presentation.importedModel?.firstPersonOptic;
+    if (optic?.contract !== 'clear-glass-and-opaque-backer-component-v3'
+      || optic?.clearGlassLensMeshCount !== 1
+      || optic?.opticWindowOpacity !== 0.02
+      || optic?.opaqueBackerAperture?.applied !== true
+      || optic?.opaqueBackerAperture?.contract !== 'semantic-lens-grid-spatial-degenerate-v1'
+      || optic?.opaqueBackerAperture?.suppressedElements < 3
+      || optic?.opaqueBackerAperture?.suppressionRatio >= 0.2
+      || optic?.adsAuthority !== 'railgun-fullscreen-scope-unchanged') {
+      violations.push(`${label}: Railgun hip optic clear-air contract failed ${JSON.stringify(optic)}`);
+    }
+  }
+  if (presentation.weapon === 'flare-gun') {
+    const width = presentation.importedModel?.firstPersonWidth;
+    if (width?.contract !== 'mesh-geometry-only-socket-invariant-width-v1'
+      || width?.multiplier < 3 || width?.multiplier > 5
+      || width?.measuredMultiplier < 3 || width?.measuredMultiplier > 5
+      || width?.widenedMeshCount < 1
+      || width?.maximumSocketDriftMeters > 1e-9) {
+      violations.push(`${label}: Flare Gun visual-width/socket invariant failed ${JSON.stringify(width)}`);
     }
   }
   if (presentation.browserProceduralMeleeArmViolation === true || presentation.proceduralMeleeArmVisible === true) violations.push(`${label}: browser procedural arm fallback is visible`);
@@ -93,6 +136,7 @@ function evidenceFor(label, state, screenshot, cadence = null) {
     authoredFingerBoneCount: presentation.authoredFingerBoneCount,
     authoredArmAnimation: presentation.authoredArmAnimation,
     armFraming: presentation.armFraming,
+    importedModel: presentation.importedModel,
     meleeKnifeFraming: presentation.meleeKnifeFraming,
     viewmodelViewport: presentation.viewmodelViewport,
     riggedArms: presentation.riggedArms,
@@ -219,8 +263,35 @@ try {
     evidence.push(evidenceFor(`${family}/${weapon}/hip`, state, screenshot, cadence));
   }
 
+  await page.setViewportSize({ width: 2560, height: 1440 });
+  for (const { family, weapon } of [
+    { family: 'handgun', weapon: 'pistol' },
+    { family: 'long-gun', weapon: 'm4a1' },
+    { family: 'railgun', weapon: 'railgun' },
+    { family: 'flare-handgun', weapon: 'flare-gun' },
+  ]) {
+    await page.evaluate((selected) => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      api.setAds(false);
+      api.setReloadCaptureProgress(null);
+      api.equipWeapon(selected);
+    }, weapon);
+    await page.waitForFunction((selected) => {
+      const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation;
+      return presentation?.weapon === selected && presentation?.importedModel?.weapon === selected;
+    }, weapon, { timeout: 30_000 });
+    await page.waitForTimeout(900);
+    const highResolutionState = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+    const label = `${family}/${weapon}/hip-2560x1440`;
+    violations.push(...presentationViolations(label, highResolutionState));
+    const highResolutionScreenshot = await capture(page, `${family}-${weapon}-hip-2560x1440`);
+    evidence.push(evidenceFor(label, highResolutionState, highResolutionScreenshot));
+  }
+  await page.setViewportSize({ width: 1600, height: 900 });
+
   await page.evaluate(() => { const api = window.__ATOMIC_ACRES_DEBUG__; api.equipWeapon('m4a1'); api.setAds(true); });
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.adsProgress > 0.98, undefined, { timeout: 12_000 });
+  await page.waitForTimeout(300);
   let state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
   violations.push(...presentationViolations('long-gun/m4a1/ads', state));
   let screenshot = await capture(page, 'long-gun-m4a1-ads');
@@ -288,6 +359,46 @@ try {
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.knifeVisible === false, undefined, { timeout: 5_000 });
   state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
   if (state.weaponPresentation.riggedMeleeBindPoseRestoredExactly !== true) violations.push('melee/exit: arm bind pose did not restore exactly');
+
+  await page.evaluate(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    api.setAds(false);
+    api.equipWeapon('m4a1');
+    api.teleportPlayer(-19.65, 1.7, -14.5, Math.PI / 2, 0);
+  });
+  await page.waitForFunction(() => (
+    window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.surfaceRetreat > 0.15
+  ), undefined, { timeout: 10_000 });
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setStance('prone'));
+  await page.waitForFunction(() => {
+    const current = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+    return current?.player?.stance === 'prone'
+      && current?.weaponPresentation?.weapon === 'm4a1'
+      && current?.weaponPresentation?.surfaceRetreat > 0.25
+      && current?.weaponPresentation?.surfaceLift >= 0.13;
+  }, undefined, { timeout: 15_000 });
+  await page.waitForTimeout(400);
+  state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+  violations.push(...presentationViolations('contact/m4a1/prone-wall-floor-hip', state));
+  if (state.weaponPresentation.contactResponse?.contract !== 'catalog-viewmodel-contact-response-v2'
+    || state.weaponPresentation.contactResponse?.additionalDropMeters <= 0.04
+    || state.weaponPresentation.contactResponse?.aimAuthority !== 'camera-forward-unchanged') {
+    violations.push(`contact/m4a1/prone-wall-floor-hip: invalid response ${JSON.stringify(state.weaponPresentation.contactResponse)}`);
+  }
+  screenshot = await capture(page, 'contact-m4a1-prone-wall-floor-hip');
+  evidence.push(evidenceFor('contact/m4a1/prone-wall-floor-hip', state, screenshot));
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
+  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.adsProgress > 0.999, undefined, { timeout: 12_000 });
+  await page.waitForTimeout(350);
+  state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+  violations.push(...presentationViolations('contact/m4a1/prone-wall-floor-ads', state));
+  if (state.weaponPresentation.contactResponse?.highReadyBlend <= 0.2
+    || state.weaponPresentation.contactResponse?.additionalDropMeters <= 0.04
+    || state.aimAlignment?.errorCssPixels > 1) {
+    violations.push(`contact/m4a1/prone-wall-floor-ads: contact/aim invariant failed`);
+  }
+  screenshot = await capture(page, 'contact-m4a1-prone-wall-floor-ads');
+  evidence.push(evidenceFor('contact/m4a1/prone-wall-floor-ads', state, screenshot));
   if (state.render.runtime.actualBackend !== 'webgpu') violations.push(`runtime backend is ${state.render.runtime.actualBackend}`);
   if (state.render.profile !== 'blender') violations.push(`render profile is ${state.render.profile}`);
   if (state.render.runtime.softwareAdapter === true) violations.push('WebGPU gate used a software adapter');

@@ -45,21 +45,76 @@ describe('same-browser hosted active-match recovery integration', () => {
     expect(admission).toContain('hostLobbyAdmissionAttemptCurrent(attempt)');
   });
 
-  it('holds guest admission until authoritative recovery is ready, then retains the reliable repair handshake', () => {
+  it('holds guest admission until authoritative recovery is ready, then consumes the exact reconnect repair once', () => {
     const admission = functionBody('admitLobbyJoin', 'updateHostReady');
     expect(admission).toContain('if (hostMatchRecoveryPreparing)');
     expect(admission).toContain('pendingHostRecoveryJoins.set(message.playerId, message)');
     const recovery = functionBody('resumeRecoveredHostMatch', 'initializeRecoveredHostLobby');
     expect(recovery.indexOf('hostMatchRecoveryPreparing = false')).toBeLessThan(recovery.indexOf('admitLobbyJoin(message)'));
-    const admittedAt = main.indexOf('gameStarted = true;', main.indexOf('async function startGame'));
-    const repairJoinAt = main.indexOf('sendClientWorldRepairReady(frozenKillstreakLoadout)', admittedAt);
+
+    const join = functionBody('sendLobbyJoin', 'sendClientWorldRepairReady');
+    expect(join).toContain('pendingClientReconnectWorldRepairConnectionEpoch = awaitingCanonicalGuestAuthority\n    ? localConnectionEpoch\n    : null;');
+    expect(join.indexOf('localConnectionEpoch = randomLobbyCredential();'))
+      .toBeLessThan(join.indexOf('pendingClientReconnectWorldRepairConnectionEpoch = awaitingCanonicalGuestAuthority'));
+
+    const start = main.slice(main.indexOf('async function startGame'), main.indexOf('\nfunction randomNonce'));
+    expect(start).toContain("clientWorldRepairAdmission = mode === 'client' && !awaitingCanonicalGuestAuthority");
+    const admittedAt = start.indexOf('gameStarted = true;');
+    const repairJoinAt = start.indexOf('sendClientWorldRepairReady(frozenKillstreakLoadout)', admittedAt);
     expect(admittedAt).toBeGreaterThanOrEqual(0);
     expect(repairJoinAt).toBeGreaterThan(admittedAt);
+
+    const repair = functionBody('sendClientWorldRepairReady', 'rejectLobbyPlayer');
+    expect(repair).toContain('pendingClientReconnectWorldRepairConnectionEpoch === localConnectionEpoch');
+    expect(repair).toContain('if (!clientWorldRepairCanAttempt(admission) && !reconnectRepair) return;');
+    expect(repair).toContain('if (reconnectRepair) pendingClientReconnectWorldRepairConnectionEpoch = null;');
+    expect(repair.match(/pendingClientReconnectWorldRepairConnectionEpoch = null/g)).toHaveLength(1);
+    expect(repair.indexOf('network.send(loadoutMessage);'))
+      .toBeLessThan(repair.indexOf('pendingClientReconnectWorldRepairConnectionEpoch = null'));
+
     const lobbyAdmission = functionBody('acceptLobbyState', 'authorizeRedeploy');
-    expect(lobbyAdmission).toContain('lastClientWorldRepairConnectionEpoch !== localConnectionEpoch || enteringActiveLobby');
-    expect(lobbyAdmission).toContain('sendClientWorldRepairReady()');
+    expect(lobbyAdmission).not.toContain('enteringActiveLobby');
+    expect(lobbyAdmission).not.toContain('sendClientWorldRepairReady');
+    const hostAdmission = functionBody('admitLobbyJoin', 'updateHostReady');
+    const confirmAt = hostAdmission.indexOf(
+      'network.confirmPlayerAdmission(message.playerId, message.resumeToken, message.connectionEpoch)',
+    );
+    const connectedAt = hostAdmission.indexOf('hostLobbyMembers.set(message.playerId, restored);');
+    const lobbyAt = hostAdmission.indexOf('broadcastHostLobby(currentPhase);');
+    const receiverReadyAt = hostAdmission.indexOf(
+      'sendKillstreakStateToPlayer(message.playerId, performance.now(), true);',
+    );
+    const lobbyStartAt = hostAdmission.indexOf("type: 'lobby-start'");
+    expect(confirmAt).toBeGreaterThanOrEqual(0);
+    expect(connectedAt).toBeGreaterThan(confirmAt);
+    expect(lobbyAt).toBeGreaterThan(connectedAt);
+    expect(receiverReadyAt).toBeGreaterThan(lobbyAt);
+    expect(lobbyStartAt).toBeGreaterThan(receiverReadyAt);
+    const activeAdmissionRepair = hostAdmission.slice(lobbyAt, lobbyStartAt);
+    expect(activeAdmissionRepair).toContain('if (gameStarted)');
+    expect(activeAdmissionRepair).not.toContain('broadcastKillstreakState(');
+    expect(activeAdmissionRepair).not.toContain('remotes');
     expect(main).toContain('broadcastHostedBotState(true)');
-    expect(main).toContain('broadcastKillstreakState(performance.now(), true)');
+  });
+
+  it('targets receiver-ready proof when recovery has retained authority but no live remote', () => {
+    const admission = functionBody('admitLobbyJoin', 'updateHostReady');
+    const proof = 'sendKillstreakStateToPlayer(message.playerId, performance.now(), true);';
+    expect(admission.match(new RegExp(proof.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(1);
+    expect(admission).not.toContain('if (gameStarted) broadcastKillstreakState(');
+
+    const targeted = functionBody('sendKillstreakStateToPlayer', 'broadcastKillstreakState');
+    expect(targeted).toContain('forPlayerId,');
+    expect(targeted).toContain('snapshot: killstreakRuntime.snapshotFor(forPlayerId, now)');
+    expect(targeted).toContain('network.sendToPlayer(forPlayerId, message)');
+    expect(targeted).toContain('network.sendStateCommitReliablyToPlayer(forPlayerId, message)');
+    expect(targeted.indexOf('network.sendToPlayer(forPlayerId, message)'))
+      .toBeLessThan(targeted.indexOf('network.sendStateCommitReliablyToPlayer(forPlayerId, message)'));
+    expect(targeted).not.toContain('remotes');
+
+    const restore = functionBody('restoreRecoveredHostRuntime', 'initializeFreshHostLobby');
+    expect(restore).toContain('retainedRemoteAuthorities.set(guest.snapshot.id');
+    expect(restore).not.toContain('remotes.set(');
   });
 
   it('lets exact resume liveness supersede a retired document without treating pose silence as a disconnect', () => {
@@ -103,13 +158,21 @@ describe('same-browser hosted active-match recovery integration', () => {
   });
 
   it('keeps gameplay-triggered checkpoint serialization off the live shot frame', () => {
+    const safeCapture = functionBody('createRecoverySafeHostMatchCheckpoint', 'persistActiveHostMatchCheckpoint');
+    expect(safeCapture).toContain('hostRecoveryPoseAudit(checkpoint)');
+    expect(safeCapture).toContain('hostCheckpointRejectedPoseWrites += 1');
+    expect(safeCapture).toContain('lastHostCheckpointRejectedPoseReason = audit.reason');
+    expect(safeCapture).not.toContain('clearHostMatchCheckpoint');
+    expect(safeCapture).not.toContain('saveHostMatchCheckpoint');
     const persist = functionBody('persistActiveHostMatchCheckpoint', 'clearStoredHostMatchCheckpoint');
     const forcedBranch = persist.slice(persist.indexOf('if (force) {'), persist.indexOf('if (hostCheckpointPersistScheduled)'));
     const deferredBranch = persist.slice(persist.indexOf('scheduleBrowserPreparationIdleTask'));
-    expect(forcedBranch).toContain('createHostMatchCheckpoint()');
+    expect(forcedBranch).toContain('createRecoverySafeHostMatchCheckpoint()');
     expect(forcedBranch).toContain('saveHostMatchCheckpoint(storage, checkpoint)');
-    expect(deferredBranch).toContain('createHostMatchCheckpoint()');
+    expect(deferredBranch).toContain('createRecoverySafeHostMatchCheckpoint()');
     expect(deferredBranch).toContain('saveHostMatchCheckpoint(deferredStorage, checkpoint)');
+    expect(deferredBranch).toContain('remainingThrottleMs');
+    expect(deferredBranch).toContain('persistActiveHostMatchCheckpoint();');
     const nonForcedPrelude = persist.slice(
       persist.indexOf('if (hostCheckpointPersistScheduled)'),
       persist.indexOf('scheduleBrowserPreparationIdleTask'),
@@ -118,6 +181,18 @@ describe('same-browser hosted active-match recovery integration', () => {
     expect(main).toContain("if (document.visibilityState === 'hidden') persistActiveHostMatchCheckpoint(true)");
     expect(main).toContain("window.addEventListener('pagehide', () => {\n  persistActiveHostMatchCheckpoint(true);");
     expect(main).toContain("window.addEventListener('beforeunload', () => {\n  persistActiveHostMatchCheckpoint(true);");
+  });
+
+  it('reports the exact owned recovery admission reason and pose-write diagnostics', () => {
+    const recovery = functionBody('resumeRecoveredHostMatch', 'initializeRecoveredHostLobby');
+    expect(recovery).toContain('const result = await beginPrivateMatch(');
+    expect(recovery).toContain("result.status === 'failed'");
+    expect(recovery).toContain('result.error.message');
+    expect(recovery).toContain('result.reason');
+    expect(recovery).toContain('Stored match could not be restored safely: ${exactReason}');
+    expect(main).toContain('hostMatchRecoveryCheckpoint: {');
+    expect(main).toContain('rejectedPoseWrites: hostCheckpointRejectedPoseWrites');
+    expect(main).toContain('lastRejectedPoseReason: lastHostCheckpointRejectedPoseReason');
   });
 
   it('checkpoints and restores guest health/loadout/pose/inventory plus finite railgun authority before reconnect repair', () => {
@@ -206,7 +281,9 @@ describe('same-browser hosted active-match recovery integration', () => {
     expect(restore).toContain('flareProjectileSystem.restoreAuthorityCheckpoint(');
     expect(restore).toContain('checkpoint.flareProjectiles,');
     expect(restore).toContain('savedAtMonoMs,');
-    expect(restore).toContain('hostileTargets: () => Object.freeze([])');
+    expect(restore).toContain('directHitTargets: () => Object.freeze([])');
+    expect(restore).toContain('burnTargets: () => Object.freeze([])');
+    expect(restore).toContain('onDirectHit: () => undefined');
     expect(restore).toContain('onImpact: () => undefined');
     expect(restore).toContain('onBurnPulse: () => undefined');
     expect(restore).toContain('restoreFlareShotFeedback(checkpoint, authority, downtimeMs, nowMonoMs)');

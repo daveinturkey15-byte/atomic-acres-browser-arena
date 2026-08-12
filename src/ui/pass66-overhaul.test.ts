@@ -25,24 +25,24 @@ describe('Pass 66 tactical UI overhaul', () => {
       'loadout-secondary', 'loadout-grenade', 'loadout-save', 'loadout-inspector',
       'graphics-profile', 'advanced-graphics', 'audio-settings', 'support-block',
     ]) expect(markup).toContain(`id="${id}"`);
-    // Exactly one canonical stat deck per card: the weapon-menu CATALOG
-    // BALLISTICS deck. The older real-stat strip was removed as a duplicate.
+    // Every card and the manager use one canonical CATALOG BALLISTICS deck.
+    // DPS is a standalone value; only the five owner-requested metrics have bars.
     expect(markup).not.toContain('class="kit-stat-strip kit-stat-strip-real"');
     expect(markup).not.toContain('class="kit-dps"');
-    expect(markup).toContain('data-weapon-metric="cyclic-dps"');
-    expect(markup.match(/data-loadout-stat=/gu)).toHaveLength(5);
-    expect(markup).toContain('data-loadout-stat="damage"');
-    expect(markup).toContain('data-loadout-stat="dps"');
-    expect(markup).not.toContain('data-loadout-stat="wallbang"');
-    expect(markup).toContain('loadout-inspector-dps');
+    expect(markup.match(/data-weapon-dps(?:\s|>)/gu)).toHaveLength(8);
+    expect(markup.match(/data-weapon-metric=/gu)).toHaveLength(40);
+    expect(markup).toContain('data-weapon-metric="piercing"');
+    expect(markup).not.toContain('data-loadout-stat=');
     expect(markup).toContain('data-loadout-grenade-detail');
     // The shell no longer emits the retired kit-stat-strip. The final cascade
     // must therefore leave the canonical asset + metric deck visible.
     expect(css).not.toContain('.kit-card .weapon-menu-stat-deck { display: none; }');
     expect(css).not.toContain('.kit-card .weapon-menu-presentation { display: block; }');
     expect(css).toContain('.custom-kit-grid .kit-card:not(.manage-kit-card)');
+    expect(css).toContain('.custom-kit-grid { grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 14px; }');
     expect(css).toContain('background: linear-gradient(150deg, #16302f, #0d1e20)');
-    expect(css).toContain('.custom-kit-grid .kit-card:not(.manage-kit-card) .kit-stat-strip small { color: #e8f4f2; }');
+    expect(css).toContain('.kit-card.selected em { display: inline-flex; align-items: center; }');
+    expect(css).toContain('.loadout-save-status[data-kind=\'error\']');
   });
 
   it('adds a sticky killstreak demo rail and minimal video cockpit symbology', () => {
@@ -55,6 +55,18 @@ describe('Pass 66 tactical UI overhaul', () => {
     expect(preview).toContain('class="cockpit-instruments"');
     expect(preview).not.toContain('canvas');
     expect(css).toContain("#menu-preview-frame[data-frame='cat'] .preview-cockpit-hud");
+  });
+
+  it('keeps visible room chat above desktop vitals and outside touch-control rails', () => {
+    expect(css).toContain('#text-chat[data-context="game"][data-visible="true"]');
+    expect(css).toContain('bottom: clamp(232px, 18vh, 340px);');
+    expect(css).toContain('body:not(.mtc-live) #text-chat[data-context="game"][data-visible="true"]');
+    expect(css).toContain('bottom: 320px;');
+    expect(css).toContain('bottom: calc(var(--mtc-safe-bottom) + var(--mtc-stick-size) + 112px);');
+    expect(css).toContain('body.mtc-live #text-chat[data-context="game"][data-visible="true"]');
+    expect(css).toContain('body.mtc-live #text-chat[data-open="true"] #text-chat-log');
+    expect(css).toContain('max-height: 72px;');
+    expect(css).toContain('left: calc(var(--mtc-safe-left) + var(--mtc-stick-size) + var(--mtc-action-width) + 16px);');
   });
 
   it('covers desktop, narrow, and reduced-motion layouts mechanically', () => {

@@ -20,9 +20,18 @@ import {
 } from './operator-model';
 import { solveTwoBoneElbow, solveTwoBoneElbowInto, type TwoBoneElbowScratch } from './ik';
 import { reloadActionEvents, reloadPoseAt, viewmodelReloadStageAt, type ReloadPose, type WeaponActionEvent } from './weapon-actions';
-import { advanceAdsBlend, advanceWeaponHeat, fireCycleAt } from './weapon-presentation-state';
+import {
+  advanceAdsBlend,
+  advanceWeaponHeat,
+  fireCycleAt,
+  viewmodelContactResponse,
+  type ViewmodelContactResponse,
+} from './weapon-presentation-state';
 import { weaponFamilyPresentation } from './weapon-family-presentation';
 import {
+  PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT,
+  PASS70_FIRST_PERSON_OPTIC_WINDOW_OPACITY,
+  capturePass70FirstPersonMaterialState,
   createPass65CrossbowModel,
   createPass65FieldKnifeModel,
   createPass65WeaponModel,
@@ -76,17 +85,12 @@ type RiggedViewArm = FirstPersonArmChain & {
   bindElbow: THREE.Quaternion;
   bindWrist: THREE.Quaternion;
   bindShoulderPosition: THREE.Vector3;
+  bindElbowPosition: THREE.Vector3;
+  bindWristPosition: THREE.Vector3;
   bindShoulderScale: THREE.Vector3;
+  bindElbowScale: THREE.Vector3;
+  bindWristScale: THREE.Vector3;
 };
-type AdsClearanceMaterial = Readonly<{
-  material: THREE.Material;
-  originalOpacity: number;
-  originalTransparent: boolean;
-  originalDepthWrite: boolean;
-  targetOpacity: number;
-  surface: 'lens' | 'primary' | 'gunmetal' | 'polymer' | 'rubber' | 'accent' | 'other-static';
-}>;
-
 type ViewArmRig = {
   side: 'left' | 'right';
   shoulder: THREE.Group;
@@ -166,14 +170,63 @@ const RELOAD_HAND_ROTATIONS: Record<WeaponId, [number, number, number]> = {
   'flare-gun': [-0.92, 0.42, -0.68],
 };
 
-type ViewmodelGripFamily = 'long-gun' | 'compact' | 'handgun' | 'heavy' | 'crossbow';
+export type ViewmodelGripFamily = 'long-gun' | 'compact' | 'handgun' | 'heavy' | 'crossbow';
 
-function viewmodelGripFamily(weapon: WeaponId): ViewmodelGripFamily {
+export function viewmodelGripFamily(weapon: WeaponId): ViewmodelGripFamily {
   if (weapon === 'pistol' || weapon === 'magnum' || weapon === 'machine-pistol' || weapon === 'flashlight-pistol' || weapon === 'flare-gun') return 'handgun';
   if (weapon === 'smg' || weapon === 'mini-uzi' || weapon === 'mp5') return 'compact';
   if (weapon === 'lmg' || weapon === 'minigun' || weapon === 'flamethrower') return 'heavy';
   if (weapon === 'explosive-crossbow') return 'crossbow';
   return 'long-gun';
+}
+
+export const RIGGED_HAND_POSE_CHAIN_CONTRACT = 'authored-palm-full-transform-to-socket-frame-v2';
+export const FIRST_PERSON_HAND_POLICY_CONTRACT = 'right-firing-hand-handgun-support-reload-only-v1';
+export type FirstPersonHandPolicy = Readonly<{
+  contract: typeof FIRST_PERSON_HAND_POLICY_CONTRACT;
+  gripFamily: ViewmodelGripFamily;
+  firingHand: 'right';
+  supportHand: 'active' | 'reload-only-stowed';
+  activeChainCount: 1 | 2;
+}>;
+
+export function firstPersonHandPolicy(weapon: WeaponId, reloadBlend = 0): FirstPersonHandPolicy {
+  const gripFamily = viewmodelGripFamily(weapon);
+  const supportStowed = gripFamily === 'handgun' && THREE.MathUtils.clamp(reloadBlend, 0, 1) <= 0.02;
+  return Object.freeze({
+    contract: FIRST_PERSON_HAND_POLICY_CONTRACT,
+    gripFamily,
+    firingHand: 'right',
+    supportHand: supportStowed ? 'reload-only-stowed' : 'active',
+    activeChainCount: supportStowed ? 1 : 2,
+  });
+}
+const RIGGED_SUPPORT_HAND_DIRECTION_LOCAL = Object.freeze(new THREE.Vector3(0.85, -0.20, -0.45).normalize());
+const RIGGED_RELOAD_HAND_DIRECTION_LOCAL = Object.freeze(new THREE.Vector3(0.90, -0.25, -0.05).normalize());
+const RIGGED_SUPPORT_WRIST_ROLL_RADIANS = THREE.MathUtils.degToRad(-4);
+const RIGGED_RELOAD_WRIST_ROLL_RADIANS = THREE.MathUtils.degToRad(-20);
+
+/**
+ * Replays the accepted Blender palm directions in glTF weapon space. Blender's
+ * `(x, y, z)` authoring vectors become `(x, z, -y)` in the runtime delivery.
+ * Keeping this interpolation independent of the camera prevents reload roll
+ * and stance framing from turning the support glove into a loose finger chain.
+ */
+export function riggedSupportHandDirectionLocal(
+  reloadBlend: number,
+  target: THREE.Vector3,
+): THREE.Vector3 {
+  return target.copy(RIGGED_SUPPORT_HAND_DIRECTION_LOCAL)
+    .lerp(RIGGED_RELOAD_HAND_DIRECTION_LOCAL, THREE.MathUtils.clamp(reloadBlend, 0, 1))
+    .normalize();
+}
+
+export function riggedSupportWristRollRadians(reloadBlend: number): number {
+  return THREE.MathUtils.lerp(
+    RIGGED_SUPPORT_WRIST_ROLL_RADIANS,
+    RIGGED_RELOAD_WRIST_ROLL_RADIANS,
+    THREE.MathUtils.clamp(reloadBlend, 0, 1),
+  );
 }
 
 type FingerCurlProfile = Readonly<Record<FirstPersonFingerBone['digit'], readonly [number, number, number]>>;
@@ -262,6 +315,29 @@ export const MELEE_VIEWMODEL_PEAK_SCALE_LIFT = 0.3;
 // hand inside the retained 15 mm socket-calibration contract while preserving
 // a real (non-zero) anti-singularity margin.
 const RIGGED_ARM_MAX_REACH_RATIO = 0.996;
+export const FIRST_PERSON_ARM_PROPORTION_CONTRACT = 'authored-uniform-strong-operator-arms-v2';
+/** Uniform root scaling preserves the authored skeleton, palms and joint radii. */
+export const FIRST_PERSON_ARM_UNIFORM_SCALE = 1.12;
+export const FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT = 'reachable-shoulders-with-continuous-sleeve-crop-v2';
+export const FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC = Object.freeze({
+  left: -1.12,
+  right: -1.07,
+});
+/** The one-handed knife arc needs extra proximal sleeve travel at peak extension. */
+export const FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC = -1.23;
+export const FIRST_PERSON_ARM_MAX_SEGMENT_LENGTH_SCALE = 2.2;
+export function riggedArmBaseSegmentLengthScale(
+  side: 'left' | 'right',
+  adsBlend: number,
+  obstructionBlend: number,
+): number {
+  const base = side === 'left'
+    ? THREE.MathUtils.lerp(1.38, 1.82, THREE.MathUtils.clamp(adsBlend, 0, 1))
+    : THREE.MathUtils.lerp(1.18, 1.52, THREE.MathUtils.clamp(adsBlend, 0, 1));
+  const contactExtension = THREE.MathUtils.clamp(obstructionBlend, 0, 1)
+    * (side === 'left' ? 0.48 : 0.3);
+  return THREE.MathUtils.clamp(base + contactExtension, 1, FIRST_PERSON_ARM_MAX_SEGMENT_LENGTH_SCALE);
+}
 /** Unit -Z blade axis reused by the per-frame melee knife alignment. */
 const KNIFE_BLADE_AXIS = Object.freeze(new THREE.Vector3(0, 0, -1));
 export const HIP_VIEWMODEL_POSITION = Object.freeze({ x: 0.34, y: -0.44, z: -1.08 });
@@ -371,14 +447,13 @@ function viewmodelMeleeScreenOffset(camera: THREE.Camera): number {
 }
 
 const FIRST_PERSON_ADS_BORE_RADIUS: Readonly<Partial<Record<WeaponId, number>>> = Object.freeze({
-  carbine: 0.032,
   'mini-uzi': 0.024,
 });
 const FIRST_PERSON_ADS_SIGHT_PICTURE_RETREAT: Readonly<Partial<Record<WeaponId, number>>> = Object.freeze({
   // The authored muzzle/front-sight geometry extends close to the camera when
-  // its rear socket is centred. A bounded ADS-only retreat keeps the complete
-  // ghosted silhouette and opaque arms below the sight window without changing
-  // the hip silhouette, source model scale, sockets or authoritative aim ray.
+  // its rear socket is centred. A bounded ADS-only retreat keeps the opaque
+  // authored silhouette and arms below the physical sight window without
+  // changing the source model, sockets or authoritative aim ray.
   carbine: 0.26,
   'mini-uzi': 0.3,
 });
@@ -394,11 +469,12 @@ type AdsSightBoreTelemetry = Readonly<{
 
 /**
  * Punches a small, real aperture through only the cloned first-person render
- * batches intersecting the authored rear-to-front sight axis. Pass 65 merged
- * the HK416 lens and Mini Uzi sight plates into material batches, leaving the
- * semantic optic nodes empty; toggling those nodes therefore hid no pixels.
- * Degenerating intersected cloned indices keeps sockets, materials and source
- * topology stable while guaranteeing that the centre sight ray is unobstructed.
+ * batches intersecting the authored rear-to-front sight axis. The carbine's
+ * authored optic is genuine clear space once its optic socket is centred, so
+ * it deliberately does not use this geometry-degeneration fallback. The Mini
+ * Uzi retains the fallback for its merged iron-sight plate. Degenerating
+ * intersected cloned indices keeps sockets, materials and source topology
+ * stable.
  */
 export function carveFirstPersonAdsSightBore(id: WeaponId, model: THREE.Object3D): AdsSightBoreTelemetry | null {
   const radius = FIRST_PERSON_ADS_BORE_RADIUS[id];
@@ -500,7 +576,7 @@ type RearOccluderTrimTelemetry = Readonly<{
 
 /** Removes only merged butt/stock triangles intersecting the rear sight corridor. */
 export function trimFirstPersonRearOccluder(id: WeaponId, model: THREE.Object3D): RearOccluderTrimTelemetry | null {
-  if (id !== 'carbine' && id !== 'mini-uzi') return null;
+  if (id !== 'mini-uzi') return null;
   const rearSocket = model.getObjectByName('rear-sight-socket');
   const frontSocket = model.getObjectByName('front-sight-socket');
   if (!rearSocket || !frontSocket) return null;
@@ -509,7 +585,7 @@ export function trimFirstPersonRearOccluder(id: WeaponId, model: THREE.Object3D)
   const front = model.worldToLocal(frontSocket.getWorldPosition(new THREE.Vector3()));
   const axis = front.clone().sub(rear).normalize();
   if (axis.lengthSq() < 0.99) return null;
-  const radius = id === 'carbine' ? 0.065 : 0.05;
+  const radius = 0.05;
   const lateral = new THREE.Vector3(1, 0, 0);
   if (Math.abs(lateral.dot(axis)) > 0.9) lateral.set(0, 1, 0);
   lateral.addScaledVector(axis, -lateral.dot(axis)).normalize();
@@ -879,12 +955,26 @@ export class WeaponPresentation {
     bendHint: new THREE.Vector3(),
     elbowTarget: new THREE.Vector3(),
     handDirection: new THREE.Vector3(),
+    weaponForward: new THREE.Vector3(),
+    weaponRotation: new THREE.Quaternion(),
+    parentWorldRotation: new THREE.Quaternion(),
+    wristWorldRotation: new THREE.Quaternion(),
+    palmWorldRotation: new THREE.Quaternion(),
+    palmTargetRotation: new THREE.Quaternion(),
+    palmRotationDelta: new THREE.Quaternion(),
+    palmTargetBasis: new THREE.Matrix4(),
+    palmTargetForward: new THREE.Vector3(),
+    palmTargetUp: new THREE.Vector3(),
+    palmTargetRight: new THREE.Vector3(),
+    shoulderEntryWorld: new THREE.Vector3(),
+    shoulderEntryLocal: new THREE.Vector3(),
+    shoulderProjected: new THREE.Vector3(),
+    cameraDown: new THREE.Vector3(),
+    cameraRight: new THREE.Vector3(),
     handTarget: new THREE.Vector3(),
     wristTarget: new THREE.Vector3(),
     solvedWrist: new THREE.Vector3(),
     palmWorld: new THREE.Vector3(),
-    palmWrist: new THREE.Vector3(),
-    palmDigitBase: new THREE.Vector3(),
     palmCorrection: new THREE.Vector3(),
     diagnosticShoulder: new THREE.Vector3(),
     diagnosticElbow: new THREE.Vector3(),
@@ -896,7 +986,6 @@ export class WeaponPresentation {
     meleeBendHintWorld: new THREE.Vector3(),
     meleeHandDirectionWorld: new THREE.Vector3(),
     meleeArmsWorldRotation: new THREE.Quaternion(),
-    gripEuler: new THREE.Euler(),
     elbowSolver: {
       toTarget: new THREE.Vector3(),
       perpendicular: new THREE.Vector3(),
@@ -939,6 +1028,8 @@ export class WeaponPresentation {
   private flamethrowerHeldFireClearancePrewarmChecks = 0;
   private surfaceRetreat = 0;
   private surfaceLift = 0;
+  private prone = false;
+  private contactResponse: ViewmodelContactResponse = viewmodelContactResponse('carbine', 0, 0, false, 0);
   private fullscreenPresentationSuppressed = false;
   private readonly minigunSpool = createMinigunSpoolState();
   private actionContract: CharacterActionContract = characterActionContract({
@@ -968,7 +1059,7 @@ export class WeaponPresentation {
     // unreadable in the Gun Range shadow floor. Keep one retained, viewmodel-
     // only warm key and give it enough bounded intensity to reveal PBR detail
     // without flattening the metal/fabric response or touching world lighting.
-    this.viewmodelFill.userData.authoredIntensity = flattenMaterials ? 0 : 11.75;
+    this.viewmodelFill.userData.authoredIntensity = flattenMaterials ? 0 : 17.5;
     this.root.add(this.viewmodelFill);
     const fabricMaterial = (color: number, roughness: number, repeatX: number, repeatY: number, normalScale: number): THREE.MeshStandardMaterial => {
       if (typeof document === 'undefined') return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
@@ -1475,11 +1566,19 @@ export class WeaponPresentation {
           bindElbow: chain.elbow.quaternion.clone(),
           bindWrist: chain.wrist.quaternion.clone(),
           bindShoulderPosition: chain.shoulder.position.clone(),
+          bindElbowPosition: chain.elbow.position.clone(),
+          bindWristPosition: chain.wrist.position.clone(),
           bindShoulderScale: chain.shoulder.scale.clone(),
+          bindElbowScale: chain.elbow.scale.clone(),
+          bindWristScale: chain.wrist.scale.clone(),
         });
       }
       this.riggedFingerBones.push(...authoredArms.fingers);
       this.authoredArmsRoot = authoredArms.root;
+      authoredArms.root.scale.setScalar(FIRST_PERSON_ARM_UNIFORM_SCALE);
+      authoredArms.root.userData.firstPersonArmProportionContract = FIRST_PERSON_ARM_PROPORTION_CONTRACT;
+      authoredArms.root.userData.firstPersonArmUniformScale = FIRST_PERSON_ARM_UNIFORM_SCALE;
+      authoredArms.root.userData.firstPersonArmViewportEntryContract = FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT;
       this.root.add(authoredArms.root);
       const authoredKnife = createPass65FieldKnifeModel(this.flattenMaterials, 'first-person');
       if (!authoredKnife) throw new Error('Pass 65 authored first-person field knife failed the release contract');
@@ -2331,6 +2430,13 @@ export class WeaponPresentation {
     const previousActive = this.active;
     if (id !== this.active) resetMinigunSpool(this.minigunSpool);
     this.active = id;
+    this.contactResponse = viewmodelContactResponse(
+      id,
+      this.surfaceRetreat,
+      this.surfaceLift,
+      this.prone,
+      this.adsBlend,
+    );
     this.switchBlend = immediate ? 1 : 0;
     this.reloadLastProgress = 0;
     this.pendingScattergunShell = false;
@@ -2367,10 +2473,7 @@ export class WeaponPresentation {
   setPresentationVisible(visible: boolean): void {
     if (this.fullscreenPresentationSuppressed) {
       this.fullscreenPresentationSuppressed = false;
-      this.root.scale.setScalar(
-        THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend)
-          * viewmodelScreenScale(this.camera),
-      );
+      this.root.scale.setScalar(this.unsuppressedViewmodelScale());
     }
     this.root.visible = visible;
     this.viewmodelFill.intensity = visible
@@ -2390,7 +2493,7 @@ export class WeaponPresentation {
     this.root.visible = true;
     this.root.scale.setScalar(suppressed
       ? FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE
-      : THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend) * viewmodelScreenScale(this.camera));
+      : this.unsuppressedViewmodelScale());
     this.viewmodelFill.intensity = suppressed
       ? 0
       : Number(this.viewmodelFill.userData.authoredIntensity ?? 0);
@@ -2399,6 +2502,12 @@ export class WeaponPresentation {
 
   suppressForSniperScope(suppressed: boolean): void {
     this.suppressForFullscreenPresentation(suppressed);
+  }
+
+  private unsuppressedViewmodelScale(): number {
+    return THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend)
+      * viewmodelScreenScale(this.camera)
+      * this.contactResponse.scale;
   }
 
   /**
@@ -2427,6 +2536,8 @@ export class WeaponPresentation {
     this.shotsPresented = 0;
     this.surfaceRetreat = surfaceRetreat;
     this.surfaceLift = 0;
+    this.prone = false;
+    this.contactResponse = viewmodelContactResponse(this.active, surfaceRetreat, 0, false, 0);
     resetMinigunSpool(this.minigunSpool);
 
     this.muzzleLight.intensity = 0;
@@ -2456,15 +2567,20 @@ export class WeaponPresentation {
     const surfaceRetreatClamped = Math.min(surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
     this.root.position.set(
       HIP_VIEWMODEL_POSITION.x,
-      HIP_VIEWMODEL_POSITION.y,
+      HIP_VIEWMODEL_POSITION.y + this.contactResponse.additionalLiftMeters
+        - this.contactResponse.additionalDropMeters,
       // The wall retreat is capped at the near-plane-safe distance: pushing
       // the weapon further back would drive the arms/stock through the near
       // plane and fail the prone framing contract.
       HIP_VIEWMODEL_POSITION.z + surfaceRetreatClamped - VIEWMODEL_NEAR_PLANE_CLEARANCE
         - authoredNearPlaneContactRetreat(this.active, surfaceRetreatClamped),
     );
-    this.root.rotation.set(0, weaponHipYaw(this.active), 0);
-    this.root.scale.setScalar(HIP_VIEWMODEL_SCALE);
+    this.root.rotation.set(
+      this.contactResponse.pitchRadians,
+      weaponHipYaw(this.active) + this.contactResponse.yawRadians,
+      this.contactResponse.rollRadians,
+    );
+    this.root.scale.setScalar(HIP_VIEWMODEL_SCALE * this.contactResponse.scale);
     this.meleeRig.visible = false;
     this.meleeKnife.visible = false;
     this.passiveKnife.visible = false;
@@ -2730,7 +2846,10 @@ export class WeaponPresentation {
                       : ['pistol-rear-sight'];
     // Pass 65 authored GLBs expose a canonical socket contract. Cosmetic mesh
     // names are retained only as a fallback for the procedural/headless models.
-    return model?.getObjectByName('rear-sight-socket')
+    return (this.active === 'carbine'
+      ? model?.getObjectByName('optic-socket') ?? model?.getObjectByName('optic-reticle')
+      : model?.getObjectByName('rear-sight-socket'))
+      ?? model?.getObjectByName('rear-sight-socket')
       ?? sightNames.map((name) => model?.getObjectByName(name)).find((sight) => sight !== undefined);
   }
 
@@ -2749,94 +2868,6 @@ export class WeaponPresentation {
     this.root.position.x -= cameraLocal.x * lock;
     this.root.position.y -= cameraLocal.y * lock;
     this.root.updateWorldMatrix(true, true);
-  }
-
-  private readonly adsClearanceMaterials = new WeakMap<THREE.Object3D, ReadonlyArray<AdsClearanceMaterial>>();
-  private adsClearanceWeapon: WeaponId | null = null;
-  private adsClearanceBlend = 0;
-
-  /**
-   * Ghosts the complete static HK416/Mini Uzi silhouette only while ADS is
-   * settled. These release GLBs merge the receiver, optic frame, polymer and
-   * stock surfaces into material batches; treating only Primary_PBR/Lens left
-   * the other batches as a large opaque wall around the physical sight bore.
-   * Action and magazine batches stay solid, and every per-viewmodel material
-   * clone is restored exactly on ADS release or weapon switch.
-   */
-  private applyAdsOpticClearance(adsBlend: number): void {
-    const restore = (weapon: WeaponId | null) => {
-      if (!weapon) return;
-      const previous = this.models.get(weapon);
-      if (!previous) return;
-      for (const entry of this.adsClearanceMaterials.get(previous) ?? []) {
-        const transparentChanged = entry.material.transparent !== entry.originalTransparent;
-        const depthWriteChanged = entry.material.depthWrite !== entry.originalDepthWrite;
-        entry.material.opacity = entry.originalOpacity;
-        entry.material.transparent = entry.originalTransparent;
-        entry.material.depthWrite = entry.originalDepthWrite;
-        if (transparentChanged || depthWriteChanged) entry.material.needsUpdate = true;
-      }
-    };
-    if (this.adsClearanceWeapon !== this.active) restore(this.adsClearanceWeapon);
-    this.adsClearanceWeapon = this.active;
-    const model = this.mountedModel();
-    if (!model || (this.active !== 'carbine' && this.active !== 'mini-uzi')) {
-      this.adsClearanceBlend = 0;
-      return;
-    }
-    let materials = this.adsClearanceMaterials.get(model);
-    if (!materials) {
-      const collected: AdsClearanceMaterial[] = [];
-      const seen = new Set<THREE.Material>();
-      model.traverse((node) => {
-        if (!(node instanceof THREE.Mesh) || !node.name.includes('Runtime_static')) return;
-        const surface: AdsClearanceMaterial['surface'] = node.name.includes('_Lens')
-          ? 'lens'
-          : node.name.includes('_Primary_PBR')
-            ? 'primary'
-            : node.name.includes('_Gunmetal')
-              ? 'gunmetal'
-              : node.name.includes('_Polymer_PBR')
-                ? 'polymer'
-                : node.name.includes('_Rubber')
-                  ? 'rubber'
-                  : node.name.includes('_Accent') ? 'accent' : 'other-static';
-        const targetOpacity = surface === 'lens'
-          ? 0.025
-          : surface === 'accent'
-            ? 0.14
-            : surface === 'polymer' || surface === 'rubber'
-              ? 0.1
-              : surface === 'gunmetal' ? 0.09 : 0.07;
-        const candidates = Array.isArray(node.material) ? node.material : [node.material];
-        for (const material of candidates) {
-          if (seen.has(material)) continue;
-          seen.add(material);
-          collected.push(Object.freeze({
-            material,
-            originalOpacity: material.opacity,
-            originalTransparent: material.transparent,
-            originalDepthWrite: material.depthWrite,
-            targetOpacity,
-            surface,
-          }));
-        }
-      });
-      materials = Object.freeze(collected);
-      this.adsClearanceMaterials.set(model, materials);
-    }
-    const clearance = THREE.MathUtils.smoothstep(adsBlend, 0.58, 0.94);
-    this.adsClearanceBlend = clearance;
-    for (const entry of materials) {
-      const transparent = clearance > 0.01 ? true : entry.originalTransparent;
-      const depthWrite = clearance > 0.08 ? false : entry.originalDepthWrite;
-      if (entry.material.transparent !== transparent || entry.material.depthWrite !== depthWrite) {
-        entry.material.transparent = transparent;
-        entry.material.depthWrite = depthWrite;
-        entry.material.needsUpdate = true;
-      }
-      entry.material.opacity = THREE.MathUtils.lerp(entry.originalOpacity, entry.targetOpacity, clearance);
-    }
   }
 
   presentationState() {
@@ -2887,57 +2918,84 @@ export class WeaponPresentation {
         && (importedModel.sightForwardDot ?? -1) > 0.995
         && (importedModel.muzzleForwardDot ?? -1) > 0.85
       : requiredDetails.every((name) => model?.getObjectByName(name) !== undefined);
-    const adsClearanceCatalog = (['carbine', 'mini-uzi'] as const).map((weapon) => {
-      const weaponModel = this.models.get(weapon);
-      const entries = weaponModel ? (this.adsClearanceMaterials.get(weaponModel) ?? []) : [];
-      return {
-        weapon,
-        materialCount: entries.length,
-        transparentCount: entries.filter((entry) => entry.material.transparent).length,
-        nonOpaqueCount: entries.filter((entry) => entry.material.opacity < 1).length,
-        depthWriteDisabledCount: entries.filter((entry) => !entry.material.depthWrite).length,
-        restoredCount: entries.filter((entry) => entry.material.opacity === entry.originalOpacity
-          && entry.material.transparent === entry.originalTransparent
-          && entry.material.depthWrite === entry.originalDepthWrite).length,
-        maximumOpacity: entries.reduce((maximum, entry) => Math.max(maximum, entry.material.opacity), 0),
-        maximumTargetOpacity: entries.reduce((maximum, entry) => Math.max(maximum, entry.targetOpacity), 0),
-        surfaces: [...new Set(entries.map((entry) => entry.surface))].sort(),
-      };
-    });
+    const opticMaterialSemantics = model ? capturePass70FirstPersonMaterialState(model) : {
+      contract: PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT,
+      materialCount: 0,
+      markedMaterialCount: 0,
+      opticWindowCount: 0,
+      opaqueBodyCount: 0,
+      presentationDetailCount: 0,
+      invalidOpticWindowCount: 0,
+      invalidOpaqueBodyCount: 0,
+      opticWindows: [],
+    };
     const opaqueSightWindowHits = (() => {
+      const ndcRadius = 0.02;
       if (!model || (this.active !== 'carbine' && this.active !== 'mini-uzi')) {
         return {
-          contract: 'camera-ndc-sight-window-opaque-weapon-rays-v1',
+          contract: 'camera-ndc-authored-sight-aperture-rays-v3',
+          acceptance: 'not-applicable',
+          accepted: true,
           rayCount: 9,
+          ndcRadius,
+          centerHits: 0,
           blockedRays: 0,
           maximumHits: 0,
           meshes: [] as string[],
+          samples: [] as ReadonlyArray<unknown>,
         };
       }
       model.updateWorldMatrix(true, true);
       const offsets = [
-        [0, 0],
-        [-0.05, 0], [0.05, 0], [0, -0.05], [0, 0.05],
-        [-0.035, -0.035], [-0.035, 0.035], [0.035, -0.035], [0.035, 0.035],
+        ['center', 0, 0],
+        ['left', -ndcRadius, 0], ['right', ndcRadius, 0], ['lower', 0, -ndcRadius], ['upper', 0, ndcRadius],
+        ['lower-left', -0.014, -0.014], ['upper-left', -0.014, 0.014],
+        ['lower-right', 0.014, -0.014], ['upper-right', 0.014, 0.014],
       ] as const;
       const raycaster = new THREE.Raycaster();
       raycaster.layers.mask = this.camera.layers.mask;
-      const samples = offsets.map(([x, y]) => {
+      raycaster.near = this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0;
+      raycaster.far = this.camera instanceof THREE.PerspectiveCamera ? this.camera.far : Number.POSITIVE_INFINITY;
+      const samples = offsets.map(([label, x, y]) => {
         raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
         const hits = raycaster.intersectObject(model, true).filter((hit) => {
-          if (!(hit.object instanceof THREE.Mesh) || !hit.object.visible) return false;
+          if (!(hit.object instanceof THREE.Mesh)) return false;
+          let ancestor: THREE.Object3D | null = hit.object;
+          while (ancestor && ancestor !== model) {
+            if (!ancestor.visible) return false;
+            ancestor = ancestor.parent;
+          }
+          if (ancestor !== model || !model.visible) return false;
           const materials = Array.isArray(hit.object.material) ? hit.object.material : [hit.object.material];
           const material = materials[hit.face?.materialIndex ?? 0] ?? materials[0];
           return material?.visible === true && material.colorWrite !== false && material.opacity >= 0.35;
         });
-        return { count: hits.length, meshes: hits.map((hit) => hit.object.name) };
+        return {
+          label,
+          ndc: [x, y] as const,
+          count: hits.length,
+          hits: hits.map((hit) => {
+            const mesh = hit.object as THREE.Mesh;
+            const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            const material = materials[hit.face?.materialIndex ?? 0] ?? materials[0];
+            return { mesh: mesh.name, material: material?.name ?? '', distance: hit.distance };
+          }),
+        };
       });
+      const acceptance = this.active === 'mini-uzi' ? 'centre-ray-clear' : 'nine-ray-window-clear';
+      const blockedRays = samples.filter((sample) => sample.count > 0).length;
+      const centerHits = samples[0].count;
       return {
-        contract: 'camera-ndc-sight-window-opaque-weapon-rays-v1',
+        contract: 'camera-ndc-authored-sight-aperture-rays-v3',
+        acceptance,
+        accepted: acceptance === 'centre-ray-clear' ? centerHits === 0 : blockedRays === 0,
         rayCount: samples.length,
-        blockedRays: samples.filter((sample) => sample.count > 0).length,
+        ndcRadius,
+        centerHits,
+        blockedRays,
         maximumHits: samples.reduce((maximum, sample) => Math.max(maximum, sample.count), 0),
-        meshes: [...new Set(samples.flatMap((sample) => sample.meshes))],
+        meshes: [...new Set(samples.flatMap((sample) => sample.hits.map((hit) => hit.mesh)))],
+        samples,
       };
     })();
     return {
@@ -2962,13 +3020,10 @@ export class WeaponPresentation {
       firstPersonRearStockTrim: model?.userData.firstPersonRearStockTrim ?? null,
       firstPersonRearOccluderTrim: model?.userData.firstPersonRearOccluderTrim ?? null,
       firstPersonAdsSightBore: model?.userData.firstPersonAdsSightBore ?? null,
-      adsMaterialClearance: {
-        contract: 'static-silhouette-ads-translucency-v2',
-        active: this.active === 'carbine' || this.active === 'mini-uzi',
-        blend: this.adsClearanceBlend,
+      opticMaterialSemantics: {
+        ...opticMaterialSemantics,
+        clearWindowOpacity: PASS70_FIRST_PERSON_OPTIC_WINDOW_OPACITY,
         sightPictureRetreat: this.adsBlend * (FIRST_PERSON_ADS_SIGHT_PICTURE_RETREAT[this.active] ?? 0),
-        materialCount: model ? (this.adsClearanceMaterials.get(model)?.length ?? 0) : 0,
-        catalog: adsClearanceCatalog,
       },
       adsOpaqueSightWindow: opaqueSightWindowHits,
       flamethrowerHeldFireClearance: {
@@ -3018,6 +3073,7 @@ export class WeaponPresentation {
       modelVisibleMeshCount,
       attachedWeaponBatchStats: model?.userData.attachedWeaponBatchStats ?? null,
       adsProgress: this.adsBlend,
+      sightReferenceName: sight?.name ?? null,
       sightOffset: projected ? [projected.x, projected.y] : null,
       armsVisible: arms?.visible === true || this.meleeRig.visible,
       armMeshCount,
@@ -3049,6 +3105,7 @@ export class WeaponPresentation {
       actionContract: this.actionContract,
       surfaceRetreat: this.surfaceRetreat,
       surfaceLift: this.surfaceLift,
+      contactResponse: this.contactResponse,
       riggedArms: this.riggedArmDiagnostics,
       armsSource: arms?.userData.authoredFirstPersonArms === true
         ? 'authored-two-chain'
@@ -3163,25 +3220,80 @@ export class WeaponPresentation {
     bone.updateWorldMatrix(false, true);
   }
 
-  /**
-   * Match the anatomical contact anchor used by the Blender authoring pass.
-   * A wrist joint is at the cuff, not in the centre of the glove: solving the
-   * wrist directly onto a weapon socket buries the palm beyond the receiver
-   * and leaves only fingertips visible. The mean proximal-digit base, extended
-   * 45% beyond the wrist, tracks the real metacarpal centre of this rig.
-   */
+  /** The exported palm node is the complete position and orientation authority. */
   private riggedPalmWorld(rig: RiggedViewArm, target: THREE.Vector3): THREE.Vector3 {
+    return rig.palmContact.getWorldPosition(target);
+  }
+
+  private palmTargetWorldRotation(
+    socket: THREE.Object3D,
+    handDirectionWorld: THREE.Vector3,
+    wristRollRadians: number,
+  ): THREE.Quaternion {
     const scratch = this.riggedArmSolveScratch;
-    target.set(0, 0, 0);
-    let digitBaseCount = 0;
-    for (const finger of this.riggedFingerBones) {
-      if (finger.side !== rig.side || finger.joint !== 1) continue;
-      target.add(finger.bone.getWorldPosition(scratch.palmDigitBase));
-      digitBaseCount += 1;
+    const socketRotation = socket.getWorldQuaternion(scratch.weaponRotation);
+    const forward = scratch.palmTargetForward.copy(handDirectionWorld).normalize();
+    const up = scratch.palmTargetUp.set(0, 1, 0).applyQuaternion(socketRotation);
+    up.addScaledVector(forward, -up.dot(forward));
+    if (up.lengthSq() <= 1e-8) {
+      up.set(0, 0, 1).applyQuaternion(socketRotation);
+      up.addScaledVector(forward, -up.dot(forward));
     }
-    const wrist = rig.wrist.getWorldPosition(scratch.palmWrist);
-    if (digitBaseCount === 0) return target.copy(wrist);
-    return target.multiplyScalar(1 / digitBaseCount).sub(wrist).multiplyScalar(1.45).add(wrist);
+    up.normalize().applyAxisAngle(forward, wristRollRadians);
+    const right = scratch.palmTargetRight.crossVectors(forward, up).normalize();
+    up.crossVectors(right, forward).normalize();
+    scratch.palmTargetBasis.makeBasis(right, forward, up);
+    return scratch.palmTargetRotation.setFromRotationMatrix(scratch.palmTargetBasis).normalize();
+  }
+
+  private alignRiggedPalmWorld(rig: RiggedViewArm, targetRotationWorld: THREE.Quaternion): number {
+    const scratch = this.riggedArmSolveScratch;
+    rig.wrist.updateWorldMatrix(true, true);
+    const currentPalm = rig.palmContact.getWorldQuaternion(scratch.palmWorldRotation);
+    const wristWorld = rig.wrist.getWorldQuaternion(scratch.wristWorldRotation);
+    const parentWorld = rig.wrist.parent
+      ? rig.wrist.parent.getWorldQuaternion(scratch.parentWorldRotation)
+      : scratch.parentWorldRotation.identity();
+    scratch.palmRotationDelta.copy(targetRotationWorld).multiply(currentPalm.invert());
+    wristWorld.premultiply(scratch.palmRotationDelta);
+    rig.wrist.quaternion.copy(parentWorld.invert().multiply(wristWorld)).normalize();
+    rig.wrist.updateWorldMatrix(false, true);
+    return rig.palmContact.getWorldQuaternion(scratch.palmWorldRotation).angleTo(targetRotationWorld);
+  }
+
+  private placeRiggedShoulderEntryBelowFrame(
+    rig: RiggedViewArm,
+    cameraRotation: THREE.Quaternion,
+    targetNdcY: number = FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC[rig.side],
+  ): Readonly<{ ndc: readonly [number, number, number]; displacementMeters: number }> {
+    const scratch = this.riggedArmSolveScratch;
+    const parent = rig.shoulder.parent;
+    if (!parent) return { ndc: [0, 0, 0], displacementMeters: 0 };
+    parent.updateWorldMatrix(true, false);
+    const start = rig.shoulder.getWorldPosition(scratch.shoulderPosition);
+    const entry = scratch.shoulderEntryWorld.copy(start);
+    const cameraDown = scratch.cameraDown.set(0, -1, 0).applyQuaternion(cameraRotation).normalize();
+    const cameraRight = scratch.cameraRight.set(1, 0, 0).applyQuaternion(cameraRotation).normalize();
+    entry.addScaledVector(cameraDown, 0.1)
+      .addScaledVector(cameraRight, rig.side === 'right' ? 0.012 : -0.012);
+    // A shoulder close to -1 NDC still exposed the sleeve endpoint during
+    // recoil and prone contact. Both authored chains enter below the crop.
+    const projectedEntry = scratch.shoulderProjected.copy(entry).project(this.camera);
+    if (projectedEntry.y > targetNdcY) {
+      // Preserve exact projected depth, move the point directly below the
+      // crop, then convert that world point back through the authored parent.
+      // This is deterministic under recoil/reload rotations and replaces the
+      // former bounded iteration that could stop with the sleeve still visible.
+      projectedEntry.y = targetNdcY - 0.01;
+      entry.copy(projectedEntry.unproject(this.camera));
+    }
+    rig.shoulder.position.copy(parent.worldToLocal(scratch.shoulderEntryLocal.copy(entry)));
+    rig.shoulder.updateWorldMatrix(false, true);
+    const projected = scratch.shoulderProjected.copy(entry).project(this.camera);
+    return Object.freeze({
+      ndc: Object.freeze([projected.x, projected.y, projected.z] as const),
+      displacementMeters: start.distanceTo(entry),
+    });
   }
 
   private poseRiggedArmToWristTarget(
@@ -3216,14 +3328,22 @@ export class WeaponPresentation {
       rig.elbow.quaternion.copy(rig.bindElbow);
       rig.wrist.quaternion.copy(rig.bindWrist);
       rig.shoulder.position.copy(rig.bindShoulderPosition);
+      rig.elbow.position.copy(rig.bindElbowPosition);
+      rig.wrist.position.copy(rig.bindWristPosition);
       rig.shoulder.scale.copy(rig.bindShoulderScale);
+      rig.elbow.scale.copy(rig.bindElbowScale);
+      rig.wrist.scale.copy(rig.bindWristScale);
     }
     const restored = this.riggedArmRigs.every((rig) => (
       rig.shoulder.quaternion.equals(rig.bindShoulder)
       && rig.elbow.quaternion.equals(rig.bindElbow)
       && rig.wrist.quaternion.equals(rig.bindWrist)
       && rig.shoulder.position.equals(rig.bindShoulderPosition)
+      && rig.elbow.position.equals(rig.bindElbowPosition)
+      && rig.wrist.position.equals(rig.bindWristPosition)
       && rig.shoulder.scale.equals(rig.bindShoulderScale)
+      && rig.elbow.scale.equals(rig.bindElbowScale)
+      && rig.wrist.scale.equals(rig.bindWristScale)
     ));
     this.riggedMeleeBindPoseRestoredExactly = restored;
     return restored;
@@ -3244,6 +3364,14 @@ export class WeaponPresentation {
     const arms = this.authoredArmsRoot;
     if (arms) {
       const scratch = this.riggedArmSolveScratch;
+      const cameraRotation = this.camera.getWorldQuaternion(scratch.cameraRotation);
+      if (right) {
+        this.placeRiggedShoulderEntryBelowFrame(
+          right,
+          cameraRotation,
+          FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC,
+        );
+      }
       arms.updateWorldMatrix(true, true);
       const armsWorldRotation = arms.getWorldQuaternion(scratch.meleeArmsWorldRotation);
       const poseChain = (
@@ -3367,7 +3495,47 @@ export class WeaponPresentation {
     const captureDiagnostics = now >= this.nextRiggedArmDiagnosticsAt;
     const diagnostics: Array<Record<string, unknown>> | null = captureDiagnostics ? [] : null;
     if (captureDiagnostics) this.nextRiggedArmDiagnosticsAt = now + 250;
+    const handPolicy = firstPersonHandPolicy(this.active, reloadPose.handToReload);
     for (const rig of this.riggedArmRigs) {
+      if (rig.side === 'left' && handPolicy.supportHand === 'reload-only-stowed') {
+        rig.shoulder.position.set(
+          rig.bindShoulderPosition.x + 40,
+          rig.bindShoulderPosition.y,
+          rig.bindShoulderPosition.z,
+        );
+        rig.shoulder.scale.setScalar(0.001);
+        if (diagnostics) diagnostics.push({
+          side: rig.side,
+          weapon: this.active,
+          gripFamily: handPolicy.gripFamily,
+          handPolicy,
+          active: false,
+          finite: true,
+          stowed: true,
+          supportChainScale: rig.shoulder.scale.x,
+          supportChainPolicy: FIRST_PERSON_HAND_POLICY_CONTRACT,
+          poseChainContract: RIGGED_HAND_POSE_CHAIN_CONTRACT,
+          shoulder: rig.shoulder.getWorldPosition(scratch.diagnosticShoulder).toArray(),
+        });
+        continue;
+      }
+      // The source delivery ends at a short camera crop. Extend only the two
+      // authored bone translations (never hand or weapon scale) so the real
+      // skinned sleeves can enter below frame while both palm contacts remain
+      // physically reachable. Direction, hierarchy and bind rotations remain
+      // authored; ADS needs the larger extension because the retained root is
+      // deliberately smaller there.
+      // Contact foreshortens the shared viewmodel root. Add a bounded amount
+      // of length along the already-authored elbow/wrist directions so the
+      // palm can still reach its socket while the complete weapon is folded
+      // below a wall/floor. This does not move the socket, camera, or shot ray.
+      let segmentLengthScale = riggedArmBaseSegmentLengthScale(
+        rig.side,
+        this.adsBlend,
+        this.contactResponse.obstructionBlend,
+      );
+      rig.elbow.position.copy(rig.bindElbowPosition).multiplyScalar(segmentLengthScale);
+      rig.wrist.position.copy(rig.bindWristPosition).multiplyScalar(segmentLengthScale);
       const socketName = rig.side === 'right' ? 'grip-socket-r' : 'support-socket-l';
       const socket = activeModel.getObjectByName(socketName);
       if (!socket) continue;
@@ -3376,38 +3544,62 @@ export class WeaponPresentation {
         const reloadSocket = activeModel.getObjectByName('reload-socket-l');
         if (reloadSocket) target.lerp(reloadSocket.getWorldPosition(scratch.handTarget), reloadPose.handToReload);
       }
+      const shoulderEntry = this.placeRiggedShoulderEntryBelowFrame(rig, cameraRotation);
       const shoulderPosition = rig.shoulder.getWorldPosition(scratch.shoulderPosition);
       const elbowPosition = rig.elbow.getWorldPosition(scratch.elbowPosition);
       const wristPosition = rig.wrist.getWorldPosition(scratch.wristPosition);
-      const upperLength = shoulderPosition.distanceTo(elbowPosition);
-      const lowerLength = elbowPosition.distanceTo(wristPosition);
+      let upperLength = shoulderPosition.distanceTo(elbowPosition);
+      let lowerLength = elbowPosition.distanceTo(wristPosition);
       const socketTarget = scratch.socketTarget.copy(target);
-      const physicalReach = upperLength + lowerLength;
+      let physicalReach = upperLength + lowerLength;
       const socketReach = shoulderPosition.distanceTo(socketTarget);
+      const palmReachAllowance = rig.wrist.getWorldPosition(scratch.solvedWrist)
+        .distanceTo(this.riggedPalmWorld(rig, scratch.palmWorld)) + 0.01;
+      const requiredReach = socketReach + palmReachAllowance;
+      if (physicalReach < requiredReach) {
+        const requestedSegmentLengthScale = segmentLengthScale
+          * (requiredReach / Math.max(physicalReach, 1e-6));
+        const expandedSegmentLengthScale = Math.min(
+          FIRST_PERSON_ARM_MAX_SEGMENT_LENGTH_SCALE,
+          requestedSegmentLengthScale,
+        );
+        const reachExpansion = Math.max(1, expandedSegmentLengthScale / segmentLengthScale);
+        segmentLengthScale = expandedSegmentLengthScale;
+        rig.elbow.position.multiplyScalar(reachExpansion);
+        rig.wrist.position.multiplyScalar(reachExpansion);
+        rig.shoulder.updateWorldMatrix(true, true);
+        rig.shoulder.getWorldPosition(shoulderPosition);
+        rig.elbow.getWorldPosition(elbowPosition);
+        rig.wrist.getWorldPosition(wristPosition);
+        upperLength = shoulderPosition.distanceTo(elbowPosition);
+        lowerLength = elbowPosition.distanceTo(wristPosition);
+        physicalReach = upperLength + lowerLength;
+      }
       const socketReachRatio = socketReach / Math.max(physicalReach, 1e-6);
       const calibratedReach = physicalReach * RIGGED_ARM_MAX_REACH_RATIO;
       let gripSocketCalibration = 0;
       const bendHint = scratch.bendHint.set(rig.side === 'left' ? -0.7 : 0.7, -1, 0.25).applyQuaternion(cameraRotation);
-      const handDirection = scratch.handDirection.set(
-        rig.side === 'left' ? 0.2 : 0.08,
-        rig.side === 'left' ? -0.08 : -0.28,
-        -1,
-      ).normalize();
-      const gripRotation = WEAPON_HAND_ROTATIONS[this.active][rig.side];
-      scratch.gripEuler.set(
-        gripRotation[0] * 0.24,
-        gripRotation[1] * 0.24,
-        gripRotation[2] * 0.24,
-        'XYZ',
-      );
-      handDirection.applyEuler(scratch.gripEuler).applyQuaternion(cameraRotation);
+      const weaponRotation = activeModel.getWorldQuaternion(scratch.weaponRotation);
+      const muzzle = activeModel.getObjectByName('muzzle-socket');
+      const weaponForward = muzzle
+        ? scratch.weaponForward.copy(muzzle.getWorldPosition(scratch.handTarget)).sub(socketTarget).normalize()
+        : scratch.weaponForward.set(0, 0, 1).applyQuaternion(weaponRotation).normalize();
+      const handDirection = rig.side === 'left'
+        ? riggedSupportHandDirectionLocal(reloadPose.handToReload, scratch.handDirection).applyQuaternion(weaponRotation).normalize()
+        : scratch.handDirection.copy(weaponForward);
+      const wristRollRadians = rig.side === 'left'
+        ? riggedSupportWristRollRadians(reloadPose.handToReload)
+        : 0;
+      const palmTargetRotation = this.palmTargetWorldRotation(socket, handDirection, wristRollRadians);
+      const contactIterationErrors: number[] | null = diagnostics ? [] : null;
+      let palmOrientationError = Number.POSITIVE_INFINITY;
 
       // Iterate the wrist endpoint until the actual palm, rather than the cuff
       // joint, meets the authored weapon socket. This mirrors the source-asset
       // contact solve and keeps sleeves behind the controls at hip, ADS and
       // reload poses. All corrections remain bounded by the physical chain.
       const wristTarget = scratch.wristTarget.copy(socketTarget);
-      for (let iteration = 0; iteration < 4; iteration += 1) {
+      for (let iteration = 0; iteration < 2; iteration += 1) {
         const requestedReach = shoulderPosition.distanceTo(wristTarget);
         if (requestedReach > calibratedReach) {
           const unclampedX = wristTarget.x;
@@ -3422,8 +3614,10 @@ export class WeaponPresentation {
         this.poseRiggedArmToWristTarget(
           rig, wristTarget, shoulderPosition, upperLength, lowerLength, bendHint, handDirection,
         );
+        palmOrientationError = this.alignRiggedPalmWorld(rig, palmTargetRotation);
         this.riggedPalmWorld(rig, scratch.palmWorld);
         const correction = scratch.palmCorrection.copy(socketTarget).sub(scratch.palmWorld);
+        contactIterationErrors?.push(correction.length());
         wristTarget.add(correction);
         if (correction.lengthSq() <= 0.00025 * 0.00025) break;
       }
@@ -3436,6 +3630,7 @@ export class WeaponPresentation {
       const elbowTarget = this.poseRiggedArmToWristTarget(
         rig, wristTarget, shoulderPosition, upperLength, lowerLength, bendHint, handDirection,
       );
+      palmOrientationError = this.alignRiggedPalmWorld(rig, palmTargetRotation);
       const solvedWrist = rig.wrist.getWorldPosition(scratch.solvedWrist);
       const solvedPalm = this.riggedPalmWorld(rig, scratch.diagnosticPalm);
       const reachRatio = shoulderPosition.distanceTo(wristTarget) / Math.max(upperLength + lowerLength, 1e-6);
@@ -3444,6 +3639,8 @@ export class WeaponPresentation {
         side: rig.side,
         weapon: this.active,
         gripFamily: viewmodelGripFamily(this.active),
+        handPolicy,
+        active: true,
         socket: socketName,
         socketTarget: socketTarget.toArray(),
         socketReachRatio,
@@ -3454,14 +3651,28 @@ export class WeaponPresentation {
         elbow: rig.elbow.getWorldPosition(scratch.diagnosticElbow).toArray(),
         wrist: rig.wrist.getWorldPosition(scratch.diagnosticWrist).toArray(),
         palm: solvedPalm.toArray(),
+        palmQuaternion: rig.palmContact.getWorldQuaternion(scratch.palmWorldRotation).toArray(),
+        palmTargetQuaternion: palmTargetRotation.toArray(),
         target: socketTarget.toArray(),
         wristTarget: wristTarget.toArray(),
-        contactAnchor: 'mean-digit-base-palm-v1',
+        contactAnchor: rig.palmContact.name,
+        poseChainContract: RIGGED_HAND_POSE_CHAIN_CONTRACT,
+        shoulderEntryPolicy: 'camera-space-below-frame-continuation-v1',
+        shoulderEntryNdc: shoulderEntry.ndc,
+        shoulderEntryDisplacementMeters: shoulderEntry.displacementMeters,
+        segmentLengthScale,
+        authoredSegmentDirectionsPreserved: rig.elbow.position.clone().normalize()
+          .dot(rig.bindElbowPosition.clone().normalize()) > 0.999999
+          && rig.wrist.position.clone().normalize().dot(rig.bindWristPosition.clone().normalize()) > 0.999999,
+        handDirection: handDirection.toArray(),
+        wristRollRadians,
+        palmOrientationError,
+        contactIterationErrors,
         contactError: solvedPalm.distanceTo(socketTarget),
         wristContactError: solvedWrist.distanceTo(wristTarget),
         reachRatio,
         withinStableReach: reachRatio <= 1.001,
-        bindOffsetsPreserved: true,
+        bindOffsetsPreserved: segmentLengthScale === 1,
         finite: [...socketTarget.toArray(), ...wristTarget.toArray(), ...solvedWrist.toArray(), ...solvedPalm.toArray(), ...elbowTarget.toArray()].every(Number.isFinite),
         shoulderQuaternion: rig.shoulder.quaternion.toArray(),
         elbowQuaternion: rig.elbow.quaternion.toArray(),
@@ -3489,12 +3700,20 @@ export class WeaponPresentation {
     this.swayX = THREE.MathUtils.lerp(this.swayX, 0, smoothing(7));
     this.swayY = THREE.MathUtils.lerp(this.swayY, 0, smoothing(7));
     this.adsBlend = advanceAdsBlend(this.adsBlend, pose.ads, pose.dt, this.active);
-    // Authored holo-optic rifles (carbine, M4A1, AK-47) mount their optic
-    // housing above the iron-sight socket the ADS camera centres on. Shoulder
-    // the housing out of the sightline while aiming so the centred sight
-    // picture is unobstructed; it returns when the weapon lowers.
-    this.applyAdsOpticClearance(this.adsBlend);
-    this.root.scale.setScalar(THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend) * viewmodelScreenScale(this.camera));
+    this.surfaceRetreat = pose.surfaceRetreat ?? 0;
+    this.surfaceLift = pose.surfaceLift ?? 0;
+    this.prone = pose.prone;
+    this.contactResponse = viewmodelContactResponse(
+      this.active,
+      this.surfaceRetreat,
+      this.surfaceLift,
+      this.prone,
+      this.adsBlend,
+    );
+    // The physical aperture and bounded retreat own ADS clearance. Weapon
+    // receivers, stocks and hands remain opaque; only semantically named lens
+    // materials are clear from model instantiation onward.
+    this.root.scale.setScalar(this.unsuppressedViewmodelScale());
     this.sprintBlend = THREE.MathUtils.lerp(this.sprintBlend, pose.sprinting ? 1 : 0, smoothing(13));
     this.muzzleFlash.visible = this.muzzleLight.intensity > 0.45;
     const arms = this.root.getObjectByName('first-person-arms');
@@ -3728,24 +3947,43 @@ export class WeaponPresentation {
     // an extra stock-swing allowance during the fire kick.
     const fireNearPlaneCapZ = viewmodelBaseZ + surfaceRetreatClamped - adsSightPictureRetreat
       - (presentationKick > 0.05 ? 0.1 : 0);
+    // Floor contact must survive the complete action envelope, not only the
+    // idle mesh. Counter the authored downward recoil translation and raise a
+    // detached magazine by a bounded fraction while it is below the receiver;
+    // rotations, grips and action timing remain unchanged.
+    const floorActionClearance = this.contactResponse.floorBlend
+      * (presentationKick * 0.095 + reloadPose.magazineDrop * 0.65);
     const targetPosition = this.frameTargetPosition.set(
       viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera) + grenadeArc * 0.18 + reloadStage.lateral,
-      viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075 * aimSteady + meleeArc * 0.26,
+      viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift
+        + this.contactResponse.additionalLiftMeters - this.contactResponse.additionalDropMeters
+        + switchDrop + reloadStage.lift + floorActionClearance
+        - presentationKick * 0.095 - pose.landingImpulse * 0.075 * aimSteady + meleeArc * 0.26,
       Math.min(
         viewmodelBaseZ + adsZ + surfaceRetreatClamped - adsSightPictureRetreat - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 + grenadeArc * 0.24,
         fireNearPlaneCapZ,
       ) - authoredContactRetreat,
     );
-    this.surfaceRetreat = pose.surfaceRetreat ?? 0;
-    this.surfaceLift = pose.surfaceLift ?? 0;
     this.root.position.lerp(targetPosition, smoothing(18));
-    this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, presentationKick * profile.recoilRotation * 1.15 - this.swayY * aimSteady - grenadeArc * 0.42 + reloadStage.pitch, smoothing(22));
+    this.root.rotation.x = THREE.MathUtils.lerp(
+      this.root.rotation.x,
+      presentationKick * profile.recoilRotation * 1.15 - this.swayY * aimSteady
+        - grenadeArc * 0.42 + reloadStage.pitch + this.contactResponse.pitchRadians,
+      smoothing(22),
+    );
     this.root.rotation.y = THREE.MathUtils.lerp(
       this.root.rotation.y,
-      hipYaw * (1 - this.adsBlend) - this.swayX * 2 * aimSteady - this.sprintBlend * 0.38 - meleeArc * 0.18,
+      hipYaw * (1 - this.adsBlend) - this.swayX * 2 * aimSteady - this.sprintBlend * 0.38
+        - meleeArc * 0.18 + this.contactResponse.yawRadians,
       smoothing(13),
     );
-    this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadStage.roll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) * aimSteady - meleeArc * 0.42 + shotRoll, smoothing(13));
+    this.root.rotation.z = THREE.MathUtils.lerp(
+      this.root.rotation.z,
+      reloadStage.roll - this.sprintBlend * 0.22
+        - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) * aimSteady
+        - meleeArc * 0.42 + shotRoll + this.contactResponse.rollRadians,
+      smoothing(13),
+    );
     this.centerSightReference(activeModel);
     if (arms && !meleeActive) this.solveArms(arms, activeModel, reloadPose);
     if (!authoredMeleeActive) this.solveRiggedArms(activeModel, reloadPose);

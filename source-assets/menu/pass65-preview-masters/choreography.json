@@ -2,7 +2,7 @@
   "schemaVersion": 4,
   "recipeId": "pass66-authoritative-runtime-menu-preview-v2",
   "captureId": "pass66-authoritative-runtime-menu-preview-capture-v2",
-  "generatedAt": "2026-08-02",
+  "generatedAt": "2026-08-11",
   "coordinateSystem": "Three.js Y-up metres; camera looks along local -Z in the authoritative runtime arena",
   "fps": 30,
   "durationSeconds": 8,
@@ -10,7 +10,7 @@
   "reviewFrames": [1, 60, 120, 180, 240],
   "runtimeContract": "prerecorded compressed media only; static poster for reduced motion; zero arena construction or gameplay renderer submissions",
   "media": {
-    "cacheKey": "pass66-runtime-preview-v13",
+    "cacheKey": "pass66-runtime-preview-v15",
     "containers": ["webm", "mp4"],
     "poster": "webp",
     "encodingBudget": {

@@ -265,17 +265,23 @@ if (manifest.operatorArms?.releaseState !== 'release-ready') {
     if (!arms.bones?.includes(bone)) failures.push(`operator arms: missing ${bone} bone`);
   }
   for (const action of manifest.requiredCoreActions) if (!arms.actions?.includes(action)) failures.push(`operator arms: missing ${action} action`);
+  for (const socket of ['right-palm-contact', 'left-palm-contact']) {
+    if (!arms.sockets?.includes(socket)) failures.push(`operator arms: missing ${socket} authored palm frame`);
+  }
   for (const [field, expected] of Object.entries(OPERATOR_ARMS_RENDER_BUDGET)) {
     if (arms.renderBudget?.[field] !== expected) failures.push(`operator arms: render budget ${field} must equal ${expected}`);
   }
   for (const [field, expected] of Object.entries({
-    visualRevision: 'licensed-anatomical-viewmodel-v8',
-    limbProfileContract: 'hero-scale-connected-forearm-deformation-v2',
-    handPoseContract: 'licensed-articulated-weapon-and-knife-grip-v2',
+    visualRevision: 'pass70-manual-anatomical-viewmodel-v1',
+    materialContrastContract: 'owned-basecolor-contrast-retone-v1',
+    limbProfileContract: 'manual-continuous-cuff-forearm-deformation-v1',
+    handPoseContract: 'manual-separated-articulated-digit-contact-v1',
     shoulderEntryContract: 'weighted-capped-fps-frame-edge-sleeve-v2',
-    gloveConstructionContract: 'opaque-uv-preserved-scaled-anatomical-hand-v2',
+    gloveConstructionContract: 'opaque-manual-cuff-palm-digit-continuity-v1',
+    palmContactContract: 'authored-wrist-parented-full-transform-v1',
     weaponGripReviewContract: 'seven-view-actual-weapon-contact-v2',
-    weightingContract: 'adjacent-bone-normalized-blend-v5',
+    weightingContract: 'manual-adjacent-joint-normalized-blend-v1',
+    manualMasterContract: 'checked-in-editable-blend-export-only-v1',
     runtimeAnimationContract: 'authored-fingers-under-runtime-chain-ik-v1',
     fingerSegmentCount: 30,
     weaponGripReviewFrames: 7,
@@ -283,8 +289,8 @@ if (manifest.operatorArms?.releaseState !== 'release-ready') {
     if (arms[field] !== expected) failures.push(`operator arms: ${field} must equal ${expected}`);
   }
   for (const cameraId of [
-    'pistol-hip', 'mp5-hip', 'm4a1-hip', 'm4a1-grip-oblique',
-    'm4a1-ads', 'm4a1-reload', 'knife-contact',
+    'neutral-front', 'forearm-wrist-quarter', 'hand-anatomy-closeup',
+    'reload-cuff-flex', 'firing-digit-separation',
   ]) {
     if (!arms.review?.renders?.some((render) => render.cameraId === cameraId)) {
       failures.push(`operator arms: required ${cameraId} review frame missing`);

@@ -1,8 +1,23 @@
 import { isAbsolute } from 'node:path';
+import { PASS70_NATIVE_USER_AGENT_ENV } from './pass70-cross-browser-native-user-agent-contract.mjs';
 
 const SHA40 = /^[a-f0-9]{40}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const OWNED_CANDIDATE_URL = /^http:\/\/127\.0\.0\.1:\d+\/channels\/the-big-one\/$/u;
+
+export const PASS66_MULTIPLAYER_BROWSER_CHANNEL = 'chrome';
+export const PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV = 'QA_MULTIPLAYER_BROWSER_CHANNEL';
+export const PASS66_MULTIPLAYER_BROWSER_EXECUTABLE_ENV = 'QA_MULTIPLAYER_BROWSER_EXECUTABLE_PATH';
+export const PASS66_MULTIPLAYER_BROWSER_SHA256_ENV = 'QA_MULTIPLAYER_BROWSER_EXECUTABLE_SHA256';
+export const PASS66_MULTIPLAYER_FORBIDDEN_AUTOMATION_ENV = Object.freeze([
+  'PWDEBUG',
+  'PW_TEST_CONNECT_WS_ENDPOINT',
+  'PW_TEST_CONNECT_HEADERS',
+  'PW_TEST_CONNECT_EXPOSE_NETWORK',
+  'SELENIUM_REMOTE_URL',
+  'SELENIUM_REMOTE_CAPABILITIES',
+  'SELENIUM_REMOTE_HEADERS',
+]);
 
 export const PASS66_MULTIPLAYER_SPECS = Object.freeze([
   Object.freeze({
@@ -26,9 +41,10 @@ export const PASS66_MULTIPLAYER_SPECS = Object.freeze([
   }),
   Object.freeze({
     path: 'tests/e2e/pass66-qoder-multiplayer-authority.spec.ts',
-    expectedTests: 3,
+    expectedTests: 4,
     titles: Object.freeze([
       'post-death ladders survive authenticated replacements and an immediate host renderer crash exactly once',
+      'a guest death-drop scavenge converges through host authority exactly once',
       'Semtex and crossbolt sticky results apply once under duplicate, reorder and guest rejoin',
       'host-authoritative facing flash and semantic smoke break bot lock while the guest observes safe replicas',
     ]),
@@ -55,6 +71,14 @@ function record(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function installedChromeExecutable(value) {
+  if (typeof value !== 'string' || !isAbsolute(value)) return false;
+  const normalized = value.replaceAll('\\', '/');
+  return /\/Google\/Chrome\/Application\/chrome\.exe$/iu.test(normalized)
+    || normalized === '/opt/google/chrome/chrome'
+    || normalized === '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+}
+
 function normalizePath(value) {
   return String(value ?? '').replaceAll('\\', '/').replace(/^\.\//u, '');
 }
@@ -69,16 +93,37 @@ function canonicalSpecPath(value) {
 export function multiplayerStabilityEnvironmentFailures(environment) {
   const errors = [];
   const baseUrl = environment.QA_BASE_URL ?? '';
-  if (environment.PASS66_OWNED_GATE !== 'multiplayer-stability') {
+  if (environment.QA_OWNED_GATE !== 'multiplayer-stability') {
     errors.push('owned gate must be multiplayer-stability');
+  }
+  if (!/^PASS \d+(?:\.\d+)?$/u.test(environment.QA_OWNED_RELEASE_PASS ?? '')) {
+    errors.push('owned release pass is invalid');
   }
   if (!OWNED_CANDIDATE_URL.test(baseUrl)) errors.push('QA_BASE_URL must be the owned candidate channel route');
   if (environment.BASE_URL !== baseUrl) errors.push('BASE_URL must exactly match QA_BASE_URL');
-  if (!SHA40.test(environment.PASS66_OWNED_SOURCE_SHA ?? '')) errors.push('owned source SHA is invalid');
-  if (!SHA256.test(environment.PASS66_OWNED_TREE_SHA256 ?? '')) errors.push('owned tree digest is invalid');
-  const fileCount = Number(environment.PASS66_OWNED_FILE_COUNT ?? Number.NaN);
+  if (!SHA40.test(environment.QA_OWNED_SOURCE_SHA ?? '')) errors.push('owned source SHA is invalid');
+  if (!SHA256.test(environment.QA_OWNED_TREE_SHA256 ?? '')) errors.push('owned tree digest is invalid');
+  const fileCount = Number(environment.QA_OWNED_FILE_COUNT ?? Number.NaN);
   if (!Number.isSafeInteger(fileCount) || fileCount < 2) errors.push('owned file count is invalid');
-  if (!isAbsolute(environment.PASS66_OWNED_RECEIPT_PATH ?? '')) errors.push('owned receipt path must be absolute');
+  if (!isAbsolute(environment.QA_OWNED_RECEIPT_PATH ?? '')) errors.push('owned receipt path must be absolute');
+  if (environment[PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV] !== PASS66_MULTIPLAYER_BROWSER_CHANNEL) {
+    errors.push('owned browser channel must be installed Chrome');
+  }
+  if (!installedChromeExecutable(environment[PASS66_MULTIPLAYER_BROWSER_EXECUTABLE_ENV])) {
+    errors.push('owned browser executable must be installed Google Chrome');
+  }
+  if (!SHA256.test(environment[PASS66_MULTIPLAYER_BROWSER_SHA256_ENV] ?? '')) {
+    errors.push('owned browser executable SHA-256 is invalid');
+  }
+  if (environment[PASS70_NATIVE_USER_AGENT_ENV] !== '1') {
+    errors.push('owned browser must expose its native user agent');
+  }
+  if (environment.QA_INSTALLED_EDGE === '1') {
+    errors.push('owned browser must not drift to installed Edge');
+  }
+  for (const key of PASS66_MULTIPLAYER_FORBIDDEN_AUTOMATION_ENV) {
+    if (environment[key] !== undefined) errors.push(`owned browser rejects forbidden automation environment ${key}`);
+  }
   return errors;
 }
 
@@ -86,7 +131,7 @@ export function multiplayerServedCandidateFailures(value, expected) {
   if (!record(value)) return ['served candidate provenance must be an object'];
   const errors = [];
   if (value.schemaVersion !== 4 || value.channel !== 'the-big-one'
-    || value.releasePass !== 'PASS 66' || value.path !== 'channels/the-big-one') {
+    || value.releasePass !== expected.releasePass || value.path !== 'channels/the-big-one') {
     errors.push('served candidate identity mismatch');
   }
   if (value.sourceSha !== expected.sourceSha) errors.push('served candidate source SHA mismatch');
@@ -172,7 +217,7 @@ export function multiplayerPlaywrightReportFailures(value) {
 
 export function summarizeMultiplayerPlaywrightReport(value) {
   const failures = multiplayerPlaywrightReportFailures(value);
-  if (failures.length > 0) throw new Error(`Invalid Pass 66 multiplayer Playwright report: ${failures.join('; ')}`);
+  if (failures.length > 0) throw new Error(`Invalid multiplayer Playwright report: ${failures.join('; ')}`);
   const collected = [];
   collectReportSpecs(value.suites, undefined, collected, []);
   return {
@@ -203,9 +248,10 @@ export function summarizeMultiplayerPlaywrightReport(value) {
 export function multiplayerStabilityReceiptFailures(value, expected) {
   if (!record(value)) return ['multiplayer stability receipt must be an object'];
   const errors = [];
-  if (value.schemaVersion !== 1 || value.status !== 'PASS'
+  if (value.schemaVersion !== 3 || value.status !== 'PASS'
     || value.gate !== 'multiplayer-stability'
-    || value.schema !== 'atomic-acres/pass66-multiplayer-stability@1') {
+    || value.schema !== 'atomic-acres/multiplayer-stability@3'
+    || value.releasePass !== expected.releasePass) {
     errors.push('multiplayer stability receipt identity mismatch');
   }
   if (value.sourceSha !== expected.sourceSha) errors.push('multiplayer stability source SHA mismatch');
@@ -220,15 +266,29 @@ export function multiplayerStabilityReceiptFailures(value, expected) {
     '--project=chromium', '--workers=1', '--retries=0', '--reporter=json',
   ];
   if (!record(value.runner) || value.runner.browser !== 'chromium'
+    || value.runner.channel !== PASS66_MULTIPLAYER_BROWSER_CHANNEL
+    || value.runner.channel !== expected.browserChannel
+    || value.runner.headless !== true
+    || value.runner.nativeUserAgent !== true
+    || !installedChromeExecutable(value.runner.executablePath)
+    || value.runner.executablePath !== expected.browserExecutablePath
+    || !SHA256.test(value.runner.executableSha256 ?? '')
+    || value.runner.executableSha256 !== expected.browserExecutableSha256
     || value.runner.workers !== 1 || value.runner.retries !== 0
     || value.runner.externalPreview !== true || value.runner.baseUrl !== expected.baseUrl
     || JSON.stringify(value.runner.args) !== JSON.stringify(expectedArgs)) {
     errors.push('multiplayer stability runner identity mismatch');
   }
   const guardedSpecs = PASS66_MULTIPLAYER_SPECS.map(({ path }) => path);
+  const initialAdmissionGuard = value.pageBinding?.initialAdmissionGuard;
   if (!record(value.pageBinding) || value.pageBinding.helper !== 'assertPass66OwnedCandidatePage'
     || value.pageBinding.exactCandidateRoute !== '/channels/the-big-one/'
-    || JSON.stringify(value.pageBinding.guardedSpecs) !== JSON.stringify(guardedSpecs)) {
+    || JSON.stringify(value.pageBinding.guardedSpecs) !== JSON.stringify(guardedSpecs)
+    || !record(initialAdmissionGuard)
+    || initialAdmissionGuard.spec !== 'tests/e2e/pass66-host-crash-rejoin.spec.ts'
+    || JSON.stringify(initialAdmissionGuard.roles) !== JSON.stringify(['host', 'guest'])
+    || JSON.stringify(initialAdmissionGuard.terminalEvents) !== JSON.stringify(['crash', 'close'])
+    || initialAdmissionGuard.timeoutMs !== 60_000) {
     errors.push('multiplayer stability page binding is incomplete');
   }
   if (!Array.isArray(value.ownedPeerServers)

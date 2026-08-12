@@ -168,8 +168,31 @@ describe('timed map weapon legacy-main integration', () => {
     expect(flareUpdate).not.toContain('flareProjectileSystem.telemetry()');
     expect(flareUpdate).not.toContain('point.clone()');
 
-    const targetSnapshots = between('function prepareFlareTargetSnapshots(', '\nfunction flareHostileTargets(');
+    const targetSnapshots = between('function prepareFlareTargetSnapshots(', '\nfunction flareTargetView(');
     expect(targetSnapshots).toContain('target.root.getWorldPosition(entry.target.position)');
     expect(targetSnapshots).not.toContain('position.clone()');
+  });
+
+  it('keeps flare direct impact and ground DOT on exactly one authority lane each', () => {
+    const apply = between('function applyFlareTargetDamage(', '\nfunction finishPendingFlareShot(');
+    expect(apply).toContain("if (target.id === player.id) {");
+    expect(apply).toContain('applyDamage(outgoing, ownerId, 1, false, cause);');
+    expect(apply).toContain('const health = remoteHealthAuthorities.get(target.id);');
+    expect(apply).toContain('sendAuthoritativeHit({');
+    expect(apply).toContain("kind: 'shot'");
+
+    const directHit = between('function handleFlareDirectHit(', '\nfunction handleFlareImpact(');
+    expect(directHit).toContain('applyFlareTargetDamage(');
+    expect(directHit).toContain('finishPendingFlareShot(hit.ownerId, hit.actionNonce, outcome)');
+
+    const groundImpact = between('function handleFlareImpact(', '\nfunction handleFlareBurnPulse(');
+    expect(groundImpact).toContain('flamethrowerStreamPresentation.igniteGround(');
+    expect(groundImpact).not.toContain('applyFlareTargetDamage(');
+    expect(groundImpact).not.toContain('flamethrowerGroundFires.ignite(');
+
+    const callbacks = between('const flareProjectileCallbacks:', '\nfunction updateFlareProjectiles(');
+    expect(callbacks).toContain('onDirectHit: handleFlareDirectHit');
+    expect(callbacks).toContain('onImpact: handleFlareImpact');
+    expect(callbacks).toContain('onBurnPulse: handleFlareBurnPulse');
   });
 });

@@ -20,24 +20,36 @@ export function releaseHistoryButtonMarkup(entry: ChangelogEntry = CHANGELOG[0]!
   return `<button id="last-updated-btn" type="button" aria-haspopup="dialog" aria-controls="changelog-panel" aria-expanded="false">${escapeHtml(lastUpdatedButtonLabel(entry))}</button>`;
 }
 
+function releaseTimestampMarkup(entry: ChangelogEntry): string {
+  if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) {
+    return '<time><small>NOT PUBLISHED</small>AWAITING OWNER HITL</time>';
+  }
+  return `<time datetime="${escapeHtml(entry.releasedAt)}"><small>PUBLISHED</small>${escapeHtml(formatChangelogTimestampDetail(entry.releasedAt))}</time>`;
+}
+
 export function releaseHistoryDialogMarkup(entries: readonly ChangelogEntry[] = CHANGELOG): string {
+  const currentIsCandidate = entries[0]?.releasedAt === PENDING_PRODUCTION_RELEASE;
+  const historyEyebrow = currentIsCandidate ? 'RELEASE HISTORY · LOCAL CANDIDATE' : 'PUBLIC RELEASE HISTORY';
+  const historyLede = currentIsCandidate
+    ? 'The current local candidate appears first and is explicitly not published. For earlier builds, <b>PUBLISHED</b> is the first successful live release time, shown in UK local time and with its UTC offset.'
+    : 'Player-facing production releases only. <b>PUBLISHED</b> is the first successful live release time, shown in UK local time and with its UTC offset. Newest first.';
   return `
     <div id="changelog-backdrop" class="menu-modal-backdrop" hidden></div>
     <section id="changelog-panel" class="panel menu-modal-panel" hidden role="dialog" aria-modal="true" aria-labelledby="changelog-title">
       <header class="changelog-header menu-modal-header">
         <div>
-          <small>PUBLIC RELEASE HISTORY</small>
+          <small>${historyEyebrow}</small>
           <strong id="changelog-title">RECENT CHANGES</strong>
         </div>
         <button id="changelog-close" type="button" aria-label="Close changelog">CLOSE</button>
       </header>
-      <p class="changelog-lede">Player-facing production releases only. <b>PUBLISHED</b> is the first successful live release time, shown in UK local time and with its UTC offset. Newest first.</p>
+      <p class="changelog-lede">${historyLede}</p>
       <ol id="changelog-list">
         ${entries.map((entry, index) => `
           <li data-changelog-id="${escapeHtml(entry.id)}">
             <div class="changelog-entry-head">
-              <div class="changelog-entry-pass"><span>${escapeHtml(entry.pass)}</span>${index === 0 ? `<b>${entry.releasedAt === PENDING_PRODUCTION_RELEASE ? 'CURRENT BUILD' : 'CURRENT LIVE'}</b>` : ''}</div>
-              <time datetime="${escapeHtml(entry.releasedAt)}"><small>PUBLISHED</small>${escapeHtml(formatChangelogTimestampDetail(entry.releasedAt))}</time>
+              <div class="changelog-entry-pass"><span>${escapeHtml(entry.pass)}</span>${index === 0 ? `<b>${entry.releasedAt === PENDING_PRODUCTION_RELEASE ? 'LOCAL CANDIDATE' : 'CURRENT LIVE'}</b>` : ''}</div>
+              ${releaseTimestampMarkup(entry)}
             </div>
             <strong>${escapeHtml(entry.title)}</strong>
             <div class="changelog-areas">${entry.areas.map((area) => `<span>${escapeHtml(area)}</span>`).join('')}</div>

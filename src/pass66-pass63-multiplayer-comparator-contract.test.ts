@@ -26,11 +26,16 @@ function pinnedStableJavascript(): string {
     maxBuffer: 16 * 1024 * 1024,
   }).split(/\r?\n/u).filter((path) => path.endsWith('.js'));
   expect(paths.length).toBeGreaterThan(0);
-  return paths.map((path) => execFileSync('git', ['cat-file', 'blob', `${pagesSha}:${path}`], {
+  // Read the pinned tree through one batch process. Spawning one `git cat-file`
+  // per chunk made this byte-exact contract exceed Vitest's five-second limit
+  // only under full-suite process contention, even though the same assertion
+  // completed quickly in isolation.
+  return execFileSync('git', ['cat-file', '--batch'], {
     cwd: process.cwd(),
     encoding: 'utf8',
-    maxBuffer: 32 * 1024 * 1024,
-  })).join('\n');
+    input: `${paths.map((path) => `${pagesSha}:${path}`).join('\n')}\n`,
+    maxBuffer: 64 * 1024 * 1024,
+  });
 }
 
 describe('Pass 66 versus pinned Pass 67.1 multiplayer comparator contract', () => {

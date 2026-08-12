@@ -8,7 +8,12 @@ import { WEAPON_IDS, type WeaponId } from './protocol';
 
 type WeaponAsset = { scene: THREE.Group; clips: THREE.AnimationClip[] };
 type PresentationAssetId = WeaponId | 'field-knife';
-type ImportedWeaponRuntime = { mixer: THREE.AnimationMixer; actions: Map<string, THREE.AnimationAction>; weapon: PresentationAssetId };
+type ImportedWeaponRuntime = {
+  mixer: THREE.AnimationMixer;
+  actions: Map<string, THREE.AnimationAction>;
+  weapon: PresentationAssetId;
+  crossbowLoadedBolt: THREE.Object3D | null;
+};
 type CachedWeaponAsset = WeaponAsset & { key: string; variant: Pass65WeaponVariant; refs: number; lastUsed: number };
 
 export type Pass65CrossbowVariant = 'first-person' | 'world' | 'drop';
@@ -394,6 +399,335 @@ export async function prewarmPass65RuntimeWeaponCorpus(
   return operation;
 }
 
+export const PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT = 'semantic-first-person-optic-window-v1' as const;
+// Ten percent read too dark in the first-person overlay. Two percent retains a
+// faint authored glass highlight without blocking the hip or ADS sight picture;
+// housings and reticles remain fully opaque.
+export const PASS70_FIRST_PERSON_OPTIC_WINDOW_OPACITY = 0.02;
+export const PASS70_RAILGUN_HIP_OPTIC_CONTRACT = 'clear-glass-and-opaque-backer-component-v3' as const;
+export const PASS70_FLARE_GUN_FIRST_PERSON_WIDTH_CONTRACT = 'mesh-geometry-only-socket-invariant-width-v1' as const;
+export const PASS70_FLARE_GUN_FIRST_PERSON_WIDTH_MULTIPLIER = 3.5;
+export const PASS70_CROSSBOW_LOADED_BOLT_CLEARANCE_CONTRACT = 'semantic-loaded-bolt-local-y-zero-v1' as const;
+
+/** Restores the semantic loaded bolt after the shipped NLA bind pose leaked its empty-reload offset. */
+export function resetPass70CrossbowLoadedBoltRestPose(bolt: THREE.Object3D): void {
+  bolt.position.set(0, 0, 0);
+  bolt.userData.pass70ClearanceContract = PASS70_CROSSBOW_LOADED_BOLT_CLEARANCE_CONTRACT;
+}
+
+/** Keeps authored longitudinal fire/reload travel while preventing it from rising through the optic lenses. */
+export function clampPass70CrossbowLoadedBoltAnimation(bolt: THREE.Object3D): void {
+  bolt.position.y = 0;
+}
+
+export function isFirstPersonOpticWindowSurface(nodeName: string, materialName: string): boolean {
+  const materialSemantic = materialName.trim().toLowerCase();
+  if (/(?:^|[_\-\s])(?:optic)?lens$/u.test(materialSemantic)
+    || /(?:^|[_\-\s])(?:optic|scope|sight)(?:glass|window)$/u.test(materialSemantic)) return true;
+  if (materialSemantic !== '') return false;
+  const nodeSemantic = nodeName.trim().toLowerCase();
+  return /(?:^|[_\-\s])(?:optic)?lens(?:$|[_\-\s])/u.test(nodeSemantic)
+    || /(?:^|[_\-\s])(?:optic|scope|sight)(?:glass|window)(?:$|[_\-\s])/u.test(nodeSemantic);
+}
+
+function isFirstPersonPresentationDetailSurface(nodeName: string, materialName: string): boolean {
+  return /reticle/u.test(`${nodeName} ${materialName}`.toLowerCase());
+}
+
+export function applyPass70WeaponMaterialSemantics(
+  material: THREE.Material,
+  nodeName: string,
+  sourceMaterialName: string,
+  variant: Pass65WeaponVariant,
+): 'optic-window' | 'opaque-body' | 'presentation-detail' | 'non-first-person' {
+  material.name = sourceMaterialName;
+  if (variant !== 'first-person') {
+    material.transparent = false;
+    material.opacity = 1;
+    material.depthWrite = true;
+    return 'non-first-person';
+  }
+
+  const surface = isFirstPersonOpticWindowSurface(nodeName, sourceMaterialName)
+    ? 'optic-window'
+    : isFirstPersonPresentationDetailSurface(nodeName, sourceMaterialName)
+      ? 'presentation-detail'
+      : 'opaque-body';
+  const opticWindow = surface === 'optic-window';
+  material.transparent = opticWindow;
+  material.opacity = opticWindow ? PASS70_FIRST_PERSON_OPTIC_WINDOW_OPACITY : 1;
+  material.depthTest = true;
+  material.depthWrite = !opticWindow;
+  material.alphaTest = opticWindow ? 0 : material.alphaTest;
+  material.userData.pass70FirstPersonMaterialContract = PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT;
+  material.userData.pass70FirstPersonSurface = surface;
+  if (opticWindow && material instanceof THREE.MeshStandardMaterial) {
+    material.metalness = 0.04;
+    material.roughness = 0.12;
+  }
+  return surface;
+}
+
+export type Pass70FirstPersonMaterialState = Readonly<{
+  contract: typeof PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT;
+  materialCount: number;
+  markedMaterialCount: number;
+  opticWindowCount: number;
+  opaqueBodyCount: number;
+  presentationDetailCount: number;
+  invalidOpticWindowCount: number;
+  invalidOpaqueBodyCount: number;
+  opticWindows: readonly Readonly<{
+    mesh: string;
+    material: string;
+    opacity: number;
+    transparent: boolean;
+    depthWrite: boolean;
+  }>[];
+}>;
+
+export function capturePass70FirstPersonMaterialState(root: THREE.Object3D): Pass70FirstPersonMaterialState {
+  const seen = new Set<THREE.Material>();
+  const opticWindows: Array<{
+    mesh: string;
+    material: string;
+    opacity: number;
+    transparent: boolean;
+    depthWrite: boolean;
+  }> = [];
+  let materialCount = 0;
+  let markedMaterialCount = 0;
+  let opticWindowCount = 0;
+  let opaqueBodyCount = 0;
+  let presentationDetailCount = 0;
+  let invalidOpticWindowCount = 0;
+  let invalidOpaqueBodyCount = 0;
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    let ancestor: THREE.Object3D | null = node;
+    while (ancestor && ancestor !== root.parent) {
+      if (!ancestor.visible) return;
+      ancestor = ancestor.parent;
+    }
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const material of materials) {
+      if (seen.has(material)) continue;
+      seen.add(material);
+      materialCount += 1;
+      const marked = material.userData.pass70FirstPersonMaterialContract === PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT;
+      if (marked) markedMaterialCount += 1;
+      if (marked && material.userData.pass70FirstPersonSurface === 'optic-window') {
+        opticWindowCount += 1;
+        opticWindows.push({
+          mesh: node.name,
+          material: material.name,
+          opacity: material.opacity,
+          transparent: material.transparent,
+          depthWrite: material.depthWrite,
+        });
+        if (!material.transparent
+          || material.opacity !== PASS70_FIRST_PERSON_OPTIC_WINDOW_OPACITY
+          || material.depthWrite) invalidOpticWindowCount += 1;
+      } else if (marked && material.userData.pass70FirstPersonSurface === 'presentation-detail') {
+        presentationDetailCount += 1;
+      } else {
+        opaqueBodyCount += 1;
+        if (material.transparent || material.opacity !== 1 || !material.depthWrite) invalidOpaqueBodyCount += 1;
+      }
+    }
+  });
+  return Object.freeze({
+    contract: PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT,
+    materialCount,
+    markedMaterialCount,
+    opticWindowCount,
+    opaqueBodyCount,
+    presentationDetailCount,
+    invalidOpticWindowCount,
+    invalidOpaqueBodyCount,
+    opticWindows: Object.freeze(opticWindows.map((entry) => Object.freeze(entry))),
+  });
+}
+
+type Pass70RailgunHipOpticApertureState = Readonly<{
+  applied: boolean;
+  contract: 'semantic-lens-grid-spatial-degenerate-v1';
+  rayCount: number;
+  submittedElements: number;
+  suppressedElements: number;
+  suppressionRatio: number;
+  lensDimensionsMeters: readonly [number, number, number];
+  batches: readonly Readonly<{
+    mesh: string;
+    submittedElements: number;
+    seedElements: number;
+    suppressedElements: number;
+  }>[];
+}>;
+
+/**
+ * Opens the cloned opaque material immediately behind the Railgun's semantic
+ * lens. The delivery uses a thin Lens mesh in front of a closed housing, so
+ * changing only lens alpha still presents a solid silver block. A bounded
+ * grid through the lens's own local X/Y frame degenerates intersected cloned
+ * indices without moving sockets or changing the accepted fullscreen ADS.
+ */
+export function carvePass70RailgunHipOpticBacker(
+  model: THREE.Object3D,
+  lens: THREE.Mesh,
+): Pass70RailgunHipOpticApertureState {
+  const geometry = lens.geometry;
+  geometry.computeBoundingBox();
+  const lensBounds = geometry.boundingBox;
+  if (!lensBounds) {
+    return Object.freeze({
+      applied: false,
+      contract: 'semantic-lens-grid-spatial-degenerate-v1',
+      rayCount: 0,
+      submittedElements: 0,
+      suppressedElements: 0,
+      suppressionRatio: 0,
+      lensDimensionsMeters: Object.freeze([0, 0, 0]) as readonly [number, number, number],
+      batches: Object.freeze([]),
+    });
+  }
+
+  model.updateMatrixWorld(true);
+  const lensCentre = lens.localToWorld(lensBounds.getCenter(new THREE.Vector3()));
+  const lensLocalSize = lensBounds.getSize(new THREE.Vector3());
+  const lensWorldScale = lens.getWorldScale(new THREE.Vector3());
+  const lensDimensions = new THREE.Vector3(
+    Math.abs(lensLocalSize.x * lensWorldScale.x),
+    Math.abs(lensLocalSize.y * lensWorldScale.y),
+    Math.abs(lensLocalSize.z * lensWorldScale.z),
+  );
+  const lensRotation = lens.getWorldQuaternion(new THREE.Quaternion());
+  const lateral = new THREE.Vector3(1, 0, 0).applyQuaternion(lensRotation).normalize();
+  const vertical = new THREE.Vector3(0, 1, 0).applyQuaternion(lensRotation).normalize();
+  const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(lensRotation).normalize();
+  const halfApertureWidth = lensDimensions.x * 0.32;
+  const halfApertureHeight = lensDimensions.y * 0.32;
+  const corridorHalfDepth = Math.max(0.16, lensDimensions.z * 8);
+  const rayOffsets = Object.freeze([
+    [-0.85, -0.85], [-0.425, -0.85], [0, -0.85], [0.425, -0.85], [0.85, -0.85],
+    [-0.85, 0], [-0.425, 0], [0, 0], [0.425, 0], [0.85, 0],
+    [-0.85, 0.85], [-0.425, 0.85], [0, 0.85], [0.425, 0.85], [0.85, 0.85],
+  ] as const);
+  const rays = rayOffsets.map(([x, y]) => new THREE.Ray(
+    lensCentre.clone()
+      .addScaledVector(normal, -corridorHalfDepth)
+      .addScaledVector(lateral, x * halfApertureWidth)
+      .addScaledVector(vertical, y * halfApertureHeight),
+    normal,
+  ));
+  const maximumDistance = corridorHalfDepth * 2;
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const hit = new THREE.Vector3();
+  const batches: Array<Readonly<{
+    mesh: string;
+    submittedElements: number;
+    seedElements: number;
+    suppressedElements: number;
+  }>> = [];
+  let submittedElements = 0;
+  let suppressedElements = 0;
+
+  model.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)
+      || node === lens
+      || !node.name.includes('Runtime_static')) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    if (!materials.some((material) => (
+      material.userData.pass70FirstPersonSurface === 'opaque-body'
+      && material.transparent === false
+      && material.opacity === 1
+    ))) return;
+    const position = node.geometry.getAttribute('position');
+    const index = node.geometry.index;
+    const elementCount = index?.count ?? 0;
+    if (!position || position.itemSize < 3 || !index || elementCount < 3 || elementCount % 3 !== 0) return;
+    submittedElements += elementCount;
+    const triangles: Array<readonly [number, number, number]> = [];
+    const trianglesByVertex = new Map<number, number[]>();
+    const seedTriangles: number[] = [];
+    for (let element = 0; element < elementCount; element += 3) {
+      const ia = index.getX(element);
+      const ib = index.getX(element + 1);
+      const ic = index.getX(element + 2);
+      const triangle = element / 3;
+      triangles.push(Object.freeze([ia, ib, ic]));
+      for (const vertex of new Set([ia, ib, ic])) {
+        const adjacent = trianglesByVertex.get(vertex) ?? [];
+        adjacent.push(triangle);
+        trianglesByVertex.set(vertex, adjacent);
+      }
+      if (ia === ib && ib === ic) continue;
+      a.fromBufferAttribute(position, ia).applyMatrix4(node.matrixWorld);
+      b.fromBufferAttribute(position, ib).applyMatrix4(node.matrixWorld);
+      c.fromBufferAttribute(position, ic).applyMatrix4(node.matrixWorld);
+      const blocksLens = rays.some((ray) => {
+        const intersection = ray.intersectTriangle(a, b, c, false, hit);
+        return intersection !== null && ray.origin.distanceTo(intersection) <= maximumDistance;
+      });
+      if (!blocksLens) continue;
+      seedTriangles.push(triangle);
+    }
+    if (seedTriangles.length === 0) return;
+
+    // The opaque optic is a closed, disconnected cuboid in the merged Primary
+    // material batch. Removing only its front triangles exposes its inner/back
+    // faces and remains visually opaque. Expand each lens-hit seed through
+    // shared topology so the isolated solid optic component is removed as a
+    // whole, while disconnected receiver/rail components remain untouched.
+    const connectedTriangles = new Set<number>();
+    const pending = [...seedTriangles];
+    while (pending.length > 0) {
+      const triangle = pending.pop()!;
+      if (connectedTriangles.has(triangle)) continue;
+      connectedTriangles.add(triangle);
+      for (const vertex of triangles[triangle] ?? []) {
+        for (const adjacent of trianglesByVertex.get(vertex) ?? []) {
+          if (!connectedTriangles.has(adjacent)) pending.push(adjacent);
+        }
+      }
+    }
+    for (const triangle of connectedTriangles) {
+      const element = triangle * 3;
+      const anchor = index.getX(element);
+      index.setX(element + 1, anchor);
+      index.setX(element + 2, anchor);
+    }
+    const batchSuppressed = connectedTriangles.size * 3;
+    index.needsUpdate = true;
+    node.userData.pass70RailgunHipOpticBacker = Object.freeze({
+      contract: 'semantic-lens-grid-spatial-degenerate-v1',
+      submittedElements: elementCount,
+      seedElements: seedTriangles.length * 3,
+      suppressedElements: batchSuppressed,
+    });
+    batches.push(Object.freeze({
+      mesh: node.name,
+      submittedElements: elementCount,
+      seedElements: seedTriangles.length * 3,
+      suppressedElements: batchSuppressed,
+    }));
+    suppressedElements += batchSuppressed;
+  });
+
+  return Object.freeze({
+    applied: suppressedElements > 0,
+    contract: 'semantic-lens-grid-spatial-degenerate-v1',
+    rayCount: rays.length,
+    submittedElements,
+    suppressedElements,
+    suppressionRatio: submittedElements > 0 ? suppressedElements / submittedElements : 0,
+    lensDimensionsMeters: Object.freeze(lensDimensions.toArray()) as readonly [number, number, number],
+    batches: Object.freeze(batches),
+  });
+}
+
 function flattenMaterial(material: THREE.Material): THREE.Material {
   const source = material as THREE.MeshStandardMaterial;
   // Reduced-render mode must not read as a missing asset: preserve the full
@@ -401,7 +735,7 @@ function flattenMaterial(material: THREE.Material): THREE.Material {
   // maps). The performance win in this mode comes from batched draw calls and
   // disabled shadow casting, not from degrading the most-seen surface in the
   // game to a flat unlit colour.
-  return new THREE.MeshStandardMaterial({
+  const flattened = new THREE.MeshStandardMaterial({
     color: source.color?.clone() ?? new THREE.Color(0x303944),
     map: source.map ?? null,
     normalMap: source.normalMap ?? null,
@@ -418,6 +752,8 @@ function flattenMaterial(material: THREE.Material): THREE.Material {
     side: source.side,
     depthWrite: true,
   });
+  flattened.name = source.name;
+  return flattened;
 }
 
 function instantiateWeaponAsset(
@@ -432,22 +768,102 @@ function instantiateWeaponAsset(
   root.name = `${id}-pass65-${variant}-model`;
   const visual = cloneSkeleton(asset.scene) as THREE.Group;
   visual.name = `${id}-pass65-${variant}-visual`;
+  const railgunClearLensMeshes: string[] = [];
+  const railgunClearLensNodes: THREE.Mesh[] = [];
   visual.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
     node.castShadow = !flattenMaterials;
     node.receiveShadow = !flattenMaterials;
+    let containsOpticWindow = false;
     const prepare = (material: THREE.Material) => {
       const result = flattenMaterials ? flattenMaterial(material) : material.clone();
-      result.transparent = false;
-      result.opacity = 1;
-      result.depthWrite = true;
+      if (applyPass70WeaponMaterialSemantics(result, node.name, material.name, variant) === 'optic-window') {
+        containsOpticWindow = true;
+      }
       return result;
     };
     node.material = Array.isArray(node.material) ? node.material.map(prepare) : prepare(node.material);
+    if (containsOpticWindow) {
+      // Reduced mode batches static bodies, but a semantic lens must retain its
+      // own clear material and cannot be replaced by an unmarked opaque batch.
+      node.userData.dynamic = true;
+      node.userData.pass70FirstPersonOpticWindow = true;
+      node.castShadow = false;
+      node.receiveShadow = false;
+      if (id === 'railgun' && variant === 'first-person') {
+        // Keep the semantic lens as faint clear glass. The visually opaque slab
+        // comes from a separate closed Primary-material component behind it;
+        // that component is removed from cloned presentation geometry below.
+        railgunClearLensMeshes.push(node.name);
+        railgunClearLensNodes.push(node);
+      }
+    }
     node.userData.presentationOnly = true;
   });
   cloneMeshGeometriesForOwner(visual, `pass65-${id}-${variant}`);
+  const railgunHipOpticAperture = id === 'railgun' && variant === 'first-person' && railgunClearLensNodes.length === 1
+    ? carvePass70RailgunHipOpticBacker(visual, railgunClearLensNodes[0]!)
+    : null;
+  if (id === 'railgun' && variant === 'first-person' && !railgunHipOpticAperture?.applied) {
+    throw new Error('Railgun first-person semantic lens did not intersect its cloned opaque backer');
+  }
+  if (id === 'flare-gun' && variant === 'first-person') {
+    const socketNames = ['grip-socket-r', 'support-socket-l', 'reload-socket-l', 'muzzle-socket'] as const;
+    visual.updateWorldMatrix(true, true);
+    const socketsBefore = new Map(socketNames.map((name) => [
+      name,
+      visual.getObjectByName(name)?.getWorldPosition(new THREE.Vector3()) ?? null,
+    ]));
+    const boundsBefore = new THREE.Box3().setFromObject(visual);
+    let widenedMeshCount = 0;
+    visual.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      // Geometry-only widening is presentation-safe: it cannot move the GLB's
+      // grip, reload, support or muzzle nodes and therefore cannot leak into
+      // shot origin, pickup authority or animation/socket ownership.
+      node.geometry.scale(PASS70_FLARE_GUN_FIRST_PERSON_WIDTH_MULTIPLIER, 1, 1);
+      node.geometry.computeBoundingBox();
+      node.geometry.computeBoundingSphere();
+      node.userData.pass70FirstPersonWidthContract = PASS70_FLARE_GUN_FIRST_PERSON_WIDTH_CONTRACT;
+      widenedMeshCount += 1;
+    });
+    visual.updateWorldMatrix(true, true);
+    let maximumSocketDriftMeters = 0;
+    for (const name of socketNames) {
+      const before = socketsBefore.get(name);
+      const socket = visual.getObjectByName(name);
+      if (!before || !socket) continue;
+      maximumSocketDriftMeters = Math.max(
+        maximumSocketDriftMeters,
+        before.distanceTo(socket.getWorldPosition(new THREE.Vector3())),
+      );
+    }
+    if (maximumSocketDriftMeters > 1e-9) {
+      throw new Error(`Flare Gun first-person visual widening moved an authored socket by ${maximumSocketDriftMeters}m`);
+    }
+    const boundsAfter = new THREE.Box3().setFromObject(visual);
+    const sourceWidth = boundsBefore.max.x - boundsBefore.min.x;
+    const widenedWidth = boundsAfter.max.x - boundsAfter.min.x;
+    visual.userData.pass70FirstPersonWidth = Object.freeze({
+      contract: PASS70_FLARE_GUN_FIRST_PERSON_WIDTH_CONTRACT,
+      multiplier: PASS70_FLARE_GUN_FIRST_PERSON_WIDTH_MULTIPLIER,
+      widenedMeshCount,
+      sourceWidth,
+      widenedWidth,
+      measuredMultiplier: sourceWidth > 1e-9 ? widenedWidth / sourceWidth : null,
+      maximumSocketDriftMeters,
+    });
+  }
   root.add(visual);
+  const crossbowLoadedBolt = id === 'explosive-crossbow'
+    ? visual.getObjectByName('crossbow-loaded-bolt') ?? null
+    : null;
+  if (id === 'explosive-crossbow') {
+    if (!crossbowLoadedBolt || crossbowLoadedBolt.userData.atomic_socket !== 'bolt') {
+      throw new Error('Pass 70 crossbow loaded-bolt semantic node is missing');
+    }
+    resetPass70CrossbowLoadedBoltRestPose(crossbowLoadedBolt);
+  }
   const identityNodes: THREE.Object3D[] = [];
   visual.traverse((node) => {
     if (node.userData.asset_id === `pass65-weapon-${id}`) identityNodes.push(node);
@@ -455,7 +871,9 @@ function instantiateWeaponAsset(
   const identity = identityNodes[0]?.userData;
   const mixer = new THREE.AnimationMixer(visual);
   const actions = new Map(asset.clips.map((clip) => [clip.name, mixer.clipAction(clip)]));
-  root.userData.importedWeaponRuntime = { mixer, actions, weapon: id } satisfies ImportedWeaponRuntime;
+  root.userData.importedWeaponRuntime = {
+    mixer, actions, weapon: id, crossbowLoadedBolt,
+  } satisfies ImportedWeaponRuntime;
   root.userData.importedWeaponSource = source;
   root.userData.firstPersonSource = variant === 'first-person' ? 'project-original-blender-pass65-firearm' : undefined;
   root.userData.projectOriginalWeapon = true;
@@ -467,6 +885,17 @@ function instantiateWeaponAsset(
   root.userData.silhouetteFamily = identity?.silhouette_family ?? null;
   root.userData.pass65ManagedCacheKey = managed?.key;
   root.userData.pass65ManagedCacheReleased = false;
+  root.userData.pass70FirstPersonWidth = visual.userData.pass70FirstPersonWidth ?? null;
+  root.userData.pass70RailgunHipOptic = id === 'railgun' && variant === 'first-person'
+    ? Object.freeze({
+        contract: PASS70_RAILGUN_HIP_OPTIC_CONTRACT,
+        clearGlassLensMeshCount: railgunClearLensMeshes.length,
+        clearGlassLensMeshes: Object.freeze([...railgunClearLensMeshes]),
+        opticWindowOpacity: PASS70_FIRST_PERSON_OPTIC_WINDOW_OPACITY,
+        opaqueBackerAperture: railgunHipOpticAperture,
+        adsAuthority: 'railgun-fullscreen-scope-unchanged',
+      })
+    : null;
   if (managed) {
     managed.refs += 1;
     managed.lastUsed = ++useCounter;
@@ -709,7 +1138,10 @@ function playMatching(root: THREE.Object3D, fragment: string): void {
 }
 
 export function updateImportedWeapon(root: THREE.Object3D, dt: number): void {
-  runtime(root)?.mixer.update(Math.min(0.05, Math.max(0, dt)));
+  const state = runtime(root);
+  if (!state) return;
+  state.mixer.update(Math.min(0.05, Math.max(0, dt)));
+  if (state.crossbowLoadedBolt) clampPass70CrossbowLoadedBoltAnimation(state.crossbowLoadedBolt);
 }
 
 /** Clears retained firearm/knife actions without advancing presentation time. */
@@ -744,6 +1176,8 @@ export function importedWeaponTelemetry(root: THREE.Object3D | undefined): {
   socketContractReady: boolean;
   muzzleForwardDot: number | null;
   sightForwardDot: number | null;
+  firstPersonWidth: Readonly<Record<string, unknown>> | null;
+  firstPersonOptic: Readonly<Record<string, unknown>> | null;
 } | null {
   if (!root) return null;
   const state = runtime(root);
@@ -787,5 +1221,7 @@ export function importedWeaponTelemetry(root: THREE.Object3D | undefined): {
     socketContractReady,
     muzzleForwardDot: localDirection('grip-socket-r', 'muzzle-socket'),
     sightForwardDot: localDirection('rear-sight-socket', 'front-sight-socket'),
+    firstPersonWidth: (root.userData.pass70FirstPersonWidth as Readonly<Record<string, unknown>> | null) ?? null,
+    firstPersonOptic: (root.userData.pass70RailgunHipOptic as Readonly<Record<string, unknown>> | null) ?? null,
   };
 }

@@ -1,7 +1,12 @@
 import * as THREE from 'three';
 import type { Team } from './protocol';
+import { CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS } from './killstreak-runtime';
 import { FLAMETHROWER_EFFECT } from './special-weapon-effects';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
+import {
+  FLAME_DAMAGE_PULSE_INTERVAL_MS,
+  flameDamagePerPulse,
+} from './flame-damage-contract';
 
 // Hardware keeps the accepted four-particle silhouette. Proven software
 // adapters use two broader retained particles: this halves their additive
@@ -10,10 +15,13 @@ import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 const HARDWARE_PARTICLES_PER_EMISSION = 4;
 const SOFTWARE_PARTICLES_PER_EMISSION = 2;
 const MIN_STREAM_DISTANCE_M = 0.35;
-export const FLAMETHROWER_GROUND_FIRE_DURATION_MS = 5_000;
+export const FLAMETHROWER_GROUND_FIRE_DURATION_MS = CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS;
+export const FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS = FLAME_DAMAGE_PULSE_INTERVAL_MS;
+export const FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE = flameDamagePerPulse('flamethrower-ground-fire');
 const GROUND_FIRE_POOL_CAPACITY = 24;
 
 export const FLAMETHROWER_GROUND_FIRE_MERGE_RADIUS_M = 0.8;
+export const FLAMETHROWER_GROUND_FIRE_PRESENTATION_RADIUS_M = 0.82;
 
 /**
  * A software adapter already draws the retained, spatially merged ground-fire
@@ -31,12 +39,24 @@ type MutableGroundFire = {
   ownerTeam: Team;
   point: THREE.Vector3;
   actionNonce: number;
+  damageSource: 'flamethrower' | 'carpet-bomber';
+  activationId: string | null;
+  impactOrdinal: number;
+  pulseIndex: number;
+  pulseAtMs: number;
   sequence: number;
   expiresAt: number;
   nextPulseAt: number;
 };
 
 export type FlamethrowerGroundFire = Readonly<MutableGroundFire>;
+
+export type CarpetGroundFirePresentationSnapshot = Readonly<{
+  activationId: string;
+  impactOrdinal: number;
+  position: readonly [number, number, number];
+  expiresAtHostTimeMs: number;
+}>;
 
 /**
  * Fixed-capacity authority pool for napalm patches. Every admitted ignition
@@ -45,7 +65,7 @@ export type FlamethrowerGroundFire = Readonly<MutableGroundFire>;
  */
 export class FlamethrowerGroundFirePool {
   private readonly entries: MutableGroundFire[];
-  private readonly dueIndices: Uint8Array;
+  private readonly dueIndices: Uint32Array;
   private activeEntries = 0;
   private nextSequence = 0;
 
@@ -57,11 +77,16 @@ export class FlamethrowerGroundFirePool {
       ownerTeam: 0 as Team,
       point: new THREE.Vector3(),
       actionNonce: 0,
+      damageSource: 'flamethrower',
+      activationId: null,
+      impactOrdinal: -1,
+      pulseIndex: 0,
+      pulseAtMs: 0,
       sequence: 0,
       expiresAt: 0,
       nextPulseAt: 0,
     }));
-    this.dueIndices = new Uint8Array(boundedCapacity);
+    this.dueIndices = new Uint32Array(boundedCapacity);
   }
 
   ignite(input: Readonly<{
@@ -72,11 +97,23 @@ export class FlamethrowerGroundFirePool {
     now: number;
     durationMs: number;
     pulseIntervalMs: number;
-  }>): 'created' | 'exhausted' | 'invalid' {
+    damageSource?: 'flamethrower' | 'carpet-bomber';
+    activationId?: string;
+    impactOrdinal?: number;
+  }>): 'created' | 'duplicate' | 'exhausted' | 'invalid' {
+    const damageSource = input.damageSource ?? 'flamethrower';
     if (!input.ownerId || !Number.isSafeInteger(input.actionNonce)
       || !finiteVector3(input.point) || !Number.isFinite(input.now)
       || !Number.isFinite(input.durationMs) || input.durationMs <= 0
-      || !Number.isFinite(input.pulseIntervalMs) || input.pulseIntervalMs <= 0) return 'invalid';
+      || !Number.isFinite(input.pulseIntervalMs) || input.pulseIntervalMs <= 0
+      || damageSource === 'carpet-bomber' && (
+        typeof input.activationId !== 'string' || !/^[A-Za-z0-9_-]{8,80}$/.test(input.activationId)
+        || !Number.isSafeInteger(input.impactOrdinal) || input.impactOrdinal! < 0
+      )) return 'invalid';
+    if (damageSource === 'carpet-bomber' && this.entries.some((candidate) => candidate.active
+      && candidate.damageSource === 'carpet-bomber'
+      && candidate.activationId === input.activationId
+      && candidate.impactOrdinal === input.impactOrdinal)) return 'duplicate';
     let entry: MutableGroundFire | null = null;
     for (const candidate of this.entries) {
       if (candidate.active) continue;
@@ -89,9 +126,17 @@ export class FlamethrowerGroundFirePool {
     entry.ownerTeam = input.ownerTeam;
     entry.point.copy(input.point);
     entry.actionNonce = input.actionNonce;
+    entry.damageSource = damageSource;
+    entry.activationId = damageSource === 'carpet-bomber' ? input.activationId! : null;
+    entry.impactOrdinal = damageSource === 'carpet-bomber' ? input.impactOrdinal! : -1;
+    entry.pulseIndex = 0;
+    entry.pulseAtMs = input.now;
     entry.sequence = ++this.nextSequence;
     entry.expiresAt = input.now + input.durationMs;
-    entry.nextPulseAt = input.now + input.pulseIntervalMs;
+    // Apply the first half-second quantum as soon as the actor enters the
+    // patch, then nine more before the five-second expiry. Frame stalls never
+    // replay historical occupancy.
+    entry.nextPulseAt = input.now;
     this.activeEntries += 1;
     return 'created';
   }
@@ -119,7 +164,9 @@ export class FlamethrowerGroundFirePool {
     for (let index = 0; index < dueCount; index += 1) {
       const entry = this.entries[this.dueIndices[index]!]!;
       entry.nextPulseAt = now + pulseIntervalMs;
+      entry.pulseAtMs = now;
       onPulse(entry);
+      entry.pulseIndex += 1;
     }
   }
 
@@ -136,12 +183,31 @@ export class FlamethrowerGroundFirePool {
     return this.entries.length;
   }
 
+  carpetPresentationSnapshots(nowHostTimeMs: number): readonly CarpetGroundFirePresentationSnapshot[] {
+    if (!Number.isFinite(nowHostTimeMs)) return Object.freeze([]);
+    return Object.freeze(this.entries
+      .filter((entry) => entry.active && entry.damageSource === 'carpet-bomber'
+        && entry.activationId !== null && entry.expiresAt > nowHostTimeMs)
+      .sort((left, right) => left.sequence - right.sequence)
+      .map((entry) => Object.freeze({
+        activationId: entry.activationId!,
+        impactOrdinal: entry.impactOrdinal,
+        position: Object.freeze([entry.point.x, entry.point.y, entry.point.z] as const),
+        expiresAtHostTimeMs: entry.expiresAt,
+      })));
+  }
+
   private release(entry: MutableGroundFire): void {
     if (!entry.active) return;
     entry.active = false;
     entry.ownerId = '';
     entry.ownerTeam = 0;
     entry.actionNonce = 0;
+    entry.damageSource = 'flamethrower';
+    entry.activationId = null;
+    entry.impactOrdinal = -1;
+    entry.pulseIndex = 0;
+    entry.pulseAtMs = 0;
     entry.sequence = 0;
     entry.expiresAt = 0;
     entry.nextPulseAt = 0;
@@ -248,7 +314,7 @@ export class FlamethrowerStreamSystem {
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.userData.presentationOnly = true;
     this.groundMesh = new THREE.InstancedMesh(
-      new THREE.CircleGeometry(0.82, 14),
+      new THREE.CircleGeometry(FLAMETHROWER_GROUND_FIRE_PRESENTATION_RADIUS_M, 14),
       new THREE.MeshBasicMaterial({
         color: 0xff5a1f,
         transparent: true,
@@ -331,8 +397,14 @@ export class FlamethrowerStreamSystem {
   }
 
   /** Retained bounded scorch-flame pool used by the authoritative ground-fire lane. */
-  igniteGround(point: THREE.Vector3, now: number): boolean {
-    if (!Number.isFinite(now) || !finiteVector3(point)) return false;
+  igniteGround(
+    point: THREE.Vector3,
+    now: number,
+    lifetimeMs = FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+  ): boolean {
+    if (!Number.isFinite(now) || !finiteVector3(point)
+      || !Number.isFinite(lifetimeMs) || lifetimeMs <= 0
+      || lifetimeMs > FLAMETHROWER_GROUND_FIRE_DURATION_MS) return false;
     let slot = -1;
     for (let index = 0; index < this.groundActive.length; index += 1) {
       if (this.groundActive[index] === 0) continue;
@@ -363,7 +435,7 @@ export class FlamethrowerStreamSystem {
     this.groundPositions[offset] = point.x;
     this.groundPositions[offset + 1] = point.y + 0.035;
     this.groundPositions[offset + 2] = point.z;
-    this.groundExpiresAt[slot] = now + FLAMETHROWER_GROUND_FIRE_DURATION_MS;
+    this.groundExpiresAt[slot] = now + lifetimeMs;
     this.writeGroundMatrix(slot, now);
     this.groundMesh.instanceMatrix.needsUpdate = true;
     return true;

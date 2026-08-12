@@ -1,7 +1,8 @@
 import * as THREE from 'three';
+import { BOT_EMISSIVE_BRIGHTNESS_SCALE } from './operator-model';
 
 export const REMOTE_HUMAN_READABILITY_COLOR = 0xff8c3a;
-export const REMOTE_HUMAN_READABILITY_INTENSITY = 0.06;
+export const REMOTE_HUMAN_READABILITY_INTENSITY = BOT_EMISSIVE_BRIGHTNESS_SCALE / 2;
 export const REMOTE_HUMAN_READABILITY_MIX = 0.18;
 
 type EmissiveMaterial = THREE.MeshStandardMaterial | THREE.MeshLambertMaterial | THREE.MeshPhongMaterial;
@@ -39,7 +40,7 @@ export function applyRemoteHumanReadabilityHighlight(root: THREE.Object3D): numb
 
     const clone = material.clone() as EmissiveMaterial;
     clone.emissive.lerp(orange, REMOTE_HUMAN_READABILITY_MIX);
-    clone.emissiveIntensity = Math.max(clone.emissiveIntensity, REMOTE_HUMAN_READABILITY_INTENSITY);
+    clone.emissiveIntensity = REMOTE_HUMAN_READABILITY_INTENSITY;
     clone.userData.remoteHumanReadability = true;
     clones.set(material, clone);
     adjusted += 1;

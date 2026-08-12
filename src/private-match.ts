@@ -2,6 +2,12 @@ import type { Team } from './protocol';
 import type { ArenaId } from './map-selection';
 import { isHostedBotCount, type HostedBotCount } from './hosted-bots';
 import { isDhv, type Dhv } from './handicap';
+import {
+  isGunRangeMatchClockSnapshot,
+  type GunRangeMatchClockSnapshot,
+} from './gun-range-match-clock-authority';
+import { GUN_RANGE_ROUND_MS } from './gun-range-rules';
+import type { GunRangeTestBayDoorState } from './gun-range-test-bay';
 
 export const ROOM_CAPACITIES = [4, 6] as const;
 export type RoomCapacity = typeof ROOM_CAPACITIES[number];
@@ -49,6 +55,8 @@ export type LobbySnapshot = Readonly<{
   snapshotHostTimeMs: number;
   activeAtHostTimeMs: number | null;
   activeAtEpochMs: number | null;
+  matchClock: GunRangeMatchClockSnapshot | null;
+  testBayDoor: GunRangeTestBayDoorState | null;
 }>;
 
 export const DEFAULT_PRIVATE_MATCH_CONFIG: PrivateMatchConfig = Object.freeze({
@@ -95,7 +103,11 @@ export function isPrivateMatchConfig(value: unknown): value is PrivateMatchConfi
     && Number.isSafeInteger(config.durationMs)
     && Number(config.durationMs) >= 60_000
     && Number(config.durationMs) <= MAX_PRIVATE_MATCH_DURATION_MS
-    && (config.arenaId !== 'gun-range' || config.mode === 'ffa' && config.hostedBotCount === 0 && config.autoBalance === false);
+    && (config.arenaId !== 'gun-range'
+      || config.mode === 'ffa'
+        && config.hostedBotCount === 0
+        && config.autoBalance === false
+        && config.durationMs === GUN_RANGE_ROUND_MS);
 }
 
 export function isLobbyMember(value: unknown): value is LobbyMember {
@@ -121,6 +133,21 @@ export function isPlayerScore(value: unknown): value is PlayerScore {
     && (score.rangeScore === undefined || Number.isSafeInteger(score.rangeScore) && Number(score.rangeScore) >= 0 && Number(score.rangeScore) <= 10_000_000)
     && (score.rangeHits === undefined || Number.isSafeInteger(score.rangeHits) && Number(score.rangeHits) >= 0 && Number(score.rangeHits) <= 100_000)
     && (score.rangeShots === undefined || Number.isSafeInteger(score.rangeShots) && Number(score.rangeShots) >= 0 && Number(score.rangeShots) <= 100_000);
+}
+
+function isLobbyTestBayDoorState(value: unknown): value is GunRangeTestBayDoorState {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const state = value as Record<string, unknown>;
+  const keys = ['phase', 'openness', 'updatedAtMs', 'thumpSequence'];
+  return Object.keys(state).length === keys.length
+    && keys.every((key) => Object.hasOwn(state, key))
+    && (state.phase === 'closed' || state.phase === 'opening' || state.phase === 'open' || state.phase === 'closing')
+    && Number.isFinite(state.openness) && Number(state.openness) >= 0 && Number(state.openness) <= 1
+    && Number.isFinite(state.updatedAtMs) && Number(state.updatedAtMs) >= 0
+    && Number.isSafeInteger(state.thumpSequence) && Number(state.thumpSequence) >= 0
+    && Number(state.thumpSequence) <= 1_000_000_000
+    && (state.phase !== 'closed' || state.openness === 0)
+    && (state.phase !== 'open' || state.openness === 1);
 }
 
 export function emptyPlayerScore(id: string): PlayerScore {
@@ -162,7 +189,19 @@ export function isLobbySnapshot(value: unknown): value is LobbySnapshot {
       && Number(snapshot.activeAtHostTimeMs) <= Number(snapshot.snapshotHostTimeMs) + MAX_HOST_START_FUTURE_LEAD_MS;
   const validEpochStart = snapshot.activeAtEpochMs === null
     || Number.isFinite(snapshot.activeAtEpochMs) && Number(snapshot.activeAtEpochMs) >= 0 && Number(snapshot.activeAtEpochMs) <= 10_000_000_000_000;
-  return validHostStart && validEpochStart && (snapshot.activeAtHostTimeMs === null) === (snapshot.activeAtEpochMs === null);
+  const activeGunRange = snapshot.config.arenaId === 'gun-range' && snapshot.phase === 'active';
+  const validMatchClock = activeGunRange
+    ? isGunRangeMatchClockSnapshot(snapshot.matchClock, snapshot.config.durationMs)
+      && snapshot.matchClock.sampledAtHostTimeMs <= Number(snapshot.snapshotHostTimeMs)
+    : snapshot.matchClock === null;
+  const validTestBayDoor = activeGunRange
+    ? isLobbyTestBayDoorState(snapshot.testBayDoor)
+      && snapshot.testBayDoor.updatedAtMs <= Number(snapshot.snapshotHostTimeMs)
+    : snapshot.testBayDoor === null;
+  return validHostStart && validEpochStart
+    && (snapshot.activeAtHostTimeMs === null) === (snapshot.activeAtEpochMs === null)
+    && validMatchClock
+    && validTestBayDoor;
 }
 
 export function balanceLobbyTeams(members: readonly LobbyMember[]): LobbyMember[] {

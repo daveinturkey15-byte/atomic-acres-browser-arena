@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 70",
+  "feedbackReceivedAt": "2026-08-12T09:02:38.967Z",
+  "status": "accepted",
+  "preview": {
+    "kind": "immutable-url",
+    "ref": "local-stage://pass70/73123c438e4919b24e2a9d63f71173fa5f89d34d",
+    "sourceSha": "73123c438e4919b24e2a9d63f71173fa5f89d34d",
+    "createdAt": "2026-08-12T09:02:38.967Z"
+  },
+  "humanAcceptance": {
+    "state": "approved",
+    "approvedBy": "Dave",
+    "approvedAt": "2026-08-12T09:02:38.967Z",
+    "evidence": "Dave explicitly instructed Codex to push this Pass 70 live additionally so he can test it in a browser, while retaining Pass 69 and Pass 63. This authorizes publication for testing; it does not claim Dave has completed remote browser testing of Pass 70."
+  },
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "Publish Pass 70 as an additional browser-testable release",
+      "expected": "The public chooser routes Pass 70 to channels/the-big-one and legacy latest, normal and room links continue to select Pass 70.",
+      "falsifier": "Pass 70 is absent, routes to another pass, or a legacy latest, normal or room link selects an older channel.",
+      "acceptance": "human",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "manual",
+          "ref": "owner-authorization://pass70/2026-08-12T09:02:38.967Z",
+          "note": "Dave explicitly authorized publication of Pass 70 so he can test it remotely in a browser."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "Retain exact Pass 69 and stable Pass 63 alongside Pass 70",
+      "expected": "The chooser exposes exactly Pass 70, byte-exact retained Pass 69, and stable Pass 63 WebGL; the internal Pass 67.1 subtree remains staged but is not selectable.",
+      "falsifier": "Either retained pass disappears, Pass 69 bytes differ from Pages commit 71ec5616504d8e24241450742d01b25c1d6ff4e4, Pass 63 loses its approved-source provenance, or Pass 67.1 appears as a chooser card.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/release-channel-chooser.spec.ts",
+          "command": "node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-release-topology-browser.mjs",
+          "note": "The served three-card chooser routed Pass 70, exact Pass 69 and Pass 63 to their distinct runtime trees with zero failures."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pass70/release-topology/73123c438e4919b24e2a9d63f71173fa5f89d34d/three-channel-chooser",
+          "note": "The production-style served chooser exposes the three requested public choices."
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "summary": "Ship the requested Pass 70 combat, presentation, audio, Gun Range and support corrections",
+      "expected": "The candidate includes the corrected viewmodel contact envelope and arms, exact through-wall operator reveal, doubled residual flame damage authority, removed low-health white-noise loop, preowned first-combat feedback, stable Gun Range door lights and 120-second reset, central sticky warning, and collision-safe Carpet route and payload authority.",
+      "falsifier": "Any correction is absent from the exact candidate, its focused adversarial test fails, or authority differs between offline, host, guest, self, friendly, enemy or bot topologies where the requirement applies.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/flame-damage-authority-main-integration.test.ts",
+          "command": "npx vitest run src/flame-damage-contract.test.ts src/flame-damage-authority-main-integration.test.ts src/audio-combat-prewarm.test.ts src/gun-range-match-clock-authority.test.ts src/gun-range-carpet-bomber-collision.test.ts src/sticky-victim-feedback.test.ts src/thermal-ghost-presentation.test.ts src/weapon-presentation-anatomy.test.ts",
+          "note": "Focused authority, audio transaction, clock, Carpet route, sticky HUD, exact reveal and weapon/anatomy contracts cover the requested corrections."
+        },
+        {
+          "kind": "contract",
+          "ref": "src/pass70-weapon-contact-scope-integration.test.ts",
+          "command": "npx vitest run src/pass70-weapon-contact-scope-integration.test.ts src/thermal-ghost-presentation.test.ts",
+          "note": "The retained contact and through-wall reveal source contracts reject the earlier clipping and proxy-model implementations."
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "summary": "Complete owner testing on the public Pass 70 URL",
+      "expected": "Dave can test the exact public Pass 70 build remotely and report any remaining visual, audio, collision or frame-pacing defect without losing Pass 69 or Pass 63 access.",
+      "falsifier": "The public Pass 70 route is unavailable, does not bind the released SHA, or retaining the older channels prevents realistic browser testing.",
+      "acceptance": "human",
+      "state": "deferred",
+      "deferApproval": {
+        "approvedBy": "Dave",
+        "approvedAt": "2026-08-12T09:02:38.967Z",
+        "reason": "Dave explicitly requested publication now because he cannot test at the compute remotely and needs the public browser URL to perform final hands-on testing."
+      }
+    }
+  ]
+}

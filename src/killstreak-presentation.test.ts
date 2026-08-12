@@ -4,14 +4,21 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   HUNTER_DRONE_ASSET,
   SUPPORT_VEHICLE_ASSETS,
+  SUPPORT_VEHICLE_LOD_DISTANCES,
+  SUPPORT_VEHICLE_PREWARM_DISTANCES,
   SUPPORT_VEHICLE_TEXTURE_MEMORY_EXPECTATION,
   KillstreakPresentation,
   SupportVehicleTextureCanonicalizer,
+  applyAuthoredChopperReadability,
+  authoredSupportStaticGeometryCanBatch,
   authoredSupportMaterialCastsShadow,
+  cloneAuthoredSupportStaticGeometryForTransform,
+  deriveSupportVehiclePrewarmDistances,
   hunterDronePresentationTelemetry,
   supportAircraftPresentationVariant,
   supportAircraftWingVisibility,
   supportVehiclePresentationTelemetry,
+  supportVehicleStableAirframeBounds,
 } from './killstreak-presentation';
 import type { KillstreakImpactEvent, KillstreakRecipientSnapshot } from './killstreak-runtime';
 import { DRONE_SWARM_GUN_PROFILE_ID, PILOTED_DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
@@ -30,7 +37,293 @@ describe('authored support shadow budget', () => {
   });
 });
 
+describe('authored support LOD prewarm bands', () => {
+  it('pins the current thresholds and derives one production-scale rehearsal inside every band', () => {
+    expect(SUPPORT_VEHICLE_LOD_DISTANCES).toEqual([0, 95, 190]);
+    expect(SUPPORT_VEHICLE_PREWARM_DISTANCES[0]).toBeCloseTo(8.4 * 1.2);
+    expect(SUPPORT_VEHICLE_PREWARM_DISTANCES[0]).toBeGreaterThan(SUPPORT_VEHICLE_LOD_DISTANCES[0]);
+    expect(SUPPORT_VEHICLE_PREWARM_DISTANCES[0]).toBeLessThan(SUPPORT_VEHICLE_LOD_DISTANCES[1]);
+    expect(SUPPORT_VEHICLE_PREWARM_DISTANCES[1]).toBeGreaterThan(SUPPORT_VEHICLE_LOD_DISTANCES[1]);
+    expect(SUPPORT_VEHICLE_PREWARM_DISTANCES[1]).toBeLessThan(SUPPORT_VEHICLE_LOD_DISTANCES[2]);
+    expect(SUPPORT_VEHICLE_PREWARM_DISTANCES[2]).toBeGreaterThan(SUPPORT_VEHICLE_LOD_DISTANCES[2]);
+  });
+
+  it('derives farther rehearsals from changed thresholds instead of retaining stale hard-coded distances', () => {
+    const changed = deriveSupportVehiclePrewarmDistances([0, 120, 300]);
+    expect(changed).toEqual([8.4 * 1.2, 210, 390]);
+    expect(changed).not.toEqual(SUPPORT_VEHICLE_PREWARM_DISTANCES);
+  });
+});
+
+describe('stable authored airframe review bounds', () => {
+  it('excludes transient weapon actions and first-person meshes from the fitted exterior bounds', () => {
+    const root = new THREE.Group();
+    const scene = new THREE.Scene();
+    const presentationParent = new THREE.Group();
+    scene.add(presentationParent);
+    presentationParent.add(root);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(8, 2, 3), new THREE.MeshBasicMaterial());
+    body.name = 'chopper-fuselage';
+    const tracer = new THREE.Group();
+    tracer.name = 'chopper-tracer-action';
+    const tracerMesh = new THREE.Mesh(new THREE.BoxGeometry(80, 0.05, 0.05), new THREE.MeshBasicMaterial());
+    tracerMesh.position.x = -40;
+    tracer.add(tracerMesh);
+    const cockpit = new THREE.Group();
+    cockpit.name = 'chopper-first-person-cockpit';
+    cockpit.userData.firstPersonOnly = true;
+    const cockpitMesh = new THREE.Mesh(new THREE.BoxGeometry(40, 1, 1), new THREE.MeshBasicMaterial());
+    cockpitMesh.position.x = 20;
+    cockpit.add(cockpitMesh);
+    root.add(body, tracer, cockpit);
+
+    const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.08, 180);
+    camera.position.set(0, 0, 12);
+    camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix();
+    camera.updateMatrixWorld(true);
+    const stable = supportVehicleStableAirframeBounds(root, camera, scene);
+    expect(stable.meshCount).toBe(1);
+    expect(stable.bounds).toEqual({ min: [-4, -1, -1.5], max: [4, 1, 1.5] });
+    expect(stable.drawableMeshCount).toBe(1);
+    expect(stable.drawableBounds).toEqual(stable.bounds);
+    expect(stable.drawRejections).toEqual({ hierarchy: 0, layer: 0, material: 0, frustum: 0 });
+
+    body.layers.set(3);
+    expect(supportVehicleStableAirframeBounds(root, camera, scene)).toMatchObject({
+      meshCount: 1,
+      drawableMeshCount: 0,
+      drawableBounds: null,
+      drawRejections: { hierarchy: 0, layer: 1, material: 0, frustum: 0 },
+    });
+    body.layers.set(0);
+    (body.material as THREE.Material).colorWrite = false;
+    expect(supportVehicleStableAirframeBounds(root, camera, scene)).toMatchObject({
+      drawableMeshCount: 0,
+      drawRejections: { hierarchy: 0, layer: 0, material: 1, frustum: 0 },
+    });
+    (body.material as THREE.Material).colorWrite = true;
+    presentationParent.visible = false;
+    expect(supportVehicleStableAirframeBounds(root, camera, scene)).toMatchObject({
+      drawableMeshCount: 0,
+      drawRejections: { hierarchy: 1, layer: 0, material: 0, frustum: 0 },
+    });
+    presentationParent.visible = true;
+    body.position.x = 1_000;
+    expect(supportVehicleStableAirframeBounds(root, camera, scene)).toMatchObject({
+      drawableMeshCount: 0,
+      drawRejections: { hierarchy: 0, layer: 0, material: 0, frustum: 1 },
+    });
+    body.position.x = 0;
+    const detachedScene = new THREE.Scene();
+    detachedScene.add(presentationParent);
+    expect(supportVehicleStableAirframeBounds(root, camera, scene)).toMatchObject({
+      meshCount: 1,
+      drawableMeshCount: 0,
+      drawableBounds: null,
+      drawRejections: { hierarchy: 1, layer: 0, material: 0, frustum: 0 },
+    });
+
+    body.geometry.dispose();
+    tracerMesh.geometry.dispose();
+    cockpitMesh.geometry.dispose();
+    (body.material as THREE.Material).dispose();
+    (tracerMesh.material as THREE.Material).dispose();
+    (cockpitMesh.material as THREE.Material).dispose();
+  });
+});
+
+describe('authored Chopper runtime readability', () => {
+  it('adds bounded physical self-fill and makes only the MFD backplates dark glass', () => {
+    const root = new THREE.Group();
+    const armorTexture = new THREE.Texture();
+    const armor = new THREE.MeshStandardMaterial({ color: 0x17211a, emissiveMap: armorTexture });
+    armor.name = 'MAT_Pass65Chopper_Armor_PBR';
+    const cyanDisplay = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff });
+    cyanDisplay.name = 'MAT_Pass65Chopper_CyanDisplay';
+    const unrelated = new THREE.MeshStandardMaterial({ color: 0x123456, opacity: 1 });
+    unrelated.name = 'MAT_Unrelated';
+    const rear = new THREE.Group();
+    rear.name = 'chopper-rear-fuselage';
+    const rearMesh = new THREE.Mesh(new THREE.BoxGeometry(), armor);
+    rear.add(rearMesh);
+    const tail = new THREE.Group();
+    tail.name = 'chopper-tail-boom';
+    const tailMesh = new THREE.Mesh(new THREE.BoxGeometry(), armor);
+    tail.add(tailMesh);
+    root.add(
+      new THREE.Mesh(new THREE.BoxGeometry(), armor),
+      new THREE.Mesh(new THREE.BoxGeometry(), cyanDisplay),
+      new THREE.Mesh(new THREE.BoxGeometry(), unrelated),
+      rear,
+      tail,
+    );
+
+    applyAuthoredChopperReadability(root);
+    const rearTailArmor = rearMesh.material as THREE.MeshStandardMaterial;
+    const firstVersions = [armor.version, cyanDisplay.version, unrelated.version];
+    const rearTailVersion = rearTailArmor.version;
+    applyAuthoredChopperReadability(root);
+
+    expect(armor.emissiveMap).toBeNull();
+    expect(armor.emissive.getHex()).toBe(0x4d8a68);
+    expect(armor.emissiveIntensity).toBe(0.7);
+    expect(armor.transparent).toBe(false);
+    expect(rearTailArmor).not.toBe(armor);
+    expect(tailMesh.material).toBe(rearTailArmor);
+    expect(rearMesh.material).toBe(rearTailArmor);
+    expect(rearTailArmor.version).toBe(rearTailVersion);
+    expect(rearTailArmor.name).toBe('MAT_Pass65Chopper_RearTailArmor_PBR');
+    expect(rearTailArmor.map).toBe(armor.map);
+    expect(rearTailArmor.normalMap).toBe(armor.normalMap);
+    expect(rearTailArmor.roughnessMap).toBe(armor.roughnessMap);
+    expect(rearTailArmor.emissiveMap).toBeNull();
+    expect(rearTailArmor.emissive.getHex()).toBe(0x6f916d);
+    expect(rearTailArmor.emissiveIntensity).toBe(0.95);
+    expect(rearTailArmor.roughness).toBeGreaterThanOrEqual(0.78);
+    expect(rearTailArmor.metalness).toBeLessThanOrEqual(0.28);
+    expect(cyanDisplay.color.getHex()).toBe(0x02090c);
+    expect(cyanDisplay.emissive.getHex()).toBe(0x00465d);
+    expect(cyanDisplay.emissiveIntensity).toBe(0.34);
+    expect(cyanDisplay.transparent).toBe(true);
+    expect(cyanDisplay.opacity).toBe(0.38);
+    expect(cyanDisplay.depthWrite).toBe(false);
+    expect(unrelated.color.getHex()).toBe(0x123456);
+    expect(unrelated.opacity).toBe(1);
+    expect([armor.version, cyanDisplay.version, unrelated.version]).toEqual(firstVersions);
+
+    root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      node.geometry.dispose();
+    });
+    armor.dispose();
+    cyanDisplay.dispose();
+    unrelated.dispose();
+    rearTailArmor.dispose();
+    armorTexture.dispose();
+  });
+});
+
 describe('authored support preparation scheduling', () => {
+  it('dequantizes every transform-bearing attribute before static-batch transforms without mutating the source', () => {
+    const quantized = new THREE.BufferGeometry();
+    const position = new THREE.Int16BufferAttribute(new Int16Array([
+      -32_767, -32_767, -32_767,
+      32_767, -32_767, -32_767,
+      0, 32_767, 32_767,
+    ]), 3, true);
+    const normal = new THREE.Int8BufferAttribute(new Int8Array([
+      0, 0, 127,
+      0, 0, 127,
+      0, 0, 127,
+    ]), 3, true);
+    const tangent = new THREE.Int8BufferAttribute(new Int8Array([
+      127, 0, 0, 127,
+      127, 0, 0, 127,
+      127, 0, 0, 127,
+    ]), 4, true);
+    const compactUv = new THREE.Uint16BufferAttribute(new Uint16Array([
+      0, 0, 65_535, 0, 32_768, 65_535,
+    ]), 2, true);
+    quantized.setAttribute('position', position);
+    quantized.setAttribute('normal', normal);
+    quantized.setAttribute('tangent', tangent);
+    quantized.setAttribute('uv', compactUv);
+    quantized.setIndex([0, 1, 2]);
+    quantized.addGroup(0, 3, 0);
+    quantized.userData.semantic = 'quantized-support-fixture';
+    const sourcePosition = new Int16Array(position.array);
+
+    const transformed = cloneAuthoredSupportStaticGeometryForTransform(
+      quantized,
+      new THREE.Matrix4().compose(
+        new THREE.Vector3(6, 2, 4),
+        new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2),
+        new THREE.Vector3(2, 1, 3),
+      ),
+    );
+
+    for (const name of ['position', 'normal', 'tangent'] as const) {
+      const attribute = transformed.getAttribute(name);
+      expect(attribute.array).toBeInstanceOf(Float32Array);
+      expect(attribute.normalized).toBe(false);
+    }
+    expect(transformed.getAttribute('uv').array).toBeInstanceOf(Uint16Array);
+    expect(transformed.getAttribute('uv').normalized).toBe(true);
+    expect(transformed.index?.array).toEqual(quantized.index?.array);
+    expect(transformed.groups).toEqual(quantized.groups);
+    expect(transformed.userData).toEqual(quantized.userData);
+    expect(position.array).toEqual(sourcePosition);
+    expect(position.normalized).toBe(true);
+    expect(new THREE.Box3().setFromBufferAttribute(
+      transformed.getAttribute('position') as THREE.BufferAttribute,
+    )).toMatchObject({
+      min: { x: 3, y: 1, z: 2 },
+      max: { x: 9, y: 3, z: 6 },
+    });
+    expect(transformed.boundingBox).toMatchObject({
+      min: { x: 3, y: 1, z: 2 },
+      max: { x: 9, y: 3, z: 6 },
+    });
+    expect(transformed.boundingSphere?.center.toArray()).toEqual([6, 2, 4]);
+    expect(transformed.boundingSphere?.radius).toBeCloseTo(Math.sqrt(14));
+
+    quantized.dispose();
+    transformed.dispose();
+  });
+
+  it('fails closed instead of static-batching future morph-target support geometry', () => {
+    const source = new THREE.BoxGeometry();
+    source.morphAttributes.position = [source.getAttribute('position').clone()];
+    expect(authoredSupportStaticGeometryCanBatch(source)).toBe(false);
+    expect(() => cloneAuthoredSupportStaticGeometryForTransform(source, new THREE.Matrix4()))
+      .toThrow('rejects morph-target geometry');
+    source.dispose();
+  });
+
+  it('preserves translated quantized rear-cabin and tail-boom overlap in batch-anchor space', () => {
+    const quantizedSegment = (): THREE.BufferGeometry => {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Int16BufferAttribute(new Int16Array([
+        -32_767, -32_767, -32_767,
+        32_767, -32_767, -32_767,
+        32_767, 32_767, 32_767,
+        -32_767, 32_767, 32_767,
+      ]), 3, true));
+      geometry.setIndex([0, 1, 2, 0, 2, 3]);
+      return geometry;
+    };
+    const rearSource = quantizedSegment();
+    const tailSource = quantizedSegment();
+    const rear = cloneAuthoredSupportStaticGeometryForTransform(
+      rearSource,
+      new THREE.Matrix4().makeScale(1, 1, 1.25).premultiply(new THREE.Matrix4().makeTranslation(0, 0, 2)),
+    );
+    const tail = cloneAuthoredSupportStaticGeometryForTransform(
+      tailSource,
+      new THREE.Matrix4().makeScale(0.6, 0.6, 1.25).premultiply(new THREE.Matrix4().makeTranslation(0, 0, 4)),
+    );
+    const rearBounds = new THREE.Box3().setFromBufferAttribute(rear.getAttribute('position') as THREE.BufferAttribute);
+    const tailBounds = new THREE.Box3().setFromBufferAttribute(tail.getAttribute('position') as THREE.BufferAttribute);
+    const union = rearBounds.clone().union(tailBounds);
+
+    expect(rearBounds.min.z).toBeCloseTo(0.75);
+    expect(rearBounds.max.z).toBeCloseTo(3.25);
+    expect(tailBounds.min.z).toBeCloseTo(2.75);
+    expect(tailBounds.max.z).toBeCloseTo(5.25);
+    expect(Math.min(rearBounds.max.z, tailBounds.max.z) - Math.max(rearBounds.min.z, tailBounds.min.z))
+      .toBeCloseTo(0.5);
+    expect(union.min.z).toBeCloseTo(0.75);
+    expect(union.max.z).toBeCloseTo(5.25);
+    expect(rearSource.getAttribute('position').array).toBeInstanceOf(Int16Array);
+    expect(tailSource.getAttribute('position').array).toBeInstanceOf(Int16Array);
+
+    rearSource.dispose();
+    tailSource.dispose();
+    rear.dispose();
+    tail.dispose();
+  });
+
   it('optimizes retained LOD templates once and keeps runtime pool construction clone-only', () => {
     const source = readFileSync(new URL('./killstreak-presentation.ts', import.meta.url), 'utf8');
     const loadLod = source.slice(
@@ -45,6 +338,9 @@ describe('authored support preparation scheduling', () => {
     expect(buildVehicle).toContain('const level = source.scene.clone(true);');
     expect(buildVehicle).not.toContain('optimizeAuthoredSupportLevel(');
     expect(source).toContain('level.userData.supportStaticBatchOptimized = true;');
+    expect(source).not.toContain('source.geometry.clone().applyMatrix4(localMatrix)');
+    expect(source.match(/cloneAuthoredSupportStaticGeometryForTransform\(source\.geometry, localMatrix\)/gu))
+      .toHaveLength(2);
     expect(source).not.toContain("batchAuthoredSupportStaticMeshes(mainWing, family, 'main-wing')");
     expect(source).toContain('mainWing.userData.supportStaticBatchBoundary = true;');
   });
@@ -327,7 +623,7 @@ describe('killstreak presentation', () => {
   it('GPU-prewarms every bounded resource family once and restores exact pooled state', async () => {
     const scene = new THREE.Scene();
     const presentation = new KillstreakPresentation(scene);
-    const camera = new THREE.PerspectiveCamera();
+    const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
     const chopper = presentation.root.getObjectByName('prewarmed-chopper-1') as THREE.Group;
     const chopperChild = chopper.getObjectByName('chopper-cockpit-hud-glass')!;
     const chopperFuselage = chopper.getObjectByName('chopper-fuselage')!;
@@ -335,6 +631,7 @@ describe('killstreak presentation', () => {
     const chopperMainRotor = chopper.getObjectByName('chopper-main-rotor')!;
     const dashboard = chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh;
     const gunnerHudMaterial = (chopperChild as THREE.Mesh).material as THREE.Material;
+    const chopperChildLayerMask = chopperChild.layers.mask;
     chopper.scale.set(2, 3, 4);
     chopper.frustumCulled = true;
     chopperChild.visible = false;
@@ -343,10 +640,13 @@ describe('killstreak presentation', () => {
     lod.name = 'prewarm-test-authored-lod';
     const lod0 = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
     const lod1 = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    const lod2 = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
     lod0.visible = false;
     lod1.visible = true;
-    lod.addLevel(lod0, 0);
-    lod.addLevel(lod1, 20);
+    lod2.visible = false;
+    lod.addLevel(lod0, SUPPORT_VEHICLE_LOD_DISTANCES[0]);
+    lod.addLevel(lod1, SUPPORT_VEHICLE_LOD_DISTANCES[1]);
+    lod.addLevel(lod2, SUPPORT_VEHICLE_LOD_DISTANCES[2]);
     lod.autoUpdate = true;
     chopper.add(lod);
     presentation.clear();
@@ -383,7 +683,10 @@ describe('killstreak presentation', () => {
         expect(lod.autoUpdate).toBe(false);
         expect(lod0.visible).toBe(true);
         expect(lod1.visible).toBe(true);
+        expect(lod2.visible).toBe(true);
+        expect(camera.far).toBe(180);
         expect(chopperFuselage.visible).toBe(true);
+        expect(chopperChild.layers.mask).toBe(chopperChildLayerMask);
         expect(gunnerHudMaterial.depthWrite).toBe(true);
         presentation.clear();
         expect(swarmBatches.every((batch) => batch.count === 24)).toBe(true);
@@ -396,8 +699,14 @@ describe('killstreak presentation', () => {
         expect(presentation.root.getObjectByName('pass65-swarm-instanced-batch-12')?.visible).toBe(true);
         expect(presentation.root.getObjectByName('prewarmed-care-aircraft-1')?.visible).toBe(false);
         expect(lod.autoUpdate).toBe(true);
-        expect([lod0.visible, lod1.visible].filter(Boolean)).toHaveLength(1);
+        expect([lod0.visible, lod1.visible, lod2.visible].filter(Boolean)).toHaveLength(1);
+        expect(
+          [lod0, lod1, lod2][compilePass - 2]!.visible,
+          `compile pass ${compilePass} selected synthetic LOD ${lod.getCurrentLevel()}`,
+        ).toBe(true);
+        expect(camera.far).toBeGreaterThan(SUPPORT_VEHICLE_PREWARM_DISTANCES[2]);
         expect(gunnerHudMaterial.depthWrite).toBe(true);
+        expect(chopperChild.layers.mask).toBe(chopperChildLayerMask);
       } else {
         expect(compilePass).toBe(5);
         expect(chopper.visible).toBe(true);
@@ -405,9 +714,12 @@ describe('killstreak presentation', () => {
         expect(chopperFuselage.visible).toBe(false);
         expect(chopperRearFuselage.visible).toBe(false);
         expect(chopperMainRotor.children.every((node) => !node.visible)).toBe(true);
-        expect(dashboard.visible).toBe(false);
+        expect(dashboard.visible).toBe(true);
         expect(chopperChild.visible).toBe(true);
+        expect(chopperChild.layers.mask & (1 << 2)).not.toBe(0);
+        expect(chopperChild.layers.mask & (1 << 0)).toBe(0);
         expect(gunnerHudMaterial.depthWrite).toBe(false);
+        expect(camera.far).toBe(180);
       }
     });
     await Promise.all([
@@ -424,7 +736,10 @@ describe('killstreak presentation', () => {
     expect(lod.autoUpdate).toBe(true);
     expect(lod0.visible).toBe(false);
     expect(lod1.visible).toBe(true);
+    expect(lod2.visible).toBe(false);
+    expect(camera.far).toBe(180);
     expect(gunnerHudMaterial.depthWrite).toBe(true);
+    expect(chopperChild.layers.mask).toBe(chopperChildLayerMask);
     expect(swarmBatches.every((batch) => batch.count === 0)).toBe(true);
     for (let index = 0; index < swarmBatches.length; index += 1) {
       expect(Array.from(swarmBatches[index]!.instanceMatrix.array)).toEqual(Array.from(swarmMatricesBefore[index]!));
@@ -549,9 +864,9 @@ describe('killstreak presentation', () => {
       prewarmed: 6,
       pooledEntityInstances: 29,
       pooledSwarmDrones: 24,
-      swarmRenderBatches: 12,
+      swarmRenderBatches: 14,
       swarmRenderedInstances: 1,
-      swarmVisibleRenderBatches: 12,
+      swarmVisibleRenderBatches: 14,
       swarmMinimumRenderedInstances: 1,
       swarmMaximumRenderedInstances: 1,
       prewarmedAuthoredSupportFamilies: [],
@@ -594,24 +909,33 @@ describe('killstreak presentation', () => {
     expect(chopper.getObjectByName('chopper-first-person-rotor')).toBeUndefined();
     const hudMaterial = (chopper.getObjectByName('chopper-cockpit-hud-glass') as THREE.Mesh)
       .material as THREE.Material;
+    const cockpitHud = chopper.getObjectByName('chopper-cockpit-hud-glass') as THREE.Mesh;
+    const cockpitHudBaseLayerMask = cockpitHud.layers.mask;
     const hudBaseDepthWrite = hudMaterial.depthWrite;
     presentation.setFirstPersonEntity('ks-1-chopper-1');
     expect(chopper.visible).toBe(true);
     expect((chopper.getObjectByName('chopper-fuselage') as THREE.Mesh).visible).toBe(false);
     expect((chopper.getObjectByName('chopper-rear-fuselage') as THREE.Mesh).visible).toBe(false);
     expect((chopper.getObjectByName('chopper-main-rotor') as THREE.Group).children.every((node) => !node.visible)).toBe(true);
-    expect((chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh).visible).toBe(false);
-    expect((chopper.getObjectByName('chopper-cockpit-display-cyan') as THREE.Mesh).visible).toBe(false);
-    expect((chopper.getObjectByName('chopper-cockpit-hud-glass') as THREE.Mesh).visible).toBe(true);
-    expect((chopper.getObjectByName('chopper-cockpit-hud-target-ring') as THREE.Mesh).visible).toBe(true);
+    expect((chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh).visible).toBe(true);
+    expect((chopper.getObjectByName('chopper-cockpit-display-cyan') as THREE.Mesh).visible).toBe(true);
+    expect((chopper.getObjectByName('chopper-cockpit-display-green') as THREE.Mesh).visible).toBe(true);
+    expect((chopper.getObjectByName('chopper-cockpit-hud-glass') as THREE.Mesh).visible).toBe(false);
+    expect((chopper.getObjectByName('chopper-cockpit-hud-target-ring') as THREE.Mesh).visible).toBe(false);
     expect((chopper.getObjectByName('chopper-gunner-view-receiver') as THREE.Mesh).visible).toBe(true);
+    expect(cockpitHud.layers.mask & (1 << 2)).not.toBe(0);
+    expect(cockpitHud.layers.mask & (1 << 0)).toBe(0);
     expect(hudMaterial.depthWrite).toBe(false);
     expect(presentation.telemetry().firstPersonSightline).toMatchObject({
       entityId: 'ks-1-chopper-1',
       presentationSource: 'procedural-non-release-fallback',
-      visibleOutsideSightline: [],
-      hudVisible: true,
+      visibleOutsideCockpit: [],
+      dashboardVisible: true,
+      displaysVisible: true,
+      hudVisible: false,
+      centreSightlineClear: true,
       weaponVisible: true,
+      overlayLayerExclusive: true,
     });
     const redundantPossessionTraverse = vi.spyOn(chopper, 'traverse');
     presentation.setFirstPersonEntity('ks-1-chopper-1');
@@ -619,10 +943,15 @@ describe('killstreak presentation', () => {
     expect(redundantPossessionTraverse).not.toHaveBeenCalled();
     redundantPossessionTraverse.mockRestore();
     const cameraQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.12, 0.8, 0, 'YXZ'));
-    presentation.alignFirstPersonCockpit('ks-1-chopper-1', cameraQuaternion);
+    const cameraPosition = new THREE.Vector3(6, 8, -3);
+    const cockpit = chopper.getObjectByName('chopper-first-person-cockpit')!;
+    const cameraSocket = chopper.getObjectByName('chopper-first-person-camera-socket')!;
+    const authoredCameraPivot = cockpit.worldToLocal(cameraSocket.getWorldPosition(new THREE.Vector3()));
+    presentation.alignFirstPersonCockpit('ks-1-chopper-1', cameraPosition, cameraQuaternion);
     const cockpitWorldQuaternion = chopper.getObjectByName('chopper-first-person-cockpit')!
       .getWorldQuaternion(new THREE.Quaternion());
     expect(cockpitWorldQuaternion.angleTo(cameraQuaternion)).toBeLessThan(1e-6);
+    expect(cockpit.localToWorld(authoredCameraPivot).distanceTo(cameraPosition)).toBeLessThan(1e-6);
     presentation.setFirstPersonEntity(null);
     expect(chopper.visible).toBe(true);
     expect((chopper.getObjectByName('chopper-fuselage') as THREE.Mesh).visible).toBe(true);
@@ -630,6 +959,7 @@ describe('killstreak presentation', () => {
     expect((chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh).visible).toBe(false);
     expect((chopper.getObjectByName('chopper-cockpit-hud-glass') as THREE.Mesh).visible).toBe(false);
     expect((chopper.getObjectByName('chopper-gunner-view-receiver') as THREE.Mesh).visible).toBe(false);
+    expect(cockpitHud.layers.mask).toBe(cockpitHudBaseLayerMask);
     expect(hudMaterial.depthWrite).toBe(hudBaseDepthWrite);
     const carePackage = presentation.root.getObjectByName('pass65-care-package') as THREE.Group;
     expect(carePackage.userData).toMatchObject({ interactable: true, interactionPrompt: 'F TO COLLECT KILLSTREAK' });
@@ -722,8 +1052,8 @@ describe('killstreak presentation', () => {
     const gunnerHud = chopper.getObjectByName('chopper-cockpit-hud-glass') as THREE.Mesh;
     const gunnerHudMaterial = gunnerHud.material as THREE.Material;
     expect(fuselage.visible).toBe(false);
-    expect(dashboard.visible).toBe(false);
-    expect(gunnerHud.visible).toBe(true);
+    expect(dashboard.visible).toBe(true);
+    expect(gunnerHud.visible).toBe(false);
     expect(gunnerHudMaterial.depthWrite).toBe(false);
     presentation.setFirstPersonEntity(null);
     expect(fuselage.visible).toBe(true);
@@ -768,6 +1098,17 @@ describe('killstreak presentation', () => {
     expect(swarm.userData.presentationFamilyId).toBe(standalone.userData.presentationFamilyId);
     expect(swarm.userData.gunProfileId).toBe(DRONE_SWARM_GUN_PROFILE_ID);
     expect(swarm.getObjectByName('drone-mounted-gun')).toBeDefined();
+    expect(swarm.userData.pass70DroneSwarmBodyLogo).toBe('drone-body-black-field-white-hollow-ring-open-chevron-v1');
+    expect(swarm.getObjectByName('pass70-drone-swarm-body-logo-top')).toBeDefined();
+    expect(swarm.getObjectByName('pass70-drone-swarm-body-logo-bottom')).toBeDefined();
+    const logoBatchMaterials = presentation.root.children
+      .filter((node): node is THREE.InstancedMesh => node instanceof THREE.InstancedMesh)
+      .flatMap((node) => Array.isArray(node.material) ? node.material : [node.material])
+      .map((entry) => entry.name);
+    expect(logoBatchMaterials).toEqual(expect.arrayContaining([
+      'MAT_Pass70_DroneSwarmLogo_BlackField',
+      'MAT_Pass70_DroneSwarmLogo_WhiteMark',
+    ]));
     presentation.dispose();
   });
 
@@ -844,6 +1185,7 @@ describe('killstreak presentation', () => {
     presentation.presentImpacts(delayedDrop, 1_200);
     const shell = shellPool.children[0]!;
     const startY = shell.position.y;
+    expect(startY).toBe(20);
     presentation.sync(snapshot(0), 1_350);
     expect(shell.visible).toBe(true);
     expect(shell.position.y).toBeLessThan(startY);

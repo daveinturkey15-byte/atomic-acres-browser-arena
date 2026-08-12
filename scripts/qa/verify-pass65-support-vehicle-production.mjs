@@ -35,8 +35,9 @@ const aircraftEntry = productionManifest.supportVehicles?.find((candidate) => ca
 if (!chopperEntry || !aircraftEntry) throw new Error('Pass 65 support vehicle production entries are missing');
 const expectedRefinementContracts = Object.freeze({
   chopper: Object.freeze({
-    visualRevision: 'close-range-tandem-armored-airframe-v4',
-    detailContract: 'layered-armour-framed-canopy-fasteners-sensors-ordnance-mechanics-v4',
+    visualRevision: 'pass70-connected-rear-tail-airframe-v7',
+    detailContract: 'continuous-rear-tail-silhouette-cockpit-clear-sightline-v7',
+    materialRevision: 'pass70-daylight-readable-olive-pbr-v1',
   }),
   care: Object.freeze({
     visualRevision: 'close-range-heavy-cargo-aircraft-v4',
@@ -62,8 +63,9 @@ for (const [label, entry] of [['chopper', chopperEntry], ['aircraft', aircraftEn
   await verifyRecord(entry.sourceScript, `${label} source script`);
 }
 if (chopperEntry.visualRevision !== expectedRefinementContracts.chopper.visualRevision
-  || chopperEntry.detailContract !== expectedRefinementContracts.chopper.detailContract) {
-  failures.push('chopper: production manifest does not pin the v4 close-range tandem-armoured refinement');
+  || chopperEntry.detailContract !== expectedRefinementContracts.chopper.detailContract
+  || chopperEntry.materialRevision !== expectedRefinementContracts.chopper.materialRevision) {
+  failures.push('chopper: production manifest does not pin the Pass 70 complete authored vehicle/material refinement');
 }
 for (const [variant, expected] of Object.entries(expectedRefinementContracts)) {
   if (variant === 'chopper') continue;
@@ -107,7 +109,7 @@ else {
     'assert len(roots)==3',
     "required={'chopper-rear-fuselage','chopper-tail-boom','chopper-tail-fin','chopper-first-person-cockpit','chopper-gunner-sightline','chopper-gunner-weapon-view','chopper-nose-sensor'}",
     "assert all(required.issubset({c.get('canonical_node_name') for c in r.children_recursive}) for r in roots)",
-    "assert all(r.get('visual_revision')=='close-range-tandem-armored-airframe-v4' and r.get('detail_contract')=='layered-armour-framed-canopy-fasteners-sensors-ordnance-mechanics-v4' for r in roots)",
+    "assert all(r.get('visual_revision')=='pass70-connected-rear-tail-airframe-v7' and r.get('detail_contract')=='continuous-rear-tail-silhouette-cockpit-clear-sightline-v7' and r.get('material_revision')=='pass70-daylight-readable-olive-pbr-v1' for r in roots)",
     "names=lambda r:[str(c.get('canonical_node_name','')) for c in r.children_recursive]",
     "count=lambda r,prefix:sum(n.startswith(prefix) for n in names(r))",
     "lod0=next(r for r in roots if r.get('quality_tier')=='LOD0')",
@@ -332,9 +334,9 @@ for (const token of [
   "presentationSource = 'procedural-non-release-fallback'",
   'prewarmAuthoredAssets()',
   'prewarmedAuthoredSupportFamilies',
-  'isGunnerSightlineNode',
-  "level.getObjectByName('chopper-gunner-sightline')",
-  'node.visible = gunnerSightlineNode && !retiredStaticSource',
+  'isGunnerCockpitNode',
+  "level.getObjectByName('chopper-first-person-cockpit')",
+  'node.visible = gunnerCockpitNode && !retiredStaticSource',
 ]) if (!presentationSource.includes(token)) failures.push(`runtime lazy-cache/prewarm boundary missing: ${token}`);
 if (presentationSource.includes("getObjectByName('chopper-first-person-rotor')")) failures.push('possessed chopper still admits a first-person rotor into the runtime sightline');
 if (!mainSource.includes('loadSupportVehiclePresentations(),')

@@ -4,6 +4,28 @@ import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 
 export const WINDOW_GLASS_DEBRIS_VISUAL_CONTRACT = 'irregular-independent-radial-shards-v2';
 export const WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT = 24;
+export const WINDOW_GLASS_DEBRIS_SETTLE_TOLERANCE_M = 0.04;
+
+export type WindowGlassDebrisSettleMode = 'physics-active' | 'settled' | 'presentation-fall';
+
+/**
+ * A Rapier body can report sleeping while it is still supported by the broken
+ * window frame. Accepting that as settled leaves the visible shards suspended
+ * at sill height forever.
+ */
+export function windowGlassDebrisSettleMode(
+  positionY: number,
+  restY: number,
+  sleeping: boolean,
+): WindowGlassDebrisSettleMode {
+  if (![positionY, restY].every(Number.isFinite)) {
+    throw new TypeError('window glass debris settling requires finite heights');
+  }
+  if (!sleeping) return 'physics-active';
+  return positionY <= restY + WINDOW_GLASS_DEBRIS_SETTLE_TOLERANCE_M
+    ? 'settled'
+    : 'presentation-fall';
+}
 
 type WindowGlassDebrisVisualOptions = Readonly<{
   id: string;

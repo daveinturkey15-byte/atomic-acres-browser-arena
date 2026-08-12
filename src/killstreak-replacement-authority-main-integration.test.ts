@@ -28,12 +28,28 @@ describe('authenticated replacement authority integration', () => {
     expect(admission).toContain('resetAuthenticatedGuestReplacement(message.playerId)');
   });
 
-  it('admits a replacement sequence restart but pins registered actor life to host authority', () => {
-    expect(source).toContain('incoming.seq > remote.snapshot.seq || replacementState');
-    expect(source).toContain('replacementState && replacementLifeId === null');
+  it('holds replacement state mutations until the exact resume authority ACK', () => {
+    const ack = functionBody('acceptGuestResumeAck', 'sendGuestResumeFailure');
+    expect(ack).toContain('admitGuestResumeAck(message, {');
+    expect(ack).toContain('hostLobbyConnectionEpochs.get(message.by) !== message.connectionEpoch');
+    expect(ack).toContain('remote.awaitingReplacementState = false');
+    expect(ack.indexOf('admitGuestResumeAck(message, {'))
+      .toBeLessThan(ack.indexOf('remote.awaitingReplacementState = false'));
+
+    const messageAdmission = source.slice(
+      source.indexOf("if (message.type === 'join' || message.type === 'state')"),
+      source.indexOf("if (message.type === 'ping')"),
+    );
+    const replacementGate = "remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(incoming.id)";
+    expect(messageAdmission).toContain(replacementGate);
+    expect(messageAdmission.indexOf(replacementGate))
+      .toBeLessThan(messageAdmission.indexOf('remote.snapshot = admittedIncoming'));
+    expect(messageAdmission.indexOf(replacementGate))
+      .toBeLessThan(messageAdmission.indexOf('retainedRemoteAuthorities.set(admittedIncoming.id'));
+    expect(messageAdmission).toContain('incoming.seq > remote.snapshot.seq');
+    expect(messageAdmission).not.toContain('incoming.seq > remote.snapshot.seq || replacementState');
     expect(source).toContain('registeredActorLifeId !== null');
     expect(source).toContain('? registeredActorLifeId');
-    expect(source).toContain('remote.awaitingReplacementState = false');
   });
 
   it('adopts and persists life only from an admitted recipient-specific host snapshot', () => {
@@ -51,15 +67,15 @@ describe('authenticated replacement authority integration', () => {
     const remoteActivationStart = source.indexOf("if (message.type === 'killstreak-activate-intent') {");
     const remoteActivationEnd = source.indexOf("if (message.type === 'killstreak-control-intent')", remoteActivationStart);
     const remoteActivation = source.slice(remoteActivationStart, remoteActivationEnd);
-    expect(remoteActivation.indexOf('persistActiveHostMatchCheckpoint();'))
+    expect(remoteActivation.indexOf('persistActiveHostMatchCheckpoint(true);'))
       .toBeGreaterThan(remoteActivation.indexOf('if (admission.accepted) {'));
-    expect(remoteActivation.indexOf('persistActiveHostMatchCheckpoint();'))
+    expect(remoteActivation.indexOf('persistActiveHostMatchCheckpoint(true);'))
       .toBeLessThan(remoteActivation.indexOf('broadcastKillstreakState();'));
 
     const localActivation = functionBody('requestKillstreakActivation', 'requestKillstreakControl');
-    expect(localActivation.indexOf('persistActiveHostMatchCheckpoint();'))
+    expect(localActivation.indexOf('persistActiveHostMatchCheckpoint(true);'))
       .toBeGreaterThan(localActivation.indexOf('if (!admission.accepted)'));
-    expect(localActivation.indexOf('persistActiveHostMatchCheckpoint();'))
+    expect(localActivation.indexOf('persistActiveHostMatchCheckpoint(true);'))
       .toBeLessThan(localActivation.indexOf('broadcastKillstreakState(now);'));
   });
 });

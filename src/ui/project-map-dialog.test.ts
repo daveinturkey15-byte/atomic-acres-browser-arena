@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CHANGELOG } from '../changelog';
 import { createProjectMapBundle } from '../project-map';
 import { projectMapButtonMarkup, projectMapDialogMarkup } from './project-map-dialog';
 import { releaseHistoryButtonMarkup, releaseHistoryDialogMarkup } from './release-history-dialog';
@@ -21,6 +22,17 @@ describe('menu documentation dialogs', () => {
     const markup = `${releaseHistoryButtonMarkup()}${releaseHistoryDialogMarkup()}`;
     expect(markup).toContain('aria-controls="changelog-panel"');
     expect(markup).toContain('data-changelog-id="pass62"');
-    expect(markup).toContain('CURRENT BUILD');
+    expect(markup).toContain('LOCAL CANDIDATE');
+    expect(markup).toContain('NOT PUBLISHED');
+    expect(markup).toContain('AWAITING OWNER HITL');
+  });
+
+  it('renders timestamped production history without candidate copy', () => {
+    const released = [{ ...CHANGELOG[0]!, releasedAt: '2026-08-11T10:00:00Z' }, ...CHANGELOG.slice(1)];
+    const markup = releaseHistoryDialogMarkup(released);
+    expect(markup).toContain('PUBLIC RELEASE HISTORY');
+    expect(markup).toContain('CURRENT LIVE');
+    expect(markup).not.toContain('LOCAL CANDIDATE');
+    expect(markup).not.toContain('NOT PUBLISHED');
   });
 });

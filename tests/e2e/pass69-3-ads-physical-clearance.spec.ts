@@ -13,13 +13,13 @@ if (requestedRenderer !== 'webgl2' && requestedRenderer !== 'webgpu') {
 }
 const renderer: Renderer = requestedRenderer;
 const renderProfile = process.env.PASS69_3_ADS_PHYSICAL_RENDER_PROFILE ?? 'blender';
-if (renderProfile !== 'blender') {
-  throw new Error(`Pass 69.3 physical ADS evidence requires the Blender profile; received ${renderProfile}`);
+if (renderProfile !== 'blender' && renderProfile !== 'performance') {
+  throw new Error(`Pass 69.3 physical ADS evidence requires Blender or Performance; received ${renderProfile}`);
 }
 const expectedSourceSha = process.env.PASS69_3_ADS_PHYSICAL_SOURCE_SHA ?? '';
 const expectedTarget = process.env.PASS69_3_ADS_PHYSICAL_TARGET ?? '';
 const officialEvidence = expectedSourceSha !== '' || expectedTarget !== '';
-const targetForRenderer = `edge-${renderer}`;
+const targetForRenderer = `edge-${renderer}${renderProfile === 'performance' ? '-performance' : ''}`;
 if (officialEvidence && (!/^[a-f0-9]{40}$/u.test(expectedSourceSha) || expectedTarget !== targetForRenderer)) {
   throw new Error(`Pass 69.3 physical ADS evidence has incomplete target provenance for ${targetForRenderer}`);
 }
@@ -30,8 +30,9 @@ const sourceStatus = execFileSync('git', ['status', '--porcelain', '--untracked-
   encoding: 'utf8',
 }).trim();
 const artifactBase = resolve(repositoryRoot, 'artifacts/pass69-3/ads-physical-clearance');
-const artifactRoot = resolve(artifactBase, renderer);
-const receiptPath = resolve(artifactBase, `receipt-${renderer}.json`);
+const artifactKey = renderProfile === 'blender' ? renderer : `${renderer}-${renderProfile}`;
+const artifactRoot = resolve(artifactBase, artifactKey);
+const receiptPath = resolve(artifactBase, `receipt-${artifactKey}.json`);
 
 function sha256(value: Buffer): string {
   return createHash('sha256').update(value).digest('hex');
@@ -64,7 +65,7 @@ function expectRendererProvenance(runtime: any, label: string): void {
 async function deploy(page: Page): Promise<void> {
   const requireWebGpu = renderer === 'webgpu' ? '&requireWebGPU=1' : '';
   await page.setViewportSize({ width: 1_600, height: 900 });
-  await page.goto(`/?release=latest&map=atomic-acres&renderer=${renderer}${requireWebGpu}&render=${renderProfile}&grass=off&mist=off&rays=off&externalServices=off&seed=pass69-3-ads-physical-clearance-${renderer}`);
+  await page.goto(`/?release=latest&map=atomic-acres&renderer=${renderer}${requireWebGpu}&render=${renderProfile}&grass=off&mist=off&rays=off&externalServices=off&seed=pass69-3-ads-physical-clearance-${artifactKey}`);
   await page.waitForFunction(() => {
     const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
     return state?.bootstrap?.stage === 'ready' && state.weaponReady === true;
@@ -77,12 +78,12 @@ async function deploy(page: Page): Promise<void> {
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
 }
 
-function clearanceFor(state: any, weapon: typeof ADS_WEAPONS[number]) {
-  return state.weaponPresentation.adsMaterialClearance.catalog
-    .find((entry: { weapon: string }) => entry.weapon === weapon);
+function opticMaterialsFor(state: any) {
+  const { sightPictureRetreat: _sightPictureRetreat, ...materials } = state.weaponPresentation.opticMaterialSemantics;
+  return materials;
 }
 
-test('carbine and Mini Uzi expose a live physical ADS corridor and restore every material on exit and switch', async ({ browser, page }, testInfo) => {
+test('carbine and Mini Uzi expose a physical ADS corridor without fading their opaque bodies', async ({ browser, page }, testInfo) => {
   test.setTimeout(renderer === 'webgpu' ? 180_000 : 120_000);
   rmSync(artifactRoot, { recursive: true, force: true });
   rmSync(receiptPath, { force: true });
@@ -113,6 +114,7 @@ test('carbine and Mini Uzi expose a live physical ADS corridor and restore every
   const runtimeBefore = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().render.runtime as any);
   expectRendererProvenance(runtimeBefore, 'initial physical ADS runtime');
   const evidence: Array<Record<string, unknown>> = [];
+  const retainedMaterialStates = new Map<typeof ADS_WEAPONS[number], Record<string, unknown>>();
 
   for (const [index, weapon] of ADS_WEAPONS.entries()) {
     await page.evaluate((weaponId) => {
@@ -122,22 +124,25 @@ test('carbine and Mini Uzi expose a live physical ADS corridor and restore every
     }, weapon);
     await page.waitForFunction((weaponId) => {
       const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-      const clearance = (state.weaponPresentation as any).adsMaterialClearance.catalog
-        .find((entry: { weapon: string }) => entry.weapon === weaponId);
-      return state.player.weapon === weaponId
+      return state.weaponReady === true
+        && state.player.weapon === weaponId
         && state.weaponPresentation.weapon === weaponId
         && state.weaponPresentation.adsProgress < 0.02
-        && clearance?.materialCount > 0;
+        && (state.weaponPresentation as any).opticMaterialSemantics.materialCount > 0;
     }, weapon, { timeout: 8_000 });
 
     const hip = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot() as any);
-    const hipMaterials = clearanceFor(hip, weapon);
-    expect(hip.weaponPresentation.adsMaterialClearance.contract).toBe('static-silhouette-ads-translucency-v2');
-    expect(hipMaterials.materialCount, `${weapon}: collected complete static silhouette material set`).toBeGreaterThanOrEqual(5);
-    expect(hipMaterials.surfaces, `${weapon}: authored static material families`).toEqual(expect.arrayContaining([
-      'gunmetal', 'polymer', 'primary', 'rubber',
-    ]));
-    expect(hipMaterials.restoredCount, `${weapon}: hip materials start at authored state`).toBe(hipMaterials.materialCount);
+    const hipMaterials = opticMaterialsFor(hip);
+    retainedMaterialStates.set(weapon, hipMaterials);
+    expect(hipMaterials.contract).toBe('semantic-first-person-optic-window-v1');
+    expect(hipMaterials.clearWindowOpacity).toBe(0.1);
+    expect(hipMaterials.materialCount, `${weapon}: complete visible weapon material set`).toBeGreaterThanOrEqual(5);
+    expect(hipMaterials.markedMaterialCount, `${weapon}: no fallback or unprocessed visible material`)
+      .toBe(hipMaterials.materialCount);
+    expect(hipMaterials.opaqueBodyCount, `${weapon}: visible opaque body materials`).toBeGreaterThanOrEqual(4);
+    expect(hipMaterials.invalidOpaqueBodyCount, `${weapon}: hip receiver/body remains opaque`).toBe(0);
+    expect(hipMaterials.invalidOpticWindowCount, `${weapon}: semantic optic window remains clear`).toBe(0);
+    expect(hipMaterials.opticWindowCount, `${weapon}: exact semantic lens expectation`).toBe(weapon === 'carbine' ? 1 : 0);
     const hipScreenshotPath = resolve(artifactRoot, `${index + 1}-${weapon}-hip-retention.png`);
     const hipScreenshot = await page.screenshot({
       path: hipScreenshotPath,
@@ -150,36 +155,53 @@ test('carbine and Mini Uzi expose a live physical ADS corridor and restore every
     await page.waitForFunction((weaponId) => {
       const presentation = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).weaponPresentation;
       return presentation.weapon === weaponId
-        && presentation.adsProgress > 0.98
-        && presentation.adsMaterialClearance.blend > 0.98;
+        && presentation.adsProgress > 0.98;
     }, weapon, { timeout: 8_000 });
     const ads = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot() as any);
-    const adsMaterials = clearanceFor(ads, weapon);
-    expect(ads.weaponPresentation.firstPersonRearOccluderTrim, `${weapon}: actual served rear geometry trim`).toMatchObject({
-      applied: true,
-      contract: 'rear-sight-axis-spatial-degenerate-v1',
-    });
-    expect(ads.weaponPresentation.firstPersonRearOccluderTrim.suppressedElements).toBeGreaterThan(0);
-    expect(ads.weaponPresentation.firstPersonRearOccluderTrim.suppressionRatio, `${weapon}: hip geometry retention`).toBeLessThan(0.08);
-    expect(ads.weaponPresentation.firstPersonAdsSightBore, `${weapon}: actual served physical aperture`).toMatchObject({
-      applied: true,
-      contract: 'physical-aperture-spatial-degenerate-v1',
+    const adsMaterials = opticMaterialsFor(ads);
+    expect(ads.weaponPresentation.sightReferenceName, `${weapon}: authored sight reference`).toBe(
+      weapon === 'carbine' ? 'optic-socket' : 'rear-sight-socket',
+    );
+    expect(ads.weaponPresentation.sightOffset, `${weapon}: authored sight offset shape`).toHaveLength(2);
+    expect(Math.abs(ads.weaponPresentation.sightOffset[0]), `${weapon}: authored sight is within one horizontal CSS pixel`).toBeLessThanOrEqual(2 / 1_600);
+    expect(Math.abs(ads.weaponPresentation.sightOffset[1]), `${weapon}: authored sight is within one vertical CSS pixel`).toBeLessThanOrEqual(2 / 900);
+    if (weapon === 'mini-uzi') {
+      expect(ads.weaponPresentation.firstPersonRearOccluderTrim, `${weapon}: actual served rear geometry trim`).toMatchObject({
+        applied: true,
+        contract: 'rear-sight-axis-spatial-degenerate-v1',
+      });
+      expect(ads.weaponPresentation.firstPersonRearOccluderTrim.suppressedElements).toBeGreaterThan(0);
+      expect(ads.weaponPresentation.firstPersonRearOccluderTrim.suppressionRatio, `${weapon}: hip geometry retention`).toBeLessThan(0.08);
+      expect(ads.weaponPresentation.firstPersonAdsSightBore, `${weapon}: actual served physical aperture`).toMatchObject({
+        applied: true,
+        contract: 'physical-aperture-spatial-degenerate-v1',
+        rayCount: 9,
+      });
+      expect(ads.weaponPresentation.firstPersonAdsSightBore.suppressedElements).toBeGreaterThan(0);
+    } else {
+      expect(ads.weaponPresentation.firstPersonRearOccluderTrim, `${weapon}: no artificial lower receiver hole`).toBeNull();
+      expect(ads.weaponPresentation.firstPersonAdsSightBore, `${weapon}: authored optic aperture needs no geometry carve`).toBeNull();
+    }
+    expect(adsMaterials, `${weapon}: ADS does not mutate any material semantics`).toEqual(hipMaterials);
+    expect(adsMaterials.invalidOpaqueBodyCount, `${weapon}: ADS body remains opaque`).toBe(0);
+    expect(adsMaterials.invalidOpticWindowCount, `${weapon}: ADS window remains clear`).toBe(0);
+    expect(ads.weaponPresentation.opticMaterialSemantics.sightPictureRetreat, `${weapon}: ADS-only physical viewmodel retreat`).toBeGreaterThanOrEqual(0.25);
+    expect(ads.weaponPresentation.adsOpaqueSightWindow, `${weapon}: authored centre-reticle aperture`).toMatchObject({
+      contract: 'camera-ndc-authored-sight-aperture-rays-v3',
+      acceptance: weapon === 'carbine' ? 'nine-ray-window-clear' : 'centre-ray-clear',
+      accepted: true,
       rayCount: 9,
+      ndcRadius: 0.02,
+      centerHits: 0,
     });
-    expect(ads.weaponPresentation.firstPersonAdsSightBore.suppressedElements).toBeGreaterThan(0);
-    expect(adsMaterials.transparentCount).toBe(adsMaterials.materialCount);
-    expect(adsMaterials.nonOpaqueCount).toBe(adsMaterials.materialCount);
-    expect(adsMaterials.depthWriteDisabledCount).toBe(adsMaterials.materialCount);
-    expect(adsMaterials.maximumTargetOpacity, `${weapon}: bounded ADS ghost target`).toBeLessThanOrEqual(0.14);
-    expect(adsMaterials.maximumOpacity, `${weapon}: settled static silhouette opacity`).toBeLessThanOrEqual(0.14);
-    expect(ads.weaponPresentation.adsMaterialClearance.sightPictureRetreat, `${weapon}: ADS-only physical viewmodel retreat`).toBeGreaterThanOrEqual(0.25);
-    expect(ads.weaponPresentation.adsOpaqueSightWindow, `${weapon}: nine-ray camera sight window`).toMatchObject({
-      contract: 'camera-ndc-sight-window-opaque-weapon-rays-v1',
-      rayCount: 9,
-      blockedRays: 0,
-      maximumHits: 0,
-      meshes: [],
-    });
+    expect(ads.weaponPresentation.adsOpaqueSightWindow.samples, `${weapon}: exact nine diagnostic rays`).toHaveLength(9);
+    expect(ads.weaponPresentation.adsOpaqueSightWindow.samples[0]).toMatchObject({ label: 'center', ndc: [0, 0], count: 0 });
+    if (weapon === 'carbine') {
+      expect(ads.weaponPresentation.adsOpaqueSightWindow).toMatchObject({ blockedRays: 0, maximumHits: 0, meshes: [] });
+    } else {
+      expect(ads.weaponPresentation.adsOpaqueSightWindow.blockedRays, `${weapon}: opaque iron-sight surround remains`).toBeGreaterThan(0);
+      expect(ads.weaponPresentation.adsOpaqueSightWindow.blockedRays, `${weapon}: centre ray remains the clear aperture`).toBeLessThan(9);
+    }
 
     const adsScreenshotPath = resolve(artifactRoot, `${index + 1}-${weapon}-physical-ads-corridor.png`);
     const screenshot = await page.screenshot({
@@ -193,12 +215,11 @@ test('carbine and Mini Uzi expose a live physical ADS corridor and restore every
     await page.waitForFunction((weaponId) => {
       const presentation = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).weaponPresentation;
       return presentation.weapon === weaponId
-        && presentation.adsProgress < 0.02
-        && presentation.adsMaterialClearance.blend < 0.02;
+        && presentation.adsProgress < 0.02;
     }, weapon, { timeout: 8_000 });
     const restored = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot() as any);
-    const restoredMaterials = clearanceFor(restored, weapon);
-    expect(restoredMaterials.restoredCount, `${weapon}: exact opacity/transparent/depthWrite restoration`).toBe(restoredMaterials.materialCount);
+    const restoredMaterials = opticMaterialsFor(restored);
+    expect(restoredMaterials, `${weapon}: ADS exit preserves material semantics`).toEqual(hipMaterials);
     evidence.push({
       weapon,
       hip: {
@@ -208,7 +229,8 @@ test('carbine and Mini Uzi expose a live physical ADS corridor and restore every
       },
       ads: {
         materials: adsMaterials,
-        sightPictureRetreat: ads.weaponPresentation.adsMaterialClearance.sightPictureRetreat,
+        sightReferenceName: ads.weaponPresentation.sightReferenceName,
+        sightPictureRetreat: ads.weaponPresentation.opticMaterialSemantics.sightPictureRetreat,
         sightOffset: ads.weaponPresentation.sightOffset,
         rearOccluderTrim: ads.weaponPresentation.firstPersonRearOccluderTrim,
         sightBore: ads.weaponPresentation.firstPersonAdsSightBore,
@@ -222,12 +244,25 @@ test('carbine and Mini Uzi expose a live physical ADS corridor and restore every
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.equipWeapon('pistol'));
   await page.waitForFunction(() => {
     const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-    return state.player.weapon === 'pistol' && state.weaponPresentation.weapon === 'pistol';
+    return state.weaponReady === true
+      && state.player.weapon === 'pistol'
+      && state.weaponPresentation.weapon === 'pistol';
   });
   const afterSwitch = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot() as any);
+  const switchedMaterials = opticMaterialsFor(afterSwitch);
+  expect(switchedMaterials.invalidOpaqueBodyCount, 'switch-away weapon body remains opaque').toBe(0);
+  expect(switchedMaterials.invalidOpticWindowCount, 'switch-away semantic windows remain clear').toBe(0);
   for (const weapon of ADS_WEAPONS) {
-    const restored = clearanceFor(afterSwitch, weapon);
-    expect(restored.restoredCount, `${weapon}: remains restored after switching away`).toBe(restored.materialCount);
+    await page.evaluate((weaponId) => window.__ATOMIC_ACRES_DEBUG__.equipWeapon(weaponId), weapon);
+    await page.waitForFunction((weaponId) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return state.weaponReady === true
+        && state.player.weapon === weaponId
+        && state.weaponPresentation.weapon === weaponId;
+    }, weapon);
+    const reEquipped = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot() as any);
+    expect(opticMaterialsFor(reEquipped), `${weapon}: switch-back preserves exact material semantics`)
+      .toEqual(retainedMaterialStates.get(weapon));
   }
   const runtimeAfter = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().render.runtime as any);
   expectRendererProvenance(runtimeAfter, 'final physical ADS runtime');

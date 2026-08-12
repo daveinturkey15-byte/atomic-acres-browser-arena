@@ -7,8 +7,9 @@ import { resolve } from 'node:path';
 
 const root = process.cwd();
 const targets = Object.freeze({
-  'edge-webgl2': Object.freeze({ renderer: 'webgl2', port: '4537' }),
-  'edge-webgpu': Object.freeze({ renderer: 'webgpu', port: '4538' }),
+  'edge-webgl2': Object.freeze({ renderer: 'webgl2', renderProfile: 'blender', artifactKey: 'webgl2', port: '4537' }),
+  'edge-webgpu': Object.freeze({ renderer: 'webgpu', renderProfile: 'blender', artifactKey: 'webgpu', port: '4538' }),
+  'edge-webgl2-performance': Object.freeze({ renderer: 'webgl2', renderProfile: 'performance', artifactKey: 'webgl2-performance', port: '4539' }),
 });
 const targetName = process.argv[2] ?? '';
 const target = targets[targetName];
@@ -17,8 +18,8 @@ if (!target) {
 }
 
 const artifactBase = resolve(root, 'artifacts/pass69-3/ads-physical-clearance');
-const rendererArtifacts = resolve(artifactBase, target.renderer);
-const receiptPath = resolve(artifactBase, `receipt-${target.renderer}.json`);
+const rendererArtifacts = resolve(artifactBase, target.artifactKey);
+const receiptPath = resolve(artifactBase, `receipt-${target.artifactKey}.json`);
 mkdirSync(artifactBase, { recursive: true });
 rmSync(receiptPath, { force: true });
 
@@ -74,7 +75,7 @@ const result = spawnSync(process.execPath, [
     QA_INSTALLED_EDGE: '1',
     QA_PREVIEW_PORT: process.env.QA_PREVIEW_PORT ?? target.port,
     PASS69_3_ADS_PHYSICAL_RENDERER: target.renderer,
-    PASS69_3_ADS_PHYSICAL_RENDER_PROFILE: 'blender',
+    PASS69_3_ADS_PHYSICAL_RENDER_PROFILE: target.renderProfile,
     PASS69_3_ADS_PHYSICAL_SOURCE_SHA: sourceSha,
     PASS69_3_ADS_PHYSICAL_TARGET: targetName,
   },
@@ -105,28 +106,64 @@ const runtimeValid = (runtime) => runtime?.requestedBackend === target.renderer
     : runtime.adapterClass === 'WebGL2RenderingContext'
       && runtime.presentation?.status === 'synchronous');
 const expectedWeapons = ['carbine', 'mini-uzi'];
+const materialStateValid = (materials, expectedOpticWindows) => materials?.contract === 'semantic-first-person-optic-window-v1'
+  && materials.clearWindowOpacity === 0.1
+  && Number.isSafeInteger(materials.materialCount) && materials.materialCount >= 5
+  && Number.isSafeInteger(materials.markedMaterialCount) && materials.markedMaterialCount === materials.materialCount
+  && Number.isSafeInteger(materials.opaqueBodyCount) && materials.opaqueBodyCount >= 4
+  && Number.isSafeInteger(materials.presentationDetailCount) && materials.presentationDetailCount >= 0
+  && materials.opticWindowCount === expectedOpticWindows
+  && materials.opaqueBodyCount + materials.presentationDetailCount + materials.opticWindowCount === materials.materialCount
+  && materials.invalidOpaqueBodyCount === 0
+  && materials.invalidOpticWindowCount === 0
+  && Array.isArray(materials.opticWindows)
+  && materials.opticWindows.length === expectedOpticWindows
+  && materials.opticWindows.every((window) => window?.transparent === true
+    && window.opacity === 0.1
+    && window.depthWrite === false
+    && typeof window.mesh === 'string' && window.mesh.length > 0
+    && typeof window.material === 'string' && window.material.length > 0);
 const weaponsValid = Array.isArray(receipt.weapons)
   && receipt.weapons.length === expectedWeapons.length
   && receipt.weapons.every((entry, index) => {
     const weapon = expectedWeapons[index];
-    const hipPath = `artifacts/pass69-3/ads-physical-clearance/${target.renderer}/${index + 1}-${weapon}-hip-retention.png`;
-    const adsPath = `artifacts/pass69-3/ads-physical-clearance/${target.renderer}/${index + 1}-${weapon}-physical-ads-corridor.png`;
+    const hipPath = `artifacts/pass69-3/ads-physical-clearance/${target.artifactKey}/${index + 1}-${weapon}-hip-retention.png`;
+    const adsPath = `artifacts/pass69-3/ads-physical-clearance/${target.artifactKey}/${index + 1}-${weapon}-physical-ads-corridor.png`;
     const hipFile = resolve(root, hipPath);
     const adsFile = resolve(root, adsPath);
     return entry?.weapon === weapon
-      && entry.hip?.materials?.materialCount >= 5
-      && entry.hip.materials.restoredCount === entry.hip.materials.materialCount
-      && entry.ads?.rearOccluderTrim?.applied === true
-      && entry.ads.rearOccluderTrim.contract === 'rear-sight-axis-spatial-degenerate-v1'
-      && entry.ads.rearOccluderTrim.suppressionRatio < 0.08
-      && entry.ads?.sightBore?.applied === true
-      && entry.ads.sightBore.contract === 'physical-aperture-spatial-degenerate-v1'
-      && entry.ads.sightBore.rayCount === 9
-      && entry.ads?.opaqueSightWindow?.blockedRays === 0
-      && entry.ads.opaqueSightWindow.maximumHits === 0
-      && entry.ads?.materials?.nonOpaqueCount === entry.ads.materials.materialCount
-      && entry.ads.materials.depthWriteDisabledCount === entry.ads.materials.materialCount
-      && entry.restored?.restoredCount === entry.restored?.materialCount
+      && materialStateValid(entry.hip?.materials, weapon === 'carbine' ? 1 : 0)
+      && entry.ads?.sightReferenceName === (weapon === 'carbine' ? 'optic-socket' : 'rear-sight-socket')
+      && Array.isArray(entry.ads?.sightOffset) && entry.ads.sightOffset.length === 2
+      && entry.ads.sightOffset.every(Number.isFinite)
+      && Math.abs(entry.ads.sightOffset[0]) <= 2 / 1_600
+      && Math.abs(entry.ads.sightOffset[1]) <= 2 / 900
+      && (weapon === 'mini-uzi'
+        ? entry.ads?.rearOccluderTrim?.applied === true
+          && entry.ads.rearOccluderTrim.contract === 'rear-sight-axis-spatial-degenerate-v1'
+          && entry.ads.rearOccluderTrim.suppressionRatio < 0.08
+          && entry.ads?.sightBore?.applied === true
+          && entry.ads.sightBore.contract === 'physical-aperture-spatial-degenerate-v1'
+          && entry.ads.sightBore.rayCount === 9
+        : entry.ads?.rearOccluderTrim === null && entry.ads?.sightBore === null)
+      && entry.ads?.opaqueSightWindow?.contract === 'camera-ndc-authored-sight-aperture-rays-v3'
+      && entry.ads.opaqueSightWindow.acceptance === (weapon === 'carbine' ? 'nine-ray-window-clear' : 'centre-ray-clear')
+      && entry.ads.opaqueSightWindow.accepted === true
+      && entry.ads.opaqueSightWindow.ndcRadius === 0.02
+      && entry.ads.opaqueSightWindow.centerHits === 0
+      && Array.isArray(entry.ads.opaqueSightWindow.samples)
+      && entry.ads.opaqueSightWindow.samples.length === 9
+      && entry.ads.opaqueSightWindow.samples[0]?.label === 'center'
+      && entry.ads.opaqueSightWindow.samples[0]?.count === 0
+      && (weapon === 'carbine'
+        ? entry.ads.opaqueSightWindow.blockedRays === 0
+          && entry.ads.opaqueSightWindow.maximumHits === 0
+          && Array.isArray(entry.ads.opaqueSightWindow.meshes) && entry.ads.opaqueSightWindow.meshes.length === 0
+        : entry.ads.opaqueSightWindow.blockedRays > 0 && entry.ads.opaqueSightWindow.blockedRays < 9)
+      && materialStateValid(entry.ads?.materials, weapon === 'carbine' ? 1 : 0)
+      && JSON.stringify(entry.ads.materials) === JSON.stringify(entry.hip.materials)
+      && materialStateValid(entry.restored, weapon === 'carbine' ? 1 : 0)
+      && JSON.stringify(entry.restored) === JSON.stringify(entry.hip.materials)
       && entry.hip?.screenshot?.path === hipPath
       && entry.ads?.screenshot?.path === adsPath
       && /^[a-f0-9]{64}$/u.test(entry.hip.screenshot.sha256 ?? '')
@@ -143,7 +180,7 @@ if (receipt.schemaVersion !== 1
   || receipt.endingSourceSha !== sourceSha
   || receipt.cleanSource !== true
   || receipt.renderer !== target.renderer
-  || receipt.renderProfile !== 'blender'
+  || receipt.renderProfile !== target.renderProfile
   || receipt.browser?.project !== 'chromium'
   || receipt.browser?.channel !== 'msedge'
   || !/Edg\//u.test(receipt.browser?.userAgent ?? '')

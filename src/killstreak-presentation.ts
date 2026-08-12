@@ -3,12 +3,21 @@ import { StorageInstancedBufferAttribute } from 'three/webgpu';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import type { DroneSensorContact, KillstreakEntitySnapshot, KillstreakImpactEvent, KillstreakPlacementMarkerSnapshot, KillstreakRecipientSnapshot } from './killstreak-runtime';
+import {
+  CARPET_BOMBER_IMPACT_FLASH_BASE_RADIUS_M,
+  CARPET_BOMBER_IMPACT_FLASH_MAXIMUM_SCALE,
+  type DroneSensorContact,
+  type KillstreakEntitySnapshot,
+  type KillstreakImpactEvent,
+  type KillstreakPlacementMarkerSnapshot,
+  type KillstreakRecipientSnapshot,
+} from './killstreak-runtime';
 import { DRONE_PRESENTATION_FAMILY_ID, DRONE_SUPPORT_DEFINITIONS } from './killstreak-support-catalog';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import { SUPPORT_WEAPON_FEEDBACK_CONTRACT } from './support-vehicle-presentation-contract';
 import { yieldBrowserCpuTask, yieldBrowserPreparationFrame } from './browser-preparation-scheduler';
 import { GPU_SHARED_GEOMETRY_KEY } from './gpu-resource-ownership';
+import { attachPass70DroneSwarmBodyMarks } from './pass70-drone-swarm-logo';
 
 const MAX_PRESENTED_ENTITIES = 32;
 const MAX_IMPACT_FLASHES = 20;
@@ -16,7 +25,8 @@ const MAX_BOMB_SHELLS = 20;
 const EMBERS_PER_CARPET_IMPACT = 6;
 const MAX_EMBER_PARTICLES = MAX_BOMB_SHELLS * EMBERS_PER_CARPET_IMPACT;
 const BOMB_SHELL_DROP_DURATION_MS = 420;
-const BOMB_SHELL_ALTITUDE = 20;
+export const CARPET_BOMB_SHELL_PRESENTATION_ALTITUDE_M = 20;
+export const CARPET_BOMB_SHELL_PRESENTATION_RADIUS_M = 0.12;
 const EMBER_GRAVITY_MPS2 = 11.25;
 const MAX_SENSOR_CONTACTS = 16;
 const MAX_PLACEMENT_MARKERS = 8;
@@ -61,7 +71,7 @@ export const SUPPORT_VEHICLE_ASSETS = Object.freeze({
     './assets/original/models/support/pass65-care-crate-lod1.glb',
   ]),
 } as const);
-type SupportVehicleAssetFamily = keyof typeof SUPPORT_VEHICLE_ASSETS;
+export type SupportVehicleAssetFamily = keyof typeof SUPPORT_VEHICLE_ASSETS;
 type SupportAircraftVariant = Extract<SupportVehicleAssetFamily, 'care' | 'carpet'>;
 type LoadedSupportVehicleLod = Readonly<{
   scene: THREE.Group;
@@ -79,6 +89,21 @@ export type SupportAircraftWingVisibility = Readonly<{
   lateralSpanRatio: number;
   passed: boolean;
 }>;
+export type AuthoredSupportStaticBatchBudget = Readonly<{
+  sourceMeshes: number;
+  batches: number;
+  retiredSourceMeshes: number;
+  batchOutputMeshes: number;
+  visibleMeshes: number;
+  visibleMaterials: number;
+  stableVisibleMeshes: number;
+  stableVisibleMaterials: number;
+  exteriorBatchMeshes: number;
+  exteriorBatchMaterials: number;
+  visibleBounds: Readonly<{ min: readonly number[]; max: readonly number[] }> | null;
+  rearTailBatchMeshes: number;
+  rearTailBatchBounds: Readonly<{ min: readonly number[]; max: readonly number[] }> | null;
+}>;
 const SUPPORT_VEHICLE_LOAD_TIMEOUT_MS = 20_000;
 const SUPPORT_VEHICLE_MAX_CONCURRENT_DECODES = 2;
 const SUPPORT_VEHICLE_TARGET_DIMENSIONS: Readonly<Record<SupportVehicleAssetFamily, number>> = Object.freeze({
@@ -90,6 +115,29 @@ const SUPPORT_VEHICLE_TARGET_DIMENSIONS: Readonly<Record<SupportVehicleAssetFami
   carpet: 17,
   crate: 3.2,
 });
+export const SUPPORT_VEHICLE_LOD_DISTANCES = Object.freeze([0, 95, 190] as const);
+
+export function deriveSupportVehiclePrewarmDistances(
+  lodDistances: readonly [number, number, number] = SUPPORT_VEHICLE_LOD_DISTANCES,
+  nearFieldDimension = SUPPORT_VEHICLE_TARGET_DIMENSIONS.chopper,
+): readonly [number, number, number] {
+  const [lod0Start, lod1Start, lod2Start] = lodDistances;
+  if (lod0Start !== 0 || !(lod1Start > lod0Start) || !(lod2Start > lod1Start)) {
+    throw new Error('Support vehicle LOD distances must be three strictly increasing bands starting at zero');
+  }
+  const fartherBandWidth = lod2Start - lod1Start;
+  const nearFieldDistance = nearFieldDimension * 1.2;
+  if (!(nearFieldDistance > lod0Start && nearFieldDistance < lod1Start)) {
+    throw new Error('Support vehicle near-field prewarm must remain inside the authored LOD0 band');
+  }
+  return Object.freeze([
+    nearFieldDistance,
+    lod1Start + fartherBandWidth * 0.5,
+    lod2Start + fartherBandWidth * 0.5,
+  ]);
+}
+
+export const SUPPORT_VEHICLE_PREWARM_DISTANCES = deriveSupportVehiclePrewarmDistances();
 const SUPPORT_VEHICLE_REQUIRED_NODES: Readonly<Record<SupportVehicleAssetFamily, readonly string[]>> = Object.freeze({
   chopper: Object.freeze([
     'chopper-fuselage', 'chopper-rear-fuselage', 'chopper-tail-boom', 'chopper-tail-fin',
@@ -353,6 +401,7 @@ function markSharedPresentationAsset(root: THREE.Object3D): void {
 const AUTHORED_SUPPORT_SHADOW_MATERIALS = Object.freeze({
   chopper: new Set([
     'MAT_Pass65Chopper_Armor_PBR',
+    'MAT_Pass65Chopper_RearTailArmor_PBR',
     'MAT_Pass65Chopper_DarkArmor',
     'MAT_Pass65Chopper_Gunmetal',
     'MAT_Pass65Chopper_RotorBlade',
@@ -383,6 +432,124 @@ function applyAuthoredSupportShadowBudget(
     // every instrument, emissive chip, line and transparent rotor disc a
     // caster multiplied support-streak submissions without a visible benefit.
     node.castShadow = materials.some((entry) => authoredSupportMaterialCastsShadow(family, entry.name));
+  });
+}
+
+const CHOPPER_DISPLAY_MATERIALS = Object.freeze(new Map<string, Readonly<{
+  color: number;
+  emissive: number;
+}>>([
+  ['MAT_Pass65Chopper_CyanDisplay', Object.freeze({ color: 0x02090c, emissive: 0x00465d })],
+  ['MAT_Pass65Chopper_GreenDisplay', Object.freeze({ color: 0x020a05, emissive: 0x003b17 })],
+]));
+
+const CHOPPER_READABILITY_MATERIALS = Object.freeze(new Map<string, Readonly<{
+  emissive: number;
+  intensity: number;
+  minimumRoughness?: number;
+  maximumMetalness?: number;
+}>>([
+  ['MAT_Pass65Chopper_Armor_PBR', Object.freeze({ emissive: 0x4d8a68, intensity: 0.7 })],
+  ['MAT_Pass65Chopper_RearTailArmor_PBR', Object.freeze({
+    emissive: 0x6f916d,
+    intensity: 0.95,
+    minimumRoughness: 0.78,
+    maximumMetalness: 0.28,
+  })],
+  ['MAT_Pass65Chopper_DarkArmor', Object.freeze({ emissive: 0x263f36, intensity: 0.45 })],
+  ['MAT_Pass65Chopper_Gunmetal', Object.freeze({ emissive: 0x3f5054, intensity: 0.4 })],
+  ['MAT_Pass65Chopper_CockpitFrame', Object.freeze({ emissive: 0x2f6653, intensity: 0.55 })],
+  ['MAT_Pass65Chopper_CockpitInterior', Object.freeze({ emissive: 0x28513a, intensity: 0.45 })],
+  ['MAT_Pass65Chopper_PanelWear', Object.freeze({ emissive: 0x6b5723, intensity: 0.45 })],
+  ['MAT_Pass65Chopper_RescueAccent', Object.freeze({ emissive: 0xa63b0a, intensity: 0.6 })],
+  ['MAT_Pass65Chopper_RotorBlade', Object.freeze({ emissive: 0x172424, intensity: 0.3 })],
+]));
+
+const CHOPPER_REAR_TAIL_SEMANTIC_NODES = Object.freeze([
+  'chopper-rear-fuselage',
+  'chopper-tail-boom',
+] as const);
+const CHOPPER_REAR_TAIL_MATERIAL_NAME = 'MAT_Pass65Chopper_RearTailArmor_PBR';
+
+function isolateAuthoredChopperRearTailArmor(root: THREE.Object3D): void {
+  const clones = new Map<THREE.MeshStandardMaterial, THREE.MeshStandardMaterial>();
+  for (const semanticName of CHOPPER_REAR_TAIL_SEMANTIC_NODES) {
+    root.getObjectByName(semanticName)?.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      const sourceMaterials = Array.isArray(node.material) ? node.material : [node.material];
+      let changed = false;
+      const materials = sourceMaterials.map((entry) => {
+        if (!(entry instanceof THREE.MeshStandardMaterial)
+          || entry.name !== 'MAT_Pass65Chopper_Armor_PBR') return entry;
+        let clone = clones.get(entry);
+        if (!clone) {
+          clone = entry.clone();
+          clone.name = CHOPPER_REAR_TAIL_MATERIAL_NAME;
+          clone.userData = { ...entry.userData };
+          clones.set(entry, clone);
+        }
+        changed = true;
+        return clone;
+      });
+      if (!changed) return;
+      node.material = Array.isArray(node.material) ? materials : materials[0]!;
+    });
+  }
+}
+
+/**
+ * The authored Chopper is deliberately dark military hardware, but its first
+ * runtime pass collapsed into an unlit silhouette and the three cockpit MFD
+ * backplates read as opaque cyan/green placeholders. Keep the textured PBR
+ * response and physical instrument geometry, while adding a small bounded
+ * self-fill and turning only the named MFD backplates into dark glass.
+ */
+export function applyAuthoredChopperReadability(root: THREE.Object3D): void {
+  // The rear cabin and tail are one continuous authored volume, but their
+  // shared high-metalness armor collapses into black test-bay walls while the
+  // separately materialled canopy and rotor tips remain visible. Isolate only
+  // those named semantic subtrees so their retained PBR textures can receive a
+  // bounded fill without flattening or brightening the complete airframe.
+  isolateAuthoredChopperRearTailArmor(root);
+  const visited = new Set<THREE.Material>();
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const entry of materials) {
+      if (visited.has(entry) || !(entry instanceof THREE.MeshStandardMaterial)) continue;
+      visited.add(entry);
+      if (entry.userData.pass70ChopperReadabilityApplied === true) continue;
+      const display = CHOPPER_DISPLAY_MATERIALS.get(entry.name);
+      if (display) {
+        entry.color.setHex(display.color);
+        entry.emissive.setHex(display.emissive);
+        entry.emissiveIntensity = 0.34;
+        entry.transparent = true;
+        entry.opacity = 0.38;
+        entry.depthWrite = false;
+        entry.roughness = Math.max(entry.roughness, 0.38);
+        entry.metalness = Math.min(entry.metalness, 0.22);
+        entry.userData.pass70ChopperReadabilityApplied = true;
+        entry.needsUpdate = true;
+        continue;
+      }
+      const readability = CHOPPER_READABILITY_MATERIALS.get(entry.name);
+      if (!readability) continue;
+      // The Armor emissive texture is an intentionally black authoring mask.
+      // Retaining it multiplies the bounded fill back to zero in WebGPU.
+      if (entry.name === 'MAT_Pass65Chopper_Armor_PBR'
+        || entry.name === CHOPPER_REAR_TAIL_MATERIAL_NAME) entry.emissiveMap = null;
+      entry.emissive.setHex(readability.emissive);
+      entry.emissiveIntensity = readability.intensity;
+      if (readability.minimumRoughness !== undefined) {
+        entry.roughness = Math.max(entry.roughness, readability.minimumRoughness);
+      }
+      if (readability.maximumMetalness !== undefined) {
+        entry.metalness = Math.min(entry.metalness, readability.maximumMetalness);
+      }
+      entry.userData.pass70ChopperReadabilityApplied = true;
+      entry.needsUpdate = true;
+    }
   });
 }
 
@@ -510,6 +677,7 @@ function loadSupportVehicleLod(
         if (!(sourceMaxDimension > 0)) throw new Error(`${asset}: authored scene has no measurable geometry`);
         const contentDigests = await supportTextureContentDigests(gltf);
         supportVehicleTextureCanonicalizer.canonicalize(scene, contentDigests);
+        if (family === 'chopper') applyAuthoredChopperReadability(scene);
         markSharedPresentationAsset(scene);
         // Static batching is template work, not instance work. Build it once
         // while this LOD is entering the retained cache; all later support-pool
@@ -616,6 +784,7 @@ export function supportVehiclePresentationTelemetry(): Readonly<{
   failures: Readonly<Record<string, string>>;
   textureDedup: SupportVehicleTextureDedupTelemetry;
   aircraftWings: Readonly<Record<string, readonly SupportAircraftWingVisibility[]>>;
+  staticBatches: Readonly<Record<string, readonly AuthoredSupportStaticBatchBudget[]>>;
 }> {
   return Object.freeze({
     state: supportVehicleLoadState,
@@ -631,6 +800,12 @@ export function supportVehiclePresentationTelemetry(): Readonly<{
         .map(([family, template]) => [family, Object.freeze(template.lods.map((lod) => (
           lod.scene.userData.aircraftWingVisibility as SupportAircraftWingVisibility
         )))])
+    )),
+    staticBatches: Object.freeze(Object.fromEntries(
+      [...supportVehicleTemplates.entries()].map(([family, template]) => [
+        family,
+        Object.freeze(template.lods.map((lod) => authoredSupportStaticBatchBudget(lod.scene))),
+      ]),
     )),
   });
 }
@@ -710,7 +885,9 @@ function animatedSwarmAncestor(
 }
 
 function swarmStaticMergeKey(mesh: THREE.Mesh): string | null {
-  if (Array.isArray(mesh.material) || mesh instanceof THREE.SkinnedMesh) return null;
+  if (Array.isArray(mesh.material)
+    || mesh instanceof THREE.SkinnedMesh
+    || !authoredSupportStaticGeometryCanBatch(mesh.geometry)) return null;
   const attributeSignature = (attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute): string => {
     const array = attribute instanceof THREE.InterleavedBufferAttribute ? attribute.data.array : attribute.array;
     const gpuType = 'gpuType' in attribute ? attribute.gpuType : null;
@@ -751,6 +928,68 @@ function supportAnimationTargetNames(animations: readonly THREE.AnimationClip[])
   return names;
 }
 
+const SUPPORT_STATIC_TRANSFORM_ATTRIBUTES = Object.freeze(['position', 'normal', 'tangent'] as const);
+
+export function authoredSupportStaticGeometryCanBatch(geometry: THREE.BufferGeometry): boolean {
+  // Three transforms only direct geometry attributes in applyMatrix4(); morph
+  // targets need different absolute/relative semantics and are not present in
+  // the authored support corpus. Leave any future morph-bearing primitive in
+  // its source hierarchy rather than silently baking an invalid static batch.
+  return !Object.values(geometry.morphAttributes).some((entries) => entries.length > 0);
+}
+
+function float32TransformAttribute(
+  source: THREE.BufferAttribute | THREE.InterleavedBufferAttribute,
+): THREE.Float32BufferAttribute {
+  const values = new Float32Array(source.count * source.itemSize);
+  for (let index = 0; index < source.count; index += 1) {
+    const offset = index * source.itemSize;
+    if (source.itemSize > 0) values[offset] = source.getX(index);
+    if (source.itemSize > 1) values[offset + 1] = source.getY(index);
+    if (source.itemSize > 2) values[offset + 2] = source.getZ(index);
+    if (source.itemSize > 3) values[offset + 3] = source.getW(index);
+  }
+  const result = new THREE.Float32BufferAttribute(values, source.itemSize, false);
+  result.name = source.name;
+  result.setUsage(source instanceof THREE.InterleavedBufferAttribute ? source.data.usage : source.usage);
+  return result;
+}
+
+function dequantizeSupportStaticTransformAttributes(geometry: THREE.BufferGeometry): void {
+  for (const name of SUPPORT_STATIC_TRANSFORM_ATTRIBUTES) {
+    const attribute = geometry.getAttribute(name);
+    if (attribute && (attribute.normalized || !(attribute.array instanceof Float32Array))) {
+      geometry.setAttribute(name, float32TransformAttribute(attribute));
+    }
+  }
+}
+
+/**
+ * Clone one authored static primitive into its batch anchor without writing
+ * transformed values back through glTF's normalized integer quantization.
+ *
+ * Meshopt/KHR_mesh_quantization delivers support POSITION as normalized
+ * Int16. BufferGeometry.applyMatrix4() uses attribute setters, so applying a
+ * node translation directly to that integer clone clamps/wraps coordinates
+ * outside [-1, 1] and collapses the complete aircraft around the origin.
+ * Only transform-bearing attributes are expanded; UVs, colours, indices,
+ * groups and metadata retain their compact authored representation.
+ */
+export function cloneAuthoredSupportStaticGeometryForTransform(
+  source: THREE.BufferGeometry,
+  matrix: THREE.Matrix4,
+): THREE.BufferGeometry {
+  if (!authoredSupportStaticGeometryCanBatch(source)) {
+    throw new Error('Authored support static batching rejects morph-target geometry');
+  }
+  const transformed = source.clone();
+  dequantizeSupportStaticTransformAttributes(transformed);
+  transformed.applyMatrix4(matrix);
+  transformed.computeBoundingBox();
+  transformed.computeBoundingSphere();
+  return transformed;
+}
+
 async function batchAuthoredSupportStaticMeshes(
   anchor: THREE.Object3D,
   family: SupportVehicleAssetFamily,
@@ -783,17 +1022,20 @@ async function batchAuthoredSupportStaticMeshes(
     const transformed: THREE.BufferGeometry[] = [];
     for (const [index, source] of sources.entries()) {
       const localMatrix = new THREE.Matrix4().multiplyMatrices(anchorInverse, source.matrixWorld);
-      transformed.push(source.geometry.clone().applyMatrix4(localMatrix));
+      transformed.push(cloneAuthoredSupportStaticGeometryForTransform(source.geometry, localMatrix));
       if ((index + 1) % SUPPORT_STATIC_TRANSFORMS_PER_TASK === 0) await yieldPresentationCpuTask();
     }
     const geometry = mergeGeometries(transformed, false);
     for (const entry of transformed) entry.dispose();
     if (!geometry) continue;
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
     const representative = sources[0]!;
     const batch = new THREE.Mesh(geometry, representative.material);
     batch.name = `pass65-${family}-${scope}-static-batch-${batches + 1}`;
     batch.userData.presentationOnly = true;
     batch.userData.supportStaticBatchOutput = true;
+    batch.userData.supportStaticBatchScope = scope;
     batch.userData.sourceMeshes = sources.length;
     batch.castShadow = representative.castShadow;
     batch.receiveShadow = representative.receiveShadow;
@@ -864,7 +1106,7 @@ export function supportAircraftWingVisibility(
   });
 }
 
-async function optimizeAuthoredSupportLevel(
+export async function optimizeAuthoredSupportLevel(
   level: THREE.Group,
   family: SupportVehicleAssetFamily,
   animations: readonly THREE.AnimationClip[],
@@ -1025,6 +1267,18 @@ export type KillstreakCarpetWorkflowTelemetry = Readonly<{
     | 'depthTest' | 'writesDepth' | 'raycastDisabled' | 'visible'>>[];
 }>;
 
+type FirstPersonCockpitAlignmentTelemetry = Readonly<{
+  cameraWorldPosition: readonly number[];
+  cameraPivotWorldPosition: readonly number[];
+  cockpitWorldPosition: readonly number[];
+  parentName: string;
+  parentWorldScale: readonly number[];
+  pivotErrorM: number;
+  dashboardCameraSpacePosition: readonly number[] | null;
+  hudCameraSpacePosition: readonly number[] | null;
+  weaponCameraSpacePosition: readonly number[] | null;
+}>;
+
 export type KillstreakPresentationTelemetry = Readonly<{
   entities: number;
   impactFlashes: number;
@@ -1050,6 +1304,16 @@ export type KillstreakPresentationTelemetry = Readonly<{
     visible: boolean;
     visibleMeshCount: number;
     visibleBounds: Readonly<{ min: readonly number[]; max: readonly number[] }> | null;
+    stableAirframeMeshCount: number;
+    stableAirframeBounds: Readonly<{ min: readonly number[]; max: readonly number[] }> | null;
+    drawableStableAirframeMeshCount: number;
+    drawableStableAirframeBounds: Readonly<{ min: readonly number[]; max: readonly number[] }> | null;
+    stableAirframeDrawRejections: Readonly<{
+      hierarchy: number;
+      layer: number;
+      material: number;
+      frustum: number;
+    }>;
     activeLodIndex: number | null;
     activeLodName: string | null;
     activeLodAsset: string | null;
@@ -1075,8 +1339,13 @@ export type KillstreakPresentationTelemetry = Readonly<{
     presentationSource: string;
     visibleMeshNames: readonly string[];
     visibleOutsideSightline: readonly string[];
+    visibleOutsideCockpit: readonly string[];
+    dashboardVisible: boolean;
+    displaysVisible: boolean;
     hudVisible: boolean;
     weaponVisible: boolean;
+    overlayLayerExclusive: boolean;
+    alignment: FirstPersonCockpitAlignmentTelemetry | null;
   }> | null;
   markerDetails: readonly KillstreakPlacementMarkerTelemetry[];
   bounded: boolean;
@@ -1121,6 +1390,26 @@ function isGunnerSightlineNode(root: THREE.Object3D, node: THREE.Object3D): bool
   return false;
 }
 
+function isGunnerWeaponViewNode(root: THREE.Object3D, node: THREE.Object3D): boolean {
+  let cursor: THREE.Object3D | null = node;
+  while (cursor && cursor !== root) {
+    if (cursor.name === 'chopper-gunner-weapon-view'
+      || cursor.userData.gunnerWeaponPresentation === true) return true;
+    cursor = cursor.parent;
+  }
+  return false;
+}
+
+function isGunnerCockpitNode(root: THREE.Object3D, node: THREE.Object3D): boolean {
+  let cursor: THREE.Object3D | null = node;
+  while (cursor && cursor !== root) {
+    if (cursor.name === 'chopper-first-person-cockpit'
+      || cursor.userData.firstPersonCockpit === true) return true;
+    cursor = cursor.parent;
+  }
+  return false;
+}
+
 function isFirstPersonOnlyNode(root: THREE.Object3D, node: THREE.Object3D): boolean {
   let cursor: THREE.Object3D | null = node;
   while (cursor && cursor !== root) {
@@ -1130,30 +1419,235 @@ function isFirstPersonOnlyNode(root: THREE.Object3D, node: THREE.Object3D): bool
   return false;
 }
 
+const SUPPORT_STABLE_AIRFRAME_EXCLUDED_SUBTREES = Object.freeze(new Set([
+  'chopper-first-person-cockpit',
+  'chopper-gunner-sightline',
+  'chopper-gunner-weapon-view',
+  'chopper-muzzle-flash',
+  'chopper-tracer-action',
+  'chopper-impact-action',
+]));
+
+function isStableAirframeReviewNode(root: THREE.Object3D, node: THREE.Object3D): boolean {
+  let cursor: THREE.Object3D | null = node;
+  while (cursor && cursor !== root) {
+    if (SUPPORT_STABLE_AIRFRAME_EXCLUDED_SUBTREES.has(cursor.name)
+      || cursor.userData.firstPersonOnly === true
+      || cursor.userData.gunnerSightline === true
+      || cursor.userData.gunnerWeaponPresentation === true) return false;
+    cursor = cursor.parent;
+  }
+  return true;
+}
+
+export function authoredSupportStaticBatchBudget(root: THREE.Object3D): AuthoredSupportStaticBatchBudget {
+  root.updateWorldMatrix(true, true);
+  const stats = root.userData.supportStaticBatchStats as Readonly<{
+    sourceMeshes?: number;
+    batches?: number;
+  }> | undefined;
+  const visibleMaterials = new Set<THREE.Material>();
+  const stableVisibleMaterials = new Set<THREE.Material>();
+  const exteriorBatchMaterials = new Set<THREE.Material>();
+  const visibleBounds = new THREE.Box3();
+  const rearTailBatchBounds = new THREE.Box3();
+  const meshBounds = new THREE.Box3();
+  let retiredSourceMeshes = 0;
+  let batchOutputMeshes = 0;
+  let visibleMeshes = 0;
+  let stableVisibleMeshes = 0;
+  let exteriorBatchMeshes = 0;
+  let rearTailBatchMeshes = 0;
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    const retired = node.userData.staticBatchRendered === true
+      && node.userData.supportStaticBatchOutput !== true;
+    if (retired) retiredSourceMeshes += 1;
+    if (node.userData.supportStaticBatchOutput === true) batchOutputMeshes += 1;
+    if (!visibleThroughAncestor(root, node)) return;
+    node.geometry.computeBoundingBox();
+    if (node.geometry.boundingBox && !node.geometry.boundingBox.isEmpty()) {
+      meshBounds.copy(node.geometry.boundingBox).applyMatrix4(node.matrixWorld);
+      visibleBounds.union(meshBounds);
+    }
+    visibleMeshes += 1;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const material of materials) visibleMaterials.add(material);
+    if (node.userData.supportStaticBatchOutput === true
+      && node.userData.supportStaticBatchScope === 'exterior') {
+      exteriorBatchMeshes += 1;
+      for (const material of materials) exteriorBatchMaterials.add(material);
+    }
+    if (isStableAirframeReviewNode(root, node)) {
+      stableVisibleMeshes += 1;
+      for (const material of materials) stableVisibleMaterials.add(material);
+    }
+    if (materials.some((material) => material.name === CHOPPER_REAR_TAIL_MATERIAL_NAME)) {
+      rearTailBatchMeshes += 1;
+      if (node.geometry.boundingBox && !node.geometry.boundingBox.isEmpty()) rearTailBatchBounds.union(meshBounds);
+    }
+  });
+  const frozenBounds = (bounds: THREE.Box3): Readonly<{ min: readonly number[]; max: readonly number[] }> | null => (
+    bounds.isEmpty() ? null : Object.freeze({
+      min: Object.freeze(bounds.min.toArray()),
+      max: Object.freeze(bounds.max.toArray()),
+    })
+  );
+  return Object.freeze({
+    sourceMeshes: Number(stats?.sourceMeshes ?? 0),
+    batches: Number(stats?.batches ?? 0),
+    retiredSourceMeshes,
+    batchOutputMeshes,
+    visibleMeshes,
+    visibleMaterials: visibleMaterials.size,
+    stableVisibleMeshes,
+    stableVisibleMaterials: stableVisibleMaterials.size,
+    exteriorBatchMeshes,
+    exteriorBatchMaterials: exteriorBatchMaterials.size,
+    visibleBounds: frozenBounds(visibleBounds),
+    rearTailBatchMeshes,
+    rearTailBatchBounds: frozenBounds(rearTailBatchBounds),
+  });
+}
+
+export function supportVehicleStableAirframeBounds(
+  root: THREE.Object3D,
+  camera?: THREE.Camera,
+  submittedScene?: THREE.Scene,
+): Readonly<{
+  meshCount: number;
+  bounds: Readonly<{ min: readonly number[]; max: readonly number[] }> | null;
+  drawableMeshCount: number;
+  drawableBounds: Readonly<{ min: readonly number[]; max: readonly number[] }> | null;
+  drawRejections: Readonly<{ hierarchy: number; layer: number; material: number; frustum: number }>;
+}> {
+  root.updateWorldMatrix(true, true);
+  const bounds = new THREE.Box3();
+  const drawableBounds = new THREE.Box3();
+  const meshBounds = new THREE.Box3();
+  let meshCount = 0;
+  let drawableMeshCount = 0;
+  let hierarchyRejections = 0;
+  let layerRejections = 0;
+  let materialRejections = 0;
+  let frustumRejections = 0;
+  let frustum: THREE.Frustum | null = null;
+  if (camera) {
+    camera.updateWorldMatrix(true, false);
+    frustum = new THREE.Frustum().setFromProjectionMatrix(
+      new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse),
+      camera.coordinateSystem,
+    );
+  }
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)
+      || !visibleThroughAncestor(root, node)
+      || !isStableAirframeReviewNode(root, node)) return;
+    node.geometry.computeBoundingBox();
+    if (!node.geometry.boundingBox || node.geometry.boundingBox.isEmpty()) return;
+    meshBounds.copy(node.geometry.boundingBox).applyMatrix4(node.matrixWorld);
+    bounds.union(meshBounds);
+    meshCount += 1;
+    let hierarchyVisible = root.parent !== null;
+    let terminalAncestor: THREE.Object3D = root;
+    let ancestor: THREE.Object3D | null = root.parent;
+    while (hierarchyVisible && ancestor) {
+      hierarchyVisible = ancestor.visible;
+      terminalAncestor = ancestor;
+      ancestor = ancestor.parent;
+    }
+    hierarchyVisible &&= terminalAncestor instanceof THREE.Scene
+      && (submittedScene === undefined || terminalAncestor === submittedScene);
+    if (!hierarchyVisible) {
+      hierarchyRejections += 1;
+      return;
+    }
+    if (camera && !camera.layers.test(node.layers)) {
+      layerRejections += 1;
+      return;
+    }
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    if (!materials.some((entry) => entry.visible && entry.colorWrite && entry.opacity > 0)) {
+      materialRejections += 1;
+      return;
+    }
+    if (frustum && node.frustumCulled && !frustum.intersectsObject(node)) {
+      frustumRejections += 1;
+      return;
+    }
+    drawableBounds.union(meshBounds);
+    drawableMeshCount += 1;
+  });
+  return Object.freeze({
+    meshCount,
+    bounds: bounds.isEmpty() ? null : Object.freeze({
+      min: Object.freeze(bounds.min.toArray()),
+      max: Object.freeze(bounds.max.toArray()),
+    }),
+    drawableMeshCount,
+    drawableBounds: drawableBounds.isEmpty() ? null : Object.freeze({
+      min: Object.freeze(drawableBounds.min.toArray()),
+      max: Object.freeze(drawableBounds.max.toArray()),
+    }),
+    drawRejections: Object.freeze({
+      hierarchy: hierarchyRejections,
+      layer: layerRejections,
+      material: materialRejections,
+      frustum: frustumRejections,
+    }),
+  });
+}
+
 const supportMaterialBaseDepthWrite = new WeakMap<THREE.Material, boolean>();
+const SUPPORT_WORLD_RENDER_LAYER = 0;
+const SUPPORT_FIRST_PERSON_RENDER_LAYER = 2;
 
 function setSupportFirstPersonVisibility(root: THREE.Group, possessed: boolean): void {
   root.visible = true;
   root.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
     const gunnerSightlineNode = isGunnerSightlineNode(root, node);
+    const gunnerWeaponViewNode = isGunnerWeaponViewNode(root, node);
+    const gunnerSightBlocker = gunnerSightlineNode && !gunnerWeaponViewNode;
+    const gunnerCockpitNode = isGunnerCockpitNode(root, node);
     const firstPersonOnlyNode = isFirstPersonOnlyNode(root, node);
     const retiredStaticSource = node.userData.staticBatchRendered === true
       && node.userData.supportStaticBatchOutput !== true;
     const overrideActive = node.userData.supportFirstPersonOverrideActive === true;
     if (possessed) {
-      if (!overrideActive) node.userData.supportBaseVisible = node.visible;
+      if (!overrideActive) {
+        node.userData.supportBaseVisible = node.visible;
+        node.userData.supportBaseLayerMask = node.layers.mask;
+      }
       node.userData.supportFirstPersonOverrideActive = true;
-      node.visible = gunnerSightlineNode && !retiredStaticSource;
+      // The DOM reticle and authoritative camera ray already own the exact
+      // centre. Retire the GLB combiner-glass/reticle subtree during
+      // possession while retaining the off-centre gun receiver and authored
+      // lower cockpit; two overlapping HUD lanes created the opaque block.
+      node.visible = gunnerCockpitNode && !gunnerSightBlocker && !retiredStaticSource;
+      if (gunnerCockpitNode) {
+        // The complete cockpit is a first-person viewmodel. Keep optional
+        // effects layers, but remove the ordinary world layer so both renderer
+        // backends use the established isolated viewmodel vocabulary.
+        node.layers.mask = (node.layers.mask & ~(1 << SUPPORT_WORLD_RENDER_LAYER))
+          | (1 << SUPPORT_FIRST_PERSON_RENDER_LAYER);
+      }
     } else if (overrideActive) {
       node.visible = node.userData.supportBaseVisible === true && !firstPersonOnlyNode;
+      if (typeof node.userData.supportBaseLayerMask === 'number') {
+        node.layers.mask = node.userData.supportBaseLayerMask;
+      }
       node.userData.supportFirstPersonOverrideActive = false;
     } else if (firstPersonOnlyNode) {
       node.visible = false;
     }
-    if (!node.material || !gunnerSightlineNode) return;
+    if (!node.material || !gunnerCockpitNode) return;
     const materials = Array.isArray(node.material) ? node.material : [node.material];
     for (const entry of materials) {
+      // Only transparent cockpit glass opts out of depth writes. The retained
+      // gun is opaque and depth-correct; it must never inherit the retired HUD
+      // subtree's overlay semantics and become see-through.
+      if (!entry.transparent && entry.opacity >= 1) continue;
       if (!supportMaterialBaseDepthWrite.has(entry)) supportMaterialBaseDepthWrite.set(entry, entry.depthWrite);
       entry.depthWrite = possessed ? false : supportMaterialBaseDepthWrite.get(entry)!;
     }
@@ -1200,7 +1694,7 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
     // switches meant players almost never saw LOD0's full detailing - the
     // authored craft read as low-poly slabs. One or two active vehicles can
     // afford LOD0 at every practical gameplay distance.
-    lod.addLevel(level, [0, 95, 190][index] ?? index * 95);
+    lod.addLevel(level, SUPPORT_VEHICLE_LOD_DISTANCES[index] ?? index * SUPPORT_VEHICLE_LOD_DISTANCES[1]);
     const mixer = new THREE.AnimationMixer(level);
     for (const clipName of SUPPORT_VEHICLE_LOOP_ACTIONS[family]) {
       const clip = source.animations.find((candidate) => candidate.name === clipName);
@@ -1297,6 +1791,7 @@ function buildProceduralChopperFallback(): PresentedEntity {
   gun.position.set(0, -0.58, -0.72);
   const gunMuzzle = presentationSocket('chopper-gun-muzzle-socket', [0, -0.58, -1.24]);
   const forwardSocket = presentationSocket('chopper-forward-socket', [0, 0, -1.9]);
+  const noseSensor = presentationSocket('chopper-nose-sensor', [0, -0.28, -1.72]);
   const muzzleFlashAction = presentationSocket('chopper-muzzle-flash', [0, -0.58, -1.24]);
   const tracerAction = presentationSocket('chopper-tracer-action', [0, -0.58, -1.24]);
   const impactAction = presentationSocket('chopper-impact-action', [0, -0.58, -1.24]);
@@ -1384,7 +1879,7 @@ function buildProceduralChopperFallback(): PresentedEntity {
   root.add(
     fuselage, rearFuselage, canopy, glareshield, belly, noseArmour, tail, fin, stabilizer,
     ...stubWings, ...enginePods, ...rocketPods,
-    gun, gunMuzzle, forwardSocket, muzzleFlashAction, tracerAction, impactAction,
+    gun, gunMuzzle, forwardSocket, noseSensor, muzzleFlashAction, tracerAction, impactAction,
     cameraSocket, cockpit, rotor, tailRotor, ...skids,
   );
   root.userData.forwardAxis = [0, 0, -1];
@@ -1440,6 +1935,7 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
       const clip = hunterDroneAnimations.find((candidate) => candidate.name === clipName);
       if (clip) mixer.clipAction(clip).play();
     }
+    if (mode === 'swarm') attachPass70DroneSwarmBodyMarks(root);
     return presentedEntity(root, null, [mixer], true);
   }
   const root = new THREE.Group();
@@ -1478,6 +1974,7 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
     rotor.add(arm, disc);
   }
   root.add(body, eye, gun, muzzleSocket, cameraSocket, rotor);
+  if (mode === 'swarm') attachPass70DroneSwarmBodyMarks(root);
   root.userData.presentationSource = 'procedural-non-release-fallback';
   return presentedEntity(root, rotor, [], false);
 }
@@ -1758,6 +2255,10 @@ export class KillstreakPresentation {
   private readonly firstPersonForwardScratch = new THREE.Vector3();
   private readonly firstPersonSocketQuaternionScratch = new THREE.Quaternion();
   private readonly firstPersonRootQuaternionScratch = new THREE.Quaternion();
+  private readonly firstPersonCockpitCameraPivot = new WeakMap<THREE.Object3D, THREE.Vector3>();
+  private readonly firstPersonCockpitSocketWorldScratch = new THREE.Vector3();
+  private readonly firstPersonCockpitDesiredParentScratch = new THREE.Vector3();
+  private readonly firstPersonCockpitPivotOffsetScratch = new THREE.Vector3();
   private readonly sensorRoot = new THREE.Group();
   private readonly sensorSilhouettes: THREE.Group[];
   private visibleSensorContacts = 0;
@@ -1765,6 +2266,7 @@ export class KillstreakPresentation {
   private chopperImpactActionsPresented = 0;
   private lastChopperWeaponActions: readonly string[] = Object.freeze([]);
   private firstPersonEntityId: string | null = null;
+  private firstPersonCockpitAlignment: FirstPersonCockpitAlignmentTelemetry | null = null;
   private disposed = false;
   private readonly placementMarkers = new Map<string, PresentedPlacementMarker>();
   private readonly locallyExpiredMarkerRevisions = new Map<string, number>();
@@ -1776,13 +2278,13 @@ export class KillstreakPresentation {
   private disposalFinalized = false;
 
   constructor(
-    scene: THREE.Scene,
+    private readonly submittedScene: THREE.Scene,
     private readonly retireRoot: KillstreakPresentationRetireRoot = disposeRoot,
     private readonly useStorageSwarmMatrices = false,
   ) {
     this.root.name = 'pass65-killstreak-presentations';
     this.root.userData.presentationOnly = true;
-    scene.add(this.root);
+    this.submittedScene.add(this.root);
     this.impactFlashPoolRoot.name = 'pass65-impact-flash-pool';
     this.bombShellPoolRoot.name = 'pass65-bomb-shell-pool';
     this.emberPoolRoot.name = 'pass65-ember-pool';
@@ -1962,11 +2464,13 @@ export class KillstreakPresentation {
       const transformed = primitiveIndices.map((primitiveIndex) => {
         const source = sourceMeshes[0]![primitiveIndex]!;
         const localMatrix = new THREE.Matrix4().multiplyMatrices(anchorInverse, source.matrixWorld);
-        return source.geometry.clone().applyMatrix4(localMatrix);
+        return cloneAuthoredSupportStaticGeometryForTransform(source.geometry, localMatrix);
       });
       const merged = mergeGeometries(transformed, false);
       for (const geometry of transformed) geometry.dispose();
       if (!merged) return false;
+      merged.computeBoundingBox();
+      merged.computeBoundingSphere();
       addBatch(
         merged,
         representative.material,
@@ -2192,6 +2696,7 @@ export class KillstreakPresentation {
     }>>();
     const lodStates = new Map<THREE.LOD, boolean>();
     const possessedMaterialDepthWrite = new Map<THREE.Material, boolean>();
+    const possessedLayerMasks = new Map<THREE.Mesh, number>();
     const chopperRoot = this.entityPools.get('chopper')?.[0]?.root ?? null;
     const rootVisible = this.root.visible;
     const rootFrustumCulled = this.root.frustumCulled;
@@ -2293,25 +2798,49 @@ export class KillstreakPresentation {
         });
         liveRoot.visible = true;
       }
-      // LOD render objects are cached per concrete Object3D. A single near
-      // formation only rehearses LOD0 even after the all-visible vocabulary
-      // compile above; Atomic's live flight paths enter LOD1/LOD2 and used to
-      // build those WebGPU node/material pipelines during the first support
-      // activation. Exercise one exact-scale formation inside every authored
-      // distance band while the deployment surface is still opaque.
-      for (const [passIndex, distance] of [24, 50, 88].entries()) {
-        stageBatchInView(liveActivationRoots, distance, 2.5);
-        for (const entry of liveActivationEntries) {
-          for (const mixer of entry.mixers) mixer.setTime(0.35 + passIndex * 0.4);
+      // LOD render objects are cached per concrete Object3D. The previous
+      // 24/50/88m passes all selected LOD0 after the authored thresholds moved
+      // to 0/95/190m, so the first close production-scale view and both farther
+      // visibility graphs remained cold. Rehearse one near-field LOD0 frame at
+      // the evidence scale, then one frame inside each derived farther band.
+      // The shipped camera ends at 180m, below LOD2's 190m threshold; widen it
+      // only for these hidden fenced submissions and restore it before the
+      // possessed-cockpit pass.
+      const projectionCamera = camera instanceof THREE.PerspectiveCamera || camera instanceof THREE.OrthographicCamera
+        ? camera
+        : null;
+      const originalPrewarmFar = projectionCamera?.far ?? null;
+      const requiredPrewarmFar = SUPPORT_VEHICLE_PREWARM_DISTANCES[2]
+        + Math.max(...Object.values(SUPPORT_VEHICLE_TARGET_DIMENSIONS));
+      if (projectionCamera && projectionCamera.far < requiredPrewarmFar) {
+        projectionCamera.far = requiredPrewarmFar;
+        projectionCamera.updateProjectionMatrix();
+      }
+      try {
+        for (const [passIndex, distance] of SUPPORT_VEHICLE_PREWARM_DISTANCES.entries()) {
+          stageBatchInView(liveActivationRoots, distance, 2.5);
+          for (const entry of liveActivationEntries) {
+            for (const mixer of entry.mixers) mixer.setTime(0.35 + passIndex * 0.4);
+          }
+          camera.updateWorldMatrix(true, false);
+          this.root.updateWorldMatrix(true, false);
+          for (const liveRoot of liveActivationRoots) {
+            // stageBatchInView mutates the pooled roots after the previous
+            // forced frame. Refresh their descendants before selecting LOD;
+            // otherwise node.update(camera) reads the prior pass's matrix and
+            // rehearses every band one submission late.
+            liveRoot.updateWorldMatrix(false, true);
+            liveRoot.traverse((node) => {
+              if (node instanceof THREE.LOD) node.update(camera);
+            });
+          }
+          await runtime.compileAndRender(this.root, camera, parentScene);
         }
-        camera.updateWorldMatrix(true, false);
-        this.root.updateWorldMatrix(true, false);
-        for (const liveRoot of liveActivationRoots) {
-          liveRoot.traverse((node) => {
-            if (node instanceof THREE.LOD) node.update(camera);
-          });
+      } finally {
+        if (projectionCamera && originalPrewarmFar !== null && projectionCamera.far !== originalPrewarmFar) {
+          projectionCamera.far = originalPrewarmFar;
+          projectionCamera.updateProjectionMatrix();
         }
-        await runtime.compileAndRender(this.root, camera, parentScene);
       }
       for (const liveRoot of liveActivationRoots) liveRoot.visible = false;
       if (chopperRoot) {
@@ -2319,10 +2848,17 @@ export class KillstreakPresentation {
         chopperRoot.traverse((node) => {
           if (!(node instanceof THREE.Mesh)) return;
           const gunnerSightlineNode = isGunnerSightlineNode(chopperRoot, node);
-          node.visible = gunnerSightlineNode;
-          if (!gunnerSightlineNode) return;
+          const gunnerCockpitNode = isGunnerCockpitNode(chopperRoot, node);
+          const retiredStaticSource = node.userData.staticBatchRendered === true
+            && node.userData.supportStaticBatchOutput !== true;
+          node.visible = gunnerCockpitNode && !retiredStaticSource;
+          if (!gunnerCockpitNode) return;
+          possessedLayerMasks.set(node, node.layers.mask);
+          node.layers.mask = (node.layers.mask & ~(1 << SUPPORT_WORLD_RENDER_LAYER))
+            | (1 << SUPPORT_FIRST_PERSON_RENDER_LAYER);
           const materials = Array.isArray(node.material) ? node.material : [node.material];
           for (const entry of materials) {
+            if (!gunnerSightlineNode && !entry.transparent && entry.opacity >= 1) continue;
             if (!possessedMaterialDepthWrite.has(entry)) possessedMaterialDepthWrite.set(entry, entry.depthWrite);
             entry.depthWrite = false;
           }
@@ -2338,6 +2874,7 @@ export class KillstreakPresentation {
         batch.instanceMatrix.needsUpdate = true;
       }
       for (const [material, depthWrite] of possessedMaterialDepthWrite) material.depthWrite = depthWrite;
+      for (const [node, layerMask] of possessedLayerMasks) node.layers.mask = layerMask;
       for (const [lod, autoUpdate] of lodStates) lod.autoUpdate = autoUpdate;
       for (const [stagedRootIndex, stagedRoot] of stagedRoots.entries()) {
         stagedRoot.traverse((node) => {
@@ -2498,7 +3035,9 @@ export class KillstreakPresentation {
       if (!flash.active) continue;
       const lifetimeMs = flash.expiresAtMs - flash.createdAtMs;
       const remaining = THREE.MathUtils.clamp((flash.expiresAtMs - nowMs) / lifetimeMs, 0, 1);
-      flash.root.scale.setScalar(flash.baseRadius * (1 + (1 - remaining) * 2.8));
+      flash.root.scale.setScalar(flash.baseRadius * (
+        1 + (1 - remaining) * (CARPET_BOMBER_IMPACT_FLASH_MAXIMUM_SCALE - 1)
+      ));
       flash.root.material.opacity = remaining * flash.maximumOpacity;
       if (remaining > 0) continue;
       this.deactivateImpactFlash(flash);
@@ -2619,7 +3158,7 @@ export class KillstreakPresentation {
           BOMB_SHELL_DROP_DURATION_MS,
         );
         shell.impactAtMs = nowMs + authoredDropDurationMs;
-        shell.startY = impact.position[1] + BOMB_SHELL_ALTITUDE;
+        shell.startY = impact.position[1] + CARPET_BOMB_SHELL_PRESENTATION_ALTITUDE_M;
         shell.impactPosition.set(impact.position[0], impact.position[1] + 0.35, impact.position[2]);
         shell.root.name = 'pass65-carpet-bomb-shell';
         shell.root.position.set(impact.position[0], shell.startY, impact.position[2]);
@@ -2632,7 +3171,7 @@ export class KillstreakPresentation {
       flash.active = true;
       flash.createdAtMs = nowMs;
       flash.expiresAtMs = nowMs + (isCarpet ? 600 : 420);
-      flash.baseRadius = isCarpet ? 1.2 : 0.55;
+      flash.baseRadius = isCarpet ? CARPET_BOMBER_IMPACT_FLASH_BASE_RADIUS_M : 0.55;
       flash.maximumOpacity = isCarpet ? 0.9 : 0.8;
       flash.root.name = isCarpet ? 'pass65-carpet-impact-flash-large' : 'pass65-carpet-impact-flash';
       flash.root.position.set(impact.position[0], impact.position[1] + 0.35, impact.position[2]);
@@ -2710,9 +3249,23 @@ export class KillstreakPresentation {
     return true;
   }
 
+  activeChopperTransientActionNames(): readonly string[] {
+    const transientNames = new Set([
+      'Chopper_Muzzle_Flash',
+      'Chopper_Tracer_Pulse',
+      'Chopper_Impact_Pulse',
+    ]);
+    return Object.freeze([...new Set([...this.entities.values()].flatMap((entry) => (
+      [...entry.oneShotActions.entries()]
+        .filter(([name, actions]) => transientNames.has(name) && actions.some((action) => action.isRunning()))
+        .map(([name]) => name)
+    )))].sort());
+  }
+
   setFirstPersonEntity(id: string | null): void {
     if (id === this.firstPersonEntityId) return;
     this.firstPersonEntityId = id;
+    this.firstPersonCockpitAlignment = null;
     const presented = id ? this.entities.get(id) : null;
     if (presented) {
       // A possessed support view must use the current immutable snapshot pose;
@@ -2736,14 +3289,58 @@ export class KillstreakPresentation {
     return anchor.addScaledVector(forward, 0.08);
   }
 
-  alignFirstPersonCockpit(id: string, cameraWorldQuaternion: THREE.Quaternion): void {
+  alignFirstPersonCockpit(
+    id: string,
+    cameraWorldPosition: THREE.Vector3,
+    cameraWorldQuaternion: THREE.Quaternion,
+  ): void {
     const presented = this.entities.get(id);
-    const root = presented?.root;
     const cockpit = presented?.cockpit;
-    if (!root || !cockpit) return;
-    root.updateWorldMatrix(true, false);
-    const inverseParent = root.getWorldQuaternion(this.firstPersonRootQuaternionScratch).invert();
+    const socket = presented?.cameraSocket;
+    const parent = cockpit?.parent;
+    if (!cockpit || !socket || !parent) return;
+    parent.updateWorldMatrix(true, false);
+    socket.updateWorldMatrix(true, false);
+    cockpit.updateWorldMatrix(true, false);
+    let authoredCameraPivot = this.firstPersonCockpitCameraPivot.get(cockpit);
+    if (!authoredCameraPivot) {
+      authoredCameraPivot = cockpit.worldToLocal(
+        socket.getWorldPosition(this.firstPersonCockpitSocketWorldScratch),
+      ).clone();
+      this.firstPersonCockpitCameraPivot.set(cockpit, authoredCameraPivot);
+    }
+    const inverseParent = parent.getWorldQuaternion(this.firstPersonRootQuaternionScratch).invert();
     cockpit.quaternion.copy(inverseParent.multiply(cameraWorldQuaternion));
+    const desiredParentPosition = parent.worldToLocal(
+      this.firstPersonCockpitDesiredParentScratch.copy(cameraWorldPosition),
+    );
+    const pivotOffset = this.firstPersonCockpitPivotOffsetScratch.copy(authoredCameraPivot)
+      .multiply(cockpit.scale)
+      .applyQuaternion(cockpit.quaternion);
+    cockpit.position.copy(desiredParentPosition).sub(pivotOffset);
+    cockpit.updateMatrixWorld(true);
+    if (this.firstPersonCockpitAlignment) return;
+    const cameraPivotWorldPosition = cockpit.localToWorld(authoredCameraPivot.clone());
+    const inverseCameraQuaternion = cameraWorldQuaternion.clone().invert();
+    const cameraSpacePosition = (name: string): readonly number[] | null => {
+      const node = cockpit.getObjectByName(name);
+      if (!node) return null;
+      return Object.freeze(node.getWorldPosition(new THREE.Vector3())
+        .sub(cameraWorldPosition)
+        .applyQuaternion(inverseCameraQuaternion)
+        .toArray());
+    };
+    this.firstPersonCockpitAlignment = Object.freeze({
+      cameraWorldPosition: Object.freeze(cameraWorldPosition.toArray()),
+      cameraPivotWorldPosition: Object.freeze(cameraPivotWorldPosition.toArray()),
+      cockpitWorldPosition: Object.freeze(cockpit.getWorldPosition(new THREE.Vector3()).toArray()),
+      parentName: parent.name,
+      parentWorldScale: Object.freeze(parent.getWorldScale(new THREE.Vector3()).toArray()),
+      pivotErrorM: cameraPivotWorldPosition.distanceTo(cameraWorldPosition),
+      dashboardCameraSpacePosition: cameraSpacePosition('chopper-cockpit-dashboard-3d'),
+      hudCameraSpacePosition: cameraSpacePosition('chopper-cockpit-hud-glass'),
+      weaponCameraSpacePosition: cameraSpacePosition('chopper-gunner-weapon-view'),
+    });
   }
 
   carpetWorkflowTelemetry(): KillstreakCarpetWorkflowTelemetry {
@@ -2784,7 +3381,7 @@ export class KillstreakPresentation {
     });
   }
 
-  telemetry(): KillstreakPresentationTelemetry {
+  telemetry(camera?: THREE.Camera): KillstreakPresentationTelemetry {
     const effectivelyVisible = (node: THREE.Object3D, root: THREE.Object3D): boolean => {
       let cursor: THREE.Object3D | null = node;
       while (cursor) {
@@ -2819,6 +3416,7 @@ export class KillstreakPresentation {
       .localeCompare(`${right.entityId}:${right.name}:${right.lodRootName}`)));
     const entityDetails = Object.freeze([...this.entities.entries()].map(([entityId, entry]) => {
       entry.root.updateWorldMatrix(true, true);
+      const stableAirframe = supportVehicleStableAirframeBounds(entry.root, camera, this.submittedScene);
       const bounds = new THREE.Box3();
       const meshBounds = new THREE.Box3();
       let visibleMeshCount = 0;
@@ -2859,6 +3457,11 @@ export class KillstreakPresentation {
           min: Object.freeze(bounds.min.toArray()),
           max: Object.freeze(bounds.max.toArray()),
         }),
+        stableAirframeMeshCount: stableAirframe.meshCount,
+        stableAirframeBounds: stableAirframe.bounds,
+        drawableStableAirframeMeshCount: stableAirframe.drawableMeshCount,
+        drawableStableAirframeBounds: stableAirframe.drawableBounds,
+        stableAirframeDrawRejections: stableAirframe.drawRejections,
         activeLodIndex,
         activeLodName,
         activeLodAsset,
@@ -2929,10 +3532,15 @@ export class KillstreakPresentation {
       ? (() => {
           const visibleMeshNames: string[] = [];
           const visibleOutsideSightline: string[] = [];
+          const visibleOutsideCockpit: string[] = [];
+          let overlayLayerExclusive = true;
           firstPersonRoot.traverse((node) => {
             if (!(node instanceof THREE.Mesh) || !effectivelyVisible(node, firstPersonRoot)) return;
             visibleMeshNames.push(node.name);
             if (!isGunnerSightlineNode(firstPersonRoot, node)) visibleOutsideSightline.push(node.name);
+            if (!isGunnerCockpitNode(firstPersonRoot, node)) visibleOutsideCockpit.push(node.name);
+            overlayLayerExclusive &&= (node.layers.mask & (1 << SUPPORT_FIRST_PERSON_RENDER_LAYER)) !== 0
+              && (node.layers.mask & (1 << SUPPORT_WORLD_RENDER_LAYER)) === 0;
           });
           const subtreeHasVisibleMesh = (name: string): boolean => {
             const subtree = firstPersonRoot.getObjectByName(name);
@@ -2947,9 +3555,17 @@ export class KillstreakPresentation {
             presentationSource: String(firstPersonRoot.userData.presentationSource ?? 'unknown'),
             visibleMeshNames: Object.freeze(visibleMeshNames.sort()),
             visibleOutsideSightline: Object.freeze(visibleOutsideSightline.sort()),
+            visibleOutsideCockpit: Object.freeze(visibleOutsideCockpit.sort()),
+            dashboardVisible: subtreeHasVisibleMesh('chopper-cockpit-dashboard-3d'),
+            displaysVisible: subtreeHasVisibleMesh('chopper-cockpit-display-cyan')
+              && subtreeHasVisibleMesh('chopper-cockpit-display-green'),
             hudVisible: subtreeHasVisibleMesh('chopper-cockpit-hud-glass')
               && subtreeHasVisibleMesh('chopper-cockpit-hud-target-ring'),
+            centreSightlineClear: !subtreeHasVisibleMesh('chopper-cockpit-hud-glass')
+              && !subtreeHasVisibleMesh('chopper-cockpit-hud-target-ring'),
             weaponVisible: subtreeHasVisibleMesh('chopper-gunner-weapon-view'),
+            overlayLayerExclusive,
+            alignment: this.firstPersonCockpitAlignment,
           });
         })()
       : null;

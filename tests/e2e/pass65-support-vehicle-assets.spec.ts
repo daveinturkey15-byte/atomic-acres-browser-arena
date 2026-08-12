@@ -531,9 +531,13 @@ test('loads and prewarms the exact authored support-vehicle family before deploy
   ).killstreakPresentation.firstPersonSightline);
   expect(sightline).toMatchObject({
     presentationSource: 'project-original-blender-glb',
-    visibleOutsideSightline: [],
-    hudVisible: true,
+    visibleOutsideCockpit: [],
+    dashboardVisible: true,
+    displaysVisible: true,
+    hudVisible: false,
+    centreSightlineClear: true,
     weaponVisible: true,
+    overlayLayerExclusive: true,
   });
   expect(sightline.visibleMeshNames.length).toBeGreaterThan(0);
   expect(browserErrors).toEqual([]);

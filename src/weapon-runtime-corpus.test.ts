@@ -8,6 +8,13 @@ import { WEAPON_IDS } from './protocol';
 
 function fakeGltf(url: string) {
   const scene = new THREE.Group();
+  if (url.includes('pass65-crossbow')) {
+    const loadedBolt = new THREE.Group();
+    loadedBolt.name = 'crossbow-loaded-bolt';
+    loadedBolt.position.set(0, 0.12, -0.85);
+    loadedBolt.userData.atomic_socket = 'bolt';
+    scene.add(loadedBolt);
+  }
   const material = (name: string): THREE.MeshStandardMaterial => {
     const texture = new THREE.Texture();
     texture.image = { width: 4, height: 4 };
@@ -16,13 +23,29 @@ function fakeGltf(url: string) {
     result.name = name;
     return result;
   };
+  const railgun = url.includes('/railgun/');
   const materialNames = url.includes('/lmg/')
     ? ['MAT_Pass65_lmg_Polymer_PBR', 'MAT_Pass65_lmg_Primary_PBR']
-    : ['shared-pass65-test-material'];
+    : railgun
+      ? ['MAT_Pass65_railgun_Gunmetal', 'MAT_Pass65_railgun_Lens']
+      : ['shared-pass65-test-material'];
   if (url.includes('/lmg/') && url.includes('-drop-lod0')) materialNames.reverse();
   for (const [index, name] of materialNames.entries()) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 0.25, 0.2), material(name));
-    mesh.name = `source-${index}-${url}`;
+    const mesh = new THREE.Mesh(
+      railgun
+        ? index === 0
+          ? new THREE.BoxGeometry(0.2, 0.12, 0.12)
+          : new THREE.BoxGeometry(0.16, 0.08, 0.012)
+        : new THREE.BoxGeometry(1, 0.25, 0.2),
+      material(name),
+    );
+    if (railgun) {
+      const variant = url.includes('-fp-lod0') ? 'FP' : url.includes('-world-lod0') ? 'World' : 'Drop';
+      mesh.name = `railgun_${variant}_LOD0_Runtime_static_${name}`;
+      mesh.position.set(0, 0, 0.1);
+    } else {
+      mesh.name = `source-${index}-${url}`;
+    }
     scene.add(mesh);
   }
   return { scene, animations: [] };

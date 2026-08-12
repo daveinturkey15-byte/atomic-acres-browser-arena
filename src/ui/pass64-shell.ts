@@ -2,7 +2,7 @@ import { WEAPONS } from '../gameplay';
 import { FIELD_KITS } from '../loadout';
 import { WEAPON_CATALOG } from '../combat/weapon-catalog';
 import { GRENADE_CATALOG } from '../combat/grenade-catalog';
-import { ARENA_SELECTIONS, soloLaunchLabel } from '../map-selection';
+import { ARENA_SELECTIONS, arenaCanvasLabel, soloLaunchLabel } from '../map-selection';
 import { CHAT_TEXT_MAX_CHARS } from '../text-chat';
 import { AUDIO_BUS_IDS } from '../pass65-settings';
 import { PASS65_KILLSTREAK_CATALOG } from '../killstreak-catalog';
@@ -14,7 +14,7 @@ import { PASS66_RELEASE_IDENTITY } from '../release-identity';
 import { advancedGraphicsMarkup } from './advanced-graphics-controls';
 import './advanced-graphics.css';
 import { menuPreviewVideoDefinition, menuPreviewVideoMarkup } from './menu-preview-video';
-import { weaponMenuPresentationMarkup } from './field-kit-weapon-presentation';
+import { weaponMenuPresentationMarkup, weaponMenuStatDeckMarkup } from './field-kit-weapon-presentation';
 
 export type Pass64ShellViewModel = Readonly<{
   playerName: string;
@@ -46,13 +46,13 @@ function mapCardsMarkup(): string {
 }
 
 function fieldKitCardsMarkup(): string {
-  return FIELD_KITS.map((kit) => `<button type="button" class="kit-card" data-kit-id="${kit.id}">
+  return FIELD_KITS.map((kit) => `<button type="button" class="kit-card" data-kit-id="${kit.id}" aria-pressed="false">
     <span>${kit.role}</span>
     <strong>${kit.title}</strong>
     <b>${WEAPONS[kit.weapon].name} · ${WEAPONS[kit.sidearm].name}</b>
     <p>${kit.summary}</p>
     ${weaponMenuPresentationMarkup(kit.weapon)}
-    <em>SELECTED</em>
+    <em aria-hidden="true">✓ SELECTED</em>
   </button>`).join('');
 }
 
@@ -65,7 +65,7 @@ function customPresetCardsMarkup(): string {
     <p>Persistent operator-defined equipment. Changes queue safely for the next deployment.</p>
     <i>1 primary · 1 secondary · 1 grenade</i>
     ${weaponMenuPresentationMarkup(defaultPrimaryIds[index - 1]!)}
-    <em>SELECTED</em>
+    <em aria-hidden="true">✓ SELECTED</em>
     <span class="kit-modify-row"><small>RENAME / MODIFY</small><b data-custom-modify="custom-${index}" aria-controls="loadout-manager">EDIT</b></span>
   </button>`).join('');
   return cards;
@@ -170,16 +170,10 @@ function fieldKitPanelMarkup(): string {
         <label>SECONDARY<select id="loadout-secondary">${weaponOptionsMarkup('secondary')}</select></label>
         <label>GRENADE<select id="loadout-grenade">${grenadeOptionsMarkup()}</select></label>
         <button id="loadout-save" type="button">SAVE LOADOUT</button>
+        <p id="loadout-save-status" class="loadout-save-status" role="status" aria-live="polite" hidden></p>
       </div>
       <aside id="loadout-inspector" class="loadout-inspector" aria-live="polite">
-        <div><small>PRIMARY WEAPON</small><strong data-loadout-inspector-name>HK416</strong><span data-loadout-inspector-meta>AUTOMATIC / 650 RPM</span></div>
-        <dl class="loadout-inspector-stats">
-          <div class="loadout-inspector-dps"><dt>DPS</dt><dd><i data-loadout-stat="dps"></i><b data-loadout-value="dps">336</b></dd></div>
-          <div><dt>DAMAGE</dt><dd><i data-loadout-stat="damage"></i><b data-loadout-value="damage">31</b></dd></div>
-          <div><dt>FIRE RATE</dt><dd><i data-loadout-stat="fire-rate"></i><b data-loadout-value="fire-rate">650</b></dd></div>
-          <div><dt>RANGE</dt><dd><i data-loadout-stat="range"></i><b data-loadout-value="range">72m</b></dd></div>
-          <div><dt>CONTROL</dt><dd><i data-loadout-stat="control"></i><b data-loadout-value="control">72</b></dd></div>
-        </dl>
+        ${weaponMenuStatDeckMarkup('m4a1')}
         <p data-loadout-grenade-detail>FRAG / TIMED EXPLOSIVE / ONE CARRIED</p>
       </aside>
       </div>
@@ -303,7 +297,7 @@ function deploymentTransitionMarkup(): string {
       <div class="cockpit-instruments"><span><small>ALT</small><b>024 M</b></span><span><small>HDG</small><b>049</b></span><span><small>ROTOR</small><b>ARMED</b></span></div>
     </div>
     <div class="deployment-transition-console">
-      <small id="deployment-transition-kicker">PASS 69 // DEPLOYMENT STREAM</small>
+      <small id="deployment-transition-kicker">${PASS66_RELEASE_IDENTITY.pass} // DEPLOYMENT STREAM</small>
       <strong id="deployment-transition-title">NUKE TOWN</strong>
       <span id="deployment-transition-status">Preparing authoritative arena state…</span>
       <progress id="deployment-transition-progress" max="100" value="0" aria-label="Map loading progress">0%</progress>
@@ -378,22 +372,37 @@ function hudMarkup(): string {
     <div id="crosshair"><i></i><i></i><i></i><i></i></div><div id="hitmarker">×</div>
     <div id="damage-numbers" aria-live="polite" aria-label="Damage dealt"></div>
     <div id="sniper-scope" hidden aria-label="3x sniper scope"><div class="scope-ring"></div><div class="scope-reticle"><i></i><b></b><span></span><em></em></div><small>3×</small></div>
-    <div id="railgun-thermal" hidden aria-label="Railgun thermal scope" aria-live="off"><span>${WEAPONS.railgun.name.toUpperCase()} THERMAL · HOSTILES</span></div>
+    <div id="railgun-thermal" hidden aria-label="Railgun 2.5x clear thermal scope" aria-live="off">
+      <div class="railgun-scope-window" aria-hidden="true">
+        <div class="railgun-scope-glass"></div>
+        <div class="railgun-scope-reticle"><i></i><b></b><span></span><em></em></div>
+      </div>
+      <span>${WEAPONS.railgun.name.toUpperCase()} · 2.5× THERMAL · HOSTILES</span>
+    </div>
     <div id="dmr-thermal" hidden aria-label="M14 EBR 2.5x smoke-penetrating thermal scope" aria-live="off"><span>${WEAPONS['m14-ebr'].name.toUpperCase()} · 2.5× THERMAL · FRIEND / FOE</span><div class="dmr-thermal-reticle"><i></i><b></b></div></div>
     <div id="killfeed" aria-live="polite" aria-label="Match events"></div>
     <div id="damage-feeds" aria-label="Damage activity"><section class="damage-feed done" aria-label="Damage dealt"><div id="damage-done-feed" aria-live="polite"></div></section><section class="damage-feed taken" aria-label="Damage received"><div id="damage-taken-feed" aria-live="assertive"></div></section></div>
     <div id="overdrive-hud" hidden><small>2× DAMAGE</small><strong id="overdrive-time">30.0</strong><span>OVERDRIVE</span></div>
     <div id="power-announcement" hidden aria-live="assertive"><small>MID-MAP POWER WEAPON</small><strong>2× DAMAGE</strong><span>30 SECONDS</span></div>
     <div id="pickup-prompt" hidden><kbd>F</kbd><span>PICK UP</span><strong></strong></div>
-    <div id="gunner-cockpit-hud" hidden aria-hidden="true">
-      <div class="gunner-reticle"><i></i><b></b><span class="tl"></span><span class="tr"></span><span class="bl"></span><span class="br"></span></div>
-      <div class="gunner-readout"><small>HULL</small><strong id="gunner-hull">100</strong></div>
-      <div class="gunner-readout right"><small>AMMO</small><strong id="gunner-ammo">∞</strong></div>
+    <div id="gunner-cockpit-hud" hidden aria-hidden="true" data-support-kind="none" data-hit-confirm="false">
+      <div class="gunner-status"><small id="gunner-platform">GUNNER</small><strong id="gunner-weapon-mode">30MM AUTOCANNON</strong><span>AI FLIGHT · OWNER CONTROL</span></div>
+      <div class="gunner-reticle" data-centre-clear="true" aria-hidden="true"><span class="north"></span><span class="east"></span><span class="south"></span><span class="west"></span><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i></div>
+      <div id="gunner-target-confirm" hidden aria-hidden="true"><span>HIT</span><strong>0</strong></div>
+      <div class="gunner-instruments" aria-hidden="true">
+        <div class="gunner-readout"><small>HULL</small><strong id="gunner-hull">100</strong></div>
+        <div class="gunner-readout"><small>AMMO</small><strong id="gunner-ammo">&infin;</strong></div>
+        <div class="gunner-readout"><small>ALT</small><strong id="gunner-altitude">0M</strong></div>
+        <div class="gunner-readout"><small>SPD</small><strong id="gunner-speed">0</strong></div>
+        <div class="gunner-readout"><small>TIME</small><strong id="gunner-time">0.0</strong></div>
+        <div class="gunner-readout"><small>DAMAGE</small><strong id="gunner-damage">0</strong></div>
+      </div>
       <div id="chopper-thermal" hidden aria-hidden="true"><span>THERMAL · THROUGH-WALL AUTOCANNON · HOSTILES</span></div>
     </div>
     <pre id="runtime-error-log" hidden aria-hidden="true"></pre>
     <div id="death-fade" aria-hidden="true"></div>
     <div id="respawn" hidden><strong>ELIMINATED</strong><span id="respawn-countdown">REDEPLOYING</span></div>
+    <div id="sticky-warning" hidden role="alert" aria-live="assertive" aria-atomic="true"><small>EXPLOSIVE ATTACHED</small><strong>STUCK</strong></div>
     <div id="countdown" role="status" aria-live="assertive" aria-atomic="true" hidden></div>
     <div id="banner" hidden></div>
     <div id="roster" hidden><h2>FIELD ROSTER</h2><div id="roster-list"></div></div>
@@ -401,7 +410,7 @@ function hudMarkup(): string {
 }
 
 export function renderPass64Shell(model: Pass64ShellViewModel): string {
-  return `<canvas id="game" aria-label="Nuke Town multiplayer arena"></canvas>
+  return `<canvas id="game" aria-label="${arenaCanvasLabel(ARENA_SELECTIONS[0]!)}"></canvas>
     <div id="match-pause-backdrop" class="match-pause-backdrop" aria-hidden="true" hidden data-frame-provenance="game-canvas-css-compositor" data-capture-status="empty" data-contract="game-canvas-css-compositor-v1" data-periodic-readback-count="0" data-source-capture-attempt-count="0" data-source-capture-count="0" data-presentation-count="0" data-fallback-count="0"></div>
     <div id="color-grade"></div><div id="film-grain"></div>
     <div id="vignette"></div><div id="low-health-vignette" aria-hidden="true"></div><div id="damage-flash"></div><div id="damage-direction" aria-hidden="true"></div><div id="ordnance-flash" hidden></div><div id="killstreak-logo-flash" hidden></div>

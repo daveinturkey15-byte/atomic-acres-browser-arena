@@ -64,25 +64,78 @@ describe('legacy match admission integration', () => {
     expect(failure).toContain("return matchAdmissionResult(token, 'superseded', error);");
   });
 
-  it('publishes an already-active host admission and uses that revision as the guest world-ready retry fence', () => {
+  it('publishes an already-active host admission without treating early active lobby revisions as receiver-ready', () => {
     const accept = slice('function acceptLobbyState(', 'function authorizeRedeploy(');
     const admitted = slice("resetWebGpuPresentationEpoch('match admitted', lastFrame);", 'if (recoveredHostRespawnDelayMs !== null');
-    expect(accept).toContain("previousSnapshot?.phase !== 'active' && message.snapshot.phase === 'active'");
-    expect(accept).toContain('lastClientWorldRepairConnectionEpoch !== localConnectionEpoch || enteringActiveLobby');
-    expect(accept).toContain('sendClientWorldRepairReady();');
+    expect(accept).not.toContain('clientWorldRepairReceiverReady(');
+    expect(accept).not.toContain('sendClientWorldRepairReady();');
     expect(admitted).toContain("mode === 'host' && matchState.phase === 'active'");
     expect(admitted).toContain("broadcastHostLobby('active');");
     expect(admitted.indexOf('gameStarted = true;')).toBeLessThan(admitted.indexOf("broadcastHostLobby('active');"));
   });
 
-  it('commits rematch continuity before the one-shot guest loadout registration', () => {
+  it('commits rematch continuity before a bounded guest loadout registration and records only the completed send', () => {
     const repair = slice('function sendClientWorldRepairReady(', 'function rejectLobbyPlayer(');
     const joinAt = repair.indexOf("network.send({ type: 'join', player: snapshot() });");
     const stateAt = repair.indexOf('network.sendStateCommitReliably(createStateMessage());');
     const loadoutAt = repair.indexOf('network.send(loadoutMessage);');
+    const attemptAt = repair.indexOf('recordClientWorldRepairAttempt(admission)');
     expect(joinAt).toBeGreaterThanOrEqual(0);
     expect(stateAt).toBeGreaterThan(joinAt);
     expect(loadoutAt).toBeGreaterThan(stateAt);
+    expect(attemptAt).toBeGreaterThan(loadoutAt);
+    expect(repair).toContain('if (!clientWorldRepairCanAttempt(admission) && !reconnectRepair) return;');
+  });
+
+  it('holds ordinary client traffic until the exact host actor acknowledgement and clears admission across lifecycle boundaries', () => {
+    const start = slice('if (hostRecovery) localContinuity = hostRecovery.hostPlayer.continuity;', 'resetFlashVictimLife();');
+    const state = slice("if (message.type === 'killstreak-state') {", "if (message.type === 'killstreak-carpet-fire-state')");
+    const broadcast = slice('function scheduleStateBroadcast()', 'scheduleStateBroadcast();');
+    const gameplay = slice('function gameplayInputEnabled()', 'function resetLocalSpinUp()');
+    const reset = slice('function resetPrivateLobbyState()', 'function persistActiveHostMatchCheckpoint(');
+    const lobbyReturn = slice('function returnPrivateMatchToLobby(', 'function acceptLobbyState(');
+    const networkStatus = slice('function setNetworkStatus(', 'const network = new ArenaNetwork(');
+
+    expect(start).toContain("mode === 'client' && !awaitingCanonicalGuestAuthority");
+    expect(start).toContain('beginClientWorldRepair({');
+    expect(state.indexOf('if (!admission.accepted) return;'))
+      .toBeLessThan(state.indexOf('acknowledgeClientWorldRepairActor(clientWorldRepairAdmission, {'));
+    expect(state).toContain('actorId: actor.actorId,');
+    expect(state).toContain('lifeId: actor.lifeId,');
+    expect(state.indexOf('if (!admission.accepted) return;'))
+      .toBeLessThan(state.indexOf('clientWorldRepairReceiverReady(clientWorldRepairAdmission, {'));
+    expect(state).toContain('expectedHostId: privateLobbySnapshot?.hostId ?? null,');
+    expect(state).toContain('expectedMatchEpoch: killstreakMatchEpoch,');
+    expect(state).toContain('matchEpoch: message.snapshot.matchEpoch,');
+    expect(state).toContain('exactActorAcknowledged,');
+    expect(gameplay.match(/&& !pendingClientWorldRepair\(\);/g)).toHaveLength(2);
+    // Static observation traffic must continue so a host that had no remote can
+    // recreate it and author the first current-epoch receiver-ready snapshot.
+    expect(broadcast).not.toContain('pendingClientWorldRepair()');
+    expect(reset).toContain('clientWorldRepairAdmission = null;');
+    expect(lobbyReturn).toContain('clientWorldRepairAdmission = null;');
+    expect(networkStatus).toContain("network.role !== 'client' || !network.diagnostics().hostConnectionOpen");
+  });
+
+  it('recreates a guest from observation state and repairs continuity before idempotent loadout registration', () => {
+    const messages = slice("if (message.type === 'join' || message.type === 'state')", "if (message.type === 'ping')");
+    const remoteCreatedAt = messages.indexOf('remotes.set(incoming.id, remote);');
+    const initialContinuityAt = messages.indexOf('remote.continuity = message.continuity;');
+    const receiverReadyAt = messages.indexOf(
+      "if (network.role === 'host' && message.type === 'state')",
+      remoteCreatedAt,
+    );
+    const repairJoinAt = messages.indexOf("if (network.role === 'host' && message.type === 'join')");
+    const repairJoinEnd = messages.indexOf("if (network.role === 'host' && message.type === 'state')", repairJoinAt);
+
+    expect(remoteCreatedAt).toBeGreaterThanOrEqual(0);
+    expect(initialContinuityAt).toBeGreaterThanOrEqual(0);
+    expect(initialContinuityAt).toBeLessThan(remoteCreatedAt);
+    expect(receiverReadyAt).toBeGreaterThan(remoteCreatedAt);
+    expect(messages.slice(receiverReadyAt)).toContain('broadcastKillstreakState(performance.now(), true);');
+    expect(messages).toContain('message.continuity >= remote.continuity');
+    expect(messages.slice(repairJoinAt, repairJoinEnd)).not.toContain('remote.positionHistory.length = 0;');
+    expect(messages).toContain('remote.positionHistory.length <= 1 && claimedContinuity >= remote.continuity');
   });
 
   it('evicts and fence-retires only the exact failed arena generation', () => {

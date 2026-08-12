@@ -68,6 +68,22 @@ async function verifyPublishedProvenance() {
   if (releasePass) assertEqual(live.releasePass, releasePass, 'Live provenance releasePass');
 
   provenance.live = live;
+  const retainedEmbedded = await fetchJson(`${channelConfig.retained.path}/channel-provenance.json`);
+  assertEqual(retainedEmbedded.schemaVersion, 4, 'Retained embedded provenance schema');
+  assertEqual(retainedEmbedded.releasePass, channelConfig.retained.pass, 'Retained embedded pass');
+  assertEqual(retainedEmbedded.sourceSha, channelConfig.retained.sourceSha, 'Retained embedded source SHA');
+  assertEqual(retainedEmbedded.path, channelConfig.retained.pagesPath, 'Retained embedded source path');
+  assertEqual(retainedEmbedded.exactRootFileCount, channelConfig.retained.runtimeFileCount, 'Retained embedded file count');
+  assertEqual(retainedEmbedded.treeSha256, channelConfig.retained.runtimeTreeSha256, 'Retained embedded digest');
+  const retainedWrapper = await fetchJson(`${channelConfig.retained.path}/pinned-channel-provenance.json`);
+  assertEqual(retainedWrapper.channel, 'pass69-retained', 'Retained wrapper channel');
+  assertEqual(retainedWrapper.releasePass, channelConfig.retained.pass, 'Retained wrapper pass');
+  assertEqual(retainedWrapper.sourceSha, channelConfig.retained.sourceSha, 'Retained wrapper source SHA');
+  assertEqual(retainedWrapper.pagesSha, channelConfig.retained.pagesSha, 'Retained wrapper Pages SHA');
+  assertEqual(retainedWrapper.pagesPath, channelConfig.retained.pagesPath, 'Retained wrapper Pages path');
+  assertEqual(retainedWrapper.path, channelConfig.retained.path, 'Retained wrapper route');
+  assertEqual(retainedWrapper.pinnedRuntime?.treeSha256, retainedEmbedded.treeSha256, 'Retained wrapper embedded digest');
+  provenance.retained = { wrapper: retainedWrapper, embedded: retainedEmbedded };
   const stableOriginal = await fetchJson(`${channelConfig.stable.path}/channel-provenance.json`);
   if (stableOriginal.rebuiltFromSource === true) {
     assertEqual(stableOriginal.schemaVersion, 4, 'Stable rebuilt provenance schema');
@@ -159,8 +175,9 @@ async function openChooser(page) {
   const buttons = page.locator('#release-channel-options button');
   const labels = await buttons.allTextContents();
   const expectedBadge = expectedReleasedAt ? 'LIVE' : 'RELEASE CANDIDATE';
-  if (await buttons.count() !== 2
+  if (await buttons.count() !== 3
     || !labels.some((text) => text.includes(channelConfig.experimental.pass) && text.includes(expectedBadge) && !text.includes('THE BIG ONE'))
+    || !labels.some((text) => text.includes('PASS 69') && text.includes('PREVIOUS LIVE'))
     || !labels.some((text) => text.includes('PASS 63') && text.includes('STABLE') && text.includes('WEBGL'))
     || labels.some((text) => text.includes('PASS 66') || text.includes('PASS 65') || text.includes('PASS 64') || text.includes('PASS 59'))) {
     throw new Error(`Unexpected chooser labels: ${JSON.stringify(labels)}`);
@@ -189,11 +206,11 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
   if (expectedChangelogId) {
     await page.waitForSelector('#last-updated-btn', { timeout: 60_000 });
     const lastReleaseLabel = (await page.locator('#last-updated-btn').textContent())?.trim() ?? '';
-    const requiresPublishedTimestamp = Boolean(expectedReleasedAt)
-      || !releasePass
-      || normalizedPass(expectedPass) === normalizedPass(releasePass);
-    if (!lastReleaseLabel.includes('LAST RELEASE')
-      || (requiresPublishedTimestamp && lastReleaseLabel.includes('PENDING_PRODUCTION'))) {
+    const isCurrentCandidate = expectedPath === channelConfig.experimental.path;
+    const expectsPendingCandidate = isCurrentCandidate && !expectedReleasedAt;
+    if (expectsPendingCandidate
+      ? lastReleaseLabel !== 'CURRENT CANDIDATE · OWNER REVIEW PENDING'
+      : !lastReleaseLabel.includes('LAST RELEASE') || lastReleaseLabel.includes('PENDING_PRODUCTION')) {
       throw new Error(`Invalid Last Release label for ${expectedPass}: ${JSON.stringify(lastReleaseLabel)}`);
     }
     await page.locator('#last-updated-btn').click();
@@ -204,14 +221,19 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
     if (!normalizedPass(currentReleaseText).includes(normalizedPass(expectedPass))) {
       throw new Error(`${expectedPass} Last Release details do not identify the current pass: ${JSON.stringify(currentReleaseText)}`);
     }
-    const releasedAt = await currentRelease.locator('time').getAttribute('datetime');
-    if (!releasedAt
-      || (requiresPublishedTimestamp && releasedAt === 'PENDING_PRODUCTION')
-      || (releasedAt !== 'PENDING_PRODUCTION' && Number.isNaN(Date.parse(releasedAt)))) {
+    const releaseState = (await currentRelease.locator('.changelog-entry-pass b').textContent())?.trim() ?? null;
+    const time = currentRelease.locator('time');
+    const releasedAt = await time.getAttribute('datetime');
+    const timeText = (await time.textContent())?.replace(/\s+/g, ' ').trim() ?? '';
+    if (expectsPendingCandidate) {
+      if (releaseState !== 'LOCAL CANDIDATE' || releasedAt !== null
+        || !timeText.includes('NOT PUBLISHED') || !timeText.includes('AWAITING OWNER HITL')) {
+        throw new Error(`${expectedPass} candidate is not explicitly pending owner HITL: ${JSON.stringify({ releaseState, releasedAt, timeText })}`);
+      }
+    } else if (!releasedAt || Number.isNaN(Date.parse(releasedAt)) || timeText.includes('NOT PUBLISHED')) {
       throw new Error(`${expectedPass} Last Release timestamp is not a published instant: ${JSON.stringify(releasedAt)}`);
     }
     if (expectedReleasedAt && normalizedPass(expectedPass) === normalizedPass(releasePass)) {
-      const releaseState = (await currentRelease.locator('.changelog-entry-pass b').textContent())?.trim() ?? null;
       verifyProductionReleaseTimestamp({
         expectedReleasedAt,
         observedReleasedAt: releasedAt,
@@ -263,19 +285,20 @@ try {
   const chooser = await observedPage();
   try {
     chooserLabels = await openChooser(chooser.page);
-    for (const choice of ['experimental', 'stable']) {
+    for (const choice of ['experimental', 'retained', 'stable']) {
       if (await chooser.page.locator(`[data-release-choice="${choice}"]`).count() !== 1) {
         throw new Error(`Missing unique ${choice} chooser action: ${JSON.stringify(chooserLabels)}`);
       }
     }
     if (await chooser.page.locator('[data-release-choice="rollback"]').count() !== 0) {
-      throw new Error(`Rollback must not be a third chooser action: ${JSON.stringify(chooserLabels)}`);
+      throw new Error(`Rollback alias must not duplicate the stable chooser action: ${JSON.stringify(chooserLabels)}`);
     }
   } finally {
     await chooser.close();
   }
 
-  await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass69');
+  await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass70');
+  await verifyChoice('retained', 'channels/pass69-retained', 'PASS 69', 'pass69');
   await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63');
   if (releasePass && !normalizedPass(routes.experimental.eyebrow).includes(normalizedPass(releasePass))) {
     throw new Error(`Experimental runtime ${routes.experimental.eyebrow} does not match ${releasePass}`);

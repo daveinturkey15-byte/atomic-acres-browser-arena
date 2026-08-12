@@ -19,6 +19,7 @@ import { webGlShadowSamplerMode } from './webgl-shadow-compatibility';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
 import { PASS66_RELEASE_IDENTITY } from './release-identity';
+import { drawPass70DroneSwarmLogo } from './pass70-drone-swarm-logo';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
 import { BotWeaponGpuVocabulary } from './bot-weapon-gpu-vocabulary';
 import {
@@ -63,13 +64,36 @@ import {
   type GameplayAction,
   type KeyBindingProfile,
 } from './key-bindings';
-import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal, updateGunRangePresentation, updateGunRangeTestBayDoor } from './additional-maps';
+import {
+  GUN_RANGE_FIRING_LINE_Z,
+  applyAdditionalMapPresentationProfile,
+  applyGunRangeTestBayDoorState,
+  applyRustworksPresentationProfile,
+  buildGunRange,
+  buildRustworks1v1,
+  buildSkylineTerminal,
+  updateGunRangePresentation,
+} from './additional-maps';
 import { RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES } from './rigged-bot-visual-evidence-contract';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
+  advanceGunRangeTestBayDoorForObservers,
+  createGunRangeTestBayDoorState,
   nearestGunRangeTestBaySupportStation,
   nearestGunRangeTestBayWeaponStation,
+  projectGunRangeTestBayDoorState,
+  type GunRangeTestBayDoorState,
 } from './gun-range-test-bay';
+import {
+  advanceGunRangeMatchClock,
+  createGunRangeMatchClockSnapshot,
+  gunRangeTestBayOccupancyBoundaryCount,
+  gunRangeTestBayOccupants,
+  holdGunRangeReplicaAtAuthorityBoundary,
+  projectGunRangeMatchClock,
+  type GunRangeClockParticipant,
+  type GunRangeMatchClockSnapshot,
+} from './gun-range-match-clock-authority';
 import {
   BOT_DEATHS_PER_REINFORCEMENT,
   BOT_GRENADE_POOL,
@@ -147,14 +171,26 @@ import { flyingCatPose } from './gun-range-cat-choreography';
 import { KillstreakLoadoutController } from './killstreak-loadout';
 import type { KillstreakLoadoutV1, Pass65KillstreakId } from './killstreak-catalog';
 import {
+  CARPET_BOMBER_BLAST_RADIUS_M,
   HostKillstreakRuntime,
+  MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP,
+  chopperGunnerAuthoritativeRay,
   chopperGunnerCameraOrigin,
   type KillstreakDamageEvent,
+  type KillstreakEntitySnapshot,
   type KillstreakRecipientSnapshot,
+  type KillstreakTarget,
   type KillstreakWorld,
 } from './killstreak-runtime';
 import { KillstreakPresentation, loadHunterDronePresentation, loadSupportVehiclePresentations, supportVehiclePresentationTelemetry } from './killstreak-presentation';
+import { chopperExteriorReviewHoldActive } from './chopper-exterior-review-hold';
+import {
+  chopperExteriorReviewCameraPose,
+  withExactChopperRootHiddenForControl,
+  type ChopperExteriorReviewBounds,
+} from './chopper-exterior-review-camera';
 import { PASS65_FLIGHT_NAVIGATION, resolveSupportFlightStep } from './killstreak-flight-navigation';
+import { resolveSupportAircraftEnvelopeStep } from './support-aircraft-collision';
 import { SupportPlacementGroundSampler } from './support-placement-ground';
 import {
   applyPilotedDronePointerDelta,
@@ -167,10 +203,21 @@ import {
   type KillstreakActivateIntentMessage,
   type KillstreakCareCaptureResultMessage,
   type KillstreakControlIntentMessage,
+  type KillstreakCarpetFireStateMessage,
   type KillstreakDamageResultMessage,
   type KillstreakLoadoutIntentMessage,
   type KillstreakStateMessage,
 } from './killstreak-protocol';
+import {
+  acknowledgeClientWorldRepairActor,
+  beginClientWorldRepair,
+  clientWorldRepairCanAttempt,
+  clientWorldRepairPending,
+  clientWorldRepairReceiverReady,
+  recordClientWorldRepairAttempt,
+  type ClientWorldRepairAdmission,
+} from './client-world-repair-admission';
+import { HostKillstreakLoadoutAckRegistry, type HostKillstreakLoadoutAckIdentity } from './host-killstreak-loadout-ack';
 import {
   applyCareCaptureProjection,
   applyCareCaptureResult,
@@ -258,7 +305,16 @@ import {
   glassAuthorityProjection,
   type GlassImpactProfile,
 } from './glass-authority';
-import { activeSoloBotTarget, arenaSelection, soloLaunchLabel, ARENA_SELECTIONS, type ArenaId, type ArenaSelection } from './map-selection';
+import {
+  activeSoloBotTarget,
+  arenaCanvasLabel,
+  arenaSelection,
+  hostedArenaDurationMs,
+  soloLaunchLabel,
+  ARENA_SELECTIONS,
+  type ArenaId,
+  type ArenaSelection,
+} from './map-selection';
 import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
 import { authoredElevationAt, authoredVerticalRouteTarget, type ArenaVerticalNavigation } from './vertical-navigation';
 import { sourceScreenAngle } from './directional-hud';
@@ -315,6 +371,7 @@ import {
   createDirectionalDamageState,
   createLowHealthFeedbackState,
   directionalDamagePresentation,
+  MAX_CONCURRENT_DAMAGE_DIRECTIONS,
   recordDirectionalDamage,
   sampleLowHealthFeedback,
   type DirectionalDamageState,
@@ -326,6 +383,7 @@ import { SupportExplosionPresentation } from './support-explosion-presentation';
 import { GrassSystem } from './grass-system';
 import {
   advanceRangeScore,
+  GUN_RANGE_ROUND_MS,
   hasUnlimitedRangeAmmo,
   isGunRange,
   rangeAccuracyPercent,
@@ -448,6 +506,7 @@ import {
   type GuestAuthorityCheckpoint,
   type ResumeTokenDigestCheckpoint,
 } from './host-match-checkpoint';
+import { auditHostRecoveryPoses, type HostRecoveryPoseAudit } from './host-match-recovery-pose';
 import {
   HIGH_SCORE_STORAGE_KEY,
   HIGH_SCORE_SCHEMA_VERSION,
@@ -553,6 +612,8 @@ import {
   type StickyAttachmentSource,
 } from './remote-sticky-attachment-authority';
 import {
+  STICKY_VICTIM_URGENT_ALERT_DURATION_MS,
+  StickyVictimUrgentAlertController,
   projectStickyVictimFeedback,
   type StickyVictimFeedback,
 } from './sticky-victim-feedback';
@@ -624,6 +685,7 @@ import { canAdmitMajorDebris, SHARED_MAJOR_DEBRIS_BUDGET } from './major-debris-
 import {
   createFracturedWindowDebrisVisual,
   updateFracturedWindowDebrisVisual,
+  windowGlassDebrisSettleMode,
 } from './window-glass-debris-presentation';
 import {
   INTERACTIVE_WORLD_SCHEMA_VERSION,
@@ -640,11 +702,18 @@ import {
 } from './weapon-presentation';
 import {
   magnifiedFovDegrees,
+  VIEWMODEL_CONTACT_PROBE_OFFSETS,
+  VIEWMODEL_CONTACT_PROFILES,
   viewmodelFloorClearance,
   viewmodelObstructionPose,
   type ViewmodelObstructionPose,
 } from './weapon-presentation-state';
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
+import {
+  RAILGUN_SCOPE_MAGNIFICATION,
+  deriveRailgunScopePresentation,
+  type RailgunScopePresentationState,
+} from './railgun-scope-state';
 import { TimedMapWeaponPresentation } from './timed-map-weapon-presentation';
 import {
   TIMED_MAP_WEAPON_DEFINITIONS,
@@ -677,6 +746,7 @@ import {
   type FlarePresentationReconcileResult,
   type FlareBurnPulse,
   type FlareProjectileCallbacks,
+  type FlareProjectileDirectHit,
   type FlareProjectileImpact,
   type FlareProjectileTarget,
 } from './flare-projectile-system';
@@ -688,14 +758,27 @@ import {
 } from './flare-authority-checkpoint';
 import { FLAMETHROWER_EFFECT, FLARE_PROJECTILE_EFFECT } from './special-weapon-effects';
 import {
+  FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE,
   FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+  FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
   FlamethrowerGroundFirePool,
   FlamethrowerStreamSystem,
   flamethrowerPulseImpactPresentationEnabled,
 } from './flamethrower-stream-system';
+import { flameDamageAllowsTarget } from './flame-damage-contract';
+import { resolveFlamethrowerResidualRemoteAuthority } from './flamethrower-residual-authority';
+import {
+  CARPET_GROUND_FIRE_AUTHORITY_CAPACITY,
+  CarpetGroundFireGuestPresentationAdmission,
+  carpetGroundFireStateChunks,
+} from './carpet-ground-fire-multiplayer';
 import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
 import { runStagedDmrThermalPrewarm } from './dmr-thermal-prewarm-lifecycle';
-import { ThermalGhostPresentation, type ThermalGhostTarget } from './thermal-ghost-presentation';
+import {
+  THERMAL_GHOST_MAX_TARGETS,
+  ThermalGhostPresentation,
+  type ThermalGhostTarget,
+} from './thermal-ghost-presentation';
 import { applySkyBackdrop, waitForSkyBackdropAdmission } from './rendering/sky-backdrop';
 import {
   SmokeVolumePresentationPool,
@@ -881,6 +964,7 @@ type RemotePlayer = {
 type AdmittedRemoteShot = {
   message: ShotMessage;
   receivedAt: number;
+  matchEpoch: number;
   targets: Set<string>;
 };
 
@@ -1076,6 +1160,17 @@ const menu = element<HTMLElement>('#menu');
 const damageDirectionIndicator = element<HTMLElement>('#damage-direction');
 const damageFlash = element<HTMLElement>('#damage-flash');
 const lowHealthVignette = element<HTMLElement>('#low-health-vignette');
+const damageDirectionMarkers = Array.from({ length: MAX_CONCURRENT_DAMAGE_DIRECTIONS }, () => {
+  const marker = document.createElement('i');
+  marker.hidden = true;
+  marker.style.setProperty('--damage-opacity', '0');
+  damageDirectionIndicator.append(marker);
+  return marker;
+});
+// Instantiate the retained damage keyframe before gameplay. The negative
+// delay holds its invisible final frame, so menu presentation cannot flash.
+damageFlash.classList.add('combat-prewarm');
+const replayDamageFlash = () => damageFlash.classList.add('pulse');
 menu.dataset.context = 'deployment';
 const menuShowcase = element<HTMLElement>('#menu-showcase');
 const menuPreviewFrame = element<HTMLElement>('#menu-preview-frame');
@@ -1164,11 +1259,207 @@ type DebugCapturePresentationReceipt = Readonly<{
   worldLayoutLineOfSight: readonly Readonly<Record<string, unknown>>[];
   handSelfOcclusion: readonly Readonly<Record<string, unknown>>[];
 }>;
+type DebugCommittedCameraPresentationReceipt = Readonly<{
+  contract: 'capture-camera-committed-frame-v1';
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  arenaId: ArenaId;
+  frame: number;
+  captureRevision: number;
+  committedAtMs: number;
+  position: readonly [number, number, number];
+  quaternion: readonly [number, number, number, number];
+  yaw: number;
+  pitch: number;
+  fov: number;
+  near: number;
+  far: number;
+  submissionSequence: number;
+  completedSequence: number;
+  targetCount: number;
+  riggedActorTargetCount: number;
+  chopperAutonomousFireHeld: boolean;
+  activeChopperTransientActions: readonly string[];
+  chopperReviewTracker: Readonly<{
+    active: true;
+    entityId: string;
+    frame: number;
+    captureRevision: number;
+    side: -1 | 1;
+    position: readonly [number, number, number];
+    target: readonly [number, number, number];
+    yaw: number;
+    pitch: number;
+    fov: number;
+    distanceM: number;
+    clearanceM: number;
+    inTestBay: boolean;
+    submittedSceneDrawableMeshCount: number;
+    submittedSceneDrawableBounds: Readonly<{ min: readonly number[]; max: readonly number[] }>;
+    submissionSequence: number;
+    completedSequence: number;
+  }> | null;
+  reviewedChopper: Readonly<{
+    entityId: string;
+    expiresInMs: number;
+    rootVisible: boolean;
+    activeLodIndex: number | null;
+    drawableStableMeshCount: number;
+    drawableStableBounds: Readonly<{ min: readonly number[]; max: readonly number[] }> | null;
+    drawRejections: Readonly<{ hierarchy: number; layer: number; material: number; frustum: number }>;
+  }> | null;
+}>;
+type DebugChopperExteriorHiddenControlReceipt = Readonly<{
+  contract: 'chopper-exterior-hidden-control-v1';
+  nonPublishable: true;
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  entityId: string;
+  simulationFrame: number;
+  officialCaptureRevision: number;
+  controlCaptureRevision: number;
+  officialSubmissionSequence: number;
+  submissionSequence: number;
+  completedSequence: number;
+  position: readonly [number, number, number];
+  quaternion: readonly [number, number, number, number];
+  yaw: number;
+  pitch: number;
+  fov: number;
+  near: number;
+  far: number;
+  submittedSceneDrawableMeshCount: number;
+  submittedSceneDrawableBounds: Readonly<{ min: readonly number[]; max: readonly number[] }>;
+  rootHiddenDuringSubmission: true;
+  rootRestored: true;
+}>;
 let debugCaptureCameraRevision = 0;
 let lastDebugCapturePresentation: DebugCapturePresentationReceipt | null = null;
+let lastDebugCommittedCameraPresentation: DebugCommittedCameraPresentationReceipt | null = null;
 let debugRiggedEvidenceCaptureTargets: readonly DebugRiggedEvidenceCaptureTarget[] | null = null;
 let debugRiggedEvidenceMainCameraDrawSession: RiggedEvidenceMainCameraDrawSession | null = null;
 let debugRiggedEvidenceHandCaptureSide: 'left' | 'right' | null = null;
+let debugChopperAutonomousFireHeld = false;
+let lastKillstreakWorldTargetCount = 0;
+type DebugChopperExteriorReviewTrackerFrame = Readonly<{
+  entityId: string;
+  frame: number;
+  captureRevision: number;
+  side: -1 | 1;
+  position: readonly [number, number, number];
+  target: readonly [number, number, number];
+  yaw: number;
+  pitch: number;
+  fov: number;
+  distanceM: number;
+  clearanceM: number;
+  inTestBay: boolean;
+  submittedSceneDrawableMeshCount: number;
+  submittedSceneDrawableBounds: Readonly<{ min: readonly number[]; max: readonly number[] }>;
+}>;
+let debugChopperExteriorReviewTrackerRequested = false;
+let debugChopperExteriorReviewTrackerSide: -1 | 1 | null = null;
+let lastDebugChopperExteriorReviewTrackerFrame: DebugChopperExteriorReviewTrackerFrame | null = null;
+
+function currentDebugChopperExteriorReviewHoldActive(): boolean {
+  return chopperExteriorReviewHoldActive(debugChopperAutonomousFireHeld, {
+    arenaId: selectedArena.id,
+    gameMode,
+    networkRole: network.role,
+    gameStarted,
+    matchPhase: matchState.phase,
+    menuSurface: menuLifecycle.surface,
+  });
+}
+
+function resetDebugChopperExteriorReviewHold(): void {
+  resetDebugChopperExteriorReviewTracker();
+  if (!debugChopperAutonomousFireHeld) return;
+  debugChopperAutonomousFireHeld = false;
+  lastKillstreakWorldTargetCount = 0;
+  lastDebugCommittedCameraPresentation = null;
+  if (debugCaptureCameraActive) debugCaptureCameraRevision += 1;
+}
+
+function resetDebugChopperExteriorReviewTracker(): void {
+  const wasRequested = debugChopperExteriorReviewTrackerRequested;
+  debugChopperExteriorReviewTrackerRequested = false;
+  debugChopperExteriorReviewTrackerSide = null;
+  lastDebugChopperExteriorReviewTrackerFrame = null;
+  if (!wasRequested) return;
+  debugCaptureCameraActive = false;
+  debugCaptureCameraUsesQuaternion = false;
+  debugCaptureCameraFov = null;
+  debugCaptureOrbit = null;
+  debugCaptureFixedVisualTimeMs = null;
+  lastDebugCommittedCameraPresentation = null;
+  debugCaptureCameraRevision += 1;
+  camera.fov = preferredFov;
+  camera.updateProjectionMatrix();
+}
+
+function synchronizeDebugChopperExteriorReviewHold(): boolean {
+  const active = currentDebugChopperExteriorReviewHoldActive();
+  if (!active) resetDebugChopperExteriorReviewHold();
+  return active;
+}
+
+function updateDebugChopperExteriorReviewTracker(): void {
+  if (!debugChopperExteriorReviewTrackerRequested) return;
+  if (!currentDebugChopperExteriorReviewHoldActive() || !debugCaptureCameraActive) {
+    resetDebugChopperExteriorReviewHold();
+    return;
+  }
+  const activeChopper = killstreakSnapshot.entities.find((entity) => entity.kind === 'chopper') ?? null;
+  const detail = activeChopper
+    ? killstreakPresentation.telemetry().entityDetails.find((entry) => entry.entityId === activeChopper.id) ?? null
+    : null;
+  const sourceBounds = detail?.drawableStableAirframeBounds;
+  if (!activeChopper || !detail?.visible || !sourceBounds
+    || !(detail.drawableStableAirframeMeshCount > 0)
+    || !Number.isFinite(activeChopper.attitude[1])) {
+    lastDebugChopperExteriorReviewTrackerFrame = null;
+    return;
+  }
+  const bounds = {
+    min: sourceBounds.min as [number, number, number],
+    max: sourceBounds.max as [number, number, number],
+  } satisfies ChopperExteriorReviewBounds;
+  const pose = chopperExteriorReviewCameraPose({
+    drawableBounds: bounds,
+    entityYaw: activeChopper.attitude[1],
+    aspect: camera.aspect,
+    preferredSide: debugChopperExteriorReviewTrackerSide,
+  });
+  if (!pose) {
+    lastDebugChopperExteriorReviewTrackerFrame = null;
+    return;
+  }
+  debugChopperExteriorReviewTrackerSide ??= pose.side;
+  debugCaptureCameraPosition.set(...pose.position);
+  debugCaptureCameraYaw = pose.yaw;
+  debugCaptureCameraPitch = pose.pitch;
+  debugCaptureCameraFov = pose.fov;
+  lastDebugChopperExteriorReviewTrackerFrame = Object.freeze({
+    entityId: activeChopper.id,
+    frame: frameCount,
+    captureRevision: debugCaptureCameraRevision,
+    side: pose.side,
+    position: pose.position,
+    target: pose.target,
+    yaw: pose.yaw,
+    pitch: pose.pitch,
+    fov: pose.fov,
+    distanceM: pose.distanceM,
+    clearanceM: pose.clearanceM,
+    inTestBay: pose.inTestBay,
+    submittedSceneDrawableMeshCount: detail.drawableStableAirframeMeshCount,
+    submittedSceneDrawableBounds: Object.freeze({
+      min: Object.freeze([...sourceBounds.min]),
+      max: Object.freeze([...sourceBounds.max]),
+    }),
+  });
+}
 
 function clearDebugRiggedEvidenceCaptureTargets(): void {
   debugRiggedEvidenceMainCameraDrawSession?.dispose();
@@ -1599,24 +1890,100 @@ const flamethrowerStreamPresentation = new FlamethrowerStreamSystem(
   softwareRenderer,
 );
 const FLAMETHROWER_GROUND_FIRE_RADIUS_M = 1.8;
-const FLAMETHROWER_GROUND_FIRE_PULSE_MS = 500;
-const FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE = 6;
 const FLAMETHROWER_GROUND_FIRE_CAPACITY = 24;
 const flamethrowerGroundFires = new FlamethrowerGroundFirePool(FLAMETHROWER_GROUND_FIRE_CAPACITY);
+const carpetGroundFires = new FlamethrowerGroundFirePool(CARPET_GROUND_FIRE_AUTHORITY_CAPACITY);
 const flamethrowerGroundFireBotSnapshot: BotPlayer[] = [];
 const flamethrowerGroundFireUp = new THREE.Vector3(0, 1, 0);
+const flamethrowerGroundFireRemotePosition = new THREE.Vector3();
+const flamethrowerGroundFireRemoteDirection = new THREE.Vector3();
 const presentFlamethrowerPulseImpact = flamethrowerPulseImpactPresentationEnabled(softwareRenderer);
+const carpetGroundFireGuestPresentation = new CarpetGroundFireGuestPresentationAdmission();
+const pendingCarpetGroundFireDamageEvents: KillstreakDamageEvent[] = [];
+const carpetGroundFireAuthorityTelemetry = {
+  admitted: 0,
+  duplicate: 0,
+  exhausted: 0,
+  invalid: 0,
+  maximumActive: 0,
+};
 let flamethrowerGroundFireBotSnapshotReady = false;
+
+function resetCarpetGroundFireAuthorityTelemetry(): void {
+  carpetGroundFireAuthorityTelemetry.admitted = 0;
+  carpetGroundFireAuthorityTelemetry.duplicate = 0;
+  carpetGroundFireAuthorityTelemetry.exhausted = 0;
+  carpetGroundFireAuthorityTelemetry.invalid = 0;
+  carpetGroundFireAuthorityTelemetry.maximumActive = 0;
+}
+
+function clearGroundFireAuthorityForMatchTerminal(): void {
+  flamethrowerStreamPresentation.clear();
+  flamethrowerGroundFires.clear();
+  carpetGroundFires.clear();
+  pendingCarpetGroundFireDamageEvents.length = 0;
+  flamethrowerGroundFireBotSnapshot.length = 0;
+  flamethrowerGroundFireBotSnapshotReady = false;
+  carpetGroundFireGuestPresentation.clear();
+  resetCarpetGroundFireAuthorityTelemetry();
+}
+
+function sendCarpetGroundFirePresentationSnapshot(
+  forPlayerId: string,
+  nowHostTimeMs = performance.now(),
+): boolean {
+  if (network.role !== 'host' || !forPlayerId) return false;
+  const snapshotId = randomNonce();
+  const chunks = carpetGroundFireStateChunks(
+    snapshotId,
+    carpetGroundFires.carpetPresentationSnapshots(nowHostTimeMs),
+  );
+  if (chunks.length === 0) return false;
+  let sent = true;
+  for (const chunk of chunks) {
+    const message: KillstreakCarpetFireStateMessage = {
+      type: 'killstreak-carpet-fire-state',
+      by: player.id,
+      forPlayerId,
+      matchEpoch: killstreakMatchEpoch,
+      ...chunk,
+      nonce: randomNonce(),
+    };
+    sent = network.sendToPlayer(forPlayerId, message) && sent;
+  }
+  return sent;
+}
 
 function applyFlamethrowerGroundFirePulse(fire: Readonly<{
   ownerId: string;
+  ownerTeam: Team;
   point: THREE.Vector3;
+  actionNonce: number;
+  damageSource: 'flamethrower' | 'carpet-bomber';
+  activationId: string | null;
+  pulseAtMs: number;
 }>): void {
-  // Napalm burns EVERYONE who stands in it - self, friends and enemies alike
-  // (same friendly-fire rule as the Carpet Bomber).
+  // Prediction owns visuals only. Every HP mutation and replicated receipt is
+  // admitted once by the host/offline authority on the pool's canonical tick.
+  if (network.role === 'client') return;
+  const flameSource = fire.damageSource === 'carpet-bomber'
+    ? 'carpet-bomber-napalm' as const
+    : 'flamethrower-ground-fire' as const;
+  const cause: KillCause = fire.damageSource === 'carpet-bomber'
+    ? { kind: 'killstreak', effect: 'carpet-bomber' }
+    : { kind: 'gun', weapon: 'flamethrower' };
   const r2 = FLAMETHROWER_GROUND_FIRE_RADIUS_M * FLAMETHROWER_GROUND_FIRE_RADIUS_M;
-  if (player.alive && player.position.distanceToSquared(fire.point) < r2) {
-    applyDamage(FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, fire.ownerId, 1, false, { kind: 'killstreak', effect: 'carpet-bomber' });
+  const carpetCollisionSolids = fire.damageSource === 'carpet-bomber' ? activeWorldColliders() : null;
+  const carpetFireCanReach = (x: number, y: number, z: number): boolean => !carpetCollisionSolids
+    || killstreakLineOfSight(
+      carpetCollisionSolids,
+      [fire.point.x, fire.point.y + 0.08, fire.point.z],
+      [x, Math.max(y, fire.point.y + 0.5), z],
+    );
+  if (player.alive && player.position.distanceToSquared(fire.point) < r2
+    && carpetFireCanReach(player.position.x, player.position.y, player.position.z)
+    && flameDamageAllowsTarget(flameSource, fire.ownerId, fire.ownerTeam, player.id, player.team)) {
+    applyDamage(FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, fire.ownerId, 1, false, cause);
   }
   if (!flamethrowerGroundFireBotSnapshotReady) {
     flamethrowerGroundFireBotSnapshot.length = 0;
@@ -1627,8 +1994,109 @@ function applyFlamethrowerGroundFirePulse(fire: Readonly<{
     if (!bot.alive) continue;
     const dx = bot.position.x - fire.point.x;
     const dz = bot.position.z - fire.point.z;
-    if (dx * dx + dz * dz < r2) {
-      applyBotDamage(bot, FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, 'body', { kind: 'killstreak', effect: 'carpet-bomber' }, fire.ownerId);
+    if (dx * dx + dz * dz < r2
+      && carpetFireCanReach(bot.position.x, bot.position.y + 1.15, bot.position.z)
+      && flameDamageAllowsTarget(flameSource, fire.ownerId, fire.ownerTeam, bot.id, bot.team)) {
+      applyBotDamage(bot, FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, 'body', cause, fire.ownerId);
+    }
+  }
+  if (network.role === 'host' && fire.damageSource === 'carpet-bomber' && fire.activationId) {
+    const remoteTargets: KillstreakTarget[] = [];
+    for (const remote of remotes.values()) {
+      const health = remoteHealthAuthorities.get(remote.snapshot.id);
+      if (!health) continue;
+      remoteTargets.push({
+        id: remote.snapshot.id,
+        kind: 'player',
+        team: remote.snapshot.team,
+        lifeId: remote.continuity,
+        alive: health.alive,
+        position: [remote.snapshot.x, remote.snapshot.y, remote.snapshot.z],
+      });
+    }
+    const events = killstreakRuntime.carpetGroundFireDamageEvents({
+      activationId: fire.activationId,
+      ownerId: fire.ownerId,
+      point: [fire.point.x, fire.point.y, fire.point.z],
+      radiusM: FLAMETHROWER_GROUND_FIRE_RADIUS_M,
+      damage: FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE,
+      atMs: fire.pulseAtMs,
+    }, remoteTargets, (_from, to) => carpetFireCanReach(to[0], to[1] + 1.15, to[2]));
+    for (const event of events) {
+      const applied = applyKillstreakDamageEvent(event);
+      if (!applied || applied.damage <= 0) continue;
+      pendingCarpetGroundFireDamageEvents.push(applied);
+      recordOwnerSupportDamage(applied);
+    }
+  } else if (network.role === 'host' && fire.damageSource === 'flamethrower') {
+    const ownerBot = bots.get(fire.ownerId);
+    const retainedAction = admittedRemoteShots.get(fire.ownerId)?.get(fire.actionNonce);
+    const authority = resolveFlamethrowerResidualRemoteAuthority({
+      ownerId: fire.ownerId,
+      actionNonce: fire.actionNonce,
+      ownerKind: ownerBot ? 'hosted-bot' : 'human',
+      currentMatchEpoch: interactiveWorldMatchEpoch,
+      nowMs: fire.pulseAtMs,
+      actionLifetimeMs: admittedShotActionLifetimeMs('flamethrower'),
+      retainedAction: retainedAction ? {
+        ownerId: retainedAction.message.by,
+        actionNonce: retainedAction.message.nonce,
+        weapon: retainedAction.message.weapon,
+        matchEpoch: retainedAction.matchEpoch,
+        receivedAtMs: retainedAction.receivedAt,
+      } : null,
+    });
+    if (authority.accepted) {
+      for (const remote of remotes.values()) {
+        const health = remoteHealthAuthorities.get(remote.snapshot.id);
+        if (!health?.alive || !flameDamageAllowsTarget(
+          'flamethrower-ground-fire',
+          fire.ownerId,
+          fire.ownerTeam,
+          remote.snapshot.id,
+          remote.snapshot.team,
+        )) continue;
+        const dx = remote.snapshot.x - fire.point.x;
+        const dz = remote.snapshot.z - fire.point.z;
+        if (dx * dx + dz * dz >= r2) continue;
+        if (authority.route === 'hosted-bot-result' && ownerBot) {
+          flamethrowerGroundFireRemotePosition.set(
+            remote.snapshot.x,
+            remote.snapshot.y,
+            remote.snapshot.z,
+          );
+          flamethrowerGroundFireRemoteDirection.copy(flamethrowerGroundFireRemotePosition).sub(fire.point);
+          if (flamethrowerGroundFireRemoteDirection.lengthSq() < 1e-8) {
+            flamethrowerGroundFireRemoteDirection.set(0, 0, -1);
+          } else flamethrowerGroundFireRemoteDirection.normalize();
+          applyHostedBotDamageToRemote(
+            ownerBot,
+            {
+              id: remote.snapshot.id,
+              team: remote.snapshot.team,
+              position: flamethrowerGroundFireRemotePosition,
+              stance: remote.snapshot.stance ?? 'stand',
+              kind: 'remote',
+            },
+            FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE,
+            fire.point,
+            flamethrowerGroundFireRemoteDirection,
+            fire.pulseAtMs,
+            'flamethrower-stream',
+            'flamethrower',
+          );
+        } else {
+          sendAuthoritativeHit({
+            type: 'hit', by: fire.ownerId, target: remote.snapshot.id,
+            damage: FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, kind: 'shot',
+            origin: fire.point.toArray() as [number, number, number],
+            actionNonce: fire.actionNonce, nonce: randomNonce(),
+          }, {
+            hitZone: 'body', wallbang: false, penetrationMultiplier: 1,
+            distanceMeters: Math.sqrt(dx * dx + dz * dz),
+          });
+        }
+      }
     }
   }
   if (presentFlamethrowerPulseImpact) spawnImpactFlash(fire.point, 'concrete', flamethrowerGroundFireUp);
@@ -1636,12 +2104,27 @@ function applyFlamethrowerGroundFirePulse(fire: Readonly<{
 
 function updateFlamethrowerGroundFires(now: number): void {
   flamethrowerGroundFireBotSnapshotReady = false;
-  flamethrowerGroundFires.update(now, FLAMETHROWER_GROUND_FIRE_PULSE_MS, applyFlamethrowerGroundFirePulse);
+  pendingCarpetGroundFireDamageEvents.length = 0;
+  flamethrowerGroundFires.update(now, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyFlamethrowerGroundFirePulse);
+  carpetGroundFires.update(now, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyFlamethrowerGroundFirePulse);
+  if (network.role !== 'host' || pendingCarpetGroundFireDamageEvents.length === 0) return;
+  for (let offset = 0; offset < pendingCarpetGroundFireDamageEvents.length; offset += MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP) {
+    const message: KillstreakDamageResultMessage = {
+      type: 'killstreak-damage-result',
+      by: player.id,
+      matchEpoch: killstreakMatchEpoch,
+      revision: killstreakSnapshot.revision,
+      events: pendingCarpetGroundFireDamageEvents.slice(offset, offset + MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP),
+      impacts: [],
+      nonce: randomNonce(),
+    };
+    network.send(message);
+  }
 }
 
 const dmrThermalPresentation = new DmrThermalPresentation(scene, element<HTMLElement>('#dmr-thermal'));
-// Through-wall reveals: the M14 DMR shows the actual posed combatant via exact-
-// pose thermal ghosts; the railgun keeps its signature cyan silhouette scope.
+// Every authorized through-wall optic shows the exact animated combatant with
+// its normal appearance plus one bounded orange body-following halo.
 const thermalGhostPresentation = new ThermalGhostPresentation();
 const smokeVolumePresentationPool = new SmokeVolumePresentationPool(scene);
 smokeVolumePresentationPool.setQualityScale(graphicsRuntime.smokeScale);
@@ -2843,9 +3326,13 @@ function invalidateActiveWorldCollisionCache(): void {
 }
 
 let gunRangeTestBayDoorColliders: readonly DynamicWorldCollider[] = [];
+let gunRangeTestBayDoorBallisticSurfaces: readonly BallisticSurface[] = [];
 let gunRangeTestBayDoorColliderArena: THREE.Object3D | null = null;
-let gunRangeTestBayTimerResetLastEpoch = -1;
-let gunRangeTestBayPlayerWasInside = false;
+let gunRangeTestBayDoorState: GunRangeTestBayDoorState | null = null;
+let presentedGunRangeTestBayDoorThumpSequence = 0;
+let gunRangeTestBayDoorBroadcastPending = false;
+let gunRangeMatchClockState: GunRangeMatchClockSnapshot | null = null;
+let gunRangeMatchClockOccupantIds: readonly string[] = Object.freeze([]);
 
 function activeGunRangeTestBayDoorColliders(activeArena: ArenaMap = arena): readonly DynamicWorldCollider[] {
   return activeArena === arena && selectedArena.id === 'gun-range'
@@ -2962,11 +3449,27 @@ function updatePersistentWindowDebrisPhysics(dt = 1 / SIMULATION_HZ): void {
       entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
       entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w);
       entry.definition = majorDebrisDefinitionFromSnapshot(entry.definition, snapshot);
-      if (snapshot.sleeping) {
+      const settleMode = windowGlassDebrisSettleMode(
+        snapshot.position.y,
+        entry.fallbackRestY,
+        snapshot.sleeping,
+      );
+      if (settleMode !== 'physics-active') {
         // HF-155: the shards remain as persistent visual evidence, but a settled
         // pane-sized Rapier cuboid must not remain an invisible movement blocker.
         entry.physicsActive = false;
         retireSettledPhysics = true;
+        if (settleMode === 'settled') {
+          entry.root.position.y = entry.fallbackRestY;
+          entry.fallbackSettled = true;
+          entry.fallbackVelocity.set(0, 0, 0);
+          entry.fallbackAngular.set(0, 0, 0);
+        } else {
+          // Sleeping on the sill is not support authority for loose shards.
+          // Retire the cuboid and continue a bounded presentation-only fall.
+          entry.receivedPhysicsPose = false;
+          entry.fallbackVelocity.y = Math.min(entry.fallbackVelocity.y, -0.9);
+        }
       }
       continue;
     }
@@ -3218,9 +3721,12 @@ function activeBallisticSurfaces(activeArena: ArenaMap = arena): readonly Ballis
     (surface) => (!surface.breakableWindowId || !brokenWindowIds.has(surface.breakableWindowId))
       && !replacedHouseSurfaces.has(surface.id),
   );
+  const doorSurfaces = activeArena === arena && selectedArena.id === 'gun-range'
+    ? gunRangeTestBayDoorBallisticSurfaces
+    : [];
   return activeArena === arena && interactiveWorldRuntime
-    ? [...staticSurfaces, ...interactiveWorldRuntime.collisions().ballisticSurfaces]
-    : staticSurfaces;
+    ? [...staticSurfaces, ...doorSurfaces, ...interactiveWorldRuntime.collisions().ballisticSurfaces]
+    : [...staticSurfaces, ...doorSurfaces];
 }
 
 function activeRaycastMeshes(activeArena: ArenaMap = arena): THREE.Object3D[] {
@@ -3874,6 +4380,7 @@ let lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
 let lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
 const appliedKillstreakDamageResults = new Set<string>();
 const killstreakRegisteredActors = new Set<string>();
+const hostKillstreakLoadoutAcks = new HostKillstreakLoadoutAckRegistry();
 let displayedCareReward: Pass65KillstreakId | null = null;
 const supportDamageDealtByActivation = new Map<string, number>();
 const liveSupportActivationIds = new Set<string>();
@@ -3998,11 +4505,60 @@ const stickyTimingReplayNonces = new Set<number>();
 let stickyVictimFeedbackCount = 0;
 let lastStickyVictimFeedback: StickyVictimFeedback | null = null;
 let stickyVictimReceiptKeys = new Set<string>();
+const stickyVictimUrgentAlertController = new StickyVictimUrgentAlertController();
+let stickyVictimUrgentAlertTimeout: number | null = null;
+let stickyVictimUrgentAlertGeneration = 0;
 const lastQaStickyAuthoritativeHits = new Map<StickyAttachmentSource, HitMessage>();
 let lastQaKillstreakActivationIntent: KillstreakActivateIntentMessage | null = null;
 const PENDING_STICKY_HIT_LIMIT = 64;
 const PENDING_STICKY_HIT_LIFETIME_MS = 1_500;
 const STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS = 3_000;
+
+function hideStickyVictimUrgentAlert(): void {
+  stickyVictimUrgentAlertGeneration += 1;
+  if (stickyVictimUrgentAlertTimeout !== null) window.clearTimeout(stickyVictimUrgentAlertTimeout);
+  stickyVictimUrgentAlertTimeout = null;
+  const warning = element<HTMLElement>('#sticky-warning');
+  warning.hidden = true;
+  delete warning.dataset.source;
+  delete warning.dataset.targetLifeId;
+  delete warning.dataset.actionNonce;
+}
+
+function resetStickyVictimUrgentAlertLife(targetLifeId: number | null = null): void {
+  hideStickyVictimUrgentAlert();
+  stickyVictimUrgentAlertController.reset(targetLifeId);
+}
+
+function presentStickyVictimUrgentAlert(
+  source: StickyAttachmentSource,
+  targetId: string,
+  targetLifeId: number,
+  actionNonce: number,
+  nowMs = performance.now(),
+): boolean {
+  if (!player.alive || targetId !== player.id || targetLifeId !== localContinuity) return false;
+  const alert = stickyVictimUrgentAlertController.admit({ source, targetId, targetLifeId, actionNonce, nowMs });
+  if (!alert) return false;
+  hideStickyVictimUrgentAlert();
+  const warning = element<HTMLElement>('#sticky-warning');
+  warning.dataset.source = alert.source;
+  warning.dataset.targetLifeId = String(alert.targetLifeId);
+  warning.dataset.actionNonce = String(alert.actionNonce);
+  warning.hidden = false;
+  const generation = stickyVictimUrgentAlertGeneration;
+  const expire = (): void => {
+    if (generation !== stickyVictimUrgentAlertGeneration) return;
+    const remainingMs = alert.expiresAtMs - performance.now();
+    if (remainingMs > 0) {
+      stickyVictimUrgentAlertTimeout = window.setTimeout(expire, remainingMs);
+      return;
+    }
+    hideStickyVictimUrgentAlert();
+  };
+  stickyVictimUrgentAlertTimeout = window.setTimeout(expire, STICKY_VICTIM_URGENT_ALERT_DURATION_MS);
+  return true;
+}
 const hostTriggerAuthorities = new HostTriggerAuthorityRegistry();
 const authorizedRemoteRedeploys = new Map<string, {
   primary: PrimaryWeaponId;
@@ -4119,7 +4675,22 @@ const pendingLocalTimedShots = new Map<string, TimedMapWeaponId>();
 function admittedShotActionLifetimeMs(weapon: WeaponId): number {
   if (weapon === 'explosive-crossbow') return EXPLOSIVE_BOLT_MAX_LIFE_MS + 1_000;
   if (weapon === 'flare-gun') return FLARE_PROJECTILE_EFFECT.maximumFlightMs + FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000;
+  if (weapon === 'flamethrower') return FLAMETHROWER_GROUND_FIRE_DURATION_MS + 1_000;
   return 1_000;
+}
+
+function currentAdmittedShotAction(
+  ownerId: string,
+  actionNonce: number,
+  now = performance.now(),
+): AdmittedRemoteShot | undefined {
+  const action = admittedRemoteShots.get(ownerId)?.get(actionNonce);
+  if (!action || action.matchEpoch !== interactiveWorldMatchEpoch) return undefined;
+  const ageMs = now - action.receivedAt;
+  if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > admittedShotActionLifetimeMs(action.message.weapon)) {
+    return undefined;
+  }
+  return action;
 }
 const createRailgunClaimAudit = () => ({
   received: 0,
@@ -4200,7 +4771,8 @@ let localLobbyPingMs: number | null = null;
 let localLobbyReady = false;
 let localDhv: Dhv = 10;
 let localResumeToken = '';
-let lastClientWorldRepairConnectionEpoch: string | null = null;
+let clientWorldRepairAdmission: ClientWorldRepairAdmission | null = null;
+let pendingClientReconnectWorldRepairConnectionEpoch: string | null = null;
 let lobbyArenaSyncPromise: Promise<void> = Promise.resolve();
 let lobbyClockTimer: ReturnType<typeof setTimeout> | null = null;
 let stateBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -4818,6 +5390,7 @@ let previousHudScores: [number, number] = [0, 0];
 let adsHeld = false;
 let sniperScopeActive = false;
 let dmrThermalActive = false;
+let railgunScopeActive = false;
 let mouseTriggerHeld = false;
 let mouseAdsHeld = false;
 let gamepadMove = { x: 0, y: 0 };
@@ -4835,8 +5408,16 @@ let wasGrounded = false;
 let sensitivity = 1;
 let controllerSensitivity = 1;
 let preferredFov = 82;
-/** Railgun thermal scope magnification; matches the catalog optic (2.5×). */
-const RAILGUN_SCOPE_MAGNIFICATION = 2.5;
+/** Runtime-owned clear-scope lifecycle; aim remains camera-forward. */
+let railgunScopeState: RailgunScopePresentationState = deriveRailgunScopePresentation({
+  alive: false,
+  localHolder: false,
+  weapon: 'railgun',
+  adsHeld: false,
+  adsProgress: 0,
+  baseFov: preferredFov,
+  cameraFov: preferredFov,
+});
 let botsFrozen = false;
 let debugBotStanceOverride: PlayerSnapshot['stance'] | null = null;
 let debugBotSpeedOverride = 0;
@@ -4858,13 +5439,15 @@ syncFieldSupportRows(killstreakLoadoutController.selected);
 
 function gameplayInputEnabled(): boolean {
   return gameStarted && player.alive && matchState.phase === 'active' && menu.classList.contains('hidden') && !isTextChatTyping()
-    && !(network.role === 'client' && awaitingCanonicalGuestAuthority);
+    && !(network.role === 'client' && awaitingCanonicalGuestAuthority)
+    && !pendingClientWorldRepair();
 }
 
 function playerSimulationEnabled(): boolean {
   return gameStarted && player.alive && matchState.phase !== 'ended' && menu.classList.contains('hidden')
     && !localKillstreakActorSnapshot()?.possession
-    && !(network.role === 'client' && awaitingCanonicalGuestAuthority);
+    && !(network.role === 'client' && awaitingCanonicalGuestAuthority)
+    && !pendingClientWorldRepair();
 }
 
 function resetLocalSpinUp(): void {
@@ -4896,7 +5479,7 @@ function syncLocalTriggerAuthority(held: boolean): void {
     transmittedTriggerWeapon = null;
     return;
   }
-  if (awaitingCanonicalGuestAuthority) {
+  if (awaitingCanonicalGuestAuthority || pendingClientWorldRepair()) {
     transmittedTriggerHeld = false;
     transmittedTriggerWeapon = null;
     return;
@@ -4927,7 +5510,7 @@ function setLocalTriggerHeld(held: boolean): void {
 function sendLocalReloadCancel(): void {
   const pending = pendingLocalReloadAuthority;
   if (network.role !== 'client' || !pending || pending.cancelSequence !== null
-    || applyingLocalReloadAuthority || awaitingCanonicalGuestAuthority) return;
+    || applyingLocalReloadAuthority || awaitingCanonicalGuestAuthority || pendingClientWorldRepair()) return;
   const actionSequence = localReloadActionSequence;
   localReloadActionSequence += 1;
   pendingLocalReloadAuthority = Object.freeze({ ...pending, cancelSequence: actionSequence });
@@ -4971,6 +5554,7 @@ function clearGameplayInput(): void {
   hudRoot.classList.remove('sniper-scope-active');
   dmrThermalPresentation.update(camera, [], false);
   hudRoot.classList.remove('dmr-thermal-active');
+  deactivateRailgunScopePresentation();
   audio.minigunDrive(0, 'idle', false);
   currentSprinting = false;
   jumpQueuedAt = -10_000;
@@ -5186,6 +5770,8 @@ function requirePlayerName(): string | null {
 
 function showFatalError(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
+  clientWorldRepairAdmission = null;
+  pendingClientReconnectWorldRepairConnectionEpoch = null;
   setBootstrapStage('failed');
   bootstrapError = message;
   gameStarted = false;
@@ -5214,6 +5800,10 @@ function setNetworkStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): v
   // Observe it after that synchronous transition so failed attempts become
   // retryable and successful attempts cannot leave stale pending button copy.
   queueMicrotask(() => {
+    if (network.role !== 'client' || !network.diagnostics().hostConnectionOpen) {
+      clientWorldRepairAdmission = null;
+      pendingClientReconnectWorldRepairConnectionEpoch = null;
+    }
     const admissionToken = matchAdmissionCoordinator.token();
     if (admissionToken) {
       try {
@@ -5230,6 +5820,10 @@ function setNetworkStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): v
 const network = new ArenaNetwork(onNetworkMessage, setNetworkStatus, (entry) => {
   appendClientRuntimeLog(entry, clientPersistentStorage());
 });
+
+function pendingClientWorldRepair(): boolean {
+  return network.role === 'client' && clientWorldRepairPending(clientWorldRepairAdmission);
+}
 
 function textChatAvailable(): boolean {
   return network.role !== 'offline' && privateLobbySnapshot !== null;
@@ -5522,7 +6116,9 @@ function resetPrivateLobbyState(): void {
   localLobbyReady = false;
   localDhv = 10;
   localResumeToken = '';
-  lastClientWorldRepairConnectionEpoch = null;
+  clientWorldRepairAdmission = null;
+  pendingClientReconnectWorldRepairConnectionEpoch = null;
+  hostKillstreakLoadoutAcks.clear();
   localHostConfirmedContinuity = null;
   awaitingAuthoritativeRejoinContinuity = false;
   awaitingCanonicalGuestAuthority = false;
@@ -5556,7 +6152,253 @@ function resetPrivateLobbyState(): void {
   lastAppliedLocalShotResultSeq = -1;
   authoritativeScores.clear();
   resetTextChat();
+  gunRangeMatchClockState = null;
+  gunRangeMatchClockOccupantIds = Object.freeze([]);
+  gunRangeTestBayDoorState = null;
+  presentedGunRangeTestBayDoorThumpSequence = 0;
+  gunRangeTestBayDoorBroadcastPending = false;
   hidePrivateLobbyPresentation();
+}
+
+function gunRangeMatchClockDurationMs(): number | null {
+  const multiplayerConfig = privateLobbySnapshot?.config ?? privateMatchConfig;
+  const arenaId = network.role === 'offline' ? selectedArena.id : multiplayerConfig.arenaId;
+  return arenaId === 'gun-range' ? GUN_RANGE_ROUND_MS : null;
+}
+
+function admittedGunRangeClockParticipants(): readonly GunRangeClockParticipant[] {
+  if (network.role === 'client') return Object.freeze([]);
+  if (network.role === 'offline') {
+    return Object.freeze([Object.freeze({
+      id: player.id,
+      admitted: true,
+      connected: true,
+      alive: player.alive,
+      position: Object.freeze({ x: player.position.x, y: player.position.y, z: player.position.z }),
+    })]);
+  }
+  const participants: GunRangeClockParticipant[] = [];
+  const hostMember = hostLobbyMembers.get(player.id);
+  participants.push(Object.freeze({
+    id: player.id,
+    admitted: hostMember !== undefined,
+    connected: hostMember?.connected === true,
+    alive: player.alive,
+    position: Object.freeze({ x: player.position.x, y: player.position.y, z: player.position.z }),
+  }));
+  for (const member of hostLobbyMembers.values()) {
+    if (member.id === player.id) continue;
+    const remote = remotes.get(member.id);
+    const retained = retainedRemoteAuthorities.get(member.id)?.snapshot;
+    const authoritative = retained ?? remote?.snapshot;
+    const health = remoteHealthAuthorities.get(member.id);
+    if (!authoritative) continue;
+    participants.push(Object.freeze({
+      id: member.id,
+      admitted: true,
+      // Lobby admission alone is not proof that a replacement document has
+      // applied its retained pose. The exact resume ACK releases this flag, so
+      // a rejoin can pause the shared clock only after canonical restoration.
+      connected: member.connected && remote !== undefined && !remote.awaitingReplacementState,
+      alive: health?.alive === true,
+      position: Object.freeze({ x: authoritative.x, y: authoritative.y, z: authoritative.z }),
+    }));
+  }
+  return Object.freeze(participants);
+}
+
+function sampleAuthoritativeGunRangeTestBayDoor(nowHostTimeMs: number): GunRangeTestBayDoorState | null {
+  if (selectedArena.id !== 'gun-range' || matchState.phase !== 'active' || network.role === 'client') return null;
+  const prior = gunRangeTestBayDoorState ?? createGunRangeTestBayDoorState(nowHostTimeMs);
+  // A hidden-tab authority heartbeat samples performance.now(), while a
+  // previously queued rAF can subsequently arrive with an older frame stamp.
+  // Keep the canonical door clock monotonic across those two schedulers.
+  const sampleTimeMs = Math.max(nowHostTimeMs, prior.updatedAtMs);
+  const observerPositions = admittedGunRangeClockParticipants()
+    .filter((participant) => participant.admitted && participant.connected && participant.alive)
+    .map((participant) => participant.position);
+  gunRangeTestBayDoorState = advanceGunRangeTestBayDoorForObservers(
+    prior,
+    sampleTimeMs,
+    observerPositions,
+  ).state;
+  return gunRangeTestBayDoorState;
+}
+
+function projectActiveGunRangeTestBayDoor(nowLocalMonoMs: number): GunRangeTestBayDoorState | null {
+  if (selectedArena.id !== 'gun-range' || matchState.phase !== 'active' || !gunRangeTestBayDoorState) return null;
+  if (network.role !== 'client') return gunRangeTestBayDoorState;
+  const sampleAtLocalMonoMs = hostTimeToGuestMono(
+    hostTimeMapping,
+    gunRangeTestBayDoorState.updatedAtMs,
+    nowLocalMonoMs,
+    privateLobbySnapshot?.snapshotHostTimeMs ?? gunRangeTestBayDoorState.updatedAtMs,
+  );
+  // A replacement document can have a younger performance time origin than
+  // the host sample it is projecting. Preserve monotonic age while bounding
+  // the replica timestamp to the non-negative local clock domain accepted by
+  // the strict door-state contract.
+  const projectedUpdatedAtMs = Math.max(0, Math.min(nowLocalMonoMs, sampleAtLocalMonoMs));
+  return projectGunRangeTestBayDoorState(
+    { ...gunRangeTestBayDoorState, updatedAtMs: projectedUpdatedAtMs },
+    nowLocalMonoMs,
+  );
+}
+
+function initializeGunRangeTestBayDoor(mode: 'solo' | 'host' | 'client'): void {
+  gunRangeTestBayDoorBroadcastPending = false;
+  if (selectedArena.id !== 'gun-range') {
+    gunRangeTestBayDoorState = null;
+    gunRangeTestBayDoorColliders = Object.freeze([]);
+    gunRangeTestBayDoorBallisticSurfaces = Object.freeze([]);
+    gunRangeTestBayDoorColliderArena = null;
+    presentedGunRangeTestBayDoorThumpSequence = 0;
+    return;
+  }
+  if (mode === 'client') gunRangeTestBayDoorState = privateLobbySnapshot?.testBayDoor ?? null;
+  if (!gunRangeTestBayDoorState) gunRangeTestBayDoorState = createGunRangeTestBayDoorState(performance.now());
+  const state = projectActiveGunRangeTestBayDoor(performance.now()) ?? gunRangeTestBayDoorState;
+  const frame = applyGunRangeTestBayDoorState(arena.root, state);
+  gunRangeTestBayDoorColliderArena = arena.root;
+  gunRangeTestBayDoorColliders = frame.dynamicColliders;
+  gunRangeTestBayDoorBallisticSurfaces = frame.dynamicBallisticSurfaces;
+  presentedGunRangeTestBayDoorThumpSequence = state.thumpSequence;
+  syncInteractiveWorldPhysics();
+}
+
+function updateGunRangeTestBayDoorAuthority(nowLocalMonoMs: number): GunRangeTestBayDoorState | null {
+  if (!gameStarted || selectedArena.id !== 'gun-range' || matchState.phase !== 'active') return null;
+  if (network.role === 'client') return projectActiveGunRangeTestBayDoor(nowLocalMonoMs);
+  const priorPhase = gunRangeTestBayDoorState?.phase ?? 'closed';
+  const priorThump = gunRangeTestBayDoorState?.thumpSequence ?? 0;
+  const state = sampleAuthoritativeGunRangeTestBayDoor(nowLocalMonoMs);
+  if (state && network.role === 'host'
+    && (state.phase !== priorPhase || state.thumpSequence !== priorThump)) {
+    gunRangeTestBayDoorBroadcastPending = true;
+  }
+  return state;
+}
+
+function synchronizeGunRangeTestBayDoorWorld(
+  doorState: GunRangeTestBayDoorState,
+  presentThump: boolean,
+): void {
+  if (selectedArena.id !== 'gun-range') return;
+  const doorFrame = applyGunRangeTestBayDoorState(arena.root, doorState);
+  const doorArenaChanged = gunRangeTestBayDoorColliderArena !== arena.root;
+  gunRangeTestBayDoorColliderArena = arena.root;
+  gunRangeTestBayDoorColliders = doorFrame.dynamicColliders;
+  gunRangeTestBayDoorBallisticSurfaces = doorFrame.dynamicBallisticSurfaces;
+  if (doorState.thumpSequence > presentedGunRangeTestBayDoorThumpSequence) {
+    presentedGunRangeTestBayDoorThumpSequence = doorState.thumpSequence;
+    if (presentThump) {
+      const trigger = GUN_RANGE_TEST_BAY_CONTRACT.door.trigger;
+      audio.testBayDoorThump(player.position.distanceTo(new THREE.Vector3(trigger.x, trigger.y, trigger.z)));
+    }
+  }
+  if (doorArenaChanged || doorFrame.collisionChanged) syncInteractiveWorldPhysics();
+}
+
+function flushGunRangeTestBayDoorBroadcast(): void {
+  if (!gunRangeTestBayDoorBroadcastPending || network.role !== 'host') return;
+  gunRangeTestBayDoorBroadcastPending = false;
+  broadcastHostLobby('active');
+}
+
+function sampleAuthoritativeGunRangeMatchClock(nowHostTimeMs: number): GunRangeMatchClockSnapshot | null {
+  const durationMs = gunRangeMatchClockDurationMs();
+  if (durationMs === null || network.role === 'client') return null;
+  if (!gunRangeMatchClockState) {
+    if (matchState.phase !== 'active') return null;
+    gunRangeMatchClockState = createGunRangeMatchClockSnapshot(durationMs, nowHostTimeMs);
+  }
+  const sampleTimeMs = Math.max(nowHostTimeMs, gunRangeMatchClockState.sampledAtHostTimeMs);
+  gunRangeMatchClockState = advanceGunRangeMatchClock(
+    gunRangeMatchClockState,
+    sampleTimeMs,
+    gunRangeMatchClockState.paused,
+    durationMs,
+  ).state;
+  return gunRangeMatchClockState;
+}
+
+function projectActiveGunRangeMatchClock(nowLocalMonoMs: number): void {
+  const durationMs = gunRangeMatchClockDurationMs();
+  if (durationMs === null || !gunRangeMatchClockState || matchState.phase !== 'active') return;
+  const sampleAtLocalMonoMs = network.role === 'client'
+    ? hostTimeToGuestMono(
+        hostTimeMapping,
+        gunRangeMatchClockState.sampledAtHostTimeMs,
+        nowLocalMonoMs,
+        privateLobbySnapshot?.snapshotHostTimeMs ?? gunRangeMatchClockState.sampledAtHostTimeMs,
+      )
+    : gunRangeMatchClockState.sampledAtHostTimeMs;
+  matchState = {
+    ...matchState,
+    ...projectGunRangeMatchClock(
+      gunRangeMatchClockState,
+      sampleAtLocalMonoMs,
+      nowLocalMonoMs,
+      durationMs,
+    ),
+  };
+}
+
+function initializeGunRangeMatchClock(mode: 'solo' | 'host' | 'client'): void {
+  gunRangeMatchClockOccupantIds = Object.freeze([]);
+  const durationMs = gunRangeMatchClockDurationMs();
+  if (durationMs === null) {
+    gunRangeMatchClockState = null;
+    return;
+  }
+  if (mode === 'client') {
+    gunRangeMatchClockState = privateLobbySnapshot?.matchClock ?? null;
+    projectActiveGunRangeMatchClock(performance.now());
+    return;
+  }
+  if (!gunRangeMatchClockState) {
+    // Admission/prewarm can finish after the scheduled lobby boundary. A new
+    // Gun Range round nevertheless begins with the full exact two minutes;
+    // only the host-authored post-admission clock may consume that budget.
+    const activeAt = matchState.phase === 'active' ? performance.now() : matchState.endsAt;
+    gunRangeMatchClockState = createGunRangeMatchClockSnapshot(durationMs, activeAt);
+  }
+  projectActiveGunRangeMatchClock(performance.now());
+}
+
+function updateGunRangeMatchClockAuthority(nowLocalMonoMs: number): void {
+  const durationMs = gunRangeMatchClockDurationMs();
+  if (!gameStarted || durationMs === null || matchState.phase !== 'active') return;
+  if (network.role === 'client') {
+    projectActiveGunRangeMatchClock(nowLocalMonoMs);
+    return;
+  }
+  if (!gunRangeMatchClockState) {
+    gunRangeMatchClockState = createGunRangeMatchClockSnapshot(durationMs, nowLocalMonoMs);
+  }
+  const previousOccupantIds = gunRangeMatchClockOccupantIds;
+  const nextOccupantIds = gunRangeTestBayOccupants(
+    admittedGunRangeClockParticipants(),
+    GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds,
+  );
+  const boundaryEdgeCount = gunRangeTestBayOccupancyBoundaryCount(previousOccupantIds, nextOccupantIds);
+  gunRangeMatchClockOccupantIds = nextOccupantIds;
+  const sampleTimeMs = Math.max(nowLocalMonoMs, gunRangeMatchClockState.sampledAtHostTimeMs);
+  const step = advanceGunRangeMatchClock(
+    gunRangeMatchClockState,
+    sampleTimeMs,
+    gunRangeMatchClockOccupantIds.length > 0,
+    durationMs,
+    boundaryEdgeCount,
+  );
+  gunRangeMatchClockState = step.state;
+  projectActiveGunRangeMatchClock(nowLocalMonoMs);
+  if (step.boundaryEdgeCount > 0 && network.role === 'host') {
+    // Participant boundary edges are infrequent but release-critical. Make them crash-durable
+    // before publishing the newer reliable lobby revision to connected peers.
+    persistActiveHostMatchCheckpoint(true);
+    broadcastHostLobby('active');
+  }
 }
 
 function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phase ?? 'waiting'): LobbySnapshot {
@@ -5572,6 +6414,21 @@ function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phas
   const scores = scoreIds
     .map((id) => authoritativeScores.get(id) ?? (hostLobbyMembers.has(id) ? emptyPlayerScore(id) : undefined))
     .filter((score): score is PlayerScore => score !== undefined);
+  // The reliable envelope must never predate either canonical subsystem. A
+  // queued rAF timestamp may be marginally ahead of performance.now(), and a
+  // replica correctly rejects any child sample that appears to come from the
+  // future of its enclosing host snapshot.
+  const snapshotHostTimeMs = Math.max(
+    performance.now(),
+    gunRangeMatchClockState?.sampledAtHostTimeMs ?? 0,
+    gunRangeTestBayDoorState?.updatedAtMs ?? 0,
+  );
+  const matchClock = phase === 'active'
+    ? sampleAuthoritativeGunRangeMatchClock(snapshotHostTimeMs)
+    : null;
+  const testBayDoor = phase === 'active'
+    ? sampleAuthoritativeGunRangeTestBayDoor(snapshotHostTimeMs)
+    : null;
   return {
     revision: privateLobbyRevision,
     hostId: player.id,
@@ -5579,9 +6436,11 @@ function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phas
     config: privateMatchConfig,
     members,
     scores,
-    snapshotHostTimeMs: performance.now(),
+    snapshotHostTimeMs,
     activeAtHostTimeMs: privateMatchActiveAtHostTimeMs,
     activeAtEpochMs: privateMatchActiveAtEpochMs,
+    matchClock,
+    testBayDoor,
   };
 }
 
@@ -5594,6 +6453,15 @@ function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot
   }
   privateLobbyRevision += 1;
   privateLobbySnapshot = hostSnapshot(phase);
+  if (privateLobbySnapshot.testBayDoor && selectedArena.id === 'gun-range' && matchState.phase === 'active') {
+    // hostSnapshot advances the canonical door to the reliable envelope's
+    // exact host timestamp. Apply that exact state to the leaf, movement,
+    // ballistics and Rapier before any peer can observe the newer snapshot.
+    synchronizeGunRangeTestBayDoorWorld(
+      privateLobbySnapshot.testBayDoor,
+      document.visibilityState === 'visible' && document.hasFocus(),
+    );
+  }
   network.setCapacity(privateLobbySnapshot.config.capacity);
   for (const member of privateLobbySnapshot.members) network.setPlayerTeam(member.id, member.team);
   const message: LobbyStateMessage = { type: 'lobby-state', by: player.id, snapshot: privateLobbySnapshot, nonce: randomNonce() };
@@ -5790,6 +6658,13 @@ function createHostMatchCheckpoint(
   }
   const railgun = checkpointRailgunAuthority(railgunState, nowMonoMs);
   if (!railgun) return null;
+  const matchClock = privateMatchConfig.arenaId === 'gun-range' && matchState.phase === 'active'
+    ? sampleAuthoritativeGunRangeMatchClock(nowMonoMs)
+    : null;
+  if (privateMatchConfig.arenaId === 'gun-range' && matchState.phase === 'active' && !matchClock) return null;
+  const elapsedSinceActiveMs = matchClock
+    ? privateMatchConfig.durationMs - matchClock.remainingMs
+    : nowMonoMs - privateMatchActiveAtHostTimeMs;
   const checkpoint: HostMatchCheckpoint = {
     schemaVersion: HOST_MATCH_CHECKPOINT_SCHEMA_VERSION,
     protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
@@ -5799,7 +6674,7 @@ function createHostMatchCheckpoint(
     activeAtEpochMs: privateMatchActiveAtEpochMs,
     matchEpoch: killstreakMatchEpoch,
     phase: matchState.phase,
-    elapsedSinceActiveMs: nowMonoMs - privateMatchActiveAtHostTimeMs,
+    elapsedSinceActiveMs,
     lobbyRevision: privateLobbyRevision,
     config: privateMatchConfig,
     members,
@@ -5851,6 +6726,7 @@ function createHostMatchCheckpoint(
     railgun,
     killstreak,
     timedMapWeapons,
+    ...(matchClock ? { matchClock } : {}),
     flareProjectiles,
     flareShotFeedback,
   };
@@ -5859,6 +6735,29 @@ function createHostMatchCheckpoint(
 
 let lastHostCheckpointPersistAtEpochMs = 0;
 let hostCheckpointPersistScheduled = false;
+let hostCheckpointRejectedPoseWrites = 0;
+let lastHostCheckpointRejectedPoseReason: string | null = null;
+let lastHostCheckpointRejectedPoseAtEpochMs: number | null = null;
+const HOST_CHECKPOINT_PERSIST_INTERVAL_MS = 2_000;
+const HOST_CHECKPOINT_IDLE_TIMEOUT_MS = 250;
+
+function hostRecoveryPoseAudit(checkpoint: HostMatchCheckpoint): HostRecoveryPoseAudit {
+  return auditHostRecoveryPoses(checkpoint, selectedArena.id, arena.bounds, activeWorldColliders());
+}
+
+function createRecoverySafeHostMatchCheckpoint(): HostMatchCheckpoint | null {
+  const checkpoint = createHostMatchCheckpoint();
+  if (!checkpoint) return null;
+  const audit = hostRecoveryPoseAudit(checkpoint);
+  if (audit.accepted) return checkpoint;
+  hostCheckpointRejectedPoseWrites += 1;
+  lastHostCheckpointRejectedPoseReason = audit.reason;
+  lastHostCheckpointRejectedPoseAtEpochMs = Date.now();
+  // Deliberately retain the prior known-safe localStorage receipt. A transient
+  // collider-invalid pose must not replace the only checkpoint that can be
+  // admitted after a renderer crash.
+  return null;
+}
 /**
  * Persist the bounded host checkpoint. Serializing the entire match state
  * (bots, inventories, flare projectiles) and writing localStorage on the shot
@@ -5871,7 +6770,7 @@ function persistActiveHostMatchCheckpoint(force = false): boolean {
   if (!storage) return false;
   if (force) {
     lastHostCheckpointPersistAtEpochMs = Date.now();
-    const checkpoint = createHostMatchCheckpoint();
+    const checkpoint = createRecoverySafeHostMatchCheckpoint();
     return checkpoint ? saveHostMatchCheckpoint(storage, checkpoint) : false;
   }
   if (hostCheckpointPersistScheduled) return true;
@@ -5881,11 +6780,22 @@ function persistActiveHostMatchCheckpoint(force = false): boolean {
     const deferredStorage = clientPersistentStorage();
     if (!deferredStorage) return;
     const nowEpochMs = Date.now();
-    if (nowEpochMs - lastHostCheckpointPersistAtEpochMs < 2_000) return;
+    const remainingThrottleMs = HOST_CHECKPOINT_PERSIST_INTERVAL_MS
+      - (nowEpochMs - lastHostCheckpointPersistAtEpochMs);
+    if (remainingThrottleMs > 0) {
+      // Keep one coalesced dirty write alive. Dropping it here made a mutation
+      // just after the prior checkpoint wait for a second interval tick.
+      hostCheckpointPersistScheduled = true;
+      window.setTimeout(() => {
+        hostCheckpointPersistScheduled = false;
+        persistActiveHostMatchCheckpoint();
+      }, remainingThrottleMs);
+      return;
+    }
     lastHostCheckpointPersistAtEpochMs = nowEpochMs;
-    const checkpoint = createHostMatchCheckpoint();
+    const checkpoint = createRecoverySafeHostMatchCheckpoint();
     if (checkpoint) saveHostMatchCheckpoint(deferredStorage, checkpoint);
-  });
+  }, HOST_CHECKPOINT_IDLE_TIMEOUT_MS);
   return true;
 }
 
@@ -5923,22 +6833,9 @@ function recoveryRemainingMs(value: number, checkpoint: HostMatchCheckpoint, now
   return Math.max(0, value - Math.max(0, nowEpochMs - checkpoint.savedAtEpochMs));
 }
 
-function hostRecoveryPositionsFitArena(checkpoint: HostMatchCheckpoint): boolean {
-  const withinHeight = (y: number): boolean => Number.isFinite(y) && y >= -25 && y <= 250;
-  return checkpoint.config.arenaId === selectedArena.id
-    && pointInsideBounds(checkpoint.hostPlayer, arena.bounds, 0.44)
-    && withinHeight(checkpoint.hostPlayer.y)
-    && !isBlocked(checkpoint.hostPlayer, activeWorldColliders(), 0.44)
-    && checkpoint.guests.every((entry) => pointInsideBounds(entry.snapshot, arena.bounds, 0.44)
-      && withinHeight(entry.snapshot.y)
-      && !isBlocked(entry.snapshot, activeWorldColliders(), 0.44))
-    && checkpoint.bots.every((entry) => pointInsideBounds(entry.snapshot, arena.bounds, 0.44)
-      && withinHeight(entry.snapshot.y)
-      && !isBlocked({ ...entry.snapshot, y: entry.snapshot.y + 1.7 }, activeWorldColliders(), 0.42));
-}
-
 function restoreRecoveredHostRuntime(checkpoint: HostMatchCheckpoint, nowMonoMs = performance.now()): number {
-  if (!hostRecoveryPositionsFitArena(checkpoint)) throw new Error('Stored host recovery positions are outside the selected arena');
+  const poseAudit = hostRecoveryPoseAudit(checkpoint);
+  if (!poseAudit.accepted) throw new Error(`Stored host recovery positions are unsafe: ${poseAudit.reason}`);
   const hostState = checkpoint.hostPlayer;
   const hostScore = checkpoint.scores.find((score) => score.id === hostState.id);
   if (!hostScore || player.id !== hostState.id) throw new Error('Stored host recovery identity is inconsistent');
@@ -6046,6 +6943,11 @@ function restoreRecoveredHostRuntime(checkpoint: HostMatchCheckpoint, nowMonoMs 
 function initializeFreshHostLobby(): void {
   if (pendingHostMatchRecovery?.roomCode !== network.roomCode) clearStoredHostMatchCheckpoint();
   hostMatchRecoveryPreparing = false;
+  gunRangeMatchClockState = null;
+  gunRangeMatchClockOccupantIds = Object.freeze([]);
+  gunRangeTestBayDoorState = null;
+  presentedGunRangeTestBayDoorThumpSequence = 0;
+  gunRangeTestBayDoorBroadcastPending = false;
   // Remember the room code so a host who crashes can reclaim it on rehost,
   // letting guests who still have it saved rejoin the same lobby.
   saveLastHostedRoomCode(network.roomCode);
@@ -6076,7 +6978,7 @@ async function resumeRecoveredHostMatch(
   checkpoint: HostMatchCheckpoint,
   timing: HostMatchResumeTiming,
 ): Promise<void> {
-  await beginPrivateMatch(
+  const result = await beginPrivateMatch(
     'host',
     timing.activeAtLocalMonoMs,
     checkpoint.activeAtEpochMs,
@@ -6086,7 +6988,12 @@ async function resumeRecoveredHostMatch(
   hostMatchRecoveryPreparing = false;
   if (!gameStarted) {
     pendingHostRecoveryJoins.clear();
-    setStatus('Stored match could not be restored safely. Reload to open a fresh lobby.', 'error');
+    const exactReason = result.status === 'failed'
+      ? result.error.message
+      : result.status === 'superseded'
+        ? result.reason
+        : 'Match admission ended without publishing an active match';
+    setStatus(`Stored match could not be restored safely: ${exactReason}. Reload to open a fresh lobby.`, 'error');
     return;
   }
   pendingHostMatchRecovery = null;
@@ -6107,6 +7014,8 @@ function initializeRecoveredHostLobby(checkpoint: HostMatchCheckpoint): boolean 
   privateMatchMode = checkpoint.config.mode;
   privateMatchActiveAtHostTimeMs = timing.activeAtLocalMonoMs;
   privateMatchActiveAtEpochMs = checkpoint.activeAtEpochMs;
+  gunRangeMatchClockState = timing.matchClock;
+  gunRangeMatchClockOccupantIds = Object.freeze([]);
   killstreakMatchEpoch = checkpoint.matchEpoch;
   privateLobbyRevision = checkpoint.lobbyRevision;
   player.id = checkpoint.hostPlayer.id;
@@ -6161,12 +7070,17 @@ function initializeHostLobby(): void {
 
 function sendLobbyJoin(): void {
   if (network.role !== 'client') return;
+  clientWorldRepairAdmission = null;
+  pendingClientReconnectWorldRepairConnectionEpoch = null;
   if (!localResumeToken) restoreRoomIdentity(network.roomCode);
   if (gameStarted || privateLobbySnapshot?.phase === 'active' || privateLobbySnapshot?.phase === 'countdown') {
     awaitingCanonicalGuestAuthority = true;
     pendingGuestResumeAuthority = null;
   }
   localConnectionEpoch = randomLobbyCredential();
+  pendingClientReconnectWorldRepairConnectionEpoch = awaitingCanonicalGuestAuthority
+    ? localConnectionEpoch
+    : null;
   localTriggerActionSequence = 0;
   transmittedTriggerHeld = false;
   transmittedTriggerWeapon = null;
@@ -6187,18 +7101,23 @@ function sendLobbyJoin(): void {
 
 function sendClientWorldRepairReady(loadout = killstreakLoadoutController.activeMatch ?? killstreakLoadoutController.selected): void {
   if (network.role !== 'client' || !gameStarted) return;
+  const admission = clientWorldRepairAdmission;
+  const reconnectRepair = awaitingCanonicalGuestAuthority
+    && pendingClientReconnectWorldRepairConnectionEpoch === localConnectionEpoch;
+  if (!clientWorldRepairCanAttempt(admission) && !reconnectRepair) return;
   network.send({ type: 'join', player: snapshot() });
   // The reliable state commit is ordered before the loadout intent on the
   // event lane. On a rematch the host has rebuilt the remote at continuity 1;
   // this observed state advances it to the guest's current life before the
-  // one-shot loadout registration validates that life.
+  // idempotent loadout registration validates that life.
   network.sendStateCommitReliably(createStateMessage());
   const loadoutMessage: KillstreakLoadoutIntentMessage = {
     type: 'killstreak-loadout-intent', by: player.id, matchEpoch: killstreakMatchEpoch,
     lifeId: localContinuity, sequence: 0, loadout, nonce: randomNonce(),
   };
   network.send(loadoutMessage);
-  lastClientWorldRepairConnectionEpoch = localConnectionEpoch;
+  if (admission) clientWorldRepairAdmission = recordClientWorldRepairAttempt(admission);
+  if (reconnectRepair) pendingClientReconnectWorldRepairConnectionEpoch = null;
 }
 
 function rejectLobbyPlayer(
@@ -6223,6 +7142,7 @@ function rejectLobbyPlayer(
  */
 function resetAuthenticatedGuestReplacement(playerId: string): void {
   const now = performance.now();
+  hostKillstreakLoadoutAcks.clearActor(playerId);
   pendingGuestAuthorityRepairs.delete(playerId);
   clearRemoteReloadAuthority(playerId);
   const remote = remotes.get(playerId);
@@ -6283,6 +7203,7 @@ function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boole
   const pending = pendingGuestAuthorityRepairs.get(playerId);
   if (connectionEpoch && pending?.connectionEpoch === connectionEpoch) {
     network.sendToPlayer(playerId, pending.message);
+    sendCarpetGroundFirePresentationSnapshot(playerId);
     return true;
   }
   const member = hostLobbyMembers.get(playerId);
@@ -6322,6 +7243,7 @@ function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boole
   };
   pendingGuestAuthorityRepairs.set(playerId, Object.freeze({ connectionEpoch, authorityNonce, message }));
   network.sendToPlayer(playerId, message);
+  sendCarpetGroundFirePresentationSnapshot(playerId, now);
   return true;
 }
 
@@ -6335,7 +7257,14 @@ function acceptGuestResumeAck(message: GuestResumeAckMessage): boolean {
     expectedMatchEpoch: killstreakMatchEpoch,
     expectedAuthorityNonce: pending.authorityNonce,
   }) || hostLobbyConnectionEpochs.get(message.by) !== message.connectionEpoch) return true;
+  const remote = remotes.get(message.by);
+  if (!remote || !remote.awaitingReplacementState) return true;
   processedNonces.add(message.nonce);
+  // The replacement document may have emitted a state-lane sample before its
+  // reliable world-ready join. Only this exact epoch + authority-nonce ACK
+  // releases mutable pose authority; earlier samples must not replace the
+  // retained host pose used by the resume transaction.
+  remote.awaitingReplacementState = false;
   pendingGuestAuthorityRepairs.delete(message.by);
   const member = hostLobbyMembers.get(message.by);
   if (member && !member.connected) {
@@ -6665,6 +7594,7 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
     // world repair is sent; its normal post-admission `join` message is that
     // readiness handshake (handled in onNetworkMessage below).
     broadcastHostLobby(currentPhase);
+    if (gameStarted) sendKillstreakStateToPlayer(message.playerId, performance.now(), true);
     sendTextChatHistory(message.playerId);
     if (privateMatchActiveAtHostTimeMs !== null && privateMatchActiveAtEpochMs !== null && currentPhase !== 'waiting') {
       network.sendToPlayer(message.playerId, {
@@ -6753,6 +7683,7 @@ function scheduleDisconnectedLobbyExpiry(playerId: string, delayMs = REJOIN_GRAC
     pendingHostRecoveryJoins.delete(playerId);
     hostLobbyAdmissionInFlight.delete(playerId);
     pendingGuestAuthorityRepairs.delete(playerId);
+    hostKillstreakLoadoutAcks.clearActor(playerId);
     const retained = retainedRemoteAuthorities.get(playerId);
     if (retained) {
       const dropPoint = new THREE.Vector3(
@@ -6919,7 +7850,12 @@ function acceptAuthoritativeScores(message: MatchScoreMessage): void {
 
 async function synchronizeLobbyArena(admissionToken?: MatchAdmissionToken): Promise<void> {
   const arenaId = privateLobbySnapshot?.config.arenaId ?? privateMatchConfig.arenaId;
-  if (selectedArena.id !== arenaId) await activateArenaSelection(arenaId, false, admissionToken);
+  if (selectedArena.id !== arenaId) {
+    // An active-match rejoin already owns a match-admission token, so its
+    // arena rebuild must be allowed through the generic "preparing" guard.
+    // The token remains the fail-closed authority at every awaited boundary.
+    await activateArenaSelection(arenaId, admissionToken !== undefined, admissionToken);
+  }
 }
 
 function matchAdmissionIdentity(
@@ -7022,6 +7958,8 @@ function handleMatchAdmissionFailure(
     matchStartPreparing = false;
     setStatus(`Deployment preparation failed: ${error.message}. Retry to build fresh assets.`, 'warn');
   } else {
+    clientWorldRepairAdmission = null;
+    pendingClientReconnectWorldRepairConnectionEpoch = null;
     clearBots();
     killstreakLoadoutController.releaseAfterMatch();
     killstreakMenuBinding.setMatchActive(false);
@@ -7167,6 +8105,9 @@ function hostStartPrivateMatch(): void {
 
 function returnPrivateMatchToLobby(asHost: boolean, admissionToken?: MatchAdmissionToken): void {
   if (admissionToken && !matchAdmissionCoordinator.owns(admissionToken)) return;
+  clientWorldRepairAdmission = null;
+  pendingClientReconnectWorldRepairConnectionEpoch = null;
+  hostKillstreakLoadoutAcks.clear();
   if (asHost && network.role === 'host') clearStoredHostMatchCheckpoint();
   gameStarted = false;
   matchFinished = false;
@@ -7211,8 +8152,9 @@ function returnPrivateMatchToLobby(asHost: boolean, admissionToken?: MatchAdmiss
 function acceptLobbyState(message: LobbyStateMessage): void {
   if (network.role !== 'client' || message.by !== message.snapshot.hostId) return;
   if (privateLobbySnapshot && message.snapshot.revision < privateLobbySnapshot.revision) return;
+  if (message.snapshot.matchClock && gunRangeMatchClockState
+    && message.snapshot.matchClock.revision < gunRangeMatchClockState.revision) return;
   const previousSnapshot = privateLobbySnapshot;
-  const enteringActiveLobby = previousSnapshot?.phase !== 'active' && message.snapshot.phase === 'active';
   const newerRevision = previousSnapshot === null || message.snapshot.revision > previousSnapshot.revision;
   if (newerRevision && previousSnapshot !== null && lobbyAuthoritySupersedesActiveAdmission({
     arenaId: message.snapshot.config.arenaId,
@@ -7232,6 +8174,9 @@ function acceptLobbyState(message: LobbyStateMessage): void {
   privateMatchMode = message.snapshot.config.mode;
   privateMatchActiveAtHostTimeMs = message.snapshot.activeAtHostTimeMs;
   privateMatchActiveAtEpochMs = message.snapshot.activeAtEpochMs;
+  gunRangeMatchClockState = message.snapshot.matchClock;
+  gunRangeTestBayDoorState = message.snapshot.testBayDoor;
+  if (!gunRangeMatchClockState) gunRangeMatchClockOccupantIds = Object.freeze([]);
   lobbyArenaSyncPromise = lobbyArenaSyncPromise
     .catch(() => undefined)
     .then(() => synchronizeLobbyArena());
@@ -7249,20 +8194,12 @@ function acceptLobbyState(message: LobbyStateMessage): void {
     return;
   }
   if (endingFromHost) endTimedMatchFromAuthority(performance.now());
+  else if (gameStarted) projectActiveGunRangeMatchClock(performance.now());
   renderPrivateLobby();
   renderTextChat();
   if (message.snapshot.activeAtHostTimeMs !== null && message.snapshot.activeAtEpochMs !== null
     && message.snapshot.phase !== 'waiting' && !gameStarted) {
     void beginPrivateMatch('client', message.snapshot.activeAtHostTimeMs, message.snapshot.activeAtEpochMs, message.snapshot.snapshotHostTimeMs);
-  } else if (gameStarted && message.snapshot.phase !== 'waiting' && message.snapshot.phase !== 'ended'
-    && (lastClientWorldRepairConnectionEpoch !== localConnectionEpoch || enteringActiveLobby)) {
-    // The host's first authoritative active-lobby revision is also the proof
-    // that its gameplay receiver is live. Re-emit the world-ready handshake at
-    // that boundary because a faster guest can finish streaming first and its
-    // initial join/loadout packets are intentionally ignored by the host until
-    // host gameStarted is true. The connection-epoch branch retains the same
-    // repair for a replacement document joining an already-active match.
-    sendClientWorldRepairReady();
   }
 }
 
@@ -7418,6 +8355,8 @@ function handleLobbyMessage(message: GameMessage): boolean {
     } as const;
     setStatus(labels[message.reason], 'error');
     invalidateMatchAdmission(`Lobby rejected the active connection: ${message.reason}`);
+    clientWorldRepairAdmission = null;
+    pendingClientReconnectWorldRepairConnectionEpoch = null;
     network.close();
     privateLobbySnapshot = null;
     renderPrivateLobby();
@@ -7665,6 +8604,7 @@ let loadoutState: LoadoutStorageV2 = playerProfileStore.current.loadout;
 let managedPresetId: LoadoutPresetId = loadoutState.selected.kind === 'custom'
   ? loadoutState.selected.presetId
   : 'custom-1';
+let loadoutSaveInFlight = false;
 
 type CombatLoadoutSelection = Readonly<{
   primary: PrimaryWeaponId;
@@ -7773,6 +8713,14 @@ function renderCustomLoadoutEditor(): void {
   renderLoadoutInspector();
 }
 
+function setLoadoutSaveStatus(text = '', kind: 'ok' | 'error' = 'ok'): void {
+  const status = document.querySelector<HTMLElement>('#loadout-save-status');
+  if (!status) return;
+  status.textContent = text;
+  status.dataset.kind = kind;
+  status.hidden = text.length === 0;
+}
+
 function renderLoadoutInspector(): void {
   const inspector = document.querySelector<HTMLElement>('#loadout-inspector');
   const primarySelect = document.querySelector<HTMLSelectElement>('#loadout-primary');
@@ -7781,25 +8729,7 @@ function renderLoadoutInspector(): void {
   const weapon = WEAPON_CATALOG.find((definition) => definition.id === primarySelect.value);
   if (!weapon) return;
   inspector.dataset.weapon = weapon.id;
-  const name = inspector.querySelector<HTMLElement>('[data-loadout-inspector-name]');
-  const meta = inspector.querySelector<HTMLElement>('[data-loadout-inspector-meta]');
-  if (name) name.textContent = weapon.displayName.toUpperCase();
-  if (meta) meta.textContent = `${weapon.fireMode.toUpperCase()} / ${weapon.rpm} RPM / ${weapon.penetration.calibreLabel.toUpperCase()}`;
-  const control = Math.round(Math.max(8, Math.min(100, 100 - (weapon.recoil.pitchRadians + weapon.recoil.yawRadians) * 760)));
-  const cyclicDps = weapon.damage.base * weapon.pellets * weapon.rpm / 60;
-  const stats = {
-    dps: { value: String(Math.round(cyclicDps)), percent: Math.min(100, cyclicDps / 12) },
-    damage: { value: String(Math.round(weapon.damage.base * weapon.pellets)), percent: Math.min(100, weapon.damage.base * weapon.pellets) },
-    'fire-rate': { value: String(weapon.rpm), percent: Math.min(100, weapon.rpm / 12) },
-    range: { value: `${weapon.damage.falloffEndM}m`, percent: Math.min(100, weapon.damage.falloffEndM / 1.2) },
-    control: { value: String(control), percent: control },
-  } as const;
-  for (const [id, stat] of Object.entries(stats)) {
-    const bar = inspector.querySelector<HTMLElement>(`[data-loadout-stat="${id}"]`);
-    const value = inspector.querySelector<HTMLElement>(`[data-loadout-value="${id}"]`);
-    bar?.style.setProperty('--loadout-stat', `${stat.percent}%`);
-    if (value) value.textContent = stat.value;
-  }
+  applyWeaponMenuPresentation(inspector, weapon.id as WeaponId);
 
   const grenadeDetail = inspector.querySelector<HTMLElement>('[data-loadout-grenade-detail]');
   if (grenadeDetail) {
@@ -7811,6 +8741,13 @@ function renderLoadoutInspector(): void {
     };
     grenadeDetail.textContent = `${profiles[grenadeSelect.value] ?? grenadeSelect.value.toUpperCase()} / ONE CARRIED`;
   }
+}
+
+function applyLoadoutCardSelection(card: HTMLButtonElement, selected: boolean): void {
+  card.classList.toggle('selected', selected);
+  card.setAttribute('aria-pressed', String(selected));
+  if (selected) card.setAttribute('aria-current', 'true');
+  else card.removeAttribute('aria-current');
 }
 
 function renderFieldKitSelection(): void {
@@ -7845,15 +8782,13 @@ function renderFieldKitSelection(): void {
   summary.replaceChildren(status, title, equipment);
   document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((card) => {
     const selected = loadoutState.selected.kind === 'curated' && card.dataset.kitId === loadoutState.selected.kitId;
-    card.classList.toggle('selected', selected);
-    card.setAttribute('aria-pressed', String(selected));
+    applyLoadoutCardSelection(card, selected);
   });
   document.querySelectorAll<HTMLButtonElement>('[data-custom-preset-id]').forEach((card) => {
     const presetId = card.dataset.customPresetId as LoadoutPresetId;
     const preset = loadoutState.customPresets.find((entry) => entry.id === presetId);
     const selected = loadoutState.selected.kind === 'custom' && loadoutState.selected.presetId === presetId;
-    card.classList.toggle('selected', selected);
-    card.setAttribute('aria-pressed', String(selected));
+    applyLoadoutCardSelection(card, selected);
     const label = card.querySelector<HTMLElement>('[data-custom-name]');
     const equipmentLabel = card.querySelector<HTMLElement>('[data-custom-equipment]');
     if (label && preset) label.textContent = preset.displayName;
@@ -7884,29 +8819,54 @@ function chooseCustomPreset(presetId: LoadoutPresetId): void {
 }
 
 function saveManagedPreset(): void {
-  const current = loadoutState.customPresets.find((entry) => entry.id === managedPresetId);
-  if (!current) return;
-  const primary = element<HTMLSelectElement>('#loadout-primary').value;
-  const secondary = element<HTMLSelectElement>('#loadout-secondary').value;
-  const grenade = element<HTMLSelectElement>('#loadout-grenade').value;
-  if (!loadoutEligibility.primaryIds.includes(primary)
-    || !loadoutEligibility.secondaryIds.includes(secondary)
-    || !GRENADE_IDS.includes(grenade as GrenadeId)) return;
-  const updated = Object.freeze({
-    ...current,
-    displayName: sanitizeLoadoutPresetName(element<HTMLInputElement>('#loadout-preset-name').value, managedPresetId),
-    primary,
-    secondary,
-    grenade: grenade as LoadoutGrenadeId,
-  });
-  const candidate = {
-    ...loadoutState,
-    customPresets: loadoutState.customPresets.map((preset) => preset.id === managedPresetId ? updated : preset),
-  };
-  if (!persistLoadoutState(candidate)) return;
-  applyMenuLoadoutImmediately();
-  renderFieldKitSelection();
-  setStatus(`${updated.displayName} saved.`, 'ok');
+  const manager = element<HTMLElement>('#loadout-manager');
+  if (manager.hidden || loadoutSaveInFlight) return;
+  const submittedPresetId = managedPresetId;
+  const saveButton = element<HTMLButtonElement>('#loadout-save');
+  loadoutSaveInFlight = true;
+  saveButton.disabled = true;
+  try {
+    const current = loadoutState.customPresets.find((entry) => entry.id === submittedPresetId);
+    if (!current) {
+      setLoadoutSaveStatus('SAVE FAILED · SELECT A VALID CUSTOM SLOT AND TRY AGAIN.', 'error');
+      return;
+    }
+    const primary = element<HTMLSelectElement>('#loadout-primary').value;
+    const secondary = element<HTMLSelectElement>('#loadout-secondary').value;
+    const grenade = element<HTMLSelectElement>('#loadout-grenade').value;
+    if (!loadoutEligibility.primaryIds.includes(primary)
+      || !loadoutEligibility.secondaryIds.includes(secondary)
+      || !GRENADE_IDS.includes(grenade as GrenadeId)) {
+      setLoadoutSaveStatus('SAVE FAILED · CHOOSE AN ELIGIBLE PRIMARY, SECONDARY AND GRENADE.', 'error');
+      return;
+    }
+    const updated = Object.freeze({
+      ...current,
+      displayName: sanitizeLoadoutPresetName(element<HTMLInputElement>('#loadout-preset-name').value, submittedPresetId),
+      primary,
+      secondary,
+      grenade: grenade as LoadoutGrenadeId,
+    });
+    const candidate = {
+      ...loadoutState,
+      selected: { kind: 'custom', presetId: submittedPresetId } as SelectedLoadoutRef,
+      customPresets: loadoutState.customPresets.map((preset) => preset.id === submittedPresetId ? updated : preset),
+    };
+    if (!persistLoadoutState(candidate)) {
+      setLoadoutSaveStatus('SAVE FAILED · YOUR EDITS ARE STILL HERE. RETRY WHEN STORAGE IS AVAILABLE.', 'error');
+      return;
+    }
+    applyMenuLoadoutImmediately();
+    renderFieldKitSelection();
+    manager.hidden = true;
+    setLoadoutSaveStatus();
+    setStatus(`${updated.displayName} saved.`, 'ok');
+    document.querySelector<HTMLButtonElement>(`[data-custom-preset-id="${submittedPresetId}"]`)?.focus();
+  } finally {
+    loadoutSaveInFlight = false;
+    saveButton.disabled = false;
+    if (!manager.hidden) saveButton.focus();
+  }
 }
 
 document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button) => {
@@ -7943,11 +8903,13 @@ document.querySelectorAll<HTMLElement>('[data-custom-modify]').forEach((edit) =>
     managedPresetId = (edit.dataset.customModify ?? managedPresetId) as LoadoutPresetId;
     const manager = element<HTMLElement>('#loadout-manager');
     manager.hidden = false;
+    setLoadoutSaveStatus();
     renderCustomLoadoutEditor();
   });
 });
 element<HTMLSelectElement>('#loadout-manage-preset').addEventListener('change', (event) => {
   managedPresetId = (event.currentTarget as HTMLSelectElement).value as LoadoutPresetId;
+  setLoadoutSaveStatus();
   renderCustomLoadoutEditor();
 });
 element<HTMLSelectElement>('#loadout-primary').addEventListener('change', renderLoadoutInspector);
@@ -8007,30 +8969,25 @@ const viewmodelProbeUp = new THREE.Vector3();
 const viewmodelProbeStart = new THREE.Vector3();
 const viewmodelProbeEnd = new THREE.Vector3();
 const viewmodelProbeRotation = new THREE.Euler(0, 0, 0, 'YXZ');
-const VIEWMODEL_PROBE_LENGTH_M = 1.45;
-const VIEWMODEL_PROBE_OFFSETS = Object.freeze([
-  Object.freeze({ right: 0, up: 0 }),
-  Object.freeze({ right: -0.19, up: 0.04 }),
-  Object.freeze({ right: 0.19, up: 0.04 }),
-  Object.freeze({ right: 0, up: 0.24 }),
-  Object.freeze({ right: 0, up: -0.22 }),
-]);
-
 function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
+  const profile = VIEWMODEL_CONTACT_PROFILES[player.weapon];
   viewmodelProbeRotation.set(player.pitch, player.yaw, 0, 'YXZ');
   viewmodelProbeDirection.set(0, 0, -1).applyEuler(viewmodelProbeRotation).normalize();
   viewmodelProbeRight.set(1, 0, 0).applyEuler(viewmodelProbeRotation).normalize();
   viewmodelProbeUp.set(0, 1, 0).applyEuler(viewmodelProbeRotation).normalize();
   const colliders = activeWorldColliders();
   let nearestForward: number | null = null;
-  for (const offset of VIEWMODEL_PROBE_OFFSETS) {
+  for (const offset of VIEWMODEL_CONTACT_PROBE_OFFSETS) {
+    const verticalOffset = offset.vertical === 'upper'
+      ? profile.probeUpperOffsetMeters
+      : offset.vertical === 'lower' ? -profile.probeLowerOffsetMeters : offset.rightScale === 0 ? 0 : 0.04;
     viewmodelProbeStart.copy(player.position)
-      .addScaledVector(viewmodelProbeRight, offset.right)
-      .addScaledVector(viewmodelProbeUp, offset.up);
-    viewmodelProbeEnd.copy(viewmodelProbeStart).addScaledVector(viewmodelProbeDirection, VIEWMODEL_PROBE_LENGTH_M);
+      .addScaledVector(viewmodelProbeRight, offset.rightScale * profile.probeHalfWidthMeters)
+      .addScaledVector(viewmodelProbeUp, verticalOffset);
+    viewmodelProbeEnd.copy(viewmodelProbeStart).addScaledVector(viewmodelProbeDirection, profile.probeLengthMeters);
     const hit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, 0.075);
     if (!hit) continue;
-    const distance = hit.time * VIEWMODEL_PROBE_LENGTH_M;
+    const distance = hit.time * profile.probeLengthMeters;
     nearestForward = nearestForward === null ? distance : Math.min(nearestForward, distance);
   }
   viewmodelProbeStart.copy(player.position);
@@ -8042,7 +8999,7 @@ function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
     playerGrounded,
     stanceEyeHeight(player.stance),
   );
-  return viewmodelObstructionPose(nearestForward, player.stance === 'prone', floorClearance);
+  return viewmodelObstructionPose(nearestForward, player.stance === 'prone', floorClearance, player.weapon);
 }
 
 function currentViewmodelSurfaceRetreat(): number {
@@ -8504,9 +9461,28 @@ function onNetworkMessage(message: GameMessage): void {
   if (handleSmokeAuthorityMessage(message)) return;
   if (handleFlashAuthorityMessage(message)) return;
   if (message.type === 'killstreak-loadout-intent') {
-    if (network.role !== 'host' || message.matchEpoch !== killstreakMatchEpoch || killstreakRegisteredActors.has(message.by)) return;
+    if (network.role !== 'host' || message.matchEpoch !== killstreakMatchEpoch) return;
     const member = privateLobbySnapshot?.members.find((entry) => entry.id === message.by);
     const remote = remotes.get(message.by);
+    if (killstreakRegisteredActors.has(message.by)) {
+      const connectionEpoch = hostLobbyConnectionEpochs.get(message.by);
+      const actorLifeId = killstreakRuntime.actorLifeId(message.by);
+      if (!member?.connected || !remote || !connectionEpoch || actorLifeId !== message.lifeId) return;
+      const ackIdentity: HostKillstreakLoadoutAckIdentity = {
+        connectionEpoch,
+        matchEpoch: killstreakMatchEpoch,
+        actorId: message.by,
+        lifeId: actorLifeId,
+      };
+      // The client's receiver-ready resend is idempotent. ACK only this
+      // authenticated connection and exact actor life, and remember it only
+      // after the event-lane mirror accepted the targeted send.
+      if (hostKillstreakLoadoutAcks.needsAck(ackIdentity)) {
+        const reliableSent = sendKillstreakStateToPlayer(message.by, performance.now(), true);
+        hostKillstreakLoadoutAcks.recordReliableResult(ackIdentity, reliableSent);
+      }
+      return;
+    }
     // Guest and host arena streaming finish independently. The guest advances
     // its life exactly once at match admission, while the host may still hold
     // the authenticated lobby snapshot from the prior life when this reliable
@@ -8518,7 +9494,7 @@ function onNetworkMessage(message: GameMessage): void {
     if (!member?.connected || !remote || !initialLifeAccepted) return;
     killstreakRuntime.registerActor(message.by, member.team, message.lifeId, message.loadout);
     killstreakRegisteredActors.add(message.by);
-    broadcastKillstreakState();
+    broadcastKillstreakState(performance.now(), true);
     return;
   }
   if (message.type === 'killstreak-activate-intent') {
@@ -8529,7 +9505,7 @@ function onNetworkMessage(message: GameMessage): void {
       // Charge consumption, sender sequence and replay ID must be durable before
       // any presentation/broadcast work; a renderer crash in the old 2s timer
       // window otherwise restored a spent charge and forgot the accepted ID.
-      persistActiveHostMatchCheckpoint();
+      persistActiveHostMatchCheckpoint(true);
       if (admission.activationId && admission.activatedId && isLegacyOffensiveSupport(admission.activatedId)) {
         const state = remoteSupportAuthorities.get(message.by) ?? createRemoteSupportAuthorityState();
         remoteSupportAuthorities.set(message.by, registerRemoteSupportActivation(state, {
@@ -8610,7 +9586,14 @@ function onNetworkMessage(message: GameMessage): void {
     const previousActor = localKillstreakActorSnapshot();
     killstreakSnapshot = message.snapshot;
     const actor = localKillstreakActorSnapshot();
+    const exactActorAcknowledged = clientWorldRepairAdmission !== null
+      && actor?.actorId === clientWorldRepairAdmission.identity.playerId
+      && actor.lifeId === clientWorldRepairAdmission.identity.lifeId;
     if (actor) {
+      clientWorldRepairAdmission = acknowledgeClientWorldRepairActor(clientWorldRepairAdmission, {
+        actorId: actor.actorId,
+        lifeId: actor.lifeId,
+      });
       // Only a recipient-specific snapshot admitted from the authenticated host
       // can confirm a replacement document's life identity. Persist it for a
       // later renderer replacement, and correct any forged/stale local copy
@@ -8642,6 +9625,41 @@ function onNetworkMessage(message: GameMessage): void {
       if (actor.streak > (previousActor?.streak ?? actor.streak)) recordImmediateStreak();
       updateFieldSupportHud();
     }
+    if (clientWorldRepairReceiverReady(clientWorldRepairAdmission, {
+      connectionEpoch: localConnectionEpoch,
+      matchEpoch: message.snapshot.matchEpoch,
+      exactActorAcknowledged,
+    }) || awaitingCanonicalGuestAuthority
+      && pendingClientReconnectWorldRepairConnectionEpoch === localConnectionEpoch) {
+      // This authenticated recipient snapshot can only be authored by a live
+      // host runtime for the current match epoch. If our exact actor/life is
+      // absent, it is the bounded receiver-ready proof for one repair resend.
+      sendClientWorldRepairReady();
+    }
+    return;
+  }
+  if (message.type === 'killstreak-carpet-fire-state') {
+    if (network.role !== 'client'
+      || message.by !== privateLobbySnapshot?.hostId
+      || message.forPlayerId !== player.id
+      || message.matchEpoch !== killstreakMatchEpoch) return;
+    const presentedAt = performance.now();
+    const nowHostTimeMs = currentHostTimeMs();
+    for (const fire of message.fires) {
+      const remainingMs = carpetGroundFireGuestPresentation.admitSnapshot(
+        message.matchEpoch,
+        fire,
+        nowHostTimeMs,
+      );
+      if (remainingMs === null) continue;
+      // Rejoin repair is presentation-only. Only the host's separate Carpet
+      // authority pool can emit damage receipts.
+      flamethrowerStreamPresentation.igniteGround(
+        new THREE.Vector3(...fire.position),
+        presentedAt,
+        remainingMs,
+      );
+    }
     return;
   }
   if (message.type === 'killstreak-damage-result') {
@@ -8658,8 +9676,13 @@ function onNetworkMessage(message: GameMessage): void {
     for (const impact of message.impacts) {
       if (impact.phase !== 'impact') continue;
       const point = new THREE.Vector3(...impact.position);
+      if (carpetGroundFireGuestPresentation.admit(message.matchEpoch, impact)) {
+        // Presentation only: the guest never creates an authority pool entry,
+        // so the replicated host receipt cannot double-apply residual damage.
+        flamethrowerStreamPresentation.igniteGround(point, presentedAt);
+      }
       audio.explosion(presentedAt);
-      supportExplosionPresentation.emit(point, 4.5, presentedAt);
+      supportExplosionPresentation.emit(point, CARPET_BOMBER_BLAST_RADIUS_M, presentedAt);
     }
     killstreakPresentation.presentImpacts(message.impacts, presentedAt);
     return;
@@ -8877,8 +9900,33 @@ function onNetworkMessage(message: GameMessage): void {
           yaw: initialIncoming.yaw, stance: initialIncoming.stance ?? 'stand', continuity: retainedAuthority.continuity,
         }];
         remote.awaitingReplacementState = true;
+      } else if (network.role === 'host' && message.type === 'state'
+        && message.continuity >= remote.continuity) {
+        // createRemote seeds continuity 1 and the creating sample cannot enter
+        // the later `incoming.seq > remote.snapshot.seq` reducer. Adopt this
+        // authenticated first observation once so the receiver-ready repair
+        // loadout is checked against the life the host actually observed.
+        remote.continuity = message.continuity;
+        remote.positionHistory = remote.positionHistory.map((sample) => ({
+          ...sample,
+          continuity: message.continuity,
+        }));
+        remote.interpolation.clear();
+        remote.interpolation.push({
+          seq: initialIncoming.seq,
+          hostTimeMs: currentHostTimeMs(),
+          continuity: message.continuity,
+          value: initialIncoming,
+        });
       }
       remotes.set(incoming.id, remote);
+      if (network.role === 'host' && message.type === 'state') {
+        // onNetworkMessage admits this observation only after host gameStarted.
+        // Reply on the reliable lane with the current match-epoch support
+        // snapshot; an absent recipient actor is the client's receiver-ready
+        // proof, while a retained actor is already its acknowledgement.
+        broadcastKillstreakState(performance.now(), true);
+      }
       if (!remoteSupportAuthorities.has(incoming.id)) remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
       if (!remoteGrenadeAuthorities.has(incoming.id)) remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState(incoming.grenade));
       if (!remoteCombatInventories.has(incoming.id)) resetRemoteCombatInventory(initialIncoming);
@@ -8931,17 +9979,9 @@ function onNetworkMessage(message: GameMessage): void {
         remoteFlashVictimLifeIds.set(incoming.id, Math.max(remoteFlashVictimLifeIds.get(incoming.id) ?? 0, claimedLifeId));
       }
     }
-    const replacementState = network.role === 'host'
-      && message.type === 'state'
-      && remote.awaitingReplacementState;
     if (network.role === 'host' && message.type === 'state'
-      && pendingGuestAuthorityRepairs.has(incoming.id)) return;
-    const replacementLifeId = replacementState ? killstreakRuntime.actorLifeId(incoming.id) : null;
-    // An authenticated replacement for a registered actor must bind to the
-    // retained host life. If that authority is unexpectedly missing, do not
-    // accept a document-local sequence restart or claimed life.
-    if (replacementState && replacementLifeId === null) return;
-    if (incoming.seq > remote.snapshot.seq || replacementState) {
+      && (remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(incoming.id))) return;
+    if (incoming.seq > remote.snapshot.seq) {
       const now = performance.now();
       const redeployAuthorization = authorizedRemoteRedeploys.get(incoming.id);
       const redeployed = redeployAuthorization !== undefined
@@ -8994,7 +10034,7 @@ function onNetworkMessage(message: GameMessage): void {
         now,
         remote.lastSeen,
         remote.claimEligibleAt,
-        respawned || replacementState,
+        respawned,
       );
       if (!movement.accepted) {
         recordMatchDiagnostic('state-reconciliation', 'rejected', {
@@ -9208,7 +10248,9 @@ function onNetworkMessage(message: GameMessage): void {
       const lifetimeMs = admittedShotActionLifetimeMs(action.message.weapon);
       if (now - action.receivedAt > lifetimeMs) actions.delete(nonce);
     }
-    actions.set(message.nonce, { message, receivedAt: now, targets: new Set() });
+    actions.set(message.nonce, {
+      message, receivedAt: now, matchEpoch: interactiveWorldMatchEpoch, targets: new Set(),
+    });
     admittedRemoteShots.set(message.by, actions);
     if (network.role === 'host') {
       admitAuthoritativeSmokeShot(
@@ -9265,14 +10307,26 @@ function onNetworkMessage(message: GameMessage): void {
       addFeed('STUCK', 'gold');
     }
     const attacker = remotes.get(message.by);
-    if (!attacker || !pointInsideBounds(attacker.snapshot, arena.bounds, 0.44)) return;
+    const localCanonicalAttacker = network.role === 'client'
+      && message.by === player.id
+      && message.hostAuthority?.hostId === privateLobbySnapshot?.hostId;
+    const attackerPose = attacker?.snapshot ?? (localCanonicalAttacker ? player.position : null);
+    if (!attackerPose || !pointInsideBounds(attackerPose, arena.bounds, 0.44)) return;
     const targetIsLocal = message.target === player.id;
     const remoteTarget = targetIsLocal ? undefined : remotes.get(message.target);
     const botTarget = targetIsLocal ? undefined : bots.get(message.target);
     if (!targetIsLocal && (network.role !== 'host' || !remoteTarget && !botTarget)) return;
     const targetId = targetIsLocal ? player.id : remoteTarget?.snapshot.id ?? botTarget!.id;
     const targetTeam = targetIsLocal ? player.team : remoteTarget?.snapshot.team ?? botTarget!.team;
-    if (!areCombatantsHostile(message.by, attacker.snapshot.team, targetId, targetTeam)) return;
+    const attackerTeam = attacker?.snapshot.team ?? player.team;
+    const admittedActionWeapon = currentAdmittedShotAction(
+      message.by,
+      message.actionNonce,
+    )?.message.weapon;
+    const hostCanonicalFlame = message.hostAuthority !== undefined
+      && message.kind === 'shot'
+      && (admittedActionWeapon === 'flare-gun' || admittedActionWeapon === 'flamethrower');
+    if (!areCombatantsHostile(message.by, attackerTeam, targetId, targetTeam) && !hostCanonicalFlame) return;
     const targetLifeId = targetIsLocal ? localContinuity : remoteTarget?.continuity ?? botTarget!.continuity;
     if (network.role === 'client') {
       const canonicalResult = admitHostCanonicalHitResult(message.hostAuthority, {
@@ -9304,6 +10358,12 @@ function onNetworkMessage(message: GameMessage): void {
         saveStickyVictimReceipt(clientPersistentStorage(), receipt);
         stickyVictimFeedbackCount += 1;
         lastStickyVictimFeedback = stickyFeedback;
+        presentStickyVictimUrgentAlert(
+          stickyFeedback.source,
+          stickyFeedback.targetId,
+          stickyFeedback.targetLifeId,
+          stickyFeedback.actionNonce,
+        );
         addFeed('STUCK', 'coral');
       }
       reconcileLocalAuthoritativeHealth(
@@ -9311,13 +10371,14 @@ function onNetworkMessage(message: GameMessage): void {
         canonicalResult.appliedDamage,
         message.by,
         1,
-        killCauseFromHit(message, attacker.snapshot.weapon),
+        killCauseFromHit(message, admittedActionWeapon ?? attacker?.snapshot.weapon ?? player.weapon),
       );
       trimNonceSet();
       return;
     } else if (message.hostAuthority !== undefined) {
       return;
     }
+    if (!attacker) return;
     const now = performance.now();
     const rewindMs = incomingCombatRewindMs.get(message.nonce) ?? 0;
     incomingCombatRewindMs.delete(message.nonce);
@@ -9534,7 +10595,11 @@ function sendAuthoritativeHit(
     ...(attachment?.detonationOrigin ? { origin: [...attachment.detonationOrigin] as [number, number, number], stuck: true as const } : {}),
   };
   const timedMessage: HitMessage = canonicalMessage.timing ? canonicalMessage : { ...canonicalMessage, timing: nextCombatTiming() };
-  const admittedWeapon = admittedRemoteShots.get(timedMessage.by)?.get(timedMessage.actionNonce)?.message.weapon;
+  const admittedWeapon = currentAdmittedShotAction(
+    timedMessage.by,
+    timedMessage.actionNonce,
+    now,
+  )?.message.weapon;
   const attackerWeapon = admittedWeapon ?? remotes.get(timedMessage.by)?.snapshot.weapon ?? player.weapon;
   const poweredDamage = resolveRemotePoweredDamage(
     timedMessage.damage,
@@ -9598,7 +10663,7 @@ function sendAuthoritativeHit(
   if (result.died) {
     const death: DeathMessage = {
       type: 'death', killer: timedMessage.by, victim: timedMessage.target,
-      cause: killCauseFromHit(authoritativeTimedMessage, remotes.get(timedMessage.by)?.snapshot.weapon ?? player.weapon),
+      cause: killCauseFromHit(authoritativeTimedMessage, attackerWeapon),
       nonce: randomNonce(),
     };
     processedNonces.add(death.nonce);
@@ -9869,7 +10934,9 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     const lifetimeMs = admittedShotActionLifetimeMs(action.message.weapon);
     if (receivedAt - action.receivedAt > lifetimeMs) actions.delete(nonce);
   }
-  actions.set(visualShot.nonce, { message: visualShot, receivedAt, targets: new Set() });
+  actions.set(visualShot.nonce, {
+    message: visualShot, receivedAt, matchEpoch: interactiveWorldMatchEpoch, targets: new Set(),
+  });
   admittedRemoteShots.set(request.by, actions);
   network.send(visualShot, request.by);
   if (request.weapon === 'flare-gun') {
@@ -9914,7 +10981,8 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     finish('accepted-miss', 'none', admission.appliedRewindMs);
     return;
   }
-  renderRemoteShot(visualShot);
+  let remoteShotEnd: THREE.Vector3 | null = null;
+  if (request.weapon !== 'flamethrower') remoteShotEnd = renderRemoteShot(visualShot);
   if (request.weapon !== 'flamethrower') {
     applyKillstreakEntityShot(
       request.by,
@@ -9967,6 +11035,18 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       actorId: request.by, weaponOrEffect: request.weapon, reason: 'host-finite-ammo-consumed',
     }, request.shotId);
     broadcastTimedMapWeaponState();
+    remoteShotEnd = renderRemoteShot(visualShot);
+    if (remoteShotEnd) {
+      flamethrowerGroundFires.ignite({
+        ownerId: request.by,
+        ownerTeam: sender.snapshot.team,
+        point: remoteShotEnd,
+        actionNonce: request.nonce,
+        now: receivedAt,
+        durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+        pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
+      });
+    }
     applyKillstreakEntityShot(
       request.by,
       sender.snapshot.team,
@@ -10174,15 +11254,15 @@ function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
   recordShotProtocol('result-hit-presented');
 }
 
-function renderRemoteShot(message: ShotMessage): void {
+function renderRemoteShot(message: ShotMessage): THREE.Vector3 | null {
   const origin = new THREE.Vector3(...message.origin);
-  if (!pointInsideBounds(origin, arena.bounds, 0.44)) return;
+  if (!pointInsideBounds(origin, arena.bounds, 0.44)) return null;
   const direction = new THREE.Vector3(...message.direction).normalize();
   if (message.weapon === 'flare-gun') {
     const ownerTeam = message.by === player.id
       ? player.team
       : remotes.get(message.by)?.snapshot.team;
-    if (ownerTeam === undefined) return;
+    if (ownerTeam === undefined) return null;
     flareProjectileSystem.spawn({
       ownerId: message.by, ownerTeam, origin, direction, authority: false,
       actionNonce: message.nonce, now: performance.now(),
@@ -10190,18 +11270,18 @@ function renderRemoteShot(message: ShotMessage): void {
     const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
     if (remoteOperator) fireOperator(remoteOperator);
     audio.shot('flare-gun', true, origin.distanceTo(camera.position));
-    return;
+    return null;
   }
   if (message.weapon === 'explosive-crossbow') {
     const ownerTeam = message.by === player.id
       ? player.team
       : remotes.get(message.by)?.snapshot.team;
-    if (ownerTeam === undefined) return;
+    if (ownerTeam === undefined) return null;
     spawnExplosiveBolt(message.by, ownerTeam, origin, direction, false, message.nonce);
     const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
     if (remoteOperator) fireOperator(remoteOperator);
     audio.shot(message.weapon, true, origin.distanceTo(camera.position));
-    return;
+    return null;
   }
   const traceDistance = message.weapon === 'railgun'
     ? RAILGUN_BEAM_LENGTH_M
@@ -10213,6 +11293,7 @@ function renderRemoteShot(message: ShotMessage): void {
   const remoteMuzzle = remoteOperator?.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
   if (message.weapon === 'flamethrower') {
     flamethrowerStreamPresentation.emit(remoteMuzzle ?? origin, visibleEnd, performance.now());
+    flamethrowerStreamPresentation.igniteGround(visibleEnd, performance.now());
   } else if (message.weapon !== 'railgun') {
     spawnTracer(remoteMuzzle ?? origin, visibleEnd, WEAPONS[message.weapon].color);
   }
@@ -10234,6 +11315,7 @@ function renderRemoteShot(message: ShotMessage): void {
   }
   if (player.alive) audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
   if (message.weapon !== 'railgun') audio.shot(message.weapon, true, origin.distanceTo(camera.position));
+  return visibleEnd;
 }
 
 function showDamageDirection(attacker: string, damage = 12, now = performance.now()): void {
@@ -10254,10 +11336,13 @@ function updateSensoryFeedback(now: number): void {
   if (now - lastSensoryPresentationAt < 1000 / 30) return;
   lastSensoryPresentationAt = now;
   const directions = directionalDamagePresentation(directionalDamageState, now, player.yaw);
-  while (damageDirectionIndicator.childElementCount < directions.length) damageDirectionIndicator.append(document.createElement('i'));
-  while (damageDirectionIndicator.childElementCount > directions.length) damageDirectionIndicator.lastElementChild?.remove();
-  directions.forEach((direction, index) => {
-    const marker = damageDirectionIndicator.children.item(index) as HTMLElement;
+  damageDirectionMarkers.forEach((marker, index) => {
+    const direction = directions[index];
+    marker.hidden = direction === undefined;
+    if (!direction) {
+      marker.style.setProperty('--damage-opacity', '0');
+      return;
+    }
     marker.style.setProperty('--damage-angle', `${direction.angleRadians}rad`);
     marker.style.setProperty('--damage-opacity', direction.opacity.toFixed(4));
     marker.dataset.sector = String(direction.sector);
@@ -10323,10 +11408,11 @@ function applyDamage(
   audio.damage();
   showDamageDirection(attacker, appliedDamage, now);
   if (accessibilityRuntime.damageFlashScale > 0) {
-    damageFlash.classList.remove('pulse');
-    requestAnimationFrame(() => damageFlash.classList.add('pulse'));
+    damageFlash.classList.remove('combat-prewarm', 'pulse');
+    requestAnimationFrame(replayDamageFlash);
   }
   if (player.hp <= 0) {
+    resetStickyVictimUrgentAlertLife();
     // When a killstreak event dealt the lethal blow, the caller owns the death
     // bookkeeping and runs it after the killstreak update settles. Bail here so
     // the death is processed exactly once, not re-entrantly inside advance().
@@ -11357,8 +12443,8 @@ async function prewarmMatchBoundDmrThermalAdsPresentation(
       weaponView.suppressForFullscreenPresentation(true);
       hudRoot.classList.add('dmr-thermal-active');
       dmrThermalPresentation.update(camera, dmrThermalContacts(), true);
-      // Live gameplay replaces the generic billboard layer with the same
-      // skinned exact-pose ghosts staged below.
+      // Live gameplay uses the same skinned exact-model and halo layers staged
+      // below; the DMR-owned anchor carries only optic/contact telemetry.
       dmrThermalPresentation.worldRoot.visible = false;
       prewarmThermalGhostPipelines();
     },
@@ -11688,6 +12774,7 @@ function removeRemote(id: string, reason: string, allowRejoinReservation = true)
   if (network.role === 'host' && retainCombatAuthority) markLobbyDisconnected(id);
   clearRemoteReloadAuthority(id);
   if (!retainCombatAuthority) {
+    hostKillstreakLoadoutAcks.clearActor(id);
     retainedRemoteAuthorities.delete(id);
     remoteSupportAuthorities.delete(id);
     remoteGrenadeAuthorities.delete(id);
@@ -12119,6 +13206,7 @@ function respawn(
     localContinuity += 1;
     localPositionHistory.length = 0;
     resetFlashVictimLife();
+    resetStickyVictimUrgentAlertLife(localContinuity);
   }
   if (respawnTimer) clearTimeout(respawnTimer);
   respawnTimer = null;
@@ -12248,6 +13336,8 @@ async function startGame(
   lastDebugCapturePresentation = null;
   lastMatchAdmissionCadence = null;
   lastWebGlReadyPrime = null;
+  audio.unlock();
+  document.documentElement.dataset.combatAudioPrewarm = audio.prepareCombat() ? 'ready' : 'unavailable';
   prepareDeploymentTransition();
   applyMenuLifecycle({ type: 'match-start' });
   syncMenuPreviewCanvasPlacement();
@@ -12304,12 +13394,14 @@ async function startGame(
     : Math.max(1, Math.floor(privateMatchActiveAtEpochMs ?? Date.now()) % 1_000_000_000));
   hostedBotWeaponPresentationReplay.clear();
   interactiveWorldMatchEpoch = killstreakMatchEpoch;
+  admittedRemoteShots.clear();
   remoteStickyAttachmentAuthority = createRemoteStickyAttachmentAuthorityState();
   pendingStickyHits.clear();
   pendingStickyWindowBreaks.clear();
   stickyTimingReplayNonces.clear();
   stickyVictimFeedbackCount = 0;
   lastStickyVictimFeedback = null;
+  resetStickyVictimUrgentAlertLife();
   stickyVictimReceiptKeys = mode === 'client'
     ? new Set(loadStickyVictimReceiptKeys(clientPersistentStorage(), interactiveWorldMatchEpoch, player.id))
     : new Set();
@@ -12344,6 +13436,7 @@ async function startGame(
   displayedCareReward = null;
   appliedKillstreakDamageResults.clear();
   killstreakRegisteredActors.clear();
+  hostKillstreakLoadoutAcks.clear();
   killstreakPresentation.clear();
   lastLocalKillstreakSnapshotRefreshAt = Number.NEGATIVE_INFINITY;
   lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
@@ -12359,6 +13452,13 @@ async function startGame(
   targetHits = 0;
   rangeScore = 0;
   rangeShotsFired = 0;
+  if (!hostRecovery) {
+    gunRangeMatchClockState = null;
+    gunRangeTestBayDoorState = null;
+    presentedGunRangeTestBayDoorThumpSequence = 0;
+    gunRangeTestBayDoorBroadcastPending = false;
+  }
+  gunRangeMatchClockOccupantIds = Object.freeze([]);
   roundShotsFired = 0;
   roundHitShots = 0;
   roundHeadshots = 0;
@@ -12371,7 +13471,16 @@ async function startGame(
     // life and its next killstreak snapshot corrects any tampered storage.
     localContinuity = localHostConfirmedContinuity;
   } else localContinuity += 1;
+  clientWorldRepairAdmission = mode === 'client' && !awaitingCanonicalGuestAuthority
+    ? beginClientWorldRepair({
+        playerId: player.id,
+        connectionEpoch: localConnectionEpoch,
+        matchEpoch: killstreakMatchEpoch,
+        lifeId: localContinuity,
+      })
+    : null;
   resetFlashVictimLife();
+  resetStickyVictimUrgentAlertLife(localContinuity);
   if (mode !== 'client') {
     if (hostRecovery?.killstreak) {
       if (!killstreakRuntime.restoreCheckpoint(
@@ -12430,6 +13539,9 @@ async function startGame(
   clearFlareTargetSnapshots();
   flamethrowerStreamPresentation.clear();
   flamethrowerGroundFires.clear();
+  carpetGroundFires.clear();
+  resetCarpetGroundFireAuthorityTelemetry();
+  carpetGroundFireGuestPresentation.clear();
   timedMapWeaponAudit = createTimedMapWeaponAudit();
   pendingFlareShotRequests.clear();
   flareShotResultContexts.clear();
@@ -12620,6 +13732,8 @@ async function startGame(
   } else {
     matchState = createMatch(matchStartedAt, matchRules);
   }
+  initializeGunRangeMatchClock(mode);
+  initializeGunRangeTestBayDoor(mode);
   overdriveState = createOverdriveState(activeAtLocalMonoMs ?? matchStartedAt);
   const railgunActiveAt = matchState.phase === 'active' ? matchState.phaseStartedAt : matchState.endsAt;
   initializeRailgunForMatch(railgunActiveAt, hostRecovery);
@@ -12950,8 +14064,10 @@ function restoreRecoveredFlareRuntime(
       withinBounds: (point) => pointInsideBounds(point, arena.bounds, 0.1) && point.y >= -25 && point.y <= 250,
       // Downtime never grants retroactive target collision, direct damage or
       // burn pulses. Only immutable world collision and effect time advance.
-      hostileTargets: () => Object.freeze([]),
+      directHitTargets: () => Object.freeze([]),
+      burnTargets: () => Object.freeze([]),
       burnLineOfSight: () => false,
+      onDirectHit: () => undefined,
       onImpact: () => undefined,
       onBurnPulse: () => undefined,
       onExpire: () => undefined,
@@ -12999,6 +14115,12 @@ function initializeTimedMapWeaponsForMatch(
   clearFlareTargetSnapshots();
   flamethrowerStreamPresentation.clear();
   flamethrowerGroundFires.clear();
+  // Active support entities deliberately terminate across host replacement in
+  // KillstreakRuntimeCheckpoint; Carpet residual fire follows that same
+  // declared recovery boundary instead of silently outliving its activation.
+  carpetGroundFires.clear();
+  resetCarpetGroundFireAuthorityTelemetry();
+  carpetGroundFireGuestPresentation.clear();
   if (recovery) restoreRecoveredFlareRuntime(recovery, performance.now());
   if (network.role === 'host') broadcastTimedMapWeaponState();
 }
@@ -13563,6 +14685,7 @@ function tryFireRailgun(now: number): void {
   const shotId = `${localConnectionEpoch}:rail:${localShotSeq++}`;
   railgunAdsResetRequired = true;
   adsHeld = false;
+  deactivateRailgunScopePresentation();
   presentLocalRailgunTrigger();
   roundShotsFired += 1;
   if (network.role === 'client') {
@@ -13724,16 +14847,17 @@ function updateDmrThermal(): void {
   }
   dmrThermalWasActive = true;
   dmrThermalPresentation.update(camera, dmrThermalContacts(), true);
-  // The generic billboard silhouettes are superseded by exact-pose thermal
-  // ghosts; keep the bounded DOM markers, hide the sprite layer.
+  // Contact selection/optic telemetry remain here. The shared exact-operator
+  // layer owns every world-space body and halo; this anchor has no proxy or
+  // body-marker geometry.
   dmrThermalPresentation.worldRoot.visible = false;
 }
 
 /**
- * Compile the through-wall ghost pipelines during match admission instead of on
- * the player's first ADS. Builds one hostile and one friendly ghost set from
- * whatever live combatants exist, so both relation materials reach the GPU
- * behind the opaque deployment surface. The caller clears the ghosts again.
+ * Compile the relation-invariant exact-model and orange-halo layers during
+ * match admission instead of on the player's first ADS. Every live ID is
+ * submitted once behind the opaque deployment surface; the caller clears the
+ * ghosts again after the match-bound compile.
  */
 function prewarmThermalGhostPipelines(): void {
   const targets: ThermalGhostTarget[] = [];
@@ -13748,41 +14872,59 @@ function prewarmThermalGhostPipelines(): void {
     const relation = mode === 'tdm' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
     targets.push({ id: bot.id, relation, root: bot.root });
   }
-  // Retain records under the exact live IDs so first ADS reuses them. If the
-  // current roster has only one relation, add one bounded alias solely to
-  // submit the other shared material pipeline during admission.
-  const first = targets[0];
-  if (first && !targets.some((target) => target.relation === 'friendly')) {
-    targets.push({ id: `pipeline-friendly:${first.id}`, relation: 'friendly', root: first.root });
+  // Match admission has already staged the retained corpse operators visible
+  // behind the opaque deployment surface. Fill any remaining target slots
+  // from that exact rigged corpus so even an otherwise empty private lobby
+  // submits both the shared model and halo programs before its first guest.
+  for (const [index, entry] of corpsePresentationPool.entries()) {
+    if (targets.length >= THERMAL_GHOST_MAX_TARGETS) break;
+    targets.push({
+      id: `thermal-prewarm-corpse-${index}`,
+      relation: entry.team === player.team ? 'friendly' : 'hostile',
+      root: entry.root,
+    });
   }
-  if (first && !targets.some((target) => target.relation === 'hostile')) {
-    targets.push({ id: `pipeline-hostile:${first.id}`, relation: 'hostile', root: first.root });
-  }
+  // Exact-model and orange-halo materials are relation-invariant. Retain one
+  // record per live ID; aliases would duplicate the same skinned children.
   if (targets.length > 0) thermalGhostPresentation.sync(targets, true);
 }
 
 function updateThermalGhosts(): void {
-  // Exact-pose thermal ghosts are the M14 DMR's reveal. The railgun keeps its
-  // signature cyan silhouette scope (its unique selling point), so ghosts are
-  // driven only by the DMR optic to avoid double-drawing on the railgun.
-  const active = dmrThermalActive;
-  if (!active) {
+  // One presentation layer serves every firearm-authorized through-wall
+  // reveal. Selection remains each weapon's existing authority policy; only
+  // the primitive pawn/marker rendering has been replaced by the exact live
+  // operator model plus an orange body-following halo.
+  const chopperThermal = localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner';
+  if (!dmrThermalActive && !railgunScopeActive && !chopperThermal) {
     thermalGhostPresentation.sync([], false);
+    railgunPresentation.syncExactOperatorReveal(false, null);
     return;
   }
   const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
   const targets: ThermalGhostTarget[] = [];
+  const observer = { id: player.id, team: player.team };
+  const addTarget = (
+    id: string,
+    team: Team,
+    kind: 'player' | 'bot',
+    root: THREE.Object3D,
+  ): void => {
+    if (targets.some((target) => target.id === id)) return;
+    if (railgunScopeActive && !dmrThermalActive && !chopperThermal
+      && !railgunThermalTargetEligible(observer, { id, team, alive: true, kind }, mode)) return;
+    const relation = mode === 'tdm' && team === player.team ? 'friendly' as const : 'hostile' as const;
+    targets.push({ id, relation, root });
+  };
   for (const remote of remotes.values()) {
     if (remote.snapshot.hp <= 0) continue;
-    const relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id: remote.snapshot.id, relation, root: remote.root });
+    addTarget(remote.snapshot.id, remote.snapshot.team, 'player', remote.root);
   }
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
-    const relation = mode === 'tdm' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id: bot.id, relation, root: bot.root });
+    addTarget(bot.id, bot.team, 'bot', bot.root);
   }
   thermalGhostPresentation.sync(targets, true);
+  railgunPresentation.syncExactOperatorReveal(railgunScopeActive, thermalGhostPresentation.telemetry());
 }
 
 function updateRailgun(now: number): void {
@@ -13806,15 +14948,13 @@ function updateRailgun(now: number): void {
     railgunRechamberPresentationActive = false;
   }
   railgunPresentation.updateWorld(railgunState, now);
-  // The optic is an authority-side thermal scope: it engages on a settled aim
-  // and must stay live for the whole aim hold - gating it on the per-shot re-ADS
-  // flag turned see-through-walls off the instant the player fired, which read
-  // as the railgun scope having lost the feature entirely.
-  const thermalActive = localHoldsRailgun() && player.weapon === 'railgun' && adsHeld
-    && weaponView.adsProgress() >= 0.45;
-  // The railgun's signature see-through-walls reveal: cyan thermal silhouettes
-  // of hostile combatants drawn with depth testing disabled so they read through
-  // geometry. This is the weapon's unique selling point and must always work.
+  // Exact operator reveals share the settled clear-scope lifecycle. This
+  // prevents the reveal from appearing over the physical hip model or surviving
+  // fire/unADS/swap while retaining the Railgun's through-wall identity.
+  const thermalActive = railgunScopeActive;
+  // The railgun's signature see-through-walls reveal: the exact animated
+  // hostile operator with its ordinary appearance plus a bounded orange halo.
+  // The shared presentation disables depth testing without changing eligibility.
   railgunPresentation.updateThermal(camera, thermalActive ? railgunThermalContacts() : [], thermalActive);
 }
 
@@ -14118,16 +15258,16 @@ function tryFire(now: number): void {
       flamethrowerStreamPresentation.emit(visualStart, authoritativeEnd, now);
       // Spawn visible napalm ground fire at impact point (stays 5s like
       // napalm) plus the damage lane.
-      const ignited = flamethrowerStreamPresentation.igniteGround(authoritativeEnd, now);
-      if (ignited) {
+      flamethrowerStreamPresentation.igniteGround(authoritativeEnd, now);
+      if (network.role !== 'client') {
         flamethrowerGroundFires.ignite({
           ownerId: player.id,
           ownerTeam: player.team,
           point: authoritativeEnd,
-          actionNonce: randomNonce(),
+          actionNonce: shotActionNonce,
           now,
           durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
-          pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_MS,
+          pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
         });
       }
     }
@@ -14219,6 +15359,17 @@ function tryFire(now: number): void {
     timing: nextCombatTiming(),
     nonce: shotActionNonce,
   };
+  if (player.weapon === 'flamethrower'
+    || network.role === 'client' && player.weapon === 'flare-gun') {
+    const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
+    for (const [nonce, action] of actions) {
+      if (now - action.receivedAt > admittedShotActionLifetimeMs(action.message.weapon)) actions.delete(nonce);
+    }
+    actions.set(shot.nonce, {
+      message: shot, receivedAt: now, matchEpoch: interactiveWorldMatchEpoch, targets: new Set(),
+    });
+    admittedRemoteShots.set(player.id, actions);
+  }
   if (!projectileShot && network.role !== 'client') {
     admitAuthoritativeSmokeSegments(
       `local:${interactiveWorldMatchEpoch}:${player.id}:${shot.nonce}`,
@@ -14233,7 +15384,9 @@ function tryFire(now: number): void {
         const lifetimeMs = admittedShotActionLifetimeMs(action.message.weapon);
         if (now - action.receivedAt > lifetimeMs) actions.delete(nonce);
       }
-      actions.set(shot.nonce, { message: shot, receivedAt: now, targets: new Set() });
+      actions.set(shot.nonce, {
+        message: shot, receivedAt: now, matchEpoch: interactiveWorldMatchEpoch, targets: new Set(),
+      });
       admittedRemoteShots.set(player.id, actions);
     }
     if (player.weapon === 'flare-gun') {
@@ -15277,10 +16430,11 @@ function applyHostedBotDamageToRemote(
   direction: THREE.Vector3,
   now: number,
   presentation: BotDamageMessage['presentation'] = 'ballistic-ray',
+  authoredWeapon: WeaponId = bot.weapon,
 ): number {
-  const expectedPresentation: NonNullable<BotDamageMessage['presentation']> = bot.weapon === 'flare-gun'
+  const expectedPresentation: NonNullable<BotDamageMessage['presentation']> = authoredWeapon === 'flare-gun'
     ? 'signal-flare-projectile'
-    : bot.weapon === 'flamethrower' ? 'flamethrower-stream' : 'ballistic-ray';
+    : authoredWeapon === 'flamethrower' ? 'flamethrower-stream' : 'ballistic-ray';
   if (network.role !== 'host' || target.kind !== 'remote' || presentation !== expectedPresentation) return 0;
   const health = remoteHealthAuthorities.get(target.id);
   const remote = remotes.get(target.id);
@@ -15301,7 +16455,7 @@ function applyHostedBotDamageToRemote(
   recordDamageEvent({
     actorId: bot.id,
     targetId: target.id,
-    weaponOrEffect: bot.weapon,
+    weaponOrEffect: authoredWeapon,
     healthBefore: result.healthBefore,
     healthAfter: result.healthAfter,
     damageRequested: result.damageRequested,
@@ -15314,7 +16468,7 @@ function applyHostedBotDamageToRemote(
     by: player.id,
     botId: bot.id,
     target: target.id,
-    weapon: bot.weapon,
+    weapon: authoredWeapon,
     origin: origin.toArray(),
     direction: direction.toArray(),
     ...(presentation === 'ballistic-ray' ? {} : { presentation }),
@@ -15328,7 +16482,7 @@ function applyHostedBotDamageToRemote(
     bot.kills += 1;
     const death: DeathMessage = {
       type: 'death', killer: bot.id, victim: target.id,
-      cause: { kind: 'gun', weapon: bot.weapon }, nonce: randomNonce(),
+      cause: { kind: 'gun', weapon: authoredWeapon }, nonce: randomNonce(),
     };
     processedNonces.add(death.nonce);
     network.send(death);
@@ -15629,6 +16783,18 @@ function updateBots(dt: number, now: number): void {
         }
       }
       if (flamethrowerShot) {
+        flamethrowerStreamPresentation.igniteGround(visibleEnd, now);
+        if (network.role !== 'client') {
+          flamethrowerGroundFires.ignite({
+            ownerId: bot.id,
+            ownerTeam: bot.team,
+            point: visibleEnd,
+            actionNonce,
+            now,
+            durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+            pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
+          });
+        }
         // This action lane is independent of damage, so guests see the same
         // finite stream on both hits and misses. BotDamage only reconciles HP.
         broadcastHostedBotFlamethrowerPresentation(bot, origin, visibleEnd, actionNonce);
@@ -15707,6 +16873,7 @@ function melee(): void {
 }
 
 const explosiveBoltTargetBuffer = new ExplosiveBoltTargetBuffer<Team>();
+const explosiveBoltPracticeTargetPositionScratch = new THREE.Vector3();
 
 function fillExplosiveBoltTargets(ownerId: string, ownerTeam: Team): number {
   explosiveBoltTargetBuffer.reset();
@@ -15721,6 +16888,20 @@ function fillExplosiveBoltTargets(ownerId: string, ownerTeam: Team): number {
   for (const bot of bots.values()) {
     if (bot.id === ownerId || !bot.alive || !areCombatantsHostile(ownerId, ownerTeam, bot.id, bot.team)) continue;
     explosiveBoltTargetBuffer.append(bot.id, bot.team, bot.continuity, 'bot', bot.position, 1);
+  }
+  if (selectedArena.id === 'gun-range') {
+    for (const target of arena.targets) {
+      if (!target.active || target.kind !== 'training-dummy') continue;
+      target.root.getWorldPosition(explosiveBoltPracticeTargetPositionScratch);
+      explosiveBoltTargetBuffer.append(
+        target.id,
+        ownerTeam,
+        Math.max(0, Math.floor(target.respawnAt)),
+        'practice-target',
+        explosiveBoltPracticeTargetPositionScratch,
+        1.05,
+      );
+    }
   }
   return explosiveBoltTargetBuffer.length;
 }
@@ -15932,6 +17113,16 @@ function applyExplosiveBoltTargetDamage(
     });
     return;
   }
+  if (targetKind === 'practice-target') {
+    const practiceTarget = selectedArena.id === 'gun-range'
+      ? arena.targets.find((candidate) => candidate.id === targetId && candidate.kind === 'training-dummy')
+      : undefined;
+    if (practiceTarget?.active) hitPracticeTarget(practiceTarget.id, boundedDamage, 'body', {
+      distanceMeters: explosiveBoltTargetDistance(origin, targetX, targetY, targetZ),
+      weaponOrEffect: 'explosive-crossbow',
+    });
+    return;
+  }
   const hit: HitMessage = kind === 'direct'
     ? {
         type: 'hit', by: bolt.ownerId, target: targetId, damage: boundedDamage, kind: 'shot',
@@ -16055,14 +17246,15 @@ type FlareTargetSnapshotEntry = {
   practiceOnly: boolean;
   active: boolean;
 };
-type FlareHostileTargetView = {
+type FlareTargetView = {
   generation: number;
   targets: FlareProjectileTarget[];
 };
 const FLARE_TARGET_SNAPSHOT_CAPACITY = 128;
 const FLARE_OWNER_VIEW_CAPACITY = FLARE_PROJECTILE_EFFECT.poolCapacity;
 const flareTargetSnapshots = new Map<string, FlareTargetSnapshotEntry>();
-const flareHostileTargetViews = new Map<string, [FlareHostileTargetView | null, FlareHostileTargetView | null]>();
+const flareDirectTargetViews = new Map<string, [FlareTargetView | null, FlareTargetView | null]>();
+const flareBurnTargetViews = new Map<string, [FlareTargetView | null, FlareTargetView | null]>();
 let flareTargetSnapshotGeneration = 0;
 
 function upsertFlareTargetSnapshot(
@@ -16137,12 +17329,17 @@ function prepareFlareTargetSnapshots(): void {
   }
 }
 
-function flareHostileTargets(ownerId: string, ownerTeam: Team): readonly FlareProjectileTarget[] {
-  let views = flareHostileTargetViews.get(ownerId);
+function flareTargetView(
+  cache: Map<string, [FlareTargetView | null, FlareTargetView | null]>,
+  ownerId: string,
+  ownerTeam: Team,
+  targetPolicy: 'hostile-direct' | 'all-burn',
+): readonly FlareProjectileTarget[] {
+  let views = cache.get(ownerId);
   if (!views) {
-    if (flareHostileTargetViews.size >= FLARE_OWNER_VIEW_CAPACITY) flareHostileTargetViews.clear();
+    if (cache.size >= FLARE_OWNER_VIEW_CAPACITY) cache.clear();
     views = [null, null];
-    flareHostileTargetViews.set(ownerId, views);
+    cache.set(ownerId, views);
   }
   let view = views[ownerTeam];
   if (!view) {
@@ -16153,19 +17350,33 @@ function flareHostileTargets(ownerId: string, ownerTeam: Team): readonly FlarePr
   view.generation = flareTargetSnapshotGeneration;
   view.targets.length = 0;
   for (const entry of flareTargetSnapshots.values()) {
-    if (!entry.active || entry.target.id === ownerId) continue;
+    if (!entry.active || targetPolicy === 'hostile-direct' && entry.target.id === ownerId) continue;
     if (entry.practiceOnly) {
       if (ownerId === player.id && selectedArena.id === 'gun-range') view.targets.push(entry.target);
       continue;
     }
-    if (areCombatantsHostile(ownerId, ownerTeam, entry.target.id, entry.team)) view.targets.push(entry.target);
+    const admitted = targetPolicy === 'hostile-direct'
+      ? areCombatantsHostile(ownerId, ownerTeam, entry.target.id, entry.team)
+      : flameDamageAllowsTarget('flare-gun-burn', ownerId, ownerTeam, entry.target.id, entry.team);
+    if (admitted) {
+      view.targets.push(entry.target);
+    }
   }
   return view.targets;
 }
 
+function flareDirectHitTargets(ownerId: string, ownerTeam: Team): readonly FlareProjectileTarget[] {
+  return flareTargetView(flareDirectTargetViews, ownerId, ownerTeam, 'hostile-direct');
+}
+
+function flareBurnTargets(ownerId: string, ownerTeam: Team): readonly FlareProjectileTarget[] {
+  return flareTargetView(flareBurnTargetViews, ownerId, ownerTeam, 'all-burn');
+}
+
 function clearFlareTargetSnapshots(): void {
   flareTargetSnapshots.clear();
-  flareHostileTargetViews.clear();
+  flareDirectTargetViews.clear();
+  flareBurnTargetViews.clear();
   flareTargetSnapshotGeneration = 0;
 }
 
@@ -16296,7 +17507,8 @@ function finishPendingFlareShot(
   };
   flareShotResultContexts.set(`${ownerId}:${actionNonce}`, Object.freeze({
     ...pending,
-    expiresAt: resolvedAt + FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000,
+    expiresAt: resolvedAt + FLARE_PROJECTILE_EFFECT.maximumFlightMs
+      + FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000,
   }));
   shotTimingTelemetry.recordHostResolution({
     fireTimeMs: pending.request.fireTimeMs,
@@ -16310,16 +17522,25 @@ function finishPendingFlareShot(
   network.send(result);
 }
 
+function handleFlareDirectHit(hit: FlareProjectileDirectHit): void {
+  const outcome = applyFlareTargetDamage(
+    hit.target,
+    hit.ownerId,
+    hit.actionNonce,
+    hit.directDamage,
+    hit.point,
+  );
+  if (outcome) timedMapWeaponAudit.flareDamage += outcome.damage;
+  finishPendingFlareShot(hit.ownerId, hit.actionNonce, outcome);
+}
+
 function handleFlareImpact(impact: FlareProjectileImpact): void {
   timedMapWeaponAudit.flareImpacts += 1;
-  // Flare fire also ignites the floor like napalm for its full burn duration.
+  // Direct damage is resolved during flight; only the later world impact
+  // starts the visual fire. FlareProjectileSystem exclusively owns its DOT.
   const groundPoint = new THREE.Vector3(impact.point.x, Math.max(0.06, impact.point.y), impact.point.z);
   flamethrowerStreamPresentation.igniteGround(groundPoint, performance.now());
-  const outcome = impact.authority && impact.target
-    ? applyFlareTargetDamage(impact.target, impact.ownerId, impact.actionNonce, impact.directDamage, impact.point)
-    : null;
-  if (outcome) timedMapWeaponAudit.flareDamage += outcome.damage;
-  if (impact.authority) finishPendingFlareShot(impact.ownerId, impact.actionNonce, outcome);
+  if (impact.authority) finishPendingFlareShot(impact.ownerId, impact.actionNonce, null);
 }
 
 function handleFlareBurnPulse(pulse: FlareBurnPulse): void {
@@ -16368,7 +17589,8 @@ const flareProjectileCallbacks: FlareProjectileCallbacks = Object.freeze({
   withinBounds: (point: THREE.Vector3) => (
     pointInsideBounds(point, arena.bounds, 0.1) && point.y >= -25 && point.y <= 250
   ),
-  hostileTargets: flareHostileTargets,
+  directHitTargets: flareDirectHitTargets,
+  burnTargets: flareBurnTargets,
   burnLineOfSight: (point: THREE.Vector3, target: FlareProjectileTarget) => {
     flareBurnLineOfSightPoint.copy(point).y += 0.12;
     for (const box of flareFrameColliders) {
@@ -16376,6 +17598,7 @@ const flareProjectileCallbacks: FlareProjectileCallbacks = Object.freeze({
     }
     return true;
   },
+  onDirectHit: handleFlareDirectHit,
   onImpact: handleFlareImpact,
   onBurnPulse: handleFlareBurnPulse,
   onExpire: (expiry) => {
@@ -16447,7 +17670,12 @@ function updateExplosiveBolts(dt: number, now: number): void {
           attachedAtMs: now,
           expiresAtMs: bolt.detonatesAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
         });
-        if (targetHitKind === 'player') addFeed('STUCK', 'coral');
+        if (targetHitKind === 'player') {
+          presentStickyVictimUrgentAlert(
+            'explosive-crossbow', targetHitId, targetHitLifeId, bolt.actionNonce, now,
+          );
+          addFeed('STUCK', 'coral');
+        }
         else if (bolt.ownerId === player.id) addFeed('STUCK', 'gold');
       } else if (worldCollision || glassCollision) {
         const collisionFraction = Math.min(worldFraction, glassFraction);
@@ -17087,7 +18315,10 @@ function armImpactGrenade(
         attachedAtMs: now,
         expiresAtMs: grenade.explodeAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
       });
-      if (targetKind === 'player') addFeed('STUCK', 'coral');
+      if (targetKind === 'player') {
+        presentStickyVictimUrgentAlert('semtex', targetId, targetLifeId, grenade.actionNonce, now);
+        addFeed('STUCK', 'coral');
+      }
       else if (grenade.ownerKind === 'player') addFeed('STUCK', 'gold');
     }
   }
@@ -17745,11 +18976,12 @@ function recordOwnerSupportDamage(event: KillstreakDamageEvent): void {
   const anchor = projectSupportDamageAnchor(targetPosition, camera, viewport);
   supportDamageFeedbackTelemetry.record(event, anchor, viewport);
   showDamageNumber(event.damage, 'body', undefined, { ...anchor, targetId: event.targetId });
-  audio.hit(false);
   supportDamageDealtByActivation.set(
     event.activationId,
     (supportDamageDealtByActivation.get(event.activationId) ?? 0) + event.damage,
   );
+  showGunnerTargetConfirm(event, anchor, performance.now());
+  audio.hit(false);
   const displayedSupport = preferredOwnedSupportEntity();
   if (displayedSupport?.activationId === event.activationId) {
     element<HTMLElement>('#chopper-damage-dealt').textContent = String(Math.round(
@@ -17801,44 +19033,47 @@ function killstreakLineOfSight(
 
 function killstreakWorldState(): KillstreakWorld {
   const targets: KillstreakWorld['targets'][number][] = [];
-  targets.push({
-    id: player.id,
-    kind: 'player',
-    team: player.team,
-    lifeId: localContinuity,
-    alive: player.alive,
-    position: [player.position.x, player.position.y, player.position.z],
-  });
-  for (const bot of bots.values()) targets.push({
-    id: bot.id,
-    kind: 'bot',
-    team: bot.team,
-    lifeId: bot.continuity,
-    alive: bot.alive,
-    position: [bot.position.x, bot.position.y + 1.15, bot.position.z],
-  });
-  for (const remote of remotes.values()) targets.push({
-    id: remote.snapshot.id,
-    kind: 'player',
-    team: remote.snapshot.team,
-    lifeId: remote.continuity,
-    alive: remote.snapshot.hp > 0,
-    position: [remote.target.x, remote.target.y + 1.15, remote.target.z],
-  });
-  if (selectedArena.id === 'gun-range') {
-    for (const target of arena.targets) {
-      if (target.kind !== 'training-dummy') continue;
-      const position = target.root.getWorldPosition(new THREE.Vector3());
-      targets.push({
-        id: target.id,
-        kind: 'bot',
-        team: player.team === 0 ? 1 : 0,
-        lifeId: Math.max(0, Math.floor(target.respawnAt)),
-        alive: target.active,
-        position: [position.x, position.y + 1.05, position.z],
-      });
+  if (!synchronizeDebugChopperExteriorReviewHold()) {
+    targets.push({
+      id: player.id,
+      kind: 'player',
+      team: player.team,
+      lifeId: localContinuity,
+      alive: player.alive,
+      position: [player.position.x, player.position.y, player.position.z],
+    });
+    for (const bot of bots.values()) targets.push({
+      id: bot.id,
+      kind: 'bot',
+      team: bot.team,
+      lifeId: bot.continuity,
+      alive: bot.alive,
+      position: [bot.position.x, bot.position.y + 1.15, bot.position.z],
+    });
+    for (const remote of remotes.values()) targets.push({
+      id: remote.snapshot.id,
+      kind: 'player',
+      team: remote.snapshot.team,
+      lifeId: remote.continuity,
+      alive: remote.snapshot.hp > 0,
+      position: [remote.target.x, remote.target.y + 1.15, remote.target.z],
+    });
+    if (selectedArena.id === 'gun-range') {
+      for (const target of arena.targets) {
+        if (target.kind !== 'training-dummy') continue;
+        const position = target.root.getWorldPosition(new THREE.Vector3());
+        targets.push({
+          id: target.id,
+          kind: 'bot',
+          team: player.team === 0 ? 1 : 0,
+          lifeId: Math.max(0, Math.floor(target.respawnAt)),
+          alive: target.active,
+          position: [position.x, position.y + 1.05, position.z],
+        });
+      }
     }
   }
+  lastKillstreakWorldTargetCount = targets.length;
   const flightNavigation = PASS65_FLIGHT_NAVIGATION[selectedArena.id];
   const centrePortal = [...flightNavigation.portals]
     .sort((left, right) => right.altitudeM - left.altitudeM || left.id.localeCompare(right.id))[0];
@@ -17890,10 +19125,32 @@ function killstreakWorldState(): KillstreakWorld {
       });
       return [result.position.x, result.position.y, result.position.z];
     },
+    resolveFlightEnvelopePosition: (from, desired, envelope) => resolveSupportAircraftEnvelopeStep({
+      bounds: {
+        minX: arena.bounds.minX,
+        maxX: arena.bounds.maxX,
+        minZ: arena.bounds.minZ,
+        maxZ: arena.bounds.maxZ,
+        floorY: 0,
+        ceilingY: flightNavigation.ceilingY,
+      },
+      solids: flightSolids,
+      from,
+      desired,
+      envelope,
+    }).position,
     isFlightPositionValid: (position) => {
       const point = { x: position[0], y: position[1], z: position[2] };
       return pointInsideBounds(point, arena.bounds, 0.35)
         && !flightSolids.some((solid) => sphereIntersectsBox(point, 0.35, solid));
+    },
+    supportStrikeBoundsAt: (anchor) => {
+      const bay = GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds;
+      return selectedArena.id === 'gun-range'
+        && anchor[0] >= bay.minX && anchor[0] <= bay.maxX
+        && anchor[2] >= bay.minZ && anchor[2] <= bay.maxZ
+        ? bay
+        : arena.bounds;
     },
     supportFlightCentreVolume: {
       centre: centreSpawn,
@@ -17956,18 +19213,28 @@ function refreshLocalKillstreakSnapshot(now = performance.now(), force = true): 
   return true;
 }
 
+function sendKillstreakStateToPlayer(
+  forPlayerId: string,
+  now = performance.now(),
+  forceReliable = false,
+): boolean {
+  if (network.role !== 'host') return false;
+  const message: KillstreakStateMessage = {
+    type: 'killstreak-state',
+    by: player.id,
+    forPlayerId,
+    snapshot: killstreakRuntime.snapshotFor(forPlayerId, now),
+    nonce: randomNonce(),
+  };
+  const normalSent = network.sendToPlayer(forPlayerId, message);
+  if (!forceReliable) return normalSent;
+  return network.sendStateCommitReliablyToPlayer(forPlayerId, message);
+}
+
 function broadcastKillstreakState(now = performance.now(), forceReliable = false): void {
   if (network.role !== 'host') return;
   for (const remote of remotes.values()) {
-    const message: KillstreakStateMessage = {
-      type: 'killstreak-state',
-      by: player.id,
-      forPlayerId: remote.snapshot.id,
-      snapshot: killstreakRuntime.snapshotFor(remote.snapshot.id, now),
-      nonce: randomNonce(),
-    };
-    network.sendToPlayer(remote.snapshot.id, message);
-    if (forceReliable) network.sendStateCommitReliablyToPlayer(remote.snapshot.id, message);
+    sendKillstreakStateToPlayer(remote.snapshot.id, now, forceReliable);
   }
   lastKillstreakStateBroadcastAt = now;
 }
@@ -18065,7 +19332,7 @@ function requestKillstreakActivation(
     addFeed(`${GAMEPAD_SUPPORT_LABELS[id]} REJECTED · ${admission.reason.toUpperCase()}`, 'coral');
     return null;
   }
-  persistActiveHostMatchCheckpoint();
+  persistActiveHostMatchCheckpoint(true);
   // Host authority is already committed and remote projections are broadcast
   // below. Coalesce the local immutable projection into the next active frame:
   // consecutive support keys otherwise allocate an intermediate chopper-only
@@ -18367,38 +19634,98 @@ const killstreakPossessionCameraScratch = new THREE.Vector3();
  * on every miss, so mirror the admitted cadence as presentation-only feedback.
  */
 let nextLocalSupportGunReportAt = 0;
+let gunnerTargetConfirmUntil = 0;
+const GUNNER_TARGET_CONFIRM_DURATION_MS = 650;
 
 /**
- * First-person cockpit HUD for the Chopper Gunner and Piloted Drone: a gunsight
- * reticle plus hull/ammo readouts, shown only while the player is at the
- * controls. Presentation-only; values mirror the authoritative entity snapshot.
+ * First-person cockpit HUD for the Chopper Gunner and Piloted Drone. Values
+ * mirror the authoritative entity snapshot; the disconnected reticle leaves
+ * the exact centre ray unobstructed on desktop and mobile.
  */
-function syncGunnerCockpitHud(entity: { health: number; magazine: number | null }): void {
+function syncGunnerCockpitHud(
+  entity: KillstreakEntitySnapshot,
+  possessionKind: 'chopper-gunner' | 'piloted-drone',
+  now: number,
+): void {
   const hud = element<HTMLElement>('#gunner-cockpit-hud');
   hud.hidden = false;
+  hud.setAttribute('aria-hidden', 'false');
+  hud.dataset.supportKind = possessionKind;
   element<HTMLElement>('#gunner-hull').textContent = String(Math.max(0, Math.round(entity.health)));
   element<HTMLElement>('#gunner-ammo').textContent = entity.magazine === null ? '∞' : String(entity.magazine);
+  element<HTMLElement>('#gunner-altitude').textContent = `${Math.max(0, Math.round(entity.position[1] - (arena.bounds.minY ?? 0)))}M`;
+  element<HTMLElement>('#gunner-speed').textContent = String(Math.round(Math.hypot(...entity.velocity)));
+  element<HTMLElement>('#gunner-time').textContent = (Math.max(0, entity.expiresInMs) / 1_000).toFixed(1);
+  element<HTMLElement>('#gunner-damage').textContent = String(Math.round(
+    supportDamageDealtByActivation.get(entity.activationId) ?? 0,
+  ));
+  element<HTMLElement>('#gunner-platform').textContent = possessionKind === 'chopper-gunner' ? 'CHOPPER GUNNER' : 'PILOTED DRONE';
+  element<HTMLElement>('#gunner-weapon-mode').textContent = possessionKind === 'chopper-gunner' ? '30MM AUTOCANNON' : 'REMOTE CANNON';
+  if (now >= gunnerTargetConfirmUntil) {
+    element<HTMLElement>('#gunner-target-confirm').hidden = true;
+    hud.dataset.hitConfirm = 'false';
+  }
 }
 
 function hideGunnerCockpitHud(): void {
-  element<HTMLElement>('#gunner-cockpit-hud').hidden = true;
+  const hud = element<HTMLElement>('#gunner-cockpit-hud');
+  hud.hidden = true;
+  hud.setAttribute('aria-hidden', 'true');
+  hud.dataset.supportKind = 'none';
+  hud.dataset.hitConfirm = 'false';
+  const targetConfirm = element<HTMLElement>('#gunner-target-confirm');
+  targetConfirm.hidden = true;
+  targetConfirm.style.removeProperty('left');
+  targetConfirm.style.removeProperty('top');
+  delete targetConfirm.dataset.targetId;
+  element<HTMLElement>('#chopper-thermal').hidden = true;
+  gunnerTargetConfirmUntil = 0;
+  nextLocalSupportGunReportAt = 0;
+}
+
+function showGunnerTargetConfirm(
+  event: KillstreakDamageEvent,
+  anchor: SupportDamageScreenAnchor,
+  now: number,
+): void {
+  if (event.source !== 'chopper' || !anchor.visible) return;
+  const possession = localKillstreakActorSnapshot()?.possession;
+  const entity = possession?.kind === 'chopper-gunner'
+    ? killstreakSnapshot.entities.find((candidate) => candidate.id === possession.entityId)
+    : null;
+  if (!entity || entity.activationId !== event.activationId) return;
+  const hud = element<HTMLElement>('#gunner-cockpit-hud');
+  const targetConfirm = element<HTMLElement>('#gunner-target-confirm');
+  targetConfirm.style.left = `${anchor.xPx}px`;
+  targetConfirm.style.top = `${anchor.yPx}px`;
+  targetConfirm.dataset.targetId = event.targetId;
+  targetConfirm.querySelector<HTMLElement>('strong')!.textContent = String(Math.round(event.damage));
+  // Re-arm the short CSS pulse when successive rounds hit the same target.
+  targetConfirm.hidden = true;
+  void targetConfirm.offsetWidth;
+  targetConfirm.hidden = false;
+  hud.dataset.hitConfirm = 'true';
+  gunnerTargetConfirmUntil = now + GUNNER_TARGET_CONFIRM_DURATION_MS;
+}
+
+function resetKillstreakPossessionPresentation(): void {
+  killstreakPresentation.setFirstPersonEntity(null);
+  hideGunnerCockpitHud();
+  if (camera.near !== 0.08) {
+    camera.near = 0.08;
+    camera.updateProjectionMatrix();
+  }
 }
 
 function updateKillstreakPossession(now: number): void {
   const possession = localKillstreakActorSnapshot()?.possession;
-  if (!possession) {
-    killstreakPresentation.setFirstPersonEntity(null);
-    hideGunnerCockpitHud();
-    if (camera.near !== 0.08) {
-      camera.near = 0.08;
-      camera.updateProjectionMatrix();
-    }
+  if (!possession || !player.alive) {
+    resetKillstreakPossessionPresentation();
     return;
   }
   const entity = killstreakSnapshot.entities.find((entry) => entry.id === possession.entityId);
   if (!entity) {
-    killstreakPresentation.setFirstPersonEntity(null);
-    hideGunnerCockpitHud();
+    resetKillstreakPossessionPresentation();
     return;
   }
   killstreakPresentation.setFirstPersonEntity(entity.id);
@@ -18410,38 +19737,24 @@ function updateKillstreakPossession(now: number): void {
     position = killstreakPossessionCameraScratch.set(entity.position[0], entity.position[1], entity.position[2]);
   }
   camera.position.copy(position);
-  if (camera.near !== 0.35) {
-    camera.near = 0.35;
+  const supportCameraNear = possession.kind === 'chopper-gunner' ? 0.08 : 0.35;
+  if (camera.near !== supportCameraNear) {
+    camera.near = supportCameraNear;
     camera.updateProjectionMatrix();
   }
   camera.rotation.order = 'YXZ';
   camera.rotation.y = player.yaw;
   camera.rotation.x = player.pitch;
-  killstreakPresentation.alignFirstPersonCockpit(entity.id, camera.quaternion);
-  syncGunnerCockpitHud(entity);
+  killstreakPresentation.alignFirstPersonCockpit(entity.id, camera.position, camera.quaternion);
+  syncGunnerCockpitHud(entity, possession.kind, now);
   // Chopper Gunner thermal vision: the heavy autocannon shoots through walls,
   // so the cockpit reveals living hostiles with the same thermal-ghost overlay
   // family as the M14 DMR scope.
   const chopperThermal = possession.kind === 'chopper-gunner';
   const chopperThermalElement = element<HTMLElement>('#chopper-thermal');
   if (chopperThermalElement) chopperThermalElement.hidden = !chopperThermal;
-  if (chopperThermal) {
-    const targets: ThermalGhostTarget[] = [];
-    const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
-    for (const remote of remotes.values()) {
-      if (remote.snapshot.hp <= 0) continue;
-      const relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' as const : 'hostile' as const;
-      targets.push({ id: remote.snapshot.id, relation, root: remote.root });
-    }
-    for (const bot of bots.values()) {
-      if (!bot.alive) continue;
-      const relation = mode === 'tdm' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
-      targets.push({ id: bot.id, relation, root: bot.root });
-    }
-    thermalGhostPresentation.sync(targets, true);
-  } else if (!dmrThermalActive) {
-    thermalGhostPresentation.sync([], false);
-  }
+  // Exact operator reveal targets are synchronized once per frame by
+  // updateThermalGhosts after all weapon/support optic lifecycles settle.
   if (triggerHeld && now >= nextLocalSupportGunReportAt) {
     audio.supportGun(possession.kind === 'chopper-gunner' ? 'chopper' : 'drone');
     // Owner feedback: it was hard to tell the mounted gun was actually firing.
@@ -18449,9 +19762,9 @@ function updateKillstreakPossession(now: number): void {
     // trigger is unmistakable (presentation-only; the host owns real hits).
     if (possession.kind === 'chopper-gunner') {
       killstreakPresentation.presentChopperWeaponAction(entity.id);
-      const muzzle = camera.getWorldPosition(new THREE.Vector3());
-      const aim = camera.getWorldDirection(new THREE.Vector3());
-      muzzle.addScaledVector(aim, 1.4).y -= 0.18;
+      const shotRay = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch);
+      const muzzle = new THREE.Vector3(...shotRay.tracerOrigin);
+      const aim = new THREE.Vector3(...shotRay.direction);
       spawnTracer(muzzle, muzzle.clone().addScaledVector(aim, 130), 0xffb347);
     }
     nextLocalSupportGunReportAt = now + (possession.kind === 'chopper-gunner'
@@ -18485,14 +19798,17 @@ function updateKillstreakPossession(now: number): void {
 }
 
 function updatePass65KillstreakRuntime(now: number): void {
+  synchronizeDebugChopperExteriorReviewHold();
   if (!gameStarted) {
     audio.syncChopperRotors([]);
     killstreakPresentation.clear();
+    resetKillstreakPossessionPresentation();
     return;
   }
   if (matchState.phase === 'ended') {
     audio.syncChopperRotors([]);
     killstreakPresentation.clear();
+    resetKillstreakPossessionPresentation();
     return;
   }
   if (network.role !== 'client' && matchState.phase === 'active') {
@@ -18515,21 +19831,42 @@ function updatePass65KillstreakRuntime(now: number): void {
       if (impact.phase !== 'impact') continue;
       const point = new THREE.Vector3(...impact.position);
       if (impact.source === 'carpet-bomber') {
-        carpetWorldImpacts.push({ point, radius: 4.5, maximumDamage: 240, shedBlastClass: 'carpet-bomber-obliteration' });
+        carpetWorldImpacts.push({ point, radius: CARPET_BOMBER_BLAST_RADIUS_M, maximumDamage: 240, shedBlastClass: 'carpet-bomber-obliteration' });
         // Carpet bombs leave burning napalm on the ground too.
-        if (flamethrowerStreamPresentation.igniteGround(point, now)) {
-          flamethrowerGroundFires.ignite({
-            ownerId: player.id,
-            ownerTeam: player.team,
-            point,
-            actionNonce: randomNonce(),
-            now,
-            durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
-            pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_MS,
+        const owner = killstreakRuntime.carpetBomberOwner(impact.activationId);
+        const admission = owner
+          ? carpetGroundFires.ignite({
+              ownerId: owner.ownerId,
+              ownerTeam: owner.team,
+              point,
+              actionNonce: randomNonce(),
+              now,
+              durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+              pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
+              damageSource: 'carpet-bomber',
+              activationId: impact.activationId,
+              impactOrdinal: impact.ordinal,
+            })
+          : 'invalid';
+        if (admission === 'created') {
+          carpetGroundFireAuthorityTelemetry.admitted += 1;
+          carpetGroundFireAuthorityTelemetry.maximumActive = Math.max(
+            carpetGroundFireAuthorityTelemetry.maximumActive,
+            carpetGroundFires.activeCount(),
+          );
+          flamethrowerStreamPresentation.igniteGround(point, now);
+        } else {
+          carpetGroundFireAuthorityTelemetry[admission] += 1;
+          recordMatchDiagnostic('carpet-ground-fire-authority', 'rejected', {
+            actorId: owner?.ownerId ?? player.id,
+            weaponOrEffect: 'carpet-bomber',
+            position: [point.x, point.y, point.z],
+            reason: `authority-${admission}`,
+            modifiers: [`activation:${impact.activationId}`, `impact:${impact.ordinal}`],
           });
         }
         audio.explosion(now);
-        supportExplosionPresentation.emit(point, 4.5, now);
+        supportExplosionPresentation.emit(point, CARPET_BOMBER_BLAST_RADIUS_M, now);
       } else {
         applyInteractiveWorldExplosion(point, 4.5, 240);
       }
@@ -18942,45 +20279,7 @@ function drawPalantirLogo(): HTMLCanvasElement | null {
   canvas.height = 512;
   const context = canvas.getContext('2d');
   if (!context) return null;
-  // Fiery halo
-  const halo = context.createRadialGradient(256, 256, 90, 256, 256, 250);
-  halo.addColorStop(0, 'rgba(255,170,80,0.95)');
-  halo.addColorStop(0.45, 'rgba(214,84,26,0.55)');
-  halo.addColorStop(1, 'rgba(60,10,2,0)');
-  context.fillStyle = halo;
-  context.fillRect(0, 0, 512, 512);
-  // Orb body
-  const orb = context.createRadialGradient(210, 210, 30, 256, 256, 168);
-  orb.addColorStop(0, '#7a4a2a');
-  orb.addColorStop(0.55, '#3a2010');
-  orb.addColorStop(1, '#120804');
-  context.fillStyle = orb;
-  context.beginPath();
-  context.arc(256, 256, 168, 0, Math.PI * 2);
-  context.fill();
-  // Fiery iris ring
-  context.strokeStyle = '#ff8c3a';
-  context.lineWidth = 16;
-  context.beginPath();
-  context.arc(256, 256, 96, 0, Math.PI * 2);
-  context.stroke();
-  context.strokeStyle = 'rgba(255,200,120,0.85)';
-  context.lineWidth = 5;
-  context.beginPath();
-  context.arc(256, 256, 96, 0, Math.PI * 2);
-  context.stroke();
-  // Vertical pupil
-  const pupil = context.createLinearGradient(256, 168, 256, 344);
-  pupil.addColorStop(0, '#ffd9a8');
-  pupil.addColorStop(0.5, '#ff5a1e');
-  pupil.addColorStop(1, '#7a1400');
-  context.fillStyle = pupil;
-  context.fillRect(224, 176, 64, 160);
-  // Glare
-  context.fillStyle = 'rgba(255,240,214,0.5)';
-  context.beginPath();
-  context.arc(206, 198, 34, 0, Math.PI * 2);
-  context.fill();
+  drawPass70DroneSwarmLogo(context);
   return canvas;
 }
 
@@ -20104,6 +21403,7 @@ function clearFieldSupport(): void {
   stickyTimingReplayNonces.clear();
   stickyVictimFeedbackCount = 0;
   lastStickyVictimFeedback = null;
+  resetStickyVictimUrgentAlertLife();
   stickyVictimReceiptKeys.clear();
   lastQaStickyAuthoritativeHits.clear();
   for (const id of remotes.keys()) remoteSupportAuthorities.set(id, createRemoteSupportAuthorityState());
@@ -20113,17 +21413,59 @@ function clearFieldSupport(): void {
   updateFieldSupportHud();
 }
 
+function deactivateRailgunScopePresentation(): void {
+  railgunScopeState = deriveRailgunScopePresentation({
+    alive: player.alive,
+    localHolder: localHoldsRailgun(),
+    weapon: player.weapon,
+    adsHeld: false,
+    adsProgress: weaponView.adsProgress(),
+    baseFov: preferredFov,
+    cameraFov: camera.fov,
+  });
+  railgunScopeActive = false;
+  hudRoot.classList.remove('railgun-scope-active');
+  railgunPresentation.updateThermal(camera, [], false);
+  weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
+}
+
+function synchronizeRailgunScopeLifecycle(): void {
+  // Scope ownership is a frame-level presentation lifecycle, not part of
+  // character simulation. Death, match end, menus and authority recovery can
+  // all suspend updatePhysics while rendering continues, so they must clear
+  // the overlay/thermal/viewmodel suppression before updateRailgun consumes it.
+  if (!playerSimulationEnabled()) {
+    deactivateRailgunScopePresentation();
+    return;
+  }
+  railgunScopeState = deriveRailgunScopePresentation({
+    alive: player.alive,
+    localHolder: localHoldsRailgun(),
+    weapon: player.weapon,
+    adsHeld,
+    adsProgress: weaponView.adsProgress(),
+    baseFov: preferredFov,
+    cameraFov: camera.fov,
+  });
+  railgunScopeActive = railgunScopeState.active;
+  hudRoot.classList.toggle('railgun-scope-active', railgunScopeActive);
+  synchronizeWeaponViewmodelPresentation();
+}
+
 function shouldShowWeaponViewmodel(): boolean {
   return gameStarted
     && player.alive
+    && matchState.phase !== 'ended'
+    && menu.classList.contains('hidden')
     && !localKillstreakActorSnapshot()?.possession
     && !sniperScopeActive
     && !dmrThermalActive
+    && !railgunScopeActive
     && !debugCaptureViewmodelHidden;
 }
 
 function synchronizeWeaponViewmodelPresentation(): void {
-  if (sniperScopeActive || dmrThermalActive || localKillstreakActorSnapshot()?.possession) {
+  if (sniperScopeActive || dmrThermalActive || railgunScopeActive || localKillstreakActorSnapshot()?.possession) {
     weaponView.suppressForFullscreenPresentation(true);
     return;
   }
@@ -20321,7 +21663,6 @@ function updatePhysics(dt: number): void {
     && weaponView.adsProgress() >= 0.9
     && Math.abs(camera.fov - aimingFov) < 0.35;
   hudRoot.classList.toggle('dmr-thermal-active', dmrThermalActive);
-  synchronizeWeaponViewmodelPresentation();
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
   camera.rotation.y = player.yaw + recoilCamera.yaw;
@@ -20550,9 +21891,17 @@ function updateMatchState(now: number): void {
   const ffa = gameMode !== 'solo' && privateMatchMode === 'ffa';
   const orderedFfa = freeForAllLeaders([...authoritativeScores.values()]);
   matchState = preserveSoloCountdownCue(matchState, now, lastMatchCountdownCue, gameMode === 'solo');
-  matchState = ffa
+  const preAdvanceState = matchState;
+  const advancedState = ffa
     ? advanceFreeForAllMatch(matchState, now, orderedFfa, rules)
     : advanceMatch(matchState, now, scores, rules);
+  matchState = holdGunRangeReplicaAtAuthorityBoundary(
+    preAdvanceState,
+    advancedState,
+    network.role === 'client'
+      && privateLobbySnapshot?.config.arenaId === 'gun-range'
+      && privateLobbySnapshot.phase === 'active',
+  );
   let presentation = matchPresentationAt(matchState, now, scores, player.team, rules, arena.label);
   if (ffa) {
     const localRank = Math.max(1, orderedFfa.findIndex((entry) => entry.id === player.id) + 1);
@@ -20611,6 +21960,9 @@ function updateMatchState(now: number): void {
       refreshLocalKillstreakSnapshot(now);
       if (network.role === 'host') broadcastKillstreakState(now);
     }
+    // The frame continues rendering after `ended`; terminate every ground-fire
+    // authority and presentation lane before its unconditional frame update.
+    clearGroundFireAuthorityForMatchTerminal();
     clearGrenades();
     clearFieldSupport();
     const privateMatch = gameMode !== 'solo';
@@ -21083,26 +22435,7 @@ function updateHud(now: number): void {
   // bounded 60 Hz cadence so uncapped rendering cannot flood Canvas2D work.
   if (now - lastHudAt < 100) return;
   lastHudAt = now;
-  if (gameStarted) {
-    // Gun Range: freeze and reset the 2-minute timer every time the player
-    // enters the killstreak test bay area, and keep it frozen while inside.
-    if (selectedArena.id === 'gun-range' && matchState.phase === 'active' && player.alive) {
-      const bay = GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds;
-      const inBay = player.position.x >= bay.minX && player.position.x <= bay.maxX
-        && player.position.z >= bay.minZ && player.position.z <= bay.maxZ;
-      const entered = inBay && !gunRangeTestBayPlayerWasInside;
-      gunRangeTestBayPlayerWasInside = inBay;
-      if (entered || inBay && gunRangeTestBayTimerResetLastEpoch !== interactiveWorldMatchEpoch) {
-        gunRangeTestBayTimerResetLastEpoch = interactiveWorldMatchEpoch;
-        const rules = currentMatchRules();
-        const durationMs = rules.durationMs ?? 120_000;
-        // Freeze at the full duration: reset on every fresh entry, then keep
-        // the end anchored to now while inside so the clock never counts down.
-        matchState = { phase: 'active', phaseStartedAt: now, endsAt: now + durationMs, winner: null };
-      }
-    }
-    updateMatchState(now);
-  }
+  if (gameStarted) updateMatchState(now);
   const spec = WEAPONS[player.weapon];
   const speed = Math.hypot(player.velocity.x, player.velocity.z);
   const adsSettled = adsHeld && weaponView.adsProgress() >= 0.9;
@@ -22171,6 +23504,7 @@ function syncArenaSelectionUi(): void {
     ? `${selectedArena.titleLead} <span>${selectedArena.titleAccent}</span>`
     : selectedArena.titleLead;
   element<HTMLElement>('#arena-lede').textContent = selectedArena.menuLede;
+  canvas.setAttribute('aria-label', arenaCanvasLabel(selectedArena));
   renderFieldKitSelection();
 }
 
@@ -22676,6 +24010,11 @@ function resetForMode(preserveAdmission = false): void {
   targetHits = 0;
   rangeScore = 0;
   rangeShotsFired = 0;
+  gunRangeMatchClockState = null;
+  gunRangeMatchClockOccupantIds = Object.freeze([]);
+  gunRangeTestBayDoorState = null;
+  presentedGunRangeTestBayDoorThumpSequence = 0;
+  gunRangeTestBayDoorBroadcastPending = false;
   roundShotsFired = 0;
   roundHitShots = 0;
   roundHeadshots = 0;
@@ -22918,6 +24257,7 @@ const updateLobbyConfigFromUi = (): void => {
     capacity,
     hostedBotCount,
     autoBalance: !rangeLobby && mode === 'tdm' && element<HTMLInputElement>('#lobby-auto-balance').checked,
+    durationMs: hostedArenaDurationMs(arenaSelection(arenaId)),
   });
 };
 element<HTMLSelectElement>('#lobby-arena').addEventListener('change', updateLobbyConfigFromUi);
@@ -22951,12 +24291,23 @@ function scheduleStateBroadcast(): void {
     localSnapshotRateState.rateHz,
   );
   stateBroadcastTimer = setTimeout(() => {
+    const now = performance.now();
     const schedulingDecision = reconcilePresentationScheduling('network heartbeat eligibility');
     if (schedulingDecision.mode === 'hosted-authority-network') hostedBackgroundNetworkHeartbeatCount += 1;
-    if (gameStarted && network.role === 'host') updateTimedMapWeapons(performance.now());
+    if (gameStarted && network.role === 'host') {
+      // Hidden/occluded hosts intentionally stop presentation frames but keep
+      // this authority heartbeat alive. Sample bay occupancy here as well so
+      // a guest pause edge cannot depend on the host tab being visible.
+      const doorState = updateGunRangeTestBayDoorAuthority(now);
+      if (doorState) {
+        synchronizeGunRangeTestBayDoorWorld(doorState, false);
+        flushGunRangeTestBayDoorBroadcast();
+      }
+      updateGunRangeMatchClockAuthority(now);
+      updateTimedMapWeapons(now);
+    }
     if (gameStarted && !matchAdmissionPresentationPaused && network.role !== 'offline' && player.alive
       && !(network.role === 'client' && awaitingCanonicalGuestAuthority)) {
-      const now = performance.now();
       localSnapshotRateState = updateSnapshotRate(localSnapshotRateState, {
         rttMs: hostTimeMapping.sampleCount > 0 ? hostTimeMapping.rttMs : localLobbyPingMs ?? 20,
         jitterMs: hostTimeMapping.sampleCount > 0 ? hostTimeMapping.jitterMs : 0,
@@ -23238,6 +24589,18 @@ function frame(now: number, scheduleNext = true): void {
     if (scheduleNext) requestAnimationFrame(frame);
     return;
   }
+  if (debugRenderPaused
+    && debugChopperExteriorReviewTrackerRequested
+    && currentDebugChopperExteriorReviewHoldActive()) {
+    // Paired exterior evidence owns one exact already-presented frame. Freeze
+    // simulation and the tracking camera together until the hidden-root
+    // control is captured or the tracker is released; the control must differ
+    // only by visibility of the exact reviewed Chopper root.
+    lastFrame = now;
+    accumulator = 0;
+    if (scheduleNext) requestAnimationFrame(frame);
+    return;
+  }
   if (scheduleNext && !presentationFrameDue(now, lastPresentedFrameAt, graphicsRuntime.frameRateLimit)) {
     requestAnimationFrame(frame);
     return;
@@ -23317,7 +24680,12 @@ function frame(now: number, scheduleNext = true): void {
     updateGrenadeExplosionVisuals(now);
     updateFieldSupport(frameDt, now);
     updatePass65KillstreakRuntime(now);
+    // The offline evidence camera follows the current submitted-scene
+    // airframe after its entity transform is synchronized and before this
+    // exact frame is rendered. It never feeds back from raster coverage.
+    updateDebugChopperExteriorReviewTracker();
     updateOverdrive(now);
+    synchronizeRailgunScopeLifecycle();
     updateRailgun(now);
     updateTimedMapWeapons(now);
     updateDmrThermal();
@@ -23381,18 +24749,15 @@ function frame(now: number, scheduleNext = true): void {
       atmosphereSystem?.update(visualNow / 1_000);
     } else if (selectedArena.id === 'gun-range') {
       updateGunRangePresentation(arena.root, visualNow);
-      const doorFrame = updateGunRangeTestBayDoor(arena.root, now, player.position);
-      const doorArenaChanged = gunRangeTestBayDoorColliderArena !== arena.root;
-      gunRangeTestBayDoorColliderArena = arena.root;
-      gunRangeTestBayDoorColliders = doorFrame.dynamicColliders;
-      if (doorFrame.audioIntent) {
-        const trigger = GUN_RANGE_TEST_BAY_CONTRACT.door.trigger;
-        audio.testBayDoorThump(player.position.distanceTo(new THREE.Vector3(trigger.x, trigger.y, trigger.z)));
-      }
-      if (doorArenaChanged || doorFrame.collisionChanged) syncInteractiveWorldPhysics();
+      const doorState = updateGunRangeTestBayDoorAuthority(now)
+        ?? gunRangeTestBayDoorState
+        ?? createGunRangeTestBayDoorState(now);
+      synchronizeGunRangeTestBayDoorWorld(doorState, true);
+      flushGunRangeTestBayDoorBroadcast();
     }
     waterSystem.update(visualNow / 1_000);
     if (gameStarted) updateMinimap(now);
+    updateGunRangeMatchClockAuthority(now);
     updateHud(now);
     arenaContrastLighting.update(visualNow);
     pass64TslSystems?.update(visualNow);
@@ -23417,6 +24782,9 @@ function frame(now: number, scheduleNext = true): void {
       }
       if (frameSubmitted && gameStarted && menuLifecycle.surface === 'hidden') {
         lastGameplayPresentedFrame = frameCount;
+        if (debugCaptureCameraActive) {
+          lastDebugCommittedCameraPresentation = debugCommittedCameraPresentationReceipt(frameCount);
+        }
         if (debugCaptureCameraActive && debugRiggedEvidenceCaptureTargets !== null) {
           lastDebugCapturePresentation = debugCapturePresentationReceipt(frameCount);
         }
@@ -23935,6 +25303,7 @@ function sampleDmrThermalReadiness() {
     adsProgress: weaponView.adsProgress(),
     cameraFov: camera.fov,
     expectedFov: magnifiedFovDegrees(preferredFov, DMR_THERMAL_MAGNIFICATION),
+    exactOperatorReveal: thermalGhostPresentation.telemetry(),
   });
 }
 
@@ -24074,6 +25443,9 @@ const debugWindow = window as Window & {
       lookAtZ?: number;
     } | null) => void;
     setArenaReviewCamera: (cameraId: string) => boolean;
+    setChopperExteriorReviewHold: (held: boolean) => boolean;
+    setChopperExteriorReviewTracking: (tracked: boolean) => number | null;
+    captureChopperExteriorHiddenControl: () => Promise<DebugChopperExteriorHiddenControlReceipt | null>;
     setRiggedEvidenceCaptureTargets: (
       targets: readonly Readonly<{ kind: 'bot' | 'training-dummy'; id: string }>[],
     ) => boolean;
@@ -24090,6 +25462,7 @@ const debugWindow = window as Window & {
       mode: RiggedEvidencePrincipalWriteMode,
     ) => boolean;
     setRiggedEvidenceHandCaptureSide: (side: 'left' | 'right' | null) => boolean;
+    awaitCommittedCameraCompletion: () => Promise<Record<string, unknown>>;
     awaitRiggedEvidenceCaptureCompletion: () => Promise<Record<string, unknown>>;
     sampleRiggedEvidenceLineOfSight: (
       actorKind: 'bot' | 'training-dummy',
@@ -24424,6 +25797,159 @@ function debugRiggedHandSelfOcclusionForFrame(
     allClear: orderValid && sentinels.every((sentinel) => sentinel.present && sentinel.clear),
     drawAdmission,
     sentinels: Object.freeze(sentinels),
+  });
+}
+
+function debugCommittedCameraPresentationReceipt(frame: number): DebugCommittedCameraPresentationReceipt {
+  camera.updateWorldMatrix(true, false);
+  const presentation = renderRuntime.presentationTelemetry();
+  const activeChopper = killstreakSnapshot.entities.find((entity) => entity.kind === 'chopper') ?? null;
+  const chopperPresentation = activeChopper
+    ? killstreakPresentation.telemetry(camera).entityDetails.find((entry) => entry.entityId === activeChopper.id) ?? null
+    : null;
+  const activeChopperTransientActions = killstreakPresentation.activeChopperTransientActionNames();
+  const reviewTracker = lastDebugChopperExteriorReviewTrackerFrame?.frame === frame
+    && lastDebugChopperExteriorReviewTrackerFrame.captureRevision === debugCaptureCameraRevision
+    && debugChopperExteriorReviewTrackerRequested
+    ? Object.freeze({
+        active: true as const,
+        ...lastDebugChopperExteriorReviewTrackerFrame,
+        submissionSequence: presentation.submissionSequence,
+        completedSequence: presentation.completedSequence,
+      })
+    : null;
+  return Object.freeze({
+    contract: 'capture-camera-committed-frame-v1',
+    renderer: renderRuntime.backend,
+    completionSemantics: renderRuntime.backend === 'webgpu'
+      ? 'submission-sequence-covered-by-completion-frontier'
+      : 'synchronous-render-return',
+    arenaId: selectedArena.id,
+    frame,
+    captureRevision: debugCaptureCameraRevision,
+    committedAtMs: performance.now(),
+    position: Object.freeze(camera.position.toArray() as [number, number, number]),
+    quaternion: Object.freeze(camera.quaternion.toArray() as [number, number, number, number]),
+    yaw: camera.rotation.y,
+    pitch: camera.rotation.x,
+    fov: camera.fov,
+    near: camera.near,
+    far: camera.far,
+    submissionSequence: presentation.submissionSequence,
+    completedSequence: presentation.completedSequence,
+    targetCount: lastKillstreakWorldTargetCount,
+    riggedActorTargetCount: debugRiggedEvidenceCaptureTargets?.length ?? 0,
+    chopperAutonomousFireHeld: currentDebugChopperExteriorReviewHoldActive(),
+    activeChopperTransientActions,
+    chopperReviewTracker: reviewTracker,
+    reviewedChopper: activeChopper && chopperPresentation ? Object.freeze({
+      entityId: activeChopper.id,
+      expiresInMs: activeChopper.expiresInMs,
+      rootVisible: chopperPresentation.visible,
+      activeLodIndex: chopperPresentation.activeLodIndex,
+      drawableStableMeshCount: chopperPresentation.drawableStableAirframeMeshCount,
+      drawableStableBounds: chopperPresentation.drawableStableAirframeBounds,
+      drawRejections: chopperPresentation.stableAirframeDrawRejections,
+    }) : null,
+  });
+}
+
+async function captureDebugChopperExteriorHiddenControl(): Promise<DebugChopperExteriorHiddenControlReceipt | null> {
+  const official = lastDebugCommittedCameraPresentation;
+  const tracker = official?.chopperReviewTracker;
+  if (!debugRenderPaused
+    || !debugCaptureCameraActive
+    || !debugChopperExteriorReviewTrackerRequested
+    || !currentDebugChopperExteriorReviewHoldActive()
+    || renderSubmissionPaused
+    || !official
+    || !tracker
+    || official.frame !== lastGameplayPresentedFrame
+    || official.captureRevision !== debugCaptureCameraRevision
+    || tracker.frame !== official.frame
+    || tracker.captureRevision !== official.captureRevision
+    || tracker.entityId !== official.reviewedChopper?.entityId
+    || official.targetCount !== 0
+    || official.riggedActorTargetCount !== 0
+    || official.activeChopperTransientActions.length !== 0) return null;
+  camera.updateWorldMatrix(true, false);
+  const cameraMatchesOfficial = camera.position.toArray().every((coordinate, axis) => coordinate === official.position[axis])
+    && camera.quaternion.toArray().every((coordinate, axis) => coordinate === official.quaternion[axis])
+    && camera.fov === official.fov
+    && camera.near === official.near
+    && camera.far === official.far;
+  const root = killstreakPresentation.entityRoot(tracker.entityId);
+  const currentDetail = killstreakPresentation.telemetry().entityDetails
+    .find((entry) => entry.entityId === tracker.entityId) ?? null;
+  const currentBounds = currentDetail?.drawableStableAirframeBounds;
+  const boundsMatchOfficial = currentDetail?.drawableStableAirframeMeshCount
+    === tracker.submittedSceneDrawableMeshCount
+    && currentBounds !== null
+    && currentBounds !== undefined
+    && currentBounds.min.every((coordinate, axis) => (
+      coordinate === tracker.submittedSceneDrawableBounds.min[axis]
+    ))
+    && currentBounds.max.every((coordinate, axis) => (
+      coordinate === tracker.submittedSceneDrawableBounds.max[axis]
+    ));
+  if (!cameraMatchesOfficial || !boundsMatchOfficial || !root?.visible) return null;
+
+  const officialCaptureRevision = official.captureRevision;
+  debugCaptureCameraRevision += 1;
+  const controlCaptureRevision = debugCaptureCameraRevision;
+  const control = await withExactChopperRootHiddenForControl(root, async () => {
+    const before = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu') {
+      await submitForegroundWebGpuFrame(true, 'serialized');
+    } else if (atomicSignal) {
+      atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+    } else {
+      throw new Error('Chopper hidden-control has no active renderer');
+    }
+    const submitted = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu' && submitted.submissionSequence <= before.submissionSequence) {
+      throw new Error('Chopper hidden-control did not submit a distinct WebGPU frame');
+    }
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    const completed = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu'
+      && completed.completedSequence < submitted.submissionSequence) {
+      throw new Error('Chopper hidden-control WebGPU frame did not reach the completion frontier');
+    }
+    return Object.freeze({
+      submissionSequence: submitted.submissionSequence,
+      completedSequence: completed.completedSequence,
+      rootHiddenDuringSubmission: !root.visible,
+    });
+  });
+  if (!control.rootHiddenDuringSubmission || !root.visible) {
+    throw new Error('Chopper hidden-control did not preserve its exact hide/restore boundary');
+  }
+  return Object.freeze({
+    contract: 'chopper-exterior-hidden-control-v1',
+    nonPublishable: true,
+    renderer: renderRuntime.backend,
+    completionSemantics: renderRuntime.backend === 'webgpu'
+      ? 'submission-sequence-covered-by-completion-frontier'
+      : 'synchronous-render-return',
+    entityId: tracker.entityId,
+    simulationFrame: official.frame,
+    officialCaptureRevision,
+    controlCaptureRevision,
+    officialSubmissionSequence: official.submissionSequence,
+    submissionSequence: control.submissionSequence,
+    completedSequence: control.completedSequence,
+    position: official.position,
+    quaternion: official.quaternion,
+    yaw: official.yaw,
+    pitch: official.pitch,
+    fov: official.fov,
+    near: official.near,
+    far: official.far,
+    submittedSceneDrawableMeshCount: tracker.submittedSceneDrawableMeshCount,
+    submittedSceneDrawableBounds: tracker.submittedSceneDrawableBounds,
+    rootHiddenDuringSubmission: true,
+    rootRestored: true,
   });
 }
 
@@ -24778,6 +26304,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       hud: activeArenaReviewHud,
       captureCameraActive: debugCaptureCameraActive,
       captureCameraOrbit: debugCaptureOrbit !== null,
+      chopperExteriorReviewTracking: debugChopperExteriorReviewTrackerRequested,
+      chopperExteriorReviewTrackerFrame: lastDebugChopperExteriorReviewTrackerFrame,
       captureCameraX: Number(camera.position.x.toFixed(2)),
       captureCameraY: Number(camera.position.y.toFixed(2)),
       captureCameraZ: Number(camera.position.z.toFixed(2)),
@@ -24792,6 +26320,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         near: camera.near,
         far: camera.far,
       },
+      presentedCamera: lastDebugCommittedCameraPresentation,
       presentedCapture: lastDebugCapturePresentation,
       captureOrbitElapsedMs: debugCaptureOrbit ? Math.round(Math.max(0, performance.now() - debugCaptureOrbit.startedAtMs)) : null,
       renderSubmissionPaused,
@@ -24802,6 +26331,21 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     gameMode,
     matchPhase: matchState.phase,
     matchEndReason: matchState.endReason ?? null,
+    matchClock: gunRangeMatchClockState ? {
+      ...gunRangeMatchClockState,
+      authorityRole: network.role === 'client' ? 'replica' : network.role === 'host' ? 'host' : 'offline',
+      occupantIds: [...gunRangeMatchClockOccupantIds],
+      projectedEndsAt: matchState.endsAt,
+      effectiveRemainingMs: Math.max(0, matchState.endsAt - performance.now()),
+    } : null,
+    testBayDoor: gunRangeTestBayDoorState ? {
+      ...gunRangeTestBayDoorState,
+      projected: projectActiveGunRangeTestBayDoor(performance.now()),
+      authorityRole: network.role === 'client' ? 'replica' : network.role === 'host' ? 'host' : 'offline',
+      dynamicColliderCount: gunRangeTestBayDoorColliders.length,
+      dynamicBallisticSurfaceCount: gunRangeTestBayDoorBallisticSurfaces.length,
+      leafY: arena.root.getObjectByName('gun-range-test-bay-secure-door-leaf')?.position.y ?? null,
+    } : null,
     privateMatch: privateLobbySnapshot ? {
       mode: privateMatchMode,
       arenaId: privateLobbySnapshot.config.arenaId,
@@ -24810,6 +26354,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       capacity: privateLobbySnapshot.config.capacity,
       hostedBotCount: privateLobbySnapshot.config.hostedBotCount,
       autoBalance: privateLobbySnapshot.config.autoBalance,
+      durationMs: privateLobbySnapshot.config.durationMs,
+      matchClock: privateLobbySnapshot.matchClock ? { ...privateLobbySnapshot.matchClock } : null,
+      testBayDoor: privateLobbySnapshot.testBayDoor ? { ...privateLobbySnapshot.testBayDoor } : null,
       members: privateLobbySnapshot.members.map((member) => ({ ...member })),
       scores: [...authoritativeScores.values()].map((score) => ({ ...score })),
       activeAtHostTimeMs: privateMatchActiveAtHostTimeMs,
@@ -24817,6 +26364,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       hostTimeOffsetMs: network.role === 'client' ? hostTimeMapping.offsetMs : 0,
       localPingMs: localLobbyPingMs,
     } : null,
+    hostMatchRecoveryCheckpoint: {
+      rejectedPoseWrites: hostCheckpointRejectedPoseWrites,
+      lastRejectedPoseReason: lastHostCheckpointRejectedPoseReason,
+      lastRejectedPoseAtEpochMs: lastHostCheckpointRejectedPoseAtEpochMs,
+    },
     textChat: {
       open: textChatOpen,
       focused: document.activeElement === textChatInput,
@@ -24834,6 +26386,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       adsResetRequired: railgunAdsResetRequired,
       rechamberPresentationActive: railgunRechamberPresentationActive,
       adsProgress: weaponView.adsProgress(),
+      scopeActive: railgunScopeActive,
       thermalVisible: !element<HTMLElement>('#railgun-thermal').hidden,
       presentation: railgunPresentation.telemetry(),
       claimAudit: { ...railgunClaimAudit },
@@ -24873,12 +26426,18 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         lastAdmission: lastFlarePresentationAdmission ? { ...lastFlarePresentationAdmission } : null,
       },
       flameStream: flamethrowerStreamPresentation.telemetry(),
+      carpetGroundFireAuthority: {
+        capacity: carpetGroundFires.capacity(),
+        active: carpetGroundFires.activeCount(),
+        ...carpetGroundFireAuthorityTelemetry,
+      },
       audit: { ...timedMapWeaponAudit },
       currentHostTimeMs: currentHostTimeMs(),
       lastBroadcastAt: lastTimedMapWeaponStateBroadcastAt,
     },
     dmrThermal: {
       ...dmrThermalPresentation.telemetry(),
+      exactOperatorReveal: thermalGhostPresentation.telemetry(),
       weapon: player.weapon,
       magnification: DMR_THERMAL_MAGNIFICATION,
       cameraFov: camera.fov,
@@ -25052,11 +26611,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     random: runtimeRandomTelemetry(),
     aimAlignment: (() => {
       const canvasBounds = canvas.getBoundingClientRect();
-      const activeReticle = dmrThermalActive
-        ? element<HTMLElement>('.dmr-thermal-reticle')
-        : sniperScopeOverlay.hidden
-          ? element<HTMLElement>('#crosshair')
-          : element<HTMLElement>('.scope-reticle');
+      const activeReticle = railgunScopeActive
+        ? element<HTMLElement>('.railgun-scope-reticle')
+        : dmrThermalActive
+          ? element<HTMLElement>('.dmr-thermal-reticle')
+          : sniperScopeOverlay.hidden
+            ? element<HTMLElement>('#crosshair')
+            : element<HTMLElement>('.scope-reticle');
       const reticleBounds = activeReticle.getBoundingClientRect();
       const direction = camera.getWorldDirection(new THREE.Vector3());
       const rayNdc = camera.position.clone().addScaledVector(direction, 100).project(camera);
@@ -25068,6 +26629,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         ? { x: reticleBounds.left + reticleBounds.width / 2, y: reticleBounds.top + reticleBounds.height / 2 }
         : canvasCentre;
       return {
+        reticle: railgunScopeActive
+          ? 'railgun-camera-forward'
+          : dmrThermalActive ? 'dmr-thermal' : sniperScopeActive ? 'sniper' : 'hip-crosshair',
         canvas: { left: canvasBounds.left, top: canvasBounds.top, width: canvasBounds.width, height: canvasBounds.height },
         reticleCentre,
         rayNdc: [rayNdc.x, rayNdc.y],
@@ -25342,7 +26906,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     killstreak: killstreakSnapshot,
     killstreakControlAdmission: lastLocalKillstreakControlAdmission,
     adrenalineRuntime: adrenalineRuntimeDebugSnapshot(),
-    killstreakPresentation: killstreakPresentation.telemetry(),
+    killstreakPresentation: killstreakPresentation.telemetry(camera),
     supportVehiclePresentation: supportVehiclePresentationTelemetry(),
     supportDamageFeedback: supportDamageFeedbackTelemetry.snapshot(),
     fieldSupport: {
@@ -25610,6 +27174,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     weaponPresentation: {
       ...weaponView.presentationState(),
       depthSeparatedFromWorld: true,
+    },
+    railgunScope: {
+      ...railgunScopeState,
+      active: railgunScopeActive,
+      viewmodelVisible: shouldShowWeaponViewmodel(),
     },
     sniperScope: {
       active: !sniperScopeOverlay.hidden,
@@ -26292,6 +27861,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     localContinuity += 1;
     localPositionHistory.length = 0;
     resetFlashVictimLife();
+    resetStickyVictimUrgentAlertLife(localContinuity);
     if (gameStarted && matchState.phase === 'active' && network.role !== 'client') {
       // QA teleport starts a new local continuity domain. Keep host support
       // authority on that same life so real test-bay F interactions are not
@@ -26317,10 +27887,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     if (gameStarted) network.send(createStateMessage());
   },
   setCaptureCameraPose: (x, y = 0, z = 0, yaw = 0, pitch = 0, fov = camera.fov, fixedVisualTimeMs, seed = 6501) => {
+    resetDebugChopperExteriorReviewTracker();
     debugCaptureCameraRevision += 1;
+    lastDebugCommittedCameraPresentation = null;
     debugCaptureCameraActive = [x, y, z, yaw, pitch].every(Number.isFinite);
     debugCaptureCameraUsesQuaternion = false;
     if (!debugCaptureCameraActive) {
+      resetDebugChopperExteriorReviewHold();
       clearDebugRiggedEvidenceCaptureTargets();
       lastDebugCapturePresentation = null;
       debugCaptureCameraFov = null;
@@ -26389,6 +27962,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.updateProjectionMatrix();
   },
   setCaptureCameraOrbit: (orbit) => {
+    resetDebugChopperExteriorReviewTracker();
     // Game-loop-owned cinematic drift for capture cameras. Runs every
     // presented frame so the motion survives focus loss and page-timer
     // throttling; pass null to disable.
@@ -26412,6 +27986,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       startedAtMs: performance.now(),
     };
     debugCaptureCameraRevision += 1;
+    lastDebugCommittedCameraPresentation = null;
     debugCaptureCameraActive = true;
     debugCaptureCameraUsesQuaternion = false;
     debugCaptureCameraFov = debugCaptureOrbit.fov;
@@ -26419,6 +27994,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.updateProjectionMatrix();
   },
   setArenaReviewCamera: (cameraId) => {
+    resetDebugChopperExteriorReviewTracker();
     const reviewCamera = activeArenaVisualDefinition?.reviewCameras.find((entry) => entry.id === cameraId);
     if (!reviewCamera) return false;
     camera.position.set(...reviewCamera.position);
@@ -26442,10 +28018,76 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     debugCaptureCameraFov = camera.fov;
     debugCaptureCameraActive = true;
     debugCaptureCameraRevision += 1;
+    lastDebugCommittedCameraPresentation = null;
     return true;
   },
+  setChopperExteriorReviewHold: (held) => {
+    if (!held) {
+      resetDebugChopperExteriorReviewHold();
+      return true;
+    }
+    if (!chopperExteriorReviewHoldActive(true, {
+      arenaId: selectedArena.id,
+      gameMode,
+      networkRole: network.role,
+      gameStarted,
+      matchPhase: matchState.phase,
+      menuSurface: menuLifecycle.surface,
+    })) return false;
+    if (held && killstreakSnapshot.entities.some((entity) => entity.kind === 'chopper')) return false;
+    if (debugChopperAutonomousFireHeld === held) return true;
+    debugChopperAutonomousFireHeld = held;
+    if (held) lastKillstreakWorldTargetCount = 0;
+    lastDebugCommittedCameraPresentation = null;
+    if (debugCaptureCameraActive) debugCaptureCameraRevision += 1;
+    return true;
+  },
+  setChopperExteriorReviewTracking: (tracked) => {
+    if (!tracked) {
+      resetDebugChopperExteriorReviewTracker();
+      return null;
+    }
+    if (debugChopperExteriorReviewTrackerRequested) return debugCaptureCameraRevision;
+    if (!currentDebugChopperExteriorReviewHoldActive()
+      || debugRiggedEvidenceCaptureTargets !== null) return null;
+    const activeChopper = killstreakSnapshot.entities.find((entity) => entity.kind === 'chopper') ?? null;
+    const detail = activeChopper
+      ? killstreakPresentation.telemetry().entityDetails.find((entry) => entry.entityId === activeChopper.id) ?? null
+      : null;
+    const sourceBounds = detail?.drawableStableAirframeBounds;
+    if (!activeChopper || !detail?.visible || !sourceBounds
+      || !(detail.drawableStableAirframeMeshCount > 0)
+      || !Number.isFinite(activeChopper.attitude[1])) return null;
+    const pose = chopperExteriorReviewCameraPose({
+      drawableBounds: {
+        min: sourceBounds.min as [number, number, number],
+        max: sourceBounds.max as [number, number, number],
+      },
+      entityYaw: activeChopper.attitude[1],
+      aspect: camera.aspect,
+    });
+    if (!pose) return null;
+    debugChopperExteriorReviewTrackerRequested = true;
+    debugChopperExteriorReviewTrackerSide = pose.side;
+    lastDebugChopperExteriorReviewTrackerFrame = null;
+    debugCaptureOrbit = null;
+    debugCaptureFixedVisualTimeMs = null;
+    debugCaptureCameraUsesQuaternion = false;
+    debugCaptureCameraActive = true;
+    debugCaptureCameraPosition.set(...pose.position);
+    debugCaptureCameraYaw = pose.yaw;
+    debugCaptureCameraPitch = pose.pitch;
+    debugCaptureCameraFov = pose.fov;
+    camera.fov = pose.fov;
+    camera.updateProjectionMatrix();
+    debugCaptureCameraRevision += 1;
+    lastDebugCommittedCameraPresentation = null;
+    return debugCaptureCameraRevision;
+  },
+  captureChopperExteriorHiddenControl: captureDebugChopperExteriorHiddenControl,
   setRiggedEvidenceCaptureTargets: (targets) => {
     lastDebugCapturePresentation = null;
+    lastDebugCommittedCameraPresentation = null;
     clearDebugRiggedEvidenceCaptureTargets();
     const validated = validateRiggedEvidenceCaptureTargets(
       targets,
@@ -26529,6 +28171,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     if ((side !== 'left' && side !== 'right') || debugRiggedEvidenceCaptureTargets === null) return false;
     debugRiggedEvidenceHandCaptureSide = side;
     return true;
+  },
+  awaitCommittedCameraCompletion: async () => {
+    await flushWebGpuFrames(8_000);
+    return renderRuntime.presentationTelemetry() as unknown as Record<string, unknown>;
   },
   awaitRiggedEvidenceCaptureCompletion: async () => {
     await flushWebGpuFrames(8_000);
@@ -27136,13 +28782,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     if (!player.alive) return 'rejected: player-dead';
     if (matchState.phase !== 'active') return `rejected: phase-${matchState.phase}`;
     if (!railgunPickupNearby()) return `rejected: pickup-not-nearby status=${railgunState.status}`;
-    const claimed = claimRailgun(railgunState, player.id, railgunState.generation);
-    if (!claimed.accepted) return 'rejected: claim-not-accepted';
-    dropHeldTimedMapWeapons(player.id, player.position.clone().add(new THREE.Vector3(0, 0.3, 0)));
-    applyRailgunState(claimed.state);
-    recordMatchDiagnostic('railgun-pickup', 'accepted', { actorId: player.id, weaponOrEffect: 'railgun', position: player.position.toArray(), reason: 'host-authoritative-pickup' });
-    broadcastRailgunState();
-    return true;
+    // QA must cross the same ownership boundary as the real Use/Interact input.
+    // The previous shortcut mutated a guest locally and could manufacture a
+    // held-on-guest / available-on-host split that production never authored.
+    return interactWithRailgunPickup();
   },
   degradeStateChannel: () => localMultiplayerQa && network.degradeStateChannelForQa(),
   endMatch: () => {

@@ -8,8 +8,10 @@ function callbacks(overrides: Partial<FlareProjectileCallbacks> = {}): FlareProj
   return {
     worldCollisionFraction: () => null,
     withinBounds: () => true,
-    hostileTargets: () => [],
+    directHitTargets: () => [],
+    burnTargets: () => [],
     burnLineOfSight: () => true,
+    onDirectHit: () => undefined,
     onImpact: () => undefined,
     onBurnPulse: () => undefined,
     onExpire: () => undefined,
@@ -137,25 +139,103 @@ describe('flare projectile system', () => {
     }).toEqual(before);
   });
 
-  it('flies, impacts a target once, and emits finite host-owned burn pulses without explosion semantics', () => {
+  it('keeps direct impact unchanged, then burns for exactly 20 DPS over five seconds', () => {
     const scene = new THREE.Scene();
     const system = new FlareProjectileSystem(scene, false);
-    const target = { id: 'bot-1', lifeId: 1, kind: 'bot' as const, position: new THREE.Vector3(3, 0, 0), radiusM: 0.5 };
+    const target = { id: 'bot-1', lifeId: 1, kind: 'bot' as const, position: new THREE.Vector3(1.5, 0, 0), radiusM: 0.5 };
+    const directHit = vi.fn();
     const impact = vi.fn();
     const pulse = vi.fn();
+    const order: string[] = [];
     expect(system.spawn({
       ownerId: 'player-a', ownerTeam: 0, origin: new THREE.Vector3(), direction: new THREE.Vector3(1, 0, 0),
       authority: true, actionNonce: 77, now: 0,
     })).toBe(true);
-    system.update(0.05, 50, callbacks({ hostileTargets: () => [target], onImpact: impact, onBurnPulse: pulse }));
-    expect(impact).toHaveBeenCalledTimes(1);
-    expect(impact.mock.calls[0][0]).toMatchObject({
+    system.update(0.05, 50, callbacks({
+      worldCollisionFraction: () => 0.9,
+      directHitTargets: () => [target],
+      burnTargets: () => [target],
+      onDirectHit: (event) => { order.push('direct'); directHit(event); },
+      onImpact: (event) => { order.push('ground'); impact(event); },
+      onBurnPulse: pulse,
+    }));
+    expect(order).toEqual(['direct', 'ground']);
+    expect(directHit).toHaveBeenCalledTimes(1);
+    expect(directHit.mock.calls[0][0]).toMatchObject({
       ownerId: 'player-a', target: { id: 'bot-1' }, directDamage: FLARE_PROJECTILE_EFFECT.directDamage,
     });
-    system.update(0.05, 550, callbacks({ hostileTargets: () => [target], onImpact: impact, onBurnPulse: pulse }));
-    expect(pulse).toHaveBeenCalledTimes(1);
-    expect(pulse.mock.calls[0][0].damage).toBeGreaterThan(0);
+    expect(impact).toHaveBeenCalledTimes(1);
+    expect(impact.mock.calls[0][0]).toMatchObject({
+      ownerId: 'player-a', target: null, directDamage: 0,
+    });
+    expect(directHit.mock.calls[0][0].point.x).toBeLessThan(impact.mock.calls[0][0].point.x);
+
+    target.position.copy(impact.mock.calls[0][0].point);
+    for (let now = 550; now <= 5_050; now += 500) {
+      system.update(0.05, now, callbacks({ burnTargets: () => [target], onBurnPulse: pulse }));
+    }
+    expect(pulse).toHaveBeenCalledTimes(10);
+    expect(pulse.mock.calls.map(([event]) => event.damage)).toEqual(Array(10).fill(10));
+    expect(pulse.mock.calls.reduce((total, [event]) => total + event.damage, 0)).toBe(100);
     expect(pulse.mock.calls[0][0]).not.toHaveProperty('explosiveSource');
+    system.update(0.05, 5_550, callbacks({ burnTargets: () => [target], onBurnPulse: pulse }));
+    expect(pulse).toHaveBeenCalledTimes(10);
+  });
+
+  it('admits at most one current-occupancy burn pulse after a long frame stall', () => {
+    const system = new FlareProjectileSystem(new THREE.Scene(), false);
+    const target = {
+      id: 'target', lifeId: 1, kind: 'bot' as const,
+      position: new THREE.Vector3(0.5, 0, 0), radiusM: 0.5,
+    };
+    const pulse = vi.fn();
+    expect(system.spawn({
+      ownerId: 'owner', ownerTeam: 0, origin: new THREE.Vector3(),
+      direction: new THREE.Vector3(1, 0, 0), authority: true, actionNonce: 91, now: 0,
+    })).toBe(true);
+    system.update(0.01, 10, callbacks({
+      worldCollisionFraction: () => 0,
+      directHitTargets: () => [],
+      burnTargets: () => [target],
+      onBurnPulse: pulse,
+    }));
+    system.update(0.1, 2_510, callbacks({ burnTargets: () => [target], onBurnPulse: pulse }));
+    expect(pulse).toHaveBeenCalledTimes(1);
+    expect(pulse.mock.calls[0]![0]).toMatchObject({ pulseIndex: 1, damage: 10 });
+    system.update(0.016, 2_526, callbacks({ burnTargets: () => [target], onBurnPulse: pulse }));
+    expect(pulse).toHaveBeenCalledTimes(1);
+    system.update(0.1, 3_010, callbacks({ burnTargets: () => [target], onBurnPulse: pulse }));
+    expect(pulse).toHaveBeenCalledTimes(2);
+
+    system.update(0.1, 20_000, callbacks({ burnTargets: () => [target], onBurnPulse: pulse }));
+    expect(pulse).toHaveBeenCalledTimes(2);
+  });
+
+  it('checkpoints a delivered direct hit so authority migration cannot apply it twice', () => {
+    const target = { id: 'bot-1', lifeId: 1, kind: 'bot' as const, position: new THREE.Vector3(1.5, 0, 0), radiusM: 0.5 };
+    const source = new FlareProjectileSystem(new THREE.Scene(), true);
+    const sourceDirectHit = vi.fn();
+    expect(source.spawn({
+      ownerId: 'player-a', ownerTeam: 0, origin: new THREE.Vector3(), direction: new THREE.Vector3(1, 0, 0),
+      authority: true, actionNonce: 78, now: 0,
+    })).toBe(true);
+    source.update(0.05, 50, callbacks({ directHitTargets: () => [target], onDirectHit: sourceDirectHit }));
+    expect(sourceDirectHit).toHaveBeenCalledTimes(1);
+    const checkpoint = source.checkpointAuthority(50)!;
+    expect(checkpoint.effects[0]).toMatchObject({ phase: 'flight', directHitDelivered: true });
+
+    const restored = new FlareProjectileSystem(new THREE.Scene(), true);
+    expect(restored.restoreAuthorityCheckpoint(checkpoint, 0, 100)).toMatchObject({ accepted: true, restored: 1 });
+    const repeatedDirectHit = vi.fn();
+    const groundImpact = vi.fn();
+    restored.update(0.05, 150, callbacks({
+      worldCollisionFraction: () => 0.5,
+      directHitTargets: () => [target],
+      onDirectHit: repeatedDirectHit,
+      onImpact: groundImpact,
+    }));
+    expect(repeatedDirectHit).not.toHaveBeenCalled();
+    expect(groundImpact).toHaveBeenCalledTimes(1);
   });
 
   it('keeps predicted peer flares visual-only and rejects duplicate action nonces', () => {
@@ -201,9 +281,9 @@ describe('flare projectile system', () => {
         direction: new THREE.Vector3(1, 0, 0), authority: true, actionNonce, now: 0,
       })).toBe(true);
     }
-    const hostileTargets = vi.fn(() => []);
-    system.update(0.01, 10, callbacks({ hostileTargets }));
-    expect(hostileTargets).toHaveBeenCalledTimes(1);
+    const directHitTargets = vi.fn(() => []);
+    system.update(0.01, 10, callbacks({ directHitTargets }));
+    expect(directHitTargets).toHaveBeenCalledTimes(1);
   });
 
   it('exposes allocation-free lifecycle counters for the frame loop', () => {
@@ -222,19 +302,41 @@ describe('flare projectile system', () => {
     expect(system.burnPulseRevisionValue()).toBe(0);
   });
 
+  it('keeps replica inspection aligned with telemetry until the next valid update releases an expired effect', () => {
+    const system = new FlareProjectileSystem(new THREE.Scene(), true);
+    expect(system.spawn({
+      ownerId: 'owner-expiry', ownerTeam: 0, origin: new THREE.Vector3(),
+      direction: new THREE.Vector3(1, 0, 0), authority: true, actionNonce: 12, now: 0,
+    })).toBe(true);
+    system.update(0.05, 50, callbacks({ worldCollisionFraction: () => 0.5 }));
+
+    const expiresAt = 50 + FLARE_PROJECTILE_EFFECT.burnDurationMs;
+    expect(system.telemetry().active).toBe(1);
+    expect(system.inspectActiveReplicas(expiresAt)).toEqual([
+      expect.objectContaining({ ownerId: 'owner-expiry', phase: 'burn', remainingMs: 0, authority: true }),
+    ]);
+
+    system.update(0.016, expiresAt, callbacks());
+    expect(system.inspectActiveReplicas(expiresAt)).toEqual([]);
+    expect(system.telemetry().active).toBe(0);
+  });
+
   it('does not rebuild target or world snapshots between authority burn pulses', () => {
     const system = new FlareProjectileSystem(new THREE.Scene(), true);
-    const hostileTargets = vi.fn(() => []);
+    const directHitTargets = vi.fn(() => []);
+    const burnTargets = vi.fn(() => []);
     expect(system.spawn({
       ownerId: 'owner-a', ownerTeam: 0, origin: new THREE.Vector3(),
       direction: new THREE.Vector3(1, 0, 0), authority: true, actionNonce: 11, now: 0,
     })).toBe(true);
     expect(system.requiresWorldSnapshot(10)).toBe(true);
-    system.update(0.01, 10, callbacks({ hostileTargets, worldCollisionFraction: () => 0.5 }));
-    hostileTargets.mockClear();
+    system.update(0.01, 10, callbacks({ directHitTargets, burnTargets, worldCollisionFraction: () => 0.5 }));
+    directHitTargets.mockClear();
+    burnTargets.mockClear();
     expect(system.requiresWorldSnapshot(20)).toBe(false);
-    system.update(0.01, 20, callbacks({ hostileTargets }));
-    expect(hostileTargets).not.toHaveBeenCalled();
+    system.update(0.01, 20, callbacks({ directHitTargets, burnTargets }));
+    expect(directHitTargets).not.toHaveBeenCalled();
+    expect(burnTargets).not.toHaveBeenCalled();
     expect(system.requiresWorldSnapshot(510)).toBe(true);
   });
 

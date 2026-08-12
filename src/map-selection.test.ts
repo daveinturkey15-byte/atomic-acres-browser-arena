@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { ARENA_SELECTIONS, activeSoloBotTarget, arenaSelection, decodeArenaId, soloLaunchLabel } from './map-selection';
+import {
+  ARENA_SELECTIONS,
+  activeSoloBotTarget,
+  arenaCanvasLabel,
+  arenaSelection,
+  decodeArenaId,
+  hostedArenaDurationMs,
+  soloLaunchLabel,
+} from './map-selection';
 
 describe('opening arena selection', () => {
   it('publishes four unique, fully described maps', () => {
@@ -53,6 +61,17 @@ describe('opening arena selection', () => {
       rulesLabel: '5 MIN · HOST UP TO 6 · 1 BOT SOLO',
       matchRules: { durationMs: 300_000, scoreLimit: null },
     });
+  });
+
+  it('binds hosted round clocks and canvas labels to the selected arena', () => {
+    expect(ARENA_SELECTIONS.map((selection) => hostedArenaDurationMs(selection)))
+      .toEqual([300_000, 300_000, 300_000, 120_000]);
+    expect(ARENA_SELECTIONS.map((selection) => arenaCanvasLabel(selection))).toEqual([
+      'Nuke Town multiplayer arena',
+      'Terminal multiplayer arena',
+      'RustRig multiplayer arena',
+      'Gun Range multiplayer arena',
+    ]);
   });
 
   it('enables support presentation in every arena, including Gun Range training stations', () => {

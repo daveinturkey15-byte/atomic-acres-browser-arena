@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+  VIEWMODEL_CONTACT_PROBE_OFFSETS,
+  VIEWMODEL_CONTACT_PROFILES,
+  VIEWMODEL_CONTACT_RESPONSE_CONTRACT,
   advanceAdsBlend,
   advanceWeaponHeat,
   fireCycleAt,
   hitReactionAt,
   magnifiedFovDegrees,
   viewmodelFloorClearance,
+  viewmodelContactResponse,
   viewmodelObstructionPose,
   viewmodelSurfaceRetreat,
 } from './weapon-presentation-state';
+import { WEAPON_IDS } from './protocol';
 
 describe('weapon presentation state', () => {
   it('accumulates and cools bounded weapon heat', () => {
@@ -71,7 +76,10 @@ describe('weapon presentation state', () => {
     expect(viewmodelSurfaceRetreat(null, false)).toBe(0);
     expect(viewmodelSurfaceRetreat(2, false)).toBe(0);
     expect(viewmodelSurfaceRetreat(0.5, false)).toBeGreaterThan(0.25);
-    expect(viewmodelSurfaceRetreat(0, true)).toBeLessThanOrEqual(0.7);
+    expect(viewmodelSurfaceRetreat(0, true)).toBeCloseTo(
+      VIEWMODEL_CONTACT_PROFILES.carbine.maximumSurfaceRetreatMeters,
+      8,
+    );
     expect(viewmodelSurfaceRetreat(2, true)).toBeCloseTo(0.09);
   });
 
@@ -84,6 +92,9 @@ describe('weapon presentation state', () => {
     expect(viewmodelObstructionPose(null, true, 0.61).lift).toBeGreaterThanOrEqual(0.13);
     expect(viewmodelObstructionPose(0.2, true, 0.2).retreat).toBeLessThanOrEqual(0.7);
     expect(viewmodelObstructionPose(0.2, true, 0.2).lift).toBeLessThanOrEqual(0.2);
+    const m4JitterBoundary = viewmodelObstructionPose(0.278, true, 0.2, 'm4a1').retreat;
+    expect(Number.isInteger(m4JitterBoundary * 1_000)).toBe(true);
+    expect(m4JitterBoundary).toBeLessThanOrEqual(0.7);
   });
 
   it('uses grounded stance height when an authored floor is a raycast plane', () => {
@@ -92,5 +103,131 @@ describe('weapon presentation state', () => {
     expect(viewmodelFloorClearance(null, false, 0.61)).toBeNull();
     expect(viewmodelObstructionPose(null, true, viewmodelFloorClearance(null, true, 0.61)).lift)
       .toBeGreaterThanOrEqual(0.13);
+  });
+
+  it('owns a bounded contact response for every canonical weapon', () => {
+    expect(Object.keys(VIEWMODEL_CONTACT_PROFILES).sort()).toEqual([...WEAPON_IDS].sort());
+    for (const weapon of WEAPON_IDS) {
+      const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+      const response = viewmodelContactResponse(weapon, 0.7, 0.2, true, 0);
+      expect(profile.weapon).toBe(weapon);
+      expect(profile.probeLengthMeters).toBeGreaterThanOrEqual(1.15);
+      expect(profile.maximumSurfaceRetreatMeters).toBeGreaterThanOrEqual(0.6);
+      expect(profile.probeHalfWidthMeters).toBeGreaterThanOrEqual(0.18);
+      expect(profile.minimumScale).toBeGreaterThanOrEqual(0.7);
+      expect(profile.minimumScale).toBeLessThanOrEqual(0.9);
+      expect(profile.maximumWallDropMeters).toBeGreaterThanOrEqual(0.17);
+      expect(response).toMatchObject({
+        contract: VIEWMODEL_CONTACT_RESPONSE_CONTRACT,
+        profileId: weapon,
+        active: true,
+        aimAuthority: 'camera-forward-unchanged',
+      });
+      expect(response.obstructionBlend).toBeGreaterThan(0.85);
+      expect(response.pitchRadians).toBeGreaterThan(0.5);
+      expect(response.scale).toBeGreaterThanOrEqual(profile.minimumScale);
+      expect(response.scale).toBeLessThan(1);
+      expect([
+        response.pitchRadians,
+        response.yawRadians,
+        response.rollRadians,
+        response.additionalLiftMeters,
+        response.additionalDropMeters,
+        response.scale,
+      ].every(Number.isFinite)).toBe(true);
+    }
+    expect(VIEWMODEL_CONTACT_PROFILES.railgun.probeLengthMeters)
+      .toBeGreaterThan(VIEWMODEL_CONTACT_PROFILES.pistol.probeLengthMeters);
+    expect(VIEWMODEL_CONTACT_PROFILES.minigun.maximumSurfaceRetreatMeters)
+      .toBeGreaterThan(VIEWMODEL_CONTACT_PROFILES['flare-gun'].maximumSurfaceRetreatMeters);
+  });
+
+  it('catches diagonal corners, oblique walls and doorjamb returns that the old five-ray cross missed', () => {
+    type Point = readonly [number, number];
+    for (const weapon of WEAPON_IDS) {
+      const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+      const samples: Point[] = VIEWMODEL_CONTACT_PROBE_OFFSETS.map((offset) => [
+        offset.rightScale * profile.probeHalfWidthMeters,
+        offset.vertical === 'upper'
+          ? profile.probeUpperOffsetMeters
+          : offset.vertical === 'lower' ? -profile.probeLowerOffsetMeters : offset.rightScale === 0 ? 0 : 0.04,
+      ]);
+      const oldCross = samples.slice(0, 5);
+      const fixtures: ReadonlyArray<Readonly<{
+        name: string;
+        intersects: (sample: Point) => boolean;
+      }>> = [
+        {
+          name: 'narrow lower-right diagonal corner',
+          intersects: ([x, y]) => (
+            x >= profile.probeHalfWidthMeters * 0.94
+            && y <= -profile.probeLowerOffsetMeters * 0.94
+          ),
+        },
+        {
+          name: 'upper-right oblique wall edge',
+          // Camera-plane cross-section of a wall whose leading edge reaches
+          // only the weapon envelope corner over the tested forward span.
+          intersects: ([x, y]) => (
+            x > 0 && y > 0
+            && x / profile.probeHalfWidthMeters + y / profile.probeUpperOffsetMeters >= 1.9
+          ),
+        },
+        {
+          name: 'recessed upper-left doorjamb return',
+          intersects: ([x, y]) => (
+            x <= -profile.probeHalfWidthMeters * 0.94
+            && y >= profile.probeUpperOffsetMeters * 0.94
+          ),
+        },
+      ];
+
+      expect(samples, weapon).toHaveLength(9);
+      for (const fixture of fixtures) {
+        expect(oldCross.filter(fixture.intersects), `${weapon}: old cross: ${fixture.name}`).toHaveLength(0);
+        expect(samples.filter(fixture.intersects), `${weapon}: full envelope: ${fixture.name}`).toHaveLength(1);
+      }
+    }
+  });
+
+  it('uses each authored weapon envelope for standing, crouch-equivalent and prone wall/floor contact', () => {
+    for (const weapon of WEAPON_IDS) {
+      const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+      const open = viewmodelObstructionPose(profile.probeLengthMeters + 0.01, false, 1.7, weapon);
+      const standingWall = viewmodelObstructionPose(0, false, 1.7, weapon);
+      const crouchedWall = viewmodelObstructionPose(0, false, 1.16, weapon);
+      const proneWallFloor = viewmodelObstructionPose(0, true, 0.61, weapon);
+      expect(open.retreat, weapon).toBe(0);
+      expect(standingWall.retreat, weapon).toBeCloseTo(profile.maximumSurfaceRetreatMeters, 8);
+      expect(crouchedWall.retreat, weapon).toBeCloseTo(profile.maximumSurfaceRetreatMeters, 8);
+      expect(proneWallFloor.retreat, weapon).toBeCloseTo(profile.maximumSurfaceRetreatMeters, 8);
+      expect(proneWallFloor.lift, weapon).toBeGreaterThanOrEqual(0.18);
+    }
+  });
+
+  it('leaves open-space hip pose neutral and retains a bounded contact stow at settled ADS', () => {
+    expect(viewmodelContactResponse('carbine', 0, 0, false, 0)).toMatchObject({
+      active: false,
+      obstructionBlend: 0,
+      highReadyBlend: 0,
+      pitchRadians: 0,
+      yawRadians: 0,
+      rollRadians: 0,
+      additionalLiftMeters: 0,
+      additionalDropMeters: 0,
+      scale: 1,
+    });
+    const adsContact = viewmodelContactResponse('carbine', 0.7, 0.2, true, 1);
+    expect(adsContact).toMatchObject({
+      active: true,
+      aimAuthority: 'camera-forward-unchanged',
+    });
+    expect(adsContact.highReadyBlend).toBeGreaterThan(0.4);
+    expect(adsContact.pitchRadians).toBeGreaterThan(0.3);
+    expect(adsContact.yawRadians).toBeLessThan(0);
+    expect(adsContact.rollRadians).toBeGreaterThan(0);
+    expect(adsContact.scale).toBeLessThan(1);
+    expect(adsContact.additionalLiftMeters).toBeGreaterThan(0);
+    expect(adsContact.additionalDropMeters).toBeGreaterThan(0);
   });
 });

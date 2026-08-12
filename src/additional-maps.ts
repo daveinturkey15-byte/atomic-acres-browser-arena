@@ -8,8 +8,10 @@ import { WEAPONS } from './gameplay';
 import { GUN_RANGE_WEAPON_STATIONS } from './gun-range-armory';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
+  GUN_RANGE_TEST_BAY_STRUCTURE,
   advanceGunRangeTestBayDoor,
   createGunRangeTestBayDoorState,
+  gunRangeTestBayDoorDynamicBallisticSurfaces,
   gunRangeTestBayDoorDynamicColliders,
   gunRangeTestBayDoorLeafBounds,
   gunRangeTestBayRenderedDummyPose,
@@ -21,6 +23,7 @@ import type { DynamicWorldCollider } from './physics';
 import type { Team } from './protocol';
 import { createRustworksWelshFlag } from './rustworks-flag';
 import { makeEmissiveOnly } from './rendering/light-occlusion';
+import { applyBotEmissiveBrightness } from './operator-model';
 
 type Builder = {
   root: THREE.Group;
@@ -1584,6 +1587,7 @@ export type GunRangeTestBayDoorFrame = Readonly<{
   audioIntent: 'secure-door-opening-thump' | null;
   collisionChanged: boolean;
   dynamicColliders: readonly DynamicWorldCollider[];
+  dynamicBallisticSurfaces: readonly BallisticSurface[];
 }>;
 
 function gunRangeTrainingDummy(
@@ -1606,7 +1610,7 @@ function gunRangeTrainingDummy(
   // pre-load fixture and is replaced as soon as the shared rig is ready.
   const rigged = (() => {
     try {
-      return buildOperator(index % 2 === 0 ? 1 : 0, `gun-range-${definition.id}`, false, null, 'team');
+      return buildOperator(index % 2 === 0 ? 1 : 0, `gun-range-${definition.id}`, false, null, 'neon-purple');
     } catch {
       // Canonical rig not loaded yet (e.g. headless/unit environments): fall
       // back to the painted training robot below. Live deployment always loads
@@ -1615,6 +1619,9 @@ function gunRangeTrainingDummy(
     }
   })();
   if (rigged) {
+    // Use the same bounded emissive colour treatment as live combat bots so
+    // unarmed test-bay targets remain readable in every graphics profile.
+    applyBotEmissiveBrightness(rigged);
     rigged.position.set(0, 0, 0);
     rigged.userData.targetRoot = root;
     rigged.userData.targetId = definition.id;
@@ -1724,7 +1731,29 @@ export function updateGunRangeTestBayDoor(
   const step = advanceGunRangeTestBayDoor(prior, nowMs, observerPosition);
   root.userData.gunRangeTestBayDoorState = step.state;
   syncGunRangeTestBayDoorLeaf(root, step.state);
-  return Object.freeze({ ...step, dynamicColliders: gunRangeTestBayDoorDynamicColliders(step.state) });
+  return Object.freeze({
+    ...step,
+    dynamicColliders: gunRangeTestBayDoorDynamicColliders(step.state),
+    dynamicBallisticSurfaces: gunRangeTestBayDoorDynamicBallisticSurfaces(step.state),
+  });
+}
+
+/** Apply a host-authored or host-clock-projected leaf state. No observer is
+ * accepted here, so a guest can never author its own collision corridor. */
+export function applyGunRangeTestBayDoorState(
+  root: THREE.Object3D,
+  state: GunRangeTestBayDoorState,
+): GunRangeTestBayDoorFrame {
+  const prior = root.userData.gunRangeTestBayDoorState as GunRangeTestBayDoorState | undefined;
+  root.userData.gunRangeTestBayDoorState = state;
+  syncGunRangeTestBayDoorLeaf(root, state);
+  return Object.freeze({
+    state,
+    audioIntent: null,
+    collisionChanged: prior === undefined || Math.abs(prior.openness - state.openness) > Number.EPSILON,
+    dynamicColliders: gunRangeTestBayDoorDynamicColliders(state),
+    dynamicBallisticSurfaces: gunRangeTestBayDoorDynamicBallisticSurfaces(state),
+  });
 }
 
 export function buildGunRange(scene: THREE.Scene): ArenaMap {
@@ -1797,19 +1826,70 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   testBayCeiling.emissiveIntensity = 0.4;
   const testBayCyan = new THREE.MeshBasicMaterial({ color: 0x35b9b6, toneMapped: false });
   const testBayAmber = new THREE.MeshBasicMaterial({ color: 0xd49742, toneMapped: false });
-  const testBayVisibleFloor = new THREE.MeshBasicMaterial({ color: 0x303c40, toneMapped: false });
-  const testBayVisibleWall = new THREE.MeshBasicMaterial({ color: 0x465358, toneMapped: false });
-  const testBayVisibleCeiling = new THREE.MeshBasicMaterial({ color: 0x263237, toneMapped: false });
-  const secureDoorMaterial = new THREE.MeshStandardMaterial({ color: 0x283236, emissive: 0x14262a, emissiveIntensity: 0.48, roughness: 0.5, metalness: 0.78 });
-  const secureDoorPanelMaterial = terminalSurfaceMaterial('panel', 0x283236, '#4a5a5e', 0.52, 0.74, [2, 3]);
+  const testBayVisibleFloor = terminalSurfaceMaterial('concrete', 0x495457, '#8c999d', 0.84, 0.18, [16, 20]);
+  testBayVisibleFloor.name = 'GunRange_TestBay_VisibleFloor_PBR';
+  testBayVisibleFloor.emissive.setHex(0x11191c);
+  testBayVisibleFloor.emissiveIntensity = 0.18;
+  const testBayVisibleWall = terminalSurfaceMaterial('panel', 0x718086, '#263237', 0.62, 0.42, [12, 8]);
+  testBayVisibleWall.name = 'GunRange_TestBay_VisibleWall_PBR';
+  testBayVisibleWall.emissive.setHex(0x172125);
+  testBayVisibleWall.emissiveIntensity = 0.2;
+  const testBayVisibleCeiling = terminalSurfaceMaterial('panel', 0x465359, '#151f23', 0.76, 0.34, [12, 8]);
+  testBayVisibleCeiling.name = 'GunRange_TestBay_VisibleCeiling_PBR';
+  testBayVisibleCeiling.emissive.setHex(0x10191c);
+  testBayVisibleCeiling.emissiveIntensity = 0.16;
+  const secureDoorMaterial = new THREE.MeshStandardMaterial({
+    color: 0x526168,
+    emissive: 0x101b1f,
+    emissiveIntensity: 0.24,
+    roughness: 0.42,
+    metalness: 0.82,
+  });
+  secureDoorMaterial.name = 'GunRange_TestBay_SecureDoor_FrameMetal';
+  const secureDoorPanelMaterial = terminalSurfaceMaterial('panel', 0x5f6e74, '#1e2b30', 0.44, 0.78, [4, 6]);
   secureDoorPanelMaterial.name = 'GunRange_TestBay_SecureDoor_PanelTexture';
+  // The original physically dark gunmetal collapsed to a black slab under the
+  // bounded WebGPU practicals. Keep the metal read, but give the authored panel
+  // map enough diffuse/emissive separation to remain visible from both sides.
+  secureDoorPanelMaterial.color.setHex(0x879ba2);
+  secureDoorPanelMaterial.emissive.setHex(0x2a4149);
+  secureDoorPanelMaterial.emissiveIntensity = 0.78;
+  secureDoorPanelMaterial.roughness = 0.56;
+  secureDoorPanelMaterial.metalness = 0.52;
+  secureDoorPanelMaterial.userData.testBayDoorTextureMapping = Object.freeze({ pattern: 'panel', repeat: [2, 3] });
 
-  box(builder, 'gun-range-test-bay-corridor-floor', [35.75, -0.08, 12], [30.5, 0.16, 8], testBayFloor, { solid: false, shots: true });
-  box(builder, 'gun-range-test-bay-corridor-north-wall', [35.75, 2.6, 7.75], [30.5, 5.2, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
-  box(builder, 'gun-range-test-bay-corridor-south-wall', [35.75, 2.6, 16.25], [30.5, 5.2, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
-  box(builder, 'gun-range-test-bay-corridor-ceiling', [35.75, 5.15, 12], [30.5, 0.35, 8.5], testBayCeiling, { solid: false, shots: true });
-  // Thin unlit interior skins guarantee a readable grey-room silhouette in
-  // deterministic captures without becoming collision or shot authority.
+  const doorAssembly = new THREE.Group();
+  doorAssembly.name = 'gun-range-test-bay-secure-door-assembly';
+  doorAssembly.userData.authorityId = GUN_RANGE_TEST_BAY_CONTRACT.door.id;
+  doorAssembly.userData.structure = 'static-frame-with-dynamic-leaf';
+  doorAssembly.userData.practicalIds = Object.freeze(['test-bay-door-approach-key', 'test-bay-door-bay-key']);
+  root.add(doorAssembly);
+
+  const structureMaterials = {
+    wall: testBayWall,
+    floor: testBayFloor,
+    ceiling: testBayCeiling,
+    'door-frame': secureDoorMaterial,
+  } as const;
+  for (const definition of GUN_RANGE_TEST_BAY_STRUCTURE) {
+    const mesh = box(
+      builder,
+      definition.id,
+      [...definition.position],
+      [...definition.size],
+      structureMaterials[definition.material],
+      { ballisticMaterial: definition.ballisticMaterial },
+    );
+    mesh.userData.testBayAuthority = 'visible-movement-physics-ballistic';
+    mesh.userData.testBayStructureId = definition.id;
+    if (definition.assemblyRole) {
+      mesh.userData.doorAssemblyRole = definition.assemblyRole;
+      doorAssembly.add(mesh);
+    }
+  }
+
+  // Thin PBR interior skins expose authored panel mapping to the bounded
+  // practicals without becoming collision or shot authority.
   for (const skin of [
     box(builder, 'gun-range-test-bay-corridor-floor-skin', [35.75, 0.012, 12], [30.25, 0.024, 7.55], testBayVisibleFloor, { solid: false, shots: false, cast: false }),
     box(builder, 'gun-range-test-bay-corridor-north-skin', [35.75, 2.55, 8.015], [30.25, 4.9, 0.03], testBayVisibleWall, { solid: false, shots: false, cast: false }),
@@ -1834,13 +1914,6 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   // Large 48.5 x 64 m bay: west wall is split around the secure door aperture.
   // Owner direction: the killstreak-testing room roof is three times taller so
   // chopper/drone altitudes read realistically; the bay clears 25.5 m.
-  box(builder, 'gun-range-test-bay-floor', [75.75, -0.08, 6], [48.5, 0.16, 64], testBayFloor, { solid: false, shots: true });
-  box(builder, 'gun-range-test-bay-ceiling', [75.75, 25.35, 6], [48.5, 0.35, 64], testBayCeiling, { solid: false, shots: true });
-  box(builder, 'gun-range-test-bay-east-wall', [100.25, 13.25, 6], [0.5, 25.5, 64.5], testBayWall, { ballisticMaterial: 'structural-metal' });
-  box(builder, 'gun-range-test-bay-north-wall', [75.75, 13.25, -26.25], [49, 25.5, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
-  box(builder, 'gun-range-test-bay-south-wall', [75.75, 13.25, 38.25], [49, 25.5, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
-  box(builder, 'gun-range-test-bay-west-wall-north', [51.75, 13.25, -9], [0.5, 25.5, 34], testBayWall, { ballisticMaterial: 'structural-metal' });
-  box(builder, 'gun-range-test-bay-west-wall-south', [51.75, 13.25, 27], [0.5, 25.5, 22], testBayWall, { ballisticMaterial: 'structural-metal' });
   for (const skin of [
     box(builder, 'gun-range-test-bay-floor-skin', [75.75, 0.012, 6], [48, 0.024, 63.5], testBayVisibleFloor, { solid: false, shots: false, cast: false }),
     box(builder, 'gun-range-test-bay-ceiling-skin', [75.75, 25.155, 6], [48, 0.03, 63.5], testBayVisibleCeiling, { solid: false, shots: false, cast: false }),
@@ -1848,17 +1921,23 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     box(builder, 'gun-range-test-bay-north-wall-skin', [75.75, 13.15, -25.985], [48, 24.5, 0.03], testBayVisibleWall, { solid: false, shots: false, cast: false }),
     box(builder, 'gun-range-test-bay-south-wall-skin', [75.75, 13.15, 37.985], [48, 24.5, 0.03], testBayVisibleWall, { solid: false, shots: false, cast: false }),
   ]) skin.userData.presentationBatchCandidate = false;
-  box(builder, 'gun-range-test-bay-door-frame-top', [51.75, 7.45, 12], [1.05, 1.9, 8.5], secureDoorMaterial, { ballisticMaterial: 'structural-metal' });
-  box(builder, 'gun-range-test-bay-door-rail-north', [51.6, 3.3, 8.05], [0.3, 6.6, 0.3], secureDoorMaterial, { solid: false, shots: false });
-  box(builder, 'gun-range-test-bay-door-rail-south', [51.6, 3.3, 15.95], [0.3, 6.6, 0.3], secureDoorMaterial, { solid: false, shots: false });
+  for (const rail of [
+    box(builder, 'gun-range-test-bay-door-rail-north', [51.47, 3.3, 8.24], [0.12, 6.6, 0.16], secureDoorMaterial, { solid: false, shots: false }),
+    box(builder, 'gun-range-test-bay-door-rail-south', [51.47, 3.3, 15.76], [0.12, 6.6, 0.16], secureDoorMaterial, { solid: false, shots: false }),
+  ]) {
+    rail.userData.doorAssemblyRole = 'track';
+    rail.userData.presentationBatchCandidate = false;
+    doorAssembly.add(rail);
+  }
   // Secure door leaf: textured armour panels with amber/cyan status edge
   // lights so the door reads as the room's gameplay entrance from both faces.
   const secureDoor = box(builder, 'gun-range-test-bay-secure-door-leaf', [51.5, 3.25, 12], [0.7, 6.5, 7.6], secureDoorPanelMaterial, { solid: false, shots: false });
+  doorAssembly.add(secureDoor);
   secureDoor.userData.presentationBatchCandidate = false;
   secureDoor.userData.dynamic = true;
   secureDoor.userData.authorityId = GUN_RANGE_TEST_BAY_CONTRACT.door.id;
   secureDoor.userData.portalCollisionStatus = 'runtime-helper-required';
-  secureDoor.userData.defaultFailsOpen = true;
+  secureDoor.userData.defaultFailsOpen = false;
   const doorStatusRangeMaterial = new THREE.MeshStandardMaterial({
     color: 0xf0b24b,
     emissive: 0xf0b24b,
@@ -1877,12 +1956,40 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     toneMapped: false,
   });
   doorStatusBayMaterial.name = 'GunRange_TestBay_DoorStatus_Cyan';
+  const doorInlayMaterial = new THREE.MeshStandardMaterial({
+    color: 0x172328,
+    emissive: 0x071115,
+    emissiveIntensity: 0.25,
+    roughness: 0.34,
+    metalness: 0.88,
+  });
+  doorInlayMaterial.name = 'GunRange_TestBay_DoorInlay_Gunmetal';
+  const doorArmourPlateMaterial = new THREE.MeshStandardMaterial({
+    color: 0x9aaeb3,
+    emissive: 0x31474d,
+    emissiveIntensity: 0.62,
+    roughness: 0.5,
+    metalness: 0.58,
+  });
+  doorArmourPlateMaterial.name = 'GunRange_TestBay_DoorArmour_SatinSteel';
+  const doorGlassMaterial = new THREE.MeshStandardMaterial({
+    color: 0x77eeea,
+    emissive: 0x167f81,
+    emissiveIntensity: 1.35,
+    roughness: 0.18,
+    metalness: 0.08,
+    transparent: true,
+    opacity: 0.42,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  doorGlassMaterial.name = 'GunRange_TestBay_DoorGlass_ClearCyan';
   const attachDoorFixture = (
     name: string,
     position: [number, number, number],
     size: [number, number, number],
     material: THREE.Material,
-    role: 'edge' | 'status-light',
+    role: 'edge' | 'status-light' | 'armour-panel' | 'brace' | 'glass' | 'glyph',
   ): THREE.Mesh => {
     const fixture = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
     fixture.name = name;
@@ -1898,10 +2005,79 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   };
   attachDoorFixture('gun-range-test-bay-door-edge-north', [0, 0, -3.74], [0.7, 6.5, 0.12], doorStatusRangeMaterial, 'edge');
   attachDoorFixture('gun-range-test-bay-door-edge-south', [0, 0, 3.74], [0.7, 6.5, 0.12], doorStatusBayMaterial, 'edge');
+  attachDoorFixture('gun-range-test-bay-door-armour-range-face', [-0.355, 0.12, 0], [0.035, 4.9, 5.8], secureDoorPanelMaterial, 'armour-panel');
+  attachDoorFixture('gun-range-test-bay-door-armour-bay-face', [0.355, 0.12, 0], [0.035, 4.9, 5.8], secureDoorPanelMaterial, 'armour-panel');
+  for (const [face, x] of [['range', -0.378], ['bay', 0.378]] as const) {
+    attachDoorFixture(`gun-range-test-bay-door-brace-${face}-upper`, [x, 1.72, 0], [0.045, 0.18, 6.25], secureDoorMaterial, 'brace');
+    attachDoorFixture(`gun-range-test-bay-door-brace-${face}-lower`, [x, -1.52, 0], [0.045, 0.18, 6.25], secureDoorMaterial, 'brace');
+    attachDoorFixture(`gun-range-test-bay-door-spine-${face}`, [x, 0.12, 0], [0.048, 4.9, 0.34], doorInlayMaterial, 'brace');
+    for (const [vertical, y] of [['upper', 1.72], ['lower', -1.48]] as const) {
+      for (const [side, z] of [['north', -2.42], ['south', 2.42]] as const) {
+        attachDoorFixture(
+          `gun-range-test-bay-door-armour-tile-${face}-${vertical}-${side}`,
+          [x + (face === 'range' ? -0.004 : 0.004), y, z],
+          [0.026, 1.12, 1.18],
+          doorArmourPlateMaterial,
+          'armour-panel',
+        );
+      }
+    }
+    for (const [side, z] of [['north', -1.42], ['south', 1.42]] as const) {
+      attachDoorFixture(
+        `gun-range-test-bay-door-glass-${face}-${side}`,
+        [x + (face === 'range' ? -0.004 : 0.004), 0.28, z],
+        [0.026, 2.65, 0.62],
+        doorGlassMaterial,
+        'glass',
+      );
+    }
+    const chevronUpper = attachDoorFixture(
+      `gun-range-test-bay-door-chevron-${face}-upper`,
+      [x, 0.55, 0],
+      [0.05, 0.13, 3.2],
+      face === 'range' ? doorStatusRangeMaterial : doorStatusBayMaterial,
+      'glyph',
+    );
+    chevronUpper.rotation.x = Math.PI / 7;
+    const chevronLower = attachDoorFixture(
+      `gun-range-test-bay-door-chevron-${face}-lower`,
+      [x, 0.55, 0],
+      [0.05, 0.13, 3.2],
+      face === 'range' ? doorStatusRangeMaterial : doorStatusBayMaterial,
+      'glyph',
+    );
+    chevronLower.rotation.x = -Math.PI / 7;
+  }
   // One flush emissive indicator per face keeps the moving entrance readable
   // from the range and bay without introducing an unoccluded runtime light.
   attachDoorFixture('gun-range-test-bay-door-status-range-face', [-0.335, -2.3, 0], [0.04, 0.82, 1.45], doorStatusRangeMaterial, 'status-light');
   attachDoorFixture('gun-range-test-bay-door-status-bay-face', [0.335, -2.3, 0], [0.04, 0.82, 1.45], doorStatusBayMaterial, 'status-light');
+  const practicalHousing = box(builder, 'gun-range-test-bay-door-practical-housing', [51.12, 6.78, 12], [0.12, 0.42, 2.6], secureDoorMaterial, { solid: false, shots: false, cast: false });
+  practicalHousing.userData.doorAssemblyRole = 'practical-housing';
+  practicalHousing.userData.presentationBatchCandidate = false;
+  doorAssembly.add(practicalHousing);
+  const practicalEmitter = box(builder, 'gun-range-test-bay-door-practical-emitter', [51.05, 6.7, 12], [0.04, 0.16, 1.9], testBayCyan, { solid: false, shots: false, cast: false });
+  practicalEmitter.userData.doorAssemblyRole = 'practical-emitter';
+  practicalEmitter.userData.practicalId = 'test-bay-door-approach-key';
+  practicalEmitter.userData.presentationBatchCandidate = false;
+  doorAssembly.add(practicalEmitter);
+  const bayPracticalHousing = box(builder, 'gun-range-test-bay-door-bay-practical-housing', [52.02, 6.78, 12], [0.12, 0.42, 2.6], secureDoorMaterial, { solid: false, shots: false, cast: false });
+  bayPracticalHousing.userData.doorAssemblyRole = 'practical-housing';
+  bayPracticalHousing.userData.presentationBatchCandidate = false;
+  doorAssembly.add(bayPracticalHousing);
+  const bayPracticalEmitter = box(builder, 'gun-range-test-bay-door-bay-practical-emitter', [52.1, 6.7, 12], [0.04, 0.16, 1.9], testBayAmber, { solid: false, shots: false, cast: false });
+  bayPracticalEmitter.userData.doorAssemblyRole = 'practical-emitter';
+  bayPracticalEmitter.userData.practicalId = 'test-bay-door-bay-key';
+  bayPracticalEmitter.userData.presentationBatchCandidate = false;
+  doorAssembly.add(bayPracticalEmitter);
+  doorAssembly.userData.fixtureIds = Object.freeze([
+    'gun-range-test-bay-door-rail-north',
+    'gun-range-test-bay-door-rail-south',
+    'gun-range-test-bay-door-practical-housing',
+    'gun-range-test-bay-door-practical-emitter',
+    'gun-range-test-bay-door-bay-practical-housing',
+    'gun-range-test-bay-door-bay-practical-emitter',
+  ]);
   for (const z of [-19, -7, 5, 17, 29]) {
     box(builder, 'gun-range-test-bay-ceiling-light', [75.5, 25.02, z], [35, 0.12, 0.3], z % 2 === 0 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
   }

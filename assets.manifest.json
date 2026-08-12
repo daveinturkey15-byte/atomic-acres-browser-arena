@@ -358,9 +358,9 @@
       "sourceBlend": "source-assets/blender/pass65-support-aircraft-family.blend",
       "sourceBlendSha256": "d604ee311755cfe89caefe297c826b64274c51f4f010cc8f53af619111ea1292",
       "sourceScript": "scripts/blender/create-pass65-support-vehicles.py",
-      "sourceScriptSha256": "4ac7c18f2e2bd11b21b78a1dae0a9ed8d19500904fec6316cd402daedcec9366",
+      "sourceScriptSha256": "e3ae50f79360081d669e3a1de6c15d5809dd4c43fbe9c978a1d0db5fa813afa4",
       "sourceProvenance": "source-assets/blender/pass65-support-aircraft-family.provenance.json",
-      "sourceProvenanceSha256": "8d275c17f1c9de7aea65b2e048d62eca0b0522503c31db4dc18ece02d35a2a3b",
+      "sourceProvenanceSha256": "e8e8f1ee4cd54724ba6ea2be58aff4b8cb0013ff4ce0f7693f9108fdbe7793e3",
       "preview": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-contact-sheet.png",
       "format": "Distinct heavy four-turbofan Care transport and tailless flying-wing Carpet bomber three-LOD GLBs plus two-LOD rigged parachute crate, variant-specific embedded WebP PBR maps, semantic cargo/bomb sockets and authored actions",
       "modifications": "Project-original close-range v4 support family with daylight-readable material revision v1: Care and Carpet now use independent brighter low-metallic, high-roughness PBR sets, with authored underside and leading-edge value breaks; Care also separates its tail and engine-nacelle values. Existing hull, flight-deck, turbofan, gear, ramp, intake, service-panel, bomb-bay, drop-rig and gameplay-owned socket contracts remain unchanged.",
@@ -376,28 +376,28 @@
       "files": [
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-          "sha256": "fba45762d0fb0cb7cc68a58e791b50fc8243a03489ca528d3273e2fba5e1afcb",
+          "sha256": "d1ce0b797f5f1176f23b69b74717c64bb17d4bf29c42539d2ecea757a93a180d",
           "lod": 0,
-          "triangles": 59740,
-          "bytes": 951740
+          "triangles": 59948,
+          "bytes": 952336
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod1.glb",
-          "sha256": "c737b8b6c332ecf414890a170c07852197b6223178947ff17c1b0ec01ae8237d",
+          "sha256": "3faeb020eb3e11f144b4438f93811fa0b17e9d0447ccf4ba5e19e3c97ae9ad62",
           "lod": 1,
-          "triangles": 49920,
-          "bytes": 844688
+          "triangles": 49964,
+          "bytes": 831436
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod2.glb",
-          "sha256": "a96352c773caf04c8649253d22fa2420a14963d7344b94b9a928aa1b867c5115",
+          "sha256": "a397f5b628acc49a541628b4f5280a98517231161465be1876c32ed9e51f4f36",
           "lod": 2,
-          "triangles": 29068,
-          "bytes": 562896
+          "triangles": 29344,
+          "bytes": 571380
         },
         {
           "path": "public/assets/original/textures/support/pass65-chopper-albedo.png",
-          "sha256": "3e99137cf87a5968a68cf675fc7ade2598341f8871ecd32bf51a0e54683dfef2",
+          "sha256": "245e185d4578825299e5b7ec2f03ae9af653b5b9e0db1f18cc5120d885920737",
           "width": 512,
           "height": 512
         },
@@ -421,14 +421,14 @@
         }
       ],
       "sourceBlend": "source-assets/blender/pass65-chopper-gunner.blend",
-      "sourceBlendSha256": "6d645dc3bdf6ce6990f3c5b292cee4296d4be60ba755c4b6d163fa5f5ed1a8e0",
+      "sourceBlendSha256": "25a2556e5eccddf53e8214acbe71386820e818e359f35aa5b6a074cc3b4142c5",
       "sourceScript": "scripts/blender/create-pass65-support-vehicles.py",
-      "sourceScriptSha256": "4ac7c18f2e2bd11b21b78a1dae0a9ed8d19500904fec6316cd402daedcec9366",
+      "sourceScriptSha256": "e3ae50f79360081d669e3a1de6c15d5809dd4c43fbe9c978a1d0db5fa813afa4",
       "sourceProvenance": "source-assets/blender/pass65-chopper-gunner.provenance.json",
-      "sourceProvenanceSha256": "260b8073aac4fef02dbef45ad14f3faa1b68d4958579020714d772eb4263b88f",
+      "sourceProvenanceSha256": "44c1cf46e87f4b36811306cb1f2f0bda790bfcaff62880098815610dd4112897",
       "preview": "docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png",
-      "format": "Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, complete armoured tandem attack-helicopter silhouette, authored unobstructed gunner sightline/HUD/weapon view, detailed exterior rotors/gun/sockets and eight animation clips",
-      "modifications": "Project-original close-range v4 tandem attack-helicopter refinement with overlapping side and dorsal armour, raised fasteners and louvers, faceted framed pilot/gunner glazing, armoured nose and cheeks, restrained olive PBR, separated dual-aperture nose sensor, braced pylons, forward-aligned finned missiles, collared seven-tube rocket pods, mechanical rotor yokes/pitch links, tail gearbox, gun armour/feed chute and damped skid gear. Possessed view still excludes exterior shell and rotors; runtime gameplay authority remains TypeScript-owned.",
+      "format": "Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, complete armoured tandem attack-helicopter silhouette, authored full cockpit/dashboard/HUD/weapon view, detailed exterior rotors/gun/sockets and eight animation clips",
+      "modifications": "Project-original Pass 70 v7 attack-helicopter presentation with a continuous rear-cabin to TailRootCollar, tail-boom and tail-fin silhouette; daylight-readable olive armour; transparent canopy and HUD glass; separated gunmetal/frame values; overlapping side and dorsal armour; raised fasteners and louvers; faceted pilot/gunner glazing; armoured nose and cheeks; dual-aperture nose sensor; braced pylons; finned missiles; rocket pods; mechanical rotor hardware; gun armour/feed chute and damped skid gear. Possessed view presents the complete cockpit while excluding exterior shell and rotors; runtime gameplay authority remains TypeScript-owned.",
       "attributionRequired": false
     },
     {
@@ -456,7 +456,7 @@
       "creator": "DJMaesen source; Atomic Acres controlled Blender derivative",
       "source": "https://sketchfab.com/3d-models/fps-arms-08ec4403a47645d8ad80633abf13d39d",
       "sourceCreatorUrl": "https://sketchfab.com/bumstrum",
-      "generatedAsOf": "2026-07-29",
+      "generatedAsOf": "2026-08-11",
       "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
       "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
       "attribution": "\"fps arms\" by DJMaesen (bumstrum), modified by Atomic Acres, licensed under CC BY 4.0.",
@@ -501,15 +501,15 @@
         }
       ],
       "files": "public/assets/original/**/pass65-first-person-arms-*",
-      "sourceBlend": "source-assets/blender/pass65-first-person-operator-arms.blend",
-      "sourceBlendSha256": "cfcdca753520317b110179c675b6196156593dfc209ca4b7ea9ced8e7f3e17fa",
-      "sourceScript": "scripts/blender/build-pass65-djmaesen-first-person-arms.py",
-      "sourceScriptSha256": "ea5a42f332a7fbf44f922ee5f2526e46ffa3e520491e9dfe754778dadbd0bc0f",
-      "sourceProvenance": "source-assets/blender/pass65-first-person-operator-arms.provenance.json",
-      "sourceProvenanceSha256": "95d33318fa868d3c962d5fb0ca7984864ef4b01dd0f55d9e50adde1f36fd0628",
-      "preview": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-contact-sheet.png",
+      "sourceBlend": "source-assets/blender/pass69-3-first-person-operator-arms.blend",
+      "sourceBlendSha256": "936348c930d6132bd97da4ba557349bd7f13b9c57362e37e831ee45c019ff27c",
+      "sourceScript": "scripts/blender/export-pass69-3-first-person-operator-arms.py",
+      "sourceScriptSha256": "6b7303c620bf532c2c0d386fac80d77729aa5529d5ca416d8e17437766748438",
+      "sourceProvenance": "source-assets/blender/pass69-3-first-person-operator-arms.provenance.json",
+      "sourceProvenanceSha256": "8cb3ac8cd482c2caae40f43e8d678535a1e7092248081b754db776f1866596d7",
+      "preview": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-review-sheet.png",
       "format": "Two decreasing optimized self-contained glTF 2.0 skinned LODs with 37-bone dedicated skeleton, four material-compatible skinned renderables per LOD, embedded WebP PBR textures, opaque materials and thirteen action clips",
-      "modifications": "Removed the unrelated Icosphere; retargeted 47 source joints to the 37-bone runtime rig; collapsed terminal tip joints into distal phalanges; enlarged the complete connected forearm/hand presentation while preserving weights and cuff overlap; refined real firearm and G10 knife grips for the FPS camera; lifted crushed charcoal PBR response; capped proximal sleeves; authored four disjoint skinned batches, four gameplay sockets, thirteen action clips, a true reduced LOD1, and seven strict contact views.",
+      "modifications": "Retained the licensed 37-bone/30-finger-bone derivative and its thirteen clips; manually added local wrist/cuff deformation loops, smoothed forearm-to-glove volume, repainted LowerArm/Wrist transitions, separated and rounded all articulated digit branches, added two wrist-parented full-transform palm contacts, exported a reduced LOD1, and generated five deterministic master reviews while preserving runtime IK and weapon authority.",
       "attributionRequired": true
     },
     {
@@ -573,13 +573,13 @@
       "kind": "original-project-prerecorded-authoritative-runtime-menu-video-family",
       "creator": "Atomic Acres project",
       "source": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-      "generatedAsOf": "2026-08-02",
+      "generatedAsOf": "2026-08-11",
       "license": "Original project work",
       "files": "public/assets/original/menu-previews/*",
       "sourceScript": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-      "sourceScriptSha256": "73c9b7ca78b73b5a7e1a24323afbddca4a176594367c5fe1d95a56e5c04cafb9",
+      "sourceScriptSha256": "6579f04ced1e266bdb6065bb788eadd249e217ab63a33e9fa461a9b520101a26",
       "sourceProvenance": "source-assets/menu/pass65-preview-masters/provenance.json",
-      "sourceProvenanceSha256": "18026901f18965fcdc38b7adce10709919c46fa6fbd3eda6166dd3b60ebffa7b",
+      "sourceProvenanceSha256": "74eeb6b24b909c5367d2038d8d4be0fbb2b010be02dc7890d9e7619be163632b",
       "format": "Four distinct 2560x1440 eight-second 30 FPS selected-map runtime captures, shipped as high-bitrate VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and full-resolution static WebP posters, plus deterministic five-frame review evidence",
       "modifications": "Captured offline at native 1440p from each actual authoritative production WebGPU arena with deterministic camera and visual time; the reviewed 1280x720 logical overlay is losslessly authored at exact 2x output scale so its fixed-pixel details retain their intended proportions. Three map flyovers bake perspective-aware elliptic rotor arcs with subdued moving spokes, measured mast/hub/header occlusion, two visible structural ties into the side canopy rails, a restrained tail camera and compact green-on-graphite cockpit avionics; Gun Range bakes compact charcoal/silver ears, forelegs and top-facing paws. Runtime loading/menu playback remains one selected metadata-preload decoder with poster-first readiness, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.",
       "attributionRequired": false

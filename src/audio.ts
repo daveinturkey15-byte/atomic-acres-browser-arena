@@ -55,6 +55,77 @@ export type BrowserAudioContextResolution = Readonly<{
   source: 'standard' | 'webkit' | 'unavailable';
 }>;
 
+export type AudioListenerPoseMode = 'modern-audio-param' | 'legacy-setters' | 'hybrid' | 'unavailable';
+
+type AudioListenerAudioParam = { value: number };
+
+type CompatibleAudioListener = Readonly<{
+  positionX?: unknown;
+  positionY?: unknown;
+  positionZ?: unknown;
+  forwardX?: unknown;
+  forwardY?: unknown;
+  forwardZ?: unknown;
+  upX?: unknown;
+  upY?: unknown;
+  upZ?: unknown;
+  setPosition?: (x: number, y: number, z: number) => void;
+  setOrientation?: (x: number, y: number, z: number, xUp: number, yUp: number, zUp: number) => void;
+}>;
+
+function isMutableAudioParam(value: unknown): value is AudioListenerAudioParam {
+  return typeof value === 'object' && value !== null
+    && 'value' in value && typeof (value as { value?: unknown }).value === 'number';
+}
+
+/**
+ * AudioListener's per-axis AudioParams remain optional in shipping engines.
+ * Resolve the complete position and orientation capabilities before writing so
+ * a partially implemented listener cannot receive half a pose. Setter errors
+ * deliberately propagate to the frame error surface; only absent optional APIs
+ * select the legacy or silent compatibility path.
+ */
+export function updateBrowserAudioListenerPose(
+  listener: AudioListener | CompatibleAudioListener,
+  position: SpatialPoint,
+  yawRadians: number,
+): AudioListenerPoseMode {
+  if (![position.x, position.y, position.z, yawRadians].every(Number.isFinite)) return 'unavailable';
+  const compatible = listener as CompatibleAudioListener;
+  const modernPosition = [compatible.positionX, compatible.positionY, compatible.positionZ]
+    .every(isMutableAudioParam);
+  const modernOrientation = [
+    compatible.forwardX, compatible.forwardY, compatible.forwardZ,
+    compatible.upX, compatible.upY, compatible.upZ,
+  ].every(isMutableAudioParam);
+  const legacyPosition = typeof compatible.setPosition === 'function';
+  const legacyOrientation = typeof compatible.setOrientation === 'function';
+  if ((!modernPosition && !legacyPosition) || (!modernOrientation && !legacyOrientation)) return 'unavailable';
+
+  const forwardX = -Math.sin(yawRadians);
+  const forwardZ = -Math.cos(yawRadians);
+  if (modernPosition) {
+    (compatible.positionX as AudioListenerAudioParam).value = position.x;
+    (compatible.positionY as AudioListenerAudioParam).value = position.y;
+    (compatible.positionZ as AudioListenerAudioParam).value = position.z;
+  } else {
+    compatible.setPosition!(position.x, position.y, position.z);
+  }
+  if (modernOrientation) {
+    (compatible.forwardX as AudioListenerAudioParam).value = forwardX;
+    (compatible.forwardY as AudioListenerAudioParam).value = 0;
+    (compatible.forwardZ as AudioListenerAudioParam).value = forwardZ;
+    (compatible.upX as AudioListenerAudioParam).value = 0;
+    (compatible.upY as AudioListenerAudioParam).value = 1;
+    (compatible.upZ as AudioListenerAudioParam).value = 0;
+  } else {
+    compatible.setOrientation!(forwardX, 0, forwardZ, 0, 1, 0);
+  }
+  if (modernPosition && modernOrientation) return 'modern-audio-param';
+  if (!modernPosition && !modernOrientation) return 'legacy-setters';
+  return 'hybrid';
+}
+
 export type AudioOutputProbe = Readonly<{
   available: boolean;
   sampleRate: number;
@@ -261,7 +332,7 @@ type MinigunDriveLoop = {
 
 type ChopperRotorLoop = MinigunDriveLoop & { panner: PannerNode };
 
-type ContinuousVoiceScope = 'arena' | 'low-health';
+type ContinuousVoiceScope = 'arena' | 'combat-feedback';
 
 type ContinuousVoiceOwnership = Readonly<{
   scope: ContinuousVoiceScope;
@@ -273,6 +344,7 @@ type ContinuousVoiceOwnership = Readonly<{
 export class ArenaAudio {
   private context: AudioContext | null = null;
   private contextSource: 'uninitialized' | 'failed' | BrowserAudioContextResolution['source'] = 'uninitialized';
+  private listenerPoseMode: AudioListenerPoseMode = 'unavailable';
   private master: GainNode | null = null;
   private outputAnalyser: AnalyserNode | null = null;
   private outputTimeDomain: Float32Array<ArrayBuffer> | null = null;
@@ -333,9 +405,22 @@ export class ArenaAudio {
   private activeArena: ArenaId | null = null;
   private arenaSources: AudioScheduledSourceNode[] = [];
   private arenaNodes: AudioNode[] = [];
-  private lowHealthSources: AudioScheduledSourceNode[] = [];
+  private combatFeedbackSources: AudioScheduledSourceNode[] = [];
+  private combatFeedbackNodes: AudioNode[] = [];
   private lowHealthGains: GainNode[] = [];
-  private lowHealthNodes: AudioNode[] = [];
+  private damageFeedbackSource: OscillatorNode | null = null;
+  private damageFeedbackGain: GainNode | null = null;
+  private combatFeedbackPrepared = false;
+  private combatFeedbackPrepareRuns = 0;
+  private lowHealthFeedbackActive = false;
+  private lowHealthFeedbackAudible = false;
+  private lowHealthAppliedState: Readonly<{
+    active: boolean;
+    breathingGain: number;
+    heartbeatGain: number;
+  }> | null = null;
+  private lowHealthAutomationWrites = 0;
+  private damageFeedbackPulses = 0;
   private spatialChains = 0;
   private footstepChains: SpatialFootstepChain[] = [];
   private listenerPosition = { x: 0, y: 0, z: 0 };
@@ -389,6 +474,7 @@ export class ArenaAudio {
         this.createBus('game-music', 0.16);
         this.noiseBuffer = this.createNoiseBuffer(1.2);
         for (const id of AUDIO_BUS_IDS) this.applyBusSetting(id);
+        this.prepareCombat();
         if (this.activeArena) this.startArenaBed(this.activeArena);
       } catch {
         // Audio is optional. A sandbox/device policy may expose a constructor
@@ -398,6 +484,9 @@ export class ArenaAudio {
           try { source.stop(); } catch { /* source may not have started */ }
           try { source.disconnect(); } catch { /* partial browser node */ }
         }
+        this.stopSources(this.combatFeedbackSources);
+        this.disconnectNodes(this.combatFeedbackNodes);
+        this.resetCombatFeedbackState();
         for (const node of [...this.buses.values()]) {
           try { node.disconnect(); } catch { /* partial browser node */ }
         }
@@ -437,8 +526,8 @@ export class ArenaAudio {
     this.stopAllChopperRotors();
     this.stopSources(this.arenaSources);
     this.disconnectNodes(this.arenaNodes);
-    this.stopSources(this.lowHealthSources);
-    this.disconnectNodes(this.lowHealthNodes);
+    this.stopSources(this.combatFeedbackSources);
+    this.disconnectNodes(this.combatFeedbackNodes);
     for (const source of [...this.activeVoices.keys()]) this.stopSource(source);
     for (const timer of this.railgunSpatialTimers.splice(0)) clearTimeout(timer);
     for (const node of this.railgunSpatialNodes.splice(0)) {
@@ -450,6 +539,7 @@ export class ArenaAudio {
     const context = this.context;
     this.context = null;
     this.contextSource = 'uninitialized';
+    this.listenerPoseMode = 'unavailable';
     this.master = null;
     this.outputAnalyser = null;
     this.outputTimeDomain = null;
@@ -468,6 +558,7 @@ export class ArenaAudio {
       chain.panner.disconnect();
     }
     this.footstepChains = [];
+    this.resetCombatFeedbackState();
     this.noiseBuffer = null;
     if (context && context.state !== 'closed') void context.close();
   }
@@ -481,20 +572,11 @@ export class ArenaAudio {
   }
 
   updateListener(position: SpatialPoint, yawRadians: number): void {
-    if (!this.context || !Number.isFinite(yawRadians)) return;
+    if (!this.context || ![position.x, position.y, position.z, yawRadians].every(Number.isFinite)) return;
     this.listenerPosition.x = position.x;
     this.listenerPosition.y = position.y;
     this.listenerPosition.z = position.z;
-    const listener = this.context.listener;
-    listener.positionX.value = position.x;
-    listener.positionY.value = position.y;
-    listener.positionZ.value = position.z;
-    listener.forwardX.value = -Math.sin(yawRadians);
-    listener.forwardY.value = 0;
-    listener.forwardZ.value = -Math.cos(yawRadians);
-    listener.upX.value = 0;
-    listener.upY.value = 1;
-    listener.upZ.value = 0;
+    this.listenerPoseMode = updateBrowserAudioListenerPose(this.context.listener, position, yawRadians);
   }
 
   worldFootstep(position: SpatialPoint, surface: SpatialFootstepSurface, movement: FootstepMovement, occluded = false): boolean {
@@ -548,17 +630,120 @@ export class ArenaAudio {
     return true;
   }
 
-  setLowHealthFeedback(presentation: LowHealthFeedbackPresentation): void {
-    if (!this.context || !this.noiseBuffer || !this.feedback) return;
-    if (!presentation.active || (presentation.breathingGain <= 0 && presentation.heartbeatGain <= 0)) {
-      this.stopSources(this.lowHealthSources);
-      this.lowHealthGains = [];
-      this.disconnectNodes(this.lowHealthNodes);
-      return;
+  /**
+   * Owns the combat-feedback graph before match admission. All sources start
+   * once at zero gain and are reused until audio-session disposal, so first
+   * damage and first low-health entry perform parameter automation only.
+   */
+  prepareCombat(): boolean {
+    if (this.combatFeedbackPrepared) return true;
+    if (!this.context || !this.feedback) return false;
+    this.combatFeedbackPrepareRuns += 1;
+    const now = this.context.currentTime;
+    const createdSources: AudioScheduledSourceNode[] = [];
+    const createdNodes: AudioNode[] = [];
+    const register = (
+      source: OscillatorNode,
+      nodes: readonly AudioNode[],
+      gains: readonly GainNode[] = [],
+    ): boolean => {
+      if (!this.registerContinuousVoice(source, this.feedback!, 5, 'combat-feedback', nodes, gains)) return false;
+      // Registration mutates the voice/owner registries before start(). Track
+      // ownership first so a browser start failure is fully transactional.
+      source.start(now);
+      this.combatFeedbackSources.push(source);
+      this.combatFeedbackNodes.push(...nodes);
+      return true;
+    };
+    try {
+      // HF-280: the prior breathing voice was an indefinite looping white-
+      // noise AudioBufferSource. A quiet filtered triangle retains the paced
+      // low-health cue without any continuous broadband source.
+      const breath = this.context.createOscillator();
+      createdSources.push(breath);
+      const breathFilter = this.context.createBiquadFilter();
+      createdNodes.push(breathFilter);
+      const breathGain = this.context.createGain();
+      createdNodes.push(breathGain);
+      breath.type = 'triangle';
+      breath.frequency.value = 196;
+      breathFilter.type = 'bandpass';
+      breathFilter.frequency.value = 520;
+      breathFilter.Q.value = 1.4;
+      breathGain.gain.value = 0;
+      breath.connect(breathFilter).connect(breathGain).connect(this.feedback);
+      if (!register(breath, [breathFilter, breathGain], [breathGain])) throw new Error('combat-breath-voice-budget');
+
+      const heartbeat = this.context.createOscillator();
+      createdSources.push(heartbeat);
+      const heartbeatGain = this.context.createGain();
+      createdNodes.push(heartbeatGain);
+      heartbeat.type = 'sine';
+      heartbeat.frequency.value = 54;
+      heartbeatGain.gain.value = 0;
+      heartbeat.connect(heartbeatGain).connect(this.feedback);
+      if (!register(heartbeat, [heartbeatGain], [heartbeatGain])) throw new Error('combat-heartbeat-voice-budget');
+
+      // Damage feedback is a retained muted pressure voice. Reusing it removes
+      // first-hit oscillator/filter construction and the old broadband burst.
+      const damage = this.context.createOscillator();
+      createdSources.push(damage);
+      const damageFilter = this.context.createBiquadFilter();
+      createdNodes.push(damageFilter);
+      const damageGain = this.context.createGain();
+      createdNodes.push(damageGain);
+      damage.type = 'triangle';
+      damage.frequency.value = 180;
+      damageFilter.type = 'bandpass';
+      damageFilter.frequency.value = 520;
+      damageFilter.Q.value = 1.2;
+      damageGain.gain.value = 0;
+      damage.connect(damageFilter).connect(damageGain).connect(this.feedback);
+      if (!register(damage, [damageFilter, damageGain], [damageGain])) throw new Error('combat-damage-voice-budget');
+
+      this.lowHealthGains = [breathGain, heartbeatGain];
+      this.damageFeedbackSource = damage;
+      this.damageFeedbackGain = damageGain;
+      this.combatFeedbackPrepared = true;
+      this.lowHealthAppliedState = Object.freeze({ active: false, breathingGain: 0, heartbeatGain: 0 });
+      return true;
+    } catch {
+      // stopSource is safe for registered, partially registered and never-
+      // registered sources. It releases both voice maps before disconnecting.
+      for (const source of createdSources) this.stopSource(source);
+      for (const node of createdNodes) {
+        const index = this.combatFeedbackNodes.indexOf(node);
+        if (index >= 0) this.combatFeedbackNodes.splice(index, 1);
+        try { node.disconnect(); } catch { /* partial browser node */ }
+      }
+      this.combatFeedbackSources = this.combatFeedbackSources.filter((source) => !createdSources.includes(source));
+      this.resetCombatFeedbackState();
+      return false;
     }
-    if (this.lowHealthSources.length === 0) this.startLowHealthLoops();
-    if (this.lowHealthGains[0]) this.lowHealthGains[0].gain.value = presentation.breathingGain;
-    if (this.lowHealthGains[1]) this.lowHealthGains[1].gain.value = presentation.heartbeatGain;
+  }
+
+  setLowHealthFeedback(presentation: LowHealthFeedbackPresentation): void {
+    if (!this.context || !this.combatFeedbackPrepared || this.lowHealthGains.length !== 2) return;
+    const applied = Object.freeze({
+      active: presentation.active,
+      breathingGain: presentation.active ? Math.max(0, presentation.breathingGain) : 0,
+      heartbeatGain: presentation.active ? Math.max(0, presentation.heartbeatGain) : 0,
+    });
+    const gainsUnchanged = this.lowHealthAppliedState?.breathingGain === applied.breathingGain
+      && this.lowHealthAppliedState.heartbeatGain === applied.heartbeatGain;
+    if (this.lowHealthAppliedState?.active === applied.active && gainsUnchanged) return;
+    this.lowHealthAppliedState = applied;
+    this.lowHealthFeedbackActive = applied.active;
+    this.lowHealthFeedbackAudible = applied.breathingGain > 0 || applied.heartbeatGain > 0;
+    if (gainsUnchanged) return;
+    const now = this.context.currentTime;
+    const gains = [applied.breathingGain, applied.heartbeatGain];
+    for (let index = 0; index < this.lowHealthGains.length; index += 1) {
+      const parameter = this.lowHealthGains[index]!.gain;
+      parameter.cancelScheduledValues(now);
+      parameter.setTargetAtTime(Math.max(0, gains[index] ?? 0), now, 0.012);
+      this.lowHealthAutomationWrites += 1;
+    }
   }
 
   setArenaZone(zone: ArenaZone): void {
@@ -667,8 +852,16 @@ export class ArenaAudio {
   }
 
   damage(): void {
-    this.noise({ duration: 0.11, volume: 0.075, filter: 'bandpass', frequency: 520, q: 1.2 }, this.feedback);
-    this.sweep(110, 72, 0.14, 0.055, 'sine', this.feedback);
+    if (!this.context || !this.combatFeedbackPrepared || !this.damageFeedbackSource || !this.damageFeedbackGain) return;
+    const now = this.context.currentTime;
+    this.damageFeedbackSource.frequency.cancelScheduledValues(now);
+    this.damageFeedbackSource.frequency.setValueAtTime(180, now);
+    this.damageFeedbackSource.frequency.exponentialRampToValueAtTime(72, now + 0.14);
+    this.damageFeedbackGain.gain.cancelScheduledValues(now);
+    this.damageFeedbackGain.gain.setValueAtTime(0, now);
+    this.damageFeedbackGain.gain.linearRampToValueAtTime(0.085, now + 0.008);
+    this.damageFeedbackGain.gain.linearRampToValueAtTime(0, now + 0.14);
+    this.damageFeedbackPulses += 1;
   }
 
   impact(surface: ImpactSurface, distance = 0): void {
@@ -1194,8 +1387,12 @@ export class ArenaAudio {
       source: 'uninitialized' | 'failed' | BrowserAudioContextResolution['source'];
       state: AudioContextState | 'unavailable' | 'failed' | 'locked';
     };
+    listener: { poseMode: AudioListenerPoseMode };
     explosionMix: ExplosionAudioGate & { coalesceMs: number };
     ambience: { continuousSources: number; busGain: number; arena: ArenaId | null };
+    combatPrewarm: { prepared: boolean; runs: number; sources: number; nodes: number; broadbandLoopSources: 0 };
+    lowHealth: { prepared: boolean; sources: number; active: boolean; audible: boolean; automationWrites: number; broadbandSources: 0 };
+    damageFeedback: { prepared: boolean; sources: number; pulses: number };
     grenadeFuse: { beeps: number; startMs: number };
     crossbowFuse: { beeps: number; lastRemainingMs: number; lastDistanceM: number; startMs: number };
     minigunDrive: { active: boolean; starts: number; stops: number; fraction: number; phase: MinigunSpoolPhase };
@@ -1234,8 +1431,29 @@ export class ArenaAudio {
         state: this.context?.state
           ?? (this.contextSource === 'unavailable' ? 'unavailable' : this.contextSource === 'failed' ? 'failed' : 'locked'),
       },
+      listener: { poseMode: this.listenerPoseMode },
       explosionMix: { ...this.explosionAudioGate, coalesceMs: EXPLOSION_AUDIO_COALESCE_MS },
       ambience: { continuousSources: this.arenaSources.length, busGain: this.ambience?.gain.value ?? 0.12, arena: this.activeArena },
+      combatPrewarm: {
+        prepared: this.combatFeedbackPrepared,
+        runs: this.combatFeedbackPrepareRuns,
+        sources: this.combatFeedbackSources.length,
+        nodes: this.combatFeedbackNodes.length,
+        broadbandLoopSources: 0,
+      },
+      lowHealth: {
+        prepared: this.combatFeedbackPrepared && this.lowHealthGains.length === 2,
+        sources: this.combatFeedbackPrepared ? 2 : 0,
+        active: this.lowHealthFeedbackActive,
+        audible: this.lowHealthFeedbackAudible,
+        automationWrites: this.lowHealthAutomationWrites,
+        broadbandSources: 0,
+      },
+      damageFeedback: {
+        prepared: this.damageFeedbackSource !== null && this.damageFeedbackGain !== null,
+        sources: this.damageFeedbackSource ? 1 : 0,
+        pulses: this.damageFeedbackPulses,
+      },
       grenadeFuse: { beeps: this.grenadeFuseBeeps, startMs: GRENADE_FUSE_BEEP_START_MS },
       crossbowFuse: {
         beeps: this.crossbowFuseBeeps,
@@ -1443,20 +1661,22 @@ export class ArenaAudio {
     const owner = this.continuousVoiceOwners.get(source);
     if (!owner) return;
     this.continuousVoiceOwners.delete(source);
-    const sources = owner.scope === 'arena' ? this.arenaSources : this.lowHealthSources;
+    const sources = owner.scope === 'arena' ? this.arenaSources : this.combatFeedbackSources;
     const sourceIndex = sources.indexOf(source);
     if (sourceIndex >= 0) sources.splice(sourceIndex, 1);
-    const ownedNodes = owner.scope === 'arena' ? this.arenaNodes : this.lowHealthNodes;
+    const ownedNodes = owner.scope === 'arena' ? this.arenaNodes : this.combatFeedbackNodes;
     for (const node of owner.nodes) {
       const nodeIndex = ownedNodes.indexOf(node);
       if (nodeIndex >= 0) ownedNodes.splice(nodeIndex, 1);
-      node.disconnect();
+      try { node.disconnect(); } catch { /* partially connected browser node */ }
     }
-    if (owner.scope === 'low-health') {
+    if (owner.scope === 'combat-feedback') {
       for (const gain of owner.gains) {
         const gainIndex = this.lowHealthGains.indexOf(gain);
         if (gainIndex >= 0) this.lowHealthGains.splice(gainIndex, 1);
+        if (this.damageFeedbackGain === gain) this.damageFeedbackGain = null;
       }
+      if (this.damageFeedbackSource === source) this.damageFeedbackSource = null;
     }
   }
 
@@ -1464,7 +1684,7 @@ export class ArenaAudio {
     try { source.stop(); } catch { /* already stopped */ }
     this.releaseContinuousVoice(source);
     this.activeVoices.delete(source);
-    source.disconnect();
+    try { source.disconnect(); } catch { /* already or partially disconnected */ }
   }
 
   private stopMinigunDrive(): void {
@@ -1493,7 +1713,19 @@ export class ArenaAudio {
   }
 
   private disconnectNodes(nodes: AudioNode[]): void {
-    for (const node of nodes.splice(0)) node.disconnect();
+    for (const node of nodes.splice(0)) {
+      try { node.disconnect(); } catch { /* already or partially disconnected */ }
+    }
+  }
+
+  private resetCombatFeedbackState(): void {
+    this.lowHealthGains = [];
+    this.damageFeedbackSource = null;
+    this.damageFeedbackGain = null;
+    this.combatFeedbackPrepared = false;
+    this.lowHealthFeedbackActive = false;
+    this.lowHealthFeedbackAudible = false;
+    this.lowHealthAppliedState = null;
   }
 
   private acquireFootstepChain(): SpatialFootstepChain | null {
@@ -1597,44 +1829,6 @@ export class ArenaAudio {
       airLowpass.disconnect();
       airGain.disconnect();
       airPanner.disconnect();
-    }
-  }
-
-  private startLowHealthLoops(): void {
-    if (!this.context || !this.feedback || !this.noiseBuffer) return;
-    const now = this.context.currentTime;
-    const breath = this.context.createBufferSource();
-    const breathFilter = this.context.createBiquadFilter();
-    const breathGain = this.context.createGain();
-    breath.buffer = this.noiseBuffer;
-    breath.loop = true;
-    breathFilter.type = 'bandpass';
-    breathFilter.frequency.value = 520;
-    breathFilter.Q.value = 0.8;
-    breathGain.gain.value = 0.0001;
-    breath.connect(breathFilter).connect(breathGain).connect(this.feedback);
-    if (this.registerContinuousVoice(breath, this.feedback, 5, 'low-health', [breathFilter, breathGain], [breathGain])) {
-      breath.start(now, presentationRandom() * this.noiseBuffer.duration);
-      this.lowHealthSources.push(breath);
-      this.lowHealthGains.push(breathGain);
-      this.lowHealthNodes.push(breathFilter, breathGain);
-    } else {
-      breathFilter.disconnect();
-      breathGain.disconnect();
-    }
-    const heartbeat = this.context.createOscillator();
-    const heartbeatGain = this.context.createGain();
-    heartbeat.type = 'sine';
-    heartbeat.frequency.value = 54;
-    heartbeatGain.gain.value = 0.0001;
-    heartbeat.connect(heartbeatGain).connect(this.feedback);
-    if (this.registerContinuousVoice(heartbeat, this.feedback, 5, 'low-health', [heartbeatGain], [heartbeatGain])) {
-      heartbeat.start(now);
-      this.lowHealthSources.push(heartbeat);
-      this.lowHealthGains.push(heartbeatGain);
-      this.lowHealthNodes.push(heartbeatGain);
-    } else {
-      heartbeatGain.disconnect();
     }
   }
 

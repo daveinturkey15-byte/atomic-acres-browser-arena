@@ -18,6 +18,7 @@ describe('Pass 66 owned browser verifier runners', () => {
     expect(packageJson.scripts['qa:pass66:installed-firefox']).toContain('run-pass66-owned-browser-verifier.mjs installed-firefox');
     expect(packageJson.scripts['qa:pass61:netcode']).toContain('run-pass66-owned-browser-verifier.mjs pass61-netcode');
     expect(packageJson.scripts['qa:pass66:support-operate-prompt']).toContain('run-pass66-owned-browser-verifier.mjs support-operate-prompt');
+    expect(packageJson.scripts['qa:multiplayer:stability']).toContain('run-pass66-owned-browser-verifier.mjs multiplayer-stability');
     expect(packageJson.scripts['qa:pass66:multiplayer-stability']).toContain('run-pass66-owned-browser-verifier.mjs multiplayer-stability');
     for (const alias of [
       'qa:pass66:host-recovery',
@@ -35,7 +36,7 @@ describe('Pass 66 owned browser verifier runners', () => {
       "SOURCE_SHA: sourceSha",
       "RELEASE_DIST_ROOT: temporaryDist",
       "RELEASE_TOPOLOGY_RECEIPT_PATH: topologyReceiptPath",
-      "assertStagedTopology(topology, sourceSha)",
+      "assertStagedTopology(topology, sourceSha, releasePass)",
       "assertOwnedBrowserVerifierReceipt(receipt",
       "Refusing stale or unowned listener on PeerJS port",
       "'support-operate-prompt': Object.freeze",
@@ -46,7 +47,7 @@ describe('Pass 66 owned browser verifier runners', () => {
     ]) expect(runner).toContain(marker);
   });
 
-  it('binds the nine-test stability matrix to five wrapper-owned tokenized peer identities', () => {
+  it('binds the ten-test stability matrix to five wrapper-owned tokenized peer identities', () => {
     expect(multiplayerStability).toContain("PASS66_HOST_RECOVERY_PEER_PATH");
     expect(multiplayerStability).toContain("PASS66_OWNER_FEEDBACK_PEER_PATH");
     expect(multiplayerStability).toContain("PASS66_TIMED_WEAPONS_PEER_PATH");

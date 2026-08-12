@@ -106,7 +106,7 @@ describe('HF-165 bounded continuous audio ownership', () => {
     FakeAudioContext.instances.length = 0;
   });
 
-  it('uses two protected oscillator beds, never an indefinite white-noise buffer, and cleans every arena switch', () => {
+  it('keeps two arena beds plus three muted combat voices protected, broadband-free and fully owned', () => {
     vi.stubGlobal('AudioContext', FakeAudioContext);
     const audio = new ArenaAudio();
     audio.setArena('atomic-acres');
@@ -122,7 +122,7 @@ describe('HF-165 bounded continuous audio ownership', () => {
     expect(audio.telemetry().ambience.continuousSources).toBe(2);
     expect(internals.arenaSources.every((source) => source instanceof FakeOscillatorNode)).toBe(true);
     expect(context.bufferSources.filter((source) => source.loop)).toHaveLength(0);
-    expect(internals.continuousVoiceOwners.size).toBe(2);
+    expect(internals.continuousVoiceOwners.size).toBe(5);
     expect([...internals.activeVoices.values()].every((voice) => voice.protectedContinuous)).toBe(true);
 
     const firstSources = [...internals.arenaSources];
@@ -132,8 +132,8 @@ describe('HF-165 bounded continuous audio ownership', () => {
     expect(firstSources.every((source) => source.ended)).toBe(true);
     expect(firstNodes.every((node) => node.disconnected)).toBe(true);
     expect(audio.telemetry().ambience.continuousSources).toBe(2);
-    expect(internals.continuousVoiceOwners.size).toBe(2);
-    expect([...internals.activeVoices.values()].filter((voice) => voice.protectedContinuous)).toHaveLength(2);
+    expect(internals.continuousVoiceOwners.size).toBe(5);
+    expect([...internals.activeVoices.values()].filter((voice) => voice.protectedContinuous)).toHaveLength(5);
 
     audio.dispose();
     expect(internals.continuousVoiceOwners.size).toBe(0);

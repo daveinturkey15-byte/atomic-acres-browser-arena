@@ -10,6 +10,7 @@ import {
   estimateHostClockOffset,
   freeForAllLeaders,
   isLobbySnapshot,
+  isPrivateMatchConfig,
   latencyQuality,
   playersAreHostile,
   recordPlayerDamage,
@@ -36,6 +37,8 @@ const snapshot = (changes: Partial<LobbySnapshot> = {}): LobbySnapshot => ({
   snapshotHostTimeMs: 500,
   activeAtHostTimeMs: null,
   activeAtEpochMs: null,
+  matchClock: null,
+  testBayDoor: null,
   ...changes,
 });
 
@@ -88,11 +91,18 @@ describe('private match lobby', () => {
 
   it('keeps every distinct player hostile in the bot-free Gun Range FFA', () => {
     const range = snapshot({
+      phase: 'active',
       config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: 120_000 },
+      activeAtHostTimeMs: 0,
+      activeAtEpochMs: 1,
+      matchClock: { schemaVersion: 1, revision: 0, paused: false, remainingMs: 120_000, sampledAtHostTimeMs: 500 },
+      testBayDoor: { phase: 'closed', openness: 0, updatedAtMs: 500, thumpSequence: 0 },
     });
     expect(isLobbySnapshot(range)).toBe(true);
     expect(range.config.hostedBotCount).toBe(0);
     expect(playersAreHostile(range.config.mode, { ...members[0], team: 0 }, { ...members[1], team: 0 })).toBe(true);
+    expect(isPrivateMatchConfig({ ...range.config, durationMs: 60_000 })).toBe(false);
+    expect(isPrivateMatchConfig({ ...range.config, durationMs: 180_000 })).toBe(false);
   });
 
   it('derives team totals and stable FFA leaders from authoritative scores', () => {
@@ -125,6 +135,13 @@ describe('private match lobby', () => {
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'rustworks-1v1' } }))).toBe(true);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'skyline-terminal' } }))).toBe(true);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: 120_000 } }))).toBe(true);
+    expect(isLobbySnapshot(snapshot({
+      phase: 'active',
+      config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: 120_000 },
+      activeAtHostTimeMs: 0,
+      activeAtEpochMs: 1,
+      matchClock: null,
+    }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', hostedBotCount: 2 } }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ members: [...members, ...members, members[0]] }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, capacity: 5 as 4 } }))).toBe(false);

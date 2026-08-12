@@ -76,6 +76,7 @@ const EVENT_LABEL = 'atomic-acres-events-v1';
 const RECONNECT_WINDOW_MS = 90_000;
 const RECONNECT_DELAYS_MS = [500, 1_500, 3_000, 5_000] as const;
 const HOST_ROOM_RECLAIM_DELAYS_MS = [350, 750, 1_500, 2_500, 4_000] as const;
+export const HOST_ROOM_RECLAIM_WINDOW_MS = 60_000;
 export const CLIENT_HOST_SILENCE_TIMEOUT_MS = 15_000;
 const CLIENT_HOST_LIVENESS_POLL_MS = 1_000;
 export const CLIENT_HOST_LIVENESS_MAX_SCHEDULING_GAP_MS = CLIENT_HOST_LIVENESS_POLL_MS * 3;
@@ -152,8 +153,17 @@ export function hostRoomReclaimAction(
   attempt: number,
 ): Readonly<{ action: 'retry'; delayMs: number } | { action: 'fresh' | 'fail'; delayMs: 0 }> {
   if (!recoveryRequired) return { action: 'fresh', delayMs: 0 };
-  const delayMs = HOST_ROOM_RECLAIM_DELAYS_MS[attempt];
-  return delayMs === undefined ? { action: 'fail', delayMs: 0 } : { action: 'retry', delayMs };
+  if (!Number.isSafeInteger(attempt) || attempt < 0) return { action: 'fail', delayMs: 0 };
+  const delayMs = HOST_ROOM_RECLAIM_DELAYS_MS[Math.min(attempt, HOST_ROOM_RECLAIM_DELAYS_MS.length - 1)]!;
+  const rampTotalMs = HOST_ROOM_RECLAIM_DELAYS_MS.reduce((sum, delay, index) => (
+    index < attempt ? sum + delay : sum
+  ), 0);
+  const saturatedAttempts = Math.max(0, attempt - HOST_ROOM_RECLAIM_DELAYS_MS.length);
+  const elapsedBeforeDelayMs = rampTotalMs
+    + saturatedAttempts * HOST_ROOM_RECLAIM_DELAYS_MS[HOST_ROOM_RECLAIM_DELAYS_MS.length - 1];
+  return elapsedBeforeDelayMs + delayMs > HOST_ROOM_RECLAIM_WINDOW_MS
+    ? { action: 'fail', delayMs: 0 }
+    : { action: 'retry', delayMs };
 }
 
 export function hostConnectionAttemptKey(preferredRoomCode?: string, recoveryRequired = false): string {
@@ -523,9 +533,9 @@ export class ArenaNetwork {
     this.role = 'host';
     this.onReady = onReady;
     this.onStatus('Opening a secure peer lobby…');
-    // A crashed host can reclaim their previous room code so guests who still
-    // have it saved rejoin the same lobby. If the signalling server still holds
-    // the ID (unavailable-id), fall back to a fresh random room.
+    // A crashed host must reclaim the previous room code so guests who still
+    // have it saved rejoin the same lobby. Fresh hosts may fall back to a random
+    // room, but recovery retains the exact ID throughout its bounded retries.
     this.startHostPeer(attempt, onReady, preferred, recoveryRequired, 0);
   }
 

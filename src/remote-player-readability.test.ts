@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { applyBotEmissiveBrightness } from './operator-model';
+import { BOT_EMISSIVE_BRIGHTNESS_SCALE, applyBotEmissiveBrightness } from './operator-model';
 import {
   REMOTE_HUMAN_READABILITY_COLOR,
   REMOTE_HUMAN_READABILITY_INTENSITY,
@@ -30,6 +30,8 @@ describe('remote human readability', () => {
     expect(source.emissive.getHex()).toBe(0x000000);
     expect(highlighted.emissive.getHex()).not.toBe(0x000000);
     expect(highlighted.emissiveIntensity).toBe(REMOTE_HUMAN_READABILITY_INTENSITY);
+    expect(REMOTE_HUMAN_READABILITY_INTENSITY).toBe(0.25);
+    expect(REMOTE_HUMAN_READABILITY_INTENSITY).toBe(BOT_EMISSIVE_BRIGHTNESS_SCALE / 2);
     expect(REMOTE_HUMAN_READABILITY_MIX).toBeLessThanOrEqual(0.4);
     expect(highlighted.depthTest).toBe(true);
     expect(highlighted.depthWrite).toBe(true);
@@ -62,6 +64,19 @@ describe('remote human readability', () => {
     expect(visible.material).toBe(once);
     expect(proxy.material).toBe(proxyMaterial);
     expect(hidden.material).toBe(hiddenMaterial);
+  });
+
+  it('normalizes the readability lift to the exact remote-human budget', () => {
+    const root = new THREE.Group();
+    const material = new THREE.MeshStandardMaterial({
+      emissive: 0x001122,
+      emissiveIntensity: 0.9,
+    });
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material));
+    applyRemoteHumanReadabilityHighlight(root);
+    expect((root.children[0] as THREE.Mesh).material).not.toBe(material);
+    expect(((root.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial).emissiveIntensity).toBe(0.25);
+    expect(material.emissiveIntensity).toBe(0.9);
   });
 
   it('keeps hosted and skirmish bots on their separate purple emissive path', () => {

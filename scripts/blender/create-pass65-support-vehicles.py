@@ -30,8 +30,9 @@ REVIEW_TARGET = os.environ.get("PASS65_SUPPORT_REVIEW_TARGET", "")
 FOCUSED_FP_REVIEW = REVIEW_TARGET == "chopper-fp"
 FP_DIAGNOSTIC_REVIEW = REVIEW_TARGET == "chopper-fp-diagnostic"
 AUTHORING_SCOPE = os.environ.get("PASS65_SUPPORT_AUTHORING_SCOPE", "all")
-if AUTHORING_SCOPE not in {"all", "aircraft"}:
+if AUTHORING_SCOPE not in {"all", "aircraft", "chopper"}:
     raise RuntimeError(f"unsupported PASS65_SUPPORT_AUTHORING_SCOPE={AUTHORING_SCOPE!r}")
+SKIP_REVIEW_RENDER = os.environ.get("PASS65_SUPPORT_SKIP_REVIEWS", "0") == "1"
 
 for directory in (
     CHOPPER_BLEND.parent,
@@ -499,8 +500,9 @@ def root_metadata(name: str, asset_id: str, lod: int, variant: str | None = None
 
 def build_chopper(lod: int, materials):
     root = root_metadata(f"Pass65Chopper_LOD{lod}", "chopper-gunner-vehicle-v1", lod)
-    root["visual_revision"] = "close-range-tandem-armored-airframe-v4"
-    root["detail_contract"] = "layered-armour-framed-canopy-fasteners-sensors-ordnance-mechanics-v4"
+    root["visual_revision"] = "pass70-connected-rear-tail-airframe-v7"
+    root["detail_contract"] = "continuous-rear-tail-silhouette-cockpit-clear-sightline-v7"
+    root["material_revision"] = "pass70-daylight-readable-olive-pbr-v1"
     segments = (28, 20, 14)[lod]
     rings = (16, 12, 8)[lod]
     body = empty("chopper-fuselage", (0, 0, 0), root, "fuselage")
@@ -713,6 +715,18 @@ def build_chopper(lod: int, materials):
                 )
 
     tail = empty("chopper-tail-boom", (0, 0, 0), root, "tail-boom")
+    # The original RearCabin and TailBoom overlapped by only 0.27 m. The
+    # geometry was valid, but its aggressively tapered bridge occupied too few
+    # pixels in the shipped 60-degree front-quarter view and read as a detached
+    # tail against the dark test-bay wall. This closed collar is real airframe
+    # volume: it overlaps the cabin by 0.77 m and the boom by 0.70 m while
+    # retaining the semantic tail root, rotor sockets and animation hierarchy.
+    loft(
+        f"Chopper_TailRootCollar_LOD{lod}",
+        [(-1.95, 0.40, 0.78, 0.60), (-2.36, 0.45, 0.68, 0.52),
+         (-2.72, 0.50, 0.56, 0.43), (-3.15, 0.57, 0.39, 0.32)],
+        materials["armor"], tail, (12, 7, 7)[lod],
+    )
     loft(
         f"Chopper_TailBoom_LOD{lod}",
         [(-2.45, 0.47, 0.48, 0.40), (-3.20, 0.58, 0.34, 0.28), (-4.20, 0.80, 0.22, 0.22), (-5.18, 1.05, 0.13, 0.16)],
@@ -726,11 +740,12 @@ def build_chopper(lod: int, materials):
                 (0.46 - band * 0.055, 0.045, 0.42 - band * 0.045),
                 materials["panel_seam"], tail, bevel=0.006,
             )
-        cube(
-            f"Chopper_TailServicePanel_LOD{lod}", (0.21, -3.52, 0.79),
-            (0.020, 0.46, 0.22), materials["panel_wear"], tail,
-            rotation=(0, 0, math.radians(4)), bevel=0.006,
-        )
+        if lod == 0:
+            cube(
+                f"Chopper_TailServicePanel_LOD{lod}", (0.21, -3.52, 0.79),
+                (0.020, 0.46, 0.22), materials["panel_wear"], tail,
+                rotation=(0, 0, math.radians(4)), bevel=0.006,
+            )
     tail_fin = empty("chopper-tail-fin", (0, 0, 0), tail, "tail-fin")
     wedge(f"Chopper_TailFin_LOD{lod}", (0, -4.72, 1.55), (0.20, 1.28, 1.55), materials["armor"], tail_fin, rotation=(math.radians(-12), 0, 0))
     cube(f"Chopper_TailFinTip_LOD{lod}", (0, -5.05, 2.10), (0.22, 0.34, 0.10), materials["accent"], tail_fin, rotation=(math.radians(-12), 0, 0), bevel=0.025)
@@ -813,48 +828,48 @@ def build_chopper(lod: int, materials):
     cockpit = empty("chopper-first-person-cockpit", (0, 0, 0), root, "first-person-cockpit")
     cockpit["first_person_cockpit"] = True
     dashboard = empty("chopper-cockpit-dashboard-3d", (0, 0, 0), cockpit, "dashboard")
-    wedge(f"Chopper_Dashboard_LOD{lod}", (0, 1.56, 0.11), (1.44, 0.48, 0.46), materials["cockpit"], dashboard, rotation=(math.radians(-10), 0, 0))
+    wedge(f"Chopper_Dashboard_LOD{lod}", (0, 1.56, 0.04), (1.30, 0.44, 0.34), materials["cockpit"], dashboard, rotation=(math.radians(-10), 0, 0))
     mfd_labels = (("RADAR", "RNG 084"), ("ATTITUDE", "ALT 126"), ("WEAPON", "AMMO 84"))
-    for index, (x, material) in enumerate(((-0.37, materials["screen_cyan"]), (0.0, materials["screen_green"]), (0.37, materials["screen_cyan"]))):
-        cube(f"Chopper_MFD_Bezel_{index}_LOD{lod}", (x, 1.305, 0.21), (0.31, 0.052, 0.25), materials["frame"], dashboard, bevel=0.025)
+    for index, (x, material) in enumerate(((-0.31, materials["screen_cyan"]), (0.0, materials["screen_green"]), (0.31, materials["screen_cyan"]))):
+        cube(f"Chopper_MFD_Bezel_{index}_LOD{lod}", (x, 1.305, 0.14), (0.23, 0.044, 0.17), materials["frame"], dashboard, bevel=0.018)
         screen_name = "chopper-cockpit-display-cyan" if index == 0 else "chopper-cockpit-display-green" if index == 1 else f"chopper-cockpit-display-tactical-{lod}"
-        screen = cube(screen_name, (x, 1.272, 0.21), (0.25, 0.016, 0.18), material, dashboard, bevel=0.012)
+        screen = cube(screen_name, (x, 1.278, 0.14), (0.18, 0.012, 0.11), material, dashboard, bevel=0.009)
         if index == 0:
             cyan = screen
         if lod < 2:
             for button in range(4):
                 cylinder(
                     f"Chopper_MFD_Button_{index}_{button}_LOD{lod}",
-                    (x - 0.12 + button * 0.08, 1.245, 0.055), 0.014, 0.018,
+                    (x - 0.075 + button * 0.05, 1.251, 0.055), 0.010, 0.014,
                     materials["green" if (index + button) % 2 == 0 else "cyan"], dashboard,
                     rotation=(math.pi / 2, 0, 0), vertices=10, bevel=0.002,
                 )
-            for fastener, (dx, dz) in enumerate(((-0.132, -0.102), (0.132, -0.102), (-0.132, 0.102), (0.132, 0.102))):
+            for fastener, (dx, dz) in enumerate(((-0.098, -0.073), (0.098, -0.073), (-0.098, 0.073), (0.098, 0.073))):
                 cylinder(
-                    f"Chopper_MFD_Fastener_{index}_{fastener}_LOD{lod}", (x + dx, 1.244, 0.21 + dz),
+                    f"Chopper_MFD_Fastener_{index}_{fastener}_LOD{lod}", (x + dx, 1.250, 0.14 + dz),
                     0.006, 0.011, materials["panel_wear"], dashboard,
                     rotation=(math.pi / 2, 0, 0), vertices=8, bevel=0.001,
                 )
             if index == 0:
-                torus(f"Chopper_RadarSweepRing_LOD{lod}", (x, 1.248, 0.21), 0.060, 0.005, materials["green"], dashboard, 20, rotation=(math.pi / 2, 0, 0))
-                cube(f"Chopper_RadarSweep_LOD{lod}", (x + 0.035, 1.241, 0.245), (0.085, 0.007, 0.009), materials["green"], dashboard, rotation=(0, math.radians(-40), 0), bevel=0.002)
-                for blip, (dx, dz) in enumerate(((-0.040, 0.030), (0.052, -0.025), (0.018, 0.058))):
-                    sphere(f"Chopper_RadarBlip_{blip}_LOD{lod}", (x + dx, 1.238, 0.21 + dz), (0.010, 0.006, 0.010), materials["cyan"], dashboard, 10, 6)
+                torus(f"Chopper_RadarSweepRing_LOD{lod}", (x, 1.250, 0.14), 0.038, 0.004, materials["green"], dashboard, 18, rotation=(math.pi / 2, 0, 0))
+                cube(f"Chopper_RadarSweep_LOD{lod}", (x + 0.022, 1.244, 0.162), (0.055, 0.006, 0.007), materials["green"], dashboard, rotation=(0, math.radians(-40), 0), bevel=0.002)
+                for blip, (dx, dz) in enumerate(((-0.025, 0.018), (0.032, -0.015), (0.012, 0.034))):
+                    sphere(f"Chopper_RadarBlip_{blip}_LOD{lod}", (x + dx, 1.241, 0.14 + dz), (0.007, 0.005, 0.007), materials["cyan"], dashboard, 8, 6)
             elif index == 1:
-                cube(f"Chopper_AttitudeHorizon_LOD{lod}", (x, 1.242, 0.21), (0.22, 0.007, 0.012), materials["cyan"], dashboard, rotation=(0, math.radians(-8), 0), bevel=0.002)
-                for pitch in (-0.060, -0.030, 0.030, 0.060):
-                    cube(f"Chopper_AttitudePitch_{pitch}_LOD{lod}", (x, 1.240, 0.21 + pitch), (0.10 if abs(pitch) > 0.04 else 0.065, 0.006, 0.007), materials["green"], dashboard, bevel=0.001)
-                wedge(f"Chopper_AttitudeCraft_LOD{lod}", (x, 1.235, 0.205), (0.07, 0.012, 0.042), materials["muzzle"], dashboard, rotation=(math.pi / 2, 0, 0))
+                cube(f"Chopper_AttitudeHorizon_LOD{lod}", (x, 1.244, 0.14), (0.15, 0.006, 0.009), materials["cyan"], dashboard, rotation=(0, math.radians(-8), 0), bevel=0.002)
+                for pitch in (-0.038, -0.019, 0.019, 0.038):
+                    cube(f"Chopper_AttitudePitch_{pitch}_LOD{lod}", (x, 1.242, 0.14 + pitch), (0.07 if abs(pitch) > 0.025 else 0.045, 0.005, 0.005), materials["green"], dashboard, bevel=0.001)
+                wedge(f"Chopper_AttitudeCraft_LOD{lod}", (x, 1.237, 0.137), (0.05, 0.010, 0.030), materials["muzzle"], dashboard, rotation=(math.pi / 2, 0, 0))
             else:
-                torus(f"Chopper_WeaponReticle_LOD{lod}", (x, 1.248, 0.215), 0.048, 0.005, materials["cyan"], dashboard, 18, rotation=(math.pi / 2, 0, 0))
-                cube(f"Chopper_WeaponCrossX_LOD{lod}", (x, 1.240, 0.215), (0.14, 0.006, 0.008), materials["green"], dashboard, bevel=0.001)
-                cube(f"Chopper_WeaponCrossZ_LOD{lod}", (x, 1.240, 0.215), (0.008, 0.006, 0.14), materials["green"], dashboard, bevel=0.001)
+                torus(f"Chopper_WeaponReticle_LOD{lod}", (x, 1.250, 0.14), 0.032, 0.004, materials["cyan"], dashboard, 16, rotation=(math.pi / 2, 0, 0))
+                cube(f"Chopper_WeaponCrossX_LOD{lod}", (x, 1.243, 0.14), (0.09, 0.005, 0.006), materials["green"], dashboard, bevel=0.001)
+                cube(f"Chopper_WeaponCrossZ_LOD{lod}", (x, 1.243, 0.14), (0.006, 0.005, 0.09), materials["green"], dashboard, bevel=0.001)
                 for bar in range(4):
-                    cube(f"Chopper_AmmoBar_{bar}_LOD{lod}", (x + 0.105, 1.240, 0.155 + bar * 0.032), (0.015, 0.006, 0.020), materials["muzzle" if bar == 3 else "cyan"], dashboard, bevel=0.002)
+                    cube(f"Chopper_AmmoBar_{bar}_LOD{lod}", (x + 0.073, 1.243, 0.103 + bar * 0.024), (0.010, 0.005, 0.014), materials["muzzle" if bar == 3 else "cyan"], dashboard, bevel=0.002)
         if lod == 0:
             label, readout = mfd_labels[index]
-            text_mesh(f"Chopper_MFD_Label_{index}_LOD0", label, (x, 1.232, 0.282), 0.018, materials["hud_cyan"], dashboard)
-            text_mesh(f"Chopper_MFD_Readout_{index}_LOD0", readout, (x, 1.231, 0.138), 0.016, materials["hud_green"], dashboard)
+            text_mesh(f"Chopper_MFD_Label_{index}_LOD0", label, (x, 1.237, 0.183), 0.012, materials["hud_cyan"], dashboard)
+            text_mesh(f"Chopper_MFD_Readout_{index}_LOD0", readout, (x, 1.236, 0.095), 0.010, materials["hud_green"], dashboard)
     if lod < 2:
         for index, material in enumerate((materials["green"], materials["cyan"], materials["muzzle"], materials["green"], materials["cyan"])):
             cube(f"Chopper_Annunciator_{index}_LOD{lod}", (-0.28 + index * 0.14, 1.255, 0.385), (0.075, 0.008, 0.018), material, dashboard, bevel=0.003)
@@ -875,7 +890,7 @@ def build_chopper(lod: int, materials):
                 f"Chopper_UpperSwitchLamp_{switch}_LOD{lod}", (x, 1.225, 0.365), (0.028, 0.007, 0.010),
                 materials["green" if switch % 2 == 0 else "cyan"], dashboard, bevel=0.002,
             )
-    dashboard.location.z = 0.30
+    dashboard.location.z = 0.12
     cube(f"Chopper_CentreConsole_LOD{lod}", (0, 0.91, -0.26), (0.36, 0.72, 0.24), materials["cockpit"], cockpit, rotation=(math.radians(-7), 0, 0), bevel=0.07)
     for side in (-1, 1):
         cube(f"Chopper_SideConsole_{side}_LOD{lod}", (side * 0.66, 0.88, -0.18), (0.27, 0.92, 0.20), materials["cockpit"], cockpit, bevel=0.055)
@@ -937,7 +952,7 @@ def build_chopper(lod: int, materials):
             (0.34 + offset, 1.46, 0.39), 0.018, materials["metal"], gunner_weapon, max(8, segments // 3),
         )
     cube(f"Chopper_GunnerViewStatus_LOD{lod}", (0.34, 0.892, 0.49), (0.085, 0.012, 0.018), materials["hud_green"], gunner_weapon, bevel=0.004)
-    empty("chopper-first-person-camera-socket", (0, 0.38, 0.74), root, "first-person-camera")
+    empty("chopper-first-person-camera-socket", (0, 0.38, 0.82), root, "first-person-camera")
 
     main_rotor = empty("chopper-main-rotor", (0, -0.42, 1.72), root, "main-rotor")
     cylinder(f"Chopper_RotorMast_LOD{lod}", (0, -0.42, 1.38), 0.11, 0.72, materials["metal"], root, vertices=max(12, segments // 2))
@@ -1782,18 +1797,23 @@ def render_chopper_reviews(roots) -> None:
         print(f"CHOPPER_FP_DIAGNOSTIC={diagnostic}")
         return
     def render_accepted_first_person() -> Path:
+        cockpit = next((
+            obj for obj in hierarchy(lod0)
+            if obj.name == "chopper-first-person-cockpit"
+            or obj.get("canonical_node_name") == "chopper-first-person-cockpit"
+        ), None)
         sightline = next((
             obj for obj in hierarchy(lod0)
             if obj.name == "chopper-gunner-sightline"
             or obj.get("canonical_node_name") == "chopper-gunner-sightline"
         ), None)
-        if sightline is None:
-            raise RuntimeError("authored unobstructed chopper gunner sightline missing from focused review")
-        sightline_nodes = set(hierarchy(sightline))
+        if cockpit is None or sightline is None:
+            raise RuntimeError("authored complete cockpit or unobstructed gunner sightline missing from focused review")
+        cockpit_nodes = set(hierarchy(cockpit))
         for obj in hierarchy(lod0):
             if obj.type == "MESH":
-                obj.hide_render = obj not in sightline_nodes
-                obj.hide_viewport = obj not in sightline_nodes
+                obj.hide_render = obj not in cockpit_nodes
+                obj.hide_viewport = obj not in cockpit_nodes
         for obj in hierarchy(fp_world):
             obj.hide_render = False
             obj.hide_viewport = False
@@ -1803,12 +1823,12 @@ def render_chopper_reviews(roots) -> None:
         scene.render.resolution_x = 960
         scene.render.resolution_y = 540
         scene.render.resolution_percentage = 100
-        scene.view_settings.exposure = -0.65
+        scene.view_settings.exposure = -0.15
         background = scene.world.node_tree.nodes.get("Background")
-        background.inputs["Strength"].default_value = 0.18
+        background.inputs["Strength"].default_value = 0.28
         for obj in bpy.data.objects:
             if obj.type == "LIGHT" and obj.name.startswith("Review_"):
-                obj.data.energy *= 0.38
+                obj.data.energy *= 0.62
         scene.frame_set(7)
         focused_path = CHOPPER_REVIEW / "pass65-chopper-first-person-instruments-16x9.png"
         scene.render.filepath = str(focused_path)
@@ -1909,21 +1929,21 @@ if AUTHORING_SCOPE != "aircraft":
     reset()
     chopper_images = {
         kind: make_texture(
-            "pass65-chopper", kind, (0.17, 0.20, 0.16),
+            "pass65-chopper", kind, (0.25, 0.30, 0.22),
             emissive_panel_seams=False,
         )
         for kind in ("albedo", "normal", "orm", "emissive")
     }
     chopper_materials = {
         "armor": textured_material("MAT_Pass65Chopper_Armor_PBR", chopper_images),
-        "dark": simple_material("MAT_Pass65Chopper_DarkArmor", (0.055, 0.085, 0.095), 0.84, 0.31),
-        "metal": simple_material("MAT_Pass65Chopper_Gunmetal", (0.095, 0.120, 0.128), 0.92, 0.22),
-        "frame": simple_material("MAT_Pass65Chopper_CockpitFrame", (0.075, 0.135, 0.145), 0.78, 0.29),
-        "cockpit": simple_material("MAT_Pass65Chopper_CockpitInterior", (0.060, 0.095, 0.105), 0.50, 0.42),
-        "panel_wear": simple_material("MAT_Pass65Chopper_PanelWear", (0.28, 0.32, 0.29), 0.86, 0.34),
+        "dark": simple_material("MAT_Pass65Chopper_DarkArmor", (0.090, 0.125, 0.125), 0.78, 0.36),
+        "metal": simple_material("MAT_Pass65Chopper_Gunmetal", (0.145, 0.165, 0.172), 0.88, 0.27),
+        "frame": simple_material("MAT_Pass65Chopper_CockpitFrame", (0.175, 0.235, 0.215), 0.68, 0.38, (0.025, 0.055, 0.045), 0.16),
+        "cockpit": simple_material("MAT_Pass65Chopper_CockpitInterior", (0.145, 0.185, 0.160), 0.40, 0.52, (0.020, 0.045, 0.032), 0.22),
+        "panel_wear": simple_material("MAT_Pass65Chopper_PanelWear", (0.36, 0.41, 0.34), 0.76, 0.42),
         "panel_seam": simple_material("MAT_Pass65Chopper_PanelSeam", (0.055, 0.070, 0.067), 0.66, 0.58),
         "seat": simple_material("MAT_Pass65Chopper_Seat", (0.10, 0.15, 0.16), 0.08, 0.62),
-        "glass": simple_material("MAT_Pass65Chopper_CanopyGlass", (0.025, 0.040, 0.035), 0.18, 0.24, (0.08, 0.035, 0.010), 0.10, 0.62),
+        "glass": simple_material("MAT_Pass65Chopper_CanopyGlass", (0.050, 0.105, 0.098), 0.12, 0.30, (0.02, 0.11, 0.10), 0.16, 0.38),
         "hudglass": simple_material("MAT_Pass65Chopper_HUDGlass", (0.02, 0.20, 0.24), 0.08, 0.10, (0.01, 0.46, 0.60), 0.42, 0.12),
         "hud_cyan": simple_material("MAT_Pass65Chopper_HUDCyan", (0.01, 0.12, 0.15), 0.12, 0.22, (0.01, 0.62, 0.82), 1.8),
         "hud_green": simple_material("MAT_Pass65Chopper_HUDGreen", (0.01, 0.15, 0.055), 0.10, 0.22, (0.06, 0.80, 0.26), 1.7),
@@ -1940,12 +1960,18 @@ if AUTHORING_SCOPE != "aircraft":
     chopper_roots = [build_chopper(lod, chopper_materials) for lod in range(3)]
     for lod, chopper_root in enumerate(chopper_roots):
         export_root(chopper_root, CHOPPER_RAW / f"pass65-chopper-gunner-lod{lod}.glb")
-    render_chopper_reviews(chopper_roots)
+    if not SKIP_REVIEW_RENDER:
+        render_chopper_reviews(chopper_roots)
     bpy.ops.wm.save_as_mainfile(filepath=str(CHOPPER_BLEND))
 
     if FOCUSED_FP_REVIEW or FP_DIAGNOSTIC_REVIEW:
         print(f"CHOPPER_BLEND={CHOPPER_BLEND}")
         print(f"CHOPPER_FP_REVIEW={CHOPPER_REVIEW / 'pass65-chopper-first-person-instruments.png'}")
+        print(f"CHOPPER_REVIEW={CHOPPER_REVIEW / 'pass65-chopper-contact-sheet.png'}")
+        raise SystemExit(0)
+
+    if AUTHORING_SCOPE == "chopper":
+        print(f"CHOPPER_BLEND={CHOPPER_BLEND}")
         print(f"CHOPPER_REVIEW={CHOPPER_REVIEW / 'pass65-chopper-contact-sheet.png'}")
         raise SystemExit(0)
 

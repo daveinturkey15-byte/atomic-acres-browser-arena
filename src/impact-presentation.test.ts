@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
-import { ImpactPresentation, MAX_IMPACT_MARKS, MAX_IMPACT_PARTICLES } from './impact-presentation';
+import {
+  IMPACT_DECAL_OPACITY,
+  IMPACT_DECAL_SURFACE_OFFSET_M,
+  ImpactPresentation,
+  MAX_IMPACT_MARKS,
+  MAX_IMPACT_PARTICLES,
+} from './impact-presentation';
 
 function attributeValues(attribute: THREE.BufferAttribute | THREE.InstancedBufferAttribute): number[] {
   return Array.from(attribute.array);
@@ -16,6 +22,29 @@ function reviewCamera(): THREE.PerspectiveCamera {
 }
 
 describe('pooled impact presentation', () => {
+  it('keeps impact marks equally readable and surface-bound in every graphics profile', () => {
+    for (const reducedDetail of [false, true]) {
+      const presentation = new ImpactPresentation(new THREE.Scene(), reducedDetail);
+      const material = presentation.marks.material as THREE.MeshBasicMaterial;
+      expect(material.opacity).toBe(IMPACT_DECAL_OPACITY);
+      expect(material.depthWrite).toBe(false);
+      expect(material.depthTest).toBe(true);
+      expect(material.side).toBe(THREE.DoubleSide);
+      expect(material.toneMapped).toBe(false);
+
+      const point = new THREE.Vector3(1, 2, 3);
+      const normal = new THREE.Vector3(0, 0, 1);
+      presentation.impact(point, normal, 'concrete');
+      const instance = new THREE.Matrix4();
+      presentation.marks.getMatrixAt(0, instance);
+      const markPosition = new THREE.Vector3().setFromMatrixPosition(instance);
+      const expectedPosition = point.clone().addScaledVector(normal, IMPACT_DECAL_SURFACE_OFFSET_M);
+      expect(markPosition.x).toBeCloseTo(expectedPosition.x, 6);
+      expect(markPosition.y).toBeCloseTo(expectedPosition.y, 6);
+      expect(markPosition.z).toBeCloseTo(expectedPosition.z, 6);
+    }
+  });
+
   it('bounds debris, retains marks for the round, and resets them explicitly', () => {
     const scene = new THREE.Scene();
     const presentation = new ImpactPresentation(scene);

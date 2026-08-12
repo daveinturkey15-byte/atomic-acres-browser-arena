@@ -25,17 +25,21 @@ const pngRecord = async (value, extra = {}) => {
 
 const crossbowSourceBlend = await fileRecord('source-assets/blender/pass65-explosive-crossbow.blend');
 const crossbowSourceScript = await fileRecord('scripts/blender/create-pass65-explosive-crossbow.py');
-const armsSourceBlend = await fileRecord('source-assets/blender/pass65-first-person-operator-arms.blend');
-const armsSourceScript = await fileRecord('scripts/blender/build-pass65-djmaesen-first-person-arms.py');
-const armsContactReceipt = await fileRecord('source-assets/blender/pass65-first-person-operator-arms-contact-receipt.json');
+const armsSourceBlend = await fileRecord('source-assets/blender/pass69-3-first-person-operator-arms.blend');
+const armsSourceScript = await fileRecord('scripts/blender/export-pass69-3-first-person-operator-arms.py');
+const armsRejectedBaselineBlend = await fileRecord('source-assets/blender/pass65-first-person-operator-arms.blend');
+const armsRejectedBaselineProvenance = await fileRecord('source-assets/blender/pass65-first-person-operator-arms.provenance.json');
+const armsRejectedBaselineContactReceipt = await fileRecord('source-assets/blender/pass65-first-person-operator-arms-contact-receipt.json');
+const armsContactReceipt = await fileRecord('source-assets/blender/pass69-3-first-person-operator-arms-contact-receipt.json');
 const armsContact = JSON.parse(await readFile(absolute(armsContactReceipt.path), 'utf8'));
-if (armsContact.verdict !== 'pass' || armsContact.evidence?.length !== 7 || armsContact.violations?.length !== 0) {
-  throw new Error('DJMaesen arms require seven passing deterministic weapon-contact views');
-}
-const knifeContact = armsContact.evidence.find((entry) => entry.view === 'knife-contact')?.knifeGripContact;
-if (knifeContact?.contract !== 'anatomical-palm-and-digit-to-authored-g10-bounds-v1'
-  || knifeContact?.passed !== true || knifeContact?.digitContactCount < 3) {
-  throw new Error('DJMaesen arms require a passing authored G10 knife-grip contact receipt');
+if (armsContact.verdict !== 'pass'
+  || armsContact.id !== 'pass69-3-first-person-arms-manual-master-v1'
+  || armsContact.review?.length !== 5
+  || armsContact.audit?.bones !== 37
+  || armsContact.audit?.weighting?.passed !== true
+  || Object.keys(armsContact.audit?.palmContacts ?? {}).length !== 2
+  || armsContact.violations?.length !== 0) {
+  throw new Error('Pass 70 manual arms require a passing exact-master mesh, weighting, palm-contact and review receipt');
 }
 const armsSourceFiles = [
   'license.txt', 'scene.bin', 'scene.gltf',
@@ -120,13 +124,13 @@ const crossbowRenders = await Promise.all(crossbowRenderLabels.map((label) => pn
 )));
 const crossbowContactSheet = await pngRecord('docs/assets/pass65-weapons/crossbow/pass65-crossbow-contact-sheet.png');
 const armsRenderLabels = [
-  'pistol-hip', 'mp5-hip', 'm4a1-hip', 'm4a1-grip-oblique',
-  'm4a1-ads', 'm4a1-reload', 'knife-contact',
+  'neutral-front', 'forearm-wrist-quarter', 'hand-anatomy-closeup',
+  'reload-cuff-flex', 'firing-digit-separation',
 ];
 const armsRenders = await Promise.all(armsRenderLabels.map((label) => pngRecord(
-  `docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-${label}.png`, { cameraId: label },
+  `docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-${label}.png`, { cameraId: label },
 )));
-const armsContactSheet = await pngRecord('docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-contact-sheet.png');
+const armsContactSheet = await pngRecord('docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-review-sheet.png');
 
 const crossbowProvenancePath = 'source-assets/blender/pass65-explosive-crossbow.provenance.json';
 const crossbowProvenance = {
@@ -147,12 +151,12 @@ const crossbowProvenance = {
 await writeFile(absolute(crossbowProvenancePath), `${JSON.stringify(crossbowProvenance, null, 2)}\n`, 'utf8');
 const crossbowProvenanceRecord = await fileRecord(crossbowProvenancePath);
 
-const armsProvenancePath = 'source-assets/blender/pass65-first-person-operator-arms.provenance.json';
+const armsProvenancePath = 'source-assets/blender/pass69-3-first-person-operator-arms.provenance.json';
 const armsProvenance = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   id: 'pass65-first-person-operator-arms',
-  title: 'Pass 66 licensed anatomical first-person operator-arms derivative',
-  derivativeCreator: 'Atomic Acres project', created: '2026-07-29',
+  title: 'Pass 70 manually reauthored licensed anatomical first-person operator-arms derivative',
+  derivativeCreator: 'Atomic Acres project', created: '2026-08-11',
   sourceCreator: 'DJMaesen (bumstrum)', sourceTitle: 'fps arms',
   sourceAssetUid: '08ec4403a47645d8ad80633abf13d39d',
   sourceUrl: 'https://sketchfab.com/3d-models/fps-arms-08ec4403a47645d8ad80633abf13d39d',
@@ -167,31 +171,44 @@ const armsProvenance = {
   attribution: '"fps arms" by DJMaesen (bumstrum), modified by Atomic Acres, licensed under CC BY 4.0.',
   sourceRecords: armsSourceRecords,
   blenderVersion: '5.1.2', generator: armsSourceScript, sourceBlend: armsSourceBlend,
+  rejectedBaseline: {
+    sourceBlend: armsRejectedBaselineBlend,
+    provenance: armsRejectedBaselineProvenance,
+    contactReceipt: armsRejectedBaselineContactReceipt,
+    status: 'retained-for-comparison-not-owner-accepted',
+  },
   firstPersonGlbs: armsGlbs, pbrMaps: armsPbrMaps,
   requiredBones: REQUIRED_ARM_BONES, requiredSockets: REQUIRED_ARM_SOCKETS, animationClips: REQUIRED_CORE_ACTIONS,
   materialContract: 'All visible materials OPAQUE with depth writes; no alpha fading or see-through anatomy.',
-  visualRevision: 'licensed-anatomical-viewmodel-v8',
-  limbProfileContract: 'hero-scale-connected-forearm-deformation-v2',
-  handPoseContract: 'licensed-articulated-weapon-and-knife-grip-v2',
+  materialContrastContract: 'owned-basecolor-contrast-retone-v1',
+  visualRevision: 'pass70-manual-anatomical-viewmodel-v1',
+  limbProfileContract: 'manual-continuous-cuff-forearm-deformation-v1',
+  handPoseContract: 'manual-separated-articulated-digit-contact-v1',
   shoulderEntryContract: 'weighted-capped-fps-frame-edge-sleeve-v2',
-  gloveConstructionContract: 'opaque-uv-preserved-scaled-anatomical-hand-v2',
+  gloveConstructionContract: 'opaque-manual-cuff-palm-digit-continuity-v1',
+  palmContactContract: 'authored-wrist-parented-full-transform-v1',
   weaponGripReviewContract: 'seven-view-actual-weapon-contact-v2',
-  weightingContract: 'adjacent-bone-normalized-blend-v5',
+  weightingContract: 'manual-adjacent-joint-normalized-blend-v1',
+  manualMasterContract: 'checked-in-editable-blend-export-only-v1',
   runtimeAnimationContract: 'authored-fingers-under-runtime-chain-ik-v1',
   fingerSegmentCount: 30,
-  weaponGripReviewFrames: 7,
+  weaponGripReviewFrames: 7, manualMasterReviewFrames: 5,
   performanceContract: OPERATOR_ARMS_RENDER_BUDGET,
   modifications: [
     'Removed unrelated source Icosphere object.',
     'Retargeted the 47-joint source to the 37-bone runtime contract and collapsed terminal tip joints.',
-    'Adapted bind shoulders, larger connected forearms, hero-scale hands and finger poses for the first-person camera and actual weapon sockets.',
-    'Capped proximal sleeves, converted source specular-glossiness maps to metallic-roughness PBR, and authored four skinned batches.',
-    'Added four gameplay sockets, thirteen action clips, a reduced LOD1, seven deterministic weapon-contact reviews and an authored G10 knife-grip proximity receipt.',
+    'Retained the accepted shoulder anchors, 37-bone skeleton, 30 deforming finger bones and thirteen authored clips.',
+    'Added local wrist/cuff topology, smoothed the firing/support forearm-to-glove volume and repainted LowerArm/Wrist transition weights.',
+    'Separated and rounded the five articulated digit branches per hand while preserving the licensed UVs and action tracks.',
+    'Retoned the owned packed tactical base color to increase hand and sleeve separation on the Gun Range shadow floor.',
+    'Added full-transform left/right palm contact nodes below the authored wrist bones without changing runtime IK, weapon-ray or gameplay authority.',
+    'Exported a reduced LOD1 from the pinned manual master and generated five deterministic deformation/anatomy review frames.',
   ],
   removedObjects: ['Icosphere'], sourceJointCount: 47, runtimeBoneCount: 37,
   review: {
     authoringSeed: 0, frame: 1, renderEngine: 'BLENDER_EEVEE',
     renders: armsRenders, contactSheet: armsContactSheet, contactReceipt: armsContactReceipt,
+    retainedWeaponContactBaseline: armsRejectedBaselineContactReceipt,
   },
   runtimeAudit: { lods: armsAudits.map(({ failures: _failures, ...audit }) => audit), externalUris: 0 },
   determinismCommand: 'npm run author:blender-operator-arms',
@@ -231,13 +248,16 @@ productionManifest.operatorArms = {
   pbrMaps: armsPbrMaps, provenance: armsProvenanceRecord,
   bones: REQUIRED_ARM_BONES, sockets: REQUIRED_ARM_SOCKETS, actions: REQUIRED_CORE_ACTIONS,
   materialContract: 'opaque-depth-writing',
-  visualRevision: 'licensed-anatomical-viewmodel-v8',
-  limbProfileContract: 'hero-scale-connected-forearm-deformation-v2',
-  handPoseContract: 'licensed-articulated-weapon-and-knife-grip-v2',
+  materialContrastContract: 'owned-basecolor-contrast-retone-v1',
+  visualRevision: 'pass70-manual-anatomical-viewmodel-v1',
+  limbProfileContract: 'manual-continuous-cuff-forearm-deformation-v1',
+  handPoseContract: 'manual-separated-articulated-digit-contact-v1',
   shoulderEntryContract: 'weighted-capped-fps-frame-edge-sleeve-v2',
-  gloveConstructionContract: 'opaque-uv-preserved-scaled-anatomical-hand-v2',
+  gloveConstructionContract: 'opaque-manual-cuff-palm-digit-continuity-v1',
+  palmContactContract: 'authored-wrist-parented-full-transform-v1',
   weaponGripReviewContract: 'seven-view-actual-weapon-contact-v2',
-  weightingContract: 'adjacent-bone-normalized-blend-v5',
+  weightingContract: 'manual-adjacent-joint-normalized-blend-v1',
+  manualMasterContract: 'checked-in-editable-blend-export-only-v1',
   runtimeAnimationContract: 'authored-fingers-under-runtime-chain-ik-v1',
   fingerSegmentCount: 30,
   weaponGripReviewFrames: 7,
@@ -269,7 +289,7 @@ const assetRecords = [
     kind: 'cc-by-4.0-source-project-blender-pbr-skinned-first-person-operator-derivative',
     creator: 'DJMaesen source; Atomic Acres controlled Blender derivative',
     source: 'https://sketchfab.com/3d-models/fps-arms-08ec4403a47645d8ad80633abf13d39d',
-    sourceCreatorUrl: 'https://sketchfab.com/bumstrum', generatedAsOf: '2026-07-29',
+    sourceCreatorUrl: 'https://sketchfab.com/bumstrum', generatedAsOf: '2026-08-11',
     license: 'Creative Commons Attribution 4.0 International (CC BY 4.0)',
     licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
     attribution: '"fps arms" by DJMaesen (bumstrum), modified by Atomic Acres, licensed under CC BY 4.0.',
@@ -280,7 +300,7 @@ const assetRecords = [
     sourceProvenance: armsProvenanceRecord.path, sourceProvenanceSha256: armsProvenanceRecord.sha256,
     preview: armsContactSheet.path,
     format: 'Two decreasing optimized self-contained glTF 2.0 skinned LODs with 37-bone dedicated skeleton, four material-compatible skinned renderables per LOD, embedded WebP PBR textures, opaque materials and thirteen action clips',
-    modifications: 'Removed the unrelated Icosphere; retargeted 47 source joints to the 37-bone runtime rig; collapsed terminal tip joints into distal phalanges; enlarged the complete connected forearm/hand presentation while preserving weights and cuff overlap; refined real firearm and G10 knife grips for the FPS camera; lifted crushed charcoal PBR response; capped proximal sleeves; authored four disjoint skinned batches, four gameplay sockets, thirteen action clips, a true reduced LOD1, and seven strict contact views.',
+    modifications: 'Retained the licensed 37-bone/30-finger-bone derivative and its thirteen clips; manually added local wrist/cuff deformation loops, smoothed forearm-to-glove volume, repainted LowerArm/Wrist transitions, separated and rounded all articulated digit branches, added two wrist-parented full-transform palm contacts, exported a reduced LOD1, and generated five deterministic master reviews while preserving runtime IK and weapon authority.',
     attributionRequired: true,
   },
   {

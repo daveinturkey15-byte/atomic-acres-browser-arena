@@ -24,6 +24,7 @@ type ProductionEntry = Readonly<{
   worldGlbs?: readonly { path: string; sha256: string; triangles: number; renderPrimitives?: number }[];
   dropGlbs?: readonly { path: string; sha256: string; triangles: number; renderPrimitives?: number }[];
   actions?: readonly string[];
+  sockets?: readonly string[];
   pbrMaps?: Readonly<Record<string, { path: string; sha256: string }>>;
   opticMagnification?: number;
   materialContract?: string;
@@ -91,20 +92,25 @@ describe('Pass 65 Blender weapon and operator production gate', () => {
       sourceKind: 'license-vetted-cc-by-4.0-blender-derivative',
       materialContract: 'opaque-depth-writing',
       currentRuntimeSource: 'public/assets/original/models/operators/pass65-first-person-arms-lod0.glb',
-      visualRevision: 'licensed-anatomical-viewmodel-v8',
-      limbProfileContract: 'hero-scale-connected-forearm-deformation-v2',
-      handPoseContract: 'licensed-articulated-weapon-and-knife-grip-v2',
+      visualRevision: 'pass70-manual-anatomical-viewmodel-v1',
+      limbProfileContract: 'manual-continuous-cuff-forearm-deformation-v1',
+      handPoseContract: 'manual-separated-articulated-digit-contact-v1',
       shoulderEntryContract: 'weighted-capped-fps-frame-edge-sleeve-v2',
-      gloveConstructionContract: 'opaque-uv-preserved-scaled-anatomical-hand-v2',
+      gloveConstructionContract: 'opaque-manual-cuff-palm-digit-continuity-v1',
+      palmContactContract: 'authored-wrist-parented-full-transform-v1',
       weaponGripReviewContract: 'seven-view-actual-weapon-contact-v2',
-      weightingContract: 'adjacent-bone-normalized-blend-v5',
+      weightingContract: 'manual-adjacent-joint-normalized-blend-v1',
+      manualMasterContract: 'checked-in-editable-blend-export-only-v1',
       runtimeAnimationContract: 'authored-fingers-under-runtime-chain-ik-v1',
       fingerSegmentCount: 30,
       weaponGripReviewFrames: 7,
     });
     expect(manifest.operatorArms.review?.renders?.map((render) => render.cameraId)).toEqual(expect.arrayContaining([
-      'pistol-hip', 'mp5-hip', 'm4a1-hip', 'm4a1-grip-oblique',
-      'm4a1-ads', 'm4a1-reload', 'knife-contact',
+      'neutral-front', 'forearm-wrist-quarter', 'hand-anatomy-closeup',
+      'reload-cuff-flex', 'firing-digit-separation',
+    ]));
+    expect(manifest.operatorArms.sockets).toEqual(expect.arrayContaining([
+      'right-palm-contact', 'left-palm-contact',
     ]));
     expect(manifest.operatorArms.firstPersonGlbs).toHaveLength(2);
     expect(manifest.operatorArms.renderBudget).toEqual({

@@ -3,13 +3,28 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
   WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT,
+  WINDOW_GLASS_DEBRIS_SETTLE_TOLERANCE_M,
   WINDOW_GLASS_DEBRIS_VISUAL_CONTRACT,
   createFracturedWindowDebrisVisual,
   prewarmFracturedWindowDebrisVisual,
   updateFracturedWindowDebrisVisual,
+  windowGlassDebrisSettleMode,
 } from './window-glass-debris-presentation';
 
 describe('persistent window glass debris presentation', () => {
+  it('rejects a physics sleep above floor height and settles only at the floor', () => {
+    expect(windowGlassDebrisSettleMode(2.4, 0.6, false)).toBe('physics-active');
+    expect(windowGlassDebrisSettleMode(2.4, 0.6, true)).toBe('presentation-fall');
+    expect(windowGlassDebrisSettleMode(0.6 + WINDOW_GLASS_DEBRIS_SETTLE_TOLERANCE_M, 0.6, true))
+      .toBe('settled');
+    expect(windowGlassDebrisSettleMode(
+      0.6 + WINDOW_GLASS_DEBRIS_SETTLE_TOLERANCE_M + 1e-6,
+      0.6,
+      true,
+    )).toBe('presentation-fall');
+    expect(() => windowGlassDebrisSettleMode(Number.NaN, 0.6, true)).toThrow(TypeError);
+  });
+
   it('renders separated triangular shards instead of an intact falling pane', () => {
     const halfExtents = { x: 0.7, y: 0.6, z: 0.03 };
     const root = createFracturedWindowDebrisVisual({

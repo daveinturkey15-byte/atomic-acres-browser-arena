@@ -10,7 +10,7 @@ import {
   advanceFlareProjectileKinematics,
 } from './special-weapon-effects';
 
-export const FLARE_AUTHORITY_CHECKPOINT_SCHEMA_VERSION = 1 as const;
+export const FLARE_AUTHORITY_CHECKPOINT_SCHEMA_VERSION = 2 as const;
 export const FLARE_BURN_PULSE_INTERVAL_MS = 500;
 export const FLARE_BURN_PULSE_COUNT = FLARE_PROJECTILE_EFFECT.burnDurationMs / FLARE_BURN_PULSE_INTERVAL_MS;
 export const MAX_FLARE_SHOOTER_FEEDBACK_CONTEXTS = MAX_FLARE_PRESENTATION_REPLICAS;
@@ -18,6 +18,7 @@ export const FLARE_SHOOTER_FEEDBACK_MAX_REMAINING_MS = FLARE_PROJECTILE_EFFECT.m
   + FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000;
 
 export type FlareAuthorityContinuationEntity = FlarePresentationReplicaSnapshot & Readonly<{
+  directHitDelivered: boolean;
   nextBurnPulseRemainingMs: number | null;
   burnPulseIndex: number;
 }>;
@@ -93,7 +94,7 @@ export function isFlareAuthorityContinuationEntity(value: unknown): value is Fla
   if (!isRecord(value)
     || !exactKeys(value, [
       'ownerId', 'ownerTeam', 'actionNonce', 'phase', 'position', 'velocity', 'remainingMs',
-      'nextBurnPulseRemainingMs', 'burnPulseIndex',
+      'directHitDelivered', 'nextBurnPulseRemainingMs', 'burnPulseIndex',
     ])) return false;
   const replica = {
     ownerId: value.ownerId,
@@ -105,6 +106,7 @@ export function isFlareAuthorityContinuationEntity(value: unknown): value is Fla
     remainingMs: value.remainingMs,
   };
   if (!isFlarePresentationReplicaSnapshot(replica)
+    || typeof value.directHitDelivered !== 'boolean'
     || !boundedInteger(value.burnPulseIndex, 0, FLARE_BURN_PULSE_COUNT)) return false;
   if (replica.phase === 'flight') {
     return value.nextBurnPulseRemainingMs === null && value.burnPulseIndex === 0;

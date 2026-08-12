@@ -492,6 +492,79 @@ describe('host killstreak runtime', () => {
       .toContainEqual(expect.objectContaining({ ordinal: 0, phase: 'impact', impactAtMs: 2_000 }));
   });
 
+  it('rejects a fully blocked Carpet route before consuming the reward and permits an exact retry', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'carpet-bomber', 'chopper', 'nuke']));
+    earn(runtime, 7);
+    const blockedWorld: KillstreakWorld = {
+      ...DEFAULT_WORLD,
+      resolveFlightEnvelopePosition: (from) => [...from],
+    };
+    const activationIntent = intent('carpet-bomber', 3, 1, 'activation-blocked-route');
+    expect(runtime.activate(activationIntent, 1_000, blockedWorld)).toMatchObject({
+      accepted: false,
+      reason: 'no-clear-carpet-route',
+    });
+    expect(runtime.carpetBomberReservationCount()).toBe(0);
+    expect(runtime.snapshotFor('owner', 1_001).actors[0].available).toContain('carpet-bomber');
+
+    expect(runtime.activate(activationIntent, 1_002, DEFAULT_WORLD)).toMatchObject({
+      accepted: true,
+      activatedId: 'carpet-bomber',
+    });
+    expect(runtime.carpetBomberReservationCount()).toBe(1);
+  });
+
+  it('selects a deterministic alternate heading when the requested Carpet corridor is blocked', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'carpet-bomber', 'chopper', 'nuke']));
+    earn(runtime, 7);
+    let rejectedHorizontalSweeps = 0;
+    const headingWorld: KillstreakWorld = {
+      ...DEFAULT_WORLD,
+      resolveFlightEnvelopePosition: (from, desired) => {
+        const dx = Math.abs(desired[0] - from[0]);
+        const dz = Math.abs(desired[2] - from[2]);
+        if (dx > dz * 2 && dx > 0.5) {
+          rejectedHorizontalSweeps += 1;
+          return [...from];
+        }
+        return [...desired];
+      },
+    };
+    const result = runtime.activate({
+      ...intent('carpet-bomber', 3),
+      facing: [1, 0, 0],
+    }, 1_000, headingWorld);
+    expect(result.accepted).toBe(true);
+    expect(rejectedHorizontalSweeps).toBeGreaterThan(0);
+    const before = runtime.snapshotFor('owner', 1_000).entities.find((entity) => entity.id === result.entityIds[0]);
+    runtime.advance(2_000, headingWorld);
+    const after = runtime.snapshotFor('owner', 2_000).entities.find((entity) => entity.id === result.entityIds[0]);
+    expect(before).toBeDefined();
+    expect(after).toBeDefined();
+    expect(Math.abs(after!.position[2] - before!.position[2]))
+      .toBeGreaterThan(Math.abs(after!.position[0] - before!.position[0]));
+  });
+
+  it('never releases undropped Carpet payload while the admitted airframe is stopped, then cleans the reservation', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'carpet-bomber', 'chopper', 'nuke']));
+    earn(runtime, 7);
+    let liveRouteBlocked = false;
+    const world: KillstreakWorld = {
+      ...DEFAULT_WORLD,
+      resolveFlightEnvelopePosition: (from, desired) => liveRouteBlocked ? [...from] : [...desired],
+    };
+    expect(runtime.activate(intent('carpet-bomber', 3), 1_000, world).accepted).toBe(true);
+    liveRouteBlocked = true;
+    const emitted = [];
+    for (let now = 1_000; now <= 9_000; now += 100) emitted.push(...runtime.advance(now, world).impactEvents);
+    expect(emitted).toEqual([]);
+    expect(runtime.carpetBomberReservationCount()).toBe(0);
+    expect(runtime.snapshotFor('owner', 9_001).entities.filter((entity) => entity.kind === 'aircraft')).toEqual([]);
+  });
+
   it('preserves a real 420ms shell lead after a coarse/stalled host advance', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'carpet-bomber', 'chopper', 'nuke']));
@@ -535,6 +608,31 @@ describe('host killstreak runtime', () => {
     });
     expect(result.damageEvents.find((event) => event.targetId === 'exact-impact-enemy'
       && event.origin.every((value, axis) => value === exactImpact[axis]))?.damage).toBe(CARPET_BOMBER_MAX_DAMAGE);
+  });
+
+  it('lifts only the room-collision LOS probe above the floor while retaining the exact impact origin', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'carpet-bomber', 'chopper', 'nuke']));
+    earn(runtime, 7);
+    runtime.activate(intent('carpet-bomber', 3), 1_000, DEFAULT_WORLD);
+    const [drop] = runtime.advance(
+      1_000 + CARPET_TARGET_MARKER_MAX_LIFETIME_MS - CARPET_BOMB_SHELL_DROP_LEAD_MS,
+      DEFAULT_WORLD,
+    ).impactEvents;
+    expect(drop).toMatchObject({ ordinal: 0, phase: 'drop' });
+    const observedOrigins: readonly number[][] = [];
+    const result = runtime.advance(drop!.impactAtMs, {
+      ...DEFAULT_WORLD,
+      targets: [{
+        id: 'floor-victim', kind: 'player', team: 1, lifeId: 1, alive: true, position: drop!.position,
+      }],
+      hasLineOfSight: (from) => {
+        (observedOrigins as number[][]).push([...from]);
+        return from[1] > drop!.position[1];
+      },
+    });
+    expect(observedOrigins).toContainEqual([drop!.position[0], drop!.position[1] + 0.08, drop!.position[2]]);
+    expect(result.damageEvents.find((event) => event.targetId === 'floor-victim')?.origin).toEqual(drop!.position);
   });
 
   it('contains every admitted payload inside its seeded mildly-wide corridor across seeds, bounds and surfaces', () => {

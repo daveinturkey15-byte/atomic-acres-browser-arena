@@ -122,6 +122,15 @@ export function arenaSelection(id: string | null | undefined): ArenaSelection {
   return ARENA_SELECTIONS.find((entry) => entry.id === decoded) ?? ARENA_SELECTIONS[0]!;
 }
 
+/** The menu copy and every hosted authority path share this one round clock. */
+export function hostedArenaDurationMs(selection: ArenaSelection): number {
+  return selection.matchRules.durationMs ?? MATCH_DURATION_MS;
+}
+
+export function arenaCanvasLabel(selection: ArenaSelection): string {
+  return `${selection.displayName} multiplayer arena`;
+}
+
 export function activeSoloBotTarget(selection: ArenaSelection, cumulativeDeaths: number): number {
   if (selection.id !== 'atomic-acres') return selection.soloBotCount;
   return Math.min(selection.maximumSoloBots, soloBotTargetForDeaths(cumulativeDeaths));

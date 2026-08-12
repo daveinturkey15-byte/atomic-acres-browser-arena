@@ -10,6 +10,7 @@ import {
 } from './host-match-checkpoint';
 import { MULTIPLAYER_PROTOCOL_VERSION, WEAPON_IDS, type WeaponId } from './protocol';
 import { createRailgunAuthorityState } from './railgun-authority';
+import { FLARE_AUTHORITY_CHECKPOINT_SCHEMA_VERSION } from './flare-authority-checkpoint';
 
 function counters(value: number): Record<WeaponId, number> {
   return Object.fromEntries(WEAPON_IDS.map((weapon) => [weapon, value])) as Record<WeaponId, number>;
@@ -46,7 +47,7 @@ function baseCheckpoint(killstreak?: HostMatchCheckpoint['killstreak']): HostMat
     guests: [],
     bots: [],
     resumeTokenDigests: [],
-    flareProjectiles: { schemaVersion: 1, snapshotSeq: 0, effects: [] },
+    flareProjectiles: { schemaVersion: FLARE_AUTHORITY_CHECKPOINT_SCHEMA_VERSION, snapshotSeq: 0, effects: [] },
     flareShotFeedback: [],
     railgun: checkpointRailgunAuthority(createRailgunAuthorityState('disabled', 0, 0, 1), 5_000)!,
     ...(killstreak ? { killstreak } : {}),

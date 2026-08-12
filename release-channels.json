@@ -2,14 +2,25 @@
   "schemaVersion": 4,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 69",
-    "description": "Pass 69: the current locally approved gameplay, weapons, support, mobile and visual build."
+    "label": "PASS 70",
+    "description": "Pass 70: gameplay, weapons, support, multiplayer, mobile and visual improvements."
   },
   "experimental": {
-    "label": "PASS 69",
-    "description": "The current locally approved Pass 69 build.",
-    "pass": "PASS 69",
+    "label": "PASS 70",
+    "description": "Pass 70 gameplay and presentation build.",
+    "pass": "PASS 70",
     "path": "channels/the-big-one"
+  },
+  "retained": {
+    "label": "PASS 69 · PREVIOUS LIVE",
+    "description": "The exact previously hosted Pass 69 build, retained byte-for-byte for comparison and fallback testing.",
+    "pass": "PASS 69",
+    "sourceSha": "685ed7865018e107df5acf6cb6f7498b4468940c",
+    "pagesSha": "71ec5616504d8e24241450742d01b25c1d6ff4e4",
+    "pagesPath": "channels/the-big-one",
+    "runtimeFileCount": 515,
+    "runtimeTreeSha256": "5ace26fdf83a4cf695d0075a40523f70e0d6fcee02cb6ae5b42666b6679107b9",
+    "path": "channels/pass69-retained"
   },
   "stable": {
     "label": "STABLE SINGLEPLAYER",
@@ -27,6 +38,10 @@
     "description": "The retained stable WebGL build, rebuilt deterministically from its approved Pass 63 source SHA.",
     "pass": "PASS 63",
     "sourceSha": "ac85e9b8b46cc2370aee903d564ecf3c4682b24c",
+    "pagesSha": "46d366d188bfc5ebc5ee7a991fd52b792575316c",
+    "pagesPath": "channels/pass63-rollback",
+    "runtimeFileCount": 119,
+    "runtimeTreeSha256": "b7416e02c190d8ff0403a65cd7a7c894970507bc6a8de7b196cc2d7979d69bce",
     "path": "channels/pass63-rollback",
     "rebuiltFromSource": true
   }

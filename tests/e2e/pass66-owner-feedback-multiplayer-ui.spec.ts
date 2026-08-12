@@ -57,7 +57,7 @@ async function sendChat(page: Page, text: string): Promise<void> {
 }
 
 test('host map changes converge and lobby controls remain stable across streak selection', async ({ browser, browserName }, testInfo) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   test.skip(browserName === 'firefox', 'Bundled headless Firefox SWGL cannot retain two simultaneous GPU pages; the single-page Firefox contract runs below.');
   const [hostContext, guestContext] = await Promise.all([
     browser.newContext({ viewport: { width: 1_920, height: 1_080 } }),
@@ -168,6 +168,12 @@ test('host map changes converge and lobby controls remain stable across streak s
     for (const page of [host, guest]) {
       await expect(page.locator('#lobby-arena')).toHaveValue(arenaId);
       await expect(page.locator('#lobby-ready')).toBeEnabled();
+      await expect(page.locator('#game')).toHaveAttribute(
+        'aria-label',
+        `${arenaId === 'atomic-acres' ? 'Nuke Town' : arenaId === 'skyline-terminal' ? 'Terminal' : arenaId === 'rustworks-1v1' ? 'RustRig' : 'Gun Range'} multiplayer arena`,
+      );
+      expect(await page.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.durationMs))
+        .toBe(arenaId === 'gun-range' ? 120_000 : 300_000);
     }
     await expect(guest.locator('#lobby-arena')).toBeDisabled();
   }
@@ -212,8 +218,8 @@ test('host map changes converge and lobby controls remain stable across streak s
     return { readability: remote.readability, screenPosition: remote.screenPosition };
   });
   expect(servedReadability.readability).toMatchObject({
-    color: 0xff7a2a,
-    intensity: 0.11,
+    color: 0xff8c3a,
+    intensity: 0.25,
     allDepthTested: true,
     allDepthWriting: true,
   });
@@ -291,5 +297,63 @@ test('host map changes converge and lobby controls remain stable across streak s
   const matchShot = resolve(output, 'match-chat-2560x1440.png');
   await host.screenshot({ path: matchShot, animations: 'disabled' });
   await testInfo.attach('match-chat-2560x1440', { path: matchShot, contentType: 'image/png' });
+
+  // A second round turns the prior false-positive QA shortcut into a real
+  // guest-to-host authority adversary without weakening the first match's
+  // retained RustRig UI/readability coverage.
+  await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.endMatch());
+  await Promise.all([host, guest].map((page) => page.waitForFunction(() => (
+    document.querySelector('#rematch') !== null
+  ), undefined, { timeout: 15_000 })));
+  await host.click('#rematch');
+  await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
+    const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+    return state.gameStarted === false && state.privateMatch?.phase === 'waiting';
+  }, undefined, { timeout: 30_000 })));
+  await host.locator('#lobby-arena').selectOption('atomic-acres');
+  await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
+    const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+    return state.privateMatch?.arenaId === 'atomic-acres' && state.arenaSelection.id === 'atomic-acres';
+  }, undefined, { timeout: 60_000 })));
+  await host.click('#lobby-ready');
+  await guest.click('#lobby-ready');
+  await expect(host.locator('#lobby-start')).toBeEnabled();
+  await host.click('#lobby-start');
+  await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
+    const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+    return state.gameStarted && state.matchPhase === 'active' && state.arenaSelection.id === 'atomic-acres';
+  }, undefined, { timeout: 60_000 })));
+
+  const guestId = await host.evaluate(() => (
+    (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members
+      .find((member: any) => member.name === 'Owner Guest')?.id
+  ));
+  expect(typeof guestId).toBe('string');
+  const stagedRailgun = await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.stageRailgunSpawn(0));
+  await guest.waitForFunction(() => (
+    (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().railgun.status === 'available'
+  ), undefined, { timeout: 15_000 });
+  await guest.evaluate(([x, y, z]) => (
+    (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y, z)
+  ), stagedRailgun.pickupPosition);
+  await host.waitForFunction(({ id, pickup }) => {
+    const remote = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
+      .find((candidate: any) => candidate.id === id);
+    return remote && Math.hypot(
+      remote.authoritativePosition[0] - pickup[0],
+      remote.authoritativePosition[2] - pickup[2],
+    ) < 0.25;
+  }, { id: guestId, pickup: stagedRailgun.pickupPosition }, { timeout: 15_000 });
+  expect(await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.interactRailgun())).toBe(true);
+  await Promise.all([host, guest].map((page) => page.waitForFunction((expectedHolderId) => {
+    const railgun = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().railgun;
+    return railgun.status === 'held' && railgun.holderId === expectedHolderId;
+  }, guestId, { timeout: 15_000 })));
+  expect(await host.evaluate(() => (
+    (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().railgun.claimAudit.accepted
+  ))).toBe(1);
+  expect(await guest.evaluate(() => (
+    (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().railgun.localHolder
+  ))).toBe(true);
   await Promise.all([hostContext.close(), guestContext.close()]);
 });

@@ -1,0 +1,28 @@
+{
+  "schema": "atomic-acres/pass69-multiplayer-soak-comparator@1",
+  "recordedAt": "2026-08-11",
+  "sourceSha": "685ed7865018e107df5acf6cb6f7498b4468940c",
+  "elapsedSeconds": 7219,
+  "isolatedCycles": 64,
+  "guestReloadRejoin": {
+    "passed": 64,
+    "failed": 0
+  },
+  "hostCrashResume": {
+    "passed": 63,
+    "failed": 1,
+    "failedCycle": 52,
+    "assertionWindowMs": 90000
+  },
+  "combined": {
+    "passed": 127,
+    "failed": 1
+  },
+  "confirmedDefects": [
+    "QA Railgun guest interaction bypassed host authority and reproduced divergence twice",
+    "host room reclaim could stop before the 90-second recovery assertion window",
+    "host lobby Gun Range selection retained the prior arena duration",
+    "active Gun Range canvas retained the Nuke Town label"
+  ],
+  "promotionRequirement": "Run the same 64-cycle, two-hour alternating recovery soak against the exact clean Pass 70 candidate; require 128 of 128 recovery assertions plus the supported multiplayer stability gate."
+}

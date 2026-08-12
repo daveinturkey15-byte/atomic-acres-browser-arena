@@ -6,7 +6,40 @@ const VIEWPORTS: readonly Viewport[] = Object.freeze([
   { name: '1440p', width: 2560, height: 1440 },
   { name: '4k', width: 3840, height: 2160 },
   { name: 'ultrawide-1440p', width: 3440, height: 1440 },
+  { name: 'iphone-15-landscape', width: 844, height: 390 },
 ]);
+
+const SHOULDER_ENTRY_NDC = Object.freeze({ left: -1.12, right: -1.07 });
+const MAXIMUM_ARM_SEGMENT_LENGTH_SCALE = 2.2;
+
+function assertAuthoredArmCropAndGrip(presentation: any, label: string, maximumContactError: number): void {
+  expect(presentation.armsSource, `${label}: authored two-chain source`).toBe('authored-two-chain');
+  expect(presentation.armFraming, `${label}: authored arms continue below viewport`).toMatchObject({
+    finite: true,
+    nearPlaneClear: true,
+    intersectsViewport: true,
+  });
+  expect(presentation.armFraming.ndcMin[1], `${label}: no detached lower sleeve edge`).toBeLessThanOrEqual(-1.2);
+  expect(presentation.riggedArms, `${label}: both authored arms diagnosed`).toHaveLength(2);
+  for (const side of ['right', 'left'] as const) {
+    const arm = presentation.riggedArms.find((candidate: { side: string }) => candidate.side === side);
+    expect(arm, `${label}: ${side} authored arm`).toMatchObject({
+      active: true,
+      finite: true,
+      withinStableReach: true,
+      authoredSegmentDirectionsPreserved: true,
+      poseChainContract: 'authored-palm-full-transform-to-socket-frame-v2',
+      shoulderEntryPolicy: 'camera-space-below-frame-continuation-v1',
+    });
+    expect(arm.shoulderEntryNdc[1], `${label}: ${side} shoulder enters below frame`)
+      .toBeLessThanOrEqual(SHOULDER_ENTRY_NDC[side] + 0.001);
+    expect(arm.contactError, `${label}: ${side} palm/socket contact`).toBeLessThanOrEqual(maximumContactError);
+    expect(arm.wristContactError, `${label}: ${side} wrist target contact`).toBeLessThanOrEqual(maximumContactError);
+    expect(arm.palmOrientationError, `${label}: ${side} human palm orientation`).toBeLessThanOrEqual(0.2);
+    expect(arm.segmentLengthScale, `${label}: ${side} bounded anatomical reach`)
+      .toBeLessThanOrEqual(MAXIMUM_ARM_SEGMENT_LENGTH_SCALE);
+  }
+}
 
 async function snapshot(page: Page): Promise<any> {
   return page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot());
@@ -67,7 +100,7 @@ test('keeps authored arms and knife readable at 1440p, 4K and ultrawide', async 
       api.setMeleeCaptureProgress(null);
     });
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.adsProgress < 0.02);
-    await page.waitForTimeout(180);
+    await page.waitForTimeout(300);
     const hip = (await snapshot(page)).weaponPresentation;
     expect(hip.armsSource, `${viewport.name}: authored arms`).toBe('authored-two-chain');
     expect(hip.authoredFingerBoneCount, `${viewport.name}: articulated fingers`).toBe(30);
@@ -88,11 +121,12 @@ test('keeps authored arms and knife readable at 1440p, 4K and ultrawide', async 
     expect(hip.armFraming, `${viewport.name}: finite hip framing`).toMatchObject({
       finite: true, nearPlaneClear: true, intersectsViewport: true,
     });
+    assertAuthoredArmCropAndGrip(hip, `${viewport.name}: hip`, 0.015);
     await capture(page, testInfo, viewport, 'hip');
 
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.adsProgress > 0.98);
-    await page.waitForTimeout(120);
+    await page.waitForTimeout(300);
     const ads = (await snapshot(page)).weaponPresentation;
     expect(Math.hypot(...ads.sightOffset), `${viewport.name}: physical ADS centre`).toBeLessThanOrEqual(0.03);
     expect(ads.armFraming, `${viewport.name}: ADS arm framing`).toMatchObject({
@@ -110,6 +144,7 @@ test('keeps authored arms and knife readable at 1440p, 4K and ultrawide', async 
       ads.armFraming.nearestDepth - ads.weaponFraming.nearestDepth,
       `${viewport.name}: ADS receiver depth clearance`,
     ).toBeGreaterThan(0.08);
+    assertAuthoredArmCropAndGrip(ads, `${viewport.name}: ADS`, 0.015);
     await capture(page, testInfo, viewport, 'ads');
 
     await page.evaluate(() => {
@@ -126,6 +161,7 @@ test('keeps authored arms and knife readable at 1440p, 4K and ultrawide', async 
       return presentation?.adsProgress < 0.02
         && presentation?.authoredArmAnimation?.activeAction === 'reload';
     });
+    await page.waitForTimeout(300);
     const reload = (await snapshot(page)).weaponPresentation;
     expect(reload.authoredArmAnimation).toMatchObject({
       activeAction: 'reload',
@@ -136,6 +172,7 @@ test('keeps authored arms and knife readable at 1440p, 4K and ultrawide', async 
       expect(arm, `${viewport.name}: ${side} reload arm`).toMatchObject({ finite: true, withinStableReach: true });
       expect(arm.contactError, `${viewport.name}: ${side} reload hand contact`).toBeLessThanOrEqual(0.02);
     }
+    assertAuthoredArmCropAndGrip(reload, `${viewport.name}: reload`, 0.02);
     await capture(page, testInfo, viewport, 'reload-0_46');
 
     await page.evaluate(() => {
@@ -160,6 +197,7 @@ test('keeps authored arms and knife readable at 1440p, 4K and ultrawide', async 
     });
     expect(melee.authoredMeleeGripError, `${viewport.name}: grip-to-socket contact`).toBeLessThanOrEqual(0.001);
     expect(melee.authoredMeleeHandContactError, `${viewport.name}: knife remains in the posed firing hand`).toBeLessThanOrEqual(0.015);
+    expect(melee.armFraming.ndcMin[1], `${viewport.name}: melee sleeves continue below viewport`).toBeLessThanOrEqual(-1.2);
     await capture(page, testInfo, viewport, 'melee-0_42');
 
     await page.evaluate(() => {
@@ -187,6 +225,7 @@ test('keeps authored arms and knife readable at 1440p, 4K and ultrawide', async 
       prone.viewmodelViewport.rootPosition[1],
       `${viewport.name}: applied prone floor clearance`,
     ).toBeGreaterThan(hip.viewmodelViewport.rootPosition[1]);
+    assertAuthoredArmCropAndGrip(prone, `${viewport.name}: prone wall/floor contact`, 0.02);
     await capture(page, testInfo, viewport, 'prone-wall-floor-clearance');
     await page.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;

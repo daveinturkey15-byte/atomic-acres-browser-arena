@@ -20,6 +20,18 @@ export const GUN_RANGE_TEST_BAY_INTERIOR_VOLUME: ArenaInteriorVolumeDefinition =
   maximum: [99.95, 8.125, 37.95] as const,
 });
 
+export const GUN_RANGE_TEST_BAY_DOOR_APPROACH_VOLUME: ArenaInteriorVolumeDefinition = Object.freeze({
+  id: 'gun-range-test-bay-door-approach-interior',
+  minimum: [20.3, 0.05, 7.8] as const,
+  maximum: [51.55, 7.15, 16.2] as const,
+});
+
+export const GUN_RANGE_TEST_BAY_DOOR_PORTAL_VOLUME: ArenaInteriorVolumeDefinition = Object.freeze({
+  id: 'gun-range-test-bay-door-portal-interior',
+  minimum: [50.9, 0.05, 7.8] as const,
+  maximum: [52.1, 7.15, 16.2] as const,
+});
+
 export const definition = createProceduralArenaVisualDefinition({
   id: 'gun-range',
   displayLabel: 'Gun Range',
@@ -101,6 +113,44 @@ export const definition = createProceduralArenaVisualDefinition({
         },
       },
       {
+        id: 'test-bay-door-approach-key',
+        policy: 'shadowed-local',
+        maximumDistance: 16,
+        castsShadow: true,
+        light: {
+          kind: 'spot',
+          position: [51.05, 6.7, 12],
+          target: [47.5, 2.5, 12],
+          color: 0x72f4ed,
+          intensity: 12,
+          distance: 16,
+          angle: 0.82,
+          penumbra: 0.84,
+          decay: 2,
+          shadowMapSize: 256,
+          intendedVolume: GUN_RANGE_TEST_BAY_DOOR_APPROACH_VOLUME,
+        },
+      },
+      {
+        id: 'test-bay-door-bay-key',
+        policy: 'shadowed-local',
+        maximumDistance: 16,
+        castsShadow: true,
+        light: {
+          kind: 'spot',
+          position: [52.1, 6.7, 12],
+          target: [55.8, 2.5, 12],
+          color: 0xffc06a,
+          intensity: 14,
+          distance: 16,
+          angle: 0.76,
+          penumbra: 0.86,
+          decay: 2,
+          shadowMapSize: 256,
+          intendedVolume: GUN_RANGE_TEST_BAY_INTERIOR_VOLUME,
+        },
+      },
+      {
         id: 'test-bay-inspection-key',
         policy: 'shadowed-local',
         maximumDistance: 54,
@@ -152,7 +202,7 @@ export const definition = createProceduralArenaVisualDefinition({
   shadows: { enabled: true, mapSize: 1024, maximumDistance: 128, normalBias: 0.03 },
   atmosphere: { preset: 'indoor-range', mist: 0.08, dust: 0.08, clouds: false },
   colorPipeline: colorPipeline('pass64.gun-range.hdr.v1', 1),
-  budgets: budgets({ maximumDrawCalls: 370, maximumTriangles: 760_000, maximumTextureBytes: 224 * 1024 * 1024, maximumShadowLights: 5 }),
+  budgets: budgets({ maximumDrawCalls: 402, maximumTriangles: 780_000, maximumTextureBytes: 224 * 1024 * 1024, maximumShadowLights: 7 }),
   reviewCameras: [
     // Stay below the 7.1 m ceiling and offset from the armory header so the
     // overview frames the booths, target lanes and backstop instead of ceiling.
@@ -162,6 +212,9 @@ export const definition = createProceduralArenaVisualDefinition({
     camera('gun-range-neon-lanes', [0, 2.55, -1], [0, 1.7, -36], 'light-occlusion', 1.16),
     camera('gun-range-lateral-targets', [0, 2.45, -18.5], [0, 1.72, -29], 'geometry', 1.18),
     camera('gun-range-test-bay-corridor', [24, 2.25, 10.25], [51.5, 2.15, 12], 'geometry', 1.08),
+    camera('gun-range-test-bay-door-approach', [44.5, 2.3, 10.1], [51.5, 3.05, 12], 'geometry', 1.02),
+    camera('gun-range-test-bay-door-relief', [43.2, 3.15, 12], [51.5, 3.15, 12], 'geometry', 0.84),
+    camera('gun-range-test-bay-door-bay-face', [59, 2.55, 13.9], [51.5, 3.05, 12], 'light-occlusion', 1.02),
     camera('gun-range-test-bay-overview', [92, 4.3, 34], [72, 1.2, 1], 'overview', 1.05),
   ],
   collisionIdentity: { authoritativeArenaId: 'gun-range', evidence: 'ArenaMap gun-range collider and shot-surface identity', presentationMayMutateAuthority: false },

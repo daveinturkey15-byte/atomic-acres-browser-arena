@@ -4,7 +4,7 @@ import {
   FLARE_PROJECTILE_EFFECT,
   advanceFlareProjectileKinematics,
   createFlareProjectileKinematics,
-  flareBurnDamage,
+  flareBurnDamagePerSecond,
   flareProjectileExpired,
   flamethrowerStreamScale,
 } from './special-weapon-effects';
@@ -29,11 +29,12 @@ describe('special weapon effect contracts', () => {
     expect(flareProjectileExpired({ ...first, ageMs: 5_500 })).toBe(true);
   });
 
-  it('uses a bounded non-explosive thermal burn falloff', () => {
-    expect(flareBurnDamage(0)).toBe(FLARE_PROJECTILE_EFFECT.maximumBurnDamage);
-    expect(flareBurnDamage(FLARE_PROJECTILE_EFFECT.burnRadiusM / 2)).toBeCloseTo(5, 8);
-    expect(flareBurnDamage(FLARE_PROJECTILE_EFFECT.burnRadiusM)).toBe(0);
-    expect(flareBurnDamage(Number.NaN)).toBe(0);
+  it('doubles only the flat bounded non-explosive fire zone to twenty DPS', () => {
+    expect(FLARE_PROJECTILE_EFFECT.directDamage).toBe(42);
+    expect(flareBurnDamagePerSecond(0)).toBe(20);
+    expect(flareBurnDamagePerSecond(FLARE_PROJECTILE_EFFECT.burnRadiusM / 2)).toBe(20);
+    expect(flareBurnDamagePerSecond(FLARE_PROJECTILE_EFFECT.burnRadiusM)).toBe(0);
+    expect(flareBurnDamagePerSecond(Number.NaN)).toBe(0);
   });
 
   it('ends the flamethrower stream at its canonical short range', () => {

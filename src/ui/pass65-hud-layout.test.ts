@@ -5,6 +5,7 @@ const hudCss = readFileSync(new URL('./pass65-hud.css', import.meta.url), 'utf8'
 const tacticalCss = readFileSync(new URL('./tactical-ui.css', import.meta.url), 'utf8');
 const rootCss = readFileSync(new URL('../style.css', import.meta.url), 'utf8');
 const shell = readFileSync(new URL('./pass64-shell.ts', import.meta.url), 'utf8');
+const mainSource = readFileSync(new URL('../legacy-main.ts', import.meta.url), 'utf8');
 
 describe('Pass 65 modern tactical HUD layout contract', () => {
   it('loads one late bounded HUD layer without bypassing the accessibility layer', () => {
@@ -38,11 +39,33 @@ describe('Pass 65 modern tactical HUD layout contract', () => {
     expect(hudCss).toMatch(/prefers-reduced-motion:\s*reduce[\s\S]*?#countdown\.countdown-cue-active[\s\S]*?animation:\s*none/);
   });
 
+  it('centres the urgent sticky warning safely while retaining compact combat status', () => {
+    expect(shell).toContain('id="sticky-warning" hidden role="alert" aria-live="assertive" aria-atomic="true"');
+    expect(hudCss).toMatch(/#sticky-warning\s*\{[\s\S]*?left:\s*50%[\s\S]*?top:\s*max\(/);
+    expect(hudCss).toMatch(/#sticky-warning\s*\{[\s\S]*?transform:\s*translate\(-50%, -50%\)/);
+    expect(hudCss).toContain('#sticky-warning[hidden] { display: none; }');
+    expect(hudCss).toMatch(/@media \(max-width: 760px\), \(max-height: 520px\)[\s\S]*?#sticky-warning/);
+    expect(hudCss).toContain("html[data-reduced-sensory='true'] #sticky-warning");
+    expect(mainSource).toContain("addFeed('STUCK', 'coral');");
+    expect(mainSource).toContain("addFeed('STUCK', 'gold');");
+  });
+
   it('keeps the possessed chopper HUD minimal, legible, and free of exterior rotor presentation', () => {
     expect(tacticalCss).toContain('#support-combat-feedback[data-support-kind="chopper"][data-possessed="true"]');
     expect(tacticalCss).toMatch(/data-support-kind="chopper"[\s\S]*?#support-platform-name\s*\{\s*font-size:\s*17px/);
     expect(tacticalCss).toMatch(/data-support-kind="chopper"[\s\S]*?\.support-optic-frame\s*\{[\s\S]*?width:\s*min\(62vw, 820px\)/);
     expect(shell).toContain('class="support-optic-frame" aria-hidden="true"');
+  });
+
+  it('gives Chopper possession one uncluttered HUD lane and one centre marker', () => {
+    for (const surface of [
+      '.hud-mission-console', '.hud-map-console', '.hud-operator-console', '.hud-weapon-console',
+      '#support-block', '#support-combat-feedback', '#crosshair',
+    ]) {
+      expect(hudCss).toContain(`html[data-killstreak-possession="chopper-gunner"] ${surface}`);
+    }
+    expect(hudCss).toMatch(/data-killstreak-possession="chopper-gunner"[\s\S]*?display:\s*none !important/);
+    expect(hudCss).not.toContain('html[data-killstreak-possession="chopper-gunner"] #gunner-cockpit-hud');
   });
 
   it('enhances the existing support action row without a duplicate operate banner', () => {

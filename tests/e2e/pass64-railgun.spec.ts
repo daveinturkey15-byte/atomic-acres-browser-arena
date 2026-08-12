@@ -76,6 +76,34 @@ test('railgun restores its through-wall thermal scope, exits ADS, and enforces r
   });
   expect(thermal.thermalContacts).toBeGreaterThanOrEqual(1);
   expect(thermal.worldSilhouettes).toBeGreaterThanOrEqual(1);
+  const settledScope = await page.evaluate(() => (
+    window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
+  ).__ATOMIC_ACRES_DEBUG__.snapshot());
+  expect(settledScope.railgunScope).toMatchObject({
+    contract: 'railgun-authored-clear-scope-v1',
+    active: true,
+    magnification: 2.5,
+    fovSettled: true,
+    adsSettled: true,
+    lens: 'clear-open-aperture',
+    reticle: 'camera-forward-centred',
+    viewmodelSuppressed: true,
+    viewmodelVisible: false,
+  });
+  expect(
+    Math.tan(settledScope.railgunScope.baseFov * Math.PI / 360)
+      / Math.tan(settledScope.railgunScope.targetFov * Math.PI / 360),
+  ).toBeCloseTo(2.5, 8);
+  expect(Math.abs(
+    settledScope.railgunScope.cameraFov - settledScope.railgunScope.targetFov,
+  )).toBeLessThan(0.35);
+  expect(settledScope.weaponPresentation.fullscreenSuppression).toMatchObject({
+    active: true,
+    rootVisible: true,
+    rootScale: 0.0001,
+  });
+  expect(settledScope.aimAlignment).toMatchObject({ reticle: 'railgun-camera-forward' });
+  expect(settledScope.aimAlignment.errorCssPixels).toBeLessThanOrEqual(1);
   await page.screenshot({ path: testInfo.outputPath(`railgun-through-wall-thermal-${renderer}.png`), animations: 'disabled' });
   const shotStates = await page.evaluate(() => {
     const api = (
@@ -115,6 +143,9 @@ test('railgun restores its through-wall thermal scope, exits ADS, and enforces r
   )).toBeCloseTo(180, 5);
   expect(first.audio.railgun).toMatchObject({ local: 1, layerCount: 10, pressureDuration: 0.62 });
   expect(first.textChat.adsHeld).toBe(false);
+  expect(first.railgunScope).toMatchObject({ active: false, viewmodelSuppressed: false, viewmodelVisible: true });
+  expect(first.railgun).toMatchObject({ scopeActive: false, thermalVisible: false });
+  expect(first.weaponPresentation.fullscreenSuppression.active).toBe(false);
 
   const presentationCountBeforeBlockedShot = first.railgun.presentation.beamPresentations;
   expect(shotStates.blocked.railgun.roundsRemaining).toBe(7);
@@ -149,6 +180,70 @@ test('railgun restores its through-wall thermal scope, exits ADS, and enforces r
   expect(second.beforeReload).toBe(6);
   expect(second.afterReload).toBe(6);
   expect(second.state.player.reserve).toBe(0);
+  await page.evaluate(() => (
+    window as unknown as { __ATOMIC_ACRES_DEBUG__: any }
+  ).__ATOMIC_ACRES_DEBUG__.equipWeapon('pistol'));
+  await page.waitForFunction(() => {
+    const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } })
+      .__ATOMIC_ACRES_DEBUG__.snapshot();
+    return state.player.weapon === 'pistol'
+      && state.railgunScope.active === false
+      && state.railgun.thermalVisible === false
+      && state.weaponPresentation.fullscreenSuppression.active === false;
+  });
+  const swapped = await page.evaluate(() => (
+    window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
+  ).__ATOMIC_ACRES_DEBUG__.snapshot());
+  expect(swapped.railgunScope).toMatchObject({ active: false, viewmodelVisible: true });
+  expect(swapped.weaponPresentation.weapon).toBe('pistol');
+
+  // Death is a render-lifecycle transition, not a pointer-lock side effect.
+  // Re-enter the settled scope while this Playwright page remains unlocked,
+  // then prove the very next rendered state clears every fullscreen surface.
+  await page.evaluate(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    api.setAds(false);
+    api.equipWeapon('railgun');
+  });
+  await page.waitForFunction(() => {
+    const railgun = window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun;
+    return railgun.adsResetRequired === false && railgun.chamberReadyAtHostTimeMs === 0;
+  });
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
+  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgunScope.active === true);
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.damage(999));
+  await page.waitForFunction(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    return state.player.alive === false
+      && state.railgunScope.active === false
+      && state.railgun.thermalVisible === false
+      && state.railgun.presentation.thermalContacts === 0
+      && state.weaponPresentation.fullscreenSuppression.active === false
+      && state.railgunScope.viewmodelVisible === false;
+  });
+
+  // Match end owns the same cleanup even when the player survives. Respawn and
+  // reacquire through the real pickup helper so stale held-state cannot mask it.
+  await page.evaluate(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    api.respawn();
+    const staged = api.stageRailgunSpawn(0);
+    api.teleportPlayer(...staged.pickupPosition);
+    api.interactRailgun();
+    api.setAds(true);
+  });
+  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgunScope.active === true);
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.endMatch());
+  await page.waitForFunction(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    return state.matchPhase === 'ended'
+      && state.player.alive === true
+      && state.railgunScope.active === false
+      && state.railgun.thermalVisible === false
+      && state.railgun.presentation.thermalContacts === 0
+      && state.weaponPresentation.fullscreenSuppression.active === false
+      && state.railgunScope.viewmodelVisible === false;
+  });
   if (renderer === 'webgpu') {
     expect(second.state.render.runtime).toMatchObject({
       actualBackend: 'webgpu', deviceLost: false, uncapturedErrors: 0, presentation: { status: 'healthy' },

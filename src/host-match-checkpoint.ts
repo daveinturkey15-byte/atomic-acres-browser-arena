@@ -50,6 +50,11 @@ import {
   advanceRemoteHealthAuthority,
   type RemoteHealthAuthorityState,
 } from './remote-health-authority';
+import {
+  isGunRangeMatchClockSnapshot,
+  restoreGunRangeMatchClock,
+  type GunRangeMatchClockSnapshot,
+} from './gun-range-match-clock-authority';
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
@@ -163,6 +168,8 @@ export type HostMatchCheckpoint = Readonly<{
   flareShotFeedback: readonly FlareShooterFeedbackCheckpoint[];
   railgun: RailgunCheckpoint;
   timedMapWeapons?: TimedMapWeaponCheckpoints;
+  /** Present only for an active Gun Range round. */
+  matchClock?: GunRangeMatchClockSnapshot;
   /** Optional for checkpoints captured before killstreak runtime admission. */
   killstreak?: KillstreakRuntimeCheckpoint;
 }>;
@@ -172,6 +179,7 @@ export type HostMatchResumeTiming = Readonly<{
   elapsedSinceActiveMs: number;
   remainingMs: number;
   phase: 'warmup' | 'active';
+  matchClock: GunRangeMatchClockSnapshot | null;
 }>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -394,7 +402,7 @@ export function isHostMatchCheckpoint(value: unknown, expectedProtocolVersion?: 
     'schemaVersion', 'protocolVersion', 'savedAtEpochMs', 'expiresAtEpochMs', 'roomCode', 'activeAtEpochMs',
     'matchEpoch', 'phase', 'elapsedSinceActiveMs', 'lobbyRevision', 'config', 'members', 'scores', 'hostPlayer', 'guests', 'bots',
     'resumeTokenDigests', 'flareProjectiles', 'flareShotFeedback', 'railgun',
-  ], ['timedMapWeapons', 'killstreak'])) return false;
+  ], ['timedMapWeapons', 'matchClock', 'killstreak'])) return false;
   if (value.schemaVersion !== HOST_MATCH_CHECKPOINT_SCHEMA_VERSION
     || !isBoundedInteger(value.protocolVersion, 1, 1_000_000)
     || expectedProtocolVersion !== undefined && value.protocolVersion !== expectedProtocolVersion
@@ -435,6 +443,7 @@ export function isHostMatchCheckpoint(value: unknown, expectedProtocolVersion?: 
   const killstreak = value.killstreak as KillstreakRuntimeCheckpoint | undefined;
   const flareProjectiles = value.flareProjectiles as FlareAuthorityContinuationCheckpoint;
   const flareShotFeedback = value.flareShotFeedback as readonly FlareShooterFeedbackCheckpoint[];
+  const matchClock = value.matchClock as GunRangeMatchClockSnapshot | undefined;
   const memberIds = members.map((member) => member.id);
   const botIds = bots.map((bot) => bot.snapshot.id);
   const scoreIds = scores.map((score) => score.id);
@@ -510,6 +519,10 @@ export function isHostMatchCheckpoint(value: unknown, expectedProtocolVersion?: 
     })
     && flareShotFeedback.every((context) => guestIds.includes(context.ownerId))
     && digests.every((digest) => digest.expiresAtEpochMs === Number(value.expiresAtEpochMs))
+    && (config.arenaId === 'gun-range' && value.phase === 'active'
+      ? isGunRangeMatchClockSnapshot(matchClock, config.durationMs)
+        && Math.abs(Number(value.elapsedSinceActiveMs) - (config.durationMs - matchClock.remainingMs)) < 1
+      : matchClock === undefined)
     && (value.phase === 'warmup' ? Number(value.elapsedSinceActiveMs) < 0 : Number(value.elapsedSinceActiveMs) >= 0)
     && Number(value.elapsedSinceActiveMs) < value.config.durationMs;
 }
@@ -710,13 +723,20 @@ export function resolveHostMatchResumeTiming(
 ): HostMatchResumeTiming | null {
   if (!Number.isFinite(nowEpochMs) || !Number.isFinite(nowMonoMs)
     || nowEpochMs < checkpoint.savedAtEpochMs || nowEpochMs >= checkpoint.expiresAtEpochMs) return null;
-  const elapsedSinceActiveMs = checkpoint.elapsedSinceActiveMs + (nowEpochMs - checkpoint.savedAtEpochMs);
+  const downtimeMs = nowEpochMs - checkpoint.savedAtEpochMs;
+  const matchClock = checkpoint.matchClock
+    ? restoreGunRangeMatchClock(checkpoint.matchClock, nowMonoMs, downtimeMs, checkpoint.config.durationMs)
+    : null;
+  const elapsedSinceActiveMs = matchClock
+    ? checkpoint.config.durationMs - matchClock.remainingMs
+    : checkpoint.elapsedSinceActiveMs + downtimeMs;
   if (!Number.isFinite(elapsedSinceActiveMs) || elapsedSinceActiveMs >= checkpoint.config.durationMs) return null;
   return Object.freeze({
     activeAtLocalMonoMs: nowMonoMs - elapsedSinceActiveMs,
     elapsedSinceActiveMs,
     remainingMs: checkpoint.config.durationMs - Math.max(0, elapsedSinceActiveMs),
     phase: elapsedSinceActiveMs < 0 ? 'warmup' : 'active',
+    matchClock,
   });
 }
 

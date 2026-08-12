@@ -589,7 +589,9 @@ describe('guest event connection lifecycle', () => {
     expect(hostRoomReclaimAction(false, 0)).toEqual({ action: 'fresh', delayMs: 0 });
     expect(hostRoomReclaimAction(true, 0)).toEqual({ action: 'retry', delayMs: 350 });
     expect(hostRoomReclaimAction(true, 4)).toEqual({ action: 'retry', delayMs: 4_000 });
-    expect(hostRoomReclaimAction(true, 5)).toEqual({ action: 'fail', delayMs: 0 });
+    expect(hostRoomReclaimAction(true, 16)).toEqual({ action: 'retry', delayMs: 4_000 });
+    expect(hostRoomReclaimAction(true, 17)).toEqual({ action: 'fail', delayMs: 0 });
+    expect(hostRoomReclaimAction(true, -1)).toEqual({ action: 'fail', delayMs: 0 });
   });
 
   it('rejects a pre-v5 initial lobby handshake as a protocol mismatch', () => {

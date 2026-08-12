@@ -2,10 +2,13 @@ import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { FLAMETHROWER_EFFECT } from './special-weapon-effects';
 import {
+  FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE,
   FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+  FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
   FlamethrowerGroundFirePool,
   FlamethrowerStreamSystem,
   flamethrowerPulseImpactPresentationEnabled,
+  type FlamethrowerGroundFire,
 } from './flamethrower-stream-system';
 
 describe('flamethrower stream presentation', () => {
@@ -82,6 +85,16 @@ describe('flamethrower stream presentation', () => {
     expect(system.telemetry().groundFireActive).toBe(0);
   });
 
+  it('replays a retained ground-fire visual for the exact host-authored remaining lifetime', () => {
+    const system = new FlamethrowerStreamSystem(new THREE.Scene(), false);
+    expect(system.igniteGround(new THREE.Vector3(1, 0, 2), 2_500, 3_500)).toBe(true);
+    system.update(0.1, 5_999);
+    expect(system.telemetry().groundFireActive).toBe(1);
+    system.update(0.1, 6_000);
+    expect(system.telemetry().groundFireActive).toBe(0);
+    expect(system.igniteGround(new THREE.Vector3(), 6_001, 5_001)).toBe(false);
+  });
+
   it('writes only live particle slots and spatially merges repeated ground presentation', () => {
     const system = new FlamethrowerStreamSystem(new THREE.Scene(), false);
     const before = system.telemetry();
@@ -156,5 +169,71 @@ describe('flamethrower stream presentation', () => {
     expect(pulsed).toEqual(['player-a:1.4', 'player-a:1']);
     pool.update(5_200, 500, () => undefined);
     expect(pool.activeCount()).toBe(0);
+  });
+
+  it('applies exactly ten ten-damage pulses over five seconds without retroactive catch-up', () => {
+    const pool = new FlamethrowerGroundFirePool(1);
+    expect(pool.ignite({
+      ownerId: 'player-a', ownerTeam: 0, point: new THREE.Vector3(1, 0, 2), actionNonce: 9, now: 100,
+      durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+      pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
+    })).toBe('created');
+    let pulses = 0;
+    let damage = 0;
+    const actionNonces: number[] = [];
+    const applyPulse = (fire: FlamethrowerGroundFire) => {
+      pulses += 1;
+      damage += FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE;
+      actionNonces.push(fire.actionNonce);
+    };
+    for (let now = 100; now <= 4_600; now += FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS) {
+      pool.update(now, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyPulse);
+    }
+    expect({ pulses, damage, active: pool.activeCount() }).toEqual({ pulses: 10, damage: 100, active: 1 });
+    expect(actionNonces).toEqual(Array(10).fill(9));
+    pool.update(5_100, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyPulse);
+    expect({ pulses, damage, active: pool.activeCount() }).toEqual({ pulses: 10, damage: 100, active: 0 });
+
+    expect(pool.ignite({
+      ownerId: 'player-a', ownerTeam: 0, point: new THREE.Vector3(), actionNonce: 10, now: 6_000,
+      durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+      pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
+    })).toBe('created');
+    pool.update(6_000, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyPulse);
+    pool.update(8_400, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyPulse);
+    expect(pulses).toBe(12);
+  });
+
+  it('retains deterministic Carpet Bomber identity and pulse ordinals without changing cadence', () => {
+    const pool = new FlamethrowerGroundFirePool(1);
+    expect(pool.ignite({
+      ownerId: 'guest-owner', ownerTeam: 1, point: new THREE.Vector3(2, 0, 3), actionNonce: 17, now: 1_000,
+      durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+      pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
+      damageSource: 'carpet-bomber', activationId: 'ks-activation-9-3', impactOrdinal: 7,
+    })).toBe('created');
+    const receipts: Array<Readonly<{
+      ownerId: string;
+      activationId: string | null;
+      impactOrdinal: number;
+      pulseIndex: number;
+      pulseAtMs: number;
+    }>> = [];
+    for (let now = 1_000; now <= 5_500; now += 500) {
+      pool.update(now, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, (fire) => receipts.push({
+        ownerId: fire.ownerId,
+        activationId: fire.activationId,
+        impactOrdinal: fire.impactOrdinal,
+        pulseIndex: fire.pulseIndex,
+        pulseAtMs: fire.pulseAtMs,
+      }));
+    }
+    expect(receipts).toHaveLength(10);
+    expect(receipts.map(({ pulseIndex }) => pulseIndex)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(receipts[0]).toEqual({
+      ownerId: 'guest-owner', activationId: 'ks-activation-9-3', impactOrdinal: 7,
+      pulseIndex: 0, pulseAtMs: 1_000,
+    });
+    expect(receipts.at(-1)?.pulseAtMs).toBe(5_500);
   });
 });

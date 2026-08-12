@@ -4,10 +4,19 @@ import {
   ownedBrowserVerifierReceiptFailures,
   stagedTopologyFailures,
 } from './pass66-owned-browser-verifier-contract.mjs';
-import { PASS66_MULTIPLAYER_SPECS } from './pass66-multiplayer-stability-contract.mjs';
+import {
+  PASS66_MULTIPLAYER_BROWSER_CHANNEL,
+  PASS66_MULTIPLAYER_SPECS,
+} from './pass66-multiplayer-stability-contract.mjs';
 
 const sourceSha = 'a'.repeat(40);
 const treeSha256 = 'b'.repeat(64);
+const browserExecutableSha256 = 'c'.repeat(64);
+const browserExecutablePath = process.platform === 'win32'
+  ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+  : process.platform === 'darwin'
+    ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+    : '/opt/google/chrome/chrome';
 const candidate = {
   schemaVersion: 4,
   channel: 'the-big-one',
@@ -32,6 +41,18 @@ test('accepts only the exact staged Pass 66 candidate identity', () => {
     ...topology,
     channels: { experimental: { ...candidate, treeSha256: 'stale' } },
   }, sourceSha).join('\n'), /tree digest/u);
+});
+
+test('accepts a current multiplayer release pass without weakening staged source identity', () => {
+  const topology = {
+    schemaVersion: 4,
+    sourceSha,
+    releasePass: 'PASS 70',
+    root: { kind: 'chooser-only' },
+    channels: { experimental: { ...candidate, releasePass: 'PASS 70' } },
+  };
+  assert.deepEqual(stagedTopologyFailures(topology, sourceSha, 'PASS 70'), []);
+  assert.match(stagedTopologyFailures(topology, sourceSha, 'PASS 69').join('\n'), /releasePass/u);
 });
 
 test('rejects stale or incomplete installed-Firefox receipts', () => {
@@ -213,18 +234,23 @@ test('requires one byte-bound top-panel action surface for both supports across 
   }, expected).join('\n'), /one readable highlighted action surface/u);
 });
 
-test('requires the exact nine-test multiplayer matrix and five tokenized peer identities', () => {
+test('requires the exact ten-test multiplayer matrix and five tokenized peer identities', () => {
+  const currentCandidate = { ...candidate, releasePass: 'PASS 70' };
   const baseUrl = 'http://127.0.0.1:4530/channels/the-big-one/';
   const receipt = {
-    schemaVersion: 1,
+    schemaVersion: 3,
     status: 'PASS',
     gate: 'multiplayer-stability',
-    schema: 'atomic-acres/pass66-multiplayer-stability@1',
+    releasePass: 'PASS 70',
+    schema: 'atomic-acres/multiplayer-stability@3',
     sourceSha,
-    servedCandidate: candidate,
-    servedCandidateAfter: candidate,
+    servedCandidate: currentCandidate,
+    servedCandidateAfter: currentCandidate,
     runner: {
-      browser: 'chromium', workers: 1, retries: 0, externalPreview: true, baseUrl,
+      browser: 'chromium', channel: PASS66_MULTIPLAYER_BROWSER_CHANNEL,
+      headless: true, nativeUserAgent: true,
+      executablePath: browserExecutablePath, executableSha256: browserExecutableSha256,
+      workers: 1, retries: 0, externalPreview: true, baseUrl,
       args: [
         'test',
         ...PASS66_MULTIPLAYER_SPECS.map(({ path }) => path),
@@ -235,6 +261,12 @@ test('requires the exact nine-test multiplayer matrix and five tokenized peer id
       helper: 'assertPass66OwnedCandidatePage',
       exactCandidateRoute: '/channels/the-big-one/',
       guardedSpecs: PASS66_MULTIPLAYER_SPECS.map(({ path }) => path),
+      initialAdmissionGuard: {
+        spec: 'tests/e2e/pass66-host-crash-rejoin.spec.ts',
+        roles: ['host', 'guest'],
+        terminalEvents: ['crash', 'close'],
+        timeoutMs: 60_000,
+      },
     },
     ownedPeerServers: [
       'hostCrashRejoin', 'ownerFeedbackMultiplayerUi',
@@ -245,9 +277,9 @@ test('requires the exact nine-test multiplayer matrix and five tokenized peer id
       path: `/peerjs-${String(index + 5).repeat(24)}`, localOnly: true,
     })),
     playwright: {
-      stats: { expected: 9, skipped: 0, unexpected: 0, flaky: 0, durationMs: 800 },
-      totalTests: 9,
-      passedTests: 9,
+      stats: { expected: 10, skipped: 0, unexpected: 0, flaky: 0, durationMs: 800 },
+      totalTests: 10,
+      passedTests: 10,
       specs: PASS66_MULTIPLAYER_SPECS.map((spec) => ({
         path: spec.path,
         testCount: spec.expectedTests,
@@ -259,8 +291,11 @@ test('requires the exact nine-test multiplayer matrix and five tokenized peer id
     errors: [],
   };
   const expected = {
-    gate: 'multiplayer-stability', sourceSha, treeSha256,
+    gate: 'multiplayer-stability', releasePass: 'PASS 70', sourceSha, treeSha256,
     exactRootFileCount: 12, baseUrl,
+    browserChannel: PASS66_MULTIPLAYER_BROWSER_CHANNEL,
+    browserExecutablePath,
+    browserExecutableSha256,
   };
   assert.deepEqual(ownedBrowserVerifierReceiptFailures(receipt, expected), []);
   assert.match(ownedBrowserVerifierReceiptFailures({
@@ -269,4 +304,12 @@ test('requires the exact nine-test multiplayer matrix and five tokenized peer id
       ? { ...peer, path: '/peerjs' }
       : peer),
   }, expected).join('\n'), /PeerJS identity mismatch/u);
+  assert.match(ownedBrowserVerifierReceiptFailures({
+    ...receipt,
+    schemaVersion: 2,
+  }, expected).join('\n'), /schemaVersion must be 3/u);
+  assert.match(ownedBrowserVerifierReceiptFailures({
+    ...receipt,
+    runner: { ...receipt.runner, executableSha256: 'd'.repeat(64) },
+  }, expected).join('\n'), /runner identity mismatch/u);
 });

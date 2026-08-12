@@ -608,6 +608,8 @@ export type FirstPersonArmChain = {
   elbow: THREE.Bone;
   wrist: THREE.Bone;
   finger: THREE.Bone;
+  /** Exported full palm transform; this, not the wrist or digit centroid, is the contact authority. */
+  palmContact: THREE.Object3D;
   side: 'left' | 'right';
 };
 
@@ -704,8 +706,19 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
     const elbow = visual.getObjectByName(`LowerArm${suffix}`);
     const wrist = visual.getObjectByName(`Wrist${suffix}`);
     const finger = visual.getObjectByName(`Index1${suffix}`);
-    return shoulder instanceof THREE.Bone && elbow instanceof THREE.Bone && wrist instanceof THREE.Bone && finger instanceof THREE.Bone
-      ? { shoulder, elbow, wrist, finger, side }
+    const palmContact = visual.getObjectByName(`${side}-palm-contact`);
+    let palmAncestor: THREE.Object3D | null = palmContact?.parent ?? null;
+    while (palmAncestor && palmAncestor !== wrist) palmAncestor = palmAncestor.parent;
+    return shoulder instanceof THREE.Bone
+      && elbow instanceof THREE.Bone
+      && wrist instanceof THREE.Bone
+      && finger instanceof THREE.Bone
+      && palmContact !== undefined
+      && palmAncestor === wrist
+      && palmContact.userData.positive_determinant === true
+      && palmContact.userData.palm_forward_axis === '+Y'
+      && palmContact.userData.palm_up_axis === '+Z'
+      ? { shoulder, elbow, wrist, finger, palmContact, side }
       : null;
   };
   const chains = [chain('right'), chain('left')].filter((value): value is FirstPersonArmChain => value !== null);
@@ -751,6 +764,8 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
   root.userData.authoredAnimationTrackCount = runtimeTrackCount;
   root.userData.authoredUpperChainTracksExcluded = authoredTrackCount - runtimeTrackCount;
   root.userData.authoredKnifeSocket = knifeSocket.name;
+  root.userData.authoredPalmContactContract = 'full-transform-positive-determinant-plus-y-forward-plus-z-up-v1';
+  root.userData.authoredPalmContacts = chains.map((entry) => entry.palmContact.name);
   return { root, chains, fingers, knifeSocket };
 }
 

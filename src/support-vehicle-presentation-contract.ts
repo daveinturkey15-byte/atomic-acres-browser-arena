@@ -31,6 +31,7 @@ export const SUPPORT_VEHICLE_PRESENTATION_CONTRACT = Object.freeze({
     requiredNodes: Object.freeze([
       'chopper-fuselage', 'chopper-rear-fuselage', 'chopper-tail-boom', 'chopper-tail-fin',
       'chopper-sleek-cockpit-canopy', 'chopper-main-rotor', 'chopper-tail-rotor',
+      'chopper-nose-sensor',
       'chopper-player-gun', 'chopper-gun-muzzle-socket', 'chopper-forward-socket',
       'chopper-first-person-camera-socket', 'chopper-first-person-cockpit',
       'chopper-gunner-sightline', 'chopper-gunner-weapon-view',
@@ -43,10 +44,18 @@ export const SUPPORT_VEHICLE_PRESENTATION_CONTRACT = Object.freeze({
       'Chopper_Muzzle_Flash', 'Chopper_Tracer_Pulse', 'Chopper_Impact_Pulse', 'Chopper_Quiet_Loop',
     ]),
     possessedView: Object.freeze({
-      visibleOnlyBelow: 'chopper-gunner-sightline',
-      requiredVisibleNodes: Object.freeze(['chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring', 'chopper-gunner-weapon-view']),
+      visibleOnlyBelow: 'chopper-first-person-cockpit',
+      requiredVisibleNodes: Object.freeze([
+        'chopper-cockpit-dashboard-3d', 'chopper-cockpit-display-cyan', 'chopper-cockpit-display-green',
+        'chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring', 'chopper-gunner-weapon-view',
+      ]),
       forbiddenVisibleNodes: Object.freeze(['chopper-fuselage', 'chopper-rear-fuselage', 'chopper-main-rotor', 'chopper-tail-rotor']),
     }),
+    requiredMaterials: Object.freeze([
+      'MAT_Pass65Chopper_Armor_PBR', 'MAT_Pass65Chopper_DarkArmor', 'MAT_Pass65Chopper_Gunmetal',
+      'MAT_Pass65Chopper_CockpitFrame', 'MAT_Pass65Chopper_CanopyGlass', 'MAT_Pass65Chopper_HUDGlass',
+      'MAT_Pass65Chopper_HUDCyan', 'MAT_Pass65Chopper_HUDGreen',
+    ]),
     requiredAudio: Object.freeze(['chopper-low-loop', 'chopper-gun-report']),
     requiredWeaponFeedback: SUPPORT_WEAPON_FEEDBACK_CONTRACT,
   }),
@@ -83,4 +92,15 @@ export function supportForwardAlignment(root: THREE.Object3D, fromName: string, 
 
 export function missingSupportNodes(root: THREE.Object3D, required: readonly string[]): readonly string[] {
   return Object.freeze(required.filter((name) => root.getObjectByName(name) === undefined));
+}
+
+export function missingSupportMaterials(root: THREE.Object3D, required: readonly string[]): readonly string[] {
+  const names = new Set<string>();
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
+      if (material.name) names.add(material.name);
+    }
+  });
+  return Object.freeze(required.filter((name) => !names.has(name)));
 }

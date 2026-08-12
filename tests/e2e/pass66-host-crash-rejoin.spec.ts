@@ -47,6 +47,74 @@ async function openPlayer(context: BrowserContext, name: string, seed: string): 
   return page;
 }
 
+type InitialAdmissionRole = 'host' | 'guest';
+type InitialAdmissionTerminalEvent = 'crash' | 'close';
+
+async function readInitialAdmissionProjection(page: Page) {
+  return page.evaluate(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+    const lifecycle = document.querySelector<HTMLElement>('[data-menu-lifecycle]');
+    const gameplayArena = document.querySelector<HTMLElement>('[data-gameplay-arena]');
+    const loading = document.querySelector<HTMLElement>('[data-loading-stage]');
+    return {
+      gameStarted: state?.gameStarted ?? null,
+      matchPhase: state?.matchPhase ?? null,
+      botCount: state?.bots?.length ?? null,
+      hostedBotCount: state?.privateMatch?.hostedBotCount ?? null,
+      menuLifecycle: lifecycle?.dataset.menuLifecycle ?? null,
+      gameplayArena: gameplayArena?.dataset.gameplayArena ?? null,
+      loadingStage: loading?.dataset.loadingStage ?? null,
+      loadingPercent: loading?.dataset.loadingPercent ?? null,
+    };
+  });
+}
+
+async function waitForInitialAdmission(page: Page, role: InitialAdmissionRole): Promise<void> {
+  let rejectTermination!: (error: Error) => void;
+  let terminalEvent: InitialAdmissionTerminalEvent | null = null;
+  const termination = new Promise<never>((_resolve, reject) => { rejectTermination = reject; });
+  const rejectFor = (event: InitialAdmissionTerminalEvent) => {
+    if (terminalEvent !== null) return;
+    terminalEvent = event;
+    rejectTermination(new Error(`${role} page emitted ${event} during initial admission`));
+  };
+  const onCrash = () => rejectFor('crash');
+  const onClose = () => rejectFor('close');
+  page.once('crash', onCrash);
+  page.once('close', onClose);
+  if (page.isClosed()) rejectFor('close');
+
+  let baseline: Awaited<ReturnType<typeof readInitialAdmissionProjection>> | null = null;
+  try {
+    baseline = await Promise.race([readInitialAdmissionProjection(page), termination]);
+    await Promise.race([
+      page.waitForFunction(() => {
+        const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+        return state.gameStarted && state.matchPhase === 'active' && state.bots.length === 2;
+      }, undefined, { timeout: 60_000 }),
+      termination,
+    ]);
+  } catch (error) {
+    let latest = baseline;
+    if (!page.isClosed()) {
+      try {
+        latest = await readInitialAdmissionProjection(page);
+      } catch {
+        // A crashed renderer cannot provide a final projection; retain the baseline.
+      }
+    }
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `${role} initial admission failed (${terminalEvent ?? 'state-timeout'}): ${reason}; `
+      + `url=${page.url()}; baseline=${JSON.stringify(baseline)}; latest=${JSON.stringify(latest)}`,
+      { cause: error },
+    );
+  } finally {
+    page.off('crash', onCrash);
+    page.off('close', onClose);
+  }
+}
+
 async function settleCrashPrimitive(operation: Promise<unknown>, timeoutMs = 5_000): Promise<void> {
   await Promise.race([
     operation.then(() => undefined, () => undefined),
@@ -80,10 +148,10 @@ test('a crashed host explicitly resumes the same active room and guests plus bot
   await guest.click('#lobby-ready');
   await expect(host.locator('#lobby-start')).toBeEnabled();
   await host.click('#lobby-start');
-  await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
-    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-    return state.gameStarted && state.matchPhase === 'active' && state.bots.length === 2;
-  }, undefined, { timeout: 60_000 })));
+  await Promise.all([
+    waitForInitialAdmission(host, 'host'),
+    waitForInitialAdmission(guest, 'guest'),
+  ]);
   await host.evaluate(() => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     debug.setBotsFrozen(true);

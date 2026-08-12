@@ -30,9 +30,11 @@ const finalizerPath = path.join(root, 'scripts/assets/finalize_pass65_menu_previ
 const runtimeSourcePath = path.join(root, 'src/ui/menu-preview-video.ts');
 const runtimeEntryPath = path.join(root, 'src/legacy-main.ts');
 const cameraEvaluatorPath = path.join(root, 'src/ui/menu-preview-camera.ts');
+const acceptedCockpitSource = 'source-assets/blender/pass65-chopper-gunner.blend';
+const acceptedCockpitSourceDigest = '25a2556e5eccddf53e8214acbe71386820e818e359f35aa5b6a074cc3b4142c5';
 const acceptedCockpitEvidence = 'docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png';
-const acceptedCockpitDigest = '680a235168bfa0021232aa1e7cfe6332b91616f60bd5369b9fea60e110f9b4be';
-const requiredGenerationDate = '2026-08-02';
+const acceptedCockpitEvidenceDigest = '8882a597f015d5e16a731b88c6167bd4eb93fe811992f8424754df5dbd753e8b';
+const requiredGenerationDate = '2026-08-11';
 const arenas = ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'];
 const helicopterArenas = arenas.slice(0, 3);
 const captureToolPaths = [generatorPath, integrityPath, integrityTypesPath, dependencyManifestPath];
@@ -599,7 +601,7 @@ if (choreography.schemaVersion !== 4
   || choreography.recipeId !== 'pass66-authoritative-runtime-menu-preview-v2'
   || choreography.captureId !== 'pass66-authoritative-runtime-menu-preview-capture-v2'
   || choreography.generatedAt !== requiredGenerationDate) failures.push('canonical runtime choreography schema/recipe/capture identity drifted');
-if (choreography.media?.cacheKey !== 'pass66-runtime-preview-v13') failures.push('canonical runtime preview cache family is not the fresh Pass 66 v13 family');
+if (choreography.media?.cacheKey !== 'pass66-runtime-preview-v15') failures.push('canonical runtime preview cache family is not the fresh Pass 70 v15 family');
 if (choreography.capture?.source !== 'authoritative-runtime-arena'
   || choreography.capture?.backend !== 'webgpu'
   || choreography.capture?.overlayScale !== 0.5
@@ -755,9 +757,13 @@ if (currentCanonicalDependencies
 if (currentDependencyClosure
   && JSON.stringify(captureReceipt.runtimeInputs?.dependencyClosure) !== JSON.stringify(currentDependencyClosure)) failures.push('capture receipt recursive dependency closure drifted');
 
-const actualCockpitEvidenceDigest = await checkHash(path.join(root, acceptedCockpitEvidence), acceptedCockpitDigest, 'accepted cockpit evidence');
+const actualCockpitSourceDigest = await checkHash(path.join(root, acceptedCockpitSource), acceptedCockpitSourceDigest, 'accepted authored cockpit design source');
+if (provenance.authoredCockpit?.path !== acceptedCockpitSource
+  || provenance.authoredCockpit?.sha256 !== acceptedCockpitSourceDigest
+  || provenance.authoredCockpit?.sha256 !== actualCockpitSourceDigest) failures.push('provenance authored cockpit path/digest does not equal the accepted v7 source bytes');
+const actualCockpitEvidenceDigest = await checkHash(path.join(root, acceptedCockpitEvidence), acceptedCockpitEvidenceDigest, 'accepted cockpit evidence');
 if (provenance.authoredCockpit?.evidence !== acceptedCockpitEvidence
-  || provenance.authoredCockpit?.evidenceSha256 !== acceptedCockpitDigest
+  || provenance.authoredCockpit?.evidenceSha256 !== acceptedCockpitEvidenceDigest
   || provenance.authoredCockpit?.evidenceSha256 !== actualCockpitEvidenceDigest) failures.push('provenance cockpit evidence path/digest does not equal the accepted file bytes');
 await checkHash(choreographyPath, provenance.choreography.sha256, 'canonical choreography');
 await checkHash(documentationPath, provenance.documentation.sha256, 'preview authoring documentation');
@@ -766,7 +772,6 @@ await checkHash(finalizerPath, provenance.finalizer.sha256, 'preview finalizer')
 await checkHash(verifierPath, provenance.verification.sha256, 'production verifier');
 await checkHash(captureReceiptPath, provenance.captureReceipt.sha256, 'runtime capture receipt');
 await checkHash(cacheFamilyLockPath, provenance.cacheFamilyLock?.sha256, 'cache-family lock');
-await checkHash(path.join(root, provenance.authoredCockpit.path), provenance.authoredCockpit.sha256, 'authored cockpit design source');
 for (const record of provenance.captureTools ?? []) await checkHash(path.join(root, record.path), record.sha256);
 if ((provenance.captureTools ?? []).map((entry) => entry.path).join(',') !== expectedCaptureTools.join(',')) failures.push('provenance capture-tool roster drifted');
 for (const runtime of provenance.runtimeFiles ?? []) await checkHash(path.join(root, runtime.path), runtime.sha256);

@@ -284,7 +284,17 @@ test('an active flare repairs a rejoining guest without duplicate replicas', asy
   await expect(guest.locator('#room-input')).toHaveValue(roomCode);
   await expect(guest.locator('#join')).toHaveText('REJOIN LAST MATCH');
   await guest.fill('#player-name', 'Timed Guest flare-gun');
+  await guest.bringToFront();
+  await expect.poll(async () => guest.evaluate(() => ({
+    visibilityState: document.visibilityState,
+    hasFocus: document.hasFocus(),
+  })), { intervals: [25, 50, 100] }).toEqual({ visibilityState: 'visible', hasFocus: true });
   await guest.click('#join');
+  const lateAdmissionBoundary = guest.waitForFunction(() => {
+    const admission = window.__ATOMIC_ACRES_DEBUG__.admissionState();
+    return admission.gameStarted === false
+      && admission.bootstrapStage === 'prewarming-flare-first-shot';
+  }, undefined, { timeout: 60_000 });
   // Fire after the authenticated lobby reconnect, but before the guest has
   // rebuilt its arena and emitted the in-game join repair handshake.
   await host.waitForFunction((id) => (
@@ -295,98 +305,156 @@ test('an active flare repairs a rejoining guest without duplicate replicas', asy
   const beforeShots = await host.evaluate(() => (
     window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons.states['flare-gun'].shotsRemaining
   ));
-  // The downward flight from the arena's bounded high-air QA position lasts
-  // several seconds before impact, then retains the canonical four-second
-  // burn. This leaves a real (not duration-inflated) late-join repair window.
-  await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(0, 200, 2, 0, -1.5));
-  await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
-  await host.waitForFunction(({ beforeShots, hostId }) => {
-    const timed = window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons;
-    return timed.states['flare-gun'].shotsRemaining === beforeShots - 1
-      && timed.flareActiveReplicas.some((replica: { ownerId: string; authority: boolean; phase: string }) => (
-        replica.ownerId === hostId && replica.authority === true && replica.phase === 'flight'
-      ));
-  }, { beforeShots, hostId }, { timeout: 8_000 });
-  const activeBeforeGuestRejoin = await host.evaluate((hostId) => (
+
+  // Admission duration is deliberately variable within the overall test, so
+  // do not guess when a previously fired five-second flare remains alive. Wait
+  // for the final named prewarm boundary, then stage one real host-authority
+  // shot and bind every repair assertion to its exact nonce.
+  await lateAdmissionBoundary;
+  const priorHostFlareNonces = await host.evaluate((ownerId) => (
     window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons.flareActiveReplicas
-      .find((replica: { ownerId: string }) => replica.ownerId === hostId)
+      .filter((replica: { ownerId: string; authority: boolean }) => (
+        replica.ownerId === ownerId && replica.authority === true
+      ))
+      .map((replica: { actionNonce: number }) => replica.actionNonce)
   ), hostId);
-  expect(activeBeforeGuestRejoin).toBeTruthy();
-  const persistedBeforeGuestRejoin = await host.evaluate(() => {
-    const raw = localStorage.getItem('atomic-acres:host-match-checkpoint:v3');
-    return raw ? JSON.parse(raw) : null;
+  const broadcastBeforeLateShot = await host.evaluate(() => (
+    window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons.flarePresentationReplication.lastBroadcastAt
+  ));
+  await host.evaluate(() => {
+    window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(0, 200, 2, 0, -1.5);
+    window.__ATOMIC_ACRES_DEBUG__.fireOnce();
   });
-  expect(persistedBeforeGuestRejoin?.flareProjectiles?.effects).toHaveLength(1);
-  expect(persistedBeforeGuestRejoin?.flareShotFeedback).toEqual([]);
+  const firedBeforeRepair = 1;
+  const expectedRemaining = beforeShots - firedBeforeRepair;
+  await host.waitForFunction(({ expectedRemaining, hostId, priorNonces }) => {
+    const timed = window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons;
+    return timed.states['flare-gun'].shotsRemaining === expectedRemaining
+      && timed.flareActiveReplicas.some((replica: {
+        ownerId: string; authority: boolean; actionNonce: number; remainingMs: number;
+      }) => replica.ownerId === hostId && replica.authority === true
+        && !priorNonces.includes(replica.actionNonce) && replica.remainingMs > 0);
+  }, { expectedRemaining, hostId, priorNonces: priorHostFlareNonces }, { timeout: 8_000 });
+  const repairSource = await host.evaluate(({ hostId, priorNonces }) => {
+    const timed = window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons;
+    const replica = timed.flareActiveReplicas.find((candidate: {
+      ownerId: string; authority: boolean; actionNonce: number;
+    }) => candidate.ownerId === hostId && candidate.authority === true
+      && !priorNonces.includes(candidate.actionNonce));
+    return {
+      replica,
+      broadcastAt: timed.flarePresentationReplication.lastBroadcastAt,
+      shotsRemaining: timed.states['flare-gun'].shotsRemaining,
+    };
+  }, { hostId, priorNonces: priorHostFlareNonces });
+  expect(repairSource.replica).toBeTruthy();
+  expect(repairSource.replica.remainingMs).toBeGreaterThan(3_500);
+  expect(repairSource.broadcastAt).toBeGreaterThan(broadcastBeforeLateShot);
+  expect(repairSource.shotsRemaining).toBe(expectedRemaining);
+  await expect.poll(async () => host.evaluate(() => {
+    const raw = localStorage.getItem('atomic-acres:host-match-checkpoint:v3');
+    if (!raw) return null;
+    const checkpoint = JSON.parse(raw);
+    return {
+      effectCount: checkpoint.flareProjectiles?.effects?.length ?? 0,
+      feedbackCount: checkpoint.flareShotFeedback?.length ?? 0,
+    };
+  }), { timeout: 2_500, intervals: [25, 50, 100] }).toEqual({ effectCount: 1, feedbackCount: 0 });
   await host.evaluate(([x, y, z]) => (
     window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y, z, 0, 0)
   ), definition.spawnPosition);
 
-  // Match admission intentionally performs full presentation prewarm. Keep a
-  // canonical flare in flight/burn while that runs; no duration is inflated.
-  let firedBeforeRepair = 1;
-  while (firedBeforeRepair < 5 && !(await guest.evaluate(() => (
-    window.__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true
-  )))) {
-    await host.waitForTimeout(2_650);
-    if (await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true)) break;
-    const expectedRemaining = beforeShots - firedBeforeRepair - 1;
-    await host.evaluate(() => {
-      // Reset the QA fall before each downward shot. A real terminal fall from
-      // y=200 becomes lethal before the next 2.5 second flare cadence.
-      window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(0, 200, 2, 0, -1.5);
-      window.__ATOMIC_ACRES_DEBUG__.fireOnce();
-    });
-    try {
-      await host.waitForFunction((expectedRemaining) => (
-        window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons.states['flare-gun'].shotsRemaining === expectedRemaining
-      ), expectedRemaining, { timeout: 8_000 });
-    } catch (error) {
-      const diagnostic = await host.evaluate(() => {
+  try {
+    await guest.waitForFunction(() => (
+      window.__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true
+    ), undefined, { timeout: 60_000 });
+    const liveAtWorldRepair = await host.evaluate(({ ownerId, actionNonce }) => {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return {
+        replica: snapshot.timedMapWeapons.flareActiveReplicas.find((candidate: {
+          ownerId: string; authority: boolean; actionNonce: number;
+        }) => candidate.ownerId === ownerId && candidate.authority === true
+          && candidate.actionNonce === actionNonce) ?? null,
+        replication: snapshot.timedMapWeapons.flarePresentationReplication,
+      };
+    }, { ownerId: hostId, actionNonce: repairSource.replica.actionNonce });
+    expect(liveAtWorldRepair.replica, 'selected host flare remains live across world-ready repair').toBeTruthy();
+    expect(liveAtWorldRepair.replica.remainingMs).toBeGreaterThan(0);
+    await host.waitForFunction(({ ownerId, guestId, actionNonce, priorBroadcastAt }) => {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      const timed = snapshot.timedMapWeapons;
+      return timed.flarePresentationReplication.lastBroadcastAt > priorBroadcastAt
+        && snapshot.remotePlayers.some((candidate: { id: string }) => candidate.id === guestId)
+        && timed.flareActiveReplicas.some((candidate: {
+          ownerId: string; authority: boolean; actionNonce: number; remainingMs: number;
+        }) => candidate.ownerId === ownerId && candidate.authority === true
+          && candidate.actionNonce === actionNonce && candidate.remainingMs > 0);
+    }, {
+      ownerId: hostId,
+      guestId,
+      actionNonce: repairSource.replica.actionNonce,
+      priorBroadcastAt: repairSource.broadcastAt,
+    }, { timeout: 15_000 });
+    const hostRemoteSeqAtWorldRepair = await host.evaluate((id) => (
+      window.__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
+        .find((remote: { id: string }) => remote.id === id)?.seq ?? null
+    ), guestId);
+    expect(hostRemoteSeqAtWorldRepair).not.toBeNull();
+
+    await guest.waitForFunction(({ ownerId, actionNonce }) => {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      const timed = snapshot.timedMapWeapons;
+      return timed.flareActiveReplicas.some((candidate: {
+        ownerId: string; authority: boolean; actionNonce: number;
+      }) => candidate.ownerId === ownerId && candidate.authority === false
+        && candidate.actionNonce === actionNonce)
+        && timed.flarePresentationReplication.lastAdmission?.accepted === true
+        && snapshot.player.awaitingCanonicalGuestAuthority === false
+        && snapshot.player.lastAppliedGuestResumeAuthority !== null;
+    }, { ownerId: hostId, actionNonce: repairSource.replica.actionNonce }, { timeout: 15_000 });
+    // The guest emits its ACK before a fresh state commit on the same ordered
+    // event lane, while the host rejects replacement state until that ACK. A
+    // sequence advance from the post-world-ready remote therefore proves the
+    // host accepted the ACK without assuming the remote existed at lobby auth.
+    await host.waitForFunction(({ guestId, priorSeq }) => {
+      const remote = window.__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
+        .find((candidate: { id: string }) => candidate.id === guestId);
+      return remote !== undefined && remote.seq > priorSeq;
+    }, { guestId, priorSeq: hostRemoteSeqAtWorldRepair }, { timeout: 15_000 });
+  } catch (error) {
+    const [hostDiagnostic, guestDiagnostic] = await Promise.all([
+      host.evaluate(() => {
         const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
         return {
-          gameStarted: snapshot.gameStarted,
-          matchPhase: snapshot.matchPhase,
-          player: snapshot.player,
-          timed: snapshot.timedMapWeapons,
+          admission: window.__ATOMIC_ACRES_DEBUG__.admissionState(),
+          flares: snapshot.timedMapWeapons.flareActiveReplicas,
+          replication: snapshot.timedMapWeapons.flarePresentationReplication,
+          network: snapshot.networkLifecycle,
+          remotes: snapshot.remotePlayers.map((remote: { id: string; seq: number }) => ({
+            id: remote.id, seq: remote.seq,
+          })),
         };
-      });
-      throw new Error(`Repeated active-flare shot was not admitted: ${JSON.stringify(diagnostic)}`, { cause: error });
-    }
-    await host.evaluate(([x, y, z]) => (
-      window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y, z, 0, 0)
-    ), definition.spawnPosition);
-    firedBeforeRepair += 1;
+      }),
+      guest.evaluate(() => {
+        const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+        return {
+          admission: window.__ATOMIC_ACRES_DEBUG__.admissionState(),
+          flares: snapshot.timedMapWeapons.flareActiveReplicas,
+          replication: snapshot.timedMapWeapons.flarePresentationReplication,
+          network: snapshot.networkLifecycle,
+          resume: {
+            awaitingCanonicalGuestAuthority: snapshot.player.awaitingCanonicalGuestAuthority,
+            lastAppliedGuestResumeAuthority: snapshot.player.lastAppliedGuestResumeAuthority,
+          },
+        };
+      }),
+    ]);
+    throw new Error(`Nonce-bound flare repair boundary failed: ${JSON.stringify({
+      expected: { ownerId: hostId, actionNonce: repairSource.replica.actionNonce },
+      host: hostDiagnostic,
+      guest: guestDiagnostic,
+    })}`, { cause: error });
   }
-
-  await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
-    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-    return state.gameStarted && state.matchPhase === 'active'
-      && state.privateMatch?.members.every((member: { connected: boolean }) => member.connected)
-      && state.remotePlayers.length === 1;
-  }, undefined, { timeout: 60_000 })));
-  expect(await guest.evaluate(() => (
-    window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members
-      .find((member: { name: string }) => member.name.startsWith('Timed Guest'))?.id
-  ))).toBe(guestId);
-  const repairReplica = await host.evaluate((hostId) => (
-    window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons.flareActiveReplicas
-      .filter((replica: { ownerId: string; authority: boolean }) => replica.ownerId === hostId && replica.authority)
-      .sort((left: { remainingMs: number }, right: { remainingMs: number }) => right.remainingMs - left.remainingMs)[0]
-  ), hostId);
-  expect(repairReplica).toBeTruthy();
-  await guest.waitForFunction(({ ownerId, actionNonce }) => {
-    const timed = window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons;
-    const replica = timed.flareActiveReplicas
-      .find((candidate: { ownerId: string; actionNonce: number }) => (
-        candidate.ownerId === ownerId && candidate.actionNonce === actionNonce
-      ));
-    return replica?.authority === false
-      && timed.flarePresentationReplication.lastAdmission?.accepted === true;
-  }, {
-    ownerId: repairReplica.ownerId,
-    actionNonce: repairReplica.actionNonce,
-  }, { timeout: 10_000 });
   const guestRepair = await guest.evaluate(() => {
     const timed = window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons;
     return {
@@ -404,6 +472,13 @@ test('an active flare repairs a rejoining guest without duplicate replicas', asy
   expect(guestRepair.telemetry.replicaCreates).toBeGreaterThanOrEqual(guestRepair.replicas.length);
   expect(guestRepair.telemetry.replicaCreates).toBeLessThanOrEqual(firedBeforeRepair);
   expect(guestRepair.telemetry.active).toBe(guestRepair.replicas.length);
+  const repairReplica = guestRepair.replicas
+    .filter((replica: { ownerId: string; authority: boolean }) => (
+      replica.ownerId === hostId && replica.authority === false
+        && replica.actionNonce === repairSource.replica.actionNonce
+    ))
+    .sort((left: { remainingMs: number }, right: { remainingMs: number }) => right.remainingMs - left.remainingMs)[0];
+  expect(repairReplica).toBeTruthy();
   const persistedActiveRepair = await host.evaluate(() => {
     const raw = localStorage.getItem('atomic-acres:host-match-checkpoint:v3');
     return raw ? JSON.parse(raw) : null;
@@ -411,6 +486,17 @@ test('an active flare repairs a rejoining guest without duplicate replicas', asy
   expect(persistedActiveRepair.flareProjectiles.effects.some((effect: { ownerId: string; actionNonce: number }) => (
     effect.ownerId === repairReplica.ownerId && effect.actionNonce === repairReplica.actionNonce
   ))).toBe(true);
+
+  await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    return state.gameStarted && state.matchPhase === 'active'
+      && state.privateMatch?.members.every((member: { connected: boolean }) => member.connected)
+      && state.remotePlayers.length === 1;
+  }, undefined, { timeout: 60_000 })));
+  expect(await guest.evaluate(() => (
+    window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members
+      .find((member: { name: string }) => member.name.startsWith('Timed Guest'))?.id
+  ))).toBe(guestId);
 
   await Promise.all([host, guest].map((page) => page.waitForFunction(() => (
     window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons.flareActiveReplicas.length === 0

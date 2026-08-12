@@ -1589,10 +1589,97 @@
     z-index: 11;
     overflow: hidden;
     pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(80, 240, 255, 0.018) 0 1px, transparent 1px 4px);
+  }
+
+  #railgun-thermal .railgun-scope-window {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: min(84vw, 72vh);
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    overflow: hidden;
+    z-index: 2;
+    border: 2px solid rgba(142, 246, 255, 0.78);
+    border-radius: 50%;
+    background: transparent;
+    box-shadow:
+      0 0 0 100vmax rgba(1, 6, 9, 0.96),
+      0 0 28px rgba(72, 229, 244, 0.42),
+      inset 0 0 52px rgba(27, 160, 177, 0.1);
+  }
+
+  #railgun-thermal .railgun-scope-glass {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
     background:
-      radial-gradient(circle at 50% 50%, transparent 0 43%, rgba(4, 19, 22, 0.24) 69%, rgba(1, 7, 9, 0.68) 100%),
-      repeating-linear-gradient(0deg, rgba(80, 240, 255, 0.025) 0 1px, transparent 1px 4px);
-    box-shadow: inset 0 0 0 2px rgba(105, 245, 255, 0.18), inset 0 0 110px rgba(27, 160, 177, 0.16);
+      radial-gradient(circle at 50% 50%, transparent 0 62%, rgba(52, 208, 222, 0.035) 100%),
+      repeating-linear-gradient(0deg, rgba(113, 245, 255, 0.025) 0 1px, transparent 1px 5px);
+  }
+
+  #railgun-thermal .railgun-scope-reticle {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    border-radius: inherit;
+  }
+
+  #railgun-thermal .railgun-scope-reticle::before,
+  #railgun-thermal .railgun-scope-reticle::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(185, 252, 255, 0.78);
+    box-shadow: 0 0 6px rgba(59, 224, 241, 0.58);
+  }
+
+  #railgun-thermal .railgun-scope-reticle::before { width: 38%; height: 1px; }
+  #railgun-thermal .railgun-scope-reticle::after { width: 1px; height: 38%; }
+
+  #railgun-thermal .railgun-scope-reticle i,
+  #railgun-thermal .railgun-scope-reticle b {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    display: block;
+    width: 12%;
+    height: 12%;
+    transform: translate(-50%, -50%);
+    border: 1px solid rgba(168, 249, 255, 0.72);
+    border-radius: 50%;
+  }
+
+  #railgun-thermal .railgun-scope-reticle b {
+    width: 3%;
+    height: 3%;
+    border-color: rgba(226, 255, 255, 0.94);
+  }
+
+  #railgun-thermal .railgun-scope-reticle span {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 5px;
+    height: 5px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: #eaffff;
+    box-shadow: 0 0 8px rgba(101, 239, 255, 0.9);
+  }
+
+  #railgun-thermal .railgun-scope-reticle em {
+    position: absolute;
+    left: 50%;
+    top: 62%;
+    width: 9%;
+    height: 8%;
+    transform: translateX(-50%);
+    border: solid rgba(145, 243, 251, 0.58);
+    border-width: 0 1px 1px;
   }
 
   #railgun-thermal > span {
@@ -1600,6 +1687,7 @@
     top: 76px;
     left: 50%;
     transform: translateX(-50%);
+    z-index: 4;
     color: rgba(180, 253, 255, 0.82);
     font: 800 10px/1 var(--ui-copy);
     letter-spacing: 0.2em;
@@ -1608,6 +1696,7 @@
   #railgun-thermal .thermal-contact {
     --thermal-scale: 1;
     position: absolute;
+    z-index: 1;
     width: calc(28px * var(--thermal-scale));
     height: calc(62px * var(--thermal-scale));
     transform: translate(-50%, -50%);
@@ -1630,6 +1719,8 @@
     background: #fff8bd;
     box-shadow: 0 0 13px #ff7a4a;
   }
+
+  #hud.railgun-scope-active #crosshair { opacity: 0; }
 
   #dmr-thermal {
     position: absolute;

@@ -34,7 +34,10 @@ describe('persistent physical house-window debris integration', () => {
     expect(source).toContain('entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z)');
     expect(source).toContain('entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w)');
     expect(source).toContain('.filter((entry) => entry.physicsActive)');
-    expect(source).toContain('if (snapshot.sleeping) {');
+    expect(source).toContain('const settleMode = windowGlassDebrisSettleMode(');
+    expect(source).toContain("if (settleMode === 'settled') {");
+    expect(source).toContain('entry.receivedPhysicsPose = false;');
+    expect(source).toContain('entry.fallbackVelocity.y = Math.min(entry.fallbackVelocity.y, -0.9);');
     expect(source).toContain('entry.physicsActive = false;');
     expect(source).toContain('if (retireSettledPhysics) syncInteractiveWorldPhysics();');
   });
