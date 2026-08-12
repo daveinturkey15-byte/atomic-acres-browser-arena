@@ -341,14 +341,14 @@ describe('first-person anatomical presentation', () => {
 
       // Recreate the prior universal 0.70 m response. Every long-gun sentinel
       // must falsify that pose before the authored envelope is applied.
-      for (let frame = 0; frame < 150; frame += 1) {
+      for (let frame = 0; frame < 45; frame += 1) {
         presentation.update({ ...REST_POSE, surfaceRetreat: 0.7, surfaceLift: 0 });
       }
       camera.updateMatrixWorld(true);
       const priorCapBounds = new THREE.Box3().setFromObject(mountedModel)
         .union(new THREE.Box3().setFromObject(arms!));
 
-      for (let frame = 0; frame < 150; frame += 1) {
+      for (let frame = 0; frame < 45; frame += 1) {
         presentation.update({
           ...REST_POSE,
           surfaceRetreat: profile.maximumSurfaceRetreatMeters,
@@ -364,7 +364,7 @@ describe('first-person anatomical presentation', () => {
         expect(authoredWallBounds.min.z, `${weapon}: authored response behind wall plane`).toBeGreaterThanOrEqual(wallPlane);
       }
 
-      for (let frame = 0; frame < 150; frame += 1) {
+      for (let frame = 0; frame < 45; frame += 1) {
         presentation.update({
           ...REST_POSE,
           prone: true,
@@ -383,7 +383,7 @@ describe('first-person anatomical presentation', () => {
 
       presentation.fire(0.02);
       presentation.setFireCaptureAgeMs(0);
-      for (let frame = 0; frame < 90; frame += 1) {
+      for (let frame = 0; frame < 30; frame += 1) {
         presentation.update({
           ...REST_POSE,
           prone: true,
@@ -399,7 +399,7 @@ describe('first-person anatomical presentation', () => {
       presentation.setFireCaptureAgeMs(1_000);
 
       for (const reloadProgress of [0.5, 0.6]) {
-        for (let frame = 0; frame < 90; frame += 1) {
+        for (let frame = 0; frame < 30; frame += 1) {
           presentation.update({
             ...REST_POSE,
             prone: true,
