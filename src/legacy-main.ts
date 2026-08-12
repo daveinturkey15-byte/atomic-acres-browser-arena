@@ -87,6 +87,7 @@ import {
 import {
   advanceGunRangeMatchClock,
   createGunRangeMatchClockSnapshot,
+  gunRangeTestBayOccupancyBoundaryCount,
   gunRangeTestBayOccupants,
   holdGunRangeReplicaAtAuthorityBoundary,
   projectGunRangeMatchClock,
@@ -170,6 +171,7 @@ import { flyingCatPose } from './gun-range-cat-choreography';
 import { KillstreakLoadoutController } from './killstreak-loadout';
 import type { KillstreakLoadoutV1, Pass65KillstreakId } from './killstreak-catalog';
 import {
+  CARPET_BOMBER_BLAST_RADIUS_M,
   HostKillstreakRuntime,
   MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP,
   chopperGunnerAuthoritativeRay,
@@ -188,6 +190,7 @@ import {
   type ChopperExteriorReviewBounds,
 } from './chopper-exterior-review-camera';
 import { PASS65_FLIGHT_NAVIGATION, resolveSupportFlightStep } from './killstreak-flight-navigation';
+import { resolveSupportAircraftEnvelopeStep } from './support-aircraft-collision';
 import { SupportPlacementGroundSampler } from './support-placement-ground';
 import {
   applyPilotedDronePointerDelta,
@@ -380,6 +383,7 @@ import { SupportExplosionPresentation } from './support-explosion-presentation';
 import { GrassSystem } from './grass-system';
 import {
   advanceRangeScore,
+  GUN_RANGE_ROUND_MS,
   hasUnlimitedRangeAmmo,
   isGunRange,
   rangeAccuracyPercent,
@@ -608,6 +612,8 @@ import {
   type StickyAttachmentSource,
 } from './remote-sticky-attachment-authority';
 import {
+  STICKY_VICTIM_URGENT_ALERT_DURATION_MS,
+  StickyVictimUrgentAlertController,
   projectStickyVictimFeedback,
   type StickyVictimFeedback,
 } from './sticky-victim-feedback';
@@ -1966,7 +1972,15 @@ function applyFlamethrowerGroundFirePulse(fire: Readonly<{
     ? { kind: 'killstreak', effect: 'carpet-bomber' }
     : { kind: 'gun', weapon: 'flamethrower' };
   const r2 = FLAMETHROWER_GROUND_FIRE_RADIUS_M * FLAMETHROWER_GROUND_FIRE_RADIUS_M;
+  const carpetCollisionSolids = fire.damageSource === 'carpet-bomber' ? activeWorldColliders() : null;
+  const carpetFireCanReach = (x: number, y: number, z: number): boolean => !carpetCollisionSolids
+    || killstreakLineOfSight(
+      carpetCollisionSolids,
+      [fire.point.x, fire.point.y + 0.08, fire.point.z],
+      [x, Math.max(y, fire.point.y + 0.5), z],
+    );
   if (player.alive && player.position.distanceToSquared(fire.point) < r2
+    && carpetFireCanReach(player.position.x, player.position.y, player.position.z)
     && flameDamageAllowsTarget(flameSource, fire.ownerId, fire.ownerTeam, player.id, player.team)) {
     applyDamage(FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, fire.ownerId, 1, false, cause);
   }
@@ -1980,6 +1994,7 @@ function applyFlamethrowerGroundFirePulse(fire: Readonly<{
     const dx = bot.position.x - fire.point.x;
     const dz = bot.position.z - fire.point.z;
     if (dx * dx + dz * dz < r2
+      && carpetFireCanReach(bot.position.x, bot.position.y + 1.15, bot.position.z)
       && flameDamageAllowsTarget(flameSource, fire.ownerId, fire.ownerTeam, bot.id, bot.team)) {
       applyBotDamage(bot, FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, 'body', cause, fire.ownerId);
     }
@@ -2005,7 +2020,7 @@ function applyFlamethrowerGroundFirePulse(fire: Readonly<{
       radiusM: FLAMETHROWER_GROUND_FIRE_RADIUS_M,
       damage: FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE,
       atMs: fire.pulseAtMs,
-    }, remoteTargets);
+    }, remoteTargets, (_from, to) => carpetFireCanReach(to[0], to[1] + 1.15, to[2]));
     for (const event of events) {
       const applied = applyKillstreakDamageEvent(event);
       if (!applied || applied.damage <= 0) continue;
@@ -4489,11 +4504,60 @@ const stickyTimingReplayNonces = new Set<number>();
 let stickyVictimFeedbackCount = 0;
 let lastStickyVictimFeedback: StickyVictimFeedback | null = null;
 let stickyVictimReceiptKeys = new Set<string>();
+const stickyVictimUrgentAlertController = new StickyVictimUrgentAlertController();
+let stickyVictimUrgentAlertTimeout: number | null = null;
+let stickyVictimUrgentAlertGeneration = 0;
 const lastQaStickyAuthoritativeHits = new Map<StickyAttachmentSource, HitMessage>();
 let lastQaKillstreakActivationIntent: KillstreakActivateIntentMessage | null = null;
 const PENDING_STICKY_HIT_LIMIT = 64;
 const PENDING_STICKY_HIT_LIFETIME_MS = 1_500;
 const STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS = 3_000;
+
+function hideStickyVictimUrgentAlert(): void {
+  stickyVictimUrgentAlertGeneration += 1;
+  if (stickyVictimUrgentAlertTimeout !== null) window.clearTimeout(stickyVictimUrgentAlertTimeout);
+  stickyVictimUrgentAlertTimeout = null;
+  const warning = element<HTMLElement>('#sticky-warning');
+  warning.hidden = true;
+  delete warning.dataset.source;
+  delete warning.dataset.targetLifeId;
+  delete warning.dataset.actionNonce;
+}
+
+function resetStickyVictimUrgentAlertLife(targetLifeId: number | null = null): void {
+  hideStickyVictimUrgentAlert();
+  stickyVictimUrgentAlertController.reset(targetLifeId);
+}
+
+function presentStickyVictimUrgentAlert(
+  source: StickyAttachmentSource,
+  targetId: string,
+  targetLifeId: number,
+  actionNonce: number,
+  nowMs = performance.now(),
+): boolean {
+  if (!player.alive || targetId !== player.id || targetLifeId !== localContinuity) return false;
+  const alert = stickyVictimUrgentAlertController.admit({ source, targetId, targetLifeId, actionNonce, nowMs });
+  if (!alert) return false;
+  hideStickyVictimUrgentAlert();
+  const warning = element<HTMLElement>('#sticky-warning');
+  warning.dataset.source = alert.source;
+  warning.dataset.targetLifeId = String(alert.targetLifeId);
+  warning.dataset.actionNonce = String(alert.actionNonce);
+  warning.hidden = false;
+  const generation = stickyVictimUrgentAlertGeneration;
+  const expire = (): void => {
+    if (generation !== stickyVictimUrgentAlertGeneration) return;
+    const remainingMs = alert.expiresAtMs - performance.now();
+    if (remainingMs > 0) {
+      stickyVictimUrgentAlertTimeout = window.setTimeout(expire, remainingMs);
+      return;
+    }
+    hideStickyVictimUrgentAlert();
+  };
+  stickyVictimUrgentAlertTimeout = window.setTimeout(expire, STICKY_VICTIM_URGENT_ALERT_DURATION_MS);
+  return true;
+}
 const hostTriggerAuthorities = new HostTriggerAuthorityRegistry();
 const authorizedRemoteRedeploys = new Map<string, {
   primary: PrimaryWeaponId;
@@ -6098,11 +6162,7 @@ function resetPrivateLobbyState(): void {
 function gunRangeMatchClockDurationMs(): number | null {
   const multiplayerConfig = privateLobbySnapshot?.config ?? privateMatchConfig;
   const arenaId = network.role === 'offline' ? selectedArena.id : multiplayerConfig.arenaId;
-  if (arenaId !== 'gun-range') return null;
-  const durationMs = network.role === 'offline'
-    ? selectedArena.matchRules.durationMs
-    : multiplayerConfig.durationMs;
-  return durationMs !== null && Number.isFinite(durationMs) && durationMs > 0 ? durationMs : null;
+  return arenaId === 'gun-range' ? GUN_RANGE_ROUND_MS : null;
 }
 
 function admittedGunRangeClockParticipants(): readonly GunRangeClockParticipant[] {
@@ -6315,21 +6375,25 @@ function updateGunRangeMatchClockAuthority(nowLocalMonoMs: number): void {
   if (!gunRangeMatchClockState) {
     gunRangeMatchClockState = createGunRangeMatchClockSnapshot(durationMs, nowLocalMonoMs);
   }
-  gunRangeMatchClockOccupantIds = gunRangeTestBayOccupants(
+  const previousOccupantIds = gunRangeMatchClockOccupantIds;
+  const nextOccupantIds = gunRangeTestBayOccupants(
     admittedGunRangeClockParticipants(),
     GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds,
   );
+  const boundaryEdgeCount = gunRangeTestBayOccupancyBoundaryCount(previousOccupantIds, nextOccupantIds);
+  gunRangeMatchClockOccupantIds = nextOccupantIds;
   const sampleTimeMs = Math.max(nowLocalMonoMs, gunRangeMatchClockState.sampledAtHostTimeMs);
   const step = advanceGunRangeMatchClock(
     gunRangeMatchClockState,
     sampleTimeMs,
     gunRangeMatchClockOccupantIds.length > 0,
     durationMs,
+    boundaryEdgeCount,
   );
   gunRangeMatchClockState = step.state;
   projectActiveGunRangeMatchClock(nowLocalMonoMs);
-  if (step.transition !== null && network.role === 'host') {
-    // A pause edge is infrequent but release-critical. Make it crash-durable
+  if (step.boundaryEdgeCount > 0 && network.role === 'host') {
+    // Participant boundary edges are infrequent but release-critical. Make them crash-durable
     // before publishing the newer reliable lobby revision to connected peers.
     persistActiveHostMatchCheckpoint(true);
     broadcastHostLobby('active');
@@ -9624,7 +9688,7 @@ function onNetworkMessage(message: GameMessage): void {
         flamethrowerStreamPresentation.igniteGround(point, presentedAt);
       }
       audio.explosion(presentedAt);
-      supportExplosionPresentation.emit(point, 4.5, presentedAt);
+      supportExplosionPresentation.emit(point, CARPET_BOMBER_BLAST_RADIUS_M, presentedAt);
     }
     killstreakPresentation.presentImpacts(message.impacts, presentedAt);
     return;
@@ -10300,6 +10364,12 @@ function onNetworkMessage(message: GameMessage): void {
         saveStickyVictimReceipt(clientPersistentStorage(), receipt);
         stickyVictimFeedbackCount += 1;
         lastStickyVictimFeedback = stickyFeedback;
+        presentStickyVictimUrgentAlert(
+          stickyFeedback.source,
+          stickyFeedback.targetId,
+          stickyFeedback.targetLifeId,
+          stickyFeedback.actionNonce,
+        );
         addFeed('STUCK', 'coral');
       }
       reconcileLocalAuthoritativeHealth(
@@ -11348,6 +11418,7 @@ function applyDamage(
     requestAnimationFrame(replayDamageFlash);
   }
   if (player.hp <= 0) {
+    resetStickyVictimUrgentAlertLife();
     // When a killstreak event dealt the lethal blow, the caller owns the death
     // bookkeeping and runs it after the killstreak update settles. Bail here so
     // the death is processed exactly once, not re-entrantly inside advance().
@@ -13141,6 +13212,7 @@ function respawn(
     localContinuity += 1;
     localPositionHistory.length = 0;
     resetFlashVictimLife();
+    resetStickyVictimUrgentAlertLife(localContinuity);
   }
   if (respawnTimer) clearTimeout(respawnTimer);
   respawnTimer = null;
@@ -13335,6 +13407,7 @@ async function startGame(
   stickyTimingReplayNonces.clear();
   stickyVictimFeedbackCount = 0;
   lastStickyVictimFeedback = null;
+  resetStickyVictimUrgentAlertLife();
   stickyVictimReceiptKeys = mode === 'client'
     ? new Set(loadStickyVictimReceiptKeys(clientPersistentStorage(), interactiveWorldMatchEpoch, player.id))
     : new Set();
@@ -13413,6 +13486,7 @@ async function startGame(
       })
     : null;
   resetFlashVictimLife();
+  resetStickyVictimUrgentAlertLife(localContinuity);
   if (mode !== 'client') {
     if (hostRecovery?.killstreak) {
       if (!killstreakRuntime.restoreCheckpoint(
@@ -17602,7 +17676,12 @@ function updateExplosiveBolts(dt: number, now: number): void {
           attachedAtMs: now,
           expiresAtMs: bolt.detonatesAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
         });
-        if (targetHitKind === 'player') addFeed('STUCK', 'coral');
+        if (targetHitKind === 'player') {
+          presentStickyVictimUrgentAlert(
+            'explosive-crossbow', targetHitId, targetHitLifeId, bolt.actionNonce, now,
+          );
+          addFeed('STUCK', 'coral');
+        }
         else if (bolt.ownerId === player.id) addFeed('STUCK', 'gold');
       } else if (worldCollision || glassCollision) {
         const collisionFraction = Math.min(worldFraction, glassFraction);
@@ -18242,7 +18321,10 @@ function armImpactGrenade(
         attachedAtMs: now,
         expiresAtMs: grenade.explodeAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
       });
-      if (targetKind === 'player') addFeed('STUCK', 'coral');
+      if (targetKind === 'player') {
+        presentStickyVictimUrgentAlert('semtex', targetId, targetLifeId, grenade.actionNonce, now);
+        addFeed('STUCK', 'coral');
+      }
       else if (grenade.ownerKind === 'player') addFeed('STUCK', 'gold');
     }
   }
@@ -19049,10 +19131,32 @@ function killstreakWorldState(): KillstreakWorld {
       });
       return [result.position.x, result.position.y, result.position.z];
     },
+    resolveFlightEnvelopePosition: (from, desired, envelope) => resolveSupportAircraftEnvelopeStep({
+      bounds: {
+        minX: arena.bounds.minX,
+        maxX: arena.bounds.maxX,
+        minZ: arena.bounds.minZ,
+        maxZ: arena.bounds.maxZ,
+        floorY: 0,
+        ceilingY: flightNavigation.ceilingY,
+      },
+      solids: flightSolids,
+      from,
+      desired,
+      envelope,
+    }).position,
     isFlightPositionValid: (position) => {
       const point = { x: position[0], y: position[1], z: position[2] };
       return pointInsideBounds(point, arena.bounds, 0.35)
         && !flightSolids.some((solid) => sphereIntersectsBox(point, 0.35, solid));
+    },
+    supportStrikeBoundsAt: (anchor) => {
+      const bay = GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds;
+      return selectedArena.id === 'gun-range'
+        && anchor[0] >= bay.minX && anchor[0] <= bay.maxX
+        && anchor[2] >= bay.minZ && anchor[2] <= bay.maxZ
+        ? bay
+        : arena.bounds;
     },
     supportFlightCentreVolume: {
       centre: centreSpawn,
@@ -19733,7 +19837,7 @@ function updatePass65KillstreakRuntime(now: number): void {
       if (impact.phase !== 'impact') continue;
       const point = new THREE.Vector3(...impact.position);
       if (impact.source === 'carpet-bomber') {
-        carpetWorldImpacts.push({ point, radius: 4.5, maximumDamage: 240, shedBlastClass: 'carpet-bomber-obliteration' });
+        carpetWorldImpacts.push({ point, radius: CARPET_BOMBER_BLAST_RADIUS_M, maximumDamage: 240, shedBlastClass: 'carpet-bomber-obliteration' });
         // Carpet bombs leave burning napalm on the ground too.
         const owner = killstreakRuntime.carpetBomberOwner(impact.activationId);
         const admission = owner
@@ -19768,7 +19872,7 @@ function updatePass65KillstreakRuntime(now: number): void {
           });
         }
         audio.explosion(now);
-        supportExplosionPresentation.emit(point, 4.5, now);
+        supportExplosionPresentation.emit(point, CARPET_BOMBER_BLAST_RADIUS_M, now);
       } else {
         applyInteractiveWorldExplosion(point, 4.5, 240);
       }
@@ -21305,6 +21409,7 @@ function clearFieldSupport(): void {
   stickyTimingReplayNonces.clear();
   stickyVictimFeedbackCount = 0;
   lastStickyVictimFeedback = null;
+  resetStickyVictimUrgentAlertLife();
   stickyVictimReceiptKeys.clear();
   lastQaStickyAuthoritativeHits.clear();
   for (const id of remotes.keys()) remoteSupportAuthorities.set(id, createRemoteSupportAuthorityState());
@@ -27762,6 +27867,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     localContinuity += 1;
     localPositionHistory.length = 0;
     resetFlashVictimLife();
+    resetStickyVictimUrgentAlertLife(localContinuity);
     if (gameStarted && matchState.phase === 'active' && network.role !== 'client') {
       // QA teleport starts a new local continuity domain. Keep host support
       // authority on that same life so real test-bay F interactions are not

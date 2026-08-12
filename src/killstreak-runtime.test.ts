@@ -537,6 +537,31 @@ describe('host killstreak runtime', () => {
       && event.origin.every((value, axis) => value === exactImpact[axis]))?.damage).toBe(CARPET_BOMBER_MAX_DAMAGE);
   });
 
+  it('lifts only the room-collision LOS probe above the floor while retaining the exact impact origin', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'carpet-bomber', 'chopper', 'nuke']));
+    earn(runtime, 7);
+    runtime.activate(intent('carpet-bomber', 3), 1_000, DEFAULT_WORLD);
+    const [drop] = runtime.advance(
+      1_000 + CARPET_TARGET_MARKER_MAX_LIFETIME_MS - CARPET_BOMB_SHELL_DROP_LEAD_MS,
+      DEFAULT_WORLD,
+    ).impactEvents;
+    expect(drop).toMatchObject({ ordinal: 0, phase: 'drop' });
+    const observedOrigins: readonly number[][] = [];
+    const result = runtime.advance(drop!.impactAtMs, {
+      ...DEFAULT_WORLD,
+      targets: [{
+        id: 'floor-victim', kind: 'player', team: 1, lifeId: 1, alive: true, position: drop!.position,
+      }],
+      hasLineOfSight: (from) => {
+        (observedOrigins as number[][]).push([...from]);
+        return from[1] > drop!.position[1];
+      },
+    });
+    expect(observedOrigins).toContainEqual([drop!.position[0], drop!.position[1] + 0.08, drop!.position[2]]);
+    expect(result.damageEvents.find((event) => event.targetId === 'floor-victim')?.origin).toEqual(drop!.position);
+  });
+
   it('contains every admitted payload inside its seeded mildly-wide corridor across seeds, bounds and surfaces', () => {
     const boundsCases = [
       { minX: -40, maxX: 40, minZ: -45, maxZ: 45, floorY: 0, ceilingY: 40 },

@@ -10,6 +10,12 @@ export type Box2 = {
 };
 export type Point3 = { x: number; y: number; z: number };
 export type SweptSphereHit = { time: number; normal: Point3 };
+export type OrientedBoxSweepEnvelope = Readonly<{
+  halfExtents: Readonly<Point3>;
+  /** Envelope centre relative to the presentation root before yaw rotation. */
+  centreOffset: Readonly<Point3>;
+  yaw: number;
+}>;
 
 type RotationMatrix = {
   xx: number; xy: number; xz: number;
@@ -169,7 +175,7 @@ function segmentSlabHit(
   start: Point3,
   delta: Point3,
   halfExtents: Point3,
-  padding: number,
+  padding: number | Point3,
   result: SlabHit,
 ): boolean {
   let near = 0;
@@ -179,7 +185,10 @@ function segmentSlabHit(
   for (let axis = 0; axis < 3; axis += 1) {
     const origin = axis === 0 ? start.x : axis === 1 ? start.y : start.z;
     const direction = axis === 0 ? delta.x : axis === 1 ? delta.y : delta.z;
-    const halfSize = (axis === 0 ? halfExtents.x : axis === 1 ? halfExtents.y : halfExtents.z) + padding;
+    const axisPadding = typeof padding === 'number'
+      ? padding
+      : axis === 0 ? padding.x : axis === 1 ? padding.y : padding.z;
+    const halfSize = (axis === 0 ? halfExtents.x : axis === 1 ? halfExtents.y : halfExtents.z) + axisPadding;
     if (Math.abs(direction) < 1e-8) {
       if (origin < -halfSize || origin > halfSize) return false;
       continue;
@@ -215,6 +224,186 @@ function segmentSlabHit(
 const collisionLocalStartScratch: Point3 = { x: 0, y: 0, z: 0 };
 const collisionLocalDeltaScratch: Point3 = { x: 0, y: 0, z: 0 };
 const collisionSlabHitScratch: SlabHit = { near: 0, far: 0, nearAxis: -1, nearSign: 0 };
+const collisionOrientedPaddingScratch: Point3 = { x: 0, y: 0, z: 0 };
+
+function validOrientedEnvelope(envelope: OrientedBoxSweepEnvelope): boolean {
+  return [
+    envelope.halfExtents.x, envelope.halfExtents.y, envelope.halfExtents.z,
+    envelope.centreOffset.x, envelope.centreOffset.y, envelope.centreOffset.z,
+    envelope.yaw,
+  ].every(Number.isFinite)
+    && envelope.halfExtents.x > 0 && envelope.halfExtents.y > 0 && envelope.halfExtents.z > 0;
+}
+
+function orientedEnvelopeCentre(root: Point3, envelope: OrientedBoxSweepEnvelope): Point3 {
+  const cosine = Math.cos(envelope.yaw);
+  const sine = Math.sin(envelope.yaw);
+  return {
+    x: root.x + cosine * envelope.centreOffset.x + sine * envelope.centreOffset.z,
+    y: root.y + envelope.centreOffset.y,
+    z: root.z - sine * envelope.centreOffset.x + cosine * envelope.centreOffset.z,
+  };
+}
+
+function orientedEnvelopePaddingInBoxFrame(frame: BoxFrame, envelope: OrientedBoxSweepEnvelope): Point3 {
+  const cosine = Math.cos(envelope.yaw);
+  const sine = Math.sin(envelope.yaw);
+  const aircraftX = { x: cosine, y: 0, z: -sine };
+  const aircraftY = { x: 0, y: 1, z: 0 };
+  const aircraftZ = { x: sine, y: 0, z: cosine };
+  const projection = (axis: Point3): number => (
+    Math.abs(axis.x * aircraftX.x + axis.y * aircraftX.y + axis.z * aircraftX.z) * envelope.halfExtents.x
+    + Math.abs(axis.x * aircraftY.x + axis.y * aircraftY.y + axis.z * aircraftY.z) * envelope.halfExtents.y
+    + Math.abs(axis.x * aircraftZ.x + axis.y * aircraftZ.y + axis.z * aircraftZ.z) * envelope.halfExtents.z
+  );
+  collisionOrientedPaddingScratch.x = projection({ x: frame.rotation.xx, y: frame.rotation.yx, z: frame.rotation.zx });
+  collisionOrientedPaddingScratch.y = projection({ x: frame.rotation.xy, y: frame.rotation.yy, z: frame.rotation.zy });
+  collisionOrientedPaddingScratch.z = projection({ x: frame.rotation.xz, y: frame.rotation.yz, z: frame.rotation.zz });
+  return collisionOrientedPaddingScratch;
+}
+
+/** Exact fixed-yaw aircraft OBB against an arbitrarily rotated arena box. */
+export function orientedBoxIntersectsBox(
+  root: Point3,
+  envelope: OrientedBoxSweepEnvelope,
+  box: Box2,
+): boolean {
+  if (!validOrientedEnvelope(envelope)
+    || ![root.x, root.y, root.z].every(Number.isFinite)) return false;
+  const frame = boxFrame(box);
+  const centre = orientedEnvelopeCentre(root, envelope);
+  const cosine = Math.cos(envelope.yaw);
+  const sine = Math.sin(envelope.yaw);
+  const aircraftAxes: readonly Point3[] = [
+    { x: cosine, y: 0, z: -sine },
+    { x: 0, y: 1, z: 0 },
+    { x: sine, y: 0, z: cosine },
+  ];
+  const colliderAxes: readonly Point3[] = [
+    { x: frame.rotation.xx, y: frame.rotation.yx, z: frame.rotation.zx },
+    { x: frame.rotation.xy, y: frame.rotation.yy, z: frame.rotation.zy },
+    { x: frame.rotation.xz, y: frame.rotation.yz, z: frame.rotation.zz },
+  ];
+  const aircraftExtents = [envelope.halfExtents.x, envelope.halfExtents.y, envelope.halfExtents.z] as const;
+  const colliderExtents = [frame.halfExtents.x, frame.halfExtents.y, frame.halfExtents.z] as const;
+  const rotation = aircraftAxes.map((aircraftAxis) => colliderAxes.map((colliderAxis) => (
+    aircraftAxis.x * colliderAxis.x + aircraftAxis.y * colliderAxis.y + aircraftAxis.z * colliderAxis.z
+  )));
+  // The tolerance stabilizes parallel-axis tests without inflating the real
+  // 1.65m vertical airframe into the old isotropic clearance sphere.
+  const absoluteRotation = rotation.map((row) => row.map((value) => Math.abs(value) + 1e-10));
+  const centreDelta = {
+    x: frame.centre.x - centre.x,
+    y: frame.centre.y - centre.y,
+    z: frame.centre.z - centre.z,
+  };
+  const translation = aircraftAxes.map((axis) => (
+    centreDelta.x * axis.x + centreDelta.y * axis.y + centreDelta.z * axis.z
+  ));
+
+  for (let axis = 0; axis < 3; axis += 1) {
+    const aircraftRadius = aircraftExtents[axis];
+    const colliderRadius = colliderExtents[0] * absoluteRotation[axis][0]
+      + colliderExtents[1] * absoluteRotation[axis][1]
+      + colliderExtents[2] * absoluteRotation[axis][2];
+    if (Math.abs(translation[axis]) > aircraftRadius + colliderRadius) return false;
+  }
+  for (let axis = 0; axis < 3; axis += 1) {
+    const aircraftRadius = aircraftExtents[0] * absoluteRotation[0][axis]
+      + aircraftExtents[1] * absoluteRotation[1][axis]
+      + aircraftExtents[2] * absoluteRotation[2][axis];
+    const colliderRadius = colliderExtents[axis];
+    const projectedTranslation = Math.abs(
+      translation[0] * rotation[0][axis]
+      + translation[1] * rotation[1][axis]
+      + translation[2] * rotation[2][axis],
+    );
+    if (projectedTranslation > aircraftRadius + colliderRadius) return false;
+  }
+  for (let aircraftAxis = 0; aircraftAxis < 3; aircraftAxis += 1) {
+    const nextAircraftAxis = (aircraftAxis + 1) % 3;
+    const lastAircraftAxis = (aircraftAxis + 2) % 3;
+    for (let colliderAxis = 0; colliderAxis < 3; colliderAxis += 1) {
+      const nextColliderAxis = (colliderAxis + 1) % 3;
+      const lastColliderAxis = (colliderAxis + 2) % 3;
+      const aircraftRadius = aircraftExtents[nextAircraftAxis] * absoluteRotation[lastAircraftAxis][colliderAxis]
+        + aircraftExtents[lastAircraftAxis] * absoluteRotation[nextAircraftAxis][colliderAxis];
+      const colliderRadius = colliderExtents[nextColliderAxis] * absoluteRotation[aircraftAxis][lastColliderAxis]
+        + colliderExtents[lastColliderAxis] * absoluteRotation[aircraftAxis][nextColliderAxis];
+      const projectedTranslation = Math.abs(
+        translation[lastAircraftAxis] * rotation[nextAircraftAxis][colliderAxis]
+        - translation[nextAircraftAxis] * rotation[lastAircraftAxis][colliderAxis],
+      );
+      if (projectedTranslation > aircraftRadius + colliderRadius) return false;
+    }
+  }
+  return true;
+}
+
+function startOverlapNormal(centre: Point3, frame: BoxFrame, delta: Point3): Point3 {
+  const movementMagnitude = Math.hypot(delta.x, delta.y, delta.z);
+  if (movementMagnitude > 1e-8) return {
+    x: cleanNormalComponent(-delta.x, movementMagnitude),
+    y: cleanNormalComponent(-delta.y, movementMagnitude),
+    z: cleanNormalComponent(-delta.z, movementMagnitude),
+  };
+  const x = centre.x - frame.centre.x;
+  const y = centre.y - frame.centre.y;
+  const z = centre.z - frame.centre.z;
+  const separationMagnitude = Math.hypot(x, y, z);
+  if (separationMagnitude > 1e-8) return {
+    x: cleanNormalComponent(x, separationMagnitude),
+    y: cleanNormalComponent(y, separationMagnitude),
+    z: cleanNormalComponent(z, separationMagnitude),
+  };
+  return { x: 0, y: 1, z: 0 };
+}
+
+/**
+ * Conservative continuous OBB sweep. Projecting the truthful aircraft OBB
+ * onto each collider axis expands that collider's local slabs without turning
+ * a 1.65m-tall airframe into an isotropic 17m sphere.
+ */
+export function sweepOrientedBoxAgainstBoxes(
+  rootStart: Point3,
+  rootDelta: Point3,
+  boxes: readonly Box2[],
+  envelope: OrientedBoxSweepEnvelope,
+): SweptSphereHit | null {
+  if (!validOrientedEnvelope(envelope) || ![
+    rootStart.x, rootStart.y, rootStart.z, rootDelta.x, rootDelta.y, rootDelta.z,
+  ].every(Number.isFinite)) return null;
+  const centreStart = orientedEnvelopeCentre(rootStart, envelope);
+  let bestTime = Number.POSITIVE_INFINITY;
+  let bestFrame: BoxFrame | null = null;
+  let bestAxis = -1;
+  let bestSign = 0;
+  for (const box of boxes) {
+    const frame = boxFrame(box);
+    if (orientedBoxIntersectsBox(rootStart, envelope, box)) {
+      return { time: 0, normal: startOverlapNormal(centreStart, frame, rootDelta) };
+    }
+    worldPointToLocalInto(frame, centreStart, collisionLocalStartScratch);
+    worldVectorToLocalInto(frame, rootDelta, collisionLocalDeltaScratch);
+    if (!segmentSlabHit(
+      collisionLocalStartScratch,
+      collisionLocalDeltaScratch,
+      frame.halfExtents,
+      orientedEnvelopePaddingInBoxFrame(frame, envelope),
+      collisionSlabHitScratch,
+    )) continue;
+    if (collisionSlabHitScratch.nearAxis < 0
+      || collisionSlabHitScratch.near < 0
+      || collisionSlabHitScratch.near > 1
+      || collisionSlabHitScratch.near >= bestTime) continue;
+    bestTime = collisionSlabHitScratch.near;
+    bestFrame = frame;
+    bestAxis = collisionSlabHitScratch.nearAxis;
+    bestSign = collisionSlabHitScratch.nearSign;
+  }
+  if (!bestFrame) return null;
+  return { time: bestTime, normal: localAxisNormalToWorld(bestFrame, bestAxis, bestSign) };
+}
 
 function cross2d(origin: ProjectedPoint, a: ProjectedPoint, b: ProjectedPoint): number {
   return (a.x - origin.x) * (b.z - origin.z) - (a.z - origin.z) * (b.x - origin.x);

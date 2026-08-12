@@ -3,7 +3,15 @@ import { StorageInstancedBufferAttribute } from 'three/webgpu';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import type { DroneSensorContact, KillstreakEntitySnapshot, KillstreakImpactEvent, KillstreakPlacementMarkerSnapshot, KillstreakRecipientSnapshot } from './killstreak-runtime';
+import {
+  CARPET_BOMBER_IMPACT_FLASH_BASE_RADIUS_M,
+  CARPET_BOMBER_IMPACT_FLASH_MAXIMUM_SCALE,
+  type DroneSensorContact,
+  type KillstreakEntitySnapshot,
+  type KillstreakImpactEvent,
+  type KillstreakPlacementMarkerSnapshot,
+  type KillstreakRecipientSnapshot,
+} from './killstreak-runtime';
 import { DRONE_PRESENTATION_FAMILY_ID, DRONE_SUPPORT_DEFINITIONS } from './killstreak-support-catalog';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import { SUPPORT_WEAPON_FEEDBACK_CONTRACT } from './support-vehicle-presentation-contract';
@@ -17,7 +25,8 @@ const MAX_BOMB_SHELLS = 20;
 const EMBERS_PER_CARPET_IMPACT = 6;
 const MAX_EMBER_PARTICLES = MAX_BOMB_SHELLS * EMBERS_PER_CARPET_IMPACT;
 const BOMB_SHELL_DROP_DURATION_MS = 420;
-const BOMB_SHELL_ALTITUDE = 20;
+export const CARPET_BOMB_SHELL_PRESENTATION_ALTITUDE_M = 20;
+export const CARPET_BOMB_SHELL_PRESENTATION_RADIUS_M = 0.12;
 const EMBER_GRAVITY_MPS2 = 11.25;
 const MAX_SENSOR_CONTACTS = 16;
 const MAX_PLACEMENT_MARKERS = 8;
@@ -3026,7 +3035,9 @@ export class KillstreakPresentation {
       if (!flash.active) continue;
       const lifetimeMs = flash.expiresAtMs - flash.createdAtMs;
       const remaining = THREE.MathUtils.clamp((flash.expiresAtMs - nowMs) / lifetimeMs, 0, 1);
-      flash.root.scale.setScalar(flash.baseRadius * (1 + (1 - remaining) * 2.8));
+      flash.root.scale.setScalar(flash.baseRadius * (
+        1 + (1 - remaining) * (CARPET_BOMBER_IMPACT_FLASH_MAXIMUM_SCALE - 1)
+      ));
       flash.root.material.opacity = remaining * flash.maximumOpacity;
       if (remaining > 0) continue;
       this.deactivateImpactFlash(flash);
@@ -3147,7 +3158,7 @@ export class KillstreakPresentation {
           BOMB_SHELL_DROP_DURATION_MS,
         );
         shell.impactAtMs = nowMs + authoredDropDurationMs;
-        shell.startY = impact.position[1] + BOMB_SHELL_ALTITUDE;
+        shell.startY = impact.position[1] + CARPET_BOMB_SHELL_PRESENTATION_ALTITUDE_M;
         shell.impactPosition.set(impact.position[0], impact.position[1] + 0.35, impact.position[2]);
         shell.root.name = 'pass65-carpet-bomb-shell';
         shell.root.position.set(impact.position[0], shell.startY, impact.position[2]);
@@ -3160,7 +3171,7 @@ export class KillstreakPresentation {
       flash.active = true;
       flash.createdAtMs = nowMs;
       flash.expiresAtMs = nowMs + (isCarpet ? 600 : 420);
-      flash.baseRadius = isCarpet ? 1.2 : 0.55;
+      flash.baseRadius = isCarpet ? CARPET_BOMBER_IMPACT_FLASH_BASE_RADIUS_M : 0.55;
       flash.maximumOpacity = isCarpet ? 0.9 : 0.8;
       flash.root.name = isCarpet ? 'pass65-carpet-impact-flash-large' : 'pass65-carpet-impact-flash';
       flash.root.position.set(impact.position[0], impact.position[1] + 0.35, impact.position[2]);

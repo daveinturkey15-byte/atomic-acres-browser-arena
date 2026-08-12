@@ -402,6 +402,7 @@ function hudMarkup(): string {
     <pre id="runtime-error-log" hidden aria-hidden="true"></pre>
     <div id="death-fade" aria-hidden="true"></div>
     <div id="respawn" hidden><strong>ELIMINATED</strong><span id="respawn-countdown">REDEPLOYING</span></div>
+    <div id="sticky-warning" hidden role="alert" aria-live="assertive" aria-atomic="true"><small>EXPLOSIVE ATTACHED</small><strong>STUCK</strong></div>
     <div id="countdown" role="status" aria-live="assertive" aria-atomic="true" hidden></div>
     <div id="banner" hidden></div>
     <div id="roster" hidden><h2>FIELD ROSTER</h2><div id="roster-list"></div></div>

@@ -241,7 +241,7 @@ describe('host active-match checkpoint', () => {
       bots: [],
       matchClock: {
         schemaVersion: 1,
-        revision: 7,
+        revision: 10,
         paused: true,
         remainingMs: 80_000,
         sampledAtHostTimeMs: 1_000,
@@ -255,7 +255,7 @@ describe('host active-match checkpoint', () => {
       phase: 'active',
       matchClock: {
         schemaVersion: 1,
-        revision: 7,
+        revision: 10,
         paused: true,
         remainingMs: 80_000,
         sampledAtHostTimeMs: 5_000,

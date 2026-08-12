@@ -14,6 +14,7 @@ import {
 } from './gun-range-test-bay';
 import { WEAPON_IDS } from './protocol';
 import { definition as gunRangeVisualDefinition } from './rendering/arenas/gun-range';
+import { sampleArenaPracticalLight } from './arena-contrast-lighting';
 
 function sameBounds(left: Box2, right: Box2): boolean {
   return left.minX === right.minX && left.maxX === right.maxX
@@ -22,6 +23,16 @@ function sameBounds(left: Box2, right: Box2): boolean {
 }
 
 describe('Pass 70 Gun Range test-bay world authority', () => {
+  it('keeps both secure-door practicals at authored static intensity', () => {
+    for (const id of ['test-bay-door-approach-key', 'test-bay-door-bay-key']) {
+      const practical = gunRangeVisualDefinition.lighting.practicals.find((candidate) => candidate.id === id);
+      expect(practical?.light?.motion, id).toBeUndefined();
+      const samples = [0, 1_000, 30_000, 60_000].map((nowMs) => (
+        sampleArenaPracticalLight(practical!.light!, nowMs).intensity
+      ));
+      expect(new Set(samples), id).toEqual(new Set([practical!.light!.intensity]));
+    }
+  });
   it('projects every visible core surface into movement, Rapier, and ballistic authority', () => {
     const map = buildGunRange(new THREE.Scene());
     for (const definition of GUN_RANGE_TEST_BAY_STRUCTURE) {

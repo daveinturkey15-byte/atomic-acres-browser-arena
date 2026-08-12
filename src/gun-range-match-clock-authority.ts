@@ -20,7 +20,8 @@ export type GunRangeClockParticipant = Readonly<{
 
 export type GunRangeMatchClockStep = Readonly<{
   state: GunRangeMatchClockSnapshot;
-  transition: 'paused' | 'resumed' | null;
+  transition: 'paused' | 'resumed' | 'reset' | null;
+  boundaryEdgeCount: number;
 }>;
 
 const MAX_CLOCK_REVISION = 1_000_000_000;
@@ -75,30 +76,59 @@ export function advanceGunRangeMatchClock(
   nowHostTimeMs: number,
   pauseRequested: boolean,
   durationMs: number,
+  boundaryEdgeCount = pauseRequested === state.paused ? 0 : 1,
 ): GunRangeMatchClockStep {
   if (!isGunRangeMatchClockSnapshot(state, durationMs)
-    || !finiteClockInputs(nowHostTimeMs, durationMs)
+    || !finiteClockInputs(nowHostTimeMs, durationMs, boundaryEdgeCount)
     || nowHostTimeMs < state.sampledAtHostTimeMs
-    || durationMs < 0) {
+    || durationMs < 0
+    || !Number.isSafeInteger(boundaryEdgeCount)
+    || boundaryEdgeCount < 0
+    || pauseRequested !== state.paused && boundaryEdgeCount === 0
+    || state.revision + boundaryEdgeCount > MAX_CLOCK_REVISION) {
     throw new TypeError('Gun Range clock step requires a valid state and monotonic host time');
   }
   const elapsedMs = state.paused ? 0 : nowHostTimeMs - state.sampledAtHostTimeMs;
-  const remainingMs = Math.max(0, Math.min(durationMs, state.remainingMs - elapsedMs));
-  const transition = pauseRequested === state.paused
+  const remainingMs = boundaryEdgeCount > 0
+    ? durationMs
+    : Math.max(0, Math.min(durationMs, state.remainingMs - elapsedMs));
+  const transition = boundaryEdgeCount === 0
     ? null
-    : pauseRequested ? 'paused' : 'resumed';
+    : pauseRequested === state.paused
+      ? 'reset'
+      : pauseRequested ? 'paused' : 'resumed';
   return Object.freeze({
     state: Object.freeze({
       schemaVersion: GUN_RANGE_MATCH_CLOCK_SCHEMA_VERSION,
-      revision: transition === null
-        ? state.revision
-        : Math.min(MAX_CLOCK_REVISION, state.revision + 1),
+      revision: state.revision + boundaryEdgeCount,
       paused: pauseRequested,
       remainingMs,
       sampledAtHostTimeMs: nowHostTimeMs,
     }),
     transition,
+    boundaryEdgeCount,
   });
+}
+
+/** Counts exact admitted participant entry/exit edges between authority samples. */
+export function gunRangeTestBayOccupancyBoundaryCount(
+  previousOccupantIds: readonly string[],
+  nextOccupantIds: readonly string[],
+): number {
+  const validate = (ids: readonly string[]): Set<string> => {
+    if (!Array.isArray(ids)
+      || ids.some((id) => typeof id !== 'string' || id.length < 1 || id.length > 80)
+      || new Set(ids).size !== ids.length) {
+      throw new TypeError('Gun Range occupancy edges require unique bounded participant IDs');
+    }
+    return new Set(ids);
+  };
+  const previous = validate(previousOccupantIds);
+  const next = validate(nextOccupantIds);
+  let boundaryEdgeCount = 0;
+  for (const id of previous) if (!next.has(id)) boundaryEdgeCount += 1;
+  for (const id of next) if (!previous.has(id)) boundaryEdgeCount += 1;
+  return boundaryEdgeCount;
 }
 
 export function restoreGunRangeMatchClock(

@@ -49,6 +49,23 @@ const DELAYED_FRAME_WORLD: KillstreakWorld = Object.freeze({
 });
 
 describe('Pass 70 hosted Carpet Bomber residual fire', () => {
+  it('rejects an in-radius residual-fire victim behind the room collision authority', () => {
+    const runtime = new HostKillstreakRuntime(73);
+    runtime.registerActor('guest-owner', 1, 2, parseKillstreakLoadout({
+      schemaVersion: 1,
+      slots: ['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke'],
+    }));
+    expect(runtime.carpetGroundFireDamageEvents({
+      activationId: 'ks-activation-73-1',
+      ownerId: 'guest-owner',
+      point: [2, 0, 3],
+      radiusM: 1.8,
+      damage: FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE,
+      atMs: 1_000,
+    }, [{ id: 'behind-door', kind: 'player', team: 0, lifeId: 1, alive: true, position: [2.5, 0, 3] }], () => false))
+      .toEqual([]);
+  });
+
   it('applies exactly 20 DPS for five seconds to an in-radius hosted human through canonical receipts', () => {
     const runtime = new HostKillstreakRuntime(73);
     runtime.registerActor('guest-owner', 1, 2, parseKillstreakLoadout({
@@ -390,7 +407,7 @@ describe('Pass 70 hosted Carpet Bomber residual fire', () => {
     expect(pool.carpetPresentationSnapshots(6_000)).toEqual([]);
   });
 
-  it('wires host-only remote authority and guest-only presentation without touching local/bot lanes', () => {
+  it('wires host-only remote authority and guest-only presentation through the shared room colliders', () => {
     const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     const pulseStart = main.indexOf('function applyFlamethrowerGroundFirePulse(');
     const pulseEnd = main.indexOf('\nfunction updateFlamethrowerGroundFires(', pulseStart);
@@ -401,6 +418,9 @@ describe('Pass 70 hosted Carpet Bomber residual fire', () => {
     expect(pulse).toContain('pendingCarpetGroundFireDamageEvents.push(applied)');
     expect(pulse).toContain('applyDamage(FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE');
     expect(pulse).toContain('applyBotDamage(bot, FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE');
+    expect(pulse).toContain("fire.damageSource === 'carpet-bomber' ? activeWorldColliders() : null");
+    expect(pulse).toContain('killstreakLineOfSight(');
+    expect(pulse).toContain('carpetFireCanReach(to[0], to[1] + 1.15, to[2])');
 
     const resultStart = main.indexOf("if (message.type === 'killstreak-damage-result') {");
     const resultEnd = main.indexOf("\n  if (message.type === 'railgun-state')", resultStart);

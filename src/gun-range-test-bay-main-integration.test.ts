@@ -24,6 +24,9 @@ describe('Gun Range test-bay match timer integration', () => {
     expect(block).toContain('gunRangeTestBayOccupants(');
     expect(block).toContain('admittedGunRangeClockParticipants(),');
     expect(block).toContain('GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds,');
+    expect(block).toContain('gunRangeTestBayOccupancyBoundaryCount(previousOccupantIds, nextOccupantIds)');
+    expect(block).toContain('boundaryEdgeCount,');
+    expect(block).toContain('if (step.boundaryEdgeCount > 0');
     expect(block).toContain('const sampleTimeMs = Math.max(nowLocalMonoMs, gunRangeMatchClockState.sampledAtHostTimeMs);');
     expect(block).toContain('persistActiveHostMatchCheckpoint(true);');
     expect(block).toContain("broadcastHostLobby('active');");

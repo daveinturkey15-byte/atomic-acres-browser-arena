@@ -21,6 +21,11 @@ import {
 import { DRONE_SWARM_ENGAGEMENT_FORMATION, droneSwarmEngagementPoint } from './killstreak-drone-formation';
 import { pilotedDroneWorldVelocity } from './killstreak-drone-input';
 import { supportForwardFromYawPitch, supportYawForDirection } from './support-forward-axis';
+import {
+  CARPET_BOMBER_COLLISION_ENVELOPE,
+  supportAircraftRootClearance,
+  type SupportAircraftCollisionEnvelope,
+} from './support-aircraft-collision';
 
 export const ADRENALINE_DURATION_MS = 15_000;
 export const ADRENALINE_DAMAGE_MULTIPLIER = 1.1;
@@ -44,6 +49,23 @@ export const CARPET_BOMBER_PREVIOUS_MAX_DAMAGE = 80;
 export const CARPET_BOMBER_DAMAGE_MULTIPLIER = 3;
 export const CARPET_BOMBER_MAX_DAMAGE = CARPET_BOMBER_PREVIOUS_MAX_DAMAGE * CARPET_BOMBER_DAMAGE_MULTIPLIER;
 export const CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS = 5_000;
+export const CARPET_BOMBER_ROUTE_CLEARANCE_M = 0.05;
+export const CARPET_BOMBER_BLAST_RADIUS_M = 4.5;
+export const CARPET_BOMBER_IMPACT_FLASH_BASE_RADIUS_M = 1.2;
+export const CARPET_BOMBER_IMPACT_FLASH_MAXIMUM_SCALE = 3.8;
+/**
+ * The pooled support flash starts at 0.25m and expands by the admitted blast
+ * radius, so its full presentation footprint is 4.75m for Carpet Bomber.
+ */
+export const CARPET_BOMBER_SUPPORT_EXPLOSION_MAXIMUM_RADIUS_M = CARPET_BOMBER_BLAST_RADIUS_M + 0.25;
+export const CARPET_BOMBER_IMPACT_ORIGIN_MARGIN_M = 0.05;
+/** Keeps every authoritative and presentation footprint out of walls and the secure door. */
+export const CARPET_BOMBER_IMPACT_ORIGIN_CLEARANCE_M = (
+  Math.max(
+    CARPET_BOMBER_IMPACT_FLASH_BASE_RADIUS_M * CARPET_BOMBER_IMPACT_FLASH_MAXIMUM_SCALE,
+    CARPET_BOMBER_SUPPORT_EXPLOSION_MAXIMUM_RADIUS_M,
+  ) + CARPET_BOMBER_IMPACT_ORIGIN_MARGIN_M
+);
 /** Recipient-snapshot presentation bounds; these are not gameplay ranges. */
 export const CARE_TARGET_MARKER_MAX_LIFETIME_MS = CARE_AIRCRAFT_DROP_DELAY_MS + CARE_CRATE_DESCENT_MS;
 export const CARPET_TARGET_MARKER_MAX_LIFETIME_MS = 1_000;
@@ -91,7 +113,15 @@ export type KillstreakWorld = Readonly<{
   groundHeightAt?: (x: number, z: number) => number;
   /** Resolves against arena static/dynamic solids, ceilings, portals and no-fly data. */
   resolveFlightPosition?: (from: SupportVec3, desired: SupportVec3, radius: number) => SupportVec3;
+  /** Truthful anisotropic airframe sweep used by Carpet Bomber only. */
+  resolveFlightEnvelopePosition?: (
+    from: SupportVec3,
+    desired: SupportVec3,
+    envelope: SupportAircraftCollisionEnvelope,
+  ) => SupportVec3;
   isFlightPositionValid?: (position: SupportVec3) => boolean;
+  /** Collision-connected strike region around an admitted anchor. */
+  supportStrikeBoundsAt?: (anchor: SupportVec3) => Readonly<{ minX: number; maxX: number; minZ: number; maxZ: number }>;
   /** Optional arena-authored support-flight centre; the host derives a bounded fallback when absent. */
   supportFlightCentreVolume?: Readonly<{ centre: SupportVec3; halfExtents: SupportVec3 }>;
 }>;
@@ -173,6 +203,7 @@ type EntityBase = {
 
 type AircraftEntity = EntityBase & {
   kind: 'aircraft';
+  variant: 'care' | 'carpet';
   phase: 'inbound' | 'active' | 'outbound';
   seed: number;
   routeStart: [number, number, number];
@@ -255,6 +286,8 @@ type CarpetImpactPlan = Readonly<{
   impacts: readonly SupportVec3[];
   pathStart: SupportVec3;
   pathEnd: SupportVec3;
+  flightStart: SupportVec3;
+  flightEnd: SupportVec3;
   halfWidthM: number;
 }>;
 
@@ -762,6 +795,34 @@ function resolveFlightPosition(
   return bounded;
 }
 
+function clampFlightEnvelopePosition(
+  position: SupportVec3,
+  world: KillstreakWorld,
+  envelope: SupportAircraftCollisionEnvelope,
+): [number, number, number] {
+  const clearance = supportAircraftRootClearance(envelope);
+  const boundedAxis = (value: number, minimum: number, maximum: number): number => (
+    minimum <= maximum ? clamp(value, minimum, maximum) : (minimum + maximum) / 2
+  );
+  return [
+    boundedAxis(position[0], world.bounds.minX + clearance.negativeX, world.bounds.maxX - clearance.positiveX),
+    boundedAxis(position[1], world.bounds.floorY + clearance.negativeY, world.bounds.ceilingY - clearance.positiveY),
+    boundedAxis(position[2], world.bounds.minZ + clearance.negativeZ, world.bounds.maxZ - clearance.positiveZ),
+  ];
+}
+
+function resolveFlightEnvelopePosition(
+  from: SupportVec3,
+  desired: SupportVec3,
+  envelope: SupportAircraftCollisionEnvelope,
+  world: KillstreakWorld,
+): [number, number, number] {
+  const clamped = clampFlightEnvelopePosition(desired, world, envelope);
+  const resolved = world.resolveFlightEnvelopePosition?.(from, clamped, envelope) ?? clamped;
+  if (!finiteTuple(resolved)) return clampFlightEnvelopePosition(from, world, envelope);
+  return clampFlightEnvelopePosition(resolved, world, envelope);
+}
+
 export type DroneCentreSpawnPlan = Readonly<{
   centre: SupportVec3;
   positions: readonly SupportVec3[];
@@ -951,7 +1012,10 @@ export class HostKillstreakRuntime {
     radiusM: number;
     damage: number;
     atMs: number;
-  }>, targets: readonly KillstreakTarget[]): readonly KillstreakDamageEvent[] {
+  }>, targets: readonly KillstreakTarget[], hasLineOfSight: (
+    from: SupportVec3,
+    to: SupportVec3,
+  ) => boolean = () => true): readonly KillstreakDamageEvent[] {
     if (!/^[A-Za-z0-9_-]{8,80}$/.test(input.activationId)
       || !/^[A-Za-z0-9_-]{1,80}$/.test(input.ownerId)
       || !finiteTuple(input.point)
@@ -964,7 +1028,7 @@ export class HostKillstreakRuntime {
       if (target.kind !== 'player' || !target.alive || !finiteTuple(target.position)) continue;
       const dx = target.position[0] - input.point[0];
       const dz = target.position[2] - input.point[2];
-      if (dx * dx + dz * dz >= radiusSquared) continue;
+      if (dx * dx + dz * dz >= radiusSquared || !hasLineOfSight(input.point, target.position)) continue;
       events.push(this.damageEvent(
         input.activationId,
         'carpet-bomber',
@@ -1325,7 +1389,7 @@ export class HostKillstreakRuntime {
         createdAtMs: nowMs, expiresAtMs: nowMs + CARE_AIRCRAFT_DURATION_MS,
         position: routeStart, velocity: [0, 0, 0],
         attitude: [0, supportYawForDirection(routeEnd[0] - routeStart[0], routeEnd[2] - routeStart[2]), 0],
-        health: 1, revision: 0, kind: 'aircraft', phase: 'inbound', seed, routeStart, routeEnd,
+        health: 1, revision: 0, kind: 'aircraft', variant: 'care', phase: 'inbound', seed, routeStart, routeEnd,
       });
       this.entities.set(id, {
         id, activationId, ownerId: actor.actorId, team: actor.team,
@@ -1351,13 +1415,13 @@ export class HostKillstreakRuntime {
         anchor: groundAnchor, pathStart, pathEnd, halfWidthM: plan.halfWidthM,
         nextDropOrdinal: 0, nextImpactOrdinal: 0,
       });
-      const flightStart: SupportVec3 = Object.freeze([pathStart[0], top, pathStart[2]] as const);
-      const flightEnd: SupportVec3 = Object.freeze([pathEnd[0], top, pathEnd[2]] as const);
+      const flightStart: SupportVec3 = Object.freeze([plan.flightStart[0], top, plan.flightStart[2]] as const);
+      const flightEnd: SupportVec3 = Object.freeze([plan.flightEnd[0], top, plan.flightEnd[2]] as const);
       this.entities.set(aircraftId, {
         id: aircraftId, activationId, ownerId: actor.actorId, team: actor.team,
         createdAtMs: nowMs, expiresAtMs: nowMs + CARE_AIRCRAFT_DURATION_MS,
         position: [...flightStart], velocity: [0, 0, 0], attitude: [0, supportYawForDirection(flightEnd[0] - flightStart[0], flightEnd[2] - flightStart[2]), 0],
-        health: 1, revision: 0, kind: 'aircraft', phase: 'inbound', seed, routeStart: [...flightStart], routeEnd: [...flightEnd],
+        health: 1, revision: 0, kind: 'aircraft', variant: 'carpet', phase: 'inbound', seed, routeStart: [...flightStart], routeEnd: [...flightEnd],
       });
       entityIds.push(aircraftId);
     } else if (actualId === 'chopper') {
@@ -1486,25 +1550,52 @@ export class HostKillstreakRuntime {
     world: KillstreakWorld,
     requestedFacing?: SupportVec3,
   ): CarpetImpactPlan {
+    const requestedStrikeBounds = world.supportStrikeBoundsAt?.(anchor);
+    const strikeBounds = requestedStrikeBounds
+      && [requestedStrikeBounds.minX, requestedStrikeBounds.maxX, requestedStrikeBounds.minZ, requestedStrikeBounds.maxZ].every(Number.isFinite)
+      && requestedStrikeBounds.minX <= anchor[0] && anchor[0] <= requestedStrikeBounds.maxX
+      && requestedStrikeBounds.minZ <= anchor[2] && anchor[2] <= requestedStrikeBounds.maxZ
+      && requestedStrikeBounds.minX >= world.bounds.minX && requestedStrikeBounds.maxX <= world.bounds.maxX
+      && requestedStrikeBounds.minZ >= world.bounds.minZ && requestedStrikeBounds.maxZ <= world.bounds.maxZ
+      ? requestedStrikeBounds
+      : world.bounds;
     const requestedLength = requestedFacing ? Math.hypot(requestedFacing[0], requestedFacing[2]) : 0;
     const angle = requestedFacing && Number.isFinite(requestedLength) && requestedLength > 0.001
       ? Math.atan2(requestedFacing[2] / requestedLength, requestedFacing[0] / requestedLength)
       : unit(seed, 1) * Math.PI * 2;
     const forward: readonly [number, number] = [Math.cos(angle), Math.sin(angle)];
     const side: readonly [number, number] = [-forward[1], forward[0]];
+    const impactInsetM = CARPET_BOMBER_IMPACT_ORIGIN_CLEARANCE_M;
+    const impactMinX = strikeBounds.maxX - strikeBounds.minX >= impactInsetM * 2
+      ? strikeBounds.minX + impactInsetM
+      : (strikeBounds.minX + strikeBounds.maxX) / 2;
+    const impactMaxX = strikeBounds.maxX - strikeBounds.minX >= impactInsetM * 2
+      ? strikeBounds.maxX - impactInsetM
+      : impactMinX;
+    const impactMinZ = strikeBounds.maxZ - strikeBounds.minZ >= impactInsetM * 2
+      ? strikeBounds.minZ + impactInsetM
+      : (strikeBounds.minZ + strikeBounds.maxZ) / 2;
+    const impactMaxZ = strikeBounds.maxZ - strikeBounds.minZ >= impactInsetM * 2
+      ? strikeBounds.maxZ - impactInsetM
+      : impactMinZ;
+    const impactCentre: SupportVec3 = Object.freeze([
+      clamp(anchor[0], impactMinX, impactMaxX),
+      anchor[1],
+      clamp(anchor[2], impactMinZ, impactMaxZ),
+    ] as const);
     const impacts = Object.freeze(Array.from({ length: CARPET_BOMBER_IMPACT_COUNT }, (_, index) => {
       const along = (index / (CARPET_BOMBER_IMPACT_COUNT - 1) - 0.5) * 34;
       const zigzag = (index % 2 === 0 ? -1 : 1) * (3.4 + unit(seed, index + 2) * 2.2);
       const deltaX = forward[0] * along + side[0] * zigzag;
       const deltaZ = forward[1] * along + side[1] * zigzag;
       let boundaryScale = 1;
-      if (deltaX > 0) boundaryScale = Math.min(boundaryScale, (world.bounds.maxX - anchor[0]) / deltaX);
-      else if (deltaX < 0) boundaryScale = Math.min(boundaryScale, (world.bounds.minX - anchor[0]) / deltaX);
-      if (deltaZ > 0) boundaryScale = Math.min(boundaryScale, (world.bounds.maxZ - anchor[2]) / deltaZ);
-      else if (deltaZ < 0) boundaryScale = Math.min(boundaryScale, (world.bounds.minZ - anchor[2]) / deltaZ);
+      if (deltaX > 0) boundaryScale = Math.min(boundaryScale, (impactMaxX - impactCentre[0]) / deltaX);
+      else if (deltaX < 0) boundaryScale = Math.min(boundaryScale, (impactMinX - impactCentre[0]) / deltaX);
+      if (deltaZ > 0) boundaryScale = Math.min(boundaryScale, (impactMaxZ - impactCentre[2]) / deltaZ);
+      else if (deltaZ < 0) boundaryScale = Math.min(boundaryScale, (impactMinZ - impactCentre[2]) / deltaZ);
       boundaryScale = clamp(boundaryScale, 0, 1);
-      const x = anchor[0] + deltaX * boundaryScale;
-      const z = anchor[2] + deltaZ * boundaryScale;
+      const x = impactCentre[0] + deltaX * boundaryScale;
+      const z = impactCentre[2] + deltaZ * boundaryScale;
       return Object.freeze([
         x,
         supportGroundHeight(world, x, z),
@@ -1515,19 +1606,19 @@ export class HostKillstreakRuntime {
     // impact at a map edge can move its projection slightly, so use the
     // admitted payload's min/max forward projections for finite end caps.
     const projections = impacts.map((impact) => (
-      (impact[0] - anchor[0]) * forward[0] + (impact[2] - anchor[2]) * forward[1]
+      (impact[0] - impactCentre[0]) * forward[0] + (impact[2] - impactCentre[2]) * forward[1]
     ));
     const minimumProjection = Math.min(...projections);
     const maximumProjection = Math.max(...projections);
     const start: SupportVec3 = Object.freeze([
-      anchor[0] + forward[0] * minimumProjection,
+      impactCentre[0] + forward[0] * minimumProjection,
       anchor[1],
-      anchor[2] + forward[1] * minimumProjection,
+      impactCentre[2] + forward[1] * minimumProjection,
     ] as const);
     const end: SupportVec3 = Object.freeze([
-      anchor[0] + forward[0] * maximumProjection,
+      impactCentre[0] + forward[0] * maximumProjection,
       anchor[1],
-      anchor[2] + forward[1] * maximumProjection,
+      impactCentre[2] + forward[1] * maximumProjection,
     ] as const);
     const dx = end[0] - start[0];
     const dz = end[2] - start[2];
@@ -1537,10 +1628,49 @@ export class HostKillstreakRuntime {
       const perpendicular = Math.abs((impact[0] - start[0]) * dz - (impact[2] - start[2]) * dx) / length;
       maximumPerpendicular = Math.max(maximumPerpendicular, perpendicular);
     }
+    const yaw = supportYawForDirection(forward[0], forward[1]);
+    const flightEnvelope: SupportAircraftCollisionEnvelope = {
+      ...CARPET_BOMBER_COLLISION_ENVELOPE,
+      yaw,
+    };
+    const clearance = supportAircraftRootClearance(flightEnvelope);
+    const safeMinX = strikeBounds.minX + clearance.negativeX + CARPET_BOMBER_ROUTE_CLEARANCE_M;
+    const safeMaxX = strikeBounds.maxX - clearance.positiveX - CARPET_BOMBER_ROUTE_CLEARANCE_M;
+    const safeMinZ = strikeBounds.minZ + clearance.negativeZ + CARPET_BOMBER_ROUTE_CLEARANCE_M;
+    const safeMaxZ = strikeBounds.maxZ - clearance.positiveZ - CARPET_BOMBER_ROUTE_CLEARANCE_M;
+    const flightCentreX = safeMinX <= safeMaxX ? clamp(impactCentre[0], safeMinX, safeMaxX) : impactCentre[0];
+    const flightCentreZ = safeMinZ <= safeMaxZ ? clamp(impactCentre[2], safeMinZ, safeMaxZ) : impactCentre[2];
+    let minimumFlightProjection = minimumProjection;
+    let maximumFlightProjection = maximumProjection;
+    const restrictProjection = (direction: number, centre: number, minimum: number, maximum: number): void => {
+      if (Math.abs(direction) < 1e-8) return;
+      const first = (minimum - centre) / direction;
+      const second = (maximum - centre) / direction;
+      minimumFlightProjection = Math.max(minimumFlightProjection, Math.min(first, second));
+      maximumFlightProjection = Math.min(maximumFlightProjection, Math.max(first, second));
+    };
+    restrictProjection(forward[0], flightCentreX, safeMinX, safeMaxX);
+    restrictProjection(forward[1], flightCentreZ, safeMinZ, safeMaxZ);
+    if (minimumFlightProjection > maximumFlightProjection) {
+      minimumFlightProjection = 0;
+      maximumFlightProjection = 0;
+    }
+    const flightStart: SupportVec3 = Object.freeze([
+      flightCentreX + forward[0] * minimumFlightProjection,
+      anchor[1],
+      flightCentreZ + forward[1] * minimumFlightProjection,
+    ] as const);
+    const flightEnd: SupportVec3 = Object.freeze([
+      flightCentreX + forward[0] * maximumFlightProjection,
+      anchor[1],
+      flightCentreZ + forward[1] * maximumFlightProjection,
+    ] as const);
     return Object.freeze({
       impacts,
       pathStart: start,
       pathEnd: end,
+      flightStart,
+      flightEnd,
       halfWidthM: Math.max(0.5, maximumPerpendicular + 0.35),
     });
   }
@@ -1792,7 +1922,7 @@ export class HostKillstreakRuntime {
           activationId,
           'carpet-bomber',
           position,
-          4.5,
+          CARPET_BOMBER_BLAST_RADIUS_M,
           CARPET_BOMBER_MAX_DAMAGE,
           canonicalNowMs,
           world,
@@ -1838,7 +1968,12 @@ export class HostKillstreakRuntime {
       entity.routeStart[2] + (entity.routeEnd[2] - entity.routeStart[2]) * eased,
     ];
     const previous: SupportVec3 = [...entity.position];
-    const next = resolveFlightPosition(previous, desired, 1.25, world);
+    const next = entity.variant === 'carpet'
+      ? resolveFlightEnvelopePosition(previous, desired, {
+          ...CARPET_BOMBER_COLLISION_ENVELOPE,
+          yaw: entity.attitude[1],
+        }, world)
+      : resolveFlightPosition(previous, desired, 1.25, world);
     const inverseDt = dt > 0 ? 1 / dt : 0;
     entity.velocity = [
       (next[0] - previous[0]) * inverseDt,
@@ -2467,9 +2602,15 @@ export class HostKillstreakRuntime {
     const candidates = friendlyFire
       ? world.targets.filter((target) => target.alive && (target.kind === 'player' || target.kind === 'bot'))
       : this.hostileTargets(world, owner.actorId, owner.team);
+    // Ground impacts sit exactly on the floor collider. Lift only the LOS
+    // query so the floor cannot self-occlude the blast; the event keeps the
+    // exact admitted impact origin for presentation and recipient validation.
+    const visibilityOrigin: SupportVec3 = source === 'carpet-bomber'
+      ? [origin[0], Math.min(world.bounds.ceilingY, origin[1] + 0.08), origin[2]]
+      : origin;
     for (const target of candidates) {
       const range = distance(origin, target.position);
-      if (range > radius || !lineOfSight(world, origin, target.position) || output.length >= MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP) continue;
+      if (range > radius || !lineOfSight(world, visibilityOrigin, target.position) || output.length >= MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP) continue;
       const damage = Math.max(1, Math.round(maximum * (1 - range / radius * 0.75)));
       output.push(this.damageEvent(activationId, source, owner.actorId, target, damage, origin, nowMs));
     }

@@ -76,6 +76,27 @@ async function clock(page: Page): Promise<{
   return page.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().matchClock);
 }
 
+type ObservedGunRangeClock = Awaited<ReturnType<typeof clock>>;
+
+function expectFreshBoundaryReset(
+  values: readonly ObservedGunRangeClock[],
+  paused: boolean,
+  projectionToleranceMs = 750,
+): void {
+  for (const value of values) {
+    expect(value.paused).toBe(paused);
+    expect(Math.abs(120_000 - value.remainingMs)).toBeLessThan(projectionToleranceMs);
+    expect(Math.abs(120_000 - value.effectiveRemainingMs)).toBeLessThan(projectionToleranceMs);
+  }
+  if (values.length > 1) {
+    expect(Math.max(...values.map((value) => value.revision))).toBe(
+      Math.min(...values.map((value) => value.revision)),
+    );
+    expect(Math.max(...values.map((value) => value.effectiveRemainingMs))
+      - Math.min(...values.map((value) => value.effectiveRemainingMs))).toBeLessThan(350);
+  }
+}
+
 type NativeHostHarness = Readonly<{
   host: NativeCdpClient;
   cover: NativeCdpClient;
@@ -467,7 +488,43 @@ async function nativeClock(client: NativeCdpClient): Promise<{
   return client.evaluate('window.__ATOMIC_ACRES_DEBUG__.snapshot().matchClock');
 }
 
-test('guest bay occupancy freezes the host clock for both peers and exit resumes it', async ({ browser, browserName }) => {
+test('offline Gun Range entry and exit each reset the solo authority to two minutes', async ({ page }) => {
+  await preparePlayer(page, 'CLOCK SOLO', 'pass70-clock-solo');
+  await page.locator('.map-card[data-arena-id="gun-range"]').click();
+  await page.waitForFunction(() => (
+    (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().arenaSelection.id === 'gun-range'
+  ), undefined, { timeout: 60_000 });
+  await page.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.startSolo());
+  await page.waitForFunction(() => {
+    const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+    return state.gameStarted && state.matchPhase === 'active' && state.matchClock?.paused === false;
+  }, undefined, { timeout: 60_000 });
+  const initial = await clock(page);
+  await page.waitForTimeout(1_100);
+  await page.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(72, 1.7, 6));
+  await page.waitForFunction((revision) => {
+    const value = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().matchClock;
+    return value?.paused === true && value.revision === revision + 1;
+  }, initial.revision, { timeout: 15_000 });
+  const entered = await clock(page);
+  expectFreshBoundaryReset([entered], true);
+  await page.waitForTimeout(1_250);
+  expect(Math.abs((await clock(page)).effectiveRemainingMs - entered.effectiveRemainingMs)).toBeLessThan(180);
+
+  await page.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(20, 1.7, 0));
+  await page.waitForFunction((revision) => {
+    const value = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().matchClock;
+    return value?.paused === false && value.revision === revision + 1;
+  }, entered.revision, { timeout: 15_000 });
+  const exited = await clock(page);
+  expectFreshBoundaryReset([exited], false);
+  await page.waitForTimeout(1_250);
+  const countedDown = await clock(page);
+  expect(exited.effectiveRemainingMs - countedDown.effectiveRemainingMs).toBeGreaterThan(900);
+  expect(exited.effectiveRemainingMs - countedDown.effectiveRemainingMs).toBeLessThan(1_600);
+});
+
+test('every host and guest bay boundary resets the synchronized clock to two minutes', async ({ browser, browserName }) => {
   test.setTimeout(360_000);
   test.skip(browserName === 'firefox', 'Bundled headless Firefox cannot retain two simultaneous game pages.');
   const [hostContext, guestContext] = await Promise.all([
@@ -539,6 +596,7 @@ test('guest bay occupancy freezes the host clock for both peers and exit resumes
     expect(pausedStart[0]).toMatchObject({ paused: true, authorityRole: 'host', occupantIds: [guestId] });
     expect(pausedStart[1]).toMatchObject({ paused: true, authorityRole: 'replica', occupantIds: [] });
     expect(pausedStart[1].revision).toBe(pausedStart[0].revision);
+    expectFreshBoundaryReset(pausedStart, true);
     await host.waitForTimeout(1_250);
     const pausedEnd = await Promise.all([clock(host), clock(guest)]);
     for (let index = 0; index < 2; index += 1) {
@@ -550,31 +608,40 @@ test('guest bay occupancy freezes the host clock for both peers and exit resumes
     await Promise.all([host, guest].map((page) => page.waitForFunction(() => (
       (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().matchClock?.paused === false
     ), undefined, { timeout: 15_000 })));
-    const resumedStart = await Promise.all([clock(host), clock(guest)]);
-    expect(resumedStart[0].revision).toBe(pausedStart[0].revision + 1);
-    expect(resumedStart[1].revision).toBe(resumedStart[0].revision);
+    const exitReset = await Promise.all([clock(host), clock(guest)]);
+    expect(exitReset[0].revision).toBe(pausedStart[0].revision + 1);
+    expect(exitReset[1].revision).toBe(exitReset[0].revision);
+    expectFreshBoundaryReset(exitReset, false);
     await host.waitForTimeout(1_250);
-    const resumedEnd = await Promise.all([clock(host), clock(guest)]);
+    const exitCountedDown = await Promise.all([clock(host), clock(guest)]);
     for (let index = 0; index < 2; index += 1) {
-      const consumedMs = resumedStart[index].effectiveRemainingMs - resumedEnd[index].effectiveRemainingMs;
+      const consumedMs = exitReset[index].effectiveRemainingMs - exitCountedDown[index].effectiveRemainingMs;
       expect(consumedMs).toBeGreaterThan(900);
       expect(consumedMs).toBeLessThan(1_600);
     }
-    expect(Math.abs(resumedEnd[0].effectiveRemainingMs - resumedEnd[1].effectiveRemainingMs)).toBeLessThan(350);
+    expect(Math.abs(exitCountedDown[0].effectiveRemainingMs - exitCountedDown[1].effectiveRemainingMs)).toBeLessThan(350);
 
+    const revisionBeforeHostEntry = (await clock(host)).revision;
     await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(72, 1.7, 6));
     await Promise.all([host, guest].map((page) => page.waitForFunction(() => (
       (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().matchClock?.paused === true
     ), undefined, { timeout: 15_000 })));
-    expect((await clock(host)).occupantIds).toEqual([hostId]);
+    const hostEntered = await Promise.all([clock(host), clock(guest)]);
+    expect(hostEntered[0].occupantIds).toEqual([hostId]);
+    expect(hostEntered[0].revision).toBe(revisionBeforeHostEntry + 1);
+    expectFreshBoundaryReset(hostEntered, true);
     await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(20, 1.7, 0));
     await Promise.all([host, guest].map((page) => page.waitForFunction(() => (
       (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().matchClock?.paused === false
     ), undefined, { timeout: 15_000 })));
+    const hostExited = await Promise.all([clock(host), clock(guest)]);
+    expect(hostExited[0].revision).toBe(hostEntered[0].revision + 1);
+    expectFreshBoundaryReset(hostExited, false);
 
-    // A transport replacement is not an occupant. Disconnect in-bay resumes
-    // the clock; authenticated rejoin restores the retained host position and
-    // pauses it again without accepting a client-local pause claim.
+    // A transport replacement is not an occupant. Disconnect in-bay removes
+    // one canonical participant edge and resets to two minutes while running;
+    // authenticated rejoin restores the retained host position and creates a
+    // second two-minute paused edge without accepting a client-local claim.
     await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(72, 1.7, 6));
     await Promise.all([host, guest].map((page) => page.waitForFunction(() => (
       (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().matchClock?.paused === true
@@ -587,7 +654,11 @@ test('guest bay occupancy freezes the host clock for both peers and exit resumes
       return state.privateMatch.members.find((member: any) => member.id === id)?.connected === false
         && state.matchClock?.paused === false && !state.matchClock.occupantIds.includes(id);
     }, guestId, { timeout: 20_000 });
-    expect((await clock(host)).revision).toBe(revisionBeforeDisconnect + 1);
+    const disconnected = await clock(host);
+    // A single authority sample may observe another participant edge too; the
+    // pure edge-count gate proves the exact revision jump for that case.
+    expect(disconnected.revision).toBeGreaterThan(revisionBeforeDisconnect);
+    expectFreshBoundaryReset([disconnected], false);
 
     await guest.waitForFunction(() => (window as any).__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 60_000 });
     await expect(guest.locator('#room-input')).toHaveValue(roomCode);
@@ -638,7 +709,8 @@ test('guest bay occupancy freezes the host clock for both peers and exit resumes
     });
     const restored = await clock(host);
     expect(restored.occupantIds).toContain(guestId);
-    expect(restored.revision).toBe(revisionBeforeDisconnect + 2);
+    expect(restored.revision).toBe(disconnected.revision + 1);
+    expectFreshBoundaryReset([restored, await clock(guest)], true);
 
     // A host rematch constructs a fresh revision-zero two-minute authority;
     // it never carries the paused clock from the prior round.
@@ -670,7 +742,7 @@ test('guest bay occupancy freezes the host clock for both peers and exit resumes
   }
 });
 
-test('a genuinely hidden native host keeps authoritative bay pause transitions alive', async ({ browser, browserName }, testInfo) => {
+test('a genuinely hidden native host keeps two-minute bay boundary resets authoritative', async ({ browser, browserName }, testInfo) => {
   test.setTimeout(180_000);
   test.skip(!nativeHiddenTab, 'Opt-in evidence requires a headed installed-Chrome window and native tab ownership.');
   test.skip(browserName !== 'chromium', 'The guest fixture must be Chromium for the native Chrome authority falsifier.');
@@ -779,12 +851,13 @@ test('a genuinely hidden native host keeps authoritative bay pause transitions a
           && Math.abs(remote.authoritativePosition[2] - 6) < 0.5
           && state.matchClock?.paused === true
           && state.matchClock.occupantIds.includes(${JSON.stringify(guestId)}));
-      })()`, Boolean, 'hidden native host bay pause'),
+      })()`, Boolean, 'hidden native host bay entry reset'),
       guest.waitForFunction(() => (
         (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().matchClock?.paused === true
       ), undefined, { timeout: 15_000 }),
     ]);
     const pausedStart = await Promise.all([nativeClock(host), clock(guest)]);
+    expectFreshBoundaryReset(pausedStart, true);
     await guest.waitForTimeout(1_250);
     const pausedEnd = await Promise.all([nativeClock(host), clock(guest)]);
     for (let index = 0; index < 2; index += 1) {
@@ -798,27 +871,30 @@ test('a genuinely hidden native host keeps authoritative bay pause transitions a
 
     await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(20, 1.7, 0));
     await Promise.all([
-      waitForNativeValue<boolean>(host, `window.__ATOMIC_ACRES_DEBUG__.snapshot().matchClock?.paused === false`, Boolean, 'hidden native host bay resume'),
+      waitForNativeValue<boolean>(host, `window.__ATOMIC_ACRES_DEBUG__.snapshot().matchClock?.paused === false`, Boolean, 'hidden native host bay exit reset'),
       guest.waitForFunction(() => (
         (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().matchClock?.paused === false
       ), undefined, { timeout: 15_000 }),
     ]);
-    const resumedStart = await Promise.all([nativeClock(host), clock(guest)]);
+    const exitReset = await Promise.all([nativeClock(host), clock(guest)]);
+    expectFreshBoundaryReset(exitReset, false);
     await guest.waitForTimeout(1_250);
-    const resumedEnd = await Promise.all([nativeClock(host), clock(guest)]);
+    const exitCountedDown = await Promise.all([nativeClock(host), clock(guest)]);
     for (let index = 0; index < 2; index += 1) {
-      const consumedMs = resumedStart[index].effectiveRemainingMs - resumedEnd[index].effectiveRemainingMs;
+      const consumedMs = exitReset[index].effectiveRemainingMs - exitCountedDown[index].effectiveRemainingMs;
       expect(consumedMs).toBeGreaterThan(900);
       expect(consumedMs).toBeLessThan(1_600);
     }
 
     await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(72, 1.7, 6));
     await Promise.all([
-      waitForNativeValue<boolean>(host, `window.__ATOMIC_ACRES_DEBUG__.snapshot().matchClock?.paused === true`, Boolean, 'hidden native host second bay pause'),
+      waitForNativeValue<boolean>(host, `window.__ATOMIC_ACRES_DEBUG__.snapshot().matchClock?.paused === true`, Boolean, 'hidden native host second bay entry reset'),
       guest.waitForFunction(() => (
         (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().matchClock?.paused === true
       ), undefined, { timeout: 15_000 }),
     ]);
+    const secondPaused = await Promise.all([nativeClock(host), clock(guest)]);
+    expectFreshBoundaryReset(secondPaused, true);
 
     // Keep the host genuinely hidden while a connected guest drives the
     // secure door. The heartbeat must update the rendered leaf and both
@@ -907,8 +983,9 @@ test('a genuinely hidden native host keeps authoritative bay pause transitions a
       initial,
       pausedStart,
       pausedEnd,
-      resumedStart,
-      resumedEnd,
+      exitReset,
+      exitCountedDown,
+      secondPaused,
       hiddenDoorOpen,
       replicaDoorOpen,
       hiddenDoorClosed,

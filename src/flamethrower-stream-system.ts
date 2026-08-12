@@ -21,6 +21,7 @@ export const FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE = flameDamagePerPulse('fl
 const GROUND_FIRE_POOL_CAPACITY = 24;
 
 export const FLAMETHROWER_GROUND_FIRE_MERGE_RADIUS_M = 0.8;
+export const FLAMETHROWER_GROUND_FIRE_PRESENTATION_RADIUS_M = 0.82;
 
 /**
  * A software adapter already draws the retained, spatially merged ground-fire
@@ -313,7 +314,7 @@ export class FlamethrowerStreamSystem {
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.userData.presentationOnly = true;
     this.groundMesh = new THREE.InstancedMesh(
-      new THREE.CircleGeometry(0.82, 14),
+      new THREE.CircleGeometry(FLAMETHROWER_GROUND_FIRE_PRESENTATION_RADIUS_M, 14),
       new THREE.MeshBasicMaterial({
         color: 0xff5a1f,
         transparent: true,

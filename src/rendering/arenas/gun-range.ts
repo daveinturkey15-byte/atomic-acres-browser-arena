@@ -129,9 +129,6 @@ export const definition = createProceduralArenaVisualDefinition({
           decay: 2,
           shadowMapSize: 256,
           intendedVolume: GUN_RANGE_TEST_BAY_DOOR_APPROACH_VOLUME,
-          motion: {
-            intensity: { amplitudeRatio: 0.035, frequencyHz: 0.07, phaseRadians: 0.4 },
-          },
         },
       },
       {
@@ -151,9 +148,6 @@ export const definition = createProceduralArenaVisualDefinition({
           decay: 2,
           shadowMapSize: 256,
           intendedVolume: GUN_RANGE_TEST_BAY_INTERIOR_VOLUME,
-          motion: {
-            intensity: { amplitudeRatio: 0.03, frequencyHz: 0.06, phaseRadians: 1.1 },
-          },
         },
       },
       {

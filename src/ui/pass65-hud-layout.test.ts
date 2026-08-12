@@ -5,6 +5,7 @@ const hudCss = readFileSync(new URL('./pass65-hud.css', import.meta.url), 'utf8'
 const tacticalCss = readFileSync(new URL('./tactical-ui.css', import.meta.url), 'utf8');
 const rootCss = readFileSync(new URL('../style.css', import.meta.url), 'utf8');
 const shell = readFileSync(new URL('./pass64-shell.ts', import.meta.url), 'utf8');
+const mainSource = readFileSync(new URL('../legacy-main.ts', import.meta.url), 'utf8');
 
 describe('Pass 65 modern tactical HUD layout contract', () => {
   it('loads one late bounded HUD layer without bypassing the accessibility layer', () => {
@@ -36,6 +37,17 @@ describe('Pass 65 modern tactical HUD layout contract', () => {
     expect(tacticalCss).toContain('@keyframes pass65CountdownBeatEven');
     expect(hudCss).toContain('@keyframes pass65HudCountdownRing');
     expect(hudCss).toMatch(/prefers-reduced-motion:\s*reduce[\s\S]*?#countdown\.countdown-cue-active[\s\S]*?animation:\s*none/);
+  });
+
+  it('centres the urgent sticky warning safely while retaining compact combat status', () => {
+    expect(shell).toContain('id="sticky-warning" hidden role="alert" aria-live="assertive" aria-atomic="true"');
+    expect(hudCss).toMatch(/#sticky-warning\s*\{[\s\S]*?left:\s*50%[\s\S]*?top:\s*max\(/);
+    expect(hudCss).toMatch(/#sticky-warning\s*\{[\s\S]*?transform:\s*translate\(-50%, -50%\)/);
+    expect(hudCss).toContain('#sticky-warning[hidden] { display: none; }');
+    expect(hudCss).toMatch(/@media \(max-width: 760px\), \(max-height: 520px\)[\s\S]*?#sticky-warning/);
+    expect(hudCss).toContain("html[data-reduced-sensory='true'] #sticky-warning");
+    expect(mainSource).toContain("addFeed('STUCK', 'coral');");
+    expect(mainSource).toContain("addFeed('STUCK', 'gold');");
   });
 
   it('keeps the possessed chopper HUD minimal, legible, and free of exterior rotor presentation', () => {

@@ -1185,6 +1185,7 @@ describe('killstreak presentation', () => {
     presentation.presentImpacts(delayedDrop, 1_200);
     const shell = shellPool.children[0]!;
     const startY = shell.position.y;
+    expect(startY).toBe(20);
     presentation.sync(snapshot(0), 1_350);
     expect(shell.visible).toBe(true);
     expect(shell.position.y).toBeLessThan(startY);

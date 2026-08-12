@@ -59,6 +59,7 @@ export const UI_SURFACE_INVENTORY: readonly UiSurfaceDefinition[] = Object.freez
   { id: 'room-state', rootElementId: 'room-hud', renderer: 'match-hud', critical: true },
   { id: 'pickup', rootElementId: 'pickup-prompt', renderer: 'match-hud', critical: true },
   { id: 'respawn', rootElementId: 'respawn', renderer: 'match-hud', critical: true },
+  { id: 'sticky-ordnance-warning', rootElementId: 'sticky-warning', renderer: 'match-hud', critical: true },
   { id: 'countdown', rootElementId: 'countdown', renderer: 'match-hud', critical: true },
   { id: 'round-banner', rootElementId: 'banner', renderer: 'match-hud', critical: true },
   { id: 'roster', rootElementId: 'roster', renderer: 'match-hud', critical: true },
