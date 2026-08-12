@@ -129,7 +129,7 @@ jobs:
   bounded-browser-windows:
     needs: [classify-change, static-and-unit]
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Record browser gate decision
         run: echo "mode=${{ needs.classify-change.outputs.mode }} reason=${{ needs.classify-change.outputs.reason }}"

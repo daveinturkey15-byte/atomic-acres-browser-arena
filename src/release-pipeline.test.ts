@@ -172,6 +172,7 @@ describe('production release workflow', () => {
       verifyWorkflow.indexOf('bounded-browser-windows:'),
       verifyWorkflow.indexOf('bounded-browser-linux:'),
     );
+    expect(windowsJob).toContain('timeout-minutes: 60');
     expect(windowsJob).toContain('name: Run Pass 64 HUD browser contracts');
     expect(windowsJob).toContain('timeout-minutes: 10');
     expect(windowsJob).toContain('node node_modules/@playwright/test/cli.js test tests/e2e/pass64-hud-menu.spec.ts --project=chromium --workers=1 --retries=0');
