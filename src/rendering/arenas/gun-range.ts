@@ -119,7 +119,7 @@ export const definition = createProceduralArenaVisualDefinition({
         castsShadow: true,
         light: {
           kind: 'spot',
-          position: [51.05, 6.7, 12],
+          position: [51.04, 6.7, 12],
           target: [47.5, 2.5, 12],
           color: 0x72f4ed,
           intensity: 12,
