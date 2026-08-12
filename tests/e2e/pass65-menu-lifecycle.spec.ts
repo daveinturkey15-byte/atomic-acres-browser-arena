@@ -77,14 +77,19 @@ async function ready(
   }, undefined, { timeout: 30_000 });
 }
 
-async function installPointerLockHarness(page: Page, mode: PointerLockMode): Promise<void> {
-  await page.evaluate((initialMode) => {
+async function installPointerLockHarness(
+  page: Page,
+  mode: PointerLockMode,
+  options: Readonly<{ overrideFocus?: boolean }> = {},
+): Promise<void> {
+  await page.evaluate(({ initialMode, overrideFocus }) => {
     const canvas = document.querySelector<HTMLCanvasElement>('#game');
     if (!canvas) throw new Error('Missing game canvas');
     const harness = {
       mode: initialMode,
       locked: false,
       focused: true,
+      focusOverridden: overrideFocus,
       requests: 0,
       losses: 0,
     };
@@ -93,10 +98,12 @@ async function installPointerLockHarness(page: Page, mode: PointerLockMode): Pro
       configurable: true,
       get: () => harness.locked ? canvas : null,
     });
-    Object.defineProperty(document, 'hasFocus', {
-      configurable: true,
-      value: () => harness.focused,
-    });
+    if (overrideFocus) {
+      Object.defineProperty(document, 'hasFocus', {
+        configurable: true,
+        value: () => harness.focused,
+      });
+    }
     Object.defineProperty(canvas, 'requestPointerLock', {
       configurable: true,
       value: () => {
@@ -124,7 +131,7 @@ async function installPointerLockHarness(page: Page, mode: PointerLockMode): Pro
         document.dispatchEvent(new Event('pointerlockchange'));
       },
     });
-  }, mode);
+  }, { initialMode: mode, overrideFocus: options.overrideFocus ?? true });
 }
 
 async function lifecycle(page: Page): Promise<Record<string, any>> {
@@ -234,8 +241,8 @@ async function multiplayerAdmissionDiagnostic(page: Page, role: 'host' | 'guest'
         url: location.href,
         visibilityState: document.visibilityState,
         hidden: document.hidden,
-        // installPointerLockHarness intentionally owns this value; it is not native tab-focus evidence.
-        harnessHasFocus: document.hasFocus(),
+        documentHasFocus: document.hasFocus(),
+        pointerLockFocusOverridden: (window as any).__PASS65_POINTER_LOCK__?.focusOverridden === true,
         admission,
         bootstrap: snapshot?.bootstrap ? {
           stage: snapshot.bootstrap.stage ?? snapshot.bootstrap.bootstrapStage ?? null,
@@ -283,7 +290,9 @@ async function waitForForegroundGameStart(options: Readonly<{
       `${options.role} bringToFront timed out`,
     );
     await options.page.waitForFunction(
-      () => document.visibilityState === 'visible' && document.hidden === false,
+      () => document.visibilityState === 'visible'
+        && document.hidden === false
+        && document.hasFocus() === true,
       undefined,
       { timeout: Math.min(5_000, requireRemainingMs('visibility proof')) },
     );
@@ -398,7 +407,10 @@ async function openMultiplayerPeer(context: BrowserContext, name: string, seed: 
     seed,
   });
   await page.locator('#player-name').fill(name);
-  await installPointerLockHarness(page, 'resolve');
+  // Multiplayer admission deliberately owns one foreground rAF at a time. Keep
+  // native document focus here; spoofing both same-context pages as focused can
+  // make them contend for the headless GPU and strand one first-presentation.
+  await installPointerLockHarness(page, 'resolve', { overrideFocus: false });
   return page;
 }
 
@@ -836,8 +848,9 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
         expect.objectContaining({ surface: 'pre-match', matchStartCount: 0, pauseOpenCount: 0, visibilityChangeCount: 0 }),
       ]);
 
-      // Final presentation admission intentionally requires a visible foreground rAF.
-      // A two-tab context cannot truthfully own that boundary concurrently on Windows.
+      // Final presentation admission intentionally requires a genuinely focused
+      // foreground rAF. The multiplayer harness retains native document focus so
+      // the two same-context pages cannot both claim that boundary concurrently.
       await host.bringToFront();
       await host.locator('#lobby-start').click();
       await waitForForegroundGameStart({
