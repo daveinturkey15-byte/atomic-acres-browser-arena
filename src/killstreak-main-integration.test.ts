@@ -31,17 +31,72 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('killstreakPresentation.presentImpacts(message.impacts, presentedAt)');
   });
 
-  it('admits the one-life guest match-start race and idempotently acknowledges a duplicate without granting continuity', () => {
+  it('admits the one-life guest match-start race and targets one exact duplicate ACK without granting continuity', () => {
     const start = source.indexOf("if (message.type === 'killstreak-loadout-intent') {");
     const end = source.indexOf("if (message.type === 'killstreak-activate-intent')", start);
     const block = source.slice(start, end);
+    const duplicateEnd = block.indexOf('// Guest and host arena streaming finish independently.');
+    const duplicate = block.slice(block.indexOf('if (killstreakRegisteredActors.has(message.by))'), duplicateEnd);
     expect(block).toContain('message.lifeId === remote.continuity || message.lifeId === remote.continuity + 1');
     expect(block).toContain('if (!member?.connected || !remote || !initialLifeAccepted) return;');
-    expect(block).toContain('killstreakRuntime.actorLifeId(message.by) === message.lifeId');
+    expect(duplicate).toContain('const connectionEpoch = hostLobbyConnectionEpochs.get(message.by);');
+    expect(duplicate).toContain('actorLifeId !== message.lifeId');
+    expect(duplicate).toContain('matchEpoch: killstreakMatchEpoch');
+    expect(duplicate).toContain('hostKillstreakLoadoutAcks.needsAck(ackIdentity)');
+    expect(duplicate).toContain('sendKillstreakStateToPlayer(message.by, performance.now(), true)');
+    expect(duplicate).toContain('hostKillstreakLoadoutAcks.recordReliableResult(ackIdentity, reliableSent)');
+    expect(duplicate).not.toContain('broadcastKillstreakState(');
+    expect(duplicate).not.toContain('killstreakRuntime.registerActor(');
+    expect(duplicate).not.toContain('killstreakRuntime.recordActorDeath(');
+    expect(duplicate).not.toContain('message.loadout');
     expect(block.match(/killstreakRuntime\.registerActor\(message\.by/g)).toHaveLength(1);
-    expect(block.match(/broadcastKillstreakState\(performance\.now\(\), true\);/g)).toHaveLength(2);
+    expect(block.match(/broadcastKillstreakState\(performance\.now\(\), true\);/g)).toHaveLength(1);
     expect(block.indexOf('if (killstreakRegisteredActors.has(message.by))'))
       .toBeLessThan(block.indexOf('killstreakRuntime.registerActor(message.by'));
+  });
+
+  it('sends the duplicate ACK on both targeted lanes and clears its bounded record at every authority boundary', () => {
+    const targetedStart = source.indexOf('function sendKillstreakStateToPlayer(');
+    const targetedEnd = source.indexOf('\nfunction broadcastKillstreakState(', targetedStart);
+    const targeted = source.slice(targetedStart, targetedEnd);
+    expect(targeted).toContain('network.sendToPlayer(forPlayerId, message)');
+    expect(targeted).toContain('network.sendStateCommitReliablyToPlayer(forPlayerId, message)');
+    expect(targeted.indexOf('network.sendToPlayer(forPlayerId, message)'))
+      .toBeLessThan(targeted.indexOf('network.sendStateCommitReliablyToPlayer(forPlayerId, message)'));
+    expect(targeted).toContain('return network.sendStateCommitReliablyToPlayer(forPlayerId, message);');
+
+    const resetLobby = source.slice(
+      source.indexOf('function resetPrivateLobbyState()'),
+      source.indexOf('\nfunction gunRangeMatchClockDurationMs(', source.indexOf('function resetPrivateLobbyState()')),
+    );
+    expect(resetLobby).toContain('hostKillstreakLoadoutAcks.clear();');
+
+    const replacement = source.slice(
+      source.indexOf('function resetAuthenticatedGuestReplacement('),
+      source.indexOf('\nfunction safeGuestResumeFallbackSnapshot(', source.indexOf('function resetAuthenticatedGuestReplacement(')),
+    );
+    expect(replacement).toContain('hostKillstreakLoadoutAcks.clearActor(playerId);');
+
+    const expiry = source.slice(
+      source.indexOf('function scheduleDisconnectedLobbyExpiry('),
+      source.indexOf('\nfunction markLobbyDisconnected(', source.indexOf('function scheduleDisconnectedLobbyExpiry(')),
+    );
+    expect(expiry).toContain('hostKillstreakLoadoutAcks.clearActor(playerId);');
+
+    const remove = source.slice(
+      source.indexOf('function removeRemote('),
+      source.indexOf('\nfunction activeSpawnMode(', source.indexOf('function removeRemote(')),
+    );
+    expect(remove).toContain('if (!retainCombatAuthority) {\n    hostKillstreakLoadoutAcks.clearActor(id);');
+
+    const matchStart = source.slice(source.indexOf('async function startGame'), source.indexOf('\nfunction randomNonce'));
+    expect(matchStart).toContain('killstreakRegisteredActors.clear();\n  hostKillstreakLoadoutAcks.clear();');
+
+    const returnToLobby = source.slice(
+      source.indexOf('function returnPrivateMatchToLobby('),
+      source.indexOf('\nfunction acceptLobbyState(', source.indexOf('function returnPrivateMatchToLobby(')),
+    );
+    expect(returnToLobby).toContain('hostKillstreakLoadoutAcks.clear();');
   });
 
   it('keeps QA teleport continuity aligned with host support authority', () => {

@@ -214,6 +214,7 @@ import {
   recordClientWorldRepairAttempt,
   type ClientWorldRepairAdmission,
 } from './client-world-repair-admission';
+import { HostKillstreakLoadoutAckRegistry, type HostKillstreakLoadoutAckIdentity } from './host-killstreak-loadout-ack';
 import {
   applyCareCaptureProjection,
   applyCareCaptureResult,
@@ -4260,6 +4261,7 @@ let lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
 let lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
 const appliedKillstreakDamageResults = new Set<string>();
 const killstreakRegisteredActors = new Set<string>();
+const hostKillstreakLoadoutAcks = new HostKillstreakLoadoutAckRegistry();
 let displayedCareReward: Pass65KillstreakId | null = null;
 const supportDamageDealtByActivation = new Map<string, number>();
 const liveSupportActivationIds = new Set<string>();
@@ -5933,6 +5935,7 @@ function resetPrivateLobbyState(): void {
   localResumeToken = '';
   clientWorldRepairAdmission = null;
   pendingClientReconnectWorldRepairConnectionEpoch = null;
+  hostKillstreakLoadoutAcks.clear();
   localHostConfirmedContinuity = null;
   awaitingAuthoritativeRejoinContinuity = false;
   awaitingCanonicalGuestAuthority = false;
@@ -6956,6 +6959,7 @@ function rejectLobbyPlayer(
  */
 function resetAuthenticatedGuestReplacement(playerId: string): void {
   const now = performance.now();
+  hostKillstreakLoadoutAcks.clearActor(playerId);
   pendingGuestAuthorityRepairs.delete(playerId);
   clearRemoteReloadAuthority(playerId);
   const remote = remotes.get(playerId);
@@ -7496,6 +7500,7 @@ function scheduleDisconnectedLobbyExpiry(playerId: string, delayMs = REJOIN_GRAC
     pendingHostRecoveryJoins.delete(playerId);
     hostLobbyAdmissionInFlight.delete(playerId);
     pendingGuestAuthorityRepairs.delete(playerId);
+    hostKillstreakLoadoutAcks.clearActor(playerId);
     const retained = retainedRemoteAuthorities.get(playerId);
     if (retained) {
       const dropPoint = new THREE.Vector3(
@@ -7919,6 +7924,7 @@ function returnPrivateMatchToLobby(asHost: boolean, admissionToken?: MatchAdmiss
   if (admissionToken && !matchAdmissionCoordinator.owns(admissionToken)) return;
   clientWorldRepairAdmission = null;
   pendingClientReconnectWorldRepairConnectionEpoch = null;
+  hostKillstreakLoadoutAcks.clear();
   if (asHost && network.role === 'host') clearStoredHostMatchCheckpoint();
   gameStarted = false;
   matchFinished = false;
@@ -9281,11 +9287,21 @@ function onNetworkMessage(message: GameMessage): void {
     const member = privateLobbySnapshot?.members.find((entry) => entry.id === message.by);
     const remote = remotes.get(message.by);
     if (killstreakRegisteredActors.has(message.by)) {
-      // The client's receiver-ready resend is idempotent. Re-emit the exact
-      // actor snapshot as its reliable ACK without registering or advancing a
-      // life twice.
-      if (member?.connected && remote && killstreakRuntime.actorLifeId(message.by) === message.lifeId) {
-        broadcastKillstreakState(performance.now(), true);
+      const connectionEpoch = hostLobbyConnectionEpochs.get(message.by);
+      const actorLifeId = killstreakRuntime.actorLifeId(message.by);
+      if (!member?.connected || !remote || !connectionEpoch || actorLifeId !== message.lifeId) return;
+      const ackIdentity: HostKillstreakLoadoutAckIdentity = {
+        connectionEpoch,
+        matchEpoch: killstreakMatchEpoch,
+        actorId: message.by,
+        lifeId: actorLifeId,
+      };
+      // The client's receiver-ready resend is idempotent. ACK only this
+      // authenticated connection and exact actor life, and remember it only
+      // after the event-lane mirror accepted the targeted send.
+      if (hostKillstreakLoadoutAcks.needsAck(ackIdentity)) {
+        const reliableSent = sendKillstreakStateToPlayer(message.by, performance.now(), true);
+        hostKillstreakLoadoutAcks.recordReliableResult(ackIdentity, reliableSent);
       }
       return;
     }
@@ -12534,6 +12550,7 @@ function removeRemote(id: string, reason: string, allowRejoinReservation = true)
   if (network.role === 'host' && retainCombatAuthority) markLobbyDisconnected(id);
   clearRemoteReloadAuthority(id);
   if (!retainCombatAuthority) {
+    hostKillstreakLoadoutAcks.clearActor(id);
     retainedRemoteAuthorities.delete(id);
     remoteSupportAuthorities.delete(id);
     remoteGrenadeAuthorities.delete(id);
@@ -13190,6 +13207,7 @@ async function startGame(
   displayedCareReward = null;
   appliedKillstreakDamageResults.clear();
   killstreakRegisteredActors.clear();
+  hostKillstreakLoadoutAcks.clear();
   killstreakPresentation.clear();
   lastLocalKillstreakSnapshotRefreshAt = Number.NEGATIVE_INFINITY;
   lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
@@ -18868,18 +18886,28 @@ function refreshLocalKillstreakSnapshot(now = performance.now(), force = true): 
   return true;
 }
 
+function sendKillstreakStateToPlayer(
+  forPlayerId: string,
+  now = performance.now(),
+  forceReliable = false,
+): boolean {
+  if (network.role !== 'host') return false;
+  const message: KillstreakStateMessage = {
+    type: 'killstreak-state',
+    by: player.id,
+    forPlayerId,
+    snapshot: killstreakRuntime.snapshotFor(forPlayerId, now),
+    nonce: randomNonce(),
+  };
+  const normalSent = network.sendToPlayer(forPlayerId, message);
+  if (!forceReliable) return normalSent;
+  return network.sendStateCommitReliablyToPlayer(forPlayerId, message);
+}
+
 function broadcastKillstreakState(now = performance.now(), forceReliable = false): void {
   if (network.role !== 'host') return;
   for (const remote of remotes.values()) {
-    const message: KillstreakStateMessage = {
-      type: 'killstreak-state',
-      by: player.id,
-      forPlayerId: remote.snapshot.id,
-      snapshot: killstreakRuntime.snapshotFor(remote.snapshot.id, now),
-      nonce: randomNonce(),
-    };
-    network.sendToPlayer(remote.snapshot.id, message);
-    if (forceReliable) network.sendStateCommitReliablyToPlayer(remote.snapshot.id, message);
+    sendKillstreakStateToPlayer(remote.snapshot.id, now, forceReliable);
   }
   lastKillstreakStateBroadcastAt = now;
 }

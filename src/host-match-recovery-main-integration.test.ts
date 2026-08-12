@@ -45,19 +45,36 @@ describe('same-browser hosted active-match recovery integration', () => {
     expect(admission).toContain('hostLobbyAdmissionAttemptCurrent(attempt)');
   });
 
-  it('holds guest admission until authoritative recovery is ready, then retains the reliable repair handshake', () => {
+  it('holds guest admission until authoritative recovery is ready, then consumes the exact reconnect repair once', () => {
     const admission = functionBody('admitLobbyJoin', 'updateHostReady');
     expect(admission).toContain('if (hostMatchRecoveryPreparing)');
     expect(admission).toContain('pendingHostRecoveryJoins.set(message.playerId, message)');
     const recovery = functionBody('resumeRecoveredHostMatch', 'initializeRecoveredHostLobby');
     expect(recovery.indexOf('hostMatchRecoveryPreparing = false')).toBeLessThan(recovery.indexOf('admitLobbyJoin(message)'));
-    const admittedAt = main.indexOf('gameStarted = true;', main.indexOf('async function startGame'));
-    const repairJoinAt = main.indexOf('sendClientWorldRepairReady(frozenKillstreakLoadout)', admittedAt);
+
+    const join = functionBody('sendLobbyJoin', 'sendClientWorldRepairReady');
+    expect(join).toContain('pendingClientReconnectWorldRepairConnectionEpoch = awaitingCanonicalGuestAuthority\n    ? localConnectionEpoch\n    : null;');
+    expect(join.indexOf('localConnectionEpoch = randomLobbyCredential();'))
+      .toBeLessThan(join.indexOf('pendingClientReconnectWorldRepairConnectionEpoch = awaitingCanonicalGuestAuthority'));
+
+    const start = main.slice(main.indexOf('async function startGame'), main.indexOf('\nfunction randomNonce'));
+    expect(start).toContain("clientWorldRepairAdmission = mode === 'client' && !awaitingCanonicalGuestAuthority");
+    const admittedAt = start.indexOf('gameStarted = true;');
+    const repairJoinAt = start.indexOf('sendClientWorldRepairReady(frozenKillstreakLoadout)', admittedAt);
     expect(admittedAt).toBeGreaterThanOrEqual(0);
     expect(repairJoinAt).toBeGreaterThan(admittedAt);
+
+    const repair = functionBody('sendClientWorldRepairReady', 'rejectLobbyPlayer');
+    expect(repair).toContain('pendingClientReconnectWorldRepairConnectionEpoch === localConnectionEpoch');
+    expect(repair).toContain('if (!clientWorldRepairCanAttempt(admission) && !reconnectRepair) return;');
+    expect(repair).toContain('if (reconnectRepair) pendingClientReconnectWorldRepairConnectionEpoch = null;');
+    expect(repair.match(/pendingClientReconnectWorldRepairConnectionEpoch = null/g)).toHaveLength(1);
+    expect(repair.indexOf('network.send(loadoutMessage);'))
+      .toBeLessThan(repair.indexOf('pendingClientReconnectWorldRepairConnectionEpoch = null'));
+
     const lobbyAdmission = functionBody('acceptLobbyState', 'authorizeRedeploy');
-    expect(lobbyAdmission).toContain('lastClientWorldRepairConnectionEpoch !== localConnectionEpoch || enteringActiveLobby');
-    expect(lobbyAdmission).toContain('sendClientWorldRepairReady()');
+    expect(lobbyAdmission).not.toContain('enteringActiveLobby');
+    expect(lobbyAdmission).not.toContain('sendClientWorldRepairReady');
     expect(main).toContain('broadcastHostedBotState(true)');
     expect(main).toContain('broadcastKillstreakState(performance.now(), true)');
   });
