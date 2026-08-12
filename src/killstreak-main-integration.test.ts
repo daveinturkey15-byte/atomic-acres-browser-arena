@@ -31,12 +31,17 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('killstreakPresentation.presentImpacts(message.impacts, presentedAt)');
   });
 
-  it('admits the one-life guest match-start race without granting replacement continuity', () => {
-    expect(source).toContain('message.lifeId === remote.continuity || message.lifeId === remote.continuity + 1');
-    expect(source).toContain('if (!member?.connected || !remote || !initialLifeAccepted) return;');
-    expect(source.indexOf('killstreakRegisteredActors.has(message.by)')).toBeLessThan(
-      source.indexOf('message.lifeId === remote.continuity || message.lifeId === remote.continuity + 1'),
-    );
+  it('admits the one-life guest match-start race and idempotently acknowledges a duplicate without granting continuity', () => {
+    const start = source.indexOf("if (message.type === 'killstreak-loadout-intent') {");
+    const end = source.indexOf("if (message.type === 'killstreak-activate-intent')", start);
+    const block = source.slice(start, end);
+    expect(block).toContain('message.lifeId === remote.continuity || message.lifeId === remote.continuity + 1');
+    expect(block).toContain('if (!member?.connected || !remote || !initialLifeAccepted) return;');
+    expect(block).toContain('killstreakRuntime.actorLifeId(message.by) === message.lifeId');
+    expect(block.match(/killstreakRuntime\.registerActor\(message\.by/g)).toHaveLength(1);
+    expect(block.match(/broadcastKillstreakState\(performance\.now\(\), true\);/g)).toHaveLength(2);
+    expect(block.indexOf('if (killstreakRegisteredActors.has(message.by))'))
+      .toBeLessThan(block.indexOf('killstreakRuntime.registerActor(message.by'));
   });
 
   it('keeps QA teleport continuity aligned with host support authority', () => {

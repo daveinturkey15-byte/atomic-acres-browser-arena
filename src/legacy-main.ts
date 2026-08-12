@@ -206,6 +206,15 @@ import {
   type KillstreakStateMessage,
 } from './killstreak-protocol';
 import {
+  acknowledgeClientWorldRepairActor,
+  beginClientWorldRepair,
+  clientWorldRepairCanAttempt,
+  clientWorldRepairPending,
+  clientWorldRepairReceiverReady,
+  recordClientWorldRepairAttempt,
+  type ClientWorldRepairAdmission,
+} from './client-world-repair-admission';
+import {
   applyCareCaptureProjection,
   applyCareCaptureResult,
   careCaptureCrateId,
@@ -4577,7 +4586,8 @@ let localLobbyPingMs: number | null = null;
 let localLobbyReady = false;
 let localDhv: Dhv = 10;
 let localResumeToken = '';
-let lastClientWorldRepairConnectionEpoch: string | null = null;
+let clientWorldRepairAdmission: ClientWorldRepairAdmission | null = null;
+let pendingClientReconnectWorldRepairConnectionEpoch: string | null = null;
 let lobbyArenaSyncPromise: Promise<void> = Promise.resolve();
 let lobbyClockTimer: ReturnType<typeof setTimeout> | null = null;
 let stateBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -5244,13 +5254,15 @@ syncFieldSupportRows(killstreakLoadoutController.selected);
 
 function gameplayInputEnabled(): boolean {
   return gameStarted && player.alive && matchState.phase === 'active' && menu.classList.contains('hidden') && !isTextChatTyping()
-    && !(network.role === 'client' && awaitingCanonicalGuestAuthority);
+    && !(network.role === 'client' && awaitingCanonicalGuestAuthority)
+    && !pendingClientWorldRepair();
 }
 
 function playerSimulationEnabled(): boolean {
   return gameStarted && player.alive && matchState.phase !== 'ended' && menu.classList.contains('hidden')
     && !localKillstreakActorSnapshot()?.possession
-    && !(network.role === 'client' && awaitingCanonicalGuestAuthority);
+    && !(network.role === 'client' && awaitingCanonicalGuestAuthority)
+    && !pendingClientWorldRepair();
 }
 
 function resetLocalSpinUp(): void {
@@ -5282,7 +5294,7 @@ function syncLocalTriggerAuthority(held: boolean): void {
     transmittedTriggerWeapon = null;
     return;
   }
-  if (awaitingCanonicalGuestAuthority) {
+  if (awaitingCanonicalGuestAuthority || pendingClientWorldRepair()) {
     transmittedTriggerHeld = false;
     transmittedTriggerWeapon = null;
     return;
@@ -5313,7 +5325,7 @@ function setLocalTriggerHeld(held: boolean): void {
 function sendLocalReloadCancel(): void {
   const pending = pendingLocalReloadAuthority;
   if (network.role !== 'client' || !pending || pending.cancelSequence !== null
-    || applyingLocalReloadAuthority || awaitingCanonicalGuestAuthority) return;
+    || applyingLocalReloadAuthority || awaitingCanonicalGuestAuthority || pendingClientWorldRepair()) return;
   const actionSequence = localReloadActionSequence;
   localReloadActionSequence += 1;
   pendingLocalReloadAuthority = Object.freeze({ ...pending, cancelSequence: actionSequence });
@@ -5573,6 +5585,8 @@ function requirePlayerName(): string | null {
 
 function showFatalError(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
+  clientWorldRepairAdmission = null;
+  pendingClientReconnectWorldRepairConnectionEpoch = null;
   setBootstrapStage('failed');
   bootstrapError = message;
   gameStarted = false;
@@ -5601,6 +5615,10 @@ function setNetworkStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): v
   // Observe it after that synchronous transition so failed attempts become
   // retryable and successful attempts cannot leave stale pending button copy.
   queueMicrotask(() => {
+    if (network.role !== 'client' || !network.diagnostics().hostConnectionOpen) {
+      clientWorldRepairAdmission = null;
+      pendingClientReconnectWorldRepairConnectionEpoch = null;
+    }
     const admissionToken = matchAdmissionCoordinator.token();
     if (admissionToken) {
       try {
@@ -5617,6 +5635,10 @@ function setNetworkStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): v
 const network = new ArenaNetwork(onNetworkMessage, setNetworkStatus, (entry) => {
   appendClientRuntimeLog(entry, clientPersistentStorage());
 });
+
+function pendingClientWorldRepair(): boolean {
+  return network.role === 'client' && clientWorldRepairPending(clientWorldRepairAdmission);
+}
 
 function textChatAvailable(): boolean {
   return network.role !== 'offline' && privateLobbySnapshot !== null;
@@ -5909,7 +5931,8 @@ function resetPrivateLobbyState(): void {
   localLobbyReady = false;
   localDhv = 10;
   localResumeToken = '';
-  lastClientWorldRepairConnectionEpoch = null;
+  clientWorldRepairAdmission = null;
+  pendingClientReconnectWorldRepairConnectionEpoch = null;
   localHostConfirmedContinuity = null;
   awaitingAuthoritativeRejoinContinuity = false;
   awaitingCanonicalGuestAuthority = false;
@@ -6861,12 +6884,17 @@ function initializeHostLobby(): void {
 
 function sendLobbyJoin(): void {
   if (network.role !== 'client') return;
+  clientWorldRepairAdmission = null;
+  pendingClientReconnectWorldRepairConnectionEpoch = null;
   if (!localResumeToken) restoreRoomIdentity(network.roomCode);
   if (gameStarted || privateLobbySnapshot?.phase === 'active' || privateLobbySnapshot?.phase === 'countdown') {
     awaitingCanonicalGuestAuthority = true;
     pendingGuestResumeAuthority = null;
   }
   localConnectionEpoch = randomLobbyCredential();
+  pendingClientReconnectWorldRepairConnectionEpoch = awaitingCanonicalGuestAuthority
+    ? localConnectionEpoch
+    : null;
   localTriggerActionSequence = 0;
   transmittedTriggerHeld = false;
   transmittedTriggerWeapon = null;
@@ -6887,18 +6915,23 @@ function sendLobbyJoin(): void {
 
 function sendClientWorldRepairReady(loadout = killstreakLoadoutController.activeMatch ?? killstreakLoadoutController.selected): void {
   if (network.role !== 'client' || !gameStarted) return;
+  const admission = clientWorldRepairAdmission;
+  const reconnectRepair = awaitingCanonicalGuestAuthority
+    && pendingClientReconnectWorldRepairConnectionEpoch === localConnectionEpoch;
+  if (!clientWorldRepairCanAttempt(admission) && !reconnectRepair) return;
   network.send({ type: 'join', player: snapshot() });
   // The reliable state commit is ordered before the loadout intent on the
   // event lane. On a rematch the host has rebuilt the remote at continuity 1;
   // this observed state advances it to the guest's current life before the
-  // one-shot loadout registration validates that life.
+  // idempotent loadout registration validates that life.
   network.sendStateCommitReliably(createStateMessage());
   const loadoutMessage: KillstreakLoadoutIntentMessage = {
     type: 'killstreak-loadout-intent', by: player.id, matchEpoch: killstreakMatchEpoch,
     lifeId: localContinuity, sequence: 0, loadout, nonce: randomNonce(),
   };
   network.send(loadoutMessage);
-  lastClientWorldRepairConnectionEpoch = localConnectionEpoch;
+  if (admission) clientWorldRepairAdmission = recordClientWorldRepairAttempt(admission);
+  if (reconnectRepair) pendingClientReconnectWorldRepairConnectionEpoch = null;
 }
 
 function rejectLobbyPlayer(
@@ -7374,6 +7407,7 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
     // world repair is sent; its normal post-admission `join` message is that
     // readiness handshake (handled in onNetworkMessage below).
     broadcastHostLobby(currentPhase);
+    if (gameStarted) broadcastKillstreakState(performance.now(), true);
     sendTextChatHistory(message.playerId);
     if (privateMatchActiveAtHostTimeMs !== null && privateMatchActiveAtEpochMs !== null && currentPhase !== 'waiting') {
       network.sendToPlayer(message.playerId, {
@@ -7736,6 +7770,8 @@ function handleMatchAdmissionFailure(
     matchStartPreparing = false;
     setStatus(`Deployment preparation failed: ${error.message}. Retry to build fresh assets.`, 'warn');
   } else {
+    clientWorldRepairAdmission = null;
+    pendingClientReconnectWorldRepairConnectionEpoch = null;
     clearBots();
     killstreakLoadoutController.releaseAfterMatch();
     killstreakMenuBinding.setMatchActive(false);
@@ -7881,6 +7917,8 @@ function hostStartPrivateMatch(): void {
 
 function returnPrivateMatchToLobby(asHost: boolean, admissionToken?: MatchAdmissionToken): void {
   if (admissionToken && !matchAdmissionCoordinator.owns(admissionToken)) return;
+  clientWorldRepairAdmission = null;
+  pendingClientReconnectWorldRepairConnectionEpoch = null;
   if (asHost && network.role === 'host') clearStoredHostMatchCheckpoint();
   gameStarted = false;
   matchFinished = false;
@@ -7928,7 +7966,6 @@ function acceptLobbyState(message: LobbyStateMessage): void {
   if (message.snapshot.matchClock && gunRangeMatchClockState
     && message.snapshot.matchClock.revision < gunRangeMatchClockState.revision) return;
   const previousSnapshot = privateLobbySnapshot;
-  const enteringActiveLobby = previousSnapshot?.phase !== 'active' && message.snapshot.phase === 'active';
   const newerRevision = previousSnapshot === null || message.snapshot.revision > previousSnapshot.revision;
   if (newerRevision && previousSnapshot !== null && lobbyAuthoritySupersedesActiveAdmission({
     arenaId: message.snapshot.config.arenaId,
@@ -7974,15 +8011,6 @@ function acceptLobbyState(message: LobbyStateMessage): void {
   if (message.snapshot.activeAtHostTimeMs !== null && message.snapshot.activeAtEpochMs !== null
     && message.snapshot.phase !== 'waiting' && !gameStarted) {
     void beginPrivateMatch('client', message.snapshot.activeAtHostTimeMs, message.snapshot.activeAtEpochMs, message.snapshot.snapshotHostTimeMs);
-  } else if (gameStarted && message.snapshot.phase !== 'waiting' && message.snapshot.phase !== 'ended'
-    && (lastClientWorldRepairConnectionEpoch !== localConnectionEpoch || enteringActiveLobby)) {
-    // The host's first authoritative active-lobby revision is also the proof
-    // that its gameplay receiver is live. Re-emit the world-ready handshake at
-    // that boundary because a faster guest can finish streaming first and its
-    // initial join/loadout packets are intentionally ignored by the host until
-    // host gameStarted is true. The connection-epoch branch retains the same
-    // repair for a replacement document joining an already-active match.
-    sendClientWorldRepairReady();
   }
 }
 
@@ -8138,6 +8166,8 @@ function handleLobbyMessage(message: GameMessage): boolean {
     } as const;
     setStatus(labels[message.reason], 'error');
     invalidateMatchAdmission(`Lobby rejected the active connection: ${message.reason}`);
+    clientWorldRepairAdmission = null;
+    pendingClientReconnectWorldRepairConnectionEpoch = null;
     network.close();
     privateLobbySnapshot = null;
     renderPrivateLobby();
@@ -9247,9 +9277,18 @@ function onNetworkMessage(message: GameMessage): void {
   if (handleSmokeAuthorityMessage(message)) return;
   if (handleFlashAuthorityMessage(message)) return;
   if (message.type === 'killstreak-loadout-intent') {
-    if (network.role !== 'host' || message.matchEpoch !== killstreakMatchEpoch || killstreakRegisteredActors.has(message.by)) return;
+    if (network.role !== 'host' || message.matchEpoch !== killstreakMatchEpoch) return;
     const member = privateLobbySnapshot?.members.find((entry) => entry.id === message.by);
     const remote = remotes.get(message.by);
+    if (killstreakRegisteredActors.has(message.by)) {
+      // The client's receiver-ready resend is idempotent. Re-emit the exact
+      // actor snapshot as its reliable ACK without registering or advancing a
+      // life twice.
+      if (member?.connected && remote && killstreakRuntime.actorLifeId(message.by) === message.lifeId) {
+        broadcastKillstreakState(performance.now(), true);
+      }
+      return;
+    }
     // Guest and host arena streaming finish independently. The guest advances
     // its life exactly once at match admission, while the host may still hold
     // the authenticated lobby snapshot from the prior life when this reliable
@@ -9261,7 +9300,7 @@ function onNetworkMessage(message: GameMessage): void {
     if (!member?.connected || !remote || !initialLifeAccepted) return;
     killstreakRuntime.registerActor(message.by, member.team, message.lifeId, message.loadout);
     killstreakRegisteredActors.add(message.by);
-    broadcastKillstreakState();
+    broadcastKillstreakState(performance.now(), true);
     return;
   }
   if (message.type === 'killstreak-activate-intent') {
@@ -9353,7 +9392,14 @@ function onNetworkMessage(message: GameMessage): void {
     const previousActor = localKillstreakActorSnapshot();
     killstreakSnapshot = message.snapshot;
     const actor = localKillstreakActorSnapshot();
+    const exactActorAcknowledged = clientWorldRepairAdmission !== null
+      && actor?.actorId === clientWorldRepairAdmission.identity.playerId
+      && actor.lifeId === clientWorldRepairAdmission.identity.lifeId;
     if (actor) {
+      clientWorldRepairAdmission = acknowledgeClientWorldRepairActor(clientWorldRepairAdmission, {
+        actorId: actor.actorId,
+        lifeId: actor.lifeId,
+      });
       // Only a recipient-specific snapshot admitted from the authenticated host
       // can confirm a replacement document's life identity. Persist it for a
       // later renderer replacement, and correct any forged/stale local copy
@@ -9384,6 +9430,17 @@ function onNetworkMessage(message: GameMessage): void {
       refreshLocalKillstreakSnapshot();
       if (actor.streak > (previousActor?.streak ?? actor.streak)) recordImmediateStreak();
       updateFieldSupportHud();
+    }
+    if (clientWorldRepairReceiverReady(clientWorldRepairAdmission, {
+      connectionEpoch: localConnectionEpoch,
+      matchEpoch: message.snapshot.matchEpoch,
+      exactActorAcknowledged,
+    }) || awaitingCanonicalGuestAuthority
+      && pendingClientReconnectWorldRepairConnectionEpoch === localConnectionEpoch) {
+      // This authenticated recipient snapshot can only be authored by a live
+      // host runtime for the current match epoch. If our exact actor/life is
+      // absent, it is the bounded receiver-ready proof for one repair resend.
+      sendClientWorldRepairReady();
     }
     return;
   }
@@ -9649,8 +9706,33 @@ function onNetworkMessage(message: GameMessage): void {
           yaw: initialIncoming.yaw, stance: initialIncoming.stance ?? 'stand', continuity: retainedAuthority.continuity,
         }];
         remote.awaitingReplacementState = true;
+      } else if (network.role === 'host' && message.type === 'state'
+        && message.continuity >= remote.continuity) {
+        // createRemote seeds continuity 1 and the creating sample cannot enter
+        // the later `incoming.seq > remote.snapshot.seq` reducer. Adopt this
+        // authenticated first observation once so the receiver-ready repair
+        // loadout is checked against the life the host actually observed.
+        remote.continuity = message.continuity;
+        remote.positionHistory = remote.positionHistory.map((sample) => ({
+          ...sample,
+          continuity: message.continuity,
+        }));
+        remote.interpolation.clear();
+        remote.interpolation.push({
+          seq: initialIncoming.seq,
+          hostTimeMs: currentHostTimeMs(),
+          continuity: message.continuity,
+          value: initialIncoming,
+        });
       }
       remotes.set(incoming.id, remote);
+      if (network.role === 'host' && message.type === 'state') {
+        // onNetworkMessage admits this observation only after host gameStarted.
+        // Reply on the reliable lane with the current match-epoch support
+        // snapshot; an absent recipient actor is the client's receiver-ready
+        // proof, while a retained actor is already its acknowledgement.
+        broadcastKillstreakState(performance.now(), true);
+      }
       if (!remoteSupportAuthorities.has(incoming.id)) remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
       if (!remoteGrenadeAuthorities.has(incoming.id)) remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState(incoming.grenade));
       if (!remoteCombatInventories.has(incoming.id)) resetRemoteCombatInventory(initialIncoming);
@@ -13142,6 +13224,14 @@ async function startGame(
     // life and its next killstreak snapshot corrects any tampered storage.
     localContinuity = localHostConfirmedContinuity;
   } else localContinuity += 1;
+  clientWorldRepairAdmission = mode === 'client' && !awaitingCanonicalGuestAuthority
+    ? beginClientWorldRepair({
+        playerId: player.id,
+        connectionEpoch: localConnectionEpoch,
+        matchEpoch: killstreakMatchEpoch,
+        lifeId: localContinuity,
+      })
+    : null;
   resetFlashVictimLife();
   if (mode !== 'client') {
     if (hostRecovery?.killstreak) {
