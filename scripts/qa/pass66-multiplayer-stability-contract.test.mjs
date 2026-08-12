@@ -7,6 +7,7 @@ import {
   PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV,
   PASS66_MULTIPLAYER_BROWSER_EXECUTABLE_ENV,
   PASS66_MULTIPLAYER_BROWSER_SHA256_ENV,
+  PASS66_MULTIPLAYER_FORBIDDEN_AUTOMATION_ENV,
   PASS66_MULTIPLAYER_SPECS,
   PASS66_MULTIPLAYER_TEST_COUNT,
   multiplayerPlaywrightReportFailures,
@@ -121,10 +122,12 @@ test('owned multiplayer verifier environment fails closed on route or source amb
     ...environment,
     QA_INSTALLED_EDGE: '1',
   }).join('\n'), /installed Edge/u);
-  assert.match(multiplayerStabilityEnvironmentFailures({
-    ...environment,
-    PW_TEST_CONNECT_WS_ENDPOINT: 'ws://127.0.0.1:4444/',
-  }).join('\n'), /remote Playwright/u);
+  for (const key of PASS66_MULTIPLAYER_FORBIDDEN_AUTOMATION_ENV) {
+    assert.match(multiplayerStabilityEnvironmentFailures({
+      ...environment,
+      [key]: 'adversarial-automation-override',
+    }).join('\n'), new RegExp(`forbidden automation environment ${key}`, 'u'));
+  }
 });
 
 test('served provenance requires the exact configured candidate identity', () => {
@@ -484,7 +487,8 @@ test('verifier pins the external serial Chromium command and writes only a parse
   assert.match(source, /assertOwnedChromeUnchanged\('during'\)/u);
   assert.match(source, /\[PASS70_NATIVE_USER_AGENT_ENV\]: '1'/u);
   assert.match(wrapper, /resolveInstalledChromeIdentity\(\)/u);
-  assert.match(wrapper, /PASS66_MULTIPLAYER_REMOTE_PLAYWRIGHT_ENV\.filter/u);
+  assert.match(wrapper, /PASS66_MULTIPLAYER_FORBIDDEN_AUTOMATION_ENV\.filter/u);
+  assert.match(source, /!PASS66_MULTIPLAYER_FORBIDDEN_AUTOMATION_ENV\.includes\(key\)/u);
   assert.match(wrapper, /sha256File\(multiplayerBrowserIdentity\.executablePath\)/u);
   assert.match(config, /channel: multiplayerChromeChannel \?\? installedEdgeChannel/u);
   assert.match(hostCrash, /page\.once\('crash', onCrash\)/u);

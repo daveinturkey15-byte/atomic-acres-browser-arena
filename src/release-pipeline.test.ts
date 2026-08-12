@@ -167,7 +167,8 @@ describe('production release workflow', () => {
   it('owns and closes the local preview lifecycle for every catalogued Playwright gate', () => {
     expect(packageJson.scripts['qa:playwright-topology']).toBe('node scripts/qa/run-playwright-with-topology.mjs');
     expect(playwrightConfig).toContain("const externalPreview = process.env.QA_EXTERNAL_PREVIEW === '1'");
-    expect(playwrightConfig).toContain("userAgent: installedEdgeChannel ? undefined : devices['Desktop Chrome'].userAgent");
+    expect(playwrightConfig).toContain('userAgent: resolvePass70ChromiumProjectUserAgent({');
+    expect(playwrightConfig).toContain('nativeEngineUserAgent,');
     expect(playwrightConfig).toContain('webServer: externalPreview ? undefined :');
     expect(ownedPlaywrightRunner).toContain('outDir: temporaryDist');
     expect(ownedPlaywrightRunner).toContain("['scripts/release/stage-release-topology.mjs']");

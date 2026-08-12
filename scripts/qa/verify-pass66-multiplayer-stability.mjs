@@ -9,7 +9,7 @@ import {
   PASS66_MULTIPLAYER_BROWSER_EXECUTABLE_ENV,
   PASS66_MULTIPLAYER_BROWSER_SHA256_ENV,
   PASS66_MULTIPLAYER_SPECS,
-  PASS66_MULTIPLAYER_REMOTE_PLAYWRIGHT_ENV,
+  PASS66_MULTIPLAYER_FORBIDDEN_AUTOMATION_ENV,
   multiplayerPlaywrightReportFailures,
   multiplayerServedCandidateFailures,
   multiplayerStabilityEnvironmentFailures,
@@ -123,7 +123,7 @@ async function runPlaywright(peerPorts) {
     key !== 'QA_REQUIRE_OWNED_FRESH_PREVIEW'
     && key !== 'QA_EXTERNAL_PREVIEW'
     && key !== 'QA_INSTALLED_EDGE'
-    && !PASS66_MULTIPLAYER_REMOTE_PLAYWRIGHT_ENV.includes(key)
+    && !PASS66_MULTIPLAYER_FORBIDDEN_AUTOMATION_ENV.includes(key)
   )));
   const childEnvironment = {
     ...inheritedEnvironment,

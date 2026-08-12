@@ -9,10 +9,14 @@ export const PASS66_MULTIPLAYER_BROWSER_CHANNEL = 'chrome';
 export const PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV = 'QA_MULTIPLAYER_BROWSER_CHANNEL';
 export const PASS66_MULTIPLAYER_BROWSER_EXECUTABLE_ENV = 'QA_MULTIPLAYER_BROWSER_EXECUTABLE_PATH';
 export const PASS66_MULTIPLAYER_BROWSER_SHA256_ENV = 'QA_MULTIPLAYER_BROWSER_EXECUTABLE_SHA256';
-export const PASS66_MULTIPLAYER_REMOTE_PLAYWRIGHT_ENV = Object.freeze([
+export const PASS66_MULTIPLAYER_FORBIDDEN_AUTOMATION_ENV = Object.freeze([
+  'PWDEBUG',
   'PW_TEST_CONNECT_WS_ENDPOINT',
   'PW_TEST_CONNECT_HEADERS',
   'PW_TEST_CONNECT_EXPOSE_NETWORK',
+  'SELENIUM_REMOTE_URL',
+  'SELENIUM_REMOTE_CAPABILITIES',
+  'SELENIUM_REMOTE_HEADERS',
 ]);
 
 export const PASS66_MULTIPLAYER_SPECS = Object.freeze([
@@ -117,8 +121,8 @@ export function multiplayerStabilityEnvironmentFailures(environment) {
   if (environment.QA_INSTALLED_EDGE === '1') {
     errors.push('owned browser must not drift to installed Edge');
   }
-  for (const key of PASS66_MULTIPLAYER_REMOTE_PLAYWRIGHT_ENV) {
-    if (environment[key] !== undefined) errors.push(`owned browser rejects remote Playwright environment ${key}`);
+  for (const key of PASS66_MULTIPLAYER_FORBIDDEN_AUTOMATION_ENV) {
+    if (environment[key] !== undefined) errors.push(`owned browser rejects forbidden automation environment ${key}`);
   }
   return errors;
 }

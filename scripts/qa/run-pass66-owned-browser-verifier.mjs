@@ -16,7 +16,7 @@ import {
   PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV,
   PASS66_MULTIPLAYER_BROWSER_EXECUTABLE_ENV,
   PASS66_MULTIPLAYER_BROWSER_SHA256_ENV,
-  PASS66_MULTIPLAYER_REMOTE_PLAYWRIGHT_ENV,
+  PASS66_MULTIPLAYER_FORBIDDEN_AUTOMATION_ENV,
 } from './pass66-multiplayer-stability-contract.mjs';
 import { PASS70_NATIVE_USER_AGENT_ENV } from './pass70-cross-browser-native-user-agent-contract.mjs';
 
@@ -85,7 +85,7 @@ if (!/^[a-f0-9]{40}$/u.test(sourceSha)) throw new Error(`Invalid Pass 66 ${gate}
 
 const browserDriftEnvironment = gate === 'multiplayer-stability' ? [
   ...(process.env.QA_INSTALLED_EDGE === '1' ? ['QA_INSTALLED_EDGE'] : []),
-  ...PASS66_MULTIPLAYER_REMOTE_PLAYWRIGHT_ENV.filter((key) => process.env[key] !== undefined),
+  ...PASS66_MULTIPLAYER_FORBIDDEN_AUTOMATION_ENV.filter((key) => process.env[key] !== undefined),
 ] : [];
 if (browserDriftEnvironment.length > 0) {
   throw new Error(`Pass 66 multiplayer-stability rejects browser environment drift: ${browserDriftEnvironment.join(', ')}`);
@@ -112,7 +112,7 @@ const ownedBrowserEnvironmentKeys = new Set([
   PASS66_MULTIPLAYER_BROWSER_EXECUTABLE_ENV,
   PASS66_MULTIPLAYER_BROWSER_SHA256_ENV,
   PASS70_NATIVE_USER_AGENT_ENV,
-  ...PASS66_MULTIPLAYER_REMOTE_PLAYWRIGHT_ENV,
+  ...PASS66_MULTIPLAYER_FORBIDDEN_AUTOMATION_ENV,
 ]);
 const inheritedEnvironment = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => (
