@@ -61,6 +61,8 @@ export type ViewmodelContactResponse = Readonly<{
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 const finite = (value: number, fallback = 0): number => Number.isFinite(value) ? value : fallback;
+/** Millimetre-down quantization keeps collider float jitter from moving a viewmodel into geometry. */
+const quantizeContactMetersDown = (value: number): number => Math.floor(value * 1_000 + 1e-9) / 1_000;
 export const ADS_IN_RESPONSE_PER_SECOND = 22;
 export const ADS_OUT_RESPONSE_PER_SECOND = 18;
 export const VIEWMODEL_CONTACT_RESPONSE_CONTRACT = 'catalog-viewmodel-contact-response-v2';
@@ -269,7 +271,10 @@ export function viewmodelObstructionPose(
     ? VIEWMODEL_PRONE_FLOOR_LIFT_BUDGET_METERS * 0.88
     : 0;
   return {
-    retreat: Math.min(profile.maximumSurfaceRetreatMeters, Math.max(0, obstruction + (prone ? VIEWMODEL_PRONE_BASE_RETREAT_METERS : 0))),
+    retreat: quantizeContactMetersDown(Math.min(
+      profile.maximumSurfaceRetreatMeters,
+      Math.max(0, obstruction + (prone ? VIEWMODEL_PRONE_BASE_RETREAT_METERS : 0)),
+    )),
     lift: Math.min(0.2, Math.max(0, (prone ? VIEWMODEL_PRONE_BASE_LIFT_METERS : 0)
       + Math.max(proneGroundedLift, floorPressure * (prone ? VIEWMODEL_PRONE_FLOOR_LIFT_BUDGET_METERS : VIEWMODEL_STANDING_FLOOR_LIFT_BUDGET_METERS)))),
   };

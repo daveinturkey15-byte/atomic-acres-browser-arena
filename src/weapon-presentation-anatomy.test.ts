@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   FIRST_PERSON_ARM_PROPORTION_CONTRACT,
   FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC,
-  FIRST_PERSON_ARM_TRANSVERSE_SCALE,
+  FIRST_PERSON_ARM_UNIFORM_SCALE,
+  FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC,
   FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT,
   FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT,
   FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT,
@@ -415,7 +416,7 @@ describe('first-person anatomical presentation', () => {
     presentation.setFireCaptureAgeMs(null);
   });
 
-  it('thickens authored arm bones without shortening reach and crops both shoulders below the viewport', () => {
+  it('strengthens the complete authored arm uniformly without shearing articulated joints', () => {
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
     const presentation = new WeaponPresentation(camera, false);
     const parent = new THREE.Group();
@@ -454,10 +455,10 @@ describe('first-person anatomical presentation', () => {
     };
     const privatePresentation = presentation as unknown as {
       riggedArmRigs: Array<typeof rig>;
-      applyRiggedArmMuscleProportions(): void;
       placeRiggedShoulderEntryBelowFrame(
         arm: typeof rig,
         cameraRotation: THREE.Quaternion,
+        targetNdcY?: number,
       ): Readonly<{ ndc: readonly [number, number, number]; displacementMeters: number }>;
     };
     privatePresentation.riggedArmRigs.push(rig);
@@ -465,26 +466,30 @@ describe('first-person anatomical presentation', () => {
     const bindReach = shoulder.getWorldPosition(new THREE.Vector3())
       .distanceTo(wrist.getWorldPosition(new THREE.Vector3()));
 
-    privatePresentation.applyRiggedArmMuscleProportions();
+    parent.scale.setScalar(FIRST_PERSON_ARM_UNIFORM_SCALE);
     camera.updateMatrixWorld(true);
     expect(shoulder.getWorldScale(new THREE.Vector3()).toArray()).toEqual([
-      FIRST_PERSON_ARM_TRANSVERSE_SCALE.upperArm,
-      1,
-      FIRST_PERSON_ARM_TRANSVERSE_SCALE.upperArm,
+      FIRST_PERSON_ARM_UNIFORM_SCALE,
+      FIRST_PERSON_ARM_UNIFORM_SCALE,
+      FIRST_PERSON_ARM_UNIFORM_SCALE,
     ]);
     expect(elbow.getWorldScale(new THREE.Vector3()).toArray()).toEqual([
-      FIRST_PERSON_ARM_TRANSVERSE_SCALE.forearmAbsolute,
-      1,
-      FIRST_PERSON_ARM_TRANSVERSE_SCALE.forearmAbsolute,
+      FIRST_PERSON_ARM_UNIFORM_SCALE,
+      FIRST_PERSON_ARM_UNIFORM_SCALE,
+      FIRST_PERSON_ARM_UNIFORM_SCALE,
     ]);
     expect(wrist.getWorldScale(new THREE.Vector3()).toArray()).toEqual([
-      FIRST_PERSON_ARM_TRANSVERSE_SCALE.wristAbsolute,
-      1,
-      FIRST_PERSON_ARM_TRANSVERSE_SCALE.wristAbsolute,
+      FIRST_PERSON_ARM_UNIFORM_SCALE,
+      FIRST_PERSON_ARM_UNIFORM_SCALE,
+      FIRST_PERSON_ARM_UNIFORM_SCALE,
     ]);
     expect(shoulder.getWorldPosition(new THREE.Vector3())
-      .distanceTo(wrist.getWorldPosition(new THREE.Vector3()))).toBeCloseTo(bindReach, 8);
-    expect(FIRST_PERSON_ARM_PROPORTION_CONTRACT).toBe('authored-muscular-transverse-bone-profile-v1');
+      .distanceTo(wrist.getWorldPosition(new THREE.Vector3())))
+      .toBeCloseTo(bindReach * FIRST_PERSON_ARM_UNIFORM_SCALE, 8);
+    expect(shoulder.scale.toArray()).toEqual([1, 1, 1]);
+    expect(elbow.scale.toArray()).toEqual([1, 1, 1]);
+    expect(wrist.scale.toArray()).toEqual([1, 1, 1]);
+    expect(FIRST_PERSON_ARM_PROPORTION_CONTRACT).toBe('authored-uniform-strong-operator-arms-v2');
 
     const cropScenarios = Object.freeze([
       Object.freeze({ name: 'hip', rotation: [0, 0, 0] as const }),
@@ -500,7 +505,16 @@ describe('first-person anatomical presentation', () => {
       expect(crop.ndc[1], scenario.name).toBeLessThanOrEqual(FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC.right);
       expect(crop.displacementMeters, scenario.name).toBeGreaterThan(0);
     }
-    expect(FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT).toBe('both-shoulders-below-minus-1.20-ndc-v1');
+    shoulder.position.copy(rig.bindShoulderPosition);
+    parent.rotation.set(0, 0, 0);
+    camera.updateMatrixWorld(true);
+    const meleeCrop = privatePresentation.placeRiggedShoulderEntryBelowFrame(
+      rig,
+      camera.quaternion,
+      FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC,
+    );
+    expect(meleeCrop.ndc[1]).toBeLessThanOrEqual(FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC);
+    expect(FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT).toBe('reachable-shoulders-with-continuous-sleeve-crop-v2');
   });
 
   it('preserves Carbine and Mini Uzi centre apertures during contact ADS', async () => {

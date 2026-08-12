@@ -315,17 +315,16 @@ export const MELEE_VIEWMODEL_PEAK_SCALE_LIFT = 0.3;
 // hand inside the retained 15 mm socket-calibration contract while preserving
 // a real (non-zero) anti-singularity margin.
 const RIGGED_ARM_MAX_REACH_RATIO = 0.996;
-export const FIRST_PERSON_ARM_PROPORTION_CONTRACT = 'authored-muscular-transverse-bone-profile-v1';
-export const FIRST_PERSON_ARM_TRANSVERSE_SCALE = Object.freeze({
-  upperArm: 1.16,
-  forearmAbsolute: 1.22,
-  wristAbsolute: 1.1,
-});
-export const FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT = 'both-shoulders-below-minus-1.20-ndc-v1';
+export const FIRST_PERSON_ARM_PROPORTION_CONTRACT = 'authored-uniform-strong-operator-arms-v2';
+/** Uniform root scaling preserves the authored skeleton, palms and joint radii. */
+export const FIRST_PERSON_ARM_UNIFORM_SCALE = 1.12;
+export const FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT = 'reachable-shoulders-with-continuous-sleeve-crop-v2';
 export const FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC = Object.freeze({
-  left: -1.26,
-  right: -1.22,
+  left: -1.12,
+  right: -1.07,
 });
+/** The one-handed knife arc needs extra proximal sleeve travel at peak extension. */
+export const FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC = -1.19;
 /** Unit -Z blade axis reused by the per-frame melee knife alignment. */
 const KNIFE_BLADE_AXIS = Object.freeze(new THREE.Vector3(0, 0, -1));
 export const HIP_VIEWMODEL_POSITION = Object.freeze({ x: 0.34, y: -0.44, z: -1.08 });
@@ -1047,7 +1046,7 @@ export class WeaponPresentation {
     // unreadable in the Gun Range shadow floor. Keep one retained, viewmodel-
     // only warm key and give it enough bounded intensity to reveal PBR detail
     // without flattening the metal/fabric response or touching world lighting.
-    this.viewmodelFill.userData.authoredIntensity = flattenMaterials ? 0 : 11.75;
+    this.viewmodelFill.userData.authoredIntensity = flattenMaterials ? 0 : 15.75;
     this.root.add(this.viewmodelFill);
     const fabricMaterial = (color: number, roughness: number, repeatX: number, repeatY: number, normalScale: number): THREE.MeshStandardMaterial => {
       if (typeof document === 'undefined') return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
@@ -1563,8 +1562,9 @@ export class WeaponPresentation {
       }
       this.riggedFingerBones.push(...authoredArms.fingers);
       this.authoredArmsRoot = authoredArms.root;
+      authoredArms.root.scale.setScalar(FIRST_PERSON_ARM_UNIFORM_SCALE);
       authoredArms.root.userData.firstPersonArmProportionContract = FIRST_PERSON_ARM_PROPORTION_CONTRACT;
-      authoredArms.root.userData.firstPersonArmTransverseScale = { ...FIRST_PERSON_ARM_TRANSVERSE_SCALE };
+      authoredArms.root.userData.firstPersonArmUniformScale = FIRST_PERSON_ARM_UNIFORM_SCALE;
       authoredArms.root.userData.firstPersonArmViewportEntryContract = FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT;
       this.root.add(authoredArms.root);
       const authoredKnife = createPass65FieldKnifeModel(this.flattenMaterials, 'first-person');
@@ -3251,6 +3251,7 @@ export class WeaponPresentation {
   private placeRiggedShoulderEntryBelowFrame(
     rig: RiggedViewArm,
     cameraRotation: THREE.Quaternion,
+    targetNdcY: number = FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC[rig.side],
   ): Readonly<{ ndc: readonly [number, number, number]; displacementMeters: number }> {
     const scratch = this.riggedArmSolveScratch;
     const parent = rig.shoulder.parent;
@@ -3264,7 +3265,6 @@ export class WeaponPresentation {
       .addScaledVector(cameraRight, rig.side === 'right' ? 0.012 : -0.012);
     // A shoulder close to -1 NDC still exposed the sleeve endpoint during
     // recoil and prone contact. Both authored chains enter below the crop.
-    const targetNdcY = FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC[rig.side];
     const projectedEntry = scratch.shoulderProjected.copy(entry).project(this.camera);
     if (projectedEntry.y > targetNdcY) {
       // Preserve exact projected depth, move the point directly below the
@@ -3336,38 +3336,8 @@ export class WeaponPresentation {
     return restored;
   }
 
-  /**
-   * Add bounded adult-muscular transverse volume while preserving local-Y
-   * reach. Relative child factors compensate inherited scale, so volume does
-   * not multiply down the chain. The palm/socket IK below remains grip truth.
-   */
-  private applyRiggedArmMuscleProportions(): void {
-    for (const rig of this.riggedArmRigs) {
-      const upper = FIRST_PERSON_ARM_TRANSVERSE_SCALE.upperArm;
-      const forearmRelative = FIRST_PERSON_ARM_TRANSVERSE_SCALE.forearmAbsolute / upper;
-      const wristRelative = FIRST_PERSON_ARM_TRANSVERSE_SCALE.wristAbsolute
-        / FIRST_PERSON_ARM_TRANSVERSE_SCALE.forearmAbsolute;
-      rig.shoulder.scale.set(
-        rig.bindShoulderScale.x * upper,
-        rig.bindShoulderScale.y,
-        rig.bindShoulderScale.z * upper,
-      );
-      rig.elbow.scale.set(
-        rig.bindElbowScale.x * forearmRelative,
-        rig.bindElbowScale.y,
-        rig.bindElbowScale.z * forearmRelative,
-      );
-      rig.wrist.scale.set(
-        rig.bindWristScale.x * wristRelative,
-        rig.bindWristScale.y,
-        rig.bindWristScale.z * wristRelative,
-      );
-    }
-  }
-
   private poseRiggedMeleeArms(progress: number): void {
     this.restoreRiggedArmBindPose();
-    this.applyRiggedArmMuscleProportions();
     const windup = THREE.MathUtils.smoothstep(progress, 0, 0.14);
     const thrust = THREE.MathUtils.smoothstep(progress, 0.14, 0.44);
     const recover = THREE.MathUtils.smoothstep(progress, 0.58, 1);
@@ -3381,6 +3351,14 @@ export class WeaponPresentation {
     const arms = this.authoredArmsRoot;
     if (arms) {
       const scratch = this.riggedArmSolveScratch;
+      const cameraRotation = this.camera.getWorldQuaternion(scratch.cameraRotation);
+      if (right) {
+        this.placeRiggedShoulderEntryBelowFrame(
+          right,
+          cameraRotation,
+          FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC,
+        );
+      }
       arms.updateWorldMatrix(true, true);
       const armsWorldRotation = arms.getWorldQuaternion(scratch.meleeArmsWorldRotation);
       const poseChain = (
@@ -3496,7 +3474,6 @@ export class WeaponPresentation {
   private solveRiggedArms(activeModel: THREE.Object3D | undefined, reloadPose: ReloadPose): void {
     if (this.riggedArmRigs.length === 0) return;
     this.restoreRiggedArmBindPose();
-    this.applyRiggedArmMuscleProportions();
     if (!activeModel) return;
     this.root.updateMatrixWorld(true);
     const scratch = this.riggedArmSolveScratch;
@@ -3540,7 +3517,7 @@ export class WeaponPresentation {
       // palm can still reach its socket while the complete weapon is folded
       // below a wall/floor. This does not move the socket, camera, or shot ray.
       const contactExtension = this.contactResponse.obstructionBlend * (rig.side === 'left' ? 0.48 : 0.3);
-      const segmentLengthScale = (rig.side === 'left'
+      let segmentLengthScale = (rig.side === 'left'
         ? THREE.MathUtils.lerp(1.38, 1.82, this.adsBlend)
         : THREE.MathUtils.lerp(1.18, 1.52, this.adsBlend)) + contactExtension;
       rig.elbow.position.copy(rig.bindElbowPosition).multiplyScalar(segmentLengthScale);
@@ -3557,11 +3534,27 @@ export class WeaponPresentation {
       const shoulderPosition = rig.shoulder.getWorldPosition(scratch.shoulderPosition);
       const elbowPosition = rig.elbow.getWorldPosition(scratch.elbowPosition);
       const wristPosition = rig.wrist.getWorldPosition(scratch.wristPosition);
-      const upperLength = shoulderPosition.distanceTo(elbowPosition);
-      const lowerLength = elbowPosition.distanceTo(wristPosition);
+      let upperLength = shoulderPosition.distanceTo(elbowPosition);
+      let lowerLength = elbowPosition.distanceTo(wristPosition);
       const socketTarget = scratch.socketTarget.copy(target);
-      const physicalReach = upperLength + lowerLength;
+      let physicalReach = upperLength + lowerLength;
       const socketReach = shoulderPosition.distanceTo(socketTarget);
+      const palmReachAllowance = rig.wrist.getWorldPosition(scratch.solvedWrist)
+        .distanceTo(this.riggedPalmWorld(rig, scratch.palmWorld)) + 0.01;
+      const requiredReach = socketReach + palmReachAllowance;
+      if (physicalReach < requiredReach) {
+        const reachExpansion = Math.min(2.2 / segmentLengthScale, requiredReach / Math.max(physicalReach, 1e-6));
+        segmentLengthScale *= reachExpansion;
+        rig.elbow.position.multiplyScalar(reachExpansion);
+        rig.wrist.position.multiplyScalar(reachExpansion);
+        rig.shoulder.updateWorldMatrix(true, true);
+        rig.shoulder.getWorldPosition(shoulderPosition);
+        rig.elbow.getWorldPosition(elbowPosition);
+        rig.wrist.getWorldPosition(wristPosition);
+        upperLength = shoulderPosition.distanceTo(elbowPosition);
+        lowerLength = elbowPosition.distanceTo(wristPosition);
+        physicalReach = upperLength + lowerLength;
+      }
       const socketReachRatio = socketReach / Math.max(physicalReach, 1e-6);
       const calibratedReach = physicalReach * RIGGED_ARM_MAX_REACH_RATIO;
       let gripSocketCalibration = 0;

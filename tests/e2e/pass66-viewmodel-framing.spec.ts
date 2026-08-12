@@ -9,7 +9,7 @@ const VIEWPORTS: readonly Viewport[] = Object.freeze([
   { name: 'iphone-15-landscape', width: 844, height: 390 },
 ]);
 
-const SHOULDER_ENTRY_NDC = Object.freeze({ left: -1.26, right: -1.22 });
+const SHOULDER_ENTRY_NDC = Object.freeze({ left: -1.12, right: -1.07 });
 
 function assertAuthoredArmCropAndGrip(presentation: any, label: string, maximumContactError: number): void {
   expect(presentation.armsSource, `${label}: authored two-chain source`).toBe('authored-two-chain');

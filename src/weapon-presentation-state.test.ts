@@ -92,6 +92,9 @@ describe('weapon presentation state', () => {
     expect(viewmodelObstructionPose(null, true, 0.61).lift).toBeGreaterThanOrEqual(0.13);
     expect(viewmodelObstructionPose(0.2, true, 0.2).retreat).toBeLessThanOrEqual(0.7);
     expect(viewmodelObstructionPose(0.2, true, 0.2).lift).toBeLessThanOrEqual(0.2);
+    const m4JitterBoundary = viewmodelObstructionPose(0.278, true, 0.2, 'm4a1').retreat;
+    expect(Number.isInteger(m4JitterBoundary * 1_000)).toBe(true);
+    expect(m4JitterBoundary).toBeLessThanOrEqual(0.7);
   });
 
   it('uses grounded stance height when an authored floor is a raycast plane', () => {
