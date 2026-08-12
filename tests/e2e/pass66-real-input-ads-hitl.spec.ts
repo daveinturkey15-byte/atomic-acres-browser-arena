@@ -61,6 +61,8 @@ type ScopeReceipt = Readonly<{
     contacts: number;
     silhouettes: number;
     thermalThroughGeometry: boolean;
+    weaponProxyMeshes: 0;
+    weaponDomBodyMarkers: 0;
     exactOperatorReveal: ExactOperatorRevealReceipt;
   }>;
 }>;
@@ -248,7 +250,11 @@ async function captureRealAds(
       expect(state.overlayVisibility).toEqual({ sniper: true, dmr: false, railgun: false });
     } else if (scope === 'm14-ebr') {
       expect(wallBlocked, 'm14-ebr: staged line of sight crosses solid geometry').toBe(true);
-      expect(state.snapshot.dmrThermal.active).toBe(true);
+      expect(state.snapshot.dmrThermal).toMatchObject({
+        active: true,
+        proxyMeshes: 0,
+        domBodyMarkers: 0,
+      });
       expect(state.snapshot.dmrThermal.contacts).toBeGreaterThanOrEqual(1);
       expect(state.overlayVisibility).toEqual({ sniper: false, dmr: true, railgun: false });
       const exactOperatorReveal = assertExactOperatorReveal(scope, state.snapshot.dmrThermal.exactOperatorReveal);
@@ -257,6 +263,8 @@ async function captureRealAds(
         contacts: state.snapshot.dmrThermal.contacts,
         silhouettes: exactOperatorReveal.activeModelLayers,
         thermalThroughGeometry: true,
+        weaponProxyMeshes: state.snapshot.dmrThermal.proxyMeshes,
+        weaponDomBodyMarkers: state.snapshot.dmrThermal.domBodyMarkers,
         exactOperatorReveal,
       });
     } else {
@@ -266,6 +274,8 @@ async function captureRealAds(
       expect(state.snapshot.railgun.presentation).toMatchObject({
         thermalActive: true,
         thermalThroughGeometry: true,
+        proxyMeshes: 0,
+        domBodyMarkers: 0,
       });
       expect(state.snapshot.railgun.presentation.thermalContacts).toBeGreaterThanOrEqual(1);
       expect(state.snapshot.railgun.presentation.worldSilhouettes).toBeGreaterThanOrEqual(1);
@@ -275,6 +285,8 @@ async function captureRealAds(
         contacts: state.snapshot.railgun.presentation.thermalContacts,
         silhouettes: state.snapshot.railgun.presentation.worldSilhouettes,
         thermalThroughGeometry: state.snapshot.railgun.presentation.thermalThroughGeometry,
+        weaponProxyMeshes: state.snapshot.railgun.presentation.proxyMeshes,
+        weaponDomBodyMarkers: state.snapshot.railgun.presentation.domBodyMarkers,
         exactOperatorReveal,
       });
     }
