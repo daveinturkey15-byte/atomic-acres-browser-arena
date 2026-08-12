@@ -9,11 +9,13 @@ import {
   hitReactionAt,
   magnifiedFovDegrees,
   viewmodelFloorClearance,
+  viewmodelContactProbePaddingMeters,
   viewmodelContactResponse,
   viewmodelObstructionPose,
   viewmodelSurfaceRetreat,
 } from './weapon-presentation-state';
 import { WEAPON_IDS } from './protocol';
+import { firstSegmentBoxHit } from './collision';
 
 describe('weapon presentation state', () => {
   it('accumulates and cools bounded weapon heat', () => {
@@ -90,11 +92,15 @@ describe('weapon presentation state', () => {
       lift: expect.any(Number),
     });
     expect(viewmodelObstructionPose(null, true, 0.61).lift).toBeGreaterThanOrEqual(0.13);
-    expect(viewmodelObstructionPose(0.2, true, 0.2).retreat).toBeLessThanOrEqual(0.7);
+    expect(viewmodelObstructionPose(0.2, true, 0.2).retreat).toBeLessThanOrEqual(
+      VIEWMODEL_CONTACT_PROFILES.carbine.maximumSurfaceRetreatMeters,
+    );
     expect(viewmodelObstructionPose(0.2, true, 0.2).lift).toBeLessThanOrEqual(0.2);
     const m4JitterBoundary = viewmodelObstructionPose(0.278, true, 0.2, 'm4a1').retreat;
     expect(Number.isInteger(m4JitterBoundary * 1_000)).toBe(true);
-    expect(m4JitterBoundary).toBeLessThanOrEqual(0.7);
+    expect(m4JitterBoundary).toBeLessThanOrEqual(
+      VIEWMODEL_CONTACT_PROFILES.m4a1.maximumSurfaceRetreatMeters,
+    );
   });
 
   it('uses grounded stance height when an authored floor is a raycast plane', () => {
@@ -112,6 +118,8 @@ describe('weapon presentation state', () => {
       const response = viewmodelContactResponse(weapon, 0.7, 0.2, true, 0);
       expect(profile.weapon).toBe(weapon);
       expect(profile.probeLengthMeters).toBeGreaterThanOrEqual(1.15);
+      expect(profile.fullStowDistanceMeters).toBeGreaterThanOrEqual(0.5);
+      expect(profile.fullStowDistanceMeters).toBeLessThan(profile.probeLengthMeters);
       expect(profile.maximumSurfaceRetreatMeters).toBeGreaterThanOrEqual(0.6);
       expect(profile.probeHalfWidthMeters).toBeGreaterThanOrEqual(0.18);
       expect(profile.minimumScale).toBeGreaterThanOrEqual(0.7);
@@ -187,6 +195,59 @@ describe('weapon presentation state', () => {
         expect(oldCross.filter(fixture.intersects), `${weapon}: old cross: ${fixture.name}`).toHaveLength(0);
         expect(samples.filter(fixture.intersects), `${weapon}: full envelope: ${fixture.name}`).toHaveLength(1);
       }
+    }
+  });
+
+  it('turns the probe lattice into one overlapping swept envelope', () => {
+    for (const weapon of WEAPON_IDS) {
+      const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+      const padding = viewmodelContactProbePaddingMeters(profile);
+      expect(padding, weapon).toBeGreaterThanOrEqual(profile.probeHalfWidthMeters * 0.5);
+      expect(padding, weapon).toBeGreaterThanOrEqual(profile.probeUpperOffsetMeters * 0.5);
+      expect(padding, weapon).toBeGreaterThanOrEqual(profile.probeLowerOffsetMeters * 0.5);
+      expect(padding, weapon).toBeLessThanOrEqual(0.21);
+    }
+  });
+
+  it('detects a thin oblique doorjamb between the old point-ray samples', () => {
+    const profile = VIEWMODEL_CONTACT_PROFILES.carbine;
+    const doorjamb = Object.freeze({
+      minX: 0.112,
+      maxX: 0.128,
+      minY: 0.117,
+      maxY: 0.133,
+      minZ: -0.76,
+      maxZ: -0.64,
+      rotation: [0, Math.PI / 5, 0] as [number, number, number],
+    });
+    const anyProbeHits = (padding: number): boolean => VIEWMODEL_CONTACT_PROBE_OFFSETS.some((offset) => {
+      const y = offset.vertical === 'upper'
+        ? profile.probeUpperOffsetMeters
+        : offset.vertical === 'lower' ? -profile.probeLowerOffsetMeters : 0;
+      const start = { x: offset.rightScale * profile.probeHalfWidthMeters, y, z: 0 };
+      return firstSegmentBoxHit(
+        start,
+        { x: start.x, y: start.y, z: -profile.probeLengthMeters },
+        [doorjamb],
+        padding,
+      ) !== null;
+    });
+    expect(anyProbeHits(0.075)).toBe(false);
+    expect(anyProbeHits(viewmodelContactProbePaddingMeters(profile))).toBe(true);
+  });
+
+  it('reaches the complete stow at a real capsule-to-cover distance in hip and ADS', () => {
+    for (const weapon of WEAPON_IDS) {
+      const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+      const capsuleContact = viewmodelObstructionPose(0.42, false, 1.7, weapon);
+      const hip = viewmodelContactResponse(weapon, capsuleContact.retreat, capsuleContact.lift, false, 0);
+      const ads = viewmodelContactResponse(weapon, capsuleContact.retreat, capsuleContact.lift, false, 1);
+      expect(capsuleContact.retreat, weapon).toBeCloseTo(profile.maximumSurfaceRetreatMeters, 8);
+      expect(hip.wallBlend, weapon).toBe(1);
+      expect(hip.highReadyBlend, weapon).toBe(1);
+      expect(ads.wallBlend, weapon).toBe(1);
+      expect(ads.highReadyBlend, weapon).toBeGreaterThanOrEqual(0.82);
+      expect(ads.scale, weapon).toBeLessThan(0.9);
     }
   });
 

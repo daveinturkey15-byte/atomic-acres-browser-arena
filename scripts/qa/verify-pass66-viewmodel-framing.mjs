@@ -201,7 +201,8 @@ function temporalActionViolations(label, presentation, action, progress) {
     || right.shoulderBindDelta + right.elbowBindDelta + right.wristBindDelta < 0.08) {
     violations.push(`${label}: articulated knife arm is not finite or visibly posed`);
   }
-  if (!left || left.action !== 'melee' || left.supportChainScale > 0.0011
+  if (!left || left.action !== 'melee' || Math.abs(left.supportChainScale - 1) > 1e-6
+    || left.stowedWithoutScaling !== true
     || left.supportChainPolicy !== 'one-hand-action-stowed-outside-frustum-v1') {
     violations.push(`${label}: one-handed melee support chain is not safely stowed`);
   }

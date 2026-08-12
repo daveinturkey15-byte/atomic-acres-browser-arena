@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Box2 } from './collision';
-import { CharacterPhysics, WORLD_BOUNDARY_MAX_Y, WORLD_BOUNDARY_MIN_Y, worldBoundaryColliders } from './physics';
+import {
+  CharacterPhysics,
+  CHARACTER_PHYSICS_CONFIG,
+  STANCE_SHAPES,
+  WORLD_BOUNDARY_MAX_Y,
+  WORLD_BOUNDARY_MIN_Y,
+  worldBoundaryColliders,
+} from './physics';
 
 const bounds: Box2 = { minX: -10, maxX: 10, minZ: -10, maxZ: 10 };
 let active: CharacterPhysics | undefined;
@@ -46,6 +53,46 @@ describe('CharacterPhysics', () => {
     }
     expect(position.x).toBeLessThan(0.43);
     expect(position.z).toBeGreaterThan(-1);
+  });
+
+  it('keeps the authoritative player capsule inside its controller skin at a wall/floor corner', async () => {
+    const corner: readonly Box2[] = [
+      { minX: 0.8, maxX: 1.05, minZ: -3, maxZ: 3, minY: 0, maxY: 3 },
+      { minX: -3, maxX: 3, minZ: 0.8, maxZ: 1.05, minY: 0, maxY: 3 },
+    ];
+    for (const stance of ['stand', 'crouch', 'prone'] as const) {
+      active = await CharacterPhysics.create(corner, bounds);
+      active.teleportEye({ x: -1.2, y: 1.7, z: -1.2 });
+      expect(active.setStance(stance), stance).toBe(true);
+      let position = active.eyePosition();
+      let verticalVelocity = 0;
+      let groundedFrames = 0;
+      for (let frame = 0; frame < 180; frame += 1) {
+        verticalVelocity -= 22 / 120;
+        const movement = active.move({
+          x: 0.055,
+          y: verticalVelocity / 120,
+          z: 0.055,
+        }, 1 / 120);
+        position = movement.position;
+        if (movement.grounded) {
+          groundedFrames += 1;
+          verticalVelocity = 0;
+        }
+      }
+      expect(position.x, `${stance}: wall X penetration`).toBeLessThan(0.44);
+      expect(position.z, `${stance}: wall Z penetration`).toBeLessThan(0.44);
+      const shape = STANCE_SHAPES[stance];
+      const capsuleBottom = position.y - shape.eyeFromCenter - shape.halfHeight - shape.radius;
+      // Rapier's KCC contact skin is the permitted numerical overlap budget;
+      // crossing farther than it would indicate a real floor/collider escape.
+      expect(capsuleBottom, `${stance}: exceeded controller floor skin`).toBeGreaterThanOrEqual(
+        -CHARACTER_PHYSICS_CONFIG.controllerOffset,
+      );
+      expect(groundedFrames, `${stance}: never acquired floor support`).toBeGreaterThan(120);
+      active.dispose();
+      active = undefined;
+    }
   });
 
   it('cannot sprint, jump, crouch, or prone through any playable-bound edge', async () => {

@@ -704,6 +704,7 @@ import {
   magnifiedFovDegrees,
   VIEWMODEL_CONTACT_PROBE_OFFSETS,
   VIEWMODEL_CONTACT_PROFILES,
+  viewmodelContactProbePaddingMeters,
   viewmodelFloorClearance,
   viewmodelObstructionPose,
   type ViewmodelObstructionPose,
@@ -8976,6 +8977,7 @@ function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
   viewmodelProbeRight.set(1, 0, 0).applyEuler(viewmodelProbeRotation).normalize();
   viewmodelProbeUp.set(0, 1, 0).applyEuler(viewmodelProbeRotation).normalize();
   const colliders = activeWorldColliders();
+  const probePaddingMeters = viewmodelContactProbePaddingMeters(profile);
   let nearestForward: number | null = null;
   for (const offset of VIEWMODEL_CONTACT_PROBE_OFFSETS) {
     const verticalOffset = offset.vertical === 'upper'
@@ -8985,7 +8987,7 @@ function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
       .addScaledVector(viewmodelProbeRight, offset.rightScale * profile.probeHalfWidthMeters)
       .addScaledVector(viewmodelProbeUp, verticalOffset);
     viewmodelProbeEnd.copy(viewmodelProbeStart).addScaledVector(viewmodelProbeDirection, profile.probeLengthMeters);
-    const hit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, 0.075);
+    const hit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, probePaddingMeters);
     if (!hit) continue;
     const distance = hit.time * profile.probeLengthMeters;
     nearestForward = nearestForward === null ? distance : Math.min(nearestForward, distance);

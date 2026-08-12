@@ -24,6 +24,8 @@ export type ViewmodelContactProfile = Readonly<{
   weapon: WeaponId;
   /** Authored camera-forward envelope covering the complete weapon and hands. */
   probeLengthMeters: number;
+  /** Distance at which the player capsule is close enough to require a complete stow. */
+  fullStowDistanceMeters: number;
   probeHalfWidthMeters: number;
   probeUpperOffsetMeters: number;
   probeLowerOffsetMeters: number;
@@ -82,6 +84,19 @@ export const VIEWMODEL_CONTACT_PROBE_OFFSETS: readonly ViewmodelContactProbeOffs
   Object.freeze({ rightScale: -1, vertical: 'lower' }),
   Object.freeze({ rightScale: 1, vertical: 'lower' }),
 ]);
+/**
+ * The nine envelope probes are padded until neighbouring samples overlap.
+ * This turns the former point-ray lattice into one conservative swept volume,
+ * so a thin diagonal return or doorjamb cannot pass between samples.
+ */
+export function viewmodelContactProbePaddingMeters(profile: ViewmodelContactProfile): number {
+  return Math.max(
+    0.085,
+    profile.probeHalfWidthMeters * 0.52,
+    profile.probeUpperOffsetMeters * 0.52,
+    profile.probeLowerOffsetMeters * 0.52,
+  );
+}
 const VIEWMODEL_PRONE_BASE_RETREAT_METERS = 0.09;
 const VIEWMODEL_PRONE_BASE_LIFT_METERS = 0.115;
 const VIEWMODEL_PRONE_FLOOR_LIFT_BUDGET_METERS = 0.085;
@@ -103,6 +118,7 @@ const contactProfile = (
 ): ViewmodelContactProfile => Object.freeze({
   weapon,
   probeLengthMeters,
+  fullStowDistanceMeters: Math.min(0.78, Math.max(0.5, probeLengthMeters * 0.36)),
   probeHalfWidthMeters,
   probeUpperOffsetMeters,
   probeLowerOffsetMeters,
@@ -171,7 +187,10 @@ export function viewmodelContactResponse(
   );
   const obstructionBlend = Math.max(wallBlend, floorBlend);
   const adsRemaining = 1 - clamp01(finite(adsBlend));
-  const contactRetention = 0.48 + 0.52 * adsRemaining;
+  // Contact is a physical presentation constraint, not an aim preference.
+  // Settled ADS therefore retains eighty-two percent of the high-ready fold;
+  // the old forty-eight percent left long receivers visibly inside cover.
+  const contactRetention = 0.82 + 0.18 * adsRemaining;
   const highReadyBlend = obstructionBlend * contactRetention;
   const wallDropMeters = profile.maximumWallDropMeters
     * wallBlend
@@ -259,10 +278,13 @@ export function viewmodelObstructionPose(
   const distance = nearestForwardSurfaceMeters === null || !Number.isFinite(nearestForwardSurfaceMeters)
     ? Number.POSITIVE_INFINITY
     : Math.max(0, nearestForwardSurfaceMeters);
-  const obstruction = distance >= profile.probeLengthMeters
-    ? 0
-    : (1 - distance / profile.probeLengthMeters)
-      * (profile.maximumSurfaceRetreatMeters - (prone ? VIEWMODEL_PRONE_BASE_RETREAT_METERS : 0));
+  // The camera can never reach zero metres from a wall because the player
+  // capsule owns authoritative movement. Saturate at the real close-cover
+  // distance instead of reserving the complete fold for an impossible pose.
+  const contactRangeMeters = Math.max(0.01, profile.probeLengthMeters - profile.fullStowDistanceMeters);
+  const contactBlend = clamp01((profile.probeLengthMeters - distance) / contactRangeMeters);
+  const obstruction = contactBlend
+    * (profile.maximumSurfaceRetreatMeters - (prone ? VIEWMODEL_PRONE_BASE_RETREAT_METERS : 0));
   const floorClearance = floorClearanceMeters === null || !Number.isFinite(floorClearanceMeters)
     ? Number.POSITIVE_INFINITY
     : Math.max(0, floorClearanceMeters);

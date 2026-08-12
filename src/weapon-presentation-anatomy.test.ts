@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
   FIRST_PERSON_ARM_PROPORTION_CONTRACT,
-  FIRST_PERSON_ARM_MAX_SEGMENT_LENGTH_SCALE,
+  FIRST_PERSON_ARM_BIND_SEGMENT_LENGTH_SCALE,
   FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC,
   FIRST_PERSON_ARM_UNIFORM_SCALE,
   FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC,
@@ -13,7 +13,6 @@ import {
   HIP_VIEWMODEL_SCALE,
   VIEWMODEL_NEAR_PLANE_CLEARANCE,
   WeaponPresentation,
-  riggedArmBaseSegmentLengthScale,
   authoredNearPlaneContactRetreat,
 } from './weapon-presentation';
 import {
@@ -313,6 +312,58 @@ describe('first-person anatomical presentation', () => {
     }
   });
 
+  it('keeps the shipped arm rig fixed-length, connected and reachable across the action catalog', async () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
+    const presentation = new WeaponPresentation(camera, false);
+    await presentation.load();
+    const privatePresentation = presentation as unknown as { nextRiggedArmDiagnosticsAt: number };
+    for (const weapon of WEAPON_IDS) {
+      presentation.setWeapon(weapon, true);
+      const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+      const scenarios = Object.freeze([
+        Object.freeze({ name: 'hip', pose: REST_POSE }),
+        Object.freeze({ name: 'fire', pose: REST_POSE }),
+        Object.freeze({ name: 'ads', pose: Object.freeze({ ...REST_POSE, ads: true }) }),
+        Object.freeze({
+          name: 'prone-contact',
+          pose: Object.freeze({
+            ...REST_POSE,
+            prone: true,
+            surfaceRetreat: profile.maximumSurfaceRetreatMeters,
+            surfaceLift: 0.2,
+          }),
+        }),
+        Object.freeze({ name: 'reload', pose: Object.freeze({ ...REST_POSE, reloadProgress: 0.5 }) }),
+      ]);
+      for (const scenario of scenarios) {
+        if (scenario.name === 'fire') {
+          presentation.fire(0.02);
+          presentation.setFireCaptureAgeMs(0);
+        }
+        for (let frame = 0; frame < 45; frame += 1) presentation.update(scenario.pose);
+        privatePresentation.nextRiggedArmDiagnosticsAt = 0;
+        presentation.update(scenario.pose);
+        const state = presentation.presentationState();
+        expect(state.riggedArms, `${weapon}/${scenario.name}: both authored chains`).toHaveLength(2);
+        for (const arm of state.riggedArms.filter((entry) => entry.active === true)) {
+          const label = `${weapon}/${scenario.name}/${String(arm.side)}`;
+          expect(arm.segmentLengthScale, `${label}: segment scale`).toBe(FIRST_PERSON_ARM_BIND_SEGMENT_LENGTH_SCALE);
+          expect(arm.bindOffsetsPreserved, `${label}: bind offsets`).toBe(true);
+          expect((arm.shoulderEntryNdc as readonly number[])[1], `${label}: sleeve crop`).toBeLessThanOrEqual(-0.98);
+          expect(arm.withinStableReach, `${label}: stable reach`).toBe(true);
+          expect(arm.contactError as number, `${label}: palm contact`).toBeLessThanOrEqual(0.02);
+          expect(arm.finite, `${label}: finite solve`).toBe(true);
+        }
+        for (const arm of state.riggedArms.filter((entry) => entry.stowed === true)) {
+          const label = `${weapon}/${scenario.name}/${String(arm.side)}`;
+          expect(arm.supportChainScale, `${label}: intact stow scale`).toBe(1);
+          expect(arm.stowedWithoutScaling, `${label}: intact stow`).toBe(true);
+        }
+        if (scenario.name === 'fire') presentation.setFireCaptureAgeMs(1_000);
+      }
+    }
+  });
+
   it('keeps the complete long-gun geometry camera-side of the calibrated wall and prone floor planes', async () => {
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
     const presentation = new WeaponPresentation(camera, false);
@@ -462,6 +513,18 @@ describe('first-person anatomical presentation', () => {
         cameraRotation: THREE.Quaternion,
         targetNdcY?: number,
       ): Readonly<{ ndc: readonly [number, number, number]; displacementMeters: number }>;
+      constrainRiggedShoulderEntryToReach(
+        arm: typeof rig,
+        cameraRotation: THREE.Quaternion,
+        socketTarget: THREE.Vector3,
+        maximumSocketReach: number,
+        targetNdcY?: number,
+      ): Readonly<{
+        ndc: readonly [number, number, number];
+        displacementMeters: number;
+        adjusted: boolean;
+        socketDistance: number;
+      }>;
     };
     privatePresentation.riggedArmRigs.push(rig);
     camera.updateMatrixWorld(true);
@@ -491,7 +554,7 @@ describe('first-person anatomical presentation', () => {
     expect(shoulder.scale.toArray()).toEqual([1, 1, 1]);
     expect(elbow.scale.toArray()).toEqual([1, 1, 1]);
     expect(wrist.scale.toArray()).toEqual([1, 1, 1]);
-    expect(FIRST_PERSON_ARM_PROPORTION_CONTRACT).toBe('authored-uniform-strong-operator-arms-v2');
+    expect(FIRST_PERSON_ARM_PROPORTION_CONTRACT).toBe('authored-fixed-length-strong-operator-arms-v3');
 
     const cropScenarios = Object.freeze([
       Object.freeze({ name: 'hip', rotation: [0, 0, 0] as const }),
@@ -516,11 +579,37 @@ describe('first-person anatomical presentation', () => {
       FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC,
     );
     expect(meleeCrop.ndc[1]).toBeLessThanOrEqual(FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC);
-    expect(FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT).toBe('reachable-shoulders-with-continuous-sleeve-crop-v2');
-    expect(riggedArmBaseSegmentLengthScale('left', 1, 1)).toBe(FIRST_PERSON_ARM_MAX_SEGMENT_LENGTH_SCALE);
-    expect(riggedArmBaseSegmentLengthScale('right', 1, 1)).toBeLessThanOrEqual(
-      FIRST_PERSON_ARM_MAX_SEGMENT_LENGTH_SCALE,
+    expect(FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT)
+      .toBe('fixed-length-reachable-shoulders-continuous-sleeve-crop-v3');
+    expect(FIRST_PERSON_ARM_BIND_SEGMENT_LENGTH_SCALE).toBe(1);
+
+    shoulder.position.copy(rig.bindShoulderPosition);
+    elbow.position.copy(rig.bindElbowPosition);
+    wrist.position.copy(rig.bindWristPosition);
+    parent.rotation.set(0, 0, 0);
+    camera.updateMatrixWorld(true);
+    privatePresentation.placeRiggedShoulderEntryBelowFrame(rig, camera.quaternion);
+    const elbowBind = elbow.position.clone();
+    const wristBind = wrist.position.clone();
+    // Use a camera-near grip socket whose reachable sphere intersects the
+    // below-frame crop. A deeper synthetic socket has no mechanically valid
+    // solution without stretching the arm and would only test impossible IK.
+    const socketTarget = new THREE.Vector3(0.1, -0.22, -0.62);
+    const maximumSocketReach = bindReach * FIRST_PERSON_ARM_UNIFORM_SCALE * 0.82;
+    const reachCrop = privatePresentation.constrainRiggedShoulderEntryToReach(
+      rig,
+      camera.quaternion,
+      socketTarget,
+      maximumSocketReach,
     );
+    expect(reachCrop.adjusted).toBe(true);
+    expect(reachCrop.ndc[1]).toBeLessThanOrEqual(FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC.right);
+    expect(reachCrop.socketDistance).toBeLessThanOrEqual(maximumSocketReach + 1e-8);
+    expect(elbow.position).toEqual(elbowBind);
+    expect(wrist.position).toEqual(wristBind);
+    expect([shoulder.scale, elbow.scale, wrist.scale].every((scale) => (
+      Math.abs(scale.x - scale.y) < 1e-9 && Math.abs(scale.y - scale.z) < 1e-9
+    ))).toBe(true);
   });
 
   it('preserves Carbine and Mini Uzi centre apertures during contact ADS', async () => {
