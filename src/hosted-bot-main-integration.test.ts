@@ -74,7 +74,10 @@ describe('hosted bot skirmish parity integration', () => {
     expect(receiver).not.toContain('audio.impact(');
 
     const damageSender = functionBody('applyHostedBotDamageToRemote', 'acceptHostedBotDamage');
-    expect(damageSender).toContain("bot.weapon === 'flamethrower' ? 'flamethrower-stream' : 'ballistic-ray'");
+    expect(damageSender).toContain("authoredWeapon === 'flamethrower' ? 'flamethrower-stream' : 'ballistic-ray'");
+    expect(damageSender).toContain('authoredWeapon: WeaponId = bot.weapon');
+    expect(damageSender).toContain('weapon: authoredWeapon');
+    expect(damageSender).toContain("cause: { kind: 'gun', weapon: authoredWeapon }");
     const damageReceiver = functionBody('acceptHostedBotDamage', 'botCombatDamage');
     expect(damageReceiver).toContain('if (!hasDedicatedPresentation)');
     expect(damageReceiver.indexOf('spawnTracer(')).toBeGreaterThan(damageReceiver.indexOf('if (!hasDedicatedPresentation)'));

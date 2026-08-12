@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ArenaAudio } from './audio';
 
+let audioConnectCalls = 0;
+let failAudioConnectAt = Number.POSITIVE_INFINITY;
+let audioStartCalls = 0;
+let failAudioStartAt = Number.POSITIVE_INFINITY;
+
 class FakeAudioParam {
   value = 0;
   cancelCalls = 0;
@@ -14,7 +19,11 @@ class FakeAudioParam {
 
 class FakeAudioNode {
   disconnected = false;
-  connect<T>(destination: T): T { return destination; }
+  connect<T>(destination: T): T {
+    audioConnectCalls += 1;
+    if (audioConnectCalls === failAudioConnectAt) throw new Error('synthetic-connect-failure');
+    return destination;
+  }
   disconnect(): void { this.disconnected = true; }
 }
 
@@ -22,7 +31,11 @@ class FakeScheduledSource extends FakeAudioNode {
   onended: ((event: Event) => void) | null = null;
   ended = false;
   startCount = 0;
-  start(): void { this.startCount += 1; }
+  start(): void {
+    audioStartCalls += 1;
+    if (audioStartCalls === failAudioStartAt) throw new Error('synthetic-start-failure');
+    this.startCount += 1;
+  }
   stop(): void {
     if (this.ended) return;
     this.ended = true;
@@ -99,6 +112,10 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     FakeAudioContext.instances.length = 0;
+    audioConnectCalls = 0;
+    failAudioConnectAt = Number.POSITIVE_INFINITY;
+    audioStartCalls = 0;
+    failAudioStartAt = Number.POSITIVE_INFINITY;
   });
 
   it('prepares a tonal muted graph once and makes first damage/low-health entry allocation-free', () => {
@@ -201,6 +218,64 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
       lowHealth: { prepared: false, sources: 0, active: false, audible: false },
       damageFeedback: { prepared: false, sources: 0 },
     });
+    audio.dispose();
+    expect(context.state).toBe('closed');
+  });
+
+  it.each([1, 2, 3, 4, 5, 6, 7, 8])(
+    'fully tears down a partial graph when combat connection %i throws',
+    (failedConnection) => {
+      vi.stubGlobal('AudioContext', FakeAudioContext);
+      const audio = new ArenaAudio();
+      const originalPrepareCombat = audio.prepareCombat.bind(audio);
+      audio.prepareCombat = () => false;
+      audio.unlock();
+      const context = FakeAudioContext.instances[0]!;
+      const baseConnectCalls = audioConnectCalls;
+      const baseGainCount = context.gains.length;
+      audio.prepareCombat = originalPrepareCombat;
+      failAudioConnectAt = baseConnectCalls + failedConnection;
+
+      expect(audio.prepareCombat()).toBe(false);
+      const internals = audio as unknown as {
+        activeVoices: Map<unknown, unknown>;
+        continuousVoiceOwners: Map<unknown, unknown>;
+      };
+      expect(context.oscillators.every((source) => source.ended && source.disconnected)).toBe(true);
+      expect(context.filters.every((node) => node.disconnected)).toBe(true);
+      expect(context.gains.slice(baseGainCount).every((node) => node.disconnected)).toBe(true);
+      expect(internals.activeVoices.size).toBe(0);
+      expect(internals.continuousVoiceOwners.size).toBe(0);
+      expect(audio.telemetry().combatPrewarm).toMatchObject({ prepared: false, sources: 0, nodes: 0 });
+      audio.dispose();
+      expect(context.state).toBe('closed');
+    },
+  );
+
+  it.each([1, 2, 3])('fully releases voice ownership when combat source %i start throws', (failedSource) => {
+    vi.stubGlobal('AudioContext', FakeAudioContext);
+    const audio = new ArenaAudio();
+    const originalPrepareCombat = audio.prepareCombat.bind(audio);
+    audio.prepareCombat = () => false;
+    audio.unlock();
+    const context = FakeAudioContext.instances[0]!;
+    const baseStartCalls = audioStartCalls;
+    const baseGainCount = context.gains.length;
+    audio.prepareCombat = originalPrepareCombat;
+    failAudioStartAt = baseStartCalls + failedSource;
+
+    expect(audio.prepareCombat()).toBe(false);
+    const internals = audio as unknown as {
+      activeVoices: Map<unknown, unknown>;
+      continuousVoiceOwners: Map<unknown, unknown>;
+    };
+    expect(context.oscillators).toHaveLength(failedSource);
+    expect(context.oscillators.every((source) => source.ended && source.disconnected)).toBe(true);
+    expect(context.filters.every((node) => node.disconnected)).toBe(true);
+    expect(context.gains.slice(baseGainCount).every((node) => node.disconnected)).toBe(true);
+    expect(internals.activeVoices.size).toBe(0);
+    expect(internals.continuousVoiceOwners.size).toBe(0);
+    expect(audio.telemetry().combatPrewarm).toMatchObject({ prepared: false, sources: 0, nodes: 0 });
     audio.dispose();
     expect(context.state).toBe('closed');
   });

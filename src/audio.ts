@@ -640,20 +640,19 @@ export class ArenaAudio {
     if (!this.context || !this.feedback) return false;
     this.combatFeedbackPrepareRuns += 1;
     const now = this.context.currentTime;
-    const createdSources: OscillatorNode[] = [];
-    const registeredSources: AudioScheduledSourceNode[] = [];
+    const createdSources: AudioScheduledSourceNode[] = [];
     const createdNodes: AudioNode[] = [];
     const register = (
       source: OscillatorNode,
       nodes: readonly AudioNode[],
       gains: readonly GainNode[] = [],
     ): boolean => {
-      createdNodes.push(...nodes);
       if (!this.registerContinuousVoice(source, this.feedback!, 5, 'combat-feedback', nodes, gains)) return false;
+      // Registration mutates the voice/owner registries before start(). Track
+      // ownership first so a browser start failure is fully transactional.
       source.start(now);
       this.combatFeedbackSources.push(source);
       this.combatFeedbackNodes.push(...nodes);
-      registeredSources.push(source);
       return true;
     };
     try {
@@ -663,7 +662,9 @@ export class ArenaAudio {
       const breath = this.context.createOscillator();
       createdSources.push(breath);
       const breathFilter = this.context.createBiquadFilter();
+      createdNodes.push(breathFilter);
       const breathGain = this.context.createGain();
+      createdNodes.push(breathGain);
       breath.type = 'triangle';
       breath.frequency.value = 196;
       breathFilter.type = 'bandpass';
@@ -676,6 +677,7 @@ export class ArenaAudio {
       const heartbeat = this.context.createOscillator();
       createdSources.push(heartbeat);
       const heartbeatGain = this.context.createGain();
+      createdNodes.push(heartbeatGain);
       heartbeat.type = 'sine';
       heartbeat.frequency.value = 54;
       heartbeatGain.gain.value = 0;
@@ -687,7 +689,9 @@ export class ArenaAudio {
       const damage = this.context.createOscillator();
       createdSources.push(damage);
       const damageFilter = this.context.createBiquadFilter();
+      createdNodes.push(damageFilter);
       const damageGain = this.context.createGain();
+      createdNodes.push(damageGain);
       damage.type = 'triangle';
       damage.frequency.value = 180;
       damageFilter.type = 'bandpass';
@@ -704,19 +708,15 @@ export class ArenaAudio {
       this.lowHealthAppliedState = Object.freeze({ active: false, breathingGain: 0, heartbeatGain: 0 });
       return true;
     } catch {
-      for (const source of createdSources) {
-        if (registeredSources.includes(source)) this.stopSource(source);
-        else {
-          try { source.stop(); } catch { /* source may not have started */ }
-          try { source.disconnect(); } catch { /* partial browser node */ }
-        }
-      }
+      // stopSource is safe for registered, partially registered and never-
+      // registered sources. It releases both voice maps before disconnecting.
+      for (const source of createdSources) this.stopSource(source);
       for (const node of createdNodes) {
         const index = this.combatFeedbackNodes.indexOf(node);
         if (index >= 0) this.combatFeedbackNodes.splice(index, 1);
         try { node.disconnect(); } catch { /* partial browser node */ }
       }
-      this.combatFeedbackSources = this.combatFeedbackSources.filter((source) => !registeredSources.includes(source));
+      this.combatFeedbackSources = this.combatFeedbackSources.filter((source) => !createdSources.includes(source));
       this.resetCombatFeedbackState();
       return false;
     }
@@ -1668,7 +1668,7 @@ export class ArenaAudio {
     for (const node of owner.nodes) {
       const nodeIndex = ownedNodes.indexOf(node);
       if (nodeIndex >= 0) ownedNodes.splice(nodeIndex, 1);
-      node.disconnect();
+      try { node.disconnect(); } catch { /* partially connected browser node */ }
     }
     if (owner.scope === 'combat-feedback') {
       for (const gain of owner.gains) {
@@ -1684,7 +1684,7 @@ export class ArenaAudio {
     try { source.stop(); } catch { /* already stopped */ }
     this.releaseContinuousVoice(source);
     this.activeVoices.delete(source);
-    source.disconnect();
+    try { source.disconnect(); } catch { /* already or partially disconnected */ }
   }
 
   private stopMinigunDrive(): void {
@@ -1713,7 +1713,9 @@ export class ArenaAudio {
   }
 
   private disconnectNodes(nodes: AudioNode[]): void {
-    for (const node of nodes.splice(0)) node.disconnect();
+    for (const node of nodes.splice(0)) {
+      try { node.disconnect(); } catch { /* already or partially disconnected */ }
+    }
   }
 
   private resetCombatFeedbackState(): void {

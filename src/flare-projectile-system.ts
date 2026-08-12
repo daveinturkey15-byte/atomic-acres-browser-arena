@@ -914,7 +914,9 @@ export class FlareProjectileSystem {
     const haloMaterial = entity.halo.material;
     if (haloMaterial instanceof THREE.MeshBasicMaterial) haloMaterial.opacity = (1 - progress) * 0.52;
     entity.lightIntensity = Number(this.light.userData.baseIntensity ?? 18) * (1 - progress);
-    while (entity.authority && entity.nextBurnPulseAt <= now && entity.nextBurnPulseAt <= entity.expiresAt) {
+    // Current occupancy owns at most one canonical quantum per update. A
+    // backgrounded/stalled frame never replays historical occupancy as a burst.
+    if (entity.authority && now <= entity.expiresAt && entity.nextBurnPulseAt <= now) {
       entity.burnPulseIndex += 1;
       for (const target of targets) {
         const distance = entity.root.position.distanceTo(target.position);
@@ -931,7 +933,7 @@ export class FlareProjectileSystem {
         }));
         this.burnPulseCount += 1;
       }
-      entity.nextBurnPulseAt += FLARE_BURN_PULSE_INTERVAL_MS;
+      entity.nextBurnPulseAt = now + FLARE_BURN_PULSE_INTERVAL_MS;
     }
     if (now >= entity.expiresAt) this.release(entity);
   }

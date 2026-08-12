@@ -51,13 +51,19 @@ describe('HF-279 flame authority integration', () => {
     ]) {
       expect(pulse.indexOf(authorityMutation)).toBeGreaterThan(guestGuard);
     }
-    expect(pulse).toContain("'flamethrower-ground-fire',\n        fire.ownerId");
+    expect(pulse).toContain("'flamethrower-ground-fire',\n          fire.ownerId");
     expect(pulse).toContain("network.role === 'host' && fire.damageSource === 'carpet-bomber'");
     expect(pulse).toContain("network.role === 'host' && fire.damageSource === 'flamethrower'");
+    expect(pulse).toContain("ownerKind: ownerBot ? 'hosted-bot' : 'human'");
+    expect(pulse).toContain("authority.route === 'hosted-bot-result'");
+    expect(pulse).toContain('applyHostedBotDamageToRemote(');
+    expect(pulse).toContain("'flamethrower-stream',\n            'flamethrower'");
 
     const localFire = slice('function tryFire(now: number): void {', '\nfunction throwGrenade(): void {');
     expect(localFire).toContain('flamethrowerStreamPresentation.igniteGround(authoritativeEnd, now)');
     expect(localFire).toContain("if (network.role !== 'client') {\n        flamethrowerGroundFires.ignite({");
+    expect(localFire).toContain("if (player.weapon === 'flamethrower'");
+    expect(localFire).toContain('matchEpoch: interactiveWorldMatchEpoch');
 
     const remoteFire = slice('function resolveAuthoritativeShot(request:', '\nfunction acceptAuthoritativeShotResult(');
     const consumed = remoteFire.indexOf("const consumption = consumeTimedMapWeaponShot(timedMapWeaponStates.flamethrower");
@@ -71,6 +77,7 @@ describe('HF-279 flame authority integration', () => {
     expect(lifetime).toContain("weapon === 'flamethrower'");
     expect(lifetime).toContain('FLAMETHROWER_GROUND_FIRE_DURATION_MS + 1_000');
     expect(FLAMETHROWER_GROUND_FIRE_DURATION_MS + 1_000).toBe(6_000);
+    expect(lifetime).toContain('action.matchEpoch !== interactiveWorldMatchEpoch');
 
     const incomingHit = slice("if (message.type === 'hit'", "\n  if (message.type === 'death'");
     const clientStart = incomingHit.indexOf("if (network.role === 'client') {");
