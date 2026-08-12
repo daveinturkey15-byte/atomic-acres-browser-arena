@@ -47,6 +47,13 @@ if (!/^PASS [1-9][0-9]*$/.test(config.experimental.pass) || config.experimental.
 if (config.stable.pass !== 'PASS 67.1' || config.stable.label !== 'STABLE SINGLEPLAYER') {
   throw new Error('Pass 67.1 must remain the approved-source stable singleplayer channel');
 }
+if (config.retained.pass !== 'PASS 69'
+  || config.retained.sourceSha !== '685ed7865018e107df5acf6cb6f7498b4468940c'
+  || config.retained.pagesSha !== '71ec5616504d8e24241450742d01b25c1d6ff4e4'
+  || config.retained.pagesPath !== 'channels/the-big-one'
+  || config.retained.path !== 'channels/pass69-retained') {
+  throw new Error('Retained Pass 69 must remain pinned to the exact previously hosted Pages runtime');
+}
 if (config.rollback && (config.rollback.pass !== 'PASS 63' || config.rollback.path !== 'channels/pass63-rollback')) {
   throw new Error('Rollback must be the Pass 63 rebuild at channels/pass63-rollback');
 }
@@ -211,6 +218,7 @@ if (stableRebuildRequired && (!configuredStableDist || !isAbsolute(configuredSta
 const stable = configuredStableDist
   ? stageRebuilt('recent-stable', config.stable, configuredStableDist, process.env.STABLE_RELEASED_AT)
   : stagePinned('recent-stable', config.stable);
+const retained = stagePinned('pass69-retained', config.retained);
 const experimentalFiles = walkFiles(experimentalRoot);
 const experimental = {
   schemaVersion: 4, channel: liveChannelId, releasePass,
@@ -279,6 +287,12 @@ const publicConfig = {
     path: config.experimental.path,
     deploymentState,
   },
+  retained: {
+    label: config.retained.label,
+    description: config.retained.description,
+    pass: config.retained.pass,
+    path: config.retained.path,
+  },
   ...(rollback ? {
     stable: {
       label: config.rollback.label,
@@ -294,11 +308,12 @@ mkdirSync(dirname(topologyReceiptPath), { recursive: true });
 const topology = {
   schemaVersion: 4, sourceSha, releasePass,
   root: { kind: 'chooser-only', files: ['index.html', 'release-shell.css', 'release-shell.js', 'release-channel-config.js'] },
-  channels: Object.fromEntries(Object.entries({ experimental, stable, rollback }).filter(([, channel]) => channel)),
+  channels: Object.fromEntries(Object.entries({ experimental, retained, stable, rollback }).filter(([, channel]) => channel)),
 };
 writeFileSync(topologyReceiptPath, `${JSON.stringify(topology, null, 2)}\n`);
 console.log(JSON.stringify({ releaseTopology: 'ok', sourceSha, channels: {
   experimental: { pass: experimental.releasePass, sourceSha, digest: experimental.treeSha256 },
+  retained: { pass: retained.releasePass, pagesSha: retained.pagesSha, digest: retained.treeSha256 },
   stable: { pass: stable.releasePass, pagesSha: stable.pagesSha, digest: stable.treeSha256 },
   ...(rollback ? { rollback: { pass: rollback.releasePass, sourceSha: rollback.sourceSha, digest: rollback.treeSha256 } } : {}),
 } }));

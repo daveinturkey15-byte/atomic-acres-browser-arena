@@ -21,6 +21,15 @@ describe('Pass 70 release topology', () => {
     });
     expect(config.latest.label).toBe('PASS 70');
     expect(config.stable.sourceSha).toBe('8c3ad1cd4d819aba79f07c01c16c8c4294fd14c1');
+    expect(config.retained).toMatchObject({
+      pass: 'PASS 69',
+      sourceSha: '685ed7865018e107df5acf6cb6f7498b4468940c',
+      pagesSha: '71ec5616504d8e24241450742d01b25c1d6ff4e4',
+      pagesPath: 'channels/the-big-one',
+      runtimeFileCount: 515,
+      runtimeTreeSha256: '5ace26fdf83a4cf695d0075a40523f70e0d6fcee02cb6ae5b42666b6679107b9',
+      path: 'channels/pass69-retained',
+    });
     expect(config.rollback.sourceSha).toBe('ac85e9b8b46cc2370aee903d564ecf3c4682b24c');
     expect(config.rollback).toMatchObject({
       pass: 'PASS 63',
@@ -74,14 +83,16 @@ describe('Pass 70 release topology', () => {
     expect(JSON.stringify(config)).not.toContain('channels/new-netcode');
   });
 
-  it('shows only Pass 70 and the retained stable Pass 63 WebGL build', () => {
-    expect(shell).toContain("['experimental', 'stable']");
+  it('shows Pass 70, exact retained Pass 69 and stable Pass 63 WebGL', () => {
+    expect(shell).toContain("['experimental', 'retained', 'stable']");
     expect(shell).not.toContain("['experimental', 'stable', 'rollback']");
     expect(shell).not.toContain("['normal', 'stable', 'experimental']");
     expect(shell).toContain("channel.deploymentState === 'live' ? 'LIVE' : 'RELEASE CANDIDATE'");
     expect(shell).toContain("requested === 'stable' || requested === 'rollback') return route('stable')");
+    expect(shell).toContain("requested === 'previous' || requested === 'pass69') return route('retained')");
     expect(shell).toContain("if (!channel) continue");
     expect(shellHtml).toContain('Pass 70');
+    expect(shellHtml).toContain('Pass 69');
     expect(shellHtml).not.toContain('local Pass 70');
     expect(shellHtml).not.toContain('The Big One');
     expect(shellHtml).toContain('stable Pass 63 WebGL');
@@ -112,6 +123,7 @@ describe('Pass 70 release topology', () => {
     expect(staging).toContain('process.env.REQUIRE_STABLE_RELEASE_TIMESTAMP');
     expect(staging).toContain("stageRebuilt('recent-stable', config.stable");
     expect(staging).toContain("stagePinned('recent-stable', config.stable)");
+    expect(staging).toContain("stagePinned('pass69-retained', config.retained)");
     expect(staging).toContain('STABLE_RELEASED_AT must be one strict UTC ISO-8601 instant');
     expect(staging).toContain("channel: liveChannelId");
     expect(staging).toContain('channel.pagesPath');
