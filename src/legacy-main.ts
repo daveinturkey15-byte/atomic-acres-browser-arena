@@ -696,6 +696,7 @@ import {
 } from './weapon-presentation';
 import {
   magnifiedFovDegrees,
+  VIEWMODEL_CONTACT_PROFILES,
   viewmodelFloorClearance,
   viewmodelObstructionPose,
   type ViewmodelObstructionPose,
@@ -765,7 +766,11 @@ import {
 } from './carpet-ground-fire-multiplayer';
 import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
 import { runStagedDmrThermalPrewarm } from './dmr-thermal-prewarm-lifecycle';
-import { ThermalGhostPresentation, type ThermalGhostTarget } from './thermal-ghost-presentation';
+import {
+  THERMAL_GHOST_MAX_TARGETS,
+  ThermalGhostPresentation,
+  type ThermalGhostTarget,
+} from './thermal-ghost-presentation';
 import { applySkyBackdrop, waitForSkyBackdropAdmission } from './rendering/sky-backdrop';
 import {
   SmokeVolumePresentationPool,
@@ -2051,8 +2056,8 @@ function updateFlamethrowerGroundFires(now: number): void {
 }
 
 const dmrThermalPresentation = new DmrThermalPresentation(scene, element<HTMLElement>('#dmr-thermal'));
-// Through-wall reveals: the M14 DMR shows the actual posed combatant via exact-
-// pose thermal ghosts; the railgun keeps its signature cyan silhouette scope.
+// Every authorized through-wall optic shows the exact animated combatant with
+// its normal appearance plus one bounded orange body-following halo.
 const thermalGhostPresentation = new ThermalGhostPresentation();
 const smokeVolumePresentationPool = new SmokeVolumePresentationPool(scene);
 smokeVolumePresentationPool.setQualityScale(graphicsRuntime.smokeScale);
@@ -8834,16 +8839,15 @@ const viewmodelProbeUp = new THREE.Vector3();
 const viewmodelProbeStart = new THREE.Vector3();
 const viewmodelProbeEnd = new THREE.Vector3();
 const viewmodelProbeRotation = new THREE.Euler(0, 0, 0, 'YXZ');
-const VIEWMODEL_PROBE_LENGTH_M = 1.45;
 const VIEWMODEL_PROBE_OFFSETS = Object.freeze([
-  Object.freeze({ right: 0, up: 0 }),
-  Object.freeze({ right: -0.19, up: 0.04 }),
-  Object.freeze({ right: 0.19, up: 0.04 }),
-  Object.freeze({ right: 0, up: 0.24 }),
-  Object.freeze({ right: 0, up: -0.22 }),
+  Object.freeze({ rightScale: 0, vertical: 'centre' as const }),
+  Object.freeze({ rightScale: -1, vertical: 'centre' as const }),
+  Object.freeze({ rightScale: 1, vertical: 'centre' as const }),
+  Object.freeze({ rightScale: 0, vertical: 'upper' as const }),
+  Object.freeze({ rightScale: 0, vertical: 'lower' as const }),
 ]);
-
 function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
+  const profile = VIEWMODEL_CONTACT_PROFILES[player.weapon];
   viewmodelProbeRotation.set(player.pitch, player.yaw, 0, 'YXZ');
   viewmodelProbeDirection.set(0, 0, -1).applyEuler(viewmodelProbeRotation).normalize();
   viewmodelProbeRight.set(1, 0, 0).applyEuler(viewmodelProbeRotation).normalize();
@@ -8851,13 +8855,16 @@ function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
   const colliders = activeWorldColliders();
   let nearestForward: number | null = null;
   for (const offset of VIEWMODEL_PROBE_OFFSETS) {
+    const verticalOffset = offset.vertical === 'upper'
+      ? profile.probeUpperOffsetMeters
+      : offset.vertical === 'lower' ? -profile.probeLowerOffsetMeters : offset.rightScale === 0 ? 0 : 0.04;
     viewmodelProbeStart.copy(player.position)
-      .addScaledVector(viewmodelProbeRight, offset.right)
-      .addScaledVector(viewmodelProbeUp, offset.up);
-    viewmodelProbeEnd.copy(viewmodelProbeStart).addScaledVector(viewmodelProbeDirection, VIEWMODEL_PROBE_LENGTH_M);
+      .addScaledVector(viewmodelProbeRight, offset.rightScale * profile.probeHalfWidthMeters)
+      .addScaledVector(viewmodelProbeUp, verticalOffset);
+    viewmodelProbeEnd.copy(viewmodelProbeStart).addScaledVector(viewmodelProbeDirection, profile.probeLengthMeters);
     const hit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, 0.075);
     if (!hit) continue;
-    const distance = hit.time * VIEWMODEL_PROBE_LENGTH_M;
+    const distance = hit.time * profile.probeLengthMeters;
     nearestForward = nearestForward === null ? distance : Math.min(nearestForward, distance);
   }
   viewmodelProbeStart.copy(player.position);
@@ -8869,7 +8876,7 @@ function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
     playerGrounded,
     stanceEyeHeight(player.stance),
   );
-  return viewmodelObstructionPose(nearestForward, player.stance === 'prone', floorClearance);
+  return viewmodelObstructionPose(nearestForward, player.stance === 'prone', floorClearance, player.weapon);
 }
 
 function currentViewmodelSurfaceRetreat(): number {
@@ -12295,8 +12302,8 @@ async function prewarmMatchBoundDmrThermalAdsPresentation(
       weaponView.suppressForFullscreenPresentation(true);
       hudRoot.classList.add('dmr-thermal-active');
       dmrThermalPresentation.update(camera, dmrThermalContacts(), true);
-      // Live gameplay replaces the generic billboard layer with the same
-      // skinned exact-pose ghosts staged below.
+      // Live gameplay uses the same skinned exact-model and halo layers staged
+      // below; the DMR-owned anchor carries only optic/contact telemetry.
       dmrThermalPresentation.worldRoot.visible = false;
       prewarmThermalGhostPipelines();
     },
@@ -14695,16 +14702,17 @@ function updateDmrThermal(): void {
   }
   dmrThermalWasActive = true;
   dmrThermalPresentation.update(camera, dmrThermalContacts(), true);
-  // The generic billboard silhouettes are superseded by exact-pose thermal
-  // ghosts; keep the bounded DOM markers, hide the sprite layer.
+  // Contact selection/optic telemetry remain here. The shared exact-operator
+  // layer owns every world-space body and halo; this anchor has no proxy or
+  // body-marker geometry.
   dmrThermalPresentation.worldRoot.visible = false;
 }
 
 /**
- * Compile the through-wall ghost pipelines during match admission instead of on
- * the player's first ADS. Builds one hostile and one friendly ghost set from
- * whatever live combatants exist, so both relation materials reach the GPU
- * behind the opaque deployment surface. The caller clears the ghosts again.
+ * Compile the relation-invariant exact-model and orange-halo layers during
+ * match admission instead of on the player's first ADS. Every live ID is
+ * submitted once behind the opaque deployment surface; the caller clears the
+ * ghosts again after the match-bound compile.
  */
 function prewarmThermalGhostPipelines(): void {
   const targets: ThermalGhostTarget[] = [];
@@ -14719,41 +14727,59 @@ function prewarmThermalGhostPipelines(): void {
     const relation = mode === 'tdm' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
     targets.push({ id: bot.id, relation, root: bot.root });
   }
-  // Retain records under the exact live IDs so first ADS reuses them. If the
-  // current roster has only one relation, add one bounded alias solely to
-  // submit the other shared material pipeline during admission.
-  const first = targets[0];
-  if (first && !targets.some((target) => target.relation === 'friendly')) {
-    targets.push({ id: `pipeline-friendly:${first.id}`, relation: 'friendly', root: first.root });
+  // Match admission has already staged the retained corpse operators visible
+  // behind the opaque deployment surface. Fill any remaining target slots
+  // from that exact rigged corpus so even an otherwise empty private lobby
+  // submits both the shared model and halo programs before its first guest.
+  for (const [index, entry] of corpsePresentationPool.entries()) {
+    if (targets.length >= THERMAL_GHOST_MAX_TARGETS) break;
+    targets.push({
+      id: `thermal-prewarm-corpse-${index}`,
+      relation: entry.team === player.team ? 'friendly' : 'hostile',
+      root: entry.root,
+    });
   }
-  if (first && !targets.some((target) => target.relation === 'hostile')) {
-    targets.push({ id: `pipeline-hostile:${first.id}`, relation: 'hostile', root: first.root });
-  }
+  // Exact-model and orange-halo materials are relation-invariant. Retain one
+  // record per live ID; aliases would duplicate the same skinned children.
   if (targets.length > 0) thermalGhostPresentation.sync(targets, true);
 }
 
 function updateThermalGhosts(): void {
-  // Exact-pose thermal ghosts are the M14 DMR's reveal. The railgun keeps its
-  // signature cyan silhouette scope (its unique selling point), so ghosts are
-  // driven only by the DMR optic to avoid double-drawing on the railgun.
-  const active = dmrThermalActive;
-  if (!active) {
+  // One presentation layer serves every firearm-authorized through-wall
+  // reveal. Selection remains each weapon's existing authority policy; only
+  // the primitive pawn/marker rendering has been replaced by the exact live
+  // operator model plus an orange body-following halo.
+  const chopperThermal = localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner';
+  if (!dmrThermalActive && !railgunScopeActive && !chopperThermal) {
     thermalGhostPresentation.sync([], false);
+    railgunPresentation.syncExactOperatorReveal(false, null);
     return;
   }
   const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
   const targets: ThermalGhostTarget[] = [];
+  const observer = { id: player.id, team: player.team };
+  const addTarget = (
+    id: string,
+    team: Team,
+    kind: 'player' | 'bot',
+    root: THREE.Object3D,
+  ): void => {
+    if (targets.some((target) => target.id === id)) return;
+    if (railgunScopeActive && !dmrThermalActive && !chopperThermal
+      && !railgunThermalTargetEligible(observer, { id, team, alive: true, kind }, mode)) return;
+    const relation = mode === 'tdm' && team === player.team ? 'friendly' as const : 'hostile' as const;
+    targets.push({ id, relation, root });
+  };
   for (const remote of remotes.values()) {
     if (remote.snapshot.hp <= 0) continue;
-    const relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id: remote.snapshot.id, relation, root: remote.root });
+    addTarget(remote.snapshot.id, remote.snapshot.team, 'player', remote.root);
   }
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
-    const relation = mode === 'tdm' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id: bot.id, relation, root: bot.root });
+    addTarget(bot.id, bot.team, 'bot', bot.root);
   }
   thermalGhostPresentation.sync(targets, true);
+  railgunPresentation.syncExactOperatorReveal(railgunScopeActive, thermalGhostPresentation.telemetry());
 }
 
 function updateRailgun(now: number): void {
@@ -14777,13 +14803,13 @@ function updateRailgun(now: number): void {
     railgunRechamberPresentationActive = false;
   }
   railgunPresentation.updateWorld(railgunState, now);
-  // Thermal silhouettes share the exact settled clear-scope lifecycle. This
+  // Exact operator reveals share the settled clear-scope lifecycle. This
   // prevents the reveal from appearing over the physical hip model or surviving
   // fire/unADS/swap while retaining the Railgun's through-wall identity.
   const thermalActive = railgunScopeActive;
-  // The railgun's signature see-through-walls reveal: cyan thermal silhouettes
-  // of hostile combatants drawn with depth testing disabled so they read through
-  // geometry. This is the weapon's unique selling point and must always work.
+  // The railgun's signature see-through-walls reveal: the exact animated
+  // hostile operator with its ordinary appearance plus a bounded orange halo.
+  // The shared presentation disables depth testing without changing eligibility.
   railgunPresentation.updateThermal(camera, thermalActive ? railgunThermalContacts() : [], thermalActive);
 }
 
@@ -19504,7 +19530,6 @@ function showGunnerTargetConfirm(
 function resetKillstreakPossessionPresentation(): void {
   killstreakPresentation.setFirstPersonEntity(null);
   hideGunnerCockpitHud();
-  if (!dmrThermalActive) thermalGhostPresentation.sync([], false);
   if (camera.near !== 0.08) {
     camera.near = 0.08;
     camera.updateProjectionMatrix();
@@ -19547,23 +19572,8 @@ function updateKillstreakPossession(now: number): void {
   const chopperThermal = possession.kind === 'chopper-gunner';
   const chopperThermalElement = element<HTMLElement>('#chopper-thermal');
   if (chopperThermalElement) chopperThermalElement.hidden = !chopperThermal;
-  if (chopperThermal) {
-    const targets: ThermalGhostTarget[] = [];
-    const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
-    for (const remote of remotes.values()) {
-      if (remote.snapshot.hp <= 0) continue;
-      const relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' as const : 'hostile' as const;
-      targets.push({ id: remote.snapshot.id, relation, root: remote.root });
-    }
-    for (const bot of bots.values()) {
-      if (!bot.alive) continue;
-      const relation = mode === 'tdm' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
-      targets.push({ id: bot.id, relation, root: bot.root });
-    }
-    thermalGhostPresentation.sync(targets, true);
-  } else if (!dmrThermalActive) {
-    thermalGhostPresentation.sync([], false);
-  }
+  // Exact operator reveal targets are synchronized once per frame by
+  // updateThermalGhosts after all weapon/support optic lifecycles settle.
   if (triggerHeld && now >= nextLocalSupportGunReportAt) {
     audio.supportGun(possession.kind === 'chopper-gunner' ? 'chopper' : 'drone');
     // Owner feedback: it was hard to tell the mounted gun was actually firing.
@@ -25111,6 +25121,7 @@ function sampleDmrThermalReadiness() {
     adsProgress: weaponView.adsProgress(),
     cameraFov: camera.fov,
     expectedFov: magnifiedFovDegrees(preferredFov, DMR_THERMAL_MAGNIFICATION),
+    exactOperatorReveal: thermalGhostPresentation.telemetry(),
   });
 }
 
@@ -26244,6 +26255,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     },
     dmrThermal: {
       ...dmrThermalPresentation.telemetry(),
+      exactOperatorReveal: thermalGhostPresentation.telemetry(),
       weapon: player.weapon,
       magnification: DMR_THERMAL_MAGNIFICATION,
       cameraFov: camera.fov,

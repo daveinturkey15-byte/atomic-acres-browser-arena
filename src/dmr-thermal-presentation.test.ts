@@ -4,6 +4,7 @@ import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import {
   DMR_THERMAL_MAGNIFICATION,
   DMR_THERMAL_MAX_CONTACTS,
+  DMR_THERMAL_MODEL_POLICY,
   DMR_THERMAL_OCCLUSION_CHECKS_PER_FRAME,
   DMR_THERMAL_OCCLUSION_POLICY,
   DMR_THERMAL_TARGET_POLICY,
@@ -33,7 +34,7 @@ describe('M14 EBR 2.5x thermal presentation policy', () => {
       contact('friendly', { relation: 'friendly' }),
     ]);
     expect(DMR_THERMAL_MAGNIFICATION).toBe(2.5);
-    expect(DMR_THERMAL_WORLD_DRAW_CALLS).toBe(2);
+    expect(DMR_THERMAL_WORLD_DRAW_CALLS).toBe(0);
     expect(DMR_THERMAL_TARGET_POLICY).toBe('living-friendly-and-hostile');
     expect(DMR_THERMAL_OCCLUSION_POLICY).toBe('through-wall-reveal');
     expect(selected.map(({ id, relation }) => ({ id, relation }))).toEqual([
@@ -66,7 +67,7 @@ describe('M14 EBR 2.5x thermal presentation policy', () => {
     expect(dmrThermalOcclusionBudget(Number.NaN)).toBe(0);
   });
 
-  it('prewarms both thermal material variants once per scene generation and restores dormancy', async () => {
+  it('delegates body rendering/prewarm to the shared exact-operator path without proxy pipelines', async () => {
     const scene = new THREE.Scene();
     const overlay = { hidden: true } as HTMLElement;
     const presentation = new DmrThermalPresentation(scene, overlay);
@@ -79,10 +80,15 @@ describe('M14 EBR 2.5x thermal presentation policy', () => {
     await presentation.prewarm(runtime, camera, 7);
     await presentation.prewarm(runtime, camera, 7);
 
-    expect(compileAndRender).toHaveBeenCalledTimes(1);
-    expect(compileAndRender).toHaveBeenCalledWith(presentation.worldRoot, camera, scene);
+    expect(compileAndRender).not.toHaveBeenCalled();
     expect(presentation.worldRoot.visible).toBe(false);
-    expect(presentation.telemetry().gpuPrewarmGeneration).toBe(7);
+    expect(presentation.telemetry()).toMatchObject({
+      gpuPrewarmGeneration: 7,
+      worldDrawCalls: 0,
+      modelPolicy: DMR_THERMAL_MODEL_POLICY,
+      proxyMeshes: 0,
+      domBodyMarkers: 0,
+    });
     presentation.terminalDispose();
   });
 });

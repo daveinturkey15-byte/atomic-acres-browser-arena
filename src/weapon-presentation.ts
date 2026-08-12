@@ -88,6 +88,8 @@ type RiggedViewArm = FirstPersonArmChain & {
   bindElbowPosition: THREE.Vector3;
   bindWristPosition: THREE.Vector3;
   bindShoulderScale: THREE.Vector3;
+  bindElbowScale: THREE.Vector3;
+  bindWristScale: THREE.Vector3;
 };
 type ViewArmRig = {
   side: 'left' | 'right';
@@ -313,6 +315,17 @@ export const MELEE_VIEWMODEL_PEAK_SCALE_LIFT = 0.3;
 // hand inside the retained 15 mm socket-calibration contract while preserving
 // a real (non-zero) anti-singularity margin.
 const RIGGED_ARM_MAX_REACH_RATIO = 0.996;
+export const FIRST_PERSON_ARM_PROPORTION_CONTRACT = 'authored-muscular-transverse-bone-profile-v1';
+export const FIRST_PERSON_ARM_TRANSVERSE_SCALE = Object.freeze({
+  upperArm: 1.16,
+  forearmAbsolute: 1.22,
+  wristAbsolute: 1.1,
+});
+export const FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT = 'both-shoulders-below-minus-1.20-ndc-v1';
+export const FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC = Object.freeze({
+  left: -1.26,
+  right: -1.22,
+});
 /** Unit -Z blade axis reused by the per-frame melee knife alignment. */
 const KNIFE_BLADE_AXIS = Object.freeze(new THREE.Vector3(0, 0, -1));
 export const HIP_VIEWMODEL_POSITION = Object.freeze({ x: 0.34, y: -0.44, z: -1.08 });
@@ -1544,10 +1557,15 @@ export class WeaponPresentation {
           bindElbowPosition: chain.elbow.position.clone(),
           bindWristPosition: chain.wrist.position.clone(),
           bindShoulderScale: chain.shoulder.scale.clone(),
+          bindElbowScale: chain.elbow.scale.clone(),
+          bindWristScale: chain.wrist.scale.clone(),
         });
       }
       this.riggedFingerBones.push(...authoredArms.fingers);
       this.authoredArmsRoot = authoredArms.root;
+      authoredArms.root.userData.firstPersonArmProportionContract = FIRST_PERSON_ARM_PROPORTION_CONTRACT;
+      authoredArms.root.userData.firstPersonArmTransverseScale = { ...FIRST_PERSON_ARM_TRANSVERSE_SCALE };
+      authoredArms.root.userData.firstPersonArmViewportEntryContract = FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT;
       this.root.add(authoredArms.root);
       const authoredKnife = createPass65FieldKnifeModel(this.flattenMaterials, 'first-person');
       if (!authoredKnife) throw new Error('Pass 65 authored first-person field knife failed the release contract');
@@ -3244,13 +3262,17 @@ export class WeaponPresentation {
     const cameraRight = scratch.cameraRight.set(1, 0, 0).applyQuaternion(cameraRotation).normalize();
     entry.addScaledVector(cameraDown, 0.1)
       .addScaledVector(cameraRight, rig.side === 'right' ? 0.012 : -0.012);
-    const targetNdcY = rig.side === 'left' ? -1.12 : -1.07;
-    for (let iteration = 0; iteration < 14; iteration += 1) {
-      rig.shoulder.position.copy(parent.worldToLocal(scratch.shoulderEntryLocal.copy(entry)));
-      rig.shoulder.updateWorldMatrix(false, true);
-      const projected = scratch.shoulderProjected.copy(entry).project(this.camera);
-      if (projected.y <= targetNdcY) break;
-      entry.addScaledVector(cameraDown, Math.min(0.075, Math.max(0.018, (projected.y - targetNdcY) * 0.11)));
+    // A shoulder close to -1 NDC still exposed the sleeve endpoint during
+    // recoil and prone contact. Both authored chains enter below the crop.
+    const targetNdcY = FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC[rig.side];
+    const projectedEntry = scratch.shoulderProjected.copy(entry).project(this.camera);
+    if (projectedEntry.y > targetNdcY) {
+      // Preserve exact projected depth, move the point directly below the
+      // crop, then convert that world point back through the authored parent.
+      // This is deterministic under recoil/reload rotations and replaces the
+      // former bounded iteration that could stop with the sleeve still visible.
+      projectedEntry.y = targetNdcY - 0.01;
+      entry.copy(projectedEntry.unproject(this.camera));
     }
     rig.shoulder.position.copy(parent.worldToLocal(scratch.shoulderEntryLocal.copy(entry)));
     rig.shoulder.updateWorldMatrix(false, true);
@@ -3296,6 +3318,8 @@ export class WeaponPresentation {
       rig.elbow.position.copy(rig.bindElbowPosition);
       rig.wrist.position.copy(rig.bindWristPosition);
       rig.shoulder.scale.copy(rig.bindShoulderScale);
+      rig.elbow.scale.copy(rig.bindElbowScale);
+      rig.wrist.scale.copy(rig.bindWristScale);
     }
     const restored = this.riggedArmRigs.every((rig) => (
       rig.shoulder.quaternion.equals(rig.bindShoulder)
@@ -3305,13 +3329,45 @@ export class WeaponPresentation {
       && rig.elbow.position.equals(rig.bindElbowPosition)
       && rig.wrist.position.equals(rig.bindWristPosition)
       && rig.shoulder.scale.equals(rig.bindShoulderScale)
+      && rig.elbow.scale.equals(rig.bindElbowScale)
+      && rig.wrist.scale.equals(rig.bindWristScale)
     ));
     this.riggedMeleeBindPoseRestoredExactly = restored;
     return restored;
   }
 
+  /**
+   * Add bounded adult-muscular transverse volume while preserving local-Y
+   * reach. Relative child factors compensate inherited scale, so volume does
+   * not multiply down the chain. The palm/socket IK below remains grip truth.
+   */
+  private applyRiggedArmMuscleProportions(): void {
+    for (const rig of this.riggedArmRigs) {
+      const upper = FIRST_PERSON_ARM_TRANSVERSE_SCALE.upperArm;
+      const forearmRelative = FIRST_PERSON_ARM_TRANSVERSE_SCALE.forearmAbsolute / upper;
+      const wristRelative = FIRST_PERSON_ARM_TRANSVERSE_SCALE.wristAbsolute
+        / FIRST_PERSON_ARM_TRANSVERSE_SCALE.forearmAbsolute;
+      rig.shoulder.scale.set(
+        rig.bindShoulderScale.x * upper,
+        rig.bindShoulderScale.y,
+        rig.bindShoulderScale.z * upper,
+      );
+      rig.elbow.scale.set(
+        rig.bindElbowScale.x * forearmRelative,
+        rig.bindElbowScale.y,
+        rig.bindElbowScale.z * forearmRelative,
+      );
+      rig.wrist.scale.set(
+        rig.bindWristScale.x * wristRelative,
+        rig.bindWristScale.y,
+        rig.bindWristScale.z * wristRelative,
+      );
+    }
+  }
+
   private poseRiggedMeleeArms(progress: number): void {
     this.restoreRiggedArmBindPose();
+    this.applyRiggedArmMuscleProportions();
     const windup = THREE.MathUtils.smoothstep(progress, 0, 0.14);
     const thrust = THREE.MathUtils.smoothstep(progress, 0.14, 0.44);
     const recover = THREE.MathUtils.smoothstep(progress, 0.58, 1);
@@ -3440,6 +3496,7 @@ export class WeaponPresentation {
   private solveRiggedArms(activeModel: THREE.Object3D | undefined, reloadPose: ReloadPose): void {
     if (this.riggedArmRigs.length === 0) return;
     this.restoreRiggedArmBindPose();
+    this.applyRiggedArmMuscleProportions();
     if (!activeModel) return;
     this.root.updateMatrixWorld(true);
     const scratch = this.riggedArmSolveScratch;
@@ -3877,11 +3934,17 @@ export class WeaponPresentation {
     // an extra stock-swing allowance during the fire kick.
     const fireNearPlaneCapZ = viewmodelBaseZ + surfaceRetreatClamped - adsSightPictureRetreat
       - (presentationKick > 0.05 ? 0.1 : 0);
+    // Floor contact must survive the complete action envelope, not only the
+    // idle mesh. Counter the authored downward recoil translation and raise a
+    // detached magazine by a bounded fraction while it is below the receiver;
+    // rotations, grips and action timing remain unchanged.
+    const floorActionClearance = this.contactResponse.floorBlend
+      * (presentationKick * 0.095 + reloadPose.magazineDrop * 0.65);
     const targetPosition = this.frameTargetPosition.set(
       viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera) + grenadeArc * 0.18 + reloadStage.lateral,
       viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift
         + this.contactResponse.additionalLiftMeters - this.contactResponse.additionalDropMeters
-        + switchDrop + reloadStage.lift
+        + switchDrop + reloadStage.lift + floorActionClearance
         - presentationKick * 0.095 - pose.landingImpulse * 0.075 * aimSteady + meleeArc * 0.26,
       Math.min(
         viewmodelBaseZ + adsZ + surfaceRetreatClamped - adsSightPictureRetreat - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 + grenadeArc * 0.24,

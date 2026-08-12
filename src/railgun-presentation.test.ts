@@ -200,7 +200,7 @@ describe('railgun presentation', () => {
     expect(presentation.telemetry()).toMatchObject({ activeBeams: 0, beamPresentations: 0, lastAcceptedBeam: null });
   });
 
-  it('keeps neon-blue enemy silhouettes in the 3D scene through depth and reuses DOM markers', () => {
+  it('creates no pawn/DOM proxy and binds compatibility telemetry to actual shared reveal layers', () => {
     const scene = new THREE.Scene();
     const thermal = new FakeElement();
     const presentation = new RailgunPresentation(scene, thermal as unknown as HTMLElement, true);
@@ -211,18 +211,58 @@ describe('railgun presentation', () => {
     presentation.updateThermal(camera, contacts, true);
     expect(presentation.telemetry()).toMatchObject({
       thermalContacts: 1,
-      worldSilhouettes: 1,
-      thermalThroughGeometry: true,
+      worldSilhouettes: 0,
+      thermalThroughGeometry: false,
+      revealPresentation: 'shared-exact-animated-operator-plus-orange-halo',
+      proxyMeshes: 0,
+      domBodyMarkers: 0,
     });
-    const silhouette = scene.getObjectByName('railgun-thermal-silhouette-1') as THREE.Group;
-    expect(silhouette.visible).toBe(true);
-    const head = silhouette.getObjectByName('thermal-head') as THREE.Mesh;
-    expect((head.material as THREE.MeshBasicMaterial).depthTest).toBe(false);
-    expect((head.material as THREE.MeshBasicMaterial).color.getHex()).toBe(0x2bdcff);
-    (head.material as THREE.MeshBasicMaterial).depthWrite = true;
-    expect(presentation.telemetry().thermalThroughGeometry).toBe(false);
-    (head.material as THREE.MeshBasicMaterial).depthWrite = false;
-    presentation.updateThermal(camera, contacts, true);
-    expect(thermal.childElementCount).toBe(1);
+    expect(scene.getObjectByName('railgun-thermal-silhouette-1')).toBeUndefined();
+    expect(thermal.childElementCount).toBe(0);
+    presentation.syncExactOperatorReveal(true, {
+      contract: 'exact-animated-operator-plus-orange-halo-v1',
+      trackedTargets: 1,
+      activeTargets: 1,
+      activeModelLayers: 6,
+      activeHaloLayers: 6,
+      geometryIdentity: true,
+      skeletonIdentity: true,
+      throughGeometry: true,
+      orangeHalo: true,
+      proxyMeshes: 0,
+      maxTargets: 16,
+      exactModelMaterials: 4,
+      haloMaterials: 1,
+      ownedMaterials: 5,
+      maxOwnedMaterials: 81,
+      materialBudgetExceeded: false,
+      completeOperatorModels: true,
+      incompleteTargets: 0,
+      maxBodyLayers: 12,
+    });
+    expect(presentation.telemetry()).toMatchObject({
+      worldSilhouettes: 6,
+      thermalThroughGeometry: true,
+      exactOperatorModels: 6,
+      exactOperatorHalos: 6,
+      exactGeometryIdentity: true,
+      exactSkeletonIdentity: true,
+      orangeHalo: true,
+      exactOperatorComplete: true,
+      exactOperatorMaterialBudgetExceeded: false,
+    });
+    presentation.syncExactOperatorReveal(true, {
+      contract: 'exact-animated-operator-plus-orange-halo-v1',
+      trackedTargets: 1, activeTargets: 1, activeModelLayers: 6, activeHaloLayers: 6,
+      geometryIdentity: true, skeletonIdentity: true, throughGeometry: true,
+      orangeHalo: true, proxyMeshes: 0, maxTargets: 16,
+      exactModelMaterials: 4, haloMaterials: 1, ownedMaterials: 5, maxOwnedMaterials: 81,
+      materialBudgetExceeded: false, completeOperatorModels: false, incompleteTargets: 1, maxBodyLayers: 12,
+    });
+    expect(presentation.telemetry()).toMatchObject({
+      worldSilhouettes: 0,
+      thermalThroughGeometry: false,
+      exactOperatorComplete: false,
+    });
   });
 });

@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
+  FIRST_PERSON_ARM_PROPORTION_CONTRACT,
+  FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC,
+  FIRST_PERSON_ARM_TRANSVERSE_SCALE,
+  FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT,
   FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT,
   FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT,
   HIP_VIEWMODEL_POSITION,
@@ -9,8 +13,12 @@ import {
   WeaponPresentation,
   authoredNearPlaneContactRetreat,
 } from './weapon-presentation';
-import { VIEWMODEL_CONTACT_RESPONSE_CONTRACT, viewmodelContactResponse } from './weapon-presentation-state';
-import { WEAPON_IDS } from './protocol';
+import {
+  VIEWMODEL_CONTACT_PROFILES,
+  VIEWMODEL_CONTACT_RESPONSE_CONTRACT,
+  viewmodelContactResponse,
+} from './weapon-presentation-state';
+import { WEAPON_IDS, type WeaponId } from './protocol';
 
 const REST_POSE = {
   dt: 1 / 60,
@@ -300,6 +308,199 @@ describe('first-person anatomical presentation', () => {
       expect(state.armFraming?.finite, weapon).toBe(true);
       expect(state.armFraming?.nearPlaneClear, weapon).toBe(true);
     }
+  });
+
+  it('keeps the complete long-gun geometry camera-side of the calibrated wall and prone floor planes', async () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
+    const presentation = new WeaponPresentation(camera, false);
+    await presentation.load();
+    const longGunWallPlanes: Readonly<Partial<Record<WeaponId, number>>> = Object.freeze({
+      lmg: -1.84,
+      scattergun: -1.62,
+      sniper: -1.84,
+      minigun: -1.66,
+      'm14-ebr': -1.78,
+      'slug-shotgun': -1.60,
+      railgun: -1.85,
+      flamethrower: -1.72,
+    });
+    expect(Object.keys(longGunWallPlanes).sort()).toEqual(
+      WEAPON_IDS.filter((weapon) => VIEWMODEL_CONTACT_PROFILES[weapon].maximumSurfaceRetreatMeters >= 0.92).sort(),
+    );
+
+    for (const weapon of WEAPON_IDS) {
+      const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+      presentation.setFireCaptureAgeMs(1_000);
+      presentation.setWeapon(weapon, true);
+      const mountedModel = (presentation as unknown as { mountedModel(): THREE.Object3D }).mountedModel();
+      const arms = presentation.root.getObjectByName('first-person-arms');
+      expect(arms, weapon).toBeDefined();
+
+      // Recreate the prior universal 0.70 m response. Every long-gun sentinel
+      // must falsify that pose before the authored envelope is applied.
+      for (let frame = 0; frame < 150; frame += 1) {
+        presentation.update({ ...REST_POSE, surfaceRetreat: 0.7, surfaceLift: 0 });
+      }
+      camera.updateMatrixWorld(true);
+      const priorCapBounds = new THREE.Box3().setFromObject(mountedModel)
+        .union(new THREE.Box3().setFromObject(arms!));
+
+      for (let frame = 0; frame < 150; frame += 1) {
+        presentation.update({
+          ...REST_POSE,
+          surfaceRetreat: profile.maximumSurfaceRetreatMeters,
+          surfaceLift: 0,
+        });
+      }
+      camera.updateMatrixWorld(true);
+      const authoredWallBounds = new THREE.Box3().setFromObject(mountedModel)
+        .union(new THREE.Box3().setFromObject(arms!));
+      const wallPlane = longGunWallPlanes[weapon];
+      if (wallPlane !== undefined) {
+        expect(priorCapBounds.min.z, `${weapon}: prior 0.70m cap must cross wall plane`).toBeLessThan(wallPlane);
+        expect(authoredWallBounds.min.z, `${weapon}: authored response behind wall plane`).toBeGreaterThanOrEqual(wallPlane);
+      }
+
+      for (let frame = 0; frame < 150; frame += 1) {
+        presentation.update({
+          ...REST_POSE,
+          prone: true,
+          surfaceRetreat: profile.maximumSurfaceRetreatMeters,
+          surfaceLift: 0.2,
+        });
+      }
+      camera.updateMatrixWorld(true);
+      const proneBounds = new THREE.Box3().setFromObject(mountedModel);
+      const state = presentation.presentationState();
+      expect(proneBounds.min.y, `${weapon}: weapon below 0.61m prone floor plane`).toBeGreaterThanOrEqual(-0.61);
+      expect(state.armFraming?.ndcMin[1], `${weapon}: arms terminate inside viewport`).toBeLessThan(-1.2);
+      expect(state.weaponFraming?.nearPlaneClear, weapon).toBe(true);
+      expect(state.armFraming?.nearPlaneClear, weapon).toBe(true);
+      expect(state.contactResponse.aimAuthority, weapon).toBe('camera-forward-unchanged');
+
+      presentation.fire(0.02);
+      presentation.setFireCaptureAgeMs(0);
+      for (let frame = 0; frame < 90; frame += 1) {
+        presentation.update({
+          ...REST_POSE,
+          prone: true,
+          surfaceRetreat: profile.maximumSurfaceRetreatMeters,
+          surfaceLift: 0.2,
+        });
+      }
+      camera.updateMatrixWorld(true);
+      expect(
+        new THREE.Box3().setFromObject(mountedModel).min.y,
+        `${weapon}: recoil crossed prone floor plane`,
+      ).toBeGreaterThanOrEqual(-0.61);
+      presentation.setFireCaptureAgeMs(1_000);
+
+      for (const reloadProgress of [0.5, 0.6]) {
+        for (let frame = 0; frame < 90; frame += 1) {
+          presentation.update({
+            ...REST_POSE,
+            prone: true,
+            surfaceRetreat: profile.maximumSurfaceRetreatMeters,
+            surfaceLift: 0.2,
+            reloadProgress,
+          });
+        }
+        camera.updateMatrixWorld(true);
+        expect(
+          new THREE.Box3().setFromObject(mountedModel).min.y,
+          `${weapon}: reload ${reloadProgress} crossed prone floor plane`,
+        ).toBeGreaterThanOrEqual(-0.61);
+      }
+    }
+    presentation.setFireCaptureAgeMs(null);
+  });
+
+  it('thickens authored arm bones without shortening reach and crops both shoulders below the viewport', () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
+    const presentation = new WeaponPresentation(camera, false);
+    const parent = new THREE.Group();
+    parent.position.z = -1;
+    camera.add(parent);
+    const shoulder = new THREE.Bone();
+    const elbow = new THREE.Bone();
+    const wrist = new THREE.Bone();
+    const finger = new THREE.Bone();
+    const palmContact = new THREE.Object3D();
+    shoulder.position.set(0.28, -0.18, 0);
+    elbow.position.set(0, -0.31, 0);
+    wrist.position.set(0, -0.28, 0);
+    finger.position.set(0, -0.12, 0);
+    palmContact.position.set(0, -0.08, 0);
+    parent.add(shoulder);
+    shoulder.add(elbow);
+    elbow.add(wrist);
+    wrist.add(finger, palmContact);
+    const rig = {
+      shoulder,
+      elbow,
+      wrist,
+      finger,
+      palmContact,
+      side: 'right' as const,
+      bindShoulder: shoulder.quaternion.clone(),
+      bindElbow: elbow.quaternion.clone(),
+      bindWrist: wrist.quaternion.clone(),
+      bindShoulderPosition: shoulder.position.clone(),
+      bindElbowPosition: elbow.position.clone(),
+      bindWristPosition: wrist.position.clone(),
+      bindShoulderScale: shoulder.scale.clone(),
+      bindElbowScale: elbow.scale.clone(),
+      bindWristScale: wrist.scale.clone(),
+    };
+    const privatePresentation = presentation as unknown as {
+      riggedArmRigs: Array<typeof rig>;
+      applyRiggedArmMuscleProportions(): void;
+      placeRiggedShoulderEntryBelowFrame(
+        arm: typeof rig,
+        cameraRotation: THREE.Quaternion,
+      ): Readonly<{ ndc: readonly [number, number, number]; displacementMeters: number }>;
+    };
+    privatePresentation.riggedArmRigs.push(rig);
+    camera.updateMatrixWorld(true);
+    const bindReach = shoulder.getWorldPosition(new THREE.Vector3())
+      .distanceTo(wrist.getWorldPosition(new THREE.Vector3()));
+
+    privatePresentation.applyRiggedArmMuscleProportions();
+    camera.updateMatrixWorld(true);
+    expect(shoulder.getWorldScale(new THREE.Vector3()).toArray()).toEqual([
+      FIRST_PERSON_ARM_TRANSVERSE_SCALE.upperArm,
+      1,
+      FIRST_PERSON_ARM_TRANSVERSE_SCALE.upperArm,
+    ]);
+    expect(elbow.getWorldScale(new THREE.Vector3()).toArray()).toEqual([
+      FIRST_PERSON_ARM_TRANSVERSE_SCALE.forearmAbsolute,
+      1,
+      FIRST_PERSON_ARM_TRANSVERSE_SCALE.forearmAbsolute,
+    ]);
+    expect(wrist.getWorldScale(new THREE.Vector3()).toArray()).toEqual([
+      FIRST_PERSON_ARM_TRANSVERSE_SCALE.wristAbsolute,
+      1,
+      FIRST_PERSON_ARM_TRANSVERSE_SCALE.wristAbsolute,
+    ]);
+    expect(shoulder.getWorldPosition(new THREE.Vector3())
+      .distanceTo(wrist.getWorldPosition(new THREE.Vector3()))).toBeCloseTo(bindReach, 8);
+    expect(FIRST_PERSON_ARM_PROPORTION_CONTRACT).toBe('authored-muscular-transverse-bone-profile-v1');
+
+    const cropScenarios = Object.freeze([
+      Object.freeze({ name: 'hip', rotation: [0, 0, 0] as const }),
+      Object.freeze({ name: 'recoil', rotation: [0.22, -0.04, 0.03] as const }),
+      Object.freeze({ name: 'reload', rotation: [0.5, 0.2, 0.48] as const }),
+      Object.freeze({ name: 'prone-contact', rotation: [0.96, -0.18, 0.11] as const }),
+    ]);
+    for (const scenario of cropScenarios) {
+      shoulder.position.copy(rig.bindShoulderPosition);
+      parent.rotation.set(scenario.rotation[0], scenario.rotation[1], scenario.rotation[2]);
+      camera.updateMatrixWorld(true);
+      const crop = privatePresentation.placeRiggedShoulderEntryBelowFrame(rig, camera.quaternion);
+      expect(crop.ndc[1], scenario.name).toBeLessThanOrEqual(FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC.right);
+      expect(crop.displacementMeters, scenario.name).toBeGreaterThan(0);
+    }
+    expect(FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT).toBe('both-shoulders-below-minus-1.20-ndc-v1');
   });
 
   it('preserves Carbine and Mini Uzi centre apertures during contact ADS', async () => {

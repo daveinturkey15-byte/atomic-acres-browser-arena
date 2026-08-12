@@ -75,7 +75,10 @@ describe('weapon presentation state', () => {
     expect(viewmodelSurfaceRetreat(null, false)).toBe(0);
     expect(viewmodelSurfaceRetreat(2, false)).toBe(0);
     expect(viewmodelSurfaceRetreat(0.5, false)).toBeGreaterThan(0.25);
-    expect(viewmodelSurfaceRetreat(0, true)).toBeLessThanOrEqual(0.7);
+    expect(viewmodelSurfaceRetreat(0, true)).toBeCloseTo(
+      VIEWMODEL_CONTACT_PROFILES.carbine.maximumSurfaceRetreatMeters,
+      8,
+    );
     expect(viewmodelSurfaceRetreat(2, true)).toBeCloseTo(0.09);
   });
 
@@ -104,6 +107,9 @@ describe('weapon presentation state', () => {
       const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
       const response = viewmodelContactResponse(weapon, 0.7, 0.2, true, 0);
       expect(profile.weapon).toBe(weapon);
+      expect(profile.probeLengthMeters).toBeGreaterThanOrEqual(1.15);
+      expect(profile.maximumSurfaceRetreatMeters).toBeGreaterThanOrEqual(0.6);
+      expect(profile.probeHalfWidthMeters).toBeGreaterThanOrEqual(0.18);
       expect(profile.minimumScale).toBeGreaterThanOrEqual(0.7);
       expect(profile.minimumScale).toBeLessThanOrEqual(0.9);
       expect(profile.maximumWallDropMeters).toBeGreaterThanOrEqual(0.17);
@@ -125,6 +131,25 @@ describe('weapon presentation state', () => {
         response.additionalDropMeters,
         response.scale,
       ].every(Number.isFinite)).toBe(true);
+    }
+    expect(VIEWMODEL_CONTACT_PROFILES.railgun.probeLengthMeters)
+      .toBeGreaterThan(VIEWMODEL_CONTACT_PROFILES.pistol.probeLengthMeters);
+    expect(VIEWMODEL_CONTACT_PROFILES.minigun.maximumSurfaceRetreatMeters)
+      .toBeGreaterThan(VIEWMODEL_CONTACT_PROFILES['flare-gun'].maximumSurfaceRetreatMeters);
+  });
+
+  it('uses each authored weapon envelope for standing, crouch-equivalent and prone wall/floor contact', () => {
+    for (const weapon of WEAPON_IDS) {
+      const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+      const open = viewmodelObstructionPose(profile.probeLengthMeters + 0.01, false, 1.7, weapon);
+      const standingWall = viewmodelObstructionPose(0, false, 1.7, weapon);
+      const crouchedWall = viewmodelObstructionPose(0, false, 1.16, weapon);
+      const proneWallFloor = viewmodelObstructionPose(0, true, 0.61, weapon);
+      expect(open.retreat, weapon).toBe(0);
+      expect(standingWall.retreat, weapon).toBeCloseTo(profile.maximumSurfaceRetreatMeters, 8);
+      expect(crouchedWall.retreat, weapon).toBeCloseTo(profile.maximumSurfaceRetreatMeters, 8);
+      expect(proneWallFloor.retreat, weapon).toBeCloseTo(profile.maximumSurfaceRetreatMeters, 8);
+      expect(proneWallFloor.lift, weapon).toBeGreaterThanOrEqual(0.18);
     }
   });
 

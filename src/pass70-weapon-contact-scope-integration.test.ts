@@ -14,7 +14,29 @@ describe('Pass 70 contact and Railgun scope integration contracts', () => {
     expect(presentation).toContain('* this.contactResponse.scale');
     expect(runtime).toContain('const baseDirection = camera.getWorldDirection(new THREE.Vector3());');
     expect(runtime).toContain('cameraDirection: baseDirection.toArray()');
+    expect(runtime).toContain('const profile = VIEWMODEL_CONTACT_PROFILES[player.weapon];');
+    expect(runtime).toContain('viewmodelObstructionPose(nearestForward, player.stance === \'prone\', floorClearance, player.weapon)');
     expect(runtime).not.toMatch(/contactResponse[^\n]*(camera|baseDirection|projectile)/u);
+  });
+
+  it('routes M14, Railgun and Chopper reveals through one exact-model renderer without pawn proxies', () => {
+    const runtime = read('./legacy-main.ts');
+    const ghost = read('./thermal-ghost-presentation.ts');
+    const dmr = read('./dmr-thermal-presentation.ts');
+    const railgun = read('./railgun-presentation.ts');
+    expect(runtime).toContain("const chopperThermal = localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner';");
+    expect(runtime).toContain('if (!dmrThermalActive && !railgunScopeActive && !chopperThermal)');
+    expect(runtime).toContain('railgunPresentation.syncExactOperatorReveal(railgunScopeActive, thermalGhostPresentation.telemetry())');
+    expect(ghost).toContain("'exact-animated-operator-plus-orange-halo-v1'");
+    expect(ghost).toContain('model.skeleton === layer.source.skeleton');
+    expect(ghost).toContain('halo.geometry === layer.source.geometry');
+    expect(dmr).not.toContain('DataTexture');
+    expect(dmr).not.toContain('InstancedMesh');
+    expect(dmr).not.toContain('document.createElement');
+    expect(railgun).not.toContain('CapsuleGeometry');
+    expect(railgun).not.toContain('railgun-thermal-silhouette');
+    expect(railgun).not.toContain("part('thermal-head'");
+    expect(railgun).not.toContain('document.createElement');
   });
 
   it('coordinates one settled Railgun scope lifecycle across FOV, thermal and viewmodel suppression', () => {

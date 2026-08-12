@@ -8,6 +8,7 @@ import {
   type RailgunShotResultMessage,
 } from './railgun-authority';
 import { createPass65WeaponModel, loadPass65WeaponAsset } from './weapon-model';
+import type { ThermalGhostTelemetry } from './thermal-ghost-presentation';
 
 export type RailgunThermalContact = Readonly<{
   id: string;
@@ -43,9 +44,6 @@ export class RailgunPresentation {
   readonly root = new THREE.Group();
   private readonly weapon: THREE.Group;
   private readonly thermalRoot: HTMLElement;
-  private readonly thermalWorldRoot = new THREE.Group();
-  private readonly thermalWorldContacts: THREE.Group[] = [];
-  private readonly thermalDomContacts: HTMLElement[] = [];
   private readonly beamRoot = new THREE.Group();
   private readonly beams: Array<{
     root: THREE.Group;
@@ -74,6 +72,14 @@ export class RailgunPresentation {
   private lastPresentationStartOffsetM = 0;
   private lastViewer: RailgunBeamViewer = 'peer';
   private visibleThermalContacts = 0;
+  private exactOperatorModels = 0;
+  private exactOperatorHalos = 0;
+  private exactOperatorThroughGeometry = false;
+  private exactOperatorGeometryIdentity = false;
+  private exactOperatorSkeletonIdentity = false;
+  private exactOperatorOrangeHalo = false;
+  private exactOperatorComplete = false;
+  private exactOperatorMaterialBudgetExceeded = false;
   private weaponLoad: Promise<void> | null = null;
   private weaponLoadAttempts = 0;
   private weaponLoadRetryAt = 0;
@@ -116,9 +122,6 @@ export class RailgunPresentation {
     }
     this.root.add(this.weapon);
     this.root.visible = false;
-    this.thermalWorldRoot.name = 'railgun-through-wall-silhouettes';
-    this.thermalWorldRoot.userData.presentationOnly = true;
-    this.thermalWorldRoot.visible = false;
     this.beamRoot.name = 'railgun-replicated-beams';
     this.beamRoot.userData.presentationOnly = true;
     const beamGeometry = new THREE.CylinderGeometry(1, 1, 1, 12, 1, true);
@@ -256,7 +259,7 @@ export class RailgunPresentation {
         viewer: 'peer',
       });
     }
-    scene.add(this.root, this.thermalWorldRoot, this.beamRoot);
+    scene.add(this.root, this.beamRoot);
   }
 
   updateWorld(state: RailgunAuthorityState, now: number): void {
@@ -432,78 +435,33 @@ export class RailgunPresentation {
     }
   }
 
-  private createThermalSilhouette(index: number): THREE.Group {
-    const group = new THREE.Group();
-    group.name = `railgun-thermal-silhouette-${index + 1}`;
-    group.userData.presentationOnly = true;
-    const material = new THREE.MeshBasicMaterial({
-      color: 0x2bdcff,
-      transparent: true,
-      opacity: 0.9,
-      depthTest: false,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      toneMapped: false,
-    });
-    const part = (name: string, geometry: THREE.BufferGeometry, position: [number, number, number], rotationZ = 0) => {
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.name = name;
-      mesh.position.set(...position);
-      mesh.rotation.z = rotationZ;
-      mesh.renderOrder = 10;
-      mesh.raycast = () => undefined;
-      group.add(mesh);
-    };
-    part('thermal-head', new THREE.SphereGeometry(0.2, 10, 7), [0, 0.68, 0]);
-    part('thermal-torso', new THREE.CapsuleGeometry(0.27, 0.48, 3, 8), [0, 0.18, 0]);
-    part('thermal-arm-left', new THREE.CapsuleGeometry(0.09, 0.48, 2, 6), [-0.3, 0.18, 0], -0.18);
-    part('thermal-arm-right', new THREE.CapsuleGeometry(0.09, 0.48, 2, 6), [0.3, 0.18, 0], 0.18);
-    part('thermal-leg-left', new THREE.CapsuleGeometry(0.11, 0.58, 2, 6), [-0.14, -0.53, 0], 0.05);
-    part('thermal-leg-right', new THREE.CapsuleGeometry(0.11, 0.58, 2, 6), [0.14, -0.53, 0], -0.05);
-    group.visible = false;
-    this.thermalWorldRoot.add(group);
-    return group;
-  }
-
-  private thermalDomContact(index: number): HTMLElement {
-    const existing = this.thermalDomContacts[index];
-    if (existing) return existing;
-    const marker = document.createElement('i');
-    this.thermalDomContacts.push(marker);
-    this.thermalRoot.append(marker);
-    return marker;
-  }
-
-  updateThermal(camera: THREE.Camera, contacts: readonly RailgunThermalContact[], active: boolean): void {
+  /**
+   * Owns only the Railgun optic lifecycle and compatibility telemetry. The
+   * shared exact-operator reveal receives the same already-authorized contact
+   * set in legacy-main; no pawn geometry or DOM body marker is created here.
+   */
+  updateThermal(_camera: THREE.Camera, contacts: readonly RailgunThermalContact[], active: boolean): void {
     this.thermalRoot.hidden = !active;
-    this.thermalWorldRoot.visible = active;
-    this.visibleThermalContacts = 0;
-    for (const marker of this.thermalDomContacts) marker.hidden = true;
-    for (const silhouette of this.thermalWorldContacts) silhouette.visible = false;
-    if (!active) return;
-    for (const [index, contact] of contacts.entries()) {
-      const silhouette = this.thermalWorldContacts[index] ?? this.createThermalSilhouette(index);
-      if (!this.thermalWorldContacts[index]) this.thermalWorldContacts[index] = silhouette;
-      silhouette.visible = true;
-      silhouette.position.copy(contact.position);
-      silhouette.userData.contactId = contact.id;
-      silhouette.userData.contactKind = contact.kind;
-      silhouette.scale.setScalar(contact.kind === 'bot' ? 0.96 : 1);
-      silhouette.traverse((node) => {
-        if (node instanceof THREE.Mesh) (node.material as THREE.MeshBasicMaterial).opacity = contact.kind === 'bot' ? 0.37 : 0.74;
-      });
-      const projected = contact.position.clone().project(camera);
-      if (projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1.18 || Math.abs(projected.y) > 1.18) continue;
-      const marker = this.thermalDomContact(index);
-      marker.hidden = false;
-      marker.className = `thermal-contact ${contact.kind}`;
-      marker.dataset.contactKind = contact.kind;
-      marker.style.left = `${(projected.x * 0.5 + 0.5) * 100}%`;
-      marker.style.top = `${(-projected.y * 0.5 + 0.5) * 100}%`;
-      const distance = Math.max(2, camera.position.distanceTo(contact.position));
-      marker.style.setProperty('--thermal-scale', String(THREE.MathUtils.clamp(18 / distance, 0.42, 1.35)));
-      this.visibleThermalContacts += 1;
-    }
+    this.visibleThermalContacts = active ? contacts.length : 0;
+    if (!active) this.syncExactOperatorReveal(false, null);
+  }
+
+  /** Bind Railgun compatibility telemetry to the actual shared render layers. */
+  syncExactOperatorReveal(active: boolean, telemetry: ThermalGhostTelemetry | null): void {
+    const complete = active
+      && telemetry !== null
+      && telemetry.completeOperatorModels
+      && !telemetry.materialBudgetExceeded
+      && telemetry.activeModelLayers > 0
+      && telemetry.activeModelLayers === telemetry.activeHaloLayers;
+    this.exactOperatorModels = complete ? telemetry.activeModelLayers : 0;
+    this.exactOperatorHalos = complete ? telemetry.activeHaloLayers : 0;
+    this.exactOperatorThroughGeometry = complete && telemetry.throughGeometry;
+    this.exactOperatorGeometryIdentity = complete && telemetry.geometryIdentity;
+    this.exactOperatorSkeletonIdentity = complete && telemetry.skeletonIdentity;
+    this.exactOperatorOrangeHalo = complete && telemetry.orangeHalo;
+    this.exactOperatorComplete = complete;
+    this.exactOperatorMaterialBudgetExceeded = active && telemetry?.materialBudgetExceeded === true;
   }
 
   telemetry(): Readonly<{
@@ -512,6 +470,16 @@ export class RailgunPresentation {
     thermalContacts: number;
     worldSilhouettes: number;
     thermalThroughGeometry: boolean;
+    revealPresentation: 'shared-exact-animated-operator-plus-orange-halo';
+    proxyMeshes: 0;
+    domBodyMarkers: 0;
+    exactOperatorModels: number;
+    exactOperatorHalos: number;
+    exactGeometryIdentity: boolean;
+    exactSkeletonIdentity: boolean;
+    orangeHalo: boolean;
+    exactOperatorComplete: boolean;
+    exactOperatorMaterialBudgetExceeded: boolean;
     activeBeams: number;
     beamPresentations: number;
     lastBeamLengthM: number;
@@ -542,17 +510,7 @@ export class RailgunPresentation {
     modelId: string;
     authoredWorldModel: boolean;
   }> {
-    const thermalThroughGeometry = this.thermalWorldContacts.every((silhouette) => {
-      let throughGeometry = true;
-      silhouette.traverse((node) => {
-        if (!(node instanceof THREE.Mesh)) return;
-        const materials = Array.isArray(node.material) ? node.material : [node.material];
-        if (materials.some((material) => material.depthTest !== false || material.depthWrite !== false)) {
-          throughGeometry = false;
-        }
-      });
-      return throughGeometry;
-    });
+    const thermalThroughGeometry = this.exactOperatorThroughGeometry;
     const throughGeometry = this.beams.every(({
       core, bloom, shock, filaments, launchCore, launchCorona, launchRing, launchBridge, launchSparks,
     }) => {
@@ -581,8 +539,20 @@ export class RailgunPresentation {
       worldVisible: this.root.visible,
       thermalActive: !this.thermalRoot.hidden,
       thermalContacts: this.visibleThermalContacts,
-      worldSilhouettes: this.thermalWorldContacts.filter((contact) => contact.visible).length,
+      // Compatibility field retained for exact-SHA browser receipts. It now
+      // counts shared exact operator models, never generated silhouettes.
+      worldSilhouettes: this.exactOperatorModels,
       thermalThroughGeometry,
+      revealPresentation: 'shared-exact-animated-operator-plus-orange-halo',
+      proxyMeshes: 0,
+      domBodyMarkers: 0,
+      exactOperatorModels: this.exactOperatorModels,
+      exactOperatorHalos: this.exactOperatorHalos,
+      exactGeometryIdentity: this.exactOperatorGeometryIdentity,
+      exactSkeletonIdentity: this.exactOperatorSkeletonIdentity,
+      orangeHalo: this.exactOperatorOrangeHalo,
+      exactOperatorComplete: this.exactOperatorComplete,
+      exactOperatorMaterialBudgetExceeded: this.exactOperatorMaterialBudgetExceeded,
       activeBeams: this.beams.filter((beam) => beam.root.visible).length,
       beamPresentations: this.beamPresentations,
       lastBeamLengthM: this.lastBeamLengthM,
