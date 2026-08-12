@@ -6,20 +6,23 @@ import { resolve } from 'node:path';
 const releaseChannels = JSON.parse(readFileSync(resolve(process.cwd(), 'release-channels.json'), 'utf8')) as {
   latest: { label: string };
   experimental: { label: string; pass: string };
+  retained: { label: string; pass: string };
 };
 
-test('offers only Pass 70 and the retained stable Pass 63 WebGL build', async ({ page }, testInfo) => {
+test('offers Pass 70, exact retained Pass 69 and stable Pass 63 WebGL', async ({ page }, testInfo) => {
   await page.goto('/?release=choose&renderer=webgl2');
 
   await expect(page.locator('#release-channel-gate')).toBeVisible();
   await expect(page.locator('#menu')).toHaveCount(0);
-  await expect(page.locator('.release-channel-option')).toHaveCount(2);
+  await expect(page.locator('.release-channel-option')).toHaveCount(3);
   expect(releaseChannels.latest.label).toBe('PASS 70');
   expect(releaseChannels.experimental.label).toBe('PASS 70');
   await expect(page.locator('[data-release-choice="experimental"]')).toContainText(releaseChannels.experimental.pass);
   await expect(page.locator('[data-release-choice="experimental"]')).toContainText(releaseChannels.experimental.label);
   await expect(page.locator('[data-release-choice="experimental"]')).toContainText('RELEASE CANDIDATE');
   await expect(page.locator('[data-release-choice="experimental"]')).not.toContainText(/\bLIVE\b/u);
+  await expect(page.locator('[data-release-choice="retained"]')).toContainText(releaseChannels.retained.pass);
+  await expect(page.locator('[data-release-choice="retained"]')).toContainText('PREVIOUS LIVE');
   await expect(page.locator('[data-release-choice="stable"]')).toContainText('PASS 63');
   await expect(page.locator('[data-release-choice="stable"]')).toContainText('STABLE WEBGL');
   await expect(page.locator('[data-release-choice="rollback"]')).toHaveCount(0);
@@ -30,9 +33,9 @@ test('offers only Pass 70 and the retained stable Pass 63 WebGL build', async ({
 
   const artifactRoot = resolve(process.cwd(), 'artifacts/pass70/release-shell');
   mkdirSync(artifactRoot, { recursive: true });
-  const screenshot = resolve(artifactRoot, 'pass70-pass63-stable-webgl.png');
+  const screenshot = resolve(artifactRoot, 'pass70-pass69-pass63-chooser.png');
   await page.screenshot({ path: screenshot, animations: 'disabled', fullPage: true });
-  await testInfo.attach('pass70-pass63-stable-webgl', { path: screenshot, contentType: 'image/png' });
+  await testInfo.attach('pass70-pass69-pass63-chooser', { path: screenshot, contentType: 'image/png' });
 
   await page.locator('[data-release-choice="experimental"]').click();
   await expect(page).toHaveURL(/\/channels\/the-big-one\/.*release=latest/);
@@ -61,6 +64,13 @@ test('routes the stable choice to retained Pass 63 WebGL', async ({ page }) => {
   await page.goto('/?release=choose');
   await page.locator('[data-release-choice="stable"]').click();
   await expect(page).toHaveURL(/\/channels\/pass63-rollback\/\?release=latest/);
+});
+
+test('routes the previous-live choice to exact retained Pass 69', async ({ page }) => {
+  await page.goto('/?release=choose');
+  await page.locator('[data-release-choice="retained"]').click();
+  await expect(page).toHaveURL(/\/channels\/pass69-retained\/\?release=latest/);
+  await expect(page.locator('.command-brand span')).toContainText('PASS 69');
 });
 
 test('keeps legacy latest, normal and room entries on Pass 70', async ({ page }) => {
