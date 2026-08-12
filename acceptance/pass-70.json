@@ -5,15 +5,15 @@
   "status": "accepted",
   "preview": {
     "kind": "immutable-url",
-    "ref": "local-stage://pass70/9c0188cb455705bc36ca9778a8b3371775a9c4d8",
-    "sourceSha": "9c0188cb455705bc36ca9778a8b3371775a9c4d8",
-    "createdAt": "2026-08-12T12:43:13.962Z"
+    "ref": "local-stage://pass70/3f0f02ebcb99def6b56c0178be9c9841ff523ff3",
+    "sourceSha": "3f0f02ebcb99def6b56c0178be9c9841ff523ff3",
+    "createdAt": "2026-08-12T13:57:58.266Z"
   },
   "humanAcceptance": {
     "state": "approved",
     "approvedBy": "Dave",
-    "approvedAt": "2026-08-12T12:43:13.962Z",
-    "evidence": "Dave explicitly instructed Codex to complete these corrections and push them live as Pass 70 ASAP, while retaining Pass 69 and Pass 63, and stated that no HITL testing is required. This authorizes publication of the mechanically gated exact candidate for browser testing; it does not claim Dave inspected or tested the immutable preview."
+    "approvedAt": "2026-08-12T13:58:15.260Z",
+    "evidence": "Dave explicitly instructed Codex to complete these corrections and push them live as Pass 70 ASAP, while retaining Pass 69 and Pass 63, and stated that no HITL testing is required. This standing instruction authorizes publication of the mechanically gated final exact candidate after its protocol-compatibility closure; it does not claim Dave inspected or tested the immutable preview."
   },
   "requirements": [
     {
@@ -47,16 +47,16 @@
         },
         {
           "kind": "visual",
-          "ref": "artifact://pass70/release-topology/9c0188cb455705bc36ca9778a8b3371775a9c4d8/three-channel-chooser",
-          "note": "The exact-SHA production-style staging exposes Pass 70, byte-pinned Pass 69 and Pass 63, while retaining Pass 67.1 only as a non-selectable staged subtree."
+          "ref": "artifact://pass70/release-topology/3f0f02ebcb99def6b56c0178be9c9841ff523ff3/three-channel-chooser",
+          "note": "The exact-SHA production-style staging exposes Pass 70 runtime digest 5e7996bbfed62c4d051a4a7b4c0981172da4a76443c55e6dc2523fad00933172, byte-pinned Pass 69 and Pass 63, while retaining Pass 67.1 only as a non-selectable staged subtree."
         }
       ]
     },
     {
       "id": "R3",
       "summary": "Ship the complete Pass 70 correction plus the current owner hotfix set",
-      "expected": "The exact candidate retains the accepted Pass 70 combat, damage, audio, multiplayer, Gun Range and support work and adds hardened wall/floor viewmodel contact, fixed-length arm IK, allocation-free first-glass Rapier and audio activation, immediate trusted-Railgun exact-model wall reveal with orange halo, host-authoritative possessed-Chopper RMB missiles with six rounds and one-second cadence, higher side cockpit framing, depth-separated static door lights and an exact centred 500 ms local-victim STUCK warning.",
-      "falsifier": "Any retained or new correction is absent from the exact candidate, a focused adversarial or full release test fails, a proxy replaces the exact revealed operator, missile damage can be client-authored or fired unpossessed, the seventh or sub-second shot is admitted, a first glass breach allocates its Rapier bodies, the door layers remain coplanar or animated, or sticky feedback targets the wrong player or lifetime.",
+      "expected": "The exact candidate retains the accepted Pass 70 combat, damage, audio, multiplayer, Gun Range and support work and adds hardened wall/floor viewmodel contact, fixed-length arm IK, allocation-free first-glass Rapier and audio activation, immediate trusted-Railgun exact-model wall reveal with orange halo, host-authoritative possessed-Chopper RMB missiles with six rounds and one-second cadence, higher side cockpit framing, depth-separated static door lights and an exact centred 500 ms local-victim STUCK warning. Multiplayer protocol 17 and killstreak recipient snapshot schema 3 reject cached predecessor clients before they can silently discard the new missile state, and the dual-peer lifecycle gate grants each visible foreground peer its unchanged bounded admission proof.",
+      "falsifier": "Any retained or new correction is absent from the exact candidate, a focused adversarial or full release test fails, a proxy replaces the exact revealed operator, missile damage can be client-authored or fired unpossessed, the seventh or sub-second shot is admitted, a first glass breach allocates its Rapier bodies, the door layers remain coplanar or animated, sticky feedback targets the wrong player or lifetime, a protocol-16/schema-2 peer is admitted into the incompatible state, or either foreground peer exceeds its unchanged admission bound.",
       "acceptance": "mechanical",
       "state": "verified",
       "evidence": [
@@ -69,8 +69,8 @@
         {
           "kind": "contract",
           "ref": "src/pass70-weapon-contact-scope-integration.test.ts",
-          "command": "npx vitest run src/pass70-weapon-contact-scope-integration.test.ts src/weapon-presentation-anatomy.test.ts src/physics.test.ts src/interactive-world-physics.test.ts src/audio-combat-prewarm.test.ts src/railgun-scope-state.test.ts src/thermal-ghost-presentation.test.ts src/chopper-gunner-missile.test.ts src/killstreak-runtime.test.ts src/gun-range-test-bay-world.test.ts src/sticky-victim-feedback.test.ts",
-          "note": "Focused contact, shipped-rig anatomy, Rapier containment, glass reservation, audio preparation, Railgun reveal, exact operator, Chopper authority, door-depth and sticky-victim adversaries reject the reported regressions; an independent read-only integrated audit also passed 362 focused tests."
+          "command": "npx vitest run src/pass70-weapon-contact-scope-integration.test.ts src/weapon-presentation-anatomy.test.ts src/physics.test.ts src/interactive-world-physics.test.ts src/audio-combat-prewarm.test.ts src/railgun-scope-state.test.ts src/thermal-ghost-presentation.test.ts src/chopper-gunner-missile.test.ts src/killstreak-runtime.test.ts src/killstreak-protocol.test.ts src/network-lifecycle.test.ts src/gun-range-test-bay-world.test.ts src/sticky-victim-feedback.test.ts",
+          "note": "Focused contact, shipped-rig anatomy, Rapier containment, glass reservation, audio preparation, Railgun reveal, exact operator, Chopper authority, protocol-version rejection, door-depth and sticky-victim adversaries reject the reported regressions. Exact-runtime protocol and killstreak gates passed 127 tests, and an independent boundary red-team passed 119 focused tests plus TypeScript and Playwright discovery without launching a browser."
         }
       ]
     },
@@ -83,7 +83,7 @@
       "state": "deferred",
       "deferApproval": {
         "approvedBy": "Dave",
-        "approvedAt": "2026-08-12T12:43:13.962Z",
+        "approvedAt": "2026-08-12T13:58:15.260Z",
         "reason": "Dave explicitly instructed publication ASAP and stated that no additional local HITL testing is required; final visual and feel evaluation is therefore deferred to his testing of the public Pass 70 URL."
       }
     }
