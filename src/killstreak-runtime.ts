@@ -50,6 +50,17 @@ export const CARPET_BOMBER_DAMAGE_MULTIPLIER = 3;
 export const CARPET_BOMBER_MAX_DAMAGE = CARPET_BOMBER_PREVIOUS_MAX_DAMAGE * CARPET_BOMBER_DAMAGE_MULTIPLIER;
 export const CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS = 5_000;
 export const CARPET_BOMBER_ROUTE_CLEARANCE_M = 0.05;
+const CARPET_BOMBER_ROUTE_ADMISSION_EPSILON_M = 0.002;
+const CARPET_BOMBER_ROUTE_HEADING_OFFSETS = Object.freeze([
+  0,
+  Math.PI / 2,
+  -Math.PI / 2,
+  Math.PI / 4,
+  -Math.PI / 4,
+  Math.PI * 3 / 4,
+  -Math.PI * 3 / 4,
+  Math.PI,
+] as const);
 export const CARPET_BOMBER_BLAST_RADIUS_M = 4.5;
 export const CARPET_BOMBER_IMPACT_FLASH_BASE_RADIUS_M = 1.2;
 export const CARPET_BOMBER_IMPACT_FLASH_MAXIMUM_SCALE = 3.8;
@@ -69,6 +80,10 @@ export const CARPET_BOMBER_IMPACT_ORIGIN_CLEARANCE_M = (
 /** Recipient-snapshot presentation bounds; these are not gameplay ranges. */
 export const CARE_TARGET_MARKER_MAX_LIFETIME_MS = CARE_AIRCRAFT_DROP_DELAY_MS + CARE_CRATE_DESCENT_MS;
 export const CARPET_TARGET_MARKER_MAX_LIFETIME_MS = 1_000;
+/** The aircraft reaches the last station when its final shell is released. */
+export const CARPET_BOMBER_ROUTE_TRAVERSE_MS = CARPET_TARGET_MARKER_MAX_LIFETIME_MS
+  + (CARPET_BOMBER_IMPACT_COUNT - 1) * 180
+  - CARPET_BOMB_SHELL_DROP_LEAD_MS;
 export const SUPPORT_TARGET_CORRIDOR_MAX_LENGTH_M = 200;
 export const SUPPORT_TARGET_CORRIDOR_MAX_HALF_WIDTH_M = 12;
 export const MAX_ACTIVE_SUPPORT_ENTITIES = 32;
@@ -271,6 +286,7 @@ type CarpetBomberActivation = {
   ownerId: string;
   team: 0 | 1;
   createdAtMs: number;
+  aircraftId: string;
   authorityReleaseAtMs: number | null;
   impacts: readonly SupportVec3[];
   impactAtMs: number[];
@@ -280,6 +296,8 @@ type CarpetBomberActivation = {
   halfWidthM: number;
   nextDropOrdinal: number;
   nextImpactOrdinal: number;
+  dropRouteProgress: readonly number[];
+  routeCanceled: boolean;
 };
 
 type CarpetImpactPlan = Readonly<{
@@ -288,6 +306,7 @@ type CarpetImpactPlan = Readonly<{
   pathEnd: SupportVec3;
   flightStart: SupportVec3;
   flightEnd: SupportVec3;
+  dropRouteProgress: readonly number[];
   halfWidthM: number;
 }>;
 
@@ -823,6 +842,49 @@ function resolveFlightEnvelopePosition(
   return clampFlightEnvelopePosition(resolved, world, envelope);
 }
 
+function supportVec3Distance(left: SupportVec3, right: SupportVec3): number {
+  return Math.hypot(left[0] - right[0], left[1] - right[1], left[2] - right[2]);
+}
+
+/**
+ * Admission uses the same host-provided continuous swept-envelope resolver as
+ * live movement. Checking both directions also proves that neither endpoint is
+ * an already-overlapping hold position. A missing resolver means the arena has
+ * no authored aircraft solids and the clamped route remains authoritative.
+ */
+function carpetFlightRouteAdmitted(
+  start: SupportVec3,
+  end: SupportVec3,
+  envelope: SupportAircraftCollisionEnvelope,
+  world: KillstreakWorld,
+): boolean {
+  if (!world.resolveFlightEnvelopePosition) return supportVec3Distance(start, end) > 0.5;
+  const admittedStart = resolveFlightEnvelopePosition(start, start, envelope, world);
+  const admittedForward = resolveFlightEnvelopePosition(start, end, envelope, world);
+  const admittedEnd = resolveFlightEnvelopePosition(end, end, envelope, world);
+  const admittedReverse = resolveFlightEnvelopePosition(end, start, envelope, world);
+  return supportVec3Distance(start, end) > 0.5
+    && supportVec3Distance(admittedStart, start) <= CARPET_BOMBER_ROUTE_ADMISSION_EPSILON_M
+    && supportVec3Distance(admittedForward, end) <= CARPET_BOMBER_ROUTE_ADMISSION_EPSILON_M
+    && supportVec3Distance(admittedEnd, end) <= CARPET_BOMBER_ROUTE_ADMISSION_EPSILON_M
+    && supportVec3Distance(admittedReverse, start) <= CARPET_BOMBER_ROUTE_ADMISSION_EPSILON_M;
+}
+
+function admittedAircraftRouteProgress(entity: AircraftEntity): number | null {
+  const dx = entity.routeEnd[0] - entity.routeStart[0];
+  const dz = entity.routeEnd[2] - entity.routeStart[2];
+  const lengthSquared = dx * dx + dz * dz;
+  if (lengthSquared <= 1e-8) return null;
+  const rawProgress = ((entity.position[0] - entity.routeStart[0]) * dx
+    + (entity.position[2] - entity.routeStart[2]) * dz) / lengthSquared;
+  const progress = clamp(rawProgress, 0, 1);
+  const lateralX = entity.position[0] - (entity.routeStart[0] + dx * progress);
+  const lateralZ = entity.position[2] - (entity.routeStart[2] + dz * progress);
+  return Math.hypot(lateralX, lateralZ) <= CARPET_BOMBER_ROUTE_ADMISSION_EPSILON_M * 4
+    ? progress
+    : null;
+}
+
 export type DroneCentreSpawnPlan = Readonly<{
   centre: SupportVec3;
   positions: readonly SupportVec3[];
@@ -1333,6 +1395,16 @@ export class HostKillstreakRuntime {
 
     const activationId = this.nextActivationId();
     const seed = hashText(`${this.matchEpoch}:${activationId}:${actualId}`);
+    const requestedAnchor = finiteTuple(intent.anchor) ? this.clampAnchor(intent.anchor, world) : this.defaultAnchor(actor.actorId, world);
+    const anchor: [number, number, number] = actualId === 'care-package' || actualId === 'carpet-bomber'
+      ? [requestedAnchor[0], supportGroundHeight(world, requestedAnchor[0], requestedAnchor[2]), requestedAnchor[2]]
+      : requestedAnchor;
+    const carpetPlan = actualId === 'carpet-bomber'
+      ? this.carpetImpactPattern(anchor, seed, world, intent.facing)
+      : null;
+    // Route admission precedes request replay state and reward consumption. A
+    // blocked room/roof topology therefore leaves the earned streak retryable.
+    if (actualId === 'carpet-bomber' && carpetPlan === null) return reject('no-clear-carpet-route');
     const droneSpawnPlan = actualId === 'piloted-drone'
       ? planDroneCentreSpawns(world, 1, seed)
       : actualId === 'drone-swarm'
@@ -1351,10 +1423,6 @@ export class HostKillstreakRuntime {
       else actor.availableCharges.delete(actualId);
     }
     const entityIds: string[] = [];
-    const requestedAnchor = finiteTuple(intent.anchor) ? this.clampAnchor(intent.anchor, world) : this.defaultAnchor(actor.actorId, world);
-    const anchor: [number, number, number] = actualId === 'care-package' || actualId === 'carpet-bomber'
-      ? [requestedAnchor[0], supportGroundHeight(world, requestedAnchor[0], requestedAnchor[2]), requestedAnchor[2]]
-      : requestedAnchor;
 
     if (actualId === 'adrenaline') {
       actor.adrenalineUntilMs = nowMs + ADRENALINE_DURATION_MS;
@@ -1401,22 +1469,22 @@ export class HostKillstreakRuntime {
       });
       entityIds.push(id, aircraftId);
     } else if (actualId === 'carpet-bomber') {
-      const plan = this.carpetImpactPattern(anchor, seed, world, intent.facing);
+      const plan = carpetPlan!;
       const impacts = plan.impacts;
       const groundAnchor: SupportVec3 = Object.freeze([...anchor] as [number, number, number]);
       const aircraftId = this.nextEntityId('carpet-aircraft');
-      const top = Math.min(world.bounds.ceilingY - 1, Math.max(world.bounds.floorY + 12, world.bounds.floorY + 24));
       const pathStart: SupportVec3 = plan.pathStart;
       const pathEnd: SupportVec3 = plan.pathEnd;
       this.carpetBombers.set(activationId, {
         activationId, ownerId: actor.actorId, team: actor.team,
-        createdAtMs: nowMs, authorityReleaseAtMs: null, impacts,
+        createdAtMs: nowMs, aircraftId, authorityReleaseAtMs: null, impacts,
         impactAtMs: impacts.map((_, ordinal) => nowMs + CARPET_TARGET_MARKER_MAX_LIFETIME_MS + ordinal * 180),
         anchor: groundAnchor, pathStart, pathEnd, halfWidthM: plan.halfWidthM,
         nextDropOrdinal: 0, nextImpactOrdinal: 0,
+        dropRouteProgress: plan.dropRouteProgress, routeCanceled: false,
       });
-      const flightStart: SupportVec3 = Object.freeze([plan.flightStart[0], top, plan.flightStart[2]] as const);
-      const flightEnd: SupportVec3 = Object.freeze([plan.flightEnd[0], top, plan.flightEnd[2]] as const);
+      const flightStart = plan.flightStart;
+      const flightEnd = plan.flightEnd;
       this.entities.set(aircraftId, {
         id: aircraftId, activationId, ownerId: actor.actorId, team: actor.team,
         createdAtMs: nowMs, expiresAtMs: nowMs + CARE_AIRCRAFT_DURATION_MS,
@@ -1549,7 +1617,9 @@ export class HostKillstreakRuntime {
     seed: number,
     world: KillstreakWorld,
     requestedFacing?: SupportVec3,
-  ): CarpetImpactPlan {
+    headingAttempt = 0,
+    admittedBaseAngle?: number,
+  ): CarpetImpactPlan | null {
     const requestedStrikeBounds = world.supportStrikeBoundsAt?.(anchor);
     const strikeBounds = requestedStrikeBounds
       && [requestedStrikeBounds.minX, requestedStrikeBounds.maxX, requestedStrikeBounds.minZ, requestedStrikeBounds.maxZ].every(Number.isFinite)
@@ -1560,9 +1630,10 @@ export class HostKillstreakRuntime {
       ? requestedStrikeBounds
       : world.bounds;
     const requestedLength = requestedFacing ? Math.hypot(requestedFacing[0], requestedFacing[2]) : 0;
-    const angle = requestedFacing && Number.isFinite(requestedLength) && requestedLength > 0.001
+    const baseAngle = admittedBaseAngle ?? (requestedFacing && Number.isFinite(requestedLength) && requestedLength > 0.001
       ? Math.atan2(requestedFacing[2] / requestedLength, requestedFacing[0] / requestedLength)
-      : unit(seed, 1) * Math.PI * 2;
+      : unit(seed, 1) * Math.PI * 2);
+    const angle = baseAngle + (CARPET_BOMBER_ROUTE_HEADING_OFFSETS[headingAttempt] ?? 0);
     const forward: readonly [number, number] = [Math.cos(angle), Math.sin(angle)];
     const side: readonly [number, number] = [-forward[1], forward[0]];
     const impactInsetM = CARPET_BOMBER_IMPACT_ORIGIN_CLEARANCE_M;
@@ -1655,22 +1726,39 @@ export class HostKillstreakRuntime {
       minimumFlightProjection = 0;
       maximumFlightProjection = 0;
     }
+    const flightY = Math.min(world.bounds.ceilingY - 1, Math.max(world.bounds.floorY + 12, world.bounds.floorY + 24));
     const flightStart: SupportVec3 = Object.freeze([
       flightCentreX + forward[0] * minimumFlightProjection,
-      anchor[1],
+      flightY,
       flightCentreZ + forward[1] * minimumFlightProjection,
     ] as const);
     const flightEnd: SupportVec3 = Object.freeze([
       flightCentreX + forward[0] * maximumFlightProjection,
-      anchor[1],
+      flightY,
       flightCentreZ + forward[1] * maximumFlightProjection,
     ] as const);
+    if (!carpetFlightRouteAdmitted(flightStart, flightEnd, flightEnvelope, world)) {
+      const nextAttempt = headingAttempt + 1;
+      return nextAttempt < CARPET_BOMBER_ROUTE_HEADING_OFFSETS.length
+        ? this.carpetImpactPattern(anchor, seed, world, requestedFacing, nextAttempt, baseAngle)
+        : null;
+    }
+    // Payload ordinals are authored along the admitted corridor, but boundary
+    // insets can fold their ground projections toward a wall. Bind them to
+    // monotonic stations on the aircraft route using the exact movement ease
+    // at each canonical release time instead of reordering by clipped ground X/Z.
+    const dropRouteProgress = Object.freeze(impacts.map((_, ordinal) => {
+      const raw = clamp((CARPET_TARGET_MARKER_MAX_LIFETIME_MS + ordinal * 180
+        - CARPET_BOMB_SHELL_DROP_LEAD_MS) / CARPET_BOMBER_ROUTE_TRAVERSE_MS, 0, 1);
+      return raw * raw * (3 - 2 * raw);
+    }));
     return Object.freeze({
       impacts,
       pathStart: start,
       pathEnd: end,
       flightStart,
       flightEnd,
+      dropRouteProgress,
       halfWidthM: Math.max(0.5, maximumPerpendicular + 0.35),
     });
   }
@@ -1872,11 +1960,31 @@ export class HostKillstreakRuntime {
     this.hostileTargetCache.clear();
     this.sortedHostileTargetCache.clear();
 
+    // Move each admitted Carpet airframe before evaluating its payload. This
+    // binds shell authority to the position that is actually replicated for
+    // this host step, including coarse/stalled advances.
+    for (const bomber of this.carpetBombers.values()) {
+      const aircraft = this.entities.get(bomber.aircraftId);
+      if (!aircraft || aircraft.kind !== 'aircraft' || aircraft.variant !== 'carpet'
+        || canonicalNowMs >= aircraft.expiresAtMs || aircraft.health <= 0) {
+        bomber.routeCanceled = bomber.nextDropOrdinal < bomber.impacts.length;
+        continue;
+      }
+      this.advanceAircraft(aircraft, canonicalNowMs, dt, world);
+    }
+
     for (const [activationId, activation] of this.timedActivations) {
       if (canonicalNowMs >= activation.expiresAtMs) this.timedActivations.delete(activationId);
     }
     for (const [activationId, bomber] of this.carpetBombers) {
-      while (bomber.nextDropOrdinal < bomber.impacts.length
+      const aircraft = this.entities.get(bomber.aircraftId);
+      const routeProgress = aircraft?.kind === 'aircraft' && aircraft.variant === 'carpet'
+        ? admittedAircraftRouteProgress(aircraft)
+        : null;
+      while (!bomber.routeCanceled
+        && routeProgress !== null
+        && bomber.nextDropOrdinal < bomber.impacts.length
+        && routeProgress + 0.002 >= bomber.dropRouteProgress[bomber.nextDropOrdinal]!
         && canonicalNowMs >= bomber.impactAtMs[bomber.nextDropOrdinal]! - CARPET_BOMB_SHELL_DROP_LEAD_MS
         && impactEvents.length < CARPET_BOMBER_IMPACT_COUNT * 2) {
         const ordinal = bomber.nextDropOrdinal;
@@ -1899,7 +2007,7 @@ export class HostKillstreakRuntime {
           atMs: impactAtMs - CARPET_BOMB_SHELL_DROP_LEAD_MS,
         }));
       }
-      while (bomber.nextImpactOrdinal < bomber.impacts.length
+      while (bomber.nextImpactOrdinal < bomber.nextDropOrdinal
         && canonicalNowMs >= bomber.impactAtMs[bomber.nextImpactOrdinal]!
         && impactEvents.length < CARPET_BOMBER_IMPACT_COUNT * 2) {
         const ordinal = bomber.nextImpactOrdinal;
@@ -1930,7 +2038,9 @@ export class HostKillstreakRuntime {
           true,
         );
       }
-      if (bomber.nextImpactOrdinal >= bomber.impacts.length
+      if (bomber.routeCanceled && bomber.nextImpactOrdinal >= bomber.nextDropOrdinal) {
+        this.carpetBombers.delete(activationId);
+      } else if (bomber.nextImpactOrdinal >= bomber.impacts.length
         && bomber.authorityReleaseAtMs !== null
         && canonicalNowMs >= bomber.authorityReleaseAtMs) this.carpetBombers.delete(activationId);
     }
@@ -1941,8 +2051,9 @@ export class HostKillstreakRuntime {
         this.expireEntity(entity.id);
         continue;
       }
-      if (entity.kind === 'aircraft') this.advanceAircraft(entity, canonicalNowMs, dt, world);
-      else if (entity.kind === 'care-crate') this.advanceCareCrate(entity, canonicalNowMs, dt, world);
+      if (entity.kind === 'aircraft') {
+        if (entity.variant !== 'carpet') this.advanceAircraft(entity, canonicalNowMs, dt, world);
+      } else if (entity.kind === 'care-crate') this.advanceCareCrate(entity, canonicalNowMs, dt, world);
       else if (entity.kind === 'chopper') this.advanceChopper(entity, canonicalNowMs, dt, world, damageEvents);
       else this.advanceDrone(entity, canonicalNowMs, dt, world, damageEvents);
     }
@@ -1959,7 +2070,10 @@ export class HostKillstreakRuntime {
   }
 
   private advanceAircraft(entity: AircraftEntity, nowMs: number, dt: number, world: KillstreakWorld): void {
-    const progress = clamp((nowMs - entity.createdAtMs) / CARE_AIRCRAFT_DURATION_MS, 0, 1);
+    const routeDurationMs = entity.variant === 'carpet'
+      ? CARPET_BOMBER_ROUTE_TRAVERSE_MS
+      : CARE_AIRCRAFT_DURATION_MS;
+    const progress = clamp((nowMs - entity.createdAtMs) / routeDurationMs, 0, 1);
     entity.phase = progress < 0.12 ? 'inbound' : progress > 0.82 ? 'outbound' : 'active';
     const eased = progress * progress * (3 - 2 * progress);
     const desired: SupportVec3 = [
