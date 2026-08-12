@@ -15,6 +15,7 @@ describe('Pass 70 contact and Railgun scope integration contracts', () => {
     expect(runtime).toContain('const baseDirection = camera.getWorldDirection(new THREE.Vector3());');
     expect(runtime).toContain('cameraDirection: baseDirection.toArray()');
     expect(runtime).toContain('const profile = VIEWMODEL_CONTACT_PROFILES[player.weapon];');
+    expect(runtime).toContain('for (const offset of VIEWMODEL_CONTACT_PROBE_OFFSETS)');
     expect(runtime).toContain('viewmodelObstructionPose(nearestForward, player.stance === \'prone\', floorClearance, player.weapon)');
     expect(runtime).not.toMatch(/contactResponse[^\n]*(camera|baseDirection|projectile)/u);
   });

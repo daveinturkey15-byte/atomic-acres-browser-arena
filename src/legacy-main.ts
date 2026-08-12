@@ -702,6 +702,7 @@ import {
 } from './weapon-presentation';
 import {
   magnifiedFovDegrees,
+  VIEWMODEL_CONTACT_PROBE_OFFSETS,
   VIEWMODEL_CONTACT_PROFILES,
   viewmodelFloorClearance,
   viewmodelObstructionPose,
@@ -8968,13 +8969,6 @@ const viewmodelProbeUp = new THREE.Vector3();
 const viewmodelProbeStart = new THREE.Vector3();
 const viewmodelProbeEnd = new THREE.Vector3();
 const viewmodelProbeRotation = new THREE.Euler(0, 0, 0, 'YXZ');
-const VIEWMODEL_PROBE_OFFSETS = Object.freeze([
-  Object.freeze({ rightScale: 0, vertical: 'centre' as const }),
-  Object.freeze({ rightScale: -1, vertical: 'centre' as const }),
-  Object.freeze({ rightScale: 1, vertical: 'centre' as const }),
-  Object.freeze({ rightScale: 0, vertical: 'upper' as const }),
-  Object.freeze({ rightScale: 0, vertical: 'lower' as const }),
-]);
 function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
   const profile = VIEWMODEL_CONTACT_PROFILES[player.weapon];
   viewmodelProbeRotation.set(player.pitch, player.yaw, 0, 'YXZ');
@@ -8983,7 +8977,7 @@ function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
   viewmodelProbeUp.set(0, 1, 0).applyEuler(viewmodelProbeRotation).normalize();
   const colliders = activeWorldColliders();
   let nearestForward: number | null = null;
-  for (const offset of VIEWMODEL_PROBE_OFFSETS) {
+  for (const offset of VIEWMODEL_CONTACT_PROBE_OFFSETS) {
     const verticalOffset = offset.vertical === 'upper'
       ? profile.probeUpperOffsetMeters
       : offset.vertical === 'lower' ? -profile.probeLowerOffsetMeters : offset.rightScale === 0 ? 0 : 0.04;

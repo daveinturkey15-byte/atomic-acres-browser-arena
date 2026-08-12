@@ -36,6 +36,11 @@ export type ViewmodelContactProfile = Readonly<{
   minimumScale: number;
 }>;
 
+export type ViewmodelContactProbeOffset = Readonly<{
+  rightScale: -1 | 0 | 1;
+  vertical: 'centre' | 'upper' | 'lower';
+}>;
+
 export type ViewmodelContactResponse = Readonly<{
   contract: typeof VIEWMODEL_CONTACT_RESPONSE_CONTRACT;
   profileId: WeaponId;
@@ -59,6 +64,22 @@ const finite = (value: number, fallback = 0): number => Number.isFinite(value) ?
 export const ADS_IN_RESPONSE_PER_SECOND = 22;
 export const ADS_OUT_RESPONSE_PER_SECOND = 18;
 export const VIEWMODEL_CONTACT_RESPONSE_CONTRACT = 'catalog-viewmodel-contact-response-v2';
+/**
+ * Retained normalized samples for the complete authored weapon envelope.
+ * Runtime scales these by the active weapon profile without allocating or
+ * changing camera, muzzle, projectile, or character collision authority.
+ */
+export const VIEWMODEL_CONTACT_PROBE_OFFSETS: readonly ViewmodelContactProbeOffset[] = Object.freeze([
+  Object.freeze({ rightScale: 0, vertical: 'centre' }),
+  Object.freeze({ rightScale: -1, vertical: 'centre' }),
+  Object.freeze({ rightScale: 1, vertical: 'centre' }),
+  Object.freeze({ rightScale: 0, vertical: 'upper' }),
+  Object.freeze({ rightScale: 0, vertical: 'lower' }),
+  Object.freeze({ rightScale: -1, vertical: 'upper' }),
+  Object.freeze({ rightScale: 1, vertical: 'upper' }),
+  Object.freeze({ rightScale: -1, vertical: 'lower' }),
+  Object.freeze({ rightScale: 1, vertical: 'lower' }),
+]);
 const VIEWMODEL_PRONE_BASE_RETREAT_METERS = 0.09;
 const VIEWMODEL_PRONE_BASE_LIFT_METERS = 0.115;
 const VIEWMODEL_PRONE_FLOOR_LIFT_BUDGET_METERS = 0.085;

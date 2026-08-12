@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  VIEWMODEL_CONTACT_PROBE_OFFSETS,
   VIEWMODEL_CONTACT_PROFILES,
   VIEWMODEL_CONTACT_RESPONSE_CONTRACT,
   advanceAdsBlend,
@@ -136,6 +137,54 @@ describe('weapon presentation state', () => {
       .toBeGreaterThan(VIEWMODEL_CONTACT_PROFILES.pistol.probeLengthMeters);
     expect(VIEWMODEL_CONTACT_PROFILES.minigun.maximumSurfaceRetreatMeters)
       .toBeGreaterThan(VIEWMODEL_CONTACT_PROFILES['flare-gun'].maximumSurfaceRetreatMeters);
+  });
+
+  it('catches diagonal corners, oblique walls and doorjamb returns that the old five-ray cross missed', () => {
+    type Point = readonly [number, number];
+    for (const weapon of WEAPON_IDS) {
+      const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+      const samples: Point[] = VIEWMODEL_CONTACT_PROBE_OFFSETS.map((offset) => [
+        offset.rightScale * profile.probeHalfWidthMeters,
+        offset.vertical === 'upper'
+          ? profile.probeUpperOffsetMeters
+          : offset.vertical === 'lower' ? -profile.probeLowerOffsetMeters : offset.rightScale === 0 ? 0 : 0.04,
+      ]);
+      const oldCross = samples.slice(0, 5);
+      const fixtures: ReadonlyArray<Readonly<{
+        name: string;
+        intersects: (sample: Point) => boolean;
+      }>> = [
+        {
+          name: 'narrow lower-right diagonal corner',
+          intersects: ([x, y]) => (
+            x >= profile.probeHalfWidthMeters * 0.94
+            && y <= -profile.probeLowerOffsetMeters * 0.94
+          ),
+        },
+        {
+          name: 'upper-right oblique wall edge',
+          // Camera-plane cross-section of a wall whose leading edge reaches
+          // only the weapon envelope corner over the tested forward span.
+          intersects: ([x, y]) => (
+            x > 0 && y > 0
+            && x / profile.probeHalfWidthMeters + y / profile.probeUpperOffsetMeters >= 1.9
+          ),
+        },
+        {
+          name: 'recessed upper-left doorjamb return',
+          intersects: ([x, y]) => (
+            x <= -profile.probeHalfWidthMeters * 0.94
+            && y >= profile.probeUpperOffsetMeters * 0.94
+          ),
+        },
+      ];
+
+      expect(samples, weapon).toHaveLength(9);
+      for (const fixture of fixtures) {
+        expect(oldCross.filter(fixture.intersects), `${weapon}: old cross: ${fixture.name}`).toHaveLength(0);
+        expect(samples.filter(fixture.intersects), `${weapon}: full envelope: ${fixture.name}`).toHaveLength(1);
+      }
+    }
   });
 
   it('uses each authored weapon envelope for standing, crouch-equivalent and prone wall/floor contact', () => {
