@@ -1,3 +1,5 @@
+import { FLAME_DAMAGE_CATALOG } from './flame-damage-contract';
+
 export const FLAMETHROWER_EFFECT = Object.freeze({
   rangeM: 18,
   streamRadiusM: 0.58,
@@ -14,7 +16,7 @@ export const FLARE_PROJECTILE_EFFECT = Object.freeze({
   burnDurationMs: 5_000,
   directDamage: 42,
   burnRadiusM: 3.4,
-  burnDamagePerSecond: 10,
+  burnDamagePerSecond: FLAME_DAMAGE_CATALOG['flare-gun-burn'].damagePerSecond,
   poolCapacity: 12,
 });
 

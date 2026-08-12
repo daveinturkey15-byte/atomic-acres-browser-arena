@@ -3,6 +3,10 @@ import type { Team } from './protocol';
 import { CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS } from './killstreak-runtime';
 import { FLAMETHROWER_EFFECT } from './special-weapon-effects';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
+import {
+  FLAME_DAMAGE_PULSE_INTERVAL_MS,
+  flameDamagePerPulse,
+} from './flame-damage-contract';
 
 // Hardware keeps the accepted four-particle silhouette. Proven software
 // adapters use two broader retained particles: this halves their additive
@@ -12,8 +16,8 @@ const HARDWARE_PARTICLES_PER_EMISSION = 4;
 const SOFTWARE_PARTICLES_PER_EMISSION = 2;
 const MIN_STREAM_DISTANCE_M = 0.35;
 export const FLAMETHROWER_GROUND_FIRE_DURATION_MS = CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS;
-export const FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS = 500;
-export const FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE = 5;
+export const FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS = FLAME_DAMAGE_PULSE_INTERVAL_MS;
+export const FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE = flameDamagePerPulse('flamethrower-ground-fire');
 const GROUND_FIRE_POOL_CAPACITY = 24;
 
 export const FLAMETHROWER_GROUND_FIRE_MERGE_RADIUS_M = 0.8;

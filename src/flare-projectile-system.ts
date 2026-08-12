@@ -73,7 +73,10 @@ export type FlareProjectileCallbacks = Readonly<{
   /** Earliest collision fraction in [0,1], or null when the segment is clear. */
   worldCollisionFraction: (start: THREE.Vector3, delta: THREE.Vector3, radiusM: number) => number | null;
   withinBounds: (point: THREE.Vector3) => boolean;
-  hostileTargets: (ownerId: string, ownerTeam: Team) => readonly FlareProjectileTarget[];
+  /** Actor contacts in flight. Retains the hostile-only direct-impact policy. */
+  directHitTargets: (ownerId: string, ownerTeam: Team) => readonly FlareProjectileTarget[];
+  /** Actors inside the admitted burn volume. Includes enemy, friendly and owner. */
+  burnTargets: (ownerId: string, ownerTeam: Team) => readonly FlareProjectileTarget[];
   burnLineOfSight: (point: THREE.Vector3, target: FlareProjectileTarget) => boolean;
   onDirectHit: (hit: FlareProjectileDirectHit) => void;
   onImpact: (impact: FlareProjectileImpact) => void;
@@ -165,9 +168,10 @@ export class FlareProjectileSystem {
   private readonly next = new THREE.Vector3();
   private readonly flightDirection = new THREE.Vector3();
   private readonly projectileForward = new THREE.Vector3(0, 0, -1);
-  private readonly targetCacheOwnerIds = new Array<string>(FLARE_PROJECTILE_EFFECT.poolCapacity);
-  private readonly targetCacheOwnerTeams = new Uint8Array(FLARE_PROJECTILE_EFFECT.poolCapacity);
-  private readonly targetCacheValues = new Array<readonly FlareProjectileTarget[]>(FLARE_PROJECTILE_EFFECT.poolCapacity);
+  private readonly targetCacheOwnerIds = new Array<string>(FLARE_PROJECTILE_EFFECT.poolCapacity * 2);
+  private readonly targetCacheOwnerTeams = new Uint8Array(FLARE_PROJECTILE_EFFECT.poolCapacity * 2);
+  private readonly targetCacheKinds = new Uint8Array(FLARE_PROJECTILE_EFFECT.poolCapacity * 2);
+  private readonly targetCacheValues = new Array<readonly FlareProjectileTarget[]>(FLARE_PROJECTILE_EFFECT.poolCapacity * 2);
   private targetCacheCount = 0;
   private lifecycleRevision = 0;
   private prewarmGeneration = -1;
@@ -292,7 +296,12 @@ export class FlareProjectileSystem {
       const needsTargets = (entity.phase === 'flight' && entity.authority && !entity.directHitDelivered)
         || (entity.authority && entity.nextBurnPulseAt <= now && entity.nextBurnPulseAt <= entity.expiresAt);
       const targets = needsTargets
-        ? this.targetsForUpdate(entity.ownerId, entity.ownerTeam, callbacks)
+        ? this.targetsForUpdate(
+            entity.ownerId,
+            entity.ownerTeam,
+            entity.phase === 'flight' ? 'direct-hit' : 'burn',
+            callbacks,
+          )
         : EMPTY_FLARE_PROJECTILE_TARGETS;
       if (entity.phase === 'flight') this.updateFlight(entity, deltaSeconds, now, targets, callbacks);
       if (entity.phase === 'burn') this.updateBurn(entity, now, targets, callbacks);
@@ -974,17 +983,24 @@ export class FlareProjectileSystem {
   private targetsForUpdate(
     ownerId: string,
     ownerTeam: Team,
+    kind: 'direct-hit' | 'burn',
     callbacks: FlareProjectileCallbacks,
   ): readonly FlareProjectileTarget[] {
+    const kindValue = kind === 'direct-hit' ? 0 : 1;
     for (let index = 0; index < this.targetCacheCount; index += 1) {
-      if (this.targetCacheOwnerIds[index] === ownerId && this.targetCacheOwnerTeams[index] === ownerTeam) {
+      if (this.targetCacheOwnerIds[index] === ownerId
+        && this.targetCacheOwnerTeams[index] === ownerTeam
+        && this.targetCacheKinds[index] === kindValue) {
         return this.targetCacheValues[index]!;
       }
     }
-    const targets = callbacks.hostileTargets(ownerId, ownerTeam);
+    const targets = kind === 'direct-hit'
+      ? callbacks.directHitTargets(ownerId, ownerTeam)
+      : callbacks.burnTargets(ownerId, ownerTeam);
     const slot = this.targetCacheCount;
     this.targetCacheOwnerIds[slot] = ownerId;
     this.targetCacheOwnerTeams[slot] = ownerTeam;
+    this.targetCacheKinds[slot] = kindValue;
     this.targetCacheValues[slot] = targets;
     this.targetCacheCount += 1;
     return targets;

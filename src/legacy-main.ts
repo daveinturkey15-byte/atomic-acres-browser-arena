@@ -756,6 +756,7 @@ import {
   FlamethrowerStreamSystem,
   flamethrowerPulseImpactPresentationEnabled,
 } from './flamethrower-stream-system';
+import { flameDamageAllowsTarget } from './flame-damage-contract';
 import {
   CARPET_GROUND_FIRE_AUTHORITY_CAPACITY,
   CarpetGroundFireGuestPresentationAdmission,
@@ -1927,16 +1928,26 @@ function sendCarpetGroundFirePresentationSnapshot(
 
 function applyFlamethrowerGroundFirePulse(fire: Readonly<{
   ownerId: string;
+  ownerTeam: Team;
   point: THREE.Vector3;
+  actionNonce: number;
   damageSource: 'flamethrower' | 'carpet-bomber';
   activationId: string | null;
   pulseAtMs: number;
 }>): void {
-  // Napalm burns EVERYONE who stands in it - self, friends and enemies alike
-  // (same friendly-fire rule as the Carpet Bomber).
+  // Prediction owns visuals only. Every HP mutation and replicated receipt is
+  // admitted once by the host/offline authority on the pool's canonical tick.
+  if (network.role === 'client') return;
+  const flameSource = fire.damageSource === 'carpet-bomber'
+    ? 'carpet-bomber-napalm' as const
+    : 'flamethrower-ground-fire' as const;
+  const cause: KillCause = fire.damageSource === 'carpet-bomber'
+    ? { kind: 'killstreak', effect: 'carpet-bomber' }
+    : { kind: 'gun', weapon: 'flamethrower' };
   const r2 = FLAMETHROWER_GROUND_FIRE_RADIUS_M * FLAMETHROWER_GROUND_FIRE_RADIUS_M;
-  if (player.alive && player.position.distanceToSquared(fire.point) < r2) {
-    applyDamage(FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, fire.ownerId, 1, false, { kind: 'killstreak', effect: 'carpet-bomber' });
+  if (player.alive && player.position.distanceToSquared(fire.point) < r2
+    && flameDamageAllowsTarget(flameSource, fire.ownerId, fire.ownerTeam, player.id, player.team)) {
+    applyDamage(FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, fire.ownerId, 1, false, cause);
   }
   if (!flamethrowerGroundFireBotSnapshotReady) {
     flamethrowerGroundFireBotSnapshot.length = 0;
@@ -1947,8 +1958,9 @@ function applyFlamethrowerGroundFirePulse(fire: Readonly<{
     if (!bot.alive) continue;
     const dx = bot.position.x - fire.point.x;
     const dz = bot.position.z - fire.point.z;
-    if (dx * dx + dz * dz < r2) {
-      applyBotDamage(bot, FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, 'body', { kind: 'killstreak', effect: 'carpet-bomber' }, fire.ownerId);
+    if (dx * dx + dz * dz < r2
+      && flameDamageAllowsTarget(flameSource, fire.ownerId, fire.ownerTeam, bot.id, bot.team)) {
+      applyBotDamage(bot, FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, 'body', cause, fire.ownerId);
     }
   }
   if (network.role === 'host' && fire.damageSource === 'carpet-bomber' && fire.activationId) {
@@ -1978,6 +1990,29 @@ function applyFlamethrowerGroundFirePulse(fire: Readonly<{
       if (!applied || applied.damage <= 0) continue;
       pendingCarpetGroundFireDamageEvents.push(applied);
       recordOwnerSupportDamage(applied);
+    }
+  } else if (network.role === 'host' && fire.damageSource === 'flamethrower') {
+    for (const remote of remotes.values()) {
+      const health = remoteHealthAuthorities.get(remote.snapshot.id);
+      if (!health?.alive || !flameDamageAllowsTarget(
+        'flamethrower-ground-fire',
+        fire.ownerId,
+        fire.ownerTeam,
+        remote.snapshot.id,
+        remote.snapshot.team,
+      )) continue;
+      const dx = remote.snapshot.x - fire.point.x;
+      const dz = remote.snapshot.z - fire.point.z;
+      if (dx * dx + dz * dz >= r2) continue;
+      sendAuthoritativeHit({
+        type: 'hit', by: fire.ownerId, target: remote.snapshot.id,
+        damage: FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, kind: 'shot',
+        origin: fire.point.toArray() as [number, number, number],
+        actionNonce: fire.actionNonce, nonce: randomNonce(),
+      }, {
+        hitZone: 'body', wallbang: false, penetrationMultiplier: 1,
+        distanceMeters: Math.sqrt(dx * dx + dz * dz),
+      });
     }
   }
   if (presentFlamethrowerPulseImpact) spawnImpactFlash(fire.point, 'concrete', flamethrowerGroundFireUp);
@@ -4507,6 +4542,7 @@ const pendingLocalTimedShots = new Map<string, TimedMapWeaponId>();
 function admittedShotActionLifetimeMs(weapon: WeaponId): number {
   if (weapon === 'explosive-crossbow') return EXPLOSIVE_BOLT_MAX_LIFE_MS + 1_000;
   if (weapon === 'flare-gun') return FLARE_PROJECTILE_EFFECT.maximumFlightMs + FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000;
+  if (weapon === 'flamethrower') return FLAMETHROWER_GROUND_FIRE_DURATION_MS + 1_000;
   return 1_000;
 }
 const createRailgunClaimAudit = () => ({
@@ -10127,14 +10163,23 @@ function onNetworkMessage(message: GameMessage): void {
       addFeed('STUCK', 'gold');
     }
     const attacker = remotes.get(message.by);
-    if (!attacker || !pointInsideBounds(attacker.snapshot, arena.bounds, 0.44)) return;
+    const localCanonicalAttacker = network.role === 'client'
+      && message.by === player.id
+      && message.hostAuthority?.hostId === privateLobbySnapshot?.hostId;
+    const attackerPose = attacker?.snapshot ?? (localCanonicalAttacker ? player.position : null);
+    if (!attackerPose || !pointInsideBounds(attackerPose, arena.bounds, 0.44)) return;
     const targetIsLocal = message.target === player.id;
     const remoteTarget = targetIsLocal ? undefined : remotes.get(message.target);
     const botTarget = targetIsLocal ? undefined : bots.get(message.target);
     if (!targetIsLocal && (network.role !== 'host' || !remoteTarget && !botTarget)) return;
     const targetId = targetIsLocal ? player.id : remoteTarget?.snapshot.id ?? botTarget!.id;
     const targetTeam = targetIsLocal ? player.team : remoteTarget?.snapshot.team ?? botTarget!.team;
-    if (!areCombatantsHostile(message.by, attacker.snapshot.team, targetId, targetTeam)) return;
+    const attackerTeam = attacker?.snapshot.team ?? player.team;
+    const admittedActionWeapon = admittedRemoteShots.get(message.by)?.get(message.actionNonce)?.message.weapon;
+    const hostCanonicalFlame = message.hostAuthority !== undefined
+      && message.kind === 'shot'
+      && (admittedActionWeapon === 'flare-gun' || admittedActionWeapon === 'flamethrower');
+    if (!areCombatantsHostile(message.by, attackerTeam, targetId, targetTeam) && !hostCanonicalFlame) return;
     const targetLifeId = targetIsLocal ? localContinuity : remoteTarget?.continuity ?? botTarget!.continuity;
     if (network.role === 'client') {
       const canonicalResult = admitHostCanonicalHitResult(message.hostAuthority, {
@@ -10173,13 +10218,14 @@ function onNetworkMessage(message: GameMessage): void {
         canonicalResult.appliedDamage,
         message.by,
         1,
-        killCauseFromHit(message, attacker.snapshot.weapon),
+        killCauseFromHit(message, admittedActionWeapon ?? attacker?.snapshot.weapon ?? player.weapon),
       );
       trimNonceSet();
       return;
     } else if (message.hostAuthority !== undefined) {
       return;
     }
+    if (!attacker) return;
     const now = performance.now();
     const rewindMs = incomingCombatRewindMs.get(message.nonce) ?? 0;
     incomingCombatRewindMs.delete(message.nonce);
@@ -10776,7 +10822,8 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     finish('accepted-miss', 'none', admission.appliedRewindMs);
     return;
   }
-  renderRemoteShot(visualShot);
+  let remoteShotEnd: THREE.Vector3 | null = null;
+  if (request.weapon !== 'flamethrower') remoteShotEnd = renderRemoteShot(visualShot);
   if (request.weapon !== 'flamethrower') {
     applyKillstreakEntityShot(
       request.by,
@@ -10829,6 +10876,18 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       actorId: request.by, weaponOrEffect: request.weapon, reason: 'host-finite-ammo-consumed',
     }, request.shotId);
     broadcastTimedMapWeaponState();
+    remoteShotEnd = renderRemoteShot(visualShot);
+    if (remoteShotEnd) {
+      flamethrowerGroundFires.ignite({
+        ownerId: request.by,
+        ownerTeam: sender.snapshot.team,
+        point: remoteShotEnd,
+        actionNonce: request.nonce,
+        now: receivedAt,
+        durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+        pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
+      });
+    }
     applyKillstreakEntityShot(
       request.by,
       sender.snapshot.team,
@@ -11036,15 +11095,15 @@ function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
   recordShotProtocol('result-hit-presented');
 }
 
-function renderRemoteShot(message: ShotMessage): void {
+function renderRemoteShot(message: ShotMessage): THREE.Vector3 | null {
   const origin = new THREE.Vector3(...message.origin);
-  if (!pointInsideBounds(origin, arena.bounds, 0.44)) return;
+  if (!pointInsideBounds(origin, arena.bounds, 0.44)) return null;
   const direction = new THREE.Vector3(...message.direction).normalize();
   if (message.weapon === 'flare-gun') {
     const ownerTeam = message.by === player.id
       ? player.team
       : remotes.get(message.by)?.snapshot.team;
-    if (ownerTeam === undefined) return;
+    if (ownerTeam === undefined) return null;
     flareProjectileSystem.spawn({
       ownerId: message.by, ownerTeam, origin, direction, authority: false,
       actionNonce: message.nonce, now: performance.now(),
@@ -11052,18 +11111,18 @@ function renderRemoteShot(message: ShotMessage): void {
     const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
     if (remoteOperator) fireOperator(remoteOperator);
     audio.shot('flare-gun', true, origin.distanceTo(camera.position));
-    return;
+    return null;
   }
   if (message.weapon === 'explosive-crossbow') {
     const ownerTeam = message.by === player.id
       ? player.team
       : remotes.get(message.by)?.snapshot.team;
-    if (ownerTeam === undefined) return;
+    if (ownerTeam === undefined) return null;
     spawnExplosiveBolt(message.by, ownerTeam, origin, direction, false, message.nonce);
     const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
     if (remoteOperator) fireOperator(remoteOperator);
     audio.shot(message.weapon, true, origin.distanceTo(camera.position));
-    return;
+    return null;
   }
   const traceDistance = message.weapon === 'railgun'
     ? RAILGUN_BEAM_LENGTH_M
@@ -11075,6 +11134,7 @@ function renderRemoteShot(message: ShotMessage): void {
   const remoteMuzzle = remoteOperator?.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
   if (message.weapon === 'flamethrower') {
     flamethrowerStreamPresentation.emit(remoteMuzzle ?? origin, visibleEnd, performance.now());
+    flamethrowerStreamPresentation.igniteGround(visibleEnd, performance.now());
   } else if (message.weapon !== 'railgun') {
     spawnTracer(remoteMuzzle ?? origin, visibleEnd, WEAPONS[message.weapon].color);
   }
@@ -11096,6 +11156,7 @@ function renderRemoteShot(message: ShotMessage): void {
   }
   if (player.alive) audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
   if (message.weapon !== 'railgun') audio.shot(message.weapon, true, origin.distanceTo(camera.position));
+  return visibleEnd;
 }
 
 function showDamageDirection(attacker: string, damage = 12, now = performance.now()): void {
@@ -13834,7 +13895,8 @@ function restoreRecoveredFlareRuntime(
       withinBounds: (point) => pointInsideBounds(point, arena.bounds, 0.1) && point.y >= -25 && point.y <= 250,
       // Downtime never grants retroactive target collision, direct damage or
       // burn pulses. Only immutable world collision and effect time advance.
-      hostileTargets: () => Object.freeze([]),
+      directHitTargets: () => Object.freeze([]),
+      burnTargets: () => Object.freeze([]),
       burnLineOfSight: () => false,
       onDirectHit: () => undefined,
       onImpact: () => undefined,
@@ -15008,13 +15070,13 @@ function tryFire(now: number): void {
       flamethrowerStreamPresentation.emit(visualStart, authoritativeEnd, now);
       // Spawn visible napalm ground fire at impact point (stays 5s like
       // napalm) plus the damage lane.
-      const ignited = flamethrowerStreamPresentation.igniteGround(authoritativeEnd, now);
-      if (ignited) {
+      flamethrowerStreamPresentation.igniteGround(authoritativeEnd, now);
+      if (network.role !== 'client') {
         flamethrowerGroundFires.ignite({
           ownerId: player.id,
           ownerTeam: player.team,
           point: authoritativeEnd,
-          actionNonce: randomNonce(),
+          actionNonce: shotActionNonce,
           now,
           durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
           pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
@@ -15109,6 +15171,14 @@ function tryFire(now: number): void {
     timing: nextCombatTiming(),
     nonce: shotActionNonce,
   };
+  if (network.role === 'client' && (player.weapon === 'flare-gun' || player.weapon === 'flamethrower')) {
+    const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
+    for (const [nonce, action] of actions) {
+      if (now - action.receivedAt > admittedShotActionLifetimeMs(action.message.weapon)) actions.delete(nonce);
+    }
+    actions.set(shot.nonce, { message: shot, receivedAt: now, targets: new Set() });
+    admittedRemoteShots.set(player.id, actions);
+  }
   if (!projectileShot && network.role !== 'client') {
     admitAuthoritativeSmokeSegments(
       `local:${interactiveWorldMatchEpoch}:${player.id}:${shot.nonce}`,
@@ -16519,6 +16589,18 @@ function updateBots(dt: number, now: number): void {
         }
       }
       if (flamethrowerShot) {
+        flamethrowerStreamPresentation.igniteGround(visibleEnd, now);
+        if (network.role !== 'client') {
+          flamethrowerGroundFires.ignite({
+            ownerId: bot.id,
+            ownerTeam: bot.team,
+            point: visibleEnd,
+            actionNonce,
+            now,
+            durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+            pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
+          });
+        }
         // This action lane is independent of damage, so guests see the same
         // finite stream on both hits and misses. BotDamage only reconciles HP.
         broadcastHostedBotFlamethrowerPresentation(bot, origin, visibleEnd, actionNonce);
@@ -16970,14 +17052,15 @@ type FlareTargetSnapshotEntry = {
   practiceOnly: boolean;
   active: boolean;
 };
-type FlareHostileTargetView = {
+type FlareTargetView = {
   generation: number;
   targets: FlareProjectileTarget[];
 };
 const FLARE_TARGET_SNAPSHOT_CAPACITY = 128;
 const FLARE_OWNER_VIEW_CAPACITY = FLARE_PROJECTILE_EFFECT.poolCapacity;
 const flareTargetSnapshots = new Map<string, FlareTargetSnapshotEntry>();
-const flareHostileTargetViews = new Map<string, [FlareHostileTargetView | null, FlareHostileTargetView | null]>();
+const flareDirectTargetViews = new Map<string, [FlareTargetView | null, FlareTargetView | null]>();
+const flareBurnTargetViews = new Map<string, [FlareTargetView | null, FlareTargetView | null]>();
 let flareTargetSnapshotGeneration = 0;
 
 function upsertFlareTargetSnapshot(
@@ -17052,12 +17135,17 @@ function prepareFlareTargetSnapshots(): void {
   }
 }
 
-function flareHostileTargets(ownerId: string, ownerTeam: Team): readonly FlareProjectileTarget[] {
-  let views = flareHostileTargetViews.get(ownerId);
+function flareTargetView(
+  cache: Map<string, [FlareTargetView | null, FlareTargetView | null]>,
+  ownerId: string,
+  ownerTeam: Team,
+  targetPolicy: 'hostile-direct' | 'all-burn',
+): readonly FlareProjectileTarget[] {
+  let views = cache.get(ownerId);
   if (!views) {
-    if (flareHostileTargetViews.size >= FLARE_OWNER_VIEW_CAPACITY) flareHostileTargetViews.clear();
+    if (cache.size >= FLARE_OWNER_VIEW_CAPACITY) cache.clear();
     views = [null, null];
-    flareHostileTargetViews.set(ownerId, views);
+    cache.set(ownerId, views);
   }
   let view = views[ownerTeam];
   if (!view) {
@@ -17068,19 +17156,33 @@ function flareHostileTargets(ownerId: string, ownerTeam: Team): readonly FlarePr
   view.generation = flareTargetSnapshotGeneration;
   view.targets.length = 0;
   for (const entry of flareTargetSnapshots.values()) {
-    if (!entry.active || entry.target.id === ownerId) continue;
+    if (!entry.active || targetPolicy === 'hostile-direct' && entry.target.id === ownerId) continue;
     if (entry.practiceOnly) {
       if (ownerId === player.id && selectedArena.id === 'gun-range') view.targets.push(entry.target);
       continue;
     }
-    if (areCombatantsHostile(ownerId, ownerTeam, entry.target.id, entry.team)) view.targets.push(entry.target);
+    const admitted = targetPolicy === 'hostile-direct'
+      ? areCombatantsHostile(ownerId, ownerTeam, entry.target.id, entry.team)
+      : flameDamageAllowsTarget('flare-gun-burn', ownerId, ownerTeam, entry.target.id, entry.team);
+    if (admitted) {
+      view.targets.push(entry.target);
+    }
   }
   return view.targets;
 }
 
+function flareDirectHitTargets(ownerId: string, ownerTeam: Team): readonly FlareProjectileTarget[] {
+  return flareTargetView(flareDirectTargetViews, ownerId, ownerTeam, 'hostile-direct');
+}
+
+function flareBurnTargets(ownerId: string, ownerTeam: Team): readonly FlareProjectileTarget[] {
+  return flareTargetView(flareBurnTargetViews, ownerId, ownerTeam, 'all-burn');
+}
+
 function clearFlareTargetSnapshots(): void {
   flareTargetSnapshots.clear();
-  flareHostileTargetViews.clear();
+  flareDirectTargetViews.clear();
+  flareBurnTargetViews.clear();
   flareTargetSnapshotGeneration = 0;
 }
 
@@ -17293,7 +17395,8 @@ const flareProjectileCallbacks: FlareProjectileCallbacks = Object.freeze({
   withinBounds: (point: THREE.Vector3) => (
     pointInsideBounds(point, arena.bounds, 0.1) && point.y >= -25 && point.y <= 250
   ),
-  hostileTargets: flareHostileTargets,
+  directHitTargets: flareDirectHitTargets,
+  burnTargets: flareBurnTargets,
   burnLineOfSight: (point: THREE.Vector3, target: FlareProjectileTarget) => {
     flareBurnLineOfSightPoint.copy(point).y += 0.12;
     for (const box of flareFrameColliders) {

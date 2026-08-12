@@ -49,7 +49,7 @@ const DELAYED_FRAME_WORLD: KillstreakWorld = Object.freeze({
 });
 
 describe('Pass 70 hosted Carpet Bomber residual fire', () => {
-  it('applies exactly 10 DPS for five seconds to an in-radius hosted human through canonical receipts', () => {
+  it('applies exactly 20 DPS for five seconds to an in-radius hosted human through canonical receipts', () => {
     const runtime = new HostKillstreakRuntime(73);
     runtime.registerActor('guest-owner', 1, 2, parseKillstreakLoadout({
       schemaVersion: 1,
@@ -79,7 +79,7 @@ describe('Pass 70 hosted Carpet Bomber residual fire', () => {
         ownerId: 'guest-owner',
         targetId: 'hosted-guest',
         targetLifeId: 5,
-        damage: 5,
+        damage: 10,
         atMs,
       });
       const applied = applyAuthoritativeRemoteDamage(health, event!.damage, event!.atMs);
@@ -88,8 +88,8 @@ describe('Pass 70 hosted Carpet Bomber residual fire', () => {
       events.push(event!);
     }
     expect(events).toHaveLength(10);
-    expect(events.reduce((total, event) => total + event.damage, 0)).toBe(50);
-    expect(health.hp).toBe(50);
+    expect(events.reduce((total, event) => total + event.damage, 0)).toBe(100);
+    expect(health.hp).toBe(0);
     expect(isKillstreakProtocolMessage({
       type: 'killstreak-damage-result',
       by: 'host',

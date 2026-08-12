@@ -281,7 +281,8 @@ describe('same-browser hosted active-match recovery integration', () => {
     expect(restore).toContain('flareProjectileSystem.restoreAuthorityCheckpoint(');
     expect(restore).toContain('checkpoint.flareProjectiles,');
     expect(restore).toContain('savedAtMonoMs,');
-    expect(restore).toContain('hostileTargets: () => Object.freeze([])');
+    expect(restore).toContain('directHitTargets: () => Object.freeze([])');
+    expect(restore).toContain('burnTargets: () => Object.freeze([])');
     expect(restore).toContain('onDirectHit: () => undefined');
     expect(restore).toContain('onImpact: () => undefined');
     expect(restore).toContain('onBurnPulse: () => undefined');

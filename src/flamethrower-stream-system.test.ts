@@ -8,6 +8,7 @@ import {
   FlamethrowerGroundFirePool,
   FlamethrowerStreamSystem,
   flamethrowerPulseImpactPresentationEnabled,
+  type FlamethrowerGroundFire,
 } from './flamethrower-stream-system';
 
 describe('flamethrower stream presentation', () => {
@@ -170,7 +171,7 @@ describe('flamethrower stream presentation', () => {
     expect(pool.activeCount()).toBe(0);
   });
 
-  it('applies exactly ten five-damage pulses over five seconds without retroactive catch-up', () => {
+  it('applies exactly ten ten-damage pulses over five seconds without retroactive catch-up', () => {
     const pool = new FlamethrowerGroundFirePool(1);
     expect(pool.ignite({
       ownerId: 'player-a', ownerTeam: 0, point: new THREE.Vector3(1, 0, 2), actionNonce: 9, now: 100,
@@ -179,16 +180,19 @@ describe('flamethrower stream presentation', () => {
     })).toBe('created');
     let pulses = 0;
     let damage = 0;
-    const applyPulse = () => {
+    const actionNonces: number[] = [];
+    const applyPulse = (fire: FlamethrowerGroundFire) => {
       pulses += 1;
       damage += FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE;
+      actionNonces.push(fire.actionNonce);
     };
     for (let now = 100; now <= 4_600; now += FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS) {
       pool.update(now, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyPulse);
     }
-    expect({ pulses, damage, active: pool.activeCount() }).toEqual({ pulses: 10, damage: 50, active: 1 });
+    expect({ pulses, damage, active: pool.activeCount() }).toEqual({ pulses: 10, damage: 100, active: 1 });
+    expect(actionNonces).toEqual(Array(10).fill(9));
     pool.update(5_100, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyPulse);
-    expect({ pulses, damage, active: pool.activeCount() }).toEqual({ pulses: 10, damage: 50, active: 0 });
+    expect({ pulses, damage, active: pool.activeCount() }).toEqual({ pulses: 10, damage: 100, active: 0 });
 
     expect(pool.ignite({
       ownerId: 'player-a', ownerTeam: 0, point: new THREE.Vector3(), actionNonce: 10, now: 6_000,
