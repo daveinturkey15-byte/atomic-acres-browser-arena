@@ -366,13 +366,30 @@
       "outcomeProjectionSha256": "cfe805d3d9bc0eec7d2a76ba7801a45224aa075a9fb0c506c8123f0efe10f225"
     },
     {
+      "id": "SRC-CODEX-P70-AUG12-HITL3-001",
+      "kind": "codex-owner-feedback",
+      "externalLocator": "codex-task:pass70-owner-hitl3-2026-08-12#feedback",
+      "rawByteLength": 1681,
+      "rawSha256": "54868b730936a8e08b98eedf17c5bda91abf528e0d79a09ff4c267c363ef264d",
+      "rawEndsWithCrLf": false,
+      "normalizedRepositoryPath": "docs/pass70-sources/codex-owner-hitl3-2026-08-12.txt",
+      "normalization": "UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged",
+      "normalizedByteLength": 1666,
+      "normalizedSha256": "cc83730b064b41b1a26bbb70ab257afa49cd189072ecc235c73c004385b8dc04",
+      "outcomeCollection": "codexPass70August12Hitl3Outcomes",
+      "outcomeIdPrefix": "P70HITL3",
+      "outcomeCount": 9,
+      "lineAtomCounts": {"1":1,"3":1,"5":1,"7":1,"9":1,"11":1,"13":1,"15":1,"17":1},
+      "outcomeProjectionSha256": "16a9a34b34a09706d5afebc507204eb1b3d3512e20db8281ca32b3b2d4effbd3"
+    },
+    {
       "id": "SRC-CORRECTION-LEDGER-001",
       "kind": "canonical-correction-ledger",
       "repositoryPath": "docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md",
       "ledgerVersion": 1,
-      "latestFeedbackId": "HF-277",
-      "outcomeCount": 277,
-      "stateIndependentOutcomeSha256": "022656d186933cb8a794fa4edd0901519b4c4d53e12b41f24fdcc205da92e8e4"
+      "latestFeedbackId": "HF-286",
+      "outcomeCount": 286,
+      "stateIndependentOutcomeSha256": "2bedc0e2ab2b6f7fa065cde7ba1064d20f91de93a27d86ab11d9fcaf30f9f246"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -1056,7 +1073,7 @@
     "outcomeIdTemplate": "CORR-{feedbackId}",
     "sourceLocatorTemplate": "{feedbackId}.observation",
     "feedbackIdStart": "HF-001",
-    "feedbackIdEnd": "HF-277"
+    "feedbackIdEnd": "HF-286"
   },
   "supersessions": [
     {
@@ -1565,6 +1582,19 @@
         "HF-252"
       ],
       "canonicalText": "Pass 69 at source `685ed7865018e107df5acf6cb6f7498b4468940c` is now the immutable live starting benchmark; `HF-252` makes Pass 70 the next correction candidate and supersedes `HF-232`'s 69.3/current-69.1 release wording without changing the byte-exact Pass 63 Stable contract or the requirement for local exact-SHA HITL before publication."
+    },
+    {
+      "id": "SUP-036",
+      "ledgerOrdinal": 36,
+      "sourceOutcomeIds": [
+        "P70HITL3-007",
+        "CORR-HF-284"
+      ],
+      "feedbackIds": [
+        "HF-270",
+        "HF-284"
+      ],
+      "canonicalText": "`HF-284` strengthens `HF-270`: Gun Range room occupancy still remains host-authoritative and shared, but every admitted participant entry and exit boundary now resets the canonical clock to exactly 120 seconds instead of resuming from the previously frozen remaining time; all peers project the same revision and value."
     }
   ],
   "testCatalog": [
@@ -7481,7 +7511,16 @@
     {"id":"HF-274","sourceOutcomeIds":["CORR-HF-274","P70FFMP-007","P70FFMP-008"],"planningRequirementIds":["R003","R105","R304","R307","R600","R604","R608","R610","R613"],"canonicalOwner":"Cross-browser release compatibility","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-INSTALLED-FIREFOX","T-BROWSER-ADMISSION","T-RELEASE-SHELL"],"artifactRefs":[]}},
     {"id":"HF-275","sourceOutcomeIds":["CORR-HF-275","P70FFMP-009"],"planningRequirementIds":["R108","R200","R201","R202","R203","R204","R205","R304","R600","R609"],"canonicalOwner":"Multiplayer HUD/chat layout","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-HUD-E2E","T-HUD-UNIT","T-MULTIPLAYER-STABILITY"],"artifactRefs":[]}},
     {"id":"HF-276","sourceOutcomeIds":["CORR-HF-276","P70FFMP-010"],"planningRequirementIds":["R002","R003","R105","R109","R232","R304","R307","R600","R604","R605","R608","R610","R613"],"canonicalOwner":"Multiplayer ADS/frame-pacing authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MULTIPLAYER-STABILITY","T-NATIVE-FRAME-PACING","T-NETWORK","T-AUDIO","T-VIEWMODEL-FRAMING"],"artifactRefs":[]}},
-    {"id":"HF-277","sourceOutcomeIds":["CORR-HF-277","P70FFMP-011"],"planningRequirementIds":["R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R304","R600","R608","R609","R610"],"canonicalOwner":"Multiplayer operator material/readability","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OPERATOR-GATE","T-MULTIPLAYER-STABILITY","T-BROWSER-ADMISSION"],"artifactRefs":[]}}
+    {"id":"HF-277","sourceOutcomeIds":["CORR-HF-277","P70FFMP-011"],"planningRequirementIds":["R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R304","R600","R608","R609","R610"],"canonicalOwner":"Multiplayer operator material/readability","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OPERATOR-GATE","T-MULTIPLAYER-STABILITY","T-BROWSER-ADMISSION"],"artifactRefs":[]}},
+    {"id":"HF-278","sourceOutcomeIds":["CORR-HF-278","P70HITL3-001"],"planningRequirementIds":["R105","R108","R110","R232","R307","R600","R605","R608","R610","R613"],"canonicalOwner":"Viewmodel environment-contact regression","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-VIEWMODEL-FRAMING","T-PRONE-CONTACT-MATRIX","T-WEAPON-PRESENTATION","T-NATIVE-FRAME-PACING"],"artifactRefs":[]}},
+    {"id":"HF-279","sourceOutcomeIds":["CORR-HF-279","P70HITL3-002"],"planningRequirementIds":["R109","R232","R236","R304","R307","R510","R600","R604","R610","R613"],"canonicalOwner":"Flame and napalm combat authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-TIMED-MAP-WEAPONS","T-SUPPORT-DAMAGE","T-PASS69-3-FLAME-FLARE-POOL","T-MULTIPLAYER-STABILITY","T-NETWORK"],"artifactRefs":[]}},
+    {"id":"HF-280","sourceOutcomeIds":["CORR-HF-280","P70HITL3-003"],"planningRequirementIds":["R109","R304","R307","R600","R609","R610","R613"],"canonicalOwner":"Runtime audio-noise ownership","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-AUDIO","T-AUDIO-LONG-RUN","T-NATIVE-FRAME-PACING"],"artifactRefs":[]}},
+    {"id":"HF-281","sourceOutcomeIds":["CORR-HF-281","P70HITL3-004"],"planningRequirementIds":["R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R304","R510","R600","R605","R608","R609","R610","R613"],"canonicalOwner":"Through-wall operator reveal presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OPERATOR-GATE","T-WEAPON-PRESENTATION","T-MULTIPLAYER-STABILITY","T-BROWSER-ADMISSION"],"artifactRefs":[]}},
+    {"id":"HF-282","sourceOutcomeIds":["CORR-HF-282","P70HITL3-005"],"planningRequirementIds":["R003","R105","R108","R109","R232","R304","R307","R511","R600","R608","R610","R613"],"canonicalOwner":"Cold first-combat frame pacing","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-NATIVE-FRAME-PACING","T-PASS69-3-FLAME-FLARE-HITCH","T-FRAME-POLICY","T-WEAPON-PRESENTATION"],"artifactRefs":[]}},
+    {"id":"HF-283","sourceOutcomeIds":["CORR-HF-283","P70HITL3-006"],"planningRequirementIds":["R105","R108","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R600","R608","R609","R613"],"canonicalOwner":"First-person arm anatomy and framing","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-VIEWMODEL-FRAMING","T-WEAPON-ASSET-GATE","T-WEAPON-PRESENTATION"],"artifactRefs":[]}},
+    {"id":"HF-284","sourceOutcomeIds":["CORR-HF-284","P70HITL3-007"],"planningRequirementIds":["R110","R304","R307","R600","R604","R608","R609","R610","R613"],"canonicalOwner":"Gun Range door practicals and room-clock reset authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-GUN-RANGE-TEST-BAY","T-MULTIPLAYER-STABILITY","T-ADDITIONAL-MAPS","T-PROFILE-AUTHORITY-E2E"],"artifactRefs":[]}},
+    {"id":"HF-285","sourceOutcomeIds":["CORR-HF-285","P70HITL3-008"],"planningRequirementIds":["R109","R223","R236","R304","R600","R604","R609","R610","R613"],"canonicalOwner":"Sticky-ordnance urgent HUD feedback","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-HUD-E2E","T-HUD-UNIT","T-TIMED-MAP-WEAPONS","T-MULTIPLAYER-STABILITY"],"artifactRefs":[]}},
+    {"id":"HF-286","sourceOutcomeIds":["CORR-HF-286","P70HITL3-009"],"planningRequirementIds":["R110","R304","R504","R509","R510","R511","R600","R604","R605","R608","R610","R613"],"canonicalOwner":"Carpet Bomber Gun Range collision parity","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-GUN-RANGE-TEST-BAY","T-SUPPORT-RUNTIME","T-SUPPORT-VEHICLE-GATE","T-NATIVE-FRAME-PACING","T-PROFILE-AUTHORITY-E2E"],"artifactRefs":[]}}
   ],
   "desktopUntitledOutcomes": [
     {
@@ -9252,5 +9291,16 @@
     {"id":"P70FFMP-009","sourceLocator":"L11#1","normalizedOutcome":"Move room chat higher on the left above HP and stats without responsive HUD overlap.","feedbackIds":["HF-275"],"planningRequirementIds":["R108","R200","R201","R202","R203","R204","R205","R304","R600","R609"]},
     {"id":"P70FFMP-010","sourceLocator":"L13#1","normalizedOutcome":"Host and guest ADS firefights must remain smooth and must not freeze under online combat load.","feedbackIds":["HF-276"],"planningRequirementIds":["R002","R003","R105","R109","R232","R304","R307","R600","R604","R605","R608","R610","R613"]},
     {"id":"P70FFMP-011","sourceLocator":"L15#1","normalizedOutcome":"Give hosted and guest human operators an orange readability aura at half the accepted purple-bot strength.","feedbackIds":["HF-277"],"planningRequirementIds":["R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R304","R600","R608","R609","R610"]}
+  ],
+  "codexPass70August12Hitl3Outcomes": [
+    {"id":"P70HITL3-001","sourceLocator":"L1#1","normalizedOutcome":"First-person guns must not clip through nearby environment geometry while standing close or prone, and the prior catalog-wide correction must remain regression-proof.","feedbackIds":["HF-278"],"planningRequirementIds":["R105","R108","R110","R232","R307","R600","R605","R608","R610","R613"]},
+    {"id":"P70HITL3-002","sourceLocator":"L3#1","normalizedOutcome":"Carpet Bomber napalm, Flare Gun fire and Flamethrower fire must damage enemies, friendlies and the owner at exactly twice their preceding authoritative flame damage.","feedbackIds":["HF-279"],"planningRequirementIds":["R109","R232","R236","R304","R307","R510","R600","R604","R610","R613"]},
+    {"id":"P70HITL3-003","sourceLocator":"L5#1","normalizedOutcome":"Identify and remove the intermittent unintended background white noise without muting intended gameplay or accessibility-controlled audio.","feedbackIds":["HF-280"],"planningRequirementIds":["R109","R304","R307","R600","R609","R610","R613"]},
+    {"id":"P70HITL3-004","sourceLocator":"L7#1","normalizedOutcome":"Through-wall operator reveals must use the exact normal animated operator model with an additional body-following orange glow instead of a small orange pawn proxy.","feedbackIds":["HF-281"],"planningRequirementIds":["R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R304","R510","R600","R605","R608","R609","R610","R613"]},
+    {"id":"P70HITL3-005","sourceLocator":"L9#1","normalizedOutcome":"Locate and remove the small first-combat freeze by preparing cold combat work before the combat frame and retaining fail-closed frame errors.","feedbackIds":["HF-282"],"planningRequirementIds":["R003","R105","R108","R109","R232","R304","R307","R511","R600","R608","R610","R613"]},
+    {"id":"P70HITL3-006","sourceLocator":"L11#1","normalizedOutcome":"First-person arms must continue below the viewport, align naturally with the human camera and grips, and use thicker strong-muscular proportions without skinny or detached joints.","feedbackIds":["HF-283"],"planningRequirementIds":["R105","R108","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R600","R608","R609","R613"]},
+    {"id":"P70HITL3-007","sourceLocator":"L13#1","normalizedOutcome":"Gun Range killstreak-room blue/orange practicals must not flicker and each authoritative room entry or exit must reset the shared solo/host/guest clock to exactly 120 seconds.","feedbackIds":["HF-284"],"planningRequirementIds":["R110","R304","R307","R600","R604","R608","R609","R610","R613"]},
+    {"id":"P70HITL3-008","sourceLocator":"L15#1","normalizedOutcome":"A Semtex or explosive-crossbow actor stick must add a central red 500 ms HUD flash while retaining the compact current-life status.","feedbackIds":["HF-285"],"planningRequirementIds":["R109","R223","R236","R304","R600","R604","R609","R610","R613"]},
+    {"id":"P70HITL3-009","sourceLocator":"L17#1","normalizedOutcome":"Carpet Bomber interaction with the Gun Range killstreak room must preserve presentation, movement, support-routing and authoritative collision parity.","feedbackIds":["HF-286"],"planningRequirementIds":["R110","R304","R504","R509","R510","R511","R600","R604","R605","R608","R610","R613"]}
   ]
 }
