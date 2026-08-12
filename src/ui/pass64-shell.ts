@@ -389,6 +389,9 @@ function hudMarkup(): string {
       <div class="gunner-status"><small id="gunner-platform">GUNNER</small><strong id="gunner-weapon-mode">30MM AUTOCANNON</strong><span>AI FLIGHT · OWNER CONTROL</span></div>
       <div class="gunner-reticle" data-centre-clear="true" aria-hidden="true"><span class="north"></span><span class="east"></span><span class="south"></span><span class="west"></span><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i></div>
       <div id="gunner-target-confirm" hidden aria-hidden="true"><span>HIT</span><strong>0</strong></div>
+      <div id="gunner-missile-status" hidden aria-hidden="true" aria-live="polite" data-ready="false">
+        <kbd>RMB</kbd><span>MISSILE</span><strong id="gunner-missile-ammo">0 / 6</strong><em id="gunner-missile-cooldown">OFFLINE</em>
+      </div>
       <div class="gunner-instruments" aria-hidden="true">
         <div class="gunner-readout"><small>HULL</small><strong id="gunner-hull">100</strong></div>
         <div class="gunner-readout"><small>AMMO</small><strong id="gunner-ammo">&infin;</strong></div>

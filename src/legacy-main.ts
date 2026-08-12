@@ -172,6 +172,9 @@ import { KillstreakLoadoutController } from './killstreak-loadout';
 import type { KillstreakLoadoutV1, Pass65KillstreakId } from './killstreak-catalog';
 import {
   CARPET_BOMBER_BLAST_RADIUS_M,
+  CHOPPER_MISSILE_BLAST_RADIUS_M,
+  CHOPPER_MISSILE_CAPACITY,
+  CHOPPER_MISSILE_MAX_DAMAGE,
   HostKillstreakRuntime,
   MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP,
   chopperGunnerAuthoritativeRay,
@@ -4366,6 +4369,7 @@ let lastLocalKillstreakControlAdmission: Readonly<{
   yawQ: number | null;
   pitchQ: number | null;
   fire: boolean;
+  missileFire: boolean;
   accepted: boolean;
   reason: string;
 }> | null = null;
@@ -9688,13 +9692,17 @@ function onNetworkMessage(message: GameMessage): void {
     for (const impact of message.impacts) {
       if (impact.phase !== 'impact') continue;
       const point = new THREE.Vector3(...impact.position);
-      if (carpetGroundFireGuestPresentation.admit(message.matchEpoch, impact)) {
+      if (impact.source === 'carpet-bomber' && carpetGroundFireGuestPresentation.admit(message.matchEpoch, impact)) {
         // Presentation only: the guest never creates an authority pool entry,
         // so the replicated host receipt cannot double-apply residual damage.
         flamethrowerStreamPresentation.igniteGround(point, presentedAt);
       }
       audio.explosion(presentedAt);
-      supportExplosionPresentation.emit(point, CARPET_BOMBER_BLAST_RADIUS_M, presentedAt);
+      supportExplosionPresentation.emit(
+        point,
+        impact.source === 'chopper' ? CHOPPER_MISSILE_BLAST_RADIUS_M : CARPET_BOMBER_BLAST_RADIUS_M,
+        presentedAt,
+      );
     }
     killstreakPresentation.presentImpacts(message.impacts, presentedAt);
     return;
@@ -19377,7 +19385,7 @@ function requestKillstreakActivation(
 function requestKillstreakControl(
   entityId: string,
   action: KillstreakControlIntentMessage['action'],
-  control: Pick<KillstreakControlIntentMessage, 'yawQ' | 'pitchQ' | 'thrustQ' | 'strafeQ' | 'verticalQ' | 'fire'> = {},
+  control: Pick<KillstreakControlIntentMessage, 'yawQ' | 'pitchQ' | 'thrustQ' | 'strafeQ' | 'verticalQ' | 'fire' | 'missileFire'> = {},
   now = performance.now(),
 ): boolean {
   killstreakControlSequence += 1;
@@ -19398,6 +19406,7 @@ function requestKillstreakControl(
     lastLocalKillstreakControlAdmission = Object.freeze({
       atMs: now, entityId, action, sequence: message.sequence,
       yawQ: message.yawQ ?? null, pitchQ: message.pitchQ ?? null, fire: message.fire === true,
+      missileFire: message.missileFire === true,
       accepted: true, reason: 'sent-to-host',
     });
     return true;
@@ -19406,12 +19415,34 @@ function requestKillstreakControl(
   lastLocalKillstreakControlAdmission = Object.freeze({
     atMs: now, entityId, action, sequence: message.sequence,
     yawQ: message.yawQ ?? null, pitchQ: message.pitchQ ?? null, fire: message.fire === true,
+    missileFire: message.missileFire === true,
     accepted: result.accepted, reason: result.reason,
   });
   if (!result.accepted) return false;
   refreshLocalKillstreakSnapshot(now);
   broadcastKillstreakState(now);
   return true;
+}
+
+/** Exact RMB action for the locally possessed Chopper Gunner. */
+function requestPossessedChopperMissile(now = performance.now()): boolean {
+  const possession = localKillstreakActorSnapshot()?.possession;
+  if (possession?.kind !== 'chopper-gunner') return false;
+  const entity = killstreakSnapshot.entities.find((candidate) => (
+    candidate.id === possession.entityId
+    && candidate.kind === 'chopper'
+    && candidate.ownerId === player.id
+    && candidate.gunController === 'owner-player'
+    && candidate.expiresInMs > 0
+    && (candidate.missileAmmo ?? 0) > 0
+  ));
+  if (!entity) return false;
+  return requestKillstreakControl(entity.id, 'pilot-control', {
+    yawQ: player.yaw,
+    pitchQ: player.pitch,
+    fire: triggerHeld,
+    missileFire: true,
+  }, now);
 }
 
 function activateOrToggleFieldSupportSlot(slotIndex: number, now = performance.now()): void {
@@ -19690,6 +19721,19 @@ function syncGunnerCockpitHud(
   ));
   element<HTMLElement>('#gunner-platform').textContent = possessionKind === 'chopper-gunner' ? 'CHOPPER GUNNER' : 'PILOTED DRONE';
   element<HTMLElement>('#gunner-weapon-mode').textContent = possessionKind === 'chopper-gunner' ? '30MM AUTOCANNON' : 'REMOTE CANNON';
+  const missileStatus = element<HTMLElement>('#gunner-missile-status');
+  const chopperGunner = possessionKind === 'chopper-gunner';
+  missileStatus.hidden = !chopperGunner;
+  missileStatus.setAttribute('aria-hidden', String(!chopperGunner));
+  if (chopperGunner) {
+    const ammo = Math.max(0, Math.min(CHOPPER_MISSILE_CAPACITY, entity.missileAmmo ?? 0));
+    const cooldownMs = Math.max(0, entity.missileCooldownMs ?? 0);
+    element<HTMLElement>('#gunner-missile-ammo').textContent = `${ammo} / ${CHOPPER_MISSILE_CAPACITY}`;
+    element<HTMLElement>('#gunner-missile-cooldown').textContent = ammo <= 0
+      ? 'EMPTY'
+      : cooldownMs > 0 ? `${(cooldownMs / 1_000).toFixed(1)}S` : 'READY';
+    missileStatus.dataset.ready = String(ammo > 0 && cooldownMs <= 0);
+  }
   if (now >= gunnerTargetConfirmUntil) {
     element<HTMLElement>('#gunner-target-confirm').hidden = true;
     hud.dataset.hitConfirm = 'false';
@@ -19708,6 +19752,12 @@ function hideGunnerCockpitHud(): void {
   targetConfirm.style.removeProperty('top');
   delete targetConfirm.dataset.targetId;
   element<HTMLElement>('#chopper-thermal').hidden = true;
+  const missileStatus = element<HTMLElement>('#gunner-missile-status');
+  missileStatus.hidden = true;
+  missileStatus.setAttribute('aria-hidden', 'true');
+  missileStatus.dataset.ready = 'false';
+  element<HTMLElement>('#gunner-missile-ammo').textContent = `0 / ${CHOPPER_MISSILE_CAPACITY}`;
+  element<HTMLElement>('#gunner-missile-cooldown').textContent = 'OFFLINE';
   gunnerTargetConfirmUntil = 0;
   nextLocalSupportGunReportAt = 0;
 }
@@ -19897,7 +19947,9 @@ function updatePass65KillstreakRuntime(now: number): void {
         audio.explosion(now);
         supportExplosionPresentation.emit(point, CARPET_BOMBER_BLAST_RADIUS_M, now);
       } else {
-        applyInteractiveWorldExplosion(point, 4.5, 240);
+        applyInteractiveWorldExplosion(point, CHOPPER_MISSILE_BLAST_RADIUS_M, CHOPPER_MISSILE_MAX_DAMAGE);
+        audio.explosion(now);
+        supportExplosionPresentation.emit(point, CHOPPER_MISSILE_BLAST_RADIUS_M, now);
       }
     }
     applyInteractiveWorldExplosions(carpetWorldImpacts);
@@ -23432,6 +23484,13 @@ canvas.addEventListener('mousedown', (event) => {
   if (pointSupportTargeting && !tacticalMapOpen && event.button === 2) {
     event.preventDefault();
     cancelSupportTargeting(true);
+    return;
+  }
+  if (event.button === 2 && localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner') {
+    event.preventDefault();
+    mouseAdsHeld = false;
+    adsHeld = admittedAdsHeld(debugAdsOverride ?? false);
+    requestPossessedChopperMissile(performance.now());
     return;
   }
   if (event.button === 2) {

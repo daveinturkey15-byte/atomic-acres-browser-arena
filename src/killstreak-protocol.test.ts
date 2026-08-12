@@ -41,6 +41,16 @@ describe('killstreak protocol', () => {
       entityId: 'ks-7-pilot-drone-1', action: 'toggle-piloted-drone', nonce: 3,
     })).toBe(true);
     expect(isKillstreakProtocolMessage({
+      type: 'killstreak-control-intent', by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 3,
+      entityId: 'ks-7-chopper-1', action: 'pilot-control', yawQ: 0, pitchQ: -0.8,
+      fire: false, missileFire: true, nonce: 4,
+    })).toBe(true);
+    expect(isKillstreakProtocolMessage({
+      type: 'killstreak-control-intent', by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 3,
+      entityId: 'ks-7-chopper-1', action: 'pilot-control', yawQ: 0, pitchQ: -0.8,
+      missileFire: true, missileTarget: [20, 0, 20], nonce: 4,
+    })).toBe(false);
+    expect(isKillstreakProtocolMessage({
       type: 'killstreak-control-intent', by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2,
       entityId: 'ks-7-chopper-1', action: 'pilot-control', yawQ: 0, pitchQ: 0, thrustQ: 0, verticalQ: 0,
       position: [99, 99, 99], flightAuthority: 'player', nonce: 3,
@@ -92,6 +102,18 @@ describe('killstreak protocol', () => {
     expect(isKillstreakProtocolMessage({ ...message, impacts: [{ ...message.impacts[0], phase: 'drop', atMs: 2_001 }] })).toBe(false);
     expect(isKillstreakProtocolMessage({ ...message, impacts: [{ ...message.impacts[1], phase: 'impact', atMs: 1_999 }] })).toBe(false);
     expect(isKillstreakProtocolMessage({ ...message, impacts: [{ ...message.impacts[0], ordinal: 20 }] })).toBe(false);
+
+    const chopperMissile = {
+      ...message,
+      impacts: [
+        { activationId: 'ks-activation-7-2', source: 'chopper' as const, ordinal: 5, phase: 'drop' as const, position: [3, 0, 4] as const, impactAtMs: 2_780, atMs: 2_000 },
+        { activationId: 'ks-activation-7-2', source: 'chopper' as const, ordinal: 5, phase: 'impact' as const, position: [3, 0, 4] as const, impactAtMs: 2_780, atMs: 2_780 },
+      ],
+    };
+    expect(isKillstreakProtocolMessage(chopperMissile)).toBe(true);
+    expect(isKillstreakProtocolMessage({ ...chopperMissile, impacts: [{ ...chopperMissile.impacts[0], ordinal: 6 }] })).toBe(false);
+    expect(isKillstreakProtocolMessage({ ...chopperMissile, impacts: [{ ...chopperMissile.impacts[0], atMs: 2_001 }] })).toBe(false);
+    expect(isKillstreakProtocolMessage({ ...chopperMissile, impacts: [{ ...chopperMissile.impacts[1], atMs: 2_781 }] })).toBe(false);
   });
 
   it('requires finite authoritative ray endpoints and tracer origins on damage results', () => {
@@ -194,6 +216,33 @@ describe('killstreak protocol', () => {
         }],
       },
     })).toBe(false);
+  });
+
+  it('strictly validates replicated Chopper missile ammo and cooldown state', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout);
+    for (let index = 0; index < 8; index += 1) runtime.recordEligibleElimination('owner', 'weapon');
+    expect(runtime.activate({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, slot: 4,
+      activationId: 'activation-chopper-state', expectedId: 'chopper', anchor: [0, 0, 0],
+    }, 1_000, {
+      bounds: { minX: -40, maxX: 40, minZ: -40, maxZ: 40, floorY: 0, ceilingY: 32 },
+      targets: [],
+    }).accepted).toBe(true);
+    const snapshot = runtime.snapshotFor('owner', 1_000);
+    const message = { type: 'killstreak-state' as const, by: 'host', forPlayerId: 'owner', snapshot, nonce: 81 };
+    expect(snapshot.entities[0]).toMatchObject({ missileAmmo: 6, missileCooldownMs: 0 });
+    expect(isKillstreakProtocolMessage(message)).toBe(true);
+    const chopper = snapshot.entities[0]!;
+    const withChopper = (replacement: unknown) => ({
+      ...message,
+      snapshot: { ...snapshot, entities: [replacement] },
+    });
+    expect(isKillstreakProtocolMessage(withChopper({ ...chopper, missileAmmo: 7 }))).toBe(false);
+    expect(isKillstreakProtocolMessage(withChopper({ ...chopper, missileCooldownMs: 1_001 }))).toBe(false);
+    expect(isKillstreakProtocolMessage(withChopper({ ...chopper, missileAmmo: null }))).toBe(false);
+    const missingAmmo = Object.fromEntries(Object.entries(chopper).filter(([key]) => key !== 'missileAmmo'));
+    expect(isKillstreakProtocolMessage(withChopper(missingAmmo))).toBe(false);
   });
 
   it('admits canonical counted reward charges and rejects forged, duplicate, or mismatched banks', () => {

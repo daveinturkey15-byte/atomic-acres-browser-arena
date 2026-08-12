@@ -6,6 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   CARPET_BOMBER_IMPACT_FLASH_BASE_RADIUS_M,
   CARPET_BOMBER_IMPACT_FLASH_MAXIMUM_SCALE,
+  CHOPPER_MISSILE_FLIGHT_MS,
   type DroneSensorContact,
   type KillstreakEntitySnapshot,
   type KillstreakImpactEvent,
@@ -27,6 +28,7 @@ const MAX_EMBER_PARTICLES = MAX_BOMB_SHELLS * EMBERS_PER_CARPET_IMPACT;
 const BOMB_SHELL_DROP_DURATION_MS = 420;
 export const CARPET_BOMB_SHELL_PRESENTATION_ALTITUDE_M = 20;
 export const CARPET_BOMB_SHELL_PRESENTATION_RADIUS_M = 0.12;
+export const CHOPPER_MISSILE_PRESENTATION_ALTITUDE_M = 14;
 const EMBER_GRAVITY_MPS2 = 11.25;
 const MAX_SENSOR_CONTACTS = 16;
 const MAX_PLACEMENT_MARKERS = 8;
@@ -3147,7 +3149,8 @@ export class KillstreakPresentation {
   presentImpacts(impacts: readonly KillstreakImpactEvent[], nowMs: number): void {
     for (const impact of impacts) {
       const isCarpet = impact.source === 'carpet-bomber';
-      if (isCarpet && impact.phase === 'drop') {
+      const isChopperMissile = impact.source === 'chopper';
+      if ((isCarpet || isChopperMissile) && impact.phase === 'drop') {
         const shell = firstInactive(this.bombShellPool);
         if (!shell) continue;
         shell.active = true;
@@ -3155,12 +3158,21 @@ export class KillstreakPresentation {
         const authoredDropDurationMs = THREE.MathUtils.clamp(
           impact.impactAtMs - impact.atMs,
           1,
-          BOMB_SHELL_DROP_DURATION_MS,
+          isChopperMissile ? CHOPPER_MISSILE_FLIGHT_MS : BOMB_SHELL_DROP_DURATION_MS,
         );
         shell.impactAtMs = nowMs + authoredDropDurationMs;
-        shell.startY = impact.position[1] + CARPET_BOMB_SHELL_PRESENTATION_ALTITUDE_M;
+        shell.startY = impact.position[1] + (isChopperMissile
+          ? CHOPPER_MISSILE_PRESENTATION_ALTITUDE_M
+          : CARPET_BOMB_SHELL_PRESENTATION_ALTITUDE_M);
         shell.impactPosition.set(impact.position[0], impact.position[1] + 0.35, impact.position[2]);
-        shell.root.name = 'pass65-carpet-bomb-shell';
+        shell.root.name = isChopperMissile ? 'pass70-chopper-missile-shell' : 'pass65-carpet-bomb-shell';
+        shell.root.rotation.x = isChopperMissile ? 0 : Math.PI / 2;
+        shell.root.scale.set(
+          isChopperMissile ? 1.6 : 1,
+          isChopperMissile ? 3.5 : 1,
+          isChopperMissile ? 1.6 : 1,
+        );
+        shell.root.material.color.setHex(isChopperMissile ? 0xb09a58 : 0x2a2a2a);
         shell.root.position.set(impact.position[0], shell.startY, impact.position[2]);
         shell.root.visible = true;
         continue;
@@ -3173,7 +3185,7 @@ export class KillstreakPresentation {
       flash.expiresAtMs = nowMs + (isCarpet ? 600 : 420);
       flash.baseRadius = isCarpet ? CARPET_BOMBER_IMPACT_FLASH_BASE_RADIUS_M : 0.55;
       flash.maximumOpacity = isCarpet ? 0.9 : 0.8;
-      flash.root.name = isCarpet ? 'pass65-carpet-impact-flash-large' : 'pass65-carpet-impact-flash';
+      flash.root.name = isCarpet ? 'pass65-carpet-impact-flash-large' : 'pass70-chopper-missile-impact-flash';
       flash.root.position.set(impact.position[0], impact.position[1] + 0.35, impact.position[2]);
       flash.root.scale.setScalar(flash.baseRadius);
       flash.root.material.color.setHex(isCarpet ? 0xff6a1a : 0xffb14c);

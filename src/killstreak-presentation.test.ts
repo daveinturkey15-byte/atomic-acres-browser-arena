@@ -413,6 +413,8 @@ const snapshot = (
     reserveClips: null,
     gunProfileId: index <= 2 ? null : DRONE_SWARM_GUN_PROFILE_ID,
     gunController: index === 0 ? 'ai' : null,
+    missileAmmo: index === 0 ? 6 : null,
+    missileCooldownMs: index === 0 ? 0 : null,
     captureActorId: null,
     captureProgress: null,
     revealedReward: null,

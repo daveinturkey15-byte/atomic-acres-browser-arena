@@ -27,6 +27,7 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     for (const id of [
       'gunner-hull', 'gunner-ammo', 'gunner-altitude', 'gunner-speed', 'gunner-time', 'gunner-damage',
       'gunner-target-confirm', 'gunner-platform', 'gunner-weapon-mode',
+      'gunner-missile-status', 'gunner-missile-ammo', 'gunner-missile-cooldown',
     ]) expect(shell).toContain(`id="${id}"`);
     expect(shell).toContain('data-centre-clear="true"');
     expect(shell).not.toContain('class="gunner-reticle"><i></i><b></b>');
@@ -36,6 +37,11 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(hudCss).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))');
     expect(hudCss).toContain('env(safe-area-inset-bottom)');
     expect(hudCss).toContain('top: max(54px, calc(env(safe-area-inset-top) + 52px));');
+    expect(hudCss).toContain('#gunner-cockpit-hud[data-support-kind="chopper-gunner"]::before');
+    expect(hudCss).toContain('height: clamp(190px, 38vh, 410px);');
+    expect(hudCss).toContain('#gunner-missile-status[data-ready="true"] em');
+    expect(legacy).toContain("event.button === 2 && localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner'");
+    expect(legacy).toContain('missileFire: true');
   });
 
   it('uses authority geometry and target projection for shot and damage feedback', () => {
@@ -63,6 +69,8 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(hide).toContain("hud.dataset.supportKind = 'none'");
     expect(hide).toContain("hud.dataset.hitConfirm = 'false'");
     expect(hide).toContain("element<HTMLElement>('#chopper-thermal').hidden = true");
+    expect(hide).toContain("element<HTMLElement>('#gunner-missile-status')");
+    expect(hide).toContain("missileStatus.dataset.ready = 'false'");
     expect(hide).toContain('nextLocalSupportGunReportAt = 0');
     expect(legacy).toContain('if (!possession || !player.alive)');
     expect(legacy).toContain('if (camera.near !== 0.08)');
