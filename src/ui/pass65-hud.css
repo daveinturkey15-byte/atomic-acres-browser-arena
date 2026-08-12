@@ -36,7 +36,7 @@
     position: absolute;
     z-index: 86;
     left: 50%;
-    top: max(38%, calc(env(safe-area-inset-top) + 96px));
+    top: 50%;
     display: grid;
     min-width: min(360px, calc(100vw - max(32px, env(safe-area-inset-left)) - max(32px, env(safe-area-inset-right))));
     padding: 11px 24px 13px;
@@ -48,15 +48,24 @@
     text-align: center;
     transform: translate(-50%, -50%);
     pointer-events: none;
+    animation: sticky-warning-flash var(--sticky-warning-duration, 500ms) ease-out both;
   }
 
   #sticky-warning[hidden] { display: none; }
   #sticky-warning small { font: 850 9px/1 var(--ui-copy); letter-spacing: 0.24em; color: #ffaaa5; }
   #sticky-warning strong { margin-top: 4px; font: 950 clamp(42px, 6.5vw, 74px)/0.8 var(--ui-display); letter-spacing: 0.08em; color: #ff443c; }
 
+  @keyframes sticky-warning-flash {
+    0% { opacity: 0; filter: brightness(1.9); }
+    10% { opacity: 1; filter: brightness(1.35); }
+    32% { opacity: 1; filter: brightness(1); }
+    48% { opacity: 0.72; filter: brightness(1.4); }
+    64%, 100% { opacity: 1; filter: brightness(1); }
+  }
+
   @media (max-width: 760px), (max-height: 520px) {
     #sticky-warning {
-      top: max(34%, calc(env(safe-area-inset-top) + 72px));
+      top: 50%;
       min-width: min(280px, calc(100vw - max(20px, env(safe-area-inset-left)) - max(20px, env(safe-area-inset-right))));
       padding: 8px 16px 10px;
     }
@@ -64,6 +73,7 @@
   }
 
   html[data-reduced-sensory='true'] #sticky-warning {
+    animation: none;
     box-shadow: none;
     background: rgba(43, 1, 1, 0.96);
   }

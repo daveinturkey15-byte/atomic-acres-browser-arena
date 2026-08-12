@@ -62,6 +62,11 @@ export type MajorDebrisBodyDefinition = Readonly<{
   sleeping: boolean;
 }>;
 
+export type MajorDebrisBodyPrewarmDefinition = Readonly<{
+  id: string;
+  halfExtents: Point3;
+}>;
+
 export type MajorDebrisBodySnapshot = Readonly<{
   id: string;
   position: Point3;
@@ -115,10 +120,12 @@ export class CharacterPhysics {
   private readonly collider: RapierTypes.Collider;
   private readonly controller: RapierTypes.KinematicCharacterController;
   private readonly dynamicColliders = new Map<string, RapierTypes.Collider>();
-  private readonly majorDebrisBodies = new Map<string, Readonly<{
-    body: RapierTypes.RigidBody;
-    halfExtents: Point3;
-  }>>();
+  private readonly majorDebrisBodies = new Map<string, {
+    readonly body: RapierTypes.RigidBody;
+    readonly halfExtents: Point3;
+    readonly prewarmed: boolean;
+    active: boolean;
+  }>();
   private stance: Stance = 'stand';
 
   private constructor(
@@ -313,6 +320,71 @@ export class CharacterPhysics {
     return this.dynamicColliders.size;
   }
 
+  /**
+   * Owns exact disabled rigid-body/collider pairs before gameplay begins. A
+   * later sync with the same identity and bounds only writes pose/velocity and
+   * enables the retained pair; it does not enter Rapier's allocation path on
+   * the first live fracture. The batch commits transactionally.
+   */
+  prewarmMajorDebrisBodies(entries: readonly MajorDebrisBodyPrewarmDefinition[]): void {
+    const ids = entries.map((entry) => entry.id);
+    if (entries.length > MAX_MAJOR_DEBRIS_BODIES
+      || new Set(ids).size !== ids.length
+      || ids.some((id) => !/^[a-z0-9][a-z0-9:-]{0,127}$/.test(id))
+      || entries.some((entry) => ![
+        entry.halfExtents.x, entry.halfExtents.y, entry.halfExtents.z,
+      ].every(Number.isFinite)
+        || entry.halfExtents.x <= 0 || entry.halfExtents.y <= 0 || entry.halfExtents.z <= 0)) {
+      throw new TypeError('Major debris prewarm exceeds cap or uses invalid identities/bounds');
+    }
+    for (const entry of entries) {
+      const existing = this.majorDebrisBodies.get(entry.id);
+      if (!existing) continue;
+      if (!existing.prewarmed
+        || Math.abs(existing.halfExtents.x - entry.halfExtents.x) > 1e-6
+        || Math.abs(existing.halfExtents.y - entry.halfExtents.y) > 1e-6
+        || Math.abs(existing.halfExtents.z - entry.halfExtents.z) > 1e-6) {
+        throw new TypeError(`Major debris prewarm identity ${entry.id} is already owned by incompatible physics`);
+      }
+    }
+    const created: Array<{ id: string; body: RapierTypes.RigidBody }> = [];
+    try {
+      for (const [index, entry] of entries.entries()) {
+        if (this.majorDebrisBodies.has(entry.id)) continue;
+        const body = this.world.createRigidBody(
+          this.makeDynamicBodyDescriptor()
+            .setTranslation(0, -64 - index * 2, 0)
+            .setLinearDamping(1.35)
+            .setAngularDamping(1.8)
+            .setCanSleep(true)
+            .setSleeping(true)
+            .setSoftCcdPrediction(0.4)
+            .setEnabled(false),
+        );
+        created.push({ id: entry.id, body });
+        this.world.createCollider(
+          this.makeCuboidDescriptor(entry.halfExtents.x, entry.halfExtents.y, entry.halfExtents.z)
+            .setDensity(42)
+            .setFriction(0.78)
+            .setRestitution(0.08),
+          body,
+        );
+        this.majorDebrisBodies.set(entry.id, {
+          body,
+          halfExtents: Object.freeze({ ...entry.halfExtents }),
+          prewarmed: true,
+          active: false,
+        });
+      }
+    } catch (error) {
+      for (const entry of created.reverse()) {
+        this.majorDebrisBodies.delete(entry.id);
+        try { this.world.removeRigidBody(entry.body); } catch { /* partially-created Rapier body */ }
+      }
+      throw error;
+    }
+  }
+
   /** Creates/removes bounded host-simulated major debris without arbitrary fracture bodies. */
   syncMajorDebrisBodies(entries: readonly MajorDebrisBodyDefinition[], authoritativeResync = false): void {
     const ids = entries.map((entry) => entry.id);
@@ -324,6 +396,13 @@ export class CharacterPhysics {
     const retained = new Set(ids);
     for (const [id, entry] of this.majorDebrisBodies) {
       if (retained.has(id)) continue;
+      if (entry.prewarmed) {
+        if (entry.active) {
+          entry.body.setEnabled(false);
+          entry.active = false;
+        }
+        continue;
+      }
       this.world.removeRigidBody(entry.body);
       this.majorDebrisBodies.delete(id);
     }
@@ -338,13 +417,20 @@ export class CharacterPhysics {
       }
       const existing = this.majorDebrisBodies.get(entry.id);
       if (existing) {
-        if (authoritativeResync) {
+        if (Math.abs(existing.halfExtents.x - entry.halfExtents.x) > 1e-6
+          || Math.abs(existing.halfExtents.y - entry.halfExtents.y) > 1e-6
+          || Math.abs(existing.halfExtents.z - entry.halfExtents.z) > 1e-6) {
+          throw new TypeError(`Major debris body ${entry.id} changed its immutable bounds`);
+        }
+        if (!existing.active || authoritativeResync) {
           existing.body.setTranslation(entry.position, !entry.sleeping);
           existing.body.setRotation(entry.rotation, !entry.sleeping);
           existing.body.setLinvel(entry.linearVelocity, !entry.sleeping);
           existing.body.setAngvel(entry.angularVelocity, !entry.sleeping);
+          if (!existing.active) existing.body.setEnabled(true);
           if (entry.sleeping) existing.body.sleep();
           else existing.body.wakeUp();
+          existing.active = true;
         }
         continue;
       }
@@ -367,13 +453,18 @@ export class CharacterPhysics {
           .setRestitution(0.08),
         body,
       );
-      this.majorDebrisBodies.set(entry.id, Object.freeze({ body, halfExtents: Object.freeze({ ...entry.halfExtents }) }));
+      this.majorDebrisBodies.set(entry.id, {
+        body,
+        halfExtents: Object.freeze({ ...entry.halfExtents }),
+        prewarmed: false,
+        active: true,
+      });
     }
   }
 
   applyMajorDebrisImpulse(id: string, impulse: Point3, point?: Point3): boolean {
     const entry = this.majorDebrisBodies.get(id);
-    if (!entry || ![impulse.x, impulse.y, impulse.z].every(Number.isFinite)) return false;
+    if (!entry?.active || ![impulse.x, impulse.y, impulse.z].every(Number.isFinite)) return false;
     const magnitude = Math.hypot(impulse.x, impulse.y, impulse.z);
     if (magnitude <= 0 || magnitude > 80) return false;
     if (point && [point.x, point.y, point.z].every(Number.isFinite)) entry.body.applyImpulseAtPoint(impulse, point, true);
@@ -383,6 +474,7 @@ export class CharacterPhysics {
 
   majorDebrisSnapshots(): readonly MajorDebrisBodySnapshot[] {
     return Object.freeze([...this.majorDebrisBodies.entries()]
+      .filter(([, entry]) => entry.active)
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([id, entry]) => {
         const position = entry.body.translation();
@@ -405,7 +497,15 @@ export class CharacterPhysics {
   }
 
   majorDebrisBodyCount(): number {
-    return this.majorDebrisBodies.size;
+    let active = 0;
+    for (const entry of this.majorDebrisBodies.values()) if (entry.active) active += 1;
+    return active;
+  }
+
+  prewarmedMajorDebrisBodyCount(): number {
+    let prewarmed = 0;
+    for (const entry of this.majorDebrisBodies.values()) if (entry.prewarmed) prewarmed += 1;
+    return prewarmed;
   }
 
   move(desiredDelta: Point3, dt: number): CharacterMoveResult {

@@ -185,6 +185,41 @@ describe('CharacterPhysics', () => {
     expect(() => active!.syncDynamicColliders([{ id: '../unsafe', bounds: boundsA }])).toThrow(/unique canonical/);
   });
 
+  it('pre-owns disabled glass debris physics and activates it without allocating on first breach', async () => {
+    active = await CharacterPhysics.create([], bounds);
+    const halfExtents = { x: 0.62, y: 0.48, z: 0.03 } as const;
+    active.prewarmMajorDebrisBodies([
+      { id: 'window-debris:atomic-window-a', halfExtents },
+      { id: 'window-debris:atomic-window-b', halfExtents },
+    ]);
+    expect(active.prewarmedMajorDebrisBodyCount()).toBe(2);
+    expect(active.majorDebrisBodyCount()).toBe(0);
+    expect(active.majorDebrisSnapshots()).toEqual([]);
+    expect(active.applyMajorDebrisImpulse('window-debris:atomic-window-a', { x: 1, y: 0, z: 0 })).toBe(false);
+    const retainedRigidBodyCount = active.world.bodies.len();
+    const firstBreach = {
+      id: 'window-debris:atomic-window-a',
+      position: { x: 1, y: 1.4, z: -2 },
+      rotation: { x: 0, y: 0, z: 0, w: 1 },
+      halfExtents,
+      linearVelocity: { x: 1.4, y: -1.1, z: 0.2 },
+      angularVelocity: { x: 0.3, y: 0.1, z: -0.2 },
+      sleeping: false,
+    } as const;
+    active.syncMajorDebrisBodies([firstBreach]);
+    expect(active.world.bodies.len()).toBe(retainedRigidBodyCount);
+    expect(active.majorDebrisBodyCount()).toBe(1);
+    const activated = active.majorDebrisSnapshots()[0]!;
+    expect(activated).toMatchObject({ id: firstBreach.id, sleeping: false });
+    expect(activated.position.x).toBeCloseTo(firstBreach.position.x, 5);
+    expect(activated.position.y).toBeCloseTo(firstBreach.position.y, 5);
+    expect(activated.position.z).toBeCloseTo(firstBreach.position.z, 5);
+    active.syncMajorDebrisBodies([]);
+    expect(active.world.bodies.len()).toBe(retainedRigidBodyCount);
+    expect(active.majorDebrisBodyCount()).toBe(0);
+    expect(active.prewarmedMajorDebrisBodyCount()).toBe(2);
+  });
+
   it('bounds, wakes, impulses, snapshots, and removes host-simulated major debris', async () => {
     active = await CharacterPhysics.create([], bounds);
     active.teleportEye({ x: -5, y: 1.7, z: -5 });

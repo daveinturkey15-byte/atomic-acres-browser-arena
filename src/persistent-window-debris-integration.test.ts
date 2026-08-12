@@ -10,6 +10,7 @@ describe('persistent physical house-window debris integration', () => {
     expect(source).toContain('Math.min(capacity, SHARED_MAJOR_DEBRIS_BUDGET.window)');
     expect(source).toContain("canAdmitMajorDebris(counts, 'window')");
     expect(source).toContain('characterPhysics.syncMajorDebrisBodies(activeMajorDebrisPhysicsBodies(), authoritativeResync)');
+    expect(source).toContain('characterPhysics.prewarmMajorDebrisBodies(arena.breakableWindows.map((window) => {');
     expect(source).toContain('spawnPersistentWindowDebris(window, normal)');
   });
 

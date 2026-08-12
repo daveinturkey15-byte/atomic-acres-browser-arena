@@ -37,10 +37,9 @@ describe('Pass 65 explosive crossbolt runtime integration', () => {
     expect(update).not.toContain('bolt.velocity.clone()');
     expect(update).toContain('const targetHitId = targetHit.id;');
     expect(update).toContain('const targetHitLifeId = targetHit.lifeId;');
-    expect(update).toContain('const targetHitKind = targetHit.kind;');
     expect(update).toContain('bolt.targetId = targetHitId;');
     expect(update).toContain('bolt.targetLifeId = targetHitLifeId;');
-    expect(update).toContain("if (targetHitKind === 'player') {");
+    expect(update).toContain('if (targetHitId === player.id) {');
     expect(update).toContain("'explosive-crossbow', targetHitId, targetHitLifeId, bolt.actionNonce, now,");
     expect(update).toContain("addFeed('STUCK', 'coral');");
     expect(update).toContain("else if (bolt.ownerId === player.id) addFeed('STUCK', 'gold');");
@@ -48,7 +47,7 @@ describe('Pass 65 explosive crossbolt runtime integration', () => {
     expect(update).toContain('let targetHitIndex = -1;');
     expect(update).not.toContain('let targetHit:');
     const attachmentWrite = update.indexOf('recordReceiverStickyAttachment({');
-    expect(attachmentWrite).toBeGreaterThan(update.indexOf('const targetHitKind = targetHit.kind;'));
+    expect(attachmentWrite).toBeGreaterThan(update.indexOf('const targetHitLifeId = targetHit.lifeId;'));
     expect(update.slice(attachmentWrite)).not.toContain('targetHit.');
 
     const segmentStart = source.indexOf('function segmentSphereFraction(');

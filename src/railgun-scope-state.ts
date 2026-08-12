@@ -9,6 +9,8 @@ export const RAILGUN_SCOPE_FOV_TOLERANCE_DEGREES = 0.35;
 export type RailgunScopePresentationState = Readonly<{
   contract: typeof RAILGUN_SCOPE_PRESENTATION_CONTRACT;
   active: boolean;
+  revealActive: boolean;
+  revealActivation: 'admitted-local-ads-hold';
   magnification: typeof RAILGUN_SCOPE_MAGNIFICATION;
   baseFov: number;
   targetFov: number;
@@ -45,15 +47,22 @@ export function deriveRailgunScopePresentation(
   const cameraFov = finite(input.cameraFov, baseFov);
   const adsSettled = finite(input.adsProgress, 0) >= RAILGUN_SCOPE_SETTLED_ADS_PROGRESS;
   const fovSettled = Math.abs(cameraFov - targetFov) < RAILGUN_SCOPE_FOV_TOLERANCE_DEGREES;
-  const active = input.alive
+  // `adsHeld` is the runtime's already-admitted local RMB/pad/touch state.
+  // Through-wall presentation must not depend on camera easing or viewmodel
+  // settle: those are optic-only presentation details and previously made a
+  // valid Railgun ADS hold produce no reveal at all.
+  const revealActive = input.alive
     && input.localHolder
     && input.weapon === 'railgun'
-    && input.adsHeld
+    && input.adsHeld;
+  const active = revealActive
     && adsSettled
     && fovSettled;
   return Object.freeze({
     contract: RAILGUN_SCOPE_PRESENTATION_CONTRACT,
     active,
+    revealActive,
+    revealActivation: 'admitted-local-ads-hold',
     magnification: RAILGUN_SCOPE_MAGNIFICATION,
     baseFov,
     targetFov,

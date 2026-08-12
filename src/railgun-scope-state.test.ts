@@ -23,15 +23,17 @@ const scope = (overrides: Partial<Parameters<typeof deriveRailgunScopePresentati
 
 describe('railgun clear ADS scope lifecycle', () => {
   it('requires settled ADS and genuine 2.5x angular magnification', () => {
-    expect(scope({ adsHeld: false }).active).toBe(false);
-    expect(scope({ adsProgress: 0.899 }).active).toBe(false);
-    expect(scope({ cameraFov: targetFov + 0.36 }).active).toBe(false);
+    expect(scope({ adsHeld: false })).toMatchObject({ active: false, revealActive: false });
+    expect(scope({ adsProgress: 0.899 })).toMatchObject({ active: false, revealActive: true });
+    expect(scope({ cameraFov: targetFov + 0.36 })).toMatchObject({ active: false, revealActive: true });
     const settled = scope();
     const angularRatio = Math.tan(baseFov * Math.PI / 360) / Math.tan(settled.targetFov * Math.PI / 360);
     expect(angularRatio).toBeCloseTo(RAILGUN_SCOPE_MAGNIFICATION, 8);
     expect(settled).toMatchObject({
       contract: RAILGUN_SCOPE_PRESENTATION_CONTRACT,
       active: true,
+      revealActive: true,
+      revealActivation: 'admitted-local-ads-hold',
       fovSettled: true,
       adsSettled: true,
       lens: 'clear-open-aperture',
@@ -45,5 +47,18 @@ describe('railgun clear ADS scope lifecycle', () => {
     expect(scope({ weapon: 'pistol' }).active).toBe(false);
     expect(scope({ localHolder: false }).active).toBe(false);
     expect(scope({ alive: false }).active).toBe(false);
+  });
+
+  it('starts authorized wall reveal on admitted ADS without waiting for optic/FOV settle', () => {
+    expect(scope({ adsProgress: 0, cameraFov: baseFov })).toMatchObject({
+      active: false,
+      revealActive: true,
+      fovSettled: false,
+      adsSettled: false,
+      viewmodelSuppressed: false,
+    });
+    expect(scope({ weapon: 'pistol', adsProgress: 1, cameraFov: targetFov }).revealActive).toBe(false);
+    expect(scope({ localHolder: false }).revealActive).toBe(false);
+    expect(scope({ alive: false }).revealActive).toBe(false);
   });
 });

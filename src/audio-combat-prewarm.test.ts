@@ -190,6 +190,53 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
     });
   });
 
+  it('prewarms the exact glass impact graph once at zero gain without retaining broadband loops', () => {
+    vi.stubGlobal('AudioContext', FakeAudioContext);
+    const audio = new ArenaAudio();
+    audio.unlock();
+    const context = FakeAudioContext.instances[0]!;
+    const before = {
+      oscillators: context.oscillators.length,
+      bufferSources: context.bufferSources.length,
+      gains: context.gains.length,
+      filters: context.filters.length,
+    };
+    expect(audio.prepareGlassImpact()).toBe(true);
+    expect({
+      oscillators: context.oscillators.length,
+      bufferSources: context.bufferSources.length,
+      gains: context.gains.length,
+      filters: context.filters.length,
+    }).toEqual({
+      oscillators: before.oscillators + 1,
+      bufferSources: before.bufferSources + 1,
+      gains: before.gains + 2,
+      filters: before.filters + 1,
+    });
+    expect(context.gains.slice(-2).every((gain) => gain.gain.value === 0)).toBe(true);
+    expect(context.bufferSources.at(-1)).toMatchObject({ loop: false, startCount: 1 });
+    expect(audio.telemetry().glassImpactPrewarm).toEqual({
+      prepared: true,
+      runs: 1,
+      retainedBroadbandLoops: 0,
+    });
+    const afterFirst = {
+      oscillators: context.oscillators.length,
+      bufferSources: context.bufferSources.length,
+      gains: context.gains.length,
+      filters: context.filters.length,
+    };
+    expect(audio.prepareGlassImpact()).toBe(true);
+    expect({
+      oscillators: context.oscillators.length,
+      bufferSources: context.bufferSources.length,
+      gains: context.gains.length,
+      filters: context.filters.length,
+    }).toEqual(afterFirst);
+    audio.dispose();
+    expect(audio.telemetry().glassImpactPrewarm).toMatchObject({ prepared: false, runs: 1 });
+  });
+
   it.each([1, 2, 3])('fully tears down partial graphs when combat source %i cannot register', (failedSource) => {
     vi.stubGlobal('AudioContext', FakeAudioContext);
     const audio = new ArenaAudio();

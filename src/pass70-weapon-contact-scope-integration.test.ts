@@ -27,8 +27,8 @@ describe('Pass 70 contact and Railgun scope integration contracts', () => {
     const dmr = read('./dmr-thermal-presentation.ts');
     const railgun = read('./railgun-presentation.ts');
     expect(runtime).toContain("const chopperThermal = localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner';");
-    expect(runtime).toContain('if (!dmrThermalActive && !railgunScopeActive && !chopperThermal)');
-    expect(runtime).toContain('railgunPresentation.syncExactOperatorReveal(railgunScopeActive, thermalGhostPresentation.telemetry())');
+    expect(runtime).toContain('if (!dmrThermalActive && !railgunRevealActive && !chopperThermal)');
+    expect(runtime).toContain('railgunPresentation.syncExactOperatorReveal(railgunRevealActive, thermalGhostPresentation.telemetry())');
     expect(ghost).toContain("'exact-animated-operator-plus-orange-halo-v1'");
     expect(ghost).toContain('model.skeleton === layer.source.skeleton');
     expect(ghost).toContain('halo.geometry === layer.source.geometry');
@@ -41,13 +41,25 @@ describe('Pass 70 contact and Railgun scope integration contracts', () => {
     expect(railgun).not.toContain('document.createElement');
   });
 
-  it('coordinates one settled Railgun scope lifecycle across FOV, thermal and viewmodel suppression', () => {
+  it('traces trusted RMB admission to immediate reveal while keeping optic/viewmodel settlement separate', () => {
     const runtime = read('./legacy-main.ts');
+    const scope = read('./railgun-scope-state.ts');
+    const inputStart = runtime.indexOf("canvas.addEventListener('mousedown'");
+    const inputEnd = runtime.indexOf("window.addEventListener('mouseup'", inputStart);
+    const trustedRmb = runtime.slice(inputStart, inputEnd);
+    expect(trustedRmb).toContain('if (event.button === 2)');
+    expect(trustedRmb).toContain('adsHeld = admittedAdsHeld(debugAdsOverride ?? true);');
     expect(runtime).toContain('railgunScopeState = deriveRailgunScopePresentation({');
     expect(runtime).toContain('function synchronizeRailgunScopeLifecycle(): void {');
     expect(runtime).toContain('if (!playerSimulationEnabled()) {');
     expect(runtime).toContain('synchronizeRailgunScopeLifecycle();\n    updateRailgun(now);');
-    expect(runtime).toContain('const thermalActive = railgunScopeActive;');
+    expect(scope).toContain("revealActivation: 'admitted-local-ads-hold'");
+    expect(scope).toContain('const revealActive = input.alive');
+    expect(scope).toContain('const active = revealActive\n    && adsSettled\n    && fovSettled;');
+    expect(runtime).toContain('const revealActive = railgunScopeState.revealActive;');
+    expect(runtime).toContain('revealActive ? railgunThermalContacts() : []');
+    expect(runtime).toContain('railgunScopeActive,\n    revealActive,');
+    expect(runtime).toContain('adsHeld = admittedAdsHeld(false);');
     expect(runtime).toContain('sniperScopeActive || dmrThermalActive || railgunScopeActive');
     expect(runtime).toContain("hudRoot.classList.toggle('railgun-scope-active', railgunScopeActive)");
     expect(runtime).toContain("element<HTMLElement>('.railgun-scope-reticle')");

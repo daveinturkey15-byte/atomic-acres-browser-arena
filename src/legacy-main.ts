@@ -4524,6 +4524,8 @@ function hideStickyVictimUrgentAlert(): void {
   delete warning.dataset.source;
   delete warning.dataset.targetLifeId;
   delete warning.dataset.actionNonce;
+  delete warning.dataset.expiresAtMs;
+  warning.style.removeProperty('--sticky-warning-duration');
 }
 
 function resetStickyVictimUrgentAlertLife(targetLifeId: number | null = null): void {
@@ -4546,6 +4548,8 @@ function presentStickyVictimUrgentAlert(
   warning.dataset.source = alert.source;
   warning.dataset.targetLifeId = String(alert.targetLifeId);
   warning.dataset.actionNonce = String(alert.actionNonce);
+  warning.dataset.expiresAtMs = String(alert.expiresAtMs);
+  warning.style.setProperty('--sticky-warning-duration', `${STICKY_VICTIM_URGENT_ALERT_DURATION_MS}ms`);
   warning.hidden = false;
   const generation = stickyVictimUrgentAlertGeneration;
   const expire = (): void => {
@@ -4557,7 +4561,10 @@ function presentStickyVictimUrgentAlert(
     }
     hideStickyVictimUrgentAlert();
   };
-  stickyVictimUrgentAlertTimeout = window.setTimeout(expire, STICKY_VICTIM_URGENT_ALERT_DURATION_MS);
+  stickyVictimUrgentAlertTimeout = window.setTimeout(
+    expire,
+    Math.max(0, alert.expiresAtMs - performance.now()),
+  );
   return true;
 }
 const hostTriggerAuthorities = new HostTriggerAuthorityRegistry();
@@ -5548,7 +5555,10 @@ function clearGameplayInput(): void {
   mouseTriggerHeld = false;
   mouseAdsHeld = false;
   setLocalTriggerHeld(false);
-  adsHeld = debugAdsOverride ?? false;
+  // A focus/pointer/menu reset is a real ADS release. Route it through the
+  // Railgun's post-shot latch so the next trusted RMB press can reveal again;
+  // directly assigning false left the latch permanently armed after a shot.
+  adsHeld = admittedAdsHeld(false);
   sniperScopeActive = false;
   dmrThermalActive = false;
   sniperScopeOverlay.hidden = true;
@@ -11994,6 +12004,17 @@ async function prewarmWindowGlassDebrisPool(sceneGeneration: number): Promise<vo
     sceneGeneration,
     (stage) => renderRuntime.compileAndRender(stage, camera, scene),
   );
+  if (!characterPhysics) throw new Error('Window glass prewarm requires committed arena physics');
+  // The retained InstancedMesh alone did not remove the last first-breach
+  // hitch: the deferred reconciliation still constructed its first Rapier
+  // body/collider pair on an active browser frame. Reserve every authored pane
+  // by exact identity and shape while deployment owns the screen. Only two can
+  // become active under the unchanged shared debris authority budget.
+  characterPhysics.prewarmMajorDebrisBodies(arena.breakableWindows.map((window) => {
+    const pooled = pooledWindowDebris.get(windowDebrisPoolKey(arena.id, window.id));
+    if (!pooled) throw new Error(`${arena.id}:${window.id}: glass physics prewarm is missing retained bounds`);
+    return Object.freeze({ id: persistentWindowDebrisId(window.id), halfExtents: pooled.halfExtents });
+  }));
 }
 
 function spawnPersistentWindowDebris(window: ArenaMap['breakableWindows'][number], normal: THREE.Vector3): void {
@@ -13340,6 +13361,7 @@ async function startGame(
   lastWebGlReadyPrime = null;
   audio.unlock();
   document.documentElement.dataset.combatAudioPrewarm = audio.prepareCombat() ? 'ready' : 'unavailable';
+  document.documentElement.dataset.glassImpactAudioPrewarm = audio.prepareGlassImpact() ? 'ready' : 'unavailable';
   prepareDeploymentTransition();
   applyMenuLifecycle({ type: 'match-start' });
   syncMenuPreviewCanvasPlacement();
@@ -14897,7 +14919,8 @@ function updateThermalGhosts(): void {
   // the primitive pawn/marker rendering has been replaced by the exact live
   // operator model plus an orange body-following halo.
   const chopperThermal = localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner';
-  if (!dmrThermalActive && !railgunScopeActive && !chopperThermal) {
+  const railgunRevealActive = railgunScopeState.revealActive;
+  if (!dmrThermalActive && !railgunRevealActive && !chopperThermal) {
     thermalGhostPresentation.sync([], false);
     railgunPresentation.syncExactOperatorReveal(false, null);
     return;
@@ -14912,7 +14935,7 @@ function updateThermalGhosts(): void {
     root: THREE.Object3D,
   ): void => {
     if (targets.some((target) => target.id === id)) return;
-    if (railgunScopeActive && !dmrThermalActive && !chopperThermal
+    if (railgunRevealActive && !dmrThermalActive && !chopperThermal
       && !railgunThermalTargetEligible(observer, { id, team, alive: true, kind }, mode)) return;
     const relation = mode === 'tdm' && team === player.team ? 'friendly' as const : 'hostile' as const;
     targets.push({ id, relation, root });
@@ -14926,7 +14949,7 @@ function updateThermalGhosts(): void {
     addTarget(bot.id, bot.team, 'bot', bot.root);
   }
   thermalGhostPresentation.sync(targets, true);
-  railgunPresentation.syncExactOperatorReveal(railgunScopeActive, thermalGhostPresentation.telemetry());
+  railgunPresentation.syncExactOperatorReveal(railgunRevealActive, thermalGhostPresentation.telemetry());
 }
 
 function updateRailgun(now: number): void {
@@ -14950,14 +14973,19 @@ function updateRailgun(now: number): void {
     railgunRechamberPresentationActive = false;
   }
   railgunPresentation.updateWorld(railgunState, now);
-  // Exact operator reveals share the settled clear-scope lifecycle. This
-  // prevents the reveal from appearing over the physical hip model or surviving
-  // fire/unADS/swap while retaining the Railgun's through-wall identity.
-  const thermalActive = railgunScopeActive;
+  // The optic/viewmodel remain settled-scope presentation. Exact operators
+  // follow the admitted ADS hold immediately and are still constrained by the
+  // unchanged living-hostile Railgun eligibility policy below.
+  const revealActive = railgunScopeState.revealActive;
   // The railgun's signature see-through-walls reveal: the exact animated
   // hostile operator with its ordinary appearance plus a bounded orange halo.
   // The shared presentation disables depth testing without changing eligibility.
-  railgunPresentation.updateThermal(camera, thermalActive ? railgunThermalContacts() : [], thermalActive);
+  railgunPresentation.updateThermal(
+    camera,
+    revealActive ? railgunThermalContacts() : [],
+    railgunScopeActive,
+    revealActive,
+  );
 }
 
 /** Hostile combatants to reveal through walls while the railgun scope is up. */
@@ -17655,7 +17683,6 @@ function updateExplosiveBolts(dt: number, now: number): void {
         bolt.mesh.position.copy(targetHit.position);
         const targetHitId = targetHit.id;
         const targetHitLifeId = targetHit.lifeId;
-        const targetHitKind = targetHit.kind;
         bolt.targetId = targetHitId;
         bolt.targetLifeId = targetHitLifeId;
         bolt.impactedAt = now;
@@ -17672,7 +17699,7 @@ function updateExplosiveBolts(dt: number, now: number): void {
           attachedAtMs: now,
           expiresAtMs: bolt.detonatesAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
         });
-        if (targetHitKind === 'player') {
+        if (targetHitId === player.id) {
           presentStickyVictimUrgentAlert(
             'explosive-crossbow', targetHitId, targetHitLifeId, bolt.actionNonce, now,
           );
@@ -18317,7 +18344,7 @@ function armImpactGrenade(
         attachedAtMs: now,
         expiresAtMs: grenade.explodeAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
       });
-      if (targetKind === 'player') {
+      if (targetId === player.id) {
         presentStickyVictimUrgentAlert('semtex', targetId, targetLifeId, grenade.actionNonce, now);
         addFeed('STUCK', 'coral');
       }
@@ -26389,6 +26416,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       rechamberPresentationActive: railgunRechamberPresentationActive,
       adsProgress: weaponView.adsProgress(),
       scopeActive: railgunScopeActive,
+      revealActive: railgunScopeState.revealActive,
       thermalVisible: !element<HTMLElement>('#railgun-thermal').hidden,
       presentation: railgunPresentation.telemetry(),
       claimAudit: { ...railgunClaimAudit },
@@ -26526,6 +26554,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       presentationRootVisible: interactiveWorldRuntime?.root.visible ?? false,
       collisionCacheRevision: activeWorldColliderCacheRevision,
       rapierMajorBodies: characterPhysics?.majorDebrisBodyCount() ?? 0,
+      rapierPrewarmedMajorBodies: characterPhysics?.prewarmedMajorDebrisBodyCount() ?? 0,
       gpuRetirement: {
         queuedResources: deferredGpuRetirements.length,
         queuedRoots: deferredGpuRetirements.filter((entry) => entry.kind === 'root').length,
@@ -27031,10 +27060,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     })),
     windowGlassDebrisPool: {
       contract: 'retained-exact-instanced-render-object-v1',
+      physicsContract: 'disabled-exact-rapier-pairs-v1',
       retained: pooledWindowDebris.size,
       currentArenaRetained: arena.breakableWindows.filter((window) => (
         pooledWindowDebris.has(windowDebrisPoolKey(arena.id, window.id))
       )).length,
+      prewarmedPhysicsBodies: characterPhysics?.prewarmedMajorDebrisBodyCount() ?? 0,
       active: persistentWindowDebris.size,
     },
     persistentWindowDebris: [...persistentWindowDebris.values()].map((entry) => ({

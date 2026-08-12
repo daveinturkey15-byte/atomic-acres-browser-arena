@@ -412,6 +412,8 @@ export class ArenaAudio {
   private damageFeedbackGain: GainNode | null = null;
   private combatFeedbackPrepared = false;
   private combatFeedbackPrepareRuns = 0;
+  private glassImpactPrepared = false;
+  private glassImpactPrepareRuns = 0;
   private lowHealthFeedbackActive = false;
   private lowHealthFeedbackAudible = false;
   private lowHealthAppliedState: Readonly<{
@@ -718,6 +720,71 @@ export class ArenaAudio {
       }
       this.combatFeedbackSources = this.combatFeedbackSources.filter((source) => !createdSources.includes(source));
       this.resetCombatFeedbackState();
+      return false;
+    }
+  }
+
+  /**
+   * Exercises the exact live glass-impact source/filter/gain graph at zero
+   * gain during match admission. The one-shot sources are intentionally not
+   * retained as broadband loops; browser node factories and the destination
+   * graph are warm before the first pane breaks, with full rollback on any
+   * partial Web Audio failure.
+   */
+  prepareGlassImpact(): boolean {
+    if (this.glassImpactPrepared) return true;
+    if (!this.context || !this.noiseBuffer || !this.feedback) return false;
+    this.glassImpactPrepareRuns += 1;
+    const now = this.context.currentTime;
+    const sources: AudioScheduledSourceNode[] = [];
+    const nodes: AudioNode[] = [];
+    try {
+      const noise = this.context.createBufferSource();
+      sources.push(noise);
+      noise.buffer = this.noiseBuffer;
+      const filter = this.context.createBiquadFilter();
+      nodes.push(filter);
+      filter.type = 'bandpass';
+      filter.frequency.value = 5_200;
+      filter.Q.value = 1.25;
+      const noiseGain = this.context.createGain();
+      nodes.push(noiseGain);
+      noiseGain.gain.value = 0;
+      noise.connect(filter).connect(noiseGain).connect(this.feedback);
+      if (!this.registerVoice(noise, this.feedback, 3)) throw new Error('glass-impact-noise-voice-budget');
+      const priorNoiseEnded = noise.onended;
+      noise.onended = (event) => {
+        priorNoiseEnded?.call(noise, event);
+        filter.disconnect();
+        noiseGain.disconnect();
+      };
+
+      const tone = this.context.createOscillator();
+      sources.push(tone);
+      tone.type = 'triangle';
+      tone.frequency.value = 1_460;
+      const toneGain = this.context.createGain();
+      nodes.push(toneGain);
+      toneGain.gain.value = 0;
+      tone.connect(toneGain).connect(this.feedback);
+      if (!this.registerVoice(tone, this.feedback, 3)) throw new Error('glass-impact-tone-voice-budget');
+      const priorToneEnded = tone.onended;
+      tone.onended = (event) => {
+        priorToneEnded?.call(tone, event);
+        toneGain.disconnect();
+      };
+
+      noise.start(now, 0, 0.095);
+      tone.start(now + 0.006);
+      tone.stop(now + 0.034);
+      this.glassImpactPrepared = true;
+      return true;
+    } catch {
+      for (const source of sources) this.stopSource(source);
+      for (const node of nodes) {
+        try { node.disconnect(); } catch { /* partially connected browser node */ }
+      }
+      this.glassImpactPrepared = false;
       return false;
     }
   }
@@ -1391,6 +1458,7 @@ export class ArenaAudio {
     explosionMix: ExplosionAudioGate & { coalesceMs: number };
     ambience: { continuousSources: number; busGain: number; arena: ArenaId | null };
     combatPrewarm: { prepared: boolean; runs: number; sources: number; nodes: number; broadbandLoopSources: 0 };
+    glassImpactPrewarm: { prepared: boolean; runs: number; retainedBroadbandLoops: 0 };
     lowHealth: { prepared: boolean; sources: number; active: boolean; audible: boolean; automationWrites: number; broadbandSources: 0 };
     damageFeedback: { prepared: boolean; sources: number; pulses: number };
     grenadeFuse: { beeps: number; startMs: number };
@@ -1440,6 +1508,11 @@ export class ArenaAudio {
         sources: this.combatFeedbackSources.length,
         nodes: this.combatFeedbackNodes.length,
         broadbandLoopSources: 0,
+      },
+      glassImpactPrewarm: {
+        prepared: this.glassImpactPrepared,
+        runs: this.glassImpactPrepareRuns,
+        retainedBroadbandLoops: 0,
       },
       lowHealth: {
         prepared: this.combatFeedbackPrepared && this.lowHealthGains.length === 2,
@@ -1723,6 +1796,7 @@ export class ArenaAudio {
     this.damageFeedbackSource = null;
     this.damageFeedbackGain = null;
     this.combatFeedbackPrepared = false;
+    this.glassImpactPrepared = false;
     this.lowHealthFeedbackActive = false;
     this.lowHealthFeedbackAudible = false;
     this.lowHealthAppliedState = null;
