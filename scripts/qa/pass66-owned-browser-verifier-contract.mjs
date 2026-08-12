@@ -59,7 +59,7 @@ export function servedCandidateFailures(value, expected) {
 export function ownedBrowserVerifierReceiptFailures(value, expected) {
   if (!record(value)) return ['owned browser verifier receipt must be an object'];
   const errors = [];
-  const expectedSchemaVersion = expected.gate === 'multiplayer-stability' ? 2 : 1;
+  const expectedSchemaVersion = expected.gate === 'multiplayer-stability' ? 3 : 1;
   if (value.schemaVersion !== expectedSchemaVersion) {
     errors.push(`receipt schemaVersion must be ${expectedSchemaVersion}`);
   }

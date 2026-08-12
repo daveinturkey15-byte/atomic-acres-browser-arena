@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
@@ -11,6 +11,14 @@ import {
   assertOwnedBrowserVerifierReceipt,
   assertStagedTopology,
 } from './pass66-owned-browser-verifier-contract.mjs';
+import {
+  PASS66_MULTIPLAYER_BROWSER_CHANNEL,
+  PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV,
+  PASS66_MULTIPLAYER_BROWSER_EXECUTABLE_ENV,
+  PASS66_MULTIPLAYER_BROWSER_SHA256_ENV,
+  PASS66_MULTIPLAYER_REMOTE_PLAYWRIGHT_ENV,
+} from './pass66-multiplayer-stability-contract.mjs';
+import { PASS70_NATIVE_USER_AGENT_ENV } from './pass70-cross-browser-native-user-agent-contract.mjs';
 
 const targets = Object.freeze({
   'installed-firefox': Object.freeze({
@@ -75,6 +83,17 @@ const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], {
 }).trim();
 if (!/^[a-f0-9]{40}$/u.test(sourceSha)) throw new Error(`Invalid Pass 66 ${gate} source SHA ${sourceSha}`);
 
+const browserDriftEnvironment = gate === 'multiplayer-stability' ? [
+  ...(process.env.QA_INSTALLED_EDGE === '1' ? ['QA_INSTALLED_EDGE'] : []),
+  ...PASS66_MULTIPLAYER_REMOTE_PLAYWRIGHT_ENV.filter((key) => process.env[key] !== undefined),
+] : [];
+if (browserDriftEnvironment.length > 0) {
+  throw new Error(`Pass 66 multiplayer-stability rejects browser environment drift: ${browserDriftEnvironment.join(', ')}`);
+}
+const multiplayerBrowserIdentity = gate === 'multiplayer-stability'
+  ? resolveInstalledChromeIdentity()
+  : null;
+
 const previewPort = Number(process.env.QA_PREVIEW_PORT ?? target.previewPort);
 const peerPort = target.peerPort === null ? null : Number(process.env.QA_PEER_PORT ?? target.peerPort);
 if (!Number.isInteger(previewPort) || previewPort < 1_024 || previewPort > 65_535) {
@@ -87,8 +106,19 @@ if (peerPort !== null && (!Number.isInteger(peerPort) || peerPort < 1_024 || pee
 const temporaryRoot = mkdtempSync(join(tmpdir(), `atomic-acres-pass66-${gate}-`));
 const temporaryDist = join(temporaryRoot, 'dist');
 const topologyReceiptPath = join(temporaryRoot, 'release-topology.json');
+const ownedBrowserEnvironmentKeys = new Set([
+  'QA_INSTALLED_EDGE',
+  PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV,
+  PASS66_MULTIPLAYER_BROWSER_EXECUTABLE_ENV,
+  PASS66_MULTIPLAYER_BROWSER_SHA256_ENV,
+  PASS70_NATIVE_USER_AGENT_ENV,
+  ...PASS66_MULTIPLAYER_REMOTE_PLAYWRIGHT_ENV,
+]);
 const inheritedEnvironment = Object.fromEntries(
-  Object.entries(process.env).filter(([key]) => !key.toUpperCase().startsWith('VITE_')),
+  Object.entries(process.env).filter(([key]) => (
+    !key.toUpperCase().startsWith('VITE_')
+    && !(gate === 'multiplayer-stability' && ownedBrowserEnvironmentKeys.has(key))
+  )),
 );
 const buildEnvironment = {
   ...inheritedEnvironment,
@@ -213,6 +243,43 @@ function sha256File(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 
+function installedChromeCandidates(environment = process.env) {
+  if (process.platform === 'win32') {
+    const suffix = join('Google', 'Chrome', 'Application', 'chrome.exe');
+    const prefixes = [
+      environment.LOCALAPPDATA,
+      environment.PROGRAMFILES,
+      environment['PROGRAMFILES(X86)'],
+      environment.HOMEDRIVE ? join(environment.HOMEDRIVE, 'Program Files') : undefined,
+      environment.HOMEDRIVE ? join(environment.HOMEDRIVE, 'Program Files (x86)') : undefined,
+    ].filter(Boolean);
+    return [...new Set(prefixes.map((prefix) => join(prefix, suffix)))];
+  }
+  if (process.platform === 'darwin') {
+    return ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'];
+  }
+  if (process.platform === 'linux') return ['/opt/google/chrome/chrome'];
+  return [];
+}
+
+function resolveInstalledChromeIdentity() {
+  const executablePath = installedChromeCandidates().find((candidate) => {
+    try {
+      return existsSync(candidate) && statSync(candidate).isFile();
+    } catch {
+      return false;
+    }
+  });
+  if (!executablePath) {
+    throw new Error(`Pass 66 multiplayer-stability requires Playwright channel ${PASS66_MULTIPLAYER_BROWSER_CHANNEL} installed Chrome`);
+  }
+  return Object.freeze({
+    channel: PASS66_MULTIPLAYER_BROWSER_CHANNEL,
+    executablePath: resolve(executablePath),
+    executableSha256: sha256File(executablePath),
+  });
+}
+
 function assertSupportPromptEvidenceFiles(receipt) {
   if (gate !== 'support-operate-prompt') return;
   for (const viewport of receipt.viewports ?? []) {
@@ -275,6 +342,12 @@ try {
     PASS66_OWNED_TREE_SHA256: candidate.treeSha256,
     PASS66_OWNED_FILE_COUNT: String(candidate.exactRootFileCount),
     PASS66_OWNED_RECEIPT_PATH: receiptPath,
+    ...(multiplayerBrowserIdentity === null ? {} : {
+      [PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV]: multiplayerBrowserIdentity.channel,
+      [PASS66_MULTIPLAYER_BROWSER_EXECUTABLE_ENV]: multiplayerBrowserIdentity.executablePath,
+      [PASS66_MULTIPLAYER_BROWSER_SHA256_ENV]: multiplayerBrowserIdentity.executableSha256,
+      [PASS70_NATIVE_USER_AGENT_ENV]: '1',
+    }),
     ...(peerPort === null ? {} : {
       QA_PEER_PORT: String(peerPort),
       QA_PEER_PATH: peerPath,
@@ -290,6 +363,11 @@ try {
     cwd: root, encoding: 'utf8', windowsHide: true,
   }).trim();
   if (finalDirty || finalSha !== sourceSha) throw new Error(`Pass 66 ${gate} source drifted during verification`);
+  if (multiplayerBrowserIdentity !== null
+    && (!existsSync(multiplayerBrowserIdentity.executablePath)
+      || sha256File(multiplayerBrowserIdentity.executablePath) !== multiplayerBrowserIdentity.executableSha256)) {
+    throw new Error('Installed Chrome executable changed during multiplayer stability verification');
+  }
   const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
   if (gate === 'support-operate-prompt') {
     receipt.sourceState = {
@@ -310,6 +388,11 @@ try {
     treeSha256: candidate.treeSha256,
     exactRootFileCount: candidate.exactRootFileCount,
     baseUrl,
+    ...(multiplayerBrowserIdentity === null ? {} : {
+      browserChannel: multiplayerBrowserIdentity.channel,
+      browserExecutablePath: multiplayerBrowserIdentity.executablePath,
+      browserExecutableSha256: multiplayerBrowserIdentity.executableSha256,
+    }),
     ...(peerPort === null ? {} : { peerPort, peerPath }),
   });
   assertSupportPromptEvidenceFiles(receipt);

@@ -3,6 +3,10 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { resolve } from 'node:path';
 import {
+  PASS66_MULTIPLAYER_BROWSER_CHANNEL,
+  PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV,
+  PASS66_MULTIPLAYER_BROWSER_EXECUTABLE_ENV,
+  PASS66_MULTIPLAYER_BROWSER_SHA256_ENV,
   PASS66_MULTIPLAYER_SPECS,
   PASS66_MULTIPLAYER_TEST_COUNT,
   multiplayerPlaywrightReportFailures,
@@ -11,10 +15,17 @@ import {
   multiplayerStabilityReceiptFailures,
   summarizeMultiplayerPlaywrightReport,
 } from './pass66-multiplayer-stability-contract.mjs';
+import { PASS70_NATIVE_USER_AGENT_ENV } from './pass70-cross-browser-native-user-agent-contract.mjs';
 
 const sourceSha = 'a'.repeat(40);
 const treeSha256 = 'b'.repeat(64);
+const browserExecutableSha256 = 'c'.repeat(64);
 const exactRootFileCount = 12;
+const browserExecutablePath = process.platform === 'win32'
+  ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+  : process.platform === 'darwin'
+    ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+    : '/opt/google/chrome/chrome';
 const candidate = {
   schemaVersion: 4,
   channel: 'the-big-one',
@@ -35,6 +46,10 @@ function validEnvironment() {
     QA_OWNED_TREE_SHA256: treeSha256,
     QA_OWNED_FILE_COUNT: String(exactRootFileCount),
     QA_OWNED_RECEIPT_PATH: resolve('artifacts/multiplayer/stability/receipt.json'),
+    [PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV]: PASS66_MULTIPLAYER_BROWSER_CHANNEL,
+    [PASS66_MULTIPLAYER_BROWSER_EXECUTABLE_ENV]: browserExecutablePath,
+    [PASS66_MULTIPLAYER_BROWSER_SHA256_ENV]: browserExecutableSha256,
+    [PASS70_NATIVE_USER_AGENT_ENV]: '1',
   };
 }
 
@@ -86,6 +101,30 @@ test('owned multiplayer verifier environment fails closed on route or source amb
     ...environment,
     QA_OWNED_RECEIPT_PATH: 'relative/receipt.json',
   }).join('\n'), /absolute/u);
+  assert.match(multiplayerStabilityEnvironmentFailures({
+    ...environment,
+    [PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV]: 'chromium',
+  }).join('\n'), /installed Chrome/u);
+  assert.match(multiplayerStabilityEnvironmentFailures({
+    ...environment,
+    [PASS66_MULTIPLAYER_BROWSER_EXECUTABLE_ENV]: resolve('chromium_headless_shell-1228/chrome-headless-shell.exe'),
+  }).join('\n'), /installed Google Chrome/u);
+  assert.match(multiplayerStabilityEnvironmentFailures({
+    ...environment,
+    [PASS66_MULTIPLAYER_BROWSER_SHA256_ENV]: 'stale',
+  }).join('\n'), /executable SHA-256/u);
+  assert.match(multiplayerStabilityEnvironmentFailures({
+    ...environment,
+    [PASS70_NATIVE_USER_AGENT_ENV]: '0',
+  }).join('\n'), /native user agent/u);
+  assert.match(multiplayerStabilityEnvironmentFailures({
+    ...environment,
+    QA_INSTALLED_EDGE: '1',
+  }).join('\n'), /installed Edge/u);
+  assert.match(multiplayerStabilityEnvironmentFailures({
+    ...environment,
+    PW_TEST_CONNECT_WS_ENDPOINT: 'ws://127.0.0.1:4444/',
+  }).join('\n'), /remote Playwright/u);
 });
 
 test('served provenance requires the exact configured candidate identity', () => {
@@ -340,16 +379,19 @@ test('Qoder death-drop staging proves host authority before natural expiry witho
 test('final receipt binds exact runtime, test matrix and five physical peer identities', () => {
   const baseUrl = 'http://127.0.0.1:4530/channels/the-big-one/';
   const receipt = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     status: 'PASS',
     gate: 'multiplayer-stability',
     releasePass: 'PASS 70',
-    schema: 'atomic-acres/multiplayer-stability@2',
+    schema: 'atomic-acres/multiplayer-stability@3',
     sourceSha,
     servedCandidate: candidate,
     servedCandidateAfter: candidate,
     runner: {
-      browser: 'chromium', workers: 1, retries: 0, externalPreview: true, baseUrl,
+      browser: 'chromium', channel: PASS66_MULTIPLAYER_BROWSER_CHANNEL,
+      headless: true, nativeUserAgent: true,
+      executablePath: browserExecutablePath, executableSha256: browserExecutableSha256,
+      workers: 1, retries: 0, externalPreview: true, baseUrl,
       args: [
         'test',
         ...PASS66_MULTIPLAYER_SPECS.map(({ path }) => path),
@@ -360,6 +402,12 @@ test('final receipt binds exact runtime, test matrix and five physical peer iden
       helper: 'assertPass66OwnedCandidatePage',
       exactCandidateRoute: '/channels/the-big-one/',
       guardedSpecs: PASS66_MULTIPLAYER_SPECS.map(({ path }) => path),
+      initialAdmissionGuard: {
+        spec: 'tests/e2e/pass66-host-crash-rejoin.spec.ts',
+        roles: ['host', 'guest'],
+        terminalEvents: ['crash', 'close'],
+        timeoutMs: 60_000,
+      },
     },
     ownedPeerServers: [
       'hostCrashRejoin', 'ownerFeedbackMultiplayerUi',
@@ -372,7 +420,12 @@ test('final receipt binds exact runtime, test matrix and five physical peer iden
     playwright: summarizeMultiplayerPlaywrightReport(validReport()),
     errors: [],
   };
-  const expected = { releasePass: 'PASS 70', sourceSha, treeSha256, exactRootFileCount, baseUrl };
+  const expected = {
+    releasePass: 'PASS 70', sourceSha, treeSha256, exactRootFileCount, baseUrl,
+    browserChannel: PASS66_MULTIPLAYER_BROWSER_CHANNEL,
+    browserExecutablePath,
+    browserExecutableSha256,
+  };
   assert.deepEqual(multiplayerStabilityReceiptFailures(receipt, expected), []);
   assert.match(multiplayerStabilityReceiptFailures({
     ...receipt,
@@ -389,16 +442,57 @@ test('final receipt binds exact runtime, test matrix and five physical peer iden
         : spec),
     },
   }, expected).join('\n'), /qoder.*summary mismatch/iu);
+  for (const runnerMutation of [
+    { channel: 'chromium' },
+    { executablePath: resolve('chromium_headless_shell-1228/chrome-headless-shell.exe') },
+    { executableSha256: 'd'.repeat(64) },
+    { nativeUserAgent: false },
+  ]) {
+    assert.match(multiplayerStabilityReceiptFailures({
+      ...receipt,
+      runner: { ...receipt.runner, ...runnerMutation },
+    }, expected).join('\n'), /runner identity mismatch/u);
+  }
+  assert.match(multiplayerStabilityReceiptFailures({
+    ...receipt,
+    pageBinding: {
+      ...receipt.pageBinding,
+      initialAdmissionGuard: { ...receipt.pageBinding.initialAdmissionGuard, roles: ['guest', 'host'] },
+    },
+  }, expected).join('\n'), /page binding is incomplete/u);
+  assert.match(multiplayerStabilityReceiptFailures({
+    ...receipt,
+    pageBinding: {
+      ...receipt.pageBinding,
+      initialAdmissionGuard: { ...receipt.pageBinding.initialAdmissionGuard, terminalEvents: ['close'] },
+    },
+  }, expected).join('\n'), /page binding is incomplete/u);
 });
 
 test('verifier pins the external serial Chromium command and writes only a parsed PASS receipt', () => {
   const source = readFileSync('scripts/qa/verify-pass66-multiplayer-stability.mjs', 'utf8');
+  const wrapper = readFileSync('scripts/qa/run-pass66-owned-browser-verifier.mjs', 'utf8');
+  const config = readFileSync('playwright.config.ts', 'utf8');
+  const hostCrash = readFileSync('tests/e2e/pass66-host-crash-rejoin.spec.ts', 'utf8');
   for (const { path } of PASS66_MULTIPLAYER_SPECS) assert.match(source, /PASS66_MULTIPLAYER_SPECS/u, path);
   assert.match(source, /'--project=chromium'/u);
   assert.match(source, /'--workers=1'/u);
   assert.match(source, /'--retries=0'/u);
   assert.match(source, /'--reporter=json'/u);
   assert.match(source, /QA_EXTERNAL_PREVIEW: '1'/u);
+  assert.match(source, /assertOwnedChromeUnchanged\('before'\)/u);
+  assert.match(source, /assertOwnedChromeUnchanged\('during'\)/u);
+  assert.match(source, /\[PASS70_NATIVE_USER_AGENT_ENV\]: '1'/u);
+  assert.match(wrapper, /resolveInstalledChromeIdentity\(\)/u);
+  assert.match(wrapper, /PASS66_MULTIPLAYER_REMOTE_PLAYWRIGHT_ENV\.filter/u);
+  assert.match(wrapper, /sha256File\(multiplayerBrowserIdentity\.executablePath\)/u);
+  assert.match(config, /channel: multiplayerChromeChannel \?\? installedEdgeChannel/u);
+  assert.match(hostCrash, /page\.once\('crash', onCrash\)/u);
+  assert.match(hostCrash, /page\.once\('close', onClose\)/u);
+  assert.match(hostCrash, /waitForInitialAdmission\(host, 'host'\)/u);
+  assert.match(hostCrash, /waitForInitialAdmission\(guest, 'guest'\)/u);
+  assert.match(hostCrash, /state\.gameStarted && state\.matchPhase === 'active' && state\.bots\.length === 2/u);
+  assert.match(hostCrash, /timeout: 60_000/u);
   assert.match(source, /multiplayerPlaywrightReportFailures\(result\.report\)/u);
   assert.ok(source.indexOf("status: 'PASS'") < source.indexOf('writeFileSync(temporaryReceiptPath'));
 });

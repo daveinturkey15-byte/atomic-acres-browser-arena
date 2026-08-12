@@ -4,17 +4,35 @@ import {
   pass70NativeEngineUserAgentEnabled,
   resolvePass70ChromiumProjectUserAgent,
 } from './scripts/qa/pass70-cross-browser-native-user-agent-contract.mjs';
+import {
+  PASS66_MULTIPLAYER_BROWSER_CHANNEL,
+  PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV,
+} from './scripts/qa/pass66-multiplayer-stability-contract.mjs';
 
 const previewPort = Number(process.env.QA_PREVIEW_PORT ?? '4173');
 const externalPreview = process.env.QA_EXTERNAL_PREVIEW === '1';
 const requireOwnedFreshPreview = process.env.QA_REQUIRE_OWNED_FRESH_PREVIEW === '1';
 const installedEdgeChannel = process.env.QA_INSTALLED_EDGE === '1' ? 'msedge' as const : undefined;
+const ownedMultiplayerGate = process.env.QA_OWNED_GATE === 'multiplayer-stability';
+const requestedMultiplayerChannel = process.env[PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV];
+const multiplayerChromeChannel = ownedMultiplayerGate
+  ? PASS66_MULTIPLAYER_BROWSER_CHANNEL as 'chrome'
+  : undefined;
 const nativeEngineUserAgent = pass70NativeEngineUserAgentEnabled(
   process.env[PASS70_NATIVE_USER_AGENT_ENV],
 );
 
 if (externalPreview && requireOwnedFreshPreview) {
   throw new Error('QA_REQUIRE_OWNED_FRESH_PREVIEW cannot be combined with QA_EXTERNAL_PREVIEW');
+}
+if (ownedMultiplayerGate && requestedMultiplayerChannel !== PASS66_MULTIPLAYER_BROWSER_CHANNEL) {
+  throw new Error('Owned multiplayer stability must explicitly select installed Chrome');
+}
+if (!ownedMultiplayerGate && requestedMultiplayerChannel !== undefined) {
+  throw new Error('QA_MULTIPLAYER_BROWSER_CHANNEL is reserved for the owned multiplayer stability gate');
+}
+if (ownedMultiplayerGate && installedEdgeChannel) {
+  throw new Error('Owned multiplayer stability cannot be combined with QA_INSTALLED_EDGE');
 }
 
 export default defineConfig({
@@ -41,15 +59,15 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      // Opt into the machine-installed Edge binary without widening CI's
-      // default browser requirement or maintaining a second Chromium project.
+      // Owned multiplayer evidence runs on installed Chrome while retaining the
+      // Chromium project identity; other suites can opt into installed Edge.
       // Desktop Chrome's descriptor pins a bundled-Chromium UA. Clear that
-      // emulation for Edge evidence and explicit Pass 70 engine matrices so
+      // emulation for installed-browser evidence and explicit engine matrices so
       // navigator.userAgent proves the binary Playwright actually launched
       // instead of repeating the Chromium fixture string.
       use: {
         ...devices['Desktop Chrome'],
-        channel: installedEdgeChannel,
+        channel: multiplayerChromeChannel ?? installedEdgeChannel,
         userAgent: resolvePass70ChromiumProjectUserAgent({
           desktopChromeUserAgent: devices['Desktop Chrome'].userAgent,
           installedEdgeChannel,

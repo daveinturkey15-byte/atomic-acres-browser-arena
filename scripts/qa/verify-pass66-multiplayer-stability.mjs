@@ -1,16 +1,21 @@
 import { spawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';
 import {
+  PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV,
+  PASS66_MULTIPLAYER_BROWSER_EXECUTABLE_ENV,
+  PASS66_MULTIPLAYER_BROWSER_SHA256_ENV,
   PASS66_MULTIPLAYER_SPECS,
+  PASS66_MULTIPLAYER_REMOTE_PLAYWRIGHT_ENV,
   multiplayerPlaywrightReportFailures,
   multiplayerServedCandidateFailures,
   multiplayerStabilityEnvironmentFailures,
   summarizeMultiplayerPlaywrightReport,
 } from './pass66-multiplayer-stability-contract.mjs';
+import { PASS70_NATIVE_USER_AGENT_ENV } from './pass70-cross-browser-native-user-agent-contract.mjs';
 
 const root = resolve(process.cwd());
 const environmentFailures = multiplayerStabilityEnvironmentFailures(process.env);
@@ -24,9 +29,25 @@ const sourceSha = process.env.QA_OWNED_SOURCE_SHA;
 const treeSha256 = process.env.QA_OWNED_TREE_SHA256;
 const exactRootFileCount = Number(process.env.QA_OWNED_FILE_COUNT);
 const receiptPath = process.env.QA_OWNED_RECEIPT_PATH;
+const browserChannel = process.env[PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV];
+const browserExecutablePath = process.env[PASS66_MULTIPLAYER_BROWSER_EXECUTABLE_ENV];
+const browserExecutableSha256 = process.env[PASS66_MULTIPLAYER_BROWSER_SHA256_ENV];
 if (existsSync(receiptPath)) {
   throw new Error(`Multiplayer stability verifier refuses a stale receipt: ${receiptPath}`);
 }
+
+function sha256File(path) {
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+function assertOwnedChromeUnchanged(phase) {
+  if (!existsSync(browserExecutablePath)
+    || sha256File(browserExecutablePath) !== browserExecutableSha256) {
+    throw new Error(`Owned installed Chrome executable changed ${phase} multiplayer stability verification`);
+  }
+}
+
+assertOwnedChromeUnchanged('before');
 
 const expectedCandidate = { releasePass, sourceSha, treeSha256, exactRootFileCount };
 
@@ -101,6 +122,8 @@ async function runPlaywright(peerPorts) {
   const inheritedEnvironment = Object.fromEntries(Object.entries(process.env).filter(([key]) => (
     key !== 'QA_REQUIRE_OWNED_FRESH_PREVIEW'
     && key !== 'QA_EXTERNAL_PREVIEW'
+    && key !== 'QA_INSTALLED_EDGE'
+    && !PASS66_MULTIPLAYER_REMOTE_PLAYWRIGHT_ENV.includes(key)
   )));
   const childEnvironment = {
     ...inheritedEnvironment,
@@ -108,6 +131,10 @@ async function runPlaywright(peerPorts) {
     QA_EXTERNAL_PREVIEW: '1',
     QA_BASE_URL: baseUrl,
     BASE_URL: baseUrl,
+    [PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV]: browserChannel,
+    [PASS66_MULTIPLAYER_BROWSER_EXECUTABLE_ENV]: browserExecutablePath,
+    [PASS66_MULTIPLAYER_BROWSER_SHA256_ENV]: browserExecutableSha256,
+    [PASS70_NATIVE_USER_AGENT_ENV]: '1',
     PASS66_HOST_RECOVERY_PEER_PORT: String(peerPorts.hostCrashRejoin.port),
     PASS66_HOST_RECOVERY_PEER_PATH: peerPorts.hostCrashRejoin.path,
     PASS66_OWNER_FEEDBACK_PEER_PORT: String(peerPorts.ownerFeedbackMultiplayerUi.port),
@@ -182,18 +209,24 @@ async function main() {
   if (JSON.stringify(servedCandidateAfter) !== JSON.stringify(servedCandidate)) {
     throw new Error('Served candidate provenance changed during multiplayer stability verification');
   }
+  assertOwnedChromeUnchanged('during');
 
   const receipt = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     status: 'PASS',
     gate: 'multiplayer-stability',
     releasePass,
     sourceSha,
     servedCandidate,
     servedCandidateAfter,
-    schema: 'atomic-acres/multiplayer-stability@2',
+    schema: 'atomic-acres/multiplayer-stability@3',
     runner: {
       browser: 'chromium',
+      channel: browserChannel,
+      headless: true,
+      nativeUserAgent: true,
+      executablePath: browserExecutablePath,
+      executableSha256: browserExecutableSha256,
       workers: 1,
       retries: 0,
       externalPreview: true,
@@ -204,6 +237,12 @@ async function main() {
       helper: 'assertPass66OwnedCandidatePage',
       exactCandidateRoute: '/channels/the-big-one/',
       guardedSpecs: PASS66_MULTIPLAYER_SPECS.map(({ path }) => path),
+      initialAdmissionGuard: {
+        spec: 'tests/e2e/pass66-host-crash-rejoin.spec.ts',
+        roles: ['host', 'guest'],
+        terminalEvents: ['crash', 'close'],
+        timeoutMs: 60_000,
+      },
     },
     ownedPeerServers: Object.entries(peerPorts).map(([owner, topology]) => ({
       owner,
