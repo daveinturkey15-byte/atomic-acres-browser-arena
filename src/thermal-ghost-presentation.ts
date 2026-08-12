@@ -28,8 +28,16 @@ export type ThermalGhostTelemetry = Readonly<{
   activeTargets: number;
   activeModelLayers: number;
   activeHaloLayers: number;
+  activeSourceBodyLayers?: number;
+  activeNormalMaterialSlots?: number;
   geometryIdentity: boolean;
   skeletonIdentity: boolean;
+  bindMatrixIdentity?: boolean;
+  meshWorldMatrixIdentity?: boolean;
+  haloWorldMatrixIdentity?: boolean;
+  boneWorldMatrixIdentity?: boolean;
+  normalMaterialEquivalence?: boolean;
+  silhouetteLayerIdentity?: boolean;
   throughGeometry: boolean;
   orangeHalo: boolean;
   proxyMeshes: 0;
@@ -54,6 +62,7 @@ type GhostLayer = {
 type ExactMaterialLease = {
   material: THREE.Material;
   references: number;
+  lastSyncedGeneration: number;
 };
 
 type GhostRecord = {
@@ -108,6 +117,187 @@ function hasRenderableSourceMaterial(source: THREE.Mesh): boolean {
   return sourceMaterials(source).some((material) => material.visible && material.colorWrite);
 }
 
+const MATERIAL_PROGRAM_VALUE_KEYS = Object.freeze([
+  'alphaHash', 'alphaToCoverage', 'blending', 'colorWrite', 'dithering', 'flatShading',
+  'fog', 'forceSinglePass', 'premultipliedAlpha', 'precision', 'shadowSide', 'side',
+  'toneMapped', 'transparent', 'vertexColors', 'visible', 'wireframe',
+] as const);
+
+const MATERIAL_UNIFORM_VALUE_KEYS = Object.freeze([
+  'alphaTest', 'blendAlpha', 'blendDst', 'blendDstAlpha', 'blendEquation',
+  'blendEquationAlpha', 'blendSrc', 'blendSrcAlpha', 'clipIntersection', 'clipShadows',
+  'opacity', 'polygonOffset', 'polygonOffsetFactor', 'polygonOffsetUnits',
+  'stencilFail', 'stencilFunc', 'stencilFuncMask', 'stencilRef', 'stencilWrite',
+  'stencilWriteMask', 'stencilZFail', 'stencilZPass',
+] as const);
+
+const STANDARD_PROGRAM_VALUE_KEYS = Object.freeze([
+  'normalMapType', 'wireframeLinecap', 'wireframeLinejoin',
+] as const);
+
+const STANDARD_UNIFORM_VALUE_KEYS = Object.freeze([
+  'aoMapIntensity', 'bumpScale', 'displacementBias', 'displacementScale',
+  'emissiveIntensity', 'envMapIntensity', 'lightMapIntensity', 'metalness',
+  'roughness', 'wireframeLinewidth',
+] as const);
+
+const STANDARD_TEXTURE_KEYS = Object.freeze([
+  'alphaMap', 'aoMap', 'bumpMap', 'displacementMap', 'emissiveMap', 'envMap',
+  'lightMap', 'map', 'metalnessMap', 'normalMap', 'roughnessMap',
+] as const);
+
+const BASIC_PROGRAM_VALUE_KEYS = Object.freeze([
+  'combine', 'wireframeLinecap', 'wireframeLinejoin',
+] as const);
+
+const BASIC_UNIFORM_VALUE_KEYS = Object.freeze([
+  'aoMapIntensity', 'lightMapIntensity', 'reflectivity', 'refractionRatio',
+  'wireframeLinewidth',
+] as const);
+
+const BASIC_TEXTURE_KEYS = Object.freeze([
+  'alphaMap', 'aoMap', 'envMap', 'lightMap', 'map', 'specularMap',
+] as const);
+
+type AppearanceMaterial = THREE.Material & Record<string, unknown>;
+type MutableThermalGhostTelemetry = {
+  -readonly [Key in keyof Required<ThermalGhostTelemetry>]: Required<ThermalGhostTelemetry>[Key];
+};
+
+function appearance(material: THREE.Material): AppearanceMaterial {
+  return material as unknown as AppearanceMaterial;
+}
+
+function syncMaterialValues(
+  source: AppearanceMaterial,
+  target: AppearanceMaterial,
+  keys: readonly string[],
+): boolean {
+  let changed = false;
+  for (const key of keys) {
+    if (target[key] === source[key]) continue;
+    target[key] = source[key];
+    changed = true;
+  }
+  return changed;
+}
+
+function materialValuesEqual(
+  source: AppearanceMaterial,
+  target: AppearanceMaterial,
+  keys: readonly string[],
+): boolean {
+  return keys.every((key) => target[key] === source[key]);
+}
+
+/**
+ * Mirrors the source's live appearance without cloning or allocating textures.
+ * Program-changing fields only invalidate the clone when their value actually
+ * changes; animated colors, opacity and PBR uniforms do not churn pipelines.
+ */
+function syncExactMaterialAppearance(source: THREE.Material, target: THREE.Material): boolean {
+  if (source.type !== target.type) return false;
+  const sourceAppearance = appearance(source);
+  const targetAppearance = appearance(target);
+  let programChanged = syncMaterialValues(sourceAppearance, targetAppearance, MATERIAL_PROGRAM_VALUE_KEYS);
+  syncMaterialValues(sourceAppearance, targetAppearance, MATERIAL_UNIFORM_VALUE_KEYS);
+  target.blendColor.copy(source.blendColor);
+
+  if (source instanceof THREE.MeshStandardMaterial && target instanceof THREE.MeshStandardMaterial) {
+    const programValuesChanged = syncMaterialValues(sourceAppearance, targetAppearance, STANDARD_PROGRAM_VALUE_KEYS);
+    const texturesChanged = syncMaterialValues(sourceAppearance, targetAppearance, STANDARD_TEXTURE_KEYS);
+    programChanged ||= programValuesChanged || texturesChanged;
+    syncMaterialValues(sourceAppearance, targetAppearance, STANDARD_UNIFORM_VALUE_KEYS);
+    target.color.copy(source.color);
+    target.emissive.copy(source.emissive);
+    target.normalScale.copy(source.normalScale);
+    target.envMapRotation.copy(source.envMapRotation);
+  } else if (source instanceof THREE.MeshBasicMaterial && target instanceof THREE.MeshBasicMaterial) {
+    const programValuesChanged = syncMaterialValues(sourceAppearance, targetAppearance, BASIC_PROGRAM_VALUE_KEYS);
+    const texturesChanged = syncMaterialValues(sourceAppearance, targetAppearance, BASIC_TEXTURE_KEYS);
+    programChanged ||= programValuesChanged || texturesChanged;
+    syncMaterialValues(sourceAppearance, targetAppearance, BASIC_UNIFORM_VALUE_KEYS);
+    target.color.copy(source.color);
+  } else {
+    return false;
+  }
+
+  // These are the only intentional differences from the normal model.
+  target.depthTest = false;
+  target.depthWrite = false;
+  programChanged ||= target.clippingPlanes !== null;
+  target.clippingPlanes = null;
+  if (programChanged) target.needsUpdate = true;
+  return true;
+}
+
+function exactMaterialAppearanceEquivalent(source: THREE.Material, target: THREE.Material): boolean {
+  const sourceAppearance = appearance(source);
+  const targetAppearance = appearance(target);
+  if (source.type !== target.type
+    || !materialValuesEqual(sourceAppearance, targetAppearance, MATERIAL_PROGRAM_VALUE_KEYS)
+    || !materialValuesEqual(sourceAppearance, targetAppearance, MATERIAL_UNIFORM_VALUE_KEYS)
+    || !target.blendColor.equals(source.blendColor)) return false;
+
+  if (source instanceof THREE.MeshStandardMaterial && target instanceof THREE.MeshStandardMaterial) {
+    return materialValuesEqual(sourceAppearance, targetAppearance, STANDARD_PROGRAM_VALUE_KEYS)
+      && materialValuesEqual(sourceAppearance, targetAppearance, STANDARD_UNIFORM_VALUE_KEYS)
+      && materialValuesEqual(sourceAppearance, targetAppearance, STANDARD_TEXTURE_KEYS)
+      && target.color.equals(source.color)
+      && target.emissive.equals(source.emissive)
+      && target.normalScale.equals(source.normalScale)
+      && target.envMapRotation.equals(source.envMapRotation);
+  }
+  if (source instanceof THREE.MeshBasicMaterial && target instanceof THREE.MeshBasicMaterial) {
+    return materialValuesEqual(sourceAppearance, targetAppearance, BASIC_PROGRAM_VALUE_KEYS)
+      && materialValuesEqual(sourceAppearance, targetAppearance, BASIC_UNIFORM_VALUE_KEYS)
+      && materialValuesEqual(sourceAppearance, targetAppearance, BASIC_TEXTURE_KEYS)
+      && target.color.equals(source.color);
+  }
+  return false;
+}
+
+function matrixEquals(left: THREE.Matrix4, right: THREE.Matrix4, tolerance = 1e-9): boolean {
+  for (let index = 0; index < 16; index += 1) {
+    if (Math.abs(left.elements[index]! - right.elements[index]!) > tolerance) return false;
+  }
+  return true;
+}
+
+const HALO_SCALE_VECTOR = new THREE.Vector3(
+  THERMAL_GHOST_HALO_SCALE,
+  THERMAL_GHOST_HALO_SCALE,
+  THERMAL_GHOST_HALO_SCALE,
+);
+
+function exactMeshMaterialsEquivalent(layer: GhostLayer): boolean {
+  if (Array.isArray(layer.model.material)) {
+    if (layer.model.material.length !== layer.sourceMaterials.length) return false;
+    for (let index = 0; index < layer.model.material.length; index += 1) {
+      if (!exactMaterialAppearanceEquivalent(layer.sourceMaterials[index]!, layer.model.material[index]!)) return false;
+    }
+    return true;
+  }
+  return layer.sourceMaterials.length === 1
+    && exactMaterialAppearanceEquivalent(layer.sourceMaterials[0]!, layer.model.material);
+}
+
+function materialsRenderThroughGeometry(material: THREE.Material | THREE.Material[]): boolean {
+  if (!Array.isArray(material)) return !material.depthTest && !material.depthWrite;
+  for (const entry of material) if (entry.depthTest || entry.depthWrite) return false;
+  return true;
+}
+
+function sharedBoneWorldMatricesMatch(source: THREE.SkinnedMesh, model: THREE.SkinnedMesh): boolean {
+  if (model.skeleton.bones.length !== source.skeleton.bones.length) return false;
+  for (let index = 0; index < source.skeleton.bones.length; index += 1) {
+    const sourceBone = source.skeleton.bones[index]!;
+    const modelBone = model.skeleton.bones[index]!;
+    if (sourceBone !== modelBone || !matrixEquals(sourceBone.matrixWorld, modelBone.matrixWorld)) return false;
+  }
+  return true;
+}
+
 /**
  * Re-renders each admitted combatant's real operator meshes through occluders.
  * The first layer retains the source model's exact materials, geometry and live
@@ -120,10 +310,42 @@ export class ThermalGhostPresentation {
   private readonly exactMaterialCache = new WeakMap<THREE.Material, ExactMaterialLease>();
   private readonly ownedExactMaterials = new Set<THREE.Material>();
   private readonly sharedHaloMaterial = orangeHaloMaterial();
+  private readonly expectedHaloWorldMatrix = new THREE.Matrix4();
+  private readonly telemetryState: MutableThermalGhostTelemetry = {
+    contract: THERMAL_GHOST_PRESENTATION_CONTRACT,
+    trackedTargets: 0,
+    activeTargets: 0,
+    activeModelLayers: 0,
+    activeHaloLayers: 0,
+    activeSourceBodyLayers: 0,
+    activeNormalMaterialSlots: 0,
+    geometryIdentity: true,
+    skeletonIdentity: true,
+    bindMatrixIdentity: true,
+    meshWorldMatrixIdentity: true,
+    haloWorldMatrixIdentity: true,
+    boneWorldMatrixIdentity: true,
+    normalMaterialEquivalence: true,
+    silhouetteLayerIdentity: true,
+    throughGeometry: false,
+    orangeHalo: false,
+    proxyMeshes: 0,
+    maxTargets: THERMAL_GHOST_MAX_TARGETS,
+    exactModelMaterials: 0,
+    haloMaterials: 1,
+    ownedMaterials: 1,
+    maxOwnedMaterials: THERMAL_GHOST_MAX_OWNED_MATERIALS,
+    materialBudgetExceeded: false,
+    completeOperatorModels: true,
+    incompleteTargets: 0,
+    maxBodyLayers: THERMAL_GHOST_MAX_BODY_LAYERS,
+  };
   private generation = 0;
   private activeTargets = 0;
   private activeModelLayers = 0;
   private activeHaloLayers = 0;
+  private activeSourceBodyLayers = 0;
+  private activeNormalMaterialSlots = 0;
   private materialBudgetExceeded = false;
   private haloMaterialDisposed = false;
 
@@ -142,8 +364,8 @@ export class ThermalGhostPresentation {
         clone.depthTest = false;
         clone.depthWrite = false;
         clone.clippingPlanes = null;
-        clone.needsUpdate = true;
-        lease = { material: clone, references: 0 };
+        syncExactMaterialAppearance(material, clone);
+        lease = { material: clone, references: 0, lastSyncedGeneration: this.generation };
         this.exactMaterialCache.set(material, lease);
         this.ownedExactMaterials.add(clone);
       }
@@ -250,6 +472,8 @@ export class ThermalGhostPresentation {
     this.activeTargets = 0;
     this.activeModelLayers = 0;
     this.activeHaloLayers = 0;
+    this.activeSourceBodyLayers = 0;
+    this.activeNormalMaterialSlots = 0;
     if (active) {
       const admitted: ThermalGhostTarget[] = [];
       const seenIds = new Set<string>();
@@ -286,6 +510,12 @@ export class ThermalGhostPresentation {
         record.lastSeenGeneration = this.generation;
         let visibleLayers = 0;
         for (const layer of record.layers) {
+          for (const sourceMaterial of layer.sourceMaterials) {
+            const lease = this.exactMaterialCache.get(sourceMaterial);
+            if (!lease || lease.lastSyncedGeneration === this.generation) continue;
+            syncExactMaterialAppearance(sourceMaterial, lease.material);
+            lease.lastSyncedGeneration = this.generation;
+          }
           // A child-visible flag alone false-greens hidden LODs and materials.
           // Mirror the renderer's effective source visibility to the admitted
           // root and require at least one color-writing material.
@@ -295,6 +525,8 @@ export class ThermalGhostPresentation {
           layer.halo.visible = visible;
           if (!visible) continue;
           visibleLayers += 1;
+          this.activeSourceBodyLayers += 1;
+          this.activeNormalMaterialSlots += layer.sourceMaterials.length;
           this.activeModelLayers += 1;
           this.activeHaloLayers += 1;
         }
@@ -320,12 +552,19 @@ export class ThermalGhostPresentation {
     this.activeTargets = 0;
     this.activeModelLayers = 0;
     this.activeHaloLayers = 0;
+    this.activeSourceBodyLayers = 0;
+    this.activeNormalMaterialSlots = 0;
     this.materialBudgetExceeded = false;
   }
 
   telemetry(): ThermalGhostTelemetry {
     let geometryIdentity = true;
     let skeletonIdentity = true;
+    let bindMatrixIdentity = true;
+    let meshWorldMatrixIdentity = true;
+    let haloWorldMatrixIdentity = true;
+    let boneWorldMatrixIdentity = true;
+    let normalMaterialEquivalence = true;
     let throughGeometry = this.activeModelLayers > 0;
     let orangeHalo = this.activeHaloLayers > 0;
     let completeOperatorModels = true;
@@ -334,19 +573,32 @@ export class ThermalGhostPresentation {
       completeOperatorModels &&= record.complete;
       if (!record.complete) incompleteTargets += 1;
       for (const layer of record.layers) {
+        layer.source.updateWorldMatrix(true, false);
+        layer.model.updateWorldMatrix(true, false);
+        layer.halo.updateWorldMatrix(true, false);
+        meshWorldMatrixIdentity &&= matrixEquals(layer.source.matrixWorld, layer.model.matrixWorld);
+        this.expectedHaloWorldMatrix.copy(layer.source.matrixWorld).scale(HALO_SCALE_VECTOR);
+        haloWorldMatrixIdentity &&= matrixEquals(this.expectedHaloWorldMatrix, layer.halo.matrixWorld);
         geometryIdentity &&= layer.model.geometry === layer.source.geometry
           && layer.halo.geometry === layer.source.geometry;
         if (layer.source instanceof THREE.SkinnedMesh) {
-          skeletonIdentity &&= layer.model instanceof THREE.SkinnedMesh
-            && layer.halo instanceof THREE.SkinnedMesh
-            && layer.model.skeleton === layer.source.skeleton
-            && layer.halo.skeleton === layer.source.skeleton;
+          const model = layer.model instanceof THREE.SkinnedMesh ? layer.model : null;
+          const haloModel = layer.halo instanceof THREE.SkinnedMesh ? layer.halo : null;
+          skeletonIdentity &&= model !== null
+            && haloModel !== null
+            && model.skeleton === layer.source.skeleton
+            && haloModel.skeleton === layer.source.skeleton;
+          bindMatrixIdentity &&= model !== null
+            && haloModel !== null
+            && matrixEquals(model.bindMatrix, layer.source.bindMatrix)
+            && matrixEquals(haloModel.bindMatrix, layer.source.bindMatrix)
+            && model.bindMode === layer.source.bindMode
+            && haloModel.bindMode === layer.source.bindMode;
+          boneWorldMatrixIdentity &&= model !== null && sharedBoneWorldMatricesMatch(layer.source, model);
         }
-        const materials = [
-          ...(Array.isArray(layer.model.material) ? layer.model.material : [layer.model.material]),
-          ...(Array.isArray(layer.halo.material) ? layer.halo.material : [layer.halo.material]),
-        ];
-        throughGeometry &&= materials.every((material) => material.depthTest === false && material.depthWrite === false);
+        normalMaterialEquivalence &&= exactMeshMaterialsEquivalent(layer);
+        throughGeometry &&= materialsRenderThroughGeometry(layer.model.material)
+          && materialsRenderThroughGeometry(layer.halo.material);
         const halo = Array.isArray(layer.halo.material) ? layer.halo.material[0] : layer.halo.material;
         orangeHalo &&= halo instanceof THREE.MeshBasicMaterial
           && halo.color.getHex() === THERMAL_GHOST_ORANGE_HEX
@@ -354,27 +606,31 @@ export class ThermalGhostPresentation {
           && layer.halo.scale.x === THERMAL_GHOST_HALO_SCALE;
       }
     }
-    return Object.freeze({
-      contract: THERMAL_GHOST_PRESENTATION_CONTRACT,
-      trackedTargets: this.records.size,
-      activeTargets: this.activeTargets,
-      activeModelLayers: this.activeModelLayers,
-      activeHaloLayers: this.activeHaloLayers,
-      geometryIdentity,
-      skeletonIdentity,
-      throughGeometry,
-      orangeHalo,
-      proxyMeshes: 0,
-      maxTargets: THERMAL_GHOST_MAX_TARGETS,
-      exactModelMaterials: this.ownedExactMaterials.size,
-      haloMaterials: this.haloMaterialDisposed ? 0 : 1,
-      ownedMaterials: this.ownedExactMaterials.size + (this.haloMaterialDisposed ? 0 : 1),
-      maxOwnedMaterials: THERMAL_GHOST_MAX_OWNED_MATERIALS,
-      materialBudgetExceeded: this.materialBudgetExceeded,
-      completeOperatorModels,
-      incompleteTargets,
-      maxBodyLayers: THERMAL_GHOST_MAX_BODY_LAYERS,
-    });
+    const state = this.telemetryState;
+    state.trackedTargets = this.records.size;
+    state.activeTargets = this.activeTargets;
+    state.activeModelLayers = this.activeModelLayers;
+    state.activeHaloLayers = this.activeHaloLayers;
+    state.activeSourceBodyLayers = this.activeSourceBodyLayers;
+    state.activeNormalMaterialSlots = this.activeNormalMaterialSlots;
+    state.geometryIdentity = geometryIdentity;
+    state.skeletonIdentity = skeletonIdentity;
+    state.bindMatrixIdentity = bindMatrixIdentity;
+    state.meshWorldMatrixIdentity = meshWorldMatrixIdentity;
+    state.haloWorldMatrixIdentity = haloWorldMatrixIdentity;
+    state.boneWorldMatrixIdentity = boneWorldMatrixIdentity;
+    state.normalMaterialEquivalence = normalMaterialEquivalence;
+    state.silhouetteLayerIdentity = this.activeSourceBodyLayers === this.activeModelLayers
+      && this.activeSourceBodyLayers === this.activeHaloLayers;
+    state.throughGeometry = throughGeometry;
+    state.orangeHalo = orangeHalo;
+    state.exactModelMaterials = this.ownedExactMaterials.size;
+    state.haloMaterials = this.haloMaterialDisposed ? 0 : 1;
+    state.ownedMaterials = this.ownedExactMaterials.size + (this.haloMaterialDisposed ? 0 : 1);
+    state.materialBudgetExceeded = this.materialBudgetExceeded;
+    state.completeOperatorModels = completeOperatorModels;
+    state.incompleteTargets = incompleteTargets;
+    return state;
   }
 
   terminalDispose(): void {

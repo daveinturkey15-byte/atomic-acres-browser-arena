@@ -70,6 +70,9 @@ describe('M14 thermal ghost residency', () => {
   it('shares exact geometry and a live skeleton while rendering normal model plus orange halo', () => {
     const scene = new THREE.Scene();
     const root = new THREE.Group();
+    root.position.set(3.2, -1.1, 4.7);
+    root.rotation.set(0.2, -0.7, 0.1);
+    root.scale.set(1.3, 0.8, 1.1);
     const hip = new THREE.Bone();
     const leg = new THREE.Bone();
     hip.add(leg);
@@ -81,6 +84,9 @@ describe('M14 thermal ghost residency', () => {
     geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(weights, 4));
     const sourceMaterial = new THREE.MeshStandardMaterial({ color: 0x2f5b48, roughness: 0.73 });
     const source = new THREE.SkinnedMesh(geometry, sourceMaterial);
+    source.position.set(-0.4, 1.8, 0.6);
+    source.rotation.set(-0.15, 0.33, 0.08);
+    source.scale.set(0.9, 1.15, 1.05);
     // Runtime operator meshes carry this non-authority marker; it must not
     // suppress their exact visual reveal.
     source.userData.presentationOnly = true;
@@ -108,7 +114,76 @@ describe('M14 thermal ghost residency', () => {
     expect(halo.scale.toArray()).toEqual([THERMAL_GHOST_HALO_SCALE, THERMAL_GHOST_HALO_SCALE, THERMAL_GHOST_HALO_SCALE]);
     expect(model.raycast(new THREE.Raycaster(), [])).toBeUndefined();
     expect(halo.raycast(new THREE.Raycaster(), [])).toBeUndefined();
+    leg.rotation.x = 0.62;
+    root.updateWorldMatrix(true, true);
+    expect(presentation.telemetry()).toMatchObject({
+      activeSourceBodyLayers: 1,
+      activeModelLayers: 1,
+      activeHaloLayers: 1,
+      activeNormalMaterialSlots: 1,
+      geometryIdentity: true,
+      skeletonIdentity: true,
+      bindMatrixIdentity: true,
+      meshWorldMatrixIdentity: true,
+      haloWorldMatrixIdentity: true,
+      boneWorldMatrixIdentity: true,
+      normalMaterialEquivalence: true,
+      silhouetteLayerIdentity: true,
+      proxyMeshes: 0,
+    });
     presentation.terminalDispose();
+  });
+
+  it('synchronizes live normal-material appearance without replacing the resident clone or churning versions', () => {
+    const root = new THREE.Group();
+    const sourceMaterial = new THREE.MeshStandardMaterial({
+      color: 0x223344,
+      emissive: 0x010203,
+      opacity: 1,
+      roughness: 0.7,
+      metalness: 0.15,
+    });
+    const source = new THREE.Mesh(new THREE.BoxGeometry(), sourceMaterial);
+    root.add(source);
+    const target = { id: 'dynamic-material', relation: 'hostile' as const, root };
+    const presentation = new ThermalGhostPresentation();
+
+    presentation.sync([target], true);
+    const model = source.getObjectByName('through-wall-exact-operator-model') as THREE.Mesh;
+    const residentMaterial = model.material as THREE.MeshStandardMaterial;
+    const map = new THREE.Texture();
+    sourceMaterial.color.setHex(0x8a4f2a);
+    sourceMaterial.emissive.setHex(0x190500);
+    sourceMaterial.emissiveIntensity = 2.2;
+    sourceMaterial.opacity = 0.61;
+    sourceMaterial.transparent = true;
+    sourceMaterial.roughness = 0.32;
+    sourceMaterial.metalness = 0.74;
+    sourceMaterial.map = map;
+    sourceMaterial.normalScale.set(0.45, -0.72);
+
+    presentation.sync([target], true);
+    expect(model.material).toBe(residentMaterial);
+    expect(residentMaterial.color.equals(sourceMaterial.color)).toBe(true);
+    expect(residentMaterial.emissive.equals(sourceMaterial.emissive)).toBe(true);
+    expect(residentMaterial.emissiveIntensity).toBe(sourceMaterial.emissiveIntensity);
+    expect(residentMaterial.opacity).toBe(sourceMaterial.opacity);
+    expect(residentMaterial.transparent).toBe(true);
+    expect(residentMaterial.roughness).toBe(sourceMaterial.roughness);
+    expect(residentMaterial.metalness).toBe(sourceMaterial.metalness);
+    expect(residentMaterial.map).toBe(map);
+    expect(residentMaterial.normalScale.equals(sourceMaterial.normalScale)).toBe(true);
+    expect(residentMaterial.depthTest).toBe(false);
+    expect(residentMaterial.depthWrite).toBe(false);
+    expect(presentation.telemetry().normalMaterialEquivalence).toBe(true);
+    const versionAfterChange = residentMaterial.version;
+
+    presentation.sync([target], true);
+    expect(model.material).toBe(residentMaterial);
+    expect(residentMaterial.version).toBe(versionAfterChange);
+    expect(presentation.telemetry().normalMaterialEquivalence).toBe(true);
+    presentation.terminalDispose();
+    map.dispose();
   });
 
   it('never expands the authority-approved target set or synthesizes relation aliases', () => {

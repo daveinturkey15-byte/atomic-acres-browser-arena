@@ -24,6 +24,26 @@ test.use({
 
 type ScopeKind = 'm40' | 'm14-ebr' | 'railgun';
 
+type ExactOperatorRevealReceipt = Readonly<{
+  contract: string;
+  activeTargets: number;
+  activeSourceBodyLayers: number;
+  activeModelLayers: number;
+  activeHaloLayers: number;
+  activeNormalMaterialSlots: number;
+  geometryIdentity: boolean;
+  skeletonIdentity: boolean;
+  bindMatrixIdentity: boolean;
+  meshWorldMatrixIdentity: boolean;
+  haloWorldMatrixIdentity: boolean;
+  boneWorldMatrixIdentity: boolean;
+  normalMaterialEquivalence: boolean;
+  silhouetteLayerIdentity: boolean;
+  completeOperatorModels: boolean;
+  incompleteTargets: number;
+  proxyMeshes: 0;
+}>;
+
 type ScopeReceipt = Readonly<{
   scope: ScopeKind;
   weapon: 'sniper' | 'm14-ebr' | 'railgun';
@@ -41,6 +61,7 @@ type ScopeReceipt = Readonly<{
     contacts: number;
     silhouettes: number;
     thermalThroughGeometry: boolean;
+    exactOperatorReveal: ExactOperatorRevealReceipt;
   }>;
 }>;
 
@@ -85,14 +106,9 @@ async function equipStandardWeapon(page: Page, weapon: 'sniper' | 'm14-ebr'): Pr
   }, weapon);
 }
 
-async function equipRailgunBehindWall(page: Page): Promise<boolean> {
-  await releaseAds(page);
+async function stageBotBehindAquaWall(page: Page): Promise<boolean> {
   return page.evaluate(() => {
     const api = window.__ATOMIC_ACRES_DEBUG__ as any;
-    const staged = api.stageRailgunSpawn(0);
-    if (!Array.isArray(staged?.pickupPosition)) throw new Error('Railgun spawn did not expose its pickup position.');
-    api.teleportPlayer(...staged.pickupPosition);
-    if (!api.interactRailgun()) throw new Error('Railgun pickup was rejected.');
     // The hostile is inside the Aqua house while the player looks through the
     // solid centre section of its front wall. This proves the thermal contact
     // is not merely an unobstructed HUD marker.
@@ -100,6 +116,66 @@ async function equipRailgunBehindWall(page: Page): Promise<boolean> {
     api.placeBotRelative(0, 9);
     api.setBotsFrozen(true);
     return api.segmentBlocked(-9, -12.5, -9, -21.5);
+  });
+}
+
+async function equipRailgunBehindWall(page: Page): Promise<boolean> {
+  await releaseAds(page);
+  await page.evaluate(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__ as any;
+    const staged = api.stageRailgunSpawn(0);
+    if (!Array.isArray(staged?.pickupPosition)) throw new Error('Railgun spawn did not expose its pickup position.');
+    api.teleportPlayer(...staged.pickupPosition);
+    if (!api.interactRailgun()) throw new Error('Railgun pickup was rejected.');
+  });
+  return stageBotBehindAquaWall(page);
+}
+
+function assertExactOperatorReveal(scope: 'm14-ebr' | 'railgun', reveal: any): ExactOperatorRevealReceipt {
+  expect(reveal, `${scope}: exact animated source-model reveal telemetry`).toMatchObject({
+    contract: 'exact-animated-operator-plus-orange-halo-v1',
+    geometryIdentity: true,
+    skeletonIdentity: true,
+    bindMatrixIdentity: true,
+    meshWorldMatrixIdentity: true,
+    haloWorldMatrixIdentity: true,
+    boneWorldMatrixIdentity: true,
+    normalMaterialEquivalence: true,
+    silhouetteLayerIdentity: true,
+    throughGeometry: true,
+    orangeHalo: true,
+    proxyMeshes: 0,
+    completeOperatorModels: true,
+    incompleteTargets: 0,
+    materialBudgetExceeded: false,
+  });
+  expect(reveal.activeTargets, `${scope}: at least one admitted live operator`).toBeGreaterThanOrEqual(1);
+  expect(reveal.activeSourceBodyLayers, `${scope}: complete source silhouette has body layers`).toBeGreaterThan(0);
+  expect(reveal.activeModelLayers, `${scope}: every source layer has an exact normal-model layer`)
+    .toBe(reveal.activeSourceBodyLayers);
+  expect(reveal.activeHaloLayers, `${scope}: every source layer has an orange halo layer`)
+    .toBe(reveal.activeSourceBodyLayers);
+  expect(reveal.activeNormalMaterialSlots, `${scope}: normal source materials remain bound`).toBeGreaterThanOrEqual(
+    reveal.activeSourceBodyLayers,
+  );
+  return Object.freeze({
+    contract: reveal.contract,
+    activeTargets: reveal.activeTargets,
+    activeSourceBodyLayers: reveal.activeSourceBodyLayers,
+    activeModelLayers: reveal.activeModelLayers,
+    activeHaloLayers: reveal.activeHaloLayers,
+    activeNormalMaterialSlots: reveal.activeNormalMaterialSlots,
+    geometryIdentity: reveal.geometryIdentity,
+    skeletonIdentity: reveal.skeletonIdentity,
+    bindMatrixIdentity: reveal.bindMatrixIdentity,
+    meshWorldMatrixIdentity: reveal.meshWorldMatrixIdentity,
+    haloWorldMatrixIdentity: reveal.haloWorldMatrixIdentity,
+    boneWorldMatrixIdentity: reveal.boneWorldMatrixIdentity,
+    normalMaterialEquivalence: reveal.normalMaterialEquivalence,
+    silhouetteLayerIdentity: reveal.silhouetteLayerIdentity,
+    completeOperatorModels: reveal.completeOperatorModels,
+    incompleteTargets: reveal.incompleteTargets,
+    proxyMeshes: reveal.proxyMeshes,
   });
 }
 
@@ -166,12 +242,23 @@ async function captureRealAds(
       presentation: { status: 'healthy' },
     });
 
+    let throughWall: ScopeReceipt['throughWall'];
     if (scope === 'm40') {
       expect(state.snapshot.sniperScope.active).toBe(true);
       expect(state.overlayVisibility).toEqual({ sniper: true, dmr: false, railgun: false });
     } else if (scope === 'm14-ebr') {
+      expect(wallBlocked, 'm14-ebr: staged line of sight crosses solid geometry').toBe(true);
       expect(state.snapshot.dmrThermal.active).toBe(true);
+      expect(state.snapshot.dmrThermal.contacts).toBeGreaterThanOrEqual(1);
       expect(state.overlayVisibility).toEqual({ sniper: false, dmr: true, railgun: false });
+      const exactOperatorReveal = assertExactOperatorReveal(scope, state.snapshot.dmrThermal.exactOperatorReveal);
+      throughWall = Object.freeze({
+        wallBlocked: true,
+        contacts: state.snapshot.dmrThermal.contacts,
+        silhouettes: exactOperatorReveal.activeModelLayers,
+        thermalThroughGeometry: true,
+        exactOperatorReveal,
+      });
     } else {
       expect(wallBlocked, 'railgun: staged line of sight crosses solid geometry').toBe(true);
       expect(state.snapshot.railgun.thermalVisible).toBe(true);
@@ -182,6 +269,14 @@ async function captureRealAds(
       });
       expect(state.snapshot.railgun.presentation.thermalContacts).toBeGreaterThanOrEqual(1);
       expect(state.snapshot.railgun.presentation.worldSilhouettes).toBeGreaterThanOrEqual(1);
+      const exactOperatorReveal = assertExactOperatorReveal(scope, state.snapshot.dmrThermal.exactOperatorReveal);
+      throughWall = Object.freeze({
+        wallBlocked: true,
+        contacts: state.snapshot.railgun.presentation.thermalContacts,
+        silhouettes: state.snapshot.railgun.presentation.worldSilhouettes,
+        thermalThroughGeometry: state.snapshot.railgun.presentation.thermalThroughGeometry,
+        exactOperatorReveal,
+      });
     }
 
     const screenshotPath = resolve(output, `${scope}-${renderer}-${viewport.width}x${viewport.height}-real-rmb.png`);
@@ -210,14 +305,7 @@ async function captureRealAds(
       frameDelta: state.frameDelta,
       trustedRightMouseDowns: state.inputEvents.filter((event: any) => event.type === 'mousedown' && event.trusted).length,
       overlay: overlay.slice(1),
-      ...(scope === 'railgun' ? {
-        throughWall: Object.freeze({
-          wallBlocked: wallBlocked === true,
-          contacts: state.snapshot.railgun.presentation.thermalContacts,
-          silhouettes: state.snapshot.railgun.presentation.worldSilhouettes,
-          thermalThroughGeometry: state.snapshot.railgun.presentation.thermalThroughGeometry,
-        }),
-      } : {}),
+      ...(throughWall ? { throughWall } : {}),
     });
   } finally {
     await page.mouse.up({ button: 'right' });
@@ -285,7 +373,8 @@ test('M40, M14 EBR, and Railgun survive real right-mouse ADS with their own read
   await releaseAds(page);
 
   await equipStandardWeapon(page, 'm14-ebr');
-  receipts.push(await captureRealAds(page, 'm14-ebr', 'm14-ebr', '#dmr-thermal'));
+  const m14WallBlocked = await stageBotBehindAquaWall(page);
+  receipts.push(await captureRealAds(page, 'm14-ebr', 'm14-ebr', '#dmr-thermal', m14WallBlocked));
   await releaseAds(page);
 
   const wallBlocked = await equipRailgunBehindWall(page);
@@ -305,7 +394,7 @@ test('M40, M14 EBR, and Railgun survive real right-mouse ADS with their own read
   const sourceStatusAfter = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8' });
   expect(sourceStatusAfter, 'shared source must remain byte-set stable during the browser run').toBe(sourceStatusBefore);
   const receipt = Object.freeze({
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: new Date().toISOString(),
     sourceSha,
     cleanSource: sourceStatusAfter.trim().length === 0,
@@ -315,6 +404,18 @@ test('M40, M14 EBR, and Railgun survive real right-mouse ADS with their own read
     viewport,
     browserVersion: page.context().browser()?.version() ?? 'unknown',
     realInputOnly: true,
+    exactOperatorRevealCoverage: Object.freeze({
+      receiptBound: Object.freeze([
+        'm14-ebr:trusted-rmb:wall-blocked-live-operator',
+        'railgun:trusted-rmb:wall-blocked-live-operator',
+      ]),
+      residual: Object.freeze([
+        // Chopper is firearm-authorized, but its retained helper only aims at
+        // an unobstructed training dummy. Claim it only after a separate
+        // possessed-autocannon fixture stages a live operator behind a wall.
+        'chopper-gunner:requires-possessed-autocannon-wall-blocked-live-operator-gate',
+      ]),
+    }),
     scopes: receipts,
     runtime: finalState.snapshot.render.runtime,
     diagnostics: Object.freeze({ pageErrors, consoleErrors }),
