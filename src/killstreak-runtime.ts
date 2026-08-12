@@ -297,6 +297,7 @@ type CarpetBomberActivation = {
   nextDropOrdinal: number;
   nextImpactOrdinal: number;
   dropRouteProgress: readonly number[];
+  routeCompleted: boolean;
   routeCanceled: boolean;
 };
 
@@ -1481,7 +1482,7 @@ export class HostKillstreakRuntime {
         impactAtMs: impacts.map((_, ordinal) => nowMs + CARPET_TARGET_MARKER_MAX_LIFETIME_MS + ordinal * 180),
         anchor: groundAnchor, pathStart, pathEnd, halfWidthM: plan.halfWidthM,
         nextDropOrdinal: 0, nextImpactOrdinal: 0,
-        dropRouteProgress: plan.dropRouteProgress, routeCanceled: false,
+        dropRouteProgress: plan.dropRouteProgress, routeCompleted: false, routeCanceled: false,
       });
       const flightStart = plan.flightStart;
       const flightEnd = plan.flightEnd;
@@ -1966,11 +1967,12 @@ export class HostKillstreakRuntime {
     for (const bomber of this.carpetBombers.values()) {
       const aircraft = this.entities.get(bomber.aircraftId);
       if (!aircraft || aircraft.kind !== 'aircraft' || aircraft.variant !== 'carpet'
-        || canonicalNowMs >= aircraft.expiresAtMs || aircraft.health <= 0) {
-        bomber.routeCanceled = bomber.nextDropOrdinal < bomber.impacts.length;
+        || canonicalNowMs > aircraft.expiresAtMs || aircraft.health <= 0) {
+        if (!bomber.routeCompleted) bomber.routeCanceled = bomber.nextDropOrdinal < bomber.impacts.length;
         continue;
       }
       this.advanceAircraft(aircraft, canonicalNowMs, dt, world);
+      bomber.routeCompleted = (admittedAircraftRouteProgress(aircraft) ?? 0) >= 1 - 1e-6;
     }
 
     for (const [activationId, activation] of this.timedActivations) {
@@ -1980,7 +1982,7 @@ export class HostKillstreakRuntime {
       const aircraft = this.entities.get(bomber.aircraftId);
       const routeProgress = aircraft?.kind === 'aircraft' && aircraft.variant === 'carpet'
         ? admittedAircraftRouteProgress(aircraft)
-        : null;
+        : bomber.routeCompleted ? 1 : null;
       while (!bomber.routeCanceled
         && routeProgress !== null
         && bomber.nextDropOrdinal < bomber.impacts.length
@@ -2039,7 +2041,9 @@ export class HostKillstreakRuntime {
         );
       }
       if (bomber.routeCanceled && bomber.nextImpactOrdinal >= bomber.nextDropOrdinal) {
-        this.carpetBombers.delete(activationId);
+        if (bomber.authorityReleaseAtMs === null || canonicalNowMs >= bomber.authorityReleaseAtMs) {
+          this.carpetBombers.delete(activationId);
+        }
       } else if (bomber.nextImpactOrdinal >= bomber.impacts.length
         && bomber.authorityReleaseAtMs !== null
         && canonicalNowMs >= bomber.authorityReleaseAtMs) this.carpetBombers.delete(activationId);
