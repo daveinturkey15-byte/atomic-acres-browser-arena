@@ -324,7 +324,20 @@ export const FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC = Object.freeze({
   right: -1.07,
 });
 /** The one-handed knife arc needs extra proximal sleeve travel at peak extension. */
-export const FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC = -1.19;
+export const FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC = -1.23;
+export const FIRST_PERSON_ARM_MAX_SEGMENT_LENGTH_SCALE = 2.2;
+export function riggedArmBaseSegmentLengthScale(
+  side: 'left' | 'right',
+  adsBlend: number,
+  obstructionBlend: number,
+): number {
+  const base = side === 'left'
+    ? THREE.MathUtils.lerp(1.38, 1.82, THREE.MathUtils.clamp(adsBlend, 0, 1))
+    : THREE.MathUtils.lerp(1.18, 1.52, THREE.MathUtils.clamp(adsBlend, 0, 1));
+  const contactExtension = THREE.MathUtils.clamp(obstructionBlend, 0, 1)
+    * (side === 'left' ? 0.48 : 0.3);
+  return THREE.MathUtils.clamp(base + contactExtension, 1, FIRST_PERSON_ARM_MAX_SEGMENT_LENGTH_SCALE);
+}
 /** Unit -Z blade axis reused by the per-frame melee knife alignment. */
 const KNIFE_BLADE_AXIS = Object.freeze(new THREE.Vector3(0, 0, -1));
 export const HIP_VIEWMODEL_POSITION = Object.freeze({ x: 0.34, y: -0.44, z: -1.08 });
@@ -1046,7 +1059,7 @@ export class WeaponPresentation {
     // unreadable in the Gun Range shadow floor. Keep one retained, viewmodel-
     // only warm key and give it enough bounded intensity to reveal PBR detail
     // without flattening the metal/fabric response or touching world lighting.
-    this.viewmodelFill.userData.authoredIntensity = flattenMaterials ? 0 : 15.75;
+    this.viewmodelFill.userData.authoredIntensity = flattenMaterials ? 0 : 17.5;
     this.root.add(this.viewmodelFill);
     const fabricMaterial = (color: number, roughness: number, repeatX: number, repeatY: number, normalScale: number): THREE.MeshStandardMaterial => {
       if (typeof document === 'undefined') return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
@@ -3516,10 +3529,11 @@ export class WeaponPresentation {
       // of length along the already-authored elbow/wrist directions so the
       // palm can still reach its socket while the complete weapon is folded
       // below a wall/floor. This does not move the socket, camera, or shot ray.
-      const contactExtension = this.contactResponse.obstructionBlend * (rig.side === 'left' ? 0.48 : 0.3);
-      let segmentLengthScale = (rig.side === 'left'
-        ? THREE.MathUtils.lerp(1.38, 1.82, this.adsBlend)
-        : THREE.MathUtils.lerp(1.18, 1.52, this.adsBlend)) + contactExtension;
+      let segmentLengthScale = riggedArmBaseSegmentLengthScale(
+        rig.side,
+        this.adsBlend,
+        this.contactResponse.obstructionBlend,
+      );
       rig.elbow.position.copy(rig.bindElbowPosition).multiplyScalar(segmentLengthScale);
       rig.wrist.position.copy(rig.bindWristPosition).multiplyScalar(segmentLengthScale);
       const socketName = rig.side === 'right' ? 'grip-socket-r' : 'support-socket-l';
@@ -3543,8 +3557,14 @@ export class WeaponPresentation {
         .distanceTo(this.riggedPalmWorld(rig, scratch.palmWorld)) + 0.01;
       const requiredReach = socketReach + palmReachAllowance;
       if (physicalReach < requiredReach) {
-        const reachExpansion = Math.min(2.2 / segmentLengthScale, requiredReach / Math.max(physicalReach, 1e-6));
-        segmentLengthScale *= reachExpansion;
+        const requestedSegmentLengthScale = segmentLengthScale
+          * (requiredReach / Math.max(physicalReach, 1e-6));
+        const expandedSegmentLengthScale = Math.min(
+          FIRST_PERSON_ARM_MAX_SEGMENT_LENGTH_SCALE,
+          requestedSegmentLengthScale,
+        );
+        const reachExpansion = Math.max(1, expandedSegmentLengthScale / segmentLengthScale);
+        segmentLengthScale = expandedSegmentLengthScale;
         rig.elbow.position.multiplyScalar(reachExpansion);
         rig.wrist.position.multiplyScalar(reachExpansion);
         rig.shoulder.updateWorldMatrix(true, true);

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
   FIRST_PERSON_ARM_PROPORTION_CONTRACT,
+  FIRST_PERSON_ARM_MAX_SEGMENT_LENGTH_SCALE,
   FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC,
   FIRST_PERSON_ARM_UNIFORM_SCALE,
   FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC,
@@ -12,6 +13,7 @@ import {
   HIP_VIEWMODEL_SCALE,
   VIEWMODEL_NEAR_PLANE_CLEARANCE,
   WeaponPresentation,
+  riggedArmBaseSegmentLengthScale,
   authoredNearPlaneContactRetreat,
 } from './weapon-presentation';
 import {
@@ -515,6 +517,10 @@ describe('first-person anatomical presentation', () => {
     );
     expect(meleeCrop.ndc[1]).toBeLessThanOrEqual(FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC);
     expect(FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT).toBe('reachable-shoulders-with-continuous-sleeve-crop-v2');
+    expect(riggedArmBaseSegmentLengthScale('left', 1, 1)).toBe(FIRST_PERSON_ARM_MAX_SEGMENT_LENGTH_SCALE);
+    expect(riggedArmBaseSegmentLengthScale('right', 1, 1)).toBeLessThanOrEqual(
+      FIRST_PERSON_ARM_MAX_SEGMENT_LENGTH_SCALE,
+    );
   });
 
   it('preserves Carbine and Mini Uzi centre apertures during contact ADS', async () => {

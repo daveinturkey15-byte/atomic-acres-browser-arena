@@ -61,7 +61,7 @@ export type ViewmodelContactResponse = Readonly<{
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 const finite = (value: number, fallback = 0): number => Number.isFinite(value) ? value : fallback;
-/** Millimetre-down quantization keeps collider float jitter from moving a viewmodel into geometry. */
+/** A stable millimetre grid prevents sub-pixel collider jitter from changing the presented pose. */
 const quantizeContactMetersDown = (value: number): number => Math.floor(value * 1_000 + 1e-9) / 1_000;
 export const ADS_IN_RESPONSE_PER_SECOND = 22;
 export const ADS_OUT_RESPONSE_PER_SECOND = 18;

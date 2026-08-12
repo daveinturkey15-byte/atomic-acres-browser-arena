@@ -10,6 +10,7 @@ const VIEWPORTS: readonly Viewport[] = Object.freeze([
 ]);
 
 const SHOULDER_ENTRY_NDC = Object.freeze({ left: -1.12, right: -1.07 });
+const MAXIMUM_ARM_SEGMENT_LENGTH_SCALE = 2.2;
 
 function assertAuthoredArmCropAndGrip(presentation: any, label: string, maximumContactError: number): void {
   expect(presentation.armsSource, `${label}: authored two-chain source`).toBe('authored-two-chain');
@@ -35,6 +36,8 @@ function assertAuthoredArmCropAndGrip(presentation: any, label: string, maximumC
     expect(arm.contactError, `${label}: ${side} palm/socket contact`).toBeLessThanOrEqual(maximumContactError);
     expect(arm.wristContactError, `${label}: ${side} wrist target contact`).toBeLessThanOrEqual(maximumContactError);
     expect(arm.palmOrientationError, `${label}: ${side} human palm orientation`).toBeLessThanOrEqual(0.2);
+    expect(arm.segmentLengthScale, `${label}: ${side} bounded anatomical reach`)
+      .toBeLessThanOrEqual(MAXIMUM_ARM_SEGMENT_LENGTH_SCALE);
   }
 }
 
