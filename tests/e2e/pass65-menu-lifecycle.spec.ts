@@ -77,19 +77,14 @@ async function ready(
   }, undefined, { timeout: 30_000 });
 }
 
-async function installPointerLockHarness(
-  page: Page,
-  mode: PointerLockMode,
-  options: Readonly<{ overrideFocus?: boolean }> = {},
-): Promise<void> {
-  await page.evaluate(({ initialMode, overrideFocus }) => {
+async function installPointerLockHarness(page: Page, mode: PointerLockMode): Promise<void> {
+  await page.evaluate((initialMode) => {
     const canvas = document.querySelector<HTMLCanvasElement>('#game');
     if (!canvas) throw new Error('Missing game canvas');
     const harness = {
       mode: initialMode,
       locked: false,
       focused: true,
-      focusOverridden: overrideFocus,
       requests: 0,
       losses: 0,
     };
@@ -98,12 +93,10 @@ async function installPointerLockHarness(
       configurable: true,
       get: () => harness.locked ? canvas : null,
     });
-    if (overrideFocus) {
-      Object.defineProperty(document, 'hasFocus', {
-        configurable: true,
-        value: () => harness.focused,
-      });
-    }
+    Object.defineProperty(document, 'hasFocus', {
+      configurable: true,
+      value: () => harness.focused,
+    });
     Object.defineProperty(canvas, 'requestPointerLock', {
       configurable: true,
       value: () => {
@@ -131,7 +124,7 @@ async function installPointerLockHarness(
         document.dispatchEvent(new Event('pointerlockchange'));
       },
     });
-  }, { initialMode: mode, overrideFocus: options.overrideFocus ?? true });
+  }, mode);
 }
 
 async function lifecycle(page: Page): Promise<Record<string, any>> {
@@ -241,8 +234,9 @@ async function multiplayerAdmissionDiagnostic(page: Page, role: 'host' | 'guest'
         url: location.href,
         visibilityState: document.visibilityState,
         hidden: document.hidden,
-        documentHasFocus: document.hasFocus(),
-        pointerLockFocusOverridden: (window as any).__PASS65_POINTER_LOCK__?.focusOverridden === true,
+        // This multiplayer test owns a deterministic, mutually exclusive focus
+        // lease because both peers share one headless GPU process.
+        harnessHasFocus: document.hasFocus(),
         admission,
         bootstrap: snapshot?.bootstrap ? {
           stage: snapshot.bootstrap.stage ?? snapshot.bootstrap.bootstrapStage ?? null,
@@ -268,6 +262,7 @@ async function multiplayerAdmissionDiagnostic(page: Page, role: 'host' | 'guest'
 
 async function waitForForegroundGameStart(options: Readonly<{
   page: Page;
+  otherPage: Page;
   role: 'host' | 'guest';
   timeoutMs: number;
   host: Page;
@@ -285,9 +280,29 @@ async function waitForForegroundGameStart(options: Readonly<{
   };
   try {
     await deadlineBound(
+      setHarness(options.otherPage, { focused: false }),
+      requireRemainingMs('release peer focus'),
+      `${options.role} peer-focus release timed out`,
+    );
+    await deadlineBound(
+      options.otherPage.evaluate(() => window.dispatchEvent(new Event('blur'))),
+      requireRemainingMs('publish peer blur'),
+      `${options.role} peer-blur publication timed out`,
+    );
+    await deadlineBound(
+      setHarness(options.page, { focused: true }),
+      requireRemainingMs('claim focus'),
+      `${options.role} focus claim timed out`,
+    );
+    await deadlineBound(
       options.page.bringToFront(),
       requireRemainingMs('bringToFront'),
       `${options.role} bringToFront timed out`,
+    );
+    await deadlineBound(
+      options.page.evaluate(() => window.dispatchEvent(new Event('focus'))),
+      requireRemainingMs('publish focus'),
+      `${options.role} focus publication timed out`,
     );
     await options.page.waitForFunction(
       () => document.visibilityState === 'visible'
@@ -407,10 +422,7 @@ async function openMultiplayerPeer(context: BrowserContext, name: string, seed: 
     seed,
   });
   await page.locator('#player-name').fill(name);
-  // Multiplayer admission deliberately owns one foreground rAF at a time. Keep
-  // native document focus here; spoofing both same-context pages as focused can
-  // make them contend for the headless GPU and strand one first-presentation.
-  await installPointerLockHarness(page, 'resolve', { overrideFocus: false });
+  await installPointerLockHarness(page, 'resolve');
   return page;
 }
 
@@ -848,13 +860,17 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
         expect.objectContaining({ surface: 'pre-match', matchStartCount: 0, pauseOpenCount: 0, visibilityChangeCount: 0 }),
       ]);
 
-      // Final presentation admission intentionally requires a genuinely focused
-      // foreground rAF. The multiplayer harness retains native document focus so
-      // the two same-context pages cannot both claim that boundary concurrently.
+      // Final presentation admission intentionally requires a focused rAF. Give
+      // exactly one co-located peer the harness focus lease at a time so Linux and
+      // Windows do not contend for one headless GPU as though both tabs were
+      // independently foregrounded machines.
+      await setHarness(guest, { focused: false });
+      await guest.evaluate(() => window.dispatchEvent(new Event('blur')));
       await host.bringToFront();
       await host.locator('#lobby-start').click();
       await waitForForegroundGameStart({
         page: host,
+        otherPage: guest,
         role: 'host',
         timeoutMs: boundedPeerAdmissionMs(),
         host,
@@ -865,6 +881,7 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
       });
       await waitForForegroundGameStart({
         page: guest,
+        otherPage: host,
         role: 'guest',
         timeoutMs: boundedPeerAdmissionMs(),
         host,
