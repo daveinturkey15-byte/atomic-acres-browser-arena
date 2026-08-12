@@ -72,7 +72,7 @@ describe('spatial audio contracts', () => {
     const audioSource = readFileSync(new URL('./audio.ts', import.meta.url), 'utf8');
     const arenaBed = audioSource.slice(
       audioSource.indexOf('private startArenaBed('),
-      audioSource.indexOf('private startLowHealthLoops('),
+      audioSource.indexOf('private sweepSequence('),
     );
     expect(arenaBed).toContain("const air = this.context.createOscillator();");
     expect(arenaBed).toContain("air.type = 'triangle';");

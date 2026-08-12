@@ -368,6 +368,7 @@ import {
   createDirectionalDamageState,
   createLowHealthFeedbackState,
   directionalDamagePresentation,
+  MAX_CONCURRENT_DAMAGE_DIRECTIONS,
   recordDirectionalDamage,
   sampleLowHealthFeedback,
   type DirectionalDamageState,
@@ -1145,6 +1146,17 @@ const menu = element<HTMLElement>('#menu');
 const damageDirectionIndicator = element<HTMLElement>('#damage-direction');
 const damageFlash = element<HTMLElement>('#damage-flash');
 const lowHealthVignette = element<HTMLElement>('#low-health-vignette');
+const damageDirectionMarkers = Array.from({ length: MAX_CONCURRENT_DAMAGE_DIRECTIONS }, () => {
+  const marker = document.createElement('i');
+  marker.hidden = true;
+  marker.style.setProperty('--damage-opacity', '0');
+  damageDirectionIndicator.append(marker);
+  return marker;
+});
+// Instantiate the retained damage keyframe before gameplay. The negative
+// delay holds its invisible final frame, so menu presentation cannot flash.
+damageFlash.classList.add('combat-prewarm');
+const replayDamageFlash = () => damageFlash.classList.add('pulse');
 menu.dataset.context = 'deployment';
 const menuShowcase = element<HTMLElement>('#menu-showcase');
 const menuPreviewFrame = element<HTMLElement>('#menu-preview-frame');
@@ -11177,10 +11189,13 @@ function updateSensoryFeedback(now: number): void {
   if (now - lastSensoryPresentationAt < 1000 / 30) return;
   lastSensoryPresentationAt = now;
   const directions = directionalDamagePresentation(directionalDamageState, now, player.yaw);
-  while (damageDirectionIndicator.childElementCount < directions.length) damageDirectionIndicator.append(document.createElement('i'));
-  while (damageDirectionIndicator.childElementCount > directions.length) damageDirectionIndicator.lastElementChild?.remove();
-  directions.forEach((direction, index) => {
-    const marker = damageDirectionIndicator.children.item(index) as HTMLElement;
+  damageDirectionMarkers.forEach((marker, index) => {
+    const direction = directions[index];
+    marker.hidden = direction === undefined;
+    if (!direction) {
+      marker.style.setProperty('--damage-opacity', '0');
+      return;
+    }
     marker.style.setProperty('--damage-angle', `${direction.angleRadians}rad`);
     marker.style.setProperty('--damage-opacity', direction.opacity.toFixed(4));
     marker.dataset.sector = String(direction.sector);
@@ -11246,8 +11261,8 @@ function applyDamage(
   audio.damage();
   showDamageDirection(attacker, appliedDamage, now);
   if (accessibilityRuntime.damageFlashScale > 0) {
-    damageFlash.classList.remove('pulse');
-    requestAnimationFrame(() => damageFlash.classList.add('pulse'));
+    damageFlash.classList.remove('combat-prewarm', 'pulse');
+    requestAnimationFrame(replayDamageFlash);
   }
   if (player.hp <= 0) {
     // When a killstreak event dealt the lethal blow, the caller owns the death
@@ -13172,6 +13187,8 @@ async function startGame(
   lastDebugCapturePresentation = null;
   lastMatchAdmissionCadence = null;
   lastWebGlReadyPrime = null;
+  audio.unlock();
+  document.documentElement.dataset.combatAudioPrewarm = audio.prepareCombat() ? 'ready' : 'unavailable';
   prepareDeploymentTransition();
   applyMenuLifecycle({ type: 'match-start' });
   syncMenuPreviewCanvasPlacement();

@@ -3,13 +3,29 @@ import { ArenaAudio, resolveBrowserAudioContext, updateBrowserAudioListenerPose 
 
 class FakeAudioParam {
   value = 0;
+  setValueAtTime(value: number): this { this.value = value; return this; }
+  exponentialRampToValueAtTime(value: number): this { this.value = value; return this; }
+  linearRampToValueAtTime(value: number): this { this.value = value; return this; }
   setTargetAtTime(value: number): this { this.value = value; return this; }
+  cancelScheduledValues(): this { return this; }
 }
 class FakeAudioNode {
   connect<T>(destination: T): T { return destination; }
   disconnect(): void { /* no-op browser compatibility fixture */ }
 }
 class FakeGainNode extends FakeAudioNode { readonly gain = new FakeAudioParam(); }
+class FakeOscillatorNode extends FakeAudioNode {
+  type: OscillatorType = 'sine';
+  readonly frequency = new FakeAudioParam();
+  onended: ((event: Event) => void) | null = null;
+  start(): void { /* retained muted fixture voice */ }
+  stop(): void { this.onended?.(new Event('ended')); }
+}
+class FakeBiquadFilterNode extends FakeAudioNode {
+  type: BiquadFilterType = 'lowpass';
+  readonly frequency = new FakeAudioParam();
+  readonly Q = new FakeAudioParam();
+}
 class FakeDynamicsCompressorNode extends FakeAudioNode {
   readonly threshold = new FakeAudioParam();
   readonly knee = new FakeAudioParam();
@@ -22,10 +38,13 @@ class FakeAudioContext {
   readonly sampleRate = 1_000;
   readonly destination = new FakeAudioNode();
   state: AudioContextState = 'running';
+  currentTime = 0;
 
   constructor() { FakeAudioContext.instances += 1; }
   createDynamicsCompressor(): FakeDynamicsCompressorNode { return new FakeDynamicsCompressorNode(); }
   createGain(): FakeGainNode { return new FakeGainNode(); }
+  createOscillator(): FakeOscillatorNode { return new FakeOscillatorNode(); }
+  createBiquadFilter(): FakeBiquadFilterNode { return new FakeBiquadFilterNode(); }
   createBuffer(_channels: number, length: number): { getChannelData: () => Float32Array } {
     return { getChannelData: () => new Float32Array(length) };
   }
@@ -58,6 +77,7 @@ describe('browser Web Audio constructor compatibility', () => {
     expect(StandardAudioContext.instances).toBe(1);
     expect(WebkitAudioContext.instances).toBe(0);
     expect(audio.telemetry().context).toEqual({ source: 'standard', state: 'running' });
+    expect(audio.telemetry().combatPrewarm).toMatchObject({ prepared: true, sources: 3, broadbandLoopSources: 0 });
   });
 
   it('uses webkitAudioContext only when the standard constructor is absent', () => {
@@ -67,6 +87,7 @@ describe('browser Web Audio constructor compatibility', () => {
     expect(() => audio.unlock()).not.toThrow();
     expect(WebkitAudioContext.instances).toBe(1);
     expect(audio.telemetry().context).toEqual({ source: 'webkit', state: 'running' });
+    expect(audio.telemetry().combatPrewarm).toMatchObject({ prepared: true, sources: 3, broadbandLoopSources: 0 });
   });
 
   it('enters a truthful disabled-audio state when neither constructor exists', () => {

@@ -245,7 +245,7 @@ type PlannedEventInput = Readonly<{
 }>;
 
 export const RUNTIME_AUDIO_NON_EVENT_METHODS = Object.freeze([
-  'configure', 'dispose', 'resume', 'suspend', 'telemetry', 'unlock', 'updateListener',
+  'configure', 'dispose', 'prepareCombat', 'resume', 'suspend', 'telemetry', 'unlock', 'updateListener',
 ] as const);
 
 export type RuntimeSoundCallsiteContractEntry = Readonly<{
@@ -595,7 +595,7 @@ const events: SoundEventInventoryEntry[] = [
   existingEvent({
     id: 'combat.damage-taken', family: 'combat-feedback', bus: 'sfx', delivery: 'listener-local',
     emitterSymbols: ['damage'], contractRefs: ['R100', 'R308'], concurrency: LOCAL_FEEDBACK,
-    lifecycleOwner: 'player-life', coverageDetail: 'Damage taken has a dedicated local transient; direction remains visual-only.',
+    lifecycleOwner: 'audio-session', coverageDetail: 'A session-owned muted tonal voice replays the bounded local damage envelope without first-hit audio factories; direction remains visual-only.',
   }),
   existingEvent({
     id: 'combat.near-miss', family: 'combat-feedback', bus: 'sfx', delivery: 'listener-local',
@@ -759,14 +759,14 @@ const events: SoundEventInventoryEntry[] = [
   existingEvent({
     id: 'player.low-health-breathing', family: 'player-state', bus: 'sfx', delivery: 'listener-local',
     variants: ['threshold', 'severe', 'critical'], contractRefs: ['R103', 'R305', 'R307', 'R308'],
-    emitterSymbols: ['setLowHealthFeedback'], concurrency: LOCAL_LOOP, lifecycleOwner: 'player-life',
-    coverageDetail: 'One life-owned procedural breathing loop intensifies with health and stops on recovery, death, rematch, or reduced-sensory suppression.',
+    emitterSymbols: ['setLowHealthFeedback'], concurrency: LOCAL_LOOP, lifecycleOwner: 'audio-session',
+    coverageDetail: 'One session-owned filtered tonal breathing voice is prepared muted before admission; health and reduced-sensory state automate gain without a looping broadband source or first-hit allocation.',
   }),
   existingEvent({
     id: 'player.low-health-heartbeat', family: 'player-state', bus: 'sfx', delivery: 'listener-local',
     variants: ['threshold', 'severe', 'critical'], contractRefs: ['R103', 'R305', 'R307', 'R308'],
-    emitterSymbols: ['setLowHealthFeedback'], concurrency: LOCAL_LOOP, lifecycleOwner: 'player-life',
-    coverageDetail: 'Heartbeat gain and cadence share the bounded life lifecycle and reduced-sensory teardown used by breathing.',
+    emitterSymbols: ['setLowHealthFeedback'], concurrency: LOCAL_LOOP, lifecycleOwner: 'audio-session',
+    coverageDetail: 'One session-owned heartbeat voice is prepared muted before admission; life and reduced-sensory state automate gain and terminal audio disposal owns teardown.',
   }),
   plannedEvent({
     id: 'ordnance.grenade-prime-throw', family: 'ordnance', bus: 'sfx', delivery: 'listener-local',
@@ -1004,7 +1004,7 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
   schemaVersion: SOUND_EVENT_INVENTORY_SCHEMA_VERSION,
   events: SOUND_EVENT_INVENTORY,
 });
-export const SOUND_EVENT_INVENTORY_SHA256 = '42ed79298b2605006b716a69ae653018b6fa54db0d6a133acac789dcbb9b6565';
+export const SOUND_EVENT_INVENTORY_SHA256 = '1e33f1b8b8ab4a334d63bcca8731f4b98e9222f772f4733210e653bbb09c3a55';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

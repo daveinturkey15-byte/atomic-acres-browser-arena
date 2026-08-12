@@ -168,7 +168,7 @@ describe('timed map weapon legacy-main integration', () => {
     expect(flareUpdate).not.toContain('flareProjectileSystem.telemetry()');
     expect(flareUpdate).not.toContain('point.clone()');
 
-    const targetSnapshots = between('function prepareFlareTargetSnapshots(', '\nfunction flareHostileTargets(');
+    const targetSnapshots = between('function prepareFlareTargetSnapshots(', '\nfunction flareTargetView(');
     expect(targetSnapshots).toContain('target.root.getWorldPosition(entry.target.position)');
     expect(targetSnapshots).not.toContain('position.clone()');
   });

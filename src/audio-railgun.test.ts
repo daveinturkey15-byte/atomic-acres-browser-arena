@@ -161,14 +161,15 @@ describe('railgun report presentation', () => {
 
     audio.railgunReport(true, { x: 20, y: 1.7, z: -48 });
     const firstVoices = [...(audio as unknown as {
-      activeVoices: Map<unknown, { bus: string }>;
+      activeVoices: Map<unknown, { bus: string; protectedContinuous: boolean }>;
     }).activeVoices.values()];
+    const firstReportVoices = firstVoices.filter((voice) => !voice.protectedContinuous);
     const firstBusCounts = Object.fromEntries(['sfx', 'ambience'].map((bus) => [
       bus,
-      firstVoices.filter((voice) => voice.bus === bus).length,
+      firstReportVoices.filter((voice) => voice.bus === bus).length,
     ]));
-    expect(audio.telemetry().runtime).toMatchObject({ voices: 10, spatialChains: 2, dropped: 0 });
-    expect(audio.telemetry().railgun.layerCount).toBe(firstVoices.length);
+    expect(audio.telemetry().runtime).toMatchObject({ voices: 13, spatialChains: 2, dropped: 0 });
+    expect(audio.telemetry().railgun.layerCount).toBe(firstReportVoices.length);
     expect(firstBusCounts).toEqual({ sfx: 7, ambience: 3 });
     expect(firstBusCounts.sfx).toBeLessThanOrEqual(AUDIO_RUNTIME_BUDGET.perBus.sfx);
     expect(firstBusCounts.ambience).toBeLessThanOrEqual(AUDIO_RUNTIME_BUDGET.perBus.ambience);
@@ -177,11 +178,11 @@ describe('railgun report presentation', () => {
     expect(context.panners.every((panner) => !panner.disconnected)).toBe(true);
 
     await vi.advanceTimersByTimeAsync(1_100);
-    expect(audio.telemetry().runtime).toMatchObject({ voices: 0, spatialChains: 0 });
+    expect(audio.telemetry().runtime).toMatchObject({ voices: 3, spatialChains: 0 });
     expect(context.panners.every((panner) => panner.disconnected)).toBe(true);
 
     audio.railgunReport(true, { x: -18, y: 2.1, z: 32 });
-    expect(audio.telemetry().runtime).toMatchObject({ voices: 10, spatialChains: 2, dropped: 0 });
+    expect(audio.telemetry().runtime).toMatchObject({ voices: 13, spatialChains: 2, dropped: 0 });
     expect(context.panners).toHaveLength(4);
     expect(context.panners.filter((panner) => !panner.disconnected)).toHaveLength(2);
     audio.dispose();
