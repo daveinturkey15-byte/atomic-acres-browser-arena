@@ -15,7 +15,7 @@ const REQUIRED_BASELINE = Object.freeze({
   pagesPath: 'channels/the-big-one',
   runtimeFileCount: 515,
   runtimeTreeSha256: '1a0e90676ffc411eaefeaebef0c970481aad416084a1dc21e9bf7de6de369196',
-  guardPolicySha256: '4b25e6a6084f0e777d227008e812c843506346ba57bf79c33cac14b6305780f1',
+  guardPolicySha256: 'be16416835beec35b3e155138b222538d6536644d0c3a737fb16bd35257167fd',
 });
 
 const SCRIPT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -49,12 +49,15 @@ function qualityGuardPolicy(record) {
   return {
     sourceFileTreeSha256: record.sourceFileTreeSha256,
     protectedSourceFiles: record.protectedSourceFiles,
+    auditedSourceVariants: record.auditedSourceVariants,
     protectedSourceSets: record.protectedSourceSets,
     protectedManifestEntries: record.protectedManifestEntries,
     runtimeAssetMappings: record.runtimeAssetMappings,
     runtimeAssetTreeSha256: record.runtimeAssetTreeSha256,
     arenaGlb: record.arenaGlb,
+    semanticDeclarationParity: record.semanticDeclarationParity,
     semanticFunctionParity: record.semanticFunctionParity,
+    semanticMethodParity: record.semanticMethodParity,
     semanticTokenParity: record.semanticTokenParity,
     pagesBundleTokens: record.pagesBundleTokens,
     candidateBundleTokens: record.candidateBundleTokens,
@@ -90,6 +93,10 @@ function blobAt(root, commit, path) {
   const key = `${resolve(root)}\0${commit}:${path}`;
   if (!BLOB_CACHE.has(key)) BLOB_CACHE.set(key, git(root, ['cat-file', 'blob', `${commit}:${path}`]));
   return BLOB_CACHE.get(key);
+}
+
+function gitBlobSha(bytes) {
+  return createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
 }
 
 function blobsAt(root, commit, paths) {
@@ -185,6 +192,116 @@ export function extractFunctionDeclaration(source, name) {
     else if (character === '}' && --depth === 0) return normalized.slice(match.index, index + 1);
   }
   throw new Error(`unterminated function body ${name}`);
+}
+
+/** Extract one const declaration, including a typed or nested initializer. */
+export function extractConstDeclaration(source, name) {
+  const normalized = normalizeEol(source);
+  const match = new RegExp(`(?:export\\s+)?const\\s+${name}\\b`, 'u').exec(normalized);
+  if (!match) throw new Error(`missing const declaration ${name}`);
+  let braces = 0;
+  let brackets = 0;
+  let parentheses = 0;
+  let quote = null;
+  let escaped = false;
+  let lineComment = false;
+  let blockComment = false;
+  for (let index = match.index; index < normalized.length; index += 1) {
+    const character = normalized[index];
+    const next = normalized[index + 1];
+    if (lineComment) {
+      if (character === '\n') lineComment = false;
+      continue;
+    }
+    if (blockComment) {
+      if (character === '*' && next === '/') {
+        blockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+    if (quote !== null) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (character === '/' && next === '/') {
+      lineComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === '/' && next === '*') {
+      blockComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === '"' || character === "'" || character === '`') quote = character;
+    else if (character === '{') braces += 1;
+    else if (character === '}') braces -= 1;
+    else if (character === '[') brackets += 1;
+    else if (character === ']') brackets -= 1;
+    else if (character === '(') parentheses += 1;
+    else if (character === ')') parentheses -= 1;
+    else if (character === ';' && braces === 0 && brackets === 0 && parentheses === 0) {
+      return normalized.slice(match.index, index + 1);
+    }
+  }
+  throw new Error(`unterminated const declaration ${name}`);
+}
+
+/** Extract one two-space-indented TypeScript class method. */
+export function extractClassMethod(source, className, name) {
+  const normalized = normalizeEol(source);
+  const classMatch = new RegExp(`(?:export\\s+)?class\\s+${className}\\b`, 'u').exec(normalized);
+  if (!classMatch) throw new Error(`missing class ${className}`);
+  const classOpeningBrace = normalized.indexOf('{', classMatch.index);
+  const methodMatch = new RegExp(`\\n  (?:(?:public|private|protected|static|async|readonly)\\s+)*${name}\\s*\\(`, 'u')
+    .exec(normalized.slice(classOpeningBrace));
+  if (!methodMatch) throw new Error(`missing method ${className}#${name}`);
+  const methodStart = classOpeningBrace + methodMatch.index + 1;
+  const openingBrace = normalized.indexOf('{', methodStart);
+  if (openingBrace < 0) throw new Error(`missing method body ${className}#${name}`);
+  let depth = 0;
+  let quote = null;
+  let escaped = false;
+  let lineComment = false;
+  let blockComment = false;
+  for (let index = openingBrace; index < normalized.length; index += 1) {
+    const character = normalized[index];
+    const next = normalized[index + 1];
+    if (lineComment) {
+      if (character === '\n') lineComment = false;
+      continue;
+    }
+    if (blockComment) {
+      if (character === '*' && next === '/') {
+        blockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+    if (quote !== null) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (character === '/' && next === '/') {
+      lineComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === '/' && next === '*') {
+      blockComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === '"' || character === "'" || character === '`') quote = character;
+    else if (character === '{') depth += 1;
+    else if (character === '}' && --depth === 0) return normalized.slice(methodStart, index + 1);
+  }
+  throw new Error(`unterminated method ${className}#${name}`);
 }
 
 function parseGlb(buffer) {
@@ -305,6 +422,10 @@ export function deriveAtomicQualityBaseline(root, record) {
     return [id, sha256(Buffer.from(canonicalJson(entry)))];
   }));
   const glb = blobAt(root, record.sourceSha, record.arenaGlb.sourcePath);
+  const auditedSourceVariants = Object.fromEntries(record.auditedSourceVariants.map(({ path }) => [
+    path,
+    sha256(blobAt(root, record.sourceSha, path)),
+  ]));
   const runtimeAssets = [
     ...record.runtimeAssetMappings.map(({ sourcePath }) => sourcePath),
     ...baselineTexturePaths,
@@ -313,6 +434,7 @@ export function deriveAtomicQualityBaseline(root, record) {
     sourceFileTreeSha256: treeDigest(sourceFiles),
     textureFileCount: textureEntries.length,
     textureTreeSha256: treeDigest(textureEntries),
+    auditedSourceVariants,
     manifestEntries,
     arenaSceneSignatureSha256: sha256(Buffer.from(canonicalJson(glbSceneSignature(glb)))),
     runtimeAssetTreeSha256: treeDigest(runtimeAssets),
@@ -386,6 +508,10 @@ export function verifyAtomicQualityBaseline({
     check(derived.textureTreeSha256 === texture.treeSha256, 'baseline texture-set digest mismatch');
     check(derived.arenaSceneSignatureSha256 === record.arenaGlb.sceneSignatureSha256, 'baseline arena scene signature mismatch');
     check(derived.runtimeAssetTreeSha256 === record.runtimeAssetTreeSha256, 'baseline runtime-asset digest mismatch');
+    for (const { path, baselineGitBlobSha, baselineSha256 } of record.auditedSourceVariants) {
+      check(derived.auditedSourceVariants[path] === baselineSha256, `audited source baseline digest mismatch: ${path}`);
+      check(gitBlobSha(blobAt(repositoryRoot, record.sourceSha, path)) === baselineGitBlobSha, `audited source baseline Git blob mismatch: ${path}`);
+    }
     for (const { id, canonicalSha256 } of record.protectedManifestEntries) {
       check(derived.manifestEntries[id] === canonicalSha256, `baseline manifest entry ${id} digest mismatch`);
     }
@@ -399,6 +525,39 @@ export function verifyAtomicQualityBaseline({
       check(candidatePath.startsWith(`${repositoryRoot}${sep}`) && existsSync(candidatePath), `candidate is missing protected source ${path}`);
       if (existsSync(candidatePath)) check(readFileSync(candidatePath).equals(expected), `protected source drift: ${path}`);
       protectedFileCount += 1;
+    });
+  }
+
+  let auditedSourceVariantCount = 0;
+  for (const specification of record.auditedSourceVariants) {
+    guarded(`audited source variant ${specification.path}`, () => {
+      check(SHA256.test(specification.baselineSha256 ?? ''), `audited source baseline digest is invalid: ${specification.path}`);
+      check(SHA40.test(specification.baselineGitBlobSha ?? ''), `audited source baseline Git blob is invalid: ${specification.path}`);
+      const baseline = blobAt(repositoryRoot, record.sourceSha, specification.path);
+      check(sha256(baseline) === specification.baselineSha256, `audited source baseline digest mismatch: ${specification.path}`);
+      check(gitBlobSha(baseline) === specification.baselineGitBlobSha, `audited source baseline Git blob mismatch: ${specification.path}`);
+      const candidatePath = resolve(repositoryRoot, specification.path);
+      check(candidatePath.startsWith(`${repositoryRoot}${sep}`) && existsSync(candidatePath), `candidate is missing audited source ${specification.path}`);
+      if (!existsSync(candidatePath)) return;
+      const candidate = readFileSync(candidatePath);
+      const candidateDigest = sha256(candidate);
+      const allowed = specification.allowedVariants.find((variant) => variant.sha256 === candidateDigest);
+      const baselineVariant = candidateDigest === specification.baselineSha256;
+      check(baselineVariant || allowed !== undefined, `unaudited source drift: ${specification.path}`);
+      if (allowed) {
+        check(SHA40.test(allowed.auditSourceSha ?? ''), `audited source variant commit is invalid: ${specification.path}`);
+        check(SHA40.test(allowed.gitBlobSha ?? ''), `audited source variant Git blob is invalid: ${specification.path}`);
+        check(SHA256.test(allowed.sha256 ?? ''), `audited source variant digest is invalid: ${specification.path}`);
+        check(typeof allowed.classification === 'string' && allowed.classification.length > 0, `audited source variant classification is missing: ${specification.path}`);
+        check(gitObjectExists(repositoryRoot, `${allowed.auditSourceSha}^{commit}`), `audited source variant commit is unavailable: ${allowed.auditSourceSha}`);
+        if (gitObjectExists(repositoryRoot, `${allowed.auditSourceSha}:${specification.path}`)) {
+          check(blobAt(repositoryRoot, allowed.auditSourceSha, specification.path).equals(candidate), `audited source variant does not match ${allowed.auditSourceSha}: ${specification.path}`);
+          check(gitBlobSha(candidate) === allowed.gitBlobSha, `audited source variant Git blob mismatch: ${specification.path}`);
+        } else {
+          check(false, `audited source variant blob is unavailable: ${allowed.auditSourceSha}:${specification.path}`);
+        }
+      }
+      auditedSourceVariantCount += 1;
     });
   }
 
@@ -453,6 +612,18 @@ export function verifyAtomicQualityBaseline({
     check(canonicalJson(pages) === canonicalJson(baseline), 'Pass 70 Pages GLB scene/material/texture signature drift');
   });
 
+  let semanticDeclarationCount = 0;
+  for (const group of record.semanticDeclarationParity) {
+    guarded(`semantic declarations ${group.path}`, () => {
+      const baseline = blobAt(repositoryRoot, record.sourceSha, group.path).toString('utf8');
+      const candidate = readFileSync(resolve(repositoryRoot, group.path), 'utf8');
+      for (const name of group.declarations) {
+        check(extractConstDeclaration(candidate, name) === extractConstDeclaration(baseline, name), `quality semantic declaration drift: ${group.path}#${name}`);
+        semanticDeclarationCount += 1;
+      }
+    });
+  }
+
   let semanticFunctionCount = 0;
   for (const group of record.semanticFunctionParity) {
     guarded(`semantic functions ${group.path}`, () => {
@@ -461,6 +632,21 @@ export function verifyAtomicQualityBaseline({
       for (const name of group.functions) {
         check(extractFunctionDeclaration(candidate, name) === extractFunctionDeclaration(baseline, name), `quality semantic function drift: ${group.path}#${name}`);
         semanticFunctionCount += 1;
+      }
+    });
+  }
+
+  let semanticMethodCount = 0;
+  for (const group of record.semanticMethodParity) {
+    guarded(`semantic methods ${group.path}`, () => {
+      const baseline = blobAt(repositoryRoot, record.sourceSha, group.path).toString('utf8');
+      const candidate = readFileSync(resolve(repositoryRoot, group.path), 'utf8');
+      for (const name of group.methods) {
+        check(
+          extractClassMethod(candidate, group.className, name) === extractClassMethod(baseline, group.className, name),
+          `quality semantic method drift: ${group.path}#${group.className}.${name}`,
+        );
+        semanticMethodCount += 1;
       }
     });
   }
@@ -513,9 +699,12 @@ export function verifyAtomicQualityBaseline({
     checks: {
       pagesRuntimeFiles: runtime?.runtime.length ?? 0,
       protectedSourceFiles: protectedFileCount,
+      auditedSourceVariants: auditedSourceVariantCount,
       protectedTextures: textureFileCount,
       protectedRuntimeAssets: runtimeAssetCount,
+      semanticDeclarations: semanticDeclarationCount,
       semanticFunctions: semanticFunctionCount,
+      semanticMethods: semanticMethodCount,
       semanticTokens: semanticTokenCount,
       candidateDistChecked: candidateDist !== null,
     },

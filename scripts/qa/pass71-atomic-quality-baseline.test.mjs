@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import {
+  extractClassMethod,
+  extractConstDeclaration,
   extractFunctionDeclaration,
   glbSceneSignature,
   treeDigest,
@@ -40,7 +42,7 @@ function minimalGlb(materialName) {
   return output;
 }
 
-test('deterministic comparators reject path, byte, function and GLB scene drift', () => {
+test('deterministic comparators reject path, byte, declaration, method, function and GLB scene drift', () => {
   const originalTree = treeDigest([{ path: 'asset.bin', bytes: Buffer.from('authored') }]);
   assert.notEqual(originalTree, treeDigest([{ path: 'renamed.bin', bytes: Buffer.from('authored') }]));
   assert.notEqual(originalTree, treeDigest([{ path: 'asset.bin', bytes: Buffer.from('downgraded') }]));
@@ -52,10 +54,22 @@ test('deterministic comparators reject path, byte, function and GLB scene drift'
     extractFunctionDeclaration(source.replace('quality: true', 'quality: false'), 'retained'),
   );
 
+  const typedSource = `export const CONFIG: Readonly<{ offset: number }> = Object.freeze({ offset: 0.025 });\nexport class Fixture {\n  move(): number { return CONFIG.offset; }\n}`;
+  assert.match(extractConstDeclaration(typedSource, 'CONFIG'), /offset: 0\.025/u);
+  assert.match(extractClassMethod(typedSource, 'Fixture', 'move'), /return CONFIG\.offset/u);
+  assert.notEqual(
+    extractConstDeclaration(typedSource, 'CONFIG'),
+    extractConstDeclaration(typedSource.replace('0.025', '0.25'), 'CONFIG'),
+  );
+  assert.notEqual(
+    extractClassMethod(typedSource, 'Fixture', 'move'),
+    extractClassMethod(typedSource.replace('return CONFIG.offset', 'return 0'), 'Fixture', 'move'),
+  );
+
   assert.notDeepEqual(glbSceneSignature(minimalGlb('authored-material')), glbSceneSignature(minimalGlb('reduced-material')));
 });
 
-test('the full verifier fails closed on policy, texture, LOD, preset and renderer-semantic mutations', { timeout: 120_000 }, () => {
+test('the full verifier fails closed on policy, texture, LOD, physics, preset and renderer mutations', { timeout: 120_000 }, () => {
   const temporaryRoot = mkdtempSync(join(tmpdir(), 'atomic-quality-baseline-'));
   const checkout = join(temporaryRoot, 'checkout');
   const safeTemporaryRoot = resolve(tmpdir());
@@ -87,6 +101,24 @@ test('the full verifier fails closed on policy, texture, LOD, preset and rendere
     assert.equal(lodMutation.status, 'FAIL');
     assert.match(lodMutation.problems.join('\n'), /candidate runtime asset drift: .*operator-lod2\.glb/u);
     git(['restore', '--source', 'HEAD', '--', lodPath], checkout);
+
+    const physicsPath = 'src/physics.ts';
+    const physics = readFileSync(join(checkout, physicsPath), 'utf8');
+    const physicsMutations = [
+      ['gravity: -22', 'gravity: -12', /quality semantic declaration drift: src\/physics\.ts#CHARACTER_PHYSICS_CONFIG/u],
+      ['controllerOffset: 0.025', 'controllerOffset: 0.25', /quality semantic declaration drift: src\/physics\.ts#CHARACTER_PHYSICS_CONFIG/u],
+      ['.setFriction(0)', '.setFriction(0.5)', /candidate token count drift: src\/physics\.ts "\.setFriction\(0\)"/u],
+      ['const epsilon = 0.0005', 'const epsilon = 0.005', /quality semantic method drift: src\/physics\.ts#CharacterPhysics\.move/u],
+    ];
+    for (const [before, after, semanticFailure] of physicsMutations) {
+      assert.ok(physics.includes(before), `missing physics fixture ${before}`);
+      writeFileSync(join(checkout, physicsPath), physics.replace(before, after));
+      const physicsMutation = verifyAtomicQualityBaseline({ root: checkout, recordPath });
+      assert.equal(physicsMutation.status, 'FAIL');
+      assert.match(physicsMutation.problems.join('\n'), /unaudited source drift: src\/physics\.ts/u);
+      assert.match(physicsMutation.problems.join('\n'), semanticFailure);
+      git(['restore', '--source', 'HEAD', '--', physicsPath], checkout);
+    }
 
     const profilePath = 'src/render-profile.ts';
     const profile = readFileSync(join(checkout, profilePath), 'utf8');

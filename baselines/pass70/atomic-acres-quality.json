@@ -9,13 +9,13 @@
   "pagesPath": "channels/the-big-one",
   "runtimeFileCount": 515,
   "runtimeTreeSha256": "1a0e90676ffc411eaefeaebef0c970481aad416084a1dc21e9bf7de6de369196",
-  "guardPolicySha256": "4b25e6a6084f0e777d227008e812c843506346ba57bf79c33cac14b6305780f1",
+  "guardPolicySha256": "be16416835beec35b3e155138b222538d6536644d0c3a737fb16bd35257167fd",
   "runtimeDigestPolicy": "Hash sorted path, NUL, blob bytes, NUL for every file beneath channels/the-big-one except channel-provenance.json; the complete published subtree contains 516 files including that provenance wrapper.",
   "basis": {
     "ownerAssessment": "Pass 70 is the exact published build immediately preceding the reported Pass 71 Quality-profile downgrade. This record does not claim Dave visually approved every Pass 70 frame.",
     "mechanicalEvidence": "The Pages commit subject and embedded channel-provenance.json bind PASS 70 to the exact source SHA, 515-file runtime set and recorded tree digest. Candidate checks retain the provenance-named arena GLB and source-texture wildcard, authored sky, operator LOD assets and Quality scene contracts."
   },
-  "sourceFileTreeSha256": "0aa050a193980a8fc9544f3634c626d5bf237f6a4323a19a695d95d644c5c938",
+  "sourceFileTreeSha256": "39d5a7611a9bf373eee25828018ed93b12a8527258f716869946cb79866363ed",
   "protectedSourceFiles": [
     "scripts/assets/compress-quality-glbs.mjs",
     "scripts/blender/create-atomic-acres-blender-arena.py",
@@ -44,7 +44,6 @@
     "src/material-compatibility.ts",
     "src/operator-model.ts",
     "src/pass65-settings.ts",
-    "src/physics.ts",
     "src/render-profile.ts",
     "src/rendering/arena-visual-definition.ts",
     "src/rendering/arena-visual-stream.ts",
@@ -55,6 +54,21 @@
     "src/rendering/sky-backdrop.ts",
     "src/weapon-model.ts",
     "src/world-identity-presentation.ts"
+  ],
+  "auditedSourceVariants": [
+    {
+      "path": "src/physics.ts",
+      "baselineGitBlobSha": "a4f6cc5830f8d9927989d65b4b3408f2d7bfa2c1",
+      "baselineSha256": "728ef221a1dc8a025fdca5e5b06b6c36a03af7f797482226c0fb69aa4d194b57",
+      "allowedVariants": [
+        {
+          "auditSourceSha": "7e6ad8153e1fa82a380c96ccae32d11bfa8418a7",
+          "gitBlobSha": "1ce8d6a809ef2eb10daba25555871f32df5fd450",
+          "sha256": "7e3dab56439bd5344db470c88e40c277ca3222e31c123af6374000a6c14d0c3b",
+          "classification": "Exact audited read-only character contact/capsule evidence surface; controller, movement, stance, collision shape and contact configuration remain protected below."
+        }
+      ]
+    }
   ],
   "protectedSourceSets": [
     {
@@ -110,6 +124,18 @@
     "pagesPath": "channels/the-big-one/assets/original/models/atomic-acres-blender-arena.glb",
     "sceneSignatureSha256": "41391c79a0a90f9734e0d1104cf61ea064af965cebd7554738d9dabb67a7fd4e"
   },
+  "semanticDeclarationParity": [
+    {
+      "path": "src/physics.ts",
+      "declarations": [
+        "CHARACTER_PHYSICS_CONFIG",
+        "STANCE_SHAPES",
+        "WORLD_BOUNDARY_THICKNESS",
+        "WORLD_BOUNDARY_MIN_Y",
+        "WORLD_BOUNDARY_MAX_Y"
+      ]
+    }
+  ],
   "semanticFunctionParity": [
     {
       "path": "src/legacy-main.ts",
@@ -133,6 +159,25 @@
         "renderSceneWithOverlayLayer",
         "renderSceneLayerWithoutBackground"
       ]
+    },
+    {
+      "path": "src/physics.ts",
+      "functions": [
+        "worldBoundaryColliders"
+      ]
+    }
+  ],
+  "semanticMethodParity": [
+    {
+      "path": "src/physics.ts",
+      "className": "CharacterPhysics",
+      "methods": [
+        "teleportEye",
+        "eyePosition",
+        "setStance",
+        "currentStance",
+        "move"
+      ]
     }
   ],
   "semanticTokenParity": [
@@ -144,6 +189,21 @@
         { "token": "float kernel = (x == 0 && y == 0) ? 0.18 : ((x == 0 || y == 0) ? 0.12 : 0.085);", "count": 1 },
         { "token": "* 2.2", "count": 1 },
         { "token": "bloom / max(weight, 0.001)", "count": 1 }
+      ]
+    },
+    {
+      "path": "src/physics.ts",
+      "tokens": [
+        { "token": "this.controller = world.createCharacterController(CHARACTER_PHYSICS_CONFIG.controllerOffset);", "count": 1 },
+        { "token": "this.controller.setSlideEnabled(true);", "count": 1 },
+        { "token": "this.controller.setApplyImpulsesToDynamicBodies(true);", "count": 1 },
+        { "token": "this.controller.setCharacterMass(78);", "count": 1 },
+        { "token": "this.controller.enableAutostep(CHARACTER_PHYSICS_CONFIG.autostepHeight, CHARACTER_PHYSICS_CONFIG.autostepMinimumWidth, false);", "count": 2 },
+        { "token": "this.controller.enableSnapToGround(CHARACTER_PHYSICS_CONFIG.snapToGround);", "count": 1 },
+        { "token": "this.controller.setMaxSlopeClimbAngle(CHARACTER_PHYSICS_CONFIG.maximumSlopeClimbDegrees * Math.PI / 180);", "count": 1 },
+        { "token": "this.controller.setMinSlopeSlideAngle(CHARACTER_PHYSICS_CONFIG.minimumSlopeSlideDegrees * Math.PI / 180);", "count": 1 },
+        { "token": ".setFriction(0)", "count": 1 },
+        { "token": ".setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.ALL)", "count": 1 }
       ]
     }
   ],
