@@ -61,6 +61,9 @@ export function validateAcceptanceManifest(
     pass71NativeBrowserParityTooling?: Readonly<Record<string, string>>;
     pass71Hf296ContactTooling?: Readonly<Record<string, string>>;
     pass71Hf296ContactSourceTreeSha?: string;
+    pass71Hf297FullTooling?: Readonly<Record<string, string>>;
+    pass71Hf297FullSourceTreeSha?: string;
+    pass71Hf297FullSourceCatalog?: import('../qa/pass71-hf297-full-arms-matrix.mjs').Pass71Hf297SourceCatalog;
     pass71Hf299Tooling?: readonly Readonly<{ path: string; sha256: string }>[];
     pass71Hf300Tooling?: Readonly<Record<string, string>>;
     pass71Hf300SourceTreeSha?: string;

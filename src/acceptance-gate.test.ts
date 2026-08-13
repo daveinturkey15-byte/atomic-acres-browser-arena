@@ -16,6 +16,12 @@ import {
 } from '../scripts/qa/pass71-grenade-native-receipt-contract.mjs';
 import { createPass71Hf298CoverageFixture } from '../scripts/qa/pass71-hf298-coverage-contract.mjs';
 import {
+  createPass71Hf297FullArmsEvidenceFixture,
+  pass71Hf297FullArmsSourceTreeAtSource,
+  pass71Hf297FullArmsToolingHashesAtSource,
+} from '../scripts/qa/pass71-hf297-full-arms-evidence-contract.mjs';
+import { pass71Hf297SourceCatalogAtSource } from '../scripts/qa/pass71-hf297-full-arms-matrix.mjs';
+import {
   createPass71StuckEvidenceFixture,
   pass71StuckEvidenceToolingHashes,
 } from '../scripts/qa/pass71-stuck-evidence-contract.mjs';
@@ -87,6 +93,39 @@ let cachedHf312Source: Readonly<{
 }> | null = null;
 let cachedHf307Tooling: Readonly<{ headSha: string; tooling: readonly Readonly<{ path: string; sha256: string }>[] }> | null = null;
 let cachedHf309Tooling: Readonly<{ headSha: string; tooling: readonly Readonly<{ path: string; sha256: string }>[] }> | null = null;
+let cachedHf297FullFixture: Readonly<{
+  headSha: string;
+  sourceSha: string;
+  sourceTreeSha: string;
+  tooling: Readonly<Record<string, string>>;
+  catalog: ReturnType<typeof pass71Hf297SourceCatalogAtSource>;
+  record: Record<string, any>;
+}> | null = null;
+
+function pass71Hf297FullTestFixture(headSha: string, sourceSha: string) {
+  if (!cachedHf297FullFixture || cachedHf297FullFixture.headSha !== headSha
+    || cachedHf297FullFixture.sourceSha !== sourceSha) {
+    const sourceTreeSha = pass71Hf297FullArmsSourceTreeAtSource(process.cwd(), headSha);
+    const tooling = pass71Hf297FullArmsToolingHashesAtSource(process.cwd(), headSha);
+    const catalog = pass71Hf297SourceCatalogAtSource(process.cwd(), headSha);
+    cachedHf297FullFixture = {
+      headSha,
+      sourceSha,
+      sourceTreeSha,
+      tooling,
+      catalog,
+      record: createPass71Hf297FullArmsEvidenceFixture({
+        sourceSha,
+        sourceTreeSha,
+        tooling,
+        catalog,
+        startedAt: '2026-08-13T09:31:30.000Z',
+        completedAt: '2026-08-13T09:51:30.000Z',
+      }),
+    };
+  }
+  return cachedHf297FullFixture;
+}
 
 function pass71Hf306TestFixture(headSha: string, sourceSha: string) {
   if (!cachedHf306Fixture || cachedHf306Fixture.headSha !== headSha
@@ -218,6 +257,7 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, tooling: parityTooling,
     startedAt: '2026-08-13T09:31:00.000Z', completedAt: '2026-08-13T09:50:00.000Z',
   });
+  const hf297Full = pass71Hf297FullTestFixture(headSha, manifest.preview.sourceSha).record;
   const qualityTooling = pass71QualityVisualToolingHashes(process.cwd());
   const quality = createPass71QualityVisualEvidenceFixture({
     sourceSha: manifest.preview.sourceSha, tooling: qualityTooling,
@@ -288,10 +328,10 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, tooling, components,
     finalizedAt: '2026-08-13T09:30:00.000Z',
   });
-  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, quality, hf299, hf300, hf301, hf305, hf306, hf307, hf309, hf312, stuck, parity];
+  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, hf297Full, quality, hf299, hf300, hf301, hf305, hf306, hf307, hf309, hf312, stuck, parity];
   return {
     manifest, coverage: rebuilt.record, components: rebuilt.components, quality,
-    hf299, hf300, hf301, hf305, hf306, hf307, hf309, hf312,
+    hf297Full, hf299, hf300, hf301, hf305, hf306, hf307, hf309, hf312,
   };
 }
 
@@ -302,6 +342,15 @@ function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
     pass71StuckEvidenceTooling: pass71StuckEvidenceToolingHashes(process.cwd()),
     pass71QualityVisualTooling: pass71QualityVisualToolingHashes(process.cwd()),
     pass71NativeBrowserParityTooling: pass71NativeBrowserParityToolingHashesAtSource(process.cwd(), headSha),
+    pass71Hf297FullTooling: pass71Hf297FullTestFixture(
+      headSha, '0123456789abcdef0123456789abcdef01234567',
+    ).tooling,
+    pass71Hf297FullSourceTreeSha: pass71Hf297FullTestFixture(
+      headSha, '0123456789abcdef0123456789abcdef01234567',
+    ).sourceTreeSha,
+    pass71Hf297FullSourceCatalog: pass71Hf297FullTestFixture(
+      headSha, '0123456789abcdef0123456789abcdef01234567',
+    ).catalog,
     pass71Hf299Tooling: PASS71_HF299_TOOL_PATHS.map((path) => ({
       path,
       sha256: createHash('sha256').update(readFileSync(join(process.cwd(), path))).digest('hex'),
@@ -579,14 +628,22 @@ describe('release acceptance manifest', () => {
       .toMatch(/R8\/HF-303 must be mechanically verified before publication/);
   }, 60_000);
 
-  it('cannot use the representative HF-297 arms component as closing evidence', () => {
+  it('requires the literal full-scope HF-297 arms record and rejects representative-only coverage', () => {
     const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
-    const { manifest } = pass71Manifest(tooling);
-    manifest.requirements[1].state = 'verified';
-    delete (manifest.requirements[1] as unknown as { deferApproval?: unknown }).deferApproval;
+    const { manifest, hf297Full } = pass71Manifest(tooling);
+    const accepted = validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling));
+    expect(accepted.errors.join('\n')).not.toMatch(/verified R2\/HF-297|hf297-/);
+
+    manifest.nativeEvidence = manifest.nativeEvidence.filter((record) => record !== hf297Full);
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
-      .toMatch(/representative non-closing component: hf297-closing-evidence-required/);
-  }, 20_000);
+      .toMatch(/verified R2\/HF-297 requires its canonical registered native evidence record|representative non-closing component: hf297-closing-evidence-required/);
+
+    const forged = structuredClone(hf297Full);
+    forged.closingAuthority = false;
+    manifest.nativeEvidence.push(forged);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/nativeEvidence\[[0-9]+\]: (?:record-identity|receipt-sha256)|representative non-closing component: hf297-closing-evidence-required/);
+  }, 60_000);
 
   it('requires the exact-camera native Quality record before HF-303 can be verified', () => {
     const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
