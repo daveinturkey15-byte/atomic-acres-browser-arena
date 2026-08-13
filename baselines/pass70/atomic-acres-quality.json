@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "designation": "pass70-atomic-acres-quality-published-reference",
+  "designatedAt": "2026-08-12T19:48:30.000Z",
+  "releasePass": "PASS 70",
+  "immutable": true,
+  "sourceSha": "130fd59bd2cf1e1719b802463219ddf36e2484d5",
+  "pagesSha": "ecd683116163b4940566f82f7edb87ed9c964cb6",
+  "pagesPath": "channels/the-big-one",
+  "runtimeFileCount": 515,
+  "runtimeTreeSha256": "1a0e90676ffc411eaefeaebef0c970481aad416084a1dc21e9bf7de6de369196",
+  "guardPolicySha256": "4b25e6a6084f0e777d227008e812c843506346ba57bf79c33cac14b6305780f1",
+  "runtimeDigestPolicy": "Hash sorted path, NUL, blob bytes, NUL for every file beneath channels/the-big-one except channel-provenance.json; the complete published subtree contains 516 files including that provenance wrapper.",
+  "basis": {
+    "ownerAssessment": "Pass 70 is the exact published build immediately preceding the reported Pass 71 Quality-profile downgrade. This record does not claim Dave visually approved every Pass 70 frame.",
+    "mechanicalEvidence": "The Pages commit subject and embedded channel-provenance.json bind PASS 70 to the exact source SHA, 515-file runtime set and recorded tree digest. Candidate checks retain the provenance-named arena GLB and source-texture wildcard, authored sky, operator LOD assets and Quality scene contracts."
+  },
+  "sourceFileTreeSha256": "0aa050a193980a8fc9544f3634c626d5bf237f6a4323a19a695d95d644c5c938",
+  "protectedSourceFiles": [
+    "scripts/assets/compress-quality-glbs.mjs",
+    "scripts/blender/create-atomic-acres-blender-arena.py",
+    "scripts/blender/export-atomic-acres-arena-spec.ts",
+    "source-assets/blender/atomic-acres-arena-spec.json",
+    "source-assets/blender/atomic-acres-blender-arena.blend",
+    "source-assets/blender/atomic-acres-blender-arena.provenance.json",
+    "source-assets/skies/atomic-acres-sunset-generated.png",
+    "source-assets/skies/atomic-acres-sunset.provenance.json",
+    "src/adaptive-quality.ts",
+    "src/arena-contrast-lighting.ts",
+    "src/arena-layout.ts",
+    "src/art-kit.ts",
+    "src/atomic-profile-authority-parity.ts",
+    "src/atmosphere-system.ts",
+    "src/ballistics.ts",
+    "src/blender-environment.ts",
+    "src/blender-lighting.ts",
+    "src/environment-assets.ts",
+    "src/graphics-refinement.ts",
+    "src/graphics-settings-registry.ts",
+    "src/grass-placement.ts",
+    "src/grass-system.ts",
+    "src/house-navigation.ts",
+    "src/map.ts",
+    "src/material-compatibility.ts",
+    "src/operator-model.ts",
+    "src/pass65-settings.ts",
+    "src/physics.ts",
+    "src/render-profile.ts",
+    "src/rendering/arena-visual-definition.ts",
+    "src/rendering/arena-visual-stream.ts",
+    "src/rendering/arenas/atomic-acres.ts",
+    "src/rendering/arenas/shared.ts",
+    "src/rendering/pass64-tsl-scene.ts",
+    "src/rendering/runtime-shadow-budget.ts",
+    "src/rendering/sky-backdrop.ts",
+    "src/weapon-model.ts",
+    "src/world-identity-presentation.ts"
+  ],
+  "protectedSourceSets": [
+    {
+      "path": "public/assets/original/textures",
+      "extension": ".png",
+      "recursive": false,
+      "fileCount": 94,
+      "treeSha256": "bd01bbf45f1f51d0eef1282131935915bdd010ccaf36dbd52b731eddffa03e74",
+      "pagesPath": "channels/the-big-one/assets/original/textures",
+      "basis": "The immutable arena provenance names public/assets/original/textures/*.png as its authored source-texture wildcard."
+    }
+  ],
+  "protectedManifestEntries": [
+    {
+      "path": "assets.manifest.json",
+      "id": "atomic-acres-aesthetic-overhaul-2026-07-22",
+      "canonicalSha256": "acfc9ab104e0d77b13a02d121ccdf935819da6c005641e603e02b3ccce26c746"
+    }
+  ],
+  "runtimeAssetMappings": [
+    {
+      "sourcePath": "public/assets/original/models/atomic-acres-blender-arena.glb",
+      "pagesPath": "channels/the-big-one/assets/original/models/atomic-acres-blender-arena.glb"
+    },
+    {
+      "sourcePath": "public/assets/original/skies/atomic-acres-sunset.webp",
+      "pagesPath": "channels/the-big-one/assets/original/skies/atomic-acres-sunset.webp"
+    },
+    {
+      "sourcePath": "public/assets/original/models/operators/pass65-first-person-arms-lod0.glb",
+      "pagesPath": "channels/the-big-one/assets/original/models/operators/pass65-first-person-arms-lod0.glb"
+    },
+    {
+      "sourcePath": "public/assets/original/models/operators/pass65-first-person-arms-lod1.glb",
+      "pagesPath": "channels/the-big-one/assets/original/models/operators/pass65-first-person-arms-lod1.glb"
+    },
+    {
+      "sourcePath": "public/assets/original/models/operators/pass65-third-person-operator-lod0.glb",
+      "pagesPath": "channels/the-big-one/assets/original/models/operators/pass65-third-person-operator-lod0.glb"
+    },
+    {
+      "sourcePath": "public/assets/original/models/operators/pass65-third-person-operator-lod1.glb",
+      "pagesPath": "channels/the-big-one/assets/original/models/operators/pass65-third-person-operator-lod1.glb"
+    },
+    {
+      "sourcePath": "public/assets/original/models/operators/pass65-third-person-operator-lod2.glb",
+      "pagesPath": "channels/the-big-one/assets/original/models/operators/pass65-third-person-operator-lod2.glb"
+    }
+  ],
+  "runtimeAssetTreeSha256": "589c13fd9766ce5c9d389b83a39bfe0f9e45df74011a7feaf6e75c4ac4d8d244",
+  "arenaGlb": {
+    "sourcePath": "public/assets/original/models/atomic-acres-blender-arena.glb",
+    "pagesPath": "channels/the-big-one/assets/original/models/atomic-acres-blender-arena.glb",
+    "sceneSignatureSha256": "41391c79a0a90f9734e0d1104cf61ea064af965cebd7554738d9dabb67a7fd4e"
+  },
+  "semanticFunctionParity": [
+    {
+      "path": "src/legacy-main.ts",
+      "functions": [
+        "ensureAtomicQualityPresentation",
+        "ensureSelectedQualityPresentation",
+        "atomicQualityHousePresentationActive",
+        "syncAtomicHouseStructuralPresentation",
+        "setArenaPresentationVisibility",
+        "applyArenaLightingForSelection"
+      ]
+    },
+    {
+      "path": "src/atomic-signal.ts",
+      "functions": [
+        "atomicSignalPrincipalHdrSamples",
+        "atomicSignalConfig",
+        "atomicSignalTextureSamples",
+        "renderSceneWithoutOverlayLayer",
+        "renderSceneOverlayLayer",
+        "renderSceneWithOverlayLayer",
+        "renderSceneLayerWithoutBackground"
+      ]
+    }
+  ],
+  "semanticTokenParity": [
+    {
+      "path": "src/atomic-signal.ts",
+      "tokens": [
+        { "token": "step(bloomDepth, sceneSampleDepth + 0.0025)", "count": 1 },
+        { "token": "smoothstep(1.05, 2.1, luminance(sampleColor))", "count": 1 },
+        { "token": "float kernel = (x == 0 && y == 0) ? 0.18 : ((x == 0 || y == 0) ? 0.12 : 0.085);", "count": 1 },
+        { "token": "* 2.2", "count": 1 },
+        { "token": "bloom / max(weight, 0.001)", "count": 1 }
+      ]
+    }
+  ],
+  "pagesBundleTokens": [
+    "PASS 70",
+    "130fd59bd2cf1e1719b802463219ddf36e2484d5",
+    "atomic-acres-blender-arena.glb?v=pass63-20260724-apertures1",
+    "Nuke Town Quality art"
+  ],
+  "candidateBundleTokens": [
+    "atomic-acres-blender-arena.glb?v=pass63-20260724-apertures1",
+    "Nuke Town Quality art",
+    "atomic-acres/house-profile-authority-parity@1"
+  ],
+  "allowedRendererOptimization": {
+    "paths": [
+      "src/atomic-signal.ts",
+      "src/rendering/render-runtime.ts",
+      "src/legacy-main.ts"
+    ],
+    "contract": "Implementation may move the retained selective-bloom isolation, sampled-ray depth guard and 3x3 authored kernel to a bounded prefilter target, but may not change Quality grading, HDR samples, scene layering, authored asset selection, material/texture corpus, lighting, shadows, geometry detail or authority binding."
+  },
+  "limitations": {
+    "pixelParityBlocker": "The immutable Pass 70 source and Pages commits retain no exact-camera native-GPU pixel corpus or driver/backend receipt, and this task forbids launching a native browser/GPU. This comparator therefore proves deterministic source, published-asset and scene-contract parity, not pixel-equivalent rendering or subjective visual quality."
+  },
+  "rollbackPolicy": "Serve the exact ecd683116163b4940566f82f7edb87ed9c964cb6 channels/the-big-one bytes without rebuilding when a Pass 70 visual rollback is required."
+}

@@ -68,6 +68,10 @@ jobs:
         env:
           VITE_MATCH_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}
           VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
+      - name: Fetch immutable Pass 70 Quality baseline
+        run: git fetch --no-tags origin ecd683116163b4940566f82f7edb87ed9c964cb6
+      - name: Verify Pass 71 Atomic Acres Quality baseline
+        run: npm run qa:pass71:atomic-quality-baseline -- --candidate-dist dist
       - run: npm run verify:release-tree
       - name: Write immutable PR preview receipt
         if: github.event_name == 'pull_request' && runner.os == 'Linux' && needs.classify-change.outputs.mode != 'none'
