@@ -50,6 +50,11 @@ import {
   pass71Hf306OwnerSourceAuditAtSource,
   pass71Hf306ToolingHashesAtSource,
 } from '../scripts/qa/pass71-hf306-cockpit-evidence-contract.mjs';
+import {
+  createPass71Hf312EvidenceFixture,
+  pass71Hf312SourceAuditAtSource,
+  pass71Hf312ToolingAtSource,
+} from '../scripts/qa/pass71-hf312-bounded-consolidation-evidence-contract.mjs';
 
 const policy = {
   schemaVersion: 1,
@@ -66,6 +71,11 @@ let cachedHf306Fixture: Readonly<{
   assetAudit: readonly unknown[];
   ownerSourceAudit: unknown;
   record: Record<string, any>;
+}> | null = null;
+let cachedHf312Source: Readonly<{
+  headSha: string;
+  sourceAudit: Readonly<Record<string, unknown>>;
+  tooling: readonly Readonly<{ path: string; sha256: string }>[];
 }> | null = null;
 
 function pass71Hf306TestFixture(headSha: string, sourceSha: string) {
@@ -90,6 +100,18 @@ function pass71Hf306TestFixture(headSha: string, sourceSha: string) {
     ...cachedHf306Fixture,
     record: cachedHf306Fixture.record,
   };
+}
+
+function pass71Hf312TestSource(headSha: string) {
+  if (!cachedHf312Source || cachedHf312Source.headSha !== headSha) {
+    cachedHf312Source = {
+      headSha,
+      sourceAudit: pass71Hf312SourceAuditAtSource(process.cwd(), headSha),
+      tooling: pass71Hf312ToolingAtSource(process.cwd(), headSha),
+    };
+  }
+  if (!cachedHf312Source) throw new Error('HF-312 test source cache was not initialized');
+  return cachedHf312Source;
 }
 
 function acceptedManifest() {
@@ -203,6 +225,12 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
   });
   const hf306Fixture = pass71Hf306TestFixture(headSha, manifest.preview.sourceSha);
   const hf306 = hf306Fixture.record;
+  const { sourceAudit: hf312SourceAudit, tooling: hf312Tooling } = pass71Hf312TestSource(headSha);
+  const hf312 = createPass71Hf312EvidenceFixture({
+    sourceSha: manifest.preview.sourceSha, sourceTreeSha: headSha,
+    sourceAudit: hf312SourceAudit, tooling: hf312Tooling,
+    startedAt: '2026-08-13T09:38:00.000Z', completedAt: '2026-08-13T09:48:00.000Z',
+  });
   manifest.preview.createdAt = '2026-08-13T09:00:00Z';
   manifest.humanAcceptance.approvedAt = '2026-08-13T10:00:00Z';
   for (const requirement of manifest.requirements) {
@@ -220,8 +248,8 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, tooling, components,
     finalizedAt: '2026-08-13T09:30:00.000Z',
   });
-  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, quality, hf299, hf300, hf301, hf305, hf306, stuck, parity];
-  return { manifest, coverage: rebuilt.record, components: rebuilt.components, quality, hf299, hf300, hf301, hf305, hf306 };
+  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, quality, hf299, hf300, hf301, hf305, hf306, hf312, stuck, parity];
+  return { manifest, coverage: rebuilt.record, components: rebuilt.components, quality, hf299, hf300, hf301, hf305, hf306, hf312 };
 }
 
 function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
@@ -251,6 +279,9 @@ function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
     pass71Hf306SourceTreeSha: headSha,
     pass71Hf306AssetAudit: pass71Hf306TestFixture(headSha, '0123456789abcdef0123456789abcdef01234567').assetAudit,
     pass71Hf306OwnerSourceAudit: pass71Hf306TestFixture(headSha, '0123456789abcdef0123456789abcdef01234567').ownerSourceAudit,
+    pass71Hf312Tooling: pass71Hf312TestSource(headSha).tooling,
+    pass71Hf312SourceTreeSha: headSha,
+    pass71Hf312SourceAudit: pass71Hf312TestSource(headSha).sourceAudit,
   };
 }
 
@@ -609,6 +640,24 @@ describe('release acceptance manifest', () => {
     manifest.nativeEvidence.push(forged);
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/nativeEvidence\[[0-9]+\]: (?:scope:webgl2:viewport:0:raster:recomputed-raster-summary|receipt-sha256)/);
+  }, 60_000);
+
+  it('requires the exact source-derived bounded consolidation audit before HF-312 can be verified', () => {
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    const { manifest, hf312 } = pass71Manifest(tooling);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .not.toMatch(/verified R17\/HF-312|hf312-/);
+
+    manifest.nativeEvidence = manifest.nativeEvidence.filter((record) => record !== hf312);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/verified R17\/HF-312 requires its canonical registered native evidence record/);
+
+    const forged = structuredClone(hf312) as Record<string, any>;
+    forged.gates[0].command = 'npm test -- --passWithNoTests';
+    forged.receiptSha256 = '0'.repeat(64);
+    manifest.nativeEvidence.push(forged);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/nativeEvidence\[[0-9]+\]: (?:full-core-and-clean-preflight-gates|receipt-sha256)/);
   }, 60_000);
 
   it('orders every HF-298 component and coverage finalization between preview and approval', () => {
