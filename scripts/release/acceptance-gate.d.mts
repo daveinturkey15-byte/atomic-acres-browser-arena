@@ -56,6 +56,7 @@ export function validateAcceptanceManifest(
     pass71NativeEvidenceTooling?: Readonly<Record<string, string>>;
     pass71StuckEvidenceTooling?: Readonly<Record<string, string>>;
     pass71AudioNativeTooling?: readonly Readonly<{ path: string; sha256: string }>[];
+    pass71QualityVisualTooling?: Readonly<Record<string, string>>;
     pass71NativeBrowserParityTooling?: Readonly<Record<string, string>>;
     pass71Hf296ContactTooling?: Readonly<Record<string, string>>;
     pass71Hf296ContactSourceTreeSha?: string;

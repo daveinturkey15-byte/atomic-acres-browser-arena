@@ -20,6 +20,10 @@ import {
   createPass71NativeBrowserParityFixture,
   pass71NativeBrowserParityToolingHashesAtSource,
 } from '../scripts/qa/pass71-native-browser-parity-contract.mjs';
+import {
+  createPass71QualityVisualEvidenceFixture,
+  pass71QualityVisualToolingHashes,
+} from '../scripts/qa/pass71-quality-visual-parity-contract.mjs';
 
 const policy = {
   schemaVersion: 1,
@@ -103,6 +107,11 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, tooling: parityTooling,
     startedAt: '2026-08-13T09:31:00.000Z', completedAt: '2026-08-13T09:50:00.000Z',
   });
+  const qualityTooling = pass71QualityVisualToolingHashes(process.cwd());
+  const quality = createPass71QualityVisualEvidenceFixture({
+    sourceSha: manifest.preview.sourceSha, tooling: qualityTooling,
+    startedAt: '2026-08-13T09:32:00.000Z', completedAt: '2026-08-13T09:40:00.000Z',
+  });
   manifest.preview.createdAt = '2026-08-13T09:00:00Z';
   manifest.humanAcceptance.approvedAt = '2026-08-13T10:00:00Z';
   for (const requirement of manifest.requirements) {
@@ -120,8 +129,8 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, tooling, components,
     finalizedAt: '2026-08-13T09:30:00.000Z',
   });
-  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, stuck, parity];
-  return { manifest, coverage: rebuilt.record, components: rebuilt.components };
+  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, quality, stuck, parity];
+  return { manifest, coverage: rebuilt.record, components: rebuilt.components, quality };
 }
 
 function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
@@ -129,6 +138,7 @@ function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
   return {
     policy, pass71NativeEvidenceTooling: tooling,
     pass71StuckEvidenceTooling: pass71StuckEvidenceToolingHashes(process.cwd()),
+    pass71QualityVisualTooling: pass71QualityVisualToolingHashes(process.cwd()),
     pass71NativeBrowserParityTooling: pass71NativeBrowserParityToolingHashesAtSource(process.cwd(), headSha),
   };
 }
@@ -389,6 +399,22 @@ describe('release acceptance manifest', () => {
       .toMatch(/representative non-closing component: hf297-closing-evidence-required/);
   }, 20_000);
 
+  it('requires the exact-camera native Quality record before HF-303 can be verified', () => {
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    const { manifest, quality } = pass71Manifest(tooling);
+    const accepted = validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling));
+    expect(accepted.errors.join('\n')).not.toMatch(/verified R8\/HF-303|hf303-/);
+
+    manifest.nativeEvidence = manifest.nativeEvidence.filter((record) => record !== quality);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/verified R8\/HF-303 requires its canonical registered native evidence record/);
+
+    manifest.nativeEvidence.push(structuredClone(quality));
+    (manifest.nativeEvidence.at(-1)?.captures?.[0]?.png as { base64: string }).base64 = 'not-a-png';
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/nativeEvidence\[[0-9]+\]: (?:capture-pass70-webgl2-png|receipt-sha256)/);
+  }, 30_000);
+
   it('orders every HF-298 component and coverage finalization between preview and approval', () => {
     const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
     const { manifest, components } = pass71Manifest(tooling);
@@ -417,7 +443,7 @@ describe('release acceptance manifest', () => {
       components: [...components.slice(0, 3), afterApproval],
       finalizedAt: '2026-08-13T10:00:00.002Z',
     });
-    const retained = manifest.nativeEvidence.slice(-2);
+    const retained = manifest.nativeEvidence.slice(-3);
     manifest.nativeEvidence = [...components.slice(0, 3), afterApproval, afterCoverage, ...retained];
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/completedAt cannot follow humanAcceptance/);

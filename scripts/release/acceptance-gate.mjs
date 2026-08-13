@@ -24,6 +24,7 @@ import {
   pass71Hf297VerifiedRequirementFailures,
 } from '../qa/pass71-hf297-arms-evidence-contract.mjs';
 import { PASS71_AUDIO_NATIVE_REGISTRY_ENTRY } from '../qa/pass71-audio-native-receipt-contract.mjs';
+import { PASS71_QUALITY_VISUAL_EVIDENCE_REGISTRY_ENTRY } from '../qa/pass71-quality-visual-parity-contract.mjs';
 import {
   PASS71_STUCK_EVIDENCE_DESCRIPTOR,
   pass71StuckEvidenceFailures,
@@ -138,6 +139,7 @@ export const PASS71_NATIVE_EVIDENCE_REGISTRY = createPass71NativeEvidenceRegistr
   PASS71_HF296_CONTACT_EVIDENCE_REGISTRY_ENTRY,
   PASS71_HF297_ARMS_EVIDENCE_REGISTRY_ENTRY,
   PASS71_AUDIO_NATIVE_REGISTRY_ENTRY,
+  PASS71_QUALITY_VISUAL_EVIDENCE_REGISTRY_ENTRY,
   PASS71_STUCK_EVIDENCE_REGISTRY_ENTRY,
   PASS71_NATIVE_BROWSER_PARITY_REGISTRY_ENTRY,
 ]);
@@ -438,6 +440,7 @@ export function validateAcceptanceManifest(manifest, options = {}) {
       ['HF-296', PASS71_HF296_CONTACT_EVIDENCE_REGISTRY_ENTRY.descriptor],
       ['HF-297', null],
       ['HF-302', PASS71_AUDIO_NATIVE_REGISTRY_ENTRY.descriptor],
+      ['HF-303', PASS71_QUALITY_VISUAL_EVIDENCE_REGISTRY_ENTRY.descriptor],
       ['HF-310', PASS71_STUCK_EVIDENCE_DESCRIPTOR],
       ['HF-311', PASS71_NATIVE_BROWSER_PARITY_DESCRIPTOR],
     ]);
