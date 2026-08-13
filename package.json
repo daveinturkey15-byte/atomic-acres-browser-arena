@@ -67,6 +67,8 @@
     "qa:pass71:hf300-drone-thermal": "npm run qa:pass71:hf300-drone-thermal:contract && node scripts/qa/run-pass71-hf300-drone-thermal-evidence.mjs",
     "qa:pass71:hf304-glass:contract": "node --test scripts/qa/pass71-hf304-glass-evidence-contract.test.mjs",
     "qa:pass71:hf304-glass": "npm run qa:pass71:hf304-glass:contract && node scripts/qa/run-pass71-hf304-glass-evidence.mjs",
+    "qa:pass71:hf304-live-hosted:contract": "node --test scripts/qa/pass71-hf304-live-hosted-evidence-contract.test.mjs",
+    "qa:pass71:hf304-live-hosted": "npm run qa:pass71:hf304-live-hosted:contract && node scripts/qa/run-pass71-hf304-live-hosted-evidence.mjs",
     "qa:pass71:hf301-renderer-progress:contract": "node --test scripts/qa/pass71-hf301-renderer-progress-evidence-contract.test.mjs",
     "qa:pass71:hf301-renderer-progress": "npm run qa:pass71:hf301-renderer-progress:contract && node scripts/qa/run-pass71-hf301-renderer-progress-evidence.mjs",
     "qa:pass71:hf306-cockpit:contract": "node --test scripts/qa/pass71-hf306-cockpit-evidence-contract.test.mjs",

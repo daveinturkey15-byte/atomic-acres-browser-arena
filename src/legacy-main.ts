@@ -317,6 +317,7 @@ import { preserveSoloCountdownCue, type MatchCountdownCue } from './match-countd
 import { adsSightProfile } from './ads-sight-profile';
 import { ArenaMap, buildArena } from './map';
 import {
+  GLASS_CRACK_DAMAGE_Q,
   admitCrossbowThroughGlass,
   admitGlassImpact,
   createGlassState,
@@ -886,6 +887,7 @@ import {
   GuestCombatInventoryProjection,
   HitMessage,
   HostVerifiedStickyAttachment,
+  isGameMessage,
   GuestResumeAckMessage,
   GuestResumeAuthorityMessage,
   GuestResumeFailureMessage,
@@ -10948,6 +10950,28 @@ function onNetworkMessage(message: GameMessage): void {
     if (message.by === player.id) return;
     if (message.weapon === 'railgun') {
       if (network.role === 'host' || processedNonces.has(message.nonce)) return;
+      if (localMultiplayerQa) {
+        // The normal railgun replica is presentation-only because its sealed
+        // hit result travels separately. HF-304 still has to prove that the
+        // exact host action preceding a canonical glass event passed the same
+        // sender/weapon/origin/cadence admission as every other weapon. Retain
+        // that admitted action only on the localhost QA route; production
+        // railgun authority remains unchanged.
+        const remoteSender = remotes.get(message.by);
+        const prior = remoteShotAdmissions.get(message.by) ?? createRemoteShotAdmissionState();
+        const admission = admitRemoteShot(message, remoteSender?.snapshot, performance.now(), prior);
+        if (!admission.accepted) return;
+        remoteShotAdmissions.set(message.by, admission.nextState);
+        const actions = admittedRemoteShots.get(message.by) ?? new Map<number, AdmittedRemoteShot>();
+        const now = performance.now();
+        for (const [nonce, action] of actions) {
+          if (now - action.receivedAt > admittedShotActionLifetimeMs(action.message.weapon)) actions.delete(nonce);
+        }
+        actions.set(message.nonce, {
+          message, receivedAt: now, matchEpoch: interactiveWorldMatchEpoch, targets: new Set(),
+        });
+        admittedRemoteShots.set(message.by, actions);
+      }
       processedNonces.add(message.nonce);
       trimNonceSet();
       renderRemoteShot(message);
@@ -13168,6 +13192,310 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
   );
   if (network.role === 'host') network.send(canonicalHostWindowBreak({ ...message, origin: canonicalOriginTuple as [number, number, number] }, now), message.by);
   trimNonceSet();
+}
+
+type Hf304GlassEvidenceMode = 'solo' | 'hosted';
+
+function hf304GlassPaneEvidence(window: ArenaMap['breakableWindows'][number]) {
+  const state = window.glassState?.matchEpoch === interactiveWorldMatchEpoch
+    ? window.glassState
+    : createGlassState(window.id, interactiveWorldMatchEpoch);
+  const debris = [...persistentWindowDebris.values()].find((entry) => entry.windowId === window.id);
+  return Object.freeze({
+    paneId: window.id,
+    state: Object.freeze({ ...state, rememberedImpactIds: Object.freeze([...state.rememberedImpactIds]) }),
+    projection: glassAuthorityProjection(state),
+    meshVisible: window.mesh.visible,
+    broken: window.broken,
+    activeWorldColliderPresent: activeGlassDynamicColliders().some(({ id }) => id === `glass:${window.id}`),
+    persistentDebrisId: debris?.id ?? null,
+  });
+}
+
+function hf304GlassEvidencePane(index: number): ArenaMap['breakableWindows'][number] | null {
+  if (!Number.isSafeInteger(index) || index < 0 || index >= arena.breakableWindows.length) return null;
+  return arena.breakableWindows[index] ?? null;
+}
+
+function stageHf304GlassEvidenceActor(window: ArenaMap['breakableWindows'][number]): boolean {
+  const target = window.mesh.getWorldPosition(new THREE.Vector3());
+  let eye: THREE.Vector3 | null = null;
+  if (arena.houses.length > 0) {
+    const house = arena.houses.reduce((nearest, candidate) => {
+      const currentDistance = Math.hypot(target.x - candidate.origin.x, target.z - candidate.origin.z);
+      const nearestDistance = Math.hypot(target.x - nearest.origin.x, target.z - nearest.origin.z);
+      return currentDistance < nearestDistance ? candidate : nearest;
+    });
+    const staged = selectPlayableWindowApproach(target, house.origin, arena.bounds, activeWorldColliders(), 4);
+    if (staged) eye = new THREE.Vector3(staged.x, staged.y, staged.z);
+  } else {
+    // Skyline's panes have no HouseNavigation owner. Use the same authored
+    // mullion-safe approach as the served glass lifecycle gate, trying both
+    // sides of the facade while keeping the player inside the arena bounds.
+    const candidates = [
+      new THREE.Vector3(target.x + 1, 1.7, target.z + 6),
+      new THREE.Vector3(target.x + 1, 1.7, target.z - 6),
+    ];
+    eye = candidates.find((candidate) => pointInsideBounds(candidate, arena.bounds, 0.55)) ?? null;
+  }
+  if (!eye) return false;
+  player.position.copy(eye);
+  characterPhysics?.teleportEye(player.position);
+  player.velocity.set(0, 0, 0);
+  const delta = target.clone().sub(player.position);
+  player.yaw = Math.atan2(-delta.x, -delta.z);
+  player.pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z));
+  player.invulnerableUntil = 0;
+  camera.position.copy(player.position);
+  camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+  camera.updateMatrixWorld(true);
+  return true;
+}
+
+function prepareHf304GlassEvidenceCell(weapon: WeaponId, paneIndex: number) {
+  if (!localMultiplayerQa || matchState.phase !== 'active'
+    || network.role !== 'offline' && network.role !== 'host') return null;
+  const pane = hf304GlassEvidencePane(paneIndex);
+  if (!pane || !WEAPON_IDS.includes(weapon)) return null;
+  resetBreakableWindows();
+  player.weapon = weapon;
+  player.ammo[weapon] = WEAPONS[weapon].mag;
+  player.reserve[weapon] = WEAPONS[weapon].reserve;
+  player.nextShotAt = 0;
+  if (!stageHf304GlassEvidenceActor(pane)) return null;
+  const stateMessage = createStateMessage();
+  if (network.role === 'host') network.sendStateCommitReliably(stateMessage);
+  return Object.freeze({
+    contract: 'hf304-live-private-runtime-prepare-v1',
+    mode: (network.role === 'host' ? 'hosted' : 'solo') as Hf304GlassEvidenceMode,
+    networkRole: network.role,
+    arenaId: selectedArena.id,
+    paneId: pane.id,
+    paneIndex,
+    weaponId: weapon,
+    fireKind: WEAPONS[weapon].fireKind,
+    policy: weaponGlassBreakPolicy(weapon),
+    actorId: player.id,
+    hostId: network.role === 'host' ? player.id : null,
+    peerIds: Object.freeze([...remotes.keys()].sort()),
+    matchEpoch: interactiveWorldMatchEpoch,
+    playerPosition: Object.freeze(player.position.toArray()),
+    cameraDirection: Object.freeze(camera.getWorldDirection(new THREE.Vector3()).toArray()),
+    stateSequence: stateMessage.player.seq,
+    before: hf304GlassPaneEvidence(pane),
+  });
+}
+
+function stageHf304GlassEvidenceView(paneIndex: number) {
+  if (!localMultiplayerQa || matchState.phase !== 'active') return null;
+  const pane = hf304GlassEvidencePane(paneIndex);
+  if (!pane || !stageHf304GlassEvidenceActor(pane)) return null;
+  const stateMessage = createStateMessage();
+  if (network.role === 'host') network.sendStateCommitReliably(stateMessage);
+  return Object.freeze({
+    contract: 'hf304-live-private-runtime-stage-v1',
+    networkRole: network.role,
+    actorId: player.id,
+    paneId: pane.id,
+    playerPosition: Object.freeze(player.position.toArray()),
+    stateSequence: stateMessage.player.seq,
+  });
+}
+
+function probeHf304GlassEvidenceCrack(paneIndex: number, impactNonce: number) {
+  if (!localMultiplayerQa || matchState.phase !== 'active'
+    || network.role !== 'offline' && network.role !== 'host'
+    || !Number.isSafeInteger(impactNonce) || impactNonce < 0) return null;
+  const pane = hf304GlassEvidencePane(paneIndex);
+  if (!pane) return null;
+  const before = hf304GlassPaneEvidence(pane);
+  const state = pane.glassState?.matchEpoch === interactiveWorldMatchEpoch
+    ? pane.glassState
+    : createGlassState(pane.id, interactiveWorldMatchEpoch);
+  const impactId = `hf304-crack:${player.id}:${impactNonce}:${pane.id}`;
+  const result = admitGlassImpact(state, {
+    isHost: true,
+    matchEpoch: interactiveWorldMatchEpoch,
+    expectedRevision: state.revision,
+    impactId,
+    tick: interactiveWorldTick,
+    profile: 'bullet',
+    damageQ: GLASS_CRACK_DAMAGE_Q,
+  });
+  if (!result.accepted) return Object.freeze({ accepted: false, before, cracked: before });
+  pane.glassState = result.state;
+  const projection = glassAuthorityProjection(result.state);
+  pane.broken = projection.apertureOpen;
+  pane.mesh.visible = projection.paneVisible;
+  invalidateActiveWorldCollisionCache();
+  syncInteractiveWorldPhysics(true);
+  return Object.freeze({
+    contract: 'hf304-live-private-runtime-crack-v1',
+    networkRole: network.role,
+    actorId: player.id,
+    matchEpoch: interactiveWorldMatchEpoch,
+    impactId,
+    accepted: true,
+    before,
+    cracked: hf304GlassPaneEvidence(pane),
+  });
+}
+
+function authorHf304GlassEvidenceCell(
+  weapon: WeaponId,
+  paneIndex: number,
+  actionNonce: number,
+  windowEventNonce: number,
+) {
+  if (!localMultiplayerQa || matchState.phase !== 'active'
+    || network.role !== 'offline' && network.role !== 'host'
+    || !Number.isSafeInteger(actionNonce) || actionNonce < 0
+    || !Number.isSafeInteger(windowEventNonce) || windowEventNonce < 0
+    || actionNonce === windowEventNonce) return null;
+  const pane = hf304GlassEvidencePane(paneIndex);
+  if (!pane || !WEAPON_IDS.includes(weapon) || player.weapon !== weapon) return null;
+  const policy = weaponGlassBreakPolicy(weapon);
+  const definition = WEAPONS[weapon];
+  const point = pane.mesh.getWorldPosition(new THREE.Vector3());
+  const origin = camera.getWorldPosition(new THREE.Vector3());
+  const direction = point.clone().sub(origin).normalize();
+  const directionTuple = direction.toArray() as [number, number, number];
+  const shot: ShotMessage = {
+    type: 'shot',
+    by: player.id,
+    weapon,
+    origin: origin.toArray() as [number, number, number],
+    direction: directionTuple,
+    pelletDirections: Array.from({ length: definition.pellets }, () => [...directionTuple] as [number, number, number]),
+    nonce: actionNonce,
+  };
+  if (network.role === 'host') {
+    // The exact action precedes its durable pane event on the owned reliable
+    // peer lane. Projectile replicas consume this retained identity in
+    // admitProjectileGlassBreak; ordinary host-authored impacts remain sealed
+    // by hostAuthority plus the receiver's spatial trace.
+    const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
+    const now = performance.now();
+    for (const [nonce, action] of actions) {
+      if (now - action.receivedAt > admittedShotActionLifetimeMs(action.message.weapon)) actions.delete(nonce);
+    }
+    actions.set(actionNonce, {
+      message: shot,
+      receivedAt: now,
+      matchEpoch: interactiveWorldMatchEpoch,
+      targets: new Set(),
+    });
+    admittedRemoteShots.set(player.id, actions);
+    network.send(shot);
+  }
+  const projectile = definition.fireKind === 'projectile';
+  const normal = direction.clone().multiplyScalar(-1);
+  const before = hf304GlassPaneEvidence(pane);
+  const accepted = breakHouseWindow(
+    pane.id,
+    point,
+    normal,
+    false,
+    projectile ? point : origin,
+    'shot',
+    projectile ? actionNonce : undefined,
+    player.id,
+    windowEventNonce,
+    projectile ? weapon : undefined,
+  );
+  const untrustedMessage: WindowBreakMessage = {
+    type: 'window-break',
+    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+    by: player.id,
+    windowId: pane.id,
+    origin: (projectile ? point : origin).toArray() as [number, number, number],
+    kind: 'shot',
+    ...(projectile ? { weapon, actionNonce } : {}),
+    nonce: windowEventNonce,
+  };
+  const canonicalMessage = network.role === 'host'
+    ? canonicalHostWindowBreak(untrustedMessage, performance.now())
+    : null;
+  if (canonicalMessage) network.send(canonicalMessage);
+  return Object.freeze({
+    contract: 'hf304-live-private-runtime-authority-v1',
+    mode: (network.role === 'host' ? 'hosted' : 'solo') as Hf304GlassEvidenceMode,
+    networkRole: network.role,
+    arenaId: selectedArena.id,
+    paneId: pane.id,
+    paneIndex,
+    weaponId: weapon,
+    fireKind: definition.fireKind,
+    policy,
+    actorId: player.id,
+    hostId: network.role === 'host' ? player.id : null,
+    peerIds: Object.freeze([...remotes.keys()].sort()),
+    matchEpoch: interactiveWorldMatchEpoch,
+    action: Object.freeze({
+      nonce: actionNonce,
+      decodedByProtocol: isGameMessage(shot),
+      by: shot.by,
+      weapon: shot.weapon,
+      fireKind: definition.fireKind,
+      pelletCount: shot.pelletDirections.length,
+      origin: Object.freeze([...shot.origin]),
+      direction: Object.freeze([...shot.direction]),
+    }),
+    windowEvent: Object.freeze({
+      nonce: windowEventNonce,
+      decodedByProtocol: isGameMessage(canonicalMessage ?? untrustedMessage),
+      by: untrustedMessage.by,
+      kind: untrustedMessage.kind,
+      wireWeapon: untrustedMessage.weapon ?? null,
+      actionNonce: untrustedMessage.actionNonce ?? null,
+      hostAuthorityId: canonicalMessage?.hostAuthority?.hostId ?? null,
+      origin: Object.freeze([...untrustedMessage.origin]),
+    }),
+    accepted,
+    before,
+    after: hf304GlassPaneEvidence(pane),
+  });
+}
+
+function sampleHf304GlassEvidenceCell(
+  paneId: string,
+  actionNonce: number,
+  windowEventNonce: number,
+) {
+  if (!localMultiplayerQa || !Number.isSafeInteger(actionNonce)
+    || !Number.isSafeInteger(windowEventNonce)) return null;
+  const pane = arena.breakableWindows.find((candidate) => candidate.id === paneId);
+  if (!pane) return null;
+  const hostId = network.role === 'client' ? privateLobbySnapshot?.hostId ?? null
+    : network.role === 'host' ? player.id : null;
+  const action = hostId ? currentAdmittedShotAction(hostId, actionNonce) : undefined;
+  return Object.freeze({
+    contract: 'hf304-live-private-runtime-observation-v1',
+    networkRole: network.role,
+    arenaId: selectedArena.id,
+    localPlayerId: player.id,
+    hostId,
+    peerIds: Object.freeze([...remotes.keys()].sort()),
+    matchEpoch: interactiveWorldMatchEpoch,
+    action: action ? Object.freeze({
+      by: action.message.by,
+      weapon: action.message.weapon,
+      nonce: action.message.nonce,
+      matchEpoch: action.matchEpoch,
+      paneAdmitted: action.targets.has(`glass:${paneId}`),
+    }) : null,
+    windowEvent: Object.freeze({
+      nonce: windowEventNonce,
+      processed: processedNonces.has(windowEventNonce),
+    }),
+    pane: hf304GlassPaneEvidence(pane),
+    ledgers: Object.freeze({
+      remoteShotOwnerCount: admittedRemoteShots.size,
+      hostedBotProjectileActions: hostedBotProjectileGlassActions.size(),
+      hostedBotBallisticActions: hostedBotBallisticGlassActions.size(),
+      processedNonceCount: processedNonces.size,
+    }),
+  });
 }
 
 function resetBreakableWindows(): void {
@@ -26760,6 +27088,28 @@ const debugWindow = window as Window & {
     aimAtRemote: (zone?: HitZone) => void;
     aimAtRemoteWithOffset: (yawOffset: number, pitchOffset?: number) => void;
     stageWindow: (index: number, distance?: number) => void;
+    prepareHf304GlassEvidenceCell: (
+      weapon: WeaponId,
+      paneIndex: number,
+    ) => ReturnType<typeof prepareHf304GlassEvidenceCell>;
+    stageHf304GlassEvidenceView: (
+      paneIndex: number,
+    ) => ReturnType<typeof stageHf304GlassEvidenceView>;
+    probeHf304GlassEvidenceCrack: (
+      paneIndex: number,
+      impactNonce: number,
+    ) => ReturnType<typeof probeHf304GlassEvidenceCrack>;
+    authorHf304GlassEvidenceCell: (
+      weapon: WeaponId,
+      paneIndex: number,
+      actionNonce: number,
+      windowEventNonce: number,
+    ) => ReturnType<typeof authorHf304GlassEvidenceCell>;
+    sampleHf304GlassEvidenceCell: (
+      paneId: string,
+      actionNonce: number,
+      windowEventNonce: number,
+    ) => ReturnType<typeof sampleHf304GlassEvidenceCell>;
     resetBreakableWindows: () => void;
     detonateGrenadeAtWindow: (index: number) => number;
     stageYardhawkWall: (team?: Team) => boolean;
@@ -29974,6 +30324,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
     camera.updateMatrixWorld(true);
   },
+  prepareHf304GlassEvidenceCell,
+  stageHf304GlassEvidenceView,
+  probeHf304GlassEvidenceCrack,
+  authorHf304GlassEvidenceCell,
+  sampleHf304GlassEvidenceCell,
   resetBreakableWindows: () => resetBreakableWindows(),
   detonateGrenadeAtWindow: (index: number) => {
     const pane = arena.breakableWindows[Math.max(0, Math.min(arena.breakableWindows.length - 1, Math.floor(index)))];
