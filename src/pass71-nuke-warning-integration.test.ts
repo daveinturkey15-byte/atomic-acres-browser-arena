@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+const evidence = readFileSync(new URL('../tests/e2e/pass71-nuke-warning.spec.ts', import.meta.url), 'utf8');
 
 describe('Pass 71 dramatic Nuke warning integration', () => {
   it('prewarms both warning and detonation vocabulary before gameplay', () => {
@@ -46,5 +47,41 @@ describe('Pass 71 dramatic Nuke warning integration', () => {
     expect(clear).toContain('nukeWarningCoreMaterial.opacity = 0');
     expect(clear).toContain('nukeWarningRingMaterial.opacity = 0');
     expect(clear).not.toContain('nukeWarningLight');
+  });
+
+  it('attributes the release raster to the exact pre-detonation beacon rather than the red HUD', () => {
+    const freezeStart = main.indexOf('async function freezeDebugNukeWarningEvidenceFrame()');
+    const freezeEnd = main.indexOf('\nfunction currentDebugNukeWarningEvidenceFrame()', freezeStart);
+    const freeze = main.slice(freezeStart, freezeEnd);
+    expect(freeze).toContain('official.frame !== lastGameplayPresentedFrame');
+    expect(freeze).toContain('debugNukeWarningEvidenceState = state');
+    expect(freeze).toContain('debugRenderPaused = true');
+    expect(freeze).toContain("if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);");
+    expect(freeze).toContain('completed.completedSequence < official.submissionSequence');
+    expect(freeze).toContain("contract: 'nuke-warning-frozen-visible-frame-v1'");
+
+    const frameStart = main.indexOf('function frame(now: number, scheduleNext = true)');
+    const frameEnd = main.indexOf('\nfunction resize()', frameStart);
+    const frame = main.slice(frameStart, frameEnd);
+    expect(frame).toContain('if (debugRenderPaused && debugNukeWarningEvidenceState)');
+    expect(frame.indexOf('if (debugRenderPaused && debugNukeWarningEvidenceState)'))
+      .toBeLessThan(frame.indexOf('updateFieldSupport(frameDt, now)'));
+
+    const controlStart = main.indexOf('async function captureDebugNukeWarningHiddenControl()');
+    const controlEnd = main.indexOf('\nfunction releaseDebugNukeWarningEvidenceFrame()', controlStart);
+    const control = main.slice(controlStart, controlEnd);
+    expect(control).toContain('root.visible = false');
+    expect(control).toContain("await submitForegroundWebGpuFrame(true, 'serialized')");
+    expect(control).toContain('atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER)');
+    expect(control).toContain('finally {\n    root.visible = true;');
+    expect(control).toContain("contract: 'nuke-warning-hidden-control-v1'");
+
+    expect(evidence).toContain('redWarningAttributionDelta(hiddenControlPng, active, attributableCrop)');
+    expect(evidence).toContain('expect(attributableCrop.top).toBeGreaterThan(activation.framing.hud.bottom)');
+    expect(evidence).toContain('expect(visibleCaptureReceipt).toEqual(activation.frozen)');
+    expect(evidence).toContain('expect(activation.frozen.detonateInMs).toBeGreaterThan(2_000)');
+    expect(evidence).toContain('expect(raster.maximumRedDelta).toBeGreaterThanOrEqual(72)');
+    expect(evidence).toContain('expect(raster.changedWarningPixels).toBeGreaterThanOrEqual(240)');
+    expect(evidence).not.toContain('redWarningDelta(before, active)');
   });
 });

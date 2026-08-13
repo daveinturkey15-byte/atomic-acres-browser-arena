@@ -29,25 +29,27 @@ type NukeWarningSnapshot = Readonly<{
   }>;
 }>;
 
-async function redWarningDelta(before: Buffer, after: Buffer): Promise<Readonly<{
+type RasterCrop = Readonly<{ left: number; top: number; width: number; height: number }>;
+
+async function redWarningAttributionDelta(control: Buffer, visible: Buffer, crop: RasterCrop): Promise<Readonly<{
   changedWarningPixels: number;
   maximumRedDelta: number;
 }>> {
-  const [beforeRaw, afterRaw] = await Promise.all([
-    sharp(before).removeAlpha().raw().toBuffer({ resolveWithObject: true }),
-    sharp(after).removeAlpha().raw().toBuffer({ resolveWithObject: true }),
+  const [controlRaw, visibleRaw] = await Promise.all([
+    sharp(control).extract(crop).removeAlpha().raw().toBuffer({ resolveWithObject: true }),
+    sharp(visible).extract(crop).removeAlpha().raw().toBuffer({ resolveWithObject: true }),
   ]);
-  expect(afterRaw.info).toMatchObject({ width: beforeRaw.info.width, height: beforeRaw.info.height, channels: 3 });
-  const { width, height, channels } = afterRaw.info;
+  expect(visibleRaw.info).toMatchObject({ width: controlRaw.info.width, height: controlRaw.info.height, channels: 3 });
+  const { width, height, channels } = visibleRaw.info;
   let changedWarningPixels = 0;
   let maximumRedDelta = 0;
-  for (let y = Math.floor(height * 0.16); y < Math.ceil(height * 0.84); y += 1) {
-    for (let x = Math.floor(width * 0.18); x < Math.ceil(width * 0.82); x += 1) {
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
       const offset = (y * width + x) * channels;
-      const red = afterRaw.data[offset]!;
-      const green = afterRaw.data[offset + 1]!;
-      const blue = afterRaw.data[offset + 2]!;
-      const redDelta = red - beforeRaw.data[offset]!;
+      const red = visibleRaw.data[offset]!;
+      const green = visibleRaw.data[offset + 1]!;
+      const blue = visibleRaw.data[offset + 2]!;
+      const redDelta = red - controlRaw.data[offset]!;
       maximumRedDelta = Math.max(maximumRedDelta, redDelta);
       if (redDelta >= 34 && red >= 82 && red >= green * 1.18 && red >= blue * 1.32) {
         changedWarningPixels += 1;
@@ -86,6 +88,7 @@ test('renders the pre-detonation Nuke warning inside the Gun Range killstreak ro
   mkdirSync(output, { recursive: true });
   const beforePath = resolve(output, 'gun-range-before-warning-1920x1080.png');
   const activePath = resolve(output, 'gun-range-nuke-warning-1920x1080.png');
+  const hiddenControlPath = resolve(output, 'gun-range-nuke-warning-hidden-control.nonpublishable.png');
   const cdp = await page.context().newCDPSession(page);
   try {
     const beforeSurface = await cdp.send('Page.captureScreenshot', {
@@ -93,8 +96,7 @@ test('renders the pre-detonation Nuke warning inside the Gun Range killstreak ro
       fromSurface: true,
       captureBeyondViewport: false,
     });
-    const before = Buffer.from(beforeSurface.data, 'base64');
-    writeFileSync(beforePath, before);
+    writeFileSync(beforePath, Buffer.from(beforeSurface.data, 'base64'));
 
     const activation = await page.evaluate(async () => {
       const api = window.__ATOMIC_ACRES_DEBUG__ as any;
@@ -115,7 +117,20 @@ test('renders the pre-detonation Nuke warning inside the Gun Range killstreak ro
         };
         requestAnimationFrame(sampleRenderedFrame);
       });
-      return { armed, rendered };
+      const frozen = rendered.active && !rendered.detonated && (rendered.warning?.scale ?? 0) > 0.72
+        ? await api.freezeNukeWarningEvidenceFrame()
+        : null;
+      const canvas = document.querySelector<HTMLCanvasElement>('#game')!.getBoundingClientRect();
+      const hud = document.querySelector<HTMLElement>('#nuke-warning')!.getBoundingClientRect();
+      return {
+        armed,
+        rendered,
+        frozen,
+        framing: {
+          canvas: { left: canvas.left, top: canvas.top, right: canvas.right, bottom: canvas.bottom },
+          hud: { left: hud.left, top: hud.top, right: hud.right, bottom: hud.bottom },
+        },
+      };
     });
     const activeSurface = await cdp.send('Page.captureScreenshot', {
       format: 'png',
@@ -124,6 +139,19 @@ test('renders the pre-detonation Nuke warning inside the Gun Range killstreak ro
     });
     const active = Buffer.from(activeSurface.data, 'base64');
     writeFileSync(activePath, active);
+    const visibleCaptureReceipt = await page.evaluate(() => (
+      (window.__ATOMIC_ACRES_DEBUG__ as any).nukeWarningEvidenceFrame()
+    ));
+    const hiddenControl = await page.evaluate(() => (
+      (window.__ATOMIC_ACRES_DEBUG__ as any).captureNukeWarningHiddenControl()
+    ));
+    const hiddenControlSurface = await cdp.send('Page.captureScreenshot', {
+      format: 'png',
+      fromSurface: true,
+      captureBeyondViewport: false,
+    });
+    const hiddenControlPng = Buffer.from(hiddenControlSurface.data, 'base64');
+    writeFileSync(hiddenControlPath, hiddenControlPng);
 
     expect(activation.armed).toMatchObject({
       active: true,
@@ -147,16 +175,74 @@ test('renders the pre-detonation Nuke warning inside the Gun Range killstreak ro
     expect(activation.rendered.warning!.scale).toBeGreaterThan(0.72);
     expect(activation.rendered.warning!.coreOpacity).toBeGreaterThan(0);
     expect(activation.rendered.warning!.ringOpacity).toBeGreaterThan(0);
+    expect(activation.frozen).toMatchObject({
+      contract: 'nuke-warning-frozen-visible-frame-v1',
+      renderer,
+      active: true,
+      detonated: false,
+      beaconVisible: true,
+      beaconPosition: [...warningPosition],
+    });
+    expect(activation.frozen.detonateInMs).toBeGreaterThan(2_000);
+    expect(activation.frozen.beaconScale).toBeGreaterThan(0.72);
+    expect(activation.frozen.coreOpacity).toBeGreaterThan(0);
+    expect(activation.frozen.ringOpacity).toBeGreaterThan(0);
+    expect(visibleCaptureReceipt).toEqual(activation.frozen);
+    expect(hiddenControl).toMatchObject({
+      contract: 'nuke-warning-hidden-control-v1',
+      nonPublishable: true,
+      renderer,
+      simulationFrame: activation.frozen.simulationFrame,
+      captureRevision: activation.frozen.captureRevision,
+      officialSubmissionSequence: activation.frozen.submissionSequence,
+      beaconPosition: [...warningPosition],
+      beaconScale: activation.frozen.beaconScale,
+      coreOpacity: activation.frozen.coreOpacity,
+      ringOpacity: activation.frozen.ringOpacity,
+      beaconHiddenDuringSubmission: true,
+      beaconRestored: true,
+    });
+    if (renderer === 'webgpu') {
+      expect(hiddenControl.submissionSequence).toBeGreaterThan(hiddenControl.officialSubmissionSequence);
+      expect(hiddenControl.completedSequence).toBeGreaterThanOrEqual(hiddenControl.submissionSequence);
+    }
 
-    const raster = await redWarningDelta(before, active);
+    const width = 1_920;
+    const height = 1_080;
+    const cropTop = Math.max(Math.ceil(activation.framing.hud.bottom + 16), Math.floor(height * 0.28));
+    const attributableCrop = {
+      left: Math.floor(width * 0.25),
+      top: cropTop,
+      width: Math.ceil(width * 0.75) - Math.floor(width * 0.25),
+      height: Math.ceil(height * 0.78) - cropTop,
+    } satisfies RasterCrop;
+    expect(activation.framing.canvas).toEqual({ left: 0, top: 0, right: width, bottom: height });
+    expect(attributableCrop.top).toBeGreaterThan(activation.framing.hud.bottom);
+    expect(attributableCrop.top).toBeLessThan(height / 2);
+    expect(attributableCrop.height).toBeGreaterThan(0);
+    const raster = await redWarningAttributionDelta(hiddenControlPng, active, attributableCrop);
     await testInfo.attach('pass71-nuke-warning-raster', {
-      body: Buffer.from(`${JSON.stringify({ renderer, ...activation, raster }, null, 2)}\n`),
+      body: Buffer.from(`${JSON.stringify({
+        renderer,
+        ...activation,
+        visibleCaptureReceipt,
+        hiddenControl,
+        attributableCrop,
+        raster,
+      }, null, 2)}\n`),
       contentType: 'application/json',
+    });
+    await testInfo.attach('pass71-nuke-warning-hidden-control-nonpublishable', {
+      path: hiddenControlPath,
+      contentType: 'image/png',
     });
     expect(raster.maximumRedDelta).toBeGreaterThanOrEqual(72);
     expect(raster.changedWarningPixels).toBeGreaterThanOrEqual(240);
     expect(errors).toEqual([]);
   } finally {
+    await page.evaluate(() => (
+      (window.__ATOMIC_ACRES_DEBUG__ as any).releaseNukeWarningEvidenceFrame()
+    )).catch(() => false);
     await cdp.detach();
   }
 });

@@ -1370,6 +1370,56 @@ type DebugChopperExteriorHiddenControlReceipt = Readonly<{
   rootHiddenDuringSubmission: true;
   rootRestored: true;
 }>;
+type DebugNukeWarningVisibleFrameReceipt = Readonly<{
+  contract: 'nuke-warning-frozen-visible-frame-v1';
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  simulationFrame: number;
+  captureRevision: number;
+  submissionSequence: number;
+  completedSequence: number;
+  renderedAtMs: number;
+  detonateAtMs: number;
+  detonateInMs: number;
+  active: true;
+  detonated: false;
+  cameraPosition: readonly [number, number, number];
+  cameraQuaternion: readonly [number, number, number, number];
+  beaconPosition: readonly [number, number, number];
+  beaconScale: number;
+  coreOpacity: number;
+  ringOpacity: number;
+  beaconVisible: true;
+}>;
+type DebugNukeWarningHiddenControlReceipt = Readonly<{
+  contract: 'nuke-warning-hidden-control-v1';
+  nonPublishable: true;
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  simulationFrame: number;
+  captureRevision: number;
+  officialSubmissionSequence: number;
+  submissionSequence: number;
+  completedSequence: number;
+  beaconPosition: readonly [number, number, number];
+  beaconScale: number;
+  coreOpacity: number;
+  ringOpacity: number;
+  beaconHiddenDuringSubmission: true;
+  beaconRestored: true;
+}>;
+type DebugNukeWarningEvidenceState = {
+  sequence: NukeSequence;
+  previousRenderPaused: boolean;
+  visibleFrame: DebugNukeWarningVisibleFrameReceipt | null;
+  official: DebugCommittedCameraPresentationReceipt;
+  renderedAtMs: number;
+  detonateInMs: number;
+  beaconPosition: readonly [number, number, number];
+  beaconScale: number;
+  coreOpacity: number;
+  ringOpacity: number;
+};
 let debugCaptureCameraRevision = 0;
 let lastDebugCapturePresentation: DebugCapturePresentationReceipt | null = null;
 let lastDebugCommittedCameraPresentation: DebugCommittedCameraPresentationReceipt | null = null;
@@ -1401,6 +1451,7 @@ type DebugChopperExteriorReviewTrackerFrame = Readonly<{
 let debugChopperExteriorReviewTrackerRequested = false;
 let debugChopperExteriorReviewTrackerSide: -1 | 1 | null = null;
 let lastDebugChopperExteriorReviewTrackerFrame: DebugChopperExteriorReviewTrackerFrame | null = null;
+let debugNukeWarningEvidenceState: DebugNukeWarningEvidenceState | null = null;
 
 function currentDebugChopperExteriorReviewHoldActive(): boolean {
   return chopperExteriorReviewHoldActive(debugChopperAutonomousFireHeld, {
@@ -21253,6 +21304,7 @@ function beginNuke(now: number, authoritativeDamage = true): void {
 }
 
 function detonateNuke(sequence: NukeSequence): void {
+  if (debugNukeWarningEvidenceState?.sequence === sequence) releaseDebugNukeWarningEvidenceFrame();
   const started = performance.now();
   sequence.detonated = true;
   audio.nukeDetonation();
@@ -22236,6 +22288,7 @@ function clearGrenades(): void {
 }
 
 function clearFieldSupport(): void {
+  if (debugNukeWarningEvidenceState) releaseDebugNukeWarningEvidenceFrame();
   localCareCaptureState = createCareCaptureClientState();
   localCareCaptureRequiresHold = false;
   lastKillstreakControlSentAt = Number.NEGATIVE_INFINITY;
@@ -25505,6 +25558,15 @@ function frame(now: number, scheduleNext = true): void {
     if (scheduleNext) requestAnimationFrame(frame);
     return;
   }
+  if (debugRenderPaused && debugNukeWarningEvidenceState) {
+    // The Nuke warning evidence owns one already-presented pre-detonation
+    // frame. Hold simulation and presentation together while the exact beacon
+    // root is removed for its paired attribution control.
+    lastFrame = now;
+    accumulator = 0;
+    if (scheduleNext) requestAnimationFrame(frame);
+    return;
+  }
   if (debugRenderPaused
     && debugChopperExteriorReviewTrackerRequested
     && currentDebugChopperExteriorReviewHoldActive()) {
@@ -26410,6 +26472,10 @@ const debugWindow = window as Window & {
     setChopperExteriorReviewHold: (held: boolean) => boolean;
     setChopperExteriorReviewTracking: (tracked: boolean) => number | null;
     captureChopperExteriorHiddenControl: () => Promise<DebugChopperExteriorHiddenControlReceipt | null>;
+    freezeNukeWarningEvidenceFrame: () => Promise<DebugNukeWarningVisibleFrameReceipt | null>;
+    nukeWarningEvidenceFrame: () => DebugNukeWarningVisibleFrameReceipt | null;
+    captureNukeWarningHiddenControl: () => Promise<DebugNukeWarningHiddenControlReceipt | null>;
+    releaseNukeWarningEvidenceFrame: () => boolean;
     setRiggedEvidenceCaptureTargets: (
       targets: readonly Readonly<{ kind: 'bot' | 'training-dummy'; id: string }>[],
     ) => boolean;
@@ -26817,6 +26883,178 @@ function debugCommittedCameraPresentationReceipt(frame: number): DebugCommittedC
       drawRejections: chopperPresentation.stableAirframeDrawRejections,
     }) : null,
   });
+}
+
+async function freezeDebugNukeWarningEvidenceFrame(): Promise<DebugNukeWarningVisibleFrameReceipt | null> {
+  if (debugNukeWarningEvidenceState) return debugNukeWarningEvidenceState.visibleFrame;
+  const sequence = nukeSequence;
+  const official = lastDebugCommittedCameraPresentation;
+  const renderedAtMs = official?.committedAtMs ?? 0;
+  const detonateInMs = sequence ? sequence.detonateAt - renderedAtMs : 0;
+  if (!sequence
+    || sequence.detonated
+    || sequence.warningBeacon !== nukeWarningBeacon
+    || !sequence.warningBeacon.visible
+    || !(sequence.warningBeacon.scale.x > 0.72)
+    || !(nukeWarningCoreMaterial.opacity > 0)
+    || !(nukeWarningRingMaterial.opacity > 0)
+    || !(detonateInMs > 0)
+    || selectedArena.id !== 'gun-range'
+    || renderSubmissionPaused
+    || !debugCaptureCameraActive
+    || !official
+    || official.arenaId !== 'gun-range'
+    || official.frame !== frameCount
+    || official.frame !== lastGameplayPresentedFrame
+    || official.captureRevision !== debugCaptureCameraRevision) return null;
+
+  const state: DebugNukeWarningEvidenceState = {
+    sequence,
+    previousRenderPaused: debugRenderPaused,
+    visibleFrame: null,
+    official,
+    renderedAtMs,
+    detonateInMs,
+    beaconPosition: Object.freeze(sequence.warningBeacon.position.toArray() as [number, number, number]),
+    beaconScale: sequence.warningBeacon.scale.x,
+    coreOpacity: nukeWarningCoreMaterial.opacity,
+    ringOpacity: nukeWarningRingMaterial.opacity,
+  };
+  debugNukeWarningEvidenceState = state;
+  debugRenderPaused = true;
+  try {
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    const completed = renderRuntime.presentationTelemetry();
+    if (debugNukeWarningEvidenceState !== state
+      || nukeSequence !== sequence
+      || sequence.detonated
+      || !sequence.warningBeacon.visible
+      || frameCount !== official.frame
+      || lastGameplayPresentedFrame !== official.frame
+      || (renderRuntime.backend === 'webgpu'
+        && completed.completedSequence < official.submissionSequence)) {
+      throw new Error('Nuke warning visible frame changed before reaching its completion frontier');
+    }
+    const receipt = Object.freeze({
+      contract: 'nuke-warning-frozen-visible-frame-v1' as const,
+      renderer: renderRuntime.backend,
+      completionSemantics: renderRuntime.backend === 'webgpu'
+        ? 'submission-sequence-covered-by-completion-frontier' as const
+        : 'synchronous-render-return' as const,
+      simulationFrame: official.frame,
+      captureRevision: official.captureRevision,
+      submissionSequence: official.submissionSequence,
+      completedSequence: completed.completedSequence,
+      renderedAtMs,
+      detonateAtMs: sequence.detonateAt,
+      detonateInMs,
+      active: true as const,
+      detonated: false as const,
+      cameraPosition: official.position,
+      cameraQuaternion: official.quaternion,
+      beaconPosition: state.beaconPosition,
+      beaconScale: state.beaconScale,
+      coreOpacity: state.coreOpacity,
+      ringOpacity: state.ringOpacity,
+      beaconVisible: true as const,
+    });
+    state.visibleFrame = receipt;
+    return receipt;
+  } catch (error) {
+    if (debugNukeWarningEvidenceState === state) debugNukeWarningEvidenceState = null;
+    debugRenderPaused = state.previousRenderPaused;
+    throw error;
+  }
+}
+
+function currentDebugNukeWarningEvidenceFrame(): DebugNukeWarningVisibleFrameReceipt | null {
+  return debugNukeWarningEvidenceState?.visibleFrame ?? null;
+}
+
+async function captureDebugNukeWarningHiddenControl(): Promise<DebugNukeWarningHiddenControlReceipt | null> {
+  const state = debugNukeWarningEvidenceState;
+  const visibleFrame = state?.visibleFrame;
+  const sequence = state?.sequence;
+  const official = state?.official;
+  if (!state
+    || !visibleFrame
+    || !sequence
+    || !official
+    || !debugRenderPaused
+    || renderSubmissionPaused
+    || nukeSequence !== sequence
+    || sequence.detonated
+    || !sequence.warningBeacon.visible
+    || sequence.warningBeacon !== nukeWarningBeacon
+    || frameCount !== visibleFrame.simulationFrame
+    || lastGameplayPresentedFrame !== visibleFrame.simulationFrame
+    || debugCaptureCameraRevision !== visibleFrame.captureRevision) return null;
+  camera.updateWorldMatrix(true, false);
+  const cameraMatchesOfficial = camera.position.toArray().every((coordinate, axis) => coordinate === official.position[axis])
+    && camera.quaternion.toArray().every((coordinate, axis) => coordinate === official.quaternion[axis])
+    && camera.fov === official.fov
+    && camera.near === official.near
+    && camera.far === official.far;
+  if (!cameraMatchesOfficial) return null;
+
+  const root = sequence.warningBeacon;
+  const before = renderRuntime.presentationTelemetry();
+  let submitted = before;
+  let completed = before;
+  let beaconHiddenDuringSubmission = false;
+  root.visible = false;
+  try {
+    if (renderRuntime.backend === 'webgpu') {
+      await submitForegroundWebGpuFrame(true, 'serialized');
+    } else if (atomicSignal) {
+      atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+    } else {
+      throw new Error('Nuke warning hidden-control has no active renderer');
+    }
+    beaconHiddenDuringSubmission = !root.visible;
+    submitted = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu' && submitted.submissionSequence <= before.submissionSequence) {
+      throw new Error('Nuke warning hidden-control did not submit a distinct WebGPU frame');
+    }
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    completed = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu'
+      && completed.completedSequence < submitted.submissionSequence) {
+      throw new Error('Nuke warning hidden-control WebGPU frame did not reach the completion frontier');
+    }
+  } finally {
+    root.visible = true;
+  }
+  if (!beaconHiddenDuringSubmission || !root.visible || debugNukeWarningEvidenceState !== state) {
+    throw new Error('Nuke warning hidden-control did not preserve its exact hide/restore boundary');
+  }
+  return Object.freeze({
+    contract: 'nuke-warning-hidden-control-v1',
+    nonPublishable: true,
+    renderer: renderRuntime.backend,
+    completionSemantics: renderRuntime.backend === 'webgpu'
+      ? 'submission-sequence-covered-by-completion-frontier'
+      : 'synchronous-render-return',
+    simulationFrame: visibleFrame.simulationFrame,
+    captureRevision: visibleFrame.captureRevision,
+    officialSubmissionSequence: visibleFrame.submissionSequence,
+    submissionSequence: submitted.submissionSequence,
+    completedSequence: completed.completedSequence,
+    beaconPosition: state.beaconPosition,
+    beaconScale: state.beaconScale,
+    coreOpacity: state.coreOpacity,
+    ringOpacity: state.ringOpacity,
+    beaconHiddenDuringSubmission: true,
+    beaconRestored: true,
+  });
+}
+
+function releaseDebugNukeWarningEvidenceFrame(): boolean {
+  const state = debugNukeWarningEvidenceState;
+  if (!state) return false;
+  debugNukeWarningEvidenceState = null;
+  debugRenderPaused = state.previousRenderPaused;
+  return true;
 }
 
 async function captureDebugChopperExteriorHiddenControl(): Promise<DebugChopperExteriorHiddenControlReceipt | null> {
@@ -29343,6 +29581,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     return debugCaptureCameraRevision;
   },
   captureChopperExteriorHiddenControl: captureDebugChopperExteriorHiddenControl,
+  freezeNukeWarningEvidenceFrame: freezeDebugNukeWarningEvidenceFrame,
+  nukeWarningEvidenceFrame: currentDebugNukeWarningEvidenceFrame,
+  captureNukeWarningHiddenControl: captureDebugNukeWarningHiddenControl,
+  releaseNukeWarningEvidenceFrame: releaseDebugNukeWarningEvidenceFrame,
   setRiggedEvidenceCaptureTargets: (targets) => {
     lastDebugCapturePresentation = null;
     lastDebugCommittedCameraPresentation = null;
