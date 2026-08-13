@@ -239,6 +239,12 @@ describe('Pass 65 sound-event inventory', () => {
     expect(verifySoundEventInventory(SOUND_EVENT_INVENTORY, {
       observedRuntimeEmitterSymbols: observed.map((callsite) => callsite.emitterSymbol),
     })).toEqual([]);
+    expect(expected).toContainEqual({
+      sourcePath: 'src/legacy-main.ts',
+      emitterSymbol: 'nukeWarning',
+      argumentSignature: 'accessibilityRuntime.reducedSensory',
+      occurrences: 1,
+    });
   });
 
   it('resolves every observed emitter symbol and maps every current event to semantic callsites', () => {

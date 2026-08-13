@@ -322,7 +322,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('minigunDrive', "weaponView.minigunSpoolFraction(),weaponView.minigunSpoolPhase(),gameStarted && player.alive && player.weapon === 'minigun'", 1, ['weapon.minigun-drive']),
   runtimeCallsite('nearMiss', 'nearMissStrength(player.position, origin, visibleEnd)', 2, ['combat.near-miss']),
   runtimeCallsite('nukeDetonation', '', 1, ['support.nuke-detonation']),
-  runtimeCallsite('nukeWarning', '', 1, ['support.nuke-warning']),
+    runtimeCallsite('nukeWarning', 'accessibilityRuntime.reducedSensory', 1, ['support.nuke-warning']),
   runtimeCallsite('overdriveAvailable', '', 1, ['pickup.overdrive-available']),
   runtimeCallsite('overdriveExpire', '', 1, ['pickup.overdrive-expired']),
   runtimeCallsite('overdrivePickup', '', 1, ['pickup.overdrive-claimed']),
