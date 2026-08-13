@@ -96,9 +96,15 @@ for (const arenaId of selectedArenas) {
     for (const [index, sample] of samples.entries()) {
       expect(sample.audio.context.source).toMatch(/^(standard|webkit)$/);
       expect(sample.audio.context.state).toMatch(/^(running|suspended)$/);
-      expect(sample.audio.ambience).toMatchObject({ continuousSources: 0, arena: arenaId });
-      expect(sample.audio.ambience.transientSources).toBeLessThanOrEqual(1);
-      expect(sample.audio.ambience.lastDurationMs).toBeLessThanOrEqual(720);
+      expect(sample.audio.ambience).toEqual({
+        continuousSources: 0,
+        transientSources: 0,
+        events: 0,
+        lastDurationMs: 0,
+        nextInMs: null,
+        busGain: expect.any(Number),
+        arena: arenaId,
+      });
       expect(sample.audio.runtime.voices).toBeLessThanOrEqual(sample.audio.runtime.globalCap);
       expect(sample.audio.runtime.spatialChains).toBeLessThanOrEqual(sample.audio.runtime.spatialCap);
       expect(sample.audio.runtime.spatialChains).toBeLessThanOrEqual(5);
@@ -122,12 +128,13 @@ for (const arenaId of selectedArenas) {
       }
       if (index > 0) expect(sample.frameCount).toBeGreaterThan(samples[index - 1]!.frameCount);
     }
-    expect(samples.every((sample) => sample.audio.ambience.continuousSources === 0)).toBe(true);
-    expect(samples.map((sample) => sample.audio.ambience.events))
-      .toEqual([...samples.map((sample) => sample.audio.ambience.events)].sort((left, right) => left - right));
-    expect(samples.at(-1)!.audio.ambience.events).toBeGreaterThanOrEqual(4);
-    // A bounded cue can occupy one analyser window; a recurring tonal carrier
-    // cannot appear in consecutive one-second samples after the former hiss point.
+    expect(samples.every((sample) => sample.audio.ambience.continuousSources === 0
+      && sample.audio.ambience.transientSources === 0
+      && sample.audio.ambience.events === 0
+      && sample.audio.ambience.lastDurationMs === 0
+      && sample.audio.ambience.nextInMs === null)).toBe(true);
+    // Event-driven world cues remain available, but an idle arena must not own
+    // any scheduled noise or persistent narrowband output after one minute.
     expect(samples.slice(-6).filter((sample) => sample.audio.outputProbe.narrowbandTonePresent))
       .toHaveLength(0);
 

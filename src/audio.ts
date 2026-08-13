@@ -7,7 +7,7 @@ import { WEAPON_CATALOG } from './combat/weapon-catalog';
 import type { ArenaId } from './map-selection';
 import type { LowHealthFeedbackPresentation } from './sensory-feedback';
 import { AUDIO_BUS_IDS, type AudioBusId, type AudioSettings } from './pass65-settings';
-import { ARENA_AUDIO_DEFINITIONS, AUDIO_RUNTIME_BUDGET, selectVoiceToSteal, type FootstepMovement, type FootstepSurface as SpatialFootstepSurface, type SpatialPoint } from './spatial-audio';
+import { AUDIO_RUNTIME_BUDGET, selectVoiceToSteal, type FootstepMovement, type FootstepSurface as SpatialFootstepSurface, type SpatialPoint } from './spatial-audio';
 import { EXPLOSIVE_BOLT_ARM_DELAY_MS } from './combat/ordnance';
 import type { MinigunSpoolPhase } from './minigun-spool';
 import {
@@ -23,9 +23,6 @@ const WEAPON_REPORT_GAIN = Object.freeze(Object.fromEntries(
 
 export const EXPLOSION_AUDIO_COALESCE_MS = 90;
 export const GRENADE_FUSE_BEEP_START_MS = 1_450;
-export const ARENA_AMBIENCE_EVENT_MIN_INTERVAL_MS = 8_500;
-export const ARENA_AMBIENCE_EVENT_MAX_INTERVAL_MS = 13_500;
-export const ARENA_AMBIENCE_EVENT_DURATION_MS = 720;
 
 export const FLASHBANG_AUDIO_PROFILE = Object.freeze({
   impactDurationSeconds: 0.085,
@@ -458,13 +455,6 @@ export class ArenaAudio {
   /** No arena source is allowed to remain audible indefinitely. */
   private arenaSources: AudioScheduledSourceNode[] = [];
   private arenaNodes: AudioNode[] = [];
-  private arenaEventSources: AudioScheduledSourceNode[] = [];
-  private arenaEventNodes: AudioNode[] = [];
-  private arenaAmbienceTimer: ReturnType<typeof setTimeout> | null = null;
-  private arenaAmbienceGeneration = 0;
-  private arenaAmbienceNextAt = Number.POSITIVE_INFINITY;
-  private arenaAmbienceEvents = 0;
-  private arenaAmbienceLastDurationMs = 0;
   private combatFeedbackSources: AudioScheduledSourceNode[] = [];
   private combatFeedbackNodes: AudioNode[] = [];
   private lowHealthGains: GainNode[] = [];
@@ -547,7 +537,6 @@ export class ArenaAudio {
         if (this.prepareCombat() && this.prepareGlassImpact() && this.prepareGrenadeEffects()) {
           this.prepareChopperRotors();
         }
-        if (this.activeArena) this.startArenaBed(this.activeArena);
       } catch {
         // Audio is optional. A sandbox/device policy may expose a constructor
         // that still throws, or reject one of the initial graph nodes. Tear
@@ -636,7 +625,6 @@ export class ArenaAudio {
     if (this.activeArena === arenaId) return;
     this.stopArenaBed();
     this.activeArena = arenaId;
-    this.startArenaBed(arenaId);
   }
 
   updateListener(position: SpatialPoint, yawRadians: number): void {
@@ -1651,12 +1639,10 @@ export class ArenaAudio {
       explosionMix: { ...this.explosionAudioGate, coalesceMs: EXPLOSION_AUDIO_COALESCE_MS },
       ambience: {
         continuousSources: this.arenaSources.length,
-        transientSources: this.arenaEventSources.length,
-        events: this.arenaAmbienceEvents,
-        lastDurationMs: this.arenaAmbienceLastDurationMs,
-        nextInMs: Number.isFinite(this.arenaAmbienceNextAt)
-          ? Math.max(0, this.arenaAmbienceNextAt - performance.now())
-          : null,
+        transientSources: 0,
+        events: 0,
+        lastDurationMs: 0,
+        nextInMs: null,
         busGain: this.ambience?.gain.value ?? 0.12,
         arena: this.activeArena,
       },
@@ -2089,93 +2075,9 @@ export class ArenaAudio {
     return chain;
   }
 
-  private startArenaBed(arenaId: ArenaId): void {
-    if (!this.context || !this.ambience || !this.noiseBuffer) return;
-    const generation = ++this.arenaAmbienceGeneration;
-    this.scheduleArenaAmbienceEvent(arenaId, generation);
-  }
-
   private stopArenaBed(): void {
-    this.arenaAmbienceGeneration += 1;
-    if (this.arenaAmbienceTimer !== null) clearTimeout(this.arenaAmbienceTimer);
-    this.arenaAmbienceTimer = null;
-    this.arenaAmbienceNextAt = Number.POSITIVE_INFINITY;
-    this.stopSources(this.arenaEventSources);
-    this.disconnectNodes(this.arenaEventNodes);
     this.stopSources(this.arenaSources);
     this.disconnectNodes(this.arenaNodes);
-  }
-
-  private scheduleArenaAmbienceEvent(arenaId: ArenaId, generation: number): void {
-    if (generation !== this.arenaAmbienceGeneration || this.activeArena !== arenaId) return;
-    const interval = ARENA_AMBIENCE_EVENT_MIN_INTERVAL_MS
-      + presentationRandom() * (ARENA_AMBIENCE_EVENT_MAX_INTERVAL_MS - ARENA_AMBIENCE_EVENT_MIN_INTERVAL_MS);
-    this.arenaAmbienceNextAt = performance.now() + interval;
-    this.arenaAmbienceTimer = setTimeout(() => {
-      this.arenaAmbienceTimer = null;
-      if (generation !== this.arenaAmbienceGeneration || this.activeArena !== arenaId) return;
-      this.playArenaAmbienceEvent(arenaId);
-      this.scheduleArenaAmbienceEvent(arenaId, generation);
-    }, interval);
-  }
-
-  private playArenaAmbienceEvent(arenaId: ArenaId): void {
-    if (!this.context || !this.ambience || !this.noiseBuffer
-      || this.spatialChains >= AUDIO_RUNTIME_BUDGET.spatialVoices) return;
-    const definition = ARENA_AUDIO_DEFINITIONS[arenaId];
-    const now = this.context.currentTime;
-    const duration = ARENA_AMBIENCE_EVENT_DURATION_MS / 1_000;
-    const source = this.context.createBufferSource();
-    const filter = this.context.createBiquadFilter();
-    const gain = this.context.createGain();
-    const panner = this.context.createPanner();
-    source.buffer = this.noiseBuffer;
-    source.loop = false;
-    filter.type = 'bandpass';
-    filter.frequency.value = definition.airFrequencyHz;
-    filter.Q.value = Math.min(1.15, Math.max(0.58, definition.airQ * 0.45));
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(definition.airGain, now + 0.18);
-    gain.gain.linearRampToValueAtTime(0, now + duration);
-    panner.panningModel = 'HRTF';
-    panner.distanceModel = 'inverse';
-    panner.refDistance = 9;
-    panner.maxDistance = 100;
-    panner.rolloffFactor = 0.38;
-    const position = this.arenaAmbienceEvents % 2 === 0 ? definition.airPosition : definition.bedPosition;
-    panner.positionX.value = position.x;
-    panner.positionY.value = position.y;
-    panner.positionZ.value = position.z;
-    source.connect(filter).connect(gain).connect(panner).connect(this.ambience);
-    const distance = Math.hypot(
-      position.x - this.listenerPosition.x,
-      position.y - this.listenerPosition.y,
-      position.z - this.listenerPosition.z,
-    );
-    if (!this.registerVoice(source, this.ambience, 1, true, distance)) {
-      filter.disconnect();
-      gain.disconnect();
-      panner.disconnect();
-      return;
-    }
-    this.arenaEventSources.push(source);
-    this.arenaEventNodes.push(filter, gain, panner);
-    this.spatialChains += 1;
-    const previousEnded = source.onended;
-    source.onended = (event) => {
-      previousEnded?.call(source, event);
-      const sourceIndex = this.arenaEventSources.indexOf(source);
-      if (sourceIndex >= 0) this.arenaEventSources.splice(sourceIndex, 1);
-      for (const node of [filter, gain, panner]) {
-        const nodeIndex = this.arenaEventNodes.indexOf(node);
-        if (nodeIndex >= 0) this.arenaEventNodes.splice(nodeIndex, 1);
-        try { node.disconnect(); } catch { /* bounded event already retired */ }
-      }
-      this.spatialChains = Math.max(0, this.spatialChains - 1);
-    };
-    source.start(now, presentationRandom() * Math.max(0.001, this.noiseBuffer.duration - duration), duration);
-    this.arenaAmbienceEvents += 1;
-    this.arenaAmbienceLastDurationMs = ARENA_AMBIENCE_EVENT_DURATION_MS;
   }
 
   private sweepSequence(

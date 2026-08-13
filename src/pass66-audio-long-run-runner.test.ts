@@ -24,8 +24,12 @@ describe('Pass 66 audio long-run evidence runner', () => {
       'sample.audio?.outputProbe?.available === true',
       'sample.audio.outputProbe.suspiciousBroadbandHiss === false',
       "sample.audio.ambience?.continuousSources === 0",
+      'sample.audio.ambience?.transientSources === 0',
+      'sample.audio.ambience?.events === 0',
+      'sample.audio.ambience?.lastDurationMs === 0',
+      'sample.audio.ambience?.nextInMs === null',
       'sample.audio.runtime?.retainedSources === 12',
-      'validBoundedAmbience',
+      'validNoiseFreeArenaAmbience',
     ]) expect(runner).toContain(token);
     expect(spec).toContain("test.skip(!enabled");
     expect(spec).toContain("'/channels/the-big-one/channel-provenance.json'");
@@ -36,5 +40,9 @@ describe('Pass 66 audio long-run evidence runner', () => {
     expect(spec).toContain('2_000, 32_000, 60_000, 61_000, 62_000, 63_000, 64_000, 65_000');
     expect(spec).toContain('suspiciousBroadbandHiss: false');
     expect(spec).toContain('narrowbandTonePresent');
+    expect(spec).toContain('sample.audio.ambience.transientSources === 0');
+    expect(spec).toContain('sample.audio.ambience.events === 0');
+    expect(spec).toContain('sample.audio.ambience.lastDurationMs === 0');
+    expect(spec).toContain('sample.audio.ambience.nextInMs === null');
   });
 });

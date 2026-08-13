@@ -102,8 +102,39 @@ class FakeAudioContext {
 
 describe('HF-165 bounded continuous audio ownership', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     FakeAudioContext.instances.length = 0;
+  });
+
+  it('never allocates or schedules arena noise across a ninety-second idle clock', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('AudioContext', FakeAudioContext);
+    const audio = new ArenaAudio();
+    audio.setArena('atomic-acres');
+    audio.unlock();
+    const context = FakeAudioContext.instances[0];
+
+    expect(context.bufferSources).toHaveLength(0);
+    expect(audio.telemetry().ambience).toEqual({
+      continuousSources: 0,
+      transientSources: 0,
+      events: 0,
+      lastDurationMs: 0,
+      nextInMs: null,
+      busGain: 0.12,
+      arena: 'atomic-acres',
+    });
+
+    vi.advanceTimersByTime(90_000);
+    audio.setArena('gun-range');
+    vi.advanceTimersByTime(90_000);
+
+    expect(context.bufferSources).toHaveLength(0);
+    expect(audio.telemetry().ambience).toMatchObject({
+      continuousSources: 0, transientSources: 0, events: 0, lastDurationMs: 0, nextInMs: null, arena: 'gun-range',
+    });
+    audio.dispose();
   });
 
   it('keeps twelve muted effect/rotor voices owned while arena ambience stays bounded and non-continuous', () => {
