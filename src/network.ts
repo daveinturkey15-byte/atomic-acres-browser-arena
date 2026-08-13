@@ -25,6 +25,8 @@ type StatusHandler = (text: string, kind?: 'ok' | 'warn' | 'error') => void;
 type DiagnosticHandler = (entry: Omit<ClientRuntimeLogEntry, 'timestamp'>) => void;
 type ChannelKind = 'events' | 'state';
 
+export const LOCAL_MULTIPLAYER_QA_HOST_DAMAGE_RESULT_EVENT = 'atomic-acres:qa-host-killstreak-damage-result';
+
 type GuestBundle = {
   playerId: string;
   peerId: string;
@@ -202,10 +204,33 @@ function createArenaPeer(preferredId?: string): Peer {
   return preferredId ? new Peer(preferredId) : new Peer();
 }
 
+function localMultiplayerQaEnabled(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('multiplayerQa') === '1'
+    && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
+}
+
+function publishHostDamageResultForLocalQa(message: Extract<GameMessage, { type: 'killstreak-damage-result' }>): void {
+  if (!localMultiplayerQaEnabled()) return;
+  const detail = Object.freeze({
+    by: message.by,
+    matchEpoch: message.matchEpoch,
+    revision: message.revision,
+    nonce: message.nonce,
+    events: Object.freeze(message.events.map((event) => Object.freeze({
+      resultId: event.resultId,
+      activationId: event.activationId,
+      source: event.source,
+      targetId: event.targetId,
+      atMs: event.atMs,
+    }))),
+  });
+  window.dispatchEvent(new CustomEvent(LOCAL_MULTIPLAYER_QA_HOST_DAMAGE_RESULT_EVENT, { detail }));
+}
+
 function qaEventImpairment(): Readonly<{ delayMs: number; jitterMs: number }> {
   const params = new URLSearchParams(window.location.search);
-  const localQa = params.get('multiplayerQa') === '1' && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
-  if (!localQa) return { delayMs: 0, jitterMs: 0 };
+  if (!localMultiplayerQaEnabled()) return { delayMs: 0, jitterMs: 0 };
   const delayMs = Math.max(0, Math.min(250, Number(params.get('eventDelayQaMs')) || 0));
   const jitterMs = Math.max(0, Math.min(100, Number(params.get('eventJitterQaMs')) || 0));
   return { delayMs, jitterMs };
@@ -1131,6 +1156,7 @@ export class ArenaNetwork {
       if (!current() || !isGameMessage(payload)) return;
       if (kind === 'state' && !isStateTrafficMessage(payload)) return;
       this.noteValidHostMessage();
+      if (payload.type === 'killstreak-damage-result') publishHostDamageResultForLocalQa(payload);
       this.onMessage(payload);
     });
     connection.on('close', () => {

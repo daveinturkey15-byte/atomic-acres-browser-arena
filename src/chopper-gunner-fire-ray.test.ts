@@ -271,6 +271,49 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
     expect(result.damageEvents.every((event) => event.endpoint.every((value, axis) => value === result.damageEvents[0]!.endpoint[axis]))).toBe(true);
   });
 
+  it('rejects a centred primary and every nearby splash target when hard cover blocks the admitted impact', () => {
+    const { runtime, entityId } = setupPlayerGunner();
+    runtime.advance(1_599, world());
+    const entity = activeChopper(runtime, 1_599);
+    const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, 0, -0.2);
+    const coveredPrimary = target('covered-primary', pointAlong(ray, 20));
+    const coveredSplash = target('covered-splash', pointAlong(ray, 20, 2.75));
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId,
+      action: 'pilot-control', yawQ: 0, pitchQ: -0.2, fire: true,
+    }, 1_599).accepted).toBe(true);
+    const result = runtime.advance(1_600, world([coveredPrimary, coveredSplash], () => false));
+    expect(result.damageEvents).toEqual([]);
+  });
+
+  it('rejects guest control and preserves one unique result per target at the unchanged 280 ms cadence', () => {
+    const { runtime, entityId } = setupPlayerGunner();
+    runtime.registerActor('guest', 1, 1, LOADOUT);
+    expect(runtime.control({
+      by: 'guest', matchEpoch: 7, lifeId: 1, sequence: 1, entityId,
+      action: 'pilot-control', yawQ: 0, pitchQ: -0.2, fire: true,
+    }, 1_500)).toMatchObject({ accepted: false, reason: 'entity-unavailable' });
+
+    runtime.advance(1_599, world());
+    const entity = activeChopper(runtime, 1_599);
+    const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, 0, -0.2);
+    const primary = target('cadence-primary', pointAlong(ray, 20, 0.6));
+    const splash = target('cadence-splash', pointAlong(ray, 20, 2.75));
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId,
+      action: 'pilot-control', yawQ: 0, pitchQ: -0.2, fire: true,
+    }, 1_599).accepted).toBe(true);
+    const first = runtime.advance(1_600, world([primary, splash])).damageEvents;
+    expect(first.map((event) => event.targetId)).toEqual(['cadence-primary', 'cadence-splash']);
+    expect(new Set(first.map((event) => event.resultId)).size).toBe(2);
+    expect(runtime.advance(1_879, world([primary, splash])).damageEvents).toEqual([]);
+    const second = runtime.advance(1_880, world([primary, splash])).damageEvents;
+    expect(second.map((event) => event.targetId)).toEqual(['cadence-primary', 'cadence-splash']);
+    expect(new Set(second.map((event) => event.resultId)).size).toBe(2);
+    expect(second[0]!.atMs - first[0]!.atMs).toBe(CHOPPER_GUN_PROFILE.cadenceMs);
+    expect(second.every((event) => !first.some((prior) => prior.resultId === event.resultId))).toBe(true);
+  });
+
   it('is a strict far-range superset of the preceding one-metre direct capsule', () => {
     const { runtime, entityId } = setupPlayerGunner();
     runtime.advance(1_599, world());

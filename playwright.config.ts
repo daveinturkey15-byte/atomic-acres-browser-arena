@@ -21,6 +21,7 @@ const pass71Hf299EdgeExecutable = process.env.PASS71_HF299_EDGE_EXECUTABLE;
 const pass71Hf300EdgeExecutable = process.env.PASS71_HF300_EDGE_EXECUTABLE;
 const pass71Hf305EdgeExecutable = process.env.PASS71_HF305_EDGE_EXECUTABLE;
 const pass71Hf306EdgeExecutable = process.env.PASS71_HF306_EDGE_EXECUTABLE;
+const pass71Hf307EdgeExecutable = process.env.PASS71_HF307_EDGE_EXECUTABLE;
 const pass71OwnedEdgeExecutable = pass71GrenadeEdgeExecutable
   ?? pass71Hf296EdgeExecutable
   ?? pass71Hf304EdgeExecutable
@@ -28,7 +29,8 @@ const pass71OwnedEdgeExecutable = pass71GrenadeEdgeExecutable
   ?? pass71Hf299EdgeExecutable
   ?? pass71Hf300EdgeExecutable
   ?? pass71Hf305EdgeExecutable
-  ?? pass71Hf306EdgeExecutable;
+  ?? pass71Hf306EdgeExecutable
+  ?? pass71Hf307EdgeExecutable;
 const pass71AudioBrowserExecutable = process.env.PASS71_AUDIO_BROWSER_EXECUTABLE;
 const ownedMultiplayerGate = process.env.QA_OWNED_GATE === 'multiplayer-stability';
 const requestedMultiplayerChannel = process.env[PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV];
@@ -75,9 +77,12 @@ if (pass71Hf305EdgeExecutable && !installedEdgeChannel) {
 if (pass71Hf306EdgeExecutable && !installedEdgeChannel) {
   throw new Error('PASS71_HF306_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
 }
+if (pass71Hf307EdgeExecutable && !installedEdgeChannel) {
+  throw new Error('PASS71_HF307_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
+}
 if ([pass71GrenadeEdgeExecutable, pass71Hf296EdgeExecutable, pass71Hf304EdgeExecutable,
   pass71Hf301EdgeExecutable, pass71Hf299EdgeExecutable, pass71Hf300EdgeExecutable,
-  pass71Hf305EdgeExecutable, pass71Hf306EdgeExecutable]
+  pass71Hf305EdgeExecutable, pass71Hf306EdgeExecutable, pass71Hf307EdgeExecutable]
   .filter(Boolean).length > 1) {
   throw new Error('Pass 71 installed-Edge evidence gates require separate Playwright launches');
 }

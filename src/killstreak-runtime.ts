@@ -2373,7 +2373,7 @@ export class HostKillstreakRuntime {
         owner.team,
         world,
         CHOPPER_GUN_PROFILE.maximumRangeM,
-        true,
+        false,
         CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM,
       );
       if (hit) {
@@ -2847,12 +2847,9 @@ export class HostKillstreakRuntime {
         origin[2] + direction[2] * impactDistance,
       ] as const);
       const clear = lineOfSight(world, origin, endpoint);
-      // Owner rule: the Chopper Gunner's heavy autocannon must hit reliably
-      // from orbit. LOS is still evaluated from the camera origin (so a wall
-      // edge that occludes the aircraft root doesn't eat the shot), but an
-      // occluded centre ray is not a miss: the through-wall rule admits the
-      // target at 50% damage. Without this, hits felt random because a low
-      // wall or corner silently swallowed the ray.
+      // LOS is evaluated from the possessed camera origin so aircraft-root
+      // occlusion cannot eat a clear gunner shot. Hard cover on that exact ray
+      // still rejects the impact and therefore every splash result.
       if (!clear && (!wallbang || perpendicularSquared > directRadiusSquared)) continue;
       hits.push(Object.freeze({
         target,
