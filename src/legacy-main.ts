@@ -310,7 +310,10 @@ import {
   type GlassImpactProfile,
 } from './glass-authority';
 import { weaponGlassBreakPolicy } from './weapon-glass-break-policy';
-import { admitProjectileGlassBreak } from './projectile-glass-break-admission';
+import {
+  admitProjectileGlassBreak,
+  HostedBotProjectileGlassActionLedger,
+} from './projectile-glass-break-admission';
 import {
   activeSoloBotTarget,
   arenaCanvasLabel,
@@ -4759,6 +4762,7 @@ function recordSupportExplosionProfile(profile: ExplosionSyncProfile): void {
 }
 const processedNonces = new Set<number>();
 const hostedBotWeaponPresentationReplay = new BotWeaponPresentationReplayGuard();
+const hostedBotProjectileGlassActions = new HostedBotProjectileGlassActionLedger();
 const remoteShotAdmissions = new Map<string, RemoteShotAdmissionState>();
 const authoritativeShotAdmissions = new Map<string, AuthoritativeShotAdmissionState>();
 const admittedRemoteShots = new Map<string, Map<number, AdmittedRemoteShot>>();
@@ -12636,13 +12640,21 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
   }
   const remote = remotes.get(message.by);
   const window = arena.breakableWindows.find((candidate) => candidate.id === message.windowId);
-  if (!remote || !window || window.broken) return;
-  const sender = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
+  if (!window || window.broken) return;
   const centre = window.mesh.getWorldPosition(new THREE.Vector3());
   const projectilePolicy = message.weapon ? weaponGlassBreakPolicy(message.weapon) : null;
   if (message.weapon) {
     if (message.kind !== 'shot' || !Number.isFinite(message.actionNonce)) return;
-    const action = currentAdmittedShotAction(message.by, message.actionNonce!);
+    const now = performance.now();
+    const remoteAction = currentAdmittedShotAction(message.by, message.actionNonce!, now);
+    const hostedBotAction = message.weapon === 'flare-gun'
+      ? hostedBotProjectileGlassActions.current(
+        message.by,
+        message.actionNonce!,
+        interactiveWorldMatchEpoch,
+        now,
+      )
+      : undefined;
     const paneActionKey = `glass:${message.windowId}`;
     const origin = new THREE.Vector3(...message.origin);
     window.mesh.updateWorldMatrix(true, false);
@@ -12657,18 +12669,20 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
       weapon: message.weapon,
       fireKind: WEAPONS[message.weapon].fireKind,
       actionNonce: message.actionNonce!,
-      actionCurrent: action !== undefined,
-      actionWeapon: action?.message.weapon ?? null,
-      actionNonceObserved: action?.message.nonce ?? null,
+      actionCurrent: remoteAction !== undefined || hostedBotAction !== undefined,
+      actionWeapon: remoteAction?.message.weapon ?? hostedBotAction?.weapon ?? null,
+      actionNonceObserved: remoteAction?.message.nonce ?? hostedBotAction?.actionNonce ?? null,
       eventReplay,
-      paneAlreadyAdmittedForAction: action?.targets.has(paneActionKey) ?? false,
+      paneAlreadyAdmittedForAction: remoteAction?.targets.has(paneActionKey)
+        ?? hostedBotAction?.paneIds.has(paneActionKey)
+        ?? false,
       originInsideArena: pointInsideBounds(origin, arena.bounds, 0.44),
       paneDistanceM: paneBounds.isEmpty() ? Number.POSITIVE_INFINITY : paneBounds.distanceToPoint(origin),
       maximumPaneDistanceM: maximumDistance,
     });
-    if (!admission.accepted || !action) return;
+    if (!admission.accepted || !remoteAction && !hostedBotAction) return;
     processedNonces.add(message.nonce);
-    action.targets.add(paneActionKey);
+    (remoteAction?.targets ?? hostedBotAction!.paneIds).add(paneActionKey);
     const normal = centre.clone().sub(origin);
     if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
     else normal.normalize().multiplyScalar(-1);
@@ -12687,6 +12701,8 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
     trimNonceSet();
     return;
   }
+  if (!remote) return;
+  const sender = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
   const explosive = message.kind === 'explosive';
   const grenadeAuthority = explosive ? remoteGrenadeAuthorities.get(message.by) : undefined;
   const grenade = explosive && grenadeAuthority && Number.isFinite(message.actionNonce)
@@ -13873,6 +13889,7 @@ async function startGame(
     ? killstreakMatchEpoch + 1
     : Math.max(1, Math.floor(privateMatchActiveAtEpochMs ?? Date.now()) % 1_000_000_000));
   hostedBotWeaponPresentationReplay.clear();
+  hostedBotProjectileGlassActions.clear();
   interactiveWorldMatchEpoch = killstreakMatchEpoch;
   admittedRemoteShots.clear();
   remoteStickyAttachmentAuthority = createRemoteStickyAttachmentAuthorityState();
@@ -16859,6 +16876,14 @@ function acceptHostedBotWeaponPresentation(message: BotWeaponPresentationMessage
   });
   if (!admission.accepted || !admission.message) return;
   const admitted = admission.message;
+  const now = performance.now();
+  if (admitted.presentation === 'signal-flare-launch') {
+    const actionAdmission = hostedBotProjectileGlassActions.recordHostLaunch(admitted, {
+      hostId: privateLobbySnapshot?.hostId ?? null,
+      matchEpoch: killstreakMatchEpoch,
+    }, now);
+    if (!actionAdmission.accepted) return;
+  }
   const origin = new THREE.Vector3(...admitted.origin);
   const bot = bots.get(admitted.botId);
   const remoteMuzzle = bot?.root.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
@@ -22008,6 +22033,7 @@ function clearFieldSupport(): void {
   nukeLaunches = 0;
   nukeDetonations = 0;
   localSupportNonces.clear();
+  hostedBotProjectileGlassActions.clear();
   admittedRemoteShots.clear();
   admittedRemoteMelees.clear();
   admittedRemoteExplosions.clear();

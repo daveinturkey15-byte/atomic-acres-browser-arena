@@ -59,11 +59,28 @@ describe('catalog-wide projectile glass integration', () => {
     const remote = block('function acceptRemoteWindowBreak(', '\nfunction resetBreakableWindows(');
     expect(remote).toContain('admitProjectileGlassBreak({');
     expect(remote).toContain("const paneActionKey = `glass:${message.windowId}`;");
-    expect(remote).toContain('actionNonceObserved: action?.message.nonce ?? null');
+    expect(remote).toContain('actionNonceObserved: remoteAction?.message.nonce ?? hostedBotAction?.actionNonce ?? null');
     expect(remote).toContain("hostAuthorityValid: network.role === 'client'");
     expect(remote).toContain('eventReplay,');
-    expect(remote).toContain('paneAlreadyAdmittedForAction: action?.targets.has(paneActionKey) ?? false');
-    expect(remote.indexOf('if (!admission.accepted || !action) return;'))
+    expect(remote).toContain('paneAlreadyAdmittedForAction: remoteAction?.targets.has(paneActionKey)');
+    expect(remote.indexOf('if (!admission.accepted || !remoteAction && !hostedBotAction) return;'))
       .toBeLessThan(remote.indexOf('breakHouseWindow('));
+  });
+
+  it('retains authenticated hosted-bot flare actions without requiring a human remote pose', () => {
+    const presentation = block(
+      'function acceptHostedBotWeaponPresentation(',
+      '\nfunction botElevationAt(',
+    );
+    expect(presentation).toContain('hostedBotWeaponPresentationReplay.admit(message');
+    expect(presentation).toContain('hostedBotProjectileGlassActions.recordHostLaunch(admitted');
+    expect(presentation.indexOf('hostedBotWeaponPresentationReplay.admit(message'))
+      .toBeLessThan(presentation.indexOf('hostedBotProjectileGlassActions.recordHostLaunch(admitted'));
+
+    const remote = block('function acceptRemoteWindowBreak(', '\nfunction resetBreakableWindows(');
+    expect(remote).toContain("message.weapon === 'flare-gun'");
+    expect(remote).toContain('hostedBotProjectileGlassActions.current(');
+    expect(remote.indexOf('hostedBotProjectileGlassActions.current('))
+      .toBeLessThan(remote.indexOf('if (!remote) return;'));
   });
 });
