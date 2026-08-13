@@ -152,6 +152,39 @@ describe('Pass 71 frame-action baseline', () => {
       .toContain('maximum-frame-work:50>=50');
   });
 
+  it('keeps sparse software scheduler maxima diagnostic while native evidence gates them', () => {
+    const slowBaseline = baseline(
+      [140, 141, 139, 145, 142, 141, 144, 140, 143, 142],
+      1_417,
+    );
+    const validExceptForAmbientRafMaximum = {
+      internalHandlerSyncMs: 2,
+      outerHandlerSyncMs: 3,
+      eventToNextAnimationFrameMs: 100,
+      maximumAnimationFrameGapMs: 230,
+      maximumFrameWorkMs: 36,
+      maximumPendingForMs: 0,
+      firstSubmissionDelayMs: 133,
+      firstCompletionDelayMs: 133,
+    };
+
+    expect(frameActionBudgetFailures(
+      deriveFrameActionBudget(slowBaseline, SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE),
+      validExceptForAmbientRafMaximum,
+    )).toEqual([]);
+
+    const nativeBudget = deriveFrameActionBudget(
+      baseline(Array.from({ length: 22 }, () => 16), 352),
+    );
+    expect(frameActionBudgetFailures(nativeBudget, {
+      ...validExceptForAmbientRafMaximum,
+      eventToNextAnimationFrameMs: 16,
+      maximumFrameWorkMs: 16,
+      firstSubmissionDelayMs: 16,
+      firstCompletionDelayMs: 16,
+    })).toContain('maximum-animation-frame-gap:230>=33.333');
+  });
+
   it('keeps the native action sample floor while allowing the 350ms software-CI window to be observed', () => {
     expect(MINIMUM_NATIVE_ACTION_FRAME_SAMPLES).toBe(10);
     expect(MINIMUM_SOFTWARE_CI_ACTION_FRAME_SAMPLES).toBe(2);

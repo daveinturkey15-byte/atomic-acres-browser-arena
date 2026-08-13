@@ -410,12 +410,15 @@ describe('production release workflow', () => {
     expect(liveTopologyVerifier).not.toContain("'channels/the-big-one', 'PASS 65'");
   });
 
-  it('records the narrow standing Pass 66 authorization without fabricating preview HITL', () => {
+  it('records the narrow standing Pass 66 and Pass 71 authorizations without fabricating preview HITL', () => {
     for (const source of [agentContract, contributionGuide, pass66ExecutionPlan, ownerFeedbackSkill]) {
       expect(source).toContain('standing conditional');
       expect(source).toMatch(/does not claim|not evidence|must explicitly avoid claiming|Dave did not/u);
     }
     expect(agentContract).toContain('Pass 65 must never be promoted');
+    expect(agentContract).toContain('Pass 66 and Pass 71 are the narrow exceptions');
+    expect(contributionGuide).toContain('Pass 66 and Pass 71 have explicit, narrow authorization exceptions');
+    expect(contributionGuide).toContain('Dave did not inspect or test that immutable preview');
     expect(contributionGuide).toContain('Pass 65 is superseded audit evidence and must never be promoted');
     expect(pass66ExecutionPlan).not.toContain('Stop. Do not publish Version 66.');
   });
