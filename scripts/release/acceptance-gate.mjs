@@ -18,6 +18,10 @@ import {
   pass71Hf298CoverageFailures,
 } from '../qa/pass71-hf298-coverage-contract.mjs';
 import { PASS71_HF296_CONTACT_EVIDENCE_REGISTRY_ENTRY } from '../qa/pass71-hf296-contact-evidence-contract.mjs';
+import {
+  PASS71_HF297_ARMS_EVIDENCE_REGISTRY_ENTRY,
+  pass71Hf297VerifiedRequirementFailures,
+} from '../qa/pass71-hf297-arms-evidence-contract.mjs';
 import { PASS71_AUDIO_NATIVE_REGISTRY_ENTRY } from '../qa/pass71-audio-native-receipt-contract.mjs';
 import {
   PASS71_STUCK_EVIDENCE_DESCRIPTOR,
@@ -46,6 +50,12 @@ const MECHANICAL_EVIDENCE = new Set(['unit', 'contract', 'browser', 'trace']);
 const ACCEPTANCE_TYPES = new Set(['mechanical', 'visual', 'human', 'mixed']);
 const REQUIREMENT_STATES = new Set(['verified', 'deferred']);
 const PASS71_HF298_REQUIREMENT_ID = 'R3';
+const PASS71_OWNER_FEEDBACK_IDS = Object.freeze(Array.from(
+  { length: 18 },
+  (_, index) => `HF-${296 + index}`,
+));
+const PASS71_PUBLIC_REVIEW_REQUIREMENT_ID = 'R19';
+const PASS71_PUBLIC_REVIEW_FEEDBACK_ID = 'PUBLIC-REVIEW';
 
 const PASS71_STUCK_EVIDENCE_REGISTRY_ENTRY = Object.freeze({
   descriptor: PASS71_STUCK_EVIDENCE_DESCRIPTOR,
@@ -125,6 +135,7 @@ export function createPass71NativeEvidenceRegistry(additionalEntries = []) {
 
 export const PASS71_NATIVE_EVIDENCE_REGISTRY = createPass71NativeEvidenceRegistry([
   PASS71_HF296_CONTACT_EVIDENCE_REGISTRY_ENTRY,
+  PASS71_HF297_ARMS_EVIDENCE_REGISTRY_ENTRY,
   PASS71_AUDIO_NATIVE_REGISTRY_ENTRY,
   PASS71_STUCK_EVIDENCE_REGISTRY_ENTRY,
   PASS71_NATIVE_BROWSER_PARITY_REGISTRY_ENTRY,
@@ -315,6 +326,22 @@ export function validateAcceptanceManifest(manifest, options = {}) {
   let pass71Hf298Components = [];
   let pass71Hf298Coverages = [];
   if (manifest.releasePass === 'PASS 71') {
+    if (!Array.isArray(manifest.requirements) || manifest.requirements.length !== 19) {
+      errors.push('PASS 71 requirements must contain exactly R1..R19');
+    } else {
+      for (const [index, feedbackId] of PASS71_OWNER_FEEDBACK_IDS.entries()) {
+        if (manifest.requirements[index]?.feedbackId !== feedbackId) {
+          errors.push(`PASS 71 R${index + 1}.feedbackId must be ${feedbackId}`);
+        }
+      }
+      const publicReview = manifest.requirements[18];
+      if (publicReview?.id !== PASS71_PUBLIC_REVIEW_REQUIREMENT_ID
+        || publicReview?.feedbackId !== PASS71_PUBLIC_REVIEW_FEEDBACK_ID
+        || publicReview?.acceptance !== 'human'
+        || publicReview?.state !== 'deferred') {
+        errors.push('PASS 71 R19 must be the deferred PUBLIC-REVIEW human requirement');
+      }
+    }
     const hf298Requirement = Array.isArray(manifest.requirements)
       ? manifest.requirements.find((requirement) => requirement?.id === PASS71_HF298_REQUIREMENT_ID)
       : null;
@@ -394,6 +421,7 @@ export function validateAcceptanceManifest(manifest, options = {}) {
 
     const feedbackEvidenceRequirements = new Map([
       ['HF-296', PASS71_HF296_CONTACT_EVIDENCE_REGISTRY_ENTRY.descriptor],
+      ['HF-297', null],
       ['HF-302', PASS71_AUDIO_NATIVE_REGISTRY_ENTRY.descriptor],
       ['HF-310', PASS71_STUCK_EVIDENCE_DESCRIPTOR],
       ['HF-311', PASS71_NATIVE_BROWSER_PARITY_DESCRIPTOR],
@@ -405,9 +433,14 @@ export function validateAcceptanceManifest(manifest, options = {}) {
         errors.push(`PASS 71 ${feedbackId} must map to exactly one requirement`);
         continue;
       }
-      if (matching[0].state === 'verified'
+      if (descriptor && matching[0].state === 'verified'
         && (pass71RecordsByKey.get(nativeEvidenceKey(descriptor))?.length ?? 0) !== 1) {
         errors.push(`PASS 71 verified ${matching[0].id}/${feedbackId} requires its canonical registered native evidence record`);
+      }
+      if (feedbackId === 'HF-297' && matching[0].state === 'verified') {
+        for (const failure of pass71Hf297VerifiedRequirementFailures(matching[0], pass71NativeRecords)) {
+          errors.push(`PASS 71 verified R2/HF-297 cannot use the representative non-closing component: ${failure}`);
+        }
       }
     }
   }

@@ -76,14 +76,15 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
   manifest.preview.ref = `pr-preview-71-${manifest.preview.sourceSha}`;
   manifest.humanAcceptance.evidence = 'Dave\'s standing conditional publication authorization is bound here; Dave did not inspect or test this immutable preview.';
   const requirement = manifest.requirements[0];
-  manifest.requirements = Array.from({ length: 18 }, (_, index) => {
+  manifest.requirements = Array.from({ length: 19 }, (_, index) => {
     const row = structuredClone(requirement) as typeof requirement & {
       feedbackId: string;
       deferApproval?: { approvedBy: string; approvedAt: string; reason: string };
     };
     row.id = `R${index + 1}`;
-    row.feedbackId = `HF-${296 + index}`;
+    row.feedbackId = index < 18 ? `HF-${296 + index}` : 'PUBLIC-REVIEW';
     row.summary = `Pass 71 owner outcome ${row.feedbackId}`;
+    if (index === 18) row.acceptance = 'human';
     if (![2, 14, 15].includes(index)) {
       row.state = 'deferred';
       row.evidence = [];
@@ -337,6 +338,35 @@ describe('release acceptance manifest', () => {
     (manifest.requirements[2] as unknown as { feedbackId: string }).feedbackId = 'HF-UNKNOWN';
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/R3\.feedbackId must be HF-298/);
+  }, 20_000);
+
+  it('freezes the eighteen owner outcomes plus one deferred public review', () => {
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    const { manifest } = pass71Manifest(tooling);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling))).toMatchObject({ ok: true });
+
+    manifest.requirements.pop();
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/exactly R1\.\.R19/);
+
+    const { manifest: mislabeled } = pass71Manifest(tooling);
+    (mislabeled.requirements[7] as unknown as { feedbackId: string }).feedbackId = 'HF-999';
+    expect(validateAcceptanceManifest(mislabeled, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/R8\.feedbackId must be HF-303/);
+
+    const { manifest: prematureReview } = pass71Manifest(tooling);
+    prematureReview.requirements[18].state = 'verified';
+    expect(validateAcceptanceManifest(prematureReview, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/R19 must be the deferred PUBLIC-REVIEW human requirement/);
+  }, 20_000);
+
+  it('cannot use the representative HF-297 arms component as closing evidence', () => {
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    const { manifest } = pass71Manifest(tooling);
+    manifest.requirements[1].state = 'verified';
+    delete (manifest.requirements[1] as unknown as { deferApproval?: unknown }).deferApproval;
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/representative non-closing component: hf297-closing-evidence-required/);
   }, 20_000);
 
   it('orders every HF-298 component and coverage finalization between preview and approval', () => {
