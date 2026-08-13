@@ -5445,7 +5445,8 @@ const LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000;
 let lastObservedWebGpuCompletionSequence = 0;
 
 function resetWebGpuPresentationEpoch(reason: string, now: number, rebasePendingCompletion = true): void {
-  renderRuntime.resetPresentationProgressTelemetry(reason, now, rebasePendingCompletion);
+  if (rebasePendingCompletion) renderRuntime.resetPresentationProgressTelemetry(reason, now);
+  else renderRuntime.resetPresentationProgressTelemetry(reason, now, false);
   if (renderRuntime.backend !== 'webgpu') return;
   // A completion which retired during a hidden/pre-admission epoch is not live
   // foreground performance evidence. Consume its sequence and discard any
