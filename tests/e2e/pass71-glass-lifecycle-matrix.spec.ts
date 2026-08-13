@@ -93,17 +93,19 @@ async function assertPaneBreached(
   expectedPhase: Exclude<GlassPhase, 'intact'>,
   waitForProjectile = false,
 ): Promise<PaneObservation> {
-  const authorityMatches = (pane: PaneObservation): boolean => pane.broken === true
-    && pane.visible === false
-    && pane.authority?.phase === expectedPhase
-    && pane.authority?.paneVisible === false
-    && pane.authority?.apertureOpen === true
-    && pane.authority?.movementSolid === false
-    && pane.authority?.ballisticSolid === false
-    && pane.authority?.aiLineOfSightSolid === false
-    && pane.activeWorldColliderPresent === false;
   if (waitForProjectile) {
-    await expect.poll(async () => authorityMatches(await observePane(page, index)), { timeout: 8_000 }).toBe(true);
+    await page.waitForFunction(({ paneIndex, phase }) => {
+      const pane = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).breakableWindows[paneIndex];
+      return pane.broken === true
+        && pane.visible === false
+        && pane.authority?.phase === phase
+        && pane.authority?.paneVisible === false
+        && pane.authority?.apertureOpen === true
+        && pane.authority?.movementSolid === false
+        && pane.authority?.ballisticSolid === false
+        && pane.authority?.aiLineOfSightSolid === false
+        && pane.activeWorldColliderPresent === false;
+    }, { paneIndex: index, phase: expectedPhase }, { timeout: 8_000 });
   }
   const admittedPane = await observePane(page, index);
   expect(admittedPane, `${label}: pane ${index}`).toMatchObject({
@@ -121,9 +123,10 @@ async function assertPaneBreached(
   });
   // Pane authority remains immediate for hitscan/melee/grenade. Only the
   // already-deferred Rapier reconciliation receives a bounded poll.
-  await expect.poll(async () => (
-    (await observePane(page, index)).rapierDynamicColliders < rapierColliderCountBefore
-  ), { timeout: 5_000 }).toBe(true);
+  await page.waitForFunction(({ colliderCountBefore }) => (
+    (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).interactiveWorld.rapierDynamicColliders
+      < colliderCountBefore
+  ), { colliderCountBefore: rapierColliderCountBefore }, { timeout: 5_000 });
   return observePane(page, index);
 }
 
@@ -258,7 +261,9 @@ async function stageSkylinePane(page: Page, paneIndex: number, distance = 6): Pr
   await page.evaluate(({ paneIndex: index, distance: approachDistance }) => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     const pane = (debug.snapshot() as any).breakableWindows[index];
-    const [targetX, targetY, targetZ] = pane.position as [number, number, number];
+    const [paneX, targetY, targetZ] = pane.position as [number, number, number];
+    // Skyline's authored centre mullion is solid, so aim through clear pane area.
+    const targetX = paneX + 1;
     const eyeY = 1.7;
     const playerX = targetX;
     const playerZ = targetZ + approachDistance;
@@ -412,10 +417,10 @@ for (const profile of PROFILES) {
       const before = await observePane(page, pane);
       await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
 
-      await expect.poll(async () => page.evaluate(() => (
+      await page.waitForFunction(() => (
         (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).projectileGlass.explosiveBolts
           .some((bolt: any) => bolt.authority === true && bolt.impacted === true && bolt.detonatesInMs > 0)
-      )), { timeout: 2_000 }).toBe(true);
+      ), undefined, { timeout: 2_000 });
       const impacted = await observePane(page, pane);
       expect(impacted, `${profile.label}/explosive-crossbow pane ${pane} remains solid on bolt impact`)
         .toMatchObject({

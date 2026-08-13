@@ -11,7 +11,7 @@ export function windowBreakPathBlocked(
   const dz = origin.z - centre.z;
   const distance = Math.hypot(dx, dy, dz);
   if (distance <= Math.max(0, endpointInset)) return false;
-  const inset = Math.min(Math.max(0, endpointInset), distance * 0.25);
+  const inset = Math.min(Math.max(0, endpointInset), distance);
   const end = {
     x: centre.x + dx / distance * inset,
     y: centre.y + dy / distance * inset,

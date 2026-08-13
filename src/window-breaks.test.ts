@@ -16,6 +16,17 @@ describe('breakable-window admission geometry', () => {
     expect(windowBreakPathBlocked(origin, centre, [realCover])).toBe(true);
   });
 
+  it('does not let a target pane occlude its own projectile contact blast', () => {
+    const origin = { x: 0, y: 1.6, z: 0.21 };
+    const centre = { x: 0, y: 1.6, z: 0 };
+    const targetPane: Box2 = { minX: -2, maxX: 2, minZ: -0.04, maxZ: 0.04, minY: 0, maxY: 3 };
+    expect(segmentIntersectsBox(origin, centre, targetPane)).toBe(true);
+    expect(windowBreakPathBlocked(origin, centre, [targetPane])).toBe(false);
+
+    const realCover: Box2 = { minX: -2, maxX: 2, minZ: 0.13, maxZ: 0.17, minY: 0, maxY: 3 };
+    expect(windowBreakPathBlocked(origin, centre, [targetPane, realCover])).toBe(true);
+  });
+
   it('selects an in-bounds playable side when the requested exterior pose crosses the arena edge', () => {
     const approach = selectPlayableWindowApproach(
       { x: -13.8, y: 1.565, z: -36.22 },
