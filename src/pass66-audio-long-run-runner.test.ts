@@ -30,6 +30,7 @@ describe('Pass 66 audio long-run evidence runner', () => {
     expect(spec).toContain("test.skip(!enabled");
     expect(spec).toContain("'/channels/the-big-one/channel-provenance.json'");
     expect(spec).toContain("execFileSync('git', ['status', '--porcelain', '--untracked-files=all']");
+    expect(spec).toContain('snapshot().weaponReady === true');
     expect(spec).toContain('sourceSha: expectedSourceSha');
     expect(spec).toContain('servedCandidate,');
     expect(spec).toContain('2_000, 32_000, 60_000, 61_000, 62_000, 63_000, 64_000, 65_000');
