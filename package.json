@@ -57,7 +57,7 @@
     "qa:pass71:stuck-evidence:contract": "node --test scripts/qa/pass71-stuck-evidence-contract.test.mjs",
     "qa:pass71:stuck-evidence:verify": "node scripts/qa/verify-pass71-stuck-evidence.mjs",
     "qa:pass71:stuck-evidence": "npm run qa:pass71:stuck-evidence:contract && node scripts/qa/run-pass71-stuck-evidence.mjs",
-    "qa:pass71:hf296-contact:contract": "node --test scripts/qa/pass71-hf296-contact-evidence-contract.test.mjs",
+    "qa:pass71:hf296-contact:contract": "node --test scripts/qa/pass71-hf296-full-matrix.test.mjs scripts/qa/pass71-hf296-contact-evidence-contract.test.mjs",
     "qa:pass71:hf296-contact": "npm run qa:pass71:hf296-contact:contract && node scripts/qa/run-pass71-hf296-contact-evidence.mjs",
     "qa:pass71:hf297-arms:contract": "node --test scripts/qa/pass71-hf297-arms-evidence-contract.test.mjs",
     "qa:pass71:hf297-arms": "npm run qa:pass71:hf297-arms:contract && node scripts/qa/run-pass71-hf297-arms-evidence.mjs",

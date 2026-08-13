@@ -2,17 +2,44 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { gunzipSync, gzipSync } from 'node:zlib';
+import {
+  PASS71_HF296_ACTIONS,
+  PASS71_HF296_ARENAS,
+  PASS71_HF296_FIXTURES,
+  PASS71_HF296_LOCAL_KEY_SHA256,
+  PASS71_HF296_LOCAL_KEYS,
+  PASS71_HF296_LOCAL_ROLES,
+  PASS71_HF296_MATRIX_COUNTS,
+  PASS71_HF296_REMOTE_KEY_SHA256,
+  PASS71_HF296_REMOTE_KEYS,
+  PASS71_HF296_REMOTE_ROLES,
+  PASS71_HF296_STANCES,
+  PASS71_HF296_VISUAL_ACTION,
+  PASS71_HF296_VISUAL_KEY_SHA256,
+  PASS71_HF296_VISUAL_KEYS,
+  PASS71_HF296_VISUAL_WEAPON,
+  PASS71_HF296_WEAPONS,
+  pass71Hf296ExactSetFailures,
+  pass71Hf296KeyDigest,
+  pass71Hf296LocalKey,
+  pass71Hf296RemoteKey,
+  pass71Hf296VisualKey,
+} from './pass71-hf296-full-matrix.mjs';
 
 export const PASS71_HF296_CONTACT_EVIDENCE = Object.freeze({
-  schemaVersion: 1,
+  schemaVersion: 2,
   evidenceId: 'HF-296',
   kind: 'pass71-hf296-player-viewmodel-contact-component',
-  contract: 'atomic-acres/pass71-hf296-player-viewmodel-contact-component@1',
+  contract: 'atomic-acres/pass71-hf296-player-viewmodel-contact-closure@2',
   feedbackId: 'HF-296',
   status: 'passed',
-  coverageDisposition: 'partial-component-evidence',
+  coverageDisposition: 'full-executable-matrix',
+  closesFeedback: true,
 });
 
+// The acceptance registry freezes this four-field descriptor schema. Closure
+// semantics therefore live on both the registry entry and the strict record.
 export const PASS71_HF296_CONTACT_EVIDENCE_DESCRIPTOR = Object.freeze({
   evidenceId: PASS71_HF296_CONTACT_EVIDENCE.evidenceId,
   kind: PASS71_HF296_CONTACT_EVIDENCE.kind,
@@ -20,106 +47,110 @@ export const PASS71_HF296_CONTACT_EVIDENCE_DESCRIPTOR = Object.freeze({
   maximumCount: 1,
 });
 
-export const PASS71_HF296_WEAPONS = Object.freeze([
-  'carbine', 'smg', 'lmg', 'scattergun', 'sniper',
-  'mini-uzi', 'mp5', 'm4a1', 'ak-47', 'minigun', 'm14-ebr', 'slug-shotgun',
-  'pistol', 'machine-pistol', 'magnum', 'flashlight-pistol', 'explosive-crossbow',
-  'railgun', 'flamethrower', 'flare-gun',
-]);
-
 export const PASS71_HF296_CONTACT_COVERAGE = Object.freeze({
-  bodyAuthority: Object.freeze({
-    evidence: 'shipped-rapier-character-controller-signed-contact',
-    arenaIds: Object.freeze(['atomic-acres']),
-    stances: Object.freeze(['stand', 'crouch', 'prone']),
-    fixtureKinds: Object.freeze(['floor', 'wall', 'corner', 'doorjamb']),
-    matrixCells: 12,
-    presentationActions: Object.freeze([]),
-    roles: Object.freeze([]),
-    renderers: Object.freeze([]),
+  ledgerClaim: 'every arena/stance/firearm/solo-host-guest; floors/walls/diagonals/corners/door-returns; every action; camera-muzzle-projectile-hit identity',
+  execution: Object.freeze({
+    browser: 'installed-authenticode-valid-microsoft-edge',
+    topology: 'owned-fresh-pass71-staged-candidate-a',
+    renderer: 'webgl2',
+    renderProfile: 'blender',
+    batching: 'page-side-action-and-contact-loop-with-node-only-lossless-captures',
   }),
-  liveProneContact: Object.freeze({
-    evidence: 'installed-edge-owned-staged-browser-contact',
-    arenaIds: Object.freeze(['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range']),
-    renderProfiles: Object.freeze(['performance', 'blender', 'compat']),
-    renderers: Object.freeze(['webgl2', 'webgpu']),
-    stances: Object.freeze(['prone']),
-    soloActions: Object.freeze(['hip', 'ads', 'fire', 'reload', 'melee']),
-    soloWeapon: 'm4a1',
-    soloMeleePresentation: 'field-knife',
-    soloCells: 24,
-    hostedActions: Object.freeze(['hip']),
-    hostedRoles: Object.freeze(['host-local', 'guest-local', 'host-saw-guest', 'guest-saw-host']),
-    hostedWeapon: 'm4a1',
-    hostedCells: 24,
+  composedFoundations: Object.freeze({
+    bodyContact: 'shipped Rapier capsule and signed debugContactSnapshot authority',
+    viewmodelContact: 'shipped contact-probe/retreat and framing telemetry',
+    weaponCatalog: 'shipped all-weapon authored near-plane runner contract',
+    multiplayer: 'shipped owned PeerJS topology support and remote operator projection',
   }),
-  authoredNearPlane: Object.freeze({
-    evidence: 'installed-edge-owned-staged-all-weapon-contact-catalog',
-    arenaIds: Object.freeze(['gun-range']),
-    renderProfiles: Object.freeze(['blender']),
-    renderers: Object.freeze(['webgl2', 'webgpu']),
-    stances: Object.freeze(['prone']),
-    roles: Object.freeze(['solo']),
+  localMatrix: Object.freeze({
+    arenas: PASS71_HF296_ARENAS,
+    stances: PASS71_HF296_STANCES,
     weapons: PASS71_HF296_WEAPONS,
-    actions: Object.freeze(['hip', 'ads', 'fire-kick', 'reload']),
-    fireKickAgesMs: Object.freeze([0, 4, 8, 12, 16, 24, 36, 52, 78, 105, 150, 225, 310]),
-    reloadProgressSamples: Object.freeze([0.08, 0.22, 0.38, 0.52, 0.68, 0.84]),
-    weaponRendererCells: 40,
-    losslessPngAttachments: 40,
+    roles: PASS71_HF296_LOCAL_ROLES,
+    fixtures: PASS71_HF296_FIXTURES,
+    actions: PASS71_HF296_ACTIONS,
+    exactCells: PASS71_HF296_MATRIX_COUNTS.local,
+    exactKeySha256: PASS71_HF296_LOCAL_KEY_SHA256,
   }),
-  viewportPresentation: Object.freeze({
-    evidence: 'installed-chrome-direct-source-viewmodel-framing',
-    arenaIds: Object.freeze(['gun-range']),
-    renderProfiles: Object.freeze(['blender']),
-    renderers: Object.freeze(['webgl2']),
-    stances: Object.freeze(['stand', 'prone']),
-    weapons: Object.freeze(['m4a1', 'field-knife']),
-    viewports: Object.freeze(['1440p', '4k', 'ultrawide-1440p']),
-    actions: Object.freeze(['hip', 'ads', 'reload', 'melee', 'prone-wall-floor']),
-    stagedTopology: false,
-    losslessPngAttachments: 2,
+  remoteProjectionMatrix: Object.freeze({
+    arenas: PASS71_HF296_ARENAS,
+    stances: PASS71_HF296_STANCES,
+    weapons: PASS71_HF296_WEAPONS,
+    roles: PASS71_HF296_REMOTE_ROLES,
+    fixtures: PASS71_HF296_FIXTURES,
+    actionDimension: 'not-applicable:remote state projects weapon/stance/pose; action authority remains local',
+    exactCells: PASS71_HF296_MATRIX_COUNTS.remote,
+    exactKeySha256: PASS71_HF296_REMOTE_KEY_SHA256,
   }),
-  composition: Object.freeze({
-    fullCartesianClaim: false,
-    cameraMuzzleProjectileHitIdentityFrozen: false,
-    ownerVisualInspectionPerformed: false,
-    automatedPixelOcclusionJudgmentPerformed: false,
+  visualMatrix: Object.freeze({
+    arenas: PASS71_HF296_ARENAS,
+    stances: PASS71_HF296_STANCES,
+    roles: PASS71_HF296_LOCAL_ROLES,
+    fixtures: PASS71_HF296_FIXTURES,
+    representativeWeapon: PASS71_HF296_VISUAL_WEAPON,
+    representativeAction: PASS71_HF296_VISUAL_ACTION,
+    exactLosslessPngCells: PASS71_HF296_MATRIX_COUNTS.visual,
+    exactKeySha256: PASS71_HF296_VISUAL_KEY_SHA256,
+    attachmentPolicy: 'manifest-embedded-base64-png-bytes-with-recomputed-sha256-and-ihdr',
   }),
-  knownUnknowns: Object.freeze([
-    'standing-and-crouched rendered wall-floor contact is not crossed with every arena, renderer, profile, role, weapon and action',
-    'the all-weapon rendered catalog is one Gun Range prone solo fixture rather than every arena, stance, profile and network role',
-    'rendered corner and door-return separation is not captured; those fixture kinds are body-authority unit evidence only',
-    'the composed browser receipts do not freeze camera, muzzle, projectile and hit identities through the same contact action',
-    'the installed Edge and Chrome executable hashes and Authenticode signers are not recorded by the composed source receipts',
-    'the viewport-framing component uses a direct exact-source Vite server rather than the staged release topology',
-    'the lossless PNG attachments are mechanically hashed but have not been inspected by Dave or classified by an independent pixel-occlusion judge',
-    'manifest registry wiring, exact candidate-A execution and acceptance-manifest embedding remain separate integration steps',
+  identityFreeze: Object.freeze({
+    camera: 'principal-first-person-camera ballistic origin and direction',
+    muzzle: 'weapon-model muzzle-socket presentation-only identity',
+    projectile: 'catalog weapon fire-kind identity',
+    hit: 'production castShot read-only resolution identity',
+    requiredAction: 'fire',
+    exactEveryLocalFireCell: true,
+  }),
+  actionSemantics: Object.freeze({
+    hip: 'shipped WeaponPresentation settled hip state',
+    ads: 'shipped WeaponPresentation settled ADS state including intentional fullscreen-optic suppression',
+    fire: 'shipped WeaponPresentation fire cycle plus read-only production castShot identity; no damage mutation claimed',
+    reload: 'shipped WeaponPresentation reload cycle at deterministic capture progress',
+    melee: 'shipped WeaponPresentation field-knife cycle at deterministic capture progress',
+  }),
+  mechanicalCatalog: Object.freeze({
+    weapons: PASS71_HF296_WEAPONS,
+    exactEntries: PASS71_HF296_MATRIX_COUNTS.weaponCatalog,
+    required: Object.freeze([
+      'modelId', 'modelSource', 'modelKind', 'importedSource',
+      'socketContractReady', 'projectileIdentity', 'projectileAuthority',
+    ]),
+  }),
+  scopeBoundary: Object.freeze({
+    additionalRendererCartesianCoverageClaimed: false,
+    additionalRenderProfileCartesianCoverageClaimed: false,
+    ownerVisualInspectionClaimed: false,
+    reason: 'HF-296 ledger dimensions are authority/contact/action/role dimensions; one native renderer/profile executes them exactly',
+  }),
+  residualUnknowns: Object.freeze([
+    'Dave has not personally inspected the embedded representative frames; closure is mechanical contact/framing evidence, not owner aesthetic approval',
   ]),
 });
 
 export const PASS71_HF296_CONTACT_TOOL_PATHS = Object.freeze({
   runner: 'scripts/qa/run-pass71-hf296-contact-evidence.mjs',
   contract: 'scripts/qa/pass71-hf296-contact-evidence-contract.mjs',
-  contractTest: 'scripts/qa/pass71-hf296-contact-evidence-contract.test.mjs',
   contractTypes: 'scripts/qa/pass71-hf296-contact-evidence-contract.d.mts',
+  contractTest: 'scripts/qa/pass71-hf296-contact-evidence-contract.test.mjs',
+  matrix: 'scripts/qa/pass71-hf296-full-matrix.mjs',
+  matrixTypes: 'scripts/qa/pass71-hf296-full-matrix.d.mts',
+  matrixTest: 'scripts/qa/pass71-hf296-full-matrix.test.mjs',
+  fullSpec: 'tests/e2e/pass71-hf296-full-contact-matrix.spec.ts',
+  runtimeIntegrationTest: 'src/pass71-hf296-contact-evidence-integration.test.ts',
   capsuleTest: 'src/player-capsule-contact.test.ts',
+  viewmodelFramingTest: 'src/viewmodel-framing.test.ts',
+  viewmodelContactProbeTest: 'src/viewmodel-contact-probe.test.ts',
+  nearPlaneRunnerTest: 'src/pass69-3-authored-near-plane-catalog-runner.test.ts',
   characterPhysics: 'src/physics.ts',
-  arenaMap: 'src/map.ts',
-  houseNavigation: 'src/house-navigation.ts',
-  interactiveWorld: 'src/interactive-world-runtime.ts',
-  proneRunner: 'scripts/qa/run-pass66-prone-contact-matrix.mjs',
-  proneSpec: 'tests/e2e/pass66-prone-contact-matrix.spec.ts',
-  nearPlaneRunner: 'scripts/qa/run-pass69-3-authored-near-plane-catalog.mjs',
-  nearPlaneSpec: 'tests/e2e/pass69-3-authored-near-plane-catalog.spec.ts',
-  viewmodelRunner: 'scripts/qa/verify-pass66-viewmodel-framing.mjs',
-  viewmodelPresentation: 'src/weapon-presentation.ts',
-  viewmodelState: 'src/weapon-presentation-state.ts',
   runtimeComposition: 'src/legacy-main.ts',
+  weaponPresentation: 'src/weapon-presentation.ts',
+  weaponCatalog: 'src/combat/weapon-catalog.ts',
   protocol: 'src/protocol.ts',
-  e2eSupport: 'tests/e2e/pass66-e2e-support.ts',
+  peerSupport: 'tests/e2e/pass66-e2e-support.ts',
   playwrightConfig: 'playwright.config.ts',
   topologyRunner: 'scripts/qa/run-playwright-with-topology.mjs',
   topologyStager: 'scripts/release/stage-release-topology.mjs',
+  edgeIdentityProbe: 'scripts/qa/pass71-edge-executable-identity.mjs',
   acceptanceGate: 'scripts/release/acceptance-gate.mjs',
   releaseChannels: 'release-channels.json',
   viteConfig: 'vite.config.ts',
@@ -128,41 +159,10 @@ export const PASS71_HF296_CONTACT_TOOL_PATHS = Object.freeze({
   lockVerifier: 'scripts/qa/verify-npm10-lockfile.mjs',
 });
 
-export const PASS71_HF296_COMPONENT_DEFINITIONS = Object.freeze([
-  Object.freeze({
-    id: 'rapier-shipped-capsule', kind: 'unit', renderer: null,
-    command: 'node node_modules/vitest/vitest.mjs run src/player-capsule-contact.test.ts',
-    provenanceMode: 'exact-checkout-shipped-rapier-no-browser', receipt: false,
-  }),
-  Object.freeze({
-    id: 'prone-contact-webgl2', kind: 'browser', renderer: 'webgl2',
-    command: 'node scripts/qa/run-pass66-prone-contact-matrix.mjs',
-    provenanceMode: 'owned-staged-topology-source-bound-subreceipt-without-served-object', receipt: true,
-  }),
-  Object.freeze({
-    id: 'prone-contact-webgpu', kind: 'browser', renderer: 'webgpu',
-    command: 'node scripts/qa/run-pass66-prone-contact-matrix.mjs',
-    provenanceMode: 'owned-staged-topology-source-bound-subreceipt-without-served-object', receipt: true,
-  }),
-  Object.freeze({
-    id: 'near-plane-webgl2', kind: 'browser', renderer: 'webgl2',
-    command: 'node scripts/qa/run-pass69-3-authored-near-plane-catalog.mjs edge-webgl2',
-    provenanceMode: 'owned-staged-topology-source-and-served-candidate-bound', receipt: true,
-  }),
-  Object.freeze({
-    id: 'near-plane-webgpu', kind: 'browser', renderer: 'webgpu',
-    command: 'node scripts/qa/run-pass69-3-authored-near-plane-catalog.mjs edge-webgpu',
-    provenanceMode: 'owned-staged-topology-source-and-served-candidate-bound', receipt: true,
-  }),
-  Object.freeze({
-    id: 'viewmodel-framing-webgl2', kind: 'browser', renderer: 'webgl2',
-    command: 'node scripts/qa/verify-pass66-viewmodel-framing.mjs',
-    provenanceMode: 'exact-checkout-direct-vite-not-staged', receipt: true,
-  }),
-]);
-
 const SHA40 = /^[a-f0-9]{40}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
+const SOFTWARE_ADAPTER = /swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic/iu;
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
 function object(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value : null;
@@ -193,8 +193,12 @@ function isoTimestamp(value) {
     && new Date(value).toISOString() === value;
 }
 
+function sha256(value) {
+  return createHash('sha256').update(value).digest('hex');
+}
+
 function sha256File(path) {
-  return createHash('sha256').update(readFileSync(path)).digest('hex');
+  return sha256(readFileSync(path));
 }
 
 export function pass71Hf296ContactCanonicalBytes(record) {
@@ -204,7 +208,7 @@ export function pass71Hf296ContactCanonicalBytes(record) {
 }
 
 export function pass71Hf296ContactRecordSha256(record) {
-  return createHash('sha256').update(pass71Hf296ContactCanonicalBytes(record)).digest('hex');
+  return sha256(pass71Hf296ContactCanonicalBytes(record));
 }
 
 export function pass71Hf296ContactToolingHashes(repositoryRoot) {
@@ -216,10 +220,10 @@ export function pass71Hf296ContactToolingHashes(repositoryRoot) {
 export function pass71Hf296ContactToolingHashesAtSource(repositoryRoot, sourceSha) {
   if (!SHA40.test(sourceSha ?? '')) throw new Error('Pass 71 HF-296 tooling source must be a full SHA');
   return Object.freeze(Object.fromEntries(Object.entries(PASS71_HF296_CONTACT_TOOL_PATHS).map(
-    ([name, path]) => [`${name}Sha256`, createHash('sha256').update(execFileSync(
+    ([name, path]) => [`${name}Sha256`, sha256(execFileSync(
       'git', ['-C', repositoryRoot, 'show', `${sourceSha}:${path}`],
-      { windowsHide: true, maxBuffer: 64 * 1024 * 1024 },
-    )).digest('hex')],
+      { windowsHide: true, maxBuffer: 128 * 1024 * 1024 },
+    ))],
   )));
 }
 
@@ -230,40 +234,6 @@ export function pass71Hf296ContactSourceTreeAtSource(repositoryRoot, sourceSha) 
   }).trim();
 }
 
-function expectedVisualIdentities() {
-  const entries = [];
-  for (const renderer of ['webgl2', 'webgpu']) {
-    for (const [index, weapon] of PASS71_HF296_WEAPONS.entries()) {
-      const token = `${String(index + 1).padStart(2, '0')}-${weapon}-maximum-contact-fire-kick.png`;
-      entries.push({
-        componentId: `near-plane-${renderer}`,
-        scope: 'all-weapon-maximum-contact-fire-kick',
-        renderer,
-        weapon,
-        label: `${weapon}-maximum-contact-fire-kick`,
-        sourceArtifactPath: `artifacts/pass69-3/authored-near-plane-catalog/${renderer}/${token}`,
-        path: `artifacts/pass71/hf296-contact-evidence/visual/near-plane/${renderer}/${token}`,
-      });
-    }
-  }
-  for (const label of ['contact-sheet', 'temporal-contact-strip']) {
-    entries.push({
-      componentId: 'viewmodel-framing-webgl2',
-      scope: 'm4a1-field-knife-viewport-framing',
-      renderer: 'webgl2',
-      weapon: 'm4a1-and-field-knife',
-      label,
-      sourceArtifactPath: `artifacts/pass66/viewmodel-framing/${label}.png`,
-      path: `artifacts/pass71/hf296-contact-evidence/visual/viewmodel-framing/${label}.png`,
-    });
-  }
-  return entries;
-}
-
-export const PASS71_HF296_VISUAL_IDENTITIES = Object.freeze(
-  expectedVisualIdentities().map((entry) => Object.freeze(entry)),
-);
-
 function validateSource(source, expected, failures) {
   exactKeys(source, [
     'expectedSourceSha', 'checkoutSourceSha', 'endingCheckoutSourceSha', 'sourceTreeSha',
@@ -273,7 +243,7 @@ function validateSource(source, expected, failures) {
     || source.expectedSourceSha !== expected?.sourceSha
     || source.checkoutSourceSha !== expected?.sourceSha
     || source.endingCheckoutSourceSha !== expected?.sourceSha
-    || !SHA40.test(source.sourceTreeSha ?? '') || source.sourceTreeSha !== expected?.sourceTreeSha
+    || source.sourceTreeSha !== expected?.sourceTreeSha
     || source.releasePass !== 'PASS 71'
     || source.cleanBefore !== true || source.cleanAfter !== true) failures.push('exact-candidate-a-source');
 }
@@ -281,90 +251,311 @@ function validateSource(source, expected, failures) {
 function validateServedCandidate(candidate, expected, failures) {
   exactKeys(candidate, [
     'schemaVersion', 'channel', 'releasePass', 'sourceSha', 'path',
-    'exactRootFileCount', 'treeSha256',
+    'treeSha256', 'exactRootFileCount',
   ], 'servedCandidate', failures);
   if (!object(candidate) || candidate.schemaVersion !== 4 || candidate.channel !== 'the-big-one'
-    || candidate.releasePass !== 'PASS 71' || candidate.path !== 'channels/the-big-one'
-    || candidate.sourceSha !== expected?.sourceSha
-    || !Number.isSafeInteger(candidate.exactRootFileCount) || candidate.exactRootFileCount < 2
-    || !SHA256.test(candidate.treeSha256 ?? '')) failures.push('staged-candidate-provenance');
+    || candidate.releasePass !== 'PASS 71' || candidate.sourceSha !== expected?.sourceSha
+    || candidate.path !== 'channels/the-big-one' || !SHA256.test(candidate.treeSha256 ?? '')
+    || !Number.isSafeInteger(candidate.exactRootFileCount) || candidate.exactRootFileCount < 2) {
+    failures.push('staged-candidate-provenance');
+  }
 }
 
-function validateBrowser(browser, definition, failures) {
-  if (definition.kind === 'unit') {
-    if (browser !== null) failures.push(`${definition.id}:browser-must-be-null`);
-    return;
-  }
+function validateBrowser(browser, failures) {
   exactKeys(browser, [
-    'channel', 'installedRequested', 'version', 'userAgent', 'executableAttestation',
-  ], `${definition.id}:browser`, failures);
-  const expectedChannel = definition.id === 'viewmodel-framing-webgl2' ? 'chrome' : 'msedge';
-  if (!object(browser) || browser.channel !== expectedChannel || browser.installedRequested !== true
-    || typeof browser.version !== 'string' || browser.version.trim() === ''
-    || (definition.id.startsWith('near-plane-') && !/Edg\//u.test(browser.userAgent ?? ''))
-    || (!definition.id.startsWith('near-plane-') && browser.userAgent !== null)
-    || browser.executableAttestation !== 'not-recorded-by-composed-source-receipt') {
-    failures.push(`${definition.id}:browser-provenance`);
+    'channel', 'installed', 'executableName', 'executableSha256', 'productVersion',
+    'playwrightVersion', 'installRoot', 'authenticodeStatus', 'authenticodeSigner',
+    'userAgent', 'isolation',
+  ], 'browser', failures);
+  if (!object(browser) || browser.channel !== 'msedge' || browser.installed !== true
+    || browser.executableName !== 'msedge.exe' || !SHA256.test(browser.executableSha256 ?? '')
+    || !/^\d+(?:\.\d+){3}$/u.test(browser.productVersion ?? '')
+    || browser.playwrightVersion !== browser.productVersion
+    || !/[\\/]Microsoft[\\/]Edge[\\/]Application$/iu.test(browser.installRoot ?? '')
+    || browser.authenticodeStatus !== 'Valid'
+    || !/\bMicrosoft Corporation\b/iu.test(browser.authenticodeSigner ?? '')
+    || !new RegExp(`Edg/${String(browser.productVersion).replaceAll('.', '\\.')}`).test(browser.userAgent ?? '')
+    || browser.isolation !== 'one-owned-edge-process-with-fresh-contexts-per-arena-role') {
+    failures.push('installed-edge-identity');
   }
 }
 
-function validateComponents(components, record, failures) {
-  if (!Array.isArray(components) || components.length !== PASS71_HF296_COMPONENT_DEFINITIONS.length) {
-    failures.push('component-matrix');
-    return;
+function validateRuntime(runtime, failures) {
+  exactKeys(runtime, [
+    'requestedBackend', 'actualBackend', 'initialized', 'adapterClass', 'deviceClass',
+    'adapterLabel', 'softwareAdapter', 'deviceLost', 'uncapturedErrors', 'presentationStatus',
+  ], 'runtime', failures);
+  if (!object(runtime) || runtime.requestedBackend !== 'webgl2' || runtime.actualBackend !== 'webgl2'
+    || runtime.initialized !== true || runtime.adapterClass !== 'WebGL2RenderingContext'
+    || runtime.deviceClass !== null || runtime.softwareAdapter !== false
+    || typeof runtime.adapterLabel !== 'string' || runtime.adapterLabel.length === 0
+    || SOFTWARE_ADAPTER.test(runtime.adapterLabel) || runtime.deviceLost !== false
+    || runtime.uncapturedErrors !== 0 || runtime.presentationStatus !== 'synchronous') {
+    failures.push('native-webgl2-runtime');
   }
-  for (const [index, definition] of PASS71_HF296_COMPONENT_DEFINITIONS.entries()) {
-    const component = components[index];
-    exactKeys(component, [
-      'id', 'kind', 'status', 'command', 'renderer', 'sourceSha', 'provenanceMode',
-      'browser', 'receiptPath', 'receiptSha256', 'receiptByteLength', 'servedTreeSha256',
-    ], `component:${definition.id}`, failures);
-    if (!object(component) || component.id !== definition.id || component.kind !== definition.kind
-      || component.status !== 'passed' || component.command !== definition.command
-      || component.renderer !== definition.renderer || component.sourceSha !== record.source?.expectedSourceSha
-      || component.provenanceMode !== definition.provenanceMode) {
-      failures.push(`${definition.id}:identity-or-status`);
-      continue;
+}
+
+function finiteVector(value) {
+  return Array.isArray(value) && value.length === 3
+    && value.every((entry) => typeof entry === 'number' && Number.isFinite(entry));
+}
+
+function validateFireIdentityReceipt(value, label, failures) {
+  exactKeys(value, [
+    'cameraIdentity', 'cameraOrigin', 'cameraDirection', 'muzzleIdentity', 'muzzlePosition',
+    'projectileIdentity', 'hitIdentity',
+  ], label, failures);
+  if (!object(value) || !finiteVector(value.cameraOrigin) || !finiteVector(value.cameraDirection)
+    || !finiteVector(value.muzzlePosition)
+    || [value.cameraIdentity, value.muzzleIdentity, value.projectileIdentity, value.hitIdentity]
+      .some((entry) => typeof entry !== 'string' || entry.length === 0)) failures.push(`${label}:identity`);
+}
+
+function fireIdentityFrozen(before, after) {
+  if (!object(before) || !object(after) || !finiteVector(before.cameraOrigin)
+    || !finiteVector(after.cameraOrigin) || !finiteVector(before.cameraDirection)
+    || !finiteVector(after.cameraDirection)) return false;
+  const distance = (left, right) => Math.hypot(...left.map((value, index) => value - right[index]));
+  return before.cameraIdentity === after.cameraIdentity
+    && before.muzzleIdentity === after.muzzleIdentity
+    && before.projectileIdentity === after.projectileIdentity
+    && before.hitIdentity === after.hitIdentity
+    && distance(before.cameraOrigin, after.cameraOrigin) <= 1e-8
+    && distance(before.cameraDirection, after.cameraDirection) <= 1e-10;
+}
+
+function actionEvidencePassed(cell) {
+  if (!object(cell) || typeof cell.observedAction !== 'string' || !Number.isFinite(cell.adsProgress)
+    || !Number.isFinite(cell.fireKick) || !Number.isSafeInteger(cell.shotsPresentedBefore)
+    || !Number.isSafeInteger(cell.shotsPresentedAfter) || typeof cell.knifeVisible !== 'boolean'
+    || typeof cell.fullscreenSuppressed !== 'boolean') return false;
+  if (cell.action === 'hip') return cell.observedAction === 'hip';
+  if (cell.action === 'ads') return cell.observedAction === 'ads' && cell.adsProgress >= 0.9;
+  if (cell.action === 'fire') {
+    return cell.fireKick > 0 && cell.shotsPresentedAfter > cell.shotsPresentedBefore;
+  }
+  if (cell.action === 'reload') return cell.observedAction === 'reload';
+  return cell.action === 'melee' && cell.observedAction === 'melee' && cell.knifeVisible === true;
+}
+
+function validateLocalEvidence(rows, failures) {
+  if (!Array.isArray(rows)) {
+    failures.push('matrix:local:evidence-array');
+    return [];
+  }
+  return rows.map((cell, index) => {
+    const label = `matrix:local:evidence:${index}`;
+    exactKeys(cell, [
+      'arena', 'stance', 'weapon', 'role', 'fixture', 'action', 'contactSources',
+      'signedContactDistances', 'sweepSources', 'surfaceRetreat', 'surfaceLift',
+      'observedAction', 'adsProgress', 'fireKick', 'shotsPresentedBefore', 'shotsPresentedAfter',
+      'knifeVisible', 'fullscreenSuppressed',
+      'framingClear', 'identityFrozen', 'identityBefore', 'identityAfter',
+    ], label, failures);
+    validateFireIdentityReceipt(cell?.identityBefore, `${label}:identity-before`, failures);
+    validateFireIdentityReceipt(cell?.identityAfter, `${label}:identity-after`, failures);
+    if (!object(cell) || !Array.isArray(cell.contactSources)
+      || cell.contactSources.some((source) => typeof source !== 'string' || source.length === 0)
+      || !cell.contactSources.includes('world-floor')
+      || !Array.isArray(cell.signedContactDistances)
+      || cell.signedContactDistances.length !== cell.contactSources.length
+      || cell.signedContactDistances.some((value) => !Number.isFinite(value) || value > 0.027)
+      || !Array.isArray(cell.sweepSources)
+      || cell.sweepSources.some((source) => typeof source !== 'string' || source.length === 0)
+      || cell.fixture !== 'floor' && !cell.contactSources.some((source) => source !== 'world-floor')
+        && !cell.sweepSources.some((source) => source !== 'world-floor')
+      || !Number.isFinite(cell.surfaceRetreat)
+      || cell.fixture !== 'floor' && !(cell.surfaceRetreat > 0)
+      || !Number.isFinite(cell.surfaceLift) || !actionEvidencePassed(cell)
+      || cell.framingClear !== true || cell.identityFrozen !== true
+      || cell.action === 'fire' && !fireIdentityFrozen(cell.identityBefore, cell.identityAfter)) {
+      failures.push(`${label}:contact-action-or-identity`);
     }
-    validateBrowser(component.browser, definition, failures);
-    if (definition.receipt) {
-      if (typeof component.receiptPath !== 'string'
-        || component.receiptPath !== `artifacts/pass71/hf296-contact-evidence/components/${String(index + 1).padStart(2, '0')}-${definition.id}.json`
-        || !SHA256.test(component.receiptSha256 ?? '')
-        || !Number.isSafeInteger(component.receiptByteLength) || component.receiptByteLength < 2) {
-        failures.push(`${definition.id}:subreceipt`);
-      }
-    } else if (component.receiptPath !== null || component.receiptSha256 !== null
-      || component.receiptByteLength !== null) failures.push(`${definition.id}:unexpected-subreceipt`);
-    if (definition.id.startsWith('near-plane-')) {
-      if (component.servedTreeSha256 !== record.servedCandidate?.treeSha256) {
-        failures.push(`${definition.id}:served-tree`);
-      }
-    } else if (component.servedTreeSha256 !== null) failures.push(`${definition.id}:unexpected-served-tree`);
+    return pass71Hf296LocalKey(cell ?? {});
+  });
+}
+
+function validateRemoteEvidence(rows, failures) {
+  if (!Array.isArray(rows)) {
+    failures.push('matrix:remoteProjection:evidence-array');
+    return [];
   }
+  return rows.map((cell, index) => {
+    const label = `matrix:remoteProjection:evidence:${index}`;
+    exactKeys(cell, [
+      'arena', 'stance', 'weapon', 'role', 'fixture', 'sourcePlayerId',
+      'authoritativePosition', 'renderedPosition', 'interpolationDistance', 'fixtureDistance', 'renderedWeapon',
+    ], label, failures);
+    if (!object(cell) || typeof cell.sourcePlayerId !== 'string' || cell.sourcePlayerId.length === 0
+      || !finiteVector(cell.authoritativePosition) || !finiteVector(cell.renderedPosition)
+      || !Number.isFinite(cell.interpolationDistance) || cell.interpolationDistance < 0
+      || cell.interpolationDistance > 2 || !Number.isFinite(cell.fixtureDistance)
+      || cell.fixtureDistance < 0 || cell.fixtureDistance > 1.5 || cell.renderedWeapon !== cell.weapon) {
+      failures.push(`${label}:projection`);
+    }
+    return pass71Hf296RemoteKey(cell ?? {});
+  });
+}
+
+function validateCatalogEvidence(rows, failures) {
+  if (!Array.isArray(rows)) {
+    failures.push('matrix:weaponCatalog:evidence-array');
+    return [];
+  }
+  return rows.map((entry, index) => {
+    const label = `matrix:weaponCatalog:evidence:${index}`;
+    exactKeys(entry, [
+      'weapon', 'modelId', 'modelSource', 'modelKind', 'importedSource',
+      'socketContractReady', 'projectileIdentity', 'projectileAuthority',
+    ], label, failures);
+    if (!object(entry) || [entry.modelId, entry.modelSource, entry.modelKind, entry.importedSource,
+      entry.projectileIdentity, entry.projectileAuthority]
+      .some((value) => typeof value !== 'string' || value.length === 0)
+      || entry.socketContractReady !== true) failures.push(`${label}:catalog`);
+    return entry?.weapon;
+  });
+}
+
+function validateMatrix(matrix, failures) {
+  exactKeys(matrix, ['local', 'remoteProjection', 'weaponCatalog'], 'matrix', failures);
+  for (const [name, expectedCount, expectedKeySha] of [
+    ['local', PASS71_HF296_MATRIX_COUNTS.local, PASS71_HF296_LOCAL_KEY_SHA256],
+    ['remoteProjection', PASS71_HF296_MATRIX_COUNTS.remote, PASS71_HF296_REMOTE_KEY_SHA256],
+  ]) {
+    const value = matrix?.[name];
+    exactKeys(value, [
+      'count', 'keySha256', 'keyEncoding', 'keyByteLength', 'keysGzipBase64',
+      'evidenceEncoding', 'evidenceByteLength', 'evidenceGzipBase64', 'evidenceSha256',
+    ], `matrix:${name}`, failures);
+    const expectedKeys = name === 'local' ? PASS71_HF296_LOCAL_KEYS : PASS71_HF296_REMOTE_KEYS;
+    const decodedKeys = decodeEmbeddedKeySet(value, `matrix:${name}`, failures);
+    const evidence = decodeEmbeddedEvidence(value, `matrix:${name}`, failures);
+    const evidenceKeys = name === 'local'
+      ? validateLocalEvidence(evidence, failures)
+      : validateRemoteEvidence(evidence, failures);
+    if (!object(value) || value.count !== expectedCount || value.keySha256 !== expectedKeySha
+      || !Array.isArray(evidence) || evidence.length !== expectedCount
+      || pass71Hf296ExactSetFailures(decodedKeys, expectedKeys, `matrix:${name}`).length > 0
+      || pass71Hf296ExactSetFailures(evidenceKeys, expectedKeys, `matrix:${name}:evidence`).length > 0
+      || pass71Hf296KeyDigest(decodedKeys) !== expectedKeySha
+      || !sameJson([...decodedKeys].sort(), [...evidenceKeys].sort())) {
+      failures.push(`matrix:${name}:exact-set-or-evidence`);
+    }
+  }
+  const catalog = matrix?.weaponCatalog;
+  exactKeys(catalog, [
+    'count', 'weapons', 'evidenceEncoding', 'evidenceByteLength', 'evidenceGzipBase64', 'evidenceSha256',
+  ], 'matrix:weaponCatalog', failures);
+  const catalogEvidence = decodeEmbeddedEvidence(catalog, 'matrix:weaponCatalog', failures);
+  const catalogWeapons = validateCatalogEvidence(catalogEvidence, failures);
+  if (!object(catalog) || catalog.count !== PASS71_HF296_MATRIX_COUNTS.weaponCatalog
+    || !Array.isArray(catalogEvidence) || catalogEvidence.length !== PASS71_HF296_MATRIX_COUNTS.weaponCatalog
+    || !sameJson(catalog.weapons, PASS71_HF296_WEAPONS)
+    || !sameJson(catalogWeapons, PASS71_HF296_WEAPONS)) failures.push('matrix:weaponCatalog:exact-set-or-evidence');
+}
+
+function embeddedKeySet(keys) {
+  const bytes = Buffer.from(`${[...keys].sort().join('\n')}\n`, 'utf8');
+  return {
+    keyEncoding: 'gzip-base64-sorted-utf8-lines',
+    keyByteLength: bytes.length,
+    keysGzipBase64: gzipSync(bytes, { level: 9 }).toString('base64'),
+  };
+}
+
+function embeddedEvidence(value) {
+  const bytes = Buffer.from(`${JSON.stringify(canonicalValue(value))}\n`, 'utf8');
+  return {
+    evidenceEncoding: 'gzip-base64-canonical-json',
+    evidenceByteLength: bytes.length,
+    evidenceGzipBase64: gzipSync(bytes, { level: 9 }).toString('base64'),
+    evidenceSha256: sha256(bytes),
+  };
+}
+
+function decodeEmbeddedEvidence(value, label, failures) {
+  try {
+    if (!object(value) || value.evidenceEncoding !== 'gzip-base64-canonical-json'
+      || !Number.isSafeInteger(value.evidenceByteLength) || value.evidenceByteLength <= 0
+      || !SHA256.test(value.evidenceSha256 ?? '')
+      || typeof value.evidenceGzipBase64 !== 'string'
+      || !/^[A-Za-z0-9+/]+={0,2}$/u.test(value.evidenceGzipBase64)) throw new Error('schema');
+    const compressed = Buffer.from(value.evidenceGzipBase64, 'base64');
+    if (compressed.toString('base64') !== value.evidenceGzipBase64) throw new Error('canonical-base64');
+    const bytes = gunzipSync(compressed, { maxOutputLength: 128 * 1024 * 1024 });
+    if (bytes.length !== value.evidenceByteLength || sha256(bytes) !== value.evidenceSha256) {
+      throw new Error('bytes');
+    }
+    const decoded = JSON.parse(bytes.toString('utf8'));
+    const canonicalBytes = Buffer.from(`${JSON.stringify(canonicalValue(decoded))}\n`, 'utf8');
+    if (!bytes.equals(canonicalBytes)) throw new Error('canonical-json');
+    return decoded;
+  } catch {
+    failures.push(`${label}:embedded-evidence`);
+    return null;
+  }
+}
+
+function decodeEmbeddedKeySet(value, label, failures) {
+  try {
+    if (!object(value) || value.keyEncoding !== 'gzip-base64-sorted-utf8-lines'
+      || !Number.isSafeInteger(value.keyByteLength) || value.keyByteLength <= 0
+      || typeof value.keysGzipBase64 !== 'string'
+      || !/^[A-Za-z0-9+/]+={0,2}$/u.test(value.keysGzipBase64)) throw new Error('schema');
+    const compressed = Buffer.from(value.keysGzipBase64, 'base64');
+    if (compressed.toString('base64') !== value.keysGzipBase64) throw new Error('canonical-base64');
+    const bytes = gunzipSync(compressed, { maxOutputLength: 16 * 1024 * 1024 });
+    if (bytes.length !== value.keyByteLength) throw new Error('byte-length');
+    const text = bytes.toString('utf8');
+    if (!text.endsWith('\n')) throw new Error('line-termination');
+    const keys = text.slice(0, -1).split('\n');
+    if (JSON.stringify(keys) !== JSON.stringify([...keys].sort())) throw new Error('sort-order');
+    return keys;
+  } catch {
+    failures.push(`${label}:embedded-key-set`);
+    return [];
+  }
+}
+
+function expectedVisualIdentity(key) {
+  const [arena, stance, role, fixture] = key.split('\u001f');
+  return { key, arena, stance, role, fixture };
 }
 
 function validateVisualAttachments(attachments, failures) {
-  if (!Array.isArray(attachments) || attachments.length !== PASS71_HF296_VISUAL_IDENTITIES.length) {
-    failures.push('visual-attachment-matrix');
+  if (!Array.isArray(attachments)) {
+    failures.push('visual-attachments:not-array');
     return;
   }
-  for (const [index, identity] of PASS71_HF296_VISUAL_IDENTITIES.entries()) {
-    const attachment = attachments[index];
+  const keys = attachments.map((attachment) => attachment?.key);
+  failures.push(...pass71Hf296ExactSetFailures(keys, PASS71_HF296_VISUAL_KEYS, 'visual-attachments'));
+  for (const [index, attachment] of attachments.entries()) {
     exactKeys(attachment, [
-      'componentId', 'scope', 'renderer', 'weapon', 'label', 'sourceArtifactPath', 'path',
-      'mimeType', 'encoding', 'copyMode', 'sha256', 'byteLength', 'width', 'height',
+      'key', 'arena', 'stance', 'role', 'fixture', 'weapon', 'action',
+      'mimeType', 'encoding', 'byteLength', 'width', 'height', 'sha256', 'pngBase64',
     ], `visual:${index}`, failures);
-    if (!object(attachment)
-      || !sameJson(Object.fromEntries(Object.keys(identity).map((key) => [key, attachment[key]])), identity)
-      || attachment.mimeType !== 'image/png' || attachment.encoding !== 'lossless-png'
-      || attachment.copyMode !== 'byte-exact'
-      || !SHA256.test(attachment.sha256 ?? '')
-      || !Number.isSafeInteger(attachment.byteLength) || attachment.byteLength <= 24
-      || !Number.isSafeInteger(attachment.width) || attachment.width <= 0
-      || !Number.isSafeInteger(attachment.height) || attachment.height <= 0) {
-      failures.push(`visual:${index}:identity-or-bytes`);
+    const identity = expectedVisualIdentity(attachment?.key ?? '');
+    let bytes = null;
+    try {
+      if (typeof attachment?.pngBase64 !== 'string'
+        || !/^[A-Za-z0-9+/]+={0,2}$/u.test(attachment.pngBase64)) throw new Error('base64');
+      bytes = Buffer.from(attachment.pngBase64, 'base64');
+      if (bytes.toString('base64') !== attachment.pngBase64) throw new Error('canonical-base64');
+    } catch {
+      failures.push(`visual:${index}:embedded-bytes`);
     }
+    if (!object(attachment) || !sameJson({
+      key: attachment.key, arena: attachment.arena, stance: attachment.stance,
+      role: attachment.role, fixture: attachment.fixture,
+    }, identity) || attachment.weapon !== PASS71_HF296_VISUAL_WEAPON
+      || attachment.action !== PASS71_HF296_VISUAL_ACTION
+      || attachment.mimeType !== 'image/png' || attachment.encoding !== 'lossless-png-embedded-base64'
+      || !bytes || bytes.length <= 24 || attachment.byteLength !== bytes.length
+      || !bytes.subarray(0, 8).equals(PNG_SIGNATURE) || bytes.toString('ascii', 12, 16) !== 'IHDR'
+      || attachment.width !== bytes.readUInt32BE(16) || attachment.height !== bytes.readUInt32BE(20)
+      || !Number.isSafeInteger(attachment.width) || attachment.width <= 0
+      || !Number.isSafeInteger(attachment.height) || attachment.height <= 0
+      || attachment.sha256 !== sha256(bytes)) failures.push(`visual:${index}:identity-or-lossless-bytes`);
   }
 }
 
@@ -376,20 +567,21 @@ export function pass71Hf296ContactEvidenceFailures(record, expected = {}) {
     || record.contract !== PASS71_HF296_CONTACT_EVIDENCE.contract
     || record.feedbackId !== PASS71_HF296_CONTACT_EVIDENCE.feedbackId
     || record.status !== PASS71_HF296_CONTACT_EVIDENCE.status
-    || record.coverageDisposition !== PASS71_HF296_CONTACT_EVIDENCE.coverageDisposition) {
-    return ['hf296-identity-or-status'];
-  }
+    || record.coverageDisposition !== PASS71_HF296_CONTACT_EVIDENCE.coverageDisposition
+    || record.closesFeedback !== true) return ['hf296-identity-status-or-closure'];
   exactKeys(record, [
     'schemaVersion', 'evidenceId', 'kind', 'contract', 'feedbackId', 'status',
-    'coverageDisposition', 'startedAt', 'completedAt', 'source', 'servedCandidate',
-    'environment', 'tooling', 'coverage', 'components', 'visualAttachments', 'faults',
-    'receiptSha256',
+    'coverageDisposition', 'closesFeedback', 'startedAt', 'completedAt', 'source',
+    'servedCandidate', 'environment', 'browser', 'runtime', 'tooling', 'coverage',
+    'matrix', 'visualAttachments', 'faults', 'receiptSha256',
   ], 'record', failures);
   validateSource(record.source, expected, failures);
   validateServedCandidate(record.servedCandidate, expected, failures);
   exactKeys(record.environment, ['machine', 'platform', 'arch'], 'environment', failures);
   if (record.environment?.machine !== 'dave-gaming-pc' || record.environment?.platform !== 'win32'
     || record.environment?.arch !== 'x64') failures.push('release-machine-environment');
+  validateBrowser(record.browser, failures);
+  validateRuntime(record.runtime, failures);
   const toolingFields = Object.keys(PASS71_HF296_CONTACT_TOOL_PATHS).map((name) => `${name}Sha256`);
   if (!object(record.tooling) || !object(expected.tooling)
     || !sameJson(Object.keys(record.tooling).sort(), toolingFields.sort())
@@ -397,8 +589,8 @@ export function pass71Hf296ContactEvidenceFailures(record, expected = {}) {
     || Object.values(record.tooling).some((value) => !SHA256.test(value ?? ''))) {
     failures.push('candidate-a-tooling-hashes');
   }
-  if (!sameJson(record.coverage, PASS71_HF296_CONTACT_COVERAGE)) failures.push('truthful-partial-coverage');
-  validateComponents(record.components, record, failures);
+  if (!sameJson(record.coverage, PASS71_HF296_CONTACT_COVERAGE)) failures.push('literal-full-coverage-contract');
+  validateMatrix(record.matrix, failures);
   validateVisualAttachments(record.visualAttachments, failures);
   if (!Array.isArray(record.faults) || record.faults.length !== 0) failures.push('aggregate-faults');
   if (!isoTimestamp(record.startedAt) || !isoTimestamp(record.completedAt)
@@ -417,6 +609,7 @@ export function assertPass71Hf296ContactEvidence(record, expected) {
 export function createPass71Hf296ContactEvidenceRegistryEntry() {
   return Object.freeze({
     descriptor: PASS71_HF296_CONTACT_EVIDENCE_DESCRIPTOR,
+    closesFeedback: true,
     validate(record, context) {
       try {
         const tooling = context?.options?.pass71Hf296ContactTooling
@@ -436,62 +629,143 @@ export function createPass71Hf296ContactEvidenceRegistryEntry() {
 
 export const PASS71_HF296_CONTACT_EVIDENCE_REGISTRY_ENTRY = createPass71Hf296ContactEvidenceRegistryEntry();
 
+const FIXTURE_PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mNk+M/wHwAF/gL+XDMR7wAAAABJRU5ErkJggg==';
+const fixtureFireIdentity = (weapon) => ({
+  cameraIdentity: 'principal-first-person-camera',
+  cameraOrigin: [0, 1.6, 0],
+  cameraDirection: [0, 0, -1],
+  muzzleIdentity: `${weapon}:fixture-model:muzzle-socket`,
+  muzzlePosition: [0.2, 1.4, -0.5],
+  projectileIdentity: `${weapon}:fixture-projectile-kind`,
+  hitIdentity: 'world-surface:fixture-surface',
+});
+const FIXTURE_LOCAL_EVIDENCE = PASS71_HF296_LOCAL_KEYS.map((key) => {
+  const [arena, stance, weapon, role, fixture, action] = key.split('\u001f');
+  const contactSources = fixture === 'floor' ? ['world-floor'] : ['world-floor', `fixture:${fixture}`];
+  return {
+    arena, stance, weapon, role, fixture, action,
+    contactSources,
+    signedContactDistances: contactSources.map((source) => source === 'world-floor' ? 0.025 : 0.001),
+    sweepSources: fixture === 'floor' ? [] : [`fixture:${fixture}`],
+    surfaceRetreat: fixture === 'floor' ? 0 : 0.12,
+    surfaceLift: 0,
+    observedAction: action === 'ads' ? 'ads' : action === 'reload' ? 'reload' : action === 'melee' ? 'melee' : 'hip',
+    adsProgress: action === 'ads' ? 1 : 0,
+    fireKick: action === 'fire' ? 1 : 0,
+    shotsPresentedBefore: 0,
+    shotsPresentedAfter: action === 'fire' ? 1 : 0,
+    knifeVisible: action === 'melee',
+    fullscreenSuppressed: false,
+    framingClear: true,
+    identityFrozen: true,
+    identityBefore: fixtureFireIdentity(weapon),
+    identityAfter: fixtureFireIdentity(weapon),
+  };
+});
+const FIXTURE_REMOTE_EVIDENCE = PASS71_HF296_REMOTE_KEYS.map((key, index) => {
+  const [arena, stance, weapon, role, fixture] = key.split('\u001f');
+  return {
+    arena, stance, weapon, role, fixture,
+    sourcePlayerId: `fixture-player-${index % 2}`,
+    authoritativePosition: [0, 1.6, 0],
+    renderedPosition: [0, 1.6, 0],
+    interpolationDistance: 0,
+    fixtureDistance: 0,
+    renderedWeapon: weapon,
+  };
+});
+const FIXTURE_WEAPON_CATALOG = PASS71_HF296_WEAPONS.map((weapon) => ({
+  weapon,
+  modelId: `${weapon}:fixture-model`,
+  modelSource: `fixture://${weapon}`,
+  modelKind: 'imported',
+  importedSource: `fixture://${weapon}`,
+  socketContractReady: true,
+  projectileIdentity: `${weapon}:fixture-projectile-kind`,
+  projectileAuthority: 'fixture-production-authority',
+}));
+const FIXTURE_LOCAL_EMBEDDED_EVIDENCE = Object.freeze(embeddedEvidence(FIXTURE_LOCAL_EVIDENCE));
+const FIXTURE_REMOTE_EMBEDDED_EVIDENCE = Object.freeze(embeddedEvidence(FIXTURE_REMOTE_EVIDENCE));
+const FIXTURE_CATALOG_EMBEDDED_EVIDENCE = Object.freeze(embeddedEvidence(FIXTURE_WEAPON_CATALOG));
+
 export function createPass71Hf296ContactEvidenceFixture(options = {}) {
   const sourceSha = options.sourceSha ?? 'a'.repeat(40);
+  const sourceTreeSha = options.sourceTreeSha ?? 'c'.repeat(40);
   const tooling = options.tooling ?? Object.fromEntries(Object.keys(PASS71_HF296_CONTACT_TOOL_PATHS).map(
     (name, index) => [`${name}Sha256`, ((index % 15) + 1).toString(16).repeat(64)],
   ));
-  const servedCandidate = {
-    schemaVersion: 4, channel: 'the-big-one', releasePass: 'PASS 71', sourceSha,
-    path: 'channels/the-big-one', exactRootFileCount: 500, treeSha256: 'b'.repeat(64),
-  };
-  const components = PASS71_HF296_COMPONENT_DEFINITIONS.map((definition, index) => ({
-    id: definition.id,
-    kind: definition.kind,
-    status: 'passed',
-    command: definition.command,
-    renderer: definition.renderer,
-    sourceSha,
-    provenanceMode: definition.provenanceMode,
-    browser: definition.kind === 'unit' ? null : {
-      channel: definition.id === 'viewmodel-framing-webgl2' ? 'chrome' : 'msedge',
-      installedRequested: true,
-      version: '151.0.4129.72',
-      userAgent: definition.id.startsWith('near-plane-')
-        ? 'Mozilla/5.0 Edg/151.0.4129.72'
-        : null,
-      executableAttestation: 'not-recorded-by-composed-source-receipt',
-    },
-    receiptPath: definition.receipt
-      ? `artifacts/pass71/hf296-contact-evidence/components/${String(index + 1).padStart(2, '0')}-${definition.id}.json`
-      : null,
-    receiptSha256: definition.receipt ? (index + 1).toString(16).repeat(64) : null,
-    receiptByteLength: definition.receipt ? 1_024 + index : null,
-    servedTreeSha256: definition.id.startsWith('near-plane-') ? servedCandidate.treeSha256 : null,
-  }));
-  const visualAttachments = PASS71_HF296_VISUAL_IDENTITIES.map((identity, index) => ({
-    ...identity,
-    mimeType: 'image/png', encoding: 'lossless-png', copyMode: 'byte-exact',
-    sha256: ((index % 15) + 1).toString(16).repeat(64),
-    byteLength: 2_048 + index, width: 1_600, height: 900,
+  const png = Buffer.from(FIXTURE_PNG_BASE64, 'base64');
+  const visualAttachments = PASS71_HF296_VISUAL_KEYS.map((key) => ({
+    ...expectedVisualIdentity(key),
+    weapon: PASS71_HF296_VISUAL_WEAPON,
+    action: PASS71_HF296_VISUAL_ACTION,
+    mimeType: 'image/png',
+    encoding: 'lossless-png-embedded-base64',
+    byteLength: png.length,
+    width: png.readUInt32BE(16),
+    height: png.readUInt32BE(20),
+    sha256: sha256(png),
+    pngBase64: FIXTURE_PNG_BASE64,
   }));
   const record = {
     ...PASS71_HF296_CONTACT_EVIDENCE,
     startedAt: options.startedAt ?? '2026-08-13T19:00:00.000Z',
     completedAt: options.completedAt ?? '2026-08-13T19:30:00.000Z',
     source: {
-      expectedSourceSha: sourceSha, checkoutSourceSha: sourceSha,
-      endingCheckoutSourceSha: sourceSha, sourceTreeSha: 'c'.repeat(40),
-      releasePass: 'PASS 71', cleanBefore: true, cleanAfter: true,
+      expectedSourceSha: sourceSha,
+      checkoutSourceSha: sourceSha,
+      endingCheckoutSourceSha: sourceSha,
+      sourceTreeSha,
+      releasePass: 'PASS 71',
+      cleanBefore: true,
+      cleanAfter: true,
     },
-    servedCandidate,
+    servedCandidate: {
+      schemaVersion: 4, channel: 'the-big-one', releasePass: 'PASS 71', sourceSha,
+      path: 'channels/the-big-one', treeSha256: 'b'.repeat(64), exactRootFileCount: 500,
+    },
     environment: { machine: 'dave-gaming-pc', platform: 'win32', arch: 'x64' },
+    browser: {
+      channel: 'msedge', installed: true, executableName: 'msedge.exe',
+      executableSha256: 'd'.repeat(64), productVersion: '151.0.4129.72',
+      playwrightVersion: '151.0.4129.72',
+      installRoot: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application',
+      authenticodeStatus: 'Valid', authenticodeSigner: 'CN=Microsoft Corporation',
+      userAgent: 'Mozilla/5.0 Edg/151.0.4129.72',
+      isolation: 'one-owned-edge-process-with-fresh-contexts-per-arena-role',
+    },
+    runtime: {
+      requestedBackend: 'webgl2', actualBackend: 'webgl2', initialized: true,
+      adapterClass: 'WebGL2RenderingContext', deviceClass: null,
+      adapterLabel: 'ANGLE NVIDIA GeForce RTX 5080', softwareAdapter: false,
+      deviceLost: false, uncapturedErrors: 0, presentationStatus: 'synchronous',
+    },
     tooling: { ...tooling },
     coverage: JSON.parse(JSON.stringify(PASS71_HF296_CONTACT_COVERAGE)),
-    components,
+    matrix: {
+      local: {
+        count: PASS71_HF296_MATRIX_COUNTS.local,
+        keySha256: PASS71_HF296_LOCAL_KEY_SHA256,
+        ...embeddedKeySet(PASS71_HF296_LOCAL_KEYS),
+        ...FIXTURE_LOCAL_EMBEDDED_EVIDENCE,
+      },
+      remoteProjection: {
+        count: PASS71_HF296_MATRIX_COUNTS.remote,
+        keySha256: PASS71_HF296_REMOTE_KEY_SHA256,
+        ...embeddedKeySet(PASS71_HF296_REMOTE_KEYS),
+        ...FIXTURE_REMOTE_EMBEDDED_EVIDENCE,
+      },
+      weaponCatalog: {
+        count: PASS71_HF296_MATRIX_COUNTS.weaponCatalog,
+        weapons: [...PASS71_HF296_WEAPONS],
+        ...FIXTURE_CATALOG_EMBEDDED_EVIDENCE,
+      },
+    },
     visualAttachments,
     faults: [],
   };
   record.receiptSha256 = pass71Hf296ContactRecordSha256(record);
   return record;
 }
+
+export { pass71Hf296VisualKey };

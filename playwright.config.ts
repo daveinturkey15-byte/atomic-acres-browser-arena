@@ -14,6 +14,8 @@ const externalPreview = process.env.QA_EXTERNAL_PREVIEW === '1';
 const requireOwnedFreshPreview = process.env.QA_REQUIRE_OWNED_FRESH_PREVIEW === '1';
 const installedEdgeChannel = process.env.QA_INSTALLED_EDGE === '1' ? 'msedge' as const : undefined;
 const pass71GrenadeEdgeExecutable = process.env.PASS71_GRENADE_EDGE_EXECUTABLE;
+const pass71Hf296EdgeExecutable = process.env.PASS71_HF296_EDGE_EXECUTABLE;
+const pass71OwnedEdgeExecutable = pass71GrenadeEdgeExecutable ?? pass71Hf296EdgeExecutable;
 const pass71AudioBrowserExecutable = process.env.PASS71_AUDIO_BROWSER_EXECUTABLE;
 const ownedMultiplayerGate = process.env.QA_OWNED_GATE === 'multiplayer-stability';
 const requestedMultiplayerChannel = process.env[PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV];
@@ -39,11 +41,17 @@ if (ownedMultiplayerGate && installedEdgeChannel) {
 if (pass71GrenadeEdgeExecutable && !installedEdgeChannel) {
   throw new Error('PASS71_GRENADE_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
 }
+if (pass71Hf296EdgeExecutable && !installedEdgeChannel) {
+  throw new Error('PASS71_HF296_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
+}
+if (pass71GrenadeEdgeExecutable && pass71Hf296EdgeExecutable) {
+  throw new Error('Grenade and HF-296 installed-Edge evidence cannot share one Playwright launch');
+}
 if (pass71AudioBrowserExecutable && process.env.PASS71_AUDIO_NATIVE !== '1') {
   throw new Error('PASS71_AUDIO_BROWSER_EXECUTABLE is reserved for the owned audio-native gate');
 }
-if (pass71AudioBrowserExecutable && pass71GrenadeEdgeExecutable) {
-  throw new Error('Audio-native and grenade installed-browser evidence cannot share one Playwright launch');
+if (pass71AudioBrowserExecutable && pass71OwnedEdgeExecutable) {
+  throw new Error('Audio-native and installed-Edge evidence cannot share one Playwright launch');
 }
 
 export default defineConfig({
@@ -79,8 +87,8 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         channel: multiplayerChromeChannel ?? installedEdgeChannel,
-        launchOptions: pass71GrenadeEdgeExecutable
-          ? { executablePath: pass71GrenadeEdgeExecutable }
+        launchOptions: pass71OwnedEdgeExecutable
+          ? { executablePath: pass71OwnedEdgeExecutable }
           : pass71AudioBrowserExecutable
             ? { executablePath: pass71AudioBrowserExecutable }
             : undefined,

@@ -8,6 +8,7 @@ export type Pass71Hf296EvidenceDescriptor = Readonly<{
 export declare const PASS71_HF296_CONTACT_EVIDENCE_DESCRIPTOR: Pass71Hf296EvidenceDescriptor;
 export declare const PASS71_HF296_CONTACT_EVIDENCE_REGISTRY_ENTRY: Readonly<{
   descriptor: Pass71Hf296EvidenceDescriptor;
+  closesFeedback: true;
   validate(record: unknown, context: {
     sourceSha: string;
     repositoryRoot: string;

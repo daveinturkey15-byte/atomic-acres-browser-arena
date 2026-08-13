@@ -26310,6 +26310,199 @@ function sampleWeaponActionReadiness() {
   });
 }
 
+type Hf296ContactAction = 'hip' | 'ads' | 'fire' | 'reload' | 'melee';
+
+/**
+ * Narrow read-only evidence surface for HF-296.  The camera ray is the same
+ * production ray consumed by tryFire/castShot; the muzzle remains explicitly
+ * presentation-only.  Keeping both identities in one sample prevents a
+ * viewmodel socket from being mistaken for ballistic authority.
+ */
+function sampleHf296FireIdentity(presentation = weaponView.presentationState()) {
+  camera.updateMatrixWorld(true);
+  const origin = camera.getWorldPosition(new THREE.Vector3());
+  const direction = camera.getWorldDirection(new THREE.Vector3()).normalize();
+  const muzzle = weaponView.muzzleWorldPosition(new THREE.Vector3());
+  const spec = WEAPONS[player.weapon];
+  const maximumDistance = player.weapon === 'flamethrower' ? FLAMETHROWER_EFFECT.rangeM : 90;
+  const resolution = castShot(
+    origin,
+    direction,
+    player.weapon,
+    spec.fireKind !== 'projectile',
+    maximumDistance,
+  );
+  const hitKind = resolution.playerId ? 'player'
+    : resolution.targetId ? 'target'
+      : resolution.windowId ? 'window'
+        : resolution.ballisticTrace?.stoppedBy ? 'ballistic-surface'
+          : resolution.impactSurface ? 'world-surface' : 'miss';
+  const hitId = resolution.playerId
+    ?? resolution.targetId
+    ?? resolution.windowId
+    ?? resolution.ballisticTrace?.stoppedBy?.id
+    ?? resolution.ballisticTrace?.impacts[0]?.surface.id
+    ?? resolution.impactMaterial
+    ?? resolution.impactSurface
+    ?? 'maximum-range';
+  const projectileKind = spec.fireKind === 'projectile'
+    ? player.weapon === 'explosive-crossbow' ? 'explosive-bolt' : 'flare-projectile'
+    : spec.pellets > 1 ? 'hitscan-pellet-cloud' : 'hitscan-principal-ray';
+  return Object.freeze({
+    contract: 'hf296-camera-muzzle-projectile-hit-identity-v2',
+    weapon: player.weapon,
+    camera: Object.freeze({
+      identity: 'principal-first-person-camera',
+      authority: 'ballistic-origin-and-direction',
+      origin: Object.freeze(origin.toArray()),
+      direction: Object.freeze(direction.toArray()),
+    }),
+    muzzle: Object.freeze({
+      identity: `${player.weapon}:${String(presentation.weaponModelId ?? presentation.importedModel?.source ?? 'model')}:muzzle-socket`,
+      authority: 'presentation-only-tracer-origin',
+      socket: 'muzzle-socket',
+      position: muzzle ? Object.freeze(muzzle.toArray()) : null,
+    }),
+    projectile: Object.freeze({
+      identity: `${player.weapon}:${projectileKind}`,
+      authority: spec.fireKind === 'projectile' ? 'projectile-runtime' : 'castShot',
+      fireKind: spec.fireKind,
+      pellets: spec.pellets,
+    }),
+    hit: Object.freeze({
+      identity: `${hitKind}:${hitId}`,
+      authority: 'production-castShot-read-only-probe',
+      kind: hitKind,
+      id: hitId,
+      distance: resolution.distance,
+      damageMultiplier: resolution.damageMultiplier,
+      traceSurfaceIds: Object.freeze((resolution.ballisticTrace?.impacts ?? []).map((impact) => impact.surface.id)),
+    }),
+  });
+}
+
+function stageHf296ContactAction(action: Hf296ContactAction): ReturnType<typeof sampleHf296FireIdentity> {
+  debugAdsOverride = false;
+  adsHeld = false;
+  debugReloadProgress = null;
+  weaponView.cancelReload();
+  weaponView.setMeleeCaptureProgress(null);
+  weaponView.setFireCaptureAgeMs(null);
+  if (action === 'ads') {
+    debugAdsOverride = true;
+    adsHeld = admittedAdsHeld(true);
+  } else if (action === 'fire') {
+    weaponView.fire(0);
+    weaponView.setFireCaptureAgeMs(24);
+  } else if (action === 'reload') {
+    weaponView.reload();
+    debugReloadProgress = 0.45;
+  } else if (action === 'melee') {
+    weaponView.melee();
+    weaponView.setMeleeCaptureProgress(0.42);
+  }
+  return sampleHf296FireIdentity();
+}
+
+function sampleHf296ContactEvidence() {
+  const presentation = weaponView.presentationState();
+  const remotePlayers = [...remotes.values()].map((remote) => Object.freeze({
+    id: remote.snapshot.id,
+    weapon: remote.snapshot.weapon,
+    stance: remote.snapshot.stance ?? 'stand',
+    authoritativePosition: Object.freeze([
+      remote.snapshot.x,
+      remote.snapshot.y - stanceEyeHeight(remote.snapshot.stance ?? 'stand'),
+      remote.snapshot.z,
+    ]),
+    renderedPosition: Object.freeze(remote.root.position.toArray()),
+    renderedWeapon: remote.root.userData.operator instanceof THREE.Group
+      ? remote.root.userData.operator.userData.operatorRig?.weaponId ?? remote.snapshot.weapon
+      : remote.snapshot.weapon,
+  }));
+  return Object.freeze({
+    contract: 'hf296-player-viewmodel-contact-sample-v2',
+    arena: selectedArena.id,
+    networkRole: network.role,
+    player: Object.freeze({
+      id: player.id,
+      weapon: player.weapon,
+      stance: player.stance,
+      position: Object.freeze(player.position.toArray()),
+      yaw: player.yaw,
+    }),
+    contact: characterPhysics?.debugContactSnapshot() ?? null,
+    viewmodel: Object.freeze({
+      weapon: presentation.weapon,
+      detailsReady: presentation.detailsReady,
+      modelKind: presentation.modelKind,
+      firstPersonSource: presentation.firstPersonSource,
+      weaponModelId: presentation.weaponModelId,
+      action: presentation.actionContract.state,
+      adsProgress: presentation.adsProgress,
+      fireCycle: presentation.fireCycle,
+      shotsPresented: presentation.shotsPresented,
+      surfaceRetreat: presentation.surfaceRetreat,
+      surfaceLift: presentation.surfaceLift,
+      contactResponse: presentation.contactResponse,
+      nearPlaneClearance: presentation.nearPlaneClearance,
+      weaponFraming: presentation.weaponFraming,
+      armFraming: presentation.armFraming,
+      meleeKnifeFraming: presentation.meleeKnifeFraming,
+      fullscreenSuppression: presentation.fullscreenSuppression,
+      importedModel: presentation.importedModel,
+      meleeArmSource: presentation.meleeArmSource,
+      knifeVisible: presentation.knifeVisible,
+    }),
+    fireIdentity: sampleHf296FireIdentity(presentation),
+    remotePlayers: Object.freeze(remotePlayers),
+  });
+}
+
+function sampleHf296ActionProgress() {
+  return Object.freeze({
+    weapon: player.weapon,
+    stance: player.stance,
+    adsProgress: weaponView.adsProgress(),
+    presentedGameplayFrame: lastGameplayPresentedFrame,
+  });
+}
+
+function sampleHf296RemoteProjection() {
+  return Object.freeze([...remotes.values()].map((remote) => Object.freeze({
+    id: remote.snapshot.id,
+    weapon: remote.snapshot.weapon,
+    stance: remote.snapshot.stance ?? 'stand',
+    authoritativePosition: Object.freeze([
+      remote.snapshot.x,
+      remote.snapshot.y - stanceEyeHeight(remote.snapshot.stance ?? 'stand'),
+      remote.snapshot.z,
+    ]),
+    renderedPosition: Object.freeze(remote.root.position.toArray()),
+    renderedWeapon: remote.root.userData.operator instanceof THREE.Group
+      ? remote.root.userData.operator.userData.operatorRig?.weaponId ?? remote.snapshot.weapon
+      : remote.snapshot.weapon,
+  })));
+}
+
+function sampleHf296ColliderField() {
+  return Object.freeze({
+    contract: 'hf296-active-movement-collider-field-v1',
+    arena: selectedArena.id,
+    bounds: Object.freeze({ ...arena.bounds }),
+    colliders: Object.freeze(activeWorldColliders().map((collider, index) => Object.freeze({
+      id: `active:${index}`,
+      minX: collider.minX,
+      maxX: collider.maxX,
+      minY: collider.minY ?? 0,
+      maxY: collider.maxY ?? 8,
+      minZ: collider.minZ,
+      maxZ: collider.maxZ,
+      rotation: collider.rotation ? Object.freeze([...collider.rotation]) : null,
+    }))),
+  });
+}
+
 type DebugPlayerPose = Readonly<{ yaw: number; pitch: number }>;
 
 const debugWindow = window as Window & {
@@ -26323,6 +26516,12 @@ const debugWindow = window as Window & {
     sampleWeaponAssetCache: () => ReturnType<typeof pass65WeaponCacheTelemetry>;
     sampleDmrThermalReadiness: () => ReturnType<typeof sampleDmrThermalReadiness>;
     sampleWeaponActionReadiness: () => ReturnType<typeof sampleWeaponActionReadiness>;
+    sampleHf296ContactEvidence: () => ReturnType<typeof sampleHf296ContactEvidence>;
+    sampleHf296FireIdentity: () => ReturnType<typeof sampleHf296FireIdentity>;
+    sampleHf296ActionProgress: () => ReturnType<typeof sampleHf296ActionProgress>;
+    sampleHf296RemoteProjection: () => ReturnType<typeof sampleHf296RemoteProjection>;
+    sampleHf296ColliderField: () => ReturnType<typeof sampleHf296ColliderField>;
+    stageHf296ContactAction: (action: Hf296ContactAction) => ReturnType<typeof sampleHf296FireIdentity>;
     traceBallistics: (
       weapon: WeaponId,
       origin: [number, number, number],
@@ -27485,6 +27684,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleWeaponAssetCache: () => pass65WeaponCacheTelemetry(),
   sampleDmrThermalReadiness,
   sampleWeaponActionReadiness,
+  sampleHf296ContactEvidence,
+  sampleHf296FireIdentity,
+  sampleHf296ActionProgress,
+  sampleHf296RemoteProjection,
+  sampleHf296ColliderField,
+  stageHf296ContactAction,
   snapshot: () => ({
     bootstrap: {
       stage: bootstrapStage,
