@@ -19,6 +19,7 @@ describe('Pass 71 first-action and protected-release gate', () => {
       'TARGET_FRAME_BUDGET_MS = 1_000 / 60',
       'BASELINE_OBSERVATION_MS = 350',
       'MINIMUM_BASELINE_FRAME_SAMPLES = 10',
+      'BASELINE_CAPTURE_DEADLINE_MS = 2_000',
       'MAXIMUM_BASELINE_P95_FRAME_BUDGETS = 1.5',
       'MAXIMUM_BASELINE_GAP_FRAME_BUDGETS = 3',
       'MAXIMUM_BASELINE_COMPLETION_FRAME_BUDGETS = 3',
@@ -29,6 +30,10 @@ describe('Pass 71 first-action and protected-release gate', () => {
       'baseline.p95GapMs >= maximumBaselineP95Ms',
       'baseline.maximumGapMs >= maximumBaselineGapMs',
       'baseline.firstCompletionDelayMs >= maximumBaselineCompletionMs',
+      'gapsMs.length >= minimumFrameSamples',
+      'minimumFrameSamples: MINIMUM_BASELINE_FRAME_SAMPLES',
+      'captureDeadlineMs: BASELINE_CAPTURE_DEADLINE_MS',
+      'const complete = now < deadline',
     ]) expect(actionBudget).toContain(token);
     expect(actionBudget).toContain('Math.min(');
     expect(actionBudget).toContain('referenceBaselineMs + TARGET_FRAME_BUDGET_MS');

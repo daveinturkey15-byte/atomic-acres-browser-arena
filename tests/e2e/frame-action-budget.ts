@@ -3,6 +3,7 @@ import type { Page } from '@playwright/test';
 export const TARGET_FRAME_BUDGET_MS = 1_000 / 60;
 export const BASELINE_OBSERVATION_MS = 350;
 export const MINIMUM_BASELINE_FRAME_SAMPLES = 10;
+export const BASELINE_CAPTURE_DEADLINE_MS = 2_000;
 export const MAXIMUM_BASELINE_P95_FRAME_BUDGETS = 1.5;
 export const MAXIMUM_BASELINE_GAP_FRAME_BUDGETS = 3;
 export const MAXIMUM_BASELINE_COMPLETION_FRAME_BUDGETS = 3;
@@ -138,7 +139,12 @@ export async function captureFrameActionBaseline(
   page: Page,
   label: string,
 ): Promise<FrameActionBaseline> {
-  return page.evaluate(({ baselineLabel, minimumObservationMs }) => new Promise<FrameActionBaseline>((resolve, reject) => {
+  return page.evaluate(({
+    baselineLabel,
+    captureDeadlineMs,
+    minimumFrameSamples,
+    minimumObservationMs,
+  }) => new Promise<FrameActionBaseline>((resolve, reject) => {
     const debug = (window as any).__ATOMIC_ACRES_DEBUG__ as any;
     if (!debug) {
       reject(new Error('Atomic Acres debug surface is unavailable'));
@@ -159,7 +165,7 @@ export async function captureFrameActionBaseline(
       let endingPresentation = startingPresentation;
       let endingPresentedFrame = startingPresentedFrame;
       const gapsMs: number[] = [];
-      const deadline = startedAt + 2_000;
+      const deadline = startedAt + captureDeadlineMs;
       const round = (value: number) => Number(value.toFixed(3));
 
       const inspect = () => {
@@ -187,7 +193,9 @@ export async function captureFrameActionBaseline(
           && endingPresentation.completedSequence >= targetSubmissionSequence) {
           firstCompletionDelayMs = elapsedMs;
         }
-        const complete = elapsedMs >= minimumObservationMs
+        const complete = now < deadline
+          && elapsedMs >= minimumObservationMs
+          && gapsMs.length >= minimumFrameSamples
           && firstPresentedFrameDelayMs !== null
           && firstSubmissionDelayMs !== null
           && firstCompletionDelayMs !== null
@@ -222,12 +230,20 @@ export async function captureFrameActionBaseline(
           return;
         }
         if (now >= deadline) {
-          reject(new Error(`${baselineLabel} did not complete a presentation frontier within 2000ms`));
+          reject(new Error(
+            `${baselineLabel} did not complete a ${minimumFrameSamples}-sample presentation frontier within ${captureDeadlineMs}ms`
+              + ` (samples=${gapsMs.length}, elapsedMs=${round(elapsedMs)})`,
+          ));
           return;
         }
         requestAnimationFrame(inspect);
       };
       requestAnimationFrame(inspect);
     });
-  }), { baselineLabel: label, minimumObservationMs: BASELINE_OBSERVATION_MS });
+  }), {
+    baselineLabel: label,
+    captureDeadlineMs: BASELINE_CAPTURE_DEADLINE_MS,
+    minimumFrameSamples: MINIMUM_BASELINE_FRAME_SAMPLES,
+    minimumObservationMs: BASELINE_OBSERVATION_MS,
+  });
 }
