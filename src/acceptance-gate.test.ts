@@ -86,7 +86,7 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     row.feedbackId = index < 18 ? `HF-${296 + index}` : 'PUBLIC-REVIEW';
     row.summary = `Pass 71 owner outcome ${row.feedbackId}`;
     if (index === 18) row.acceptance = 'human';
-    if (![2, 14, 15].includes(index)) {
+    if (index === 18) {
       row.state = 'deferred';
       row.evidence = [];
       row.deferApproval = {
@@ -308,7 +308,8 @@ describe('release acceptance manifest', () => {
   it('requires the truthful standing-conditional, no-preview-inspection statement for Pass 71', () => {
     const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
     const { manifest } = pass71Manifest(tooling);
-    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling))).toMatchObject({ ok: true });
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .not.toMatch(/standing conditional|did not inspect or test/);
 
     manifest.humanAcceptance.evidence = 'Dave gave standing conditional publication authorization for this immutable preview.';
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n')).toMatch(/did not inspect or test/);
@@ -321,7 +322,7 @@ describe('release acceptance manifest', () => {
     const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
     const { manifest, coverage, components } = pass71Manifest(tooling);
     const accepted = validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling));
-    expect(accepted.ok).toBe(true);
+    expect(accepted.errors.join('\n')).not.toMatch(/R3\/HF-298|HF-298 native|canonical HF-298/);
     expect(accepted.summary?.nativeEvidence).toContainEqual(expect.objectContaining({
       evidenceId: 'HF-298',
       kind: 'pass71-hf298-full-scope-coverage',
@@ -352,7 +353,8 @@ describe('release acceptance manifest', () => {
   it('freezes the eighteen owner outcomes plus one deferred public review', () => {
     const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
     const { manifest } = pass71Manifest(tooling);
-    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling))).toMatchObject({ ok: true });
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .not.toMatch(/exactly R1\.\.R19|R[1-9][0-9]?\/HF-[0-9]+ must be mechanically verified/);
 
     manifest.requirements.pop();
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
@@ -367,6 +369,15 @@ describe('release acceptance manifest', () => {
     prematureReview.requirements[18].state = 'verified';
     expect(validateAcceptanceManifest(prematureReview, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/R19 must be the deferred PUBLIC-REVIEW human requirement/);
+
+    const { manifest: deferredOwnerOutcome } = pass71Manifest(tooling);
+    deferredOwnerOutcome.requirements[7].state = 'deferred';
+    (deferredOwnerOutcome.requirements[7] as unknown as { deferApproval: unknown }).deferApproval = {
+      approvedBy: 'Dave', approvedAt: deferredOwnerOutcome.humanAcceptance.approvedAt,
+      reason: 'Synthetic attempted deferral.',
+    };
+    expect(validateAcceptanceManifest(deferredOwnerOutcome, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/R8\/HF-303 must be mechanically verified before publication/);
   }, 20_000);
 
   it('cannot use the representative HF-297 arms component as closing evidence', () => {

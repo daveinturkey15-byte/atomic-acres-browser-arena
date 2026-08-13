@@ -345,6 +345,9 @@ export function validateAcceptanceManifest(manifest, options = {}) {
         if (manifest.requirements[index]?.feedbackId !== feedbackId) {
           errors.push(`PASS 71 R${index + 1}.feedbackId must be ${feedbackId}`);
         }
+        if (manifest.requirements[index]?.state !== 'verified') {
+          errors.push(`PASS 71 R${index + 1}/${feedbackId} must be mechanically verified before publication`);
+        }
       }
       const publicReview = manifest.requirements[18];
       if (publicReview?.id !== PASS71_PUBLIC_REVIEW_REQUIREMENT_ID
