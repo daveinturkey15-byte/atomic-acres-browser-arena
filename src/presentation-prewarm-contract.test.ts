@@ -27,9 +27,19 @@ describe('presentation prewarm startup contract', () => {
     expect(flame).toContain('boundedLightIntensity: this.light.intensity');
   });
 
-  it('keeps WebKit on real basic-depth shadows instead of invalid PCF comparison samplers', () => {
+  it('classifies the actual adapter before selecting fail-closed WebKit/software shadow samplers', () => {
     const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
-    expect(source).toContain("const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent);");
+    const rendererLabel = source.indexOf('const rendererLabel = renderRuntime.telemetry().adapterLabel;');
+    const softwareClassification = source.indexOf('const softwareRenderer = isSoftwareWebGLRenderer(rendererLabel);');
+    const shadowSelection = source.indexOf('const shadowSamplerMode = webGlShadowSamplerMode(');
+    const shadowConfiguration = source.indexOf('renderRuntime.configureShadows({');
+    expect(rendererLabel).toBeGreaterThan(-1);
+    expect(rendererLabel).toBeLessThan(softwareClassification);
+    expect(softwareClassification).toBeLessThan(shadowSelection);
+    expect(shadowSelection).toBeLessThan(shadowConfiguration);
+    expect(source.slice(shadowSelection, shadowConfiguration)).toContain(
+      "renderRuntime.backend === 'webgl2' && softwareRenderer",
+    );
     expect(source).toContain("shadowSamplerMode === 'basic-depth' ? THREE.BasicShadowMap : THREE.PCFShadowMap");
     expect(source.match(/type: webGlShadowMapType/g)).toHaveLength(2);
     expect(source).not.toContain('type: THREE.PCFShadowMap');

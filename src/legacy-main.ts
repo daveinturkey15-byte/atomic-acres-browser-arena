@@ -1833,7 +1833,12 @@ function scheduleGpuRetirementDrain(): void {
 }
 document.documentElement.dataset.renderBackend = renderRuntime.backend;
 const effectiveGraphicsExposure = (authoredExposure: number): number => authoredExposure * graphicsRuntime.post.exposureScale;
-const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent);
+const rendererLabel = renderRuntime.telemetry().adapterLabel;
+const softwareRenderer = isSoftwareWebGLRenderer(rendererLabel);
+const shadowSamplerMode = webGlShadowSamplerMode(
+  navigator.userAgent,
+  renderRuntime.backend === 'webgl2' && softwareRenderer,
+);
 const webGlShadowMapType = shadowSamplerMode === 'basic-depth' ? THREE.BasicShadowMap : THREE.PCFShadowMap;
 document.documentElement.dataset.webglShadowSampler = shadowSamplerMode;
 renderRuntime.configureOutput(effectiveGraphicsExposure(activeLighting.exposure), graphicsRuntime.post.toneMapping);
@@ -1843,8 +1848,6 @@ renderRuntime.configureShadows({
   autoUpdate: activeRenderConfig.shadowMode === 'dynamic',
   needsUpdate: activeRenderConfig.shadowMode === 'static',
 });
-const rendererLabel = renderRuntime.telemetry().adapterLabel;
-const softwareRenderer = isSoftwareWebGLRenderer(rendererLabel);
 const atomicSignalBypass = atomicSignalBypassReason(signalQuery, rendererLabel);
 document.documentElement.dataset.atomicSignalRenderer = softwareRenderer ? 'software' : 'hardware';
 const atomicSignal = renderRuntime.backend === 'webgl2'
