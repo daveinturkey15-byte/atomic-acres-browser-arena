@@ -557,7 +557,7 @@ export function validateAcceptanceManifest(manifest, options = {}) {
       nativeEvidence: pass71NativeRecords.map((record) => ({
         evidenceId: record?.evidenceId ?? null,
         kind: record?.kind ?? null,
-        receiptSha256: record?.receiptSha256 ?? null,
+        receiptSha256: record?.receiptSha256 ?? record?.evidenceDigest ?? null,
         startedAt: record?.startedAt ?? null,
         completedAt: record?.completedAt ?? null,
         finalizedAt: record?.finalizedAt ?? null,

@@ -16,6 +16,10 @@ import {
 } from '../scripts/qa/pass71-grenade-native-receipt-contract.mjs';
 import { createPass71Hf298CoverageFixture } from '../scripts/qa/pass71-hf298-coverage-contract.mjs';
 import {
+  createPass71AudioNativeEvidenceFixture,
+  pass71AudioNativeToolingHashesAtSource,
+} from '../scripts/qa/pass71-audio-native-receipt-contract.mjs';
+import {
   createPass71Hf297FullArmsEvidenceFixture,
   pass71Hf297FullArmsSourceTreeAtSource,
   pass71Hf297FullArmsToolingHashesAtSource,
@@ -259,6 +263,13 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     startedAt: '2026-08-13T09:31:00.000Z', completedAt: '2026-08-13T09:50:00.000Z',
   });
   const hf297Full = pass71Hf297FullTestFixture(headSha, manifest.preview.sourceSha).record;
+  const audioTooling = pass71AudioNativeToolingHashesAtSource(process.cwd(), headSha);
+  const audio = createPass71AudioNativeEvidenceFixture({
+    sourceSha: manifest.preview.sourceSha,
+    tooling: audioTooling,
+    startedAt: '2026-08-13T09:33:00.000Z',
+    completedAt: '2026-08-13T09:43:00.000Z',
+  });
   const qualityTooling = pass71QualityVisualToolingHashes(process.cwd());
   const quality = createPass71QualityVisualEvidenceFixture({
     sourceSha: manifest.preview.sourceSha, tooling: qualityTooling,
@@ -329,9 +340,9 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, tooling, components,
     finalizedAt: '2026-08-13T09:30:00.000Z',
   });
-  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, hf297Full, quality, hf299, hf300, hf301, hf305, hf306, hf307, hf309, hf312, stuck, parity];
+  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, hf297Full, audio, quality, hf299, hf300, hf301, hf305, hf306, hf307, hf309, hf312, stuck, parity];
   return {
-    manifest, coverage: rebuilt.record, components: rebuilt.components, quality,
+    manifest, coverage: rebuilt.record, components: rebuilt.components, audio, quality,
     hf297Full, hf299, hf300, hf301, hf305, hf306, hf307, hf309, hf312,
   };
 }
@@ -343,6 +354,7 @@ function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
     pass71StuckEvidenceTooling: pass71StuckEvidenceToolingHashes(process.cwd()),
     pass71QualityVisualTooling: pass71QualityVisualToolingHashes(process.cwd()),
     pass71NativeBrowserParityTooling: pass71NativeBrowserParityToolingHashesAtSource(process.cwd(), headSha),
+    pass71AudioNativeTooling: pass71AudioNativeToolingHashesAtSource(process.cwd(), headSha),
     pass71Hf297FullTooling: pass71Hf297FullTestFixture(
       headSha, '0123456789abcdef0123456789abcdef01234567',
     ).tooling,
@@ -613,6 +625,18 @@ describe('release acceptance manifest', () => {
     } as never);
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/complete nativeEvidence array exceeds 83886080 UTF-8 JSON bytes/);
+  }, 60_000);
+
+  it('retains the canonical HF-302 evidenceDigest in the normalized acceptance summary', () => {
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    const { manifest, audio } = pass71Manifest(tooling);
+    const validation = validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling));
+    expect(validation.errors.join('\n')).not.toMatch(/verified R7\/HF-302|evidence digest mismatch/);
+    expect(validation.summary?.nativeEvidence).toContainEqual(expect.objectContaining({
+      evidenceId: 'HF-302',
+      kind: 'pass71-hf302-audio-native-long-run',
+      receiptSha256: audio.evidenceDigest,
+    }));
   }, 60_000);
 
   it('freezes the eighteen owner outcomes plus one deferred public review', () => {
