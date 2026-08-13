@@ -71,18 +71,26 @@ describe('persistent physical house-window debris integration', () => {
     expect(source).toContain('spawnPersistentWindowDebris(window, normal)');
   });
 
-  it('coalesces deferred physics reconciliation across same-action multi-pane breaches', () => {
+  it('coalesces next-task physics reconciliation without depending on browser idle time', () => {
     const spawnStart = source.indexOf('function spawnPersistentWindowDebris(');
     const breachEnd = source.indexOf('\nfunction breakWindowsAlongBallisticTrace(', spawnStart);
     const block = source.slice(spawnStart, breachEnd);
     const breakStart = block.indexOf('function breakHouseWindow(');
     const breakBlock = block.slice(breakStart);
+    const syncStart = source.indexOf('function scheduleWindowGlassPhysicsSync()');
+    const syncEnd = source.indexOf('\nfunction activeMajorDebrisPhysicsBodies()', syncStart);
+    const syncBlock = source.slice(syncStart, syncEnd);
     const deferredSync = 'scheduleWindowGlassPhysicsSync();';
 
     expect(spawnStart).toBeGreaterThan(-1);
     expect(breachEnd).toBeGreaterThan(spawnStart);
-    expect(source).toContain('if (windowGlassPhysicsSyncScheduled) {');
-    expect(source).toContain('scheduleBrowserPreparationIdleTask(() => {');
+    expect(syncStart).toBeGreaterThan(-1);
+    expect(syncEnd).toBeGreaterThan(syncStart);
+    expect(syncBlock).toContain('if (windowGlassPhysicsSyncScheduled) {');
+    expect(syncBlock).toContain('scheduleBrowserCpuTask(() => {');
+    expect(syncBlock).not.toContain('scheduleBrowserPreparationIdleTask');
+    expect(syncBlock.indexOf('windowGlassPhysicsSyncScheduled = false;'))
+      .toBeLessThan(syncBlock.indexOf('syncInteractiveWorldPhysics();'));
     expect(breakBlock).toContain('spawnPersistentWindowDebris(window, normal);');
     expect(breakBlock).toContain(deferredSync);
     expect(breakBlock.indexOf('window.broken = true;'))

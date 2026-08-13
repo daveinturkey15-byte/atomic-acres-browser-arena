@@ -159,6 +159,7 @@ import { PresentationSchedulingLifecycle, type PresentationSchedulingDecision } 
 import { PriorityPreparationCoordinator, type PreparationPriority } from './priority-preparation-coordinator';
 import {
   browserOwnsForegroundPresentation,
+  scheduleBrowserCpuTask,
   scheduleBrowserPreparationIdleTask,
   waitForVisibleBrowserPreparation,
   yieldBrowserPreparationFrame,
@@ -3587,7 +3588,9 @@ function scheduleWindowGlassPhysicsSync(): void {
     return;
   }
   windowGlassPhysicsSyncScheduled = true;
-  scheduleBrowserPreparationIdleTask(() => {
+  // Defer one browser task turn so same-action pane breaches still coalesce,
+  // but never park movement-authority reconciliation on the idle lane.
+  scheduleBrowserCpuTask(() => {
     windowGlassPhysicsSyncScheduled = false;
     syncInteractiveWorldPhysics();
   });
