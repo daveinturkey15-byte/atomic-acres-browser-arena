@@ -23,8 +23,11 @@ export type ThermalGhostTelemetry = Readonly<{
   contract: typeof THERMAL_GHOST_PRESENTATION_CONTRACT;
   trackedTargets: number;
   activeTargets: number;
+  activeTargetIds: readonly string[];
   occludedTargets: number;
+  occludedTargetIds: readonly string[];
   visibleOriginalTargets: number;
+  visibleOriginalTargetIds: readonly string[];
   activeModelLayers: number;
   activeThermalLayers: number;
   /** Retained compatibility field. Pass 71 deliberately owns no second halo. */
@@ -160,8 +163,11 @@ export class ThermalGhostPresentation {
   private readonly sharedThermalMaterial = thermalMaterial();
   private generation = 0;
   private activeTargets = 0;
+  private readonly activeTargetIds: string[] = [];
   private occludedTargets = 0;
+  private readonly occludedTargetIds: string[] = [];
   private visibleOriginalTargets = 0;
+  private readonly visibleOriginalTargetIds: string[] = [];
   private activeModelLayers = 0;
   private activeSourceBodyLayers = 0;
   private thermalMaterialDisposed = false;
@@ -229,8 +235,11 @@ export class ThermalGhostPresentation {
   sync(targets: readonly ThermalGhostTarget[], active: boolean): void {
     this.generation += 1;
     this.activeTargets = 0;
+    this.activeTargetIds.length = 0;
     this.occludedTargets = 0;
+    this.occludedTargetIds.length = 0;
     this.visibleOriginalTargets = 0;
+    this.visibleOriginalTargetIds.length = 0;
     this.activeModelLayers = 0;
     this.activeSourceBodyLayers = 0;
     if (active) {
@@ -266,8 +275,13 @@ export class ThermalGhostPresentation {
         record.relation = target.relation;
         record.occluded = target.occluded;
         record.lastSeenGeneration = this.generation;
-        if (!target.occluded) this.visibleOriginalTargets += 1;
-        else this.occludedTargets += 1;
+        if (!target.occluded) {
+          this.visibleOriginalTargets += 1;
+          this.visibleOriginalTargetIds.push(target.id);
+        } else {
+          this.occludedTargets += 1;
+          this.occludedTargetIds.push(target.id);
+        }
         let visibleLayers = 0;
         for (const layer of record.layers) {
           syncSiblingTransform(layer);
@@ -280,7 +294,10 @@ export class ThermalGhostPresentation {
           this.activeSourceBodyLayers += 1;
           this.activeModelLayers += 1;
         }
-        if (visibleLayers > 0) this.activeTargets += 1;
+        if (visibleLayers > 0) {
+          this.activeTargets += 1;
+          this.activeTargetIds.push(target.id);
+        }
       }
     }
     for (const [id, record] of this.records) {
@@ -294,13 +311,28 @@ export class ThermalGhostPresentation {
   }
 
   clear(): void {
+    if (!this.thermalMaterialDisposed) this.sharedThermalMaterial.visible = true;
     for (const record of this.records.values()) this.releaseRecord(record);
     this.records.clear();
     this.activeTargets = 0;
+    this.activeTargetIds.length = 0;
     this.occludedTargets = 0;
+    this.occludedTargetIds.length = 0;
     this.visibleOriginalTargets = 0;
+    this.visibleOriginalTargetIds.length = 0;
     this.activeModelLayers = 0;
     this.activeSourceBodyLayers = 0;
+  }
+
+  /**
+   * Paired-raster evidence may suppress only the shared presentation material
+   * for one explicit renderer submission. The admitted target set, animation,
+   * source rig and gameplay authority remain untouched.
+   */
+  setEvidenceControlHidden(hidden: boolean): boolean {
+    if (this.thermalMaterialDisposed) return false;
+    this.sharedThermalMaterial.visible = !hidden;
+    return this.sharedThermalMaterial.visible === !hidden;
   }
 
   telemetry(): ThermalGhostTelemetry {
@@ -339,8 +371,11 @@ export class ThermalGhostPresentation {
       contract: THERMAL_GHOST_PRESENTATION_CONTRACT,
       trackedTargets: this.records.size,
       activeTargets: this.activeTargets,
+      activeTargetIds: Object.freeze([...this.activeTargetIds]),
       occludedTargets: this.occludedTargets,
+      occludedTargetIds: Object.freeze([...this.occludedTargetIds]),
       visibleOriginalTargets: this.visibleOriginalTargets,
+      visibleOriginalTargetIds: Object.freeze([...this.visibleOriginalTargetIds]),
       activeModelLayers: this.activeModelLayers,
       activeThermalLayers: this.activeModelLayers,
       activeHaloLayers: 0,

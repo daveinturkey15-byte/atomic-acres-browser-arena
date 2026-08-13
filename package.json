@@ -61,6 +61,8 @@
     "qa:pass71:hf296-contact": "npm run qa:pass71:hf296-contact:contract && node scripts/qa/run-pass71-hf296-contact-evidence.mjs",
     "qa:pass71:hf297-arms:contract": "node --test scripts/qa/pass71-hf297-arms-evidence-contract.test.mjs",
     "qa:pass71:hf297-arms": "npm run qa:pass71:hf297-arms:contract && node scripts/qa/run-pass71-hf297-arms-evidence.mjs",
+    "qa:pass71:hf299-thermal:contract": "node --test scripts/qa/pass71-hf299-thermal-operator-evidence-contract.test.mjs",
+    "qa:pass71:hf299-thermal": "npm run qa:pass71:hf299-thermal:contract && node scripts/qa/run-pass71-hf299-thermal-operator-evidence.mjs",
     "qa:pass71:hf304-glass:contract": "node --test scripts/qa/pass71-hf304-glass-evidence-contract.test.mjs",
     "qa:pass71:hf304-glass": "npm run qa:pass71:hf304-glass:contract && node scripts/qa/run-pass71-hf304-glass-evidence.mjs",
     "qa:pass71:hf301-renderer-progress:contract": "node --test scripts/qa/pass71-hf301-renderer-progress-evidence-contract.test.mjs",

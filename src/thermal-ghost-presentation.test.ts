@@ -33,7 +33,9 @@ describe('single exact animated thermal operator', () => {
       contract: THERMAL_GHOST_PRESENTATION_CONTRACT,
       trackedTargets: 1,
       activeTargets: 0,
+      activeTargetIds: [],
       visibleOriginalTargets: 1,
+      visibleOriginalTargetIds: ['bot-1'],
       activeModelLayers: 0,
       activeHaloLayers: 0,
       treatmentsPerTarget: 0,
@@ -45,7 +47,9 @@ describe('single exact animated thermal operator', () => {
     presentation.sync([{ ...visible, occluded: true }], true);
     expect(presentation.telemetry()).toMatchObject({
       activeTargets: 1,
+      activeTargetIds: ['bot-1'],
       occludedTargets: 1,
+      occludedTargetIds: ['bot-1'],
       visibleOriginalTargets: 0,
       activeModelLayers: 2,
       activeThermalLayers: 2,
@@ -57,6 +61,12 @@ describe('single exact animated thermal operator', () => {
       ownedMaterials: 1,
       maxOwnedMaterials: THERMAL_GHOST_MAX_OWNED_MATERIALS,
     });
+    expect(presentation.setEvidenceControlHidden(true)).toBe(true);
+    const evidenceLayer = root.getObjectByName('through-wall-single-thermal-operator-model') as THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
+    expect(evidenceLayer.material.visible).toBe(false);
+    expect(presentation.telemetry()).toMatchObject({ activeTargets: 1, activeTargetIds: ['bot-1'] });
+    expect(presentation.setEvidenceControlHidden(false)).toBe(true);
+    expect(evidenceLayer.material.visible).toBe(true);
     presentation.terminalDispose();
   });
 

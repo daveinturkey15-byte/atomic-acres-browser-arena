@@ -223,8 +223,11 @@ describe('railgun presentation', () => {
       contract: 'occlusion-conditioned-single-exact-animated-thermal-operator-v2',
       trackedTargets: 1,
       activeTargets: 1,
+      activeTargetIds: ['bot-1'],
       occludedTargets: 1,
+      occludedTargetIds: ['bot-1'],
       visibleOriginalTargets: 0,
+      visibleOriginalTargetIds: [],
       activeModelLayers: 6,
       activeThermalLayers: 6,
       activeHaloLayers: 0,
@@ -264,7 +267,9 @@ describe('railgun presentation', () => {
     });
     presentation.syncExactOperatorReveal(true, {
       contract: 'occlusion-conditioned-single-exact-animated-thermal-operator-v2',
-      trackedTargets: 1, activeTargets: 1, occludedTargets: 1, visibleOriginalTargets: 0,
+      trackedTargets: 1, activeTargets: 1, activeTargetIds: ['bot-1'],
+      occludedTargets: 1, occludedTargetIds: ['bot-1'],
+      visibleOriginalTargets: 0, visibleOriginalTargetIds: [],
       activeModelLayers: 6, activeThermalLayers: 6, activeHaloLayers: 0, activeSourceBodyLayers: 6,
       geometryIdentity: true, skeletonIdentity: true, bindMatrixIdentity: true,
       meshWorldMatrixIdentity: true, boneWorldMatrixIdentity: true, silhouetteLayerIdentity: true,

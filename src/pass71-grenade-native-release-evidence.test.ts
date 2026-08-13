@@ -45,7 +45,8 @@ describe('Pass 71 exact-SHA grenade native release evidence', () => {
     ]) expect(runner).toContain(token);
     expect(runner).not.toContain('software-ci-semantic');
     expect(playwrightConfig).toContain('PASS71_GRENADE_EDGE_EXECUTABLE');
-    expect(playwrightConfig).toContain('{ executablePath: pass71GrenadeEdgeExecutable }');
+    expect(playwrightConfig).toContain('const pass71OwnedEdgeExecutable = pass71GrenadeEdgeExecutable');
+    expect(playwrightConfig).toContain('{ executablePath: pass71OwnedEdgeExecutable }');
   });
 
   it('observes served source provenance from staged browser bytes rather than copying the runner environment', () => {
@@ -96,9 +97,8 @@ describe('Pass 71 exact-SHA grenade native release evidence', () => {
     expect(acceptanceGate).toContain('pass71Hf298CoverageFailures(record');
     expect(acceptanceGate).toContain("manifestPath === 'acceptance/pass-71.json'");
     expect(acceptanceGate).toContain('candidate B may change only acceptance/pass-71.json');
-    expect(acceptanceGate).toContain('.startedAt cannot precede preview.createdAt');
-    expect(acceptanceGate).toContain('.completedAt cannot follow humanAcceptance.approvedAt');
-    expect(acceptanceGate).toContain('.finalizedAt cannot follow humanAcceptance.approvedAt');
+    expect(acceptanceGate).toContain('.${startField} cannot precede preview.createdAt');
+    expect(acceptanceGate).toContain('.${endField} cannot follow humanAcceptance.approvedAt');
     expect(verifyWorkflow).toContain('node scripts/release/acceptance-gate.mjs --phase ci');
     expect(releaseWorkflow).toContain('node scripts/release/acceptance-gate.mjs --phase release');
     expect(verifier).toContain('assertPass71GrenadeNativeEvidence(record');

@@ -26,7 +26,8 @@ describe('Pass 71 HF-304 release evidence wiring', () => {
     expect(runner).toContain("QA_INSTALLED_EDGE: '1'");
     expect(runner).toContain('PASS71_HF304_EDGE_EXECUTABLE: edgeExecutable');
     expect(playwrightConfig).toContain('const pass71Hf304EdgeExecutable = process.env.PASS71_HF304_EDGE_EXECUTABLE;');
-    expect(playwrightConfig).toContain('? { executablePath: pass71Hf304EdgeExecutable }');
+    expect(playwrightConfig).toContain('?? pass71Hf304EdgeExecutable');
+    expect(playwrightConfig).toContain('? { executablePath: pass71OwnedEdgeExecutable }');
     expect(runner).toContain("'scripts/qa/run-playwright-with-topology.mjs'");
     expect(runner).toContain('readWindowsExecutableIdentity(edgeExecutable)');
     expect(runner).toContain('assertInstalledEdgeExecutableIdentity(');

@@ -1,4 +1,7 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   acceptanceWorkflowOutputs,
@@ -24,6 +27,10 @@ import {
   createPass71QualityVisualEvidenceFixture,
   pass71QualityVisualToolingHashes,
 } from '../scripts/qa/pass71-quality-visual-parity-contract.mjs';
+import {
+  createPass71Hf299EvidenceFixture,
+  PASS71_HF299_TOOL_PATHS,
+} from '../scripts/qa/pass71-hf299-thermal-operator-evidence-contract.mjs';
 
 const policy = {
   schemaVersion: 1,
@@ -112,6 +119,14 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, tooling: qualityTooling,
     startedAt: '2026-08-13T09:32:00.000Z', completedAt: '2026-08-13T09:40:00.000Z',
   });
+  const hf299Tooling = PASS71_HF299_TOOL_PATHS.map((path) => ({
+    path,
+    sha256: createHash('sha256').update(readFileSync(join(process.cwd(), path))).digest('hex'),
+  }));
+  const hf299 = createPass71Hf299EvidenceFixture({
+    sourceSha: manifest.preview.sourceSha, tooling: hf299Tooling,
+    startedAt: '2026-08-13T09:34:00.000Z', completedAt: '2026-08-13T09:42:00.000Z',
+  });
   manifest.preview.createdAt = '2026-08-13T09:00:00Z';
   manifest.humanAcceptance.approvedAt = '2026-08-13T10:00:00Z';
   for (const requirement of manifest.requirements) {
@@ -129,8 +144,8 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, tooling, components,
     finalizedAt: '2026-08-13T09:30:00.000Z',
   });
-  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, quality, stuck, parity];
-  return { manifest, coverage: rebuilt.record, components: rebuilt.components, quality };
+  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, quality, hf299, stuck, parity];
+  return { manifest, coverage: rebuilt.record, components: rebuilt.components, quality, hf299 };
 }
 
 function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
@@ -140,6 +155,10 @@ function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
     pass71StuckEvidenceTooling: pass71StuckEvidenceToolingHashes(process.cwd()),
     pass71QualityVisualTooling: pass71QualityVisualToolingHashes(process.cwd()),
     pass71NativeBrowserParityTooling: pass71NativeBrowserParityToolingHashesAtSource(process.cwd(), headSha),
+    pass71Hf299Tooling: PASS71_HF299_TOOL_PATHS.map((path) => ({
+      path,
+      sha256: createHash('sha256').update(readFileSync(join(process.cwd(), path))).digest('hex'),
+    })),
   };
 }
 
@@ -326,7 +345,7 @@ describe('release acceptance manifest', () => {
 
     manifest.humanAcceptance.evidence = 'Dave did not inspect this immutable preview; publication may proceed.';
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n')).toMatch(/standing conditional/);
-  });
+  }, 30_000);
 
   it('requires canonical full-scope HF-298 coverage before R3 can be verified', () => {
     const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
@@ -415,6 +434,23 @@ describe('release acceptance manifest', () => {
       .toMatch(/nativeEvidence\[[0-9]+\]: (?:capture-pass70-webgl2-png|receipt-sha256)/);
   }, 30_000);
 
+  it('requires exact bot and remote M14/Railgun thermal attribution before HF-299 can be verified', () => {
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    const { manifest, hf299 } = pass71Manifest(tooling);
+    const accepted = validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling));
+    expect(accepted.errors.join('\n')).not.toMatch(/verified R4\/HF-299|hf299-/);
+
+    manifest.nativeEvidence = manifest.nativeEvidence.filter((record) => record !== hf299);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/verified R4\/HF-299 requires its canonical registered native evidence record/);
+
+    const forged = structuredClone(hf299);
+    forged.scopes[0].occluded.reveal.throughGeometry = false;
+    manifest.nativeEvidence.push(forged);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/nativeEvidence\[[0-9]+\]: (?:scope:bot:webgl2:m14-ebr:semantics|receipt-sha256)/);
+  }, 30_000);
+
   it('orders every HF-298 component and coverage finalization between preview and approval', () => {
     const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
     const { manifest, components } = pass71Manifest(tooling);
@@ -443,7 +479,7 @@ describe('release acceptance manifest', () => {
       components: [...components.slice(0, 3), afterApproval],
       finalizedAt: '2026-08-13T10:00:00.002Z',
     });
-    const retained = manifest.nativeEvidence.slice(-3);
+    const retained = manifest.nativeEvidence.slice(-4);
     manifest.nativeEvidence = [...components.slice(0, 3), afterApproval, afterCoverage, ...retained];
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/completedAt cannot follow humanAcceptance/);

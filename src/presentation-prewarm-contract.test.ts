@@ -936,7 +936,7 @@ describe('presentation prewarm startup contract', () => {
     const runtimeSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     const enduranceHealth = runtimeSource.slice(
       runtimeSource.indexOf('function sampleEnduranceHealth('),
-      runtimeSource.indexOf('const debugWindow = window'),
+      runtimeSource.indexOf('\nfunction sampleAdmissionState()', runtimeSource.indexOf('function sampleEnduranceHealth(')),
     );
     expect(enduranceHealth).toContain('renderRuntime.healthTelemetry()');
     expect(enduranceHealth).toContain('weaponView.browserCatalogHealth()');

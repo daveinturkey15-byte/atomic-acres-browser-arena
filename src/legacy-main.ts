@@ -1422,6 +1422,40 @@ type DebugNukeWarningEvidenceState = {
   coreOpacity: number;
   ringOpacity: number;
 };
+type DebugThermalOperatorVisibleFrameReceipt = Readonly<{
+  contract: 'thermal-operator-frozen-visible-frame-v1';
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  simulationFrame: number;
+  submissionSequence: number;
+  completedSequence: number;
+  targetId: string;
+  activeSourceBodyLayers: number;
+  activeModelLayers: number;
+  cameraPosition: readonly [number, number, number];
+  cameraQuaternion: readonly [number, number, number, number];
+}>;
+type DebugThermalOperatorHiddenControlReceipt = Readonly<{
+  contract: 'thermal-operator-hidden-control-v1';
+  nonPublishable: true;
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  simulationFrame: number;
+  officialSubmissionSequence: number;
+  submissionSequence: number;
+  completedSequence: number;
+  targetId: string;
+  activeSourceBodyLayers: number;
+  activeModelLayers: number;
+  cameraPosition: readonly [number, number, number];
+  cameraQuaternion: readonly [number, number, number, number];
+  thermalMaterialHiddenDuringSubmission: true;
+  thermalMaterialRestored: true;
+}>;
+type DebugThermalOperatorEvidenceState = {
+  previousRenderPaused: boolean;
+  visibleFrame: DebugThermalOperatorVisibleFrameReceipt | null;
+};
 let debugCaptureCameraRevision = 0;
 let lastDebugCapturePresentation: DebugCapturePresentationReceipt | null = null;
 let lastDebugCommittedCameraPresentation: DebugCommittedCameraPresentationReceipt | null = null;
@@ -1454,6 +1488,7 @@ let debugChopperExteriorReviewTrackerRequested = false;
 let debugChopperExteriorReviewTrackerSide: -1 | 1 | null = null;
 let lastDebugChopperExteriorReviewTrackerFrame: DebugChopperExteriorReviewTrackerFrame | null = null;
 let debugNukeWarningEvidenceState: DebugNukeWarningEvidenceState | null = null;
+let debugThermalOperatorEvidenceState: DebugThermalOperatorEvidenceState | null = null;
 
 function currentDebugChopperExteriorReviewHoldActive(): boolean {
   return chopperExteriorReviewHoldActive(debugChopperAutonomousFireHeld, {
@@ -22293,6 +22328,7 @@ function clearGrenades(): void {
 
 function clearFieldSupport(): void {
   if (debugNukeWarningEvidenceState) releaseDebugNukeWarningEvidenceFrame();
+  if (debugThermalOperatorEvidenceState) releaseDebugThermalOperatorEvidenceFrame();
   localCareCaptureState = createCareCaptureClientState();
   localCareCaptureRequiresHold = false;
   lastKillstreakControlSentAt = Number.NEGATIVE_INFINITY;
@@ -25033,6 +25069,7 @@ function resetForMode(preserveAdmission = false): void {
   localTimedMapWeaponPendingUntil.clear();
   lastTimedMapWeaponStateBroadcastAt = Number.NEGATIVE_INFINITY;
   timedMapWeaponAudit = createTimedMapWeaponAudit();
+  if (debugThermalOperatorEvidenceState) releaseDebugThermalOperatorEvidenceFrame();
   thermalGhostPresentation.clear();
   authorizedRemoteRedeploys.clear();
   resetBreakableWindows();
@@ -25566,6 +25603,14 @@ function frame(now: number, scheduleNext = true): void {
     // The Nuke warning evidence owns one already-presented pre-detonation
     // frame. Hold simulation and presentation together while the exact beacon
     // root is removed for its paired attribution control.
+    lastFrame = now;
+    accumulator = 0;
+    if (scheduleNext) requestAnimationFrame(frame);
+    return;
+  }
+  if (debugRenderPaused && debugThermalOperatorEvidenceState) {
+    // Hold the already-presented thermal operator frame while its one shared
+    // material is suppressed for the exact paired attribution submission.
     lastFrame = now;
     accumulator = 0;
     if (scheduleNext) requestAnimationFrame(frame);
@@ -26568,6 +26613,15 @@ const debugWindow = window as Window & {
     } | null;
     setBotPresentation: (stance: PlayerSnapshot['stance'] | null, speed?: number, weapon?: WeaponId) => void;
     clearBots: () => void;
+    stageThermalEvidenceBot: (occluded: boolean) => {
+      targetId: string;
+      targetKind: 'bot';
+      targetPosition: number[];
+      observerPosition: number[];
+      hostile: true;
+      living: true;
+      wallBlocked: boolean;
+    } | null;
     placeBotAhead: (distance?: number) => {
       contract: 'debug-place-bot-ahead-synchronous-transaction-v1';
       source: '__ATOMIC_ACRES_DEBUG__.placeBotAhead';
@@ -26679,6 +26733,10 @@ const debugWindow = window as Window & {
     nukeWarningEvidenceFrame: () => DebugNukeWarningVisibleFrameReceipt | null;
     captureNukeWarningHiddenControl: () => Promise<DebugNukeWarningHiddenControlReceipt | null>;
     releaseNukeWarningEvidenceFrame: () => boolean;
+    freezeThermalOperatorEvidenceFrame: (targetId: string) => Promise<DebugThermalOperatorVisibleFrameReceipt | null>;
+    thermalOperatorEvidenceFrame: () => DebugThermalOperatorVisibleFrameReceipt | null;
+    captureThermalOperatorHiddenControl: () => Promise<DebugThermalOperatorHiddenControlReceipt | null>;
+    releaseThermalOperatorEvidenceFrame: () => boolean;
     setRiggedEvidenceCaptureTargets: (
       targets: readonly Readonly<{ kind: 'bot' | 'training-dummy'; id: string }>[],
     ) => boolean;
@@ -27256,6 +27314,147 @@ function releaseDebugNukeWarningEvidenceFrame(): boolean {
   const state = debugNukeWarningEvidenceState;
   if (!state) return false;
   debugNukeWarningEvidenceState = null;
+  debugRenderPaused = state.previousRenderPaused;
+  return true;
+}
+
+async function freezeDebugThermalOperatorEvidenceFrame(
+  targetId: string,
+): Promise<DebugThermalOperatorVisibleFrameReceipt | null> {
+  if (debugThermalOperatorEvidenceState) return debugThermalOperatorEvidenceState.visibleFrame;
+  if (!localMultiplayerQa || debugRenderPaused || renderSubmissionPaused
+    || !gameStarted || matchState.phase !== 'active' || menuLifecycle.surface !== 'hidden'
+    || document.visibilityState !== 'visible' || !document.hasFocus()) return null;
+  const thermal = thermalGhostPresentation.telemetry();
+  if (thermal.activeTargets !== 1 || thermal.activeTargetIds.length !== 1
+    || thermal.activeTargetIds[0] !== targetId || thermal.occludedTargets !== 1
+    || thermal.occludedTargetIds.length !== 1 || thermal.occludedTargetIds[0] !== targetId
+    || thermal.activeSourceBodyLayers <= 0
+    || thermal.activeSourceBodyLayers !== thermal.activeModelLayers) return null;
+  const officialFrame = lastGameplayPresentedFrame;
+  const officialPresentation = renderRuntime.presentationTelemetry();
+  if (officialFrame <= 0) return null;
+  const state: DebugThermalOperatorEvidenceState = {
+    previousRenderPaused: debugRenderPaused,
+    visibleFrame: null,
+  };
+  // Publish the hold owner before the first await. Otherwise the rAF loop can
+  // advance simulation while the GPU completion frontier is pending because
+  // debugRenderPaused alone deliberately does not stop ordinary test helpers.
+  debugThermalOperatorEvidenceState = state;
+  debugRenderPaused = true;
+  try {
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    const completed = renderRuntime.presentationTelemetry();
+    const frozenThermal = thermalGhostPresentation.telemetry();
+    if (frameCount !== officialFrame || lastGameplayPresentedFrame !== officialFrame
+      || frozenThermal.activeTargets !== 1 || frozenThermal.activeTargetIds[0] !== targetId
+      || frozenThermal.activeSourceBodyLayers !== thermal.activeSourceBodyLayers
+      || frozenThermal.activeModelLayers !== thermal.activeModelLayers
+      || (renderRuntime.backend === 'webgpu'
+        && completed.completedSequence < officialPresentation.submissionSequence)) {
+      throw new Error('Thermal operator changed before reaching its exact completion frontier');
+    }
+    const receipt = Object.freeze({
+      contract: 'thermal-operator-frozen-visible-frame-v1' as const,
+      renderer: renderRuntime.backend,
+      completionSemantics: renderRuntime.backend === 'webgpu'
+        ? 'submission-sequence-covered-by-completion-frontier' as const
+        : 'synchronous-render-return' as const,
+      simulationFrame: officialFrame,
+      submissionSequence: officialPresentation.submissionSequence,
+      completedSequence: completed.completedSequence,
+      targetId,
+      activeSourceBodyLayers: frozenThermal.activeSourceBodyLayers,
+      activeModelLayers: frozenThermal.activeModelLayers,
+      cameraPosition: Object.freeze(camera.position.toArray() as [number, number, number]),
+      cameraQuaternion: Object.freeze(camera.quaternion.toArray() as [number, number, number, number]),
+    });
+    state.visibleFrame = receipt;
+    return receipt;
+  } catch (error) {
+    if (debugThermalOperatorEvidenceState === state) debugThermalOperatorEvidenceState = null;
+    debugRenderPaused = state.previousRenderPaused;
+    throw error;
+  }
+}
+
+function currentDebugThermalOperatorEvidenceFrame(): DebugThermalOperatorVisibleFrameReceipt | null {
+  return debugThermalOperatorEvidenceState?.visibleFrame ?? null;
+}
+
+async function captureDebugThermalOperatorHiddenControl(): Promise<DebugThermalOperatorHiddenControlReceipt | null> {
+  const state = debugThermalOperatorEvidenceState;
+  const visibleFrame = state?.visibleFrame;
+  if (!state || !visibleFrame || !debugRenderPaused || renderSubmissionPaused
+    || frameCount !== visibleFrame.simulationFrame
+    || lastGameplayPresentedFrame !== visibleFrame.simulationFrame) return null;
+  camera.updateWorldMatrix(true, false);
+  const cameraPosition = camera.position.toArray() as [number, number, number];
+  const cameraQuaternion = camera.quaternion.toArray() as [number, number, number, number];
+  if (!cameraPosition.every((coordinate, axis) => coordinate === visibleFrame.cameraPosition[axis])
+    || !cameraQuaternion.every((coordinate, axis) => coordinate === visibleFrame.cameraQuaternion[axis])) return null;
+  const thermal = thermalGhostPresentation.telemetry();
+  if (thermal.activeTargets !== 1 || thermal.activeTargetIds[0] !== visibleFrame.targetId
+    || thermal.activeSourceBodyLayers !== visibleFrame.activeSourceBodyLayers
+    || thermal.activeModelLayers !== visibleFrame.activeModelLayers) return null;
+
+  const before = renderRuntime.presentationTelemetry();
+  let submitted = before;
+  let completed = before;
+  let thermalMaterialHiddenDuringSubmission = false;
+  if (!thermalGhostPresentation.setEvidenceControlHidden(true)) return null;
+  try {
+    if (renderRuntime.backend === 'webgpu') {
+      await submitForegroundWebGpuFrame(true, 'serialized');
+    } else if (atomicSignal) {
+      atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+    } else {
+      throw new Error('Thermal operator hidden-control has no active renderer');
+    }
+    thermalMaterialHiddenDuringSubmission = true;
+    submitted = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu' && submitted.submissionSequence <= before.submissionSequence) {
+      throw new Error('Thermal operator hidden-control did not submit a distinct WebGPU frame');
+    }
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    completed = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu'
+      && completed.completedSequence < submitted.submissionSequence) {
+      throw new Error('Thermal operator hidden-control did not reach its WebGPU completion frontier');
+    }
+  } finally {
+    thermalGhostPresentation.setEvidenceControlHidden(false);
+  }
+  if (!thermalMaterialHiddenDuringSubmission || debugThermalOperatorEvidenceState !== state) {
+    throw new Error('Thermal operator hidden-control did not preserve its exact hide/restore boundary');
+  }
+  return Object.freeze({
+    contract: 'thermal-operator-hidden-control-v1',
+    nonPublishable: true,
+    renderer: renderRuntime.backend,
+    completionSemantics: renderRuntime.backend === 'webgpu'
+      ? 'submission-sequence-covered-by-completion-frontier'
+      : 'synchronous-render-return',
+    simulationFrame: visibleFrame.simulationFrame,
+    officialSubmissionSequence: visibleFrame.submissionSequence,
+    submissionSequence: submitted.submissionSequence,
+    completedSequence: completed.completedSequence,
+    targetId: visibleFrame.targetId,
+    activeSourceBodyLayers: visibleFrame.activeSourceBodyLayers,
+    activeModelLayers: visibleFrame.activeModelLayers,
+    cameraPosition: visibleFrame.cameraPosition,
+    cameraQuaternion: visibleFrame.cameraQuaternion,
+    thermalMaterialHiddenDuringSubmission: true,
+    thermalMaterialRestored: true,
+  });
+}
+
+function releaseDebugThermalOperatorEvidenceFrame(): boolean {
+  const state = debugThermalOperatorEvidenceState;
+  if (!state) return false;
+  thermalGhostPresentation.setEvidenceControlHidden(false);
+  debugThermalOperatorEvidenceState = null;
   debugRenderPaused = state.previousRenderPaused;
   return true;
 }
@@ -29130,6 +29329,49 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     }
   },
   clearBots: () => clearBots(),
+  stageThermalEvidenceBot: (occluded) => {
+    if (selectedArena.id !== 'atomic-acres' || matchState.phase !== 'active') return null;
+    // Give this visual falsifier exactly one canonical hostile. Extra solo bots
+    // could legitimately reveal at the same time and make a one-target raster
+    // look like duplicate thermal presentation.
+    clearBots();
+    spawnBot(0);
+    const bot = bots.get('bot-0');
+    if (!bot) return null;
+    player.position.set(-9, 1.7, -12.5);
+    characterPhysics?.teleportEye(player.position);
+    player.velocity.set(0, 0, 0);
+    player.yaw = 0;
+    player.pitch = 0;
+    player.invulnerableUntil = 0;
+    camera.position.copy(player.position);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    const targetPosition = occluded
+      ? new THREE.Vector3(-9, 0, -21.5)
+      : new THREE.Vector3(-9, 0, -15.5);
+    bot.position.copy(targetPosition);
+    bot.root.position.copy(targetPosition);
+    bot.root.rotation.y = operatorYawToward(bot.position, player.position);
+    bot.root.updateMatrixWorld(true);
+    bot.velocity.set(0, 0, 0);
+    bot.team = player.team === 0 ? 1 : 0;
+    bot.hp = 100;
+    bot.alive = true;
+    bot.invulnerableUntil = 0;
+    botsFrozen = true;
+    const body = targetPosition.clone().add(new THREE.Vector3(0, 1.05, 0));
+    const wallBlocked = dmrThermalSolidOccluded(camera.position, body, activeWorldColliders());
+    return {
+      targetId: bot.id,
+      targetKind: 'bot',
+      targetPosition: targetPosition.toArray(),
+      observerPosition: player.position.toArray(),
+      hostile: true,
+      living: true,
+      wallBlocked,
+    };
+  },
   placeBotAhead: (distance = 5) => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     if (!bot || !Number.isFinite(distance)) return null;
@@ -29794,6 +30036,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   nukeWarningEvidenceFrame: currentDebugNukeWarningEvidenceFrame,
   captureNukeWarningHiddenControl: captureDebugNukeWarningHiddenControl,
   releaseNukeWarningEvidenceFrame: releaseDebugNukeWarningEvidenceFrame,
+  freezeThermalOperatorEvidenceFrame: freezeDebugThermalOperatorEvidenceFrame,
+  thermalOperatorEvidenceFrame: currentDebugThermalOperatorEvidenceFrame,
+  captureThermalOperatorHiddenControl: captureDebugThermalOperatorHiddenControl,
+  releaseThermalOperatorEvidenceFrame: releaseDebugThermalOperatorEvidenceFrame,
   setRiggedEvidenceCaptureTargets: (targets) => {
     lastDebugCapturePresentation = null;
     lastDebugCommittedCameraPresentation = null;
