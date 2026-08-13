@@ -50,6 +50,7 @@ for (const arenaId of selectedArenas) {
     })) url.searchParams.set(key, value);
     await page.goto(url.toString(), { waitUntil: 'domcontentloaded', timeout: 90_000 });
     await expect(page.locator('#solo')).toBeEnabled({ timeout: 60_000 });
+    await page.locator('#player-name').fill('Pass 71 Audio Soak');
 
     // A physical click is part of the contract: Web Audio unlock behavior must
     // be exercised rather than bypassed through the debug API.
