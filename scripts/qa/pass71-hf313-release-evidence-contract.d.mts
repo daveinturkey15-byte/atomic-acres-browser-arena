@@ -11,6 +11,7 @@ export declare const PASS71_HF313_TOOL_PATHS: readonly string[];
 export declare function pass71Hf313DependencyProjection(records: readonly any[]): readonly Readonly<Record<string, unknown>>[];
 export declare function pass71Hf313NativeEvidenceEnvelope(records: readonly any[]): Readonly<{
   recordCount: number; jsonBytes: number; maxJsonBytes: number;
+  completeTimestampCount: number; latestCompletedAt: string | null;
 }>;
 export declare function pass71Hf313ToolingAtSource(repositoryRoot: string, sourceSha: string): readonly Readonly<{ path: string; sha256: string }>[];
 export declare function pass71Hf313SourceAuditAtSource(repositoryRoot: string, sourceSha: string): Readonly<Record<string, any>>;

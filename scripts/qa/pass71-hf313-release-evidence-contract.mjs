@@ -136,10 +136,16 @@ export function pass71Hf313DependencyProjection(records) {
 
 export function pass71Hf313NativeEvidenceEnvelope(records) {
   const priorRecords = records.filter((record) => object(record) && record.evidenceId !== 'HF-313');
+  const completionInstants = priorRecords.map((record) => record.completedAt ?? record.finalizedAt ?? null);
+  const validCompletionInstants = completionInstants.filter((value) => ISO.test(value ?? ''));
   return Object.freeze({
     recordCount: priorRecords.length,
     jsonBytes: Buffer.byteLength(JSON.stringify(priorRecords), 'utf8'),
     maxJsonBytes: PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES,
+    completeTimestampCount: validCompletionInstants.length,
+    latestCompletedAt: validCompletionInstants.length === priorRecords.length
+      ? [...validCompletionInstants].sort((left, right) => Date.parse(left) - Date.parse(right)).at(-1)
+      : null,
   });
 }
 
@@ -289,13 +295,19 @@ export function pass71Hf313EvidenceFailures(record, expected = {}) {
       || entry.path !== PASS71_HF313_TOOL_PATHS[index] || !SHA256.test(entry.sha256 ?? ''))) failures.push('candidate-a-tooling');
   if (!dependenciesValid(record?.dependencies)
     || !same(record?.dependencies, expected.dependencies)) failures.push('complete-native-evidence-binding');
-  if (!exactKeys(record?.dependencyEnvelope, ['recordCount', 'jsonBytes', 'maxJsonBytes'])
+  if (!exactKeys(record?.dependencyEnvelope, [
+    'recordCount', 'jsonBytes', 'maxJsonBytes', 'completeTimestampCount', 'latestCompletedAt',
+  ])
     || !same(record?.dependencyEnvelope, expected.dependencyEnvelope)
     || record?.dependencyEnvelope?.recordCount < PASS71_HF313_REQUIRED_FEEDBACK_IDS.length
     || !Number.isSafeInteger(record?.dependencyEnvelope?.jsonBytes)
     || record.dependencyEnvelope.jsonBytes < 1
     || record?.dependencyEnvelope?.maxJsonBytes !== PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES
-    || record.dependencyEnvelope.jsonBytes > PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES) {
+    || record.dependencyEnvelope.jsonBytes > PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES
+    || record?.dependencyEnvelope?.completeTimestampCount !== record?.dependencyEnvelope?.recordCount
+    || !ISO.test(record?.dependencyEnvelope?.latestCompletedAt ?? '')
+    || (ISO.test(record?.startedAt ?? '')
+      && Date.parse(record.dependencyEnvelope.latestCompletedAt) > Date.parse(record.startedAt))) {
     failures.push('bounded-native-evidence-envelope');
   }
   if (!exactKeys(record?.publication, [

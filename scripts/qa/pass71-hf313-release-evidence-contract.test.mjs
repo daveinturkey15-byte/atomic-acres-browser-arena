@@ -45,7 +45,9 @@ const sourceAudit = {
   finalizer: { exactManifestPathOnly: true, standingConditionalNoHitl: true, candidateAOriginalAttemptOnly: true },
   postcondition: { receiptSchemaVersion: 4, rollbackProvenanceLiveChecked: true, liveVerifiedStatusOwnedByReceipt: true },
 };
-const dependencyRecords = dependencies.map((entry) => ({ ...entry }));
+const dependencyRecords = dependencies.map((entry, index) => ({
+  ...entry, completedAt: `2026-08-13T09:${String(index).padStart(2, '0')}:00.000Z`,
+}));
 const dependencyEnvelope = pass71Hf313NativeEvidenceEnvelope(dependencyRecords);
 const expected = { sourceSha: candidateA, sourceTreeSha, sourceAudit, tooling, dependencies, dependencyEnvelope };
 
@@ -142,6 +144,10 @@ describe('Pass 71 HF-313 protected release evidence', () => {
     oversized.dependencyEnvelope.jsonBytes = PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES + 1;
     resign(oversized);
     assert(pass71Hf313EvidenceFailures(oversized, expected).includes('bounded-native-evidence-envelope'));
+    const premature = fixture();
+    premature.dependencyEnvelope.latestCompletedAt = '2026-08-13T09:48:00.001Z';
+    resign(premature);
+    assert(pass71Hf313EvidenceFailures(premature, expected).includes('bounded-native-evidence-envelope'));
   });
 
   it('rejects channel, publisher, source, tooling, schema and digest drift', () => {
