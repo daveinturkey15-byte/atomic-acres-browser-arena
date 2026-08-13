@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { PASS71_HF304_GLASS_EVIDENCE } from './pass71-hf304-glass-evidence-contract.mjs';
@@ -14,6 +15,8 @@ import {
   createPass71Hf304LiveHostedEvidenceFixture,
   pass71Hf304LiveHostedEvidenceFailures,
   pass71Hf304LiveHostedRecordSha256,
+  pass71Hf304LiveHostedSourceTreeAtSource,
+  pass71Hf304LiveHostedToolingHashesAtSource,
 } from './pass71-hf304-live-hosted-evidence-contract.mjs';
 
 const SOURCE_SHA = 'a'.repeat(40);
@@ -83,6 +86,18 @@ test('optional acceptance registry validates the exact source-bound fixture', ()
       pass71Hf304LiveHostedSourceTreeSha: SOURCE_TREE_SHA,
       pass71Hf304LiveHostedTooling: BASE.tooling,
     },
+  }), []);
+});
+
+test('production acceptance resolves the exact source tree and tooling from Candidate A', () => {
+  const repositoryRoot = process.cwd();
+  const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  const sourceTreeSha = pass71Hf304LiveHostedSourceTreeAtSource(repositoryRoot, sourceSha);
+  const tooling = pass71Hf304LiveHostedToolingHashesAtSource(repositoryRoot, sourceSha);
+  const record = createPass71Hf304LiveHostedEvidenceFixture({ sourceSha, sourceTreeSha, tooling });
+  assert.deepEqual(PASS71_HF304_LIVE_HOSTED_EVIDENCE_REGISTRY_ENTRY.validate(record, {
+    repositoryRoot,
+    sourceSha,
   }), []);
 });
 

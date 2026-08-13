@@ -175,6 +175,14 @@ export function pass71Hf304LiveHostedToolingHashesAtSource(repositoryRoot, sourc
   })));
 }
 
+export function pass71Hf304LiveHostedSourceTreeAtSource(repositoryRoot, sourceSha) {
+  if (!SHA40.test(sourceSha ?? '')) throw new TypeError('HF-304 live hosted source tree requires a full source SHA');
+  return execFileSync('git', ['-C', repositoryRoot, 'rev-parse', `${sourceSha}^{tree}`], {
+    encoding: 'utf8',
+    windowsHide: true,
+  }).trim();
+}
+
 function validateServedCandidate(value, sourceSha, label, failures) {
   exactKeys(value, [
     'schemaVersion', 'channel', 'releasePass', 'sourceSha', 'path', 'treeSha256', 'exactRootFileCount',
@@ -806,11 +814,16 @@ export function createPass71Hf304LiveHostedEvidenceRegistryEntry() {
     closesFeedback: true,
     ownerSubjectiveApproval: 'not-claimed',
     validate(record, context = {}) {
-      return pass71Hf304LiveHostedEvidenceFailures(record, {
-        sourceSha: context.sourceSha,
-        sourceTreeSha: context.options?.pass71Hf304LiveHostedSourceTreeSha,
-        tooling: context.options?.pass71Hf304LiveHostedTooling,
-      });
+      try {
+        const sourceSha = context.sourceSha;
+        const sourceTreeSha = context.options?.pass71Hf304LiveHostedSourceTreeSha
+          ?? pass71Hf304LiveHostedSourceTreeAtSource(context.repositoryRoot, sourceSha);
+        const tooling = context.options?.pass71Hf304LiveHostedTooling
+          ?? pass71Hf304LiveHostedToolingHashesAtSource(context.repositoryRoot, sourceSha);
+        return pass71Hf304LiveHostedEvidenceFailures(record, { sourceSha, sourceTreeSha, tooling });
+      } catch (error) {
+        return [`hf304-live-hosted-validator:${error instanceof Error ? error.message : String(error)}`];
+      }
     },
   });
 }

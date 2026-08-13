@@ -48,6 +48,10 @@ export declare function pass71Hf304LiveHostedToolingHashesAtSource(
   repositoryRoot: string,
   sourceSha: string,
 ): readonly Readonly<{ path: string; sha256: string }>[];
+export declare function pass71Hf304LiveHostedSourceTreeAtSource(
+  repositoryRoot: string,
+  sourceSha: string,
+): string;
 export declare function pass71Hf304LiveHostedEvidenceFailures(
   record: unknown,
   expected?: Readonly<{ sourceSha?: string; sourceTreeSha?: string; tooling?: unknown }>,
