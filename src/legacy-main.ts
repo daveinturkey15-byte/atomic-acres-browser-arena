@@ -259,7 +259,8 @@ import {
   weaponPrewarmCatalogForArena,
 } from './weapon-prewarm-catalog';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
-import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes, sweptSphereSurfaceLeadFraction } from './collision';
+import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes } from './collision';
+import { resolveIdentifiedGlassSweepImpact } from './projectile-glass-collision';
 import {
   applyPenetrationDamage,
   ballisticImpactSurface,
@@ -3496,6 +3497,7 @@ let presentedGunRangeTestBayDoorThumpSequence = 0;
 let gunRangeTestBayDoorBroadcastPending = false;
 let gunRangeMatchClockState: GunRangeMatchClockSnapshot | null = null;
 let gunRangeMatchClockOccupantIds: readonly string[] = Object.freeze([]);
+const activeGlassColliderWindowIds = new WeakMap<ArenaMap['colliders'][number], string>();
 
 function activeGunRangeTestBayDoorColliders(activeArena: ArenaMap = arena): readonly DynamicWorldCollider[] {
   return activeArena === arena && selectedArena.id === 'gun-range'
@@ -3515,16 +3517,18 @@ function activeGlassDynamicColliders(activeArena: ArenaMap = arena): readonly Dy
     if (bounds.isEmpty() || ![
       bounds.min.x, bounds.max.x, bounds.min.y, bounds.max.y, bounds.min.z, bounds.max.z,
     ].every(Number.isFinite)) continue;
+    const colliderBounds = Object.freeze({
+      minX: bounds.min.x,
+      maxX: bounds.max.x,
+      minY: bounds.min.y,
+      maxY: bounds.max.y,
+      minZ: bounds.min.z,
+      maxZ: bounds.max.z,
+    });
+    activeGlassColliderWindowIds.set(colliderBounds, pane.id);
     entries.push(Object.freeze({
       id: `glass:${pane.id}`,
-      bounds: Object.freeze({
-        minX: bounds.min.x,
-        maxX: bounds.max.x,
-        minY: bounds.min.y,
-        maxY: bounds.max.y,
-        minZ: bounds.min.z,
-        maxZ: bounds.max.z,
-      }),
+      bounds: colliderBounds,
     }));
   }
   return Object.freeze(entries);
@@ -18457,17 +18461,11 @@ const flareBurnLineOfSightPoint = new THREE.Vector3();
 const flareProjectileCallbacks: FlareProjectileCallbacks = Object.freeze({
   worldCollisionFraction: (start: THREE.Vector3, delta: THREE.Vector3, radiusM: number) => {
     const worldHit = sweepSphereAgainstBoxes(start, delta, flareFrameColliders, radiusM);
-    const world = worldHit?.time ?? null;
     const glass = crossbowGlassCollision(start, delta);
-    if (!glass) return world;
-    const radiusFraction = worldHit
-      ? sweptSphereSurfaceLeadFraction(delta, worldHit.normal, radiusM)
-      : 0;
-    if (world !== null && glass.time > world + radiusFraction + 1e-4) return world;
-    return Object.freeze({
-      fraction: Math.min(world ?? glass.time, glass.time),
-      breakableWindowId: glass.windowId,
-    });
+    const worldGlassWindowId = worldHit
+      ? activeGlassColliderWindowIds.get(worldHit.box) ?? null
+      : null;
+    return resolveIdentifiedGlassSweepImpact(worldHit, glass, worldGlassWindowId);
   },
   withinBounds: (point: THREE.Vector3) => (
     pointInsideBounds(point, arena.bounds, 0.1) && point.y >= -25 && point.y <= 250

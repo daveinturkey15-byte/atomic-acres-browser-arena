@@ -11,7 +11,6 @@ import {
   segmentIntersectsBox,
   shortestAngleDelta,
   sweepSphereAgainstBoxes,
-  sweptSphereSurfaceLeadFraction,
   sphereIntersectsBox,
   type Box2,
 } from './collision';
@@ -121,6 +120,7 @@ describe('arena collision', () => {
     expect(hit!.time).toBeGreaterThan(0.15);
     expect(hit!.time).toBeLessThan(0.3);
     expect(hit!.normal).toEqual({ x: -1, y: 0, z: 0 });
+    expect(hit!.box).toBe(wall);
     expect(sweepSphereAgainstBoxes({ x: 0, y: 4, z: 0 }, { x: 4, y: 0, z: 0 }, [wall])).toBeNull();
   });
 
@@ -184,17 +184,6 @@ describe('arena collision', () => {
     expect(diagonalHit!.normal.z).toBeCloseTo(-diagonal, 10);
   });
 
-  it('measures swept-sphere surface lead on the collision-normal axis', () => {
-    const delta = { x: 0, y: 0.5792513444732934, z: -5.154385083549701 };
-    const normal = { x: 0, y: 0, z: -1 };
-    const axialLead = sweptSphereSurfaceLeadFraction(delta, normal, 0.16);
-    const euclideanLead = 0.16 / Math.hypot(delta.x, delta.y, delta.z);
-
-    expect(axialLead).toBeCloseTo(0.03104153015471088, 12);
-    expect(axialLead).toBeGreaterThan(euclideanLead);
-    expect(sweptSphereSurfaceLeadFraction(delta, { x: 0, y: 0, z: 0 }, 0.16)).toBe(0);
-    expect(sweptSphereSurfaceLeadFraction(delta, normal, Number.NaN)).toBe(0);
-  });
 });
 
 describe('interpolation helpers', () => {

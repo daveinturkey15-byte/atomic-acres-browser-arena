@@ -10,6 +10,7 @@ export type Box2 = {
 };
 export type Point3 = { x: number; y: number; z: number };
 export type SweptSphereHit = { time: number; normal: Point3 };
+export type IdentifiedSweptSphereHit = SweptSphereHit & { box: Box2 };
 export type OrientedBoxSweepEnvelope = Readonly<{
   halfExtents: Readonly<Point3>;
   /** Envelope centre relative to the presentation root before yaw rotation. */
@@ -536,8 +537,9 @@ export function sweepSphereAgainstBoxes(
   delta: Point3,
   boxes: readonly Box2[],
   radius = 0.17,
-): SweptSphereHit | null {
+): IdentifiedSweptSphereHit | null {
   let bestTime = Number.POSITIVE_INFINITY;
+  let bestBox: Box2 | null = null;
   let bestFrame: BoxFrame | null = null;
   let bestAxis = -1;
   let bestSign = 0;
@@ -557,30 +559,13 @@ export function sweepSphereAgainstBoxes(
       || collisionSlabHitScratch.near > 1
       || collisionSlabHitScratch.near >= bestTime) continue;
     bestTime = collisionSlabHitScratch.near;
+    bestBox = box;
     bestFrame = frame;
     bestAxis = collisionSlabHitScratch.nearAxis;
     bestSign = collisionSlabHitScratch.nearSign;
   }
-  if (!bestFrame) return null;
-  return { time: bestTime, normal: localAxisNormalToWorld(bestFrame, bestAxis, bestSign) };
-}
-
-/** Fractional lead between a swept sphere contact and its centre crossing the same surface. */
-export function sweptSphereSurfaceLeadFraction(
-  delta: Point3,
-  surfaceNormal: Point3,
-  radius: number,
-): number {
-  if (!Number.isFinite(radius) || radius <= 0) return 0;
-  const normalLength = Math.hypot(surfaceNormal.x, surfaceNormal.y, surfaceNormal.z);
-  if (!Number.isFinite(normalLength) || normalLength <= 1e-8) return 0;
-  const normalTravel = Math.abs(
-    delta.x * surfaceNormal.x
-      + delta.y * surfaceNormal.y
-      + delta.z * surfaceNormal.z,
-  ) / normalLength;
-  if (!Number.isFinite(normalTravel) || normalTravel <= 1e-8) return 0;
-  return radius / normalTravel;
+  if (!bestFrame || !bestBox) return null;
+  return { time: bestTime, normal: localAxisNormalToWorld(bestFrame, bestAxis, bestSign), box: bestBox };
 }
 
 /** Exact sphere overlap against an authored axis-aligned or oriented box. */

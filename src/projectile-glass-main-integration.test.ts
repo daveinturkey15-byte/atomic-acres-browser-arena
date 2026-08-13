@@ -31,10 +31,15 @@ describe('catalog-wide projectile glass integration', () => {
   });
 
   it('carries the exact flare pane from collision to authoritative impact breach', () => {
+    const activeGlass = block('function activeGlassDynamicColliders(', '\nfunction activeWorldColliders(');
+    expect(activeGlass).toContain('activeGlassColliderWindowIds.set(colliderBounds, pane.id);');
+    expect(activeGlass).toContain('bounds: colliderBounds,');
+
     const collision = block('const flareProjectileCallbacks:', '\nfunction updateFlareProjectiles(');
-    expect(collision).toContain('breakableWindowId: glass.windowId');
-    expect(collision).toContain('radiusFraction');
-    expect(collision).toContain('sweptSphereSurfaceLeadFraction(delta, worldHit.normal, radiusM)');
+    expect(collision).toContain('activeGlassColliderWindowIds.get(worldHit.box)');
+    expect(collision).toContain('resolveIdentifiedGlassSweepImpact(worldHit, glass, worldGlassWindowId)');
+    expect(collision).not.toContain('radiusFraction');
+    expect(collision).not.toContain('worldHit.normal');
 
     const impact = block('function handleFlareImpact(', '\nfunction handleFlareBurnPulse(');
     expect(impact).toContain("weaponGlassBreakPolicy('flare-gun')");
