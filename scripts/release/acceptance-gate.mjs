@@ -34,7 +34,10 @@ import { PASS71_HF306_COCKPIT_REGISTRY_ENTRY } from '../qa/pass71-hf306-cockpit-
 import { PASS71_HF307_CHOPPER_MG_EVIDENCE_REGISTRY_ENTRY } from '../qa/pass71-hf307-chopper-mg-evidence-contract.mjs';
 import { PASS71_HF309_CHOPPER_FIRST_ENTRY_EVIDENCE_REGISTRY_ENTRY } from '../qa/pass71-hf309-chopper-first-entry-evidence-contract.mjs';
 import { PASS71_HF312_BOUNDED_CONSOLIDATION_REGISTRY_ENTRY } from '../qa/pass71-hf312-bounded-consolidation-evidence-contract.mjs';
-import { PASS71_HF313_RELEASE_EVIDENCE_REGISTRY_ENTRY } from '../qa/pass71-hf313-release-evidence-contract.mjs';
+import {
+  PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES,
+  PASS71_HF313_RELEASE_EVIDENCE_REGISTRY_ENTRY,
+} from '../qa/pass71-hf313-release-evidence-contract.mjs';
 import {
   PASS71_STUCK_EVIDENCE_DESCRIPTOR,
   pass71StuckEvidenceFailures,
@@ -395,6 +398,10 @@ export function validateAcceptanceManifest(manifest, options = {}) {
       errors.push('PASS 71 nativeEvidence must be an array of registered exact-schema records');
     } else {
       pass71NativeRecords = nativeEvidence;
+      const nativeEvidenceJsonBytes = Buffer.byteLength(JSON.stringify(nativeEvidence), 'utf8');
+      if (nativeEvidenceJsonBytes > PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES) {
+        errors.push(`PASS 71 complete nativeEvidence array exceeds ${PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES} UTF-8 JSON bytes; received ${nativeEvidenceJsonBytes}`);
+      }
       const registryByKey = new Map(PASS71_NATIVE_EVIDENCE_REGISTRY.map((entry) => [
         nativeEvidenceKey(entry.descriptor), entry,
       ]));

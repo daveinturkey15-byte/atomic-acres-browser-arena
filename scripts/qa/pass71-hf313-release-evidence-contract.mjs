@@ -122,6 +122,10 @@ function projectionKey(value) {
   return `${value.feedbackId}\u0000${value.evidenceId}\u0000${value.kind}\u0000${value.receiptSha256}`;
 }
 
+function canonicalEvidenceDigest(record) {
+  return record?.receiptSha256 ?? record?.evidenceDigest;
+}
+
 export function pass71Hf313DependencyProjection(records) {
   return Object.freeze(records
     .filter((record) => object(record) && record.evidenceId !== 'HF-313')
@@ -129,7 +133,7 @@ export function pass71Hf313DependencyProjection(records) {
       feedbackId: record.feedbackId ?? record.evidenceId,
       evidenceId: record.evidenceId,
       kind: record.kind,
-      receiptSha256: record.receiptSha256,
+      receiptSha256: canonicalEvidenceDigest(record),
     }))
     .sort((left, right) => projectionKey(left).localeCompare(projectionKey(right))));
 }

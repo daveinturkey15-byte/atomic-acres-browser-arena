@@ -69,6 +69,7 @@ import {
   pass71Hf312SourceAuditAtSource,
   pass71Hf312ToolingAtSource,
 } from '../scripts/qa/pass71-hf312-bounded-consolidation-evidence-contract.mjs';
+import { PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES } from '../scripts/qa/pass71-hf313-release-evidence-contract.mjs';
 
 const policy = {
   schemaVersion: 1,
@@ -596,6 +597,22 @@ describe('release acceptance manifest', () => {
     (manifest.requirements[2] as unknown as { feedbackId: string }).feedbackId = 'HF-UNKNOWN';
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/R3\.feedbackId must be HF-298/);
+  }, 60_000);
+
+  it('caps the complete nativeEvidence array including the HF-313 readiness record', () => {
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    const { manifest } = pass71Manifest(tooling);
+    const finalArrayBytes = Buffer.byteLength(JSON.stringify(manifest.nativeEvidence), 'utf8');
+    expect(finalArrayBytes).toBeLessThanOrEqual(PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .not.toMatch(/complete nativeEvidence array exceeds/);
+
+    manifest.nativeEvidence.push({
+      evidenceId: 'HF-999', kind: 'oversized-unregistered',
+      payload: 'x'.repeat(PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES),
+    } as never);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/complete nativeEvidence array exceeds 83886080 UTF-8 JSON bytes/);
   }, 60_000);
 
   it('freezes the eighteen owner outcomes plus one deferred public review', () => {

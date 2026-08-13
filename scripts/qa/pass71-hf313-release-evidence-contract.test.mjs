@@ -141,9 +141,13 @@ describe('Pass 71 HF-313 protected release evidence', () => {
         completedAt: `2026-08-13T09:${String(index).padStart(2, '0')}:00.000Z`,
       }));
     });
+    const hf302 = records.find((record) => record.evidenceId === 'HF-302');
+    hf302.evidenceDigest = hf302.receiptSha256;
+    delete hf302.receiptSha256;
     const projected = pass71Hf313DependencyProjection(records);
     assert.equal(projected.length, records.length);
     assert(projected.every((entry) => entry.feedbackId === entry.evidenceId));
+    assert.equal(projected.find((entry) => entry.evidenceId === 'HF-302').receiptSha256, hf302.evidenceDigest);
     const projectedEnvelope = pass71Hf313NativeEvidenceEnvelope(records);
     const projectedExpected = {
       ...expected, dependencies: projected, dependencyEnvelope: projectedEnvelope,
