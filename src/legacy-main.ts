@@ -26105,6 +26105,8 @@ function sampleWeaponActionReadiness() {
     weapon: player.weapon,
     switchingReady: now >= player.switchingUntil,
     switchingRemainingMs: Math.max(0, player.switchingUntil - now),
+    fireReady: now >= player.nextShotAt,
+    shotCooldownRemainingMs: Math.max(0, player.nextShotAt - now),
     configuredSpinUpMs: WEAPONS[player.weapon].spinUpMs ?? 0,
     spinUpActive: spinUpWeapon === player.weapon && spinUpStartedAtPerformanceMs !== null,
     spinUpElapsedMs: spinUpWeapon === player.weapon && spinUpStartedAtPerformanceMs !== null
@@ -27230,6 +27232,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       currentHostTimeMs: currentHostTimeMs(),
       lastBroadcastAt: lastTimedMapWeaponStateBroadcastAt,
     },
+    projectileGlass: {
+      explosiveBolts: explosiveBolts.map((bolt) => ({
+        actionNonce: bolt.actionNonce,
+        authority: bolt.authority,
+        impacted: bolt.impactedAt !== null,
+        position: bolt.mesh.position.toArray(),
+        detonatesInMs: Math.max(0, bolt.detonatesAt - performance.now()),
+      })),
+    },
     dmrThermal: {
       ...dmrThermalPresentation.telemetry(),
       exactOperatorReveal: thermalGhostPresentation.telemetry(),
@@ -27337,6 +27348,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       presentationRootInScene: interactiveWorldRuntime?.root.parent === scene,
       presentationRootVisible: interactiveWorldRuntime?.root.visible ?? false,
       collisionCacheRevision: activeWorldColliderCacheRevision,
+      rapierDynamicColliders: characterPhysics?.dynamicColliderCount() ?? 0,
       rapierMajorBodies: characterPhysics?.majorDebrisBodyCount() ?? 0,
       rapierPrewarmedMajorBodies: characterPhysics?.prewarmedMajorDebrisBodyCount() ?? 0,
       gpuRetirement: {
@@ -27853,6 +27865,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       broken: window.broken,
       visible: window.mesh.visible,
       authority: window.glassState ? glassAuthorityProjection(window.glassState) : null,
+      activeWorldColliderPresent: activeGlassDynamicColliders().some(({ id }) => id === `glass:${window.id}`),
       position: window.mesh.getWorldPosition(new THREE.Vector3()).toArray(),
       persistentDebrisId: [...persistentWindowDebris.values()].find((entry) => entry.windowId === window.id)?.id ?? null,
       retainedDebrisPrewarmed: pooledWindowDebris.has(windowDebrisPoolKey(arena.id, window.id)),
@@ -27864,6 +27877,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       currentArenaRetained: arena.breakableWindows.filter((window) => (
         pooledWindowDebris.has(windowDebrisPoolKey(arena.id, window.id))
       )).length,
+      visibleRetained: [...pooledWindowDebris.values()].filter(({ root }) => root.visible).length,
       prewarmedPhysicsBodies: characterPhysics?.prewarmedMajorDebrisBodyCount() ?? 0,
       active: persistentWindowDebris.size,
       activePhysics: [...persistentWindowDebris.values()].filter((entry) => entry.physicsActive).length,
