@@ -17,7 +17,7 @@ from mathutils import Vector
 
 
 ROOT = Path(__file__).resolve().parents[2]
-CHOPPER_BLEND = ROOT / "source-assets/blender/pass65-chopper-gunner.blend"
+CHOPPER_BLEND = ROOT / "source-assets/blender/pass71-chopper-gunner.blend"
 AIRCRAFT_BLEND = ROOT / "source-assets/blender/pass65-support-aircraft-family.blend"
 CHOPPER_RAW = ROOT / "artifacts/blender-support-vehicles/raw/chopper"
 AIRCRAFT_RAW = ROOT / "artifacts/blender-support-vehicles/raw/aircraft"

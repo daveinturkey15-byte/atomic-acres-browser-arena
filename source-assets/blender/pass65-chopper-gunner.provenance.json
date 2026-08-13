@@ -10,7 +10,7 @@
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/create-pass65-support-vehicles.py",
-    "sha256": "5a101db26217443a6757d8bb64e6fd95d23005c913859a7b525f5857a305935b"
+    "sha256": "295ade944607de19bef999eef832fae75a749f9b85648aff50f333760b0e041e"
   },
   "runtimeForwardAxis": "-Z",
   "blenderAuthoringForwardAxis": "+Y converted to glTF -Z by Y-up export",
@@ -21,7 +21,7 @@
   "materialRevision": "pass70-daylight-readable-olive-pbr-v1",
   "firstPersonCockpitFraming": "pass71-tall-pillars-centre-clear-v1",
   "sourceBlend": {
-    "path": "source-assets/blender/pass65-chopper-gunner.blend",
+    "path": "source-assets/blender/pass71-chopper-gunner.blend",
     "sha256": "452d718a0ff60208a80202bb4cf58166a7b3b96bc6ca6d1cac5270cfa5e06593"
   },
   "sharedConsumers": [
@@ -135,7 +135,7 @@
   ],
   "review": {
     "acceptedFirstPersonFrame": {
-      "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
+      "path": "docs/assets/pass65-vehicles/chopper/pass71-chopper-first-person-instruments-16x9.png",
       "sha256": "dd526e777cc2d9be7ab467d2d62c437b6222ac8bc3c1447db4ca1f48d52fb766",
       "cameraId": "accepted-first-person-instruments",
       "width": 960,
@@ -178,7 +178,7 @@
         "height": 512
       },
       {
-        "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
+        "path": "docs/assets/pass65-vehicles/chopper/pass71-chopper-first-person-instruments-16x9.png",
         "sha256": "dd526e777cc2d9be7ab467d2d62c437b6222ac8bc3c1447db4ca1f48d52fb766",
         "cameraId": "accepted-first-person-instruments",
         "width": 960,

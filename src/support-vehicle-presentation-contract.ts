@@ -37,6 +37,10 @@ export const SUPPORT_VEHICLE_PRESENTATION_CONTRACT = Object.freeze({
       'chopper-gunner-sightline', 'chopper-gunner-weapon-view',
       'chopper-cockpit-dashboard-3d', 'chopper-cockpit-display-cyan', 'chopper-cockpit-display-green',
       'chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring',
+      'chopper-inner-windscreen-pillar-left-base', 'chopper-inner-windscreen-pillar-left-top',
+      'chopper-inner-windscreen-pillar-right-base', 'chopper-inner-windscreen-pillar-right-top',
+      'chopper-inner-windscreen-glow-left-base', 'chopper-inner-windscreen-glow-left-top',
+      'chopper-inner-windscreen-glow-right-base', 'chopper-inner-windscreen-glow-right-top',
       'chopper-muzzle-flash', 'chopper-tracer-action', 'chopper-impact-action',
     ]),
     requiredActions: Object.freeze([

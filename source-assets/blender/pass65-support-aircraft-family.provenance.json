@@ -10,7 +10,7 @@
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/create-pass65-support-vehicles.py",
-    "sha256": "5a101db26217443a6757d8bb64e6fd95d23005c913859a7b525f5857a305935b"
+    "sha256": "295ade944607de19bef999eef832fae75a749f9b85648aff50f333760b0e041e"
   },
   "runtimeForwardAxis": "-Z",
   "blenderAuthoringForwardAxis": "+Y converted to glTF -Z by Y-up export",

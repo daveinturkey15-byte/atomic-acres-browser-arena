@@ -245,18 +245,16 @@ describe('Pass 65 playable killstreak integration', () => {
   });
 
   it('plays the authored chopper impact action for host-applied and client-received authoritative hits', () => {
-    const start = source.indexOf('function updatePass65KillstreakRuntime(');
-    const end = source.indexOf('\nfunction updateFieldSupportHud(', start);
+    const start = source.indexOf('function presentKillstreakDamageFeedback(');
+    const end = source.indexOf('\nfunction killstreakActorModifiers(', start);
     const block = source.slice(start, end);
-    expect(block).toContain("if (event.source === 'chopper')");
+    expect(block).toContain("event.source === 'chopper'");
     expect(block).toContain('entity.activationId === event.activationId');
     expect(block).toContain('killstreakPresentation.presentChopperImpactAction(presented.id)');
     const clientStart = source.indexOf("if (message.type === 'killstreak-damage-result')");
     const clientEnd = source.indexOf("\n  if (message.type === 'railgun-state')", clientStart);
     const clientBlock = source.slice(clientStart, clientEnd);
-    expect(clientBlock).toContain("if (event.source === 'chopper')");
-    expect(clientBlock).toContain('entity.activationId === event.activationId');
-    expect(clientBlock).toContain('killstreakPresentation.presentChopperImpactAction(presented.id)');
+    expect(clientBlock).toContain('presentKillstreakDamageFeedback(message.events)');
   });
 
   it('uses a world-space crosshair for Care/Carpet placement and host-owned surface height', () => {

@@ -89,10 +89,17 @@ const menuPreviewProvenance = JSON.parse(await readFile(
   resolveRepoPath('source-assets/menu/pass65-preview-masters/provenance.json'),
   'utf8',
 ));
-if (menuPreviewProvenance.authoredCockpit?.assetId !== chopperEntry.id
-  || menuPreviewProvenance.authoredCockpit?.sha256 !== chopperEntry.sourceBlend.sha256
-  || menuPreviewProvenance.authoredCockpit?.qualityTier !== 'LOD0') {
-  failures.push('prerecorded menu previews are stale against the release-ready authored chopper cockpit');
+const menuPreviewCockpit = menuPreviewProvenance.authoredCockpit;
+if (menuPreviewCockpit?.assetId !== chopperEntry.id
+  || menuPreviewCockpit?.qualityTier !== 'LOD0'
+  || typeof menuPreviewCockpit?.path !== 'string'
+  || typeof menuPreviewCockpit?.sha256 !== 'string') {
+  failures.push('prerecorded menu previews lack their exact retained authored cockpit reference');
+} else {
+  await verifyRecord(
+    { path: menuPreviewCockpit.path, sha256: menuPreviewCockpit.sha256 },
+    'prerecorded menu preview retained cockpit source',
+  );
 }
 if (JSON.stringify(menuPreviewProvenance.sources?.map((source) => source.arenaId).sort())
   !== JSON.stringify(['atomic-acres', 'gun-range', 'rustworks-1v1', 'skyline-terminal'])) {

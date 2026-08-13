@@ -784,12 +784,12 @@
       "materialRevision": "pass70-daylight-readable-olive-pbr-v1",
       "firstPersonCockpitFraming": "pass71-tall-pillars-centre-clear-v1",
       "sourceBlend": {
-        "path": "source-assets/blender/pass65-chopper-gunner.blend",
+        "path": "source-assets/blender/pass71-chopper-gunner.blend",
         "sha256": "452d718a0ff60208a80202bb4cf58166a7b3b96bc6ca6d1cac5270cfa5e06593"
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-support-vehicles.py",
-        "sha256": "5a101db26217443a6757d8bb64e6fd95d23005c913859a7b525f5857a305935b"
+        "sha256": "295ade944607de19bef999eef832fae75a749f9b85648aff50f333760b0e041e"
       },
       "worldGlbs": [
         {
@@ -849,7 +849,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-chopper-gunner.provenance.json",
-        "sha256": "ee8af56b13a0b66f33bd56e7fa0bfe34e430bbc3b92d6f3fd27236296aa6273f"
+        "sha256": "ef55e017efbc8d80f2eec7f81fab75c1d979355e1a0c4dcc9c75e8aa7b32715d"
       },
       "sockets": [
         "chopper-first-person-camera-socket",
@@ -937,7 +937,7 @@
             "height": 512
           },
           {
-            "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
+            "path": "docs/assets/pass65-vehicles/chopper/pass71-chopper-first-person-instruments-16x9.png",
             "sha256": "dd526e777cc2d9be7ab467d2d62c437b6222ac8bc3c1447db4ca1f48d52fb766",
             "cameraId": "accepted-first-person-instruments",
             "width": 960,
@@ -952,7 +952,7 @@
           "height": 1024
         },
         "acceptedFirstPersonFrame": {
-          "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
+          "path": "docs/assets/pass65-vehicles/chopper/pass71-chopper-first-person-instruments-16x9.png",
           "sha256": "dd526e777cc2d9be7ab467d2d62c437b6222ac8bc3c1447db4ca1f48d52fb766",
           "cameraId": "accepted-first-person-instruments",
           "width": 960,
@@ -2215,7 +2215,7 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-support-vehicles.py",
-        "sha256": "5a101db26217443a6757d8bb64e6fd95d23005c913859a7b525f5857a305935b"
+        "sha256": "295ade944607de19bef999eef832fae75a749f9b85648aff50f333760b0e041e"
       },
       "pbrMaps": {
         "care": {
@@ -2299,7 +2299,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-support-aircraft-family.provenance.json",
-        "sha256": "e3578a3bc509e34fd31a7e663c418289439ad65b50c067d585a5568bc80387a7"
+        "sha256": "32cd89744be12bce2e6ee8a6332d71c3fb05d23c41295f62a60e2f172325b37a"
       },
       "variants": {
         "care": {

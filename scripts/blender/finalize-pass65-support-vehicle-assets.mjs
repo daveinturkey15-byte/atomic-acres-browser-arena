@@ -53,7 +53,7 @@ async function reviewRecord(relative, cameraId, expectedWidth, expectedHeight) {
 }
 
 const sourceScript = await fileRecord('scripts/blender/create-pass65-support-vehicles.py');
-const chopperSourceBlend = await fileRecord('source-assets/blender/pass65-chopper-gunner.blend');
+const chopperSourceBlend = await fileRecord('source-assets/blender/pass71-chopper-gunner.blend');
 const aircraftSourceBlend = await fileRecord('source-assets/blender/pass65-support-aircraft-family.blend');
 
 const chopper = await auditedLods('chopper', [0, 1, 2].map((lod) => `public/assets/original/models/support/pass65-chopper-gunner-lod${lod}.glb`));
@@ -74,7 +74,7 @@ const chopperRenders = await Promise.all([
   reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-rear-fuselage-quarter.png', 'rear-fuselage-quarter', 512, 512),
   reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-canopy-armour-closeup.png', 'canopy-armour-closeup', 512, 512),
   reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-ordnance-mechanics-closeup.png', 'ordnance-mechanics-closeup', 512, 512),
-  reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png', 'accepted-first-person-instruments', 960, 540),
+  reviewRecord('docs/assets/pass65-vehicles/chopper/pass71-chopper-first-person-instruments-16x9.png', 'accepted-first-person-instruments', 960, 540),
 ]);
 const chopperContactSheet = await reviewRecord(
   'docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png', 'accepted-contact-sheet', 1536, 1024,
