@@ -39,12 +39,15 @@ describe('Semtex live-stick runtime integration', () => {
     const armEnd = source.indexOf('\nfunction updateGrenades(', armStart);
     const arm = source.slice(armStart, armEnd);
     expect(arm).toContain('if (targetId === player.id) {');
-    expect(arm).toContain("presentStickyVictimUrgentAlert('semtex', targetId, targetLifeId, grenade.actionNonce, now)");
+    expect(arm).toContain("presentStickyUrgentAlert('semtex', 'victim', targetId, targetLifeId, grenade.actionNonce, now)");
+    expect(arm).toContain("presentStickyUrgentAlert('semtex', 'attacker', targetId, targetLifeId, grenade.actionNonce, now)");
 
-    const alertStart = source.indexOf('function presentStickyVictimUrgentAlert(');
+    const alertStart = source.indexOf('function presentStickyUrgentAlert(');
     const alertEnd = source.indexOf('\nconst hostTriggerAuthorities', alertStart);
     const alert = source.slice(alertStart, alertEnd);
-    expect(alert).toContain('targetId !== player.id || targetLifeId !== localContinuity');
+    expect(alert).toContain("audience === 'victim' && attachedTargetId !== player.id");
+    expect(alert).toContain('recipientId: player.id');
+    expect(alert).toContain('recipientLifeId: localContinuity');
     expect(alert).toContain("warning.style.setProperty('--sticky-warning-duration', `${STICKY_VICTIM_URGENT_ALERT_DURATION_MS}ms`)");
     expect(alert).toContain('Math.max(0, alert.expiresAtMs - performance.now())');
   });

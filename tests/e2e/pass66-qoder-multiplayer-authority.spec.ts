@@ -887,13 +887,46 @@ test('Semtex and crossbolt sticky results apply once under duplicate, reorder an
     expect(semtex).not.toBeNull();
     expect(semtex.stuckDamage).toBeCloseTo(semtex.baseDamage * 2, 6);
     expect(semtex.stuckRadiusM).toBeCloseTo(semtex.baseRadiusM * 2, 6);
+    await expect.poll(async () => host.evaluate(() => {
+      const alert = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().stickyAuthority.urgentAlert;
+      return {
+        visible: alert.visible,
+        source: alert.source,
+        audience: alert.audience,
+        position: alert.computedPosition,
+        zIndex: alert.computedZIndex,
+        centred: alert.centreErrorPx <= 1,
+      };
+    })).toEqual({
+      visible: true,
+      source: 'semtex',
+      audience: 'attacker',
+      position: 'fixed',
+      zIndex: 120,
+      centred: true,
+    });
     await expect.poll(async () => guest.evaluate(() => {
       const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
-      return { hp: state.player.hp, feedback: state.stickyAuthority };
+      return {
+        hp: state.player.hp,
+        feedback: state.stickyAuthority,
+        alert: {
+          visible: state.stickyAuthority.urgentAlert.visible,
+          source: state.stickyAuthority.urgentAlert.source,
+          audience: state.stickyAuthority.urgentAlert.audience,
+          position: state.stickyAuthority.urgentAlert.computedPosition,
+          zIndex: state.stickyAuthority.urgentAlert.computedZIndex,
+          centred: state.stickyAuthority.urgentAlert.centreErrorPx <= 1,
+        },
+      };
     })).toMatchObject({
       hp: semtex.healthAfter,
       feedback: { victimFeedbackCount: 1, lastVictimFeedback: { label: 'STUCK', source: 'semtex' } },
+      alert: { visible: true, source: 'semtex', audience: 'victim', position: 'fixed', zIndex: 120, centred: true },
     });
+    await expect.poll(async () => Promise.all([host, guest].map((page) => page.evaluate(() => (
+      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().stickyAuthority.urgentAlert.visible
+    )))), { timeout: 1_000 }).toEqual([false, false]);
     expect(await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.replayStickyEffect('semtex'))).toBe(true);
     await guest.waitForTimeout(350);
     expect(await guest.evaluate(() => {
@@ -919,10 +952,28 @@ test('Semtex and crossbolt sticky results apply once under duplicate, reorder an
     expect(crossbolt).not.toBeNull();
     expect(crossbolt.stuckDamage).toBeCloseTo(crossbolt.baseDamage * 2, 6);
     expect(crossbolt.stuckRadiusM).toBeCloseTo(crossbolt.baseRadiusM * 2, 6);
+    await expect.poll(async () => host.evaluate(() => {
+      const alert = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().stickyAuthority.urgentAlert;
+      return { visible: alert.visible, source: alert.source, audience: alert.audience, centred: alert.centreErrorPx <= 1 };
+    })).toEqual({ visible: true, source: 'explosive-crossbow', audience: 'attacker', centred: true });
     await expect.poll(async () => guest.evaluate(() => {
       const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
-      return { hp: state.player.hp, count: state.stickyAuthority.victimFeedbackCount, source: state.stickyAuthority.lastVictimFeedback?.source };
-    })).toEqual({ hp: crossbolt.healthAfter, count: 1, source: 'explosive-crossbow' });
+      return {
+        hp: state.player.hp,
+        count: state.stickyAuthority.victimFeedbackCount,
+        source: state.stickyAuthority.lastVictimFeedback?.source,
+        alert: {
+          visible: state.stickyAuthority.urgentAlert.visible,
+          audience: state.stickyAuthority.urgentAlert.audience,
+          centred: state.stickyAuthority.urgentAlert.centreErrorPx <= 1,
+        },
+      };
+    })).toEqual({
+      hp: crossbolt.healthAfter,
+      count: 1,
+      source: 'explosive-crossbow',
+      alert: { visible: true, audience: 'victim', centred: true },
+    });
     expect(await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.replayStickyEffect('explosive-crossbow'))).toBe(true);
     expect(await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.replayStickyEffect('semtex'))).toBe(true);
     await guest.waitForTimeout(350);

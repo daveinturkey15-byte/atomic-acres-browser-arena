@@ -403,18 +403,18 @@
       "id": "SRC-CODEX-P71-AUG13-001",
       "kind": "codex-owner-feedback",
       "externalLocator": "codex-task:pass71-owner-feedback-2026-08-13#feedback-and-publication-instruction",
-      "rawByteLength": 3095,
-      "rawSha256": "0a278ab38f5e9c0965c4442a45c29178766d4a4c2fe4ecded82c5c8ca094f2c4",
+      "rawByteLength": 3172,
+      "rawSha256": "2bdd25b24988751ce7c6f73f92082d24791bc7acbac3ee8b4bfd1be2d64b7994",
       "rawEndsWithCrLf": false,
       "normalizedRepositoryPath": "docs/pass71-sources/codex-owner-feedback-2026-08-13.txt",
       "normalization": "UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged",
-      "normalizedByteLength": 3062,
-      "normalizedSha256": "0cb9b27ca0bd4a977e574fec755a047fb32ccdc4dede3481f6f08aef0c105ece",
+      "normalizedByteLength": 3139,
+      "normalizedSha256": "d63460747310522c02daea68eaf284e37914aff5c6a81c3d209cda6d96fee366",
       "outcomeCollection": "codexPass71August13Outcomes",
       "outcomeIdPrefix": "P71AUG13",
       "outcomeCount": 18,
       "lineAtomCounts": {"1":1,"3":1,"5":1,"7":1,"9":1,"11":1,"13":1,"15":1,"17":1,"19":1,"21":1,"23":1,"25":1,"27":1,"29":1,"31":1,"33":1,"35":1},
-      "outcomeProjectionSha256": "c79d442b9195920e7d97fda169c47d6eb69ee5b9c7826c9f44cef5fa72953eea"
+      "outcomeProjectionSha256": "4ee51cf4436b9b6f7bb041b426c059b2bb2c669e29dd315fca609e91db58a153"
     },
     {
       "id": "SRC-CORRECTION-LEDGER-001",
@@ -423,7 +423,7 @@
       "ledgerVersion": 1,
       "latestFeedbackId": "HF-313",
       "outcomeCount": 313,
-      "stateIndependentOutcomeSha256": "23f0f4f4ef06cfcf349b38d4845c72bc99beaf25251fa7d1aa9ab2d216128052"
+      "stateIndependentOutcomeSha256": "98ef6c593748d487cd555bb6ec4de0764c29bd613132081a5baa19431d781c1a"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -1676,7 +1676,7 @@
       "ledgerOrdinal": 42,
       "sourceOutcomeIds": ["P70HITL3-008","P70HOTFIX2-008","P71AUG13-015","CORR-HF-285","CORR-HF-294","CORR-HF-310"],
       "feedbackIds": ["HF-285","HF-294","HF-310"],
-      "canonicalText": "`HF-310` reopens and strengthens `HF-285` and `HF-294`: controller and CSS existence did not establish that actual local-victim Semtex and crossbow paths visibly present the central red alert, so direct self-stick and canonical two-peer onset are mandatory evidence."
+      "canonicalText": "`HF-310` reopens and strengthens `HF-285` and `HF-294`: controller and CSS existence did not establish that actual local-success or local-victim Semtex and crossbow paths visibly present the central red alert, so both trusted attacker confirmation and canonical two-peer victim onset are mandatory evidence."
     },
     {
       "id": "SUP-043",
@@ -7640,7 +7640,7 @@
     {"id":"HF-307","sourceOutcomeIds":["CORR-HF-307","P71AUG13-012"],"planningRequirementIds":["R109","R113","R232","R304","R504","R510","R600","R604","R608","R610","R613"],"canonicalOwner":"Chopper machine-gun splash authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-SUPPORT-RUNTIME","T-SUPPORT-DAMAGE","T-NETWORK","T-MULTIPLAYER-STABILITY"],"artifactRefs":[]}},
     {"id":"HF-308","sourceOutcomeIds":["CORR-HF-308","P71AUG13-013"],"planningRequirementIds":["R108","R109","R113","R232","R304","R504","R510","R600","R604","R608","R609","R610","R613"],"canonicalOwner":"Chopper missile spatial authority and presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-SUPPORT-RUNTIME","T-SUPPORT-FORWARD","T-SUPPORT-VISUAL-E2E","T-NETWORK","T-MULTIPLAYER-STABILITY"],"artifactRefs":[]}},
     {"id":"HF-309","sourceOutcomeIds":["CORR-HF-309","P71AUG13-014"],"planningRequirementIds":["R003","R108","R109","R113","R304","R504","R511","R600","R608","R610","R613"],"canonicalOwner":"Chopper possession cold-path frame pacing","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FRAME-POLICY","T-NATIVE-FRAME-PACING","T-SUPPORT-VISUAL-E2E"],"artifactRefs":[]}},
-    {"id":"HF-310","sourceOutcomeIds":["CORR-HF-310","P71AUG13-015"],"planningRequirementIds":["R109","R223","R236","R304","R600","R604","R609","R610","R613"],"canonicalOwner":"Pass 71 local-victim STUCK HUD authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-HUD-E2E","T-HUD-UNIT","T-TIMED-MAP-WEAPONS","T-MULTIPLAYER-STABILITY"],"artifactRefs":[]}},
+    {"id":"HF-310","sourceOutcomeIds":["CORR-HF-310","P71AUG13-015"],"planningRequirementIds":["R109","R223","R236","R304","R600","R604","R609","R610","R613"],"canonicalOwner":"Pass 71 local STUCK HUD authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-HUD-E2E","T-HUD-UNIT","T-TIMED-MAP-WEAPONS","T-MULTIPLAYER-STABILITY"],"artifactRefs":[]}},
     {"id":"HF-311","sourceOutcomeIds":["CORR-HF-311","P71AUG13-016"],"planningRequirementIds":["R002","R003","R004","R105","R108","R304","R307","R511","R600","R604","R608","R610","R613"],"canonicalOwner":"Firefox cross-engine frame-pacing parity","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-INSTALLED-FIREFOX","T-NATIVE-FRAME-PACING","T-FRAME-POLICY"],"artifactRefs":[]}},
     {"id":"HF-312","sourceOutcomeIds":["CORR-HF-312","P71AUG13-017"],"planningRequirementIds":["R003","R304","R307","R600","R608","R610","R613"],"canonicalOwner":"Pass 71 bounded code-health consolidation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FRAME-POLICY","T-OWNER-GATE","T-TEXT-INTEGRITY"],"artifactRefs":[]}},
     {"id":"HF-313","sourceOutcomeIds":["CORR-HF-313","P71AUG13-018"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"],"canonicalOwner":"Pass 71 integration and protected release","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OWNER-GATE","T-RELEASE-SHELL"],"artifactRefs":[]}}
@@ -9452,7 +9452,7 @@
     {"id":"P71AUG13-012","sourceLocator":"L23#1","normalizedOutcome":"Give the Chopper Gunner machine gun host-authoritative splash damage with an effective hit volume exactly three times the preceding direct tolerance.","feedbackIds":["HF-307"],"planningRequirementIds":["R109","R113","R232","R304","R504","R510","R600","R604","R608","R610","R613"]},
     {"id":"P71AUG13-013","sourceLocator":"L25#1","normalizedOutcome":"Make possessed Chopper Gunner missiles originate at the chopper rather than the sky while retaining the six-round one-second-cadence authority.","feedbackIds":["HF-308"],"planningRequirementIds":["R108","R109","R113","R232","R304","R504","R510","R600","R604","R608","R609","R610","R613"]},
     {"id":"P71AUG13-014","sourceLocator":"L27#1","normalizedOutcome":"Eliminate the first Chopper Gunner entry freeze by preparing cockpit, support, weapon, audio and renderer resources before possession.","feedbackIds":["HF-309"],"planningRequirementIds":["R003","R108","R109","R113","R304","R504","R511","R600","R608","R610","R613"]},
-    {"id":"P71AUG13-015","sourceLocator":"L29#1","normalizedOutcome":"Show a loud true-centre red STUCK alert for exactly 500 ms on actual local-victim Semtex and explosive-crossbow attachments.","feedbackIds":["HF-310"],"planningRequirementIds":["R109","R223","R236","R304","R600","R604","R609","R610","R613"]},
+    {"id":"P71AUG13-015","sourceLocator":"L29#1","normalizedOutcome":"Show a loud true-centre red STUCK alert for exactly 500 ms both on trusted local-success and canonical local-victim Semtex and explosive-crossbow attachments.","feedbackIds":["HF-310"],"planningRequirementIds":["R109","R223","R236","R304","R600","R604","R609","R610","R613"]},
     {"id":"P71AUG13-016","sourceLocator":"L31#1","normalizedOutcome":"Measure and correct Firefox same-scene Quality frame pacing so it is essentially comparable to Chrome without software fallback, silent quality loss or threshold weakening.","feedbackIds":["HF-311"],"planningRequirementIds":["R002","R003","R004","R105","R108","R304","R307","R511","R600","R604","R608","R610","R613"]},
     {"id":"P71AUG13-017","sourceLocator":"L33#1","normalizedOutcome":"Streamline only the touched systems where measured duplicate ownership, cold factories or structural friction exists, with complete regression coverage and no broad rewrite.","feedbackIds":["HF-312"],"planningRequirementIds":["R003","R304","R307","R600","R608","R610","R613"]},
     {"id":"P71AUG13-018","sourceLocator":"L35#1","normalizedOutcome":"Publish the complete correction as live Pass 71 replacing Pass 70 while preserving independently selectable Pass 69 and byte-exact Pass 63.","feedbackIds":["HF-313"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"]}

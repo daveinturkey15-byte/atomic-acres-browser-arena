@@ -26,7 +26,7 @@ Chopper Gunner missiles must visibly originate from the possessed chopper rather
 
 Entering Chopper Gunner possession must not freeze the game or perform cold cockpit, weapon, missile, audio or rendering work on the entry frame.
 
-Semtex and explosive-crossbow attachments on the local living player must present a loud central red STUCK flash for exactly 500 ms in addition to compact status.
+Semtex and explosive-crossbow attachments must present a loud central red STUCK flash for exactly 500 ms both when the local player successfully sticks a target and when the local living player is the victim, in addition to compact status.
 
 Firefox frame pacing must be measured against Chrome in the same supported scene and corrected so there is no unexplained severe 20 to 30 percent performance path, software fallback or silent quality downgrade.
 

@@ -616,9 +616,11 @@ import {
 } from './remote-sticky-attachment-authority';
 import {
   STICKY_VICTIM_URGENT_ALERT_DURATION_MS,
-  StickyVictimUrgentAlertController,
+  StickyUrgentAlertController,
+  projectStickyAttackerFeedback,
   projectStickyVictimFeedback,
   type StickyVictimFeedback,
+  type StickyUrgentAlertAudience,
 } from './sticky-victim-feedback';
 import {
   STICKY_VICTIM_RECEIPT_TTL_MS,
@@ -4510,62 +4512,76 @@ const stickyTimingReplayNonces = new Set<number>();
 let stickyVictimFeedbackCount = 0;
 let lastStickyVictimFeedback: StickyVictimFeedback | null = null;
 let stickyVictimReceiptKeys = new Set<string>();
-const stickyVictimUrgentAlertController = new StickyVictimUrgentAlertController();
-let stickyVictimUrgentAlertTimeout: number | null = null;
-let stickyVictimUrgentAlertGeneration = 0;
+const stickyUrgentAlertController = new StickyUrgentAlertController();
+let stickyUrgentAlertTimeout: number | null = null;
+let stickyUrgentAlertGeneration = 0;
 const lastQaStickyAuthoritativeHits = new Map<StickyAttachmentSource, HitMessage>();
 let lastQaKillstreakActivationIntent: KillstreakActivateIntentMessage | null = null;
 const PENDING_STICKY_HIT_LIMIT = 64;
 const PENDING_STICKY_HIT_LIFETIME_MS = 1_500;
 const STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS = 3_000;
 
-function hideStickyVictimUrgentAlert(): void {
-  stickyVictimUrgentAlertGeneration += 1;
-  if (stickyVictimUrgentAlertTimeout !== null) window.clearTimeout(stickyVictimUrgentAlertTimeout);
-  stickyVictimUrgentAlertTimeout = null;
+function hideStickyUrgentAlert(): void {
+  stickyUrgentAlertGeneration += 1;
+  if (stickyUrgentAlertTimeout !== null) window.clearTimeout(stickyUrgentAlertTimeout);
+  stickyUrgentAlertTimeout = null;
   const warning = element<HTMLElement>('#sticky-warning');
   warning.hidden = true;
   delete warning.dataset.source;
+  delete warning.dataset.audience;
+  delete warning.dataset.targetId;
   delete warning.dataset.targetLifeId;
   delete warning.dataset.actionNonce;
   delete warning.dataset.expiresAtMs;
   warning.style.removeProperty('--sticky-warning-duration');
 }
 
-function resetStickyVictimUrgentAlertLife(targetLifeId: number | null = null): void {
-  hideStickyVictimUrgentAlert();
-  stickyVictimUrgentAlertController.reset(targetLifeId);
+function resetStickyUrgentAlertLife(targetLifeId: number | null = null): void {
+  hideStickyUrgentAlert();
+  stickyUrgentAlertController.reset(targetLifeId);
 }
 
-function presentStickyVictimUrgentAlert(
+function presentStickyUrgentAlert(
   source: StickyAttachmentSource,
-  targetId: string,
-  targetLifeId: number,
+  audience: StickyUrgentAlertAudience,
+  attachedTargetId: string,
+  attachedTargetLifeId: number,
   actionNonce: number,
   nowMs = performance.now(),
 ): boolean {
-  if (!player.alive || targetId !== player.id || targetLifeId !== localContinuity) return false;
-  const alert = stickyVictimUrgentAlertController.admit({ source, targetId, targetLifeId, actionNonce, nowMs });
+  if (!player.alive || (audience === 'victim' && attachedTargetId !== player.id)) return false;
+  const alert = stickyUrgentAlertController.admit({
+    source,
+    audience,
+    recipientId: player.id,
+    recipientLifeId: localContinuity,
+    attachedTargetId,
+    attachedTargetLifeId,
+    actionNonce,
+    nowMs,
+  });
   if (!alert) return false;
-  hideStickyVictimUrgentAlert();
+  hideStickyUrgentAlert();
   const warning = element<HTMLElement>('#sticky-warning');
   warning.dataset.source = alert.source;
-  warning.dataset.targetLifeId = String(alert.targetLifeId);
+  warning.dataset.audience = alert.audience;
+  warning.dataset.targetId = alert.attachedTargetId;
+  warning.dataset.targetLifeId = String(alert.attachedTargetLifeId);
   warning.dataset.actionNonce = String(alert.actionNonce);
   warning.dataset.expiresAtMs = String(alert.expiresAtMs);
   warning.style.setProperty('--sticky-warning-duration', `${STICKY_VICTIM_URGENT_ALERT_DURATION_MS}ms`);
   warning.hidden = false;
-  const generation = stickyVictimUrgentAlertGeneration;
+  const generation = stickyUrgentAlertGeneration;
   const expire = (): void => {
-    if (generation !== stickyVictimUrgentAlertGeneration) return;
+    if (generation !== stickyUrgentAlertGeneration) return;
     const remainingMs = alert.expiresAtMs - performance.now();
     if (remainingMs > 0) {
-      stickyVictimUrgentAlertTimeout = window.setTimeout(expire, remainingMs);
+      stickyUrgentAlertTimeout = window.setTimeout(expire, remainingMs);
       return;
     }
-    hideStickyVictimUrgentAlert();
+    hideStickyUrgentAlert();
   };
-  stickyVictimUrgentAlertTimeout = window.setTimeout(
+  stickyUrgentAlertTimeout = window.setTimeout(
     expire,
     Math.max(0, alert.expiresAtMs - performance.now()),
   );
@@ -10321,9 +10337,21 @@ function onNetworkMessage(message: GameMessage): void {
     // Attacker-side STUCK confirmation: when the local player's own sticky Semtex
     // or explosive crossbolt attaches to a combatant, mirror the alert on their
     // screen too (the victim already sees it via the target branch below).
-    if (message.by === player.id && message.stuck === true && !attackerStuckNonces.has(message.nonce)) {
+    const attackerStickyFeedback = projectStickyAttackerFeedback(
+      message,
+      player.id,
+      privateLobbySnapshot?.hostId,
+    );
+    if (attackerStickyFeedback && !attackerStuckNonces.has(message.nonce)) {
       attackerStuckNonces.add(message.nonce);
       while (attackerStuckNonces.size > 128) attackerStuckNonces.delete(attackerStuckNonces.values().next().value!);
+      presentStickyUrgentAlert(
+        attackerStickyFeedback.source,
+        'attacker',
+        attackerStickyFeedback.targetId,
+        attackerStickyFeedback.targetLifeId,
+        attackerStickyFeedback.actionNonce,
+      );
       addFeed('STUCK', 'gold');
     }
     const attacker = remotes.get(message.by);
@@ -10378,8 +10406,9 @@ function onNetworkMessage(message: GameMessage): void {
         saveStickyVictimReceipt(clientPersistentStorage(), receipt);
         stickyVictimFeedbackCount += 1;
         lastStickyVictimFeedback = stickyFeedback;
-        presentStickyVictimUrgentAlert(
+        presentStickyUrgentAlert(
           stickyFeedback.source,
+          'victim',
           stickyFeedback.targetId,
           stickyFeedback.targetLifeId,
           stickyFeedback.actionNonce,
@@ -10763,6 +10792,14 @@ function authorStickyEffectForQa(source: StickyAttachmentSource): QaStickyEffect
   const canonical = lastQaStickyAuthoritativeHits.get(source);
   const healthAfter = remoteHealthAuthorities.get(remote.snapshot.id)?.hp ?? healthBefore;
   if (!canonical || canonical.actionNonce !== actionNonce || healthAfter >= healthBefore) return null;
+  presentStickyUrgentAlert(
+    source,
+    'attacker',
+    remote.snapshot.id,
+    remote.continuity,
+    actionNonce,
+    now,
+  );
   const qaHealth = remoteHealthAuthorities.get(remote.snapshot.id);
   if (qaHealth?.alive) {
     // Keep this bounded authority/rejoin proof independent of frame rate and
@@ -11432,7 +11469,7 @@ function applyDamage(
     requestAnimationFrame(replayDamageFlash);
   }
   if (player.hp <= 0) {
-    resetStickyVictimUrgentAlertLife();
+    resetStickyUrgentAlertLife();
     // When a killstreak event dealt the lethal blow, the caller owns the death
     // bookkeeping and runs it after the killstreak update settles. Bail here so
     // the death is processed exactly once, not re-entrantly inside advance().
@@ -13237,7 +13274,7 @@ function respawn(
     localContinuity += 1;
     localPositionHistory.length = 0;
     resetFlashVictimLife();
-    resetStickyVictimUrgentAlertLife(localContinuity);
+    resetStickyUrgentAlertLife(localContinuity);
   }
   if (respawnTimer) clearTimeout(respawnTimer);
   respawnTimer = null;
@@ -13433,7 +13470,7 @@ async function startGame(
   stickyTimingReplayNonces.clear();
   stickyVictimFeedbackCount = 0;
   lastStickyVictimFeedback = null;
-  resetStickyVictimUrgentAlertLife();
+  resetStickyUrgentAlertLife();
   stickyVictimReceiptKeys = mode === 'client'
     ? new Set(loadStickyVictimReceiptKeys(clientPersistentStorage(), interactiveWorldMatchEpoch, player.id))
     : new Set();
@@ -13512,7 +13549,7 @@ async function startGame(
       })
     : null;
   resetFlashVictimLife();
-  resetStickyVictimUrgentAlertLife(localContinuity);
+  resetStickyUrgentAlertLife(localContinuity);
   if (mode !== 'client') {
     if (hostRecovery?.killstreak) {
       if (!killstreakRuntime.restoreCheckpoint(
@@ -17708,12 +17745,17 @@ function updateExplosiveBolts(dt: number, now: number): void {
           expiresAtMs: bolt.detonatesAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
         });
         if (targetHitId === player.id) {
-          presentStickyVictimUrgentAlert(
-            'explosive-crossbow', targetHitId, targetHitLifeId, bolt.actionNonce, now,
+          presentStickyUrgentAlert(
+            'explosive-crossbow', 'victim', targetHitId, targetHitLifeId, bolt.actionNonce, now,
           );
           addFeed('STUCK', 'coral');
         }
-        else if (bolt.ownerId === player.id) addFeed('STUCK', 'gold');
+        else if (bolt.ownerId === player.id) {
+          presentStickyUrgentAlert(
+            'explosive-crossbow', 'attacker', targetHitId, targetHitLifeId, bolt.actionNonce, now,
+          );
+          addFeed('STUCK', 'gold');
+        }
       } else if (worldCollision || glassCollision) {
         const collisionFraction = Math.min(worldFraction, glassFraction);
         bolt.mesh.position.copy(start).addScaledVector(delta, collisionFraction);
@@ -18353,10 +18395,13 @@ function armImpactGrenade(
         expiresAtMs: grenade.explodeAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
       });
       if (targetId === player.id) {
-        presentStickyVictimUrgentAlert('semtex', targetId, targetLifeId, grenade.actionNonce, now);
+        presentStickyUrgentAlert('semtex', 'victim', targetId, targetLifeId, grenade.actionNonce, now);
         addFeed('STUCK', 'coral');
       }
-      else if (grenade.ownerKind === 'player') addFeed('STUCK', 'gold');
+      else if (grenade.ownerKind === 'player') {
+        presentStickyUrgentAlert('semtex', 'attacker', targetId, targetLifeId, grenade.actionNonce, now);
+        addFeed('STUCK', 'gold');
+      }
     }
   }
   audio.coverImpact(position.distanceTo(player.position));
@@ -21484,7 +21529,7 @@ function clearFieldSupport(): void {
   stickyTimingReplayNonces.clear();
   stickyVictimFeedbackCount = 0;
   lastStickyVictimFeedback = null;
-  resetStickyVictimUrgentAlertLife();
+  resetStickyUrgentAlertLife();
   stickyVictimReceiptKeys.clear();
   lastQaStickyAuthoritativeHits.clear();
   for (const id of remotes.keys()) remoteSupportAuthorities.set(id, createRemoteSupportAuthorityState());
@@ -26549,6 +26594,25 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       victimFeedbackCount: stickyVictimFeedbackCount,
       lastVictimFeedback: lastStickyVictimFeedback ? { ...lastStickyVictimFeedback } : null,
       retainedReceiptCount: stickyVictimReceiptKeys.size,
+      urgentAlert: (() => {
+        const warning = element<HTMLElement>('#sticky-warning');
+        const bounds = warning.getBoundingClientRect();
+        return {
+          visible: !warning.hidden,
+          source: warning.dataset.source ?? null,
+          audience: warning.dataset.audience ?? null,
+          targetId: warning.dataset.targetId ?? null,
+          targetLifeId: warning.dataset.targetLifeId === undefined ? null : Number(warning.dataset.targetLifeId),
+          actionNonce: warning.dataset.actionNonce === undefined ? null : Number(warning.dataset.actionNonce),
+          expiresAtMs: warning.dataset.expiresAtMs === undefined ? null : Number(warning.dataset.expiresAtMs),
+          centreErrorPx: Math.hypot(
+            bounds.left + bounds.width * 0.5 - window.innerWidth * 0.5,
+            bounds.top + bounds.height * 0.5 - window.innerHeight * 0.5,
+          ),
+          computedPosition: getComputedStyle(warning).position,
+          computedZIndex: Number(getComputedStyle(warning).zIndex),
+        };
+      })(),
     },
     lastCompletedMultiplayerDiagnostic: loadLastMultiplayerDiagnostic(clientPersistentStorage()),
     matchDiagnosticsUpload: matchDiagnosticUploader.telemetry(),
@@ -27953,7 +28017,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     localContinuity += 1;
     localPositionHistory.length = 0;
     resetFlashVictimLife();
-    resetStickyVictimUrgentAlertLife(localContinuity);
+    resetStickyUrgentAlertLife(localContinuity);
     if (gameStarted && matchState.phase === 'active' && network.role !== 'client') {
       // QA teleport starts a new local continuity domain. Keep host support
       // authority on that same life so real test-bay F interactions are not

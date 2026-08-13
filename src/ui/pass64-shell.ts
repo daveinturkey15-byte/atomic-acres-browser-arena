@@ -405,7 +405,6 @@ function hudMarkup(): string {
     <pre id="runtime-error-log" hidden aria-hidden="true"></pre>
     <div id="death-fade" aria-hidden="true"></div>
     <div id="respawn" hidden><strong>ELIMINATED</strong><span id="respawn-countdown">REDEPLOYING</span></div>
-    <div id="sticky-warning" hidden role="alert" aria-live="assertive" aria-atomic="true"><small>EXPLOSIVE ATTACHED</small><strong>STUCK</strong></div>
     <div id="countdown" role="status" aria-live="assertive" aria-atomic="true" hidden></div>
     <div id="banner" hidden></div>
     <div id="roster" hidden><h2>FIELD ROSTER</h2><div id="roster-list"></div></div>
@@ -426,5 +425,6 @@ export function renderPass64Shell(model: Pass64ShellViewModel): string {
     ${projectMapDialogMarkup()}
     <div id="refresh-warning" hidden><strong>30 HZ DISPLAY LIMIT</strong><span>Set Windows Advanced display or the remote-stream client to 60 Hz+ for synchronized motion.</span></div>
     <section id="strike-map-overlay" hidden aria-label="Support targeting map"><header><span id="strike-target-mode">TRI-PASS</span><strong id="strike-target-instruction">SELECT THREE TARGETS</strong><b id="strike-target-count">0 / 3</b></header><canvas id="strike-map" width="480" height="480"></canvas><footer><strong id="strike-hostile-count">ENEMIES LIVE · 0</strong><span id="strike-target-help">CLICK THREE LOCATIONS · <kbd>ESC</kbd> CANCELS AND REFUNDS</span></footer></section>
-    ${hudMarkup()}`;
+    ${hudMarkup()}
+    <div id="sticky-warning" hidden role="alert" aria-live="assertive" aria-atomic="true"><small>EXPLOSIVE ATTACHED</small><strong>STUCK</strong></div>`;
 }
