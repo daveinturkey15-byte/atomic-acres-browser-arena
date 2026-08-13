@@ -3,11 +3,16 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
   WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT,
+  WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS,
+  WINDOW_GLASS_DEBRIS_MAX_PHYSICS_MS,
+  WINDOW_GLASS_DEBRIS_NO_PROGRESS_MS,
+  WINDOW_GLASS_DEBRIS_POSE_GRACE_MS,
   WINDOW_GLASS_DEBRIS_SETTLE_TOLERANCE_M,
   WINDOW_GLASS_DEBRIS_VISUAL_CONTRACT,
   createFracturedWindowDebrisVisual,
   prewarmFracturedWindowDebrisVisual,
   updateFracturedWindowDebrisVisual,
+  windowGlassDebrisLifecycleMode,
   windowGlassDebrisSettleMode,
 } from './window-glass-debris-presentation';
 
@@ -23,6 +28,66 @@ describe('persistent window glass debris presentation', () => {
       true,
     )).toBe('presentation-fall');
     expect(() => windowGlassDebrisSettleMode(Number.NaN, 0.6, true)).toThrow(TypeError);
+  });
+
+  it('bounds pose admission, awake no-progress, dynamic collision and total fragment lifetime', () => {
+    const sample = {
+      ageMs: WINDOW_GLASS_DEBRIS_POSE_GRACE_MS - 1,
+      positionY: 2.4,
+      restY: 0.6,
+      physicsActive: true,
+      sleeping: false,
+      receivedPhysicsPose: false,
+      noProgressMs: 0,
+      fallbackSettled: false,
+    };
+    expect(windowGlassDebrisLifecycleMode(sample)).toBe('physics-active');
+    expect(windowGlassDebrisLifecycleMode({
+      ...sample,
+      ageMs: WINDOW_GLASS_DEBRIS_POSE_GRACE_MS,
+    })).toBe('presentation-fall');
+    expect(windowGlassDebrisLifecycleMode({
+      ...sample,
+      ageMs: WINDOW_GLASS_DEBRIS_NO_PROGRESS_MS,
+      receivedPhysicsPose: true,
+      noProgressMs: WINDOW_GLASS_DEBRIS_NO_PROGRESS_MS,
+    })).toBe('presentation-fall');
+    expect(windowGlassDebrisLifecycleMode({
+      ...sample,
+      ageMs: WINDOW_GLASS_DEBRIS_MAX_PHYSICS_MS,
+      receivedPhysicsPose: true,
+    })).toBe('presentation-fall');
+    expect(windowGlassDebrisLifecycleMode({
+      ...sample,
+      ageMs: WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS,
+      receivedPhysicsPose: true,
+    })).toBe('expired');
+    expect(windowGlassDebrisLifecycleMode({
+      ...sample,
+      ageMs: 700,
+      positionY: sample.restY,
+      receivedPhysicsPose: true,
+      sleeping: true,
+    })).toBe('settled');
+    expect(windowGlassDebrisLifecycleMode({
+      ...sample,
+      ageMs: 700,
+      receivedPhysicsPose: true,
+      sleeping: true,
+    })).toBe('presentation-fall');
+    expect(windowGlassDebrisLifecycleMode({
+      ...sample,
+      restY: null,
+      receivedPhysicsPose: true,
+      sleeping: true,
+    })).toBe('presentation-fall');
+    expect(windowGlassDebrisLifecycleMode({
+      ...sample,
+      restY: null,
+      receivedPhysicsPose: true,
+      sleeping: false,
+    })).toBe('physics-active');
+    expect(() => windowGlassDebrisLifecycleMode({ ...sample, noProgressMs: Number.NaN })).toThrow(TypeError);
   });
 
   it('renders separated triangular shards instead of an intact falling pane', () => {
@@ -139,6 +204,11 @@ describe('persistent window glass debris presentation', () => {
     expect(block).toContain('pooledWindowDebris.get(windowDebrisPoolKey(arena.id, window.id))');
     expect(block).not.toContain('createFracturedWindowDebrisVisual({');
     expect(block).not.toContain('new THREE.BoxGeometry');
+    const support = source.slice(source.indexOf('function windowDebrisSupport('), source.indexOf('\nasync function withStagedWindowGlassDebrisPool'));
+    expect(support).toContain('let supportY: number | null = null;');
+    expect(support).toContain('restY: supportY === null ? null : supportY + halfExtents.y');
+    expect(support).not.toContain('arena.bounds.minY');
+    expect(support).not.toContain("source = 'arena-bound'");
   });
 
   it('prewarms zero-light world glass and impact programs before staging the flare PointLight', () => {
@@ -172,14 +242,21 @@ describe('persistent window glass debris presentation', () => {
     const matchStart = runtime.slice(runtime.indexOf('async function startGame('), runtime.indexOf('\nfunction randomNonce()'));
     const breach = runtime.slice(runtime.indexOf('function breakHouseWindow('), runtime.indexOf('\nfunction breakWindowsAlongBallisticTrace('));
     expect(matchStart).toContain("document.documentElement.dataset.glassImpactAudioPrewarm = audio.prepareGlassImpact() ? 'ready' : 'unavailable';");
+    expect(matchStart).toContain("document.documentElement.dataset.grenadeAudioPrewarm = audio.prepareGrenadeEffects() ? 'ready' : 'unavailable';");
+    expect(matchStart).toContain("document.documentElement.dataset.chopperRotorAudioPrewarm = audio.prepareChopperRotors() ? 'ready' : 'unavailable';");
     expect(matchStart.indexOf('audio.prepareGlassImpact()')).toBeLessThan(matchStart.indexOf('prepareDeploymentTransition()'));
+    expect(matchStart.indexOf('audio.prepareGrenadeEffects()')).toBeLessThan(matchStart.indexOf('prepareDeploymentTransition()'));
+    expect(matchStart.indexOf('audio.prepareChopperRotors()')).toBeLessThan(matchStart.indexOf('prepareDeploymentTransition()'));
     expect(breach).toContain("audio.impact('glass', point.distanceTo(camera.position));");
     const prewarm = audio.slice(audio.indexOf('prepareGlassImpact(): boolean {'), audio.indexOf('\n  setLowHealthFeedback('));
-    expect(prewarm).toContain("filter.type = 'bandpass';");
-    expect(prewarm).toContain('filter.frequency.value = 5_200;');
-    expect(prewarm).toContain("tone.type = 'triangle';");
-    expect(prewarm).toContain('tone.frequency.value = 1_460;');
-    expect(prewarm).toContain('noiseGain.gain.value = 0;');
-    expect(prewarm).toContain('toneGain.gain.value = 0;');
+    expect(prewarm).toContain('this.createRetainedEffectGraph([');
+    expect(prewarm).toContain("{ type: 'triangle', frequency: 5_200, filter: 'highpass'");
+    expect(prewarm).toContain("{ type: 'sine', frequency: 1_460, filter: 'bandpass'");
+    const retainedGraph = audio.slice(audio.indexOf('private createRetainedEffectGraph('), audio.indexOf('\n  private registerContinuousVoice('));
+    expect(retainedGraph).toContain('gain.gain.value = 0;');
+    expect(retainedGraph).toContain("this.registerContinuousVoice(source, this.feedback, 5, 'combat-feedback'");
+    const impact = audio.slice(audio.indexOf('impact(surface: ImpactSurface'), audio.indexOf('\n  coverImpact('));
+    expect(impact).toContain('this.automateRetainedEffectVoice(this.glassImpactVoices[0]!');
+    expect(impact).not.toContain('this.context.create');
   });
 });

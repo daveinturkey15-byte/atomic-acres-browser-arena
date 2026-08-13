@@ -5,7 +5,9 @@ import type { AudioBusId } from './audio-buses';
 export const AUDIO_RUNTIME_BUDGET = Object.freeze({
   globalVoices: 48,
   spatialVoices: 12,
-  continuousVoices: 8,
+  // Eight muted combat/effect voices plus four muted spatial rotor voices are
+  // owned at unlock; the global cap remains unchanged and live entry allocates none.
+  continuousVoices: 12,
   occlusionChecksPerFrame: 4,
   perBus: Object.freeze({
     sfx: 24,
@@ -231,26 +233,26 @@ export type ArenaAudioDefinition = Readonly<{
 
 export const ARENA_AUDIO_DEFINITIONS: Readonly<Record<ArenaId, ArenaAudioDefinition>> = Object.freeze({
   'atomic-acres': Object.freeze({
-    arenaId: 'atomic-acres', identity: 'suburban-wind-and-distant-grid-hum', source: 'repository-procedural-original',
-    continuousVoices: 2, bedFrequencyHz: 58, airFrequencyHz: 196, airLowpassHz: 720, airQ: 1.8, airGain: 0.007,
+    arenaId: 'atomic-acres', identity: 'suburban-wind-gusts-and-distant-grid-pulses', source: 'repository-procedural-original',
+    continuousVoices: 0, bedFrequencyHz: 58, airFrequencyHz: 196, airLowpassHz: 720, airQ: 1.8, airGain: 0.007,
     modulationHz: 0.08, modulationDepth: 0.09,
     bedPosition: Object.freeze({ x: -18, y: 4, z: 9 }), airPosition: Object.freeze({ x: 17, y: 7, z: -11 }),
   }),
   'rustworks-1v1': Object.freeze({
     arenaId: 'rustworks-1v1', identity: 'industrial-duct-and-stressed-metal', source: 'repository-procedural-original',
-    continuousVoices: 2, bedFrequencyHz: 43, airFrequencyHz: 127, airLowpassHz: 540, airQ: 1.65, airGain: 0.008,
+    continuousVoices: 0, bedFrequencyHz: 43, airFrequencyHz: 127, airLowpassHz: 540, airQ: 1.65, airGain: 0.008,
     modulationHz: 0.13, modulationDepth: 0.12,
     bedPosition: Object.freeze({ x: 0, y: 9, z: 0 }), airPosition: Object.freeze({ x: -19, y: 3, z: 15 }),
   }),
   'gun-range': Object.freeze({
-    arenaId: 'gun-range', identity: 'indoor-ventilation-and-ballast-buzz', source: 'repository-procedural-original',
-    continuousVoices: 2, bedFrequencyHz: 71, airFrequencyHz: 238, airLowpassHz: 780, airQ: 2.35, airGain: 0.006,
+    arenaId: 'gun-range', identity: 'indoor-ventilation-pulses-and-structure-ticks', source: 'repository-procedural-original',
+    continuousVoices: 0, bedFrequencyHz: 71, airFrequencyHz: 238, airLowpassHz: 780, airQ: 2.35, airGain: 0.006,
     modulationHz: 0.06, modulationDepth: 0.075,
     bedPosition: Object.freeze({ x: 14, y: 3, z: -33 }), airPosition: Object.freeze({ x: -13, y: 4, z: -19 }),
   }),
   'skyline-terminal': Object.freeze({
     arenaId: 'skyline-terminal', identity: 'terminal-hvac-and-apron-engine-wash', source: 'repository-procedural-original',
-    continuousVoices: 2, bedFrequencyHz: 49, airFrequencyHz: 174, airLowpassHz: 640, airQ: 1.9, airGain: 0.0075,
+    continuousVoices: 0, bedFrequencyHz: 49, airFrequencyHz: 174, airLowpassHz: 640, airQ: 1.9, airGain: 0.0075,
     modulationHz: 0.095, modulationDepth: 0.1,
     bedPosition: Object.freeze({ x: -17, y: 5, z: -8 }), airPosition: Object.freeze({ x: 22, y: 4, z: 14 }),
   }),
@@ -267,7 +269,7 @@ export function validateArenaAudioDefinitions(): readonly string[] {
     }
     if (identities.has(definition.identity)) issues.push(`duplicate-identity:${definition.identity}`);
     identities.add(definition.identity);
-    if (definition.continuousVoices > 2) issues.push(`voice-budget:${arena.id}`);
+    if (definition.continuousVoices !== 0) issues.push(`continuous-ambience:${arena.id}`);
     if (definition.airGain <= 0 || definition.airGain > 0.01) issues.push(`broadband-gain:${arena.id}`);
     if (definition.airQ < 1.4) issues.push(`broadband-q:${arena.id}`);
     if (definition.airLowpassHz > 900 || definition.airLowpassHz <= definition.airFrequencyHz) {

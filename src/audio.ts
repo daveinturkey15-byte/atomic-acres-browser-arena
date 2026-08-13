@@ -23,6 +23,9 @@ const WEAPON_REPORT_GAIN = Object.freeze(Object.fromEntries(
 
 export const EXPLOSION_AUDIO_COALESCE_MS = 90;
 export const GRENADE_FUSE_BEEP_START_MS = 1_450;
+export const ARENA_AMBIENCE_EVENT_MIN_INTERVAL_MS = 8_500;
+export const ARENA_AMBIENCE_EVENT_MAX_INTERVAL_MS = 13_500;
+export const ARENA_AMBIENCE_EVENT_DURATION_MS = 720;
 
 export const FLASHBANG_AUDIO_PROFILE = Object.freeze({
   impactDurationSeconds: 0.085,
@@ -135,6 +138,9 @@ export type AudioOutputProbe = Readonly<{
   crestFactor: number;
   spectralFlatness: number;
   highFrequencyEnergyRatio: number;
+  dominantFrequencyHz: number;
+  dominantPowerRatio: number;
+  narrowbandTonePresent: boolean;
   suspiciousBroadbandHiss: boolean;
 }>;
 
@@ -147,13 +153,17 @@ const EMPTY_AUDIO_OUTPUT_PROBE: AudioOutputProbe = Object.freeze({
   crestFactor: 0,
   spectralFlatness: 0,
   highFrequencyEnergyRatio: 0,
+  dominantFrequencyHz: 0,
+  dominantPowerRatio: 0,
+  narrowbandTonePresent: false,
   suspiciousBroadbandHiss: false,
 });
 
 /**
  * Measures the final compressed mix, not source counts or configured gains.
- * Persistent broadband hiss has a materially flatter spectrum and more energy
- * above 3 kHz than the two intentional low-frequency arena oscillators.
+ * Broadband hiss and a narrow tonal carrier have distinct spectra. Persistence
+ * is established by the long-run sampler, while this probe reports each final
+ * compressed output window without trusting source labels.
  */
 export function analyzeAudioOutput(
   timeDomain: Float32Array,
@@ -177,12 +187,18 @@ export function analyzeAudioOutput(
   let logarithmicPower = 0;
   let totalPower = 0;
   let highFrequencyPower = 0;
+  let dominantPower = 0;
+  let dominantFrequencyHz = 0;
   for (let index = 0; index < frequencyDb.length; index += 1) {
     const frequency = index * binWidth;
     if (frequency < 80 || frequency > Math.min(12_000, nyquist)) continue;
     const db = Number.isFinite(frequencyDb[index]) ? frequencyDb[index]! : -120;
     const power = Math.pow(10, Math.max(-120, Math.min(0, db)) / 10);
     totalPower += power;
+    if (power > dominantPower) {
+      dominantPower = power;
+      dominantFrequencyHz = frequency;
+    }
     if (frequency >= 3_000) highFrequencyPower += power;
     logarithmicPower += Math.log(Math.max(power, 1e-12));
     spectralCount += 1;
@@ -191,6 +207,7 @@ export function analyzeAudioOutput(
   const geometricMean = spectralCount > 0 ? Math.exp(logarithmicPower / spectralCount) : 0;
   const spectralFlatness = arithmeticMean > 1e-12 ? Math.min(1, geometricMean / arithmeticMean) : 0;
   const highFrequencyEnergyRatio = totalPower > 1e-12 ? Math.min(1, highFrequencyPower / totalPower) : 0;
+  const dominantPowerRatio = totalPower > 1e-12 ? Math.min(1, dominantPower / totalPower) : 0;
   const crestFactor = rms > 1e-9 ? peak / rms : 0;
   return Object.freeze({
     available: true,
@@ -201,6 +218,9 @@ export function analyzeAudioOutput(
     crestFactor: Number(crestFactor.toFixed(6)),
     spectralFlatness: Number(spectralFlatness.toFixed(8)),
     highFrequencyEnergyRatio: Number(highFrequencyEnergyRatio.toFixed(8)),
+    dominantFrequencyHz: Number(dominantFrequencyHz.toFixed(3)),
+    dominantPowerRatio: Number(dominantPowerRatio.toFixed(8)),
+    narrowbandTonePresent: rms >= 0.002 && dominantPowerRatio >= 0.45 && spectralFlatness <= 0.15,
     suspiciousBroadbandHiss: rms >= 0.002
       && spectralFlatness >= 0.5
       && highFrequencyEnergyRatio >= 0.18,
@@ -271,6 +291,9 @@ export const TEST_BAY_DOOR_THUMP_PROFILE = Object.freeze({
   shedEmitterReused: false,
 } as const);
 
+/** Exact retained capacity of the support-aircraft rotor mix. */
+export const CHOPPER_ROTOR_POOL_CAPACITY = 4;
+
 export function railgunReportAttenuation(remote: boolean, distance: number): number {
   return remote ? Math.max(0.1, 0.68 * (1 - Math.min(1, Math.max(0, distance) / 130))) : 1;
 }
@@ -330,7 +353,28 @@ type MinigunDriveLoop = {
   gain: GainNode;
 };
 
-type ChopperRotorLoop = MinigunDriveLoop & { panner: PannerNode };
+type ChopperRotorLoop = MinigunDriveLoop & { panner: PannerNode; boundId: string | null };
+type ChopperRotorFirstActiveSync = Readonly<{
+  cold: true;
+  durationMs: number;
+  factoryDelta: number;
+  admitted: number;
+  contextState: string;
+}>;
+
+type RetainedEffectVoice = Readonly<{
+  source: OscillatorNode;
+  filter: BiquadFilterNode;
+  gain: GainNode;
+}>;
+
+type RetainedEffectVoiceSpec = Readonly<{
+  type: OscillatorType;
+  frequency: number;
+  filter: BiquadFilterType;
+  filterFrequency: number;
+  q: number;
+}>;
 
 type ContinuousVoiceScope = 'arena' | 'combat-feedback';
 
@@ -376,7 +420,15 @@ export class ArenaAudio {
   private minigunDrivePhase: MinigunSpoolPhase = 'idle';
   private minigunDriveLastUpdateAt = Number.NEGATIVE_INFINITY;
   private readonly chopperRotorLoops = new Map<string, ChopperRotorLoop>();
+  private chopperRotorPool: ChopperRotorLoop[] = [];
   private readonly liveChopperRotorIds = new Set<string>();
+  private chopperRotorPrepared = false;
+  private chopperRotorPrepareRuns = 0;
+  private chopperRotorFactoryCalls = 0;
+  private chopperRotorSyncs = 0;
+  private chopperRotorActiveSyncs = 0;
+  private chopperRotorLastSyncFactoryDelta = 0;
+  private chopperRotorFirstActiveSync: ChopperRotorFirstActiveSync | null = null;
   private chopperRotorStarts = 0;
   private chopperRotorStops = 0;
   private supportCuePlays = 0;
@@ -403,8 +455,16 @@ export class ArenaAudio {
   private voicesDropped = 0;
   private voicesStolen = 0;
   private activeArena: ArenaId | null = null;
+  /** No arena source is allowed to remain audible indefinitely. */
   private arenaSources: AudioScheduledSourceNode[] = [];
   private arenaNodes: AudioNode[] = [];
+  private arenaEventSources: AudioScheduledSourceNode[] = [];
+  private arenaEventNodes: AudioNode[] = [];
+  private arenaAmbienceTimer: ReturnType<typeof setTimeout> | null = null;
+  private arenaAmbienceGeneration = 0;
+  private arenaAmbienceNextAt = Number.POSITIVE_INFINITY;
+  private arenaAmbienceEvents = 0;
+  private arenaAmbienceLastDurationMs = 0;
   private combatFeedbackSources: AudioScheduledSourceNode[] = [];
   private combatFeedbackNodes: AudioNode[] = [];
   private lowHealthGains: GainNode[] = [];
@@ -414,6 +474,14 @@ export class ArenaAudio {
   private combatFeedbackPrepareRuns = 0;
   private glassImpactPrepared = false;
   private glassImpactPrepareRuns = 0;
+  private glassImpactVoices: RetainedEffectVoice[] = [];
+  private glassImpactNodes: AudioNode[] = [];
+  private glassImpactPulses = 0;
+  private grenadeEffectsPrepared = false;
+  private grenadeEffectsPrepareRuns = 0;
+  private grenadeEffectVoices: RetainedEffectVoice[] = [];
+  private grenadeEffectNodes: AudioNode[] = [];
+  private grenadeEffectAutomations = 0;
   private lowHealthFeedbackActive = false;
   private lowHealthFeedbackAudible = false;
   private lowHealthAppliedState: Readonly<{
@@ -476,16 +544,15 @@ export class ArenaAudio {
         this.createBus('game-music', 0.16);
         this.noiseBuffer = this.createNoiseBuffer(1.2);
         for (const id of AUDIO_BUS_IDS) this.applyBusSetting(id);
-        this.prepareCombat();
+        if (this.prepareCombat() && this.prepareGlassImpact() && this.prepareGrenadeEffects()) {
+          this.prepareChopperRotors();
+        }
         if (this.activeArena) this.startArenaBed(this.activeArena);
       } catch {
         // Audio is optional. A sandbox/device policy may expose a constructor
         // that still throws, or reject one of the initial graph nodes. Tear
         // down the partial graph and keep gameplay admission error-free.
-        for (const source of this.arenaSources.splice(0)) {
-          try { source.stop(); } catch { /* source may not have started */ }
-          try { source.disconnect(); } catch { /* partial browser node */ }
-        }
+        this.stopArenaBed();
         this.stopSources(this.combatFeedbackSources);
         this.disconnectNodes(this.combatFeedbackNodes);
         this.resetCombatFeedbackState();
@@ -526,7 +593,7 @@ export class ArenaAudio {
   dispose(): void {
     this.stopMinigunDrive();
     this.stopAllChopperRotors();
-    this.stopSources(this.arenaSources);
+    this.stopArenaBed();
     this.disconnectNodes(this.arenaNodes);
     this.stopSources(this.combatFeedbackSources);
     this.disconnectNodes(this.combatFeedbackNodes);
@@ -567,9 +634,8 @@ export class ArenaAudio {
 
   setArena(arenaId: ArenaId): void {
     if (this.activeArena === arenaId) return;
+    this.stopArenaBed();
     this.activeArena = arenaId;
-    this.stopSources(this.arenaSources);
-    this.disconnectNodes(this.arenaNodes);
     this.startArenaBed(arenaId);
   }
 
@@ -724,67 +790,104 @@ export class ArenaAudio {
     }
   }
 
-  /**
-   * Exercises the exact live glass-impact source/filter/gain graph at zero
-   * gain during match admission. The one-shot sources are intentionally not
-   * retained as broadband loops; browser node factories and the destination
-   * graph are warm before the first pane breaks, with full rollback on any
-   * partial Web Audio failure.
-   */
+  /** Owns the exact glass-impact graph before a pane can be hit. */
   prepareGlassImpact(): boolean {
     if (this.glassImpactPrepared) return true;
-    if (!this.context || !this.noiseBuffer || !this.feedback) return false;
+    if (!this.context || !this.feedback) return false;
     this.glassImpactPrepareRuns += 1;
+    const graph = this.createRetainedEffectGraph([
+      { type: 'triangle', frequency: 5_200, filter: 'highpass', filterFrequency: 3_400, q: 0.72 },
+      { type: 'sine', frequency: 1_460, filter: 'bandpass', filterFrequency: 1_720, q: 1.25 },
+    ]);
+    if (!graph) return false;
+    this.glassImpactVoices = graph.voices;
+    this.glassImpactNodes = graph.nodes;
+    this.glassImpactPrepared = true;
+    return true;
+  }
+
+  /**
+   * Owns bounce, fuse and blast voices during audio unlock. Live grenade paths
+   * only write AudioParams; they never create a node on the first throw.
+   */
+  prepareGrenadeEffects(): boolean {
+    if (this.grenadeEffectsPrepared) return true;
+    if (!this.context || !this.feedback) return false;
+    this.grenadeEffectsPrepareRuns += 1;
+    const graph = this.createRetainedEffectGraph([
+      { type: 'sawtooth', frequency: 96, filter: 'lowpass', filterFrequency: 720, q: 0.72 },
+      { type: 'triangle', frequency: 920, filter: 'bandpass', filterFrequency: 1_180, q: 0.9 },
+      { type: 'square', frequency: 1_840, filter: 'highpass', filterFrequency: 1_240, q: 0.66 },
+    ]);
+    if (!graph) return false;
+    this.grenadeEffectVoices = graph.voices;
+    this.grenadeEffectNodes = graph.nodes;
+    this.grenadeEffectsPrepared = true;
+    return true;
+  }
+
+  /**
+   * Owns every rotor oscillator/filter/gain/panner during audio unlock. Chopper
+   * entry and support updates only bind an ID and automate this retained pool.
+   */
+  prepareChopperRotors(): boolean {
+    if (this.chopperRotorPrepared) return true;
+    if (!this.context || !this.ambience) return false;
+    this.chopperRotorPrepareRuns += 1;
+    const created: ChopperRotorLoop[] = [];
     const now = this.context.currentTime;
-    const sources: AudioScheduledSourceNode[] = [];
-    const nodes: AudioNode[] = [];
     try {
-      const noise = this.context.createBufferSource();
-      sources.push(noise);
-      noise.buffer = this.noiseBuffer;
-      const filter = this.context.createBiquadFilter();
-      nodes.push(filter);
-      filter.type = 'bandpass';
-      filter.frequency.value = 5_200;
-      filter.Q.value = 1.25;
-      const noiseGain = this.context.createGain();
-      nodes.push(noiseGain);
-      noiseGain.gain.value = 0;
-      noise.connect(filter).connect(noiseGain).connect(this.feedback);
-      if (!this.registerVoice(noise, this.feedback, 3)) throw new Error('glass-impact-noise-voice-budget');
-      const priorNoiseEnded = noise.onended;
-      noise.onended = (event) => {
-        priorNoiseEnded?.call(noise, event);
-        filter.disconnect();
-        noiseGain.disconnect();
-      };
-
-      const tone = this.context.createOscillator();
-      sources.push(tone);
-      tone.type = 'triangle';
-      tone.frequency.value = 1_460;
-      const toneGain = this.context.createGain();
-      nodes.push(toneGain);
-      toneGain.gain.value = 0;
-      tone.connect(toneGain).connect(this.feedback);
-      if (!this.registerVoice(tone, this.feedback, 3)) throw new Error('glass-impact-tone-voice-budget');
-      const priorToneEnded = tone.onended;
-      tone.onended = (event) => {
-        priorToneEnded?.call(tone, event);
-        toneGain.disconnect();
-      };
-
-      noise.start(now, 0, 0.095);
-      tone.start(now + 0.006);
-      tone.stop(now + 0.034);
-      this.glassImpactPrepared = true;
+      for (let index = 0; index < CHOPPER_ROTOR_POOL_CAPACITY; index += 1) {
+        const source = this.context.createOscillator();
+        this.chopperRotorFactoryCalls += 1;
+        const filter = this.context.createBiquadFilter();
+        this.chopperRotorFactoryCalls += 1;
+        const gain = this.context.createGain();
+        this.chopperRotorFactoryCalls += 1;
+        const panner = this.context.createPanner();
+        this.chopperRotorFactoryCalls += 1;
+        source.type = 'sawtooth';
+        source.frequency.value = 38;
+        filter.type = 'lowpass';
+        filter.frequency.value = 230;
+        filter.Q.value = 0.62;
+        gain.gain.value = 0;
+        panner.panningModel = 'HRTF';
+        panner.distanceModel = 'inverse';
+        panner.refDistance = 4;
+        panner.maxDistance = 110;
+        panner.rolloffFactor = 0.72;
+        source.connect(filter).connect(gain).connect(panner).connect(this.ambience);
+        const loop = { source, filter, gain, panner, boundId: null } satisfies ChopperRotorLoop;
+        created.push(loop);
+        if (!this.registerContinuousVoice(
+          source,
+          this.ambience,
+          1,
+          'combat-feedback',
+          [filter, gain, panner],
+          [gain],
+        )) throw new Error('chopper-rotor-voice-budget');
+        source.start(now);
+        this.combatFeedbackSources.push(source);
+        this.combatFeedbackNodes.push(filter, gain, panner);
+      }
+      this.chopperRotorPool = created;
+      this.spatialChains += created.length;
+      this.chopperRotorPrepared = true;
       return true;
     } catch {
-      for (const source of sources) this.stopSource(source);
-      for (const node of nodes) {
-        try { node.disconnect(); } catch { /* partially connected browser node */ }
+      for (const loop of created) this.stopSource(loop.source);
+      for (const loop of created) {
+        for (const node of [loop.filter, loop.gain, loop.panner]) {
+          const nodeIndex = this.combatFeedbackNodes.indexOf(node);
+          if (nodeIndex >= 0) this.combatFeedbackNodes.splice(nodeIndex, 1);
+          try { node.disconnect(); } catch { /* partially connected retained graph */ }
+        }
+        const sourceIndex = this.combatFeedbackSources.indexOf(loop.source);
+        if (sourceIndex >= 0) this.combatFeedbackSources.splice(sourceIndex, 1);
       }
-      this.glassImpactPrepared = false;
+      this.chopperRotorPool = [];
       return false;
     }
   }
@@ -933,9 +1036,14 @@ export class ArenaAudio {
 
   impact(surface: ImpactSurface, distance = 0): void {
     const attenuation = Math.max(0.08, 1 - Math.min(1, distance / 34));
-    const profile = surface === 'glass'
-      ? { frequency: 5200, tone: 1460, duration: 0.095, volume: 0.105 }
-      : surface === 'metal'
+    if (surface === 'glass') {
+      if (!this.glassImpactPrepared || this.glassImpactVoices.length !== 2) return;
+      this.automateRetainedEffectVoice(this.glassImpactVoices[0]!, 5_600, 2_800, 0.095, 0.105 * attenuation);
+      this.automateRetainedEffectVoice(this.glassImpactVoices[1]!, 1_520, 1_080, 0.034, 0.03 * attenuation, 0.006);
+      this.glassImpactPulses += 1;
+      return;
+    }
+    const profile = surface === 'metal'
       ? { frequency: 3150, tone: 960, duration: 0.065, volume: 0.09 }
       : surface === 'wood'
         ? { frequency: 980, tone: 240, duration: 0.075, volume: 0.07 }
@@ -1081,9 +1189,11 @@ export class ArenaAudio {
   }
 
   grenadeBounce(strength: number): void {
+    if (!this.grenadeEffectsPrepared || this.grenadeEffectVoices.length !== 3) return;
     const level = Math.min(1, Math.max(0.2, strength / 10));
-    this.tone(310, 0.025, 0.035 * level, 'triangle', this.feedback);
-    this.tone(185, 0.035, 0.026 * level, 'square', this.feedback, 0.012);
+    this.automateRetainedEffectVoice(this.grenadeEffectVoices[1]!, 310, 282, 0.025, 0.035 * level);
+    this.automateRetainedEffectVoice(this.grenadeEffectVoices[2]!, 185, 168, 0.035, 0.026 * level, 0.012);
+    this.grenadeEffectAutomations += 2;
   }
 
   grenadeFuseBeep(remainingMs: number, now = performance.now()): boolean {
@@ -1092,8 +1202,24 @@ export class ArenaAudio {
     this.lastGrenadeFuseBeepAt = now;
     this.grenadeFuseBeeps += 1;
     const urgency = 1 - remainingMs / GRENADE_FUSE_BEEP_START_MS;
-    this.tone(920 + urgency * 360, 0.042, 0.052, 'square', this.feedback);
-    this.tone(1_840 + urgency * 420, 0.028, 0.022, 'sine', this.feedback, 0.006);
+    if (this.grenadeEffectsPrepared && this.grenadeEffectVoices.length === 3) {
+      this.automateRetainedEffectVoice(
+        this.grenadeEffectVoices[1]!,
+        920 + urgency * 360,
+        860 + urgency * 330,
+        0.042,
+        0.052,
+      );
+      this.automateRetainedEffectVoice(
+        this.grenadeEffectVoices[2]!,
+        1_840 + urgency * 420,
+        1_680 + urgency * 390,
+        0.028,
+        0.022,
+        0.006,
+      );
+      this.grenadeEffectAutomations += 2;
+    }
     return true;
   }
 
@@ -1204,9 +1330,12 @@ export class ArenaAudio {
     this.explosionAudioGate = admission.state;
     if (!admission.admitted) return false;
     if (!this.weapons) return true;
-    this.sweep(96, 24, 0.58, 0.29, 'sawtooth', this.weapons);
-    this.noise({ duration: 0.64, volume: 0.42, filter: 'lowpass', frequency: 2100, q: 0.5 }, this.weapons);
-    this.noise({ duration: 0.18, volume: 0.12, filter: 'highpass', frequency: 3100, q: 0.4, delay: 0.035 }, this.weapons);
+    if (this.grenadeEffectsPrepared && this.grenadeEffectVoices.length === 3) {
+      this.automateRetainedEffectVoice(this.grenadeEffectVoices[0]!, 96, 24, 0.58, 0.29);
+      this.automateRetainedEffectVoice(this.grenadeEffectVoices[1]!, 2_100, 180, 0.64, 0.16);
+      this.automateRetainedEffectVoice(this.grenadeEffectVoices[2]!, 3_100, 620, 0.18, 0.075, 0.035);
+      this.grenadeEffectAutomations += 3;
+    }
     return true;
   }
 
@@ -1262,6 +1391,9 @@ export class ArenaAudio {
     position: SpatialPoint;
     phase: 'inbound' | 'orbiting' | 'outbound';
   }>[]): void {
+    const syncStartedAt = performance.now();
+    const factoryCallsBefore = this.chopperRotorFactoryCalls;
+    this.chopperRotorSyncs += 1;
     this.liveChopperRotorIds.clear();
     let admittedCount = 0;
     for (const entry of sources) {
@@ -1271,10 +1403,13 @@ export class ArenaAudio {
       admittedCount += 1;
       if (admittedCount >= 4) break;
     }
-    for (const id of this.chopperRotorLoops.keys()) {
-      if (!this.liveChopperRotorIds.has(id)) this.stopChopperRotor(id);
+    for (const id of [...this.chopperRotorLoops.keys()]) {
+      if (!this.liveChopperRotorIds.has(id)) this.releaseChopperRotor(id);
     }
-    if (!this.context || !this.ambience) return;
+    if (!this.context || !this.ambience || !this.chopperRotorPrepared) {
+      this.chopperRotorLastSyncFactoryDelta = this.chopperRotorFactoryCalls - factoryCallsBefore;
+      return;
+    }
     admittedCount = 0;
     for (const entry of sources) {
       if (entry.id.length === 0 || !Number.isFinite(entry.position.x)
@@ -1286,40 +1421,9 @@ export class ArenaAudio {
         entry.position.z - this.listenerPosition.z,
       );
       if (!loop) {
-        const source = this.context.createOscillator();
-        const filter = this.context.createBiquadFilter();
-        const gain = this.context.createGain();
-        const panner = this.context.createPanner();
-        source.type = 'sawtooth';
-        source.frequency.value = 38;
-        filter.type = 'lowpass';
-        filter.frequency.value = 230;
-        filter.Q.value = 0.62;
-        gain.gain.value = 0.011;
-        panner.panningModel = 'HRTF';
-        panner.distanceModel = 'inverse';
-        panner.refDistance = 4;
-        panner.maxDistance = 110;
-        panner.rolloffFactor = 0.72;
-        source.connect(filter).connect(gain).connect(panner).connect(this.ambience);
-        if (!this.registerVoice(source, this.ambience, 1, true, listenerDistance)) {
-          filter.disconnect();
-          gain.disconnect();
-          panner.disconnect();
-          continue;
-        }
-        loop = { source, filter, gain, panner };
-        const voiceEnded = source.onended;
-        source.onended = (event) => {
-          this.spatialChains = Math.max(0, this.spatialChains - 1);
-          voiceEnded?.call(source, event);
-          filter.disconnect();
-          gain.disconnect();
-          panner.disconnect();
-          if (this.chopperRotorLoops.get(entry.id) === loop) this.chopperRotorLoops.delete(entry.id);
-        };
-        source.start(this.context.currentTime);
-        this.spatialChains += 1;
+        loop = this.chopperRotorPool.find((candidate) => candidate.boundId === null);
+        if (!loop) continue;
+        loop.boundId = entry.id;
         this.chopperRotorLoops.set(entry.id, loop);
         this.chopperRotorStarts += 1;
       }
@@ -1327,11 +1431,27 @@ export class ArenaAudio {
       loop.panner.positionY.value = entry.position.y;
       loop.panner.positionZ.value = entry.position.z;
       loop.source.frequency.value = entry.phase === 'inbound' ? 36 : entry.phase === 'outbound' ? 34 : 38;
-      loop.gain.gain.value = entry.phase === 'inbound' ? 0.009 : entry.phase === 'outbound' ? 0.007 : 0.011;
+      loop.gain.gain.setTargetAtTime(
+        entry.phase === 'inbound' ? 0.009 : entry.phase === 'outbound' ? 0.007 : 0.011,
+        this.context.currentTime,
+        0.012,
+      );
       const voice = this.activeVoices.get(loop.source);
       if (voice) voice.distance = listenerDistance;
       admittedCount += 1;
       if (admittedCount >= 4) break;
+    }
+    this.chopperRotorLastSyncFactoryDelta = this.chopperRotorFactoryCalls - factoryCallsBefore;
+    if (admittedCount > 0) {
+      const cold = this.chopperRotorActiveSyncs === 0;
+      this.chopperRotorActiveSyncs += 1;
+      if (cold) this.chopperRotorFirstActiveSync = Object.freeze({
+        cold: true,
+        durationMs: Math.max(0, performance.now() - syncStartedAt),
+        factoryDelta: this.chopperRotorLastSyncFactoryDelta,
+        admitted: admittedCount,
+        contextState: this.context.state,
+      });
     }
   }
 
@@ -1456,15 +1576,43 @@ export class ArenaAudio {
     };
     listener: { poseMode: AudioListenerPoseMode };
     explosionMix: ExplosionAudioGate & { coalesceMs: number };
-    ambience: { continuousSources: number; busGain: number; arena: ArenaId | null };
+    ambience: {
+      continuousSources: number;
+      transientSources: number;
+      events: number;
+      lastDurationMs: number;
+      nextInMs: number | null;
+      busGain: number;
+      arena: ArenaId | null;
+    };
     combatPrewarm: { prepared: boolean; runs: number; sources: number; nodes: number; broadbandLoopSources: 0 };
-    glassImpactPrewarm: { prepared: boolean; runs: number; retainedBroadbandLoops: 0 };
+    glassImpactPrewarm: { prepared: boolean; runs: number; sources: number; nodes: number; pulses: number; retainedBroadbandLoops: 0 };
+    grenadeEffectsPrewarm: { prepared: boolean; runs: number; sources: number; nodes: number; automations: number; retainedBroadbandLoops: 0 };
     lowHealth: { prepared: boolean; sources: number; active: boolean; audible: boolean; automationWrites: number; broadbandSources: 0 };
     damageFeedback: { prepared: boolean; sources: number; pulses: number };
     grenadeFuse: { beeps: number; startMs: number };
     crossbowFuse: { beeps: number; lastRemainingMs: number; lastDistanceM: number; startMs: number };
     minigunDrive: { active: boolean; starts: number; stops: number; fraction: number; phase: MinigunSpoolPhase };
-    support: { cues: number; chopperRotorActive: boolean; chopperRotorStarts: number; chopperRotorStops: number };
+    support: {
+      cues: number;
+      chopperRotorActive: boolean;
+      chopperRotorStarts: number;
+      chopperRotorStops: number;
+      chopperRotorPrewarm: {
+        prepared: boolean;
+        runs: number;
+        capacity: number;
+        sources: number;
+        nodes: number;
+        factoryCalls: number;
+        syncs: number;
+        activeSyncs: number;
+        lastSyncFactoryDelta: number;
+        liveIds: readonly string[];
+        firstActiveSync: ChopperRotorFirstActiveSync | null;
+        retainedBroadbandLoops: 0;
+      };
+    };
     countdown: { cues: number; lastCue: MatchCountdownAudioCueId | null; maximumVoicesPerCue: number; maximumCueWindowSeconds: number; buses: readonly ['announcements', 'ui'] };
     railgun: {
       local: number;
@@ -1478,7 +1626,7 @@ export class ArenaAudio {
     };
     flashbang: { plays: number; lastAudioGain: number; immediateOnsets: number; scheduledBeeps: number; maximumTailMs: number };
     outputProbe: AudioOutputProbe;
-    runtime: { voices: number; spatialChains: number; spatialPoolSize: number; stolen: number; dropped: number; globalCap: number; spatialCap: number };
+    runtime: { voices: number; retainedSources: number; retainedAudibleGains: number; spatialChains: number; spatialPoolSize: number; stolen: number; dropped: number; globalCap: number; spatialCap: number };
     buses: Record<AudioBusId, { configuredGain: number; muted: boolean; effectiveGain: number }>;
   } {
     const buses = Object.fromEntries(AUDIO_BUS_IDS.map((id) => {
@@ -1501,17 +1649,38 @@ export class ArenaAudio {
       },
       listener: { poseMode: this.listenerPoseMode },
       explosionMix: { ...this.explosionAudioGate, coalesceMs: EXPLOSION_AUDIO_COALESCE_MS },
-      ambience: { continuousSources: this.arenaSources.length, busGain: this.ambience?.gain.value ?? 0.12, arena: this.activeArena },
+      ambience: {
+        continuousSources: this.arenaSources.length,
+        transientSources: this.arenaEventSources.length,
+        events: this.arenaAmbienceEvents,
+        lastDurationMs: this.arenaAmbienceLastDurationMs,
+        nextInMs: Number.isFinite(this.arenaAmbienceNextAt)
+          ? Math.max(0, this.arenaAmbienceNextAt - performance.now())
+          : null,
+        busGain: this.ambience?.gain.value ?? 0.12,
+        arena: this.activeArena,
+      },
       combatPrewarm: {
         prepared: this.combatFeedbackPrepared,
         runs: this.combatFeedbackPrepareRuns,
-        sources: this.combatFeedbackSources.length,
-        nodes: this.combatFeedbackNodes.length,
+        sources: this.combatFeedbackPrepared ? 3 : 0,
+        nodes: this.combatFeedbackPrepared ? 5 : 0,
         broadbandLoopSources: 0,
       },
       glassImpactPrewarm: {
         prepared: this.glassImpactPrepared,
         runs: this.glassImpactPrepareRuns,
+        sources: this.glassImpactVoices.length,
+        nodes: this.glassImpactNodes.length,
+        pulses: this.glassImpactPulses,
+        retainedBroadbandLoops: 0,
+      },
+      grenadeEffectsPrewarm: {
+        prepared: this.grenadeEffectsPrepared,
+        runs: this.grenadeEffectsPrepareRuns,
+        sources: this.grenadeEffectVoices.length,
+        nodes: this.grenadeEffectNodes.length,
+        automations: this.grenadeEffectAutomations,
         retainedBroadbandLoops: 0,
       },
       lowHealth: {
@@ -1546,6 +1715,20 @@ export class ArenaAudio {
         chopperRotorActive: this.chopperRotorLoops.size > 0,
         chopperRotorStarts: this.chopperRotorStarts,
         chopperRotorStops: this.chopperRotorStops,
+        chopperRotorPrewarm: {
+          prepared: this.chopperRotorPrepared,
+          runs: this.chopperRotorPrepareRuns,
+          capacity: CHOPPER_ROTOR_POOL_CAPACITY,
+          sources: this.chopperRotorPool.length,
+          nodes: this.chopperRotorPool.length * 3,
+          factoryCalls: this.chopperRotorFactoryCalls,
+          syncs: this.chopperRotorSyncs,
+          activeSyncs: this.chopperRotorActiveSyncs,
+          lastSyncFactoryDelta: this.chopperRotorLastSyncFactoryDelta,
+          liveIds: Object.freeze([...this.chopperRotorLoops.keys()]),
+          firstActiveSync: this.chopperRotorFirstActiveSync,
+          retainedBroadbandLoops: 0,
+        },
       },
       countdown: {
         cues: this.matchCountdownCuePlays,
@@ -1559,6 +1742,10 @@ export class ArenaAudio {
       outputProbe,
       runtime: {
         voices: this.activeVoices.size,
+        retainedSources: this.continuousVoiceOwners.size,
+        retainedAudibleGains: [...this.continuousVoiceOwners.values()]
+          .flatMap((owner) => owner.gains)
+          .filter((gain) => gain.gain.value > 0.0001).length,
         spatialChains: this.spatialChains + this.arenaSources.length,
         spatialPoolSize: this.footstepChains.length,
         stolen: this.voicesStolen,
@@ -1708,6 +1895,70 @@ export class ArenaAudio {
     return true;
   }
 
+  private createRetainedEffectGraph(
+    specs: readonly RetainedEffectVoiceSpec[],
+  ): Readonly<{ voices: RetainedEffectVoice[]; nodes: AudioNode[] }> | null {
+    if (!this.context || !this.feedback) return null;
+    const now = this.context.currentTime;
+    const voices: RetainedEffectVoice[] = [];
+    const nodes: AudioNode[] = [];
+    const sources: OscillatorNode[] = [];
+    try {
+      for (const spec of specs) {
+        const source = this.context.createOscillator();
+        sources.push(source);
+        const filter = this.context.createBiquadFilter();
+        const gain = this.context.createGain();
+        nodes.push(filter, gain);
+        source.type = spec.type;
+        source.frequency.value = spec.frequency;
+        filter.type = spec.filter;
+        filter.frequency.value = spec.filterFrequency;
+        filter.Q.value = spec.q;
+        gain.gain.value = 0;
+        source.connect(filter).connect(gain).connect(this.feedback);
+        if (!this.registerContinuousVoice(source, this.feedback, 5, 'combat-feedback', [filter, gain], [gain])) {
+          throw new Error('retained-effect-voice-budget');
+        }
+        source.start(now);
+        this.combatFeedbackSources.push(source);
+        this.combatFeedbackNodes.push(filter, gain);
+        voices.push(Object.freeze({ source, filter, gain }));
+      }
+      return Object.freeze({ voices, nodes });
+    } catch {
+      for (const source of sources) this.stopSource(source);
+      for (const node of nodes) {
+        const index = this.combatFeedbackNodes.indexOf(node);
+        if (index >= 0) this.combatFeedbackNodes.splice(index, 1);
+        try { node.disconnect(); } catch { /* partially connected browser node */ }
+      }
+      return null;
+    }
+  }
+
+  private automateRetainedEffectVoice(
+    voice: RetainedEffectVoice,
+    startFrequency: number,
+    endFrequency: number,
+    duration: number,
+    volume: number,
+    delay = 0,
+  ): void {
+    if (!this.context) return;
+    const now = this.context.currentTime + Math.max(0, delay);
+    const end = now + Math.max(0.008, duration);
+    const attackEnd = Math.min(end, now + 0.006);
+    voice.source.frequency.cancelScheduledValues(now);
+    voice.source.frequency.setValueAtTime(Math.max(1, startFrequency), now);
+    voice.source.frequency.exponentialRampToValueAtTime(Math.max(1, endFrequency), end);
+    voice.gain.gain.cancelScheduledValues(now);
+    voice.gain.gain.setValueAtTime(0, now);
+    voice.gain.gain.linearRampToValueAtTime(Math.max(0, volume), attackEnd);
+    voice.gain.gain.linearRampToValueAtTime(0, end);
+    voice.gain.gain.setValueAtTime(0, end + 0.001);
+  }
+
   private registerContinuousVoice(
     source: AudioScheduledSourceNode,
     destination: AudioNode,
@@ -1769,16 +2020,20 @@ export class ArenaAudio {
     this.stopSource(loop.source);
   }
 
-  private stopChopperRotor(id: string): void {
+  private releaseChopperRotor(id: string): void {
     const loop = this.chopperRotorLoops.get(id);
     if (!loop) return;
     this.chopperRotorLoops.delete(id);
+    loop.boundId = null;
+    if (this.context) {
+      loop.gain.gain.cancelScheduledValues(this.context.currentTime);
+      loop.gain.gain.setTargetAtTime(0, this.context.currentTime, 0.008);
+    } else loop.gain.gain.value = 0;
     this.chopperRotorStops += 1;
-    this.stopSource(loop.source);
   }
 
   private stopAllChopperRotors(): void {
-    for (const id of [...this.chopperRotorLoops.keys()]) this.stopChopperRotor(id);
+    for (const id of [...this.chopperRotorLoops.keys()]) this.releaseChopperRotor(id);
   }
 
   private stopSources(sources: AudioScheduledSourceNode[]): void {
@@ -1792,11 +2047,21 @@ export class ArenaAudio {
   }
 
   private resetCombatFeedbackState(): void {
+    this.spatialChains = Math.max(0, this.spatialChains - this.chopperRotorPool.length);
+    this.chopperRotorLoops.clear();
+    this.liveChopperRotorIds.clear();
+    this.chopperRotorPool = [];
+    this.chopperRotorPrepared = false;
     this.lowHealthGains = [];
     this.damageFeedbackSource = null;
     this.damageFeedbackGain = null;
     this.combatFeedbackPrepared = false;
     this.glassImpactPrepared = false;
+    this.glassImpactVoices = [];
+    this.glassImpactNodes = [];
+    this.grenadeEffectsPrepared = false;
+    this.grenadeEffectVoices = [];
+    this.grenadeEffectNodes = [];
     this.lowHealthFeedbackActive = false;
     this.lowHealthFeedbackAudible = false;
     this.lowHealthAppliedState = null;
@@ -1825,85 +2090,92 @@ export class ArenaAudio {
   }
 
   private startArenaBed(arenaId: ArenaId): void {
-    if (!this.context || !this.ambience) return;
+    if (!this.context || !this.ambience || !this.noiseBuffer) return;
+    const generation = ++this.arenaAmbienceGeneration;
+    this.scheduleArenaAmbienceEvent(arenaId, generation);
+  }
+
+  private stopArenaBed(): void {
+    this.arenaAmbienceGeneration += 1;
+    if (this.arenaAmbienceTimer !== null) clearTimeout(this.arenaAmbienceTimer);
+    this.arenaAmbienceTimer = null;
+    this.arenaAmbienceNextAt = Number.POSITIVE_INFINITY;
+    this.stopSources(this.arenaEventSources);
+    this.disconnectNodes(this.arenaEventNodes);
+    this.stopSources(this.arenaSources);
+    this.disconnectNodes(this.arenaNodes);
+  }
+
+  private scheduleArenaAmbienceEvent(arenaId: ArenaId, generation: number): void {
+    if (generation !== this.arenaAmbienceGeneration || this.activeArena !== arenaId) return;
+    const interval = ARENA_AMBIENCE_EVENT_MIN_INTERVAL_MS
+      + presentationRandom() * (ARENA_AMBIENCE_EVENT_MAX_INTERVAL_MS - ARENA_AMBIENCE_EVENT_MIN_INTERVAL_MS);
+    this.arenaAmbienceNextAt = performance.now() + interval;
+    this.arenaAmbienceTimer = setTimeout(() => {
+      this.arenaAmbienceTimer = null;
+      if (generation !== this.arenaAmbienceGeneration || this.activeArena !== arenaId) return;
+      this.playArenaAmbienceEvent(arenaId);
+      this.scheduleArenaAmbienceEvent(arenaId, generation);
+    }, interval);
+  }
+
+  private playArenaAmbienceEvent(arenaId: ArenaId): void {
+    if (!this.context || !this.ambience || !this.noiseBuffer
+      || this.spatialChains >= AUDIO_RUNTIME_BUDGET.spatialVoices) return;
     const definition = ARENA_AUDIO_DEFINITIONS[arenaId];
     const now = this.context.currentTime;
-    const tone = this.context.createOscillator();
-    const toneFilter = this.context.createBiquadFilter();
-    const toneGain = this.context.createGain();
-    const tonePanner = this.context.createPanner();
-    tone.type = arenaId === 'rustworks-1v1' ? 'sawtooth' : 'sine';
-    tone.frequency.value = definition.bedFrequencyHz;
-    toneFilter.type = 'lowpass';
-    toneFilter.frequency.value = definition.airFrequencyHz * 2;
-    toneGain.gain.value = 0.012;
-    tonePanner.panningModel = 'HRTF';
-    tonePanner.distanceModel = 'inverse';
-    tonePanner.refDistance = 8;
-    tonePanner.maxDistance = 90;
-    tonePanner.rolloffFactor = 0.45;
-    tonePanner.positionX.value = definition.bedPosition.x;
-    tonePanner.positionY.value = definition.bedPosition.y;
-    tonePanner.positionZ.value = definition.bedPosition.z;
-    tone.connect(toneFilter).connect(toneGain).connect(tonePanner).connect(this.ambience);
-    if (this.registerContinuousVoice(tone, this.ambience, 1, 'arena', [toneFilter, toneGain, tonePanner])) {
-      tone.start(now);
-      this.arenaSources.push(tone);
-      this.arenaNodes.push(toneFilter, toneGain, tonePanner);
-    } else {
-      toneFilter.disconnect();
-      toneGain.disconnect();
-      tonePanner.disconnect();
+    const duration = ARENA_AMBIENCE_EVENT_DURATION_MS / 1_000;
+    const source = this.context.createBufferSource();
+    const filter = this.context.createBiquadFilter();
+    const gain = this.context.createGain();
+    const panner = this.context.createPanner();
+    source.buffer = this.noiseBuffer;
+    source.loop = false;
+    filter.type = 'bandpass';
+    filter.frequency.value = definition.airFrequencyHz;
+    filter.Q.value = Math.min(1.15, Math.max(0.58, definition.airQ * 0.45));
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(definition.airGain, now + 0.18);
+    gain.gain.linearRampToValueAtTime(0, now + duration);
+    panner.panningModel = 'HRTF';
+    panner.distanceModel = 'inverse';
+    panner.refDistance = 9;
+    panner.maxDistance = 100;
+    panner.rolloffFactor = 0.38;
+    const position = this.arenaAmbienceEvents % 2 === 0 ? definition.airPosition : definition.bedPosition;
+    panner.positionX.value = position.x;
+    panner.positionY.value = position.y;
+    panner.positionZ.value = position.z;
+    source.connect(filter).connect(gain).connect(panner).connect(this.ambience);
+    const distance = Math.hypot(
+      position.x - this.listenerPosition.x,
+      position.y - this.listenerPosition.y,
+      position.z - this.listenerPosition.z,
+    );
+    if (!this.registerVoice(source, this.ambience, 1, true, distance)) {
+      filter.disconnect();
+      gain.disconnect();
+      panner.disconnect();
+      return;
     }
-    // HF-165: never use an indefinite white-noise buffer for arena ambience.
-    // A filtered, gently modulated oscillator retains air movement without the
-    // recurring broadband hiss that became obvious after loud combat tails.
-    const air = this.context.createOscillator();
-    const airFilter = this.context.createBiquadFilter();
-    const airLowpass = this.context.createBiquadFilter();
-    const airGain = this.context.createGain();
-    const airPanner = this.context.createPanner();
-    air.type = 'triangle';
-    air.frequency.value = definition.airFrequencyHz;
-    airFilter.type = 'bandpass';
-    airFilter.frequency.value = definition.airFrequencyHz;
-    airFilter.Q.value = definition.airQ;
-    airLowpass.type = 'lowpass';
-    airLowpass.frequency.value = definition.airLowpassHz;
-    airLowpass.Q.value = 0.72;
-    airGain.gain.value = definition.airGain;
-    airPanner.panningModel = 'HRTF';
-    airPanner.distanceModel = 'inverse';
-    airPanner.refDistance = 9;
-    airPanner.maxDistance = 100;
-    airPanner.rolloffFactor = 0.38;
-    airPanner.positionX.value = definition.airPosition.x;
-    airPanner.positionY.value = definition.airPosition.y;
-    airPanner.positionZ.value = definition.airPosition.z;
-    // HF-165: never use an indefinite white-noise buffer for arena ambience.
-    // A filtered, gently modulated oscillator retains air movement without the
-    // recurring broadband hiss that became obvious after loud combat tails.
-    air.frequency.setValueAtTime(definition.airFrequencyHz, now);
-    const halfCycleSeconds = 0.5 / definition.modulationHz;
-    const scheduledHalfCycles = Math.ceil(120 / halfCycleSeconds);
-    for (let step = 1; step <= scheduledHalfCycles; step += 1) {
-      const direction = step % 2 === 0 ? -1 : 1;
-      air.frequency.exponentialRampToValueAtTime(
-        definition.airFrequencyHz * (1 + definition.modulationDepth * direction),
-        now + halfCycleSeconds * step,
-      );
-    }
-    air.connect(airFilter).connect(airLowpass).connect(airGain).connect(airPanner).connect(this.ambience);
-    if (this.registerContinuousVoice(air, this.ambience, 1, 'arena', [airFilter, airLowpass, airGain, airPanner])) {
-      air.start(now);
-      this.arenaSources.push(air);
-      this.arenaNodes.push(airFilter, airLowpass, airGain, airPanner);
-    } else {
-      airFilter.disconnect();
-      airLowpass.disconnect();
-      airGain.disconnect();
-      airPanner.disconnect();
-    }
+    this.arenaEventSources.push(source);
+    this.arenaEventNodes.push(filter, gain, panner);
+    this.spatialChains += 1;
+    const previousEnded = source.onended;
+    source.onended = (event) => {
+      previousEnded?.call(source, event);
+      const sourceIndex = this.arenaEventSources.indexOf(source);
+      if (sourceIndex >= 0) this.arenaEventSources.splice(sourceIndex, 1);
+      for (const node of [filter, gain, panner]) {
+        const nodeIndex = this.arenaEventNodes.indexOf(node);
+        if (nodeIndex >= 0) this.arenaEventNodes.splice(nodeIndex, 1);
+        try { node.disconnect(); } catch { /* bounded event already retired */ }
+      }
+      this.spatialChains = Math.max(0, this.spatialChains - 1);
+    };
+    source.start(now, presentationRandom() * Math.max(0.001, this.noiseBuffer.duration - duration), duration);
+    this.arenaAmbienceEvents += 1;
+    this.arenaAmbienceLastDurationMs = ARENA_AMBIENCE_EVENT_DURATION_MS;
   }
 
   private sweepSequence(

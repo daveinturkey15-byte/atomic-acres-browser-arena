@@ -51,14 +51,15 @@ describe('spatial audio contracts', () => {
     expect(selectVoiceToSteal(active, { id: 'weak', priority: 1, distance: 1, startedAt: 30 }, 3)).toBeNull();
   });
 
-  it('covers all arenas with distinct original beds inside continuous budgets', () => {
+  it('covers all arenas with distinct bounded ambience identities and no continuous beds', () => {
     expect(validateArenaAudioDefinitions()).toEqual([]);
     expect(new Set(Object.values(ARENA_AUDIO_DEFINITIONS).map((definition) => definition.identity)).size).toBe(4);
-    expect(Object.values(ARENA_AUDIO_DEFINITIONS).every((definition) => definition.continuousVoices <= 2)).toBe(true);
+    expect(Object.values(ARENA_AUDIO_DEFINITIONS).every((definition) => definition.continuousVoices === 0)).toBe(true);
+    expect(Object.values(ARENA_AUDIO_DEFINITIONS).every((definition) => !/buzz|hum/iu.test(definition.identity))).toBe(true);
     expect(AUDIO_RUNTIME_BUDGET.continuousVoices).toBeGreaterThanOrEqual(8);
   });
 
-  it('keeps continuous air beds narrow, quiet and slowly modulated instead of broadband white hiss', () => {
+  it('uses short filtered spatial gusts instead of an indefinite oscillator or noise bed', () => {
     for (const definition of Object.values(ARENA_AUDIO_DEFINITIONS)) {
       expect(definition.airGain).toBeGreaterThan(0);
       expect(definition.airGain).toBeLessThanOrEqual(0.01);
@@ -74,9 +75,12 @@ describe('spatial audio contracts', () => {
       audioSource.indexOf('private startArenaBed('),
       audioSource.indexOf('private sweepSequence('),
     );
-    expect(arenaBed).toContain("const air = this.context.createOscillator();");
-    expect(arenaBed).toContain("air.type = 'triangle';");
-    expect(arenaBed).not.toContain('const air = this.context.createBufferSource();');
+    expect(arenaBed).toContain('const source = this.context.createBufferSource();');
+    expect(arenaBed).toContain('source.loop = false;');
+    expect(arenaBed).toContain('ARENA_AMBIENCE_EVENT_DURATION_MS');
+    expect(arenaBed).toContain('this.scheduleArenaAmbienceEvent(arenaId, generation);');
+    expect(arenaBed).not.toContain('this.context.createOscillator();');
+    expect(arenaBed).not.toContain('registerContinuousVoice(');
   });
 
   it('maps footsteps to each arena dominant authored walkable material', () => {

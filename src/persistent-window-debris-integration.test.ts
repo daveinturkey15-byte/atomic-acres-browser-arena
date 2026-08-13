@@ -14,20 +14,20 @@ describe('persistent physical house-window debris integration', () => {
     expect(source).toContain('spawnPersistentWindowDebris(window, normal)');
   });
 
-  it('updates the visible fragment while falling, then retires only its movement body when settled', () => {
+  it('updates fragments through bounded physics, support-aware fallback, settle and cleanup', () => {
     const start = source.indexOf('function spawnPersistentWindowDebris(');
     const end = source.indexOf('\nfunction clearPersistentWindowDebris(', start);
     const block = source.slice(start, end);
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
     expect(block).toContain('persistentWindowDebris.set(id, {');
-    expect(block).toContain('physicsActive: true,');
+    expect(block).toContain('physicsActive: physicsEligible,');
     // Owner requirement: shards always reach the ground, so the record carries a
     // presentation-only fall used when Rapier publishes no pose for the body.
     expect(block).toContain('fallbackSettled: false,');
     expect(block).toContain('receivedPhysicsPose: false,');
     expect(block).not.toContain('setTimeout');
-    expect(block).not.toContain('expiresAt');
+    expect(block).toContain('fallbackSupportSource: support.source,');
     expect(block).toContain('root.userData.persistentMajorDebris = true');
     expect(block).toContain('scene.add(root)');
     expect(block).not.toContain('if (reducedRenderMode)');
@@ -35,20 +35,24 @@ describe('persistent physical house-window debris integration', () => {
     expect(source).toContain('entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z)');
     expect(source).toContain('entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w)');
     expect(source).toContain('.filter((entry) => entry.physicsActive)');
-    expect(source).toContain('const settleMode = windowGlassDebrisSettleMode(');
-    expect(source).toContain("if (settleMode === 'settled') {");
+    expect(source).toContain('const lifecycle = windowGlassDebrisLifecycleMode({');
+    expect(source).toContain("if (lifecycle === 'expired') {");
+    expect(source).toContain("if (lifecycle === 'settled') {");
     expect(source).toContain('entry.receivedPhysicsPose = false;');
     expect(source).toContain('entry.fallbackVelocity.y = Math.min(entry.fallbackVelocity.y, -0.9);');
     expect(source).toContain('entry.physicsActive = false;');
-    expect(source).toContain('if (retireSettledPhysics) syncInteractiveWorldPhysics();');
+    expect(source).toContain('if (retirePhysics) scheduleWindowGlassPhysicsSync();');
+    expect(source).toContain('persistentWindowDebris.delete(id);');
+    expect(source).toContain('entry.root.visible = false;');
   });
 
-  it('clears the persistent major pane only at the explicit window reset boundary', () => {
+  it('preserves canonical pane damage while temporary debris also clears at the reset boundary', () => {
     const resetStart = source.indexOf('function resetBreakableWindows()');
     const resetEnd = source.indexOf('\nconst CORPSE_LIFETIME_MS', resetStart);
     const resetBlock = source.slice(resetStart, resetEnd);
     expect(resetBlock).toContain('clearPersistentWindowDebris()');
     expect(source.match(/clearPersistentWindowDebris\(\)/g)).toHaveLength(2);
+    expect(source).toContain('WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS');
   });
 
   it('uses one prewarmed instanced shard presentation instead of a second cosmetic RAF path', () => {
@@ -67,20 +71,22 @@ describe('persistent physical house-window debris integration', () => {
     expect(source).toContain('spawnPersistentWindowDebris(window, normal)');
   });
 
-  it('schedules exactly one deferred physics reconciliation for each admitted breach', () => {
+  it('coalesces deferred physics reconciliation across same-action multi-pane breaches', () => {
     const spawnStart = source.indexOf('function spawnPersistentWindowDebris(');
     const breachEnd = source.indexOf('\nfunction breakWindowsAlongBallisticTrace(', spawnStart);
     const block = source.slice(spawnStart, breachEnd);
     const breakStart = block.indexOf('function breakHouseWindow(');
     const breakBlock = block.slice(breakStart);
-    const deferredSync = 'scheduleBrowserPreparationIdleTask(() => syncInteractiveWorldPhysics());';
+    const deferredSync = 'scheduleWindowGlassPhysicsSync();';
 
     expect(spawnStart).toBeGreaterThan(-1);
     expect(breachEnd).toBeGreaterThan(spawnStart);
-    expect(block.match(/scheduleBrowserPreparationIdleTask\(\(\) => syncInteractiveWorldPhysics\(\)\);/g))
-      .toHaveLength(1);
+    expect(source).toContain('if (windowGlassPhysicsSyncScheduled) {');
+    expect(source).toContain('scheduleBrowserPreparationIdleTask(() => {');
     expect(breakBlock).toContain('spawnPersistentWindowDebris(window, normal);');
     expect(breakBlock).toContain(deferredSync);
+    expect(breakBlock.indexOf('window.broken = true;'))
+      .toBeLessThan(breakBlock.indexOf('spawnPersistentWindowDebris(window, normal);'));
     expect(breakBlock.indexOf('spawnPersistentWindowDebris(window, normal);'))
       .toBeLessThan(breakBlock.indexOf(deferredSync));
   });

@@ -110,7 +110,7 @@ type DebugState = {
     profile: { disposeMs: number; audioMs: number; visualMs: number; targetDamageMs: number; selfDamageMs: number; totalSyncMs: number };
   };
   audio: {
-    ambience: { continuousSources: number; busGain: number };
+    ambience: { continuousSources: number; transientSources: number; busGain: number };
     grenadeFuse: { beeps: number; startMs: number };
     support: { cues: number };
     buses: Record<string, { configuredGain: number; muted: boolean; effectiveGain: number }>;
@@ -1071,7 +1071,7 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'MAX', 'CUSTOM']);
     await expect(page.locator('#audio-settings')).toBeVisible();
     await expect(page.locator('#accessibility-settings')).toBeVisible();
-    expect((await debug(page)).audio.ambience.continuousSources).toBe(2);
+    expect((await debug(page)).audio.ambience).toMatchObject({ continuousSources: 0, transientSources: 0 });
     await page.locator('#controller-sensitivity').evaluate((input) => {
       const slider = input as HTMLInputElement;
       slider.value = '1.45';

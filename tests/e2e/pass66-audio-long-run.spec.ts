@@ -84,10 +84,13 @@ for (const arenaId of selectedArenas) {
     for (const [index, sample] of samples.entries()) {
       expect(sample.audio.context.source).toMatch(/^(standard|webkit)$/);
       expect(sample.audio.context.state).toMatch(/^(running|suspended)$/);
-      expect(sample.audio.ambience).toMatchObject({ continuousSources: 2, arena: arenaId });
+      expect(sample.audio.ambience).toMatchObject({ continuousSources: 0, arena: arenaId });
+      expect(sample.audio.ambience.transientSources).toBeLessThanOrEqual(1);
+      expect(sample.audio.ambience.lastDurationMs).toBeLessThanOrEqual(720);
       expect(sample.audio.runtime.voices).toBeLessThanOrEqual(sample.audio.runtime.globalCap);
       expect(sample.audio.runtime.spatialChains).toBeLessThanOrEqual(sample.audio.runtime.spatialCap);
-      expect(sample.audio.runtime.spatialChains).toBe(2);
+      expect(sample.audio.runtime.spatialChains).toBeLessThanOrEqual(5);
+      expect(sample.audio.runtime.retainedSources).toBe(12);
       expect(sample.audio.runtime.stolen).toBe(0);
       expect(sample.audio.runtime.dropped).toBe(0);
       expect(sample.audio.minigunDrive.active).toBe(false);
@@ -99,10 +102,7 @@ for (const arenaId of selectedArenas) {
         suspiciousBroadbandHiss: false,
       });
       expect(sample.audio.outputProbe.sampleRate).toBeGreaterThanOrEqual(8_000);
-      expect(sample.audio.outputProbe.rms).toBeGreaterThan(0);
       expect(sample.audio.outputProbe.peak).toBeGreaterThanOrEqual(sample.audio.outputProbe.rms);
-      expect(sample.audio.outputProbe.spectralFlatness).toBeLessThan(0.5);
-      expect(sample.audio.outputProbe.highFrequencyEnergyRatio).toBeLessThan(0.18);
       for (const bus of Object.values(sample.audio.buses)) {
         expect(Number.isFinite(bus.effectiveGain)).toBe(true);
         expect(bus.effectiveGain).toBeGreaterThanOrEqual(0);
@@ -110,8 +110,14 @@ for (const arenaId of selectedArenas) {
       }
       if (index > 0) expect(sample.frameCount).toBeGreaterThan(samples[index - 1]!.frameCount);
     }
-    expect(samples.every((sample) => sample.audio.ambience.continuousSources === 2)).toBe(true);
-    expect(samples.every((sample) => sample.audio.runtime.spatialChains === 2)).toBe(true);
+    expect(samples.every((sample) => sample.audio.ambience.continuousSources === 0)).toBe(true);
+    expect(samples.map((sample) => sample.audio.ambience.events))
+      .toEqual([...samples.map((sample) => sample.audio.ambience.events)].sort((left, right) => left - right));
+    expect(samples.at(-1)!.audio.ambience.events).toBeGreaterThanOrEqual(4);
+    // A bounded cue can occupy one analyser window; a recurring tonal carrier
+    // cannot appear in consecutive one-second samples after the former hiss point.
+    expect(samples.slice(-6).filter((sample) => sample.audio.outputProbe.narrowbandTonePresent))
+      .toHaveLength(0);
 
     const clientRuntimeLog = await page.evaluate(() => {
       try { return JSON.parse(localStorage.getItem('atomic-acres:client-runtime-log:v1') ?? '[]'); }

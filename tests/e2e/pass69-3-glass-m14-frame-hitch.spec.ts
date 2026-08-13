@@ -233,12 +233,19 @@ test('cold carbine control, isolated first M14 EBR use and glass breach reach th
       panes: snapshot.breakableWindows.map((window: any) => window.retainedDebrisPrewarmed),
     };
   });
-  expect(retainedGlassBefore).toEqual({
+  expect(retainedGlassBefore).toMatchObject({
     pool: {
       contract: 'retained-exact-instanced-render-object-v1',
       retained: 6,
       currentArenaRetained: 6,
       active: 0,
+      activePhysics: 0,
+      lifecycle: {
+        poseGraceMs: 180,
+        noProgressMs: 450,
+        maxPhysicsMs: 1_800,
+        maxLifetimeMs: 4_500,
+      },
     },
     panes: [true, true, true, true, true, true],
   });
@@ -308,6 +315,44 @@ test('cold carbine control, isolated first M14 EBR use and glass breach reach th
     };
   });
   expect(glassAfter).toMatchObject({ coldWindowBroken: true, warmWindowBroken: true });
+  const debrisSamples: any[] = [];
+  for (const elapsedMs of [250, 750, 1_500, 2_500, 4_750]) {
+    await page.waitForTimeout(elapsedMs - (debrisSamples.at(-1)?.elapsedMs ?? 0));
+    debrisSamples.push(await page.evaluate((sampleElapsedMs) => {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
+      return {
+        elapsedMs: sampleElapsedMs,
+        pool: snapshot.windowGlassDebrisPool,
+        debris: snapshot.persistentWindowDebris,
+        panes: snapshot.breakableWindows.slice(0, 2).map((pane: any) => ({
+          id: pane.id,
+          broken: pane.broken,
+          apertureOpen: pane.authority?.apertureOpen,
+        })),
+      };
+    }, elapsedMs));
+  }
+  for (const sample of debrisSamples) {
+    for (const debris of sample.debris) {
+      expect(debris.position.every(Number.isFinite), `${sample.elapsedMs}ms finite shard root`).toBe(true);
+      expect(
+        !debris.fallbackSettled || debris.support.restY !== null && debris.position[1] <= debris.support.restY + 0.04,
+        `${sample.elapsedMs}ms debris cannot report mid-air settled: ${JSON.stringify(debris)}`,
+      ).toBe(true);
+      expect(
+        !debris.physicsActive || debris.noProgressMs < sample.pool.lifecycle.noProgressMs + 80,
+        `${sample.elapsedMs}ms active body must make progress: ${JSON.stringify(debris)}`,
+      ).toBe(true);
+    }
+  }
+  expect(debrisSamples.at(-1)).toMatchObject({
+    pool: { retained: 6, currentArenaRetained: 6, active: 0, activePhysics: 0 },
+    debris: [],
+    panes: [
+      { broken: true, apertureOpen: true },
+      { broken: true, apertureOpen: true },
+    ],
+  });
   const runtimeAfter = await captureFrameHitchRendererEvidence(page, testInfo);
   expectFrameHitchRendererEvidence(runtimeAfter, 'atomic-acres', 'glass/M14 final runtime');
 
@@ -322,6 +367,7 @@ test('cold carbine control, isolated first M14 EBR use and glass breach reach th
       runtimeAfter,
       retainedGlassBefore,
       glassAfter,
+      debrisSamples,
       probes,
     }, null, 2)),
     contentType: 'application/json',
@@ -353,7 +399,7 @@ test('cold carbine control, isolated first M14 EBR use and glass breach reach th
       maximumRelativeMultiplier: 4,
       maximumRelativeAllowanceMs: 40,
     },
-    { retainedGlassBefore, glassAfter, probes },
+    { retainedGlassBefore, glassAfter, debrisSamples, probes },
     browserErrors,
   );
 });

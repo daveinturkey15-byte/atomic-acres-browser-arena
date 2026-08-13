@@ -5,8 +5,25 @@ import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 export const WINDOW_GLASS_DEBRIS_VISUAL_CONTRACT = 'irregular-independent-radial-shards-v2';
 export const WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT = 24;
 export const WINDOW_GLASS_DEBRIS_SETTLE_TOLERANCE_M = 0.04;
+export const WINDOW_GLASS_DEBRIS_POSE_GRACE_MS = 180;
+export const WINDOW_GLASS_DEBRIS_NO_PROGRESS_MS = 450;
+export const WINDOW_GLASS_DEBRIS_MIN_PROGRESS_M = 0.025;
+export const WINDOW_GLASS_DEBRIS_MAX_PHYSICS_MS = 1_800;
+export const WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS = 4_500;
 
 export type WindowGlassDebrisSettleMode = 'physics-active' | 'settled' | 'presentation-fall';
+export type WindowGlassDebrisLifecycleMode = WindowGlassDebrisSettleMode | 'expired';
+
+export type WindowGlassDebrisLifecycleSample = Readonly<{
+  ageMs: number;
+  positionY: number;
+  restY: number | null;
+  physicsActive: boolean;
+  sleeping: boolean;
+  receivedPhysicsPose: boolean;
+  noProgressMs: number;
+  fallbackSettled: boolean;
+}>;
 
 /**
  * A Rapier body can report sleeping while it is still supported by the broken
@@ -25,6 +42,33 @@ export function windowGlassDebrisSettleMode(
   return positionY <= restY + WINDOW_GLASS_DEBRIS_SETTLE_TOLERANCE_M
     ? 'settled'
     : 'presentation-fall';
+}
+
+/**
+ * A detached pane gets a short dynamic collision phase, then a deterministic
+ * presentation fall and cleanup. Awake-but-wedged bodies are not progress and
+ * cannot retain an invisible pane-sized collider for the rest of the match.
+ */
+export function windowGlassDebrisLifecycleMode(
+  sample: WindowGlassDebrisLifecycleSample,
+): WindowGlassDebrisLifecycleMode {
+  if (![sample.ageMs, sample.positionY, sample.noProgressMs].every(Number.isFinite)
+    || sample.restY !== null && !Number.isFinite(sample.restY)) {
+    throw new TypeError('window glass debris lifecycle requires finite samples');
+  }
+  if (sample.ageMs >= WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS) return 'expired';
+  if (sample.fallbackSettled) return 'settled';
+  if (!sample.physicsActive) return 'presentation-fall';
+  if (!sample.receivedPhysicsPose && sample.ageMs < WINDOW_GLASS_DEBRIS_POSE_GRACE_MS) {
+    return 'physics-active';
+  }
+  if (!sample.receivedPhysicsPose
+    || sample.ageMs >= WINDOW_GLASS_DEBRIS_MAX_PHYSICS_MS
+    || sample.noProgressMs >= WINDOW_GLASS_DEBRIS_NO_PROGRESS_MS) {
+    return 'presentation-fall';
+  }
+  if (sample.restY === null) return sample.sleeping ? 'presentation-fall' : 'physics-active';
+  return windowGlassDebrisSettleMode(sample.positionY, sample.restY, sample.sleeping);
 }
 
 type WindowGlassDebrisVisualOptions = Readonly<{

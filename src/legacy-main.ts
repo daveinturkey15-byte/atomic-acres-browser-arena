@@ -688,9 +688,14 @@ import { shedPlacementsForArena } from './destructible-shed-registry';
 import { FIELD_SHED_EXPLOSION_DAMAGE_MULTIPLIER } from './destructible-shed-definition';
 import { canAdmitMajorDebris, SHARED_MAJOR_DEBRIS_BUDGET } from './major-debris-budget';
 import {
+  WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS,
+  WINDOW_GLASS_DEBRIS_MAX_PHYSICS_MS,
+  WINDOW_GLASS_DEBRIS_MIN_PROGRESS_M,
+  WINDOW_GLASS_DEBRIS_NO_PROGRESS_MS,
+  WINDOW_GLASS_DEBRIS_POSE_GRACE_MS,
   createFracturedWindowDebrisVisual,
   updateFracturedWindowDebrisVisual,
-  windowGlassDebrisSettleMode,
+  windowGlassDebrisLifecycleMode,
 } from './window-glass-debris-presentation';
 import {
   INTERACTIVE_WORLD_SCHEMA_VERSION,
@@ -3305,10 +3310,15 @@ type PersistentWindowDebris = {
    */
   fallbackVelocity: THREE.Vector3;
   fallbackAngular: THREE.Vector3;
-  fallbackRestY: number;
+  fallbackRestY: number | null;
+  fallbackSupportSource: string | null;
   fallbackSettled: boolean;
   receivedPhysicsPose: boolean;
   spawnedAt: number;
+  lastProgressY: number;
+  lastProgressAt: number;
+  fallbackStartedAt: number | null;
+  settledAt: number | null;
 };
 type PooledWindowDebris = Readonly<{
   key: string;
@@ -3318,6 +3328,16 @@ type PooledWindowDebris = Readonly<{
   halfExtents: Readonly<{ x: number; y: number; z: number }>;
 }>;
 const persistentWindowDebris = new Map<string, PersistentWindowDebris>();
+const windowGlassDebrisLifecycleTelemetry = {
+  spawned: 0,
+  presentationFallbacks: 0,
+  settled: 0,
+  expired: 0,
+  physicsRetirements: 0,
+  missingPrewarm: 0,
+  coalescedPhysicsSyncs: 0,
+};
+let windowGlassPhysicsSyncScheduled = false;
 // Retain the exact InstancedMesh objects that were submitted behind the
 // deployment surface. Compiling one throwaway lookalike still left each live
 // pane's instance buffer/render object to initialize on the shot frame.
@@ -3446,6 +3466,18 @@ function syncInteractiveWorldPhysics(authoritativeResync = false): void {
   syncAtomicHouseStructuralPresentation();
 }
 
+function scheduleWindowGlassPhysicsSync(): void {
+  if (windowGlassPhysicsSyncScheduled) {
+    windowGlassDebrisLifecycleTelemetry.coalescedPhysicsSyncs += 1;
+    return;
+  }
+  windowGlassPhysicsSyncScheduled = true;
+  scheduleBrowserPreparationIdleTask(() => {
+    windowGlassPhysicsSyncScheduled = false;
+    syncInteractiveWorldPhysics();
+  });
+}
+
 function activeMajorDebrisPhysicsBodies(): readonly MajorDebrisBodyDefinition[] {
   const runtimeBodies = interactiveWorldRuntime?.majorDebrisPhysicsBodies() ?? [];
   const capacity = Math.max(0, MAX_MAJOR_DEBRIS_BODIES - runtimeBodies.length);
@@ -3465,64 +3497,101 @@ function updatePersistentWindowDebrisPhysics(dt = 1 / SIMULATION_HZ): void {
     ? new Map(characterPhysics.majorDebrisSnapshots().map((snapshot) => [snapshot.id, snapshot]))
     : new Map<string, MajorDebrisBodySnapshot>();
   const fallbackDt = Math.min(0.05, Math.max(0, dt));
-  let retireSettledPhysics = false;
+  let retirePhysics = false;
   const now = performance.now();
-  for (const entry of persistentWindowDebris.values()) {
-    updateFracturedWindowDebrisVisual(entry.root, Math.max(0, (now - entry.spawnedAt) / 1_000));
+  for (const [id, entry] of persistentWindowDebris) {
+    const ageMs = Math.max(0, now - entry.spawnedAt);
+    updateFracturedWindowDebrisVisual(entry.root, ageMs / 1_000);
     const snapshot = snapshots.get(entry.id);
     if (snapshot) {
       entry.receivedPhysicsPose = true;
-      if (!entry.physicsActive) continue;
-      entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
-      entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w);
-      entry.definition = majorDebrisDefinitionFromSnapshot(entry.definition, snapshot);
-      const settleMode = windowGlassDebrisSettleMode(
-        snapshot.position.y,
-        entry.fallbackRestY,
-        snapshot.sleeping,
-      );
-      if (settleMode !== 'physics-active') {
-        // HF-155: the shards remain as persistent visual evidence, but a settled
-        // pane-sized Rapier cuboid must not remain an invisible movement blocker.
-        entry.physicsActive = false;
-        retireSettledPhysics = true;
-        if (settleMode === 'settled') {
-          entry.root.position.y = entry.fallbackRestY;
-          entry.fallbackSettled = true;
-          entry.fallbackVelocity.set(0, 0, 0);
-          entry.fallbackAngular.set(0, 0, 0);
-        } else {
-          // Sleeping on the sill is not support authority for loose shards.
-          // Retire the cuboid and continue a bounded presentation-only fall.
-          entry.receivedPhysicsPose = false;
-          entry.fallbackVelocity.y = Math.min(entry.fallbackVelocity.y, -0.9);
+      if (entry.physicsActive) {
+        entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
+        entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w);
+        entry.definition = majorDebrisDefinitionFromSnapshot(entry.definition, snapshot);
+        const support = windowDebrisSupport(entry.root.position, entry.definition.halfExtents);
+        entry.fallbackRestY = support.restY;
+        entry.fallbackSupportSource = support.source;
+        if (snapshot.position.y <= entry.lastProgressY - WINDOW_GLASS_DEBRIS_MIN_PROGRESS_M) {
+          entry.lastProgressY = snapshot.position.y;
+          entry.lastProgressAt = now;
         }
+      }
+    }
+
+    const lifecycle = windowGlassDebrisLifecycleMode({
+      ageMs,
+      positionY: entry.root.position.y,
+      restY: entry.fallbackRestY,
+      physicsActive: entry.physicsActive,
+      sleeping: snapshot?.sleeping ?? false,
+      receivedPhysicsPose: entry.receivedPhysicsPose,
+      noProgressMs: Math.max(0, now - entry.lastProgressAt),
+      fallbackSettled: entry.fallbackSettled,
+    });
+    if (lifecycle === 'expired') {
+      if (entry.physicsActive) {
+        entry.physicsActive = false;
+        retirePhysics = true;
+        windowGlassDebrisLifecycleTelemetry.physicsRetirements += 1;
+      }
+      updateFracturedWindowDebrisVisual(entry.root, 0);
+      entry.root.visible = false;
+      entry.root.userData.persistentMajorDebris = false;
+      persistentWindowDebris.delete(id);
+      windowGlassDebrisLifecycleTelemetry.expired += 1;
+      continue;
+    }
+    if (lifecycle === 'settled') {
+      if (!entry.fallbackSettled) {
+        if (entry.fallbackRestY !== null) entry.root.position.y = entry.fallbackRestY;
+        entry.fallbackSettled = true;
+        entry.settledAt = now;
+        entry.fallbackVelocity.set(0, 0, 0);
+        entry.fallbackAngular.set(0, 0, 0);
+        windowGlassDebrisLifecycleTelemetry.settled += 1;
+      }
+      if (entry.physicsActive) {
+        entry.physicsActive = false;
+        retirePhysics = true;
+        windowGlassDebrisLifecycleTelemetry.physicsRetirements += 1;
       }
       continue;
     }
-    // No authoritative pose for this body. Owner-visible requirement: broken
-    // glass must always reach the ground, so integrate a bounded presentation
-    // fall instead of leaving the shards frozen in the window opening.
-    if (entry.receivedPhysicsPose || entry.fallbackSettled) continue;
+    if (lifecycle === 'presentation-fall' && entry.physicsActive) {
+      entry.physicsActive = false;
+      entry.receivedPhysicsPose = false;
+      entry.fallbackStartedAt = now;
+      entry.fallbackVelocity.y = Math.min(entry.fallbackVelocity.y, -0.9);
+      retirePhysics = true;
+      windowGlassDebrisLifecycleTelemetry.presentationFallbacks += 1;
+      windowGlassDebrisLifecycleTelemetry.physicsRetirements += 1;
+    }
+    if (entry.physicsActive || entry.fallbackSettled) continue;
+
+    // Once the bounded Rapier phase ends, keep visible fragments truthful with
+    // a deterministic gravity fall while the pane's canonical breached state
+    // remains for the whole round.
+    const support = windowDebrisSupport(entry.root.position, entry.definition.halfExtents);
+    entry.fallbackRestY = support.restY;
+    entry.fallbackSupportSource = support.source;
     entry.fallbackVelocity.y -= 9.81 * fallbackDt;
     entry.root.position.addScaledVector(entry.fallbackVelocity, fallbackDt);
     entry.root.rotation.x += entry.fallbackAngular.x * fallbackDt;
     entry.root.rotation.y += entry.fallbackAngular.y * fallbackDt;
     entry.root.rotation.z += entry.fallbackAngular.z * fallbackDt;
-    if (entry.root.position.y <= entry.fallbackRestY) {
+    if (entry.fallbackRestY !== null && entry.root.position.y <= entry.fallbackRestY) {
       entry.root.position.y = entry.fallbackRestY;
       entry.root.rotation.x = 0;
       entry.root.rotation.z = 0;
       entry.fallbackVelocity.set(0, 0, 0);
       entry.fallbackAngular.set(0, 0, 0);
       entry.fallbackSettled = true;
-      if (entry.physicsActive) {
-        entry.physicsActive = false;
-        retireSettledPhysics = true;
-      }
+      entry.settledAt = now;
+      windowGlassDebrisLifecycleTelemetry.settled += 1;
     }
   }
-  if (retireSettledPhysics) syncInteractiveWorldPhysics();
+  if (retirePhysics) scheduleWindowGlassPhysicsSync();
 }
 
 function majorDebrisDefinitionFromSnapshot(
@@ -4370,6 +4439,138 @@ let lastGrenadeExplosionProfile = {
   selfDamageMs: 0,
   totalSyncMs: 0,
 };
+type GrenadeFirstActionProfile = {
+  actionNonce: number;
+  grenade: GrenadeId;
+  cold: boolean;
+  startedAt: number;
+  handlerCompletedAt: number;
+  handlerSyncMs: number;
+  audio: Readonly<{
+    contextState: string;
+    prepared: boolean;
+    retainedSources: number;
+    automationsBefore: number;
+    automationsAfter: number;
+  }>;
+  startingSubmissionSequence: number;
+  startingCompletedSequence: number;
+  targetSubmissionSequence: number | null;
+  firstSubmissionAt: number | null;
+  firstSubmissionDelayMs: number | null;
+  firstCompletionAt: number | null;
+  firstCompletionDelayMs: number | null;
+  endingSubmissionSequence: number;
+  endingCompletedSequence: number;
+  maximumPendingForMs: number;
+  maximumAnimationFrameGapMs: number;
+  lastAnimationFrameAt: number;
+  maximumFrameWorkMs: number;
+  frameSamples: number;
+  completionFailures: number;
+  status: string;
+  observationComplete: boolean;
+};
+let grenadeActionProfiles = 0;
+let lastGrenadeFirstActionProfile: GrenadeFirstActionProfile | null = null;
+
+function beginGrenadeFirstActionProfile(actionNonce: number, grenade: GrenadeId, startedAt: number): void {
+  const presentation = renderRuntime.presentationTelemetry(startedAt);
+  const audioTelemetry = audio.telemetry();
+  const profile: GrenadeFirstActionProfile = {
+    actionNonce,
+    grenade,
+    cold: grenadeActionProfiles === 0,
+    startedAt,
+    handlerCompletedAt: startedAt,
+    handlerSyncMs: 0,
+    audio: Object.freeze({
+      contextState: audioTelemetry.context.state,
+      prepared: audioTelemetry.grenadeEffectsPrewarm.prepared,
+      retainedSources: audioTelemetry.grenadeEffectsPrewarm.sources,
+      automationsBefore: audioTelemetry.grenadeEffectsPrewarm.automations,
+      automationsAfter: audioTelemetry.grenadeEffectsPrewarm.automations,
+    }),
+    startingSubmissionSequence: presentation.submissionSequence,
+    startingCompletedSequence: presentation.completedSequence,
+    targetSubmissionSequence: null,
+    firstSubmissionAt: null,
+    firstSubmissionDelayMs: null,
+    firstCompletionAt: null,
+    firstCompletionDelayMs: null,
+    endingSubmissionSequence: presentation.submissionSequence,
+    endingCompletedSequence: presentation.completedSequence,
+    maximumPendingForMs: presentation.pendingForMs,
+    maximumAnimationFrameGapMs: 0,
+    lastAnimationFrameAt: startedAt,
+    maximumFrameWorkMs: 0,
+    frameSamples: 0,
+    completionFailures: presentation.completionFailures,
+    status: presentation.status,
+    observationComplete: false,
+  };
+  grenadeActionProfiles += 1;
+  lastGrenadeFirstActionProfile = profile;
+}
+
+function completeGrenadeActionHandler(completedAt: number): void {
+  const profile = lastGrenadeFirstActionProfile;
+  if (!profile || profile.handlerCompletedAt !== profile.startedAt) return;
+  const audioTelemetry = audio.telemetry();
+  profile.handlerCompletedAt = completedAt;
+  profile.handlerSyncMs = Math.max(0, completedAt - profile.startedAt);
+  profile.audio = Object.freeze({
+    ...profile.audio,
+    automationsAfter: audioTelemetry.grenadeEffectsPrewarm.automations,
+  });
+}
+
+function sampleGrenadeFirstActionProfile(frameNow: number, frameWorkMs: number): void {
+  const profile = lastGrenadeFirstActionProfile;
+  if (!profile || profile.observationComplete) return;
+  const elapsedMs = Math.max(0, frameNow - profile.startedAt);
+  const presentation = renderRuntime.presentationTelemetry(frameNow);
+  const audioTelemetry = audio.telemetry();
+  profile.audio = Object.freeze({
+    ...profile.audio,
+    automationsAfter: audioTelemetry.grenadeEffectsPrewarm.automations,
+  });
+  profile.maximumPendingForMs = Math.max(profile.maximumPendingForMs, presentation.pendingForMs);
+  profile.maximumFrameWorkMs = Math.max(profile.maximumFrameWorkMs, Math.max(0, frameWorkMs));
+  profile.maximumAnimationFrameGapMs = Math.max(
+    profile.maximumAnimationFrameGapMs,
+    Math.max(0, frameNow - profile.lastAnimationFrameAt),
+  );
+  profile.lastAnimationFrameAt = frameNow;
+  profile.frameSamples += 1;
+  if (renderRuntime.backend !== 'webgpu' && profile.firstSubmissionAt === null) {
+    profile.targetSubmissionSequence = 0;
+    profile.firstSubmissionAt = frameNow;
+    profile.firstSubmissionDelayMs = elapsedMs;
+    profile.firstCompletionAt = frameNow;
+    profile.firstCompletionDelayMs = elapsedMs;
+  } else if (profile.targetSubmissionSequence === null
+    && presentation.submissionSequence > profile.startingSubmissionSequence) {
+    profile.targetSubmissionSequence = presentation.submissionSequence;
+    profile.firstSubmissionAt = frameNow;
+    profile.firstSubmissionDelayMs = elapsedMs;
+  }
+  profile.endingSubmissionSequence = presentation.submissionSequence;
+  profile.endingCompletedSequence = presentation.completedSequence;
+  profile.completionFailures = presentation.completionFailures;
+  profile.status = presentation.status;
+  const target = profile.targetSubmissionSequence;
+  if (profile.firstCompletionAt === null && target !== null
+    && presentation.completedSequence >= target) {
+    profile.firstCompletionAt = frameNow;
+    profile.firstCompletionDelayMs = elapsedMs;
+  }
+  profile.observationComplete = elapsedMs >= 350 && (
+    renderRuntime.backend !== 'webgpu'
+      ? profile.firstSubmissionAt !== null
+      : target !== null && presentation.completedSequence >= target
+  );
+}
 let lastBotEliminationProfile = {
   deathDropMs: 0,
   deathPoseMs: 0,
@@ -11988,6 +12189,34 @@ function windowDebrisHalfExtents(
   });
 }
 
+function windowDebrisSupport(
+  position: Readonly<{ x: number; y: number; z: number }>,
+  halfExtents: Readonly<{ x: number; y: number; z: number }>,
+): Readonly<{ restY: number | null; source: string | null }> {
+  let supportY: number | null = null;
+  let source: string | null = null;
+  const verticalClearance = Math.max(0.08, halfExtents.y * 0.2);
+  const footprintInsetX = Math.min(halfExtents.x * 0.35, 0.18);
+  const footprintInsetZ = Math.min(halfExtents.z * 0.35, 0.08);
+  for (const [index, collider] of activeWorldColliders().entries()) {
+    const minY = collider.minY;
+    const maxY = collider.maxY;
+    if (minY === undefined || maxY === undefined
+      || ![collider.minX, collider.maxX, minY, maxY, collider.minZ, collider.maxZ].every(Number.isFinite)) continue;
+    // Only an authored surface actually below the detached fragments can own
+    // their resting height. Tall walls and the former pane opening never count.
+    if (maxY > position.y - verticalClearance || supportY !== null && maxY < supportY) continue;
+    const overlapsX = position.x + halfExtents.x - footprintInsetX >= collider.minX
+      && position.x - halfExtents.x + footprintInsetX <= collider.maxX;
+    const overlapsZ = position.z + halfExtents.z - footprintInsetZ >= collider.minZ
+      && position.z - halfExtents.z + footprintInsetZ <= collider.maxZ;
+    if (!overlapsX || !overlapsZ) continue;
+    supportY = maxY;
+    source = `world-collider:${index}`;
+  }
+  return Object.freeze({ restY: supportY === null ? null : supportY + halfExtents.y, source });
+}
+
 async function withStagedWindowGlassDebrisPool(
   sceneGeneration: number,
   submit: (stage: THREE.Group) => Promise<void>,
@@ -12085,29 +12314,32 @@ async function prewarmWindowGlassDebrisPool(sceneGeneration: number): Promise<vo
   }));
 }
 
-function spawnPersistentWindowDebris(window: ArenaMap['breakableWindows'][number], normal: THREE.Vector3): void {
+function spawnPersistentWindowDebris(window: ArenaMap['breakableWindows'][number], normal: THREE.Vector3): boolean {
   const id = persistentWindowDebrisId(window.id);
-  if (persistentWindowDebris.has(id)) return;
+  if (persistentWindowDebris.has(id)) return true;
   const counts = Object.freeze({
     shed: interactiveWorldRuntime?.shedMajorBodyCount() ?? 0,
     house: interactiveWorldRuntime?.houseMajorBodyCount() ?? 0,
-    window: persistentWindowDebris.size,
+    window: [...persistentWindowDebris.values()].filter((entry) => entry.physicsActive).length,
   });
-  if (!canAdmitMajorDebris(counts, 'window')) return;
   // The exact instanced topology/material is compiled during deployment. Add
   // the already-analysed shard draw immediately so impact feedback cannot lag
-  // behind authority; only the Rapier reconciliation remains deferred.
-  spawnPersistentWindowDebrisSynchronously(window, normal, id);
+  // behind authority. A full physics partition degrades to the same bounded
+  // gravity presentation instead of silently omitting debris.
+  return spawnPersistentWindowDebrisSynchronously(window, normal, id, canAdmitMajorDebris(counts, 'window'));
 }
 
 function spawnPersistentWindowDebrisSynchronously(
   window: ArenaMap['breakableWindows'][number],
   normal: THREE.Vector3,
   id: string,
-): void {
+  physicsEligible: boolean,
+): boolean {
   const pooled = pooledWindowDebris.get(windowDebrisPoolKey(arena.id, window.id));
   if (!pooled) {
-    throw new Error(`${arena.id}:${window.id}: retained glass-debris prewarm instance is missing`);
+    windowGlassDebrisLifecycleTelemetry.missingPrewarm += 1;
+    console.error(`${arena.id}:${window.id}: retained glass-debris prewarm instance is missing`);
+    return false;
   }
   const { halfExtents, root } = pooled;
   const centre = window.mesh.getWorldPosition(new THREE.Vector3());
@@ -12146,12 +12378,14 @@ function spawnPersistentWindowDebrisSynchronously(
     }),
     sleeping: false,
   });
+  const spawnedAt = performance.now();
+  const support = windowDebrisSupport(centre, halfExtents);
   persistentWindowDebris.set(id, {
     id,
     windowId: window.id,
     root,
     definition,
-    physicsActive: true,
+    physicsActive: physicsEligible,
     fallbackVelocity: new THREE.Vector3(
       definition.linearVelocity.x,
       definition.linearVelocity.y,
@@ -12162,12 +12396,19 @@ function spawnPersistentWindowDebrisSynchronously(
       definition.angularVelocity.y,
       definition.angularVelocity.z,
     ),
-    // Settle on the arena floor beneath the pane, not at the pane's own height.
-    fallbackRestY: halfExtents.y,
+    fallbackRestY: support.restY,
+    fallbackSupportSource: support.source,
     fallbackSettled: false,
     receivedPhysicsPose: false,
-    spawnedAt: performance.now(),
+    spawnedAt,
+    lastProgressY: centre.y,
+    lastProgressAt: spawnedAt,
+    fallbackStartedAt: physicsEligible ? null : spawnedAt,
+    settledAt: null,
   });
+  windowGlassDebrisLifecycleTelemetry.spawned += 1;
+  if (!physicsEligible) windowGlassDebrisLifecycleTelemetry.presentationFallbacks += 1;
+  return true;
 }
 
 function clearPersistentWindowDebris(): void {
@@ -12176,6 +12417,7 @@ function clearPersistentWindowDebris(): void {
     entry.root.visible = false;
   }
   persistentWindowDebris.clear();
+  windowGlassPhysicsSyncScheduled = false;
   syncInteractiveWorldPhysics();
 }
 
@@ -12228,16 +12470,18 @@ function breakHouseWindow(
   if (!projection.apertureOpen) {
     window.broken = false;
     window.mesh.visible = projection.paneVisible;
-    syncInteractiveWorldPhysics();
     return true;
   }
   if (window.broken) return false;
-  spawnPersistentWindowDebris(window, normal);
+  // Canonical authority must not depend on a presentation pool. Commit the
+  // aperture before admitting optional debris so a missing render object can
+  // never leave an invisible or still-solid pane behind.
   window.broken = true;
   window.mesh.visible = projection.paneVisible;
+  spawnPersistentWindowDebris(window, normal);
   // Coalesce the pane collider and optional debris-body admission into one
   // deferred physics sync. Visual effects still happen immediately.
-  scheduleBrowserPreparationIdleTask(() => syncInteractiveWorldPhysics());
+  scheduleWindowGlassPhysicsSync();
   spawnImpactFlash(point, 'glass', normal);
   audio.impact('glass', point.distanceTo(camera.position));
   return true;
@@ -13430,6 +13674,8 @@ async function startGame(
   audio.unlock();
   document.documentElement.dataset.combatAudioPrewarm = audio.prepareCombat() ? 'ready' : 'unavailable';
   document.documentElement.dataset.glassImpactAudioPrewarm = audio.prepareGlassImpact() ? 'ready' : 'unavailable';
+  document.documentElement.dataset.grenadeAudioPrewarm = audio.prepareGrenadeEffects() ? 'ready' : 'unavailable';
+  document.documentElement.dataset.chopperRotorAudioPrewarm = audio.prepareChopperRotors() ? 'ready' : 'unavailable';
   prepareDeploymentTransition();
   applyMenuLifecycle({ type: 'match-start' });
   syncMenuPreviewCanvasPlacement();
@@ -17838,6 +18084,7 @@ function throwGrenade(): void {
   const origin = camera.getWorldPosition(new THREE.Vector3()).addScaledVector(direction, 0.7);
   const velocity = direction.clone().multiplyScalar(13).add(new THREE.Vector3(0, 5.2, 0));
   const actionNonce = randomNonce();
+  beginGrenadeFirstActionProfile(actionNonce, player.selectedGrenade, performance.now());
   network.send({
     type: 'grenade-throw', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: player.id,
     connectionEpoch: localConnectionEpoch,
@@ -17874,6 +18121,7 @@ function throwGrenade(): void {
     attachedTargetId: null,
     attachedTargetLifeId: null,
   });
+  completeGrenadeActionHandler(performance.now());
 }
 
 function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-throw' }>, ownerTeam: Team): void {
@@ -24211,6 +24459,8 @@ function resetForMode(preserveAdmission = false): void {
   lastHostedBotStateSeq = -1;
   clearGrenades();
   clearGrenadeExplosionVisuals();
+  grenadeActionProfiles = 0;
+  lastGrenadeFirstActionProfile = null;
   clearFieldSupport();
   clearDeathDrops();
   clearCorpsePresentations();
@@ -24977,7 +25227,9 @@ function frame(now: number, scheduleNext = true): void {
       if (activeRenderConfig.shadowMode === 'static') requestStaticShadowRefresh(false);
     }
     if (scheduleNext) {
-      recentFrameWorkMs.push(Math.max(0, performance.now() - frameWorkStartedAt));
+      const frameWorkMs = Math.max(0, performance.now() - frameWorkStartedAt);
+      recentFrameWorkMs.push(frameWorkMs);
+      sampleGrenadeFirstActionProfile(performance.now(), frameWorkMs);
       if (recentFrameWorkMs.length > FRAME_WORK_SAMPLE_LIMIT) {
         recentFrameWorkMs.splice(0, recentFrameWorkMs.length - FRAME_WORK_SAMPLE_LIMIT);
       }
@@ -25577,6 +25829,7 @@ const debugWindow = window as Window & {
     aimAtRemote: (zone?: HitZone) => void;
     aimAtRemoteWithOffset: (yawOffset: number, pitchOffset?: number) => void;
     stageWindow: (index: number, distance?: number) => void;
+    resetBreakableWindows: () => void;
     detonateGrenadeAtWindow: (index: number) => number;
     stageYardhawkWall: (team?: Team) => boolean;
     stageBotAtIndoorRamp: (team?: Team, descending?: boolean) => boolean;
@@ -25688,6 +25941,7 @@ const debugWindow = window as Window & {
     interactTestBayStation: () => boolean;
     setAmmo: (weapon: WeaponId, ammo: number, reserve: number) => void;
     setGrenades: (count: number) => void;
+    setSelectedGrenade: (grenade: GrenadeId) => void;
     reload: () => void;
     melee: () => { accepted: boolean; alive: boolean; phase: string; lastMeleeAt: number };
     setAds: (held: boolean) => void;
@@ -27084,6 +27338,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       lastExplosionAgeMs: lastGrenadeExplosionFrameAt > 0 ? Math.max(0, performance.now() - lastGrenadeExplosionFrameAt) : null,
       profile: { ...lastGrenadeExplosionProfile },
     },
+    grenadeFirstAction: lastGrenadeFirstActionProfile ? {
+      ...lastGrenadeFirstActionProfile,
+      audio: { ...lastGrenadeFirstActionProfile.audio },
+    } : null,
     audio: { ...audio.telemetry(), occlusion: audioOcclusionBudget.telemetry() },
     settings: {
       requested: pass65Settings,
@@ -27228,6 +27486,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       id: window.id,
       broken: window.broken,
       visible: window.mesh.visible,
+      authority: window.glassState ? glassAuthorityProjection(window.glassState) : null,
       position: window.mesh.getWorldPosition(new THREE.Vector3()).toArray(),
       persistentDebrisId: [...persistentWindowDebris.values()].find((entry) => entry.windowId === window.id)?.id ?? null,
       retainedDebrisPrewarmed: pooledWindowDebris.has(windowDebrisPoolKey(arena.id, window.id)),
@@ -27241,6 +27500,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       )).length,
       prewarmedPhysicsBodies: characterPhysics?.prewarmedMajorDebrisBodyCount() ?? 0,
       active: persistentWindowDebris.size,
+      activePhysics: [...persistentWindowDebris.values()].filter((entry) => entry.physicsActive).length,
+      lifecycle: {
+        ...windowGlassDebrisLifecycleTelemetry,
+        poseGraceMs: WINDOW_GLASS_DEBRIS_POSE_GRACE_MS,
+        noProgressMs: WINDOW_GLASS_DEBRIS_NO_PROGRESS_MS,
+        maxPhysicsMs: WINDOW_GLASS_DEBRIS_MAX_PHYSICS_MS,
+        maxLifetimeMs: WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS,
+      },
     },
     persistentWindowDebris: [...persistentWindowDebris.values()].map((entry) => ({
       id: entry.id,
@@ -27248,6 +27515,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       position: entry.root.position.toArray(),
       visible: entry.root.visible,
       physical: characterPhysics?.majorDebrisSnapshots().some((snapshot) => snapshot.id === entry.id) ?? false,
+      physicsActive: entry.physicsActive,
+      receivedPhysicsPose: entry.receivedPhysicsPose,
+      fallbackSettled: entry.fallbackSettled,
+      support: { source: entry.fallbackSupportSource, restY: entry.fallbackRestY },
+      ageMs: Math.max(0, performance.now() - entry.spawnedAt),
+      noProgressMs: Math.max(0, performance.now() - entry.lastProgressAt),
+      fallbackStartedAt: entry.fallbackStartedAt,
+      settledAt: entry.settledAt,
     })),
     physicalCover: arena.physicalCover.map((cover) => ({
       id: cover.id,
@@ -27899,6 +28174,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
     camera.updateMatrixWorld(true);
   },
+  resetBreakableWindows: () => resetBreakableWindows(),
   detonateGrenadeAtWindow: (index: number) => {
     const pane = arena.breakableWindows[Math.max(0, Math.min(arena.breakableWindows.length - 1, Math.floor(index)))];
     return pane ? breakWindowsInGrenadeBlast(pane.mesh.getWorldPosition(new THREE.Vector3()), randomNonce(), true) : 0;
@@ -28660,6 +28936,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   setGrenades: (count: number) => {
     if (Number.isFinite(count)) player.grenades = Math.max(0, Math.min(1, Math.floor(count)));
+  },
+  setSelectedGrenade: (grenade: GrenadeId) => {
+    if (['frag', 'flash', 'smoke', 'semtex'].includes(grenade)) player.selectedGrenade = grenade;
   },
   reload: () => reload(),
   melee: () => {

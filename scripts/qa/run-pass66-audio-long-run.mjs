@@ -91,12 +91,16 @@ for (let index = 0; index < arenas.length; index += 1) {
       && Number.isSafeInteger(sample.frameCount) && sample.frameCount > 0
       && sample.audio?.outputProbe?.available === true
       && sample.audio.outputProbe.fftSize === 2_048
-      && Number.isFinite(sample.audio.outputProbe.rms) && sample.audio.outputProbe.rms > 0
+      && Number.isFinite(sample.audio.outputProbe.rms) && sample.audio.outputProbe.rms >= 0
       && sample.audio.outputProbe.suspiciousBroadbandHiss === false
-      && Number.isFinite(sample.audio.outputProbe.spectralFlatness)
-      && sample.audio.outputProbe.spectralFlatness < 0.5
-      && Number.isFinite(sample.audio.outputProbe.highFrequencyEnergyRatio)
-      && sample.audio.outputProbe.highFrequencyEnergyRatio < 0.18);
+      && typeof sample.audio.outputProbe.narrowbandTonePresent === 'boolean'
+      && sample.audio.ambience?.continuousSources === 0
+      && Number.isSafeInteger(sample.audio.ambience?.events)
+      && sample.audio.runtime?.retainedSources === 12);
+  const postMinuteSamples = Array.isArray(receipt.samples) ? receipt.samples.slice(-6) : [];
+  const validBoundedAmbience = postMinuteSamples.length === 6
+    && postMinuteSamples.every((sample) => sample.audio.outputProbe.narrowbandTonePresent === false)
+    && receipt.samples.at(-1)?.audio?.ambience?.events >= 4;
   if (receipt.schemaVersion !== 3 || receipt.status !== 'PASS' || receipt.sourceSha !== sourceSha
     || receipt.arenaId !== arenaId || receipt.browserName !== 'chromium' || receipt.durationMs !== 65_000
     || receipt.servedCandidate?.schemaVersion !== 4 || receipt.servedCandidate.channel !== 'the-big-one'
@@ -106,7 +110,7 @@ for (let index = 0; index < arenas.length; index += 1) {
     || !/^[a-f0-9]{64}$/u.test(receipt.servedCandidate?.treeSha256 ?? '')
     || !Number.isSafeInteger(receipt.servedCandidate?.exactRootFileCount)
     || receipt.servedCandidate.exactRootFileCount < 2
-    || !validOutputSamples
+    || !validOutputSamples || !validBoundedAmbience
     || !Array.isArray(receipt.clientRuntimeLog) || receipt.clientRuntimeLog.length !== 0
     || !Array.isArray(receipt.faults) || receipt.faults.length !== 0) {
     discardEvidence(`Pass 66 audio long-run emitted an invalid ${arenaId} receipt`);
