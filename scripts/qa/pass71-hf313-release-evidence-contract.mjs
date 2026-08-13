@@ -126,7 +126,7 @@ export function pass71Hf313DependencyProjection(records) {
   return Object.freeze(records
     .filter((record) => object(record) && record.evidenceId !== 'HF-313')
     .map((record) => Object.freeze({
-      feedbackId: record.feedbackId,
+      feedbackId: record.feedbackId ?? record.evidenceId,
       evidenceId: record.evidenceId,
       kind: record.kind,
       receiptSha256: record.receiptSha256,

@@ -12,6 +12,7 @@ import {
   PASS71_HF313_WORKFLOW_STEPS,
   createPass71Hf313EvidenceFixture,
   createPass71Hf313LivePostcondition,
+  pass71Hf313DependencyProjection,
   pass71Hf313EvidenceFailures,
   pass71Hf313NativeEvidenceEnvelope,
   pass71Hf313ProductionPostconditionFailures,
@@ -128,6 +129,33 @@ describe('Pass 71 HF-313 protected release evidence', () => {
       evidenceId: 'HF-313', kind: 'pass71-hf313-protected-release-readiness', minimumCount: 0, maximumCount: 1,
     });
     assert.equal(PASS71_HF313_RELEASE_EVIDENCE_REGISTRY_ENTRY.closesFeedback, true);
+  });
+
+  it('projects canonical feedback ownership for exact-schema records that omit feedbackId', () => {
+    const records = PASS71_HF313_REQUIRED_FEEDBACK_IDS.flatMap((feedbackId, index) => {
+      const count = feedbackId === 'HF-298' ? 5 : 1;
+      return Array.from({ length: count }, (_, componentIndex) => ({
+        evidenceId: feedbackId,
+        kind: `fixture-${feedbackId.toLowerCase()}-${componentIndex}`,
+        receiptSha256: ((index + componentIndex) % 15 + 1).toString(16).repeat(64),
+        completedAt: `2026-08-13T09:${String(index).padStart(2, '0')}:00.000Z`,
+      }));
+    });
+    const projected = pass71Hf313DependencyProjection(records);
+    assert.equal(projected.length, records.length);
+    assert(projected.every((entry) => entry.feedbackId === entry.evidenceId));
+    const projectedEnvelope = pass71Hf313NativeEvidenceEnvelope(records);
+    const projectedExpected = {
+      ...expected, dependencies: projected, dependencyEnvelope: projectedEnvelope,
+    };
+    assert.deepEqual(pass71Hf313EvidenceFailures(
+      createPass71Hf313EvidenceFixture(projectedExpected), projectedExpected,
+    ), []);
+
+    const explicitMismatch = pass71Hf313DependencyProjection([{
+      ...records[0], feedbackId: 'HF-999',
+    }]);
+    assert.equal(explicitMismatch[0].feedbackId, 'HF-999');
   });
 
   it('rejects invented live status and incomplete prior evidence', () => {
