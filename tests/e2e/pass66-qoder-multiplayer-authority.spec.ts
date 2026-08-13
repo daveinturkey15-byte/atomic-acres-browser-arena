@@ -1,4 +1,8 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { expect, test, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
+import sharp from 'sharp';
 import {
   assertPass66OwnedCandidatePage,
   startOwnedPeerServer,
@@ -16,6 +20,8 @@ const HOST_RECOVERY_END_TO_END_TIMEOUT_MS = 90_000;
 const GUEST_RENDER_RESUME_FRAME_TIMEOUT_MS = 10_000;
 const DEATH_DROP_AUTHORITY_TTL_MARGIN_MS = 5_000;
 const REMOTE_STAGE_ACK_TIMEOUT_MS = 10_000;
+const STUCK_RASTER_SOURCE_SHA = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true }).trim();
+const STUCK_RASTER_ROOT = resolve('artifacts/pass71/stuck-warning', STUCK_RASTER_SOURCE_SHA);
 
 type Position3 = readonly [number, number, number];
 
@@ -46,6 +52,227 @@ type RejoinAdmissionSample = Readonly<{
 }>;
 
 type TimedRejoinAdmissionSample = RejoinAdmissionSample & Readonly<{ elapsedMs: number }>;
+
+type StickyWarningBounds = Readonly<{
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}>;
+
+async function stickyWarningPixelEvidence(
+  screenshot: Buffer,
+  bounds: StickyWarningBounds,
+): Promise<Readonly<{ brightRedFraction: number; darkPanelFraction: number }>> {
+  const metadata = await sharp(screenshot).metadata();
+  if (!metadata.width || !metadata.height) throw new Error('STUCK raster has no dimensions');
+  const left = Math.max(0, Math.floor(bounds.left));
+  const top = Math.max(0, Math.floor(bounds.top));
+  const width = Math.max(1, Math.min(metadata.width - left, Math.ceil(bounds.width)));
+  const height = Math.max(1, Math.min(metadata.height - top, Math.ceil(bounds.height)));
+  const { data, info } = await sharp(screenshot).extract({
+    left,
+    top,
+    width,
+    height,
+  }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  let brightRedPixels = 0;
+  let darkPanelPixels = 0;
+  for (let offset = 0; offset < data.length; offset += info.channels) {
+    const red = data[offset];
+    const green = data[offset + 1];
+    const blue = data[offset + 2];
+    if (red >= 120 && red >= green + 40 && red >= blue + 30) brightRedPixels += 1;
+    if (red >= 18 && red <= 105 && red >= green * 1.35 && red >= blue * 1.2) darkPanelPixels += 1;
+  }
+  const pixels = info.width * info.height;
+  return Object.freeze({
+    brightRedFraction: brightRedPixels / pixels,
+    darkPanelFraction: darkPanelPixels / pixels,
+  });
+}
+
+async function captureStickyWarningRasters(
+  host: Page,
+  guest: Page,
+  source: 'semtex' | 'explosive-crossbow',
+  testInfo: TestInfo,
+): Promise<readonly Readonly<Record<string, unknown>>[]> {
+  mkdirSync(STUCK_RASTER_ROOT, { recursive: true });
+  const records = await Promise.all(([
+    ['attacker', host],
+    ['victim', guest],
+  ] as const).map(async ([audience, page]) => {
+    const path = resolve(STUCK_RASTER_ROOT, `${source}-${audience}-1280x720.png`);
+    const deadline = Date.now() + 2_000;
+    let captured: Readonly<Record<string, unknown>> | null = null;
+    let lastAlert: Readonly<Record<string, unknown>> | null = null;
+    const cdp = await page.context().newCDPSession(page);
+    while (Date.now() < deadline && captured === null) {
+      const alert = await page.locator('#sticky-warning').evaluate((warning: HTMLElement) => {
+        const bounds = warning.getBoundingClientRect();
+        const style = getComputedStyle(warning);
+        return {
+          visible: !warning.hidden,
+          source: warning.dataset.source ?? null,
+          audience: warning.dataset.audience ?? null,
+          duration: warning.style.getPropertyValue('--sticky-warning-duration'),
+          position: style.position,
+          zIndex: Number(style.zIndex),
+          bounds: { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height },
+          centreErrorPx: Math.hypot(
+            bounds.left + bounds.width * 0.5 - innerWidth * 0.5,
+            bounds.top + bounds.height * 0.5 - innerHeight * 0.5,
+          ),
+        };
+      });
+      lastAlert = alert;
+      if (alert.visible && alert.source === source && alert.audience === audience) {
+        const surface = await cdp.send('Page.captureScreenshot', {
+          format: 'png',
+          fromSurface: true,
+          captureBeyondViewport: false,
+        });
+        const screenshot = Buffer.from(surface.data, 'base64');
+        const pixels = await stickyWarningPixelEvidence(screenshot, alert.bounds);
+        if (pixels.brightRedFraction > 0.01 && pixels.darkPanelFraction > 0.12) {
+          writeFileSync(path, screenshot);
+          captured = Object.freeze({
+            source,
+            audience,
+            path: path.replaceAll('\\', '/'),
+            capturedAtEpochMs: Date.now(),
+            ...pixels,
+            alert,
+          });
+          break;
+        }
+      }
+      await page.waitForTimeout(10);
+    }
+    await cdp.detach();
+    expect(captured, `${source}/${audience}: captured live warning; last=${JSON.stringify(lastAlert)}`).not.toBeNull();
+    expect(captured!.alert).toMatchObject({
+      visible: true,
+      source,
+      audience,
+      duration: '500ms',
+      position: 'fixed',
+      zIndex: 120,
+    });
+    expect((captured!.alert as { centreErrorPx: number }).centreErrorPx, `${source}/${audience}: true viewport centre`).toBeLessThanOrEqual(1);
+    await testInfo.attach(`pass71-stuck-${source}-${audience}`, { path, contentType: 'image/png' });
+    return captured!;
+  }));
+  const receiptPath = resolve(STUCK_RASTER_ROOT, `${source}-receipt.json`);
+  writeFileSync(receiptPath, `${JSON.stringify({
+    schemaVersion: 1,
+    contract: 'atomic-acres/pass71-stuck-centred-raster@1',
+    sourceSha: STUCK_RASTER_SOURCE_SHA,
+    viewport: { width: 1_280, height: 720 },
+    records,
+  }, null, 2)}\n`, 'utf8');
+  await testInfo.attach(`pass71-stuck-${source}-receipt`, { path: receiptPath, contentType: 'application/json' });
+  return records;
+}
+
+async function authorStickyWithImmediateAlert(
+  host: Page,
+  source: 'semtex' | 'explosive-crossbow',
+): Promise<Readonly<{
+  result: any;
+  alert: Readonly<{
+    visible: boolean;
+    source: string | null;
+    audience: string | null;
+    remainingMs: number | null;
+    presentedDurationMs: number | null;
+    centreErrorPx: number;
+  }>;
+}>> {
+  return host.evaluate((stickySource) => {
+    const result = (window as any).__ATOMIC_ACRES_DEBUG__.authorStickyEffect(stickySource);
+    const warning = document.querySelector<HTMLElement>('#sticky-warning')!;
+    const bounds = warning.getBoundingClientRect();
+    const expiresAtMs = warning.dataset.expiresAtMs === undefined
+      ? null
+      : Number(warning.dataset.expiresAtMs);
+    const presentedAtMs = warning.dataset.presentedAtMs === undefined
+      ? null
+      : Number(warning.dataset.presentedAtMs);
+    return {
+      result,
+      alert: {
+        visible: !warning.hidden,
+        source: warning.dataset.source ?? null,
+        audience: warning.dataset.audience ?? null,
+        remainingMs: expiresAtMs === null ? null : expiresAtMs - performance.now(),
+        presentedDurationMs: expiresAtMs === null || presentedAtMs === null
+          ? null
+          : expiresAtMs - presentedAtMs,
+        centreErrorPx: Math.hypot(
+          bounds.left + bounds.width * 0.5 - innerWidth * 0.5,
+          bounds.top + bounds.height * 0.5 - innerHeight * 0.5,
+        ),
+      },
+    };
+  }, source);
+}
+
+async function installStickyTimingProbe(
+  pages: readonly Page[],
+  source: 'semtex' | 'explosive-crossbow',
+): Promise<void> {
+  await Promise.all(pages.map((page) => page.evaluate((stickySource) => {
+    const warning = document.querySelector<HTMLElement>('#sticky-warning')!;
+    const probe = {
+      source: stickySource,
+      shownAtMs: null as number | null,
+      expiresAtMs: null as number | null,
+      hiddenAtMs: null as number | null,
+    };
+    (window as any).__PASS71_STICKY_TIMING__ = probe;
+    const observer = new MutationObserver(() => {
+      if (probe.shownAtMs === null
+        && !warning.hidden
+        && warning.dataset.source === stickySource) {
+        probe.shownAtMs = Number(warning.dataset.presentedAtMs);
+        probe.expiresAtMs = Number(warning.dataset.expiresAtMs);
+        return;
+      }
+      if (probe.shownAtMs !== null && probe.hiddenAtMs === null && warning.hidden) {
+        probe.hiddenAtMs = performance.now();
+        observer.disconnect();
+      }
+    });
+    observer.observe(warning, { attributes: true });
+  }, source)));
+}
+
+async function expectStickyTimingCompleted(
+  pages: readonly Page[],
+  source: 'semtex' | 'explosive-crossbow',
+): Promise<void> {
+  const probes = await Promise.all(pages.map(async (page) => {
+    await page.waitForFunction((stickySource) => {
+      const probe = (window as any).__PASS71_STICKY_TIMING__;
+      return probe?.source === stickySource && probe.hiddenAtMs !== null;
+    }, source, { timeout: 5_000 });
+    return page.evaluate(() => ({ ...(window as any).__PASS71_STICKY_TIMING__ }));
+  }));
+  for (const probe of probes) {
+    expect(probe).toMatchObject({ source });
+    expect(probe.expiresAtMs - probe.shownAtMs).toBe(500);
+    expect(probe.hiddenAtMs).toBeGreaterThanOrEqual(probe.expiresAtMs);
+  }
+}
+
+async function setStickyRasterRenderPaused(pages: readonly Page[], paused: boolean): Promise<void> {
+  // Freeze only 3D submissions; DOM, network and the real 500 ms timeout stay live.
+  await Promise.all(pages.map((page) => page.evaluate((value) => (
+    (window as any).__ATOMIC_ACRES_DEBUG__.setRenderPaused(value)
+  ), paused)));
+}
 
 test.use({
   launchOptions: {
@@ -864,7 +1091,7 @@ test('a guest death-drop scavenge converges through host authority exactly once'
   }
 });
 
-test('Semtex and crossbolt sticky results apply once under duplicate, reorder and guest rejoin', async ({ browser, browserName }) => {
+test('Semtex and crossbolt sticky results apply once under duplicate, reorder and guest rejoin', async ({ browser, browserName }, testInfo) => {
   test.skip(browserName === 'firefox', 'Two simultaneous headless Firefox SWGL pages are covered by the serial browser matrix.');
   const [hostContext, guestContext] = await Promise.all([
     browser.newContext(),
@@ -881,52 +1108,36 @@ test('Semtex and crossbolt sticky results apply once under duplicate, reorder an
     host.on('pageerror', (error) => errors.push(`host: ${error.message}`));
     guest.on('pageerror', (error) => errors.push(`guest: ${error.message}`));
     await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.setStance('prone'));
-    const semtex = await host.evaluate(() => (
-      (window as any).__ATOMIC_ACRES_DEBUG__.authorStickyEffect('semtex')
-    ));
-    expect(semtex).not.toBeNull();
-    expect(semtex.stuckDamage).toBeCloseTo(semtex.baseDamage * 2, 6);
-    expect(semtex.stuckRadiusM).toBeCloseTo(semtex.baseRadiusM * 2, 6);
-    await expect.poll(async () => host.evaluate(() => {
-      const alert = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().stickyAuthority.urgentAlert;
-      return {
-        visible: alert.visible,
-        source: alert.source,
-        audience: alert.audience,
-        position: alert.computedPosition,
-        zIndex: alert.computedZIndex,
-        centred: alert.centreErrorPx <= 1,
-      };
-    })).toEqual({
+    await installStickyTimingProbe([host, guest], 'semtex');
+    await setStickyRasterRenderPaused([host, guest], true);
+    const semtexRasters = captureStickyWarningRasters(host, guest, 'semtex', testInfo);
+    const authoredSemtex = await authorStickyWithImmediateAlert(host, 'semtex');
+    expect(authoredSemtex.alert).toMatchObject({
       visible: true,
       source: 'semtex',
       audience: 'attacker',
-      position: 'fixed',
-      zIndex: 120,
-      centred: true,
     });
+    expect(authoredSemtex.alert.remainingMs).toBeGreaterThan(0);
+    expect(authoredSemtex.alert.remainingMs).toBeLessThanOrEqual(500);
+    expect(authoredSemtex.alert.presentedDurationMs).toBe(500);
+    expect(authoredSemtex.alert.centreErrorPx).toBeLessThanOrEqual(1);
+    await semtexRasters;
+    await setStickyRasterRenderPaused([host, guest], false);
+    const semtex = authoredSemtex.result;
+    expect(semtex).not.toBeNull();
+    expect(semtex.stuckDamage).toBeCloseTo(semtex.baseDamage * 2, 6);
+    expect(semtex.stuckRadiusM).toBeCloseTo(semtex.baseRadiusM * 2, 6);
     await expect.poll(async () => guest.evaluate(() => {
       const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
       return {
         hp: state.player.hp,
         feedback: state.stickyAuthority,
-        alert: {
-          visible: state.stickyAuthority.urgentAlert.visible,
-          source: state.stickyAuthority.urgentAlert.source,
-          audience: state.stickyAuthority.urgentAlert.audience,
-          position: state.stickyAuthority.urgentAlert.computedPosition,
-          zIndex: state.stickyAuthority.urgentAlert.computedZIndex,
-          centred: state.stickyAuthority.urgentAlert.centreErrorPx <= 1,
-        },
       };
     })).toMatchObject({
       hp: semtex.healthAfter,
       feedback: { victimFeedbackCount: 1, lastVictimFeedback: { label: 'STUCK', source: 'semtex' } },
-      alert: { visible: true, source: 'semtex', audience: 'victim', position: 'fixed', zIndex: 120, centred: true },
     });
-    await expect.poll(async () => Promise.all([host, guest].map((page) => page.evaluate(() => (
-      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().stickyAuthority.urgentAlert.visible
-    )))), { timeout: 1_000 }).toEqual([false, false]);
+    await expectStickyTimingCompleted([host, guest], 'semtex');
     expect(await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.replayStickyEffect('semtex'))).toBe(true);
     await guest.waitForTimeout(350);
     expect(await guest.evaluate(() => {
@@ -946,34 +1157,38 @@ test('Semtex and crossbolt sticky results apply once under duplicate, reorder an
       return { hp: state.player.hp, count: state.stickyAuthority.victimFeedbackCount };
     })).toEqual({ hp: semtex.healthAfter, count: 0 });
 
-    const crossbolt = await host.evaluate(() => (
-      (window as any).__ATOMIC_ACRES_DEBUG__.authorStickyEffect('explosive-crossbow')
-    ));
+    await installStickyTimingProbe([host, guest], 'explosive-crossbow');
+    await setStickyRasterRenderPaused([host, guest], true);
+    const crossboltRasters = captureStickyWarningRasters(host, guest, 'explosive-crossbow', testInfo);
+    const authoredCrossbolt = await authorStickyWithImmediateAlert(host, 'explosive-crossbow');
+    expect(authoredCrossbolt.alert).toMatchObject({
+      visible: true,
+      source: 'explosive-crossbow',
+      audience: 'attacker',
+    });
+    expect(authoredCrossbolt.alert.remainingMs).toBeGreaterThan(0);
+    expect(authoredCrossbolt.alert.remainingMs).toBeLessThanOrEqual(500);
+    expect(authoredCrossbolt.alert.presentedDurationMs).toBe(500);
+    expect(authoredCrossbolt.alert.centreErrorPx).toBeLessThanOrEqual(1);
+    await crossboltRasters;
+    await setStickyRasterRenderPaused([host, guest], false);
+    const crossbolt = authoredCrossbolt.result;
     expect(crossbolt).not.toBeNull();
     expect(crossbolt.stuckDamage).toBeCloseTo(crossbolt.baseDamage * 2, 6);
     expect(crossbolt.stuckRadiusM).toBeCloseTo(crossbolt.baseRadiusM * 2, 6);
-    await expect.poll(async () => host.evaluate(() => {
-      const alert = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().stickyAuthority.urgentAlert;
-      return { visible: alert.visible, source: alert.source, audience: alert.audience, centred: alert.centreErrorPx <= 1 };
-    })).toEqual({ visible: true, source: 'explosive-crossbow', audience: 'attacker', centred: true });
     await expect.poll(async () => guest.evaluate(() => {
       const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
       return {
         hp: state.player.hp,
         count: state.stickyAuthority.victimFeedbackCount,
         source: state.stickyAuthority.lastVictimFeedback?.source,
-        alert: {
-          visible: state.stickyAuthority.urgentAlert.visible,
-          audience: state.stickyAuthority.urgentAlert.audience,
-          centred: state.stickyAuthority.urgentAlert.centreErrorPx <= 1,
-        },
       };
     })).toEqual({
       hp: crossbolt.healthAfter,
       count: 1,
       source: 'explosive-crossbow',
-      alert: { visible: true, audience: 'victim', centred: true },
     });
+    await expectStickyTimingCompleted([host, guest], 'explosive-crossbow');
     expect(await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.replayStickyEffect('explosive-crossbow'))).toBe(true);
     expect(await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.replayStickyEffect('semtex'))).toBe(true);
     await guest.waitForTimeout(350);

@@ -4824,6 +4824,7 @@ function hideStickyUrgentAlert(): void {
   delete warning.dataset.targetId;
   delete warning.dataset.targetLifeId;
   delete warning.dataset.actionNonce;
+  delete warning.dataset.presentedAtMs;
   delete warning.dataset.expiresAtMs;
   warning.style.removeProperty('--sticky-warning-duration');
 }
@@ -4841,7 +4842,6 @@ function presentStickyUrgentAlert(
   attachedTargetId: string,
   attachedTargetLifeId: number,
   actionNonce: number,
-  nowMs = performance.now(),
 ): boolean {
   if (!player.alive || (audience === 'victim' && attachedTargetId !== player.id)) return false;
   const recipientLifeId = network.role === 'client' ? localHostConfirmedContinuity : localContinuity;
@@ -4856,7 +4856,7 @@ function presentStickyUrgentAlert(
     attachedTargetId,
     attachedTargetLifeId,
     actionNonce,
-    nowMs,
+    nowMs: performance.now(),
   });
   if (!alert) return false;
   hideStickyUrgentAlert();
@@ -4866,13 +4866,16 @@ function presentStickyUrgentAlert(
   warning.dataset.targetId = alert.attachedTargetId;
   warning.dataset.targetLifeId = String(alert.attachedTargetLifeId);
   warning.dataset.actionNonce = String(alert.actionNonce);
-  warning.dataset.expiresAtMs = String(alert.expiresAtMs);
   warning.style.setProperty('--sticky-warning-duration', `${STICKY_VICTIM_URGENT_ALERT_DURATION_MS}ms`);
+  const presentedAtMs = performance.now();
+  const expiresAtMs = presentedAtMs + STICKY_VICTIM_URGENT_ALERT_DURATION_MS;
+  warning.dataset.presentedAtMs = String(presentedAtMs);
+  warning.dataset.expiresAtMs = String(expiresAtMs);
   warning.hidden = false;
   const generation = stickyUrgentAlertGeneration;
   const expire = (): void => {
     if (generation !== stickyUrgentAlertGeneration) return;
-    const remainingMs = alert.expiresAtMs - performance.now();
+    const remainingMs = expiresAtMs - performance.now();
     if (remainingMs > 0) {
       stickyUrgentAlertTimeout = window.setTimeout(expire, remainingMs);
       return;
@@ -4881,7 +4884,7 @@ function presentStickyUrgentAlert(
   };
   stickyUrgentAlertTimeout = window.setTimeout(
     expire,
-    Math.max(0, alert.expiresAtMs - performance.now()),
+    Math.max(0, expiresAtMs - performance.now()),
   );
   return true;
 }
@@ -9656,7 +9659,6 @@ function currentStickyAttachmentActorLifeId(actorId: string): number | null {
 function presentStickyAttachmentOnset(
   attachment: Pick<StickyAttachmentRecord, 'source' | 'ownerId' | 'ownerLifeId' | 'targetId' | 'targetLifeId' | 'actionNonce'>,
   audience: StickyUrgentAlertAudience,
-  nowMs = performance.now(),
 ): boolean {
   if (!presentStickyUrgentAlert(
     attachment.source,
@@ -9666,17 +9668,16 @@ function presentStickyAttachmentOnset(
     attachment.targetId,
     attachment.targetLifeId,
     attachment.actionNonce,
-    nowMs,
   )) return false;
   if (audience === 'victim') addFeed('STUCK', 'coral');
   else addFeed('STUCK', 'gold');
   return true;
 }
 
-function publishStickyAttachmentOnset(attachment: StickyAttachmentRecord, nowMs: number): void {
+function publishStickyAttachmentOnset(attachment: StickyAttachmentRecord): void {
   if (network.role === 'client') return;
   const plan = planStickyAttachmentOnset(attachment, player.id);
-  if (plan.localAudience) presentStickyAttachmentOnset(attachment, plan.localAudience, nowMs);
+  if (plan.localAudience) presentStickyAttachmentOnset(attachment, plan.localAudience);
   if (network.role !== 'host') return;
   for (const recipient of plan.remoteRecipients) {
     const receipt: StickyAttachmentReceiptMessage = {
@@ -11185,7 +11186,7 @@ function authorStickyEffectForQa(source: StickyAttachmentSource): QaStickyEffect
     expiresAtMs: now + 30_000,
   });
   if (!recordedAttachment) return null;
-  publishStickyAttachmentOnset(recordedAttachment, now);
+  publishStickyAttachmentOnset(recordedAttachment);
   const attachment = sealReceiverStickyDetonation({
     ownerId: player.id,
     ownerLifeId: localContinuity,
@@ -18454,7 +18455,7 @@ function updateExplosiveBolts(dt: number, now: number): void {
           attachedAtMs: now,
           expiresAtMs: bolt.detonatesAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
         }) : null;
-        if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment, now);
+        if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment);
       } else if (worldCollision || glassCollision) {
         const collisionFraction = Math.min(worldFraction, glassFraction);
         bolt.mesh.position.copy(start).addScaledVector(delta, collisionFraction);
@@ -19133,7 +19134,7 @@ function armImpactGrenade(
         attachedAtMs: now,
         expiresAtMs: grenade.explodeAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
       }) : null;
-      if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment, now);
+      if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment);
     }
   }
   audio.coverImpact(position.distanceTo(player.position));

@@ -84,6 +84,28 @@ describe('sticky victim feedback projection', () => {
     });
   });
 
+  it('starts the exact 500 ms interval at presentation rather than stale attachment time', () => {
+    const controller = new StickyUrgentAlertController();
+    controller.reset(9);
+    const attachedAtMs = 1_000;
+    const presentedAtMs = 8_000;
+    const alert = controller.admit({
+      source: 'semtex',
+      audience: 'attacker',
+      recipientId: 'local-owner',
+      recipientLifeId: 9,
+      ownerId: 'local-owner',
+      ownerLifeId: 9,
+      attachedTargetId: 'remote-target',
+      attachedTargetLifeId: 3,
+      actionNonce: 42,
+      nowMs: presentedAtMs,
+    });
+    expect(alert).toMatchObject({ admittedAtMs: presentedAtMs, expiresAtMs: presentedAtMs + 500 });
+    expect(alert!.expiresAtMs - alert!.admittedAtMs).toBe(STICKY_VICTIM_URGENT_ALERT_DURATION_MS);
+    expect(alert!.expiresAtMs).not.toBe(attachedAtMs + STICKY_VICTIM_URGENT_ALERT_DURATION_MS);
+  });
+
   it('bounds same-life attachment receipts and evicts the oldest deterministically', () => {
     const controller = new StickyUrgentAlertController();
     controller.reset(4);

@@ -41,7 +41,7 @@ describe('Pass 65 explosive crossbolt runtime integration', () => {
     expect(update).toContain('bolt.targetLifeId = targetHitLifeId;');
     expect(update).toContain('const recordedAttachment = bolt.authority ? recordReceiverStickyAttachment({');
     expect(update).toContain("source: 'explosive-crossbow'");
-    expect(update).toContain('if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment, now);');
+    expect(update).toContain('if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment);');
     expect(update).toContain('explosiveBoltTargetBuffer.findIndex(bolt.targetId, bolt.targetLifeId)');
     expect(update).toContain('let targetHitIndex = -1;');
     expect(update).not.toContain('let targetHit:');

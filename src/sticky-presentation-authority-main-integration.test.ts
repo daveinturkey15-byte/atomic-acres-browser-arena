@@ -21,19 +21,20 @@ describe('sticky urgent-alert authority integration', () => {
     const semtex = block('function armImpactGrenade(', '\nfunction updateGrenades(');
     expect(semtex).toContain('const recordedAttachment = receiverCanAuthorAttachment ? recordReceiverStickyAttachment({');
     expect(semtex).toContain("source: 'semtex'");
-    expect(semtex).toContain('if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment, now);');
+    expect(semtex).toContain('if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment);');
 
     const crossbow = block('function updateExplosiveBolts(', '\nfunction throwGrenade(');
     expect(crossbow).toContain('const recordedAttachment = bolt.authority ? recordReceiverStickyAttachment({');
     expect(crossbow).toContain("source: 'explosive-crossbow'");
-    expect(crossbow).toContain('if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment, now);');
+    expect(crossbow).toContain('if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment);');
   });
 
-  it('retains immediate offline/host feedback and targets exact guest onset receipts', () => {
+  it('starts local expiry at presentation while retaining attachment time in exact guest receipts', () => {
     const publish = block('function publishStickyAttachmentOnset(', '\nfunction sealReceiverStickyDetonation(');
     expect(publish).toContain("if (network.role === 'client') return");
     expect(publish).toContain('planStickyAttachmentOnset(attachment, player.id)');
-    expect(publish).toContain('if (plan.localAudience) presentStickyAttachmentOnset(attachment, plan.localAudience, nowMs)');
+    expect(publish).toContain('if (plan.localAudience) presentStickyAttachmentOnset(attachment, plan.localAudience)');
+    expect(publish).not.toContain('presentStickyAttachmentOnset(attachment, plan.localAudience,');
     expect(publish).toContain("type: 'sticky-attachment-receipt'");
     expect(publish).toContain('protocolVersion: MULTIPLAYER_PROTOCOL_VERSION');
     expect(publish).toContain('by: player.id');
@@ -41,6 +42,7 @@ describe('sticky urgent-alert authority integration', () => {
     expect(publish).toContain('matchEpoch: attachment.matchEpoch');
     expect(publish).toContain('ownerLifeId: attachment.ownerLifeId');
     expect(publish).toContain('targetLifeId: attachment.targetLifeId');
+    expect(publish).toContain('attachedAtHostTimeMs: attachment.attachedAtMs');
     expect(publish).toContain('network.sendToPlayer(recipient.playerId, receipt)');
   });
 
@@ -48,6 +50,12 @@ describe('sticky urgent-alert authority integration', () => {
     const present = block('function presentStickyUrgentAlert(', '\nfunction setStatus(');
     expect(present).toContain("network.role === 'client' ? localHostConfirmedContinuity : localContinuity");
     expect(present).toContain('recipientLifeId,');
+    expect(present).toContain('const presentedAtMs = performance.now();');
+    expect(present).toContain('const expiresAtMs = presentedAtMs + STICKY_VICTIM_URGENT_ALERT_DURATION_MS;');
+    expect(present.indexOf('warning.dataset.presentedAtMs = String(presentedAtMs);'))
+      .toBeLessThan(present.indexOf('warning.hidden = false;'));
+    expect(present.indexOf('warning.hidden = false;'))
+      .toBeLessThan(present.indexOf('stickyUrgentAlertTimeout = window.setTimeout('));
 
     const currentLife = block('function currentStickyAttachmentActorLifeId(', '\nfunction presentStickyAttachmentOnset(');
     expect(currentLife).toContain("network.role === 'client' ? localHostConfirmedContinuity : localContinuity");

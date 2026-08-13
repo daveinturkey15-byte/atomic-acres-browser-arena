@@ -40,7 +40,7 @@ describe('Semtex live-stick runtime integration', () => {
     const arm = source.slice(armStart, armEnd);
     expect(arm).toContain('const recordedAttachment = receiverCanAuthorAttachment ? recordReceiverStickyAttachment({');
     expect(arm).toContain("source: 'semtex'");
-    expect(arm).toContain('if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment, now);');
+    expect(arm).toContain('if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment);');
 
     const alertStart = source.indexOf('function presentStickyUrgentAlert(');
     const alertEnd = source.indexOf('\nconst hostTriggerAuthorities', alertStart);
@@ -51,6 +51,8 @@ describe('Semtex live-stick runtime integration', () => {
     expect(alert).toContain('if (recipientLifeId === null) return false;');
     expect(alert).toContain('recipientLifeId,');
     expect(alert).toContain("warning.style.setProperty('--sticky-warning-duration', `${STICKY_VICTIM_URGENT_ALERT_DURATION_MS}ms`)");
-    expect(alert).toContain('Math.max(0, alert.expiresAtMs - performance.now())');
+    expect(alert).toContain('const presentedAtMs = performance.now();');
+    expect(alert).toContain('const expiresAtMs = presentedAtMs + STICKY_VICTIM_URGENT_ALERT_DURATION_MS;');
+    expect(alert).toContain('Math.max(0, expiresAtMs - performance.now())');
   });
 });
