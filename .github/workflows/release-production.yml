@@ -46,6 +46,11 @@ jobs:
         run: npm run build
       - name: Validate accepted requirement manifest
         run: node scripts/release/acceptance-gate.mjs --phase release --pass "${{ inputs.release_pass }}" --head "${{ inputs.source_sha }}" --output artifacts/pipeline/acceptance-coverage.json
+      - name: Verify Pass 71 candidate A preview bytes and browser-run conclusions
+        if: inputs.release_pass == 'PASS 71'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release/verify-pr-preview-provenance.mjs --manifest acceptance/pass-71.json --output artifacts/pipeline/pr-preview-provenance.json
       - name: Reproduce static release gates
         run: npm run verify:pass25a:core
       - name: Capture immutable production build timestamp

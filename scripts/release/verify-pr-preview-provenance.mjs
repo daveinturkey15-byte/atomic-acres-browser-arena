@@ -15,10 +15,38 @@ const DEFAULT_API_BASE = 'https://api.github.com';
 const DEFAULT_MAX_ARCHIVE_BYTES = 1024 * 1024 * 1024;
 const DEFAULT_MAX_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024;
 const MAX_ARTIFACT_RESULTS = 1000;
+const MAX_WORKFLOW_JOBS = 1000;
+const MAX_JOB_LOG_BYTES = 16 * 1024 * 1024;
 const PREVIEW_REF = /^pr-preview-([1-9][0-9]*)-([0-9a-f]{40})$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const textDecoder = new TextDecoder('utf-8', { fatal: true });
+export const PASS71_CANDIDATE_A_REQUIRED_SUCCESS_JOBS = Object.freeze([
+  'classify-change',
+  'static-and-unit (ubuntu-latest)',
+  'static-and-unit (windows-latest)',
+  'bounded-browser-linux',
+  'bounded-browser-windows',
+  'bounded-browser-windows-supplemental-shard (pass71-grenade-first-action)',
+  'bounded-browser-windows-supplemental-shard (pass70-chopper-gunner)',
+  'bounded-browser-windows-supplemental',
+  'bounded-browser-linux-supplemental-shard (pass71-glass-quality-bullet)',
+  'bounded-browser-linux-supplemental-shard (pass71-glass-quality-knife)',
+  'bounded-browser-linux-supplemental-shard (pass71-glass-quality-grenade)',
+  'bounded-browser-linux-supplemental-shard (pass71-glass-quality-flare)',
+  'bounded-browser-linux-supplemental-shard (pass71-glass-quality-crossbow)',
+  'bounded-browser-linux-supplemental-shard (pass71-glass-performance-bullet)',
+  'bounded-browser-linux-supplemental-shard (pass71-glass-performance-knife)',
+  'bounded-browser-linux-supplemental-shard (pass71-glass-performance-grenade)',
+  'bounded-browser-linux-supplemental-shard (pass71-glass-performance-flare)',
+  'bounded-browser-linux-supplemental-shard (pass71-glass-performance-crossbow)',
+  'bounded-browser-linux-supplemental-shard (pass71-nuke-warning)',
+  'bounded-browser-linux-supplemental',
+  'pipeline-metrics',
+]);
+const PASS71_REQUIREMENTS_JOB = 'requirements-acceptance';
+const PASS71_ACCEPTANCE_STEP = 'Verify complete requirement-to-evidence coverage and exact preview approval';
+const PASS71_MISSING_MANIFEST_ERROR = 'runtime/release-shell or acceptance-finalizer changes must add or update exactly one enforced pass manifest; found 0';
 
 class ProvenanceError extends Error {
   constructor(message, kind = 'invalid') {
@@ -428,6 +456,35 @@ async function readWorkflowRun({ fetchImpl, apiBase, repository, token, runId })
   return run;
 }
 
+async function readWorkflowJobs({ fetchImpl, apiBase, repository, token, runId }) {
+  const jobs = [];
+  let expectedTotal = null;
+  for (let page = 1; page <= Math.ceil(MAX_WORKFLOW_JOBS / 100); page += 1) {
+    const url = new URL(`${apiPathPrefix(apiBase)}/repos/${repository}/actions/runs/${runId}/jobs`, apiBase.origin);
+    url.searchParams.set('filter', 'all');
+    url.searchParams.set('per_page', '100');
+    url.searchParams.set('page', String(page));
+    let response;
+    try {
+      response = await fetchImpl(url, { headers: githubHeaders(token), redirect: 'error' });
+    } catch (error) {
+      throw new ProvenanceError(`GitHub workflow run ${runId} jobs lookup failed: ${error instanceof Error ? error.message : String(error)}`, 'inconclusive');
+    }
+    const body = await responseJson(response, `GitHub workflow run ${runId} jobs lookup`);
+    invariant(isObject(body) && Number.isSafeInteger(body.total_count) && body.total_count >= 0 && Array.isArray(body.jobs),
+      `GitHub workflow run ${runId} jobs response has an invalid shape`);
+    if (expectedTotal === null) expectedTotal = body.total_count;
+    invariant(body.total_count === expectedTotal, `GitHub workflow run ${runId} jobs changed while paginated`, 'inconclusive');
+    invariant(expectedTotal <= MAX_WORKFLOW_JOBS, `candidate A workflow has too many jobs (${expectedTotal})`);
+    jobs.push(...body.jobs);
+    if (jobs.length >= expectedTotal) break;
+    invariant(body.jobs.length > 0, `GitHub workflow run ${runId} jobs ended before total_count`, 'inconclusive');
+  }
+  invariant(jobs.length === expectedTotal,
+    `GitHub workflow run ${runId} returned ${jobs.length} of ${expectedTotal} jobs`, 'inconclusive');
+  return jobs;
+}
+
 function verifyWorkflowRun(run, artifact, identity, repository) {
   invariant(run.head_sha === identity.sourceSha,
     `GitHub workflow run ${run.id} head_sha does not match the preview source SHA`);
@@ -440,6 +497,49 @@ function verifyWorkflowRun(run, artifact, identity, repository) {
     `GitHub workflow run ${run.id} repository identity does not match ${repository}`);
   }
   invariant(run.id === artifact.workflow_run.id, `GitHub workflow run identity changed for artifact ${artifact.id}`);
+}
+
+export function validatePass71CandidateAWorkflowJobs(jobs) {
+  invariant(Array.isArray(jobs) && jobs.length > 0, 'candidate A workflow has no jobs');
+  const byName = new Map();
+  for (const [index, job] of jobs.entries()) {
+    invariant(isObject(job) && Number.isSafeInteger(job.id) && job.id > 0,
+      `candidate A workflow job ${index} has invalid identity`);
+    invariant(typeof job.name === 'string' && job.name.length > 0,
+      `candidate A workflow job ${index} has no name`);
+    invariant(!byName.has(job.name), `candidate A workflow repeated job name: ${job.name}`);
+    byName.set(job.name, job);
+  }
+  for (const name of PASS71_CANDIDATE_A_REQUIRED_SUCCESS_JOBS) {
+    const job = byName.get(name);
+    invariant(job, `candidate A workflow is missing required job: ${name}`);
+    invariant(job.status === 'completed' && job.conclusion === 'success',
+      `candidate A required job is not green: ${name}=${job.conclusion ?? job.status ?? 'unknown'}`);
+  }
+  const requirements = byName.get(PASS71_REQUIREMENTS_JOB);
+  invariant(requirements, `candidate A workflow is missing required job: ${PASS71_REQUIREMENTS_JOB}`);
+  invariant(requirements.status === 'completed' && requirements.conclusion === 'failure',
+    `candidate A ${PASS71_REQUIREMENTS_JOB} must fail solely for the absent finalizer manifest`);
+  for (const job of jobs) {
+    if (job.name === PASS71_REQUIREMENTS_JOB) continue;
+    invariant(job.status === 'completed' && job.conclusion === 'success',
+      `candidate A has an additional non-green job: ${job.name}=${job.conclusion ?? job.status ?? 'unknown'}`);
+  }
+  invariant(Array.isArray(requirements.steps), `candidate A ${PASS71_REQUIREMENTS_JOB} has no step conclusions`);
+  const failedSteps = requirements.steps.filter((step) => step?.conclusion === 'failure');
+  invariant(failedSteps.length === 1 && failedSteps[0]?.name === PASS71_ACCEPTANCE_STEP,
+    `candidate A ${PASS71_REQUIREMENTS_JOB} did not fail solely in the acceptance-manifest step`);
+  invariant(requirements.steps.every((step) => !['cancelled', 'timed_out'].includes(step?.conclusion)),
+    `candidate A ${PASS71_REQUIREMENTS_JOB} has a cancelled or timed-out step`);
+  return requirements;
+}
+
+export function validatePass71MissingManifestLog(log) {
+  invariant(typeof log === 'string', `candidate A ${PASS71_REQUIREMENTS_JOB} log is not text`);
+  const matches = log.split(PASS71_MISSING_MANIFEST_ERROR).length - 1;
+  invariant(matches === 1,
+    `candidate A ${PASS71_REQUIREMENTS_JOB} log does not contain exactly one canonical missing-manifest failure`);
+  return true;
 }
 
 function validArtifactMetadata(artifact, identity, nowMs) {
@@ -534,6 +634,43 @@ async function downloadArtifact({ fetchImpl, apiBase, repository, token, artifac
   throw new ProvenanceError(`artifact ${artifact.id} download did not terminate`, 'inconclusive');
 }
 
+async function downloadJobLog({ fetchImpl, apiBase, repository, token, jobId }) {
+  let url = new URL(`${apiPathPrefix(apiBase)}/repos/${repository}/actions/jobs/${jobId}/logs`, apiBase.origin);
+  let sendAuthorization = true;
+  for (let redirect = 0; redirect <= 5; redirect += 1) {
+    let response;
+    try {
+      response = await fetchImpl(url, {
+        headers: sendAuthorization ? githubHeaders(token) : { Accept: 'text/plain' },
+        redirect: 'manual',
+      });
+    } catch (error) {
+      throw new ProvenanceError(`candidate A requirements log download failed: ${error instanceof Error ? error.message : String(error)}`, 'inconclusive');
+    }
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      invariant(redirect < 5, 'candidate A requirements log redirected too many times', 'inconclusive');
+      const location = response.headers.get('location');
+      invariant(location, 'candidate A requirements log redirect omitted Location', 'inconclusive');
+      const next = new URL(location, url);
+      invariant(next.protocol === 'https:' && !next.username && !next.password,
+        'candidate A requirements log redirect is not credential-free HTTPS');
+      sendAuthorization = next.origin === apiBase.origin
+        && next.pathname === `${apiPathPrefix(apiBase)}/repos/${repository}/actions/jobs/${jobId}/logs`.replace(/\/+/g, '/');
+      url = next;
+      continue;
+    }
+    invariant(response.ok, `candidate A requirements log download failed with HTTP ${response.status}`,
+      response.status >= 500 || response.status === 429 ? 'inconclusive' : 'invalid');
+    const bytes = await readResponseBytes(response, MAX_JOB_LOG_BYTES, 'candidate A requirements log');
+    try {
+      return textDecoder.decode(bytes);
+    } catch (error) {
+      throw new ProvenanceError(`candidate A requirements log is not valid UTF-8: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  throw new ProvenanceError('candidate A requirements log download did not terminate', 'inconclusive');
+}
+
 function artifactSummary(artifact, errors) {
   return {
     id: artifact.id,
@@ -566,6 +703,7 @@ export async function verifyPreviewProvenance(options = {}) {
   invariant(acceptance.ok,
     `acceptance manifest is invalid: ${acceptance.errors.join('; ')}`);
   const identity = parsePreviewManifest(manifest);
+  const requirePass71CandidateAWorkflow = manifest.releasePass === 'PASS 71';
   const repository = validateRepository(options.repository ?? process.env.GITHUB_REPOSITORY);
   const token = options.token ?? process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
   invariant(typeof token === 'string' && token.length > 0 && !/[\r\n]/.test(token),
@@ -580,6 +718,10 @@ export async function verifyPreviewProvenance(options = {}) {
 
   const listed = await listExactArtifacts({ fetchImpl, apiBase, repository, token, artifactName: identity.artifactName });
   invariant(listed.length > 0, `GitHub has no artifact named ${identity.artifactName}`);
+  if (requirePass71CandidateAWorkflow) {
+    invariant(listed.length === 1,
+      `Pass 71 candidate A must have exactly one preview artifact named ${identity.artifactName}; found ${listed.length}`);
+  }
   const metadataRejected = [];
   const candidates = [];
   for (const artifact of listed) {
@@ -604,6 +746,28 @@ export async function verifyPreviewProvenance(options = {}) {
         workflowRuns.set(artifact.workflow_run.id, workflowRun);
       }
       verifyWorkflowRun(workflowRun, artifact, identity, repository);
+      let candidateAWorkflow = null;
+      if (requirePass71CandidateAWorkflow) {
+        invariant(workflowRun.status === 'completed' && workflowRun.conclusion === 'failure',
+          `candidate A workflow run ${workflowRun.id} must conclude failure solely for the absent finalizer manifest`);
+        const jobs = await readWorkflowJobs({
+          fetchImpl, apiBase, repository, token, runId: workflowRun.id,
+        });
+        const requirements = validatePass71CandidateAWorkflowJobs(jobs);
+        const requirementsLog = await downloadJobLog({
+          fetchImpl, apiBase, repository, token, jobId: requirements.id,
+        });
+        validatePass71MissingManifestLog(requirementsLog);
+        candidateAWorkflow = {
+          runId: workflowRun.id,
+          status: workflowRun.status,
+          conclusion: workflowRun.conclusion,
+          jobCount: jobs.length,
+          requirementsJobId: requirements.id,
+          requirementsConclusion: requirements.conclusion,
+          missingManifestFailure: PASS71_MISSING_MANIFEST_ERROR,
+        };
+      }
       const archive = await downloadArtifact({
         fetchImpl, apiBase, repository, token, artifact, maxArchiveBytes,
       });
@@ -615,7 +779,7 @@ export async function verifyPreviewProvenance(options = {}) {
       const inspected = inspectPreviewArtifactZip(archive, identity, {
         maxUncompressedBytes: options.maxUncompressedBytes,
       });
-      valid.push({ artifact, archiveSha256, inspected });
+      valid.push({ artifact, archiveSha256, inspected, candidateAWorkflow });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const summary = artifactSummary(artifact, [message]);
@@ -652,6 +816,7 @@ export async function verifyPreviewProvenance(options = {}) {
     matchingLiveArtifactCount: candidates.length,
     rejectedMetadata: metadataRejected,
     rejectedArchives: invalid,
+    candidateAWorkflow: selected.candidateAWorkflow,
     verifiedAt: new Date(nowMs).toISOString(),
   };
 }

@@ -23,6 +23,14 @@ export function inspectPreviewArtifactZip(
   options?: Readonly<{ maxUncompressedBytes?: number }>,
 ): PreviewTree & Readonly<{ receipt: unknown }>;
 
+export const PASS71_CANDIDATE_A_REQUIRED_SUCCESS_JOBS: readonly string[];
+
+export function validatePass71CandidateAWorkflowJobs(
+  jobs: readonly unknown[],
+): Readonly<{ id: number; name: string; conclusion: string }>;
+
+export function validatePass71MissingManifestLog(log: string): true;
+
 export type PreviewProvenanceOptions = Readonly<{
   repositoryRoot?: string;
   manifestPath?: string;

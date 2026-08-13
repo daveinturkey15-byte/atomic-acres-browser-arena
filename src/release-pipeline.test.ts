@@ -160,6 +160,9 @@ describe('production release workflow', () => {
     expect(receiptStep).toBeGreaterThan(liveStep);
     expect(workflow).toContain('QA_OUTPUT: artifacts/pipeline/live-release-smoke.json');
     expect(workflow).toContain('checks: read');
+    expect(workflow).toContain('name: Verify Pass 71 candidate A preview bytes and browser-run conclusions');
+    expect(workflow).toContain("if: inputs.release_pass == 'PASS 71'");
+    expect(workflow).toContain('scripts/release/verify-pr-preview-provenance.mjs --manifest acceptance/pass-71.json');
   });
 
   it('publishes immutable PR previews while requirement acceptance and timing remain explicit jobs', () => {
