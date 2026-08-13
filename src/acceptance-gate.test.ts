@@ -50,6 +50,11 @@ import {
   PASS71_HF301_TOOL_PATHS,
   pass71Hf301OwnerReplayAtSource,
 } from '../scripts/qa/pass71-hf301-renderer-progress-evidence-contract.mjs';
+import { PASS71_HF304_GLASS_EVIDENCE } from '../scripts/qa/pass71-hf304-glass-evidence-contract.mjs';
+import {
+  createPass71Hf304LiveHostedEvidenceFixture,
+  pass71Hf304LiveHostedToolingHashesAtSource,
+} from '../scripts/qa/pass71-hf304-live-hosted-evidence-contract.mjs';
 import {
   createPass71Hf305EvidenceFixture,
   PASS71_HF305_TOOLING_PATHS,
@@ -106,6 +111,13 @@ let cachedHf297FullFixture: Readonly<{
   catalog: ReturnType<typeof pass71Hf297SourceCatalogAtSource>;
   record: Record<string, any>;
 }> | null = null;
+let cachedHf304LiveHostedFixture: Readonly<{
+  headSha: string;
+  sourceSha: string;
+  sourceTreeSha: string;
+  tooling: readonly Readonly<{ path: string; sha256: string }>[];
+  record: Record<string, any>;
+}> | null = null;
 
 function pass71Hf297FullTestFixture(headSha: string, sourceSha: string) {
   if (!cachedHf297FullFixture || cachedHf297FullFixture.headSha !== headSha
@@ -130,6 +142,28 @@ function pass71Hf297FullTestFixture(headSha: string, sourceSha: string) {
     };
   }
   return cachedHf297FullFixture;
+}
+
+function pass71Hf304LiveHostedTestFixture(headSha: string, sourceSha: string) {
+  if (!cachedHf304LiveHostedFixture || cachedHf304LiveHostedFixture.headSha !== headSha
+    || cachedHf304LiveHostedFixture.sourceSha !== sourceSha) {
+    const sourceTreeSha = execFileSync('git', ['rev-parse', `${headSha}^{tree}`], { encoding: 'utf8' }).trim();
+    const tooling = pass71Hf304LiveHostedToolingHashesAtSource(process.cwd(), headSha);
+    cachedHf304LiveHostedFixture = {
+      headSha,
+      sourceSha,
+      sourceTreeSha,
+      tooling,
+      record: createPass71Hf304LiveHostedEvidenceFixture({
+        sourceSha,
+        sourceTreeSha,
+        tooling,
+        startedAt: '2026-08-13T09:35:30.000Z',
+        completedAt: '2026-08-13T09:45:30.000Z',
+      }),
+    };
+  }
+  return cachedHf304LiveHostedFixture;
 }
 
 function pass71Hf306TestFixture(headSha: string, sourceSha: string) {
@@ -275,6 +309,7 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, tooling: qualityTooling,
     startedAt: '2026-08-13T09:32:00.000Z', completedAt: '2026-08-13T09:40:00.000Z',
   });
+  const hf304 = pass71Hf304LiveHostedTestFixture(headSha, manifest.preview.sourceSha).record;
   const hf299Tooling = PASS71_HF299_TOOL_PATHS.map((path) => ({
     path,
     sha256: createHash('sha256').update(readFileSync(join(process.cwd(), path))).digest('hex'),
@@ -340,10 +375,10 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, tooling, components,
     finalizedAt: '2026-08-13T09:30:00.000Z',
   });
-  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, hf297Full, audio, quality, hf299, hf300, hf301, hf305, hf306, hf307, hf309, hf312, stuck, parity];
+  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, hf297Full, audio, quality, hf299, hf300, hf301, hf304, hf305, hf306, hf307, hf309, hf312, stuck, parity];
   return {
     manifest, coverage: rebuilt.record, components: rebuilt.components, audio, quality,
-    hf297Full, hf299, hf300, hf301, hf305, hf306, hf307, hf309, hf312,
+    hf297Full, hf299, hf300, hf301, hf304, hf305, hf306, hf307, hf309, hf312,
   };
 }
 
@@ -375,6 +410,12 @@ function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
     ])),
     pass71Hf301SourceTreeSha: headSha,
     pass71Hf301OwnerReplay: pass71Hf301OwnerReplayAtSource(process.cwd(), headSha),
+    pass71Hf304LiveHostedTooling: pass71Hf304LiveHostedTestFixture(
+      headSha, '0123456789abcdef0123456789abcdef01234567',
+    ).tooling,
+    pass71Hf304LiveHostedSourceTreeSha: pass71Hf304LiveHostedTestFixture(
+      headSha, '0123456789abcdef0123456789abcdef01234567',
+    ).sourceTreeSha,
     pass71Hf305Tooling: PASS71_HF305_TOOLING_PATHS.map((path) => ({
       path,
       sha256: createHash('sha256').update(readFileSync(join(process.cwd(), path))).digest('hex'),
@@ -735,6 +776,29 @@ describe('release acceptance manifest', () => {
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/nativeEvidence\[[0-9]+\]: (?:scope:bot:solo:webgl2:occluded:thermal-authority|receipt-sha256)/);
   }, 30_000);
+
+  it('requires the closing live-hosted glass record before HF-304 can be verified', () => {
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    const { manifest, hf304 } = pass71Manifest(tooling);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .not.toMatch(/verified R9\/HF-304|HF-304 live hosted evidence failed/);
+
+    manifest.nativeEvidence = manifest.nativeEvidence.filter((record) => record !== hf304);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/verified R9\/HF-304 requires its canonical registered native evidence record/);
+
+    const forged = structuredClone(hf304) as Record<string, any>;
+    forged.receiptSha256 = '0'.repeat(64);
+    manifest.nativeEvidence.push(forged);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/nativeEvidence\[[0-9]+\]: receipt-digest/);
+
+    manifest.nativeEvidence.pop();
+    manifest.nativeEvidence.push({ ...PASS71_HF304_GLASS_EVIDENCE });
+    const nonclosing = validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n');
+    expect(nonclosing).toMatch(/has no registered evidence validator/);
+    expect(nonclosing).toMatch(/verified R9\/HF-304 requires its canonical registered native evidence record/);
+  }, 60_000);
 
   it('requires exact native renderer forward-progress evidence before HF-301 can be verified', () => {
     const tooling = pass71GrenadeNativeToolingHashes(process.cwd());

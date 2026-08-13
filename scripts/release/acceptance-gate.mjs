@@ -29,6 +29,7 @@ import { PASS71_QUALITY_VISUAL_EVIDENCE_REGISTRY_ENTRY } from '../qa/pass71-qual
 import { PASS71_HF299_THERMAL_EVIDENCE_REGISTRY_ENTRY } from '../qa/pass71-hf299-thermal-operator-evidence-contract.mjs';
 import { PASS71_HF300_DRONE_THERMAL_EVIDENCE_REGISTRY_ENTRY } from '../qa/pass71-hf300-drone-thermal-evidence-contract.mjs';
 import { PASS71_HF301_RENDERER_PROGRESS_REGISTRY_ENTRY } from '../qa/pass71-hf301-renderer-progress-evidence-contract.mjs';
+import { PASS71_HF304_LIVE_HOSTED_EVIDENCE_REGISTRY_ENTRY } from '../qa/pass71-hf304-live-hosted-evidence-contract.mjs';
 import { PASS71_HF305_NUKE_WARNING_EVIDENCE_REGISTRY_ENTRY } from '../qa/pass71-hf305-nuke-warning-evidence-contract.mjs';
 import { PASS71_HF306_COCKPIT_REGISTRY_ENTRY } from '../qa/pass71-hf306-cockpit-evidence-contract.mjs';
 import { PASS71_HF307_CHOPPER_MG_EVIDENCE_REGISTRY_ENTRY } from '../qa/pass71-hf307-chopper-mg-evidence-contract.mjs';
@@ -157,6 +158,7 @@ export const PASS71_NATIVE_EVIDENCE_REGISTRY = createPass71NativeEvidenceRegistr
   PASS71_HF299_THERMAL_EVIDENCE_REGISTRY_ENTRY,
   PASS71_HF300_DRONE_THERMAL_EVIDENCE_REGISTRY_ENTRY,
   PASS71_HF301_RENDERER_PROGRESS_REGISTRY_ENTRY,
+  PASS71_HF304_LIVE_HOSTED_EVIDENCE_REGISTRY_ENTRY,
   PASS71_HF305_NUKE_WARNING_EVIDENCE_REGISTRY_ENTRY,
   PASS71_HF306_COCKPIT_REGISTRY_ENTRY,
   PASS71_HF307_CHOPPER_MG_EVIDENCE_REGISTRY_ENTRY,
@@ -468,6 +470,7 @@ export function validateAcceptanceManifest(manifest, options = {}) {
       ['HF-297', PASS71_HF297_FULL_ARMS_EVIDENCE_REGISTRY_ENTRY.descriptor],
       ['HF-302', PASS71_AUDIO_NATIVE_REGISTRY_ENTRY.descriptor],
       ['HF-303', PASS71_QUALITY_VISUAL_EVIDENCE_REGISTRY_ENTRY.descriptor],
+      ['HF-304', PASS71_HF304_LIVE_HOSTED_EVIDENCE_REGISTRY_ENTRY.descriptor],
       ['HF-299', PASS71_HF299_THERMAL_EVIDENCE_REGISTRY_ENTRY.descriptor],
       ['HF-300', PASS71_HF300_DRONE_THERMAL_EVIDENCE_REGISTRY_ENTRY.descriptor],
       ['HF-301', PASS71_HF301_RENDERER_PROGRESS_REGISTRY_ENTRY.descriptor],
