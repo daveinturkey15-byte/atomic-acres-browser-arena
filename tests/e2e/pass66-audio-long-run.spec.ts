@@ -54,7 +54,12 @@ for (const arenaId of selectedArenas) {
     // A physical click is part of the contract: Web Audio unlock behavior must
     // be exercised rather than bypassed through the debug API.
     await page.locator('#solo').click();
-    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: 90_000 });
+    await page.waitForFunction(() => {
+      const debug = window.__ATOMIC_ACRES_DEBUG__;
+      if (!debug) return false;
+      const admission = debug.admissionState();
+      return admission.matchPhase === 'active' && admission.presentedGameplayFrame > 2;
+    }, undefined, { timeout: 90_000 });
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
 
     const samples: Array<{
