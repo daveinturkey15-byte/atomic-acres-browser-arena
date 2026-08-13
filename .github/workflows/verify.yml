@@ -63,6 +63,8 @@ jobs:
       - run: npm run verify:provenance
       - run: npm run verify:killstreak-catalog
       - run: npm test
+      - name: Verify Pass 71 manifest-embedded STUCK evidence contract
+        run: npm run qa:pass71:stuck-evidence:contract
       - run: npm run leaderboard:check
       - run: npm run build
         env:
