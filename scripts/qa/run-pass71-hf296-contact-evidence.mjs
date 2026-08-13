@@ -11,6 +11,9 @@ import { gzipSync } from 'node:zlib';
 import {
   PASS71_HF296_CONTACT_COVERAGE,
   PASS71_HF296_CONTACT_EVIDENCE,
+  PASS71_HF296_MAX_RECORD_JSON_BYTES,
+  PASS71_HF296_MAX_VISUAL_BYTES,
+  PASS71_HF296_VISUAL_CROP,
   assertPass71Hf296ContactEvidence,
   pass71Hf296ContactRecordSha256,
   pass71Hf296ContactSourceTreeAtSource,
@@ -324,6 +327,11 @@ function embedVisualAttachments(component) {
     const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
     if (bytes.length <= 24 || !bytes.subarray(0, 8).equals(signature)
       || bytes.toString('ascii', 12, 16) !== 'IHDR') throw new Error(`HF-296 visual is not PNG: ${identity.filename}`);
+    if (bytes.length > PASS71_HF296_MAX_VISUAL_BYTES
+      || bytes.readUInt32BE(16) !== PASS71_HF296_VISUAL_CROP.width
+      || bytes.readUInt32BE(20) !== PASS71_HF296_VISUAL_CROP.height) {
+      throw new Error(`HF-296 visual exceeds its bounded ROI contract: ${identity.filename}`);
+    }
     return {
       key: identity.key,
       arena: identity.arena,
@@ -345,7 +353,11 @@ function embedVisualAttachments(component) {
 
 function writeReceipt(record) {
   mkdirSync(artifactRoot, { recursive: true });
-  const bytes = Buffer.from(`${JSON.stringify(record, null, 2)}\n`, 'utf8');
+  const payload = JSON.stringify(record);
+  if (Buffer.byteLength(payload, 'utf8') > PASS71_HF296_MAX_RECORD_JSON_BYTES) {
+    throw new Error('HF-296 complete receipt exceeds its manifest evidence budget');
+  }
+  const bytes = Buffer.from(`${payload}\n`, 'utf8');
   writeFileSync(receiptPath, bytes);
   writeFileSync(`${receiptPath}.sha256`, `${sha256(bytes)}  ${basename(receiptPath)}\n`, 'utf8');
   return sha256(bytes);
@@ -507,6 +519,8 @@ async function main() {
     localCells: record.matrix.local.count,
     remoteProjectionCells: record.matrix.remoteProjection.count,
     losslessEmbeddedVisualCells: record.visualAttachments.length,
+    recordJsonBytes: Buffer.byteLength(JSON.stringify(record), 'utf8'),
+    maxRecordJsonBytes: PASS71_HF296_MAX_RECORD_JSON_BYTES,
     weaponCatalogEntries: record.matrix.weaponCatalog.count,
   }, null, 2)}\n`);
 }

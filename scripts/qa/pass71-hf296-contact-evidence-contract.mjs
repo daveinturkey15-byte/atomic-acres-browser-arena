@@ -47,6 +47,11 @@ export const PASS71_HF296_CONTACT_EVIDENCE_DESCRIPTOR = Object.freeze({
   maximumCount: 1,
 });
 
+export const PASS71_HF296_VISUAL_SOURCE_VIEWPORT = Object.freeze({ width: 960, height: 540 });
+export const PASS71_HF296_VISUAL_CROP = Object.freeze({ x: 400, y: 396, width: 160, height: 90 });
+export const PASS71_HF296_MAX_VISUAL_BYTES = 64 * 1024;
+export const PASS71_HF296_MAX_RECORD_JSON_BYTES = 24 * 1024 * 1024;
+
 export const PASS71_HF296_CONTACT_COVERAGE = Object.freeze({
   ledgerClaim: 'every arena/stance/firearm/solo-host-guest; floors/walls/diagonals/corners/door-returns; every action; camera-muzzle-projectile-hit identity',
   execution: Object.freeze({
@@ -91,7 +96,11 @@ export const PASS71_HF296_CONTACT_COVERAGE = Object.freeze({
     representativeAction: PASS71_HF296_VISUAL_ACTION,
     exactLosslessPngCells: PASS71_HF296_MATRIX_COUNTS.visual,
     exactKeySha256: PASS71_HF296_VISUAL_KEY_SHA256,
-    attachmentPolicy: 'manifest-embedded-base64-png-bytes-with-recomputed-sha256-and-ihdr',
+    sourceViewport: PASS71_HF296_VISUAL_SOURCE_VIEWPORT,
+    crop: PASS71_HF296_VISUAL_CROP,
+    maxBytesPerPng: PASS71_HF296_MAX_VISUAL_BYTES,
+    maxCompleteRecordJsonBytes: PASS71_HF296_MAX_RECORD_JSON_BYTES,
+    attachmentPolicy: 'manifest-embedded-lower-centre-lossless-png-roi-with-recomputed-sha256-and-ihdr',
   }),
   identityFreeze: Object.freeze({
     camera: 'principal-first-person-camera ballistic origin and direction',
@@ -550,11 +559,12 @@ function validateVisualAttachments(attachments, failures) {
     }, identity) || attachment.weapon !== PASS71_HF296_VISUAL_WEAPON
       || attachment.action !== PASS71_HF296_VISUAL_ACTION
       || attachment.mimeType !== 'image/png' || attachment.encoding !== 'lossless-png-embedded-base64'
-      || !bytes || bytes.length <= 24 || attachment.byteLength !== bytes.length
+      || !bytes || bytes.length <= 24 || bytes.length > PASS71_HF296_MAX_VISUAL_BYTES
+      || attachment.byteLength !== bytes.length
       || !bytes.subarray(0, 8).equals(PNG_SIGNATURE) || bytes.toString('ascii', 12, 16) !== 'IHDR'
       || attachment.width !== bytes.readUInt32BE(16) || attachment.height !== bytes.readUInt32BE(20)
-      || !Number.isSafeInteger(attachment.width) || attachment.width <= 0
-      || !Number.isSafeInteger(attachment.height) || attachment.height <= 0
+      || attachment.width !== PASS71_HF296_VISUAL_CROP.width
+      || attachment.height !== PASS71_HF296_VISUAL_CROP.height
       || attachment.sha256 !== sha256(bytes)) failures.push(`visual:${index}:identity-or-lossless-bytes`);
   }
 }
@@ -569,6 +579,9 @@ export function pass71Hf296ContactEvidenceFailures(record, expected = {}) {
     || record.status !== PASS71_HF296_CONTACT_EVIDENCE.status
     || record.coverageDisposition !== PASS71_HF296_CONTACT_EVIDENCE.coverageDisposition
     || record.closesFeedback !== true) return ['hf296-identity-status-or-closure'];
+  if (Buffer.byteLength(JSON.stringify(record), 'utf8') > PASS71_HF296_MAX_RECORD_JSON_BYTES) {
+    failures.push('record:encoded-size-cap');
+  }
   exactKeys(record, [
     'schemaVersion', 'evidenceId', 'kind', 'contract', 'feedbackId', 'status',
     'coverageDisposition', 'closesFeedback', 'startedAt', 'completedAt', 'source',
@@ -629,7 +642,7 @@ export function createPass71Hf296ContactEvidenceRegistryEntry() {
 
 export const PASS71_HF296_CONTACT_EVIDENCE_REGISTRY_ENTRY = createPass71Hf296ContactEvidenceRegistryEntry();
 
-const FIXTURE_PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mNk+M/wHwAF/gL+XDMR7wAAAABJRU5ErkJggg==';
+const FIXTURE_PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAKAAAABaCAYAAAA/xl1SAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAB5ElEQVR4nO2UQQ3AQACDTgpSJmX+TdxkrAk8MFBID897ow34aYNTfMXHjxsUYAHeAiyCa92gBxyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmAIckICYAhyQgJgCHJCAmA8dej1/RG5UgAAAAABJRU5ErkJggg==';
 const fixtureFireIdentity = (weapon) => ({
   cameraIdentity: 'principal-first-person-camera',
   cameraOrigin: [0, 1.6, 0],

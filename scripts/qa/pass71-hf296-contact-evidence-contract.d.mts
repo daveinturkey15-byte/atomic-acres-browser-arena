@@ -6,6 +6,10 @@ export type Pass71Hf296EvidenceDescriptor = Readonly<{
 }>;
 
 export declare const PASS71_HF296_CONTACT_EVIDENCE_DESCRIPTOR: Pass71Hf296EvidenceDescriptor;
+export declare const PASS71_HF296_VISUAL_SOURCE_VIEWPORT: Readonly<{ width: 960; height: 540 }>;
+export declare const PASS71_HF296_VISUAL_CROP: Readonly<{ x: 400; y: 396; width: 160; height: 90 }>;
+export declare const PASS71_HF296_MAX_VISUAL_BYTES: number;
+export declare const PASS71_HF296_MAX_RECORD_JSON_BYTES: number;
 export declare const PASS71_HF296_CONTACT_EVIDENCE_REGISTRY_ENTRY: Readonly<{
   descriptor: Pass71Hf296EvidenceDescriptor;
   closesFeedback: true;

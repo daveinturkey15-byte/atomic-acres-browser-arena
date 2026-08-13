@@ -6,6 +6,9 @@ import {
   PASS71_HF296_CONTACT_EVIDENCE_DESCRIPTOR,
   PASS71_HF296_CONTACT_EVIDENCE_REGISTRY_ENTRY,
   PASS71_HF296_CONTACT_TOOL_PATHS,
+  PASS71_HF296_MAX_RECORD_JSON_BYTES,
+  PASS71_HF296_MAX_VISUAL_BYTES,
+  PASS71_HF296_VISUAL_CROP,
   assertPass71Hf296ContactEvidence,
   createPass71Hf296ContactEvidenceFixture,
   pass71Hf296ContactEvidenceFailures,
@@ -47,6 +50,11 @@ describe('Pass 71 HF-296 full contact closure contract', () => {
     assert.equal(record.matrix.remoteProjection.count, 2_400);
     assert.equal(record.visualAttachments.length, 180);
     assert.equal(record.matrix.weaponCatalog.count, 20);
+    assert.deepEqual(PASS71_HF296_VISUAL_CROP, { x: 400, y: 396, width: 160, height: 90 });
+    assert.equal(record.visualAttachments[0].width, PASS71_HF296_VISUAL_CROP.width);
+    assert.equal(record.visualAttachments[0].height, PASS71_HF296_VISUAL_CROP.height);
+    assert(record.visualAttachments.every(({ byteLength }) => byteLength <= PASS71_HF296_MAX_VISUAL_BYTES));
+    assert(Buffer.byteLength(JSON.stringify(record), 'utf8') <= PASS71_HF296_MAX_RECORD_JSON_BYTES);
     assert.deepEqual(PASS71_HF296_MATRIX_COUNTS, {
       local: 18_000, remote: 2_400, visual: 180, weaponCatalog: 20,
     });
@@ -150,6 +158,18 @@ describe('Pass 71 HF-296 full contact closure contract', () => {
     tampered.visualAttachments[0].pngBase64 = tampered.visualAttachments[0].pngBase64.replace('i', 'j');
     resign(tampered);
     assert(pass71Hf296ContactEvidenceFailures(tampered, expected).includes('visual:0:identity-or-lossless-bytes'));
+    const wrongDimensions = fixture();
+    wrongDimensions.visualAttachments[0].width = 1;
+    resign(wrongDimensions);
+    assert(pass71Hf296ContactEvidenceFailures(wrongDimensions, expected)
+      .includes('visual:0:identity-or-lossless-bytes'));
+  });
+
+  it('rejects a complete record beyond the manifest evidence budget', () => {
+    const oversized = fixture();
+    oversized.visualAttachments[0].pngBase64 = 'A'.repeat(PASS71_HF296_MAX_RECORD_JSON_BYTES);
+    resign(oversized);
+    assert(pass71Hf296ContactEvidenceFailures(oversized, expected).includes('record:encoded-size-cap'));
   });
 
   it('rejects unsigned Edge, software rendering, source drift, tooling drift, and faults', () => {

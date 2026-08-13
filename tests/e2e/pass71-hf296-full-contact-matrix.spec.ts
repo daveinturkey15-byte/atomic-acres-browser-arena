@@ -18,6 +18,7 @@ import {
   pass71Hf296RemoteKey,
   pass71Hf296VisualKey,
 } from '../../scripts/qa/pass71-hf296-full-matrix.mjs';
+import { PASS71_HF296_VISUAL_CROP } from '../../scripts/qa/pass71-hf296-contact-evidence-contract.mjs';
 import {
   attachBrowserDiagnostics,
   readPersistedClientRuntimeLog,
@@ -557,7 +558,12 @@ async function captureVisualMatrix(
     const key = pass71Hf296VisualKey({ arena, stance, role, fixture: fixture.kind });
     const filename = `${arena}--${stance}--${role}--${fixture.kind}.png`;
     const absolutePath = resolve(outputRoot, filename);
-    await page.screenshot({ path: absolutePath, type: 'png', animations: 'disabled' });
+    await page.screenshot({
+      path: absolutePath,
+      type: 'png',
+      animations: 'disabled',
+      clip: { ...PASS71_HF296_VISUAL_CROP },
+    });
     rows.push({
       key, arena, stance, role, fixture: fixture.kind,
       weapon: PASS71_HF296_VISUAL_WEAPON,

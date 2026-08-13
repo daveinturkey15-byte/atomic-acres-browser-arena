@@ -51,7 +51,8 @@ describe('Pass 71 HF-296 runtime evidence integration', () => {
   it('runs page-side exact matrices and retains Node only for lossless captures', () => {
     expect(spec).toContain('return page.evaluate(async');
     expect(spec).toContain('assertPass71Hf296ExactSets({ localKeys, remoteKeys, visualKeys })');
-    expect(spec).toContain('await page.screenshot({ path: absolutePath, type: \'png\'');
+    expect(spec).toContain('await page.screenshot({');
+    expect(spec).toContain('clip: { ...PASS71_HF296_VISUAL_CROP }');
     expect(spec).toContain("runPageMatrix(host, arena, 'host-local')");
     expect(spec).toContain("runPageMatrix(guest, arena, 'guest-local')");
     expect(spec).toContain("guest, host, arena, 'host-saw-guest'");
@@ -65,5 +66,7 @@ describe('Pass 71 HF-296 runtime evidence integration', () => {
     expect(runner).toContain("PASS71_HF296_FULL_MATRIX: '1'");
     expect(runner).toContain('assertPass71Hf296ExactSets({ localKeys, remoteKeys, visualKeys })');
     expect(runner).toContain("encoding: 'lossless-png-embedded-base64'");
+    expect(runner).toContain('bytes.length > PASS71_HF296_MAX_VISUAL_BYTES');
+    expect(runner).toContain('payload, \'utf8\') > PASS71_HF296_MAX_RECORD_JSON_BYTES');
   });
 });
