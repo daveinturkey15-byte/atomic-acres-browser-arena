@@ -47,7 +47,9 @@ describe('Semtex live-stick runtime integration', () => {
     const alert = source.slice(alertStart, alertEnd);
     expect(alert).toContain("audience === 'victim' && attachedTargetId !== player.id");
     expect(alert).toContain('recipientId: player.id');
-    expect(alert).toContain('recipientLifeId: localContinuity');
+    expect(alert).toContain("network.role === 'client' ? localHostConfirmedContinuity : localContinuity");
+    expect(alert).toContain('if (recipientLifeId === null) return false;');
+    expect(alert).toContain('recipientLifeId,');
     expect(alert).toContain("warning.style.setProperty('--sticky-warning-duration', `${STICKY_VICTIM_URGENT_ALERT_DURATION_MS}ms`)");
     expect(alert).toContain('Math.max(0, alert.expiresAtMs - performance.now())');
   });
