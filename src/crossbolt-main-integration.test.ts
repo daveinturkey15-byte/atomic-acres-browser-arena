@@ -39,11 +39,11 @@ describe('Pass 65 explosive crossbolt runtime integration', () => {
     expect(update).toContain('const targetHitLifeId = targetHit.lifeId;');
     expect(update).toContain('bolt.targetId = targetHitId;');
     expect(update).toContain('bolt.targetLifeId = targetHitLifeId;');
-    expect(update).toContain('if (targetHitId === player.id) {');
+    expect(update).toContain("if (network.role !== 'client' && targetHitId === player.id) {");
     expect(update).toContain("'explosive-crossbow', 'victim', targetHitId, targetHitLifeId, bolt.actionNonce, now,");
     expect(update).toContain("'explosive-crossbow', 'attacker', targetHitId, targetHitLifeId, bolt.actionNonce, now,");
     expect(update).toContain("addFeed('STUCK', 'coral');");
-    expect(update).toContain('else if (bolt.ownerId === player.id) {');
+    expect(update).toContain("else if (network.role !== 'client' && bolt.ownerId === player.id) {");
     expect(update).toContain("addFeed('STUCK', 'gold');");
     expect(update).toContain('explosiveBoltTargetBuffer.findIndex(bolt.targetId, bolt.targetLifeId)');
     expect(update).toContain('let targetHitIndex = -1;');

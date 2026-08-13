@@ -1822,6 +1822,16 @@ function buildProceduralChopperFallback(): PresentedEntity {
   cockpitRailRight.name = 'chopper-cockpit-rail-right';
   cockpitRailRight.position.x = 0.47;
   cockpitRailRight.rotation.z = 0.18;
+  const proceduralCockpitEndpoints = [
+    presentationSocket('chopper-inner-windscreen-pillar-left-base', [-0.47, -0.22, -0.27]),
+    presentationSocket('chopper-inner-windscreen-pillar-left-top', [-0.47, 0.26, -0.27]),
+    presentationSocket('chopper-inner-windscreen-pillar-right-base', [0.47, -0.22, -0.27]),
+    presentationSocket('chopper-inner-windscreen-pillar-right-top', [0.47, 0.26, -0.27]),
+    presentationSocket('chopper-inner-windscreen-glow-left-base', [-0.47, -0.22, -0.285]),
+    presentationSocket('chopper-inner-windscreen-glow-left-top', [-0.47, 0.26, -0.285]),
+    presentationSocket('chopper-inner-windscreen-glow-right-base', [0.47, -0.22, -0.285]),
+    presentationSocket('chopper-inner-windscreen-glow-right-top', [0.47, 0.26, -0.285]),
+  ];
   const displayMaterial = (colour: number) => new THREE.MeshStandardMaterial({
     color: colour,
     emissive: colour,
@@ -1861,7 +1871,10 @@ function buildProceduralChopperFallback(): PresentedEntity {
   gunnerViewBarrel.position.set(0.31, -0.16, -0.61);
   gunnerWeaponView.add(gunnerViewReceiver, gunnerViewBarrel);
   gunnerSightline.add(hudGlass, hudTargetRing, hudReticle, gunnerWeaponView);
-  cockpit.add(dashboard, cockpitRailLeft, cockpitRailRight, cyanDisplay, greenDisplay, gunnerSightline);
+  cockpit.add(
+    dashboard, cockpitRailLeft, cockpitRailRight, ...proceduralCockpitEndpoints,
+    cyanDisplay, greenDisplay, gunnerSightline,
+  );
   const rotor = new THREE.Group();
   rotor.name = 'chopper-main-rotor';
   rotor.position.y = 0.85;
