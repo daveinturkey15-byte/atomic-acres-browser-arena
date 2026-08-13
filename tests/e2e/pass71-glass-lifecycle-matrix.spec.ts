@@ -1,4 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 
 const PROFILES = [
   { label: 'quality', query: 'quality' },
@@ -6,6 +8,100 @@ const PROFILES = [
 ] as const;
 const PANE_COUNT = 6;
 const ALL_PANE_INDEXES = Object.freeze(Array.from({ length: PANE_COUNT }, (_, index) => index));
+const HF304_COMPONENT_PATH = process.env.PASS71_HF304_BROWSER_COMPONENT_PATH
+  ? resolve(process.env.PASS71_HF304_BROWSER_COMPONENT_PATH)
+  : null;
+const HF304_EXPECTED_SOURCE_SHA = process.env.PASS71_HF304_EXPECTED_SOURCE_SHA ?? null;
+const HF304_RELEASE_PASS = process.env.PASS71_HF304_RELEASE_PASS ?? null;
+const HF304_CASE_IDS = Object.freeze(PROFILES.flatMap((profile) => (
+  ['bullet', 'knife', 'grenade', 'flare-gun', 'explosive-crossbow'].map((path) => `${profile.label}/${path}`)
+)));
+const hf304Cases: Array<Record<string, unknown>> = [];
+let hf304ServedCandidate: Record<string, unknown> | null = null;
+let hf304UserAgent: string | null = null;
+
+async function captureHf304RuntimeIdentity(page: Page): Promise<void> {
+  if (!HF304_COMPONENT_PATH) return;
+  expect(HF304_EXPECTED_SOURCE_SHA).toMatch(/^[a-f0-9]{40}$/u);
+  expect(HF304_RELEASE_PASS).toBe('PASS 71');
+  const identity = await page.evaluate(async () => {
+    const response = await fetch(new URL('channel-provenance.json', window.location.href), {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
+    if (!response.ok) throw new Error(`HF-304 candidate provenance returned HTTP ${response.status}`);
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
+    return {
+      servedCandidate: await response.json(),
+      userAgent: navigator.userAgent,
+      actualRenderer: snapshot.render?.runtime?.actualBackend,
+    };
+  });
+  expect(identity.servedCandidate).toMatchObject({
+    schemaVersion: 4,
+    channel: 'the-big-one',
+    releasePass: HF304_RELEASE_PASS,
+    sourceSha: HF304_EXPECTED_SOURCE_SHA,
+    path: 'channels/the-big-one',
+  });
+  expect(identity.userAgent).toMatch(/Edg\//u);
+  expect(identity.actualRenderer).toBe('webgl2');
+  if (hf304ServedCandidate === null) hf304ServedCandidate = identity.servedCandidate;
+  else expect(identity.servedCandidate).toEqual(hf304ServedCandidate);
+  if (hf304UserAgent === null) hf304UserAgent = identity.userAgent;
+  else expect(identity.userAgent).toBe(hf304UserAgent);
+}
+
+function recordHf304Case(
+  profile: string,
+  path: string,
+  arenaId: ArenaId,
+  receipt: unknown,
+  faults: readonly string[],
+): void {
+  if (!HF304_COMPONENT_PATH) return;
+  hf304Cases.push({
+    id: `${profile}/${path}`,
+    profile,
+    path,
+    arenaId,
+    status: 'PASS',
+    paneCount: PANE_COUNT,
+    receipt,
+    faults: [...faults],
+  });
+}
+
+test.afterAll(() => {
+  if (!HF304_COMPONENT_PATH) return;
+  expect(hf304Cases.map((entry) => entry.id)).toEqual(HF304_CASE_IDS);
+  expect(hf304ServedCandidate).not.toBeNull();
+  expect(hf304UserAgent).toMatch(/Edg\//u);
+  const component = {
+    schemaVersion: 1,
+    contract: 'atomic-acres/pass71-hf304-glass-browser-component@1',
+    status: 'PASS',
+    sourceSha: HF304_EXPECTED_SOURCE_SHA,
+    servedCandidate: hf304ServedCandidate,
+    browser: { channel: 'msedge', userAgent: hf304UserAgent },
+    renderer: { requested: 'webgl2', actual: 'webgl2' },
+    coverage: {
+      profiles: ['quality', 'performance'],
+      arenas: ['atomic-acres', 'skyline-terminal'],
+      paneCountPerArena: PANE_COUNT,
+      paths: ['bullet', 'knife', 'grenade', 'flare-gun', 'explosive-crossbow'],
+      caseCount: HF304_CASE_IDS.length,
+      authorityMode: 'solo',
+      hostedRuntimeTopologyObserved: false,
+    },
+    cases: hf304Cases,
+    faults: [],
+  };
+  mkdirSync(dirname(HF304_COMPONENT_PATH), { recursive: true });
+  const temporary = `${HF304_COMPONENT_PATH}.tmp`;
+  writeFileSync(temporary, `${JSON.stringify(component, null, 2)}\n`, 'utf8');
+  renameSync(temporary, HF304_COMPONENT_PATH);
+});
 
 type GlassPhase = 'intact' | 'breached' | 'detached';
 type ArenaId = 'atomic-acres' | 'skyline-terminal';
@@ -54,6 +150,7 @@ async function deploy(
       && debug.admissionState().presentedGameplayFrame > 2;
   }, undefined, { timeout: 90_000 });
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
+  await captureHf304RuntimeIdentity(page);
 }
 
 async function observePane(page: Page, index: number): Promise<PaneObservation> {
@@ -141,9 +238,20 @@ async function observePaneDebris(page: Page, index: number): Promise<any | null>
 }
 
 async function assertDebrisMovesAndSettles(page: Page, index: number, label: string): Promise<any> {
-  await expect.poll(async () => Boolean(await observePaneDebris(page, index)), { timeout: 1_000 }).toBe(true);
+  await expect.poll(async () => {
+    const current = await observePaneDebris(page, index);
+    return current?.physical === true
+      && current.physicsActive === true
+      && current.receivedPhysicsPose === true;
+  }, { timeout: 1_500 }).toBe(true);
   const initial = await observePaneDebris(page, index);
-  expect(initial, `${label}: retained debris is created`).not.toBeNull();
+  expect(initial, `${label}: retained debris begins on collision-backed physics`).toMatchObject({
+    visible: true,
+    physical: true,
+    physicsActive: true,
+    receivedPhysicsPose: true,
+    fallbackSettled: false,
+  });
   expect(initial.position.every(Number.isFinite), `${label}: finite initial debris position`).toBe(true);
 
   await expect.poll(async () => {
@@ -212,6 +320,7 @@ async function assertDebrisRetired(
     },
   });
   expect(snapshot.persistentWindowDebris, `${label}: no fragment or collider remains`).toEqual([]);
+  expect(snapshot.interactiveWorld.rapierMajorBodies, `${label}: no active major-debris body remains`).toBe(0);
   return {
     panes: snapshot.breakableWindows.map((pane: any) => ({
       id: pane.id,
@@ -221,6 +330,8 @@ async function assertDebrisRetired(
     })),
     pool: snapshot.windowGlassDebrisPool,
     rapierDynamicColliders: snapshot.interactiveWorld.rapierDynamicColliders,
+    rapierMajorBodies: snapshot.interactiveWorld.rapierMajorBodies,
+    persistentWindowDebris: snapshot.persistentWindowDebris,
   };
 }
 
@@ -287,6 +398,7 @@ for (const profile of PROFILES) {
 
     await resetBreakableWindows(page);
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.equipWeapon('carbine'));
+    let lifecycle: unknown = null;
     for (let pane = 0; pane < PANE_COUNT; pane += 1) {
       const before = await observePane(page, pane);
       await page.evaluate((paneIndex) => {
@@ -295,11 +407,14 @@ for (const profile of PROFILES) {
         debug.fireOnce();
       }, pane);
       await assertPaneBreached(page, pane, `${profile.label}/bullet`, before.rapierDynamicColliders, 'breached');
+      if (pane === 0) lifecycle = await assertDebrisMovesAndSettles(page, pane, `${profile.label}/bullet`);
       await page.waitForTimeout(130);
     }
-    const receipt = await assertDebrisRetired(page, `${profile.label}/bullet`);
+    const retired = await assertDebrisRetired(page, `${profile.label}/bullet`);
+    const receipt = { lifecycle, retired };
 
     expect(faults, JSON.stringify(faults, null, 2)).toEqual([]);
+    recordHf304Case(profile.label, 'bullet', 'atomic-acres', receipt, faults);
     await testInfo.attach(`pass71-glass-${profile.label}-bullet`, {
       body: Buffer.from(JSON.stringify({ profile: profile.label, paneCount: PANE_COUNT, receipt, faults }, null, 2)),
       contentType: 'application/json',
@@ -316,6 +431,7 @@ for (const profile of PROFILES) {
     await deploy(page, profile.query);
 
     await resetBreakableWindows(page);
+    let lifecycle: unknown = null;
     for (let pane = 0; pane < PANE_COUNT; pane += 1) {
       const before = await observePane(page, pane);
       const accepted = await page.evaluate((paneIndex) => {
@@ -325,11 +441,14 @@ for (const profile of PROFILES) {
       }, pane);
       expect(accepted, `${profile.label}/knife pane ${pane} admitted`).toBe(true);
       await assertPaneBreached(page, pane, `${profile.label}/knife`, before.rapierDynamicColliders, 'breached');
+      if (pane === 0) lifecycle = await assertDebrisMovesAndSettles(page, pane, `${profile.label}/knife`);
       await page.waitForTimeout(670);
     }
-    const receipt = await assertDebrisRetired(page, `${profile.label}/knife`);
+    const retired = await assertDebrisRetired(page, `${profile.label}/knife`);
+    const receipt = { lifecycle, retired };
 
     expect(faults, JSON.stringify(faults, null, 2)).toEqual([]);
+    recordHf304Case(profile.label, 'knife', 'atomic-acres', receipt, faults);
     await testInfo.attach(`pass71-glass-${profile.label}-knife`, {
       body: Buffer.from(JSON.stringify({ profile: profile.label, paneCount: PANE_COUNT, receipt, faults }, null, 2)),
       contentType: 'application/json',
@@ -361,9 +480,12 @@ for (const profile of PROFILES) {
       const debug = window.__ATOMIC_ACRES_DEBUG__;
       for (let pane = 0; pane < 6; pane += 1) debug.detonateGrenadeAtWindow(pane);
     });
-    const receipt = await assertDebrisRetired(page, `${profile.label}/grenade`);
+    const lifecycle = await assertDebrisMovesAndSettles(page, 0, `${profile.label}/grenade`);
+    const retired = await assertDebrisRetired(page, `${profile.label}/grenade`);
+    const receipt = { lifecycle, retired };
 
     expect(faults, JSON.stringify(faults, null, 2)).toEqual([]);
+    recordHf304Case(profile.label, 'grenade', 'atomic-acres', receipt, faults);
     await testInfo.attach(`pass71-glass-${profile.label}-grenade`, {
       body: Buffer.from(JSON.stringify({ profile: profile.label, paneCount: PANE_COUNT, receipt, faults }, null, 2)),
       contentType: 'application/json',
@@ -413,15 +535,19 @@ for (const profile of PROFILES) {
     ));
     expect(timedState).toMatchObject({ status: 'depleted', shotsRemaining: 0 });
     expect(faults, JSON.stringify(faults, null, 2)).toEqual([]);
+    const evidenceReceipt = {
+      grant,
+      paneReceipts,
+      lifecycle,
+      retired,
+      timedState,
+    };
+    recordHf304Case(profile.label, 'flare-gun', 'skyline-terminal', evidenceReceipt, faults);
     await testInfo.attach(`pass71-glass-${profile.label}-flare-gun`, {
       body: Buffer.from(JSON.stringify({
         profile: profile.label,
         arena: 'skyline-terminal',
-        grant,
-        paneReceipts,
-        lifecycle,
-        retired,
-        timedState,
+        ...evidenceReceipt,
         faults,
       }, null, 2)),
       contentType: 'application/json',
@@ -511,13 +637,13 @@ for (const profile of PROFILES) {
 
     const retired = await assertDebrisRetired(page, `${profile.label}/explosive-crossbow`, [PANE_COUNT - 1]);
     expect(faults, JSON.stringify(faults, null, 2)).toEqual([]);
+    const evidenceReceipt = { paneReceipts, lifecycle, retired };
+    recordHf304Case(profile.label, 'explosive-crossbow', 'atomic-acres', evidenceReceipt, faults);
     await testInfo.attach(`pass71-glass-${profile.label}-explosive-crossbow`, {
       body: Buffer.from(JSON.stringify({
         profile: profile.label,
         arena: 'atomic-acres',
-        paneReceipts,
-        lifecycle,
-        retired,
+        ...evidenceReceipt,
         faults,
       }, null, 2)),
       contentType: 'application/json',

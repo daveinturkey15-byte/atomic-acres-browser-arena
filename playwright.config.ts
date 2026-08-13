@@ -15,7 +15,10 @@ const requireOwnedFreshPreview = process.env.QA_REQUIRE_OWNED_FRESH_PREVIEW === 
 const installedEdgeChannel = process.env.QA_INSTALLED_EDGE === '1' ? 'msedge' as const : undefined;
 const pass71GrenadeEdgeExecutable = process.env.PASS71_GRENADE_EDGE_EXECUTABLE;
 const pass71Hf296EdgeExecutable = process.env.PASS71_HF296_EDGE_EXECUTABLE;
-const pass71OwnedEdgeExecutable = pass71GrenadeEdgeExecutable ?? pass71Hf296EdgeExecutable;
+const pass71Hf304EdgeExecutable = process.env.PASS71_HF304_EDGE_EXECUTABLE;
+const pass71OwnedEdgeExecutable = pass71GrenadeEdgeExecutable
+  ?? pass71Hf296EdgeExecutable
+  ?? pass71Hf304EdgeExecutable;
 const pass71AudioBrowserExecutable = process.env.PASS71_AUDIO_BROWSER_EXECUTABLE;
 const ownedMultiplayerGate = process.env.QA_OWNED_GATE === 'multiplayer-stability';
 const requestedMultiplayerChannel = process.env[PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV];
@@ -44,8 +47,12 @@ if (pass71GrenadeEdgeExecutable && !installedEdgeChannel) {
 if (pass71Hf296EdgeExecutable && !installedEdgeChannel) {
   throw new Error('PASS71_HF296_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
 }
-if (pass71GrenadeEdgeExecutable && pass71Hf296EdgeExecutable) {
-  throw new Error('Grenade and HF-296 installed-Edge evidence cannot share one Playwright launch');
+if (pass71Hf304EdgeExecutable && !installedEdgeChannel) {
+  throw new Error('PASS71_HF304_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
+}
+if ([pass71GrenadeEdgeExecutable, pass71Hf296EdgeExecutable, pass71Hf304EdgeExecutable]
+  .filter(Boolean).length > 1) {
+  throw new Error('Pass 71 installed-Edge evidence gates require separate Playwright launches');
 }
 if (pass71AudioBrowserExecutable && process.env.PASS71_AUDIO_NATIVE !== '1') {
   throw new Error('PASS71_AUDIO_BROWSER_EXECUTABLE is reserved for the owned audio-native gate');
