@@ -203,7 +203,8 @@ export function pass71Hf313SourceAuditAtSource(repositoryRoot, sourceSha) {
     postcondition: Object.freeze({
       receiptSchemaVersion: receiptWriter.includes('schemaVersion: 4') ? 4 : null,
       rollbackProvenanceLiveChecked: liveVerifier.includes('provenance.rollback'),
-      liveVerifiedStatusOwnedByReceipt: receiptWriter.includes("status: 'live-verified'"),
+      liveVerifiedStatusOwnedByReceipt: receiptWriter.includes('createPass71Hf313LivePostcondition')
+        && receiptWriter.includes("hf313.status !== 'live-verified'"),
     }),
   });
 }
