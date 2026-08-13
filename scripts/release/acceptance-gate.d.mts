@@ -21,6 +21,11 @@ export type AcceptanceValidation = Readonly<{
   }>;
 }>;
 
+export type AcceptanceWorkflowOutputs = Readonly<{
+  manifest_selected: 'true' | 'false';
+  manifest_path: string;
+}>;
+
 export function validateAcceptanceManifest(
   manifest: unknown,
   options?: Readonly<{ policy?: AcceptancePolicy }>,
@@ -36,5 +41,7 @@ export function classifyPreviewDelta(
 export function pass66FinalizerOutputPaths(previewSha: string, graph?: unknown): string[];
 
 export function selectCiAcceptanceManifest(impact: string, manifestPaths: readonly string[]): string | null;
+
+export function acceptanceWorkflowOutputs(receipt: unknown): AcceptanceWorkflowOutputs;
 
 export function evaluateAcceptance(values: Readonly<Record<string, string>>): unknown;

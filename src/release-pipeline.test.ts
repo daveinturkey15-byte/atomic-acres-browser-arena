@@ -283,26 +283,29 @@ describe('production release workflow', () => {
     expect(mutationRunner).toContain('spawnSync(process.execPath');
   });
 
-  it('makes exact Pass 69 evidence and real preview provenance mandatory in the required acceptance job', () => {
+  it('authenticates the dynamically selected pass manifest and its exact preview bytes', () => {
     const acceptanceJob = verifyWorkflow.indexOf('requirements-acceptance:');
     const metricsJob = verifyWorkflow.indexOf('pipeline-metrics:');
     const section = verifyWorkflow.slice(acceptanceJob, metricsJob);
     const installStep = section.indexOf('npm ci --ignore-scripts');
     const buildStep = section.indexOf('Build exact frozen-evidence candidate bytes');
-    const candidateStep = section.indexOf('Verify exact Pass 69 evidence catalog and frozen runtime');
-    const provenanceStep = section.indexOf('Verify immutable Pass 69 preview provenance and bytes');
     const acceptanceStep = section.indexOf('Verify complete requirement-to-evidence coverage and exact preview approval');
+    const provenanceStep = section.indexOf('Verify immutable selected preview provenance and exact bytes');
 
     expect(section).toContain('needs: [classify-change, static-and-unit]');
     expect(installStep).toBeGreaterThan(-1);
     expect(buildStep).toBeGreaterThan(installStep);
-    expect(candidateStep).toBeGreaterThan(buildStep);
-    expect(provenanceStep).toBeGreaterThan(candidateStep);
-    expect(acceptanceStep).toBeGreaterThan(provenanceStep);
+    expect(acceptanceStep).toBeGreaterThan(buildStep);
+    expect(provenanceStep).toBeGreaterThan(acceptanceStep);
     expect(section).toContain('scripts/release/acceptance-gate.mjs --phase ci');
+    expect(section).toContain('--github-output "$GITHUB_OUTPUT"');
+    expect(section).toContain("if: steps.acceptance.outputs.manifest_selected == 'true'");
     expect(section).toContain('scripts/release/verify-pr-preview-provenance.mjs');
+    expect(section).toContain('--manifest "${{ steps.acceptance.outputs.manifest_path }}"');
     expect(section).toContain('GITHUB_TOKEN: ${{ github.token }}');
     expect(section).toContain('artifacts/pipeline/pr-preview-provenance.json');
+    expect(section).not.toContain("hashFiles('acceptance/pass-69.json')");
+    expect(section).not.toContain('--manifest acceptance/pass-69.json');
   });
 
   it('records the schema 3 two-channel topology in the production receipt', () => {

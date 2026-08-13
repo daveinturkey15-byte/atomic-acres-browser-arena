@@ -62,6 +62,32 @@ function nonEmpty(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+export function acceptanceWorkflowOutputs(receipt) {
+  if (!receipt || receipt.ok !== true || receipt.phase !== 'ci') {
+    throw new Error('GitHub outputs require a successful CI acceptance receipt');
+  }
+  if (receipt.exempt === true) {
+    if (receipt.manifestPath !== undefined) {
+      throw new Error('an exempt CI acceptance receipt must not select a manifest');
+    }
+    return { manifest_selected: 'false', manifest_path: '' };
+  }
+
+  const match = /^acceptance\/pass-([1-9][0-9]*)\.json$/.exec(receipt.manifestPath ?? '');
+  if (!match) throw new Error('CI acceptance receipt has an invalid manifestPath');
+  if (receipt.releasePass !== `PASS ${match[1]}`) {
+    throw new Error('CI acceptance receipt manifestPath does not match releasePass');
+  }
+  return { manifest_selected: 'true', manifest_path: receipt.manifestPath };
+}
+
+function writeAcceptanceWorkflowOutputs(path, receipt) {
+  if (!nonEmpty(path) || /[\r\n]/.test(path)) throw new Error('--github-output must be a valid file path');
+  const outputs = acceptanceWorkflowOutputs(receipt);
+  const lines = Object.entries(outputs).map(([name, value]) => `${name}=${value}`).join('\n');
+  writeFileSync(path, `${lines}\n`, { encoding: 'utf8', flag: 'a' });
+}
+
 function evidenceReferenceIsRemote(reference) {
   return /^(?:https:\/\/|artifact:\/\/)/.test(reference);
 }
@@ -427,6 +453,9 @@ if (resolve(process.argv[1] ?? '') === SCRIPT_PATH) {
   let receipt;
   try {
     receipt = evaluateAcceptance(values);
+    if (receipt.ok && values['github-output']) {
+      writeAcceptanceWorkflowOutputs(values['github-output'], receipt);
+    }
   } catch (error) {
     receipt = {
       schemaVersion: 1,

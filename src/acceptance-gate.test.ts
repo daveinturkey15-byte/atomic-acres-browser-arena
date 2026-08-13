@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  acceptanceWorkflowOutputs,
   classifyPreviewDelta,
   selectCiAcceptanceManifest,
   validateAcceptanceManifest,
@@ -93,6 +94,40 @@ describe('release acceptance manifest', () => {
     expect(selectCiAcceptanceManifest('none', ['acceptance/pass-66.json'])).toBe('acceptance/pass-66.json');
     expect(() => selectCiAcceptanceManifest('none', ['acceptance/pass-65.json', 'acceptance/pass-66.json'])).toThrow(/found 2/);
     expect(() => selectCiAcceptanceManifest('full', [])).toThrow(/found 0/);
+  });
+
+  it('exports the exact selected manifest for provenance verification across passes', () => {
+    expect(acceptanceWorkflowOutputs({
+      ok: true,
+      phase: 'ci',
+      manifestPath: 'acceptance/pass-71.json',
+      releasePass: 'PASS 71',
+    })).toEqual({ manifest_selected: 'true', manifest_path: 'acceptance/pass-71.json' });
+    expect(acceptanceWorkflowOutputs({
+      ok: true,
+      phase: 'ci',
+      manifestPath: 'acceptance/pass-69.json',
+      releasePass: 'PASS 69',
+    })).toEqual({ manifest_selected: 'true', manifest_path: 'acceptance/pass-69.json' });
+    expect(acceptanceWorkflowOutputs({ ok: true, phase: 'ci', exempt: true }))
+      .toEqual({ manifest_selected: 'false', manifest_path: '' });
+  });
+
+  it('rejects a provenance manifest output that is not the selected release pass', () => {
+    expect(() => acceptanceWorkflowOutputs({
+      ok: true,
+      phase: 'ci',
+      manifestPath: 'acceptance/pass-69.json',
+      releasePass: 'PASS 71',
+    })).toThrow(/does not match releasePass/);
+    expect(() => acceptanceWorkflowOutputs({
+      ok: true,
+      phase: 'ci',
+      manifestPath: '../acceptance/pass-71.json',
+      releasePass: 'PASS 71',
+    })).toThrow(/invalid manifestPath/);
+    expect(() => acceptanceWorkflowOutputs({ ok: false, phase: 'ci' }))
+      .toThrow(/successful CI acceptance receipt/);
   });
 
   it('retains preview approval only for the finalizer exact-SHA receipt set', () => {
