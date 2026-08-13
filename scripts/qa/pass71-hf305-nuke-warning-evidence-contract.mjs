@@ -826,7 +826,8 @@ export function createPass71Hf305EvidenceFixture(options = {}) {
   });
   const record = {
     ...PASS71_HF305_NUKE_WARNING_EVIDENCE,
-    startedAt: '2026-08-13T20:00:00.000Z', completedAt: '2026-08-13T20:10:00.000Z',
+    startedAt: options.startedAt ?? '2026-08-13T20:00:00.000Z',
+    completedAt: options.completedAt ?? '2026-08-13T20:10:00.000Z',
     source: { expectedSourceSha: sourceSha, checkoutSourceSha: sourceSha, endingCheckoutSourceSha: sourceSha, sourceTreeSha, releasePass: 'PASS 71', cleanBefore: true, cleanAfter: true },
     environment: { machine: 'dave-gaming-pc', hostnameSha256: hash, platform: 'win32', arch: 'x64' },
     browser: { channel: 'msedge', installed: true, executableName: 'msedge.exe', executableSha256: hash, executableVersion: '140.0.0.0', authenticodeStatus: 'Valid', authenticodeSigner: 'Microsoft Corporation', isolation: 'one-signed-installed-edge-process-and-fresh-profile-per-renderer' },

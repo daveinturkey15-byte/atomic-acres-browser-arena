@@ -26,6 +26,7 @@ import {
 import { PASS71_AUDIO_NATIVE_REGISTRY_ENTRY } from '../qa/pass71-audio-native-receipt-contract.mjs';
 import { PASS71_QUALITY_VISUAL_EVIDENCE_REGISTRY_ENTRY } from '../qa/pass71-quality-visual-parity-contract.mjs';
 import { PASS71_HF299_THERMAL_EVIDENCE_REGISTRY_ENTRY } from '../qa/pass71-hf299-thermal-operator-evidence-contract.mjs';
+import { PASS71_HF305_NUKE_WARNING_EVIDENCE_REGISTRY_ENTRY } from '../qa/pass71-hf305-nuke-warning-evidence-contract.mjs';
 import {
   PASS71_STUCK_EVIDENCE_DESCRIPTOR,
   pass71StuckEvidenceFailures,
@@ -142,6 +143,7 @@ export const PASS71_NATIVE_EVIDENCE_REGISTRY = createPass71NativeEvidenceRegistr
   PASS71_AUDIO_NATIVE_REGISTRY_ENTRY,
   PASS71_QUALITY_VISUAL_EVIDENCE_REGISTRY_ENTRY,
   PASS71_HF299_THERMAL_EVIDENCE_REGISTRY_ENTRY,
+  PASS71_HF305_NUKE_WARNING_EVIDENCE_REGISTRY_ENTRY,
   PASS71_STUCK_EVIDENCE_REGISTRY_ENTRY,
   PASS71_NATIVE_BROWSER_PARITY_REGISTRY_ENTRY,
 ]);
@@ -444,6 +446,7 @@ export function validateAcceptanceManifest(manifest, options = {}) {
       ['HF-302', PASS71_AUDIO_NATIVE_REGISTRY_ENTRY.descriptor],
       ['HF-303', PASS71_QUALITY_VISUAL_EVIDENCE_REGISTRY_ENTRY.descriptor],
       ['HF-299', PASS71_HF299_THERMAL_EVIDENCE_REGISTRY_ENTRY.descriptor],
+      ['HF-305', PASS71_HF305_NUKE_WARNING_EVIDENCE_REGISTRY_ENTRY.descriptor],
       ['HF-310', PASS71_STUCK_EVIDENCE_DESCRIPTOR],
       ['HF-311', PASS71_NATIVE_BROWSER_PARITY_DESCRIPTOR],
     ]);

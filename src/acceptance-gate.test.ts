@@ -31,6 +31,10 @@ import {
   createPass71Hf299EvidenceFixture,
   PASS71_HF299_TOOL_PATHS,
 } from '../scripts/qa/pass71-hf299-thermal-operator-evidence-contract.mjs';
+import {
+  createPass71Hf305EvidenceFixture,
+  PASS71_HF305_TOOLING_PATHS,
+} from '../scripts/qa/pass71-hf305-nuke-warning-evidence-contract.mjs';
 
 const policy = {
   schemaVersion: 1,
@@ -127,6 +131,14 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, tooling: hf299Tooling,
     startedAt: '2026-08-13T09:34:00.000Z', completedAt: '2026-08-13T09:42:00.000Z',
   });
+  const hf305Tooling = PASS71_HF305_TOOLING_PATHS.map((path) => ({
+    path,
+    sha256: createHash('sha256').update(readFileSync(join(process.cwd(), path))).digest('hex'),
+  }));
+  const hf305 = createPass71Hf305EvidenceFixture({
+    sourceSha: manifest.preview.sourceSha, sourceTreeSha: headSha, tooling: hf305Tooling,
+    startedAt: '2026-08-13T09:35:00.000Z', completedAt: '2026-08-13T09:45:00.000Z',
+  });
   manifest.preview.createdAt = '2026-08-13T09:00:00Z';
   manifest.humanAcceptance.approvedAt = '2026-08-13T10:00:00Z';
   for (const requirement of manifest.requirements) {
@@ -144,8 +156,8 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, tooling, components,
     finalizedAt: '2026-08-13T09:30:00.000Z',
   });
-  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, quality, hf299, stuck, parity];
-  return { manifest, coverage: rebuilt.record, components: rebuilt.components, quality, hf299 };
+  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, quality, hf299, hf305, stuck, parity];
+  return { manifest, coverage: rebuilt.record, components: rebuilt.components, quality, hf299, hf305 };
 }
 
 function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
@@ -159,6 +171,11 @@ function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
       path,
       sha256: createHash('sha256').update(readFileSync(join(process.cwd(), path))).digest('hex'),
     })),
+    pass71Hf305Tooling: PASS71_HF305_TOOLING_PATHS.map((path) => ({
+      path,
+      sha256: createHash('sha256').update(readFileSync(join(process.cwd(), path))).digest('hex'),
+    })),
+    pass71Hf305SourceTreeSha: headSha,
   };
 }
 
@@ -451,6 +468,23 @@ describe('release acceptance manifest', () => {
       .toMatch(/nativeEvidence\[[0-9]+\]: (?:scope:bot:webgl2:m14-ebr:semantics|receipt-sha256)/);
   }, 30_000);
 
+  it('requires exact native Nuke warning and detonation authority before HF-305 can be verified', () => {
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    const { manifest, hf305 } = pass71Manifest(tooling);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .not.toMatch(/verified R10\/HF-305|hf305-/);
+
+    manifest.nativeEvidence = manifest.nativeEvidence.filter((record) => record !== hf305);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/verified R10\/HF-305 requires its canonical registered native evidence record/);
+
+    const forged = structuredClone(hf305) as Record<string, any>;
+    forged.coverage.sameFrameBeaconAttribution = false;
+    manifest.nativeEvidence.push(forged);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/nativeEvidence\[[0-9]+\]: (?:receipt-coverage|receipt-digest)/);
+  }, 30_000);
+
   it('orders every HF-298 component and coverage finalization between preview and approval', () => {
     const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
     const { manifest, components } = pass71Manifest(tooling);
@@ -479,7 +513,7 @@ describe('release acceptance manifest', () => {
       components: [...components.slice(0, 3), afterApproval],
       finalizedAt: '2026-08-13T10:00:00.002Z',
     });
-    const retained = manifest.nativeEvidence.slice(-4);
+    const retained = manifest.nativeEvidence.slice(-5);
     manifest.nativeEvidence = [...components.slice(0, 3), afterApproval, afterCoverage, ...retained];
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/completedAt cannot follow humanAcceptance/);

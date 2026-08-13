@@ -49,4 +49,6 @@ export declare function createPass71Hf305EvidenceFixture(options?: Readonly<{
   sourceSha?: string;
   sourceTreeSha?: string;
   tooling?: unknown;
+  startedAt?: string;
+  completedAt?: string;
 }>): Record<string, unknown>;
