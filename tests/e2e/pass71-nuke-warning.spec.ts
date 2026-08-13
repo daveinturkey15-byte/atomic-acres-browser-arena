@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 import sharp from 'sharp';
@@ -84,46 +84,79 @@ test('renders the pre-detonation Nuke warning inside the Gun Range killstreak ro
 
   const output = resolve(process.cwd(), `artifacts/pass71/nuke-warning/${renderer}`);
   mkdirSync(output, { recursive: true });
-  const before = await page.screenshot({ path: resolve(output, 'gun-range-before-warning-1920x1080.png'), animations: 'disabled' });
-  await page.evaluate(() => {
-    const api = window.__ATOMIC_ACRES_DEBUG__ as any;
-    api.earnSupport(15);
-    api.activateSupport('nuke');
-  });
-  await expect(page.locator('#nuke-warning')).toBeVisible();
-  await expect.poll(async () => page.evaluate(() => (
-    (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).fieldSupport.nuke as NukeWarningSnapshot
-  )), { timeout: 2_500 }).toMatchObject({
-    active: true,
-    detonated: false,
-    warning: {
-      visible: true,
-      arenaId: 'gun-range',
-      position: [...warningPosition],
-    },
-  });
-  await expect.poll(async () => page.evaluate(() => (
-    (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).fieldSupport.nuke.warning?.scale ?? 0
-  )), { timeout: 2_000 }).toBeGreaterThan(0.72);
-  const armed = await page.evaluate(() => (
-    (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).fieldSupport.nuke as NukeWarningSnapshot
-  ));
-  expect(armed.detonateInMs).toBeGreaterThan(2_000);
-  expect(armed.warning).toMatchObject({
-    visible: true,
-    arenaId: 'gun-range',
-    position: [...warningPosition],
-  });
-  expect(armed.warning!.coreOpacity).toBeGreaterThan(0);
-  expect(armed.warning!.ringOpacity).toBeGreaterThan(0);
+  const beforePath = resolve(output, 'gun-range-before-warning-1920x1080.png');
+  const activePath = resolve(output, 'gun-range-nuke-warning-1920x1080.png');
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    const beforeSurface = await cdp.send('Page.captureScreenshot', {
+      format: 'png',
+      fromSurface: true,
+      captureBeyondViewport: false,
+    });
+    const before = Buffer.from(beforeSurface.data, 'base64');
+    writeFileSync(beforePath, before);
 
-  const active = await page.screenshot({ path: resolve(output, 'gun-range-nuke-warning-1920x1080.png'), animations: 'disabled' });
-  const raster = await redWarningDelta(before, active);
-  await testInfo.attach('pass71-nuke-warning-raster', {
-    body: Buffer.from(`${JSON.stringify({ renderer, armed, raster }, null, 2)}\n`),
-    contentType: 'application/json',
-  });
-  expect(raster.maximumRedDelta).toBeGreaterThanOrEqual(72);
-  expect(raster.changedWarningPixels).toBeGreaterThanOrEqual(240);
-  expect(errors).toEqual([]);
+    const activation = await page.evaluate(async () => {
+      const api = window.__ATOMIC_ACRES_DEBUG__ as any;
+      const snapshot = (): NukeWarningSnapshot => (
+        (api.snapshot() as any).fieldSupport.nuke as NukeWarningSnapshot
+      );
+      api.earnSupport(15);
+      api.activateSupport('nuke');
+      const armed = snapshot();
+      const rendered = await new Promise<NukeWarningSnapshot>((resolveRendered) => {
+        const sampleRenderedFrame = (): void => {
+          const current = snapshot();
+          if ((current.warning?.scale ?? 0) > 0.72 || current.detonated || !current.active) {
+            resolveRendered(current);
+            return;
+          }
+          requestAnimationFrame(sampleRenderedFrame);
+        };
+        requestAnimationFrame(sampleRenderedFrame);
+      });
+      return { armed, rendered };
+    });
+    const activeSurface = await cdp.send('Page.captureScreenshot', {
+      format: 'png',
+      fromSurface: true,
+      captureBeyondViewport: false,
+    });
+    const active = Buffer.from(activeSurface.data, 'base64');
+    writeFileSync(activePath, active);
+
+    expect(activation.armed).toMatchObject({
+      active: true,
+      detonated: false,
+      warning: {
+        visible: true,
+        arenaId: 'gun-range',
+        position: [...warningPosition],
+      },
+    });
+    expect(activation.armed.detonateInMs).toBeGreaterThan(2_000);
+    expect(activation.rendered).toMatchObject({
+      active: true,
+      detonated: false,
+      warning: {
+        visible: true,
+        arenaId: 'gun-range',
+        position: [...warningPosition],
+      },
+    });
+    expect(activation.rendered.warning!.scale).toBeGreaterThan(0.72);
+    expect(activation.rendered.warning!.coreOpacity).toBeGreaterThan(0);
+    expect(activation.rendered.warning!.ringOpacity).toBeGreaterThan(0);
+
+    const raster = await redWarningDelta(before, active);
+    await testInfo.attach('pass71-nuke-warning-raster', {
+      body: Buffer.from(`${JSON.stringify({ renderer, ...activation, raster }, null, 2)}\n`),
+      contentType: 'application/json',
+    });
+    expect(raster.maximumRedDelta).toBeGreaterThanOrEqual(72);
+    expect(raster.changedWarningPixels).toBeGreaterThanOrEqual(240);
+    expect(errors).toEqual([]);
+  } finally {
+    await cdp.detach();
+  }
 });
