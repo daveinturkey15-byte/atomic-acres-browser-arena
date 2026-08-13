@@ -118,6 +118,26 @@ async function verifyPublishedProvenance() {
     assertEqual(stableWrapper.pinnedRuntime?.treeSha256, stableOriginal.treeSha256, 'Stable wrapper embedded digest');
     provenance.stable = { wrapper: stableWrapper, embedded: stableOriginal };
   }
+
+  const rollbackEmbedded = await fetchJson(`${channelConfig.rollback.path}/channel-provenance.json`);
+  assertEqual(rollbackEmbedded.schemaVersion, 4, 'Rollback embedded provenance schema');
+  assertEqual(rollbackEmbedded.releasePass, channelConfig.rollback.pass, 'Rollback embedded pass');
+  assertEqual(rollbackEmbedded.sourceSha, channelConfig.rollback.sourceSha, 'Rollback embedded source SHA');
+  assertEqual(rollbackEmbedded.path, channelConfig.rollback.pagesPath, 'Rollback embedded source path');
+  assertEqual(rollbackEmbedded.exactRootFileCount, channelConfig.rollback.runtimeFileCount, 'Rollback embedded file count');
+  assertEqual(rollbackEmbedded.treeSha256, channelConfig.rollback.runtimeTreeSha256, 'Rollback embedded digest');
+  const rollbackWrapper = await fetchJson(`${channelConfig.rollback.path}/pinned-channel-provenance.json`);
+  assertEqual(rollbackWrapper.schemaVersion, 4, 'Rollback wrapper provenance schema');
+  assertEqual(rollbackWrapper.channel, 'rollback', 'Rollback wrapper channel');
+  assertEqual(rollbackWrapper.releasePass, channelConfig.rollback.pass, 'Rollback wrapper pass');
+  assertEqual(rollbackWrapper.sourceSha, channelConfig.rollback.sourceSha, 'Rollback wrapper source SHA');
+  assertEqual(rollbackWrapper.pagesSha, channelConfig.rollback.pagesSha, 'Rollback wrapper Pages SHA');
+  assertEqual(rollbackWrapper.pagesPath, channelConfig.rollback.pagesPath, 'Rollback wrapper Pages path');
+  assertEqual(rollbackWrapper.path, channelConfig.rollback.path, 'Rollback wrapper route');
+  assertEqual(rollbackWrapper.pinnedRuntime?.sourceSha, rollbackEmbedded.sourceSha, 'Rollback wrapper embedded source SHA');
+  assertEqual(rollbackWrapper.pinnedRuntime?.exactRootFileCount, rollbackEmbedded.exactRootFileCount, 'Rollback wrapper embedded file count');
+  assertEqual(rollbackWrapper.pinnedRuntime?.treeSha256, rollbackEmbedded.treeSha256, 'Rollback wrapper embedded digest');
+  provenance.rollback = { wrapper: rollbackWrapper, embedded: rollbackEmbedded };
 }
 
 async function observedPage() {

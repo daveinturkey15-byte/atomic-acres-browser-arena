@@ -16,6 +16,7 @@ export type AcceptanceValidation = Readonly<{
     deferred: number;
     acceptanceRatio: number;
     feedbackReceivedAt: string | null;
+    previewSourceSha: string | null;
     previewCreatedAt: string | null;
     approvedAt: string | null;
     nativeEvidence: readonly Readonly<{

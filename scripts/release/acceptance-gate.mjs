@@ -539,6 +539,7 @@ export function validateAcceptanceManifest(manifest, options = {}) {
       acceptanceRatio: Array.isArray(manifest.requirements) && manifest.requirements.length > 0
         ? verified / manifest.requirements.length : 0,
       feedbackReceivedAt: manifest.feedbackReceivedAt ?? null,
+      previewSourceSha: preview?.sourceSha ?? null,
       previewCreatedAt: preview?.createdAt ?? null,
       approvedAt: approval?.approvedAt ?? null,
       nativeEvidence: pass71NativeRecords.map((record) => ({

@@ -395,10 +395,13 @@ describe('production release workflow', () => {
     expect(section).not.toContain('--manifest acceptance/pass-69.json');
   });
 
-  it('records the schema 3 two-channel topology in the production receipt', () => {
+  it('records schema 4 candidate-A/B and live postconditions in the production receipt', () => {
     expect(workflow).toContain('node scripts/release/write-production-receipt.mjs');
-    expect(receiptWriter).toContain('schemaVersion: 3');
+    expect(receiptWriter).toContain('schemaVersion: 4');
     expect(receiptWriter).toContain('topology,');
+    expect(receiptWriter).toContain("status !== 'live-verified'");
+    expect(receiptWriter).toContain('pr-preview-provenance.json');
+    expect(receiptWriter).toContain('createPass71Hf313LivePostcondition');
     expect(receiptWriter).toContain("readJson('artifacts/pipeline/release-topology.json')");
   });
 
