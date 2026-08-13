@@ -1,4 +1,5 @@
 import type { WeaponFireKind } from './combat/weapon-schema';
+import { EXPLOSIVE_BOLT_MAX_LIFE_MS } from './combat/ordnance';
 import {
   isBotWeaponPresentationMessage,
   type BotFlareLaunchPresentationMessage,
@@ -115,6 +116,74 @@ export class HostedBotProjectileGlassActionLedger {
       if (this.actions.delete(key)) return;
     }
   }
+}
+
+export type ProjectileGlassWeaponId = 'explosive-crossbow' | 'flare-gun';
+
+export function projectileGlassActionLifetimeMs(weapon: WeaponId): number | null {
+  if (weapon === 'explosive-crossbow') return EXPLOSIVE_BOLT_MAX_LIFE_MS + 1_000;
+  if (weapon === 'flare-gun') {
+    return FLARE_PROJECTILE_EFFECT.maximumFlightMs + FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000;
+  }
+  return null;
+}
+
+export function isProjectileGlassWeapon(weapon: WeaponId): weapon is ProjectileGlassWeaponId {
+  return projectileGlassActionLifetimeMs(weapon) !== null;
+}
+
+export type RetainableProjectileGlassAction = Readonly<{
+  message: Readonly<{ weapon: WeaponId }>;
+  receivedAt: number;
+  matchEpoch: number;
+}>;
+
+/**
+ * A host-authoritative projectile can outlive its shooter's transport. Retain
+ * only the exact projectile identities that can still reach glass; ordinary
+ * shots and stale/cross-epoch identities are discarded immediately.
+ */
+export function retainInFlightProjectileGlassActions<T extends RetainableProjectileGlassAction>(
+  actions: Map<number, T> | undefined,
+  expectedMatchEpoch: number,
+  nowMs: number,
+): number {
+  if (!actions || !Number.isFinite(nowMs)) return 0;
+  for (const [actionNonce, action] of actions) {
+    const lifetimeMs = projectileGlassActionLifetimeMs(action.message.weapon);
+    const ageMs = nowMs - action.receivedAt;
+    if (lifetimeMs === null
+      || action.matchEpoch !== expectedMatchEpoch
+      || !Number.isFinite(ageMs)
+      || ageMs < 0
+      || ageMs > lifetimeMs) actions.delete(actionNonce);
+  }
+  return actions.size;
+}
+
+export type ProjectileSimulationGlassMutationAdmission = Readonly<{
+  accepted: boolean;
+  reason: 'authoritative-simulation' | 'presentation-only-prediction';
+}>;
+
+const AUTHORITATIVE_SIMULATION = Object.freeze({
+  accepted: true,
+  reason: 'authoritative-simulation',
+} as const);
+const PRESENTATION_ONLY_PREDICTION = Object.freeze({
+  accepted: false,
+  reason: 'presentation-only-prediction',
+} as const);
+
+/**
+ * Projectile replicas may predict flight, impact presentation and audio, but
+ * only the authoritative simulation owns durable pane/collider mutation. A
+ * guest receives that mutation later through admitProjectileGlassBreak.
+ */
+export function admitProjectileSimulationGlassMutation(
+  projectileAuthority: boolean,
+): ProjectileSimulationGlassMutationAdmission {
+  return projectileAuthority ? AUTHORITATIVE_SIMULATION : PRESENTATION_ONLY_PREDICTION;
 }
 
 export type ProjectileGlassBreakAdmissionReason =

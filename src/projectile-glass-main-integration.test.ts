@@ -37,15 +37,19 @@ describe('catalog-wide projectile glass integration', () => {
 
     const impact = block('function handleFlareImpact(', '\nfunction handleFlareBurnPulse(');
     expect(impact).toContain("weaponGlassBreakPolicy('flare-gun')");
+    expect(impact).toContain('admitProjectileSimulationGlassMutation(impact.authority)');
     expect(impact).toContain('impact.breakableWindowId');
     expect(impact).toContain("'flare-gun',");
+    expect(impact).not.toContain("network.role === 'client' && impact.ownerId === player.id");
     expect(impact.indexOf('breakHouseWindow(')).toBeLessThan(impact.indexOf('igniteGround('));
   });
 
   it('breaches crossbow blast glass at detonation before presentation disposal', () => {
     const detonation = block('function detonateExplosiveBoltEntity(', '\nconst crossbowGlassRay');
     expect(detonation).toContain("weaponGlassBreakPolicy('explosive-crossbow')");
+    expect(detonation).toContain('admitProjectileSimulationGlassMutation(bolt.authority)');
     expect(detonation).toContain('breakWindowsInWeaponBlast(');
+    expect(detonation).not.toContain("network.role === 'client' && bolt.ownerId === player.id");
     expect(detonation.indexOf('breakWindowsInWeaponBlast(')).toBeLessThan(detonation.indexOf('disposeExplosiveBolt('));
     expect(detonation.indexOf('breakWindowsInWeaponBlast(')).toBeLessThan(detonation.indexOf('if (!bolt.authority) return;'));
 
@@ -57,6 +61,7 @@ describe('catalog-wide projectile glass integration', () => {
 
   it('admits only host-canonical projectile breaks tied to the exact live action and pane', () => {
     const remote = block('function acceptRemoteWindowBreak(', '\nfunction resetBreakableWindows(');
+    expect(remote).toContain("const localCanonicalProjectile = network.role === 'client'");
     expect(remote).toContain('admitProjectileGlassBreak({');
     expect(remote).toContain("const paneActionKey = `glass:${message.windowId}`;");
     expect(remote).toContain('actionNonceObserved: remoteAction?.message.nonce ?? hostedBotAction?.actionNonce ?? null');
@@ -65,6 +70,41 @@ describe('catalog-wide projectile glass integration', () => {
     expect(remote).toContain('paneAlreadyAdmittedForAction: remoteAction?.targets.has(paneActionKey)');
     expect(remote.indexOf('if (!admission.accepted || !remoteAction && !hostedBotAction) return;'))
       .toBeLessThan(remote.indexOf('breakHouseWindow('));
+    expect(remote.indexOf('if (!remote) return;'))
+      .toBeGreaterThan(remote.indexOf('if (!admission.accepted || !action) return;'));
+    const paneMutation = block('function breakHouseWindow(', '\nfunction breakWindowsAlongBallisticTrace(');
+    expect(paneMutation).toContain('spawnPersistentWindowDebris(window, normal);');
+    expect(paneMutation).toContain("spawnImpactFlash(point, 'glass', normal);");
+    expect(paneMutation).toContain("audio.impact('glass', point.distanceTo(camera.position));");
+  });
+
+  it('retains the guest local projectile action until its late canonical pane event', () => {
+    const fire = block('function tryFire(', '\nfunction castShot(');
+    const projectile = block('if (projectileShot) {', "\n  if (network.role === 'client') {");
+    expect(projectile).toContain('actions.set(shot.nonce');
+    expect(projectile).toContain('admittedRemoteShots.set(player.id, actions);');
+    expect(projectile).not.toContain("if (network.role !== 'client')");
+    expect(fire.indexOf('actions.set(shot.nonce'))
+      .toBeLessThan(fire.indexOf("if (player.weapon === 'flare-gun')"));
+    const result = block('function acceptAuthoritativeShotResult(', '\nfunction renderRemoteShot(');
+    expect(result).toContain('pendingLocalProjectileGlassShots.get(message.shotId)');
+    expect(result).toContain("if (message.status === 'rejected'");
+    expect(result).toContain('localActions?.delete(pendingProjectileGlass.actionNonce);');
+  });
+
+  it('keeps an admitted projectile action through transport loss without retaining ordinary shots', () => {
+    const removal = block('function removeRemote(', '\nfunction activeSpawnMode(');
+    expect(removal).toContain('retainDisconnectedProjectileGlassActions(id);');
+    expect(removal).not.toContain('admittedRemoteShots.delete(id);');
+    const replacement = block('function resetAuthenticatedGuestReplacement(', '\nfunction safeGuestResumeFallbackSnapshot(');
+    expect(replacement).toContain('retainDisconnectedProjectileGlassActions(playerId, now);');
+    expect(replacement).not.toContain('admittedRemoteShots.delete(playerId);');
+    const retention = block(
+      'function retainDisconnectedProjectileGlassActions(',
+      '\nconst createRailgunClaimAudit',
+    );
+    expect(retention).toContain('retainInFlightProjectileGlassActions(');
+    expect(retention).toContain('interactiveWorldMatchEpoch');
   });
 
   it('retains authenticated hosted-bot flare actions without requiring a human remote pose', () => {

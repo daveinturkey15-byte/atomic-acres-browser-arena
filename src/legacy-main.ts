@@ -313,6 +313,10 @@ import { weaponGlassBreakPolicy } from './weapon-glass-break-policy';
 import {
   admitProjectileGlassBreak,
   HostedBotProjectileGlassActionLedger,
+  admitProjectileSimulationGlassMutation,
+  isProjectileGlassWeapon,
+  projectileGlassActionLifetimeMs,
+  retainInFlightProjectileGlassActions,
 } from './projectile-glass-break-admission';
 import {
   activeSoloBotTarget,
@@ -4979,9 +4983,14 @@ const flareShotResultContexts = new Map<string, Readonly<PendingFlareShotRequest
 let lastFlarePresentationBroadcastAt = Number.NEGATIVE_INFINITY;
 let lastFlarePresentationAdmission: FlarePresentationReconcileResult | null = null;
 const pendingLocalTimedShots = new Map<string, TimedMapWeaponId>();
+const pendingLocalProjectileGlassShots = new Map<string, Readonly<{
+  actionNonce: number;
+  matchEpoch: number;
+  weapon: 'explosive-crossbow' | 'flare-gun';
+}>>();
 function admittedShotActionLifetimeMs(weapon: WeaponId): number {
-  if (weapon === 'explosive-crossbow') return EXPLOSIVE_BOLT_MAX_LIFE_MS + 1_000;
-  if (weapon === 'flare-gun') return FLARE_PROJECTILE_EFFECT.maximumFlightMs + FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000;
+  const projectileGlassLifetimeMs = projectileGlassActionLifetimeMs(weapon);
+  if (projectileGlassLifetimeMs !== null) return projectileGlassLifetimeMs;
   if (weapon === 'flamethrower') return FLAMETHROWER_GROUND_FIRE_DURATION_MS + 1_000;
   return 1_000;
 }
@@ -4991,13 +5000,23 @@ function currentAdmittedShotAction(
   actionNonce: number,
   now = performance.now(),
 ): AdmittedRemoteShot | undefined {
-  const action = admittedRemoteShots.get(ownerId)?.get(actionNonce);
+  const actions = admittedRemoteShots.get(ownerId);
+  const action = actions?.get(actionNonce);
   if (!action || action.matchEpoch !== interactiveWorldMatchEpoch) return undefined;
   const ageMs = now - action.receivedAt;
   if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > admittedShotActionLifetimeMs(action.message.weapon)) {
+    actions!.delete(actionNonce);
+    if (actions!.size === 0) admittedRemoteShots.delete(ownerId);
     return undefined;
   }
   return action;
+}
+
+function retainDisconnectedProjectileGlassActions(ownerId: string, now = performance.now()): void {
+  const actions = admittedRemoteShots.get(ownerId);
+  if (retainInFlightProjectileGlassActions(actions, interactiveWorldMatchEpoch, now) === 0) {
+    admittedRemoteShots.delete(ownerId);
+  }
 }
 const createRailgunClaimAudit = () => ({
   received: 0,
@@ -6459,6 +6478,7 @@ function resetPrivateLobbyState(): void {
   remoteReloadTimers.clear();
   remoteReloadAuthorities.clear();
   pendingLocalOrdinaryShots.clear();
+  pendingLocalProjectileGlassShots.clear();
   pendingLocalReloadAuthority = null;
   localReloadActionSequence = 0;
   lastAppliedLocalCombatAuthorityRevision = -1;
@@ -7473,7 +7493,7 @@ function resetAuthenticatedGuestReplacement(playerId: string): void {
   }
   authoritativeShotAdmissions.delete(playerId);
   remoteShotAdmissions.delete(playerId);
-  admittedRemoteShots.delete(playerId);
+  retainDisconnectedProjectileGlassActions(playerId, now);
   admittedRemoteMelees.delete(playerId);
   admittedRemoteExplosions.delete(playerId);
   remoteMeleeAdmissions.delete(playerId);
@@ -7765,6 +7785,7 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   lastAppliedLocalCombatAuthorityRevision = projection.combatInventoryRevision;
   lastAppliedLocalShotResultSeq = -1;
   pendingLocalOrdinaryShots.clear();
+  pendingLocalProjectileGlassShots.clear();
   pendingLocalReloadAuthority = null;
   localReloadActionSequence = 0;
   player.invulnerableUntil = 0;
@@ -11559,6 +11580,16 @@ function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
   processedShotResults.add(resultKey);
   while (processedShotResults.size > 512) processedShotResults.delete(processedShotResults.values().next().value!);
   if (message.forPlayerId === player.id) {
+    const pendingProjectileGlass = pendingLocalProjectileGlassShots.get(message.shotId);
+    if (pendingProjectileGlass) {
+      pendingLocalProjectileGlassShots.delete(message.shotId);
+      if (message.status === 'rejected'
+        && pendingProjectileGlass.matchEpoch === interactiveWorldMatchEpoch) {
+        const localActions = admittedRemoteShots.get(player.id);
+        localActions?.delete(pendingProjectileGlass.actionNonce);
+        if (localActions?.size === 0) admittedRemoteShots.delete(player.id);
+      }
+    }
     const ordinary = pendingLocalOrdinaryShots.get(message.shotId);
     if (ordinary && admitLocalShotInventoryRepair(message, {
       playerId: player.id,
@@ -12631,7 +12662,11 @@ function canonicalHostWindowBreak(message: WindowBreakMessage, now: number): Win
 }
 
 function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
-  if (message.by === player.id) return;
+  const localCanonicalProjectile = network.role === 'client'
+    && message.by === player.id
+    && message.weapon !== undefined
+    && message.hostAuthority?.hostId === privateLobbySnapshot?.hostId;
+  if (message.by === player.id && !localCanonicalProjectile) return;
   const eventReplay = processedNonces.has(message.nonce);
   if (!message.weapon && eventReplay) return;
   if (network.role === 'client') {
@@ -13243,7 +13278,7 @@ function removeRemote(id: string, reason: string, allowRejoinReservation = true)
   verifiedRemoteKills.delete(id);
   remoteShotAdmissions.delete(id);
   hostTriggerAuthorities.reset(id, 'disconnect');
-  admittedRemoteShots.delete(id);
+  retainDisconnectedProjectileGlassActions(id);
   admittedRemoteMelees.delete(id);
   admittedRemoteExplosions.delete(id);
   remoteStickyAttachmentAuthority = removeRemoteStickyAttachmentsForActor(remoteStickyAttachmentAuthority, id);
@@ -14016,6 +14051,7 @@ async function startGame(
   localShotSeq = 0;
   localWeaponSequences.clear();
   pendingLocalOrdinaryShots.clear();
+  pendingLocalProjectileGlassShots.clear();
   pendingLocalReloadAuthority = null;
   localReloadActionSequence = 0;
   lastAppliedLocalCombatAuthorityRevision = -1;
@@ -14047,6 +14083,7 @@ async function startGame(
   pendingFlareShotRequests.clear();
   flareShotResultContexts.clear();
   pendingLocalTimedShots.clear();
+  pendingLocalProjectileGlassShots.clear();
   for (const timer of remoteReloadTimers.values()) window.clearTimeout(timer);
   remoteReloadTimers.clear();
   remoteReloadAuthorities.clear();
@@ -14610,6 +14647,7 @@ function initializeTimedMapWeaponsForMatch(
   pendingFlareShotRequests.clear();
   flareShotResultContexts.clear();
   pendingLocalTimedShots.clear();
+  pendingLocalProjectileGlassShots.clear();
   lastFlarePresentationBroadcastAt = Number.NEGATIVE_INFINITY;
   lastFlarePresentationAdmission = null;
   flareProjectileSystem.clear();
@@ -15892,8 +15930,7 @@ function tryFire(now: number): void {
     timing: nextCombatTiming(),
     nonce: shotActionNonce,
   };
-  if (player.weapon === 'flamethrower'
-    || network.role === 'client' && player.weapon === 'flare-gun') {
+  if (player.weapon === 'flamethrower') {
     const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
     for (const [nonce, action] of actions) {
       if (now - action.receivedAt > admittedShotActionLifetimeMs(action.message.weapon)) actions.delete(nonce);
@@ -15911,17 +15948,15 @@ function tryFire(now: number): void {
     );
   }
   if (projectileShot) {
-    if (network.role !== 'client') {
-      const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
-      for (const [nonce, action] of actions) {
-        const lifetimeMs = admittedShotActionLifetimeMs(action.message.weapon);
-        if (now - action.receivedAt > lifetimeMs) actions.delete(nonce);
-      }
-      actions.set(shot.nonce, {
-        message: shot, receivedAt: now, matchEpoch: interactiveWorldMatchEpoch, targets: new Set(),
-      });
-      admittedRemoteShots.set(player.id, actions);
+    const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
+    for (const [nonce, action] of actions) {
+      const lifetimeMs = admittedShotActionLifetimeMs(action.message.weapon);
+      if (now - action.receivedAt > lifetimeMs) actions.delete(nonce);
     }
+    actions.set(shot.nonce, {
+      message: shot, receivedAt: now, matchEpoch: interactiveWorldMatchEpoch, targets: new Set(),
+    });
+    admittedRemoteShots.set(player.id, actions);
     if (player.weapon === 'flare-gun') {
       const spawned = flareProjectileSystem.spawn({
         ownerId: player.id, ownerTeam: player.team, origin,
@@ -15969,6 +16004,13 @@ function tryFire(now: number): void {
       shotSeq: request.shotSeq,
       weapon: player.weapon,
     }));
+    if (isProjectileGlassWeapon(player.weapon)) {
+      pendingLocalProjectileGlassShots.set(request.shotId, Object.freeze({
+        actionNonce: request.nonce,
+        matchEpoch: interactiveWorldMatchEpoch,
+        weapon: player.weapon,
+      }));
+    }
     localShotSeq += 1;
     localWeaponSequences.set(player.weapon, weaponSequence + 1);
     network.send(request);
@@ -17704,8 +17746,9 @@ function detonateExplosiveBoltEntity(bolt: ExplosiveBoltEntity, now: number): vo
   const stuck = sealedAttachment !== null;
   const blastRadiusM = explosiveBoltBlastRadiusM(stuck);
   const glassPolicy = weaponGlassBreakPolicy('explosive-crossbow');
+  const glassMutation = admitProjectileSimulationGlassMutation(bolt.authority);
   if (glassPolicy.timing === 'detonation'
-    && (bolt.authority || network.role === 'client' && bolt.ownerId === player.id)) {
+    && glassMutation.accepted) {
     breakWindowsInWeaponBlast(
       point,
       bolt.actionNonce,
@@ -18090,8 +18133,9 @@ function handleFlareDirectHit(hit: FlareProjectileDirectHit): void {
 function handleFlareImpact(impact: FlareProjectileImpact): void {
   timedMapWeaponAudit.flareImpacts += 1;
   const glassPolicy = weaponGlassBreakPolicy('flare-gun');
+  const glassMutation = admitProjectileSimulationGlassMutation(impact.authority);
   if (impact.breakableWindowId && glassPolicy.timing === 'impact'
-    && (impact.authority || network.role === 'client' && impact.ownerId === player.id)) {
+    && glassMutation.accepted) {
     const pane = arena.breakableWindows.find(({ id }) => id === impact.breakableWindowId);
     if (pane) {
       const centre = pane.mesh.getWorldPosition(new THREE.Vector3());
@@ -24716,6 +24760,7 @@ function resetForMode(preserveAdmission = false): void {
   pendingFlareShotRequests.clear();
   flareShotResultContexts.clear();
   pendingLocalTimedShots.clear();
+  pendingLocalProjectileGlassShots.clear();
   localTimedMapWeaponPendingUntil.clear();
   lastTimedMapWeaponStateBroadcastAt = Number.NEGATIVE_INFINITY;
   timedMapWeaponAudit = createTimedMapWeaponAudit();
