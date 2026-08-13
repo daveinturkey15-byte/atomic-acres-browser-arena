@@ -28,7 +28,7 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('admitKillstreakStateMessage(message, {');
     expect(source).toContain('seenNonces: processedNonces');
     expect(source).toContain('event.targetLifeId !== localContinuity');
-    expect(source).toContain('killstreakPresentation.presentImpacts(message.impacts, presentedAt)');
+    expect(source).toContain('killstreakPresentation.presentImpacts(admission.impacts, presentedAt)');
   });
 
   it('admits the one-life guest match-start race and targets one exact duplicate ACK without granting continuity', () => {
@@ -245,16 +245,20 @@ describe('Pass 65 playable killstreak integration', () => {
   });
 
   it('plays the authored chopper impact action for host-applied and client-received authoritative hits', () => {
-    const start = source.indexOf('function presentKillstreakDamageFeedback(');
-    const end = source.indexOf('\nfunction killstreakActorModifiers(', start);
-    const block = source.slice(start, end);
-    expect(block).toContain("event.source === 'chopper'");
-    expect(block).toContain('entity.activationId === event.activationId');
-    expect(block).toContain('killstreakPresentation.presentChopperImpactAction(presented.id)');
+    const feedbackStart = source.indexOf('function presentKillstreakDamageFeedback(');
+    const feedbackEnd = source.indexOf('\nfunction killstreakActorModifiers(', feedbackStart);
+    const feedback = source.slice(feedbackStart, feedbackEnd);
+    expect(feedback).toContain("if (event.source === 'chopper'");
+    expect(feedback).toContain('entity.activationId === event.activationId');
+    expect(feedback).toContain('killstreakPresentation.presentChopperImpactAction(presented.id)');
+
+    const hostStart = source.indexOf('function updatePass65KillstreakRuntime(');
+    const hostEnd = source.indexOf('\nfunction overdriveStateMessage(', hostStart);
+    expect(source.slice(hostStart, hostEnd)).toContain('presentKillstreakDamageFeedback(applied)');
     const clientStart = source.indexOf("if (message.type === 'killstreak-damage-result')");
     const clientEnd = source.indexOf("\n  if (message.type === 'railgun-state')", clientStart);
     const clientBlock = source.slice(clientStart, clientEnd);
-    expect(clientBlock).toContain('presentKillstreakDamageFeedback(message.events)');
+    expect(clientBlock).toContain('presentKillstreakDamageFeedback(admission.events)');
   });
 
   it('uses a world-space crosshair for Care/Carpet placement and host-owned surface height', () => {

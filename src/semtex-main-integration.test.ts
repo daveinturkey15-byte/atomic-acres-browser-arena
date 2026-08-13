@@ -38,7 +38,8 @@ describe('Semtex live-stick runtime integration', () => {
     const armStart = source.indexOf('function armImpactGrenade(');
     const armEnd = source.indexOf('\nfunction updateGrenades(', armStart);
     const arm = source.slice(armStart, armEnd);
-    expect(arm).toContain('if (targetId === player.id) {');
+    expect(arm).toContain("if (network.role !== 'client' && targetId === player.id) {");
+    expect(arm).toContain("else if (network.role !== 'client' && grenade.ownerKind === 'player') {");
     expect(arm).toContain("presentStickyUrgentAlert('semtex', 'victim', targetId, targetLifeId, grenade.actionNonce, now)");
     expect(arm).toContain("presentStickyUrgentAlert('semtex', 'attacker', targetId, targetLifeId, grenade.actionNonce, now)");
 

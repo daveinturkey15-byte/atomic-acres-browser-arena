@@ -212,6 +212,7 @@ import {
   type KillstreakLoadoutIntentMessage,
   type KillstreakStateMessage,
 } from './killstreak-protocol';
+import { KillstreakDamageResultReplayLedger } from './killstreak-damage-result-admission';
 import {
   acknowledgeClientWorldRepairActor,
   beginClientWorldRepair,
@@ -326,7 +327,13 @@ import { hitProxyZoneCentre } from './hit-proxies';
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { routeIdentityTelemetry } from './world-identity';
 import { damageNumberPresentation, roundStatSummary } from './player-feedback';
-import { SupportDamageFeedbackTelemetry, planSupportDamageFeedback, projectSupportDamageAnchor, type SupportDamageScreenAnchor } from './support-damage-feedback';
+import {
+  LocalSupportShotPresentationReceipts,
+  SupportDamageFeedbackTelemetry,
+  planSupportDamageFeedback,
+  projectSupportDamageAnchor,
+  type SupportDamageScreenAnchor,
+} from './support-damage-feedback';
 import { isHoldInteraction, primaryInteraction, type InteractionCandidate } from './interaction-arbitration';
 import {
   createFInteractionPressState,
@@ -4646,12 +4653,14 @@ const SUPPORT_STATUS_HUD_REFRESH_INTERVAL_MS = 100;
 let lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
 let lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
 const appliedKillstreakDamageResults = new Set<string>();
+const killstreakDamageResultReplayLedger = new KillstreakDamageResultReplayLedger();
 const killstreakRegisteredActors = new Set<string>();
 const hostKillstreakLoadoutAcks = new HostKillstreakLoadoutAckRegistry();
 let displayedCareReward: Pass65KillstreakId | null = null;
 const supportDamageDealtByActivation = new Map<string, number>();
 const liveSupportActivationIds = new Set<string>();
 const supportDamageFeedbackTelemetry = new SupportDamageFeedbackTelemetry();
+const localSupportShotPresentationReceipts = new LocalSupportShotPresentationReceipts();
 let adrenalineHudWasActive = false;
 let lastMatchCountdownCue: MatchCountdownCue | null = null;
 let matchCountdownCueSequence = 0;
@@ -9732,6 +9741,39 @@ function handleFlashAuthorityMessage(message: GameMessage): boolean {
   return true;
 }
 
+function presentCanonicalStickyAttackerFeedback(message: HitMessage): void {
+  if (network.role !== 'client') return;
+  const targetLifeId = message.target === player.id
+    ? localContinuity
+    : remotes.get(message.target)?.continuity ?? bots.get(message.target)?.continuity ?? null;
+  if (targetLifeId === null) return;
+  const feedback = projectStickyAttackerFeedback(
+    message,
+    player.id,
+    privateLobbySnapshot?.hostId,
+    targetLifeId,
+  );
+  if (!feedback) return;
+  const canonicalResult = admitHostCanonicalHitResult(message.hostAuthority, {
+    expectedHostId: privateLobbySnapshot?.hostId,
+    targetId: message.target,
+    expectedTargetId: feedback.targetId,
+    expectedTargetLifeId: feedback.targetLifeId,
+    alreadyProcessed: attackerStuckNonces.has(message.nonce),
+  });
+  if (!canonicalResult.accepted) return;
+  attackerStuckNonces.add(message.nonce);
+  while (attackerStuckNonces.size > 128) attackerStuckNonces.delete(attackerStuckNonces.values().next().value!);
+  presentStickyUrgentAlert(
+    feedback.source,
+    'attacker',
+    feedback.targetId,
+    feedback.targetLifeId,
+    feedback.actionNonce,
+  );
+  addFeed('STUCK', 'gold');
+}
+
 function onNetworkMessage(message: GameMessage): void {
   if (handleLobbyMessage(message)) return;
   if (!gameStarted) return;
@@ -9957,13 +9999,18 @@ function onNetworkMessage(message: GameMessage): void {
     return;
   }
   if (message.type === 'killstreak-damage-result') {
-    if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.matchEpoch !== killstreakMatchEpoch) return;
-    for (const event of message.events) {
+    if (network.role !== 'client') return;
+    const admission = killstreakDamageResultReplayLedger.admit(message, {
+      expectedHostId: privateLobbySnapshot?.hostId,
+      expectedMatchEpoch: killstreakMatchEpoch,
+    });
+    if (!admission.accepted) return;
+    for (const event of admission.events) {
       if (event.targetId === player.id) applyKillstreakDamageEvent(event);
     }
-    presentKillstreakDamageFeedback(message.events);
+    presentKillstreakDamageFeedback(admission.events);
     const presentedAt = performance.now();
-    for (const impact of message.impacts) {
+    for (const impact of admission.impacts) {
       if (impact.phase !== 'impact') continue;
       const point = new THREE.Vector3(...impact.position);
       if (impact.source === 'carpet-bomber' && carpetGroundFireGuestPresentation.admit(message.matchEpoch, impact)) {
@@ -9978,7 +10025,7 @@ function onNetworkMessage(message: GameMessage): void {
         presentedAt,
       );
     }
-    killstreakPresentation.presentImpacts(message.impacts, presentedAt);
+    killstreakPresentation.presentImpacts(admission.impacts, presentedAt);
     return;
   }
   if (message.type === 'railgun-state') {
@@ -10591,27 +10638,8 @@ function onNetworkMessage(message: GameMessage): void {
     }
     return;
   }
+  if (message.type === 'hit') presentCanonicalStickyAttackerFeedback(message);
   if (message.type === 'hit' && !processedNonces.has(message.nonce)) {
-    // Attacker-side STUCK confirmation: when the local player's own sticky Semtex
-    // or explosive crossbolt attaches to a combatant, mirror the alert on their
-    // screen too (the victim already sees it via the target branch below).
-    const attackerStickyFeedback = projectStickyAttackerFeedback(
-      message,
-      player.id,
-      privateLobbySnapshot?.hostId,
-    );
-    if (attackerStickyFeedback && !attackerStuckNonces.has(message.nonce)) {
-      attackerStuckNonces.add(message.nonce);
-      while (attackerStuckNonces.size > 128) attackerStuckNonces.delete(attackerStuckNonces.values().next().value!);
-      presentStickyUrgentAlert(
-        attackerStickyFeedback.source,
-        'attacker',
-        attackerStickyFeedback.targetId,
-        attackerStickyFeedback.targetLifeId,
-        attackerStickyFeedback.actionNonce,
-      );
-      addFeed('STUCK', 'gold');
-    }
     const attacker = remotes.get(message.by);
     const localCanonicalAttacker = network.role === 'client'
       && message.by === player.id
@@ -13773,6 +13801,7 @@ async function startGame(
   stickyTimingReplayNonces.clear();
   stickyVictimFeedbackCount = 0;
   lastStickyVictimFeedback = null;
+  attackerStuckNonces.clear();
   resetStickyUrgentAlertLife();
   stickyVictimReceiptKeys = mode === 'client'
     ? new Set(loadStickyVictimReceiptKeys(clientPersistentStorage(), interactiveWorldMatchEpoch, player.id))
@@ -13807,6 +13836,7 @@ async function startGame(
   localCareCaptureRequiresHold = false;
   displayedCareReward = null;
   appliedKillstreakDamageResults.clear();
+  killstreakDamageResultReplayLedger.reset();
   killstreakRegisteredActors.clear();
   hostKillstreakLoadoutAcks.clear();
   killstreakPresentation.clear();
@@ -13814,6 +13844,7 @@ async function startGame(
   lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
   lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
   supportDamageFeedbackTelemetry.reset();
+  localSupportShotPresentationReceipts.reset();
   player.name = requiredName;
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
   resetMatchPauseBackdrop();
@@ -18066,13 +18097,13 @@ function updateExplosiveBolts(dt: number, now: number): void {
           attachedAtMs: now,
           expiresAtMs: bolt.detonatesAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
         });
-        if (targetHitId === player.id) {
+        if (network.role !== 'client' && targetHitId === player.id) {
           presentStickyUrgentAlert(
             'explosive-crossbow', 'victim', targetHitId, targetHitLifeId, bolt.actionNonce, now,
           );
           addFeed('STUCK', 'coral');
         }
-        else if (bolt.ownerId === player.id) {
+        else if (network.role !== 'client' && bolt.ownerId === player.id) {
           presentStickyUrgentAlert(
             'explosive-crossbow', 'attacker', targetHitId, targetHitLifeId, bolt.actionNonce, now,
           );
@@ -18718,11 +18749,11 @@ function armImpactGrenade(
         attachedAtMs: now,
         expiresAtMs: grenade.explodeAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
       });
-      if (targetId === player.id) {
+      if (network.role !== 'client' && targetId === player.id) {
         presentStickyUrgentAlert('semtex', 'victim', targetId, targetLifeId, grenade.actionNonce, now);
         addFeed('STUCK', 'coral');
       }
-      else if (grenade.ownerKind === 'player') {
+      else if (network.role !== 'client' && grenade.ownerKind === 'player') {
         presentStickyUrgentAlert('semtex', 'attacker', targetId, targetLifeId, grenade.actionNonce, now);
         addFeed('STUCK', 'gold');
       }
@@ -19367,13 +19398,8 @@ function updateFInteractionPrompt(now = performance.now()): void {
   }
 }
 
-function localPossessionAlreadyPresentedChopperShot(event: KillstreakDamageEvent): boolean {
-  if (event.source !== 'chopper') return false;
-  const possession = localKillstreakActorSnapshot()?.possession;
-  if (possession?.kind !== 'chopper-gunner') return false;
-  return killstreakSnapshot.entities.some((entity) => (
-    entity.id === possession.entityId && entity.activationId === event.activationId
-  ));
+function consumeLocalChopperShotPresentationReceipt(event: KillstreakDamageEvent): boolean {
+  return localSupportShotPresentationReceipts.consume(event, currentHostTimeMs());
 }
 
 function recordOwnerSupportDamage(
@@ -19415,9 +19441,11 @@ function recordOwnerSupportDamage(
 function presentKillstreakDamageFeedback(events: readonly KillstreakDamageEvent[]): void {
   for (const { event, firstForShot: firstShotEvent } of planSupportDamageFeedback(events)) {
     if (event.ownerId === player.id) {
+      const localBallisticsAlreadyPresented = firstShotEvent
+        && consumeLocalChopperShotPresentationReceipt(event);
       recordOwnerSupportDamage(
         event,
-        firstShotEvent && !localPossessionAlreadyPresentedChopperShot(event),
+        firstShotEvent && !localBallisticsAlreadyPresented,
         firstShotEvent,
       );
     }
@@ -20246,6 +20274,11 @@ function updateKillstreakPossession(now: number): void {
       const muzzle = new THREE.Vector3(...shotRay.tracerOrigin);
       const aim = new THREE.Vector3(...shotRay.direction);
       spawnTracer(muzzle, muzzle.clone().addScaledVector(aim, 130), 0xffb347);
+      localSupportShotPresentationReceipts.record({
+        activationId: entity.activationId,
+        source: 'chopper',
+        presentedAtHostTimeMs: currentHostTimeMs(),
+      });
     }
     nextLocalSupportGunReportAt = now + (possession.kind === 'chopper-gunner'
       ? CHOPPER_GUN_PROFILE.cadenceMs
@@ -21849,6 +21882,8 @@ function clearFieldSupport(): void {
   lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
   killstreakPresentation.setFirstPersonEntity(null);
   killstreakPresentation.clear();
+  killstreakDamageResultReplayLedger.reset();
+  localSupportShotPresentationReceipts.reset();
   document.documentElement.dataset.killstreakPossession = 'none';
   if (camera.near !== 0.08) {
     camera.near = 0.08;
@@ -21900,6 +21935,7 @@ function clearFieldSupport(): void {
   stickyTimingReplayNonces.clear();
   stickyVictimFeedbackCount = 0;
   lastStickyVictimFeedback = null;
+  attackerStuckNonces.clear();
   resetStickyUrgentAlertLife();
   stickyVictimReceiptKeys.clear();
   lastQaStickyAuthoritativeHits.clear();

@@ -109,21 +109,22 @@ describe('sticky victim feedback projection', () => {
   });
 
   it('projects attacker confirmation only from the exact canonical host envelope', () => {
-    expect(projectStickyAttackerFeedback(result(), 'host-1', 'host-1')).toEqual({
+    expect(projectStickyAttackerFeedback(result(), 'host-1', 'host-1', 4)).toEqual({
       label: 'STUCK', source: 'semtex', targetId: 'guest-1', targetLifeId: 4, actionNonce: 31, resultNonce: 91,
     });
-    expect(projectStickyAttackerFeedback(result({ explosiveSource: 'explosive-crossbow' }), 'host-1', 'host-1'))
+    expect(projectStickyAttackerFeedback(result({ explosiveSource: 'explosive-crossbow' }), 'host-1', 'host-1', 4))
       .toMatchObject({ source: 'explosive-crossbow' });
-    expect(projectStickyAttackerFeedback(result(), 'guest-1', 'host-1')).toBeNull();
-    expect(projectStickyAttackerFeedback(result(), 'host-1', 'other-host')).toBeNull();
-    expect(projectStickyAttackerFeedback(result({ hostAuthority: undefined }), 'host-1', 'host-1')).toBeNull();
-    expect(projectStickyAttackerFeedback(result({ stuck: undefined }), 'host-1', 'host-1')).toBeNull();
+    expect(projectStickyAttackerFeedback(result(), 'guest-1', 'host-1', 4)).toBeNull();
+    expect(projectStickyAttackerFeedback(result(), 'host-1', 'other-host', 4)).toBeNull();
+    expect(projectStickyAttackerFeedback(result(), 'host-1', 'host-1', 5)).toBeNull();
+    expect(projectStickyAttackerFeedback(result({ hostAuthority: undefined }), 'host-1', 'host-1', 4)).toBeNull();
+    expect(projectStickyAttackerFeedback(result({ stuck: undefined }), 'host-1', 'host-1', 4)).toBeNull();
     expect(projectStickyAttackerFeedback(result({
       hostAuthority: { ...result().hostAuthority!, appliedDamage: 0 },
-    }), 'host-1', 'host-1')).toBeNull();
+    }), 'host-1', 'host-1', 4)).toBeNull();
     expect(projectStickyAttackerFeedback(result({
       hostAuthority: { ...result().hostAuthority!, targetLifeId: 5 },
-    }), 'host-1', 'host-1')).toBeNull();
+    }), 'host-1', 'host-1', 4)).toBeNull();
   });
 
   it('rejects non-sticky, noncanonical, stale-life and wrong-victim projections', () => {

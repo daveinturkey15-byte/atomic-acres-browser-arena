@@ -120,6 +120,7 @@ export function projectStickyAttackerFeedback(
   message: Pick<HitMessage, 'by' | 'target' | 'kind' | 'explosiveSource' | 'stuck' | 'hostAuthority' | 'actionNonce' | 'nonce'>,
   expectedAttackerId: string,
   expectedHostId: string | undefined,
+  expectedTargetLifeId: number,
 ): StickyAttackerFeedback | null {
   const authority = message.hostAuthority;
   const attachment = authority?.stickyAttachment;
@@ -130,6 +131,7 @@ export function projectStickyAttackerFeedback(
     || message.explosiveSource !== 'grenade' && message.explosiveSource !== 'explosive-crossbow'
     || !authority
     || authority.hostId !== expectedHostId
+    || authority.targetLifeId !== expectedTargetLifeId
     || authority.targetLifeId !== attachment?.targetLifeId
     || authority.appliedDamage <= 0
     || !attachment
