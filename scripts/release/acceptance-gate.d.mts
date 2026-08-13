@@ -18,6 +18,13 @@ export type AcceptanceValidation = Readonly<{
     feedbackReceivedAt: string | null;
     previewCreatedAt: string | null;
     approvedAt: string | null;
+    nativeEvidence: null | Readonly<{
+      evidenceId: string | null;
+      kind: string | null;
+      receiptSha256: string | null;
+      startedAt: string | null;
+      completedAt: string | null;
+    }>;
   }>;
 }>;
 
@@ -28,7 +35,10 @@ export type AcceptanceWorkflowOutputs = Readonly<{
 
 export function validateAcceptanceManifest(
   manifest: unknown,
-  options?: Readonly<{ policy?: AcceptancePolicy }>,
+  options?: Readonly<{
+    policy?: AcceptancePolicy;
+    pass71NativeEvidenceTooling?: Readonly<Record<string, string>>;
+  }>,
 ): AcceptanceValidation;
 
 export function classifyPreviewDelta(

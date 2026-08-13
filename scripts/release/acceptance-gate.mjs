@@ -6,6 +6,11 @@ import { dirname, isAbsolute, join, normalize, relative, resolve } from 'node:pa
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { classifyPaths } from './change-impact.mjs';
+import {
+  PASS71_GRENADE_NATIVE_EVIDENCE,
+  pass71GrenadeNativeEvidenceFailures,
+  pass71GrenadeNativeToolingHashesAtSource,
+} from '../qa/pass71-grenade-native-receipt-contract.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPOSITORY_ROOT = resolve(dirname(SCRIPT_PATH), '..', '..');
@@ -203,6 +208,43 @@ export function validateAcceptanceManifest(manifest, options = {}) {
       errors.push('GitHub Actions preview ref must be pr-preview-<pr>-<sourceSha> and match preview.sourceSha');
     }
   }
+  if (manifest.releasePass === 'PASS 71') {
+    const nativeEvidence = manifest.nativeEvidence;
+    if (!Array.isArray(nativeEvidence)) {
+      errors.push('PASS 71 nativeEvidence must be an array containing exactly one canonical HF-298 native-WebGPU component record');
+    } else {
+      const knownKey = `${PASS71_GRENADE_NATIVE_EVIDENCE.evidenceId}\u0000${PASS71_GRENADE_NATIVE_EVIDENCE.kind}`;
+      const recordsByKey = new Map();
+      for (const [index, record] of nativeEvidence.entries()) {
+        const key = `${record?.evidenceId ?? ''}\u0000${record?.kind ?? ''}`;
+        if (key !== knownKey) {
+          errors.push(`PASS 71 nativeEvidence[${index}] has no registered evidence validator`);
+          continue;
+        }
+        const records = recordsByKey.get(key) ?? [];
+        records.push({ index, record });
+        recordsByKey.set(key, records);
+      }
+      const hf298Records = recordsByKey.get(knownKey) ?? [];
+      if (hf298Records.length !== 1) {
+        errors.push('PASS 71 nativeEvidence must contain exactly one canonical HF-298 native-WebGPU component record');
+      } else {
+        const [{ index, record }] = hf298Records;
+        let tooling = options.pass71NativeEvidenceTooling;
+        try {
+          tooling ??= pass71GrenadeNativeToolingHashesAtSource(REPOSITORY_ROOT, preview?.sourceSha);
+        } catch (error) {
+          errors.push(`PASS 71 nativeEvidence tooling could not be hashed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        if (tooling) {
+          for (const failure of pass71GrenadeNativeEvidenceFailures(record, {
+            sourceSha: preview?.sourceSha,
+            tooling,
+          })) errors.push(`PASS 71 nativeEvidence[${index}]: ${failure}`);
+        }
+      }
+    }
+  }
   const approval = manifest.humanAcceptance;
   if (!approval || approval.state !== 'approved' || approval.approvedBy !== policy.ownerHandle
     || !isIsoDate(approval.approvedAt) || !nonEmpty(approval.evidence)) {
@@ -221,6 +263,24 @@ export function validateAcceptanceManifest(manifest, options = {}) {
   if (preview && approval && isIsoDate(preview.createdAt) && isIsoDate(approval.approvedAt)
     && Date.parse(approval.approvedAt) < Date.parse(preview.createdAt)) {
     errors.push('humanAcceptance.approvedAt cannot precede preview.createdAt');
+  }
+  const pass71NativeRecord = manifest.releasePass === 'PASS 71'
+    && Array.isArray(manifest.nativeEvidence)
+    ? manifest.nativeEvidence.find((record) => (
+      record?.evidenceId === PASS71_GRENADE_NATIVE_EVIDENCE.evidenceId
+      && record?.kind === PASS71_GRENADE_NATIVE_EVIDENCE.kind
+    ))
+    : null;
+  if (pass71NativeRecord && isIsoDate(preview?.createdAt)
+    && isIsoDate(pass71NativeRecord.startedAt)
+    && isIsoDate(pass71NativeRecord.completedAt)
+    && isIsoDate(approval?.approvedAt)) {
+    if (Date.parse(pass71NativeRecord.startedAt) < Date.parse(preview.createdAt)) {
+      errors.push('PASS 71 native evidence startedAt cannot precede preview.createdAt');
+    }
+    if (Date.parse(pass71NativeRecord.completedAt) > Date.parse(approval.approvedAt)) {
+      errors.push('PASS 71 native evidence completedAt cannot follow humanAcceptance.approvedAt');
+    }
   }
   if (isIsoDate(manifest.feedbackReceivedAt) && preview && isIsoDate(preview.createdAt)
     && Date.parse(preview.createdAt) < Date.parse(manifest.feedbackReceivedAt)) {
@@ -244,6 +304,13 @@ export function validateAcceptanceManifest(manifest, options = {}) {
       feedbackReceivedAt: manifest.feedbackReceivedAt ?? null,
       previewCreatedAt: preview?.createdAt ?? null,
       approvedAt: approval?.approvedAt ?? null,
+      nativeEvidence: pass71NativeRecord ? {
+        evidenceId: pass71NativeRecord.evidenceId ?? null,
+        kind: pass71NativeRecord.kind ?? null,
+        receiptSha256: pass71NativeRecord.receiptSha256 ?? null,
+        startedAt: pass71NativeRecord.startedAt ?? null,
+        completedAt: pass71NativeRecord.completedAt ?? null,
+      } : null,
     },
   };
 }
@@ -334,6 +401,15 @@ export function classifyPreviewDelta(paths, manifestPath, previewSha = null, opt
         ok: false,
         paths: normalizedPaths,
         reason: `Pass 66 post-preview delta differs from the exact finalizer output set (missing=${missing.join(',') || '<none>'}; unexpected=${unexpected.join(',') || '<none>'})`,
+      };
+  }
+  if (manifestPath === 'acceptance/pass-71.json') {
+    return normalizedPaths.length === 1 && normalizedPaths[0] === manifestPath
+      ? { ok: true, paths: normalizedPaths, reason: 'only the exact Pass 71 manifest finalizer changed after preview' }
+      : {
+        ok: false,
+        paths: normalizedPaths,
+        reason: 'Pass 71 candidate B may change only acceptance/pass-71.json after candidate A preview',
       };
   }
   // Test sources never enter the shipped Vite tree. They must still classify

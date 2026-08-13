@@ -53,6 +53,25 @@ The machine name identifies where the bytes originated; the harness identifies w
 
 Pass 66 and Pass 71 have explicit, narrow authorization exceptions. Dave instructed the release owner to publish each frozen candidate as **The Big One** only when it is genuinely green, without waiting for another subjective HITL feedback round; Pass 71 replaces Pass 70 while retaining Pass 69 and byte-exact Pass 63. The immutable preview, exact-SHA gates and acceptance manifest remain mandatory. Only after that preview exists may a process-only acceptance update bind the standing instruction to its exact SHA and actual binding time; it must state truthfully that Dave did not inspect or test that immutable preview in a new HITL round. Any later runtime or release-shell drift invalidates the binding. This exception does not apply to another pass.
 
+### Pass 71 candidate-A grenade native WebGPU component evidence
+
+The hosted Windows `software-ci-semantic` grenade shard is acceptance-ineligible. After the immutable preview for final candidate A exists, check out that exact clean A and run the release-owned installed-Edge native-WebGPU gate with its SHA explicitly supplied:
+
+```powershell
+$candidateSha = git rev-parse HEAD
+npm run qa:pass71:grenade-native -- --expected-source-sha $candidateSha
+```
+
+The runner rejects source dirt before or after the run, a checkout or staged-source mismatch, Vite overrides, a non-Edge browser, WebGL fallback, a software adapter, device loss, browser/runtime faults, any missing cold/warm Frag/Flash/Smoke/Semtex trial, and every native action-frontier breach. It runs the pinned npm lockfile preflight, records Edge's on-disk ProductVersion, install root, executable hash and valid Microsoft Authenticode identity, and requires that identity to agree with the observed `Edg/` UA/version. Each grenade requires the port to be unbound and gets a separate topology-wrapper and Playwright invocation. That wrapper creates a new temporary build, stages the release topology, and starts Vite with `strictPort`, so the cold action starts in a fresh owned staged preview, Edge process, profile and GPU-cache boundary; the warm action remains in that same trial. Unlike the software shard it retains and gates maximum rAF as well as handler, frame-work, next-rAF, submission, completion and pending frontiers. `servedSourceSha` comes from a no-cache browser fetch of the staged `channels/the-big-one/channel-provenance.json`; it is not copied from `SOURCE_SHA` or another runner variable.
+
+A pass writes ignored local diagnostics under `artifacts/pass71/grenade-native/`: a full receipt, file hashes, and `<candidate-A-sha>-native-evidence.json`. A local artifact path or `artifact://` string is not CI-verifiable release evidence. The native-evidence JSON is instead a ready-to-paste canonical object whose `receiptSha256` is recomputed from the embedded object itself, excluding only that digest field. Before finalization it can be independently checked with:
+
+```powershell
+npm run qa:pass71:grenade-native:verify -- --evidence artifacts/pass71/grenade-native/$candidateSha-native-evidence.json --expected-source-sha $candidateSha
+```
+
+After candidate A's immutable preview exists, candidate B changes only `acceptance/pass-71.json`. Copy that object unchanged into the manifest's top-level `nativeEvidence` array. Pass 71 currently requires exactly one `HF-298` **solo Atomic Acres Performance WebGPU grenade component** record; it does not claim complete HF-298 hosted or WebGL2 closure. The array is an evidence-validator registry boundary rather than a globally fixed one-record set, so later HF-296/297/302/303/310/311 component validators can be added without weakening this requirement. Duplicate HF-298 components, unregistered IDs/kinds, unknown schema fields, transcription drift and stale candidate-A hashes for the runner, contract, spec, frame budget, topology, Playwright/Vite configuration, release channels, acceptance gate, package manifest/lock, lock verifier, and browser identity helpers fail. CI and the production workflow both run `acceptance-gate.mjs`, which recomputes the embedded digest and all measurement eligibility, requires expected/checkout/served/end SHA to equal the manifest preview's candidate A SHA, enforces `preview.createdAt <= startedAt <= completedAt <= humanAcceptance.approvedAt`, hashes those unchanged candidate-A blobs with `git show`, and separately proves candidate A is an ancestor with an exact candidate-B delta of only `acceptance/pass-71.json`. Adding a kind requires a named exact-schema validator rather than an opaque external reference. The remaining hosted/WebGL2 HF-298 evidence must stay open or use separately validated exact-A component records; this receipt cannot close it by implication.
+
 Before implementation, declare one mechanically conservative impact class:
 
 | Class | Typical paths | Required browser work |

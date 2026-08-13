@@ -5,6 +5,10 @@ import {
   selectCiAcceptanceManifest,
   validateAcceptanceManifest,
 } from '../scripts/release/acceptance-gate.mjs';
+import {
+  createPass71GrenadeNativeEvidenceFixture,
+  pass71GrenadeNativeToolingHashes,
+} from '../scripts/qa/pass71-grenade-native-receipt-contract.mjs';
 
 const policy = {
   schemaVersion: 1,
@@ -207,14 +211,90 @@ describe('release acceptance manifest', () => {
     const manifest = acceptedManifest();
     manifest.releasePass = 'PASS 71';
     manifest.preview.ref = `pr-preview-71-${manifest.preview.sourceSha}`;
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    (manifest as typeof manifest & { nativeEvidence: unknown[] }).nativeEvidence = [
+      createPass71GrenadeNativeEvidenceFixture({ sourceSha: manifest.preview.sourceSha, tooling }),
+    ];
     manifest.humanAcceptance.evidence = 'Dave\'s standing conditional publication authorization is bound here; Dave did not inspect or test this immutable preview.';
-    expect(validateAcceptanceManifest(manifest, { policy })).toMatchObject({ ok: true });
+    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling })).toMatchObject({ ok: true });
 
     manifest.humanAcceptance.evidence = 'Dave gave standing conditional publication authorization for this immutable preview.';
-    expect(validateAcceptanceManifest(manifest, { policy }).errors.join('\n')).toMatch(/did not inspect or test/);
+    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling }).errors.join('\n')).toMatch(/did not inspect or test/);
 
     manifest.humanAcceptance.evidence = 'Dave did not inspect this immutable preview; publication may proceed.';
-    expect(validateAcceptanceManifest(manifest, { policy }).errors.join('\n')).toMatch(/standing conditional/);
+    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling }).errors.join('\n')).toMatch(/standing conditional/);
+  });
+
+  it('requires exactly one canonical preview-bound HF-298 native-WebGPU component record for Pass 71', () => {
+    const manifest = acceptedManifest();
+    manifest.releasePass = 'PASS 71';
+    manifest.preview.ref = `pr-preview-71-${manifest.preview.sourceSha}`;
+    manifest.humanAcceptance.evidence = 'Dave\'s standing conditional publication authorization is bound here; Dave did not inspect or test this immutable preview.';
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    const nativeEvidence = createPass71GrenadeNativeEvidenceFixture({
+      sourceSha: manifest.preview.sourceSha,
+      tooling,
+    });
+    (manifest as typeof manifest & { nativeEvidence: unknown[] }).nativeEvidence = [nativeEvidence];
+    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling })).toMatchObject({
+      ok: true,
+      summary: {
+        nativeEvidence: {
+          evidenceId: 'HF-298',
+          kind: 'pass71-hf298-grenade-native-webgpu-component',
+          receiptSha256: nativeEvidence.receiptSha256,
+          startedAt: nativeEvidence.startedAt,
+          completedAt: nativeEvidence.completedAt,
+        },
+      },
+    });
+
+    (manifest as typeof manifest & { nativeEvidence: unknown[] }).nativeEvidence = [];
+    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling }).errors.join('\n')).toMatch(/exactly one/);
+    (manifest as typeof manifest & { nativeEvidence: unknown[] }).nativeEvidence = [nativeEvidence, nativeEvidence];
+    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling }).errors.join('\n')).toMatch(/exactly one/);
+    (manifest as typeof manifest & { nativeEvidence: unknown[] }).nativeEvidence = [nativeEvidence, {
+      evidenceId: 'HF-FUTURE', kind: 'unregistered-component', schemaVersion: 1,
+    }];
+    const unregistered = validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling });
+    expect(unregistered.errors.join('\n')).toMatch(/no registered evidence validator/);
+    expect(unregistered.errors.join('\n')).not.toMatch(/exactly one canonical HF-298/);
+    (manifest as typeof manifest & { nativeEvidence: unknown[] }).nativeEvidence = [{
+      ...nativeEvidence,
+      evidenceId: 'HF-UNKNOWN',
+    }];
+    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling }).errors.join('\n')).toMatch(/canonical HF-298/);
+
+    const beforePreview = createPass71GrenadeNativeEvidenceFixture({
+      sourceSha: manifest.preview.sourceSha,
+      tooling,
+      startedAt: '2026-07-24T08:59:59.000Z',
+    });
+    (manifest as typeof manifest & { nativeEvidence: unknown[] }).nativeEvidence = [beforePreview];
+    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling }).errors.join('\n'))
+      .toMatch(/startedAt cannot precede preview/);
+
+    const afterApproval = createPass71GrenadeNativeEvidenceFixture({
+      sourceSha: manifest.preview.sourceSha,
+      tooling,
+      completedAt: '2026-07-24T09:10:00.001Z',
+    });
+    (manifest as typeof manifest & { nativeEvidence: unknown[] }).nativeEvidence = [afterApproval];
+    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling }).errors.join('\n'))
+      .toMatch(/completedAt cannot follow humanAcceptance/);
+  });
+
+  it('permits only the Pass 71 manifest in candidate B after immutable candidate A', () => {
+    const manifestPath = 'acceptance/pass-71.json';
+    const sha = 'a'.repeat(40);
+    expect(classifyPreviewDelta([manifestPath], manifestPath, sha)).toMatchObject({ ok: true });
+    for (const path of [
+      'docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md',
+      'scripts/release/acceptance-gate.mjs',
+      'scripts/qa/pass71-grenade-native-receipt-contract.mjs',
+      'tests/e2e/pass71-grenade-first-action.spec.ts',
+    ]) expect(classifyPreviewDelta([manifestPath, path], manifestPath, sha), path).toMatchObject({ ok: false });
+    expect(classifyPreviewDelta([], manifestPath, sha)).toMatchObject({ ok: false });
   });
 
   it('leaves exactly the owner-approval error on a complete pre-HITL manifest', () => {

@@ -1,4 +1,7 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS,
   assertFrameActionEvidenceEnvironment,
@@ -61,6 +64,21 @@ const evidenceMode = resolveFrameActionEvidenceMode(process.env.PASS71_GRENADE_E
 assertFrameActionEvidenceEnvironment(evidenceMode, isContinuousIntegrationEnvironment(process.env.CI));
 const installedBrowserEvidence = process.env.QA_INSTALLED_EDGE === '1';
 const grenades: readonly GrenadeId[] = ['frag', 'flash', 'smoke', 'semtex'];
+const nativeComponentDirectory = process.env.PASS71_GRENADE_NATIVE_COMPONENT_DIR;
+const nativeExpectedSourceSha = process.env.PASS71_GRENADE_EXPECTED_SOURCE_SHA;
+const nativeCheckoutSourceSha = nativeComponentDirectory
+  ? execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true }).trim()
+  : undefined;
+
+if (nativeComponentDirectory && (
+  !/^[a-f0-9]{40}$/u.test(nativeExpectedSourceSha ?? '')
+  || nativeCheckoutSourceSha !== nativeExpectedSourceSha
+  || evidenceMode !== 'native-no-freeze'
+  || renderer !== 'webgpu'
+  || !installedBrowserEvidence
+)) {
+  throw new Error('Official Pass 71 grenade native components require exact-SHA installed-Edge native-WebGPU evidence');
+}
 
 function releaseAcceptanceIdentity(
   receipt: Awaited<ReturnType<typeof throwAndObserve>>,
@@ -81,7 +99,7 @@ function releaseAcceptanceIdentity(
   };
 }
 
-async function deployWithUnlockedAudio(page: Page, grenade: GrenadeId): Promise<void> {
+async function deployWithUnlockedAudio(page: Page, grenade: GrenadeId): Promise<Record<string, unknown>> {
   await page.goto(
     `/?release=latest&map=atomic-acres&renderer=${renderer}${requireWebGpu}`
       + `&render=${renderProfile}&signal=off&grass=off&mist=off&clouds=off&rays=off&externalServices=off`
@@ -107,6 +125,80 @@ async function deployWithUnlockedAudio(page: Page, grenade: GrenadeId): Promise<
     debug.setSelectedGrenade(selectedGrenade);
     debug.setGrenades(1);
   }, grenade);
+  const provenance = await page.evaluate(async () => {
+    // This is an independent observation from the staged bytes the browser is
+    // actually using. It must not be populated from the runner environment.
+    const response = await fetch(new URL('channel-provenance.json', window.location.href), {
+      cache: 'no-store',
+    });
+    if (!response.ok) throw new Error(`Candidate provenance request failed: ${response.status}`);
+    return response.json() as Promise<Record<string, unknown>>;
+  });
+  return {
+    schemaVersion: provenance.schemaVersion,
+    channel: provenance.channel,
+    releasePass: provenance.releasePass,
+    sourceSha: provenance.sourceSha,
+    path: provenance.path,
+    treeSha256: provenance.treeSha256,
+    exactRootFileCount: provenance.exactRootFileCount,
+  };
+}
+
+function nativeRuntimeEvidence(runtime: any): Record<string, unknown> {
+  return {
+    requestedBackend: runtime.requestedBackend,
+    actualBackend: runtime.actualBackend,
+    initialized: runtime.initialized,
+    adapterClass: runtime.adapterClass,
+    deviceClass: runtime.deviceClass,
+    adapterLabel: runtime.adapterLabel,
+    softwareAdapter: runtime.softwareAdapter,
+    deviceLost: runtime.deviceLost,
+    uncapturedErrors: runtime.uncapturedErrors,
+    presentation: { status: runtime.presentation?.status },
+  };
+}
+
+function nativeActionEvidence(
+  receipt: Awaited<ReturnType<typeof throwAndObserve>>,
+  phase: 'cold' | 'warm',
+): Record<string, unknown> {
+  const { actionFrontier, frameActionBaseline, frameActionBudget, profile } = receipt;
+  return {
+    phase,
+    baseline: frameActionBaseline,
+    budget: frameActionBudget,
+    measurement: {
+      internalHandlerSyncMs: profile.handlerSyncMs,
+      outerHandlerSyncMs: actionFrontier.handlerSyncMs,
+      eventToNextAnimationFrameMs: actionFrontier.eventToNextAnimationFrameMs,
+      maximumAnimationFrameGapMs: profile.maximumAnimationFrameGapMs,
+      maximumFrameWorkMs: profile.maximumFrameWorkMs,
+      maximumPendingForMs: profile.maximumPendingForMs,
+      firstSubmissionDelayMs: profile.firstSubmissionDelayMs,
+      firstCompletionDelayMs: profile.firstCompletionDelayMs,
+    },
+    frontier: {
+      actionNonce: profile.actionNonce,
+      grenade: profile.grenade,
+      cold: profile.cold,
+      frameSamples: profile.frameSamples,
+      startingSubmissionSequence: profile.startingSubmissionSequence,
+      startingCompletedSequence: profile.startingCompletedSequence,
+      targetSubmissionSequence: profile.targetSubmissionSequence,
+      endingSubmissionSequence: profile.endingSubmissionSequence,
+      endingCompletedSequence: profile.endingCompletedSequence,
+      completionFailures: profile.completionFailures,
+      status: profile.status,
+      observationComplete: profile.observationComplete,
+    },
+    audio: {
+      contextState: profile.audio.contextState,
+      prepared: profile.audio.prepared,
+      retainedSources: profile.audio.retainedSources,
+    },
+  };
 }
 
 async function throwAndObserve(page: Page, baselineLabel: string): Promise<{
@@ -261,7 +353,14 @@ for (const grenade of grenades) {
     page.on('console', (message) => {
       if (message.type() === 'error') faults.push(message.text());
     });
-    await deployWithUnlockedAudio(page, grenade);
+    const servedCandidate = await deployWithUnlockedAudio(page, grenade);
+    if (nativeComponentDirectory) {
+      expect(servedCandidate, `${grenade}: staged bytes independently identify exact candidate A`).toMatchObject({
+        sourceSha: nativeExpectedSourceSha,
+        treeSha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        exactRootFileCount: expect.any(Number),
+      });
+    }
     const cold = await throwAndObserve(page, `${grenade}-cold-preaction-baseline`);
     assertActionReceipt(cold, grenade, true);
 
@@ -289,9 +388,16 @@ for (const grenade of grenades) {
       retainedSources: 12,
       continuousAmbience: 0,
     });
+    const settledAudio = await page.evaluate(() => {
+      const audio = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).audio;
+      return {
+        retainedAudibleGains: audio.runtime.retainedAudibleGains,
+        retainedSources: audio.runtime.retainedSources,
+        continuousAmbienceSources: audio.ambience.continuousSources,
+      };
+    });
     expect(faults, JSON.stringify(faults, null, 2)).toEqual([]);
-    await testInfo.attach(`pass71-${grenade}-first-action-${renderer}`, {
-      body: Buffer.from(JSON.stringify({
+    const attachment = {
         grenade,
         renderer,
         evidenceMode,
@@ -328,8 +434,54 @@ for (const grenade of grenades) {
         cold,
         warm,
         faults,
-      }, null, 2)),
+    };
+    await testInfo.attach(`pass71-${grenade}-first-action-${renderer}`, {
+      body: Buffer.from(JSON.stringify(attachment, null, 2)),
       contentType: 'application/json',
     });
+    if (nativeComponentDirectory) {
+      const version = page.context().browser()?.version() ?? '';
+      const userAgentVersion = cold.userAgent.match(/Edg\/(\d+(?:\.\d+){3})/u)?.[1] ?? '';
+      expect(version, `${grenade}: launched Edge binary and native UA report one version`)
+        .toBe(userAgentVersion);
+      const component = {
+        schemaVersion: 1,
+        expectedSourceSha: nativeExpectedSourceSha,
+        checkoutSourceSha: nativeCheckoutSourceSha,
+        trial: {
+          grenade,
+          servedCandidate,
+          browser: {
+            channel: 'msedge', installed: true, userAgent: cold.userAgent, version,
+          },
+          runtime: {
+            cold: nativeRuntimeEvidence(cold.runtime),
+            warm: nativeRuntimeEvidence(warm.runtime),
+          },
+          cold: nativeActionEvidence(cold, 'cold'),
+          warm: nativeActionEvidence(warm, 'warm'),
+          audio: {
+            prewarm: {
+              prepared: cold.audio.grenadeEffectsPrewarm.prepared,
+              runs: cold.audio.grenadeEffectsPrewarm.runs,
+              sources: cold.audio.grenadeEffectsPrewarm.sources,
+              nodes: cold.audio.grenadeEffectsPrewarm.nodes,
+              retainedBroadbandLoops: cold.audio.grenadeEffectsPrewarm.retainedBroadbandLoops,
+            },
+            runtimeRetainedSources: cold.audio.runtime.retainedSources,
+            runtimeRetainedAudibleGains: cold.audio.runtime.retainedAudibleGains,
+            continuousAmbienceSources: cold.audio.ambience.continuousSources,
+            settled: settledAudio,
+          },
+          faults,
+        },
+      };
+      mkdirSync(resolve(nativeComponentDirectory), { recursive: true });
+      writeFileSync(
+        resolve(nativeComponentDirectory, `${grenade}.json`),
+        `${JSON.stringify(component, null, 2)}\n`,
+        'utf8',
+      );
+    }
   });
 }
