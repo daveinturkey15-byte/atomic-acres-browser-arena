@@ -2,10 +2,15 @@ import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import sharp from 'sharp';
+import { MATCH_WARMUP_MS } from '../../src/gameplay';
 import { chopperMissileLaunchPosition } from '../../src/killstreak-runtime';
 
 const renderer = process.env.PASS71_CONTROLLED_SUPPORT_RENDERER === 'webgpu' ? 'webgpu' : 'webgl2';
 const requireWebGpu = renderer === 'webgpu' ? '&requireWebGPU=1' : '';
+// The runtime deadline stays MATCH_WARMUP_MS. A second warmup-length is only
+// the Node-side observation budget for the first post-deadline page frame when
+// the software renderer is delivering one frame per second.
+const MATCH_WARMUP_EVIDENCE_TIMEOUT_MS = MATCH_WARMUP_MS * 2;
 const loadout = Object.freeze({
   schemaVersion: 1,
   slots: ['care-package', 'piloted-drone', 'carpet-bomber', 'chopper', 'drone-swarm'],
@@ -77,13 +82,43 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
   ), undefined, { timeout: 90_000 });
   await page.locator('#player-name').fill('Pass 71 Support Operator');
   await page.locator('#solo').click();
-  await page.waitForFunction(() => {
+  await expect.poll(async () => page.evaluate(() => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     const snapshot = debug?.snapshot() as any;
-    return snapshot?.matchPhase === 'active'
-      && debug.admissionState().presentedGameplayFrame > 2
-      && snapshot.supportVehiclePresentation?.state === 'ready';
-  }, undefined, { timeout: 90_000 });
+    const support = snapshot?.supportVehiclePresentation;
+    const requiredAssets = support?.requiredAssets ?? [];
+    const loadedAssets = support?.loadedAssets ?? [];
+    return {
+      gameStarted: snapshot?.gameStarted === true,
+      state: support?.state ?? null,
+      exactAssetSet: requiredAssets.length > 0
+        && requiredAssets.length === loadedAssets.length
+        && requiredAssets.every((asset: string) => loadedAssets.includes(asset)),
+      readyFamilies: support?.readyFamilies ?? [],
+      failures: support?.failures ?? null,
+    };
+  }), {
+    timeout: 90_000,
+    intervals: [100, 250, 500],
+    message: 'authored support assets must complete their release barrier before controlled evidence',
+  }).toMatchObject({
+    gameStarted: true,
+    state: 'ready',
+    exactAssetSet: true,
+    readyFamilies: ['care', 'carpet', 'chopper', 'crate'],
+    failures: {},
+  });
+  await expect.poll(async () => page.evaluate(() => ({
+    matchPhase: (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).matchPhase,
+    presentedGameplayFrameAdvanced: window.__ATOMIC_ACRES_DEBUG__.admissionState().presentedGameplayFrame > 2,
+  })), {
+    timeout: MATCH_WARMUP_EVIDENCE_TIMEOUT_MS,
+    intervals: [50, 100, 250],
+    message: 'the unchanged match warmup must advance after support readiness',
+  }).toMatchObject({
+    matchPhase: 'active',
+    presentedGameplayFrameAdvanced: true,
+  });
   await page.evaluate(() => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     debug.setBotsFrozen(true);

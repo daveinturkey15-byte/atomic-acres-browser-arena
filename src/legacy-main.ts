@@ -191,9 +191,12 @@ import { CHOPPER_GUNNER_SPLASH_POLICY, PILOTED_DRONE_SENSOR_PROFILE } from './ki
 import { KillstreakPresentation, loadHunterDronePresentation, loadSupportVehiclePresentations, supportVehiclePresentationTelemetry } from './killstreak-presentation';
 import { chopperExteriorReviewHoldActive } from './chopper-exterior-review-hold';
 import {
+  CHOPPER_EXTERIOR_REVIEW_CAMERA_CONTRACT,
   chopperExteriorReviewCameraPose,
   withExactChopperRootHiddenForControl,
+  type ChopperExteriorReviewCameraCandidate,
   type ChopperExteriorReviewBounds,
+  type ChopperExteriorReviewWorldAssessment,
 } from './chopper-exterior-review-camera';
 import { PASS65_FLIGHT_NAVIGATION, resolveSupportFlightStep } from './killstreak-flight-navigation';
 import { resolveSupportAircraftEnvelopeStep } from './support-aircraft-collision';
@@ -1388,6 +1391,10 @@ type DebugChopperExteriorReviewTrackerFrame = Readonly<{
   distanceM: number;
   clearanceM: number;
   inTestBay: boolean;
+  cameraColliderClear: boolean;
+  cameraClearanceRadiusM: number;
+  lineOfSightSampleCount: number;
+  clearLineOfSightSampleCount: number;
   submittedSceneDrawableMeshCount: number;
   submittedSceneDrawableBounds: Readonly<{ min: readonly number[]; max: readonly number[] }>;
 }>;
@@ -1438,6 +1445,30 @@ function synchronizeDebugChopperExteriorReviewHold(): boolean {
   return active;
 }
 
+function assessDebugChopperExteriorReviewWorldCandidate(
+  bounds: ChopperExteriorReviewBounds,
+  candidate: ChopperExteriorReviewCameraCandidate,
+): ChopperExteriorReviewWorldAssessment {
+  const colliders = activeWorldColliders();
+  const cameraPoint = { x: candidate.position[0], y: candidate.position[1], z: candidate.position[2] };
+  const lineOfSightSamples: Array<readonly [number, number, number]> = [[...candidate.target]];
+  for (const x of [bounds.min[0], bounds.max[0]]) {
+    for (const y of [bounds.min[1], bounds.max[1]]) {
+      for (const z of [bounds.min[2], bounds.max[2]]) lineOfSightSamples.push([x, y, z]);
+    }
+  }
+  const clearLineOfSightSampleCount = lineOfSightSamples.filter(([x, y, z]) => !colliders.some((box) => (
+    segmentIntersectsBox(cameraPoint, { x, y, z }, box)
+  ))).length;
+  const cameraClearanceRadiusM = CHOPPER_EXTERIOR_REVIEW_CAMERA_CONTRACT.cameraColliderClearanceRadiusM;
+  return Object.freeze({
+    cameraColliderClear: !colliders.some((box) => sphereIntersectsBox(cameraPoint, cameraClearanceRadiusM, box)),
+    cameraClearanceRadiusM,
+    lineOfSightSampleCount: lineOfSightSamples.length,
+    clearLineOfSightSampleCount,
+  });
+}
+
 function updateDebugChopperExteriorReviewTracker(): void {
   if (!debugChopperExteriorReviewTrackerRequested) return;
   if (!currentDebugChopperExteriorReviewHoldActive() || !debugCaptureCameraActive) {
@@ -1464,12 +1495,13 @@ function updateDebugChopperExteriorReviewTracker(): void {
     entityYaw: activeChopper.attitude[1],
     aspect: camera.aspect,
     preferredSide: debugChopperExteriorReviewTrackerSide,
+    assessWorldCandidate: (candidate) => assessDebugChopperExteriorReviewWorldCandidate(bounds, candidate),
   });
   if (!pose) {
     lastDebugChopperExteriorReviewTrackerFrame = null;
     return;
   }
-  debugChopperExteriorReviewTrackerSide ??= pose.side;
+  debugChopperExteriorReviewTrackerSide = pose.side;
   debugCaptureCameraPosition.set(...pose.position);
   debugCaptureCameraYaw = pose.yaw;
   debugCaptureCameraPitch = pose.pitch;
@@ -1487,6 +1519,10 @@ function updateDebugChopperExteriorReviewTracker(): void {
     distanceM: pose.distanceM,
     clearanceM: pose.clearanceM,
     inTestBay: pose.inTestBay,
+    cameraColliderClear: pose.world.cameraColliderClear,
+    cameraClearanceRadiusM: pose.world.cameraClearanceRadiusM,
+    lineOfSightSampleCount: pose.world.lineOfSightSampleCount,
+    clearLineOfSightSampleCount: pose.world.clearLineOfSightSampleCount,
     submittedSceneDrawableMeshCount: detail.drawableStableAirframeMeshCount,
     submittedSceneDrawableBounds: Object.freeze({
       min: Object.freeze([...sourceBounds.min]),
@@ -29283,6 +29319,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       },
       entityYaw: activeChopper.attitude[1],
       aspect: camera.aspect,
+      assessWorldCandidate: (candidate) => assessDebugChopperExteriorReviewWorldCandidate({
+        min: sourceBounds.min as [number, number, number],
+        max: sourceBounds.max as [number, number, number],
+      }, candidate),
     });
     if (!pose) return null;
     debugChopperExteriorReviewTrackerRequested = true;

@@ -582,6 +582,10 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       distanceM: number;
       clearanceM: number;
       inTestBay: boolean;
+      cameraColliderClear: boolean;
+      cameraClearanceRadiusM: number;
+      lineOfSightSampleCount: number;
+      clearLineOfSightSampleCount: number;
       submittedSceneDrawableMeshCount: number;
       submittedSceneDrawableBounds: { min: number[]; max: number[] };
       submissionSequence: number;
@@ -607,6 +611,10 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
   });
   expect(tracker.submittedSceneDrawableMeshCount).toBeGreaterThan(0);
   expect(tracker.submittedSceneDrawableBounds).not.toBeNull();
+  expect(tracker.cameraColliderClear).toBe(true);
+  expect(tracker.cameraClearanceRadiusM).toBe(0.4);
+  expect(tracker.lineOfSightSampleCount).toBe(9);
+  expect(tracker.clearLineOfSightSampleCount).toBe(tracker.lineOfSightSampleCount);
   expect(exteriorReceipt.reviewedChopper).toMatchObject({
     entityId: tracker.entityId,
     rootVisible: true,
@@ -707,6 +715,12 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
   try {
     const exteriorPng = await page.screenshot({ animations: 'allow' });
     writeFileSync(resolve(evidence, 'exterior-front-quarter.png'), exteriorPng);
+    const hiddenControl = await page.evaluate(async () => (
+      window.__ATOMIC_ACRES_DEBUG__.captureChopperExteriorHiddenControl()
+    )) as any;
+    const hiddenControlPng = await page.screenshot({ animations: 'allow' });
+    const hiddenControlPath = resolve(evidence, 'exterior-hidden-control.nonpublishable.png');
+    writeFileSync(hiddenControlPath, hiddenControlPng);
     const pixelBounds = receiptProjection.viewportBounds;
     const left = Math.max(0, Math.floor(pixelBounds.minX));
     const top = Math.max(0, Math.floor(pixelBounds.minY));
@@ -739,9 +753,6 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
     expect(rasterVisibility.visiblePixelRatio).toBeGreaterThan(0.01);
     expect(rasterVisibility.highContrastPixelRatio).toBeGreaterThan(0.0025);
     expect(rasterVisibility.maximumLuminance).toBeGreaterThan(32);
-    const hiddenControl = await page.evaluate(async () => (
-      window.__ATOMIC_ACRES_DEBUG__.captureChopperExteriorHiddenControl()
-    )) as any;
     expect(hiddenControl).toMatchObject({
       contract: 'chopper-exterior-hidden-control-v1',
       nonPublishable: true,
@@ -783,9 +794,6 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       captureRevision: hiddenControl.controlCaptureRevision,
       frame: exteriorReceipt.frame,
     });
-    const hiddenControlPng = await page.screenshot({ animations: 'allow' });
-    const hiddenControlPath = resolve(evidence, 'exterior-hidden-control.nonpublishable.png');
-    writeFileSync(hiddenControlPath, hiddenControlPng);
     const { data: controlData, info: controlInfo } = await sharp(hiddenControlPng)
       .extract({ left, top, width, height })
       .removeAlpha()
