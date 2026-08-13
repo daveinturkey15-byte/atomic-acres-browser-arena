@@ -21,6 +21,10 @@ export const SUPPORT_VEHICLE_SPECS = Object.freeze({
       'chopper-gunner-weapon-view',
       'chopper-cockpit-dashboard-3d', 'chopper-cockpit-display-cyan', 'chopper-cockpit-display-green',
       'chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring',
+      'chopper-inner-windscreen-pillar-left-base', 'chopper-inner-windscreen-pillar-left-top',
+      'chopper-inner-windscreen-pillar-right-base', 'chopper-inner-windscreen-pillar-right-top',
+      'chopper-inner-windscreen-glow-left-base', 'chopper-inner-windscreen-glow-left-top',
+      'chopper-inner-windscreen-glow-right-base', 'chopper-inner-windscreen-glow-right-top',
       'chopper-first-person-camera-socket', 'chopper-main-rotor', 'chopper-tail-rotor',
       'chopper-player-gun', 'chopper-gun-muzzle-socket',
       'chopper-forward-socket', 'chopper-muzzle-flash', 'chopper-tracer-action', 'chopper-impact-action',
@@ -146,7 +150,7 @@ function rotateVector(q, vector) {
   return multiplyQuaternion(multiplyQuaternion(q, [...vector, 0]), [-q[0], -q[1], -q[2], q[3]]).slice(0, 3);
 }
 
-function nodeWorldTranslation(json, index) {
+function nodeWorldTransform(json, index) {
   const parents = new Map();
   for (const [parentIndex, node] of (json.nodes ?? []).entries()) {
     for (const child of node.children ?? []) parents.set(child, parentIndex);
@@ -167,7 +171,226 @@ function nodeWorldTranslation(json, index) {
       scale: parent.scale.map((value, axis) => value * scale[axis]),
     };
   };
-  return resolve(index).position;
+  return resolve(index);
+}
+
+function nodeWorldTranslation(json, index) {
+  return nodeWorldTransform(json, index).position;
+}
+
+function transformPoint(transform, point) {
+  const scaled = point.map((value, axis) => value * transform.scale[axis]);
+  const rotated = rotateVector(transform.rotation, scaled);
+  return transform.position.map((value, axis) => value + rotated[axis]);
+}
+
+function normalizedAccessorExtrema(accessor, axis) {
+  const decode = (value) => {
+    if (!accessor.normalized) return value;
+    if (accessor.componentType === 5120) return Math.max(value / 127, -1);
+    if (accessor.componentType === 5121) return value / 255;
+    if (accessor.componentType === 5122) return Math.max(value / 32767, -1);
+    if (accessor.componentType === 5123) return value / 65535;
+    return Number.NaN;
+  };
+  return [decode(accessor.min?.[axis]), decode(accessor.max?.[axis])];
+}
+
+const CHOPPER_COCKPIT_FRAMING_REVISION = 'pass71-tall-pillars-centre-clear-v1';
+const CHOPPER_COCKPIT_PILLAR_RADIUS_M = 0.035;
+const CHOPPER_COCKPIT_GLOW_RADIUS_M = 0.012;
+const CHOPPER_COCKPIT_EDGE_MARGIN_PX = 2;
+const CHOPPER_COCKPIT_RETICLE_MARGIN_PX = 8;
+const CHOPPER_COCKPIT_MAXIMUM_TOP_VIEWPORT_RATIO = 0.24;
+const CHOPPER_COCKPIT_FRAMING_CASES = Object.freeze([
+  Object.freeze({ label: 'desktop-720p-min-fov', width: 1280, height: 720, fov: 70 }),
+  Object.freeze({ label: 'desktop-720p-max-fov', width: 1280, height: 720, fov: 100 }),
+  Object.freeze({ label: 'desktop-1080p-min-fov', width: 1920, height: 1080, fov: 70 }),
+  Object.freeze({ label: 'desktop-1080p-max-fov', width: 1920, height: 1080, fov: 100 }),
+  Object.freeze({ label: 'iphone-15-landscape-min-fov', width: 844, height: 390, fov: 70 }),
+  Object.freeze({ label: 'iphone-15-landscape-max-fov', width: 844, height: 390, fov: 100 }),
+  Object.freeze({ label: 'iphone-15-portrait-min-fov', width: 390, height: 844, fov: 70 }),
+  Object.freeze({ label: 'iphone-15-portrait-max-fov', width: 390, height: 844, fov: 100 }),
+]);
+
+function chopperReticleDiameterPx(width, height) {
+  const compact = width <= 760 || height <= 520;
+  const preferred = compact ? width * 0.28 : Math.min(height * 0.20, width * 0.16);
+  return Math.min(compact ? 142 : 188, Math.max(compact ? 104 : 126, preferred));
+}
+
+function chopperCockpitFramingAudit(json, nodeIndex, lod) {
+  const failures = [];
+  const cameraIndex = nodeIndex.get('chopper-first-person-camera-socket');
+  if (cameraIndex === undefined) return { failures: [`chopper LOD${lod}: cockpit framing camera socket missing`], cases: [] };
+  const camera = nodeWorldTranslation(json, cameraIndex);
+  const elements = [
+    { kind: 'pillar', side: 'left', authoredSide: -1, radius: CHOPPER_COCKPIT_PILLAR_RADIUS_M },
+    { kind: 'pillar', side: 'right', authoredSide: 1, radius: CHOPPER_COCKPIT_PILLAR_RADIUS_M },
+    { kind: 'glow', side: 'left', authoredSide: -1, radius: CHOPPER_COCKPIT_GLOW_RADIUS_M },
+    { kind: 'glow', side: 'right', authoredSide: 1, radius: CHOPPER_COCKPIT_GLOW_RADIUS_M },
+  ];
+  const endpointDistance = (left, right) => Math.hypot(...left.map((value, axis) => value - right[axis]));
+  const auditedElements = [];
+  const assertMeshEndpoints = (label, meshName, base, top) => {
+    const meshIndex = nodeIndex.get(meshName);
+    if (meshIndex === undefined) {
+      failures.push(`chopper LOD${lod}: ${label} mesh missing`);
+      return;
+    }
+    const meshTransform = nodeWorldTransform(json, meshIndex);
+    // Blender cylinders are authored along local Z and exported Y-up. Verify
+    // the actual optimized mesh axis instead of assuming a normalized +/-1
+    // primitive. glTF accessor bounds remain quantized component values, so
+    // decode normalization before comparing the geometry with the semantic
+    // endpoints. This rejects both the former radial-axis scale mutation and
+    // a mesh whose node transform is correct but whose geometry is too short.
+    const expectedHalfLength = endpointDistance(base, top) / 2;
+    const axisScale = Math.abs(meshTransform.scale[1]);
+    const expectedLocalHalfLength = axisScale > 0 ? expectedHalfLength / axisScale : Number.NaN;
+    const mesh = json.meshes?.[json.nodes?.[meshIndex]?.mesh];
+    const positionExtrema = (mesh?.primitives ?? []).map((primitive) => (
+      normalizedAccessorExtrema(json.accessors?.[primitive.attributes?.POSITION] ?? {}, 1)
+    ));
+    const localMinimum = Math.min(...positionExtrema.map(([minimum]) => minimum));
+    const localMaximum = Math.max(...positionExtrema.map(([, maximum]) => maximum));
+    const extentError = Math.max(
+      Math.abs(localMinimum + expectedLocalHalfLength),
+      Math.abs(localMaximum - expectedLocalHalfLength),
+    ) * axisScale;
+    if (!Number.isFinite(extentError) || extentError > 0.002) {
+      failures.push(`chopper LOD${lod}: ${label} mesh normalized POSITION Y extent does not match audited semantic half-length`);
+      return;
+    }
+    const meshEndpoints = [
+      transformPoint(meshTransform, [0, localMinimum, 0]),
+      transformPoint(meshTransform, [0, localMaximum, 0]),
+    ];
+    const directError = endpointDistance(meshEndpoints[0], base) + endpointDistance(meshEndpoints[1], top);
+    const reversedError = endpointDistance(meshEndpoints[1], base) + endpointDistance(meshEndpoints[0], top);
+    if (Math.min(directError, reversedError) > 0.004) {
+      failures.push(`chopper LOD${lod}: ${label} mesh does not terminate at its audited semantic endpoints`);
+    }
+  };
+  for (const element of elements) {
+    const baseName = `chopper-inner-windscreen-${element.kind}-${element.side}-base`;
+    const topName = `chopper-inner-windscreen-${element.kind}-${element.side}-top`;
+    const meshFamily = element.kind === 'pillar' ? 'Pillar' : 'Glow';
+    const meshName = `Chopper_InnerWindscreen${meshFamily}_${element.authoredSide}_LOD${lod}`;
+    const baseIndex = nodeIndex.get(baseName);
+    const topIndex = nodeIndex.get(topName);
+    if (baseIndex === undefined || topIndex === undefined) {
+      failures.push(`chopper LOD${lod}: ${element.side} authored cockpit ${element.kind} endpoints missing`);
+      continue;
+    }
+    const base = nodeWorldTranslation(json, baseIndex);
+    const top = nodeWorldTranslation(json, topIndex);
+    assertMeshEndpoints(`${element.side} ${element.kind}`, meshName, base, top);
+    auditedElements.push({ ...element, base, top });
+  }
+  const endpoint = (kind, side, edge) => auditedElements
+    .find((element) => element.kind === kind && element.side === side)?.[edge];
+  const headerEndpoints = [endpoint('pillar', 'left', 'top'), endpoint('pillar', 'right', 'top')];
+  const headerGlowEndpoints = [endpoint('glow', 'left', 'top'), endpoint('glow', 'right', 'top')];
+  if (headerEndpoints.every(Boolean)) {
+    assertMeshEndpoints('header', `Chopper_InnerWindscreenHeader_LOD${lod}`, ...headerEndpoints);
+  }
+  if (headerGlowEndpoints.every(Boolean)) {
+    assertMeshEndpoints('header glow', `Chopper_InnerWindscreenHeaderGlow_LOD${lod}`, ...headerGlowEndpoints);
+  }
+
+  const caseReceipts = [];
+  for (const viewport of CHOPPER_COCKPIT_FRAMING_CASES) {
+    const tangent = Math.tan((viewport.fov * Math.PI / 180) / 2);
+    const focalPixels = viewport.height / (2 * tangent);
+    const reticleDiameter = chopperReticleDiameterPx(viewport.width, viewport.height);
+    const reticleTop = (viewport.height - reticleDiameter) / 2;
+    const reticleBottom = (viewport.height + reticleDiameter) / 2;
+    const elementReceipts = [];
+    for (const element of auditedElements) {
+      const toCamera = (point) => ({
+        x: point[0] - camera[0],
+        y: point[1] - camera[1],
+        depth: camera[2] - point[2],
+      });
+      const base = toCamera(element.base);
+      const top = toCamera(element.top);
+      const project = (point) => ({
+        x: viewport.width / 2 + focalPixels * point.x / point.depth,
+        y: viewport.height / 2 - focalPixels * point.y / point.depth,
+      });
+      const basePx = project(base);
+      const topPx = project(top);
+      if (!(base.depth > 0 && top.depth > 0)) {
+        failures.push(`chopper LOD${lod}: ${element.side} ${element.kind} is behind ${viewport.label} camera`);
+        continue;
+      }
+      const verticalSamples = [reticleTop, reticleBottom];
+      const clearances = verticalSamples.map((screenY) => {
+        const projectedYOverDepth = (viewport.height / 2 - screenY) / focalPixels;
+        const deltaY = top.y - base.y;
+        const deltaDepth = top.depth - base.depth;
+        const denominator = deltaY - projectedYOverDepth * deltaDepth;
+        const t = denominator === 0
+          ? Number.NaN
+          : (projectedYOverDepth * base.depth - base.y) / denominator;
+        if (!Number.isFinite(t) || t < 0 || t > 1) return Number.NEGATIVE_INFINITY;
+        const depth = base.depth + t * deltaDepth;
+        const x = base.x + t * (top.x - base.x);
+        const horizontalDistance = Math.abs(focalPixels * x / depth);
+        const radiusPixels = focalPixels * element.radius / depth;
+        return horizontalDistance - reticleDiameter / 2 - radiusPixels - CHOPPER_COCKPIT_RETICLE_MARGIN_PX;
+      });
+      const topRatio = topPx.y / viewport.height;
+      const topRadiusPixels = focalPixels * element.radius / top.depth;
+      const centreClearance = Math.min(...clearances);
+      if (topPx.y - topRadiusPixels < CHOPPER_COCKPIT_EDGE_MARGIN_PX
+        || topRatio > CHOPPER_COCKPIT_MAXIMUM_TOP_VIEWPORT_RATIO) {
+        failures.push(`chopper LOD${lod}: ${element.side} ${element.kind} does not reach the bounded upper viewport in ${viewport.label}`);
+      }
+      if (!(basePx.y > reticleBottom && topPx.y < reticleTop && centreClearance >= 0)) {
+        failures.push(`chopper LOD${lod}: ${element.side} ${element.kind} enters the protected reticle corridor in ${viewport.label}`);
+      }
+      elementReceipts.push(Object.freeze({
+        kind: element.kind,
+        side: element.side,
+        topViewportRatio: Number(topRatio.toFixed(6)),
+        centreClearancePx: Number(centreClearance.toFixed(3)),
+      }));
+    }
+    const headers = [
+      { kind: 'header', radius: CHOPPER_COCKPIT_PILLAR_RADIUS_M, endpoints: headerEndpoints },
+      { kind: 'header-glow', radius: CHOPPER_COCKPIT_GLOW_RADIUS_M, endpoints: headerGlowEndpoints },
+    ].flatMap((header) => {
+      if (!header.endpoints.every(Boolean)) return [];
+      const points = header.endpoints.map((point) => ({
+        x: point[0] - camera[0], y: point[1] - camera[1], depth: camera[2] - point[2],
+      }));
+      const centre = points.map((point) => ({
+        x: viewport.width / 2 + focalPixels * point.x / point.depth,
+        y: viewport.height / 2 - focalPixels * point.y / point.depth,
+        radius: focalPixels * header.radius / point.depth,
+      }));
+      const maximumBottomPx = Math.max(...centre.map((point) => point.y + point.radius));
+      const minimumTopPx = Math.min(...centre.map((point) => point.y - point.radius));
+      if (minimumTopPx < CHOPPER_COCKPIT_EDGE_MARGIN_PX
+        || maximumBottomPx > reticleTop - CHOPPER_COCKPIT_RETICLE_MARGIN_PX) {
+        failures.push(`chopper LOD${lod}: ${header.kind} is cropped or enters the protected reticle corridor in ${viewport.label}`);
+      }
+      return [Object.freeze({
+        kind: header.kind,
+        minimumTopPx: Number(minimumTopPx.toFixed(3)),
+        maximumBottomPx: Number(maximumBottomPx.toFixed(3)),
+      })];
+    });
+    caseReceipts.push(Object.freeze({
+      ...viewport,
+      reticleDiameter,
+      elements: Object.freeze(elementReceipts),
+      headers: Object.freeze(headers),
+    }));
+  }
+  return Object.freeze({ failures: Object.freeze(failures), cases: Object.freeze(caseReceipts) });
 }
 
 function animationDuration(json, animation) {
@@ -196,11 +419,18 @@ export function auditSupportVehicleGlb(json, bytes, family, lod) {
     }
   }
   const detailCounts = {};
+  let cockpitFraming = null;
   if (family === 'chopper') {
     if (root?.extras?.visual_revision !== 'pass70-connected-rear-tail-airframe-v7'
       || root?.extras?.detail_contract !== 'continuous-rear-tail-silhouette-cockpit-clear-sightline-v7') {
       failures.push(`chopper LOD${lod}: authored airframe refinement contract missing`);
     }
+    if (root?.extras?.first_person_cockpit_framing !== CHOPPER_COCKPIT_FRAMING_REVISION
+      || root?.extras?.first_person_cockpit_pillar_radius_m !== CHOPPER_COCKPIT_PILLAR_RADIUS_M) {
+      failures.push(`chopper LOD${lod}: tall centre-clear first-person cockpit framing contract missing`);
+    }
+    cockpitFraming = chopperCockpitFramingAudit(json, nodeIndex, lod);
+    failures.push(...cockpitFraming.failures);
     const requiredDetail = [
       ['Chopper_ArmoredNose_', 1],
       ['Chopper_CheekArmor_', 2],
@@ -389,5 +619,6 @@ export function auditSupportVehicleGlb(json, bytes, family, lod) {
     materials: (json.materials ?? []).length, images: (json.images ?? []).length,
     animations: Object.freeze([...animations.keys()]), externalUris: (json.images ?? []).filter((image) => image.uri).length + (json.buffers ?? []).filter((buffer) => buffer.uri).length,
     detailCounts: Object.freeze(detailCounts),
+    ...(cockpitFraming ? { cockpitFraming } : {}),
   });
 }

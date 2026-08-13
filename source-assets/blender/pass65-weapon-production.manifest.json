@@ -782,43 +782,44 @@
       "visualRevision": "pass70-connected-rear-tail-airframe-v7",
       "detailContract": "continuous-rear-tail-silhouette-cockpit-clear-sightline-v7",
       "materialRevision": "pass70-daylight-readable-olive-pbr-v1",
+      "firstPersonCockpitFraming": "pass71-tall-pillars-centre-clear-v1",
       "sourceBlend": {
         "path": "source-assets/blender/pass65-chopper-gunner.blend",
-        "sha256": "25a2556e5eccddf53e8214acbe71386820e818e359f35aa5b6a074cc3b4142c5"
+        "sha256": "452d718a0ff60208a80202bb4cf58166a7b3b96bc6ca6d1cac5270cfa5e06593"
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-support-vehicles.py",
-        "sha256": "e3ae50f79360081d669e3a1de6c15d5809dd4c43fbe9c978a1d0db5fa813afa4"
+        "sha256": "5a101db26217443a6757d8bb64e6fd95d23005c913859a7b525f5857a305935b"
       },
       "worldGlbs": [
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-          "sha256": "d1ce0b797f5f1176f23b69b74717c64bb17d4bf29c42539d2ecea757a93a180d",
+          "sha256": "2d9884607ae42ac25d857d4d0916d56aac6bd4cbc9634bb65c0ba33c1f9044b9",
           "lod": 0,
           "triangles": 59948,
-          "bytes": 952336
+          "bytes": 955584
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod1.glb",
-          "sha256": "3faeb020eb3e11f144b4438f93811fa0b17e9d0447ccf4ba5e19e3c97ae9ad62",
+          "sha256": "77ebffdc15428be7bb860aa55e9a3a6ed01b49e1124cef174bec311cf61f8a7c",
           "lod": 1,
           "triangles": 49964,
-          "bytes": 831436
+          "bytes": 830812
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod2.glb",
-          "sha256": "a397f5b628acc49a541628b4f5280a98517231161465be1876c32ed9e51f4f36",
+          "sha256": "e386f1ec84483274cc88fe9da413374ea1347be628673ba81430cd86cbfe4709",
           "lod": 2,
           "triangles": 29344,
-          "bytes": 571380
+          "bytes": 570048
         }
       ],
       "firstPersonGlb": {
         "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-        "sha256": "d1ce0b797f5f1176f23b69b74717c64bb17d4bf29c42539d2ecea757a93a180d",
+        "sha256": "2d9884607ae42ac25d857d4d0916d56aac6bd4cbc9634bb65c0ba33c1f9044b9",
         "lod": 0,
         "triangles": 59948,
-        "bytes": 952336
+        "bytes": 955584
       },
       "pbrMaps": {
         "baseColor": {
@@ -848,7 +849,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-chopper-gunner.provenance.json",
-        "sha256": "44c1cf46e87f4b36811306cb1f2f0bda790bfcaff62880098815610dd4112897"
+        "sha256": "ee8af56b13a0b66f33bd56e7fa0bfe34e430bbc3b92d6f3fd27236296aa6273f"
       },
       "sockets": [
         "chopper-first-person-camera-socket",
@@ -870,6 +871,14 @@
         "chopper-cockpit-display-green",
         "chopper-cockpit-hud-glass",
         "chopper-cockpit-hud-target-ring",
+        "chopper-inner-windscreen-pillar-left-base",
+        "chopper-inner-windscreen-pillar-left-top",
+        "chopper-inner-windscreen-pillar-right-base",
+        "chopper-inner-windscreen-pillar-right-top",
+        "chopper-inner-windscreen-glow-left-base",
+        "chopper-inner-windscreen-glow-left-top",
+        "chopper-inner-windscreen-glow-right-base",
+        "chopper-inner-windscreen-glow-right-top",
         "chopper-first-person-camera-socket",
         "chopper-main-rotor",
         "chopper-tail-rotor",
@@ -894,42 +903,42 @@
         "renders": [
           {
             "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-exterior-front-quarter.png",
-            "sha256": "3a21b1f10741dd388598e239df5f86c108e6af9ad8b471756c4576d42763f1ef",
+            "sha256": "2837f705e3362e6fb01b831a8437dcd0790aee287b758bc92455450123fc7e48",
             "cameraId": "exterior-front-quarter",
             "width": 512,
             "height": 512
           },
           {
             "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-rotor-gun-profile.png",
-            "sha256": "975563a6e4a5b2b4010bf603b146a79016dcf0750038be6834675ec4bc84868e",
+            "sha256": "857cabdaf3897f4e8dba7bce5c377702060990a1d3292abd22117293e1ac56dc",
             "cameraId": "rotor-gun-profile",
             "width": 512,
             "height": 512
           },
           {
             "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-rear-fuselage-quarter.png",
-            "sha256": "7bf8743e15e694e887a215b787aa3f13633fc1872ae172352cb1bdc7bbd9c9a9",
+            "sha256": "86acb769512bbe3637202f061e2bef6f8aacbcfeba54a3f56cb14de7dbd8c35f",
             "cameraId": "rear-fuselage-quarter",
             "width": 512,
             "height": 512
           },
           {
             "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-canopy-armour-closeup.png",
-            "sha256": "8d2c9d6eec9ff7c3591f3c506c2043e97b7907ee9837fb20c8d015ffe31b3480",
+            "sha256": "7a194384d73ceb684d723acdd2a413df185d66d1bdc8271d3b5e649440907534",
             "cameraId": "canopy-armour-closeup",
             "width": 512,
             "height": 512
           },
           {
             "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-ordnance-mechanics-closeup.png",
-            "sha256": "19b49720cd4260a0ad5b6cbecab124a4bf429eb815d4c75a6f73afa5bf70fe53",
+            "sha256": "7e62f0586e23fc7b1c989cc1713f67a882d29ea2edc20875a548b5cdf44e7dfb",
             "cameraId": "ordnance-mechanics-closeup",
             "width": 512,
             "height": 512
           },
           {
             "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
-            "sha256": "8882a597f015d5e16a731b88c6167bd4eb93fe811992f8424754df5dbd753e8b",
+            "sha256": "dd526e777cc2d9be7ab467d2d62c437b6222ac8bc3c1447db4ca1f48d52fb766",
             "cameraId": "accepted-first-person-instruments",
             "width": 960,
             "height": 540
@@ -937,14 +946,14 @@
         ],
         "contactSheet": {
           "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png",
-          "sha256": "8823fb5e320d95fd0366a195b98af06111c22e1f9ef9369b3beb89f82f390974",
+          "sha256": "f6914e076ac4f9c294a329169fc8a10bd19231ba29404071bd7f960a14203ca9",
           "cameraId": "accepted-contact-sheet",
           "width": 1536,
           "height": 1024
         },
         "acceptedFirstPersonFrame": {
           "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
-          "sha256": "8882a597f015d5e16a731b88c6167bd4eb93fe811992f8424754df5dbd753e8b",
+          "sha256": "dd526e777cc2d9be7ab467d2d62c437b6222ac8bc3c1447db4ca1f48d52fb766",
           "cameraId": "accepted-first-person-instruments",
           "width": 960,
           "height": 540
@@ -955,7 +964,7 @@
           {
             "lod": 0,
             "triangles": 59948,
-            "bytes": 952336,
+            "bytes": 955584,
             "meshNodes": 361,
             "materials": 19,
             "images": 4,
@@ -1003,12 +1012,377 @@
               "Chopper_FuselagePanelSeam_": 6,
               "Chopper_GunFeedLink_": 5,
               "Chopper_SkidWearShoe_": 4
+            },
+            "cockpitFraming": {
+              "failures": [],
+              "cases": [
+                {
+                  "label": "desktop-720p-min-fov",
+                  "width": 1280,
+                  "height": 720,
+                  "fov": 70,
+                  "reticleDiameter": 144,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 247.957
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 247.957
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 238.724
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 238.724
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 7.247,
+                      "maximumBottomPx": 27.242
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 20.555,
+                      "maximumBottomPx": 27.566
+                    }
+                  ]
+                },
+                {
+                  "label": "desktop-720p-max-fov",
+                  "width": 1280,
+                  "height": 720,
+                  "fov": 100,
+                  "reticleDiameter": 144,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 103.191
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 103.191
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 98.618
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 98.618
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 152.742,
+                      "maximumBottomPx": 164.49
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 160.561,
+                      "maximumBottomPx": 164.68
+                    }
+                  ]
+                },
+                {
+                  "label": "desktop-1080p-min-fov",
+                  "width": 1920,
+                  "height": 1080,
+                  "fov": 70,
+                  "reticleDiameter": 188,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 394.413
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 394.413
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 380.162
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 380.162
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 10.871,
+                      "maximumBottomPx": 40.862
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 30.833,
+                      "maximumBottomPx": 41.349
+                    }
+                  ]
+                },
+                {
+                  "label": "desktop-1080p-max-fov",
+                  "width": 1920,
+                  "height": 1080,
+                  "fov": 100,
+                  "reticleDiameter": 188,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 177.264
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 177.264
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 170.003
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 170.003
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 229.114,
+                      "maximumBottomPx": 246.735
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 240.842,
+                      "maximumBottomPx": 247.021
+                    }
+                  ]
+                },
+                {
+                  "label": "iphone-15-landscape-min-fov",
+                  "width": 844,
+                  "height": 390,
+                  "fov": 70,
+                  "reticleDiameter": 142,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 88.408
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 88.408
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 84.325
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 84.325
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 3.926,
+                      "maximumBottomPx": 14.756
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 11.134,
+                      "maximumBottomPx": 14.932
+                    }
+                  ]
+                },
+                {
+                  "label": "iphone-15-landscape-max-fov",
+                  "width": 844,
+                  "height": 390,
+                  "fov": 100,
+                  "reticleDiameter": 142,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 9.993
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 9.993
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 8.434
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 8.434
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 82.735,
+                      "maximumBottomPx": 89.099
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 86.971,
+                      "maximumBottomPx": 89.202
+                    }
+                  ]
+                },
+                {
+                  "label": "iphone-15-portrait-min-fov",
+                  "width": 390,
+                  "height": 844,
+                  "fov": 70,
+                  "reticleDiameter": 109.20000000000002,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 331.37
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 331.37
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 319.692
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 319.692
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 8.496,
+                      "maximumBottomPx": 31.933
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 24.095,
+                      "maximumBottomPx": 32.314
+                    }
+                  ]
+                },
+                {
+                  "label": "iphone-15-portrait-max-fov",
+                  "width": 390,
+                  "height": 844,
+                  "fov": 100,
+                  "reticleDiameter": 109.20000000000002,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 161.671
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 161.671
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 155.456
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 155.456
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 179.048,
+                      "maximumBottomPx": 192.819
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 188.214,
+                      "maximumBottomPx": 193.042
+                    }
+                  ]
+                }
+              ]
             }
           },
           {
             "lod": 1,
             "triangles": 49964,
-            "bytes": 831436,
+            "bytes": 830812,
             "meshNodes": 301,
             "materials": 19,
             "images": 4,
@@ -1048,12 +1422,377 @@
               "Chopper_OverlappingArmorPlate_": 4,
               "Chopper_DorsalArmorPanel_": 1,
               "Chopper_CanopyArmourBrow_": 2
+            },
+            "cockpitFraming": {
+              "failures": [],
+              "cases": [
+                {
+                  "label": "desktop-720p-min-fov",
+                  "width": 1280,
+                  "height": 720,
+                  "fov": 70,
+                  "reticleDiameter": 144,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 247.957
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 247.957
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 238.724
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 238.724
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 7.247,
+                      "maximumBottomPx": 27.242
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 20.555,
+                      "maximumBottomPx": 27.566
+                    }
+                  ]
+                },
+                {
+                  "label": "desktop-720p-max-fov",
+                  "width": 1280,
+                  "height": 720,
+                  "fov": 100,
+                  "reticleDiameter": 144,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 103.191
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 103.191
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 98.618
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 98.618
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 152.742,
+                      "maximumBottomPx": 164.49
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 160.561,
+                      "maximumBottomPx": 164.68
+                    }
+                  ]
+                },
+                {
+                  "label": "desktop-1080p-min-fov",
+                  "width": 1920,
+                  "height": 1080,
+                  "fov": 70,
+                  "reticleDiameter": 188,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 394.413
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 394.413
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 380.162
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 380.162
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 10.871,
+                      "maximumBottomPx": 40.862
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 30.833,
+                      "maximumBottomPx": 41.349
+                    }
+                  ]
+                },
+                {
+                  "label": "desktop-1080p-max-fov",
+                  "width": 1920,
+                  "height": 1080,
+                  "fov": 100,
+                  "reticleDiameter": 188,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 177.264
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 177.264
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 170.003
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 170.003
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 229.114,
+                      "maximumBottomPx": 246.735
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 240.842,
+                      "maximumBottomPx": 247.021
+                    }
+                  ]
+                },
+                {
+                  "label": "iphone-15-landscape-min-fov",
+                  "width": 844,
+                  "height": 390,
+                  "fov": 70,
+                  "reticleDiameter": 142,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 88.408
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 88.408
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 84.325
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 84.325
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 3.926,
+                      "maximumBottomPx": 14.756
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 11.134,
+                      "maximumBottomPx": 14.932
+                    }
+                  ]
+                },
+                {
+                  "label": "iphone-15-landscape-max-fov",
+                  "width": 844,
+                  "height": 390,
+                  "fov": 100,
+                  "reticleDiameter": 142,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 9.993
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 9.993
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 8.434
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 8.434
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 82.735,
+                      "maximumBottomPx": 89.099
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 86.971,
+                      "maximumBottomPx": 89.202
+                    }
+                  ]
+                },
+                {
+                  "label": "iphone-15-portrait-min-fov",
+                  "width": 390,
+                  "height": 844,
+                  "fov": 70,
+                  "reticleDiameter": 109.20000000000002,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 331.37
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 331.37
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 319.692
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 319.692
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 8.496,
+                      "maximumBottomPx": 31.933
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 24.095,
+                      "maximumBottomPx": 32.314
+                    }
+                  ]
+                },
+                {
+                  "label": "iphone-15-portrait-max-fov",
+                  "width": 390,
+                  "height": 844,
+                  "fov": 100,
+                  "reticleDiameter": 109.20000000000002,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 161.671
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 161.671
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 155.456
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 155.456
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 179.048,
+                      "maximumBottomPx": 192.819
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 188.214,
+                      "maximumBottomPx": 193.042
+                    }
+                  ]
+                }
+              ]
             }
           },
           {
             "lod": 2,
             "triangles": 29344,
-            "bytes": 571380,
+            "bytes": 570048,
             "meshNodes": 165,
             "materials": 19,
             "images": 4,
@@ -1090,6 +1829,371 @@
               "Chopper_GunBarrelCollar_": 3,
               "Chopper_GunArmourShroud_": 2,
               "Chopper_SkidDamper_": 4
+            },
+            "cockpitFraming": {
+              "failures": [],
+              "cases": [
+                {
+                  "label": "desktop-720p-min-fov",
+                  "width": 1280,
+                  "height": 720,
+                  "fov": 70,
+                  "reticleDiameter": 144,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 247.957
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 247.957
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 238.724
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 238.724
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 7.247,
+                      "maximumBottomPx": 27.242
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 20.555,
+                      "maximumBottomPx": 27.566
+                    }
+                  ]
+                },
+                {
+                  "label": "desktop-720p-max-fov",
+                  "width": 1280,
+                  "height": 720,
+                  "fov": 100,
+                  "reticleDiameter": 144,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 103.191
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 103.191
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 98.618
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 98.618
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 152.742,
+                      "maximumBottomPx": 164.49
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 160.561,
+                      "maximumBottomPx": 164.68
+                    }
+                  ]
+                },
+                {
+                  "label": "desktop-1080p-min-fov",
+                  "width": 1920,
+                  "height": 1080,
+                  "fov": 70,
+                  "reticleDiameter": 188,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 394.413
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 394.413
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 380.162
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 380.162
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 10.871,
+                      "maximumBottomPx": 40.862
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 30.833,
+                      "maximumBottomPx": 41.349
+                    }
+                  ]
+                },
+                {
+                  "label": "desktop-1080p-max-fov",
+                  "width": 1920,
+                  "height": 1080,
+                  "fov": 100,
+                  "reticleDiameter": 188,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 177.264
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 177.264
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 170.003
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 170.003
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 229.114,
+                      "maximumBottomPx": 246.735
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 240.842,
+                      "maximumBottomPx": 247.021
+                    }
+                  ]
+                },
+                {
+                  "label": "iphone-15-landscape-min-fov",
+                  "width": 844,
+                  "height": 390,
+                  "fov": 70,
+                  "reticleDiameter": 142,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 88.408
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 88.408
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 84.325
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 84.325
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 3.926,
+                      "maximumBottomPx": 14.756
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 11.134,
+                      "maximumBottomPx": 14.932
+                    }
+                  ]
+                },
+                {
+                  "label": "iphone-15-landscape-max-fov",
+                  "width": 844,
+                  "height": 390,
+                  "fov": 100,
+                  "reticleDiameter": 142,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 9.993
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 9.993
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 8.434
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 8.434
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 82.735,
+                      "maximumBottomPx": 89.099
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 86.971,
+                      "maximumBottomPx": 89.202
+                    }
+                  ]
+                },
+                {
+                  "label": "iphone-15-portrait-min-fov",
+                  "width": 390,
+                  "height": 844,
+                  "fov": 70,
+                  "reticleDiameter": 109.20000000000002,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 331.37
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.023951,
+                      "centreClearancePx": 331.37
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 319.692
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.033418,
+                      "centreClearancePx": 319.692
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 8.496,
+                      "maximumBottomPx": 31.933
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 24.095,
+                      "maximumBottomPx": 32.314
+                    }
+                  ]
+                },
+                {
+                  "label": "iphone-15-portrait-max-fov",
+                  "width": 390,
+                  "height": 844,
+                  "fov": 100,
+                  "reticleDiameter": 109.20000000000002,
+                  "elements": [
+                    {
+                      "kind": "pillar",
+                      "side": "left",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 161.671
+                    },
+                    {
+                      "kind": "pillar",
+                      "side": "right",
+                      "topViewportRatio": 0.2203,
+                      "centreClearancePx": 161.671
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "left",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 155.456
+                    },
+                    {
+                      "kind": "glow",
+                      "side": "right",
+                      "topViewportRatio": 0.225862,
+                      "centreClearancePx": 155.456
+                    }
+                  ],
+                  "headers": [
+                    {
+                      "kind": "header",
+                      "minimumTopPx": 179.048,
+                      "maximumBottomPx": 192.819
+                    },
+                    {
+                      "kind": "header-glow",
+                      "minimumTopPx": 188.214,
+                      "maximumBottomPx": 193.042
+                    }
+                  ]
+                }
+              ]
             }
           }
         ]
@@ -1111,7 +2215,7 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-support-vehicles.py",
-        "sha256": "e3ae50f79360081d669e3a1de6c15d5809dd4c43fbe9c978a1d0db5fa813afa4"
+        "sha256": "5a101db26217443a6757d8bb64e6fd95d23005c913859a7b525f5857a305935b"
       },
       "pbrMaps": {
         "care": {
@@ -1195,7 +2299,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-support-aircraft-family.provenance.json",
-        "sha256": "e8e8f1ee4cd54724ba6ea2be58aff4b8cb0013ff4ce0f7693f9108fdbe7793e3"
+        "sha256": "e3578a3bc509e34fd31a7e663c418289439ad65b50c067d585a5568bc80387a7"
       },
       "variants": {
         "care": {

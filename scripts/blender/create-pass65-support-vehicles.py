@@ -34,6 +34,23 @@ if AUTHORING_SCOPE not in {"all", "aircraft", "chopper"}:
     raise RuntimeError(f"unsupported PASS65_SUPPORT_AUTHORING_SCOPE={AUTHORING_SCOPE!r}")
 SKIP_REVIEW_RENDER = os.environ.get("PASS65_SUPPORT_SKIP_REVIEWS", "0") == "1"
 
+# These values are one authored framing contract. The endpoint empties exported
+# beside the meshes let runtime and release QA project the actual first-person
+# pillars without guessing from pixels or duplicating a cosmetic DOM frame.
+CHOPPER_FP_COCKPIT_FRAMING_REVISION = "pass71-tall-pillars-centre-clear-v1"
+CHOPPER_FP_CAMERA_SOCKET = (0.0, 0.38, 0.82)
+CHOPPER_FP_PILLAR_BASE = (0.68, 0.95, 0.02)
+CHOPPER_FP_PILLAR_TOP = (0.88, 2.18, 2.02)
+CHOPPER_FP_PILLAR_RADIUS_M = 0.035
+CHOPPER_FP_GLOW_BASE = (0.64, 1.00, 0.07)
+CHOPPER_FP_GLOW_TOP = (0.84, 2.14, 1.97)
+CHOPPER_FP_GLOW_RADIUS_M = 0.012
+CHOPPER_FP_REVIEW_VERTICAL_FOV_DEGREES = 82.0
+
+
+def signed_cockpit_point(point, side: int):
+    return (side * point[0], point[1], point[2])
+
 for directory in (
     CHOPPER_BLEND.parent,
     CHOPPER_RAW,
@@ -503,6 +520,8 @@ def build_chopper(lod: int, materials):
     root["visual_revision"] = "pass70-connected-rear-tail-airframe-v7"
     root["detail_contract"] = "continuous-rear-tail-silhouette-cockpit-clear-sightline-v7"
     root["material_revision"] = "pass70-daylight-readable-olive-pbr-v1"
+    root["first_person_cockpit_framing"] = CHOPPER_FP_COCKPIT_FRAMING_REVISION
+    root["first_person_cockpit_pillar_radius_m"] = CHOPPER_FP_PILLAR_RADIUS_M
     segments = (28, 20, 14)[lod]
     rings = (16, 12, 8)[lod]
     body = empty("chopper-fuselage", (0, 0, 0), root, "fuselage")
@@ -919,11 +938,35 @@ def build_chopper(lod: int, materials):
     cube(f"Chopper_CollectiveGrip_LOD{lod}", (-0.52, 0.72, 0.20), (0.24, 0.09, 0.13), materials["dark"], cockpit, bevel=0.04)
     cube(f"Chopper_CollectiveWearBand_LOD{lod}", (-0.52, 0.668, 0.20), (0.18, 0.012, 0.028), materials["panel_wear"], cockpit, bevel=0.006)
     cube(f"Chopper_CollectiveHatSwitch_LOD{lod}", (-0.58, 0.660, 0.24), (0.042, 0.014, 0.038), materials["hud_green"], cockpit, bevel=0.008)
-    for side in (-1, 1):
-        strut_between(f"Chopper_InnerWindscreenPillar_{side}_LOD{lod}", (side * 0.68, 0.95, 0.02), (side * 0.46, 2.18, 0.94), 0.035, materials["frame"], cockpit, 10)
-        strut_between(f"Chopper_InnerWindscreenGlow_{side}_LOD{lod}", (side * 0.64, 1.00, 0.07), (side * 0.44, 2.14, 0.90), 0.012, materials["cyan"], cockpit, 8)
-    strut_between(f"Chopper_InnerWindscreenHeader_LOD{lod}", (-0.47, 2.18, 0.94), (0.47, 2.18, 0.94), 0.035, materials["frame"], cockpit, 10)
-    strut_between(f"Chopper_InnerWindscreenHeaderGlow_LOD{lod}", (-0.42, 2.15, 0.90), (0.42, 2.15, 0.90), 0.012, materials["green"], cockpit, 8)
+    for side, label in ((-1, "left"), (1, "right")):
+        pillar_base = signed_cockpit_point(CHOPPER_FP_PILLAR_BASE, side)
+        pillar_top = signed_cockpit_point(CHOPPER_FP_PILLAR_TOP, side)
+        glow_base = signed_cockpit_point(CHOPPER_FP_GLOW_BASE, side)
+        glow_top = signed_cockpit_point(CHOPPER_FP_GLOW_TOP, side)
+        strut_between(
+            f"Chopper_InnerWindscreenPillar_{side}_LOD{lod}",
+            pillar_base, pillar_top, CHOPPER_FP_PILLAR_RADIUS_M, materials["frame"], cockpit, 10,
+        )
+        strut_between(
+            f"Chopper_InnerWindscreenGlow_{side}_LOD{lod}",
+            glow_base, glow_top, CHOPPER_FP_GLOW_RADIUS_M, materials["cyan"], cockpit, 8,
+        )
+        empty(f"chopper-inner-windscreen-pillar-{label}-base", pillar_base, cockpit)
+        empty(f"chopper-inner-windscreen-pillar-{label}-top", pillar_top, cockpit)
+        empty(f"chopper-inner-windscreen-glow-{label}-base", glow_base, cockpit)
+        empty(f"chopper-inner-windscreen-glow-{label}-top", glow_top, cockpit)
+    strut_between(
+        f"Chopper_InnerWindscreenHeader_LOD{lod}",
+        signed_cockpit_point(CHOPPER_FP_PILLAR_TOP, -1),
+        signed_cockpit_point(CHOPPER_FP_PILLAR_TOP, 1),
+        CHOPPER_FP_PILLAR_RADIUS_M, materials["frame"], cockpit, 10,
+    )
+    strut_between(
+        f"Chopper_InnerWindscreenHeaderGlow_LOD{lod}",
+        signed_cockpit_point(CHOPPER_FP_GLOW_TOP, -1),
+        signed_cockpit_point(CHOPPER_FP_GLOW_TOP, 1),
+        CHOPPER_FP_GLOW_RADIUS_M, materials["green"], cockpit, 8,
+    )
     gunner_sightline = empty("chopper-gunner-sightline", (0, 0, 0), cockpit, "gunner-sightline")
     gunner_sightline["first_person_only"] = True
     gunner_sightline["gunner_sightline"] = True
@@ -952,7 +995,7 @@ def build_chopper(lod: int, materials):
             (0.34 + offset, 1.46, 0.39), 0.018, materials["metal"], gunner_weapon, max(8, segments // 3),
         )
     cube(f"Chopper_GunnerViewStatus_LOD{lod}", (0.34, 0.892, 0.49), (0.085, 0.012, 0.018), materials["hud_green"], gunner_weapon, bevel=0.004)
-    empty("chopper-first-person-camera-socket", (0, 0.38, 0.82), root, "first-person-camera")
+    empty("chopper-first-person-camera-socket", CHOPPER_FP_CAMERA_SOCKET, root, "first-person-camera")
 
     main_rotor = empty("chopper-main-rotor", (0, -0.42, 1.72), root, "main-rotor")
     cylinder(f"Chopper_RotorMast_LOD{lod}", (0, -0.42, 1.38), 0.11, 0.72, materials["metal"], root, vertices=max(12, segments // 2))
@@ -1620,6 +1663,58 @@ def assert_roots_inside_review_camera(scene, camera, roots, label: str, margin: 
         raise RuntimeError(f"{label} review camera crops required geometry: {violations[:12]}")
 
 
+def assert_chopper_first_person_review_framing(scene, camera, root) -> None:
+    """Keep the accepted cockpit review aligned with the shipped camera contract."""
+    bpy.context.view_layer.update()
+    width = scene.render.resolution_x * scene.render.resolution_percentage / 100
+    height = scene.render.resolution_y * scene.render.resolution_percentage / 100
+    reticle_diameter = max(126.0, min(188.0, min(height * 0.20, width * 0.16)))
+    protected_x = (reticle_diameter / 2 + 8.0) / width
+    protected_y = (reticle_diameter / 2 + 8.0) / height
+    required_tops = {
+        "chopper-inner-windscreen-pillar-left-top": -1,
+        "chopper-inner-windscreen-pillar-right-top": 1,
+        "chopper-inner-windscreen-glow-left-top": -1,
+        "chopper-inner-windscreen-glow-right-top": 1,
+    }
+    by_canonical_name = {
+        obj.get("canonical_node_name"): obj
+        for obj in hierarchy(root)
+        if obj.get("canonical_node_name")
+    }
+    violations = []
+    receipt = {}
+    for canonical_name, side in required_tops.items():
+        obj = by_canonical_name.get(canonical_name)
+        if obj is None:
+            violations.append((canonical_name, "missing"))
+            continue
+        projected = world_to_camera_view(scene, camera, obj.matrix_world.translation)
+        receipt[canonical_name] = (
+            round(projected.x, 4), round(projected.y, 4), round(projected.z, 4),
+        )
+        horizontally_clear = (
+            projected.x < 0.5 - protected_x
+            if side < 0
+            else projected.x > 0.5 + protected_x
+        )
+        if (
+            projected.z <= 0
+            or projected.x < 0.02
+            or projected.x > 0.98
+            or projected.y <= 0.5 + protected_y
+            or projected.y > 0.98
+            or not horizontally_clear
+        ):
+            violations.append((canonical_name, *receipt[canonical_name]))
+    if violations:
+        raise RuntimeError(
+            "chopper accepted first-person review does not visibly prove the "
+            f"raised centre-clear cockpit frame: {violations}"
+        )
+    print(f"CHOPPER_FP_REVIEW_FRAMING={receipt}")
+
+
 def assert_roots_above_review_stage(roots, stage_z: float, label: str, clearance: float = 0.05) -> None:
     """Fail if the opaque review floor can hide any required asset geometry."""
     bpy.context.view_layer.update()
@@ -1817,12 +1912,16 @@ def render_chopper_reviews(roots) -> None:
         for obj in hierarchy(fp_world):
             obj.hide_render = False
             obj.hide_viewport = False
-        camera.location = (0, 0.38, 0.74)
-        camera.data.lens = 32
-        look_at(camera, (0, 8.0, 0.18))
+        camera.location = CHOPPER_FP_CAMERA_SOCKET
+        camera.data.sensor_fit = "VERTICAL"
+        camera.data.lens = camera.data.sensor_height / (
+            2 * math.tan(math.radians(CHOPPER_FP_REVIEW_VERTICAL_FOV_DEGREES) / 2)
+        )
+        look_at(camera, (0, 8.0, CHOPPER_FP_CAMERA_SOCKET[2]))
         scene.render.resolution_x = 960
         scene.render.resolution_y = 540
         scene.render.resolution_percentage = 100
+        assert_chopper_first_person_review_framing(scene, camera, lod0)
         scene.view_settings.exposure = -0.15
         background = scene.world.node_tree.nodes.get("Background")
         background.inputs["Strength"].default_value = 0.28
