@@ -35,7 +35,7 @@
   },
   "rollback": {
     "label": "PASS 63 · STABLE WEBGL",
-    "description": "The retained stable WebGL build, rebuilt deterministically from its approved Pass 63 source SHA.",
+    "description": "The exact previously hosted stable WebGL build, retained byte-for-byte from its approved Pass 63 Pages subtree.",
     "pass": "PASS 63",
     "sourceSha": "ac85e9b8b46cc2370aee903d564ecf3c4682b24c",
     "pagesSha": "46d366d188bfc5ebc5ee7a991fd52b792575316c",

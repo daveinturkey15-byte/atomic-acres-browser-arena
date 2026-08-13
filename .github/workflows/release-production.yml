@@ -76,17 +76,14 @@ jobs:
           echo "STABLE_RELEASED_AT=$stable_released_at" >> "$GITHUB_ENV"
       - name: Install topology browser
         run: npx playwright install --with-deps chromium
-      - name: Rebuild Pass 63 rollback from approved source
-        run: |
-          git worktree add artifacts/pass63-rollback-src ac85e9b8b46cc2370aee903d564ecf3c4682b24c
-          (cd artifacts/pass63-rollback-src && npm ci --ignore-scripts && VITE_MATCH_BUILD_ID=ac85e9b8b46cc2370aee903d564ecf3c4682b24c VITE_RELEASED_AT="$RELEASE_BUILT_AT" npm run build)
-          echo "RELEASE_ROLLBACK_DIST=$(pwd)/artifacts/pass63-rollback-src/dist" >> "$GITHUB_ENV"
-      - name: Stage live Pass 71, exact retained Pass 69, rebuilt Pass 67.1 and Pass 63 rollback
+      - name: Stage live Pass 71, exact retained Pass 69, rebuilt Pass 67.1 and exact Pass 63 rollback
         run: |
           test -n "${RELEASE_BUILT_AT:-}"
           git fetch --no-tags origin gh-pages:refs/remotes/origin/gh-pages
           RETAINED_PAGES_SHA=$(node -e "console.log(JSON.parse(require('fs').readFileSync('release-channels.json','utf8')).retained.pagesSha)")
           git cat-file -e "${RETAINED_PAGES_SHA}^{commit}" 2>/dev/null || git fetch --no-tags origin "$RETAINED_PAGES_SHA"
+          ROLLBACK_PAGES_SHA=$(node -e "console.log(JSON.parse(require('fs').readFileSync('release-channels.json','utf8')).rollback.pagesSha)")
+          git cat-file -e "${ROLLBACK_PAGES_SHA}^{commit}" 2>/dev/null || git fetch --no-tags origin "$ROLLBACK_PAGES_SHA"
           # The Pass 62 best-ever-netcode benchmark pins a gh-pages commit that may be
           # orphaned from the current gh-pages tip after subsequent production deploys.
           # Fetch it explicitly so verify:benchmark --verify-git can resolve the rollback subtree.
@@ -102,7 +99,6 @@ jobs:
           RELEASE_STABLE_DIST: ${{ env.RELEASE_STABLE_DIST }}
           STABLE_RELEASED_AT: ${{ env.STABLE_RELEASED_AT }}
           REQUIRE_STABLE_RELEASE_TIMESTAMP: '1'
-          RELEASE_ROLLBACK_DIST: ${{ env.RELEASE_ROLLBACK_DIST }}
       - name: Configure release commit identity
         run: |
           git config user.name "github-actions[bot]"

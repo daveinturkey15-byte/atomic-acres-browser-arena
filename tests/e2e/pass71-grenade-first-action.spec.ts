@@ -1,4 +1,18 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import {
+  ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS,
+  captureFrameActionBaseline,
+  deriveFrameActionBudget,
+  MAXIMUM_ACTION_FRAME_BUDGETS,
+  MAXIMUM_BASELINE_COMPLETION_FRAME_BUDGETS,
+  MAXIMUM_BASELINE_GAP_FRAME_BUDGETS,
+  MAXIMUM_BASELINE_P95_FRAME_BUDGETS,
+  MINIMUM_ACTION_FRAME_BUDGETS,
+  MINIMUM_BASELINE_FRAME_SAMPLES,
+  TARGET_FRAME_BUDGET_MS,
+  type FrameActionBaseline,
+  type FrameActionBudget,
+} from './frame-action-budget';
 
 type GrenadeId = 'frag' | 'flash' | 'smoke' | 'semtex';
 type GrenadeFirstActionReceipt = Readonly<{
@@ -34,10 +48,6 @@ const requireWebGpu = renderer === 'webgpu' ? '&requireWebGPU=1' : '';
 const renderProfile = process.env.PASS71_GRENADE_RENDER_PROFILE
   ?? (renderer === 'webgpu' ? 'performance' : 'compat');
 const grenades: readonly GrenadeId[] = ['frag', 'flash', 'smoke', 'semtex'];
-const MAX_SYNCHRONOUS_ACTION_MS = 50;
-const MAX_FIRST_PRESENTATION_MS = process.env.QA_INSTALLED_EDGE === '1' ? 120 : 220;
-const MAX_OBSERVATION_FRAME_GAP_MS = process.env.QA_INSTALLED_EDGE === '1' ? 180 : 220;
-const MAX_COMPLETION_MS = 350;
 
 async function deployWithUnlockedAudio(page: Page, grenade: GrenadeId): Promise<void> {
   await page.goto(
@@ -67,13 +77,17 @@ async function deployWithUnlockedAudio(page: Page, grenade: GrenadeId): Promise<
   }, grenade);
 }
 
-async function throwAndObserve(page: Page): Promise<{
+async function throwAndObserve(page: Page, baselineLabel: string): Promise<{
+  frameActionBaseline: FrameActionBaseline;
+  frameActionBudget: FrameActionBudget;
   profile: GrenadeFirstActionReceipt;
   audio: any;
   presentation: any;
   runtime: any;
   userAgent: string;
 }> {
+  const frameActionBaseline = await captureFrameActionBaseline(page, baselineLabel);
+  const frameActionBudget = deriveFrameActionBudget(frameActionBaseline);
   await page.evaluate(() => new Promise<void>((resolve) => {
     requestAnimationFrame(() => {
       window.__ATOMIC_ACRES_DEBUG__.throwGrenade();
@@ -93,7 +107,7 @@ async function throwAndObserve(page: Page): Promise<{
       runtime: snapshot.render.runtime,
       userAgent: navigator.userAgent,
     };
-  });
+  }).then((receipt) => ({ ...receipt, frameActionBaseline, frameActionBudget }));
 }
 
 function assertActionReceipt(
@@ -101,8 +115,10 @@ function assertActionReceipt(
   grenade: GrenadeId,
   cold: boolean,
 ): void {
-  const { profile, audio, presentation, runtime, userAgent } = receipt;
-  const evidence = JSON.stringify({ renderer, profile, audio, presentation, runtime, userAgent });
+  const { frameActionBaseline, frameActionBudget, profile, audio, presentation, runtime, userAgent } = receipt;
+  const evidence = JSON.stringify({
+    renderer, frameActionBaseline, frameActionBudget, profile, audio, presentation, runtime, userAgent,
+  });
   expect(profile, evidence).toMatchObject({
     grenade,
     cold,
@@ -110,20 +126,28 @@ function assertActionReceipt(
     observationComplete: true,
     completionFailures: 0,
   });
-  expect(profile.handlerSyncMs, `${evidence}: synchronous throw handler`).toBeLessThan(MAX_SYNCHRONOUS_ACTION_MS);
+  expect(frameActionBudget).toMatchObject({
+    targetFrameBudgetMs: Number(TARGET_FRAME_BUDGET_MS.toFixed(3)),
+    maximumSynchronousActionMs: Number((TARGET_FRAME_BUDGET_MS * 2).toFixed(3)),
+  });
+  expect(profile.handlerSyncMs, `${evidence}: synchronous throw handler`)
+    .toBeLessThan(frameActionBudget.maximumSynchronousActionMs);
   expect(profile.maximumAnimationFrameGapMs, `${evidence}: no visible first-action freeze`)
-    .toBeLessThan(MAX_OBSERVATION_FRAME_GAP_MS);
+    .toBeLessThan(frameActionBudget.maximumActionMs);
   expect(profile.maximumFrameWorkMs, `${evidence}: no first-action long frame`)
-    .toBeLessThan(MAX_FIRST_PRESENTATION_MS);
-  expect(profile.frameSamples, `${evidence}: exact 0-350ms observation window`).toBeGreaterThan(2);
+    .toBeLessThan(frameActionBudget.maximumActionMs);
+  expect(profile.maximumPendingForMs, `${evidence}: no hidden completion backlog`)
+    .toBeLessThan(frameActionBudget.maximumActionMs);
+  expect(profile.frameSamples, `${evidence}: exact 0-350ms observation window`)
+    .toBeGreaterThanOrEqual(MINIMUM_BASELINE_FRAME_SAMPLES);
   expect(profile.firstSubmissionDelayMs, `${evidence}: first presentation after the action`)
     .not.toBeNull();
   expect(profile.firstSubmissionDelayMs!, `${evidence}: action reaches presentation promptly`)
-    .toBeLessThan(MAX_FIRST_PRESENTATION_MS);
+    .toBeLessThan(frameActionBudget.maximumActionMs);
   expect(profile.firstCompletionDelayMs, `${evidence}: actual completion frontier observed`)
     .not.toBeNull();
   expect(profile.firstCompletionDelayMs!, `${evidence}: completion inside observed action window`)
-    .toBeLessThanOrEqual(MAX_COMPLETION_MS);
+    .toBeLessThan(frameActionBudget.maximumActionMs);
   expect(profile.status, evidence).toBe(renderer === 'webgpu' ? 'healthy' : 'synchronous');
   expect(profile.endingCompletedSequence, evidence).toBeGreaterThanOrEqual(profile.targetSubmissionSequence ?? 0);
   if (renderer === 'webgpu') {
@@ -163,7 +187,7 @@ for (const grenade of grenades) {
       if (message.type() === 'error') faults.push(message.text());
     });
     await deployWithUnlockedAudio(page, grenade);
-    const cold = await throwAndObserve(page);
+    const cold = await throwAndObserve(page, `${grenade}-cold-preaction-baseline`);
     assertActionReceipt(cold, grenade, true);
 
     await page.evaluate((selectedGrenade) => {
@@ -171,7 +195,7 @@ for (const grenade of grenades) {
       debug.setSelectedGrenade(selectedGrenade);
       debug.setGrenades(1);
     }, grenade);
-    const warm = await throwAndObserve(page);
+    const warm = await throwAndObserve(page, `${grenade}-warm-preaction-baseline`);
     assertActionReceipt(warm, grenade, false);
 
     expect(warm.audio.grenadeEffectsPrewarm.sources, 'warm action retains the exact pre-owned graph')
@@ -192,7 +216,22 @@ for (const grenade of grenades) {
     });
     expect(faults, JSON.stringify(faults, null, 2)).toEqual([]);
     await testInfo.attach(`pass71-${grenade}-first-action-${renderer}`, {
-      body: Buffer.from(JSON.stringify({ grenade, renderer, cold, warm, faults }, null, 2)),
+      body: Buffer.from(JSON.stringify({
+        grenade,
+        renderer,
+        thresholds: {
+          targetFrameBudgetMs: Number(TARGET_FRAME_BUDGET_MS.toFixed(3)),
+          maximumBaselineP95FrameBudgets: MAXIMUM_BASELINE_P95_FRAME_BUDGETS,
+          maximumBaselineGapFrameBudgets: MAXIMUM_BASELINE_GAP_FRAME_BUDGETS,
+          maximumBaselineCompletionFrameBudgets: MAXIMUM_BASELINE_COMPLETION_FRAME_BUDGETS,
+          minimumActionFrameBudgets: MINIMUM_ACTION_FRAME_BUDGETS,
+          maximumActionFrameBudgets: MAXIMUM_ACTION_FRAME_BUDGETS,
+          actionRelativeAllowanceFrameBudgets: ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS,
+        },
+        cold,
+        warm,
+        faults,
+      }, null, 2)),
       contentType: 'application/json',
     });
   });

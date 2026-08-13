@@ -8,6 +8,7 @@ const pass62Benchmark = JSON.parse(readFileSync('baselines/pass62/best-netcode-b
 const shell = readFileSync('release-shell/release-shell.js', 'utf8');
 const shellHtml = readFileSync('release-shell/index.html', 'utf8');
 const staging = readFileSync('scripts/release/stage-release-topology.mjs', 'utf8');
+const staticVerifier = readFileSync('scripts/qa/verify-release-topology.mjs', 'utf8');
 const playwrightServer = readFileSync('scripts/qa/playwright-web-server.mjs', 'utf8');
 
 describe('Pass 71 release topology', () => {
@@ -132,9 +133,13 @@ describe('Pass 71 release topology', () => {
     expect(staging).toContain('experimental: {');
     expect(staging).toContain('...(rollback ? {');
     expect(staging).toContain('stable: {');
-    expect(staging).toContain("RELEASE_ROLLBACK_DIST");
-    expect(staging).toContain("pagesSha: '46d366d188bfc5ebc5ee7a991fd52b792575316c'");
-    expect(staging).toContain("rollback = stagePinned('rollback', { ...config.rollback, ...PASS63_PREVIEW_PIN })");
+    expect(staging).not.toContain('RELEASE_ROLLBACK_DIST');
+    expect(staging).not.toContain('PASS63_PREVIEW_PIN');
+    expect(staging).toContain("rollback = stagePinned('rollback', config.rollback)");
+    expect(staticVerifier).toContain('const rollbackFiles = verifyPinned(config.rollback)');
+    expect(staticVerifier).toContain('rollbackFiles !== config.rollback.runtimeFileCount + 1');
+    expect(staticVerifier).toContain('rollbackEmbedded.treeSha256 !== config.rollback.runtimeTreeSha256');
+    expect(staticVerifier).toContain('rollbackWrapper.pagesSha !== config.rollback.pagesSha');
     expect(staging).toContain("schemaVersion: 4");
     expect(staging).toContain("process.env.RELEASE_BUILT_AT?.trim() ? 'live' : 'candidate'");
     expect(staging).toContain('deploymentState,');

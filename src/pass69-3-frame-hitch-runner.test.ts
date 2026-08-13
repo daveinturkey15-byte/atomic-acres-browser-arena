@@ -75,30 +75,39 @@ describe('Pass 69.3 clean exact-SHA frame-hitch matrix', () => {
     expect(specialSpec).toContain("frameHitchRoute('gun-range', seed, { signal: false })");
   });
 
-  it('retains and independently validates every absolute and relative freeze threshold', () => {
-    for (const spec of [glassSpec, specialSpec]) {
-      expect(spec).toContain('const MAX_EVENT_TO_PRESENTED_FRAME_MS = 120;');
-      expect(spec).toContain('const MAX_SYNCHRONOUS_ACTION_MS = 50;');
-    }
-    expect(glassSpec).toContain('baseline.eventToPresentedFrameMs * 4 + 40');
+  it('uses completed-frontier frame-budget-relative glass gates and retains the legacy special matrix', () => {
+    expect(glassSpec).toContain('captureFrameActionBaseline(page');
+    expect(glassSpec).toContain('deriveFrameActionBudget(frameActionBaseline)');
+    expect(glassSpec).toContain('probe.eventToCompletionMs');
+    expect(glassSpec).toContain('probe.endingCompletedSequence');
+    expect(glassSpec).toContain('budget.maximumActionMs');
+    expect(glassSpec).not.toContain('baseline.eventToPresentedFrameMs * 4 + 40');
+    expect(glassSpec).not.toContain('const MAX_EVENT_TO_PRESENTED_FRAME_MS = 120;');
     expect(glassSpec).toContain('const MAX_M14_TRANSITION_READY_MS = 5_000;');
-    expect(glassSpec).toContain('transition.maximumAnimationFrameGapMs');
+    expect(glassSpec).toContain('probe.maximumAnimationFrameGapMs');
+    expect(specialSpec).toContain('const MAX_EVENT_TO_PRESENTED_FRAME_MS = 120;');
+    expect(specialSpec).toContain('const MAX_SYNCHRONOUS_ACTION_MS = 50;');
     expect(specialSpec).toContain('baseline.p95Ms * 4 + 40');
     expect(specialSpec).toContain('const MAX_SUSTAINED_PRESENTED_FRAME_GAP_MS = 120;');
     expect(specialSpec).toContain('const MAX_SUSTAINED_P95_MS = 50;');
     expect(specialSpec).toContain('expectBoundedEquipProbe(equipProbe');
     expect(specialSpec).toContain('probe.maximumAnimationFrameGapMs');
     for (const token of [
+      'TARGET_FRAME_BUDGET_MS = 1_000 / 60',
+      'MAXIMUM_BASELINE_P95_FRAME_BUDGETS = 1.5',
+      'MAXIMUM_ACTION_FRAME_BUDGETS = 3',
+      'ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS = 1',
+      'frameActionBaselineValid(frameActionBaseline',
+      'glassActionProbeValid(',
+      'probe.eventToCompletionMs < budget.maximumActionMs',
+      'probe.maximumAnimationFrameGapMs < budget.maximumActionMs',
       'thresholds?.maximumEventToPresentedFrameMs === 120',
       'thresholds.maximumSynchronousActionMs === 50',
       'thresholds.maximumSustainedPresentedFrameGapMs === 120',
       'thresholds.maximumSustainedP95Ms === 50',
       'thresholds.maximumRelativeMultiplier === 4',
       'thresholds.maximumRelativeAllowanceMs === 40',
-      'receipt.thresholds.maximumM14TransitionReadyMs !== 5_000',
       'probe.maximumAnimationFrameGapMs < 120',
-      'probe.eventToPresentedFrameMs < baseline.eventToPresentedFrameMs * 4 + 40',
-      'probe.maximumAnimationFrameGapMs < baseline.eventToPresentedFrameMs * 4 + 40',
       'probe.frameWindow.maximumMs < baseline.p95Ms * 4 + 40',
       'equipProbe.eventToPresentedFrameMs < baseline.p95Ms * 4 + 40',
       'equipProbe.maximumAnimationFrameGapMs < baseline.p95Ms * 4 + 40',

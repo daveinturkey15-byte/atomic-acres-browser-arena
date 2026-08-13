@@ -56,4 +56,19 @@ describe('release change impact', () => {
     expect(output.windows_groups.split(',')).not.toContain('pass64-hud-contracts');
     expect(output.linux_groups.split(',')).toContain('pass64-hud-contracts');
   });
+
+  it('routes the Pass 71 hitch and lifecycle gates through bounded supplemental shards', () => {
+    const output = outputsFor(classifyPaths(['src/legacy-main.ts']));
+    expect(output.windows_supplemental_groups.split(',')).toEqual([
+      'pass71-grenade-first-action',
+      'pass70-chopper-gunner',
+    ]);
+    expect(output.linux_supplemental_groups.split(',')).toEqual([
+      'pass71-glass-lifecycle',
+      'pass71-nuke-warning',
+    ]);
+    const smoke = outputsFor(classifyPaths(['index.html']));
+    expect(smoke.windows_supplemental_groups).toBe('');
+    expect(smoke.linux_supplemental_groups).toBe('');
+  });
 });

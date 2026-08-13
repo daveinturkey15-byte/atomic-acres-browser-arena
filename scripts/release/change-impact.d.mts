@@ -6,6 +6,8 @@ export type ChangeImpact = Readonly<{
 export type ChangeImpactOutputs = ChangeImpact & Readonly<{
   windows_groups: string;
   linux_groups: string;
+  windows_supplemental_groups: string;
+  linux_supplemental_groups: string;
 }>;
 
 export function classifyPaths(paths: readonly string[]): ChangeImpact;

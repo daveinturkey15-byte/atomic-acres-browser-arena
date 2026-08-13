@@ -148,13 +148,31 @@ if (config.rollback && existsSync(join(dist, config.rollback.path))) {
   if (!rollbackAssets.some((name) => readFileSync(join(rollbackRoot, 'assets', name)).includes(Buffer.from(config.rollback.pass)))) {
     throw new Error(`Rollback channel does not contain ${config.rollback.pass}`);
   }
-  const rollbackProvenance = JSON.parse(readFileSync(join(rollbackRoot, 'channel-provenance.json'), 'utf8'));
-  if (rollbackProvenance.schemaVersion !== 4
-    || rollbackProvenance.releasePass !== config.rollback.pass
-    || rollbackProvenance.sourceSha !== config.rollback.sourceSha
-    || rollbackProvenance.path !== config.rollback.path
-    || rollbackProvenance.rebuiltFromSource !== true) {
-    throw new Error('Rollback provenance does not match the configured Pass 63 rebuilt-source record');
+  const rollbackFiles = verifyPinned(config.rollback);
+  const rollbackEmbedded = JSON.parse(readFileSync(join(rollbackRoot, 'channel-provenance.json'), 'utf8'));
+  const rollbackWrapper = JSON.parse(readFileSync(join(rollbackRoot, 'pinned-channel-provenance.json'), 'utf8'));
+  const rollbackPinnedFiles = walkFiles(rollbackRoot)
+    .filter((path) => path !== join(rollbackRoot, 'pinned-channel-provenance.json'));
+  if (rollbackFiles !== config.rollback.runtimeFileCount + 1
+    || rollbackPinnedFiles.length !== rollbackFiles
+    || rollbackEmbedded.schemaVersion !== 4
+    || rollbackEmbedded.releasePass !== config.rollback.pass
+    || rollbackEmbedded.sourceSha !== config.rollback.sourceSha
+    || rollbackEmbedded.path !== config.rollback.pagesPath
+    || rollbackEmbedded.exactRootFileCount !== config.rollback.runtimeFileCount
+    || rollbackEmbedded.treeSha256 !== config.rollback.runtimeTreeSha256
+    || rollbackWrapper.schemaVersion !== 4
+    || rollbackWrapper.channel !== 'rollback'
+    || rollbackWrapper.releasePass !== config.rollback.pass
+    || rollbackWrapper.sourceSha !== config.rollback.sourceSha
+    || rollbackWrapper.pagesSha !== config.rollback.pagesSha
+    || rollbackWrapper.pagesPath !== config.rollback.pagesPath
+    || rollbackWrapper.path !== config.rollback.path
+    || rollbackWrapper.exactRootFileCount !== rollbackFiles
+    || rollbackWrapper.treeSha256 !== treeDigest(rollbackRoot, rollbackPinnedFiles)
+    || rollbackWrapper.pinnedRuntime?.exactRootFileCount !== config.rollback.runtimeFileCount
+    || rollbackWrapper.pinnedRuntime?.treeSha256 !== config.rollback.runtimeTreeSha256) {
+    throw new Error('Rollback Pass 63 does not match the exact configured Pages subtree and embedded runtime');
   }
 }
 console.log(JSON.stringify({ releaseTopology: 'verified', retainedFiles, stableFiles, experimentalAssets: experimentalAssets.length }));

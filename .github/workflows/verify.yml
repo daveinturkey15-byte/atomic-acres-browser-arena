@@ -22,6 +22,8 @@ jobs:
       reason: ${{ steps.impact.outputs.reason }}
       windows_groups: ${{ steps.impact.outputs.windows_groups }}
       linux_groups: ${{ steps.impact.outputs.linux_groups }}
+      windows_supplemental_groups: ${{ steps.impact.outputs.windows_supplemental_groups }}
+      linux_supplemental_groups: ${{ steps.impact.outputs.linux_supplemental_groups }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -189,9 +191,59 @@ jobs:
           QA_E2E_GROUPS: ${{ needs.classify-change.outputs.linux_groups }}
         run: npm run test:e2e:bounded
 
+  bounded-browser-windows-supplemental:
+    needs: [classify-change, static-and-unit]
+    if: needs.classify-change.outputs.windows_supplemental_groups != ''
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install chromium
+      - run: npm run build
+        env:
+          VITE_MATCH_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}
+          VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
+      - name: Run Pass 71 Windows supplemental browser groups
+        env:
+          QA_E2E_GROUPS: ${{ needs.classify-change.outputs.windows_supplemental_groups }}
+        run: npm run test:e2e:bounded
+
+  bounded-browser-linux-supplemental:
+    needs: [classify-change, static-and-unit]
+    if: needs.classify-change.outputs.linux_supplemental_groups != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+        env:
+          VITE_MATCH_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}
+          VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
+      - name: Run Pass 71 Linux supplemental browser groups
+        env:
+          QA_E2E_GROUPS: ${{ needs.classify-change.outputs.linux_supplemental_groups }}
+        run: npm run test:e2e:bounded
+
   pipeline-metrics:
     if: always()
-    needs: [classify-change, requirements-acceptance, static-and-unit, bounded-browser-linux, bounded-browser-windows]
+    needs: [classify-change, requirements-acceptance, static-and-unit, bounded-browser-linux, bounded-browser-windows, bounded-browser-linux-supplemental, bounded-browser-windows-supplemental]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -41,16 +41,17 @@ describe('production release workflow', () => {
     expect(workflow).not.toContain('git config --global');
   });
 
-  it('stages live Pass 71, retained Pass 69, stable Pass 67.1 and rollback Pass 63 before a complete publish', () => {
+  it('stages live Pass 71, retained Pass 69, stable Pass 67.1 and exact rollback Pass 63 before a complete publish', () => {
     expect(workflow).toContain('npm run stage:release-topology');
     expect(workflow).toContain('npm run verify:release-topology');
     expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}');
     expect(workflow).toContain('RELEASE_PASS: ${{ inputs.release_pass }}');
-    expect(workflow).toContain('RELEASE_ROLLBACK_DIST: ${{ env.RELEASE_ROLLBACK_DIST }}');
-    expect(workflow).toContain('git worktree add artifacts/pass63-rollback-src ac85e9b8b46cc2370aee903d564ecf3c4682b24c');
+    expect(workflow).not.toContain('RELEASE_ROLLBACK_DIST');
+    expect(workflow).not.toContain('pass63-rollback-src');
     expect(workflow).not.toContain('stage:stable-channel');
-    expect(workflow).toContain('Stage live Pass 71, exact retained Pass 69, rebuilt Pass 67.1 and Pass 63 rollback');
+    expect(workflow).toContain('Stage live Pass 71, exact retained Pass 69, rebuilt Pass 67.1 and exact Pass 63 rollback');
     expect(workflow).toContain('RETAINED_PAGES_SHA=$(node -e');
+    expect(workflow).toContain('ROLLBACK_PAGES_SHA=$(node -e');
     expect(readFileSync('package.json', 'utf8')).toContain('"deploy:ci": "gh-pages -d dist"');
     expect(readFileSync('package.json', 'utf8')).not.toContain('"deploy:ci": "gh-pages -d dist --add"');
   });
@@ -131,7 +132,7 @@ describe('production release workflow', () => {
 
   it('checks out the real PR head SHA rather than GitHub synthetic merge bytes', () => {
     const exactCheckout = 'ref: ${{ github.event.pull_request.head.sha || github.sha }}';
-    expect(verifyWorkflow.match(new RegExp(exactCheckout.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))?.length).toBe(6);
+    expect(verifyWorkflow.match(new RegExp(exactCheckout.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))?.length).toBe(8);
     expect(verifyWorkflow).toContain('HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}');
     const staticJob = verifyWorkflow.slice(
       verifyWorkflow.indexOf('static-and-unit:'),
@@ -179,6 +180,16 @@ describe('production release workflow', () => {
     expect(windowsJob).toContain('name: Run Pass 65 menu lifecycle contracts');
     expect(windowsJob).toContain('timeout-minutes: 13');
     expect(windowsJob).toContain('node node_modules/@playwright/test/cli.js test tests/e2e/pass65-menu-lifecycle.spec.ts --project=chromium --workers=1 --retries=0');
+  });
+
+  it('runs the Pass 71 first-action and lifecycle coverage in bounded supplemental shards', () => {
+    expect(verifyWorkflow).toContain('windows_supplemental_groups: ${{ steps.impact.outputs.windows_supplemental_groups }}');
+    expect(verifyWorkflow).toContain('linux_supplemental_groups: ${{ steps.impact.outputs.linux_supplemental_groups }}');
+    expect(verifyWorkflow).toContain('bounded-browser-windows-supplemental:');
+    expect(verifyWorkflow).toContain('bounded-browser-linux-supplemental:');
+    expect(verifyWorkflow).toContain('QA_E2E_GROUPS: ${{ needs.classify-change.outputs.windows_supplemental_groups }}');
+    expect(verifyWorkflow).toContain('QA_E2E_GROUPS: ${{ needs.classify-change.outputs.linux_supplemental_groups }}');
+    expect(verifyWorkflow).toContain('bounded-browser-linux-supplemental, bounded-browser-windows-supplemental');
   });
 
   it('owns and closes the local preview lifecycle for every catalogued Playwright gate', () => {
