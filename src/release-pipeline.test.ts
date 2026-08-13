@@ -186,10 +186,61 @@ describe('production release workflow', () => {
   it('runs the Pass 71 first-action and lifecycle coverage in bounded supplemental shards', () => {
     expect(verifyWorkflow).toContain('windows_supplemental_groups: ${{ steps.impact.outputs.windows_supplemental_groups }}');
     expect(verifyWorkflow).toContain('linux_supplemental_groups: ${{ steps.impact.outputs.linux_supplemental_groups }}');
+    expect(verifyWorkflow).toContain('bounded-browser-windows-supplemental-shard:');
     expect(verifyWorkflow).toContain('bounded-browser-windows-supplemental:');
+    expect(verifyWorkflow).toContain('bounded-browser-linux-supplemental-shard:');
     expect(verifyWorkflow).toContain('bounded-browser-linux-supplemental:');
-    expect(verifyWorkflow).toContain('QA_E2E_GROUPS: ${{ needs.classify-change.outputs.windows_supplemental_groups }}');
-    expect(verifyWorkflow).toContain('QA_E2E_GROUPS: ${{ needs.classify-change.outputs.linux_supplemental_groups }}');
+    const windowsShardJob = verifyWorkflow.slice(
+      verifyWorkflow.indexOf('bounded-browser-windows-supplemental-shard:'),
+      verifyWorkflow.indexOf('bounded-browser-windows-supplemental:'),
+    );
+    expect(windowsShardJob).toContain('timeout-minutes: 30');
+    expect(windowsShardJob).toContain('fail-fast: false');
+    for (const group of [
+      'pass71-grenade-first-action',
+      'pass70-chopper-gunner',
+    ]) expect(windowsShardJob).toContain(`- ${group}`);
+    expect(windowsShardJob).toContain('QA_E2E_GROUPS: ${{ matrix.group }}');
+    expect(windowsShardJob).toContain('if: failure()');
+    expect(windowsShardJob).toContain('artifacts/pass25a/playwright-results/**');
+    expect(windowsShardJob).toContain('playwright-report/**');
+    expect(windowsShardJob).toContain('retention-days: 30');
+    const windowsAggregateJob = verifyWorkflow.slice(
+      verifyWorkflow.indexOf('bounded-browser-windows-supplemental:'),
+      verifyWorkflow.indexOf('bounded-browser-linux-supplemental-shard:'),
+    );
+    expect(windowsAggregateJob).toContain('needs: [classify-change, bounded-browser-windows-supplemental-shard]');
+    expect(windowsAggregateJob).toContain("if: always() && needs.classify-change.outputs.windows_supplemental_groups != ''");
+    expect(windowsAggregateJob).toContain('SHARD_RESULT: ${{ needs.bounded-browser-windows-supplemental-shard.result }}');
+    expect(windowsAggregateJob).toContain('if [[ "$SHARD_RESULT" != "success" ]]');
+    const linuxShardJob = verifyWorkflow.slice(
+      verifyWorkflow.indexOf('bounded-browser-linux-supplemental-shard:'),
+      verifyWorkflow.indexOf('bounded-browser-linux-supplemental:'),
+    );
+    expect(linuxShardJob).toContain('timeout-minutes: 30');
+    expect(linuxShardJob).toContain('fail-fast: false');
+    for (const group of [
+      'pass71-glass-quality-matrix',
+      'pass71-glass-quality-flare',
+      'pass71-glass-quality-crossbow',
+      'pass71-glass-performance-matrix',
+      'pass71-glass-performance-flare',
+      'pass71-glass-performance-crossbow',
+      'pass71-nuke-warning',
+    ]) expect(linuxShardJob).toContain(`- ${group}`);
+    expect(linuxShardJob).toContain('QA_E2E_GROUPS: ${{ matrix.group }}');
+    expect(linuxShardJob).toContain('if: failure()');
+    expect(linuxShardJob).toContain('artifacts/pass25a/playwright-results/**');
+    expect(linuxShardJob).toContain('playwright-report/**');
+    expect(linuxShardJob).toContain('retention-days: 30');
+    const linuxAggregateJob = verifyWorkflow.slice(
+      verifyWorkflow.indexOf('bounded-browser-linux-supplemental:'),
+      verifyWorkflow.indexOf('pipeline-metrics:'),
+    );
+    expect(linuxAggregateJob).toContain('needs: [classify-change, bounded-browser-linux-supplemental-shard]');
+    expect(linuxAggregateJob).toContain("if: always() && needs.classify-change.outputs.linux_supplemental_groups != ''");
+    expect(linuxAggregateJob).toContain('SHARD_RESULT: ${{ needs.bounded-browser-linux-supplemental-shard.result }}');
+    expect(linuxAggregateJob).toContain('if [[ "$SHARD_RESULT" != "success" ]]');
     expect(verifyWorkflow).toContain('bounded-browser-linux-supplemental, bounded-browser-windows-supplemental');
     expect(verifyWorkflow).toContain('requirements-acceptance:\n    needs: [classify-change, static-and-unit, bounded-browser-linux-supplemental, bounded-browser-windows-supplemental]\n    if: always()');
     expect(verifyWorkflow).toContain('WINDOWS_SUPPLEMENTAL_RESULT: ${{ needs.bounded-browser-windows-supplemental.result }}');

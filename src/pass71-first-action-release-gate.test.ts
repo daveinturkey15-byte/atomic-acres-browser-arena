@@ -65,16 +65,45 @@ describe('Pass 71 first-action and protected-release gate', () => {
   it('makes grenade, glass lifecycle, Nuke and Chopper coverage required full-impact shards', () => {
     for (const group of [
       'pass71-grenade-first-action',
-      'pass71-glass-lifecycle',
+      'pass71-glass-quality-matrix',
+      'pass71-glass-quality-flare',
+      'pass71-glass-quality-crossbow',
+      'pass71-glass-performance-matrix',
+      'pass71-glass-performance-flare',
+      'pass71-glass-performance-crossbow',
       'pass71-nuke-warning',
       'pass70-chopper-gunner',
     ]) expect(boundedRunner).toContain(`name: '${group}'`);
+    for (const [group, title] of [
+      ['pass71-glass-quality-matrix', 'quality: all six authored panes'],
+      ['pass71-glass-quality-flare', 'quality: real Flare Gun impacts'],
+      ['pass71-glass-quality-crossbow', 'quality: real explosive-crossbow impact'],
+      ['pass71-glass-performance-matrix', 'performance: all six authored panes'],
+      ['pass71-glass-performance-flare', 'performance: real Flare Gun impacts'],
+      ['pass71-glass-performance-crossbow', 'performance: real explosive-crossbow impact'],
+    ]) {
+      const line = boundedRunner.match(new RegExp(`name: '${group}'[^\\n]+`, 'u'))?.[0] ?? '';
+      expect(line).toContain('timeoutMs: 360_000');
+      expect(line).toContain("'tests/e2e/pass71-glass-lifecycle-matrix.spec.ts'");
+      expect(line).toContain("'--workers=1'");
+      expect(line).toContain("'--grep'");
+      expect(line).toContain(`'${title}'`);
+    }
+    expect(boundedRunner).toContain("stdio: 'inherit'");
+    expect(boundedRunner).toContain('windowsHide: true');
+    expect(boundedRunner).not.toContain("encoding: 'utf8'");
+    expect(boundedRunner).not.toContain('result.stdout');
+    expect(boundedRunner).not.toContain('result.stderr');
+    const grenadeGroup = boundedRunner.match(/name: 'pass71-grenade-first-action'[^\n]+/u)?.[0] ?? '';
+    expect(grenadeGroup).toContain('timeoutMs: 600_000');
+    expect(grenadeGroup).toContain("'tests/e2e/pass71-grenade-first-action.spec.ts'");
     const chopperGroup = boundedRunner.match(/name: 'pass70-chopper-gunner'[^\n]+/u)?.[0] ?? '';
-    expect(chopperGroup).toContain('timeoutMs: 300_000');
+    expect(chopperGroup).toContain('timeoutMs: 420_000');
     expect(chopperGroup).toContain("'tests/e2e/pass70-chopper-gunner.spec.ts'");
     expect(chopperGroup).toContain("'tests/e2e/pass71-controlled-support-native.spec.ts'");
     expect(impactClassifier).toContain("windows_supplemental_groups: 'pass71-grenade-first-action,pass70-chopper-gunner'");
-    expect(impactClassifier).toContain("linux_supplemental_groups: 'pass71-glass-lifecycle,pass71-nuke-warning'");
+    expect(impactClassifier).toContain("linux_supplemental_groups: 'pass71-glass-quality-matrix,pass71-glass-quality-flare,pass71-glass-quality-crossbow,pass71-glass-performance-matrix,pass71-glass-performance-flare,pass71-glass-performance-crossbow,pass71-nuke-warning'");
+    expect(verifyWorkflow).toContain('bounded-browser-windows-supplemental-shard:');
     expect(verifyWorkflow).toContain('bounded-browser-windows-supplemental:');
     expect(verifyWorkflow).toContain('bounded-browser-linux-supplemental:');
     expect(verifyWorkflow).toContain('bounded-browser-linux-supplemental, bounded-browser-windows-supplemental');

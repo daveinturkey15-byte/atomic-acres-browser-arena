@@ -226,11 +226,17 @@ jobs:
           QA_E2E_GROUPS: ${{ needs.classify-change.outputs.linux_groups }}
         run: npm run test:e2e:bounded
 
-  bounded-browser-windows-supplemental:
+  bounded-browser-windows-supplemental-shard:
     needs: [classify-change, static-and-unit]
     if: needs.classify-change.outputs.windows_supplemental_groups != ''
     runs-on: windows-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        group:
+          - pass71-grenade-first-action
+          - pass70-chopper-gunner
     steps:
       - uses: actions/checkout@v4
         with:
@@ -246,16 +252,53 @@ jobs:
         env:
           VITE_MATCH_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}
           VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
-      - name: Run Pass 71 Windows supplemental browser groups
+      - name: Run Pass 71 Windows supplemental browser shard
         env:
-          QA_E2E_GROUPS: ${{ needs.classify-change.outputs.windows_supplemental_groups }}
+          QA_E2E_GROUPS: ${{ matrix.group }}
         run: npm run test:e2e:bounded
+      - name: Upload Pass 71 Windows supplemental failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pass71-windows-supplemental-${{ matrix.group }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            artifacts/pass25a/playwright-results/**
+            playwright-report/**
+          if-no-files-found: warn
+          retention-days: 30
 
-  bounded-browser-linux-supplemental:
+  bounded-browser-windows-supplemental:
+    needs: [classify-change, bounded-browser-windows-supplemental-shard]
+    if: always() && needs.classify-change.outputs.windows_supplemental_groups != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every Pass 71 Windows supplemental browser shard
+        shell: bash
+        env:
+          SHARD_RESULT: ${{ needs.bounded-browser-windows-supplemental-shard.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$SHARD_RESULT" != "success" ]]; then
+            echo "::error::Pass 71 Windows supplemental browser shards concluded $SHARD_RESULT"
+            exit 1
+          fi
+
+  bounded-browser-linux-supplemental-shard:
     needs: [classify-change, static-and-unit]
     if: needs.classify-change.outputs.linux_supplemental_groups != ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        group:
+          - pass71-glass-quality-matrix
+          - pass71-glass-quality-flare
+          - pass71-glass-quality-crossbow
+          - pass71-glass-performance-matrix
+          - pass71-glass-performance-flare
+          - pass71-glass-performance-crossbow
+          - pass71-nuke-warning
     steps:
       - uses: actions/checkout@v4
         with:
@@ -271,10 +314,36 @@ jobs:
         env:
           VITE_MATCH_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}
           VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
-      - name: Run Pass 71 Linux supplemental browser groups
+      - name: Run Pass 71 Linux supplemental browser shard
         env:
-          QA_E2E_GROUPS: ${{ needs.classify-change.outputs.linux_supplemental_groups }}
+          QA_E2E_GROUPS: ${{ matrix.group }}
         run: npm run test:e2e:bounded
+      - name: Upload Pass 71 Linux supplemental failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pass71-linux-supplemental-${{ matrix.group }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            artifacts/pass25a/playwright-results/**
+            playwright-report/**
+          if-no-files-found: warn
+          retention-days: 30
+
+  bounded-browser-linux-supplemental:
+    needs: [classify-change, bounded-browser-linux-supplemental-shard]
+    if: always() && needs.classify-change.outputs.linux_supplemental_groups != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every Pass 71 Linux supplemental browser shard
+        shell: bash
+        env:
+          SHARD_RESULT: ${{ needs.bounded-browser-linux-supplemental-shard.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$SHARD_RESULT" != "success" ]]; then
+            echo "::error::Pass 71 Linux supplemental browser shards concluded $SHARD_RESULT"
+            exit 1
+          fi
 
   pipeline-metrics:
     if: always()

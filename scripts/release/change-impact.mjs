@@ -104,7 +104,7 @@ export function outputsFor(classification) {
     windows_groups: 'release-shell,pass25a-capability-chromium,boot-and-authored,pass64-renderer-foundation',
     linux_groups: 'release-shell,pass25a-baseline,pass25a-capability-chromium,pass64-hud-contracts,pass64-renderer-foundation',
     windows_supplemental_groups: 'pass71-grenade-first-action,pass70-chopper-gunner',
-    linux_supplemental_groups: 'pass71-glass-lifecycle,pass71-nuke-warning',
+    linux_supplemental_groups: 'pass71-glass-quality-matrix,pass71-glass-quality-flare,pass71-glass-quality-crossbow,pass71-glass-performance-matrix,pass71-glass-performance-flare,pass71-glass-performance-crossbow,pass71-nuke-warning',
   };
 }
 

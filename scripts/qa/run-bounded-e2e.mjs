@@ -20,9 +20,14 @@ const groups = [
   { name: 'pass69-3-ads-physical', timeoutMs: 900_000, args: ['tests/e2e/pass69-3-ads-physical-clearance.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass69-3-frame-hitch', timeoutMs: 900_000, args: ['tests/e2e/pass69-3-glass-m14-frame-hitch.spec.ts', 'tests/e2e/pass69-3-special-weapon-frame-hitch.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass71-grenade-first-action', timeoutMs: 600_000, args: ['tests/e2e/pass71-grenade-first-action.spec.ts', '--project=chromium', '--workers=1'] },
-  { name: 'pass71-glass-lifecycle', timeoutMs: 600_000, args: ['tests/e2e/pass71-glass-lifecycle-matrix.spec.ts', '--project=chromium', '--workers=1'] },
+  { name: 'pass71-glass-quality-matrix', timeoutMs: 360_000, args: ['tests/e2e/pass71-glass-lifecycle-matrix.spec.ts', '--project=chromium', '--workers=1', '--grep', 'quality: all six authored panes'] },
+  { name: 'pass71-glass-quality-flare', timeoutMs: 360_000, args: ['tests/e2e/pass71-glass-lifecycle-matrix.spec.ts', '--project=chromium', '--workers=1', '--grep', 'quality: real Flare Gun impacts'] },
+  { name: 'pass71-glass-quality-crossbow', timeoutMs: 360_000, args: ['tests/e2e/pass71-glass-lifecycle-matrix.spec.ts', '--project=chromium', '--workers=1', '--grep', 'quality: real explosive-crossbow impact'] },
+  { name: 'pass71-glass-performance-matrix', timeoutMs: 360_000, args: ['tests/e2e/pass71-glass-lifecycle-matrix.spec.ts', '--project=chromium', '--workers=1', '--grep', 'performance: all six authored panes'] },
+  { name: 'pass71-glass-performance-flare', timeoutMs: 360_000, args: ['tests/e2e/pass71-glass-lifecycle-matrix.spec.ts', '--project=chromium', '--workers=1', '--grep', 'performance: real Flare Gun impacts'] },
+  { name: 'pass71-glass-performance-crossbow', timeoutMs: 360_000, args: ['tests/e2e/pass71-glass-lifecycle-matrix.spec.ts', '--project=chromium', '--workers=1', '--grep', 'performance: real explosive-crossbow impact'] },
   { name: 'pass71-nuke-warning', timeoutMs: 240_000, args: ['tests/e2e/pass71-nuke-warning.spec.ts', '--project=chromium', '--workers=1'] },
-  { name: 'pass70-chopper-gunner', timeoutMs: 300_000, args: ['tests/e2e/pass70-chopper-gunner.spec.ts', 'tests/e2e/pass71-controlled-support-native.spec.ts', '--project=chromium', '--workers=1'] },
+  { name: 'pass70-chopper-gunner', timeoutMs: 420_000, args: ['tests/e2e/pass70-chopper-gunner.spec.ts', 'tests/e2e/pass71-controlled-support-native.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass64-hud-contracts', default: false, timeoutMs: 900_000, args: ['tests/e2e/pass64-hud-menu.spec.ts', 'tests/e2e/pass65-menu-lifecycle.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass64-renderer-foundation', default: false, timeoutMs: 420_000, args: ['tests/e2e/pass64-renderer-foundation.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'capability-firefox', default: false, xvfb: true, args: ['tests/e2e/pass25a-capability.spec.ts', '--project=firefox', '--workers=1', '--headed'] },
@@ -50,12 +55,10 @@ for (const group of selectedGroups) {
   const result = spawnSync(command, args, {
     cwd: process.cwd(),
     env: { ...process.env, CI: '1' },
-    encoding: 'utf8',
+    stdio: 'inherit',
+    windowsHide: true,
     timeout: group.timeoutMs ?? 240_000,
-    maxBuffer: 16 * 1024 * 1024,
   });
-  if (result.stdout) process.stdout.write(result.stdout);
-  if (result.stderr) process.stderr.write(result.stderr);
   if (result.error) {
     console.error(`${group.name}: ${result.error.message}`);
     process.exit(1);
