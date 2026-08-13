@@ -14,6 +14,7 @@ import {
   PASS71_HF296_MAX_RECORD_JSON_BYTES,
   PASS71_HF296_MAX_VISUAL_BYTES,
   PASS71_HF296_VISUAL_CROP,
+  PASS71_HF296_VISUAL_SOURCE_VIEWPORT,
   assertPass71Hf296ContactEvidence,
   pass71Hf296ContactRecordSha256,
   pass71Hf296ContactSourceTreeAtSource,
@@ -222,11 +223,15 @@ function validateComponent(component) {
     || component.status !== 'passed' || component.expectedSourceSha !== expectedSourceSha
     || component.checkoutSourceSha !== expectedSourceSha) throw new Error('HF-296 component identity is invalid');
   exactKeys(component.coverage, [
-    'renderer', 'renderProfile', 'arenas', 'stances', 'weapons',
+    'renderer', 'renderProfile', 'sourceViewport', 'visualCrop', 'arenas', 'stances', 'weapons',
     'localRoles', 'remoteRoles', 'fixtures', 'actions',
   ], 'component coverage');
   if (component.coverage.renderer !== 'webgl2' || component.coverage.renderProfile !== 'blender') {
     throw new Error('HF-296 component renderer/profile is invalid');
+  }
+  if (JSON.stringify(component.coverage.sourceViewport) !== JSON.stringify(PASS71_HF296_VISUAL_SOURCE_VIEWPORT)
+    || JSON.stringify(component.coverage.visualCrop) !== JSON.stringify(PASS71_HF296_VISUAL_CROP)) {
+    throw new Error('HF-296 component visual source viewport/crop drifted');
   }
   for (const [actual, expected, label] of [
     [component.coverage.arenas, PASS71_HF296_ARENAS, 'arenas'],

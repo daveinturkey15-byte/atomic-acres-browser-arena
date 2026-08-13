@@ -18,7 +18,10 @@ import {
   pass71Hf296RemoteKey,
   pass71Hf296VisualKey,
 } from '../../scripts/qa/pass71-hf296-full-matrix.mjs';
-import { PASS71_HF296_VISUAL_CROP } from '../../scripts/qa/pass71-hf296-contact-evidence-contract.mjs';
+import {
+  PASS71_HF296_VISUAL_CROP,
+  PASS71_HF296_VISUAL_SOURCE_VIEWPORT,
+} from '../../scripts/qa/pass71-hf296-contact-evidence-contract.mjs';
 import {
   attachBrowserDiagnostics,
   readPersistedClientRuntimeLog,
@@ -57,7 +60,7 @@ if (enabled && (!/^[a-f0-9]{40}$/u.test(expectedSourceSha)
   throw new Error('Official HF-296 full matrix requires exact candidate A and an owned component directory');
 }
 
-test.use({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });
+test.use({ viewport: { ...PASS71_HF296_VISUAL_SOURCE_VIEWPORT }, deviceScaleFactor: 1 });
 test.describe.configure({ mode: 'serial' });
 
 function candidateUrl(arena: ArenaId, seed: string, peerServer?: OwnedPeerServer): string {
@@ -684,6 +687,8 @@ test('executes the literal HF-296 player/viewmodel contact closure matrix', asyn
       runtime: browserRuntime,
       coverage: {
         renderer, renderProfile,
+        sourceViewport: PASS71_HF296_VISUAL_SOURCE_VIEWPORT,
+        visualCrop: PASS71_HF296_VISUAL_CROP,
         arenas: PASS71_HF296_ARENAS,
         stances: PASS71_HF296_STANCES,
         weapons: PASS71_HF296_WEAPONS,

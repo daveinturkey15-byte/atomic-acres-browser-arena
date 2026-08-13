@@ -52,7 +52,10 @@ describe('Pass 71 HF-296 runtime evidence integration', () => {
     expect(spec).toContain('return page.evaluate(async');
     expect(spec).toContain('assertPass71Hf296ExactSets({ localKeys, remoteKeys, visualKeys })');
     expect(spec).toContain('await page.screenshot({');
+    expect(spec).toContain('viewport: { ...PASS71_HF296_VISUAL_SOURCE_VIEWPORT }');
     expect(spec).toContain('clip: { ...PASS71_HF296_VISUAL_CROP }');
+    expect(spec).toContain('sourceViewport: PASS71_HF296_VISUAL_SOURCE_VIEWPORT');
+    expect(spec).toContain('visualCrop: PASS71_HF296_VISUAL_CROP');
     expect(spec).toContain("runPageMatrix(host, arena, 'host-local')");
     expect(spec).toContain("runPageMatrix(guest, arena, 'guest-local')");
     expect(spec).toContain("guest, host, arena, 'host-saw-guest'");
