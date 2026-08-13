@@ -181,7 +181,9 @@ import {
   MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP,
   chopperGunnerAuthoritativeRay,
   chopperGunnerCameraOrigin,
+  chopperMissileGroundTarget,
   type KillstreakDamageEvent,
+  type ChopperMissileAuthorityEvidenceEvent,
   type KillstreakEntitySnapshot,
   type KillstreakImpactEvent,
   type KillstreakRecipientSnapshot,
@@ -1444,6 +1446,50 @@ type DebugChopperCockpitEvidenceState = {
   cockpitRootVisibilities: readonly boolean[];
   visibleFrame: DebugChopperCockpitVisibleFrameReceipt | null;
 };
+type DebugChopperMissileVisibleFrameReceipt = Readonly<{
+  contract: 'chopper-missile-frozen-visible-frame-v1';
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  simulationFrame: number;
+  submissionSequence: number;
+  completedSequence: number;
+  camera: DebugChopperCockpitHiddenControlReceipt['camera'];
+  viewport: DebugChopperCockpitHiddenControlReceipt['viewport'];
+  trajectoryId: string;
+  activationId: string;
+  ordinal: number;
+  missile: KillstreakPresentationTelemetry['chopperMissileShells'][number];
+  authority: ChopperMissileAuthorityEvidenceEvent;
+  missileRootVisible: true;
+}>;
+type DebugChopperMissileHiddenControlReceipt = Readonly<{
+  contract: 'chopper-missile-hidden-control-v1';
+  nonPublishable: true;
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  simulationFrame: number;
+  officialSubmissionSequence: number;
+  officialCompletedSequence: number;
+  submissionSequence: number;
+  completedSequence: number;
+  camera: DebugChopperCockpitHiddenControlReceipt['camera'];
+  viewport: DebugChopperCockpitHiddenControlReceipt['viewport'];
+  trajectoryId: string;
+  activationId: string;
+  ordinal: number;
+  missile: KillstreakPresentationTelemetry['chopperMissileShells'][number];
+  authority: ChopperMissileAuthorityEvidenceEvent;
+  missileRootHiddenDuringSubmission: true;
+  missileRootRestored: true;
+  allOtherMissileRootVisibilitiesPreserved: true;
+}>;
+type DebugChopperMissileEvidenceState = {
+  previousRenderPaused: boolean;
+  missileRoot: THREE.Object3D;
+  missileRootVisible: boolean;
+  otherMissileRoots: readonly Readonly<{ root: THREE.Object3D; visible: boolean }>[];
+  visibleFrame: DebugChopperMissileVisibleFrameReceipt | null;
+};
 type DebugNukeWarningVisibleFrameReceipt = Readonly<{
   contract: 'nuke-warning-frozen-visible-frame-v1';
   renderer: 'webgl2' | 'webgpu';
@@ -1562,6 +1608,7 @@ let lastDebugChopperExteriorReviewTrackerFrame: DebugChopperExteriorReviewTracke
 let debugNukeWarningEvidenceState: DebugNukeWarningEvidenceState | null = null;
 let debugThermalOperatorEvidenceState: DebugThermalOperatorEvidenceState | null = null;
 let debugChopperCockpitEvidenceState: DebugChopperCockpitEvidenceState | null = null;
+let debugChopperMissileEvidenceState: DebugChopperMissileEvidenceState | null = null;
 
 function currentDebugChopperExteriorReviewHoldActive(): boolean {
   return chopperExteriorReviewHoldActive(debugChopperAutonomousFireHeld, {
@@ -4871,6 +4918,12 @@ let localCareCaptureState = createCareCaptureClientState();
 let localCareCaptureRequiresHold = false;
 let killstreakSnapshot: KillstreakRecipientSnapshot = killstreakRuntime.snapshotFor(null, 0);
 const recentKillstreakImpactEvents: KillstreakImpactEvent[] = [];
+function retainRecentKillstreakImpactEvents(events: readonly KillstreakImpactEvent[]): void {
+  recentKillstreakImpactEvents.push(...events);
+  if (recentKillstreakImpactEvents.length > 16) {
+    recentKillstreakImpactEvents.splice(0, recentKillstreakImpactEvents.length - 16);
+  }
+}
 let lastKillstreakStateBroadcastAt = Number.NEGATIVE_INFINITY;
 const LOCAL_KILLSTREAK_SNAPSHOT_REFRESH_INTERVAL_MS = 50;
 let lastLocalKillstreakSnapshotRefreshAt = Number.NEGATIVE_INFINITY;
@@ -10390,6 +10443,7 @@ function onNetworkMessage(message: GameMessage): void {
     }
     presentKillstreakDamageFeedback(admission.events);
     const presentedAt = performance.now();
+    retainRecentKillstreakImpactEvents(admission.impacts);
     for (const impact of admission.impacts) {
       if (impact.phase !== 'impact') continue;
       const point = new THREE.Vector3(...impact.position);
@@ -21236,12 +21290,7 @@ function updatePass65KillstreakRuntime(now: number): void {
   }
   if (network.role !== 'client' && matchState.phase === 'active') {
     const result = killstreakRuntime.advance(now, killstreakWorldState());
-    if (result.impactEvents.length > 0) {
-      recentKillstreakImpactEvents.push(...result.impactEvents);
-      if (recentKillstreakImpactEvents.length > 16) {
-        recentKillstreakImpactEvents.splice(0, recentKillstreakImpactEvents.length - 16);
-      }
-    }
+    if (result.impactEvents.length > 0) retainRecentKillstreakImpactEvents(result.impactEvents);
     const applied = result.damageEvents.map(applyKillstreakDamageEvent).filter((event): event is KillstreakDamageEvent => event !== null && event.damage > 0);
     presentKillstreakDamageFeedback(applied);
     const carpetWorldImpacts: Array<{
@@ -22732,6 +22781,7 @@ function clearFieldSupport(): void {
   if (debugNukeWarningEvidenceState) releaseDebugNukeWarningEvidenceFrame();
   if (debugThermalOperatorEvidenceState) releaseDebugThermalOperatorEvidenceFrame();
   if (debugChopperCockpitEvidenceState) releaseDebugChopperCockpitEvidenceFrame();
+  if (debugChopperMissileEvidenceState) releaseDebugChopperMissileEvidenceFrame();
   localCareCaptureState = createCareCaptureClientState();
   localCareCaptureRequiresHold = false;
   lastKillstreakControlSentAt = Number.NEGATIVE_INFINITY;
@@ -22741,6 +22791,7 @@ function clearFieldSupport(): void {
   lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
   killstreakPresentation.setFirstPersonEntity(null);
   killstreakPresentation.clear();
+  recentKillstreakImpactEvents.length = 0;
   killstreakDamageResultReplayLedger.reset();
   localSupportShotPresentationReceipts.reset();
   document.documentElement.dataset.killstreakPossession = 'none';
@@ -26029,6 +26080,15 @@ function frame(now: number, scheduleNext = true): void {
     if (scheduleNext) requestAnimationFrame(frame);
     return;
   }
+  if (debugRenderPaused && debugChopperMissileEvidenceState) {
+    // HF-308 owns one already-presented missile frame. Freeze simulation,
+    // camera and shell interpolation together while only the identified shell
+    // root is suppressed for its paired attribution submission.
+    lastFrame = now;
+    accumulator = 0;
+    if (scheduleNext) requestAnimationFrame(frame);
+    return;
+  }
   if (debugRenderPaused
     && debugChopperExteriorReviewTrackerRequested
     && currentDebugChopperExteriorReviewHoldActive()) {
@@ -27000,6 +27060,15 @@ const debugWindow = window as Window & {
       separationM: number;
       splashRadiusM: number;
     } | null;
+    stagePossessedChopperMissileTarget: () => {
+      entityId: string;
+      activationId: string;
+      targetId: string;
+      targetLifeId: number;
+      targetKind: 'bot' | 'training-dummy';
+      targetPosition: number[];
+      lineOfSight: true;
+    } | null;
     stagePossessedPilotedDroneSensorTarget: (occluded: boolean) => {
       entityId: string;
       activationId: string;
@@ -27064,6 +27133,8 @@ const debugWindow = window as Window & {
       target: number[];
       yaw: number;
       pitch: number;
+      impactPosition: number[];
+      targetDistanceFromImpactM: number;
       lineOfSight: true;
     } | null;
     aimPossessedChopperAtTarget: (targetId: string) => {
@@ -27074,6 +27145,8 @@ const debugWindow = window as Window & {
       target: number[];
       yaw: number;
       pitch: number;
+      impactPosition: number[];
+      targetDistanceFromImpactM: number;
       lineOfSight: true;
     } | null;
     aimPossessedPilotedDroneAtTarget: (targetId: string) => {
@@ -27167,6 +27240,12 @@ const debugWindow = window as Window & {
     freezeChopperCockpitEvidenceFrame: () => Promise<DebugChopperCockpitVisibleFrameReceipt | null>;
     captureChopperCockpitHiddenControl: () => Promise<DebugChopperCockpitHiddenControlReceipt | null>;
     releaseChopperCockpitEvidenceFrame: () => boolean;
+    freezeChopperMissileEvidenceFrame: (
+      activationId: string,
+      ordinal: number,
+    ) => Promise<DebugChopperMissileVisibleFrameReceipt | null>;
+    captureChopperMissileHiddenControl: () => Promise<DebugChopperMissileHiddenControlReceipt | null>;
+    releaseChopperMissileEvidenceFrame: () => boolean;
     freezeNukeWarningEvidenceFrame: () => Promise<DebugNukeWarningVisibleFrameReceipt | null>;
     nukeWarningEvidenceFrame: () => DebugNukeWarningVisibleFrameReceipt | null;
     captureNukeWarningHiddenControl: () => Promise<DebugNukeWarningHiddenControlReceipt | null>;
@@ -28146,6 +28225,191 @@ function releaseDebugChopperCockpitEvidenceFrame(): boolean {
   if (!state) return false;
   state.cockpitRoots.forEach((root, index) => { root.visible = state.cockpitRootVisibilities[index]!; });
   debugChopperCockpitEvidenceState = null;
+  debugRenderPaused = state.previousRenderPaused;
+  return true;
+}
+
+function chopperMissileTupleMatches(
+  left: readonly number[],
+  right: readonly number[],
+  epsilon = 1e-6,
+): boolean {
+  return left.length === right.length
+    && left.every((value, axis) => Math.abs(value - right[axis]!) <= epsilon);
+}
+
+async function freezeDebugChopperMissileEvidenceFrame(
+  activationId: string,
+  ordinal: number,
+): Promise<DebugChopperMissileVisibleFrameReceipt | null> {
+  if (debugChopperMissileEvidenceState) {
+    const existing = debugChopperMissileEvidenceState.visibleFrame;
+    return existing?.activationId === activationId && existing.ordinal === ordinal ? existing : null;
+  }
+  if (!/^ks-activation-[0-9]+-[0-9]+$/.test(activationId)
+    || !Number.isSafeInteger(ordinal) || ordinal < 0 || ordinal >= CHOPPER_MISSILE_CAPACITY
+    || debugRenderPaused || renderSubmissionPaused || !gameStarted
+    || matchState.phase !== 'active' || menuLifecycle.surface !== 'hidden') return null;
+  const presentation = killstreakPresentation.telemetry(camera);
+  const missile = presentation.chopperMissileShells.find((entry) => (
+    entry.activationId === activationId && entry.ordinal === ordinal
+  )) ?? null;
+  const missileRoot = killstreakPresentation.chopperMissileShellRoot(activationId, ordinal);
+  const authority = killstreakRuntime.chopperMissileAuthorityEvidence().events.find((event) => (
+    event.phase === 'launch' && event.activationId === activationId && event.ordinal === ordinal
+  )) ?? null;
+  if (!missile || !missileRoot || !authority || !missile.visible || !missileRoot.visible
+    || !missile.inFrustum || missile.progress <= 0 || missile.progress >= 1
+    || missile.distanceFromTrajectoryM > 0.001
+    || missile.trajectoryId !== authority.trajectoryId
+    || !chopperMissileTupleMatches(missile.launchPosition, authority.launchPosition)
+    || !chopperMissileTupleMatches(missile.targetPosition, [
+      authority.impactPosition[0],
+      authority.impactPosition[1] + 0.35,
+      authority.impactPosition[2],
+    ])) return null;
+  const otherMissileRoots = presentation.chopperMissileShells.flatMap((entry) => {
+    if (entry.activationId === activationId && entry.ordinal === ordinal) return [];
+    const root = killstreakPresentation.chopperMissileShellRoot(entry.activationId, entry.ordinal);
+    return root ? [Object.freeze({ root, visible: root.visible })] : [];
+  });
+  const before = renderRuntime.presentationTelemetry();
+  if (renderRuntime.backend === 'webgpu' && before.completedSequence < before.submissionSequence) return null;
+  const simulationFrame = lastGameplayPresentedFrame;
+  const cameraReceipt = chopperCockpitCameraReceipt();
+  const viewportReceipt = chopperCockpitViewportReceipt();
+  const state: DebugChopperMissileEvidenceState = {
+    previousRenderPaused: debugRenderPaused,
+    missileRoot,
+    missileRootVisible: missileRoot.visible,
+    otherMissileRoots: Object.freeze(otherMissileRoots),
+    visibleFrame: null,
+  };
+  debugChopperMissileEvidenceState = state;
+  debugRenderPaused = true;
+  try {
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    const completed = renderRuntime.presentationTelemetry();
+    const current = killstreakPresentation.telemetry(camera).chopperMissileShells.find((entry) => (
+      entry.activationId === activationId && entry.ordinal === ordinal
+    )) ?? null;
+    if (debugChopperMissileEvidenceState !== state || !current
+      || lastGameplayPresentedFrame !== simulationFrame
+      || !chopperCockpitCameraMatches(cameraReceipt)
+      || state.missileRoot.visible !== state.missileRootVisible
+      || !chopperMissileTupleMatches(current.worldPosition, missile.worldPosition)
+      || current.progress !== missile.progress
+      || state.otherMissileRoots.some((entry) => entry.root.visible !== entry.visible)
+      || (renderRuntime.backend === 'webgpu' && completed.completedSequence < before.submissionSequence)) {
+      throw new Error('Chopper missile visible frame changed before reaching its completion frontier');
+    }
+    const receipt = Object.freeze({
+      contract: 'chopper-missile-frozen-visible-frame-v1' as const,
+      renderer: renderRuntime.backend,
+      completionSemantics: renderRuntime.backend === 'webgpu'
+        ? 'submission-sequence-covered-by-completion-frontier' as const
+        : 'synchronous-render-return' as const,
+      simulationFrame,
+      submissionSequence: before.submissionSequence,
+      completedSequence: completed.completedSequence,
+      camera: cameraReceipt,
+      viewport: viewportReceipt,
+      trajectoryId: missile.trajectoryId,
+      activationId,
+      ordinal,
+      missile,
+      authority,
+      missileRootVisible: true as const,
+    });
+    state.visibleFrame = receipt;
+    return receipt;
+  } catch (error) {
+    if (debugChopperMissileEvidenceState === state) debugChopperMissileEvidenceState = null;
+    debugRenderPaused = state.previousRenderPaused;
+    throw error;
+  }
+}
+
+async function captureDebugChopperMissileHiddenControl(): Promise<DebugChopperMissileHiddenControlReceipt | null> {
+  const state = debugChopperMissileEvidenceState;
+  const visibleFrame = state?.visibleFrame;
+  if (!state || !visibleFrame || !debugRenderPaused || renderSubmissionPaused
+    || state.missileRoot !== killstreakPresentation.chopperMissileShellRoot(
+      visibleFrame.activationId,
+      visibleFrame.ordinal,
+    )
+    || !state.missileRoot.visible || lastGameplayPresentedFrame !== visibleFrame.simulationFrame
+    || !chopperCockpitCameraMatches(visibleFrame.camera)
+    || state.otherMissileRoots.some((entry) => entry.root.visible !== entry.visible)) return null;
+  const current = killstreakPresentation.telemetry(camera).chopperMissileShells.find((entry) => (
+    entry.activationId === visibleFrame.activationId && entry.ordinal === visibleFrame.ordinal
+  )) ?? null;
+  if (!current || !chopperMissileTupleMatches(current.worldPosition, visibleFrame.missile.worldPosition)
+    || current.progress !== visibleFrame.missile.progress) return null;
+
+  const before = renderRuntime.presentationTelemetry();
+  let submitted = before;
+  let completed = before;
+  let missileRootHiddenDuringSubmission = false;
+  state.missileRoot.visible = false;
+  try {
+    if (renderRuntime.backend === 'webgpu') {
+      await submitForegroundWebGpuFrame(true, 'serialized');
+    } else if (atomicSignal) {
+      atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+    } else {
+      throw new Error('Chopper missile hidden-control has no active renderer');
+    }
+    missileRootHiddenDuringSubmission = !state.missileRoot.visible;
+    submitted = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu' && submitted.submissionSequence <= before.submissionSequence) {
+      throw new Error('Chopper missile hidden-control did not submit a distinct WebGPU frame');
+    }
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    completed = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu' && completed.completedSequence < submitted.submissionSequence) {
+      throw new Error('Chopper missile hidden-control WebGPU frame did not reach the completion frontier');
+    }
+  } finally {
+    state.missileRoot.visible = state.missileRootVisible;
+  }
+  const otherRootsPreserved = state.otherMissileRoots.every((entry) => entry.root.visible === entry.visible);
+  if (!missileRootHiddenDuringSubmission || !state.missileRoot.visible || !otherRootsPreserved
+    || debugChopperMissileEvidenceState !== state
+    || lastGameplayPresentedFrame !== visibleFrame.simulationFrame
+    || !chopperCockpitCameraMatches(visibleFrame.camera)) {
+    throw new Error('Chopper missile hidden-control did not preserve its exact frozen-frame boundary');
+  }
+  return Object.freeze({
+    contract: 'chopper-missile-hidden-control-v1',
+    nonPublishable: true,
+    renderer: renderRuntime.backend,
+    completionSemantics: renderRuntime.backend === 'webgpu'
+      ? 'submission-sequence-covered-by-completion-frontier'
+      : 'synchronous-render-return',
+    simulationFrame: visibleFrame.simulationFrame,
+    officialSubmissionSequence: visibleFrame.submissionSequence,
+    officialCompletedSequence: visibleFrame.completedSequence,
+    submissionSequence: submitted.submissionSequence,
+    completedSequence: completed.completedSequence,
+    camera: visibleFrame.camera,
+    viewport: visibleFrame.viewport,
+    trajectoryId: visibleFrame.trajectoryId,
+    activationId: visibleFrame.activationId,
+    ordinal: visibleFrame.ordinal,
+    missile: visibleFrame.missile,
+    authority: visibleFrame.authority,
+    missileRootHiddenDuringSubmission: true,
+    missileRootRestored: true,
+    allOtherMissileRootVisibilitiesPreserved: true,
+  });
+}
+
+function releaseDebugChopperMissileEvidenceFrame(): boolean {
+  const state = debugChopperMissileEvidenceState;
+  if (!state) return false;
+  state.missileRoot.visible = state.missileRootVisible;
+  debugChopperMissileEvidenceState = null;
   debugRenderPaused = state.previousRenderPaused;
   return true;
 }
@@ -29254,6 +29518,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         launchPosition: event.launchPosition ? [...event.launchPosition] : null,
       })),
     },
+    chopperMissileAuthority: killstreakRuntime.chopperMissileAuthorityEvidence(),
     fieldSupport: {
       streak: localFieldSupportProjection().streak,
       rewardCycle: localFieldSupportProjection().rewardCycle,
@@ -29866,6 +30131,123 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       splashRadiusM: CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM,
     };
   },
+  stagePossessedChopperMissileTarget: () => {
+    if (network.role === 'client' || matchState.phase !== 'active') return null;
+    const possession = localKillstreakActorSnapshot()?.possession;
+    if (possession?.kind !== 'chopper-gunner') return null;
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.id === possession.entityId && candidate.kind === 'chopper'
+    ));
+    if (!entity) return null;
+    const origin = new THREE.Vector3(...chopperGunnerCameraOrigin(entity.position, entity.attitude));
+    const colliders = activeWorldColliders();
+    if (selectedArena.id === 'gun-range') {
+      const trainingTargets = arena.targets
+        .filter((target) => target.kind === 'training-dummy')
+        .sort((left, right) => left.id.localeCompare(right.id));
+      for (const target of trainingTargets) {
+        target.active = true;
+        target.health = target.maxHealth;
+        target.respawnAt = 0;
+        target.root.visible = true;
+        target.root.updateMatrixWorld(true);
+        const targetPosition = trainingDummySupportPoint(target);
+        if (!killstreakLineOfSight(
+          colliders,
+          [origin.x, origin.y, origin.z],
+          [targetPosition.x, targetPosition.y, targetPosition.z],
+        )) continue;
+        const delta = targetPosition.clone().sub(origin);
+        const yaw = Math.atan2(-delta.x, -delta.z);
+        const pitch = THREE.MathUtils.clamp(
+          Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
+          -1.2,
+          0.5,
+        );
+        const impactPosition = new THREE.Vector3(...chopperMissileGroundTarget(
+          entity.position,
+          entity.attitude,
+          yaw,
+          pitch,
+          killstreakWorldState(),
+        ));
+        if (impactPosition.distanceTo(targetPosition) > CHOPPER_MISSILE_BLAST_RADIUS_M) continue;
+        return {
+          entityId: entity.id,
+          activationId: entity.activationId,
+          targetId: target.id,
+          targetLifeId: Math.max(0, Math.floor(target.respawnAt)),
+          targetKind: 'training-dummy',
+          targetPosition: targetPosition.toArray(),
+          lineOfSight: true,
+        };
+      }
+      return null;
+    }
+    const target = bots.values().next().value as BotPlayer | undefined;
+    if (!target) return null;
+    const candidates = [
+      ...arena.patrolPoints.map((point) => point.clone()),
+    ];
+    for (let x = arena.bounds.minX + 2; x <= arena.bounds.maxX - 2; x += 4) {
+      for (let z = arena.bounds.minZ + 2; z <= arena.bounds.maxZ - 2; z += 4) {
+        candidates.push(new THREE.Vector3(x, 0, z));
+      }
+    }
+    for (const candidate of candidates) {
+      candidate.y = botElevationAt(candidate, 0);
+      const targetPosition = candidate.clone().add(new THREE.Vector3(0, 1.15, 0));
+      const range = origin.distanceTo(targetPosition);
+      if (range < 8 || range > 70
+        || !pointInsideBounds(candidate, arena.bounds, 0.7)
+        || isBlocked(candidate, colliders, 0.45)
+        || !killstreakLineOfSight(
+          colliders,
+          [origin.x, origin.y, origin.z],
+          [targetPosition.x, targetPosition.y, targetPosition.z],
+        )) continue;
+      const delta = targetPosition.clone().sub(origin);
+      const yaw = Math.atan2(-delta.x, -delta.z);
+      const pitch = THREE.MathUtils.clamp(
+        Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
+        -1.2,
+        0.5,
+      );
+      const impactPosition = new THREE.Vector3(...chopperMissileGroundTarget(
+        entity.position,
+        entity.attitude,
+        yaw,
+        pitch,
+        killstreakWorldState(),
+      ));
+      if (impactPosition.distanceTo(targetPosition) > CHOPPER_MISSILE_BLAST_RADIUS_M) continue;
+      target.team = player.team === 0 ? 1 : 0;
+      target.position.copy(candidate);
+      target.root.position.copy(candidate);
+      target.velocity.set(0, 0, 0);
+      target.root.rotation.y = operatorYawToward(candidate, origin);
+      target.root.visible = true;
+      target.root.updateMatrixWorld(true);
+      target.hp = 100;
+      target.alive = true;
+      target.invulnerableUntil = 0;
+      target.respawnAt = 0;
+      target.lastShotAt = performance.now();
+      target.nextGrenadeAt = performance.now() + 60_000;
+      botsFrozen = true;
+      broadcastHostedBotState(true);
+      return {
+        entityId: entity.id,
+        activationId: entity.activationId,
+        targetId: target.id,
+        targetLifeId: target.continuity,
+        targetKind: 'bot',
+        targetPosition: targetPosition.toArray(),
+        lineOfSight: true,
+      };
+    }
+    return null;
+  },
   stagePossessedPilotedDroneSensorTarget: (occluded) => {
     if (network.role === 'client' || matchState.phase !== 'active') return null;
     const possession = localKillstreakActorSnapshot()?.possession;
@@ -30183,12 +30565,23 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     )) return null;
     const delta = targetPoint.clone().sub(origin);
     if (delta.lengthSq() < 1e-6) return null;
-    player.yaw = Math.atan2(-delta.x, -delta.z);
-    player.pitch = THREE.MathUtils.clamp(
+    const yaw = Math.atan2(-delta.x, -delta.z);
+    const pitch = THREE.MathUtils.clamp(
       Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
       -1.2,
       0.5,
     );
+    const impactPosition = new THREE.Vector3(...chopperMissileGroundTarget(
+      entity.position,
+      entity.attitude,
+      yaw,
+      pitch,
+      killstreakWorldState(),
+    ));
+    const targetDistanceFromImpactM = impactPosition.distanceTo(targetPoint);
+    if (targetDistanceFromImpactM > CHOPPER_MISSILE_BLAST_RADIUS_M) return null;
+    player.yaw = yaw;
+    player.pitch = pitch;
     camera.position.copy(origin);
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
     camera.updateMatrixWorld(true);
@@ -30200,6 +30593,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       target: targetPoint.toArray(),
       yaw: player.yaw,
       pitch: player.pitch,
+      impactPosition: impactPosition.toArray(),
+      targetDistanceFromImpactM,
       lineOfSight: true,
     };
   },
@@ -30219,12 +30614,23 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     )) return null;
     const delta = targetPoint.clone().sub(origin);
     if (delta.lengthSq() < 1e-6) return null;
-    player.yaw = Math.atan2(-delta.x, -delta.z);
-    player.pitch = THREE.MathUtils.clamp(
+    const yaw = Math.atan2(-delta.x, -delta.z);
+    const pitch = THREE.MathUtils.clamp(
       Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
       -1.2,
       0.5,
     );
+    const impactPosition = new THREE.Vector3(...chopperMissileGroundTarget(
+      entity.position,
+      entity.attitude,
+      yaw,
+      pitch,
+      killstreakWorldState(),
+    ));
+    const targetDistanceFromImpactM = impactPosition.distanceTo(targetPoint);
+    if (targetDistanceFromImpactM > CHOPPER_MISSILE_BLAST_RADIUS_M) return null;
+    player.yaw = yaw;
+    player.pitch = pitch;
     camera.position.copy(origin);
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
     camera.updateMatrixWorld(true);
@@ -30236,6 +30642,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       target: targetPoint.toArray(),
       yaw: player.yaw,
       pitch: player.pitch,
+      impactPosition: impactPosition.toArray(),
+      targetDistanceFromImpactM,
       lineOfSight: true,
     };
   },
@@ -30731,6 +31139,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   freezeChopperCockpitEvidenceFrame: freezeDebugChopperCockpitEvidenceFrame,
   captureChopperCockpitHiddenControl: captureDebugChopperCockpitHiddenControl,
   releaseChopperCockpitEvidenceFrame: releaseDebugChopperCockpitEvidenceFrame,
+  freezeChopperMissileEvidenceFrame: freezeDebugChopperMissileEvidenceFrame,
+  captureChopperMissileHiddenControl: captureDebugChopperMissileHiddenControl,
+  releaseChopperMissileEvidenceFrame: releaseDebugChopperMissileEvidenceFrame,
   freezeNukeWarningEvidenceFrame: freezeDebugNukeWarningEvidenceFrame,
   nukeWarningEvidenceFrame: currentDebugNukeWarningEvidenceFrame,
   captureNukeWarningHiddenControl: captureDebugNukeWarningHiddenControl,

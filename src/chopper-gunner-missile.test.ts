@@ -6,6 +6,7 @@ import {
   CHOPPER_MISSILE_CAPACITY,
   CHOPPER_MISSILE_FLIGHT_MS,
   CHOPPER_MISSILE_SOCKET_LOCAL_M,
+  CHOPPER_MISSILE_AUTHORITY_EVIDENCE_CONTRACT,
   HostKillstreakRuntime,
   chopperMissileLaunchPosition,
   chopperMissileGroundTarget,
@@ -108,6 +109,31 @@ describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
     }, now).accepted).toBe(true);
     expect(runtime.advance(now, world()).impactEvents.filter((event) => event.phase === 'drop')).toEqual([]);
     expect(runtime.snapshotFor('owner', now).entities[0].missileAmmo).toBe(0);
+    const authority = runtime.chopperMissileAuthorityEvidence();
+    const launches = authority.events.filter((event) => event.phase === 'launch');
+    const impacts = authority.events.filter((event) => event.phase === 'impact');
+    expect(authority.events).toHaveLength(CHOPPER_MISSILE_CAPACITY * 2);
+    expect(launches.map((event) => ({
+      ordinal: event.ordinal,
+      socketSide: event.socketSide,
+      ammoBefore: event.ammoBefore,
+      ammoAfter: event.ammoAfter,
+      targetId: event.targetId,
+      targetLifeId: event.targetLifeId,
+      targetKind: event.targetKind,
+    }))).toEqual(Array.from({ length: CHOPPER_MISSILE_CAPACITY }, (_, ordinal) => ({
+      ordinal,
+      socketSide: ordinal % 2 === 0 ? 'left' : 'right',
+      ammoBefore: CHOPPER_MISSILE_CAPACITY - ordinal,
+      ammoAfter: CHOPPER_MISSILE_CAPACITY - ordinal - 1,
+      targetId: `ks-activation-7-1:missile:${ordinal}:terrain`,
+      targetLifeId: 0,
+      targetKind: 'terrain',
+    })));
+    expect(launches.slice(1).every((event, index) => (
+      event.launchAtMs - launches[index]!.launchAtMs >= CHOPPER_MISSILE_CADENCE_MS
+    ))).toBe(true);
+    expect(impacts.map((event) => event.impactId)).toEqual(launches.map((event) => event.impactId));
   });
 
   it('derives the target from the host ray and emits replicated impact plus damage receipts', () => {
@@ -136,6 +162,57 @@ describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
     })]);
     expect(impact.damageEvents).toEqual([expect.objectContaining({
       source: 'chopper', ownerId: 'owner', targetId: 'enemy', targetLifeId: 4,
+    })]);
+    const evidence = runtime.chopperMissileAuthorityEvidence();
+    expect(evidence).toMatchObject({
+      contract: CHOPPER_MISSILE_AUTHORITY_EVIDENCE_CONTRACT,
+      matchEpoch: 7,
+      capacity: CHOPPER_MISSILE_CAPACITY,
+      cadenceMs: CHOPPER_MISSILE_CADENCE_MS,
+      flightMs: CHOPPER_MISSILE_FLIGHT_MS,
+    });
+    expect(evidence.events).toEqual([
+      expect.objectContaining({
+        eventId: 'ks-activation-7-1:missile:0:launch',
+        trajectoryId: 'ks-activation-7-1:missile:0',
+        impactId: 'ks-activation-7-1:missile:0:impact',
+        phase: 'launch',
+        matchEpoch: 7,
+        aircraftId: entityId,
+        activationId: 'ks-activation-7-1',
+        activationSequence: 1,
+        ownerId: 'owner',
+        ownerLifeId: 1,
+        controlSequence: 2,
+        ordinal: 0,
+        socketSide: 'left',
+        socketLocal: CHOPPER_MISSILE_SOCKET_LOCAL_M.left,
+        sourcePosition: before.position,
+        sourceAttitude: before.attitude,
+        launchPosition: launchEvent.launchPosition,
+        targetId: 'enemy',
+        targetLifeId: 4,
+        targetKind: 'player',
+        targetPosition: impactWorld.targets[0]!.position,
+        impactPosition: targetPoint,
+        launchAtMs: 1_100,
+        impactAtMs: 1_100 + CHOPPER_MISSILE_FLIGHT_MS,
+        ammoBefore: 6,
+        ammoAfter: 5,
+      }),
+      expect.objectContaining({
+        eventId: 'ks-activation-7-1:missile:0:impact',
+        trajectoryId: 'ks-activation-7-1:missile:0',
+        phase: 'impact',
+        atMs: 1_100 + CHOPPER_MISSILE_FLIGHT_MS,
+      }),
+    ]);
+    expect(evidence.aircraft).toEqual([expect.objectContaining({
+      aircraftId: entityId,
+      missilesRemaining: 5,
+      nextMissileOrdinal: 1,
+      pendingRequest: false,
+      inFlightTrajectoryIds: [],
     })]);
   });
 
@@ -167,6 +244,10 @@ describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
       action: 'pilot-control', yawQ: 0, pitchQ: -1, missileFire: true,
     }, 1_100);
     expect(rematch.runtime.endMatch()).toContain(rematch.entityId);
+    expect(rematch.runtime.chopperMissileAuthorityEvidence()).toMatchObject({
+      events: [],
+      aircraft: [],
+    });
     expect(rematch.runtime.advance(2_000, world())).toEqual({
       damageEvents: [], impactEvents: [], expiredEntityIds: [],
     });

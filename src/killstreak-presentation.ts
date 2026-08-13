@@ -1224,9 +1224,14 @@ type PooledBombShell = {
   inactiveName: string;
   impactPosition: THREE.Vector3;
   launchPosition: THREE.Vector3;
+  source: 'carpet-bomber' | 'chopper' | null;
+  activationId: string | null;
+  ordinal: number | null;
+  trajectoryId: string | null;
   active: boolean;
   createdAtMs: number;
   impactAtMs: number;
+  progress: number;
 };
 
 type PooledEmber = {
@@ -1288,6 +1293,21 @@ export type KillstreakPresentationTelemetry = Readonly<{
   entities: number;
   impactFlashes: number;
   bombShells: number;
+  chopperMissileShells: readonly Readonly<{
+    trajectoryId: string;
+    activationId: string;
+    ordinal: number;
+    rootName: string;
+    poolSlot: number;
+    visible: boolean;
+    worldPosition: readonly number[];
+    launchPosition: readonly number[];
+    targetPosition: readonly number[];
+    progress: number;
+    distanceFromTrajectoryM: number;
+    projectedNdc: readonly number[] | null;
+    inFrustum: boolean;
+  }>[];
   emberParticles: number;
   sensorContacts: number;
   sensorProxyMeshes: 0;
@@ -2182,9 +2202,14 @@ function createPooledBombShell(index: number): PooledBombShell {
     inactiveName,
     impactPosition: new THREE.Vector3(),
     launchPosition: new THREE.Vector3(),
+    source: null,
+    activationId: null,
+    ordinal: null,
+    trajectoryId: null,
     active: false,
     createdAtMs: 0,
     impactAtMs: 0,
+    progress: 0,
   };
 }
 
@@ -2936,8 +2961,13 @@ export class KillstreakPresentation {
     shell.active = false;
     shell.root.visible = false;
     shell.root.name = shell.inactiveName;
+    shell.source = null;
+    shell.activationId = null;
+    shell.ordinal = null;
+    shell.trajectoryId = null;
     shell.root.rotation.set(Math.PI / 2, 0, 0);
     shell.root.scale.setScalar(1);
+    shell.progress = 0;
   }
 
   private deactivateEmber(ember: PooledEmber): void {
@@ -3047,6 +3077,7 @@ export class KillstreakPresentation {
       if (!shell.active) continue;
       const dropDurationMs = Math.max(1, shell.impactAtMs - shell.createdAtMs);
       const progress = THREE.MathUtils.clamp((nowMs - shell.createdAtMs) / dropDurationMs, 0, 1);
+      shell.progress = progress;
       shell.root.position.lerpVectors(shell.launchPosition, shell.impactPosition, progress);
       if (progress >= 1) this.deactivateBombShell(shell);
     }
@@ -3128,6 +3159,10 @@ export class KillstreakPresentation {
         const shell = firstInactive(this.bombShellPool);
         if (!shell) continue;
         shell.active = true;
+        shell.source = impact.source;
+        shell.activationId = impact.activationId;
+        shell.ordinal = impact.ordinal;
+        shell.trajectoryId = `${impact.activationId}:missile:${impact.ordinal}`;
         shell.createdAtMs = nowMs;
         const authoredDropDurationMs = THREE.MathUtils.clamp(
           impact.impactAtMs - impact.atMs,
@@ -3135,6 +3170,7 @@ export class KillstreakPresentation {
           isChopperMissile ? CHOPPER_MISSILE_FLIGHT_MS : BOMB_SHELL_DROP_DURATION_MS,
         );
         shell.impactAtMs = nowMs + authoredDropDurationMs;
+        shell.progress = 0;
         shell.impactPosition.set(impact.position[0], impact.position[1] + 0.35, impact.position[2]);
         if (isChopperMissile && impact.launchPosition) shell.launchPosition.fromArray(impact.launchPosition);
         else shell.launchPosition.set(
@@ -3205,6 +3241,13 @@ export class KillstreakPresentation {
 
   entityRoot(id: string): THREE.Group | null {
     return this.entities.get(id)?.root ?? null;
+  }
+
+  chopperMissileShellRoot(activationId: string, ordinal: number): THREE.Object3D | null {
+    return this.bombShellPool.find((shell) => shell.active
+      && shell.source === 'chopper'
+      && shell.activationId === activationId
+      && shell.ordinal === ordinal)?.root ?? null;
   }
 
   private playChopperActions(entityId: string, names: readonly string[]): readonly string[] {
@@ -3516,6 +3559,31 @@ export class KillstreakPresentation {
       });
     const impactFlashes = countActive(this.impactFlashPool);
     const bombShells = countActive(this.bombShellPool);
+    const chopperMissileShells = Object.freeze(this.bombShellPool.flatMap((shell) => {
+      if (!shell.active || shell.source !== 'chopper' || !shell.activationId
+        || shell.ordinal === null || !shell.trajectoryId) return [];
+      shell.root.updateWorldMatrix(true, false);
+      const worldPosition = shell.root.getWorldPosition(new THREE.Vector3());
+      const closest = new THREE.Line3(shell.launchPosition, shell.impactPosition)
+        .closestPointToPoint(worldPosition, true, new THREE.Vector3());
+      const projected = camera ? worldPosition.clone().project(camera) : null;
+      return [Object.freeze({
+        trajectoryId: shell.trajectoryId,
+        activationId: shell.activationId,
+        ordinal: shell.ordinal,
+        rootName: shell.root.name,
+        poolSlot: Number(shell.root.userData.poolSlot),
+        visible: shell.root.visible && shell.root.parent !== null,
+        worldPosition: Object.freeze(worldPosition.toArray()),
+        launchPosition: Object.freeze(shell.launchPosition.toArray()),
+        targetPosition: Object.freeze(shell.impactPosition.toArray()),
+        progress: shell.progress,
+        distanceFromTrajectoryM: worldPosition.distanceTo(closest),
+        projectedNdc: projected ? Object.freeze(projected.toArray()) : null,
+        inFrustum: Boolean(projected && Math.abs(projected.x) <= 1 && Math.abs(projected.y) <= 1
+          && projected.z >= -1 && projected.z <= 1),
+      })];
+    }));
     const emberParticles = countActive(this.emberPool);
     const visibleSwarmBatches = this.swarmInstanceBatches.filter((batch) => batch.root.visible && batch.root.count > 0);
     const visibleSwarmCounts = visibleSwarmBatches.map((batch) => batch.root.count);
@@ -3566,6 +3634,7 @@ export class KillstreakPresentation {
       entities: this.entities.size,
       impactFlashes,
       bombShells,
+      chopperMissileShells,
       emberParticles,
       sensorContacts: this.visibleSensorContacts,
       sensorProxyMeshes: 0,

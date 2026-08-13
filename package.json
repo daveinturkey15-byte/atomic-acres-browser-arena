@@ -121,6 +121,8 @@
     "qa:pass71:hf309-chopper-first-entry": "npm run qa:pass71:hf309-chopper-first-entry:contract && node scripts/qa/run-pass71-hf309-chopper-first-entry-evidence.mjs",
     "qa:pass71:hf313-release:contract": "node --test scripts/qa/pass71-hf313-release-evidence-contract.test.mjs",
     "qa:pass71:hf313-release": "npm run qa:pass71:hf313-release:contract && node scripts/qa/run-pass71-hf313-release-evidence.mjs",
+    "qa:pass71:hf308-chopper-missile:contract": "node --test scripts/qa/pass71-hf308-chopper-missile-evidence-contract.test.mjs",
+    "qa:pass71:hf308-chopper-missile": "npm run qa:pass71:hf308-chopper-missile:contract && node scripts/qa/run-pass71-hf308-chopper-missile-evidence.mjs",
     "qa:pass66:ads-catalog:edge-webgl2": "node scripts/qa/run-pass66-ads-sight-catalog.mjs edge-webgl2",
     "qa:pass66:ads-catalog:edge-webgpu": "node scripts/qa/run-pass66-ads-sight-catalog.mjs edge-webgpu",
     "qa:pass66:ads-catalog": "npm run qa:pass66:ads-catalog:edge-webgl2 && npm run qa:pass66:ads-catalog:edge-webgpu",

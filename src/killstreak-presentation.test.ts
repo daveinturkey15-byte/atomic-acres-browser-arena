@@ -861,6 +861,7 @@ describe('killstreak presentation', () => {
       ]),
       impactFlashes: 0,
       bombShells: 0,
+      chopperMissileShells: [],
       emberParticles: 0,
       sensorContacts: 0,
       sensorProxyMeshes: 0,
@@ -1238,8 +1239,23 @@ describe('killstreak presentation', () => {
     const shell = shellPool.children[0]!;
     expect(shell.name).toBe('pass70-chopper-missile-shell');
     expect(shell.position.toArray()).toEqual(launchPosition);
+    expect(presentation.chopperMissileShellRoot('ks-chopper-socket-launch', 0)).toBe(shell);
+    expect(presentation.telemetry().chopperMissileShells).toEqual([
+      expect.objectContaining({
+        trajectoryId: 'ks-chopper-socket-launch:missile:0',
+        activationId: 'ks-chopper-socket-launch',
+        ordinal: 0,
+        visible: true,
+        worldPosition: launchPosition,
+        launchPosition,
+        targetPosition: [impactPosition[0], impactPosition[1] + 0.35, impactPosition[2]],
+        progress: 0,
+        distanceFromTrajectoryM: 0,
+      }),
+    ]);
     expect(shell.position.y).not.toBe(impactPosition[1] + 14);
     presentation.sync(snapshot(0), 4_390);
+    expect(presentation.telemetry().chopperMissileShells[0]).toMatchObject({ progress: 0.5 });
     expect(shell.position.distanceTo(new THREE.Vector3(...launchPosition))).toBeGreaterThan(0);
     expect(shell.position.distanceTo(new THREE.Vector3(...impactPosition))).toBeGreaterThan(0);
     presentation.sync(snapshot(0), 4_780);

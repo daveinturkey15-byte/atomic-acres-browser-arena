@@ -224,6 +224,16 @@ function publishHostDamageResultForLocalQa(message: Extract<GameMessage, { type:
       targetId: event.targetId,
       atMs: event.atMs,
     }))),
+    impacts: Object.freeze(message.impacts.map((impact) => Object.freeze({
+      activationId: impact.activationId,
+      source: impact.source,
+      ordinal: impact.ordinal,
+      phase: impact.phase,
+      position: Object.freeze([...impact.position]),
+      launchPosition: impact.launchPosition ? Object.freeze([...impact.launchPosition]) : null,
+      impactAtMs: impact.impactAtMs,
+      atMs: impact.atMs,
+    }))),
   });
   window.dispatchEvent(new CustomEvent(LOCAL_MULTIPLAYER_QA_HOST_DAMAGE_RESULT_EVENT, { detail }));
 }
