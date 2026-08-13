@@ -82,6 +82,8 @@ describe('Pass 71 dramatic Nuke warning integration', () => {
     expect(evidence).toContain('expect(activation.frozen.detonateInMs).toBeGreaterThan(2_000)');
     expect(evidence).toContain('expect(raster.maximumRedDelta).toBeGreaterThanOrEqual(72)');
     expect(evidence).toContain('expect(raster.changedWarningPixels).toBeGreaterThanOrEqual(240)');
+    expect(evidence.indexOf('page.setViewportSize({ width: 1_920, height: 1_080 })'))
+      .toBeGreaterThan(evidence.indexOf("snapshot().matchPhase === 'active'"));
     expect(evidence).not.toContain('redWarningDelta(before, active)');
   });
 });

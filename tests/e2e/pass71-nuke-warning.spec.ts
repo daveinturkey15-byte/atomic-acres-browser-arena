@@ -61,7 +61,7 @@ async function redWarningAttributionDelta(control: Buffer, visible: Buffer, crop
 
 test('renders the pre-detonation Nuke warning inside the Gun Range killstreak room', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
-  await page.setViewportSize({ width: 1_920, height: 1_080 });
+  await page.setViewportSize({ width: 1_280, height: 720 });
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.stack ?? error.message));
   page.on('console', (message) => {
@@ -76,6 +76,7 @@ test('renders the pre-detonation Nuke warning inside the Gun Range killstreak ro
   }, undefined, { timeout: 60_000 });
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.startSolo());
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
+  await page.setViewportSize({ width: 1_920, height: 1_080 });
   await page.evaluate(({ position, yaw, pitch }) => {
     const api = window.__ATOMIC_ACRES_DEBUG__ as any;
     api.setBotsFrozen(true);
