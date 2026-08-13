@@ -65,12 +65,13 @@ import {
   type BotWeaponPresentationMessage,
 } from './bot-weapon-presentation';
 import { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
+import { WEAPON_CATALOG } from './combat/weapon-catalog';
 import { validateKillstreakLoadout, type KillstreakLoadoutV1 } from './killstreak-catalog';
 
 export { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 
 export type Team = 0 | 1;
-export const MULTIPLAYER_PROTOCOL_VERSION = 19;
+export const MULTIPLAYER_PROTOCOL_VERSION = 20;
 export type PrimaryWeaponId =
   | 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper'
   | 'mini-uzi' | 'mp5' | 'm4a1' | 'ak-47' | 'minigun' | 'm14-ebr' | 'slug-shotgun';
@@ -365,11 +366,12 @@ export type PickupMessage = {
 };
 export type WindowBreakMessage = {
   type: 'window-break';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
   by: string;
   windowId: string;
   origin: [number, number, number];
   kind?: 'shot' | 'knife' | 'explosive';
-  /** Present only for a projectile impact/detonation tied to an admitted shot. */
+  /** Present for a projectile impact/detonation or host-canonical bot ballistic action. */
   weapon?: WeaponId;
   actionNonce?: number;
   /** Added only by the host after receiver simulation canonicalizes the break. */
@@ -557,6 +559,21 @@ export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDama
   | TimedMapWeaponProtocolMessage | FlarePresentationProtocolMessage | BotWeaponPresentationMessage;
 
 const weapons = new Set<WeaponId>(WEAPON_IDS);
+/**
+ * Protocol projection of bot-owned instantaneous glass actions. This is
+ * derived from the canonical weapon catalog so a newly eligible family cannot
+ * silently borrow the wire lane without satisfying the decoder tests.
+ */
+export const HOSTED_BOT_BALLISTIC_WINDOW_WEAPON_IDS: readonly WeaponId[] = Object.freeze(
+  WEAPON_CATALOG
+    .filter((definition) => definition.policies.bot === 'eligible'
+      && definition.projectileId === null
+      && (definition.fireKind === 'hitscan'
+        || definition.fireKind === 'pellet'
+        || definition.fireKind === 'slug'))
+    .map((definition) => definition.id as WeaponId),
+);
+const hostedBotBallisticWindowWeapons = new Set<WeaponId>(HOSTED_BOT_BALLISTIC_WINDOW_WEAPON_IDS);
 const primaryWeapons = new Set<PrimaryWeaponId>(PRIMARY_WEAPON_IDS);
 const sidearmWeapons = new Set<SidearmWeaponId>(SIDEARM_WEAPON_IDS);
 const specialWeapons = new Set<SpecialWeaponId>(SPECIAL_WEAPON_IDS);
@@ -968,13 +985,19 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Array.isArray(msg.position) && msg.position.length === 3 && msg.position.every(Number.isFinite)
         && Number.isFinite(msg.nonce);
     case 'window-break':
-      return typeof msg.by === 'string'
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && typeof msg.windowId === 'string' && msg.windowId.length > 0 && msg.windowId.length <= 160
         && (msg.kind === undefined || msg.kind === 'shot' || msg.kind === 'knife' || msg.kind === 'explosive')
-        && (msg.weapon === undefined || msg.weapon === 'flare-gun' || msg.weapon === 'explosive-crossbow')
+        && (msg.weapon === undefined
+          || msg.weapon === 'flare-gun'
+          || msg.weapon === 'explosive-crossbow'
+          || /^host-bot-[0-3]$/.test(msg.by)
+            && isHostWindowBreakAuthority(msg.hostAuthority)
+            && hostedBotBallisticWindowWeapons.has(msg.weapon as WeaponId))
         && (msg.weapon === undefined || msg.kind === 'shot')
-        && (msg.kind === 'explosive' || msg.weapon === 'flare-gun' || msg.weapon === 'explosive-crossbow'
-          ? Number.isFinite(msg.actionNonce)
+        && (msg.kind === 'explosive' || msg.weapon !== undefined
+          ? Number.isSafeInteger(msg.actionNonce) && Number(msg.actionNonce) >= 0
           : msg.actionNonce === undefined)
         && (msg.hostAuthority === undefined || isHostWindowBreakAuthority(msg.hostAuthority))
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)

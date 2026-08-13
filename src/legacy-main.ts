@@ -12675,6 +12675,7 @@ function breakHouseWindow(
   if (replicate) {
     const message: WindowBreakMessage = {
       type: 'window-break',
+      protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
       by: impactOwnerId,
       windowId,
       origin: origin.toArray(),

@@ -102,9 +102,15 @@ describe('hosted bot skirmish parity integration', () => {
     expect(traceBreak).toContain('authority.impactOwnerId');
     expect(traceBreak).toContain('authority.weapon');
 
+    const mutation = functionBody('breakHouseWindow', 'breakWindowsAlongBallisticTrace');
+    expect(mutation).toContain('protocolVersion: MULTIPLAYER_PROTOCOL_VERSION');
+
     const receiver = functionBody('acceptRemoteWindowBreak', 'resetBreakableWindows');
     const botAdmission = receiver.indexOf('hostedBotBallisticGlassActions.admit({');
     expect(botAdmission).toBeGreaterThan(-1);
+    const hostReject = receiver.indexOf("} else if (message.hostAuthority !== undefined) {");
+    expect(hostReject).toBeGreaterThanOrEqual(0);
+    expect(hostReject).toBeLessThan(botAdmission);
     expect(receiver).toContain("message.hostAuthority?.hostId === privateLobbySnapshot?.hostId");
     expect(receiver).toContain('botAdmitted: hostedBotIds(privateLobbySnapshot?.config.hostedBotCount ?? 0).includes(message.by)');
     expect(receiver).toContain('eventReplay,');
