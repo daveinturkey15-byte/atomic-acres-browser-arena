@@ -202,7 +202,7 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(e2e).toContain('budget.maximumActionMs');
     expect(e2e).toContain('budget.maximumSynchronousActionMs');
     const requiredGroup = boundedE2e.match(/name: 'pass70-chopper-gunner'[^\n]+/u)?.[0] ?? '';
-    expect(requiredGroup).toContain("timeoutMs: 300_000");
+    expect(requiredGroup).toContain("timeoutMs: 420_000");
     expect(requiredGroup).toContain("'tests/e2e/pass70-chopper-gunner.spec.ts'");
     expect(requiredGroup).toContain("'tests/e2e/pass71-controlled-support-native.spec.ts'");
     expect(requiredGroup).toContain("'--workers=1'");
