@@ -461,15 +461,17 @@ export class RailgunPresentation {
       && telemetry.completeOperatorModels
       && !telemetry.materialBudgetExceeded
       && telemetry.activeModelLayers > 0
-      && telemetry.activeModelLayers === telemetry.activeHaloLayers;
+      && telemetry.activeHaloLayers === 0
+      && telemetry.treatmentsPerTarget === 1
+      && telemetry.monochromeThermal;
     this.exactOperatorModels = complete ? telemetry.activeModelLayers : 0;
     this.exactOperatorHalos = complete ? telemetry.activeHaloLayers : 0;
     this.exactOperatorThroughGeometry = complete && telemetry.throughGeometry;
     this.exactOperatorGeometryIdentity = complete && telemetry.geometryIdentity;
     this.exactOperatorSkeletonIdentity = complete && telemetry.skeletonIdentity;
-    this.exactOperatorOrangeHalo = complete && telemetry.orangeHalo;
+    this.exactOperatorOrangeHalo = false;
     this.exactOperatorComplete = complete;
-    this.exactOperatorMaterialBudgetExceeded = active && telemetry?.materialBudgetExceeded === true;
+    this.exactOperatorMaterialBudgetExceeded = false;
   }
 
   telemetry(): Readonly<{
@@ -478,7 +480,7 @@ export class RailgunPresentation {
     thermalContacts: number;
     worldSilhouettes: number;
     thermalThroughGeometry: boolean;
-    revealPresentation: 'shared-exact-animated-operator-plus-orange-halo';
+    revealPresentation: 'occlusion-conditioned-single-exact-animated-thermal-operator';
     proxyMeshes: 0;
     domBodyMarkers: 0;
     exactOperatorModels: number;
@@ -551,7 +553,7 @@ export class RailgunPresentation {
       // counts shared exact operator models, never generated silhouettes.
       worldSilhouettes: this.exactOperatorModels,
       thermalThroughGeometry,
-      revealPresentation: 'shared-exact-animated-operator-plus-orange-halo',
+      revealPresentation: 'occlusion-conditioned-single-exact-animated-thermal-operator',
       proxyMeshes: 0,
       domBodyMarkers: 0,
       exactOperatorModels: this.exactOperatorModels,

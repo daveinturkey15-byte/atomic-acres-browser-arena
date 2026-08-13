@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { ATOMIC_SIGNAL_FRAGMENT, AtomicSignalPass, atomicSignalBypassReason, atomicSignalConfig, atomicSignalEffectsTextureSamples, atomicSignalPrincipalHdrSamples, atomicSignalTextureSamples, isSoftwareWebGLRenderer, renderSceneLayerWithoutBackground, renderSceneOverlayLayer, renderSceneWithoutOverlayLayer, renderSceneWithOverlayLayer } from './atomic-signal';
+import { ATOMIC_SIGNAL_BLOOM_BLUR_FRAGMENT, ATOMIC_SIGNAL_BLOOM_VISIBILITY_FRAGMENT, ATOMIC_SIGNAL_FRAGMENT, AtomicSignalPass, atomicSignalBloomPrefilterTextureSamples, atomicSignalBypassReason, atomicSignalConfig, atomicSignalEffectsTextureSamples, atomicSignalPrincipalHdrSamples, atomicSignalTextureSamples, isSoftwareWebGLRenderer, renderSceneLayerWithoutBackground, renderSceneOverlayLayer, renderSceneWithoutOverlayLayer, renderSceneWithOverlayLayer } from './atomic-signal';
 import { graphicsEffectsBudget } from './graphics-refinement';
 
 function linearChannelToSrgb(channel: number): number {
@@ -215,11 +215,17 @@ describe('Atomic Signal profile contract', () => {
     const full = graphicsEffectsBudget('blender', 1);
     const low = graphicsEffectsBudget('blender', 0.65);
     expect(atomicSignalEffectsTextureSamples(config, full)).toBeGreaterThan(atomicSignalEffectsTextureSamples(config, low));
+    expect(atomicSignalEffectsTextureSamples(config, full)).toBe(11);
+    expect(atomicSignalBloomPrefilterTextureSamples(full)).toBe(12);
     expect(ATOMIC_SIGNAL_FRAGMENT).toContain('contactOcclusion');
     expect(ATOMIC_SIGNAL_FRAGMENT).toContain('selectiveBloom');
     expect(ATOMIC_SIGNAL_FRAGMENT).toContain('worldPositionFromDepth');
-    expect(ATOMIC_SIGNAL_FRAGMENT).toContain('float sceneSampleDepth = texture2D(tDepth, uv).x');
-    expect(ATOMIC_SIGNAL_FRAGMENT).toContain('step(bloomDepth, sceneSampleDepth + 0.0025)');
-    expect(ATOMIC_SIGNAL_FRAGMENT).not.toContain('step(bloomDepth, centreDepth + 0.0025)');
+    expect(ATOMIC_SIGNAL_FRAGMENT).toContain('return texture2D(tBloom, vUv).rgb;');
+    expect(ATOMIC_SIGNAL_BLOOM_VISIBILITY_FRAGMENT).toContain('float sceneSampleDepth = texture2D(tSceneDepth, vUv).x');
+    expect(ATOMIC_SIGNAL_BLOOM_VISIBILITY_FRAGMENT).toContain('step(bloomDepth, sceneSampleDepth + 0.0025)');
+    expect(ATOMIC_SIGNAL_BLOOM_BLUR_FRAGMENT).toContain('for (int x = -1; x <= 1; x++)');
+    expect(ATOMIC_SIGNAL_BLOOM_BLUR_FRAGMENT).toContain('0.18');
+    expect(ATOMIC_SIGNAL_BLOOM_BLUR_FRAGMENT).toContain('0.12');
+    expect(ATOMIC_SIGNAL_BLOOM_BLUR_FRAGMENT).toContain('0.085');
   });
 });

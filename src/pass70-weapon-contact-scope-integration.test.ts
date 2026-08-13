@@ -21,17 +21,23 @@ describe('Pass 70 contact and Railgun scope integration contracts', () => {
     expect(runtime).not.toMatch(/contactResponse[^\n]*(camera|baseDirection|projectile)/u);
   });
 
-  it('routes M14, Railgun and Chopper reveals through one exact-model renderer without pawn proxies', () => {
+  it('routes M14, Railgun, Chopper and piloted-drone reveals through one exact-model renderer without pawn proxies', () => {
     const runtime = read('./legacy-main.ts');
     const ghost = read('./thermal-ghost-presentation.ts');
     const dmr = read('./dmr-thermal-presentation.ts');
     const railgun = read('./railgun-presentation.ts');
-    expect(runtime).toContain("const chopperThermal = localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner';");
-    expect(runtime).toContain('if (!dmrThermalActive && !railgunRevealActive && !chopperThermal)');
+    expect(runtime).toContain("const chopperThermal = possessionKind === 'chopper-gunner';");
+    expect(runtime).toContain('const revealActive = dmrThermalRevealActive || railgunRevealActive || chopperThermal || pilotedDroneThermal;');
+    expect(runtime).toContain('const contacts = dmrThermalContacts(!thermalGhostWasActive);');
+    expect(runtime).toContain('occluded: contact?.solidOccluded ?? true');
     expect(runtime).toContain('railgunPresentation.syncExactOperatorReveal(railgunRevealActive, thermalGhostPresentation.telemetry())');
-    expect(ghost).toContain("'exact-animated-operator-plus-orange-halo-v1'");
+    expect(runtime).toContain("const pilotedDroneThermal = possessionKind === 'piloted-drone';");
+    expect(runtime).toContain('new Set(killstreakSnapshot.sensorContacts.map((contact) => `${contact.kind}:${contact.id}`))');
+    expect(runtime).toContain('if (pilotedDroneContactKeys && !pilotedDroneContactKeys.has(`${kind}:${id}`)) return;');
+    expect(ghost).toContain("'occlusion-conditioned-single-exact-animated-thermal-operator-v2'");
     expect(ghost).toContain('model.skeleton === layer.source.skeleton');
-    expect(ghost).toContain('halo.geometry === layer.source.geometry');
+    expect(ghost).toContain('parent.add(model);');
+    expect(ghost).not.toContain('orangeHaloMaterial');
     expect(dmr).not.toContain('DataTexture');
     expect(dmr).not.toContain('InstancedMesh');
     expect(dmr).not.toContain('document.createElement');

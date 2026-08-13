@@ -35,9 +35,9 @@ describe('presentation prewarm startup contract', () => {
     expect(source).not.toContain('type: THREE.PCFShadowMap');
   });
 
-  it('keeps cold work one-deep and bounds warmed live work to a two-frame completion frontier', () => {
+  it('keeps cold work one-deep and bounds warmed live work to a triple-buffered completion frontier', () => {
     const source = readFileSync(new URL('./rendering/render-runtime.ts', import.meta.url), 'utf8');
-    expect(source).toContain("mode === 'warmed-live' ? 2 : 1");
+    expect(source).toContain("mode === 'warmed-live' ? 3 : 1");
     expect(source).toContain('Forced WebGPU submission requires an idle completion frontier');
     expect(source).toContain('await this.waitForSubmittedWork(12_000);');
     expect(source).toContain('completionProbeTargetSequence: this.completionProbeTargetSequence');

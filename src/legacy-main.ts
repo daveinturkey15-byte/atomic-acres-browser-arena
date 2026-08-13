@@ -4,7 +4,7 @@ import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } f
 import { AdaptiveQualityController, DeferredAdaptivePixelRatio, adaptiveShadowsEnabled, assertWebGpuAdmissionCompletionLatency, classifyDisplayFrameMs, configuredAdaptiveQualityLevels, shouldFreezeAdaptiveQualityForMatch } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
 import { ArenaContrastLighting } from './arena-contrast-lighting';
-import { centeredReadbackRegion, detectLivePresentationStall, LegacyWebGlRenderRuntime, shouldResetPresentationAfterSchedulerGap, WebGpuRenderRuntime, resolveRenderRuntimeRequest, type WebGpuSubmissionMode } from './rendering/render-runtime';
+import { centeredReadbackRegion, detectLivePresentationStall, geometryFreeCompositeCanvasConfig, LegacyWebGlRenderRuntime, probeWebGl2AdapterLabel, shouldResetPresentationAfterSchedulerGap, WebGpuRenderRuntime, resolveRenderRuntimeRequest, type WebGpuSubmissionMode } from './rendering/render-runtime';
 import { estimateResidentObjectMemory } from './rendering/resident-memory';
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
@@ -1593,21 +1593,43 @@ const runtimeRequest = resolveRenderRuntimeRequest(
   window.location.search,
   typeof navigator !== 'undefined' && typeof (navigator as Navigator & { gpu?: unknown }).gpu !== 'undefined',
 );
+const signalQuery = new URLSearchParams(window.location.search).get('signal');
 async function createWebGl2Runtime(): Promise<LegacyWebGlRenderRuntime> {
+  const probedAdapterLabel = probeWebGl2AdapterLabel();
+  // Atomic Signal resolves the multisampled principal HDR target before its
+  // fullscreen composite. Multisampling that geometry-free default-framebuffer
+  // draw a second time is redundant and disproportionately expensive in native
+  // Firefox/ANGLE. Keep canvas MSAA whenever the pass is disabled or a software
+  // adapter will take the direct-render fallback.
+  const atomicSignalOwnsAntialiasing = probedAdapterLabel !== null
+    && renderProfile !== 'compat'
+    && atomicSignalBypassReason(signalQuery, probedAdapterLabel) === null;
   return LegacyWebGlRenderRuntime.create({
     canvas,
     alpha: false,
-    antialias: activeRenderConfig.antialias,
+    antialias: activeRenderConfig.antialias && !atomicSignalOwnsAntialiasing,
+    // Retain a default depth buffer for the fail-closed direct-render fallback
+    // and WebGL presentation prewarm. The live Atomic Signal composite does not
+    // multisample it, while a late HDR-target validation failure can still draw
+    // the world with correct depth instead of flattening geometry by render order.
+    depth: true,
+    stencil: !atomicSignalOwnsAntialiasing,
     powerPreference: 'high-performance',
   });
 }
 let renderRuntime: WebGpuRenderRuntime | LegacyWebGlRenderRuntime;
 if (runtimeRequest.requestedBackend === 'webgpu') {
   try {
+    const compositeCanvas = geometryFreeCompositeCanvasConfig(Math.max(1, graphicsRuntime.antialiasSamples));
     renderRuntime = await WebGpuRenderRuntime.create({
       canvas,
-      antialias: graphicsRuntime.antialiasSamples > 0,
-      samples: Math.max(1, graphicsRuntime.antialiasSamples),
+      // The submitted scene is already rasterized into the principal HDR
+      // target with the player-selected MSAA sample count. RenderPipeline then
+      // presents a geometry-free full-screen composite. Multisampling that
+      // swapchain draw a second time contributes no edge coverage and is a
+      // severe native-Firefox/WebGPU bandwidth and resolve penalty.
+      antialias: compositeCanvas.antialias,
+      samples: compositeCanvas.samples,
       requireWebGPU: true,
     });
   } catch (webGpuError) {
@@ -1793,7 +1815,6 @@ renderRuntime.configureShadows({
   autoUpdate: activeRenderConfig.shadowMode === 'dynamic',
   needsUpdate: activeRenderConfig.shadowMode === 'static',
 });
-const signalQuery = new URLSearchParams(window.location.search).get('signal');
 const rendererLabel = renderRuntime.telemetry().adapterLabel;
 const softwareRenderer = isSoftwareWebGLRenderer(rendererLabel);
 const atomicSignalBypass = atomicSignalBypassReason(signalQuery, rendererLabel);
@@ -5418,6 +5439,7 @@ let previousHudScores: [number, number] = [0, 0];
 let adsHeld = false;
 let sniperScopeActive = false;
 let dmrThermalActive = false;
+let dmrThermalRevealActive = false;
 let railgunScopeActive = false;
 let mouseTriggerHeld = false;
 let mouseAdsHeld = false;
@@ -5581,6 +5603,7 @@ function clearGameplayInput(): void {
   adsHeld = admittedAdsHeld(false);
   sniperScopeActive = false;
   dmrThermalActive = false;
+  dmrThermalRevealActive = false;
   sniperScopeOverlay.hidden = true;
   hudRoot.classList.remove('sniper-scope-active');
   dmrThermalPresentation.update(camera, [], false);
@@ -14818,7 +14841,8 @@ type RuntimeDmrThermalContact = {
 const dmrThermalContactBuffer: RuntimeDmrThermalContact[] = [];
 const dmrThermalContactCache = new Map<string, RuntimeDmrThermalContact>();
 let dmrThermalOcclusionCursor = 0;
-let dmrThermalWasActive = false;
+let dmrThermalContactFrame = -1;
+let thermalGhostWasActive = false;
 
 function acquireDmrThermalContact(id: string, kind: 'player' | 'bot'): RuntimeDmrThermalContact {
   const key = `${kind}:${id}`;
@@ -14850,36 +14874,43 @@ function dmrThermalSolidOccluded(
   return false;
 }
 
-function dmrThermalContacts(): readonly DmrThermalContact[] {
+function dmrThermalContacts(forceCompleteOcclusion = false): readonly DmrThermalContact[] {
+  const sameFrame = dmrThermalContactFrame === frameCount;
+  if (sameFrame && (!forceCompleteOcclusion || dmrThermalContactBuffer.every((contact) => contact.occlusionSampled))) {
+    return dmrThermalContactBuffer;
+  }
   const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
   const observer = camera.position;
-  dmrThermalContactBuffer.length = 0;
-  for (const remote of remotes.values()) {
-    if (dmrThermalContactBuffer.length >= DMR_THERMAL_MAX_CONTACTS) break;
-    const contact = acquireDmrThermalContact(remote.snapshot.id, 'player');
-    contact.position.copy(remote.target);
-    contact.position.y += 1.05;
-    contact.relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' : 'hostile';
-    contact.living = remote.snapshot.hp > 0;
-    if (!contact.occlusionSampled
-      || contact.position.distanceToSquared(contact.lastOcclusionPosition) > 0.16
-      || observer.distanceToSquared(contact.lastOcclusionObserver) > 0.16) contact.solidOccluded = true;
-    dmrThermalContactBuffer.push(contact);
-  }
-  for (const bot of bots.values()) {
-    if (dmrThermalContactBuffer.length >= DMR_THERMAL_MAX_CONTACTS) break;
-    const contact = acquireDmrThermalContact(bot.id, 'bot');
-    contact.position.copy(bot.position);
-    contact.position.y += 1.05;
-    contact.relation = mode === 'tdm' && bot.team === player.team ? 'friendly' : 'hostile';
-    contact.living = bot.alive;
-    if (!contact.occlusionSampled
-      || contact.position.distanceToSquared(contact.lastOcclusionPosition) > 0.16
-      || observer.distanceToSquared(contact.lastOcclusionObserver) > 0.16) contact.solidOccluded = true;
-    dmrThermalContactBuffer.push(contact);
+  if (!sameFrame) {
+    dmrThermalContactFrame = frameCount;
+    dmrThermalContactBuffer.length = 0;
+    for (const remote of remotes.values()) {
+      if (dmrThermalContactBuffer.length >= DMR_THERMAL_MAX_CONTACTS) break;
+      const contact = acquireDmrThermalContact(remote.snapshot.id, 'player');
+      contact.position.copy(remote.target);
+      contact.position.y += 1.05;
+      contact.relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' : 'hostile';
+      contact.living = remote.snapshot.hp > 0;
+      if (!contact.occlusionSampled
+        || contact.position.distanceToSquared(contact.lastOcclusionPosition) > 0.16
+        || observer.distanceToSquared(contact.lastOcclusionObserver) > 0.16) contact.occlusionSampled = false;
+      dmrThermalContactBuffer.push(contact);
+    }
+    for (const bot of bots.values()) {
+      if (dmrThermalContactBuffer.length >= DMR_THERMAL_MAX_CONTACTS) break;
+      const contact = acquireDmrThermalContact(bot.id, 'bot');
+      contact.position.copy(bot.position);
+      contact.position.y += 1.05;
+      contact.relation = mode === 'tdm' && bot.team === player.team ? 'friendly' : 'hostile';
+      contact.living = bot.alive;
+      if (!contact.occlusionSampled
+        || contact.position.distanceToSquared(contact.lastOcclusionPosition) > 0.16
+        || observer.distanceToSquared(contact.lastOcclusionObserver) > 0.16) contact.occlusionSampled = false;
+      dmrThermalContactBuffer.push(contact);
+    }
   }
   const contactCount = dmrThermalContactBuffer.length;
-  const budget = dmrThermalOcclusionBudget(contactCount);
+  const budget = forceCompleteOcclusion ? contactCount : dmrThermalOcclusionBudget(contactCount);
   const colliders = budget > 0 ? activeWorldColliders() : [];
   let checked = 0;
   let inspected = 0;
@@ -14904,26 +14935,17 @@ function dmrThermalContacts(): readonly DmrThermalContact[] {
 function updateDmrThermal(): void {
   if (!dmrThermalActive) {
     dmrThermalPresentation.update(camera, [], false);
-    if (dmrThermalWasActive) {
-      dmrThermalOcclusionCursor = 0;
-      for (const contact of dmrThermalContactCache.values()) {
-        contact.solidOccluded = true;
-        contact.occlusionSampled = false;
-      }
-    }
-    dmrThermalWasActive = false;
     return;
   }
-  dmrThermalWasActive = true;
   dmrThermalPresentation.update(camera, dmrThermalContacts(), true);
   // Contact selection/optic telemetry remain here. The shared exact-operator
-  // layer owns every world-space body and halo; this anchor has no proxy or
+  // layer owns every world-space thermal body; this anchor has no proxy or
   // body-marker geometry.
   dmrThermalPresentation.worldRoot.visible = false;
 }
 
 /**
- * Compile the relation-invariant exact-model and orange-halo layers during
+ * Compile the relation-invariant single thermal-body layer during
  * match admission instead of on the player's first ADS. Every live ID is
  * submitted once behind the opaque deployment surface; the caller clears the
  * ghosts again after the match-bound compile.
@@ -14934,26 +14956,27 @@ function prewarmThermalGhostPipelines(): void {
   for (const remote of remotes.values()) {
     if (remote.snapshot.hp <= 0) continue;
     const relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id: remote.snapshot.id, relation, root: remote.root });
+    targets.push({ id: remote.snapshot.id, relation, root: remote.root, occluded: true });
   }
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
     const relation = mode === 'tdm' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id: bot.id, relation, root: bot.root });
+    targets.push({ id: bot.id, relation, root: bot.root, occluded: true });
   }
   // Match admission has already staged the retained corpse operators visible
   // behind the opaque deployment surface. Fill any remaining target slots
   // from that exact rigged corpus so even an otherwise empty private lobby
-  // submits both the shared model and halo programs before its first guest.
+  // submits the shared exact-rig thermal program before its first guest.
   for (const [index, entry] of corpsePresentationPool.entries()) {
     if (targets.length >= THERMAL_GHOST_MAX_TARGETS) break;
     targets.push({
       id: `thermal-prewarm-corpse-${index}`,
       relation: entry.team === player.team ? 'friendly' : 'hostile',
       root: entry.root,
+      occluded: true,
     });
   }
-  // Exact-model and orange-halo materials are relation-invariant. Retain one
+  // The single thermal material is relation-invariant. Retain one
   // record per live ID; aliases would duplicate the same skinned children.
   if (targets.length > 0) thermalGhostPresentation.sync(targets, true);
 }
@@ -14962,14 +14985,31 @@ function updateThermalGhosts(): void {
   // One presentation layer serves every firearm-authorized through-wall
   // reveal. Selection remains each weapon's existing authority policy; only
   // the primitive pawn/marker rendering has been replaced by the exact live
-  // operator model plus an orange body-following halo.
-  const chopperThermal = localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner';
+  // operator model with one monochrome thermal treatment.
+  const possessionKind = localKillstreakActorSnapshot()?.possession?.kind ?? null;
+  const chopperThermal = possessionKind === 'chopper-gunner';
+  const pilotedDroneThermal = possessionKind === 'piloted-drone';
+  // The host already applies the piloted drone's range, forward-cone, life and
+  // hostility policy. Reuse those admitted IDs instead of inferring authority
+  // from local pixels or showing every combatant in the arena.
+  const pilotedDroneContactKeys = pilotedDroneThermal
+    ? new Set(killstreakSnapshot.sensorContacts.map((contact) => `${contact.kind}:${contact.id}`))
+    : null;
   const railgunRevealActive = railgunScopeState.revealActive;
-  if (!dmrThermalActive && !railgunRevealActive && !chopperThermal) {
+  const revealActive = dmrThermalRevealActive || railgunRevealActive || chopperThermal || pilotedDroneThermal;
+  if (!revealActive) {
     thermalGhostPresentation.sync([], false);
     railgunPresentation.syncExactOperatorReveal(false, null);
+    if (thermalGhostWasActive) {
+      dmrThermalOcclusionCursor = 0;
+      dmrThermalContactFrame = -1;
+      for (const contact of dmrThermalContactCache.values()) contact.occlusionSampled = false;
+    }
+    thermalGhostWasActive = false;
     return;
   }
+  const contacts = dmrThermalContacts(!thermalGhostWasActive);
+  thermalGhostWasActive = true;
   const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
   const targets: ThermalGhostTarget[] = [];
   const observer = { id: player.id, team: player.team };
@@ -14980,10 +15020,12 @@ function updateThermalGhosts(): void {
     root: THREE.Object3D,
   ): void => {
     if (targets.some((target) => target.id === id)) return;
-    if (railgunRevealActive && !dmrThermalActive && !chopperThermal
+    if (pilotedDroneContactKeys && !pilotedDroneContactKeys.has(`${kind}:${id}`)) return;
+    if (railgunRevealActive && !dmrThermalRevealActive && !chopperThermal && !pilotedDroneThermal
       && !railgunThermalTargetEligible(observer, { id, team, alive: true, kind }, mode)) return;
     const relation = mode === 'tdm' && team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id, relation, root });
+    const contact = contacts.find((candidate) => candidate.id === id && candidate.kind === kind);
+    targets.push({ id, relation, root, occluded: contact?.solidOccluded ?? true });
   };
   for (const remote of remotes.values()) {
     if (remote.snapshot.hp <= 0) continue;
@@ -15022,9 +15064,9 @@ function updateRailgun(now: number): void {
   // follow the admitted ADS hold immediately and are still constrained by the
   // unchanged living-hostile Railgun eligibility policy below.
   const revealActive = railgunScopeState.revealActive;
-  // The railgun's signature see-through-walls reveal: the exact animated
-  // hostile operator with its ordinary appearance plus a bounded orange halo.
-  // The shared presentation disables depth testing without changing eligibility.
+  // The railgun's signature see-through-walls reveal: one exact animated
+  // hostile operator receives the shared monochrome thermal treatment only
+  // while world geometry occludes it. Eligibility remains unchanged.
   railgunPresentation.updateThermal(
     camera,
     revealActive ? railgunThermalContacts() : [],
@@ -21788,6 +21830,9 @@ function updatePhysics(dt: number): void {
     && adsHeld
     && weaponView.adsProgress() >= 0.9
     && Math.abs(camera.fov - aimingFov) < 0.35;
+  dmrThermalRevealActive = player.alive
+    && player.weapon === 'm14-ebr'
+    && adsHeld;
   hudRoot.classList.toggle('dmr-thermal-active', dmrThermalActive);
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
@@ -24647,10 +24692,16 @@ function monitorSelectedArenaRender(now: number): void {
     pendingForMs: presentation.pendingForMs,
     stallThresholdMs: LIVE_WEBGPU_PRESENTATION_STALL_MS,
   });
-  if (liveStall?.kind === 'pending-completion') {
+  // A one-second pending frontier is actionable telemetry, not proof that the
+  // GPU is hung: cold but valid owner-hardware submissions can retire after
+  // ~2.4 s. Backpressure already prevents additional queue work after 250 ms.
+  // Let the renderer's independently tested completion deadline classify a
+  // real stall; do not surface a false fatal while that exact fence is alive.
+  if (liveStall?.kind === 'pending-completion' && presentation.completionDeadlineExceeded) {
     throw new Error(
       `Renderer presentation made no GPU progress for ${Math.round(liveStall.elapsedMs)}ms`
-      + ` (${presentation.submissionSequence - presentation.completedSequence} submission pending)`,
+      + ` (${presentation.submissionSequence - presentation.completedSequence} submission pending)`
+      + ` beyond ${presentation.completionDeadlineMs}ms completion deadline`,
     );
   }
   if (liveStall?.kind === 'missing-submission') {
@@ -24962,8 +25013,8 @@ function activePostTelemetry(): Record<string, unknown> {
     fallbackReason: null,
     bypassReason: null,
     samples: frameCount,
-    canvasAntialias: graphicsRuntime.antialiasSamples > 0,
-    canvasSamples: Math.max(1, graphicsRuntime.antialiasSamples),
+    canvasAntialias: renderRuntime.telemetry().canvasAntialias,
+    canvasSamples: renderRuntime.telemetry().canvasSamples,
     principalHdrSamples: target?.samples ?? 0,
     bloomSamples: pass64TslSystems?.bloomSamples ?? 0,
     targetValidated: target?.samples === Math.max(1, graphicsRuntime.antialiasSamples),

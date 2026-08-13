@@ -28,6 +28,8 @@ export type AtomicSignalTelemetry = {
   averagePassCpuMs: number;
   samples: number;
   textureSamples: number;
+  bloomPrefilterTextureSamples: number;
+  bloomEquivalentFullResolutionTextureSamples: number;
   canvasAntialias: boolean;
   canvasSamples: number;
   principalHdrSamples: number;
@@ -67,9 +69,7 @@ export const ATOMIC_SIGNAL_FRAGMENT = /* glsl */`
   uniform sampler2D tDiffuse;
   uniform sampler2D tDepth;
   uniform sampler2D tBloom;
-  uniform sampler2D tBloomDepth;
   uniform vec2 inverseResolution;
-  uniform vec2 bloomTexelSize;
   uniform float signalExposure;
   uniform float contrast;
   uniform float saturation;
@@ -181,26 +181,11 @@ export const ATOMIC_SIGNAL_FRAGMENT = /* glsl */`
   }
 
   vec3 selectiveBloom() {
-    vec3 bloom = vec3(0.0);
-    float weight = 0.0;
-    for (int x = -1; x <= 1; x++) {
-      for (int y = -1; y <= 1; y++) {
-        vec2 offset = vec2(float(x), float(y)) * bloomTexelSize * 2.2;
-        vec2 uv = clamp(vUv + offset, vec2(0.0), vec2(1.0));
-        vec3 sampleColor = texture2D(tBloom, uv).rgb;
-        float bloomDepth = texture2D(tBloomDepth, uv).x;
-        // Occlusion belongs to the sampled ray, not the destination pixel. A
-        // centre-depth comparison let emissive fixtures behind angled house
-        // walls bleed into nearby exterior pixels at half-resolution bloom.
-        float sceneSampleDepth = texture2D(tDepth, uv).x;
-        float visible = step(bloomDepth, sceneSampleDepth + 0.0025);
-        float kernel = (x == 0 && y == 0) ? 0.18 : ((x == 0 || y == 0) ? 0.12 : 0.085);
-        float isolated = smoothstep(1.05, 2.1, luminance(sampleColor));
-        bloom += sampleColor * isolated * visible * kernel;
-        weight += kernel;
-      }
-    }
-    return bloom / max(weight, 0.001);
+    // Isolation, occlusion and the same 3x3-shaped blur are resolved once at
+    // the bounded bloom resolution. The final HDR composite therefore needs a
+    // single filtered lookup instead of repeating 27 texture fetches per
+    // full-resolution pixel.
+    return texture2D(tBloom, vUv).rgb;
   }
 
   void main() {
@@ -257,6 +242,44 @@ export const ATOMIC_SIGNAL_FRAGMENT = /* glsl */`
     vec3 encoded = clamp(color, 0.0, 1.0);
     encoded += (orderedDither(gl_FragCoord.xy) - 0.46875) * (dither / 255.0);
     gl_FragColor = vec4(clamp(encoded, 0.0, 1.0), 1.0);
+  }
+`;
+
+export const ATOMIC_SIGNAL_BLOOM_VISIBILITY_FRAGMENT = /* glsl */`
+  precision highp float;
+  uniform sampler2D tBloom;
+  uniform sampler2D tBloomDepth;
+  uniform sampler2D tSceneDepth;
+  varying vec2 vUv;
+  float luminance(vec3 color) { return dot(color, vec3(0.2126, 0.7152, 0.0722)); }
+  void main() {
+    vec3 sampleColor = texture2D(tBloom, vUv).rgb;
+    float bloomDepth = texture2D(tBloomDepth, vUv).x;
+    float sceneSampleDepth = texture2D(tSceneDepth, vUv).x;
+    float visible = step(bloomDepth, sceneSampleDepth + 0.0025);
+    float isolated = smoothstep(1.05, 2.1, luminance(sampleColor));
+    gl_FragColor = vec4(sampleColor * isolated * visible, 1.0);
+  }
+`;
+
+export const ATOMIC_SIGNAL_BLOOM_BLUR_FRAGMENT = /* glsl */`
+  precision highp float;
+  uniform sampler2D tInput;
+  uniform vec2 texelSize;
+  varying vec2 vUv;
+  void main() {
+    vec3 bloom = vec3(0.0);
+    float weight = 0.0;
+    for (int x = -1; x <= 1; x++) {
+      for (int y = -1; y <= 1; y++) {
+        vec2 offset = vec2(float(x), float(y)) * texelSize * 2.2;
+        vec2 uv = clamp(vUv + offset, vec2(0.0), vec2(1.0));
+        float kernel = (x == 0 && y == 0) ? 0.18 : ((x == 0 || y == 0) ? 0.12 : 0.085);
+        bloom += texture2D(tInput, uv).rgb * kernel;
+        weight += kernel;
+      }
+    }
+    gl_FragColor = vec4(bloom / max(weight, 0.001), 1.0);
   }
 `;
 
@@ -322,8 +345,14 @@ export function atomicSignalEffectsTextureSamples(config: AtomicSignalConfig, bu
   if (!config.enabled) return 0;
   let samples = atomicSignalTextureSamples(config) + 1;
   if (budget.contactShadowStrength > 0) samples += 4;
-  if (budget.bloomStrength > 0) samples += 18;
+  if (budget.bloomStrength > 0) samples += 1;
   return samples;
+}
+
+export function atomicSignalBloomPrefilterTextureSamples(budget: GraphicsEffectsBudget): number {
+  // Three visibility/isolation taps plus the retained authored nine-tap
+  // kernel, all at the bounded bloom resolution.
+  return budget.bloomStrength > 0 ? 12 : 0;
 }
 
 type LayeredSceneRenderer = Pick<THREE.WebGLRenderer, 'autoClear' | 'clearDepth' | 'render'>;
@@ -419,9 +448,14 @@ export class AtomicSignalPass {
   private readonly screenToneMapping: THREE.ToneMapping;
   private readonly target: THREE.WebGLRenderTarget | null;
   private readonly bloomTarget: THREE.WebGLRenderTarget | null;
+  private readonly bloomMaskTarget: THREE.WebGLRenderTarget | null;
   private readonly material: THREE.RawShaderMaterial | null;
+  private readonly bloomMaskMaterial: THREE.RawShaderMaterial | null;
+  private readonly bloomBlurMaterial: THREE.RawShaderMaterial | null;
   private readonly quadScene = new THREE.Scene();
   private readonly quadCamera = new THREE.Camera();
+  private readonly bloomQuadScene = new THREE.Scene();
+  private readonly bloomQuadCamera = new THREE.Camera();
   private readonly bypassReason: string | null;
   private fallbackReason: string | null = null;
   private targetValidated = false;
@@ -458,7 +492,10 @@ export class AtomicSignalPass {
     if (!this.config.enabled) {
       this.target = null;
       this.bloomTarget = null;
+      this.bloomMaskTarget = null;
       this.material = null;
+      this.bloomMaskMaterial = null;
+      this.bloomBlurMaterial = null;
       return;
     }
     // The HDR scene target must remain linear. Atomic Signal owns the one and
@@ -491,6 +528,54 @@ export class AtomicSignalPass {
     this.bloomTarget.depthTexture = new THREE.DepthTexture(1, 1, THREE.UnsignedIntType);
     this.bloomTarget.depthTexture.name = `AtomicSignal.${profile}.selective-bloom-depth`;
 
+    const bloomIntermediate = (name: string) => {
+      const target = new THREE.WebGLRenderTarget(1, 1, {
+        type: THREE.HalfFloatType,
+        depthBuffer: false,
+        stencilBuffer: false,
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        generateMipmaps: false,
+      });
+      target.texture.name = `AtomicSignal.${profile}.${name}`;
+      return target;
+    };
+    this.bloomMaskTarget = bloomIntermediate('selective-bloom-visible');
+
+    this.bloomMaskMaterial = new THREE.RawShaderMaterial({
+      name: `Atomic Signal ${profile} bloom visibility`,
+      vertexShader: FULLSCREEN_VERTEX,
+      fragmentShader: ATOMIC_SIGNAL_BLOOM_VISIBILITY_FRAGMENT,
+      uniforms: {
+        tBloom: { value: this.bloomTarget.texture },
+        tBloomDepth: { value: this.bloomTarget.depthTexture },
+        tSceneDepth: { value: this.target.depthTexture },
+      },
+      depthTest: false,
+      depthWrite: false,
+      blending: THREE.NoBlending,
+      transparent: false,
+      toneMapped: false,
+    });
+    this.bloomBlurMaterial = new THREE.RawShaderMaterial({
+      name: `Atomic Signal ${profile} authored-kernel bloom`,
+      vertexShader: FULLSCREEN_VERTEX,
+      fragmentShader: ATOMIC_SIGNAL_BLOOM_BLUR_FRAGMENT,
+      uniforms: {
+        tInput: { value: this.bloomMaskTarget.texture },
+        texelSize: { value: new THREE.Vector2(1, 1) },
+      },
+      depthTest: false,
+      depthWrite: false,
+      blending: THREE.NoBlending,
+      transparent: false,
+      toneMapped: false,
+    });
+    const bloomQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.bloomMaskMaterial);
+    bloomQuad.name = 'atomic-signal-bloom-filter-quad';
+    bloomQuad.frustumCulled = false;
+    this.bloomQuadScene.add(bloomQuad);
+
     this.material = new THREE.RawShaderMaterial({
       name: `Atomic Signal ${profile}`,
       vertexShader: FULLSCREEN_VERTEX,
@@ -499,9 +584,7 @@ export class AtomicSignalPass {
         tDiffuse: { value: this.target.texture },
         tDepth: { value: this.target.depthTexture },
         tBloom: { value: this.bloomTarget.texture },
-        tBloomDepth: { value: this.bloomTarget.depthTexture },
         inverseResolution: { value: new THREE.Vector2(1, 1) },
-        bloomTexelSize: { value: new THREE.Vector2(1, 1) },
         signalExposure: { value: renderer.toneMappingExposure * this.config.exposureScale },
         contrast: { value: this.config.contrast },
         saturation: { value: this.config.saturation },
@@ -534,7 +617,7 @@ export class AtomicSignalPass {
   }
 
   resize(): void {
-    if (!this.target || !this.bloomTarget || !this.material) return;
+    if (!this.target || !this.bloomTarget || !this.bloomMaskTarget || !this.material) return;
     const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
     const width = Math.max(1, Math.floor(size.x));
     const height = Math.max(1, Math.floor(size.y));
@@ -547,7 +630,11 @@ export class AtomicSignalPass {
     this.bloomWidth = Math.max(1, Math.floor(width * bloomScale));
     this.bloomHeight = Math.max(1, Math.floor(height * bloomScale));
     this.bloomTarget.setSize(this.bloomWidth, this.bloomHeight);
-    (this.material.uniforms.bloomTexelSize.value as THREE.Vector2).set(1 / this.bloomWidth, 1 / this.bloomHeight);
+    this.bloomMaskTarget.setSize(this.bloomWidth, this.bloomHeight);
+    if (this.bloomBlurMaterial) {
+      (this.bloomBlurMaterial.uniforms.texelSize.value as THREE.Vector2)
+        .set(1 / this.bloomWidth, 1 / this.bloomHeight);
+    }
   }
 
   setEffectsBudget(budget: GraphicsEffectsBudget): void {
@@ -586,7 +673,8 @@ export class AtomicSignalPass {
   }
 
   private renderSelectiveBloom(scene: THREE.Scene, camera: THREE.Camera): void {
-    if (!this.bloomTarget || this.effectsBudget.bloomStrength <= 0) return;
+    if (!this.bloomTarget || !this.bloomMaskTarget
+      || !this.bloomMaskMaterial || !this.bloomBlurMaterial || this.effectsBudget.bloomStrength <= 0) return;
     const previousLayerMask = camera.layers.mask;
     const previousClearColor = this.renderer.getClearColor(new THREE.Color()).clone();
     const previousClearAlpha = this.renderer.getClearAlpha();
@@ -595,6 +683,18 @@ export class AtomicSignalPass {
       this.renderer.setClearColor(0x000000, 0);
       this.renderer.clear(true, true, false);
       renderSceneLayerWithoutBackground(this.renderer, scene, camera, SELECTIVE_BLOOM_LAYER);
+
+      const bloomQuad = this.bloomQuadScene.children[0] as THREE.Mesh;
+      bloomQuad.material = this.bloomMaskMaterial;
+      this.renderer.setRenderTarget(this.bloomMaskTarget);
+      this.renderer.clear(true, false, false);
+      this.renderer.render(this.bloomQuadScene, this.bloomQuadCamera);
+
+      bloomQuad.material = this.bloomBlurMaterial;
+      this.bloomBlurMaterial.uniforms.tInput.value = this.bloomMaskTarget.texture;
+      this.renderer.setRenderTarget(this.bloomTarget);
+      this.renderer.clear(true, false, false);
+      this.renderer.render(this.bloomQuadScene, this.bloomQuadCamera);
     } finally {
       camera.layers.mask = previousLayerMask;
       this.renderer.setClearColor(previousClearColor, previousClearAlpha);
@@ -688,6 +788,11 @@ export class AtomicSignalPass {
       averagePassCpuMs: active ? this.averagePassCpuMs : 0,
       samples: active ? this.samples : 0,
       textureSamples: active ? atomicSignalEffectsTextureSamples(this.config, this.effectsBudget) : 0,
+      bloomPrefilterTextureSamples: active ? atomicSignalBloomPrefilterTextureSamples(this.effectsBudget) : 0,
+      bloomEquivalentFullResolutionTextureSamples: active && this.effectsBudget.bloomStrength > 0
+        ? 1 + atomicSignalBloomPrefilterTextureSamples(this.effectsBudget)
+          * this.effectsBudget.bloomResolutionScale ** 2
+        : 0,
       canvasAntialias: this.canvasAntialias,
       canvasSamples: this.canvasSamples,
       principalHdrSamples: active ? this.principalHdrSamples : 0,
@@ -716,8 +821,13 @@ export class AtomicSignalPass {
     if (this.config.enabled) this.renderer.toneMapping = this.screenToneMapping;
     this.target?.dispose();
     this.bloomTarget?.dispose();
+    this.bloomMaskTarget?.dispose();
     this.material?.dispose();
+    this.bloomMaskMaterial?.dispose();
+    this.bloomBlurMaterial?.dispose();
     const quad = this.quadScene.children[0];
     if (quad instanceof THREE.Mesh) quad.geometry.dispose();
+    const bloomQuad = this.bloomQuadScene.children[0];
+    if (bloomQuad instanceof THREE.Mesh) bloomQuad.geometry.dispose();
   }
 }
