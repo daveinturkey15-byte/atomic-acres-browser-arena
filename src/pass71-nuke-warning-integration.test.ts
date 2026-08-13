@@ -37,7 +37,6 @@ describe('Pass 71 dramatic Nuke warning integration', () => {
     const update = main.slice(updateStart, updateEnd);
     expect(update).toContain('sampleNukeWarningPresentation(');
     expect(update).toContain('accessibilityRuntime.reducedSensory');
-    expect(update).toContain('warningPresentation.lightIntensity');
     expect(update).toContain('warningPresentation.skyFlash');
 
     const clearStart = main.indexOf('function clearFieldSupport()');
@@ -46,6 +45,6 @@ describe('Pass 71 dramatic Nuke warning integration', () => {
     expect(clear).toContain('nukeWarningBeacon.visible = false');
     expect(clear).toContain('nukeWarningCoreMaterial.opacity = 0');
     expect(clear).toContain('nukeWarningRingMaterial.opacity = 0');
-    expect(clear).toContain('nukeWarningLight.intensity = 0');
+    expect(clear).not.toContain('nukeWarningLight');
   });
 });

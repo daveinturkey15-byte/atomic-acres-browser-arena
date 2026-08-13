@@ -26,7 +26,6 @@ type NukeWarningSnapshot = Readonly<{
     scale: number;
     coreOpacity: number;
     ringOpacity: number;
-    lightIntensity: number;
   }>;
 }>;
 
@@ -117,7 +116,6 @@ test('renders the pre-detonation Nuke warning inside the Gun Range killstreak ro
   });
   expect(armed.warning!.coreOpacity).toBeGreaterThan(0);
   expect(armed.warning!.ringOpacity).toBeGreaterThan(0);
-  expect(armed.warning!.lightIntensity).toBeGreaterThan(0);
 
   const active = await page.screenshot({ path: resolve(output, 'gun-range-nuke-warning-1920x1080.png'), animations: 'disabled' });
   const raster = await redWarningDelta(before, active);

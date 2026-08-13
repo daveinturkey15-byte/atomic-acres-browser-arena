@@ -151,7 +151,6 @@ type DebugState = {
         scale: number;
         coreOpacity: number;
         ringOpacity: number;
-        lightIntensity: number;
         reducedSensory: boolean;
       };
     };
@@ -2122,7 +2121,7 @@ test.describe('solo mechanics', () => {
       shockwaveInScene: true,
       warningBeaconInScene: true,
       prewarmed: true,
-      dynamicLights: 1,
+      dynamicLights: 0,
     });
     await page.evaluate(() => {
       const flash = document.querySelector<HTMLElement>('#nuke-flash')!;
@@ -2157,7 +2156,6 @@ test.describe('solo mechanics', () => {
     expect(armed.nuke.warning.scale).toBeGreaterThanOrEqual(0.65);
     expect(armed.nuke.warning.coreOpacity).toBeGreaterThan(0);
     expect(armed.nuke.warning.ringOpacity).toBeGreaterThan(0);
-    expect(armed.nuke.warning.lightIntensity).toBeGreaterThan(0);
     await expect.poll(async () => (await debug(page)).fieldSupport.nukeDetonations, { timeout: 15_000 }).toBe(1);
     const detonated = (await debug(page)).fieldSupport;
     expect(detonated.explosionProfile.source).toBe('nuke');

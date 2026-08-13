@@ -445,7 +445,7 @@ function isImpactEvent(value: unknown): value is KillstreakImpactEvent {
     || !finite(value.impactAtMs, 0, Number.MAX_SAFE_INTEGER)
     || !finite(value.atMs, 0, Number.MAX_SAFE_INTEGER)) return false;
   if (value.source === 'chopper') return vec3(value.launchPosition) && (value.phase === 'drop'
-    ? value.impactAtMs - value.atMs === CHOPPER_MISSILE_FLIGHT_MS
+    ? Math.abs((value.impactAtMs - value.atMs) - CHOPPER_MISSILE_FLIGHT_MS) <= 1e-6
     : value.atMs === value.impactAtMs);
   if (value.launchPosition !== null) return false;
   return value.phase === 'drop' ? value.atMs <= value.impactAtMs : value.atMs >= value.impactAtMs;

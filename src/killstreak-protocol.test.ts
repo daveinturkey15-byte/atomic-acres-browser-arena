@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { parseKillstreakLoadout } from './killstreak-catalog';
-import { HostKillstreakRuntime, MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD } from './killstreak-runtime';
+import {
+  CHOPPER_MISSILE_FLIGHT_MS,
+  HostKillstreakRuntime,
+  MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD,
+} from './killstreak-runtime';
 import {
   admitKillstreakCareCaptureResultMessage,
   admitKillstreakStateMessage,
@@ -111,6 +115,23 @@ describe('killstreak protocol', () => {
       ],
     };
     expect(isKillstreakProtocolMessage(chopperMissile)).toBe(true);
+    const fractionalDropAtMs = 2_000.123456789;
+    expect(isKillstreakProtocolMessage({
+      ...chopperMissile,
+      impacts: [{
+        ...chopperMissile.impacts[0],
+        atMs: fractionalDropAtMs,
+        impactAtMs: fractionalDropAtMs + CHOPPER_MISSILE_FLIGHT_MS,
+      }],
+    })).toBe(true);
+    expect(isKillstreakProtocolMessage({
+      ...chopperMissile,
+      impacts: [{
+        ...chopperMissile.impacts[0],
+        atMs: fractionalDropAtMs,
+        impactAtMs: fractionalDropAtMs + CHOPPER_MISSILE_FLIGHT_MS + 0.001,
+      }],
+    })).toBe(false);
     expect(isKillstreakProtocolMessage({ ...chopperMissile, impacts: [{ ...chopperMissile.impacts[0], ordinal: 6 }] })).toBe(false);
     expect(isKillstreakProtocolMessage({ ...chopperMissile, impacts: [{ ...chopperMissile.impacts[0], atMs: 2_001 }] })).toBe(false);
     expect(isKillstreakProtocolMessage({ ...chopperMissile, impacts: [{ ...chopperMissile.impacts[1], atMs: 2_781 }] })).toBe(false);

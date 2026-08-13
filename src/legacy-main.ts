@@ -4180,9 +4180,7 @@ const nukeWarningRings = [0, 1, 2].map((index) => {
   ring.position.y = index * 0.55 - 0.55;
   return ring;
 });
-const nukeWarningLight = new THREE.PointLight(0xff4a22, 0, 32, 2);
-nukeWarningLight.name = 'pass71-nuke-warning-light';
-nukeWarningBeacon.add(nukeWarningCore, ...nukeWarningRings, nukeWarningLight);
+nukeWarningBeacon.add(nukeWarningCore, ...nukeWarningRings);
 nukeWarningBeacon.traverse((node) => { node.raycast = () => undefined; });
 let nukePresentationPrewarmed = false;
 
@@ -20841,7 +20839,6 @@ function beginNuke(now: number, authoritativeDamage = true): void {
   nukeWarningBeacon.scale.setScalar(0.65);
   nukeWarningCoreMaterial.opacity = 0.18;
   nukeWarningRingMaterial.opacity = 0.2;
-  nukeWarningLight.intensity = accessibilityRuntime.reducedSensory ? 1.25 : 3.5;
   nukeSequence = {
     startedAt: now,
     detonateAt: now + NUKE_WARNING_MS,
@@ -20866,7 +20863,6 @@ function detonateNuke(sequence: NukeSequence): void {
   const afterAudio = performance.now();
   sequence.shockwave.visible = true;
   sequence.warningBeacon.visible = false;
-  nukeWarningLight.intensity = 0;
   sequence.shockwave.scale.setScalar(0.1);
   const flash = element<HTMLElement>('#nuke-flash');
   flash.hidden = false;
@@ -20939,7 +20935,6 @@ function updateNuke(now: number): void {
     sequence.warningBeacon.rotation.y = warningPresentation.rotationY;
     nukeWarningCoreMaterial.opacity = warningPresentation.coreOpacity;
     nukeWarningRingMaterial.opacity = warningPresentation.ringOpacity;
-    nukeWarningLight.intensity = warningPresentation.lightIntensity;
     if (now >= sequence.detonateAt) detonateNuke(sequence);
     return;
   }
@@ -20956,7 +20951,6 @@ function updateNuke(now: number): void {
   if (now < sequence.finishedAt) return;
   sequence.shockwave.visible = false;
   sequence.warningBeacon.visible = false;
-  nukeWarningLight.intensity = 0;
   (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
   if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor);
@@ -21878,7 +21872,6 @@ function clearFieldSupport(): void {
   nukeWarningBeacon.visible = false;
   nukeWarningCoreMaterial.opacity = 0;
   nukeWarningRingMaterial.opacity = 0;
-  nukeWarningLight.intensity = 0;
   (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
   if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor);
@@ -27505,7 +27498,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         shockwaveInScene: nukeShockwave.parent === scene,
         warningBeaconInScene: nukeWarningBeacon.parent === scene,
         prewarmed: nukePresentationPrewarmed,
-        dynamicLights: 1,
+        dynamicLights: 0,
       },
       strikeMissiles: strikeMissiles.map((strike) => ({
         target: strike.target.toArray(),
@@ -27537,7 +27530,6 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
           scale: nukeSequence.warningBeacon.scale.x,
           coreOpacity: nukeWarningCoreMaterial.opacity,
           ringOpacity: nukeWarningRingMaterial.opacity,
-          lightIntensity: nukeWarningLight.intensity,
           reducedSensory: accessibilityRuntime.reducedSensory,
         },
       } : { active: false, detonated: false, detonateInMs: 0, finishInMs: 0 },

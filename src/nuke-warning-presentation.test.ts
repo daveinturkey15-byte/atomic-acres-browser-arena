@@ -21,10 +21,9 @@ describe('Pass 71 Nuke warning presentation', () => {
       expect(samples[index].rotationY).toBeGreaterThan(samples[index - 1].rotationY);
       expect(samples[index].coreOpacity).toBeGreaterThan(samples[index - 1].coreOpacity);
       expect(samples[index].ringOpacity).toBeGreaterThan(samples[index - 1].ringOpacity);
-      expect(samples[index].lightIntensity).toBeGreaterThan(samples[index - 1].lightIntensity);
       expect(samples[index].fogBlend).toBeGreaterThan(samples[index - 1].fogBlend);
     }
-    expect(samples.at(-1)).toMatchObject({ charge: 1, scale: 2.2, ringOpacity: 0.76, lightIntensity: 17.5 });
+    expect(samples.at(-1)).toMatchObject({ charge: 1, scale: 2.2, ringOpacity: 0.76 });
     expect(samples.at(-1)?.coreOpacity).toBeCloseTo(0.86, 10);
   });
 
@@ -32,7 +31,6 @@ describe('Pass 71 Nuke warning presentation', () => {
     const full = sampleNukeWarningPresentation(5_000, 5_000, false);
     const reduced = sampleNukeWarningPresentation(5_000, 5_000, true);
     expect(reduced.charge).toBe(1);
-    expect(reduced.lightIntensity).toBeLessThan(full.lightIntensity / 2);
     expect(reduced.coreOpacity).toBeLessThan(full.coreOpacity / 2);
     expect(reduced.rotationY).toBeLessThan(full.rotationY);
     expect(reduced.scale).toBeGreaterThan(1);

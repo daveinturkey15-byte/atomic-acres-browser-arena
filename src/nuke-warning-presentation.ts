@@ -6,7 +6,6 @@ export type NukeWarningPresentationSample = Readonly<{
   rotationY: number;
   coreOpacity: number;
   ringOpacity: number;
-  lightIntensity: number;
   skyFlash: number;
   fogBlend: number;
 }>;
@@ -25,7 +24,6 @@ export function sampleNukeWarningPresentation(
     rotationY: charge * Math.PI * (reducedSensory ? 0.35 : 1.5),
     coreOpacity: (0.18 + charge * 0.68) * sensoryScale,
     ringOpacity: (0.2 + charge * 0.56) * sensoryScale,
-    lightIntensity: (3.5 + charge * 14) * sensoryScale,
     skyFlash: Math.max(0, warningWave) * charge * 0.18 * sensoryScale,
     fogBlend: charge * 0.24,
   });

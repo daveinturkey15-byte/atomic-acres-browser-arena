@@ -164,7 +164,7 @@ test.describe('Pass 35 hitch-free explosions and Tri-Pass live targeting', () =>
       shockwaveInScene: true,
       warningBeaconInScene: true,
       prewarmed: true,
-      dynamicLights: 1,
+      dynamicLights: 0,
     });
     expect(state.render.contextLifecycle.lost).toBe(false);
     expect(errors).toEqual([]);
