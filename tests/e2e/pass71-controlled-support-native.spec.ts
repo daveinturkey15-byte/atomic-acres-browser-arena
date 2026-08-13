@@ -7,10 +7,11 @@ import { chopperMissileLaunchPosition } from '../../src/killstreak-runtime';
 
 const renderer = process.env.PASS71_CONTROLLED_SUPPORT_RENDERER === 'webgpu' ? 'webgpu' : 'webgl2';
 const requireWebGpu = renderer === 'webgpu' ? '&requireWebGPU=1' : '';
-// The runtime deadline stays MATCH_WARMUP_MS. A second warmup-length is only
-// the Node-side observation budget for the first post-deadline page frame when
-// the software renderer is delivering one frame per second.
-const MATCH_WARMUP_EVIDENCE_TIMEOUT_MS = MATCH_WARMUP_MS * 2;
+const MATCH_COUNTDOWN_CUE_COUNT = 4;
+// Solo continuity deliberately preserves each unseen 3/2/1/ENGAGE edge across
+// a starved presentation frame. Evidence budgets one unchanged warmup envelope
+// per required cue; the runtime warmup remains MATCH_WARMUP_MS.
+const MATCH_WARMUP_SCHEDULER_EVIDENCE_TIMEOUT_MS = MATCH_WARMUP_MS * MATCH_COUNTDOWN_CUE_COUNT;
 const loadout = Object.freeze({
   schemaVersion: 1,
   slots: ['care-package', 'piloted-drone', 'carpet-bomber', 'chopper', 'drone-swarm'],
@@ -47,6 +48,29 @@ async function chopperEntity(page: Page, entityId: string) {
       presentation: snapshot.killstreakPresentation,
     };
   }, entityId);
+}
+
+async function awaitSchedulerSafeMatchWarmupEvidence(page: Page) {
+  const handle = await page.waitForFunction((requiredCueCount) => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const snapshot = debug.snapshot() as any;
+    const admission = debug.admissionState() as any;
+    const countdown = snapshot.audio?.countdown;
+    if (snapshot.matchPhase !== 'active'
+      || !(admission.presentedGameplayFrame > 2)
+      || countdown?.cues !== requiredCueCount
+      || countdown.lastCue !== 'engage') return false;
+    return {
+      matchPhase: snapshot.matchPhase,
+      presentedGameplayFrame: admission.presentedGameplayFrame,
+      cues: countdown.cues,
+      lastCue: countdown.lastCue,
+    };
+  }, MATCH_COUNTDOWN_CUE_COUNT, {
+    timeout: MATCH_WARMUP_SCHEDULER_EVIDENCE_TIMEOUT_MS,
+    polling: 'raf',
+  });
+  return handle.jsonValue();
 }
 
 test(`${renderer}: trusted possessed support controls prove Chopper splash/missiles and exact-rig Piloted Drone sensing`, async ({ page }, testInfo) => {
@@ -108,16 +132,11 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
     readyFamilies: ['care', 'carpet', 'chopper', 'crate'],
     failures: {},
   });
-  await expect.poll(async () => page.evaluate(() => ({
-    matchPhase: (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).matchPhase,
-    presentedGameplayFrameAdvanced: window.__ATOMIC_ACRES_DEBUG__.admissionState().presentedGameplayFrame > 2,
-  })), {
-    timeout: MATCH_WARMUP_EVIDENCE_TIMEOUT_MS,
-    intervals: [50, 100, 250],
-    message: 'the unchanged match warmup must advance after support readiness',
-  }).toMatchObject({
+  expect(await awaitSchedulerSafeMatchWarmupEvidence(page)).toMatchObject({
     matchPhase: 'active',
-    presentedGameplayFrameAdvanced: true,
+    presentedGameplayFrame: expect.any(Number),
+    cues: MATCH_COUNTDOWN_CUE_COUNT,
+    lastCue: 'engage',
   });
   await page.evaluate(() => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;

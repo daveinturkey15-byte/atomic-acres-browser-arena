@@ -112,6 +112,15 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(presentation).toContain("'chopper-impact-action'");
     expect(e2e).toContain('const visibleBounds = detail.stableAirframeBounds;');
     expect(e2e).toContain('const visibleBounds = detail.drawableStableAirframeBounds;');
+    const exteriorBootstrap = e2e.slice(
+      e2e.indexOf('const roughExteriorPose'),
+      e2e.indexOf('const exteriorPose'),
+    );
+    expect(exteriorBootstrap).toContain('deterministicReview.presentedCamera');
+    expect(exteriorBootstrap).toContain('receipt.reviewedChopper.drawableStableMeshCount > 0');
+    expect(exteriorBootstrap).toContain('Boolean(receipt.reviewedChopper.drawableStableBounds)');
+    expect(exteriorBootstrap.indexOf('const visibleBounds = detail.stableAirframeBounds;'))
+      .toBeLessThan(exteriorBootstrap.indexOf('deterministicReview.presentedCamera'));
     expect(e2e).toContain('receipt.reviewedChopper.drawableStableMeshCount > 0');
     expect(e2e).toContain('rasterVisibility.visiblePixelRatio');
     expect(e2e).toContain('rasterVisibility.maximumLuminance');
@@ -209,6 +218,10 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
   });
 
   it('proves real LMB splash, real RMB cadence/hardpoints, and one exact Piloted Drone rig', () => {
+    expect(controlledSupportE2e).toContain('awaitSchedulerSafeMatchWarmupEvidence(page)');
+    expect(controlledSupportE2e).toContain('MATCH_WARMUP_SCHEDULER_EVIDENCE_TIMEOUT_MS');
+    expect(controlledSupportE2e).toContain("countdown.lastCue !== 'engage'");
+    expect(controlledSupportE2e).not.toContain('MATCH_WARMUP_EVIDENCE_TIMEOUT_MS');
     for (const token of [
       "page.mouse.down({ button: 'left' })",
       "page.mouse.down({ button: 'right' })",

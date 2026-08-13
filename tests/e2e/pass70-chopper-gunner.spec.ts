@@ -375,7 +375,7 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
     const horizontalDistanceM = Math.hypot(candidate.x - target[0], candidate.z - target[2]);
     const cameraYaw = Math.atan2(candidate.x - target[0], candidate.z - target[2]);
     const cameraPitch = Math.atan2(target[1] - cameraY, horizontalDistanceM);
-    window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(
+    const captureRevision = window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(
       candidate.x,
       cameraY,
       candidate.z,
@@ -383,6 +383,7 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       cameraPitch,
       50,
     );
+    if (captureRevision === null) throw new Error('Rough authored Chopper evidence camera was not admitted');
     return {
       entityId: entity.id,
       worldPosition: [x, y, z],
@@ -398,15 +399,24 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       visibleSpan,
       inTestBay,
       nearestWall,
+      captureRevision,
     };
   });
-  await page.waitForFunction(() => {
-    const detail = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).killstreakPresentation.entityDetails
-      .find((entry: any) => entry.poolKey === 'chopper');
-    return detail?.visible === true
-      && detail.presentationSource === 'project-original-blender-glb'
-      && detail.activeLodIndex === 0;
-  }, undefined, { timeout: 5_000 });
+  await page.waitForFunction(({ entityId, captureRevision }) => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const presentedGameplayFrame = (debug.admissionState() as any).presentedGameplayFrame;
+    const receipt = (debug.snapshot() as any).deterministicReview.presentedCamera;
+    return receipt?.captureRevision === captureRevision
+      && receipt.frame === presentedGameplayFrame
+      && receipt.reviewedChopper?.entityId === entityId
+      && receipt.reviewedChopper.rootVisible === true
+      && receipt.reviewedChopper.activeLodIndex === 0
+      && receipt.reviewedChopper.drawableStableMeshCount > 0
+      && Boolean(receipt.reviewedChopper.drawableStableBounds);
+  }, {
+    entityId: roughExteriorPose.entityId,
+    captureRevision: roughExteriorPose.captureRevision,
+  }, { timeout: 8_000, polling: 16 });
   const exteriorPose = await page.evaluate((roughPose) => {
     const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
     const detail = snapshot.killstreakPresentation.entityDetails
