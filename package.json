@@ -71,6 +71,8 @@
     "qa:pass71:hf301-renderer-progress": "npm run qa:pass71:hf301-renderer-progress:contract && node scripts/qa/run-pass71-hf301-renderer-progress-evidence.mjs",
     "qa:pass71:hf306-cockpit:contract": "node --test scripts/qa/pass71-hf306-cockpit-evidence-contract.test.mjs",
     "qa:pass71:hf306-cockpit": "npm run qa:pass71:hf306-cockpit:contract && node scripts/qa/run-pass71-hf306-cockpit-evidence.mjs",
+    "qa:pass71:hf312-bounded-consolidation:contract": "node --test scripts/qa/pass71-hf312-bounded-consolidation-evidence-contract.test.mjs",
+    "qa:pass71:hf312-bounded-consolidation": "npm run qa:pass71:hf312-bounded-consolidation:contract && node scripts/qa/run-pass71-hf312-bounded-consolidation-evidence.mjs",
     "qa:pass71:native-browser-parity:contract": "node --test scripts/qa/pass71-native-browser-parity-contract.test.mjs",
     "qa:pass71:native-browser-parity": "npm run qa:pass71:native-browser-parity:contract && node scripts/qa/run-pass71-native-browser-parity.mjs",
     "qa:pass71:atomic-quality-baseline:contract": "node --test scripts/qa/pass71-atomic-quality-baseline.test.mjs",
