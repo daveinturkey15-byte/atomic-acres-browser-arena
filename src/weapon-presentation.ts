@@ -91,6 +91,7 @@ type RiggedViewArm = FirstPersonArmChain & {
   bindShoulderScale: THREE.Vector3;
   bindElbowScale: THREE.Vector3;
   bindWristScale: THREE.Vector3;
+  proximalSleeveContinuation: THREE.Mesh;
 };
 type ViewArmRig = {
   side: 'left' | 'right';
@@ -327,6 +328,12 @@ export const FIRST_PERSON_ARM_PROPORTION_CONTRACT = 'authored-fixed-length-stron
 /** Uniform root scaling preserves the authored skeleton, palms and joint radii. */
 export const FIRST_PERSON_ARM_UNIFORM_SCALE = 1.12;
 export const FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT = 'fixed-length-reachable-shoulders-continuous-sleeve-crop-v3';
+export const FIRST_PERSON_PROXIMAL_SLEEVE_CONTINUATION_CONTRACT = 'shoulder-bound-authored-pbr-lower-crop-continuation-v1';
+export const FIRST_PERSON_ARM_BRANCH_CROP_NDC_Y = -1.05;
+const FIRST_PERSON_ARM_CONTINUATION_TARGET_NDC_Y = -1.3;
+const FIRST_PERSON_ARM_CONTINUATION_LATERAL_NDC = 0.22;
+const FIRST_PERSON_ARM_CONTINUATION_ANCHOR_FRACTION = 0.18;
+const FIRST_PERSON_ARM_CONTINUATION_AXIS = Object.freeze(new THREE.Vector3(0, 1, 0));
 export const FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC = Object.freeze({
   left: -1.12,
   right: -1.07,
@@ -805,6 +812,55 @@ function tuneAuthoredFirstPersonArmMaterials(root: THREE.Object3D, flattenMateri
   root.userData.armMaterialPresentationAdjusted = adjusted;
 }
 
+function authoredFirstPersonSleeveMaterial(root: THREE.Object3D): THREE.Material | null {
+  let sleeve: THREE.Material | null = null;
+  root.traverse((node) => {
+    if (sleeve || !(node instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    sleeve = materials.find((material) => material.name.toLowerCase().includes('arms_sleeve')) ?? null;
+  });
+  return sleeve;
+}
+
+function createFirstPersonProximalSleeveContinuation(
+  chain: FirstPersonArmChain,
+  material: THREE.Material,
+  flattenMaterials: boolean,
+): THREE.Mesh {
+  const authoredUpperLength = Math.max(0.01, chain.elbow.position.length());
+  const geometry = new THREE.CylinderGeometry(
+    authoredUpperLength * 0.42,
+    authoredUpperLength * 0.32,
+    1,
+    flattenMaterials ? 8 : 16,
+    2,
+    false,
+  );
+  const continuation = new THREE.Mesh(geometry, material);
+  continuation.name = `${chain.side}-proximal-sleeve-continuation`;
+  continuation.castShadow = false;
+  continuation.receiveShadow = false;
+  continuation.frustumCulled = false;
+  continuation.userData.contract = FIRST_PERSON_PROXIMAL_SLEEVE_CONTINUATION_CONTRACT;
+  continuation.userData.side = chain.side;
+  continuation.userData.authoredSleeveMaterial = true;
+  continuation.userData.anchorFraction = FIRST_PERSON_ARM_CONTINUATION_ANCHOR_FRACTION;
+  // Give retained-asset/GPU prewarm a valid, connected bind transform. The live
+  // camera-aware endpoint is updated after IK without changing any bone/socket.
+  const anchor = chain.elbow.position.clone().multiplyScalar(FIRST_PERSON_ARM_CONTINUATION_ANCHOR_FRACTION);
+  const target = new THREE.Vector3(
+    (chain.side === 'right' ? 1 : -1) * authoredUpperLength * 0.5,
+    -authoredUpperLength * 1.5,
+    authoredUpperLength * 0.12,
+  );
+  const direction = target.clone().sub(anchor);
+  continuation.position.addVectors(anchor, target).multiplyScalar(0.5);
+  continuation.quaternion.setFromUnitVectors(FIRST_PERSON_ARM_CONTINUATION_AXIS as THREE.Vector3, direction.normalize());
+  continuation.scale.set(1, anchor.distanceTo(target), 1);
+  chain.shoulder.add(continuation);
+  return continuation;
+}
+
 function weaponHipYaw(weapon: WeaponId): number {
   return weapon === 'carbine'
     ? 0.18
@@ -993,6 +1049,12 @@ export class WeaponPresentation {
     diagnosticPalm: new THREE.Vector3(),
     diagnosticElbowToShoulder: new THREE.Vector3(),
     diagnosticElbowToWrist: new THREE.Vector3(),
+    continuationShoulderWorld: new THREE.Vector3(),
+    continuationShoulderNdc: new THREE.Vector3(),
+    continuationTargetWorld: new THREE.Vector3(),
+    continuationTargetLocal: new THREE.Vector3(),
+    continuationAnchorLocal: new THREE.Vector3(),
+    continuationDirectionLocal: new THREE.Vector3(),
     meleeRestWristLocal: new THREE.Vector3(),
     meleeGuardTargetLocal: new THREE.Vector3(),
     meleeWristTargetLocal: new THREE.Vector3(),
@@ -1568,6 +1630,10 @@ export class WeaponPresentation {
         throw new Error('Pass 65 authored first-person arms failed the two-chain release contract');
       }
       tuneAuthoredFirstPersonArmMaterials(authoredArms.root, this.flattenMaterials);
+      const authoredSleeveMaterial = authoredFirstPersonSleeveMaterial(authoredArms.root);
+      if (!authoredSleeveMaterial) {
+        throw new Error('Pass 71 authored first-person arms are missing their sleeve PBR material');
+      }
       const fallbackArms = this.root.getObjectByName('first-person-arms');
       if (fallbackArms) this.root.remove(fallbackArms);
       this.armRigs.length = 0;
@@ -1585,6 +1651,11 @@ export class WeaponPresentation {
           bindShoulderScale: chain.shoulder.scale.clone(),
           bindElbowScale: chain.elbow.scale.clone(),
           bindWristScale: chain.wrist.scale.clone(),
+          proximalSleeveContinuation: createFirstPersonProximalSleeveContinuation(
+            chain,
+            authoredSleeveMaterial,
+            this.flattenMaterials,
+          ),
         });
       }
       this.riggedFingerBones.push(...authoredArms.fingers);
@@ -3110,6 +3181,23 @@ export class WeaponPresentation {
         rig.side,
         measureSkinnedBranchCameraFraming(arms, this.camera, rig.shoulder),
       ])) : null,
+      proximalSleeveContinuations: this.riggedArmRigs.map((rig) => {
+        const material = Array.isArray(rig.proximalSleeveContinuation.material)
+          ? rig.proximalSleeveContinuation.material[0]
+          : rig.proximalSleeveContinuation.material;
+        return {
+          contract: rig.proximalSleeveContinuation.userData.contract,
+          side: rig.side,
+          mesh: rig.proximalSleeveContinuation.name,
+          parent: rig.proximalSleeveContinuation.parent?.name ?? null,
+          material: material?.name ?? null,
+          materialKind: material?.type ?? null,
+          authoredSleeveMaterial: rig.proximalSleeveContinuation.userData.authoredSleeveMaterial === true,
+          opaque: material?.transparent === false && material.opacity === 1 && material.depthWrite === true,
+          targetNdcY: FIRST_PERSON_ARM_CONTINUATION_TARGET_NDC_Y,
+          minimumBranchNdcY: FIRST_PERSON_ARM_BRANCH_CROP_NDC_Y,
+        };
+      }),
       weaponFraming: model?.visible ? measureCameraFraming(model, this.camera) : null,
       meleeKnifeFraming: this.meleeKnife.visible ? measureCameraFraming(this.meleeKnife, this.camera) : null,
       viewmodelViewport: {
@@ -3623,6 +3711,49 @@ export class WeaponPresentation {
     }
   }
 
+  /**
+   * Extends each authored upper sleeve from its solved shoulder toward a stable
+   * below-frame torso entry. This is presentation-only geometry: grip sockets,
+   * bone lengths, IK targets, camera aim and shot authority are untouched.
+   */
+  private updateRiggedArmSleeveContinuations(): void {
+    const scratch = this.riggedArmSolveScratch;
+    for (const rig of this.riggedArmRigs) {
+      const continuation = rig.proximalSleeveContinuation;
+      const shoulderWorld = rig.shoulder.getWorldPosition(scratch.continuationShoulderWorld);
+      const shoulderNdc = scratch.continuationShoulderNdc.copy(shoulderWorld).project(this.camera);
+      if (!Number.isFinite(shoulderNdc.x)
+        || !Number.isFinite(shoulderNdc.y)
+        || !Number.isFinite(shoulderNdc.z)) {
+        continuation.visible = false;
+        continue;
+      }
+      shoulderNdc.x = THREE.MathUtils.clamp(
+        shoulderNdc.x + (rig.side === 'right' ? FIRST_PERSON_ARM_CONTINUATION_LATERAL_NDC : -FIRST_PERSON_ARM_CONTINUATION_LATERAL_NDC),
+        -0.82,
+        0.82,
+      );
+      shoulderNdc.y = FIRST_PERSON_ARM_CONTINUATION_TARGET_NDC_Y;
+      const targetWorld = scratch.continuationTargetWorld.copy(shoulderNdc).unproject(this.camera);
+      const targetLocal = rig.shoulder.worldToLocal(scratch.continuationTargetLocal.copy(targetWorld));
+      const anchorLocal = scratch.continuationAnchorLocal.copy(rig.bindElbowPosition)
+        .multiplyScalar(FIRST_PERSON_ARM_CONTINUATION_ANCHOR_FRACTION);
+      const directionLocal = scratch.continuationDirectionLocal.subVectors(targetLocal, anchorLocal);
+      const length = directionLocal.length();
+      if (!Number.isFinite(length) || length <= 1e-5) {
+        continuation.visible = false;
+        continue;
+      }
+      continuation.visible = true;
+      continuation.position.addVectors(anchorLocal, targetLocal).multiplyScalar(0.5);
+      continuation.quaternion.setFromUnitVectors(
+        FIRST_PERSON_ARM_CONTINUATION_AXIS as THREE.Vector3,
+        directionLocal.multiplyScalar(1 / length),
+      );
+      continuation.scale.set(1, length, 1);
+    }
+  }
+
   private solveRiggedArms(activeModel: THREE.Object3D | undefined, reloadPose: ReloadPose): void {
     if (this.riggedArmRigs.length === 0) return;
     this.restoreRiggedArmBindPose();
@@ -4104,6 +4235,7 @@ export class WeaponPresentation {
     this.centerSightReference(activeModel);
     if (arms && !meleeActive) this.solveArms(arms, activeModel, reloadPose);
     if (!authoredMeleeActive) this.solveRiggedArms(activeModel, reloadPose);
+    if (this.authoredArmsRoot) this.updateRiggedArmSleeveContinuations();
     // The conservative position cap and authored contact retreat above are the
     // live near-plane contract.
     // Exact skinned bounds remain available to admission/diagnostic probes, but

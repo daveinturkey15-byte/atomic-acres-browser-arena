@@ -115,7 +115,15 @@ export function measureSkinnedBranchCameraFraming(
   const localVertex = new THREE.Vector3();
   const worldVertex = new THREE.Vector3();
   object.traverse((child) => {
-    if (!(child instanceof THREE.SkinnedMesh) || !effectivelyVisibleWithin(child, object)) return;
+    if (!(child instanceof THREE.Mesh) || !effectivelyVisibleWithin(child, object)) return;
+    if (!(child instanceof THREE.SkinnedMesh)) {
+      let ancestor: THREE.Object3D | null = child;
+      while (ancestor && ancestor !== branchRoot) ancestor = ancestor.parent;
+      if (ancestor !== branchRoot) return;
+      if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
+      if (child.geometry.boundingBox) bounds.union(child.geometry.boundingBox.clone().applyMatrix4(child.matrixWorld));
+      return;
+    }
     const position = child.geometry.getAttribute('position');
     const skinIndex = child.geometry.getAttribute('skinIndex');
     const skinWeight = child.geometry.getAttribute('skinWeight');

@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import {
   characterActionContract,
   measureCameraFraming,
+  measureSkinnedBranchCameraFraming,
   objectLocalGeometryBounds,
   resolveSocketWorld,
 } from './character-presentation-contract';
@@ -141,5 +142,25 @@ describe('character presentation contracts', () => {
       intersectsViewport: true,
       fullyInsideViewport: true,
     });
+  });
+
+  it('includes only the selected shoulder-bound continuation in per-arm framing', () => {
+    const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100);
+    const assembly = new THREE.Group();
+    const leftShoulder = new THREE.Bone(); leftShoulder.name = 'UpperArmL'; leftShoulder.position.z = -1;
+    const rightShoulder = new THREE.Bone(); rightShoulder.name = 'UpperArmR'; rightShoulder.position.z = -1;
+    const leftContinuation = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.7, 0.16));
+    leftContinuation.position.set(-0.2, -0.75, 0);
+    const unrelatedRightGeometry = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 0.2));
+    unrelatedRightGeometry.position.set(4, 4, 0);
+    leftShoulder.add(leftContinuation);
+    rightShoulder.add(unrelatedRightGeometry);
+    assembly.add(leftShoulder, rightShoulder);
+
+    const framing = measureSkinnedBranchCameraFraming(assembly, camera, leftShoulder);
+
+    expect(framing).toMatchObject({ finite: true, nearPlaneClear: true, intersectsViewport: true });
+    expect(framing!.ndcMin[1]).toBeLessThanOrEqual(-1.05);
+    expect(framing!.ndcMax[0]).toBeLessThan(0);
   });
 });

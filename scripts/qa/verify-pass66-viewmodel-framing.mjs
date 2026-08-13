@@ -72,6 +72,26 @@ function framingViolations(label, framing, requireNearPlane = true) {
   return violations;
 }
 
+function independentArmCropViolations(label, presentation) {
+  const violations = [];
+  for (const [side, suffix] of [['left', 'L'], ['right', 'R']]) {
+    const branch = presentation?.armBranchFraming?.[side];
+    const continuation = presentation?.proximalSleeveContinuations?.find((entry) => entry.side === side);
+    violations.push(...framingViolations(`${label}/${side}-branch`, branch));
+    if (branch?.ndcMin?.[1] > -1.05) {
+      violations.push(`${label}: ${side} sleeve ends inside the viewport at ${branch.ndcMin[1]} NDC`);
+    }
+    if (continuation?.contract !== 'shoulder-bound-authored-pbr-lower-crop-continuation-v1'
+      || continuation?.parent !== `UpperArm${suffix}`
+      || continuation?.materialKind !== 'MeshStandardMaterial'
+      || continuation?.authoredSleeveMaterial !== true
+      || continuation?.opaque !== true) {
+      violations.push(`${label}: ${side} authored proximal sleeve continuation is invalid`);
+    }
+  }
+  return violations;
+}
+
 function presentationViolations(label, presentation, melee) {
   const violations = [];
   if (presentation?.weapon === 'm4a1') {
@@ -96,6 +116,7 @@ function presentationViolations(label, presentation, melee) {
     violations.push(`${label}: opaque depth-writing arm material contract failed`);
   }
   violations.push(...framingViolations(`${label}/arms`, presentation?.armFraming));
+  violations.push(...independentArmCropViolations(label, presentation));
   if (!melee) violations.push(...framingViolations(`${label}/weapon`, presentation?.weaponFraming));
   if (!melee) {
     for (const side of ['right', 'left']) {
@@ -173,6 +194,7 @@ function temporalActionViolations(label, presentation, action, progress) {
     violations.push(`${label}: opaque depth-writing arm material contract failed`);
   }
   violations.push(...framingViolations(`${label}/arms`, presentation?.armFraming));
+  violations.push(...independentArmCropViolations(label, presentation));
   violations.push(...framingViolations(`${label}/knife`, presentation?.meleeKnifeFraming));
   if (presentation?.meleeKnifeFraming?.fullyInsideViewport !== true
     && (presentation?.meleeKnifeFraming?.ndcMin?.[1] ?? -2) < -1.015) {

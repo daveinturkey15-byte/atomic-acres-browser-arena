@@ -1058,6 +1058,18 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(sleeveFixture).toBeInstanceOf(THREE.Mesh);
     expect(((sleeveFixture as THREE.Mesh).material as THREE.MeshStandardMaterial).normalScale.toArray())
       .toEqual([1, 1]);
+    for (const [side, suffix] of [['left', 'L'], ['right', 'R']] as const) {
+      const shoulder = arms?.getObjectByName(`UpperArm${suffix}`);
+      const continuation = arms?.getObjectByName(`${side}-proximal-sleeve-continuation`);
+      expect(continuation, `${side} shoulder-bound sleeve continuation`).toBeInstanceOf(THREE.Mesh);
+      expect(continuation?.parent).toBe(shoulder);
+      expect((continuation as THREE.Mesh).material).toBe((sleeveFixture as THREE.Mesh).material);
+      expect(continuation?.userData).toMatchObject({
+        contract: 'shoulder-bound-authored-pbr-lower-crop-continuation-v1',
+        side,
+        authoredSleeveMaterial: true,
+      });
+    }
 
     presentation.melee();
     presentation.setMeleeCaptureProgress(0.42);
@@ -1078,6 +1090,18 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       knifeVisible: true,
     });
     expect(active.authoredMeleeGripError).toBeLessThan(1e-6);
+    expect(active.proximalSleeveContinuations).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        side: 'left', contract: 'shoulder-bound-authored-pbr-lower-crop-continuation-v1',
+        materialKind: 'MeshStandardMaterial', authoredSleeveMaterial: true, opaque: true,
+      }),
+      expect.objectContaining({
+        side: 'right', contract: 'shoulder-bound-authored-pbr-lower-crop-continuation-v1',
+        materialKind: 'MeshStandardMaterial', authoredSleeveMaterial: true, opaque: true,
+      }),
+    ]));
+    expect(active.armBranchFraming?.left?.ndcMin[1]).toBeLessThanOrEqual(-1.05);
+    expect(active.armBranchFraming?.right?.ndcMin[1]).toBeLessThanOrEqual(-1.05);
     expect(arms?.getObjectByName('pass70-left-forearm-volume-reinforcement')).toBeUndefined();
     expect(arms?.getObjectByName('pass70-right-forearm-volume-reinforcement')).toBeUndefined();
     expect(active.riggedArms).toEqual(expect.arrayContaining([

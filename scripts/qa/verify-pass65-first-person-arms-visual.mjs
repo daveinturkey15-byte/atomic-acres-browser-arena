@@ -38,6 +38,8 @@ function fatalBrowserErrors(errors) {
 }
 
 const finiteArray = (values) => Array.isArray(values) && values.every(Number.isFinite);
+const minimumArmBranchNdcY = -1.05;
+const proximalSleeveContract = 'shoulder-bound-authored-pbr-lower-crop-continuation-v1';
 
 function presentationViolations(label, state) {
   const violations = [];
@@ -63,13 +65,17 @@ function presentationViolations(label, state) {
   const branchFraming = presentation.armBranchFraming;
   for (const side of ['left', 'right']) {
     const branch = branchFraming?.[side];
+    const continuation = presentation.proximalSleeveContinuations?.find((entry) => entry.side === side);
+    if (continuation?.contract !== proximalSleeveContract
+      || continuation?.parent !== `UpperArm${side === 'left' ? 'L' : 'R'}`
+      || continuation?.materialKind !== 'MeshStandardMaterial'
+      || continuation?.authoredSleeveMaterial !== true
+      || continuation?.opaque !== true) {
+      violations.push(`${label}/${side}: authored proximal sleeve continuation is invalid ${JSON.stringify(continuation)}`);
+    }
     if (!branch?.finite || !branch?.nearPlaneClear || !branch?.intersectsViewport) {
       violations.push(`${label}/${side}: deformed branch framing is missing, clipped, or offscreen`);
-    } else if (branch.ndcMin?.[1] > -1.05 && branch.ndcMax?.[1] < -0.42) {
-      // A fully visible support upper arm is legitimate when fixed human bone
-      // lengths and palm contact place its shoulder inside the lower frame.
-      // Reject only a detached stump: an in-frame branch must visibly continue
-      // upward into its connected hand/weapon rather than ending mid-screen.
+    } else if (branch.ndcMin?.[1] > minimumArmBranchNdcY) {
       violations.push(`${label}/${side}: detached sleeve envelope ${JSON.stringify(branch)}`);
     }
   }
@@ -145,6 +151,7 @@ function evidenceFor(label, state, screenshot, cadence = null) {
     authoredArmAnimation: presentation.authoredArmAnimation,
     armFraming: presentation.armFraming,
     armBranchFraming: presentation.armBranchFraming,
+    proximalSleeveContinuations: presentation.proximalSleeveContinuations,
     importedModel: presentation.importedModel,
     meleeKnifeFraming: presentation.meleeKnifeFraming,
     viewmodelViewport: presentation.viewmodelViewport,
