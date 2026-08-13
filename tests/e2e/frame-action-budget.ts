@@ -3,6 +3,8 @@ import type { Page } from '@playwright/test';
 export const TARGET_FRAME_BUDGET_MS = 1_000 / 60;
 export const BASELINE_OBSERVATION_MS = 350;
 export const MINIMUM_BASELINE_FRAME_SAMPLES = 10;
+export const MINIMUM_NATIVE_ACTION_FRAME_SAMPLES = MINIMUM_BASELINE_FRAME_SAMPLES;
+export const MINIMUM_SOFTWARE_CI_ACTION_FRAME_SAMPLES = 2;
 export const BASELINE_CAPTURE_DEADLINE_MS = 2_000;
 export const MAXIMUM_BASELINE_P95_FRAME_BUDGETS = 1.5;
 export const MAXIMUM_BASELINE_GAP_FRAME_BUDGETS = 3;
@@ -11,6 +13,27 @@ export const MINIMUM_ACTION_FRAME_BUDGETS = 2;
 export const MAXIMUM_ACTION_FRAME_BUDGETS = 3;
 export const ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS = 1;
 export const MAXIMUM_SYNCHRONOUS_ACTION_FRAME_BUDGETS = 2;
+
+export const NATIVE_NO_FREEZE_FRAME_ACTION_MODE = 'native-no-freeze';
+export const SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE = 'software-ci-semantic';
+export const REQUIRED_RELEASE_ACCEPTANCE_FRAME_ACTION_MODE = NATIVE_NO_FREEZE_FRAME_ACTION_MODE;
+
+export type FrameActionEvidenceMode =
+  | typeof NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+  | typeof SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE;
+
+export type FrameActionReleaseAcceptanceIdentity = Readonly<{
+  evidenceMode: FrameActionEvidenceMode;
+  expectedSourceSha: string | undefined;
+  checkoutSourceSha: string | undefined;
+  servedSourceSha: string | undefined;
+  renderer: 'webgl2' | 'webgpu';
+  browserChannel: 'msedge' | 'configured-chromium';
+  browserUserAgent: string;
+  installedBrowser: boolean;
+  softwareAdapter: boolean | undefined;
+  adapterLabel: string | undefined;
+}>;
 
 export type FrameActionBaseline = Readonly<{
   label: string;
@@ -36,10 +59,28 @@ export type FrameActionBaseline = Readonly<{
 }>;
 
 export type FrameActionBudget = Readonly<{
+  evidenceMode: FrameActionEvidenceMode;
+  releaseAcceptanceModeEligible: boolean;
   targetFrameBudgetMs: number;
   maximumActionMs: number;
   maximumSynchronousActionMs: number;
+  maximumFrameWorkMs: number;
+  maximumAnimationFrameGapMs: number;
+  maximumFirstSubmissionDelayMs: number;
+  maximumFirstCompletionDelayMs: number;
+  maximumPendingForMs: number;
   referenceBaselineMs: number;
+}>;
+
+export type FrameActionMeasurement = Readonly<{
+  internalHandlerSyncMs: number;
+  outerHandlerSyncMs: number;
+  eventToNextAnimationFrameMs: number;
+  maximumAnimationFrameGapMs: number;
+  maximumFrameWorkMs: number;
+  maximumPendingForMs: number;
+  firstSubmissionDelayMs: number;
+  firstCompletionDelayMs: number;
 }>;
 
 function rounded(value: number): number {
@@ -55,7 +96,65 @@ function requireFiniteNonNegative(value: number, label: string): void {
   if (!Number.isFinite(value) || value < 0) throw new Error(`${label} must be finite and non-negative`);
 }
 
-export function deriveFrameActionBudget(baseline: FrameActionBaseline): FrameActionBudget {
+export function resolveFrameActionEvidenceMode(value: string | undefined): FrameActionEvidenceMode {
+  if (value === undefined || value === '' || value === NATIVE_NO_FREEZE_FRAME_ACTION_MODE) {
+    return NATIVE_NO_FREEZE_FRAME_ACTION_MODE;
+  }
+  if (value === SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE) return SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE;
+  throw new Error(`Unknown frame-action evidence mode: ${value}`);
+}
+
+export function assertFrameActionEvidenceEnvironment(
+  evidenceMode: FrameActionEvidenceMode,
+  continuousIntegration: boolean,
+): void {
+  if (evidenceMode === SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE && !continuousIntegration) {
+    throw new Error('software-ci-semantic frame-action evidence is CI-only');
+  }
+}
+
+const SOFTWARE_ADAPTER_PATTERN = /swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic/iu;
+const SOURCE_SHA_PATTERN = /^[a-f0-9]{40}$/u;
+
+export function minimumActionFrameSamples(evidenceMode: FrameActionEvidenceMode): number {
+  return evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+    ? MINIMUM_NATIVE_ACTION_FRAME_SAMPLES
+    : MINIMUM_SOFTWARE_CI_ACTION_FRAME_SAMPLES;
+}
+
+export function frameActionReleaseAcceptanceFailures(
+  identity: FrameActionReleaseAcceptanceIdentity,
+): readonly string[] {
+  const failures: string[] = [];
+  if (identity.evidenceMode !== REQUIRED_RELEASE_ACCEPTANCE_FRAME_ACTION_MODE) {
+    failures.push('native-no-freeze evidence mode required');
+  }
+  if (!SOURCE_SHA_PATTERN.test(identity.expectedSourceSha ?? '')
+    || identity.checkoutSourceSha !== identity.expectedSourceSha
+    || identity.servedSourceSha !== identity.expectedSourceSha) {
+    failures.push('exact expected checkout and served source SHA required');
+  }
+  if (identity.renderer !== 'webgpu') failures.push('WebGPU renderer required');
+  if (!identity.installedBrowser || identity.browserChannel !== 'msedge'
+    || !/Edg\//u.test(identity.browserUserAgent)) {
+    failures.push('installed Edge identity required');
+  }
+  if (identity.softwareAdapter !== false
+    || typeof identity.adapterLabel !== 'string'
+    || identity.adapterLabel.trim() === ''
+    || SOFTWARE_ADAPTER_PATTERN.test(identity.adapterLabel)) {
+    failures.push('non-software adapter identity required');
+  }
+  return failures;
+}
+
+export function frameActionReleaseAcceptanceEligible(
+  identity: FrameActionReleaseAcceptanceIdentity,
+): boolean {
+  return frameActionReleaseAcceptanceFailures(identity).length === 0;
+}
+
+function validateCompletedFrameActionBaseline(baseline: FrameActionBaseline): void {
   for (const [label, value] of [
     ['observationMs', baseline.observationMs],
     ['p50GapMs', baseline.p50GapMs],
@@ -92,14 +191,26 @@ export function deriveFrameActionBudget(baseline: FrameActionBaseline): FrameAct
     || baseline.endingCompletedSequence < baseline.targetSubmissionSequence) {
     throw new Error(`${baseline.label} did not advance a healthy completed presentation frontier`);
   }
+}
+
+export function deriveFrameActionBudget(
+  baseline: FrameActionBaseline,
+  evidenceMode: FrameActionEvidenceMode = NATIVE_NO_FREEZE_FRAME_ACTION_MODE,
+): FrameActionBudget {
+  if (evidenceMode !== NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+    && evidenceMode !== SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE) {
+    throw new Error(`Unknown frame-action evidence mode: ${String(evidenceMode)}`);
+  }
+  validateCompletedFrameActionBaseline(baseline);
 
   const maximumBaselineP95Ms = TARGET_FRAME_BUDGET_MS * MAXIMUM_BASELINE_P95_FRAME_BUDGETS;
   const maximumBaselineGapMs = TARGET_FRAME_BUDGET_MS * MAXIMUM_BASELINE_GAP_FRAME_BUDGETS;
   const maximumBaselineCompletionMs = TARGET_FRAME_BUDGET_MS
     * MAXIMUM_BASELINE_COMPLETION_FRAME_BUDGETS;
-  if (baseline.p95GapMs >= maximumBaselineP95Ms
-    || baseline.maximumGapMs >= maximumBaselineGapMs
-    || baseline.firstCompletionDelayMs >= maximumBaselineCompletionMs) {
+  if (evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+    && (baseline.p95GapMs >= maximumBaselineP95Ms
+      || baseline.maximumGapMs >= maximumBaselineGapMs
+      || baseline.firstCompletionDelayMs >= maximumBaselineCompletionMs)) {
     throw new Error(
       `${baseline.label} baseline is already outside the no-freeze envelope: ${JSON.stringify({
         p95GapMs: baseline.p95GapMs,
@@ -125,14 +236,63 @@ export function deriveFrameActionBudget(baseline: FrameActionBaseline): FrameAct
       referenceBaselineMs + TARGET_FRAME_BUDGET_MS * ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS,
     ),
   );
+  const relativeAllowanceMs = TARGET_FRAME_BUDGET_MS * ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS;
+  const softwareSemanticThresholds = Object.freeze({
+    maximumAnimationFrameGapMs: rounded(baseline.maximumGapMs + relativeAllowanceMs),
+    maximumFirstSubmissionDelayMs: rounded(baseline.firstSubmissionDelayMs + relativeAllowanceMs),
+    maximumFirstCompletionDelayMs: rounded(baseline.firstCompletionDelayMs + relativeAllowanceMs),
+    maximumPendingForMs: rounded(baseline.maximumPendingForMs + relativeAllowanceMs),
+  });
+  const nativeThreshold = rounded(maximumActionMs);
+  const maximumSynchronousActionMs = rounded(
+    TARGET_FRAME_BUDGET_MS * MAXIMUM_SYNCHRONOUS_ACTION_FRAME_BUDGETS,
+  );
+  const maximumFrameWorkMs = evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+    ? nativeThreshold
+    : rounded(TARGET_FRAME_BUDGET_MS * MAXIMUM_ACTION_FRAME_BUDGETS);
+  const thresholds = evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+    ? Object.freeze({
+      maximumAnimationFrameGapMs: nativeThreshold,
+      maximumFirstSubmissionDelayMs: nativeThreshold,
+      maximumFirstCompletionDelayMs: nativeThreshold,
+      maximumPendingForMs: nativeThreshold,
+    })
+    : softwareSemanticThresholds;
   return Object.freeze({
+    evidenceMode,
+    // Mode is the first acceptance fence. The exact receipt must additionally
+    // prove an installed browser and a non-software adapter.
+    releaseAcceptanceModeEligible: evidenceMode === REQUIRED_RELEASE_ACCEPTANCE_FRAME_ACTION_MODE,
     targetFrameBudgetMs: rounded(TARGET_FRAME_BUDGET_MS),
-    maximumActionMs: rounded(maximumActionMs),
-    maximumSynchronousActionMs: rounded(
-      TARGET_FRAME_BUDGET_MS * MAXIMUM_SYNCHRONOUS_ACTION_FRAME_BUDGETS,
-    ),
+    maximumActionMs: evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+      ? nativeThreshold
+      : Math.max(...Object.values(softwareSemanticThresholds)),
+    maximumSynchronousActionMs,
+    maximumFrameWorkMs,
+    ...thresholds,
     referenceBaselineMs: rounded(referenceBaselineMs),
   });
+}
+
+export function frameActionBudgetFailures(
+  budget: FrameActionBudget,
+  measurement: FrameActionMeasurement,
+): readonly string[] {
+  const thresholds = [
+    ['internal-handler-sync', measurement.internalHandlerSyncMs, budget.maximumSynchronousActionMs],
+    ['outer-handler-sync', measurement.outerHandlerSyncMs, budget.maximumSynchronousActionMs],
+    ['event-to-next-animation-frame', measurement.eventToNextAnimationFrameMs, budget.maximumAnimationFrameGapMs],
+    ['maximum-animation-frame-gap', measurement.maximumAnimationFrameGapMs, budget.maximumAnimationFrameGapMs],
+    ['maximum-frame-work', measurement.maximumFrameWorkMs, budget.maximumFrameWorkMs],
+    ['maximum-presentation-pending', measurement.maximumPendingForMs, budget.maximumPendingForMs],
+    ['first-submission-delay', measurement.firstSubmissionDelayMs, budget.maximumFirstSubmissionDelayMs],
+    ['first-completion-delay', measurement.firstCompletionDelayMs, budget.maximumFirstCompletionDelayMs],
+  ] as const;
+  return thresholds.flatMap(([label, value, maximum]) => (
+    Number.isFinite(value) && value >= 0 && value < maximum
+      ? []
+      : [`${label}:${String(value)}>=${maximum}`]
+  ));
 }
 
 export async function captureFrameActionBaseline(

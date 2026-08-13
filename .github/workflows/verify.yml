@@ -252,7 +252,14 @@ jobs:
         env:
           VITE_MATCH_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}
           VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
-      - name: Run Pass 71 Windows supplemental browser shard
+      - name: Run Pass 71 Windows software-CI semantic grenade shard
+        if: matrix.group == 'pass71-grenade-first-action'
+        env:
+          QA_E2E_GROUPS: ${{ matrix.group }}
+          PASS71_GRENADE_EVIDENCE_MODE: software-ci-semantic
+        run: npm run test:e2e:bounded
+      - name: Run Pass 71 Windows non-grenade supplemental browser shard
+        if: matrix.group != 'pass71-grenade-first-action'
         env:
           QA_E2E_GROUPS: ${{ matrix.group }}
         run: npm run test:e2e:bounded

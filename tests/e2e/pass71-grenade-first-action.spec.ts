@@ -1,17 +1,24 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import {
   ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS,
+  assertFrameActionEvidenceEnvironment,
   captureFrameActionBaseline,
   deriveFrameActionBudget,
+  frameActionBudgetFailures,
+  frameActionReleaseAcceptanceEligible,
   MAXIMUM_ACTION_FRAME_BUDGETS,
   MAXIMUM_BASELINE_COMPLETION_FRAME_BUDGETS,
   MAXIMUM_BASELINE_GAP_FRAME_BUDGETS,
   MAXIMUM_BASELINE_P95_FRAME_BUDGETS,
   MINIMUM_ACTION_FRAME_BUDGETS,
-  MINIMUM_BASELINE_FRAME_SAMPLES,
+  minimumActionFrameSamples,
+  REQUIRED_RELEASE_ACCEPTANCE_FRAME_ACTION_MODE,
+  resolveFrameActionEvidenceMode,
+  SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE,
   TARGET_FRAME_BUDGET_MS,
   type FrameActionBaseline,
   type FrameActionBudget,
+  type FrameActionReleaseAcceptanceIdentity,
 } from './frame-action-budget';
 
 type GrenadeId = 'frag' | 'flash' | 'smoke' | 'semtex';
@@ -49,7 +56,29 @@ const renderer = process.env.PASS71_GRENADE_RENDERER === 'webgpu' ? 'webgpu' : '
 const requireWebGpu = renderer === 'webgpu' ? '&requireWebGPU=1' : '';
 const renderProfile = process.env.PASS71_GRENADE_RENDER_PROFILE
   ?? (renderer === 'webgpu' ? 'performance' : 'compat');
+const evidenceMode = resolveFrameActionEvidenceMode(process.env.PASS71_GRENADE_EVIDENCE_MODE);
+assertFrameActionEvidenceEnvironment(evidenceMode, process.env.CI === 'true');
+const installedBrowserEvidence = process.env.QA_INSTALLED_EDGE === '1';
 const grenades: readonly GrenadeId[] = ['frag', 'flash', 'smoke', 'semtex'];
+
+function releaseAcceptanceIdentity(
+  receipt: Awaited<ReturnType<typeof throwAndObserve>>,
+): FrameActionReleaseAcceptanceIdentity {
+  return {
+    evidenceMode,
+    // The generic supplemental shard has no exact-candidate provenance. Only a
+    // separately owned exact-SHA receipt may populate these three identity fields.
+    expectedSourceSha: undefined,
+    checkoutSourceSha: undefined,
+    servedSourceSha: undefined,
+    renderer,
+    browserChannel: installedBrowserEvidence ? 'msedge' : 'configured-chromium',
+    browserUserAgent: receipt.userAgent,
+    installedBrowser: installedBrowserEvidence,
+    softwareAdapter: receipt.runtime.softwareAdapter,
+    adapterLabel: receipt.runtime.adapterLabel,
+  };
+}
 
 async function deployWithUnlockedAudio(page: Page, grenade: GrenadeId): Promise<void> {
   await page.goto(
@@ -96,7 +125,7 @@ async function throwAndObserve(page: Page, baselineLabel: string): Promise<{
   userAgent: string;
 }> {
   const frameActionBaseline = await captureFrameActionBaseline(page, baselineLabel);
-  const frameActionBudget = deriveFrameActionBudget(frameActionBaseline);
+  const frameActionBudget = deriveFrameActionBudget(frameActionBaseline, evidenceMode);
   const actionFrontier = await page.evaluate(() => new Promise<{
     invokedAt: number;
     handlerReturnedAt: number;
@@ -150,34 +179,29 @@ function assertActionReceipt(
     completionFailures: 0,
   });
   expect(frameActionBudget).toMatchObject({
+    evidenceMode,
     targetFrameBudgetMs: Number(TARGET_FRAME_BUDGET_MS.toFixed(3)),
     maximumSynchronousActionMs: Number((TARGET_FRAME_BUDGET_MS * 2).toFixed(3)),
   });
-  expect(profile.handlerSyncMs, `${evidence}: synchronous throw handler`)
-    .toBeLessThan(frameActionBudget.maximumSynchronousActionMs);
-  expect(actionFrontier.handlerSyncMs, `${evidence}: outer canonical throw handler`)
-    .toBeLessThan(frameActionBudget.maximumSynchronousActionMs);
-  expect(actionFrontier.eventToNextAnimationFrameMs, `${evidence}: call entry reaches the next browser frame`)
-    .toBeLessThan(frameActionBudget.maximumActionMs);
   expect(profile.startedAt, `${evidence}: internal profile starts no later than outer handler return`)
     .toBeLessThanOrEqual(actionFrontier.handlerReturnedAt);
   expect(profile.actionNonce, `${evidence}: accepted action binds its exact nonce`).toEqual(expect.any(Number));
-  expect(profile.maximumAnimationFrameGapMs, `${evidence}: no visible first-action freeze`)
-    .toBeLessThan(frameActionBudget.maximumActionMs);
-  expect(profile.maximumFrameWorkMs, `${evidence}: no first-action long frame`)
-    .toBeLessThan(frameActionBudget.maximumActionMs);
-  expect(profile.maximumPendingForMs, `${evidence}: no hidden completion backlog`)
-    .toBeLessThan(frameActionBudget.maximumActionMs);
   expect(profile.frameSamples, `${evidence}: exact 0-350ms observation window`)
-    .toBeGreaterThanOrEqual(MINIMUM_BASELINE_FRAME_SAMPLES);
+    .toBeGreaterThanOrEqual(minimumActionFrameSamples(evidenceMode));
   expect(profile.firstSubmissionDelayMs, `${evidence}: first presentation after the action`)
     .not.toBeNull();
-  expect(profile.firstSubmissionDelayMs!, `${evidence}: action reaches presentation promptly`)
-    .toBeLessThan(frameActionBudget.maximumActionMs);
   expect(profile.firstCompletionDelayMs, `${evidence}: actual completion frontier observed`)
     .not.toBeNull();
-  expect(profile.firstCompletionDelayMs!, `${evidence}: completion inside observed action window`)
-    .toBeLessThan(frameActionBudget.maximumActionMs);
+  expect(frameActionBudgetFailures(frameActionBudget, {
+    internalHandlerSyncMs: profile.handlerSyncMs,
+    outerHandlerSyncMs: actionFrontier.handlerSyncMs,
+    eventToNextAnimationFrameMs: actionFrontier.eventToNextAnimationFrameMs,
+    maximumAnimationFrameGapMs: profile.maximumAnimationFrameGapMs,
+    maximumFrameWorkMs: profile.maximumFrameWorkMs,
+    maximumPendingForMs: profile.maximumPendingForMs,
+    firstSubmissionDelayMs: profile.firstSubmissionDelayMs!,
+    firstCompletionDelayMs: profile.firstCompletionDelayMs!,
+  }), evidence).toEqual([]);
   expect(profile.status, evidence).toBe(renderer === 'webgpu' ? 'healthy' : 'synchronous');
   expect(profile.endingCompletedSequence, evidence).toBeGreaterThanOrEqual(profile.targetSubmissionSequence ?? 0);
   if (renderer === 'webgpu') {
@@ -187,13 +211,30 @@ function assertActionReceipt(
       requestedBackend: 'webgpu', actualBackend: 'webgpu', initialized: true,
       deviceLost: false, uncapturedErrors: 0, presentation: { status: 'healthy' },
     });
-    if (process.env.QA_INSTALLED_EDGE === '1') {
-      expect(userAgent, `${evidence}: installed Edge identity`).toMatch(/Edg\//u);
-      expect(runtime.softwareAdapter, `${evidence}: native hardware adapter`).toBe(false);
-      expect(runtime.adapterLabel, `${evidence}: concrete hardware adapter`).toEqual(expect.any(String));
-      expect(runtime.adapterLabel, `${evidence}: reject a software adapter`)
-        .not.toMatch(/swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic/iu);
-    }
+  }
+  if (installedBrowserEvidence) {
+    expect(userAgent, `${evidence}: installed Edge identity`).toMatch(/Edg\//u);
+    expect(runtime.softwareAdapter, `${evidence}: native hardware adapter`).toBe(false);
+    expect(runtime.adapterLabel, `${evidence}: concrete hardware adapter`).toEqual(expect.any(String));
+    expect(runtime.adapterLabel, `${evidence}: reject a software adapter`)
+      .not.toMatch(/swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic/iu);
+  }
+  if (evidenceMode === SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE) {
+    expect(renderer, `${evidence}: software-CI semantics are WebGL2-only`).toBe('webgl2');
+    expect(installedBrowserEvidence, `${evidence}: software-CI is not installed-browser evidence`).toBe(false);
+    expect(runtime.softwareAdapter, `${evidence}: software-CI provenance`).toBe(true);
+    expect(runtime.adapterLabel, `${evidence}: concrete software adapter`).toMatch(
+      /swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic/iu,
+    );
+    expect(frameActionBudget.releaseAcceptanceModeEligible, evidence).toBe(false);
+    expect(frameActionReleaseAcceptanceEligible(releaseAcceptanceIdentity(receipt)), evidence)
+      .toBe(false);
+  } else if (installedBrowserEvidence) {
+    expect(frameActionBudget.releaseAcceptanceModeEligible, evidence).toBe(true);
+    // Native timings alone are deliberately insufficient: the release-owned
+    // receipt must also bind exact checkout and served source identities.
+    expect(frameActionReleaseAcceptanceEligible(releaseAcceptanceIdentity(receipt)), evidence)
+      .toBe(false);
   }
   expect(audio.grenadeEffectsPrewarm, evidence).toMatchObject({
     prepared: true,
@@ -209,7 +250,10 @@ function assertActionReceipt(
 }
 
 for (const grenade of grenades) {
-  test(`${renderer}: ${grenade} cold and warm throws are pre-owned and complete without a first-use freeze`, async ({ page }, testInfo: TestInfo) => {
+  const evidenceClaim = evidenceMode === SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE
+    ? 'preserve bounded software-CI action overhead'
+    : 'complete without a first-use freeze';
+  test(`${renderer}: ${grenade} cold and warm throws are pre-owned and ${evidenceClaim}`, async ({ page }, testInfo: TestInfo) => {
     test.setTimeout(120_000);
     const faults: string[] = [];
     page.on('pageerror', (error) => faults.push(error.stack ?? error.message));
@@ -249,6 +293,28 @@ for (const grenade of grenades) {
       body: Buffer.from(JSON.stringify({
         grenade,
         renderer,
+        evidenceMode,
+        claim: evidenceMode === SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE
+          ? 'software-CI action-overhead semantics only; not hardware no-freeze evidence'
+          : 'native no-freeze evidence',
+        releaseAcceptance: {
+          requiredEvidenceMode: REQUIRED_RELEASE_ACCEPTANCE_FRAME_ACTION_MODE,
+          exactExpectedCheckoutAndServedSourceShaRequired: true,
+          installedBrowserRequired: true,
+          installedEdgeRequired: true,
+          webGpuRequired: true,
+          hardwareAdapterRequired: true,
+          eligible: frameActionReleaseAcceptanceEligible(
+            releaseAcceptanceIdentity(cold),
+          ) && frameActionReleaseAcceptanceEligible(
+            releaseAcceptanceIdentity(warm),
+          ),
+        },
+        actionFrameSamples: {
+          required: minimumActionFrameSamples(evidenceMode),
+          cold: cold.profile.frameSamples,
+          warm: warm.profile.frameSamples,
+        },
         thresholds: {
           targetFrameBudgetMs: Number(TARGET_FRAME_BUDGET_MS.toFixed(3)),
           maximumBaselineP95FrameBudgets: MAXIMUM_BASELINE_P95_FRAME_BUDGETS,

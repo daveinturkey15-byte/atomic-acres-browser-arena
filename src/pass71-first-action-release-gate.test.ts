@@ -19,6 +19,8 @@ describe('Pass 71 first-action and protected-release gate', () => {
       'TARGET_FRAME_BUDGET_MS = 1_000 / 60',
       'BASELINE_OBSERVATION_MS = 350',
       'MINIMUM_BASELINE_FRAME_SAMPLES = 10',
+      'MINIMUM_NATIVE_ACTION_FRAME_SAMPLES = MINIMUM_BASELINE_FRAME_SAMPLES',
+      'MINIMUM_SOFTWARE_CI_ACTION_FRAME_SAMPLES = 2',
       'BASELINE_CAPTURE_DEADLINE_MS = 2_000',
       'MAXIMUM_BASELINE_P95_FRAME_BUDGETS = 1.5',
       'MAXIMUM_BASELINE_GAP_FRAME_BUDGETS = 3',
@@ -26,6 +28,9 @@ describe('Pass 71 first-action and protected-release gate', () => {
       'MINIMUM_ACTION_FRAME_BUDGETS = 2',
       'MAXIMUM_ACTION_FRAME_BUDGETS = 3',
       'ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS = 1',
+      "NATIVE_NO_FREEZE_FRAME_ACTION_MODE = 'native-no-freeze'",
+      "SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE = 'software-ci-semantic'",
+      'REQUIRED_RELEASE_ACCEPTANCE_FRAME_ACTION_MODE = NATIVE_NO_FREEZE_FRAME_ACTION_MODE',
       'endingCompletedSequence < baseline.targetSubmissionSequence',
       'baseline.p95GapMs >= maximumBaselineP95Ms',
       'baseline.maximumGapMs >= maximumBaselineGapMs',
@@ -34,20 +39,46 @@ describe('Pass 71 first-action and protected-release gate', () => {
       'minimumFrameSamples: MINIMUM_BASELINE_FRAME_SAMPLES',
       'captureDeadlineMs: BASELINE_CAPTURE_DEADLINE_MS',
       'const complete = now < deadline',
+      'identity.evidenceMode !== REQUIRED_RELEASE_ACCEPTANCE_FRAME_ACTION_MODE',
+      'identity.checkoutSourceSha !== identity.expectedSourceSha',
+      'identity.servedSourceSha !== identity.expectedSourceSha',
+      "identity.renderer !== 'webgpu'",
+      "identity.browserChannel !== 'msedge'",
+      'identity.softwareAdapter !== false',
+      "throw new Error('software-ci-semantic frame-action evidence is CI-only')",
     ]) expect(actionBudget).toContain(token);
     expect(actionBudget).toContain('Math.min(');
     expect(actionBudget).toContain('referenceBaselineMs + TARGET_FRAME_BUDGET_MS');
+    expect(actionBudget).toContain('baseline.maximumGapMs + relativeAllowanceMs');
+    expect(actionBudget).toContain('baseline.firstSubmissionDelayMs + relativeAllowanceMs');
+    expect(actionBudget).toContain('baseline.firstCompletionDelayMs + relativeAllowanceMs');
+    expect(actionBudget).toContain('baseline.maximumPendingForMs + relativeAllowanceMs');
+    expect(actionBudget).toContain('TARGET_FRAME_BUDGET_MS * MAXIMUM_SYNCHRONOUS_ACTION_FRAME_BUDGETS');
+    expect(actionBudget).toContain('TARGET_FRAME_BUDGET_MS * MAXIMUM_ACTION_FRAME_BUDGETS');
   });
 
   it('applies the completed-frontier envelope to cold and warm grenade actions', () => {
     expect(grenadeSpec).toContain('captureFrameActionBaseline(page, baselineLabel)');
-    expect(grenadeSpec).toContain('deriveFrameActionBudget(frameActionBaseline)');
+    expect(grenadeSpec).toContain('deriveFrameActionBudget(frameActionBaseline, evidenceMode)');
+    expect(grenadeSpec).toContain("assertFrameActionEvidenceEnvironment(evidenceMode, process.env.CI === 'true')");
     expect(grenadeSpec).toContain('`${grenade}-cold-preaction-baseline`');
     expect(grenadeSpec).toContain('`${grenade}-warm-preaction-baseline`');
     expect(grenadeSpec).toContain('profile.firstCompletionDelayMs!');
     expect(grenadeSpec).toContain('profile.maximumPendingForMs');
-    expect(grenadeSpec).toContain('frameActionBudget.maximumActionMs');
-    expect(grenadeSpec).toContain('frameActionBudget.maximumSynchronousActionMs');
+    expect(grenadeSpec).toContain('maximumSynchronousActionMs: Number((TARGET_FRAME_BUDGET_MS * 2).toFixed(3))');
+    expect(grenadeSpec).toContain('maximumFrameWorkMs: profile.maximumFrameWorkMs');
+    expect(grenadeSpec).toContain('maximumAnimationFrameGapMs: profile.maximumAnimationFrameGapMs');
+    expect(grenadeSpec).toContain('firstCompletionDelayMs: profile.firstCompletionDelayMs!');
+    expect(grenadeSpec).toContain('frameActionBudgetFailures(frameActionBudget');
+    expect(grenadeSpec).toContain('minimumActionFrameSamples(evidenceMode)');
+    expect(grenadeSpec).toContain('const cold = await throwAndObserve(page, `${grenade}-cold-preaction-baseline`)');
+    expect(grenadeSpec).toContain('const warm = await throwAndObserve(page, `${grenade}-warm-preaction-baseline`)');
+    expect(grenadeSpec).toContain("'software-CI action-overhead semantics only; not hardware no-freeze evidence'");
+    expect(grenadeSpec).toContain('frameActionReleaseAcceptanceEligible(');
+    expect(grenadeSpec).toContain('exactExpectedCheckoutAndServedSourceShaRequired: true');
+    expect(grenadeSpec).toContain('actionFrameSamples: {');
+    expect(grenadeSpec).toContain("expect(runtime.softwareAdapter, `${evidence}: software-CI provenance`).toBe(true)");
+    expect(grenadeSpec).toContain("expect(renderer, `${evidence}: software-CI semantics are WebGL2-only`).toBe('webgl2')");
     expect(grenadeSpec).not.toContain('MAX_FIRST_PRESENTATION_MS');
     expect(grenadeSpec).not.toContain('MAX_OBSERVATION_FRAME_GAP_MS');
     expect(grenadeSpec).not.toContain('MAX_COMPLETION_MS');
@@ -104,6 +135,15 @@ describe('Pass 71 first-action and protected-release gate', () => {
     expect(impactClassifier).toContain("windows_supplemental_groups: 'pass71-grenade-first-action,pass70-chopper-gunner'");
     expect(impactClassifier).toContain("linux_supplemental_groups: 'pass71-glass-quality-matrix,pass71-glass-quality-flare,pass71-glass-quality-crossbow,pass71-glass-performance-matrix,pass71-glass-performance-flare,pass71-glass-performance-crossbow,pass71-nuke-warning'");
     expect(verifyWorkflow).toContain('bounded-browser-windows-supplemental-shard:');
+    const grenadeWorkflowStep = verifyWorkflow.match(
+      /- name: Run Pass 71 Windows software-CI semantic grenade shard[\s\S]+?run: npm run test:e2e:bounded/u,
+    )?.[0] ?? '';
+    expect(grenadeWorkflowStep).toContain("if: matrix.group == 'pass71-grenade-first-action'");
+    expect(grenadeWorkflowStep).toContain('PASS71_GRENADE_EVIDENCE_MODE: software-ci-semantic');
+    expect(grenadeWorkflowStep).not.toContain('PASS71_GRENADE_EVIDENCE_MODE: native-no-freeze');
+    expect(grenadeWorkflowStep).not.toContain('PASS71_GRENADE_RENDERER: webgpu');
+    expect(grenadeWorkflowStep).not.toContain('QA_INSTALLED_EDGE');
+    expect(releaseWorkflow).not.toContain('software-ci-semantic');
     expect(verifyWorkflow).toContain('bounded-browser-windows-supplemental:');
     expect(verifyWorkflow).toContain('bounded-browser-linux-supplemental:');
     expect(verifyWorkflow).toContain('bounded-browser-linux-supplemental, bounded-browser-windows-supplemental');
