@@ -256,15 +256,17 @@ jobs:
         env:
           QA_E2E_GROUPS: ${{ matrix.group }}
         run: npm run test:e2e:bounded
-      - name: Upload Pass 71 Windows supplemental failure evidence
-        if: failure()
+      - name: Upload Pass 71 Windows supplemental evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pass71-windows-supplemental-${{ matrix.group }}-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
+            artifacts/pass70/chopper-gunner/**
+            artifacts/pass71/**
             artifacts/pass25a/playwright-results/**
             playwright-report/**
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
 
   bounded-browser-windows-supplemental:
@@ -318,15 +320,16 @@ jobs:
         env:
           QA_E2E_GROUPS: ${{ matrix.group }}
         run: npm run test:e2e:bounded
-      - name: Upload Pass 71 Linux supplemental failure evidence
-        if: failure()
+      - name: Upload Pass 71 Linux supplemental evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pass71-linux-supplemental-${{ matrix.group }}-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
+            artifacts/pass71/**
             artifacts/pass25a/playwright-results/**
             playwright-report/**
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
 
   bounded-browser-linux-supplemental:

@@ -201,9 +201,12 @@ describe('production release workflow', () => {
       'pass70-chopper-gunner',
     ]) expect(windowsShardJob).toContain(`- ${group}`);
     expect(windowsShardJob).toContain('QA_E2E_GROUPS: ${{ matrix.group }}');
-    expect(windowsShardJob).toContain('if: failure()');
+    expect(windowsShardJob).toContain('if: always()');
+    expect(windowsShardJob).toContain('artifacts/pass70/chopper-gunner/**');
+    expect(windowsShardJob).toContain('artifacts/pass71/**');
     expect(windowsShardJob).toContain('artifacts/pass25a/playwright-results/**');
     expect(windowsShardJob).toContain('playwright-report/**');
+    expect(windowsShardJob).toContain('if-no-files-found: error');
     expect(windowsShardJob).toContain('retention-days: 30');
     const windowsAggregateJob = verifyWorkflow.slice(
       verifyWorkflow.indexOf('bounded-browser-windows-supplemental:'),
@@ -229,9 +232,11 @@ describe('production release workflow', () => {
       'pass71-nuke-warning',
     ]) expect(linuxShardJob).toContain(`- ${group}`);
     expect(linuxShardJob).toContain('QA_E2E_GROUPS: ${{ matrix.group }}');
-    expect(linuxShardJob).toContain('if: failure()');
+    expect(linuxShardJob).toContain('if: always()');
+    expect(linuxShardJob).toContain('artifacts/pass71/**');
     expect(linuxShardJob).toContain('artifacts/pass25a/playwright-results/**');
     expect(linuxShardJob).toContain('playwright-report/**');
+    expect(linuxShardJob).toContain('if-no-files-found: error');
     expect(linuxShardJob).toContain('retention-days: 30');
     const linuxAggregateJob = verifyWorkflow.slice(
       verifyWorkflow.indexOf('bounded-browser-linux-supplemental:'),
