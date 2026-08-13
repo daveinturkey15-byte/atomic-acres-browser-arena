@@ -305,6 +305,12 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ ...brokenWindow, kind: 'explosive' })).toBe(false);
     expect(isGameMessage({ ...brokenWindow, kind: 'explosive', actionNonce: 55 })).toBe(true);
     expect(isGameMessage({ ...brokenWindow, kind: 'shot', actionNonce: 55 })).toBe(false);
+    expect(isGameMessage({ ...brokenWindow, kind: 'shot', weapon: 'flare-gun', actionNonce: 55 })).toBe(true);
+    expect(isGameMessage({ ...brokenWindow, kind: 'shot', weapon: 'explosive-crossbow', actionNonce: 55 })).toBe(true);
+    expect(isGameMessage({ ...brokenWindow, kind: 'shot', weapon: 'flare-gun' })).toBe(false);
+    expect(isGameMessage({ ...brokenWindow, kind: 'knife', weapon: 'flare-gun', actionNonce: 55 })).toBe(false);
+    expect(isGameMessage({ ...brokenWindow, kind: 'shot', weapon: 'carbine', actionNonce: 55 })).toBe(false);
+    expect(isGameMessage({ ...brokenWindow, kind: 'shot', weapon: 'not-a-weapon', actionNonce: 55 })).toBe(false);
     expect(isGameMessage({ ...brokenWindow, kind: 'magic' })).toBe(false);
     expect(messageBelongsToPlayer(pickup, 'abc')).toBe(true);
     expect(messageBelongsToPlayer(brokenWindow, 'abc')).toBe(true);

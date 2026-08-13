@@ -310,6 +310,8 @@ import {
   glassAuthorityProjection,
   type GlassImpactProfile,
 } from './glass-authority';
+import { weaponGlassBreakPolicy } from './weapon-glass-break-policy';
+import { admitProjectileGlassBreak } from './projectile-glass-break-admission';
 import {
   activeSoloBotTarget,
   arenaCanvasLabel,
@@ -11164,6 +11166,7 @@ function makeShotResult(
 
 function resolveAuthoritativeShot(request: ShotRequestMessage): void {
   if (network.role !== 'host' || request.by === player.id) return;
+  weaponGlassBreakPolicy(request.weapon);
   const cacheKey = `${request.by}:${request.shotId}`;
   const cached = resolvedShotRequests.get(cacheKey);
   if (cached) {
@@ -11617,6 +11620,7 @@ function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
 }
 
 function renderRemoteShot(message: ShotMessage): THREE.Vector3 | null {
+  weaponGlassBreakPolicy(message.weapon);
   const origin = new THREE.Vector3(...message.origin);
   if (!pointInsideBounds(origin, arena.bounds, 0.44)) return null;
   const direction = new THREE.Vector3(...message.direction).normalize();
@@ -12512,13 +12516,16 @@ function breakHouseWindow(
   actionNonce?: number,
   impactOwnerId = player.id,
   impactNonce = randomNonce(),
+  weapon?: WeaponId,
 ): boolean {
   const window = arena.breakableWindows.find((candidate) => candidate.id === windowId);
   if (!window) return false;
   const state = window.glassState?.matchEpoch === interactiveWorldMatchEpoch
     ? window.glassState
     : createGlassState(window.id, interactiveWorldMatchEpoch);
-  const profile: GlassImpactProfile = kind === 'explosive' ? 'explosion' : kind === 'knife' ? 'knife' : 'bullet';
+  const profile: GlassImpactProfile = weapon
+    ? weaponGlassBreakPolicy(weapon).profile
+    : kind === 'explosive' ? 'explosion' : kind === 'knife' ? 'knife' : 'bullet';
   const impactId = `${profile}:${impactOwnerId}:${impactNonce}:${state.revision}`;
   const result = admitGlassImpact(state, {
     // Network-originated mutations reach this point only after the existing
@@ -12543,7 +12550,8 @@ function breakHouseWindow(
       windowId,
       origin: origin.toArray(),
       kind,
-      ...(kind === 'explosive' ? { actionNonce } : {}),
+      ...(weapon ? { weapon } : {}),
+      ...(kind === 'explosive' || weapon ? { actionNonce } : {}),
       nonce: impactNonce,
     };
     network.send(network.role === 'host' ? canonicalHostWindowBreak(message, performance.now()) : message);
@@ -12606,7 +12614,11 @@ function canonicalHostWindowBreak(message: WindowBreakMessage, now: number): Win
   const { hostAuthority: _untrustedHostAuthority, ...untrustedMessage } = message;
   return {
     ...untrustedMessage,
-    ...(attachment?.detonationOrigin ? { origin: [...attachment.detonationOrigin] as [number, number, number] } : {}),
+    // Projectile impact/detonation already supplies the receiver-simulated
+    // canonical point. Sticky Semtex alone is replaced by its sealed origin.
+    ...(!message.weapon && attachment?.detonationOrigin
+      ? { origin: [...attachment.detonationOrigin] as [number, number, number] }
+      : {}),
     hostAuthority: {
       hostId: player.id,
       stickyAttachment: attachment ? verifiedStickyAttachment(attachment) : null,
@@ -12615,7 +12627,9 @@ function canonicalHostWindowBreak(message: WindowBreakMessage, now: number): Win
 }
 
 function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
-  if (message.by === player.id || processedNonces.has(message.nonce)) return;
+  if (message.by === player.id) return;
+  const eventReplay = processedNonces.has(message.nonce);
+  if (!message.weapon && eventReplay) return;
   if (network.role === 'client') {
     if (!message.hostAuthority || message.hostAuthority.hostId !== privateLobbySnapshot?.hostId) return;
   } else if (message.hostAuthority !== undefined) {
@@ -12626,6 +12640,54 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
   if (!remote || !window || window.broken) return;
   const sender = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
   const centre = window.mesh.getWorldPosition(new THREE.Vector3());
+  const projectilePolicy = message.weapon ? weaponGlassBreakPolicy(message.weapon) : null;
+  if (message.weapon) {
+    if (message.kind !== 'shot' || !Number.isFinite(message.actionNonce)) return;
+    const action = currentAdmittedShotAction(message.by, message.actionNonce!);
+    const paneActionKey = `glass:${message.windowId}`;
+    const origin = new THREE.Vector3(...message.origin);
+    window.mesh.updateWorldMatrix(true, false);
+    const paneBounds = new THREE.Box3().setFromObject(window.mesh);
+    const maximumDistance = projectilePolicy!.timing === 'detonation'
+      ? explosiveBoltBlastRadiusM(true) + 0.5
+      : FLARE_PROJECTILE_EFFECT.collisionRadiusM + 0.2;
+    const admission = admitProjectileGlassBreak({
+      receiverRole: network.role === 'host' ? 'host' : 'client',
+      hostAuthorityValid: network.role === 'client'
+        && message.hostAuthority?.hostId === privateLobbySnapshot?.hostId,
+      weapon: message.weapon,
+      fireKind: WEAPONS[message.weapon].fireKind,
+      actionNonce: message.actionNonce!,
+      actionCurrent: action !== undefined,
+      actionWeapon: action?.message.weapon ?? null,
+      actionNonceObserved: action?.message.nonce ?? null,
+      eventReplay,
+      paneAlreadyAdmittedForAction: action?.targets.has(paneActionKey) ?? false,
+      originInsideArena: pointInsideBounds(origin, arena.bounds, 0.44),
+      paneDistanceM: paneBounds.isEmpty() ? Number.POSITIVE_INFINITY : paneBounds.distanceToPoint(origin),
+      maximumPaneDistanceM: maximumDistance,
+    });
+    if (!admission.accepted || !action) return;
+    processedNonces.add(message.nonce);
+    action.targets.add(paneActionKey);
+    const normal = centre.clone().sub(origin);
+    if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
+    else normal.normalize().multiplyScalar(-1);
+    breakHouseWindow(
+      message.windowId,
+      paneBounds.clampPoint(origin, new THREE.Vector3()),
+      normal,
+      false,
+      origin,
+      'shot',
+      message.actionNonce,
+      message.by,
+      message.nonce,
+      message.weapon,
+    );
+    trimNonceSet();
+    return;
+  }
   const explosive = message.kind === 'explosive';
   const grenadeAuthority = explosive ? remoteGrenadeAuthorities.get(message.by) : undefined;
   const grenade = explosive && grenadeAuthority && Number.isFinite(message.actionNonce)
@@ -15668,7 +15730,14 @@ function tryFire(now: number): void {
   const presentedSurfaceIds = new Set<string>();
   const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+  // Resolving this for every trigger means catalog drift fails at the action
+  // boundary instead of silently leaving a newly added weapon unable to
+  // breach glass.
+  const glassBreakPolicy = weaponGlassBreakPolicy(player.weapon);
   const projectileShot = spec.fireKind === 'projectile';
+  if (projectileShot && glassBreakPolicy.timing !== (player.weapon === 'explosive-crossbow' ? 'detonation' : 'impact')) {
+    throw new TypeError(`Weapon ${player.weapon} has an invalid projectile glass-break timing`);
+  }
   const flamethrowerShot = player.weapon === 'flamethrower';
   const maximumShotDistance = flamethrowerShot ? FLAMETHROWER_EFFECT.rangeM : 90;
   for (let pellet = 0; pellet < spec.pellets; pellet += 1) {
@@ -17607,12 +17676,24 @@ function detonateExplosiveBoltEntity(bolt: ExplosiveBoltEntity, now: number): vo
         currentAttachmentTarget: { id: attachedTargetId!, lifeId: attachedTargetLifeId! },
       })
     : null;
+  const stuck = sealedAttachment !== null;
+  const blastRadiusM = explosiveBoltBlastRadiusM(stuck);
+  const glassPolicy = weaponGlassBreakPolicy('explosive-crossbow');
+  if (glassPolicy.timing === 'detonation'
+    && (bolt.authority || network.role === 'client' && bolt.ownerId === player.id)) {
+    breakWindowsInWeaponBlast(
+      point,
+      bolt.actionNonce,
+      true,
+      blastRadiusM,
+      bolt.ownerId,
+      'explosive-crossbow',
+    );
+  }
   disposeExplosiveBolt(bolt);
   spawnGrenadeExplosionVisual(point, now);
   audio.explosion(now);
   if (!bolt.authority) return;
-  const stuck = sealedAttachment !== null;
-  const blastRadiusM = explosiveBoltBlastRadiusM(stuck);
   applyInteractiveWorldExplosion(point, blastRadiusM, EXPLOSIVE_BOLT_BLAST_MAX_DAMAGE * (stuck ? 2 : 1));
   const targetCount = fillExplosiveBoltTargets(bolt.ownerId, bolt.ownerTeam);
   for (let targetIndex = 0; targetIndex < targetCount; targetIndex += 1) {
@@ -17983,6 +18064,29 @@ function handleFlareDirectHit(hit: FlareProjectileDirectHit): void {
 
 function handleFlareImpact(impact: FlareProjectileImpact): void {
   timedMapWeaponAudit.flareImpacts += 1;
+  const glassPolicy = weaponGlassBreakPolicy('flare-gun');
+  if (impact.breakableWindowId && glassPolicy.timing === 'impact'
+    && (impact.authority || network.role === 'client' && impact.ownerId === player.id)) {
+    const pane = arena.breakableWindows.find(({ id }) => id === impact.breakableWindowId);
+    if (pane) {
+      const centre = pane.mesh.getWorldPosition(new THREE.Vector3());
+      const normal = centre.clone().sub(impact.point);
+      if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
+      else normal.normalize().multiplyScalar(-1);
+      breakHouseWindow(
+        pane.id,
+        impact.point,
+        normal,
+        true,
+        impact.point,
+        'shot',
+        impact.actionNonce,
+        impact.ownerId,
+        randomNonce(),
+        'flare-gun',
+      );
+    }
+  }
   // Direct damage is resolved during flight; only the later world impact
   // starts the visual fire. FlareProjectileSystem exclusively owns its DOT.
   const groundPoint = new THREE.Vector3(impact.point.x, Math.max(0.06, impact.point.y), impact.point.z);
@@ -18028,10 +18132,14 @@ const flareBurnLineOfSightPoint = new THREE.Vector3();
 const flareProjectileCallbacks: FlareProjectileCallbacks = Object.freeze({
   worldCollisionFraction: (start: THREE.Vector3, delta: THREE.Vector3, radiusM: number) => {
     const world = sweepSphereAgainstBoxes(start, delta, flareFrameColliders, radiusM)?.time ?? null;
-    const glass = crossbowGlassCollision(start, delta)?.time ?? null;
-    if (world === null) return glass;
-    if (glass === null) return world;
-    return Math.min(world, glass);
+    const glass = crossbowGlassCollision(start, delta);
+    if (!glass) return world;
+    const radiusFraction = radiusM / Math.max(delta.length(), 1e-8);
+    if (world !== null && glass.time > world + radiusFraction + 1e-4) return world;
+    return Object.freeze({
+      fraction: Math.min(world ?? glass.time, glass.time),
+      breakableWindowId: glass.windowId,
+    });
   },
   withinBounds: (point: THREE.Vector3) => (
     pointInsideBounds(point, arena.bounds, 0.1) && point.y >= -25 && point.y <= 250
@@ -18248,6 +18356,41 @@ function breakWindowsInGrenadeBlast(point: THREE.Vector3, actionNonce: number, r
     if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
     else normal.normalize().multiplyScalar(-1);
     if (breakHouseWindow(pane.id, centre, normal, replicate, point, 'explosive', actionNonce)) broken += 1;
+  }
+  return broken;
+}
+
+function breakWindowsInWeaponBlast(
+  point: THREE.Vector3,
+  actionNonce: number,
+  replicate: boolean,
+  radius: number,
+  ownerId: string,
+  weapon: WeaponId,
+): number {
+  const policy = weaponGlassBreakPolicy(weapon);
+  if (policy.timing !== 'detonation') return 0;
+  let broken = 0;
+  for (const pane of arena.breakableWindows) {
+    if (pane.broken) continue;
+    const centre = pane.mesh.getWorldPosition(new THREE.Vector3());
+    if (centre.distanceTo(point) > radius) continue;
+    if (windowBreakPathBlocked(point, centre, activeWorldColliders())) continue;
+    const normal = centre.clone().sub(point);
+    if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
+    else normal.normalize().multiplyScalar(-1);
+    if (breakHouseWindow(
+      pane.id,
+      centre,
+      normal,
+      replicate,
+      point,
+      'shot',
+      actionNonce,
+      ownerId,
+      randomNonce(),
+      weapon,
+    )) broken += 1;
   }
   return broken;
 }

@@ -37,8 +37,14 @@ export type FlareProjectileImpact = Readonly<{
   actionNonce: number;
   authority: boolean;
   point: THREE.Vector3;
+  breakableWindowId: string | null;
   target: FlareProjectileTarget | null;
   directDamage: number;
+}>;
+
+export type FlareProjectileWorldCollision = Readonly<{
+  fraction: number;
+  breakableWindowId: string | null;
 }>;
 
 export type FlareProjectileDirectHit = Readonly<{
@@ -71,7 +77,11 @@ export type FlareProjectileExpiry = Readonly<{
 
 export type FlareProjectileCallbacks = Readonly<{
   /** Earliest collision fraction in [0,1], or null when the segment is clear. */
-  worldCollisionFraction: (start: THREE.Vector3, delta: THREE.Vector3, radiusM: number) => number | null;
+  worldCollisionFraction: (
+    start: THREE.Vector3,
+    delta: THREE.Vector3,
+    radiusM: number,
+  ) => number | FlareProjectileWorldCollision | null;
   withinBounds: (point: THREE.Vector3) => boolean;
   /** Actor contacts in flight. Retains the hostile-only direct-impact policy. */
   directHitTargets: (ownerId: string, ownerTeam: Team) => readonly FlareProjectileTarget[];
@@ -821,7 +831,13 @@ export class FlareProjectileSystem {
     this.start.copy(entity.root.position);
     entity.velocity.y -= FLARE_PROJECTILE_EFFECT.gravityMps2 * deltaSeconds;
     this.delta.copy(entity.velocity).multiplyScalar(deltaSeconds);
-    let collisionFraction = callbacks.worldCollisionFraction(this.start, this.delta, FLARE_PROJECTILE_EFFECT.collisionRadiusM);
+    const collision = callbacks.worldCollisionFraction(
+      this.start,
+      this.delta,
+      FLARE_PROJECTILE_EFFECT.collisionRadiusM,
+    );
+    let collisionFraction = typeof collision === 'number' ? collision : collision?.fraction ?? null;
+    const breakableWindowId = typeof collision === 'number' ? null : collision?.breakableWindowId ?? null;
     if (collisionFraction !== null && (!Number.isFinite(collisionFraction) || collisionFraction < 0 || collisionFraction > 1)) {
       collisionFraction = null;
     }
@@ -857,7 +873,7 @@ export class FlareProjectileSystem {
     }
     if (worldFraction <= 1) {
       entity.root.position.copy(this.start).addScaledVector(this.delta, worldFraction);
-      this.beginBurn(entity, now, callbacks);
+      this.beginBurn(entity, now, callbacks, breakableWindowId);
       return;
     }
     this.next.copy(this.start).add(this.delta);
@@ -882,6 +898,7 @@ export class FlareProjectileSystem {
     entity: FlareEntity,
     now: number,
     callbacks: FlareProjectileCallbacks,
+    breakableWindowId: string | null,
   ): void {
     entity.phase = 'burn';
     entity.impactedAt = now;
@@ -898,6 +915,7 @@ export class FlareProjectileSystem {
       actionNonce: entity.actionNonce,
       authority: entity.authority,
       point: entity.root.position.clone(),
+      breakableWindowId,
       target: null,
       directDamage: 0,
     }));

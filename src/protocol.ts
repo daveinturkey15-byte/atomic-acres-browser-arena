@@ -369,6 +369,8 @@ export type WindowBreakMessage = {
   windowId: string;
   origin: [number, number, number];
   kind?: 'shot' | 'knife' | 'explosive';
+  /** Present only for a projectile impact/detonation tied to an admitted shot. */
+  weapon?: WeaponId;
   actionNonce?: number;
   /** Added only by the host after receiver simulation canonicalizes the break. */
   hostAuthority?: HostWindowBreakAuthority;
@@ -969,7 +971,11 @@ export function isGameMessage(value: unknown): value is GameMessage {
       return typeof msg.by === 'string'
         && typeof msg.windowId === 'string' && msg.windowId.length > 0 && msg.windowId.length <= 160
         && (msg.kind === undefined || msg.kind === 'shot' || msg.kind === 'knife' || msg.kind === 'explosive')
-        && (msg.kind === 'explosive' ? Number.isFinite(msg.actionNonce) : msg.actionNonce === undefined)
+        && (msg.weapon === undefined || msg.weapon === 'flare-gun' || msg.weapon === 'explosive-crossbow')
+        && (msg.weapon === undefined || msg.kind === 'shot')
+        && (msg.kind === 'explosive' || msg.weapon === 'flare-gun' || msg.weapon === 'explosive-crossbow'
+          ? Number.isFinite(msg.actionNonce)
+          : msg.actionNonce === undefined)
         && (msg.hostAuthority === undefined || isHostWindowBreakAuthority(msg.hostAuthority))
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
         && Number.isFinite(msg.nonce);
