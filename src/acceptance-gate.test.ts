@@ -36,6 +36,11 @@ import {
   pass71Hf300ToolingHashes,
 } from '../scripts/qa/pass71-hf300-drone-thermal-evidence-contract.mjs';
 import {
+  createPass71Hf301EvidenceFixture,
+  PASS71_HF301_TOOL_PATHS,
+  pass71Hf301OwnerReplayAtSource,
+} from '../scripts/qa/pass71-hf301-renderer-progress-evidence-contract.mjs';
+import {
   createPass71Hf305EvidenceFixture,
   PASS71_HF305_TOOLING_PATHS,
 } from '../scripts/qa/pass71-hf305-nuke-warning-evidence-contract.mjs';
@@ -140,6 +145,15 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, sourceTreeSha: headSha, tooling: hf300Tooling,
     startedAt: '2026-08-13T09:36:00.000Z', completedAt: '2026-08-13T09:46:00.000Z',
   });
+  const hf301Tooling = Object.fromEntries(Object.entries(PASS71_HF301_TOOL_PATHS).map(([name, path]) => [
+    `${name}Sha256`, createHash('sha256').update(readFileSync(join(process.cwd(), path))).digest('hex'),
+  ]));
+  const hf301OwnerReplay = pass71Hf301OwnerReplayAtSource(process.cwd(), headSha);
+  const hf301 = createPass71Hf301EvidenceFixture({
+    sourceSha: manifest.preview.sourceSha, sourceTreeSha: headSha, tooling: hf301Tooling,
+    ownerReplay: hf301OwnerReplay,
+    startedAt: '2026-08-13T09:37:00.000Z', completedAt: '2026-08-13T09:47:00.000Z',
+  });
   const hf305Tooling = PASS71_HF305_TOOLING_PATHS.map((path) => ({
     path,
     sha256: createHash('sha256').update(readFileSync(join(process.cwd(), path))).digest('hex'),
@@ -165,8 +179,8 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, tooling, components,
     finalizedAt: '2026-08-13T09:30:00.000Z',
   });
-  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, quality, hf299, hf300, hf305, stuck, parity];
-  return { manifest, coverage: rebuilt.record, components: rebuilt.components, quality, hf299, hf300, hf305 };
+  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, quality, hf299, hf300, hf301, hf305, stuck, parity];
+  return { manifest, coverage: rebuilt.record, components: rebuilt.components, quality, hf299, hf300, hf301, hf305 };
 }
 
 function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
@@ -182,6 +196,11 @@ function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
     })),
     pass71Hf300Tooling: pass71Hf300ToolingHashes(process.cwd()),
     pass71Hf300SourceTreeSha: headSha,
+    pass71Hf301Tooling: Object.fromEntries(Object.entries(PASS71_HF301_TOOL_PATHS).map(([name, path]) => [
+      `${name}Sha256`, createHash('sha256').update(readFileSync(join(process.cwd(), path))).digest('hex'),
+    ])),
+    pass71Hf301SourceTreeSha: headSha,
+    pass71Hf301OwnerReplay: pass71Hf301OwnerReplayAtSource(process.cwd(), headSha),
     pass71Hf305Tooling: PASS71_HF305_TOOLING_PATHS.map((path) => ({
       path,
       sha256: createHash('sha256').update(readFileSync(join(process.cwd(), path))).digest('hex'),
@@ -494,6 +513,23 @@ describe('release acceptance manifest', () => {
     manifest.nativeEvidence.push(forged);
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/nativeEvidence\[[0-9]+\]: (?:scope:bot:solo:webgl2:occluded:thermal-authority|receipt-sha256)/);
+  }, 30_000);
+
+  it('requires exact native renderer forward-progress evidence before HF-301 can be verified', () => {
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    const { manifest, hf301 } = pass71Manifest(tooling);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .not.toMatch(/verified R6\/HF-301|hf301-/);
+
+    manifest.nativeEvidence = manifest.nativeEvidence.filter((record) => record !== hf301);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/verified R6\/HF-301 requires its canonical registered native evidence record/);
+
+    const forged = structuredClone(hf301) as Record<string, any>;
+    forged.ownerReplay.input.stallThresholdMs = 1_001;
+    manifest.nativeEvidence.push(forged);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/nativeEvidence\[[0-9]+\]: (?:real-owner-replay|receipt-sha256)/);
   }, 30_000);
 
   it('requires exact native Nuke warning and detonation authority before HF-305 can be verified', () => {

@@ -569,7 +569,14 @@ function fixtureTrace(renderer, id, index) {
   };
 }
 
-export function createPass71Hf301EvidenceFixture({ sourceSha, sourceTreeSha, tooling, ownerReplay = EXPECTED_OWNER_REPLAY }) {
+export function createPass71Hf301EvidenceFixture({
+  sourceSha,
+  sourceTreeSha,
+  tooling,
+  ownerReplay = EXPECTED_OWNER_REPLAY,
+  startedAt = '2026-08-13T20:00:00.000Z',
+  completedAt = '2026-08-13T20:02:00.000Z',
+}) {
   const servedCandidate = {
     schemaVersion: 4, channel: 'the-big-one', releasePass: 'PASS 71', sourceSha,
     path: 'channels/the-big-one', treeSha256: 'b'.repeat(64), exactRootFileCount: 7,
@@ -600,8 +607,8 @@ export function createPass71Hf301EvidenceFixture({ sourceSha, sourceTreeSha, too
   }));
   const record = {
     ...PASS71_HF301_RENDERER_PROGRESS_EVIDENCE,
-    startedAt: '2026-08-13T20:00:00.000Z',
-    completedAt: '2026-08-13T20:02:00.000Z',
+    startedAt,
+    completedAt,
     source: {
       expectedSourceSha: sourceSha, checkoutSourceSha: sourceSha, endingCheckoutSourceSha: sourceSha,
       sourceTreeSha, releasePass: 'PASS 71', cleanBefore: true, cleanAfter: true,

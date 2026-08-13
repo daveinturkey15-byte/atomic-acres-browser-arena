@@ -44,4 +44,6 @@ export function createPass71Hf301EvidenceFixture(input: Readonly<{
   sourceTreeSha: string;
   tooling: Record<string, string>;
   ownerReplay?: Record<string, unknown>;
+  startedAt?: string;
+  completedAt?: string;
 }>): Record<string, any>;
