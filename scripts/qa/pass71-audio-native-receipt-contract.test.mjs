@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  PASS71_AUDIO_NATIVE, PASS71_AUDIO_NATIVE_DESCRIPTOR, assertPass71AudioNativeReceipt,
+  PASS71_AUDIO_NATIVE, PASS71_AUDIO_NATIVE_DESCRIPTOR, PASS71_AUDIO_NATIVE_MACHINE_HOSTNAME_SHA256,
+  assertPass71AudioNativeReceipt,
   createPass71AudioNativeEvidenceFixture, pass71AudioNativeFailures, sha256Canonical,
 } from './pass71-audio-native-receipt-contract.mjs';
 
@@ -53,6 +54,24 @@ test('exports one optional strict manifest registry descriptor', () => {
   assert.deepEqual(PASS71_AUDIO_NATIVE_DESCRIPTOR, {
     evidenceId: 'HF-302', kind: 'pass71-hf302-audio-native-long-run', minimumCount: 0, maximumCount: 1,
   });
+});
+
+test('binds the logical machine ID to a separate physical-host attestation', () => {
+  const wrongLogicalId = mutate(['environment', 'machine'], 'desktop-vi3cr5q');
+  assert.ok(pass71AudioNativeFailures(wrongLogicalId, SHA)
+    .includes('release machine or physical-host attestation mismatch'));
+
+  const wrongPhysicalHost = mutate(['environment', 'hostnameSha256'], '0'.repeat(64));
+  assert.ok(pass71AudioNativeFailures(wrongPhysicalHost, SHA)
+    .includes('release machine or physical-host attestation mismatch'));
+
+  const missingAttestation = fixture();
+  delete missingAttestation.environment.hostnameSha256;
+  const withoutDigest = { ...missingAttestation }; delete withoutDigest.evidenceDigest;
+  missingAttestation.evidenceDigest = sha256Canonical(withoutDigest);
+  assert.ok(pass71AudioNativeFailures(missingAttestation, SHA)
+    .includes('release machine or physical-host attestation mismatch'));
+  assert.match(PASS71_AUDIO_NATIVE_MACHINE_HOSTNAME_SHA256, /^[a-f0-9]{64}$/u);
 });
 
 for (const [name, path, value, fragment] of [

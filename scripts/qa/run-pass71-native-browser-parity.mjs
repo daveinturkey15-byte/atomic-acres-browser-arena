@@ -4,13 +4,15 @@ import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import net from 'node:net';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { chromium } from '@playwright/test';
 import { build, preview } from 'vite';
 import {
   PASS71_NATIVE_BROWSER_PARITY,
+  PASS71_NATIVE_BROWSER_PARITY_MACHINE_HOSTNAME_SHA256,
+  PASS71_NATIVE_BROWSER_PARITY_MACHINE_ID,
   PASS71_NATIVE_BROWSER_PARITY_TRUSTED_ACTION_EVENTS,
   PASS71_QUALITY_REQUESTED_GRAPHICS,
   assertPass71NativeBrowserParityReceipt,
@@ -23,6 +25,14 @@ import {
 
 const root = path.resolve(process.cwd());
 const contract = PASS71_NATIVE_BROWSER_PARITY;
+const machine = requiredMachine();
+if (process.platform !== 'win32' || process.arch !== 'x64') {
+  throw new Error(`Pass 71 native parity requires win32/x64; received ${process.platform}/${process.arch}`);
+}
+const hostnameSha256 = sha256(Buffer.from(hostname().trim().toLowerCase(), 'utf8'));
+if (hostnameSha256 !== PASS71_NATIVE_BROWSER_PARITY_MACHINE_HOSTNAME_SHA256) {
+  throw new Error('Pass 71 native parity physical OS hostname does not match dave-gaming-pc host attestation');
+}
 const previewPort = boundedPort('PASS71_PARITY_PREVIEW_PORT', 4_561);
 const peerPort = boundedPort('PASS71_PARITY_PEER_PORT', 9_171);
 const firefoxDriverPorts = [
@@ -81,6 +91,16 @@ function requiredSourceSha() {
   const value = index >= 0 ? process.argv[index + 1] : process.env.PASS71_EXPECTED_SOURCE_SHA;
   if (!/^[a-f0-9]{40}$/u.test(value ?? '')) {
     throw new Error('Pass 71 native parity requires --expected-source-sha <40-char SHA>');
+  }
+  return value;
+}
+
+function requiredMachine() {
+  const inline = process.argv.find((argument) => argument.startsWith('--machine='));
+  const index = process.argv.indexOf('--machine');
+  const value = inline ? inline.slice('--machine='.length) : index >= 0 ? process.argv[index + 1] : undefined;
+  if (value !== PASS71_NATIVE_BROWSER_PARITY_MACHINE_ID) {
+    throw new Error('Pass 71 native parity requires --machine dave-gaming-pc');
   }
   return value;
 }
@@ -1119,9 +1139,10 @@ async function main() {
     },
     servedCandidate,
     environment: {
+      machine,
+      hostnameSha256,
       platform: process.platform,
       arch: process.arch,
-      machine: process.env.COMPUTERNAME?.toLowerCase() ?? 'unknown',
     },
     tooling: pass71NativeBrowserParityToolingHashesAtSource(root, sourceSha),
     browsers: {
@@ -1142,7 +1163,7 @@ async function main() {
   const failures = pass71NativeBrowserParityFailures(receipt, {
     sourceSha,
     tooling: receipt.tooling,
-    machine: 'dave-gaming-pc',
+    machine: PASS71_NATIVE_BROWSER_PARITY_MACHINE_ID,
   });
   if (failures.length > 0) {
     receipt.status = 'failed';
@@ -1158,7 +1179,7 @@ async function main() {
   assertPass71NativeBrowserParityReceipt(receipt, {
     sourceSha,
     tooling: receipt.tooling,
-    machine: 'dave-gaming-pc',
+    machine: PASS71_NATIVE_BROWSER_PARITY_MACHINE_ID,
   });
   process.stdout.write(`${JSON.stringify({ status: receipt.status, sourceSha, receiptPath, comparison: receipt.comparison }, null, 2)}\n`);
 }

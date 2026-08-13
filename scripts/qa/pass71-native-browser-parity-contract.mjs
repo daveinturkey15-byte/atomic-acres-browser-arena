@@ -1,12 +1,17 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
+export const PASS71_NATIVE_BROWSER_PARITY_MACHINE_ID = 'dave-gaming-pc';
+export const PASS71_NATIVE_BROWSER_PARITY_MACHINE_HOSTNAME_SHA256 = createHash('sha256')
+  .update('desktop-vi3cr5q', 'utf8')
+  .digest('hex');
+
 export const PASS71_NATIVE_BROWSER_PARITY = Object.freeze({
-  schemaVersion: 3,
+  schemaVersion: 4,
   evidenceId: 'HF-311',
   kind: 'pass71-firefox-chrome-quality-parity',
-  contract: 'atomic-acres/pass71-firefox-chrome-quality-parity@3',
-  gate: 'pass71-native-firefox-chrome-quality-combat-parity-v3',
+  contract: 'atomic-acres/pass71-firefox-chrome-quality-parity@4',
+  gate: 'pass71-native-firefox-chrome-quality-combat-parity-v4',
   viewport: Object.freeze({ width: 1_904, height: 987, deviceScaleFactor: 1 }),
   sceneModes: Object.freeze(['solo-quality-combat', 'hosted-quality-combat']),
   actionTimeline: Object.freeze(['pointer-lock', 'ads-down', 'fire', 'ads-up', 'reload']),
@@ -636,10 +641,11 @@ export function pass71NativeBrowserParityFailures(record, expected = {}) {
     || !SHA256.test(record.servedCandidate.treeSha256 ?? '')
     || !Number.isSafeInteger(record.servedCandidate.exactRootFileCount)
     || record.servedCandidate.exactRootFileCount < 2) failures.push('staged-candidate-provenance');
-  exactKeys(record.environment, ['platform', 'arch', 'machine'], 'environment', failures);
+  exactKeys(record.environment, ['machine', 'hostnameSha256', 'platform', 'arch'], 'environment', failures);
   if (record.environment?.platform !== 'win32' || typeof record.environment?.arch !== 'string'
-    || record.environment.arch.trim() === '' || typeof record.environment?.machine !== 'string'
-    || record.environment.machine.trim() === ''
+    || record.environment.arch.trim() === ''
+    || record.environment?.machine !== PASS71_NATIVE_BROWSER_PARITY_MACHINE_ID
+    || record.environment?.hostnameSha256 !== PASS71_NATIVE_BROWSER_PARITY_MACHINE_HOSTNAME_SHA256
     || (typeof expected.machine === 'string' && record.environment.machine !== expected.machine)) {
     failures.push('native-windows-environment');
   }
@@ -709,7 +715,7 @@ export function validatePass71NativeBrowserParityEvidence(record, context) {
   return pass71NativeBrowserParityFailures(record, {
     sourceSha: context.sourceSha,
     tooling,
-    machine: 'dave-gaming-pc',
+    machine: PASS71_NATIVE_BROWSER_PARITY_MACHINE_ID,
   });
 }
 
@@ -866,7 +872,12 @@ export function createPass71NativeBrowserParityFixture(options = {}) {
       schemaVersion: 4, channel: 'the-big-one', releasePass: 'PASS 71', sourceSha,
       path: 'channels/the-big-one', treeSha256: 'c'.repeat(64), exactRootFileCount: 500,
     },
-    environment: { platform: 'win32', arch: 'x64', machine: 'dave-gaming-pc' },
+    environment: {
+      machine: PASS71_NATIVE_BROWSER_PARITY_MACHINE_ID,
+      hostnameSha256: PASS71_NATIVE_BROWSER_PARITY_MACHINE_HOSTNAME_SHA256,
+      platform: 'win32',
+      arch: 'x64',
+    },
     tooling,
     browsers: {
       chrome: {

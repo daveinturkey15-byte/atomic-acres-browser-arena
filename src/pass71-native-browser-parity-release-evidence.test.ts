@@ -45,7 +45,11 @@ describe('Pass 71 installed Firefox and Chrome Quality parity evidence', () => {
       "captureStableTelemetry(adapter, 'after-action')",
       'rendererSamples',
       'assertSceneSamples',
+      "process.argv.indexOf('--machine')",
+      'hostname().trim().toLowerCase()',
+      'hostnameSha256 !== PASS71_NATIVE_BROWSER_PARITY_MACHINE_HOSTNAME_SHA256',
     ]) expect(runner).toContain(token);
+    expect(runner).not.toContain('COMPUTERNAME');
   });
 
   it('retains raw cadence, long-task, allocation, draw, material and synchronous WebGL evidence', () => {
@@ -90,7 +94,7 @@ describe('Pass 71 installed Firefox and Chrome Quality parity evidence', () => {
       "failures.push(`${prefix}:long-task-budget`)",
       "failures.push(`${prefix}:median-fps-ratio`)",
       "failures.push(`${prefix}:p95-frame-time-ratio`)",
-      "machine: 'dave-gaming-pc'",
+      "PASS71_NATIVE_BROWSER_PARITY_MACHINE_ID = 'dave-gaming-pc'",
     ]) expect(contract).toContain(token);
   });
 

@@ -14,11 +14,13 @@ describe('HF-302 exact-A audio-native release evidence wiring', () => {
     expect(packageJson.scripts['qa:pass71:audio-native'])
       .toBe('npm run qa:pass71:audio-native:contract && node scripts/qa/run-pass71-audio-native-receipt.mjs');
     for (const token of [
-      '--expected-source-sha=', 'run-playwright-with-topology.mjs', "PASS71_AUDIO_NATIVE: '1'",
+      '--expected-source-sha=', '--machine=', 'hostname().trim().toLowerCase()',
+      'PASS71_AUDIO_NATIVE_MACHINE_HOSTNAME_SHA256', 'run-playwright-with-topology.mjs', "PASS71_AUDIO_NATIVE: '1'",
       "PASS70_NATIVE_ENGINE_USER_AGENT: '1'", "git('status', '--porcelain', '--untracked-files=all')",
       'executableSha256', 'sha256Canonical', 'assertPass71AudioNativeReceipt', 'endingSha !== sourceSha',
       'readWindowsExecutableIdentity', 'authenticodeStatus', 'startedAt', 'completedAt',
     ]) expect(runner).toContain(token);
+    expect(runner).not.toContain('COMPUTERNAME');
     for (const token of [
       "renderer: 'webgpu'", "render: 'blender'", "page.locator('#solo').click()", "event('combat'",
       "event('grenade'", "event('glass'", "event('support'", "event('rematch'", "event('arena-transition'",

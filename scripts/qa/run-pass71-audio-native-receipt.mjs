@@ -1,10 +1,16 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { hostname } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import {
-  PASS71_AUDIO_NATIVE, assertPass71AudioNativeReceipt, pass71AudioNativeToolingHashesAtSource, sha256Canonical,
+  PASS71_AUDIO_NATIVE,
+  PASS71_AUDIO_NATIVE_MACHINE_HOSTNAME_SHA256,
+  PASS71_AUDIO_NATIVE_MACHINE_ID,
+  assertPass71AudioNativeReceipt,
+  pass71AudioNativeToolingHashesAtSource,
+  sha256Canonical,
 } from './pass71-audio-native-receipt-contract.mjs';
 import {
   assertInstalledEdgeExecutableIdentity, readWindowsExecutableIdentity,
@@ -12,10 +18,28 @@ import {
 
 const root = path.resolve(process.cwd());
 const startedAt = new Date().toISOString();
-const expectedArgument = process.argv.find((argument) => argument.startsWith('--expected-source-sha='))?.split('=')[1] ?? '';
-const browserArgument = process.argv.find((argument) => argument.startsWith('--browser='))?.split('=')[1] ?? 'msedge';
+
+function argumentValue(name) {
+  const inlinePrefix = `--${name}=`;
+  const inline = process.argv.find((argument) => argument.startsWith(inlinePrefix));
+  if (inline) return inline.slice(inlinePrefix.length);
+  const index = process.argv.indexOf(`--${name}`);
+  return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+const expectedArgument = argumentValue('expected-source-sha') ?? '';
+const browserArgument = argumentValue('browser') ?? 'msedge';
+const machineArgument = argumentValue('machine') ?? '';
 if (!/^[a-f0-9]{40}$/u.test(expectedArgument)) throw new Error('HF-302 requires --expected-source-sha=<40 lowercase hex>');
 if (browserArgument !== 'msedge') throw new Error('HF-302 --browser must be msedge for signed installed-browser release evidence');
+if (machineArgument !== PASS71_AUDIO_NATIVE_MACHINE_ID) throw new Error('HF-302 requires --machine=dave-gaming-pc');
+if (process.platform !== 'win32' || process.arch !== 'x64') {
+  throw new Error(`HF-302 requires win32/x64; received ${process.platform}/${process.arch}`);
+}
+const hostnameSha256 = createHash('sha256').update(hostname().trim().toLowerCase(), 'utf8').digest('hex');
+if (hostnameSha256 !== PASS71_AUDIO_NATIVE_MACHINE_HOSTNAME_SHA256) {
+  throw new Error('HF-302 physical OS hostname does not match dave-gaming-pc host attestation');
+}
 const browserPaths = [
   process.env.PASS71_AUDIO_BROWSER_PATH,
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
@@ -91,8 +115,8 @@ const receiptWithoutDigest = {
   kind: PASS71_AUDIO_NATIVE.kind, contract: PASS71_AUDIO_NATIVE.contract,
   feedbackId: PASS71_AUDIO_NATIVE.feedbackId, schema: PASS71_AUDIO_NATIVE.schema, status: 'passed',
   startedAt, completedAt,
-  invocation: 'npm run qa:pass71:audio-native -- --expected-source-sha=<A> --browser=msedge',
-  environment: { machine: String(process.env.COMPUTERNAME ?? '').toLowerCase(), platform: process.platform, arch: process.arch },
+  invocation: 'npm run qa:pass71:audio-native -- --expected-source-sha=<A> --browser=msedge --machine=dave-gaming-pc',
+  environment: { machine: machineArgument, hostnameSha256, platform: process.platform, arch: process.arch },
   sourceSha, endingSha, sourceTree, sourceBranch,
   cleanBefore: true, cleanAfter, servedCandidate, profile: PASS71_AUDIO_NATIVE.profile,
   browser: {

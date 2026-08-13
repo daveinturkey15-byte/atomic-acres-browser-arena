@@ -1,13 +1,18 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
+export const PASS71_AUDIO_NATIVE_MACHINE_ID = 'dave-gaming-pc';
+export const PASS71_AUDIO_NATIVE_MACHINE_HOSTNAME_SHA256 = createHash('sha256')
+  .update('desktop-vi3cr5q', 'utf8')
+  .digest('hex');
+
 export const PASS71_AUDIO_NATIVE = Object.freeze({
-  schemaVersion: 1,
+  schemaVersion: 2,
   evidenceId: 'HF-302',
   kind: 'pass71-hf302-audio-native-long-run',
-  contract: 'atomic-acres/pass71-hf302-audio-native-long-run@1',
+  contract: 'atomic-acres/pass71-hf302-audio-native-long-run@2',
   feedbackId: 'HF-302',
-  schema: 'atomic-acres/pass71-audio-native@1',
+  schema: 'atomic-acres/pass71-audio-native@2',
   arenaSchema: 'atomic-acres/pass71-audio-native-arena@1',
   arenas: Object.freeze(['atomic-acres', 'rustworks-1v1', 'skyline-terminal', 'gun-range']),
   events: Object.freeze(['start', 'combat', 'grenade', 'glass', 'support', 'rematch', 'arena-transition']),
@@ -162,10 +167,13 @@ export function pass71AudioNativeFailures(receipt, expected = {}) {
   if (!SHA40.test(receipt.sourceTree ?? '') || typeof receipt.sourceBranch !== 'string' || receipt.sourceBranch.length === 0) failures.push('source tree/branch missing');
   if (!isoTimestamp(receipt.startedAt) || !isoTimestamp(receipt.completedAt)
     || Date.parse(receipt.startedAt) > Date.parse(receipt.completedAt)) failures.push('run timestamps invalid');
-  if (receipt.invocation !== 'npm run qa:pass71:audio-native -- --expected-source-sha=<A> --browser=msedge') failures.push('invocation mismatch');
-  if (!exactKeys(receipt.environment, ['machine', 'platform', 'arch'])
-    || receipt.environment.machine !== 'dave-gaming-pc' || receipt.environment.platform !== 'win32'
-    || receipt.environment.arch !== 'x64') failures.push('release machine mismatch');
+  if (receipt.invocation !== 'npm run qa:pass71:audio-native -- --expected-source-sha=<A> --browser=msedge --machine=dave-gaming-pc') failures.push('invocation mismatch');
+  if (!exactKeys(receipt.environment, ['machine', 'hostnameSha256', 'platform', 'arch'])
+    || receipt.environment.machine !== PASS71_AUDIO_NATIVE_MACHINE_ID
+    || receipt.environment.hostnameSha256 !== PASS71_AUDIO_NATIVE_MACHINE_HOSTNAME_SHA256
+    || receipt.environment.platform !== 'win32' || receipt.environment.arch !== 'x64') {
+    failures.push('release machine or physical-host attestation mismatch');
+  }
   if (receipt.cleanBefore !== true || receipt.cleanAfter !== true) failures.push('source was not clean throughout');
   if (!exactKeys(receipt.servedCandidate, ['schemaVersion', 'channel', 'releasePass', 'sourceSha', 'treeSha256', 'exactRootFileCount', 'path'])
     || receipt.servedCandidate?.sourceSha !== expectedSourceSha || receipt.servedCandidate?.channel !== 'the-big-one'
@@ -300,8 +308,13 @@ export function createPass71AudioNativeEvidenceFixture(options = {}) {
     kind: PASS71_AUDIO_NATIVE.kind, contract: PASS71_AUDIO_NATIVE.contract, feedbackId: PASS71_AUDIO_NATIVE.feedbackId,
     schema: PASS71_AUDIO_NATIVE.schema, status: 'passed',
     startedAt: options.startedAt ?? '2026-07-24T09:01:00.000Z', completedAt: options.completedAt ?? '2026-07-24T09:08:00.000Z',
-    invocation: 'npm run qa:pass71:audio-native -- --expected-source-sha=<A> --browser=msedge',
-    environment: { machine: 'dave-gaming-pc', platform: 'win32', arch: 'x64' },
+    invocation: 'npm run qa:pass71:audio-native -- --expected-source-sha=<A> --browser=msedge --machine=dave-gaming-pc',
+    environment: {
+      machine: PASS71_AUDIO_NATIVE_MACHINE_ID,
+      hostnameSha256: PASS71_AUDIO_NATIVE_MACHINE_HOSTNAME_SHA256,
+      platform: 'win32',
+      arch: 'x64',
+    },
     sourceSha, endingSha: sourceSha, sourceTree: 'c'.repeat(40), sourceBranch: 'candidate', cleanBefore: true, cleanAfter: true,
     servedCandidate, profile: PASS71_AUDIO_NATIVE.profile, browser,
     durationMsPerArena: PASS71_AUDIO_NATIVE.durationMsPerArena, arenas: PASS71_AUDIO_NATIVE.arenas,

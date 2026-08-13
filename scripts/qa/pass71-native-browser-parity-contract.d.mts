@@ -6,10 +6,10 @@ export type Pass71NativeBrowserParityExpected = Readonly<{
 }>;
 
 export const PASS71_NATIVE_BROWSER_PARITY: Readonly<{
-  schemaVersion: 3;
+  schemaVersion: 4;
   evidenceId: 'HF-311';
   kind: 'pass71-firefox-chrome-quality-parity';
-  contract: 'atomic-acres/pass71-firefox-chrome-quality-parity@3';
+  contract: 'atomic-acres/pass71-firefox-chrome-quality-parity@4';
   gate: string;
   viewport: Readonly<{ width: number; height: number; deviceScaleFactor: number }>;
   sceneModes: readonly ['solo-quality-combat', 'hosted-quality-combat'];
@@ -31,6 +31,8 @@ export const PASS71_NATIVE_BROWSER_PARITY: Readonly<{
   scenePositionToleranceM: number;
   maximumSceneSampleDriftM: number;
 }>;
+export const PASS71_NATIVE_BROWSER_PARITY_MACHINE_ID: 'dave-gaming-pc';
+export const PASS71_NATIVE_BROWSER_PARITY_MACHINE_HOSTNAME_SHA256: string;
 export const PASS71_NATIVE_BROWSER_PARITY_TRUSTED_ACTION_EVENTS: readonly Readonly<{
   phase: 'pointer-lock' | 'ads-down' | 'fire' | 'ads-up' | 'reload';
   type: 'mousedown' | 'mouseup' | 'click' | 'keydown' | 'keyup';

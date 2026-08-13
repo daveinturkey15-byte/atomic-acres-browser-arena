@@ -1,10 +1,12 @@
 export const PASS71_AUDIO_NATIVE: Readonly<{
-  schemaVersion: 1; evidenceId: 'HF-302'; kind: 'pass71-hf302-audio-native-long-run';
+  schemaVersion: 2; evidenceId: 'HF-302'; kind: 'pass71-hf302-audio-native-long-run';
   contract: string; feedbackId: 'HF-302'; schema: string; arenaSchema: string; arenas: readonly string[]; events: readonly string[];
   durationMsPerArena: number; profile: Readonly<{ name: 'Quality'; renderer: 'webgpu'; render: 'blender' }>;
   retainedSampleCount: number;
   toolingPaths: readonly string[];
 }>;
+export const PASS71_AUDIO_NATIVE_MACHINE_ID: 'dave-gaming-pc';
+export const PASS71_AUDIO_NATIVE_MACHINE_HOSTNAME_SHA256: string;
 export const PASS71_AUDIO_NATIVE_DESCRIPTOR: Readonly<{
   evidenceId: 'HF-302'; kind: 'pass71-hf302-audio-native-long-run'; minimumCount: 0; maximumCount: 1;
 }>;

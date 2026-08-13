@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   PASS71_NATIVE_BROWSER_PARITY,
+  PASS71_NATIVE_BROWSER_PARITY_MACHINE_HOSTNAME_SHA256,
   PASS71_NATIVE_BROWSER_PARITY_TRUSTED_ACTION_EVENTS,
   PASS71_QUALITY_REQUESTED_GRAPHICS,
   assertPass71NativeBrowserParityReceipt,
@@ -237,6 +238,23 @@ test('binds the native receipt to the approved machine when requested', () => {
   const receipt = createPass71NativeBrowserParityFixture();
   assert.ok(pass71NativeBrowserParityFailures(rehash(receipt), { machine: 'another-machine' })
     .includes('native-windows-environment'));
+});
+
+test('rejects logical-machine drift, physical-host drift and missing host attestation', () => {
+  const wrongLogicalId = createPass71NativeBrowserParityFixture();
+  wrongLogicalId.environment.machine = 'desktop-vi3cr5q';
+  assert.ok(pass71NativeBrowserParityFailures(rehash(wrongLogicalId)).includes('native-windows-environment'));
+
+  const wrongPhysicalHost = createPass71NativeBrowserParityFixture();
+  wrongPhysicalHost.environment.hostnameSha256 = '0'.repeat(64);
+  assert.ok(pass71NativeBrowserParityFailures(rehash(wrongPhysicalHost)).includes('native-windows-environment'));
+
+  const missingAttestation = createPass71NativeBrowserParityFixture();
+  delete missingAttestation.environment.hostnameSha256;
+  const failures = pass71NativeBrowserParityFailures(rehash(missingAttestation));
+  assert.ok(failures.includes('environment:schema-fields'));
+  assert.ok(failures.includes('native-windows-environment'));
+  assert.match(PASS71_NATIVE_BROWSER_PARITY_MACHINE_HOSTNAME_SHA256, /^[a-f0-9]{64}$/u);
 });
 
 test('rejects unknown receipt fields rather than carrying unvalidated claims', () => {
