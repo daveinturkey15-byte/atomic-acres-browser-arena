@@ -359,6 +359,27 @@ export function inspectPreviewArtifactZip(zipBytes, identity, options = {}) {
   return { receipt, ...tree };
 }
 
+export function inspectPass71CandidateAAcceptanceArtifactZip(zipBytes) {
+  invariant(zipBytes instanceof Uint8Array, 'candidate A acceptance artifact ZIP must be bytes');
+  const entries = readZipEntries(zipBytes, 1024 * 1024).filter((entry) => !entry.directory);
+  invariant(entries.length === 1 && entries[0].canonical === 'acceptance-coverage.json',
+    'candidate A acceptance artifact must contain only acceptance-coverage.json');
+  invariant(entries[0].bytes.length <= 1024 * 1024,
+    'candidate A acceptance coverage receipt is unexpectedly large');
+  const receipt = safeJson(entries[0].bytes, 'candidate A acceptance coverage receipt');
+  invariant(isObject(receipt), 'candidate A acceptance coverage receipt must be an object');
+  invariant(JSON.stringify(Object.keys(receipt).sort())
+    === JSON.stringify(['errors', 'impact', 'ok', 'phase', 'schemaVersion'].sort()),
+  'candidate A acceptance coverage receipt has unexpected schema fields');
+  invariant(receipt.schemaVersion === 1 && receipt.ok === false
+    && receipt.phase === 'ci' && receipt.impact === 'full',
+  'candidate A acceptance coverage receipt has the wrong identity or status');
+  invariant(Array.isArray(receipt.errors) && receipt.errors.length === 1
+    && receipt.errors[0] === PASS71_MISSING_MANIFEST_ERROR,
+  'candidate A acceptance coverage receipt errors must contain only the canonical missing-manifest failure');
+  return receipt;
+}
+
 function githubHeaders(token) {
   return {
     Accept: 'application/vnd.github+json',
@@ -505,6 +526,8 @@ export function validatePass71CandidateAWorkflowJobs(jobs) {
   for (const [index, job] of jobs.entries()) {
     invariant(isObject(job) && Number.isSafeInteger(job.id) && job.id > 0,
       `candidate A workflow job ${index} has invalid identity`);
+    invariant(job.run_attempt === 1,
+      `candidate A workflow job ${job.name ?? index} is not from required attempt 1`);
     invariant(typeof job.name === 'string' && job.name.length > 0,
       `candidate A workflow job ${index} has no name`);
     invariant(!byName.has(job.name), `candidate A workflow repeated job name: ${job.name}`);
@@ -671,6 +694,36 @@ async function downloadJobLog({ fetchImpl, apiBase, repository, token, jobId }) 
   throw new ProvenanceError('candidate A requirements log download did not terminate', 'inconclusive');
 }
 
+async function verifyPass71CandidateAAcceptanceArtifact({
+  fetchImpl, apiBase, repository, token, identity, workflowRunId, nowMs,
+}) {
+  const artifactName = `acceptance-coverage-${identity.sourceSha}`;
+  const listed = await listExactArtifacts({ fetchImpl, apiBase, repository, token, artifactName });
+  invariant(listed.length === 1,
+    `Pass 71 candidate A must have exactly one acceptance artifact named ${artifactName}; found ${listed.length}`);
+  const artifact = listed[0];
+  const metadataErrors = validArtifactMetadata(artifact, identity, nowMs);
+  invariant(metadataErrors.length === 0,
+    `candidate A acceptance artifact metadata is invalid: ${metadataErrors.join('; ')}`);
+  invariant(artifact.workflow_run.id === workflowRunId,
+    `candidate A acceptance artifact belongs to workflow run ${artifact.workflow_run.id}, expected ${workflowRunId}`);
+  invariant(typeof artifact.digest === 'string' && /^sha256:[0-9a-f]{64}$/.test(artifact.digest),
+    'candidate A acceptance artifact is missing its GitHub SHA-256 digest');
+  const archive = await downloadArtifact({
+    fetchImpl, apiBase, repository, token, artifact, maxArchiveBytes: 8 * 1024 * 1024,
+  });
+  const archiveSha256 = sha256(archive);
+  invariant(artifact.digest === `sha256:${archiveSha256}`,
+    'candidate A acceptance artifact GitHub digest does not match the downloaded ZIP');
+  const receipt = inspectPass71CandidateAAcceptanceArtifactZip(archive);
+  return {
+    artifactId: artifact.id,
+    artifactName,
+    archiveSha256,
+    receipt,
+  };
+}
+
 function artifactSummary(artifact, errors) {
   return {
     id: artifact.id,
@@ -750,6 +803,10 @@ export async function verifyPreviewProvenance(options = {}) {
       if (requirePass71CandidateAWorkflow) {
         invariant(workflowRun.status === 'completed' && workflowRun.conclusion === 'failure',
           `candidate A workflow run ${workflowRun.id} must conclude failure solely for the absent finalizer manifest`);
+        invariant(workflowRun.run_attempt === 1,
+          `candidate A workflow run ${workflowRun.id} must be original attempt 1; received ${workflowRun.run_attempt ?? 'unknown'}`);
+        invariant(typeof artifact.digest === 'string' && /^sha256:[0-9a-f]{64}$/.test(artifact.digest),
+          'candidate A preview artifact is missing its GitHub SHA-256 digest');
         const jobs = await readWorkflowJobs({
           fetchImpl, apiBase, repository, token, runId: workflowRun.id,
         });
@@ -758,6 +815,9 @@ export async function verifyPreviewProvenance(options = {}) {
           fetchImpl, apiBase, repository, token, jobId: requirements.id,
         });
         validatePass71MissingManifestLog(requirementsLog);
+        const acceptanceArtifact = await verifyPass71CandidateAAcceptanceArtifact({
+          fetchImpl, apiBase, repository, token, identity, workflowRunId: workflowRun.id, nowMs,
+        });
         candidateAWorkflow = {
           runId: workflowRun.id,
           status: workflowRun.status,
@@ -766,6 +826,9 @@ export async function verifyPreviewProvenance(options = {}) {
           requirementsJobId: requirements.id,
           requirementsConclusion: requirements.conclusion,
           missingManifestFailure: PASS71_MISSING_MANIFEST_ERROR,
+          acceptanceArtifactId: acceptanceArtifact.artifactId,
+          acceptanceArtifactName: acceptanceArtifact.artifactName,
+          acceptanceArtifactSha256: acceptanceArtifact.archiveSha256,
         };
       }
       const archive = await downloadArtifact({

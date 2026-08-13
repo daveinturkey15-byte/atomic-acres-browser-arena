@@ -12,6 +12,7 @@ const receiptWriter = readFileSync('scripts/release/write-production-receipt.mjs
 const productionEnv = readFileSync('.env.production', 'utf8');
 const diagnosticsPreviewRunner = readFileSync('scripts/qa/run-pass64-diagnostics-browser.mjs', 'utf8');
 const liveTopologyVerifier = readFileSync('scripts/qa/verify-release-topology-browser.mjs', 'utf8');
+const previewProvenanceVerifier = readFileSync('scripts/release/verify-pr-preview-provenance.mjs', 'utf8');
 const staticTopologyVerifier = readFileSync('scripts/qa/verify-release-topology.mjs', 'utf8');
 const agentContract = readFileSync('AGENTS.md', 'utf8');
 const contributionGuide = readFileSync('docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md', 'utf8');
@@ -163,6 +164,10 @@ describe('production release workflow', () => {
     expect(workflow).toContain('name: Verify Pass 71 candidate A preview bytes and browser-run conclusions');
     expect(workflow).toContain("if: inputs.release_pass == 'PASS 71'");
     expect(workflow).toContain('scripts/release/verify-pr-preview-provenance.mjs --manifest acceptance/pass-71.json');
+    expect(previewProvenanceVerifier).toContain('acceptance-coverage-${identity.sourceSha}');
+    expect(previewProvenanceVerifier).toContain('acceptance coverage receipt errors must contain only');
+    expect(previewProvenanceVerifier).toContain('workflowRun.run_attempt === 1');
+    expect(previewProvenanceVerifier).toContain("url.searchParams.set('filter', 'all')");
   });
 
   it('publishes immutable PR previews while requirement acceptance and timing remain explicit jobs', () => {

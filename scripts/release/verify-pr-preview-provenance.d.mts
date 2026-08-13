@@ -23,6 +23,14 @@ export function inspectPreviewArtifactZip(
   options?: Readonly<{ maxUncompressedBytes?: number }>,
 ): PreviewTree & Readonly<{ receipt: unknown }>;
 
+export function inspectPass71CandidateAAcceptanceArtifactZip(bytes: Uint8Array): Readonly<{
+  schemaVersion: 1;
+  ok: false;
+  phase: 'ci';
+  impact: 'full';
+  errors: readonly string[];
+}>;
+
 export const PASS71_CANDIDATE_A_REQUIRED_SUCCESS_JOBS: readonly string[];
 
 export function validatePass71CandidateAWorkflowJobs(

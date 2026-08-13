@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PASS71_CANDIDATE_A_REQUIRED_SUCCESS_JOBS,
   computePreviewTree,
+  inspectPass71CandidateAAcceptanceArtifactZip,
   inspectPreviewArtifactZip,
   parsePreviewManifest,
   validatePass71CandidateAWorkflowJobs,
@@ -26,12 +27,14 @@ function pass71CandidateAJobs(overrides: Readonly<Record<string, string>> = {}) 
     name: string;
     status: string;
     conclusion: string;
+    run_attempt: number;
     steps: Array<{ name: string; conclusion: string }>;
   }> = PASS71_CANDIDATE_A_REQUIRED_SUCCESS_JOBS.map((name, index) => ({
     id: index + 1,
     name,
     status: 'completed',
     conclusion: overrides[name] ?? 'success',
+    run_attempt: 1,
     steps: [],
   }));
   jobs.push({
@@ -39,6 +42,7 @@ function pass71CandidateAJobs(overrides: Readonly<Record<string, string>> = {}) 
     name: 'requirements-acceptance',
     status: 'completed',
     conclusion: overrides['requirements-acceptance'] ?? 'failure',
+    run_attempt: 1,
     steps: overrides['requirements-step'] === 'predecessor'
       ? [{ name: 'Require static and supplemental browser predecessors', conclusion: 'failure' }]
       : [
@@ -481,7 +485,7 @@ describe('Pass 71 candidate A workflow provenance', () => {
 
   it('rejects any additional failed workflow job even when the named topology is green', () => {
     const jobs = [...pass71CandidateAJobs(), {
-      id: 20_000, name: 'future-required-check', status: 'completed', conclusion: 'failure', steps: [],
+      id: 20_000, name: 'future-required-check', status: 'completed', conclusion: 'failure', run_attempt: 1, steps: [],
     }];
     expect(() => validatePass71CandidateAWorkflowJobs(jobs)).toThrow(/additional non-green job/);
   });
@@ -492,5 +496,44 @@ describe('Pass 71 candidate A workflow provenance', () => {
       .toThrow(/exactly one canonical missing-manifest failure/);
     expect(() => validatePass71MissingManifestLog(`${MISSING_PASS71_MANIFEST}\n${MISSING_PASS71_MANIFEST}`))
       .toThrow(/exactly one canonical missing-manifest failure/);
+  });
+
+  it('accepts only the exact machine-readable missing-manifest coverage receipt', () => {
+    const receipt = {
+      schemaVersion: 1,
+      ok: false,
+      phase: 'ci',
+      impact: 'full',
+      errors: [MISSING_PASS71_MANIFEST],
+    };
+    const archive = storedZip([{
+      name: 'acceptance-coverage.json',
+      bytes: encoder.encode(`${JSON.stringify(receipt)}\n`),
+    }]);
+    expect(inspectPass71CandidateAAcceptanceArtifactZip(archive)).toEqual(receipt);
+    for (const invalid of [
+      { ...receipt, errors: [MISSING_PASS71_MANIFEST, 'another semantic failure'] },
+      { ...receipt, errors: [] },
+      { ...receipt, ok: true },
+      { ...receipt, headSha: SOURCE_SHA },
+    ]) {
+      const invalidArchive = storedZip([{
+        name: 'acceptance-coverage.json',
+        bytes: encoder.encode(JSON.stringify(invalid)),
+      }]);
+      expect(() => inspectPass71CandidateAAcceptanceArtifactZip(invalidArchive))
+        .toThrow(/receipt|errors|identity|schema/);
+    }
+    const extraFile = storedZip([
+      { name: 'acceptance-coverage.json', bytes: encoder.encode(JSON.stringify(receipt)) },
+      { name: 'extra.json', bytes: encoder.encode('{}') },
+    ]);
+    expect(() => inspectPass71CandidateAAcceptanceArtifactZip(extraFile)).toThrow(/contain only/);
+  });
+
+  it('rejects rerun-attempt jobs explicitly instead of mixing attempts', () => {
+    const jobs = pass71CandidateAJobs();
+    jobs[0] = { ...jobs[0], run_attempt: 2 };
+    expect(() => validatePass71CandidateAWorkflowJobs(jobs)).toThrow(/required attempt 1/);
   });
 });
