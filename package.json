@@ -107,6 +107,8 @@
     "qa:pass66:audio-long-run": "node scripts/qa/run-pass66-audio-long-run.mjs",
     "qa:pass71:audio-native:contract": "node --test scripts/qa/pass71-audio-native-receipt-contract.test.mjs",
     "qa:pass71:audio-native": "npm run qa:pass71:audio-native:contract && node scripts/qa/run-pass71-audio-native-receipt.mjs",
+    "qa:pass71:hf305-nuke:contract": "node --test scripts/qa/pass71-hf305-nuke-warning-evidence-contract.test.mjs",
+    "qa:pass71:hf305-nuke": "npm run qa:pass71:hf305-nuke:contract && node scripts/qa/run-pass71-hf305-nuke-warning-evidence.mjs",
     "qa:pass66:ads-catalog:edge-webgl2": "node scripts/qa/run-pass66-ads-sight-catalog.mjs edge-webgl2",
     "qa:pass66:ads-catalog:edge-webgpu": "node scripts/qa/run-pass66-ads-sight-catalog.mjs edge-webgpu",
     "qa:pass66:ads-catalog": "npm run qa:pass66:ads-catalog:edge-webgl2 && npm run qa:pass66:ads-catalog:edge-webgpu",

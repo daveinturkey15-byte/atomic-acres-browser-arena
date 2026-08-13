@@ -38,6 +38,72 @@ export const FLASHBANG_AUDIO_PROFILE = Object.freeze({
   onsetDelayMs: 0,
 } as const);
 
+export const NUKE_WARNING_AUDIO_PROFILE = Object.freeze({
+  pulseCount: 5,
+  durationSeconds: 5,
+  maximumScheduledVoices: 11,
+  broadbandNoiseLayers: 0,
+  standardGainScale: 1,
+  reducedSensoryGainScale: 0.42,
+  maximumStandardLayerGain: 0.107,
+  maximumReducedLayerGain: 0.04494,
+} as const);
+
+export type NukeWarningAudioCueProfile = Readonly<{
+  gainScale: number;
+  pressurePulses: readonly Readonly<{
+    startFrequency: number;
+    endFrequency: number;
+    duration: number;
+    volume: number;
+    delay: number;
+  }>[];
+  alarmPulses: readonly Readonly<{
+    startFrequency: number;
+    endFrequency: number;
+    duration: number;
+    volume: number;
+    delay: number;
+  }>[];
+  pressureBed: Readonly<{
+    startFrequency: number;
+    endFrequency: number;
+    duration: number;
+    volume: number;
+    delay: number;
+  }>;
+}>;
+
+export function nukeWarningAudioCueProfile(reducedSensory: boolean): NukeWarningAudioCueProfile {
+  const gainScale = reducedSensory
+    ? NUKE_WARNING_AUDIO_PROFILE.reducedSensoryGainScale
+    : NUKE_WARNING_AUDIO_PROFILE.standardGainScale;
+  return Object.freeze({
+    gainScale,
+    pressurePulses: Object.freeze(Array.from({ length: NUKE_WARNING_AUDIO_PROFILE.pulseCount }, (_, pulse) => Object.freeze({
+      startFrequency: 210 + pulse * 18,
+      endFrequency: 96,
+      duration: 0.64,
+      volume: (0.075 + pulse * 0.008) * gainScale,
+      delay: pulse,
+    }))),
+    alarmPulses: Object.freeze(Array.from({ length: NUKE_WARNING_AUDIO_PROFILE.pulseCount }, (_, pulse) => Object.freeze({
+      startFrequency: 680 + pulse * 90,
+      endFrequency: 680 + pulse * 90,
+      duration: 0.12,
+      volume: 0.045 * gainScale,
+      delay: pulse + 0.68,
+    }))),
+    pressureBed: Object.freeze({
+      startFrequency: 42,
+      endFrequency: 148,
+      duration: 4.85,
+      volume: 0.055 * gainScale,
+      delay: 0.05,
+    }),
+  });
+}
+
 export type FlashbangAudioEnvelope = Readonly<{
   audioGain: number;
   impactVolume: number;
@@ -1577,14 +1643,20 @@ export class ArenaAudio {
     this.tone(110, 0.22, 0.035, 'sine', this.ambience, 0.12);
   }
 
-  nukeWarning(): void {
-    this.sweepSequence(Array.from({ length: 5 }, (_, pulse) => ({
-      startFrequency: 210 + pulse * 18, endFrequency: 96, duration: 0.64, volume: 0.075 + pulse * 0.008, delay: pulse,
-    })), 'sawtooth', this.announcements);
-    this.sweepSequence(Array.from({ length: 5 }, (_, pulse) => ({
-      startFrequency: 680 + pulse * 90, endFrequency: 680 + pulse * 90, duration: 0.12, volume: 0.045, delay: pulse + 0.68,
-    })), 'square', this.announcements);
-    this.sweep(42, 148, 4.85, 0.055, 'triangle', this.ambience, 0.05);
+  nukeWarning(reducedSensory = false): void {
+    this.supportCuePlays += 1;
+    const profile = nukeWarningAudioCueProfile(reducedSensory);
+    this.sweepSequence(profile.pressurePulses, 'sawtooth', this.announcements);
+    this.sweepSequence(profile.alarmPulses, 'square', this.announcements);
+    this.sweep(
+      profile.pressureBed.startFrequency,
+      profile.pressureBed.endFrequency,
+      profile.pressureBed.duration,
+      profile.pressureBed.volume,
+      'triangle',
+      this.ambience,
+      profile.pressureBed.delay,
+    );
   }
 
   nukeDetonation(): void {

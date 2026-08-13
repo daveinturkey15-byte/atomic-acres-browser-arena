@@ -21337,7 +21337,7 @@ function beginNuke(now: number, authoritativeDamage = true): void {
   const warning = element<HTMLElement>('#nuke-warning');
   warning.hidden = false;
   element<HTMLElement>('#nuke-warning b').textContent = '5';
-  audio.nukeWarning();
+  audio.nukeWarning(accessibilityRuntime.reducedSensory);
   nukeLaunches += 1;
   addFeed('NUKE ARMED · FIVE-SECOND ATOMIC WARNING', 'gold');
 }
