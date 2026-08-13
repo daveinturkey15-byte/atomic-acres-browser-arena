@@ -6,6 +6,7 @@ import {
   deriveFrameActionBudget,
   frameActionBudgetFailures,
   frameActionReleaseAcceptanceEligible,
+  isContinuousIntegrationEnvironment,
   MAXIMUM_ACTION_FRAME_BUDGETS,
   MAXIMUM_BASELINE_COMPLETION_FRAME_BUDGETS,
   MAXIMUM_BASELINE_GAP_FRAME_BUDGETS,
@@ -57,7 +58,7 @@ const requireWebGpu = renderer === 'webgpu' ? '&requireWebGPU=1' : '';
 const renderProfile = process.env.PASS71_GRENADE_RENDER_PROFILE
   ?? (renderer === 'webgpu' ? 'performance' : 'compat');
 const evidenceMode = resolveFrameActionEvidenceMode(process.env.PASS71_GRENADE_EVIDENCE_MODE);
-assertFrameActionEvidenceEnvironment(evidenceMode, process.env.CI === 'true');
+assertFrameActionEvidenceEnvironment(evidenceMode, isContinuousIntegrationEnvironment(process.env.CI));
 const installedBrowserEvidence = process.env.QA_INSTALLED_EDGE === '1';
 const grenades: readonly GrenadeId[] = ['frag', 'flash', 'smoke', 'semtex'];
 

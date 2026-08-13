@@ -60,7 +60,9 @@ describe('Pass 71 first-action and protected-release gate', () => {
   it('applies the completed-frontier envelope to cold and warm grenade actions', () => {
     expect(grenadeSpec).toContain('captureFrameActionBaseline(page, baselineLabel)');
     expect(grenadeSpec).toContain('deriveFrameActionBudget(frameActionBaseline, evidenceMode)');
-    expect(grenadeSpec).toContain("assertFrameActionEvidenceEnvironment(evidenceMode, process.env.CI === 'true')");
+    expect(grenadeSpec).toContain('assertFrameActionEvidenceEnvironment(evidenceMode, isContinuousIntegrationEnvironment(process.env.CI))');
+    expect(actionBudget).toContain("return value === '1' || value?.toLowerCase() === 'true'");
+    expect(boundedRunner).toContain("env: { ...process.env, CI: '1' }");
     expect(grenadeSpec).toContain('`${grenade}-cold-preaction-baseline`');
     expect(grenadeSpec).toContain('`${grenade}-warm-preaction-baseline`');
     expect(grenadeSpec).toContain('profile.firstCompletionDelayMs!');

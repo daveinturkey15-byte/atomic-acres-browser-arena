@@ -113,6 +113,10 @@ export function assertFrameActionEvidenceEnvironment(
   }
 }
 
+export function isContinuousIntegrationEnvironment(value: string | undefined): boolean {
+  return value === '1' || value?.toLowerCase() === 'true';
+}
+
 const SOFTWARE_ADAPTER_PATTERN = /swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic/iu;
 const SOURCE_SHA_PATTERN = /^[a-f0-9]{40}$/u;
 

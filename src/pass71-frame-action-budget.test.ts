@@ -5,6 +5,7 @@ import {
   frameActionBudgetFailures,
   frameActionReleaseAcceptanceEligible,
   frameActionReleaseAcceptanceFailures,
+  isContinuousIntegrationEnvironment,
   MAXIMUM_ACTION_FRAME_BUDGETS,
   MAXIMUM_BASELINE_COMPLETION_FRAME_BUDGETS,
   MAXIMUM_BASELINE_GAP_FRAME_BUDGETS,
@@ -159,6 +160,11 @@ describe('Pass 71 frame-action baseline', () => {
   });
 
   it('keeps software-CI mode acceptance-ineligible and requires exact-SHA installed Edge WebGPU hardware', () => {
+    expect(isContinuousIntegrationEnvironment('1')).toBe(true);
+    expect(isContinuousIntegrationEnvironment('true')).toBe(true);
+    expect(isContinuousIntegrationEnvironment('TRUE')).toBe(true);
+    expect(isContinuousIntegrationEnvironment(undefined)).toBe(false);
+    expect(isContinuousIntegrationEnvironment('0')).toBe(false);
     expect(resolveFrameActionEvidenceMode(undefined)).toBe(NATIVE_NO_FREEZE_FRAME_ACTION_MODE);
     expect(resolveFrameActionEvidenceMode(SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE))
       .toBe(SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE);
