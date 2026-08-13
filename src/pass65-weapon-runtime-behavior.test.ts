@@ -464,6 +464,51 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(presentation.presentationState().fullscreenSuppression.active).toBe(false);
   });
 
+  it('keeps contact-foreshortened viewmodel exposure physically stable without changing authority', () => {
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), false);
+    presentation.setWeapon('m4a1', true);
+    presentation.setPresentationVisible(true);
+    const basePose = {
+      dt: 1 / 60, moving: false, sprinting: false, crouched: false, prone: false,
+      ads: false, phase: 0, landingImpulse: 0, lateralSpeed: 0, reloadProgress: null,
+    };
+    presentation.update(basePose);
+    const open = presentation.presentationState();
+    const openFill = open.fullscreenSuppression.structuralLights
+      .find((light) => light.name === 'first-person-viewmodel-fill');
+    expect(open.contactFillLighting).toMatchObject({
+      contract: 'inverse-square-contact-scale-compensation-v1',
+      authoredIntensity: 17.5,
+      contactScale: 1,
+      compensatedIntensity: 17.5,
+      authority: 'presentation-only',
+    });
+    expect(openFill?.intensity).toBe(17.5);
+
+    presentation.update({
+      ...basePose,
+      prone: true,
+      surfaceRetreat: 0.82,
+      surfaceLift: 0.1898,
+    });
+    const contact = presentation.presentationState();
+    const contactFill = contact.fullscreenSuppression.structuralLights
+      .find((light) => light.name === 'first-person-viewmodel-fill');
+    expect(contact.contactResponse).toMatchObject({
+      profileId: 'm4a1',
+      wallBlend: 1,
+      scale: 0.78,
+      aimAuthority: 'camera-forward-unchanged',
+    });
+    expect(contact.contactResponse.floorBlend).toBeCloseTo(0.88, 8);
+    expect(contact.contactFillLighting.compensatedIntensity).toBeCloseTo(10.647, 6);
+    expect(contactFill?.intensity).toBeCloseTo(10.647, 6);
+    presentation.suppressForFullscreenPresentation(true);
+    expect(presentation.presentationState().contactFillLighting.compensatedIntensity).toBe(0);
+    presentation.suppressForFullscreenPresentation(false);
+    expect(presentation.presentationState().contactFillLighting.compensatedIntensity).toBeCloseTo(10.647, 6);
+  });
+
   it('keeps a rapid loadout switch atomic while initial browser assets are delayed', async () => {
     stubBrowserTextureLoading();
     const pending = new Map<string, Deferred<FakeGltf>>();

@@ -72,12 +72,25 @@ const quantizeContactMetersDown = (value: number): number => Math.floor(value * 
 export const ADS_IN_RESPONSE_PER_SECOND = 22;
 export const ADS_OUT_RESPONSE_PER_SECOND = 18;
 export const VIEWMODEL_CONTACT_RESPONSE_CONTRACT = 'catalog-viewmodel-contact-response-v2';
+export const VIEWMODEL_CONTACT_FILL_LIGHT_CONTRACT = 'inverse-square-contact-scale-compensation-v1';
 /** Contact never erases an accepted action, but limits its presentation reach. */
 export const VIEWMODEL_CONTACT_MINIMUM_ACTION_FREEDOM = 0.14;
 
 export function viewmodelContactActionFreedom(obstructionBlend: number): number {
   const blend = clamp01(finite(obstructionBlend));
   return 1 - blend * (1 - VIEWMODEL_CONTACT_MINIMUM_ACTION_FREEDOM);
+}
+
+/**
+ * The viewmodel key is parented to the scaled presentation root. Contact
+ * foreshortening therefore moves it closer to every lit surface; compensate
+ * its physically based inverse-square intensity so a tucked pose preserves the
+ * authored open-space exposure instead of clipping bright sleeves and metal.
+ */
+export function viewmodelContactFillIntensity(authoredIntensity: number, contactScale: number): number {
+  const intensity = Math.max(0, finite(authoredIntensity));
+  const scale = clamp01(finite(contactScale, 1));
+  return intensity * scale * scale;
 }
 /**
  * Retained normalized samples for the complete authored weapon envelope.

@@ -25,7 +25,9 @@ import {
   advanceWeaponHeat,
   fireCycleAt,
   viewmodelContactActionFreedom,
+  viewmodelContactFillIntensity,
   viewmodelContactResponse,
+  VIEWMODEL_CONTACT_FILL_LIGHT_CONTRACT,
   type ViewmodelContactResponse,
 } from './weapon-presentation-state';
 import { weaponFamilyPresentation } from './weapon-family-presentation';
@@ -2561,9 +2563,7 @@ export class WeaponPresentation {
       this.root.scale.setScalar(this.unsuppressedViewmodelScale());
     }
     this.root.visible = visible;
-    this.viewmodelFill.intensity = visible
-      ? Number(this.viewmodelFill.userData.authoredIntensity ?? 0)
-      : 0;
+    this.syncViewmodelFillIntensity();
   }
 
   /**
@@ -2579,10 +2579,15 @@ export class WeaponPresentation {
     this.root.scale.setScalar(suppressed
       ? FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE
       : this.unsuppressedViewmodelScale());
-    this.viewmodelFill.intensity = suppressed
-      ? 0
-      : Number(this.viewmodelFill.userData.authoredIntensity ?? 0);
+    this.syncViewmodelFillIntensity();
     if (suppressed) this.muzzleLight.intensity = 0;
+  }
+
+  private syncViewmodelFillIntensity(): void {
+    const authoredIntensity = Number(this.viewmodelFill.userData.authoredIntensity ?? 0);
+    this.viewmodelFill.intensity = this.root.visible && !this.fullscreenPresentationSuppressed
+      ? viewmodelContactFillIntensity(authoredIntensity, this.contactResponse.scale)
+      : 0;
   }
 
   suppressForSniperScope(suppressed: boolean): void {
@@ -3129,6 +3134,13 @@ export class WeaponPresentation {
           this.active,
           Math.min(this.surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT),
         ),
+      },
+      contactFillLighting: {
+        contract: VIEWMODEL_CONTACT_FILL_LIGHT_CONTRACT,
+        authoredIntensity: Number(this.viewmodelFill.userData.authoredIntensity ?? 0),
+        contactScale: this.contactResponse.scale,
+        compensatedIntensity: this.viewmodelFill.intensity,
+        authority: 'presentation-only',
       },
       fullscreenSuppression: {
         contract: FULLSCREEN_PRESENTATION_SUPPRESSION_CONTRACT,
@@ -3953,6 +3965,7 @@ export class WeaponPresentation {
       this.prone,
       this.adsBlend,
     );
+    this.syncViewmodelFillIntensity();
     // The physical aperture and bounded retreat own ADS clearance. Weapon
     // receivers, stocks and hands remain opaque; only semantically named lens
     // materials are clear from model instantiation onward.
