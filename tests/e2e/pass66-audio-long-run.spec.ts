@@ -8,6 +8,7 @@ const requestedArena = process.env.PASS66_AUDIO_ARENA;
 const selectedArenas = ARENAS.filter((arenaId) => !requestedArena || requestedArena === arenaId);
 const enabled = process.env.PASS66_AUDIO_LONG_RUN === '1';
 const expectedSourceSha = process.env.PASS66_AUDIO_SOURCE_SHA ?? '';
+const expectedReleasePass = process.env.PASS66_AUDIO_RELEASE_PASS ?? '';
 
 test.describe.configure({ mode: 'serial' });
 test.skip(!enabled, 'Run through npm run qa:pass66:audio-long-run for fresh exact-SHA evidence.');
@@ -16,6 +17,7 @@ for (const arenaId of selectedArenas) {
   test(`${arenaId} keeps the intentional audio graph bounded beyond the reported one-minute hiss point`, async ({ page, request }, testInfo) => {
     test.setTimeout(150_000);
     expect(expectedSourceSha).toMatch(/^[a-f0-9]{40}$/u);
+    expect(expectedReleasePass).toMatch(/^PASS [1-9][0-9]*(?:\.[0-9]+)?$/u);
     expect(execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8' }).trim()).toBe('');
     expect(execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()).toBe(expectedSourceSha);
     const provenanceResponse = await request.get(new URL(
@@ -27,7 +29,7 @@ for (const arenaId of selectedArenas) {
     expect(servedCandidate).toMatchObject({
       schemaVersion: 4,
       channel: 'the-big-one',
-      releasePass: 'PASS 66',
+      releasePass: expectedReleasePass,
       sourceSha: expectedSourceSha,
       path: 'channels/the-big-one',
     });

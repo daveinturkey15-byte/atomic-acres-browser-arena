@@ -6,6 +6,11 @@ import {
 import { resolve } from 'node:path';
 
 const root = process.cwd();
+const releaseChannels = JSON.parse(readFileSync(resolve(root, 'release-channels.json'), 'utf8'));
+const releasePass = releaseChannels?.experimental?.pass;
+if (!/^PASS [1-9][0-9]*(?:\.[0-9]+)?$/u.test(releasePass ?? '')) {
+  throw new Error('Pass 66 audio long-run requires a valid configured experimental release pass');
+}
 const artifactRoot = resolve(root, 'artifacts/pass66/audio-long-run');
 const aggregatePath = resolve(artifactRoot, 'receipt.json');
 const aggregateTempPath = `${aggregatePath}.tmp`;
@@ -57,10 +62,11 @@ const result = spawnSync(process.execPath, [
     ...inheritedEnvironment,
     NODE_ENV: 'production',
     SOURCE_SHA: sourceSha,
-    RELEASE_PASS: 'PASS 66',
+    RELEASE_PASS: releasePass,
     VITE_MATCH_BUILD_ID: sourceSha,
     PASS66_AUDIO_LONG_RUN: '1',
     PASS66_AUDIO_SOURCE_SHA: sourceSha,
+    PASS66_AUDIO_RELEASE_PASS: releasePass,
     PASS66_AUDIO_ARENA: '',
     QA_PREVIEW_PORT: process.env.QA_PREVIEW_PORT ?? '4529',
   },
@@ -104,7 +110,7 @@ for (let index = 0; index < arenas.length; index += 1) {
   if (receipt.schemaVersion !== 3 || receipt.status !== 'PASS' || receipt.sourceSha !== sourceSha
     || receipt.arenaId !== arenaId || receipt.browserName !== 'chromium' || receipt.durationMs !== 65_000
     || receipt.servedCandidate?.schemaVersion !== 4 || receipt.servedCandidate.channel !== 'the-big-one'
-    || receipt.servedCandidate.releasePass !== 'PASS 66'
+    || receipt.servedCandidate.releasePass !== releasePass
     || receipt.servedCandidate.path !== 'channels/the-big-one'
     || receipt.servedCandidate.sourceSha !== sourceSha
     || !/^[a-f0-9]{64}$/u.test(receipt.servedCandidate?.treeSha256 ?? '')
