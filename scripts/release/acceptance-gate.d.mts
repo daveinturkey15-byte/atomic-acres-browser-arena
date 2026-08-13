@@ -61,6 +61,8 @@ export function validateAcceptanceManifest(
     pass71Hf296ContactTooling?: Readonly<Record<string, string>>;
     pass71Hf296ContactSourceTreeSha?: string;
     pass71Hf299Tooling?: readonly Readonly<{ path: string; sha256: string }>[];
+    pass71Hf300Tooling?: Readonly<Record<string, string>>;
+    pass71Hf300SourceTreeSha?: string;
     pass71Hf305Tooling?: readonly Readonly<{ path: string; sha256: string }>[];
     pass71Hf305SourceTreeSha?: string;
   }>,

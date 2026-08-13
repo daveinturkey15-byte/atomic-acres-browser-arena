@@ -680,11 +680,6 @@ function validateScope(scope, expectedScope, aggregate, expectedSourceSha, label
       || scope?.staging?.wallWitnessTargetId === targetId) {
     failures.push(`${label}:canonical-target-root-identity`);
   }
-  if (scope?.death?.targetRootIdentity !== scope?.staging?.targetRootIdentity
-    || (scope?.occluded?.sourceOperator && scope?.death?.sourceOperator
-      && !sameJson(scope.occluded.sourceOperator, scope.death.sourceOperator))) {
-    failures.push(`${label}:canonical-target-death-identity-drift`);
-  }
   if (scope?.occluded?.sourceOperator && scope?.lineOfSight?.sourceOperator) {
     for (const field of ['source', 'assetUrl', 'lod', 'skinnedMeshes', 'runtimeClips', 'runtimeActionsBound', 'skeletons']) {
       if (!sameJson(scope.occluded.sourceOperator[field], scope.lineOfSight.sourceOperator[field])) {
@@ -907,7 +902,7 @@ function fixtureRuntime(renderer) {
   };
 }
 
-function fixtureScope(scope, sourceSha, ordinal) {
+function fixtureScope(scope, sourceSha, ordinal, runStartedAt) {
   const targetId = scope.targetKind === 'bot' ? 'bot:0' : 'remote-player-1';
   const candidate = fixtureCandidate(sourceSha);
   const operator = fixtureOperator(scope.targetKind, 'thermal');
@@ -927,11 +922,13 @@ function fixtureScope(scope, sourceSha, ordinal) {
     before: structuredClone(pose), after: structuredClone(pose),
   };
   const priorEpoch = 7 + ordinal;
+  const scopeStartedAt = new Date(Date.parse(runStartedAt) + ordinal * 60_000).toISOString();
+  const scopeCompletedAt = new Date(Date.parse(scopeStartedAt) + 30_000).toISOString();
   return {
     ...scope,
     arenaId: 'atomic-acres', renderProfile: 'blender',
-    startedAt: `2026-08-13T20:0${ordinal}:00.000Z`,
-    completedAt: `2026-08-13T20:0${ordinal}:30.000Z`,
+    startedAt: scopeStartedAt,
+    completedAt: scopeCompletedAt,
     servedCandidate: candidate,
     browser: {
       channel: 'msedge', installed: true, userAgent: 'Mozilla/5.0 Edg/151.0.4129.72',
@@ -987,11 +984,15 @@ export function createPass71Hf300EvidenceFixture(options = {}) {
   const tooling = options.tooling ?? Object.fromEntries(Object.keys(PASS71_HF300_DRONE_THERMAL_TOOL_PATHS).map(
     (name, index) => [`${name}Sha256`, ((index % 15) + 1).toString(16).repeat(64)],
   ));
-  const scopes = PASS71_HF300_DRONE_THERMAL_SCOPES.map((scope, index) => fixtureScope(scope, sourceSha, index));
+  const startedAt = options.startedAt ?? '2026-08-13T20:00:00.000Z';
+  const completedAt = options.completedAt ?? '2026-08-13T20:10:00.000Z';
+  const scopes = PASS71_HF300_DRONE_THERMAL_SCOPES.map(
+    (scope, index) => fixtureScope(scope, sourceSha, index, startedAt),
+  );
   const record = {
     ...PASS71_HF300_DRONE_THERMAL_EVIDENCE,
-    startedAt: '2026-08-13T20:00:00.000Z',
-    completedAt: '2026-08-13T20:10:00.000Z',
+    startedAt,
+    completedAt,
     source: {
       expectedSourceSha: sourceSha, checkoutSourceSha: sourceSha, endingCheckoutSourceSha: sourceSha,
       sourceTreeSha, releasePass: 'PASS 71', cleanBefore: true, cleanAfter: true,

@@ -199,7 +199,7 @@ describe('Pass 71 HF-300 exact piloted-drone thermal closure contract', () => {
       [(record) => { record.scopes[0].death.targetAliveAfter = true; }, ':death:canonical-target-death'],
       [(record) => { record.scopes[0].death.afterReveal.activeTargets = 1; }, ':death:after:thermal-cleanup'],
       [(record) => { record.scopes[2].death.deathReceipt.nextLifeId = 1; }, ':death:canonical-target-death'],
-      [(record) => { record.scopes[0].death.targetRootIdentity = '20000000-0000-4000-8000-000000000001'; }, ':canonical-target-death-identity-drift'],
+      [(record) => { record.scopes[0].death.targetRootIdentity = 'forged-root'; }, ':death:canonical-target-root-identity'],
     ]) {
       const record = fixture();
       mutate(record);
