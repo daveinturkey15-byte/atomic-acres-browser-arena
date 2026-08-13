@@ -16,6 +16,14 @@ if (!target) {
   throw new Error(`Pass 69.3 authored near-plane target must be one of ${Object.keys(targets).join(', ')}; received ${targetName || '(missing)'}`);
 }
 
+const releaseChannels = JSON.parse(readFileSync(resolve(root, 'release-channels.json'), 'utf8'));
+const releasePass = process.env.PASS69_3_NEAR_PLANE_RELEASE_PASS
+  ?? releaseChannels?.experimental?.pass;
+if (!/^PASS [1-9][0-9]*$/u.test(releasePass ?? '')
+  || releasePass !== releaseChannels?.experimental?.pass) {
+  throw new Error(`Pass 69.3 authored near-plane requires the current experimental pass; received ${releasePass ?? '(missing)'}`);
+}
+
 const artifactBase = resolve(root, 'artifacts/pass69-3/authored-near-plane-catalog');
 const rendererArtifacts = resolve(artifactBase, target.renderer);
 const receiptPath = resolve(artifactBase, `receipt-${target.renderer}.json`);
@@ -515,7 +523,7 @@ const result = spawnSync(process.execPath, [
     ...inheritedEnvironment,
     NODE_ENV: 'production',
     SOURCE_SHA: sourceSha,
-    RELEASE_PASS: 'PASS 69',
+    RELEASE_PASS: releasePass,
     VITE_MATCH_BUILD_ID: sourceSha,
     QA_INSTALLED_EDGE: '1',
     QA_PREVIEW_PORT: process.env.QA_PREVIEW_PORT ?? target.port,
@@ -523,6 +531,7 @@ const result = spawnSync(process.execPath, [
     PASS69_3_NEAR_PLANE_RENDER_PROFILE: 'blender',
     PASS69_3_NEAR_PLANE_SOURCE_SHA: sourceSha,
     PASS69_3_NEAR_PLANE_TARGET: targetName,
+    PASS69_3_NEAR_PLANE_RELEASE_PASS: releasePass,
   },
   stdio: 'inherit',
   windowsHide: true,
@@ -602,7 +611,7 @@ if (receipt.schemaVersion !== 3
   || !/Edg\//u.test(receipt.browser?.userAgent ?? '')
   || receipt.servedCandidate?.schemaVersion !== 4
   || receipt.servedCandidate.channel !== 'the-big-one'
-  || receipt.servedCandidate.releasePass !== 'PASS 69'
+  || receipt.servedCandidate.releasePass !== releasePass
   || receipt.servedCandidate.path !== 'channels/the-big-one'
   || receipt.servedCandidate.sourceSha !== sourceSha
   || !/^[a-f0-9]{64}$/u.test(receipt.servedCandidate?.treeSha256 ?? '')

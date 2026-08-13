@@ -28,11 +28,20 @@ const expectedSourceSha = process.env.PASS69_3_NEAR_PLANE_SOURCE_SHA ?? '';
 const expectedTarget = process.env.PASS69_3_NEAR_PLANE_TARGET ?? '';
 const officialEvidence = expectedSourceSha !== '' || expectedTarget !== '';
 const expectedTargetForRenderer = `edge-${renderer}`;
+const repositoryRoot = process.cwd();
+const releaseChannels = JSON.parse(readFileSync(resolve(repositoryRoot, 'release-channels.json'), 'utf8')) as {
+  experimental?: { pass?: string };
+};
+const expectedReleasePass = process.env.PASS69_3_NEAR_PLANE_RELEASE_PASS
+  ?? releaseChannels.experimental?.pass ?? '';
 if (officialEvidence && (!/^[a-f0-9]{40}$/u.test(expectedSourceSha) || expectedTarget !== expectedTargetForRenderer)) {
   throw new Error(`Pass 69.3 authored near-plane evidence has incomplete target provenance for ${expectedTargetForRenderer}`);
 }
+if (!/^PASS [1-9][0-9]*$/u.test(expectedReleasePass)
+  || expectedReleasePass !== releaseChannels.experimental?.pass) {
+  throw new Error('Pass 69.3 authored near-plane evidence requires an exact release-pass provenance value');
+}
 
-const repositoryRoot = process.cwd();
 const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], {
   cwd: repositoryRoot, encoding: 'utf8', windowsHide: true,
 }).trim();
@@ -966,7 +975,7 @@ test('proves canonical authored first-person weapons satisfy the scoped maximum-
   expect(servedCandidate, 'near-plane page is bound to the staged candidate').toMatchObject({
     schemaVersion: 4,
     channel: 'the-big-one',
-    releasePass: 'PASS 69',
+    releasePass: expectedReleasePass,
     path: 'channels/the-big-one',
     sourceSha,
   });
