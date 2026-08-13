@@ -50,6 +50,8 @@
     "qa:pass70:firefox": "npm run qa:pass70:cross-browser:contract && node scripts/qa/run-pass70-cross-browser.mjs firefox",
     "qa:pass70:firefox-geckodriver:contract": "node --test scripts/qa/pass70-firefox-geckodriver-contract.test.mjs",
     "qa:pass70:firefox-geckodriver": "npm run qa:pass70:firefox-geckodriver:contract && node scripts/qa/run-pass70-firefox-geckodriver.mjs",
+    "qa:pass71:native-browser-parity:contract": "node --test scripts/qa/pass71-native-browser-parity-contract.test.mjs",
+    "qa:pass71:native-browser-parity": "npm run qa:pass71:native-browser-parity:contract && node scripts/qa/run-pass71-native-browser-parity.mjs",
     "qa:pass70:iphone15-webkit": "npm run qa:pass70:cross-browser:contract && node scripts/qa/run-pass70-cross-browser.mjs iphone15",
     "qa:pass70:opera": "npm run qa:pass70:cross-browser:contract && node scripts/qa/run-pass70-cross-browser.mjs opera",
     "qa:pass64:diagnostics:collector": "tsx scripts/qa/collect-pass64-match-diagnostics.ts",
