@@ -70,7 +70,7 @@ import { validateKillstreakLoadout, type KillstreakLoadoutV1 } from './killstrea
 export { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 
 export type Team = 0 | 1;
-export const MULTIPLAYER_PROTOCOL_VERSION = 18;
+export const MULTIPLAYER_PROTOCOL_VERSION = 19;
 export type PrimaryWeaponId =
   | 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper'
   | 'mini-uzi' | 'mp5' | 'm4a1' | 'ak-47' | 'minigun' | 'm14-ebr' | 'slug-shotgun';
@@ -311,6 +311,26 @@ export type HitMessage = {
   timing?: CombatTiming;
   nonce: number;
 };
+/**
+ * Host-confirmed sticky attachment onset. This is deliberately separate from
+ * the later explosive hit so both parties receive immediate, replay-safe HUD
+ * feedback without treating guest collision prediction as authority.
+ */
+export type StickyAttachmentReceiptMessage = {
+  type: 'sticky-attachment-receipt';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string;
+  forPlayerId: string;
+  matchEpoch: number;
+  source: 'semtex' | 'explosive-crossbow';
+  ownerId: string;
+  ownerLifeId: number;
+  targetId: string;
+  targetLifeId: number;
+  actionNonce: number;
+  attachedAtHostTimeMs: number;
+  nonce: number;
+};
 export type SupportActivateMessage = {
   type: 'support-activate';
   by: string;
@@ -528,7 +548,7 @@ export type ChatHistoryMessage = {
   by: string; forPlayerId: string; entries: ChatEntry[]; nonce: number;
 };
 
-export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | GrenadeResultMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
+export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | GrenadeResultMessage | HitMessage | StickyAttachmentReceiptMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
   | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
   | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage
@@ -540,6 +560,11 @@ const sidearmWeapons = new Set<SidearmWeaponId>(SIDEARM_WEAPON_IDS);
 const specialWeapons = new Set<SpecialWeaponId>(SPECIAL_WEAPON_IDS);
 const grenades = new Set<GrenadeId>(GRENADE_IDS);
 const offensiveSupportSources = new Set<OffensiveSupportSource>(['yardhawk', 'tri-pass', 'hunter-swarm', 'nuke']);
+const boundedPlayerIdPattern = /^[A-Za-z0-9_-]{1,80}$/;
+
+function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  return Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+}
 
 export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
   if (!value || typeof value !== 'object') return false;
@@ -858,6 +883,25 @@ export function isGameMessage(value: unknown): value is GameMessage {
               && msg.hostAuthority.stickyAttachment.targetLifeId === msg.hostAuthority.targetLifeId))
         && isOptionalCombatTiming(msg.timing)
         && Number.isFinite(msg.nonce);
+    case 'sticky-attachment-receipt':
+      return hasExactKeys(msg, [
+        'type', 'protocolVersion', 'by', 'forPlayerId', 'matchEpoch', 'source', 'ownerId', 'ownerLifeId',
+        'targetId', 'targetLifeId', 'actionNonce', 'attachedAtHostTimeMs', 'nonce',
+      ])
+        && msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && boundedPlayerIdPattern.test(msg.by)
+        && typeof msg.forPlayerId === 'string' && boundedPlayerIdPattern.test(msg.forPlayerId)
+        && msg.by !== msg.forPlayerId
+        && typeof msg.ownerId === 'string' && boundedPlayerIdPattern.test(msg.ownerId)
+        && typeof msg.targetId === 'string' && boundedPlayerIdPattern.test(msg.targetId)
+        && (msg.forPlayerId === msg.ownerId || msg.forPlayerId === msg.targetId)
+        && Number.isSafeInteger(msg.matchEpoch) && Number(msg.matchEpoch) >= 0
+        && (msg.source === 'semtex' || msg.source === 'explosive-crossbow')
+        && Number.isSafeInteger(msg.ownerLifeId) && Number(msg.ownerLifeId) >= 0
+        && Number.isSafeInteger(msg.targetLifeId) && Number(msg.targetLifeId) >= 0
+        && Number.isSafeInteger(msg.actionNonce) && Number(msg.actionNonce) >= 0
+        && Number.isFinite(msg.attachedAtHostTimeMs) && Number(msg.attachedAtHostTimeMs) >= 0
+        && Number.isSafeInteger(msg.nonce) && Number(msg.nonce) >= 0;
     case 'support-activate':
       return typeof msg.by === 'string'
         && offensiveSupportSources.has(msg.source as OffensiveSupportSource)
@@ -1139,6 +1183,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'grenade-throw':
     case 'grenade-result':
     case 'hit':
+    case 'sticky-attachment-receipt':
     case 'support-activate':
     case 'ping':
     case 'pickup':
@@ -1203,6 +1248,7 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'flare-presentation-state'
     || message.type === 'bot-weapon-presentation'
     || message.type === 'railgun-shot-result'
+    || message.type === 'sticky-attachment-receipt'
     || message.type === 'bot-state'
     || message.type === 'bot-damage'
     || message.type === 'hit' && message.hostAuthority !== undefined

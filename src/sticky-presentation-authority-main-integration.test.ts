@@ -12,38 +12,62 @@ function block(startMarker: string, endMarker: string): string {
 }
 
 describe('sticky urgent-alert authority integration', () => {
-  it('keeps immediate Semtex and crossbow alerts on offline/host authority but never on guest prediction', () => {
+  it('publishes onset only from a newly receiver-authored Semtex or crossbow attachment', () => {
+    const record = block('function recordReceiverStickyAttachment(', '\nfunction currentStickyAttachmentActorLifeId(');
+    expect(record).toContain("if (network.role === 'client') return null");
+    expect(record).toContain("if (result.reason !== 'recorded') return null");
+    expect(record).toContain('return stickyAttachmentRecord(');
+
     const semtex = block('function armImpactGrenade(', '\nfunction updateGrenades(');
-    expect(semtex).toContain("if (network.role !== 'client' && targetId === player.id)");
-    expect(semtex).toContain("else if (network.role !== 'client' && grenade.ownerKind === 'player')");
-    expect(semtex).toContain("presentStickyUrgentAlert('semtex', 'victim'");
-    expect(semtex).toContain("presentStickyUrgentAlert('semtex', 'attacker'");
+    expect(semtex).toContain('const recordedAttachment = receiverCanAuthorAttachment ? recordReceiverStickyAttachment({');
+    expect(semtex).toContain("source: 'semtex'");
+    expect(semtex).toContain('if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment, now);');
 
     const crossbow = block('function updateExplosiveBolts(', '\nfunction throwGrenade(');
-    expect(crossbow).toContain("if (network.role !== 'client' && targetHitId === player.id)");
-    expect(crossbow).toContain("else if (network.role !== 'client' && bolt.ownerId === player.id)");
-    expect(crossbow).toContain("'explosive-crossbow', 'victim'");
-    expect(crossbow).toContain("'explosive-crossbow', 'attacker'");
+    expect(crossbow).toContain('const recordedAttachment = bolt.authority ? recordReceiverStickyAttachment({');
+    expect(crossbow).toContain("source: 'explosive-crossbow'");
+    expect(crossbow).toContain('if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment, now);');
   });
 
-  it('admits a guest attacker alert only from the host envelope, current target life, and fresh result nonce', () => {
-    const projection = block('function presentCanonicalStickyAttackerFeedback(', '\nfunction onNetworkMessage(');
-    expect(projection).toContain("if (network.role !== 'client') return");
-    expect(projection).toContain('const targetLifeId = message.target === player.id');
-    expect(projection).toContain('projectStickyAttackerFeedback(');
-    expect(projection).toContain('const canonicalResult = admitHostCanonicalHitResult(message.hostAuthority');
-    expect(projection).toContain('alreadyProcessed: attackerStuckNonces.has(message.nonce)');
-    expect(projection).toContain('if (!canonicalResult.accepted) return');
-    expect(projection.indexOf('if (!canonicalResult.accepted) return'))
-      .toBeLessThan(projection.indexOf("'attacker',\n    feedback.targetId"));
-    expect(source).toContain("if (message.type === 'hit') presentCanonicalStickyAttackerFeedback(message);\n  if (message.type === 'hit' && !processedNonces.has(message.nonce))");
+  it('retains immediate offline/host feedback and targets exact guest onset receipts', () => {
+    const publish = block('function publishStickyAttachmentOnset(', '\nfunction sealReceiverStickyDetonation(');
+    expect(publish).toContain("if (network.role === 'client') return");
+    expect(publish).toContain('planStickyAttachmentOnset(attachment, player.id)');
+    expect(publish).toContain('if (plan.localAudience) presentStickyAttachmentOnset(attachment, plan.localAudience, nowMs)');
+    expect(publish).toContain("type: 'sticky-attachment-receipt'");
+    expect(publish).toContain('protocolVersion: MULTIPLAYER_PROTOCOL_VERSION');
+    expect(publish).toContain('by: player.id');
+    expect(publish).toContain('forPlayerId: recipient.playerId');
+    expect(publish).toContain('matchEpoch: attachment.matchEpoch');
+    expect(publish).toContain('ownerLifeId: attachment.ownerLifeId');
+    expect(publish).toContain('targetLifeId: attachment.targetLifeId');
+    expect(publish).toContain('network.sendToPlayer(recipient.playerId, receipt)');
   });
 
-  it('retains the persistent canonical victim receipt before showing the current-life alert', () => {
+  it('admits guest feedback only from the exact host, recipient, epoch, and current actor lives', () => {
+    const handler = block('function handleStickyAttachmentReceipt(', '\nfunction onNetworkMessage(');
+    expect(handler).toContain("if (message.type !== 'sticky-attachment-receipt') return false");
+    expect(handler).toContain("if (network.role !== 'client' || matchState.phase !== 'active') return true");
+    expect(handler).toContain('expectedHostId: privateLobbySnapshot?.hostId');
+    expect(handler).toContain('expectedRecipientId: player.id');
+    expect(handler).toContain('expectedMatchEpoch: interactiveWorldMatchEpoch');
+    expect(handler).toContain('currentOwnerLifeId: currentStickyAttachmentActorLifeId(message.ownerId)');
+    expect(handler).toContain('currentTargetLifeId: currentStickyAttachmentActorLifeId(message.targetId)');
+    expect(handler).toContain('if (!admission.accepted) return true');
+    expect(source).toContain('if (handleStickyAttachmentReceipt(message)) return;');
+  });
+
+  it('persists victim replay evidence before presentation and never derives STUCK from detonation hits', () => {
+    const handler = block('function handleStickyAttachmentReceipt(', '\nfunction onNetworkMessage(');
+    expect(handler).toContain('const receiptKey = stickyVictimReceiptKey(receipt)');
+    expect(handler).toContain('saveStickyVictimReceipt(clientPersistentStorage(), receipt)');
+    expect(handler.indexOf('saveStickyVictimReceipt(clientPersistentStorage(), receipt)'))
+      .toBeLessThan(handler.indexOf('presentStickyAttachmentOnset(message, admission.audience)'));
+
     const incomingHit = block("if (message.type === 'hit'", "if (message.type === 'death'");
-    expect(incomingHit).toContain('const receiptKey = stickyVictimReceiptKey(receipt)');
-    expect(incomingHit).toContain('saveStickyVictimReceipt(clientPersistentStorage(), receipt)');
-    expect(incomingHit.indexOf('saveStickyVictimReceipt(clientPersistentStorage(), receipt)'))
-      .toBeLessThan(incomingHit.indexOf("stickyFeedback.source,\n          'victim'"));
+    expect(incomingHit).not.toContain('presentStickyAttachmentOnset');
+    expect(incomingHit).not.toContain('presentStickyUrgentAlert');
+    expect(incomingHit).not.toContain('projectStickyVictimFeedback');
+    expect(incomingHit).toContain('reconcileLocalAuthoritativeHealth(');
   });
 });

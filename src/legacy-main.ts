@@ -625,11 +625,13 @@ import {
 import {
   STICKY_VICTIM_URGENT_ALERT_DURATION_MS,
   StickyUrgentAlertController,
-  projectStickyAttackerFeedback,
-  projectStickyVictimFeedback,
   type StickyVictimFeedback,
   type StickyUrgentAlertAudience,
 } from './sticky-victim-feedback';
+import {
+  StickyAttachmentReceiptLedger,
+  planStickyAttachmentOnset,
+} from './sticky-attachment-receipt';
 import {
   STICKY_VICTIM_RECEIPT_TTL_MS,
   loadStickyVictimReceiptKeys,
@@ -896,6 +898,7 @@ import {
   ShotRequestMessage,
   ShotResultMessage,
   StateMessage,
+  StickyAttachmentReceiptMessage,
   MULTIPLAYER_PROTOCOL_VERSION,
   Team,
   TriggerStateMessage,
@@ -4754,8 +4757,6 @@ function recordSupportExplosionProfile(profile: ExplosionSyncProfile): void {
   };
 }
 const processedNonces = new Set<number>();
-/** Guards the attacker-side STUCK confirmation against duplicate hit replays. */
-const attackerStuckNonces = new Set<number>();
 const hostedBotWeaponPresentationReplay = new BotWeaponPresentationReplayGuard();
 const remoteShotAdmissions = new Map<string, RemoteShotAdmissionState>();
 const authoritativeShotAdmissions = new Map<string, AuthoritativeShotAdmissionState>();
@@ -4780,6 +4781,7 @@ const stickyTimingReplayNonces = new Set<number>();
 let stickyVictimFeedbackCount = 0;
 let lastStickyVictimFeedback: StickyVictimFeedback | null = null;
 let stickyVictimReceiptKeys = new Set<string>();
+const stickyAttachmentReceiptLedger = new StickyAttachmentReceiptLedger();
 const stickyUrgentAlertController = new StickyUrgentAlertController();
 let stickyUrgentAlertTimeout: number | null = null;
 let stickyUrgentAlertGeneration = 0;
@@ -4812,6 +4814,8 @@ function resetStickyUrgentAlertLife(targetLifeId: number | null = null): void {
 function presentStickyUrgentAlert(
   source: StickyAttachmentSource,
   audience: StickyUrgentAlertAudience,
+  ownerId: string,
+  ownerLifeId: number,
   attachedTargetId: string,
   attachedTargetLifeId: number,
   actionNonce: number,
@@ -4823,6 +4827,8 @@ function presentStickyUrgentAlert(
     audience,
     recipientId: player.id,
     recipientLifeId: localContinuity,
+    ownerId,
+    ownerLifeId,
     attachedTargetId,
     attachedTargetLifeId,
     actionNonce,
@@ -9575,14 +9581,73 @@ function recordReceiverStickyAttachment(input: Readonly<{
   targetLifeId: number;
   attachedAtMs: number;
   expiresAtMs: number;
-}>): void {
-  if (network.role === 'client') return;
+}>): StickyAttachmentRecord | null {
+  if (network.role === 'client') return null;
   remoteStickyAttachmentAuthority = pruneRemoteStickyAttachments(remoteStickyAttachmentAuthority, input.attachedAtMs);
   const result = recordRemoteStickyAttachment(remoteStickyAttachmentAuthority, {
     matchEpoch: interactiveWorldMatchEpoch,
     ...input,
   });
-  if (result.accepted) remoteStickyAttachmentAuthority = result.state;
+  if (!result.accepted) return null;
+  remoteStickyAttachmentAuthority = result.state;
+  if (result.reason !== 'recorded') return null;
+  return stickyAttachmentRecord(
+    remoteStickyAttachmentAuthority,
+    interactiveWorldMatchEpoch,
+    input.ownerId,
+    input.ownerLifeId,
+    input.source,
+    input.actionNonce,
+  );
+}
+
+function currentStickyAttachmentActorLifeId(actorId: string): number | null {
+  if (actorId === player.id) return localContinuity;
+  return remotes.get(actorId)?.continuity ?? bots.get(actorId)?.continuity ?? null;
+}
+
+function presentStickyAttachmentOnset(
+  attachment: Pick<StickyAttachmentRecord, 'source' | 'ownerId' | 'ownerLifeId' | 'targetId' | 'targetLifeId' | 'actionNonce'>,
+  audience: StickyUrgentAlertAudience,
+  nowMs = performance.now(),
+): void {
+  if (!presentStickyUrgentAlert(
+    attachment.source,
+    audience,
+    attachment.ownerId,
+    attachment.ownerLifeId,
+    attachment.targetId,
+    attachment.targetLifeId,
+    attachment.actionNonce,
+    nowMs,
+  )) return;
+  if (audience === 'victim') addFeed('STUCK', 'coral');
+  else addFeed('STUCK', 'gold');
+}
+
+function publishStickyAttachmentOnset(attachment: StickyAttachmentRecord, nowMs: number): void {
+  if (network.role === 'client') return;
+  const plan = planStickyAttachmentOnset(attachment, player.id);
+  if (plan.localAudience) presentStickyAttachmentOnset(attachment, plan.localAudience, nowMs);
+  if (network.role !== 'host') return;
+  for (const recipient of plan.remoteRecipients) {
+    const receipt: StickyAttachmentReceiptMessage = {
+      type: 'sticky-attachment-receipt',
+      protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: player.id,
+      forPlayerId: recipient.playerId,
+      matchEpoch: attachment.matchEpoch,
+      source: attachment.source,
+      ownerId: attachment.ownerId,
+      ownerLifeId: attachment.ownerLifeId,
+      targetId: attachment.targetId,
+      targetLifeId: attachment.targetLifeId,
+      actionNonce: attachment.actionNonce,
+      attachedAtHostTimeMs: attachment.attachedAtMs,
+      nonce: randomNonce(),
+    };
+    network.sendToPlayer(recipient.playerId, receipt);
+  }
 }
 
 function sealReceiverStickyDetonation(input: Readonly<{
@@ -9723,37 +9788,44 @@ function handleFlashAuthorityMessage(message: GameMessage): boolean {
   return true;
 }
 
-function presentCanonicalStickyAttackerFeedback(message: HitMessage): void {
-  if (network.role !== 'client') return;
-  const targetLifeId = message.target === player.id
-    ? localContinuity
-    : remotes.get(message.target)?.continuity ?? bots.get(message.target)?.continuity ?? null;
-  if (targetLifeId === null) return;
-  const feedback = projectStickyAttackerFeedback(
-    message,
-    player.id,
-    privateLobbySnapshot?.hostId,
-    targetLifeId,
-  );
-  if (!feedback) return;
-  const canonicalResult = admitHostCanonicalHitResult(message.hostAuthority, {
+function handleStickyAttachmentReceipt(message: GameMessage): boolean {
+  if (message.type !== 'sticky-attachment-receipt') return false;
+  if (network.role !== 'client' || matchState.phase !== 'active') return true;
+  const admission = stickyAttachmentReceiptLedger.admit(message, {
     expectedHostId: privateLobbySnapshot?.hostId,
-    targetId: message.target,
-    expectedTargetId: feedback.targetId,
-    expectedTargetLifeId: feedback.targetLifeId,
-    alreadyProcessed: attackerStuckNonces.has(message.nonce),
+    expectedRecipientId: player.id,
+    expectedMatchEpoch: interactiveWorldMatchEpoch,
+    currentOwnerLifeId: currentStickyAttachmentActorLifeId(message.ownerId),
+    currentTargetLifeId: currentStickyAttachmentActorLifeId(message.targetId),
   });
-  if (!canonicalResult.accepted) return;
-  attackerStuckNonces.add(message.nonce);
-  while (attackerStuckNonces.size > 128) attackerStuckNonces.delete(attackerStuckNonces.values().next().value!);
-  presentStickyUrgentAlert(
-    feedback.source,
-    'attacker',
-    feedback.targetId,
-    feedback.targetLifeId,
-    feedback.actionNonce,
-  );
-  addFeed('STUCK', 'gold');
+  if (!admission.accepted) return true;
+  if (admission.audience === 'victim') {
+    const receipt = {
+      matchEpoch: message.matchEpoch,
+      ownerId: message.ownerId,
+      ownerLifeId: message.ownerLifeId,
+      targetId: message.targetId,
+      targetLifeId: message.targetLifeId,
+      source: message.source,
+      actionNonce: message.actionNonce,
+      expiresAtEpochMs: Date.now() + STICKY_VICTIM_RECEIPT_TTL_MS,
+    } as const;
+    const receiptKey = stickyVictimReceiptKey(receipt);
+    if (stickyVictimReceiptKeys.has(receiptKey)) return true;
+    stickyVictimReceiptKeys.add(receiptKey);
+    saveStickyVictimReceipt(clientPersistentStorage(), receipt);
+    stickyVictimFeedbackCount += 1;
+    lastStickyVictimFeedback = Object.freeze({
+      label: 'STUCK',
+      source: message.source,
+      targetId: message.targetId,
+      targetLifeId: message.targetLifeId,
+      actionNonce: message.actionNonce,
+      resultNonce: message.nonce,
+    });
+  }
+  presentStickyAttachmentOnset(message, admission.audience);
+  return true;
 }
 
 function onNetworkMessage(message: GameMessage): void {
@@ -9775,6 +9847,7 @@ function onNetworkMessage(message: GameMessage): void {
     acceptGuestResumeFailure(message);
     return;
   }
+  if (handleStickyAttachmentReceipt(message)) return;
   if (handleInteractiveWorldMessage(message)) return;
   if (handleSmokeAuthorityMessage(message)) return;
   if (handleFlashAuthorityMessage(message)) return;
@@ -10620,7 +10693,6 @@ function onNetworkMessage(message: GameMessage): void {
     }
     return;
   }
-  if (message.type === 'hit') presentCanonicalStickyAttackerFeedback(message);
   if (message.type === 'hit' && !processedNonces.has(message.nonce)) {
     const attacker = remotes.get(message.by);
     const localCanonicalAttacker = network.role === 'client'
@@ -10654,35 +10726,6 @@ function onNetworkMessage(message: GameMessage): void {
       });
       if (!canonicalResult.accepted) return;
       processedNonces.add(message.nonce);
-      const stickyFeedback = projectStickyVictimFeedback(message, player.id, targetLifeId);
-      if (stickyFeedback) {
-        const receipt = {
-          matchEpoch: interactiveWorldMatchEpoch,
-          ownerId: message.by,
-          targetId: stickyFeedback.targetId,
-          targetLifeId: stickyFeedback.targetLifeId,
-          source: stickyFeedback.source,
-          actionNonce: stickyFeedback.actionNonce,
-          expiresAtEpochMs: Date.now() + STICKY_VICTIM_RECEIPT_TTL_MS,
-        } as const;
-        const receiptKey = stickyVictimReceiptKey(receipt);
-        if (stickyVictimReceiptKeys.has(receiptKey)) {
-          trimNonceSet();
-          return;
-        }
-        stickyVictimReceiptKeys.add(receiptKey);
-        saveStickyVictimReceipt(clientPersistentStorage(), receipt);
-        stickyVictimFeedbackCount += 1;
-        lastStickyVictimFeedback = stickyFeedback;
-        presentStickyUrgentAlert(
-          stickyFeedback.source,
-          'victim',
-          stickyFeedback.targetId,
-          stickyFeedback.targetLifeId,
-          stickyFeedback.actionNonce,
-        );
-        addFeed('STUCK', 'coral');
-      }
       reconcileLocalAuthoritativeHealth(
         canonicalResult.resultingHealth,
         canonicalResult.appliedDamage,
@@ -11011,7 +11054,7 @@ function authorStickyEffectForQa(source: StickyAttachmentSource): QaStickyEffect
   const now = performance.now();
   const actionNonce = randomNonce();
   const origin = [remote.snapshot.x, remote.snapshot.y + 1.1, remote.snapshot.z] as [number, number, number];
-  recordReceiverStickyAttachment({
+  const recordedAttachment = recordReceiverStickyAttachment({
     ownerId: player.id,
     ownerLifeId: localContinuity,
     source,
@@ -11021,6 +11064,8 @@ function authorStickyEffectForQa(source: StickyAttachmentSource): QaStickyEffect
     attachedAtMs: now,
     expiresAtMs: now + 30_000,
   });
+  if (!recordedAttachment) return null;
+  publishStickyAttachmentOnset(recordedAttachment, now);
   const attachment = sealReceiverStickyDetonation({
     ownerId: player.id,
     ownerLifeId: localContinuity,
@@ -11060,14 +11105,6 @@ function authorStickyEffectForQa(source: StickyAttachmentSource): QaStickyEffect
   const canonical = lastQaStickyAuthoritativeHits.get(source);
   const healthAfter = remoteHealthAuthorities.get(remote.snapshot.id)?.hp ?? healthBefore;
   if (!canonical || canonical.actionNonce !== actionNonce || healthAfter >= healthBefore) return null;
-  presentStickyUrgentAlert(
-    source,
-    'attacker',
-    remote.snapshot.id,
-    remote.continuity,
-    actionNonce,
-    now,
-  );
   const qaHealth = remoteHealthAuthorities.get(remote.snapshot.id);
   if (qaHealth?.alive) {
     // Keep this bounded authority/rejoin proof independent of frame rate and
@@ -13783,7 +13820,7 @@ async function startGame(
   stickyTimingReplayNonces.clear();
   stickyVictimFeedbackCount = 0;
   lastStickyVictimFeedback = null;
-  attackerStuckNonces.clear();
+  stickyAttachmentReceiptLedger.reset();
   resetStickyUrgentAlertLife();
   stickyVictimReceiptKeys = mode === 'client'
     ? new Set(loadStickyVictimReceiptKeys(clientPersistentStorage(), interactiveWorldMatchEpoch, player.id))
@@ -18069,7 +18106,7 @@ function updateExplosiveBolts(dt: number, now: number): void {
         bolt.detonatesAt = Math.min(bolt.expiresAt, now + EXPLOSIVE_BOLT_ARM_DELAY_MS);
         bolt.nextFuseBeepAt = now;
         bolt.velocity.set(0, 0, 0);
-        if (bolt.authority) recordReceiverStickyAttachment({
+        const recordedAttachment = bolt.authority ? recordReceiverStickyAttachment({
           ownerId: bolt.ownerId,
           ownerLifeId: bolt.ownerLifeId,
           source: 'explosive-crossbow',
@@ -18078,19 +18115,8 @@ function updateExplosiveBolts(dt: number, now: number): void {
           targetLifeId: targetHitLifeId,
           attachedAtMs: now,
           expiresAtMs: bolt.detonatesAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
-        });
-        if (network.role !== 'client' && targetHitId === player.id) {
-          presentStickyUrgentAlert(
-            'explosive-crossbow', 'victim', targetHitId, targetHitLifeId, bolt.actionNonce, now,
-          );
-          addFeed('STUCK', 'coral');
-        }
-        else if (network.role !== 'client' && bolt.ownerId === player.id) {
-          presentStickyUrgentAlert(
-            'explosive-crossbow', 'attacker', targetHitId, targetHitLifeId, bolt.actionNonce, now,
-          );
-          addFeed('STUCK', 'gold');
-        }
+        }) : null;
+        if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment, now);
       } else if (worldCollision || glassCollision) {
         const collisionFraction = Math.min(worldFraction, glassFraction);
         bolt.mesh.position.copy(start).addScaledVector(delta, collisionFraction);
@@ -18721,7 +18747,7 @@ function armImpactGrenade(
         || remoteGrenadeAuthority !== undefined
           && remoteGrenadeForAction(remoteGrenadeAuthority, grenade.actionNonce) === 'semtex'
           && remoteGrenadeLifeForAction(remoteGrenadeAuthority, grenade.actionNonce) === grenade.ownerLifeId;
-      if (receiverCanAuthorAttachment) recordReceiverStickyAttachment({
+      const recordedAttachment = receiverCanAuthorAttachment ? recordReceiverStickyAttachment({
         ownerId: grenade.ownerId,
         ownerLifeId: grenade.ownerLifeId,
         source: 'semtex',
@@ -18730,15 +18756,8 @@ function armImpactGrenade(
         targetLifeId,
         attachedAtMs: now,
         expiresAtMs: grenade.explodeAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
-      });
-      if (network.role !== 'client' && targetId === player.id) {
-        presentStickyUrgentAlert('semtex', 'victim', targetId, targetLifeId, grenade.actionNonce, now);
-        addFeed('STUCK', 'coral');
-      }
-      else if (network.role !== 'client' && grenade.ownerKind === 'player') {
-        presentStickyUrgentAlert('semtex', 'attacker', targetId, targetLifeId, grenade.actionNonce, now);
-        addFeed('STUCK', 'gold');
-      }
+      }) : null;
+      if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment, now);
     }
   }
   audio.coverImpact(position.distanceTo(player.position));
@@ -21917,7 +21936,7 @@ function clearFieldSupport(): void {
   stickyTimingReplayNonces.clear();
   stickyVictimFeedbackCount = 0;
   lastStickyVictimFeedback = null;
-  attackerStuckNonces.clear();
+  stickyAttachmentReceiptLedger.reset();
   resetStickyUrgentAlertLife();
   stickyVictimReceiptKeys.clear();
   lastQaStickyAuthoritativeHits.clear();

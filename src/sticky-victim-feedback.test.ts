@@ -39,6 +39,8 @@ describe('sticky victim feedback projection', () => {
       audience: 'victim' as const,
       recipientId: 'guest-1',
       recipientLifeId: 4,
+      ownerId: 'host-1',
+      ownerLifeId: 2,
       attachedTargetId: 'guest-1',
       attachedTargetLifeId: 4,
       actionNonce: 31,
@@ -49,6 +51,7 @@ describe('sticky victim feedback projection', () => {
       label: 'STUCK', admittedAtMs: 1_000, expiresAtMs: 1_500,
     });
     expect(controller.admit({ ...input, nowMs: 1_050 })).toBeNull();
+    expect(controller.admit({ ...input, ownerLifeId: 3, nowMs: 1_060 })).not.toBeNull();
     expect(controller.admit({ ...input, recipientLifeId: 5, attachedTargetLifeId: 5, actionNonce: 32 })).toBeNull();
     controller.reset(5);
     expect(controller.admit({ ...input, recipientLifeId: 5, attachedTargetLifeId: 5, actionNonce: 32, nowMs: 2_000 }))
@@ -63,6 +66,8 @@ describe('sticky victim feedback projection', () => {
       audience: 'attacker',
       recipientId: 'local-owner',
       recipientLifeId: 9,
+      ownerId: 'local-owner',
+      ownerLifeId: 9,
       attachedTargetId: 'remote-target',
       attachedTargetLifeId: 3,
       actionNonce: 41,
@@ -87,6 +92,8 @@ describe('sticky victim feedback projection', () => {
       audience: 'victim',
       recipientId: 'guest-1',
       recipientLifeId: 4,
+      ownerId: 'host-1',
+      ownerLifeId: 2,
       attachedTargetId: 'guest-1',
       attachedTargetLifeId: 4,
       actionNonce,

@@ -30,6 +30,8 @@ export type StickyUrgentAlert = Readonly<{
   audience: StickyUrgentAlertAudience;
   recipientId: string;
   recipientLifeId: number;
+  ownerId: string;
+  ownerLifeId: number;
   attachedTargetId: string;
   attachedTargetLifeId: number;
   actionNonce: number;
@@ -55,6 +57,8 @@ export class StickyUrgentAlertController {
     audience: StickyUrgentAlertAudience;
     recipientId: string;
     recipientLifeId: number;
+    ownerId: string;
+    ownerLifeId: number;
     attachedTargetId: string;
     attachedTargetLifeId: number;
     actionNonce: number;
@@ -64,6 +68,8 @@ export class StickyUrgentAlertController {
       || input.audience !== 'victim' && input.audience !== 'attacker'
       || typeof input.recipientId !== 'string' || input.recipientId.length < 1 || input.recipientId.length > 80
       || !Number.isSafeInteger(input.recipientLifeId) || input.recipientLifeId < 0
+      || typeof input.ownerId !== 'string' || input.ownerId.length < 1 || input.ownerId.length > 80
+      || !Number.isSafeInteger(input.ownerLifeId) || input.ownerLifeId < 0
       || typeof input.attachedTargetId !== 'string' || input.attachedTargetId.length < 1 || input.attachedTargetId.length > 80
       || !Number.isSafeInteger(input.attachedTargetLifeId) || input.attachedTargetLifeId < 0
       || !Number.isSafeInteger(input.actionNonce) || input.actionNonce < 0
@@ -71,6 +77,7 @@ export class StickyUrgentAlertController {
     if (this.lifeId === null) this.lifeId = input.recipientLifeId;
     if (input.recipientLifeId !== this.lifeId) return null;
     const key = `${input.audience}\u0000${input.source}\u0000${input.recipientId}\u0000${input.recipientLifeId}`
+      + `\u0000${input.ownerId}\u0000${input.ownerLifeId}`
       + `\u0000${input.attachedTargetId}\u0000${input.attachedTargetLifeId}\u0000${input.actionNonce}`;
     if (this.admittedActions.has(key)) return null;
     this.admittedActions.add(key);

@@ -2,8 +2,8 @@ import type { StickyAttachmentSource } from './remote-sticky-attachment-authorit
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
 
-export const STICKY_VICTIM_RECEIPT_SCHEMA_VERSION = 1;
-export const STICKY_VICTIM_RECEIPT_STORAGE_KEY = 'atomic-acres:sticky-victim-receipts:v1';
+export const STICKY_VICTIM_RECEIPT_SCHEMA_VERSION = 2;
+export const STICKY_VICTIM_RECEIPT_STORAGE_KEY = 'atomic-acres:sticky-victim-receipts:v2';
 export const MAX_STICKY_VICTIM_RECEIPTS = 64;
 export const MAX_STICKY_VICTIM_RECEIPT_BYTES = 64 * 1024;
 /** Maximum 15-minute match plus the 90-second crash-rejoin reservation. */
@@ -12,6 +12,7 @@ export const STICKY_VICTIM_RECEIPT_TTL_MS = 990_000;
 export type StickyVictimReceipt = Readonly<{
   matchEpoch: number;
   ownerId: string;
+  ownerLifeId: number;
   targetId: string;
   targetLifeId: number;
   source: StickyAttachmentSource;
@@ -38,9 +39,10 @@ function safeInteger(value: unknown, minimum: number, maximum: number): boolean 
 
 function validReceipt(value: unknown): value is StickyVictimReceipt {
   return record(value)
-    && exactKeys(value, ['matchEpoch', 'ownerId', 'targetId', 'targetLifeId', 'source', 'actionNonce', 'expiresAtEpochMs'])
+    && exactKeys(value, ['matchEpoch', 'ownerId', 'ownerLifeId', 'targetId', 'targetLifeId', 'source', 'actionNonce', 'expiresAtEpochMs'])
     && safeInteger(value.matchEpoch, 0, 999_999_999)
     && typeof value.ownerId === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(value.ownerId)
+    && safeInteger(value.ownerLifeId, 0, 1_000_000_000)
     && typeof value.targetId === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(value.targetId)
     && safeInteger(value.targetLifeId, 0, 1_000_000_000)
     && (value.source === 'semtex' || value.source === 'explosive-crossbow')
@@ -69,6 +71,7 @@ export function stickyVictimReceiptKey(receipt: Omit<StickyVictimReceipt, 'expir
   return JSON.stringify([
     receipt.matchEpoch,
     receipt.ownerId,
+    receipt.ownerLifeId,
     receipt.targetId,
     receipt.targetLifeId,
     receipt.source,
