@@ -15,6 +15,7 @@ const requireOwnedFreshPreview = process.env.QA_REQUIRE_OWNED_FRESH_PREVIEW === 
 const installedEdgeChannel = process.env.QA_INSTALLED_EDGE === '1' ? 'msedge' as const : undefined;
 const pass71GrenadeEdgeExecutable = process.env.PASS71_GRENADE_EDGE_EXECUTABLE;
 const pass71Hf296EdgeExecutable = process.env.PASS71_HF296_EDGE_EXECUTABLE;
+const pass71Hf297FullEdgeExecutable = process.env.PASS71_HF297_FULL_EDGE_EXECUTABLE;
 const pass71Hf304EdgeExecutable = process.env.PASS71_HF304_EDGE_EXECUTABLE;
 const pass71Hf301EdgeExecutable = process.env.PASS71_HF301_EDGE_EXECUTABLE;
 const pass71Hf299EdgeExecutable = process.env.PASS71_HF299_EDGE_EXECUTABLE;
@@ -25,6 +26,7 @@ const pass71Hf307EdgeExecutable = process.env.PASS71_HF307_EDGE_EXECUTABLE;
 const pass71Hf309EdgeExecutable = process.env.PASS71_HF309_EDGE_EXECUTABLE;
 const pass71OwnedEdgeExecutable = pass71GrenadeEdgeExecutable
   ?? pass71Hf296EdgeExecutable
+  ?? pass71Hf297FullEdgeExecutable
   ?? pass71Hf304EdgeExecutable
   ?? pass71Hf301EdgeExecutable
   ?? pass71Hf299EdgeExecutable
@@ -61,6 +63,9 @@ if (pass71GrenadeEdgeExecutable && !installedEdgeChannel) {
 if (pass71Hf296EdgeExecutable && !installedEdgeChannel) {
   throw new Error('PASS71_HF296_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
 }
+if (pass71Hf297FullEdgeExecutable && !installedEdgeChannel) {
+  throw new Error('PASS71_HF297_FULL_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
+}
 if (pass71Hf304EdgeExecutable && !installedEdgeChannel) {
   throw new Error('PASS71_HF304_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
 }
@@ -85,7 +90,8 @@ if (pass71Hf307EdgeExecutable && !installedEdgeChannel) {
 if (pass71Hf309EdgeExecutable && !installedEdgeChannel) {
   throw new Error('PASS71_HF309_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
 }
-if ([pass71GrenadeEdgeExecutable, pass71Hf296EdgeExecutable, pass71Hf304EdgeExecutable,
+if ([pass71GrenadeEdgeExecutable, pass71Hf296EdgeExecutable, pass71Hf297FullEdgeExecutable,
+  pass71Hf304EdgeExecutable,
   pass71Hf301EdgeExecutable, pass71Hf299EdgeExecutable, pass71Hf300EdgeExecutable,
   pass71Hf305EdgeExecutable, pass71Hf306EdgeExecutable, pass71Hf307EdgeExecutable,
   pass71Hf309EdgeExecutable]
