@@ -178,6 +178,10 @@ async function stageAndAimMissileTarget(host: Page, ordinal: number): Promise<an
   };
 }
 
+function canonicalAuthorityTargetKind(stagedTargetKind: string): string {
+  return stagedTargetKind === 'training-dummy' ? 'bot' : stagedTargetKind;
+}
+
 async function servedCandidate(page: Page): Promise<Record<string, unknown>> {
   return page.evaluate(async () => {
     const response = await fetch(new URL('channel-provenance.json', window.location.href), {
@@ -384,7 +388,7 @@ test(`${arena}/${renderer}/${mode}: closes HF-308 missile authority presentation
     expect(firstLaunch).toMatchObject({
       targetId: firstTarget.targetId,
       targetLifeId: firstTarget.targetLifeId,
-      targetKind: 'bot',
+      targetKind: canonicalAuthorityTargetKind(firstTarget.targetKind),
       targetPosition: firstTarget.targetPosition,
     });
     expect((await entityState(host, staged.entityId)).entity.missileAmmo).toBe(5);
@@ -516,7 +520,7 @@ test(`${arena}/${renderer}/${mode}: closes HF-308 missile authority presentation
     expect(secondLaunch).toMatchObject({
       targetId: secondTarget.targetId,
       targetLifeId: secondTarget.targetLifeId,
-      targetKind: 'bot',
+      targetKind: canonicalAuthorityTargetKind(secondTarget.targetKind),
       targetPosition: secondTarget.targetPosition,
     });
     expect(secondLaunch.launchAtMs - firstLaunch.launchAtMs).toBeGreaterThanOrEqual(1_000);
@@ -573,7 +577,7 @@ test(`${arena}/${renderer}/${mode}: closes HF-308 missile authority presentation
       expect(launch).toMatchObject({
         targetId: targetAdmission.targetId,
         targetLifeId: targetAdmission.targetLifeId,
-        targetKind: 'bot',
+        targetKind: canonicalAuthorityTargetKind(targetAdmission.targetKind),
         targetPosition: targetAdmission.targetPosition,
       });
       expect((await entityState(host, staged.entityId)).entity.missileAmmo).toBe(5 - ordinal);

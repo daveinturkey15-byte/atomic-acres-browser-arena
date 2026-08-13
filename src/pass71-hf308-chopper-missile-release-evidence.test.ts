@@ -41,6 +41,10 @@ describe('Pass 71 HF-308 Chopper Gunner missile full-closing evidence', () => {
     expect(runtime).toContain('this.retainChopperMissileAuthorityEvent({');
     expect(network).toContain('impacts: Object.freeze(message.impacts.map((impact)');
     expect(main).toContain('retainRecentKillstreakImpactEvents(admission.impacts)');
+    expect(nativeEvidence).toContain("stagedTargetKind === 'training-dummy' ? 'bot' : stagedTargetKind");
+    expect(nativeEvidence).toContain('targetKind: canonicalAuthorityTargetKind(firstTarget.targetKind)');
+    expect(nativeEvidence).toContain('targetKind: canonicalAuthorityTargetKind(secondTarget.targetKind)');
+    expect(nativeEvidence).toContain('targetKind: canonicalAuthorityTargetKind(targetAdmission.targetKind)');
   });
 
   it('preserves canonical six-ammo authority at no less than the 1000 ms cadence without queued cooldown or seventh launches', () => {
