@@ -24,6 +24,7 @@ import {
   advanceAdsBlend,
   advanceWeaponHeat,
   fireCycleAt,
+  viewmodelContactActionFreedom,
   viewmodelContactResponse,
   type ViewmodelContactResponse,
 } from './weapon-presentation-state';
@@ -3469,7 +3470,9 @@ export class WeaponPresentation {
     const windup = THREE.MathUtils.smoothstep(progress, 0, 0.14);
     const thrust = THREE.MathUtils.smoothstep(progress, 0.14, 0.44);
     const recover = THREE.MathUtils.smoothstep(progress, 0.58, 1);
-    const drive = thrust * (1 - recover);
+    const contactActionFreedom = viewmodelContactActionFreedom(this.contactResponse.obstructionBlend);
+    const retainedWindup = windup * contactActionFreedom;
+    const drive = thrust * (1 - recover) * contactActionFreedom;
     let right: RiggedViewArm | undefined;
     let left: RiggedViewArm | undefined;
     for (const rig of this.riggedArmRigs) {
@@ -3510,7 +3513,7 @@ export class WeaponPresentation {
         const lowerLength = elbow.distanceTo(wrist);
         const restWristLocal = arms.worldToLocal(scratch.meleeRestWristLocal.copy(wrist));
         const targetLocal = scratch.meleeWristTargetLocal.copy(restWristLocal)
-          .addScaledVector(windupOffsetLocal, windup * (1 - thrust))
+          .addScaledVector(windupOffsetLocal, retainedWindup * (1 - thrust))
           .lerp(peakTargetLocal, drive);
         const wristTarget = arms.localToWorld(scratch.meleeWristTargetWorld.copy(targetLocal));
         const maximumReach = (upperLength + lowerLength) * RIGGED_ARM_MAX_REACH_RATIO;
@@ -3987,7 +3990,10 @@ export class WeaponPresentation {
       : timedMeleeProgress;
     const meleeProgress = this.debugMeleeProgress ?? presentedMeleeProgress;
     const meleeActive = this.debugMeleeProgress !== null || (this.meleeStart > 0 && meleeProgress < 1);
-    const meleeArc = meleeActive ? Math.sin(meleeProgress * Math.PI) : 0;
+    const contactActionFreedom = viewmodelContactActionFreedom(this.contactResponse.obstructionBlend);
+    const meleeArc = meleeActive
+      ? Math.sin(meleeProgress * Math.PI) * contactActionFreedom
+      : 0;
     this.actionContract = characterActionContract({
       weapon: this.active,
       aimBlend: this.adsBlend,
@@ -4019,15 +4025,16 @@ export class WeaponPresentation {
       const windup = THREE.MathUtils.smoothstep(meleeProgress, 0, 0.14);
       const thrust = THREE.MathUtils.smoothstep(meleeProgress, 0.14, 0.44);
       const recover = THREE.MathUtils.smoothstep(meleeProgress, 0.58, 1);
-      const drive = thrust * (1 - recover);
+      const retainedWindup = windup * contactActionFreedom;
+      const drive = thrust * (1 - recover) * contactActionFreedom;
       if (authoredMeleeActive) {
         this.poseRiggedMeleeArms(meleeProgress);
       } else if (proceduralMeleeActive) {
         this.proceduralMeleeArmFrames += 1;
         this.meleeRig.position.set(
-          0.28 + windup * 0.08 - drive * 0.42,
-          -0.12 - windup * 0.07 + drive * 0.24,
-          -0.2 + windup * 0.1 - drive * 0.54,
+          0.28 + retainedWindup * 0.08 - drive * 0.42,
+          -0.12 - retainedWindup * 0.07 + drive * 0.24,
+          -0.2 + retainedWindup * 0.1 - drive * 0.54,
         );
         this.meleeRig.rotation.set(-drive * 0.3, -drive * 0.48, drive * 0.55);
       }
@@ -4035,7 +4042,9 @@ export class WeaponPresentation {
       this.restoreRiggedArmBindPose();
     }
     const grenadeProgress = THREE.MathUtils.clamp((performance.now() - this.grenadeStart) / 620, 0, 1);
-    const grenadeArc = this.grenadeStart > 0 && grenadeProgress < 1 ? Math.sin(grenadeProgress * Math.PI) : 0;
+    const grenadeArc = this.grenadeStart > 0 && grenadeProgress < 1
+      ? Math.sin(grenadeProgress * Math.PI) * contactActionFreedom
+      : 0;
 
     const viewmodelBaseX = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.x, ADS_VIEWMODEL_BASE_POSITION.x, this.adsBlend);
     const viewmodelBaseY = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.y, ADS_VIEWMODEL_BASE_POSITION.y, this.adsBlend)

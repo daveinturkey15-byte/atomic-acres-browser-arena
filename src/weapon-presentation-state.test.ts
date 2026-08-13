@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   VIEWMODEL_CONTACT_PROBE_OFFSETS,
   VIEWMODEL_CONTACT_PROFILES,
+  VIEWMODEL_CONTACT_MINIMUM_ACTION_FREEDOM,
   VIEWMODEL_CONTACT_RESPONSE_CONTRACT,
   advanceAdsBlend,
   advanceWeaponHeat,
   fireCycleAt,
   hitReactionAt,
   magnifiedFovDegrees,
+  viewmodelContactActionFreedom,
   viewmodelFloorClearance,
   viewmodelContactProbePaddingMeters,
   viewmodelContactResponse,
@@ -122,6 +124,9 @@ describe('weapon presentation state', () => {
       expect(profile.fullStowDistanceMeters).toBeLessThan(profile.probeLengthMeters);
       expect(profile.maximumSurfaceRetreatMeters).toBeGreaterThanOrEqual(0.6);
       expect(profile.probeHalfWidthMeters).toBeGreaterThanOrEqual(0.18);
+      expect(profile.envelopeHalfWidthMeters).toBeGreaterThan(profile.probeHalfWidthMeters);
+      expect(profile.envelopeUpperOffsetMeters).toBeGreaterThan(profile.probeUpperOffsetMeters);
+      expect(profile.envelopeLowerOffsetMeters).toBeGreaterThan(profile.probeLowerOffsetMeters);
       expect(profile.minimumScale).toBeGreaterThanOrEqual(0.7);
       expect(profile.minimumScale).toBeLessThanOrEqual(0.9);
       expect(profile.maximumWallDropMeters).toBeGreaterThanOrEqual(0.17);
@@ -246,9 +251,16 @@ describe('weapon presentation state', () => {
       expect(hip.wallBlend, weapon).toBe(1);
       expect(hip.highReadyBlend, weapon).toBe(1);
       expect(ads.wallBlend, weapon).toBe(1);
-      expect(ads.highReadyBlend, weapon).toBeGreaterThanOrEqual(0.82);
+      expect(ads.highReadyBlend, weapon).toBeGreaterThanOrEqual(0.94);
       expect(ads.scale, weapon).toBeLessThan(0.9);
     }
+  });
+
+  it('retains a visible accepted action while conservatively limiting contact reach', () => {
+    expect(viewmodelContactActionFreedom(0)).toBe(1);
+    expect(viewmodelContactActionFreedom(1)).toBe(VIEWMODEL_CONTACT_MINIMUM_ACTION_FREEDOM);
+    expect(viewmodelContactActionFreedom(0.5)).toBeGreaterThan(VIEWMODEL_CONTACT_MINIMUM_ACTION_FREEDOM);
+    expect(viewmodelContactActionFreedom(Number.NaN)).toBe(1);
   });
 
   it('uses each authored weapon envelope for standing, crouch-equivalent and prone wall/floor contact', () => {

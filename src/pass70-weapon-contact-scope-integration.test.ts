@@ -7,6 +7,7 @@ describe('Pass 70 contact and Railgun scope integration contracts', () => {
   it('keeps contact motion presentation-only while camera-forward remains shot authority', () => {
     const presentation = read('./weapon-presentation.ts');
     const runtime = read('./legacy-main.ts');
+    const probe = read('./viewmodel-contact-probe.ts');
     expect(presentation).toContain('viewmodelContactResponse(');
     expect(presentation).toContain('+ this.contactResponse.pitchRadians');
     expect(presentation).toContain('+ this.contactResponse.yawRadians');
@@ -15,10 +16,16 @@ describe('Pass 70 contact and Railgun scope integration contracts', () => {
     expect(runtime).toContain('const baseDirection = camera.getWorldDirection(new THREE.Vector3());');
     expect(runtime).toContain('cameraDirection: baseDirection.toArray()');
     expect(runtime).toContain('const profile = VIEWMODEL_CONTACT_PROFILES[player.weapon];');
-    expect(runtime).toContain('const probePaddingMeters = viewmodelContactProbePaddingMeters(profile);');
-    expect(runtime).toContain('for (const offset of VIEWMODEL_CONTACT_PROBE_OFFSETS)');
-    expect(runtime).toContain('viewmodelObstructionPose(nearestForward, player.stance === \'prone\', floorClearance, player.weapon)');
+    expect(runtime).toContain('const viewmodelContactProbe = new ViewmodelContactProbe();');
+    expect(runtime).toContain('const sample = viewmodelContactProbe.sample(');
+    expect(runtime).toContain('sample.nearestForwardSurfaceMeters');
+    expect(probe).toContain("'retained-splayed-real-collider-envelope-v1'");
+    expect(probe).toContain('for (const offset of VIEWMODEL_CONTACT_PROBE_OFFSETS)');
+    expect(probe).toContain('profile.envelopeHalfWidthMeters');
+    expect(probe).toContain('segmentBoxHitTime(start, end, collider, paddingMeters)');
+    expect(presentation).toContain('viewmodelContactActionFreedom(this.contactResponse.obstructionBlend)');
     expect(runtime).not.toMatch(/contactResponse[^\n]*(camera|baseDirection|projectile)/u);
+    expect(probe).not.toMatch(/camera\.position|player\.position|muzzle|projectile/u);
   });
 
   it('routes M14, Railgun, Chopper and piloted-drone reveals through one exact-model renderer without pawn proxies', () => {

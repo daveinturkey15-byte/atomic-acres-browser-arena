@@ -322,23 +322,32 @@ describe('first-person anatomical presentation', () => {
     for (const weapon of WEAPON_IDS) {
       presentation.setWeapon(weapon, true);
       const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+      const wallContactPose = Object.freeze({
+        ...REST_POSE,
+        surfaceRetreat: profile.maximumSurfaceRetreatMeters,
+        surfaceLift: 0,
+      });
       const scenarios = Object.freeze([
         Object.freeze({ name: 'hip', pose: REST_POSE }),
-        Object.freeze({ name: 'fire', pose: REST_POSE }),
-        Object.freeze({ name: 'ads', pose: Object.freeze({ ...REST_POSE, ads: true }) }),
+        Object.freeze({ name: 'wall-contact', pose: wallContactPose }),
+        Object.freeze({ name: 'crouch-contact', pose: Object.freeze({ ...wallContactPose, crouched: true }) }),
+        Object.freeze({ name: 'fire-contact', pose: wallContactPose }),
+        Object.freeze({ name: 'ads-contact', pose: Object.freeze({ ...wallContactPose, ads: true }) }),
         Object.freeze({
           name: 'prone-contact',
           pose: Object.freeze({
-            ...REST_POSE,
+            ...wallContactPose,
             prone: true,
-            surfaceRetreat: profile.maximumSurfaceRetreatMeters,
             surfaceLift: 0.2,
           }),
         }),
-        Object.freeze({ name: 'reload', pose: Object.freeze({ ...REST_POSE, reloadProgress: 0.5 }) }),
+        Object.freeze({
+          name: 'reload-contact',
+          pose: Object.freeze({ ...wallContactPose, reloadProgress: 0.5 }),
+        }),
       ]);
       for (const scenario of scenarios) {
-        if (scenario.name === 'fire') {
+        if (scenario.name === 'fire-contact') {
           presentation.fire(0.02);
           presentation.setFireCaptureAgeMs(0);
         }
@@ -347,6 +356,13 @@ describe('first-person anatomical presentation', () => {
         presentation.update(scenario.pose);
         const state = presentation.presentationState();
         expect(state.riggedArms, `${weapon}/${scenario.name}: both authored chains`).toHaveLength(2);
+        if (scenario.name !== 'hip') {
+          expect(state.contactResponse.obstructionBlend, `${weapon}/${scenario.name}: contact response`).toBe(1);
+          expect(state.armFraming?.finite, `${weapon}/${scenario.name}: finite arm envelope`).toBe(true);
+          expect(state.armFraming?.nearPlaneClear, `${weapon}/${scenario.name}: arm near plane`).toBe(true);
+          expect(state.weaponFraming?.finite, `${weapon}/${scenario.name}: finite weapon envelope`).toBe(true);
+          expect(state.weaponFraming?.nearPlaneClear, `${weapon}/${scenario.name}: weapon near plane`).toBe(true);
+        }
         for (const arm of state.riggedArms.filter((entry) => entry.active === true)) {
           const label = `${weapon}/${scenario.name}/${String(arm.side)}`;
           expect(arm.segmentLengthScale, `${label}: segment scale`).toBe(FIRST_PERSON_ARM_BIND_SEGMENT_LENGTH_SCALE);
@@ -359,10 +375,40 @@ describe('first-person anatomical presentation', () => {
           expect(arm.contactError as number, `${label}: palm contact`).toBeLessThanOrEqual(0.02);
           expect(arm.finite, `${label}: finite solve`).toBe(true);
         }
-        if (scenario.name === 'fire') presentation.setFireCaptureAgeMs(1_000);
+        if (scenario.name === 'fire-contact') presentation.setFireCaptureAgeMs(1_000);
       }
     }
-  }, 15_000);
+  }, 20_000);
+
+  it('keeps the accepted knife visible while contact shortens its complete action reach', () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
+    const presentation = new WeaponPresentation(camera, false);
+    presentation.setMeleeCaptureProgress(0.4);
+    for (const weapon of WEAPON_IDS) {
+      presentation.setWeapon(weapon, true);
+      presentation.update(REST_POSE);
+      const meleeRig = presentation.root.getObjectByName('field-knife-arm-rig');
+      expect(meleeRig, weapon).toBeDefined();
+      const openReachZ = meleeRig!.position.z;
+
+      const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+      presentation.update({
+        ...REST_POSE,
+        prone: true,
+        surfaceRetreat: profile.maximumSurfaceRetreatMeters,
+        surfaceLift: 0.2,
+      });
+      const state = presentation.presentationState();
+      expect(meleeRig!.position.z - openReachZ, `${weapon}: contact-shortened knife reach`)
+        .toBeGreaterThan(0.3);
+      expect(state.knifeVisible, weapon).toBe(true);
+      expect(state.armsVisible, weapon).toBe(true);
+      expect(state.contactResponse.obstructionBlend, weapon).toBe(1);
+      expect(state.meleeKnifeFraming?.finite, weapon).toBe(true);
+      expect(state.meleeKnifeFraming?.nearPlaneClear, weapon).toBe(true);
+    }
+    presentation.setMeleeCaptureProgress(null);
+  });
 
   it('keeps the complete long-gun geometry camera-side of the calibrated wall and prone floor planes', async () => {
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
@@ -418,6 +464,21 @@ describe('first-person anatomical presentation', () => {
       for (let frame = 0; frame < 45; frame += 1) {
         presentation.update({
           ...REST_POSE,
+          ads: true,
+          surfaceRetreat: profile.maximumSurfaceRetreatMeters,
+          surfaceLift: 0.2,
+        });
+      }
+      camera.updateMatrixWorld(true);
+      const adsWallBounds = new THREE.Box3().setFromObject(mountedModel)
+        .union(new THREE.Box3().setFromObject(arms!));
+      if (wallPlane !== undefined) {
+        expect(adsWallBounds.min.z, `${weapon}: contact ADS crossed wall plane`).toBeGreaterThanOrEqual(wallPlane);
+      }
+
+      for (let frame = 0; frame < 45; frame += 1) {
+        presentation.update({
+          ...REST_POSE,
           prone: true,
           surfaceRetreat: profile.maximumSurfaceRetreatMeters,
           surfaceLift: 0.2,
@@ -447,6 +508,11 @@ describe('first-person anatomical presentation', () => {
         new THREE.Box3().setFromObject(mountedModel).min.y,
         `${weapon}: recoil crossed prone floor plane`,
       ).toBeGreaterThanOrEqual(-0.61);
+      if (wallPlane !== undefined) {
+        const fireWallBounds = new THREE.Box3().setFromObject(mountedModel)
+          .union(new THREE.Box3().setFromObject(arms!));
+        expect(fireWallBounds.min.z, `${weapon}: contact fire crossed wall plane`).toBeGreaterThanOrEqual(wallPlane);
+      }
       presentation.setFireCaptureAgeMs(1_000);
 
       for (const reloadProgress of [0.5, 0.6]) {
@@ -464,6 +530,12 @@ describe('first-person anatomical presentation', () => {
           new THREE.Box3().setFromObject(mountedModel).min.y,
           `${weapon}: reload ${reloadProgress} crossed prone floor plane`,
         ).toBeGreaterThanOrEqual(-0.61);
+        if (wallPlane !== undefined) {
+          const reloadWallBounds = new THREE.Box3().setFromObject(mountedModel)
+            .union(new THREE.Box3().setFromObject(arms!));
+          expect(reloadWallBounds.min.z, `${weapon}: contact reload ${reloadProgress} crossed wall plane`)
+            .toBeGreaterThanOrEqual(wallPlane);
+        }
       }
     }
     presentation.setFireCaptureAgeMs(null);

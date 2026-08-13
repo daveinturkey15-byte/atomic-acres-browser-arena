@@ -253,7 +253,7 @@ import {
   weaponPrewarmCatalogForArena,
 } from './weapon-prewarm-catalog';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
-import { clampPointToBounds, damp, firstSegmentBoxHit, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes } from './collision';
+import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes } from './collision';
 import {
   applyPenetrationDamage,
   ballisticImpactSurface,
@@ -720,13 +720,12 @@ import {
 } from './weapon-presentation';
 import {
   magnifiedFovDegrees,
-  VIEWMODEL_CONTACT_PROBE_OFFSETS,
   VIEWMODEL_CONTACT_PROFILES,
-  viewmodelContactProbePaddingMeters,
   viewmodelFloorClearance,
   viewmodelObstructionPose,
   type ViewmodelObstructionPose,
 } from './weapon-presentation-state';
+import { ViewmodelContactProbe } from './viewmodel-contact-probe';
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
 import {
   RAILGUN_SCOPE_MAGNIFICATION,
@@ -9265,44 +9264,27 @@ function stanceEyeHeight(stance: PlayerSnapshot['stance']): number {
   return stance === 'prone' ? 0.61 : stance === 'crouch' ? 1.16 : 1.7;
 }
 
-const viewmodelProbeDirection = new THREE.Vector3();
-const viewmodelProbeRight = new THREE.Vector3();
-const viewmodelProbeUp = new THREE.Vector3();
-const viewmodelProbeStart = new THREE.Vector3();
-const viewmodelProbeEnd = new THREE.Vector3();
-const viewmodelProbeRotation = new THREE.Euler(0, 0, 0, 'YXZ');
+const viewmodelContactProbe = new ViewmodelContactProbe();
 function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
   const profile = VIEWMODEL_CONTACT_PROFILES[player.weapon];
-  viewmodelProbeRotation.set(player.pitch, player.yaw, 0, 'YXZ');
-  viewmodelProbeDirection.set(0, 0, -1).applyEuler(viewmodelProbeRotation).normalize();
-  viewmodelProbeRight.set(1, 0, 0).applyEuler(viewmodelProbeRotation).normalize();
-  viewmodelProbeUp.set(0, 1, 0).applyEuler(viewmodelProbeRotation).normalize();
-  const colliders = activeWorldColliders();
-  const probePaddingMeters = viewmodelContactProbePaddingMeters(profile);
-  let nearestForward: number | null = null;
-  for (const offset of VIEWMODEL_CONTACT_PROBE_OFFSETS) {
-    const verticalOffset = offset.vertical === 'upper'
-      ? profile.probeUpperOffsetMeters
-      : offset.vertical === 'lower' ? -profile.probeLowerOffsetMeters : offset.rightScale === 0 ? 0 : 0.04;
-    viewmodelProbeStart.copy(player.position)
-      .addScaledVector(viewmodelProbeRight, offset.rightScale * profile.probeHalfWidthMeters)
-      .addScaledVector(viewmodelProbeUp, verticalOffset);
-    viewmodelProbeEnd.copy(viewmodelProbeStart).addScaledVector(viewmodelProbeDirection, profile.probeLengthMeters);
-    const hit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, probePaddingMeters);
-    if (!hit) continue;
-    const distance = hit.time * profile.probeLengthMeters;
-    nearestForward = nearestForward === null ? distance : Math.min(nearestForward, distance);
-  }
-  viewmodelProbeStart.copy(player.position);
-  viewmodelProbeEnd.copy(player.position);
-  viewmodelProbeEnd.y -= 1.05;
-  const floorHit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, 0.035);
+  const sample = viewmodelContactProbe.sample(
+    player.position,
+    player.pitch,
+    player.yaw,
+    activeWorldColliders(),
+    profile,
+  );
   const floorClearance = viewmodelFloorClearance(
-    floorHit ? floorHit.time * 1.05 : null,
+    sample.floorSurfaceMeters,
     playerGrounded,
     stanceEyeHeight(player.stance),
   );
-  return viewmodelObstructionPose(nearestForward, player.stance === 'prone', floorClearance, player.weapon);
+  return viewmodelObstructionPose(
+    sample.nearestForwardSurfaceMeters,
+    player.stance === 'prone',
+    floorClearance,
+    player.weapon,
+  );
 }
 
 function currentViewmodelSurfaceRetreat(): number {
