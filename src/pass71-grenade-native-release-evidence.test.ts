@@ -5,6 +5,10 @@ const contract = readFileSync('scripts/qa/pass71-grenade-native-receipt-contract
 const contractTests = readFileSync('scripts/qa/pass71-grenade-native-receipt-contract.test.mjs', 'utf8');
 const runner = readFileSync('scripts/qa/run-pass71-grenade-native-receipt.mjs', 'utf8');
 const verifier = readFileSync('scripts/qa/verify-pass71-grenade-native-evidence.mjs', 'utf8');
+const coverageContract = readFileSync('scripts/qa/pass71-hf298-coverage-contract.mjs', 'utf8');
+const coverageTests = readFileSync('scripts/qa/pass71-hf298-coverage-contract.test.mjs', 'utf8');
+const coverageRunner = readFileSync('scripts/qa/run-pass71-hf298-coverage.mjs', 'utf8');
+const coverageVerifier = readFileSync('scripts/qa/verify-pass71-hf298-coverage.mjs', 'utf8');
 const spec = readFileSync('tests/e2e/pass71-grenade-first-action.spec.ts', 'utf8');
 const playwrightConfig = readFileSync('playwright.config.ts', 'utf8');
 const acceptanceGate = readFileSync('scripts/release/acceptance-gate.mjs', 'utf8');
@@ -13,7 +17,7 @@ const releaseWorkflow = readFileSync('.github/workflows/release-production.yml',
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
 
 describe('Pass 71 exact-SHA grenade native release evidence', () => {
-  it('owns a clean exact-candidate installed-Edge native-WebGPU runner', () => {
+  it('owns a clean exact-candidate installed-Edge component runner for every representative scope', () => {
     for (const token of [
       "values['expected-source-sha']",
       "git('rev-parse', 'HEAD')",
@@ -22,7 +26,8 @@ describe('Pass 71 exact-SHA grenade native release evidence', () => {
       "endingCheckoutSourceSha = git('rev-parse', 'HEAD')",
       "QA_INSTALLED_EDGE: '1'",
       'PASS71_GRENADE_EDGE_EXECUTABLE: edgeExecutable',
-      "PASS71_GRENADE_RENDERER: 'webgpu'",
+      'PASS71_GRENADE_RENDERER: scope.renderer',
+      'PASS71_GRENADE_NATIVE_MODE: scope.mode',
       "PASS71_GRENADE_EVIDENCE_MODE: 'native-no-freeze'",
       'PASS71_GRENADE_NATIVE_COMPONENT_DIR: componentDirectory',
       "'tests/e2e/pass71-grenade-first-action.spec.ts'",
@@ -48,7 +53,7 @@ describe('Pass 71 exact-SHA grenade native release evidence', () => {
     expect(spec).toContain("cache: 'no-store'");
     expect(spec).toContain('sourceSha: nativeExpectedSourceSha');
     expect(spec).toContain('servedCandidate,');
-    expect(spec).toContain('page.context().browser()?.version()');
+    expect(spec).toContain('actionPage.context().browser()?.version()');
     expect(runner).toContain('servedSourceSha: served?.sourceSha');
     expect(runner).not.toContain('servedSourceSha: expectedSourceSha');
   });
@@ -80,26 +85,55 @@ describe('Pass 71 exact-SHA grenade native release evidence', () => {
 
   it('makes the ready-to-paste canonical record mechanically mandatory in both CI acceptance and release', () => {
     expect(acceptanceGate).toContain("manifest.releasePass === 'PASS 71'");
-    expect(acceptanceGate).toContain('hf298Records.length !== 1');
+    expect(acceptanceGate).toContain('PASS71_NATIVE_EVIDENCE_REGISTRY');
     expect(acceptanceGate).toContain('has no registered evidence validator');
-    expect(acceptanceGate).toContain('PASS71_GRENADE_NATIVE_EVIDENCE.evidenceId');
+    expect(acceptanceGate).toContain('PASS71_GRENADE_NATIVE_EVIDENCE_DESCRIPTOR');
+    expect(acceptanceGate).toContain("PASS71_HF298_REQUIREMENT_ID = 'R3'");
+    expect(acceptanceGate).toContain('feedbackId must be HF-298');
+    expect(acceptanceGate).toContain('requires all four solo/hosted x WebGL2/WebGPU components');
     expect(acceptanceGate).toContain('pass71GrenadeNativeToolingHashesAtSource(REPOSITORY_ROOT, preview?.sourceSha)');
     expect(acceptanceGate).toContain('pass71GrenadeNativeEvidenceFailures(record');
+    expect(acceptanceGate).toContain('pass71Hf298CoverageFailures(record');
     expect(acceptanceGate).toContain("manifestPath === 'acceptance/pass-71.json'");
     expect(acceptanceGate).toContain('candidate B may change only acceptance/pass-71.json');
-    expect(acceptanceGate).toContain('native evidence startedAt cannot precede preview.createdAt');
-    expect(acceptanceGate).toContain('native evidence completedAt cannot follow humanAcceptance.approvedAt');
+    expect(acceptanceGate).toContain('.startedAt cannot precede preview.createdAt');
+    expect(acceptanceGate).toContain('.completedAt cannot follow humanAcceptance.approvedAt');
+    expect(acceptanceGate).toContain('.finalizedAt cannot follow humanAcceptance.approvedAt');
     expect(verifyWorkflow).toContain('node scripts/release/acceptance-gate.mjs --phase ci');
     expect(releaseWorkflow).toContain('node scripts/release/acceptance-gate.mjs --phase release');
     expect(verifier).toContain('assertPass71GrenadeNativeEvidence(record');
   });
 
+  it('finalizes exactly four component receipts into one digest-bound HF-298 coverage record', () => {
+    for (const scope of [
+      "Object.freeze({ mode: 'solo', renderer: 'webgl2' })",
+      "Object.freeze({ mode: 'solo', renderer: 'webgpu' })",
+      "Object.freeze({ mode: 'hosted', renderer: 'webgl2' })",
+      "Object.freeze({ mode: 'hosted', renderer: 'webgpu' })",
+    ]) expect(contract).toContain(scope);
+    expect(spec).toContain('startOwnedPeerServer(peerPort)');
+    expect(spec).toContain('privateMatch?.members.length === 2');
+    expect(spec).toContain("presentation: { status: 'synchronous' }");
+    expect(contract).toContain("renderer === 'webgl2' && (");
+    expect(contract).toContain('baseline.targetSubmissionSequence !== 0');
+    expect(coverageContract).toContain("kind: 'pass71-hf298-full-scope-coverage'");
+    expect(coverageContract).toContain('exact-four-component-set');
+    expect(coverageContract).toContain('pass71GrenadeNativeRecordSha256(component)');
+    expect(coverageRunner).toContain('for (const scope of PASS71_GRENADE_NATIVE_EVIDENCE.scopes) runComponent(scope)');
+    expect(coverageRunner).toContain('const manifestEvidence = [...components, coverage]');
+    expect(coverageRunner).toContain('Paste the complete five-record nativeEvidence array');
+    expect(coverageVerifier).toContain('records.length !== 5 || components.length !== 4 || coverages.length !== 1');
+    expect(coverageTests).toContain('rejects a WebGL2 component that invents asynchronous GPU submission sequences');
+  });
+
   it('exposes explicit run, contract and verification commands', () => {
     expect(packageJson.scripts['qa:pass71:grenade-native:contract'])
-      .toBe('node --test scripts/qa/pass71-grenade-native-receipt-contract.test.mjs scripts/qa/pass71-edge-executable-identity.test.mjs');
+      .toContain('scripts/qa/pass71-hf298-coverage-contract.test.mjs');
     expect(packageJson.scripts['qa:pass71:grenade-native:verify'])
-      .toBe('node scripts/qa/verify-pass71-grenade-native-evidence.mjs');
+      .toBe('node scripts/qa/verify-pass71-hf298-coverage.mjs');
+    expect(packageJson.scripts['qa:pass71:grenade-native:component'])
+      .toBe('node scripts/qa/run-pass71-grenade-native-receipt.mjs');
     expect(packageJson.scripts['qa:pass71:grenade-native'])
-      .toContain('run-pass71-grenade-native-receipt.mjs');
+      .toContain('run-pass71-hf298-coverage.mjs');
   });
 });

@@ -12,9 +12,29 @@ const fixture = () => createPass71GrenadeNativeEvidenceFixture({ sourceSha });
 const expected = (record) => ({ sourceSha, tooling: record.tooling });
 const refreshDigest = (record) => { record.receiptSha256 = pass71GrenadeNativeRecordSha256(record); };
 
-test('accepts the canonical exact-SHA installed-Edge native-WebGPU four-grenade receipt', () => {
+test('accepts the canonical exact-SHA installed-Edge four-grenade component', () => {
   const record = fixture();
   assert.doesNotThrow(() => assertPass71GrenadeNativeEvidence(record, expected(record)));
+});
+
+test('accepts each representative solo/hosted x WebGL2/WebGPU component scope', () => {
+  for (const mode of ['solo', 'hosted']) {
+    for (const renderer of ['webgl2', 'webgpu']) {
+      const record = createPass71GrenadeNativeEvidenceFixture({ sourceSha, mode, renderer });
+      assert.doesNotThrow(
+        () => assertPass71GrenadeNativeEvidence(record, expected(record)),
+        `${mode}/${renderer}`,
+      );
+    }
+  }
+});
+
+test('WebGL2 requires synchronous seq0 frontiers rather than forged GPU submission claims', () => {
+  const record = createPass71GrenadeNativeEvidenceFixture({ sourceSha, renderer: 'webgl2' });
+  record.trials[0].cold.frontier.targetSubmissionSequence = 1;
+  refreshDigest(record);
+  assert.ok(pass71GrenadeNativeEvidenceFailures(record, expected(record))
+    .includes('trial:frag:cold:completed-presentation-frontier'));
 });
 
 test('canonical receipt digest excludes only the digest field and survives property reordering', () => {

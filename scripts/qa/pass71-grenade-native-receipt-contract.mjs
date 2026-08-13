@@ -4,13 +4,26 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 export const PASS71_GRENADE_NATIVE_EVIDENCE = Object.freeze({
-  schemaVersion: 1,
+  schemaVersion: 2,
   evidenceId: 'HF-298',
-  kind: 'pass71-hf298-grenade-native-webgpu-component',
-  contract: 'atomic-acres/pass71-hf298-grenade-native-webgpu-component@1',
-  gate: 'pass71-exact-sha-installed-edge-native-webgpu-grenade-first-action-v1',
+  kind: 'pass71-hf298-grenade-native-component',
+  contract: 'atomic-acres/pass71-hf298-grenade-native-component@2',
+  gate: 'pass71-exact-sha-installed-edge-native-grenade-first-action-v2',
   grenades: Object.freeze(['frag', 'flash', 'smoke', 'semtex']),
   phases: Object.freeze(['cold', 'warm']),
+  scopes: Object.freeze([
+    Object.freeze({ mode: 'solo', renderer: 'webgl2' }),
+    Object.freeze({ mode: 'solo', renderer: 'webgpu' }),
+    Object.freeze({ mode: 'hosted', renderer: 'webgl2' }),
+    Object.freeze({ mode: 'hosted', renderer: 'webgpu' }),
+  ]),
+});
+
+export const PASS71_GRENADE_NATIVE_EVIDENCE_DESCRIPTOR = Object.freeze({
+  evidenceId: PASS71_GRENADE_NATIVE_EVIDENCE.evidenceId,
+  kind: PASS71_GRENADE_NATIVE_EVIDENCE.kind,
+  minimumCount: 1,
+  maximumCount: PASS71_GRENADE_NATIVE_EVIDENCE.scopes.length,
 });
 
 export const PASS71_GRENADE_NATIVE_TOOL_PATHS = Object.freeze({
@@ -30,6 +43,10 @@ export const PASS71_GRENADE_NATIVE_TOOL_PATHS = Object.freeze({
   edgeIdentityProbe: 'scripts/qa/pass71-edge-executable-identity.mjs',
   nativeUserAgentContract: 'scripts/qa/pass70-cross-browser-native-user-agent-contract.mjs',
   multiplayerBrowserContract: 'scripts/qa/pass66-multiplayer-stability-contract.mjs',
+  peerSupport: 'tests/e2e/pass66-e2e-support.ts',
+  coverageContract: 'scripts/qa/pass71-hf298-coverage-contract.mjs',
+  coverageRunner: 'scripts/qa/run-pass71-hf298-coverage.mjs',
+  coverageVerifier: 'scripts/qa/verify-pass71-hf298-coverage.mjs',
 });
 
 const SHA40 = /^[a-f0-9]{40}$/u;
@@ -148,7 +165,7 @@ function expectedBudget(baseline) {
   };
 }
 
-function validateBaseline(baseline, expectedLabel, prefix, failures) {
+function validateBaseline(baseline, expectedLabel, renderer, prefix, failures) {
   exactKeys(baseline, [
     'label', 'observationMs', 'frameSamples', 'gapsMs', 'p50GapMs', 'p95GapMs',
     'maximumGapMs', 'presentationStatus', 'startingPresentedFrame', 'endingPresentedFrame',
@@ -169,7 +186,7 @@ function validateBaseline(baseline, expectedLabel, prefix, failures) {
     || !finiteNonNegative(baseline.firstSubmissionDelayMs)
     || !finiteNonNegative(baseline.firstCompletionDelayMs)
     || !finiteNonNegative(baseline.maximumPendingForMs)
-    || baseline.presentationStatus !== 'healthy'
+    || baseline.presentationStatus !== (renderer === 'webgpu' ? 'healthy' : 'synchronous')
     || baseline.completionFailures !== 0
     || !Number.isSafeInteger(baseline.startingPresentedFrame)
     || !Number.isSafeInteger(baseline.endingPresentedFrame)
@@ -181,7 +198,13 @@ function validateBaseline(baseline, expectedLabel, prefix, failures) {
     || !Number.isSafeInteger(baseline.endingCompletedSequence)
     || baseline.endingSubmissionSequence < baseline.startingSubmissionSequence
     || baseline.endingCompletedSequence < baseline.startingCompletedSequence
-    || baseline.endingCompletedSequence < baseline.targetSubmissionSequence) {
+    || baseline.endingCompletedSequence < baseline.targetSubmissionSequence
+    || renderer === 'webgpu' && baseline.targetSubmissionSequence <= baseline.startingSubmissionSequence
+    || renderer === 'webgl2' && (
+      baseline.startingSubmissionSequence !== 0 || baseline.startingCompletedSequence !== 0
+      || baseline.targetSubmissionSequence !== 0 || baseline.endingSubmissionSequence !== 0
+      || baseline.endingCompletedSequence !== 0
+    )) {
     failures.push(`${prefix}:baseline-frontier`);
     return null;
   }
@@ -199,7 +222,7 @@ function validateBaseline(baseline, expectedLabel, prefix, failures) {
   return expectedBudget(baseline);
 }
 
-function validateAction(action, grenade, phase, prefix, failures) {
+function validateAction(action, grenade, phase, renderer, prefix, failures) {
   const expectedCold = phase === 'cold';
   exactKeys(action, ['phase', 'baseline', 'budget', 'measurement', 'frontier', 'audio'], prefix, failures);
   if (!object(action) || action.phase !== phase) {
@@ -209,6 +232,7 @@ function validateAction(action, grenade, phase, prefix, failures) {
   const budget = validateBaseline(
     action.baseline,
     `${grenade}-${phase}-preaction-baseline`,
+    renderer,
     prefix,
     failures,
   );
@@ -254,11 +278,17 @@ function validateAction(action, grenade, phase, prefix, failures) {
     || !Number.isSafeInteger(frontier.startingSubmissionSequence)
     || !Number.isSafeInteger(frontier.startingCompletedSequence)
     || !Number.isSafeInteger(frontier.targetSubmissionSequence)
-    || frontier.targetSubmissionSequence <= frontier.startingSubmissionSequence
     || !Number.isSafeInteger(frontier.endingSubmissionSequence)
     || !Number.isSafeInteger(frontier.endingCompletedSequence)
     || frontier.endingCompletedSequence < frontier.targetSubmissionSequence
-    || frontier.completionFailures !== 0 || frontier.status !== 'healthy'
+    || renderer === 'webgpu' && frontier.targetSubmissionSequence <= frontier.startingSubmissionSequence
+    || renderer === 'webgl2' && (
+      frontier.startingSubmissionSequence !== 0 || frontier.startingCompletedSequence !== 0
+      || frontier.targetSubmissionSequence !== 0 || frontier.endingSubmissionSequence !== 0
+      || frontier.endingCompletedSequence !== 0
+    )
+    || frontier.completionFailures !== 0
+    || frontier.status !== (renderer === 'webgpu' ? 'healthy' : 'synchronous')
     || frontier.observationComplete !== true) failures.push(`${prefix}:completed-presentation-frontier`);
   const audio = action.audio;
   exactKeys(audio, ['contextState', 'prepared', 'retainedSources'], `${prefix}:audio`, failures);
@@ -282,10 +312,33 @@ function validateRuntime(runtime, prefix, failures) {
     || runtime.presentation?.status !== 'healthy') failures.push(`${prefix}:native-webgpu-runtime`);
 }
 
+function validateWebGl2Runtime(runtime, prefix, failures) {
+  exactKeys(runtime, [
+    'requestedBackend', 'actualBackend', 'initialized', 'adapterClass', 'deviceClass',
+    'adapterLabel', 'softwareAdapter', 'deviceLost', 'uncapturedErrors', 'presentation',
+  ], prefix, failures);
+  exactKeys(runtime?.presentation, ['status'], `${prefix}:presentation`, failures);
+  if (!object(runtime) || runtime.requestedBackend !== 'webgl2'
+    || runtime.actualBackend !== 'webgl2' || runtime.initialized !== true
+    || runtime.adapterClass !== 'WebGL2RenderingContext' || runtime.deviceClass !== null
+    || runtime.softwareAdapter !== false
+    || typeof runtime.adapterLabel !== 'string' || runtime.adapterLabel.trim() === ''
+    || !/ANGLE/iu.test(runtime.adapterLabel)
+    || SOFTWARE_ADAPTER.test(runtime.adapterLabel)
+    || runtime.deviceLost !== false || runtime.uncapturedErrors !== 0
+    || runtime.presentation?.status !== 'synchronous') failures.push(`${prefix}:native-webgl2-runtime`);
+}
+
 function validateTrial(trial, grenade, record, prefix, failures) {
   exactKeys(trial, [
-    'grenade', 'servedCandidate', 'browser', 'runtime', 'cold', 'warm', 'audio', 'faults',
+    'mode', 'renderer', 'arenaId', 'hostedMemberCount', 'grenade', 'servedCandidate',
+    'browser', 'runtime', 'cold', 'warm', 'audio', 'faults',
   ], prefix, failures);
+  if (trial?.mode !== record.scope?.mode || trial?.renderer !== record.scope?.renderer
+    || trial?.arenaId !== 'atomic-acres'
+    || trial?.hostedMemberCount !== (record.scope?.mode === 'hosted' ? 2 : 0)) {
+    failures.push(`${prefix}:representative-scope`);
+  }
   exactKeys(trial?.servedCandidate, [
     'schemaVersion', 'channel', 'releasePass', 'sourceSha', 'path', 'treeSha256',
     'exactRootFileCount',
@@ -310,10 +363,11 @@ function validateTrial(trial, grenade, record, prefix, failures) {
     failures.push(`${prefix}:installed-edge-identity`);
   }
   exactKeys(trial?.runtime, ['cold', 'warm'], `${prefix}:runtime`, failures);
-  validateRuntime(trial?.runtime?.cold, `${prefix}:cold`, failures);
-  validateRuntime(trial?.runtime?.warm, `${prefix}:warm`, failures);
-  validateAction(trial?.cold, grenade, 'cold', `${prefix}:cold`, failures);
-  validateAction(trial?.warm, grenade, 'warm', `${prefix}:warm`, failures);
+  const runtimeValidator = record.scope?.renderer === 'webgpu' ? validateRuntime : validateWebGl2Runtime;
+  runtimeValidator(trial?.runtime?.cold, `${prefix}:cold`, failures);
+  runtimeValidator(trial?.runtime?.warm, `${prefix}:warm`, failures);
+  validateAction(trial?.cold, grenade, 'cold', record.scope?.renderer, `${prefix}:cold`, failures);
+  validateAction(trial?.warm, grenade, 'warm', record.scope?.renderer, `${prefix}:warm`, failures);
   const audio = trial?.audio;
   exactKeys(audio, [
     'prewarm', 'runtimeRetainedSources', 'runtimeRetainedAudibleGains',
@@ -349,9 +403,13 @@ export function pass71GrenadeNativeEvidenceFailures(record, expected) {
     || record.status !== 'passed') return ['receipt-identity-or-status'];
   exactKeys(record, [
     'schemaVersion', 'evidenceId', 'kind', 'contract', 'gate', 'status', 'startedAt',
-    'completedAt', 'capturedAt', 'invocation', 'source', 'environment', 'browser',
+    'completedAt', 'capturedAt', 'scope', 'invocation', 'source', 'environment', 'browser',
     'tooling', 'trials', 'faults', 'receiptSha256',
   ], 'receipt', failures);
+  exactKeys(record.scope, ['mode', 'renderer', 'arenaId'], 'scope', failures);
+  if (!PASS71_GRENADE_NATIVE_EVIDENCE.scopes.some((scope) => sameJson(scope, {
+    mode: record.scope?.mode, renderer: record.scope?.renderer,
+  })) || record.scope?.arenaId !== 'atomic-acres') failures.push('representative-scope');
   const source = record.source;
   exactKeys(source, [
     'expectedSourceSha', 'checkoutSourceSha', 'servedSourceSha', 'endingCheckoutSourceSha',
@@ -376,7 +434,7 @@ export function pass71GrenadeNativeEvidenceFailures(record, expected) {
     || record.invocation.expectedSourceSha !== expected?.sourceSha
     || !Number.isSafeInteger(record.invocation.previewPort)
     || record.invocation.previewPort < 1_024 || record.invocation.previewPort > 65_535
-    || record.invocation.renderer !== 'webgpu'
+    || record.invocation.renderer !== record.scope?.renderer
     || record.invocation.renderProfile !== 'performance'
     || record.invocation.evidenceMode !== 'native-no-freeze'
     || record.invocation.playwrightProject !== 'chromium'
@@ -435,22 +493,25 @@ export function assertPass71GrenadeNativeEvidence(record, expected) {
   return record;
 }
 
-function fixtureBaseline(label) {
+function fixtureBaseline(label, renderer) {
   const gapsMs = Array.from({ length: 22 }, () => 16);
   return {
     label, observationMs: 352, frameSamples: gapsMs.length, gapsMs,
     p50GapMs: 16, p95GapMs: 16, maximumGapMs: 16,
-    presentationStatus: 'healthy',
+    presentationStatus: renderer === 'webgpu' ? 'healthy' : 'synchronous',
     startingPresentedFrame: 100, endingPresentedFrame: 122,
-    startingSubmissionSequence: 100, startingCompletedSequence: 100,
-    targetSubmissionSequence: 101, endingSubmissionSequence: 122, endingCompletedSequence: 122,
+    startingSubmissionSequence: renderer === 'webgpu' ? 100 : 0,
+    startingCompletedSequence: renderer === 'webgpu' ? 100 : 0,
+    targetSubmissionSequence: renderer === 'webgpu' ? 101 : 0,
+    endingSubmissionSequence: renderer === 'webgpu' ? 122 : 0,
+    endingCompletedSequence: renderer === 'webgpu' ? 122 : 0,
     firstPresentedFrameDelayMs: 16, firstSubmissionDelayMs: 16,
     firstCompletionDelayMs: 16, maximumPendingForMs: 0, completionFailures: 0,
   };
 }
 
-function fixtureAction(grenade, phase, nonce) {
-  const baseline = fixtureBaseline(`${grenade}-${phase}-preaction-baseline`);
+function fixtureAction(grenade, phase, nonce, renderer) {
+  const baseline = fixtureBaseline(`${grenade}-${phase}-preaction-baseline`, renderer);
   return {
     phase,
     baseline,
@@ -462,9 +523,12 @@ function fixtureAction(grenade, phase, nonce) {
     },
     frontier: {
       actionNonce: nonce, grenade, cold: phase === 'cold', frameSamples: 22,
-      startingSubmissionSequence: 100, startingCompletedSequence: 100,
-      targetSubmissionSequence: 101, endingSubmissionSequence: 122, endingCompletedSequence: 122,
-      completionFailures: 0, status: 'healthy', observationComplete: true,
+      startingSubmissionSequence: renderer === 'webgpu' ? 100 : 0,
+      startingCompletedSequence: renderer === 'webgpu' ? 100 : 0,
+      targetSubmissionSequence: renderer === 'webgpu' ? 101 : 0,
+      endingSubmissionSequence: renderer === 'webgpu' ? 122 : 0,
+      endingCompletedSequence: renderer === 'webgpu' ? 122 : 0,
+      completionFailures: 0, status: renderer === 'webgpu' ? 'healthy' : 'synchronous', observationComplete: true,
     },
     audio: { contextState: 'running', prepared: true, retainedSources: 3 },
   };
@@ -476,11 +540,18 @@ export function createPass71GrenadeNativeEvidenceFixture(options = {}) {
     runnerSha256: '1'.repeat(64), contractSha256: '2'.repeat(64),
     specSha256: '3'.repeat(64), frameActionBudgetSha256: '4'.repeat(64),
   };
+  const mode = options.mode ?? 'solo';
+  const renderer = options.renderer ?? 'webgpu';
   const runtime = {
-    requestedBackend: 'webgpu', actualBackend: 'webgpu', initialized: true,
-    adapterClass: 'GPUAdapter', deviceClass: 'GPUDevice',
-    adapterLabel: 'NVIDIA GeForce RTX 5080', softwareAdapter: false,
-    deviceLost: false, uncapturedErrors: 0, presentation: { status: 'healthy' },
+    requestedBackend: renderer, actualBackend: renderer, initialized: true,
+    adapterClass: renderer === 'webgpu' ? 'GPUAdapter' : 'WebGL2RenderingContext',
+    deviceClass: renderer === 'webgpu' ? 'GPUDevice' : null,
+    adapterLabel: renderer === 'webgpu'
+      ? 'NVIDIA GeForce RTX 5080'
+      : 'ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 Direct3D11)',
+    softwareAdapter: false,
+    deviceLost: false, uncapturedErrors: 0,
+    presentation: { status: renderer === 'webgpu' ? 'healthy' : 'synchronous' },
   };
   const servedCandidate = {
     schemaVersion: 4, channel: 'the-big-one', releasePass: 'PASS 71',
@@ -489,15 +560,15 @@ export function createPass71GrenadeNativeEvidenceFixture(options = {}) {
   };
   const version = '151.0.4129.72';
   const trials = PASS71_GRENADE_NATIVE_EVIDENCE.grenades.map((grenade, index) => ({
-    grenade,
+    mode, renderer, arenaId: 'atomic-acres', hostedMemberCount: mode === 'hosted' ? 2 : 0, grenade,
     servedCandidate,
     browser: {
       channel: 'msedge', installed: true,
       userAgent: `Mozilla/5.0 Edg/${version}`, version,
     },
     runtime: { cold: runtime, warm: runtime },
-    cold: fixtureAction(grenade, 'cold', index * 2 + 1),
-    warm: fixtureAction(grenade, 'warm', index * 2 + 2),
+    cold: fixtureAction(grenade, 'cold', index * 2 + 1, renderer),
+    warm: fixtureAction(grenade, 'warm', index * 2 + 2, renderer),
     audio: {
       prewarm: { prepared: true, runs: 1, sources: 3, nodes: 6, retainedBroadbandLoops: 0 },
       runtimeRetainedSources: 12, runtimeRetainedAudibleGains: 3,
@@ -516,9 +587,10 @@ export function createPass71GrenadeNativeEvidenceFixture(options = {}) {
     startedAt: options.startedAt ?? '2026-07-24T09:01:00.000Z',
     completedAt: options.completedAt ?? '2026-07-24T09:05:00.000Z',
     capturedAt: options.completedAt ?? '2026-07-24T09:05:00.000Z',
+    scope: { mode, renderer, arenaId: 'atomic-acres' },
     invocation: {
       runner: PASS71_GRENADE_NATIVE_TOOL_PATHS.runner,
-      expectedSourceSha: sourceSha, previewPort: 4564, renderer: 'webgpu',
+      expectedSourceSha: sourceSha, previewPort: 4564, renderer,
       renderProfile: 'performance', evidenceMode: 'native-no-freeze',
       playwrightProject: 'chromium', workers: 1, retries: 0, browserProcessCount: 4,
       dependencyPreflight: 'npm@10.9.8-ci-dry-run',

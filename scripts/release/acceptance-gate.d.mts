@@ -18,13 +18,14 @@ export type AcceptanceValidation = Readonly<{
     feedbackReceivedAt: string | null;
     previewCreatedAt: string | null;
     approvedAt: string | null;
-    nativeEvidence: null | Readonly<{
+    nativeEvidence: readonly Readonly<{
       evidenceId: string | null;
       kind: string | null;
       receiptSha256: string | null;
       startedAt: string | null;
       completedAt: string | null;
-    }>;
+      finalizedAt: string | null;
+    }>[];
   }>;
 }>;
 
@@ -32,6 +33,21 @@ export type AcceptanceWorkflowOutputs = Readonly<{
   manifest_selected: 'true' | 'false';
   manifest_path: string;
 }>;
+
+export type Pass71NativeEvidenceRegistryEntry = Readonly<{
+  descriptor: Readonly<{
+    evidenceId: string;
+    kind: string;
+    minimumCount: number;
+    maximumCount: number;
+  }>;
+  validate: (record: unknown, context: Readonly<Record<string, any>>) => readonly string[];
+}>;
+
+export const PASS71_NATIVE_EVIDENCE_REGISTRY: readonly Pass71NativeEvidenceRegistryEntry[];
+export function createPass71NativeEvidenceRegistry(
+  additionalEntries?: readonly Pass71NativeEvidenceRegistryEntry[],
+): readonly Pass71NativeEvidenceRegistryEntry[];
 
 export function validateAcceptanceManifest(
   manifest: unknown,

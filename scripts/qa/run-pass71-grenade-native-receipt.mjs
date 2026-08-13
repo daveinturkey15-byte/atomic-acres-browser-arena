@@ -22,24 +22,35 @@ const root = resolve(process.cwd());
 const values = parseArgs(process.argv.slice(2));
 const expectedSourceSha = values['expected-source-sha'];
 const previewPort = boundedPort(values.port ?? process.env.PASS71_GRENADE_NATIVE_PORT ?? '4564');
+const peerPort = boundedPort(values['peer-port'] ?? process.env.PASS71_GRENADE_PEER_PORT ?? '4565');
+const requestedScope = `${values.mode ?? ''}/${values.renderer ?? ''}`;
+const scope = PASS71_GRENADE_NATIVE_EVIDENCE.scopes.find((candidate) => (
+  `${candidate.mode}/${candidate.renderer}` === requestedScope
+));
 const checkoutSourceSha = git('rev-parse', 'HEAD');
 const cleanBefore = sourceStatus() === '';
 let temporaryRoot = null;
 let componentDirectory = null;
 const artifactRoot = resolve(root, 'artifacts/pass71/grenade-native');
-const receiptPath = resolve(artifactRoot, `${expectedSourceSha}-receipt.json`);
-const evidencePath = resolve(artifactRoot, `${expectedSourceSha}-native-evidence.json`);
+const scopeSlug = scope ? `${scope.mode}-${scope.renderer}` : 'invalid-scope';
+const receiptPath = resolve(artifactRoot, `${expectedSourceSha}-${scopeSlug}-receipt.json`);
+const evidencePath = resolve(artifactRoot, `${expectedSourceSha}-${scopeSlug}-native-evidence.json`);
 let edgeExecutable = null;
 
 function parseArgs(argv) {
   const parsed = {};
+  const allowed = new Set(['expected-source-sha', 'mode', 'renderer', 'port', 'peer-port', 'edge-executable']);
   for (let index = 0; index < argv.length; index += 1) {
     const name = argv[index];
     const value = argv[index + 1];
     if (!name?.startsWith('--') || !value || value.startsWith('--')) {
       throw new Error(`Pass 71 grenade native runner expected --name value; received ${name ?? '(missing)'}`);
     }
-    parsed[name.slice(2)] = value;
+    const key = name.slice(2);
+    if (!allowed.has(key) || Object.hasOwn(parsed, key)) {
+      throw new Error(`Pass 71 grenade native runner rejected unknown or duplicate argument --${key}`);
+    }
+    parsed[key] = value;
     index += 1;
   }
   return parsed;
@@ -105,7 +116,9 @@ function readComponent(grenade) {
   if (component?.schemaVersion !== 1
     || component.expectedSourceSha !== expectedSourceSha
     || component.checkoutSourceSha !== expectedSourceSha
-    || component.trial?.grenade !== grenade) {
+    || component.trial?.grenade !== grenade
+    || component.trial?.mode !== scope?.mode
+    || component.trial?.renderer !== scope?.renderer) {
     throw new Error(`Pass 71 grenade native ${grenade} component has invalid source or trial identity`);
   }
   return component.trial;
@@ -122,11 +135,17 @@ async function main() {
   if (!/^[a-f0-9]{40}$/u.test(expectedSourceSha ?? '')) {
     throw new Error('Pass 71 grenade native runner requires --expected-source-sha with candidate A full SHA');
   }
+  if (!scope) {
+    throw new Error('Pass 71 grenade native runner requires --mode solo|hosted and --renderer webgl2|webgpu');
+  }
   if (process.platform !== 'win32') throw new Error('Pass 71 grenade native evidence is Windows installed-Edge evidence');
   if (checkoutSourceSha !== expectedSourceSha || !cleanBefore) {
     throw new Error(`Pass 71 grenade native evidence requires clean exact candidate A (${checkoutSourceSha}/${expectedSourceSha}; clean=${cleanBefore})`);
   }
   if (await portIsListening(previewPort)) throw new Error(`Pass 71 grenade native runner requires unbound port ${previewPort}`);
+  if (scope.mode === 'hosted' && await portIsListening(peerPort)) {
+    throw new Error(`Pass 71 grenade hosted runner requires unbound PeerJS port ${peerPort}`);
+  }
   const viteOverrides = ['.env', '.env.local', '.env.production.local']
     .filter((path) => existsSync(resolve(root, path)));
   if (viteOverrides.length > 0) throw new Error(`Pass 71 grenade native runner rejects Vite overrides: ${viteOverrides.join(', ')}`);
@@ -171,11 +190,13 @@ async function main() {
         QA_INSTALLED_EDGE: '1',
         PASS71_GRENADE_EDGE_EXECUTABLE: edgeExecutable,
         QA_PREVIEW_PORT: String(previewPort),
-        PASS71_GRENADE_RENDERER: 'webgpu',
+        PASS71_GRENADE_RENDERER: scope.renderer,
         PASS71_GRENADE_RENDER_PROFILE: 'performance',
         PASS71_GRENADE_EVIDENCE_MODE: 'native-no-freeze',
         PASS71_GRENADE_EXPECTED_SOURCE_SHA: expectedSourceSha,
         PASS71_GRENADE_NATIVE_COMPONENT_DIR: componentDirectory,
+        PASS71_GRENADE_NATIVE_MODE: scope.mode,
+        PASS71_GRENADE_PEER_PORT: String(peerPort),
       },
       stdio: 'inherit',
       windowsHide: true,
@@ -204,11 +225,12 @@ async function main() {
     startedAt,
     completedAt,
     capturedAt: completedAt,
+    scope: { ...scope, arenaId: 'atomic-acres' },
     invocation: {
       runner: 'scripts/qa/run-pass71-grenade-native-receipt.mjs',
       expectedSourceSha,
       previewPort,
-      renderer: 'webgpu',
+      renderer: scope.renderer,
       renderProfile: 'performance',
       evidenceMode: 'native-no-freeze',
       playwrightProject: 'chromium',
@@ -258,7 +280,8 @@ async function main() {
   process.stdout.write(`${JSON.stringify({
     status: 'passed', sourceSha: expectedSourceSha, receiptPath, receiptFileSha256,
     nativeEvidencePath: evidencePath, nativeEvidenceCanonicalSha256: record.receiptSha256,
-    next: 'Copy the native-evidence JSON object unchanged into acceptance/pass-71.json nativeEvidence[0].',
+    scope: scopeSlug,
+    next: 'Retain this component for the HF-298 coverage finalizer; all four representative scopes are required.',
   }, null, 2)}\n`);
 }
 

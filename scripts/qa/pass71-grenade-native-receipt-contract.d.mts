@@ -4,13 +4,20 @@ export type Pass71GrenadeNativeExpected = Readonly<{
 }>;
 
 export const PASS71_GRENADE_NATIVE_EVIDENCE: Readonly<{
-  schemaVersion: 1;
+  schemaVersion: 2;
   evidenceId: 'HF-298';
-  kind: 'pass71-hf298-grenade-native-webgpu-component';
+  kind: 'pass71-hf298-grenade-native-component';
   contract: string;
   gate: string;
   grenades: readonly ['frag', 'flash', 'smoke', 'semtex'];
   phases: readonly ['cold', 'warm'];
+  scopes: readonly Readonly<{ mode: 'solo' | 'hosted'; renderer: 'webgl2' | 'webgpu' }>[];
+}>;
+export const PASS71_GRENADE_NATIVE_EVIDENCE_DESCRIPTOR: Readonly<{
+  evidenceId: 'HF-298';
+  kind: 'pass71-hf298-grenade-native-component';
+  minimumCount: 1;
+  maximumCount: 4;
 }>;
 export const PASS71_GRENADE_NATIVE_TOOL_PATHS: Readonly<Record<string, string>>;
 export function pass71GrenadeNativeCanonicalBytes(record: Readonly<Record<string, unknown>>): Buffer;
@@ -30,4 +37,6 @@ export function createPass71GrenadeNativeEvidenceFixture(options?: Readonly<{
   tooling?: Readonly<Record<string, string>>;
   startedAt?: string;
   completedAt?: string;
+  mode?: 'solo' | 'hosted';
+  renderer?: 'webgl2' | 'webgpu';
 }>): Record<string, any>;

@@ -74,8 +74,8 @@ describe('Pass 71 first-action and protected-release gate', () => {
     expect(grenadeSpec).toContain('firstCompletionDelayMs: profile.firstCompletionDelayMs!');
     expect(grenadeSpec).toContain('frameActionBudgetFailures(frameActionBudget');
     expect(grenadeSpec).toContain('minimumActionFrameSamples(evidenceMode)');
-    expect(grenadeSpec).toContain('const cold = await throwAndObserve(page, `${grenade}-cold-preaction-baseline`)');
-    expect(grenadeSpec).toContain('const warm = await throwAndObserve(page, `${grenade}-warm-preaction-baseline`)');
+    expect(grenadeSpec).toContain('const cold = await throwAndObserve(actionPage, `${grenade}-cold-preaction-baseline`)');
+    expect(grenadeSpec).toContain('const warm = await throwAndObserve(actionPage, `${grenade}-warm-preaction-baseline`)');
     expect(grenadeSpec).toContain("'software-CI action-overhead semantics only; not hardware no-freeze evidence'");
     expect(grenadeSpec).toContain('frameActionReleaseAcceptanceEligible(');
     expect(grenadeSpec).toContain('exactExpectedCheckoutAndServedSourceShaRequired: true');

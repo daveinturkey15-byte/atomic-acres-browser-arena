@@ -8,9 +8,15 @@ import { fileURLToPath } from 'node:url';
 import { classifyPaths } from './change-impact.mjs';
 import {
   PASS71_GRENADE_NATIVE_EVIDENCE,
+  PASS71_GRENADE_NATIVE_EVIDENCE_DESCRIPTOR,
   pass71GrenadeNativeEvidenceFailures,
   pass71GrenadeNativeToolingHashesAtSource,
 } from '../qa/pass71-grenade-native-receipt-contract.mjs';
+import {
+  PASS71_HF298_COVERAGE,
+  PASS71_HF298_COVERAGE_DESCRIPTOR,
+  pass71Hf298CoverageFailures,
+} from '../qa/pass71-hf298-coverage-contract.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPOSITORY_ROOT = resolve(dirname(SCRIPT_PATH), '..', '..');
@@ -27,6 +33,57 @@ const LOCAL_EVIDENCE = new Set(['unit', 'contract', 'browser', 'trace']);
 const MECHANICAL_EVIDENCE = new Set(['unit', 'contract', 'browser', 'trace']);
 const ACCEPTANCE_TYPES = new Set(['mechanical', 'visual', 'human', 'mixed']);
 const REQUIREMENT_STATES = new Set(['verified', 'deferred']);
+const PASS71_HF298_REQUIREMENT_ID = 'R3';
+
+const PASS71_HF298_EVIDENCE_REGISTRY_ENTRIES = Object.freeze([
+  Object.freeze({
+    descriptor: PASS71_GRENADE_NATIVE_EVIDENCE_DESCRIPTOR,
+    validate: (record, context) => pass71GrenadeNativeEvidenceFailures(record, {
+      sourceSha: context.sourceSha,
+      tooling: context.pass71GrenadeTooling,
+    }),
+  }),
+  Object.freeze({
+    descriptor: PASS71_HF298_COVERAGE_DESCRIPTOR,
+    validate: (record, context) => pass71Hf298CoverageFailures(record, {
+      sourceSha: context.sourceSha,
+      tooling: context.pass71GrenadeTooling,
+      components: context.recordsByKey
+        .get(nativeEvidenceKey(PASS71_GRENADE_NATIVE_EVIDENCE_DESCRIPTOR))
+        ?.map(({ record: component }) => component) ?? [],
+    }),
+  }),
+]);
+
+function nativeEvidenceKey(value) {
+  return `${value?.evidenceId ?? ''}\u0000${value?.kind ?? ''}`;
+}
+
+export function createPass71NativeEvidenceRegistry(additionalEntries = []) {
+  const entries = [...PASS71_HF298_EVIDENCE_REGISTRY_ENTRIES, ...additionalEntries];
+  const keys = new Set();
+  for (const entry of entries) {
+    const descriptor = entry?.descriptor;
+    if (!descriptor || JSON.stringify(Object.keys(descriptor).sort())
+      !== JSON.stringify(['evidenceId', 'kind', 'maximumCount', 'minimumCount'].sort())
+      || !nonEmpty(descriptor.evidenceId) || !nonEmpty(descriptor.kind)
+      || !Number.isSafeInteger(descriptor.minimumCount) || descriptor.minimumCount < 0
+      || !Number.isSafeInteger(descriptor.maximumCount)
+      || descriptor.maximumCount < descriptor.minimumCount
+      || typeof entry.validate !== 'function') {
+      throw new Error('Pass 71 native evidence registry entry is invalid');
+    }
+    const key = nativeEvidenceKey(descriptor);
+    if (keys.has(key)) throw new Error(`Pass 71 native evidence validator is duplicated: ${descriptor.evidenceId}/${descriptor.kind}`);
+    keys.add(key);
+  }
+  return Object.freeze(entries.map((entry) => Object.freeze({
+    ...entry,
+    descriptor: Object.freeze({ ...entry.descriptor }),
+  })));
+}
+
+export const PASS71_NATIVE_EVIDENCE_REGISTRY = createPass71NativeEvidenceRegistry();
 
 function parseArgs(argv) {
   const values = {};
@@ -208,16 +265,33 @@ export function validateAcceptanceManifest(manifest, options = {}) {
       errors.push('GitHub Actions preview ref must be pr-preview-<pr>-<sourceSha> and match preview.sourceSha');
     }
   }
+  let pass71NativeRecords = [];
+  let pass71Hf298Components = [];
+  let pass71Hf298Coverages = [];
   if (manifest.releasePass === 'PASS 71') {
+    const hf298Requirement = Array.isArray(manifest.requirements)
+      ? manifest.requirements.find((requirement) => requirement?.id === PASS71_HF298_REQUIREMENT_ID)
+      : null;
+    if (hf298Requirement?.feedbackId !== PASS71_HF298_COVERAGE.feedbackId) {
+      errors.push(`PASS 71 ${PASS71_HF298_REQUIREMENT_ID}.feedbackId must be HF-298`);
+    }
+    if (Array.isArray(manifest.requirements) && manifest.requirements.some((requirement) => (
+      requirement?.id !== PASS71_HF298_REQUIREMENT_ID
+      && requirement?.feedbackId === PASS71_HF298_COVERAGE.feedbackId
+    ))) errors.push(`PASS 71 HF-298 feedbackId belongs only to ${PASS71_HF298_REQUIREMENT_ID}`);
+
     const nativeEvidence = manifest.nativeEvidence;
     if (!Array.isArray(nativeEvidence)) {
-      errors.push('PASS 71 nativeEvidence must be an array containing exactly one canonical HF-298 native-WebGPU component record');
+      errors.push('PASS 71 nativeEvidence must be an array of registered exact-schema records');
     } else {
-      const knownKey = `${PASS71_GRENADE_NATIVE_EVIDENCE.evidenceId}\u0000${PASS71_GRENADE_NATIVE_EVIDENCE.kind}`;
+      pass71NativeRecords = nativeEvidence;
+      const registryByKey = new Map(PASS71_NATIVE_EVIDENCE_REGISTRY.map((entry) => [
+        nativeEvidenceKey(entry.descriptor), entry,
+      ]));
       const recordsByKey = new Map();
       for (const [index, record] of nativeEvidence.entries()) {
-        const key = `${record?.evidenceId ?? ''}\u0000${record?.kind ?? ''}`;
-        if (key !== knownKey) {
+        const key = nativeEvidenceKey(record);
+        if (!registryByKey.has(key)) {
           errors.push(`PASS 71 nativeEvidence[${index}] has no registered evidence validator`);
           continue;
         }
@@ -225,23 +299,49 @@ export function validateAcceptanceManifest(manifest, options = {}) {
         records.push({ index, record });
         recordsByKey.set(key, records);
       }
-      const hf298Records = recordsByKey.get(knownKey) ?? [];
-      if (hf298Records.length !== 1) {
-        errors.push('PASS 71 nativeEvidence must contain exactly one canonical HF-298 native-WebGPU component record');
-      } else {
-        const [{ index, record }] = hf298Records;
-        let tooling = options.pass71NativeEvidenceTooling;
-        try {
-          tooling ??= pass71GrenadeNativeToolingHashesAtSource(REPOSITORY_ROOT, preview?.sourceSha);
-        } catch (error) {
-          errors.push(`PASS 71 nativeEvidence tooling could not be hashed: ${error instanceof Error ? error.message : String(error)}`);
+      for (const entry of PASS71_NATIVE_EVIDENCE_REGISTRY) {
+        const records = recordsByKey.get(nativeEvidenceKey(entry.descriptor)) ?? [];
+        if (records.length < entry.descriptor.minimumCount || records.length > entry.descriptor.maximumCount) {
+          errors.push(`PASS 71 ${entry.descriptor.evidenceId}/${entry.descriptor.kind} record count must be ${entry.descriptor.minimumCount}..${entry.descriptor.maximumCount}; received ${records.length}`);
         }
-        if (tooling) {
-          for (const failure of pass71GrenadeNativeEvidenceFailures(record, {
-            sourceSha: preview?.sourceSha,
-            tooling,
-          })) errors.push(`PASS 71 nativeEvidence[${index}]: ${failure}`);
+      }
+      pass71Hf298Components = recordsByKey.get(nativeEvidenceKey(PASS71_GRENADE_NATIVE_EVIDENCE_DESCRIPTOR)) ?? [];
+      pass71Hf298Coverages = recordsByKey.get(nativeEvidenceKey(PASS71_HF298_COVERAGE_DESCRIPTOR)) ?? [];
+      const componentScopeKeys = pass71Hf298Components.map(({ record }) => (
+        `${record?.scope?.mode ?? ''}/${record?.scope?.renderer ?? ''}`
+      ));
+      if (new Set(componentScopeKeys).size !== componentScopeKeys.length) {
+        errors.push('PASS 71 HF-298 native components must use unique representative scopes');
+      }
+      if (!componentScopeKeys.includes('solo/webgpu')) {
+        errors.push('PASS 71 nativeEvidence must retain the canonical HF-298 solo/WebGPU component');
+      }
+      let tooling = options.pass71NativeEvidenceTooling;
+      try {
+        tooling ??= pass71GrenadeNativeToolingHashesAtSource(REPOSITORY_ROOT, preview?.sourceSha);
+      } catch (error) {
+        errors.push(`PASS 71 nativeEvidence tooling could not be hashed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      if (tooling) {
+        const context = {
+          sourceSha: preview?.sourceSha,
+          repositoryRoot: REPOSITORY_ROOT,
+          options,
+          recordsByKey,
+          pass71GrenadeTooling: tooling,
+        };
+        for (const entry of PASS71_NATIVE_EVIDENCE_REGISTRY) {
+          for (const { index, record } of recordsByKey.get(nativeEvidenceKey(entry.descriptor)) ?? []) {
+            for (const failure of entry.validate(record, context)) {
+              errors.push(`PASS 71 nativeEvidence[${index}]: ${failure}`);
+            }
+          }
         }
+      }
+      if (hf298Requirement?.state === 'verified'
+        && (pass71Hf298Components.length !== PASS71_GRENADE_NATIVE_EVIDENCE.scopes.length
+          || pass71Hf298Coverages.length !== 1)) {
+        errors.push('PASS 71 verified R3/HF-298 requires all four solo/hosted x WebGL2/WebGPU components and one canonical full-scope coverage record');
       }
     }
   }
@@ -264,22 +364,24 @@ export function validateAcceptanceManifest(manifest, options = {}) {
     && Date.parse(approval.approvedAt) < Date.parse(preview.createdAt)) {
     errors.push('humanAcceptance.approvedAt cannot precede preview.createdAt');
   }
-  const pass71NativeRecord = manifest.releasePass === 'PASS 71'
-    && Array.isArray(manifest.nativeEvidence)
-    ? manifest.nativeEvidence.find((record) => (
-      record?.evidenceId === PASS71_GRENADE_NATIVE_EVIDENCE.evidenceId
-      && record?.kind === PASS71_GRENADE_NATIVE_EVIDENCE.kind
-    ))
-    : null;
-  if (pass71NativeRecord && isIsoDate(preview?.createdAt)
-    && isIsoDate(pass71NativeRecord.startedAt)
-    && isIsoDate(pass71NativeRecord.completedAt)
-    && isIsoDate(approval?.approvedAt)) {
-    if (Date.parse(pass71NativeRecord.startedAt) < Date.parse(preview.createdAt)) {
-      errors.push('PASS 71 native evidence startedAt cannot precede preview.createdAt');
+  for (const { index, record } of pass71Hf298Components) {
+    if (isIsoDate(preview?.createdAt) && isIsoDate(record?.startedAt)
+      && Date.parse(record.startedAt) < Date.parse(preview.createdAt)) {
+      errors.push(`PASS 71 nativeEvidence[${index}].startedAt cannot precede preview.createdAt`);
     }
-    if (Date.parse(pass71NativeRecord.completedAt) > Date.parse(approval.approvedAt)) {
-      errors.push('PASS 71 native evidence completedAt cannot follow humanAcceptance.approvedAt');
+    if (isIsoDate(record?.completedAt) && isIsoDate(approval?.approvedAt)
+      && Date.parse(record.completedAt) > Date.parse(approval.approvedAt)) {
+      errors.push(`PASS 71 nativeEvidence[${index}].completedAt cannot follow humanAcceptance.approvedAt`);
+    }
+  }
+  for (const { index, record } of pass71Hf298Coverages) {
+    if (isIsoDate(preview?.createdAt) && isIsoDate(record?.finalizedAt)
+      && Date.parse(record.finalizedAt) < Date.parse(preview.createdAt)) {
+      errors.push(`PASS 71 nativeEvidence[${index}].finalizedAt cannot precede preview.createdAt`);
+    }
+    if (isIsoDate(record?.finalizedAt) && isIsoDate(approval?.approvedAt)
+      && Date.parse(record.finalizedAt) > Date.parse(approval.approvedAt)) {
+      errors.push(`PASS 71 nativeEvidence[${index}].finalizedAt cannot follow humanAcceptance.approvedAt`);
     }
   }
   if (isIsoDate(manifest.feedbackReceivedAt) && preview && isIsoDate(preview.createdAt)
@@ -304,13 +406,14 @@ export function validateAcceptanceManifest(manifest, options = {}) {
       feedbackReceivedAt: manifest.feedbackReceivedAt ?? null,
       previewCreatedAt: preview?.createdAt ?? null,
       approvedAt: approval?.approvedAt ?? null,
-      nativeEvidence: pass71NativeRecord ? {
-        evidenceId: pass71NativeRecord.evidenceId ?? null,
-        kind: pass71NativeRecord.kind ?? null,
-        receiptSha256: pass71NativeRecord.receiptSha256 ?? null,
-        startedAt: pass71NativeRecord.startedAt ?? null,
-        completedAt: pass71NativeRecord.completedAt ?? null,
-      } : null,
+      nativeEvidence: pass71NativeRecords.map((record) => ({
+        evidenceId: record?.evidenceId ?? null,
+        kind: record?.kind ?? null,
+        receiptSha256: record?.receiptSha256 ?? null,
+        startedAt: record?.startedAt ?? null,
+        completedAt: record?.completedAt ?? null,
+        finalizedAt: record?.finalizedAt ?? null,
+      })),
     },
   };
 }
