@@ -51,6 +51,14 @@ import {
   pass71Hf306ToolingHashesAtSource,
 } from '../scripts/qa/pass71-hf306-cockpit-evidence-contract.mjs';
 import {
+  createPass71Hf307EvidenceFixture,
+  pass71Hf307ToolingHashesAtSource,
+} from '../scripts/qa/pass71-hf307-chopper-mg-evidence-contract.mjs';
+import {
+  createPass71Hf309EvidenceFixture,
+  pass71Hf309ToolingHashesAtSource,
+} from '../scripts/qa/pass71-hf309-chopper-first-entry-evidence-contract.mjs';
+import {
   createPass71Hf312EvidenceFixture,
   pass71Hf312SourceAuditAtSource,
   pass71Hf312ToolingAtSource,
@@ -77,6 +85,8 @@ let cachedHf312Source: Readonly<{
   sourceAudit: Readonly<Record<string, unknown>>;
   tooling: readonly Readonly<{ path: string; sha256: string }>[];
 }> | null = null;
+let cachedHf307Tooling: Readonly<{ headSha: string; tooling: readonly Readonly<{ path: string; sha256: string }>[] }> | null = null;
+let cachedHf309Tooling: Readonly<{ headSha: string; tooling: readonly Readonly<{ path: string; sha256: string }>[] }> | null = null;
 
 function pass71Hf306TestFixture(headSha: string, sourceSha: string) {
   if (!cachedHf306Fixture || cachedHf306Fixture.headSha !== headSha
@@ -112,6 +122,26 @@ function pass71Hf312TestSource(headSha: string) {
   }
   if (!cachedHf312Source) throw new Error('HF-312 test source cache was not initialized');
   return cachedHf312Source;
+}
+
+function pass71Hf307TestTooling(headSha: string) {
+  if (!cachedHf307Tooling || cachedHf307Tooling.headSha !== headSha) {
+    cachedHf307Tooling = {
+      headSha,
+      tooling: pass71Hf307ToolingHashesAtSource(process.cwd(), headSha),
+    };
+  }
+  return cachedHf307Tooling.tooling;
+}
+
+function pass71Hf309TestTooling(headSha: string) {
+  if (!cachedHf309Tooling || cachedHf309Tooling.headSha !== headSha) {
+    cachedHf309Tooling = {
+      headSha,
+      tooling: pass71Hf309ToolingHashesAtSource(process.cwd(), headSha),
+    };
+  }
+  return cachedHf309Tooling.tooling;
 }
 
 function acceptedManifest() {
@@ -225,6 +255,16 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
   });
   const hf306Fixture = pass71Hf306TestFixture(headSha, manifest.preview.sourceSha);
   const hf306 = hf306Fixture.record;
+  const hf307 = createPass71Hf307EvidenceFixture({
+    sourceSha: manifest.preview.sourceSha, sourceTreeSha: headSha,
+    tooling: pass71Hf307TestTooling(headSha),
+    startedAt: '2026-08-13T09:37:15.000Z', completedAt: '2026-08-13T09:47:15.000Z',
+  });
+  const hf309 = createPass71Hf309EvidenceFixture({
+    sourceSha: manifest.preview.sourceSha, sourceTreeSha: headSha,
+    tooling: pass71Hf309TestTooling(headSha),
+    startedAt: '2026-08-13T09:37:30.000Z', completedAt: '2026-08-13T09:47:30.000Z',
+  });
   const { sourceAudit: hf312SourceAudit, tooling: hf312Tooling } = pass71Hf312TestSource(headSha);
   const hf312 = createPass71Hf312EvidenceFixture({
     sourceSha: manifest.preview.sourceSha, sourceTreeSha: headSha,
@@ -248,8 +288,11 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, tooling, components,
     finalizedAt: '2026-08-13T09:30:00.000Z',
   });
-  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, quality, hf299, hf300, hf301, hf305, hf306, hf312, stuck, parity];
-  return { manifest, coverage: rebuilt.record, components: rebuilt.components, quality, hf299, hf300, hf301, hf305, hf306, hf312 };
+  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, quality, hf299, hf300, hf301, hf305, hf306, hf307, hf309, hf312, stuck, parity];
+  return {
+    manifest, coverage: rebuilt.record, components: rebuilt.components, quality,
+    hf299, hf300, hf301, hf305, hf306, hf307, hf309, hf312,
+  };
 }
 
 function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
@@ -279,6 +322,10 @@ function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
     pass71Hf306SourceTreeSha: headSha,
     pass71Hf306AssetAudit: pass71Hf306TestFixture(headSha, '0123456789abcdef0123456789abcdef01234567').assetAudit,
     pass71Hf306OwnerSourceAudit: pass71Hf306TestFixture(headSha, '0123456789abcdef0123456789abcdef01234567').ownerSourceAudit,
+    pass71Hf307Tooling: pass71Hf307TestTooling(headSha),
+    pass71Hf307SourceTreeSha: headSha,
+    pass71Hf309Tooling: pass71Hf309TestTooling(headSha),
+    pass71Hf309SourceTreeSha: headSha,
     pass71Hf312Tooling: pass71Hf312TestSource(headSha).tooling,
     pass71Hf312SourceTreeSha: headSha,
     pass71Hf312SourceAudit: pass71Hf312TestSource(headSha).sourceAudit,
@@ -640,6 +687,40 @@ describe('release acceptance manifest', () => {
     manifest.nativeEvidence.push(forged);
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/nativeEvidence\[[0-9]+\]: (?:scope:webgl2:viewport:0:raster:recomputed-raster-summary|receipt-sha256)/);
+  }, 60_000);
+
+  it('requires exact hosted Chopper MG splash authority before HF-307 can be verified', () => {
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    const { manifest, hf307 } = pass71Manifest(tooling);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .not.toMatch(/verified R12\/HF-307|hf307-/);
+
+    manifest.nativeEvidence = manifest.nativeEvidence.filter((record) => record !== hf307);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/verified R12\/HF-307 requires its canonical registered native evidence record/);
+
+    const forged = structuredClone(hf307) as Record<string, any>;
+    forged.receiptSha256 = '0'.repeat(64);
+    manifest.nativeEvidence.push(forged);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/nativeEvidence\[[0-9]+\]: (?:receipt-sha256|receipt-digest)/);
+  }, 60_000);
+
+  it('requires exact cold and warm Chopper first-entry preparation before HF-309 can be verified', () => {
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    const { manifest, hf309 } = pass71Manifest(tooling);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .not.toMatch(/verified R14\/HF-309|hf309-/);
+
+    manifest.nativeEvidence = manifest.nativeEvidence.filter((record) => record !== hf309);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/verified R14\/HF-309 requires its canonical registered native evidence record/);
+
+    const forged = structuredClone(hf309) as Record<string, any>;
+    forged.receiptSha256 = '0'.repeat(64);
+    manifest.nativeEvidence.push(forged);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/nativeEvidence\[[0-9]+\]: receipt-digest/);
   }, 60_000);
 
   it('requires the exact source-derived bounded consolidation audit before HF-312 can be verified', () => {

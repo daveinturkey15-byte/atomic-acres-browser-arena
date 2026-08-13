@@ -72,6 +72,10 @@ export function validateAcceptanceManifest(
     pass71Hf306SourceTreeSha?: string;
     pass71Hf306AssetAudit?: readonly unknown[];
     pass71Hf306OwnerSourceAudit?: unknown;
+    pass71Hf307Tooling?: readonly Readonly<{ path: string; sha256: string }>[];
+    pass71Hf307SourceTreeSha?: string;
+    pass71Hf309Tooling?: readonly Readonly<{ path: string; sha256: string }>[];
+    pass71Hf309SourceTreeSha?: string;
     pass71Hf312Tooling?: readonly Readonly<{ path: string; sha256: string }>[];
     pass71Hf312SourceTreeSha?: string;
     pass71Hf312SourceAudit?: Readonly<Record<string, unknown>>;
