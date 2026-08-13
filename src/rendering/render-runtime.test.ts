@@ -697,14 +697,21 @@ describe('Pass 64 render runtime boundary', () => {
       pendingForMs: atFence.pendingForMs,
       stallThresholdMs: 1_000,
     })).toEqual({ kind: 'pending-completion', elapsedMs: 1_000 });
-    // The live one-second detector is diagnostic. A valid cold submission is
-    // fatal only at the renderer-owned completion deadline, which prevents the
-    // 1146 ms Firefox false-positive without weakening the actual GPU fence.
+    // The renderer retains a broader deadline for explicit cold admission
+    // fences, while active gameplay independently treats this exact one-second
+    // detector result as fatal. Never substitute the 12-second cold bound for
+    // the live no-progress contract.
     expect(atFence.completionDeadlineExceeded).toBe(false);
     expect(runtime.presentationTelemetry(17_000)).toMatchObject({
       pendingForMs: 12_000,
       completionDeadlineMs: 12_000,
       completionDeadlineExceeded: true,
+    });
+
+    runtime.resetPresentationProgressTelemetry('foreground scheduler gap', 6_200, false);
+    expect(runtime.presentationTelemetry(6_200)).toMatchObject({
+      pendingSince: 5_000,
+      pendingForMs: 1_200,
     });
 
     now = 5_025;

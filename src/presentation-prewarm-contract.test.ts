@@ -562,8 +562,10 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain("source: 'webgpu-submission' as const");
     expect(source).toContain('LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000');
     expect(source).toContain('detectLivePresentationStall({');
+    expect(source).toContain("if (liveStall?.kind === 'pending-completion') {");
+    expect(source).not.toContain("liveStall?.kind === 'pending-completion' && presentation.completionDeadlineExceeded");
     expect(source).toContain('documentFocused: document.hasFocus()');
-    expect(source).toContain("resetWebGpuPresentationEpoch('foreground scheduler gap', now);");
+    expect(source).toContain("resetWebGpuPresentationEpoch('foreground scheduler gap', now, false);");
     expect(source).toContain('currentSubmissionGapMs: presentation.progress.currentSubmissionGapMs');
     expect(source).toContain('backpressureActive: presentation.backpressureActive');
     expect(source).toContain('debugRenderPaused,');

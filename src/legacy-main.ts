@@ -20,7 +20,6 @@ import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
 import { PASS66_RELEASE_IDENTITY } from './release-identity';
 import { GUN_RANGE_NUKE_WARNING_POSITION, sampleNukeWarningPresentation } from './nuke-warning-presentation';
-import { drawPass70DroneSwarmLogo } from './pass70-drone-swarm-logo';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
 import { BotWeaponGpuVocabulary } from './bot-weapon-gpu-vocabulary';
 import {
@@ -5441,8 +5440,8 @@ const framePacing = new FramePacingSampler();
 const LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000;
 let lastObservedWebGpuCompletionSequence = 0;
 
-function resetWebGpuPresentationEpoch(reason: string, now: number): void {
-  renderRuntime.resetPresentationProgressTelemetry(reason, now);
+function resetWebGpuPresentationEpoch(reason: string, now: number, rebasePendingCompletion = true): void {
+  renderRuntime.resetPresentationProgressTelemetry(reason, now, rebasePendingCompletion);
   if (renderRuntime.backend !== 'webgpu') return;
   // A completion which retired during a hidden/pre-admission epoch is not live
   // foreground performance evidence. Consume its sequence and discard any
@@ -20925,76 +20924,15 @@ function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): vo
 
 let killstreakLogoFlashTimeout: ReturnType<typeof setTimeout> | null = null;
 
-function drawPalantirLogo(): HTMLCanvasElement | null {
-  if (typeof document === 'undefined') return null;
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
-  const context = canvas.getContext('2d');
-  if (!context) return null;
-  drawPass70DroneSwarmLogo(context);
-  return canvas;
-}
-
-function drawUsFlagLogo(): HTMLCanvasElement | null {
-  if (typeof document === 'undefined') return null;
-  const canvas = document.createElement('canvas');
-  canvas.width = 640;
-  canvas.height = 384;
-  const context = canvas.getContext('2d');
-  if (!context) return null;
-  const stripeHeight = 384 / 13;
-  for (let stripe = 0; stripe < 13; stripe += 1) {
-    context.fillStyle = stripe % 2 === 0 ? '#b22234' : '#ffffff';
-    context.fillRect(0, stripe * stripeHeight, 640, stripeHeight);
-  }
-  // Canton
-  context.fillStyle = '#3c3b6e';
-  context.fillRect(0, 0, 256, 7 * stripeHeight);
-  // 50 stars: 9 rows alternating 6/5
-  const starRadius = 6.4;
-  const star = (cx: number, cy: number, radius: number) => {
-    context.beginPath();
-    for (let point = 0; point < 10; point += 1) {
-      const angle = -Math.PI / 2 + point * Math.PI / 5;
-      const r = point % 2 === 0 ? radius : radius * 0.44;
-      const x = cx + Math.cos(angle) * r;
-      const y = cy + Math.sin(angle) * r;
-      if (point === 0) context.moveTo(x, y);
-      else context.lineTo(x, y);
-    }
-    context.closePath();
-  };
-  context.fillStyle = '#ffffff';
-  for (let row = 0; row < 9; row += 1) {
-    const count = row % 2 === 0 ? 6 : 5;
-    const starRowY = stripeHeight * (row + 1) - starRadius * 0.8;
-    for (let column = 0; column < count; column += 1) {
-      const x = 256 / (count + 1) * (column + 1);
-      star(x, starRowY, starRadius);
-      context.fill();
-    }
-  }
-  return canvas;
-}
-
-function canvasLogoDataUrl(draw: () => HTMLCanvasElement | null): string {
-  const canvas = draw();
-  if (!canvas) return '';
-  try {
-    return canvas.toDataURL('image/png');
-  } catch {
-    return '';
-  }
-}
-
 function flashKillstreakLogo(kind: 'palantir' | 'us-flag'): void {
   const el = element<HTMLElement>('#killstreak-logo-flash');
   if (!el) return;
-  const dataUrl = canvasLogoDataUrl(kind === 'palantir' ? drawPalantirLogo : drawUsFlagLogo);
-  el.innerHTML = dataUrl
-    ? `<div class="logo ${kind}"><img src="${dataUrl}" alt="${kind === 'palantir' ? 'Palantir' : 'US flag'}"></div>`
-    : `<div class="logo ${kind}">${kind === 'palantir' ? '◉' : '🇺🇸'}</div>`;
+  // Keep the live gameplay canvas and every transient logo on a one-way GPU /
+  // compositor path. The previous canvas-to-data-URL conversion performed a
+  // synchronous readback at the exact moment a killstreak began.
+  el.innerHTML = kind === 'palantir'
+    ? '<div class="logo palantir" role="img" aria-label="Palantir"><span class="palantir-mark" aria-hidden="true"></span><b>PALANTIR</b></div>'
+    : '<div class="logo us-flag" role="img" aria-label="United States flag"><span class="us-flag-canton" aria-hidden="true"></span></div>';
   el.hidden = false;
   el.style.opacity = '1';
   if (killstreakLogoFlashTimeout) clearTimeout(killstreakLogoFlashTimeout);
@@ -25203,16 +25141,15 @@ function monitorSelectedArenaRender(now: number): void {
     pendingForMs: presentation.pendingForMs,
     stallThresholdMs: LIVE_WEBGPU_PRESENTATION_STALL_MS,
   });
-  // A one-second pending frontier is actionable telemetry, not proof that the
-  // GPU is hung: cold but valid owner-hardware submissions can retire after
-  // ~2.4 s. Backpressure already prevents additional queue work after 250 ms.
-  // Let the renderer's independently tested completion deadline classify a
-  // real stall; do not surface a false fatal while that exact fence is alive.
-  if (liveStall?.kind === 'pending-completion' && presentation.completionDeadlineExceeded) {
+  // Gameplay has already preowned and submitted every known cold presentation
+  // path behind admission. Preserve the one-second live no-progress fence: a
+  // warmed foreground queue which cannot complete inside it is a real release
+  // failure, not permission to wait behind the renderer's broader cold-work
+  // admission deadline.
+  if (liveStall?.kind === 'pending-completion') {
     throw new Error(
       `Renderer presentation made no GPU progress for ${Math.round(liveStall.elapsedMs)}ms`
-      + ` (${presentation.submissionSequence - presentation.completedSequence} submission pending)`
-      + ` beyond ${presentation.completionDeadlineMs}ms completion deadline`,
+      + ` (${presentation.submissionSequence - presentation.completedSequence} submission pending)`,
     );
   }
   if (liveStall?.kind === 'missing-submission') {
@@ -25312,7 +25249,10 @@ function frame(now: number, scheduleNext = true): void {
       && document.visibilityState === 'visible' && document.hasFocus();
     if (activeForegroundWebGpuFrame
       && shouldResetPresentationAfterSchedulerGap(rawFrameMs, LIVE_WEBGPU_PRESENTATION_STALL_MS)) {
-      resetWebGpuPresentationEpoch('foreground scheduler gap', now);
+      // A visible/focused scheduler gap is not a new ownership epoch. Preserve
+      // the age of any unresolved GPU work so the one-second live fence cannot
+      // be erased by the same main-thread pause it is meant to diagnose.
+      resetWebGpuPresentationEpoch('foreground scheduler gap', now, false);
     }
     monitorCompletedWebGpuQueueHealth(now);
     // The HUD must report even pathologically slow software-rendered frames.

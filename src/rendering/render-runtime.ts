@@ -537,7 +537,11 @@ export class LegacyWebGlRenderRuntime {
     };
   }
 
-  resetPresentationProgressTelemetry(_reason?: string, _now?: number): void { /* Synchronous WebGL has no queue frontier. */ }
+  resetPresentationProgressTelemetry(
+    _reason?: string,
+    _now?: number,
+    _rebasePendingCompletion?: boolean,
+  ): void { /* Synchronous WebGL has no queue frontier. */ }
 
   resetPresentationProgressWindow(_now?: number): void { /* Synchronous WebGL has no queue frontier. */ }
 
@@ -1025,13 +1029,17 @@ export class WebGpuRenderRuntime {
     };
   }
 
-  resetPresentationProgressTelemetry(reason = 'presentation progress reset', now = this.clock()): void {
+  resetPresentationProgressTelemetry(
+    reason = 'presentation progress reset',
+    now = this.clock(),
+    rebasePendingCompletion = true,
+  ): void {
     this.submissionPacing.reset(reason);
     this.completionPacing.reset(reason);
     // Full lifecycle resets (not endurance-window samples) establish a new
     // foreground observation epoch. An unresolved queue item may remain, but
     // hidden-tab time must not count against its foreground completion fence.
-    if (this.pendingCompletionStartedAt !== null) this.pendingCompletionStartedAt = now;
+    if (rebasePendingCompletion && this.pendingCompletionStartedAt !== null) this.pendingCompletionStartedAt = now;
     this.resetPresentationProgressWindow(now);
   }
 
