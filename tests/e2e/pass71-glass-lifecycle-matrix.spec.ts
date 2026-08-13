@@ -276,7 +276,7 @@ async function stageSkylinePane(page: Page, paneIndex: number, distance = 6): Pr
 }
 
 for (const profile of PROFILES) {
-  test(`${profile.label}: all six authored panes breach by bullet, knife and grenade and retire debris by 5s`, async ({ page }, testInfo) => {
+  test(`${profile.label}: all six authored panes breach by bullet and retire debris by 5s`, async ({ page }, testInfo) => {
     test.setTimeout(240_000);
     const faults: string[] = [];
     page.on('pageerror', (error) => faults.push(error.stack ?? error.message));
@@ -284,7 +284,6 @@ for (const profile of PROFILES) {
       if (message.type() === 'error') faults.push(message.text());
     });
     await deploy(page, profile.query);
-    const receipts: Record<string, unknown> = {};
 
     await resetBreakableWindows(page);
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.equipWeapon('carbine'));
@@ -298,7 +297,23 @@ for (const profile of PROFILES) {
       await assertPaneBreached(page, pane, `${profile.label}/bullet`, before.rapierDynamicColliders, 'breached');
       await page.waitForTimeout(130);
     }
-    receipts.bullet = await assertDebrisRetired(page, `${profile.label}/bullet`);
+    const receipt = await assertDebrisRetired(page, `${profile.label}/bullet`);
+
+    expect(faults, JSON.stringify(faults, null, 2)).toEqual([]);
+    await testInfo.attach(`pass71-glass-${profile.label}-bullet`, {
+      body: Buffer.from(JSON.stringify({ profile: profile.label, paneCount: PANE_COUNT, receipt, faults }, null, 2)),
+      contentType: 'application/json',
+    });
+  });
+
+  test(`${profile.label}: all six authored panes breach by knife and retire debris by 5s`, async ({ page }, testInfo) => {
+    test.setTimeout(240_000);
+    const faults: string[] = [];
+    page.on('pageerror', (error) => faults.push(error.stack ?? error.message));
+    page.on('console', (message) => {
+      if (message.type() === 'error') faults.push(message.text());
+    });
+    await deploy(page, profile.query);
 
     await resetBreakableWindows(page);
     for (let pane = 0; pane < PANE_COUNT; pane += 1) {
@@ -312,7 +327,23 @@ for (const profile of PROFILES) {
       await assertPaneBreached(page, pane, `${profile.label}/knife`, before.rapierDynamicColliders, 'breached');
       await page.waitForTimeout(670);
     }
-    receipts.knife = await assertDebrisRetired(page, `${profile.label}/knife`);
+    const receipt = await assertDebrisRetired(page, `${profile.label}/knife`);
+
+    expect(faults, JSON.stringify(faults, null, 2)).toEqual([]);
+    await testInfo.attach(`pass71-glass-${profile.label}-knife`, {
+      body: Buffer.from(JSON.stringify({ profile: profile.label, paneCount: PANE_COUNT, receipt, faults }, null, 2)),
+      contentType: 'application/json',
+    });
+  });
+
+  test(`${profile.label}: all six authored panes breach by grenade and retire debris by 5s`, async ({ page }, testInfo) => {
+    test.setTimeout(240_000);
+    const faults: string[] = [];
+    page.on('pageerror', (error) => faults.push(error.stack ?? error.message));
+    page.on('console', (message) => {
+      if (message.type() === 'error') faults.push(message.text());
+    });
+    await deploy(page, profile.query);
 
     for (let pane = 0; pane < PANE_COUNT; pane += 1) {
       await resetBreakableWindows(page);
@@ -330,11 +361,11 @@ for (const profile of PROFILES) {
       const debug = window.__ATOMIC_ACRES_DEBUG__;
       for (let pane = 0; pane < 6; pane += 1) debug.detonateGrenadeAtWindow(pane);
     });
-    receipts.grenade = await assertDebrisRetired(page, `${profile.label}/grenade`);
+    const receipt = await assertDebrisRetired(page, `${profile.label}/grenade`);
 
     expect(faults, JSON.stringify(faults, null, 2)).toEqual([]);
-    await testInfo.attach(`pass71-glass-${profile.label}-matrix`, {
-      body: Buffer.from(JSON.stringify({ profile: profile.label, paneCount: PANE_COUNT, receipts, faults }, null, 2)),
+    await testInfo.attach(`pass71-glass-${profile.label}-grenade`, {
+      body: Buffer.from(JSON.stringify({ profile: profile.label, paneCount: PANE_COUNT, receipt, faults }, null, 2)),
       contentType: 'application/json',
     });
   });

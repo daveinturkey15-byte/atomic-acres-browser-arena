@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const grenadeSpec = readFileSync('tests/e2e/pass71-grenade-first-action.spec.ts', 'utf8');
 const glassSpec = readFileSync('tests/e2e/pass69-3-glass-m14-frame-hitch.spec.ts', 'utf8');
+const glassLifecycleSpec = readFileSync('tests/e2e/pass71-glass-lifecycle-matrix.spec.ts', 'utf8');
 const actionBudget = readFileSync('tests/e2e/frame-action-budget.ts', 'utf8');
 const boundedRunner = readFileSync('scripts/qa/run-bounded-e2e.mjs', 'utf8');
 const impactClassifier = readFileSync('scripts/release/change-impact.mjs', 'utf8');
@@ -98,20 +99,28 @@ describe('Pass 71 first-action and protected-release gate', () => {
   it('makes grenade, glass lifecycle, Nuke and Chopper coverage required full-impact shards', () => {
     for (const group of [
       'pass71-grenade-first-action',
-      'pass71-glass-quality-matrix',
+      'pass71-glass-quality-bullet',
+      'pass71-glass-quality-knife',
+      'pass71-glass-quality-grenade',
       'pass71-glass-quality-flare',
       'pass71-glass-quality-crossbow',
-      'pass71-glass-performance-matrix',
+      'pass71-glass-performance-bullet',
+      'pass71-glass-performance-knife',
+      'pass71-glass-performance-grenade',
       'pass71-glass-performance-flare',
       'pass71-glass-performance-crossbow',
       'pass71-nuke-warning',
       'pass70-chopper-gunner',
     ]) expect(boundedRunner).toContain(`name: '${group}'`);
     for (const [group, title] of [
-      ['pass71-glass-quality-matrix', 'quality: all six authored panes'],
+      ['pass71-glass-quality-bullet', 'quality: all six authored panes breach by bullet'],
+      ['pass71-glass-quality-knife', 'quality: all six authored panes breach by knife'],
+      ['pass71-glass-quality-grenade', 'quality: all six authored panes breach by grenade'],
       ['pass71-glass-quality-flare', 'quality: real Flare Gun impacts'],
       ['pass71-glass-quality-crossbow', 'quality: real explosive-crossbow impact'],
-      ['pass71-glass-performance-matrix', 'performance: all six authored panes'],
+      ['pass71-glass-performance-bullet', 'performance: all six authored panes breach by bullet'],
+      ['pass71-glass-performance-knife', 'performance: all six authored panes breach by knife'],
+      ['pass71-glass-performance-grenade', 'performance: all six authored panes breach by grenade'],
       ['pass71-glass-performance-flare', 'performance: real Flare Gun impacts'],
       ['pass71-glass-performance-crossbow', 'performance: real explosive-crossbow impact'],
     ]) {
@@ -122,6 +131,17 @@ describe('Pass 71 first-action and protected-release gate', () => {
       expect(line).toContain("'--grep'");
       expect(line).toContain(`'${title}'`);
     }
+    expect(glassLifecycleSpec.match(/test\.setTimeout\(240_000\)/gu)).toHaveLength(5);
+    expect(glassLifecycleSpec).not.toContain('breach by bullet, knife and grenade');
+    for (const title of [
+      'all six authored panes breach by bullet and retire debris by 5s',
+      'all six authored panes breach by knife and retire debris by 5s',
+      'all six authored panes breach by grenade and retire debris by 5s',
+    ]) expect(glassLifecycleSpec).toContain(title);
+    expect(glassLifecycleSpec).toContain('}, pane, { timeout: 2_000 });');
+    expect(glassLifecycleSpec).toContain(')), { timeout: 2_000 }).toBeGreaterThan(impactCountBefore)');
+    expect(glassLifecycleSpec).toContain('}, { paneIndex: index, phase: expectedPhase }, { timeout: 8_000 });');
+    expect(glassLifecycleSpec).toContain('), { colliderCountBefore: rapierColliderCountBefore }, { timeout: 5_000 });');
     expect(boundedRunner).toContain("stdio: 'inherit'");
     expect(boundedRunner).toContain('windowsHide: true');
     expect(boundedRunner).not.toContain("encoding: 'utf8'");
@@ -135,7 +155,7 @@ describe('Pass 71 first-action and protected-release gate', () => {
     expect(chopperGroup).toContain("'tests/e2e/pass70-chopper-gunner.spec.ts'");
     expect(chopperGroup).toContain("'tests/e2e/pass71-controlled-support-native.spec.ts'");
     expect(impactClassifier).toContain("windows_supplemental_groups: 'pass71-grenade-first-action,pass70-chopper-gunner'");
-    expect(impactClassifier).toContain("linux_supplemental_groups: 'pass71-glass-quality-matrix,pass71-glass-quality-flare,pass71-glass-quality-crossbow,pass71-glass-performance-matrix,pass71-glass-performance-flare,pass71-glass-performance-crossbow,pass71-nuke-warning'");
+    expect(impactClassifier).toContain("linux_supplemental_groups: 'pass71-glass-quality-bullet,pass71-glass-quality-knife,pass71-glass-quality-grenade,pass71-glass-quality-flare,pass71-glass-quality-crossbow,pass71-glass-performance-bullet,pass71-glass-performance-knife,pass71-glass-performance-grenade,pass71-glass-performance-flare,pass71-glass-performance-crossbow,pass71-nuke-warning'");
     expect(verifyWorkflow).toContain('bounded-browser-windows-supplemental-shard:');
     const grenadeWorkflowStep = verifyWorkflow.match(
       /- name: Run Pass 71 Windows software-CI semantic grenade shard[\s\S]+?run: npm run test:e2e:bounded/u,

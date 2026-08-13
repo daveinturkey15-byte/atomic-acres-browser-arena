@@ -223,10 +223,14 @@ describe('production release workflow', () => {
     expect(linuxShardJob).toContain('timeout-minutes: 30');
     expect(linuxShardJob).toContain('fail-fast: false');
     for (const group of [
-      'pass71-glass-quality-matrix',
+      'pass71-glass-quality-bullet',
+      'pass71-glass-quality-knife',
+      'pass71-glass-quality-grenade',
       'pass71-glass-quality-flare',
       'pass71-glass-quality-crossbow',
-      'pass71-glass-performance-matrix',
+      'pass71-glass-performance-bullet',
+      'pass71-glass-performance-knife',
+      'pass71-glass-performance-grenade',
       'pass71-glass-performance-flare',
       'pass71-glass-performance-crossbow',
       'pass71-nuke-warning',

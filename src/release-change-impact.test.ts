@@ -64,10 +64,14 @@ describe('release change impact', () => {
       'pass70-chopper-gunner',
     ]);
     expect(output.linux_supplemental_groups.split(',')).toEqual([
-      'pass71-glass-quality-matrix',
+      'pass71-glass-quality-bullet',
+      'pass71-glass-quality-knife',
+      'pass71-glass-quality-grenade',
       'pass71-glass-quality-flare',
       'pass71-glass-quality-crossbow',
-      'pass71-glass-performance-matrix',
+      'pass71-glass-performance-bullet',
+      'pass71-glass-performance-knife',
+      'pass71-glass-performance-grenade',
       'pass71-glass-performance-flare',
       'pass71-glass-performance-crossbow',
       'pass71-nuke-warning',
