@@ -1,109 +1,246 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   PASS71_NATIVE_BROWSER_PARITY,
+  PASS71_NATIVE_BROWSER_PARITY_TRUSTED_ACTION_EVENTS,
+  PASS71_QUALITY_REQUESTED_GRAPHICS,
   assertPass71NativeBrowserParityReceipt,
+  createPass71NativeBrowserParityFixture,
   pass71NativeBrowserParityFailures,
+  pass71NativeBrowserParityRecordSha256,
+  pass71NativeBrowserParitySceneSignature,
   summarizePass71FrameWindow,
 } from './pass71-native-browser-parity-contract.mjs';
 
-const hash = 'a'.repeat(64);
-function browser(name, medianFps, p95FrameTimeMs, presentedFps = medianFps) {
-  const elapsedMs = 9_000;
-  const sampleCount = Math.round(medianFps * elapsedMs / 1_000);
-  const gameFrameDelta = Math.round(presentedFps * elapsedMs / 1_000);
-  return {
-    name,
-    identity: { executableSha256: hash, version: '1.2.3' },
-    route: 'http://127.0.0.1:4561/?renderer=webgl2&render=blender&map=atomic-acres&seed=pass71-parity-v1',
-    requestedRoute: 'http://127.0.0.1:4561/?renderer=webgl2&render=blender&map=atomic-acres&seed=pass71-parity-v1',
-    viewport: { ...PASS71_NATIVE_BROWSER_PARITY.viewport },
-    scene: { arenaId: 'atomic-acres', gameStarted: true, matchPhase: 'active', botCount: 1, botsFrozen: true, qualityAssetState: 'ready', seed: 'pass71-parity-v1', staging: 'frozen-one-bot-ahead-v1', signature: 'same-scene' },
-    runtime: { requestedBackend: 'webgl2', actualBackend: 'webgl2', softwareAdapter: false, deviceLost: false, uncapturedErrors: 0 },
-    webglVersion: 'WebGL 2.0',
-    graphics: { requestedPreset: 'custom', effectivePreset: 'custom', renderProfile: 'blender', renderScale: 1, adaptive: false, antialiasSamples: 4, geometryDetail: 'full', frameRateLimit: 0 },
-    principalHdrSamples: 4,
-    settleMs: 6_000,
-    performance: {
-      elapsedMs,
-      sampleCount,
-      medianFps,
-      p95FrameTimeMs,
-      gameFrameDelta,
-      presentedFps: gameFrameDelta * 1_000 / elapsedMs,
-      gameFrameToCallbackRatio: gameFrameDelta / sampleCount,
-    },
-    faults: { bootstrapError: null, runtimeErrorLog: '', fatalErrorVisible: false, capturedErrors: [], watchdogStatus: 'healthy', watchdogIncidents: 0, contextLosses: 0, documentVisible: true, documentFocused: true },
-  };
+function rehash(record) {
+  record.receiptSha256 = pass71NativeBrowserParityRecordSha256(record);
+  return record;
 }
 
-function receipt(firefoxMedianFps = 50, firefoxP95 = 20, firefoxPresentedFps = firefoxMedianFps) {
-  const chrome = browser('chrome', 60, 16);
-  const firefox = browser('firefox', firefoxMedianFps, firefoxP95, firefoxPresentedFps);
-  return {
-    schemaVersion: PASS71_NATIVE_BROWSER_PARITY.schemaVersion,
-    gate: PASS71_NATIVE_BROWSER_PARITY.gate,
-    source: { sha: 'b'.repeat(40), tree: 'c'.repeat(40), cleanBefore: true, cleanAfter: true },
-    build: { manifestSha256: hash, fileCount: 10 },
-    tooling: { runnerSha256: hash, contractSha256: hash },
-    browsers: { chrome, firefox },
-    comparison: {
-      firefoxMedianFpsRatio: firefox.performance.medianFps / chrome.performance.medianFps,
-      firefoxPresentedFpsRatio: firefox.performance.presentedFps / chrome.performance.presentedFps,
-      firefoxP95FrameTimeRatio: firefox.performance.p95FrameTimeMs / chrome.performance.p95FrameTimeMs,
-    },
-  };
-}
-
-test('summarizes median FPS and p95 frame time from retained intervals', () => {
+test('summarizes retained native frame intervals', () => {
   const summary = summarizePass71FrameWindow([10, 12, 14, 16, 20], 72);
   assert.equal(summary.medianFrameTimeMs, 14);
   assert.equal(summary.medianFps, 1_000 / 14);
   assert.equal(summary.p95FrameTimeMs, 20);
+  assert.equal(summary.maximumFrameTimeMs, 20);
 });
 
-test('accepts the exact threshold boundaries', () => {
-  assert.doesNotThrow(() => assertPass71NativeBrowserParityReceipt(receipt(48, 20)));
+test('freezes deterministic material identities instead of random Three UUIDs', () => {
+  const source = readFileSync(new URL('../../src/legacy-main.ts', import.meta.url), 'utf8');
+  assert.match(source, /const materialIdentity = \(material: THREE\.Material\): string/u);
+  assert.match(source, /textureIdentity\(visual\.normalMap\)/u);
+  assert.doesNotMatch(source, /material\.uuid\.slice/u);
 });
 
-test('rejects Firefox below 0.80 Chrome median FPS', () => {
-  assert.ok(pass71NativeBrowserParityFailures(receipt(47.99, 20)).includes('firefox-median-fps-ratio'));
+test('rejects a forged deterministic scene signature or hidden target drift', () => {
+  const receipt = createPass71NativeBrowserParityFixture();
+  receipt.browsers.firefox.scenes[0].scene.target.position[0] += 1;
+  const failures = pass71NativeBrowserParityFailures(rehash(receipt));
+  assert.ok(failures.includes('firefox:solo-quality-combat:deterministic-scene-signature'));
 });
 
-test('rejects a slow game presentation loop even when independent rAF cadence looks healthy', () => {
-  const value = receipt(60, 16, 30);
-  const failures = pass71NativeBrowserParityFailures(value);
-  assert.ok(failures.includes('firefox:presentation-cadence'));
-  assert.ok(failures.includes('firefox-presented-fps-ratio'));
+test('accepts exact threshold boundaries in both Quality combat scenes', () => {
+  const receipt = createPass71NativeBrowserParityFixture();
+  assert.doesNotThrow(() => assertPass71NativeBrowserParityReceipt(receipt));
+  assert.deepEqual(receipt.browsers.chrome.scenes.map((scene) => scene.mode), PASS71_NATIVE_BROWSER_PARITY.sceneModes);
 });
 
-test('rejects omitted or self-inconsistent game presentation telemetry', () => {
-  const value = receipt();
-  delete value.browsers.firefox.performance.gameFrameDelta;
-  assert.ok(pass71NativeBrowserParityFailures(value).includes('firefox:measurement-window'));
-
-  const inconsistent = receipt();
-  inconsistent.browsers.firefox.performance.presentedFps += 1;
-  assert.ok(pass71NativeBrowserParityFailures(inconsistent).includes('firefox:measurement-window'));
+test('rejects anything except the named Quality preset and complete Quality fields', () => {
+  const receipt = createPass71NativeBrowserParityFixture();
+  receipt.browsers.firefox.scenes[0].displayedGraphicsPreset = 'custom';
+  receipt.browsers.firefox.scenes[0].requestedGraphics = {
+    ...PASS71_QUALITY_REQUESTED_GRAPHICS,
+    adaptiveResolution: false,
+  };
+  const failures = pass71NativeBrowserParityFailures(rehash(receipt));
+  assert.ok(failures.includes('firefox:solo-quality-combat:named-quality-settings'));
 });
 
-test('rejects Firefox above 1.25 Chrome p95 frame time', () => {
-  assert.ok(pass71NativeBrowserParityFailures(receipt(50, 20.01)).includes('firefox-p95-frame-time-ratio'));
+test('requires the canonical Quality runtime reason and ignores object insertion order only', () => {
+  const receipt = createPass71NativeBrowserParityFixture();
+  const effective = receipt.browsers.chrome.scenes[0].effectiveGraphics;
+  receipt.browsers.chrome.scenes[0].effectiveGraphics = Object.fromEntries(Object.entries(effective).reverse());
+  assert.doesNotThrow(() => assertPass71NativeBrowserParityReceipt(rehash(receipt)));
+
+  delete receipt.browsers.chrome.scenes[0].effectiveGraphics.reason;
+  const failures = pass71NativeBrowserParityFailures(rehash(receipt));
+  assert.ok(failures.includes('chrome:solo-quality-combat:effective-graphics:schema-fields'));
+  assert.ok(failures.includes('chrome:solo-quality-combat:named-quality-settings'));
 });
 
-test('rejects software adapters, configuration drift and watchdog incidents', () => {
-  const value = receipt();
-  value.browsers.firefox.runtime.softwareAdapter = true;
-  value.browsers.firefox.graphics.adaptive = true;
-  value.browsers.firefox.faults.watchdogIncidents = 1;
-  const failures = pass71NativeBrowserParityFailures(value);
-  assert.ok(failures.includes('firefox:hardware-webgl2'));
-  assert.ok(failures.includes('firefox:graphics'));
-  assert.ok(failures.includes('firefox:runtime-or-watchdog-fault'));
+test('rejects missing hosted combat or a mismatched hosted scene signature', () => {
+  const missing = createPass71NativeBrowserParityFixture();
+  missing.browsers.firefox.scenes.pop();
+  assert.ok(pass71NativeBrowserParityFailures(rehash(missing)).includes('firefox:scene-set'));
+
+  const mismatch = createPass71NativeBrowserParityFixture();
+  mismatch.browsers.firefox.scenes[1].scene.signature = '0'.repeat(64);
+  assert.ok(pass71NativeBrowserParityFailures(rehash(mismatch))
+    .includes('comparison:hosted-quality-combat:scene-signature'));
 });
 
-test('rejects a different staged player or bot pose despite an identical seed', () => {
-  const value = receipt();
-  value.browsers.firefox.scene.signature = 'different-scene';
-  assert.ok(pass71NativeBrowserParityFailures(value).includes('scene-not-identical'));
+test('rejects synthetic or incomplete representative combat', () => {
+  const receipt = createPass71NativeBrowserParityFixture();
+  receipt.browsers.chrome.scenes[1].action.trustedEvents[2].trusted = false;
+  receipt.browsers.chrome.scenes[1].action.targetHealthAfter = receipt.browsers.chrome.scenes[1].action.targetHealthBefore;
+  assert.ok(pass71NativeBrowserParityFailures(rehash(receipt))
+    .includes('chrome:hosted-quality-combat:representative-combat-action'));
+});
+
+test('retains exact ordered trusted input types, buttons, key codes and monotonic timestamps', () => {
+  const fixture = createPass71NativeBrowserParityFixture();
+  const retained = fixture.browsers.firefox.scenes[1].action.trustedEvents;
+  assert.deepEqual(retained.map(({ phase, type, button, key, code }) => ({ phase, type, button, key, code })),
+    PASS71_NATIVE_BROWSER_PARITY_TRUSTED_ACTION_EVENTS);
+
+  const mutations = [
+    (events) => { [events[4], events[5]] = [events[5], events[4]]; },
+    (events) => { events[3].button = 0; },
+    (events) => { events[8].code = ''; },
+    (events) => { events[6].type = 'mouseup'; },
+    (events) => { events[7].eventTimestampMs = events[6].eventTimestampMs - 1; },
+    (events) => { events[7].observedAtMs = events[6].observedAtMs - 1; },
+    (events) => { events[7].sequence = events[6].sequence; },
+    (events) => { events[4].pointerLocked = false; },
+    (events) => { events.pop(); },
+  ];
+  for (const mutate of mutations) {
+    const receipt = createPass71NativeBrowserParityFixture();
+    mutate(receipt.browsers.firefox.scenes[1].action.trustedEvents);
+    const failures = pass71NativeBrowserParityFailures(rehash(receipt));
+    assert.ok(failures.includes('firefox:hosted-quality-combat:trusted-action-events'));
+    assert.ok(failures.includes('firefox:hosted-quality-combat:representative-combat-action'));
+  }
+});
+
+test('rejects software adapters and runtime/watchdog faults', () => {
+  const receipt = createPass71NativeBrowserParityFixture();
+  receipt.browsers.firefox.scenes[0].runtime.softwareAdapter = true;
+  receipt.browsers.firefox.scenes[0].runtime.adapterLabel = 'llvmpipe';
+  receipt.browsers.firefox.scenes[0].faults.watchdogIncidents = 1;
+  const failures = pass71NativeBrowserParityFailures(rehash(receipt));
+  assert.ok(failures.includes('firefox:solo-quality-combat:hardware-webgl2'));
+  assert.ok(failures.includes('firefox:solo-quality-combat:runtime-or-watchdog-fault'));
+});
+
+test('rejects executable, runtime and user-agent browser version drift', () => {
+  const receipt = createPass71NativeBrowserParityFixture();
+  receipt.browsers.chrome.identity.runtimeVersion = '150.9.9';
+  receipt.browsers.firefox.identity.userAgent = 'Mozilla/5.0 Firefox/149.0';
+  const failures = pass71NativeBrowserParityFailures(rehash(receipt));
+  assert.ok(failures.includes('chrome:installed-browser-identity'));
+  assert.ok(failures.includes('firefox:installed-browser-identity'));
+});
+
+test('rejects hidden renderer allocations, material drift and draw-budget drift', () => {
+  const receipt = createPass71NativeBrowserParityFixture();
+  receipt.browsers.chrome.scenes[0].resources.after.cachedTextures += 1;
+  receipt.browsers.chrome.scenes[0].renderInventory.after.entries[0].material = 'MeshBasicMaterial:downgrade';
+  receipt.browsers.chrome.scenes[0].renderInventory.after.sha256 = '0'.repeat(64);
+  receipt.browsers.chrome.scenes[0].renderBudget.after.drawCalls += 1;
+  const failures = pass71NativeBrowserParityFailures(rehash(receipt));
+  assert.ok(failures.includes('chrome:solo-quality-combat:renderer-allocation-drift'));
+  assert.ok(failures.includes('chrome:solo-quality-combat:material-or-drawable-drift'));
+  assert.ok(failures.includes('chrome:solo-quality-combat:draw-budget-drift'));
+});
+
+test('rejects unstable renderer samples and scene observations not aligned to those frames', () => {
+  const renderer = createPass71NativeBrowserParityFixture();
+  renderer.browsers.chrome.scenes[0].renderBudget.before.rendererSamples[1].calls += 1;
+  assert.ok(pass71NativeBrowserParityFailures(rehash(renderer))
+    .includes('chrome:solo-quality-combat:render-budget:before:stable-renderer-sampling'));
+
+  const sceneDrift = createPass71NativeBrowserParityFixture();
+  sceneDrift.browsers.firefox.scenes[1].scene.samples.before[1].targetPosition[0] += 0.03;
+  assert.ok(pass71NativeBrowserParityFailures(rehash(sceneDrift))
+    .includes('firefox:hosted-quality-combat:deterministic-scene-signature'));
+
+  const misaligned = createPass71NativeBrowserParityFixture();
+  misaligned.browsers.chrome.scenes[1].scene.samples.after[1].frameCount += 10;
+  assert.ok(pass71NativeBrowserParityFailures(rehash(misaligned))
+    .includes('chrome:hosted-quality-combat:scene-render-sample-alignment:after'));
+
+  const forgedStage = createPass71NativeBrowserParityFixture();
+  const hosted = forgedStage.browsers.firefox.scenes[1];
+  hosted.scene.staging.targetPosition[0] += 1;
+  hosted.scene.signature = pass71NativeBrowserParitySceneSignature({ mode: hosted.mode, ...hosted.scene });
+  assert.ok(pass71NativeBrowserParityFailures(rehash(forgedStage))
+    .includes('firefox:hosted-quality-combat:deterministic-scene-signature'));
+});
+
+test('rejects healthy rAF hiding a slow game loop', () => {
+  const receipt = createPass71NativeBrowserParityFixture();
+  const performance = receipt.browsers.firefox.scenes[0].performance;
+  performance.gameFrameDelta = Math.floor(performance.sampleCount / 2);
+  performance.presentedFps = performance.gameFrameDelta * 1_000 / performance.elapsedMs;
+  performance.gameFrameToCallbackRatio = performance.gameFrameDelta / performance.sampleCount;
+  const failures = pass71NativeBrowserParityFailures(rehash(receipt));
+  assert.ok(failures.includes('firefox:solo-quality-combat:presentation-cadence'));
+  assert.ok(failures.includes('comparison:solo-quality-combat:presented-fps-ratio'));
+});
+
+test('rejects retained long tasks even when aggregate FPS is healthy', () => {
+  const receipt = createPass71NativeBrowserParityFixture();
+  receipt.browsers.firefox.scenes[0].performance.longTasks = {
+    entries: [{ startTimeMs: 2_000, durationMs: 75 }],
+    count: 1,
+    totalDurationMs: 75,
+    maximumDurationMs: 75,
+  };
+  assert.ok(pass71NativeBrowserParityFailures(rehash(receipt))
+    .includes('firefox:solo-quality-combat:long-task-budget'));
+});
+
+test('rejects Firefox below 0.80 Chrome median or presented FPS', () => {
+  const median = createPass71NativeBrowserParityFixture();
+  median.browsers.firefox.scenes[0].performance.medianFps = median.browsers.chrome.scenes[0].performance.medianFps * 0.799;
+  assert.ok(pass71NativeBrowserParityFailures(rehash(median))
+    .includes('comparison:solo-quality-combat:median-fps-ratio'));
+
+  const presented = createPass71NativeBrowserParityFixture();
+  const firefox = presented.browsers.firefox.scenes[1].performance;
+  const chrome = presented.browsers.chrome.scenes[1].performance;
+  firefox.gameFrameDelta = Math.floor(chrome.gameFrameDelta * 0.799);
+  firefox.presentedFps = firefox.gameFrameDelta * 1_000 / firefox.elapsedMs;
+  firefox.gameFrameToCallbackRatio = firefox.gameFrameDelta / firefox.sampleCount;
+  assert.ok(pass71NativeBrowserParityFailures(rehash(presented))
+    .includes('comparison:hosted-quality-combat:presented-fps-ratio'));
+});
+
+test('rejects Firefox above 1.25 Chrome p95 or maximum frame time', () => {
+  const p95 = createPass71NativeBrowserParityFixture();
+  p95.browsers.firefox.scenes[0].performance.p95FrameTimeMs = p95.browsers.chrome.scenes[0].performance.p95FrameTimeMs * 1.251;
+  assert.ok(pass71NativeBrowserParityFailures(rehash(p95))
+    .includes('comparison:solo-quality-combat:p95-frame-time-ratio'));
+
+  const maximum = createPass71NativeBrowserParityFixture();
+  maximum.browsers.firefox.scenes[1].performance.maximumFrameTimeMs = maximum.browsers.chrome.scenes[1].performance.maximumFrameTimeMs * 1.251;
+  assert.ok(pass71NativeBrowserParityFailures(rehash(maximum))
+    .includes('comparison:hosted-quality-combat:maximum-frame-time-ratio'));
+});
+
+test('rejects tool, source, served candidate and receipt digest drift', () => {
+  const receipt = createPass71NativeBrowserParityFixture();
+  receipt.source.endingCheckoutSourceSha = '9'.repeat(40);
+  receipt.servedCandidate.sourceSha = '8'.repeat(40);
+  receipt.tooling.runnerSha256 = 'not-a-digest';
+  receipt.receiptSha256 = '7'.repeat(64);
+  const failures = pass71NativeBrowserParityFailures(receipt, { sourceSha: 'a'.repeat(40) });
+  assert.ok(failures.includes('exact-source-identity'));
+  assert.ok(failures.includes('staged-candidate-provenance'));
+  assert.ok(failures.includes('exact-source-tooling'));
+  assert.ok(failures.includes('receipt-sha256'));
+});
+
+test('binds the native receipt to the approved machine when requested', () => {
+  const receipt = createPass71NativeBrowserParityFixture();
+  assert.ok(pass71NativeBrowserParityFailures(rehash(receipt), { machine: 'another-machine' })
+    .includes('native-windows-environment'));
+});
+
+test('rejects unknown receipt fields rather than carrying unvalidated claims', () => {
+  const receipt = createPass71NativeBrowserParityFixture();
+  receipt.unvalidatedClaim = 'Firefox is perfect everywhere';
+  assert.ok(pass71NativeBrowserParityFailures(rehash(receipt)).includes('receipt:schema-fields'));
 });

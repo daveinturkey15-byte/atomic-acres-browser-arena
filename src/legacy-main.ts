@@ -30001,6 +30001,55 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     const projection = new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     const frustum = new THREE.Frustum().setFromProjectionMatrix(projection);
     const visible: Array<{ name: string; material: string; triangles: number }> = [];
+    const textureIdentity = (texture: THREE.Texture | null | undefined): string => {
+      if (!texture) return '-';
+      const image = texture.image as { currentSrc?: unknown; src?: unknown } | undefined;
+      const source = typeof image?.currentSrc === 'string' && image.currentSrc.length > 0
+        ? image.currentSrc
+        : typeof image?.src === 'string' ? image.src : '';
+      let stableSource = source;
+      try {
+        const parsed = new URL(source, window.location.href);
+        stableSource = `${parsed.pathname}${parsed.search}`;
+      } catch { /* Retain the source string when it is not URL-shaped. */ }
+      return encodeURIComponent(texture.name || stableSource || '(anonymous-texture)');
+    };
+    const materialIdentity = (material: THREE.Material): string => {
+      const visual = material as THREE.Material & {
+        color?: THREE.Color;
+        emissive?: THREE.Color;
+        roughness?: number;
+        metalness?: number;
+        map?: THREE.Texture | null;
+        normalMap?: THREE.Texture | null;
+        roughnessMap?: THREE.Texture | null;
+        metalnessMap?: THREE.Texture | null;
+        emissiveMap?: THREE.Texture | null;
+        alphaMap?: THREE.Texture | null;
+        aoMap?: THREE.Texture | null;
+        lightMap?: THREE.Texture | null;
+      };
+      return [
+        material.type,
+        encodeURIComponent(material.name || '(unnamed)'),
+        visual.color?.getHexString() ?? '-',
+        visual.emissive?.getHexString() ?? '-',
+        Number.isFinite(visual.roughness) ? visual.roughness : '-',
+        Number.isFinite(visual.metalness) ? visual.metalness : '-',
+        material.opacity,
+        material.transparent,
+        material.side,
+        material.blending,
+        textureIdentity(visual.map),
+        textureIdentity(visual.normalMap),
+        textureIdentity(visual.roughnessMap),
+        textureIdentity(visual.metalnessMap),
+        textureIdentity(visual.emissiveMap),
+        textureIdentity(visual.alphaMap),
+        textureIdentity(visual.aoMap),
+        textureIdentity(visual.lightMap),
+      ].join('|');
+    };
     scene.traverse((node) => {
       if (!(node instanceof THREE.Mesh) || !node.layers.test(camera.layers)) return;
       let ancestor: THREE.Object3D | null = node;
@@ -30014,7 +30063,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       const triangles = Math.floor((node.geometry.index?.count ?? positionCount) / 3);
       visible.push({
         name: node.name || node.parent?.name || '(unnamed)',
-        material: materials.map((material) => `${material.type}:${material.name || material.uuid.slice(0, 8)}`).join(','),
+        material: materials.map(materialIdentity).join(','),
         triangles,
       });
     });
