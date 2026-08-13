@@ -209,7 +209,7 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
     const isCurrentCandidate = expectedPath === channelConfig.experimental.path;
     const expectsPendingCandidate = isCurrentCandidate && !expectedReleasedAt;
     if (expectsPendingCandidate
-      ? lastReleaseLabel !== 'CURRENT CANDIDATE · OWNER REVIEW PENDING'
+      ? lastReleaseLabel !== 'CURRENT CANDIDATE · RELEASE GATES PENDING'
       : !lastReleaseLabel.includes('LAST RELEASE') || lastReleaseLabel.includes('PENDING_PRODUCTION')) {
       throw new Error(`Invalid Last Release label for ${expectedPass}: ${JSON.stringify(lastReleaseLabel)}`);
     }
@@ -227,8 +227,8 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
     const timeText = (await time.textContent())?.replace(/\s+/g, ' ').trim() ?? '';
     if (expectsPendingCandidate) {
       if (releaseState !== 'LOCAL CANDIDATE' || releasedAt !== null
-        || !timeText.includes('NOT PUBLISHED') || !timeText.includes('AWAITING OWNER HITL')) {
-        throw new Error(`${expectedPass} candidate is not explicitly pending owner HITL: ${JSON.stringify({ releaseState, releasedAt, timeText })}`);
+        || !timeText.includes('NOT PUBLISHED') || !timeText.includes('AWAITING RELEASE GATES')) {
+        throw new Error(`${expectedPass} candidate is not explicitly pending release gates: ${JSON.stringify({ releaseState, releasedAt, timeText })}`);
       }
     } else if (!releasedAt || Number.isNaN(Date.parse(releasedAt)) || timeText.includes('NOT PUBLISHED')) {
       throw new Error(`${expectedPass} Last Release timestamp is not a published instant: ${JSON.stringify(releasedAt)}`);
@@ -297,7 +297,7 @@ try {
     await chooser.close();
   }
 
-  await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass70');
+  await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass71');
   await verifyChoice('retained', 'channels/pass69-retained', 'PASS 69', 'pass69');
   await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63');
   if (releasePass && !normalizedPass(routes.experimental.eyebrow).includes(normalizedPass(releasePass))) {

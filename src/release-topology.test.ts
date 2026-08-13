@@ -10,16 +10,16 @@ const shellHtml = readFileSync('release-shell/index.html', 'utf8');
 const staging = readFileSync('scripts/release/stage-release-topology.mjs', 'utf8');
 const playwrightServer = readFileSync('scripts/qa/playwright-web-server.mjs', 'utf8');
 
-describe('Pass 70 release topology', () => {
-  it('identifies this source as Pass 70 without moving protected fallback pins', () => {
+describe('Pass 71 release topology', () => {
+  it('identifies this source as Pass 71 without moving protected fallback pins', () => {
     expect(PASS66_RELEASE_IDENTITY).toMatchObject({
-      pass: 'PASS 70',
-      label: 'PASS 70',
+      pass: 'PASS 71',
+      label: 'PASS 71',
       state: 'RELEASE CANDIDATE',
       route: 'channels/the-big-one',
-      runtimeLabel: 'PASS 70',
+      runtimeLabel: 'PASS 71',
     });
-    expect(config.latest.label).toBe('PASS 70');
+    expect(config.latest.label).toBe('PASS 71');
     expect(config.stable.sourceSha).toBe('8c3ad1cd4d819aba79f07c01c16c8c4294fd14c1');
     expect(config.retained).toMatchObject({
       pass: 'PASS 69',
@@ -70,7 +70,7 @@ describe('Pass 70 release topology', () => {
     });
   });
 
-  it('stages the Pass 70 candidate at the promotable path and removes old channels', () => {
+  it('stages the Pass 71 candidate at the promotable path and removes old channels', () => {
     expect(config.experimental).toEqual({
       pass: PASS66_RELEASE_IDENTITY.pass,
       label: PASS66_RELEASE_IDENTITY.label,
@@ -83,7 +83,7 @@ describe('Pass 70 release topology', () => {
     expect(JSON.stringify(config)).not.toContain('channels/new-netcode');
   });
 
-  it('shows Pass 70, exact retained Pass 69 and stable Pass 63 WebGL', () => {
+  it('shows Pass 71, exact retained Pass 69 and stable Pass 63 WebGL', () => {
     expect(shell).toContain("['experimental', 'retained', 'stable']");
     expect(shell).not.toContain("['experimental', 'stable', 'rollback']");
     expect(shell).not.toContain("['normal', 'stable', 'experimental']");
@@ -91,9 +91,9 @@ describe('Pass 70 release topology', () => {
     expect(shell).toContain("requested === 'stable' || requested === 'rollback') return route('stable')");
     expect(shell).toContain("requested === 'previous' || requested === 'pass69') return route('retained')");
     expect(shell).toContain("if (!channel) continue");
-    expect(shellHtml).toContain('Pass 70');
+    expect(shellHtml).toContain('Pass 71');
     expect(shellHtml).toContain('Pass 69');
-    expect(shellHtml).not.toContain('local Pass 70');
+    expect(shellHtml).not.toContain('local Pass 71');
     expect(shellHtml).not.toContain('The Big One');
     expect(shellHtml).toContain('stable Pass 63 WebGL');
     expect(shellHtml).toContain('Nuke Town');
@@ -101,7 +101,7 @@ describe('Pass 70 release topology', () => {
     expect(shellHtml).not.toContain('Pass 59');
   });
 
-  it('routes root rooms and legacy latest or normal aliases to Pass 70', () => {
+  it('routes root rooms and legacy latest or normal aliases to Pass 71', () => {
     expect(shell).toContain("requested === 'latest' || requested === 'normal') return route('experimental')");
     expect(shell).toContain("requested === 'experimental'");
     expect(shell).toContain("requested === 'stable' || requested === 'rollback'");
@@ -139,7 +139,7 @@ describe('Pass 70 release topology', () => {
     expect(staging).toContain("process.env.RELEASE_BUILT_AT?.trim() ? 'live' : 'candidate'");
     expect(staging).toContain('deploymentState,');
     expect(staging).toContain("deploymentState === 'live'");
-    expect(staging).toContain('Publication remains disabled until owner approval.');
+    expect(staging).toContain('Publication remains disabled until the release gates pass.');
   });
 
   it('stages the production channel topology before browser regression tests', () => {
@@ -149,7 +149,7 @@ describe('Pass 70 release topology', () => {
   });
 
   it('tracks the current release acceptance lifecycle without allowing premature publication', () => {
-    const manifestPath = 'acceptance/pass-70.json';
+    const manifestPath = 'acceptance/pass-71.json';
     if (!existsSync(manifestPath)) {
       expect(() => evaluateAcceptance({ phase: 'release', pass: PASS66_RELEASE_IDENTITY.pass }))
         .toThrow(`acceptance manifest does not exist: ${manifestPath}`);

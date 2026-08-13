@@ -40,9 +40,9 @@ const exactSha = (value, label) => {
 };
 exactSha(sourceSha, 'SOURCE_SHA');
 if (config.schemaVersion !== 4) throw new Error('release-channels.json schemaVersion must be 4');
-if (!/^PASS [1-9][0-9]*$/.test(config.experimental.pass) || config.experimental.label !== 'PASS 70'
+if (!/^PASS [1-9][0-9]*$/.test(config.experimental.pass) || config.experimental.label !== 'PASS 71'
   || config.experimental.path !== 'channels/the-big-one') {
-  throw new Error('Experimental production topology must stage PASS 70 at channels/the-big-one');
+  throw new Error('Experimental production topology must stage PASS 71 at channels/the-big-one');
 }
 if (config.stable.pass !== 'PASS 67.1' || config.stable.label !== 'STABLE SINGLEPLAYER') {
   throw new Error('Pass 67.1 must remain the approved-source stable singleplayer channel');
@@ -281,8 +281,8 @@ const publicConfig = {
   experimental: {
     label: config.experimental.label,
     description: deploymentState === 'live'
-      ? 'The approved Pass 70 gameplay and presentation build.'
-      : 'The local Pass 70 HITL candidate. Publication remains disabled until owner approval.',
+      ? 'The approved Pass 71 correction and presentation build.'
+      : 'The local Pass 71 release candidate. Publication remains disabled until the release gates pass.',
     pass: config.experimental.pass,
     path: config.experimental.path,
     deploymentState,

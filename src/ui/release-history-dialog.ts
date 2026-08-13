@@ -22,7 +22,7 @@ export function releaseHistoryButtonMarkup(entry: ChangelogEntry = CHANGELOG[0]!
 
 function releaseTimestampMarkup(entry: ChangelogEntry): string {
   if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) {
-    return '<time><small>NOT PUBLISHED</small>AWAITING OWNER HITL</time>';
+    return '<time><small>NOT PUBLISHED</small>AWAITING RELEASE GATES</time>';
   }
   return `<time datetime="${escapeHtml(entry.releasedAt)}"><small>PUBLISHED</small>${escapeHtml(formatChangelogTimestampDetail(entry.releasedAt))}</time>`;
 }

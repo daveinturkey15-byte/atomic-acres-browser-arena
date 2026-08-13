@@ -24,7 +24,7 @@ describe('menu documentation dialogs', () => {
     expect(markup).toContain('data-changelog-id="pass62"');
     expect(markup).toContain('LOCAL CANDIDATE');
     expect(markup).toContain('NOT PUBLISHED');
-    expect(markup).toContain('AWAITING OWNER HITL');
+    expect(markup).toContain('AWAITING RELEASE GATES');
   });
 
   it('renders timestamped production history without candidate copy', () => {

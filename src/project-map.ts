@@ -61,11 +61,11 @@ export function projectMapReleaseCopy(releasedAt: string): Readonly<{
   const released = releasedAt !== PENDING_PRODUCTION_RELEASE;
   return Object.freeze({
     summary: released
-      ? 'Pass 70 is the current released build for first-person combat, support, Gun Range, loadout and multiplayer improvements; the stable Pass 63 WebGL fallback stays frozen.'
-      : 'Pass 70 is the current local HITL candidate for first-person combat, support, Gun Range, loadout and multiplayer improvements; the stable Pass 63 WebGL fallback stays frozen.',
+      ? 'Pass 71 is the current released build for first-person presentation, thermal vision, destruction, support, audio and frame-pacing corrections; the retained Pass 69 and stable Pass 63 fallbacks stay frozen.'
+      : 'Pass 71 is the current local release candidate for first-person presentation, thermal vision, destruction, support, audio and frame-pacing corrections; release gates remain pending and the retained fallbacks stay frozen.',
     approvalHighlight: released
-      ? 'Pass 70 was promoted only after approval of its immutable preview'
-      : 'Owner approval remains pending on the immutable Pass 70 preview',
+      ? 'Pass 71 was promoted only after its immutable candidate cleared the release gates'
+      : 'Release gates remain pending on the immutable Pass 71 candidate',
   });
 }
 
@@ -73,20 +73,20 @@ const projectMapReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELE
 const projectMapCopy = projectMapReleaseCopy(projectMapReleasedAt);
 
 export const PROJECT_MAP_RELEASE: ChangelogEntry = Object.freeze({
-  id: 'pass70',
+  id: 'pass71',
   pass: PASS66_RELEASE_IDENTITY.pass,
-  title: 'Pass 70',
+  title: 'Pass 71',
   releasedAt: projectMapReleasedAt,
-  areas: Object.freeze(['FIRST-PERSON', 'SUPPORT', 'MULTIPLAYER', 'GUN RANGE', 'LOADOUT', 'HITL']),
+  areas: Object.freeze(['FIRST-PERSON', 'THERMAL', 'DESTRUCTION', 'SUPPORT', 'AUDIO', 'PERFORMANCE', 'RELEASE']),
   summary: projectMapCopy.summary,
   highlights: Object.freeze([
-    'Opaque weapon bodies retain only their authored clear lens and reticle corridors, with connected hands and bounded wall or prone contact poses',
-    'Railgun and Chopper Gunner presentation has explicit activation, firing, death, match-end and exit cleanup rather than persistent overlays',
-    'The secure test bay shares visible, movement, Rapier and ballistic structure authority while its timer freezes only inside the room',
-    'Field Kit cards and the Manage/Rename inspector share one desktop/mobile DPS and five-stat projection with verified selected and save states',
-    'Multiplayer pickup, recovery, duration, accessibility and soak contracts are corrected against the immutable Pass 69 comparison evidence',
+    'First-person arms retain authored proportions and connected framing while bounded contact poses keep weapons clear of walls, floors and prone geometry',
+    'M14 EBR, Railgun, Chopper Gunner and piloted-drone sensors reveal one exact animated rig through occlusion instead of stacked proxies',
+    'Grenade, glass and combat-audio first actions use preowned bounded resources, and unsupported shards retire deterministically',
+    'Chopper gun splash, hardpoint missiles, cockpit framing and Nuke warning presentation retain host-owned support authority',
+    'Firefox presentation pacing removes redundant canvas work while Quality assets and HDR settings remain unchanged',
     projectMapCopy.approvalHighlight,
-    'Pass 63 stays frozen as the selectable stable WebGL fallback',
+    'Pass 69 stays frozen as the exact retained comparison build and Pass 63 stays frozen as the selectable stable WebGL fallback',
   ]),
 });
 

@@ -2,13 +2,13 @@
   "schemaVersion": 4,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 70",
-    "description": "Pass 70: gameplay, weapons, support, multiplayer, mobile and visual improvements."
+    "label": "PASS 71",
+    "description": "Pass 71: first-person, thermal vision, destruction, support, audio and performance corrections."
   },
   "experimental": {
-    "label": "PASS 70",
-    "description": "Pass 70 gameplay and presentation build.",
-    "pass": "PASS 70",
+    "label": "PASS 71",
+    "description": "Pass 71 correction and presentation build.",
+    "pass": "PASS 71",
     "path": "channels/the-big-one"
   },
   "retained": {

@@ -25,9 +25,9 @@ describe('project map', () => {
   it('keeps the current snapshot first and the complete older history in the archive', () => {
     const bundle = createProjectMapBundle('2026-07-24T17:00:00Z');
     expect(bundle.current.release).toEqual(PROJECT_MAP_RELEASE);
-    expect(bundle.current.previousRelease).toBe('PASS 69');
+    expect(bundle.current.previousRelease).toBe('PASS 70');
     expect(bundle.archive).toEqual(CHANGELOG);
-    // The current snapshot replaces the pending PASS 70 ledger entry at the
+    // The current snapshot replaces the pending PASS 71 ledger entry at the
     // front of the combined changes list instead of duplicating the pass.
     expect(bundle.changes).toEqual([
       PROJECT_MAP_RELEASE,
@@ -35,7 +35,7 @@ describe('project map', () => {
     ]);
     expect(bundle.current.releaseState).toBe('release-candidate');
     expect(bundle.publishedChannels.liveTarget).toMatchObject({
-      pass: 'PASS 70', label: 'PASS 70', path: 'channels/the-big-one', state: 'release-candidate',
+      pass: 'PASS 71', label: 'PASS 71', path: 'channels/the-big-one', state: 'release-candidate',
     });
     expect(bundle.publishedChannels.failedRegressionEvidence).toMatchObject({
       pass: 'PASS 64', role: 'published-failed-regression-evidence',
@@ -50,13 +50,13 @@ describe('project map', () => {
 
   it('keeps candidate and timestamped-production release copy mutually truthful', () => {
     expect(projectMapReleaseCopy('PENDING_PRODUCTION')).toMatchObject({
-      summary: expect.stringContaining('current local HITL candidate'),
-      approvalHighlight: expect.stringContaining('Owner approval remains pending'),
+      summary: expect.stringContaining('current local release candidate'),
+      approvalHighlight: expect.stringContaining('Release gates remain pending'),
     });
     const released = projectMapReleaseCopy('2026-08-09T20:00:00Z');
     expect(released.summary).toContain('current released build');
-    expect(released.summary).not.toContain('local HITL candidate');
-    expect(released.approvalHighlight).toContain('was promoted only after approval');
+    expect(released.summary).not.toContain('local release candidate');
+    expect(released.approvalHighlight).toContain('was promoted only after');
     expect(released.approvalHighlight).not.toContain('remains pending');
   });
 
@@ -71,7 +71,7 @@ describe('project map', () => {
     expect(markdown.indexOf('## Current release snapshot')).toBeLessThan(markdown.indexOf('## Release archive'));
     expect(markdown).toContain(`### ${CHANGELOG[0]?.pass}: ${CHANGELOG[0]?.title}`);
     expect(markdown).toContain('TypeScript and Rapier own physics');
-    expect(markdown).toMatch(/Live target: PASS 70 \(PASS 70\); release-candidate/);
+    expect(markdown).toMatch(/Live target: PASS 71 \(PASS 71\); release-candidate/);
     expect(markdown).toContain('Failed-regression evidence: PASS 64');
   });
 

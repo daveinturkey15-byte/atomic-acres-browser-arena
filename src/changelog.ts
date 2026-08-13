@@ -30,20 +30,20 @@ export function resolveProductionReleasedAt(
   return injectedReleasedAt;
 }
 
-export function pass70ReleaseCopy(releasedAt: string): Readonly<{ summary: string; lineage: string }> {
+export function pass71ReleaseCopy(releasedAt: string): Readonly<{ summary: string; lineage: string }> {
   const released = releasedAt !== PENDING_PRODUCTION_RELEASE;
   return Object.freeze({
     summary: released
-      ? 'Pass 70 improves first-person weapons and hands, support streaks, the Gun Range test bay, Field Kit clarity and multiplayer recovery without changing the retained Pass 63 fallback.'
-      : 'Pass 70 is the local owner-review candidate, improving first-person weapons and hands, support streaks, the Gun Range test bay, Field Kit clarity and multiplayer recovery without changing the retained Pass 63 fallback.',
+      ? 'Pass 71 hardens first-person weapon contact and anatomy, cold-action frame pacing, thermal wall reveals, glass destruction, support streaks and combat audio without moving the retained Pass 69 or Pass 63 fallbacks.'
+      : 'Pass 71 is the local release candidate for first-person weapon contact and anatomy, cold-action frame pacing, thermal wall reveals, glass destruction, support streaks and combat audio; release gates remain pending.',
     lineage: released
-      ? 'Pass 69 remains the immutable comparison benchmark and Pass 63 remains the only selectable stable WebGL fallback'
-      : 'Pass 69 remains the immutable live comparison benchmark and Pass 63 remains the only selectable stable WebGL fallback until this exact candidate is approved',
+      ? 'Pass 70 remains in the release history, Pass 69 remains the immutable comparison build and Pass 63 remains the selectable stable WebGL fallback'
+      : 'Pass 70 remains the current live build, Pass 69 remains the immutable comparison build and Pass 63 remains the selectable stable WebGL fallback until this exact candidate clears release gates',
   });
 }
 
-const pass70ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
-const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
+const pass71ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+const pass71Copy = pass71ReleaseCopy(pass71ReleasedAt);
 
 /**
  * Newest first. Keep this player-facing rather than turning it into an internal
@@ -53,12 +53,30 @@ const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
+    id: 'pass71',
+    pass: 'PASS 71',
+    title: 'Pass 71 · Presentation, Destruction & Frame-Pacing Repair',
+    releasedAt: pass71ReleasedAt,
+    areas: Object.freeze(['FIRST-PERSON', 'THERMAL', 'DESTRUCTION', 'SUPPORT', 'AUDIO', 'PERFORMANCE', 'STABILITY']),
+    summary: pass71Copy.summary,
+    highlights: Object.freeze([
+      'Authored first-person arms keep muscular proportions, connected joints and reachable framing through weapon, pistol, knife, wall-contact and prone presentation',
+      'M14 EBR, Railgun, Chopper Gunner and piloted-drone sensors reveal one exact animated operator rig through occlusion instead of stacked proxy silhouettes',
+      'Grenade audio and physics work is preowned before combat, while glass breaches remain authoritative, fall from unsupported panes and retire deterministically',
+      'Bounded arena ambience replaces persistent tonal oscillators that could surface as intermittent buzzing during a match',
+      'Chopper Gunner gains wider machine-gun splash, six host-authoritative hardpoint missiles, taller cockpit framing and coalesced support feedback',
+      'Nuke warning presentation escalates visibly in the Gun Range and centred sticky alerts make Semtex and crossbow attachments unmistakable',
+      'Firefox-specific presentation pacing removes redundant canvas sampling and bounds completion telemetry without reducing Quality assets or HDR settings',
+      pass71Copy.lineage,
+    ]),
+  }),
+  Object.freeze({
     id: 'pass70',
     pass: 'PASS 70',
     title: 'Pass 70 · Combat, Support & Multiplayer Refinement',
-    releasedAt: pass70ReleasedAt,
+    releasedAt: '2026-08-12T19:46:48Z',
     areas: Object.freeze(['FIRST-PERSON', 'SUPPORT', 'MULTIPLAYER', 'GUN RANGE', 'LOADOUT', 'STABILITY']),
-    summary: pass70Copy.summary,
+    summary: 'Pass 70 improves first-person weapons and hands, support streaks, the Gun Range test bay, Field Kit clarity and multiplayer recovery without changing the retained Pass 63 fallback.',
     highlights: Object.freeze([
       'Carbine, Mini Uzi, Railgun and crossbow optics keep opaque weapon bodies while exposing the authored aim lane, clear scope glass and safe loaded-bolt path',
       'Connected first-person hands, catalog-wide wall and prone contact poses, persistent decals and grounded glass debris improve close-quarters presentation',
@@ -67,7 +85,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
       'The Gun Range test bay has coherent collision and ballistics, a lit textured door, room-only timer freeze, forward-facing illuminated dummies and crossbow-valid targets',
       'Field Kit cards and Manage/Rename share one clear DPS plus five-stat projection on desktop and mobile, with an unmistakable selected state and verified save-to-close behavior',
       'Multiplayer corrections cover authoritative Railgun pickup convergence, same-room host recovery, the two-minute Gun Range contract, current arena accessibility copy and Pass-neutral soak tooling',
-      pass70Copy.lineage,
+      'Pass 69 remains the immutable comparison benchmark and Pass 63 remains the only selectable stable WebGL fallback',
     ]),
   }),
   Object.freeze({
@@ -485,6 +503,6 @@ export function formatChangelogTimestampDetail(isoTimestamp: string): string {
 }
 
 export function lastUpdatedButtonLabel(entry: ChangelogEntry = latestChangelogEntry()): string {
-  if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) return 'CURRENT CANDIDATE · OWNER REVIEW PENDING';
+  if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) return 'CURRENT CANDIDATE · RELEASE GATES PENDING';
   return `LAST RELEASE · ${formatChangelogTimestamp(entry.releasedAt)}`;
 }
