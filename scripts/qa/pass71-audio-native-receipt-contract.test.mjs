@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  PASS71_AUDIO_NATIVE, assertPass71AudioNativeReceipt, pass71AudioNativeFailures, sha256Canonical,
+  PASS71_AUDIO_NATIVE, PASS71_AUDIO_NATIVE_DESCRIPTOR, assertPass71AudioNativeReceipt,
+  createPass71AudioNativeEvidenceFixture, pass71AudioNativeFailures, sha256Canonical,
 } from './pass71-audio-native-receipt-contract.mjs';
 
 const SHA = 'a'.repeat(40);
@@ -32,32 +33,7 @@ function lockedPhase() {
   return value;
 }
 
-function fixture() {
-  const servedCandidate = { schemaVersion: 4, channel: 'the-big-one', releasePass: 'PASS 71', sourceSha: SHA, treeSha256: HASH, exactRootFileCount: 42, path: 'channels/the-big-one' };
-  const browser = { name: 'msedge', installed: true, executablePath: 'C:/Program Files/Microsoft/Edge/Application/msedge.exe', executableSha256: HASH, version: '140.0.0.0', userAgent: 'Edg/140', softwareRenderer: false };
-  const arenaReceipts = PASS71_AUDIO_NATIVE.arenas.map((arenaId, arenaIndex) => ({
-    schema: PASS71_AUDIO_NATIVE.arenaSchema, status: 'PASS', sourceSha: SHA, servedCandidate,
-    arenaId, transitionArenaId: PASS71_AUDIO_NATIVE.arenas[(arenaIndex + 1) % 4], browserName: browser.name,
-    browserVersion: browser.version, userAgent: browser.userAgent,
-    adapter: { description: 'NVIDIA GeForce RTX', vendor: 'NVIDIA', architecture: 'ada', software: false },
-    physicalAudioUnlock: true, profile: PASS71_AUDIO_NATIVE.profile, durationMs: 65_000,
-    timeline: PASS71_AUDIO_NATIVE.events.map((id, index) => ({
-      id, action: `debug-${id}`, before: id === 'start' ? lockedPhase() : phase(index * 1_000, 0.001, 12 + index, index),
-      during: phase(index * 1_000 + 20, 0.02, 13 + index, index),
-      after: phase(index * 1_000 + 800, 0.001, 13 + index, index + 1), audibleDelta: 0.019, returnedToBaseline: true,
-    })),
-    postMinuteSamples: [60, 61, 62, 63, 64, 65].map((second) => phase(second * 1_000, 0.001, 30, 18)),
-    clientRuntimeLog: [], faults: [],
-  }));
-  const receipt = {
-    schema: PASS71_AUDIO_NATIVE.schema, status: 'PASS', sourceSha: SHA, endingSha: SHA, sourceTree: SHA,
-    sourceBranch: 'candidate', cleanBefore: true, cleanAfter: true, servedCandidate,
-    profile: PASS71_AUDIO_NATIVE.profile, browser, durationMsPerArena: 65_000,
-    arenas: PASS71_AUDIO_NATIVE.arenas,
-    tooling: PASS71_AUDIO_NATIVE.toolingPaths.map((path) => ({ path, sha256: HASH })), arenaReceipts,
-  };
-  return { ...receipt, evidenceDigest: sha256Canonical(receipt) };
-}
+function fixture() { return createPass71AudioNativeEvidenceFixture({ sourceSha: SHA }); }
 
 function mutate(path, value) {
   const copy = structuredClone(fixture());
@@ -70,7 +46,13 @@ function mutate(path, value) {
 }
 
 test('accepts one exact four-arena installed-browser Quality receipt', () => {
-  assert.equal(assertPass71AudioNativeReceipt(fixture(), SHA).status, 'PASS');
+  assert.equal(assertPass71AudioNativeReceipt(fixture(), SHA).status, 'passed');
+});
+
+test('exports one optional strict manifest registry descriptor', () => {
+  assert.deepEqual(PASS71_AUDIO_NATIVE_DESCRIPTOR, {
+    evidenceId: 'HF-302', kind: 'pass71-hf302-audio-native-long-run', minimumCount: 0, maximumCount: 1,
+  });
 });
 
 for (const [name, path, value, fragment] of [

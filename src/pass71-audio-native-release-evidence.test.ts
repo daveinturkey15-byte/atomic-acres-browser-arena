@@ -17,6 +17,7 @@ describe('HF-302 exact-A audio-native release evidence wiring', () => {
       '--expected-source-sha=', 'run-playwright-with-topology.mjs', "PASS71_AUDIO_NATIVE: '1'",
       "PASS70_NATIVE_ENGINE_USER_AGENT: '1'", "git('status', '--porcelain', '--untracked-files=all')",
       'executableSha256', 'sha256Canonical', 'assertPass71AudioNativeReceipt', 'endingSha !== sourceSha',
+      'readWindowsExecutableIdentity', 'authenticodeStatus', 'startedAt', 'completedAt',
     ]) expect(runner).toContain(token);
     for (const token of [
       "renderer: 'webgpu'", "render: 'blender'", "page.locator('#solo').click()", "event('combat'",
@@ -25,6 +26,9 @@ describe('HF-302 exact-A audio-native release evidence wiring', () => {
     ]) expect(spec).toContain(token);
     expect(contract).toContain("events: Object.freeze(['start', 'combat', 'grenade', 'glass', 'support', 'rematch', 'arena-transition'])");
     expect(contract).toContain('receipt.evidenceDigest !== sha256Canonical(withoutDigest)');
+    expect(contract).toContain('PASS71_AUDIO_NATIVE_DESCRIPTOR');
+    expect(contract).toContain('PASS71_AUDIO_NATIVE_REGISTRY_ENTRY');
+    expect(contract).toContain('pass71AudioNativeToolingHashesAtSource');
     expect(config).toContain('PASS71_AUDIO_BROWSER_EXECUTABLE');
     expect(config).toContain("reserved for the owned audio-native gate");
   });

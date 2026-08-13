@@ -4,25 +4,26 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync 
 import path from 'node:path';
 import process from 'node:process';
 import {
-  PASS71_AUDIO_NATIVE, assertPass71AudioNativeReceipt, sha256Canonical,
+  PASS71_AUDIO_NATIVE, assertPass71AudioNativeReceipt, pass71AudioNativeToolingHashesAtSource, sha256Canonical,
 } from './pass71-audio-native-receipt-contract.mjs';
+import {
+  assertInstalledEdgeExecutableIdentity, readWindowsExecutableIdentity,
+} from './pass71-edge-executable-identity.mjs';
 
 const root = path.resolve(process.cwd());
+const startedAt = new Date().toISOString();
 const expectedArgument = process.argv.find((argument) => argument.startsWith('--expected-source-sha='))?.split('=')[1] ?? '';
 const browserArgument = process.argv.find((argument) => argument.startsWith('--browser='))?.split('=')[1] ?? 'msedge';
 if (!/^[a-f0-9]{40}$/u.test(expectedArgument)) throw new Error('HF-302 requires --expected-source-sha=<40 lowercase hex>');
-if (!['chrome', 'msedge'].includes(browserArgument)) throw new Error('HF-302 --browser must be chrome or msedge');
-const browserPaths = browserArgument === 'msedge' ? [
+if (browserArgument !== 'msedge') throw new Error('HF-302 --browser must be msedge for signed installed-browser release evidence');
+const browserPaths = [
   process.env.PASS71_AUDIO_BROWSER_PATH,
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
   'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
-] : [
-  process.env.PASS71_AUDIO_BROWSER_PATH,
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
 ];
 const executablePath = browserPaths.filter(Boolean).map((candidate) => path.resolve(candidate)).find(existsSync);
 if (!executablePath) throw new Error(`HF-302 requires installed ${browserArgument}`);
+const executableIdentity = assertInstalledEdgeExecutableIdentity(readWindowsExecutableIdentity(executablePath));
 
 function git(...arguments_) {
   return execFileSync('git', arguments_, { cwd: root, encoding: 'utf8', windowsHide: true }).trim();
@@ -81,20 +82,30 @@ const userAgents = new Set(arenaReceipts.map((receipt) => receipt.userAgent));
 if (versions.size !== 1 || userAgents.size !== 1) fail('HF-302 browser identity changed between arenas', artifactRoot);
 if (arenaReceipts.some((receipt) => receipt.adapter?.software !== false)) fail('HF-302 rejects software rendering', artifactRoot);
 
-const tooling = PASS71_AUDIO_NATIVE.toolingPaths.map((relativePath) => ({ path: relativePath, sha256: sha256File(path.join(root, relativePath)) }));
+const tooling = pass71AudioNativeToolingHashesAtSource(root, sourceSha);
 const endingSha = git('rev-parse', 'HEAD');
 const cleanAfter = clean();
+const completedAt = new Date().toISOString();
 const receiptWithoutDigest = {
-  schema: PASS71_AUDIO_NATIVE.schema, status: 'PASS', sourceSha, endingSha, sourceTree, sourceBranch,
+  schemaVersion: PASS71_AUDIO_NATIVE.schemaVersion, evidenceId: PASS71_AUDIO_NATIVE.evidenceId,
+  kind: PASS71_AUDIO_NATIVE.kind, contract: PASS71_AUDIO_NATIVE.contract,
+  feedbackId: PASS71_AUDIO_NATIVE.feedbackId, schema: PASS71_AUDIO_NATIVE.schema, status: 'passed',
+  startedAt, completedAt,
+  invocation: 'npm run qa:pass71:audio-native -- --expected-source-sha=<A> --browser=msedge',
+  environment: { machine: String(process.env.COMPUTERNAME ?? '').toLowerCase(), platform: process.platform, arch: process.arch },
+  sourceSha, endingSha, sourceTree, sourceBranch,
   cleanBefore: true, cleanAfter, servedCandidate, profile: PASS71_AUDIO_NATIVE.profile,
   browser: {
     name: browserArgument, installed: true, executablePath: executablePath.replaceAll('\\', '/'),
-    executableSha256: sha256File(executablePath), version: [...versions][0], userAgent: [...userAgents][0], softwareRenderer: false,
+    executableSha256: sha256File(executablePath), productVersion: executableIdentity.productVersion,
+    installRoot: executableIdentity.installRoot.replaceAll('\\', '/'), authenticodeStatus: executableIdentity.signatureStatus,
+    authenticodeSigner: executableIdentity.signerSubject,
+    version: [...versions][0], userAgent: [...userAgents][0], softwareRenderer: false,
   },
   durationMsPerArena: PASS71_AUDIO_NATIVE.durationMsPerArena, arenas: PASS71_AUDIO_NATIVE.arenas, tooling, arenaReceipts,
 };
 const receipt = { ...receiptWithoutDigest, evidenceDigest: sha256Canonical(receiptWithoutDigest) };
-assertPass71AudioNativeReceipt(receipt, expectedArgument);
+assertPass71AudioNativeReceipt(receipt, { sourceSha: expectedArgument, tooling });
 if (!cleanAfter || endingSha !== sourceSha) fail(`HF-302 source drifted during evidence (${sourceSha} -> ${endingSha})`, artifactRoot);
 const receiptPath = path.join(artifactRoot, `${sourceSha}-${browserArgument}-receipt.json`);
 const tempPath = path.join(artifactRoot, 'receipt.tmp');
