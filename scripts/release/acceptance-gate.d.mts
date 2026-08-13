@@ -80,6 +80,9 @@ export function validateAcceptanceManifest(
     pass71Hf312Tooling?: readonly Readonly<{ path: string; sha256: string }>[];
     pass71Hf312SourceTreeSha?: string;
     pass71Hf312SourceAudit?: Readonly<Record<string, unknown>>;
+    pass71Hf313Tooling?: readonly Readonly<{ path: string; sha256: string }>[];
+    pass71Hf313SourceTreeSha?: string;
+    pass71Hf313SourceAudit?: Readonly<Record<string, unknown>>;
   }>,
 ): AcceptanceValidation;
 

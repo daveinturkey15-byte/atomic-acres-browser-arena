@@ -790,6 +790,13 @@ describe('release acceptance manifest', () => {
     expect(classifyPreviewDelta([], manifestPath, sha)).toMatchObject({ ok: false });
   });
 
+  it('requires exact protected-release readiness before HF-313 can be verified', () => {
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    const { manifest } = pass71Manifest(tooling);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/verified R18\/HF-313 requires its canonical registered native evidence record/);
+  }, 60_000);
+
   it('leaves exactly the owner-approval error on a complete pre-HITL manifest', () => {
     const manifest = acceptedManifest();
     delete (manifest as { humanAcceptance?: unknown }).humanAcceptance;
