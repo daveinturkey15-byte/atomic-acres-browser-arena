@@ -139,12 +139,32 @@ type DebugState = {
     hunterSwarmLaunches: number;
     hunterSwarmImpacts: number;
     gamepadSelection: 'scout-sweep' | 'yardhawk' | 'tri-pass' | 'hunter-swarm' | 'nuke';
-    nuke: { active: boolean; detonated: boolean; detonateInMs: number; finishInMs: number };
+    nuke: {
+      active: boolean;
+      detonated: boolean;
+      detonateInMs: number;
+      finishInMs: number;
+      warning?: {
+        visible: boolean;
+        arenaId: string;
+        position: number[];
+        scale: number;
+        coreOpacity: number;
+        ringOpacity: number;
+        lightIntensity: number;
+        reducedSensory: boolean;
+      };
+    };
     nukeActivations: number;
     nukeDetonations: number;
     explosionProfile: { source: string | null; totalSyncMs: number };
     explosionFrameProfile: { sources: string[]; impacts: number; totalSyncMs: number; maxImpactSyncMs: number };
-    prewarmedNuke: { shockwaveInScene: boolean; prewarmed: boolean; dynamicLights: number };
+    prewarmedNuke: {
+      shockwaveInScene: boolean;
+      warningBeaconInScene: boolean;
+      prewarmed: boolean;
+      dynamicLights: number;
+    };
   };
   overdrive: {
     generation: number;
@@ -2098,7 +2118,12 @@ test.describe('solo mechanics', () => {
 
   test('arms and detonates the 15-elimination Nuke with a bounded warning sequence', async ({ page }) => {
     test.setTimeout(120_000);
-    expect((await debug(page)).fieldSupport.prewarmedNuke).toEqual({ shockwaveInScene: true, prewarmed: true, dynamicLights: 0 });
+    expect((await debug(page)).fieldSupport.prewarmedNuke).toEqual({
+      shockwaveInScene: true,
+      warningBeaconInScene: true,
+      prewarmed: true,
+      dynamicLights: 1,
+    });
     await page.evaluate(() => {
       const flash = document.querySelector<HTMLElement>('#nuke-flash')!;
       document.documentElement.dataset.qaNukeFlashObserved = String(!flash.hidden);
@@ -2118,7 +2143,21 @@ test.describe('solo mechanics', () => {
       api.activateSupport('nuke');
     });
     await expect(page.locator('#nuke-warning')).toBeVisible();
-    expect((await debug(page)).fieldSupport.nukeActivations).toBe(1);
+    const armed = (await debug(page)).fieldSupport;
+    expect(armed.nukeActivations).toBe(1);
+    expect(armed.nuke).toMatchObject({
+      active: true,
+      detonated: false,
+      warning: {
+        visible: true,
+        arenaId: 'atomic-acres',
+        reducedSensory: false,
+      },
+    });
+    expect(armed.nuke.warning.scale).toBeGreaterThanOrEqual(0.65);
+    expect(armed.nuke.warning.coreOpacity).toBeGreaterThan(0);
+    expect(armed.nuke.warning.ringOpacity).toBeGreaterThan(0);
+    expect(armed.nuke.warning.lightIntensity).toBeGreaterThan(0);
     await expect.poll(async () => (await debug(page)).fieldSupport.nukeDetonations, { timeout: 15_000 }).toBe(1);
     const detonated = (await debug(page)).fieldSupport;
     expect(detonated.explosionProfile.source).toBe('nuke');

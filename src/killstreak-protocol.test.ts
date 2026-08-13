@@ -90,8 +90,8 @@ describe('killstreak protocol', () => {
       type: 'killstreak-damage-result' as const,
       by: 'host', matchEpoch: 7, revision: 3, events: [],
       impacts: [
-        { activationId: 'ks-activation-7-1', source: 'carpet-bomber' as const, ordinal: 0, phase: 'drop' as const, position: [1, 0, 2] as const, impactAtMs: 2_000, atMs: 1_580 },
-        { activationId: 'ks-activation-7-1', source: 'carpet-bomber' as const, ordinal: 0, phase: 'impact' as const, position: [1, 0, 2] as const, impactAtMs: 2_000, atMs: 2_000 },
+        { activationId: 'ks-activation-7-1', source: 'carpet-bomber' as const, ordinal: 0, phase: 'drop' as const, position: [1, 0, 2] as const, launchPosition: null, impactAtMs: 2_000, atMs: 1_580 },
+        { activationId: 'ks-activation-7-1', source: 'carpet-bomber' as const, ordinal: 0, phase: 'impact' as const, position: [1, 0, 2] as const, launchPosition: null, impactAtMs: 2_000, atMs: 2_000 },
       ],
       nonce: 9,
     };
@@ -106,8 +106,8 @@ describe('killstreak protocol', () => {
     const chopperMissile = {
       ...message,
       impacts: [
-        { activationId: 'ks-activation-7-2', source: 'chopper' as const, ordinal: 5, phase: 'drop' as const, position: [3, 0, 4] as const, impactAtMs: 2_780, atMs: 2_000 },
-        { activationId: 'ks-activation-7-2', source: 'chopper' as const, ordinal: 5, phase: 'impact' as const, position: [3, 0, 4] as const, impactAtMs: 2_780, atMs: 2_780 },
+        { activationId: 'ks-activation-7-2', source: 'chopper' as const, ordinal: 5, phase: 'drop' as const, position: [3, 0, 4] as const, launchPosition: [1, 18, 2] as const, impactAtMs: 2_780, atMs: 2_000 },
+        { activationId: 'ks-activation-7-2', source: 'chopper' as const, ordinal: 5, phase: 'impact' as const, position: [3, 0, 4] as const, launchPosition: [1, 18, 2] as const, impactAtMs: 2_780, atMs: 2_780 },
       ],
     };
     expect(isKillstreakProtocolMessage(chopperMissile)).toBe(true);

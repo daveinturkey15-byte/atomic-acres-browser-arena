@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { SupportDamageFeedbackTelemetry, projectSupportDamageAnchor } from './support-damage-feedback';
+import { SupportDamageFeedbackTelemetry, planSupportDamageFeedback, projectSupportDamageAnchor } from './support-damage-feedback';
 
 function reviewCamera(): THREE.PerspectiveCamera {
   const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.05, 200);
@@ -12,6 +12,23 @@ function reviewCamera(): THREE.PerspectiveCamera {
 }
 
 describe('support damage feedback projection', () => {
+  it('coalesces one round of splash presentation without coalescing target receipts', () => {
+    const first = {
+      resultId: 'result-1', activationId: 'activation-1', source: 'chopper', ownerId: 'owner',
+      targetId: 'target-a', targetLifeId: 1, targetPosition: [0, 0, -10], damage: 18,
+      origin: [0, 8, 0], endpoint: [0, 0, -10], tracerOrigin: [0, 7, -1], atMs: 1_000,
+    } as const;
+    const sameShot = { ...first, resultId: 'result-2', targetId: 'target-b', damage: 9 } as const;
+    const nextShot = { ...first, resultId: 'result-3', targetId: 'target-c', atMs: 1_080 } as const;
+    const plan = planSupportDamageFeedback([first, sameShot, nextShot]);
+    expect(plan.map(({ event, firstForShot }) => ({ resultId: event.resultId, firstForShot }))).toEqual([
+      { resultId: 'result-1', firstForShot: true },
+      { resultId: 'result-2', firstForShot: false },
+      { resultId: 'result-3', firstForShot: true },
+    ]);
+    expect(plan.map(({ event }) => event.targetId)).toEqual(['target-a', 'target-b', 'target-c']);
+  });
+
   it('anchors feedback to the admitted target instead of the caller reticle', () => {
     const camera = reviewCamera();
     const centre = projectSupportDamageAnchor(new THREE.Vector3(0, 0, -10), camera, { width: 1920, height: 1080 });

@@ -19,6 +19,7 @@ import { webGlShadowSamplerMode } from './webgl-shadow-compatibility';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
 import { PASS66_RELEASE_IDENTITY } from './release-identity';
+import { GUN_RANGE_NUKE_WARNING_POSITION, sampleNukeWarningPresentation } from './nuke-warning-presentation';
 import { drawPass70DroneSwarmLogo } from './pass70-drone-swarm-logo';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
 import { BotWeaponGpuVocabulary } from './bot-weapon-gpu-vocabulary';
@@ -325,7 +326,7 @@ import { hitProxyZoneCentre } from './hit-proxies';
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { routeIdentityTelemetry } from './world-identity';
 import { damageNumberPresentation, roundStatSummary } from './player-feedback';
-import { SupportDamageFeedbackTelemetry, projectSupportDamageAnchor, type SupportDamageScreenAnchor } from './support-damage-feedback';
+import { SupportDamageFeedbackTelemetry, planSupportDamageFeedback, projectSupportDamageAnchor, type SupportDamageScreenAnchor } from './support-damage-feedback';
 import { isHoldInteraction, primaryInteraction, type InteractionCandidate } from './interaction-arbitration';
 import {
   createFInteractionPressState,
@@ -1113,6 +1114,7 @@ type NukeSequence = {
   finishedAt: number;
   detonated: boolean;
   shockwave: THREE.Mesh;
+  warningBeacon: THREE.Group;
   authoritativeDamage: boolean;
 };
 
@@ -2054,12 +2056,14 @@ function applyFlamethrowerGroundFirePulse(fire: Readonly<{
       damage: FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE,
       atMs: fire.pulseAtMs,
     }, remoteTargets, (_from, to) => carpetFireCanReach(to[0], to[1] + 1.15, to[2]));
+    const appliedEvents: KillstreakDamageEvent[] = [];
     for (const event of events) {
       const applied = applyKillstreakDamageEvent(event);
       if (!applied || applied.damage <= 0) continue;
       pendingCarpetGroundFireDamageEvents.push(applied);
-      recordOwnerSupportDamage(applied);
+      appliedEvents.push(applied);
     }
+    presentKillstreakDamageFeedback(appliedEvents);
   } else if (network.role === 'host' && fire.damageSource === 'flamethrower') {
     const ownerBot = bots.get(fire.ownerId);
     const retainedAction = admittedRemoteShots.get(fire.ownerId)?.get(fire.actionNonce);
@@ -4148,22 +4152,58 @@ nukeShockwave.name = 'pass35-prewarmed-nuke-shockwave';
 nukeShockwave.position.set(0, 1.5, 0);
 nukeShockwave.visible = false;
 nukeShockwave.userData.presentationOnly = true;
+const nukeWarningBeacon = new THREE.Group();
+nukeWarningBeacon.name = 'pass71-nuke-warning-beacon';
+nukeWarningBeacon.userData.presentationOnly = true;
+nukeWarningBeacon.visible = false;
+const nukeWarningCoreMaterial = new THREE.MeshBasicMaterial({
+  color: 0xff2f14,
+  transparent: true,
+  opacity: 0,
+  depthWrite: false,
+  toneMapped: false,
+});
+const nukeWarningRingMaterial = new THREE.MeshBasicMaterial({
+  color: 0xff9a32,
+  transparent: true,
+  opacity: 0,
+  depthWrite: false,
+  toneMapped: false,
+  side: THREE.DoubleSide,
+});
+const nukeWarningCore = new THREE.Mesh(new THREE.SphereGeometry(0.72, 20, 14), nukeWarningCoreMaterial);
+nukeWarningCore.name = 'pass71-nuke-warning-core';
+const nukeWarningRings = [0, 1, 2].map((index) => {
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.5 + index * 0.62, 0.055, 8, 36), nukeWarningRingMaterial);
+  ring.name = `pass71-nuke-warning-ring-${index + 1}`;
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = index * 0.55 - 0.55;
+  return ring;
+});
+const nukeWarningLight = new THREE.PointLight(0xff4a22, 0, 32, 2);
+nukeWarningLight.name = 'pass71-nuke-warning-light';
+nukeWarningBeacon.add(nukeWarningCore, ...nukeWarningRings, nukeWarningLight);
+nukeWarningBeacon.traverse((node) => { node.raycast = () => undefined; });
 let nukePresentationPrewarmed = false;
 
 async function prewarmNukePresentation(): Promise<void> {
   if (nukePresentationPrewarmed) return;
   nukeShockwave.visible = true;
+  nukeWarningBeacon.visible = true;
   nukeShockwave.scale.setScalar(0.0001);
   try {
+    await renderRuntime.compileAndRender(nukeWarningBeacon, camera, scene);
     await renderRuntime.compileAndRender(nukeShockwave, camera, scene);
     nukePresentationPrewarmed = true;
   } finally {
     nukeShockwave.visible = false;
+    nukeWarningBeacon.visible = false;
     nukeShockwave.scale.setScalar(0.1);
   }
 }
 nukeShockwave.raycast = () => undefined;
 scene.add(nukeShockwave);
+scene.add(nukeWarningBeacon);
 let arenaArtRoot: THREE.Group | null = null;
 let blenderArenaActive = false;
 let atomicHouseAuthorityParity: AtomicHouseAuthorityParityReport | null = null;
@@ -9921,13 +9961,9 @@ function onNetworkMessage(message: GameMessage): void {
   if (message.type === 'killstreak-damage-result') {
     if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.matchEpoch !== killstreakMatchEpoch) return;
     for (const event of message.events) {
-      if (event.ownerId === player.id) recordOwnerSupportDamage(event);
       if (event.targetId === player.id) applyKillstreakDamageEvent(event);
-      if (event.source === 'chopper') {
-        const presented = killstreakSnapshot.entities.find((entity) => entity.activationId === event.activationId);
-        if (presented) killstreakPresentation.presentChopperImpactAction(presented.id);
-      }
     }
+    presentKillstreakDamageFeedback(message.events);
     const presentedAt = performance.now();
     for (const impact of message.impacts) {
       if (impact.phase !== 'impact') continue;
@@ -19333,10 +19369,24 @@ function updateFInteractionPrompt(now = performance.now()): void {
   }
 }
 
-function recordOwnerSupportDamage(event: KillstreakDamageEvent): void {
+function localPossessionAlreadyPresentedChopperShot(event: KillstreakDamageEvent): boolean {
+  if (event.source !== 'chopper') return false;
+  const possession = localKillstreakActorSnapshot()?.possession;
+  if (possession?.kind !== 'chopper-gunner') return false;
+  return killstreakSnapshot.entities.some((entity) => (
+    entity.id === possession.entityId && entity.activationId === event.activationId
+  ));
+}
+
+function recordOwnerSupportDamage(
+  event: KillstreakDamageEvent,
+  presentBallisticFeedback: boolean,
+  presentHitFeedback: boolean,
+): void {
   if (event.ownerId !== player.id || event.damage <= 0) return;
   const targetPosition = new THREE.Vector3(...event.targetPosition);
-  if (targetPosition && (event.source === 'chopper' || event.source === 'piloted-drone' || event.source === 'drone-swarm')) {
+  if (presentBallisticFeedback && targetPosition
+    && (event.source === 'chopper' || event.source === 'piloted-drone' || event.source === 'drone-swarm')) {
     const drone = event.source === 'piloted-drone' || event.source === 'drone-swarm';
     spawnTracer(new THREE.Vector3(...event.tracerOrigin), new THREE.Vector3(...event.endpoint), drone ? 0x52e8ff : 0xffc65c);
     audio.supportGun(drone ? 'drone' : 'chopper');
@@ -19352,13 +19402,31 @@ function recordOwnerSupportDamage(event: KillstreakDamageEvent): void {
     event.activationId,
     (supportDamageDealtByActivation.get(event.activationId) ?? 0) + event.damage,
   );
-  showGunnerTargetConfirm(event, anchor, performance.now());
-  audio.hit(false);
+  if (presentHitFeedback) {
+    showGunnerTargetConfirm(event, anchor, performance.now());
+    audio.hit(false);
+  }
   const displayedSupport = preferredOwnedSupportEntity();
   if (displayedSupport?.activationId === event.activationId) {
     element<HTMLElement>('#chopper-damage-dealt').textContent = String(Math.round(
       supportDamageDealtByActivation.get(event.activationId) ?? 0,
     ));
+  }
+}
+
+function presentKillstreakDamageFeedback(events: readonly KillstreakDamageEvent[]): void {
+  for (const { event, firstForShot: firstShotEvent } of planSupportDamageFeedback(events)) {
+    if (event.ownerId === player.id) {
+      recordOwnerSupportDamage(
+        event,
+        firstShotEvent && !localPossessionAlreadyPresentedChopperShot(event),
+        firstShotEvent,
+      );
+    }
+    if (event.source === 'chopper' && firstShotEvent) {
+      const presented = killstreakSnapshot.entities.find((entity) => entity.activationId === event.activationId);
+      if (presented) killstreakPresentation.presentChopperImpactAction(presented.id);
+    }
   }
 }
 
@@ -20228,13 +20296,7 @@ function updatePass65KillstreakRuntime(now: number): void {
   if (network.role !== 'client' && matchState.phase === 'active') {
     const result = killstreakRuntime.advance(now, killstreakWorldState());
     const applied = result.damageEvents.map(applyKillstreakDamageEvent).filter((event): event is KillstreakDamageEvent => event !== null && event.damage > 0);
-    for (const event of applied) {
-      recordOwnerSupportDamage(event);
-      if (event.source === 'chopper') {
-        const presented = killstreakSnapshot.entities.find((entity) => entity.activationId === event.activationId);
-        if (presented) killstreakPresentation.presentChopperImpactAction(presented.id);
-      }
-    }
+    presentKillstreakDamageFeedback(applied);
     const carpetWorldImpacts: Array<{
       point: THREE.Vector3;
       radius: number;
@@ -20772,12 +20834,21 @@ function beginNuke(now: number, authoritativeDamage = true): void {
   nukeShockwave.scale.setScalar(0.1);
   (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   nukeShockwave.visible = false;
+  nukeWarningBeacon.position.fromArray(
+    selectedArena.id === 'gun-range' ? GUN_RANGE_NUKE_WARNING_POSITION : [0, 4.5, 0],
+  );
+  nukeWarningBeacon.visible = true;
+  nukeWarningBeacon.scale.setScalar(0.65);
+  nukeWarningCoreMaterial.opacity = 0.18;
+  nukeWarningRingMaterial.opacity = 0.2;
+  nukeWarningLight.intensity = accessibilityRuntime.reducedSensory ? 1.25 : 3.5;
   nukeSequence = {
     startedAt: now,
     detonateAt: now + NUKE_WARNING_MS,
     finishedAt: now + NUKE_WARNING_MS + 4_500,
     detonated: false,
     shockwave: nukeShockwave,
+    warningBeacon: nukeWarningBeacon,
     authoritativeDamage,
   };
   const warning = element<HTMLElement>('#nuke-warning');
@@ -20794,6 +20865,8 @@ function detonateNuke(sequence: NukeSequence): void {
   audio.nukeDetonation();
   const afterAudio = performance.now();
   sequence.shockwave.visible = true;
+  sequence.warningBeacon.visible = false;
+  nukeWarningLight.intensity = 0;
   sequence.shockwave.scale.setScalar(0.1);
   const flash = element<HTMLElement>('#nuke-flash');
   flash.hidden = false;
@@ -20855,9 +20928,18 @@ function updateNuke(now: number): void {
   if (!sequence.detonated) {
     const remaining = Math.max(0, sequence.detonateAt - now);
     element<HTMLElement>('#nuke-warning b').textContent = String(Math.max(1, Math.ceil(remaining / 1_000)));
-    const charge = THREE.MathUtils.clamp((now - sequence.startedAt) / NUKE_WARNING_MS, 0, 1);
-    if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = Math.max(0, Math.sin(now * 0.018)) * charge * 0.18;
-    if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor).lerp(new THREE.Color(0x8c536f), charge * 0.24);
+    const warningPresentation = sampleNukeWarningPresentation(
+      now - sequence.startedAt,
+      NUKE_WARNING_MS,
+      accessibilityRuntime.reducedSensory,
+    );
+    if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = warningPresentation.skyFlash;
+    if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor).lerp(new THREE.Color(0x8c536f), warningPresentation.fogBlend);
+    sequence.warningBeacon.scale.setScalar(warningPresentation.scale);
+    sequence.warningBeacon.rotation.y = warningPresentation.rotationY;
+    nukeWarningCoreMaterial.opacity = warningPresentation.coreOpacity;
+    nukeWarningRingMaterial.opacity = warningPresentation.ringOpacity;
+    nukeWarningLight.intensity = warningPresentation.lightIntensity;
     if (now >= sequence.detonateAt) detonateNuke(sequence);
     return;
   }
@@ -20873,6 +20955,8 @@ function updateNuke(now: number): void {
   flash.style.opacity = String(Math.min(1, flashStrength * 1.25));
   if (now < sequence.finishedAt) return;
   sequence.shockwave.visible = false;
+  sequence.warningBeacon.visible = false;
+  nukeWarningLight.intensity = 0;
   (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
   if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor);
@@ -21791,6 +21875,10 @@ function clearFieldSupport(): void {
   supportExplosionPresentation.clear();
   if (nukeSequence) nukeSequence = null;
   nukeShockwave.visible = false;
+  nukeWarningBeacon.visible = false;
+  nukeWarningCoreMaterial.opacity = 0;
+  nukeWarningRingMaterial.opacity = 0;
+  nukeWarningLight.intensity = 0;
   (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
   if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor);
@@ -27415,8 +27503,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       pendingRetiredPresentationRoots: deferredGpuRetirements.filter((entry) => entry.kind === 'root').length,
       prewarmedNuke: {
         shockwaveInScene: nukeShockwave.parent === scene,
+        warningBeaconInScene: nukeWarningBeacon.parent === scene,
         prewarmed: nukePresentationPrewarmed,
-        dynamicLights: 0,
+        dynamicLights: 1,
       },
       strikeMissiles: strikeMissiles.map((strike) => ({
         target: strike.target.toArray(),
@@ -27441,6 +27530,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         detonated: nukeSequence.detonated,
         detonateInMs: Math.max(0, nukeSequence.detonateAt - performance.now()),
         finishInMs: Math.max(0, nukeSequence.finishedAt - performance.now()),
+        warning: {
+          visible: nukeSequence.warningBeacon.visible,
+          arenaId: selectedArena.id,
+          position: nukeSequence.warningBeacon.position.toArray(),
+          scale: nukeSequence.warningBeacon.scale.x,
+          coreOpacity: nukeWarningCoreMaterial.opacity,
+          ringOpacity: nukeWarningRingMaterial.opacity,
+          lightIntensity: nukeWarningLight.intensity,
+          reducedSensory: accessibilityRuntime.reducedSensory,
+        },
       } : { active: false, detonated: false, detonateInMs: 0, finishInMs: 0 },
       nukeActivations: nukeLaunches,
       nukeDetonations,

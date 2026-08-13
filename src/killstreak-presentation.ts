@@ -28,7 +28,6 @@ const MAX_EMBER_PARTICLES = MAX_BOMB_SHELLS * EMBERS_PER_CARPET_IMPACT;
 const BOMB_SHELL_DROP_DURATION_MS = 420;
 export const CARPET_BOMB_SHELL_PRESENTATION_ALTITUDE_M = 20;
 export const CARPET_BOMB_SHELL_PRESENTATION_RADIUS_M = 0.12;
-export const CHOPPER_MISSILE_PRESENTATION_ALTITUDE_M = 14;
 const EMBER_GRAVITY_MPS2 = 11.25;
 const MAX_SENSOR_CONTACTS = 16;
 const MAX_PLACEMENT_MARKERS = 8;
@@ -147,6 +146,10 @@ const SUPPORT_VEHICLE_REQUIRED_NODES: Readonly<Record<SupportVehicleAssetFamily,
     'chopper-gunner-sightline', 'chopper-gunner-weapon-view',
     'chopper-cockpit-dashboard-3d', 'chopper-cockpit-display-cyan', 'chopper-cockpit-display-green',
     'chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring',
+    'chopper-inner-windscreen-pillar-left-base', 'chopper-inner-windscreen-pillar-left-top',
+    'chopper-inner-windscreen-pillar-right-base', 'chopper-inner-windscreen-pillar-right-top',
+    'chopper-inner-windscreen-glow-left-base', 'chopper-inner-windscreen-glow-left-top',
+    'chopper-inner-windscreen-glow-right-base', 'chopper-inner-windscreen-glow-right-top',
     'chopper-first-person-camera-socket', 'chopper-main-rotor', 'chopper-tail-rotor',
     'chopper-player-gun', 'chopper-gun-muzzle-socket', 'chopper-forward-socket',
     'chopper-muzzle-flash', 'chopper-tracer-action', 'chopper-impact-action',
@@ -1220,8 +1223,8 @@ type PooledBombShell = {
   root: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshStandardMaterial>;
   inactiveName: string;
   impactPosition: THREE.Vector3;
+  launchPosition: THREE.Vector3;
   active: boolean;
-  startY: number;
   createdAtMs: number;
   impactAtMs: number;
 };
@@ -1287,6 +1290,8 @@ export type KillstreakPresentationTelemetry = Readonly<{
   bombShells: number;
   emberParticles: number;
   sensorContacts: number;
+  sensorProxyMeshes: 0;
+  sensorPresentation: 'shared-exact-animated-thermal-operator';
   placementMarkers: number;
   prewarmed: number;
   pooledEntityInstances: number;
@@ -2010,34 +2015,6 @@ function createPresentedEntity(entity: KillstreakEntitySnapshot): PresentedEntit
   return buildAuthoredSupportVehicle('crate') ?? buildProceduralCareCrateFallback();
 }
 
-function buildDroneSensorSilhouette(index: number): THREE.Group {
-  const root = new THREE.Group();
-  root.name = `piloted-drone-hostile-sensor-${index + 1}`;
-  root.userData.presentationOnly = true;
-  const sensorMaterial = new THREE.MeshBasicMaterial({
-    name: 'piloted-drone-hostile-through-wall',
-    color: 0xff674f,
-    transparent: true,
-    opacity: 0.62,
-    depthTest: false,
-    depthWrite: false,
-    toneMapped: false,
-  });
-  const part = (name: string, geometry: THREE.BufferGeometry, position: readonly [number, number, number]) => {
-    const result = new THREE.Mesh(geometry, sensorMaterial);
-    result.name = name;
-    result.position.set(...position);
-    result.renderOrder = 90;
-    root.add(result);
-  };
-  part('drone-sensor-head', new THREE.SphereGeometry(0.2, 9, 6), [0, 0.68, 0]);
-  part('drone-sensor-torso', new THREE.CapsuleGeometry(0.27, 0.48, 3, 8), [0, 0.18, 0]);
-  part('drone-sensor-leg-left', new THREE.CapsuleGeometry(0.1, 0.56, 2, 6), [-0.14, -0.51, 0]);
-  part('drone-sensor-leg-right', new THREE.CapsuleGeometry(0.1, 0.56, 2, 6), [0.14, -0.51, 0]);
-  root.visible = false;
-  return root;
-}
-
 const disabledPlacementMarkerRaycast: THREE.Object3D['raycast'] = () => undefined;
 
 function placementMarkerMaterial(opacity: number): THREE.MeshBasicMaterial {
@@ -2190,8 +2167,8 @@ function createPooledBombShell(index: number): PooledBombShell {
     root,
     inactiveName,
     impactPosition: new THREE.Vector3(),
+    launchPosition: new THREE.Vector3(),
     active: false,
-    startY: 0,
     createdAtMs: 0,
     impactAtMs: 0,
   };
@@ -2261,8 +2238,6 @@ export class KillstreakPresentation {
   private readonly firstPersonCockpitSocketWorldScratch = new THREE.Vector3();
   private readonly firstPersonCockpitDesiredParentScratch = new THREE.Vector3();
   private readonly firstPersonCockpitPivotOffsetScratch = new THREE.Vector3();
-  private readonly sensorRoot = new THREE.Group();
-  private readonly sensorSilhouettes: THREE.Group[];
   private visibleSensorContacts = 0;
   private chopperWeaponActionsPresented = 0;
   private chopperImpactActionsPresented = 0;
@@ -2301,11 +2276,6 @@ export class KillstreakPresentation {
     // occurred when one snapshot synchronously cloned every drone on the
     // activation frame; pooled roots make that path allocation-free.
     this.installPrewarmedVocabulary();
-    this.sensorRoot.name = 'piloted-drone-through-wall-sensor';
-    this.sensorRoot.userData.presentationOnly = true;
-    this.sensorSilhouettes = Array.from({ length: MAX_SENSOR_CONTACTS }, (_, index) => buildDroneSensorSilhouette(index));
-    this.sensorRoot.add(...this.sensorSilhouettes);
-    this.root.add(this.sensorRoot);
   }
 
   private static readonly PREWARMED_CAPACITIES: readonly [PresentedEntityPoolKey, number][] = Object.freeze([
@@ -2673,7 +2643,7 @@ export class KillstreakPresentation {
       ...this.bombShellPool.map((entry) => entry.root),
       ...this.emberPool.map((entry) => entry.root),
     ];
-    const overlayRoots: THREE.Object3D[] = [...this.sensorSilhouettes, ...stagedMarkerRoots];
+    const overlayRoots: THREE.Object3D[] = [...stagedMarkerRoots];
     const stagedBatches = [[...entityRoots, ...effectRoots, ...overlayRoots]].filter((batch) => batch.length > 0);
     const stagedRoots = stagedBatches.flat();
     const liveActivationEntries = [
@@ -2952,6 +2922,8 @@ export class KillstreakPresentation {
     shell.active = false;
     shell.root.visible = false;
     shell.root.name = shell.inactiveName;
+    shell.root.rotation.set(Math.PI / 2, 0, 0);
+    shell.root.scale.setScalar(1);
   }
 
   private deactivateEmber(ember: PooledEmber): void {
@@ -3061,25 +3033,13 @@ export class KillstreakPresentation {
       if (!shell.active) continue;
       const dropDurationMs = Math.max(1, shell.impactAtMs - shell.createdAtMs);
       const progress = THREE.MathUtils.clamp((nowMs - shell.createdAtMs) / dropDurationMs, 0, 1);
-      shell.root.position.y = THREE.MathUtils.lerp(shell.startY, shell.impactPosition.y, progress);
+      shell.root.position.lerpVectors(shell.launchPosition, shell.impactPosition, progress);
       if (progress >= 1) this.deactivateBombShell(shell);
     }
   }
 
   private syncSensorContacts(contacts: readonly DroneSensorContact[]): void {
-    const admittedCount = Math.min(contacts.length, MAX_SENSOR_CONTACTS);
-    this.visibleSensorContacts = admittedCount;
-    for (let index = 0; index < this.sensorSilhouettes.length; index += 1) {
-      const silhouette = this.sensorSilhouettes[index]!;
-      const contact = index < admittedCount ? contacts[index] : undefined;
-      silhouette.visible = contact !== undefined;
-      if (!contact) continue;
-      silhouette.position.fromArray(contact.position);
-      silhouette.userData.contactId = contact.id;
-      silhouette.userData.contactLifeId = contact.lifeId;
-      silhouette.userData.relation = contact.relation;
-      silhouette.userData.throughWall = contact.throughWall;
-    }
+    this.visibleSensorContacts = Math.min(contacts.length, MAX_SENSOR_CONTACTS);
   }
 
   private syncPlacementMarkers(
@@ -3161,10 +3121,13 @@ export class KillstreakPresentation {
           isChopperMissile ? CHOPPER_MISSILE_FLIGHT_MS : BOMB_SHELL_DROP_DURATION_MS,
         );
         shell.impactAtMs = nowMs + authoredDropDurationMs;
-        shell.startY = impact.position[1] + (isChopperMissile
-          ? CHOPPER_MISSILE_PRESENTATION_ALTITUDE_M
-          : CARPET_BOMB_SHELL_PRESENTATION_ALTITUDE_M);
         shell.impactPosition.set(impact.position[0], impact.position[1] + 0.35, impact.position[2]);
+        if (isChopperMissile && impact.launchPosition) shell.launchPosition.fromArray(impact.launchPosition);
+        else shell.launchPosition.set(
+          impact.position[0],
+          impact.position[1] + CARPET_BOMB_SHELL_PRESENTATION_ALTITUDE_M,
+          impact.position[2],
+        );
         shell.root.name = isChopperMissile ? 'pass70-chopper-missile-shell' : 'pass65-carpet-bomb-shell';
         shell.root.rotation.x = isChopperMissile ? 0 : Math.PI / 2;
         shell.root.scale.set(
@@ -3173,7 +3136,11 @@ export class KillstreakPresentation {
           isChopperMissile ? 1.6 : 1,
         );
         shell.root.material.color.setHex(isChopperMissile ? 0xb09a58 : 0x2a2a2a);
-        shell.root.position.set(impact.position[0], shell.startY, impact.position[2]);
+        shell.root.position.copy(shell.launchPosition);
+        if (isChopperMissile) {
+          shell.root.lookAt(shell.impactPosition);
+          shell.root.rotateX(Math.PI / 2);
+        }
         shell.root.visible = true;
         continue;
       }
@@ -3587,6 +3554,8 @@ export class KillstreakPresentation {
       bombShells,
       emberParticles,
       sensorContacts: this.visibleSensorContacts,
+      sensorProxyMeshes: 0,
+      sensorPresentation: 'shared-exact-animated-thermal-operator',
       placementMarkers: this.placementMarkers.size,
       prewarmed: this.entityPools.size,
       pooledEntityInstances: this.prewarmed.length,
@@ -3636,7 +3605,6 @@ export class KillstreakPresentation {
     this.chopperWeaponActionsPresented = 0;
     this.chopperImpactActionsPresented = 0;
     this.lastChopperWeaponActions = Object.freeze([]);
-    for (const silhouette of this.sensorSilhouettes) silhouette.visible = false;
     for (const presented of this.placementMarkers.values()) this.retireRoot(presented.root);
     this.placementMarkers.clear();
     this.locallyExpiredMarkerRevisions.clear();
@@ -3660,7 +3628,6 @@ export class KillstreakPresentation {
     this.disposeSwarmInstancing();
     for (const entry of this.prewarmed) this.retireRoot(entry.root);
     this.prewarmed.length = 0;
-    this.retireRoot(this.sensorRoot);
     this.retireRoot(this.impactFlashPoolRoot);
     this.retireRoot(this.bombShellPoolRoot);
     this.retireRoot(this.emberPoolRoot);

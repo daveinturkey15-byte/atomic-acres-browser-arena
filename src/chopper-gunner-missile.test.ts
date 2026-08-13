@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import { parseKillstreakLoadout } from './killstreak-catalog';
 import {
   CHOPPER_MISSILE_CADENCE_MS,
   CHOPPER_MISSILE_CAPACITY,
   CHOPPER_MISSILE_FLIGHT_MS,
+  CHOPPER_MISSILE_SOCKET_LOCAL_M,
   HostKillstreakRuntime,
+  chopperMissileLaunchPosition,
   chopperMissileGroundTarget,
   type KillstreakWorld,
 } from './killstreak-runtime';
@@ -41,6 +44,22 @@ function setup(enterControl = true): Readonly<{ runtime: HostKillstreakRuntime; 
 }
 
 describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
+  it('launches from alternating authored hardpoints under a banked host pose', () => {
+    const position = [13, 18, -7] as const;
+    const attitude = [0.31, -0.22, 0.47] as const;
+    const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(...attitude, 'YXZ'));
+    const independentlyProjected = (local: readonly [number, number, number]) => new THREE.Vector3(...local)
+      .applyQuaternion(quaternion)
+      .add(new THREE.Vector3(...position))
+      .toArray();
+    const left = chopperMissileLaunchPosition(position, attitude, 0);
+    const right = chopperMissileLaunchPosition(position, attitude, 1);
+    expect(left).toEqual(independentlyProjected(CHOPPER_MISSILE_SOCKET_LOCAL_M.left));
+    expect(right).toEqual(independentlyProjected(CHOPPER_MISSILE_SOCKET_LOCAL_M.right));
+    expect(chopperMissileLaunchPosition(position, attitude, 2)).toEqual(left);
+    expect(left).not.toEqual(right);
+  });
+
   it('admits only possessed edge requests, owns six rounds, and never queues cooldown clicks', () => {
     const outside = setup(false);
     expect(outside.runtime.control({
@@ -107,9 +126,13 @@ describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
     expect(launch.impactEvents).toEqual([expect.objectContaining({
       source: 'chopper', ordinal: 0, phase: 'drop', position: targetPoint,
     })]);
+    const launchEvent = launch.impactEvents[0]!;
+    expect(launchEvent.launchPosition).toEqual(chopperMissileLaunchPosition(before.position, before.attitude, 0));
+    expect(launchEvent.launchPosition).not.toEqual(targetPoint);
     const impact = runtime.advance(1_100 + CHOPPER_MISSILE_FLIGHT_MS, impactWorld);
     expect(impact.impactEvents).toEqual([expect.objectContaining({
       source: 'chopper', ordinal: 0, phase: 'impact', position: targetPoint,
+      launchPosition: launchEvent.launchPosition,
     })]);
     expect(impact.damageEvents).toEqual([expect.objectContaining({
       source: 'chopper', ownerId: 'owner', targetId: 'enemy', targetLifeId: 4,

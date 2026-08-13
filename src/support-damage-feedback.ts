@@ -40,6 +40,32 @@ export type SupportDamageFeedbackTelemetrySnapshot = Readonly<{
   bounded: boolean;
 }>;
 
+export type PlannedSupportDamageFeedback = Readonly<{
+  event: KillstreakDamageEvent;
+  firstForShot: boolean;
+}>;
+
+/**
+ * Splash damage fans one admitted Chopper round into several target receipts.
+ * Presentation/audio must still run once for that round, while target-bound
+ * damage numbers and authority remain one receipt per target.
+ */
+export function supportDamageShotKey(event: KillstreakDamageEvent): string {
+  return `${event.activationId}\u0000${event.source}\u0000${event.atMs}\u0000${event.endpoint.join(',')}\u0000${event.tracerOrigin.join(',')}`;
+}
+
+export function planSupportDamageFeedback(
+  events: readonly KillstreakDamageEvent[],
+): readonly PlannedSupportDamageFeedback[] {
+  const seen = new Set<string>();
+  return Object.freeze(events.map((event) => {
+    const key = supportDamageShotKey(event);
+    const firstForShot = !seen.has(key);
+    if (firstForShot) seen.add(key);
+    return Object.freeze({ event, firstForShot });
+  }));
+}
+
 /**
  * Bounded evidence for owner support feedback. This records only presentation
  * decisions; target identity, target position, damage, and authority remain

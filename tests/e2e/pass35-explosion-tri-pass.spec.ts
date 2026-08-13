@@ -38,7 +38,12 @@ type Pass35Snapshot = {
     explosionProfile: { source: string | null; totalSyncMs: number; visualMs: number; audioMs: number };
     explosionFrameProfile: { sources: string[]; impacts: number; totalSyncMs: number; maxImpactSyncMs: number };
     retiredPresentationRoots: number;
-    prewarmedNuke: { shockwaveInScene: boolean; prewarmed: boolean; dynamicLights: number };
+    prewarmedNuke: {
+      shockwaveInScene: boolean;
+      warningBeaconInScene: boolean;
+      prewarmed: boolean;
+      dynamicLights: number;
+    };
   };
 };
 
@@ -155,7 +160,12 @@ test.describe('Pass 35 hitch-free explosions and Tri-Pass live targeting', () =>
     expect(state.audio.explosionMix.requests).toBeGreaterThanOrEqual(3);
     expect(state.audio.explosionMix.coalesced).toBeGreaterThanOrEqual(2);
     expect(state.fieldSupport.retiredPresentationRoots).toBeGreaterThanOrEqual(6);
-    expect(state.fieldSupport.prewarmedNuke).toEqual({ shockwaveInScene: true, prewarmed: true, dynamicLights: 0 });
+    expect(state.fieldSupport.prewarmedNuke).toEqual({
+      shockwaveInScene: true,
+      warningBeaconInScene: true,
+      prewarmed: true,
+      dynamicLights: 1,
+    });
     expect(state.render.contextLifecycle.lost).toBe(false);
     expect(errors).toEqual([]);
   });

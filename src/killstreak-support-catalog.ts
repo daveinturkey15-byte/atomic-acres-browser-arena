@@ -77,6 +77,18 @@ export const CHOPPER_GUN_PROFILE = Object.freeze({
 } as const);
 
 /**
+ * Pass 71 preserves the previous one-metre direct capsule as the immutable
+ * comparator, then admits a bounded radial autocannon impact exactly three
+ * times wider. The splash still uses host-owned LOS and hostile relations.
+ */
+export const CHOPPER_GUNNER_SPLASH_POLICY = Object.freeze({
+  precedingDirectHitRadiusM: 1,
+  linearRadiusMultiplier: 3,
+  splashRadiusM: 3,
+  radialMinimumDamageMultiplier: 0.25,
+} as const);
+
+/**
  * Host-owned geometry for the possessed Chopper Gunner fire contract. These
  * offsets are the authored LOD0 socket transforms after Blender-to-glTF axis
  * conversion; gameplay never reads a rendered/interpolated Object3D pose.

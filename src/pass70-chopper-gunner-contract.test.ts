@@ -38,7 +38,8 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(hudCss).toContain('env(safe-area-inset-bottom)');
     expect(hudCss).toContain('top: max(54px, calc(env(safe-area-inset-top) + 52px));');
     expect(hudCss).toContain('#gunner-cockpit-hud[data-support-kind="chopper-gunner"]::before');
-    expect(hudCss).toContain('height: clamp(190px, 38vh, 410px);');
+    expect(hudCss).toContain('height: clamp(280px, 58vh, 620px);');
+    expect(hudCss).toContain('height: clamp(210px, 48vh, 390px);');
     expect(hudCss).toContain('#gunner-missile-status[data-ready="true"] em');
     expect(legacy).toContain("event.button === 2 && localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner'");
     expect(legacy).toContain('missileFire: true');

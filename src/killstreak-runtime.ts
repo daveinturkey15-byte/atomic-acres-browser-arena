@@ -8,6 +8,7 @@ import { parseKillstreakLoadout, type KillstreakLoadoutV1 } from './killstreak-c
 import {
   CHOPPER_GUN_PROFILE,
   CHOPPER_GUNNER_RAY_POLICY,
+  CHOPPER_GUNNER_SPLASH_POLICY,
   DRONE_GUN_PROFILE,
   DRONE_DEPLOYMENT_POLICY,
   DRONE_SWARM_FIRE_LANE_INTERVAL_MS,
@@ -40,6 +41,11 @@ export const CHOPPER_MISSILE_FLIGHT_MS = 780;
 export const CHOPPER_MISSILE_MAX_RANGE_M = 120;
 export const CHOPPER_MISSILE_BLAST_RADIUS_M = 4.5;
 export const CHOPPER_MISSILE_MAX_DAMAGE = 240;
+/** Exact authored LOD0 rocket-tube muzzle centres after Blender-to-glTF conversion. */
+export const CHOPPER_MISSILE_SOCKET_LOCAL_M = Object.freeze({
+  left: Object.freeze([-1.18, -0.3, -0.145] as const),
+  right: Object.freeze([1.18, -0.3, -0.145] as const),
+});
 export const PILOTED_DRONE_DURATION_MS = DRONE_SUPPORT_DEFINITIONS.piloted.lifetimeMs;
 export const DRONE_SWARM_DURATION_MS = DRONE_SUPPORT_DEFINITIONS.swarm.lifetimeMs;
 export const DRONE_SWARM_COUNT = 24;
@@ -184,6 +190,8 @@ export type KillstreakImpactEvent = Readonly<{
   ordinal: number;
   phase: 'drop' | 'impact';
   position: SupportVec3;
+  /** Host-derived source socket for Chopper missiles; null for vertical Carpet ordnance. */
+  launchPosition: SupportVec3 | null;
   impactAtMs: number;
   atMs: number;
 }>;
@@ -250,6 +258,7 @@ type ChopperEntity = EntityBase & {
   pendingMissiles: Array<Readonly<{
     ordinal: number;
     position: SupportVec3;
+    launchPosition: SupportVec3;
     impactAtMs: number;
   }>>;
 };
@@ -635,6 +644,7 @@ type SupportRayTargetHit = Readonly<{
   target: KillstreakTarget;
   endpoint: SupportVec3;
   distance: number;
+  radialDistance: number;
   /** True when the centre ray was occluded but the wallbang rule admits the shot at reduced damage. */
   wallbanged: boolean;
 }>;
@@ -693,6 +703,17 @@ export function chopperGunnerAuthoritativeRay(
     direction: supportForwardFromYawPitch(aimYaw, aimPitch),
     tracerOrigin: translatedSupportOffset(position, attitude, CHOPPER_GUNNER_RAY_POLICY.muzzleSocketLocalM),
   });
+}
+
+export function chopperMissileLaunchPosition(
+  position: SupportVec3,
+  attitude: SupportVec3,
+  ordinal: number,
+): SupportVec3 {
+  const socket = ordinal % 2 === 0
+    ? CHOPPER_MISSILE_SOCKET_LOCAL_M.left
+    : CHOPPER_MISSILE_SOCKET_LOCAL_M.right;
+  return translatedSupportOffset(position, attitude, socket);
 }
 
 /**
@@ -2076,6 +2097,7 @@ export class HostKillstreakRuntime {
           ordinal,
           phase: 'drop',
           position: bomber.impacts[ordinal],
+          launchPosition: null,
           impactAtMs,
           atMs: impactAtMs - CARPET_BOMB_SHELL_DROP_LEAD_MS,
         }));
@@ -2094,6 +2116,7 @@ export class HostKillstreakRuntime {
           ordinal,
           phase: 'impact',
           position,
+          launchPosition: null,
           impactAtMs,
           atMs: impactAtMs,
         }));
@@ -2274,6 +2297,7 @@ export class HostKillstreakRuntime {
           ordinal: missile.ordinal,
           phase: 'impact',
           position: missile.position,
+          launchPosition: missile.launchPosition,
           impactAtMs: missile.impactAtMs,
           atMs: missile.impactAtMs,
         }));
@@ -2309,13 +2333,15 @@ export class HostKillstreakRuntime {
         world,
       );
       const impactAtMs = nowMs + CHOPPER_MISSILE_FLIGHT_MS;
-      entity.pendingMissiles.push(Object.freeze({ ordinal, position, impactAtMs }));
+      const launchPosition = chopperMissileLaunchPosition(firingPosition, firingAttitude, ordinal);
+      entity.pendingMissiles.push(Object.freeze({ ordinal, position, launchPosition, impactAtMs }));
       impactEvents.push(Object.freeze({
         activationId: entity.activationId,
         source: 'chopper',
         ordinal,
         phase: 'drop',
         position,
+        launchPosition,
         impactAtMs,
         atMs: nowMs,
       }));
@@ -2348,23 +2374,18 @@ export class HostKillstreakRuntime {
         world,
         CHOPPER_GUN_PROFILE.maximumRangeM,
         true,
+        CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM,
       );
       if (hit) {
-        const distanceDamage = supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, hit.distance);
-        // Through-wall admission costs half the autocannon damage; clear
-        // centre-ray shots deal the full profile damage.
-        const admittedDamage = hit.wallbanged ? distanceDamage * 0.5 : distanceDamage;
-        if (admittedDamage > 0) damageEvents.push(this.damageEvent(
+        this.damageChopperAutocannonImpact(
           entity.activationId,
-          'chopper',
-          owner.actorId,
-          hit.target,
-          admittedDamage,
-          ray.origin,
+          owner,
+          hit,
+          ray,
           nowMs,
-          hit.endpoint,
-          ray.tracerOrigin,
-        ));
+          world,
+          damageEvents,
+        );
       }
     }
     entity.nextShotAtMs = nowMs + CHOPPER_GUN_PROFILE.cadenceMs;
@@ -2804,23 +2825,26 @@ export class HostKillstreakRuntime {
     world: KillstreakWorld,
     maximumRange: number,
     wallbang = false,
+    targetRadiusM: number = CHOPPER_GUNNER_RAY_POLICY.targetRadiusM,
   ): SupportRayTargetHit | null {
-    const radiusSquared = CHOPPER_GUNNER_RAY_POLICY.targetRadiusM ** 2;
+    const radiusSquared = targetRadiusM ** 2;
+    const directRadiusSquared = CHOPPER_GUNNER_RAY_POLICY.targetRadiusM ** 2;
     const hits: SupportRayTargetHit[] = [];
     for (const target of hostileTargets(world, ownerId, team)) {
       const dx = target.position[0] - origin[0];
       const dy = target.position[1] - origin[1];
       const dz = target.position[2] - origin[2];
       const centreDistance = dx * direction[0] + dy * direction[1] + dz * direction[2];
-      if (centreDistance <= 0 || centreDistance - CHOPPER_GUNNER_RAY_POLICY.targetRadiusM > maximumRange) continue;
+      if (centreDistance <= 0) continue;
       const perpendicularSquared = Math.max(0, dx * dx + dy * dy + dz * dz - centreDistance * centreDistance);
       if (perpendicularSquared > radiusSquared) continue;
       const entryDistance = Math.max(0, centreDistance - Math.sqrt(radiusSquared - perpendicularSquared));
       if (entryDistance > maximumRange) continue;
+      const impactDistance = Math.min(maximumRange, centreDistance);
       const endpoint: SupportVec3 = Object.freeze([
-        origin[0] + direction[0] * entryDistance,
-        origin[1] + direction[1] * entryDistance,
-        origin[2] + direction[2] * entryDistance,
+        origin[0] + direction[0] * impactDistance,
+        origin[1] + direction[1] * impactDistance,
+        origin[2] + direction[2] * impactDistance,
       ] as const);
       const clear = lineOfSight(world, origin, endpoint);
       // Owner rule: the Chopper Gunner's heavy autocannon must hit reliably
@@ -2829,10 +2853,65 @@ export class HostKillstreakRuntime {
       // occluded centre ray is not a miss: the through-wall rule admits the
       // target at 50% damage. Without this, hits felt random because a low
       // wall or corner silently swallowed the ray.
-      if (!clear && !wallbang) continue;
-      hits.push(Object.freeze({ target, endpoint, distance: entryDistance, wallbanged: !clear }));
+      if (!clear && (!wallbang || perpendicularSquared > directRadiusSquared)) continue;
+      hits.push(Object.freeze({
+        target,
+        endpoint,
+        distance: entryDistance,
+        radialDistance: Math.sqrt(perpendicularSquared),
+        wallbanged: !clear,
+      }));
     }
     return hits.sort((left, right) => left.distance - right.distance || left.target.id.localeCompare(right.target.id))[0] ?? null;
+  }
+
+  private damageChopperAutocannonImpact(
+    activationId: string,
+    owner: ActorAuthorityState,
+    primary: SupportRayTargetHit,
+    ray: ChopperGunnerAuthoritativeRay,
+    nowMs: number,
+    world: KillstreakWorld,
+    output: KillstreakDamageEvent[],
+  ): void {
+    const directRadius = CHOPPER_GUNNER_SPLASH_POLICY.precedingDirectHitRadiusM;
+    const splashRadius = CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM;
+    const targets = [
+      primary.target,
+      ...this.sortedHostileTargets(world, owner.actorId, owner.team)
+        .filter((target) => target.id !== primary.target.id),
+    ];
+    for (const target of targets) {
+      if (output.length >= MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP) return;
+      const radialDistance = target.id === primary.target.id
+        ? primary.radialDistance
+        : distance(primary.endpoint, target.position);
+      if (radialDistance > splashRadius) continue;
+      const isWallbangedPrimary = primary.wallbanged && target.id === primary.target.id;
+      const requiresImpactLineOfSight = target.id !== primary.target.id || primary.radialDistance > directRadius;
+      if (!isWallbangedPrimary && requiresImpactLineOfSight
+        && !lineOfSight(world, primary.endpoint, target.position)) continue;
+      const distanceDamage = supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, primary.distance);
+      if (distanceDamage <= 0) continue;
+      const splashAlpha = radialDistance <= directRadius
+        ? 0
+        : (radialDistance - directRadius) / Math.max(0.001, splashRadius - directRadius);
+      const radialMultiplier = 1 - clamp(splashAlpha, 0, 1)
+        * (1 - CHOPPER_GUNNER_SPLASH_POLICY.radialMinimumDamageMultiplier);
+      const wallMultiplier = isWallbangedPrimary ? 0.5 : 1;
+      const admittedDamage = Math.max(1, Math.round(distanceDamage * radialMultiplier * wallMultiplier));
+      output.push(this.damageEvent(
+        activationId,
+        'chopper',
+        owner.actorId,
+        target,
+        admittedDamage,
+        ray.origin,
+        nowMs,
+        primary.endpoint,
+        ray.tracerOrigin,
+      ));
+    }
   }
 
   private damageAround(
