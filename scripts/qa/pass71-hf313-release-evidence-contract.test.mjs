@@ -59,7 +59,8 @@ function pinnedTopologyChannel(expectedChannel, channel) {
     schemaVersion: 4, channel, releasePass: expectedChannel.pass,
     sourceSha: expectedChannel.sourceSha, pagesSha: expectedChannel.pagesSha,
     pagesPath: expectedChannel.pagesPath, path: expectedChannel.path,
-    treeSha256: 'd'.repeat(64),
+    exactRootFileCount: expectedChannel.runtimeFileCount,
+    treeSha256: expectedChannel.runtimeTreeSha256,
     pinnedRuntime: {
       releasePass: expectedChannel.pass, sourceSha: expectedChannel.sourceSha,
       exactRootFileCount: expectedChannel.runtimeFileCount,

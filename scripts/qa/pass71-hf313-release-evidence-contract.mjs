@@ -352,9 +352,12 @@ export function createPass71Hf313EvidenceFixture(options = {}) {
 }
 
 function exactPinnedChannel(channel, expected, channelName) {
-  return object(channel) && channel.releasePass === expected.pass && channel.sourceSha === expected.sourceSha
+  return object(channel) && channel.schemaVersion === 4
+    && channel.releasePass === expected.pass && channel.sourceSha === expected.sourceSha
     && channel.pagesSha === expected.pagesSha && channel.pagesPath === expected.pagesPath
-    && channel.path === expected.path && channel.pinnedRuntime?.releasePass === expected.pass
+    && channel.path === expected.path && channel.exactRootFileCount === expected.runtimeFileCount
+    && channel.treeSha256 === expected.runtimeTreeSha256
+    && channel.pinnedRuntime?.releasePass === expected.pass
     && channel.pinnedRuntime?.sourceSha === expected.sourceSha
     && channel.pinnedRuntime?.exactRootFileCount === expected.runtimeFileCount
     && channel.pinnedRuntime?.treeSha256 === expected.runtimeTreeSha256

@@ -30,12 +30,15 @@ describe('production receipt v4', () => {
     const candidateA = 'a'.repeat(40);
     const candidateB = 'b'.repeat(40);
     const pinned = (channel: 'pass69-retained' | 'rollback', value: typeof PASS71_HF313_PINNED_CHANNELS.retained) => ({
+      schemaVersion: 4,
       channel,
       releasePass: value.pass,
       sourceSha: value.sourceSha,
       pagesSha: value.pagesSha,
       pagesPath: value.pagesPath,
       path: value.path,
+      exactRootFileCount: value.runtimeFileCount,
+      treeSha256: value.runtimeTreeSha256,
       pinnedRuntime: {
         releasePass: value.pass,
         sourceSha: value.sourceSha,
