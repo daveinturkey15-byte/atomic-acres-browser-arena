@@ -17,6 +17,18 @@ import {
   PASS71_HF298_COVERAGE_DESCRIPTOR,
   pass71Hf298CoverageFailures,
 } from '../qa/pass71-hf298-coverage-contract.mjs';
+import { PASS71_HF296_CONTACT_EVIDENCE_REGISTRY_ENTRY } from '../qa/pass71-hf296-contact-evidence-contract.mjs';
+import { PASS71_AUDIO_NATIVE_REGISTRY_ENTRY } from '../qa/pass71-audio-native-receipt-contract.mjs';
+import {
+  PASS71_STUCK_EVIDENCE_DESCRIPTOR,
+  pass71StuckEvidenceFailures,
+  pass71StuckEvidenceToolingHashesAtSource,
+} from '../qa/pass71-stuck-evidence-contract.mjs';
+import {
+  PASS71_NATIVE_BROWSER_PARITY_DESCRIPTOR,
+  pass71NativeBrowserParityFailures,
+  pass71NativeBrowserParityToolingHashesAtSource,
+} from '../qa/pass71-native-browser-parity-contract.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPOSITORY_ROOT = resolve(dirname(SCRIPT_PATH), '..', '..');
@@ -34,6 +46,34 @@ const MECHANICAL_EVIDENCE = new Set(['unit', 'contract', 'browser', 'trace']);
 const ACCEPTANCE_TYPES = new Set(['mechanical', 'visual', 'human', 'mixed']);
 const REQUIREMENT_STATES = new Set(['verified', 'deferred']);
 const PASS71_HF298_REQUIREMENT_ID = 'R3';
+
+const PASS71_STUCK_EVIDENCE_REGISTRY_ENTRY = Object.freeze({
+  descriptor: PASS71_STUCK_EVIDENCE_DESCRIPTOR,
+  validate: (record, context) => {
+    try {
+      const tooling = context?.options?.pass71StuckEvidenceTooling
+        ?? pass71StuckEvidenceToolingHashesAtSource(context?.repositoryRoot, context?.sourceSha);
+      return pass71StuckEvidenceFailures(record, { sourceSha: context?.sourceSha, tooling });
+    } catch (error) {
+      return [`hf310-tooling-unavailable:${error instanceof Error ? error.message : String(error)}`];
+    }
+  },
+});
+
+const PASS71_NATIVE_BROWSER_PARITY_REGISTRY_ENTRY = Object.freeze({
+  descriptor: PASS71_NATIVE_BROWSER_PARITY_DESCRIPTOR,
+  validate: (record, context) => {
+    try {
+      const tooling = context?.options?.pass71NativeBrowserParityTooling
+        ?? pass71NativeBrowserParityToolingHashesAtSource(context?.repositoryRoot, context?.sourceSha);
+      return pass71NativeBrowserParityFailures(record, {
+        sourceSha: context?.sourceSha, tooling, machine: 'dave-gaming-pc',
+      });
+    } catch (error) {
+      return [`hf311-tooling-unavailable:${error instanceof Error ? error.message : String(error)}`];
+    }
+  },
+});
 
 const PASS71_HF298_EVIDENCE_REGISTRY_ENTRIES = Object.freeze([
   Object.freeze({
@@ -83,7 +123,12 @@ export function createPass71NativeEvidenceRegistry(additionalEntries = []) {
   })));
 }
 
-export const PASS71_NATIVE_EVIDENCE_REGISTRY = createPass71NativeEvidenceRegistry();
+export const PASS71_NATIVE_EVIDENCE_REGISTRY = createPass71NativeEvidenceRegistry([
+  PASS71_HF296_CONTACT_EVIDENCE_REGISTRY_ENTRY,
+  PASS71_AUDIO_NATIVE_REGISTRY_ENTRY,
+  PASS71_STUCK_EVIDENCE_REGISTRY_ENTRY,
+  PASS71_NATIVE_BROWSER_PARITY_REGISTRY_ENTRY,
+]);
 
 function parseArgs(argv) {
   const values = {};
@@ -266,6 +311,7 @@ export function validateAcceptanceManifest(manifest, options = {}) {
     }
   }
   let pass71NativeRecords = [];
+  let pass71RecordsByKey = new Map();
   let pass71Hf298Components = [];
   let pass71Hf298Coverages = [];
   if (manifest.releasePass === 'PASS 71') {
@@ -289,6 +335,7 @@ export function validateAcceptanceManifest(manifest, options = {}) {
         nativeEvidenceKey(entry.descriptor), entry,
       ]));
       const recordsByKey = new Map();
+      pass71RecordsByKey = recordsByKey;
       for (const [index, record] of nativeEvidence.entries()) {
         const key = nativeEvidenceKey(record);
         if (!registryByKey.has(key)) {
@@ -344,6 +391,25 @@ export function validateAcceptanceManifest(manifest, options = {}) {
         errors.push('PASS 71 verified R3/HF-298 requires all four solo/hosted x WebGL2/WebGPU components and one canonical full-scope coverage record');
       }
     }
+
+    const feedbackEvidenceRequirements = new Map([
+      ['HF-296', PASS71_HF296_CONTACT_EVIDENCE_REGISTRY_ENTRY.descriptor],
+      ['HF-302', PASS71_AUDIO_NATIVE_REGISTRY_ENTRY.descriptor],
+      ['HF-310', PASS71_STUCK_EVIDENCE_DESCRIPTOR],
+      ['HF-311', PASS71_NATIVE_BROWSER_PARITY_DESCRIPTOR],
+    ]);
+    for (const [feedbackId, descriptor] of feedbackEvidenceRequirements) {
+      const matching = Array.isArray(manifest.requirements)
+        ? manifest.requirements.filter((requirement) => requirement?.feedbackId === feedbackId) : [];
+      if (matching.length !== 1) {
+        errors.push(`PASS 71 ${feedbackId} must map to exactly one requirement`);
+        continue;
+      }
+      if (matching[0].state === 'verified'
+        && (pass71RecordsByKey.get(nativeEvidenceKey(descriptor))?.length ?? 0) !== 1) {
+        errors.push(`PASS 71 verified ${matching[0].id}/${feedbackId} requires its canonical registered native evidence record`);
+      }
+    }
   }
   const approval = manifest.humanAcceptance;
   if (!approval || approval.state !== 'approved' || approval.approvedBy !== policy.ownerHandle
@@ -364,24 +430,18 @@ export function validateAcceptanceManifest(manifest, options = {}) {
     && Date.parse(approval.approvedAt) < Date.parse(preview.createdAt)) {
     errors.push('humanAcceptance.approvedAt cannot precede preview.createdAt');
   }
-  for (const { index, record } of pass71Hf298Components) {
-    if (isIsoDate(preview?.createdAt) && isIsoDate(record?.startedAt)
-      && Date.parse(record.startedAt) < Date.parse(preview.createdAt)) {
-      errors.push(`PASS 71 nativeEvidence[${index}].startedAt cannot precede preview.createdAt`);
+  for (const [index, record] of pass71NativeRecords.entries()) {
+    const startField = isIsoDate(record?.startedAt) ? 'startedAt'
+      : isIsoDate(record?.finalizedAt) ? 'finalizedAt' : null;
+    const endField = isIsoDate(record?.completedAt) ? 'completedAt'
+      : isIsoDate(record?.finalizedAt) ? 'finalizedAt' : null;
+    if (startField && isIsoDate(preview?.createdAt)
+      && Date.parse(record[startField]) < Date.parse(preview.createdAt)) {
+      errors.push(`PASS 71 nativeEvidence[${index}].${startField} cannot precede preview.createdAt`);
     }
-    if (isIsoDate(record?.completedAt) && isIsoDate(approval?.approvedAt)
-      && Date.parse(record.completedAt) > Date.parse(approval.approvedAt)) {
-      errors.push(`PASS 71 nativeEvidence[${index}].completedAt cannot follow humanAcceptance.approvedAt`);
-    }
-  }
-  for (const { index, record } of pass71Hf298Coverages) {
-    if (isIsoDate(preview?.createdAt) && isIsoDate(record?.finalizedAt)
-      && Date.parse(record.finalizedAt) < Date.parse(preview.createdAt)) {
-      errors.push(`PASS 71 nativeEvidence[${index}].finalizedAt cannot precede preview.createdAt`);
-    }
-    if (isIsoDate(record?.finalizedAt) && isIsoDate(approval?.approvedAt)
-      && Date.parse(record.finalizedAt) > Date.parse(approval.approvedAt)) {
-      errors.push(`PASS 71 nativeEvidence[${index}].finalizedAt cannot follow humanAcceptance.approvedAt`);
+    if (endField && isIsoDate(approval?.approvedAt)
+      && Date.parse(record[endField]) > Date.parse(approval.approvedAt)) {
+      errors.push(`PASS 71 nativeEvidence[${index}].${endField} cannot follow humanAcceptance.approvedAt`);
     }
   }
   if (isIsoDate(manifest.feedbackReceivedAt) && preview && isIsoDate(preview.createdAt)

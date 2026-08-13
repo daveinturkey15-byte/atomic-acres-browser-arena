@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import {
   acceptanceWorkflowOutputs,
@@ -11,6 +12,14 @@ import {
   pass71GrenadeNativeToolingHashes,
 } from '../scripts/qa/pass71-grenade-native-receipt-contract.mjs';
 import { createPass71Hf298CoverageFixture } from '../scripts/qa/pass71-hf298-coverage-contract.mjs';
+import {
+  createPass71StuckEvidenceFixture,
+  pass71StuckEvidenceToolingHashes,
+} from '../scripts/qa/pass71-stuck-evidence-contract.mjs';
+import {
+  createPass71NativeBrowserParityFixture,
+  pass71NativeBrowserParityToolingHashesAtSource,
+} from '../scripts/qa/pass71-native-browser-parity-contract.mjs';
 
 const policy = {
   schemaVersion: 1,
@@ -59,6 +68,7 @@ function acceptedManifest() {
 }
 
 function pass71Manifest(tooling: Readonly<Record<string, string>>) {
+  const headSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   const manifest = acceptedManifest() as ReturnType<typeof acceptedManifest> & {
     nativeEvidence: Record<string, any>[];
   };
@@ -66,19 +76,59 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
   manifest.preview.ref = `pr-preview-71-${manifest.preview.sourceSha}`;
   manifest.humanAcceptance.evidence = 'Dave\'s standing conditional publication authorization is bound here; Dave did not inspect or test this immutable preview.';
   const requirement = manifest.requirements[0];
-  manifest.requirements = [
-    requirement,
-    { ...structuredClone(requirement), id: 'R2', summary: 'Independent Pass 71 requirement' },
-    {
-      ...structuredClone(requirement), id: 'R3', feedbackId: 'HF-298',
-      summary: 'Grenade first-action coverage',
-    },
-  ] as typeof manifest.requirements;
-  const { record, components } = createPass71Hf298CoverageFixture({
-    sourceSha: manifest.preview.sourceSha, tooling,
+  manifest.requirements = Array.from({ length: 18 }, (_, index) => {
+    const row = structuredClone(requirement) as typeof requirement & {
+      feedbackId: string;
+      deferApproval?: { approvedBy: string; approvedAt: string; reason: string };
+    };
+    row.id = `R${index + 1}`;
+    row.feedbackId = `HF-${296 + index}`;
+    row.summary = `Pass 71 owner outcome ${row.feedbackId}`;
+    if (![2, 14, 15].includes(index)) {
+      row.state = 'deferred';
+      row.evidence = [];
+      row.deferApproval = {
+        approvedBy: 'Dave', approvedAt: manifest.humanAcceptance.approvedAt,
+        reason: 'Synthetic unit fixture deferral; production requires the registered exact-A record.',
+      };
+    }
+    return row;
+  }) as typeof manifest.requirements;
+  const stuckTooling = pass71StuckEvidenceToolingHashes(process.cwd());
+  const stuck = createPass71StuckEvidenceFixture({ sourceSha: manifest.preview.sourceSha, tooling: stuckTooling });
+  const parityTooling = pass71NativeBrowserParityToolingHashesAtSource(process.cwd(), headSha);
+  const parity = createPass71NativeBrowserParityFixture({
+    sourceSha: manifest.preview.sourceSha, tooling: parityTooling,
+    startedAt: '2026-08-13T09:31:00.000Z', completedAt: '2026-08-13T09:50:00.000Z',
   });
-  manifest.nativeEvidence = [...components, record];
-  return { manifest, coverage: record, components };
+  manifest.preview.createdAt = '2026-08-13T09:00:00Z';
+  manifest.humanAcceptance.approvedAt = '2026-08-13T10:00:00Z';
+  for (const requirement of manifest.requirements) {
+    if ('deferApproval' in requirement && requirement.deferApproval) {
+      (requirement.deferApproval as { approvedAt: string }).approvedAt = manifest.humanAcceptance.approvedAt;
+    }
+  }
+  const components = ([
+    ['solo', 'webgl2'], ['solo', 'webgpu'], ['hosted', 'webgl2'], ['hosted', 'webgpu'],
+  ] as const).map(([mode, renderer], index) => createPass71GrenadeNativeEvidenceFixture({
+    sourceSha: manifest.preview.sourceSha, tooling, mode, renderer,
+    startedAt: `2026-08-13T09:1${index}:00.000Z`, completedAt: `2026-08-13T09:2${index}:00.000Z`,
+  }));
+  const rebuilt = createPass71Hf298CoverageFixture({
+    sourceSha: manifest.preview.sourceSha, tooling, components,
+    finalizedAt: '2026-08-13T09:30:00.000Z',
+  });
+  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, stuck, parity];
+  return { manifest, coverage: rebuilt.record, components: rebuilt.components };
+}
+
+function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
+  const headSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  return {
+    policy, pass71NativeEvidenceTooling: tooling,
+    pass71StuckEvidenceTooling: pass71StuckEvidenceToolingHashes(process.cwd()),
+    pass71NativeBrowserParityTooling: pass71NativeBrowserParityToolingHashesAtSource(process.cwd(), headSha),
+  };
 }
 
 describe('release acceptance manifest', () => {
@@ -248,19 +298,19 @@ describe('release acceptance manifest', () => {
   it('requires the truthful standing-conditional, no-preview-inspection statement for Pass 71', () => {
     const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
     const { manifest } = pass71Manifest(tooling);
-    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling })).toMatchObject({ ok: true });
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling))).toMatchObject({ ok: true });
 
     manifest.humanAcceptance.evidence = 'Dave gave standing conditional publication authorization for this immutable preview.';
-    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling }).errors.join('\n')).toMatch(/did not inspect or test/);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n')).toMatch(/did not inspect or test/);
 
     manifest.humanAcceptance.evidence = 'Dave did not inspect this immutable preview; publication may proceed.';
-    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling }).errors.join('\n')).toMatch(/standing conditional/);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n')).toMatch(/standing conditional/);
   });
 
   it('requires canonical full-scope HF-298 coverage before R3 can be verified', () => {
     const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
     const { manifest, coverage, components } = pass71Manifest(tooling);
-    const accepted = validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling });
+    const accepted = validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling));
     expect(accepted.ok).toBe(true);
     expect(accepted.summary?.nativeEvidence).toContainEqual(expect.objectContaining({
       evidenceId: 'HF-298',
@@ -270,24 +320,24 @@ describe('release acceptance manifest', () => {
     }));
 
     manifest.nativeEvidence = [components[1]];
-    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling }).errors.join('\n'))
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/verified R3\/HF-298 requires all four/);
     manifest.nativeEvidence = [components[0]];
-    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling }).errors.join('\n'))
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/retain the canonical HF-298 solo\/WebGPU component/);
     manifest.nativeEvidence = [...components, coverage, coverage];
-    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling }).errors.join('\n'))
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/record count must be 0\.\.1/);
     manifest.nativeEvidence = [...components, coverage, {
       evidenceId: 'HF-FUTURE', kind: 'unregistered-component', schemaVersion: 1,
     } as never];
-    const unregistered = validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling });
+    const unregistered = validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling));
     expect(unregistered.errors.join('\n')).toMatch(/no registered evidence validator/);
     manifest.nativeEvidence = [...components, coverage];
     (manifest.requirements[2] as unknown as { feedbackId: string }).feedbackId = 'HF-UNKNOWN';
-    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling }).errors.join('\n'))
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/R3\.feedbackId must be HF-298/);
-  });
+  }, 20_000);
 
   it('orders every HF-298 component and coverage finalization between preview and approval', () => {
     const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
@@ -297,10 +347,10 @@ describe('release acceptance manifest', () => {
       tooling,
       mode: 'solo',
       renderer: 'webgl2',
-      startedAt: '2026-07-24T08:59:59.000Z',
+      startedAt: '2026-08-13T08:59:59.000Z',
     });
     manifest.nativeEvidence[0] = beforePreview;
-    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling }).errors.join('\n'))
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/startedAt cannot precede preview/);
 
     const afterApproval = createPass71GrenadeNativeEvidenceFixture({
@@ -308,20 +358,22 @@ describe('release acceptance manifest', () => {
       tooling,
       mode: 'hosted',
       renderer: 'webgpu',
-      completedAt: '2026-07-24T09:10:00.001Z',
+      startedAt: '2026-08-13T09:40:00.000Z',
+      completedAt: '2026-08-13T10:00:00.001Z',
     });
     const { record: afterCoverage } = createPass71Hf298CoverageFixture({
       sourceSha: manifest.preview.sourceSha,
       tooling,
       components: [...components.slice(0, 3), afterApproval],
-      finalizedAt: '2026-07-24T09:10:00.002Z',
+      finalizedAt: '2026-08-13T10:00:00.002Z',
     });
-    manifest.nativeEvidence = [...components.slice(0, 3), afterApproval, afterCoverage];
-    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling }).errors.join('\n'))
+    const retained = manifest.nativeEvidence.slice(-2);
+    manifest.nativeEvidence = [...components.slice(0, 3), afterApproval, afterCoverage, ...retained];
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/completedAt cannot follow humanAcceptance/);
-    expect(validateAcceptanceManifest(manifest, { policy, pass71NativeEvidenceTooling: tooling }).errors.join('\n'))
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/finalizedAt cannot follow humanAcceptance/);
-  });
+  }, 20_000);
 
   it('permits only the Pass 71 manifest in candidate B after immutable candidate A', () => {
     const manifestPath = 'acceptance/pass-71.json';

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 const contract = readFileSync('scripts/qa/pass71-native-browser-parity-contract.mjs', 'utf8');
 const runner = readFileSync('scripts/qa/run-pass71-native-browser-parity.mjs', 'utf8');
 const runtime = readFileSync('src/legacy-main.ts', 'utf8');
+const acceptance = readFileSync('scripts/release/acceptance-gate.mjs', 'utf8');
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
 
 describe('Pass 71 installed Firefox and Chrome Quality parity evidence', () => {
@@ -100,5 +101,9 @@ describe('Pass 71 installed Firefox and Chrome Quality parity evidence', () => {
       .toContain('run-pass71-native-browser-parity.mjs');
     expect(contract).toContain('PASS71_NATIVE_BROWSER_PARITY_DESCRIPTOR');
     expect(contract).toContain('validatePass71NativeBrowserParityEvidence');
+    expect(acceptance).toContain('PASS71_NATIVE_BROWSER_PARITY_DESCRIPTOR');
+    expect(acceptance).toContain('PASS71_NATIVE_BROWSER_PARITY_REGISTRY_ENTRY');
+    expect(acceptance).toContain("['HF-311', PASS71_NATIVE_BROWSER_PARITY_DESCRIPTOR]");
+    expect(acceptance).toContain('for (const [index, record] of pass71NativeRecords.entries())');
   });
 });
