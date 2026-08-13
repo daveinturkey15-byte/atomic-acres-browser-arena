@@ -44,7 +44,14 @@ describe('sticky urgent-alert authority integration', () => {
     expect(publish).toContain('network.sendToPlayer(recipient.playerId, receipt)');
   });
 
-  it('admits guest feedback only from the exact host, recipient, epoch, and current actor lives', () => {
+  it('admits guest feedback only from exact authority or queues it until current actor lives arrive', () => {
+    const present = block('function presentStickyUrgentAlert(', '\nfunction setStatus(');
+    expect(present).toContain("network.role === 'client' ? localHostConfirmedContinuity : localContinuity");
+    expect(present).toContain('recipientLifeId,');
+
+    const currentLife = block('function currentStickyAttachmentActorLifeId(', '\nfunction presentStickyAttachmentOnset(');
+    expect(currentLife).toContain("network.role === 'client' ? localHostConfirmedContinuity : localContinuity");
+
     const handler = block('function handleStickyAttachmentReceipt(', '\nfunction onNetworkMessage(');
     expect(handler).toContain("if (message.type !== 'sticky-attachment-receipt') return false");
     expect(handler).toContain("if (network.role !== 'client' || matchState.phase !== 'active') return true");
@@ -53,16 +60,46 @@ describe('sticky urgent-alert authority integration', () => {
     expect(handler).toContain('expectedMatchEpoch: interactiveWorldMatchEpoch');
     expect(handler).toContain('currentOwnerLifeId: currentStickyAttachmentActorLifeId(message.ownerId)');
     expect(handler).toContain('currentTargetLifeId: currentStickyAttachmentActorLifeId(message.targetId)');
-    expect(handler).toContain('if (!admission.accepted) return true');
+    expect(handler).toContain("if (admission.reason === 'pending-continuity') schedulePendingStickyAttachmentReceiptRetry()");
+
+    const retry = block('function retryPendingStickyAttachmentReceipts(', '\nfunction handleStickyAttachmentReceipt(');
+    expect(retry).toContain('currentLifeId: currentStickyAttachmentActorLifeId');
+    expect(retry).toContain('const result = consumeStickyAttachmentReceipt(entry.message, entry.audience)');
+    expect(retry).toContain("if (result !== 'deferred') stickyAttachmentReceiptLedger.finalizePending(entry.message)");
+    expect(retry.indexOf('consumeStickyAttachmentReceipt(entry.message, entry.audience)'))
+      .toBeLessThan(retry.indexOf('stickyAttachmentReceiptLedger.finalizePending(entry.message)'));
+    const advanceLife = block('function advancePendingStickyAttachmentReceiptActorLife(', '\nfunction consumeStickyAttachmentReceipt(');
+    expect(advanceLife).toContain("network.role === 'client' && actorId === player.id && lifeId !== localHostConfirmedContinuity");
     expect(source).toContain('if (handleStickyAttachmentReceipt(message)) return;');
   });
 
-  it('persists victim replay evidence before presentation and never derives STUCK from detonation hits', () => {
-    const handler = block('function handleStickyAttachmentReceipt(', '\nfunction onNetworkMessage(');
-    expect(handler).toContain('const receiptKey = stickyVictimReceiptKey(receipt)');
-    expect(handler).toContain('saveStickyVictimReceipt(clientPersistentStorage(), receipt)');
-    expect(handler.indexOf('saveStickyVictimReceipt(clientPersistentStorage(), receipt)'))
-      .toBeLessThan(handler.indexOf('presentStickyAttachmentOnset(message, admission.audience)'));
+  it('retries on canonical life catch-up and cleans pending receipts at exact lifecycle boundaries', () => {
+    const guestResume = block('function applyGuestResumeAuthority(', '\nasync function admitLobbyJoin(');
+    expect(guestResume).toContain('advancePendingStickyAttachmentReceiptActorLife(player.id, projection.continuity)');
+
+    const respawn = block('function respawn(', '\nfunction applyLocalClassRedeploy(');
+    expect(respawn).toContain('discardPendingStickyAttachmentReceiptsForActor(player.id)');
+
+    const removeRemote = block('function removeRemote(', '\nfunction activeSpawnMode(');
+    expect(removeRemote).toContain('discardPendingStickyAttachmentReceiptsForActor(id)');
+
+    const networkStatus = block('function setNetworkStatus(', '\nconst network = new ArenaNetwork(');
+    expect(networkStatus).toContain('discardPendingStickyAttachmentReceipts()');
+
+    const provisionalRemote = block('remotes.set(incoming.id, remote);', "if (network.role === 'host' && message.type === 'state')");
+    expect(provisionalRemote).not.toContain('advancePendingStickyAttachmentReceiptActorLife');
+    expect(source).toContain('advancePendingStickyAttachmentReceiptActorLife(incoming.id, admittedContinuity)');
+    expect(source).toContain('discardPendingStickyAttachmentReceiptsForActor(message.victim)');
+    expect(source).toContain('resetStickyAttachmentReceiptAdmission();');
+  });
+
+  it('persists victim replay evidence only after presentation and never derives STUCK from detonation hits', () => {
+    const consume = block('function consumeStickyAttachmentReceipt(', '\nfunction schedulePendingStickyAttachmentReceiptRetry(');
+    expect(consume).toContain('const receiptKey = stickyVictimReceiptKey(receipt)');
+    expect(consume).toContain('saveStickyVictimReceipt(clientPersistentStorage(), receipt)');
+    expect(consume.indexOf('presentStickyAttachmentOnset(message, audience)'))
+      .toBeLessThan(consume.indexOf('saveStickyVictimReceipt(clientPersistentStorage(), receipt)'));
+    expect(consume).toContain("if (!presentStickyAttachmentOnset(message, audience)) return 'deferred'");
 
     const incomingHit = block("if (message.type === 'hit'", "if (message.type === 'death'");
     expect(incomingHit).not.toContain('presentStickyAttachmentOnset');

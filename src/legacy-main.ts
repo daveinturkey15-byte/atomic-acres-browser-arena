@@ -4791,6 +4791,7 @@ let stickyVictimFeedbackCount = 0;
 let lastStickyVictimFeedback: StickyVictimFeedback | null = null;
 let stickyVictimReceiptKeys = new Set<string>();
 const stickyAttachmentReceiptLedger = new StickyAttachmentReceiptLedger();
+let stickyAttachmentReceiptRetryTimeout: number | null = null;
 const stickyUrgentAlertController = new StickyUrgentAlertController();
 let stickyUrgentAlertTimeout: number | null = null;
 let stickyUrgentAlertGeneration = 0;
@@ -4831,11 +4832,13 @@ function presentStickyUrgentAlert(
   nowMs = performance.now(),
 ): boolean {
   if (!player.alive || (audience === 'victim' && attachedTargetId !== player.id)) return false;
+  const recipientLifeId = network.role === 'client' ? localHostConfirmedContinuity : localContinuity;
+  if (recipientLifeId === null) return false;
   const alert = stickyUrgentAlertController.admit({
     source,
     audience,
     recipientId: player.id,
-    recipientLifeId: localContinuity,
+    recipientLifeId,
     ownerId,
     ownerLifeId,
     attachedTargetId,
@@ -6135,6 +6138,7 @@ function setNetworkStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): v
     if (network.role !== 'client' || !network.diagnostics().hostConnectionOpen) {
       clientWorldRepairAdmission = null;
       pendingClientReconnectWorldRepairConnectionEpoch = null;
+      discardPendingStickyAttachmentReceipts();
     }
     const admissionToken = matchAdmissionCoordinator.token();
     if (admissionToken) {
@@ -7791,6 +7795,8 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   player.invulnerableUntil = 0;
   localContinuity = projection.continuity;
   localHostConfirmedContinuity = projection.continuity;
+  resetStickyUrgentAlertLife(projection.continuity);
+  advancePendingStickyAttachmentReceiptActorLife(player.id, projection.continuity);
   killstreakLoadoutController.reconcileActiveMatchAuthority(projection.loadout);
   gamepadSupportSelection = projection.loadout.slots[0];
   syncFieldSupportRows(projection.loadout);
@@ -9629,7 +9635,9 @@ function recordReceiverStickyAttachment(input: Readonly<{
 }
 
 function currentStickyAttachmentActorLifeId(actorId: string): number | null {
-  if (actorId === player.id) return localContinuity;
+  if (actorId === player.id) {
+    return network.role === 'client' ? localHostConfirmedContinuity : localContinuity;
+  }
   return remotes.get(actorId)?.continuity ?? bots.get(actorId)?.continuity ?? null;
 }
 
@@ -9637,7 +9645,7 @@ function presentStickyAttachmentOnset(
   attachment: Pick<StickyAttachmentRecord, 'source' | 'ownerId' | 'ownerLifeId' | 'targetId' | 'targetLifeId' | 'actionNonce'>,
   audience: StickyUrgentAlertAudience,
   nowMs = performance.now(),
-): void {
+): boolean {
   if (!presentStickyUrgentAlert(
     attachment.source,
     audience,
@@ -9647,9 +9655,10 @@ function presentStickyAttachmentOnset(
     attachment.targetLifeId,
     attachment.actionNonce,
     nowMs,
-  )) return;
+  )) return false;
   if (audience === 'victim') addFeed('STUCK', 'coral');
   else addFeed('STUCK', 'gold');
+  return true;
 }
 
 function publishStickyAttachmentOnset(attachment: StickyAttachmentRecord, nowMs: number): void {
@@ -9815,18 +9824,38 @@ function handleFlashAuthorityMessage(message: GameMessage): boolean {
   return true;
 }
 
-function handleStickyAttachmentReceipt(message: GameMessage): boolean {
-  if (message.type !== 'sticky-attachment-receipt') return false;
-  if (network.role !== 'client' || matchState.phase !== 'active') return true;
-  const admission = stickyAttachmentReceiptLedger.admit(message, {
-    expectedHostId: privateLobbySnapshot?.hostId,
-    expectedRecipientId: player.id,
-    expectedMatchEpoch: interactiveWorldMatchEpoch,
-    currentOwnerLifeId: currentStickyAttachmentActorLifeId(message.ownerId),
-    currentTargetLifeId: currentStickyAttachmentActorLifeId(message.targetId),
-  });
-  if (!admission.accepted) return true;
-  if (admission.audience === 'victim') {
+function clearStickyAttachmentReceiptRetryTimeout(): void {
+  if (stickyAttachmentReceiptRetryTimeout !== null) window.clearTimeout(stickyAttachmentReceiptRetryTimeout);
+  stickyAttachmentReceiptRetryTimeout = null;
+}
+
+function resetStickyAttachmentReceiptAdmission(): void {
+  clearStickyAttachmentReceiptRetryTimeout();
+  stickyAttachmentReceiptLedger.reset();
+}
+
+function discardPendingStickyAttachmentReceipts(): void {
+  clearStickyAttachmentReceiptRetryTimeout();
+  stickyAttachmentReceiptLedger.discardPending();
+}
+
+function discardPendingStickyAttachmentReceiptsForActor(actorId: string): void {
+  stickyAttachmentReceiptLedger.discardPendingForActor(actorId);
+  schedulePendingStickyAttachmentReceiptRetry();
+}
+
+function advancePendingStickyAttachmentReceiptActorLife(actorId: string, lifeId: number): void {
+  if (stickyAttachmentReceiptRetryTimeout === null) return;
+  if (network.role === 'client' && actorId === player.id && lifeId !== localHostConfirmedContinuity) return;
+  stickyAttachmentReceiptLedger.discardPendingBeforeActorLife(actorId, lifeId);
+  retryPendingStickyAttachmentReceipts();
+}
+
+function consumeStickyAttachmentReceipt(
+  message: StickyAttachmentReceiptMessage,
+  audience: StickyUrgentAlertAudience,
+): 'presented' | 'already-presented' | 'deferred' {
+  if (audience === 'victim') {
     const receipt = {
       matchEpoch: message.matchEpoch,
       ownerId: message.ownerId,
@@ -9838,7 +9867,8 @@ function handleStickyAttachmentReceipt(message: GameMessage): boolean {
       expiresAtEpochMs: Date.now() + STICKY_VICTIM_RECEIPT_TTL_MS,
     } as const;
     const receiptKey = stickyVictimReceiptKey(receipt);
-    if (stickyVictimReceiptKeys.has(receiptKey)) return true;
+    if (stickyVictimReceiptKeys.has(receiptKey)) return 'already-presented';
+    if (!presentStickyAttachmentOnset(message, audience)) return 'deferred';
     stickyVictimReceiptKeys.add(receiptKey);
     saveStickyVictimReceipt(clientPersistentStorage(), receipt);
     stickyVictimFeedbackCount += 1;
@@ -9850,8 +9880,54 @@ function handleStickyAttachmentReceipt(message: GameMessage): boolean {
       actionNonce: message.actionNonce,
       resultNonce: message.nonce,
     });
+    return 'presented';
   }
-  presentStickyAttachmentOnset(message, admission.audience);
+  return presentStickyAttachmentOnset(message, audience) ? 'presented' : 'deferred';
+}
+
+function schedulePendingStickyAttachmentReceiptRetry(): void {
+  clearStickyAttachmentReceiptRetryTimeout();
+  const nextExpiry = stickyAttachmentReceiptLedger.snapshot().nextPendingExpiryAtMs;
+  if (nextExpiry === null) return;
+  stickyAttachmentReceiptRetryTimeout = window.setTimeout(() => {
+    stickyAttachmentReceiptRetryTimeout = null;
+    retryPendingStickyAttachmentReceipts();
+  }, Math.max(0, nextExpiry - performance.now()) + 1);
+}
+
+function retryPendingStickyAttachmentReceipts(): void {
+  if (network.role !== 'client' || matchState.phase !== 'active') {
+    discardPendingStickyAttachmentReceipts();
+    return;
+  }
+  const ready = stickyAttachmentReceiptLedger.retryPending({
+    expectedHostId: privateLobbySnapshot?.hostId,
+    expectedRecipientId: player.id,
+    expectedMatchEpoch: interactiveWorldMatchEpoch,
+    currentLifeId: currentStickyAttachmentActorLifeId,
+  }, performance.now());
+  for (const entry of ready) {
+    const result = consumeStickyAttachmentReceipt(entry.message, entry.audience);
+    if (result !== 'deferred') stickyAttachmentReceiptLedger.finalizePending(entry.message);
+  }
+  schedulePendingStickyAttachmentReceiptRetry();
+}
+
+function handleStickyAttachmentReceipt(message: GameMessage): boolean {
+  if (message.type !== 'sticky-attachment-receipt') return false;
+  if (network.role !== 'client' || matchState.phase !== 'active') return true;
+  const admission = stickyAttachmentReceiptLedger.admit(message, {
+    expectedHostId: privateLobbySnapshot?.hostId,
+    expectedRecipientId: player.id,
+    expectedMatchEpoch: interactiveWorldMatchEpoch,
+    currentOwnerLifeId: currentStickyAttachmentActorLifeId(message.ownerId),
+    currentTargetLifeId: currentStickyAttachmentActorLifeId(message.targetId),
+  }, performance.now());
+  if (!admission.accepted) {
+    if (admission.reason === 'pending-continuity') schedulePendingStickyAttachmentReceiptRetry();
+    return true;
+  }
+  consumeStickyAttachmentReceipt(message, admission.audience);
   return true;
 }
 
@@ -10016,7 +10092,9 @@ function onNetworkMessage(message: GameMessage): void {
       // can confirm a replacement document's life identity. Persist it for a
       // later renderer replacement, and correct any forged/stale local copy
       // without allowing that copy to mutate host authority.
+      const previousHostConfirmedContinuity = localHostConfirmedContinuity;
       localHostConfirmedContinuity = actor.lifeId;
+      if (previousHostConfirmedContinuity !== actor.lifeId) resetStickyUrgentAlertLife(actor.lifeId);
       if (awaitingAuthoritativeRejoinContinuity) {
         localContinuity = actor.lifeId;
         localPositionHistory.length = 0;
@@ -10027,6 +10105,7 @@ function onNetworkMessage(message: GameMessage): void {
         resetFlashVictimLife();
         awaitingAuthoritativeRejoinContinuity = false;
       }
+      advancePendingStickyAttachmentReceiptActorLife(player.id, actor.lifeId);
       if (network.roomCode && localResumeToken) {
         try { saveActiveRoomIdentity(network.roomCode); } catch { /* In-memory host authority remains canonical. */ }
       }
@@ -10534,6 +10613,7 @@ function onNetworkMessage(message: GameMessage): void {
       if (message.type === 'state') remote.snapshotRateHz = message.rateHz;
       if (remote.positionHistory.at(-1)?.continuity !== admittedContinuity) remote.positionHistory.length = 0;
       remote.continuity = admittedContinuity;
+      advancePendingStickyAttachmentReceiptActorLife(incoming.id, admittedContinuity);
       const priorBufferStats = remote.interpolation.stats;
       remote.interpolation.push({
         seq: admittedIncoming.seq,
@@ -10949,6 +11029,7 @@ function onNetworkMessage(message: GameMessage): void {
   }
   if (message.type === 'death' && !processedNonces.has(message.nonce)) {
     processedNonces.add(message.nonce);
+    discardPendingStickyAttachmentReceiptsForActor(message.victim);
     processDeath(message);
     trimNonceSet();
     return;
@@ -13241,6 +13322,7 @@ function processDeath(message: DeathMessage): void {
 }
 
 function removeRemote(id: string, reason: string, allowRejoinReservation = true): void {
+  discardPendingStickyAttachmentReceiptsForActor(id);
   const remote = remotes.get(id);
   if (!remote) return;
   const retainCombatAuthority = allowRejoinReservation && shouldRetainRemoteCombatAuthority(
@@ -13732,6 +13814,7 @@ function respawn(
 ): void {
   const startsNewLife = !player.alive || forceNewLife;
   if (startsNewLife) {
+    discardPendingStickyAttachmentReceiptsForActor(player.id);
     localContinuity += 1;
     localPositionHistory.length = 0;
     resetFlashVictimLife();
@@ -13934,7 +14017,7 @@ async function startGame(
   stickyTimingReplayNonces.clear();
   stickyVictimFeedbackCount = 0;
   lastStickyVictimFeedback = null;
-  stickyAttachmentReceiptLedger.reset();
+  resetStickyAttachmentReceiptAdmission();
   resetStickyUrgentAlertLife();
   stickyVictimReceiptKeys = mode === 'client'
     ? new Set(loadStickyVictimReceiptKeys(clientPersistentStorage(), interactiveWorldMatchEpoch, player.id))
@@ -22088,7 +22171,7 @@ function clearFieldSupport(): void {
   stickyTimingReplayNonces.clear();
   stickyVictimFeedbackCount = 0;
   lastStickyVictimFeedback = null;
-  stickyAttachmentReceiptLedger.reset();
+  resetStickyAttachmentReceiptAdmission();
   resetStickyUrgentAlertLife();
   stickyVictimReceiptKeys.clear();
   lastQaStickyAuthoritativeHits.clear();
@@ -28624,6 +28707,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   teleportPlayer: (x, y, z, yaw = player.yaw, pitch = player.pitch) => {
     if (![x, y, z, yaw, pitch].every(Number.isFinite)) return;
+    discardPendingStickyAttachmentReceiptsForActor(player.id);
     localContinuity += 1;
     localPositionHistory.length = 0;
     resetFlashVictimLife();

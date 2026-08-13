@@ -1,14 +1,20 @@
 import type { StickyAttachmentReceiptMessage } from './protocol';
 import type { StickyAttachmentRecord } from './remote-sticky-attachment-authority';
 import type { StickyUrgentAlertAudience } from './sticky-victim-feedback';
+import { STATE_BROADCAST_INTERVAL_MS } from './network-sync';
 
 export const STICKY_ATTACHMENT_RECEIPT_REPLAY_CAPACITY = 256;
+export const STICKY_ATTACHMENT_PENDING_CAPACITY = 64;
+export const STICKY_ATTACHMENT_PENDING_STATE_WINDOWS = 40;
+export const STICKY_ATTACHMENT_PENDING_TTL_MS = STATE_BROADCAST_INTERVAL_MS
+  * STICKY_ATTACHMENT_PENDING_STATE_WINDOWS;
 
 export type StickyAttachmentReceiptAdmission = Readonly<
   | {
       accepted: false;
       reason: 'forged-host' | 'wrong-recipient' | 'recipient-not-party' | 'match-epoch-mismatch'
-        | 'owner-life-mismatch' | 'target-life-mismatch' | 'duplicate-nonce' | 'duplicate-attachment';
+        | 'owner-life-mismatch' | 'target-life-mismatch' | 'duplicate-nonce' | 'duplicate-attachment'
+        | 'pending-continuity';
       audience: null;
     }
   | {
@@ -17,6 +23,17 @@ export type StickyAttachmentReceiptAdmission = Readonly<
       audience: StickyUrgentAlertAudience;
     }
 >;
+
+export type StickyAttachmentReceiptReady = Readonly<{
+  message: StickyAttachmentReceiptMessage;
+  audience: StickyUrgentAlertAudience;
+}>;
+
+type PendingStickyAttachmentReceipt = Readonly<{
+  message: StickyAttachmentReceiptMessage;
+  audience: StickyUrgentAlertAudience;
+  expiresAtMs: number;
+}>;
 
 export type StickyAttachmentOnsetPlan = Readonly<{
   localAudience: StickyUrgentAlertAudience | null;
@@ -68,8 +85,45 @@ function attachmentReplayKey(message: StickyAttachmentReceiptMessage): string {
     message.targetId,
     message.targetLifeId,
     message.actionNonce,
-    message.forPlayerId,
   ]);
+}
+
+type StickyAttachmentReceiptIdentityContext = Readonly<{
+  expectedHostId: string | null | undefined;
+  expectedRecipientId: string;
+  expectedMatchEpoch: number;
+}>;
+
+type StickyAttachmentReceiptAdmissionContext = StickyAttachmentReceiptIdentityContext & Readonly<{
+  currentOwnerLifeId: number | null;
+  currentTargetLifeId: number | null;
+}>;
+
+type StickyAttachmentReceiptRetryContext = StickyAttachmentReceiptIdentityContext & Readonly<{
+  currentLifeId: (actorId: string) => number | null;
+}>;
+
+function identityFailure(
+  message: StickyAttachmentReceiptMessage,
+  context: StickyAttachmentReceiptIdentityContext,
+): Exclude<StickyAttachmentReceiptAdmission['reason'], 'accepted' | 'owner-life-mismatch' | 'target-life-mismatch'
+  | 'duplicate-nonce' | 'duplicate-attachment' | 'pending-continuity'> | null {
+  if (!context.expectedHostId || message.by !== context.expectedHostId) return 'forged-host';
+  if (message.forPlayerId !== context.expectedRecipientId) return 'wrong-recipient';
+  if (!stickyAttachmentAudience(message.ownerId, message.targetId, message.forPlayerId)) return 'recipient-not-party';
+  if (message.matchEpoch !== context.expectedMatchEpoch) return 'match-epoch-mismatch';
+  return null;
+}
+
+function continuityState(
+  message: StickyAttachmentReceiptMessage,
+  currentOwnerLifeId: number | null,
+  currentTargetLifeId: number | null,
+): 'current' | 'pending' | 'stale-owner' | 'stale-target' {
+  if (currentOwnerLifeId !== null && currentOwnerLifeId > message.ownerLifeId) return 'stale-owner';
+  if (currentTargetLifeId !== null && currentTargetLifeId > message.targetLifeId) return 'stale-target';
+  if (currentOwnerLifeId === message.ownerLifeId && currentTargetLifeId === message.targetLifeId) return 'current';
+  return 'pending';
 }
 
 /**
@@ -80,57 +134,170 @@ function attachmentReplayKey(message: StickyAttachmentReceiptMessage): string {
 export class StickyAttachmentReceiptLedger {
   private readonly nonces = new Set<number>();
   private readonly attachments = new Set<string>();
+  private readonly pending = new Map<string, PendingStickyAttachmentReceipt>();
+  private readonly pendingNonces = new Map<number, string>();
+
+  private spend(message: StickyAttachmentReceiptMessage): void {
+    retainBounded(this.nonces, message.nonce);
+    retainBounded(this.attachments, attachmentReplayKey(message));
+  }
+
+  private removePending(key: string, spend: boolean): PendingStickyAttachmentReceipt | null {
+    const entry = this.pending.get(key) ?? null;
+    if (!entry) return null;
+    this.pending.delete(key);
+    this.pendingNonces.delete(entry.message.nonce);
+    if (spend) this.spend(entry.message);
+    return entry;
+  }
+
+  private expirePending(nowMs: number): void {
+    for (const [key, entry] of this.pending) {
+      if (entry.expiresAtMs > nowMs) continue;
+      this.removePending(key, true);
+    }
+  }
+
+  private queue(
+    message: StickyAttachmentReceiptMessage,
+    audience: StickyUrgentAlertAudience,
+    nowMs: number,
+  ): void {
+    while (this.pending.size >= STICKY_ATTACHMENT_PENDING_CAPACITY) {
+      const oldest = this.pending.keys().next().value as string | undefined;
+      if (oldest === undefined) break;
+      this.removePending(oldest, true);
+    }
+    const key = attachmentReplayKey(message);
+    this.pending.set(key, Object.freeze({
+      message: Object.freeze({ ...message }),
+      audience,
+      expiresAtMs: nowMs + STICKY_ATTACHMENT_PENDING_TTL_MS,
+    }));
+    this.pendingNonces.set(message.nonce, key);
+  }
 
   admit(
     message: StickyAttachmentReceiptMessage,
-    context: Readonly<{
-      expectedHostId: string | null | undefined;
-      expectedRecipientId: string;
-      expectedMatchEpoch: number;
-      currentOwnerLifeId: number | null;
-      currentTargetLifeId: number | null;
-    }>,
+    context: StickyAttachmentReceiptAdmissionContext,
+    nowMs = performance.now(),
   ): StickyAttachmentReceiptAdmission {
-    if (!context.expectedHostId || message.by !== context.expectedHostId) {
-      return Object.freeze({ accepted: false, reason: 'forged-host', audience: null });
-    }
-    if (message.forPlayerId !== context.expectedRecipientId) {
-      return Object.freeze({ accepted: false, reason: 'wrong-recipient', audience: null });
-    }
+    this.expirePending(nowMs);
+    const failure = identityFailure(message, context);
+    if (failure) return Object.freeze({ accepted: false, reason: failure, audience: null });
     const audience = stickyAttachmentAudience(message.ownerId, message.targetId, message.forPlayerId);
     if (!audience) return Object.freeze({ accepted: false, reason: 'recipient-not-party', audience: null });
-    if (message.matchEpoch !== context.expectedMatchEpoch) {
-      return Object.freeze({ accepted: false, reason: 'match-epoch-mismatch', audience: null });
-    }
-    if (context.currentOwnerLifeId === null || message.ownerLifeId !== context.currentOwnerLifeId) {
-      return Object.freeze({ accepted: false, reason: 'owner-life-mismatch', audience: null });
-    }
-    if (context.currentTargetLifeId === null || message.targetLifeId !== context.currentTargetLifeId) {
-      return Object.freeze({ accepted: false, reason: 'target-life-mismatch', audience: null });
-    }
     if (this.nonces.has(message.nonce)) {
       return Object.freeze({ accepted: false, reason: 'duplicate-nonce', audience: null });
     }
-    retainBounded(this.nonces, message.nonce);
     const key = attachmentReplayKey(message);
     if (this.attachments.has(key)) {
+      retainBounded(this.nonces, message.nonce);
       return Object.freeze({ accepted: false, reason: 'duplicate-attachment', audience: null });
     }
-    retainBounded(this.attachments, key);
+    if (this.pendingNonces.has(message.nonce)) {
+      return Object.freeze({ accepted: false, reason: 'duplicate-nonce', audience: null });
+    }
+    if (this.pending.has(key)) {
+      retainBounded(this.nonces, message.nonce);
+      return Object.freeze({ accepted: false, reason: 'duplicate-attachment', audience: null });
+    }
+    const continuity = continuityState(message, context.currentOwnerLifeId, context.currentTargetLifeId);
+    if (continuity === 'stale-owner') {
+      this.spend(message);
+      return Object.freeze({ accepted: false, reason: 'owner-life-mismatch', audience: null });
+    }
+    if (continuity === 'stale-target') {
+      this.spend(message);
+      return Object.freeze({ accepted: false, reason: 'target-life-mismatch', audience: null });
+    }
+    if (continuity === 'pending') {
+      this.queue(message, audience, nowMs);
+      return Object.freeze({ accepted: false, reason: 'pending-continuity', audience: null });
+    }
+    this.spend(message);
     return Object.freeze({ accepted: true, reason: 'accepted', audience });
+  }
+
+  retryPending(
+    context: StickyAttachmentReceiptRetryContext,
+    nowMs = performance.now(),
+  ): readonly StickyAttachmentReceiptReady[] {
+    this.expirePending(nowMs);
+    const ready: StickyAttachmentReceiptReady[] = [];
+    for (const [key, entry] of [...this.pending]) {
+      if (identityFailure(entry.message, context)) {
+        this.removePending(key, true);
+        continue;
+      }
+      const continuity = continuityState(
+        entry.message,
+        context.currentLifeId(entry.message.ownerId),
+        context.currentLifeId(entry.message.targetId),
+      );
+      if (continuity === 'pending') continue;
+      if (continuity !== 'current') {
+        this.removePending(key, true);
+        continue;
+      }
+      // Keep the canonical identity pending until the caller has actually
+      // presented it; retry and presentation are intentionally two-phase.
+      ready.push(Object.freeze({ message: entry.message, audience: entry.audience }));
+    }
+    return Object.freeze(ready);
+  }
+
+  finalizePending(message: StickyAttachmentReceiptMessage): boolean {
+    const key = attachmentReplayKey(message);
+    const pending = this.pending.get(key);
+    if (!pending || pending.message.nonce !== message.nonce) return false;
+    this.removePending(key, true);
+    return true;
+  }
+
+  discardPendingForActor(actorId: string): void {
+    for (const [key, entry] of [...this.pending]) {
+      if (entry.message.ownerId === actorId || entry.message.targetId === actorId) this.removePending(key, true);
+    }
+  }
+
+  discardPendingBeforeActorLife(actorId: string, currentLifeId: number): void {
+    for (const [key, entry] of [...this.pending]) {
+      const actorLifeIds = [
+        ...(entry.message.ownerId === actorId ? [entry.message.ownerLifeId] : []),
+        ...(entry.message.targetId === actorId ? [entry.message.targetLifeId] : []),
+      ];
+      if (actorLifeIds.some((lifeId) => lifeId < currentLifeId)) this.removePending(key, true);
+    }
+  }
+
+  discardPending(): void {
+    for (const key of [...this.pending.keys()]) this.removePending(key, true);
   }
 
   reset(): void {
     this.nonces.clear();
     this.attachments.clear();
+    this.pending.clear();
+    this.pendingNonces.clear();
   }
 
-  snapshot(): Readonly<{ nonces: number; attachments: number; bounded: boolean }> {
+  snapshot(): Readonly<{
+    nonces: number;
+    attachments: number;
+    pending: number;
+    nextPendingExpiryAtMs: number | null;
+    bounded: boolean;
+  }> {
+    const nextPendingExpiryAtMs = this.pending.values().next().value?.expiresAtMs ?? null;
     return Object.freeze({
       nonces: this.nonces.size,
       attachments: this.attachments.size,
+      pending: this.pending.size,
+      nextPendingExpiryAtMs,
       bounded: this.nonces.size <= STICKY_ATTACHMENT_RECEIPT_REPLAY_CAPACITY
-        && this.attachments.size <= STICKY_ATTACHMENT_RECEIPT_REPLAY_CAPACITY,
+        && this.attachments.size <= STICKY_ATTACHMENT_RECEIPT_REPLAY_CAPACITY
+        && this.pending.size <= STICKY_ATTACHMENT_PENDING_CAPACITY,
     });
   }
 }
