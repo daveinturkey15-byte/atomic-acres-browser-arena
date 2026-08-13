@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   PASS71_HF313_PINNED_CHANNELS,
+  PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES,
   PASS71_HF313_PUBLIC_CHOICES,
   PASS71_HF313_RELEASE_DESCRIPTOR,
   PASS71_HF313_RELEASE_EVIDENCE,
@@ -12,6 +13,7 @@ import {
   createPass71Hf313EvidenceFixture,
   createPass71Hf313LivePostcondition,
   pass71Hf313EvidenceFailures,
+  pass71Hf313NativeEvidenceEnvelope,
   pass71Hf313ProductionPostconditionFailures,
   pass71Hf313RecordSha256,
 } from './pass71-hf313-release-evidence-contract.mjs';
@@ -43,7 +45,9 @@ const sourceAudit = {
   finalizer: { exactManifestPathOnly: true, standingConditionalNoHitl: true, candidateAOriginalAttemptOnly: true },
   postcondition: { receiptSchemaVersion: 4, rollbackProvenanceLiveChecked: true, liveVerifiedStatusOwnedByReceipt: true },
 };
-const expected = { sourceSha: candidateA, sourceTreeSha, sourceAudit, tooling, dependencies };
+const dependencyRecords = dependencies.map((entry) => ({ ...entry }));
+const dependencyEnvelope = pass71Hf313NativeEvidenceEnvelope(dependencyRecords);
+const expected = { sourceSha: candidateA, sourceTreeSha, sourceAudit, tooling, dependencies, dependencyEnvelope };
 
 function fixture() {
   return createPass71Hf313EvidenceFixture(expected);
@@ -134,6 +138,10 @@ describe('Pass 71 HF-313 protected release evidence', () => {
     missing.dependencies.pop();
     resign(missing);
     assert(pass71Hf313EvidenceFailures(missing, expected).includes('complete-native-evidence-binding'));
+    const oversized = fixture();
+    oversized.dependencyEnvelope.jsonBytes = PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES + 1;
+    resign(oversized);
+    assert(pass71Hf313EvidenceFailures(oversized, expected).includes('bounded-native-evidence-envelope'));
   });
 
   it('rejects channel, publisher, source, tooling, schema and digest drift', () => {

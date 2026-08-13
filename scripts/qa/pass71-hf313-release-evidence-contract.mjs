@@ -23,6 +23,8 @@ export const PASS71_HF313_REQUIRED_FEEDBACK_IDS = Object.freeze(Array.from(
   { length: 17 }, (_, index) => `HF-${296 + index}`,
 ));
 
+export const PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES = 80 * 1024 * 1024;
+
 export const PASS71_HF313_PUBLIC_CHOICES = Object.freeze(['experimental', 'retained', 'stable']);
 
 export const PASS71_HF313_PINNED_CHANNELS = Object.freeze({
@@ -132,6 +134,15 @@ export function pass71Hf313DependencyProjection(records) {
     .sort((left, right) => projectionKey(left).localeCompare(projectionKey(right))));
 }
 
+export function pass71Hf313NativeEvidenceEnvelope(records) {
+  const priorRecords = records.filter((record) => object(record) && record.evidenceId !== 'HF-313');
+  return Object.freeze({
+    recordCount: priorRecords.length,
+    jsonBytes: Buffer.byteLength(JSON.stringify(priorRecords), 'utf8'),
+    maxJsonBytes: PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES,
+  });
+}
+
 export function pass71Hf313ToolingAtSource(repositoryRoot, sourceSha) {
   if (!SHA40.test(sourceSha ?? '')) throw new Error('HF-313 tooling requires exact candidate A SHA');
   return Object.freeze(PASS71_HF313_TOOL_PATHS.map((path) => Object.freeze({
@@ -236,7 +247,7 @@ export function pass71Hf313EvidenceFailures(record, expected = {}) {
   if (!exactKeys(record, [
     'schemaVersion', 'evidenceId', 'kind', 'contract', 'feedbackId', 'status', 'closesFeedback',
     'closingAuthority', 'startedAt', 'completedAt', 'source', 'sourceAudit', 'tooling',
-    'dependencies', 'publication', 'faults', 'receiptSha256',
+    'dependencies', 'dependencyEnvelope', 'publication', 'faults', 'receiptSha256',
   ]) || record?.schemaVersion !== 1 || record?.evidenceId !== 'HF-313'
     || record?.kind !== PASS71_HF313_RELEASE_EVIDENCE.kind
     || record?.contract !== PASS71_HF313_RELEASE_EVIDENCE.contract
@@ -278,6 +289,15 @@ export function pass71Hf313EvidenceFailures(record, expected = {}) {
       || entry.path !== PASS71_HF313_TOOL_PATHS[index] || !SHA256.test(entry.sha256 ?? ''))) failures.push('candidate-a-tooling');
   if (!dependenciesValid(record?.dependencies)
     || !same(record?.dependencies, expected.dependencies)) failures.push('complete-native-evidence-binding');
+  if (!exactKeys(record?.dependencyEnvelope, ['recordCount', 'jsonBytes', 'maxJsonBytes'])
+    || !same(record?.dependencyEnvelope, expected.dependencyEnvelope)
+    || record?.dependencyEnvelope?.recordCount < PASS71_HF313_REQUIRED_FEEDBACK_IDS.length
+    || !Number.isSafeInteger(record?.dependencyEnvelope?.jsonBytes)
+    || record.dependencyEnvelope.jsonBytes < 1
+    || record?.dependencyEnvelope?.maxJsonBytes !== PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES
+    || record.dependencyEnvelope.jsonBytes > PASS71_HF313_MAX_NATIVE_EVIDENCE_JSON_BYTES) {
+    failures.push('bounded-native-evidence-envelope');
+  }
   if (!exactKeys(record?.publication, [
     'phase', 'alreadyLive', 'postconditionRequired', 'postconditionOwner', 'successStatus',
     'candidateAPreviewRequired', 'candidateBManifestOnly', 'publicChoices',
@@ -313,6 +333,7 @@ export function createPass71Hf313RegistryEntry() {
           tooling: context?.options?.pass71Hf313Tooling
             ?? pass71Hf313ToolingAtSource(context?.repositoryRoot, sourceSha),
           dependencies: pass71Hf313DependencyProjection(allRecords),
+          dependencyEnvelope: pass71Hf313NativeEvidenceEnvelope(allRecords),
         });
       } catch (error) {
         return [`hf313-source-audit-unavailable:${error instanceof Error ? error.message : String(error)}`];
@@ -339,6 +360,7 @@ export function createPass71Hf313EvidenceFixture(options = {}) {
     sourceAudit: structuredClone(options.sourceAudit),
     tooling: structuredClone(options.tooling),
     dependencies: structuredClone(options.dependencies),
+    dependencyEnvelope: structuredClone(options.dependencyEnvelope),
     publication: {
       phase: 'ready-not-live', alreadyLive: false, postconditionRequired: true,
       postconditionOwner: '.github/workflows/release-production.yml', successStatus: 'live-verified',

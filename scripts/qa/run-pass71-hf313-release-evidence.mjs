@@ -7,6 +7,7 @@ import {
   createPass71Hf313EvidenceFixture,
   pass71Hf313DependencyProjection,
   pass71Hf313EvidenceFailures,
+  pass71Hf313NativeEvidenceEnvelope,
   pass71Hf313SourceAuditAtSource,
   pass71Hf313ToolingAtSource,
 } from './pass71-hf313-release-evidence-contract.mjs';
@@ -58,17 +59,18 @@ const sourceTreeSha = git('rev-parse', `${expectedSourceSha}^{tree}`);
 const sourceAudit = pass71Hf313SourceAuditAtSource(root, expectedSourceSha);
 const tooling = pass71Hf313ToolingAtSource(root, expectedSourceSha);
 const dependencies = pass71Hf313DependencyProjection(nativeEvidence);
+const dependencyEnvelope = pass71Hf313NativeEvidenceEnvelope(nativeEvidence);
 const endingCheckoutSourceSha = git('rev-parse', 'HEAD');
 if (endingCheckoutSourceSha !== expectedSourceSha || !clean()) throw new Error('HF-313 checkout changed while binding release readiness');
 const completedAt = new Date().toISOString();
 const record = createPass71Hf313EvidenceFixture({
-  sourceSha: expectedSourceSha, sourceTreeSha, sourceAudit, tooling, dependencies,
+  sourceSha: expectedSourceSha, sourceTreeSha, sourceAudit, tooling, dependencies, dependencyEnvelope,
   startedAt, completedAt,
 });
 record.source.checkoutSourceSha = checkoutSourceSha;
 record.source.endingCheckoutSourceSha = endingCheckoutSourceSha;
 const failures = pass71Hf313EvidenceFailures(record, {
-  sourceSha: expectedSourceSha, sourceTreeSha, sourceAudit, tooling, dependencies,
+  sourceSha: expectedSourceSha, sourceTreeSha, sourceAudit, tooling, dependencies, dependencyEnvelope,
 });
 if (failures.length) throw new Error(`HF-313 readiness receipt rejected: ${failures.join(', ')}`);
 const outputPath = resolve(root, 'artifacts/pass71/hf313-release-readiness/native-evidence.json');
@@ -80,5 +82,6 @@ console.log(JSON.stringify({
   evidence: PASS71_HF313_RELEASE_EVIDENCE.kind,
   outputPath,
   dependencyCount: dependencies.length,
+  nativeEvidenceJsonBytes: dependencyEnvelope.jsonBytes,
   receiptSha256: record.receiptSha256,
 }, null, 2));
