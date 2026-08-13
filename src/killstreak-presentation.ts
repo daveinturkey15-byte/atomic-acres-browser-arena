@@ -1350,6 +1350,7 @@ export type KillstreakPresentationTelemetry = Readonly<{
     dashboardVisible: boolean;
     displaysVisible: boolean;
     hudVisible: boolean;
+    centreSightlineClear: boolean;
     weaponVisible: boolean;
     overlayLayerExclusive: boolean;
     alignment: FirstPersonCockpitAlignmentTelemetry | null;

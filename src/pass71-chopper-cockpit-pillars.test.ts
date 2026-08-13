@@ -13,6 +13,8 @@ const REQUIRED_FRAMING_CASES = Object.freeze([
   'desktop-720p-max-fov',
   'desktop-1080p-min-fov',
   'desktop-1080p-max-fov',
+  'ultrawide-1080p-min-fov',
+  'ultrawide-1080p-max-fov',
   'iphone-15-landscape-min-fov',
   'iphone-15-landscape-max-fov',
   'iphone-15-portrait-min-fov',

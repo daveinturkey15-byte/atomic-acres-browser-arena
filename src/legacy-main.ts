@@ -189,7 +189,13 @@ import {
   type KillstreakWorld,
 } from './killstreak-runtime';
 import { CHOPPER_GUNNER_SPLASH_POLICY, PILOTED_DRONE_SENSOR_PROFILE } from './killstreak-support-catalog';
-import { KillstreakPresentation, loadHunterDronePresentation, loadSupportVehiclePresentations, supportVehiclePresentationTelemetry } from './killstreak-presentation';
+import {
+  KillstreakPresentation,
+  loadHunterDronePresentation,
+  loadSupportVehiclePresentations,
+  supportVehiclePresentationTelemetry,
+  type KillstreakPresentationTelemetry,
+} from './killstreak-presentation';
 import { chopperExteriorReviewHoldActive } from './chopper-exterior-review-hold';
 import {
   CHOPPER_EXTERIOR_REVIEW_CAMERA_CONTRACT,
@@ -1372,6 +1378,70 @@ type DebugChopperExteriorHiddenControlReceipt = Readonly<{
   rootHiddenDuringSubmission: true;
   rootRestored: true;
 }>;
+type DebugChopperCockpitHiddenControlReceipt = Readonly<{
+  contract: 'chopper-cockpit-hidden-control-v1';
+  nonPublishable: true;
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  entityId: string;
+  simulationFrame: number;
+  officialSubmissionSequence: number;
+  officialCompletedSequence: number;
+  submissionSequence: number;
+  completedSequence: number;
+  camera: Readonly<{
+    position: readonly [number, number, number];
+    quaternion: readonly [number, number, number, number];
+    fov: number;
+    near: number;
+    far: number;
+    aspect: number;
+  }>;
+  viewport: Readonly<{
+    cssWidth: number;
+    cssHeight: number;
+    devicePixelRatio: number;
+    canvasWidth: number;
+    canvasHeight: number;
+  }>;
+  cockpitRootName: 'chopper-first-person-cockpit';
+  cockpitRootCount: number;
+  activeCockpitRootCount: number;
+  activeLodAsset: string | null;
+  semanticNodeNames: readonly string[];
+  firstPerson: NonNullable<KillstreakPresentationTelemetry['firstPersonSightline']>;
+  cockpitRootsHiddenDuringSubmission: true;
+  cockpitRootsRestored: true;
+  entityRootVisibleDuringSubmission: true;
+  cockpitHudVisibleDuringSubmission: true;
+}>;
+type DebugChopperCockpitVisibleFrameReceipt = Readonly<{
+  contract: 'chopper-cockpit-frozen-visible-frame-v1';
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  entityId: string;
+  simulationFrame: number;
+  submissionSequence: number;
+  completedSequence: number;
+  camera: DebugChopperCockpitHiddenControlReceipt['camera'];
+  viewport: DebugChopperCockpitHiddenControlReceipt['viewport'];
+  cockpitRootName: 'chopper-first-person-cockpit';
+  cockpitRootCount: number;
+  activeCockpitRootCount: number;
+  activeLodAsset: string | null;
+  semanticNodeNames: readonly string[];
+  firstPerson: NonNullable<KillstreakPresentationTelemetry['firstPersonSightline']>;
+  cockpitRootsVisible: true;
+  entityRootVisible: true;
+  cockpitHudVisible: true;
+}>;
+type DebugChopperCockpitEvidenceState = {
+  previousRenderPaused: boolean;
+  entityRoot: THREE.Object3D;
+  cockpitRoots: readonly THREE.Object3D[];
+  cockpitRootVisibilities: readonly boolean[];
+  visibleFrame: DebugChopperCockpitVisibleFrameReceipt | null;
+};
 type DebugNukeWarningVisibleFrameReceipt = Readonly<{
   contract: 'nuke-warning-frozen-visible-frame-v1';
   renderer: 'webgl2' | 'webgpu';
@@ -1489,6 +1559,7 @@ let debugChopperExteriorReviewTrackerSide: -1 | 1 | null = null;
 let lastDebugChopperExteriorReviewTrackerFrame: DebugChopperExteriorReviewTrackerFrame | null = null;
 let debugNukeWarningEvidenceState: DebugNukeWarningEvidenceState | null = null;
 let debugThermalOperatorEvidenceState: DebugThermalOperatorEvidenceState | null = null;
+let debugChopperCockpitEvidenceState: DebugChopperCockpitEvidenceState | null = null;
 
 function currentDebugChopperExteriorReviewHoldActive(): boolean {
   return chopperExteriorReviewHoldActive(debugChopperAutonomousFireHeld, {
@@ -5675,6 +5746,7 @@ let debugCaptureCameraUsesQuaternion = false;
 let debugCaptureCameraFov: number | null = null;
 let debugCaptureFixedVisualTimeMs: number | null = null;
 let debugCaptureViewmodelHidden = false;
+let debugChopperEvidenceControlOverrideActive = false;
 // Optional game-loop-owned orbit for capture cameras. Page-context intervals
 // are throttled when the tab loses focus (which the F-arbitration key press
 // provokes), freezing the clip; driving the orbit from the presentation loop
@@ -20725,6 +20797,7 @@ function showGunnerTargetConfirm(
 }
 
 function resetKillstreakPossessionPresentation(): void {
+  debugChopperEvidenceControlOverrideActive = false;
   killstreakPresentation.setFirstPersonEntity(null);
   hideGunnerCockpitHud();
   if (camera.near !== 0.08) {
@@ -20794,6 +20867,7 @@ function updateKillstreakPossession(now: number): void {
   } else if (!triggerHeld) {
     nextLocalSupportGunReportAt = 0;
   }
+  if (possession.kind === 'chopper-gunner' && debugChopperEvidenceControlOverrideActive) return;
   if (now - lastKillstreakControlSentAt < 50) return;
   const droneKeyProfile = activeKeyBindingProfile();
   const droneAxes = pilotedDroneControlAxes({
@@ -22329,6 +22403,7 @@ function clearGrenades(): void {
 function clearFieldSupport(): void {
   if (debugNukeWarningEvidenceState) releaseDebugNukeWarningEvidenceFrame();
   if (debugThermalOperatorEvidenceState) releaseDebugThermalOperatorEvidenceFrame();
+  if (debugChopperCockpitEvidenceState) releaseDebugChopperCockpitEvidenceFrame();
   localCareCaptureState = createCareCaptureClientState();
   localCareCaptureRequiresHold = false;
   lastKillstreakControlSentAt = Number.NEGATIVE_INFINITY;
@@ -25616,6 +25691,16 @@ function frame(now: number, scheduleNext = true): void {
     if (scheduleNext) requestAnimationFrame(frame);
     return;
   }
+  if (debugRenderPaused && debugChopperCockpitEvidenceState) {
+    // HF-306 owns one already-presented possession frame while the exact
+    // authored cockpit roots are removed for its paired attribution control.
+    // Freeze simulation, HUD and camera together; only root visibility may
+    // differ between the official and non-publishable control submissions.
+    lastFrame = now;
+    accumulator = 0;
+    if (scheduleNext) requestAnimationFrame(frame);
+    return;
+  }
   if (debugRenderPaused
     && debugChopperExteriorReviewTrackerRequested
     && currentDebugChopperExteriorReviewHoldActive()) {
@@ -26729,6 +26814,9 @@ const debugWindow = window as Window & {
     setChopperExteriorReviewHold: (held: boolean) => boolean;
     setChopperExteriorReviewTracking: (tracked: boolean) => number | null;
     captureChopperExteriorHiddenControl: () => Promise<DebugChopperExteriorHiddenControlReceipt | null>;
+    freezeChopperCockpitEvidenceFrame: () => Promise<DebugChopperCockpitVisibleFrameReceipt | null>;
+    captureChopperCockpitHiddenControl: () => Promise<DebugChopperCockpitHiddenControlReceipt | null>;
+    releaseChopperCockpitEvidenceFrame: () => boolean;
     freezeNukeWarningEvidenceFrame: () => Promise<DebugNukeWarningVisibleFrameReceipt | null>;
     nukeWarningEvidenceFrame: () => DebugNukeWarningVisibleFrameReceipt | null;
     captureNukeWarningHiddenControl: () => Promise<DebugNukeWarningHiddenControlReceipt | null>;
@@ -26828,6 +26916,14 @@ const debugWindow = window as Window & {
     forceRemoteDeathForReconnect: (playerId?: string) => { targetId: string; nextLifeId: number } | null;
     togglePilotedDroneControl: (entityId?: string) => boolean;
     toggleChopperGunnerControl: (entityId?: string) => boolean;
+    requestPossessedChopperEvidenceControl: (control: Readonly<{
+      thrustQ?: number;
+      strafeQ?: number;
+      verticalQ?: number;
+      fire?: boolean;
+      missileFire?: boolean;
+    }>) => boolean;
+    releasePossessedChopperEvidenceControl: () => void;
     forceBotGrenade: (fuseMs?: number, grenade?: GrenadeId) => boolean;
     activateSupport: (id: FieldSupportId) => void;
     setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
@@ -27455,6 +27551,251 @@ function releaseDebugThermalOperatorEvidenceFrame(): boolean {
   if (!state) return false;
   thermalGhostPresentation.setEvidenceControlHidden(false);
   debugThermalOperatorEvidenceState = null;
+  debugRenderPaused = state.previousRenderPaused;
+  return true;
+}
+
+const CHOPPER_COCKPIT_EVIDENCE_SEMANTIC_NODES = Object.freeze([
+  'chopper-cockpit-dashboard-3d',
+  'chopper-cockpit-display-cyan',
+  'chopper-cockpit-display-green',
+  'chopper-inner-windscreen-pillar-left-base',
+  'chopper-inner-windscreen-pillar-left-top',
+  'chopper-inner-windscreen-pillar-right-base',
+  'chopper-inner-windscreen-pillar-right-top',
+  'chopper-inner-windscreen-glow-left-base',
+  'chopper-inner-windscreen-glow-left-top',
+  'chopper-inner-windscreen-glow-right-base',
+  'chopper-inner-windscreen-glow-right-top',
+] as const);
+
+function chopperCockpitRootVisibleThroughEntity(
+  node: THREE.Object3D,
+  entityRoot: THREE.Object3D,
+): boolean {
+  let cursor: THREE.Object3D | null = node;
+  while (cursor) {
+    if (!cursor.visible) return false;
+    if (cursor === entityRoot) return true;
+    cursor = cursor.parent;
+  }
+  return false;
+}
+
+function chopperCockpitCameraReceipt(): DebugChopperCockpitVisibleFrameReceipt['camera'] {
+  camera.updateWorldMatrix(true, false);
+  return Object.freeze({
+    position: Object.freeze(camera.position.toArray() as [number, number, number]),
+    quaternion: Object.freeze(camera.quaternion.toArray() as [number, number, number, number]),
+    fov: camera.fov,
+    near: camera.near,
+    far: camera.far,
+    aspect: camera.aspect,
+  });
+}
+
+function chopperCockpitViewportReceipt(): DebugChopperCockpitVisibleFrameReceipt['viewport'] {
+  return Object.freeze({
+    cssWidth: window.innerWidth,
+    cssHeight: window.innerHeight,
+    devicePixelRatio: window.devicePixelRatio,
+    canvasWidth: canvas.width,
+    canvasHeight: canvas.height,
+  });
+}
+
+function chopperCockpitCameraMatches(
+  receipt: DebugChopperCockpitVisibleFrameReceipt['camera'],
+): boolean {
+  camera.updateWorldMatrix(true, false);
+  return camera.position.toArray().every((value, axis) => value === receipt.position[axis])
+    && camera.quaternion.toArray().every((value, axis) => value === receipt.quaternion[axis])
+    && camera.fov === receipt.fov
+    && camera.near === receipt.near
+    && camera.far === receipt.far
+    && camera.aspect === receipt.aspect;
+}
+
+async function freezeDebugChopperCockpitEvidenceFrame(): Promise<DebugChopperCockpitVisibleFrameReceipt | null> {
+  if (debugChopperCockpitEvidenceState) return debugChopperCockpitEvidenceState.visibleFrame;
+  const possession = localKillstreakActorSnapshot()?.possession;
+  if (possession?.kind !== 'chopper-gunner' || debugRenderPaused || renderSubmissionPaused
+    || !gameStarted || matchState.phase !== 'active' || menuLifecycle.surface !== 'hidden') return null;
+  const entityRoot = killstreakPresentation.entityRoot(possession.entityId);
+  const presentation = killstreakPresentation.telemetry(camera);
+  const firstPerson = presentation.firstPersonSightline;
+  const detail = presentation.entityDetails.find((entry) => entry.entityId === possession.entityId) ?? null;
+  if (!entityRoot?.visible || !firstPerson || firstPerson.entityId !== possession.entityId
+    || firstPerson.presentationSource !== 'project-original-blender-glb'
+    || firstPerson.visibleOutsideCockpit.length !== 0
+    || !firstPerson.dashboardVisible || !firstPerson.displaysVisible
+    || firstPerson.hudVisible || !firstPerson.centreSightlineClear
+    || !firstPerson.weaponVisible || !firstPerson.overlayLayerExclusive
+    || !firstPerson.alignment || firstPerson.alignment.pivotErrorM >= 0.001) return null;
+  const cockpitRoots: THREE.Object3D[] = [];
+  entityRoot.traverse((node) => {
+    if (node.name === 'chopper-first-person-cockpit') cockpitRoots.push(node);
+  });
+  const cockpitRootVisibilities = cockpitRoots.map((root) => root.visible);
+  const activeCockpitRootCount = cockpitRoots.filter((root) => (
+    chopperCockpitRootVisibleThroughEntity(root, entityRoot)
+  )).length;
+  const semanticNodeNames = CHOPPER_COCKPIT_EVIDENCE_SEMANTIC_NODES.filter((name) => (
+    entityRoot.getObjectByName(name) !== undefined
+  ));
+  const cockpitHud = element<HTMLElement>('#gunner-cockpit-hud');
+  const cockpitHudVisible = !cockpitHud.hidden && getComputedStyle(cockpitHud).display !== 'none'
+    && cockpitHud.dataset.supportKind === 'chopper-gunner';
+  if (cockpitRoots.length !== 3 || activeCockpitRootCount !== 1
+    || cockpitRootVisibilities.some((visible) => !visible)
+    || semanticNodeNames.length !== CHOPPER_COCKPIT_EVIDENCE_SEMANTIC_NODES.length
+    || !cockpitHudVisible || detail?.activeLodIndex !== 0 || !detail.activeLodAsset) return null;
+
+  const before = renderRuntime.presentationTelemetry();
+  if (renderRuntime.backend === 'webgpu' && before.completedSequence < before.submissionSequence) return null;
+  const simulationFrame = lastGameplayPresentedFrame;
+  const cameraReceipt = chopperCockpitCameraReceipt();
+  const viewportReceipt = chopperCockpitViewportReceipt();
+  const state: DebugChopperCockpitEvidenceState = {
+    previousRenderPaused: debugRenderPaused,
+    entityRoot,
+    cockpitRoots: Object.freeze(cockpitRoots),
+    cockpitRootVisibilities: Object.freeze(cockpitRootVisibilities),
+    visibleFrame: null,
+  };
+  debugChopperCockpitEvidenceState = state;
+  debugRenderPaused = true;
+  try {
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    const completed = renderRuntime.presentationTelemetry();
+    const currentPossession = localKillstreakActorSnapshot()?.possession;
+    if (debugChopperCockpitEvidenceState !== state
+      || currentPossession?.kind !== 'chopper-gunner'
+      || currentPossession.entityId !== possession.entityId
+      || lastGameplayPresentedFrame !== simulationFrame
+      || !chopperCockpitCameraMatches(cameraReceipt)
+      || state.cockpitRoots.some((root, index) => root.visible !== state.cockpitRootVisibilities[index])
+      || (renderRuntime.backend === 'webgpu' && completed.completedSequence < before.submissionSequence)) {
+      throw new Error('Chopper cockpit visible frame changed before reaching its completion frontier');
+    }
+    const receipt = Object.freeze({
+      contract: 'chopper-cockpit-frozen-visible-frame-v1' as const,
+      renderer: renderRuntime.backend,
+      completionSemantics: renderRuntime.backend === 'webgpu'
+        ? 'submission-sequence-covered-by-completion-frontier' as const
+        : 'synchronous-render-return' as const,
+      entityId: possession.entityId,
+      simulationFrame,
+      submissionSequence: before.submissionSequence,
+      completedSequence: completed.completedSequence,
+      camera: cameraReceipt,
+      viewport: viewportReceipt,
+      cockpitRootName: 'chopper-first-person-cockpit' as const,
+      cockpitRootCount: cockpitRoots.length,
+      activeCockpitRootCount,
+      activeLodAsset: detail.activeLodAsset,
+      semanticNodeNames: Object.freeze([...semanticNodeNames]),
+      firstPerson,
+      cockpitRootsVisible: true as const,
+      entityRootVisible: true as const,
+      cockpitHudVisible: true as const,
+    });
+    state.visibleFrame = receipt;
+    return receipt;
+  } catch (error) {
+    if (debugChopperCockpitEvidenceState === state) debugChopperCockpitEvidenceState = null;
+    debugRenderPaused = state.previousRenderPaused;
+    throw error;
+  }
+}
+
+async function captureDebugChopperCockpitHiddenControl(): Promise<DebugChopperCockpitHiddenControlReceipt | null> {
+  const state = debugChopperCockpitEvidenceState;
+  const visibleFrame = state?.visibleFrame;
+  const possession = localKillstreakActorSnapshot()?.possession;
+  if (!state || !visibleFrame || !debugRenderPaused || renderSubmissionPaused
+    || possession?.kind !== 'chopper-gunner' || possession.entityId !== visibleFrame.entityId
+    || state.entityRoot !== killstreakPresentation.entityRoot(visibleFrame.entityId)
+    || !state.entityRoot.visible || lastGameplayPresentedFrame !== visibleFrame.simulationFrame
+    || !chopperCockpitCameraMatches(visibleFrame.camera)
+    || state.cockpitRoots.some((root, index) => root.visible !== state.cockpitRootVisibilities[index])) return null;
+
+  const before = renderRuntime.presentationTelemetry();
+  let submitted = before;
+  let completed = before;
+  let cockpitRootsHiddenDuringSubmission = false;
+  let entityRootVisibleDuringSubmission = false;
+  let cockpitHudVisibleDuringSubmission = false;
+  for (const root of state.cockpitRoots) root.visible = false;
+  try {
+    if (renderRuntime.backend === 'webgpu') {
+      await submitForegroundWebGpuFrame(true, 'serialized');
+    } else if (atomicSignal) {
+      atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+    } else {
+      throw new Error('Chopper cockpit hidden-control has no active renderer');
+    }
+    cockpitRootsHiddenDuringSubmission = state.cockpitRoots.every((root) => !root.visible);
+    entityRootVisibleDuringSubmission = state.entityRoot.visible;
+    const cockpitHud = element<HTMLElement>('#gunner-cockpit-hud');
+    cockpitHudVisibleDuringSubmission = !cockpitHud.hidden
+      && getComputedStyle(cockpitHud).display !== 'none'
+      && cockpitHud.dataset.supportKind === 'chopper-gunner';
+    submitted = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu' && submitted.submissionSequence <= before.submissionSequence) {
+      throw new Error('Chopper cockpit hidden-control did not submit a distinct WebGPU frame');
+    }
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    completed = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu' && completed.completedSequence < submitted.submissionSequence) {
+      throw new Error('Chopper cockpit hidden-control WebGPU frame did not reach the completion frontier');
+    }
+  } finally {
+    state.cockpitRoots.forEach((root, index) => { root.visible = state.cockpitRootVisibilities[index]!; });
+  }
+  const rootsRestored = state.cockpitRoots.every((root, index) => (
+    root.visible === state.cockpitRootVisibilities[index]
+  ));
+  if (!cockpitRootsHiddenDuringSubmission || !entityRootVisibleDuringSubmission
+    || !cockpitHudVisibleDuringSubmission || !rootsRestored
+    || debugChopperCockpitEvidenceState !== state
+    || lastGameplayPresentedFrame !== visibleFrame.simulationFrame
+    || !chopperCockpitCameraMatches(visibleFrame.camera)) {
+    throw new Error('Chopper cockpit hidden-control did not preserve its exact frozen-frame boundary');
+  }
+  return Object.freeze({
+    contract: 'chopper-cockpit-hidden-control-v1',
+    nonPublishable: true,
+    renderer: renderRuntime.backend,
+    completionSemantics: renderRuntime.backend === 'webgpu'
+      ? 'submission-sequence-covered-by-completion-frontier'
+      : 'synchronous-render-return',
+    entityId: visibleFrame.entityId,
+    simulationFrame: visibleFrame.simulationFrame,
+    officialSubmissionSequence: visibleFrame.submissionSequence,
+    officialCompletedSequence: visibleFrame.completedSequence,
+    submissionSequence: submitted.submissionSequence,
+    completedSequence: completed.completedSequence,
+    camera: visibleFrame.camera,
+    viewport: visibleFrame.viewport,
+    cockpitRootName: visibleFrame.cockpitRootName,
+    cockpitRootCount: visibleFrame.cockpitRootCount,
+    activeCockpitRootCount: visibleFrame.activeCockpitRootCount,
+    activeLodAsset: visibleFrame.activeLodAsset,
+    semanticNodeNames: visibleFrame.semanticNodeNames,
+    firstPerson: visibleFrame.firstPerson,
+    cockpitRootsHiddenDuringSubmission: true,
+    cockpitRootsRestored: true,
+    entityRootVisibleDuringSubmission: true,
+    cockpitHudVisibleDuringSubmission: true,
+  });
+}
+
+function releaseDebugChopperCockpitEvidenceFrame(): boolean {
+  const state = debugChopperCockpitEvidenceState;
+  if (!state) return false;
+  state.cockpitRoots.forEach((root, index) => { root.visible = state.cockpitRootVisibilities[index]!; });
+  debugChopperCockpitEvidenceState = null;
   debugRenderPaused = state.previousRenderPaused;
   return true;
 }
@@ -30032,6 +30373,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     return debugCaptureCameraRevision;
   },
   captureChopperExteriorHiddenControl: captureDebugChopperExteriorHiddenControl,
+  freezeChopperCockpitEvidenceFrame: freezeDebugChopperCockpitEvidenceFrame,
+  captureChopperCockpitHiddenControl: captureDebugChopperCockpitHiddenControl,
+  releaseChopperCockpitEvidenceFrame: releaseDebugChopperCockpitEvidenceFrame,
   freezeNukeWarningEvidenceFrame: freezeDebugNukeWarningEvidenceFrame,
   nukeWarningEvidenceFrame: currentDebugNukeWarningEvidenceFrame,
   captureNukeWarningHiddenControl: captureDebugNukeWarningHiddenControl,
@@ -30655,6 +30999,28 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     ));
     return entity ? requestKillstreakControl(entity.id, 'toggle-chopper-gunner') : false;
   },
+  requestPossessedChopperEvidenceControl: (control) => {
+    const possession = localKillstreakActorSnapshot()?.possession;
+    if (possession?.kind !== 'chopper-gunner' || !control || typeof control !== 'object') return false;
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.id === possession.entityId && candidate.kind === 'chopper'
+      && candidate.ownerId === player.id && candidate.expiresInMs > 0
+    ));
+    if (!entity || ![control.thrustQ, control.strafeQ, control.verticalQ]
+      .every((value) => value === undefined || Number.isFinite(value))) return false;
+    const accepted = requestKillstreakControl(entity.id, 'pilot-control', {
+      yawQ: player.yaw,
+      pitchQ: player.pitch,
+      thrustQ: THREE.MathUtils.clamp(control.thrustQ ?? 0, -1, 1),
+      strafeQ: THREE.MathUtils.clamp(control.strafeQ ?? 0, -1, 1),
+      verticalQ: THREE.MathUtils.clamp(control.verticalQ ?? 0, -1, 1),
+      fire: control.fire === true,
+      missileFire: control.missileFire === true,
+    });
+    debugChopperEvidenceControlOverrideActive = accepted;
+    return accepted;
+  },
+  releasePossessedChopperEvidenceControl: () => { debugChopperEvidenceControlOverrideActive = false; },
   forceBotGrenade: (fuseMs = 1_100, grenade: GrenadeId = 'frag') => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     return bot ? throwBotGrenade(bot, performance.now(), fuseMs, player.position, player.stance, grenade) : false;

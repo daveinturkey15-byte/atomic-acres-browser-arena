@@ -207,6 +207,8 @@ const CHOPPER_COCKPIT_FRAMING_CASES = Object.freeze([
   Object.freeze({ label: 'desktop-720p-max-fov', width: 1280, height: 720, fov: 100 }),
   Object.freeze({ label: 'desktop-1080p-min-fov', width: 1920, height: 1080, fov: 70 }),
   Object.freeze({ label: 'desktop-1080p-max-fov', width: 1920, height: 1080, fov: 100 }),
+  Object.freeze({ label: 'ultrawide-1080p-min-fov', width: 2560, height: 1080, fov: 70 }),
+  Object.freeze({ label: 'ultrawide-1080p-max-fov', width: 2560, height: 1080, fov: 100 }),
   Object.freeze({ label: 'iphone-15-landscape-min-fov', width: 844, height: 390, fov: 70 }),
   Object.freeze({ label: 'iphone-15-landscape-max-fov', width: 844, height: 390, fov: 100 }),
   Object.freeze({ label: 'iphone-15-portrait-min-fov', width: 390, height: 844, fov: 70 }),
