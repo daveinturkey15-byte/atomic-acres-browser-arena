@@ -44,6 +44,12 @@ import {
   createPass71Hf305EvidenceFixture,
   PASS71_HF305_TOOLING_PATHS,
 } from '../scripts/qa/pass71-hf305-nuke-warning-evidence-contract.mjs';
+import {
+  createPass71Hf306EvidenceFixture,
+  pass71Hf306AssetAuditAtSource,
+  pass71Hf306OwnerSourceAuditAtSource,
+  pass71Hf306ToolingHashesAtSource,
+} from '../scripts/qa/pass71-hf306-cockpit-evidence-contract.mjs';
 
 const policy = {
   schemaVersion: 1,
@@ -52,6 +58,39 @@ const policy = {
   ownerHandle: 'Dave',
   allowedEvidenceKinds: ['unit', 'contract', 'browser', 'trace', 'visual', 'manual'],
 };
+
+let cachedHf306Fixture: Readonly<{
+  headSha: string;
+  sourceSha: string;
+  tooling: Readonly<Record<string, string>>;
+  assetAudit: readonly unknown[];
+  ownerSourceAudit: unknown;
+  record: Record<string, any>;
+}> | null = null;
+
+function pass71Hf306TestFixture(headSha: string, sourceSha: string) {
+  if (!cachedHf306Fixture || cachedHf306Fixture.headSha !== headSha
+    || cachedHf306Fixture.sourceSha !== sourceSha) {
+    const tooling = pass71Hf306ToolingHashesAtSource(process.cwd(), headSha);
+    const assetAudit = pass71Hf306AssetAuditAtSource(process.cwd(), headSha);
+    const ownerSourceAudit = pass71Hf306OwnerSourceAuditAtSource(process.cwd(), headSha);
+    cachedHf306Fixture = {
+      headSha,
+      sourceSha,
+      tooling,
+      assetAudit,
+      ownerSourceAudit,
+      record: createPass71Hf306EvidenceFixture({
+        sourceSha, sourceTreeSha: headSha, tooling, assetAudit, ownerSourceAudit,
+        startedAt: '2026-08-13T09:36:30.000Z', completedAt: '2026-08-13T09:46:30.000Z',
+      }),
+    };
+  }
+  return {
+    ...cachedHf306Fixture,
+    record: cachedHf306Fixture.record,
+  };
+}
 
 function acceptedManifest() {
   return {
@@ -162,6 +201,8 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, sourceTreeSha: headSha, tooling: hf305Tooling,
     startedAt: '2026-08-13T09:35:00.000Z', completedAt: '2026-08-13T09:45:00.000Z',
   });
+  const hf306Fixture = pass71Hf306TestFixture(headSha, manifest.preview.sourceSha);
+  const hf306 = hf306Fixture.record;
   manifest.preview.createdAt = '2026-08-13T09:00:00Z';
   manifest.humanAcceptance.approvedAt = '2026-08-13T10:00:00Z';
   for (const requirement of manifest.requirements) {
@@ -179,8 +220,8 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
     sourceSha: manifest.preview.sourceSha, tooling, components,
     finalizedAt: '2026-08-13T09:30:00.000Z',
   });
-  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, quality, hf299, hf300, hf301, hf305, stuck, parity];
-  return { manifest, coverage: rebuilt.record, components: rebuilt.components, quality, hf299, hf300, hf301, hf305 };
+  manifest.nativeEvidence = [...rebuilt.components, rebuilt.record, quality, hf299, hf300, hf301, hf305, hf306, stuck, parity];
+  return { manifest, coverage: rebuilt.record, components: rebuilt.components, quality, hf299, hf300, hf301, hf305, hf306 };
 }
 
 function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
@@ -206,6 +247,10 @@ function pass71ValidationOptions(tooling: Readonly<Record<string, string>>) {
       sha256: createHash('sha256').update(readFileSync(join(process.cwd(), path))).digest('hex'),
     })),
     pass71Hf305SourceTreeSha: headSha,
+    pass71Hf306Tooling: pass71Hf306TestFixture(headSha, '0123456789abcdef0123456789abcdef01234567').tooling,
+    pass71Hf306SourceTreeSha: headSha,
+    pass71Hf306AssetAudit: pass71Hf306TestFixture(headSha, '0123456789abcdef0123456789abcdef01234567').assetAudit,
+    pass71Hf306OwnerSourceAudit: pass71Hf306TestFixture(headSha, '0123456789abcdef0123456789abcdef01234567').ownerSourceAudit,
   };
 }
 
@@ -243,7 +288,7 @@ describe('release acceptance manifest', () => {
     manifest.requirements[2].evidence[1].ref = 'artifact://chooser/accepted.png';
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/candidate artifact reference has an invalid canonical shape/);
-  }, 20_000);
+  }, 60_000);
 
   it('allows only explicitly owner-approved deferrals', () => {
     const manifest = acceptedManifest();
@@ -424,7 +469,7 @@ describe('release acceptance manifest', () => {
     (manifest.requirements[2] as unknown as { feedbackId: string }).feedbackId = 'HF-UNKNOWN';
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/R3\.feedbackId must be HF-298/);
-  }, 20_000);
+  }, 60_000);
 
   it('freezes the eighteen owner outcomes plus one deferred public review', () => {
     const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
@@ -454,7 +499,7 @@ describe('release acceptance manifest', () => {
     };
     expect(validateAcceptanceManifest(deferredOwnerOutcome, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/R8\/HF-303 must be mechanically verified before publication/);
-  }, 20_000);
+  }, 60_000);
 
   it('cannot use the representative HF-297 arms component as closing evidence', () => {
     const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
@@ -548,6 +593,23 @@ describe('release acceptance manifest', () => {
     expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
       .toMatch(/nativeEvidence\[[0-9]+\]: (?:receipt-coverage|receipt-digest)/);
   }, 30_000);
+
+  it('requires exact native Chopper cockpit framing and action attribution before HF-306 can be verified', () => {
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    const { manifest, hf306 } = pass71Manifest(tooling);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .not.toMatch(/verified R11\/HF-306|hf306-/);
+
+    manifest.nativeEvidence = manifest.nativeEvidence.filter((record) => record !== hf306);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/verified R11\/HF-306 requires its canonical registered native evidence record/);
+
+    const forged = structuredClone(hf306) as Record<string, any>;
+    forged.scopes[0].viewportCases[0].raster.sameFrame = false;
+    manifest.nativeEvidence.push(forged);
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/nativeEvidence\[[0-9]+\]: (?:scope:webgl2:viewport:0:raster:recomputed-raster-summary|receipt-sha256)/);
+  }, 60_000);
 
   it('orders every HF-298 component and coverage finalization between preview and approval', () => {
     const tooling = pass71GrenadeNativeToolingHashes(process.cwd());

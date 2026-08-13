@@ -68,6 +68,10 @@ export function validateAcceptanceManifest(
     pass71Hf301OwnerReplay?: Readonly<Record<string, unknown>>;
     pass71Hf305Tooling?: readonly Readonly<{ path: string; sha256: string }>[];
     pass71Hf305SourceTreeSha?: string;
+    pass71Hf306Tooling?: Readonly<Record<string, string>>;
+    pass71Hf306SourceTreeSha?: string;
+    pass71Hf306AssetAudit?: readonly unknown[];
+    pass71Hf306OwnerSourceAudit?: unknown;
   }>,
 ): AcceptanceValidation;
 
