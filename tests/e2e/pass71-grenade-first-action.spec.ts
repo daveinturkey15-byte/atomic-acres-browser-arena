@@ -19,6 +19,8 @@ type GrenadeFirstActionReceipt = Readonly<{
   actionNonce: number;
   grenade: GrenadeId;
   cold: boolean;
+  startedAt: number;
+  handlerCompletedAt: number;
   handlerSyncMs: number;
   audio: {
     contextState: string;
@@ -80,6 +82,13 @@ async function deployWithUnlockedAudio(page: Page, grenade: GrenadeId): Promise<
 async function throwAndObserve(page: Page, baselineLabel: string): Promise<{
   frameActionBaseline: FrameActionBaseline;
   frameActionBudget: FrameActionBudget;
+  actionFrontier: Readonly<{
+    invokedAt: number;
+    handlerReturnedAt: number;
+    nextAnimationFrameAt: number;
+    handlerSyncMs: number;
+    eventToNextAnimationFrameMs: number;
+  }>;
   profile: GrenadeFirstActionReceipt;
   audio: any;
   presentation: any;
@@ -88,10 +97,24 @@ async function throwAndObserve(page: Page, baselineLabel: string): Promise<{
 }> {
   const frameActionBaseline = await captureFrameActionBaseline(page, baselineLabel);
   const frameActionBudget = deriveFrameActionBudget(frameActionBaseline);
-  await page.evaluate(() => new Promise<void>((resolve) => {
+  const actionFrontier = await page.evaluate(() => new Promise<{
+    invokedAt: number;
+    handlerReturnedAt: number;
+    nextAnimationFrameAt: number;
+    handlerSyncMs: number;
+    eventToNextAnimationFrameMs: number;
+  }>((resolve) => {
     requestAnimationFrame(() => {
+      const invokedAt = performance.now();
       window.__ATOMIC_ACRES_DEBUG__.throwGrenade();
-      resolve();
+      const handlerReturnedAt = performance.now();
+      requestAnimationFrame((nextAnimationFrameAt) => resolve({
+        invokedAt,
+        handlerReturnedAt,
+        nextAnimationFrameAt,
+        handlerSyncMs: handlerReturnedAt - invokedAt,
+        eventToNextAnimationFrameMs: nextAnimationFrameAt - invokedAt,
+      }));
     });
   }));
   await page.waitForFunction(() => (
@@ -107,7 +130,7 @@ async function throwAndObserve(page: Page, baselineLabel: string): Promise<{
       runtime: snapshot.render.runtime,
       userAgent: navigator.userAgent,
     };
-  }).then((receipt) => ({ ...receipt, frameActionBaseline, frameActionBudget }));
+  }).then((receipt) => ({ ...receipt, actionFrontier, frameActionBaseline, frameActionBudget }));
 }
 
 function assertActionReceipt(
@@ -115,9 +138,9 @@ function assertActionReceipt(
   grenade: GrenadeId,
   cold: boolean,
 ): void {
-  const { frameActionBaseline, frameActionBudget, profile, audio, presentation, runtime, userAgent } = receipt;
+  const { actionFrontier, frameActionBaseline, frameActionBudget, profile, audio, presentation, runtime, userAgent } = receipt;
   const evidence = JSON.stringify({
-    renderer, frameActionBaseline, frameActionBudget, profile, audio, presentation, runtime, userAgent,
+    renderer, actionFrontier, frameActionBaseline, frameActionBudget, profile, audio, presentation, runtime, userAgent,
   });
   expect(profile, evidence).toMatchObject({
     grenade,
@@ -132,6 +155,13 @@ function assertActionReceipt(
   });
   expect(profile.handlerSyncMs, `${evidence}: synchronous throw handler`)
     .toBeLessThan(frameActionBudget.maximumSynchronousActionMs);
+  expect(actionFrontier.handlerSyncMs, `${evidence}: outer canonical throw handler`)
+    .toBeLessThan(frameActionBudget.maximumSynchronousActionMs);
+  expect(actionFrontier.eventToNextAnimationFrameMs, `${evidence}: call entry reaches the next browser frame`)
+    .toBeLessThan(frameActionBudget.maximumActionMs);
+  expect(profile.startedAt, `${evidence}: internal profile starts no later than outer handler return`)
+    .toBeLessThanOrEqual(actionFrontier.handlerReturnedAt);
+  expect(profile.actionNonce, `${evidence}: accepted action binds its exact nonce`).toEqual(expect.any(Number));
   expect(profile.maximumAnimationFrameGapMs, `${evidence}: no visible first-action freeze`)
     .toBeLessThan(frameActionBudget.maximumActionMs);
   expect(profile.maximumFrameWorkMs, `${evidence}: no first-action long frame`)

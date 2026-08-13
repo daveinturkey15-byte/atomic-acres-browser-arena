@@ -276,7 +276,14 @@ async function stopFrameProbe(adapter) {
     return { elapsedMs: endedAt - probe.startedAt, intervalsMs: probe.intervalsMs,
       gameFrameDelta: state.frameCount - probe.startingGameFrame };
   `);
-  return { ...summarizePass71FrameWindow(raw.intervalsMs, raw.elapsedMs), gameFrameDelta: raw.gameFrameDelta, intervalsMs: raw.intervalsMs };
+  const summary = summarizePass71FrameWindow(raw.intervalsMs, raw.elapsedMs);
+  return {
+    ...summary,
+    gameFrameDelta: raw.gameFrameDelta,
+    presentedFps: raw.gameFrameDelta * 1_000 / raw.elapsedMs,
+    gameFrameToCallbackRatio: raw.gameFrameDelta / summary.sampleCount,
+    intervalsMs: raw.intervalsMs,
+  };
 }
 
 async function auditBrowser(adapter, staged, browserEventFaults) {
@@ -538,6 +545,7 @@ async function main() {
   const cleanAfter = git('status', '--porcelain', '--untracked-files=all') === '';
   const comparison = {
     firefoxMedianFpsRatio: firefox.performance.medianFps / chrome.performance.medianFps,
+    firefoxPresentedFpsRatio: firefox.performance.presentedFps / chrome.performance.presentedFps,
     firefoxP95FrameTimeRatio: firefox.performance.p95FrameTimeMs / chrome.performance.p95FrameTimeMs,
   };
   receipt = {
@@ -555,11 +563,11 @@ async function main() {
     browsers: { chrome, firefox },
     comparison,
     claims: {
-      observed: 'Installed native Chrome and Firefox ran sequentially, headful and focused on one exact built SHA with retained rAF intervals and runtime telemetry.',
+      observed: 'Installed native Chrome and Firefox ran sequentially, headful and focused on one exact built SHA with retained rAF intervals, actual game-frame deltas and runtime telemetry.',
       inference: 'A passing ratio supports browser performance parity for this bounded warm Atomic Acres WebGL2 quality scene on this machine.',
       assumption: 'The frozen one-bot scene and nine-second steady window represent the reported foreground match pacing regression.',
       unknown: 'This single-machine gate does not establish parity for other drivers, displays, maps, cold asset admission or WebGPU.',
-      falsifiers: 'Source drift, browser or viewport drift, software rendering, graphics drift, runtime/watchdog faults, Firefox median FPS below 0.80 Chrome or Firefox p95 frame time above 1.25 Chrome fail the gate.',
+      falsifiers: 'Source drift, browser or viewport drift, software rendering, graphics drift, runtime/watchdog faults, game presentation below 0.98 of rAF cadence, Firefox median or presented FPS below 0.80 Chrome, or Firefox p95 frame time above 1.25 Chrome fail the gate.',
     },
   };
   const failures = pass71NativeBrowserParityFailures(receipt);

@@ -1,12 +1,15 @@
 export const PASS71_NATIVE_BROWSER_PARITY = Object.freeze({
-  schemaVersion: 1,
+  schemaVersion: 2,
   gate: 'pass71-native-firefox-chrome-webgl2-parity',
   viewport: Object.freeze({ width: 1_904, height: 987, deviceScaleFactor: 1 }),
   settleMs: 6_000,
   minimumWindowMs: 8_000,
   maximumWindowMs: 10_000,
   targetWindowMs: 9_000,
+  minimumGameFrameToCallbackRatio: 0.98,
+  maximumGameFrameToCallbackRatio: 1.02,
   minimumFirefoxMedianFpsRatio: 0.8,
+  minimumFirefoxPresentedFpsRatio: 0.8,
   maximumFirefoxP95FrameTimeRatio: 1.25,
 });
 
@@ -61,9 +64,18 @@ function browserFailures(browser, expectedName, contract) {
   if (browser?.principalHdrSamples !== 4) failures.push(`${expectedName}:principal-hdr-msaa`);
   if (browser?.settleMs < contract.settleMs) failures.push(`${expectedName}:settle-window`);
   const performance = browser?.performance;
+  const derivedPresentedFps = performance?.gameFrameDelta * 1_000 / performance?.elapsedMs;
+  const derivedGameFrameToCallbackRatio = performance?.gameFrameDelta / performance?.sampleCount;
   if (!finite(performance?.elapsedMs) || performance.elapsedMs < contract.minimumWindowMs
     || performance.elapsedMs > contract.maximumWindowMs || !finite(performance?.medianFps)
-    || !finite(performance?.p95FrameTimeMs) || performance.sampleCount < 120) failures.push(`${expectedName}:measurement-window`);
+    || !finite(performance?.p95FrameTimeMs) || performance.sampleCount < 120
+    || !Number.isSafeInteger(performance?.gameFrameDelta) || performance.gameFrameDelta < 1
+    || !finite(performance?.presentedFps) || performance.presentedFps !== derivedPresentedFps
+    || !finite(performance?.gameFrameToCallbackRatio)
+    || performance.gameFrameToCallbackRatio !== derivedGameFrameToCallbackRatio) failures.push(`${expectedName}:measurement-window`);
+  if (!finite(derivedGameFrameToCallbackRatio)
+    || derivedGameFrameToCallbackRatio < contract.minimumGameFrameToCallbackRatio
+    || derivedGameFrameToCallbackRatio > contract.maximumGameFrameToCallbackRatio) failures.push(`${expectedName}:presentation-cadence`);
   const faults = browser?.faults;
   if (!faults || faults.bootstrapError !== null || faults.runtimeErrorLog !== ''
     || faults.fatalErrorVisible !== false || faults.capturedErrors?.length !== 0
@@ -87,10 +99,13 @@ export function pass71NativeBrowserParityFailures(receipt, contract = PASS71_NAT
   if (chrome?.scene?.seed !== firefox?.scene?.seed || chrome?.scene?.staging !== firefox?.scene?.staging
     || typeof chrome?.scene?.signature !== 'string' || chrome.scene.signature !== firefox?.scene?.signature) failures.push('scene-not-identical');
   const medianRatio = firefox?.performance?.medianFps / chrome?.performance?.medianFps;
+  const presentedRatio = firefox?.performance?.presentedFps / chrome?.performance?.presentedFps;
   const p95Ratio = firefox?.performance?.p95FrameTimeMs / chrome?.performance?.p95FrameTimeMs;
   if (!finite(medianRatio) || medianRatio < contract.minimumFirefoxMedianFpsRatio) failures.push('firefox-median-fps-ratio');
+  if (!finite(presentedRatio) || presentedRatio < contract.minimumFirefoxPresentedFpsRatio) failures.push('firefox-presented-fps-ratio');
   if (!finite(p95Ratio) || p95Ratio > contract.maximumFirefoxP95FrameTimeRatio) failures.push('firefox-p95-frame-time-ratio');
   if (receipt?.comparison?.firefoxMedianFpsRatio !== medianRatio
+    || receipt?.comparison?.firefoxPresentedFpsRatio !== presentedRatio
     || receipt?.comparison?.firefoxP95FrameTimeRatio !== p95Ratio) failures.push('comparison-mismatch');
   return [...new Set(failures)];
 }

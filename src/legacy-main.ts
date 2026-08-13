@@ -96,6 +96,7 @@ import {
 } from './gun-range-match-clock-authority';
 import {
   BOT_DEATHS_PER_REINFORCEMENT,
+  BOT_FIRE_RANGE,
   BOT_GRENADE_POOL,
   BOT_REACTION_DELAY,
   BOT_GRENADE_COOLDOWN_MS,
@@ -318,6 +319,7 @@ import {
   projectileGlassActionLifetimeMs,
   retainInFlightProjectileGlassActions,
 } from './projectile-glass-break-admission';
+import { HostedBotBallisticGlassActionLedger } from './hosted-bot-glass-authority';
 import {
   activeSoloBotTarget,
   arenaCanvasLabel,
@@ -4495,7 +4497,7 @@ let lastGrenadeExplosionProfile = {
   totalSyncMs: 0,
 };
 type GrenadeFirstActionProfile = {
-  actionNonce: number;
+  actionNonce: number | null;
   grenade: GrenadeId;
   cold: boolean;
   startedAt: number;
@@ -4529,11 +4531,11 @@ type GrenadeFirstActionProfile = {
 let grenadeActionProfiles = 0;
 let lastGrenadeFirstActionProfile: GrenadeFirstActionProfile | null = null;
 
-function beginGrenadeFirstActionProfile(actionNonce: number, grenade: GrenadeId, startedAt: number): void {
+function beginGrenadeFirstActionProfile(grenade: GrenadeId, startedAt: number): void {
   const presentation = renderRuntime.presentationTelemetry(startedAt);
   const audioTelemetry = audio.telemetry();
   const profile: GrenadeFirstActionProfile = {
-    actionNonce,
+    actionNonce: null,
     grenade,
     cold: grenadeActionProfiles === 0,
     startedAt,
@@ -4566,6 +4568,12 @@ function beginGrenadeFirstActionProfile(actionNonce: number, grenade: GrenadeId,
   };
   grenadeActionProfiles += 1;
   lastGrenadeFirstActionProfile = profile;
+}
+
+function bindGrenadeFirstActionNonce(actionNonce: number): void {
+  const profile = lastGrenadeFirstActionProfile;
+  if (!profile || profile.actionNonce !== null || !Number.isSafeInteger(actionNonce)) return;
+  profile.actionNonce = actionNonce;
 }
 
 function completeGrenadeActionHandler(completedAt: number): void {
@@ -4767,6 +4775,7 @@ function recordSupportExplosionProfile(profile: ExplosionSyncProfile): void {
 const processedNonces = new Set<number>();
 const hostedBotWeaponPresentationReplay = new BotWeaponPresentationReplayGuard();
 const hostedBotProjectileGlassActions = new HostedBotProjectileGlassActionLedger();
+const hostedBotBallisticGlassActions = new HostedBotBallisticGlassActionLedger();
 const remoteShotAdmissions = new Map<string, RemoteShotAdmissionState>();
 const authoritativeShotAdmissions = new Map<string, AuthoritativeShotAdmissionState>();
 const admittedRemoteShots = new Map<string, Map<number, AdmittedRemoteShot>>();
@@ -12696,10 +12705,18 @@ function breakWindowsAlongBallisticTrace(
   trace: BallisticTrace,
   origin: THREE.Vector3,
   direction: THREE.Vector3,
-  impactOwnerId: string,
+  authority: Readonly<{
+    impactOwnerId: string;
+    actionNonce?: number;
+    weapon?: WeaponId;
+    visitedWindowIds?: Set<string>;
+  }>,
 ): number {
+  if (authority.weapon && weaponGlassBreakPolicy(authority.weapon).timing !== 'impact') {
+    throw new TypeError(`Weapon ${authority.weapon} cannot break glass at ballistic impact`);
+  }
   const unitDirection = direction.clone().normalize();
-  const visited = new Set<string>();
+  const visited = authority.visitedWindowIds ?? new Set<string>();
   let broken = 0;
   for (const impact of trace.impacts) {
     const windowId = impact.surface.breakableWindowId;
@@ -12714,9 +12731,10 @@ function breakWindowsAlongBallisticTrace(
       true,
       origin,
       'shot',
-      undefined,
-      impactOwnerId,
+      authority.actionNonce,
+      authority.impactOwnerId,
       randomNonce(),
+      authority.weapon,
     )) broken += 1;
   }
   return broken;
@@ -12760,6 +12778,54 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
   if (!window || window.broken) return;
   const centre = window.mesh.getWorldPosition(new THREE.Vector3());
   const projectilePolicy = message.weapon ? weaponGlassBreakPolicy(message.weapon) : null;
+  if (message.weapon && message.kind === 'shot' && Number.isSafeInteger(message.actionNonce)
+    && /^host-bot-[0-3]$/.test(message.by)) {
+    const origin = new THREE.Vector3(...message.origin);
+    window.mesh.updateWorldMatrix(true, false);
+    const paneBounds = new THREE.Box3().setFromObject(window.mesh);
+    const maximumDistance = message.weapon === 'flamethrower'
+      ? FLAMETHROWER_EFFECT.rangeM + 0.5
+      : BOT_FIRE_RANGE + 2.5;
+    const admission = hostedBotBallisticGlassActions.admit({
+      receiverRole: network.role,
+      hostAuthorityValid: network.role === 'client'
+        && message.hostAuthority?.hostId === privateLobbySnapshot?.hostId,
+      matchEpoch: interactiveWorldMatchEpoch,
+      botId: message.by,
+      botAdmitted: hostedBotIds(privateLobbySnapshot?.config.hostedBotCount ?? 0).includes(message.by),
+      weapon: message.weapon,
+      actionNonce: message.actionNonce!,
+      eventReplay,
+      paneId: message.windowId,
+      originInsideArena: pointInsideBounds(origin, arena.bounds, 0.44),
+      paneDistanceM: paneBounds.isEmpty() ? Number.POSITIVE_INFINITY : paneBounds.distanceToPoint(origin),
+      maximumPaneDistanceM: maximumDistance,
+      nowMs: performance.now(),
+    });
+    if (admission.accepted) {
+      processedNonces.add(message.nonce);
+      const normal = centre.clone().sub(origin);
+      if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
+      else normal.normalize().multiplyScalar(-1);
+      breakHouseWindow(
+        message.windowId,
+        paneBounds.clampPoint(origin, new THREE.Vector3()),
+        normal,
+        false,
+        origin,
+        'shot',
+        message.actionNonce,
+        message.by,
+        message.nonce,
+        message.weapon,
+      );
+      trimNonceSet();
+      return;
+    }
+    // A host-bot-looking event may never borrow the human/projectile lane.
+    // Only an actually eligible projectile continues into its separate ledger.
+    if (WEAPONS[message.weapon].fireKind !== 'projectile') return;
+  }
   if (message.weapon) {
     if (message.kind !== 'shot' || !Number.isFinite(message.actionNonce)) return;
     const now = performance.now();
@@ -14009,6 +14075,7 @@ async function startGame(
     : Math.max(1, Math.floor(privateMatchActiveAtEpochMs ?? Date.now()) % 1_000_000_000));
   hostedBotWeaponPresentationReplay.clear();
   hostedBotProjectileGlassActions.clear();
+  hostedBotBallisticGlassActions.clear();
   interactiveWorldMatchEpoch = killstreakMatchEpoch;
   admittedRemoteShots.clear();
   remoteStickyAttachmentAuthority = createRemoteStickyAttachmentAuthorityState();
@@ -15241,7 +15308,7 @@ function resolveRailgunShot(request: RailgunShotRequestMessage): RailgunShotResu
   applyRailgunState(fired.state);
   broadcastRailgunState();
   const railgunTrace = traceWeaponPath(origin, normalized, RAILGUN_BEAM_LENGTH_M, 'railgun');
-  breakWindowsAlongBallisticTrace(railgunTrace, origin, normalized, request.by);
+  breakWindowsAlongBallisticTrace(railgunTrace, origin, normalized, { impactOwnerId: request.by });
   applyInteractiveWorldBallisticTrace(railgunTrace, origin, normalized, 'railgun');
   const outcomes = admission.targets.flatMap(({ target, distance }) => {
     const outcome = applyAuthoritativeRailgunDamage(request.by, target, distance);
@@ -15326,7 +15393,7 @@ function tryFireRailgun(now: number): void {
   applyRailgunState(fired.state);
   broadcastRailgunState();
   const railgunTrace = traceWeaponPath(origin, direction, RAILGUN_BEAM_LENGTH_M, 'railgun');
-  breakWindowsAlongBallisticTrace(railgunTrace, origin, direction, player.id);
+  breakWindowsAlongBallisticTrace(railgunTrace, origin, direction, { impactOwnerId: player.id });
   applyInteractiveWorldBallisticTrace(railgunTrace, origin, direction, 'railgun');
   applyKillstreakEntityShot(player.id, player.team, origin, [direction], 'railgun', now);
   const outcomes = (hostAdmission?.targets ?? []).flatMap(({ target, distance }) => {
@@ -17404,6 +17471,7 @@ function updateBots(dt: number, now: number): void {
       let principalDirection = baseDirection;
       let visibleEnd = origin.clone().addScaledVector(baseDirection, shotLength);
       let impactCount = 0;
+      const admittedWindowIds = new Set<string>();
       for (let pellet = 0; pellet < pelletCount; pellet += 1) {
         const sample = sampleWeaponPellet(botWeapon, pellet, jitter, gameplayRandom(), gameplayRandom());
         const direction = baseDirection.clone()
@@ -17420,6 +17488,12 @@ function updateBots(dt: number, now: number): void {
           botWeapon.penetration,
           activeBallisticSurfaces(),
         );
+        breakWindowsAlongBallisticTrace(resolution.trace, origin, direction, {
+          impactOwnerId: bot.id,
+          actionNonce,
+          weapon: bot.weapon,
+          visitedWindowIds: admittedWindowIds,
+        });
         if (!flamethrowerShot) applyInteractiveWorldBallisticTrace(resolution.trace, origin, direction, bot.weapon);
         const pelletVisibleEnd = origin.clone().addScaledVector(direction, resolution.tracerDistance);
         if (pellet === 0) visibleEnd = pelletVisibleEnd;
@@ -18410,18 +18484,21 @@ function throwGrenade(): void {
     return;
   }
   if (!player.alive || player.grenades <= 0 || matchState.phase !== 'active') return;
-  endSpawnProtectionOnOffense(performance.now());
+  const grenade = player.selectedGrenade;
+  const actionStartedAt = performance.now();
+  beginGrenadeFirstActionProfile(grenade, actionStartedAt);
+  endSpawnProtectionOnOffense(actionStartedAt);
   player.grenades -= 1;
   weaponView.throwGrenade();
   const direction = camera.getWorldDirection(new THREE.Vector3());
   const origin = camera.getWorldPosition(new THREE.Vector3()).addScaledVector(direction, 0.7);
   const velocity = direction.clone().multiplyScalar(13).add(new THREE.Vector3(0, 5.2, 0));
   const actionNonce = randomNonce();
-  beginGrenadeFirstActionProfile(actionNonce, player.selectedGrenade, performance.now());
+  bindGrenadeFirstActionNonce(actionNonce);
   network.send({
     type: 'grenade-throw', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: player.id,
     connectionEpoch: localConnectionEpoch,
-    grenade: player.selectedGrenade,
+    grenade,
     lifeId: localContinuity,
     actionSequence: localGrenadeActionSequence,
     origin: origin.toArray() as [number, number, number],
@@ -18431,14 +18508,14 @@ function throwGrenade(): void {
     nonce: randomNonce(),
   });
   localGrenadeActionSequence += 1;
-  const mesh = acquireGrenadeWorldPresentation(player.selectedGrenade);
+  const mesh = acquireGrenadeWorldPresentation(grenade);
   mesh.position.copy(origin);
   mesh.castShadow = true;
   const thrownAt = performance.now();
-  const impactDetonated = player.selectedGrenade === 'flash' || player.selectedGrenade === 'smoke';
-  const sticky = player.selectedGrenade === 'semtex';
+  const impactDetonated = grenade === 'flash' || grenade === 'smoke';
+  const sticky = grenade === 'semtex';
   grenades.push({
-    grenade: player.selectedGrenade,
+    grenade,
     mesh,
     velocity,
     angularVelocity: new THREE.Vector3(8.4, 5.2, 10.8),
@@ -22162,6 +22239,7 @@ function clearFieldSupport(): void {
   nukeDetonations = 0;
   localSupportNonces.clear();
   hostedBotProjectileGlassActions.clear();
+  hostedBotBallisticGlassActions.clear();
   admittedRemoteShots.clear();
   admittedRemoteMelees.clear();
   admittedRemoteExplosions.clear();

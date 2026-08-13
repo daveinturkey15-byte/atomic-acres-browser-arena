@@ -68,10 +68,11 @@ describe('catalog-wide projectile glass integration', () => {
     expect(remote).toContain("hostAuthorityValid: network.role === 'client'");
     expect(remote).toContain('eventReplay,');
     expect(remote).toContain('paneAlreadyAdmittedForAction: remoteAction?.targets.has(paneActionKey)');
-    expect(remote.indexOf('if (!admission.accepted || !remoteAction && !hostedBotAction) return;'))
-      .toBeLessThan(remote.indexOf('breakHouseWindow('));
-    expect(remote.indexOf('if (!remote) return;'))
-      .toBeGreaterThan(remote.indexOf('if (!admission.accepted || !action) return;'));
+    const projectileAdmissionGate = remote.indexOf('if (!admission.accepted || !remoteAction && !hostedBotAction) return;');
+    const projectileBreak = remote.indexOf('breakHouseWindow(', projectileAdmissionGate);
+    expect(projectileAdmissionGate).toBeGreaterThan(-1);
+    expect(projectileBreak).toBeGreaterThan(projectileAdmissionGate);
+    expect(remote.indexOf('if (!remote) return;')).toBeGreaterThan(projectileBreak);
     const paneMutation = block('function breakHouseWindow(', '\nfunction breakWindowsAlongBallisticTrace(');
     expect(paneMutation).toContain('spawnPersistentWindowDebris(window, normal);');
     expect(paneMutation).toContain("spawnImpactFlash(point, 'glass', normal);");

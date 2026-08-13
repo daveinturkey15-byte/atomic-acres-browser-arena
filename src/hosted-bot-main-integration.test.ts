@@ -83,6 +83,35 @@ describe('hosted bot skirmish parity integration', () => {
     expect(damageReceiver.indexOf('spawnTracer(')).toBeGreaterThan(damageReceiver.indexOf('if (!hasDedicatedPresentation)'));
   });
 
+  it('routes every host-bot ballistic trace through canonical glass authority and guest admission', () => {
+    const update = functionBody('updateBots', 'melee');
+    const glassBreak = update.indexOf('breakWindowsAlongBallisticTrace(resolution.trace, origin, direction, {');
+    const interactiveWorld = update.indexOf('applyInteractiveWorldBallisticTrace(resolution.trace', glassBreak);
+    expect(glassBreak).toBeGreaterThan(update.indexOf('resolveBallisticHitscanAgainstTarget('));
+    expect(interactiveWorld).toBeGreaterThan(glassBreak);
+    const action = update.slice(glassBreak, interactiveWorld);
+    expect(action).toContain('impactOwnerId: bot.id');
+    expect(action).toContain('actionNonce,');
+    expect(action).toContain('weapon: bot.weapon');
+    expect(action).toContain('visitedWindowIds: admittedWindowIds');
+    expect(update.indexOf('const admittedWindowIds = new Set<string>();')).toBeLessThan(glassBreak);
+
+    const traceBreak = functionBody('breakWindowsAlongBallisticTrace', 'canonicalHostWindowBreak');
+    expect(traceBreak).toContain('weaponGlassBreakPolicy(authority.weapon).timing');
+    expect(traceBreak).toContain('authority.actionNonce');
+    expect(traceBreak).toContain('authority.impactOwnerId');
+    expect(traceBreak).toContain('authority.weapon');
+
+    const receiver = functionBody('acceptRemoteWindowBreak', 'resetBreakableWindows');
+    const botAdmission = receiver.indexOf('hostedBotBallisticGlassActions.admit({');
+    expect(botAdmission).toBeGreaterThan(-1);
+    expect(receiver).toContain("message.hostAuthority?.hostId === privateLobbySnapshot?.hostId");
+    expect(receiver).toContain('botAdmitted: hostedBotIds(privateLobbySnapshot?.config.hostedBotCount ?? 0).includes(message.by)');
+    expect(receiver).toContain('eventReplay,');
+    expect(receiver).toContain('breakHouseWindow(');
+    expect(receiver).toContain('// A host-bot-looking event may never borrow the human/projectile lane.');
+  });
+
   it('presents each bot flare launch once without spawning a second replica or impact sound', () => {
     const sender = functionBody('broadcastHostedBotFlareLaunchPresentation', 'acceptHostedBotWeaponPresentation');
     expect(sender).toContain("presentation: 'signal-flare-launch'");
