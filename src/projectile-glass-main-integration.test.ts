@@ -34,6 +34,7 @@ describe('catalog-wide projectile glass integration', () => {
     const collision = block('const flareProjectileCallbacks:', '\nfunction updateFlareProjectiles(');
     expect(collision).toContain('breakableWindowId: glass.windowId');
     expect(collision).toContain('radiusFraction');
+    expect(collision).toContain('sweptSphereSurfaceLeadFraction(delta, worldHit.normal, radiusM)');
 
     const impact = block('function handleFlareImpact(', '\nfunction handleFlareBurnPulse(');
     expect(impact).toContain("weaponGlassBreakPolicy('flare-gun')");

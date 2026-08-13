@@ -258,7 +258,7 @@ import {
   weaponPrewarmCatalogForArena,
 } from './weapon-prewarm-catalog';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
-import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes } from './collision';
+import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes, sweptSphereSurfaceLeadFraction } from './collision';
 import {
   applyPenetrationDamage,
   ballisticImpactSurface,
@@ -18453,10 +18453,13 @@ let flareFrameColliders: ArenaMap['colliders'] = [];
 const flareBurnLineOfSightPoint = new THREE.Vector3();
 const flareProjectileCallbacks: FlareProjectileCallbacks = Object.freeze({
   worldCollisionFraction: (start: THREE.Vector3, delta: THREE.Vector3, radiusM: number) => {
-    const world = sweepSphereAgainstBoxes(start, delta, flareFrameColliders, radiusM)?.time ?? null;
+    const worldHit = sweepSphereAgainstBoxes(start, delta, flareFrameColliders, radiusM);
+    const world = worldHit?.time ?? null;
     const glass = crossbowGlassCollision(start, delta);
     if (!glass) return world;
-    const radiusFraction = radiusM / Math.max(delta.length(), 1e-8);
+    const radiusFraction = worldHit
+      ? sweptSphereSurfaceLeadFraction(delta, worldHit.normal, radiusM)
+      : 0;
     if (world !== null && glass.time > world + radiusFraction + 1e-4) return world;
     return Object.freeze({
       fraction: Math.min(world ?? glass.time, glass.time),

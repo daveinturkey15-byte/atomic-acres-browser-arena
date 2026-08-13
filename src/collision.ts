@@ -565,6 +565,24 @@ export function sweepSphereAgainstBoxes(
   return { time: bestTime, normal: localAxisNormalToWorld(bestFrame, bestAxis, bestSign) };
 }
 
+/** Fractional lead between a swept sphere contact and its centre crossing the same surface. */
+export function sweptSphereSurfaceLeadFraction(
+  delta: Point3,
+  surfaceNormal: Point3,
+  radius: number,
+): number {
+  if (!Number.isFinite(radius) || radius <= 0) return 0;
+  const normalLength = Math.hypot(surfaceNormal.x, surfaceNormal.y, surfaceNormal.z);
+  if (!Number.isFinite(normalLength) || normalLength <= 1e-8) return 0;
+  const normalTravel = Math.abs(
+    delta.x * surfaceNormal.x
+      + delta.y * surfaceNormal.y
+      + delta.z * surfaceNormal.z,
+  ) / normalLength;
+  if (!Number.isFinite(normalTravel) || normalTravel <= 1e-8) return 0;
+  return radius / normalTravel;
+}
+
 /** Exact sphere overlap against an authored axis-aligned or oriented box. */
 export function sphereIntersectsBox(point: Point3, radius: number, box: Box2): boolean {
   if (!Number.isFinite(radius) || radius < 0) return false;

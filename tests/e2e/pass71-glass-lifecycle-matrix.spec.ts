@@ -417,11 +417,39 @@ for (const profile of PROFILES) {
       const before = await observePane(page, pane);
       await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
 
-      await page.waitForFunction(() => (
-        (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).projectileGlass.explosiveBolts
-          .some((bolt: any) => bolt.authority === true && bolt.impacted === true && bolt.detonatesInMs > 0)
-      ), undefined, { timeout: 2_000 });
-      const impacted = await observePane(page, pane);
+      // Capture the pane in the same browser sample as the live fuse. A separate
+      // protocol round trip can outlast the two-second fuse on software CI.
+      const impactSampleHandle = await page.waitForFunction((paneIndex) => {
+        const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
+        const bolt = snapshot.projectileGlass.explosiveBolts
+          .find((candidate: any) => (
+            candidate.authority === true
+              && candidate.impacted === true
+              && candidate.detonatesInMs > 0
+          ));
+        if (!bolt) return false;
+        const impactedPane = snapshot.breakableWindows[paneIndex];
+        return {
+          bolt: {
+            impacted: bolt.impacted,
+            authority: bolt.authority,
+            detonatesInMs: bolt.detonatesInMs,
+          },
+          pane: {
+            ...impactedPane,
+            authority: { ...impactedPane.authority },
+            rapierDynamicColliders: snapshot.interactiveWorld.rapierDynamicColliders,
+          },
+        };
+      }, pane, { timeout: 2_000 });
+      const impactSample = await impactSampleHandle.jsonValue() as {
+        bolt: { impacted: boolean; authority: boolean; detonatesInMs: number };
+        pane: PaneObservation;
+      };
+      await impactSampleHandle.dispose();
+      expect(impactSample.bolt).toMatchObject({ impacted: true, authority: true });
+      expect(impactSample.bolt.detonatesInMs).toBeGreaterThan(0);
+      const impacted = impactSample.pane;
       expect(impacted, `${profile.label}/explosive-crossbow pane ${pane} remains solid on bolt impact`)
         .toMatchObject({
           broken: false,
