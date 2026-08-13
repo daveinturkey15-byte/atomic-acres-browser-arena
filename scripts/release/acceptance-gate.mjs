@@ -208,14 +208,14 @@ export function validateAcceptanceManifest(manifest, options = {}) {
     || !isIsoDate(approval.approvedAt) || !nonEmpty(approval.evidence)) {
     errors.push(`humanAcceptance must be approved by ${policy.ownerHandle} with timestamped evidence`);
   }
-  if (manifest.releasePass === 'PASS 66' && approval && nonEmpty(approval.evidence)) {
+  if (['PASS 66', 'PASS 71'].includes(manifest.releasePass) && approval && nonEmpty(approval.evidence)) {
     const evidence = approval.evidence.toLowerCase();
     const bindsStandingConditional = /\bstanding\s+conditional\b/.test(evidence);
     const explicitlyDisclaimsInspection = /\b(?:did\s+not|has\s+not|was\s+not)\b/.test(evidence)
       && /\b(?:inspect(?:ed|ion)?|test(?:ed|ing)?|review(?:ed)?)\b/.test(evidence)
       && /\bpreview\b/.test(evidence);
     if (!bindsStandingConditional || !explicitlyDisclaimsInspection) {
-      errors.push('PASS 66 humanAcceptance.evidence must bind Dave\'s standing conditional authorization and explicitly state that he did not inspect or test the immutable preview');
+      errors.push(`${manifest.releasePass} humanAcceptance.evidence must bind Dave's standing conditional authorization and explicitly state that he did not inspect or test the immutable preview`);
     }
   }
   if (preview && approval && isIsoDate(preview.createdAt) && isIsoDate(approval.approvedAt)

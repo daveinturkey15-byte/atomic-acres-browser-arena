@@ -203,6 +203,20 @@ describe('release acceptance manifest', () => {
     expect(validateAcceptanceManifest(manifest, { policy }).errors.join('\n')).toMatch(/standing conditional/);
   });
 
+  it('requires the truthful standing-conditional, no-preview-inspection statement for Pass 71', () => {
+    const manifest = acceptedManifest();
+    manifest.releasePass = 'PASS 71';
+    manifest.preview.ref = `pr-preview-71-${manifest.preview.sourceSha}`;
+    manifest.humanAcceptance.evidence = 'Dave\'s standing conditional publication authorization is bound here; Dave did not inspect or test this immutable preview.';
+    expect(validateAcceptanceManifest(manifest, { policy })).toMatchObject({ ok: true });
+
+    manifest.humanAcceptance.evidence = 'Dave gave standing conditional publication authorization for this immutable preview.';
+    expect(validateAcceptanceManifest(manifest, { policy }).errors.join('\n')).toMatch(/did not inspect or test/);
+
+    manifest.humanAcceptance.evidence = 'Dave did not inspect this immutable preview; publication may proceed.';
+    expect(validateAcceptanceManifest(manifest, { policy }).errors.join('\n')).toMatch(/standing conditional/);
+  });
+
   it('leaves exactly the owner-approval error on a complete pre-HITL manifest', () => {
     const manifest = acceptedManifest();
     delete (manifest as { humanAcceptance?: unknown }).humanAcceptance;
