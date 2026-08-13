@@ -139,6 +139,8 @@ export type AudioOutputProbe = Readonly<{
   dominantPowerRatio: number;
   narrowbandTonePresent: boolean;
   suspiciousBroadbandHiss: boolean;
+  logBandsDb: readonly number[];
+  timeDomainSamples: readonly number[];
 }>;
 
 const EMPTY_AUDIO_OUTPUT_PROBE: AudioOutputProbe = Object.freeze({
@@ -154,7 +156,38 @@ const EMPTY_AUDIO_OUTPUT_PROBE: AudioOutputProbe = Object.freeze({
   dominantPowerRatio: 0,
   narrowbandTonePresent: false,
   suspiciousBroadbandHiss: false,
+  logBandsDb: Object.freeze([]),
+  timeDomainSamples: Object.freeze([]),
 });
+
+const AUDIO_EVIDENCE_SAMPLE_COUNT = 16;
+
+/** Retains a small deterministic projection of analyser data, never the full stream. */
+export function boundedAudioEvidenceSamples(
+  timeDomain: Float32Array,
+  frequencyDb: Float32Array,
+): Readonly<{ logBandsDb: readonly number[]; timeDomainSamples: readonly number[] }> {
+  if (timeDomain.length === 0 || frequencyDb.length === 0) {
+    return Object.freeze({ logBandsDb: Object.freeze([]), timeDomainSamples: Object.freeze([]) });
+  }
+  const finite = (value: number, lower: number, upper: number) => (
+    Math.round(Math.max(lower, Math.min(upper, Number.isFinite(value) ? value : lower)) * 10_000) / 10_000
+  );
+  const timeDomainSamples = Array.from({ length: AUDIO_EVIDENCE_SAMPLE_COUNT }, (_, index) => {
+    const sourceIndex = Math.min(timeDomain.length - 1, Math.floor(index * timeDomain.length / AUDIO_EVIDENCE_SAMPLE_COUNT));
+    return finite(timeDomain[sourceIndex]!, -1, 1);
+  });
+  const maximumIndex = frequencyDb.length - 1;
+  const logBandsDb = Array.from({ length: AUDIO_EVIDENCE_SAMPLE_COUNT }, (_, index) => {
+    const ratio = index / (AUDIO_EVIDENCE_SAMPLE_COUNT - 1);
+    const sourceIndex = Math.min(maximumIndex, Math.round((Math.pow(2, ratio) - 1) * maximumIndex));
+    return finite(frequencyDb[sourceIndex]!, -120, 0);
+  });
+  return Object.freeze({
+    logBandsDb: Object.freeze(logBandsDb),
+    timeDomainSamples: Object.freeze(timeDomainSamples),
+  });
+}
 
 /**
  * Measures the final compressed mix, not source counts or configured gains.
@@ -206,6 +239,7 @@ export function analyzeAudioOutput(
   const highFrequencyEnergyRatio = totalPower > 1e-12 ? Math.min(1, highFrequencyPower / totalPower) : 0;
   const dominantPowerRatio = totalPower > 1e-12 ? Math.min(1, dominantPower / totalPower) : 0;
   const crestFactor = rms > 1e-9 ? peak / rms : 0;
+  const retainedSamples = boundedAudioEvidenceSamples(timeDomain, frequencyDb);
   return Object.freeze({
     available: true,
     sampleRate,
@@ -221,6 +255,7 @@ export function analyzeAudioOutput(
     suspiciousBroadbandHiss: rms >= 0.002
       && spectralFlatness >= 0.5
       && highFrequencyEnergyRatio >= 0.18,
+    ...retainedSamples,
   });
 }
 
@@ -451,6 +486,11 @@ export class ArenaAudio {
   private nextVoiceId = 1;
   private voicesDropped = 0;
   private voicesStolen = 0;
+  private voiceRegistrations = 0;
+  private voiceDisposals = 0;
+  private continuousOwnerRegistrations = 0;
+  private continuousOwnerDisposals = 0;
+  private continuousNodeDisposals = 0;
   private activeArena: ArenaId | null = null;
   /** No arena source is allowed to remain audible indefinitely. */
   private arenaSources: AudioScheduledSourceNode[] = [];
@@ -1615,6 +1655,14 @@ export class ArenaAudio {
     flashbang: { plays: number; lastAudioGain: number; immediateOnsets: number; scheduledBeeps: number; maximumTailMs: number };
     outputProbe: AudioOutputProbe;
     runtime: { voices: number; retainedSources: number; retainedAudibleGains: number; spatialChains: number; spatialPoolSize: number; stolen: number; dropped: number; globalCap: number; spatialCap: number };
+    lifecycle: {
+      voiceRegistrations: number;
+      voiceDisposals: number;
+      continuousOwnerRegistrations: number;
+      continuousOwnerDisposals: number;
+      continuousNodeDisposals: number;
+      owners: { arena: number; combatFeedback: number; nodes: number };
+    };
     buses: Record<AudioBusId, { configuredGain: number; muted: boolean; effectiveGain: number }>;
   } {
     const buses = Object.fromEntries(AUDIO_BUS_IDS.map((id) => {
@@ -1738,6 +1786,18 @@ export class ArenaAudio {
         dropped: this.voicesDropped,
         globalCap: AUDIO_RUNTIME_BUDGET.globalVoices,
         spatialCap: AUDIO_RUNTIME_BUDGET.spatialVoices,
+      },
+      lifecycle: {
+        voiceRegistrations: this.voiceRegistrations,
+        voiceDisposals: this.voiceDisposals,
+        continuousOwnerRegistrations: this.continuousOwnerRegistrations,
+        continuousOwnerDisposals: this.continuousOwnerDisposals,
+        continuousNodeDisposals: this.continuousNodeDisposals,
+        owners: {
+          arena: [...this.continuousVoiceOwners.values()].filter((owner) => owner.scope === 'arena').length,
+          combatFeedback: [...this.continuousVoiceOwners.values()].filter((owner) => owner.scope === 'combat-feedback').length,
+          nodes: [...this.continuousVoiceOwners.values()].reduce((total, owner) => total + owner.nodes.length, 0),
+        },
       },
       buses,
     };
@@ -1874,8 +1934,9 @@ export class ArenaAudio {
       protectedContinuous,
     };
     this.activeVoices.set(source, voice);
+    this.voiceRegistrations += 1;
     source.onended = () => {
-      this.activeVoices.delete(source);
+      if (this.activeVoices.delete(source)) this.voiceDisposals += 1;
       source.disconnect();
     };
     return true;
@@ -1959,6 +2020,7 @@ export class ArenaAudio {
       nodes: Object.freeze([...nodes]),
       gains: Object.freeze([...gains]),
     }));
+    this.continuousOwnerRegistrations += 1;
     const previousEnded = source.onended;
     source.onended = (event) => {
       previousEnded?.call(source, event);
@@ -1971,6 +2033,8 @@ export class ArenaAudio {
     const owner = this.continuousVoiceOwners.get(source);
     if (!owner) return;
     this.continuousVoiceOwners.delete(source);
+    this.continuousOwnerDisposals += 1;
+    this.continuousNodeDisposals += owner.nodes.length;
     const sources = owner.scope === 'arena' ? this.arenaSources : this.combatFeedbackSources;
     const sourceIndex = sources.indexOf(source);
     if (sourceIndex >= 0) sources.splice(sourceIndex, 1);
@@ -1993,7 +2057,7 @@ export class ArenaAudio {
   private stopSource(source: AudioScheduledSourceNode): void {
     try { source.stop(); } catch { /* already stopped */ }
     this.releaseContinuousVoice(source);
-    this.activeVoices.delete(source);
+    if (this.activeVoices.delete(source)) this.voiceDisposals += 1;
     try { source.disconnect(); } catch { /* already or partially disconnected */ }
   }
 

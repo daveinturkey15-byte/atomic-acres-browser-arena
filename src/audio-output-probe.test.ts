@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeAudioOutput } from './audio';
+import { analyzeAudioOutput, boundedAudioEvidenceSamples } from './audio';
 
 function tone(samples: number, frequency: number, sampleRate: number, gain: number): Float32Array {
   return Float32Array.from({ length: samples }, (_, index) => gain * Math.sin(index / sampleRate * frequency * Math.PI * 2));
@@ -27,6 +27,8 @@ describe('final audio output probe', () => {
     expect(result.spectralFlatness).toBeLessThan(0.2);
     expect(result.highFrequencyEnergyRatio).toBeLessThan(0.1);
     expect(result.dominantPowerRatio).toBeGreaterThan(0.5);
+    expect(result.logBandsDb).toHaveLength(16);
+    expect(result.timeDomainSamples).toHaveLength(16);
   });
 
   it('rejects a persistent broadband high-frequency signal', () => {
@@ -58,6 +60,23 @@ describe('final audio output probe', () => {
       dominantPowerRatio: 0,
       narrowbandTonePresent: false,
       suspiciousBroadbandHiss: false,
+      logBandsDb: [],
+      timeDomainSamples: [],
     });
+  });
+
+  it('bounds and deterministically downsamples retained evidence', () => {
+    const evidence = boundedAudioEvidenceSamples(
+      Float32Array.from({ length: 32 }, (_, index) => index === 0 ? Number.NaN : (index - 16) / 8),
+      Float32Array.from({ length: 32 }, (_, index) => index === 0 ? Number.POSITIVE_INFINITY : -140 + index * 6),
+    );
+    expect(evidence.timeDomainSamples).toHaveLength(16);
+    expect(evidence.logBandsDb).toHaveLength(16);
+    expect(evidence.timeDomainSamples.every((sample) => sample >= -1 && sample <= 1)).toBe(true);
+    expect(evidence.logBandsDb.every((sample) => sample >= -120 && sample <= 0)).toBe(true);
+    expect(evidence.timeDomainSamples[0]).toBe(-1);
+    expect(evidence.logBandsDb[0]).toBe(-120);
+    expect(Object.isFrozen(evidence.logBandsDb)).toBe(true);
+    expect(Object.isFrozen(evidence.timeDomainSamples)).toBe(true);
   });
 });
