@@ -3,6 +3,11 @@ import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import sharp from 'sharp';
+import {
+  captureFrameActionBaseline,
+  deriveFrameActionBudget,
+  type FrameActionBudget,
+} from './frame-action-budget';
 
 const renderer = process.env.PASS70_CHOPPER_RENDERER === 'webgpu' ? 'webgpu' : 'webgl2';
 const loadout = Object.freeze({
@@ -11,6 +16,117 @@ const loadout = Object.freeze({
 });
 
 type PresentedReceiptKind = 'rigged' | 'camera-only';
+
+type ChopperPossessionEntryReceipt = Readonly<{
+  accepted: boolean;
+  synchronousMs: number;
+  eventToPresentedFrameMs: number;
+  eventToCompletionMs: number;
+  maximumAnimationFrameGapMs: number;
+  maximumPendingForMs: number;
+  presentationStatus: string;
+  startingPresentedFrame: number;
+  endingPresentedFrame: number;
+  startingSubmissionSequence: number;
+  startingCompletedSequence: number;
+  targetSubmissionSequence: number;
+  endingSubmissionSequence: number;
+  endingCompletedSequence: number;
+  completionFailures: number;
+  possession: string;
+}>;
+
+async function captureFirstChopperPossessionEntry(page: Page): Promise<ChopperPossessionEntryReceipt> {
+  return page.evaluate(() => new Promise<ChopperPossessionEntryReceipt>((resolveEntry, rejectEntry) => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    requestAnimationFrame(() => {
+      const startedAt = performance.now();
+      const startingPresentedFrame = debug.admissionState().presentedGameplayFrame;
+      const startingPresentation = debug.samplePresentationTelemetry() as any;
+      const synchronous = startingPresentation.status === 'synchronous';
+      const accepted = debug.toggleChopperGunnerControl();
+      const synchronousMs = performance.now() - startedAt;
+      let previousAnimationFrameAt = startedAt;
+      let maximumAnimationFrameGapMs = 0;
+      let maximumPendingForMs = startingPresentation.pendingForMs as number;
+      let eventToPresentedFrameMs: number | null = null;
+      let eventToCompletionMs: number | null = null;
+      let targetSubmissionSequence: number | null = synchronous ? 0 : null;
+      let endingPresentedFrame = startingPresentedFrame;
+      let endingPresentation = startingPresentation;
+      const deadline = startedAt + 2_000;
+      const rounded = (value: number) => Number(value.toFixed(3));
+      const inspect = () => {
+        const now = performance.now();
+        maximumAnimationFrameGapMs = Math.max(maximumAnimationFrameGapMs, now - previousAnimationFrameAt);
+        previousAnimationFrameAt = now;
+        endingPresentedFrame = debug.admissionState().presentedGameplayFrame;
+        endingPresentation = debug.samplePresentationTelemetry() as any;
+        maximumPendingForMs = Math.max(maximumPendingForMs, endingPresentation.pendingForMs as number);
+        if (eventToPresentedFrameMs === null && endingPresentedFrame > startingPresentedFrame) {
+          eventToPresentedFrameMs = now - startedAt;
+          if (synchronous) eventToCompletionMs = eventToPresentedFrameMs;
+        }
+        if (!synchronous && targetSubmissionSequence === null
+          && endingPresentation.submissionSequence > startingPresentation.submissionSequence) {
+          targetSubmissionSequence = endingPresentation.submissionSequence;
+        }
+        if (!synchronous && eventToCompletionMs === null && targetSubmissionSequence !== null
+          && endingPresentation.completedSequence >= targetSubmissionSequence) {
+          eventToCompletionMs = now - startedAt;
+        }
+        if (eventToPresentedFrameMs !== null && eventToCompletionMs !== null
+          && targetSubmissionSequence !== null) {
+          resolveEntry({
+            accepted,
+            synchronousMs: rounded(synchronousMs),
+            eventToPresentedFrameMs: rounded(eventToPresentedFrameMs),
+            eventToCompletionMs: rounded(eventToCompletionMs),
+            maximumAnimationFrameGapMs: rounded(maximumAnimationFrameGapMs),
+            maximumPendingForMs: rounded(maximumPendingForMs),
+            presentationStatus: endingPresentation.status,
+            startingPresentedFrame,
+            endingPresentedFrame,
+            startingSubmissionSequence: startingPresentation.submissionSequence,
+            startingCompletedSequence: startingPresentation.completedSequence,
+            targetSubmissionSequence,
+            endingSubmissionSequence: endingPresentation.submissionSequence,
+            endingCompletedSequence: endingPresentation.completedSequence,
+            completionFailures: endingPresentation.completionFailures,
+            possession: document.documentElement.dataset.killstreakPossession ?? 'none',
+          });
+          return;
+        }
+        if (now >= deadline) {
+          rejectEntry(new Error('First Chopper possession did not reach a completed presented frame within 2000ms'));
+          return;
+        }
+        requestAnimationFrame(inspect);
+      };
+      requestAnimationFrame(inspect);
+    });
+  }));
+}
+
+function assertBoundedChopperPossessionEntry(
+  receipt: ChopperPossessionEntryReceipt,
+  budget: FrameActionBudget,
+): void {
+  const evidence = JSON.stringify({ receipt, budget });
+  expect(receipt.accepted, evidence).toBe(true);
+  expect(receipt.synchronousMs, `${evidence}: synchronous control admission`).toBeLessThan(budget.maximumSynchronousActionMs);
+  expect(receipt.eventToPresentedFrameMs, `${evidence}: next presented gameplay frame`).toBeLessThan(budget.maximumActionMs);
+  expect(receipt.eventToCompletionMs, `${evidence}: completed presentation frontier`).toBeLessThan(budget.maximumActionMs);
+  expect(receipt.maximumAnimationFrameGapMs, `${evidence}: no possession-entry hitch`).toBeLessThan(budget.maximumActionMs);
+  expect(receipt.maximumPendingForMs, `${evidence}: no hidden completion backlog`).toBeLessThan(budget.maximumActionMs);
+  expect(receipt.completionFailures, evidence).toBe(0);
+  expect(receipt.presentationStatus, evidence).toMatch(/^(?:healthy|synchronous)$/u);
+  expect(receipt.endingPresentedFrame, evidence).toBeGreaterThan(receipt.startingPresentedFrame);
+  expect(receipt.endingSubmissionSequence, evidence).toBeGreaterThanOrEqual(receipt.startingSubmissionSequence);
+  expect(receipt.endingCompletedSequence, evidence).toBeGreaterThanOrEqual(receipt.startingCompletedSequence);
+  expect(receipt.endingCompletedSequence, evidence).toBeGreaterThanOrEqual(receipt.targetSubmissionSequence);
+  expect(receipt.possession, evidence).toBe('chopper-gunner');
+}
 
 function projectWorldBounds(
   bounds: { min: number[]; max: number[] },
@@ -730,7 +846,19 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
   expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRiggedEvidenceCaptureTargets([
     { kind: 'training-dummy', id: 'test-dummy-alpha' },
   ]))).toBe(true);
-  expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.toggleChopperGunnerControl())).toBe(true);
+  const possessionEntryBaseline = await captureFrameActionBaseline(page, 'chopper-first-possession-preaction-baseline');
+  const possessionEntryBudget = deriveFrameActionBudget(possessionEntryBaseline);
+  const possessionEntry = await captureFirstChopperPossessionEntry(page);
+  assertBoundedChopperPossessionEntry(possessionEntry, possessionEntryBudget);
+  await testInfo.attach(`pass70-chopper-${renderer}-first-possession-frame-budget`, {
+    body: Buffer.from(`${JSON.stringify({
+      distinction: 'input-handler-through-next-presented-and-completed-frame; excludes intentional cockpit dwell time',
+      baseline: possessionEntryBaseline,
+      budget: possessionEntryBudget,
+      receipt: possessionEntry,
+    }, null, 2)}\n`, 'utf8'),
+    contentType: 'application/json',
+  });
   await page.waitForFunction(() => Boolean(
     (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).killstreakPresentation.firstPersonSightline?.alignment,
   ));

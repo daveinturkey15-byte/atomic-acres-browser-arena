@@ -64,6 +64,10 @@ describe('Pass 71 first-action and protected-release gate', () => {
       'pass71-nuke-warning',
       'pass70-chopper-gunner',
     ]) expect(boundedRunner).toContain(`name: '${group}'`);
+    const chopperGroup = boundedRunner.match(/name: 'pass70-chopper-gunner'[^\n]+/u)?.[0] ?? '';
+    expect(chopperGroup).toContain('timeoutMs: 300_000');
+    expect(chopperGroup).toContain("'tests/e2e/pass70-chopper-gunner.spec.ts'");
+    expect(chopperGroup).toContain("'tests/e2e/pass71-controlled-support-native.spec.ts'");
     expect(impactClassifier).toContain("windows_supplemental_groups: 'pass71-grenade-first-action,pass70-chopper-gunner'");
     expect(impactClassifier).toContain("linux_supplemental_groups: 'pass71-glass-lifecycle,pass71-nuke-warning'");
     expect(verifyWorkflow).toContain('bounded-browser-windows-supplemental:');

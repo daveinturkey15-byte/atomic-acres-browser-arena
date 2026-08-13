@@ -22,7 +22,7 @@ const groups = [
   { name: 'pass71-grenade-first-action', timeoutMs: 600_000, args: ['tests/e2e/pass71-grenade-first-action.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass71-glass-lifecycle', timeoutMs: 600_000, args: ['tests/e2e/pass71-glass-lifecycle-matrix.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass71-nuke-warning', timeoutMs: 240_000, args: ['tests/e2e/pass71-nuke-warning.spec.ts', '--project=chromium', '--workers=1'] },
-  { name: 'pass70-chopper-gunner', timeoutMs: 300_000, args: ['tests/e2e/pass70-chopper-gunner.spec.ts', '--project=chromium', '--workers=1'] },
+  { name: 'pass70-chopper-gunner', timeoutMs: 300_000, args: ['tests/e2e/pass70-chopper-gunner.spec.ts', 'tests/e2e/pass71-controlled-support-native.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass64-hud-contracts', default: false, timeoutMs: 900_000, args: ['tests/e2e/pass64-hud-menu.spec.ts', 'tests/e2e/pass65-menu-lifecycle.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass64-renderer-foundation', default: false, timeoutMs: 420_000, args: ['tests/e2e/pass64-renderer-foundation.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'capability-firefox', default: false, xvfb: true, args: ['tests/e2e/pass25a-capability.spec.ts', '--project=firefox', '--workers=1', '--headed'] },

@@ -8,6 +8,8 @@ const presentation = readFileSync(new URL('./killstreak-presentation.ts', import
 const authoring = readFileSync(new URL('../scripts/blender/create-pass65-support-vehicles.py', import.meta.url), 'utf8');
 const authoringRunner = readFileSync(new URL('../scripts/blender/run-authoring.mjs', import.meta.url), 'utf8');
 const e2e = readFileSync(new URL('../tests/e2e/pass70-chopper-gunner.spec.ts', import.meta.url), 'utf8');
+const controlledSupportE2e = readFileSync(new URL('../tests/e2e/pass71-controlled-support-native.spec.ts', import.meta.url), 'utf8');
+const boundedE2e = readFileSync(new URL('../scripts/qa/run-bounded-e2e.mjs', import.meta.url), 'utf8');
 
 describe('Pass 70 complete Chopper Gunner contract', () => {
   it('presents the complete authored cockpit while excluding exterior and rotors', () => {
@@ -189,5 +191,66 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(capture.indexOf('api.setRenderPaused(true)')).toBeLessThan(capture.indexOf('awaitRiggedEvidenceCaptureCompletion()'));
     expect(e2e).not.toContain('Renderer presentation made no GPU progress');
     expect(e2e).not.toContain('errors.filter');
+  });
+
+  it('gates first possession and trusted controlled support through the required Chopper shard', () => {
+    expect(e2e).toContain("captureFrameActionBaseline(page, 'chopper-first-possession-preaction-baseline')");
+    expect(e2e).toContain('captureFirstChopperPossessionEntry(page)');
+    expect(e2e).toContain('receipt.eventToPresentedFrameMs');
+    expect(e2e).toContain('receipt.eventToCompletionMs');
+    expect(e2e).toContain('receipt.maximumAnimationFrameGapMs');
+    expect(e2e).toContain('budget.maximumActionMs');
+    expect(e2e).toContain('budget.maximumSynchronousActionMs');
+    const requiredGroup = boundedE2e.match(/name: 'pass70-chopper-gunner'[^\n]+/u)?.[0] ?? '';
+    expect(requiredGroup).toContain("timeoutMs: 300_000");
+    expect(requiredGroup).toContain("'tests/e2e/pass70-chopper-gunner.spec.ts'");
+    expect(requiredGroup).toContain("'tests/e2e/pass71-controlled-support-native.spec.ts'");
+    expect(requiredGroup).toContain("'--workers=1'");
+  });
+
+  it('proves real LMB splash, real RMB cadence/hardpoints, and one exact Piloted Drone rig', () => {
+    for (const token of [
+      "page.mouse.down({ button: 'left' })",
+      "page.mouse.down({ button: 'right' })",
+      'event.trusted === true',
+      'stagePossessedChopperSplashTargets()',
+      'aimPossessedChopperAtTarget(targetId)',
+      'stagedSplash.splashRadiusM).toBe(3)',
+      'stagedSplash.separationM).toBeGreaterThan(2.8)',
+      'splashReceipt.primary.atMs).toBe(splashReceipt.splash.atMs)',
+      'immediateSecond.entity.missileAmmo).toBe(5)',
+      'secondDrop.atMs - firstDrop.atMs).toBeGreaterThanOrEqual(1_000)',
+      'chopperMissileLaunchPosition(',
+      "'chopper-hardpoint-missile.png'",
+      'stagePossessedPilotedDroneSensorTarget(true)',
+      'stagePossessedPilotedDroneSensorTarget(false)',
+      "contract: 'occlusion-conditioned-single-exact-animated-thermal-operator-v2'",
+      'geometryIdentity: true',
+      'skeletonIdentity: true',
+      'boneWorldMatrixIdentity: true',
+      'visibleOriginalTargets: 1',
+      'activeThermalLayers: 0',
+      'activeHaloLayers: 0',
+      'proxyMeshes: 0',
+      "'piloted-drone-occluded-exact-thermal-rig.png'",
+    ]) expect(controlledSupportE2e).toContain(token);
+
+    for (const method of [
+      'stagePossessedChopperSplashTargets: () => {',
+      'stagePossessedPilotedDroneSensorTarget: (occluded) => {',
+      'aimPossessedChopperAtTarget: (targetId) => {',
+      'aimPossessedPilotedDroneAtTarget: (targetId) => {',
+    ]) {
+      const start = legacy.indexOf(method, legacy.indexOf('debugWindow.__ATOMIC_ACRES_DEBUG__ = {'));
+      const end = legacy.indexOf('\n  },', start);
+      expect(start).toBeGreaterThan(-1);
+      expect(end).toBeGreaterThan(start);
+      const block = legacy.slice(start, end);
+      expect(block).not.toContain('requestKillstreakControl');
+      expect(block).not.toContain('applyKillstreakDamageEvent');
+      expect(block).not.toContain('applyBotDamage');
+      expect(block).not.toContain('sensorContacts.push');
+      expect(block).not.toContain('impactEvents.push');
+    }
   });
 });
