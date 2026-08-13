@@ -6,6 +6,7 @@ const glassSpec = readFileSync('tests/e2e/pass69-3-glass-m14-frame-hitch.spec.ts
 const actionBudget = readFileSync('tests/e2e/frame-action-budget.ts', 'utf8');
 const boundedRunner = readFileSync('scripts/qa/run-bounded-e2e.mjs', 'utf8');
 const impactClassifier = readFileSync('scripts/release/change-impact.mjs', 'utf8');
+const pipelineGuard = readFileSync('scripts/release/pipeline-guard.mjs', 'utf8');
 const verifyWorkflow = readFileSync('.github/workflows/verify.yml', 'utf8');
 const releaseWorkflow = readFileSync('.github/workflows/release-production.yml', 'utf8');
 const topologyStaging = readFileSync('scripts/release/stage-release-topology.mjs', 'utf8');
@@ -68,6 +69,15 @@ describe('Pass 71 first-action and protected-release gate', () => {
     expect(verifyWorkflow).toContain('bounded-browser-windows-supplemental:');
     expect(verifyWorkflow).toContain('bounded-browser-linux-supplemental:');
     expect(verifyWorkflow).toContain('bounded-browser-linux-supplemental, bounded-browser-windows-supplemental');
+    expect(verifyWorkflow).toContain('requirements-acceptance:\n    needs: [classify-change, static-and-unit, bounded-browser-linux-supplemental, bounded-browser-windows-supplemental]\n    if: always()');
+    expect(verifyWorkflow).toContain('WINDOWS_SUPPLEMENTAL_RESULT: ${{ needs.bounded-browser-windows-supplemental.result }}');
+    expect(verifyWorkflow).toContain('LINUX_SUPPLEMENTAL_RESULT: ${{ needs.bounded-browser-linux-supplemental.result }}');
+    expect(verifyWorkflow).toContain('required Windows supplemental groups ($WINDOWS_SUPPLEMENTAL_GROUPS) concluded $WINDOWS_SUPPLEMENTAL_RESULT');
+    expect(verifyWorkflow).toContain('required Linux supplemental groups ($LINUX_SUPPLEMENTAL_GROUPS) concluded $LINUX_SUPPLEMENTAL_RESULT');
+    expect(verifyWorkflow).toContain('empty Windows supplemental groups unexpectedly concluded $WINDOWS_SUPPLEMENTAL_RESULT');
+    expect(verifyWorkflow).toContain('empty Linux supplemental groups unexpectedly concluded $LINUX_SUPPLEMENTAL_RESULT');
+    expect(pipelineGuard).toContain("'bounded-browser-linux-supplemental'");
+    expect(pipelineGuard).toContain("'bounded-browser-windows-supplemental'");
   });
 
   it('stages Pass 63 from one configured Pages subtree without rebuilding historical source', () => {

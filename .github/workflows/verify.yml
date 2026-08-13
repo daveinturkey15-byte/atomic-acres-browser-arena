@@ -88,9 +88,40 @@ jobs:
         run: npm run audit:dependencies
 
   requirements-acceptance:
-    needs: [classify-change, static-and-unit]
+    needs: [classify-change, static-and-unit, bounded-browser-linux-supplemental, bounded-browser-windows-supplemental]
+    if: always()
     runs-on: ubuntu-latest
     steps:
+      - name: Require static and supplemental browser predecessors
+        shell: bash
+        env:
+          STATIC_RESULT: ${{ needs.static-and-unit.result }}
+          WINDOWS_SUPPLEMENTAL_GROUPS: ${{ needs.classify-change.outputs.windows_supplemental_groups }}
+          WINDOWS_SUPPLEMENTAL_RESULT: ${{ needs.bounded-browser-windows-supplemental.result }}
+          LINUX_SUPPLEMENTAL_GROUPS: ${{ needs.classify-change.outputs.linux_supplemental_groups }}
+          LINUX_SUPPLEMENTAL_RESULT: ${{ needs.bounded-browser-linux-supplemental.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$STATIC_RESULT" != "success" ]]; then
+            echo "::error::static-and-unit concluded $STATIC_RESULT"
+            exit 1
+          fi
+          if [[ -n "$WINDOWS_SUPPLEMENTAL_GROUPS" && "$WINDOWS_SUPPLEMENTAL_RESULT" != "success" ]]; then
+            echo "::error::required Windows supplemental groups ($WINDOWS_SUPPLEMENTAL_GROUPS) concluded $WINDOWS_SUPPLEMENTAL_RESULT"
+            exit 1
+          fi
+          if [[ -z "$WINDOWS_SUPPLEMENTAL_GROUPS" && "$WINDOWS_SUPPLEMENTAL_RESULT" != "skipped" ]]; then
+            echo "::error::empty Windows supplemental groups unexpectedly concluded $WINDOWS_SUPPLEMENTAL_RESULT"
+            exit 1
+          fi
+          if [[ -n "$LINUX_SUPPLEMENTAL_GROUPS" && "$LINUX_SUPPLEMENTAL_RESULT" != "success" ]]; then
+            echo "::error::required Linux supplemental groups ($LINUX_SUPPLEMENTAL_GROUPS) concluded $LINUX_SUPPLEMENTAL_RESULT"
+            exit 1
+          fi
+          if [[ -z "$LINUX_SUPPLEMENTAL_GROUPS" && "$LINUX_SUPPLEMENTAL_RESULT" != "skipped" ]]; then
+            echo "::error::empty Linux supplemental groups unexpectedly concluded $LINUX_SUPPLEMENTAL_RESULT"
+            exit 1
+          fi
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}

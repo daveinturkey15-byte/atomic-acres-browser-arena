@@ -7,6 +7,7 @@ import {
 
 const workflow = readFileSync('.github/workflows/release-production.yml', 'utf8');
 const verifyWorkflow = readFileSync('.github/workflows/verify.yml', 'utf8');
+const pipelineGuard = readFileSync('scripts/release/pipeline-guard.mjs', 'utf8');
 const receiptWriter = readFileSync('scripts/release/write-production-receipt.mjs', 'utf8');
 const productionEnv = readFileSync('.env.production', 'utf8');
 const diagnosticsPreviewRunner = readFileSync('scripts/qa/run-pass64-diagnostics-browser.mjs', 'utf8');
@@ -190,6 +191,13 @@ describe('production release workflow', () => {
     expect(verifyWorkflow).toContain('QA_E2E_GROUPS: ${{ needs.classify-change.outputs.windows_supplemental_groups }}');
     expect(verifyWorkflow).toContain('QA_E2E_GROUPS: ${{ needs.classify-change.outputs.linux_supplemental_groups }}');
     expect(verifyWorkflow).toContain('bounded-browser-linux-supplemental, bounded-browser-windows-supplemental');
+    expect(verifyWorkflow).toContain('requirements-acceptance:\n    needs: [classify-change, static-and-unit, bounded-browser-linux-supplemental, bounded-browser-windows-supplemental]\n    if: always()');
+    expect(verifyWorkflow).toContain('WINDOWS_SUPPLEMENTAL_RESULT: ${{ needs.bounded-browser-windows-supplemental.result }}');
+    expect(verifyWorkflow).toContain('LINUX_SUPPLEMENTAL_RESULT: ${{ needs.bounded-browser-linux-supplemental.result }}');
+    expect(verifyWorkflow).toContain('empty Windows supplemental groups unexpectedly concluded $WINDOWS_SUPPLEMENTAL_RESULT');
+    expect(verifyWorkflow).toContain('empty Linux supplemental groups unexpectedly concluded $LINUX_SUPPLEMENTAL_RESULT');
+    expect(pipelineGuard).toContain("'bounded-browser-linux-supplemental'");
+    expect(pipelineGuard).toContain("'bounded-browser-windows-supplemental'");
   });
 
   it('owns and closes the local preview lifecycle for every catalogued Playwright gate', () => {
