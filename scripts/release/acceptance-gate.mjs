@@ -6,6 +6,7 @@ import { dirname, isAbsolute, join, normalize, relative, resolve } from 'node:pa
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { classifyPaths } from './change-impact.mjs';
+import { parsePass71CandidateAArtifactReference } from './pass71-candidate-artifact-reference.mjs';
 import {
   PASS71_GRENADE_NATIVE_EVIDENCE,
   PASS71_GRENADE_NATIVE_EVIDENCE_DESCRIPTOR,
@@ -232,7 +233,7 @@ function changedManifestPaths(base, head, policy) {
   });
 }
 
-function validateEvidence(requirement, errors, policy) {
+function validateEvidence(requirement, errors, policy, context = {}) {
   if (!Array.isArray(requirement.evidence) || requirement.evidence.length === 0) {
     errors.push(`${requirement.id}: evidence must contain at least one entry`);
     return;
@@ -250,6 +251,14 @@ function validateEvidence(requirement, errors, policy) {
     }
     kinds.add(evidence.kind);
     if (!nonEmpty(evidence.ref)) errors.push(`${prefix}: ref is required`);
+    if (context.releasePass === 'PASS 71' && typeof evidence.ref === 'string'
+      && evidence.ref.startsWith('artifact://')) {
+      try {
+        parsePass71CandidateAArtifactReference(evidence.ref, context.sourceSha);
+      } catch (error) {
+        errors.push(`${prefix}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
     if (!nonEmpty(evidence.note)) errors.push(`${prefix}: note is required`);
     if (LOCAL_EVIDENCE.has(evidence.kind)) {
       if (!nonEmpty(evidence.command)) errors.push(`${prefix}: command is required for ${evidence.kind}`);
@@ -300,7 +309,10 @@ export function validateAcceptanceManifest(manifest, options = {}) {
       }
       if (!ACCEPTANCE_TYPES.has(requirement.acceptance)) errors.push(`${requirement.id}: invalid acceptance type`);
       if (!REQUIREMENT_STATES.has(requirement.state)) errors.push(`${requirement.id}: state must be verified or deferred`);
-      if (requirement.state === 'verified') validateEvidence(requirement, errors, policy);
+      if (requirement.state === 'verified') validateEvidence(requirement, errors, policy, {
+        releasePass: manifest.releasePass,
+        sourceSha: manifest.preview?.sourceSha,
+      });
       if (requirement.state === 'deferred') {
         const decision = requirement.deferApproval;
         if (!decision || decision.approvedBy !== policy.ownerHandle || !isIsoDate(decision.approvedAt) || !nonEmpty(decision.reason)) {

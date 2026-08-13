@@ -6,6 +6,10 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { inflateRawSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { validateAcceptanceManifest } from './acceptance-gate.mjs';
+import {
+  pass71CandidateAArtifactNames,
+  parsePass71CandidateAArtifactReference,
+} from './pass71-candidate-artifact-reference.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPOSITORY_ROOT = resolve(dirname(SCRIPT_PATH), '..', '..');
@@ -380,6 +384,44 @@ export function inspectPass71CandidateAAcceptanceArtifactZip(zipBytes) {
   return receipt;
 }
 
+export function collectPass71CandidateAArtifactReferences(manifest, sourceSha) {
+  const references = new Map();
+  for (const requirement of manifest?.requirements ?? []) {
+    if (requirement?.state !== 'verified') continue;
+    for (const evidence of requirement?.evidence ?? []) {
+      if (typeof evidence?.ref !== 'string' || !evidence.ref.startsWith('artifact://')) continue;
+      const parsed = parsePass71CandidateAArtifactReference(evidence.ref, sourceSha);
+      const key = `${parsed.artifactName}\u0000${parsed.path}`;
+      const prior = references.get(key);
+      invariant(!prior || (prior.sha256 === parsed.sha256 && prior.byteLength === parsed.byteLength),
+        `Pass 71 candidate artifact file has conflicting evidence identities: ${parsed.artifactName}/${parsed.path}`);
+      references.set(key, parsed);
+    }
+  }
+  return Object.freeze([...references.values()].sort((left, right) => (
+    `${left.artifactName}/${left.path}`.localeCompare(`${right.artifactName}/${right.path}`)
+  )));
+}
+
+export function inspectPass71CandidateAShardArtifactZip(zipBytes, expectedReferences = []) {
+  invariant(zipBytes instanceof Uint8Array, 'candidate A shard artifact ZIP must be bytes');
+  const entries = readZipEntries(zipBytes).filter((entry) => !entry.directory);
+  invariant(entries.length > 0, 'candidate A shard artifact contains no files');
+  const byPath = new Map(entries.map((entry) => [entry.canonical, entry]));
+  const files = [];
+  for (const reference of expectedReferences) {
+    const entry = byPath.get(reference.path);
+    invariant(entry, `candidate A shard artifact is missing referenced file: ${reference.path}`);
+    invariant(entry.bytes.length === reference.byteLength,
+      `candidate A shard artifact byte length differs for ${reference.path}`);
+    const fileSha256 = sha256(entry.bytes);
+    invariant(fileSha256 === reference.sha256,
+      `candidate A shard artifact SHA-256 differs for ${reference.path}`);
+    files.push({ path: reference.path, byteLength: entry.bytes.length, sha256: fileSha256 });
+  }
+  return Object.freeze({ fileCount: entries.length, referencedFiles: Object.freeze(files) });
+}
+
 function githubHeaders(token) {
   return {
     Accept: 'application/vnd.github+json',
@@ -724,6 +766,70 @@ async function verifyPass71CandidateAAcceptanceArtifact({
   };
 }
 
+async function verifyPass71CandidateAShardArtifacts({
+  fetchImpl, apiBase, repository, token, identity, workflowRunId, nowMs, manifest,
+}) {
+  const references = collectPass71CandidateAArtifactReferences(manifest, identity.sourceSha);
+  const referencesByArtifact = new Map();
+  for (const reference of references) {
+    const rows = referencesByArtifact.get(reference.artifactName) ?? [];
+    rows.push(reference);
+    referencesByArtifact.set(reference.artifactName, rows);
+  }
+  const results = [];
+  for (const artifactName of pass71CandidateAArtifactNames(identity.sourceSha)) {
+    const listed = await listExactArtifacts({ fetchImpl, apiBase, repository, token, artifactName });
+    invariant(listed.length === 1,
+      `Pass 71 candidate A must have exactly one shard artifact named ${artifactName}; found ${listed.length}`);
+    const artifact = listed[0];
+    const metadataErrors = validArtifactMetadata(artifact, identity, nowMs);
+    invariant(metadataErrors.length === 0,
+      `candidate A shard artifact metadata is invalid for ${artifactName}: ${metadataErrors.join('; ')}`);
+    invariant(artifact.workflow_run.id === workflowRunId,
+      `candidate A shard artifact ${artifactName} belongs to workflow run ${artifact.workflow_run.id}, expected ${workflowRunId}`);
+    invariant(typeof artifact.digest === 'string' && /^sha256:[0-9a-f]{64}$/.test(artifact.digest),
+      `candidate A shard artifact ${artifactName} is missing its GitHub SHA-256 digest`);
+    invariant(Number.isSafeInteger(artifact.size_in_bytes) && artifact.size_in_bytes > 0
+      && artifact.size_in_bytes <= DEFAULT_MAX_ARCHIVE_BYTES,
+    `candidate A shard artifact ${artifactName} has an invalid archive size`);
+    const expectedReferences = referencesByArtifact.get(artifactName) ?? [];
+    if (expectedReferences.length === 0) {
+      results.push(Object.freeze({
+        artifactId: artifact.id,
+        artifactName,
+        githubArtifactDigest: artifact.digest,
+        compressedByteLength: artifact.size_in_bytes,
+        archiveSha256: null,
+        fileCount: null,
+        referencedFiles: Object.freeze([]),
+      }));
+      continue;
+    }
+    const archive = await downloadArtifact({
+      fetchImpl, apiBase, repository, token, artifact, maxArchiveBytes: DEFAULT_MAX_ARCHIVE_BYTES,
+    });
+    const archiveSha256 = sha256(archive);
+    invariant(artifact.digest === `sha256:${archiveSha256}`,
+      `candidate A shard artifact ${artifactName} GitHub digest does not match the downloaded ZIP`);
+    const inspected = inspectPass71CandidateAShardArtifactZip(
+      archive,
+      expectedReferences,
+    );
+    results.push(Object.freeze({
+      artifactId: artifact.id,
+      artifactName,
+      githubArtifactDigest: artifact.digest,
+      compressedByteLength: artifact.size_in_bytes,
+      archiveSha256,
+      fileCount: inspected.fileCount,
+      referencedFiles: inspected.referencedFiles,
+    }));
+  }
+  invariant(results.reduce((sum, result) => sum + result.referencedFiles.length, 0) === references.length,
+    'not every Pass 71 candidate-A artifact reference was resolved');
+  return Object.freeze(results);
+}
+
 function artifactSummary(artifact, errors) {
   return {
     id: artifact.id,
@@ -818,6 +924,9 @@ export async function verifyPreviewProvenance(options = {}) {
         const acceptanceArtifact = await verifyPass71CandidateAAcceptanceArtifact({
           fetchImpl, apiBase, repository, token, identity, workflowRunId: workflowRun.id, nowMs,
         });
+        const shardArtifacts = await verifyPass71CandidateAShardArtifacts({
+          fetchImpl, apiBase, repository, token, identity, workflowRunId: workflowRun.id, nowMs, manifest,
+        });
         candidateAWorkflow = {
           runId: workflowRun.id,
           status: workflowRun.status,
@@ -829,6 +938,9 @@ export async function verifyPreviewProvenance(options = {}) {
           acceptanceArtifactId: acceptanceArtifact.artifactId,
           acceptanceArtifactName: acceptanceArtifact.artifactName,
           acceptanceArtifactSha256: acceptanceArtifact.archiveSha256,
+          shardArtifactCount: shardArtifacts.length,
+          referencedShardFileCount: shardArtifacts.reduce((sum, artifact) => sum + artifact.referencedFiles.length, 0),
+          shardArtifacts,
         };
       }
       const archive = await downloadArtifact({

@@ -1,8 +1,11 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
   PASS71_CANDIDATE_A_REQUIRED_SUCCESS_JOBS,
   computePreviewTree,
+  collectPass71CandidateAArtifactReferences,
   inspectPass71CandidateAAcceptanceArtifactZip,
+  inspectPass71CandidateAShardArtifactZip,
   inspectPreviewArtifactZip,
   parsePreviewManifest,
   validatePass71CandidateAWorkflowJobs,
@@ -10,6 +13,10 @@ import {
   verifyPreviewProvenance,
   type PreviewIdentity,
 } from '../scripts/release/verify-pr-preview-provenance.mjs';
+import {
+  pass71CandidateAArtifactNames,
+  parsePass71CandidateAArtifactReference,
+} from '../scripts/release/pass71-candidate-artifact-reference.mjs';
 
 const SOURCE_SHA = 'a'.repeat(40);
 const OTHER_SHA = 'b'.repeat(40);
@@ -458,6 +465,43 @@ describe('Pass 66 immutable preview provenance', () => {
 });
 
 describe('Pass 71 candidate A workflow provenance', () => {
+  it('freezes two Windows and eleven Linux exact-SHA supplemental artifacts', () => {
+    const names = pass71CandidateAArtifactNames(SOURCE_SHA);
+    expect(names).toHaveLength(13);
+    expect(new Set(names)).toHaveLength(13);
+    expect(names).toContain(`pass71-windows-supplemental-pass70-chopper-gunner-${SOURCE_SHA}`);
+    expect(names).toContain(`pass71-linux-supplemental-pass71-nuke-warning-${SOURCE_SHA}`);
+    expect(() => parsePass71CandidateAArtifactReference('artifact://chooser/accepted.png', SOURCE_SHA))
+      .toThrow(/invalid canonical shape/);
+  });
+
+  it('collects and byte-verifies exact referenced candidate-A shard files', () => {
+    const artifactName = `pass71-linux-supplemental-pass71-nuke-warning-${SOURCE_SHA}`;
+    const image = encoder.encode('lossless-png-fixture');
+    const imageSha = createHash('sha256').update(image).digest('hex');
+    const manifest = acceptedManifest();
+    manifest.releasePass = 'PASS 71';
+    manifest.requirements[0].evidence.push({
+      kind: 'visual',
+      ref: `artifact://candidate-a/${artifactName}/artifacts/pass71/nuke-warning/active.png?sha256=${imageSha}&bytes=${image.length}`,
+      command: 'not-required-for-visual-evidence',
+      note: 'Exact candidate-A Nuke warning raster.',
+    });
+    const references = collectPass71CandidateAArtifactReferences(manifest, SOURCE_SHA);
+    expect(references).toEqual([{
+      artifactName,
+      path: 'artifacts/pass71/nuke-warning/active.png',
+      sha256: imageSha,
+      byteLength: image.length,
+    }]);
+    expect(inspectPass71CandidateAShardArtifactZip(storedZip([{
+      name: 'artifacts/pass71/nuke-warning/active.png', bytes: image,
+    }]), references)).toMatchObject({ fileCount: 1, referencedFiles: references.map(({ path, sha256, byteLength }) => ({ path, sha256, byteLength })) });
+    expect(() => inspectPass71CandidateAShardArtifactZip(storedZip([{
+      name: 'artifacts/pass71/nuke-warning/active.png', bytes: encoder.encode('changed'),
+    }]), references)).toThrow(/byte length differs|SHA-256 differs/);
+  });
+
   it('requires the exact green static, broad and sharded browser topology with only requirements red', () => {
     expect(validatePass71CandidateAWorkflowJobs(pass71CandidateAJobs())).toMatchObject({
       id: 10_000,

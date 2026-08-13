@@ -76,6 +76,7 @@ function pass71Manifest(tooling: Readonly<Record<string, string>>) {
   manifest.preview.ref = `pr-preview-71-${manifest.preview.sourceSha}`;
   manifest.humanAcceptance.evidence = 'Dave\'s standing conditional publication authorization is bound here; Dave did not inspect or test this immutable preview.';
   const requirement = manifest.requirements[0];
+  requirement.evidence[1].ref = `artifact://candidate-a/pass71-linux-supplemental-pass71-nuke-warning-${manifest.preview.sourceSha}/artifacts/pass71/nuke-warning/active.png?sha256=${'a'.repeat(64)}&bytes=1`;
   manifest.requirements = Array.from({ length: 19 }, (_, index) => {
     const row = structuredClone(requirement) as typeof requirement & {
       feedbackId: string;
@@ -159,6 +160,14 @@ describe('release acceptance manifest', () => {
     expect(result.errors.join('\n')).toMatch(/served-browser evidence/);
     expect(result.errors.join('\n')).toMatch(/visual artifact/);
   });
+
+  it('rejects generic artifact references in Pass 71 verified evidence', () => {
+    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
+    const { manifest } = pass71Manifest(tooling);
+    manifest.requirements[2].evidence[1].ref = 'artifact://chooser/accepted.png';
+    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
+      .toMatch(/candidate artifact reference has an invalid canonical shape/);
+  }, 20_000);
 
   it('allows only explicitly owner-approved deferrals', () => {
     const manifest = acceptedManifest();
