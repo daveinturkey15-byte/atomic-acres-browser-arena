@@ -1,5 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import {
+  PASS71_HF297_ARMS_EVIDENCE_REGISTRY_ENTRY,
+  createPass71Hf297EvidenceFixture,
+  pass71Hf297VerifiedRequirementFailures,
+} from '../scripts/qa/pass71-hf297-arms-evidence-contract.mjs';
 
 describe('HF-297 partial non-closing first-person arms evidence wiring', () => {
   it('binds exact candidate A, installed hardware Chrome, bounded lossless sheets and all-weapon telemetry', () => {
@@ -41,6 +46,21 @@ describe('HF-297 partial non-closing first-person arms evidence wiring', () => {
     expect(contract).toContain("'WebGPU is not captured by this HF-297 component");
     expect(contract).toContain("'hosted multiplayer roles are not crossed");
     expect(contract).toContain("'Dave has not inspected or tested these exact-candidate visual sheets'");
+    expect(contract).toContain("if (record.closesFeedback !== false) failures.push('feedback-closing-prohibited')");
     expect(contract).toContain("if (record.closingAuthority !== false) failures.push('non-closing-authority')");
+    expect(PASS71_HF297_ARMS_EVIDENCE_REGISTRY_ENTRY.descriptor).toEqual({
+      evidenceId: 'HF-297',
+      kind: 'pass71-hf297-first-person-arms-component',
+      minimumCount: 0,
+      maximumCount: 1,
+    });
+    expect(pass71Hf297VerifiedRequirementFailures(
+      { id: 'R2', feedbackId: 'HF-297', state: 'verified' },
+      [createPass71Hf297EvidenceFixture()],
+    )).toEqual(['hf297-closing-evidence-required']);
+    expect(pass71Hf297VerifiedRequirementFailures(
+      { id: 'R2', feedbackId: 'HF-297', state: 'deferred' },
+      [createPass71Hf297EvidenceFixture()],
+    )).toEqual(['hf297-requirement-must-be-verified']);
   });
 });

@@ -11,6 +11,7 @@ import {
   createPass71Hf297EvidenceFixture,
   pass71Hf297EvidenceFailures,
   pass71Hf297RecordSha256,
+  pass71Hf297VerifiedRequirementFailures,
 } from './pass71-hf297-arms-evidence-contract.mjs';
 
 const sourceSha = 'a'.repeat(40);
@@ -42,7 +43,6 @@ describe('Pass 71 HF-297 first-person arms evidence contract', () => {
       kind: 'pass71-hf297-first-person-arms-component',
       minimumCount: 0,
       maximumCount: 1,
-      closesFeedback: false,
     });
     assert.equal(PASS71_HF297_ARMS_EVIDENCE_REGISTRY_ENTRY.descriptor,
       PASS71_HF297_ARMS_EVIDENCE_DESCRIPTOR);
@@ -109,6 +109,27 @@ describe('Pass 71 HF-297 first-person arms evidence contract', () => {
     record.closingAuthority = true;
     resign(record);
     assert(pass71Hf297EvidenceFailures(record, expected).includes('non-closing-authority'));
+
+    const closesFeedback = fixture();
+    closesFeedback.closesFeedback = true;
+    resign(closesFeedback);
+    assert(pass71Hf297EvidenceFailures(closesFeedback, expected).includes('feedback-closing-prohibited'));
+  });
+
+  it('cannot satisfy a verified HF-297 requirement as supporting evidence', () => {
+    const requirement = { id: 'R2', feedbackId: 'HF-297', state: 'verified' };
+    assert.deepEqual(pass71Hf297VerifiedRequirementFailures(requirement, [fixture()]), [
+      'hf297-closing-evidence-required',
+    ]);
+    assert.deepEqual(pass71Hf297VerifiedRequirementFailures(requirement, []), [
+      'hf297-closing-evidence-required',
+    ]);
+    assert.deepEqual(pass71Hf297VerifiedRequirementFailures(
+      { ...requirement, state: 'deferred' }, [fixture()],
+    ), ['hf297-requirement-must-be-verified']);
+    assert.deepEqual(pass71Hf297VerifiedRequirementFailures(
+      { ...requirement, feedbackId: 'HF-296' }, [fixture()],
+    ), []);
   });
 
   it('rejects missing or cross-drifted component receipts', () => {

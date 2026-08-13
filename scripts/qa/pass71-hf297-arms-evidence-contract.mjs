@@ -11,6 +11,7 @@ export const PASS71_HF297_ARMS_EVIDENCE = Object.freeze({
   feedbackId: 'HF-297',
   status: 'passed',
   coverageDisposition: 'partial-non-closing-component-evidence',
+  closesFeedback: false,
   closingAuthority: false,
 });
 
@@ -19,7 +20,6 @@ export const PASS71_HF297_ARMS_EVIDENCE_DESCRIPTOR = Object.freeze({
   kind: PASS71_HF297_ARMS_EVIDENCE.kind,
   minimumCount: 0,
   maximumCount: 1,
-  closesFeedback: false,
 });
 
 export const PASS71_HF297_VIEWPORTS = Object.freeze([
@@ -468,10 +468,11 @@ export function pass71Hf297EvidenceFailures(record, expected = {}) {
   }
   exactKeys(record, [
     'schemaVersion', 'evidenceId', 'kind', 'contract', 'feedbackId', 'status',
-    'coverageDisposition', 'closingAuthority', 'startedAt', 'completedAt', 'source', 'servedCandidate',
+    'coverageDisposition', 'closesFeedback', 'closingAuthority', 'startedAt', 'completedAt', 'source', 'servedCandidate',
     'environment', 'browser', 'tooling', 'coverage', 'components', 'visualFrames', 'visualSheets',
     'catalogTelemetry', 'faults', 'receiptSha256',
   ], 'record', failures);
+  if (record.closesFeedback !== false) failures.push('feedback-closing-prohibited');
   if (record.closingAuthority !== false) failures.push('non-closing-authority');
   validateSource(record.source, expected, failures);
   validateServedCandidate(record.servedCandidate, expected, failures);
@@ -526,6 +527,18 @@ export function createPass71Hf297EvidenceRegistryEntry() {
 }
 
 export const PASS71_HF297_ARMS_EVIDENCE_REGISTRY_ENTRY = createPass71Hf297EvidenceRegistryEntry();
+
+export function pass71Hf297VerifiedRequirementFailures(requirement, records) {
+  if (requirement?.feedbackId !== PASS71_HF297_ARMS_EVIDENCE.feedbackId) return [];
+  if (requirement?.state !== 'verified') return ['hf297-requirement-must-be-verified'];
+  if (!Array.isArray(records) || records.length === 0) return ['hf297-closing-evidence-required'];
+  const closingRecords = records.filter((record) => record?.evidenceId === PASS71_HF297_ARMS_EVIDENCE.evidenceId
+    && record?.feedbackId === PASS71_HF297_ARMS_EVIDENCE.feedbackId
+    && record?.closesFeedback === true
+    && record?.closingAuthority === true);
+  if (closingRecords.length !== 1) return ['hf297-closing-evidence-required'];
+  return [];
+}
 
 function fixtureFraming() {
   return {

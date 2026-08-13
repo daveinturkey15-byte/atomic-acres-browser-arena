@@ -3,7 +3,6 @@ export type Pass71Hf297EvidenceDescriptor = Readonly<{
   kind: 'pass71-hf297-first-person-arms-component';
   minimumCount: 0;
   maximumCount: 1;
-  closesFeedback: false;
 }>;
 
 export declare const PASS71_HF297_ARMS_EVIDENCE_DESCRIPTOR: Pass71Hf297EvidenceDescriptor;
@@ -32,3 +31,10 @@ export declare function pass71Hf297ToolingHashesAtSource(
   sourceSha: string,
 ): Readonly<Record<string, string>>;
 export declare function pass71Hf297SourceTreeAtSource(repositoryRoot: string, sourceSha: string): string;
+export declare function createPass71Hf297EvidenceFixture(
+  options?: Readonly<Record<string, unknown>>,
+): Record<string, unknown>;
+export declare function pass71Hf297VerifiedRequirementFailures(
+  requirement: unknown,
+  records: readonly unknown[],
+): string[];
