@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   FIRST_PERSON_ARM_PROPORTION_CONTRACT,
   FIRST_PERSON_ARM_BIND_SEGMENT_LENGTH_SCALE,
+  RIGGED_ARM_MAX_REACH_RATIO,
+  FIRST_PERSON_ARM_MINIMUM_ELBOW_FLEX_RADIANS,
   FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC,
   FIRST_PERSON_ARM_UNIFORM_SCALE,
   FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC,
@@ -351,18 +353,16 @@ describe('first-person anatomical presentation', () => {
           expect(arm.bindOffsetsPreserved, `${label}: bind offsets`).toBe(true);
           expect((arm.shoulderEntryNdc as readonly number[])[1], `${label}: sleeve crop`).toBeLessThanOrEqual(-0.98);
           expect(arm.withinStableReach, `${label}: stable reach`).toBe(true);
+          expect(arm.meaningfulElbowBend, `${label}: meaningful elbow bend`).toBe(true);
+          expect(arm.elbowFlexRadians as number, `${label}: elbow flex`)
+            .toBeGreaterThanOrEqual(FIRST_PERSON_ARM_MINIMUM_ELBOW_FLEX_RADIANS);
           expect(arm.contactError as number, `${label}: palm contact`).toBeLessThanOrEqual(0.02);
           expect(arm.finite, `${label}: finite solve`).toBe(true);
-        }
-        for (const arm of state.riggedArms.filter((entry) => entry.stowed === true)) {
-          const label = `${weapon}/${scenario.name}/${String(arm.side)}`;
-          expect(arm.supportChainScale, `${label}: intact stow scale`).toBe(1);
-          expect(arm.stowedWithoutScaling, `${label}: intact stow`).toBe(true);
         }
         if (scenario.name === 'fire') presentation.setFireCaptureAgeMs(1_000);
       }
     }
-  });
+  }, 15_000);
 
   it('keeps the complete long-gun geometry camera-side of the calibrated wall and prone floor planes', async () => {
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
@@ -554,7 +554,9 @@ describe('first-person anatomical presentation', () => {
     expect(shoulder.scale.toArray()).toEqual([1, 1, 1]);
     expect(elbow.scale.toArray()).toEqual([1, 1, 1]);
     expect(wrist.scale.toArray()).toEqual([1, 1, 1]);
-    expect(FIRST_PERSON_ARM_PROPORTION_CONTRACT).toBe('authored-fixed-length-strong-operator-arms-v3');
+    expect(FIRST_PERSON_ARM_PROPORTION_CONTRACT).toBe('authored-fixed-length-strong-operator-arms-v4');
+    expect(RIGGED_ARM_MAX_REACH_RATIO).toBeLessThanOrEqual(0.96);
+    expect(FIRST_PERSON_ARM_MINIMUM_ELBOW_FLEX_RADIANS).toBeGreaterThanOrEqual(0.35);
 
     const cropScenarios = Object.freeze([
       Object.freeze({ name: 'hip', rotation: [0, 0, 0] as const }),

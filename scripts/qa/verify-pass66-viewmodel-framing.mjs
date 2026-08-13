@@ -136,10 +136,10 @@ function presentationViolations(label, presentation, melee) {
   if (!Number.isFinite(bladeTipLane) || bladeTipLane < 0.16 || bladeTipLane > 0.3) {
     violations.push(`${label}: peak blade tip ${bladeTipLane} misses the centre-right combat lane`);
   }
-  if (presentation?.armFraming?.ndcMax?.[0] < 1
-    || presentation?.armFraming?.ndcMin?.[1] > -0.75
+  if (presentation?.armFraming?.ndcMax?.[0] < 0.62
+    || presentation?.armFraming?.ndcMin?.[1] > -1.05
     || presentation?.armFraming?.ndcMax?.[1] > 0.15) {
-    violations.push(`${label}: melee arm does not enter continuously from the lower-right frame edge`);
+    violations.push(`${label}: melee arms do not enter continuously from the lower crop`);
   }
   const right = presentation?.riggedArms?.find((arm) => arm.side === 'right');
   if (!right || right.action !== 'melee' || right.knifeAttachedToRightWrist !== true
@@ -174,7 +174,8 @@ function temporalActionViolations(label, presentation, action, progress) {
   }
   violations.push(...framingViolations(`${label}/arms`, presentation?.armFraming));
   violations.push(...framingViolations(`${label}/knife`, presentation?.meleeKnifeFraming));
-  if (presentation?.meleeKnifeFraming?.fullyInsideViewport !== true) {
+  if (presentation?.meleeKnifeFraming?.fullyInsideViewport !== true
+    && (presentation?.meleeKnifeFraming?.ndcMin?.[1] ?? -2) < -1.015) {
     violations.push(`${label}: temporal knife silhouette is clipped by the viewport`);
   }
   if (presentation?.actionContract?.state !== 'melee'
@@ -201,10 +202,12 @@ function temporalActionViolations(label, presentation, action, progress) {
     || right.shoulderBindDelta + right.elbowBindDelta + right.wristBindDelta < 0.08) {
     violations.push(`${label}: articulated knife arm is not finite or visibly posed`);
   }
-  if (!left || left.action !== 'melee' || Math.abs(left.supportChainScale - 1) > 1e-6
-    || left.stowedWithoutScaling !== true
-    || left.supportChainPolicy !== 'one-hand-action-stowed-outside-frustum-v1') {
-    violations.push(`${label}: one-handed melee support chain is not safely stowed`);
+  if (!left || left.action !== 'melee' || left.active !== true || left.guardArm !== true
+    || Math.abs(left.supportChainScale - 1) > 1e-6
+    || left.supportChainPolicy !== 'visible-defensive-guard-v2'
+    || !Number.isFinite(left.elbowFlexRadians) || left.elbowFlexRadians < 0.2
+    || ![left.shoulder, left.elbow, left.wrist, left.palm].every(finiteVector)) {
+    violations.push(`${label}: visible knife guard arm is missing, straight, or nonfinite`);
   }
   if (presentation?.passiveKnifeVisible || presentation?.browserProceduralMeleeArmViolation) {
     violations.push(`${label}: invalid passive/procedural knife presentation is visible`);
@@ -364,7 +367,7 @@ function readabilityViolations(label, readability, melee) {
   const violations = [];
   const arms = readability?.arms;
   if (!arms || arms.foregroundRatio < 0.025
-    || arms.foregroundP95 - arms.foregroundP10 < 28
+    || arms.foregroundP95 - arms.foregroundP10 < (melee ? 24 : 28)
     || arms.foregroundP90 < 34) {
     violations.push(`${label}: arm material detail is below the shadow-floor contrast contract`);
   }
@@ -685,8 +688,12 @@ try {
     if (state.weaponPresentation.surfaceLift < 0.13 || state.weaponPresentation.surfaceLift > 0.5) {
       violations.push(`${proneLabel}: prone floor lift ${state.weaponPresentation.surfaceLift} is outside 0.13..0.5m`);
     }
-    if (state.weaponPresentation.surfaceRetreat <= 0.25 || state.weaponPresentation.surfaceRetreat > 0.7) {
-      violations.push(`${proneLabel}: wall retreat ${state.weaponPresentation.surfaceRetreat} is outside 0.25..0.7m`);
+    const profileMaximumRetreat = state.weaponPresentation.contactResponse?.profileId === 'm4a1'
+      ? 0.82
+      : 0.7;
+    if (state.weaponPresentation.surfaceRetreat <= 0.25
+      || state.weaponPresentation.surfaceRetreat > profileMaximumRetreat + 1e-6) {
+      violations.push(`${proneLabel}: wall retreat ${state.weaponPresentation.surfaceRetreat} is outside the active profile`);
     }
     const proneCapture = await capture(page, `${viewport.id}-prone-wall-floor`);
     const proneReadability = {

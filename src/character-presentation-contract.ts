@@ -97,6 +97,81 @@ export type CameraFramingTelemetry = {
   nearestDepth: number;
 };
 
+/**
+ * Current deformed framing for only the vertices influenced by one authored
+ * arm branch. The four-material FPS delivery intentionally combines both arms
+ * into each SkinnedMesh, so object bounds cannot prove that each sleeve exits
+ * the bottom edge independently. This diagnostic runs only when presentation
+ * telemetry is requested, never in the live update path.
+ */
+export function measureSkinnedBranchCameraFraming(
+  object: THREE.Object3D,
+  camera: THREE.Camera,
+  branchRoot: THREE.Object3D,
+): CameraFramingTelemetry | null {
+  object.updateWorldMatrix(true, true);
+  camera.updateWorldMatrix(true, false);
+  const bounds = new THREE.Box3().makeEmpty();
+  const localVertex = new THREE.Vector3();
+  const worldVertex = new THREE.Vector3();
+  object.traverse((child) => {
+    if (!(child instanceof THREE.SkinnedMesh) || !effectivelyVisibleWithin(child, object)) return;
+    const position = child.geometry.getAttribute('position');
+    const skinIndex = child.geometry.getAttribute('skinIndex');
+    const skinWeight = child.geometry.getAttribute('skinWeight');
+    if (!position || !skinIndex || !skinWeight || skinIndex.itemSize !== 4 || skinWeight.itemSize !== 4) return;
+    // Resolve ancestry once per skeleton/bone for this branch. Walking the
+    // hierarchy for each of the four influences on every vertex made repeated
+    // QA snapshots expensive enough to trip the renderer progress watchdog.
+    const branchInfluence = child.skeleton.bones.map((bone) => {
+      let current: THREE.Object3D | null = bone;
+      while (current) {
+        if (current === branchRoot) return true;
+        current = current.parent;
+      }
+      return false;
+    });
+    const indices = [0, 0, 0, 0];
+    const weights = [0, 0, 0, 0];
+    for (let vertex = 0; vertex < position.count; vertex += 1) {
+      indices[0] = skinIndex.getX(vertex); indices[1] = skinIndex.getY(vertex);
+      indices[2] = skinIndex.getZ(vertex); indices[3] = skinIndex.getW(vertex);
+      weights[0] = skinWeight.getX(vertex); weights[1] = skinWeight.getY(vertex);
+      weights[2] = skinWeight.getZ(vertex); weights[3] = skinWeight.getW(vertex);
+      if (!indices.some((index, slot) => weights[slot]! > 1e-5 && branchInfluence[index] === true)) continue;
+      localVertex.fromBufferAttribute(position, vertex);
+      child.applyBoneTransform(vertex, localVertex);
+      worldVertex.copy(localVertex).applyMatrix4(child.matrixWorld);
+      bounds.expandByPoint(worldVertex);
+    }
+  });
+  if (bounds.isEmpty()) return null;
+  const corners: THREE.Vector3[] = [];
+  for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y]) for (const z of [bounds.min.z, bounds.max.z]) {
+    corners.push(new THREE.Vector3(x, y, z));
+  }
+  let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity; let nearestDepth = Infinity;
+  let finite = true;
+  for (const world of corners) {
+    const cameraPoint = camera.worldToLocal(world.clone());
+    nearestDepth = Math.min(nearestDepth, -cameraPoint.z);
+    const projected = world.project(camera);
+    finite = finite && projected.toArray().every(Number.isFinite) && Number.isFinite(nearestDepth);
+    minX = Math.min(minX, projected.x); minY = Math.min(minY, projected.y);
+    maxX = Math.max(maxX, projected.x); maxY = Math.max(maxY, projected.y);
+  }
+  const near = camera instanceof THREE.PerspectiveCamera || camera instanceof THREE.OrthographicCamera ? camera.near : 0;
+  return {
+    finite,
+    nearPlaneClear: finite && nearestDepth > near,
+    intersectsViewport: finite && maxX >= -1 && minX <= 1 && maxY >= -1 && minY <= 1,
+    fullyInsideViewport: finite && minX >= -1 && maxX <= 1 && minY >= -1 && maxY <= 1,
+    ndcMin: [minX, minY],
+    ndcMax: [maxX, maxY],
+    nearestDepth,
+  };
+}
+
 /** Deterministic near-plane and viewport framing for a visible object bounds. */
 export function measureCameraFraming(
   object: THREE.Object3D,
