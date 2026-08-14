@@ -148,20 +148,28 @@ describe('Pass 71 first-action and protected-release gate', () => {
       'all six authored panes breach by knife and retire debris by 5s',
       'all six authored panes breach by grenade and retire debris by 5s',
     ]) expect(glassLifecycleSpec).toContain(title);
-    const crossbowImpactHelper = glassLifecycleSpec.match(
-      /async function fireAndObserveLiveCrossbowImpact[\s\S]+?\n\}\n/u,
-    )?.[0] ?? '';
+    const crossbowImpactStart = glassLifecycleSpec.indexOf('async function fireAndObserveLiveCrossbowImpact');
+    const crossbowImpactEnd = glassLifecycleSpec.indexOf('\nasync function resetBreakableWindows', crossbowImpactStart);
+    const crossbowImpactHelper = glassLifecycleSpec.slice(crossbowImpactStart, crossbowImpactEnd);
     expect(glassLifecycleSpec).toContain('const LIVE_CROSSBOW_IMPACT_TIMEOUT_MS = 2_000;');
-    expect(crossbowImpactHelper).toContain('timeoutMs: LIVE_CROSSBOW_IMPACT_TIMEOUT_MS');
-    expect(crossbowImpactHelper).toContain('performance.now() - startedAt >= timeoutMs');
-    expect(crossbowImpactHelper).toContain('window.setTimeout(failAtDeadline, timeoutMs)');
-    expect(crossbowImpactHelper).toContain('candidate.impactWindowId === impactedPane?.id');
-    expect(crossbowImpactHelper).toContain('candidate.detonatesInMs > 0');
-    expect(crossbowImpactHelper).toContain('impactWindowId: bolt.impactWindowId');
-    expect(crossbowImpactHelper.indexOf('requestAnimationFrame(sampleAfterGameFrame)'))
+    expect(glassLifecycleSpec).toContain('const CROSSBOW_IMPACT_RECEIPT_COLLECTION_TIMEOUT_MS = 8_000;');
+    expect(crossbowImpactHelper).toContain('const arm = debug.armExplosiveBoltImpactObservation(paneIndex);');
+    expect(crossbowImpactHelper).toContain('const action = debug.fireOnce();');
+    expect(crossbowImpactHelper).toContain('debug.bindExplosiveBoltImpactObservation(arm, action)');
+    expect(crossbowImpactHelper).toContain('.readExplosiveBoltImpactReceipt(bound, maxImpactLatencyMs)');
+    expect(crossbowImpactHelper).toContain('maxImpactLatencyMs: LIVE_CROSSBOW_IMPACT_TIMEOUT_MS');
+    expect(crossbowImpactHelper).toContain('timeout: CROSSBOW_IMPACT_RECEIPT_COLLECTION_TIMEOUT_MS');
+    expect(crossbowImpactHelper).toContain('actualImpactLatencyMs: read.actualImpactLatencyMs');
+    expect(crossbowImpactHelper).toContain('observedAfterDetonation: read.observedAfterDetonation');
+    expect(crossbowImpactHelper.indexOf('armExplosiveBoltImpactObservation(paneIndex)'))
       .toBeLessThan(crossbowImpactHelper.indexOf('debug.fireOnce()'));
+    expect(crossbowImpactHelper.indexOf('debug.fireOnce()'))
+      .toBeLessThan(crossbowImpactHelper.indexOf('bindExplosiveBoltImpactObservation(arm, action)'));
+    expect(crossbowImpactHelper).not.toContain('debug.snapshot()');
+    expect(crossbowImpactHelper).not.toContain('detonatesInMs');
     expect(glassLifecycleSpec).toContain('await fireAndObserveLiveCrossbowImpact(page, pane)');
     expect(glassLifecycleSpec).toContain('impactWindowId: before.id');
+    expect(glassLifecycleSpec).toContain('actualImpactLatencyMs).toBeLessThanOrEqual(LIVE_CROSSBOW_IMPACT_TIMEOUT_MS)');
     expect(glassLifecycleSpec).toContain(')), { timeout: 2_000 }).toBeGreaterThan(impactCountBefore)');
     expect(glassLifecycleSpec).toContain('}, { paneIndex: index, phase: expectedPhase }, { timeout: 8_000 });');
     expect(glassLifecycleSpec).toContain('), { colliderCountBefore: rapierColliderCountBefore }, { timeout: 5_000 });');

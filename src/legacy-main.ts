@@ -132,6 +132,13 @@ import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type 
 import { nextShotDeadline } from './combat-timing';
 import { SEMTEX_HITL_CONTRACT, flashbangPresentation, semtexBlastDamage, semtexBlastRadiusM } from './combat/pass65-ordnance-contract';
 import { ExplosiveBoltTargetBuffer, type ExplosiveBoltTargetKind } from './combat/explosive-bolt-target-buffer';
+import {
+  ExplosiveBoltImpactReceiptLedger,
+  bindExplosiveBoltImpactObservation,
+  type ExplosiveBoltImpactObservationArm,
+  type ExplosiveBoltImpactObservationBinding,
+  type LocalExplosiveBoltActionIdentity,
+} from './explosive-bolt-impact-receipt';
 import { latestChangelogEntry } from './changelog';
 import { bindReleaseHistoryDialog } from './ui/release-history-dialog';
 import { bindProjectMapDialog } from './ui/project-map-dialog';
@@ -4953,6 +4960,8 @@ let lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
 let flashHostAuthority = new FlashHostAuthority(interactiveWorldMatchEpoch, 'host');
 let flashVictimConsumer = new FlashVictimResultConsumer(interactiveWorldMatchEpoch, 'pending-player', 0);
 const explosiveBolts: ExplosiveBoltEntity[] = [];
+const explosiveBoltImpactReceipts = new ExplosiveBoltImpactReceiptLedger();
+let lastLocalExplosiveBoltActionIdentity: LocalExplosiveBoltActionIdentity | null = null;
 const explosiveBoltStartScratch = new THREE.Vector3();
 const explosiveBoltDeltaScratch = new THREE.Vector3();
 const explosiveBoltTargetPositionScratch = new THREE.Vector3();
@@ -13384,6 +13393,15 @@ function spawnPersistentWindowDebrisSynchronously(
   });
   windowGlassDebrisLifecycleTelemetry.spawned += 1;
   if (!physicsEligible) windowGlassDebrisLifecycleTelemetry.presentationFallbacks += 1;
+  if (physicsEligible && characterPhysics) {
+    // Deployment already owns creation of this exact disabled Rapier pair.
+    // Enable it at admission, then preserve the real pose returned by Rapier;
+    // the deferred full sync below still reconciles pane/dynamic/nav authority.
+    characterPhysics.syncMajorDebrisBodies(activeMajorDebrisPhysicsBodies());
+    const admittedSnapshots = characterPhysics.majorDebrisSnapshots();
+    const observedAt = performance.now();
+    ingestPersistentWindowDebrisPhysicsSnapshots(admittedSnapshots, observedAt);
+  }
   return true;
 }
 
@@ -18885,6 +18903,106 @@ function spawnExplosiveBolt(
     impactWindowId: null,
     actionNonce,
   });
+  if (ownerId === player.id) {
+    lastLocalExplosiveBoltActionIdentity = Object.freeze({
+      matchEpoch: interactiveWorldMatchEpoch,
+      ownerId,
+      actionNonce,
+      authority,
+      spawnedAt: now,
+    });
+  }
+}
+
+function recordLocalExplosiveBoltWindowImpactReceipt(
+  bolt: ExplosiveBoltEntity,
+  impactWindowId: string,
+  impactedAt: number,
+): void {
+  if (!bolt.authority || bolt.ownerId !== player.id) return;
+  const pane = arena.breakableWindows.find((candidate) => candidate.id === impactWindowId);
+  const state = pane?.glassState;
+  if (!pane || !state || state.matchEpoch !== interactiveWorldMatchEpoch) return;
+  const projection = glassAuthorityProjection(state);
+  const broken = pane.broken;
+  const visible = pane.mesh.visible;
+  const activeWorldColliderPresent = activeGlassDynamicColliders()
+    .some(({ id }) => id === `glass:${impactWindowId}`);
+  if (broken !== false
+    || visible !== true
+    || activeWorldColliderPresent !== true
+    || projection.phase !== 'intact'
+    || projection.paneVisible !== true
+    || projection.apertureOpen !== false
+    || projection.movementSolid !== true
+    || projection.ballisticSolid !== true
+    || projection.aiLineOfSightSolid !== true) return;
+  explosiveBoltImpactReceipts.record({
+    matchEpoch: interactiveWorldMatchEpoch,
+    ownerId: bolt.ownerId,
+    actionNonce: bolt.actionNonce,
+    authority: bolt.authority,
+    spawnedAt: bolt.spawnedAt,
+    impactedAt,
+    impactWindowId,
+    position: Object.freeze([
+      bolt.mesh.position.x,
+      bolt.mesh.position.y,
+      bolt.mesh.position.z,
+    ]),
+    detonatesAt: bolt.detonatesAt,
+    pane: Object.freeze({
+      id: pane.id,
+      broken,
+      visible,
+      activeWorldColliderPresent,
+      rapierDynamicColliderCount: characterPhysics?.dynamicColliderCount() ?? 0,
+      authority: Object.freeze({
+        phase: projection.phase,
+        paneVisible: projection.paneVisible,
+        apertureOpen: projection.apertureOpen,
+        movementSolid: projection.movementSolid,
+        ballisticSolid: projection.ballisticSolid,
+        aiLineOfSightSolid: projection.aiLineOfSightSolid,
+      }),
+    }),
+  });
+}
+
+function armLocalExplosiveBoltImpactObservation(paneIndex: number): ExplosiveBoltImpactObservationArm | null {
+  if (network.role === 'client' || !Number.isSafeInteger(paneIndex)) return null;
+  const pane = arena.breakableWindows[paneIndex];
+  const state = pane?.glassState;
+  if (!pane || !state || state.matchEpoch !== interactiveWorldMatchEpoch) return null;
+  const projection = glassAuthorityProjection(state);
+  if (pane.broken
+    || !pane.mesh.visible
+    || projection.phase !== 'intact'
+    || !activeGlassDynamicColliders().some(({ id }) => id === `glass:${pane.id}`)) return null;
+  return Object.freeze({
+    cursor: explosiveBoltImpactReceipts.cursor(),
+    matchEpoch: interactiveWorldMatchEpoch,
+    ownerId: player.id,
+    impactWindowId: pane.id,
+    armedAt: performance.now(),
+  });
+}
+
+function bindLocalExplosiveBoltImpactObservation(
+  arm: ExplosiveBoltImpactObservationArm,
+  action: LocalExplosiveBoltActionIdentity | null,
+): ExplosiveBoltImpactObservationBinding | null {
+  if (action === null
+    || action !== lastLocalExplosiveBoltActionIdentity
+    || !explosiveBoltImpactReceipts.acceptsCursor(arm.cursor)) return null;
+  return bindExplosiveBoltImpactObservation(arm, action);
+}
+
+function readLocalExplosiveBoltImpactReceipt(
+  binding: ExplosiveBoltImpactObservationBinding,
+  maxImpactLatencyMs: number,
+) {
+  return explosiveBoltImpactReceipts.readExact(binding, maxImpactLatencyMs, performance.now());
 }
 
 function disposeExplosiveBolt(entity: ExplosiveBoltEntity): void {
@@ -19534,6 +19652,9 @@ function updateExplosiveBolts(dt: number, now: number): void {
         bolt.detonatesAt = Math.min(bolt.expiresAt, now + EXPLOSIVE_BOLT_ARM_DELAY_MS);
         bolt.nextFuseBeepAt = now;
         bolt.velocity.set(0, 0, 0);
+        if (bolt.impactWindowId !== null) {
+          recordLocalExplosiveBoltWindowImpactReceipt(bolt, bolt.impactWindowId, now);
+        }
       } else {
         bolt.mesh.position.add(delta);
       }
@@ -23394,6 +23515,8 @@ function clearGrenades(): void {
   grenades.length = 0;
   for (const bolt of explosiveBolts) disposeExplosiveBolt(bolt);
   explosiveBolts.length = 0;
+  explosiveBoltImpactReceipts.clear();
+  lastLocalExplosiveBoltActionIdentity = null;
   smokeVolumePresentationPool.clear();
   smokeVolumes.length = 0;
   smokeAuthority.reset(interactiveWorldMatchEpoch, network.role === 'client' ? 'replica' : 'host');
@@ -27666,6 +27789,15 @@ const debugWindow = window as Window & {
     sampleHf296RemoteProjection: () => ReturnType<typeof sampleHf296RemoteProjection>;
     sampleHf296ColliderField: () => ReturnType<typeof sampleHf296ColliderField>;
     sampleWindowDebrisLifecycle: (paneIndex: number) => ReturnType<typeof sampleWindowDebrisLifecycle>;
+    armExplosiveBoltImpactObservation: (paneIndex: number) => ExplosiveBoltImpactObservationArm | null;
+    bindExplosiveBoltImpactObservation: (
+      arm: ExplosiveBoltImpactObservationArm,
+      action: LocalExplosiveBoltActionIdentity | null,
+    ) => ExplosiveBoltImpactObservationBinding | null;
+    readExplosiveBoltImpactReceipt: (
+      binding: ExplosiveBoltImpactObservationBinding,
+      maxImpactLatencyMs: number,
+    ) => ReturnType<typeof readLocalExplosiveBoltImpactReceipt>;
     stageHf296ContactAction: (action: Hf296ContactAction) => ReturnType<typeof sampleHf296FireIdentity>;
     traceBallistics: (
       weapon: WeaponId,
@@ -27968,7 +28100,7 @@ const debugWindow = window as Window & {
     setRenderPaused: (paused: boolean) => void;
     recoverFromVisibilityRegain: () => void;
     openMenu: () => void;
-    fireOnce: () => void;
+    fireOnce: () => LocalExplosiveBoltActionIdentity | null;
     setTriggerHeld: (held: boolean) => void;
     stageSmokeVolume: (distance?: number) => string;
     authorStickyEffect: (source: StickyAttachmentSource) => QaStickyEffectResult | null;
@@ -29516,6 +29648,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleHf296RemoteProjection,
   sampleHf296ColliderField,
   sampleWindowDebrisLifecycle,
+  armExplosiveBoltImpactObservation: armLocalExplosiveBoltImpactObservation,
+  bindExplosiveBoltImpactObservation: bindLocalExplosiveBoltImpactObservation,
+  readExplosiveBoltImpactReceipt: readLocalExplosiveBoltImpactReceipt,
   stageHf296ContactAction,
   snapshot: () => ({
     bootstrap: {
@@ -32239,11 +32374,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   recoverFromVisibilityRegain: () => recoverFromSchedulingInterruption('debug visibility regain'),
   openMenu: () => openActiveMatchPause('debug-pause'),
   fireOnce: () => {
+    const previousExplosiveBoltAction = lastLocalExplosiveBoltActionIdentity;
     debugInputUnlocked = true;
     setLocalTriggerHeld(true);
     tryFire(performance.now());
     setLocalTriggerHeld(false);
     debugInputUnlocked = false;
+    return lastLocalExplosiveBoltActionIdentity !== previousExplosiveBoltAction
+      ? lastLocalExplosiveBoltActionIdentity
+      : null;
   },
   setTriggerHeld: (held: boolean) => {
     mouseTriggerHeld = held;

@@ -55,6 +55,25 @@ describe('persistent physical house-window debris integration', () => {
   });
 
   it('captures the first real Rapier pose immediately after body sync without backdating a late pose', () => {
+    const spawnStart = source.indexOf('function spawnPersistentWindowDebrisSynchronously(');
+    const spawnEnd = source.indexOf('\nfunction clearPersistentWindowDebris(', spawnStart);
+    const spawn = source.slice(spawnStart, spawnEnd);
+    const admission = spawn.indexOf('persistentWindowDebris.set(id, {');
+    const eligibility = spawn.indexOf('if (physicsEligible && characterPhysics) {');
+    const immediateSync = spawn.indexOf('characterPhysics.syncMajorDebrisBodies(activeMajorDebrisPhysicsBodies());');
+    const actualSnapshots = spawn.indexOf('const admittedSnapshots = characterPhysics.majorDebrisSnapshots();');
+    const actualObservedAt = spawn.indexOf('const observedAt = performance.now();', actualSnapshots);
+    const immediateIngest = spawn.indexOf(
+      'ingestPersistentWindowDebrisPhysicsSnapshots(admittedSnapshots, observedAt);',
+    );
+    expect(admission).toBeGreaterThanOrEqual(0);
+    expect(eligibility).toBeGreaterThan(admission);
+    expect(immediateSync).toBeGreaterThan(eligibility);
+    expect(actualSnapshots).toBeGreaterThan(immediateSync);
+    expect(actualObservedAt).toBeGreaterThan(actualSnapshots);
+    expect(immediateIngest).toBeGreaterThan(actualObservedAt);
+    expect(spawn.slice(eligibility, immediateIngest)).not.toContain('spawnedAt +');
+
     const syncStart = source.indexOf('function syncInteractiveWorldPhysics(');
     const syncEnd = source.indexOf('\nfunction scheduleWindowGlassPhysicsSync()', syncStart);
     const sync = source.slice(syncStart, syncEnd);

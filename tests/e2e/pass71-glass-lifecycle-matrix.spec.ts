@@ -8,6 +8,7 @@ const PROFILES = [
 ] as const;
 const PANE_COUNT = 6;
 const LIVE_CROSSBOW_IMPACT_TIMEOUT_MS = 2_000;
+const CROSSBOW_IMPACT_RECEIPT_COLLECTION_TIMEOUT_MS = 8_000;
 const DEBRIS_SPAWN_TIMEOUT_MS = 5_000;
 const DEBRIS_PHYSICS_TIMEOUT_MS = 1_500;
 const DEBRIS_MOVEMENT_TIMEOUT_MS = 2_500;
@@ -131,12 +132,19 @@ type PaneObservation = Readonly<{
 
 type CrossbowImpactSample = Readonly<{
   bolt: Readonly<{
-    impacted: boolean;
-    authority: boolean;
+    impacted: true;
+    authority: true;
+    ownerId: string;
+    actionNonce: number;
     impactWindowId: string;
-    detonatesInMs: number;
+    position: readonly number[];
+    spawnedAt: number;
+    impactedAt: number;
+    detonatesAt: number;
+    actualImpactLatencyMs: number;
   }>;
-  pane: PaneObservation;
+  pane: Omit<PaneObservation, 'position'>;
+  observedAfterDetonation: boolean;
 }>;
 
 type DebrisLifecycleSample = Readonly<{
@@ -220,63 +228,58 @@ async function observePane(page: Page, index: number): Promise<PaneObservation> 
 }
 
 async function fireAndObserveLiveCrossbowImpact(page: Page, index: number): Promise<CrossbowImpactSample> {
-  return page.evaluate(({ paneIndex, timeoutMs }) => new Promise<CrossbowImpactSample>((resolveImpact, rejectImpact) => {
+  const binding = await page.evaluate((paneIndex) => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
-    const startedAt = performance.now();
-    let animationFrame = 0;
-    let timeout = 0;
-    let settled = false;
-
-    const finish = (result: CrossbowImpactSample | Error): void => {
-      if (settled) return;
-      settled = true;
-      window.cancelAnimationFrame(animationFrame);
-      window.clearTimeout(timeout);
-      if (result instanceof Error) rejectImpact(result);
-      else resolveImpact(result);
-    };
-    const failAtDeadline = (): void => finish(new Error(
-      `No live impacted crossbow fuse within ${timeoutMs}ms (elapsed ${Math.round(performance.now() - startedAt)}ms)`,
-    ));
-    const sampleAfterGameFrame = (): void => {
-      if (performance.now() - startedAt >= timeoutMs) {
-        failAtDeadline();
-        return;
-      }
-      const snapshot = debug.snapshot() as any;
-      const impactedPane = snapshot.breakableWindows[paneIndex];
-      const bolt = snapshot.projectileGlass.explosiveBolts
-        .find((candidate: any) => (
-          candidate.authority === true
-            && candidate.impacted === true
-            && candidate.impactWindowId === impactedPane?.id
-            && candidate.detonatesInMs > 0
-        ));
-      if (bolt) {
-        finish({
-          bolt: {
-            impacted: bolt.impacted,
-            authority: bolt.authority,
-            impactWindowId: bolt.impactWindowId,
-            detonatesInMs: bolt.detonatesInMs,
-          },
-          pane: {
-            ...impactedPane,
-            authority: { ...impactedPane.authority },
-            rapierDynamicColliders: snapshot.interactiveWorld.rapierDynamicColliders,
-          },
-        });
-        return;
-      }
-      animationFrame = window.requestAnimationFrame(sampleAfterGameFrame);
-    };
-
-    // Register behind the already-scheduled game callback before firing. This
-    // samples the exact post-update frame without a second protocol round trip.
-    animationFrame = window.requestAnimationFrame(sampleAfterGameFrame);
-    timeout = window.setTimeout(failAtDeadline, timeoutMs);
-    debug.fireOnce();
-  }), { paneIndex: index, timeoutMs: LIVE_CROSSBOW_IMPACT_TIMEOUT_MS });
+    const arm = debug.armExplosiveBoltImpactObservation(paneIndex);
+    if (!arm) throw new Error(`Unable to arm exact crossbow impact receipt for pane ${paneIndex}`);
+    const action = debug.fireOnce();
+    const bound = debug.bindExplosiveBoltImpactObservation(arm, action);
+    if (!bound) throw new Error(`Crossbow fire did not produce one newly spawned authoritative action for pane ${paneIndex}`);
+    return bound;
+  }, index);
+  // Collection may happen after the fuse has detonated on a starved CI worker.
+  // Admission still uses only the retained event's actual impact-spawn delta.
+  const receiptHandle = await page.waitForFunction(({ bound, maxImpactLatencyMs }) => {
+    const result = window.__ATOMIC_ACRES_DEBUG__
+      .readExplosiveBoltImpactReceipt(bound, maxImpactLatencyMs);
+    return result.status === 'pending' ? null : result;
+  }, {
+    bound: binding,
+    maxImpactLatencyMs: LIVE_CROSSBOW_IMPACT_TIMEOUT_MS,
+  }, {
+    timeout: CROSSBOW_IMPACT_RECEIPT_COLLECTION_TIMEOUT_MS,
+    polling: 50,
+  });
+  const read = await receiptHandle.jsonValue() as any;
+  await receiptHandle.dispose();
+  if (read.status !== 'accepted') {
+    throw new Error(`Exact crossbow impact receipt rejected: ${read.reason}`);
+  }
+  const receipt = read.receipt;
+  return Object.freeze({
+    bolt: Object.freeze({
+      impacted: true,
+      authority: receipt.authority,
+      ownerId: receipt.ownerId,
+      actionNonce: receipt.actionNonce,
+      impactWindowId: receipt.impactWindowId,
+      position: Object.freeze([...receipt.position]),
+      spawnedAt: receipt.spawnedAt,
+      impactedAt: receipt.impactedAt,
+      detonatesAt: receipt.detonatesAt,
+      actualImpactLatencyMs: read.actualImpactLatencyMs,
+    }),
+    pane: Object.freeze({
+      id: receipt.pane.id,
+      broken: receipt.pane.broken,
+      visible: receipt.pane.visible,
+      activeWorldColliderPresent: receipt.pane.activeWorldColliderPresent,
+      persistentDebrisId: null,
+      authority: Object.freeze({ ...receipt.pane.authority }),
+      rapierDynamicColliders: receipt.pane.rapierDynamicColliderCount,
+    }),
+    observedAfterDetonation: read.observedAfterDetonation,
+  });
 }
 
 async function resetBreakableWindows(page: Page): Promise<void> {
@@ -939,7 +942,11 @@ for (const profile of PROFILES) {
         authority: true,
         impactWindowId: before.id,
       });
-      expect(impactSample.bolt.detonatesInMs).toBeGreaterThan(0);
+      expect(Number.isSafeInteger(impactSample.bolt.actionNonce)).toBe(true);
+      expect(impactSample.bolt.actualImpactLatencyMs).toBeLessThanOrEqual(LIVE_CROSSBOW_IMPACT_TIMEOUT_MS);
+      expect(impactSample.bolt.impactedAt).toBeGreaterThanOrEqual(impactSample.bolt.spawnedAt);
+      expect(impactSample.bolt.detonatesAt).toBeGreaterThan(impactSample.bolt.impactedAt);
+      expect(impactSample.bolt.position.every(Number.isFinite)).toBe(true);
       const impacted = impactSample.pane;
       expect(impacted, `${profile.label}/explosive-crossbow pane ${pane} remains solid on bolt impact`)
         .toMatchObject({
