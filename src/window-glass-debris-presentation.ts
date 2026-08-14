@@ -344,6 +344,12 @@ export function integrateWindowGlassDebrisFallback(
   ) => WindowGlassDebrisFallbackSweep,
   movementOrigin: WindowGlassDebrisFallbackVector | null = null,
 ): WindowGlassDebrisFallbackResult {
+  const maxElapsedSeconds = WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS / 1_000;
+  const elapsedTolerance = Number.EPSILON * Math.max(
+    1,
+    Math.abs(elapsedSeconds),
+    maxElapsedSeconds,
+  );
   const values = [
     elapsedSeconds,
     ...Object.values(initialState.position),
@@ -353,9 +359,10 @@ export function integrateWindowGlassDebrisFallback(
   ];
   if (!values.every(Number.isFinite)
     || elapsedSeconds < 0
-    || elapsedSeconds > WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS / 1_000) {
+    || elapsedSeconds > maxElapsedSeconds + elapsedTolerance) {
     throw new TypeError('window glass debris fallback requires finite bounded motion');
   }
+  const boundedElapsedSeconds = Math.min(elapsedSeconds, maxElapsedSeconds);
 
   let position = { ...initialState.position };
   let velocity = { ...initialState.velocity };
@@ -376,10 +383,10 @@ export function integrateWindowGlassDebrisFallback(
   };
 
   captureMoving();
-  while (elapsedSeconds - advancedSeconds > Number.EPSILON) {
+  while (boundedElapsedSeconds - advancedSeconds > Number.EPSILON) {
     const stepSeconds = Math.min(
       WINDOW_GLASS_DEBRIS_FALLBACK_MAX_STEP_SECONDS,
-      elapsedSeconds - advancedSeconds,
+      boundedElapsedSeconds - advancedSeconds,
     );
     const nextVelocity = {
       x: velocity.x,

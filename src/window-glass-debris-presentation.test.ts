@@ -211,6 +211,40 @@ describe('persistent window glass debris presentation', () => {
     expect(result.support).toEqual({ restY: halfExtents.y, source: 'world-floor' });
   });
 
+  it('clamps only an ULP-sized exact-lifetime subtraction excess', () => {
+    const state = {
+      position: { x: 0, y: 100, z: 0 },
+      velocity: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      angular: { x: 0, y: 0, z: 0 },
+    };
+    const noSupport = () => ({ restY: null, source: null, impactFraction: null });
+    const maxElapsedSeconds = WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS / 1_000;
+    const timestamp = 3_692.0048154258648;
+    const roundedExactLifetime = (
+      timestamp + WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS - timestamp
+    ) / 1_000;
+    expect(roundedExactLifetime).toBeGreaterThan(maxElapsedSeconds);
+    expect(integrateWindowGlassDebrisFallback(
+      state,
+      maxElapsedSeconds,
+      noSupport,
+    ).elapsedSeconds).toBe(maxElapsedSeconds);
+    expect(integrateWindowGlassDebrisFallback(
+      state,
+      roundedExactLifetime,
+      noSupport,
+    ).elapsedSeconds).toBe(maxElapsedSeconds);
+    for (const rejected of [
+      maxElapsedSeconds + 1e-6,
+      -Number.EPSILON,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+    ]) {
+      expect(() => integrateWindowGlassDebrisFallback(state, rejected, noSupport)).toThrow(TypeError);
+    }
+  });
+
   it('derives a sparse-callback catch-up interval from policy boundaries without moving retirement', () => {
     expect(windowGlassDebrisFallbackInterval({
       spawnedAt: 1_000,
