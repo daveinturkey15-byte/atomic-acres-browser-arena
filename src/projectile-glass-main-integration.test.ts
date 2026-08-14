@@ -55,14 +55,27 @@ describe('catalog-wide projectile glass integration', () => {
     expect(detonation).toContain("weaponGlassBreakPolicy('explosive-crossbow')");
     expect(detonation).toContain('admitProjectileSimulationGlassMutation(bolt.authority)');
     expect(detonation).toContain('breakWindowsInWeaponBlast(');
+    expect(detonation).toContain("'explosive-crossbow',\n      bolt.impactWindowId,");
     expect(detonation).not.toContain("network.role === 'client' && bolt.ownerId === player.id");
     expect(detonation.indexOf('breakWindowsInWeaponBlast(')).toBeLessThan(detonation.indexOf('disposeExplosiveBolt('));
     expect(detonation.indexOf('breakWindowsInWeaponBlast(')).toBeLessThan(detonation.indexOf('if (!bolt.authority) return;'));
 
     const blast = block('function breakWindowsInWeaponBlast(', '\nfunction synchronizeSmokePresentation(');
     expect(blast).toContain('for (const pane of arena.breakableWindows)');
+    expect(blast.match(/activeWorldColliders\(\)/gu)).toHaveLength(1);
+    expect(blast).toContain('const worldColliderSnapshot = Object.freeze([...activeWorldColliders()]);');
+    expect(blast).toContain('windowBlastLineOfSightColliders(');
+    expect(blast).toContain('(collider) => activeGlassColliderWindowIds.get(collider) ?? null,');
+    expect(blast).toContain('windowBreakPathBlocked(point, centre, blastLineOfSightColliders)');
     expect(blast).toContain("'shot',");
     expect(blast).toContain('weapon,');
+
+    const update = block('function updateExplosiveBolts(', '\nfunction throwGrenade(');
+    expect(update).toContain('bolt.impactWindowId = worldCollision !== null && worldFraction <= glassFraction');
+    expect(update).toContain('? activeGlassColliderWindowIds.get(worldCollision.box) ?? null');
+
+    const snapshot = block('projectileGlass: {', '\n    dmrThermal:');
+    expect(snapshot).toContain('impactWindowId: bolt.impactWindowId,');
   });
 
   it('admits only host-canonical projectile breaks tied to the exact live action and pane', () => {
@@ -80,7 +93,7 @@ describe('catalog-wide projectile glass integration', () => {
     expect(projectileBreak).toBeGreaterThan(projectileAdmissionGate);
     expect(remote.indexOf('if (!remote) return;')).toBeGreaterThan(projectileBreak);
     const paneMutation = block('function breakHouseWindow(', '\nfunction breakWindowsAlongBallisticTrace(');
-    expect(paneMutation).toContain('spawnPersistentWindowDebris(window, normal);');
+    expect(paneMutation).toContain('spawnPersistentWindowDebris(window, normal, impactId);');
     expect(paneMutation).toContain("spawnImpactFlash(point, 'glass', normal);");
     expect(paneMutation).toContain("audio.impact('glass', point.distanceTo(camera.position));");
   });

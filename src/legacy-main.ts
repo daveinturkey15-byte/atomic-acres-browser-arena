@@ -881,7 +881,11 @@ import {
   type RailgunShotResultMessage,
   type RailgunStateMessage,
 } from './railgun-authority';
-import { selectPlayableWindowApproach, windowBreakPathBlocked } from './window-breaks';
+import {
+  selectPlayableWindowApproach,
+  windowBlastLineOfSightColliders,
+  windowBreakPathBlocked,
+} from './window-breaks';
 import { resolveRenderProfile, type RenderProfile } from './render-profile';
 import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRandom, runtimeRandomTelemetry, runtimeSeed } from './runtime-random';
 import {
@@ -1112,6 +1116,7 @@ type ExplosiveBoltEntity = {
   nextFuseBeepAt: number | null;
   targetId: string | null;
   targetLifeId: number | null;
+  impactWindowId: string | null;
   actionNonce: number;
 };
 
@@ -18843,6 +18848,7 @@ function spawnExplosiveBolt(
     nextFuseBeepAt: null,
     targetId: null,
     targetLifeId: null,
+    impactWindowId: null,
     actionNonce,
   });
 }
@@ -18948,6 +18954,7 @@ function detonateExplosiveBoltEntity(bolt: ExplosiveBoltEntity, now: number): vo
       blastRadiusM,
       bolt.ownerId,
       'explosive-crossbow',
+      bolt.impactWindowId,
     );
   }
   disposeExplosiveBolt(bolt);
@@ -19486,6 +19493,9 @@ function updateExplosiveBolts(dt: number, now: number): void {
       } else if (worldCollision || glassCollision) {
         const collisionFraction = Math.min(worldFraction, glassFraction);
         bolt.mesh.position.copy(start).addScaledVector(delta, collisionFraction);
+        bolt.impactWindowId = worldCollision !== null && worldFraction <= glassFraction
+          ? activeGlassColliderWindowIds.get(worldCollision.box) ?? null
+          : null;
         bolt.impactedAt = now;
         bolt.detonatesAt = Math.min(bolt.expiresAt, now + EXPLOSIVE_BOLT_ARM_DELAY_MS);
         bolt.nextFuseBeepAt = now;
@@ -19628,15 +19638,22 @@ function breakWindowsInWeaponBlast(
   radius: number,
   ownerId: string,
   weapon: WeaponId,
+  impactWindowId: string | null,
 ): number {
   const policy = weaponGlassBreakPolicy(weapon);
   if (policy.timing !== 'detonation') return 0;
+  const worldColliderSnapshot = Object.freeze([...activeWorldColliders()]);
+  const blastLineOfSightColliders = windowBlastLineOfSightColliders(
+    worldColliderSnapshot,
+    impactWindowId,
+    (collider) => activeGlassColliderWindowIds.get(collider) ?? null,
+  );
   let broken = 0;
   for (const pane of arena.breakableWindows) {
     if (pane.broken) continue;
     const centre = pane.mesh.getWorldPosition(new THREE.Vector3());
     if (centre.distanceTo(point) > radius) continue;
-    if (windowBreakPathBlocked(point, centre, activeWorldColliders())) continue;
+    if (windowBreakPathBlocked(point, centre, blastLineOfSightColliders)) continue;
     const normal = centre.clone().sub(point);
     if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
     else normal.normalize().multiplyScalar(-1);
@@ -29452,6 +29469,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         actionNonce: bolt.actionNonce,
         authority: bolt.authority,
         impacted: bolt.impactedAt !== null,
+        impactWindowId: bolt.impactWindowId,
         position: bolt.mesh.position.toArray(),
         detonatesInMs: Math.max(0, bolt.detonatesAt - performance.now()),
       })),

@@ -130,7 +130,12 @@ type PaneObservation = Readonly<{
 }>;
 
 type CrossbowImpactSample = Readonly<{
-  bolt: Readonly<{ impacted: boolean; authority: boolean; detonatesInMs: number }>;
+  bolt: Readonly<{
+    impacted: boolean;
+    authority: boolean;
+    impactWindowId: string;
+    detonatesInMs: number;
+  }>;
   pane: PaneObservation;
 }>;
 
@@ -239,18 +244,20 @@ async function fireAndObserveLiveCrossbowImpact(page: Page, index: number): Prom
         return;
       }
       const snapshot = debug.snapshot() as any;
+      const impactedPane = snapshot.breakableWindows[paneIndex];
       const bolt = snapshot.projectileGlass.explosiveBolts
         .find((candidate: any) => (
           candidate.authority === true
             && candidate.impacted === true
+            && candidate.impactWindowId === impactedPane?.id
             && candidate.detonatesInMs > 0
         ));
       if (bolt) {
-        const impactedPane = snapshot.breakableWindows[paneIndex];
         finish({
           bolt: {
             impacted: bolt.impacted,
             authority: bolt.authority,
+            impactWindowId: bolt.impactWindowId,
             detonatesInMs: bolt.detonatesInMs,
           },
           pane: {
@@ -927,7 +934,11 @@ for (const profile of PROFILES) {
         await armPaneDebrisLifecycleObservation(page, pane, `${profile.label}/explosive-crossbow`);
       }
       const impactSample = await fireAndObserveLiveCrossbowImpact(page, pane);
-      expect(impactSample.bolt).toMatchObject({ impacted: true, authority: true });
+      expect(impactSample.bolt).toMatchObject({
+        impacted: true,
+        authority: true,
+        impactWindowId: before.id,
+      });
       expect(impactSample.bolt.detonatesInMs).toBeGreaterThan(0);
       const impacted = impactSample.pane;
       expect(impacted, `${profile.label}/explosive-crossbow pane ${pane} remains solid on bolt impact`)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sweepSphereAgainstBoxes, type Box2 } from './collision';
+import { segmentIntersectsBox, sweepSphereAgainstBoxes, type Box2 } from './collision';
 import { resolveIdentifiedGlassSweepImpact, type ProjectileGlassRayHit } from './projectile-glass-collision';
 
 const start = Object.freeze({ x: 0, y: 0, z: 0 });
@@ -23,6 +23,25 @@ function resolve(
 }
 
 describe('identified projectile glass collision', () => {
+  it('retains a grazing pane identity from the winning sphere even when the centre ray misses', () => {
+    const delta = Object.freeze({ x: 10, y: 0, z: 0 });
+    const grazingPane: Box2 = Object.freeze({
+      minX: 4,
+      maxX: 4.04,
+      minY: -1,
+      maxY: 1,
+      minZ: radiusM * 0.75,
+      maxZ: radiusM * 1.5,
+    });
+    const worldHit = sweepSphereAgainstBoxes(start, delta, [grazingPane], radiusM);
+    const end = Object.freeze({ x: start.x + delta.x, y: start.y + delta.y, z: start.z + delta.z });
+    const colliderWindowIds = new WeakMap<Box2, string>([[grazingPane, 'grazed-pane']]);
+
+    expect(segmentIntersectsBox(start, end, grazingPane)).toBe(false);
+    expect(worldHit?.box).toBe(grazingPane);
+    expect(colliderWindowIds.get(worldHit!.box)).toBe('grazed-pane');
+  });
+
   it('does not misattribute a pane behind unrelated grazing cover', () => {
     const delta = Object.freeze({ x: 10, y: 0, z: 0.2 });
     const grazingCover: Box2 = Object.freeze({
