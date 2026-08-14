@@ -241,23 +241,31 @@ export function deriveFrameActionBudget(
     ),
   );
   const relativeAllowanceMs = TARGET_FRAME_BUDGET_MS * ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS;
+  const maximumSynchronousActionMs = rounded(
+    TARGET_FRAME_BUDGET_MS * MAXIMUM_SYNCHRONOUS_ACTION_FRAME_BUDGETS,
+  );
   const softwareSemanticThresholds = Object.freeze({
     maximumAnimationFrameGapMs: rounded(baseline.maximumGapMs + relativeAllowanceMs),
+    // The profile starts before the accepted handler returns, so these first
+    // frontiers include the separately bounded synchronous handler interval.
     maximumFirstSubmissionDelayMs: rounded(
-      Math.max(baseline.p95GapMs, baseline.firstSubmissionDelayMs) + relativeAllowanceMs,
+      Math.max(baseline.p95GapMs, baseline.firstSubmissionDelayMs) + maximumSynchronousActionMs,
     ),
     maximumFirstCompletionDelayMs: rounded(
-      Math.max(baseline.p95GapMs, baseline.firstCompletionDelayMs) + relativeAllowanceMs,
+      Math.max(baseline.p95GapMs, baseline.firstCompletionDelayMs) + maximumSynchronousActionMs,
     ),
     maximumPendingForMs: rounded(baseline.maximumPendingForMs + relativeAllowanceMs),
   });
   const nativeThreshold = rounded(maximumActionMs);
-  const maximumSynchronousActionMs = rounded(
-    TARGET_FRAME_BUDGET_MS * MAXIMUM_SYNCHRONOUS_ACTION_FRAME_BUDGETS,
-  );
   const maximumFrameWorkMs = evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE
     ? nativeThreshold
-    : rounded(TARGET_FRAME_BUDGET_MS * MAXIMUM_ACTION_FRAME_BUDGETS);
+    // The software shard samples whole live-frame CPU work, not grenade-only
+    // work. Its immediately preceding completed rAF p95 is the conservative
+    // same-page ambient ceiling; retain the existing 50ms floor for fast CI.
+    : rounded(Math.max(
+      TARGET_FRAME_BUDGET_MS * MAXIMUM_ACTION_FRAME_BUDGETS,
+      baseline.p95GapMs,
+    ));
   const thresholds = evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE
     ? Object.freeze({
       maximumAnimationFrameGapMs: nativeThreshold,

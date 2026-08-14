@@ -51,13 +51,21 @@ describe('Pass 71 first-action and protected-release gate', () => {
     expect(actionBudget).toContain('Math.min(');
     expect(actionBudget).toContain('referenceBaselineMs + TARGET_FRAME_BUDGET_MS');
     expect(actionBudget).toContain('baseline.maximumGapMs + relativeAllowanceMs');
-    expect(actionBudget).toContain('Math.max(baseline.p95GapMs, baseline.firstSubmissionDelayMs) + relativeAllowanceMs');
-    expect(actionBudget).toContain('Math.max(baseline.p95GapMs, baseline.firstCompletionDelayMs) + relativeAllowanceMs');
+    expect(actionBudget).toContain('Math.max(baseline.p95GapMs, baseline.firstSubmissionDelayMs) + maximumSynchronousActionMs');
+    expect(actionBudget).toContain('Math.max(baseline.p95GapMs, baseline.firstCompletionDelayMs) + maximumSynchronousActionMs');
     expect(actionBudget).not.toContain('rounded(baseline.firstSubmissionDelayMs + relativeAllowanceMs)');
     expect(actionBudget).not.toContain('rounded(baseline.firstCompletionDelayMs + relativeAllowanceMs)');
+    expect(actionBudget).not.toContain('Math.max(baseline.p95GapMs, baseline.firstSubmissionDelayMs) + relativeAllowanceMs');
+    expect(actionBudget).not.toContain('Math.max(baseline.p95GapMs, baseline.firstCompletionDelayMs) + relativeAllowanceMs');
     expect(actionBudget).toContain('baseline.maximumPendingForMs + relativeAllowanceMs');
     expect(actionBudget).toContain('TARGET_FRAME_BUDGET_MS * MAXIMUM_SYNCHRONOUS_ACTION_FRAME_BUDGETS');
     expect(actionBudget).toContain('TARGET_FRAME_BUDGET_MS * MAXIMUM_ACTION_FRAME_BUDGETS');
+    expect(actionBudget).toContain('baseline.p95GapMs,\n    ));');
+    expect(actionBudget).toContain(
+      'const maximumFrameWorkMs = evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE\n    ? nativeThreshold',
+    );
+    expect(actionBudget).toContain('maximumFirstSubmissionDelayMs: nativeThreshold');
+    expect(actionBudget).toContain('maximumFirstCompletionDelayMs: nativeThreshold');
   });
 
   it('applies the completed-frontier envelope to cold and warm grenade actions', () => {

@@ -105,7 +105,7 @@ describe('Pass 71 frame-action baseline', () => {
     })).toThrow('synthetic-baseline baseline is already outside the no-freeze envelope');
   });
 
-  it('derives software-CI action thresholds from the immediately preceding completed baseline plus one frame', () => {
+  it('derives software-CI thresholds from the completed ambient baseline and unchanged handler ceiling', () => {
     const completedSlowBaseline = baseline(
       [140, 141, 139, 145, 142, 141, 144, 140, 143, 142],
       1_417,
@@ -118,11 +118,12 @@ describe('Pass 71 frame-action baseline', () => {
     expect(budget).toMatchObject({
       evidenceMode: SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE,
       releaseAcceptanceModeEligible: false,
+      maximumActionMs: 178.333,
       maximumSynchronousActionMs: 33.333,
-      maximumFrameWorkMs: 50,
+      maximumFrameWorkMs: 145,
       maximumAnimationFrameGapMs: 161.667,
-      maximumFirstSubmissionDelayMs: 161.667,
-      maximumFirstCompletionDelayMs: 161.667,
+      maximumFirstSubmissionDelayMs: 178.333,
+      maximumFirstCompletionDelayMs: 178.333,
       maximumPendingForMs: 16.667,
     });
     expect(frameActionBudgetFailures(budget, {
@@ -130,54 +131,131 @@ describe('Pass 71 frame-action baseline', () => {
       outerHandlerSyncMs: 33.332,
       eventToNextAnimationFrameMs: 161.666,
       maximumAnimationFrameGapMs: 161.666,
-      maximumFrameWorkMs: 49.999,
+      maximumFrameWorkMs: 144.999,
       maximumPendingForMs: 16.666,
-      firstSubmissionDelayMs: 161.666,
-      firstCompletionDelayMs: 161.666,
+      firstSubmissionDelayMs: 178.332,
+      firstCompletionDelayMs: 178.332,
     })).toEqual([]);
   });
 
-  it('uses the completed software baseline p95 when one first-frontier sample is unrepresentatively fast', () => {
-    const windowsSwiftShaderBaseline = {
-      ...baseline([119.6, 122.7, 124, 124.1, 127.6, 118.5, 120.5, 129.4, 122.3, 121.3], 1_230),
-      firstPresentedFrameDelayMs: 119.6,
-      firstSubmissionDelayMs: 119.6,
-      firstCompletionDelayMs: 119.6,
-    };
+  it('retains the existing 50ms software frame-work floor when the completed ambient p95 is faster', () => {
+    const fastSoftwareBaseline = baseline(Array.from({ length: 22 }, () => 16), 352);
     const budget = deriveFrameActionBudget(
-      windowsSwiftShaderBaseline,
+      fastSoftwareBaseline,
       SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE,
     );
-    const observedSemtexAction = {
-      internalHandlerSyncMs: 2,
-      outerHandlerSyncMs: 2.6,
-      eventToNextAnimationFrameMs: 102.3,
-      maximumAnimationFrameGapMs: 235,
-      maximumFrameWorkMs: 34.9,
-      maximumPendingForMs: 0,
-      firstSubmissionDelayMs: 145.1,
-      firstCompletionDelayMs: 145.1,
-    };
 
-    expect(budget).toMatchObject({
-      evidenceMode: SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE,
-      releaseAcceptanceModeEligible: false,
-      maximumAnimationFrameGapMs: 146.067,
-      maximumFirstSubmissionDelayMs: 146.067,
-      maximumFirstCompletionDelayMs: 146.067,
-      maximumPendingForMs: 16.667,
-      maximumSynchronousActionMs: 33.333,
-      maximumFrameWorkMs: 50,
-    });
-    expect(frameActionBudgetFailures(budget, observedSemtexAction)).toEqual([]);
-    expect(frameActionBudgetFailures(budget, {
-      ...observedSemtexAction,
-      firstSubmissionDelayMs: 146.067,
-    })).toContain('first-submission-delay:146.067>=146.067');
-    expect(frameActionBudgetFailures(budget, {
-      ...observedSemtexAction,
-      firstCompletionDelayMs: 146.067,
-    })).toContain('first-completion-delay:146.067>=146.067');
+    expect(budget.maximumFrameWorkMs).toBe(50);
+    expect(budget.releaseAcceptanceModeEligible).toBe(false);
+  });
+
+  it('admits the exact failed Windows SwiftShader receipts while rejecting every boundary and overrun', () => {
+    const receipts = [
+      {
+        grenade: 'frag',
+        baseline: {
+          gapsMs: [141.2, 120.5, 133, 125, 131.3, 137.2, 121, 120.3, 118.2, 128.9],
+          observationMs: 1_276.6,
+          firstFrontierMs: 141.2,
+        },
+        measurement: {
+          internalHandlerSyncMs: 1.8,
+          outerHandlerSyncMs: 2.5,
+          eventToNextAnimationFrameMs: 93,
+          maximumAnimationFrameGapMs: 208.2,
+          maximumFrameWorkMs: 88.9,
+          maximumPendingForMs: 0,
+          firstSubmissionDelayMs: 131.6,
+          firstCompletionDelayMs: 131.6,
+        },
+        expected: { frameWork: 141.2, firstFrontier: 174.533, animationFrame: 157.867 },
+      },
+      {
+        grenade: 'smoke',
+        baseline: {
+          gapsMs: [124.4, 128.7, 131.4, 136, 124.6, 127.5, 128.1, 128.6, 133.1, 125.9],
+          observationMs: 1_288.3,
+          firstFrontierMs: 124.4,
+        },
+        measurement: {
+          internalHandlerSyncMs: 3.3,
+          outerHandlerSyncMs: 4.1,
+          eventToNextAnimationFrameMs: 88.6,
+          maximumAnimationFrameGapMs: 213,
+          maximumFrameWorkMs: 60.3,
+          maximumPendingForMs: 0,
+          firstSubmissionDelayMs: 130.1,
+          firstCompletionDelayMs: 130.1,
+        },
+        expected: { frameWork: 136, firstFrontier: 169.333, animationFrame: 152.667 },
+      },
+      {
+        grenade: 'semtex',
+        baseline: {
+          gapsMs: [146, 137.4, 137.2, 140.5, 139.5, 129.8, 127.1, 137.7, 148.3, 138.2],
+          observationMs: 1_381.7,
+          firstFrontierMs: 146,
+        },
+        measurement: {
+          internalHandlerSyncMs: 14.1,
+          outerHandlerSyncMs: 15.4,
+          eventToNextAnimationFrameMs: 108,
+          maximumAnimationFrameGapMs: 276,
+          maximumFrameWorkMs: 54.7,
+          maximumPendingForMs: 0,
+          firstSubmissionDelayMs: 176.2,
+          firstCompletionDelayMs: 176.2,
+        },
+        expected: { frameWork: 148.3, firstFrontier: 181.633, animationFrame: 164.967 },
+      },
+    ] as const;
+
+    for (const receipt of receipts) {
+      const completedBaseline = {
+        ...baseline(receipt.baseline.gapsMs, receipt.baseline.observationMs),
+        label: `${receipt.grenade}-cold-preaction-baseline`,
+        firstPresentedFrameDelayMs: receipt.baseline.firstFrontierMs,
+        firstSubmissionDelayMs: receipt.baseline.firstFrontierMs,
+        firstCompletionDelayMs: receipt.baseline.firstFrontierMs,
+      };
+      const budget = deriveFrameActionBudget(
+        completedBaseline,
+        SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE,
+      );
+
+      expect(budget, receipt.grenade).toMatchObject({
+        evidenceMode: SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE,
+        releaseAcceptanceModeEligible: false,
+        maximumActionMs: receipt.expected.firstFrontier,
+        maximumSynchronousActionMs: 33.333,
+        maximumFrameWorkMs: receipt.expected.frameWork,
+        maximumAnimationFrameGapMs: receipt.expected.animationFrame,
+        maximumFirstSubmissionDelayMs: receipt.expected.firstFrontier,
+        maximumFirstCompletionDelayMs: receipt.expected.firstFrontier,
+        maximumPendingForMs: 16.667,
+      });
+      expect(frameActionBudgetFailures(budget, receipt.measurement), receipt.grenade).toEqual([]);
+
+      for (const [field, failureLabel, maximum] of [
+        ['maximumFrameWorkMs', 'maximum-frame-work', budget.maximumFrameWorkMs],
+        ['firstSubmissionDelayMs', 'first-submission-delay', budget.maximumFirstSubmissionDelayMs],
+        ['firstCompletionDelayMs', 'first-completion-delay', budget.maximumFirstCompletionDelayMs],
+      ] as const) {
+        expect(frameActionBudgetFailures(budget, {
+          ...receipt.measurement,
+          [field]: maximum,
+        }), `${receipt.grenade} ${field} exact boundary`).toEqual([
+          `${failureLabel}:${maximum}>=${maximum}`,
+        ]);
+        const overrun = Number((maximum + 0.001).toFixed(3));
+        expect(frameActionBudgetFailures(budget, {
+          ...receipt.measurement,
+          [field]: overrun,
+        }), `${receipt.grenade} ${field} just over boundary`).toEqual([
+          `${failureLabel}:${overrun}>=${maximum}`,
+        ]);
+      }
+    }
   });
 
   it('retains a slower corresponding first-frontier sample as the software threshold anchor', () => {
@@ -191,11 +269,12 @@ describe('Pass 71 frame-action baseline', () => {
       SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE,
     );
 
-    expect(budget.maximumFirstSubmissionDelayMs).toBe(156.667);
-    expect(budget.maximumFirstCompletionDelayMs).toBe(146.667);
+    expect(budget.maximumFirstSubmissionDelayMs).toBe(173.333);
+    expect(budget.maximumFirstCompletionDelayMs).toBe(163.333);
+    expect(budget.maximumFrameWorkMs).toBe(120);
   });
 
-  it('fails software-CI semantics closed on action-induced overhead and absolute handler/frame-work regressions', () => {
+  it('fails software-CI semantics closed on action-induced overhead and bounded handler/frame-work regressions', () => {
     const budget = deriveFrameActionBudget(
       baseline([140, 141, 139, 145, 142, 141, 144, 140, 143, 142], 1_417),
       SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE,
@@ -211,16 +290,16 @@ describe('Pass 71 frame-action baseline', () => {
       firstCompletionDelayMs: 150,
     };
 
-    expect(frameActionBudgetFailures(budget, { ...valid, firstCompletionDelayMs: 161.667 }))
-      .toContain('first-completion-delay:161.667>=161.667');
+    expect(frameActionBudgetFailures(budget, { ...valid, firstCompletionDelayMs: 178.333 }))
+      .toContain('first-completion-delay:178.333>=178.333');
     expect(frameActionBudgetFailures(budget, { ...valid, internalHandlerSyncMs: 33.333 }))
       .toContain('internal-handler-sync:33.333>=33.333');
     expect(frameActionBudgetFailures(budget, { ...valid, outerHandlerSyncMs: 33.333 }))
       .toContain('outer-handler-sync:33.333>=33.333');
     expect(frameActionBudgetFailures(budget, { ...valid, eventToNextAnimationFrameMs: 161.667 }))
       .toContain('event-to-next-animation-frame:161.667>=161.667');
-    expect(frameActionBudgetFailures(budget, { ...valid, maximumFrameWorkMs: 50 }))
-      .toContain('maximum-frame-work:50>=50');
+    expect(frameActionBudgetFailures(budget, { ...valid, maximumFrameWorkMs: 145 }))
+      .toContain('maximum-frame-work:145>=145');
     expect(frameActionBudgetFailures(budget, { ...valid, maximumPendingForMs: 16.667 }))
       .toContain('maximum-presentation-pending:16.667>=16.667');
   });
