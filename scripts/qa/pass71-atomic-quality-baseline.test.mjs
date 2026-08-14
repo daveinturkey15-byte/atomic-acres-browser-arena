@@ -94,21 +94,21 @@ test('the full verifier fails closed on policy, audit metadata, runtime, texture
     const auditedRuntime = forgedProvenanceRecord.auditedSourceVariants
       .find((specification) => specification.path === runtimePath);
     const finalRuntimeVariant = auditedRuntime?.allowedVariants
-      .find((variant) => variant.auditSourceSha === '7c920e78fe0a655ff4b3dcd40834353d12833c0d');
+      .find((variant) => variant.auditSourceSha === 'e81f13c8b39ca1292913d298612f08b6439fd451');
     assert.deepEqual(finalRuntimeVariant, {
-      auditSourceSha: '7c920e78fe0a655ff4b3dcd40834353d12833c0d',
-      gitBlobSha: '095f9ae7f73d3393d2f23054c4a87d3420b31cfa',
-      sha256: 'f8c1423d8423baa2baf581371d33af9b270f1e41a04881b6aeaf5c4ffd5c7bd6',
-      classification: 'Exact audited Pass 71 runtime composition at the final candidate A product freeze: retains every previously admitted owner-feedback, glass lifecycle and Chopper evidence path, synchronously admits the prewarmed Rapier window-debris body and its real post-sync pose, and records a bounded exact explosive-bolt intact-pane impact receipt for sparse-frame observation. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted.',
+      auditSourceSha: 'e81f13c8b39ca1292913d298612f08b6439fd451',
+      gitBlobSha: 'fc6481e7c075f09651028087cd1e8a3cddf99cef',
+      sha256: 'f20c4732103e28a40b96979ffa50d731a38ee7d939be7c742e810aaf302e0a53',
+      classification: 'Exact audited Pass 71 runtime composition at the repaired candidate A product freeze: retains every previously admitted owner-feedback, glass lifecycle, Chopper and exact explosive-bolt impact path, while preventing a post-policy Rapier snapshot from replacing the earlier real debris pose or publishing a late moving milestone ahead of retained support-aware fallback catch-up. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted.',
     });
-    finalRuntimeVariant.auditSourceSha = 'e219fbfdd88d21b9a1ce5a84375bbf3c97a4f4ba';
+    finalRuntimeVariant.auditSourceSha = '7c920e78fe0a655ff4b3dcd40834353d12833c0d';
     writeFileSync(forgedProvenanceRecordPath, JSON.stringify(forgedProvenanceRecord));
     const forgedProvenance = verifyAtomicQualityBaseline({ root: checkout, recordPath: forgedProvenanceRecordPath });
     assert.equal(forgedProvenance.status, 'FAIL');
     assert.match(forgedProvenance.problems.join('\n'), /guard policy drift/u);
     assert.match(
       forgedProvenance.problems.join('\n'),
-      /audited source variant does not match e219fbfdd88d21b9a1ce5a84375bbf3c97a4f4ba: src\/legacy-main\.ts/u,
+      /audited source variant does not match 7c920e78fe0a655ff4b3dcd40834353d12833c0d: src\/legacy-main\.ts/u,
     );
 
     const runtime = readFileSync(join(checkout, runtimePath));
