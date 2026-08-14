@@ -685,6 +685,16 @@ async function runRemoteProjectionSweep(
           && finiteVector(remote.authoritativePosition) && finiteVector(remote.renderedPosition)
           && distance(remote.authoritativePosition, remote.renderedPosition) <= 2
           && fixtureDistance <= 1.5) break;
+        // The ordinary higher-sequence state stream can replace the one-shot
+        // reliable sentinel before a slow native peer samples it. Republish
+        // the same still-current sentinel until the actor answers with the
+        // position-bound first cell; later cells use their normal ack chain.
+        if (cellIndex === 0 && attempt > 0 && attempt % 15 === 0) {
+          const retry = api.publishHf296RemoteProjectionState();
+          if (retry?.weapon !== 'flare-gun' || retry?.stance !== 'prone') {
+            throw new Error(`HF-296 sentinel retry publication failed ${arenaId}/${projectionRole}`);
+          }
+        }
         if (attempt > 0 && attempt % 60 === 0
           && api.authorizeHf296RemoteProjectionWeapon(weapon) !== expectedSourcePlayerId) {
           throw new Error(`HF-296 projection authorization renewal failed ${arenaId}/${projectionRole}/${fixture.kind}/${stance}/${weapon}`);
