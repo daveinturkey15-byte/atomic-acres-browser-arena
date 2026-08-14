@@ -14,7 +14,10 @@ function operatorRoot(layerCount = 2): THREE.Group {
   visual.name = 'rigged-operator-visual';
   const material = new THREE.MeshStandardMaterial({ color: 0x493d36 });
   for (let index = 0; index < layerCount; index += 1) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(), material);
+    const mesh = new THREE.SkinnedMesh(new THREE.BoxGeometry(), material);
+    const bone = new THREE.Bone();
+    mesh.add(bone);
+    mesh.bind(new THREE.Skeleton([bone]));
     mesh.position.y = index;
     visual.add(mesh);
   }
@@ -165,7 +168,7 @@ describe('single exact animated thermal operator', () => {
 
   it('does not false-green hidden ancestors or non-color-writing source material', () => {
     const root = operatorRoot(1);
-    const source = root.getObjectByProperty('type', 'Mesh') as THREE.Mesh;
+    const source = root.getObjectByProperty('type', 'SkinnedMesh') as THREE.SkinnedMesh;
     const presentation = new ThermalGhostPresentation();
     const target = { id: 'visibility', relation: 'hostile' as const, root, occluded: true };
     presentation.sync([target], true);
@@ -177,6 +180,33 @@ describe('single exact animated thermal operator', () => {
     (source.material as THREE.Material).colorWrite = false;
     presentation.sync([target], true);
     expect(presentation.telemetry().activeTargets).toBe(0);
+    presentation.terminalDispose();
+  });
+
+  it('keeps asynchronously attached rigid equipment outside the canonical body-layer bound', () => {
+    const root = operatorRoot(2);
+    const visual = root.getObjectByName('rigged-operator-visual')!;
+    const wrist = new THREE.Bone();
+    wrist.name = 'WristR';
+    visual.add(wrist);
+    for (let index = 0; index < THERMAL_GHOST_MAX_BODY_LAYERS + 4; index += 1) {
+      const attachment = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+      attachment.name = `authored-field-knife-part-${index}`;
+      wrist.add(attachment);
+    }
+    const presentation = new ThermalGhostPresentation();
+
+    presentation.sync([{ id: 'equipped', relation: 'hostile', root, occluded: true }], true);
+
+    expect(presentation.telemetry()).toMatchObject({
+      trackedTargets: 1,
+      activeTargets: 1,
+      activeModelLayers: 2,
+      activeSourceBodyLayers: 2,
+      completeOperatorModels: true,
+      incompleteTargets: 0,
+    });
+    expect(root.getObjectsByProperty('name', 'through-wall-single-thermal-operator-model')).toHaveLength(2);
     presentation.terminalDispose();
   });
 

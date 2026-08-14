@@ -174,7 +174,7 @@ describe('Pass 71 first-action and protected-release gate', () => {
     expect(glassLifecycleSpec).toContain('await fireAndObserveLiveCrossbowImpact(page, pane)');
     expect(glassLifecycleSpec).toContain('impactWindowId: before.id');
     expect(glassLifecycleSpec).toContain('actualImpactLatencyMs).toBeLessThanOrEqual(LIVE_CROSSBOW_IMPACT_TIMEOUT_MS)');
-    expect(glassLifecycleSpec).toContain(')), { timeout: 2_000 }).toBeGreaterThan(impactCountBefore)');
+    expect(glassLifecycleSpec).toContain('expect(impactCountAfter).toBe(impactCountBefore + 1)');
     expect(glassLifecycleSpec).toContain('}, { paneIndex: index, phase: expectedPhase }, { timeout: 8_000 });');
     expect(glassLifecycleSpec).toContain('), { colliderCountBefore: rapierColliderCountBefore }, { timeout: 5_000 });');
     expect(boundedRunner).toContain("stdio: 'inherit'");

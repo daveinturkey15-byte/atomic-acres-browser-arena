@@ -176,19 +176,18 @@ export class ThermalGhostPresentation {
     const layers: GhostLayer[] = [];
     target.root.updateWorldMatrix(true, false);
     const operatorVisual = target.root.getObjectByName('rigged-operator-visual') ?? target.root;
-    const sourceBodyMeshes: THREE.Mesh[] = [];
-    let unsupportedInstancedBody = false;
+    const sourceBodyMeshes: THREE.SkinnedMesh[] = [];
     operatorVisual.traverse((node) => {
       if (node.userData.thermalGhost === true) return;
-      if (!(node instanceof THREE.Mesh)) return;
-      if (node instanceof THREE.InstancedMesh) {
-        unsupportedInstancedBody = true;
-        return;
-      }
+      // The canonical operator body is the retained nine-layer skinned GLB.
+      // Rigid equipment may be attached beneath an animated hand after match
+      // admission (the authored field knife is loaded this way); it is not a
+      // body layer and must not make an otherwise complete operator fail the
+      // bounded body-corpus admission.
+      if (!(node instanceof THREE.SkinnedMesh)) return;
       sourceBodyMeshes.push(node);
     });
-    const complete = !unsupportedInstancedBody
-      && sourceBodyMeshes.length > 0
+    const complete = sourceBodyMeshes.length > 0
       && sourceBodyMeshes.length <= THERMAL_GHOST_MAX_BODY_LAYERS;
     if (complete) {
       for (const source of sourceBodyMeshes) {

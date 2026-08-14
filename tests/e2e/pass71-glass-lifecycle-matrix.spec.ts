@@ -887,9 +887,14 @@ for (const profile of PROFILES) {
         'breached',
         true,
       );
-      await expect.poll(async () => page.evaluate(() => (
+      const impactCountAfter = await page.evaluate(() => (
         (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).timedMapWeapons.flareProjectiles.impactCount
-      )), { timeout: 2_000 }).toBeGreaterThan(impactCountBefore);
+      ));
+      // FlareProjectileSystem increments this exact authority counter before
+      // the same synchronous callback breaches the pane. A post-breach +1 is
+      // therefore stronger than a transport-side poll whose own trace capture
+      // can overrun its timeout after returning the successful value.
+      expect(impactCountAfter).toBe(impactCountBefore + 1);
       if (pane === 0) lifecycle = await readPaneDebrisLifecycleObservation(page, `${profile.label}/flare-gun`);
       paneReceipts.push({ id: breached.id, phase: breached.authority.phase });
     }
