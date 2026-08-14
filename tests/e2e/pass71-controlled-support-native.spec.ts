@@ -218,50 +218,177 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
   });
   expect(splashBaseline.remainingLifetimeMs).toBeGreaterThan(5_000);
 
-  await page.mouse.down({ button: 'left' });
-  const splashReceipt = await page.evaluate(async ({ staged, baseline }) => {
+  await page.evaluate(({ staged, baseline }) => {
+    const key = '__PASS71_CHOPPER_SPLASH_OBSERVER__';
+    if ((globalThis as any)[key]) throw new Error('A Chopper splash observer is already armed');
     const debug = window.__ATOMIC_ACRES_DEBUG__;
-    const deadline = performance.now() + 2_500;
-    let latest: any = null;
-    let validAim: any = null;
-    do {
-      const targetId = staged.primaryTargetId;
-      const aim = debug.aimPossessedChopperAtTarget(targetId);
-      validAim ??= aim;
-      const snapshot = debug.snapshot() as any;
-      const entity = snapshot.killstreak.entities.find((candidate: any) => candidate.id === staged.entityId) ?? null;
-      const possession = snapshot.killstreak.actors
-        .find((actor: any) => actor.actorId === snapshot.player.id)?.possession ?? null;
-      if (aim && (!entity || entity.activationId !== staged.activationId || !(entity.expiresInMs > 0))) {
-        throw new Error('A valid Chopper aim receipt did not retain its activation identity');
-      }
-      const recent = snapshot.supportDamageFeedback.recent.filter((sample: any) => (
-        sample.source === 'chopper'
-          && sample.activationId === staged.activationId
-          && sample.atMs >= baseline.startedAtMs
-      ));
-      const primary = recent.find((sample: any) => sample.targetId === staged.primaryTargetId);
-      const splash = recent.find((sample: any) => sample.targetId === staged.splashTargetId);
-      latest = {
-        aim: validAim,
-        primary,
-        splash,
-        primaryHealth: snapshot.bots.find((bot: any) => bot.id === staged.primaryTargetId)?.hp,
-        splashHealth: snapshot.bots.find((bot: any) => bot.id === staged.splashTargetId)?.hp,
-        triggerHeld: snapshot.textChat.triggerHeld,
-        possession,
-        entityId: entity?.id ?? null,
-        activationId: entity?.activationId ?? null,
-        remainingLifetimeMs: entity?.expiresInMs ?? 0,
-        entity,
-        trustedLeftDown: (globalThis as any).__PASS71_CONTROLLED_SUPPORT_INPUTS__
-          .some((event: any) => event.type === 'mousedown' && event.button === 0 && event.trusted === true),
+    const observerArmedAtMs = performance.now();
+    const observer: any = {
+      entityId: staged.entityId,
+      activationId: staged.activationId,
+      observerArmedAtMs,
+      trustedTriggerAtMs: null,
+      deadlineAtMs: null,
+      watchdogId: null,
+      latest: null,
+      settled: false,
+      promise: null,
+      cancel: null,
+      dispose: null,
+    };
+    observer.promise = new Promise((resolveReceipt, rejectReceipt) => {
+      let validAim: any = null;
+      const dispose = () => {
+        if (observer.watchdogId !== null) {
+          clearTimeout(observer.watchdogId);
+          observer.watchdogId = null;
+        }
+        window.removeEventListener('mousedown', onTrustedMouseDown, true);
       };
-      if (primary && splash) return latest;
-      await new Promise<void>((resolveDelay) => setTimeout(resolveDelay, 25));
-    } while (performance.now() < deadline);
-    return latest;
+      const finish = (receipt: any) => {
+        if (observer.settled) return;
+        observer.settled = true;
+        dispose();
+        resolveReceipt(receipt);
+      };
+      const fail = (error: unknown) => {
+        if (observer.settled) return;
+        observer.settled = true;
+        dispose();
+        rejectReceipt(error);
+      };
+      const inspect = () => {
+        if (observer.settled) return;
+        try {
+          if (performance.now() >= observer.deadlineAtMs) {
+            onDeadline();
+            return;
+          }
+          const aim = debug.aimPossessedChopperAtTarget(staged.primaryTargetId);
+          validAim ??= aim;
+          const snapshot = debug.snapshot() as any;
+          const entity = snapshot.killstreak.entities
+            .find((candidate: any) => candidate.id === staged.entityId) ?? null;
+          const possession = snapshot.killstreak.actors
+            .find((actor: any) => actor.actorId === snapshot.player.id)?.possession ?? null;
+          if (aim && (!entity || entity.activationId !== staged.activationId || !(entity.expiresInMs > 0))) {
+            throw new Error('A valid Chopper aim receipt did not retain its activation identity');
+          }
+          const recent = snapshot.supportDamageFeedback.recent.filter((sample: any) => (
+            sample.source === 'chopper'
+              && sample.activationId === staged.activationId
+              && sample.atMs >= baseline.startedAtMs
+              && sample.atMs <= observer.deadlineAtMs
+          ));
+          const primary = recent.find((sample: any) => sample.targetId === staged.primaryTargetId);
+          const splash = recent.find((sample: any) => sample.targetId === staged.splashTargetId);
+          observer.latest = {
+            aim: validAim,
+            primary,
+            splash,
+            primaryHealth: snapshot.bots.find((bot: any) => bot.id === staged.primaryTargetId)?.hp,
+            splashHealth: snapshot.bots.find((bot: any) => bot.id === staged.splashTargetId)?.hp,
+            triggerHeld: snapshot.textChat.triggerHeld,
+            possession,
+            entityId: entity?.id ?? null,
+            activationId: entity?.activationId ?? null,
+            remainingLifetimeMs: entity?.expiresInMs ?? 0,
+            entity,
+            observerEntityId: staged.entityId,
+            observerActivationId: staged.activationId,
+            observerArmedAtMs,
+            trustedTriggerAtMs: observer.trustedTriggerAtMs,
+            deadlineAtMs: observer.deadlineAtMs,
+            trustedLeftDown: (globalThis as any).__PASS71_CONTROLLED_SUPPORT_INPUTS__
+              .some((event: any) => event.type === 'mousedown' && event.button === 0 && event.trusted === true),
+          };
+          if (primary && splash) {
+            finish(observer.latest);
+            return;
+          }
+          requestAnimationFrame(inspect);
+        } catch (error) {
+          fail(error);
+        }
+      };
+      const onDeadline = () => {
+        if (observer.settled) return;
+        const remainingMs = observer.deadlineAtMs - performance.now();
+        if (remainingMs > 0) {
+          observer.watchdogId = window.setTimeout(onDeadline, remainingMs);
+          return;
+        }
+        if (observer.latest !== null) {
+          finish(observer.latest);
+          return;
+        }
+        fail(new Error('Trusted Chopper splash trigger produced no game-frame observation within 2500ms'));
+      };
+      const onTrustedMouseDown = (event: MouseEvent) => {
+        if (event.button !== 0 || event.isTrusted !== true) return;
+        window.removeEventListener('mousedown', onTrustedMouseDown, true);
+        try {
+          observer.trustedTriggerAtMs = performance.now();
+          observer.deadlineAtMs = observer.trustedTriggerAtMs + 2_500;
+          validAim = debug.aimPossessedChopperAtTarget(staged.primaryTargetId);
+          if (!validAim) throw new Error('Trusted Chopper splash trigger could not establish staged primary aim');
+          const snapshot = debug.snapshot() as any;
+          const possession = snapshot.killstreak.actors
+            .find((actor: any) => actor.actorId === snapshot.player.id)?.possession ?? null;
+          const entity = snapshot.killstreak.entities
+            .find((candidate: any) => candidate.id === staged.entityId) ?? null;
+          if (possession?.kind !== 'chopper-gunner'
+            || possession.entityId !== staged.entityId
+            || entity?.activationId !== staged.activationId
+            || !(entity.expiresInMs > 0)) {
+            throw new Error('Trusted Chopper splash trigger did not retain the staged possession identity');
+          }
+          observer.watchdogId = window.setTimeout(onDeadline, 2_500);
+          requestAnimationFrame(inspect);
+        } catch (error) {
+          fail(error);
+        }
+      };
+      observer.cancel = (message: string) => {
+        fail(new Error(message));
+        if ((globalThis as any)[key] === observer) delete (globalThis as any)[key];
+      };
+      observer.dispose = dispose;
+      window.addEventListener('mousedown', onTrustedMouseDown, true);
+    });
+    void observer.promise.catch(() => undefined);
+    (globalThis as any)[key] = observer;
   }, { staged: stagedSplash, baseline: splashBaseline });
+  let splashReceipt: any;
+  try {
+    await page.mouse.down({ button: 'left' });
+    splashReceipt = await page.evaluate(async ({ entityId, activationId }) => {
+      const key = '__PASS71_CHOPPER_SPLASH_OBSERVER__';
+      const observer = (globalThis as any)[key];
+      if (!observer || observer.entityId !== entityId || observer.activationId !== activationId) {
+        throw new Error('Chopper splash observer was not armed for the active possession identity');
+      }
+      if (observer.trustedTriggerAtMs === null) {
+        observer.cancel('Trusted Chopper splash mousedown was not observed after input admission');
+      }
+      try {
+        return await observer.promise;
+      } finally {
+        observer.dispose();
+        if ((globalThis as any)[key] === observer) delete (globalThis as any)[key];
+      }
+    }, { entityId: stagedSplash.entityId, activationId: stagedSplash.activationId });
+  } catch (error) {
+    await page.evaluate(({ entityId, activationId }) => {
+      const key = '__PASS71_CHOPPER_SPLASH_OBSERVER__';
+      const observer = (globalThis as any)[key];
+      if (observer?.entityId === entityId && observer.activationId === activationId) {
+        observer.cancel('Trusted Chopper splash transaction was cancelled after input or protocol failure');
+      }
+    }, { entityId: stagedSplash.entityId, activationId: stagedSplash.activationId }).catch(() => undefined);
+    await page.mouse.up({ button: 'left' }).catch(() => undefined);
+    throw error;
+  }
   await page.mouse.up({ button: 'left' });
   const missileArmReceipt = await page.evaluate(({ entityId, activationId }) => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
@@ -293,7 +420,11 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
     possession: { kind: 'chopper-gunner', entityId: stagedSplash.entityId },
     entityId: stagedSplash.entityId,
     activationId: stagedSplash.activationId,
+    observerEntityId: stagedSplash.entityId,
+    observerActivationId: stagedSplash.activationId,
   });
+  expect(splashReceipt.trustedTriggerAtMs).toBeGreaterThanOrEqual(splashReceipt.observerArmedAtMs);
+  expect(splashReceipt.deadlineAtMs - splashReceipt.trustedTriggerAtMs).toBe(2_500);
   expect(splashReceipt.remainingLifetimeMs).toBeGreaterThan(0);
   expect(splashReceipt.triggerHeld).toBe(true);
   expect(splashReceipt.primaryHealth).toBeLessThan(splashBaseline.primaryHealth);

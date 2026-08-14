@@ -308,7 +308,7 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
     const hud = document.querySelector<HTMLElement>('#hud');
     if (hud) hud.style.visibility = 'hidden';
   });
-  const roughExteriorPose = await page.evaluate(() => {
+  const roughExteriorPlan = await page.evaluate(() => {
     const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
     const detail = snapshot.killstreakPresentation.entityDetails
       .find((entry: any) => entry.poolKey === 'chopper');
@@ -375,15 +375,6 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
     const horizontalDistanceM = Math.hypot(candidate.x - target[0], candidate.z - target[2]);
     const cameraYaw = Math.atan2(candidate.x - target[0], candidate.z - target[2]);
     const cameraPitch = Math.atan2(target[1] - cameraY, horizontalDistanceM);
-    const captureRevision = window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(
-      candidate.x,
-      cameraY,
-      candidate.z,
-      cameraYaw,
-      cameraPitch,
-      50,
-    );
-    if (captureRevision === null) throw new Error('Rough authored Chopper evidence camera was not admitted');
     return {
       entityId: entity.id,
       worldPosition: [x, y, z],
@@ -399,27 +390,146 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       visibleSpan,
       inTestBay,
       nearestWall,
-      captureRevision,
     };
   });
-  const roughPresentedHandle = await page.waitForFunction(({ entityId, captureRevision }) => {
+  const roughPresentedObservation = await page.evaluate(async (roughPose) => {
+    const key = '__PASS70_ROUGH_CHOPPER_PRESENTATION__';
+    if ((globalThis as any)[key]) throw new Error('A rough authored Chopper presentation observer is already armed');
     const debug = window.__ATOMIC_ACRES_DEBUG__;
-    const presentedGameplayFrame = (debug.admissionState() as any).presentedGameplayFrame;
-    const receipt = (debug.snapshot() as any).deterministicReview.presentedCamera;
-    return receipt?.captureRevision === captureRevision
-      && receipt.frame === presentedGameplayFrame
-      && receipt.reviewedChopper?.entityId === entityId
-      && receipt.reviewedChopper.rootVisible === true
-      && receipt.reviewedChopper.activeLodIndex === 0
-      && receipt.reviewedChopper.drawableStableMeshCount > 0
-      && Boolean(receipt.reviewedChopper.drawableStableBounds)
-      ? receipt
-      : false;
-  }, {
-    entityId: roughExteriorPose.entityId,
-    captureRevision: roughExteriorPose.captureRevision,
-  }, { timeout: 8_000, polling: 16 });
-  const roughPresentedReceipt = await roughPresentedHandle.jsonValue() as {
+    const baselinePresentedGameplayFrame = (debug.admissionState() as any).presentedGameplayFrame as number;
+    const baselineReceipt = (debug.snapshot() as any).deterministicReview.presentedCamera;
+    const baselineCaptureRevision = baselineReceipt?.captureRevision ?? null;
+    const armedAtMs = performance.now();
+    const observer: any = {
+      entityId: roughPose.entityId,
+      baselinePresentedGameplayFrame,
+      baselineCaptureRevision,
+      armedAtMs,
+      transactionStartedAtMs: null,
+      deadlineAtMs: null,
+      captureRevision: null,
+      watchdogId: null,
+      settled: false,
+      resolveReceipt: null,
+      rejectReceipt: null,
+      promise: null,
+    };
+    observer.promise = new Promise((resolveReceipt, rejectReceipt) => {
+      observer.resolveReceipt = resolveReceipt;
+      observer.rejectReceipt = rejectReceipt;
+    });
+    void observer.promise.catch(() => undefined);
+    const dispose = () => {
+      if (observer.watchdogId !== null) {
+        clearTimeout(observer.watchdogId);
+        observer.watchdogId = null;
+      }
+      if ((globalThis as any)[key] === observer) delete (globalThis as any)[key];
+    };
+    const rejectObservation = (error: unknown) => {
+      if (observer.settled) return;
+      observer.settled = true;
+      dispose();
+      observer.rejectReceipt(error);
+    };
+    const inspect = () => {
+      if (observer.settled) return;
+      try {
+        if (performance.now() >= observer.deadlineAtMs) {
+          rejectObservation(new Error('Rough authored Chopper camera did not publish an exact presented receipt within 8000ms'));
+          return;
+        }
+        const presentedGameplayFrame = (debug.admissionState() as any).presentedGameplayFrame as number;
+        const receipt = (debug.snapshot() as any).deterministicReview.presentedCamera;
+        if (receipt?.captureRevision === observer.captureRevision
+          && receipt.frame > baselinePresentedGameplayFrame
+          && receipt.frame === presentedGameplayFrame
+          && receipt.reviewedChopper?.entityId === roughPose.entityId
+          && receipt.reviewedChopper.rootVisible === true
+          && receipt.reviewedChopper.activeLodIndex === 0
+          && receipt.reviewedChopper.drawableStableMeshCount > 0
+          && Boolean(receipt.reviewedChopper.drawableStableBounds)) {
+          observer.settled = true;
+          dispose();
+          observer.resolveReceipt({
+            entityId: roughPose.entityId,
+            baselinePresentedGameplayFrame,
+            baselineCaptureRevision,
+            armedAtMs,
+            transactionStartedAtMs: observer.transactionStartedAtMs,
+            deadlineAtMs: observer.deadlineAtMs,
+            captureRevision: observer.captureRevision,
+            observedPresentedGameplayFrame: presentedGameplayFrame,
+            receipt,
+          });
+          return;
+        }
+        requestAnimationFrame(inspect);
+      } catch (error) {
+        rejectObservation(error);
+      }
+    };
+    const onDeadline = () => {
+      if (observer.settled) return;
+      const remainingMs = observer.deadlineAtMs - performance.now();
+      if (remainingMs > 0) {
+        observer.watchdogId = window.setTimeout(onDeadline, remainingMs);
+        return;
+      }
+      rejectObservation(new Error('Rough authored Chopper camera did not publish an exact presented receipt within 8000ms'));
+    };
+    (globalThis as any)[key] = observer;
+    requestAnimationFrame(inspect);
+    observer.transactionStartedAtMs = performance.now();
+    observer.deadlineAtMs = observer.transactionStartedAtMs + 8_000;
+    observer.watchdogId = window.setTimeout(onDeadline, 8_000);
+    try {
+      observer.captureRevision = debug.setCaptureCameraPose(
+        roughPose.cameraPosition[0],
+        roughPose.cameraPosition[1],
+        roughPose.cameraPosition[2],
+        roughPose.cameraYaw,
+        roughPose.cameraPitch,
+        50,
+      );
+      if (observer.captureRevision === null) {
+        throw new Error('Rough authored Chopper evidence camera was not admitted');
+      }
+      const observation = await observer.promise;
+      if (observation.entityId !== roughPose.entityId
+        || observation.receipt?.captureRevision !== observer.captureRevision) {
+        throw new Error('Rough authored Chopper presented receipt did not match the admitted camera transaction');
+      }
+      return observation;
+    } catch (error) {
+      rejectObservation(error);
+      throw error;
+    } finally {
+      dispose();
+    }
+  }, roughExteriorPlan) as {
+    entityId: string;
+    baselinePresentedGameplayFrame: number;
+    baselineCaptureRevision: number | null;
+    armedAtMs: number;
+    transactionStartedAtMs: number;
+    deadlineAtMs: number;
+    captureRevision: number;
+    observedPresentedGameplayFrame: number;
+    receipt: {
+      frame: number;
+      captureRevision: number;
+      reviewedChopper: {
+        entityId: string;
+        rootVisible: boolean;
+        activeLodIndex: number;
+        drawableStableMeshCount: number;
+        drawableStableBounds: { min: number[]; max: number[] };
+      };
+    };
+  };
+  const roughExteriorPose = { ...roughExteriorPlan, captureRevision: roughPresentedObservation.captureRevision };
+  const roughPresentedReceipt = roughPresentedObservation.receipt as {
     frame: number;
     captureRevision: number;
     reviewedChopper: {
@@ -430,6 +540,10 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       drawableStableBounds: { min: number[]; max: number[] };
     };
   };
+  expect(roughPresentedObservation.transactionStartedAtMs).toBeGreaterThanOrEqual(roughPresentedObservation.armedAtMs);
+  expect(roughPresentedObservation.deadlineAtMs - roughPresentedObservation.transactionStartedAtMs).toBe(8_000);
+  expect(roughPresentedObservation.observedPresentedGameplayFrame).toBe(roughPresentedReceipt.frame);
+  expect(roughPresentedReceipt.frame).toBeGreaterThan(roughPresentedObservation.baselinePresentedGameplayFrame);
   expect(roughPresentedReceipt).toMatchObject({
     captureRevision: roughExteriorPose.captureRevision,
     reviewedChopper: {
