@@ -94,21 +94,21 @@ test('the full verifier fails closed on policy, audit metadata, runtime, texture
     const auditedRuntime = forgedProvenanceRecord.auditedSourceVariants
       .find((specification) => specification.path === runtimePath);
     const finalRuntimeVariant = auditedRuntime?.allowedVariants
-      .find((variant) => variant.auditSourceSha === 'e81f13c8b39ca1292913d298612f08b6439fd451');
+      .find((variant) => variant.auditSourceSha === '3c32323b4499442912bbfb0760b45858394f9b73');
     assert.deepEqual(finalRuntimeVariant, {
-      auditSourceSha: 'e81f13c8b39ca1292913d298612f08b6439fd451',
-      gitBlobSha: 'fc6481e7c075f09651028087cd1e8a3cddf99cef',
-      sha256: 'f20c4732103e28a40b96979ffa50d731a38ee7d939be7c742e810aaf302e0a53',
-      classification: 'Exact audited Pass 71 runtime composition at the repaired candidate A product freeze: retains every previously admitted owner-feedback, glass lifecycle, Chopper and exact explosive-bolt impact path, while preventing a post-policy Rapier snapshot from replacing the earlier real debris pose or publishing a late moving milestone ahead of retained support-aware fallback catch-up. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted.',
+      auditSourceSha: '3c32323b4499442912bbfb0760b45858394f9b73',
+      gitBlobSha: '2bff921e313d108ba45b0724977f0f8f65f9f2d4',
+      sha256: '01cdfae3bc1c7af43c82d51f1d538d72feabfb3ef5b1937d3d9c48cd8278da2f',
+      classification: 'Exact audited Pass 71 runtime composition for the owner-tested local HITL product freeze: retains every previously admitted owner-feedback, glass, Chopper, debris and explosive-bolt path, and adds only bounded local-multiplayer-QA weapon-projection authorization, hosted-matrix duration and signed-contact readiness needed to observe the existing HF-296 authority contract. Production gameplay authority remains protected by the localMultiplayerQa and non-offline gates. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted.',
     });
-    finalRuntimeVariant.auditSourceSha = '7c920e78fe0a655ff4b3dcd40834353d12833c0d';
+    finalRuntimeVariant.auditSourceSha = 'e81f13c8b39ca1292913d298612f08b6439fd451';
     writeFileSync(forgedProvenanceRecordPath, JSON.stringify(forgedProvenanceRecord));
     const forgedProvenance = verifyAtomicQualityBaseline({ root: checkout, recordPath: forgedProvenanceRecordPath });
     assert.equal(forgedProvenance.status, 'FAIL');
     assert.match(forgedProvenance.problems.join('\n'), /guard policy drift/u);
     assert.match(
       forgedProvenance.problems.join('\n'),
-      /audited source variant does not match 7c920e78fe0a655ff4b3dcd40834353d12833c0d: src\/legacy-main\.ts/u,
+      /audited source variant does not match e81f13c8b39ca1292913d298612f08b6439fd451: src\/legacy-main\.ts/u,
     );
 
     const runtime = readFileSync(join(checkout, runtimePath));
