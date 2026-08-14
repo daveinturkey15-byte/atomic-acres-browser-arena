@@ -38,16 +38,51 @@ async function ensurePointerLock(page: Page): Promise<void> {
   await page.waitForFunction(() => document.pointerLockElement === document.querySelector('#game'), undefined, { timeout: 5_000 });
 }
 
-async function chopperEntity(page: Page, entityId: string) {
-  return page.evaluate((id) => {
-    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
-    return {
-      entity: snapshot.killstreak.entities.find((candidate: any) => candidate.id === id) ?? null,
-      impacts: snapshot.supportImpactEvents,
-      controlAdmission: snapshot.killstreakControlAdmission,
-      presentation: snapshot.killstreakPresentation,
-    };
-  }, entityId);
+async function awaitChopperRuntimePhase(
+  page: Page,
+  entityId: string,
+  activationId: string,
+  phase: 'cooldown-ready' | 'second-missile',
+) {
+  return page.evaluate(async ({ id, activation, expectedPhase }) => {
+    const deadline = performance.now() + 3_000;
+    let latest: any = null;
+    let firstMissileReceipt: any = null;
+    do {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
+      const entity = snapshot.killstreak.entities.find((candidate: any) => candidate.id === id) ?? null;
+      const drops = snapshot.supportImpactEvents.recent.filter((event: any) => (
+        event.source === 'chopper'
+          && event.activationId === activation
+          && event.phase === 'drop'
+      ));
+      latest = {
+        entity,
+        impacts: snapshot.supportImpactEvents,
+        authority: snapshot.chopperMissileAuthority,
+        controlAdmission: snapshot.killstreakControlAdmission,
+        presentation: snapshot.killstreakPresentation,
+        activationMatches: entity?.activationId === activation,
+        remainingLifetimeMs: entity?.expiresInMs ?? 0,
+      };
+      if (entity?.missileAmmo === 5 && drops.some((event: any) => event.ordinal === 0)) {
+        firstMissileReceipt ??= latest;
+      }
+      if (!entity || entity.activationId !== activation || !(entity.expiresInMs > 0)) {
+        return { ...latest, firstMissileReceipt };
+      }
+      if ((expectedPhase === 'cooldown-ready' && firstMissileReceipt !== null
+          && entity.missileAmmo === 5
+          && drops.some((event: any) => event.ordinal === 0)
+          && entity.missileCooldownMs === 0)
+        || (expectedPhase === 'second-missile' && entity.missileAmmo === 4
+          && drops.some((event: any) => event.ordinal === 1))) {
+        return { ...latest, firstMissileReceipt };
+      }
+      await new Promise<void>((resolveDelay) => setTimeout(resolveDelay, 25));
+    } while (performance.now() < deadline);
+    return { ...latest, firstMissileReceipt };
+  }, { id: entityId, activation: activationId, expectedPhase: phase });
 }
 
 async function awaitSchedulerSafeMatchWarmupEvidence(page: Page) {
@@ -163,28 +198,43 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
   expect(stagedSplash.separationM).toBeLessThan(stagedSplash.splashRadiusM);
   const splashBaseline = await page.evaluate(({ primaryTargetId, splashTargetId }) => {
     const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
+    const possession = snapshot.killstreak.actors.find((actor: any) => actor.actorId === snapshot.player.id)?.possession;
+    const entity = snapshot.killstreak.entities.find((candidate: any) => candidate.id === possession?.entityId);
     return {
       primaryHealth: snapshot.bots.find((bot: any) => bot.id === primaryTargetId)?.hp,
       splashHealth: snapshot.bots.find((bot: any) => bot.id === splashTargetId)?.hp,
       received: snapshot.supportDamageFeedback.received,
       startedAtMs: performance.now(),
+      possession,
+      entityId: entity?.id ?? null,
+      activationId: entity?.activationId ?? null,
+      remainingLifetimeMs: entity?.expiresInMs ?? 0,
     };
   }, stagedSplash);
+  expect(splashBaseline).toMatchObject({
+    possession: { kind: 'chopper-gunner', entityId: stagedSplash.entityId },
+    entityId: stagedSplash.entityId,
+    activationId: stagedSplash.activationId,
+  });
+  expect(splashBaseline.remainingLifetimeMs).toBeGreaterThan(5_000);
 
   await page.mouse.down({ button: 'left' });
-  let splashReceipt: any = null;
-  for (let attempt = 0; attempt < 24 && splashReceipt === null; attempt += 1) {
-    expect(await page.evaluate((targetId) => (
-      window.__ATOMIC_ACRES_DEBUG__.aimPossessedChopperAtTarget(targetId)
-    ), stagedSplash.primaryTargetId)).toMatchObject({
-      entityId: stagedSplash.entityId,
-      activationId: stagedSplash.activationId,
-      targetId: stagedSplash.primaryTargetId,
-      lineOfSight: true,
-    });
-    await page.waitForTimeout(75);
-    splashReceipt = await page.evaluate(({ staged, baseline }) => {
-      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
+  const splashReceipt = await page.evaluate(async ({ staged, baseline }) => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const deadline = performance.now() + 2_500;
+    let latest: any = null;
+    let validAim: any = null;
+    do {
+      const targetId = staged.primaryTargetId;
+      const aim = debug.aimPossessedChopperAtTarget(targetId);
+      validAim ??= aim;
+      const snapshot = debug.snapshot() as any;
+      const entity = snapshot.killstreak.entities.find((candidate: any) => candidate.id === staged.entityId) ?? null;
+      const possession = snapshot.killstreak.actors
+        .find((actor: any) => actor.actorId === snapshot.player.id)?.possession ?? null;
+      if (aim && (!entity || entity.activationId !== staged.activationId || !(entity.expiresInMs > 0))) {
+        throw new Error('A valid Chopper aim receipt did not retain its activation identity');
+      }
       const recent = snapshot.supportDamageFeedback.recent.filter((sample: any) => (
         sample.source === 'chopper'
           && sample.activationId === staged.activationId
@@ -192,21 +242,59 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
       ));
       const primary = recent.find((sample: any) => sample.targetId === staged.primaryTargetId);
       const splash = recent.find((sample: any) => sample.targetId === staged.splashTargetId);
-      const primaryBot = snapshot.bots.find((bot: any) => bot.id === staged.primaryTargetId);
-      const splashBot = snapshot.bots.find((bot: any) => bot.id === staged.splashTargetId);
-      return primary && splash ? {
+      latest = {
+        aim: validAim,
         primary,
         splash,
-        primaryHealth: primaryBot?.hp,
-        splashHealth: splashBot?.hp,
+        primaryHealth: snapshot.bots.find((bot: any) => bot.id === staged.primaryTargetId)?.hp,
+        splashHealth: snapshot.bots.find((bot: any) => bot.id === staged.splashTargetId)?.hp,
         triggerHeld: snapshot.textChat.triggerHeld,
-      } : null;
-    }, { staged: stagedSplash, baseline: splashBaseline });
-  }
+        possession,
+        entityId: entity?.id ?? null,
+        activationId: entity?.activationId ?? null,
+        remainingLifetimeMs: entity?.expiresInMs ?? 0,
+        entity,
+        trustedLeftDown: (globalThis as any).__PASS71_CONTROLLED_SUPPORT_INPUTS__
+          .some((event: any) => event.type === 'mousedown' && event.button === 0 && event.trusted === true),
+      };
+      if (primary && splash) return latest;
+      await new Promise<void>((resolveDelay) => setTimeout(resolveDelay, 25));
+    } while (performance.now() < deadline);
+    return latest;
+  }, { staged: stagedSplash, baseline: splashBaseline });
   await page.mouse.up({ button: 'left' });
-  expect(await page.evaluate(() => (globalThis as any).__PASS71_CONTROLLED_SUPPORT_INPUTS__
-    .some((event: any) => event.type === 'mousedown' && event.button === 0 && event.trusted === true))).toBe(true);
+  const missileArmReceipt = await page.evaluate(({ entityId, activationId }) => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const accepted = debug.requestPossessedChopperEvidenceControl({ fire: false });
+    const snapshot = debug.snapshot() as any;
+    const possession = snapshot.killstreak.actors
+      .find((actor: any) => actor.actorId === snapshot.player.id)?.possession ?? null;
+    const entity = snapshot.killstreak.entities
+      .find((candidate: any) => candidate.id === entityId) ?? null;
+    return {
+      accepted,
+      possession,
+      entity,
+      entityId: entity?.id ?? null,
+      activationId: entity?.activationId ?? null,
+      activationMatches: entity?.activationId === activationId,
+      remainingLifetimeMs: entity?.expiresInMs ?? 0,
+    };
+  }, { entityId: stagedSplash.entityId, activationId: stagedSplash.activationId });
   expect(splashReceipt).not.toBeNull();
+  expect(splashReceipt.aim).toMatchObject({
+    entityId: stagedSplash.entityId,
+    activationId: stagedSplash.activationId,
+    targetId: stagedSplash.primaryTargetId,
+    lineOfSight: true,
+  });
+  expect(splashReceipt.trustedLeftDown).toBe(true);
+  expect(splashReceipt).toMatchObject({
+    possession: { kind: 'chopper-gunner', entityId: stagedSplash.entityId },
+    entityId: stagedSplash.entityId,
+    activationId: stagedSplash.activationId,
+  });
+  expect(splashReceipt.remainingLifetimeMs).toBeGreaterThan(0);
   expect(splashReceipt.triggerHeld).toBe(true);
   expect(splashReceipt.primaryHealth).toBeLessThan(splashBaseline.primaryHealth);
   expect(splashReceipt.splashHealth).toBeLessThan(splashBaseline.splashHealth);
@@ -215,18 +303,36 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
   expect(splashReceipt.primary.damage).toBeGreaterThan(0);
   expect(splashReceipt.splash.damage).toBeGreaterThan(0);
 
-  expect(await page.evaluate((targetId) => (
-    window.__ATOMIC_ACRES_DEBUG__.aimPossessedChopperAtTarget(targetId)
-  ), stagedSplash.primaryTargetId)).not.toBeNull();
-  const missileBefore = await chopperEntity(page, stagedSplash.entityId);
-  expect(missileBefore.entity).toMatchObject({ missileAmmo: 6, missileCooldownMs: 0 });
+  expect(splashReceipt.aim).not.toBeNull();
+  expect(missileArmReceipt).toMatchObject({
+    accepted: true,
+    possession: { kind: 'chopper-gunner', entityId: stagedSplash.entityId },
+    entityId: stagedSplash.entityId,
+    activationId: stagedSplash.activationId,
+    activationMatches: true,
+  });
+  expect(missileArmReceipt.remainingLifetimeMs).toBeGreaterThan(0);
+  const missileBefore = missileArmReceipt;
+  expect(missileBefore.entity).toMatchObject({
+    activationId: stagedSplash.activationId,
+    missileAmmo: 6,
+    missileCooldownMs: 0,
+  });
+  expect(missileBefore.entity.expiresInMs).toBeGreaterThan(0);
   const firstMissileWallClockMs = Date.now();
   await page.mouse.down({ button: 'right' });
   await page.mouse.up({ button: 'right' });
-  await expect.poll(async () => (await chopperEntity(page, stagedSplash.entityId)).entity?.missileAmmo, {
-    timeout: 3_000,
-  }).toBe(5);
-  const firstMissile = await chopperEntity(page, stagedSplash.entityId);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.up({ button: 'right' });
+  const cooldownReady = await awaitChopperRuntimePhase(
+    page,
+    stagedSplash.entityId,
+    stagedSplash.activationId,
+    'cooldown-ready',
+  );
+  const firstMissile = cooldownReady.firstMissileReceipt;
+  expect(firstMissile).toMatchObject({ activationMatches: true, entity: { missileAmmo: 5 } });
+  expect(firstMissile.remainingLifetimeMs).toBeGreaterThan(0);
   const firstDrop = [...firstMissile.impacts.recent].reverse().find((event: any) => (
     event.source === 'chopper'
       && event.activationId === stagedSplash.activationId
@@ -234,12 +340,27 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
       && event.ordinal === 0
   ));
   expect(firstDrop).toMatchObject({ launchPosition: [expect.any(Number), expect.any(Number), expect.any(Number)] });
-  expect(firstMissile.entity.missileCooldownMs).toBeGreaterThan(0);
+  const firstAuthority = [...firstMissile.authority.events].reverse().find((event: any) => (
+    event.phase === 'launch'
+      && event.activationId === stagedSplash.activationId
+      && event.ordinal === 0
+  ));
+  expect(firstAuthority).toMatchObject({
+    contract: 'pass71-hf308-chopper-missile-authority-v1',
+    aircraftId: stagedSplash.entityId,
+    activationId: stagedSplash.activationId,
+    ordinal: 0,
+    socketSide: 'left',
+    launchPosition: firstDrop.launchPosition,
+    ammoBefore: 6,
+    ammoAfter: 5,
+    cadenceMs: 1_000,
+  });
   expect(firstMissile.presentation.bombShells).toBeGreaterThan(0);
   expect(firstMissile.controlAdmission).toMatchObject({ action: 'pilot-control', missileFire: true, accepted: true });
   const expectedFirstHardpoint = chopperMissileLaunchPosition(
-    missileBefore.entity.position,
-    missileBefore.entity.attitude,
+    firstAuthority.sourcePosition,
+    firstAuthority.sourceAttitude,
     0,
   );
   expect(Math.hypot(
@@ -248,45 +369,53 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
     firstDrop.launchPosition[2] - expectedFirstHardpoint[2],
   )).toBeLessThan(0.75);
   const hardpointDistanceM = Math.hypot(
-    firstDrop.launchPosition[0] - firstMissile.entity.position[0],
-    firstDrop.launchPosition[1] - firstMissile.entity.position[1],
-    firstDrop.launchPosition[2] - firstMissile.entity.position[2],
+    firstDrop.launchPosition[0] - firstAuthority.sourcePosition[0],
+    firstDrop.launchPosition[1] - firstAuthority.sourcePosition[1],
+    firstDrop.launchPosition[2] - firstAuthority.sourcePosition[2],
   );
   expect(hardpointDistanceM).toBeGreaterThan(0.5);
   expect(hardpointDistanceM).toBeLessThan(3);
-  expect(Math.abs(firstDrop.launchPosition[1] - firstMissile.entity.position[1])).toBeLessThan(1.5);
+  expect(Math.abs(firstDrop.launchPosition[1] - firstAuthority.sourcePosition[1])).toBeLessThan(1.5);
   expect(firstDrop.launchPosition[1] - firstDrop.position[1]).toBeLessThan(20);
-  await page.mouse.down({ button: 'right' });
-  await page.mouse.up({ button: 'right' });
-  await page.waitForTimeout(125);
-  const immediateSecond = await chopperEntity(page, stagedSplash.entityId);
-  expect(immediateSecond.entity.missileAmmo).toBe(5);
+  const immediateSecond = firstMissile;
+  expect(immediateSecond.entity).toMatchObject({
+    activationId: stagedSplash.activationId,
+    missileAmmo: 5,
+  });
+  expect(immediateSecond.entity.expiresInMs).toBeGreaterThan(0);
   expect(immediateSecond.impacts.recent.filter((event: any) => (
     event.source === 'chopper'
       && event.activationId === stagedSplash.activationId
       && event.phase === 'drop'
   ))).toHaveLength(1);
-  expect(immediateSecond.entity.missileCooldownMs).toBeGreaterThan(0);
-  const missileScreenshot = resolve(evidence, 'chopper-hardpoint-missile.png');
-  await page.screenshot({ path: missileScreenshot, animations: 'allow' });
-  expect((await sharp(missileScreenshot).stats()).entropy).toBeGreaterThan(1.5);
-  await testInfo.attach(`pass71-${renderer}-chopper-hardpoint-missile`, {
-    path: missileScreenshot,
-    contentType: 'image/png',
+  expect(immediateSecond.controlAdmission).toMatchObject({
+    action: 'pilot-control',
+    fire: false,
+    missileFire: true,
+    accepted: true,
+    reason: 'accepted',
   });
-
-  await expect.poll(async () => (await chopperEntity(page, stagedSplash.entityId)).entity?.missileCooldownMs, {
-    timeout: 3_000,
-    intervals: [25],
-  }).toBe(0);
+  expect(immediateSecond.controlAdmission.sequence).toBe(firstAuthority.controlSequence + 1);
+  expect(cooldownReady).toMatchObject({ activationMatches: true, entity: { missileCooldownMs: 0 } });
+  expect(cooldownReady.remainingLifetimeMs).toBeGreaterThan(0);
   expect(Date.now() - firstMissileWallClockMs).toBeGreaterThanOrEqual(1_000);
-  const secondMissileBefore = await chopperEntity(page, stagedSplash.entityId);
+  const secondMissileBefore = cooldownReady;
+  expect(secondMissileBefore.entity).toMatchObject({
+    activationId: stagedSplash.activationId,
+    missileAmmo: 5,
+    missileCooldownMs: 0,
+  });
+  expect(secondMissileBefore.entity.expiresInMs).toBeGreaterThan(0);
   await page.mouse.down({ button: 'right' });
   await page.mouse.up({ button: 'right' });
-  await expect.poll(async () => (await chopperEntity(page, stagedSplash.entityId)).entity?.missileAmmo, {
-    timeout: 3_000,
-  }).toBe(4);
-  const secondMissile = await chopperEntity(page, stagedSplash.entityId);
+  const secondMissile = await awaitChopperRuntimePhase(
+    page,
+    stagedSplash.entityId,
+    stagedSplash.activationId,
+    'second-missile',
+  );
+  expect(secondMissile).toMatchObject({ activationMatches: true, entity: { missileAmmo: 4 } });
+  expect(secondMissile.remainingLifetimeMs).toBeGreaterThan(0);
   const secondDrop = [...secondMissile.impacts.recent].reverse().find((event: any) => (
     event.source === 'chopper'
       && event.activationId === stagedSplash.activationId
@@ -295,9 +424,27 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
   ));
   expect(secondDrop).toBeTruthy();
   expect(secondDrop.atMs - firstDrop.atMs).toBeGreaterThanOrEqual(1_000);
+  expect(secondMissile.presentation.bombShells).toBeGreaterThan(0);
+  const secondAuthority = [...secondMissile.authority.events].reverse().find((event: any) => (
+    event.phase === 'launch'
+      && event.activationId === stagedSplash.activationId
+      && event.ordinal === 1
+  ));
+  expect(secondAuthority).toMatchObject({
+    contract: 'pass71-hf308-chopper-missile-authority-v1',
+    aircraftId: stagedSplash.entityId,
+    activationId: stagedSplash.activationId,
+    ordinal: 1,
+    socketSide: 'right',
+    launchPosition: secondDrop.launchPosition,
+    ammoBefore: 5,
+    ammoAfter: 4,
+    cadenceMs: 1_000,
+  });
+  expect(secondAuthority.controlSequence).toBe(immediateSecond.controlAdmission.sequence + 1);
   const expectedSecondHardpoint = chopperMissileLaunchPosition(
-    secondMissileBefore.entity.position,
-    secondMissileBefore.entity.attitude,
+    secondAuthority.sourcePosition,
+    secondAuthority.sourceAttitude,
     1,
   );
   expect(Math.hypot(
@@ -305,9 +452,17 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
     secondDrop.launchPosition[1] - expectedSecondHardpoint[1],
     secondDrop.launchPosition[2] - expectedSecondHardpoint[2],
   )).toBeLessThan(0.75);
+  const missileScreenshot = resolve(evidence, 'chopper-hardpoint-missile.png');
+  await page.screenshot({ path: missileScreenshot, animations: 'allow' });
+  expect((await sharp(missileScreenshot).stats()).entropy).toBeGreaterThan(1.5);
+  await testInfo.attach(`pass71-${renderer}-chopper-hardpoint-missile`, {
+    path: missileScreenshot,
+    contentType: 'image/png',
+  });
   expect(await page.evaluate(() => (globalThis as any).__PASS71_CONTROLLED_SUPPORT_INPUTS__
     .filter((event: any) => event.type === 'mousedown' && event.button === 2 && event.trusted === true).length)).toBe(3);
 
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.releasePossessedChopperEvidenceControl());
   expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.toggleChopperGunnerControl())).toBe(true);
   await page.waitForFunction(() => document.documentElement.dataset.killstreakPossession === 'none');
   expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.activateKillstreak('piloted-drone'))).toBe(true);
@@ -430,7 +585,47 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
 
   await testInfo.attach(`pass71-${renderer}-controlled-support-runtime-proof`, {
     body: Buffer.from(`${JSON.stringify({
-      chopper: { stagedSplash, splashBaseline, splashReceipt, firstDrop, immediateSecond, secondDrop },
+      chopper: {
+        stagedSplash,
+        splashBaseline,
+        splashReceipt,
+        missileBefore: {
+          entityId: missileBefore.entity.id,
+          activationId: missileBefore.entity.activationId,
+          remainingLifetimeMs: missileBefore.entity.expiresInMs,
+        },
+        firstMissile: {
+          entityId: firstMissile.entity.id,
+          activationId: firstMissile.entity.activationId,
+          remainingLifetimeMs: firstMissile.remainingLifetimeMs,
+          authority: firstAuthority,
+        },
+        firstDrop,
+        immediateSecond: {
+          entityId: immediateSecond.entity.id,
+          activationId: immediateSecond.entity.activationId,
+          remainingLifetimeMs: immediateSecond.remainingLifetimeMs,
+          admittedControlSequence: immediateSecond.controlAdmission.sequence,
+          missileAmmo: immediateSecond.entity.missileAmmo,
+          dropCount: immediateSecond.impacts.recent.filter((event: any) => (
+            event.source === 'chopper'
+              && event.activationId === stagedSplash.activationId
+              && event.phase === 'drop'
+          )).length,
+        },
+        cooldownReady: {
+          entityId: cooldownReady.entity.id,
+          activationId: cooldownReady.entity.activationId,
+          remainingLifetimeMs: cooldownReady.remainingLifetimeMs,
+        },
+        secondMissile: {
+          entityId: secondMissile.entity.id,
+          activationId: secondMissile.entity.activationId,
+          remainingLifetimeMs: secondMissile.remainingLifetimeMs,
+          authority: secondAuthority,
+        },
+        secondDrop,
+      },
       pilotedDrone: { occludedStage, occludedScreenPosition, visibleStage },
     }, null, 2)}\n`, 'utf8'),
     contentType: 'application/json',

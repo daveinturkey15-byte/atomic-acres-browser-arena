@@ -402,7 +402,7 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       captureRevision,
     };
   });
-  await page.waitForFunction(({ entityId, captureRevision }) => {
+  const roughPresentedHandle = await page.waitForFunction(({ entityId, captureRevision }) => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     const presentedGameplayFrame = (debug.admissionState() as any).presentedGameplayFrame;
     const receipt = (debug.snapshot() as any).deterministicReview.presentedCamera;
@@ -412,21 +412,43 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       && receipt.reviewedChopper.rootVisible === true
       && receipt.reviewedChopper.activeLodIndex === 0
       && receipt.reviewedChopper.drawableStableMeshCount > 0
-      && Boolean(receipt.reviewedChopper.drawableStableBounds);
+      && Boolean(receipt.reviewedChopper.drawableStableBounds)
+      ? receipt
+      : false;
   }, {
     entityId: roughExteriorPose.entityId,
     captureRevision: roughExteriorPose.captureRevision,
   }, { timeout: 8_000, polling: 16 });
-  const exteriorPose = await page.evaluate((roughPose) => {
-    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
-    const detail = snapshot.killstreakPresentation.entityDetails
-      .find((entry: any) => entry.entityId === roughPose.entityId);
-    const entity = snapshot.killstreak.entities.find((entry: any) => entry.id === roughPose.entityId);
-    if (!detail?.drawableStableAirframeBounds || !(detail.drawableStableAirframeMeshCount > 0)
-      || detail.activeLodIndex !== 0 || !Number.isFinite(entity?.attitude?.[1])) {
-      throw new Error('Drawable authored Chopper LOD0 bounds were unavailable for the final runtime evidence pose');
+  const roughPresentedReceipt = await roughPresentedHandle.jsonValue() as {
+    frame: number;
+    captureRevision: number;
+    reviewedChopper: {
+      entityId: string;
+      rootVisible: boolean;
+      activeLodIndex: number;
+      drawableStableMeshCount: number;
+      drawableStableBounds: { min: number[]; max: number[] };
+    };
+  };
+  expect(roughPresentedReceipt).toMatchObject({
+    captureRevision: roughExteriorPose.captureRevision,
+    reviewedChopper: {
+      entityId: roughExteriorPose.entityId,
+      rootVisible: true,
+      activeLodIndex: 0,
+    },
+  });
+  const exteriorPose = await page.evaluate(({ roughPose, presentedReceipt }) => {
+    const detail = presentedReceipt.reviewedChopper;
+    if (presentedReceipt.captureRevision !== roughPose.captureRevision
+      || detail.entityId !== roughPose.entityId
+      || !detail.drawableStableBounds
+      || !(detail.drawableStableMeshCount > 0)
+      || detail.activeLodIndex !== 0
+      || !Number.isFinite(roughPose.entityYaw)) {
+      throw new Error('Presented authored Chopper LOD0 bounds were unavailable for the final runtime evidence pose');
     }
-    const visibleBounds = detail.drawableStableAirframeBounds;
+    const visibleBounds = detail.drawableStableBounds;
     const target = [
       (visibleBounds.min[0] + visibleBounds.max[0]) / 2,
       (visibleBounds.min[1] + visibleBounds.max[1]) / 2,
@@ -437,7 +459,7 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       visibleBounds.max[1] - visibleBounds.min[1],
       visibleBounds.max[2] - visibleBounds.min[2],
     ];
-    const inTestBay = detail.worldPosition[0] >= 50;
+    const inTestBay = roughPose.worldPosition[0] >= 50;
     const bounds = inTestBay
       ? { minX: 52.8, maxX: 99.2, minZ: -25.2, maxZ: 37.2, maxCameraY: 22 }
       : { minX: -19.2, maxX: 19.2, minZ: -47.8, maxZ: 19, maxCameraY: 5.8 };
@@ -453,7 +475,7 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
     const cameraDistanceM = Math.min(18, fitDistance);
     const wallInsetM = 0.8;
     const sideCandidates = [-1, 1].map((side) => {
-      const angle = entity.attitude[1] + Math.PI + (side * Math.PI / 3);
+      const angle = roughPose.entityYaw + Math.PI + (side * Math.PI / 3);
       const candidate = {
         side,
         x: Math.max(bounds.minX + wallInsetM, Math.min(
@@ -518,10 +540,10 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       maxY: Math.max(...projected.map((point) => point.y)),
     };
     return {
-      entityId: entity.id,
+      entityId: roughPose.entityId,
       activeLodIndex: detail.activeLodIndex,
-      worldPosition: detail.worldPosition,
-      entityYaw: entity.attitude[1],
+      worldPosition: roughPose.worldPosition,
+      entityYaw: roughPose.entityYaw,
       cameraPosition: [candidate.x, cameraY, candidate.z],
       cameraYaw,
       cameraPitch,
@@ -530,8 +552,8 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       cameraDistanceM: candidate.distance,
       target,
       visibleBounds,
-      stableAirframeMeshCount: detail.stableAirframeMeshCount,
-      drawableStableAirframeMeshCount: detail.drawableStableAirframeMeshCount,
+      stableAirframeMeshCount: roughPose.stableAirframeMeshCount,
+      drawableStableAirframeMeshCount: detail.drawableStableMeshCount,
       visibleSpan,
       viewportBounds,
       viewportCoverage: {
@@ -543,8 +565,10 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       inTestBay,
       roughPose,
       captureRevision,
+      roughPresentedFrame: presentedReceipt.frame,
+      roughPresentedCaptureRevision: presentedReceipt.captureRevision,
     };
-  }, roughExteriorPose);
+  }, { roughPose: roughExteriorPose, presentedReceipt: roughPresentedReceipt });
   expect(exteriorPose).toMatchObject({ activeLodIndex: 0, allBoundsInFront: true });
   expect(exteriorPose.stableAirframeMeshCount).toBeGreaterThan(0);
   expect(exteriorPose.drawableStableAirframeMeshCount).toBeGreaterThan(0);

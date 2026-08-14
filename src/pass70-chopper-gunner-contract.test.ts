@@ -111,7 +111,6 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(presentation).toContain("'chopper-muzzle-flash'");
     expect(presentation).toContain("'chopper-impact-action'");
     expect(e2e).toContain('const visibleBounds = detail.stableAirframeBounds;');
-    expect(e2e).toContain('const visibleBounds = detail.drawableStableAirframeBounds;');
     const exteriorBootstrap = e2e.slice(
       e2e.indexOf('const roughExteriorPose'),
       e2e.indexOf('const exteriorPose'),
@@ -119,8 +118,19 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(exteriorBootstrap).toContain('deterministicReview.presentedCamera');
     expect(exteriorBootstrap).toContain('receipt.reviewedChopper.drawableStableMeshCount > 0');
     expect(exteriorBootstrap).toContain('Boolean(receipt.reviewedChopper.drawableStableBounds)');
+    expect(exteriorBootstrap).toContain('const roughPresentedHandle = await page.waitForFunction');
+    expect(exteriorBootstrap).toContain('const roughPresentedReceipt = await roughPresentedHandle.jsonValue()');
     expect(exteriorBootstrap.indexOf('const visibleBounds = detail.stableAirframeBounds;'))
       .toBeLessThan(exteriorBootstrap.indexOf('deterministicReview.presentedCamera'));
+    const finalExteriorPose = e2e.slice(
+      e2e.indexOf('const exteriorPose'),
+      e2e.indexOf('expect(exteriorPose)', e2e.indexOf('const exteriorPose')),
+    );
+    expect(finalExteriorPose).toContain('const detail = presentedReceipt.reviewedChopper;');
+    expect(finalExteriorPose).toContain('const visibleBounds = detail.drawableStableBounds;');
+    expect(finalExteriorPose).toContain('entityId: roughPose.entityId');
+    expect(finalExteriorPose).not.toContain('window.__ATOMIC_ACRES_DEBUG__.snapshot()');
+    expect(finalExteriorPose).not.toContain('snapshot.killstreakPresentation.entityDetails');
     expect(e2e).toContain('receipt.reviewedChopper.drawableStableMeshCount > 0');
     expect(e2e).toContain('rasterVisibility.visiblePixelRatio');
     expect(e2e).toContain('rasterVisibility.maximumLuminance');
@@ -228,10 +238,21 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
       'event.trusted === true',
       'stagePossessedChopperSplashTargets()',
       'aimPossessedChopperAtTarget(targetId)',
+      'awaitChopperRuntimePhase(',
+      "expectedPhase === 'cooldown-ready' && firstMissileReceipt !== null",
+      'entity.missileAmmo === 5',
+      'debug.requestPossessedChopperEvidenceControl({ fire: false })',
+      'expect(splashBaseline.remainingLifetimeMs).toBeGreaterThan(5_000)',
+      'expect(secondMissileBefore.entity.expiresInMs).toBeGreaterThan(0)',
+      'snapshot.chopperMissileAuthority',
+      "contract: 'pass71-hf308-chopper-missile-authority-v1'",
+      'controlAdmission.sequence).toBe(firstAuthority.controlSequence + 1)',
       'stagedSplash.splashRadiusM).toBe(3)',
       'stagedSplash.separationM).toBeGreaterThan(2.8)',
       'splashReceipt.primary.atMs).toBe(splashReceipt.splash.atMs)',
-      'immediateSecond.entity.missileAmmo).toBe(5)',
+      'const immediateSecond = firstMissile',
+      'expect(immediateSecond.impacts.recent.filter',
+      'expect(immediateSecond.controlAdmission).toMatchObject',
       'secondDrop.atMs - firstDrop.atMs).toBeGreaterThanOrEqual(1_000)',
       'chopperMissileLaunchPosition(',
       "'chopper-hardpoint-missile.png'",
@@ -247,6 +268,17 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
       'proxyMeshes: 0',
       "'piloted-drone-occluded-exact-thermal-rig.png'",
     ]) expect(controlledSupportE2e).toContain(token);
+    expect(controlledSupportE2e).not.toContain('for (let attempt = 0; attempt < 24');
+    const cadenceTransaction = controlledSupportE2e.slice(
+      controlledSupportE2e.indexOf('const firstMissileWallClockMs'),
+      controlledSupportE2e.indexOf('const firstMissile = cooldownReady.firstMissileReceipt'),
+    );
+    expect(cadenceTransaction.match(/page\.mouse\.down\(\{ button: 'right' \}\)/gu)).toHaveLength(2);
+    expect(cadenceTransaction.match(/page\.mouse\.up\(\{ button: 'right' \}\)/gu)).toHaveLength(2);
+    expect(cadenceTransaction.indexOf('const cooldownReady = await awaitChopperRuntimePhase'))
+      .toBeGreaterThan(-1);
+    expect(cadenceTransaction.lastIndexOf("page.mouse.up({ button: 'right' })"))
+      .toBeLessThan(cadenceTransaction.indexOf('const cooldownReady = await awaitChopperRuntimePhase'));
 
     for (const method of [
       'stagePossessedChopperSplashTargets: () => {',
