@@ -66,8 +66,8 @@ function pinnedTopologyChannel(expectedChannel, channel) {
     schemaVersion: 4, channel, releasePass: expectedChannel.pass,
     sourceSha: expectedChannel.sourceSha, pagesSha: expectedChannel.pagesSha,
     pagesPath: expectedChannel.pagesPath, path: expectedChannel.path,
-    exactRootFileCount: expectedChannel.runtimeFileCount,
-    treeSha256: expectedChannel.runtimeTreeSha256,
+    exactRootFileCount: expectedChannel.pagesSubtreeFileCount,
+    treeSha256: expectedChannel.pagesSubtreeTreeSha256,
     pinnedRuntime: {
       releasePass: expectedChannel.pass, sourceSha: expectedChannel.sourceSha,
       exactRootFileCount: expectedChannel.runtimeFileCount,
@@ -215,5 +215,14 @@ describe('Pass 71 HF-313 protected release evidence', () => {
     assert.deepEqual(postcondition.publicChoices, PASS71_HF313_PUBLIC_CHOICES);
     input.liveSmoke.routes.stable.url = 'https://example/channels/recent-stable/';
     assert(pass71Hf313ProductionPostconditionFailures(input).includes('canonical-live-routes'));
+  });
+
+  it('keeps wrapper subtree identity distinct from embedded runtime identity', () => {
+    const input = productionInput();
+    const retained = input.topology.channels.retained;
+    assert.equal(retained.exactRootFileCount, PASS71_HF313_PINNED_CHANNELS.retained.pagesSubtreeFileCount);
+    assert.equal(retained.pinnedRuntime.exactRootFileCount, PASS71_HF313_PINNED_CHANNELS.retained.runtimeFileCount);
+    retained.exactRootFileCount = retained.pinnedRuntime.exactRootFileCount;
+    assert(pass71Hf313ProductionPostconditionFailures(input).includes('staged-release-topology'));
   });
 });

@@ -29,6 +29,8 @@ describe('Pass 71 release topology', () => {
       pagesPath: 'channels/the-big-one',
       runtimeFileCount: 515,
       runtimeTreeSha256: '5ace26fdf83a4cf695d0075a40523f70e0d6fcee02cb6ae5b42666b6679107b9',
+      pagesSubtreeFileCount: 516,
+      pagesSubtreeTreeSha256: '04e3fcf121db14038a1cd27661ec9ac5fdf62939af470c070fa92cfbb45388ec',
       path: 'channels/pass69-retained',
     });
     expect(config.rollback.sourceSha).toBe('ac85e9b8b46cc2370aee903d564ecf3c4682b24c');
@@ -38,6 +40,8 @@ describe('Pass 71 release topology', () => {
       pagesPath: 'channels/pass63-rollback',
       runtimeFileCount: 119,
       runtimeTreeSha256: 'b7416e02c190d8ff0403a65cd7a7c894970507bc6a8de7b196cc2d7979d69bce',
+      pagesSubtreeFileCount: 120,
+      pagesSubtreeTreeSha256: '43e97691b33240be8992f1f1238f5d3effb292e3765e7528b27756c04695f579',
       path: 'channels/pass63-rollback',
     });
   });
@@ -67,6 +71,8 @@ describe('Pass 71 release topology', () => {
       pagesPath: 'channels/recent-stable',
       runtimeFileCount: 508,
       runtimeTreeSha256: 'd8d444578e83a408c2e4d63ca4d1c2c5b705521f565fee6a58daffeb1e205ce9',
+      pagesSubtreeFileCount: 509,
+      pagesSubtreeTreeSha256: '10e408e5663dda8fef820aae89bbcda174699bd2661b9d94387d060fdb55914a',
       path: 'channels/recent-stable',
     });
   });
@@ -128,6 +134,8 @@ describe('Pass 71 release topology', () => {
     expect(staging).toContain('STABLE_RELEASED_AT must be one strict UTC ISO-8601 instant');
     expect(staging).toContain("channel: liveChannelId");
     expect(staging).toContain('channel.pagesPath');
+    expect(staging).toContain('paths.length !== channel.pagesSubtreeFileCount');
+    expect(staging).toContain('digest !== channel.pagesSubtreeTreeSha256');
     expect(staging).toContain("'pinned-channel-provenance.json'");
     expect(staging).not.toContain("stagePinned('new-netcode'");
     expect(staging).toContain('experimental: {');
@@ -137,7 +145,10 @@ describe('Pass 71 release topology', () => {
     expect(staging).not.toContain('PASS63_PREVIEW_PIN');
     expect(staging).toContain("rollback = stagePinned('rollback', config.rollback)");
     expect(staticVerifier).toContain('const rollbackFiles = verifyPinned(config.rollback)');
-    expect(staticVerifier).toContain('rollbackFiles !== config.rollback.runtimeFileCount + 1');
+    expect(staticVerifier).toContain('rollbackFiles !== config.rollback.pagesSubtreeFileCount');
+    expect(staticVerifier).toContain('retainedWrapper.treeSha256 !== config.retained.pagesSubtreeTreeSha256');
+    expect(staticVerifier).toContain('stableProvenance.treeSha256 !== config.stable.pagesSubtreeTreeSha256');
+    expect(staticVerifier).toContain('rollbackWrapper.treeSha256 !== config.rollback.pagesSubtreeTreeSha256');
     expect(staticVerifier).toContain('rollbackEmbedded.treeSha256 !== config.rollback.runtimeTreeSha256');
     expect(staticVerifier).toContain('rollbackWrapper.pagesSha !== config.rollback.pagesSha');
     expect(staging).toContain("schemaVersion: 4");

@@ -37,8 +37,8 @@ describe('production receipt v4', () => {
       pagesSha: value.pagesSha,
       pagesPath: value.pagesPath,
       path: value.path,
-      exactRootFileCount: value.runtimeFileCount,
-      treeSha256: value.runtimeTreeSha256,
+      exactRootFileCount: value.pagesSubtreeFileCount,
+      treeSha256: value.pagesSubtreeTreeSha256,
       pinnedRuntime: {
         releasePass: value.pass,
         sourceSha: value.sourceSha,

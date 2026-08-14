@@ -64,6 +64,11 @@ describe('production release workflow', () => {
     expect(staticTopologyVerifier).toContain('publicConfig.stable.pass !== config.rollback.pass');
     expect(liveTopologyVerifier).toContain('await buttons.count() !== 3');
     expect(liveTopologyVerifier).toContain("for (const choice of ['experimental', 'retained', 'stable'])");
+    expect(liveTopologyVerifier).toContain('channelConfig.retained.pagesSubtreeTreeSha256');
+    expect(liveTopologyVerifier).toContain('channelConfig.stable.pagesSubtreeTreeSha256');
+    expect(liveTopologyVerifier).toContain('channelConfig.rollback.pagesSubtreeTreeSha256');
+    expect(liveTopologyVerifier).toContain('retainedWrapper.pinnedRuntime?.treeSha256');
+    expect(liveTopologyVerifier).toContain('rollbackWrapper.pinnedRuntime?.treeSha256');
     expect(liveTopologyVerifier).toContain("await verifyChoice('retained', 'channels/pass69-retained', 'PASS 69', 'pass69');");
     expect(liveTopologyVerifier).toContain("await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63');");
     expect(liveTopologyVerifier).not.toContain("await verifyChoice('rollback'");

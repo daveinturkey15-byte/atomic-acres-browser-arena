@@ -143,6 +143,10 @@ function stagePinned(channelName, channel) {
   }
   if (passEvidenceFiles.length === 0) throw new Error(`${pagesSha} does not contain configured ${channel.pass}`);
   const digest = treeDigest(targetRoot, paths.map((path) => join(targetRoot, path)));
+  if (pagesPath && (paths.length !== channel.pagesSubtreeFileCount
+    || digest !== channel.pagesSubtreeTreeSha256)) {
+    throw new Error(`${channelName} complete Pages subtree does not match its pinned wrapper identity`);
+  }
   const provenance = {
     schemaVersion: 4, channel: channelName, releasePass: channel.pass,
     pagesSha, pagesPath: pagesPath || '.', sourceSha: pinnedSourceSha, sourceSubject, path: channel.path,

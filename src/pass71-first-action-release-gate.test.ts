@@ -188,13 +188,16 @@ describe('Pass 71 first-action and protected-release gate', () => {
       pagesPath: 'channels/pass63-rollback',
       runtimeFileCount: 119,
       runtimeTreeSha256: 'b7416e02c190d8ff0403a65cd7a7c894970507bc6a8de7b196cc2d7979d69bce',
+      pagesSubtreeFileCount: 120,
+      pagesSubtreeTreeSha256: '43e97691b33240be8992f1f1238f5d3effb292e3765e7528b27756c04695f579',
       path: 'channels/pass63-rollback',
     });
     expect(topologyStaging).toContain("stagePinned('rollback', config.rollback)");
     expect(topologyStaging).not.toContain('RELEASE_ROLLBACK_DIST');
     expect(topologyStaging).not.toContain('PASS63_PREVIEW_PIN');
     expect(topologyVerifier).toContain('const rollbackFiles = verifyPinned(config.rollback)');
-    expect(topologyVerifier).toContain('rollbackFiles !== config.rollback.runtimeFileCount + 1');
+    expect(topologyVerifier).toContain('rollbackFiles !== config.rollback.pagesSubtreeFileCount');
+    expect(topologyVerifier).toContain('rollbackWrapper.treeSha256 !== config.rollback.pagesSubtreeTreeSha256');
     expect(topologyVerifier).toContain('rollbackWrapper.pagesSha !== config.rollback.pagesSha');
     expect(releaseWorkflow).toContain('ROLLBACK_PAGES_SHA=$(node -e');
     expect(releaseWorkflow).not.toContain('pass63-rollback-src');

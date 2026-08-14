@@ -89,6 +89,8 @@ if (retainedEmbedded.releasePass !== config.retained.pass
   || retainedWrapper.pagesSha !== config.retained.pagesSha
   || retainedWrapper.pagesPath !== config.retained.pagesPath
   || retainedWrapper.path !== config.retained.path
+  || retainedWrapper.exactRootFileCount !== config.retained.pagesSubtreeFileCount
+  || retainedWrapper.treeSha256 !== config.retained.pagesSubtreeTreeSha256
   || retainedWrapper.pinnedRuntime?.treeSha256 !== config.retained.runtimeTreeSha256) {
   throw new Error('Retained Pass 69 does not match the exact previously hosted runtime');
 }
@@ -127,6 +129,8 @@ if (rebuiltStable?.rebuiltFromSource === true) {
     || stableProvenance.sourceSha !== config.stable.sourceSha
     || stableProvenance.pagesSha !== config.stable.pagesSha
     || stableProvenance.pagesPath !== config.stable.pagesPath
+    || stableProvenance.exactRootFileCount !== config.stable.pagesSubtreeFileCount
+    || stableProvenance.treeSha256 !== config.stable.pagesSubtreeTreeSha256
     || stableProvenance.pinnedRuntime?.exactRootFileCount !== config.stable.runtimeFileCount
     || stableProvenance.pinnedRuntime?.treeSha256 !== config.stable.runtimeTreeSha256) {
     throw new Error('Stable Pass 67.1 provenance does not match the exact configured source and Pages SHAs');
@@ -153,7 +157,7 @@ if (config.rollback && existsSync(join(dist, config.rollback.path))) {
   const rollbackWrapper = JSON.parse(readFileSync(join(rollbackRoot, 'pinned-channel-provenance.json'), 'utf8'));
   const rollbackPinnedFiles = walkFiles(rollbackRoot)
     .filter((path) => path !== join(rollbackRoot, 'pinned-channel-provenance.json'));
-  if (rollbackFiles !== config.rollback.runtimeFileCount + 1
+  if (rollbackFiles !== config.rollback.pagesSubtreeFileCount
     || rollbackPinnedFiles.length !== rollbackFiles
     || rollbackEmbedded.schemaVersion !== 4
     || rollbackEmbedded.releasePass !== config.rollback.pass
@@ -168,7 +172,8 @@ if (config.rollback && existsSync(join(dist, config.rollback.path))) {
     || rollbackWrapper.pagesSha !== config.rollback.pagesSha
     || rollbackWrapper.pagesPath !== config.rollback.pagesPath
     || rollbackWrapper.path !== config.rollback.path
-    || rollbackWrapper.exactRootFileCount !== rollbackFiles
+    || rollbackWrapper.exactRootFileCount !== config.rollback.pagesSubtreeFileCount
+    || rollbackWrapper.treeSha256 !== config.rollback.pagesSubtreeTreeSha256
     || rollbackWrapper.treeSha256 !== treeDigest(rollbackRoot, rollbackPinnedFiles)
     || rollbackWrapper.pinnedRuntime?.exactRootFileCount !== config.rollback.runtimeFileCount
     || rollbackWrapper.pinnedRuntime?.treeSha256 !== config.rollback.runtimeTreeSha256) {

@@ -82,8 +82,8 @@ async function verifyPublishedProvenance() {
   assertEqual(retainedWrapper.pagesSha, channelConfig.retained.pagesSha, 'Retained wrapper Pages SHA');
   assertEqual(retainedWrapper.pagesPath, channelConfig.retained.pagesPath, 'Retained wrapper Pages path');
   assertEqual(retainedWrapper.path, channelConfig.retained.path, 'Retained wrapper route');
-  assertEqual(retainedWrapper.exactRootFileCount, retainedEmbedded.exactRootFileCount, 'Retained wrapper exact file count');
-  assertEqual(retainedWrapper.treeSha256, retainedEmbedded.treeSha256, 'Retained wrapper exact runtime digest');
+  assertEqual(retainedWrapper.exactRootFileCount, channelConfig.retained.pagesSubtreeFileCount, 'Retained wrapper Pages subtree file count');
+  assertEqual(retainedWrapper.treeSha256, channelConfig.retained.pagesSubtreeTreeSha256, 'Retained wrapper Pages subtree digest');
   assertEqual(retainedWrapper.pinnedRuntime?.treeSha256, retainedEmbedded.treeSha256, 'Retained wrapper embedded digest');
   provenance.retained = { wrapper: retainedWrapper, embedded: retainedEmbedded };
   const stableOriginal = await fetchJson(`${channelConfig.stable.path}/channel-provenance.json`);
@@ -115,6 +115,8 @@ async function verifyPublishedProvenance() {
     assertEqual(stableWrapper.pagesSha, channelConfig.stable.pagesSha, 'Stable wrapper pagesSha');
     assertEqual(stableWrapper.pagesPath, channelConfig.stable.pagesPath, 'Stable wrapper Pages path');
     assertEqual(stableWrapper.path, channelConfig.stable.path, 'Stable wrapper route');
+    assertEqual(stableWrapper.exactRootFileCount, channelConfig.stable.pagesSubtreeFileCount, 'Stable wrapper Pages subtree file count');
+    assertEqual(stableWrapper.treeSha256, channelConfig.stable.pagesSubtreeTreeSha256, 'Stable wrapper Pages subtree digest');
     assertEqual(stableWrapper.pinnedRuntime?.sourceSha, stableOriginal.sourceSha, 'Stable wrapper embedded sourceSha');
     assertEqual(stableWrapper.pinnedRuntime?.exactRootFileCount, stableOriginal.exactRootFileCount, 'Stable wrapper embedded file count');
     assertEqual(stableWrapper.pinnedRuntime?.treeSha256, stableOriginal.treeSha256, 'Stable wrapper embedded digest');
@@ -136,8 +138,8 @@ async function verifyPublishedProvenance() {
   assertEqual(rollbackWrapper.pagesSha, channelConfig.rollback.pagesSha, 'Rollback wrapper Pages SHA');
   assertEqual(rollbackWrapper.pagesPath, channelConfig.rollback.pagesPath, 'Rollback wrapper Pages path');
   assertEqual(rollbackWrapper.path, channelConfig.rollback.path, 'Rollback wrapper route');
-  assertEqual(rollbackWrapper.exactRootFileCount, rollbackEmbedded.exactRootFileCount, 'Rollback wrapper exact file count');
-  assertEqual(rollbackWrapper.treeSha256, rollbackEmbedded.treeSha256, 'Rollback wrapper exact runtime digest');
+  assertEqual(rollbackWrapper.exactRootFileCount, channelConfig.rollback.pagesSubtreeFileCount, 'Rollback wrapper Pages subtree file count');
+  assertEqual(rollbackWrapper.treeSha256, channelConfig.rollback.pagesSubtreeTreeSha256, 'Rollback wrapper Pages subtree digest');
   assertEqual(rollbackWrapper.pinnedRuntime?.sourceSha, rollbackEmbedded.sourceSha, 'Rollback wrapper embedded source SHA');
   assertEqual(rollbackWrapper.pinnedRuntime?.exactRootFileCount, rollbackEmbedded.exactRootFileCount, 'Rollback wrapper embedded file count');
   assertEqual(rollbackWrapper.pinnedRuntime?.treeSha256, rollbackEmbedded.treeSha256, 'Rollback wrapper embedded digest');

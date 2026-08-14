@@ -36,6 +36,8 @@ export const PASS71_HF313_PINNED_CHANNELS = Object.freeze({
     path: 'channels/pass69-retained',
     runtimeFileCount: 515,
     runtimeTreeSha256: '5ace26fdf83a4cf695d0075a40523f70e0d6fcee02cb6ae5b42666b6679107b9',
+    pagesSubtreeFileCount: 516,
+    pagesSubtreeTreeSha256: '04e3fcf121db14038a1cd27661ec9ac5fdf62939af470c070fa92cfbb45388ec',
   }),
   rollback: Object.freeze({
     pass: 'PASS 63',
@@ -45,6 +47,8 @@ export const PASS71_HF313_PINNED_CHANNELS = Object.freeze({
     path: 'channels/pass63-rollback',
     runtimeFileCount: 119,
     runtimeTreeSha256: 'b7416e02c190d8ff0403a65cd7a7c894970507bc6a8de7b196cc2d7979d69bce',
+    pagesSubtreeFileCount: 120,
+    pagesSubtreeTreeSha256: '43e97691b33240be8992f1f1238f5d3effb292e3765e7528b27756c04695f579',
   }),
 });
 
@@ -393,8 +397,8 @@ function exactPinnedChannel(channel, expected, channelName) {
   return object(channel) && channel.schemaVersion === 4
     && channel.releasePass === expected.pass && channel.sourceSha === expected.sourceSha
     && channel.pagesSha === expected.pagesSha && channel.pagesPath === expected.pagesPath
-    && channel.path === expected.path && channel.exactRootFileCount === expected.runtimeFileCount
-    && channel.treeSha256 === expected.runtimeTreeSha256
+    && channel.path === expected.path && channel.exactRootFileCount === expected.pagesSubtreeFileCount
+    && channel.treeSha256 === expected.pagesSubtreeTreeSha256
     && channel.pinnedRuntime?.releasePass === expected.pass
     && channel.pinnedRuntime?.sourceSha === expected.sourceSha
     && channel.pinnedRuntime?.exactRootFileCount === expected.runtimeFileCount
