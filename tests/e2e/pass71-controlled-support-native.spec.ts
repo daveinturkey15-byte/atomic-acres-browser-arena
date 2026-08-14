@@ -44,6 +44,80 @@ async function ensurePointerLock(page: Page): Promise<void> {
   await page.waitForFunction(() => document.pointerLockElement === document.querySelector('#game'), undefined, { timeout: 5_000 });
 }
 
+async function pauseCompletedPresentedFrame(page: Page) {
+  const committed = await page.evaluate(async () => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    let renderPaused = false;
+    try {
+      const baselinePresentedFrame = (debug.admissionState() as any).presentedGameplayFrame as number;
+      await new Promise<void>((resolveFrame, rejectFrame) => {
+        const deadlineAtMs = performance.now() + 8_000;
+        const inspect = () => {
+          const presentedFrame = (debug.admissionState() as any).presentedGameplayFrame as number;
+          if (presentedFrame > baselinePresentedFrame) {
+            resolveFrame();
+            return;
+          }
+          if (performance.now() >= deadlineAtMs) {
+            rejectFrame(new Error('Controlled-support raster did not reach a new presented frame within 8000ms'));
+            return;
+          }
+          requestAnimationFrame(inspect);
+        };
+        requestAnimationFrame(inspect);
+      });
+      const presentedFrame = (debug.admissionState() as any).presentedGameplayFrame as number;
+      const presented = debug.samplePresentationTelemetry() as any;
+      debug.setRenderPaused(true);
+      renderPaused = true;
+      const pausedFrame = (debug.admissionState() as any).presentedGameplayFrame as number;
+      const paused = debug.samplePresentationTelemetry() as any;
+      if (pausedFrame !== presentedFrame
+        || paused.submissionSequence !== presented.submissionSequence) {
+        throw new Error('Controlled-support raster pause did not retain the exact presented frame');
+      }
+      const completion = await debug.awaitCommittedCameraCompletion() as any;
+      const stableFrame = (debug.admissionState() as any).presentedGameplayFrame as number;
+      const stableSnapshot = debug.snapshot() as any;
+      const stable = debug.samplePresentationTelemetry() as any;
+      if (stableFrame !== pausedFrame
+        || stableSnapshot.deterministicReview.debugRenderPaused !== true
+        || completion.submissionSequence !== paused.submissionSequence
+        || completion.completedSequence < completion.submissionSequence
+        || stable.submissionSequence !== paused.submissionSequence
+        || stable.completedSequence < completion.completedSequence) {
+        throw new Error('Controlled-support raster did not retain a paused completed presentation frontier');
+      }
+      return {
+        baselinePresentedFrame,
+        presentedFrame,
+        submissionSequence: paused.submissionSequence as number,
+        completedSequence: completion.completedSequence as number,
+        presentationStatus: stable.status as string,
+        debugRenderPaused: true,
+      };
+    } catch (error) {
+      if (renderPaused) debug.setRenderPaused(false);
+      throw error;
+    }
+  });
+  expect(committed.presentedFrame).toBeGreaterThan(committed.baselinePresentedFrame);
+  expect(committed.completedSequence).toBeGreaterThanOrEqual(committed.submissionSequence);
+  expect(committed.presentationStatus).toMatch(/^(?:healthy|synchronous)$/u);
+  expect(committed.debugRenderPaused).toBe(true);
+  return committed;
+}
+
+async function capturePausedCompletedPresentedScreenshot(page: Page, path: string) {
+  try {
+    const committed = await pauseCompletedPresentedFrame(page);
+    await page.screenshot({ path, animations: 'allow' });
+    return committed;
+  } finally {
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
+  }
+}
+
 async function awaitChopperRuntimePhase(
   page: Page,
   entityId: string,
@@ -988,8 +1062,12 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
     secondDrop.launchPosition[2] - expectedSecondHardpoint[2],
   )).toBeLessThan(0.75);
   const missileScreenshot = resolve(evidence, 'chopper-hardpoint-missile.png');
-  await page.screenshot({ path: missileScreenshot, animations: 'allow' });
+  const missileCaptureCommit = await capturePausedCompletedPresentedScreenshot(page, missileScreenshot);
   expect((await sharp(missileScreenshot).stats()).entropy).toBeGreaterThan(1.5);
+  await testInfo.attach(`pass71-${renderer}-chopper-hardpoint-missile-frame`, {
+    body: Buffer.from(`${JSON.stringify(missileCaptureCommit, null, 2)}\n`, 'utf8'),
+    contentType: 'application/json',
+  });
   await testInfo.attach(`pass71-${renderer}-chopper-hardpoint-missile`, {
     path: missileScreenshot,
     contentType: 'image/png',
@@ -1069,8 +1147,12 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
   expect(occludedScreenPosition[2]).toBeGreaterThan(-1);
   expect(occludedScreenPosition[2]).toBeLessThan(1);
   const droneOccludedScreenshot = resolve(evidence, 'piloted-drone-occluded-exact-thermal-rig.png');
-  await page.screenshot({ path: droneOccludedScreenshot, animations: 'allow' });
+  const droneCaptureCommit = await capturePausedCompletedPresentedScreenshot(page, droneOccludedScreenshot);
   expect((await sharp(droneOccludedScreenshot).stats()).entropy).toBeGreaterThan(1.5);
+  await testInfo.attach(`pass71-${renderer}-piloted-drone-occluded-frame`, {
+    body: Buffer.from(`${JSON.stringify(droneCaptureCommit, null, 2)}\n`, 'utf8'),
+    contentType: 'application/json',
+  });
   await testInfo.attach(`pass71-${renderer}-piloted-drone-occluded-exact-thermal-rig`, {
     path: droneOccludedScreenshot,
     contentType: 'image/png',

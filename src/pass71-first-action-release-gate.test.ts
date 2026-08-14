@@ -38,6 +38,7 @@ describe('Pass 71 first-action and protected-release gate', () => {
       'baseline.firstCompletionDelayMs >= maximumBaselineCompletionMs',
       'gapsMs.length >= minimumFrameSamples',
       'minimumFrameSamples: MINIMUM_BASELINE_FRAME_SAMPLES',
+      'minimumFrameSamples: minimumActionFrameSamples(evidenceMode)',
       'captureDeadlineMs: BASELINE_CAPTURE_DEADLINE_MS',
       'const complete = now < deadline',
       'identity.evidenceMode !== REQUIRED_RELEASE_ACCEPTANCE_FRAME_ACTION_MODE',

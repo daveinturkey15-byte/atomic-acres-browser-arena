@@ -178,7 +178,10 @@ export function frameActionReleaseAcceptanceEligible(
   return frameActionReleaseAcceptanceFailures(identity).length === 0;
 }
 
-function validateCompletedFrameActionBaseline(baseline: FrameActionBaseline): void {
+function validateCompletedFrameActionBaseline(
+  baseline: FrameActionBaseline,
+  evidenceMode: FrameActionEvidenceMode,
+): void {
   for (const [label, value] of [
     ['observationMs', baseline.observationMs],
     ['p50GapMs', baseline.p50GapMs],
@@ -192,8 +195,9 @@ function validateCompletedFrameActionBaseline(baseline: FrameActionBaseline): vo
   if (baseline.observationMs < BASELINE_OBSERVATION_MS) {
     throw new Error(`${baseline.label} did not cover the ${BASELINE_OBSERVATION_MS}ms baseline window`);
   }
+  const minimumFrameSamples = minimumActionFrameSamples(evidenceMode);
   if (!Number.isSafeInteger(baseline.frameSamples)
-    || baseline.frameSamples < MINIMUM_BASELINE_FRAME_SAMPLES
+    || baseline.frameSamples < minimumFrameSamples
     || baseline.gapsMs.length !== baseline.frameSamples) {
     throw new Error(`${baseline.label} has an incomplete frame sample set`);
   }
@@ -225,7 +229,7 @@ export function deriveFrameActionBudget(
     && evidenceMode !== SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE) {
     throw new Error(`Unknown frame-action evidence mode: ${String(evidenceMode)}`);
   }
-  validateCompletedFrameActionBaseline(baseline);
+  validateCompletedFrameActionBaseline(baseline, evidenceMode);
 
   const maximumBaselineP95Ms = TARGET_FRAME_BUDGET_MS * MAXIMUM_BASELINE_P95_FRAME_BUDGETS;
   const maximumBaselineGapMs = TARGET_FRAME_BUDGET_MS * MAXIMUM_BASELINE_GAP_FRAME_BUDGETS;
@@ -358,6 +362,7 @@ export async function armFrameActionBaseline(
   page: Page,
   label: string,
   identity: FrameActionBaselineIdentity,
+  evidenceMode: FrameActionEvidenceMode = NATIVE_NO_FREEZE_FRAME_ACTION_MODE,
 ): Promise<ArmedFrameActionBaseline> {
   const key = '__ATOMIC_ACRES_ARMED_FRAME_ACTION_BASELINE__';
   await page.evaluate(({
@@ -557,7 +562,7 @@ export async function armFrameActionBaseline(
     baselineLabel: label,
     expectedIdentity: identity,
     captureDeadlineMs: BASELINE_CAPTURE_DEADLINE_MS,
-    minimumFrameSamples: MINIMUM_BASELINE_FRAME_SAMPLES,
+    minimumFrameSamples: minimumActionFrameSamples(evidenceMode),
     minimumObservationMs: BASELINE_OBSERVATION_MS,
   });
   return Object.freeze({ key, label, identity });

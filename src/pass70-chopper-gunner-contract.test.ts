@@ -10,6 +10,8 @@ const authoringRunner = readFileSync(new URL('../scripts/blender/run-authoring.m
 const e2e = readFileSync(new URL('../tests/e2e/pass70-chopper-gunner.spec.ts', import.meta.url), 'utf8');
 const controlledSupportE2e = readFileSync(new URL('../tests/e2e/pass71-controlled-support-native.spec.ts', import.meta.url), 'utf8');
 const frameActionBudgetE2e = readFileSync(new URL('../tests/e2e/frame-action-budget.ts', import.meta.url), 'utf8');
+const hf309E2e = readFileSync(new URL('../tests/e2e/pass71-hf309-chopper-first-entry.spec.ts', import.meta.url), 'utf8');
+const hf309Runner = readFileSync(new URL('../scripts/qa/run-pass71-hf309-chopper-first-entry-evidence.mjs', import.meta.url), 'utf8');
 const boundedE2e = readFileSync(new URL('../scripts/qa/run-bounded-e2e.mjs', import.meta.url), 'utf8');
 
 describe('Pass 70 complete Chopper Gunner contract', () => {
@@ -275,9 +277,12 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
       'firstCompletionDelayMs',
       'endingEntity?.activationId !== expectedIdentity.activationId',
       'captureDeadlineMs: BASELINE_CAPTURE_DEADLINE_MS',
-      'minimumFrameSamples: MINIMUM_BASELINE_FRAME_SAMPLES',
+      'minimumFrameSamples: minimumActionFrameSamples(evidenceMode)',
       'minimumObservationMs: BASELINE_OBSERVATION_MS',
     ]) expect(armedBaseline).toContain(token);
+    expect(armedBaseline).toContain(
+      'evidenceMode: FrameActionEvidenceMode = NATIVE_NO_FREEZE_FRAME_ACTION_MODE',
+    );
     expect(armedBaseline).not.toContain('const deadline = performance.now()');
     expect(armedBaseline).not.toContain('let previousFrameAt = observer.startRequestedAtMs!;');
     expect(armedBaseline).not.toContain('inspect(frameAt);');
@@ -327,6 +332,32 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(evidenceAttachment).toBeGreaterThan(targetSetup);
   });
 
+  it('uses acceptance-ineligible software semantics only in the legacy CI shard and preserves native HF-309', () => {
+    for (const token of [
+      'const continuousIntegration = isContinuousIntegrationEnvironment(process.env.CI);',
+      'process.env.PASS70_CHOPPER_EVIDENCE_MODE',
+      '? SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE',
+      ': NATIVE_NO_FREEZE_FRAME_ACTION_MODE',
+      'assertFrameActionEvidenceEnvironment(evidenceMode, continuousIntegration);',
+      'expectedExteriorEntity,\n      evidenceMode,',
+      'deriveFrameActionBudget(possessionEntryBaseline, evidenceMode)',
+      'minimumActionFrameSamples(evidenceMode)',
+      'possessionEntryBudget.releaseAcceptanceModeEligible',
+      '.toBe(evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE)',
+      'software-CI semantic first-possession evidence only; not native HF-309 or release-acceptance evidence',
+    ]) expect(e2e).toContain(token);
+    expect(hf309E2e).toContain(
+      'deriveFrameActionBudget(baseline, NATIVE_NO_FREEZE_FRAME_ACTION_MODE)',
+    );
+    expect(hf309E2e).toContain(
+      'minimumSamples: minimumActionFrameSamples(NATIVE_NO_FREEZE_FRAME_ACTION_MODE)',
+    );
+    expect(hf309E2e).not.toContain('SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE');
+    expect(hf309E2e).not.toContain('PASS70_CHOPPER_EVIDENCE_MODE');
+    expect(hf309Runner).toContain('PASS71_HF309_SOURCE_SHA: expectedSourceSha');
+    expect(hf309Runner).not.toContain('PASS70_CHOPPER_EVIDENCE_MODE');
+  });
+
   it('proves real LMB splash, real RMB cadence/hardpoints, and one exact Piloted Drone rig', () => {
     expect(controlledSupportE2e).toContain("trace: 'off'");
     expect(controlledSupportE2e).toContain('awaitSchedulerSafeMatchWarmupEvidence(page)');
@@ -371,6 +402,40 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
       'proxyMeshes: 0',
       "'piloted-drone-occluded-exact-thermal-rig.png'",
     ]) expect(controlledSupportE2e).toContain(token);
+    const rasterCapture = controlledSupportE2e.slice(
+      controlledSupportE2e.indexOf('async function pauseCompletedPresentedFrame('),
+      controlledSupportE2e.indexOf('\nasync function awaitChopperRuntimePhase('),
+    );
+    for (const token of [
+      'presentedFrame > baselinePresentedFrame',
+      'debug.setRenderPaused(true);',
+      'pausedFrame !== presentedFrame',
+      'await debug.awaitCommittedCameraCompletion()',
+      'completion.submissionSequence !== paused.submissionSequence',
+      'stableFrame !== pausedFrame',
+      'await page.screenshot({ path, animations:',
+      'finally {',
+      'debug.setRenderPaused(false)',
+    ]) expect(rasterCapture).toContain(token);
+    expect(rasterCapture).not.toContain('timeout:');
+    const missileCapture = controlledSupportE2e.indexOf(
+      'capturePausedCompletedPresentedScreenshot(page, missileScreenshot)',
+    );
+    const missileEntropy = controlledSupportE2e.indexOf(
+      'sharp(missileScreenshot).stats()).entropy',
+      missileCapture,
+    );
+    const droneCapture = controlledSupportE2e.indexOf(
+      'capturePausedCompletedPresentedScreenshot(page, droneOccludedScreenshot)',
+    );
+    const droneEntropy = controlledSupportE2e.indexOf(
+      'sharp(droneOccludedScreenshot).stats()).entropy',
+      droneCapture,
+    );
+    expect(missileCapture).toBeGreaterThan(-1);
+    expect(missileEntropy).toBeGreaterThan(missileCapture);
+    expect(droneCapture).toBeGreaterThan(missileEntropy);
+    expect(droneEntropy).toBeGreaterThan(droneCapture);
     expect(controlledSupportE2e).not.toContain('for (let attempt = 0; attempt < 24');
     const splashTransaction = controlledSupportE2e.slice(
       controlledSupportE2e.indexOf("const key = '__PASS71_CHOPPER_SPLASH_OBSERVER__'"),

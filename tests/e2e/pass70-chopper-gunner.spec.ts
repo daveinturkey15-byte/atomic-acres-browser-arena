@@ -4,16 +4,32 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import sharp from 'sharp';
 import {
+  assertFrameActionEvidenceEnvironment,
   armFrameActionBaseline,
   awaitArmedFrameActionBaseline,
+  BASELINE_CAPTURE_DEADLINE_MS,
+  BASELINE_OBSERVATION_MS,
   cancelArmedFrameActionBaseline,
   deriveFrameActionBudget,
+  isContinuousIntegrationEnvironment,
+  minimumActionFrameSamples,
+  NATIVE_NO_FREEZE_FRAME_ACTION_MODE,
+  resolveFrameActionEvidenceMode,
+  SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE,
   type ArmedFrameActionBaseline,
   type ArmedFrameActionBaselineReceipt,
   type FrameActionBudget,
 } from './frame-action-budget';
 
 const renderer = process.env.PASS70_CHOPPER_RENDERER === 'webgpu' ? 'webgpu' : 'webgl2';
+const continuousIntegration = isContinuousIntegrationEnvironment(process.env.CI);
+const evidenceMode = resolveFrameActionEvidenceMode(
+  process.env.PASS70_CHOPPER_EVIDENCE_MODE
+    ?? (continuousIntegration
+      ? SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE
+      : NATIVE_NO_FREEZE_FRAME_ACTION_MODE),
+);
+assertFrameActionEvidenceEnvironment(evidenceMode, continuousIntegration);
 const loadout = Object.freeze({
   schemaVersion: 1,
   slots: ['care-package', 'piloted-drone', 'carpet-bomber', 'chopper', 'drone-swarm'],
@@ -869,6 +885,7 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       page,
       'chopper-first-possession-preaction-baseline',
       expectedExteriorEntity,
+      evidenceMode,
     );
   } finally {
     let exteriorCleanupFailure: Error | null = null;
@@ -1003,7 +1020,15 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
     ).catch(() => undefined);
     throw error;
   }
-  const possessionEntryBudget = deriveFrameActionBudget(possessionEntryBaseline);
+  const possessionEntryBudget = deriveFrameActionBudget(possessionEntryBaseline, evidenceMode);
+  expect(possessionEntryBaseline.observationMs).toBeGreaterThanOrEqual(BASELINE_OBSERVATION_MS);
+  expect(possessionEntryBaseline.observationMs).toBeLessThan(BASELINE_CAPTURE_DEADLINE_MS);
+  expect(possessionEntryBaseline.frameSamples).toBeGreaterThanOrEqual(
+    minimumActionFrameSamples(evidenceMode),
+  );
+  expect(possessionEntryBudget.evidenceMode).toBe(evidenceMode);
+  expect(possessionEntryBudget.releaseAcceptanceModeEligible)
+    .toBe(evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE);
   const possessionEntry = await captureFirstChopperPossessionEntry(page);
   assertBoundedChopperPossessionEntry(possessionEntry, possessionEntryBudget);
   expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRiggedEvidenceCaptureTargets([
@@ -1012,6 +1037,9 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
   await testInfo.attach(`pass70-chopper-${renderer}-first-possession-frame-budget`, {
     body: Buffer.from(`${JSON.stringify({
       distinction: 'input-handler-through-next-presented-and-completed-frame; excludes intentional cockpit dwell time',
+      claim: evidenceMode === SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE
+        ? 'software-CI semantic first-possession evidence only; not native HF-309 or release-acceptance evidence'
+        : 'native no-freeze first-possession evidence',
       baseline: possessionEntryBaseline,
       budget: possessionEntryBudget,
       receipt: possessionEntry,

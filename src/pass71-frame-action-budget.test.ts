@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   assertFrameActionEvidenceEnvironment,
+  BASELINE_CAPTURE_DEADLINE_MS,
+  BASELINE_OBSERVATION_MS,
   deriveFrameActionBudget,
   frameActionBudgetFailures,
   frameActionReleaseAcceptanceEligible,
@@ -370,6 +372,32 @@ describe('Pass 71 frame-action baseline', () => {
     expect(MINIMUM_SOFTWARE_CI_ACTION_FRAME_SAMPLES).toBe(2);
     expect(minimumActionFrameSamples(NATIVE_NO_FREEZE_FRAME_ACTION_MODE)).toBe(10);
     expect(minimumActionFrameSamples(SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE)).toBe(2);
+  });
+
+  it('admits the observed two-frame software baseline without weakening the ten-frame native floor', () => {
+    const sparseSoftwareWindowsBaseline = baseline([633, 516], 1_149);
+    const softwareBudget = deriveFrameActionBudget(
+      sparseSoftwareWindowsBaseline,
+      SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE,
+    );
+
+    expect(sparseSoftwareWindowsBaseline.observationMs).toBeGreaterThanOrEqual(BASELINE_OBSERVATION_MS);
+    expect(sparseSoftwareWindowsBaseline.observationMs).toBeLessThan(BASELINE_CAPTURE_DEADLINE_MS);
+    expect(sparseSoftwareWindowsBaseline.frameSamples)
+      .toBe(minimumActionFrameSamples(SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE));
+    expect(softwareBudget).toMatchObject({
+      evidenceMode: SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE,
+      releaseAcceptanceModeEligible: false,
+      referenceBaselineMs: 633,
+    });
+    expect(() => deriveFrameActionBudget(
+      sparseSoftwareWindowsBaseline,
+      NATIVE_NO_FREEZE_FRAME_ACTION_MODE,
+    )).toThrow('synthetic-baseline has an incomplete frame sample set');
+    expect(() => deriveFrameActionBudget(
+      baseline([633], 633),
+      SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE,
+    )).toThrow('synthetic-baseline has an incomplete frame sample set');
   });
 
   it('keeps software-CI mode acceptance-ineligible and requires exact-SHA installed Edge WebGPU hardware', () => {
