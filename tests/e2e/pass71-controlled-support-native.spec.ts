@@ -277,7 +277,7 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
           const recent = snapshot.supportDamageFeedback.recent.filter((sample: any) => (
             sample.source === 'chopper'
               && sample.activationId === staged.activationId
-              && sample.atMs >= baseline.startedAtMs
+              && sample.atMs >= observer.trustedTriggerAtMs
               && sample.atMs <= observer.deadlineAtMs
           ));
           const primary = recent.find((sample: any) => sample.targetId === staged.primaryTargetId);

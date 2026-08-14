@@ -309,6 +309,7 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(splashTransaction).toContain('event.isTrusted !== true');
     expect(splashTransaction).toContain('observer.deadlineAtMs = observer.trustedTriggerAtMs + 2_500;');
     expect(splashTransaction).toContain('observer.watchdogId = window.setTimeout(onDeadline, 2_500);');
+    expect(splashTransaction).toContain('sample.atMs >= observer.trustedTriggerAtMs');
     expect(splashTransaction).toContain('sample.atMs <= observer.deadlineAtMs');
     expect(splashTransaction).toContain('requestAnimationFrame(inspect);');
     expect(splashTransaction).toContain('observerActivationId: staged.activationId');
