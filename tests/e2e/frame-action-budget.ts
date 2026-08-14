@@ -58,6 +58,26 @@ export type FrameActionBaseline = Readonly<{
   completionFailures: number;
 }>;
 
+export type FrameActionBaselineIdentity = Readonly<{
+  entityId: string;
+  activationId: string;
+}>;
+
+export type ArmedFrameActionBaseline = Readonly<{
+  key: string;
+  label: string;
+  identity: FrameActionBaselineIdentity;
+}>;
+
+export type ArmedFrameActionBaselineReceipt = FrameActionBaseline & Readonly<{
+  observerArmedAtMs: number;
+  startRequestedAtMs: number;
+  startedAtMs: number;
+  identity: FrameActionBaselineIdentity;
+  startingRemainingLifetimeMs: number;
+  endingRemainingLifetimeMs: number;
+}>;
+
 export type FrameActionBudget = Readonly<{
   evidenceMode: FrameActionEvidenceMode;
   releaseAcceptanceModeEligible: boolean;
@@ -316,6 +336,245 @@ export function frameActionBudgetFailures(
       ? []
       : [`${label}:${String(value)}>=${maximum}`]
   ));
+}
+
+/**
+ * Arms a paused-frontier baseline without starting its functional deadline.
+ * The page-owned `start` method is intentionally exposed on the opaque handle
+ * so a caller can invoke it in the same task that resumes presentation.
+ */
+export async function armFrameActionBaseline(
+  page: Page,
+  label: string,
+  identity: FrameActionBaselineIdentity,
+): Promise<ArmedFrameActionBaseline> {
+  const key = '__ATOMIC_ACRES_ARMED_FRAME_ACTION_BASELINE__';
+  await page.evaluate(({
+    observerKey,
+    baselineLabel,
+    expectedIdentity,
+    captureDeadlineMs,
+    minimumFrameSamples,
+    minimumObservationMs,
+  }) => {
+    if ((globalThis as any)[observerKey]) {
+      throw new Error('A frame-action baseline observer is already armed');
+    }
+    const debug = (window as any).__ATOMIC_ACRES_DEBUG__ as any;
+    if (!debug) throw new Error('Atomic Acres debug surface is unavailable');
+    const observerArmedAtMs = performance.now();
+    const startingPresentation = debug.samplePresentationTelemetry() as any;
+    const startingPresentedFrame = debug.admissionState().presentedGameplayFrame as number;
+    const synchronous = startingPresentation.status === 'synchronous';
+    let resolveBaseline!: (receipt: ArmedFrameActionBaselineReceipt) => void;
+    let rejectBaseline!: (error: unknown) => void;
+    const promise = new Promise<ArmedFrameActionBaselineReceipt>((resolve, reject) => {
+      resolveBaseline = resolve;
+      rejectBaseline = reject;
+    });
+    const observer = {
+      key: observerKey,
+      label: baselineLabel,
+      identity: expectedIdentity,
+      observerArmedAtMs,
+      startRequestedAtMs: null as number | null,
+      startedAtMs: null as number | null,
+      settled: false,
+      promise,
+      start: () => {
+        if (observer.settled || observer.startRequestedAtMs !== null) return false;
+        observer.startRequestedAtMs = performance.now();
+        requestAnimationFrame((frameAt) => {
+          if (observer.settled) return;
+          try {
+            const startingSnapshot = debug.snapshot() as any;
+            const startingEntity = startingSnapshot.killstreak.entities.find((candidate: any) => (
+              candidate.id === expectedIdentity.entityId
+            ));
+            if (startingEntity?.activationId !== expectedIdentity.activationId
+              || !(startingEntity.expiresInMs > 0)) {
+              throw new Error('Armed frame-action baseline lost its Chopper activation before the first resumed frame');
+            }
+            const startedAt = frameAt;
+            observer.startedAtMs = startedAt;
+            let previousFrameAt = observer.startRequestedAtMs!;
+            let targetSubmissionSequence: number | null = synchronous ? 0 : null;
+            let firstPresentedFrameDelayMs: number | null = null;
+            let firstSubmissionDelayMs: number | null = null;
+            let firstCompletionDelayMs: number | null = null;
+            let maximumPendingForMs = startingPresentation.pendingForMs as number;
+            let completionFailures = startingPresentation.completionFailures as number;
+            let endingPresentation = startingPresentation;
+            let endingPresentedFrame = startingPresentedFrame;
+            const gapsMs: number[] = [];
+            const deadline = startedAt + captureDeadlineMs;
+            const round = (value: number) => Number(value.toFixed(3));
+
+            const fail = (error: unknown) => {
+              if (observer.settled) return;
+              observer.settled = true;
+              rejectBaseline(error);
+            };
+            const inspect = (sampleAt = performance.now()) => {
+              if (observer.settled) return;
+              try {
+                const now = sampleAt;
+                const elapsedMs = now - startedAt;
+                gapsMs.push(now - previousFrameAt);
+                previousFrameAt = now;
+                endingPresentation = debug.samplePresentationTelemetry() as any;
+                endingPresentedFrame = debug.admissionState().presentedGameplayFrame as number;
+                maximumPendingForMs = Math.max(maximumPendingForMs, endingPresentation.pendingForMs as number);
+                completionFailures = Math.max(completionFailures, endingPresentation.completionFailures as number);
+                if (firstPresentedFrameDelayMs === null && endingPresentedFrame > startingPresentedFrame) {
+                  firstPresentedFrameDelayMs = elapsedMs;
+                  if (synchronous) {
+                    firstSubmissionDelayMs = elapsedMs;
+                    firstCompletionDelayMs = elapsedMs;
+                  }
+                }
+                if (!synchronous && targetSubmissionSequence === null
+                  && endingPresentation.submissionSequence > startingPresentation.submissionSequence) {
+                  targetSubmissionSequence = endingPresentation.submissionSequence;
+                  firstSubmissionDelayMs = elapsedMs;
+                }
+                if (!synchronous && firstCompletionDelayMs === null && targetSubmissionSequence !== null
+                  && endingPresentation.completedSequence >= targetSubmissionSequence) {
+                  firstCompletionDelayMs = elapsedMs;
+                }
+                const complete = now < deadline
+                  && elapsedMs >= minimumObservationMs
+                  && gapsMs.length >= minimumFrameSamples
+                  && firstPresentedFrameDelayMs !== null
+                  && firstSubmissionDelayMs !== null
+                  && firstCompletionDelayMs !== null
+                  && targetSubmissionSequence !== null;
+                if (complete) {
+                  const endingSnapshot = debug.snapshot() as any;
+                  const endingEntity = endingSnapshot.killstreak.entities.find((candidate: any) => (
+                    candidate.id === expectedIdentity.entityId
+                  ));
+                  if (endingEntity?.activationId !== expectedIdentity.activationId
+                    || !(endingEntity.expiresInMs > 0)) {
+                    throw new Error('Armed frame-action baseline lost its bound Chopper activation');
+                  }
+                  const sorted = [...gapsMs].sort((left, right) => left - right);
+                  const sample = (quantile: number) => sorted[
+                    Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * quantile) - 1))
+                  ]!;
+                  observer.settled = true;
+                  resolveBaseline({
+                    label: baselineLabel,
+                    observationMs: round(elapsedMs),
+                    frameSamples: gapsMs.length,
+                    gapsMs: gapsMs.map(round),
+                    p50GapMs: round(sample(0.5)),
+                    p95GapMs: round(sample(0.95)),
+                    maximumGapMs: round(sorted[sorted.length - 1]!),
+                    presentationStatus: endingPresentation.status,
+                    startingPresentedFrame,
+                    endingPresentedFrame,
+                    startingSubmissionSequence: startingPresentation.submissionSequence,
+                    startingCompletedSequence: startingPresentation.completedSequence,
+                    targetSubmissionSequence: targetSubmissionSequence!,
+                    endingSubmissionSequence: endingPresentation.submissionSequence,
+                    endingCompletedSequence: endingPresentation.completedSequence,
+                    firstPresentedFrameDelayMs: round(firstPresentedFrameDelayMs!),
+                    firstSubmissionDelayMs: round(firstSubmissionDelayMs!),
+                    firstCompletionDelayMs: round(firstCompletionDelayMs!),
+                    maximumPendingForMs: round(maximumPendingForMs),
+                    completionFailures,
+                    observerArmedAtMs,
+                    startRequestedAtMs: observer.startRequestedAtMs!,
+                    startedAtMs: observer.startedAtMs!,
+                    identity: expectedIdentity,
+                    startingRemainingLifetimeMs: startingEntity.expiresInMs,
+                    endingRemainingLifetimeMs: endingEntity.expiresInMs,
+                  });
+                  return;
+                }
+                if (now >= deadline) {
+                  fail(new Error(
+                    `${baselineLabel} did not complete a ${minimumFrameSamples}-sample presentation frontier within ${captureDeadlineMs}ms`
+                      + ` (samples=${gapsMs.length}, elapsedMs=${round(elapsedMs)})`,
+                  ));
+                  return;
+                }
+                requestAnimationFrame(inspect);
+              } catch (error) {
+                fail(error);
+              }
+            };
+            // The first post-resume rAF is itself a valid sample against the
+            // paused frontier captured when the observer was armed.
+            inspect(frameAt);
+          } catch (error) {
+            observer.settled = true;
+            rejectBaseline(error);
+          }
+        });
+        return true;
+      },
+      cancel: (message: string) => {
+        if (observer.settled) return;
+        observer.settled = true;
+        rejectBaseline(new Error(message));
+      },
+    };
+    void promise.catch(() => undefined);
+    (globalThis as any)[observerKey] = observer;
+  }, {
+    observerKey: key,
+    baselineLabel: label,
+    expectedIdentity: identity,
+    captureDeadlineMs: BASELINE_CAPTURE_DEADLINE_MS,
+    minimumFrameSamples: MINIMUM_BASELINE_FRAME_SAMPLES,
+    minimumObservationMs: BASELINE_OBSERVATION_MS,
+  });
+  return Object.freeze({ key, label, identity });
+}
+
+export async function awaitArmedFrameActionBaseline(
+  page: Page,
+  armed: ArmedFrameActionBaseline,
+): Promise<ArmedFrameActionBaselineReceipt> {
+  return page.evaluate(async ({ observerKey, baselineLabel, expectedIdentity }) => {
+    const observer = (globalThis as any)[observerKey];
+    if (!observer
+      || observer.label !== baselineLabel
+      || observer.identity.entityId !== expectedIdentity.entityId
+      || observer.identity.activationId !== expectedIdentity.activationId
+      || observer.startRequestedAtMs === null) {
+      throw new Error('The expected started frame-action baseline observer is unavailable');
+    }
+    try {
+      return await observer.promise;
+    } finally {
+      if ((globalThis as any)[observerKey] === observer) delete (globalThis as any)[observerKey];
+    }
+  }, { observerKey: armed.key, baselineLabel: armed.label, expectedIdentity: armed.identity });
+}
+
+export async function cancelArmedFrameActionBaseline(
+  page: Page,
+  armed: ArmedFrameActionBaseline,
+  message: string,
+): Promise<void> {
+  await page.evaluate(({ observerKey, baselineLabel, expectedIdentity, reason }) => {
+    const observer = (globalThis as any)[observerKey];
+    if (observer
+      && observer.label === baselineLabel
+      && observer.identity.entityId === expectedIdentity.entityId
+      && observer.identity.activationId === expectedIdentity.activationId) {
+      observer.cancel(reason);
+      if ((globalThis as any)[observerKey] === observer) delete (globalThis as any)[observerKey];
+    }
+  }, {
+    observerKey: armed.key,
+    baselineLabel: armed.label,
+    expectedIdentity: armed.identity,
+    reason: message,
+  });
 }
 
 export async function captureFrameActionBaseline(

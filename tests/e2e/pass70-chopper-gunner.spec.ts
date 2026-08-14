@@ -4,8 +4,12 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import sharp from 'sharp';
 import {
-  captureFrameActionBaseline,
+  armFrameActionBaseline,
+  awaitArmedFrameActionBaseline,
+  cancelArmedFrameActionBaseline,
   deriveFrameActionBudget,
+  type ArmedFrameActionBaseline,
+  type ArmedFrameActionBaselineReceipt,
   type FrameActionBudget,
 } from './frame-action-budget';
 
@@ -525,6 +529,9 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
   const evidence = resolve(process.cwd(), `artifacts/pass70/chopper-gunner/${renderer}`);
   mkdirSync(evidence, { recursive: true });
   let exteriorReviewHoldActive = false;
+  let possessionEntryBaselineObserver: ArmedFrameActionBaseline | null = null;
+  let possessionEntryBaselineStarted = false;
+  let exteriorCleanupCompleted = false;
   try {
   const exteriorReviewHoldEnabled = await page.evaluate(() => (
     window.__ATOMIC_ACRES_DEBUG__.setChopperExteriorReviewHold(true)
@@ -853,30 +860,153 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
     rasterVisibility,
     attributableRasterDifference,
   }, null, 2)}\n`, 'utf8');
+    possessionEntryBaselineObserver = await armFrameActionBaseline(
+      page,
+      'chopper-first-possession-preaction-baseline',
+      expectedExteriorEntity,
+    );
   } finally {
+    let exteriorCleanupFailure: Error | null = null;
     try {
-      await page.evaluate(() => {
-        window.__ATOMIC_ACRES_DEBUG__.setChopperExteriorReviewTracking(false);
-        window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(null);
-        window.__ATOMIC_ACRES_DEBUG__.setCaptureViewmodelHidden(false);
-        window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false);
-        const hud = document.querySelector<HTMLElement>('#hud');
-        if (hud) hud.style.visibility = '';
-      });
-    } finally {
-      if (exteriorReviewHoldActive) {
-        const released = await page.evaluate(() => (
-          window.__ATOMIC_ACRES_DEBUG__.setChopperExteriorReviewHold(false)
-        ));
-        exteriorReviewHoldActive = false;
-        expect(released).toBe(true);
+      const cleanup = await page.evaluate((armedBaseline) => {
+        const debug = window.__ATOMIC_ACRES_DEBUG__;
+        const failures: string[] = [];
+        const attempt = (label: string, action: () => void) => {
+          try {
+            action();
+          } catch (error) {
+            failures.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        };
+        let observer: any = null;
+        let exactIdentity = false;
+        if (armedBaseline) {
+          attempt('baseline identity', () => {
+            observer = (globalThis as any)[armedBaseline.key];
+            const snapshot = debug.snapshot() as any;
+            const entity = snapshot.killstreak.entities.find((candidate: any) => (
+              candidate.id === armedBaseline.identity.entityId
+            ));
+            exactIdentity = Boolean(observer
+              && observer.label === armedBaseline.label
+              && observer.identity.entityId === armedBaseline.identity.entityId
+              && observer.identity.activationId === armedBaseline.identity.activationId
+              && entity?.activationId === armedBaseline.identity.activationId
+              && entity.expiresInMs > 0);
+            if (!exactIdentity) {
+              throw new Error('The armed Chopper baseline did not retain its exact cleanup identity');
+            }
+          });
+        }
+        attempt('review tracking', () => { debug.setChopperExteriorReviewTracking(false); });
+        attempt('capture camera', () => { debug.setCaptureCameraPose(null); });
+        attempt('capture viewmodel', () => { debug.setCaptureViewmodelHidden(false); });
+        attempt('HUD visibility', () => {
+          const hud = document.querySelector<HTMLElement>('#hud');
+          if (hud) hud.style.visibility = '';
+        });
+        let riggedTargetsSet = false;
+        if (armedBaseline) {
+          attempt('rigged capture target', () => {
+            riggedTargetsSet = debug.setRiggedEvidenceCaptureTargets([
+              { kind: 'training-dummy', id: 'test-dummy-alpha' },
+            ]);
+            if (!riggedTargetsSet) throw new Error('Rigged evidence capture target was rejected');
+          });
+        }
+        let holdReleased = false;
+        attempt('exterior review hold', () => {
+          holdReleased = debug.setChopperExteriorReviewHold(false);
+          if (!holdReleased) throw new Error('Exterior review hold release was rejected');
+        });
+        attempt('render pause', () => { debug.setRenderPaused(false); });
+        let baselineStarted = false;
+        if (armedBaseline && exactIdentity && riggedTargetsSet && holdReleased && failures.length === 0) {
+          attempt('baseline start', () => {
+            baselineStarted = observer.start();
+            if (!baselineStarted) throw new Error('The armed baseline rejected its first start');
+          });
+        }
+        return { failures, holdReleased, riggedTargetsSet, baselineStarted };
+      }, possessionEntryBaselineObserver);
+      if (cleanup.holdReleased) exteriorReviewHoldActive = false;
+      possessionEntryBaselineStarted = cleanup.baselineStarted;
+      exteriorCleanupCompleted = cleanup.failures.length === 0;
+      if (cleanup.failures.length > 0) {
+        exteriorCleanupFailure = new Error(`Chopper exterior cleanup failed: ${cleanup.failures.join('; ')}`);
       }
+    } catch (error) {
+      exteriorCleanupFailure = error instanceof Error ? error : new Error(String(error));
+    } finally {
+      if (!exteriorCleanupCompleted) {
+        try {
+          const fallback = await page.evaluate(() => {
+            const debug = window.__ATOMIC_ACRES_DEBUG__;
+            const failures: string[] = [];
+            const attempt = (label: string, action: () => void) => {
+              try {
+                action();
+              } catch (error) {
+                failures.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+              }
+            };
+            attempt('review tracking', () => { debug.setChopperExteriorReviewTracking(false); });
+            attempt('capture camera', () => { debug.setCaptureCameraPose(null); });
+            attempt('capture viewmodel', () => { debug.setCaptureViewmodelHidden(false); });
+            attempt('HUD visibility', () => {
+              const hud = document.querySelector<HTMLElement>('#hud');
+              if (hud) hud.style.visibility = '';
+            });
+            let holdReleased = false;
+            attempt('exterior review hold', () => {
+              holdReleased = debug.setChopperExteriorReviewHold(false);
+              if (!holdReleased) throw new Error('Exterior review hold release was rejected');
+            });
+            attempt('render pause', () => { debug.setRenderPaused(false); });
+            return { failures, holdReleased };
+          });
+          if (fallback.holdReleased) exteriorReviewHoldActive = false;
+          if (fallback.failures.length > 0) {
+            const message = `Chopper exterior fallback cleanup failed: ${fallback.failures.join('; ')}`;
+            exteriorCleanupFailure = exteriorCleanupFailure
+              ? new Error(`${exteriorCleanupFailure.message}; ${message}`)
+              : new Error(message);
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          exteriorCleanupFailure = exteriorCleanupFailure
+            ? new Error(`${exteriorCleanupFailure.message}; fallback transport failed: ${message}`)
+            : new Error(`Chopper exterior fallback transport failed: ${message}`);
+        }
+      }
+      if (exteriorReviewHoldActive) {
+        exteriorCleanupFailure = exteriorCleanupFailure
+          ?? new Error('Chopper exterior cleanup did not release its review hold');
+      }
+      if (possessionEntryBaselineObserver && !possessionEntryBaselineStarted) {
+        await cancelArmedFrameActionBaseline(
+          page,
+          possessionEntryBaselineObserver,
+          'The Chopper baseline transaction was cancelled during exterior cleanup',
+        ).catch(() => undefined);
+      }
+      if (exteriorCleanupFailure) throw exteriorCleanupFailure;
     }
   }
-  expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRiggedEvidenceCaptureTargets([
-    { kind: 'training-dummy', id: 'test-dummy-alpha' },
-  ]))).toBe(true);
-  const possessionEntryBaseline = await captureFrameActionBaseline(page, 'chopper-first-possession-preaction-baseline');
+  if (!possessionEntryBaselineObserver || !possessionEntryBaselineStarted) {
+    throw new Error('The Chopper first-possession baseline was not started during exterior cleanup');
+  }
+  let possessionEntryBaseline: ArmedFrameActionBaselineReceipt;
+  try {
+    possessionEntryBaseline = await awaitArmedFrameActionBaseline(page, possessionEntryBaselineObserver);
+  } catch (error) {
+    await cancelArmedFrameActionBaseline(
+      page,
+      possessionEntryBaselineObserver,
+      'The Chopper baseline transaction was cancelled before possession entry',
+    ).catch(() => undefined);
+    throw error;
+  }
   const possessionEntryBudget = deriveFrameActionBudget(possessionEntryBaseline);
   const possessionEntry = await captureFirstChopperPossessionEntry(page);
   assertBoundedChopperPossessionEntry(possessionEntry, possessionEntryBudget);
