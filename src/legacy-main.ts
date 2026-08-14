@@ -28176,6 +28176,12 @@ const debugWindow = window as Window & {
     setMovement: (forward: boolean, sprint?: boolean) => void;
     extendHf296HostedMatrixDuration: () => number | null;
     authorizeHf296RemoteProjectionWeapon: (weapon: WeaponId) => string | null;
+    publishHf296RemoteProjectionState: () => Readonly<{
+      playerId: string;
+      weapon: WeaponId;
+      stance: Stance;
+      sequence: number;
+    }> | null;
     sendRawChat: (text: string, claimedBy?: string) => boolean;
     setMeleeCaptureProgress: (progress: number | null) => void;
     setFireCaptureAgeMs: (ageMs: number | null) => void;
@@ -32591,6 +32597,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       expiresAt: performance.now() + HF296_REMOTE_PROJECTION_AUTHORIZATION_MS,
     }));
     return remote.snapshot.id;
+  },
+  publishHf296RemoteProjectionState: () => {
+    if (!localMultiplayerQa || network.role === 'offline' || matchState.phase !== 'active') return null;
+    const message = createStateMessage();
+    network.sendStateCommitReliably(message);
+    return Object.freeze({
+      playerId: message.player.id,
+      weapon: message.player.weapon,
+      stance: message.player.stance ?? 'stand',
+      sequence: message.player.seq,
+    });
   },
   sendRawChat: (text, claimedBy = player.id) => {
     if (new URLSearchParams(window.location.search).get('multiplayerQa') !== '1' || network.role === 'offline') return false;

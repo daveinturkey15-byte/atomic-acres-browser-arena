@@ -106,6 +106,12 @@ describe('Pass 71 HF-296 runtime evidence integration', () => {
     expect(main).toContain('admittedIncoming.grenade === remote.snapshot.grenade');
     expect(main).toContain('&& !respawned && !hf296ProjectionSecondaryAllowed) return;');
     expect(main).toContain('if (hf296ProjectionWeaponAllowed) hf296RemoteProjectionWeaponAuthorizations.delete(admittedIncoming.id);');
+    expect(main).toContain('publishHf296RemoteProjectionState: () => {');
+    expect(main).toContain('network.sendStateCommitReliably(message);');
+    expect(spec).toContain('const observerSentinelPublication = api.publishHf296RemoteProjectionState();');
+    expect(spec).toContain('const actorSentinelPublication = api.publishHf296RemoteProjectionState();');
+    expect(spec).toContain('const acknowledgementPublication = api.publishHf296RemoteProjectionState();');
+    expect(spec).toContain('const actorPublication = api.publishHf296RemoteProjectionState();');
     expect(spec).toContain('assertPass71Hf296ExactSets({ localKeys, remoteKeys, visualKeys })');
     expect(spec).toContain('await page.screenshot({');
     expect(spec).toContain('viewport: { ...PASS71_HF296_VISUAL_SOURCE_VIEWPORT }');

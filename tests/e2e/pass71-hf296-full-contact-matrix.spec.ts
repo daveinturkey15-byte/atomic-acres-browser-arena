@@ -650,6 +650,11 @@ async function runRemoteProjectionSweep(
       sentinelSample = api.sampleHf296ContactEvidence();
     }
     api.equipWeapon('flare-gun');
+    const observerSentinelPublication = api.publishHf296RemoteProjectionState();
+    if (observerSentinelPublication?.weapon !== 'flare-gun'
+      || observerSentinelPublication?.stance !== 'prone') {
+      throw new Error(`HF-296 observer sentinel publication failed ${arenaId}/${projectionRole}`);
+    }
     const rows: Array<Record<string, unknown>> = [];
     const cells = poses.flatMap((fixture) => stances.flatMap((stance) => (
       weapons.map((weapon) => ({ fixture, stance, weapon }))
@@ -718,6 +723,11 @@ async function runRemoteProjectionSweep(
       // state lane. The actor will not advance until this exact pair arrives.
       api.setStance(stance);
       api.equipWeapon(weapon);
+      const acknowledgementPublication = api.publishHf296RemoteProjectionState();
+      if (acknowledgementPublication?.weapon !== weapon
+        || acknowledgementPublication?.stance !== stance) {
+        throw new Error(`HF-296 acknowledgement publication failed ${arenaId}/${projectionRole}/${fixture.kind}/${stance}/${weapon}`);
+      }
     }
     return rows;
   }, {
@@ -805,6 +815,10 @@ async function runRemoteProjectionSweep(
       throw new Error(`HF-296 sentinel authorization failed ${arenaId}/${projectionRole}`);
     }
     api.equipWeapon('flashlight-pistol');
+    const actorSentinelPublication = api.publishHf296RemoteProjectionState();
+    if (actorSentinelPublication?.weapon !== 'flashlight-pistol') {
+      throw new Error(`HF-296 actor sentinel publication failed ${arenaId}/${projectionRole}`);
+    }
     // Wait until the observer's sentinel is actually present on the network
     // before publishing the first cell.
     let sentinel = false;
@@ -845,6 +859,10 @@ async function runRemoteProjectionSweep(
           throw new Error(`HF-296 acknowledgement authorization failed ${arenaId}/${projectionRole}/${fixture.kind}/${stance}/${weapon}`);
         }
         api.equipWeapon(weapon);
+        const actorPublication = api.publishHf296RemoteProjectionState();
+        if (actorPublication?.weapon !== weapon || actorPublication?.stance !== stance) {
+          throw new Error(`HF-296 actor publication failed ${arenaId}/${projectionRole}/${fixture.kind}/${stance}/${weapon}`);
+        }
         let acknowledged = false;
         for (let attempt = 0; attempt < 360; attempt += 1) {
           const remote = api.sampleHf296RemoteProjection()[0];
