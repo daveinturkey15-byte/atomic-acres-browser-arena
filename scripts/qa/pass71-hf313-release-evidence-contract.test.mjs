@@ -44,7 +44,13 @@ const sourceAudit = {
     acceptanceBeforePublish: true, topologyBeforePublish: true, pagesAndLiveBeforeReceipt: true,
   },
   finalizer: { exactManifestPathOnly: true, standingConditionalNoHitl: true, candidateAOriginalAttemptOnly: true },
-  postcondition: { receiptSchemaVersion: 4, rollbackProvenanceLiveChecked: true, liveVerifiedStatusOwnedByReceipt: true },
+  postcondition: {
+    receiptSchemaVersion: 4,
+    rollbackProvenanceLiveChecked: true,
+    pinnedWrapperIdentityStaticChecked: true,
+    pinnedWrapperIdentityLiveChecked: true,
+    liveVerifiedStatusOwnedByReceipt: true,
+  },
 };
 const dependencyRecords = dependencies.map((entry, index) => ({
   ...entry, completedAt: `2026-08-13T09:${String(index).padStart(2, '0')}:00.000Z`,

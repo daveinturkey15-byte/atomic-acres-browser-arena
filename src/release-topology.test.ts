@@ -9,6 +9,7 @@ const shell = readFileSync('release-shell/release-shell.js', 'utf8');
 const shellHtml = readFileSync('release-shell/index.html', 'utf8');
 const staging = readFileSync('scripts/release/stage-release-topology.mjs', 'utf8');
 const staticVerifier = readFileSync('scripts/qa/verify-release-topology.mjs', 'utf8');
+const liveVerifier = readFileSync('scripts/qa/verify-release-topology-browser.mjs', 'utf8');
 const playwrightServer = readFileSync('scripts/qa/playwright-web-server.mjs', 'utf8');
 
 describe('Pass 71 release topology', () => {
@@ -149,6 +150,16 @@ describe('Pass 71 release topology', () => {
     expect(staticVerifier).toContain('retainedWrapper.treeSha256 !== config.retained.pagesSubtreeTreeSha256');
     expect(staticVerifier).toContain('stableProvenance.treeSha256 !== config.stable.pagesSubtreeTreeSha256');
     expect(staticVerifier).toContain('rollbackWrapper.treeSha256 !== config.rollback.pagesSubtreeTreeSha256');
+    expect(staticVerifier).toContain('retainedWrapper.treeSha256 !== treeDigest(retainedRoot, retainedPinnedFiles)');
+    expect(staticVerifier).toContain('stableProvenance.treeSha256 !== treeDigest(stableRoot, stablePinnedFiles)');
+    expect(liveVerifier).toContain('channelConfig.retained.pagesSubtreeFileCount');
+    expect(liveVerifier).toContain('channelConfig.retained.pagesSubtreeTreeSha256');
+    expect(liveVerifier).toContain('channelConfig.stable.pagesSubtreeFileCount');
+    expect(liveVerifier).toContain('channelConfig.stable.pagesSubtreeTreeSha256');
+    expect(liveVerifier).toContain('channelConfig.rollback.pagesSubtreeFileCount');
+    expect(liveVerifier).toContain('channelConfig.rollback.pagesSubtreeTreeSha256');
+    expect(liveVerifier).toContain('retainedWrapper.pinnedRuntime?.treeSha256');
+    expect(liveVerifier).toContain('rollbackWrapper.pinnedRuntime?.treeSha256');
     expect(staticVerifier).toContain('rollbackEmbedded.treeSha256 !== config.rollback.runtimeTreeSha256');
     expect(staticVerifier).toContain('rollbackWrapper.pagesSha !== config.rollback.pagesSha');
     expect(staging).toContain("schemaVersion: 4");

@@ -80,7 +80,11 @@ const retainedFiles = verifyPinned(config.retained);
 const retainedRoot = resolve(dist, config.retained.path);
 const retainedEmbedded = JSON.parse(readFileSync(join(retainedRoot, 'channel-provenance.json'), 'utf8'));
 const retainedWrapper = JSON.parse(readFileSync(join(retainedRoot, 'pinned-channel-provenance.json'), 'utf8'));
-if (retainedEmbedded.releasePass !== config.retained.pass
+const retainedPinnedFiles = walkFiles(retainedRoot)
+  .filter((path) => path !== join(retainedRoot, 'pinned-channel-provenance.json'));
+if (retainedFiles !== config.retained.pagesSubtreeFileCount
+  || retainedPinnedFiles.length !== retainedFiles
+  || retainedEmbedded.releasePass !== config.retained.pass
   || retainedEmbedded.sourceSha !== config.retained.sourceSha
   || retainedEmbedded.path !== config.retained.pagesPath
   || retainedEmbedded.exactRootFileCount !== config.retained.runtimeFileCount
@@ -91,6 +95,7 @@ if (retainedEmbedded.releasePass !== config.retained.pass
   || retainedWrapper.path !== config.retained.path
   || retainedWrapper.exactRootFileCount !== config.retained.pagesSubtreeFileCount
   || retainedWrapper.treeSha256 !== config.retained.pagesSubtreeTreeSha256
+  || retainedWrapper.treeSha256 !== treeDigest(retainedRoot, retainedPinnedFiles)
   || retainedWrapper.pinnedRuntime?.treeSha256 !== config.retained.runtimeTreeSha256) {
   throw new Error('Retained Pass 69 does not match the exact previously hosted runtime');
 }
@@ -124,13 +129,18 @@ if (rebuiltStable?.rebuiltFromSource === true) {
   stableFiles = verifyPinned(config.stable);
   const stableProvenanceFile = config.stable.pagesPath ? 'pinned-channel-provenance.json' : 'channel-provenance.json';
   const stableProvenance = JSON.parse(readFileSync(join(stableRoot, stableProvenanceFile), 'utf8'));
-  if (stableProvenance.schemaVersion !== 4
+  const stablePinnedFiles = walkFiles(stableRoot)
+    .filter((path) => path !== join(stableRoot, 'pinned-channel-provenance.json'));
+  if (stableFiles !== config.stable.pagesSubtreeFileCount
+    || stablePinnedFiles.length !== stableFiles
+    || stableProvenance.schemaVersion !== 4
     || stableProvenance.releasePass !== config.stable.pass
     || stableProvenance.sourceSha !== config.stable.sourceSha
     || stableProvenance.pagesSha !== config.stable.pagesSha
     || stableProvenance.pagesPath !== config.stable.pagesPath
     || stableProvenance.exactRootFileCount !== config.stable.pagesSubtreeFileCount
     || stableProvenance.treeSha256 !== config.stable.pagesSubtreeTreeSha256
+    || stableProvenance.treeSha256 !== treeDigest(stableRoot, stablePinnedFiles)
     || stableProvenance.pinnedRuntime?.exactRootFileCount !== config.stable.runtimeFileCount
     || stableProvenance.pinnedRuntime?.treeSha256 !== config.stable.runtimeTreeSha256) {
     throw new Error('Stable Pass 67.1 provenance does not match the exact configured source and Pages SHAs');

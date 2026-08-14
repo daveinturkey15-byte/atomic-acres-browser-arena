@@ -171,6 +171,7 @@ export function pass71Hf313SourceAuditAtSource(repositoryRoot, sourceSha) {
   const workflow = blobAtSource(repositoryRoot, sourceSha, '.github/workflows/release-production.yml', 'utf8');
   const acceptance = blobAtSource(repositoryRoot, sourceSha, 'scripts/release/acceptance-gate.mjs', 'utf8');
   const previewVerifier = blobAtSource(repositoryRoot, sourceSha, 'scripts/release/verify-pr-preview-provenance.mjs', 'utf8');
+  const staticVerifier = blobAtSource(repositoryRoot, sourceSha, 'scripts/qa/verify-release-topology.mjs', 'utf8');
   const liveVerifier = blobAtSource(repositoryRoot, sourceSha, 'scripts/qa/verify-release-topology-browser.mjs', 'utf8');
   const receiptWriter = blobAtSource(repositoryRoot, sourceSha, 'scripts/release/write-production-receipt.mjs', 'utf8');
   let manifestAbsent = false;
@@ -228,6 +229,14 @@ export function pass71Hf313SourceAuditAtSource(repositoryRoot, sourceSha) {
     postcondition: Object.freeze({
       receiptSchemaVersion: receiptWriter.includes('schemaVersion: 4') ? 4 : null,
       rollbackProvenanceLiveChecked: liveVerifier.includes('provenance.rollback'),
+      pinnedWrapperIdentityStaticChecked: staticVerifier.includes('retainedWrapper.treeSha256 !== treeDigest(retainedRoot, retainedPinnedFiles)')
+        && staticVerifier.includes('stableProvenance.treeSha256 !== treeDigest(stableRoot, stablePinnedFiles)')
+        && staticVerifier.includes('rollbackWrapper.treeSha256 !== treeDigest(rollbackRoot, rollbackPinnedFiles)'),
+      pinnedWrapperIdentityLiveChecked: liveVerifier.includes('channelConfig.retained.pagesSubtreeTreeSha256')
+        && liveVerifier.includes('channelConfig.stable.pagesSubtreeTreeSha256')
+        && liveVerifier.includes('channelConfig.rollback.pagesSubtreeTreeSha256')
+        && liveVerifier.includes('retainedWrapper.pinnedRuntime?.treeSha256, retainedEmbedded.treeSha256')
+        && liveVerifier.includes('rollbackWrapper.pinnedRuntime?.treeSha256, rollbackEmbedded.treeSha256'),
       liveVerifiedStatusOwnedByReceipt: receiptWriter.includes('createPass71Hf313LivePostcondition')
         && receiptWriter.includes("hf313.status !== 'live-verified'"),
     }),
@@ -296,6 +305,8 @@ export function pass71Hf313EvidenceFailures(record, expected = {}) {
     || record?.sourceAudit?.finalizer?.candidateAOriginalAttemptOnly !== true
     || record?.sourceAudit?.postcondition?.receiptSchemaVersion !== 4
     || record?.sourceAudit?.postcondition?.rollbackProvenanceLiveChecked !== true
+    || record?.sourceAudit?.postcondition?.pinnedWrapperIdentityStaticChecked !== true
+    || record?.sourceAudit?.postcondition?.pinnedWrapperIdentityLiveChecked !== true
     || record?.sourceAudit?.postcondition?.liveVerifiedStatusOwnedByReceipt !== true) failures.push('protected-release-source-audit');
   if (!same(record?.tooling, expected.tooling)
     || record?.tooling?.length !== PASS71_HF313_TOOL_PATHS.length
