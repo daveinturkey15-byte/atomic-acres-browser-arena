@@ -411,10 +411,25 @@ async function runPageMatrix(
         sample = await waitForContact(fixture);
       } else {
         const retainedCandidates = fixtureCandidates.get(fixture.kind) ?? [];
-        const candidates = [fixture, ...retainedCandidates.filter((candidate) => (
+        const discoveredCandidates = [fixture, ...retainedCandidates.filter((candidate) => (
           Math.hypot(candidate.x - fixture.x, candidate.z - fixture.z) >= 0.35
             || Math.abs(candidate.yaw - fixture.yaw) >= 0.08
         ))];
+        // A corner or narrow return can expose signed contacts on both sides of
+        // the capsule. Probe discovery identifies the occupied point, but its
+        // first blocked direction is not necessarily the side retained by the
+        // live Rapier contact after settling. Try both honest camera/movement
+        // orientations and still require the real obstacle contact plus live
+        // viewmodel retreat below before admitting the fixture.
+        const candidates = discoveredCandidates.flatMap((candidate) => [
+          candidate,
+          {
+            ...candidate,
+            yaw: candidate.yaw + Math.PI,
+            approach: [-candidate.approach[0], -candidate.approach[1]] as [number, number],
+            discovery: `${candidate.discovery}:reverse-signed-contact-side`,
+          },
+        ]);
         const rejected: Array<Record<string, unknown>> = [];
         let selected: FixturePose | null = null;
         for (const candidate of candidates) {

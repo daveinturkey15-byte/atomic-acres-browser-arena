@@ -146,6 +146,11 @@ describe('Pass 71 HF-296 runtime evidence integration', () => {
     expect(spec).toContain('const stanceDeadlineAt = performance.now() + contactSettleTimeoutMs;');
     expect(spec).toContain('api.teleportPlayer(openFloor.x, openFloor.y, openFloor.z, openFloor.yaw, 0);');
     expect(spec).toContain('const fixtureCandidates = new Map<string, FixturePose[]>();');
+    expect(spec).toContain('const discoveredCandidates = [fixture, ...retainedCandidates.filter');
+    expect(spec).toContain('const candidates = discoveredCandidates.flatMap((candidate) => [');
+    expect(spec).toContain('yaw: candidate.yaw + Math.PI');
+    expect(spec).toContain('approach: [-candidate.approach[0], -candidate.approach[1]]');
+    expect(spec).toContain('reverse-signed-contact-side');
     expect(spec).toContain('lateralBlockedFor(first).filter(Boolean).length !== 1');
     expect(spec).toContain('lateralBlockedFor(second).filter(Boolean).length !== 1');
     expect(spec).toContain("if (performance.now() >= presentationDeadlineAt) throw new Error('no live viewmodel obstruction retreat');");
