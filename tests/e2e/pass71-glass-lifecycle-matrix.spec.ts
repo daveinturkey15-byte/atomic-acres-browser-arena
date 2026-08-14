@@ -7,6 +7,7 @@ const PROFILES = [
   { label: 'performance', query: 'performance' },
 ] as const;
 const PANE_COUNT = 6;
+const LIVE_CROSSBOW_IMPACT_TIMEOUT_MS = 2_000;
 const ALL_PANE_INDEXES = Object.freeze(Array.from({ length: PANE_COUNT }, (_, index) => index));
 const HF304_COMPONENT_PATH = process.env.PASS71_HF304_BROWSER_COMPONENT_PATH
   ? resolve(process.env.PASS71_HF304_BROWSER_COMPONENT_PATH)
@@ -123,6 +124,11 @@ type PaneObservation = Readonly<{
   rapierDynamicColliders: number;
 }>;
 
+type CrossbowImpactSample = Readonly<{
+  bolt: Readonly<{ impacted: boolean; authority: boolean; detonatesInMs: number }>;
+  pane: PaneObservation;
+}>;
+
 async function deploy(
   page: Page,
   render: string,
@@ -162,6 +168,64 @@ async function observePane(page: Page, index: number): Promise<PaneObservation> 
       rapierDynamicColliders: snapshot.interactiveWorld.rapierDynamicColliders,
     };
   }, index);
+}
+
+async function fireAndObserveLiveCrossbowImpact(page: Page, index: number): Promise<CrossbowImpactSample> {
+  return page.evaluate(({ paneIndex, timeoutMs }) => new Promise<CrossbowImpactSample>((resolveImpact, rejectImpact) => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const startedAt = performance.now();
+    let animationFrame = 0;
+    let timeout = 0;
+    let settled = false;
+
+    const finish = (result: CrossbowImpactSample | Error): void => {
+      if (settled) return;
+      settled = true;
+      window.cancelAnimationFrame(animationFrame);
+      window.clearTimeout(timeout);
+      if (result instanceof Error) rejectImpact(result);
+      else resolveImpact(result);
+    };
+    const failAtDeadline = (): void => finish(new Error(
+      `No live impacted crossbow fuse within ${timeoutMs}ms (elapsed ${Math.round(performance.now() - startedAt)}ms)`,
+    ));
+    const sampleAfterGameFrame = (): void => {
+      if (performance.now() - startedAt >= timeoutMs) {
+        failAtDeadline();
+        return;
+      }
+      const snapshot = debug.snapshot() as any;
+      const bolt = snapshot.projectileGlass.explosiveBolts
+        .find((candidate: any) => (
+          candidate.authority === true
+            && candidate.impacted === true
+            && candidate.detonatesInMs > 0
+        ));
+      if (bolt) {
+        const impactedPane = snapshot.breakableWindows[paneIndex];
+        finish({
+          bolt: {
+            impacted: bolt.impacted,
+            authority: bolt.authority,
+            detonatesInMs: bolt.detonatesInMs,
+          },
+          pane: {
+            ...impactedPane,
+            authority: { ...impactedPane.authority },
+            rapierDynamicColliders: snapshot.interactiveWorld.rapierDynamicColliders,
+          },
+        });
+        return;
+      }
+      animationFrame = window.requestAnimationFrame(sampleAfterGameFrame);
+    };
+
+    // Register behind the already-scheduled game callback before firing. This
+    // samples the exact post-update frame without a second protocol round trip.
+    animationFrame = window.requestAnimationFrame(sampleAfterGameFrame);
+    timeout = window.setTimeout(failAtDeadline, timeoutMs);
+    debug.fireOnce();
+  }), { paneIndex: index, timeoutMs: LIVE_CROSSBOW_IMPACT_TIMEOUT_MS });
 }
 
 async function resetBreakableWindows(page: Page): Promise<void> {
@@ -572,38 +636,7 @@ for (const profile of PROFILES) {
       await waitForWeaponReady(page, 'explosive-crossbow');
       await page.evaluate((paneIndex) => window.__ATOMIC_ACRES_DEBUG__.stageWindow(paneIndex, 6), pane);
       const before = await observePane(page, pane);
-      await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
-
-      // Capture the pane in the same browser sample as the live fuse. A separate
-      // protocol round trip can outlast the two-second fuse on software CI.
-      const impactSampleHandle = await page.waitForFunction((paneIndex) => {
-        const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
-        const bolt = snapshot.projectileGlass.explosiveBolts
-          .find((candidate: any) => (
-            candidate.authority === true
-              && candidate.impacted === true
-              && candidate.detonatesInMs > 0
-          ));
-        if (!bolt) return false;
-        const impactedPane = snapshot.breakableWindows[paneIndex];
-        return {
-          bolt: {
-            impacted: bolt.impacted,
-            authority: bolt.authority,
-            detonatesInMs: bolt.detonatesInMs,
-          },
-          pane: {
-            ...impactedPane,
-            authority: { ...impactedPane.authority },
-            rapierDynamicColliders: snapshot.interactiveWorld.rapierDynamicColliders,
-          },
-        };
-      }, pane, { timeout: 2_000 });
-      const impactSample = await impactSampleHandle.jsonValue() as {
-        bolt: { impacted: boolean; authority: boolean; detonatesInMs: number };
-        pane: PaneObservation;
-      };
-      await impactSampleHandle.dispose();
+      const impactSample = await fireAndObserveLiveCrossbowImpact(page, pane);
       expect(impactSample.bolt).toMatchObject({ impacted: true, authority: true });
       expect(impactSample.bolt.detonatesInMs).toBeGreaterThan(0);
       const impacted = impactSample.pane;

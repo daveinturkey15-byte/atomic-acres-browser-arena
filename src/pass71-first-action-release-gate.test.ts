@@ -138,7 +138,17 @@ describe('Pass 71 first-action and protected-release gate', () => {
       'all six authored panes breach by knife and retire debris by 5s',
       'all six authored panes breach by grenade and retire debris by 5s',
     ]) expect(glassLifecycleSpec).toContain(title);
-    expect(glassLifecycleSpec).toContain('}, pane, { timeout: 2_000 });');
+    const crossbowImpactHelper = glassLifecycleSpec.match(
+      /async function fireAndObserveLiveCrossbowImpact[\s\S]+?\n\}\n/u,
+    )?.[0] ?? '';
+    expect(glassLifecycleSpec).toContain('const LIVE_CROSSBOW_IMPACT_TIMEOUT_MS = 2_000;');
+    expect(crossbowImpactHelper).toContain('timeoutMs: LIVE_CROSSBOW_IMPACT_TIMEOUT_MS');
+    expect(crossbowImpactHelper).toContain('performance.now() - startedAt >= timeoutMs');
+    expect(crossbowImpactHelper).toContain('window.setTimeout(failAtDeadline, timeoutMs)');
+    expect(crossbowImpactHelper).toContain('candidate.detonatesInMs > 0');
+    expect(crossbowImpactHelper.indexOf('requestAnimationFrame(sampleAfterGameFrame)'))
+      .toBeLessThan(crossbowImpactHelper.indexOf('debug.fireOnce()'));
+    expect(glassLifecycleSpec).toContain('await fireAndObserveLiveCrossbowImpact(page, pane)');
     expect(glassLifecycleSpec).toContain(')), { timeout: 2_000 }).toBeGreaterThan(impactCountBefore)');
     expect(glassLifecycleSpec).toContain('}, { paneIndex: index, phase: expectedPhase }, { timeout: 8_000 });');
     expect(glassLifecycleSpec).toContain('), { colliderCountBefore: rapierColliderCountBefore }, { timeout: 5_000 });');
