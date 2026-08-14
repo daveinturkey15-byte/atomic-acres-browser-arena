@@ -247,6 +247,7 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
   });
 
   it('arms the exact first resumed-frame baseline before fail-safe exterior cleanup', () => {
+    expect(e2e).toContain("test.use({ trace: 'off' });");
     const armStart = frameActionBudgetE2e.indexOf('export async function armFrameActionBaseline(');
     const armEnd = frameActionBudgetE2e.indexOf('\nexport async function awaitArmedFrameActionBaseline(', armStart);
     const armedBaseline = frameActionBudgetE2e.slice(armStart, armEnd);
@@ -264,6 +265,10 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
       'gapsMs.length >= minimumFrameSamples',
       'now < deadline',
       'now >= deadline',
+      'gapsMs: gapsMs.map(round)',
+      'firstPresentedFrameDelayMs',
+      'firstSubmissionDelayMs',
+      'firstCompletionDelayMs',
       'endingEntity?.activationId !== expectedIdentity.activationId',
       'captureDeadlineMs: BASELINE_CAPTURE_DEADLINE_MS',
       'minimumFrameSamples: MINIMUM_BASELINE_FRAME_SAMPLES',
@@ -310,6 +315,7 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
   });
 
   it('proves real LMB splash, real RMB cadence/hardpoints, and one exact Piloted Drone rig', () => {
+    expect(controlledSupportE2e).toContain("trace: 'off'");
     expect(controlledSupportE2e).toContain('awaitSchedulerSafeMatchWarmupEvidence(page)');
     expect(controlledSupportE2e).toContain('MATCH_WARMUP_SCHEDULER_EVIDENCE_TIMEOUT_MS');
     expect(controlledSupportE2e).toContain("countdown.lastCue !== 'engage'");
@@ -355,7 +361,7 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(controlledSupportE2e).not.toContain('for (let attempt = 0; attempt < 24');
     const splashTransaction = controlledSupportE2e.slice(
       controlledSupportE2e.indexOf("const key = '__PASS71_CHOPPER_SPLASH_OBSERVER__'"),
-      controlledSupportE2e.indexOf('const missileArmReceipt'),
+      controlledSupportE2e.indexOf('let missileArmReceipt'),
     );
     const splashObserverArm = splashTransaction.indexOf("window.addEventListener('mousedown', onTrustedMouseDown, true)");
     const trustedLeftDown = splashTransaction.indexOf("await page.mouse.down({ button: 'left' })");
@@ -398,6 +404,11 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
       'event.eventPhase !== Event.CAPTURING_PHASE',
       'event.currentTarget !== window',
       'observer.trustedRightDowns.length >= 2',
+      'const armedRemainingLifetimeMs = armedEntity.expiresInMs',
+      'projectedRemainingLifetimeMs = armedRemainingLifetimeMs - (observedAtMs - armedAtMs)',
+      '!(projectedRemainingLifetimeMs > minimumEvidenceLifetimeMs)',
+      'remainingLifetimeMs: projectedRemainingLifetimeMs',
+      'queueMicrotask(() => {',
       'observer.deadlineAtMs = observedAtMs + 3_000;',
       'handlerDeltaMs >= 0 && handlerDeltaMs < cadenceMs',
       'admission?.sequence !== firstLaunch.controlSequence + 1',
@@ -413,19 +424,32 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
       missileObserver.indexOf('const onTrustedRightDown = (event: MouseEvent) => {'),
       missileObserver.indexOf('observer.cancel =', missileObserver.indexOf('const onTrustedRightDown = (event: MouseEvent) => {')),
     );
+    const armedProjectionClock = missileObserver.indexOf('const armedAtMs = performance.now();');
+    const armedSnapshot = missileObserver.indexOf('const armedSnapshot = debug.snapshot()');
+    expect(armedProjectionClock).toBeGreaterThan(-1);
+    expect(armedProjectionClock).toBeLessThan(armedSnapshot);
+    expect(controlledSupportE2e).toContain('MINIMUM_CHOPPER_MISSILE_EVIDENCE_LIFETIME_MS = 5_000');
+    expect(missileObserver).toContain('minimumEvidenceLifetimeMs: MINIMUM_CHOPPER_MISSILE_EVIDENCE_LIFETIME_MS');
+    expect(trustedHandler).not.toContain('projectedRemainingLifetimeMs >= minimumEvidenceLifetimeMs');
     expect(trustedHandler).not.toContain("removeEventListener('mousedown'");
     const cadenceTransaction = controlledSupportE2e.slice(
       controlledSupportE2e.indexOf("const missileInputBounds = await page.locator('#game').boundingBox()"),
       controlledSupportE2e.indexOf('const firstMissile = cooldownReady.firstMissileReceipt'),
     );
     const bounds = cadenceTransaction.indexOf("const missileInputBounds = await page.locator('#game').boundingBox()");
+    const activation = cadenceTransaction.indexOf("activateKillstreak('chopper')");
     const observerArm = cadenceTransaction.indexOf('await armFirstChopperMissileObserver(');
+    const trustedLeftDownForSplash = cadenceTransaction.indexOf("await page.mouse.down({ button: 'left' })");
     const trustedDoubleClick = cadenceTransaction.indexOf('await page.mouse.dblclick(');
     const observerAwait = cadenceTransaction.indexOf('await awaitFirstChopperMissileObserver(');
+    const firstSplashAssertion = cadenceTransaction.indexOf('expect(splashReceipt).not.toBeNull()');
     expect(bounds).toBeGreaterThan(-1);
+    expect(activation).toBeGreaterThan(bounds);
     expect(observerArm).toBeGreaterThan(bounds);
+    expect(trustedLeftDownForSplash).toBeGreaterThan(observerArm);
     expect(trustedDoubleClick).toBeGreaterThan(observerArm);
     expect(observerAwait).toBeGreaterThan(trustedDoubleClick);
+    expect(firstSplashAssertion).toBeGreaterThan(observerAwait);
     expect(cadenceTransaction.match(/page\.mouse\.dblclick\(/gu)).toHaveLength(1);
     expect(cadenceTransaction).toContain("{ button: 'right', delay: 0 }");
     expect(cadenceTransaction).not.toContain("page.mouse.down({ button: 'right' })");

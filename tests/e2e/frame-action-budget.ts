@@ -494,9 +494,25 @@ export async function armFrameActionBaseline(
                   return;
                 }
                 if (now >= deadline) {
+                  const diagnostics = {
+                    samples: gapsMs.length,
+                    elapsedMs: round(elapsedMs),
+                    gapsMs: gapsMs.map(round),
+                    startingPresentedFrame,
+                    endingPresentedFrame,
+                    startingSubmissionSequence: startingPresentation.submissionSequence,
+                    endingSubmissionSequence: endingPresentation.submissionSequence,
+                    startingCompletedSequence: startingPresentation.completedSequence,
+                    endingCompletedSequence: endingPresentation.completedSequence,
+                    firstPresentedFrameDelayMs,
+                    firstSubmissionDelayMs,
+                    firstCompletionDelayMs,
+                    maximumPendingForMs: round(maximumPendingForMs),
+                    completionFailures,
+                  };
                   fail(new Error(
                     `${baselineLabel} did not complete a ${minimumFrameSamples}-sample presentation frontier within ${captureDeadlineMs}ms`
-                      + ` (samples=${gapsMs.length}, elapsedMs=${round(elapsedMs)})`,
+                      + `: ${JSON.stringify(diagnostics)}`,
                   ));
                   return;
                 }
@@ -672,9 +688,25 @@ export async function captureFrameActionBaseline(
           return;
         }
         if (now >= deadline) {
+          const diagnostics = {
+            samples: gapsMs.length,
+            elapsedMs: round(elapsedMs),
+            gapsMs: gapsMs.map(round),
+            startingPresentedFrame,
+            endingPresentedFrame,
+            startingSubmissionSequence: startingPresentation.submissionSequence,
+            endingSubmissionSequence: endingPresentation.submissionSequence,
+            startingCompletedSequence: startingPresentation.completedSequence,
+            endingCompletedSequence: endingPresentation.completedSequence,
+            firstPresentedFrameDelayMs,
+            firstSubmissionDelayMs,
+            firstCompletionDelayMs,
+            maximumPendingForMs: round(maximumPendingForMs),
+            completionFailures,
+          };
           reject(new Error(
             `${baselineLabel} did not complete a ${minimumFrameSamples}-sample presentation frontier within ${captureDeadlineMs}ms`
-              + ` (samples=${gapsMs.length}, elapsedMs=${round(elapsedMs)})`,
+              + `: ${JSON.stringify(diagnostics)}`,
           ));
           return;
         }

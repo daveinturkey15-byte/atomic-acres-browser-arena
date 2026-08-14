@@ -19,6 +19,11 @@ const loadout = Object.freeze({
   slots: ['care-package', 'piloted-drone', 'carpet-bomber', 'chopper', 'drone-swarm'],
 });
 
+// This spec measures an exact browser-frame envelope. Playwright's retained
+// screencast trace materially changes that envelope on software CI; the spec
+// retains its purpose-built JSON and raster evidence instead.
+test.use({ trace: 'off' });
+
 type PresentedReceiptKind = 'rigged' | 'camera-only';
 
 type ChopperPossessionEntryReceipt = Readonly<{

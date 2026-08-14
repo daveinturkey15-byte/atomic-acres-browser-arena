@@ -14,12 +14,16 @@ const MATCH_COUNTDOWN_CUE_COUNT = 4;
 // per required cue; the runtime warmup remains MATCH_WARMUP_MS.
 const MATCH_WARMUP_SCHEDULER_EVIDENCE_TIMEOUT_MS = MATCH_WARMUP_MS * MATCH_COUNTDOWN_CUE_COUNT;
 const FIRST_CHOPPER_MISSILE_OBSERVER_KEY = '__PASS71_FIRST_CHOPPER_MISSILE_OBSERVER__';
+const MINIMUM_CHOPPER_MISSILE_EVIDENCE_LIFETIME_MS = 5_000;
 const loadout = Object.freeze({
   schemaVersion: 1,
   slots: ['care-package', 'piloted-drone', 'carpet-bomber', 'chopper', 'drone-swarm'],
 });
 
 test.use({
+  // Retained screencast tracing delays trusted input dispatch by seconds on
+  // software CI. Exact page-owned input/authority receipts remain the gate.
+  trace: 'off',
   viewport: { width: 1_920, height: 1_080 },
   launchOptions: {
     args: [
@@ -92,9 +96,12 @@ async function armFirstChopperMissileObserver(
   entityId: string,
   activationId: string,
 ): Promise<void> {
-  await page.evaluate(({ key, id, activation, cadenceMs }) => {
+  await page.evaluate(({ key, id, activation, cadenceMs, minimumEvidenceLifetimeMs }) => {
     if ((globalThis as any)[key]) throw new Error('A first Chopper missile observer is already armed');
     const debug = window.__ATOMIC_ACRES_DEBUG__;
+    // Start the projection clock before reading the entity so the retained
+    // lifetime is conservative even if snapshot collection itself takes time.
+    const armedAtMs = performance.now();
     const armedSnapshot = debug.snapshot() as any;
     const armedEntity = armedSnapshot.killstreak.entities
       .find((candidate: any) => candidate.id === id) ?? null;
@@ -109,7 +116,7 @@ async function armFirstChopperMissileObserver(
       || !(armedEntity.expiresInMs > 0)) {
       throw new Error('The exact ready Chopper identity was unavailable while arming its missile observer');
     }
-    const armedAtMs = performance.now();
+    const armedRemainingLifetimeMs = armedEntity.expiresInMs as number;
     let resolveReceipt!: (receipt: any) => void;
     let rejectReceipt!: (error: unknown) => void;
     const promise = new Promise<any>((resolve, reject) => {
@@ -120,16 +127,19 @@ async function armFirstChopperMissileObserver(
       entityId: id,
       activationId: activation,
       armedAtMs,
+      armedRemainingLifetimeMs,
       deadlineAtMs: null as number | null,
       trustedRightDowns: [] as Array<Readonly<{
         eventTimestampMs: number;
         observedAtMs: number;
         eventPhase: number;
+        remainingLifetimeMs: number;
       }>>,
       firstMissileReceipt: null as any,
       latest: null as any,
       pollId: null as number | null,
       watchdogId: null as number | null,
+      inspectionMicrotaskQueued: false,
       settled: false,
       promise,
       cancel: (_message: string) => undefined,
@@ -161,6 +171,19 @@ async function armFirstChopperMissileObserver(
     const scheduleInspect = () => {
       if (observer.settled || observer.pollId !== null) return;
       observer.pollId = window.setTimeout(inspect, 25);
+    };
+    const schedulePostPropagationInspect = () => {
+      if (observer.settled || observer.inspectionMicrotaskQueued) return;
+      observer.inspectionMicrotaskQueued = true;
+      queueMicrotask(() => {
+        observer.inspectionMicrotaskQueued = false;
+        if (observer.settled) return;
+        if (observer.pollId !== null) {
+          clearTimeout(observer.pollId);
+          observer.pollId = null;
+        }
+        inspect();
+      });
     };
     const inspect = () => {
       observer.pollId = null;
@@ -261,16 +284,34 @@ async function armFirstChopperMissileObserver(
         return;
       }
       const observedAtMs = performance.now();
+      const projectedRemainingLifetimeMs = armedRemainingLifetimeMs - (observedAtMs - armedAtMs);
+      if (!(projectedRemainingLifetimeMs > minimumEvidenceLifetimeMs)) {
+        fail(new Error(`The trusted Chopper missile input arrived without enough exact activation lifetime for the unchanged cadence: ${JSON.stringify({
+          entityId: id,
+          activationId: activation,
+          armedAtMs,
+          armedRemainingLifetimeMs,
+          observedAtMs,
+          projectedRemainingLifetimeMs,
+          cadenceMs,
+          minimumEvidenceLifetimeMs,
+        })}`));
+        return;
+      }
       observer.trustedRightDowns.push(Object.freeze({
         eventTimestampMs: event.timeStamp,
         observedAtMs,
         eventPhase: event.eventPhase,
+        remainingLifetimeMs: projectedRemainingLifetimeMs,
       }));
       if (observer.deadlineAtMs === null) {
         observer.deadlineAtMs = observedAtMs + 3_000;
         observer.watchdogId = window.setTimeout(onDeadline, 3_000);
       }
-      scheduleInspect();
+      // The observer runs at window capture before the canvas input owner.
+      // Inspect in a microtask after propagation so the exact launch/admission
+      // can be retained before any later starved timer or natural expiry.
+      schedulePostPropagationInspect();
     };
     observer.cancel = (message: string) => fail(new Error(message));
     observer.dispose = dispose;
@@ -282,6 +323,7 @@ async function armFirstChopperMissileObserver(
     id: entityId,
     activation: activationId,
     cadenceMs: CHOPPER_MISSILE_CADENCE_MS,
+    minimumEvidenceLifetimeMs: MINIMUM_CHOPPER_MISSILE_EVIDENCE_LIFETIME_MS,
   });
 }
 
@@ -421,6 +463,8 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
   });
   const evidence = resolve(process.cwd(), `artifacts/pass71/controlled-support/${renderer}`);
   mkdirSync(evidence, { recursive: true });
+  const missileInputBounds = await page.locator('#game').boundingBox();
+  if (!missileInputBounds) throw new Error('Game canvas has no trusted Chopper missile input bounds');
   expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.activateDormantReinforcement())).toMatchObject({ activated: true });
 
   expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.activateKillstreak('chopper'))).toBe(true);
@@ -652,6 +696,11 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
     void observer.promise.catch(() => undefined);
     (globalThis as any)[key] = observer;
   }, { staged: stagedSplash, baseline: splashBaseline });
+  await armFirstChopperMissileObserver(
+    page,
+    stagedSplash.entityId,
+    stagedSplash.activationId,
+  );
   let splashReceipt: any;
   try {
     await page.mouse.down({ button: 'left' });
@@ -679,30 +728,66 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
         observer.cancel('Trusted Chopper splash transaction was cancelled after input or protocol failure');
       }
     }, { entityId: stagedSplash.entityId, activationId: stagedSplash.activationId }).catch(() => undefined);
+    await cancelFirstChopperMissileObserver(
+      page,
+      stagedSplash.entityId,
+      stagedSplash.activationId,
+    ).catch(() => undefined);
     await page.mouse.up({ button: 'left' }).catch(() => undefined);
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.clearPossessedChopperAimTarget()).catch(() => undefined);
     throw error;
   }
-  await page.mouse.up({ button: 'left' });
-  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.clearPossessedChopperAimTarget());
-  const missileArmReceipt = await page.evaluate(({ entityId, activationId }) => {
-    const debug = window.__ATOMIC_ACRES_DEBUG__;
-    const accepted = debug.requestPossessedChopperEvidenceControl({ fire: false });
-    const snapshot = debug.snapshot() as any;
-    const possession = snapshot.killstreak.actors
-      .find((actor: any) => actor.actorId === snapshot.player.id)?.possession ?? null;
-    const entity = snapshot.killstreak.entities
-      .find((candidate: any) => candidate.id === entityId) ?? null;
-    return {
-      accepted,
-      possession,
-      entity,
-      entityId: entity?.id ?? null,
-      activationId: entity?.activationId ?? null,
-      activationMatches: entity?.activationId === activationId,
-      remainingLifetimeMs: entity?.expiresInMs ?? 0,
-    };
-  }, { entityId: stagedSplash.entityId, activationId: stagedSplash.activationId });
+  let missileArmReceipt: any;
+  try {
+    await page.mouse.up({ button: 'left' });
+    missileArmReceipt = await page.evaluate(({ entityId, activationId }) => {
+      const debug = window.__ATOMIC_ACRES_DEBUG__;
+      debug.clearPossessedChopperAimTarget();
+      const accepted = debug.requestPossessedChopperEvidenceControl({ fire: false });
+      const snapshot = debug.snapshot() as any;
+      const possession = snapshot.killstreak.actors
+        .find((actor: any) => actor.actorId === snapshot.player.id)?.possession ?? null;
+      const entity = snapshot.killstreak.entities
+        .find((candidate: any) => candidate.id === entityId) ?? null;
+      return {
+        accepted,
+        possession,
+        entity,
+        entityId: entity?.id ?? null,
+        activationId: entity?.activationId ?? null,
+        activationMatches: entity?.activationId === activationId,
+        remainingLifetimeMs: entity?.expiresInMs ?? 0,
+      };
+    }, { entityId: stagedSplash.entityId, activationId: stagedSplash.activationId });
+  } catch (error) {
+    await cancelFirstChopperMissileObserver(
+      page,
+      stagedSplash.entityId,
+      stagedSplash.activationId,
+    ).catch(() => undefined);
+    throw error;
+  }
+  const firstMissileWallClockMs = Date.now();
+  let cooldownReady: any;
+  try {
+    await page.mouse.dblclick(
+      missileInputBounds.x + missileInputBounds.width / 2,
+      missileInputBounds.y + missileInputBounds.height / 2,
+      { button: 'right', delay: 0 },
+    );
+    cooldownReady = await awaitFirstChopperMissileObserver(
+      page,
+      stagedSplash.entityId,
+      stagedSplash.activationId,
+    );
+  } catch (error) {
+    await cancelFirstChopperMissileObserver(
+      page,
+      stagedSplash.entityId,
+      stagedSplash.activationId,
+    ).catch(() => undefined);
+    throw error;
+  }
   expect(splashReceipt).not.toBeNull();
   expect(splashReceipt.aim).toMatchObject({
     contract: 'chopper-gunner-trusted-aligned-aim-v1',
@@ -780,34 +865,6 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
     missileCooldownMs: 0,
   });
   expect(missileBefore.entity.expiresInMs).toBeGreaterThan(0);
-  const missileInputBounds = await page.locator('#game').boundingBox();
-  if (!missileInputBounds) throw new Error('Game canvas has no trusted Chopper missile input bounds');
-  await armFirstChopperMissileObserver(
-    page,
-    stagedSplash.entityId,
-    stagedSplash.activationId,
-  );
-  const firstMissileWallClockMs = Date.now();
-  let cooldownReady: any;
-  try {
-    await page.mouse.dblclick(
-      missileInputBounds.x + missileInputBounds.width / 2,
-      missileInputBounds.y + missileInputBounds.height / 2,
-      { button: 'right', delay: 0 },
-    );
-    cooldownReady = await awaitFirstChopperMissileObserver(
-      page,
-      stagedSplash.entityId,
-      stagedSplash.activationId,
-    );
-  } catch (error) {
-    await cancelFirstChopperMissileObserver(
-      page,
-      stagedSplash.entityId,
-      stagedSplash.activationId,
-    ).catch(() => undefined);
-    throw error;
-  }
   const firstMissile = cooldownReady.firstMissileReceipt;
   expect(firstMissile).toMatchObject({ activationMatches: true, entity: { missileAmmo: 5 } });
   expect(firstMissile.remainingLifetimeMs).toBeGreaterThan(0);
@@ -840,6 +897,8 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
   expect(secondTrustedRightDown).toMatchObject({ eventPhase: 1 });
   expect(firstTrustedRightDown.eventTimestampMs).toBeLessThanOrEqual(firstTrustedRightDown.observedAtMs);
   expect(secondTrustedRightDown.eventTimestampMs).toBeLessThanOrEqual(secondTrustedRightDown.observedAtMs);
+  expect(firstTrustedRightDown.remainingLifetimeMs).toBeGreaterThan(MINIMUM_CHOPPER_MISSILE_EVIDENCE_LIFETIME_MS);
+  expect(secondTrustedRightDown.remainingLifetimeMs).toBeGreaterThan(MINIMUM_CHOPPER_MISSILE_EVIDENCE_LIFETIME_MS);
   expect(secondTrustedRightDown.observedAtMs - firstTrustedRightDown.observedAtMs)
     .toBeLessThan(CHOPPER_MISSILE_CADENCE_MS);
   expect(firstAuthority.launchAtMs).toBeGreaterThanOrEqual(firstTrustedRightDown.observedAtMs);
