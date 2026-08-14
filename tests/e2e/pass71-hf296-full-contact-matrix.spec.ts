@@ -1,4 +1,4 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { chromium, expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -51,6 +51,16 @@ const componentDirectory = process.env.PASS71_HF296_COMPONENT_DIR ?? '';
 const peerPort = Number(process.env.PASS71_HF296_PEER_PORT ?? '4587');
 const renderer = 'webgl2';
 const renderProfile = 'blender';
+const CONTACT_SETTLE_TIMEOUT_MS = 1_500;
+const WEAPON_PRESENTATION_TIMEOUT_MS = 1_500;
+const HOSTED_MATRIX_DURATION_MS = 900_000;
+const EDGE_LAUNCH_ARGS = Object.freeze([
+  '--disable-background-timer-throttling',
+  '--disable-renderer-backgrounding',
+  '--disable-backgrounding-occluded-windows',
+  '--allow-loopback-in-peer-connection',
+  '--disable-features=WebRtcHideLocalIpsWithMdns',
+]);
 const checkoutSourceSha = execFileSync('git', ['rev-parse', 'HEAD'], {
   encoding: 'utf8', windowsHide: true,
 }).trim();
@@ -60,7 +70,13 @@ if (enabled && (!/^[a-f0-9]{40}$/u.test(expectedSourceSha)
   throw new Error('Official HF-296 full matrix requires exact candidate A and an owned component directory');
 }
 
-test.use({ viewport: { ...PASS71_HF296_VISUAL_SOURCE_VIEWPORT }, deviceScaleFactor: 1 });
+test.use({
+  launchOptions: {
+    args: [...EDGE_LAUNCH_ARGS],
+  },
+  viewport: { ...PASS71_HF296_VISUAL_SOURCE_VIEWPORT },
+  deviceScaleFactor: 1,
+});
 test.describe.configure({ mode: 'serial' });
 
 function candidateUrl(arena: ArenaId, seed: string, peerServer?: OwnedPeerServer): string {
@@ -139,15 +155,39 @@ async function startHosted(host: Page, guest: Page, arena: ArenaId): Promise<voi
   await Promise.all([host, guest].map((page) => page.waitForFunction(() => (
     (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch?.members.length === 2
   ), undefined, { timeout: 45_000 })));
+  expect(await host.evaluate(() => (
+    (window as any).__ATOMIC_ACRES_DEBUG__.extendHf296HostedMatrixDuration()
+  ))).toBe(HOSTED_MATRIX_DURATION_MS);
+  await Promise.all([host, guest].map((page) => page.waitForFunction((durationMs) => (
+    (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch?.durationMs === durationMs
+  ), HOSTED_MATRIX_DURATION_MS, { timeout: 45_000 })));
   await host.locator('#lobby-ready').click();
   await guest.locator('#lobby-ready').click();
   await expect(host.locator('#lobby-start')).toBeEnabled();
   await host.locator('#lobby-start').click();
-  await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
-    const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
-    return state.gameStarted && state.matchPhase === 'active'
-      && state.remotePlayers.length === 1 && state.remotePlayers[0].operatorModel !== null;
-  }, undefined, { timeout: 90_000 })));
+  const waitForHostedMatch = async (page: Page) => {
+    await page.bringToFront();
+    await page.waitForFunction(() => {
+      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+      return document.visibilityState === 'visible' && document.hasFocus()
+        && state.gameStarted && state.matchPhase === 'active'
+        && state.remotePlayers.length === 1;
+    }, undefined, { timeout: 90_000 });
+  };
+  const waitForHostedOperator = async (page: Page) => {
+    await page.bringToFront();
+    await page.waitForFunction(() => {
+      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+      return document.visibilityState === 'visible' && document.hasFocus()
+        && state.gameStarted && state.matchPhase === 'active'
+        && state.remotePlayers.length === 1
+        && state.remotePlayers[0].operatorModel !== null;
+    }, undefined, { timeout: 90_000 });
+  };
+  await waitForHostedMatch(host);
+  await waitForHostedMatch(guest);
+  await waitForHostedOperator(host);
+  await waitForHostedOperator(guest);
   await Promise.all([host, guest].map((page) => page.evaluate(() => {
     const api = (window as any).__ATOMIC_ACRES_DEBUG__;
     api.setBotsFrozen(true);
@@ -164,7 +204,7 @@ async function runPageMatrix(
   localCells: Array<Record<string, unknown>>;
   catalog: Array<Record<string, unknown>>;
 }> {
-  return page.evaluate(async ({ arenaId, localRole, stances, weapons, fixtures, actions }) => {
+  return page.evaluate(async ({ arenaId, localRole, stances, weapons, fixtures, actions, contactSettleTimeoutMs, weaponPresentationTimeoutMs }) => {
     const api = (window as any).__ATOMIC_ACRES_DEBUG__;
     const frame = () => new Promise<void>((resolveFrame) => requestAnimationFrame(() => resolveFrame()));
     const frames = async (count: number) => { for (let index = 0; index < count; index += 1) await frame(); };
@@ -178,6 +218,10 @@ async function runPageMatrix(
       projectileIdentity: identity.projectile.identity,
       hitIdentity: identity.hit.identity,
     });
+    const preparedCatalog = await api.prepareHf296WeaponCatalog();
+    if (preparedCatalog.prewarming || !weapons.every((weapon: string) => preparedCatalog.retained.includes(weapon))) {
+      throw new Error(`HF-296 ${arenaId}/${localRole} full weapon catalog was not resident before evidence: ${JSON.stringify(preparedCatalog)}`);
+    }
     const state = api.sampleHf296ContactEvidence();
     const bounds = api.sampleHf296ColliderField().bounds;
     const eyeY = state.player.position[1];
@@ -202,55 +246,76 @@ async function runPageMatrix(
     }
     points.sort((left, right) => left.distance - right.distance || left.x - right.x || left.z - right.z);
     const discovered = new Map<string, FixturePose>();
+    const fixtureCandidates = new Map<string, FixturePose[]>();
+    const rememberFixtureCandidate = (candidate: FixturePose) => {
+      const retained = fixtureCandidates.get(candidate.kind) ?? [];
+      if (retained.length >= 12 || retained.some((entry) => (
+        Math.hypot(entry.x - candidate.x, entry.z - candidate.z) < 0.35
+          && Math.abs(entry.yaw - candidate.yaw) < 0.08
+      ))) return;
+      retained.push(candidate);
+      fixtureCandidates.set(candidate.kind, retained);
+      if (!discovered.has(candidate.kind)) discovered.set(candidate.kind, candidate);
+    };
     for (const point of points) {
       const blocked = directions.map(([dx, dz], index) => ({
         index, dx, dz, blocked: probe(point.x + dx * 0.78, point.z + dz * 0.78),
       })).filter((entry) => entry.blocked);
+      const lateralBlockedByIndex = new Map<number, boolean[]>();
+      const lateralBlockedFor = ({ index, dx, dz }: { index: number; dx: number; dz: number }) => {
+        const retained = lateralBlockedByIndex.get(index);
+        if (retained) return retained;
+        const lateralX = -dz;
+        const lateralZ = dx;
+        const observed = [-1, 1].map((sign) => probe(
+          point.x + lateralX * 0.66 * sign + dx * 0.78,
+          point.z + lateralZ * 0.66 * sign + dz * 0.78,
+        ));
+        lateralBlockedByIndex.set(index, observed);
+        return observed;
+      };
       if (!discovered.has('floor') && blocked.length === 0
         && directions.every(([dx, dz]) => !probe(point.x + dx * 1.2, point.z + dz * 1.2))) {
-        discovered.set('floor', {
+        rememberFixtureCandidate({
           kind: 'floor', x: point.x, y: eyeY + 0.2, z: point.z,
           yaw: 0, approach: [0, 0], discovery: 'open-grid-grounded-world-floor',
         });
       }
       for (const direction of blocked) {
         const { dx, dz } = direction;
-        const lateralX = -dz;
-        const lateralZ = dx;
-        const sideBlocked = [-1, 1].map((sign) => probe(
-          point.x + lateralX * 0.66 * sign + dx * 0.78,
-          point.z + lateralZ * 0.66 * sign + dz * 0.78,
-        ));
+        const sideBlocked = lateralBlockedFor(direction);
         const yaw = Math.atan2(-dx, -dz);
-        if (!discovered.has('wall') && sideBlocked.every(Boolean)) {
-          discovered.set('wall', {
+        if (sideBlocked.every(Boolean)) {
+          rememberFixtureCandidate({
             kind: 'wall', x: point.x, y: eyeY + 0.2, z: point.z,
             yaw, approach: [dx, dz], discovery: 'live-probe-continuous-face-both-laterals-blocked',
           });
           const obliqueYaw = yaw + Math.PI / 6;
-          discovered.set('oblique', {
+          rememberFixtureCandidate({
             kind: 'oblique', x: point.x, y: eyeY + 0.2, z: point.z,
             yaw: obliqueYaw,
             approach: [-Math.sin(obliqueYaw), -Math.cos(obliqueYaw)],
             discovery: 'same-live-face-thirty-degree-diagonal-approach',
           });
         }
-        if (!discovered.has('door-return') && sideBlocked.filter(Boolean).length === 1) {
-          discovered.set('door-return', {
+        if (sideBlocked.filter(Boolean).length === 1) {
+          rememberFixtureCandidate({
             kind: 'door-return', x: point.x, y: eyeY + 0.2, z: point.z,
             yaw, approach: [dx, dz], discovery: 'live-probe-face-end-one-lateral-open-one-blocked',
           });
         }
       }
-      if (!discovered.has('corner')) {
+      {
         outer: for (const first of blocked) for (const second of blocked) {
           if (first.index >= second.index || Math.abs(first.dx * second.dx + first.dz * second.dz) > 0.3) continue;
+          if (lateralBlockedFor(first).filter(Boolean).length !== 1
+            || lateralBlockedFor(second).filter(Boolean).length !== 1) continue;
           const dx = first.dx + second.dx;
           const dz = first.dz + second.dz;
           const length = Math.hypot(dx, dz);
           if (length < 0.2) continue;
           const approach: [number, number] = [dx / length, dz / length];
-          discovered.set('corner', {
+          rememberFixtureCandidate({
             kind: 'corner', x: point.x, y: eyeY + 0.2, z: point.z,
             yaw: Math.atan2(-approach[0], -approach[1]), approach,
             discovery: 'live-probe-two-perpendicular-blocking-normals',
@@ -258,41 +323,149 @@ async function runPageMatrix(
           break outer;
         }
       }
-      if (fixtures.every((fixture: string) => discovered.has(fixture))) break;
+      if (fixtures.every((fixture: string) => (
+        fixtureCandidates.get(fixture)?.length ?? 0
+      ) >= (fixture === 'floor' ? 1 : 4))) break;
     }
     if (!fixtures.every((fixture: string) => discovered.has(fixture))) {
       throw new Error(`HF-296 ${arenaId}/${localRole} fixture discovery incomplete: ${JSON.stringify([...discovered.keys()])}`);
     }
     const fixturePoses = fixtures.map((fixture: string) => discovered.get(fixture)!);
+    const floorFixture = fixturePoses.find((fixture: FixturePose) => fixture.kind === 'floor');
+    if (!floorFixture) throw new Error(`HF-296 ${arenaId}/${localRole} missing open floor fixture`);
     const localCells: Array<Record<string, unknown>> = [];
     const catalog: Array<Record<string, unknown>> = [];
     const expectedNetworkRole = localRole === 'solo' ? 'offline'
       : localRole === 'host-local' ? 'host' : 'client';
+    const waitForContact = async (fixture: FixturePose) => {
+      const deadlineAt = performance.now() + contactSettleTimeoutMs;
+      let sample: any;
+      while (true) {
+        sample = api.sampleHf296ContactEvidence();
+        const floorContact = sample.contact?.contacts.some((contact: any) => contact.source === 'world-floor');
+        const obstacleContact = sample.contact?.contacts.some((contact: any) => contact.source !== 'world-floor')
+          || sample.contact?.sweepCollisions.some((contact: any) => contact.source !== 'world-floor');
+        if (floorContact && (fixture.kind === 'floor' || obstacleContact)) return sample;
+        if (performance.now() >= deadlineAt) {
+          const runtime = api.snapshot();
+          throw new Error(`HF-296 missing Rapier signed contact ${arenaId}/${localRole}/${fixture.kind}/${sample?.player?.stance ?? 'unknown'}: ${JSON.stringify({
+            playerPosition: sample?.player?.position,
+            capsule: sample?.contact?.capsule,
+            contacts: sample?.contact?.contacts,
+            sweepCollisions: sample?.contact?.sweepCollisions,
+            frameCount: runtime.frameCount,
+            grounded: runtime.player?.grounded,
+            presentationScheduling: runtime.presentationScheduling,
+            visibilityState: document.visibilityState,
+            documentFocused: document.hasFocus(),
+          })}`);
+        }
+        await frame();
+      }
+    };
+    const waitForStance = async (stance: string) => {
+      const deadlineAt = performance.now() + contactSettleTimeoutMs;
+      let sample: any;
+      while (true) {
+        sample = api.sampleHf296ContactEvidence();
+        const floorContact = sample.contact?.contacts.some((contact: any) => contact.source === 'world-floor');
+        if (floorContact && sample.player?.stance === stance && sample.contact?.stance === stance) return sample;
+        if (performance.now() >= deadlineAt) {
+          throw new Error(`HF-296 stance admission failed on open floor ${arenaId}/${localRole}/${stance}: ${JSON.stringify({
+            playerPosition: sample?.player?.position,
+            playerStance: sample?.player?.stance,
+            contactStance: sample?.contact?.stance,
+            capsule: sample?.contact?.capsule,
+            contacts: sample?.contact?.contacts,
+          })}`);
+        }
+        await frame();
+      }
+    };
+    const waitForWeaponPresentation = async (weapon: string) => {
+      const deadlineAt = performance.now() + weaponPresentationTimeoutMs;
+      let sample: any;
+      while (true) {
+        sample = api.sampleHf296ContactEvidence();
+        if (sample.player.weapon === weapon && sample.viewmodel.weapon === weapon
+          && sample.viewmodel.detailsReady === true && sample.viewmodel.importedModel?.weapon === weapon) return sample;
+        if (performance.now() >= deadlineAt) {
+          throw new Error(`HF-296 weapon presentation not ready ${arenaId}/${localRole}/${weapon}: ${JSON.stringify({
+            playerWeapon: sample?.player?.weapon,
+            viewmodelWeapon: sample?.viewmodel?.weapon,
+            detailsReady: sample?.viewmodel?.detailsReady,
+            importedModel: sample?.viewmodel?.importedModel,
+          })}`);
+        }
+        await frame();
+      }
+    };
     const stage = async (fixture: FixturePose, stance: string) => {
       api.setMovement(false);
-      api.teleportPlayer(fixture.x, fixture.y, fixture.z, fixture.yaw, 0);
-      await frames(8);
+      api.teleportPlayer(floorFixture.x, floorFixture.y, floorFixture.z, floorFixture.yaw, 0);
+      await waitForContact(floorFixture);
       api.setStance(stance);
+      let sample = await waitForStance(stance);
       await frames(8);
-      if (fixture.kind !== 'floor') {
-        api.setMovement(true);
-        await frames(14);
-        api.setMovement(false);
-        await frames(3);
+      if (fixture.kind === 'floor') {
+        sample = await waitForContact(fixture);
+      } else {
+        const retainedCandidates = fixtureCandidates.get(fixture.kind) ?? [];
+        const candidates = [fixture, ...retainedCandidates.filter((candidate) => (
+          Math.hypot(candidate.x - fixture.x, candidate.z - fixture.z) >= 0.35
+            || Math.abs(candidate.yaw - fixture.yaw) >= 0.08
+        ))];
+        const rejected: Array<Record<string, unknown>> = [];
+        let selected: FixturePose | null = null;
+        for (const candidate of candidates) {
+          try {
+            api.teleportPlayer(candidate.x, candidate.y, candidate.z, candidate.yaw, 0);
+            await waitForContact({ ...candidate, kind: 'floor' });
+            api.setMovement(true);
+            try {
+              sample = await waitForContact(candidate);
+            } finally {
+              api.setMovement(false);
+            }
+            const presentationDeadlineAt = performance.now() + weaponPresentationTimeoutMs;
+            while (true) {
+              const floorContact = sample.contact?.contacts.some((contact: any) => contact.source === 'world-floor');
+              const obstacleContact = sample.contact?.contacts.some((contact: any) => contact.source !== 'world-floor')
+                || sample.contact?.sweepCollisions.some((contact: any) => contact.source !== 'world-floor');
+              if (floorContact && obstacleContact && sample.viewmodel.surfaceRetreat > 0) {
+                selected = candidate;
+                break;
+              }
+              if (performance.now() >= presentationDeadlineAt) throw new Error('no live viewmodel obstruction retreat');
+              await frame();
+              sample = api.sampleHf296ContactEvidence();
+            }
+          } catch (error) {
+            api.setMovement(false);
+            rejected.push({
+              x: candidate.x, z: candidate.z, yaw: candidate.yaw,
+              reason: error instanceof Error ? error.message : String(error),
+              surfaceRetreat: sample?.viewmodel?.surfaceRetreat,
+              contacts: sample?.contact?.contacts,
+            });
+          }
+          if (selected) break;
+        }
+        if (!selected) {
+          throw new Error(`HF-296 no signed presentation-compatible fixture ${arenaId}/${localRole}/${fixture.kind}/${stance}: ${JSON.stringify(rejected)}`);
+        }
+        Object.assign(fixture as any, selected);
       }
-      const sample = api.sampleHf296ContactEvidence();
       if (sample.arena !== arenaId || sample.networkRole !== expectedNetworkRole
         || sample.player.stance !== stance || sample.contact?.stance !== stance) {
-        throw new Error(`HF-296 stage identity drift ${arenaId}/${localRole}/${fixture.kind}/${stance}`);
-      }
-      const floorContact = sample.contact.contacts.some((contact: any) => contact.source === 'world-floor');
-      const obstacleContact = sample.contact.contacts.some((contact: any) => contact.source !== 'world-floor')
-        || sample.contact.sweepCollisions.some((contact: any) => contact.source !== 'world-floor');
-      if (!floorContact || fixture.kind !== 'floor' && !obstacleContact) {
-        throw new Error(`HF-296 missing Rapier signed contact ${arenaId}/${localRole}/${fixture.kind}/${stance}`);
-      }
-      if (fixture.kind !== 'floor' && !(sample.viewmodel.surfaceRetreat > 0)) {
-        throw new Error(`HF-296 missing viewmodel obstruction retreat ${arenaId}/${localRole}/${fixture.kind}/${stance}`);
+        throw new Error(`HF-296 stage identity drift ${arenaId}/${localRole}/${fixture.kind}/${stance}: ${JSON.stringify({
+          observedArena: sample?.arena,
+          observedNetworkRole: sample?.networkRole,
+          playerStance: sample?.player?.stance,
+          contactStance: sample?.contact?.stance,
+          capsule: sample?.contact?.capsule,
+          contacts: sample?.contact?.contacts,
+        })}`);
       }
       return sample;
     };
@@ -300,12 +473,7 @@ async function runPageMatrix(
       await stage(fixture, stance);
       for (const weapon of weapons) {
         api.equipWeapon(weapon);
-        await frames(4);
-        let base = api.sampleHf296ContactEvidence();
-        if (base.player.weapon !== weapon || base.viewmodel.weapon !== weapon
-          || base.viewmodel.detailsReady !== true || base.viewmodel.importedModel?.weapon !== weapon) {
-          throw new Error(`HF-296 weapon presentation not ready ${arenaId}/${localRole}/${fixture.kind}/${stance}/${weapon}`);
-        }
+        let base = await waitForWeaponPresentation(weapon);
         if (!catalog.some((entry) => entry.weapon === weapon)) catalog.push({
           weapon,
           modelId: base.viewmodel.weaponModelId,
@@ -319,11 +487,12 @@ async function runPageMatrix(
         for (const action of actions) {
           base = api.sampleHf296ContactEvidence();
           const beforeIdentity = base.fireIdentity;
-          api.stageHf296ContactAction(action);
+          const stagedIdentity = api.stageHf296ContactAction(action);
           if (action === 'ads') {
             for (let attempt = 0; attempt < 45; attempt += 1) {
               await frame();
-              if (api.sampleHf296ActionProgress().adsProgress >= 0.9) break;
+              const progress = api.sampleHf296ContactEvidence().viewmodel;
+              if (progress.action === 'ads' && progress.adsProgress >= 0.92) break;
             }
           } else await frames(3);
           const sample = api.sampleHf296ContactEvidence();
@@ -333,16 +502,25 @@ async function runPageMatrix(
           const framingClear = intentionallySuppressed || (framing !== null
             && framing.finite === true && framing.nearPlaneClear === true && framing.intersectsViewport === true);
           const actionReady = action === 'hip' ? viewmodel.action === 'hip'
-            : action === 'ads' ? viewmodel.action === 'ads' && viewmodel.adsProgress >= 0.9
+            : action === 'ads' ? viewmodel.action === 'ads' && viewmodel.adsProgress >= 0.92
               : action === 'fire' ? viewmodel.fireCycle.kick > 0 && viewmodel.shotsPresented > base.viewmodel.shotsPresented
                 : action === 'reload' ? viewmodel.action === 'reload'
                   : viewmodel.action === 'melee' && viewmodel.knifeVisible === true;
           const armsClearOrIntentionallySuppressed = viewmodel.fullscreenSuppression?.active === true
             || (viewmodel.armFraming?.finite === true && viewmodel.armFraming.nearPlaneClear === true);
           if (!actionReady || !framingClear || !armsClearOrIntentionallySuppressed) {
-            throw new Error(`HF-296 action presentation failed ${arenaId}/${localRole}/${fixture.kind}/${stance}/${weapon}/${action}`);
+            throw new Error(`HF-296 action presentation failed ${arenaId}/${localRole}/${fixture.kind}/${stance}/${weapon}/${action}: ${JSON.stringify({
+              actionReady,
+              observedAction: viewmodel.action,
+              adsProgress: viewmodel.adsProgress,
+              framing,
+              armFraming: viewmodel.armFraming,
+              fullscreenSuppression: viewmodel.fullscreenSuppression,
+              framingClear,
+              armsClearOrIntentionallySuppressed,
+            })}`);
           }
-          const afterIdentity = sample.fireIdentity;
+          const afterIdentity = action === 'fire' ? stagedIdentity : sample.fireIdentity;
           const identityFrozen = action !== 'fire' || (
             beforeIdentity.camera.identity === afterIdentity.camera.identity
             && beforeIdentity.muzzle.identity === afterIdentity.muzzle.identity
@@ -384,6 +562,8 @@ async function runPageMatrix(
     weapons: PASS71_HF296_WEAPONS,
     fixtures: PASS71_HF296_FIXTURES,
     actions: PASS71_HF296_ACTIONS,
+    contactSettleTimeoutMs: CONTACT_SETTLE_TIMEOUT_MS,
+    weaponPresentationTimeoutMs: WEAPON_PRESENTATION_TIMEOUT_MS,
   });
 }
 
@@ -395,24 +575,77 @@ async function runRemoteProjectionSweep(
   actorFixtures: FixturePose[],
   observerFloor: FixturePose,
 ): Promise<Array<Record<string, unknown>>> {
-  const observerPromise = observer.evaluate(async ({ arenaId, projectionRole, poses, stances, weapons, floor, expectedRole }) => {
+  const observerPromise = observer.evaluate(async ({ arenaId, projectionRole, poses, stances, weapons, floor, expectedRole, contactSettleTimeoutMs }) => {
     const api = (window as any).__ATOMIC_ACRES_DEBUG__;
     const frame = () => new Promise<void>((resolveFrame) => requestAnimationFrame(() => resolveFrame()));
     const distance = (left: number[], right: number[]) => Math.hypot(...left.map((value, index) => value - right[index]));
     const finiteVector = (value: unknown) => Array.isArray(value)
       && value.length === 3 && value.every((entry) => typeof entry === 'number' && Number.isFinite(entry));
+    const waitForExactRemote = async (label: string) => {
+      const deadlineAt = performance.now() + contactSettleTimeoutMs;
+      let priorId: string | null = null;
+      let observed: any[] = [];
+      while (true) {
+        observed = api.sampleHf296RemoteProjection();
+        const current = observed.length === 1 ? observed[0] : null;
+        if (typeof current?.id === 'string' && current.id === priorId) return current;
+        priorId = typeof current?.id === 'string' ? current.id : null;
+        if (performance.now() >= deadlineAt) {
+          throw new Error(`HF-296 ${arenaId}/${projectionRole} ${label} did not retain one stable remote: ${JSON.stringify(observed)}`);
+        }
+        await frame();
+      }
+    };
     if (api.sampleHf296ContactEvidence().networkRole !== expectedRole) {
       throw new Error(`HF-296 ${arenaId}/${projectionRole} observer role drift`);
     }
     api.setMovement(false);
     api.teleportPlayer(floor.x, floor.y, floor.z, floor.yaw, 0);
-    for (let index = 0; index < 8; index += 1) await frame();
+    const floorDeadlineAt = performance.now() + contactSettleTimeoutMs;
+    while (!api.sampleHf296ContactEvidence().contact?.contacts.some((entry: any) => entry.source === 'world-floor')) {
+      if (performance.now() >= floorDeadlineAt) throw new Error(
+        `HF-296 ${arenaId}/${projectionRole} observer did not settle on the signed world floor`,
+      );
+      await frame();
+    }
+    const markerRemote = await waitForExactRemote('sentinel-ready');
+    if (api.authorizeHf296RemoteProjectionWeapon('flashlight-pistol') !== markerRemote?.id) {
+      throw new Error(`HF-296 sentinel-ready marker authorization failed ${arenaId}/${projectionRole}`);
+    }
+    let markerObserved: any = null;
+    for (let attempt = 0; attempt < 360; attempt += 1) {
+      markerObserved = api.sampleHf296RemoteProjection()[0];
+      if (markerObserved?.weapon === 'flashlight-pistol') break;
+      await frame();
+    }
+    if (markerObserved?.weapon !== 'flashlight-pistol') {
+      throw new Error(`HF-296 sentinel-ready marker was not observed ${arenaId}/${projectionRole}: ${JSON.stringify(markerObserved)}`);
+    }
     // A sentinel distinct from the first stand/carbine cell prevents a stale
     // initial state from being accepted as an acknowledgement.
     api.setStance('prone');
+    const sentinelDeadlineAt = performance.now() + contactSettleTimeoutMs;
+    let sentinelSample = api.sampleHf296ContactEvidence();
+    while (sentinelSample.player?.stance !== 'prone' || sentinelSample.contact?.stance !== 'prone'
+      || !sentinelSample.contact?.contacts.some((entry: any) => entry.source === 'world-floor')) {
+      if (performance.now() >= sentinelDeadlineAt) {
+        throw new Error(`HF-296 ${arenaId}/${projectionRole} observer sentinel stance was not admitted on signed floor`);
+      }
+      await frame();
+      sentinelSample = api.sampleHf296ContactEvidence();
+    }
     api.equipWeapon('flare-gun');
     const rows: Array<Record<string, unknown>> = [];
-    for (const fixture of poses) for (const stance of stances) for (const weapon of weapons) {
+    const cells = poses.flatMap((fixture) => stances.flatMap((stance) => (
+      weapons.map((weapon) => ({ fixture, stance, weapon }))
+    )));
+    const first = cells[0];
+    const firstRemote = await waitForExactRemote('first-cell');
+    if (!first || api.authorizeHf296RemoteProjectionWeapon(first.weapon) !== firstRemote?.id) {
+      throw new Error(`HF-296 initial projection authorization failed ${arenaId}/${projectionRole}`);
+    }
+    for (let cellIndex = 0; cellIndex < cells.length; cellIndex += 1) {
+      const { fixture, stance, weapon } = cells[cellIndex]!;
       let remote: any = null;
       for (let attempt = 0; attempt < 360; attempt += 1) {
         remote = api.sampleHf296RemoteProjection()[0];
@@ -446,6 +679,13 @@ async function runRemoteProjectionSweep(
         fixtureDistance,
         renderedWeapon: remote.renderedWeapon,
       });
+      const next = cells[cellIndex + 1];
+      if (next) {
+        const authorizedPlayerId = api.authorizeHf296RemoteProjectionWeapon(next.weapon);
+        if (authorizedPlayerId !== remote.id) {
+          throw new Error(`HF-296 projection authorization failed ${arenaId}/${projectionRole}/${next.fixture.kind}/${next.stance}/${next.weapon}`);
+        }
+      }
       // Mirror the observed cell as an acknowledgement on the same replicated
       // state lane. The actor will not advance until this exact pair arrives.
       api.setStance(stance);
@@ -460,45 +700,122 @@ async function runRemoteProjectionSweep(
     weapons: PASS71_HF296_WEAPONS,
     floor: observerFloor,
     expectedRole: role === 'host-saw-guest' ? 'host' : 'client',
+    contactSettleTimeoutMs: CONTACT_SETTLE_TIMEOUT_MS,
   });
 
-  const actorPromise = actor.evaluate(async ({ arenaId, projectionRole, poses, stances, weapons, expectedRole }) => {
+  const actorPromise = actor.evaluate(async ({ arenaId, projectionRole, poses, stances, weapons, expectedRole, contactSettleTimeoutMs }) => {
     const api = (window as any).__ATOMIC_ACRES_DEBUG__;
     const frame = () => new Promise<void>((resolveFrame) => requestAnimationFrame(() => resolveFrame()));
     const frames = async (count: number) => { for (let index = 0; index < count; index += 1) await frame(); };
+    const waitForExactRemote = async (label: string) => {
+      const deadlineAt = performance.now() + contactSettleTimeoutMs;
+      let priorId: string | null = null;
+      let observed: any[] = [];
+      while (true) {
+        observed = api.sampleHf296RemoteProjection();
+        const current = observed.length === 1 ? observed[0] : null;
+        if (typeof current?.id === 'string' && current.id === priorId) return current;
+        priorId = typeof current?.id === 'string' ? current.id : null;
+        if (performance.now() >= deadlineAt) {
+          throw new Error(`HF-296 ${arenaId}/${projectionRole} ${label} did not retain one stable remote: ${JSON.stringify(observed)}`);
+        }
+        await frame();
+      }
+    };
+    const waitForContact = async (fixture: FixturePose) => {
+      const deadlineAt = performance.now() + contactSettleTimeoutMs;
+      let sample: any;
+      while (true) {
+        sample = api.sampleHf296ContactEvidence();
+        const floorContact = sample.contact?.contacts.some((entry: any) => entry.source === 'world-floor');
+        const obstacleContact = sample.contact?.contacts.some((entry: any) => entry.source !== 'world-floor')
+          || sample.contact?.sweepCollisions.some((entry: any) => entry.source !== 'world-floor');
+        if (floorContact && (fixture.kind === 'floor' || obstacleContact)) return sample;
+        if (performance.now() >= deadlineAt) {
+          const runtime = api.snapshot();
+          throw new Error(`HF-296 remote actor lost contact ${arenaId}/${projectionRole}/${fixture.kind}/${sample?.player?.stance ?? 'unknown'}: ${JSON.stringify({
+            playerPosition: sample?.player?.position,
+            capsule: sample?.contact?.capsule,
+            contacts: sample?.contact?.contacts,
+            sweepCollisions: sample?.contact?.sweepCollisions,
+            frameCount: runtime.frameCount,
+            grounded: runtime.player?.grounded,
+            presentationScheduling: runtime.presentationScheduling,
+            visibilityState: document.visibilityState,
+            documentFocused: document.hasFocus(),
+          })}`);
+        }
+        await frame();
+      }
+    };
+    const floorFixture = poses.find((fixture: FixturePose) => fixture.kind === 'floor');
+    if (!floorFixture) throw new Error(`HF-296 ${arenaId}/${projectionRole} actor missing open floor fixture`);
+    const waitForStance = async (stance: string) => {
+      const deadlineAt = performance.now() + contactSettleTimeoutMs;
+      let sample: any;
+      while (true) {
+        sample = api.sampleHf296ContactEvidence();
+        const floorContact = sample.contact?.contacts.some((entry: any) => entry.source === 'world-floor');
+        if (floorContact && sample.player?.stance === stance && sample.contact?.stance === stance) return sample;
+        if (performance.now() >= deadlineAt) {
+          throw new Error(`HF-296 remote actor stance admission failed on open floor ${arenaId}/${projectionRole}/${stance}: ${JSON.stringify({
+            playerPosition: sample?.player?.position,
+            playerStance: sample?.player?.stance,
+            contactStance: sample?.contact?.stance,
+            capsule: sample?.contact?.capsule,
+            contacts: sample?.contact?.contacts,
+          })}`);
+        }
+        await frame();
+      }
+    };
     if (api.sampleHf296ContactEvidence().networkRole !== expectedRole) {
       throw new Error(`HF-296 ${arenaId}/${projectionRole} actor role drift`);
     }
+    const sentinelRemote = await waitForExactRemote('sentinel-authorization');
+    if (api.authorizeHf296RemoteProjectionWeapon('flare-gun') !== sentinelRemote?.id) {
+      throw new Error(`HF-296 sentinel authorization failed ${arenaId}/${projectionRole}`);
+    }
+    api.equipWeapon('flashlight-pistol');
     // Wait until the observer's sentinel is actually present on the network
     // before publishing the first cell.
     let sentinel = false;
+    let sentinelObserved: any = null;
     for (let attempt = 0; attempt < 360; attempt += 1) {
-      const remote = api.sampleHf296RemoteProjection()[0];
-      if (remote?.weapon === 'flare-gun' && remote?.stance === 'prone') { sentinel = true; break; }
+      sentinelObserved = api.sampleHf296RemoteProjection()[0];
+      if (sentinelObserved?.weapon === 'flare-gun' && sentinelObserved?.stance === 'prone') { sentinel = true; break; }
       await frame();
     }
-    if (!sentinel) throw new Error(`HF-296 actor did not receive observer sentinel ${arenaId}/${projectionRole}`);
+    if (!sentinel) throw new Error(`HF-296 actor did not receive observer sentinel ${arenaId}/${projectionRole}: ${JSON.stringify({
+      expectedRemoteId: sentinelRemote?.id,
+      observedRemote: sentinelObserved,
+      local: api.sampleHf296ContactEvidence(),
+    })}`);
     let acknowledgements = 0;
     for (const fixture of poses) for (const stance of stances) {
       api.setMovement(false);
-      api.teleportPlayer(fixture.x, fixture.y, fixture.z, fixture.yaw, 0);
-      await frames(8);
+      api.teleportPlayer(floorFixture.x, floorFixture.y, floorFixture.z, floorFixture.yaw, 0);
+      await waitForContact(floorFixture);
       api.setStance(stance);
+      await waitForStance(stance);
       await frames(8);
       if (fixture.kind !== 'floor') {
+        api.teleportPlayer(fixture.x, fixture.y, fixture.z, fixture.yaw, 0);
+        await waitForContact({ ...fixture, kind: 'floor' });
         api.setMovement(true);
-        await frames(14);
-        api.setMovement(false);
-        await frames(3);
-      }
-      const contact = api.sampleHf296ContactEvidence();
-      const floorContact = contact.contact?.contacts.some((entry: any) => entry.source === 'world-floor');
-      const obstacleContact = contact.contact?.contacts.some((entry: any) => entry.source !== 'world-floor')
-        || contact.contact?.sweepCollisions.some((entry: any) => entry.source !== 'world-floor');
-      if (!floorContact || fixture.kind !== 'floor' && !obstacleContact) {
-        throw new Error(`HF-296 remote actor lost contact ${arenaId}/${projectionRole}/${fixture.kind}/${stance}`);
+        try {
+          await waitForContact(fixture);
+        } finally {
+          api.setMovement(false);
+        }
+      } else {
+        await waitForContact(fixture);
       }
       for (const weapon of weapons) {
+        const remote = api.sampleHf296RemoteProjection()[0];
+        if (api.authorizeHf296RemoteProjectionWeapon(weapon) !== remote?.id) {
+          throw new Error(`HF-296 acknowledgement authorization failed ${arenaId}/${projectionRole}/${fixture.kind}/${stance}/${weapon}`);
+        }
         api.equipWeapon(weapon);
         let acknowledged = false;
         for (let attempt = 0; attempt < 360; attempt += 1) {
@@ -520,6 +837,7 @@ async function runRemoteProjectionSweep(
     stances: PASS71_HF296_STANCES,
     weapons: PASS71_HF296_WEAPONS,
     expectedRole: role === 'host-saw-guest' ? 'client' : 'host',
+    contactSettleTimeoutMs: CONTACT_SETTLE_TIMEOUT_MS,
   });
 
   const [rows, acknowledgements] = await Promise.all([observerPromise, actorPromise]);
@@ -536,28 +854,70 @@ async function captureVisualMatrix(
   outputRoot: string,
 ): Promise<Array<Record<string, unknown>>> {
   const rows: Array<Record<string, unknown>> = [];
+  const floorFixture = fixtures.find((fixture) => fixture.kind === 'floor');
+  if (!floorFixture) throw new Error(`HF-296 ${arena}/${role} visual matrix missing open floor fixture`);
   for (const fixture of fixtures) for (const stance of PASS71_HF296_STANCES as readonly Stance[]) {
-    await page.evaluate(async ({ fixturePose, expectedStance, weapon }) => {
+    await page.evaluate(async ({ fixturePose, openFloor, expectedStance, weapon, contactSettleTimeoutMs }) => {
       const api = (window as any).__ATOMIC_ACRES_DEBUG__;
       const frame = () => new Promise<void>((resolveFrame) => requestAnimationFrame(() => resolveFrame()));
       api.setMovement(false);
-      api.teleportPlayer(fixturePose.x, fixturePose.y, fixturePose.z, fixturePose.yaw, 0);
-      for (let index = 0; index < 8; index += 1) await frame();
+      api.teleportPlayer(openFloor.x, openFloor.y, openFloor.z, openFloor.yaw, 0);
+      const floorDeadlineAt = performance.now() + contactSettleTimeoutMs;
+      let sample = api.sampleHf296ContactEvidence();
+      while (!sample.contact?.contacts.some((entry: any) => entry.source === 'world-floor')) {
+        if (performance.now() >= floorDeadlineAt) throw new Error(
+          `HF-296 visual staging did not settle on the signed world floor ${fixturePose.kind}/${expectedStance}`,
+        );
+        await frame();
+        sample = api.sampleHf296ContactEvidence();
+      }
       api.setStance(expectedStance);
+      const stanceDeadlineAt = performance.now() + contactSettleTimeoutMs;
+      while (sample.player?.stance !== expectedStance || sample.contact?.stance !== expectedStance
+        || !sample.contact?.contacts.some((entry: any) => entry.source === 'world-floor')) {
+        if (performance.now() >= stanceDeadlineAt) throw new Error(
+          `HF-296 visual stance admission failed on open floor ${fixturePose.kind}/${expectedStance}`,
+        );
+        await frame();
+        sample = api.sampleHf296ContactEvidence();
+      }
       for (let index = 0; index < 8; index += 1) await frame();
       if (fixturePose.kind !== 'floor') {
+        api.teleportPlayer(fixturePose.x, fixturePose.y, fixturePose.z, fixturePose.yaw, 0);
+        const targetFloorDeadlineAt = performance.now() + contactSettleTimeoutMs;
+        while (!api.sampleHf296ContactEvidence().contact?.contacts.some((entry: any) => entry.source === 'world-floor')) {
+          if (performance.now() >= targetFloorDeadlineAt) throw new Error(
+            `HF-296 visual target staging did not settle on the signed world floor ${fixturePose.kind}/${expectedStance}`,
+          );
+          await frame();
+        }
         api.setMovement(true);
-        for (let index = 0; index < 14; index += 1) await frame();
-        api.setMovement(false);
+        try {
+          const obstacleDeadlineAt = performance.now() + contactSettleTimeoutMs;
+          while (!api.sampleHf296ContactEvidence().contact?.contacts.some((entry: any) => entry.source !== 'world-floor')) {
+            if (performance.now() >= obstacleDeadlineAt) throw new Error(
+              `HF-296 visual staging did not reach the signed obstacle contact ${fixturePose.kind}/${expectedStance}`,
+            );
+            await frame();
+          }
+        } finally {
+          api.setMovement(false);
+        }
       }
       api.equipWeapon(weapon);
       for (let index = 0; index < 4; index += 1) await frame();
       api.stageHf296ContactAction('fire');
       for (let index = 0; index < 3; index += 1) await frame();
-      const sample = api.sampleHf296ContactEvidence();
-      if (sample.player.stance !== expectedStance || sample.player.weapon !== weapon
-        || sample.viewmodel.fireCycle.kick <= 0) throw new Error('HF-296 visual staging failed');
-    }, { fixturePose: fixture, expectedStance: stance, weapon: PASS71_HF296_VISUAL_WEAPON });
+      const finalSample = api.sampleHf296ContactEvidence();
+      if (finalSample.player.stance !== expectedStance || finalSample.player.weapon !== weapon
+        || finalSample.viewmodel.fireCycle.kick <= 0) throw new Error('HF-296 visual staging failed');
+    }, {
+      fixturePose: fixture,
+      openFloor: floorFixture,
+      expectedStance: stance,
+      weapon: PASS71_HF296_VISUAL_WEAPON,
+      contactSettleTimeoutMs: CONTACT_SETTLE_TIMEOUT_MS,
+    });
     const key = pass71Hf296VisualKey({ arena, stance, role, fixture: fixture.kind });
     const filename = `${arena}--${stance}--${role}--${fixture.kind}.png`;
     const absolutePath = resolve(outputRoot, filename);
@@ -582,6 +942,14 @@ test('executes the literal HF-296 player/viewmodel contact closure matrix', asyn
   test.skip(browserName !== 'chromium', 'HF-296 uses installed signed Edge through the Chromium project.');
   test.setTimeout(5_400_000);
   const peerServer = await startOwnedPeerServer(peerPort);
+  const secondaryEdge = await chromium.launch({
+    executablePath: process.env.PASS71_HF296_EDGE_EXECUTABLE,
+    headless: true,
+    args: [...EDGE_LAUNCH_ARGS],
+  }).catch(async (error: unknown) => {
+    await peerServer.stop();
+    throw error;
+  });
   const visualRoot = resolve(componentDirectory, 'visual');
   mkdirSync(visualRoot, { recursive: true });
   const localCells: Array<Record<string, unknown>> = [];
@@ -592,6 +960,7 @@ test('executes the literal HF-296 player/viewmodel contact closure matrix', asyn
   let browserRuntime: Record<string, unknown> | null = null;
   const faults: string[] = [];
   try {
+    expect(secondaryEdge.version()).toBe(browser.version());
     for (const arena of PASS71_HF296_ARENAS as readonly ArenaId[]) {
       const soloContext = await browser.newContext({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });
       try {
@@ -619,7 +988,7 @@ test('executes the literal HF-296 player/viewmodel contact closure matrix', asyn
       }
 
       const hostContext = await browser.newContext({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });
-      const guestContext = await browser.newContext({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });
+      const guestContext = await secondaryEdge.newContext({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });
       try {
         const diagnostics: BrowserDiagnostics = { pageErrors: [], consoleErrors: [] };
         const [host, guest] = await Promise.all([
@@ -705,6 +1074,7 @@ test('executes the literal HF-296 player/viewmodel contact closure matrix', asyn
     };
     writeFileSync(resolve(componentDirectory, 'component.json'), `${JSON.stringify(component)}\n`, 'utf8');
   } finally {
+    await secondaryEdge.close();
     await peerServer.stop();
   }
 });

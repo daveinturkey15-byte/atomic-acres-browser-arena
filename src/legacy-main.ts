@@ -607,6 +607,7 @@ import {
   CLOCK_PING_INTERVAL_MS,
   DEFAULT_PRIVATE_MATCH_CONFIG,
   LOBBY_START_LEAD_MS,
+  MAX_PRIVATE_MATCH_DURATION_MS,
   REJOIN_GRACE_MS,
   rejoinReservationExpired,
   balanceLobbyTeams,
@@ -5478,6 +5479,11 @@ const authorizedRemoteRedeploys = new Map<string, {
   expiresAt: number;
   nonce: number;
 }>();
+const hf296RemoteProjectionWeaponAuthorizations = new Map<string, Readonly<{
+  weapon: WeaponId;
+  expiresAt: number;
+}>>();
+const HF296_REMOTE_PROJECTION_AUTHORIZATION_MS = 15_000;
 const peerTimingStates = new Map<string, PeerTimingState>();
 const incomingCombatRewindMs = new Map<number, number>();
 const localPositionHistory: CombatantPoseSample[] = [];
@@ -5756,7 +5762,7 @@ function localGuestCombatInventoryProjection(revision: number) {
     player.grenades,
     revision,
     player.primaryWeapon,
-    handicapSidearm(player.primaryWeapon),
+    localMultiplayerQa ? player.secondaryWeapon : handicapSidearm(player.primaryWeapon),
   );
 }
 
@@ -10951,7 +10957,11 @@ function onNetworkMessage(message: GameMessage): void {
     const claimedIncoming = message.player;
     const lobbyMember = privateLobbySnapshot?.members.find((member) => member.id === claimedIncoming.id);
     if (privateLobbySnapshot && (!lobbyMember || claimedIncoming.team !== lobbyMember.team)) return;
-    if (claimedIncoming.weapon === 'magnum' && lobbyMember?.dhv !== 'X') return;
+    const hf296ClaimedProjectionAuthorization = hf296RemoteProjectionWeaponAuthorizations.get(claimedIncoming.id);
+    const hf296ClaimedProjectionAllowed = network.role !== 'offline' && localMultiplayerQa
+      && hf296ClaimedProjectionAuthorization?.weapon === claimedIncoming.weapon
+      && hf296ClaimedProjectionAuthorization.expiresAt > performance.now();
+    if (claimedIncoming.weapon === 'magnum' && lobbyMember?.dhv !== 'X' && !hf296ClaimedProjectionAllowed) return;
     const authoritativeScore = authoritativeScores.get(claimedIncoming.id);
     const incoming = network.role === 'host' && lobbyMember
       ? {
@@ -11155,14 +11165,27 @@ function onNetworkMessage(message: GameMessage): void {
       });
       const pickup = authorizedRemotePickups.get(admittedIncoming.id);
       const pickupAllowed = pickup !== undefined && pickup.expiresAt >= now && pickup.weapon === admittedIncoming.primary;
+      const hf296ProjectionAuthorization = hf296RemoteProjectionWeaponAuthorizations.get(admittedIncoming.id);
+      const hf296ProjectionWeaponAllowed = network.role !== 'offline' && localMultiplayerQa
+        && hf296ProjectionAuthorization?.weapon === admittedIncoming.weapon
+        && hf296ProjectionAuthorization.expiresAt > now;
+      const hf296ProjectionSecondaryAllowed = hf296ProjectionWeaponAllowed
+        && admittedIncoming.grenade === remote.snapshot.grenade
+        && (admittedIncoming.secondary === admittedIncoming.weapon
+          || admittedIncoming.primary === admittedIncoming.weapon
+            && admittedIncoming.secondary === handicapSidearm(admittedIncoming.primary, memberDhv(admittedIncoming.id)));
       if (admittedIncoming.team !== remote.snapshot.team) return;
-      if (network.role === 'host' && admittedIncoming.weapon === 'railgun' && railgunState.holderId !== admittedIncoming.id) return;
+      if (network.role === 'host' && admittedIncoming.weapon === 'railgun'
+        && railgunState.holderId !== admittedIncoming.id && !hf296ProjectionWeaponAllowed) return;
       if (network.role === 'host' && isTimedMapWeaponId(admittedIncoming.weapon)
-        && timedMapWeaponStates[admittedIncoming.weapon].holderId !== admittedIncoming.id) return;
-      if (admittedIncoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed) return;
+        && timedMapWeaponStates[admittedIncoming.weapon].holderId !== admittedIncoming.id
+        && !hf296ProjectionWeaponAllowed) return;
+      if (admittedIncoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed
+        && !hf296ProjectionWeaponAllowed) return;
       if ((admittedIncoming.secondary !== remote.snapshot.secondary || admittedIncoming.grenade !== remote.snapshot.grenade)
-        && !respawned) return;
+        && !respawned && !hf296ProjectionSecondaryAllowed) return;
       if (pickupAllowed) authorizedRemotePickups.delete(admittedIncoming.id);
+      if (hf296ProjectionWeaponAllowed) hf296RemoteProjectionWeaponAuthorizations.delete(admittedIncoming.id);
       if (redeployed) authorizedRemoteRedeploys.delete(admittedIncoming.id);
       if (network.role === 'host') {
         hostTriggerAuthorities.resetIfWeaponChanged(admittedIncoming.id, admittedIncoming.weapon);
@@ -14580,6 +14603,7 @@ function removeRemote(id: string, reason: string, allowRejoinReservation = true)
   remoteMeleeAdmissions.delete(id);
   authorizedRemotePickups.delete(id);
   authorizedRemoteRedeploys.delete(id);
+  hf296RemoteProjectionWeaponAuthorizations.delete(id);
   addFeed(`${remote.snapshot.name} ${reason}`);
 }
 
@@ -23759,7 +23783,6 @@ function updatePhysics(dt: number): void {
     jumpQueuedAt = -10_000;
   } else {
     player.velocity.y -= 24.5 * dt;
-    if (playerGrounded) player.velocity.y = Math.max(0, player.velocity.y);
   }
 
   const impactVelocity = player.velocity.y;
@@ -26299,6 +26322,7 @@ function resetForMode(preserveAdmission = false): void {
   if (debugThermalOperatorEvidenceState) releaseDebugThermalOperatorEvidenceFrame();
   thermalGhostPresentation.clear();
   authorizedRemoteRedeploys.clear();
+  hf296RemoteProjectionWeaponAuthorizations.clear();
   resetBreakableWindows();
   for (const id of remotes.keys()) removeRemote(id, 'cleared', false);
   verifiedRemoteKills.clear();
@@ -27808,6 +27832,7 @@ const debugWindow = window as Window & {
     sampleDmrThermalReadiness: () => ReturnType<typeof sampleDmrThermalReadiness>;
     sampleWeaponActionReadiness: () => ReturnType<typeof sampleWeaponActionReadiness>;
     sampleHf296ContactEvidence: () => ReturnType<typeof sampleHf296ContactEvidence>;
+    prepareHf296WeaponCatalog: () => Promise<ReturnType<typeof weaponView.browserCatalogReadiness>>;
     sampleHf296FireIdentity: () => ReturnType<typeof sampleHf296FireIdentity>;
     sampleHf296ActionProgress: () => ReturnType<typeof sampleHf296ActionProgress>;
     sampleHf296RemoteProjection: () => ReturnType<typeof sampleHf296RemoteProjection>;
@@ -28145,6 +28170,8 @@ const debugWindow = window as Window & {
     melee: () => { accepted: boolean; alive: boolean; phase: string; lastMeleeAt: number };
     setAds: (held: boolean) => void;
     setMovement: (forward: boolean, sprint?: boolean) => void;
+    extendHf296HostedMatrixDuration: () => number | null;
+    authorizeHf296RemoteProjectionWeapon: (weapon: WeaponId) => string | null;
     sendRawChat: (text: string, claimedBy?: string) => boolean;
     setMeleeCaptureProgress: (progress: number | null) => void;
     setFireCaptureAgeMs: (ageMs: number | null) => void;
@@ -29667,6 +29694,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleDmrThermalReadiness,
   sampleWeaponActionReadiness,
   sampleHf296ContactEvidence,
+  prepareHf296WeaponCatalog: async () => {
+    await weaponView.prepareBrowserWeaponCatalogAssets(
+      WEAPON_IDS,
+      undefined,
+      yieldDeploymentPrewarmFrame,
+    );
+    return weaponView.browserCatalogReadiness();
+  },
   sampleHf296FireIdentity,
   sampleHf296ActionProgress,
   sampleHf296RemoteProjection,
@@ -30252,7 +30287,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       snapshotAgeMs: Math.max(0, performance.now() - remote.lastSeen),
       interpolationError: remote.root.position.distanceTo(remote.target),
       screenPosition: remote.root.localToWorld(new THREE.Vector3(0, 1.2, 0)).project(camera).toArray(),
-      operatorModel: riggedOperatorTelemetry(remote.root),
+      operatorModel: riggedOperatorTelemetry(remote.root.userData.operator as THREE.Object3D),
       readability: remoteHumanReadabilityTelemetry(remote.root.userData.operator as THREE.Object3D),
     })),
     retainedRemotePlayers: [...retainedRemoteAuthorities.values()].map((retained) => ({
@@ -32490,7 +32525,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   equipWeapon: (weapon: WeaponId) => {
     if (PRIMARY_WEAPON_IDS.includes(weapon as PrimaryWeaponId)) {
       player.primaryWeapon = weapon as PrimaryWeaponId;
+      if (localMultiplayerQa) player.secondaryWeapon = handicapSidearm(player.primaryWeapon);
       if (selectedArena.id === 'gun-range') rangePrimaryUnlocked = true;
+    } else if (localMultiplayerQa && SIDEARM_WEAPON_IDS.includes(weapon as SidearmWeaponId)) {
+      player.secondaryWeapon = weapon as SidearmWeaponId;
     }
     player.weapon = weapon;
     player.ammo[weapon] = WEAPONS[weapon].mag;
@@ -32528,6 +32566,27 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     keys.delete('ShiftRight');
     if (forward) keys.add('KeyW');
     if (forward && sprint) keys.add('ShiftLeft');
+  },
+  extendHf296HostedMatrixDuration: () => {
+    if (launchParams.get('multiplayerQa') !== '1' || network.role !== 'host'
+      || privateLobbySnapshot?.phase !== 'waiting') return null;
+    applyHostLobbyConfig({
+      ...privateMatchConfig,
+      durationMs: MAX_PRIVATE_MATCH_DURATION_MS,
+    });
+    return privateMatchConfig.durationMs;
+  },
+  authorizeHf296RemoteProjectionWeapon: (weapon) => {
+    if (!localMultiplayerQa || network.role === 'offline' || matchState.phase !== 'active'
+      || !WEAPON_IDS.includes(weapon)) return null;
+    const candidates = [...remotes.values()].filter((remote) => remote.snapshot.hp > 0);
+    if (candidates.length !== 1) return null;
+    const remote = candidates[0]!;
+    hf296RemoteProjectionWeaponAuthorizations.set(remote.snapshot.id, Object.freeze({
+      weapon,
+      expiresAt: performance.now() + HF296_REMOTE_PROJECTION_AUTHORIZATION_MS,
+    }));
+    return remote.snapshot.id;
   },
   sendRawChat: (text, claimedBy = player.id) => {
     if (new URLSearchParams(window.location.search).get('multiplayerQa') !== '1' || network.role === 'offline') return false;
