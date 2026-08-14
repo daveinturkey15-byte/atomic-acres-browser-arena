@@ -80,6 +80,7 @@ type NetworkInternals = {
   }>;
   guestPeerOwners: Map<string, string>;
   clientHostLivenessTimer: number | null;
+  hostEventConnection: DataConnection | null;
   lastValidHostMessageMonoMs: number | null;
   foregroundProbeGraceUntilMonoMs: number | null;
   lastClientHostLivenessCheckMonoMs: number | null;
@@ -113,6 +114,22 @@ describe('local QA PeerJS path ownership', () => {
 });
 
 describe('client host liveness watchdog', () => {
+  it('exposes only a recently authenticated open host as active', () => {
+    const network = new ArenaNetwork(() => undefined, () => undefined);
+    const internals = network as unknown as NetworkInternals;
+    const connection = new FakeConnection('host-peer');
+    internals.role = 'client';
+    internals.hostEventConnection = connection as unknown as DataConnection;
+    internals.lastValidHostMessageMonoMs = 1_000;
+
+    expect(network.activeHost(12_000, 12_999)).toBe(true);
+    expect(network.activeHost(12_000, 13_001)).toBe(false);
+    connection.close();
+    expect(network.activeHost(12_000, 1_001)).toBe(false);
+    internals.role = 'host';
+    expect(network.activeHost(12_000, 1_001)).toBe(false);
+  });
+
   const sample = (overrides: Partial<Parameters<typeof clientHostLivenessExpired>[0]> = {}) => ({
     activeClient: true,
     eventChannelOpen: true,

@@ -23922,7 +23922,11 @@ function interpolationSourceSnapshotRateHz(): 20 | 30 | 40 {
 
 function updateRemotes(dt: number, now: number): void {
   if (remotes.size === 0) return;
-  const activeGuestIds = network.role === 'host' ? new Set(network.activePlayerIds(12_000, now)) : null;
+  const activeRemoteIds = network.role === 'host'
+    ? new Set(network.activePlayerIds(12_000, now))
+    : network.role === 'client' && network.activeHost(12_000, now) && privateLobbySnapshot?.hostId
+      ? new Set([privateLobbySnapshot.hostId])
+      : null;
   const hostNow = currentHostTimeMs();
   recordCombatantPose(localPositionHistory, {
     at: hostNow, x: player.position.x, y: player.position.y, z: player.position.z,
@@ -23952,7 +23956,7 @@ function updateRemotes(dt: number, now: number): void {
       // pings continue on the reliable lane. Retain that live actor, but do not
       // trust PeerJS `open` forever after a renderer crash leaves a zombie RTC
       // channel with no authenticated messages.
-      if (activeGuestIds?.has(id)) continue;
+      if (activeRemoteIds?.has(id)) continue;
       removeRemote(id, 'timed out');
       continue;
     }

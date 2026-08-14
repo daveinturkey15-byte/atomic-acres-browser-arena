@@ -123,9 +123,11 @@ describe('same-browser hosted active-match recovery integration', () => {
     expect(ack).toContain("hostLobbyMembers.set(message.by, { ...member, connected: true })");
     expect(ack).toContain("broadcastHostLobby(privateLobbySnapshot?.phase ?? 'active')");
     const remotes = functionBody('updateRemotes', 'teamScores');
-    expect(remotes).toContain("network.role === 'host' ? new Set(network.activePlayerIds(12_000, now)) : null");
-    expect(remotes).toContain('if (activeGuestIds?.has(id)) continue;');
-    expect(remotes.indexOf('if (activeGuestIds?.has(id)) continue;'))
+    expect(remotes).toContain("? new Set(network.activePlayerIds(12_000, now))");
+    expect(remotes).toContain("network.role === 'client' && network.activeHost(12_000, now) && privateLobbySnapshot?.hostId");
+    expect(remotes).toContain('new Set([privateLobbySnapshot.hostId])');
+    expect(remotes).toContain('if (activeRemoteIds?.has(id)) continue;');
+    expect(remotes.indexOf('if (activeRemoteIds?.has(id)) continue;'))
       .toBeLessThan(remotes.indexOf("removeRemote(id, 'timed out')"));
   });
 

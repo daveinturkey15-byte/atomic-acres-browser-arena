@@ -729,6 +729,15 @@ export class ArenaNetwork {
       .map((bundle) => bundle.playerId);
   }
 
+  activeHost(maxSilenceMs: number, nowMonoMs = performance.now()): boolean {
+    return this.role === 'client'
+      && Boolean(this.hostEventConnection?.open)
+      && Number.isFinite(maxSilenceMs) && maxSilenceMs >= 0
+      && Number.isFinite(nowMonoMs)
+      && this.lastValidHostMessageMonoMs !== null
+      && nowMonoMs - this.lastValidHostMessageMonoMs <= maxSilenceMs;
+  }
+
   stateBufferedPressure(playerId?: string): number {
     const amount = this.role === 'client'
       ? this.hostStateConnection?.dataChannel?.bufferedAmount ?? this.hostEventConnection?.dataChannel?.bufferedAmount ?? 0
