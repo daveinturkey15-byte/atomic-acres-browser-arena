@@ -733,12 +733,12 @@ import {
   WINDOW_GLASS_DEBRIS_SETTLE_TOLERANCE_M,
   createFracturedWindowDebrisVisual,
   integrateWindowGlassDebrisFallback,
+  snapshotWindowGlassDebrisFallbackState,
   updateFracturedWindowDebrisVisual,
   windowGlassDebrisFallbackInterval,
   windowGlassDebrisFallbackSweepSupport,
   windowGlassDebrisLifecycleMode,
   windowGlassDebrisMilestoneAdmitted,
-  type WindowGlassDebrisFallbackState,
   type WindowGlassDebrisFallbackSupportCandidate,
 } from './window-glass-debris-presentation';
 import {
@@ -4020,12 +4020,12 @@ function updatePersistentWindowDebrisPhysics(_dt = 1 / SIMULATION_HZ): void {
         const stateStartedAt = entry.fallbackIntegratedAt ?? interval.stateStartAt;
         const captureStartedAt = Math.max(stateStartedAt, interval.captureStartAt);
         const initial = entry.lifecycleMilestones[0];
-        const retainedState: WindowGlassDebrisFallbackState = {
+        const retainedState = snapshotWindowGlassDebrisFallbackState({
           position: entry.root.position,
           velocity: entry.fallbackVelocity,
           rotation: entry.root.rotation,
           angular: entry.fallbackAngular,
-        };
+        });
         const supportCandidates = fallbackSupportCandidates
           ?? (fallbackSupportCandidates = windowDebrisFallbackSupportCandidates());
         const preCapture = integrateWindowGlassDebrisFallback(

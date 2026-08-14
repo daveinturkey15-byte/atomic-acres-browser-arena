@@ -106,6 +106,10 @@ describe('persistent physical house-window debris integration', () => {
     expect(update).toContain('retainedPolicyInterval !== null');
     expect(update).toContain('stateStartAt: entry.fallbackStateObservedAt,');
     expect(update).toContain('captureStartAt: Math.max(');
+    expect(update).toContain('const retainedState = snapshotWindowGlassDebrisFallbackState({');
+    expect(update).toContain('position: entry.root.position,');
+    expect(update).toContain('rotation: entry.root.rotation,');
+    expect(update).not.toContain('const retainedState: WindowGlassDebrisFallbackState = {');
     expect(preCapture).toBeGreaterThan(entryLoop);
     expect(capture).toBeGreaterThan(preCapture);
     expect(physicalRetire).toBeGreaterThan(capture);

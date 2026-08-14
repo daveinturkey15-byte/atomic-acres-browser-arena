@@ -158,6 +158,32 @@ export type WindowGlassDebrisFallbackInterval = Readonly<{
 }>;
 
 /**
+ * Freezes the Three.js presentation bridge into the pure fallback contract.
+ * Euler metadata is enumerable, so spreading or validating a live Euler would
+ * leak non-numeric fields such as `isEuler` and `_order` into the integrator.
+ */
+function snapshotWindowGlassDebrisFallbackVector(
+  vector: WindowGlassDebrisFallbackVector,
+): WindowGlassDebrisFallbackVector {
+  const snapshot = Object.freeze({ x: vector.x, y: vector.y, z: vector.z });
+  if (!Object.values(snapshot).every(Number.isFinite)) {
+    throw new TypeError('window glass debris fallback snapshot requires finite motion');
+  }
+  return snapshot;
+}
+
+export function snapshotWindowGlassDebrisFallbackState(
+  state: WindowGlassDebrisFallbackState,
+): WindowGlassDebrisFallbackState {
+  return Object.freeze({
+    position: snapshotWindowGlassDebrisFallbackVector(state.position),
+    velocity: snapshotWindowGlassDebrisFallbackVector(state.velocity),
+    rotation: snapshotWindowGlassDebrisFallbackVector(state.rotation),
+    angular: snapshotWindowGlassDebrisFallbackVector(state.angular),
+  });
+}
+
+/**
  * Derives the fallback interval from retained lifecycle timestamps, not from
  * the callback that happens to notice the boundary. The end remains the hard
  * retirement instant even when one sparse outer callback arrives later.
@@ -223,12 +249,7 @@ export function windowGlassDebrisFallbackInterval(sample: Readonly<{
 }
 
 function cloneFallbackState(state: WindowGlassDebrisFallbackState): WindowGlassDebrisFallbackState {
-  return Object.freeze({
-    position: Object.freeze({ ...state.position }),
-    velocity: Object.freeze({ ...state.velocity }),
-    rotation: Object.freeze({ ...state.rotation }),
-    angular: Object.freeze({ ...state.angular }),
-  });
+  return snapshotWindowGlassDebrisFallbackState(state);
 }
 
 function fallbackMovementReached(

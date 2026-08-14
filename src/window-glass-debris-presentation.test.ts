@@ -13,6 +13,7 @@ import {
   createFracturedWindowDebrisVisual,
   integrateWindowGlassDebrisFallback,
   prewarmFracturedWindowDebrisVisual,
+  snapshotWindowGlassDebrisFallbackState,
   updateFracturedWindowDebrisVisual,
   windowGlassDebrisLifecycleMode,
   windowGlassDebrisMilestoneAdmitted,
@@ -22,6 +23,45 @@ import {
 } from './window-glass-debris-presentation';
 
 describe('persistent window glass debris presentation', () => {
+  it('snapshots live Three.js vectors and Euler rotation as immutable plain xyz motion', () => {
+    const position = new THREE.Vector3(1.25, 2.5, -3.75);
+    const velocity = new THREE.Vector3(0.5, -0.75, 1);
+    const rotation = new THREE.Euler(0.1, 0.2, 0.3);
+    const angular = new THREE.Vector3(-0.4, 0.6, -0.8);
+    expect(Object.values(rotation).every(Number.isFinite)).toBe(false);
+
+    const snapshot = snapshotWindowGlassDebrisFallbackState({
+      position,
+      velocity,
+      rotation,
+      angular,
+    });
+    expect(snapshot).toEqual({
+      position: { x: 1.25, y: 2.5, z: -3.75 },
+      velocity: { x: 0.5, y: -0.75, z: 1 },
+      rotation: { x: 0.1, y: 0.2, z: 0.3 },
+      angular: { x: -0.4, y: 0.6, z: -0.8 },
+    });
+    expect(Object.keys(snapshot.rotation)).toEqual(['x', 'y', 'z']);
+    expect(Object.isFrozen(snapshot)).toBe(true);
+    expect([
+      snapshot.position,
+      snapshot.velocity,
+      snapshot.rotation,
+      snapshot.angular,
+    ].every(Object.isFrozen)).toBe(true);
+
+    position.set(99, 99, 99);
+    rotation.set(1, 1, 1);
+    expect(snapshot.position).toEqual({ x: 1.25, y: 2.5, z: -3.75 });
+    expect(snapshot.rotation).toEqual({ x: 0.1, y: 0.2, z: 0.3 });
+    expect(() => integrateWindowGlassDebrisFallback(
+      snapshot,
+      0.05,
+      () => ({ restY: null, source: null, impactFraction: null }),
+    )).not.toThrow();
+  });
+
   it('rejects a physics sleep above floor height and settles only at the floor', () => {
     expect(windowGlassDebrisSettleMode(2.4, 0.6, false)).toBe('physics-active');
     expect(windowGlassDebrisSettleMode(2.4, 0.6, true)).toBe('presentation-fall');
