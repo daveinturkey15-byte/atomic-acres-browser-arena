@@ -9,7 +9,7 @@
   "pagesPath": "channels/the-big-one",
   "runtimeFileCount": 515,
   "runtimeTreeSha256": "1a0e90676ffc411eaefeaebef0c970481aad416084a1dc21e9bf7de6de369196",
-  "guardPolicySha256": "bba72d6c98f5738ee169890416e3dcb9b94f5b8ecd5151da0c228029b2a1027a",
+  "guardPolicySha256": "71477a6ee2bffc6910edde8a63115e08433f922e92ec8a1c13bb9eff71612f42",
   "runtimeDigestPolicy": "Hash sorted path, NUL, blob bytes, NUL for every file beneath channels/the-big-one except channel-provenance.json; the complete published subtree contains 516 files including that provenance wrapper.",
   "basis": {
     "ownerAssessment": "Pass 70 is the exact published build immediately preceding the reported Pass 71 Quality-profile downgrade. This record does not claim Dave visually approved every Pass 70 frame.",
@@ -85,6 +85,12 @@
           "gitBlobSha": "533bcf0f2d6e4698964ad6a3ed3710ec08701e4b",
           "sha256": "992f7f8592b62f0a4bc3d161fd407c44801f2e9c0b8fe2beb5d99730d6c1feef",
           "classification": "Exact audited Pass 71 runtime composition at candidate A: owner-feedback gameplay and evidence wiring plus the final sparse-frame glass-debris lifecycle and exact crossbow impacted-pane line-of-sight exclusion. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no broader legacy-main variant is admitted."
+        },
+        {
+          "auditSourceSha": "e219fbfdd88d21b9a1ce5a84375bbf3c97a4f4ba",
+          "gitBlobSha": "6a8cfc22f4b837cf1534b9dc5fe18770f997844c",
+          "sha256": "9c6112cb57280fc8e5e6d781be874801b0ba30c3bcc6447c4e6ae72b01ed2678",
+          "classification": "Exact audited Pass 71 runtime composition at the final candidate A product freeze: retains the previously admitted owner-feedback and glass lifecycle wiring, adds the plain-data window-debris fallback snapshot, and binds Chopper exterior review tracking plus trusted-trigger-only bounded gunner aim and feedback evidence to current authoritative aircraft and gun-ray state. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted."
         }
       ]
     }

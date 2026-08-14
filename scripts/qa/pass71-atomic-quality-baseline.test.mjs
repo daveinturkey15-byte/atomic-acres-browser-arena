@@ -69,7 +69,7 @@ test('deterministic comparators reject path, byte, declaration, method, function
   assert.notDeepEqual(glbSceneSignature(minimalGlb('authored-material')), glbSceneSignature(minimalGlb('reduced-material')));
 });
 
-test('the full verifier fails closed on policy, texture, LOD, physics, preset and renderer mutations', { timeout: 120_000 }, () => {
+test('the full verifier fails closed on policy, audit metadata, runtime, texture, LOD, physics, preset and renderer mutations', { timeout: 120_000 }, () => {
   const temporaryRoot = mkdtempSync(join(tmpdir(), 'atomic-quality-baseline-'));
   const checkout = join(temporaryRoot, 'checkout');
   const safeTemporaryRoot = resolve(tmpdir());
@@ -89,6 +89,28 @@ test('the full verifier fails closed on policy, texture, LOD, physics, preset an
     assert.match(weakenedPolicy.problems.join('\n'), /guard policy drift/u);
 
     const runtimePath = 'src/legacy-main.ts';
+    const auditedRuntimeRecordPath = join(temporaryRoot, 'tampered-runtime-audit-record.json');
+    const auditedRuntimeRecord = JSON.parse(readFileSync(recordPath, 'utf8'));
+    const auditedRuntime = auditedRuntimeRecord.auditedSourceVariants
+      .find((specification) => specification.path === runtimePath);
+    const finalRuntimeVariant = auditedRuntime?.allowedVariants
+      .find((variant) => variant.auditSourceSha === 'e219fbfdd88d21b9a1ce5a84375bbf3c97a4f4ba');
+    assert.deepEqual(finalRuntimeVariant, {
+      auditSourceSha: 'e219fbfdd88d21b9a1ce5a84375bbf3c97a4f4ba',
+      gitBlobSha: '6a8cfc22f4b837cf1534b9dc5fe18770f997844c',
+      sha256: '9c6112cb57280fc8e5e6d781be874801b0ba30c3bcc6447c4e6ae72b01ed2678',
+      classification: 'Exact audited Pass 71 runtime composition at the final candidate A product freeze: retains the previously admitted owner-feedback and glass lifecycle wiring, adds the plain-data window-debris fallback snapshot, and binds Chopper exterior review tracking plus trusted-trigger-only bounded gunner aim and feedback evidence to current authoritative aircraft and gun-ray state. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted.',
+    });
+    finalRuntimeVariant.auditSourceSha = 'c08ccaa45ef7b2ba2655406d494b3b06d8c184ee';
+    writeFileSync(auditedRuntimeRecordPath, JSON.stringify(auditedRuntimeRecord));
+    const auditMetadataMutation = verifyAtomicQualityBaseline({ root: checkout, recordPath: auditedRuntimeRecordPath });
+    assert.equal(auditMetadataMutation.status, 'FAIL');
+    assert.match(auditMetadataMutation.problems.join('\n'), /guard policy drift/u);
+    assert.match(
+      auditMetadataMutation.problems.join('\n'),
+      /audited source variant does not match c08ccaa45ef7b2ba2655406d494b3b06d8c184ee: src\/legacy-main\.ts/u,
+    );
+
     const runtime = readFileSync(join(checkout, runtimePath));
     writeFileSync(join(checkout, runtimePath), Buffer.concat([runtime, Buffer.from('\n// unaudited Atomic Quality source mutation\n')]));
     const runtimeMutation = verifyAtomicQualityBaseline({ root: checkout, recordPath });
