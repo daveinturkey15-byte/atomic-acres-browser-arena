@@ -11140,13 +11140,17 @@ function onNetworkMessage(message: GameMessage): void {
           resetRemoteCombatInventory(admittedIncoming, grenadeCount);
         }
       }
+      const claimedContinuity = message.type === 'state' ? message.continuity : remote.continuity;
+      const hf296ContinuityResync = localMultiplayerQa && message.type === 'state'
+        && Number.isSafeInteger(claimedContinuity)
+        && claimedContinuity === remote.continuity + 1;
       const movement = admitRemoteSnapshotMovement(
         remote.snapshot,
         admittedIncoming,
         now,
         remote.lastSeen,
         remote.claimEligibleAt,
-        respawned,
+        respawned || hf296ContinuityResync,
       );
       if (!movement.accepted) {
         recordMatchDiagnostic('state-reconciliation', 'rejected', {
@@ -11207,7 +11211,6 @@ function onNetworkMessage(message: GameMessage): void {
         remote.claimRequiresCoreExit = false;
         remote.claimEligibleAt = Math.max(remote.claimEligibleAt, now + 1_500);
       }
-      const claimedContinuity = message.type === 'state' ? message.continuity : remote.continuity;
       let registeredActorLifeId = network.role === 'host' ? killstreakRuntime.actorLifeId(incoming.id) : null;
       if (network.role === 'host' && localMultiplayerQa && movement.resynchronized
         && registeredActorLifeId !== null && claimedContinuity === registeredActorLifeId + 1) {
