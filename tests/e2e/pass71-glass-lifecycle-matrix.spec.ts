@@ -8,6 +8,11 @@ const PROFILES = [
 ] as const;
 const PANE_COUNT = 6;
 const LIVE_CROSSBOW_IMPACT_TIMEOUT_MS = 2_000;
+const DEBRIS_SPAWN_TIMEOUT_MS = 5_000;
+const DEBRIS_PHYSICS_TIMEOUT_MS = 1_500;
+const DEBRIS_MOVEMENT_TIMEOUT_MS = 2_500;
+const DEBRIS_SETTLE_TIMEOUT_MS = 4_250;
+const DEBRIS_MAX_LIFETIME_MS = 4_500;
 const ALL_PANE_INDEXES = Object.freeze(Array.from({ length: PANE_COUNT }, (_, index) => index));
 const HF304_COMPONENT_PATH = process.env.PASS71_HF304_BROWSER_COMPONENT_PATH
   ? resolve(process.env.PASS71_HF304_BROWSER_COMPONENT_PATH)
@@ -127,6 +132,28 @@ type PaneObservation = Readonly<{
 type CrossbowImpactSample = Readonly<{
   bolt: Readonly<{ impacted: boolean; authority: boolean; detonatesInMs: number }>;
   pane: PaneObservation;
+}>;
+
+type DebrisLifecycleSample = Readonly<{
+  id: string;
+  windowId: string;
+  position: readonly number[];
+  visible: boolean;
+  physical: boolean;
+  physicsActive: boolean;
+  receivedPhysicsPose: boolean;
+  fallbackSettled: boolean;
+  support: Readonly<{ source: string | null; restY: number | null }>;
+  ageMs: number;
+  noProgressMs: number;
+  fallbackStartedAt: number | null;
+  settledAt: number | null;
+}>;
+
+type DebrisLifecycleReceipt = Readonly<{
+  initial: DebrisLifecycleSample;
+  moving: DebrisLifecycleSample;
+  settled: DebrisLifecycleSample;
 }>;
 
 async function deploy(
@@ -291,24 +318,212 @@ async function assertPaneBreached(
   return observePane(page, index);
 }
 
-async function observePaneDebris(page: Page, index: number): Promise<any | null> {
-  return page.evaluate((paneIndex) => {
-    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
-    const debrisId = snapshot.breakableWindows[paneIndex]?.persistentDebrisId;
-    return debrisId
-      ? snapshot.persistentWindowDebris.find((entry: any) => entry.id === debrisId) ?? null
-      : null;
-  }, index);
+async function armPaneDebrisLifecycleObservation(page: Page, index: number, label: string): Promise<void> {
+  await page.evaluate((options) => {
+    type ObserverOutcome = Readonly<{
+      receipt: DebrisLifecycleReceipt | null;
+      error: string | null;
+    }>;
+    type ObserverWindow = Window & {
+      __PASS71_GLASS_DEBRIS_OBSERVER__?: Readonly<{
+        outcome: Promise<ObserverOutcome>;
+        cancel: () => void;
+      }>;
+    };
+    const observerWindow = window as ObserverWindow;
+    observerWindow.__PASS71_GLASS_DEBRIS_OBSERVER__?.cancel();
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const armedAt = performance.now();
+    let animationFrame = 0;
+    let spawnDeadline = 0;
+    let finished = false;
+    let sawDebris = false;
+    let initial: DebrisLifecycleSample | null = null;
+    let moving: DebrisLifecycleSample | null = null;
+    let lastSample: DebrisLifecycleSample | null = null;
+    let initialObservedAt = 0;
+    let movingObservedAt = 0;
+    let cancelLifecycle = (): void => undefined;
+
+    const cloneSample = (sample: DebrisLifecycleSample): DebrisLifecycleSample => Object.freeze({
+      ...sample,
+      position: Object.freeze([...sample.position]),
+      support: Object.freeze({ ...sample.support }),
+    });
+    const describeSample = (sample: DebrisLifecycleSample | null): string => JSON.stringify(sample
+      ? {
+        ageMs: Math.round(sample.ageMs),
+        position: sample.position,
+        physical: sample.physical,
+        physicsActive: sample.physicsActive,
+        receivedPhysicsPose: sample.receivedPhysicsPose,
+        fallbackSettled: sample.fallbackSettled,
+        support: sample.support,
+      }
+      : { ageMs: null, armedElapsedMs: Math.round(performance.now() - armedAt), state: 'not-spawned' });
+    const lifecycle = new Promise<DebrisLifecycleReceipt>((resolveLifecycle, rejectLifecycle) => {
+      const finish = (result: DebrisLifecycleReceipt | Error): void => {
+        if (finished) return;
+        finished = true;
+        window.cancelAnimationFrame(animationFrame);
+        window.clearTimeout(spawnDeadline);
+        if (result instanceof Error) rejectLifecycle(result);
+        else resolveLifecycle(result);
+      };
+      cancelLifecycle = (): void => finish(new Error(
+        `${options.label}: debris observation cancelled; last=${describeSample(lastSample)}`,
+      ));
+
+      const sampleAfterGameFrame = (): void => {
+        const current = debug.sampleWindowDebrisLifecycle(options.paneIndex) as DebrisLifecycleSample | null;
+        const now = performance.now();
+        if (!current) {
+          if (sawDebris) {
+            finish(new Error(
+              `${options.label}: debris disappeared before a valid settled sample; last=${describeSample(lastSample)}`,
+            ));
+            return;
+          }
+          if (now - armedAt >= options.spawnTimeoutMs) {
+            finish(new Error(
+              `${options.label}: no debris spawned within ${options.spawnTimeoutMs}ms; last=${describeSample(null)}`,
+            ));
+            return;
+          }
+          animationFrame = window.requestAnimationFrame(sampleAfterGameFrame);
+          return;
+        }
+        if (!sawDebris) {
+          sawDebris = true;
+          window.clearTimeout(spawnDeadline);
+        }
+        lastSample = cloneSample(current);
+        if (!Number.isFinite(current.ageMs) || !current.position.every(Number.isFinite)) {
+          finish(new Error(
+            `${options.label}: debris published a non-finite lifecycle sample; last=${describeSample(lastSample)}`,
+          ));
+          return;
+        }
+        if (current.ageMs >= options.maxLifetimeMs) {
+          finish(new Error(
+            `${options.label}: debris exceeded the ${options.maxLifetimeMs}ms lifetime; last=${describeSample(lastSample)}`,
+          ));
+          return;
+        }
+
+        if (!initial) {
+          if (current.ageMs >= options.physicsTimeoutMs) {
+            finish(new Error(
+              `${options.label}: no collision-backed physics pose within ${options.physicsTimeoutMs}ms; last=${describeSample(lastSample)}`,
+            ));
+            return;
+          }
+          if (current.visible === true
+            && current.physical === true
+            && current.physicsActive === true
+            && current.receivedPhysicsPose === true
+            && current.fallbackSettled === false) {
+            initial = cloneSample(current);
+            initialObservedAt = now;
+          }
+        }
+
+        if (initial && !moving) {
+          if (now - initialObservedAt >= options.movementTimeoutMs) {
+            finish(new Error(
+              `${options.label}: no falling debris motion within ${options.movementTimeoutMs}ms; last=${describeSample(lastSample)}`,
+            ));
+            return;
+          }
+          const displacement = Math.hypot(
+            current.position[0] - initial.position[0],
+            current.position[1] - initial.position[1],
+            current.position[2] - initial.position[2],
+          );
+          if (current.fallbackSettled === false
+            && current.position[1] <= initial.position[1] - 0.025
+            && displacement >= 0.04) {
+            moving = cloneSample(current);
+            movingObservedAt = now;
+          }
+        }
+
+        if (initial && moving) {
+          if (now - movingObservedAt >= options.settleTimeoutMs) {
+            finish(new Error(
+              `${options.label}: no supported settled debris within ${options.settleTimeoutMs}ms; last=${describeSample(lastSample)}`,
+            ));
+            return;
+          }
+          const restY = current.support.restY;
+          const supportSource = current.support.source;
+          const collisionAuthoritativeSupport = supportSource === 'world-floor'
+            || supportSource?.startsWith('world-collider:') === true;
+          if (current.visible === true
+            && current.physical === false
+            && current.physicsActive === false
+            && current.fallbackSettled === true
+            && collisionAuthoritativeSupport
+            && typeof restY === 'number'
+            && Number.isFinite(restY)
+            && Math.abs(current.position[1] - restY) <= 0.04) {
+            finish(Object.freeze({ initial, moving, settled: cloneSample(current) }));
+            return;
+          }
+        }
+        animationFrame = window.requestAnimationFrame(sampleAfterGameFrame);
+      };
+
+      spawnDeadline = window.setTimeout(() => finish(new Error(
+        `${options.label}: no debris spawned within ${options.spawnTimeoutMs}ms; last=${describeSample(null)}`,
+      )), options.spawnTimeoutMs);
+      animationFrame = window.requestAnimationFrame(sampleAfterGameFrame);
+    });
+    const outcome = lifecycle.then<ObserverOutcome>(
+      (receipt) => Object.freeze({ receipt, error: null }),
+      (error: unknown) => Object.freeze({
+        receipt: null,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+    observerWindow.__PASS71_GLASS_DEBRIS_OBSERVER__ = Object.freeze({
+      outcome,
+      cancel: () => cancelLifecycle(),
+    });
+  }, {
+    paneIndex: index,
+    label,
+    spawnTimeoutMs: DEBRIS_SPAWN_TIMEOUT_MS,
+    physicsTimeoutMs: DEBRIS_PHYSICS_TIMEOUT_MS,
+    movementTimeoutMs: DEBRIS_MOVEMENT_TIMEOUT_MS,
+    settleTimeoutMs: DEBRIS_SETTLE_TIMEOUT_MS,
+    maxLifetimeMs: DEBRIS_MAX_LIFETIME_MS,
+  });
 }
 
-async function assertDebrisMovesAndSettles(page: Page, index: number, label: string): Promise<any> {
-  await expect.poll(async () => {
-    const current = await observePaneDebris(page, index);
-    return current?.physical === true
-      && current.physicsActive === true
-      && current.receivedPhysicsPose === true;
-  }, { timeout: 1_500 }).toBe(true);
-  const initial = await observePaneDebris(page, index);
+async function readPaneDebrisLifecycleObservation(page: Page, label: string): Promise<DebrisLifecycleReceipt> {
+  const outcome = await page.evaluate(async () => {
+    const observerWindow = window as Window & {
+      __PASS71_GLASS_DEBRIS_OBSERVER__?: Readonly<{
+        outcome: Promise<Readonly<{
+          receipt: DebrisLifecycleReceipt | null;
+          error: string | null;
+        }>>;
+        cancel: () => void;
+      }>;
+    };
+    const observer = observerWindow.__PASS71_GLASS_DEBRIS_OBSERVER__;
+    if (!observer) return { receipt: null, error: 'debris lifecycle observer was not armed' };
+    try {
+      return await observer.outcome;
+    } finally {
+      observer.cancel();
+      delete observerWindow.__PASS71_GLASS_DEBRIS_OBSERVER__;
+    }
+  });
+  expect(outcome.error, label).toBeNull();
+  if (!outcome.receipt) throw new Error(`${label}: debris lifecycle observer returned no receipt`);
+  const { initial, moving, settled } = outcome.receipt;
   expect(initial, `${label}: retained debris begins on collision-backed physics`).toMatchObject({
     visible: true,
     physical: true,
@@ -317,36 +532,28 @@ async function assertDebrisMovesAndSettles(page: Page, index: number, label: str
     fallbackSettled: false,
   });
   expect(initial.position.every(Number.isFinite), `${label}: finite initial debris position`).toBe(true);
-
-  await expect.poll(async () => {
-    const current = await observePaneDebris(page, index);
-    if (!current) return false;
-    const displacement = Math.hypot(
-      current.position[0] - initial.position[0],
-      current.position[1] - initial.position[1],
-      current.position[2] - initial.position[2],
-    );
-    return current.position[1] <= initial.position[1] - 0.025 && displacement >= 0.04;
-  }, { timeout: 2_500 }).toBe(true);
-  const moving = await observePaneDebris(page, index);
-
-  await expect.poll(async () => {
-    const current = await observePaneDebris(page, index);
-    const restY = current?.support?.restY;
-    return current?.fallbackSettled === true
-      && current.physicsActive === false
-      && current.physical === false
-      && typeof restY === 'number'
-      && Math.abs(current.position[1] - restY) <= 0.04;
-  }, { timeout: 4_250 }).toBe(true);
-  const settled = await observePaneDebris(page, index);
-  expect(settled, `${label}: shards settle on authored support`).toMatchObject({
+  expect(moving.fallbackSettled, `${label}: in-flight sample precedes fallback settlement`).toBe(false);
+  expect(moving.position[1], `${label}: shards fall`).toBeLessThanOrEqual(initial.position[1] - 0.025);
+  expect(Math.hypot(
+    moving.position[0] - initial.position[0],
+    moving.position[1] - initial.position[1],
+    moving.position[2] - initial.position[2],
+  ), `${label}: shards move`).toBeGreaterThanOrEqual(0.04);
+  expect(settled, `${label}: shards settle on collision-authoritative support`).toMatchObject({
     visible: true,
     physical: false,
     physicsActive: false,
     fallbackSettled: true,
   });
-  return { initial, moving, settled };
+  expect(
+    settled.support.source === 'world-floor'
+      || settled.support.source?.startsWith('world-collider:') === true,
+    `${label}: settled support source`,
+  ).toBe(true);
+  expect(Number.isFinite(settled.support.restY), `${label}: finite settled support height`).toBe(true);
+  expect(Math.abs(settled.position[1] - (settled.support.restY as number)), `${label}: supported rest pose`)
+    .toBeLessThanOrEqual(0.04);
+  return outcome.receipt;
 }
 
 async function assertDebrisRetired(
@@ -465,13 +672,14 @@ for (const profile of PROFILES) {
     let lifecycle: unknown = null;
     for (let pane = 0; pane < PANE_COUNT; pane += 1) {
       const before = await observePane(page, pane);
+      if (pane === 0) await armPaneDebrisLifecycleObservation(page, pane, `${profile.label}/bullet`);
       await page.evaluate((paneIndex) => {
         const debug = window.__ATOMIC_ACRES_DEBUG__;
         debug.stageWindow(paneIndex, 4);
         debug.fireOnce();
       }, pane);
       await assertPaneBreached(page, pane, `${profile.label}/bullet`, before.rapierDynamicColliders, 'breached');
-      if (pane === 0) lifecycle = await assertDebrisMovesAndSettles(page, pane, `${profile.label}/bullet`);
+      if (pane === 0) lifecycle = await readPaneDebrisLifecycleObservation(page, `${profile.label}/bullet`);
       await page.waitForTimeout(130);
     }
     const retired = await assertDebrisRetired(page, `${profile.label}/bullet`);
@@ -498,6 +706,7 @@ for (const profile of PROFILES) {
     let lifecycle: unknown = null;
     for (let pane = 0; pane < PANE_COUNT; pane += 1) {
       const before = await observePane(page, pane);
+      if (pane === 0) await armPaneDebrisLifecycleObservation(page, pane, `${profile.label}/knife`);
       const accepted = await page.evaluate((paneIndex) => {
         const debug = window.__ATOMIC_ACRES_DEBUG__;
         debug.stageWindow(paneIndex, 1.25);
@@ -505,7 +714,7 @@ for (const profile of PROFILES) {
       }, pane);
       expect(accepted, `${profile.label}/knife pane ${pane} admitted`).toBe(true);
       await assertPaneBreached(page, pane, `${profile.label}/knife`, before.rapierDynamicColliders, 'breached');
-      if (pane === 0) lifecycle = await assertDebrisMovesAndSettles(page, pane, `${profile.label}/knife`);
+      if (pane === 0) lifecycle = await readPaneDebrisLifecycleObservation(page, `${profile.label}/knife`);
       await page.waitForTimeout(670);
     }
     const retired = await assertDebrisRetired(page, `${profile.label}/knife`);
@@ -540,11 +749,12 @@ for (const profile of PROFILES) {
     // Finish with all six concurrently breached so the four presentation-only
     // fallbacks beyond the two-body Rapier partition are exercised together.
     await resetBreakableWindows(page);
+    await armPaneDebrisLifecycleObservation(page, 0, `${profile.label}/grenade`);
     await page.evaluate(() => {
       const debug = window.__ATOMIC_ACRES_DEBUG__;
       for (let pane = 0; pane < 6; pane += 1) debug.detonateGrenadeAtWindow(pane);
     });
-    const lifecycle = await assertDebrisMovesAndSettles(page, 0, `${profile.label}/grenade`);
+    const lifecycle = await readPaneDebrisLifecycleObservation(page, `${profile.label}/grenade`);
     const retired = await assertDebrisRetired(page, `${profile.label}/grenade`);
     const receipt = { lifecycle, retired };
 
@@ -577,6 +787,7 @@ for (const profile of PROFILES) {
       const impactCountBefore = await page.evaluate(() => (
         (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).timedMapWeapons.flareProjectiles.impactCount
       ));
+      if (pane === 0) await armPaneDebrisLifecycleObservation(page, pane, `${profile.label}/flare-gun`);
       await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
       const breached = await assertPaneBreached(
         page,
@@ -589,7 +800,7 @@ for (const profile of PROFILES) {
       await expect.poll(async () => page.evaluate(() => (
         (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).timedMapWeapons.flareProjectiles.impactCount
       )), { timeout: 2_000 }).toBeGreaterThan(impactCountBefore);
-      if (pane === 0) lifecycle = await assertDebrisMovesAndSettles(page, pane, `${profile.label}/flare-gun`);
+      if (pane === 0) lifecycle = await readPaneDebrisLifecycleObservation(page, `${profile.label}/flare-gun`);
       paneReceipts.push({ id: breached.id, phase: breached.authority.phase });
     }
 
@@ -636,6 +847,9 @@ for (const profile of PROFILES) {
       await waitForWeaponReady(page, 'explosive-crossbow');
       await page.evaluate((paneIndex) => window.__ATOMIC_ACRES_DEBUG__.stageWindow(paneIndex, 6), pane);
       const before = await observePane(page, pane);
+      if (pane === 0) {
+        await armPaneDebrisLifecycleObservation(page, pane, `${profile.label}/explosive-crossbow`);
+      }
       const impactSample = await fireAndObserveLiveCrossbowImpact(page, pane);
       expect(impactSample.bolt).toMatchObject({ impacted: true, authority: true });
       expect(impactSample.bolt.detonatesInMs).toBeGreaterThan(0);
@@ -664,7 +878,9 @@ for (const profile of PROFILES) {
         'detached',
         true,
       );
-      if (pane === 0) lifecycle = await assertDebrisMovesAndSettles(page, pane, `${profile.label}/explosive-crossbow`);
+      if (pane === 0) {
+        lifecycle = await readPaneDebrisLifecycleObservation(page, `${profile.label}/explosive-crossbow`);
+      }
       paneReceipts.push({ id: breached.id, phase: breached.authority.phase });
     }
 

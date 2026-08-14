@@ -12719,6 +12719,32 @@ function windowDebrisSupport(
   return Object.freeze({ restY: supportY === null ? null : supportY + halfExtents.y, source });
 }
 
+function samplePersistentWindowDebrisLifecycle(entry: PersistentWindowDebris) {
+  const now = performance.now();
+  return Object.freeze({
+    id: entry.id,
+    windowId: entry.windowId,
+    position: Object.freeze(entry.root.position.toArray()),
+    visible: entry.root.visible,
+    physical: characterPhysics?.majorDebrisSnapshots().some((snapshot) => snapshot.id === entry.id) ?? false,
+    physicsActive: entry.physicsActive,
+    receivedPhysicsPose: entry.receivedPhysicsPose,
+    fallbackSettled: entry.fallbackSettled,
+    support: Object.freeze({ source: entry.fallbackSupportSource, restY: entry.fallbackRestY }),
+    ageMs: Math.max(0, now - entry.spawnedAt),
+    noProgressMs: Math.max(0, now - entry.lastProgressAt),
+    fallbackStartedAt: entry.fallbackStartedAt,
+    settledAt: entry.settledAt,
+  });
+}
+
+function sampleWindowDebrisLifecycle(paneIndex: number) {
+  const pane = Number.isInteger(paneIndex) ? arena.breakableWindows[paneIndex] : undefined;
+  if (!pane) return null;
+  const entry = persistentWindowDebris.get(persistentWindowDebrisId(pane.id));
+  return entry ? samplePersistentWindowDebrisLifecycle(entry) : null;
+}
+
 async function withStagedWindowGlassDebrisPool(
   sceneGeneration: number,
   submit: (stage: THREE.Group) => Promise<void>,
@@ -27045,6 +27071,7 @@ const debugWindow = window as Window & {
     sampleHf296ActionProgress: () => ReturnType<typeof sampleHf296ActionProgress>;
     sampleHf296RemoteProjection: () => ReturnType<typeof sampleHf296RemoteProjection>;
     sampleHf296ColliderField: () => ReturnType<typeof sampleHf296ColliderField>;
+    sampleWindowDebrisLifecycle: (paneIndex: number) => ReturnType<typeof sampleWindowDebrisLifecycle>;
     stageHf296ContactAction: (action: Hf296ContactAction) => ReturnType<typeof sampleHf296FireIdentity>;
     traceBallistics: (
       weapon: WeaponId,
@@ -28849,6 +28876,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleHf296ActionProgress,
   sampleHf296RemoteProjection,
   sampleHf296ColliderField,
+  sampleWindowDebrisLifecycle,
   stageHf296ContactAction,
   snapshot: () => ({
     bootstrap: {
@@ -29674,21 +29702,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         maxLifetimeMs: WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS,
       },
     },
-    persistentWindowDebris: [...persistentWindowDebris.values()].map((entry) => ({
-      id: entry.id,
-      windowId: entry.windowId,
-      position: entry.root.position.toArray(),
-      visible: entry.root.visible,
-      physical: characterPhysics?.majorDebrisSnapshots().some((snapshot) => snapshot.id === entry.id) ?? false,
-      physicsActive: entry.physicsActive,
-      receivedPhysicsPose: entry.receivedPhysicsPose,
-      fallbackSettled: entry.fallbackSettled,
-      support: { source: entry.fallbackSupportSource, restY: entry.fallbackRestY },
-      ageMs: Math.max(0, performance.now() - entry.spawnedAt),
-      noProgressMs: Math.max(0, performance.now() - entry.lastProgressAt),
-      fallbackStartedAt: entry.fallbackStartedAt,
-      settledAt: entry.settledAt,
-    })),
+    persistentWindowDebris: [...persistentWindowDebris.values()].map(samplePersistentWindowDebrisLifecycle),
     physicalCover: arena.physicalCover.map((cover) => ({
       id: cover.id,
       bounds: { ...cover.bounds },

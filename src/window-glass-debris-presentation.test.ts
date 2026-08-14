@@ -216,6 +216,47 @@ describe('persistent window glass debris presentation', () => {
     expect(support).not.toContain("source = 'arena-bound'");
   });
 
+  it('arms a narrow in-page lifecycle observer before every covered first-pane action', () => {
+    const source = readFileSync('src/legacy-main.ts', 'utf8');
+    const browser = readFileSync('tests/e2e/pass71-glass-lifecycle-matrix.spec.ts', 'utf8');
+    const observerStart = browser.indexOf('async function armPaneDebrisLifecycleObservation');
+    const observerEnd = browser.indexOf('\nasync function readPaneDebrisLifecycleObservation', observerStart);
+    const observer = browser.slice(observerStart, observerEnd);
+    expect(source).toContain('sampleWindowDebrisLifecycle: (paneIndex: number)');
+    expect(source).toContain('persistentWindowDebris.get(persistentWindowDebrisId(pane.id))');
+    expect(observer).toContain('debug.sampleWindowDebrisLifecycle(options.paneIndex)');
+    expect(observer).toContain('window.requestAnimationFrame(sampleAfterGameFrame)');
+    expect(observer).not.toContain('debug.snapshot()');
+    expect(observer).toContain('debris disappeared before a valid settled sample');
+    expect(observer).toContain('last=${describeSample(lastSample)}');
+    expect(observer).toContain('current.physical === true');
+    expect(observer).toContain("supportSource === 'world-floor'");
+    expect(observer).toContain("supportSource?.startsWith('world-collider:') === true");
+    expect(observer).toContain('finish(Object.freeze({ initial, moving, settled: cloneSample(current) }))');
+    expect(browser).toContain('const DEBRIS_PHYSICS_TIMEOUT_MS = 1_500;');
+    expect(browser).toContain('const DEBRIS_MOVEMENT_TIMEOUT_MS = 2_500;');
+    expect(browser).toContain('const DEBRIS_SETTLE_TIMEOUT_MS = 4_250;');
+    expect(browser).toContain('const DEBRIS_MAX_LIFETIME_MS = 4_500;');
+    expect(browser.match(/await armPaneDebrisLifecycleObservation\(/gu)).toHaveLength(5);
+    expect(browser.match(/await readPaneDebrisLifecycleObservation\(/gu)).toHaveLength(5);
+
+    for (const [title, action] of [
+      ['all six authored panes breach by bullet', 'debug.fireOnce();'],
+      ['all six authored panes breach by knife', 'return debug.melee().accepted;'],
+      ['all six authored panes breach by grenade', 'for (let pane = 0; pane < 6; pane += 1) debug.detonateGrenadeAtWindow(pane);'],
+      ['real Flare Gun impacts breach all six Skyline panes', 'await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());'],
+      ['real explosive-crossbow impact stays solid until detonation', 'const impactSample = await fireAndObserveLiveCrossbowImpact(page, pane);'],
+    ] as const) {
+      const start = browser.indexOf(title);
+      const end = browser.indexOf('\n  test(', start);
+      const testCase = browser.slice(start, end < 0 ? browser.length : end);
+      expect(start, title).toBeGreaterThanOrEqual(0);
+      expect(testCase.indexOf('await armPaneDebrisLifecycleObservation('), title).toBeGreaterThanOrEqual(0);
+      expect(testCase.indexOf('await armPaneDebrisLifecycleObservation('), title)
+        .toBeLessThan(testCase.indexOf(action));
+    }
+  });
+
   it('prewarms zero-light world glass and impact programs before staging the flare PointLight', () => {
     const source = readFileSync('src/legacy-main.ts', 'utf8');
     const start = source.indexOf('async function prewarmArenaBoundGameplayPresentations');
