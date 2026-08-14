@@ -45,6 +45,10 @@ const PRODUCTION_TS_EXCEPTIONS = Object.freeze({
   'src/audio.ts': Object.freeze(['src/audio-combat-prewarm.test.ts', 'src/audio-continuous-ownership.test.ts', 'src/audio-output-probe.test.ts']),
   'src/bootstrap.ts': Object.freeze(['src/project-map.test.ts', 'src/release-topology.test.ts']),
   'src/legacy-main.ts': Object.freeze(['src/presentation-prewarm-contract.test.ts', 'src/pass71-first-action-release-gate.test.ts']),
+  'src/network.ts': Object.freeze([
+    'src/pass71-hf307-chopper-mg-release-evidence.test.ts',
+    'src/pass71-hf308-chopper-missile-release-evidence.test.ts',
+  ]),
   'src/release-identity.ts': Object.freeze(['src/release-channel.test.ts', 'src/release-topology.test.ts']),
   'src/style.css': Object.freeze(['src/sticky-victim-feedback.test.ts', 'src/pass71-nuke-warning-integration.test.ts']),
   'src/ui/pass65-hud.css': Object.freeze(['src/ui/pass65-hud-layout.test.ts']),

@@ -96,6 +96,13 @@ describe('Pass 71 HF-312 bounded consolidation evidence', () => {
     const headSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
     const audit = pass71Hf312SourceAuditAtSource(process.cwd(), headSha);
     assert.deepEqual(audit.unownedProductionPaths, []);
+    assert.deepEqual(
+      audit.ownership.find(({ path }) => path === 'src/network.ts')?.ownerTests,
+      [
+        'src/pass71-hf307-chopper-mg-release-evidence.test.ts',
+        'src/pass71-hf308-chopper-missile-release-evidence.test.ts',
+      ],
+    );
     assert.equal(audit.acceptanceManifestAbsent, true);
     assert(audit.changedProductionPathCount > 0);
   });
