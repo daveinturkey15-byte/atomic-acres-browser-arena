@@ -60,9 +60,18 @@ describe('Pass 71 frame-action baseline', () => {
     expect(budget.maximumActionMs).toBe(33.333);
     expect(budget.maximumSynchronousActionMs).toBe(33.333);
     expect(budget.maximumFrameWorkMs).toBe(33.333);
-    expect(budget).toMatchObject({
+    expect(budget).toEqual({
       evidenceMode: NATIVE_NO_FREEZE_FRAME_ACTION_MODE,
       releaseAcceptanceModeEligible: true,
+      targetFrameBudgetMs: 16.667,
+      maximumActionMs: 33.333,
+      maximumSynchronousActionMs: 33.333,
+      maximumFrameWorkMs: 33.333,
+      maximumAnimationFrameGapMs: 33.333,
+      maximumFirstSubmissionDelayMs: 33.333,
+      maximumFirstCompletionDelayMs: 33.333,
+      maximumPendingForMs: 33.333,
+      referenceBaselineMs: 16,
     });
   });
 
@@ -112,8 +121,8 @@ describe('Pass 71 frame-action baseline', () => {
       maximumSynchronousActionMs: 33.333,
       maximumFrameWorkMs: 50,
       maximumAnimationFrameGapMs: 161.667,
-      maximumFirstSubmissionDelayMs: 156.667,
-      maximumFirstCompletionDelayMs: 156.667,
+      maximumFirstSubmissionDelayMs: 161.667,
+      maximumFirstCompletionDelayMs: 161.667,
       maximumPendingForMs: 16.667,
     });
     expect(frameActionBudgetFailures(budget, {
@@ -123,9 +132,67 @@ describe('Pass 71 frame-action baseline', () => {
       maximumAnimationFrameGapMs: 161.666,
       maximumFrameWorkMs: 49.999,
       maximumPendingForMs: 16.666,
-      firstSubmissionDelayMs: 156.666,
-      firstCompletionDelayMs: 156.666,
+      firstSubmissionDelayMs: 161.666,
+      firstCompletionDelayMs: 161.666,
     })).toEqual([]);
+  });
+
+  it('uses the completed software baseline p95 when one first-frontier sample is unrepresentatively fast', () => {
+    const windowsSwiftShaderBaseline = {
+      ...baseline([119.6, 122.7, 124, 124.1, 127.6, 118.5, 120.5, 129.4, 122.3, 121.3], 1_230),
+      firstPresentedFrameDelayMs: 119.6,
+      firstSubmissionDelayMs: 119.6,
+      firstCompletionDelayMs: 119.6,
+    };
+    const budget = deriveFrameActionBudget(
+      windowsSwiftShaderBaseline,
+      SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE,
+    );
+    const observedSemtexAction = {
+      internalHandlerSyncMs: 2,
+      outerHandlerSyncMs: 2.6,
+      eventToNextAnimationFrameMs: 102.3,
+      maximumAnimationFrameGapMs: 235,
+      maximumFrameWorkMs: 34.9,
+      maximumPendingForMs: 0,
+      firstSubmissionDelayMs: 145.1,
+      firstCompletionDelayMs: 145.1,
+    };
+
+    expect(budget).toMatchObject({
+      evidenceMode: SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE,
+      releaseAcceptanceModeEligible: false,
+      maximumAnimationFrameGapMs: 146.067,
+      maximumFirstSubmissionDelayMs: 146.067,
+      maximumFirstCompletionDelayMs: 146.067,
+      maximumPendingForMs: 16.667,
+      maximumSynchronousActionMs: 33.333,
+      maximumFrameWorkMs: 50,
+    });
+    expect(frameActionBudgetFailures(budget, observedSemtexAction)).toEqual([]);
+    expect(frameActionBudgetFailures(budget, {
+      ...observedSemtexAction,
+      firstSubmissionDelayMs: 146.067,
+    })).toContain('first-submission-delay:146.067>=146.067');
+    expect(frameActionBudgetFailures(budget, {
+      ...observedSemtexAction,
+      firstCompletionDelayMs: 146.067,
+    })).toContain('first-completion-delay:146.067>=146.067');
+  });
+
+  it('retains a slower corresponding first-frontier sample as the software threshold anchor', () => {
+    const completedBaseline = {
+      ...baseline(Array.from({ length: 10 }, () => 120), 1_200),
+      firstSubmissionDelayMs: 140,
+      firstCompletionDelayMs: 130,
+    };
+    const budget = deriveFrameActionBudget(
+      completedBaseline,
+      SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE,
+    );
+
+    expect(budget.maximumFirstSubmissionDelayMs).toBe(156.667);
+    expect(budget.maximumFirstCompletionDelayMs).toBe(146.667);
   });
 
   it('fails software-CI semantics closed on action-induced overhead and absolute handler/frame-work regressions', () => {
@@ -144,12 +211,18 @@ describe('Pass 71 frame-action baseline', () => {
       firstCompletionDelayMs: 150,
     };
 
-    expect(frameActionBudgetFailures(budget, { ...valid, firstCompletionDelayMs: 156.667 }))
-      .toContain('first-completion-delay:156.667>=156.667');
+    expect(frameActionBudgetFailures(budget, { ...valid, firstCompletionDelayMs: 161.667 }))
+      .toContain('first-completion-delay:161.667>=161.667');
     expect(frameActionBudgetFailures(budget, { ...valid, internalHandlerSyncMs: 33.333 }))
       .toContain('internal-handler-sync:33.333>=33.333');
+    expect(frameActionBudgetFailures(budget, { ...valid, outerHandlerSyncMs: 33.333 }))
+      .toContain('outer-handler-sync:33.333>=33.333');
+    expect(frameActionBudgetFailures(budget, { ...valid, eventToNextAnimationFrameMs: 161.667 }))
+      .toContain('event-to-next-animation-frame:161.667>=161.667');
     expect(frameActionBudgetFailures(budget, { ...valid, maximumFrameWorkMs: 50 }))
       .toContain('maximum-frame-work:50>=50');
+    expect(frameActionBudgetFailures(budget, { ...valid, maximumPendingForMs: 16.667 }))
+      .toContain('maximum-presentation-pending:16.667>=16.667');
   });
 
   it('keeps sparse software scheduler maxima diagnostic while native evidence gates them', () => {

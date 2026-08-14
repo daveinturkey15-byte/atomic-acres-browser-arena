@@ -51,8 +51,10 @@ describe('Pass 71 first-action and protected-release gate', () => {
     expect(actionBudget).toContain('Math.min(');
     expect(actionBudget).toContain('referenceBaselineMs + TARGET_FRAME_BUDGET_MS');
     expect(actionBudget).toContain('baseline.maximumGapMs + relativeAllowanceMs');
-    expect(actionBudget).toContain('baseline.firstSubmissionDelayMs + relativeAllowanceMs');
-    expect(actionBudget).toContain('baseline.firstCompletionDelayMs + relativeAllowanceMs');
+    expect(actionBudget).toContain('Math.max(baseline.p95GapMs, baseline.firstSubmissionDelayMs) + relativeAllowanceMs');
+    expect(actionBudget).toContain('Math.max(baseline.p95GapMs, baseline.firstCompletionDelayMs) + relativeAllowanceMs');
+    expect(actionBudget).not.toContain('rounded(baseline.firstSubmissionDelayMs + relativeAllowanceMs)');
+    expect(actionBudget).not.toContain('rounded(baseline.firstCompletionDelayMs + relativeAllowanceMs)');
     expect(actionBudget).toContain('baseline.maximumPendingForMs + relativeAllowanceMs');
     expect(actionBudget).toContain('TARGET_FRAME_BUDGET_MS * MAXIMUM_SYNCHRONOUS_ACTION_FRAME_BUDGETS');
     expect(actionBudget).toContain('TARGET_FRAME_BUDGET_MS * MAXIMUM_ACTION_FRAME_BUDGETS');

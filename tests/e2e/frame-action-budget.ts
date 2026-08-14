@@ -243,8 +243,12 @@ export function deriveFrameActionBudget(
   const relativeAllowanceMs = TARGET_FRAME_BUDGET_MS * ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS;
   const softwareSemanticThresholds = Object.freeze({
     maximumAnimationFrameGapMs: rounded(baseline.maximumGapMs + relativeAllowanceMs),
-    maximumFirstSubmissionDelayMs: rounded(baseline.firstSubmissionDelayMs + relativeAllowanceMs),
-    maximumFirstCompletionDelayMs: rounded(baseline.firstCompletionDelayMs + relativeAllowanceMs),
+    maximumFirstSubmissionDelayMs: rounded(
+      Math.max(baseline.p95GapMs, baseline.firstSubmissionDelayMs) + relativeAllowanceMs,
+    ),
+    maximumFirstCompletionDelayMs: rounded(
+      Math.max(baseline.p95GapMs, baseline.firstCompletionDelayMs) + relativeAllowanceMs,
+    ),
     maximumPendingForMs: rounded(baseline.maximumPendingForMs + relativeAllowanceMs),
   });
   const nativeThreshold = rounded(maximumActionMs);
