@@ -109,7 +109,7 @@ describe('Pass 71 HF-296 runtime evidence integration', () => {
     expect(main).toContain('publishHf296RemoteProjectionState: () => {');
     expect(main).toContain('network.sendStateCommitReliably(message);');
     expect(main).toContain("const hf296ContinuityResync = localMultiplayerQa && message.type === 'state'");
-    expect(main).toContain('claimedContinuity === remote.continuity + 1');
+    expect(main).toContain('claimedContinuity > remote.continuity');
     expect(main).toContain('respawned || hf296ContinuityResync');
     expect(spec).toContain('const observerSentinelPublication = api.publishHf296RemoteProjectionState();');
     expect(spec).toContain('const actorSentinelPublication = api.publishHf296RemoteProjectionState();');

@@ -11143,7 +11143,7 @@ function onNetworkMessage(message: GameMessage): void {
       const claimedContinuity = message.type === 'state' ? message.continuity : remote.continuity;
       const hf296ContinuityResync = localMultiplayerQa && message.type === 'state'
         && Number.isSafeInteger(claimedContinuity)
-        && claimedContinuity === remote.continuity + 1;
+        && claimedContinuity > remote.continuity;
       const movement = admitRemoteSnapshotMovement(
         remote.snapshot,
         admittedIncoming,
