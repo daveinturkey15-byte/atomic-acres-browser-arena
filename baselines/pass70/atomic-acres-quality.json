@@ -9,7 +9,7 @@
   "pagesPath": "channels/the-big-one",
   "runtimeFileCount": 515,
   "runtimeTreeSha256": "1a0e90676ffc411eaefeaebef0c970481aad416084a1dc21e9bf7de6de369196",
-  "guardPolicySha256": "be16416835beec35b3e155138b222538d6536644d0c3a737fb16bd35257167fd",
+  "guardPolicySha256": "e230183afcba5afeee0f914beadb8f303c78bb2d0e9ffad090e6cf924c07a3e9",
   "runtimeDigestPolicy": "Hash sorted path, NUL, blob bytes, NUL for every file beneath channels/the-big-one except channel-provenance.json; the complete published subtree contains 516 files including that provenance wrapper.",
   "basis": {
     "ownerAssessment": "Pass 70 is the exact published build immediately preceding the reported Pass 71 Quality-profile downgrade. This record does not claim Dave visually approved every Pass 70 frame.",
@@ -66,6 +66,12 @@
           "gitBlobSha": "1ce8d6a809ef2eb10daba25555871f32df5fd450",
           "sha256": "7e3dab56439bd5344db470c88e40c277ca3222e31c123af6374000a6c14d0c3b",
           "classification": "Exact audited read-only character contact/capsule evidence surface; controller, movement, stance, collision shape and contact configuration remain protected below."
+        },
+        {
+          "auditSourceSha": "73c6b5ab5fc9f082b6648a60ebef5a680c00b6e4",
+          "gitBlobSha": "43b51ae8220f13d22fcf6a8c65c54a9659e5222b",
+          "sha256": "4c6eafbd3d5065bf7255f80249fe3cd2b4a2626149e715e49dfafc91266c8883",
+          "classification": "Exact audited canonical world-floor extraction: Rapier retains the same -0.2m to 0m collider while presentation fallback consumes that collision-owned shape; protected controller, movement, stance, collision and contact semantics remain unchanged."
         }
       ]
     }

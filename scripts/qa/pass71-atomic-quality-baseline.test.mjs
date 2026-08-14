@@ -104,6 +104,14 @@ test('the full verifier fails closed on policy, texture, LOD, physics, preset an
 
     const physicsPath = 'src/physics.ts';
     const physics = readFileSync(join(checkout, physicsPath), 'utf8');
+    const floorThickness = 'const WORLD_FLOOR_THICKNESS = 0.2;';
+    assert.ok(physics.includes(floorThickness), 'missing canonical world-floor audit fixture');
+    writeFileSync(join(checkout, physicsPath), physics.replace(floorThickness, 'const WORLD_FLOOR_THICKNESS = 0.25;'));
+    const floorMutation = verifyAtomicQualityBaseline({ root: checkout, recordPath });
+    assert.equal(floorMutation.status, 'FAIL');
+    assert.match(floorMutation.problems.join('\n'), /unaudited source drift: src\/physics\.ts/u);
+    git(['restore', '--source', 'HEAD', '--', physicsPath], checkout);
+
     const physicsMutations = [
       ['gravity: -22', 'gravity: -12', /quality semantic declaration drift: src\/physics\.ts#CHARACTER_PHYSICS_CONFIG/u],
       ['controllerOffset: 0.025', 'controllerOffset: 0.25', /quality semantic declaration drift: src\/physics\.ts#CHARACTER_PHYSICS_CONFIG/u],
