@@ -25,6 +25,19 @@ import {
 const peerPort = Number(process.env.PASS70_CROSS_BROWSER_PEER_PORT ?? 9_089);
 let peerServer: OwnedPeerServer | null = null;
 
+type CrossBrowserRenderer = 'webgl2' | 'webgpu';
+const requestedRenderer = process.env.PASS70_CROSS_BROWSER_RENDERER ?? 'webgl2';
+if (requestedRenderer !== 'webgl2' && requestedRenderer !== 'webgpu') {
+  throw new Error(`Unsupported PASS70_CROSS_BROWSER_RENDERER: ${requestedRenderer}`);
+}
+const crossBrowserRenderer = requestedRenderer as CrossBrowserRenderer;
+const crossBrowserRenderProfile = process.env.PASS70_CROSS_BROWSER_RENDER_PROFILE
+  ?? (crossBrowserRenderer === 'webgpu' ? 'blender' : 'compat');
+const crossBrowserHeadless = process.env.PASS70_CROSS_BROWSER_HEADLESS !== '0';
+const crossBrowserHostChannel = process.env.PASS70_CROSS_BROWSER_HOST_CHANNEL === 'chrome'
+  ? 'chrome' as const
+  : null;
+
 test.describe.configure({ timeout: 360_000 });
 
 test.beforeAll(async () => {
@@ -41,7 +54,9 @@ function route(baseUrl: string, seed: string, renderPaused = false): string {
   if (!peerServer) throw new Error('Owned PeerJS server is not ready');
   const url = new URL(baseUrl);
   for (const [key, value] of Object.entries({
-    release: 'latest', renderer: 'webgl2', render: 'compat', signal: 'off', grass: 'off', mist: 'off',
+    release: 'latest', renderer: crossBrowserRenderer, render: crossBrowserRenderProfile,
+    requireWebGPU: crossBrowserRenderer === 'webgpu' ? '1' : '0',
+    signal: 'off', grass: 'off', mist: 'off',
     clouds: 'off', rays: 'off', externalServices: 'off', multiplayerQa: '1',
     peerQaPort: String(peerPort), peerQaPath: peerServer.path, seed,
     ...(renderPaused ? { renderPaused: '1' } : {}),
@@ -57,11 +72,13 @@ async function preparePlayer(
   renderPaused = false,
 ): Promise<void> {
   await page.goto(route(baseUrl, seed, renderPaused));
-  await page.waitForFunction(() => {
+  await page.waitForFunction(({ expectedRenderer, expectedProfile }) => {
     const state = (window as any).__ATOMIC_ACRES_DEBUG__?.snapshot();
     return state?.weaponReady === true && state.bootstrap?.stage === 'ready'
+      && state.render?.runtime?.actualBackend === expectedRenderer
+      && state.render?.profile === expectedProfile
       && document.querySelector<HTMLButtonElement>('#solo')?.disabled === false;
-  }, undefined, { timeout: 90_000 });
+  }, { expectedRenderer: crossBrowserRenderer, expectedProfile: crossBrowserRenderProfile }, { timeout: 120_000 });
   await page.fill('#player-name', name);
 }
 
@@ -97,6 +114,11 @@ async function startOneBotSkirmish(page: Page): Promise<Record<string, unknown>>
       ammo: state.player.ammo,
       reloading: state.player.reloading,
       matchPhase: state.matchPhase,
+      renderer: state.render.runtime.actualBackend,
+      renderProfile: state.render.profile,
+      rendererInitialized: state.render.runtime.initialized,
+      rendererDeviceLost: state.render.runtime.deviceLost,
+      rendererUncapturedErrors: state.render.runtime.uncapturedErrors,
       userAgent: navigator.userAgent,
     };
   }, beforeFrame);
@@ -174,18 +196,18 @@ if (!supportedEngines.includes(configuredCrossGuest as EngineKind)) {
 const crossGuestEngine = configuredCrossGuest as EngineKind;
 
 async function openEngineBrowser(kind: EngineKind): Promise<Browser> {
-  if (kind === 'chromium') return chromium.launch({ headless: true });
+  if (kind === 'chromium') return chromium.launch({ headless: crossBrowserHeadless });
   if (kind === 'firefox') {
     const executablePath = process.env.PASS70_FIREFOX_EXECUTABLE_PATH;
-    return firefox.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
+    return firefox.launch({ headless: crossBrowserHeadless, ...(executablePath ? { executablePath } : {}) });
   }
-  if (kind === 'webkit') return webkit.launch({ headless: true });
+  if (kind === 'webkit') return webkit.launch({ headless: crossBrowserHeadless });
   if (kind === 'opera') {
     const executablePath = process.env.PASS70_OPERA_EXECUTABLE_PATH;
     if (!executablePath) throw new Error('PASS70_VERIFY_OPERA requires PASS70_OPERA_EXECUTABLE_PATH');
-    return chromium.launch({ headless: true, executablePath });
+    return chromium.launch({ headless: crossBrowserHeadless, executablePath });
   }
-  return chromium.launch({ headless: true, channel: kind === 'chrome' ? 'chrome' : 'msedge' });
+  return chromium.launch({ headless: crossBrowserHeadless, channel: kind === 'chrome' ? 'chrome' : 'msedge' });
 }
 
 function expectNoBrowserFaults(diagnostics: BrowserDiagnostics): void {
@@ -195,12 +217,15 @@ function expectNoBrowserFaults(diagnostics: BrowserDiagnostics): void {
 }
 
 async function newPageWithDeadline(context: BrowserContext, label: string): Promise<Page> {
+  const pageCreateTimeoutMs = crossBrowserHeadless ? 20_000 : 60_000;
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       context.newPage(),
       new Promise<never>((_resolve, reject) => {
-        timeout = setTimeout(() => reject(new Error(`${label}: browser context did not create a page within 20s`)), 20_000);
+        timeout = setTimeout(() => reject(new Error(
+          `${label}: browser context did not create a page within ${pageCreateTimeoutMs}ms`,
+        )), pageCreateTimeoutMs);
       }),
     ]);
   } finally {
@@ -253,6 +278,13 @@ for (const kind of ['firefox', 'chromium', 'webkit', 'chrome', 'edge', 'opera'] 
       }, null, 2), 'utf8');
       await testInfo.attach(`${kind}-one-bot-receipt`, { path: receiptPath, contentType: 'application/json' });
       expect(first).toMatchObject({ botCount: 1, runtimeError: '', systemPaused: false, reloading: false, matchPhase: 'active' });
+      expect(first).toMatchObject({
+        renderer: crossBrowserRenderer,
+        renderProfile: crossBrowserRenderProfile,
+        rendererInitialized: true,
+        rendererDeviceLost: false,
+        rendererUncapturedErrors: 0,
+      });
       expect(first.frameDelta).toBeGreaterThan(20);
       expect(audioEvidenceLedger.failures, audioEvidenceLedger.qualification).toEqual([]);
       expect(audioEvidenceLedger.verdict).toBe('PASS');
@@ -695,7 +727,7 @@ async function auditChatLayout(page: Page, viewport: { width: number; height: nu
   });
 }
 
-test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejoin and host renderer recovery`, async ({ browserName }, testInfo) => {
+test(`${crossBrowserHostChannel ?? 'chromium'} host and ${crossGuestEngine} guest survive ADS combat, guest rejoin and host renderer recovery`, async ({ browserName }, testInfo) => {
   test.skip(browserName !== 'chromium', 'The explicit cross-engine pair is owned once by the Chromium project.');
   test.skip(!verifyCrossBrowser,
     'Run the explicit Pass 70 cross-browser verifier; ordinary Chromium projects do not launch external engines.');
@@ -705,7 +737,8 @@ test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejo
     'Set PASS70_VERIFY_FIREFOX=1 to run the real fail-closed Firefox cross-engine lifecycle lane.');
   const baseUrl = String(testInfo.project.use.baseURL);
   const chromiumBrowser = await chromium.launch({
-    headless: true,
+    headless: crossBrowserHeadless,
+    ...(crossBrowserHostChannel ? { channel: crossBrowserHostChannel } : {}),
     args: [
       '--disable-background-timer-throttling',
       '--disable-renderer-backgrounding',
@@ -1013,6 +1046,41 @@ test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejo
       document.querySelector('#runtime-error-log')?.textContent?.trim() ?? ''
     ))));
     expect(runtimeLogs).toEqual(['', '']);
+    const runtimeIdentities = await Promise.all([host, guest].map((page) => page.evaluate(() => {
+      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+      return {
+        renderer: state.render.runtime.actualBackend,
+        profile: state.render.profile,
+        initialized: state.render.runtime.initialized,
+        deviceLost: state.render.runtime.deviceLost,
+        uncapturedErrors: state.render.runtime.uncapturedErrors,
+      };
+    })));
+    expect(runtimeIdentities).toEqual([
+      { renderer: crossBrowserRenderer, profile: crossBrowserRenderProfile, initialized: true, deviceLost: false, uncapturedErrors: 0 },
+      { renderer: crossBrowserRenderer, profile: crossBrowserRenderProfile, initialized: true, deviceLost: false, uncapturedErrors: 0 },
+    ]);
+    await testInfo.attach('chrome-firefox-lobby-recovery-receipt', {
+      body: Buffer.from(`${JSON.stringify({
+        sourceSha: process.env.SOURCE_SHA,
+        host: {
+          automation: crossBrowserHostChannel === 'chrome' ? 'installed-chrome-via-playwright' : 'playwright-chromium',
+          browserVersion: chromiumBrowser.version(),
+          runtime: runtimeIdentities[0],
+          recoveredPosition: recoveredHostPosition,
+        },
+        guest: {
+          automation: `playwright-${crossGuestEngine}`,
+          browserVersion: guestBrowser.version(),
+          runtime: runtimeIdentities[1],
+          recoveredPosition: recoveredGuestPosition,
+        },
+        roomCode,
+        memberIds: initialMemberIds,
+        checkpoint: checkpointReceipt,
+      }, null, 2)}\n`, 'utf8'),
+      contentType: 'application/json',
+    });
     expectNoBrowserFaults(diagnostics);
   } finally {
     await Promise.allSettled([hostContext.close(), guestContext.close()]);

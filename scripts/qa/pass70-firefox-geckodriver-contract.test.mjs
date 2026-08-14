@@ -423,3 +423,21 @@ test('package exposes a separate contract gate and a contract-first real Firefox
     'npm run qa:pass70:firefox-geckodriver:contract && node scripts/qa/run-pass70-firefox-geckodriver.mjs',
   );
 });
+
+test('Pass 71 installed Firefox lobby mode is headed, WebGPU-only and separately identified', () => {
+  assert.equal(
+    packageJson.scripts['qa:pass71:installed-firefox-webgpu-lobby'],
+    'npm run qa:pass70:firefox-geckodriver:contract && node scripts/qa/run-pass70-firefox-geckodriver.mjs pass71-webgpu',
+  );
+  for (const required of [
+    "const pass71Webgpu = process.argv[2] === 'pass71-webgpu'",
+    "const expectedRenderer = pass71Webgpu ? 'webgpu' : 'webgl2'",
+    "const expectedRenderProfile = pass71Webgpu ? 'blender' : 'compat'",
+    'const expectedHeadless = !pass71Webgpu',
+    "...(pass71Webgpu ? { requireWebGPU: '1' } : {})",
+    "schema: 'atomic-acres/pass71-firefox-webgpu-lobby@1'",
+    'const soloCycles = pass71Webgpu ? []',
+    "renderer.renderer !== 'webgpu'",
+    'if (pass71Webgpu) assertPass71FirefoxWebgpuReceipt(completed.receipt, completed.expected)',
+  ]) assert.ok(runnerSource.includes(required), `missing Pass 71 installed-Firefox WebGPU guard: ${required}`);
+});
