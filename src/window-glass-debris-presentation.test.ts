@@ -206,6 +206,11 @@ describe('persistent window glass debris presentation', () => {
     expect(block).not.toContain('new THREE.BoxGeometry');
     const support = source.slice(source.indexOf('function windowDebrisSupport('), source.indexOf('\nasync function withStagedWindowGlassDebrisPool'));
     expect(support).toContain('let supportY: number | null = null;');
+    const canonicalFloor = support.indexOf("{ source: 'world-floor', collider: worldFloorCollider(arena.bounds) }");
+    const authoredColliders = support.indexOf('...activeWorldColliders().map(');
+    expect(canonicalFloor).toBeGreaterThanOrEqual(0);
+    expect(authoredColliders).toBeGreaterThan(canonicalFloor);
+    expect(support).toContain('supportY !== null && maxY <= supportY');
     expect(support).toContain('restY: supportY === null ? null : supportY + halfExtents.y');
     expect(support).not.toContain('arena.bounds.minY');
     expect(support).not.toContain("source = 'arena-bound'");

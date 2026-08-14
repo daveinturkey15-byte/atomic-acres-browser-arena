@@ -26,6 +26,19 @@ export const STANCE_SHAPES: Readonly<Record<Stance, { halfHeight: number; radius
 export const WORLD_BOUNDARY_THICKNESS = 0.5;
 export const WORLD_BOUNDARY_MIN_Y = -2;
 export const WORLD_BOUNDARY_MAX_Y = 14;
+const WORLD_FLOOR_THICKNESS = 0.2;
+
+/** Canonical floor collider consumed by Rapier and presentation fallback support. */
+export function worldFloorCollider(bounds: Box2): Box2 {
+  return Object.freeze({
+    minX: bounds.minX,
+    maxX: bounds.maxX,
+    minY: -WORLD_FLOOR_THICKNESS,
+    maxY: 0,
+    minZ: bounds.minZ,
+    maxZ: bounds.maxZ,
+  });
+}
 
 /** Physics-only perimeter walls. Their inner faces exactly match playable bounds. */
 export function worldBoundaryColliders(bounds: Box2): readonly Box2[] {
@@ -194,15 +207,16 @@ export class CharacterPhysics {
     // The world floor and four thin boundary walls make falling out impossible even if
     // an authored visual mesh is missing or still loading.
     const colliderDebugSources = new Map<number, string>();
+    const floorShape = boxShape(worldFloorCollider(bounds));
     const floor = world.createCollider(
       RAPIER.ColliderDesc.cuboid(
-        (bounds.maxX - bounds.minX) / 2,
-        0.1,
-        (bounds.maxZ - bounds.minZ) / 2,
+        floorShape.halfExtents.x,
+        floorShape.halfExtents.y,
+        floorShape.halfExtents.z,
       ).setTranslation(
-        (bounds.minX + bounds.maxX) / 2,
-        -0.1,
-        (bounds.minZ + bounds.maxZ) / 2,
+        floorShape.centre.x,
+        floorShape.centre.y,
+        floorShape.centre.z,
       ),
     );
     colliderDebugSources.set(floor.handle, 'world-floor');

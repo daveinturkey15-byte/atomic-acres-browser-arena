@@ -715,6 +715,7 @@ import {
   CharacterPhysics,
   MAX_MAJOR_DEBRIS_BODIES,
   worldBoundaryColliders,
+  worldFloorCollider,
   type MajorDebrisBodyDefinition,
   type MajorDebrisBodySnapshot,
   type DynamicWorldCollider,
@@ -12694,21 +12695,26 @@ function windowDebrisSupport(
   const verticalClearance = Math.max(0.08, halfExtents.y * 0.2);
   const footprintInsetX = Math.min(halfExtents.x * 0.35, 0.18);
   const footprintInsetZ = Math.min(halfExtents.z * 0.35, 0.08);
-  for (const [index, collider] of activeWorldColliders().entries()) {
+  const candidates = [
+    { source: 'world-floor', collider: worldFloorCollider(arena.bounds) },
+    ...activeWorldColliders().map((collider, index) => ({ source: `world-collider:${index}`, collider })),
+  ];
+  for (const candidate of candidates) {
+    const { collider } = candidate;
     const minY = collider.minY;
     const maxY = collider.maxY;
     if (minY === undefined || maxY === undefined
       || ![collider.minX, collider.maxX, minY, maxY, collider.minZ, collider.maxZ].every(Number.isFinite)) continue;
-    // Only an authored surface actually below the detached fragments can own
+    // Only a collision-authoritative surface actually below the fragments can own
     // their resting height. Tall walls and the former pane opening never count.
-    if (maxY > position.y - verticalClearance || supportY !== null && maxY < supportY) continue;
+    if (maxY > position.y - verticalClearance || supportY !== null && maxY <= supportY) continue;
     const overlapsX = position.x + halfExtents.x - footprintInsetX >= collider.minX
       && position.x - halfExtents.x + footprintInsetX <= collider.maxX;
     const overlapsZ = position.z + halfExtents.z - footprintInsetZ >= collider.minZ
       && position.z - halfExtents.z + footprintInsetZ <= collider.maxZ;
     if (!overlapsX || !overlapsZ) continue;
     supportY = maxY;
-    source = `world-collider:${index}`;
+    source = candidate.source;
   }
   return Object.freeze({ restY: supportY === null ? null : supportY + halfExtents.y, source });
 }
