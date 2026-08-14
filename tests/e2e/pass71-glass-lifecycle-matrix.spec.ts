@@ -137,6 +137,11 @@ type CrossbowImpactSample = Readonly<{
 type DebrisLifecycleSample = Readonly<{
   id: string;
   windowId: string;
+  spawnGeneration: number;
+  spawnedAt: number;
+  actionIdentity: string;
+  milestone: 'initial' | 'moving' | 'settled' | null;
+  sampledAt: number;
   position: readonly number[];
   visible: boolean;
   physical: boolean;
@@ -148,6 +153,18 @@ type DebrisLifecycleSample = Readonly<{
   noProgressMs: number;
   fallbackStartedAt: number | null;
   settledAt: number | null;
+}>;
+
+type DebrisLifecycleBatch = Readonly<{
+  id: string;
+  windowId: string;
+  spawnGeneration: number;
+  spawnedAt: number;
+  actionIdentity: string;
+  milestones: readonly DebrisLifecycleSample[];
+  current: DebrisLifecycleSample | null;
+  terminal: DebrisLifecycleSample | null;
+  retired: boolean;
 }>;
 
 type DebrisLifecycleReceipt = Readonly<{
@@ -341,8 +358,8 @@ async function armPaneDebrisLifecycleObservation(page: Page, index: number, labe
     let initial: DebrisLifecycleSample | null = null;
     let moving: DebrisLifecycleSample | null = null;
     let lastSample: DebrisLifecycleSample | null = null;
-    let initialObservedAt = 0;
-    let movingObservedAt = 0;
+    let observedGeneration: number | null = null;
+    let lastMilestoneAt = Number.NEGATIVE_INFINITY;
     let cancelLifecycle = (): void => undefined;
 
     const cloneSample = (sample: DebrisLifecycleSample): DebrisLifecycleSample => Object.freeze({
@@ -352,6 +369,9 @@ async function armPaneDebrisLifecycleObservation(page: Page, index: number, labe
     });
     const describeSample = (sample: DebrisLifecycleSample | null): string => JSON.stringify(sample
       ? {
+        spawnGeneration: sample.spawnGeneration,
+        milestone: sample.milestone,
+        sampledAt: Math.round(sample.sampledAt),
         ageMs: Math.round(sample.ageMs),
         position: sample.position,
         physical: sample.physical,
@@ -374,10 +394,124 @@ async function armPaneDebrisLifecycleObservation(page: Page, index: number, labe
         `${options.label}: debris observation cancelled; last=${describeSample(lastSample)}`,
       ));
 
+      const consumeSample = (current: DebrisLifecycleSample, batch: DebrisLifecycleBatch): void => {
+        if (finished) return;
+        if (current.spawnGeneration !== batch.spawnGeneration
+          || current.id !== batch.id
+          || current.windowId !== batch.windowId
+          || current.spawnedAt !== batch.spawnedAt
+          || current.actionIdentity !== batch.actionIdentity) {
+          finish(new Error(
+            `${options.label}: debris published a stale or mixed-generation milestone; last=${describeSample(current)}`,
+          ));
+          return;
+        }
+        if (current.milestone !== null) {
+          if (current.sampledAt < lastMilestoneAt
+            || current.sampledAt >= current.spawnedAt + options.maxLifetimeMs
+            || current.milestone === 'moving' && current.physical === false
+              && (current.fallbackStartedAt === null || current.sampledAt < current.fallbackStartedAt)) {
+            finish(new Error(
+              `${options.label}: debris published a non-monotonic or expired milestone; last=${describeSample(current)}`,
+            ));
+            return;
+          }
+          lastMilestoneAt = current.sampledAt;
+        }
+        lastSample = cloneSample(current);
+        if (!Number.isFinite(current.sampledAt)
+          || !Number.isFinite(current.ageMs)
+          || !current.position.every(Number.isFinite)) {
+          finish(new Error(
+            `${options.label}: debris published a non-finite lifecycle sample; last=${describeSample(lastSample)}`,
+          ));
+          return;
+        }
+
+        if (!initial) {
+          if (current.ageMs >= options.physicsTimeoutMs) {
+            finish(new Error(
+              `${options.label}: no collision-backed physics pose within ${options.physicsTimeoutMs}ms; last=${describeSample(lastSample)}`,
+            ));
+            return;
+          }
+          if (current.milestone === 'initial'
+            && current.visible === true
+            && current.physical === true
+            && current.physicsActive === true
+            && current.receivedPhysicsPose === true
+            && current.fallbackSettled === false) {
+            initial = cloneSample(current);
+          }
+        }
+
+        if (initial && !moving) {
+          const displacement = Math.hypot(
+            current.position[0] - initial.position[0],
+            current.position[1] - initial.position[1],
+            current.position[2] - initial.position[2],
+          );
+          if (current.milestone === 'moving'
+            && current.fallbackSettled === false
+            && current.position[1] <= initial.position[1] - 0.025
+            && displacement >= 0.04) {
+            if (current.ageMs >= options.movementTimeoutMs) {
+              finish(new Error(
+                `${options.label}: no falling debris motion within ${options.movementTimeoutMs}ms; last=${describeSample(lastSample)}`,
+              ));
+              return;
+            }
+            moving = cloneSample(current);
+          } else if (current.ageMs >= options.movementTimeoutMs) {
+            finish(new Error(
+              `${options.label}: no falling debris motion within ${options.movementTimeoutMs}ms; last=${describeSample(lastSample)}`,
+            ));
+            return;
+          }
+        }
+
+        if (initial && moving) {
+          const restY = current.support.restY;
+          const supportSource = current.support.source;
+          const collisionAuthoritativeSupport = supportSource === 'world-floor'
+            || supportSource?.startsWith('world-collider:') === true;
+          if (current.milestone === 'settled'
+            && current.visible === true
+            && current.physical === false
+            && current.physicsActive === false
+            && current.fallbackSettled === true
+            && collisionAuthoritativeSupport
+            && typeof restY === 'number'
+            && Number.isFinite(restY)
+            && Math.abs(current.position[1] - restY) <= 0.04) {
+            if (current.ageMs >= options.settleTimeoutMs) {
+              finish(new Error(
+                `${options.label}: no supported settled debris within ${options.settleTimeoutMs}ms; last=${describeSample(lastSample)}`,
+              ));
+              return;
+            }
+            finish(Object.freeze({ initial, moving, settled: cloneSample(current) }));
+            return;
+          }
+          if (current.ageMs >= options.settleTimeoutMs) {
+            finish(new Error(
+              `${options.label}: no supported settled debris within ${options.settleTimeoutMs}ms; last=${describeSample(lastSample)}`,
+            ));
+            return;
+          }
+        }
+
+        if (current.ageMs >= options.maxLifetimeMs) {
+          finish(new Error(
+            `${options.label}: debris exceeded the ${options.maxLifetimeMs}ms lifetime; last=${describeSample(lastSample)}`,
+          ));
+        }
+      };
+
       const sampleAfterGameFrame = (): void => {
-        const current = debug.sampleWindowDebrisLifecycle(options.paneIndex) as DebrisLifecycleSample | null;
+        const batch = debug.sampleWindowDebrisLifecycle(options.paneIndex) as DebrisLifecycleBatch | null;
         const now = performance.now();
-        if (!current) {
+        if (!batch) {
           if (sawDebris) {
             finish(new Error(
               `${options.label}: debris disappeared before a valid settled sample; last=${describeSample(lastSample)}`,
@@ -393,85 +527,27 @@ async function armPaneDebrisLifecycleObservation(page: Page, index: number, labe
           animationFrame = window.requestAnimationFrame(sampleAfterGameFrame);
           return;
         }
+        if (observedGeneration !== null && observedGeneration !== batch.spawnGeneration) {
+          finish(new Error(
+            `${options.label}: debris generation changed during observation; last=${describeSample(lastSample)}`,
+          ));
+          return;
+        }
+        observedGeneration = batch.spawnGeneration;
         if (!sawDebris) {
           sawDebris = true;
           window.clearTimeout(spawnDeadline);
         }
-        lastSample = cloneSample(current);
-        if (!Number.isFinite(current.ageMs) || !current.position.every(Number.isFinite)) {
+        for (const milestone of batch.milestones) consumeSample(milestone, batch);
+        if (!finished && batch.current) consumeSample(batch.current, batch);
+        if (!finished && batch.terminal) consumeSample(batch.terminal, batch);
+        if (!finished && batch.retired) {
           finish(new Error(
-            `${options.label}: debris published a non-finite lifecycle sample; last=${describeSample(lastSample)}`,
+            `${options.label}: debris retired before a valid settled milestone; last=${describeSample(lastSample)}`,
           ));
           return;
         }
-        if (current.ageMs >= options.maxLifetimeMs) {
-          finish(new Error(
-            `${options.label}: debris exceeded the ${options.maxLifetimeMs}ms lifetime; last=${describeSample(lastSample)}`,
-          ));
-          return;
-        }
-
-        if (!initial) {
-          if (current.ageMs >= options.physicsTimeoutMs) {
-            finish(new Error(
-              `${options.label}: no collision-backed physics pose within ${options.physicsTimeoutMs}ms; last=${describeSample(lastSample)}`,
-            ));
-            return;
-          }
-          if (current.visible === true
-            && current.physical === true
-            && current.physicsActive === true
-            && current.receivedPhysicsPose === true
-            && current.fallbackSettled === false) {
-            initial = cloneSample(current);
-            initialObservedAt = now;
-          }
-        }
-
-        if (initial && !moving) {
-          if (now - initialObservedAt >= options.movementTimeoutMs) {
-            finish(new Error(
-              `${options.label}: no falling debris motion within ${options.movementTimeoutMs}ms; last=${describeSample(lastSample)}`,
-            ));
-            return;
-          }
-          const displacement = Math.hypot(
-            current.position[0] - initial.position[0],
-            current.position[1] - initial.position[1],
-            current.position[2] - initial.position[2],
-          );
-          if (current.fallbackSettled === false
-            && current.position[1] <= initial.position[1] - 0.025
-            && displacement >= 0.04) {
-            moving = cloneSample(current);
-            movingObservedAt = now;
-          }
-        }
-
-        if (initial && moving) {
-          if (now - movingObservedAt >= options.settleTimeoutMs) {
-            finish(new Error(
-              `${options.label}: no supported settled debris within ${options.settleTimeoutMs}ms; last=${describeSample(lastSample)}`,
-            ));
-            return;
-          }
-          const restY = current.support.restY;
-          const supportSource = current.support.source;
-          const collisionAuthoritativeSupport = supportSource === 'world-floor'
-            || supportSource?.startsWith('world-collider:') === true;
-          if (current.visible === true
-            && current.physical === false
-            && current.physicsActive === false
-            && current.fallbackSettled === true
-            && collisionAuthoritativeSupport
-            && typeof restY === 'number'
-            && Number.isFinite(restY)
-            && Math.abs(current.position[1] - restY) <= 0.04) {
-            finish(Object.freeze({ initial, moving, settled: cloneSample(current) }));
-            return;
-          }
-        }
-        animationFrame = window.requestAnimationFrame(sampleAfterGameFrame);
+        if (!finished) animationFrame = window.requestAnimationFrame(sampleAfterGameFrame);
       };
 
       spawnDeadline = window.setTimeout(() => finish(new Error(

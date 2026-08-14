@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
   WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT,
+  WINDOW_GLASS_DEBRIS_FALLBACK_MAX_STEP_SECONDS,
   WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS,
   WINDOW_GLASS_DEBRIS_MAX_PHYSICS_MS,
   WINDOW_GLASS_DEBRIS_NO_PROGRESS_MS,
@@ -10,9 +11,13 @@ import {
   WINDOW_GLASS_DEBRIS_SETTLE_TOLERANCE_M,
   WINDOW_GLASS_DEBRIS_VISUAL_CONTRACT,
   createFracturedWindowDebrisVisual,
+  integrateWindowGlassDebrisFallback,
   prewarmFracturedWindowDebrisVisual,
   updateFracturedWindowDebrisVisual,
   windowGlassDebrisLifecycleMode,
+  windowGlassDebrisMilestoneAdmitted,
+  windowGlassDebrisFallbackInterval,
+  windowGlassDebrisFallbackSweepSupport,
   windowGlassDebrisSettleMode,
 } from './window-glass-debris-presentation';
 
@@ -88,6 +93,260 @@ describe('persistent window glass debris presentation', () => {
       sleeping: false,
     })).toBe('physics-active');
     expect(() => windowGlassDebrisLifecycleMode({ ...sample, noProgressMs: Number.NaN })).toThrow(TypeError);
+  });
+
+  it('resolves only a crossed or already-overlapping collision-authoritative support', () => {
+    const halfExtents = { x: 0.6, y: 0.63, z: 0.08 };
+    const floor = {
+      source: 'world-floor',
+      collider: { minX: -5, maxX: 5, minY: -0.2, maxY: 0, minZ: -5, maxZ: 5 },
+    };
+    expect(windowGlassDebrisFallbackSweepSupport(
+      { x: 0, y: 0.124, z: 0 },
+      { x: 0, y: 0.05, z: 0 },
+      halfExtents,
+      [floor],
+    )).toEqual({ restY: 0.63, source: 'world-floor', impactFraction: 0 });
+
+    const crossing = windowGlassDebrisFallbackSweepSupport(
+      { x: 0, y: 1, z: 0 },
+      { x: 0, y: 0.1, z: 0 },
+      { x: 0.2, y: 0.2, z: 0.2 },
+      [floor],
+    );
+    expect(crossing.source).toBe('world-floor');
+    expect(crossing.restY).toBe(0.2);
+    expect(crossing.impactFraction).toBeGreaterThan(0);
+    expect(crossing.impactFraction).toBeLessThanOrEqual(1);
+
+    const highest = windowGlassDebrisFallbackSweepSupport(
+      { x: 0, y: 1, z: 0 },
+      { x: 0, y: -0.4, z: 0 },
+      { x: 0.2, y: 0.2, z: 0.2 },
+      [floor, {
+        source: 'world-collider:0',
+        collider: { minX: -1, maxX: 1, minY: 0, maxY: 0.25, minZ: -1, maxZ: 1 },
+      }],
+    );
+    expect(highest).toMatchObject({ restY: 0.45, source: 'world-collider:0' });
+
+    for (const rejected of [
+      windowGlassDebrisFallbackSweepSupport(
+        { x: 0, y: 0.5, z: 0 }, { x: 0, y: 0.4, z: 0 }, halfExtents,
+        [{ source: 'tall-wall', collider: { minX: -1, maxX: 1, minY: -1, maxY: 2, minZ: -1, maxZ: 1 } }],
+      ),
+      windowGlassDebrisFallbackSweepSupport(
+        { x: 8, y: 0.5, z: 0 }, { x: 8, y: -0.5, z: 0 }, halfExtents, [floor],
+      ),
+      windowGlassDebrisFallbackSweepSupport(
+        { x: 0, y: 5, z: 0 }, { x: 0, y: 4, z: 0 }, halfExtents, [floor],
+      ),
+    ]) expect(rejected).toEqual({ restY: null, source: null, impactFraction: null });
+  });
+
+  it('catches real elapsed fallback up in bounded substeps and retains motion before collision settle', () => {
+    const steps: number[] = [];
+    const halfExtents = { x: 0.5, y: 0.6, z: 0.05 };
+    const floor = {
+      source: 'world-floor',
+      collider: { minX: -20, maxX: 20, minY: -0.2, maxY: 0, minZ: -20, maxZ: 20 },
+    };
+    const result = integrateWindowGlassDebrisFallback({
+      position: { x: 0, y: 10, z: 0 },
+      velocity: { x: 0.2, y: -0.9, z: 0.1 },
+      rotation: { x: 0.2, y: 0.3, z: 0.4 },
+      angular: { x: 0.8, y: 0.4, z: 0.6 },
+    }, WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS / 1_000, (from, to, stepSeconds) => {
+      steps.push(stepSeconds);
+      return windowGlassDebrisFallbackSweepSupport(from, to, halfExtents, [floor]);
+    }, { x: 0, y: 10, z: 0 });
+
+    expect(steps.length).toBeGreaterThan(1);
+    expect(Math.max(...steps)).toBeLessThanOrEqual(WINDOW_GLASS_DEBRIS_FALLBACK_MAX_STEP_SECONDS);
+    expect(result.moving).not.toBeNull();
+    expect(result.moving!.elapsedSeconds).toBeLessThan(result.settledAfterSeconds!);
+    expect(result.settled).toBe(true);
+    expect(result.settledAfterSeconds).toBeLessThan(WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS / 1_000);
+    expect(result.state.position.y).toBe(halfExtents.y);
+    expect(result.support).toEqual({ restY: halfExtents.y, source: 'world-floor' });
+  });
+
+  it('derives a sparse-callback catch-up interval from policy boundaries without moving retirement', () => {
+    expect(windowGlassDebrisFallbackInterval({
+      spawnedAt: 1_000,
+      now: 6_100,
+      physicsActive: true,
+      receivedPhysicsPose: true,
+      stateIncludesPhysicsPose: true,
+      firstPhysicsPoseAt: 1_050,
+      stateObservedAt: 1_050,
+      lastProgressAt: 1_050,
+      fallbackStartedAt: null,
+    })).toEqual({ policyStartAt: 1_500, stateStartAt: 1_050, captureStartAt: 1_500, endAt: 5_500 });
+    expect(windowGlassDebrisFallbackInterval({
+      spawnedAt: 1_000,
+      now: 6_100,
+      physicsActive: true,
+      receivedPhysicsPose: false,
+      stateIncludesPhysicsPose: false,
+      stateObservedAt: 1_000,
+      lastProgressAt: 1_000,
+      fallbackStartedAt: null,
+    })).toEqual({ policyStartAt: 1_180, stateStartAt: 1_000, captureStartAt: 1_180, endAt: 5_500 });
+    expect(windowGlassDebrisFallbackInterval({
+      spawnedAt: 1_000,
+      now: 6_100,
+      physicsActive: true,
+      receivedPhysicsPose: true,
+      stateIncludesPhysicsPose: false,
+      firstPhysicsPoseAt: 5_000,
+      stateObservedAt: 1_000,
+      lastProgressAt: 1_000,
+      fallbackStartedAt: null,
+    })).toEqual({ policyStartAt: 1_180, stateStartAt: 1_000, captureStartAt: 1_180, endAt: 5_500 });
+    expect(windowGlassDebrisFallbackInterval({
+      spawnedAt: 1_000,
+      now: 6_100,
+      physicsActive: true,
+      receivedPhysicsPose: true,
+      stateIncludesPhysicsPose: true,
+      firstPhysicsPoseAt: 5_000,
+      stateObservedAt: 5_000,
+      lastProgressAt: 5_000,
+      fallbackStartedAt: null,
+    })).toEqual({ policyStartAt: 2_800, stateStartAt: 5_000, captureStartAt: 5_000, endAt: 5_500 });
+    expect(windowGlassDebrisFallbackInterval({
+      spawnedAt: 1_000,
+      now: 1_100,
+      physicsActive: true,
+      receivedPhysicsPose: false,
+      stateIncludesPhysicsPose: false,
+      stateObservedAt: 1_000,
+      lastProgressAt: 1_000,
+      fallbackStartedAt: null,
+    })).toBeNull();
+  });
+
+  it('rejects late, backwards, stale-phase and pre-fallback presentation milestones', () => {
+    const initial = { phase: 'initial' as const, sampledAt: 1_050, physical: true };
+    const moving = { phase: 'moving' as const, sampledAt: 1_500, physical: false };
+    expect(windowGlassDebrisMilestoneAdmitted({
+      phase: 'initial', spawnedAt: 1_000, sampledAt: 1_050,
+      previous: null, physical: true, fallbackStartedAt: null,
+    })).toBe(true);
+    expect(windowGlassDebrisMilestoneAdmitted({
+      phase: 'initial', spawnedAt: 1_000, sampledAt: 1_050,
+      previous: null, physical: false, fallbackStartedAt: null,
+    })).toBe(false);
+    expect(windowGlassDebrisMilestoneAdmitted({
+      phase: 'moving', spawnedAt: 1_000, sampledAt: 1_500,
+      previous: initial, physical: false, fallbackStartedAt: 1_500,
+    })).toBe(true);
+    expect(windowGlassDebrisMilestoneAdmitted({
+      phase: 'settled', spawnedAt: 1_000, sampledAt: 1_500,
+      previous: moving, physical: false, fallbackStartedAt: 1_500,
+    })).toBe(true);
+    expect(windowGlassDebrisMilestoneAdmitted({
+      phase: 'settled', spawnedAt: 1_000, sampledAt: 1_500,
+      previous: { phase: 'moving', sampledAt: 1_400, physical: true }, physical: false, fallbackStartedAt: null,
+    })).toBe(true);
+    expect(windowGlassDebrisMilestoneAdmitted({
+      phase: 'initial', spawnedAt: 1_000, sampledAt: 6_000,
+      previous: null, physical: true, fallbackStartedAt: null,
+    })).toBe(false);
+    expect(windowGlassDebrisMilestoneAdmitted({
+      phase: 'moving', spawnedAt: 1_000, sampledAt: 1_200,
+      previous: { phase: 'initial', sampledAt: 5_000, physical: true }, physical: false, fallbackStartedAt: 1_180,
+    })).toBe(false);
+    expect(windowGlassDebrisMilestoneAdmitted({
+      phase: 'settled', spawnedAt: 1_000, sampledAt: 1_600,
+      previous: initial, physical: false, fallbackStartedAt: 1_180,
+    })).toBe(false);
+    expect(windowGlassDebrisMilestoneAdmitted({
+      phase: 'moving', spawnedAt: 1_000, sampledAt: 1_100,
+      previous: initial, physical: false, fallbackStartedAt: 1_180,
+    })).toBe(false);
+  });
+
+  it('retains valid sparse-callback chronology for an early or 1400ms pose and rejects a 5000ms pose', () => {
+    const floor = [{
+      source: 'world-floor',
+      collider: { minX: -5, maxX: 5, minY: -0.2, maxY: 0, minZ: -5, maxZ: 5 },
+    }];
+    const halfExtents = { x: 0.5, y: 0.6, z: 0.05 };
+    const catchUp = (stateObservedAt: number, policyStartAt: number) => {
+      const interval = windowGlassDebrisFallbackInterval({
+        spawnedAt: 0,
+        now: 5_100,
+        physicsActive: true,
+        receivedPhysicsPose: true,
+        stateIncludesPhysicsPose: true,
+        firstPhysicsPoseAt: stateObservedAt,
+        stateObservedAt,
+        lastProgressAt: stateObservedAt,
+        fallbackStartedAt: policyStartAt,
+      })!;
+      const initialState = {
+        position: { x: 0, y: 1.5, z: 0 },
+        velocity: { x: 0.1, y: -0.9, z: 0 },
+        rotation: { x: 0.1, y: 0.2, z: 0.1 },
+        angular: { x: 0.2, y: 0.3, z: 0.2 },
+      };
+      const preCapture = integrateWindowGlassDebrisFallback(
+        initialState,
+        (interval.captureStartAt - interval.stateStartAt) / 1_000,
+        (from, to) => windowGlassDebrisFallbackSweepSupport(from, to, halfExtents, floor),
+      );
+      const result = integrateWindowGlassDebrisFallback(
+        preCapture.state,
+        (interval.endAt - interval.captureStartAt) / 1_000,
+        (from, to) => windowGlassDebrisFallbackSweepSupport(from, to, halfExtents, floor),
+        initialState.position,
+      );
+      return { interval, result };
+    };
+
+    const early = catchUp(50, 500);
+    expect(early.result.moving).not.toBeNull();
+    expect(early.result.settled).toBe(true);
+    expect(early.interval.captureStartAt + early.result.moving!.elapsedSeconds * 1_000).toBeLessThan(2_500);
+    expect(early.interval.captureStartAt + early.result.settledAfterSeconds! * 1_000).toBeLessThan(4_250);
+
+    const delayed = catchUp(1_400, 180);
+    expect(delayed.interval).toMatchObject({ policyStartAt: 180, stateStartAt: 1_400, captureStartAt: 1_400 });
+    expect(delayed.result.moving).not.toBeNull();
+    expect(delayed.interval.captureStartAt + delayed.result.moving!.elapsedSeconds * 1_000).toBeLessThan(2_500);
+    expect(delayed.interval.captureStartAt + delayed.result.settledAfterSeconds! * 1_000).toBeLessThan(4_250);
+
+    const lateInitial = { phase: 'initial' as const, sampledAt: 5_000, physical: true };
+    expect(windowGlassDebrisMilestoneAdmitted({
+      phase: 'initial', spawnedAt: 0, sampledAt: lateInitial.sampledAt,
+      previous: null, physical: true, fallbackStartedAt: null,
+    })).toBe(false);
+    expect(windowGlassDebrisMilestoneAdmitted({
+      phase: 'moving', spawnedAt: 0, sampledAt: 1_200,
+      previous: lateInitial, physical: false, fallbackStartedAt: 180,
+    })).toBe(false);
+  });
+
+  it('leaves unsupported off-footprint fallback falling instead of fabricating a settle', () => {
+    const result = integrateWindowGlassDebrisFallback({
+      position: { x: 8, y: 0.2, z: 0 },
+      velocity: { x: 0, y: -0.9, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      angular: { x: 0, y: 0, z: 0 },
+    }, 1, (from, to) => windowGlassDebrisFallbackSweepSupport(
+      from,
+      to,
+      { x: 0.5, y: 0.6, z: 0.05 },
+      [{
+        source: 'world-floor',
+        collider: { minX: -5, maxX: 5, minY: -0.2, maxY: 0, minZ: -5, maxZ: 5 },
+      }],
+    ), { x: 8, y: 0.2, z: 0 });
+    expect(result.settled).toBe(false);
+    expect(result.support).toEqual({ restY: null, source: null });
+    expect(result.state.position.y).toBeLessThan(0);
   });
 
   it('renders separated triangular shards instead of an intact falling pane', () => {
@@ -223,12 +482,22 @@ describe('persistent window glass debris presentation', () => {
     const observerEnd = browser.indexOf('\nasync function readPaneDebrisLifecycleObservation', observerStart);
     const observer = browser.slice(observerStart, observerEnd);
     expect(source).toContain('sampleWindowDebrisLifecycle: (paneIndex: number)');
-    expect(source).toContain('persistentWindowDebris.get(persistentWindowDebrisId(pane.id))');
+    expect(source).toContain('const entry = persistentWindowDebris.get(id);');
+    expect(source).toContain('const milestones = Object.freeze(lifecycleMilestones.slice(nextMilestone));');
     expect(observer).toContain('debug.sampleWindowDebrisLifecycle(options.paneIndex)');
     expect(observer).toContain('window.requestAnimationFrame(sampleAfterGameFrame)');
     expect(observer).not.toContain('debug.snapshot()');
     expect(observer).toContain('debris disappeared before a valid settled sample');
     expect(observer).toContain('last=${describeSample(lastSample)}');
+    expect(observer).toContain('for (const milestone of batch.milestones) consumeSample(milestone, batch);');
+    expect(observer).toContain('current.sampledAt < lastMilestoneAt');
+    expect(observer).toContain('current.sampledAt >= current.spawnedAt + options.maxLifetimeMs');
+    expect(observer).toContain("current.milestone === 'initial'");
+    expect(observer).toContain("current.milestone === 'moving'");
+    expect(observer).toContain("current.milestone === 'settled'");
+    expect(observer).toContain('current.ageMs >= options.physicsTimeoutMs');
+    expect(observer).toContain('current.ageMs >= options.movementTimeoutMs');
+    expect(observer).toContain('current.ageMs >= options.settleTimeoutMs');
     expect(observer).toContain('current.physical === true');
     expect(observer).toContain("supportSource === 'world-floor'");
     expect(observer).toContain("supportSource?.startsWith('world-collider:') === true");

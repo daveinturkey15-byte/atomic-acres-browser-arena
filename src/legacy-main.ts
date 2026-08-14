@@ -730,9 +730,16 @@ import {
   WINDOW_GLASS_DEBRIS_MIN_PROGRESS_M,
   WINDOW_GLASS_DEBRIS_NO_PROGRESS_MS,
   WINDOW_GLASS_DEBRIS_POSE_GRACE_MS,
+  WINDOW_GLASS_DEBRIS_SETTLE_TOLERANCE_M,
   createFracturedWindowDebrisVisual,
+  integrateWindowGlassDebrisFallback,
   updateFracturedWindowDebrisVisual,
+  windowGlassDebrisFallbackInterval,
+  windowGlassDebrisFallbackSweepSupport,
   windowGlassDebrisLifecycleMode,
+  windowGlassDebrisMilestoneAdmitted,
+  type WindowGlassDebrisFallbackState,
+  type WindowGlassDebrisFallbackSupportCandidate,
 } from './window-glass-debris-presentation';
 import {
   INTERACTIVE_WORLD_SCHEMA_VERSION,
@@ -3569,9 +3576,42 @@ let activeWorldColliderCacheArena: ArenaMap | null = null;
 let activeWorldColliderCacheRuntime: InteractiveWorldRuntime | null = null;
 let activeWorldColliderCacheRevision = -1;
 let activeWorldColliderCache: ArenaMap['colliders'] = [];
+type WindowDebrisLifecycleMilestonePhase = 'initial' | 'moving' | 'settled';
+type WindowDebrisLifecycleSample = Readonly<{
+  id: string;
+  windowId: string;
+  spawnGeneration: number;
+  spawnedAt: number;
+  actionIdentity: string;
+  milestone: WindowDebrisLifecycleMilestonePhase | null;
+  sampledAt: number;
+  position: readonly [number, number, number];
+  visible: boolean;
+  physical: boolean;
+  physicsActive: boolean;
+  receivedPhysicsPose: boolean;
+  fallbackSettled: boolean;
+  support: Readonly<{ source: string | null; restY: number | null }>;
+  ageMs: number;
+  noProgressMs: number;
+  fallbackStartedAt: number | null;
+  settledAt: number | null;
+}>;
+type RetiredWindowDebrisLifecycleReceipt = Readonly<{
+  id: string;
+  windowId: string;
+  spawnGeneration: number;
+  spawnedAt: number;
+  actionIdentity: string;
+  milestones: readonly WindowDebrisLifecycleSample[];
+  terminal: WindowDebrisLifecycleSample | null;
+  retiredAt: number;
+}>;
 type PersistentWindowDebris = {
   id: string;
   windowId: string;
+  spawnGeneration: number;
+  actionIdentity: string;
   root: THREE.Group;
   definition: MajorDebrisBodyDefinition;
   physicsActive: boolean;
@@ -3587,11 +3627,17 @@ type PersistentWindowDebris = {
   fallbackSupportSource: string | null;
   fallbackSettled: boolean;
   receivedPhysicsPose: boolean;
+  firstPhysicsPoseAt: number | null;
+  fallbackStateObservedAt: number;
+  fallbackStateIncludesPhysicsPose: boolean;
   spawnedAt: number;
   lastProgressY: number;
   lastProgressAt: number;
   fallbackStartedAt: number | null;
+  fallbackIntegratedAt: number | null;
   settledAt: number | null;
+  lifecycleMilestones: WindowDebrisLifecycleSample[];
+  lastPhysicsPoseSample: WindowDebrisLifecycleSample | null;
 };
 type PooledWindowDebris = Readonly<{
   key: string;
@@ -3601,6 +3647,12 @@ type PooledWindowDebris = Readonly<{
   halfExtents: Readonly<{ x: number; y: number; z: number }>;
 }>;
 const persistentWindowDebris = new Map<string, PersistentWindowDebris>();
+const retiredWindowDebrisLifecycleReceipts = new Map<string, RetiredWindowDebrisLifecycleReceipt>();
+const windowDebrisLifecycleReadCursors = new Map<string, Readonly<{
+  spawnGeneration: number;
+  nextMilestone: number;
+}>>();
+let nextWindowDebrisSpawnGeneration = 1;
 const windowGlassDebrisLifecycleTelemetry = {
   spawned: 0,
   presentationFallbacks: 0,
@@ -3716,6 +3768,85 @@ function activeWorldColliders(activeArena: ArenaMap = arena): ArenaMap['collider
   return activeWorldColliderCache;
 }
 
+function applyPersistentWindowDebrisPhysicsSnapshot(
+  entry: PersistentWindowDebris,
+  snapshot: MajorDebrisBodySnapshot,
+  observedAt: number,
+  applyState = true,
+): void {
+  if (!entry.physicsActive) return;
+  const position = Object.freeze({ ...snapshot.position });
+  const support = windowDebrisSupport(position, entry.definition.halfExtents);
+  entry.receivedPhysicsPose = true;
+  if (entry.firstPhysicsPoseAt === null) entry.firstPhysicsPoseAt = observedAt;
+  entry.lastPhysicsPoseSample = createWindowDebrisLifecycleSample(entry, observedAt, null, {
+    position,
+    physical: true,
+    physicsActive: true,
+    fallbackSettled: false,
+    support,
+  });
+  recordWindowDebrisLifecycleMilestone(entry, 'initial', observedAt, {
+    position,
+    physical: true,
+    physicsActive: true,
+    fallbackSettled: false,
+    support,
+  });
+  const initial = entry.lifecycleMilestones[0];
+  if (initial?.milestone === 'initial') {
+    const displacement = Math.hypot(
+      snapshot.position.x - initial.position[0],
+      snapshot.position.y - initial.position[1],
+      snapshot.position.z - initial.position[2],
+    );
+    if (snapshot.position.y <= initial.position[1] - WINDOW_GLASS_DEBRIS_MIN_PROGRESS_M
+      && displacement >= WINDOW_GLASS_DEBRIS_SETTLE_TOLERANCE_M) {
+      recordWindowDebrisLifecycleMilestone(entry, 'moving', observedAt, {
+        position,
+        physical: true,
+        physicsActive: true,
+        fallbackSettled: false,
+        support,
+      });
+    }
+  }
+  if (!applyState) return;
+  entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
+  entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w);
+  entry.definition = majorDebrisDefinitionFromSnapshot(entry.definition, snapshot);
+  entry.fallbackVelocity.set(
+    snapshot.linearVelocity.x,
+    snapshot.linearVelocity.y,
+    snapshot.linearVelocity.z,
+  );
+  entry.fallbackAngular.set(
+    snapshot.angularVelocity.x,
+    snapshot.angularVelocity.y,
+    snapshot.angularVelocity.z,
+  );
+  entry.fallbackRestY = support.restY;
+  entry.fallbackSupportSource = support.source;
+  entry.fallbackStateObservedAt = observedAt;
+  entry.fallbackStateIncludesPhysicsPose = true;
+  if (snapshot.position.y <= entry.lastProgressY - WINDOW_GLASS_DEBRIS_MIN_PROGRESS_M) {
+    entry.lastProgressY = snapshot.position.y;
+    entry.lastProgressAt = observedAt;
+  }
+}
+
+function ingestPersistentWindowDebrisPhysicsSnapshots(
+  snapshots: readonly MajorDebrisBodySnapshot[],
+  observedAt: number,
+): void {
+  for (const snapshot of snapshots) {
+    const entry = persistentWindowDebris.get(snapshot.id);
+    if (!entry) continue;
+    const beforeExpiry = observedAt < entry.spawnedAt + WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS;
+    applyPersistentWindowDebrisPhysicsSnapshot(entry, snapshot, observedAt, beforeExpiry);
+  }
+}
+
 function syncInteractiveWorldPhysics(authoritativeResync = false): void {
   invalidateActiveWorldCollisionCache();
   if (!characterPhysics) return;
@@ -3734,6 +3865,7 @@ function syncInteractiveWorldPhysics(authoritativeResync = false): void {
     ],
   );
   characterPhysics.syncMajorDebrisBodies(activeMajorDebrisPhysicsBodies(), authoritativeResync);
+  ingestPersistentWindowDebrisPhysicsSnapshots(characterPhysics.majorDebrisSnapshots(), performance.now());
   if (!interactiveWorldRuntime) return;
   for (const mesh of interactiveWorldRuntime.housePresentationRaycastMeshes()) {
     if (!arena.raycastMeshes.includes(mesh)) arena.raycastMeshes.push(mesh);
@@ -3769,107 +3901,229 @@ function activeMajorDebrisPhysicsBodies(): readonly MajorDebrisBodyDefinition[] 
   return Object.freeze(bodies);
 }
 
-function updatePersistentWindowDebrisPhysics(dt = 1 / SIMULATION_HZ): void {
+function updatePersistentWindowDebrisPhysics(_dt = 1 / SIMULATION_HZ): void {
   if (persistentWindowDebris.size === 0) return;
-  const snapshots = characterPhysics
-    ? new Map(characterPhysics.majorDebrisSnapshots().map((snapshot) => [snapshot.id, snapshot]))
-    : new Map<string, MajorDebrisBodySnapshot>();
-  const fallbackDt = Math.min(0.05, Math.max(0, dt));
-  let retirePhysics = false;
+  const snapshotList = characterPhysics?.majorDebrisSnapshots() ?? [];
   const now = performance.now();
-  for (const [id, entry] of persistentWindowDebris) {
+  const snapshots = new Map(snapshotList.map((snapshot) => [snapshot.id, snapshot]));
+  let retirePhysics = false;
+  const pendingMilestones: Array<Readonly<{
+    entry: PersistentWindowDebris;
+    phase: 'moving' | 'settled';
+    sampledAt: number;
+    overrides: WindowDebrisLifecycleSampleOverrides;
+  }>> = [];
+  const expiredEntries: PersistentWindowDebris[] = [];
+  let fallbackSupportCandidates: readonly WindowGlassDebrisFallbackSupportCandidate[] | null = null;
+  for (const entry of persistentWindowDebris.values()) {
     const ageMs = Math.max(0, now - entry.spawnedAt);
     updateFracturedWindowDebrisVisual(entry.root, ageMs / 1_000);
     const snapshot = snapshots.get(entry.id);
+    const expiresAt = entry.spawnedAt + WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS;
+    const beforeExpiry = now < expiresAt;
+    const retainedPolicyInterval = entry.fallbackSettled ? null : windowGlassDebrisFallbackInterval({
+      spawnedAt: entry.spawnedAt,
+      now,
+      physicsActive: entry.physicsActive,
+      receivedPhysicsPose: entry.receivedPhysicsPose,
+      stateIncludesPhysicsPose: entry.fallbackStateIncludesPhysicsPose,
+      firstPhysicsPoseAt: entry.firstPhysicsPoseAt,
+      stateObservedAt: entry.fallbackStateObservedAt,
+      lastProgressAt: entry.lastProgressAt,
+      fallbackStartedAt: entry.fallbackStartedAt,
+    });
     if (snapshot) {
-      entry.receivedPhysicsPose = true;
-      if (entry.physicsActive) {
-        entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
-        entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w);
-        entry.definition = majorDebrisDefinitionFromSnapshot(entry.definition, snapshot);
-        const support = windowDebrisSupport(entry.root.position, entry.definition.halfExtents);
-        entry.fallbackRestY = support.restY;
-        entry.fallbackSupportSource = support.source;
-        if (snapshot.position.y <= entry.lastProgressY - WINDOW_GLASS_DEBRIS_MIN_PROGRESS_M) {
-          entry.lastProgressY = snapshot.position.y;
-          entry.lastProgressAt = now;
-        }
-      }
+      applyPersistentWindowDebrisPhysicsSnapshot(entry, snapshot, now, beforeExpiry);
     }
-
+    const lifecycleAgeMs = Math.min(ageMs, WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS - 0.001);
     const lifecycle = windowGlassDebrisLifecycleMode({
-      ageMs,
+      ageMs: lifecycleAgeMs,
       positionY: entry.root.position.y,
       restY: entry.fallbackRestY,
       physicsActive: entry.physicsActive,
-      sleeping: snapshot?.sleeping ?? false,
+      sleeping: beforeExpiry && (snapshot?.sleeping ?? false),
       receivedPhysicsPose: entry.receivedPhysicsPose,
-      noProgressMs: Math.max(0, now - entry.lastProgressAt),
+      noProgressMs: Math.max(0, Math.min(now, expiresAt) - entry.lastProgressAt),
       fallbackSettled: entry.fallbackSettled,
     });
-    if (lifecycle === 'expired') {
-      if (entry.physicsActive) {
-        entry.physicsActive = false;
-        retirePhysics = true;
-        windowGlassDebrisLifecycleTelemetry.physicsRetirements += 1;
-      }
-      updateFracturedWindowDebrisVisual(entry.root, 0);
-      entry.root.visible = false;
-      entry.root.userData.persistentMajorDebris = false;
-      persistentWindowDebris.delete(id);
-      windowGlassDebrisLifecycleTelemetry.expired += 1;
-      continue;
-    }
-    if (lifecycle === 'settled') {
-      if (!entry.fallbackSettled) {
-        if (entry.fallbackRestY !== null) entry.root.position.y = entry.fallbackRestY;
-        entry.fallbackSettled = true;
-        entry.settledAt = now;
-        entry.fallbackVelocity.set(0, 0, 0);
-        entry.fallbackAngular.set(0, 0, 0);
-        windowGlassDebrisLifecycleTelemetry.settled += 1;
-      }
-      if (entry.physicsActive) {
-        entry.physicsActive = false;
-        retirePhysics = true;
-        windowGlassDebrisLifecycleTelemetry.physicsRetirements += 1;
-      }
-      continue;
-    }
-    if (lifecycle === 'presentation-fall' && entry.physicsActive) {
-      entry.physicsActive = false;
-      entry.receivedPhysicsPose = false;
-      entry.fallbackStartedAt = now;
-      entry.fallbackVelocity.y = Math.min(entry.fallbackVelocity.y, -0.9);
-      retirePhysics = true;
-      windowGlassDebrisLifecycleTelemetry.presentationFallbacks += 1;
-      windowGlassDebrisLifecycleTelemetry.physicsRetirements += 1;
-    }
-    if (entry.physicsActive || entry.fallbackSettled) continue;
-
-    // Once the bounded Rapier phase ends, keep visible fragments truthful with
-    // a deterministic gravity fall while the pane's canonical breached state
-    // remains for the whole round.
-    const support = windowDebrisSupport(entry.root.position, entry.definition.halfExtents);
-    entry.fallbackRestY = support.restY;
-    entry.fallbackSupportSource = support.source;
-    entry.fallbackVelocity.y -= 9.81 * fallbackDt;
-    entry.root.position.addScaledVector(entry.fallbackVelocity, fallbackDt);
-    entry.root.rotation.x += entry.fallbackAngular.x * fallbackDt;
-    entry.root.rotation.y += entry.fallbackAngular.y * fallbackDt;
-    entry.root.rotation.z += entry.fallbackAngular.z * fallbackDt;
-    if (entry.fallbackRestY !== null && entry.root.position.y <= entry.fallbackRestY) {
-      entry.root.position.y = entry.fallbackRestY;
-      entry.root.rotation.x = 0;
-      entry.root.rotation.z = 0;
-      entry.fallbackVelocity.set(0, 0, 0);
-      entry.fallbackAngular.set(0, 0, 0);
+    if (lifecycle === 'settled' && beforeExpiry && !entry.fallbackSettled) {
+      if (entry.fallbackRestY !== null) entry.root.position.y = entry.fallbackRestY;
       entry.fallbackSettled = true;
       entry.settledAt = now;
+      entry.fallbackVelocity.set(0, 0, 0);
+      entry.fallbackAngular.set(0, 0, 0);
       windowGlassDebrisLifecycleTelemetry.settled += 1;
+      if (entry.physicsActive) {
+        entry.physicsActive = false;
+        retirePhysics = true;
+        windowGlassDebrisLifecycleTelemetry.physicsRetirements += 1;
+      }
+      pendingMilestones.push(Object.freeze({
+        entry,
+        phase: 'settled',
+        sampledAt: now,
+        overrides: Object.freeze({
+          position: Object.freeze({ ...entry.root.position }),
+          physicsActive: false,
+          fallbackSettled: true,
+          support: Object.freeze({
+            source: entry.fallbackSupportSource,
+            restY: entry.fallbackRestY,
+          }),
+          settledAt: now,
+        }),
+      }));
     }
+
+    if (!entry.fallbackSettled) {
+      const forcedFallbackAt = beforeExpiry && snapshot?.sleeping ? now : null;
+      const currentPolicyInterval = windowGlassDebrisFallbackInterval({
+        spawnedAt: entry.spawnedAt,
+        now,
+        physicsActive: entry.physicsActive,
+        receivedPhysicsPose: entry.receivedPhysicsPose,
+        stateIncludesPhysicsPose: entry.fallbackStateIncludesPhysicsPose,
+        firstPhysicsPoseAt: entry.firstPhysicsPoseAt,
+        stateObservedAt: entry.fallbackStateObservedAt,
+        lastProgressAt: entry.lastProgressAt,
+        fallbackStartedAt: entry.fallbackStartedAt,
+        forcedFallbackAt,
+      });
+      const interval = retainedPolicyInterval
+        ? Object.freeze({
+            ...retainedPolicyInterval,
+            stateStartAt: entry.fallbackStateObservedAt,
+            captureStartAt: Math.max(
+              retainedPolicyInterval.policyStartAt,
+              entry.fallbackStateObservedAt,
+            ),
+          })
+        : currentPolicyInterval;
+      if (interval && (retainedPolicyInterval !== null
+        || lifecycle === 'presentation-fall'
+        || entry.fallbackStartedAt !== null)) {
+        if (entry.fallbackStartedAt === null) {
+          entry.fallbackStartedAt = interval.policyStartAt;
+          entry.fallbackIntegratedAt = interval.stateStartAt;
+          windowGlassDebrisLifecycleTelemetry.presentationFallbacks += 1;
+        }
+        if (entry.physicsActive) {
+          entry.physicsActive = false;
+          retirePhysics = true;
+          windowGlassDebrisLifecycleTelemetry.physicsRetirements += 1;
+        }
+        const stateStartedAt = entry.fallbackIntegratedAt ?? interval.stateStartAt;
+        const captureStartedAt = Math.max(stateStartedAt, interval.captureStartAt);
+        const initial = entry.lifecycleMilestones[0];
+        const retainedState: WindowGlassDebrisFallbackState = {
+          position: entry.root.position,
+          velocity: entry.fallbackVelocity,
+          rotation: entry.root.rotation,
+          angular: entry.fallbackAngular,
+        };
+        const supportCandidates = fallbackSupportCandidates
+          ?? (fallbackSupportCandidates = windowDebrisFallbackSupportCandidates());
+        const preCapture = integrateWindowGlassDebrisFallback(
+          retainedState,
+          Math.max(0, captureStartedAt - stateStartedAt) / 1_000,
+          (from, to) => windowDebrisFallbackSupport(
+            from,
+            to,
+            entry.definition.halfExtents,
+            supportCandidates,
+          ),
+        );
+        const result = integrateWindowGlassDebrisFallback(
+          preCapture.state,
+          Math.max(0, interval.endAt - captureStartedAt) / 1_000,
+          (from, to) => windowDebrisFallbackSupport(
+            from,
+            to,
+            entry.definition.halfExtents,
+            supportCandidates,
+          ),
+          initial?.milestone === 'initial'
+            ? { x: initial.position[0], y: initial.position[1], z: initial.position[2] }
+            : null,
+        );
+        entry.root.position.set(result.state.position.x, result.state.position.y, result.state.position.z);
+        entry.root.rotation.set(result.state.rotation.x, result.state.rotation.y, result.state.rotation.z);
+        entry.fallbackVelocity.set(result.state.velocity.x, result.state.velocity.y, result.state.velocity.z);
+        entry.fallbackAngular.set(result.state.angular.x, result.state.angular.y, result.state.angular.z);
+        entry.fallbackIntegratedAt = captureStartedAt + result.elapsedSeconds * 1_000;
+        entry.fallbackStateObservedAt = entry.fallbackIntegratedAt;
+        entry.fallbackStateIncludesPhysicsPose = false;
+        if (result.moving) {
+          const movingAt = captureStartedAt + result.moving.elapsedSeconds * 1_000;
+          const movingSupport = windowDebrisSupport(
+            result.moving.state.position,
+            entry.definition.halfExtents,
+          );
+          pendingMilestones.push(Object.freeze({
+            entry,
+            phase: 'moving',
+            sampledAt: movingAt,
+            overrides: Object.freeze({
+              position: result.moving.state.position,
+              physicsActive: false,
+              fallbackSettled: false,
+              support: movingSupport,
+            }),
+          }));
+        }
+        if (result.settled && result.settledAfterSeconds !== null) {
+          const settledAt = captureStartedAt + result.settledAfterSeconds * 1_000;
+          entry.fallbackRestY = result.support.restY;
+          entry.fallbackSupportSource = result.support.source;
+          entry.fallbackSettled = true;
+          entry.settledAt = settledAt;
+          windowGlassDebrisLifecycleTelemetry.settled += 1;
+          pendingMilestones.push(Object.freeze({
+            entry,
+            phase: 'settled',
+            sampledAt: settledAt,
+            overrides: Object.freeze({
+              position: result.state.position,
+              physicsActive: false,
+              fallbackSettled: true,
+              support: result.support,
+              settledAt,
+            }),
+          }));
+        } else {
+          const support = windowDebrisSupport(entry.root.position, entry.definition.halfExtents);
+          entry.fallbackRestY = support.restY;
+          entry.fallbackSupportSource = support.source;
+        }
+      }
+    }
+    if (now >= expiresAt) expiredEntries.push(entry);
   }
-  if (retirePhysics) scheduleWindowGlassPhysicsSync();
+
+  if (retirePhysics && characterPhysics) {
+    characterPhysics.syncMajorDebrisBodies(activeMajorDebrisPhysicsBodies(), false);
+  }
+  const remainingPhysicalIds = new Set(
+    characterPhysics?.majorDebrisSnapshots().map((snapshot) => snapshot.id) ?? [],
+  );
+  for (const pending of pendingMilestones) {
+    if (remainingPhysicalIds.has(pending.entry.id)) continue;
+    recordWindowDebrisLifecycleMilestone(
+      pending.entry,
+      pending.phase,
+      pending.sampledAt,
+      { ...pending.overrides, physical: false },
+    );
+  }
+  for (const entry of expiredEntries) {
+    if (remainingPhysicalIds.has(entry.id)) continue;
+    retainWindowDebrisLifecycleReceipt(entry, now);
+    updateFracturedWindowDebrisVisual(entry.root, 0);
+    entry.root.visible = false;
+    entry.root.userData.persistentMajorDebris = false;
+    persistentWindowDebris.delete(entry.id);
+    windowGlassDebrisLifecycleTelemetry.expired += 1;
+  }
 }
 
 function majorDebrisDefinitionFromSnapshot(
@@ -12719,30 +12973,163 @@ function windowDebrisSupport(
   return Object.freeze({ restY: supportY === null ? null : supportY + halfExtents.y, source });
 }
 
-function samplePersistentWindowDebrisLifecycle(entry: PersistentWindowDebris) {
-  const now = performance.now();
+function windowDebrisFallbackSupportCandidates(): readonly WindowGlassDebrisFallbackSupportCandidate[] {
+  const floor = worldFloorCollider(arena.bounds);
+  if (floor.minY === undefined || floor.maxY === undefined) {
+    throw new TypeError('canonical world floor is missing vertical bounds');
+  }
+  const candidates: WindowGlassDebrisFallbackSupportCandidate[] = [{
+    source: 'world-floor',
+    collider: {
+      minX: floor.minX,
+      maxX: floor.maxX,
+      minY: floor.minY,
+      maxY: floor.maxY,
+      minZ: floor.minZ,
+      maxZ: floor.maxZ,
+    },
+  }];
+  for (const [index, collider] of activeWorldColliders().entries()) {
+    if (collider.minY === undefined || collider.maxY === undefined) continue;
+    candidates.push({
+      source: `world-collider:${index}`,
+      collider: {
+        minX: collider.minX,
+        maxX: collider.maxX,
+        minY: collider.minY,
+        maxY: collider.maxY,
+        minZ: collider.minZ,
+        maxZ: collider.maxZ,
+      },
+    });
+  }
+  return Object.freeze(candidates);
+}
+
+function windowDebrisFallbackSupport(
+  from: Readonly<{ x: number; y: number; z: number }>,
+  to: Readonly<{ x: number; y: number; z: number }>,
+  halfExtents: Readonly<{ x: number; y: number; z: number }>,
+  candidates: readonly WindowGlassDebrisFallbackSupportCandidate[],
+) {
+  return windowGlassDebrisFallbackSweepSupport(from, to, halfExtents, candidates);
+}
+
+type WindowDebrisLifecycleSampleOverrides = Readonly<{
+  position?: Readonly<{ x: number; y: number; z: number }>;
+  physical?: boolean;
+  physicsActive?: boolean;
+  fallbackSettled?: boolean;
+  support?: Readonly<{ source: string | null; restY: number | null }>;
+  settledAt?: number | null;
+}>;
+
+function createWindowDebrisLifecycleSample(
+  entry: PersistentWindowDebris,
+  sampledAt: number,
+  milestone: WindowDebrisLifecycleMilestonePhase | null,
+  overrides: WindowDebrisLifecycleSampleOverrides = {},
+): WindowDebrisLifecycleSample {
+  const position = overrides.position ?? entry.root.position;
+  const support = overrides.support ?? {
+    source: entry.fallbackSupportSource,
+    restY: entry.fallbackRestY,
+  };
   return Object.freeze({
     id: entry.id,
     windowId: entry.windowId,
-    position: Object.freeze(entry.root.position.toArray()),
+    spawnGeneration: entry.spawnGeneration,
+    spawnedAt: entry.spawnedAt,
+    actionIdentity: entry.actionIdentity,
+    milestone,
+    sampledAt,
+    position: Object.freeze([position.x, position.y, position.z] as [number, number, number]),
     visible: entry.root.visible,
-    physical: characterPhysics?.majorDebrisSnapshots().some((snapshot) => snapshot.id === entry.id) ?? false,
-    physicsActive: entry.physicsActive,
+    physical: overrides.physical
+      ?? characterPhysics?.majorDebrisSnapshots().some((snapshot) => snapshot.id === entry.id)
+      ?? false,
+    physicsActive: overrides.physicsActive ?? entry.physicsActive,
     receivedPhysicsPose: entry.receivedPhysicsPose,
-    fallbackSettled: entry.fallbackSettled,
-    support: Object.freeze({ source: entry.fallbackSupportSource, restY: entry.fallbackRestY }),
-    ageMs: Math.max(0, now - entry.spawnedAt),
-    noProgressMs: Math.max(0, now - entry.lastProgressAt),
+    fallbackSettled: overrides.fallbackSettled ?? entry.fallbackSettled,
+    support: Object.freeze({ ...support }),
+    ageMs: Math.max(0, sampledAt - entry.spawnedAt),
+    noProgressMs: Math.max(0, sampledAt - entry.lastProgressAt),
     fallbackStartedAt: entry.fallbackStartedAt,
-    settledAt: entry.settledAt,
+    settledAt: overrides.settledAt === undefined ? entry.settledAt : overrides.settledAt,
   });
+}
+
+function recordWindowDebrisLifecycleMilestone(
+  entry: PersistentWindowDebris,
+  phase: WindowDebrisLifecycleMilestonePhase,
+  sampledAt: number,
+  overrides: WindowDebrisLifecycleSampleOverrides = {},
+): boolean {
+  const previous = entry.lifecycleMilestones.at(-1);
+  const sample = createWindowDebrisLifecycleSample(entry, sampledAt, phase, overrides);
+  if (!windowGlassDebrisMilestoneAdmitted({
+    phase,
+    spawnedAt: entry.spawnedAt,
+    sampledAt,
+    previous: previous?.milestone
+      ? { phase: previous.milestone, sampledAt: previous.sampledAt, physical: previous.physical }
+      : null,
+    physical: sample.physical,
+    fallbackStartedAt: entry.fallbackStartedAt,
+  })) return false;
+  entry.lifecycleMilestones.push(sample);
+  return true;
+}
+
+function samplePersistentWindowDebrisLifecycle(entry: PersistentWindowDebris): WindowDebrisLifecycleSample {
+  return createWindowDebrisLifecycleSample(entry, performance.now(), null);
+}
+
+function retainWindowDebrisLifecycleReceipt(entry: PersistentWindowDebris, retiredAt: number): void {
+  retiredWindowDebrisLifecycleReceipts.set(entry.id, Object.freeze({
+    id: entry.id,
+    windowId: entry.windowId,
+    spawnGeneration: entry.spawnGeneration,
+    spawnedAt: entry.spawnedAt,
+    actionIdentity: entry.actionIdentity,
+    milestones: Object.freeze([...entry.lifecycleMilestones]),
+    terminal: entry.lifecycleMilestones.at(-1) ?? entry.lastPhysicsPoseSample,
+    retiredAt,
+  }));
+  if (retiredWindowDebrisLifecycleReceipts.size > arena.breakableWindows.length) {
+    throw new TypeError('window debris lifecycle receipt bound exceeded canonical pane count');
+  }
 }
 
 function sampleWindowDebrisLifecycle(paneIndex: number) {
   const pane = Number.isInteger(paneIndex) ? arena.breakableWindows[paneIndex] : undefined;
   if (!pane) return null;
-  const entry = persistentWindowDebris.get(persistentWindowDebrisId(pane.id));
-  return entry ? samplePersistentWindowDebrisLifecycle(entry) : null;
+  const id = persistentWindowDebrisId(pane.id);
+  const entry = persistentWindowDebris.get(id);
+  const receipt = entry ? null : retiredWindowDebrisLifecycleReceipts.get(id);
+  if (!entry && !receipt) return null;
+  const record = entry ?? receipt!;
+  const lifecycleMilestones = entry ? entry.lifecycleMilestones : receipt!.milestones;
+  const priorCursor = windowDebrisLifecycleReadCursors.get(id);
+  const nextMilestone = priorCursor?.spawnGeneration === record.spawnGeneration
+    ? priorCursor.nextMilestone
+    : 0;
+  const milestones = Object.freeze(lifecycleMilestones.slice(nextMilestone));
+  windowDebrisLifecycleReadCursors.set(id, Object.freeze({
+    spawnGeneration: record.spawnGeneration,
+    nextMilestone: lifecycleMilestones.length,
+  }));
+  return Object.freeze({
+    id: record.id,
+    windowId: record.windowId,
+    spawnGeneration: record.spawnGeneration,
+    spawnedAt: record.spawnedAt,
+    actionIdentity: record.actionIdentity,
+    milestones,
+    current: entry ? samplePersistentWindowDebrisLifecycle(entry) : null,
+    terminal: receipt?.terminal ?? null,
+    retired: receipt !== null,
+  });
 }
 
 async function withStagedWindowGlassDebrisPool(
@@ -12842,7 +13229,11 @@ async function prewarmWindowGlassDebrisPool(sceneGeneration: number): Promise<vo
   }));
 }
 
-function spawnPersistentWindowDebris(window: ArenaMap['breakableWindows'][number], normal: THREE.Vector3): boolean {
+function spawnPersistentWindowDebris(
+  window: ArenaMap['breakableWindows'][number],
+  normal: THREE.Vector3,
+  actionIdentity: string,
+): boolean {
   const id = persistentWindowDebrisId(window.id);
   if (persistentWindowDebris.has(id)) return true;
   const counts = Object.freeze({
@@ -12854,13 +13245,20 @@ function spawnPersistentWindowDebris(window: ArenaMap['breakableWindows'][number
   // the already-analysed shard draw immediately so impact feedback cannot lag
   // behind authority. A full physics partition degrades to the same bounded
   // gravity presentation instead of silently omitting debris.
-  return spawnPersistentWindowDebrisSynchronously(window, normal, id, canAdmitMajorDebris(counts, 'window'));
+  return spawnPersistentWindowDebrisSynchronously(
+    window,
+    normal,
+    id,
+    actionIdentity,
+    canAdmitMajorDebris(counts, 'window'),
+  );
 }
 
 function spawnPersistentWindowDebrisSynchronously(
   window: ArenaMap['breakableWindows'][number],
   normal: THREE.Vector3,
   id: string,
+  actionIdentity: string,
   physicsEligible: boolean,
 ): boolean {
   const pooled = pooledWindowDebris.get(windowDebrisPoolKey(arena.id, window.id));
@@ -12908,9 +13306,14 @@ function spawnPersistentWindowDebrisSynchronously(
   });
   const spawnedAt = performance.now();
   const support = windowDebrisSupport(centre, halfExtents);
+  const spawnGeneration = nextWindowDebrisSpawnGeneration++;
+  retiredWindowDebrisLifecycleReceipts.delete(id);
+  windowDebrisLifecycleReadCursors.delete(id);
   persistentWindowDebris.set(id, {
     id,
     windowId: window.id,
+    spawnGeneration,
+    actionIdentity,
     root,
     definition,
     physicsActive: physicsEligible,
@@ -12928,11 +13331,17 @@ function spawnPersistentWindowDebrisSynchronously(
     fallbackSupportSource: support.source,
     fallbackSettled: false,
     receivedPhysicsPose: false,
+    firstPhysicsPoseAt: null,
+    fallbackStateObservedAt: spawnedAt,
+    fallbackStateIncludesPhysicsPose: false,
     spawnedAt,
     lastProgressY: centre.y,
     lastProgressAt: spawnedAt,
     fallbackStartedAt: physicsEligible ? null : spawnedAt,
+    fallbackIntegratedAt: physicsEligible ? null : spawnedAt,
     settledAt: null,
+    lifecycleMilestones: [],
+    lastPhysicsPoseSample: null,
   });
   windowGlassDebrisLifecycleTelemetry.spawned += 1;
   if (!physicsEligible) windowGlassDebrisLifecycleTelemetry.presentationFallbacks += 1;
@@ -12945,6 +13354,8 @@ function clearPersistentWindowDebris(): void {
     entry.root.visible = false;
   }
   persistentWindowDebris.clear();
+  retiredWindowDebrisLifecycleReceipts.clear();
+  windowDebrisLifecycleReadCursors.clear();
   windowGlassPhysicsSyncScheduled = false;
   syncInteractiveWorldPhysics();
 }
@@ -13011,7 +13422,7 @@ function breakHouseWindow(
   // never leave an invisible or still-solid pane behind.
   window.broken = true;
   window.mesh.visible = projection.paneVisible;
-  spawnPersistentWindowDebris(window, normal);
+  spawnPersistentWindowDebris(window, normal, impactId);
   // Coalesce the pane collider and optional debris-body admission into one
   // deferred physics sync. Visual effects still happen immediately.
   scheduleWindowGlassPhysicsSync();

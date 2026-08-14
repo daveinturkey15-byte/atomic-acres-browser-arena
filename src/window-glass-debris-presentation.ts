@@ -10,9 +10,12 @@ export const WINDOW_GLASS_DEBRIS_NO_PROGRESS_MS = 450;
 export const WINDOW_GLASS_DEBRIS_MIN_PROGRESS_M = 0.025;
 export const WINDOW_GLASS_DEBRIS_MAX_PHYSICS_MS = 1_800;
 export const WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS = 4_500;
+export const WINDOW_GLASS_DEBRIS_FALLBACK_MAX_STEP_SECONDS = 0.05;
+const WINDOW_GLASS_DEBRIS_FALLBACK_GRAVITY_MPS2 = 9.81;
 
 export type WindowGlassDebrisSettleMode = 'physics-active' | 'settled' | 'presentation-fall';
 export type WindowGlassDebrisLifecycleMode = WindowGlassDebrisSettleMode | 'expired';
+export type WindowGlassDebrisLifecycleMilestonePhase = 'initial' | 'moving' | 'settled';
 
 export type WindowGlassDebrisLifecycleSample = Readonly<{
   ageMs: number;
@@ -69,6 +72,362 @@ export function windowGlassDebrisLifecycleMode(
   }
   if (sample.restY === null) return sample.sleeping ? 'presentation-fall' : 'physics-active';
   return windowGlassDebrisSettleMode(sample.positionY, sample.restY, sample.sleeping);
+}
+
+export function windowGlassDebrisMilestoneAdmitted(sample: Readonly<{
+  phase: WindowGlassDebrisLifecycleMilestonePhase;
+  spawnedAt: number;
+  sampledAt: number;
+  previous: Readonly<{
+    phase: WindowGlassDebrisLifecycleMilestonePhase;
+    sampledAt: number;
+    physical: boolean;
+  }> | null;
+  physical: boolean;
+  fallbackStartedAt: number | null;
+}>): boolean {
+  const expected = sample.previous === null
+    ? 'initial'
+    : sample.previous.phase === 'initial'
+      ? 'moving'
+      : sample.previous.phase === 'moving'
+        ? 'settled'
+        : null;
+  return sample.phase === expected
+    && Number.isFinite(sample.spawnedAt)
+    && Number.isFinite(sample.sampledAt)
+    && sample.sampledAt >= sample.spawnedAt
+    && sample.sampledAt < sample.spawnedAt + WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS
+    && (sample.previous === null || sample.sampledAt >= sample.previous.sampledAt)
+    && (sample.phase === 'initial'
+      ? sample.physical
+      : sample.phase === 'moving'
+        ? sample.physical
+          || sample.fallbackStartedAt !== null && sample.sampledAt >= sample.fallbackStartedAt
+        : !sample.physical && (sample.fallbackStartedAt === null
+          ? sample.previous?.physical === true
+          : sample.sampledAt >= sample.fallbackStartedAt));
+}
+
+export type WindowGlassDebrisFallbackVector = Readonly<{ x: number; y: number; z: number }>;
+
+export type WindowGlassDebrisFallbackState = Readonly<{
+  position: WindowGlassDebrisFallbackVector;
+  velocity: WindowGlassDebrisFallbackVector;
+  rotation: WindowGlassDebrisFallbackVector;
+  angular: WindowGlassDebrisFallbackVector;
+}>;
+
+export type WindowGlassDebrisFallbackSweep = Readonly<{
+  restY: number | null;
+  source: string | null;
+  impactFraction: number | null;
+}>;
+
+export type WindowGlassDebrisFallbackSupportCandidate = Readonly<{
+  source: string;
+  collider: Readonly<{
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+    minZ: number;
+    maxZ: number;
+  }>;
+}>;
+
+export type WindowGlassDebrisFallbackMotionSample = Readonly<{
+  elapsedSeconds: number;
+  state: WindowGlassDebrisFallbackState;
+}>;
+
+export type WindowGlassDebrisFallbackResult = Readonly<{
+  elapsedSeconds: number;
+  state: WindowGlassDebrisFallbackState;
+  moving: WindowGlassDebrisFallbackMotionSample | null;
+  settled: boolean;
+  settledAfterSeconds: number | null;
+  support: Readonly<{ restY: number | null; source: string | null }>;
+}>;
+
+export type WindowGlassDebrisFallbackInterval = Readonly<{
+  policyStartAt: number;
+  stateStartAt: number;
+  captureStartAt: number;
+  endAt: number;
+}>;
+
+/**
+ * Derives the fallback interval from retained lifecycle timestamps, not from
+ * the callback that happens to notice the boundary. The end remains the hard
+ * retirement instant even when one sparse outer callback arrives later.
+ */
+export function windowGlassDebrisFallbackInterval(sample: Readonly<{
+  spawnedAt: number;
+  now: number;
+  physicsActive: boolean;
+  receivedPhysicsPose: boolean;
+  stateIncludesPhysicsPose: boolean;
+  firstPhysicsPoseAt?: number | null;
+  stateObservedAt: number;
+  lastProgressAt: number;
+  fallbackStartedAt: number | null;
+  forcedFallbackAt?: number | null;
+}>): WindowGlassDebrisFallbackInterval | null {
+  const values = [
+    sample.spawnedAt,
+    sample.now,
+    sample.lastProgressAt,
+    sample.firstPhysicsPoseAt ?? null,
+    sample.stateObservedAt,
+    sample.fallbackStartedAt,
+    sample.forcedFallbackAt ?? null,
+  ].filter((value): value is number => value !== null);
+  if (!values.every(Number.isFinite)
+    || sample.now < sample.spawnedAt
+    || sample.lastProgressAt < sample.spawnedAt
+    || sample.lastProgressAt > sample.now
+    || sample.stateObservedAt < sample.spawnedAt
+    || sample.stateObservedAt > sample.now
+    || sample.lastProgressAt > sample.stateObservedAt
+    || sample.stateIncludesPhysicsPose && (!sample.receivedPhysicsPose
+      || sample.firstPhysicsPoseAt === undefined
+      || sample.firstPhysicsPoseAt === null
+      || sample.firstPhysicsPoseAt > sample.stateObservedAt)
+    || sample.firstPhysicsPoseAt !== undefined && sample.firstPhysicsPoseAt !== null
+      && (sample.firstPhysicsPoseAt < sample.spawnedAt || sample.firstPhysicsPoseAt > sample.now)
+    || sample.fallbackStartedAt !== null
+      && (sample.fallbackStartedAt < sample.spawnedAt || sample.fallbackStartedAt > sample.now)
+    || sample.forcedFallbackAt !== undefined && sample.forcedFallbackAt !== null
+      && (sample.forcedFallbackAt < sample.spawnedAt || sample.forcedFallbackAt > sample.now)) {
+    throw new TypeError('window glass debris fallback interval requires ordered finite timestamps');
+  }
+  const policyStart = sample.fallbackStartedAt
+    ?? (!sample.physicsActive
+      ? sample.spawnedAt
+      : !sample.stateIncludesPhysicsPose
+        ? sample.spawnedAt + WINDOW_GLASS_DEBRIS_POSE_GRACE_MS
+        : Math.min(
+            sample.lastProgressAt + WINDOW_GLASS_DEBRIS_NO_PROGRESS_MS,
+            sample.spawnedAt + WINDOW_GLASS_DEBRIS_MAX_PHYSICS_MS,
+            sample.forcedFallbackAt ?? Number.POSITIVE_INFINITY,
+          ));
+  const endAt = Math.min(sample.now, sample.spawnedAt + WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS);
+  if (policyStart > endAt || sample.stateObservedAt > endAt) return null;
+  return Object.freeze({
+    policyStartAt: policyStart,
+    stateStartAt: sample.stateObservedAt,
+    captureStartAt: Math.max(policyStart, sample.stateObservedAt),
+    endAt,
+  });
+}
+
+function cloneFallbackState(state: WindowGlassDebrisFallbackState): WindowGlassDebrisFallbackState {
+  return Object.freeze({
+    position: Object.freeze({ ...state.position }),
+    velocity: Object.freeze({ ...state.velocity }),
+    rotation: Object.freeze({ ...state.rotation }),
+    angular: Object.freeze({ ...state.angular }),
+  });
+}
+
+function fallbackMovementReached(
+  position: WindowGlassDebrisFallbackVector,
+  origin: WindowGlassDebrisFallbackVector | null,
+): boolean {
+  if (!origin || position.y > origin.y - WINDOW_GLASS_DEBRIS_MIN_PROGRESS_M) return false;
+  return Math.hypot(position.x - origin.x, position.y - origin.y, position.z - origin.z)
+    >= WINDOW_GLASS_DEBRIS_SETTLE_TOLERANCE_M;
+}
+
+/**
+ * Finds the highest collision-authoritative support crossed by a bounded
+ * downward step. A body already overlapping a surface is admitted only when
+ * that surface top lies inside its current vertical extent; this recovers a
+ * real penetration without treating tall walls or distant floors as support.
+ */
+export function windowGlassDebrisFallbackSweepSupport(
+  from: WindowGlassDebrisFallbackVector,
+  to: WindowGlassDebrisFallbackVector,
+  halfExtents: WindowGlassDebrisFallbackVector,
+  candidates: readonly WindowGlassDebrisFallbackSupportCandidate[],
+): WindowGlassDebrisFallbackSweep {
+  const values = [...Object.values(from), ...Object.values(to), ...Object.values(halfExtents)];
+  if (!values.every(Number.isFinite)
+    || halfExtents.x <= 0
+    || halfExtents.y <= 0
+    || halfExtents.z <= 0) {
+    throw new TypeError('window glass debris fallback support requires finite positive bounds');
+  }
+  if (to.y > from.y) return Object.freeze({ restY: null, source: null, impactFraction: null });
+
+  const footprintInsetX = Math.min(halfExtents.x * 0.35, 0.18);
+  const footprintInsetZ = Math.min(halfExtents.z * 0.35, 0.08);
+  const fromBottom = from.y - halfExtents.y;
+  const toBottom = to.y - halfExtents.y;
+  let supportY: number | null = null;
+  let source: string | null = null;
+  let impactFraction: number | null = null;
+
+  for (const candidate of candidates) {
+    const { collider } = candidate;
+    if (!candidate.source
+      || !Number.isFinite(collider.minX)
+      || !Number.isFinite(collider.maxX)
+      || !Number.isFinite(collider.minY)
+      || !Number.isFinite(collider.maxY)
+      || !Number.isFinite(collider.minZ)
+      || !Number.isFinite(collider.maxZ)
+      || collider.minX > collider.maxX
+      || collider.minY > collider.maxY
+      || collider.minZ > collider.maxZ) continue;
+    const surfaceY = collider.maxY;
+    const overlappingAtStart = surfaceY >= fromBottom
+      && surfaceY <= from.y + halfExtents.y;
+    const crossedDuringStep = fromBottom > surfaceY && toBottom <= surfaceY;
+    if (!overlappingAtStart && !crossedDuringStep) continue;
+    const fraction = overlappingAtStart
+      ? 0
+      : (fromBottom - surfaceY) / (fromBottom - toBottom);
+    const impactX = from.x + (to.x - from.x) * fraction;
+    const impactZ = from.z + (to.z - from.z) * fraction;
+    const overlapsX = impactX + halfExtents.x - footprintInsetX >= collider.minX
+      && impactX - halfExtents.x + footprintInsetX <= collider.maxX;
+    const overlapsZ = impactZ + halfExtents.z - footprintInsetZ >= collider.minZ
+      && impactZ - halfExtents.z + footprintInsetZ <= collider.maxZ;
+    if (!overlapsX || !overlapsZ || supportY !== null && surfaceY <= supportY) continue;
+    supportY = surfaceY;
+    source = candidate.source;
+    impactFraction = fraction;
+  }
+
+  return Object.freeze({
+    restY: supportY === null ? null : supportY + halfExtents.y,
+    source,
+    impactFraction,
+  });
+}
+
+/**
+ * Advances presentation-owned debris by real elapsed time while retaining a
+ * bounded collision step. The caller owns support authority and can therefore
+ * reject off-footprint or non-collision surfaces without changing this motion.
+ */
+export function integrateWindowGlassDebrisFallback(
+  initialState: WindowGlassDebrisFallbackState,
+  elapsedSeconds: number,
+  supportForSweep: (
+    from: WindowGlassDebrisFallbackVector,
+    to: WindowGlassDebrisFallbackVector,
+    stepSeconds: number,
+  ) => WindowGlassDebrisFallbackSweep,
+  movementOrigin: WindowGlassDebrisFallbackVector | null = null,
+): WindowGlassDebrisFallbackResult {
+  const values = [
+    elapsedSeconds,
+    ...Object.values(initialState.position),
+    ...Object.values(initialState.velocity),
+    ...Object.values(initialState.rotation),
+    ...Object.values(initialState.angular),
+  ];
+  if (!values.every(Number.isFinite)
+    || elapsedSeconds < 0
+    || elapsedSeconds > WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS / 1_000) {
+    throw new TypeError('window glass debris fallback requires finite bounded motion');
+  }
+
+  let position = { ...initialState.position };
+  let velocity = { ...initialState.velocity };
+  let rotation = { ...initialState.rotation };
+  let angular = { ...initialState.angular };
+  let advancedSeconds = 0;
+  let moving: WindowGlassDebrisFallbackMotionSample | null = null;
+  let support: Readonly<{ restY: number | null; source: string | null }> = Object.freeze({
+    restY: null,
+    source: null,
+  });
+  const captureMoving = () => {
+    if (moving || !fallbackMovementReached(position, movementOrigin)) return;
+    moving = Object.freeze({
+      elapsedSeconds: advancedSeconds,
+      state: cloneFallbackState({ position, velocity, rotation, angular }),
+    });
+  };
+
+  captureMoving();
+  while (elapsedSeconds - advancedSeconds > Number.EPSILON) {
+    const stepSeconds = Math.min(
+      WINDOW_GLASS_DEBRIS_FALLBACK_MAX_STEP_SECONDS,
+      elapsedSeconds - advancedSeconds,
+    );
+    const nextVelocity = {
+      x: velocity.x,
+      y: velocity.y - WINDOW_GLASS_DEBRIS_FALLBACK_GRAVITY_MPS2 * stepSeconds,
+      z: velocity.z,
+    };
+    const nextPosition = {
+      x: position.x + velocity.x * stepSeconds,
+      y: position.y + velocity.y * stepSeconds
+        - 0.5 * WINDOW_GLASS_DEBRIS_FALLBACK_GRAVITY_MPS2 * stepSeconds * stepSeconds,
+      z: position.z + velocity.z * stepSeconds,
+    };
+    const sweep = supportForSweep(position, nextPosition, stepSeconds);
+    const sweepValues = [sweep.restY, sweep.impactFraction]
+      .filter((value): value is number => value !== null);
+    if (!sweepValues.every(Number.isFinite)
+      || (sweep.restY === null) !== (sweep.source === null)
+      || (sweep.restY === null) !== (sweep.impactFraction === null)
+      || sweep.impactFraction !== null && (sweep.impactFraction < 0 || sweep.impactFraction > 1)) {
+      throw new TypeError('window glass debris fallback received an invalid support sweep');
+    }
+
+    if (sweep.restY !== null && sweep.source !== null && sweep.impactFraction !== null) {
+      const impactSeconds = stepSeconds * sweep.impactFraction;
+      position = {
+        x: position.x + velocity.x * impactSeconds,
+        y: sweep.restY,
+        z: position.z + velocity.z * impactSeconds,
+      };
+      rotation = {
+        x: 0,
+        y: rotation.y + angular.y * impactSeconds,
+        z: 0,
+      };
+      velocity = { x: 0, y: 0, z: 0 };
+      angular = { x: 0, y: 0, z: 0 };
+      advancedSeconds += impactSeconds;
+      captureMoving();
+      support = Object.freeze({ restY: sweep.restY, source: sweep.source });
+      const settledState = cloneFallbackState({ position, velocity, rotation, angular });
+      return Object.freeze({
+        elapsedSeconds: advancedSeconds,
+        state: settledState,
+        moving,
+        settled: true,
+        settledAfterSeconds: advancedSeconds,
+        support,
+      });
+    }
+
+    position = nextPosition;
+    velocity = nextVelocity;
+    rotation = {
+      x: rotation.x + angular.x * stepSeconds,
+      y: rotation.y + angular.y * stepSeconds,
+      z: rotation.z + angular.z * stepSeconds,
+    };
+    advancedSeconds += stepSeconds;
+    captureMoving();
+  }
+
+  return Object.freeze({
+    elapsedSeconds: advancedSeconds,
+    state: cloneFallbackState({ position, velocity, rotation, angular }),
+    moving,
+    settled: false,
+    settledAfterSeconds: null,
+    support,
+  });
 }
 
 type WindowGlassDebrisVisualOptions = Readonly<{
