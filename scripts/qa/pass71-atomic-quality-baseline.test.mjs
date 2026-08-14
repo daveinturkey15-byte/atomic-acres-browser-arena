@@ -94,21 +94,21 @@ test('the full verifier fails closed on policy, audit metadata, runtime, texture
     const auditedRuntime = forgedProvenanceRecord.auditedSourceVariants
       .find((specification) => specification.path === runtimePath);
     const finalRuntimeVariant = auditedRuntime?.allowedVariants
-      .find((variant) => variant.auditSourceSha === '7034aa446acf65ed05d37905cfd977beec28ec32');
+      .find((variant) => variant.auditSourceSha === 'f2bb3a56f07370be3d4a35fa7a1177da2bda4e82');
     assert.deepEqual(finalRuntimeVariant, {
-      auditSourceSha: '7034aa446acf65ed05d37905cfd977beec28ec32',
-      gitBlobSha: 'e4d7c6d2eeefa0940ffa3a3a398ecbb7532c6cc6',
-      sha256: 'cde8387a4af09d4a1922e15545e62d3f39e653713d118d28ad3b31fd65c0eedc',
-      classification: 'Exact audited Pass 71 runtime composition for the repaired owner-test candidate product freeze: retains every previously admitted owner-feedback, glass, Chopper, debris, explosive-bolt and bounded local-multiplayer-QA path, and makes live-host retention symmetric by allowing only the exact lobby host identity to survive pose-admission silence while its bound event channel continues delivering recent schema-valid authenticated host traffic. Other remote identities and stale or closed host channels retain the existing 12-second fail-closed timeout. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted.',
+      auditSourceSha: 'f2bb3a56f07370be3d4a35fa7a1177da2bda4e82',
+      gitBlobSha: '10fd592422711eda076da8235471b2a4ef67a473',
+      sha256: '7ba164c4d33d98f43d163ad4d7ad88edb00aafe025ed88c90c7cd0e1e5efffac',
+      classification: 'Exact audited Pass 71 runtime composition for the repaired owner-test candidate product freeze: retains every previously admitted owner-feedback, glass, Chopper, debris, explosive-bolt, authenticated-host-liveness and bounded local-multiplayer-QA path, and adds only an explicit reliable mirror of the current schema-valid player state for HF-296 projection evidence after exact local staging. The mirror remains restricted to active local multiplayer QA, traverses the real network validator and remote admission path, and does not alter production gameplay authority or ordinary state cadence. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted.',
     });
-    finalRuntimeVariant.auditSourceSha = '3c32323b4499442912bbfb0760b45858394f9b73';
+    finalRuntimeVariant.auditSourceSha = '7034aa446acf65ed05d37905cfd977beec28ec32';
     writeFileSync(forgedProvenanceRecordPath, JSON.stringify(forgedProvenanceRecord));
     const forgedProvenance = verifyAtomicQualityBaseline({ root: checkout, recordPath: forgedProvenanceRecordPath });
     assert.equal(forgedProvenance.status, 'FAIL');
     assert.match(forgedProvenance.problems.join('\n'), /guard policy drift/u);
     assert.match(
       forgedProvenance.problems.join('\n'),
-      /audited source variant does not match 3c32323b4499442912bbfb0760b45858394f9b73: src\/legacy-main\.ts/u,
+      /audited source variant does not match 7034aa446acf65ed05d37905cfd977beec28ec32: src\/legacy-main\.ts/u,
     );
 
     const runtime = readFileSync(join(checkout, runtimePath));
