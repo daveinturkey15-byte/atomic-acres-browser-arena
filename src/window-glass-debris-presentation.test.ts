@@ -601,6 +601,8 @@ describe('persistent window glass debris presentation', () => {
     expect(source).toContain('const milestones = Object.freeze(lifecycleMilestones.slice(nextMilestone));');
     expect(observer).toContain('debug.sampleWindowDebrisLifecycle(options.paneIndex)');
     expect(observer).toContain('window.requestAnimationFrame(sampleAfterGameFrame)');
+    expect(observer).toContain('window.setTimeout(sampleAfterGameFrame, options.spawnTimeoutMs)');
+    expect(observer).not.toContain('window.setTimeout(() => finish(new Error(');
     expect(observer).not.toContain('debug.snapshot()');
     expect(observer).toContain('debris disappeared before a valid settled sample');
     expect(observer).toContain('last=${describeSample(lastSample)}');

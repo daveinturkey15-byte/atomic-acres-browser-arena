@@ -564,9 +564,11 @@ async function armPaneDebrisLifecycleObservation(page: Page, index: number, labe
         if (!finished) animationFrame = window.requestAnimationFrame(sampleAfterGameFrame);
       };
 
-      spawnDeadline = window.setTimeout(() => finish(new Error(
-        `${options.label}: no debris spawned within ${options.spawnTimeoutMs}ms; last=${describeSample(null)}`,
-      )), options.spawnTimeoutMs);
+      // A software renderer can starve rAF beyond the complete 4.5 s debris
+      // lifetime. At the unchanged spawn deadline, inspect the bounded retained
+      // lifecycle receipt before rejecting; its own sampledAt/ageMs fields still
+      // enforce every 1.5/2.5/4.25/4.5 s event-time boundary above.
+      spawnDeadline = window.setTimeout(sampleAfterGameFrame, options.spawnTimeoutMs);
       animationFrame = window.requestAnimationFrame(sampleAfterGameFrame);
     });
     const outcome = lifecycle.then<ObserverOutcome>(
