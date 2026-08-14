@@ -821,7 +821,7 @@ export function pass71QualityVisualEvidenceFailures(record, expected) {
       pagesPath: PASS71_QUALITY_VISUAL_EVIDENCE.baseline.pagesPath,
       runtimeFileCount: PASS71_QUALITY_VISUAL_EVIDENCE.baseline.runtimeFileCount,
       runtimeTreeSha256: PASS71_QUALITY_VISUAL_EVIDENCE.baseline.runtimeTreeSha256,
-      guardPolicySha256: '89db342697286d7725076dceeffae81daded3c7443164264adceae4c619e2118',
+      guardPolicySha256: '043c6dba830c65eec947e2e721a833a130ada077ef6a84696732271690159b4e',
     }) || structural.checks?.candidateDistChecked !== true || structural.pixelParity?.status !== 'UNPROVEN'
     || typeof structural.pixelParity?.blocker !== 'string' || structural.pixelParity.blocker.trim() === ''
     || !Array.isArray(structural.problems) || structural.problems.length !== 0) failures.push('composed-structural-baseline');
@@ -1182,7 +1182,7 @@ export function createPass71QualityVisualEvidenceFixture(options = {}) {
         pagesPath: PASS71_QUALITY_VISUAL_EVIDENCE.baseline.pagesPath,
         runtimeFileCount: PASS71_QUALITY_VISUAL_EVIDENCE.baseline.runtimeFileCount,
         runtimeTreeSha256: PASS71_QUALITY_VISUAL_EVIDENCE.baseline.runtimeTreeSha256,
-        guardPolicySha256: '89db342697286d7725076dceeffae81daded3c7443164264adceae4c619e2118',
+        guardPolicySha256: '043c6dba830c65eec947e2e721a833a130ada077ef6a84696732271690159b4e',
       },
       checks: {
         pagesRuntimeFiles: 515, protectedSourceFiles: 37, auditedSourceVariants: 2, protectedTextures: 94,
