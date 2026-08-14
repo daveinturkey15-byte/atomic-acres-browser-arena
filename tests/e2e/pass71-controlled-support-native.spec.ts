@@ -696,11 +696,6 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
     void observer.promise.catch(() => undefined);
     (globalThis as any)[key] = observer;
   }, { staged: stagedSplash, baseline: splashBaseline });
-  await armFirstChopperMissileObserver(
-    page,
-    stagedSplash.entityId,
-    stagedSplash.activationId,
-  );
   let splashReceipt: any;
   try {
     await page.mouse.down({ button: 'left' });
@@ -728,45 +723,37 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
         observer.cancel('Trusted Chopper splash transaction was cancelled after input or protocol failure');
       }
     }, { entityId: stagedSplash.entityId, activationId: stagedSplash.activationId }).catch(() => undefined);
-    await cancelFirstChopperMissileObserver(
-      page,
-      stagedSplash.entityId,
-      stagedSplash.activationId,
-    ).catch(() => undefined);
     await page.mouse.up({ button: 'left' }).catch(() => undefined);
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.clearPossessedChopperAimTarget()).catch(() => undefined);
     throw error;
   }
-  let missileArmReceipt: any;
-  try {
-    await page.mouse.up({ button: 'left' });
-    missileArmReceipt = await page.evaluate(({ entityId, activationId }) => {
-      const debug = window.__ATOMIC_ACRES_DEBUG__;
-      debug.clearPossessedChopperAimTarget();
-      const accepted = debug.requestPossessedChopperEvidenceControl({ fire: false });
-      const snapshot = debug.snapshot() as any;
-      const possession = snapshot.killstreak.actors
-        .find((actor: any) => actor.actorId === snapshot.player.id)?.possession ?? null;
-      const entity = snapshot.killstreak.entities
-        .find((candidate: any) => candidate.id === entityId) ?? null;
-      return {
-        accepted,
-        possession,
-        entity,
-        entityId: entity?.id ?? null,
-        activationId: entity?.activationId ?? null,
-        activationMatches: entity?.activationId === activationId,
-        remainingLifetimeMs: entity?.expiresInMs ?? 0,
-      };
-    }, { entityId: stagedSplash.entityId, activationId: stagedSplash.activationId });
-  } catch (error) {
-    await cancelFirstChopperMissileObserver(
-      page,
-      stagedSplash.entityId,
-      stagedSplash.activationId,
-    ).catch(() => undefined);
-    throw error;
-  }
+  await page.mouse.up({ button: 'left' });
+  const missileArmReceipt = await page.evaluate(({ entityId, activationId }) => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    debug.clearPossessedChopperAimTarget();
+    const accepted = debug.requestPossessedChopperEvidenceControl({ fire: false });
+    const snapshot = debug.snapshot() as any;
+    const possession = snapshot.killstreak.actors
+      .find((actor: any) => actor.actorId === snapshot.player.id)?.possession ?? null;
+    const entity = snapshot.killstreak.entities
+      .find((candidate: any) => candidate.id === entityId) ?? null;
+    return {
+      accepted,
+      possession,
+      entity,
+      entityId: entity?.id ?? null,
+      activationId: entity?.activationId ?? null,
+      activationMatches: entity?.activationId === activationId,
+      remainingLifetimeMs: entity?.expiresInMs ?? 0,
+    };
+  }, { entityId: stagedSplash.entityId, activationId: stagedSplash.activationId });
+  expect(splashReceipt).not.toBeNull();
+  expect(splashReceipt.aim).not.toBeNull();
+  await armFirstChopperMissileObserver(
+    page,
+    stagedSplash.entityId,
+    stagedSplash.activationId,
+  );
   const firstMissileWallClockMs = Date.now();
   let cooldownReady: any;
   try {
@@ -788,7 +775,6 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
     ).catch(() => undefined);
     throw error;
   }
-  expect(splashReceipt).not.toBeNull();
   expect(splashReceipt.aim).toMatchObject({
     contract: 'chopper-gunner-trusted-aligned-aim-v1',
     entityId: stagedSplash.entityId,
@@ -849,7 +835,6 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
   expect(splashReceipt.primary.damage).toBeGreaterThan(0);
   expect(splashReceipt.splash.damage).toBeGreaterThan(0);
 
-  expect(splashReceipt.aim).not.toBeNull();
   expect(missileArmReceipt).toMatchObject({
     accepted: true,
     possession: { kind: 'chopper-gunner', entityId: stagedSplash.entityId },

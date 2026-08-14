@@ -408,7 +408,7 @@ export async function armFrameActionBaseline(
             }
             const startedAt = frameAt;
             observer.startedAtMs = startedAt;
-            let previousFrameAt = observer.startRequestedAtMs!;
+            let previousFrameAt = frameAt;
             let targetSubmissionSequence: number | null = synchronous ? 0 : null;
             let firstPresentedFrameDelayMs: number | null = null;
             let firstSubmissionDelayMs: number | null = null;
@@ -532,9 +532,11 @@ export async function armFrameActionBaseline(
                 fail(error);
               }
             };
-            // The first post-resume rAF is itself a valid sample against the
-            // paused frontier captured when the observer was armed.
-            inspect(frameAt);
+            // `frameAt` is the browser's timestamp for this presentation
+            // opportunity and can predate the `performance.now()` call that
+            // requested it from the same frame. Keep it only as the exact
+            // first-resumed-frame anchor; sample 1 is the next real rAF gap.
+            requestAnimationFrame(inspect);
           } catch (error) {
             observer.settled = true;
             rejectBaseline(error);

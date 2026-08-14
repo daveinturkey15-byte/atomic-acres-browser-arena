@@ -910,15 +910,6 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
           const hud = document.querySelector<HTMLElement>('#hud');
           if (hud) hud.style.visibility = '';
         });
-        let riggedTargetsSet = false;
-        if (armedBaseline) {
-          attempt('rigged capture target', () => {
-            riggedTargetsSet = debug.setRiggedEvidenceCaptureTargets([
-              { kind: 'training-dummy', id: 'test-dummy-alpha' },
-            ]);
-            if (!riggedTargetsSet) throw new Error('Rigged evidence capture target was rejected');
-          });
-        }
         let holdReleased = false;
         attempt('exterior review hold', () => {
           holdReleased = debug.setChopperExteriorReviewHold(false);
@@ -926,13 +917,13 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
         });
         attempt('render pause', () => { debug.setRenderPaused(false); });
         let baselineStarted = false;
-        if (armedBaseline && exactIdentity && riggedTargetsSet && holdReleased && failures.length === 0) {
+        if (armedBaseline && exactIdentity && holdReleased && failures.length === 0) {
           attempt('baseline start', () => {
             baselineStarted = observer.start();
             if (!baselineStarted) throw new Error('The armed baseline rejected its first start');
           });
         }
-        return { failures, holdReleased, riggedTargetsSet, baselineStarted };
+        return { failures, holdReleased, baselineStarted };
       }, possessionEntryBaselineObserver);
       if (cleanup.holdReleased) exteriorReviewHoldActive = false;
       possessionEntryBaselineStarted = cleanup.baselineStarted;
@@ -1015,6 +1006,9 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
   const possessionEntryBudget = deriveFrameActionBudget(possessionEntryBaseline);
   const possessionEntry = await captureFirstChopperPossessionEntry(page);
   assertBoundedChopperPossessionEntry(possessionEntry, possessionEntryBudget);
+  expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRiggedEvidenceCaptureTargets([
+    { kind: 'training-dummy', id: 'test-dummy-alpha' },
+  ]))).toBe(true);
   await testInfo.attach(`pass70-chopper-${renderer}-first-possession-frame-budget`, {
     body: Buffer.from(`${JSON.stringify({
       distinction: 'input-handler-through-next-presented-and-completed-frame; excludes intentional cockpit dwell time',
