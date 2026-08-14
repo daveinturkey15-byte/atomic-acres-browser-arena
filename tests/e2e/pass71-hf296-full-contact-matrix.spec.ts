@@ -659,8 +659,17 @@ async function runRemoteProjectionSweep(
     if (!first || api.authorizeHf296RemoteProjectionWeapon(first.weapon) !== firstRemote?.id) {
       throw new Error(`HF-296 initial projection authorization failed ${arenaId}/${projectionRole}`);
     }
+    const expectedSourcePlayerId = firstRemote.id;
     for (let cellIndex = 0; cellIndex < cells.length; cellIndex += 1) {
       const { fixture, stance, weapon } = cells[cellIndex]!;
+      // The actor cannot advance until it observes the preceding acknowledgement.
+      // On a slow native renderer that can consume the one-shot QA authorization
+      // granted by the preceding cell. Rebind the same exact player/weapon at
+      // this cell boundary, and periodically while waiting, without changing
+      // the product's bounded authorization lifetime or admitting another ID.
+      if (api.authorizeHf296RemoteProjectionWeapon(weapon) !== expectedSourcePlayerId) {
+        throw new Error(`HF-296 current projection authorization failed ${arenaId}/${projectionRole}/${fixture.kind}/${stance}/${weapon}`);
+      }
       let remote: any = null;
       for (let attempt = 0; attempt < 360; attempt += 1) {
         remote = api.sampleHf296RemoteProjection()[0];
@@ -671,6 +680,10 @@ async function runRemoteProjectionSweep(
           && finiteVector(remote.authoritativePosition) && finiteVector(remote.renderedPosition)
           && distance(remote.authoritativePosition, remote.renderedPosition) <= 2
           && fixtureDistance <= 1.5) break;
+        if (attempt > 0 && attempt % 60 === 0
+          && api.authorizeHf296RemoteProjectionWeapon(weapon) !== expectedSourcePlayerId) {
+          throw new Error(`HF-296 projection authorization renewal failed ${arenaId}/${projectionRole}/${fixture.kind}/${stance}/${weapon}`);
+        }
         await frame();
       }
       if (!remote || remote.weapon !== weapon || remote.renderedWeapon !== weapon || remote.stance !== stance
@@ -697,7 +710,7 @@ async function runRemoteProjectionSweep(
       const next = cells[cellIndex + 1];
       if (next) {
         const authorizedPlayerId = api.authorizeHf296RemoteProjectionWeapon(next.weapon);
-        if (authorizedPlayerId !== remote.id) {
+        if (authorizedPlayerId !== expectedSourcePlayerId) {
           throw new Error(`HF-296 projection authorization failed ${arenaId}/${projectionRole}/${next.fixture.kind}/${next.stance}/${next.weapon}`);
         }
       }

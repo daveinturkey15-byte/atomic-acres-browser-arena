@@ -119,6 +119,10 @@ describe('Pass 71 HF-296 runtime evidence integration', () => {
     expect(spec).toContain('const [rows, acknowledgements] = await Promise.all');
     expect(spec).toContain("api.authorizeHf296RemoteProjectionWeapon('flare-gun') !== sentinelRemote?.id");
     expect(spec).toContain("api.authorizeHf296RemoteProjectionWeapon('flashlight-pistol') !== markerRemote?.id");
+    expect(spec).toContain('const expectedSourcePlayerId = firstRemote.id;');
+    expect(spec).toContain('api.authorizeHf296RemoteProjectionWeapon(weapon) !== expectedSourcePlayerId');
+    expect(spec).toContain('attempt > 0 && attempt % 60 === 0');
+    expect(spec).toContain('HF-296 projection authorization renewal failed');
     expect(spec.match(/const waitForExactRemote = async \(label: string\) =>/gu)).toHaveLength(2);
     expect(spec.match(/observed\.length === 1 \? observed\[0\] : null/gu)).toHaveLength(2);
     expect(spec.match(/current\.id === priorId/gu)).toHaveLength(2);
