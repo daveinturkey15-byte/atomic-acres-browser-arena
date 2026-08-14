@@ -9,7 +9,7 @@
   "pagesPath": "channels/the-big-one",
   "runtimeFileCount": 515,
   "runtimeTreeSha256": "1a0e90676ffc411eaefeaebef0c970481aad416084a1dc21e9bf7de6de369196",
-  "guardPolicySha256": "043c6dba830c65eec947e2e721a833a130ada077ef6a84696732271690159b4e",
+  "guardPolicySha256": "58bf77450c4704093a576712eed00614bb2e34e19035cb5611dc414b9cf82eab",
   "runtimeDigestPolicy": "Hash sorted path, NUL, blob bytes, NUL for every file beneath channels/the-big-one except channel-provenance.json; the complete published subtree contains 516 files including that provenance wrapper.",
   "basis": {
     "ownerAssessment": "Pass 70 is the exact published build immediately preceding the reported Pass 71 Quality-profile downgrade. This record does not claim Dave visually approved every Pass 70 frame.",
@@ -127,6 +127,12 @@
           "gitBlobSha": "db970b2e19c9df981990f46c6d8b4da87c64670f",
           "sha256": "86836a2efe940a0d02feb845de626ae874e98b5aec4db51706ffe9e64ba18765",
           "classification": "Exact audited Pass 71 runtime composition for the repaired owner-test candidate product freeze: retains every previously admitted owner-feedback, glass, Chopper, debris, explosive-bolt, authenticated-host-liveness, reliable projection and bounded local-multiplayer-QA path, and admits only a one-step QA teleport continuity increment as an immediate movement resynchronization before the ordinary envelope check. The exception remains restricted to local multiplayer QA; production movement bounds, remote identity, health authority, claim requalification and continuity checks remain fail-closed. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted."
+        },
+        {
+          "auditSourceSha": "d3e76619e6e8c7b4bb2bea03e48452360e8b60ea",
+          "gitBlobSha": "6a42ff5857cf9b74f4b2aa597001411d0fef3855",
+          "sha256": "0026258350c7752e5febfa8ed2076fca9c3bfd516b152e0c73f042a617145fcc",
+          "classification": "Exact audited Pass 71 runtime composition for the repaired owner-test candidate product freeze: retains every previously admitted owner-feedback, glass, Chopper, debris, explosive-bolt, authenticated-host-liveness, reliable projection and bounded local-multiplayer-QA path, and admits only a strictly newer safe-integer QA teleport continuity as an immediate movement resynchronization before the ordinary envelope check. Equal or backward generations still reject, the exception remains restricted to local multiplayer QA, and production movement bounds, identity, health authority and claim requalification remain fail-closed. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted."
         }
       ]
     }

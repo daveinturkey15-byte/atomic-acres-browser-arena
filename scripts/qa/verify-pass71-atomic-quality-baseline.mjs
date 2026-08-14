@@ -15,7 +15,7 @@ const REQUIRED_BASELINE = Object.freeze({
   pagesPath: 'channels/the-big-one',
   runtimeFileCount: 515,
   runtimeTreeSha256: '1a0e90676ffc411eaefeaebef0c970481aad416084a1dc21e9bf7de6de369196',
-  guardPolicySha256: '043c6dba830c65eec947e2e721a833a130ada077ef6a84696732271690159b4e',
+  guardPolicySha256: '58bf77450c4704093a576712eed00614bb2e34e19035cb5611dc414b9cf82eab',
 });
 
 const SCRIPT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');

@@ -94,21 +94,21 @@ test('the full verifier fails closed on policy, audit metadata, runtime, texture
     const auditedRuntime = forgedProvenanceRecord.auditedSourceVariants
       .find((specification) => specification.path === runtimePath);
     const finalRuntimeVariant = auditedRuntime?.allowedVariants
-      .find((variant) => variant.auditSourceSha === '04d3a9d5b8c08dccd32924275359129da0b2b471');
+      .find((variant) => variant.auditSourceSha === 'd3e76619e6e8c7b4bb2bea03e48452360e8b60ea');
     assert.deepEqual(finalRuntimeVariant, {
-      auditSourceSha: '04d3a9d5b8c08dccd32924275359129da0b2b471',
-      gitBlobSha: 'db970b2e19c9df981990f46c6d8b4da87c64670f',
-      sha256: '86836a2efe940a0d02feb845de626ae874e98b5aec4db51706ffe9e64ba18765',
-      classification: 'Exact audited Pass 71 runtime composition for the repaired owner-test candidate product freeze: retains every previously admitted owner-feedback, glass, Chopper, debris, explosive-bolt, authenticated-host-liveness, reliable projection and bounded local-multiplayer-QA path, and admits only a one-step QA teleport continuity increment as an immediate movement resynchronization before the ordinary envelope check. The exception remains restricted to local multiplayer QA; production movement bounds, remote identity, health authority, claim requalification and continuity checks remain fail-closed. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted.',
+      auditSourceSha: 'd3e76619e6e8c7b4bb2bea03e48452360e8b60ea',
+      gitBlobSha: '6a42ff5857cf9b74f4b2aa597001411d0fef3855',
+      sha256: '0026258350c7752e5febfa8ed2076fca9c3bfd516b152e0c73f042a617145fcc',
+      classification: 'Exact audited Pass 71 runtime composition for the repaired owner-test candidate product freeze: retains every previously admitted owner-feedback, glass, Chopper, debris, explosive-bolt, authenticated-host-liveness, reliable projection and bounded local-multiplayer-QA path, and admits only a strictly newer safe-integer QA teleport continuity as an immediate movement resynchronization before the ordinary envelope check. Equal or backward generations still reject, the exception remains restricted to local multiplayer QA, and production movement bounds, identity, health authority and claim requalification remain fail-closed. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted.',
     });
-    finalRuntimeVariant.auditSourceSha = 'f2bb3a56f07370be3d4a35fa7a1177da2bda4e82';
+    finalRuntimeVariant.auditSourceSha = '04d3a9d5b8c08dccd32924275359129da0b2b471';
     writeFileSync(forgedProvenanceRecordPath, JSON.stringify(forgedProvenanceRecord));
     const forgedProvenance = verifyAtomicQualityBaseline({ root: checkout, recordPath: forgedProvenanceRecordPath });
     assert.equal(forgedProvenance.status, 'FAIL');
     assert.match(forgedProvenance.problems.join('\n'), /guard policy drift/u);
     assert.match(
       forgedProvenance.problems.join('\n'),
-      /audited source variant does not match f2bb3a56f07370be3d4a35fa7a1177da2bda4e82: src\/legacy-main\.ts/u,
+      /audited source variant does not match 04d3a9d5b8c08dccd32924275359129da0b2b471: src\/legacy-main\.ts/u,
     );
 
     const runtime = readFileSync(join(checkout, runtimePath));
