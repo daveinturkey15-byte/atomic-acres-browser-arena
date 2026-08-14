@@ -51,10 +51,14 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     const updateStart = legacy.indexOf('function updateKillstreakPossession(');
     const updateEnd = legacy.indexOf('\nfunction updatePass65KillstreakRuntime(', updateStart);
     const update = legacy.slice(updateStart, updateEnd);
+    const presentationStart = legacy.indexOf('function presentLocalPossessedSupportGun(');
+    const presentationEnd = legacy.indexOf('\nfunction updateKillstreakPossession(', presentationStart);
+    const shotPresentation = legacy.slice(presentationStart, presentationEnd);
     expect(update).toContain('chopperGunnerCameraOrigin(entity.position, entity.attitude)');
-    expect(update).toContain('chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch)');
-    expect(update).toContain('new THREE.Vector3(...shotRay.tracerOrigin)');
-    expect(update).toContain('new THREE.Vector3(...shotRay.direction)');
+    expect(shotPresentation).toContain('chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch)');
+    expect(shotPresentation).toContain('new THREE.Vector3(...shotRay.tracerOrigin)');
+    expect(shotPresentation).toContain('new THREE.Vector3(...shotRay.direction)');
+    expect(update).toContain('if (deferQaShotPresentation && alignedQaRequest && alignedQaAim) {');
 
     const hitStart = legacy.indexOf('function showGunnerTargetConfirm(');
     const hitEnd = legacy.indexOf('\nfunction resetKillstreakPossessionPresentation(', hitStart);
@@ -110,65 +114,47 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(presentation).toContain("'chopper-tracer-action'");
     expect(presentation).toContain("'chopper-muzzle-flash'");
     expect(presentation).toContain("'chopper-impact-action'");
-    expect(e2e).toContain('const visibleBounds = detail.stableAirframeBounds;');
     const exteriorBootstrap = e2e.slice(
-      e2e.indexOf('const roughExteriorPlan'),
-      e2e.indexOf('const exteriorPose'),
+      e2e.indexOf('async function captureTrackedChopperExteriorFrame('),
+      e2e.indexOf('\ntest(', e2e.indexOf('async function captureTrackedChopperExteriorFrame(')),
     );
     expect(exteriorBootstrap).toContain('deterministicReview.presentedCamera');
-    expect(exteriorBootstrap).toContain('receipt.reviewedChopper.drawableStableMeshCount > 0');
-    expect(exteriorBootstrap).toContain('Boolean(receipt.reviewedChopper.drawableStableBounds)');
-    expect(exteriorBootstrap).toContain("__PASS70_ROUGH_CHOPPER_PRESENTATION__");
-    expect(exteriorBootstrap).toContain('observer.transactionStartedAtMs = performance.now();');
-    expect(exteriorBootstrap).toContain('observer.deadlineAtMs = observer.transactionStartedAtMs + 8_000;');
-    expect(exteriorBootstrap).toContain('observer.watchdogId = window.setTimeout(onDeadline, 8_000);');
+    expect(exteriorBootstrap).toContain("__PASS70_TRACKED_CHOPPER_PRESENTATION__");
+    expect(exteriorBootstrap).toContain('const transactionStartedAtMs = performance.now();');
+    expect(exteriorBootstrap).toContain('const deadlineAtMs = transactionStartedAtMs + 8_000;');
+    expect(exteriorBootstrap).toContain('watchdogId = window.setTimeout(() => {');
     expect(exteriorBootstrap).toContain('delete (globalThis as any)[key]');
     expect(exteriorBootstrap).toContain('requestAnimationFrame(inspect);');
-    expect(exteriorBootstrap).toContain('const roughPresentedObservation = await page.evaluate');
-    expect(exteriorBootstrap).toContain('const roughPresentedReceipt = roughPresentedObservation.receipt');
-    expect(exteriorBootstrap).not.toContain('const roughPresentedHandle = await page.waitForFunction');
-    expect(exteriorBootstrap.indexOf('const visibleBounds = detail.stableAirframeBounds;'))
-      .toBeLessThan(exteriorBootstrap.indexOf('deterministicReview.presentedCamera'));
+    expect(exteriorBootstrap).toContain('exactBounds(reviewed.drawableStableBounds, tracker.submittedSceneDrawableBounds)');
+    expect(exteriorBootstrap).toContain('currentEntity?.activationId === activationId');
+    expect(exteriorBootstrap).toContain('completion.submissionSequence !== pausedReceipt.submissionSequence');
     const observerArm = exteriorBootstrap.indexOf('(globalThis as any)[key] = observer;');
     const presentationFrameArm = exteriorBootstrap.indexOf('requestAnimationFrame(inspect);', observerArm);
-    const cameraTransaction = exteriorBootstrap.indexOf('observer.transactionStartedAtMs = performance.now();');
-    const receiptConsumer = exteriorBootstrap.indexOf('const observation = await observer.promise;');
+    const cameraTransaction = exteriorBootstrap.indexOf('captureRevision = debug.setChopperExteriorReviewTracking(true);');
     expect(observerArm).toBeGreaterThan(-1);
     expect(observerArm).toBeLessThan(presentationFrameArm);
     expect(presentationFrameArm).toBeLessThan(cameraTransaction);
-    expect(observerArm).toBeLessThan(cameraTransaction);
-    expect(cameraTransaction).toBeLessThan(receiptConsumer);
-    const presentationInspect = exteriorBootstrap.slice(
-      exteriorBootstrap.indexOf('const inspect = () => {'),
-      exteriorBootstrap.indexOf('const onDeadline = () => {'),
+    const inspect = exteriorBootstrap.slice(
+      exteriorBootstrap.indexOf('function inspect() {'),
+      exteriorBootstrap.indexOf('\n  }), expected);'),
     );
-    expect(presentationInspect.indexOf('performance.now() >= observer.deadlineAtMs'))
-      .toBeLessThan(presentationInspect.indexOf('deterministicReview.presentedCamera'));
-    const presentationWatchdog = exteriorBootstrap.slice(
-      exteriorBootstrap.indexOf('const onDeadline = () => {'),
-      observerArm,
+    expect(inspect).toContain('captureRevision !== null');
+    expect(inspect).toContain('void completeCurrentReceipt(currentFrame, receipt, currentEntity)');
+    const completionHelper = exteriorBootstrap.slice(
+      exteriorBootstrap.indexOf('const completeCurrentReceipt = async ('),
+      exteriorBootstrap.indexOf('function inspect() {'),
     );
-    expect(presentationWatchdog).toContain('rejectObservation(new Error(');
-    expect(presentationWatchdog).not.toContain('resolveReceipt');
-    expect(presentationWatchdog).not.toContain('debug.snapshot()');
-    const finalExteriorPose = e2e.slice(
-      e2e.indexOf('const exteriorPose'),
-      e2e.indexOf('expect(exteriorPose)', e2e.indexOf('const exteriorPose')),
-    );
-    expect(finalExteriorPose).toContain('const detail = presentedReceipt.reviewedChopper;');
-    expect(finalExteriorPose).toContain('const visibleBounds = detail.drawableStableBounds;');
-    expect(finalExteriorPose).toContain('entityId: roughPose.entityId');
-    expect(finalExteriorPose).not.toContain('window.__ATOMIC_ACRES_DEBUG__.snapshot()');
-    expect(finalExteriorPose).not.toContain('snapshot.killstreakPresentation.entityDetails');
-    expect(e2e).toContain('receipt.reviewedChopper.drawableStableMeshCount > 0');
+    expect(completionHelper.indexOf('debug.setRenderPaused(true)'))
+      .toBeLessThan(completionHelper.indexOf('await debug.awaitCommittedCameraCompletion()'));
+    expect(exteriorBootstrap).not.toContain('setCaptureCameraPose(');
+    expect(e2e).not.toContain('roughExteriorPlan');
+    expect(e2e).not.toContain('__PASS70_ROUGH_CHOPPER_PRESENTATION__');
     expect(e2e).toContain('rasterVisibility.visiblePixelRatio');
     expect(e2e).toContain('rasterVisibility.maximumLuminance');
     expect(e2e).toContain('captureChopperExteriorHiddenControl()');
     expect(e2e).toContain('attributableRasterDifference.materiallyChangedPixelRatio');
     expect(e2e).toContain('exterior-hidden-control.nonpublishable.png');
-    expect(e2e).toContain('side * Math.PI / 3');
-    expect(e2e.indexOf("page.screenshot({ path: resolve(evidence, 'exterior-front-quarter.png')"))
-      .toBeLessThan(e2e.indexOf("{ kind: 'training-dummy', id: 'test-dummy-alpha' }"));
+    expect(e2e).toContain("window.__ATOMIC_ACRES_DEBUG__.setChopperExteriorReviewHold(false)");
   });
 
   it('commits a zero-target exterior camera without loosening rigged actor receipts', () => {
@@ -207,7 +193,8 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(holdSetter).toContain('menuSurface: menuLifecycle.surface');
     expect(holdSetter).toContain('if (!held) {\n      resetDebugChopperExteriorReviewHold();\n      return true;');
     expect(e2e).toContain('setChopperExteriorReviewTracking(true)');
-    expect(e2e).toContain("pauseCompletedPresentedFrame(page, trackerRevision, 'camera-only')");
+    expect(e2e).toContain('captureTrackedChopperExteriorFrame(');
+    expect(e2e).toContain('captureRevision = debug.setChopperExteriorReviewTracking(true);');
     expect(e2e).toContain('awaitCommittedCameraCompletion()');
     expect(e2e).toContain('setChopperExteriorReviewHold(true)');
     expect(e2e).toContain('targetCount: 0');
@@ -266,7 +253,8 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
       "page.mouse.down({ button: 'right' })",
       'event.trusted === true',
       'stagePossessedChopperSplashTargets()',
-      'aimPossessedChopperAtTarget(staged.primaryTargetId)',
+      'debug.armPossessedChopperAimTarget(event, {',
+      'debug.readPossessedChopperAlignedAimReceipt()',
       'awaitChopperRuntimePhase(',
       "expectedPhase === 'cooldown-ready' && firstMissileReceipt !== null",
       'entity.missileAmmo === 5',
@@ -309,7 +297,7 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(splashTransaction).toContain('event.isTrusted !== true');
     expect(splashTransaction).toContain('observer.deadlineAtMs = observer.trustedTriggerAtMs + 2_500;');
     expect(splashTransaction).toContain('observer.watchdogId = window.setTimeout(onDeadline, 2_500);');
-    expect(splashTransaction).toContain('sample.atMs >= observer.trustedTriggerAtMs');
+    expect(splashTransaction).toContain('sample.atMs >= aim.controlAdmissionAtMs');
     expect(splashTransaction).toContain('sample.atMs <= observer.deadlineAtMs');
     expect(splashTransaction).toContain('requestAnimationFrame(inspect);');
     expect(splashTransaction).toContain('observerActivationId: staged.activationId');
@@ -319,12 +307,14 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
       splashTransaction.indexOf('const onDeadline = () => {'),
       splashTransaction.indexOf('const onTrustedMouseDown = (event: MouseEvent) => {'),
     );
-    expect(splashWatchdog).toContain('finish(observer.latest)');
     expect(splashWatchdog).toContain('fail(new Error(');
     expect(splashWatchdog).not.toContain('debug.snapshot()');
     expect(splashWatchdog).not.toContain('aimPossessedChopperAtTarget');
     expect(splashTransaction).not.toContain('setTimeout(resolveDelay, 25)');
     expect(splashTransaction).not.toContain('requestPossessedChopperEvidenceControl({ fire: true })');
+    expect(splashTransaction).not.toContain('aimPossessedChopperAtTarget');
+    expect(controlledSupportE2e).toContain('splashReceipt.primary.origin).toEqual(splashReceipt.aim.origin)');
+    expect(controlledSupportE2e).toContain('splashReceipt.primary.endpoint).toEqual(splashReceipt.aim.endpoint)');
     const cadenceTransaction = controlledSupportE2e.slice(
       controlledSupportE2e.indexOf('const firstMissileWallClockMs'),
       controlledSupportE2e.indexOf('const firstMissile = cooldownReady.firstMissileReceipt'),

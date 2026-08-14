@@ -21,6 +21,9 @@ export type SupportDamageFeedbackSample = Readonly<{
   targetId: string;
   targetLifeId: number;
   targetPosition: readonly number[];
+  origin: readonly number[];
+  endpoint: readonly number[];
+  tracerOrigin: readonly number[];
   damage: number;
   atMs: number;
   visible: boolean;
@@ -162,6 +165,9 @@ export class SupportDamageFeedbackTelemetry {
       targetId: event.targetId,
       targetLifeId: event.targetLifeId,
       targetPosition: Object.freeze([...event.targetPosition]),
+      origin: Object.freeze([...event.origin]),
+      endpoint: Object.freeze([...event.endpoint]),
+      tracerOrigin: Object.freeze([...event.tracerOrigin]),
       damage: event.damage,
       atMs: event.atMs,
       visible: anchor.visible,

@@ -64,8 +64,13 @@ describe('Pass 71 HF-307 exact Chopper MG splash release evidence', () => {
     const possessedStart = runtime.indexOf('const ray = chopperGunnerAuthoritativeRay(');
     const possessedEnd = runtime.indexOf('\n      if (hit) {', possessedStart);
     const possessedRay = runtime.slice(possessedStart, possessedEnd);
-    expect(possessedRay).toContain('CHOPPER_GUN_PROFILE.maximumRangeM,\n        false,');
-    expect(possessedRay).toContain('CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM');
+    expect(possessedRay).toContain('chopperGunnerAuthoritativeTargetAlongRay(');
+    const selectorStart = runtime.indexOf('export function chopperGunnerAuthoritativeTargetAlongRay(');
+    const selectorEnd = runtime.indexOf('\nfunction actorPosition(', selectorStart);
+    const selector = runtime.slice(selectorStart, selectorEnd);
+    expect(selector).toContain('const maximumRangeM = CHOPPER_GUN_PROFILE.maximumRangeM;');
+    expect(selector).toContain('const targetRadiusM = CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM;');
+    expect(selector).toContain('if (!lineOfSight(world, ray.origin, endpoint)) continue;');
     expect(PASS71_HF307_REQUIRED_ASSERTIONS).toContain(
       'rejects a centred primary and every nearby splash target when hard cover blocks the admitted impact',
     );

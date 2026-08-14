@@ -180,6 +180,7 @@ import {
   HostKillstreakRuntime,
   MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP,
   chopperGunnerAuthoritativeRay,
+  chopperGunnerAuthoritativeTargetAlongRay,
   chopperGunnerCameraOrigin,
   chopperMissileGroundTarget,
   type KillstreakDamageEvent,
@@ -190,6 +191,15 @@ import {
   type KillstreakTarget,
   type KillstreakWorld,
 } from './killstreak-runtime';
+import {
+  chopperGunnerQaAimReceipt,
+  chopperGunnerQaAimThrottleEvidence,
+  createChopperGunnerQaAimRequest,
+  resolveChopperGunnerQaAim,
+  type ChopperGunnerQaAimAlignment,
+  type ChopperGunnerQaAimReceipt,
+  type ChopperGunnerQaAimRequest,
+} from './chopper-gunner-qa-aim';
 import { CHOPPER_GUNNER_SPLASH_POLICY, PILOTED_DRONE_SENSOR_PROFILE } from './killstreak-support-catalog';
 import {
   KillstreakPresentation,
@@ -5174,6 +5184,27 @@ let lastLocalKillstreakControlAdmission: Readonly<{
   accepted: boolean;
   reason: string;
 }> | null = null;
+let debugChopperGunnerQaAimRequest: ChopperGunnerQaAimRequest | null = null;
+let lastDebugChopperGunnerQaAimReceipt: ChopperGunnerQaAimReceipt | null = null;
+let debugChopperGunnerQaAimEdgeSequence = 0;
+
+function nextDebugChopperGunnerQaAimEdgeSequence(): number {
+  debugChopperGunnerQaAimEdgeSequence = debugChopperGunnerQaAimEdgeSequence >= Number.MAX_SAFE_INTEGER
+    ? 1
+    : debugChopperGunnerQaAimEdgeSequence + 1;
+  return debugChopperGunnerQaAimEdgeSequence;
+}
+
+function clearDebugChopperGunnerQaAimRequest(): void {
+  if (debugChopperGunnerQaAimRequest) nextDebugChopperGunnerQaAimEdgeSequence();
+  debugChopperGunnerQaAimRequest = null;
+}
+
+function resetDebugChopperGunnerQaAimEvidence(): void {
+  debugChopperGunnerQaAimRequest = null;
+  lastDebugChopperGunnerQaAimReceipt = null;
+  nextDebugChopperGunnerQaAimEdgeSequence();
+}
 let localCareCaptureState = createCareCaptureClientState();
 let localCareCaptureRequiresHold = false;
 let killstreakSnapshot: KillstreakRecipientSnapshot = killstreakRuntime.snapshotFor(null, 0);
@@ -6369,7 +6400,10 @@ function syncLocalTriggerAuthority(held: boolean): void {
 function setLocalTriggerHeld(held: boolean): void {
   triggerHeld = held;
   syncLocalTriggerAuthority(held);
-  if (!held) resetLocalSpinUp();
+  if (!held) {
+    clearDebugChopperGunnerQaAimRequest();
+    resetLocalSpinUp();
+  }
 }
 
 function sendLocalReloadCancel(): void {
@@ -21638,13 +21672,116 @@ function showGunnerTargetConfirm(
   gunnerTargetConfirmUntil = now + GUNNER_TARGET_CONFIRM_DURATION_MS;
 }
 
+function armDebugChopperGunnerQaAimFromTrustedCapture(
+  event: MouseEvent,
+  requested: Readonly<{
+    entityId: string;
+    activationId: string;
+    targetId: string;
+    deadlineAtMs: number;
+  }>,
+): boolean {
+  if (!(event instanceof MouseEvent)
+    || event.isTrusted !== true
+    || event.button !== 0
+    || event.eventPhase !== Event.CAPTURING_PHASE
+    || event.currentTarget !== window
+    || event.target !== canvas
+    || document.pointerLockElement !== canvas
+    || isTextChatTyping()
+    || pointSupportTargeting
+    || tacticalMapOpen
+    || matchState.phase !== 'active'
+    || !gameStarted
+    || !player.alive
+    || triggerHeld) return false;
+  const now = performance.now();
+  if (debugChopperGunnerQaAimRequest) {
+    if (now <= debugChopperGunnerQaAimRequest.deadlineAtMs) return false;
+    clearDebugChopperGunnerQaAimRequest();
+  }
+  const actor = localKillstreakActorSnapshot();
+  const possession = actor?.possession;
+  if (!actor || actor.lifeId !== localContinuity
+    || possession?.kind !== 'chopper-gunner'
+    || possession.entityId !== requested.entityId) return false;
+  const entity = killstreakSnapshot.entities.find((candidate) => (
+    candidate.id === requested.entityId
+    && candidate.activationId === requested.activationId
+    && candidate.kind === 'chopper'
+    && candidate.ownerId === player.id
+    && candidate.gunController === 'owner-player'
+    && candidate.expiresInMs > 0
+  ));
+  if (!entity) return false;
+  const world = killstreakWorldState();
+  const target = world.targets.find((candidate) => candidate.id === requested.targetId) ?? null;
+  if (!target || !target.alive || target.id === player.id
+    || !(world.areHostile?.(player.id, player.team, target) ?? target.team !== player.team)) return false;
+  const triggerEdgeSequence = nextDebugChopperGunnerQaAimEdgeSequence();
+  const request = createChopperGunnerQaAimRequest({
+    entityId: entity.id,
+    activationId: entity.activationId,
+    ownerLifeId: actor.lifeId,
+    targetId: target.id,
+    targetLifeId: target.lifeId,
+    triggerEdgeSequence,
+    trustedEventTimestampMs: event.timeStamp,
+    armedAtMs: now,
+    deadlineAtMs: requested.deadlineAtMs,
+  });
+  if (!request) return false;
+  const currentGeometry = resolveChopperGunnerQaAim(request, {
+    nowMs: now,
+    triggerHeld: true,
+    triggerEdgeSequence,
+    entity,
+    ownerId: player.id,
+    ownerLifeId: actor.lifeId,
+    ownerTeam: player.team,
+    world,
+  });
+  if (currentGeometry.status !== 'aligned') return false;
+  debugChopperGunnerQaAimRequest = request;
+  lastDebugChopperGunnerQaAimReceipt = null;
+  return true;
+}
+
 function resetKillstreakPossessionPresentation(): void {
   debugChopperEvidenceControlOverrideActive = false;
+  clearDebugChopperGunnerQaAimRequest();
   killstreakPresentation.setFirstPersonEntity(null);
   hideGunnerCockpitHud();
   if (camera.near !== 0.08) {
     camera.near = 0.08;
     camera.updateProjectionMatrix();
+  }
+}
+
+function presentLocalPossessedSupportGun(
+  now: number,
+  possession: Readonly<{ kind: 'chopper-gunner' | 'piloted-drone'; entityId: string }>,
+  entity: KillstreakEntitySnapshot,
+): void {
+  if (triggerHeld && now >= nextLocalSupportGunReportAt) {
+    audio.supportGun(possession.kind === 'chopper-gunner' ? 'chopper' : 'drone');
+    if (possession.kind === 'chopper-gunner') {
+      killstreakPresentation.presentChopperWeaponAction(entity.id);
+      const shotRay = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch);
+      const muzzle = new THREE.Vector3(...shotRay.tracerOrigin);
+      const aim = new THREE.Vector3(...shotRay.direction);
+      spawnTracer(muzzle, muzzle.clone().addScaledVector(aim, 130), 0xffb347);
+      localSupportShotPresentationReceipts.record({
+        activationId: entity.activationId,
+        source: 'chopper',
+        presentedAtHostTimeMs: currentHostTimeMs(),
+      });
+    }
+    nextLocalSupportGunReportAt = now + (possession.kind === 'chopper-gunner'
+      ? CHOPPER_GUN_PROFILE.cadenceMs
+      : DRONE_GUN_PROFILE.cadenceMs);
+  } else if (!triggerHeld) {
+    nextLocalSupportGunReportAt = 0;
   }
 }
 
@@ -21686,31 +21823,52 @@ function updateKillstreakPossession(now: number): void {
   if (chopperThermalElement) chopperThermalElement.hidden = !chopperThermal;
   // Exact operator reveal targets are synchronized once per frame by
   // updateThermalGhosts after all weapon/support optic lifecycles settle.
-  if (triggerHeld && now >= nextLocalSupportGunReportAt) {
-    audio.supportGun(possession.kind === 'chopper-gunner' ? 'chopper' : 'drone');
-    // Owner feedback: it was hard to tell the mounted gun was actually firing.
-    // Stream a bright tracer down the aim line on every admitted shot so the
-    // trigger is unmistakable (presentation-only; the host owns real hits).
-    if (possession.kind === 'chopper-gunner') {
-      killstreakPresentation.presentChopperWeaponAction(entity.id);
-      const shotRay = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch);
-      const muzzle = new THREE.Vector3(...shotRay.tracerOrigin);
-      const aim = new THREE.Vector3(...shotRay.direction);
-      spawnTracer(muzzle, muzzle.clone().addScaledVector(aim, 130), 0xffb347);
-      localSupportShotPresentationReceipts.record({
-        activationId: entity.activationId,
-        source: 'chopper',
-        presentedAtHostTimeMs: currentHostTimeMs(),
-      });
-    }
-    nextLocalSupportGunReportAt = now + (possession.kind === 'chopper-gunner'
-      ? CHOPPER_GUN_PROFILE.cadenceMs
-      : DRONE_GUN_PROFILE.cadenceMs);
-  } else if (!triggerHeld) {
-    nextLocalSupportGunReportAt = 0;
+  const deferQaShotPresentation = debugChopperGunnerQaAimRequest !== null;
+  if (!deferQaShotPresentation) presentLocalPossessedSupportGun(now, possession, entity);
+  if (debugChopperGunnerQaAimRequest && now > debugChopperGunnerQaAimRequest.deadlineAtMs) {
+    clearDebugChopperGunnerQaAimRequest();
   }
   if (possession.kind === 'chopper-gunner' && debugChopperEvidenceControlOverrideActive) return;
   if (now - lastKillstreakControlSentAt < 50) return;
+  const controlThrottle = chopperGunnerQaAimThrottleEvidence(now, lastKillstreakControlSentAt);
+  let alignedQaRequest: ChopperGunnerQaAimRequest | null = null;
+  let alignedQaAim: ChopperGunnerQaAimAlignment | null = null;
+  if (debugChopperGunnerQaAimRequest) {
+    const request = debugChopperGunnerQaAimRequest;
+    const actor = localKillstreakActorSnapshot();
+    const qaEntity = possession.kind === 'chopper-gunner'
+      && possession.entityId === request.entityId
+      && entity.kind === 'chopper'
+      && entity.activationId === request.activationId
+      && entity.ownerId === player.id
+      && entity.gunController === 'owner-player'
+      ? entity
+      : null;
+    const resolution = resolveChopperGunnerQaAim(request, {
+      nowMs: now,
+      triggerHeld,
+      triggerEdgeSequence: debugChopperGunnerQaAimEdgeSequence,
+      entity: qaEntity,
+      ownerId: player.id,
+      ownerLifeId: actor?.lifeId ?? -1,
+      ownerTeam: player.team,
+      world: killstreakWorldState(),
+    });
+    if (resolution.status === 'clear') {
+      clearDebugChopperGunnerQaAimRequest();
+    } else {
+      alignedQaRequest = request;
+      alignedQaAim = resolution.alignment;
+      player.yaw = alignedQaAim.yaw;
+      player.pitch = alignedQaAim.pitch;
+      camera.rotation.y = player.yaw;
+      camera.rotation.x = player.pitch;
+      killstreakPresentation.alignFirstPersonCockpit(entity.id, camera.position, camera.quaternion);
+    }
+  }
+  if (deferQaShotPresentation && alignedQaRequest && alignedQaAim) {
+    presentLocalPossessedSupportGun(now, possession, entity);
+  }
   const droneKeyProfile = activeKeyBindingProfile();
   const droneAxes = pilotedDroneControlAxes({
     keyboardForward: actionHeld('move-forward', keys, droneKeyProfile),
@@ -21731,6 +21889,13 @@ function updateKillstreakPossession(now: number): void {
     verticalQ: possession.kind === 'piloted-drone' ? droneAxes.vertical : 0,
     fire: triggerHeld,
   }, now);
+  if (alignedQaRequest && alignedQaAim) {
+    const admission = lastLocalKillstreakControlAdmission;
+    lastDebugChopperGunnerQaAimReceipt = admission
+      ? chopperGunnerQaAimReceipt(alignedQaRequest, alignedQaAim, admission, now, controlThrottle)
+      : null;
+    clearDebugChopperGunnerQaAimRequest();
+  }
   lastKillstreakControlSentAt = now;
 }
 
@@ -23242,6 +23407,7 @@ function clearFieldSupport(): void {
   if (debugThermalOperatorEvidenceState) releaseDebugThermalOperatorEvidenceFrame();
   if (debugChopperCockpitEvidenceState) releaseDebugChopperCockpitEvidenceFrame();
   if (debugChopperMissileEvidenceState) releaseDebugChopperMissileEvidenceFrame();
+  resetDebugChopperGunnerQaAimEvidence();
   localCareCaptureState = createCareCaptureClientState();
   localCareCaptureRequiresHold = false;
   lastKillstreakControlSentAt = Number.NEGATIVE_INFINITY;
@@ -27515,7 +27681,9 @@ const debugWindow = window as Window & {
       entityId: string;
       activationId: string;
       primaryTargetId: string;
+      primaryTargetLifeId: number;
       splashTargetId: string;
+      splashTargetLifeId: number;
       primaryPosition: number[];
       splashPosition: number[];
       separationM: number;
@@ -27590,6 +27758,38 @@ const debugWindow = window as Window & {
       entityId: string;
       activationId: string;
       targetId: string;
+      targetLifeId: number;
+      origin: number[];
+      target: number[];
+      yaw: number;
+      pitch: number;
+      endpoint: number[];
+      entryDistanceM: number;
+      targetRadialDistanceM: number;
+      maximumRangeM: number;
+      splashRadiusM: number;
+      lineOfSight: true;
+    } | null;
+    aimPossessedChopperAtTarget: (targetId: string) => {
+      entityId: string;
+      activationId: string;
+      targetId: string;
+      targetLifeId: number;
+      origin: number[];
+      target: number[];
+      yaw: number;
+      pitch: number;
+      endpoint: number[];
+      entryDistanceM: number;
+      targetRadialDistanceM: number;
+      maximumRangeM: number;
+      splashRadiusM: number;
+      lineOfSight: true;
+    } | null;
+    aimPossessedChopperMissileAtTarget: (targetId: string) => {
+      entityId: string;
+      activationId: string;
+      targetId: string;
       origin: number[];
       target: number[];
       yaw: number;
@@ -27598,7 +27798,7 @@ const debugWindow = window as Window & {
       targetDistanceFromImpactM: number;
       lineOfSight: true;
     } | null;
-    aimPossessedChopperAtTarget: (targetId: string) => {
+    aimPossessedChopperMissileAtTrainingDummy: (targetId: string) => {
       entityId: string;
       activationId: string;
       targetId: string;
@@ -27620,6 +27820,17 @@ const debugWindow = window as Window & {
       pitch: number;
     } | null;
     aimAtRemote: (zone?: HitZone) => void;
+    armPossessedChopperAimTarget: (
+      event: MouseEvent,
+      request: Readonly<{
+        entityId: string;
+        activationId: string;
+        targetId: string;
+        deadlineAtMs: number;
+      }>,
+    ) => boolean;
+    clearPossessedChopperAimTarget: () => void;
+    readPossessedChopperAlignedAimReceipt: () => ChopperGunnerQaAimReceipt | null;
     aimAtRemoteWithOffset: (yawOffset: number, pitchOffset?: number) => void;
     stageWindow: (index: number, distance?: number) => void;
     prepareHf304GlassEvidenceCell: (
@@ -30500,7 +30711,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     const possession = localKillstreakActorSnapshot()?.possession;
     if (possession?.kind !== 'chopper-gunner') return null;
     const entity = killstreakSnapshot.entities.find((candidate) => (
-      candidate.id === possession.entityId && candidate.kind === 'chopper'
+      candidate.id === possession.entityId
+      && candidate.kind === 'chopper'
+      && candidate.ownerId === player.id
+      && candidate.gunController === 'owner-player'
+      && candidate.expiresInMs > 0
     ));
     const stagedBots = [...bots.values()].slice(0, 2);
     if (!entity || stagedBots.length !== 2) return null;
@@ -30515,7 +30730,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         candidates.push(new THREE.Vector3(x, 0, z));
       }
     }
-    let staged: { primary: THREE.Vector3; splash: THREE.Vector3 } | null = null;
+    const baseWorld = killstreakWorldState();
+    const hostileTeam = player.team === 0 ? 1 : 0;
+    let staged: {
+      primary: THREE.Vector3;
+      splash: THREE.Vector3;
+      impact: readonly [number, number, number];
+    } | null = null;
     for (const candidate of candidates) {
       candidate.y = botElevationAt(candidate, 0);
       const primaryPoint = candidate.clone().add(new THREE.Vector3(0, 1.15, 0));
@@ -30528,8 +30749,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
           [origin.x, origin.y, origin.z],
           [primaryPoint.x, primaryPoint.y, primaryPoint.z],
         )) continue;
-      for (let ordinal = 0; ordinal < 8; ordinal += 1) {
-        const angle = ordinal * Math.PI / 4;
+      const outwardAngle = Math.atan2(candidate.z - origin.z, candidate.x - origin.x);
+      const outwardOffsets = [0, Math.PI / 6, -Math.PI / 6, Math.PI / 3, -Math.PI / 3];
+      for (const offset of outwardOffsets) {
+        const angle = outwardAngle + offset;
         const splash = candidate.clone().add(new THREE.Vector3(
           Math.cos(angle) * separationM,
           0,
@@ -30539,19 +30762,63 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         const splashPoint = splash.clone().add(new THREE.Vector3(0, 1.15, 0));
         if (!pointInsideBounds(splash, arena.bounds, 0.7)
           || isBlocked(splash, colliders, 0.45)
-          || primaryPoint.distanceTo(splashPoint) >= CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM
-          || !killstreakLineOfSight(
-            colliders,
-            [primaryPoint.x, primaryPoint.y, primaryPoint.z],
+          || primaryPoint.distanceTo(splashPoint) >= CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM) continue;
+        const prospectiveTargets = baseWorld.targets.map((target) => {
+          if (target.id === stagedBots[0]!.id) return Object.freeze({
+            ...target,
+            team: hostileTeam,
+            lifeId: stagedBots[0]!.continuity,
+            alive: true,
+            position: Object.freeze(primaryPoint.toArray()) as unknown as [number, number, number],
+          });
+          if (target.id === stagedBots[1]!.id) return Object.freeze({
+            ...target,
+            team: hostileTeam,
+            lifeId: stagedBots[1]!.continuity,
+            alive: true,
+            position: Object.freeze(splashPoint.toArray()) as unknown as [number, number, number],
+          });
+          if (target.kind === 'bot') return Object.freeze({ ...target, team: player.team });
+          return target;
+        });
+        const prospectiveWorld: KillstreakWorld = Object.freeze({
+          ...baseWorld,
+          targets: Object.freeze(prospectiveTargets),
+        });
+        const delta = primaryPoint.clone().sub(origin);
+        const yaw = Math.atan2(-delta.x, -delta.z);
+        const pitch = THREE.MathUtils.clamp(
+          Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
+          -1.2,
+          0.5,
+        );
+        const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, yaw, pitch);
+        const hit = chopperGunnerAuthoritativeTargetAlongRay(ray, player.id, player.team, prospectiveWorld);
+        if (!hit
+          || hit.target.id !== stagedBots[0]!.id
+          || hit.target.lifeId !== stagedBots[0]!.continuity
+          || hit.radialDistance > CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM
+          || hit.distance > CHOPPER_GUN_PROFILE.maximumRangeM) continue;
+        const impactToSplash = Math.hypot(
+          hit.endpoint[0] - splashPoint.x,
+          hit.endpoint[1] - splashPoint.y,
+          hit.endpoint[2] - splashPoint.z,
+        );
+        if (impactToSplash <= 2.8
+          || impactToSplash >= CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM
+          || prospectiveWorld.hasLineOfSight?.(
+            hit.endpoint,
             [splashPoint.x, splashPoint.y, splashPoint.z],
-          )) continue;
-        staged = { primary: candidate.clone(), splash };
+          ) === false) continue;
+        staged = { primary: candidate.clone(), splash, impact: hit.endpoint };
         break;
       }
       if (staged) break;
     }
     if (!staged) return null;
-    const hostileTeam = player.team === 0 ? 1 : 0;
+    for (const bot of bots.values()) {
+      if (!stagedBots.includes(bot)) bot.team = player.team;
+    }
     for (const [index, bot] of stagedBots.entries()) {
       const position = index === 0 ? staged.primary : staged.splash;
       bot.team = hostileTeam;
@@ -30573,7 +30840,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       entityId: entity.id,
       activationId: entity.activationId,
       primaryTargetId: stagedBots[0]!.id,
+      primaryTargetLifeId: stagedBots[0]!.continuity,
       splashTargetId: stagedBots[1]!.id,
+      splashTargetLifeId: stagedBots[1]!.continuity,
       primaryPosition: staged.primary.toArray(),
       splashPosition: staged.splash.toArray(),
       separationM: staged.primary.distanceTo(staged.splash),
@@ -30996,10 +31265,165 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.updateMatrixWorld(true);
   },
   aimPossessedChopperAtTrainingDummy: (targetId) => {
+    const actor = localKillstreakActorSnapshot();
+    const possession = actor?.possession;
+    if (possession?.kind !== 'chopper-gunner' || selectedArena.id !== 'gun-range') return null;
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.id === possession.entityId
+      && candidate.kind === 'chopper'
+      && candidate.ownerId === player.id
+      && candidate.gunController === 'owner-player'
+      && candidate.expiresInMs > 0
+    ));
+    const world = killstreakWorldState();
+    const target = world.targets.find((candidate) => candidate.id === targetId) ?? null;
+    if (!actor || actor.lifeId !== localContinuity || !entity || !target || !target.alive) return null;
+    const origin = new THREE.Vector3(...chopperGunnerCameraOrigin(entity.position, entity.attitude));
+    const targetPoint = new THREE.Vector3(...target.position);
+    const delta = targetPoint.clone().sub(origin);
+    if (delta.lengthSq() < 1e-6) return null;
+    const yaw = Math.atan2(-delta.x, -delta.z);
+    const pitch = THREE.MathUtils.clamp(
+      Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
+      -1.2,
+      0.5,
+    );
+    const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, yaw, pitch);
+    const hit = chopperGunnerAuthoritativeTargetAlongRay(ray, player.id, player.team, world);
+    if (!hit || hit.target.id !== target.id || hit.target.lifeId !== target.lifeId) return null;
+    player.yaw = yaw;
+    player.pitch = pitch;
+    camera.position.copy(origin);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    return {
+      entityId: entity.id,
+      activationId: entity.activationId,
+      targetId: target.id,
+      targetLifeId: target.lifeId,
+      origin: origin.toArray(),
+      target: targetPoint.toArray(),
+      yaw: player.yaw,
+      pitch: player.pitch,
+      endpoint: [...hit.endpoint],
+      entryDistanceM: hit.distance,
+      targetRadialDistanceM: hit.radialDistance,
+      maximumRangeM: CHOPPER_GUN_PROFILE.maximumRangeM,
+      splashRadiusM: CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM,
+      lineOfSight: true,
+    };
+  },
+  aimPossessedChopperAtTarget: (targetId) => {
+    const actor = localKillstreakActorSnapshot();
+    const possession = actor?.possession;
+    if (possession?.kind !== 'chopper-gunner') return null;
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.id === possession.entityId
+      && candidate.kind === 'chopper'
+      && candidate.ownerId === player.id
+      && candidate.gunController === 'owner-player'
+      && candidate.expiresInMs > 0
+    ));
+    const world = killstreakWorldState();
+    const target = world.targets.find((candidate) => candidate.id === targetId) ?? null;
+    if (!actor || actor.lifeId !== localContinuity || !entity || !target || !target.alive) return null;
+    const targetPoint = new THREE.Vector3(...target.position);
+    const origin = new THREE.Vector3(...chopperGunnerCameraOrigin(entity.position, entity.attitude));
+    const delta = targetPoint.clone().sub(origin);
+    if (delta.lengthSq() < 1e-6) return null;
+    const yaw = Math.atan2(-delta.x, -delta.z);
+    const pitch = THREE.MathUtils.clamp(
+      Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
+      -1.2,
+      0.5,
+    );
+    const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, yaw, pitch);
+    const hit = chopperGunnerAuthoritativeTargetAlongRay(ray, player.id, player.team, world);
+    if (!hit || hit.target.id !== target.id || hit.target.lifeId !== target.lifeId) return null;
+    player.yaw = yaw;
+    player.pitch = pitch;
+    camera.position.copy(origin);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    return {
+      entityId: entity.id,
+      activationId: entity.activationId,
+      targetId,
+      targetLifeId: target.lifeId,
+      origin: origin.toArray(),
+      target: targetPoint.toArray(),
+      yaw: player.yaw,
+      pitch: player.pitch,
+      endpoint: [...hit.endpoint],
+      entryDistanceM: hit.distance,
+      targetRadialDistanceM: hit.radialDistance,
+      maximumRangeM: CHOPPER_GUN_PROFILE.maximumRangeM,
+      splashRadiusM: CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM,
+      lineOfSight: true,
+    };
+  },
+  aimPossessedChopperMissileAtTarget: (targetId) => {
+    const possession = localKillstreakActorSnapshot()?.possession;
+    if (possession?.kind !== 'chopper-gunner') return null;
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.id === possession.entityId
+      && candidate.kind === 'chopper'
+      && candidate.ownerId === player.id
+      && candidate.gunController === 'owner-player'
+      && candidate.expiresInMs > 0
+    ));
+    const targetPoint = supportTargetPosition(targetId);
+    if (!entity || !targetPoint) return null;
+    const origin = new THREE.Vector3(...chopperGunnerCameraOrigin(entity.position, entity.attitude));
+    if (!killstreakLineOfSight(
+      activeWorldColliders(),
+      [origin.x, origin.y, origin.z],
+      [targetPoint.x, targetPoint.y, targetPoint.z],
+    )) return null;
+    const delta = targetPoint.clone().sub(origin);
+    if (delta.lengthSq() < 1e-6) return null;
+    const yaw = Math.atan2(-delta.x, -delta.z);
+    const pitch = THREE.MathUtils.clamp(
+      Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
+      -1.2,
+      0.5,
+    );
+    const impactPosition = new THREE.Vector3(...chopperMissileGroundTarget(
+      entity.position,
+      entity.attitude,
+      yaw,
+      pitch,
+      killstreakWorldState(),
+    ));
+    const targetDistanceFromImpactM = impactPosition.distanceTo(targetPoint);
+    if (targetDistanceFromImpactM > CHOPPER_MISSILE_BLAST_RADIUS_M) return null;
+    player.yaw = yaw;
+    player.pitch = pitch;
+    camera.position.copy(origin);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    return {
+      entityId: entity.id,
+      activationId: entity.activationId,
+      targetId,
+      origin: origin.toArray(),
+      target: targetPoint.toArray(),
+      yaw: player.yaw,
+      pitch: player.pitch,
+      impactPosition: impactPosition.toArray(),
+      targetDistanceFromImpactM,
+      lineOfSight: true,
+    };
+  },
+  aimPossessedChopperMissileAtTrainingDummy: (targetId) => {
     const possession = localKillstreakActorSnapshot()?.possession;
     if (possession?.kind !== 'chopper-gunner' || selectedArena.id !== 'gun-range') return null;
     const entity = killstreakSnapshot.entities.find((candidate) => (
-      candidate.id === possession.entityId && candidate.kind === 'chopper'
+      candidate.id === possession.entityId
+      && candidate.kind === 'chopper'
+      && candidate.ownerId === player.id
+      && candidate.gunController === 'owner-player'
+      && candidate.expiresInMs > 0
     ));
     const target = arena.targets.find((candidate) => (
       candidate.id === targetId && candidate.kind === 'training-dummy' && candidate.active
@@ -31038,55 +31462,6 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       entityId: entity.id,
       activationId: entity.activationId,
       targetId: target.id,
-      origin: origin.toArray(),
-      target: targetPoint.toArray(),
-      yaw: player.yaw,
-      pitch: player.pitch,
-      impactPosition: impactPosition.toArray(),
-      targetDistanceFromImpactM,
-      lineOfSight: true,
-    };
-  },
-  aimPossessedChopperAtTarget: (targetId) => {
-    const possession = localKillstreakActorSnapshot()?.possession;
-    if (possession?.kind !== 'chopper-gunner') return null;
-    const entity = killstreakSnapshot.entities.find((candidate) => (
-      candidate.id === possession.entityId && candidate.kind === 'chopper'
-    ));
-    const targetPoint = supportTargetPosition(targetId);
-    if (!entity || !targetPoint) return null;
-    const origin = new THREE.Vector3(...chopperGunnerCameraOrigin(entity.position, entity.attitude));
-    if (!killstreakLineOfSight(
-      activeWorldColliders(),
-      [origin.x, origin.y, origin.z],
-      [targetPoint.x, targetPoint.y, targetPoint.z],
-    )) return null;
-    const delta = targetPoint.clone().sub(origin);
-    if (delta.lengthSq() < 1e-6) return null;
-    const yaw = Math.atan2(-delta.x, -delta.z);
-    const pitch = THREE.MathUtils.clamp(
-      Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
-      -1.2,
-      0.5,
-    );
-    const impactPosition = new THREE.Vector3(...chopperMissileGroundTarget(
-      entity.position,
-      entity.attitude,
-      yaw,
-      pitch,
-      killstreakWorldState(),
-    ));
-    const targetDistanceFromImpactM = impactPosition.distanceTo(targetPoint);
-    if (targetDistanceFromImpactM > CHOPPER_MISSILE_BLAST_RADIUS_M) return null;
-    player.yaw = yaw;
-    player.pitch = pitch;
-    camera.position.copy(origin);
-    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
-    camera.updateMatrixWorld(true);
-    return {
-      entityId: entity.id,
-      activationId: entity.activationId,
-      targetId,
       origin: origin.toArray(),
       target: targetPoint.toArray(),
       yaw: player.yaw,
@@ -31140,6 +31515,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     remote.root.position.copy(remote.target);
     remote.root.updateMatrixWorld(true);
   },
+  armPossessedChopperAimTarget: (event, request) => (
+    armDebugChopperGunnerQaAimFromTrustedCapture(event, request)
+  ),
+  clearPossessedChopperAimTarget: () => clearDebugChopperGunnerQaAimRequest(),
+  readPossessedChopperAlignedAimReceipt: () => lastDebugChopperGunnerQaAimReceipt,
   aimAtRemoteWithOffset: (yawOffset = 0, pitchOffset = 0) => {
     const remote = remotes.values().next().value as RemotePlayer | undefined;
     if (!remote || !Number.isFinite(yawOffset) || !Number.isFinite(pitchOffset)) return;
@@ -31869,6 +32249,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     mouseTriggerHeld = held;
     triggerHeld = held;
     if (!held) {
+      clearDebugChopperGunnerQaAimRequest();
       spinUpWeapon = null;
       spinUpStartedAtPerformanceMs = null;
       spinUpStartedAtHostTimeMs = null;

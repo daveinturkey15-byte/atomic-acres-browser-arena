@@ -50,19 +50,38 @@ describe('Pass 66 test-bay QA teleport support lifecycle integration', () => {
 
   it('keeps deterministic possessed-chopper aiming debug-only and unable to submit damage', () => {
     const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
-    const start = source.indexOf('  aimPossessedChopperAtTrainingDummy: (targetId) => {');
-    const end = source.indexOf('\n  aimAtRemote:', start);
-    expect(start).toBeGreaterThan(-1);
-    expect(end).toBeGreaterThan(start);
-    const integration = source.slice(start, end);
-    expect(integration).toContain("possession?.kind !== 'chopper-gunner'");
-    expect(integration).toContain("candidate.kind === 'training-dummy' && candidate.active");
-    expect(integration).toContain('chopperGunnerCameraOrigin(entity.position, entity.attitude)');
-    expect(integration).toContain('trainingDummySupportPoint(target)');
-    expect(integration).toContain('killstreakLineOfSight(');
-    expect(integration).toContain('activeWorldColliders()');
-    expect(integration).toContain('player.yaw = Math.atan2(-delta.x, -delta.z);');
-    expect(integration).toContain('player.pitch = THREE.MathUtils.clamp(');
+    const debugStart = source.indexOf('debugWindow.__ATOMIC_ACRES_DEBUG__ = {');
+    const block = (startMarker: string, endMarker: string) => {
+      const start = source.indexOf(startMarker, debugStart);
+      const end = source.indexOf(endMarker, start);
+      expect(start).toBeGreaterThan(debugStart);
+      expect(end).toBeGreaterThan(start);
+      return source.slice(start, end);
+    };
+    const mgAims = [
+      block('  aimPossessedChopperAtTrainingDummy: (targetId) => {', '\n  aimPossessedChopperAtTarget:'),
+      block('  aimPossessedChopperAtTarget: (targetId) => {', '\n  aimPossessedChopperMissileAtTarget:'),
+    ];
+    for (const aim of mgAims) {
+      expect(aim).toContain("possession?.kind !== 'chopper-gunner'");
+      expect(aim).toContain('chopperGunnerCameraOrigin(entity.position, entity.attitude)');
+      expect(aim).toContain('chopperGunnerAuthoritativeRay(');
+      expect(aim).toContain('chopperGunnerAuthoritativeTargetAlongRay(');
+      expect(aim).toContain('CHOPPER_GUN_PROFILE.maximumRangeM');
+      expect(aim).toContain('CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM');
+      expect(aim).not.toContain('chopperMissileGroundTarget');
+    }
+    const missileAims = [
+      block('  aimPossessedChopperMissileAtTarget: (targetId) => {', '\n  aimPossessedChopperMissileAtTrainingDummy:'),
+      block('  aimPossessedChopperMissileAtTrainingDummy: (targetId) => {', '\n  aimPossessedPilotedDroneAtTarget:'),
+    ];
+    for (const aim of missileAims) {
+      expect(aim).toContain('chopperMissileGroundTarget(');
+      expect(aim).toContain('CHOPPER_MISSILE_BLAST_RADIUS_M');
+      expect(aim).toContain('killstreakLineOfSight(');
+      expect(aim).toContain('activeWorldColliders()');
+    }
+    const integration = [...mgAims, ...missileAims].join('\n');
     expect(integration).not.toContain('requestKillstreakControl');
     expect(integration).not.toContain('killstreakRuntime');
     expect(integration).not.toContain('hitPracticeTarget');

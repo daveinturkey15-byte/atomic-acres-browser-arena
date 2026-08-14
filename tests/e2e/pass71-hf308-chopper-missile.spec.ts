@@ -154,8 +154,8 @@ async function stageAndAimMissileTarget(host: Page, ordinal: number): Promise<an
   expect(Number.isSafeInteger(staged.targetLifeId)).toBe(true);
   const aim = await host.evaluate(({ targetId, targetKind }) => (
     targetKind === 'training-dummy'
-      ? window.__ATOMIC_ACRES_DEBUG__.aimPossessedChopperAtTrainingDummy(targetId)
-      : window.__ATOMIC_ACRES_DEBUG__.aimPossessedChopperAtTarget(targetId)
+      ? window.__ATOMIC_ACRES_DEBUG__.aimPossessedChopperMissileAtTrainingDummy(targetId)
+      : window.__ATOMIC_ACRES_DEBUG__.aimPossessedChopperMissileAtTarget(targetId)
   ), staged);
   expect(aim).toMatchObject({
     entityId: staged.entityId,

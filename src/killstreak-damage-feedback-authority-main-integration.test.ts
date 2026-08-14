@@ -28,9 +28,14 @@ describe('killstreak damage feedback authority integration', () => {
 
   it('records actual local Chopper ballistics and consumes that bounded receipt instead of inferring possession', () => {
     const possession = block('function updateKillstreakPossession(', '\nfunction updatePass65KillstreakRuntime(');
-    expect(possession).toContain('localSupportShotPresentationReceipts.record({');
-    expect(possession).toContain('activationId: entity.activationId');
-    expect(possession).toContain('presentedAtHostTimeMs: currentHostTimeMs()');
+    const presentation = block('function presentLocalPossessedSupportGun(', '\nfunction updateKillstreakPossession(');
+    expect(presentation).toContain('localSupportShotPresentationReceipts.record({');
+    expect(presentation).toContain('activationId: entity.activationId');
+    expect(presentation).toContain('presentedAtHostTimeMs: currentHostTimeMs()');
+    expect(possession).toContain('if (deferQaShotPresentation && alignedQaRequest && alignedQaAim) {');
+    expect(possession.indexOf('player.yaw = alignedQaAim.yaw;'))
+      .toBeLessThan(possession.lastIndexOf('presentLocalPossessedSupportGun(now, possession, entity);'));
+    expect(possession).not.toContain('if (deferQaShotPresentation) presentLocalPossessedSupportGun');
 
     const feedback = block('function consumeLocalChopperShotPresentationReceipt(', '\nfunction killstreakActorModifiers(');
     expect(feedback).toContain('localSupportShotPresentationReceipts.consume(event, currentHostTimeMs())');

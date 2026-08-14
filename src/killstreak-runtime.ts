@@ -724,13 +724,12 @@ export type ChopperGunnerAuthoritativeRay = Readonly<{
   tracerOrigin: SupportVec3;
 }>;
 
-type SupportRayTargetHit = Readonly<{
+export type ChopperGunnerAuthoritativeTargetHit = Readonly<{
   target: KillstreakTarget;
   endpoint: SupportVec3;
   distance: number;
   radialDistance: number;
-  /** True when the centre ray was occluded but the wallbang rule admits the shot at reduced damage. */
-  wallbanged: boolean;
+  wallbanged: false;
 }>;
 
 function rotateSupportOffsetYXZ(offset: SupportVec3, attitude: SupportVec3): SupportVec3 {
@@ -840,6 +839,51 @@ function hostileTargets(world: KillstreakWorld, ownerId: string, team: 0 | 1): K
 }
 function lineOfSight(world: KillstreakWorld, from: SupportVec3, to: SupportVec3): boolean {
   return world.hasLineOfSight?.(from, to) ?? true;
+}
+
+/**
+ * Exact host-owned primary-impact selector for the possessed Chopper gun. QA
+ * aiming and live damage share this function so range, radial and LOS rules
+ * cannot drift into missile or rendered-pose approximations.
+ */
+export function chopperGunnerAuthoritativeTargetAlongRay(
+  ray: ChopperGunnerAuthoritativeRay,
+  ownerId: string,
+  team: 0 | 1,
+  world: KillstreakWorld,
+): ChopperGunnerAuthoritativeTargetHit | null {
+  const maximumRangeM = CHOPPER_GUN_PROFILE.maximumRangeM;
+  const targetRadiusM = CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM;
+  const radiusSquared = targetRadiusM ** 2;
+  const hits: ChopperGunnerAuthoritativeTargetHit[] = [];
+  for (const target of hostileTargets(world, ownerId, team)) {
+    const dx = target.position[0] - ray.origin[0];
+    const dy = target.position[1] - ray.origin[1];
+    const dz = target.position[2] - ray.origin[2];
+    const centreDistance = dx * ray.direction[0] + dy * ray.direction[1] + dz * ray.direction[2];
+    if (centreDistance <= 0) continue;
+    const perpendicularSquared = Math.max(0, dx * dx + dy * dy + dz * dz - centreDistance * centreDistance);
+    if (perpendicularSquared > radiusSquared) continue;
+    const entryDistance = Math.max(0, centreDistance - Math.sqrt(radiusSquared - perpendicularSquared));
+    if (entryDistance > maximumRangeM) continue;
+    const impactDistance = Math.min(maximumRangeM, centreDistance);
+    const endpoint: SupportVec3 = Object.freeze([
+      ray.origin[0] + ray.direction[0] * impactDistance,
+      ray.origin[1] + ray.direction[1] * impactDistance,
+      ray.origin[2] + ray.direction[2] * impactDistance,
+    ] as const);
+    if (!lineOfSight(world, ray.origin, endpoint)) continue;
+    hits.push(Object.freeze({
+      target,
+      endpoint,
+      distance: entryDistance,
+      radialDistance: Math.sqrt(perpendicularSquared),
+      wallbanged: false as const,
+    }));
+  }
+  return hits.sort((left, right) => (
+    left.distance - right.distance || left.target.id.localeCompare(right.target.id)
+  ))[0] ?? null;
 }
 
 function actorPosition(world: KillstreakWorld, actorId: string): SupportVec3 | null {
@@ -2596,15 +2640,11 @@ export class HostKillstreakRuntime {
       }
     } else {
       const ray = chopperGunnerAuthoritativeRay(firingPosition, firingAttitude, entity.aimYaw, entity.aimPitch);
-      const hit = this.visibleTargetAlongRay(
-        ray.origin,
-        ray.direction,
+      const hit = chopperGunnerAuthoritativeTargetAlongRay(
+        ray,
         owner.actorId,
         owner.team,
         world,
-        CHOPPER_GUN_PROFILE.maximumRangeM,
-        false,
-        CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM,
       );
       if (hit) {
         this.damageChopperAutocannonImpact(
@@ -3047,55 +3087,10 @@ export class HostKillstreakRuntime {
     return nearest;
   }
 
-  private visibleTargetAlongRay(
-    origin: SupportVec3,
-    direction: SupportVec3,
-    ownerId: string,
-    team: 0 | 1,
-    world: KillstreakWorld,
-    maximumRange: number,
-    wallbang = false,
-    targetRadiusM: number = CHOPPER_GUNNER_RAY_POLICY.targetRadiusM,
-  ): SupportRayTargetHit | null {
-    const radiusSquared = targetRadiusM ** 2;
-    const directRadiusSquared = CHOPPER_GUNNER_RAY_POLICY.targetRadiusM ** 2;
-    const hits: SupportRayTargetHit[] = [];
-    for (const target of hostileTargets(world, ownerId, team)) {
-      const dx = target.position[0] - origin[0];
-      const dy = target.position[1] - origin[1];
-      const dz = target.position[2] - origin[2];
-      const centreDistance = dx * direction[0] + dy * direction[1] + dz * direction[2];
-      if (centreDistance <= 0) continue;
-      const perpendicularSquared = Math.max(0, dx * dx + dy * dy + dz * dz - centreDistance * centreDistance);
-      if (perpendicularSquared > radiusSquared) continue;
-      const entryDistance = Math.max(0, centreDistance - Math.sqrt(radiusSquared - perpendicularSquared));
-      if (entryDistance > maximumRange) continue;
-      const impactDistance = Math.min(maximumRange, centreDistance);
-      const endpoint: SupportVec3 = Object.freeze([
-        origin[0] + direction[0] * impactDistance,
-        origin[1] + direction[1] * impactDistance,
-        origin[2] + direction[2] * impactDistance,
-      ] as const);
-      const clear = lineOfSight(world, origin, endpoint);
-      // LOS is evaluated from the possessed camera origin so aircraft-root
-      // occlusion cannot eat a clear gunner shot. Hard cover on that exact ray
-      // still rejects the impact and therefore every splash result.
-      if (!clear && (!wallbang || perpendicularSquared > directRadiusSquared)) continue;
-      hits.push(Object.freeze({
-        target,
-        endpoint,
-        distance: entryDistance,
-        radialDistance: Math.sqrt(perpendicularSquared),
-        wallbanged: !clear,
-      }));
-    }
-    return hits.sort((left, right) => left.distance - right.distance || left.target.id.localeCompare(right.target.id))[0] ?? null;
-  }
-
   private damageChopperAutocannonImpact(
     activationId: string,
     owner: ActorAuthorityState,
-    primary: SupportRayTargetHit,
+    primary: ChopperGunnerAuthoritativeTargetHit,
     ray: ChopperGunnerAuthoritativeRay,
     nowMs: number,
     world: KillstreakWorld,

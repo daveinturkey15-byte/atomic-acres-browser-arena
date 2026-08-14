@@ -4,6 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 import sharp from 'sharp';
 import { MATCH_WARMUP_MS } from '../../src/gameplay';
 import { chopperMissileLaunchPosition } from '../../src/killstreak-runtime';
+import { CHOPPER_GUN_PROFILE, CHOPPER_GUNNER_SPLASH_POLICY } from '../../src/killstreak-support-catalog';
 
 const renderer = process.env.PASS71_CONTROLLED_SUPPORT_RENDERER === 'webgpu' ? 'webgpu' : 'webgl2';
 const requireWebGpu = renderer === 'webgpu' ? '&requireWebGPU=1' : '';
@@ -189,9 +190,54 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
   await page.waitForFunction(() => document.documentElement.dataset.killstreakPossession === 'chopper-gunner');
   await ensurePointerLock(page);
 
+  const gunCadenceDwell = await page.evaluate(async (cadenceMs) => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const before = debug.snapshot() as any;
+    const possession = before.killstreak.actors
+      .find((actor: any) => actor.actorId === before.player.id)?.possession ?? null;
+    const entity = before.killstreak.entities
+      .find((candidate: any) => candidate.id === possession?.entityId) ?? null;
+    const startedAtMs = performance.now();
+    const accepted = debug.requestPossessedChopperEvidenceControl({ fire: false });
+    try {
+      await new Promise<void>((resolveDelay) => window.setTimeout(resolveDelay, cadenceMs));
+      const after = debug.snapshot() as any;
+      const currentPossession = after.killstreak.actors
+        .find((actor: any) => actor.actorId === after.player.id)?.possession ?? null;
+      const currentEntity = after.killstreak.entities
+        .find((candidate: any) => candidate.id === entity?.id) ?? null;
+      return {
+        accepted,
+        fire: false,
+        elapsedMs: performance.now() - startedAtMs,
+        entityId: entity?.id ?? null,
+        activationId: entity?.activationId ?? null,
+        currentPossession,
+        currentEntityId: currentEntity?.id ?? null,
+        currentActivationId: currentEntity?.activationId ?? null,
+        remainingLifetimeMs: currentEntity?.expiresInMs ?? 0,
+        triggerHeld: after.textChat.triggerHeld,
+      };
+    } finally {
+      debug.releasePossessedChopperEvidenceControl();
+    }
+  }, CHOPPER_GUN_PROFILE.cadenceMs);
+  expect(gunCadenceDwell).toMatchObject({
+    accepted: true,
+    fire: false,
+    currentPossession: { kind: 'chopper-gunner', entityId: gunCadenceDwell.entityId },
+    currentEntityId: gunCadenceDwell.entityId,
+    currentActivationId: gunCadenceDwell.activationId,
+    triggerHeld: false,
+  });
+  expect(gunCadenceDwell.elapsedMs).toBeGreaterThanOrEqual(CHOPPER_GUN_PROFILE.cadenceMs);
+  expect(gunCadenceDwell.remainingLifetimeMs).toBeGreaterThan(5_000);
+
   const stagedSplash = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.stagePossessedChopperSplashTargets());
   expect(stagedSplash).not.toBeNull();
   if (!stagedSplash) throw new Error('No authoritative two-bot Chopper splash stage was available');
+  expect(stagedSplash.entityId).toBe(gunCadenceDwell.entityId);
+  expect(stagedSplash.activationId).toBe(gunCadenceDwell.activationId);
   expect(stagedSplash.splashRadiusM).toBe(3);
   expect(stagedSplash.separationM).toBeGreaterThan(1);
   expect(stagedSplash.separationM).toBeGreaterThan(2.8);
@@ -237,13 +283,13 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
       dispose: null,
     };
     observer.promise = new Promise((resolveReceipt, rejectReceipt) => {
-      let validAim: any = null;
       const dispose = () => {
         if (observer.watchdogId !== null) {
           clearTimeout(observer.watchdogId);
           observer.watchdogId = null;
         }
         window.removeEventListener('mousedown', onTrustedMouseDown, true);
+        debug.clearPossessedChopperAimTarget();
       };
       const finish = (receipt: any) => {
         if (observer.settled) return;
@@ -264,8 +310,7 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
             onDeadline();
             return;
           }
-          const aim = debug.aimPossessedChopperAtTarget(staged.primaryTargetId);
-          validAim ??= aim;
+          const aim = debug.readPossessedChopperAlignedAimReceipt();
           const snapshot = debug.snapshot() as any;
           const entity = snapshot.killstreak.entities
             .find((candidate: any) => candidate.id === staged.entityId) ?? null;
@@ -275,15 +320,22 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
             throw new Error('A valid Chopper aim receipt did not retain its activation identity');
           }
           const recent = snapshot.supportDamageFeedback.recent.filter((sample: any) => (
-            sample.source === 'chopper'
+            aim
+              && sample.source === 'chopper'
               && sample.activationId === staged.activationId
-              && sample.atMs >= observer.trustedTriggerAtMs
+              && sample.atMs >= aim.controlAdmissionAtMs
               && sample.atMs <= observer.deadlineAtMs
           ));
-          const primary = recent.find((sample: any) => sample.targetId === staged.primaryTargetId);
-          const splash = recent.find((sample: any) => sample.targetId === staged.splashTargetId);
+          const primary = recent.find((sample: any) => (
+            sample.targetId === staged.primaryTargetId
+              && sample.targetLifeId === staged.primaryTargetLifeId
+          ));
+          const splash = recent.find((sample: any) => (
+            sample.targetId === staged.splashTargetId
+              && sample.targetLifeId === staged.splashTargetLifeId
+          ));
           observer.latest = {
-            aim: validAim,
+            aim,
             primary,
             splash,
             primaryHealth: snapshot.bots.find((bot: any) => bot.id === staged.primaryTargetId)?.hp,
@@ -302,7 +354,7 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
             trustedLeftDown: (globalThis as any).__PASS71_CONTROLLED_SUPPORT_INPUTS__
               .some((event: any) => event.type === 'mousedown' && event.button === 0 && event.trusted === true),
           };
-          if (primary && splash) {
+          if (aim && primary && splash) {
             finish(observer.latest);
             return;
           }
@@ -318,11 +370,7 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
           observer.watchdogId = window.setTimeout(onDeadline, remainingMs);
           return;
         }
-        if (observer.latest !== null) {
-          finish(observer.latest);
-          return;
-        }
-        fail(new Error('Trusted Chopper splash trigger produced no game-frame observation within 2500ms'));
+        fail(new Error(`Trusted Chopper splash trigger produced no exact admitted damage receipt within 2500ms: ${JSON.stringify(observer.latest)}`));
       };
       const onTrustedMouseDown = (event: MouseEvent) => {
         if (event.button !== 0 || event.isTrusted !== true) return;
@@ -330,8 +378,13 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
         try {
           observer.trustedTriggerAtMs = performance.now();
           observer.deadlineAtMs = observer.trustedTriggerAtMs + 2_500;
-          validAim = debug.aimPossessedChopperAtTarget(staged.primaryTargetId);
-          if (!validAim) throw new Error('Trusted Chopper splash trigger could not establish staged primary aim');
+          const armed = debug.armPossessedChopperAimTarget(event, {
+            entityId: staged.entityId,
+            activationId: staged.activationId,
+            targetId: staged.primaryTargetId,
+            deadlineAtMs: observer.deadlineAtMs,
+          });
+          if (!armed) throw new Error('Trusted Chopper splash trigger could not arm staged primary aim');
           const snapshot = debug.snapshot() as any;
           const possession = snapshot.killstreak.actors
             .find((actor: any) => actor.actorId === snapshot.player.id)?.possession ?? null;
@@ -387,9 +440,11 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
       }
     }, { entityId: stagedSplash.entityId, activationId: stagedSplash.activationId }).catch(() => undefined);
     await page.mouse.up({ button: 'left' }).catch(() => undefined);
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.clearPossessedChopperAimTarget()).catch(() => undefined);
     throw error;
   }
   await page.mouse.up({ button: 'left' });
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.clearPossessedChopperAimTarget());
   const missileArmReceipt = await page.evaluate(({ entityId, activationId }) => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     const accepted = debug.requestPossessedChopperEvidenceControl({ fire: false });
@@ -410,9 +465,20 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
   }, { entityId: stagedSplash.entityId, activationId: stagedSplash.activationId });
   expect(splashReceipt).not.toBeNull();
   expect(splashReceipt.aim).toMatchObject({
+    contract: 'chopper-gunner-trusted-aligned-aim-v1',
     entityId: stagedSplash.entityId,
     activationId: stagedSplash.activationId,
     targetId: stagedSplash.primaryTargetId,
+    targetLifeId: stagedSplash.primaryTargetLifeId,
+    controlAction: 'pilot-control',
+    controlReason: 'accepted',
+    missileFire: false,
+    fireAuthority: 'native-trigger-held',
+    triggerHeld: true,
+    controlAccepted: true,
+    selectedAsPrimary: true,
+    maximumRangeM: CHOPPER_GUN_PROFILE.maximumRangeM,
+    splashRadiusM: CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM,
     lineOfSight: true,
   });
   expect(splashReceipt.trustedLeftDown).toBe(true);
@@ -425,12 +491,36 @@ test(`${renderer}: trusted possessed support controls prove Chopper splash/missi
   });
   expect(splashReceipt.trustedTriggerAtMs).toBeGreaterThanOrEqual(splashReceipt.observerArmedAtMs);
   expect(splashReceipt.deadlineAtMs - splashReceipt.trustedTriggerAtMs).toBe(2_500);
+  expect(splashReceipt.aim.trustedEventTimestampMs).toBeLessThanOrEqual(splashReceipt.aim.armedAtMs);
+  expect(splashReceipt.aim.armedAtMs).toBeGreaterThanOrEqual(splashReceipt.trustedTriggerAtMs);
+  expect(splashReceipt.aim.controlAdmissionAtMs).toBe(splashReceipt.aim.alignedAtMs);
+  expect(splashReceipt.aim.consumedAtMs).toBe(splashReceipt.aim.controlAdmissionAtMs);
+  expect(splashReceipt.aim.controlAdmissionAtMs).toBeGreaterThanOrEqual(splashReceipt.aim.armedAtMs);
+  expect(splashReceipt.aim.controlAdmissionAtMs).toBeLessThanOrEqual(splashReceipt.deadlineAtMs);
+  expect(Number.isSafeInteger(splashReceipt.aim.controlSequence)).toBe(true);
+  expect(splashReceipt.aim.controlSequence).toBeGreaterThan(0);
+  if (splashReceipt.aim.minimumControlEligibleAtMs !== null) {
+    expect(splashReceipt.aim.controlAdmissionAtMs)
+      .toBeGreaterThanOrEqual(splashReceipt.aim.minimumControlEligibleAtMs);
+  }
+  expect(splashReceipt.aim.entryDistanceM).toBeLessThanOrEqual(CHOPPER_GUN_PROFILE.maximumRangeM);
+  expect(splashReceipt.aim.radialDistanceM).toBeLessThanOrEqual(CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM);
   expect(splashReceipt.remainingLifetimeMs).toBeGreaterThan(0);
   expect(splashReceipt.triggerHeld).toBe(true);
   expect(splashReceipt.primaryHealth).toBeLessThan(splashBaseline.primaryHealth);
   expect(splashReceipt.splashHealth).toBeLessThan(splashBaseline.splashHealth);
   expect(splashReceipt.primary.atMs).toBe(splashReceipt.splash.atMs);
+  expect(splashReceipt.primary.atMs).toBeGreaterThanOrEqual(splashReceipt.aim.controlAdmissionAtMs);
+  expect(splashReceipt.primary.atMs).toBeLessThanOrEqual(splashReceipt.deadlineAtMs);
   expect(splashReceipt.primary.activationId).toBe(splashReceipt.splash.activationId);
+  expect(splashReceipt.primary.targetLifeId).toBe(stagedSplash.primaryTargetLifeId);
+  expect(splashReceipt.splash.targetLifeId).toBe(stagedSplash.splashTargetLifeId);
+  expect(splashReceipt.primary.origin).toEqual(splashReceipt.aim.origin);
+  expect(splashReceipt.splash.origin).toEqual(splashReceipt.aim.origin);
+  expect(splashReceipt.primary.endpoint).toEqual(splashReceipt.aim.endpoint);
+  expect(splashReceipt.splash.endpoint).toEqual(splashReceipt.aim.endpoint);
+  expect(splashReceipt.primary.tracerOrigin).toEqual(splashReceipt.aim.tracerOrigin);
+  expect(splashReceipt.splash.tracerOrigin).toEqual(splashReceipt.aim.tracerOrigin);
   expect(splashReceipt.primary.damage).toBeGreaterThan(0);
   expect(splashReceipt.splash.damage).toBeGreaterThan(0);
 
