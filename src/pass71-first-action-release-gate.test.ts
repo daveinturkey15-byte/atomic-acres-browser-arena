@@ -153,6 +153,7 @@ describe('Pass 71 first-action and protected-release gate', () => {
     const crossbowImpactHelper = glassLifecycleSpec.slice(crossbowImpactStart, crossbowImpactEnd);
     expect(glassLifecycleSpec).toContain('const LIVE_CROSSBOW_IMPACT_TIMEOUT_MS = 2_000;');
     expect(glassLifecycleSpec).toContain('const CROSSBOW_IMPACT_RECEIPT_COLLECTION_TIMEOUT_MS = 8_000;');
+    expect(crossbowImpactHelper).toContain('debug.stageWindow(paneIndex, 6);');
     expect(crossbowImpactHelper).toContain('const arm = debug.armExplosiveBoltImpactObservation(paneIndex);');
     expect(crossbowImpactHelper).toContain('const action = debug.fireOnce();');
     expect(crossbowImpactHelper).toContain('debug.bindExplosiveBoltImpactObservation(arm, action)');
@@ -161,6 +162,8 @@ describe('Pass 71 first-action and protected-release gate', () => {
     expect(crossbowImpactHelper).toContain('timeout: CROSSBOW_IMPACT_RECEIPT_COLLECTION_TIMEOUT_MS');
     expect(crossbowImpactHelper).toContain('actualImpactLatencyMs: read.actualImpactLatencyMs');
     expect(crossbowImpactHelper).toContain('observedAfterDetonation: read.observedAfterDetonation');
+    expect(crossbowImpactHelper.indexOf('debug.stageWindow(paneIndex, 6)'))
+      .toBeLessThan(crossbowImpactHelper.indexOf('armExplosiveBoltImpactObservation(paneIndex)'));
     expect(crossbowImpactHelper.indexOf('armExplosiveBoltImpactObservation(paneIndex)'))
       .toBeLessThan(crossbowImpactHelper.indexOf('debug.fireOnce()'));
     expect(crossbowImpactHelper.indexOf('debug.fireOnce()'))

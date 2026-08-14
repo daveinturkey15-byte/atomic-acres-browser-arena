@@ -40,7 +40,8 @@ describe('persistent physical house-window debris integration', () => {
     expect(source).toContain('.filter((entry) => entry.physicsActive)');
     expect(source).toContain('const lifecycle = windowGlassDebrisLifecycleMode({');
     expect(source).toContain("if (lifecycle === 'settled' && beforeExpiry && !entry.fallbackSettled) {");
-    expect(source).toContain('const retainedPolicyInterval = entry.fallbackSettled ? null : windowGlassDebrisFallbackInterval({');
+    expect(source).toContain('const retainedPolicyInterval = entry.fallbackSettled');
+    expect(source).toContain('retainedWindowDebrisFallbackInterval(entry, now);');
     expect(source).toContain('stateStartAt: entry.fallbackStateObservedAt,');
     expect(source).toContain('captureStartAt: Math.max(');
     expect(source).toContain('const preCapture = integrateWindowGlassDebrisFallback(');
@@ -90,9 +91,9 @@ describe('persistent physical house-window debris integration', () => {
     expect(apply).toContain('if (entry.firstPhysicsPoseAt === null) entry.firstPhysicsPoseAt = observedAt;');
     expect(apply).toContain("recordWindowDebrisLifecycleMilestone(entry, 'initial', observedAt, {");
     expect(apply).toContain('position,');
-    expect(apply.indexOf("recordWindowDebrisLifecycleMilestone(entry, 'initial', observedAt"))
-      .toBeLessThan(apply.indexOf('if (!applyState) return;'));
     expect(apply.indexOf('if (!applyState) return;'))
+      .toBeLessThan(apply.indexOf("recordWindowDebrisLifecycleMilestone(entry, 'initial', observedAt"));
+    expect(apply.indexOf("recordWindowDebrisLifecycleMilestone(entry, 'initial', observedAt"))
       .toBeLessThan(apply.indexOf('entry.root.position.set(snapshot.position.x'));
     expect(apply).toContain('entry.fallbackStateObservedAt = observedAt;');
     expect(apply).toContain('entry.fallbackStateIncludesPhysicsPose = true;');
@@ -120,8 +121,11 @@ describe('persistent physical house-window debris integration', () => {
     expect(observedAt).toBeGreaterThan(snapshotRead);
     expect(candidateDeclaration).toBeLessThan(entryLoop);
     expect(update.match(/windowDebrisFallbackSupportCandidates\(\)/gu)).toHaveLength(1);
-    expect(update).toContain('const retainedPolicyInterval = entry.fallbackSettled ? null');
-    expect(update).toContain('applyPersistentWindowDebrisPhysicsSnapshot(entry, snapshot, now, beforeExpiry);');
+    expect(update).toContain('const retainedPolicyInterval = entry.fallbackSettled');
+    expect(source).toContain('const retainedFallbackInterval = entry.fallbackSettled');
+    expect(source).toContain('windowGlassDebrisPhysicsSnapshotMode({');
+    expect(source).toContain("snapshotMode === 'state-and-lifecycle'");
+    expect(update).toContain('retainedWindowDebrisFallbackInterval(entry, now);');
     expect(update).toContain('retainedPolicyInterval !== null');
     expect(update).toContain('stateStartAt: entry.fallbackStateObservedAt,');
     expect(update).toContain('captureStartAt: Math.max(');

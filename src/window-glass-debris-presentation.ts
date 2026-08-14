@@ -157,6 +157,25 @@ export type WindowGlassDebrisFallbackInterval = Readonly<{
   endAt: number;
 }>;
 
+export type WindowGlassDebrisPhysicsSnapshotMode = 'state-and-lifecycle' | 'forensic-only';
+
+/**
+ * Once a real initial pose has reached the retained fallback boundary, that
+ * earlier state owns deterministic catch-up. A later Rapier snapshot remains
+ * useful forensic evidence, but must not replace the pre-boundary state or
+ * publish a late `moving` milestone ahead of the retained fallback chronology.
+ */
+export function windowGlassDebrisPhysicsSnapshotMode(sample: Readonly<{
+  beforeExpiry: boolean;
+  hasInitialMilestone: boolean;
+  retainedFallbackInterval: WindowGlassDebrisFallbackInterval | null;
+}>): WindowGlassDebrisPhysicsSnapshotMode {
+  return sample.beforeExpiry
+    && (!sample.hasInitialMilestone || sample.retainedFallbackInterval === null)
+    ? 'state-and-lifecycle'
+    : 'forensic-only';
+}
+
 /**
  * Freezes the Three.js presentation bridge into the pure fallback contract.
  * Euler metadata is enumerable, so spreading or validating a live Euler would

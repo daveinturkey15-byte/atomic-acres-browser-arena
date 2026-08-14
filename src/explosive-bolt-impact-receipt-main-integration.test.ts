@@ -64,11 +64,13 @@ describe('explosive-bolt window impact receipt integration', () => {
       'async function fireAndObserveLiveCrossbowImpact(',
       '\nasync function resetBreakableWindows(',
     );
+    const stage = helper.indexOf('debug.stageWindow(paneIndex, 6);');
     const arm = helper.indexOf('debug.armExplosiveBoltImpactObservation(paneIndex)');
     const fire = helper.indexOf('const action = debug.fireOnce();');
     const bind = helper.indexOf('debug.bindExplosiveBoltImpactObservation(arm, action)');
     const read = helper.indexOf('.readExplosiveBoltImpactReceipt(bound, maxImpactLatencyMs)');
-    expect(arm).toBeGreaterThanOrEqual(0);
+    expect(stage).toBeGreaterThanOrEqual(0);
+    expect(arm).toBeGreaterThan(stage);
     expect(fire).toBeGreaterThan(arm);
     expect(bind).toBeGreaterThan(fire);
     expect(read).toBeGreaterThan(bind);
@@ -77,6 +79,13 @@ describe('explosive-bolt window impact receipt integration', () => {
     expect(helper).toContain('observedAfterDetonation: read.observedAfterDetonation');
     expect(helper).not.toContain('projectileGlass.explosiveBolts');
     expect(helper).not.toContain('detonatesInMs');
+
+    const crossbowTest = between(
+      browser,
+      'real explosive-crossbow impact stays solid until detonation',
+      '\n  });\n}',
+    );
+    expect(crossbowTest).not.toContain('stageWindow(');
 
     const debugFire = between(main, 'fireOnce: () => {', '\n  setTriggerHeld:');
     expect(debugFire).toContain('const previousExplosiveBoltAction = lastLocalExplosiveBoltActionIdentity;');

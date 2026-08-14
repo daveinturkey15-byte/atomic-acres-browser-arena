@@ -19,6 +19,7 @@ import {
   windowGlassDebrisMilestoneAdmitted,
   windowGlassDebrisFallbackInterval,
   windowGlassDebrisFallbackSweepSupport,
+  windowGlassDebrisPhysicsSnapshotMode,
   windowGlassDebrisSettleMode,
 } from './window-glass-debris-presentation';
 
@@ -401,6 +402,46 @@ describe('persistent window glass debris presentation', () => {
       phase: 'moving', spawnedAt: 0, sampledAt: 1_200,
       previous: lateInitial, physical: false, fallbackStartedAt: 180,
     })).toBe(false);
+  });
+
+  it('keeps post-policy Rapier snapshots forensic once a real initial pose owns fallback catch-up', () => {
+    const retainedFallbackInterval = windowGlassDebrisFallbackInterval({
+      spawnedAt: 0,
+      now: 3_987,
+      physicsActive: true,
+      receivedPhysicsPose: true,
+      stateIncludesPhysicsPose: true,
+      firstPhysicsPoseAt: 90,
+      stateObservedAt: 90,
+      lastProgressAt: 90,
+      fallbackStartedAt: null,
+    });
+    expect(retainedFallbackInterval).toEqual({
+      policyStartAt: 540,
+      stateStartAt: 90,
+      captureStartAt: 540,
+      endAt: 3_987,
+    });
+    expect(windowGlassDebrisPhysicsSnapshotMode({
+      beforeExpiry: true,
+      hasInitialMilestone: true,
+      retainedFallbackInterval,
+    })).toBe('forensic-only');
+    expect(windowGlassDebrisPhysicsSnapshotMode({
+      beforeExpiry: true,
+      hasInitialMilestone: false,
+      retainedFallbackInterval,
+    })).toBe('state-and-lifecycle');
+    expect(windowGlassDebrisPhysicsSnapshotMode({
+      beforeExpiry: true,
+      hasInitialMilestone: true,
+      retainedFallbackInterval: null,
+    })).toBe('state-and-lifecycle');
+    expect(windowGlassDebrisPhysicsSnapshotMode({
+      beforeExpiry: false,
+      hasInitialMilestone: true,
+      retainedFallbackInterval: null,
+    })).toBe('forensic-only');
   });
 
   it('leaves unsupported off-footprint fallback falling instead of fabricating a settle', () => {

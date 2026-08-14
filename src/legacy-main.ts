@@ -756,6 +756,7 @@ import {
   windowGlassDebrisFallbackSweepSupport,
   windowGlassDebrisLifecycleMode,
   windowGlassDebrisMilestoneAdmitted,
+  windowGlassDebrisPhysicsSnapshotMode,
   type WindowGlassDebrisFallbackSupportCandidate,
 } from './window-glass-debris-presentation';
 import {
@@ -3808,6 +3809,7 @@ function applyPersistentWindowDebrisPhysicsSnapshot(
     fallbackSettled: false,
     support,
   });
+  if (!applyState) return;
   recordWindowDebrisLifecycleMilestone(entry, 'initial', observedAt, {
     position,
     physical: true,
@@ -3833,7 +3835,6 @@ function applyPersistentWindowDebrisPhysicsSnapshot(
       });
     }
   }
-  if (!applyState) return;
   entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
   entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w);
   entry.definition = majorDebrisDefinitionFromSnapshot(entry.definition, snapshot);
@@ -3857,6 +3858,25 @@ function applyPersistentWindowDebrisPhysicsSnapshot(
   }
 }
 
+function retainedWindowDebrisFallbackInterval(
+  entry: PersistentWindowDebris,
+  now: number,
+  forcedFallbackAt: number | null = null,
+) {
+  return windowGlassDebrisFallbackInterval({
+    spawnedAt: entry.spawnedAt,
+    now,
+    physicsActive: entry.physicsActive,
+    receivedPhysicsPose: entry.receivedPhysicsPose,
+    stateIncludesPhysicsPose: entry.fallbackStateIncludesPhysicsPose,
+    firstPhysicsPoseAt: entry.firstPhysicsPoseAt,
+    stateObservedAt: entry.fallbackStateObservedAt,
+    lastProgressAt: entry.lastProgressAt,
+    fallbackStartedAt: entry.fallbackStartedAt,
+    forcedFallbackAt,
+  });
+}
+
 function ingestPersistentWindowDebrisPhysicsSnapshots(
   snapshots: readonly MajorDebrisBodySnapshot[],
   observedAt: number,
@@ -3865,7 +3885,20 @@ function ingestPersistentWindowDebrisPhysicsSnapshots(
     const entry = persistentWindowDebris.get(snapshot.id);
     if (!entry) continue;
     const beforeExpiry = observedAt < entry.spawnedAt + WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS;
-    applyPersistentWindowDebrisPhysicsSnapshot(entry, snapshot, observedAt, beforeExpiry);
+    const retainedFallbackInterval = entry.fallbackSettled
+      ? null
+      : retainedWindowDebrisFallbackInterval(entry, observedAt);
+    const snapshotMode = windowGlassDebrisPhysicsSnapshotMode({
+      beforeExpiry,
+      hasInitialMilestone: entry.lifecycleMilestones[0]?.milestone === 'initial',
+      retainedFallbackInterval,
+    });
+    applyPersistentWindowDebrisPhysicsSnapshot(
+      entry,
+      snapshot,
+      observedAt,
+      snapshotMode === 'state-and-lifecycle',
+    );
   }
 }
 
@@ -3943,19 +3976,21 @@ function updatePersistentWindowDebrisPhysics(_dt = 1 / SIMULATION_HZ): void {
     const snapshot = snapshots.get(entry.id);
     const expiresAt = entry.spawnedAt + WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS;
     const beforeExpiry = now < expiresAt;
-    const retainedPolicyInterval = entry.fallbackSettled ? null : windowGlassDebrisFallbackInterval({
-      spawnedAt: entry.spawnedAt,
-      now,
-      physicsActive: entry.physicsActive,
-      receivedPhysicsPose: entry.receivedPhysicsPose,
-      stateIncludesPhysicsPose: entry.fallbackStateIncludesPhysicsPose,
-      firstPhysicsPoseAt: entry.firstPhysicsPoseAt,
-      stateObservedAt: entry.fallbackStateObservedAt,
-      lastProgressAt: entry.lastProgressAt,
-      fallbackStartedAt: entry.fallbackStartedAt,
-    });
+    const retainedPolicyInterval = entry.fallbackSettled
+      ? null
+      : retainedWindowDebrisFallbackInterval(entry, now);
     if (snapshot) {
-      applyPersistentWindowDebrisPhysicsSnapshot(entry, snapshot, now, beforeExpiry);
+      const snapshotMode = windowGlassDebrisPhysicsSnapshotMode({
+        beforeExpiry,
+        hasInitialMilestone: entry.lifecycleMilestones[0]?.milestone === 'initial',
+        retainedFallbackInterval: retainedPolicyInterval,
+      });
+      applyPersistentWindowDebrisPhysicsSnapshot(
+        entry,
+        snapshot,
+        now,
+        snapshotMode === 'state-and-lifecycle',
+      );
     }
     const lifecycleAgeMs = Math.min(ageMs, WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS - 0.001);
     const lifecycle = windowGlassDebrisLifecycleMode({
@@ -3999,18 +4034,7 @@ function updatePersistentWindowDebrisPhysics(_dt = 1 / SIMULATION_HZ): void {
 
     if (!entry.fallbackSettled) {
       const forcedFallbackAt = beforeExpiry && snapshot?.sleeping ? now : null;
-      const currentPolicyInterval = windowGlassDebrisFallbackInterval({
-        spawnedAt: entry.spawnedAt,
-        now,
-        physicsActive: entry.physicsActive,
-        receivedPhysicsPose: entry.receivedPhysicsPose,
-        stateIncludesPhysicsPose: entry.fallbackStateIncludesPhysicsPose,
-        firstPhysicsPoseAt: entry.firstPhysicsPoseAt,
-        stateObservedAt: entry.fallbackStateObservedAt,
-        lastProgressAt: entry.lastProgressAt,
-        fallbackStartedAt: entry.fallbackStartedAt,
-        forcedFallbackAt,
-      });
+      const currentPolicyInterval = retainedWindowDebrisFallbackInterval(entry, now, forcedFallbackAt);
       const interval = retainedPolicyInterval
         ? Object.freeze({
             ...retainedPolicyInterval,

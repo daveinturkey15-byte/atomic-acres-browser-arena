@@ -230,6 +230,10 @@ async function observePane(page: Page, index: number): Promise<PaneObservation> 
 async function fireAndObserveLiveCrossbowImpact(page: Page, index: number): Promise<CrossbowImpactSample> {
   const binding = await page.evaluate((paneIndex) => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
+    // Stage and fire in one browser task. On a starved worker an upper-window
+    // teleport can otherwise fall for several game frames while intervening
+    // evidence reads leave the original camera pitch aimed below the pane.
+    debug.stageWindow(paneIndex, 6);
     const arm = debug.armExplosiveBoltImpactObservation(paneIndex);
     if (!arm) throw new Error(`Unable to arm exact crossbow impact receipt for pane ${paneIndex}`);
     const action = debug.fireOnce();
@@ -931,7 +935,6 @@ for (const profile of PROFILES) {
       await resetBreakableWindows(page);
       await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.equipWeapon('explosive-crossbow'));
       await waitForWeaponReady(page, 'explosive-crossbow');
-      await page.evaluate((paneIndex) => window.__ATOMIC_ACRES_DEBUG__.stageWindow(paneIndex, 6), pane);
       const before = await observePane(page, pane);
       if (pane === 0) {
         await armPaneDebrisLifecycleObservation(page, pane, `${profile.label}/explosive-crossbow`);
