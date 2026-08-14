@@ -294,6 +294,21 @@ function acceptedManifest() {
   };
 }
 
+const PASS71_STANDING_CONDITIONAL_ERROR = 'PASS 71 humanAcceptance.evidence must bind Dave\'s standing conditional authorization and explicitly state that he did not inspect or test the immutable preview';
+
+function pass71StandingConditionalManifest(evidence: string) {
+  const manifest = acceptedManifest();
+  manifest.releasePass = 'PASS 71';
+  manifest.preview.ref = `pr-preview-71-${manifest.preview.sourceSha}`;
+  manifest.humanAcceptance.evidence = evidence;
+  return manifest;
+}
+
+function pass71StandingConditionalErrors(evidence: string) {
+  return validateAcceptanceManifest(pass71StandingConditionalManifest(evidence), { policy }).errors
+    .filter((error) => error.includes('humanAcceptance.evidence'));
+}
+
 function pass71Manifest(tooling: Readonly<Record<string, string>>) {
   const headSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   const manifest = acceptedManifest() as ReturnType<typeof acceptedManifest> & {
@@ -649,16 +664,19 @@ describe('release acceptance manifest', () => {
   });
 
   it('requires the truthful standing-conditional, no-preview-inspection statement for Pass 71', () => {
-    const tooling = pass71GrenadeNativeToolingHashes(process.cwd());
-    const { manifest } = pass71Manifest(tooling);
-    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n'))
-      .not.toMatch(/standing conditional|did not inspect or test/);
+    const truthful = pass71StandingConditionalManifest(
+      'Dave\'s standing conditional publication authorization is bound here; Dave did not inspect or test this immutable preview.',
+    );
+    expect(truthful).not.toHaveProperty('nativeEvidence');
+    expect(pass71StandingConditionalErrors(truthful.humanAcceptance.evidence)).toEqual([]);
 
-    manifest.humanAcceptance.evidence = 'Dave gave standing conditional publication authorization for this immutable preview.';
-    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n')).toMatch(/did not inspect or test/);
+    expect(pass71StandingConditionalErrors(
+      'Dave gave standing conditional publication authorization for this immutable preview.',
+    )).toEqual([PASS71_STANDING_CONDITIONAL_ERROR]);
 
-    manifest.humanAcceptance.evidence = 'Dave did not inspect this immutable preview; publication may proceed.';
-    expect(validateAcceptanceManifest(manifest, pass71ValidationOptions(tooling)).errors.join('\n')).toMatch(/standing conditional/);
+    expect(pass71StandingConditionalErrors(
+      'Dave did not inspect this immutable preview; publication may proceed.',
+    )).toEqual([PASS71_STANDING_CONDITIONAL_ERROR]);
   }, 30_000);
 
   it('requires canonical full-scope HF-298 coverage before R3 can be verified', () => {
