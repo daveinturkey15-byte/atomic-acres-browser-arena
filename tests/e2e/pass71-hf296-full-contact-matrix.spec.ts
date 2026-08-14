@@ -877,6 +877,12 @@ async function runRemoteProjectionSweep(
         for (let attempt = 0; attempt < 360; attempt += 1) {
           const remote = api.sampleHf296RemoteProjection()[0];
           if (remote?.weapon === weapon && remote?.stance === stance) { acknowledged = true; break; }
+          if (attempt > 0 && attempt % 15 === 0) {
+            const retry = api.publishHf296RemoteProjectionState();
+            if (retry?.weapon !== weapon || retry?.stance !== stance) {
+              throw new Error(`HF-296 actor retry publication failed ${arenaId}/${projectionRole}/${fixture.kind}/${stance}/${weapon}`);
+            }
+          }
           await frame();
         }
         if (!acknowledged) {

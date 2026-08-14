@@ -115,6 +115,8 @@ describe('Pass 71 HF-296 runtime evidence integration', () => {
     expect(spec).toContain('const actorSentinelPublication = api.publishHf296RemoteProjectionState();');
     expect(spec).toContain("if (cellIndex === 0 && attempt > 0 && attempt % 15 === 0)");
     expect(spec).toContain("retry?.weapon !== 'flare-gun' || retry?.stance !== 'prone'");
+    expect(spec).toContain('retry?.weapon !== weapon || retry?.stance !== stance');
+    expect(spec).toContain('HF-296 actor retry publication failed');
     expect(spec).toContain('const acknowledgementPublication = api.publishHf296RemoteProjectionState();');
     expect(spec).toContain('const actorPublication = api.publishHf296RemoteProjectionState();');
     expect(spec).toContain('assertPass71Hf296ExactSets({ localKeys, remoteKeys, visualKeys })');
