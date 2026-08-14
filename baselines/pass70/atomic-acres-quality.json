@@ -9,7 +9,7 @@
   "pagesPath": "channels/the-big-one",
   "runtimeFileCount": 515,
   "runtimeTreeSha256": "1a0e90676ffc411eaefeaebef0c970481aad416084a1dc21e9bf7de6de369196",
-  "guardPolicySha256": "71477a6ee2bffc6910edde8a63115e08433f922e92ec8a1c13bb9eff71612f42",
+  "guardPolicySha256": "3b0cf81eb0809528917e6d35adf72535db982a238e8d29f39cb7fb9e835486de",
   "runtimeDigestPolicy": "Hash sorted path, NUL, blob bytes, NUL for every file beneath channels/the-big-one except channel-provenance.json; the complete published subtree contains 516 files including that provenance wrapper.",
   "basis": {
     "ownerAssessment": "Pass 70 is the exact published build immediately preceding the reported Pass 71 Quality-profile downgrade. This record does not claim Dave visually approved every Pass 70 frame.",
@@ -91,6 +91,12 @@
           "gitBlobSha": "6a8cfc22f4b837cf1534b9dc5fe18770f997844c",
           "sha256": "9c6112cb57280fc8e5e6d781be874801b0ba30c3bcc6447c4e6ae72b01ed2678",
           "classification": "Exact audited Pass 71 runtime composition at the final candidate A product freeze: retains the previously admitted owner-feedback and glass lifecycle wiring, adds the plain-data window-debris fallback snapshot, and binds Chopper exterior review tracking plus trusted-trigger-only bounded gunner aim and feedback evidence to current authoritative aircraft and gun-ray state. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted."
+        },
+        {
+          "auditSourceSha": "7c920e78fe0a655ff4b3dcd40834353d12833c0d",
+          "gitBlobSha": "095f9ae7f73d3393d2f23054c4a87d3420b31cfa",
+          "sha256": "f8c1423d8423baa2baf581371d33af9b270f1e41a04881b6aeaf5c4ffd5c7bd6",
+          "classification": "Exact audited Pass 71 runtime composition at the final candidate A product freeze: retains every previously admitted owner-feedback, glass lifecycle and Chopper evidence path, synchronously admits the prewarmed Rapier window-debris body and its real post-sync pose, and records a bounded exact explosive-bolt intact-pane impact receipt for sparse-frame observation. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted."
         }
       ]
     }
