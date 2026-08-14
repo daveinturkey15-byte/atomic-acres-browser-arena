@@ -821,7 +821,7 @@ export function pass71QualityVisualEvidenceFailures(record, expected) {
       pagesPath: PASS71_QUALITY_VISUAL_EVIDENCE.baseline.pagesPath,
       runtimeFileCount: PASS71_QUALITY_VISUAL_EVIDENCE.baseline.runtimeFileCount,
       runtimeTreeSha256: PASS71_QUALITY_VISUAL_EVIDENCE.baseline.runtimeTreeSha256,
-      guardPolicySha256: 'be16416835beec35b3e155138b222538d6536644d0c3a737fb16bd35257167fd',
+      guardPolicySha256: 'bba72d6c98f5738ee169890416e3dcb9b94f5b8ecd5151da0c228029b2a1027a',
     }) || structural.checks?.candidateDistChecked !== true || structural.pixelParity?.status !== 'UNPROVEN'
     || typeof structural.pixelParity?.blocker !== 'string' || structural.pixelParity.blocker.trim() === ''
     || !Array.isArray(structural.problems) || structural.problems.length !== 0) failures.push('composed-structural-baseline');
@@ -1182,12 +1182,12 @@ export function createPass71QualityVisualEvidenceFixture(options = {}) {
         pagesPath: PASS71_QUALITY_VISUAL_EVIDENCE.baseline.pagesPath,
         runtimeFileCount: PASS71_QUALITY_VISUAL_EVIDENCE.baseline.runtimeFileCount,
         runtimeTreeSha256: PASS71_QUALITY_VISUAL_EVIDENCE.baseline.runtimeTreeSha256,
-        guardPolicySha256: 'be16416835beec35b3e155138b222538d6536644d0c3a737fb16bd35257167fd',
+        guardPolicySha256: 'bba72d6c98f5738ee169890416e3dcb9b94f5b8ecd5151da0c228029b2a1027a',
       },
       checks: {
-        pagesRuntimeFiles: 515, protectedSourceFiles: 38, auditedSourceVariants: 1, protectedTextures: 94,
-        protectedRuntimeAssets: 7, semanticDeclarations: 5, semanticFunctions: 9, semanticMethods: 5,
-        semanticTokens: 11, candidateDistChecked: true,
+        pagesRuntimeFiles: 515, protectedSourceFiles: 37, auditedSourceVariants: 2, protectedTextures: 94,
+        protectedRuntimeAssets: 7, semanticDeclarations: 5, semanticFunctions: 14, semanticMethods: 5,
+        semanticTokens: 15, candidateDistChecked: true,
       },
       pixelParity: { status: 'UNPROVEN', blocker: 'No earlier exact-camera native-GPU corpus existed.' },
       problems: [],

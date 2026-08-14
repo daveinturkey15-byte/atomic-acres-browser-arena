@@ -88,6 +88,14 @@ test('the full verifier fails closed on policy, texture, LOD, physics, preset an
     assert.equal(weakenedPolicy.status, 'FAIL');
     assert.match(weakenedPolicy.problems.join('\n'), /guard policy drift/u);
 
+    const runtimePath = 'src/legacy-main.ts';
+    const runtime = readFileSync(join(checkout, runtimePath));
+    writeFileSync(join(checkout, runtimePath), Buffer.concat([runtime, Buffer.from('\n// unaudited Atomic Quality source mutation\n')]));
+    const runtimeMutation = verifyAtomicQualityBaseline({ root: checkout, recordPath });
+    assert.equal(runtimeMutation.status, 'FAIL');
+    assert.match(runtimeMutation.problems.join('\n'), /unaudited source drift: src\/legacy-main\.ts/u);
+    git(['restore', '--source', 'HEAD', '--', runtimePath], checkout);
+
     const texturePath = 'public/assets/original/textures/asphalt-aged.png';
     writeFileSync(join(checkout, texturePath), Buffer.concat([readFileSync(join(checkout, texturePath)), Buffer.from([0])]));
     const textureMutation = verifyAtomicQualityBaseline({ root: checkout, recordPath });

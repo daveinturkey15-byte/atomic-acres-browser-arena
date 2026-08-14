@@ -9,7 +9,7 @@
   "pagesPath": "channels/the-big-one",
   "runtimeFileCount": 515,
   "runtimeTreeSha256": "1a0e90676ffc411eaefeaebef0c970481aad416084a1dc21e9bf7de6de369196",
-  "guardPolicySha256": "e230183afcba5afeee0f914beadb8f303c78bb2d0e9ffad090e6cf924c07a3e9",
+  "guardPolicySha256": "bba72d6c98f5738ee169890416e3dcb9b94f5b8ecd5151da0c228029b2a1027a",
   "runtimeDigestPolicy": "Hash sorted path, NUL, blob bytes, NUL for every file beneath channels/the-big-one except channel-provenance.json; the complete published subtree contains 516 files including that provenance wrapper.",
   "basis": {
     "ownerAssessment": "Pass 70 is the exact published build immediately preceding the reported Pass 71 Quality-profile downgrade. This record does not claim Dave visually approved every Pass 70 frame.",
@@ -72,6 +72,19 @@
           "gitBlobSha": "43b51ae8220f13d22fcf6a8c65c54a9659e5222b",
           "sha256": "4c6eafbd3d5065bf7255f80249fe3cd2b4a2626149e715e49dfafc91266c8883",
           "classification": "Exact audited canonical world-floor extraction: Rapier retains the same -0.2m to 0m collider while presentation fallback consumes that collision-owned shape; protected controller, movement, stance, collision and contact semantics remain unchanged."
+        }
+      ]
+    },
+    {
+      "path": "src/legacy-main.ts",
+      "baselineGitBlobSha": "c4260f4a202cb238a5e39885bc8758a93893dd1f",
+      "baselineSha256": "c78c4e21a06e3dfab3382fdf151aa0791a04a4a3128116966f9394537d736690",
+      "allowedVariants": [
+        {
+          "auditSourceSha": "c08ccaa45ef7b2ba2655406d494b3b06d8c184ee",
+          "gitBlobSha": "533bcf0f2d6e4698964ad6a3ed3710ec08701e4b",
+          "sha256": "992f7f8592b62f0a4bc3d161fd407c44801f2e9c0b8fe2beb5d99730d6c1feef",
+          "classification": "Exact audited Pass 71 runtime composition at candidate A: owner-feedback gameplay and evidence wiring plus the final sparse-frame glass-debris lifecycle and exact crossbow impacted-pane line-of-sight exclusion. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no broader legacy-main variant is admitted."
         }
       ]
     }
