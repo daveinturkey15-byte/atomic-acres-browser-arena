@@ -16,14 +16,81 @@ export type AcceptanceValidation = Readonly<{
     deferred: number;
     acceptanceRatio: number;
     feedbackReceivedAt: string | null;
+    previewSourceSha: string | null;
     previewCreatedAt: string | null;
     approvedAt: string | null;
+    nativeEvidence: readonly Readonly<{
+      evidenceId: string | null;
+      kind: string | null;
+      receiptSha256: string | null;
+      startedAt: string | null;
+      completedAt: string | null;
+      finalizedAt: string | null;
+    }>[];
   }>;
 }>;
 
+export type AcceptanceWorkflowOutputs = Readonly<{
+  manifest_selected: 'true' | 'false';
+  manifest_path: string;
+}>;
+
+export type Pass71NativeEvidenceRegistryEntry = Readonly<{
+  descriptor: Readonly<{
+    evidenceId: string;
+    kind: string;
+    minimumCount: number;
+    maximumCount: number;
+  }>;
+  validate: (record: unknown, context: Readonly<Record<string, any>>) => readonly string[];
+}>;
+
+export const PASS71_NATIVE_EVIDENCE_REGISTRY: readonly Pass71NativeEvidenceRegistryEntry[];
+export function createPass71NativeEvidenceRegistry(
+  additionalEntries?: readonly Pass71NativeEvidenceRegistryEntry[],
+): readonly Pass71NativeEvidenceRegistryEntry[];
+
 export function validateAcceptanceManifest(
   manifest: unknown,
-  options?: Readonly<{ policy?: AcceptancePolicy }>,
+  options?: Readonly<{
+    policy?: AcceptancePolicy;
+    pass71NativeEvidenceTooling?: Readonly<Record<string, string>>;
+    pass71StuckEvidenceTooling?: Readonly<Record<string, string>>;
+    pass71AudioNativeTooling?: readonly Readonly<{ path: string; sha256: string }>[];
+    pass71QualityVisualTooling?: Readonly<Record<string, string>>;
+    pass71NativeBrowserParityTooling?: Readonly<Record<string, string>>;
+    pass71Hf296ContactTooling?: Readonly<Record<string, string>>;
+    pass71Hf296ContactSourceTreeSha?: string;
+    pass71Hf297FullTooling?: Readonly<Record<string, string>>;
+    pass71Hf297FullSourceTreeSha?: string;
+    pass71Hf297FullSourceCatalog?: import('../qa/pass71-hf297-full-arms-matrix.mjs').Pass71Hf297SourceCatalog;
+    pass71Hf299Tooling?: readonly Readonly<{ path: string; sha256: string }>[];
+    pass71Hf300Tooling?: Readonly<Record<string, string>>;
+    pass71Hf300SourceTreeSha?: string;
+    pass71Hf301Tooling?: Readonly<Record<string, string>>;
+    pass71Hf301SourceTreeSha?: string;
+    pass71Hf301OwnerReplay?: Readonly<Record<string, unknown>>;
+    pass71Hf304LiveHostedTooling?: readonly Readonly<{ path: string; sha256: string }>[];
+    pass71Hf304LiveHostedSourceTreeSha?: string;
+    pass71Hf305Tooling?: readonly Readonly<{ path: string; sha256: string }>[];
+    pass71Hf305SourceTreeSha?: string;
+    pass71Hf306Tooling?: Readonly<Record<string, string>>;
+    pass71Hf306SourceTreeSha?: string;
+    pass71Hf306AssetAudit?: readonly unknown[];
+    pass71Hf306OwnerSourceAudit?: unknown;
+    pass71Hf307Tooling?: readonly Readonly<{ path: string; sha256: string }>[];
+    pass71Hf307SourceTreeSha?: string;
+    pass71Hf308Tooling?: readonly Readonly<{ path: string; sha256: string }>[];
+    pass71Hf308SourceTreeSha?: string;
+    pass71Hf309Tooling?: readonly Readonly<{ path: string; sha256: string }>[];
+    pass71Hf309SourceTreeSha?: string;
+    pass71Hf312Tooling?: readonly Readonly<{ path: string; sha256: string }>[];
+    pass71Hf312SourceTreeSha?: string;
+    pass71Hf312SourceAudit?: Readonly<Record<string, unknown>>;
+    pass71Hf313Tooling?: readonly Readonly<{ path: string; sha256: string }>[];
+    pass71Hf313SourceTreeSha?: string;
+    pass71Hf313SourceAudit?: Readonly<Record<string, unknown>>;
+  }>,
 ): AcceptanceValidation;
 
 export function classifyPreviewDelta(
@@ -36,5 +103,7 @@ export function classifyPreviewDelta(
 export function pass66FinalizerOutputPaths(previewSha: string, graph?: unknown): string[];
 
 export function selectCiAcceptanceManifest(impact: string, manifestPaths: readonly string[]): string | null;
+
+export function acceptanceWorkflowOutputs(receipt: unknown): AcceptanceWorkflowOutputs;
 
 export function evaluateAcceptance(values: Readonly<Record<string, string>>): unknown;

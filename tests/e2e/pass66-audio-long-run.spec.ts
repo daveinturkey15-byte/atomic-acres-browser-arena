@@ -8,6 +8,7 @@ const requestedArena = process.env.PASS66_AUDIO_ARENA;
 const selectedArenas = ARENAS.filter((arenaId) => !requestedArena || requestedArena === arenaId);
 const enabled = process.env.PASS66_AUDIO_LONG_RUN === '1';
 const expectedSourceSha = process.env.PASS66_AUDIO_SOURCE_SHA ?? '';
+const expectedReleasePass = process.env.PASS66_AUDIO_RELEASE_PASS ?? '';
 
 test.describe.configure({ mode: 'serial' });
 test.skip(!enabled, 'Run through npm run qa:pass66:audio-long-run for fresh exact-SHA evidence.');
@@ -16,6 +17,7 @@ for (const arenaId of selectedArenas) {
   test(`${arenaId} keeps the intentional audio graph bounded beyond the reported one-minute hiss point`, async ({ page, request }, testInfo) => {
     test.setTimeout(150_000);
     expect(expectedSourceSha).toMatch(/^[a-f0-9]{40}$/u);
+    expect(expectedReleasePass).toMatch(/^PASS [1-9][0-9]*(?:\.[0-9]+)?$/u);
     expect(execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8' }).trim()).toBe('');
     expect(execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()).toBe(expectedSourceSha);
     const provenanceResponse = await request.get(new URL(
@@ -27,7 +29,7 @@ for (const arenaId of selectedArenas) {
     expect(servedCandidate).toMatchObject({
       schemaVersion: 4,
       channel: 'the-big-one',
-      releasePass: 'PASS 66',
+      releasePass: expectedReleasePass,
       sourceSha: expectedSourceSha,
       path: 'channels/the-big-one',
     });
@@ -47,12 +49,22 @@ for (const arenaId of selectedArenas) {
       seed: `pass66-audio-long-run-${arenaId}`,
     })) url.searchParams.set(key, value);
     await page.goto(url.toString(), { waitUntil: 'domcontentloaded', timeout: 90_000 });
-    await expect(page.locator('#solo')).toBeEnabled({ timeout: 60_000 });
+    await page.waitForFunction(() => Boolean(
+      window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true
+        && document.querySelector<HTMLButtonElement>('#solo')?.disabled === false,
+    ), undefined, { timeout: 90_000 });
+    await expect(page.locator('#solo')).toBeEnabled();
+    await page.locator('#player-name').fill('Pass 71 Audio Soak');
 
     // A physical click is part of the contract: Web Audio unlock behavior must
     // be exercised rather than bypassed through the debug API.
     await page.locator('#solo').click();
-    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: 90_000 });
+    await page.waitForFunction(() => {
+      const debug = window.__ATOMIC_ACRES_DEBUG__;
+      if (!debug) return false;
+      const admission = debug.admissionState();
+      return admission.matchPhase === 'active' && admission.presentedGameplayFrame > 2;
+    }, undefined, { timeout: 90_000 });
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
 
     const samples: Array<{
@@ -84,10 +96,19 @@ for (const arenaId of selectedArenas) {
     for (const [index, sample] of samples.entries()) {
       expect(sample.audio.context.source).toMatch(/^(standard|webkit)$/);
       expect(sample.audio.context.state).toMatch(/^(running|suspended)$/);
-      expect(sample.audio.ambience).toMatchObject({ continuousSources: 2, arena: arenaId });
+      expect(sample.audio.ambience).toEqual({
+        continuousSources: 0,
+        transientSources: 0,
+        events: 0,
+        lastDurationMs: 0,
+        nextInMs: null,
+        busGain: expect.any(Number),
+        arena: arenaId,
+      });
       expect(sample.audio.runtime.voices).toBeLessThanOrEqual(sample.audio.runtime.globalCap);
       expect(sample.audio.runtime.spatialChains).toBeLessThanOrEqual(sample.audio.runtime.spatialCap);
-      expect(sample.audio.runtime.spatialChains).toBe(2);
+      expect(sample.audio.runtime.spatialChains).toBeLessThanOrEqual(5);
+      expect(sample.audio.runtime.retainedSources).toBe(12);
       expect(sample.audio.runtime.stolen).toBe(0);
       expect(sample.audio.runtime.dropped).toBe(0);
       expect(sample.audio.minigunDrive.active).toBe(false);
@@ -99,10 +120,7 @@ for (const arenaId of selectedArenas) {
         suspiciousBroadbandHiss: false,
       });
       expect(sample.audio.outputProbe.sampleRate).toBeGreaterThanOrEqual(8_000);
-      expect(sample.audio.outputProbe.rms).toBeGreaterThan(0);
       expect(sample.audio.outputProbe.peak).toBeGreaterThanOrEqual(sample.audio.outputProbe.rms);
-      expect(sample.audio.outputProbe.spectralFlatness).toBeLessThan(0.5);
-      expect(sample.audio.outputProbe.highFrequencyEnergyRatio).toBeLessThan(0.18);
       for (const bus of Object.values(sample.audio.buses)) {
         expect(Number.isFinite(bus.effectiveGain)).toBe(true);
         expect(bus.effectiveGain).toBeGreaterThanOrEqual(0);
@@ -110,8 +128,15 @@ for (const arenaId of selectedArenas) {
       }
       if (index > 0) expect(sample.frameCount).toBeGreaterThan(samples[index - 1]!.frameCount);
     }
-    expect(samples.every((sample) => sample.audio.ambience.continuousSources === 2)).toBe(true);
-    expect(samples.every((sample) => sample.audio.runtime.spatialChains === 2)).toBe(true);
+    expect(samples.every((sample) => sample.audio.ambience.continuousSources === 0
+      && sample.audio.ambience.transientSources === 0
+      && sample.audio.ambience.events === 0
+      && sample.audio.ambience.lastDurationMs === 0
+      && sample.audio.ambience.nextInMs === null)).toBe(true);
+    // Event-driven world cues remain available, but an idle arena must not own
+    // any scheduled noise or persistent narrowband output after one minute.
+    expect(samples.slice(-6).filter((sample) => sample.audio.outputProbe.narrowbandTonePresent))
+      .toHaveLength(0);
 
     const clientRuntimeLog = await page.evaluate(() => {
       try { return JSON.parse(localStorage.getItem('atomic-acres:client-runtime-log:v1') ?? '[]'); }

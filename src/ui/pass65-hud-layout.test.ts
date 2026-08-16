@@ -43,6 +43,7 @@ describe('Pass 65 modern tactical HUD layout contract', () => {
     expect(shell).toContain('id="sticky-warning" hidden role="alert" aria-live="assertive" aria-atomic="true"');
     expect(hudCss).toMatch(/#sticky-warning\s*\{[\s\S]*?left:\s*50%[\s\S]*?top:\s*50%/);
     expect(hudCss).toMatch(/#sticky-warning\s*\{[\s\S]*?transform:\s*translate\(-50%, -50%\)/);
+    expect(hudCss).toMatch(/#sticky-warning\s*\{[\s\S]*?z-index:\s*120/);
     expect(hudCss).toContain('animation: sticky-warning-flash var(--sticky-warning-duration, 500ms) ease-out both;');
     expect(hudCss).toContain('@keyframes sticky-warning-flash');
     expect(hudCss).toContain('#sticky-warning[hidden] { display: none; }');

@@ -53,6 +53,11 @@ describe('Chopper exterior same-frame review camera integration', () => {
     ]) expect(tracker).not.toContain(forbidden);
     expect(tracker).toContain('chopperExteriorReviewCameraPose({');
     expect(tracker).toContain('preferredSide: debugChopperExteriorReviewTrackerSide');
+    expect(tracker).toContain('assessDebugChopperExteriorReviewWorldCandidate(bounds, candidate)');
+    expect(source).toContain('activeWorldColliders()');
+    expect(source).toContain('sphereIntersectsBox(cameraPoint, cameraClearanceRadiusM, box)');
+    expect(source).toContain('segmentIntersectsBox(cameraPoint, { x, y, z }, box)');
+    expect(tracker).toContain('debugChopperExteriorReviewTrackerSide = pose.side;');
   });
 
   it('binds active tracker identity, same frame, pose, bounds and submission into the receipt', () => {
@@ -65,6 +70,8 @@ describe('Chopper exterior same-frame review camera integration', () => {
     expect(receipt).toContain('submissionSequence: presentation.submissionSequence');
     expect(receipt).toContain('completedSequence: presentation.completedSequence');
     expect(receipt).toContain('chopperReviewTracker: reviewTracker');
+    expect(source).toContain('cameraColliderClear: pose.world.cameraColliderClear');
+    expect(source).toContain('clearLineOfSightSampleCount: pose.world.clearLineOfSightSampleCount');
   });
 
   it('resets tracker ownership on hold/lifecycle and capture-mode exits', () => {
@@ -122,9 +129,11 @@ describe('Chopper exterior same-frame review camera integration', () => {
     const official = e2e.indexOf("writeFileSync(resolve(evidence, 'exterior-front-quarter.png'), exteriorPng);");
     const control = e2e.indexOf('captureChopperExteriorHiddenControl()');
     const hiddenPng = e2e.indexOf("'exterior-hidden-control.nonpublishable.png'");
+    const firstRasterAnalysis = e2e.indexOf('const pixelBounds = receiptProjection.viewportBounds;');
     expect(official).toBeGreaterThanOrEqual(0);
     expect(official).toBeLessThan(control);
     expect(control).toBeLessThan(hiddenPng);
+    expect(hiddenPng).toBeLessThan(firstRasterAnalysis);
     expect(e2e).toContain("contract: 'visible-airframe-vs-hidden-control-raster-difference-v1'");
     expect(e2e).toContain('materiallyChangedPixelRatio');
     expect(e2e).toContain('highContrastChangedPixelRatio');

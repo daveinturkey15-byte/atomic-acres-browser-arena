@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { configureRuntimeRandom } from './runtime-random';
 import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
-import { MULTIPLAYER_PROTOCOL_VERSION, isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type ChatHistoryMessage, type ChatMessage, type ChatSubmitMessage, type GrenadeResultMessage, type GrenadeThrowMessage, type LeaderboardSyncMessage, type RedeployCommitMessage, type RedeployRequestMessage, type SupportActivateMessage, type TriggerStateMessage } from './protocol';
+import { HOSTED_BOT_BALLISTIC_WINDOW_WEAPON_IDS, MULTIPLAYER_PROTOCOL_VERSION, isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type ChatHistoryMessage, type ChatMessage, type ChatSubmitMessage, type GrenadeResultMessage, type GrenadeThrowMessage, type LeaderboardSyncMessage, type RedeployCommitMessage, type RedeployRequestMessage, type SupportActivateMessage, type TriggerStateMessage } from './protocol';
 import { advanceRailgunAuthority, createRailgunAuthorityState, RAILGUN_SPAWN_DELAY_MS } from './railgun-authority';
 import { shedPlacementsForArena } from './destructible-shed-registry';
 import { InteractiveWorldRuntime } from './interactive-world-runtime';
 import { BOT_WEAPON_PRESENTATION_SCHEMA_VERSION } from './bot-weapon-presentation';
+import { BOT_WEAPON_POOL, botWeaponFireAdapter } from './bot-arsenal';
 
 const player = {
   id: 'abc', name: 'Tester', team: 0 as const,
@@ -198,10 +199,11 @@ describe('network protocol guards', () => {
       hostAuthority: { hostId: 'host', targetLifeId: 9, appliedDamage: 64, resultingHealth: 36, stickyAttachment }, nonce: 78,
     };
     const windowBreak = {
-      type: 'window-break' as const, by: 'guest-a', windowId: 'aqua-house:ground-window-glass',
+      type: 'window-break' as const, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'guest-a', windowId: 'aqua-house:ground-window-glass',
       origin: [1, 2, 3] as [number, number, number], kind: 'explosive' as const, actionNonce: 41,
       hostAuthority: { hostId: 'host', stickyAttachment }, nonce: 79,
-    };
+    } as const;
     expect(isGameMessage(hit)).toBe(true);
     expect(isGameMessage(windowBreak)).toBe(true);
     expect(isHostAuthorityMessage(hit)).toBe(true);
@@ -297,7 +299,11 @@ describe('network protocol guards', () => {
       weapon: 'sniper', mode: 'weapon', selectedGrenade: 'frag', grenadeGranted: 0,
       position: [1, 1.7, 2] as [number, number, number], nonce: 77,
     } as const;
-    const brokenWindow = { type: 'window-break', by: 'abc', windowId: 'aqua-house:ground-window-glass', origin: [1, 1.7, 2] as [number, number, number], nonce: 78 } as const;
+    const brokenWindow = {
+      type: 'window-break', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'abc', windowId: 'aqua-house:ground-window-glass',
+      origin: [1, 1.7, 2] as [number, number, number], nonce: 78,
+    } as const;
     expect(isGameMessage(pickup)).toBe(true);
     expect(isGameMessage({ ...pickup, mode: 'scavenge' })).toBe(true);
     expect(isGameMessage({ ...pickup, mode: 'scavenge', weapon: 'pistol' })).toBe(true);
@@ -305,6 +311,15 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ ...brokenWindow, kind: 'explosive' })).toBe(false);
     expect(isGameMessage({ ...brokenWindow, kind: 'explosive', actionNonce: 55 })).toBe(true);
     expect(isGameMessage({ ...brokenWindow, kind: 'shot', actionNonce: 55 })).toBe(false);
+    expect(isGameMessage({ ...brokenWindow, kind: 'shot', weapon: 'flare-gun', actionNonce: 55 })).toBe(true);
+    expect(isGameMessage({ ...brokenWindow, kind: 'shot', weapon: 'explosive-crossbow', actionNonce: 55 })).toBe(true);
+    expect(isGameMessage({ ...brokenWindow, kind: 'shot', weapon: 'flare-gun' })).toBe(false);
+    expect(isGameMessage({ ...brokenWindow, kind: 'knife', weapon: 'flare-gun', actionNonce: 55 })).toBe(false);
+    expect(isGameMessage({ ...brokenWindow, kind: 'shot', weapon: 'carbine', actionNonce: 55 })).toBe(false);
+    expect(isGameMessage({ ...brokenWindow, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION - 1 })).toBe(false);
+    expect(isGameMessage({ ...brokenWindow, protocolVersion: undefined })).toBe(false);
+    expect(isGameMessage({ ...brokenWindow, kind: 'explosive', actionNonce: 55.5 })).toBe(false);
+    expect(isGameMessage({ ...brokenWindow, kind: 'shot', weapon: 'not-a-weapon', actionNonce: 55 })).toBe(false);
     expect(isGameMessage({ ...brokenWindow, kind: 'magic' })).toBe(false);
     expect(messageBelongsToPlayer(pickup, 'abc')).toBe(true);
     expect(messageBelongsToPlayer(brokenWindow, 'abc')).toBe(true);
@@ -313,6 +328,34 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ ...pickup, mode: 'duplicate' })).toBe(false);
     expect(isGameMessage({ ...brokenWindow, origin: [Infinity, 1.7, 2] })).toBe(false);
     expect(messageBelongsToPlayer({ ...brokenWindow, by: 'spoof' }, 'abc')).toBe(false);
+  });
+
+  it('decodes only host-canonical bot ballistic and flamethrower glass envelopes', () => {
+    const expectedWeapons = BOT_WEAPON_POOL.filter((weapon) => botWeaponFireAdapter(weapon) === 'ballistic-ray');
+    expect(HOSTED_BOT_BALLISTIC_WINDOW_WEAPON_IDS).toEqual(expectedWeapons);
+    const canonical = {
+      type: 'window-break' as const,
+      protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'host-bot-0',
+      windowId: 'aqua-house:ground-window-glass',
+      origin: [1, 1.7, 2] as [number, number, number],
+      kind: 'shot' as const,
+      actionNonce: 55,
+      hostAuthority: { hostId: 'host', stickyAttachment: null },
+      nonce: 78,
+    } as const;
+    for (const weapon of expectedWeapons) {
+      expect(isGameMessage({ ...canonical, weapon }), weapon).toBe(true);
+    }
+    expect(isHostAuthorityMessage({ ...canonical, weapon: 'carbine' })).toBe(true);
+    expect(expectedWeapons).toContain('carbine');
+    expect(expectedWeapons).toContain('flamethrower');
+    expect(isGameMessage({ ...canonical, by: 'guest-player', weapon: 'carbine' })).toBe(false);
+    expect(isGameMessage({ ...canonical, by: 'host-bot-4', weapon: 'carbine' })).toBe(false);
+    expect(isGameMessage({ ...canonical, hostAuthority: undefined, weapon: 'carbine' })).toBe(false);
+    expect(isGameMessage({ ...canonical, hostAuthority: { hostId: '', stickyAttachment: null }, weapon: 'carbine' })).toBe(false);
+    expect(isGameMessage({ ...canonical, weapon: 'minigun' })).toBe(false);
+    expect(isGameMessage({ ...canonical, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION - 1, weapon: 'carbine' })).toBe(false);
   });
 
   it('validates bounded host-authoritative Overdrive claims and state', () => {

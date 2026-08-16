@@ -4,6 +4,7 @@ import { parseKillstreakLoadout } from './killstreak-catalog';
 import {
   CHOPPER_GUN_PROFILE,
   CHOPPER_GUNNER_RAY_POLICY,
+  CHOPPER_GUNNER_SPLASH_POLICY,
 } from './killstreak-support-catalog';
 import {
   HostKillstreakRuntime,
@@ -100,15 +101,12 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
     }
   });
 
-  it('admits near and far centre-ray targets but excludes an old-cone off-crosshair target', () => {
+  it('admits near and far impacts plus the exact three-metre splash volume while excluding wider old-cone targets', () => {
     const { runtime, entityId } = setupPlayerGunner();
     runtime.advance(1_599, world());
     let entity = activeChopper(runtime, 1_599);
     let ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, 0, -0.2);
-    // The capsule is one torso wide (owner balance), so the off-crosshair probe
-    // sits a full 2 m perpendicular: still firmly outside the centre ray. The
-    // contract being defended is "no forgiving cone", not a specific radius.
-    const oldConeTarget = target('off-crosshair', pointAlong(ray, 10, 2));
+    const oldConeTarget = target('off-crosshair', pointAlong(ray, 10, 3.01));
     expect(runtime.control({
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId,
       action: 'pilot-control', yawQ: 0, pitchQ: -0.2, fire: true,
@@ -241,5 +239,108 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
     vecClose(resumedAi.origin, resumedAiFiringEntity.position);
     vecClose(resumedAi.tracerOrigin, resumedAi.origin);
     vecClose(resumedAi.endpoint, resumedAi.targetPosition);
+  });
+
+  it('freezes the preceding direct radius and admits one LOS-bounded result per hostile inside exact 3x splash', () => {
+    expect(CHOPPER_GUNNER_SPLASH_POLICY.precedingDirectHitRadiusM).toBe(CHOPPER_GUNNER_RAY_POLICY.targetRadiusM);
+    expect(CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM).toBe(
+      CHOPPER_GUNNER_SPLASH_POLICY.precedingDirectHitRadiusM
+      * CHOPPER_GUNNER_SPLASH_POLICY.linearRadiusMultiplier,
+    );
+    const { runtime, entityId } = setupPlayerGunner();
+    runtime.advance(1_599, world());
+    const entity = activeChopper(runtime, 1_599);
+    const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, 0, -0.2);
+    const primary = target('primary', pointAlong(ray, 20, 0.6));
+    const splash = target('splash', pointAlong(ray, 20, 2.75));
+    const covered = target('covered', pointAlong(ray, 20, -2.5));
+    const outside = target('outside', pointAlong(ray, 20, 3.01));
+    const friendly = Object.freeze({ ...target('friendly', pointAlong(ray, 20, 2)), team: 0 as const });
+    const owner = Object.freeze({ ...target('owner', pointAlong(ray, 20, 1)), team: 0 as const });
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId,
+      action: 'pilot-control', yawQ: 0, pitchQ: -0.2, fire: true,
+    }, 1_599).accepted).toBe(true);
+    const result = runtime.advance(1_600, world(
+      [primary, splash, covered, outside, friendly, owner],
+      (_from, to) => to !== covered.position,
+    ));
+    expect(result.damageEvents.map((event) => event.targetId)).toEqual(['primary', 'splash']);
+    expect(new Set(result.damageEvents.map((event) => event.targetId)).size).toBe(result.damageEvents.length);
+    expect(result.damageEvents[0]!.damage).toBeGreaterThan(result.damageEvents[1]!.damage);
+    expect(result.damageEvents.every((event) => event.endpoint.every((value, axis) => value === result.damageEvents[0]!.endpoint[axis]))).toBe(true);
+  });
+
+  it('rejects a centred primary and every nearby splash target when hard cover blocks the admitted impact', () => {
+    const { runtime, entityId } = setupPlayerGunner();
+    runtime.advance(1_599, world());
+    const entity = activeChopper(runtime, 1_599);
+    const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, 0, -0.2);
+    const coveredPrimary = target('covered-primary', pointAlong(ray, 20));
+    const coveredSplash = target('covered-splash', pointAlong(ray, 20, 2.75));
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId,
+      action: 'pilot-control', yawQ: 0, pitchQ: -0.2, fire: true,
+    }, 1_599).accepted).toBe(true);
+    const result = runtime.advance(1_600, world([coveredPrimary, coveredSplash], () => false));
+    expect(result.damageEvents).toEqual([]);
+  });
+
+  it('rejects guest control and preserves one unique result per target at the unchanged 280 ms cadence', () => {
+    const { runtime, entityId } = setupPlayerGunner();
+    runtime.registerActor('guest', 1, 1, LOADOUT);
+    expect(runtime.control({
+      by: 'guest', matchEpoch: 7, lifeId: 1, sequence: 1, entityId,
+      action: 'pilot-control', yawQ: 0, pitchQ: -0.2, fire: true,
+    }, 1_500)).toMatchObject({ accepted: false, reason: 'entity-unavailable' });
+
+    runtime.advance(1_599, world());
+    const entity = activeChopper(runtime, 1_599);
+    const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, 0, -0.2);
+    const primary = target('cadence-primary', pointAlong(ray, 20, 0.6));
+    const splash = target('cadence-splash', pointAlong(ray, 20, 2.75));
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId,
+      action: 'pilot-control', yawQ: 0, pitchQ: -0.2, fire: true,
+    }, 1_599).accepted).toBe(true);
+    const first = runtime.advance(1_600, world([primary, splash])).damageEvents;
+    expect(first.map((event) => event.targetId)).toEqual(['cadence-primary', 'cadence-splash']);
+    expect(new Set(first.map((event) => event.resultId)).size).toBe(2);
+    expect(runtime.advance(1_879, world([primary, splash])).damageEvents).toEqual([]);
+    const second = runtime.advance(1_880, world([primary, splash])).damageEvents;
+    expect(second.map((event) => event.targetId)).toEqual(['cadence-primary', 'cadence-splash']);
+    expect(new Set(second.map((event) => event.resultId)).size).toBe(2);
+    expect(second[0]!.atMs - first[0]!.atMs).toBe(CHOPPER_GUN_PROFILE.cadenceMs);
+    expect(second.every((event) => !first.some((prior) => prior.resultId === event.resultId))).toBe(true);
+  });
+
+  it('is a strict far-range superset of the preceding one-metre direct capsule', () => {
+    const { runtime, entityId } = setupPlayerGunner();
+    runtime.advance(1_599, world());
+    const entity = activeChopper(runtime, 1_599);
+    const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, 0, 0);
+    const precedingFarEdge = target(
+      'preceding-far-edge',
+      pointAlong(ray, CHOPPER_GUN_PROFILE.maximumRangeM + 0.99, 0),
+    );
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId,
+      action: 'pilot-control', yawQ: 0, pitchQ: 0, fire: true,
+    }, 1_599).accepted).toBe(true);
+    expect(runtime.advance(1_600, world([precedingFarEdge])).damageEvents)
+      .toEqual([expect.objectContaining({ targetId: 'preceding-far-edge' })]);
+
+    runtime.advance(1_879, world());
+    const laterEntity = activeChopper(runtime, 1_879);
+    const laterRay = chopperGunnerAuthoritativeRay(laterEntity.position, laterEntity.attitude, 0, 0);
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 3, entityId,
+      action: 'pilot-control', yawQ: 0, pitchQ: 0, fire: true,
+    }, 1_879).accepted).toBe(true);
+    const beyondNewEnvelope = target(
+      'beyond-new-envelope',
+      pointAlong(laterRay, CHOPPER_GUN_PROFILE.maximumRangeM + CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM + 0.01, 0),
+    );
+    expect(runtime.advance(1_880, world([beyondNewEnvelope])).damageEvents).toEqual([]);
   });
 });

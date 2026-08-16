@@ -76,12 +76,14 @@ async function verifyPublishedProvenance() {
   assertEqual(retainedEmbedded.exactRootFileCount, channelConfig.retained.runtimeFileCount, 'Retained embedded file count');
   assertEqual(retainedEmbedded.treeSha256, channelConfig.retained.runtimeTreeSha256, 'Retained embedded digest');
   const retainedWrapper = await fetchJson(`${channelConfig.retained.path}/pinned-channel-provenance.json`);
-  assertEqual(retainedWrapper.channel, 'pass69-retained', 'Retained wrapper channel');
+  assertEqual(retainedWrapper.channel, 'pass70-retained', 'Retained wrapper channel');
   assertEqual(retainedWrapper.releasePass, channelConfig.retained.pass, 'Retained wrapper pass');
   assertEqual(retainedWrapper.sourceSha, channelConfig.retained.sourceSha, 'Retained wrapper source SHA');
   assertEqual(retainedWrapper.pagesSha, channelConfig.retained.pagesSha, 'Retained wrapper Pages SHA');
   assertEqual(retainedWrapper.pagesPath, channelConfig.retained.pagesPath, 'Retained wrapper Pages path');
   assertEqual(retainedWrapper.path, channelConfig.retained.path, 'Retained wrapper route');
+  assertEqual(retainedWrapper.exactRootFileCount, channelConfig.retained.pagesSubtreeFileCount, 'Retained wrapper Pages subtree file count');
+  assertEqual(retainedWrapper.treeSha256, channelConfig.retained.pagesSubtreeTreeSha256, 'Retained wrapper Pages subtree digest');
   assertEqual(retainedWrapper.pinnedRuntime?.treeSha256, retainedEmbedded.treeSha256, 'Retained wrapper embedded digest');
   provenance.retained = { wrapper: retainedWrapper, embedded: retainedEmbedded };
   const stableOriginal = await fetchJson(`${channelConfig.stable.path}/channel-provenance.json`);
@@ -113,11 +115,35 @@ async function verifyPublishedProvenance() {
     assertEqual(stableWrapper.pagesSha, channelConfig.stable.pagesSha, 'Stable wrapper pagesSha');
     assertEqual(stableWrapper.pagesPath, channelConfig.stable.pagesPath, 'Stable wrapper Pages path');
     assertEqual(stableWrapper.path, channelConfig.stable.path, 'Stable wrapper route');
+    assertEqual(stableWrapper.exactRootFileCount, channelConfig.stable.pagesSubtreeFileCount, 'Stable wrapper Pages subtree file count');
+    assertEqual(stableWrapper.treeSha256, channelConfig.stable.pagesSubtreeTreeSha256, 'Stable wrapper Pages subtree digest');
     assertEqual(stableWrapper.pinnedRuntime?.sourceSha, stableOriginal.sourceSha, 'Stable wrapper embedded sourceSha');
     assertEqual(stableWrapper.pinnedRuntime?.exactRootFileCount, stableOriginal.exactRootFileCount, 'Stable wrapper embedded file count');
     assertEqual(stableWrapper.pinnedRuntime?.treeSha256, stableOriginal.treeSha256, 'Stable wrapper embedded digest');
     provenance.stable = { wrapper: stableWrapper, embedded: stableOriginal };
   }
+
+  const rollbackEmbedded = await fetchJson(`${channelConfig.rollback.path}/channel-provenance.json`);
+  assertEqual(rollbackEmbedded.schemaVersion, 4, 'Rollback embedded provenance schema');
+  assertEqual(rollbackEmbedded.releasePass, channelConfig.rollback.pass, 'Rollback embedded pass');
+  assertEqual(rollbackEmbedded.sourceSha, channelConfig.rollback.sourceSha, 'Rollback embedded source SHA');
+  assertEqual(rollbackEmbedded.path, channelConfig.rollback.pagesPath, 'Rollback embedded source path');
+  assertEqual(rollbackEmbedded.exactRootFileCount, channelConfig.rollback.runtimeFileCount, 'Rollback embedded file count');
+  assertEqual(rollbackEmbedded.treeSha256, channelConfig.rollback.runtimeTreeSha256, 'Rollback embedded digest');
+  const rollbackWrapper = await fetchJson(`${channelConfig.rollback.path}/pinned-channel-provenance.json`);
+  assertEqual(rollbackWrapper.schemaVersion, 4, 'Rollback wrapper provenance schema');
+  assertEqual(rollbackWrapper.channel, 'rollback', 'Rollback wrapper channel');
+  assertEqual(rollbackWrapper.releasePass, channelConfig.rollback.pass, 'Rollback wrapper pass');
+  assertEqual(rollbackWrapper.sourceSha, channelConfig.rollback.sourceSha, 'Rollback wrapper source SHA');
+  assertEqual(rollbackWrapper.pagesSha, channelConfig.rollback.pagesSha, 'Rollback wrapper Pages SHA');
+  assertEqual(rollbackWrapper.pagesPath, channelConfig.rollback.pagesPath, 'Rollback wrapper Pages path');
+  assertEqual(rollbackWrapper.path, channelConfig.rollback.path, 'Rollback wrapper route');
+  assertEqual(rollbackWrapper.exactRootFileCount, channelConfig.rollback.pagesSubtreeFileCount, 'Rollback wrapper Pages subtree file count');
+  assertEqual(rollbackWrapper.treeSha256, channelConfig.rollback.pagesSubtreeTreeSha256, 'Rollback wrapper Pages subtree digest');
+  assertEqual(rollbackWrapper.pinnedRuntime?.sourceSha, rollbackEmbedded.sourceSha, 'Rollback wrapper embedded source SHA');
+  assertEqual(rollbackWrapper.pinnedRuntime?.exactRootFileCount, rollbackEmbedded.exactRootFileCount, 'Rollback wrapper embedded file count');
+  assertEqual(rollbackWrapper.pinnedRuntime?.treeSha256, rollbackEmbedded.treeSha256, 'Rollback wrapper embedded digest');
+  provenance.rollback = { wrapper: rollbackWrapper, embedded: rollbackEmbedded };
 }
 
 async function observedPage() {
@@ -177,7 +203,7 @@ async function openChooser(page) {
   const expectedBadge = expectedReleasedAt ? 'LIVE' : 'RELEASE CANDIDATE';
   if (await buttons.count() !== 3
     || !labels.some((text) => text.includes(channelConfig.experimental.pass) && text.includes(expectedBadge) && !text.includes('THE BIG ONE'))
-    || !labels.some((text) => text.includes('PASS 69') && text.includes('PREVIOUS LIVE'))
+    || !labels.some((text) => text.includes('PASS 70') && text.includes('PREVIOUS LIVE'))
     || !labels.some((text) => text.includes('PASS 63') && text.includes('STABLE') && text.includes('WEBGL'))
     || labels.some((text) => text.includes('PASS 66') || text.includes('PASS 65') || text.includes('PASS 64') || text.includes('PASS 59'))) {
     throw new Error(`Unexpected chooser labels: ${JSON.stringify(labels)}`);
@@ -209,7 +235,7 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
     const isCurrentCandidate = expectedPath === channelConfig.experimental.path;
     const expectsPendingCandidate = isCurrentCandidate && !expectedReleasedAt;
     if (expectsPendingCandidate
-      ? lastReleaseLabel !== 'CURRENT CANDIDATE · OWNER REVIEW PENDING'
+      ? lastReleaseLabel !== 'CURRENT CANDIDATE · RELEASE GATES PENDING'
       : !lastReleaseLabel.includes('LAST RELEASE') || lastReleaseLabel.includes('PENDING_PRODUCTION')) {
       throw new Error(`Invalid Last Release label for ${expectedPass}: ${JSON.stringify(lastReleaseLabel)}`);
     }
@@ -227,8 +253,8 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
     const timeText = (await time.textContent())?.replace(/\s+/g, ' ').trim() ?? '';
     if (expectsPendingCandidate) {
       if (releaseState !== 'LOCAL CANDIDATE' || releasedAt !== null
-        || !timeText.includes('NOT PUBLISHED') || !timeText.includes('AWAITING OWNER HITL')) {
-        throw new Error(`${expectedPass} candidate is not explicitly pending owner HITL: ${JSON.stringify({ releaseState, releasedAt, timeText })}`);
+        || !timeText.includes('NOT PUBLISHED') || !timeText.includes('AWAITING RELEASE GATES')) {
+        throw new Error(`${expectedPass} candidate is not explicitly pending release gates: ${JSON.stringify({ releaseState, releasedAt, timeText })}`);
       }
     } else if (!releasedAt || Number.isNaN(Date.parse(releasedAt)) || timeText.includes('NOT PUBLISHED')) {
       throw new Error(`${expectedPass} Last Release timestamp is not a published instant: ${JSON.stringify(releasedAt)}`);
@@ -297,8 +323,8 @@ try {
     await chooser.close();
   }
 
-  await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass70');
-  await verifyChoice('retained', 'channels/pass69-retained', 'PASS 69', 'pass69');
+  await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass71');
+  await verifyChoice('retained', 'channels/pass70-retained', 'PASS 70', 'pass70');
   await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63');
   if (releasePass && !normalizedPass(routes.experimental.eyebrow).includes(normalizedPass(releasePass))) {
     throw new Error(`Experimental runtime ${routes.experimental.eyebrow} does not match ${releasePass}`);

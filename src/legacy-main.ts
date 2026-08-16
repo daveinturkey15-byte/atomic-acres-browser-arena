@@ -4,7 +4,7 @@ import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } f
 import { AdaptiveQualityController, DeferredAdaptivePixelRatio, adaptiveShadowsEnabled, assertWebGpuAdmissionCompletionLatency, classifyDisplayFrameMs, configuredAdaptiveQualityLevels, shouldFreezeAdaptiveQualityForMatch } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
 import { ArenaContrastLighting } from './arena-contrast-lighting';
-import { centeredReadbackRegion, detectLivePresentationStall, LegacyWebGlRenderRuntime, shouldResetPresentationAfterSchedulerGap, WebGpuRenderRuntime, resolveRenderRuntimeRequest, type WebGpuSubmissionMode } from './rendering/render-runtime';
+import { centeredReadbackRegion, detectLivePresentationStall, geometryFreeCompositeCanvasConfig, LegacyWebGlRenderRuntime, probeWebGl2AdapterLabel, shouldResetPresentationAfterSchedulerGap, WebGpuRenderRuntime, resolveRenderRuntimeRequest, type WebGpuSubmissionMode } from './rendering/render-runtime';
 import { estimateResidentObjectMemory } from './rendering/resident-memory';
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
@@ -19,7 +19,7 @@ import { webGlShadowSamplerMode } from './webgl-shadow-compatibility';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
 import { PASS66_RELEASE_IDENTITY } from './release-identity';
-import { drawPass70DroneSwarmLogo } from './pass70-drone-swarm-logo';
+import { GUN_RANGE_NUKE_WARNING_POSITION, sampleNukeWarningPresentation } from './nuke-warning-presentation';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
 import { BotWeaponGpuVocabulary } from './bot-weapon-gpu-vocabulary';
 import {
@@ -96,6 +96,7 @@ import {
 } from './gun-range-match-clock-authority';
 import {
   BOT_DEATHS_PER_REINFORCEMENT,
+  BOT_FIRE_RANGE,
   BOT_GRENADE_POOL,
   BOT_REACTION_DELAY,
   BOT_GRENADE_COOLDOWN_MS,
@@ -131,6 +132,13 @@ import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type 
 import { nextShotDeadline } from './combat-timing';
 import { SEMTEX_HITL_CONTRACT, flashbangPresentation, semtexBlastDamage, semtexBlastRadiusM } from './combat/pass65-ordnance-contract';
 import { ExplosiveBoltTargetBuffer, type ExplosiveBoltTargetKind } from './combat/explosive-bolt-target-buffer';
+import {
+  ExplosiveBoltImpactReceiptLedger,
+  bindExplosiveBoltImpactObservation,
+  type ExplosiveBoltImpactObservationArm,
+  type ExplosiveBoltImpactObservationBinding,
+  type LocalExplosiveBoltActionIdentity,
+} from './explosive-bolt-impact-receipt';
 import { latestChangelogEntry } from './changelog';
 import { bindReleaseHistoryDialog } from './ui/release-history-dialog';
 import { bindProjectMapDialog } from './ui/project-map-dialog';
@@ -158,6 +166,7 @@ import { PresentationSchedulingLifecycle, type PresentationSchedulingDecision } 
 import { PriorityPreparationCoordinator, type PreparationPriority } from './priority-preparation-coordinator';
 import {
   browserOwnsForegroundPresentation,
+  scheduleBrowserCpuTask,
   scheduleBrowserPreparationIdleTask,
   waitForVisibleBrowserPreparation,
   yieldBrowserPreparationFrame,
@@ -178,19 +187,42 @@ import {
   HostKillstreakRuntime,
   MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP,
   chopperGunnerAuthoritativeRay,
+  chopperGunnerAuthoritativeTargetAlongRay,
   chopperGunnerCameraOrigin,
+  chopperMissileGroundTarget,
   type KillstreakDamageEvent,
+  type ChopperMissileAuthorityEvidenceEvent,
   type KillstreakEntitySnapshot,
+  type KillstreakImpactEvent,
   type KillstreakRecipientSnapshot,
   type KillstreakTarget,
   type KillstreakWorld,
 } from './killstreak-runtime';
-import { KillstreakPresentation, loadHunterDronePresentation, loadSupportVehiclePresentations, supportVehiclePresentationTelemetry } from './killstreak-presentation';
+import {
+  chopperGunnerQaAimReceipt,
+  chopperGunnerQaAimThrottleEvidence,
+  createChopperGunnerQaAimRequest,
+  resolveChopperGunnerQaAim,
+  type ChopperGunnerQaAimAlignment,
+  type ChopperGunnerQaAimReceipt,
+  type ChopperGunnerQaAimRequest,
+} from './chopper-gunner-qa-aim';
+import { CHOPPER_GUNNER_SPLASH_POLICY, PILOTED_DRONE_SENSOR_PROFILE } from './killstreak-support-catalog';
+import {
+  KillstreakPresentation,
+  loadHunterDronePresentation,
+  loadSupportVehiclePresentations,
+  supportVehiclePresentationTelemetry,
+  type KillstreakPresentationTelemetry,
+} from './killstreak-presentation';
 import { chopperExteriorReviewHoldActive } from './chopper-exterior-review-hold';
 import {
+  CHOPPER_EXTERIOR_REVIEW_CAMERA_CONTRACT,
   chopperExteriorReviewCameraPose,
   withExactChopperRootHiddenForControl,
+  type ChopperExteriorReviewCameraCandidate,
   type ChopperExteriorReviewBounds,
+  type ChopperExteriorReviewWorldAssessment,
 } from './chopper-exterior-review-camera';
 import { PASS65_FLIGHT_NAVIGATION, resolveSupportFlightStep } from './killstreak-flight-navigation';
 import { resolveSupportAircraftEnvelopeStep } from './support-aircraft-collision';
@@ -211,6 +243,7 @@ import {
   type KillstreakLoadoutIntentMessage,
   type KillstreakStateMessage,
 } from './killstreak-protocol';
+import { KillstreakDamageResultReplayLedger } from './killstreak-damage-result-admission';
 import {
   acknowledgeClientWorldRepairActor,
   beginClientWorldRepair,
@@ -251,7 +284,8 @@ import {
   weaponPrewarmCatalogForArena,
 } from './weapon-prewarm-catalog';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
-import { clampPointToBounds, damp, firstSegmentBoxHit, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes } from './collision';
+import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes } from './collision';
+import { resolveIdentifiedGlassSweepImpact } from './projectile-glass-collision';
 import {
   applyPenetrationDamage,
   ballisticImpactSurface,
@@ -302,12 +336,23 @@ import { preserveSoloCountdownCue, type MatchCountdownCue } from './match-countd
 import { adsSightProfile } from './ads-sight-profile';
 import { ArenaMap, buildArena } from './map';
 import {
+  GLASS_CRACK_DAMAGE_Q,
   admitCrossbowThroughGlass,
   admitGlassImpact,
   createGlassState,
   glassAuthorityProjection,
   type GlassImpactProfile,
 } from './glass-authority';
+import { weaponGlassBreakPolicy } from './weapon-glass-break-policy';
+import {
+  admitProjectileGlassBreak,
+  HostedBotProjectileGlassActionLedger,
+  admitProjectileSimulationGlassMutation,
+  isProjectileGlassWeapon,
+  projectileGlassActionLifetimeMs,
+  retainInFlightProjectileGlassActions,
+} from './projectile-glass-break-admission';
+import { HostedBotBallisticGlassActionLedger } from './hosted-bot-glass-authority';
 import {
   activeSoloBotTarget,
   arenaCanvasLabel,
@@ -325,7 +370,13 @@ import { hitProxyZoneCentre } from './hit-proxies';
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { routeIdentityTelemetry } from './world-identity';
 import { damageNumberPresentation, roundStatSummary } from './player-feedback';
-import { SupportDamageFeedbackTelemetry, projectSupportDamageAnchor, type SupportDamageScreenAnchor } from './support-damage-feedback';
+import {
+  LocalSupportShotPresentationReceipts,
+  SupportDamageFeedbackTelemetry,
+  planSupportDamageFeedback,
+  projectSupportDamageAnchor,
+  type SupportDamageScreenAnchor,
+} from './support-damage-feedback';
 import { isHoldInteraction, primaryInteraction, type InteractionCandidate } from './interaction-arbitration';
 import {
   createFInteractionPressState,
@@ -556,6 +607,7 @@ import {
   CLOCK_PING_INTERVAL_MS,
   DEFAULT_PRIVATE_MATCH_CONFIG,
   LOBBY_START_LEAD_MS,
+  MAX_PRIVATE_MATCH_DURATION_MS,
   REJOIN_GRACE_MS,
   rejoinReservationExpired,
   balanceLobbyTeams,
@@ -616,10 +668,14 @@ import {
 } from './remote-sticky-attachment-authority';
 import {
   STICKY_VICTIM_URGENT_ALERT_DURATION_MS,
-  StickyVictimUrgentAlertController,
-  projectStickyVictimFeedback,
+  StickyUrgentAlertController,
   type StickyVictimFeedback,
+  type StickyUrgentAlertAudience,
 } from './sticky-victim-feedback';
+import {
+  StickyAttachmentReceiptLedger,
+  planStickyAttachmentOnset,
+} from './sticky-attachment-receipt';
 import {
   STICKY_VICTIM_RECEIPT_TTL_MS,
   loadStickyVictimReceiptKeys,
@@ -677,6 +733,7 @@ import {
   CharacterPhysics,
   MAX_MAJOR_DEBRIS_BODIES,
   worldBoundaryColliders,
+  worldFloorCollider,
   type MajorDebrisBodyDefinition,
   type MajorDebrisBodySnapshot,
   type DynamicWorldCollider,
@@ -686,9 +743,22 @@ import { shedPlacementsForArena } from './destructible-shed-registry';
 import { FIELD_SHED_EXPLOSION_DAMAGE_MULTIPLIER } from './destructible-shed-definition';
 import { canAdmitMajorDebris, SHARED_MAJOR_DEBRIS_BUDGET } from './major-debris-budget';
 import {
+  WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS,
+  WINDOW_GLASS_DEBRIS_MAX_PHYSICS_MS,
+  WINDOW_GLASS_DEBRIS_MIN_PROGRESS_M,
+  WINDOW_GLASS_DEBRIS_NO_PROGRESS_MS,
+  WINDOW_GLASS_DEBRIS_POSE_GRACE_MS,
+  WINDOW_GLASS_DEBRIS_SETTLE_TOLERANCE_M,
   createFracturedWindowDebrisVisual,
+  integrateWindowGlassDebrisFallback,
+  snapshotWindowGlassDebrisFallbackState,
   updateFracturedWindowDebrisVisual,
-  windowGlassDebrisSettleMode,
+  windowGlassDebrisFallbackInterval,
+  windowGlassDebrisFallbackSweepSupport,
+  windowGlassDebrisLifecycleMode,
+  windowGlassDebrisMilestoneAdmitted,
+  windowGlassDebrisPhysicsSnapshotMode,
+  type WindowGlassDebrisFallbackSupportCandidate,
 } from './window-glass-debris-presentation';
 import {
   INTERACTIVE_WORLD_SCHEMA_VERSION,
@@ -705,13 +775,12 @@ import {
 } from './weapon-presentation';
 import {
   magnifiedFovDegrees,
-  VIEWMODEL_CONTACT_PROBE_OFFSETS,
   VIEWMODEL_CONTACT_PROFILES,
-  viewmodelContactProbePaddingMeters,
   viewmodelFloorClearance,
   viewmodelObstructionPose,
   type ViewmodelObstructionPose,
 } from './weapon-presentation-state';
+import { ViewmodelContactProbe } from './viewmodel-contact-probe';
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
 import {
   RAILGUN_SCOPE_MAGNIFICATION,
@@ -831,7 +900,11 @@ import {
   type RailgunShotResultMessage,
   type RailgunStateMessage,
 } from './railgun-authority';
-import { selectPlayableWindowApproach, windowBreakPathBlocked } from './window-breaks';
+import {
+  selectPlayableWindowApproach,
+  windowBlastLineOfSightColliders,
+  windowBreakPathBlocked,
+} from './window-breaks';
 import { resolveRenderProfile, type RenderProfile } from './render-profile';
 import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRandom, runtimeRandomTelemetry, runtimeSeed } from './runtime-random';
 import {
@@ -847,6 +920,7 @@ import {
   GuestCombatInventoryProjection,
   HitMessage,
   HostVerifiedStickyAttachment,
+  isGameMessage,
   GuestResumeAckMessage,
   GuestResumeAuthorityMessage,
   GuestResumeFailureMessage,
@@ -882,6 +956,7 @@ import {
   ShotRequestMessage,
   ShotResultMessage,
   StateMessage,
+  StickyAttachmentReceiptMessage,
   MULTIPLAYER_PROTOCOL_VERSION,
   Team,
   TriggerStateMessage,
@@ -1060,6 +1135,7 @@ type ExplosiveBoltEntity = {
   nextFuseBeepAt: number | null;
   targetId: string | null;
   targetLifeId: number | null;
+  impactWindowId: string | null;
   actionNonce: number;
 };
 
@@ -1106,6 +1182,7 @@ type NukeSequence = {
   finishedAt: number;
   detonated: boolean;
   shockwave: THREE.Mesh;
+  warningBeacon: THREE.Group;
   authoritativeDamage: boolean;
 };
 
@@ -1337,6 +1414,198 @@ type DebugChopperExteriorHiddenControlReceipt = Readonly<{
   rootHiddenDuringSubmission: true;
   rootRestored: true;
 }>;
+type DebugChopperCockpitHiddenControlReceipt = Readonly<{
+  contract: 'chopper-cockpit-hidden-control-v1';
+  nonPublishable: true;
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  entityId: string;
+  simulationFrame: number;
+  officialSubmissionSequence: number;
+  officialCompletedSequence: number;
+  submissionSequence: number;
+  completedSequence: number;
+  camera: Readonly<{
+    position: readonly [number, number, number];
+    quaternion: readonly [number, number, number, number];
+    fov: number;
+    near: number;
+    far: number;
+    aspect: number;
+  }>;
+  viewport: Readonly<{
+    cssWidth: number;
+    cssHeight: number;
+    devicePixelRatio: number;
+    canvasWidth: number;
+    canvasHeight: number;
+  }>;
+  cockpitRootName: 'chopper-first-person-cockpit';
+  cockpitRootCount: number;
+  activeCockpitRootCount: number;
+  activeLodAsset: string | null;
+  semanticNodeNames: readonly string[];
+  firstPerson: NonNullable<KillstreakPresentationTelemetry['firstPersonSightline']>;
+  cockpitRootsHiddenDuringSubmission: true;
+  cockpitRootsRestored: true;
+  entityRootVisibleDuringSubmission: true;
+  cockpitHudVisibleDuringSubmission: true;
+}>;
+type DebugChopperCockpitVisibleFrameReceipt = Readonly<{
+  contract: 'chopper-cockpit-frozen-visible-frame-v1';
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  entityId: string;
+  simulationFrame: number;
+  submissionSequence: number;
+  completedSequence: number;
+  camera: DebugChopperCockpitHiddenControlReceipt['camera'];
+  viewport: DebugChopperCockpitHiddenControlReceipt['viewport'];
+  cockpitRootName: 'chopper-first-person-cockpit';
+  cockpitRootCount: number;
+  activeCockpitRootCount: number;
+  activeLodAsset: string | null;
+  semanticNodeNames: readonly string[];
+  firstPerson: NonNullable<KillstreakPresentationTelemetry['firstPersonSightline']>;
+  cockpitRootsVisible: true;
+  entityRootVisible: true;
+  cockpitHudVisible: true;
+}>;
+type DebugChopperCockpitEvidenceState = {
+  previousRenderPaused: boolean;
+  entityRoot: THREE.Object3D;
+  cockpitRoots: readonly THREE.Object3D[];
+  cockpitRootVisibilities: readonly boolean[];
+  visibleFrame: DebugChopperCockpitVisibleFrameReceipt | null;
+};
+type DebugChopperMissileVisibleFrameReceipt = Readonly<{
+  contract: 'chopper-missile-frozen-visible-frame-v1';
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  simulationFrame: number;
+  submissionSequence: number;
+  completedSequence: number;
+  camera: DebugChopperCockpitHiddenControlReceipt['camera'];
+  viewport: DebugChopperCockpitHiddenControlReceipt['viewport'];
+  trajectoryId: string;
+  activationId: string;
+  ordinal: number;
+  missile: KillstreakPresentationTelemetry['chopperMissileShells'][number];
+  authority: ChopperMissileAuthorityEvidenceEvent;
+  missileRootVisible: true;
+}>;
+type DebugChopperMissileHiddenControlReceipt = Readonly<{
+  contract: 'chopper-missile-hidden-control-v1';
+  nonPublishable: true;
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  simulationFrame: number;
+  officialSubmissionSequence: number;
+  officialCompletedSequence: number;
+  submissionSequence: number;
+  completedSequence: number;
+  camera: DebugChopperCockpitHiddenControlReceipt['camera'];
+  viewport: DebugChopperCockpitHiddenControlReceipt['viewport'];
+  trajectoryId: string;
+  activationId: string;
+  ordinal: number;
+  missile: KillstreakPresentationTelemetry['chopperMissileShells'][number];
+  authority: ChopperMissileAuthorityEvidenceEvent;
+  missileRootHiddenDuringSubmission: true;
+  missileRootRestored: true;
+  allOtherMissileRootVisibilitiesPreserved: true;
+}>;
+type DebugChopperMissileEvidenceState = {
+  previousRenderPaused: boolean;
+  missileRoot: THREE.Object3D;
+  missileRootVisible: boolean;
+  otherMissileRoots: readonly Readonly<{ root: THREE.Object3D; visible: boolean }>[];
+  visibleFrame: DebugChopperMissileVisibleFrameReceipt | null;
+};
+type DebugNukeWarningVisibleFrameReceipt = Readonly<{
+  contract: 'nuke-warning-frozen-visible-frame-v1';
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  simulationFrame: number;
+  captureRevision: number;
+  submissionSequence: number;
+  completedSequence: number;
+  renderedAtMs: number;
+  detonateAtMs: number;
+  detonateInMs: number;
+  active: true;
+  detonated: false;
+  cameraPosition: readonly [number, number, number];
+  cameraQuaternion: readonly [number, number, number, number];
+  beaconPosition: readonly [number, number, number];
+  beaconScale: number;
+  coreOpacity: number;
+  ringOpacity: number;
+  beaconVisible: true;
+}>;
+type DebugNukeWarningHiddenControlReceipt = Readonly<{
+  contract: 'nuke-warning-hidden-control-v1';
+  nonPublishable: true;
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  simulationFrame: number;
+  captureRevision: number;
+  officialSubmissionSequence: number;
+  submissionSequence: number;
+  completedSequence: number;
+  beaconPosition: readonly [number, number, number];
+  beaconScale: number;
+  coreOpacity: number;
+  ringOpacity: number;
+  beaconHiddenDuringSubmission: true;
+  beaconRestored: true;
+}>;
+type DebugNukeWarningEvidenceState = {
+  sequence: NukeSequence;
+  previousRenderPaused: boolean;
+  visibleFrame: DebugNukeWarningVisibleFrameReceipt | null;
+  official: DebugCommittedCameraPresentationReceipt;
+  renderedAtMs: number;
+  detonateInMs: number;
+  beaconPosition: readonly [number, number, number];
+  beaconScale: number;
+  coreOpacity: number;
+  ringOpacity: number;
+};
+type DebugThermalOperatorVisibleFrameReceipt = Readonly<{
+  contract: 'thermal-operator-frozen-visible-frame-v1';
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  simulationFrame: number;
+  submissionSequence: number;
+  completedSequence: number;
+  targetId: string;
+  activeSourceBodyLayers: number;
+  activeModelLayers: number;
+  cameraPosition: readonly [number, number, number];
+  cameraQuaternion: readonly [number, number, number, number];
+}>;
+type DebugThermalOperatorHiddenControlReceipt = Readonly<{
+  contract: 'thermal-operator-hidden-control-v1';
+  nonPublishable: true;
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  simulationFrame: number;
+  officialSubmissionSequence: number;
+  submissionSequence: number;
+  completedSequence: number;
+  targetId: string;
+  activeSourceBodyLayers: number;
+  activeModelLayers: number;
+  cameraPosition: readonly [number, number, number];
+  cameraQuaternion: readonly [number, number, number, number];
+  thermalMaterialHiddenDuringSubmission: true;
+  thermalMaterialRestored: true;
+}>;
+type DebugThermalOperatorEvidenceState = {
+  previousRenderPaused: boolean;
+  visibleFrame: DebugThermalOperatorVisibleFrameReceipt | null;
+};
 let debugCaptureCameraRevision = 0;
 let lastDebugCapturePresentation: DebugCapturePresentationReceipt | null = null;
 let lastDebugCommittedCameraPresentation: DebugCommittedCameraPresentationReceipt | null = null;
@@ -1358,12 +1627,20 @@ type DebugChopperExteriorReviewTrackerFrame = Readonly<{
   distanceM: number;
   clearanceM: number;
   inTestBay: boolean;
+  cameraColliderClear: boolean;
+  cameraClearanceRadiusM: number;
+  lineOfSightSampleCount: number;
+  clearLineOfSightSampleCount: number;
   submittedSceneDrawableMeshCount: number;
   submittedSceneDrawableBounds: Readonly<{ min: readonly number[]; max: readonly number[] }>;
 }>;
 let debugChopperExteriorReviewTrackerRequested = false;
 let debugChopperExteriorReviewTrackerSide: -1 | 1 | null = null;
 let lastDebugChopperExteriorReviewTrackerFrame: DebugChopperExteriorReviewTrackerFrame | null = null;
+let debugNukeWarningEvidenceState: DebugNukeWarningEvidenceState | null = null;
+let debugThermalOperatorEvidenceState: DebugThermalOperatorEvidenceState | null = null;
+let debugChopperCockpitEvidenceState: DebugChopperCockpitEvidenceState | null = null;
+let debugChopperMissileEvidenceState: DebugChopperMissileEvidenceState | null = null;
 
 function currentDebugChopperExteriorReviewHoldActive(): boolean {
   return chopperExteriorReviewHoldActive(debugChopperAutonomousFireHeld, {
@@ -1408,6 +1685,30 @@ function synchronizeDebugChopperExteriorReviewHold(): boolean {
   return active;
 }
 
+function assessDebugChopperExteriorReviewWorldCandidate(
+  bounds: ChopperExteriorReviewBounds,
+  candidate: ChopperExteriorReviewCameraCandidate,
+): ChopperExteriorReviewWorldAssessment {
+  const colliders = activeWorldColliders();
+  const cameraPoint = { x: candidate.position[0], y: candidate.position[1], z: candidate.position[2] };
+  const lineOfSightSamples: Array<readonly [number, number, number]> = [[...candidate.target]];
+  for (const x of [bounds.min[0], bounds.max[0]]) {
+    for (const y of [bounds.min[1], bounds.max[1]]) {
+      for (const z of [bounds.min[2], bounds.max[2]]) lineOfSightSamples.push([x, y, z]);
+    }
+  }
+  const clearLineOfSightSampleCount = lineOfSightSamples.filter(([x, y, z]) => !colliders.some((box) => (
+    segmentIntersectsBox(cameraPoint, { x, y, z }, box)
+  ))).length;
+  const cameraClearanceRadiusM = CHOPPER_EXTERIOR_REVIEW_CAMERA_CONTRACT.cameraColliderClearanceRadiusM;
+  return Object.freeze({
+    cameraColliderClear: !colliders.some((box) => sphereIntersectsBox(cameraPoint, cameraClearanceRadiusM, box)),
+    cameraClearanceRadiusM,
+    lineOfSightSampleCount: lineOfSightSamples.length,
+    clearLineOfSightSampleCount,
+  });
+}
+
 function updateDebugChopperExteriorReviewTracker(): void {
   if (!debugChopperExteriorReviewTrackerRequested) return;
   if (!currentDebugChopperExteriorReviewHoldActive() || !debugCaptureCameraActive) {
@@ -1434,12 +1735,13 @@ function updateDebugChopperExteriorReviewTracker(): void {
     entityYaw: activeChopper.attitude[1],
     aspect: camera.aspect,
     preferredSide: debugChopperExteriorReviewTrackerSide,
+    assessWorldCandidate: (candidate) => assessDebugChopperExteriorReviewWorldCandidate(bounds, candidate),
   });
   if (!pose) {
     lastDebugChopperExteriorReviewTrackerFrame = null;
     return;
   }
-  debugChopperExteriorReviewTrackerSide ??= pose.side;
+  debugChopperExteriorReviewTrackerSide = pose.side;
   debugCaptureCameraPosition.set(...pose.position);
   debugCaptureCameraYaw = pose.yaw;
   debugCaptureCameraPitch = pose.pitch;
@@ -1457,6 +1759,10 @@ function updateDebugChopperExteriorReviewTracker(): void {
     distanceM: pose.distanceM,
     clearanceM: pose.clearanceM,
     inTestBay: pose.inTestBay,
+    cameraColliderClear: pose.world.cameraColliderClear,
+    cameraClearanceRadiusM: pose.world.cameraClearanceRadiusM,
+    lineOfSightSampleCount: pose.world.lineOfSightSampleCount,
+    clearLineOfSightSampleCount: pose.world.clearLineOfSightSampleCount,
     submittedSceneDrawableMeshCount: detail.drawableStableAirframeMeshCount,
     submittedSceneDrawableBounds: Object.freeze({
       min: Object.freeze([...sourceBounds.min]),
@@ -1591,21 +1897,43 @@ const runtimeRequest = resolveRenderRuntimeRequest(
   window.location.search,
   typeof navigator !== 'undefined' && typeof (navigator as Navigator & { gpu?: unknown }).gpu !== 'undefined',
 );
+const signalQuery = new URLSearchParams(window.location.search).get('signal');
 async function createWebGl2Runtime(): Promise<LegacyWebGlRenderRuntime> {
+  const probedAdapterLabel = probeWebGl2AdapterLabel();
+  // Atomic Signal resolves the multisampled principal HDR target before its
+  // fullscreen composite. Multisampling that geometry-free default-framebuffer
+  // draw a second time is redundant and disproportionately expensive in native
+  // Firefox/ANGLE. Keep canvas MSAA whenever the pass is disabled or a software
+  // adapter will take the direct-render fallback.
+  const atomicSignalOwnsAntialiasing = probedAdapterLabel !== null
+    && renderProfile !== 'compat'
+    && atomicSignalBypassReason(signalQuery, probedAdapterLabel) === null;
   return LegacyWebGlRenderRuntime.create({
     canvas,
     alpha: false,
-    antialias: activeRenderConfig.antialias,
+    antialias: activeRenderConfig.antialias && !atomicSignalOwnsAntialiasing,
+    // Retain a default depth buffer for the fail-closed direct-render fallback
+    // and WebGL presentation prewarm. The live Atomic Signal composite does not
+    // multisample it, while a late HDR-target validation failure can still draw
+    // the world with correct depth instead of flattening geometry by render order.
+    depth: true,
+    stencil: !atomicSignalOwnsAntialiasing,
     powerPreference: 'high-performance',
   });
 }
 let renderRuntime: WebGpuRenderRuntime | LegacyWebGlRenderRuntime;
 if (runtimeRequest.requestedBackend === 'webgpu') {
   try {
+    const compositeCanvas = geometryFreeCompositeCanvasConfig(Math.max(1, graphicsRuntime.antialiasSamples));
     renderRuntime = await WebGpuRenderRuntime.create({
       canvas,
-      antialias: graphicsRuntime.antialiasSamples > 0,
-      samples: Math.max(1, graphicsRuntime.antialiasSamples),
+      // The submitted scene is already rasterized into the principal HDR
+      // target with the player-selected MSAA sample count. RenderPipeline then
+      // presents a geometry-free full-screen composite. Multisampling that
+      // swapchain draw a second time contributes no edge coverage and is a
+      // severe native-Firefox/WebGPU bandwidth and resolve penalty.
+      antialias: compositeCanvas.antialias,
+      samples: compositeCanvas.samples,
       requireWebGPU: true,
     });
   } catch (webGpuError) {
@@ -1781,7 +2109,12 @@ function scheduleGpuRetirementDrain(): void {
 }
 document.documentElement.dataset.renderBackend = renderRuntime.backend;
 const effectiveGraphicsExposure = (authoredExposure: number): number => authoredExposure * graphicsRuntime.post.exposureScale;
-const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent);
+const rendererLabel = renderRuntime.telemetry().adapterLabel;
+const softwareRenderer = isSoftwareWebGLRenderer(rendererLabel);
+const shadowSamplerMode = webGlShadowSamplerMode(
+  navigator.userAgent,
+  renderRuntime.backend === 'webgl2' && softwareRenderer,
+);
 const webGlShadowMapType = shadowSamplerMode === 'basic-depth' ? THREE.BasicShadowMap : THREE.PCFShadowMap;
 document.documentElement.dataset.webglShadowSampler = shadowSamplerMode;
 renderRuntime.configureOutput(effectiveGraphicsExposure(activeLighting.exposure), graphicsRuntime.post.toneMapping);
@@ -1791,9 +2124,6 @@ renderRuntime.configureShadows({
   autoUpdate: activeRenderConfig.shadowMode === 'dynamic',
   needsUpdate: activeRenderConfig.shadowMode === 'static',
 });
-const signalQuery = new URLSearchParams(window.location.search).get('signal');
-const rendererLabel = renderRuntime.telemetry().adapterLabel;
-const softwareRenderer = isSoftwareWebGLRenderer(rendererLabel);
 const atomicSignalBypass = atomicSignalBypassReason(signalQuery, rendererLabel);
 document.documentElement.dataset.atomicSignalRenderer = softwareRenderer ? 'software' : 'hardware';
 const atomicSignal = renderRuntime.backend === 'webgl2'
@@ -2026,12 +2356,14 @@ function applyFlamethrowerGroundFirePulse(fire: Readonly<{
       damage: FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE,
       atMs: fire.pulseAtMs,
     }, remoteTargets, (_from, to) => carpetFireCanReach(to[0], to[1] + 1.15, to[2]));
+    const appliedEvents: KillstreakDamageEvent[] = [];
     for (const event of events) {
       const applied = applyKillstreakDamageEvent(event);
       if (!applied || applied.damage <= 0) continue;
       pendingCarpetGroundFireDamageEvents.push(applied);
-      recordOwnerSupportDamage(applied);
+      appliedEvents.push(applied);
     }
+    presentKillstreakDamageFeedback(appliedEvents);
   } else if (network.role === 'host' && fire.damageSource === 'flamethrower') {
     const ownerBot = bots.get(fire.ownerId);
     const retainedAction = admittedRemoteShots.get(fire.ownerId)?.get(fire.actionNonce);
@@ -3268,9 +3600,42 @@ let activeWorldColliderCacheArena: ArenaMap | null = null;
 let activeWorldColliderCacheRuntime: InteractiveWorldRuntime | null = null;
 let activeWorldColliderCacheRevision = -1;
 let activeWorldColliderCache: ArenaMap['colliders'] = [];
+type WindowDebrisLifecycleMilestonePhase = 'initial' | 'moving' | 'settled';
+type WindowDebrisLifecycleSample = Readonly<{
+  id: string;
+  windowId: string;
+  spawnGeneration: number;
+  spawnedAt: number;
+  actionIdentity: string;
+  milestone: WindowDebrisLifecycleMilestonePhase | null;
+  sampledAt: number;
+  position: readonly [number, number, number];
+  visible: boolean;
+  physical: boolean;
+  physicsActive: boolean;
+  receivedPhysicsPose: boolean;
+  fallbackSettled: boolean;
+  support: Readonly<{ source: string | null; restY: number | null }>;
+  ageMs: number;
+  noProgressMs: number;
+  fallbackStartedAt: number | null;
+  settledAt: number | null;
+}>;
+type RetiredWindowDebrisLifecycleReceipt = Readonly<{
+  id: string;
+  windowId: string;
+  spawnGeneration: number;
+  spawnedAt: number;
+  actionIdentity: string;
+  milestones: readonly WindowDebrisLifecycleSample[];
+  terminal: WindowDebrisLifecycleSample | null;
+  retiredAt: number;
+}>;
 type PersistentWindowDebris = {
   id: string;
   windowId: string;
+  spawnGeneration: number;
+  actionIdentity: string;
   root: THREE.Group;
   definition: MajorDebrisBodyDefinition;
   physicsActive: boolean;
@@ -3282,10 +3647,21 @@ type PersistentWindowDebris = {
    */
   fallbackVelocity: THREE.Vector3;
   fallbackAngular: THREE.Vector3;
-  fallbackRestY: number;
+  fallbackRestY: number | null;
+  fallbackSupportSource: string | null;
   fallbackSettled: boolean;
   receivedPhysicsPose: boolean;
+  firstPhysicsPoseAt: number | null;
+  fallbackStateObservedAt: number;
+  fallbackStateIncludesPhysicsPose: boolean;
   spawnedAt: number;
+  lastProgressY: number;
+  lastProgressAt: number;
+  fallbackStartedAt: number | null;
+  fallbackIntegratedAt: number | null;
+  settledAt: number | null;
+  lifecycleMilestones: WindowDebrisLifecycleSample[];
+  lastPhysicsPoseSample: WindowDebrisLifecycleSample | null;
 };
 type PooledWindowDebris = Readonly<{
   key: string;
@@ -3295,6 +3671,22 @@ type PooledWindowDebris = Readonly<{
   halfExtents: Readonly<{ x: number; y: number; z: number }>;
 }>;
 const persistentWindowDebris = new Map<string, PersistentWindowDebris>();
+const retiredWindowDebrisLifecycleReceipts = new Map<string, RetiredWindowDebrisLifecycleReceipt>();
+const windowDebrisLifecycleReadCursors = new Map<string, Readonly<{
+  spawnGeneration: number;
+  nextMilestone: number;
+}>>();
+let nextWindowDebrisSpawnGeneration = 1;
+const windowGlassDebrisLifecycleTelemetry = {
+  spawned: 0,
+  presentationFallbacks: 0,
+  settled: 0,
+  expired: 0,
+  physicsRetirements: 0,
+  missingPrewarm: 0,
+  coalescedPhysicsSyncs: 0,
+};
+let windowGlassPhysicsSyncScheduled = false;
 // Retain the exact InstancedMesh objects that were submitted behind the
 // deployment surface. Compiling one throwaway lookalike still left each live
 // pane's instance buffer/render object to initialize on the shot frame.
@@ -3337,6 +3729,7 @@ let presentedGunRangeTestBayDoorThumpSequence = 0;
 let gunRangeTestBayDoorBroadcastPending = false;
 let gunRangeMatchClockState: GunRangeMatchClockSnapshot | null = null;
 let gunRangeMatchClockOccupantIds: readonly string[] = Object.freeze([]);
+const activeGlassColliderWindowIds = new WeakMap<ArenaMap['colliders'][number], string>();
 
 function activeGunRangeTestBayDoorColliders(activeArena: ArenaMap = arena): readonly DynamicWorldCollider[] {
   return activeArena === arena && selectedArena.id === 'gun-range'
@@ -3356,16 +3749,18 @@ function activeGlassDynamicColliders(activeArena: ArenaMap = arena): readonly Dy
     if (bounds.isEmpty() || ![
       bounds.min.x, bounds.max.x, bounds.min.y, bounds.max.y, bounds.min.z, bounds.max.z,
     ].every(Number.isFinite)) continue;
+    const colliderBounds = Object.freeze({
+      minX: bounds.min.x,
+      maxX: bounds.max.x,
+      minY: bounds.min.y,
+      maxY: bounds.max.y,
+      minZ: bounds.min.z,
+      maxZ: bounds.max.z,
+    });
+    activeGlassColliderWindowIds.set(colliderBounds, pane.id);
     entries.push(Object.freeze({
       id: `glass:${pane.id}`,
-      bounds: Object.freeze({
-        minX: bounds.min.x,
-        maxX: bounds.max.x,
-        minY: bounds.min.y,
-        maxY: bounds.max.y,
-        minZ: bounds.min.z,
-        maxZ: bounds.max.z,
-      }),
+      bounds: colliderBounds,
     }));
   }
   return Object.freeze(entries);
@@ -3397,6 +3792,117 @@ function activeWorldColliders(activeArena: ArenaMap = arena): ArenaMap['collider
   return activeWorldColliderCache;
 }
 
+function applyPersistentWindowDebrisPhysicsSnapshot(
+  entry: PersistentWindowDebris,
+  snapshot: MajorDebrisBodySnapshot,
+  observedAt: number,
+  applyState = true,
+): void {
+  if (!entry.physicsActive) return;
+  const position = Object.freeze({ ...snapshot.position });
+  const support = windowDebrisSupport(position, entry.definition.halfExtents);
+  entry.receivedPhysicsPose = true;
+  if (entry.firstPhysicsPoseAt === null) entry.firstPhysicsPoseAt = observedAt;
+  entry.lastPhysicsPoseSample = createWindowDebrisLifecycleSample(entry, observedAt, null, {
+    position,
+    physical: true,
+    physicsActive: true,
+    fallbackSettled: false,
+    support,
+  });
+  if (!applyState) return;
+  recordWindowDebrisLifecycleMilestone(entry, 'initial', observedAt, {
+    position,
+    physical: true,
+    physicsActive: true,
+    fallbackSettled: false,
+    support,
+  });
+  const initial = entry.lifecycleMilestones[0];
+  if (initial?.milestone === 'initial') {
+    const displacement = Math.hypot(
+      snapshot.position.x - initial.position[0],
+      snapshot.position.y - initial.position[1],
+      snapshot.position.z - initial.position[2],
+    );
+    if (snapshot.position.y <= initial.position[1] - WINDOW_GLASS_DEBRIS_MIN_PROGRESS_M
+      && displacement >= WINDOW_GLASS_DEBRIS_SETTLE_TOLERANCE_M) {
+      recordWindowDebrisLifecycleMilestone(entry, 'moving', observedAt, {
+        position,
+        physical: true,
+        physicsActive: true,
+        fallbackSettled: false,
+        support,
+      });
+    }
+  }
+  entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
+  entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w);
+  entry.definition = majorDebrisDefinitionFromSnapshot(entry.definition, snapshot);
+  entry.fallbackVelocity.set(
+    snapshot.linearVelocity.x,
+    snapshot.linearVelocity.y,
+    snapshot.linearVelocity.z,
+  );
+  entry.fallbackAngular.set(
+    snapshot.angularVelocity.x,
+    snapshot.angularVelocity.y,
+    snapshot.angularVelocity.z,
+  );
+  entry.fallbackRestY = support.restY;
+  entry.fallbackSupportSource = support.source;
+  entry.fallbackStateObservedAt = observedAt;
+  entry.fallbackStateIncludesPhysicsPose = true;
+  if (snapshot.position.y <= entry.lastProgressY - WINDOW_GLASS_DEBRIS_MIN_PROGRESS_M) {
+    entry.lastProgressY = snapshot.position.y;
+    entry.lastProgressAt = observedAt;
+  }
+}
+
+function retainedWindowDebrisFallbackInterval(
+  entry: PersistentWindowDebris,
+  now: number,
+  forcedFallbackAt: number | null = null,
+) {
+  return windowGlassDebrisFallbackInterval({
+    spawnedAt: entry.spawnedAt,
+    now,
+    physicsActive: entry.physicsActive,
+    receivedPhysicsPose: entry.receivedPhysicsPose,
+    stateIncludesPhysicsPose: entry.fallbackStateIncludesPhysicsPose,
+    firstPhysicsPoseAt: entry.firstPhysicsPoseAt,
+    stateObservedAt: entry.fallbackStateObservedAt,
+    lastProgressAt: entry.lastProgressAt,
+    fallbackStartedAt: entry.fallbackStartedAt,
+    forcedFallbackAt,
+  });
+}
+
+function ingestPersistentWindowDebrisPhysicsSnapshots(
+  snapshots: readonly MajorDebrisBodySnapshot[],
+  observedAt: number,
+): void {
+  for (const snapshot of snapshots) {
+    const entry = persistentWindowDebris.get(snapshot.id);
+    if (!entry) continue;
+    const beforeExpiry = observedAt < entry.spawnedAt + WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS;
+    const retainedFallbackInterval = entry.fallbackSettled
+      ? null
+      : retainedWindowDebrisFallbackInterval(entry, observedAt);
+    const snapshotMode = windowGlassDebrisPhysicsSnapshotMode({
+      beforeExpiry,
+      hasInitialMilestone: entry.lifecycleMilestones[0]?.milestone === 'initial',
+      retainedFallbackInterval,
+    });
+    applyPersistentWindowDebrisPhysicsSnapshot(
+      entry,
+      snapshot,
+      observedAt,
+      snapshotMode === 'state-and-lifecycle',
+    );
+  }
+}
+
 function syncInteractiveWorldPhysics(authoritativeResync = false): void {
   invalidateActiveWorldCollisionCache();
   if (!characterPhysics) return;
@@ -3415,12 +3921,27 @@ function syncInteractiveWorldPhysics(authoritativeResync = false): void {
     ],
   );
   characterPhysics.syncMajorDebrisBodies(activeMajorDebrisPhysicsBodies(), authoritativeResync);
+  ingestPersistentWindowDebrisPhysicsSnapshots(characterPhysics.majorDebrisSnapshots(), performance.now());
   if (!interactiveWorldRuntime) return;
   for (const mesh of interactiveWorldRuntime.housePresentationRaycastMeshes()) {
     if (!arena.raycastMeshes.includes(mesh)) arena.raycastMeshes.push(mesh);
   }
   botNavigationColliders = navigationCollidersFor(arena);
   syncAtomicHouseStructuralPresentation();
+}
+
+function scheduleWindowGlassPhysicsSync(): void {
+  if (windowGlassPhysicsSyncScheduled) {
+    windowGlassDebrisLifecycleTelemetry.coalescedPhysicsSyncs += 1;
+    return;
+  }
+  windowGlassPhysicsSyncScheduled = true;
+  // Defer one browser task turn so same-action pane breaches still coalesce,
+  // but never park movement-authority reconciliation on the idle lane.
+  scheduleBrowserCpuTask(() => {
+    windowGlassPhysicsSyncScheduled = false;
+    syncInteractiveWorldPhysics();
+  });
 }
 
 function activeMajorDebrisPhysicsBodies(): readonly MajorDebrisBodyDefinition[] {
@@ -3436,70 +3957,220 @@ function activeMajorDebrisPhysicsBodies(): readonly MajorDebrisBodyDefinition[] 
   return Object.freeze(bodies);
 }
 
-function updatePersistentWindowDebrisPhysics(dt = 1 / SIMULATION_HZ): void {
+function updatePersistentWindowDebrisPhysics(_dt = 1 / SIMULATION_HZ): void {
   if (persistentWindowDebris.size === 0) return;
-  const snapshots = characterPhysics
-    ? new Map(characterPhysics.majorDebrisSnapshots().map((snapshot) => [snapshot.id, snapshot]))
-    : new Map<string, MajorDebrisBodySnapshot>();
-  const fallbackDt = Math.min(0.05, Math.max(0, dt));
-  let retireSettledPhysics = false;
+  const snapshotList = characterPhysics?.majorDebrisSnapshots() ?? [];
   const now = performance.now();
+  const snapshots = new Map(snapshotList.map((snapshot) => [snapshot.id, snapshot]));
+  let retirePhysics = false;
+  const pendingMilestones: Array<Readonly<{
+    entry: PersistentWindowDebris;
+    phase: 'moving' | 'settled';
+    sampledAt: number;
+    overrides: WindowDebrisLifecycleSampleOverrides;
+  }>> = [];
+  const expiredEntries: PersistentWindowDebris[] = [];
+  let fallbackSupportCandidates: readonly WindowGlassDebrisFallbackSupportCandidate[] | null = null;
   for (const entry of persistentWindowDebris.values()) {
-    updateFracturedWindowDebrisVisual(entry.root, Math.max(0, (now - entry.spawnedAt) / 1_000));
+    const ageMs = Math.max(0, now - entry.spawnedAt);
+    updateFracturedWindowDebrisVisual(entry.root, ageMs / 1_000);
     const snapshot = snapshots.get(entry.id);
+    const expiresAt = entry.spawnedAt + WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS;
+    const beforeExpiry = now < expiresAt;
+    const retainedPolicyInterval = entry.fallbackSettled
+      ? null
+      : retainedWindowDebrisFallbackInterval(entry, now);
     if (snapshot) {
-      entry.receivedPhysicsPose = true;
-      if (!entry.physicsActive) continue;
-      entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
-      entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w);
-      entry.definition = majorDebrisDefinitionFromSnapshot(entry.definition, snapshot);
-      const settleMode = windowGlassDebrisSettleMode(
-        snapshot.position.y,
-        entry.fallbackRestY,
-        snapshot.sleeping,
+      const snapshotMode = windowGlassDebrisPhysicsSnapshotMode({
+        beforeExpiry,
+        hasInitialMilestone: entry.lifecycleMilestones[0]?.milestone === 'initial',
+        retainedFallbackInterval: retainedPolicyInterval,
+      });
+      applyPersistentWindowDebrisPhysicsSnapshot(
+        entry,
+        snapshot,
+        now,
+        snapshotMode === 'state-and-lifecycle',
       );
-      if (settleMode !== 'physics-active') {
-        // HF-155: the shards remain as persistent visual evidence, but a settled
-        // pane-sized Rapier cuboid must not remain an invisible movement blocker.
-        entry.physicsActive = false;
-        retireSettledPhysics = true;
-        if (settleMode === 'settled') {
-          entry.root.position.y = entry.fallbackRestY;
-          entry.fallbackSettled = true;
-          entry.fallbackVelocity.set(0, 0, 0);
-          entry.fallbackAngular.set(0, 0, 0);
-        } else {
-          // Sleeping on the sill is not support authority for loose shards.
-          // Retire the cuboid and continue a bounded presentation-only fall.
-          entry.receivedPhysicsPose = false;
-          entry.fallbackVelocity.y = Math.min(entry.fallbackVelocity.y, -0.9);
-        }
-      }
-      continue;
     }
-    // No authoritative pose for this body. Owner-visible requirement: broken
-    // glass must always reach the ground, so integrate a bounded presentation
-    // fall instead of leaving the shards frozen in the window opening.
-    if (entry.receivedPhysicsPose || entry.fallbackSettled) continue;
-    entry.fallbackVelocity.y -= 9.81 * fallbackDt;
-    entry.root.position.addScaledVector(entry.fallbackVelocity, fallbackDt);
-    entry.root.rotation.x += entry.fallbackAngular.x * fallbackDt;
-    entry.root.rotation.y += entry.fallbackAngular.y * fallbackDt;
-    entry.root.rotation.z += entry.fallbackAngular.z * fallbackDt;
-    if (entry.root.position.y <= entry.fallbackRestY) {
-      entry.root.position.y = entry.fallbackRestY;
-      entry.root.rotation.x = 0;
-      entry.root.rotation.z = 0;
+    const lifecycleAgeMs = Math.min(ageMs, WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS - 0.001);
+    const lifecycle = windowGlassDebrisLifecycleMode({
+      ageMs: lifecycleAgeMs,
+      positionY: entry.root.position.y,
+      restY: entry.fallbackRestY,
+      physicsActive: entry.physicsActive,
+      sleeping: beforeExpiry && (snapshot?.sleeping ?? false),
+      receivedPhysicsPose: entry.receivedPhysicsPose,
+      noProgressMs: Math.max(0, Math.min(now, expiresAt) - entry.lastProgressAt),
+      fallbackSettled: entry.fallbackSettled,
+    });
+    if (lifecycle === 'settled' && beforeExpiry && !entry.fallbackSettled) {
+      if (entry.fallbackRestY !== null) entry.root.position.y = entry.fallbackRestY;
+      entry.fallbackSettled = true;
+      entry.settledAt = now;
       entry.fallbackVelocity.set(0, 0, 0);
       entry.fallbackAngular.set(0, 0, 0);
-      entry.fallbackSettled = true;
+      windowGlassDebrisLifecycleTelemetry.settled += 1;
       if (entry.physicsActive) {
         entry.physicsActive = false;
-        retireSettledPhysics = true;
+        retirePhysics = true;
+        windowGlassDebrisLifecycleTelemetry.physicsRetirements += 1;
+      }
+      pendingMilestones.push(Object.freeze({
+        entry,
+        phase: 'settled',
+        sampledAt: now,
+        overrides: Object.freeze({
+          position: Object.freeze({ ...entry.root.position }),
+          physicsActive: false,
+          fallbackSettled: true,
+          support: Object.freeze({
+            source: entry.fallbackSupportSource,
+            restY: entry.fallbackRestY,
+          }),
+          settledAt: now,
+        }),
+      }));
+    }
+
+    if (!entry.fallbackSettled) {
+      const forcedFallbackAt = beforeExpiry && snapshot?.sleeping ? now : null;
+      const currentPolicyInterval = retainedWindowDebrisFallbackInterval(entry, now, forcedFallbackAt);
+      const interval = retainedPolicyInterval
+        ? Object.freeze({
+            ...retainedPolicyInterval,
+            stateStartAt: entry.fallbackStateObservedAt,
+            captureStartAt: Math.max(
+              retainedPolicyInterval.policyStartAt,
+              entry.fallbackStateObservedAt,
+            ),
+          })
+        : currentPolicyInterval;
+      if (interval && (retainedPolicyInterval !== null
+        || lifecycle === 'presentation-fall'
+        || entry.fallbackStartedAt !== null)) {
+        if (entry.fallbackStartedAt === null) {
+          entry.fallbackStartedAt = interval.policyStartAt;
+          entry.fallbackIntegratedAt = interval.stateStartAt;
+          windowGlassDebrisLifecycleTelemetry.presentationFallbacks += 1;
+        }
+        if (entry.physicsActive) {
+          entry.physicsActive = false;
+          retirePhysics = true;
+          windowGlassDebrisLifecycleTelemetry.physicsRetirements += 1;
+        }
+        const stateStartedAt = entry.fallbackIntegratedAt ?? interval.stateStartAt;
+        const captureStartedAt = Math.max(stateStartedAt, interval.captureStartAt);
+        const initial = entry.lifecycleMilestones[0];
+        const retainedState = snapshotWindowGlassDebrisFallbackState({
+          position: entry.root.position,
+          velocity: entry.fallbackVelocity,
+          rotation: entry.root.rotation,
+          angular: entry.fallbackAngular,
+        });
+        const supportCandidates = fallbackSupportCandidates
+          ?? (fallbackSupportCandidates = windowDebrisFallbackSupportCandidates());
+        const preCapture = integrateWindowGlassDebrisFallback(
+          retainedState,
+          Math.max(0, captureStartedAt - stateStartedAt) / 1_000,
+          (from, to) => windowDebrisFallbackSupport(
+            from,
+            to,
+            entry.definition.halfExtents,
+            supportCandidates,
+          ),
+        );
+        const result = integrateWindowGlassDebrisFallback(
+          preCapture.state,
+          Math.max(0, interval.endAt - captureStartedAt) / 1_000,
+          (from, to) => windowDebrisFallbackSupport(
+            from,
+            to,
+            entry.definition.halfExtents,
+            supportCandidates,
+          ),
+          initial?.milestone === 'initial'
+            ? { x: initial.position[0], y: initial.position[1], z: initial.position[2] }
+            : null,
+        );
+        entry.root.position.set(result.state.position.x, result.state.position.y, result.state.position.z);
+        entry.root.rotation.set(result.state.rotation.x, result.state.rotation.y, result.state.rotation.z);
+        entry.fallbackVelocity.set(result.state.velocity.x, result.state.velocity.y, result.state.velocity.z);
+        entry.fallbackAngular.set(result.state.angular.x, result.state.angular.y, result.state.angular.z);
+        entry.fallbackIntegratedAt = captureStartedAt + result.elapsedSeconds * 1_000;
+        entry.fallbackStateObservedAt = entry.fallbackIntegratedAt;
+        entry.fallbackStateIncludesPhysicsPose = false;
+        if (result.moving) {
+          const movingAt = captureStartedAt + result.moving.elapsedSeconds * 1_000;
+          const movingSupport = windowDebrisSupport(
+            result.moving.state.position,
+            entry.definition.halfExtents,
+          );
+          pendingMilestones.push(Object.freeze({
+            entry,
+            phase: 'moving',
+            sampledAt: movingAt,
+            overrides: Object.freeze({
+              position: result.moving.state.position,
+              physicsActive: false,
+              fallbackSettled: false,
+              support: movingSupport,
+            }),
+          }));
+        }
+        if (result.settled && result.settledAfterSeconds !== null) {
+          const settledAt = captureStartedAt + result.settledAfterSeconds * 1_000;
+          entry.fallbackRestY = result.support.restY;
+          entry.fallbackSupportSource = result.support.source;
+          entry.fallbackSettled = true;
+          entry.settledAt = settledAt;
+          windowGlassDebrisLifecycleTelemetry.settled += 1;
+          pendingMilestones.push(Object.freeze({
+            entry,
+            phase: 'settled',
+            sampledAt: settledAt,
+            overrides: Object.freeze({
+              position: result.state.position,
+              physicsActive: false,
+              fallbackSettled: true,
+              support: result.support,
+              settledAt,
+            }),
+          }));
+        } else {
+          const support = windowDebrisSupport(entry.root.position, entry.definition.halfExtents);
+          entry.fallbackRestY = support.restY;
+          entry.fallbackSupportSource = support.source;
+        }
       }
     }
+    if (now >= expiresAt) expiredEntries.push(entry);
   }
-  if (retireSettledPhysics) syncInteractiveWorldPhysics();
+
+  if (retirePhysics && characterPhysics) {
+    characterPhysics.syncMajorDebrisBodies(activeMajorDebrisPhysicsBodies(), false);
+  }
+  const remainingPhysicalIds = new Set(
+    characterPhysics?.majorDebrisSnapshots().map((snapshot) => snapshot.id) ?? [],
+  );
+  for (const pending of pendingMilestones) {
+    if (remainingPhysicalIds.has(pending.entry.id)) continue;
+    recordWindowDebrisLifecycleMilestone(
+      pending.entry,
+      pending.phase,
+      pending.sampledAt,
+      { ...pending.overrides, physical: false },
+    );
+  }
+  for (const entry of expiredEntries) {
+    if (remainingPhysicalIds.has(entry.id)) continue;
+    retainWindowDebrisLifecycleReceipt(entry, now);
+    updateFracturedWindowDebrisVisual(entry.root, 0);
+    entry.root.visible = false;
+    entry.root.userData.persistentMajorDebris = false;
+    persistentWindowDebris.delete(entry.id);
+    windowGlassDebrisLifecycleTelemetry.expired += 1;
+  }
 }
 
 function majorDebrisDefinitionFromSnapshot(
@@ -4056,22 +4727,56 @@ nukeShockwave.name = 'pass35-prewarmed-nuke-shockwave';
 nukeShockwave.position.set(0, 1.5, 0);
 nukeShockwave.visible = false;
 nukeShockwave.userData.presentationOnly = true;
+const nukeWarningBeacon = new THREE.Group();
+nukeWarningBeacon.name = 'pass71-nuke-warning-beacon';
+nukeWarningBeacon.userData.presentationOnly = true;
+nukeWarningBeacon.visible = false;
+const nukeWarningCoreMaterial = new THREE.MeshBasicMaterial({
+  color: 0xff2f14,
+  transparent: true,
+  opacity: 0,
+  depthWrite: false,
+  toneMapped: false,
+});
+const nukeWarningRingMaterial = new THREE.MeshBasicMaterial({
+  color: 0xff9a32,
+  transparent: true,
+  opacity: 0,
+  depthWrite: false,
+  toneMapped: false,
+  side: THREE.DoubleSide,
+});
+const nukeWarningCore = new THREE.Mesh(new THREE.SphereGeometry(0.72, 20, 14), nukeWarningCoreMaterial);
+nukeWarningCore.name = 'pass71-nuke-warning-core';
+const nukeWarningRings = [0, 1, 2].map((index) => {
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.5 + index * 0.62, 0.055, 8, 36), nukeWarningRingMaterial);
+  ring.name = `pass71-nuke-warning-ring-${index + 1}`;
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = index * 0.55 - 0.55;
+  return ring;
+});
+nukeWarningBeacon.add(nukeWarningCore, ...nukeWarningRings);
+nukeWarningBeacon.traverse((node) => { node.raycast = () => undefined; });
 let nukePresentationPrewarmed = false;
 
 async function prewarmNukePresentation(): Promise<void> {
   if (nukePresentationPrewarmed) return;
   nukeShockwave.visible = true;
+  nukeWarningBeacon.visible = true;
   nukeShockwave.scale.setScalar(0.0001);
   try {
+    await renderRuntime.compileAndRender(nukeWarningBeacon, camera, scene);
     await renderRuntime.compileAndRender(nukeShockwave, camera, scene);
     nukePresentationPrewarmed = true;
   } finally {
     nukeShockwave.visible = false;
+    nukeWarningBeacon.visible = false;
     nukeShockwave.scale.setScalar(0.1);
   }
 }
 nukeShockwave.raycast = () => undefined;
 scene.add(nukeShockwave);
+scene.add(nukeWarningBeacon);
 let arenaArtRoot: THREE.Group | null = null;
 let blenderArenaActive = false;
 let atomicHouseAuthorityParity: AtomicHouseAuthorityParityReport | null = null;
@@ -4280,6 +4985,8 @@ let lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
 let flashHostAuthority = new FlashHostAuthority(interactiveWorldMatchEpoch, 'host');
 let flashVictimConsumer = new FlashVictimResultConsumer(interactiveWorldMatchEpoch, 'pending-player', 0);
 const explosiveBolts: ExplosiveBoltEntity[] = [];
+const explosiveBoltImpactReceipts = new ExplosiveBoltImpactReceiptLedger();
+let lastLocalExplosiveBoltActionIdentity: LocalExplosiveBoltActionIdentity | null = null;
 const explosiveBoltStartScratch = new THREE.Vector3();
 const explosiveBoltDeltaScratch = new THREE.Vector3();
 const explosiveBoltTargetPositionScratch = new THREE.Vector3();
@@ -4347,6 +5054,144 @@ let lastGrenadeExplosionProfile = {
   selfDamageMs: 0,
   totalSyncMs: 0,
 };
+type GrenadeFirstActionProfile = {
+  actionNonce: number | null;
+  grenade: GrenadeId;
+  cold: boolean;
+  startedAt: number;
+  handlerCompletedAt: number;
+  handlerSyncMs: number;
+  audio: Readonly<{
+    contextState: string;
+    prepared: boolean;
+    retainedSources: number;
+    automationsBefore: number;
+    automationsAfter: number;
+  }>;
+  startingSubmissionSequence: number;
+  startingCompletedSequence: number;
+  targetSubmissionSequence: number | null;
+  firstSubmissionAt: number | null;
+  firstSubmissionDelayMs: number | null;
+  firstCompletionAt: number | null;
+  firstCompletionDelayMs: number | null;
+  endingSubmissionSequence: number;
+  endingCompletedSequence: number;
+  maximumPendingForMs: number;
+  maximumAnimationFrameGapMs: number;
+  lastAnimationFrameAt: number;
+  maximumFrameWorkMs: number;
+  frameSamples: number;
+  completionFailures: number;
+  status: string;
+  observationComplete: boolean;
+};
+let grenadeActionProfiles = 0;
+let lastGrenadeFirstActionProfile: GrenadeFirstActionProfile | null = null;
+
+function beginGrenadeFirstActionProfile(grenade: GrenadeId, startedAt: number): void {
+  const presentation = renderRuntime.presentationTelemetry(startedAt);
+  const audioTelemetry = audio.telemetry();
+  const profile: GrenadeFirstActionProfile = {
+    actionNonce: null,
+    grenade,
+    cold: grenadeActionProfiles === 0,
+    startedAt,
+    handlerCompletedAt: startedAt,
+    handlerSyncMs: 0,
+    audio: Object.freeze({
+      contextState: audioTelemetry.context.state,
+      prepared: audioTelemetry.grenadeEffectsPrewarm.prepared,
+      retainedSources: audioTelemetry.grenadeEffectsPrewarm.sources,
+      automationsBefore: audioTelemetry.grenadeEffectsPrewarm.automations,
+      automationsAfter: audioTelemetry.grenadeEffectsPrewarm.automations,
+    }),
+    startingSubmissionSequence: presentation.submissionSequence,
+    startingCompletedSequence: presentation.completedSequence,
+    targetSubmissionSequence: null,
+    firstSubmissionAt: null,
+    firstSubmissionDelayMs: null,
+    firstCompletionAt: null,
+    firstCompletionDelayMs: null,
+    endingSubmissionSequence: presentation.submissionSequence,
+    endingCompletedSequence: presentation.completedSequence,
+    maximumPendingForMs: presentation.pendingForMs,
+    maximumAnimationFrameGapMs: 0,
+    lastAnimationFrameAt: startedAt,
+    maximumFrameWorkMs: 0,
+    frameSamples: 0,
+    completionFailures: presentation.completionFailures,
+    status: presentation.status,
+    observationComplete: false,
+  };
+  grenadeActionProfiles += 1;
+  lastGrenadeFirstActionProfile = profile;
+}
+
+function bindGrenadeFirstActionNonce(actionNonce: number): void {
+  const profile = lastGrenadeFirstActionProfile;
+  if (!profile || profile.actionNonce !== null || !Number.isSafeInteger(actionNonce)) return;
+  profile.actionNonce = actionNonce;
+}
+
+function completeGrenadeActionHandler(completedAt: number): void {
+  const profile = lastGrenadeFirstActionProfile;
+  if (!profile || profile.handlerCompletedAt !== profile.startedAt) return;
+  const audioTelemetry = audio.telemetry();
+  profile.handlerCompletedAt = completedAt;
+  profile.handlerSyncMs = Math.max(0, completedAt - profile.startedAt);
+  profile.audio = Object.freeze({
+    ...profile.audio,
+    automationsAfter: audioTelemetry.grenadeEffectsPrewarm.automations,
+  });
+}
+
+function sampleGrenadeFirstActionProfile(frameNow: number, frameWorkMs: number): void {
+  const profile = lastGrenadeFirstActionProfile;
+  if (!profile || profile.observationComplete) return;
+  const elapsedMs = Math.max(0, frameNow - profile.startedAt);
+  const presentation = renderRuntime.presentationTelemetry(frameNow);
+  const audioTelemetry = audio.telemetry();
+  profile.audio = Object.freeze({
+    ...profile.audio,
+    automationsAfter: audioTelemetry.grenadeEffectsPrewarm.automations,
+  });
+  profile.maximumPendingForMs = Math.max(profile.maximumPendingForMs, presentation.pendingForMs);
+  profile.maximumFrameWorkMs = Math.max(profile.maximumFrameWorkMs, Math.max(0, frameWorkMs));
+  profile.maximumAnimationFrameGapMs = Math.max(
+    profile.maximumAnimationFrameGapMs,
+    Math.max(0, frameNow - profile.lastAnimationFrameAt),
+  );
+  profile.lastAnimationFrameAt = frameNow;
+  profile.frameSamples += 1;
+  if (renderRuntime.backend !== 'webgpu' && profile.firstSubmissionAt === null) {
+    profile.targetSubmissionSequence = 0;
+    profile.firstSubmissionAt = frameNow;
+    profile.firstSubmissionDelayMs = elapsedMs;
+    profile.firstCompletionAt = frameNow;
+    profile.firstCompletionDelayMs = elapsedMs;
+  } else if (profile.targetSubmissionSequence === null
+    && presentation.submissionSequence > profile.startingSubmissionSequence) {
+    profile.targetSubmissionSequence = presentation.submissionSequence;
+    profile.firstSubmissionAt = frameNow;
+    profile.firstSubmissionDelayMs = elapsedMs;
+  }
+  profile.endingSubmissionSequence = presentation.submissionSequence;
+  profile.endingCompletedSequence = presentation.completedSequence;
+  profile.completionFailures = presentation.completionFailures;
+  profile.status = presentation.status;
+  const target = profile.targetSubmissionSequence;
+  if (profile.firstCompletionAt === null && target !== null
+    && presentation.completedSequence >= target) {
+    profile.firstCompletionAt = frameNow;
+    profile.firstCompletionDelayMs = elapsedMs;
+  }
+  profile.observationComplete = elapsedMs >= 350 && (
+    renderRuntime.backend !== 'webgpu'
+      ? profile.firstSubmissionAt !== null
+      : target !== null && presentation.completedSequence >= target
+  );
+}
 let lastBotEliminationProfile = {
   deathDropMs: 0,
   deathPoseMs: 0,
@@ -4373,9 +5218,37 @@ let lastLocalKillstreakControlAdmission: Readonly<{
   accepted: boolean;
   reason: string;
 }> | null = null;
+let debugChopperGunnerQaAimRequest: ChopperGunnerQaAimRequest | null = null;
+let lastDebugChopperGunnerQaAimReceipt: ChopperGunnerQaAimReceipt | null = null;
+let debugChopperGunnerQaAimEdgeSequence = 0;
+
+function nextDebugChopperGunnerQaAimEdgeSequence(): number {
+  debugChopperGunnerQaAimEdgeSequence = debugChopperGunnerQaAimEdgeSequence >= Number.MAX_SAFE_INTEGER
+    ? 1
+    : debugChopperGunnerQaAimEdgeSequence + 1;
+  return debugChopperGunnerQaAimEdgeSequence;
+}
+
+function clearDebugChopperGunnerQaAimRequest(): void {
+  if (debugChopperGunnerQaAimRequest) nextDebugChopperGunnerQaAimEdgeSequence();
+  debugChopperGunnerQaAimRequest = null;
+}
+
+function resetDebugChopperGunnerQaAimEvidence(): void {
+  debugChopperGunnerQaAimRequest = null;
+  lastDebugChopperGunnerQaAimReceipt = null;
+  nextDebugChopperGunnerQaAimEdgeSequence();
+}
 let localCareCaptureState = createCareCaptureClientState();
 let localCareCaptureRequiresHold = false;
 let killstreakSnapshot: KillstreakRecipientSnapshot = killstreakRuntime.snapshotFor(null, 0);
+const recentKillstreakImpactEvents: KillstreakImpactEvent[] = [];
+function retainRecentKillstreakImpactEvents(events: readonly KillstreakImpactEvent[]): void {
+  recentKillstreakImpactEvents.push(...events);
+  if (recentKillstreakImpactEvents.length > 16) {
+    recentKillstreakImpactEvents.splice(0, recentKillstreakImpactEvents.length - 16);
+  }
+}
 let lastKillstreakStateBroadcastAt = Number.NEGATIVE_INFINITY;
 const LOCAL_KILLSTREAK_SNAPSHOT_REFRESH_INTERVAL_MS = 50;
 let lastLocalKillstreakSnapshotRefreshAt = Number.NEGATIVE_INFINITY;
@@ -4384,12 +5257,14 @@ const SUPPORT_STATUS_HUD_REFRESH_INTERVAL_MS = 100;
 let lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
 let lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
 const appliedKillstreakDamageResults = new Set<string>();
+const killstreakDamageResultReplayLedger = new KillstreakDamageResultReplayLedger();
 const killstreakRegisteredActors = new Set<string>();
 const hostKillstreakLoadoutAcks = new HostKillstreakLoadoutAckRegistry();
 let displayedCareReward: Pass65KillstreakId | null = null;
 const supportDamageDealtByActivation = new Map<string, number>();
 const liveSupportActivationIds = new Set<string>();
 const supportDamageFeedbackTelemetry = new SupportDamageFeedbackTelemetry();
+const localSupportShotPresentationReceipts = new LocalSupportShotPresentationReceipts();
 let adrenalineHudWasActive = false;
 let lastMatchCountdownCue: MatchCountdownCue | null = null;
 let matchCountdownCueSequence = 0;
@@ -4484,9 +5359,9 @@ function recordSupportExplosionProfile(profile: ExplosionSyncProfile): void {
   };
 }
 const processedNonces = new Set<number>();
-/** Guards the attacker-side STUCK confirmation against duplicate hit replays. */
-const attackerStuckNonces = new Set<number>();
 const hostedBotWeaponPresentationReplay = new BotWeaponPresentationReplayGuard();
+const hostedBotProjectileGlassActions = new HostedBotProjectileGlassActionLedger();
+const hostedBotBallisticGlassActions = new HostedBotBallisticGlassActionLedger();
 const remoteShotAdmissions = new Map<string, RemoteShotAdmissionState>();
 const authoritativeShotAdmissions = new Map<string, AuthoritativeShotAdmissionState>();
 const admittedRemoteShots = new Map<string, Map<number, AdmittedRemoteShot>>();
@@ -4510,64 +5385,89 @@ const stickyTimingReplayNonces = new Set<number>();
 let stickyVictimFeedbackCount = 0;
 let lastStickyVictimFeedback: StickyVictimFeedback | null = null;
 let stickyVictimReceiptKeys = new Set<string>();
-const stickyVictimUrgentAlertController = new StickyVictimUrgentAlertController();
-let stickyVictimUrgentAlertTimeout: number | null = null;
-let stickyVictimUrgentAlertGeneration = 0;
+const stickyAttachmentReceiptLedger = new StickyAttachmentReceiptLedger();
+let stickyAttachmentReceiptRetryTimeout: number | null = null;
+const stickyUrgentAlertController = new StickyUrgentAlertController();
+let stickyUrgentAlertTimeout: number | null = null;
+let stickyUrgentAlertGeneration = 0;
 const lastQaStickyAuthoritativeHits = new Map<StickyAttachmentSource, HitMessage>();
 let lastQaKillstreakActivationIntent: KillstreakActivateIntentMessage | null = null;
 const PENDING_STICKY_HIT_LIMIT = 64;
 const PENDING_STICKY_HIT_LIFETIME_MS = 1_500;
 const STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS = 3_000;
 
-function hideStickyVictimUrgentAlert(): void {
-  stickyVictimUrgentAlertGeneration += 1;
-  if (stickyVictimUrgentAlertTimeout !== null) window.clearTimeout(stickyVictimUrgentAlertTimeout);
-  stickyVictimUrgentAlertTimeout = null;
+function hideStickyUrgentAlert(): void {
+  stickyUrgentAlertGeneration += 1;
+  if (stickyUrgentAlertTimeout !== null) window.clearTimeout(stickyUrgentAlertTimeout);
+  stickyUrgentAlertTimeout = null;
   const warning = element<HTMLElement>('#sticky-warning');
   warning.hidden = true;
   delete warning.dataset.source;
+  delete warning.dataset.audience;
+  delete warning.dataset.targetId;
   delete warning.dataset.targetLifeId;
   delete warning.dataset.actionNonce;
+  delete warning.dataset.presentedAtMs;
   delete warning.dataset.expiresAtMs;
   warning.style.removeProperty('--sticky-warning-duration');
 }
 
-function resetStickyVictimUrgentAlertLife(targetLifeId: number | null = null): void {
-  hideStickyVictimUrgentAlert();
-  stickyVictimUrgentAlertController.reset(targetLifeId);
+function resetStickyUrgentAlertLife(targetLifeId: number | null = null): void {
+  hideStickyUrgentAlert();
+  stickyUrgentAlertController.reset(targetLifeId);
 }
 
-function presentStickyVictimUrgentAlert(
+function presentStickyUrgentAlert(
   source: StickyAttachmentSource,
-  targetId: string,
-  targetLifeId: number,
+  audience: StickyUrgentAlertAudience,
+  ownerId: string,
+  ownerLifeId: number,
+  attachedTargetId: string,
+  attachedTargetLifeId: number,
   actionNonce: number,
-  nowMs = performance.now(),
 ): boolean {
-  if (!player.alive || targetId !== player.id || targetLifeId !== localContinuity) return false;
-  const alert = stickyVictimUrgentAlertController.admit({ source, targetId, targetLifeId, actionNonce, nowMs });
+  if (!player.alive || (audience === 'victim' && attachedTargetId !== player.id)) return false;
+  const recipientLifeId = network.role === 'client' ? localHostConfirmedContinuity : localContinuity;
+  if (recipientLifeId === null) return false;
+  const alert = stickyUrgentAlertController.admit({
+    source,
+    audience,
+    recipientId: player.id,
+    recipientLifeId,
+    ownerId,
+    ownerLifeId,
+    attachedTargetId,
+    attachedTargetLifeId,
+    actionNonce,
+    nowMs: performance.now(),
+  });
   if (!alert) return false;
-  hideStickyVictimUrgentAlert();
+  hideStickyUrgentAlert();
   const warning = element<HTMLElement>('#sticky-warning');
   warning.dataset.source = alert.source;
-  warning.dataset.targetLifeId = String(alert.targetLifeId);
+  warning.dataset.audience = alert.audience;
+  warning.dataset.targetId = alert.attachedTargetId;
+  warning.dataset.targetLifeId = String(alert.attachedTargetLifeId);
   warning.dataset.actionNonce = String(alert.actionNonce);
-  warning.dataset.expiresAtMs = String(alert.expiresAtMs);
   warning.style.setProperty('--sticky-warning-duration', `${STICKY_VICTIM_URGENT_ALERT_DURATION_MS}ms`);
+  const presentedAtMs = performance.now();
+  const expiresAtMs = presentedAtMs + STICKY_VICTIM_URGENT_ALERT_DURATION_MS;
+  warning.dataset.presentedAtMs = String(presentedAtMs);
+  warning.dataset.expiresAtMs = String(expiresAtMs);
   warning.hidden = false;
-  const generation = stickyVictimUrgentAlertGeneration;
+  const generation = stickyUrgentAlertGeneration;
   const expire = (): void => {
-    if (generation !== stickyVictimUrgentAlertGeneration) return;
-    const remainingMs = alert.expiresAtMs - performance.now();
+    if (generation !== stickyUrgentAlertGeneration) return;
+    const remainingMs = expiresAtMs - performance.now();
     if (remainingMs > 0) {
-      stickyVictimUrgentAlertTimeout = window.setTimeout(expire, remainingMs);
+      stickyUrgentAlertTimeout = window.setTimeout(expire, remainingMs);
       return;
     }
-    hideStickyVictimUrgentAlert();
+    hideStickyUrgentAlert();
   };
-  stickyVictimUrgentAlertTimeout = window.setTimeout(
+  stickyUrgentAlertTimeout = window.setTimeout(
     expire,
-    Math.max(0, alert.expiresAtMs - performance.now()),
+    Math.max(0, expiresAtMs - performance.now()),
   );
   return true;
 }
@@ -4579,6 +5479,11 @@ const authorizedRemoteRedeploys = new Map<string, {
   expiresAt: number;
   nonce: number;
 }>();
+const hf296RemoteProjectionWeaponAuthorizations = new Map<string, Readonly<{
+  weapon: WeaponId;
+  expiresAt: number;
+}>>();
+const HF296_REMOTE_PROJECTION_AUTHORIZATION_MS = 15_000;
 const peerTimingStates = new Map<string, PeerTimingState>();
 const incomingCombatRewindMs = new Map<number, number>();
 const localPositionHistory: CombatantPoseSample[] = [];
@@ -4684,9 +5589,14 @@ const flareShotResultContexts = new Map<string, Readonly<PendingFlareShotRequest
 let lastFlarePresentationBroadcastAt = Number.NEGATIVE_INFINITY;
 let lastFlarePresentationAdmission: FlarePresentationReconcileResult | null = null;
 const pendingLocalTimedShots = new Map<string, TimedMapWeaponId>();
+const pendingLocalProjectileGlassShots = new Map<string, Readonly<{
+  actionNonce: number;
+  matchEpoch: number;
+  weapon: 'explosive-crossbow' | 'flare-gun';
+}>>();
 function admittedShotActionLifetimeMs(weapon: WeaponId): number {
-  if (weapon === 'explosive-crossbow') return EXPLOSIVE_BOLT_MAX_LIFE_MS + 1_000;
-  if (weapon === 'flare-gun') return FLARE_PROJECTILE_EFFECT.maximumFlightMs + FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000;
+  const projectileGlassLifetimeMs = projectileGlassActionLifetimeMs(weapon);
+  if (projectileGlassLifetimeMs !== null) return projectileGlassLifetimeMs;
   if (weapon === 'flamethrower') return FLAMETHROWER_GROUND_FIRE_DURATION_MS + 1_000;
   return 1_000;
 }
@@ -4696,13 +5606,23 @@ function currentAdmittedShotAction(
   actionNonce: number,
   now = performance.now(),
 ): AdmittedRemoteShot | undefined {
-  const action = admittedRemoteShots.get(ownerId)?.get(actionNonce);
+  const actions = admittedRemoteShots.get(ownerId);
+  const action = actions?.get(actionNonce);
   if (!action || action.matchEpoch !== interactiveWorldMatchEpoch) return undefined;
   const ageMs = now - action.receivedAt;
   if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > admittedShotActionLifetimeMs(action.message.weapon)) {
+    actions!.delete(actionNonce);
+    if (actions!.size === 0) admittedRemoteShots.delete(ownerId);
     return undefined;
   }
   return action;
+}
+
+function retainDisconnectedProjectileGlassActions(ownerId: string, now = performance.now()): void {
+  const actions = admittedRemoteShots.get(ownerId);
+  if (retainInFlightProjectileGlassActions(actions, interactiveWorldMatchEpoch, now) === 0) {
+    admittedRemoteShots.delete(ownerId);
+  }
 }
 const createRailgunClaimAudit = () => ({
   received: 0,
@@ -4842,7 +5762,7 @@ function localGuestCombatInventoryProjection(revision: number) {
     player.grenades,
     revision,
     player.primaryWeapon,
-    handicapSidearm(player.primaryWeapon),
+    localMultiplayerQa ? player.secondaryWeapon : handicapSidearm(player.primaryWeapon),
   );
 }
 
@@ -5149,8 +6069,9 @@ const framePacing = new FramePacingSampler();
 const LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000;
 let lastObservedWebGpuCompletionSequence = 0;
 
-function resetWebGpuPresentationEpoch(reason: string, now: number): void {
-  renderRuntime.resetPresentationProgressTelemetry(reason, now);
+function resetWebGpuPresentationEpoch(reason: string, now: number, rebasePendingCompletion = true): void {
+  if (rebasePendingCompletion) renderRuntime.resetPresentationProgressTelemetry(reason, now);
+  else renderRuntime.resetPresentationProgressTelemetry(reason, now, false);
   if (renderRuntime.backend !== 'webgpu') return;
   // A completion which retired during a hidden/pre-admission epoch is not live
   // foreground performance evidence. Consume its sequence and discard any
@@ -5210,6 +6131,7 @@ let debugCaptureCameraUsesQuaternion = false;
 let debugCaptureCameraFov: number | null = null;
 let debugCaptureFixedVisualTimeMs: number | null = null;
 let debugCaptureViewmodelHidden = false;
+let debugChopperEvidenceControlOverrideActive = false;
 // Optional game-loop-owned orbit for capture cameras. Page-context intervals
 // are throttled when the tab loses focus (which the F-arbitration key press
 // provokes), freezing the clip; driving the orbit from the presentation loop
@@ -5402,6 +6324,7 @@ let previousHudScores: [number, number] = [0, 0];
 let adsHeld = false;
 let sniperScopeActive = false;
 let dmrThermalActive = false;
+let dmrThermalRevealActive = false;
 let railgunScopeActive = false;
 let mouseTriggerHeld = false;
 let mouseAdsHeld = false;
@@ -5516,7 +6439,10 @@ function syncLocalTriggerAuthority(held: boolean): void {
 function setLocalTriggerHeld(held: boolean): void {
   triggerHeld = held;
   syncLocalTriggerAuthority(held);
-  if (!held) resetLocalSpinUp();
+  if (!held) {
+    clearDebugChopperGunnerQaAimRequest();
+    resetLocalSpinUp();
+  }
 }
 
 function sendLocalReloadCancel(): void {
@@ -5565,6 +6491,7 @@ function clearGameplayInput(): void {
   adsHeld = admittedAdsHeld(false);
   sniperScopeActive = false;
   dmrThermalActive = false;
+  dmrThermalRevealActive = false;
   sniperScopeOverlay.hidden = true;
   hudRoot.classList.remove('sniper-scope-active');
   dmrThermalPresentation.update(camera, [], false);
@@ -5818,6 +6745,7 @@ function setNetworkStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): v
     if (network.role !== 'client' || !network.diagnostics().hostConnectionOpen) {
       clientWorldRepairAdmission = null;
       pendingClientReconnectWorldRepairConnectionEpoch = null;
+      discardPendingStickyAttachmentReceipts();
     }
     const admissionToken = matchAdmissionCoordinator.token();
     if (admissionToken) {
@@ -6161,6 +7089,7 @@ function resetPrivateLobbyState(): void {
   remoteReloadTimers.clear();
   remoteReloadAuthorities.clear();
   pendingLocalOrdinaryShots.clear();
+  pendingLocalProjectileGlassShots.clear();
   pendingLocalReloadAuthority = null;
   localReloadActionSequence = 0;
   lastAppliedLocalCombatAuthorityRevision = -1;
@@ -7175,7 +8104,7 @@ function resetAuthenticatedGuestReplacement(playerId: string): void {
   }
   authoritativeShotAdmissions.delete(playerId);
   remoteShotAdmissions.delete(playerId);
-  admittedRemoteShots.delete(playerId);
+  retainDisconnectedProjectileGlassActions(playerId, now);
   admittedRemoteMelees.delete(playerId);
   admittedRemoteExplosions.delete(playerId);
   remoteMeleeAdmissions.delete(playerId);
@@ -7467,11 +8396,14 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   lastAppliedLocalCombatAuthorityRevision = projection.combatInventoryRevision;
   lastAppliedLocalShotResultSeq = -1;
   pendingLocalOrdinaryShots.clear();
+  pendingLocalProjectileGlassShots.clear();
   pendingLocalReloadAuthority = null;
   localReloadActionSequence = 0;
   player.invulnerableUntil = 0;
   localContinuity = projection.continuity;
   localHostConfirmedContinuity = projection.continuity;
+  resetStickyUrgentAlertLife(projection.continuity);
+  advancePendingStickyAttachmentReceiptActorLife(player.id, projection.continuity);
   killstreakLoadoutController.reconcileActiveMatchAuthority(projection.loadout);
   gamepadSupportSelection = projection.loadout.slots[0];
   syncFieldSupportRows(projection.loadout);
@@ -8978,44 +9910,27 @@ function stanceEyeHeight(stance: PlayerSnapshot['stance']): number {
   return stance === 'prone' ? 0.61 : stance === 'crouch' ? 1.16 : 1.7;
 }
 
-const viewmodelProbeDirection = new THREE.Vector3();
-const viewmodelProbeRight = new THREE.Vector3();
-const viewmodelProbeUp = new THREE.Vector3();
-const viewmodelProbeStart = new THREE.Vector3();
-const viewmodelProbeEnd = new THREE.Vector3();
-const viewmodelProbeRotation = new THREE.Euler(0, 0, 0, 'YXZ');
+const viewmodelContactProbe = new ViewmodelContactProbe();
 function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
   const profile = VIEWMODEL_CONTACT_PROFILES[player.weapon];
-  viewmodelProbeRotation.set(player.pitch, player.yaw, 0, 'YXZ');
-  viewmodelProbeDirection.set(0, 0, -1).applyEuler(viewmodelProbeRotation).normalize();
-  viewmodelProbeRight.set(1, 0, 0).applyEuler(viewmodelProbeRotation).normalize();
-  viewmodelProbeUp.set(0, 1, 0).applyEuler(viewmodelProbeRotation).normalize();
-  const colliders = activeWorldColliders();
-  const probePaddingMeters = viewmodelContactProbePaddingMeters(profile);
-  let nearestForward: number | null = null;
-  for (const offset of VIEWMODEL_CONTACT_PROBE_OFFSETS) {
-    const verticalOffset = offset.vertical === 'upper'
-      ? profile.probeUpperOffsetMeters
-      : offset.vertical === 'lower' ? -profile.probeLowerOffsetMeters : offset.rightScale === 0 ? 0 : 0.04;
-    viewmodelProbeStart.copy(player.position)
-      .addScaledVector(viewmodelProbeRight, offset.rightScale * profile.probeHalfWidthMeters)
-      .addScaledVector(viewmodelProbeUp, verticalOffset);
-    viewmodelProbeEnd.copy(viewmodelProbeStart).addScaledVector(viewmodelProbeDirection, profile.probeLengthMeters);
-    const hit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, probePaddingMeters);
-    if (!hit) continue;
-    const distance = hit.time * profile.probeLengthMeters;
-    nearestForward = nearestForward === null ? distance : Math.min(nearestForward, distance);
-  }
-  viewmodelProbeStart.copy(player.position);
-  viewmodelProbeEnd.copy(player.position);
-  viewmodelProbeEnd.y -= 1.05;
-  const floorHit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, 0.035);
+  const sample = viewmodelContactProbe.sample(
+    player.position,
+    player.pitch,
+    player.yaw,
+    activeWorldColliders(),
+    profile,
+  );
   const floorClearance = viewmodelFloorClearance(
-    floorHit ? floorHit.time * 1.05 : null,
+    sample.floorSurfaceMeters,
     playerGrounded,
     stanceEyeHeight(player.stance),
   );
-  return viewmodelObstructionPose(nearestForward, player.stance === 'prone', floorClearance, player.weapon);
+  return viewmodelObstructionPose(
+    sample.nearestForwardSurfaceMeters,
+    player.stance === 'prone',
+    floorClearance,
+    player.weapon,
+  );
 }
 
 function currentViewmodelSurfaceRetreat(): number {
@@ -9306,14 +10221,74 @@ function recordReceiverStickyAttachment(input: Readonly<{
   targetLifeId: number;
   attachedAtMs: number;
   expiresAtMs: number;
-}>): void {
-  if (network.role === 'client') return;
+}>): StickyAttachmentRecord | null {
+  if (network.role === 'client') return null;
   remoteStickyAttachmentAuthority = pruneRemoteStickyAttachments(remoteStickyAttachmentAuthority, input.attachedAtMs);
   const result = recordRemoteStickyAttachment(remoteStickyAttachmentAuthority, {
     matchEpoch: interactiveWorldMatchEpoch,
     ...input,
   });
-  if (result.accepted) remoteStickyAttachmentAuthority = result.state;
+  if (!result.accepted) return null;
+  remoteStickyAttachmentAuthority = result.state;
+  if (result.reason !== 'recorded') return null;
+  return stickyAttachmentRecord(
+    remoteStickyAttachmentAuthority,
+    interactiveWorldMatchEpoch,
+    input.ownerId,
+    input.ownerLifeId,
+    input.source,
+    input.actionNonce,
+  );
+}
+
+function currentStickyAttachmentActorLifeId(actorId: string): number | null {
+  if (actorId === player.id) {
+    return network.role === 'client' ? localHostConfirmedContinuity : localContinuity;
+  }
+  return remotes.get(actorId)?.continuity ?? bots.get(actorId)?.continuity ?? null;
+}
+
+function presentStickyAttachmentOnset(
+  attachment: Pick<StickyAttachmentRecord, 'source' | 'ownerId' | 'ownerLifeId' | 'targetId' | 'targetLifeId' | 'actionNonce'>,
+  audience: StickyUrgentAlertAudience,
+): boolean {
+  if (!presentStickyUrgentAlert(
+    attachment.source,
+    audience,
+    attachment.ownerId,
+    attachment.ownerLifeId,
+    attachment.targetId,
+    attachment.targetLifeId,
+    attachment.actionNonce,
+  )) return false;
+  if (audience === 'victim') addFeed('STUCK', 'coral');
+  else addFeed('STUCK', 'gold');
+  return true;
+}
+
+function publishStickyAttachmentOnset(attachment: StickyAttachmentRecord): void {
+  if (network.role === 'client') return;
+  const plan = planStickyAttachmentOnset(attachment, player.id);
+  if (plan.localAudience) presentStickyAttachmentOnset(attachment, plan.localAudience);
+  if (network.role !== 'host') return;
+  for (const recipient of plan.remoteRecipients) {
+    const receipt: StickyAttachmentReceiptMessage = {
+      type: 'sticky-attachment-receipt',
+      protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: player.id,
+      forPlayerId: recipient.playerId,
+      matchEpoch: attachment.matchEpoch,
+      source: attachment.source,
+      ownerId: attachment.ownerId,
+      ownerLifeId: attachment.ownerLifeId,
+      targetId: attachment.targetId,
+      targetLifeId: attachment.targetLifeId,
+      actionNonce: attachment.actionNonce,
+      attachedAtHostTimeMs: attachment.attachedAtMs,
+      nonce: randomNonce(),
+    };
+    network.sendToPlayer(recipient.playerId, receipt);
+  }
 }
 
 function sealReceiverStickyDetonation(input: Readonly<{
@@ -9454,6 +10429,113 @@ function handleFlashAuthorityMessage(message: GameMessage): boolean {
   return true;
 }
 
+function clearStickyAttachmentReceiptRetryTimeout(): void {
+  if (stickyAttachmentReceiptRetryTimeout !== null) window.clearTimeout(stickyAttachmentReceiptRetryTimeout);
+  stickyAttachmentReceiptRetryTimeout = null;
+}
+
+function resetStickyAttachmentReceiptAdmission(): void {
+  clearStickyAttachmentReceiptRetryTimeout();
+  stickyAttachmentReceiptLedger.reset();
+}
+
+function discardPendingStickyAttachmentReceipts(): void {
+  clearStickyAttachmentReceiptRetryTimeout();
+  stickyAttachmentReceiptLedger.discardPending();
+}
+
+function discardPendingStickyAttachmentReceiptsForActor(actorId: string): void {
+  stickyAttachmentReceiptLedger.discardPendingForActor(actorId);
+  schedulePendingStickyAttachmentReceiptRetry();
+}
+
+function advancePendingStickyAttachmentReceiptActorLife(actorId: string, lifeId: number): void {
+  if (stickyAttachmentReceiptRetryTimeout === null) return;
+  if (network.role === 'client' && actorId === player.id && lifeId !== localHostConfirmedContinuity) return;
+  stickyAttachmentReceiptLedger.discardPendingBeforeActorLife(actorId, lifeId);
+  retryPendingStickyAttachmentReceipts();
+}
+
+function consumeStickyAttachmentReceipt(
+  message: StickyAttachmentReceiptMessage,
+  audience: StickyUrgentAlertAudience,
+): 'presented' | 'already-presented' | 'deferred' {
+  if (audience === 'victim') {
+    const receipt = {
+      matchEpoch: message.matchEpoch,
+      ownerId: message.ownerId,
+      ownerLifeId: message.ownerLifeId,
+      targetId: message.targetId,
+      targetLifeId: message.targetLifeId,
+      source: message.source,
+      actionNonce: message.actionNonce,
+      expiresAtEpochMs: Date.now() + STICKY_VICTIM_RECEIPT_TTL_MS,
+    } as const;
+    const receiptKey = stickyVictimReceiptKey(receipt);
+    if (stickyVictimReceiptKeys.has(receiptKey)) return 'already-presented';
+    if (!presentStickyAttachmentOnset(message, audience)) return 'deferred';
+    stickyVictimReceiptKeys.add(receiptKey);
+    saveStickyVictimReceipt(clientPersistentStorage(), receipt);
+    stickyVictimFeedbackCount += 1;
+    lastStickyVictimFeedback = Object.freeze({
+      label: 'STUCK',
+      source: message.source,
+      targetId: message.targetId,
+      targetLifeId: message.targetLifeId,
+      actionNonce: message.actionNonce,
+      resultNonce: message.nonce,
+    });
+    return 'presented';
+  }
+  return presentStickyAttachmentOnset(message, audience) ? 'presented' : 'deferred';
+}
+
+function schedulePendingStickyAttachmentReceiptRetry(): void {
+  clearStickyAttachmentReceiptRetryTimeout();
+  const nextExpiry = stickyAttachmentReceiptLedger.snapshot().nextPendingExpiryAtMs;
+  if (nextExpiry === null) return;
+  stickyAttachmentReceiptRetryTimeout = window.setTimeout(() => {
+    stickyAttachmentReceiptRetryTimeout = null;
+    retryPendingStickyAttachmentReceipts();
+  }, Math.max(0, nextExpiry - performance.now()) + 1);
+}
+
+function retryPendingStickyAttachmentReceipts(): void {
+  if (network.role !== 'client' || matchState.phase !== 'active') {
+    discardPendingStickyAttachmentReceipts();
+    return;
+  }
+  const ready = stickyAttachmentReceiptLedger.retryPending({
+    expectedHostId: privateLobbySnapshot?.hostId,
+    expectedRecipientId: player.id,
+    expectedMatchEpoch: interactiveWorldMatchEpoch,
+    currentLifeId: currentStickyAttachmentActorLifeId,
+  }, performance.now());
+  for (const entry of ready) {
+    const result = consumeStickyAttachmentReceipt(entry.message, entry.audience);
+    if (result !== 'deferred') stickyAttachmentReceiptLedger.finalizePending(entry.message);
+  }
+  schedulePendingStickyAttachmentReceiptRetry();
+}
+
+function handleStickyAttachmentReceipt(message: GameMessage): boolean {
+  if (message.type !== 'sticky-attachment-receipt') return false;
+  if (network.role !== 'client' || matchState.phase !== 'active') return true;
+  const admission = stickyAttachmentReceiptLedger.admit(message, {
+    expectedHostId: privateLobbySnapshot?.hostId,
+    expectedRecipientId: player.id,
+    expectedMatchEpoch: interactiveWorldMatchEpoch,
+    currentOwnerLifeId: currentStickyAttachmentActorLifeId(message.ownerId),
+    currentTargetLifeId: currentStickyAttachmentActorLifeId(message.targetId),
+  }, performance.now());
+  if (!admission.accepted) {
+    if (admission.reason === 'pending-continuity') schedulePendingStickyAttachmentReceiptRetry();
+    return true;
+  }
+  consumeStickyAttachmentReceipt(message, admission.audience);
+  return true;
+}
+
 function onNetworkMessage(message: GameMessage): void {
   if (handleLobbyMessage(message)) return;
   if (!gameStarted) return;
@@ -9473,6 +10555,7 @@ function onNetworkMessage(message: GameMessage): void {
     acceptGuestResumeFailure(message);
     return;
   }
+  if (handleStickyAttachmentReceipt(message)) return;
   if (handleInteractiveWorldMessage(message)) return;
   if (handleSmokeAuthorityMessage(message)) return;
   if (handleFlashAuthorityMessage(message)) return;
@@ -9614,7 +10697,9 @@ function onNetworkMessage(message: GameMessage): void {
       // can confirm a replacement document's life identity. Persist it for a
       // later renderer replacement, and correct any forged/stale local copy
       // without allowing that copy to mutate host authority.
+      const previousHostConfirmedContinuity = localHostConfirmedContinuity;
       localHostConfirmedContinuity = actor.lifeId;
+      if (previousHostConfirmedContinuity !== actor.lifeId) resetStickyUrgentAlertLife(actor.lifeId);
       if (awaitingAuthoritativeRejoinContinuity) {
         localContinuity = actor.lifeId;
         localPositionHistory.length = 0;
@@ -9625,6 +10710,7 @@ function onNetworkMessage(message: GameMessage): void {
         resetFlashVictimLife();
         awaitingAuthoritativeRejoinContinuity = false;
       }
+      advancePendingStickyAttachmentReceiptActorLife(player.id, actor.lifeId);
       if (network.roomCode && localResumeToken) {
         try { saveActiveRoomIdentity(network.roomCode); } catch { /* In-memory host authority remains canonical. */ }
       }
@@ -9679,17 +10765,19 @@ function onNetworkMessage(message: GameMessage): void {
     return;
   }
   if (message.type === 'killstreak-damage-result') {
-    if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.matchEpoch !== killstreakMatchEpoch) return;
-    for (const event of message.events) {
-      if (event.ownerId === player.id) recordOwnerSupportDamage(event);
+    if (network.role !== 'client') return;
+    const admission = killstreakDamageResultReplayLedger.admit(message, {
+      expectedHostId: privateLobbySnapshot?.hostId,
+      expectedMatchEpoch: killstreakMatchEpoch,
+    });
+    if (!admission.accepted) return;
+    for (const event of admission.events) {
       if (event.targetId === player.id) applyKillstreakDamageEvent(event);
-      if (event.source === 'chopper') {
-        const presented = killstreakSnapshot.entities.find((entity) => entity.activationId === event.activationId);
-        if (presented) killstreakPresentation.presentChopperImpactAction(presented.id);
-      }
     }
+    presentKillstreakDamageFeedback(admission.events);
     const presentedAt = performance.now();
-    for (const impact of message.impacts) {
+    retainRecentKillstreakImpactEvents(admission.impacts);
+    for (const impact of admission.impacts) {
       if (impact.phase !== 'impact') continue;
       const point = new THREE.Vector3(...impact.position);
       if (impact.source === 'carpet-bomber' && carpetGroundFireGuestPresentation.admit(message.matchEpoch, impact)) {
@@ -9704,7 +10792,7 @@ function onNetworkMessage(message: GameMessage): void {
         presentedAt,
       );
     }
-    killstreakPresentation.presentImpacts(message.impacts, presentedAt);
+    killstreakPresentation.presentImpacts(admission.impacts, presentedAt);
     return;
   }
   if (message.type === 'railgun-state') {
@@ -9869,7 +10957,11 @@ function onNetworkMessage(message: GameMessage): void {
     const claimedIncoming = message.player;
     const lobbyMember = privateLobbySnapshot?.members.find((member) => member.id === claimedIncoming.id);
     if (privateLobbySnapshot && (!lobbyMember || claimedIncoming.team !== lobbyMember.team)) return;
-    if (claimedIncoming.weapon === 'magnum' && lobbyMember?.dhv !== 'X') return;
+    const hf296ClaimedProjectionAuthorization = hf296RemoteProjectionWeaponAuthorizations.get(claimedIncoming.id);
+    const hf296ClaimedProjectionAllowed = network.role !== 'offline' && localMultiplayerQa
+      && hf296ClaimedProjectionAuthorization?.weapon === claimedIncoming.weapon
+      && hf296ClaimedProjectionAuthorization.expiresAt > performance.now();
+    if (claimedIncoming.weapon === 'magnum' && lobbyMember?.dhv !== 'X' && !hf296ClaimedProjectionAllowed) return;
     const authoritativeScore = authoritativeScores.get(claimedIncoming.id);
     const incoming = network.role === 'host' && lobbyMember
       ? {
@@ -10048,13 +11140,17 @@ function onNetworkMessage(message: GameMessage): void {
           resetRemoteCombatInventory(admittedIncoming, grenadeCount);
         }
       }
+      const claimedContinuity = message.type === 'state' ? message.continuity : remote.continuity;
+      const hf296ContinuityResync = localMultiplayerQa && message.type === 'state'
+        && Number.isSafeInteger(claimedContinuity)
+        && claimedContinuity > remote.continuity;
       const movement = admitRemoteSnapshotMovement(
         remote.snapshot,
         admittedIncoming,
         now,
         remote.lastSeen,
         remote.claimEligibleAt,
-        respawned,
+        respawned || hf296ContinuityResync,
       );
       if (!movement.accepted) {
         recordMatchDiagnostic('state-reconciliation', 'rejected', {
@@ -10073,14 +11169,27 @@ function onNetworkMessage(message: GameMessage): void {
       });
       const pickup = authorizedRemotePickups.get(admittedIncoming.id);
       const pickupAllowed = pickup !== undefined && pickup.expiresAt >= now && pickup.weapon === admittedIncoming.primary;
+      const hf296ProjectionAuthorization = hf296RemoteProjectionWeaponAuthorizations.get(admittedIncoming.id);
+      const hf296ProjectionWeaponAllowed = network.role !== 'offline' && localMultiplayerQa
+        && hf296ProjectionAuthorization?.weapon === admittedIncoming.weapon
+        && hf296ProjectionAuthorization.expiresAt > now;
+      const hf296ProjectionSecondaryAllowed = hf296ProjectionWeaponAllowed
+        && admittedIncoming.grenade === remote.snapshot.grenade
+        && (admittedIncoming.secondary === admittedIncoming.weapon
+          || admittedIncoming.primary === admittedIncoming.weapon
+            && admittedIncoming.secondary === handicapSidearm(admittedIncoming.primary, memberDhv(admittedIncoming.id)));
       if (admittedIncoming.team !== remote.snapshot.team) return;
-      if (network.role === 'host' && admittedIncoming.weapon === 'railgun' && railgunState.holderId !== admittedIncoming.id) return;
+      if (network.role === 'host' && admittedIncoming.weapon === 'railgun'
+        && railgunState.holderId !== admittedIncoming.id && !hf296ProjectionWeaponAllowed) return;
       if (network.role === 'host' && isTimedMapWeaponId(admittedIncoming.weapon)
-        && timedMapWeaponStates[admittedIncoming.weapon].holderId !== admittedIncoming.id) return;
-      if (admittedIncoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed) return;
+        && timedMapWeaponStates[admittedIncoming.weapon].holderId !== admittedIncoming.id
+        && !hf296ProjectionWeaponAllowed) return;
+      if (admittedIncoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed
+        && !hf296ProjectionWeaponAllowed) return;
       if ((admittedIncoming.secondary !== remote.snapshot.secondary || admittedIncoming.grenade !== remote.snapshot.grenade)
-        && !respawned) return;
+        && !respawned && !hf296ProjectionSecondaryAllowed) return;
       if (pickupAllowed) authorizedRemotePickups.delete(admittedIncoming.id);
+      if (hf296ProjectionWeaponAllowed) hf296RemoteProjectionWeaponAuthorizations.delete(admittedIncoming.id);
       if (redeployed) authorizedRemoteRedeploys.delete(admittedIncoming.id);
       if (network.role === 'host') {
         hostTriggerAuthorities.resetIfWeaponChanged(admittedIncoming.id, admittedIncoming.weapon);
@@ -10102,7 +11211,6 @@ function onNetworkMessage(message: GameMessage): void {
         remote.claimRequiresCoreExit = false;
         remote.claimEligibleAt = Math.max(remote.claimEligibleAt, now + 1_500);
       }
-      const claimedContinuity = message.type === 'state' ? message.continuity : remote.continuity;
       let registeredActorLifeId = network.role === 'host' ? killstreakRuntime.actorLifeId(incoming.id) : null;
       if (network.role === 'host' && localMultiplayerQa && movement.resynchronized
         && registeredActorLifeId !== null && claimedContinuity === registeredActorLifeId + 1) {
@@ -10131,6 +11239,7 @@ function onNetworkMessage(message: GameMessage): void {
       if (message.type === 'state') remote.snapshotRateHz = message.rateHz;
       if (remote.positionHistory.at(-1)?.continuity !== admittedContinuity) remote.positionHistory.length = 0;
       remote.continuity = admittedContinuity;
+      advancePendingStickyAttachmentReceiptActorLife(incoming.id, admittedContinuity);
       const priorBufferStats = remote.interpolation.stats;
       remote.interpolation.push({
         seq: admittedIncoming.seq,
@@ -10248,6 +11357,28 @@ function onNetworkMessage(message: GameMessage): void {
     if (message.by === player.id) return;
     if (message.weapon === 'railgun') {
       if (network.role === 'host' || processedNonces.has(message.nonce)) return;
+      if (localMultiplayerQa) {
+        // The normal railgun replica is presentation-only because its sealed
+        // hit result travels separately. HF-304 still has to prove that the
+        // exact host action preceding a canonical glass event passed the same
+        // sender/weapon/origin/cadence admission as every other weapon. Retain
+        // that admitted action only on the localhost QA route; production
+        // railgun authority remains unchanged.
+        const remoteSender = remotes.get(message.by);
+        const prior = remoteShotAdmissions.get(message.by) ?? createRemoteShotAdmissionState();
+        const admission = admitRemoteShot(message, remoteSender?.snapshot, performance.now(), prior);
+        if (!admission.accepted) return;
+        remoteShotAdmissions.set(message.by, admission.nextState);
+        const actions = admittedRemoteShots.get(message.by) ?? new Map<number, AdmittedRemoteShot>();
+        const now = performance.now();
+        for (const [nonce, action] of actions) {
+          if (now - action.receivedAt > admittedShotActionLifetimeMs(action.message.weapon)) actions.delete(nonce);
+        }
+        actions.set(message.nonce, {
+          message, receivedAt: now, matchEpoch: interactiveWorldMatchEpoch, targets: new Set(),
+        });
+        admittedRemoteShots.set(message.by, actions);
+      }
       processedNonces.add(message.nonce);
       trimNonceSet();
       renderRemoteShot(message);
@@ -10318,14 +11449,6 @@ function onNetworkMessage(message: GameMessage): void {
     return;
   }
   if (message.type === 'hit' && !processedNonces.has(message.nonce)) {
-    // Attacker-side STUCK confirmation: when the local player's own sticky Semtex
-    // or explosive crossbolt attaches to a combatant, mirror the alert on their
-    // screen too (the victim already sees it via the target branch below).
-    if (message.by === player.id && message.stuck === true && !attackerStuckNonces.has(message.nonce)) {
-      attackerStuckNonces.add(message.nonce);
-      while (attackerStuckNonces.size > 128) attackerStuckNonces.delete(attackerStuckNonces.values().next().value!);
-      addFeed('STUCK', 'gold');
-    }
     const attacker = remotes.get(message.by);
     const localCanonicalAttacker = network.role === 'client'
       && message.by === player.id
@@ -10358,34 +11481,6 @@ function onNetworkMessage(message: GameMessage): void {
       });
       if (!canonicalResult.accepted) return;
       processedNonces.add(message.nonce);
-      const stickyFeedback = projectStickyVictimFeedback(message, player.id, targetLifeId);
-      if (stickyFeedback) {
-        const receipt = {
-          matchEpoch: interactiveWorldMatchEpoch,
-          ownerId: message.by,
-          targetId: stickyFeedback.targetId,
-          targetLifeId: stickyFeedback.targetLifeId,
-          source: stickyFeedback.source,
-          actionNonce: stickyFeedback.actionNonce,
-          expiresAtEpochMs: Date.now() + STICKY_VICTIM_RECEIPT_TTL_MS,
-        } as const;
-        const receiptKey = stickyVictimReceiptKey(receipt);
-        if (stickyVictimReceiptKeys.has(receiptKey)) {
-          trimNonceSet();
-          return;
-        }
-        stickyVictimReceiptKeys.add(receiptKey);
-        saveStickyVictimReceipt(clientPersistentStorage(), receipt);
-        stickyVictimFeedbackCount += 1;
-        lastStickyVictimFeedback = stickyFeedback;
-        presentStickyVictimUrgentAlert(
-          stickyFeedback.source,
-          stickyFeedback.targetId,
-          stickyFeedback.targetLifeId,
-          stickyFeedback.actionNonce,
-        );
-        addFeed('STUCK', 'coral');
-      }
       reconcileLocalAuthoritativeHealth(
         canonicalResult.resultingHealth,
         canonicalResult.appliedDamage,
@@ -10582,6 +11677,7 @@ function onNetworkMessage(message: GameMessage): void {
   }
   if (message.type === 'death' && !processedNonces.has(message.nonce)) {
     processedNonces.add(message.nonce);
+    discardPendingStickyAttachmentReceiptsForActor(message.victim);
     processDeath(message);
     trimNonceSet();
     return;
@@ -10714,7 +11810,7 @@ function authorStickyEffectForQa(source: StickyAttachmentSource): QaStickyEffect
   const now = performance.now();
   const actionNonce = randomNonce();
   const origin = [remote.snapshot.x, remote.snapshot.y + 1.1, remote.snapshot.z] as [number, number, number];
-  recordReceiverStickyAttachment({
+  const recordedAttachment = recordReceiverStickyAttachment({
     ownerId: player.id,
     ownerLifeId: localContinuity,
     source,
@@ -10724,6 +11820,8 @@ function authorStickyEffectForQa(source: StickyAttachmentSource): QaStickyEffect
     attachedAtMs: now,
     expiresAtMs: now + 30_000,
   });
+  if (!recordedAttachment) return null;
+  publishStickyAttachmentOnset(recordedAttachment);
   const attachment = sealReceiverStickyDetonation({
     ownerId: player.id,
     ownerLifeId: localContinuity,
@@ -10822,6 +11920,7 @@ function makeShotResult(
 
 function resolveAuthoritativeShot(request: ShotRequestMessage): void {
   if (network.role !== 'host' || request.by === player.id) return;
+  weaponGlassBreakPolicy(request.weapon);
   const cacheKey = `${request.by}:${request.shotId}`;
   const cached = resolvedShotRequests.get(cacheKey);
   if (cached) {
@@ -11210,6 +12309,16 @@ function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
   processedShotResults.add(resultKey);
   while (processedShotResults.size > 512) processedShotResults.delete(processedShotResults.values().next().value!);
   if (message.forPlayerId === player.id) {
+    const pendingProjectileGlass = pendingLocalProjectileGlassShots.get(message.shotId);
+    if (pendingProjectileGlass) {
+      pendingLocalProjectileGlassShots.delete(message.shotId);
+      if (message.status === 'rejected'
+        && pendingProjectileGlass.matchEpoch === interactiveWorldMatchEpoch) {
+        const localActions = admittedRemoteShots.get(player.id);
+        localActions?.delete(pendingProjectileGlass.actionNonce);
+        if (localActions?.size === 0) admittedRemoteShots.delete(player.id);
+      }
+    }
     const ordinary = pendingLocalOrdinaryShots.get(message.shotId);
     if (ordinary && admitLocalShotInventoryRepair(message, {
       playerId: player.id,
@@ -11275,6 +12384,7 @@ function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
 }
 
 function renderRemoteShot(message: ShotMessage): THREE.Vector3 | null {
+  weaponGlassBreakPolicy(message.weapon);
   const origin = new THREE.Vector3(...message.origin);
   if (!pointInsideBounds(origin, arena.bounds, 0.44)) return null;
   const direction = new THREE.Vector3(...message.direction).normalize();
@@ -11432,7 +12542,7 @@ function applyDamage(
     requestAnimationFrame(replayDamageFlash);
   }
   if (player.hp <= 0) {
-    resetStickyVictimUrgentAlertLife();
+    resetStickyUrgentAlertLife();
     // When a killstreak event dealt the lethal blow, the caller owns the death
     // bookkeeping and runs it after the killstreak update settles. Bail here so
     // the death is processed exactly once, not re-entrantly inside advance().
@@ -11928,6 +13038,198 @@ function windowDebrisHalfExtents(
   });
 }
 
+function windowDebrisSupport(
+  position: Readonly<{ x: number; y: number; z: number }>,
+  halfExtents: Readonly<{ x: number; y: number; z: number }>,
+): Readonly<{ restY: number | null; source: string | null }> {
+  let supportY: number | null = null;
+  let source: string | null = null;
+  const verticalClearance = Math.max(0.08, halfExtents.y * 0.2);
+  const footprintInsetX = Math.min(halfExtents.x * 0.35, 0.18);
+  const footprintInsetZ = Math.min(halfExtents.z * 0.35, 0.08);
+  const candidates = [
+    { source: 'world-floor', collider: worldFloorCollider(arena.bounds) },
+    ...activeWorldColliders().map((collider, index) => ({ source: `world-collider:${index}`, collider })),
+  ];
+  for (const candidate of candidates) {
+    const { collider } = candidate;
+    const minY = collider.minY;
+    const maxY = collider.maxY;
+    if (minY === undefined || maxY === undefined
+      || ![collider.minX, collider.maxX, minY, maxY, collider.minZ, collider.maxZ].every(Number.isFinite)) continue;
+    // Only a collision-authoritative surface actually below the fragments can own
+    // their resting height. Tall walls and the former pane opening never count.
+    if (maxY > position.y - verticalClearance || supportY !== null && maxY <= supportY) continue;
+    const overlapsX = position.x + halfExtents.x - footprintInsetX >= collider.minX
+      && position.x - halfExtents.x + footprintInsetX <= collider.maxX;
+    const overlapsZ = position.z + halfExtents.z - footprintInsetZ >= collider.minZ
+      && position.z - halfExtents.z + footprintInsetZ <= collider.maxZ;
+    if (!overlapsX || !overlapsZ) continue;
+    supportY = maxY;
+    source = candidate.source;
+  }
+  return Object.freeze({ restY: supportY === null ? null : supportY + halfExtents.y, source });
+}
+
+function windowDebrisFallbackSupportCandidates(): readonly WindowGlassDebrisFallbackSupportCandidate[] {
+  const floor = worldFloorCollider(arena.bounds);
+  if (floor.minY === undefined || floor.maxY === undefined) {
+    throw new TypeError('canonical world floor is missing vertical bounds');
+  }
+  const candidates: WindowGlassDebrisFallbackSupportCandidate[] = [{
+    source: 'world-floor',
+    collider: {
+      minX: floor.minX,
+      maxX: floor.maxX,
+      minY: floor.minY,
+      maxY: floor.maxY,
+      minZ: floor.minZ,
+      maxZ: floor.maxZ,
+    },
+  }];
+  for (const [index, collider] of activeWorldColliders().entries()) {
+    if (collider.minY === undefined || collider.maxY === undefined) continue;
+    candidates.push({
+      source: `world-collider:${index}`,
+      collider: {
+        minX: collider.minX,
+        maxX: collider.maxX,
+        minY: collider.minY,
+        maxY: collider.maxY,
+        minZ: collider.minZ,
+        maxZ: collider.maxZ,
+      },
+    });
+  }
+  return Object.freeze(candidates);
+}
+
+function windowDebrisFallbackSupport(
+  from: Readonly<{ x: number; y: number; z: number }>,
+  to: Readonly<{ x: number; y: number; z: number }>,
+  halfExtents: Readonly<{ x: number; y: number; z: number }>,
+  candidates: readonly WindowGlassDebrisFallbackSupportCandidate[],
+) {
+  return windowGlassDebrisFallbackSweepSupport(from, to, halfExtents, candidates);
+}
+
+type WindowDebrisLifecycleSampleOverrides = Readonly<{
+  position?: Readonly<{ x: number; y: number; z: number }>;
+  physical?: boolean;
+  physicsActive?: boolean;
+  fallbackSettled?: boolean;
+  support?: Readonly<{ source: string | null; restY: number | null }>;
+  settledAt?: number | null;
+}>;
+
+function createWindowDebrisLifecycleSample(
+  entry: PersistentWindowDebris,
+  sampledAt: number,
+  milestone: WindowDebrisLifecycleMilestonePhase | null,
+  overrides: WindowDebrisLifecycleSampleOverrides = {},
+): WindowDebrisLifecycleSample {
+  const position = overrides.position ?? entry.root.position;
+  const support = overrides.support ?? {
+    source: entry.fallbackSupportSource,
+    restY: entry.fallbackRestY,
+  };
+  return Object.freeze({
+    id: entry.id,
+    windowId: entry.windowId,
+    spawnGeneration: entry.spawnGeneration,
+    spawnedAt: entry.spawnedAt,
+    actionIdentity: entry.actionIdentity,
+    milestone,
+    sampledAt,
+    position: Object.freeze([position.x, position.y, position.z] as [number, number, number]),
+    visible: entry.root.visible,
+    physical: overrides.physical
+      ?? characterPhysics?.majorDebrisSnapshots().some((snapshot) => snapshot.id === entry.id)
+      ?? false,
+    physicsActive: overrides.physicsActive ?? entry.physicsActive,
+    receivedPhysicsPose: entry.receivedPhysicsPose,
+    fallbackSettled: overrides.fallbackSettled ?? entry.fallbackSettled,
+    support: Object.freeze({ ...support }),
+    ageMs: Math.max(0, sampledAt - entry.spawnedAt),
+    noProgressMs: Math.max(0, sampledAt - entry.lastProgressAt),
+    fallbackStartedAt: entry.fallbackStartedAt,
+    settledAt: overrides.settledAt === undefined ? entry.settledAt : overrides.settledAt,
+  });
+}
+
+function recordWindowDebrisLifecycleMilestone(
+  entry: PersistentWindowDebris,
+  phase: WindowDebrisLifecycleMilestonePhase,
+  sampledAt: number,
+  overrides: WindowDebrisLifecycleSampleOverrides = {},
+): boolean {
+  const previous = entry.lifecycleMilestones.at(-1);
+  const sample = createWindowDebrisLifecycleSample(entry, sampledAt, phase, overrides);
+  if (!windowGlassDebrisMilestoneAdmitted({
+    phase,
+    spawnedAt: entry.spawnedAt,
+    sampledAt,
+    previous: previous?.milestone
+      ? { phase: previous.milestone, sampledAt: previous.sampledAt, physical: previous.physical }
+      : null,
+    physical: sample.physical,
+    fallbackStartedAt: entry.fallbackStartedAt,
+  })) return false;
+  entry.lifecycleMilestones.push(sample);
+  return true;
+}
+
+function samplePersistentWindowDebrisLifecycle(entry: PersistentWindowDebris): WindowDebrisLifecycleSample {
+  return createWindowDebrisLifecycleSample(entry, performance.now(), null);
+}
+
+function retainWindowDebrisLifecycleReceipt(entry: PersistentWindowDebris, retiredAt: number): void {
+  retiredWindowDebrisLifecycleReceipts.set(entry.id, Object.freeze({
+    id: entry.id,
+    windowId: entry.windowId,
+    spawnGeneration: entry.spawnGeneration,
+    spawnedAt: entry.spawnedAt,
+    actionIdentity: entry.actionIdentity,
+    milestones: Object.freeze([...entry.lifecycleMilestones]),
+    terminal: entry.lifecycleMilestones.at(-1) ?? entry.lastPhysicsPoseSample,
+    retiredAt,
+  }));
+  if (retiredWindowDebrisLifecycleReceipts.size > arena.breakableWindows.length) {
+    throw new TypeError('window debris lifecycle receipt bound exceeded canonical pane count');
+  }
+}
+
+function sampleWindowDebrisLifecycle(paneIndex: number) {
+  const pane = Number.isInteger(paneIndex) ? arena.breakableWindows[paneIndex] : undefined;
+  if (!pane) return null;
+  const id = persistentWindowDebrisId(pane.id);
+  const entry = persistentWindowDebris.get(id);
+  const receipt = entry ? null : retiredWindowDebrisLifecycleReceipts.get(id);
+  if (!entry && !receipt) return null;
+  const record = entry ?? receipt!;
+  const lifecycleMilestones = entry ? entry.lifecycleMilestones : receipt!.milestones;
+  const priorCursor = windowDebrisLifecycleReadCursors.get(id);
+  const nextMilestone = priorCursor?.spawnGeneration === record.spawnGeneration
+    ? priorCursor.nextMilestone
+    : 0;
+  const milestones = Object.freeze(lifecycleMilestones.slice(nextMilestone));
+  windowDebrisLifecycleReadCursors.set(id, Object.freeze({
+    spawnGeneration: record.spawnGeneration,
+    nextMilestone: lifecycleMilestones.length,
+  }));
+  return Object.freeze({
+    id: record.id,
+    windowId: record.windowId,
+    spawnGeneration: record.spawnGeneration,
+    spawnedAt: record.spawnedAt,
+    actionIdentity: record.actionIdentity,
+    milestones,
+    current: entry ? samplePersistentWindowDebrisLifecycle(entry) : null,
+    terminal: receipt?.terminal ?? null,
+    retired: receipt !== null,
+  });
+}
+
 async function withStagedWindowGlassDebrisPool(
   sceneGeneration: number,
   submit: (stage: THREE.Group) => Promise<void>,
@@ -12025,29 +13327,43 @@ async function prewarmWindowGlassDebrisPool(sceneGeneration: number): Promise<vo
   }));
 }
 
-function spawnPersistentWindowDebris(window: ArenaMap['breakableWindows'][number], normal: THREE.Vector3): void {
+function spawnPersistentWindowDebris(
+  window: ArenaMap['breakableWindows'][number],
+  normal: THREE.Vector3,
+  actionIdentity: string,
+): boolean {
   const id = persistentWindowDebrisId(window.id);
-  if (persistentWindowDebris.has(id)) return;
+  if (persistentWindowDebris.has(id)) return true;
   const counts = Object.freeze({
     shed: interactiveWorldRuntime?.shedMajorBodyCount() ?? 0,
     house: interactiveWorldRuntime?.houseMajorBodyCount() ?? 0,
-    window: persistentWindowDebris.size,
+    window: [...persistentWindowDebris.values()].filter((entry) => entry.physicsActive).length,
   });
-  if (!canAdmitMajorDebris(counts, 'window')) return;
   // The exact instanced topology/material is compiled during deployment. Add
   // the already-analysed shard draw immediately so impact feedback cannot lag
-  // behind authority; only the Rapier reconciliation remains deferred.
-  spawnPersistentWindowDebrisSynchronously(window, normal, id);
+  // behind authority. A full physics partition degrades to the same bounded
+  // gravity presentation instead of silently omitting debris.
+  return spawnPersistentWindowDebrisSynchronously(
+    window,
+    normal,
+    id,
+    actionIdentity,
+    canAdmitMajorDebris(counts, 'window'),
+  );
 }
 
 function spawnPersistentWindowDebrisSynchronously(
   window: ArenaMap['breakableWindows'][number],
   normal: THREE.Vector3,
   id: string,
-): void {
+  actionIdentity: string,
+  physicsEligible: boolean,
+): boolean {
   const pooled = pooledWindowDebris.get(windowDebrisPoolKey(arena.id, window.id));
   if (!pooled) {
-    throw new Error(`${arena.id}:${window.id}: retained glass-debris prewarm instance is missing`);
+    windowGlassDebrisLifecycleTelemetry.missingPrewarm += 1;
+    console.error(`${arena.id}:${window.id}: retained glass-debris prewarm instance is missing`);
+    return false;
   }
   const { halfExtents, root } = pooled;
   const centre = window.mesh.getWorldPosition(new THREE.Vector3());
@@ -12086,12 +13402,19 @@ function spawnPersistentWindowDebrisSynchronously(
     }),
     sleeping: false,
   });
+  const spawnedAt = performance.now();
+  const support = windowDebrisSupport(centre, halfExtents);
+  const spawnGeneration = nextWindowDebrisSpawnGeneration++;
+  retiredWindowDebrisLifecycleReceipts.delete(id);
+  windowDebrisLifecycleReadCursors.delete(id);
   persistentWindowDebris.set(id, {
     id,
     windowId: window.id,
+    spawnGeneration,
+    actionIdentity,
     root,
     definition,
-    physicsActive: true,
+    physicsActive: physicsEligible,
     fallbackVelocity: new THREE.Vector3(
       definition.linearVelocity.x,
       definition.linearVelocity.y,
@@ -12102,12 +13425,34 @@ function spawnPersistentWindowDebrisSynchronously(
       definition.angularVelocity.y,
       definition.angularVelocity.z,
     ),
-    // Settle on the arena floor beneath the pane, not at the pane's own height.
-    fallbackRestY: halfExtents.y,
+    fallbackRestY: support.restY,
+    fallbackSupportSource: support.source,
     fallbackSettled: false,
     receivedPhysicsPose: false,
-    spawnedAt: performance.now(),
+    firstPhysicsPoseAt: null,
+    fallbackStateObservedAt: spawnedAt,
+    fallbackStateIncludesPhysicsPose: false,
+    spawnedAt,
+    lastProgressY: centre.y,
+    lastProgressAt: spawnedAt,
+    fallbackStartedAt: physicsEligible ? null : spawnedAt,
+    fallbackIntegratedAt: physicsEligible ? null : spawnedAt,
+    settledAt: null,
+    lifecycleMilestones: [],
+    lastPhysicsPoseSample: null,
   });
+  windowGlassDebrisLifecycleTelemetry.spawned += 1;
+  if (!physicsEligible) windowGlassDebrisLifecycleTelemetry.presentationFallbacks += 1;
+  if (physicsEligible && characterPhysics) {
+    // Deployment already owns creation of this exact disabled Rapier pair.
+    // Enable it at admission, then preserve the real pose returned by Rapier;
+    // the deferred full sync below still reconciles pane/dynamic/nav authority.
+    characterPhysics.syncMajorDebrisBodies(activeMajorDebrisPhysicsBodies());
+    const admittedSnapshots = characterPhysics.majorDebrisSnapshots();
+    const observedAt = performance.now();
+    ingestPersistentWindowDebrisPhysicsSnapshots(admittedSnapshots, observedAt);
+  }
+  return true;
 }
 
 function clearPersistentWindowDebris(): void {
@@ -12116,6 +13461,9 @@ function clearPersistentWindowDebris(): void {
     entry.root.visible = false;
   }
   persistentWindowDebris.clear();
+  retiredWindowDebrisLifecycleReceipts.clear();
+  windowDebrisLifecycleReadCursors.clear();
+  windowGlassPhysicsSyncScheduled = false;
   syncInteractiveWorldPhysics();
 }
 
@@ -12129,13 +13477,16 @@ function breakHouseWindow(
   actionNonce?: number,
   impactOwnerId = player.id,
   impactNonce = randomNonce(),
+  weapon?: WeaponId,
 ): boolean {
   const window = arena.breakableWindows.find((candidate) => candidate.id === windowId);
   if (!window) return false;
   const state = window.glassState?.matchEpoch === interactiveWorldMatchEpoch
     ? window.glassState
     : createGlassState(window.id, interactiveWorldMatchEpoch);
-  const profile: GlassImpactProfile = kind === 'explosive' ? 'explosion' : kind === 'knife' ? 'knife' : 'bullet';
+  const profile: GlassImpactProfile = weapon
+    ? weaponGlassBreakPolicy(weapon).profile
+    : kind === 'explosive' ? 'explosion' : kind === 'knife' ? 'knife' : 'bullet';
   const impactId = `${profile}:${impactOwnerId}:${impactNonce}:${state.revision}`;
   const result = admitGlassImpact(state, {
     // Network-originated mutations reach this point only after the existing
@@ -12156,11 +13507,13 @@ function breakHouseWindow(
   if (replicate) {
     const message: WindowBreakMessage = {
       type: 'window-break',
+      protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
       by: impactOwnerId,
       windowId,
       origin: origin.toArray(),
       kind,
-      ...(kind === 'explosive' ? { actionNonce } : {}),
+      ...(weapon ? { weapon } : {}),
+      ...(kind === 'explosive' || weapon ? { actionNonce } : {}),
       nonce: impactNonce,
     };
     network.send(network.role === 'host' ? canonicalHostWindowBreak(message, performance.now()) : message);
@@ -12168,16 +13521,18 @@ function breakHouseWindow(
   if (!projection.apertureOpen) {
     window.broken = false;
     window.mesh.visible = projection.paneVisible;
-    syncInteractiveWorldPhysics();
     return true;
   }
   if (window.broken) return false;
-  spawnPersistentWindowDebris(window, normal);
+  // Canonical authority must not depend on a presentation pool. Commit the
+  // aperture before admitting optional debris so a missing render object can
+  // never leave an invisible or still-solid pane behind.
   window.broken = true;
   window.mesh.visible = projection.paneVisible;
+  spawnPersistentWindowDebris(window, normal, impactId);
   // Coalesce the pane collider and optional debris-body admission into one
   // deferred physics sync. Visual effects still happen immediately.
-  scheduleBrowserPreparationIdleTask(() => syncInteractiveWorldPhysics());
+  scheduleWindowGlassPhysicsSync();
   spawnImpactFlash(point, 'glass', normal);
   audio.impact('glass', point.distanceTo(camera.position));
   return true;
@@ -12187,10 +13542,18 @@ function breakWindowsAlongBallisticTrace(
   trace: BallisticTrace,
   origin: THREE.Vector3,
   direction: THREE.Vector3,
-  impactOwnerId: string,
+  authority: Readonly<{
+    impactOwnerId: string;
+    actionNonce?: number;
+    weapon?: WeaponId;
+    visitedWindowIds?: Set<string>;
+  }>,
 ): number {
+  if (authority.weapon && weaponGlassBreakPolicy(authority.weapon).timing !== 'impact') {
+    throw new TypeError(`Weapon ${authority.weapon} cannot break glass at ballistic impact`);
+  }
   const unitDirection = direction.clone().normalize();
-  const visited = new Set<string>();
+  const visited = authority.visitedWindowIds ?? new Set<string>();
   let broken = 0;
   for (const impact of trace.impacts) {
     const windowId = impact.surface.breakableWindowId;
@@ -12205,9 +13568,10 @@ function breakWindowsAlongBallisticTrace(
       true,
       origin,
       'shot',
-      undefined,
-      impactOwnerId,
+      authority.actionNonce,
+      authority.impactOwnerId,
       randomNonce(),
+      authority.weapon,
     )) broken += 1;
   }
   return broken;
@@ -12221,7 +13585,11 @@ function canonicalHostWindowBreak(message: WindowBreakMessage, now: number): Win
   const { hostAuthority: _untrustedHostAuthority, ...untrustedMessage } = message;
   return {
     ...untrustedMessage,
-    ...(attachment?.detonationOrigin ? { origin: [...attachment.detonationOrigin] as [number, number, number] } : {}),
+    // Projectile impact/detonation already supplies the receiver-simulated
+    // canonical point. Sticky Semtex alone is replaced by its sealed origin.
+    ...(!message.weapon && attachment?.detonationOrigin
+      ? { origin: [...attachment.detonationOrigin] as [number, number, number] }
+      : {}),
     hostAuthority: {
       hostId: player.id,
       stickyAttachment: attachment ? verifiedStickyAttachment(attachment) : null,
@@ -12230,7 +13598,13 @@ function canonicalHostWindowBreak(message: WindowBreakMessage, now: number): Win
 }
 
 function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
-  if (message.by === player.id || processedNonces.has(message.nonce)) return;
+  const localCanonicalProjectile = network.role === 'client'
+    && message.by === player.id
+    && message.weapon !== undefined
+    && message.hostAuthority?.hostId === privateLobbySnapshot?.hostId;
+  if (message.by === player.id && !localCanonicalProjectile) return;
+  const eventReplay = processedNonces.has(message.nonce);
+  if (!message.weapon && eventReplay) return;
   if (network.role === 'client') {
     if (!message.hostAuthority || message.hostAuthority.hostId !== privateLobbySnapshot?.hostId) return;
   } else if (message.hostAuthority !== undefined) {
@@ -12238,9 +13612,117 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
   }
   const remote = remotes.get(message.by);
   const window = arena.breakableWindows.find((candidate) => candidate.id === message.windowId);
-  if (!remote || !window || window.broken) return;
-  const sender = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
+  if (!window || window.broken) return;
   const centre = window.mesh.getWorldPosition(new THREE.Vector3());
+  const projectilePolicy = message.weapon ? weaponGlassBreakPolicy(message.weapon) : null;
+  if (message.weapon && message.kind === 'shot' && Number.isSafeInteger(message.actionNonce)
+    && /^host-bot-[0-3]$/.test(message.by)) {
+    const origin = new THREE.Vector3(...message.origin);
+    window.mesh.updateWorldMatrix(true, false);
+    const paneBounds = new THREE.Box3().setFromObject(window.mesh);
+    const maximumDistance = message.weapon === 'flamethrower'
+      ? FLAMETHROWER_EFFECT.rangeM + 0.5
+      : BOT_FIRE_RANGE + 2.5;
+    const admission = hostedBotBallisticGlassActions.admit({
+      receiverRole: network.role,
+      hostAuthorityValid: network.role === 'client'
+        && message.hostAuthority?.hostId === privateLobbySnapshot?.hostId,
+      matchEpoch: interactiveWorldMatchEpoch,
+      botId: message.by,
+      botAdmitted: hostedBotIds(privateLobbySnapshot?.config.hostedBotCount ?? 0).includes(message.by),
+      weapon: message.weapon,
+      actionNonce: message.actionNonce!,
+      eventReplay,
+      paneId: message.windowId,
+      originInsideArena: pointInsideBounds(origin, arena.bounds, 0.44),
+      paneDistanceM: paneBounds.isEmpty() ? Number.POSITIVE_INFINITY : paneBounds.distanceToPoint(origin),
+      maximumPaneDistanceM: maximumDistance,
+      nowMs: performance.now(),
+    });
+    if (admission.accepted) {
+      processedNonces.add(message.nonce);
+      const normal = centre.clone().sub(origin);
+      if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
+      else normal.normalize().multiplyScalar(-1);
+      breakHouseWindow(
+        message.windowId,
+        paneBounds.clampPoint(origin, new THREE.Vector3()),
+        normal,
+        false,
+        origin,
+        'shot',
+        message.actionNonce,
+        message.by,
+        message.nonce,
+        message.weapon,
+      );
+      trimNonceSet();
+      return;
+    }
+    // A host-bot-looking event may never borrow the human/projectile lane.
+    // Only an actually eligible projectile continues into its separate ledger.
+    if (WEAPONS[message.weapon].fireKind !== 'projectile') return;
+  }
+  if (message.weapon) {
+    if (message.kind !== 'shot' || !Number.isFinite(message.actionNonce)) return;
+    const now = performance.now();
+    const remoteAction = currentAdmittedShotAction(message.by, message.actionNonce!, now);
+    const hostedBotAction = message.weapon === 'flare-gun'
+      ? hostedBotProjectileGlassActions.current(
+        message.by,
+        message.actionNonce!,
+        interactiveWorldMatchEpoch,
+        now,
+      )
+      : undefined;
+    const paneActionKey = `glass:${message.windowId}`;
+    const origin = new THREE.Vector3(...message.origin);
+    window.mesh.updateWorldMatrix(true, false);
+    const paneBounds = new THREE.Box3().setFromObject(window.mesh);
+    const maximumDistance = projectilePolicy!.timing === 'detonation'
+      ? explosiveBoltBlastRadiusM(true) + 0.5
+      : FLARE_PROJECTILE_EFFECT.collisionRadiusM + 0.2;
+    const admission = admitProjectileGlassBreak({
+      receiverRole: network.role === 'host' ? 'host' : 'client',
+      hostAuthorityValid: network.role === 'client'
+        && message.hostAuthority?.hostId === privateLobbySnapshot?.hostId,
+      weapon: message.weapon,
+      fireKind: WEAPONS[message.weapon].fireKind,
+      actionNonce: message.actionNonce!,
+      actionCurrent: remoteAction !== undefined || hostedBotAction !== undefined,
+      actionWeapon: remoteAction?.message.weapon ?? hostedBotAction?.weapon ?? null,
+      actionNonceObserved: remoteAction?.message.nonce ?? hostedBotAction?.actionNonce ?? null,
+      eventReplay,
+      paneAlreadyAdmittedForAction: remoteAction?.targets.has(paneActionKey)
+        ?? hostedBotAction?.paneIds.has(paneActionKey)
+        ?? false,
+      originInsideArena: pointInsideBounds(origin, arena.bounds, 0.44),
+      paneDistanceM: paneBounds.isEmpty() ? Number.POSITIVE_INFINITY : paneBounds.distanceToPoint(origin),
+      maximumPaneDistanceM: maximumDistance,
+    });
+    if (!admission.accepted || !remoteAction && !hostedBotAction) return;
+    processedNonces.add(message.nonce);
+    (remoteAction?.targets ?? hostedBotAction!.paneIds).add(paneActionKey);
+    const normal = centre.clone().sub(origin);
+    if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
+    else normal.normalize().multiplyScalar(-1);
+    breakHouseWindow(
+      message.windowId,
+      paneBounds.clampPoint(origin, new THREE.Vector3()),
+      normal,
+      false,
+      origin,
+      'shot',
+      message.actionNonce,
+      message.by,
+      message.nonce,
+      message.weapon,
+    );
+    trimNonceSet();
+    return;
+  }
+  if (!remote) return;
+  const sender = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
   const explosive = message.kind === 'explosive';
   const grenadeAuthority = explosive ? remoteGrenadeAuthorities.get(message.by) : undefined;
   const grenade = explosive && grenadeAuthority && Number.isFinite(message.actionNonce)
@@ -12314,6 +13796,310 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
   );
   if (network.role === 'host') network.send(canonicalHostWindowBreak({ ...message, origin: canonicalOriginTuple as [number, number, number] }, now), message.by);
   trimNonceSet();
+}
+
+type Hf304GlassEvidenceMode = 'solo' | 'hosted';
+
+function hf304GlassPaneEvidence(window: ArenaMap['breakableWindows'][number]) {
+  const state = window.glassState?.matchEpoch === interactiveWorldMatchEpoch
+    ? window.glassState
+    : createGlassState(window.id, interactiveWorldMatchEpoch);
+  const debris = [...persistentWindowDebris.values()].find((entry) => entry.windowId === window.id);
+  return Object.freeze({
+    paneId: window.id,
+    state: Object.freeze({ ...state, rememberedImpactIds: Object.freeze([...state.rememberedImpactIds]) }),
+    projection: glassAuthorityProjection(state),
+    meshVisible: window.mesh.visible,
+    broken: window.broken,
+    activeWorldColliderPresent: activeGlassDynamicColliders().some(({ id }) => id === `glass:${window.id}`),
+    persistentDebrisId: debris?.id ?? null,
+  });
+}
+
+function hf304GlassEvidencePane(index: number): ArenaMap['breakableWindows'][number] | null {
+  if (!Number.isSafeInteger(index) || index < 0 || index >= arena.breakableWindows.length) return null;
+  return arena.breakableWindows[index] ?? null;
+}
+
+function stageHf304GlassEvidenceActor(window: ArenaMap['breakableWindows'][number]): boolean {
+  const target = window.mesh.getWorldPosition(new THREE.Vector3());
+  let eye: THREE.Vector3 | null = null;
+  if (arena.houses.length > 0) {
+    const house = arena.houses.reduce((nearest, candidate) => {
+      const currentDistance = Math.hypot(target.x - candidate.origin.x, target.z - candidate.origin.z);
+      const nearestDistance = Math.hypot(target.x - nearest.origin.x, target.z - nearest.origin.z);
+      return currentDistance < nearestDistance ? candidate : nearest;
+    });
+    const staged = selectPlayableWindowApproach(target, house.origin, arena.bounds, activeWorldColliders(), 4);
+    if (staged) eye = new THREE.Vector3(staged.x, staged.y, staged.z);
+  } else {
+    // Skyline's panes have no HouseNavigation owner. Use the same authored
+    // mullion-safe approach as the served glass lifecycle gate, trying both
+    // sides of the facade while keeping the player inside the arena bounds.
+    const candidates = [
+      new THREE.Vector3(target.x + 1, 1.7, target.z + 6),
+      new THREE.Vector3(target.x + 1, 1.7, target.z - 6),
+    ];
+    eye = candidates.find((candidate) => pointInsideBounds(candidate, arena.bounds, 0.55)) ?? null;
+  }
+  if (!eye) return false;
+  player.position.copy(eye);
+  characterPhysics?.teleportEye(player.position);
+  player.velocity.set(0, 0, 0);
+  const delta = target.clone().sub(player.position);
+  player.yaw = Math.atan2(-delta.x, -delta.z);
+  player.pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z));
+  player.invulnerableUntil = 0;
+  camera.position.copy(player.position);
+  camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+  camera.updateMatrixWorld(true);
+  return true;
+}
+
+function prepareHf304GlassEvidenceCell(weapon: WeaponId, paneIndex: number) {
+  if (!localMultiplayerQa || matchState.phase !== 'active'
+    || network.role !== 'offline' && network.role !== 'host') return null;
+  const pane = hf304GlassEvidencePane(paneIndex);
+  if (!pane || !WEAPON_IDS.includes(weapon)) return null;
+  resetBreakableWindows();
+  player.weapon = weapon;
+  player.ammo[weapon] = WEAPONS[weapon].mag;
+  player.reserve[weapon] = WEAPONS[weapon].reserve;
+  player.nextShotAt = 0;
+  if (!stageHf304GlassEvidenceActor(pane)) return null;
+  const stateMessage = createStateMessage();
+  if (network.role === 'host') network.sendStateCommitReliably(stateMessage);
+  return Object.freeze({
+    contract: 'hf304-live-private-runtime-prepare-v1',
+    mode: (network.role === 'host' ? 'hosted' : 'solo') as Hf304GlassEvidenceMode,
+    networkRole: network.role,
+    arenaId: selectedArena.id,
+    paneId: pane.id,
+    paneIndex,
+    weaponId: weapon,
+    fireKind: WEAPONS[weapon].fireKind,
+    policy: weaponGlassBreakPolicy(weapon),
+    actorId: player.id,
+    hostId: network.role === 'host' ? player.id : null,
+    peerIds: Object.freeze([...remotes.keys()].sort()),
+    matchEpoch: interactiveWorldMatchEpoch,
+    playerPosition: Object.freeze(player.position.toArray()),
+    cameraDirection: Object.freeze(camera.getWorldDirection(new THREE.Vector3()).toArray()),
+    stateSequence: stateMessage.player.seq,
+    before: hf304GlassPaneEvidence(pane),
+  });
+}
+
+function stageHf304GlassEvidenceView(paneIndex: number) {
+  if (!localMultiplayerQa || matchState.phase !== 'active') return null;
+  const pane = hf304GlassEvidencePane(paneIndex);
+  if (!pane || !stageHf304GlassEvidenceActor(pane)) return null;
+  const stateMessage = createStateMessage();
+  if (network.role === 'host') network.sendStateCommitReliably(stateMessage);
+  return Object.freeze({
+    contract: 'hf304-live-private-runtime-stage-v1',
+    networkRole: network.role,
+    actorId: player.id,
+    paneId: pane.id,
+    playerPosition: Object.freeze(player.position.toArray()),
+    stateSequence: stateMessage.player.seq,
+  });
+}
+
+function probeHf304GlassEvidenceCrack(paneIndex: number, impactNonce: number) {
+  if (!localMultiplayerQa || matchState.phase !== 'active'
+    || network.role !== 'offline' && network.role !== 'host'
+    || !Number.isSafeInteger(impactNonce) || impactNonce < 0) return null;
+  const pane = hf304GlassEvidencePane(paneIndex);
+  if (!pane) return null;
+  const before = hf304GlassPaneEvidence(pane);
+  const state = pane.glassState?.matchEpoch === interactiveWorldMatchEpoch
+    ? pane.glassState
+    : createGlassState(pane.id, interactiveWorldMatchEpoch);
+  const impactId = `hf304-crack:${player.id}:${impactNonce}:${pane.id}`;
+  const result = admitGlassImpact(state, {
+    isHost: true,
+    matchEpoch: interactiveWorldMatchEpoch,
+    expectedRevision: state.revision,
+    impactId,
+    tick: interactiveWorldTick,
+    profile: 'bullet',
+    damageQ: GLASS_CRACK_DAMAGE_Q,
+  });
+  if (!result.accepted) return Object.freeze({ accepted: false, before, cracked: before });
+  pane.glassState = result.state;
+  const projection = glassAuthorityProjection(result.state);
+  pane.broken = projection.apertureOpen;
+  pane.mesh.visible = projection.paneVisible;
+  invalidateActiveWorldCollisionCache();
+  syncInteractiveWorldPhysics(true);
+  return Object.freeze({
+    contract: 'hf304-live-private-runtime-crack-v1',
+    networkRole: network.role,
+    actorId: player.id,
+    matchEpoch: interactiveWorldMatchEpoch,
+    impactId,
+    accepted: true,
+    before,
+    cracked: hf304GlassPaneEvidence(pane),
+  });
+}
+
+function authorHf304GlassEvidenceCell(
+  weapon: WeaponId,
+  paneIndex: number,
+  actionNonce: number,
+  windowEventNonce: number,
+) {
+  if (!localMultiplayerQa || matchState.phase !== 'active'
+    || network.role !== 'offline' && network.role !== 'host'
+    || !Number.isSafeInteger(actionNonce) || actionNonce < 0
+    || !Number.isSafeInteger(windowEventNonce) || windowEventNonce < 0
+    || actionNonce === windowEventNonce) return null;
+  const pane = hf304GlassEvidencePane(paneIndex);
+  if (!pane || !WEAPON_IDS.includes(weapon) || player.weapon !== weapon) return null;
+  const policy = weaponGlassBreakPolicy(weapon);
+  const definition = WEAPONS[weapon];
+  const point = pane.mesh.getWorldPosition(new THREE.Vector3());
+  const origin = camera.getWorldPosition(new THREE.Vector3());
+  const direction = point.clone().sub(origin).normalize();
+  const directionTuple = direction.toArray() as [number, number, number];
+  const shot: ShotMessage = {
+    type: 'shot',
+    by: player.id,
+    weapon,
+    origin: origin.toArray() as [number, number, number],
+    direction: directionTuple,
+    pelletDirections: Array.from({ length: definition.pellets }, () => [...directionTuple] as [number, number, number]),
+    nonce: actionNonce,
+  };
+  if (network.role === 'host') {
+    // The exact action precedes its durable pane event on the owned reliable
+    // peer lane. Projectile replicas consume this retained identity in
+    // admitProjectileGlassBreak; ordinary host-authored impacts remain sealed
+    // by hostAuthority plus the receiver's spatial trace.
+    const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
+    const now = performance.now();
+    for (const [nonce, action] of actions) {
+      if (now - action.receivedAt > admittedShotActionLifetimeMs(action.message.weapon)) actions.delete(nonce);
+    }
+    actions.set(actionNonce, {
+      message: shot,
+      receivedAt: now,
+      matchEpoch: interactiveWorldMatchEpoch,
+      targets: new Set(),
+    });
+    admittedRemoteShots.set(player.id, actions);
+    network.send(shot);
+  }
+  const projectile = definition.fireKind === 'projectile';
+  const normal = direction.clone().multiplyScalar(-1);
+  const before = hf304GlassPaneEvidence(pane);
+  const accepted = breakHouseWindow(
+    pane.id,
+    point,
+    normal,
+    false,
+    projectile ? point : origin,
+    'shot',
+    projectile ? actionNonce : undefined,
+    player.id,
+    windowEventNonce,
+    projectile ? weapon : undefined,
+  );
+  const untrustedMessage: WindowBreakMessage = {
+    type: 'window-break',
+    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+    by: player.id,
+    windowId: pane.id,
+    origin: (projectile ? point : origin).toArray() as [number, number, number],
+    kind: 'shot',
+    ...(projectile ? { weapon, actionNonce } : {}),
+    nonce: windowEventNonce,
+  };
+  const canonicalMessage = network.role === 'host'
+    ? canonicalHostWindowBreak(untrustedMessage, performance.now())
+    : null;
+  if (canonicalMessage) network.send(canonicalMessage);
+  return Object.freeze({
+    contract: 'hf304-live-private-runtime-authority-v1',
+    mode: (network.role === 'host' ? 'hosted' : 'solo') as Hf304GlassEvidenceMode,
+    networkRole: network.role,
+    arenaId: selectedArena.id,
+    paneId: pane.id,
+    paneIndex,
+    weaponId: weapon,
+    fireKind: definition.fireKind,
+    policy,
+    actorId: player.id,
+    hostId: network.role === 'host' ? player.id : null,
+    peerIds: Object.freeze([...remotes.keys()].sort()),
+    matchEpoch: interactiveWorldMatchEpoch,
+    action: Object.freeze({
+      nonce: actionNonce,
+      decodedByProtocol: isGameMessage(shot),
+      by: shot.by,
+      weapon: shot.weapon,
+      fireKind: definition.fireKind,
+      pelletCount: shot.pelletDirections.length,
+      origin: Object.freeze([...shot.origin]),
+      direction: Object.freeze([...shot.direction]),
+    }),
+    windowEvent: Object.freeze({
+      nonce: windowEventNonce,
+      decodedByProtocol: isGameMessage(canonicalMessage ?? untrustedMessage),
+      by: untrustedMessage.by,
+      kind: untrustedMessage.kind,
+      wireWeapon: untrustedMessage.weapon ?? null,
+      actionNonce: untrustedMessage.actionNonce ?? null,
+      hostAuthorityId: canonicalMessage?.hostAuthority?.hostId ?? null,
+      origin: Object.freeze([...untrustedMessage.origin]),
+    }),
+    accepted,
+    before,
+    after: hf304GlassPaneEvidence(pane),
+  });
+}
+
+function sampleHf304GlassEvidenceCell(
+  paneId: string,
+  actionNonce: number,
+  windowEventNonce: number,
+) {
+  if (!localMultiplayerQa || !Number.isSafeInteger(actionNonce)
+    || !Number.isSafeInteger(windowEventNonce)) return null;
+  const pane = arena.breakableWindows.find((candidate) => candidate.id === paneId);
+  if (!pane) return null;
+  const hostId = network.role === 'client' ? privateLobbySnapshot?.hostId ?? null
+    : network.role === 'host' ? player.id : null;
+  const action = hostId ? currentAdmittedShotAction(hostId, actionNonce) : undefined;
+  return Object.freeze({
+    contract: 'hf304-live-private-runtime-observation-v1',
+    networkRole: network.role,
+    arenaId: selectedArena.id,
+    localPlayerId: player.id,
+    hostId,
+    peerIds: Object.freeze([...remotes.keys()].sort()),
+    matchEpoch: interactiveWorldMatchEpoch,
+    action: action ? Object.freeze({
+      by: action.message.by,
+      weapon: action.message.weapon,
+      nonce: action.message.nonce,
+      matchEpoch: action.matchEpoch,
+      paneAdmitted: action.targets.has(`glass:${paneId}`),
+    }) : null,
+    windowEvent: Object.freeze({
+      nonce: windowEventNonce,
+      processed: processedNonces.has(windowEventNonce),
+    }),
+    pane: hf304GlassPaneEvidence(pane),
+    ledgers: Object.freeze({
+      remoteShotOwnerCount: admittedRemoteShots.size,
+      hostedBotProjectileActions: hostedBotProjectileGlassActions.size(),
+      hostedBotBallisticActions: hostedBotBallisticGlassActions.size(),
+      processedNonceCount: processedNonces.size,
+    }),
+  });
 }
 
 function resetBreakableWindows(): void {
@@ -12743,6 +14529,7 @@ function processDeath(message: DeathMessage): void {
 }
 
 function removeRemote(id: string, reason: string, allowRejoinReservation = true): void {
+  discardPendingStickyAttachmentReceiptsForActor(id);
   const remote = remotes.get(id);
   if (!remote) return;
   const retainCombatAuthority = allowRejoinReservation && shouldRetainRemoteCombatAuthority(
@@ -12780,7 +14567,7 @@ function removeRemote(id: string, reason: string, allowRejoinReservation = true)
   verifiedRemoteKills.delete(id);
   remoteShotAdmissions.delete(id);
   hostTriggerAuthorities.reset(id, 'disconnect');
-  admittedRemoteShots.delete(id);
+  retainDisconnectedProjectileGlassActions(id);
   admittedRemoteMelees.delete(id);
   admittedRemoteExplosions.delete(id);
   remoteStickyAttachmentAuthority = removeRemoteStickyAttachmentsForActor(remoteStickyAttachmentAuthority, id);
@@ -12819,6 +14606,7 @@ function removeRemote(id: string, reason: string, allowRejoinReservation = true)
   remoteMeleeAdmissions.delete(id);
   authorizedRemotePickups.delete(id);
   authorizedRemoteRedeploys.delete(id);
+  hf296RemoteProjectionWeaponAuthorizations.delete(id);
   addFeed(`${remote.snapshot.name} ${reason}`);
 }
 
@@ -13234,10 +15022,11 @@ function respawn(
 ): void {
   const startsNewLife = !player.alive || forceNewLife;
   if (startsNewLife) {
+    discardPendingStickyAttachmentReceiptsForActor(player.id);
     localContinuity += 1;
     localPositionHistory.length = 0;
     resetFlashVictimLife();
-    resetStickyVictimUrgentAlertLife(localContinuity);
+    resetStickyUrgentAlertLife(localContinuity);
   }
   if (respawnTimer) clearTimeout(respawnTimer);
   respawnTimer = null;
@@ -13370,6 +15159,8 @@ async function startGame(
   audio.unlock();
   document.documentElement.dataset.combatAudioPrewarm = audio.prepareCombat() ? 'ready' : 'unavailable';
   document.documentElement.dataset.glassImpactAudioPrewarm = audio.prepareGlassImpact() ? 'ready' : 'unavailable';
+  document.documentElement.dataset.grenadeAudioPrewarm = audio.prepareGrenadeEffects() ? 'ready' : 'unavailable';
+  document.documentElement.dataset.chopperRotorAudioPrewarm = audio.prepareChopperRotors() ? 'ready' : 'unavailable';
   prepareDeploymentTransition();
   applyMenuLifecycle({ type: 'match-start' });
   syncMenuPreviewCanvasPlacement();
@@ -13425,6 +15216,8 @@ async function startGame(
     ? killstreakMatchEpoch + 1
     : Math.max(1, Math.floor(privateMatchActiveAtEpochMs ?? Date.now()) % 1_000_000_000));
   hostedBotWeaponPresentationReplay.clear();
+  hostedBotProjectileGlassActions.clear();
+  hostedBotBallisticGlassActions.clear();
   interactiveWorldMatchEpoch = killstreakMatchEpoch;
   admittedRemoteShots.clear();
   remoteStickyAttachmentAuthority = createRemoteStickyAttachmentAuthorityState();
@@ -13433,7 +15226,8 @@ async function startGame(
   stickyTimingReplayNonces.clear();
   stickyVictimFeedbackCount = 0;
   lastStickyVictimFeedback = null;
-  resetStickyVictimUrgentAlertLife();
+  resetStickyAttachmentReceiptAdmission();
+  resetStickyUrgentAlertLife();
   stickyVictimReceiptKeys = mode === 'client'
     ? new Set(loadStickyVictimReceiptKeys(clientPersistentStorage(), interactiveWorldMatchEpoch, player.id))
     : new Set();
@@ -13463,10 +15257,12 @@ async function startGame(
   killstreakRuntime = new HostKillstreakRuntime(killstreakMatchEpoch);
   killstreakActivationSequence = 0;
   killstreakControlSequence = 0;
+  recentKillstreakImpactEvents.length = 0;
   localCareCaptureState = createCareCaptureClientState();
   localCareCaptureRequiresHold = false;
   displayedCareReward = null;
   appliedKillstreakDamageResults.clear();
+  killstreakDamageResultReplayLedger.reset();
   killstreakRegisteredActors.clear();
   hostKillstreakLoadoutAcks.clear();
   killstreakPresentation.clear();
@@ -13474,6 +15270,7 @@ async function startGame(
   lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
   lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
   supportDamageFeedbackTelemetry.reset();
+  localSupportShotPresentationReceipts.reset();
   player.name = requiredName;
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
   resetMatchPauseBackdrop();
@@ -13512,7 +15309,7 @@ async function startGame(
       })
     : null;
   resetFlashVictimLife();
-  resetStickyVictimUrgentAlertLife(localContinuity);
+  resetStickyUrgentAlertLife(localContinuity);
   if (mode !== 'client') {
     if (hostRecovery?.killstreak) {
       if (!killstreakRuntime.restoreCheckpoint(
@@ -13547,6 +15344,7 @@ async function startGame(
   localShotSeq = 0;
   localWeaponSequences.clear();
   pendingLocalOrdinaryShots.clear();
+  pendingLocalProjectileGlassShots.clear();
   pendingLocalReloadAuthority = null;
   localReloadActionSequence = 0;
   lastAppliedLocalCombatAuthorityRevision = -1;
@@ -13578,6 +15376,7 @@ async function startGame(
   pendingFlareShotRequests.clear();
   flareShotResultContexts.clear();
   pendingLocalTimedShots.clear();
+  pendingLocalProjectileGlassShots.clear();
   for (const timer of remoteReloadTimers.values()) window.clearTimeout(timer);
   remoteReloadTimers.clear();
   remoteReloadAuthorities.clear();
@@ -14141,6 +15940,7 @@ function initializeTimedMapWeaponsForMatch(
   pendingFlareShotRequests.clear();
   flareShotResultContexts.clear();
   pendingLocalTimedShots.clear();
+  pendingLocalProjectileGlassShots.clear();
   lastFlarePresentationBroadcastAt = Number.NEGATIVE_INFINITY;
   lastFlarePresentationAdmission = null;
   flareProjectileSystem.clear();
@@ -14651,7 +16451,7 @@ function resolveRailgunShot(request: RailgunShotRequestMessage): RailgunShotResu
   applyRailgunState(fired.state);
   broadcastRailgunState();
   const railgunTrace = traceWeaponPath(origin, normalized, RAILGUN_BEAM_LENGTH_M, 'railgun');
-  breakWindowsAlongBallisticTrace(railgunTrace, origin, normalized, request.by);
+  breakWindowsAlongBallisticTrace(railgunTrace, origin, normalized, { impactOwnerId: request.by });
   applyInteractiveWorldBallisticTrace(railgunTrace, origin, normalized, 'railgun');
   const outcomes = admission.targets.flatMap(({ target, distance }) => {
     const outcome = applyAuthoritativeRailgunDamage(request.by, target, distance);
@@ -14736,7 +16536,7 @@ function tryFireRailgun(now: number): void {
   applyRailgunState(fired.state);
   broadcastRailgunState();
   const railgunTrace = traceWeaponPath(origin, direction, RAILGUN_BEAM_LENGTH_M, 'railgun');
-  breakWindowsAlongBallisticTrace(railgunTrace, origin, direction, player.id);
+  breakWindowsAlongBallisticTrace(railgunTrace, origin, direction, { impactOwnerId: player.id });
   applyInteractiveWorldBallisticTrace(railgunTrace, origin, direction, 'railgun');
   applyKillstreakEntityShot(player.id, player.team, origin, [direction], 'railgun', now);
   const outcomes = (hostAdmission?.targets ?? []).flatMap(({ target, distance }) => {
@@ -14781,7 +16581,8 @@ type RuntimeDmrThermalContact = {
 const dmrThermalContactBuffer: RuntimeDmrThermalContact[] = [];
 const dmrThermalContactCache = new Map<string, RuntimeDmrThermalContact>();
 let dmrThermalOcclusionCursor = 0;
-let dmrThermalWasActive = false;
+let dmrThermalContactFrame = -1;
+let thermalGhostWasActive = false;
 
 function acquireDmrThermalContact(id: string, kind: 'player' | 'bot'): RuntimeDmrThermalContact {
   const key = `${kind}:${id}`;
@@ -14813,36 +16614,43 @@ function dmrThermalSolidOccluded(
   return false;
 }
 
-function dmrThermalContacts(): readonly DmrThermalContact[] {
+function dmrThermalContacts(forceCompleteOcclusion = false): readonly DmrThermalContact[] {
+  const sameFrame = dmrThermalContactFrame === frameCount;
+  if (sameFrame && (!forceCompleteOcclusion || dmrThermalContactBuffer.every((contact) => contact.occlusionSampled))) {
+    return dmrThermalContactBuffer;
+  }
   const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
   const observer = camera.position;
-  dmrThermalContactBuffer.length = 0;
-  for (const remote of remotes.values()) {
-    if (dmrThermalContactBuffer.length >= DMR_THERMAL_MAX_CONTACTS) break;
-    const contact = acquireDmrThermalContact(remote.snapshot.id, 'player');
-    contact.position.copy(remote.target);
-    contact.position.y += 1.05;
-    contact.relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' : 'hostile';
-    contact.living = remote.snapshot.hp > 0;
-    if (!contact.occlusionSampled
-      || contact.position.distanceToSquared(contact.lastOcclusionPosition) > 0.16
-      || observer.distanceToSquared(contact.lastOcclusionObserver) > 0.16) contact.solidOccluded = true;
-    dmrThermalContactBuffer.push(contact);
-  }
-  for (const bot of bots.values()) {
-    if (dmrThermalContactBuffer.length >= DMR_THERMAL_MAX_CONTACTS) break;
-    const contact = acquireDmrThermalContact(bot.id, 'bot');
-    contact.position.copy(bot.position);
-    contact.position.y += 1.05;
-    contact.relation = mode === 'tdm' && bot.team === player.team ? 'friendly' : 'hostile';
-    contact.living = bot.alive;
-    if (!contact.occlusionSampled
-      || contact.position.distanceToSquared(contact.lastOcclusionPosition) > 0.16
-      || observer.distanceToSquared(contact.lastOcclusionObserver) > 0.16) contact.solidOccluded = true;
-    dmrThermalContactBuffer.push(contact);
+  if (!sameFrame) {
+    dmrThermalContactFrame = frameCount;
+    dmrThermalContactBuffer.length = 0;
+    for (const remote of remotes.values()) {
+      if (dmrThermalContactBuffer.length >= DMR_THERMAL_MAX_CONTACTS) break;
+      const contact = acquireDmrThermalContact(remote.snapshot.id, 'player');
+      contact.position.copy(remote.target);
+      contact.position.y += 1.05;
+      contact.relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' : 'hostile';
+      contact.living = remote.snapshot.hp > 0;
+      if (!contact.occlusionSampled
+        || contact.position.distanceToSquared(contact.lastOcclusionPosition) > 0.16
+        || observer.distanceToSquared(contact.lastOcclusionObserver) > 0.16) contact.occlusionSampled = false;
+      dmrThermalContactBuffer.push(contact);
+    }
+    for (const bot of bots.values()) {
+      if (dmrThermalContactBuffer.length >= DMR_THERMAL_MAX_CONTACTS) break;
+      const contact = acquireDmrThermalContact(bot.id, 'bot');
+      contact.position.copy(bot.position);
+      contact.position.y += 1.05;
+      contact.relation = mode === 'tdm' && bot.team === player.team ? 'friendly' : 'hostile';
+      contact.living = bot.alive;
+      if (!contact.occlusionSampled
+        || contact.position.distanceToSquared(contact.lastOcclusionPosition) > 0.16
+        || observer.distanceToSquared(contact.lastOcclusionObserver) > 0.16) contact.occlusionSampled = false;
+      dmrThermalContactBuffer.push(contact);
+    }
   }
   const contactCount = dmrThermalContactBuffer.length;
-  const budget = dmrThermalOcclusionBudget(contactCount);
+  const budget = forceCompleteOcclusion ? contactCount : dmrThermalOcclusionBudget(contactCount);
   const colliders = budget > 0 ? activeWorldColliders() : [];
   let checked = 0;
   let inspected = 0;
@@ -14867,26 +16675,17 @@ function dmrThermalContacts(): readonly DmrThermalContact[] {
 function updateDmrThermal(): void {
   if (!dmrThermalActive) {
     dmrThermalPresentation.update(camera, [], false);
-    if (dmrThermalWasActive) {
-      dmrThermalOcclusionCursor = 0;
-      for (const contact of dmrThermalContactCache.values()) {
-        contact.solidOccluded = true;
-        contact.occlusionSampled = false;
-      }
-    }
-    dmrThermalWasActive = false;
     return;
   }
-  dmrThermalWasActive = true;
   dmrThermalPresentation.update(camera, dmrThermalContacts(), true);
   // Contact selection/optic telemetry remain here. The shared exact-operator
-  // layer owns every world-space body and halo; this anchor has no proxy or
+  // layer owns every world-space thermal body; this anchor has no proxy or
   // body-marker geometry.
   dmrThermalPresentation.worldRoot.visible = false;
 }
 
 /**
- * Compile the relation-invariant exact-model and orange-halo layers during
+ * Compile the relation-invariant single thermal-body layer during
  * match admission instead of on the player's first ADS. Every live ID is
  * submitted once behind the opaque deployment surface; the caller clears the
  * ghosts again after the match-bound compile.
@@ -14897,26 +16696,27 @@ function prewarmThermalGhostPipelines(): void {
   for (const remote of remotes.values()) {
     if (remote.snapshot.hp <= 0) continue;
     const relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id: remote.snapshot.id, relation, root: remote.root });
+    targets.push({ id: remote.snapshot.id, relation, root: remote.root, occluded: true });
   }
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
     const relation = mode === 'tdm' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id: bot.id, relation, root: bot.root });
+    targets.push({ id: bot.id, relation, root: bot.root, occluded: true });
   }
   // Match admission has already staged the retained corpse operators visible
   // behind the opaque deployment surface. Fill any remaining target slots
   // from that exact rigged corpus so even an otherwise empty private lobby
-  // submits both the shared model and halo programs before its first guest.
+  // submits the shared exact-rig thermal program before its first guest.
   for (const [index, entry] of corpsePresentationPool.entries()) {
     if (targets.length >= THERMAL_GHOST_MAX_TARGETS) break;
     targets.push({
       id: `thermal-prewarm-corpse-${index}`,
       relation: entry.team === player.team ? 'friendly' : 'hostile',
       root: entry.root,
+      occluded: true,
     });
   }
-  // Exact-model and orange-halo materials are relation-invariant. Retain one
+  // The single thermal material is relation-invariant. Retain one
   // record per live ID; aliases would duplicate the same skinned children.
   if (targets.length > 0) thermalGhostPresentation.sync(targets, true);
 }
@@ -14925,14 +16725,31 @@ function updateThermalGhosts(): void {
   // One presentation layer serves every firearm-authorized through-wall
   // reveal. Selection remains each weapon's existing authority policy; only
   // the primitive pawn/marker rendering has been replaced by the exact live
-  // operator model plus an orange body-following halo.
-  const chopperThermal = localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner';
+  // operator model with one monochrome thermal treatment.
+  const possessionKind = localKillstreakActorSnapshot()?.possession?.kind ?? null;
+  const chopperThermal = possessionKind === 'chopper-gunner';
+  const pilotedDroneThermal = possessionKind === 'piloted-drone';
+  // The host already applies the piloted drone's range, forward-cone, life and
+  // hostility policy. Reuse those admitted IDs instead of inferring authority
+  // from local pixels or showing every combatant in the arena.
+  const pilotedDroneContactKeys = pilotedDroneThermal
+    ? new Set(killstreakSnapshot.sensorContacts.map((contact) => `${contact.kind}:${contact.id}`))
+    : null;
   const railgunRevealActive = railgunScopeState.revealActive;
-  if (!dmrThermalActive && !railgunRevealActive && !chopperThermal) {
+  const revealActive = dmrThermalRevealActive || railgunRevealActive || chopperThermal || pilotedDroneThermal;
+  if (!revealActive) {
     thermalGhostPresentation.sync([], false);
     railgunPresentation.syncExactOperatorReveal(false, null);
+    if (thermalGhostWasActive) {
+      dmrThermalOcclusionCursor = 0;
+      dmrThermalContactFrame = -1;
+      for (const contact of dmrThermalContactCache.values()) contact.occlusionSampled = false;
+    }
+    thermalGhostWasActive = false;
     return;
   }
+  const contacts = dmrThermalContacts(!thermalGhostWasActive);
+  thermalGhostWasActive = true;
   const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
   const targets: ThermalGhostTarget[] = [];
   const observer = { id: player.id, team: player.team };
@@ -14943,10 +16760,12 @@ function updateThermalGhosts(): void {
     root: THREE.Object3D,
   ): void => {
     if (targets.some((target) => target.id === id)) return;
-    if (railgunRevealActive && !dmrThermalActive && !chopperThermal
+    if (pilotedDroneContactKeys && !pilotedDroneContactKeys.has(`${kind}:${id}`)) return;
+    if (railgunRevealActive && !dmrThermalRevealActive && !chopperThermal && !pilotedDroneThermal
       && !railgunThermalTargetEligible(observer, { id, team, alive: true, kind }, mode)) return;
     const relation = mode === 'tdm' && team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id, relation, root });
+    const contact = contacts.find((candidate) => candidate.id === id && candidate.kind === kind);
+    targets.push({ id, relation, root, occluded: contact?.solidOccluded ?? true });
   };
   for (const remote of remotes.values()) {
     if (remote.snapshot.hp <= 0) continue;
@@ -14985,9 +16804,9 @@ function updateRailgun(now: number): void {
   // follow the admitted ADS hold immediately and are still constrained by the
   // unchanged living-hostile Railgun eligibility policy below.
   const revealActive = railgunScopeState.revealActive;
-  // The railgun's signature see-through-walls reveal: the exact animated
-  // hostile operator with its ordinary appearance plus a bounded orange halo.
-  // The shared presentation disables depth testing without changing eligibility.
+  // The railgun's signature see-through-walls reveal: one exact animated
+  // hostile operator receives the shared monochrome thermal treatment only
+  // while world geometry occludes it. Eligibility remains unchanged.
   railgunPresentation.updateThermal(
     camera,
     revealActive ? railgunThermalContacts() : [],
@@ -15259,7 +17078,14 @@ function tryFire(now: number): void {
   const presentedSurfaceIds = new Set<string>();
   const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+  // Resolving this for every trigger means catalog drift fails at the action
+  // boundary instead of silently leaving a newly added weapon unable to
+  // breach glass.
+  const glassBreakPolicy = weaponGlassBreakPolicy(player.weapon);
   const projectileShot = spec.fireKind === 'projectile';
+  if (projectileShot && glassBreakPolicy.timing !== (player.weapon === 'explosive-crossbow' ? 'detonation' : 'impact')) {
+    throw new TypeError(`Weapon ${player.weapon} has an invalid projectile glass-break timing`);
+  }
   const flamethrowerShot = player.weapon === 'flamethrower';
   const maximumShotDistance = flamethrowerShot ? FLAMETHROWER_EFFECT.rangeM : 90;
   for (let pellet = 0; pellet < spec.pellets; pellet += 1) {
@@ -15397,8 +17223,7 @@ function tryFire(now: number): void {
     timing: nextCombatTiming(),
     nonce: shotActionNonce,
   };
-  if (player.weapon === 'flamethrower'
-    || network.role === 'client' && player.weapon === 'flare-gun') {
+  if (player.weapon === 'flamethrower') {
     const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
     for (const [nonce, action] of actions) {
       if (now - action.receivedAt > admittedShotActionLifetimeMs(action.message.weapon)) actions.delete(nonce);
@@ -15416,17 +17241,15 @@ function tryFire(now: number): void {
     );
   }
   if (projectileShot) {
-    if (network.role !== 'client') {
-      const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
-      for (const [nonce, action] of actions) {
-        const lifetimeMs = admittedShotActionLifetimeMs(action.message.weapon);
-        if (now - action.receivedAt > lifetimeMs) actions.delete(nonce);
-      }
-      actions.set(shot.nonce, {
-        message: shot, receivedAt: now, matchEpoch: interactiveWorldMatchEpoch, targets: new Set(),
-      });
-      admittedRemoteShots.set(player.id, actions);
+    const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
+    for (const [nonce, action] of actions) {
+      const lifetimeMs = admittedShotActionLifetimeMs(action.message.weapon);
+      if (now - action.receivedAt > lifetimeMs) actions.delete(nonce);
     }
+    actions.set(shot.nonce, {
+      message: shot, receivedAt: now, matchEpoch: interactiveWorldMatchEpoch, targets: new Set(),
+    });
+    admittedRemoteShots.set(player.id, actions);
     if (player.weapon === 'flare-gun') {
       const spawned = flareProjectileSystem.spawn({
         ownerId: player.id, ownerTeam: player.team, origin,
@@ -15474,6 +17297,13 @@ function tryFire(now: number): void {
       shotSeq: request.shotSeq,
       weapon: player.weapon,
     }));
+    if (isProjectileGlassWeapon(player.weapon)) {
+      pendingLocalProjectileGlassShots.set(request.shotId, Object.freeze({
+        actionNonce: request.nonce,
+        matchEpoch: interactiveWorldMatchEpoch,
+        weapon: player.weapon,
+      }));
+    }
     localShotSeq += 1;
     localWeaponSequences.set(player.weapon, weaponSequence + 1);
     network.send(request);
@@ -16382,6 +18212,14 @@ function acceptHostedBotWeaponPresentation(message: BotWeaponPresentationMessage
   });
   if (!admission.accepted || !admission.message) return;
   const admitted = admission.message;
+  const now = performance.now();
+  if (admitted.presentation === 'signal-flare-launch') {
+    const actionAdmission = hostedBotProjectileGlassActions.recordHostLaunch(admitted, {
+      hostId: privateLobbySnapshot?.hostId ?? null,
+      matchEpoch: killstreakMatchEpoch,
+    }, now);
+    if (!actionAdmission.accepted) return;
+  }
   const origin = new THREE.Vector3(...admitted.origin);
   const bot = bots.get(admitted.botId);
   const remoteMuzzle = bot?.root.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
@@ -16776,6 +18614,7 @@ function updateBots(dt: number, now: number): void {
       let principalDirection = baseDirection;
       let visibleEnd = origin.clone().addScaledVector(baseDirection, shotLength);
       let impactCount = 0;
+      const admittedWindowIds = new Set<string>();
       for (let pellet = 0; pellet < pelletCount; pellet += 1) {
         const sample = sampleWeaponPellet(botWeapon, pellet, jitter, gameplayRandom(), gameplayRandom());
         const direction = baseDirection.clone()
@@ -16792,6 +18631,12 @@ function updateBots(dt: number, now: number): void {
           botWeapon.penetration,
           activeBallisticSurfaces(),
         );
+        breakWindowsAlongBallisticTrace(resolution.trace, origin, direction, {
+          impactOwnerId: bot.id,
+          actionNonce,
+          weapon: bot.weapon,
+          visitedWindowIds: admittedWindowIds,
+        });
         if (!flamethrowerShot) applyInteractiveWorldBallisticTrace(resolution.trace, origin, direction, bot.weapon);
         const pelletVisibleEnd = origin.clone().addScaledVector(direction, resolution.tracerDistance);
         if (pellet === 0) visibleEnd = pelletVisibleEnd;
@@ -17106,8 +18951,109 @@ function spawnExplosiveBolt(
     nextFuseBeepAt: null,
     targetId: null,
     targetLifeId: null,
+    impactWindowId: null,
     actionNonce,
   });
+  if (ownerId === player.id) {
+    lastLocalExplosiveBoltActionIdentity = Object.freeze({
+      matchEpoch: interactiveWorldMatchEpoch,
+      ownerId,
+      actionNonce,
+      authority,
+      spawnedAt: now,
+    });
+  }
+}
+
+function recordLocalExplosiveBoltWindowImpactReceipt(
+  bolt: ExplosiveBoltEntity,
+  impactWindowId: string,
+  impactedAt: number,
+): void {
+  if (!bolt.authority || bolt.ownerId !== player.id) return;
+  const pane = arena.breakableWindows.find((candidate) => candidate.id === impactWindowId);
+  const state = pane?.glassState;
+  if (!pane || !state || state.matchEpoch !== interactiveWorldMatchEpoch) return;
+  const projection = glassAuthorityProjection(state);
+  const broken = pane.broken;
+  const visible = pane.mesh.visible;
+  const activeWorldColliderPresent = activeGlassDynamicColliders()
+    .some(({ id }) => id === `glass:${impactWindowId}`);
+  if (broken !== false
+    || visible !== true
+    || activeWorldColliderPresent !== true
+    || projection.phase !== 'intact'
+    || projection.paneVisible !== true
+    || projection.apertureOpen !== false
+    || projection.movementSolid !== true
+    || projection.ballisticSolid !== true
+    || projection.aiLineOfSightSolid !== true) return;
+  explosiveBoltImpactReceipts.record({
+    matchEpoch: interactiveWorldMatchEpoch,
+    ownerId: bolt.ownerId,
+    actionNonce: bolt.actionNonce,
+    authority: bolt.authority,
+    spawnedAt: bolt.spawnedAt,
+    impactedAt,
+    impactWindowId,
+    position: Object.freeze([
+      bolt.mesh.position.x,
+      bolt.mesh.position.y,
+      bolt.mesh.position.z,
+    ]),
+    detonatesAt: bolt.detonatesAt,
+    pane: Object.freeze({
+      id: pane.id,
+      broken,
+      visible,
+      activeWorldColliderPresent,
+      rapierDynamicColliderCount: characterPhysics?.dynamicColliderCount() ?? 0,
+      authority: Object.freeze({
+        phase: projection.phase,
+        paneVisible: projection.paneVisible,
+        apertureOpen: projection.apertureOpen,
+        movementSolid: projection.movementSolid,
+        ballisticSolid: projection.ballisticSolid,
+        aiLineOfSightSolid: projection.aiLineOfSightSolid,
+      }),
+    }),
+  });
+}
+
+function armLocalExplosiveBoltImpactObservation(paneIndex: number): ExplosiveBoltImpactObservationArm | null {
+  if (network.role === 'client' || !Number.isSafeInteger(paneIndex)) return null;
+  const pane = arena.breakableWindows[paneIndex];
+  const state = pane?.glassState;
+  if (!pane || !state || state.matchEpoch !== interactiveWorldMatchEpoch) return null;
+  const projection = glassAuthorityProjection(state);
+  if (pane.broken
+    || !pane.mesh.visible
+    || projection.phase !== 'intact'
+    || !activeGlassDynamicColliders().some(({ id }) => id === `glass:${pane.id}`)) return null;
+  return Object.freeze({
+    cursor: explosiveBoltImpactReceipts.cursor(),
+    matchEpoch: interactiveWorldMatchEpoch,
+    ownerId: player.id,
+    impactWindowId: pane.id,
+    armedAt: performance.now(),
+  });
+}
+
+function bindLocalExplosiveBoltImpactObservation(
+  arm: ExplosiveBoltImpactObservationArm,
+  action: LocalExplosiveBoltActionIdentity | null,
+): ExplosiveBoltImpactObservationBinding | null {
+  if (action === null
+    || action !== lastLocalExplosiveBoltActionIdentity
+    || !explosiveBoltImpactReceipts.acceptsCursor(arm.cursor)) return null;
+  return bindExplosiveBoltImpactObservation(arm, action);
+}
+
+function readLocalExplosiveBoltImpactReceipt(
+  binding: ExplosiveBoltImpactObservationBinding,
+  maxImpactLatencyMs: number,
+) {
+  return explosiveBoltImpactReceipts.readExact(binding, maxImpactLatencyMs, performance.now());
 }
 
 function disposeExplosiveBolt(entity: ExplosiveBoltEntity): void {
@@ -17198,12 +19144,26 @@ function detonateExplosiveBoltEntity(bolt: ExplosiveBoltEntity, now: number): vo
         currentAttachmentTarget: { id: attachedTargetId!, lifeId: attachedTargetLifeId! },
       })
     : null;
+  const stuck = sealedAttachment !== null;
+  const blastRadiusM = explosiveBoltBlastRadiusM(stuck);
+  const glassPolicy = weaponGlassBreakPolicy('explosive-crossbow');
+  const glassMutation = admitProjectileSimulationGlassMutation(bolt.authority);
+  if (glassPolicy.timing === 'detonation'
+    && glassMutation.accepted) {
+    breakWindowsInWeaponBlast(
+      point,
+      bolt.actionNonce,
+      true,
+      blastRadiusM,
+      bolt.ownerId,
+      'explosive-crossbow',
+      bolt.impactWindowId,
+    );
+  }
   disposeExplosiveBolt(bolt);
   spawnGrenadeExplosionVisual(point, now);
   audio.explosion(now);
   if (!bolt.authority) return;
-  const stuck = sealedAttachment !== null;
-  const blastRadiusM = explosiveBoltBlastRadiusM(stuck);
   applyInteractiveWorldExplosion(point, blastRadiusM, EXPLOSIVE_BOLT_BLAST_MAX_DAMAGE * (stuck ? 2 : 1));
   const targetCount = fillExplosiveBoltTargets(bolt.ownerId, bolt.ownerTeam);
   for (let targetIndex = 0; targetIndex < targetCount; targetIndex += 1) {
@@ -17574,6 +19534,30 @@ function handleFlareDirectHit(hit: FlareProjectileDirectHit): void {
 
 function handleFlareImpact(impact: FlareProjectileImpact): void {
   timedMapWeaponAudit.flareImpacts += 1;
+  const glassPolicy = weaponGlassBreakPolicy('flare-gun');
+  const glassMutation = admitProjectileSimulationGlassMutation(impact.authority);
+  if (impact.breakableWindowId && glassPolicy.timing === 'impact'
+    && glassMutation.accepted) {
+    const pane = arena.breakableWindows.find(({ id }) => id === impact.breakableWindowId);
+    if (pane) {
+      const centre = pane.mesh.getWorldPosition(new THREE.Vector3());
+      const normal = centre.clone().sub(impact.point);
+      if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
+      else normal.normalize().multiplyScalar(-1);
+      breakHouseWindow(
+        pane.id,
+        impact.point,
+        normal,
+        true,
+        impact.point,
+        'shot',
+        impact.actionNonce,
+        impact.ownerId,
+        randomNonce(),
+        'flare-gun',
+      );
+    }
+  }
   // Direct damage is resolved during flight; only the later world impact
   // starts the visual fire. FlareProjectileSystem exclusively owns its DOT.
   const groundPoint = new THREE.Vector3(impact.point.x, Math.max(0.06, impact.point.y), impact.point.z);
@@ -17618,11 +19602,12 @@ let flareFrameColliders: ArenaMap['colliders'] = [];
 const flareBurnLineOfSightPoint = new THREE.Vector3();
 const flareProjectileCallbacks: FlareProjectileCallbacks = Object.freeze({
   worldCollisionFraction: (start: THREE.Vector3, delta: THREE.Vector3, radiusM: number) => {
-    const world = sweepSphereAgainstBoxes(start, delta, flareFrameColliders, radiusM)?.time ?? null;
-    const glass = crossbowGlassCollision(start, delta)?.time ?? null;
-    if (world === null) return glass;
-    if (glass === null) return world;
-    return Math.min(world, glass);
+    const worldHit = sweepSphereAgainstBoxes(start, delta, flareFrameColliders, radiusM);
+    const glass = crossbowGlassCollision(start, delta);
+    const worldGlassWindowId = worldHit
+      ? activeGlassColliderWindowIds.get(worldHit.box) ?? null
+      : null;
+    return resolveIdentifiedGlassSweepImpact(worldHit, glass, worldGlassWindowId);
   },
   withinBounds: (point: THREE.Vector3) => (
     pointInsideBounds(point, arena.bounds, 0.1) && point.y >= -25 && point.y <= 250
@@ -17697,7 +19682,7 @@ function updateExplosiveBolts(dt: number, now: number): void {
         bolt.detonatesAt = Math.min(bolt.expiresAt, now + EXPLOSIVE_BOLT_ARM_DELAY_MS);
         bolt.nextFuseBeepAt = now;
         bolt.velocity.set(0, 0, 0);
-        if (bolt.authority) recordReceiverStickyAttachment({
+        const recordedAttachment = bolt.authority ? recordReceiverStickyAttachment({
           ownerId: bolt.ownerId,
           ownerLifeId: bolt.ownerLifeId,
           source: 'explosive-crossbow',
@@ -17706,21 +19691,21 @@ function updateExplosiveBolts(dt: number, now: number): void {
           targetLifeId: targetHitLifeId,
           attachedAtMs: now,
           expiresAtMs: bolt.detonatesAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
-        });
-        if (targetHitId === player.id) {
-          presentStickyVictimUrgentAlert(
-            'explosive-crossbow', targetHitId, targetHitLifeId, bolt.actionNonce, now,
-          );
-          addFeed('STUCK', 'coral');
-        }
-        else if (bolt.ownerId === player.id) addFeed('STUCK', 'gold');
+        }) : null;
+        if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment);
       } else if (worldCollision || glassCollision) {
         const collisionFraction = Math.min(worldFraction, glassFraction);
         bolt.mesh.position.copy(start).addScaledVector(delta, collisionFraction);
+        bolt.impactWindowId = worldCollision !== null && worldFraction <= glassFraction
+          ? activeGlassColliderWindowIds.get(worldCollision.box) ?? null
+          : null;
         bolt.impactedAt = now;
         bolt.detonatesAt = Math.min(bolt.expiresAt, now + EXPLOSIVE_BOLT_ARM_DELAY_MS);
         bolt.nextFuseBeepAt = now;
         bolt.velocity.set(0, 0, 0);
+        if (bolt.impactWindowId !== null) {
+          recordLocalExplosiveBoltWindowImpactReceipt(bolt, bolt.impactWindowId, now);
+        }
       } else {
         bolt.mesh.position.add(delta);
       }
@@ -17747,17 +19732,21 @@ function throwGrenade(): void {
     return;
   }
   if (!player.alive || player.grenades <= 0 || matchState.phase !== 'active') return;
-  endSpawnProtectionOnOffense(performance.now());
+  const grenade = player.selectedGrenade;
+  const actionStartedAt = performance.now();
+  beginGrenadeFirstActionProfile(grenade, actionStartedAt);
+  endSpawnProtectionOnOffense(actionStartedAt);
   player.grenades -= 1;
   weaponView.throwGrenade();
   const direction = camera.getWorldDirection(new THREE.Vector3());
   const origin = camera.getWorldPosition(new THREE.Vector3()).addScaledVector(direction, 0.7);
   const velocity = direction.clone().multiplyScalar(13).add(new THREE.Vector3(0, 5.2, 0));
   const actionNonce = randomNonce();
+  bindGrenadeFirstActionNonce(actionNonce);
   network.send({
     type: 'grenade-throw', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: player.id,
     connectionEpoch: localConnectionEpoch,
-    grenade: player.selectedGrenade,
+    grenade,
     lifeId: localContinuity,
     actionSequence: localGrenadeActionSequence,
     origin: origin.toArray() as [number, number, number],
@@ -17767,14 +19756,14 @@ function throwGrenade(): void {
     nonce: randomNonce(),
   });
   localGrenadeActionSequence += 1;
-  const mesh = acquireGrenadeWorldPresentation(player.selectedGrenade);
+  const mesh = acquireGrenadeWorldPresentation(grenade);
   mesh.position.copy(origin);
   mesh.castShadow = true;
   const thrownAt = performance.now();
-  const impactDetonated = player.selectedGrenade === 'flash' || player.selectedGrenade === 'smoke';
-  const sticky = player.selectedGrenade === 'semtex';
+  const impactDetonated = grenade === 'flash' || grenade === 'smoke';
+  const sticky = grenade === 'semtex';
   grenades.push({
-    grenade: player.selectedGrenade,
+    grenade,
     mesh,
     velocity,
     angularVelocity: new THREE.Vector3(8.4, 5.2, 10.8),
@@ -17790,6 +19779,7 @@ function throwGrenade(): void {
     attachedTargetId: null,
     attachedTargetLifeId: null,
   });
+  completeGrenadeActionHandler(performance.now());
 }
 
 function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-throw' }>, ownerTeam: Team): void {
@@ -17843,6 +19833,48 @@ function breakWindowsInGrenadeBlast(point: THREE.Vector3, actionNonce: number, r
     if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
     else normal.normalize().multiplyScalar(-1);
     if (breakHouseWindow(pane.id, centre, normal, replicate, point, 'explosive', actionNonce)) broken += 1;
+  }
+  return broken;
+}
+
+function breakWindowsInWeaponBlast(
+  point: THREE.Vector3,
+  actionNonce: number,
+  replicate: boolean,
+  radius: number,
+  ownerId: string,
+  weapon: WeaponId,
+  impactWindowId: string | null,
+): number {
+  const policy = weaponGlassBreakPolicy(weapon);
+  if (policy.timing !== 'detonation') return 0;
+  const worldColliderSnapshot = Object.freeze([...activeWorldColliders()]);
+  const blastLineOfSightColliders = windowBlastLineOfSightColliders(
+    worldColliderSnapshot,
+    impactWindowId,
+    (collider) => activeGlassColliderWindowIds.get(collider) ?? null,
+  );
+  let broken = 0;
+  for (const pane of arena.breakableWindows) {
+    if (pane.broken) continue;
+    const centre = pane.mesh.getWorldPosition(new THREE.Vector3());
+    if (centre.distanceTo(point) > radius) continue;
+    if (windowBreakPathBlocked(point, centre, blastLineOfSightColliders)) continue;
+    const normal = centre.clone().sub(point);
+    if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
+    else normal.normalize().multiplyScalar(-1);
+    if (breakHouseWindow(
+      pane.id,
+      centre,
+      normal,
+      replicate,
+      point,
+      'shot',
+      actionNonce,
+      ownerId,
+      randomNonce(),
+      weapon,
+    )) broken += 1;
   }
   return broken;
 }
@@ -18342,7 +20374,7 @@ function armImpactGrenade(
         || remoteGrenadeAuthority !== undefined
           && remoteGrenadeForAction(remoteGrenadeAuthority, grenade.actionNonce) === 'semtex'
           && remoteGrenadeLifeForAction(remoteGrenadeAuthority, grenade.actionNonce) === grenade.ownerLifeId;
-      if (receiverCanAuthorAttachment) recordReceiverStickyAttachment({
+      const recordedAttachment = receiverCanAuthorAttachment ? recordReceiverStickyAttachment({
         ownerId: grenade.ownerId,
         ownerLifeId: grenade.ownerLifeId,
         source: 'semtex',
@@ -18351,12 +20383,8 @@ function armImpactGrenade(
         targetLifeId,
         attachedAtMs: now,
         expiresAtMs: grenade.explodeAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
-      });
-      if (targetId === player.id) {
-        presentStickyVictimUrgentAlert('semtex', targetId, targetLifeId, grenade.actionNonce, now);
-        addFeed('STUCK', 'coral');
-      }
-      else if (grenade.ownerKind === 'player') addFeed('STUCK', 'gold');
+      }) : null;
+      if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment);
     }
   }
   audio.coverImpact(position.distanceTo(player.position));
@@ -18998,10 +21026,19 @@ function updateFInteractionPrompt(now = performance.now()): void {
   }
 }
 
-function recordOwnerSupportDamage(event: KillstreakDamageEvent): void {
+function consumeLocalChopperShotPresentationReceipt(event: KillstreakDamageEvent): boolean {
+  return localSupportShotPresentationReceipts.consume(event, currentHostTimeMs());
+}
+
+function recordOwnerSupportDamage(
+  event: KillstreakDamageEvent,
+  presentBallisticFeedback: boolean,
+  presentHitFeedback: boolean,
+): void {
   if (event.ownerId !== player.id || event.damage <= 0) return;
   const targetPosition = new THREE.Vector3(...event.targetPosition);
-  if (targetPosition && (event.source === 'chopper' || event.source === 'piloted-drone' || event.source === 'drone-swarm')) {
+  if (presentBallisticFeedback && targetPosition
+    && (event.source === 'chopper' || event.source === 'piloted-drone' || event.source === 'drone-swarm')) {
     const drone = event.source === 'piloted-drone' || event.source === 'drone-swarm';
     spawnTracer(new THREE.Vector3(...event.tracerOrigin), new THREE.Vector3(...event.endpoint), drone ? 0x52e8ff : 0xffc65c);
     audio.supportGun(drone ? 'drone' : 'chopper');
@@ -19017,13 +21054,33 @@ function recordOwnerSupportDamage(event: KillstreakDamageEvent): void {
     event.activationId,
     (supportDamageDealtByActivation.get(event.activationId) ?? 0) + event.damage,
   );
-  showGunnerTargetConfirm(event, anchor, performance.now());
-  audio.hit(false);
+  if (presentHitFeedback) {
+    showGunnerTargetConfirm(event, anchor, performance.now());
+    audio.hit(false);
+  }
   const displayedSupport = preferredOwnedSupportEntity();
   if (displayedSupport?.activationId === event.activationId) {
     element<HTMLElement>('#chopper-damage-dealt').textContent = String(Math.round(
       supportDamageDealtByActivation.get(event.activationId) ?? 0,
     ));
+  }
+}
+
+function presentKillstreakDamageFeedback(events: readonly KillstreakDamageEvent[]): void {
+  for (const { event, firstForShot: firstShotEvent } of planSupportDamageFeedback(events)) {
+    if (event.ownerId === player.id) {
+      const localBallisticsAlreadyPresented = firstShotEvent
+        && consumeLocalChopperShotPresentationReceipt(event);
+      recordOwnerSupportDamage(
+        event,
+        firstShotEvent && !localBallisticsAlreadyPresented,
+        firstShotEvent,
+      );
+    }
+    if (event.source === 'chopper' && firstShotEvent) {
+      const presented = killstreakSnapshot.entities.find((entity) => entity.activationId === event.activationId);
+      if (presented) killstreakPresentation.presentChopperImpactAction(presented.id);
+    }
   }
 }
 
@@ -19787,12 +21844,116 @@ function showGunnerTargetConfirm(
   gunnerTargetConfirmUntil = now + GUNNER_TARGET_CONFIRM_DURATION_MS;
 }
 
+function armDebugChopperGunnerQaAimFromTrustedCapture(
+  event: MouseEvent,
+  requested: Readonly<{
+    entityId: string;
+    activationId: string;
+    targetId: string;
+    deadlineAtMs: number;
+  }>,
+): boolean {
+  if (!(event instanceof MouseEvent)
+    || event.isTrusted !== true
+    || event.button !== 0
+    || event.eventPhase !== Event.CAPTURING_PHASE
+    || event.currentTarget !== window
+    || event.target !== canvas
+    || document.pointerLockElement !== canvas
+    || isTextChatTyping()
+    || pointSupportTargeting
+    || tacticalMapOpen
+    || matchState.phase !== 'active'
+    || !gameStarted
+    || !player.alive
+    || triggerHeld) return false;
+  const now = performance.now();
+  if (debugChopperGunnerQaAimRequest) {
+    if (now <= debugChopperGunnerQaAimRequest.deadlineAtMs) return false;
+    clearDebugChopperGunnerQaAimRequest();
+  }
+  const actor = localKillstreakActorSnapshot();
+  const possession = actor?.possession;
+  if (!actor || actor.lifeId !== localContinuity
+    || possession?.kind !== 'chopper-gunner'
+    || possession.entityId !== requested.entityId) return false;
+  const entity = killstreakSnapshot.entities.find((candidate) => (
+    candidate.id === requested.entityId
+    && candidate.activationId === requested.activationId
+    && candidate.kind === 'chopper'
+    && candidate.ownerId === player.id
+    && candidate.gunController === 'owner-player'
+    && candidate.expiresInMs > 0
+  ));
+  if (!entity) return false;
+  const world = killstreakWorldState();
+  const target = world.targets.find((candidate) => candidate.id === requested.targetId) ?? null;
+  if (!target || !target.alive || target.id === player.id
+    || !(world.areHostile?.(player.id, player.team, target) ?? target.team !== player.team)) return false;
+  const triggerEdgeSequence = nextDebugChopperGunnerQaAimEdgeSequence();
+  const request = createChopperGunnerQaAimRequest({
+    entityId: entity.id,
+    activationId: entity.activationId,
+    ownerLifeId: actor.lifeId,
+    targetId: target.id,
+    targetLifeId: target.lifeId,
+    triggerEdgeSequence,
+    trustedEventTimestampMs: event.timeStamp,
+    armedAtMs: now,
+    deadlineAtMs: requested.deadlineAtMs,
+  });
+  if (!request) return false;
+  const currentGeometry = resolveChopperGunnerQaAim(request, {
+    nowMs: now,
+    triggerHeld: true,
+    triggerEdgeSequence,
+    entity,
+    ownerId: player.id,
+    ownerLifeId: actor.lifeId,
+    ownerTeam: player.team,
+    world,
+  });
+  if (currentGeometry.status !== 'aligned') return false;
+  debugChopperGunnerQaAimRequest = request;
+  lastDebugChopperGunnerQaAimReceipt = null;
+  return true;
+}
+
 function resetKillstreakPossessionPresentation(): void {
+  debugChopperEvidenceControlOverrideActive = false;
+  clearDebugChopperGunnerQaAimRequest();
   killstreakPresentation.setFirstPersonEntity(null);
   hideGunnerCockpitHud();
   if (camera.near !== 0.08) {
     camera.near = 0.08;
     camera.updateProjectionMatrix();
+  }
+}
+
+function presentLocalPossessedSupportGun(
+  now: number,
+  possession: Readonly<{ kind: 'chopper-gunner' | 'piloted-drone'; entityId: string }>,
+  entity: KillstreakEntitySnapshot,
+): void {
+  if (triggerHeld && now >= nextLocalSupportGunReportAt) {
+    audio.supportGun(possession.kind === 'chopper-gunner' ? 'chopper' : 'drone');
+    if (possession.kind === 'chopper-gunner') {
+      killstreakPresentation.presentChopperWeaponAction(entity.id);
+      const shotRay = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch);
+      const muzzle = new THREE.Vector3(...shotRay.tracerOrigin);
+      const aim = new THREE.Vector3(...shotRay.direction);
+      spawnTracer(muzzle, muzzle.clone().addScaledVector(aim, 130), 0xffb347);
+      localSupportShotPresentationReceipts.record({
+        activationId: entity.activationId,
+        source: 'chopper',
+        presentedAtHostTimeMs: currentHostTimeMs(),
+      });
+    }
+    nextLocalSupportGunReportAt = now + (possession.kind === 'chopper-gunner'
+      ? CHOPPER_GUN_PROFILE.cadenceMs
+      : DRONE_GUN_PROFILE.cadenceMs);
+  } else if (!triggerHeld) {
+    nextLocalSupportGunReportAt = 0;
   }
 }
 
@@ -19834,25 +21995,56 @@ function updateKillstreakPossession(now: number): void {
   if (chopperThermalElement) chopperThermalElement.hidden = !chopperThermal;
   // Exact operator reveal targets are synchronized once per frame by
   // updateThermalGhosts after all weapon/support optic lifecycles settle.
-  if (triggerHeld && now >= nextLocalSupportGunReportAt) {
-    audio.supportGun(possession.kind === 'chopper-gunner' ? 'chopper' : 'drone');
-    // Owner feedback: it was hard to tell the mounted gun was actually firing.
-    // Stream a bright tracer down the aim line on every admitted shot so the
-    // trigger is unmistakable (presentation-only; the host owns real hits).
-    if (possession.kind === 'chopper-gunner') {
-      killstreakPresentation.presentChopperWeaponAction(entity.id);
-      const shotRay = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch);
-      const muzzle = new THREE.Vector3(...shotRay.tracerOrigin);
-      const aim = new THREE.Vector3(...shotRay.direction);
-      spawnTracer(muzzle, muzzle.clone().addScaledVector(aim, 130), 0xffb347);
-    }
-    nextLocalSupportGunReportAt = now + (possession.kind === 'chopper-gunner'
-      ? CHOPPER_GUN_PROFILE.cadenceMs
-      : DRONE_GUN_PROFILE.cadenceMs);
-  } else if (!triggerHeld) {
-    nextLocalSupportGunReportAt = 0;
+  const deferQaShotPresentation = debugChopperGunnerQaAimRequest !== null;
+  if (!deferQaShotPresentation) presentLocalPossessedSupportGun(now, possession, entity);
+  if (debugChopperGunnerQaAimRequest && now > debugChopperGunnerQaAimRequest.deadlineAtMs) {
+    clearDebugChopperGunnerQaAimRequest();
   }
+  // A trusted input can arrive after the current RAF timestamp was sampled.
+  // Defer its admission to the next frame so authority can never predate the
+  // trusted arming edge recorded with performance.now().
+  if (debugChopperGunnerQaAimRequest && now < debugChopperGunnerQaAimRequest.armedAtMs) return;
+  if (possession.kind === 'chopper-gunner' && debugChopperEvidenceControlOverrideActive) return;
   if (now - lastKillstreakControlSentAt < 50) return;
+  const controlThrottle = chopperGunnerQaAimThrottleEvidence(now, lastKillstreakControlSentAt);
+  let alignedQaRequest: ChopperGunnerQaAimRequest | null = null;
+  let alignedQaAim: ChopperGunnerQaAimAlignment | null = null;
+  if (debugChopperGunnerQaAimRequest) {
+    const request = debugChopperGunnerQaAimRequest;
+    const actor = localKillstreakActorSnapshot();
+    const qaEntity = possession.kind === 'chopper-gunner'
+      && possession.entityId === request.entityId
+      && entity.kind === 'chopper'
+      && entity.activationId === request.activationId
+      && entity.ownerId === player.id
+      && entity.gunController === 'owner-player'
+      ? entity
+      : null;
+    const resolution = resolveChopperGunnerQaAim(request, {
+      nowMs: now,
+      triggerHeld,
+      triggerEdgeSequence: debugChopperGunnerQaAimEdgeSequence,
+      entity: qaEntity,
+      ownerId: player.id,
+      ownerLifeId: actor?.lifeId ?? -1,
+      ownerTeam: player.team,
+      world: killstreakWorldState(),
+    });
+    if (resolution.status === 'clear') {
+      clearDebugChopperGunnerQaAimRequest();
+    } else {
+      alignedQaRequest = request;
+      alignedQaAim = resolution.alignment;
+      player.yaw = alignedQaAim.yaw;
+      player.pitch = alignedQaAim.pitch;
+      camera.rotation.y = player.yaw;
+      camera.rotation.x = player.pitch;
+      killstreakPresentation.alignFirstPersonCockpit(entity.id, camera.position, camera.quaternion);
+    }
+  }
+  if (deferQaShotPresentation && alignedQaRequest && alignedQaAim) {
+    presentLocalPossessedSupportGun(now, possession, entity);
+  }
   const droneKeyProfile = activeKeyBindingProfile();
   const droneAxes = pilotedDroneControlAxes({
     keyboardForward: actionHeld('move-forward', keys, droneKeyProfile),
@@ -19873,6 +22065,13 @@ function updateKillstreakPossession(now: number): void {
     verticalQ: possession.kind === 'piloted-drone' ? droneAxes.vertical : 0,
     fire: triggerHeld,
   }, now);
+  if (alignedQaRequest && alignedQaAim) {
+    const admission = lastLocalKillstreakControlAdmission;
+    lastDebugChopperGunnerQaAimReceipt = admission
+      ? chopperGunnerQaAimReceipt(alignedQaRequest, alignedQaAim, admission, now, controlThrottle)
+      : null;
+    clearDebugChopperGunnerQaAimRequest();
+  }
   lastKillstreakControlSentAt = now;
 }
 
@@ -19892,14 +22091,9 @@ function updatePass65KillstreakRuntime(now: number): void {
   }
   if (network.role !== 'client' && matchState.phase === 'active') {
     const result = killstreakRuntime.advance(now, killstreakWorldState());
+    if (result.impactEvents.length > 0) retainRecentKillstreakImpactEvents(result.impactEvents);
     const applied = result.damageEvents.map(applyKillstreakDamageEvent).filter((event): event is KillstreakDamageEvent => event !== null && event.damage > 0);
-    for (const event of applied) {
-      recordOwnerSupportDamage(event);
-      if (event.source === 'chopper') {
-        const presented = killstreakSnapshot.entities.find((entity) => entity.activationId === event.activationId);
-        if (presented) killstreakPresentation.presentChopperImpactAction(presented.id);
-      }
-    }
+    presentKillstreakDamageFeedback(applied);
     const carpetWorldImpacts: Array<{
       point: THREE.Vector3;
       radius: number;
@@ -20353,76 +22547,15 @@ function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): vo
 
 let killstreakLogoFlashTimeout: ReturnType<typeof setTimeout> | null = null;
 
-function drawPalantirLogo(): HTMLCanvasElement | null {
-  if (typeof document === 'undefined') return null;
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
-  const context = canvas.getContext('2d');
-  if (!context) return null;
-  drawPass70DroneSwarmLogo(context);
-  return canvas;
-}
-
-function drawUsFlagLogo(): HTMLCanvasElement | null {
-  if (typeof document === 'undefined') return null;
-  const canvas = document.createElement('canvas');
-  canvas.width = 640;
-  canvas.height = 384;
-  const context = canvas.getContext('2d');
-  if (!context) return null;
-  const stripeHeight = 384 / 13;
-  for (let stripe = 0; stripe < 13; stripe += 1) {
-    context.fillStyle = stripe % 2 === 0 ? '#b22234' : '#ffffff';
-    context.fillRect(0, stripe * stripeHeight, 640, stripeHeight);
-  }
-  // Canton
-  context.fillStyle = '#3c3b6e';
-  context.fillRect(0, 0, 256, 7 * stripeHeight);
-  // 50 stars: 9 rows alternating 6/5
-  const starRadius = 6.4;
-  const star = (cx: number, cy: number, radius: number) => {
-    context.beginPath();
-    for (let point = 0; point < 10; point += 1) {
-      const angle = -Math.PI / 2 + point * Math.PI / 5;
-      const r = point % 2 === 0 ? radius : radius * 0.44;
-      const x = cx + Math.cos(angle) * r;
-      const y = cy + Math.sin(angle) * r;
-      if (point === 0) context.moveTo(x, y);
-      else context.lineTo(x, y);
-    }
-    context.closePath();
-  };
-  context.fillStyle = '#ffffff';
-  for (let row = 0; row < 9; row += 1) {
-    const count = row % 2 === 0 ? 6 : 5;
-    const starRowY = stripeHeight * (row + 1) - starRadius * 0.8;
-    for (let column = 0; column < count; column += 1) {
-      const x = 256 / (count + 1) * (column + 1);
-      star(x, starRowY, starRadius);
-      context.fill();
-    }
-  }
-  return canvas;
-}
-
-function canvasLogoDataUrl(draw: () => HTMLCanvasElement | null): string {
-  const canvas = draw();
-  if (!canvas) return '';
-  try {
-    return canvas.toDataURL('image/png');
-  } catch {
-    return '';
-  }
-}
-
 function flashKillstreakLogo(kind: 'palantir' | 'us-flag'): void {
   const el = element<HTMLElement>('#killstreak-logo-flash');
   if (!el) return;
-  const dataUrl = canvasLogoDataUrl(kind === 'palantir' ? drawPalantirLogo : drawUsFlagLogo);
-  el.innerHTML = dataUrl
-    ? `<div class="logo ${kind}"><img src="${dataUrl}" alt="${kind === 'palantir' ? 'Palantir' : 'US flag'}"></div>`
-    : `<div class="logo ${kind}">${kind === 'palantir' ? '◉' : '🇺🇸'}</div>`;
+  // Keep the live gameplay canvas and every transient logo on a one-way GPU /
+  // compositor path. The previous canvas-to-data-URL conversion performed a
+  // synchronous readback at the exact moment a killstreak began.
+  el.innerHTML = kind === 'palantir'
+    ? '<div class="logo palantir" role="img" aria-label="Palantir"><span class="palantir-mark" aria-hidden="true"></span><b>PALANTIR</b></div>'
+    : '<div class="logo us-flag" role="img" aria-label="United States flag"><span class="us-flag-canton" aria-hidden="true"></span></div>';
   el.hidden = false;
   el.style.opacity = '1';
   if (killstreakLogoFlashTimeout) clearTimeout(killstreakLogoFlashTimeout);
@@ -20437,28 +22570,38 @@ function beginNuke(now: number, authoritativeDamage = true): void {
   nukeShockwave.scale.setScalar(0.1);
   (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   nukeShockwave.visible = false;
+  nukeWarningBeacon.position.fromArray(
+    selectedArena.id === 'gun-range' ? GUN_RANGE_NUKE_WARNING_POSITION : [0, 4.5, 0],
+  );
+  nukeWarningBeacon.visible = true;
+  nukeWarningBeacon.scale.setScalar(0.65);
+  nukeWarningCoreMaterial.opacity = 0.18;
+  nukeWarningRingMaterial.opacity = 0.2;
   nukeSequence = {
     startedAt: now,
     detonateAt: now + NUKE_WARNING_MS,
     finishedAt: now + NUKE_WARNING_MS + 4_500,
     detonated: false,
     shockwave: nukeShockwave,
+    warningBeacon: nukeWarningBeacon,
     authoritativeDamage,
   };
   const warning = element<HTMLElement>('#nuke-warning');
   warning.hidden = false;
   element<HTMLElement>('#nuke-warning b').textContent = '5';
-  audio.nukeWarning();
+  audio.nukeWarning(accessibilityRuntime.reducedSensory);
   nukeLaunches += 1;
   addFeed('NUKE ARMED · FIVE-SECOND ATOMIC WARNING', 'gold');
 }
 
 function detonateNuke(sequence: NukeSequence): void {
+  if (debugNukeWarningEvidenceState?.sequence === sequence) releaseDebugNukeWarningEvidenceFrame();
   const started = performance.now();
   sequence.detonated = true;
   audio.nukeDetonation();
   const afterAudio = performance.now();
   sequence.shockwave.visible = true;
+  sequence.warningBeacon.visible = false;
   sequence.shockwave.scale.setScalar(0.1);
   const flash = element<HTMLElement>('#nuke-flash');
   flash.hidden = false;
@@ -20520,9 +22663,17 @@ function updateNuke(now: number): void {
   if (!sequence.detonated) {
     const remaining = Math.max(0, sequence.detonateAt - now);
     element<HTMLElement>('#nuke-warning b').textContent = String(Math.max(1, Math.ceil(remaining / 1_000)));
-    const charge = THREE.MathUtils.clamp((now - sequence.startedAt) / NUKE_WARNING_MS, 0, 1);
-    if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = Math.max(0, Math.sin(now * 0.018)) * charge * 0.18;
-    if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor).lerp(new THREE.Color(0x8c536f), charge * 0.24);
+    const warningPresentation = sampleNukeWarningPresentation(
+      now - sequence.startedAt,
+      NUKE_WARNING_MS,
+      accessibilityRuntime.reducedSensory,
+    );
+    if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = warningPresentation.skyFlash;
+    if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor).lerp(new THREE.Color(0x8c536f), warningPresentation.fogBlend);
+    sequence.warningBeacon.scale.setScalar(warningPresentation.scale);
+    sequence.warningBeacon.rotation.y = warningPresentation.rotationY;
+    nukeWarningCoreMaterial.opacity = warningPresentation.coreOpacity;
+    nukeWarningRingMaterial.opacity = warningPresentation.ringOpacity;
     if (now >= sequence.detonateAt) detonateNuke(sequence);
     return;
   }
@@ -20538,6 +22689,7 @@ function updateNuke(now: number): void {
   flash.style.opacity = String(Math.min(1, flashStrength * 1.25));
   if (now < sequence.finishedAt) return;
   sequence.shockwave.visible = false;
+  sequence.warningBeacon.visible = false;
   (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
   if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor);
@@ -21418,6 +23570,8 @@ function clearGrenades(): void {
   grenades.length = 0;
   for (const bolt of explosiveBolts) disposeExplosiveBolt(bolt);
   explosiveBolts.length = 0;
+  explosiveBoltImpactReceipts.clear();
+  lastLocalExplosiveBoltActionIdentity = null;
   smokeVolumePresentationPool.clear();
   smokeVolumes.length = 0;
   smokeAuthority.reset(interactiveWorldMatchEpoch, network.role === 'client' ? 'replica' : 'host');
@@ -21427,6 +23581,11 @@ function clearGrenades(): void {
 }
 
 function clearFieldSupport(): void {
+  if (debugNukeWarningEvidenceState) releaseDebugNukeWarningEvidenceFrame();
+  if (debugThermalOperatorEvidenceState) releaseDebugThermalOperatorEvidenceFrame();
+  if (debugChopperCockpitEvidenceState) releaseDebugChopperCockpitEvidenceFrame();
+  if (debugChopperMissileEvidenceState) releaseDebugChopperMissileEvidenceFrame();
+  resetDebugChopperGunnerQaAimEvidence();
   localCareCaptureState = createCareCaptureClientState();
   localCareCaptureRequiresHold = false;
   lastKillstreakControlSentAt = Number.NEGATIVE_INFINITY;
@@ -21436,6 +23595,9 @@ function clearFieldSupport(): void {
   lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
   killstreakPresentation.setFirstPersonEntity(null);
   killstreakPresentation.clear();
+  recentKillstreakImpactEvents.length = 0;
+  killstreakDamageResultReplayLedger.reset();
+  localSupportShotPresentationReceipts.reset();
   document.documentElement.dataset.killstreakPossession = 'none';
   if (camera.near !== 0.08) {
     camera.near = 0.08;
@@ -21456,6 +23618,9 @@ function clearFieldSupport(): void {
   supportExplosionPresentation.clear();
   if (nukeSequence) nukeSequence = null;
   nukeShockwave.visible = false;
+  nukeWarningBeacon.visible = false;
+  nukeWarningCoreMaterial.opacity = 0;
+  nukeWarningRingMaterial.opacity = 0;
   (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
   if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor);
@@ -21475,6 +23640,8 @@ function clearFieldSupport(): void {
   nukeLaunches = 0;
   nukeDetonations = 0;
   localSupportNonces.clear();
+  hostedBotProjectileGlassActions.clear();
+  hostedBotBallisticGlassActions.clear();
   admittedRemoteShots.clear();
   admittedRemoteMelees.clear();
   admittedRemoteExplosions.clear();
@@ -21484,7 +23651,8 @@ function clearFieldSupport(): void {
   stickyTimingReplayNonces.clear();
   stickyVictimFeedbackCount = 0;
   lastStickyVictimFeedback = null;
-  resetStickyVictimUrgentAlertLife();
+  resetStickyAttachmentReceiptAdmission();
+  resetStickyUrgentAlertLife();
   stickyVictimReceiptKeys.clear();
   lastQaStickyAuthoritativeHits.clear();
   for (const id of remotes.keys()) remoteSupportAuthorities.set(id, createRemoteSupportAuthorityState());
@@ -21622,7 +23790,6 @@ function updatePhysics(dt: number): void {
     jumpQueuedAt = -10_000;
   } else {
     player.velocity.y -= 24.5 * dt;
-    if (playerGrounded) player.velocity.y = Math.max(0, player.velocity.y);
   }
 
   const impactVelocity = player.velocity.y;
@@ -21743,6 +23910,9 @@ function updatePhysics(dt: number): void {
     && adsHeld
     && weaponView.adsProgress() >= 0.9
     && Math.abs(camera.fov - aimingFov) < 0.35;
+  dmrThermalRevealActive = player.alive
+    && player.weapon === 'm14-ebr'
+    && adsHeld;
   hudRoot.classList.toggle('dmr-thermal-active', dmrThermalActive);
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
@@ -21759,7 +23929,11 @@ function interpolationSourceSnapshotRateHz(): 20 | 30 | 40 {
 
 function updateRemotes(dt: number, now: number): void {
   if (remotes.size === 0) return;
-  const activeGuestIds = network.role === 'host' ? new Set(network.activePlayerIds(12_000, now)) : null;
+  const activeRemoteIds = network.role === 'host'
+    ? new Set(network.activePlayerIds(12_000, now))
+    : network.role === 'client' && network.activeHost(12_000, now) && privateLobbySnapshot?.hostId
+      ? new Set([privateLobbySnapshot.hostId])
+      : null;
   const hostNow = currentHostTimeMs();
   recordCombatantPose(localPositionHistory, {
     at: hostNow, x: player.position.x, y: player.position.y, z: player.position.z,
@@ -21789,7 +23963,7 @@ function updateRemotes(dt: number, now: number): void {
       // pings continue on the reliable lane. Retain that live actor, but do not
       // trust PeerJS `open` forever after a renderer crash leaves a zombie RTC
       // channel with no authenticated messages.
-      if (activeGuestIds?.has(id)) continue;
+      if (activeRemoteIds?.has(id)) continue;
       removeRemote(id, 'timed out');
       continue;
     }
@@ -24121,6 +26295,8 @@ function resetForMode(preserveAdmission = false): void {
   lastHostedBotStateSeq = -1;
   clearGrenades();
   clearGrenadeExplosionVisuals();
+  grenadeActionProfiles = 0;
+  lastGrenadeFirstActionProfile = null;
   clearFieldSupport();
   clearDeathDrops();
   clearCorpsePresentations();
@@ -24150,11 +26326,14 @@ function resetForMode(preserveAdmission = false): void {
   pendingFlareShotRequests.clear();
   flareShotResultContexts.clear();
   pendingLocalTimedShots.clear();
+  pendingLocalProjectileGlassShots.clear();
   localTimedMapWeaponPendingUntil.clear();
   lastTimedMapWeaponStateBroadcastAt = Number.NEGATIVE_INFINITY;
   timedMapWeaponAudit = createTimedMapWeaponAudit();
+  if (debugThermalOperatorEvidenceState) releaseDebugThermalOperatorEvidenceFrame();
   thermalGhostPresentation.clear();
   authorizedRemoteRedeploys.clear();
+  hf296RemoteProjectionWeaponAuthorizations.clear();
   resetBreakableWindows();
   for (const id of remotes.keys()) removeRemote(id, 'cleared', false);
   verifiedRemoteKills.clear();
@@ -24602,6 +26781,11 @@ function monitorSelectedArenaRender(now: number): void {
     pendingForMs: presentation.pendingForMs,
     stallThresholdMs: LIVE_WEBGPU_PRESENTATION_STALL_MS,
   });
+  // Gameplay has already preowned and submitted every known cold presentation
+  // path behind admission. Preserve the one-second live no-progress fence: a
+  // warmed foreground queue which cannot complete inside it is a real release
+  // failure, not permission to wait behind the renderer's broader cold-work
+  // admission deadline.
   if (liveStall?.kind === 'pending-completion') {
     throw new Error(
       `Renderer presentation made no GPU progress for ${Math.round(liveStall.elapsedMs)}ms`
@@ -24677,6 +26861,42 @@ function frame(now: number, scheduleNext = true): void {
     if (scheduleNext) requestAnimationFrame(frame);
     return;
   }
+  if (debugRenderPaused && debugNukeWarningEvidenceState) {
+    // The Nuke warning evidence owns one already-presented pre-detonation
+    // frame. Hold simulation and presentation together while the exact beacon
+    // root is removed for its paired attribution control.
+    lastFrame = now;
+    accumulator = 0;
+    if (scheduleNext) requestAnimationFrame(frame);
+    return;
+  }
+  if (debugRenderPaused && debugThermalOperatorEvidenceState) {
+    // Hold the already-presented thermal operator frame while its one shared
+    // material is suppressed for the exact paired attribution submission.
+    lastFrame = now;
+    accumulator = 0;
+    if (scheduleNext) requestAnimationFrame(frame);
+    return;
+  }
+  if (debugRenderPaused && debugChopperCockpitEvidenceState) {
+    // HF-306 owns one already-presented possession frame while the exact
+    // authored cockpit roots are removed for its paired attribution control.
+    // Freeze simulation, HUD and camera together; only root visibility may
+    // differ between the official and non-publishable control submissions.
+    lastFrame = now;
+    accumulator = 0;
+    if (scheduleNext) requestAnimationFrame(frame);
+    return;
+  }
+  if (debugRenderPaused && debugChopperMissileEvidenceState) {
+    // HF-308 owns one already-presented missile frame. Freeze simulation,
+    // camera and shell interpolation together while only the identified shell
+    // root is suppressed for its paired attribution submission.
+    lastFrame = now;
+    accumulator = 0;
+    if (scheduleNext) requestAnimationFrame(frame);
+    return;
+  }
   if (debugRenderPaused
     && debugChopperExteriorReviewTrackerRequested
     && currentDebugChopperExteriorReviewHoldActive()) {
@@ -24705,7 +26925,10 @@ function frame(now: number, scheduleNext = true): void {
       && document.visibilityState === 'visible' && document.hasFocus();
     if (activeForegroundWebGpuFrame
       && shouldResetPresentationAfterSchedulerGap(rawFrameMs, LIVE_WEBGPU_PRESENTATION_STALL_MS)) {
-      resetWebGpuPresentationEpoch('foreground scheduler gap', now);
+      // A visible/focused scheduler gap is not a new ownership epoch. Preserve
+      // the age of any unresolved GPU work so the one-second live fence cannot
+      // be erased by the same main-thread pause it is meant to diagnose.
+      resetWebGpuPresentationEpoch('foreground scheduler gap', now, false);
     }
     monitorCompletedWebGpuQueueHealth(now);
     // The HUD must report even pathologically slow software-rendered frames.
@@ -24881,7 +27104,9 @@ function frame(now: number, scheduleNext = true): void {
       if (activeRenderConfig.shadowMode === 'static') requestStaticShadowRefresh(false);
     }
     if (scheduleNext) {
-      recentFrameWorkMs.push(Math.max(0, performance.now() - frameWorkStartedAt));
+      const frameWorkMs = Math.max(0, performance.now() - frameWorkStartedAt);
+      recentFrameWorkMs.push(frameWorkMs);
+      sampleGrenadeFirstActionProfile(performance.now(), frameWorkMs);
       if (recentFrameWorkMs.length > FRAME_WORK_SAMPLE_LIMIT) {
         recentFrameWorkMs.splice(0, recentFrameWorkMs.length - FRAME_WORK_SAMPLE_LIMIT);
       }
@@ -24917,8 +27142,8 @@ function activePostTelemetry(): Record<string, unknown> {
     fallbackReason: null,
     bypassReason: null,
     samples: frameCount,
-    canvasAntialias: graphicsRuntime.antialiasSamples > 0,
-    canvasSamples: Math.max(1, graphicsRuntime.antialiasSamples),
+    canvasAntialias: renderRuntime.telemetry().canvasAntialias,
+    canvasSamples: renderRuntime.telemetry().canvasSamples,
     principalHdrSamples: target?.samples ?? 0,
     bloomSamples: pass64TslSystems?.bloomSamples ?? 0,
     targetValidated: target?.samples === Math.max(1, graphicsRuntime.antialiasSamples),
@@ -25401,11 +27626,206 @@ function sampleWeaponActionReadiness() {
     weapon: player.weapon,
     switchingReady: now >= player.switchingUntil,
     switchingRemainingMs: Math.max(0, player.switchingUntil - now),
+    fireReady: now >= player.nextShotAt,
+    shotCooldownRemainingMs: Math.max(0, player.nextShotAt - now),
     configuredSpinUpMs: WEAPONS[player.weapon].spinUpMs ?? 0,
     spinUpActive: spinUpWeapon === player.weapon && spinUpStartedAtPerformanceMs !== null,
     spinUpElapsedMs: spinUpWeapon === player.weapon && spinUpStartedAtPerformanceMs !== null
       ? Math.max(0, now - spinUpStartedAtPerformanceMs)
       : 0,
+  });
+}
+
+type Hf296ContactAction = 'hip' | 'ads' | 'fire' | 'reload' | 'melee';
+
+/**
+ * Narrow read-only evidence surface for HF-296.  The camera ray is the same
+ * production ray consumed by tryFire/castShot; the muzzle remains explicitly
+ * presentation-only.  Keeping both identities in one sample prevents a
+ * viewmodel socket from being mistaken for ballistic authority.
+ */
+function sampleHf296FireIdentity(presentation = weaponView.presentationState()) {
+  camera.updateMatrixWorld(true);
+  const origin = camera.getWorldPosition(new THREE.Vector3());
+  const direction = camera.getWorldDirection(new THREE.Vector3()).normalize();
+  const muzzle = weaponView.muzzleWorldPosition(new THREE.Vector3());
+  const spec = WEAPONS[player.weapon];
+  const maximumDistance = player.weapon === 'flamethrower' ? FLAMETHROWER_EFFECT.rangeM : 90;
+  const resolution = castShot(
+    origin,
+    direction,
+    player.weapon,
+    spec.fireKind !== 'projectile',
+    maximumDistance,
+  );
+  const hitKind = resolution.playerId ? 'player'
+    : resolution.targetId ? 'target'
+      : resolution.windowId ? 'window'
+        : resolution.ballisticTrace?.stoppedBy ? 'ballistic-surface'
+          : resolution.impactSurface ? 'world-surface' : 'miss';
+  const hitId = resolution.playerId
+    ?? resolution.targetId
+    ?? resolution.windowId
+    ?? resolution.ballisticTrace?.stoppedBy?.id
+    ?? resolution.ballisticTrace?.impacts[0]?.surface.id
+    ?? resolution.impactMaterial
+    ?? resolution.impactSurface
+    ?? 'maximum-range';
+  const projectileKind = spec.fireKind === 'projectile'
+    ? player.weapon === 'explosive-crossbow' ? 'explosive-bolt' : 'flare-projectile'
+    : spec.pellets > 1 ? 'hitscan-pellet-cloud' : 'hitscan-principal-ray';
+  return Object.freeze({
+    contract: 'hf296-camera-muzzle-projectile-hit-identity-v2',
+    weapon: player.weapon,
+    camera: Object.freeze({
+      identity: 'principal-first-person-camera',
+      authority: 'ballistic-origin-and-direction',
+      origin: Object.freeze(origin.toArray()),
+      direction: Object.freeze(direction.toArray()),
+    }),
+    muzzle: Object.freeze({
+      identity: `${player.weapon}:${String(presentation.weaponModelId ?? presentation.importedModel?.source ?? 'model')}:muzzle-socket`,
+      authority: 'presentation-only-tracer-origin',
+      socket: 'muzzle-socket',
+      position: muzzle ? Object.freeze(muzzle.toArray()) : null,
+    }),
+    projectile: Object.freeze({
+      identity: `${player.weapon}:${projectileKind}`,
+      authority: spec.fireKind === 'projectile' ? 'projectile-runtime' : 'castShot',
+      fireKind: spec.fireKind,
+      pellets: spec.pellets,
+    }),
+    hit: Object.freeze({
+      identity: `${hitKind}:${hitId}`,
+      authority: 'production-castShot-read-only-probe',
+      kind: hitKind,
+      id: hitId,
+      distance: resolution.distance,
+      damageMultiplier: resolution.damageMultiplier,
+      traceSurfaceIds: Object.freeze((resolution.ballisticTrace?.impacts ?? []).map((impact) => impact.surface.id)),
+    }),
+  });
+}
+
+function stageHf296ContactAction(action: Hf296ContactAction): ReturnType<typeof sampleHf296FireIdentity> {
+  debugAdsOverride = false;
+  adsHeld = false;
+  debugReloadProgress = null;
+  weaponView.cancelReload();
+  weaponView.setMeleeCaptureProgress(null);
+  weaponView.setFireCaptureAgeMs(null);
+  if (action === 'ads') {
+    debugAdsOverride = true;
+    adsHeld = admittedAdsHeld(true);
+  } else if (action === 'fire') {
+    weaponView.fire(0);
+    weaponView.setFireCaptureAgeMs(24);
+  } else if (action === 'reload') {
+    weaponView.reload();
+    debugReloadProgress = 0.45;
+  } else if (action === 'melee') {
+    weaponView.melee();
+    weaponView.setMeleeCaptureProgress(0.42);
+  }
+  return sampleHf296FireIdentity();
+}
+
+function sampleHf296ContactEvidence() {
+  const presentation = weaponView.presentationState();
+  const remotePlayers = [...remotes.values()].map((remote) => Object.freeze({
+    id: remote.snapshot.id,
+    weapon: remote.snapshot.weapon,
+    stance: remote.snapshot.stance ?? 'stand',
+    authoritativePosition: Object.freeze([
+      remote.snapshot.x,
+      remote.snapshot.y - stanceEyeHeight(remote.snapshot.stance ?? 'stand'),
+      remote.snapshot.z,
+    ]),
+    renderedPosition: Object.freeze(remote.root.position.toArray()),
+    renderedWeapon: remote.root.userData.operator instanceof THREE.Group
+      ? remote.root.userData.operator.userData.operatorRig?.weaponId ?? remote.snapshot.weapon
+      : remote.snapshot.weapon,
+  }));
+  return Object.freeze({
+    contract: 'hf296-player-viewmodel-contact-sample-v2',
+    arena: selectedArena.id,
+    networkRole: network.role,
+    player: Object.freeze({
+      id: player.id,
+      weapon: player.weapon,
+      stance: player.stance,
+      position: Object.freeze(player.position.toArray()),
+      yaw: player.yaw,
+    }),
+    contact: characterPhysics?.debugContactSnapshot() ?? null,
+    viewmodel: Object.freeze({
+      weapon: presentation.weapon,
+      detailsReady: presentation.detailsReady,
+      modelKind: presentation.modelKind,
+      firstPersonSource: presentation.firstPersonSource,
+      weaponModelId: presentation.weaponModelId,
+      action: presentation.actionContract.state,
+      adsProgress: presentation.adsProgress,
+      fireCycle: presentation.fireCycle,
+      shotsPresented: presentation.shotsPresented,
+      surfaceRetreat: presentation.surfaceRetreat,
+      surfaceLift: presentation.surfaceLift,
+      contactResponse: presentation.contactResponse,
+      nearPlaneClearance: presentation.nearPlaneClearance,
+      weaponFraming: presentation.weaponFraming,
+      armFraming: presentation.armFraming,
+      meleeKnifeFraming: presentation.meleeKnifeFraming,
+      fullscreenSuppression: presentation.fullscreenSuppression,
+      importedModel: presentation.importedModel,
+      meleeArmSource: presentation.meleeArmSource,
+      knifeVisible: presentation.knifeVisible,
+    }),
+    fireIdentity: sampleHf296FireIdentity(presentation),
+    remotePlayers: Object.freeze(remotePlayers),
+  });
+}
+
+function sampleHf296ActionProgress() {
+  return Object.freeze({
+    weapon: player.weapon,
+    stance: player.stance,
+    adsProgress: weaponView.adsProgress(),
+    presentedGameplayFrame: lastGameplayPresentedFrame,
+  });
+}
+
+function sampleHf296RemoteProjection() {
+  return Object.freeze([...remotes.values()].map((remote) => Object.freeze({
+    id: remote.snapshot.id,
+    weapon: remote.snapshot.weapon,
+    stance: remote.snapshot.stance ?? 'stand',
+    authoritativePosition: Object.freeze([
+      remote.snapshot.x,
+      remote.snapshot.y - stanceEyeHeight(remote.snapshot.stance ?? 'stand'),
+      remote.snapshot.z,
+    ]),
+    renderedPosition: Object.freeze(remote.root.position.toArray()),
+    renderedWeapon: remote.root.userData.operator instanceof THREE.Group
+      ? remote.root.userData.operator.userData.operatorRig?.weaponId ?? remote.snapshot.weapon
+      : remote.snapshot.weapon,
+  })));
+}
+
+function sampleHf296ColliderField() {
+  return Object.freeze({
+    contract: 'hf296-active-movement-collider-field-v1',
+    arena: selectedArena.id,
+    bounds: Object.freeze({ ...arena.bounds }),
+    colliders: Object.freeze(activeWorldColliders().map((collider, index) => Object.freeze({
+      id: `active:${index}`,
+      minX: collider.minX,
+      maxX: collider.maxX,
+      minY: collider.minY ?? 0,
+      maxY: collider.maxY ?? 8,
+      minZ: collider.minZ,
+      maxZ: collider.maxZ,
+      rotation: collider.rotation ? Object.freeze([...collider.rotation]) : null,
+    }))),
   });
 }
 
@@ -25422,6 +27842,23 @@ const debugWindow = window as Window & {
     sampleWeaponAssetCache: () => ReturnType<typeof pass65WeaponCacheTelemetry>;
     sampleDmrThermalReadiness: () => ReturnType<typeof sampleDmrThermalReadiness>;
     sampleWeaponActionReadiness: () => ReturnType<typeof sampleWeaponActionReadiness>;
+    sampleHf296ContactEvidence: () => ReturnType<typeof sampleHf296ContactEvidence>;
+    prepareHf296WeaponCatalog: () => Promise<ReturnType<typeof weaponView.browserCatalogReadiness>>;
+    sampleHf296FireIdentity: () => ReturnType<typeof sampleHf296FireIdentity>;
+    sampleHf296ActionProgress: () => ReturnType<typeof sampleHf296ActionProgress>;
+    sampleHf296RemoteProjection: () => ReturnType<typeof sampleHf296RemoteProjection>;
+    sampleHf296ColliderField: () => ReturnType<typeof sampleHf296ColliderField>;
+    sampleWindowDebrisLifecycle: (paneIndex: number) => ReturnType<typeof sampleWindowDebrisLifecycle>;
+    armExplosiveBoltImpactObservation: (paneIndex: number) => ExplosiveBoltImpactObservationArm | null;
+    bindExplosiveBoltImpactObservation: (
+      arm: ExplosiveBoltImpactObservationArm,
+      action: LocalExplosiveBoltActionIdentity | null,
+    ) => ExplosiveBoltImpactObservationBinding | null;
+    readExplosiveBoltImpactReceipt: (
+      binding: ExplosiveBoltImpactObservationBinding,
+      maxImpactLatencyMs: number,
+    ) => ReturnType<typeof readLocalExplosiveBoltImpactReceipt>;
+    stageHf296ContactAction: (action: Hf296ContactAction) => ReturnType<typeof sampleHf296FireIdentity>;
     traceBallistics: (
       weapon: WeaponId,
       origin: [number, number, number],
@@ -25432,6 +27869,38 @@ const debugWindow = window as Window & {
     startSolo: () => void;
     setBotsFrozen: (frozen: boolean) => void;
     stageHostedBotAgainstRemote: () => { botId: string; targetId: string } | null;
+    stagePossessedChopperSplashTargets: () => {
+      entityId: string;
+      activationId: string;
+      primaryTargetId: string;
+      primaryTargetLifeId: number;
+      splashTargetId: string;
+      splashTargetLifeId: number;
+      primaryPosition: number[];
+      splashPosition: number[];
+      separationM: number;
+      splashRadiusM: number;
+    } | null;
+    stagePossessedChopperMissileTarget: () => {
+      entityId: string;
+      activationId: string;
+      targetId: string;
+      targetLifeId: number;
+      targetKind: 'bot' | 'training-dummy';
+      targetPosition: number[];
+      lineOfSight: true;
+    } | null;
+    stagePossessedPilotedDroneSensorTarget: (occluded: boolean) => {
+      entityId: string;
+      activationId: string;
+      targetId: string;
+      targetRootUuid: string;
+      origin: number[];
+      target: number[];
+      occluded: boolean;
+      rangeM: number;
+      sensorMaximumRangeM: number;
+    } | null;
     stageBotPerceptionAgainstRemote: (effect: 'smoke' | 'flash') => {
       effect: 'smoke' | 'flash';
       botId: string;
@@ -25447,6 +27916,15 @@ const debugWindow = window as Window & {
     } | null;
     setBotPresentation: (stance: PlayerSnapshot['stance'] | null, speed?: number, weapon?: WeaponId) => void;
     clearBots: () => void;
+    stageThermalEvidenceBot: (occluded: boolean) => {
+      targetId: string;
+      targetKind: 'bot';
+      targetPosition: number[];
+      observerPosition: number[];
+      hostile: true;
+      living: true;
+      wallBlocked: boolean;
+    } | null;
     placeBotAhead: (distance?: number) => {
       contract: 'debug-place-bot-ahead-synchronous-transaction-v1';
       source: '__ATOMIC_ACRES_DEBUG__.placeBotAhead';
@@ -25472,15 +27950,104 @@ const debugWindow = window as Window & {
       entityId: string;
       activationId: string;
       targetId: string;
+      targetLifeId: number;
       origin: number[];
       target: number[];
       yaw: number;
       pitch: number;
+      endpoint: number[];
+      entryDistanceM: number;
+      targetRadialDistanceM: number;
+      maximumRangeM: number;
+      splashRadiusM: number;
       lineOfSight: true;
     } | null;
+    aimPossessedChopperAtTarget: (targetId: string) => {
+      entityId: string;
+      activationId: string;
+      targetId: string;
+      targetLifeId: number;
+      origin: number[];
+      target: number[];
+      yaw: number;
+      pitch: number;
+      endpoint: number[];
+      entryDistanceM: number;
+      targetRadialDistanceM: number;
+      maximumRangeM: number;
+      splashRadiusM: number;
+      lineOfSight: true;
+    } | null;
+    aimPossessedChopperMissileAtTarget: (targetId: string) => {
+      entityId: string;
+      activationId: string;
+      targetId: string;
+      origin: number[];
+      target: number[];
+      yaw: number;
+      pitch: number;
+      impactPosition: number[];
+      targetDistanceFromImpactM: number;
+      lineOfSight: true;
+    } | null;
+    aimPossessedChopperMissileAtTrainingDummy: (targetId: string) => {
+      entityId: string;
+      activationId: string;
+      targetId: string;
+      origin: number[];
+      target: number[];
+      yaw: number;
+      pitch: number;
+      impactPosition: number[];
+      targetDistanceFromImpactM: number;
+      lineOfSight: true;
+    } | null;
+    aimPossessedPilotedDroneAtTarget: (targetId: string) => {
+      entityId: string;
+      activationId: string;
+      targetId: string;
+      origin: number[];
+      target: number[];
+      yaw: number;
+      pitch: number;
+    } | null;
     aimAtRemote: (zone?: HitZone) => void;
+    armPossessedChopperAimTarget: (
+      event: MouseEvent,
+      request: Readonly<{
+        entityId: string;
+        activationId: string;
+        targetId: string;
+        deadlineAtMs: number;
+      }>,
+    ) => boolean;
+    clearPossessedChopperAimTarget: () => void;
+    readPossessedChopperAlignedAimReceipt: () => ChopperGunnerQaAimReceipt | null;
     aimAtRemoteWithOffset: (yawOffset: number, pitchOffset?: number) => void;
     stageWindow: (index: number, distance?: number) => void;
+    prepareHf304GlassEvidenceCell: (
+      weapon: WeaponId,
+      paneIndex: number,
+    ) => ReturnType<typeof prepareHf304GlassEvidenceCell>;
+    stageHf304GlassEvidenceView: (
+      paneIndex: number,
+    ) => ReturnType<typeof stageHf304GlassEvidenceView>;
+    probeHf304GlassEvidenceCrack: (
+      paneIndex: number,
+      impactNonce: number,
+    ) => ReturnType<typeof probeHf304GlassEvidenceCrack>;
+    authorHf304GlassEvidenceCell: (
+      weapon: WeaponId,
+      paneIndex: number,
+      actionNonce: number,
+      windowEventNonce: number,
+    ) => ReturnType<typeof authorHf304GlassEvidenceCell>;
+    sampleHf304GlassEvidenceCell: (
+      paneId: string,
+      actionNonce: number,
+      windowEventNonce: number,
+    ) => ReturnType<typeof sampleHf304GlassEvidenceCell>;
+    resetBreakableWindows: () => void;
     detonateGrenadeAtWindow: (index: number) => number;
     stageYardhawkWall: (team?: Team) => boolean;
     stageBotAtIndoorRamp: (team?: Team, descending?: boolean) => boolean;
@@ -25534,6 +28101,23 @@ const debugWindow = window as Window & {
     setChopperExteriorReviewHold: (held: boolean) => boolean;
     setChopperExteriorReviewTracking: (tracked: boolean) => number | null;
     captureChopperExteriorHiddenControl: () => Promise<DebugChopperExteriorHiddenControlReceipt | null>;
+    freezeChopperCockpitEvidenceFrame: () => Promise<DebugChopperCockpitVisibleFrameReceipt | null>;
+    captureChopperCockpitHiddenControl: () => Promise<DebugChopperCockpitHiddenControlReceipt | null>;
+    releaseChopperCockpitEvidenceFrame: () => boolean;
+    freezeChopperMissileEvidenceFrame: (
+      activationId: string,
+      ordinal: number,
+    ) => Promise<DebugChopperMissileVisibleFrameReceipt | null>;
+    captureChopperMissileHiddenControl: () => Promise<DebugChopperMissileHiddenControlReceipt | null>;
+    releaseChopperMissileEvidenceFrame: () => boolean;
+    freezeNukeWarningEvidenceFrame: () => Promise<DebugNukeWarningVisibleFrameReceipt | null>;
+    nukeWarningEvidenceFrame: () => DebugNukeWarningVisibleFrameReceipt | null;
+    captureNukeWarningHiddenControl: () => Promise<DebugNukeWarningHiddenControlReceipt | null>;
+    releaseNukeWarningEvidenceFrame: () => boolean;
+    freezeThermalOperatorEvidenceFrame: (targetId: string) => Promise<DebugThermalOperatorVisibleFrameReceipt | null>;
+    thermalOperatorEvidenceFrame: () => DebugThermalOperatorVisibleFrameReceipt | null;
+    captureThermalOperatorHiddenControl: () => Promise<DebugThermalOperatorHiddenControlReceipt | null>;
+    releaseThermalOperatorEvidenceFrame: () => boolean;
     setRiggedEvidenceCaptureTargets: (
       targets: readonly Readonly<{ kind: 'bot' | 'training-dummy'; id: string }>[],
     ) => boolean;
@@ -25576,7 +28160,7 @@ const debugWindow = window as Window & {
     setRenderPaused: (paused: boolean) => void;
     recoverFromVisibilityRegain: () => void;
     openMenu: () => void;
-    fireOnce: () => void;
+    fireOnce: () => LocalExplosiveBoltActionIdentity | null;
     setTriggerHeld: (held: boolean) => void;
     stageSmokeVolume: (distance?: number) => string;
     authorStickyEffect: (source: StickyAttachmentSource) => QaStickyEffectResult | null;
@@ -25592,10 +28176,19 @@ const debugWindow = window as Window & {
     interactTestBayStation: () => boolean;
     setAmmo: (weapon: WeaponId, ammo: number, reserve: number) => void;
     setGrenades: (count: number) => void;
+    setSelectedGrenade: (grenade: GrenadeId) => void;
     reload: () => void;
     melee: () => { accepted: boolean; alive: boolean; phase: string; lastMeleeAt: number };
     setAds: (held: boolean) => void;
     setMovement: (forward: boolean, sprint?: boolean) => void;
+    extendHf296HostedMatrixDuration: () => number | null;
+    authorizeHf296RemoteProjectionWeapon: (weapon: WeaponId) => string | null;
+    publishHf296RemoteProjectionState: () => Readonly<{
+      playerId: string;
+      weapon: WeaponId;
+      stance: Stance;
+      sequence: number;
+    }> | null;
     sendRawChat: (text: string, claimedBy?: string) => boolean;
     setMeleeCaptureProgress: (progress: number | null) => void;
     setFireCaptureAgeMs: (ageMs: number | null) => void;
@@ -25624,6 +28217,14 @@ const debugWindow = window as Window & {
     forceRemoteDeathForReconnect: (playerId?: string) => { targetId: string; nextLifeId: number } | null;
     togglePilotedDroneControl: (entityId?: string) => boolean;
     toggleChopperGunnerControl: (entityId?: string) => boolean;
+    requestPossessedChopperEvidenceControl: (control: Readonly<{
+      thrustQ?: number;
+      strafeQ?: number;
+      verticalQ?: number;
+      fire?: boolean;
+      missileFire?: boolean;
+    }>) => boolean;
+    releasePossessedChopperEvidenceControl: () => void;
     forceBotGrenade: (fuseMs?: number, grenade?: GrenadeId) => boolean;
     activateSupport: (id: FieldSupportId) => void;
     setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
@@ -25940,6 +28541,749 @@ function debugCommittedCameraPresentationReceipt(frame: number): DebugCommittedC
       drawRejections: chopperPresentation.stableAirframeDrawRejections,
     }) : null,
   });
+}
+
+async function freezeDebugNukeWarningEvidenceFrame(): Promise<DebugNukeWarningVisibleFrameReceipt | null> {
+  if (debugNukeWarningEvidenceState) return debugNukeWarningEvidenceState.visibleFrame;
+  const sequence = nukeSequence;
+  const official = lastDebugCommittedCameraPresentation;
+  const renderedAtMs = official?.committedAtMs ?? 0;
+  const detonateInMs = sequence ? sequence.detonateAt - renderedAtMs : 0;
+  if (!sequence
+    || sequence.detonated
+    || sequence.warningBeacon !== nukeWarningBeacon
+    || !sequence.warningBeacon.visible
+    || !(sequence.warningBeacon.scale.x > 0.72)
+    || !(nukeWarningCoreMaterial.opacity > 0)
+    || !(nukeWarningRingMaterial.opacity > 0)
+    || !(detonateInMs > 0)
+    || selectedArena.id !== 'gun-range'
+    || renderSubmissionPaused
+    || !debugCaptureCameraActive
+    || !official
+    || official.arenaId !== 'gun-range'
+    || official.frame !== frameCount
+    || official.frame !== lastGameplayPresentedFrame
+    || official.captureRevision !== debugCaptureCameraRevision) return null;
+
+  const state: DebugNukeWarningEvidenceState = {
+    sequence,
+    previousRenderPaused: debugRenderPaused,
+    visibleFrame: null,
+    official,
+    renderedAtMs,
+    detonateInMs,
+    beaconPosition: Object.freeze(sequence.warningBeacon.position.toArray() as [number, number, number]),
+    beaconScale: sequence.warningBeacon.scale.x,
+    coreOpacity: nukeWarningCoreMaterial.opacity,
+    ringOpacity: nukeWarningRingMaterial.opacity,
+  };
+  debugNukeWarningEvidenceState = state;
+  debugRenderPaused = true;
+  try {
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    const completed = renderRuntime.presentationTelemetry();
+    if (debugNukeWarningEvidenceState !== state
+      || nukeSequence !== sequence
+      || sequence.detonated
+      || !sequence.warningBeacon.visible
+      || frameCount !== official.frame
+      || lastGameplayPresentedFrame !== official.frame
+      || (renderRuntime.backend === 'webgpu'
+        && completed.completedSequence < official.submissionSequence)) {
+      throw new Error('Nuke warning visible frame changed before reaching its completion frontier');
+    }
+    const receipt = Object.freeze({
+      contract: 'nuke-warning-frozen-visible-frame-v1' as const,
+      renderer: renderRuntime.backend,
+      completionSemantics: renderRuntime.backend === 'webgpu'
+        ? 'submission-sequence-covered-by-completion-frontier' as const
+        : 'synchronous-render-return' as const,
+      simulationFrame: official.frame,
+      captureRevision: official.captureRevision,
+      submissionSequence: official.submissionSequence,
+      completedSequence: completed.completedSequence,
+      renderedAtMs,
+      detonateAtMs: sequence.detonateAt,
+      detonateInMs,
+      active: true as const,
+      detonated: false as const,
+      cameraPosition: official.position,
+      cameraQuaternion: official.quaternion,
+      beaconPosition: state.beaconPosition,
+      beaconScale: state.beaconScale,
+      coreOpacity: state.coreOpacity,
+      ringOpacity: state.ringOpacity,
+      beaconVisible: true as const,
+    });
+    state.visibleFrame = receipt;
+    return receipt;
+  } catch (error) {
+    if (debugNukeWarningEvidenceState === state) debugNukeWarningEvidenceState = null;
+    debugRenderPaused = state.previousRenderPaused;
+    throw error;
+  }
+}
+
+function currentDebugNukeWarningEvidenceFrame(): DebugNukeWarningVisibleFrameReceipt | null {
+  return debugNukeWarningEvidenceState?.visibleFrame ?? null;
+}
+
+async function captureDebugNukeWarningHiddenControl(): Promise<DebugNukeWarningHiddenControlReceipt | null> {
+  const state = debugNukeWarningEvidenceState;
+  const visibleFrame = state?.visibleFrame;
+  const sequence = state?.sequence;
+  const official = state?.official;
+  if (!state
+    || !visibleFrame
+    || !sequence
+    || !official
+    || !debugRenderPaused
+    || renderSubmissionPaused
+    || nukeSequence !== sequence
+    || sequence.detonated
+    || !sequence.warningBeacon.visible
+    || sequence.warningBeacon !== nukeWarningBeacon
+    || frameCount !== visibleFrame.simulationFrame
+    || lastGameplayPresentedFrame !== visibleFrame.simulationFrame
+    || debugCaptureCameraRevision !== visibleFrame.captureRevision) return null;
+  camera.updateWorldMatrix(true, false);
+  const cameraMatchesOfficial = camera.position.toArray().every((coordinate, axis) => coordinate === official.position[axis])
+    && camera.quaternion.toArray().every((coordinate, axis) => coordinate === official.quaternion[axis])
+    && camera.fov === official.fov
+    && camera.near === official.near
+    && camera.far === official.far;
+  if (!cameraMatchesOfficial) return null;
+
+  const root = sequence.warningBeacon;
+  const before = renderRuntime.presentationTelemetry();
+  let submitted = before;
+  let completed = before;
+  let beaconHiddenDuringSubmission = false;
+  root.visible = false;
+  try {
+    if (renderRuntime.backend === 'webgpu') {
+      await submitForegroundWebGpuFrame(true, 'serialized');
+    } else if (atomicSignal) {
+      atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+    } else {
+      throw new Error('Nuke warning hidden-control has no active renderer');
+    }
+    beaconHiddenDuringSubmission = !root.visible;
+    submitted = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu' && submitted.submissionSequence <= before.submissionSequence) {
+      throw new Error('Nuke warning hidden-control did not submit a distinct WebGPU frame');
+    }
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    completed = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu'
+      && completed.completedSequence < submitted.submissionSequence) {
+      throw new Error('Nuke warning hidden-control WebGPU frame did not reach the completion frontier');
+    }
+  } finally {
+    root.visible = true;
+  }
+  if (!beaconHiddenDuringSubmission || !root.visible || debugNukeWarningEvidenceState !== state) {
+    throw new Error('Nuke warning hidden-control did not preserve its exact hide/restore boundary');
+  }
+  return Object.freeze({
+    contract: 'nuke-warning-hidden-control-v1',
+    nonPublishable: true,
+    renderer: renderRuntime.backend,
+    completionSemantics: renderRuntime.backend === 'webgpu'
+      ? 'submission-sequence-covered-by-completion-frontier'
+      : 'synchronous-render-return',
+    simulationFrame: visibleFrame.simulationFrame,
+    captureRevision: visibleFrame.captureRevision,
+    officialSubmissionSequence: visibleFrame.submissionSequence,
+    submissionSequence: submitted.submissionSequence,
+    completedSequence: completed.completedSequence,
+    beaconPosition: state.beaconPosition,
+    beaconScale: state.beaconScale,
+    coreOpacity: state.coreOpacity,
+    ringOpacity: state.ringOpacity,
+    beaconHiddenDuringSubmission: true,
+    beaconRestored: true,
+  });
+}
+
+function releaseDebugNukeWarningEvidenceFrame(): boolean {
+  const state = debugNukeWarningEvidenceState;
+  if (!state) return false;
+  debugNukeWarningEvidenceState = null;
+  debugRenderPaused = state.previousRenderPaused;
+  return true;
+}
+
+async function freezeDebugThermalOperatorEvidenceFrame(
+  targetId: string,
+): Promise<DebugThermalOperatorVisibleFrameReceipt | null> {
+  if (debugThermalOperatorEvidenceState) return debugThermalOperatorEvidenceState.visibleFrame;
+  if (!localMultiplayerQa || debugRenderPaused || renderSubmissionPaused
+    || !gameStarted || matchState.phase !== 'active' || menuLifecycle.surface !== 'hidden'
+    || document.visibilityState !== 'visible' || !document.hasFocus()) return null;
+  const thermal = thermalGhostPresentation.telemetry();
+  if (thermal.activeTargets !== 1 || thermal.activeTargetIds.length !== 1
+    || thermal.activeTargetIds[0] !== targetId || thermal.occludedTargets !== 1
+    || thermal.occludedTargetIds.length !== 1 || thermal.occludedTargetIds[0] !== targetId
+    || thermal.activeSourceBodyLayers <= 0
+    || thermal.activeSourceBodyLayers !== thermal.activeModelLayers) return null;
+  const officialFrame = lastGameplayPresentedFrame;
+  const officialPresentation = renderRuntime.presentationTelemetry();
+  if (officialFrame <= 0) return null;
+  const state: DebugThermalOperatorEvidenceState = {
+    previousRenderPaused: debugRenderPaused,
+    visibleFrame: null,
+  };
+  // Publish the hold owner before the first await. Otherwise the rAF loop can
+  // advance simulation while the GPU completion frontier is pending because
+  // debugRenderPaused alone deliberately does not stop ordinary test helpers.
+  debugThermalOperatorEvidenceState = state;
+  debugRenderPaused = true;
+  try {
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    const completed = renderRuntime.presentationTelemetry();
+    const frozenThermal = thermalGhostPresentation.telemetry();
+    if (frameCount !== officialFrame || lastGameplayPresentedFrame !== officialFrame
+      || frozenThermal.activeTargets !== 1 || frozenThermal.activeTargetIds[0] !== targetId
+      || frozenThermal.activeSourceBodyLayers !== thermal.activeSourceBodyLayers
+      || frozenThermal.activeModelLayers !== thermal.activeModelLayers
+      || (renderRuntime.backend === 'webgpu'
+        && completed.completedSequence < officialPresentation.submissionSequence)) {
+      throw new Error('Thermal operator changed before reaching its exact completion frontier');
+    }
+    const receipt = Object.freeze({
+      contract: 'thermal-operator-frozen-visible-frame-v1' as const,
+      renderer: renderRuntime.backend,
+      completionSemantics: renderRuntime.backend === 'webgpu'
+        ? 'submission-sequence-covered-by-completion-frontier' as const
+        : 'synchronous-render-return' as const,
+      simulationFrame: officialFrame,
+      submissionSequence: officialPresentation.submissionSequence,
+      completedSequence: completed.completedSequence,
+      targetId,
+      activeSourceBodyLayers: frozenThermal.activeSourceBodyLayers,
+      activeModelLayers: frozenThermal.activeModelLayers,
+      cameraPosition: Object.freeze(camera.position.toArray() as [number, number, number]),
+      cameraQuaternion: Object.freeze(camera.quaternion.toArray() as [number, number, number, number]),
+    });
+    state.visibleFrame = receipt;
+    return receipt;
+  } catch (error) {
+    if (debugThermalOperatorEvidenceState === state) debugThermalOperatorEvidenceState = null;
+    debugRenderPaused = state.previousRenderPaused;
+    throw error;
+  }
+}
+
+function currentDebugThermalOperatorEvidenceFrame(): DebugThermalOperatorVisibleFrameReceipt | null {
+  return debugThermalOperatorEvidenceState?.visibleFrame ?? null;
+}
+
+async function captureDebugThermalOperatorHiddenControl(): Promise<DebugThermalOperatorHiddenControlReceipt | null> {
+  const state = debugThermalOperatorEvidenceState;
+  const visibleFrame = state?.visibleFrame;
+  if (!state || !visibleFrame || !debugRenderPaused || renderSubmissionPaused
+    || frameCount !== visibleFrame.simulationFrame
+    || lastGameplayPresentedFrame !== visibleFrame.simulationFrame) return null;
+  camera.updateWorldMatrix(true, false);
+  const cameraPosition = camera.position.toArray() as [number, number, number];
+  const cameraQuaternion = camera.quaternion.toArray() as [number, number, number, number];
+  if (!cameraPosition.every((coordinate, axis) => coordinate === visibleFrame.cameraPosition[axis])
+    || !cameraQuaternion.every((coordinate, axis) => coordinate === visibleFrame.cameraQuaternion[axis])) return null;
+  const thermal = thermalGhostPresentation.telemetry();
+  if (thermal.activeTargets !== 1 || thermal.activeTargetIds[0] !== visibleFrame.targetId
+    || thermal.activeSourceBodyLayers !== visibleFrame.activeSourceBodyLayers
+    || thermal.activeModelLayers !== visibleFrame.activeModelLayers) return null;
+
+  const before = renderRuntime.presentationTelemetry();
+  let submitted = before;
+  let completed = before;
+  let thermalMaterialHiddenDuringSubmission = false;
+  if (!thermalGhostPresentation.setEvidenceControlHidden(true)) return null;
+  try {
+    if (renderRuntime.backend === 'webgpu') {
+      await submitForegroundWebGpuFrame(true, 'serialized');
+    } else if (atomicSignal) {
+      atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+    } else {
+      throw new Error('Thermal operator hidden-control has no active renderer');
+    }
+    thermalMaterialHiddenDuringSubmission = true;
+    submitted = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu' && submitted.submissionSequence <= before.submissionSequence) {
+      throw new Error('Thermal operator hidden-control did not submit a distinct WebGPU frame');
+    }
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    completed = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu'
+      && completed.completedSequence < submitted.submissionSequence) {
+      throw new Error('Thermal operator hidden-control did not reach its WebGPU completion frontier');
+    }
+  } finally {
+    thermalGhostPresentation.setEvidenceControlHidden(false);
+  }
+  if (!thermalMaterialHiddenDuringSubmission || debugThermalOperatorEvidenceState !== state) {
+    throw new Error('Thermal operator hidden-control did not preserve its exact hide/restore boundary');
+  }
+  return Object.freeze({
+    contract: 'thermal-operator-hidden-control-v1',
+    nonPublishable: true,
+    renderer: renderRuntime.backend,
+    completionSemantics: renderRuntime.backend === 'webgpu'
+      ? 'submission-sequence-covered-by-completion-frontier'
+      : 'synchronous-render-return',
+    simulationFrame: visibleFrame.simulationFrame,
+    officialSubmissionSequence: visibleFrame.submissionSequence,
+    submissionSequence: submitted.submissionSequence,
+    completedSequence: completed.completedSequence,
+    targetId: visibleFrame.targetId,
+    activeSourceBodyLayers: visibleFrame.activeSourceBodyLayers,
+    activeModelLayers: visibleFrame.activeModelLayers,
+    cameraPosition: visibleFrame.cameraPosition,
+    cameraQuaternion: visibleFrame.cameraQuaternion,
+    thermalMaterialHiddenDuringSubmission: true,
+    thermalMaterialRestored: true,
+  });
+}
+
+function releaseDebugThermalOperatorEvidenceFrame(): boolean {
+  const state = debugThermalOperatorEvidenceState;
+  if (!state) return false;
+  thermalGhostPresentation.setEvidenceControlHidden(false);
+  debugThermalOperatorEvidenceState = null;
+  debugRenderPaused = state.previousRenderPaused;
+  return true;
+}
+
+const CHOPPER_COCKPIT_EVIDENCE_SEMANTIC_NODES = Object.freeze([
+  'chopper-cockpit-dashboard-3d',
+  'chopper-cockpit-display-cyan',
+  'chopper-cockpit-display-green',
+  'chopper-inner-windscreen-pillar-left-base',
+  'chopper-inner-windscreen-pillar-left-top',
+  'chopper-inner-windscreen-pillar-right-base',
+  'chopper-inner-windscreen-pillar-right-top',
+  'chopper-inner-windscreen-glow-left-base',
+  'chopper-inner-windscreen-glow-left-top',
+  'chopper-inner-windscreen-glow-right-base',
+  'chopper-inner-windscreen-glow-right-top',
+] as const);
+
+function chopperCockpitRootVisibleThroughEntity(
+  node: THREE.Object3D,
+  entityRoot: THREE.Object3D,
+): boolean {
+  let cursor: THREE.Object3D | null = node;
+  while (cursor) {
+    if (!cursor.visible) return false;
+    if (cursor === entityRoot) return true;
+    cursor = cursor.parent;
+  }
+  return false;
+}
+
+function chopperCockpitCameraReceipt(): DebugChopperCockpitVisibleFrameReceipt['camera'] {
+  camera.updateWorldMatrix(true, false);
+  return Object.freeze({
+    position: Object.freeze(camera.position.toArray() as [number, number, number]),
+    quaternion: Object.freeze(camera.quaternion.toArray() as [number, number, number, number]),
+    fov: camera.fov,
+    near: camera.near,
+    far: camera.far,
+    aspect: camera.aspect,
+  });
+}
+
+function chopperCockpitViewportReceipt(): DebugChopperCockpitVisibleFrameReceipt['viewport'] {
+  return Object.freeze({
+    cssWidth: window.innerWidth,
+    cssHeight: window.innerHeight,
+    devicePixelRatio: window.devicePixelRatio,
+    canvasWidth: canvas.width,
+    canvasHeight: canvas.height,
+  });
+}
+
+function chopperCockpitCameraMatches(
+  receipt: DebugChopperCockpitVisibleFrameReceipt['camera'],
+): boolean {
+  camera.updateWorldMatrix(true, false);
+  return camera.position.toArray().every((value, axis) => value === receipt.position[axis])
+    && camera.quaternion.toArray().every((value, axis) => value === receipt.quaternion[axis])
+    && camera.fov === receipt.fov
+    && camera.near === receipt.near
+    && camera.far === receipt.far
+    && camera.aspect === receipt.aspect;
+}
+
+async function freezeDebugChopperCockpitEvidenceFrame(): Promise<DebugChopperCockpitVisibleFrameReceipt | null> {
+  if (debugChopperCockpitEvidenceState) return debugChopperCockpitEvidenceState.visibleFrame;
+  const possession = localKillstreakActorSnapshot()?.possession;
+  if (possession?.kind !== 'chopper-gunner' || debugRenderPaused || renderSubmissionPaused
+    || !gameStarted || matchState.phase !== 'active' || menuLifecycle.surface !== 'hidden') return null;
+  const entityRoot = killstreakPresentation.entityRoot(possession.entityId);
+  const presentation = killstreakPresentation.telemetry(camera);
+  const firstPerson = presentation.firstPersonSightline;
+  const detail = presentation.entityDetails.find((entry) => entry.entityId === possession.entityId) ?? null;
+  if (!entityRoot?.visible || !firstPerson || firstPerson.entityId !== possession.entityId
+    || firstPerson.presentationSource !== 'project-original-blender-glb'
+    || firstPerson.visibleOutsideCockpit.length !== 0
+    || !firstPerson.dashboardVisible || !firstPerson.displaysVisible
+    || firstPerson.hudVisible || !firstPerson.centreSightlineClear
+    || !firstPerson.weaponVisible || !firstPerson.overlayLayerExclusive
+    || !firstPerson.alignment || firstPerson.alignment.pivotErrorM >= 0.001) return null;
+  const cockpitRoots: THREE.Object3D[] = [];
+  entityRoot.traverse((node) => {
+    if (node.name === 'chopper-first-person-cockpit') cockpitRoots.push(node);
+  });
+  const cockpitRootVisibilities = cockpitRoots.map((root) => root.visible);
+  const activeCockpitRootCount = cockpitRoots.filter((root) => (
+    chopperCockpitRootVisibleThroughEntity(root, entityRoot)
+  )).length;
+  const semanticNodeNames = CHOPPER_COCKPIT_EVIDENCE_SEMANTIC_NODES.filter((name) => (
+    entityRoot.getObjectByName(name) !== undefined
+  ));
+  const cockpitHud = element<HTMLElement>('#gunner-cockpit-hud');
+  const cockpitHudVisible = !cockpitHud.hidden && getComputedStyle(cockpitHud).display !== 'none'
+    && cockpitHud.dataset.supportKind === 'chopper-gunner';
+  if (cockpitRoots.length !== 3 || activeCockpitRootCount !== 1
+    || cockpitRootVisibilities.some((visible) => !visible)
+    || semanticNodeNames.length !== CHOPPER_COCKPIT_EVIDENCE_SEMANTIC_NODES.length
+    || !cockpitHudVisible || detail?.activeLodIndex !== 0 || !detail.activeLodAsset) return null;
+
+  const before = renderRuntime.presentationTelemetry();
+  if (renderRuntime.backend === 'webgpu' && before.completedSequence < before.submissionSequence) return null;
+  const simulationFrame = lastGameplayPresentedFrame;
+  const cameraReceipt = chopperCockpitCameraReceipt();
+  const viewportReceipt = chopperCockpitViewportReceipt();
+  const state: DebugChopperCockpitEvidenceState = {
+    previousRenderPaused: debugRenderPaused,
+    entityRoot,
+    cockpitRoots: Object.freeze(cockpitRoots),
+    cockpitRootVisibilities: Object.freeze(cockpitRootVisibilities),
+    visibleFrame: null,
+  };
+  debugChopperCockpitEvidenceState = state;
+  debugRenderPaused = true;
+  try {
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    const completed = renderRuntime.presentationTelemetry();
+    const currentPossession = localKillstreakActorSnapshot()?.possession;
+    if (debugChopperCockpitEvidenceState !== state
+      || currentPossession?.kind !== 'chopper-gunner'
+      || currentPossession.entityId !== possession.entityId
+      || lastGameplayPresentedFrame !== simulationFrame
+      || !chopperCockpitCameraMatches(cameraReceipt)
+      || state.cockpitRoots.some((root, index) => root.visible !== state.cockpitRootVisibilities[index])
+      || (renderRuntime.backend === 'webgpu' && completed.completedSequence < before.submissionSequence)) {
+      throw new Error('Chopper cockpit visible frame changed before reaching its completion frontier');
+    }
+    const receipt = Object.freeze({
+      contract: 'chopper-cockpit-frozen-visible-frame-v1' as const,
+      renderer: renderRuntime.backend,
+      completionSemantics: renderRuntime.backend === 'webgpu'
+        ? 'submission-sequence-covered-by-completion-frontier' as const
+        : 'synchronous-render-return' as const,
+      entityId: possession.entityId,
+      simulationFrame,
+      submissionSequence: before.submissionSequence,
+      completedSequence: completed.completedSequence,
+      camera: cameraReceipt,
+      viewport: viewportReceipt,
+      cockpitRootName: 'chopper-first-person-cockpit' as const,
+      cockpitRootCount: cockpitRoots.length,
+      activeCockpitRootCount,
+      activeLodAsset: detail.activeLodAsset,
+      semanticNodeNames: Object.freeze([...semanticNodeNames]),
+      firstPerson,
+      cockpitRootsVisible: true as const,
+      entityRootVisible: true as const,
+      cockpitHudVisible: true as const,
+    });
+    state.visibleFrame = receipt;
+    return receipt;
+  } catch (error) {
+    if (debugChopperCockpitEvidenceState === state) debugChopperCockpitEvidenceState = null;
+    debugRenderPaused = state.previousRenderPaused;
+    throw error;
+  }
+}
+
+async function captureDebugChopperCockpitHiddenControl(): Promise<DebugChopperCockpitHiddenControlReceipt | null> {
+  const state = debugChopperCockpitEvidenceState;
+  const visibleFrame = state?.visibleFrame;
+  const possession = localKillstreakActorSnapshot()?.possession;
+  if (!state || !visibleFrame || !debugRenderPaused || renderSubmissionPaused
+    || possession?.kind !== 'chopper-gunner' || possession.entityId !== visibleFrame.entityId
+    || state.entityRoot !== killstreakPresentation.entityRoot(visibleFrame.entityId)
+    || !state.entityRoot.visible || lastGameplayPresentedFrame !== visibleFrame.simulationFrame
+    || !chopperCockpitCameraMatches(visibleFrame.camera)
+    || state.cockpitRoots.some((root, index) => root.visible !== state.cockpitRootVisibilities[index])) return null;
+
+  const before = renderRuntime.presentationTelemetry();
+  let submitted = before;
+  let completed = before;
+  let cockpitRootsHiddenDuringSubmission = false;
+  let entityRootVisibleDuringSubmission = false;
+  let cockpitHudVisibleDuringSubmission = false;
+  for (const root of state.cockpitRoots) root.visible = false;
+  try {
+    if (renderRuntime.backend === 'webgpu') {
+      await submitForegroundWebGpuFrame(true, 'serialized');
+    } else if (atomicSignal) {
+      atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+    } else {
+      throw new Error('Chopper cockpit hidden-control has no active renderer');
+    }
+    cockpitRootsHiddenDuringSubmission = state.cockpitRoots.every((root) => !root.visible);
+    entityRootVisibleDuringSubmission = state.entityRoot.visible;
+    const cockpitHud = element<HTMLElement>('#gunner-cockpit-hud');
+    cockpitHudVisibleDuringSubmission = !cockpitHud.hidden
+      && getComputedStyle(cockpitHud).display !== 'none'
+      && cockpitHud.dataset.supportKind === 'chopper-gunner';
+    submitted = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu' && submitted.submissionSequence <= before.submissionSequence) {
+      throw new Error('Chopper cockpit hidden-control did not submit a distinct WebGPU frame');
+    }
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    completed = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu' && completed.completedSequence < submitted.submissionSequence) {
+      throw new Error('Chopper cockpit hidden-control WebGPU frame did not reach the completion frontier');
+    }
+  } finally {
+    state.cockpitRoots.forEach((root, index) => { root.visible = state.cockpitRootVisibilities[index]!; });
+  }
+  const rootsRestored = state.cockpitRoots.every((root, index) => (
+    root.visible === state.cockpitRootVisibilities[index]
+  ));
+  if (!cockpitRootsHiddenDuringSubmission || !entityRootVisibleDuringSubmission
+    || !cockpitHudVisibleDuringSubmission || !rootsRestored
+    || debugChopperCockpitEvidenceState !== state
+    || lastGameplayPresentedFrame !== visibleFrame.simulationFrame
+    || !chopperCockpitCameraMatches(visibleFrame.camera)) {
+    throw new Error('Chopper cockpit hidden-control did not preserve its exact frozen-frame boundary');
+  }
+  return Object.freeze({
+    contract: 'chopper-cockpit-hidden-control-v1',
+    nonPublishable: true,
+    renderer: renderRuntime.backend,
+    completionSemantics: renderRuntime.backend === 'webgpu'
+      ? 'submission-sequence-covered-by-completion-frontier'
+      : 'synchronous-render-return',
+    entityId: visibleFrame.entityId,
+    simulationFrame: visibleFrame.simulationFrame,
+    officialSubmissionSequence: visibleFrame.submissionSequence,
+    officialCompletedSequence: visibleFrame.completedSequence,
+    submissionSequence: submitted.submissionSequence,
+    completedSequence: completed.completedSequence,
+    camera: visibleFrame.camera,
+    viewport: visibleFrame.viewport,
+    cockpitRootName: visibleFrame.cockpitRootName,
+    cockpitRootCount: visibleFrame.cockpitRootCount,
+    activeCockpitRootCount: visibleFrame.activeCockpitRootCount,
+    activeLodAsset: visibleFrame.activeLodAsset,
+    semanticNodeNames: visibleFrame.semanticNodeNames,
+    firstPerson: visibleFrame.firstPerson,
+    cockpitRootsHiddenDuringSubmission: true,
+    cockpitRootsRestored: true,
+    entityRootVisibleDuringSubmission: true,
+    cockpitHudVisibleDuringSubmission: true,
+  });
+}
+
+function releaseDebugChopperCockpitEvidenceFrame(): boolean {
+  const state = debugChopperCockpitEvidenceState;
+  if (!state) return false;
+  state.cockpitRoots.forEach((root, index) => { root.visible = state.cockpitRootVisibilities[index]!; });
+  debugChopperCockpitEvidenceState = null;
+  debugRenderPaused = state.previousRenderPaused;
+  return true;
+}
+
+function chopperMissileTupleMatches(
+  left: readonly number[],
+  right: readonly number[],
+  epsilon = 1e-6,
+): boolean {
+  return left.length === right.length
+    && left.every((value, axis) => Math.abs(value - right[axis]!) <= epsilon);
+}
+
+async function freezeDebugChopperMissileEvidenceFrame(
+  activationId: string,
+  ordinal: number,
+): Promise<DebugChopperMissileVisibleFrameReceipt | null> {
+  if (debugChopperMissileEvidenceState) {
+    const existing = debugChopperMissileEvidenceState.visibleFrame;
+    return existing?.activationId === activationId && existing.ordinal === ordinal ? existing : null;
+  }
+  if (!/^ks-activation-[0-9]+-[0-9]+$/.test(activationId)
+    || !Number.isSafeInteger(ordinal) || ordinal < 0 || ordinal >= CHOPPER_MISSILE_CAPACITY
+    || debugRenderPaused || renderSubmissionPaused || !gameStarted
+    || matchState.phase !== 'active' || menuLifecycle.surface !== 'hidden') return null;
+  const presentation = killstreakPresentation.telemetry(camera);
+  const missile = presentation.chopperMissileShells.find((entry) => (
+    entry.activationId === activationId && entry.ordinal === ordinal
+  )) ?? null;
+  const missileRoot = killstreakPresentation.chopperMissileShellRoot(activationId, ordinal);
+  const authority = killstreakRuntime.chopperMissileAuthorityEvidence().events.find((event) => (
+    event.phase === 'launch' && event.activationId === activationId && event.ordinal === ordinal
+  )) ?? null;
+  if (!missile || !missileRoot || !authority || !missile.visible || !missileRoot.visible
+    || !missile.inFrustum || missile.progress <= 0 || missile.progress >= 1
+    || missile.distanceFromTrajectoryM > 0.001
+    || missile.trajectoryId !== authority.trajectoryId
+    || !chopperMissileTupleMatches(missile.launchPosition, authority.launchPosition)
+    || !chopperMissileTupleMatches(missile.targetPosition, [
+      authority.impactPosition[0],
+      authority.impactPosition[1] + 0.35,
+      authority.impactPosition[2],
+    ])) return null;
+  const otherMissileRoots = presentation.chopperMissileShells.flatMap((entry) => {
+    if (entry.activationId === activationId && entry.ordinal === ordinal) return [];
+    const root = killstreakPresentation.chopperMissileShellRoot(entry.activationId, entry.ordinal);
+    return root ? [Object.freeze({ root, visible: root.visible })] : [];
+  });
+  const before = renderRuntime.presentationTelemetry();
+  if (renderRuntime.backend === 'webgpu' && before.completedSequence < before.submissionSequence) return null;
+  const simulationFrame = lastGameplayPresentedFrame;
+  const cameraReceipt = chopperCockpitCameraReceipt();
+  const viewportReceipt = chopperCockpitViewportReceipt();
+  const state: DebugChopperMissileEvidenceState = {
+    previousRenderPaused: debugRenderPaused,
+    missileRoot,
+    missileRootVisible: missileRoot.visible,
+    otherMissileRoots: Object.freeze(otherMissileRoots),
+    visibleFrame: null,
+  };
+  debugChopperMissileEvidenceState = state;
+  debugRenderPaused = true;
+  try {
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    const completed = renderRuntime.presentationTelemetry();
+    const current = killstreakPresentation.telemetry(camera).chopperMissileShells.find((entry) => (
+      entry.activationId === activationId && entry.ordinal === ordinal
+    )) ?? null;
+    if (debugChopperMissileEvidenceState !== state || !current
+      || lastGameplayPresentedFrame !== simulationFrame
+      || !chopperCockpitCameraMatches(cameraReceipt)
+      || state.missileRoot.visible !== state.missileRootVisible
+      || !chopperMissileTupleMatches(current.worldPosition, missile.worldPosition)
+      || current.progress !== missile.progress
+      || state.otherMissileRoots.some((entry) => entry.root.visible !== entry.visible)
+      || (renderRuntime.backend === 'webgpu' && completed.completedSequence < before.submissionSequence)) {
+      throw new Error('Chopper missile visible frame changed before reaching its completion frontier');
+    }
+    const receipt = Object.freeze({
+      contract: 'chopper-missile-frozen-visible-frame-v1' as const,
+      renderer: renderRuntime.backend,
+      completionSemantics: renderRuntime.backend === 'webgpu'
+        ? 'submission-sequence-covered-by-completion-frontier' as const
+        : 'synchronous-render-return' as const,
+      simulationFrame,
+      submissionSequence: before.submissionSequence,
+      completedSequence: completed.completedSequence,
+      camera: cameraReceipt,
+      viewport: viewportReceipt,
+      trajectoryId: missile.trajectoryId,
+      activationId,
+      ordinal,
+      missile,
+      authority,
+      missileRootVisible: true as const,
+    });
+    state.visibleFrame = receipt;
+    return receipt;
+  } catch (error) {
+    if (debugChopperMissileEvidenceState === state) debugChopperMissileEvidenceState = null;
+    debugRenderPaused = state.previousRenderPaused;
+    throw error;
+  }
+}
+
+async function captureDebugChopperMissileHiddenControl(): Promise<DebugChopperMissileHiddenControlReceipt | null> {
+  const state = debugChopperMissileEvidenceState;
+  const visibleFrame = state?.visibleFrame;
+  if (!state || !visibleFrame || !debugRenderPaused || renderSubmissionPaused
+    || state.missileRoot !== killstreakPresentation.chopperMissileShellRoot(
+      visibleFrame.activationId,
+      visibleFrame.ordinal,
+    )
+    || !state.missileRoot.visible || lastGameplayPresentedFrame !== visibleFrame.simulationFrame
+    || !chopperCockpitCameraMatches(visibleFrame.camera)
+    || state.otherMissileRoots.some((entry) => entry.root.visible !== entry.visible)) return null;
+  const current = killstreakPresentation.telemetry(camera).chopperMissileShells.find((entry) => (
+    entry.activationId === visibleFrame.activationId && entry.ordinal === visibleFrame.ordinal
+  )) ?? null;
+  if (!current || !chopperMissileTupleMatches(current.worldPosition, visibleFrame.missile.worldPosition)
+    || current.progress !== visibleFrame.missile.progress) return null;
+
+  const before = renderRuntime.presentationTelemetry();
+  let submitted = before;
+  let completed = before;
+  let missileRootHiddenDuringSubmission = false;
+  state.missileRoot.visible = false;
+  try {
+    if (renderRuntime.backend === 'webgpu') {
+      await submitForegroundWebGpuFrame(true, 'serialized');
+    } else if (atomicSignal) {
+      atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+    } else {
+      throw new Error('Chopper missile hidden-control has no active renderer');
+    }
+    missileRootHiddenDuringSubmission = !state.missileRoot.visible;
+    submitted = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu' && submitted.submissionSequence <= before.submissionSequence) {
+      throw new Error('Chopper missile hidden-control did not submit a distinct WebGPU frame');
+    }
+    if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames(8_000);
+    completed = renderRuntime.presentationTelemetry();
+    if (renderRuntime.backend === 'webgpu' && completed.completedSequence < submitted.submissionSequence) {
+      throw new Error('Chopper missile hidden-control WebGPU frame did not reach the completion frontier');
+    }
+  } finally {
+    state.missileRoot.visible = state.missileRootVisible;
+  }
+  const otherRootsPreserved = state.otherMissileRoots.every((entry) => entry.root.visible === entry.visible);
+  if (!missileRootHiddenDuringSubmission || !state.missileRoot.visible || !otherRootsPreserved
+    || debugChopperMissileEvidenceState !== state
+    || lastGameplayPresentedFrame !== visibleFrame.simulationFrame
+    || !chopperCockpitCameraMatches(visibleFrame.camera)) {
+    throw new Error('Chopper missile hidden-control did not preserve its exact frozen-frame boundary');
+  }
+  return Object.freeze({
+    contract: 'chopper-missile-hidden-control-v1',
+    nonPublishable: true,
+    renderer: renderRuntime.backend,
+    completionSemantics: renderRuntime.backend === 'webgpu'
+      ? 'submission-sequence-covered-by-completion-frontier'
+      : 'synchronous-render-return',
+    simulationFrame: visibleFrame.simulationFrame,
+    officialSubmissionSequence: visibleFrame.submissionSequence,
+    officialCompletedSequence: visibleFrame.completedSequence,
+    submissionSequence: submitted.submissionSequence,
+    completedSequence: completed.completedSequence,
+    camera: visibleFrame.camera,
+    viewport: visibleFrame.viewport,
+    trajectoryId: visibleFrame.trajectoryId,
+    activationId: visibleFrame.activationId,
+    ordinal: visibleFrame.ordinal,
+    missile: visibleFrame.missile,
+    authority: visibleFrame.authority,
+    missileRootHiddenDuringSubmission: true,
+    missileRootRestored: true,
+    allOtherMissileRootVisibilitiesPreserved: true,
+  });
+}
+
+function releaseDebugChopperMissileEvidenceFrame(): boolean {
+  const state = debugChopperMissileEvidenceState;
+  if (!state) return false;
+  state.missileRoot.visible = state.missileRootVisible;
+  debugChopperMissileEvidenceState = null;
+  debugRenderPaused = state.previousRenderPaused;
+  return true;
 }
 
 async function captureDebugChopperExteriorHiddenControl(): Promise<DebugChopperExteriorHiddenControlReceipt | null> {
@@ -26366,6 +29710,24 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleWeaponAssetCache: () => pass65WeaponCacheTelemetry(),
   sampleDmrThermalReadiness,
   sampleWeaponActionReadiness,
+  sampleHf296ContactEvidence,
+  prepareHf296WeaponCatalog: async () => {
+    await weaponView.prepareBrowserWeaponCatalogAssets(
+      WEAPON_IDS,
+      undefined,
+      yieldDeploymentPrewarmFrame,
+    );
+    return weaponView.browserCatalogReadiness();
+  },
+  sampleHf296FireIdentity,
+  sampleHf296ActionProgress,
+  sampleHf296RemoteProjection,
+  sampleHf296ColliderField,
+  sampleWindowDebrisLifecycle,
+  armExplosiveBoltImpactObservation: armLocalExplosiveBoltImpactObservation,
+  bindExplosiveBoltImpactObservation: bindLocalExplosiveBoltImpactObservation,
+  readExplosiveBoltImpactReceipt: readLocalExplosiveBoltImpactReceipt,
+  stageHf296ContactAction,
   snapshot: () => ({
     bootstrap: {
       stage: bootstrapStage,
@@ -26524,6 +29886,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       currentHostTimeMs: currentHostTimeMs(),
       lastBroadcastAt: lastTimedMapWeaponStateBroadcastAt,
     },
+    projectileGlass: {
+      explosiveBolts: explosiveBolts.map((bolt) => ({
+        actionNonce: bolt.actionNonce,
+        authority: bolt.authority,
+        impacted: bolt.impactedAt !== null,
+        impactWindowId: bolt.impactWindowId,
+        position: bolt.mesh.position.toArray(),
+        detonatesInMs: Math.max(0, bolt.detonatesAt - performance.now()),
+      })),
+    },
     dmrThermal: {
       ...dmrThermalPresentation.telemetry(),
       exactOperatorReveal: thermalGhostPresentation.telemetry(),
@@ -26549,6 +29921,25 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       victimFeedbackCount: stickyVictimFeedbackCount,
       lastVictimFeedback: lastStickyVictimFeedback ? { ...lastStickyVictimFeedback } : null,
       retainedReceiptCount: stickyVictimReceiptKeys.size,
+      urgentAlert: (() => {
+        const warning = element<HTMLElement>('#sticky-warning');
+        const bounds = warning.getBoundingClientRect();
+        return {
+          visible: !warning.hidden,
+          source: warning.dataset.source ?? null,
+          audience: warning.dataset.audience ?? null,
+          targetId: warning.dataset.targetId ?? null,
+          targetLifeId: warning.dataset.targetLifeId === undefined ? null : Number(warning.dataset.targetLifeId),
+          actionNonce: warning.dataset.actionNonce === undefined ? null : Number(warning.dataset.actionNonce),
+          expiresAtMs: warning.dataset.expiresAtMs === undefined ? null : Number(warning.dataset.expiresAtMs),
+          centreErrorPx: Math.hypot(
+            bounds.left + bounds.width * 0.5 - window.innerWidth * 0.5,
+            bounds.top + bounds.height * 0.5 - window.innerHeight * 0.5,
+          ),
+          computedPosition: getComputedStyle(warning).position,
+          computedZIndex: Number(getComputedStyle(warning).zIndex),
+        };
+      })(),
     },
     lastCompletedMultiplayerDiagnostic: loadLastMultiplayerDiagnostic(clientPersistentStorage()),
     matchDiagnosticsUpload: matchDiagnosticUploader.telemetry(),
@@ -26612,6 +30003,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       presentationRootInScene: interactiveWorldRuntime?.root.parent === scene,
       presentationRootVisible: interactiveWorldRuntime?.root.visible ?? false,
       collisionCacheRevision: activeWorldColliderCacheRevision,
+      rapierDynamicColliders: characterPhysics?.dynamicColliderCount() ?? 0,
       rapierMajorBodies: characterPhysics?.majorDebrisBodyCount() ?? 0,
       rapierPrewarmedMajorBodies: characterPhysics?.prewarmedMajorDebrisBodyCount() ?? 0,
       gpuRetirement: {
@@ -26782,6 +30174,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       const operatorModel = riggedOperatorTelemetry(bot.root);
       return {
         id: bot.id,
+        rootUuid: bot.root.uuid,
         name: bot.name,
         team: bot.team,
         hp: bot.hp,
@@ -26911,7 +30304,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       snapshotAgeMs: Math.max(0, performance.now() - remote.lastSeen),
       interpolationError: remote.root.position.distanceTo(remote.target),
       screenPosition: remote.root.localToWorld(new THREE.Vector3(0, 1.2, 0)).project(camera).toArray(),
-      operatorModel: riggedOperatorTelemetry(remote.root),
+      operatorModel: riggedOperatorTelemetry(remote.root.userData.operator as THREE.Object3D),
       readability: remoteHumanReadabilityTelemetry(remote.root.userData.operator as THREE.Object3D),
     })),
     retainedRemotePlayers: [...retainedRemoteAuthorities.values()].map((retained) => ({
@@ -26969,6 +30362,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       lastExplosionAgeMs: lastGrenadeExplosionFrameAt > 0 ? Math.max(0, performance.now() - lastGrenadeExplosionFrameAt) : null,
       profile: { ...lastGrenadeExplosionProfile },
     },
+    grenadeFirstAction: lastGrenadeFirstActionProfile ? {
+      ...lastGrenadeFirstActionProfile,
+      audio: { ...lastGrenadeFirstActionProfile.audio },
+    } : null,
     audio: { ...audio.telemetry(), occlusion: audioOcclusionBudget.telemetry() },
     settings: {
       requested: pass65Settings,
@@ -26999,6 +30396,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     killstreakPresentation: killstreakPresentation.telemetry(camera),
     supportVehiclePresentation: supportVehiclePresentationTelemetry(),
     supportDamageFeedback: supportDamageFeedbackTelemetry.snapshot(),
+    supportImpactEvents: {
+      recent: recentKillstreakImpactEvents.map((event) => ({
+        ...event,
+        position: [...event.position],
+        launchPosition: event.launchPosition ? [...event.launchPosition] : null,
+      })),
+    },
+    chopperMissileAuthority: killstreakRuntime.chopperMissileAuthorityEvidence(),
     fieldSupport: {
       streak: localFieldSupportProjection().streak,
       rewardCycle: localFieldSupportProjection().rewardCycle,
@@ -27042,6 +30447,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       pendingRetiredPresentationRoots: deferredGpuRetirements.filter((entry) => entry.kind === 'root').length,
       prewarmedNuke: {
         shockwaveInScene: nukeShockwave.parent === scene,
+        warningBeaconInScene: nukeWarningBeacon.parent === scene,
         prewarmed: nukePresentationPrewarmed,
         dynamicLights: 0,
       },
@@ -27068,6 +30474,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         detonated: nukeSequence.detonated,
         detonateInMs: Math.max(0, nukeSequence.detonateAt - performance.now()),
         finishInMs: Math.max(0, nukeSequence.finishedAt - performance.now()),
+        warning: {
+          visible: nukeSequence.warningBeacon.visible,
+          arenaId: selectedArena.id,
+          position: nukeSequence.warningBeacon.position.toArray(),
+          scale: nukeSequence.warningBeacon.scale.x,
+          coreOpacity: nukeWarningCoreMaterial.opacity,
+          ringOpacity: nukeWarningRingMaterial.opacity,
+          reducedSensory: accessibilityRuntime.reducedSensory,
+        },
       } : { active: false, detonated: false, detonateInMs: 0, finishInMs: 0 },
       nukeActivations: nukeLaunches,
       nukeDetonations,
@@ -27113,6 +30528,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       id: window.id,
       broken: window.broken,
       visible: window.mesh.visible,
+      authority: window.glassState ? glassAuthorityProjection(window.glassState) : null,
+      activeWorldColliderPresent: activeGlassDynamicColliders().some(({ id }) => id === `glass:${window.id}`),
       position: window.mesh.getWorldPosition(new THREE.Vector3()).toArray(),
       persistentDebrisId: [...persistentWindowDebris.values()].find((entry) => entry.windowId === window.id)?.id ?? null,
       retainedDebrisPrewarmed: pooledWindowDebris.has(windowDebrisPoolKey(arena.id, window.id)),
@@ -27124,16 +30541,19 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       currentArenaRetained: arena.breakableWindows.filter((window) => (
         pooledWindowDebris.has(windowDebrisPoolKey(arena.id, window.id))
       )).length,
+      visibleRetained: [...pooledWindowDebris.values()].filter(({ root }) => root.visible).length,
       prewarmedPhysicsBodies: characterPhysics?.prewarmedMajorDebrisBodyCount() ?? 0,
       active: persistentWindowDebris.size,
+      activePhysics: [...persistentWindowDebris.values()].filter((entry) => entry.physicsActive).length,
+      lifecycle: {
+        ...windowGlassDebrisLifecycleTelemetry,
+        poseGraceMs: WINDOW_GLASS_DEBRIS_POSE_GRACE_MS,
+        noProgressMs: WINDOW_GLASS_DEBRIS_NO_PROGRESS_MS,
+        maxPhysicsMs: WINDOW_GLASS_DEBRIS_MAX_PHYSICS_MS,
+        maxLifetimeMs: WINDOW_GLASS_DEBRIS_MAX_LIFETIME_MS,
+      },
     },
-    persistentWindowDebris: [...persistentWindowDebris.values()].map((entry) => ({
-      id: entry.id,
-      windowId: entry.windowId,
-      position: entry.root.position.toArray(),
-      visible: entry.root.visible,
-      physical: characterPhysics?.majorDebrisSnapshots().some((snapshot) => snapshot.id === entry.id) ?? false,
-    })),
+    persistentWindowDebris: [...persistentWindowDebris.values()].map(samplePersistentWindowDebrisLifecycle),
     physicalCover: arena.physicalCover.map((cover) => ({
       id: cover.id,
       bounds: { ...cover.bounds },
@@ -27497,6 +30917,328 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     botsFrozen = false;
     return { botId: bot.id, targetId: remote.snapshot.id };
   },
+  stagePossessedChopperSplashTargets: () => {
+    if (network.role === 'client' || matchState.phase !== 'active') return null;
+    const possession = localKillstreakActorSnapshot()?.possession;
+    if (possession?.kind !== 'chopper-gunner') return null;
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.id === possession.entityId
+      && candidate.kind === 'chopper'
+      && candidate.ownerId === player.id
+      && candidate.gunController === 'owner-player'
+      && candidate.expiresInMs > 0
+    ));
+    const stagedBots = [...bots.values()].slice(0, 2);
+    if (!entity || stagedBots.length !== 2) return null;
+    const origin = new THREE.Vector3(...chopperGunnerCameraOrigin(entity.position, entity.attitude));
+    const colliders = activeWorldColliders();
+    const separationM = CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM - 0.1;
+    const candidates = [
+      ...arena.patrolPoints.map((point) => point.clone()),
+    ];
+    for (let x = arena.bounds.minX + 2; x <= arena.bounds.maxX - 2; x += 4) {
+      for (let z = arena.bounds.minZ + 2; z <= arena.bounds.maxZ - 2; z += 4) {
+        candidates.push(new THREE.Vector3(x, 0, z));
+      }
+    }
+    const baseWorld = killstreakWorldState();
+    const hostileTeam = player.team === 0 ? 1 : 0;
+    let staged: {
+      primary: THREE.Vector3;
+      splash: THREE.Vector3;
+      impact: readonly [number, number, number];
+    } | null = null;
+    for (const candidate of candidates) {
+      candidate.y = botElevationAt(candidate, 0);
+      const primaryPoint = candidate.clone().add(new THREE.Vector3(0, 1.15, 0));
+      const range = origin.distanceTo(primaryPoint);
+      if (range < 8 || range > 70
+        || !pointInsideBounds(candidate, arena.bounds, 0.7)
+        || isBlocked(candidate, colliders, 0.45)
+        || !killstreakLineOfSight(
+          colliders,
+          [origin.x, origin.y, origin.z],
+          [primaryPoint.x, primaryPoint.y, primaryPoint.z],
+        )) continue;
+      const outwardAngle = Math.atan2(candidate.z - origin.z, candidate.x - origin.x);
+      const outwardOffsets = [0, Math.PI / 6, -Math.PI / 6, Math.PI / 3, -Math.PI / 3];
+      for (const offset of outwardOffsets) {
+        const angle = outwardAngle + offset;
+        const splash = candidate.clone().add(new THREE.Vector3(
+          Math.cos(angle) * separationM,
+          0,
+          Math.sin(angle) * separationM,
+        ));
+        splash.y = botElevationAt(splash, candidate.y);
+        const splashPoint = splash.clone().add(new THREE.Vector3(0, 1.15, 0));
+        if (!pointInsideBounds(splash, arena.bounds, 0.7)
+          || isBlocked(splash, colliders, 0.45)
+          || primaryPoint.distanceTo(splashPoint) >= CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM) continue;
+        const prospectiveTargets = baseWorld.targets.map((target) => {
+          if (target.id === stagedBots[0]!.id) return Object.freeze({
+            ...target,
+            team: hostileTeam,
+            lifeId: stagedBots[0]!.continuity,
+            alive: true,
+            position: Object.freeze(primaryPoint.toArray()) as unknown as [number, number, number],
+          });
+          if (target.id === stagedBots[1]!.id) return Object.freeze({
+            ...target,
+            team: hostileTeam,
+            lifeId: stagedBots[1]!.continuity,
+            alive: true,
+            position: Object.freeze(splashPoint.toArray()) as unknown as [number, number, number],
+          });
+          if (target.kind === 'bot') return Object.freeze({ ...target, team: player.team });
+          return target;
+        });
+        const prospectiveWorld: KillstreakWorld = Object.freeze({
+          ...baseWorld,
+          targets: Object.freeze(prospectiveTargets),
+        });
+        const delta = primaryPoint.clone().sub(origin);
+        const yaw = Math.atan2(-delta.x, -delta.z);
+        const pitch = THREE.MathUtils.clamp(
+          Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
+          -1.2,
+          0.5,
+        );
+        const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, yaw, pitch);
+        const hit = chopperGunnerAuthoritativeTargetAlongRay(ray, player.id, player.team, prospectiveWorld);
+        if (!hit
+          || hit.target.id !== stagedBots[0]!.id
+          || hit.target.lifeId !== stagedBots[0]!.continuity
+          || hit.radialDistance > CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM
+          || hit.distance > CHOPPER_GUN_PROFILE.maximumRangeM) continue;
+        const impactToSplash = Math.hypot(
+          hit.endpoint[0] - splashPoint.x,
+          hit.endpoint[1] - splashPoint.y,
+          hit.endpoint[2] - splashPoint.z,
+        );
+        if (impactToSplash <= 2.8
+          || impactToSplash >= CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM
+          || prospectiveWorld.hasLineOfSight?.(
+            hit.endpoint,
+            [splashPoint.x, splashPoint.y, splashPoint.z],
+          ) === false) continue;
+        staged = { primary: candidate.clone(), splash, impact: hit.endpoint };
+        break;
+      }
+      if (staged) break;
+    }
+    if (!staged) return null;
+    for (const bot of bots.values()) {
+      if (!stagedBots.includes(bot)) bot.team = player.team;
+    }
+    for (const [index, bot] of stagedBots.entries()) {
+      const position = index === 0 ? staged.primary : staged.splash;
+      bot.team = hostileTeam;
+      bot.position.copy(position);
+      bot.root.position.copy(position);
+      bot.velocity.set(0, 0, 0);
+      bot.root.rotation.y = operatorYawToward(position, origin);
+      bot.root.visible = true;
+      bot.root.updateMatrixWorld(true);
+      bot.hp = 100;
+      bot.alive = true;
+      bot.invulnerableUntil = 0;
+      bot.respawnAt = 0;
+      bot.lastShotAt = performance.now();
+      bot.nextGrenadeAt = performance.now() + 60_000;
+    }
+    botsFrozen = true;
+    return {
+      entityId: entity.id,
+      activationId: entity.activationId,
+      primaryTargetId: stagedBots[0]!.id,
+      primaryTargetLifeId: stagedBots[0]!.continuity,
+      splashTargetId: stagedBots[1]!.id,
+      splashTargetLifeId: stagedBots[1]!.continuity,
+      primaryPosition: staged.primary.toArray(),
+      splashPosition: staged.splash.toArray(),
+      separationM: staged.primary.distanceTo(staged.splash),
+      splashRadiusM: CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM,
+    };
+  },
+  stagePossessedChopperMissileTarget: () => {
+    if (network.role === 'client' || matchState.phase !== 'active') return null;
+    const possession = localKillstreakActorSnapshot()?.possession;
+    if (possession?.kind !== 'chopper-gunner') return null;
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.id === possession.entityId && candidate.kind === 'chopper'
+    ));
+    if (!entity) return null;
+    const origin = new THREE.Vector3(...chopperGunnerCameraOrigin(entity.position, entity.attitude));
+    const colliders = activeWorldColliders();
+    if (selectedArena.id === 'gun-range') {
+      const trainingTargets = arena.targets
+        .filter((target) => target.kind === 'training-dummy')
+        .sort((left, right) => left.id.localeCompare(right.id));
+      for (const target of trainingTargets) {
+        target.active = true;
+        target.health = target.maxHealth;
+        target.respawnAt = 0;
+        target.root.visible = true;
+        target.root.updateMatrixWorld(true);
+        const targetPosition = trainingDummySupportPoint(target);
+        if (!killstreakLineOfSight(
+          colliders,
+          [origin.x, origin.y, origin.z],
+          [targetPosition.x, targetPosition.y, targetPosition.z],
+        )) continue;
+        const delta = targetPosition.clone().sub(origin);
+        const yaw = Math.atan2(-delta.x, -delta.z);
+        const pitch = THREE.MathUtils.clamp(
+          Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
+          -1.2,
+          0.5,
+        );
+        const impactPosition = new THREE.Vector3(...chopperMissileGroundTarget(
+          entity.position,
+          entity.attitude,
+          yaw,
+          pitch,
+          killstreakWorldState(),
+        ));
+        if (impactPosition.distanceTo(targetPosition) > CHOPPER_MISSILE_BLAST_RADIUS_M) continue;
+        return {
+          entityId: entity.id,
+          activationId: entity.activationId,
+          targetId: target.id,
+          targetLifeId: Math.max(0, Math.floor(target.respawnAt)),
+          targetKind: 'training-dummy',
+          targetPosition: targetPosition.toArray(),
+          lineOfSight: true,
+        };
+      }
+      return null;
+    }
+    const target = bots.values().next().value as BotPlayer | undefined;
+    if (!target) return null;
+    const candidates = [
+      ...arena.patrolPoints.map((point) => point.clone()),
+    ];
+    for (let x = arena.bounds.minX + 2; x <= arena.bounds.maxX - 2; x += 4) {
+      for (let z = arena.bounds.minZ + 2; z <= arena.bounds.maxZ - 2; z += 4) {
+        candidates.push(new THREE.Vector3(x, 0, z));
+      }
+    }
+    for (const candidate of candidates) {
+      candidate.y = botElevationAt(candidate, 0);
+      const targetPosition = candidate.clone().add(new THREE.Vector3(0, 1.15, 0));
+      const range = origin.distanceTo(targetPosition);
+      if (range < 8 || range > 70
+        || !pointInsideBounds(candidate, arena.bounds, 0.7)
+        || isBlocked(candidate, colliders, 0.45)
+        || !killstreakLineOfSight(
+          colliders,
+          [origin.x, origin.y, origin.z],
+          [targetPosition.x, targetPosition.y, targetPosition.z],
+        )) continue;
+      const delta = targetPosition.clone().sub(origin);
+      const yaw = Math.atan2(-delta.x, -delta.z);
+      const pitch = THREE.MathUtils.clamp(
+        Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
+        -1.2,
+        0.5,
+      );
+      const impactPosition = new THREE.Vector3(...chopperMissileGroundTarget(
+        entity.position,
+        entity.attitude,
+        yaw,
+        pitch,
+        killstreakWorldState(),
+      ));
+      if (impactPosition.distanceTo(targetPosition) > CHOPPER_MISSILE_BLAST_RADIUS_M) continue;
+      target.team = player.team === 0 ? 1 : 0;
+      target.position.copy(candidate);
+      target.root.position.copy(candidate);
+      target.velocity.set(0, 0, 0);
+      target.root.rotation.y = operatorYawToward(candidate, origin);
+      target.root.visible = true;
+      target.root.updateMatrixWorld(true);
+      target.hp = 100;
+      target.alive = true;
+      target.invulnerableUntil = 0;
+      target.respawnAt = 0;
+      target.lastShotAt = performance.now();
+      target.nextGrenadeAt = performance.now() + 60_000;
+      botsFrozen = true;
+      broadcastHostedBotState(true);
+      return {
+        entityId: entity.id,
+        activationId: entity.activationId,
+        targetId: target.id,
+        targetLifeId: target.continuity,
+        targetKind: 'bot',
+        targetPosition: targetPosition.toArray(),
+        lineOfSight: true,
+      };
+    }
+    return null;
+  },
+  stagePossessedPilotedDroneSensorTarget: (occluded) => {
+    if (network.role === 'client' || matchState.phase !== 'active') return null;
+    const possession = localKillstreakActorSnapshot()?.possession;
+    if (possession?.kind !== 'piloted-drone') return null;
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.id === possession.entityId && candidate.kind === 'drone' && candidate.mode === 'piloted'
+    ));
+    const targetBot = [...bots.values()][0];
+    if (!entity || !targetBot) return null;
+    const flightOrigin = new THREE.Vector3(...entity.position);
+    const observer = camera.position.clone();
+    const colliders = activeWorldColliders();
+    let staged: THREE.Vector3 | null = null;
+    const candidates = [
+      ...arena.patrolPoints.map((point) => point.clone()),
+    ];
+    for (let x = arena.bounds.minX + 1; x <= arena.bounds.maxX - 1; x += 2.5) {
+      for (let z = arena.bounds.minZ + 1; z <= arena.bounds.maxZ - 1; z += 2.5) {
+        candidates.push(new THREE.Vector3(x, 0, z));
+      }
+    }
+    for (const candidate of candidates) {
+      candidate.y = botElevationAt(candidate, 0);
+      const targetPoint = candidate.clone().add(new THREE.Vector3(0, 1.05, 0));
+      const range = flightOrigin.distanceTo(targetPoint);
+      if (range < 6 || range >= PILOTED_DRONE_SENSOR_PROFILE.maximumRangeM - 1
+        || !pointInsideBounds(candidate, arena.bounds, 0.65)
+        || isBlocked(candidate, colliders, 0.45)
+        || dmrThermalSolidOccluded(observer, targetPoint, colliders) !== occluded) continue;
+      staged = candidate.clone();
+      break;
+    }
+    if (!staged) return null;
+    for (const bot of bots.values()) {
+      bot.team = bot.id === targetBot.id ? (player.team === 0 ? 1 : 0) : player.team;
+      bot.lastShotAt = performance.now();
+      bot.nextGrenadeAt = performance.now() + 60_000;
+    }
+    targetBot.position.copy(staged);
+    targetBot.root.position.copy(staged);
+    targetBot.velocity.set(0, 0, 0);
+    targetBot.root.rotation.y = operatorYawToward(staged, observer);
+    targetBot.root.visible = true;
+    targetBot.root.updateMatrixWorld(true);
+    targetBot.hp = 100;
+    targetBot.alive = true;
+    targetBot.invulnerableUntil = 0;
+    targetBot.respawnAt = 0;
+    botsFrozen = true;
+    const targetPoint = staged.clone().add(new THREE.Vector3(0, 1.05, 0));
+    return {
+      entityId: entity.id,
+      activationId: entity.activationId,
+      targetId: targetBot.id,
+      targetRootUuid: targetBot.root.uuid,
+      origin: observer.toArray(),
+      target: targetPoint.toArray(),
+      occluded,
+      rangeM: flightOrigin.distanceTo(targetPoint),
+      sensorMaximumRangeM: PILOTED_DRONE_SENSOR_PROFILE.maximumRangeM,
+    };
+  },
   stageBotPerceptionAgainstRemote: (effect) => {
     if (!localMultiplayerQa || network.role !== 'host' || matchState.phase !== 'active') return null;
     const staged = debugWindow.__ATOMIC_ACRES_DEBUG__?.stageHostedBotAgainstRemote();
@@ -27589,6 +31331,49 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     }
   },
   clearBots: () => clearBots(),
+  stageThermalEvidenceBot: (occluded) => {
+    if (selectedArena.id !== 'atomic-acres' || matchState.phase !== 'active') return null;
+    // Give this visual falsifier exactly one canonical hostile. Extra solo bots
+    // could legitimately reveal at the same time and make a one-target raster
+    // look like duplicate thermal presentation.
+    clearBots();
+    spawnBot(0);
+    const bot = bots.get('bot-0');
+    if (!bot) return null;
+    player.position.set(-9, 1.7, -12.5);
+    characterPhysics?.teleportEye(player.position);
+    player.velocity.set(0, 0, 0);
+    player.yaw = 0;
+    player.pitch = 0;
+    player.invulnerableUntil = 0;
+    camera.position.copy(player.position);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    const targetPosition = occluded
+      ? new THREE.Vector3(-9, 0, -21.5)
+      : new THREE.Vector3(-9, 0, -15.5);
+    bot.position.copy(targetPosition);
+    bot.root.position.copy(targetPosition);
+    bot.root.rotation.y = operatorYawToward(bot.position, player.position);
+    bot.root.updateMatrixWorld(true);
+    bot.velocity.set(0, 0, 0);
+    bot.team = player.team === 0 ? 1 : 0;
+    bot.hp = 100;
+    bot.alive = true;
+    bot.invulnerableUntil = 0;
+    botsFrozen = true;
+    const body = targetPosition.clone().add(new THREE.Vector3(0, 1.05, 0));
+    const wallBlocked = dmrThermalSolidOccluded(camera.position, body, activeWorldColliders());
+    return {
+      targetId: bot.id,
+      targetKind: 'bot',
+      targetPosition: targetPosition.toArray(),
+      observerPosition: player.position.toArray(),
+      hostile: true,
+      living: true,
+      wallBlocked,
+    };
+  },
   placeBotAhead: (distance = 5) => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     if (!bot || !Number.isFinite(distance)) return null;
@@ -27691,10 +31476,165 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.updateMatrixWorld(true);
   },
   aimPossessedChopperAtTrainingDummy: (targetId) => {
+    const actor = localKillstreakActorSnapshot();
+    const possession = actor?.possession;
+    if (possession?.kind !== 'chopper-gunner' || selectedArena.id !== 'gun-range') return null;
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.id === possession.entityId
+      && candidate.kind === 'chopper'
+      && candidate.ownerId === player.id
+      && candidate.gunController === 'owner-player'
+      && candidate.expiresInMs > 0
+    ));
+    const world = killstreakWorldState();
+    const target = world.targets.find((candidate) => candidate.id === targetId) ?? null;
+    if (!actor || actor.lifeId !== localContinuity || !entity || !target || !target.alive) return null;
+    const origin = new THREE.Vector3(...chopperGunnerCameraOrigin(entity.position, entity.attitude));
+    const targetPoint = new THREE.Vector3(...target.position);
+    const delta = targetPoint.clone().sub(origin);
+    if (delta.lengthSq() < 1e-6) return null;
+    const yaw = Math.atan2(-delta.x, -delta.z);
+    const pitch = THREE.MathUtils.clamp(
+      Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
+      -1.2,
+      0.5,
+    );
+    const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, yaw, pitch);
+    const hit = chopperGunnerAuthoritativeTargetAlongRay(ray, player.id, player.team, world);
+    if (!hit || hit.target.id !== target.id || hit.target.lifeId !== target.lifeId) return null;
+    player.yaw = yaw;
+    player.pitch = pitch;
+    camera.position.copy(origin);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    return {
+      entityId: entity.id,
+      activationId: entity.activationId,
+      targetId: target.id,
+      targetLifeId: target.lifeId,
+      origin: origin.toArray(),
+      target: targetPoint.toArray(),
+      yaw: player.yaw,
+      pitch: player.pitch,
+      endpoint: [...hit.endpoint],
+      entryDistanceM: hit.distance,
+      targetRadialDistanceM: hit.radialDistance,
+      maximumRangeM: CHOPPER_GUN_PROFILE.maximumRangeM,
+      splashRadiusM: CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM,
+      lineOfSight: true,
+    };
+  },
+  aimPossessedChopperAtTarget: (targetId) => {
+    const actor = localKillstreakActorSnapshot();
+    const possession = actor?.possession;
+    if (possession?.kind !== 'chopper-gunner') return null;
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.id === possession.entityId
+      && candidate.kind === 'chopper'
+      && candidate.ownerId === player.id
+      && candidate.gunController === 'owner-player'
+      && candidate.expiresInMs > 0
+    ));
+    const world = killstreakWorldState();
+    const target = world.targets.find((candidate) => candidate.id === targetId) ?? null;
+    if (!actor || actor.lifeId !== localContinuity || !entity || !target || !target.alive) return null;
+    const targetPoint = new THREE.Vector3(...target.position);
+    const origin = new THREE.Vector3(...chopperGunnerCameraOrigin(entity.position, entity.attitude));
+    const delta = targetPoint.clone().sub(origin);
+    if (delta.lengthSq() < 1e-6) return null;
+    const yaw = Math.atan2(-delta.x, -delta.z);
+    const pitch = THREE.MathUtils.clamp(
+      Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
+      -1.2,
+      0.5,
+    );
+    const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, yaw, pitch);
+    const hit = chopperGunnerAuthoritativeTargetAlongRay(ray, player.id, player.team, world);
+    if (!hit || hit.target.id !== target.id || hit.target.lifeId !== target.lifeId) return null;
+    player.yaw = yaw;
+    player.pitch = pitch;
+    camera.position.copy(origin);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    return {
+      entityId: entity.id,
+      activationId: entity.activationId,
+      targetId,
+      targetLifeId: target.lifeId,
+      origin: origin.toArray(),
+      target: targetPoint.toArray(),
+      yaw: player.yaw,
+      pitch: player.pitch,
+      endpoint: [...hit.endpoint],
+      entryDistanceM: hit.distance,
+      targetRadialDistanceM: hit.radialDistance,
+      maximumRangeM: CHOPPER_GUN_PROFILE.maximumRangeM,
+      splashRadiusM: CHOPPER_GUNNER_SPLASH_POLICY.splashRadiusM,
+      lineOfSight: true,
+    };
+  },
+  aimPossessedChopperMissileAtTarget: (targetId) => {
+    const possession = localKillstreakActorSnapshot()?.possession;
+    if (possession?.kind !== 'chopper-gunner') return null;
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.id === possession.entityId
+      && candidate.kind === 'chopper'
+      && candidate.ownerId === player.id
+      && candidate.gunController === 'owner-player'
+      && candidate.expiresInMs > 0
+    ));
+    const targetPoint = supportTargetPosition(targetId);
+    if (!entity || !targetPoint) return null;
+    const origin = new THREE.Vector3(...chopperGunnerCameraOrigin(entity.position, entity.attitude));
+    if (!killstreakLineOfSight(
+      activeWorldColliders(),
+      [origin.x, origin.y, origin.z],
+      [targetPoint.x, targetPoint.y, targetPoint.z],
+    )) return null;
+    const delta = targetPoint.clone().sub(origin);
+    if (delta.lengthSq() < 1e-6) return null;
+    const yaw = Math.atan2(-delta.x, -delta.z);
+    const pitch = THREE.MathUtils.clamp(
+      Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
+      -1.2,
+      0.5,
+    );
+    const impactPosition = new THREE.Vector3(...chopperMissileGroundTarget(
+      entity.position,
+      entity.attitude,
+      yaw,
+      pitch,
+      killstreakWorldState(),
+    ));
+    const targetDistanceFromImpactM = impactPosition.distanceTo(targetPoint);
+    if (targetDistanceFromImpactM > CHOPPER_MISSILE_BLAST_RADIUS_M) return null;
+    player.yaw = yaw;
+    player.pitch = pitch;
+    camera.position.copy(origin);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    return {
+      entityId: entity.id,
+      activationId: entity.activationId,
+      targetId,
+      origin: origin.toArray(),
+      target: targetPoint.toArray(),
+      yaw: player.yaw,
+      pitch: player.pitch,
+      impactPosition: impactPosition.toArray(),
+      targetDistanceFromImpactM,
+      lineOfSight: true,
+    };
+  },
+  aimPossessedChopperMissileAtTrainingDummy: (targetId) => {
     const possession = localKillstreakActorSnapshot()?.possession;
     if (possession?.kind !== 'chopper-gunner' || selectedArena.id !== 'gun-range') return null;
     const entity = killstreakSnapshot.entities.find((candidate) => (
-      candidate.id === possession.entityId && candidate.kind === 'chopper'
+      candidate.id === possession.entityId
+      && candidate.kind === 'chopper'
+      && candidate.ownerId === player.id
+      && candidate.gunController === 'owner-player'
+      && candidate.expiresInMs > 0
     ));
     const target = arena.targets.find((candidate) => (
       candidate.id === targetId && candidate.kind === 'training-dummy' && candidate.active
@@ -27709,12 +31649,23 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     )) return null;
     const delta = targetPoint.clone().sub(origin);
     if (delta.lengthSq() < 1e-6) return null;
-    player.yaw = Math.atan2(-delta.x, -delta.z);
-    player.pitch = THREE.MathUtils.clamp(
+    const yaw = Math.atan2(-delta.x, -delta.z);
+    const pitch = THREE.MathUtils.clamp(
       Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
       -1.2,
       0.5,
     );
+    const impactPosition = new THREE.Vector3(...chopperMissileGroundTarget(
+      entity.position,
+      entity.attitude,
+      yaw,
+      pitch,
+      killstreakWorldState(),
+    ));
+    const targetDistanceFromImpactM = impactPosition.distanceTo(targetPoint);
+    if (targetDistanceFromImpactM > CHOPPER_MISSILE_BLAST_RADIUS_M) return null;
+    player.yaw = yaw;
+    player.pitch = pitch;
     camera.position.copy(origin);
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
     camera.updateMatrixWorld(true);
@@ -27726,7 +31677,39 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       target: targetPoint.toArray(),
       yaw: player.yaw,
       pitch: player.pitch,
+      impactPosition: impactPosition.toArray(),
+      targetDistanceFromImpactM,
       lineOfSight: true,
+    };
+  },
+  aimPossessedPilotedDroneAtTarget: (targetId) => {
+    const possession = localKillstreakActorSnapshot()?.possession;
+    if (possession?.kind !== 'piloted-drone') return null;
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.id === possession.entityId && candidate.kind === 'drone' && candidate.mode === 'piloted'
+    ));
+    const targetPoint = supportTargetPosition(targetId);
+    if (!entity || !targetPoint) return null;
+    const origin = new THREE.Vector3(...entity.position);
+    const delta = targetPoint.clone().sub(origin);
+    if (delta.lengthSq() < 1e-6) return null;
+    player.yaw = Math.atan2(-delta.x, -delta.z);
+    player.pitch = THREE.MathUtils.clamp(
+      Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
+      -1.2,
+      1.2,
+    );
+    camera.position.copy(origin);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    return {
+      entityId: entity.id,
+      activationId: entity.activationId,
+      targetId,
+      origin: origin.toArray(),
+      target: targetPoint.toArray(),
+      yaw: player.yaw,
+      pitch: player.pitch,
     };
   },
   aimAtRemote: (zone: HitZone = 'body') => {
@@ -27743,6 +31726,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     remote.root.position.copy(remote.target);
     remote.root.updateMatrixWorld(true);
   },
+  armPossessedChopperAimTarget: (event, request) => (
+    armDebugChopperGunnerQaAimFromTrustedCapture(event, request)
+  ),
+  clearPossessedChopperAimTarget: () => clearDebugChopperGunnerQaAimRequest(),
+  readPossessedChopperAlignedAimReceipt: () => lastDebugChopperGunnerQaAimReceipt,
   aimAtRemoteWithOffset: (yawOffset = 0, pitchOffset = 0) => {
     const remote = remotes.values().next().value as RemotePlayer | undefined;
     if (!remote || !Number.isFinite(yawOffset) || !Number.isFinite(pitchOffset)) return;
@@ -27784,6 +31772,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
     camera.updateMatrixWorld(true);
   },
+  prepareHf304GlassEvidenceCell,
+  stageHf304GlassEvidenceView,
+  probeHf304GlassEvidenceCrack,
+  authorHf304GlassEvidenceCell,
+  sampleHf304GlassEvidenceCell,
+  resetBreakableWindows: () => resetBreakableWindows(),
   detonateGrenadeAtWindow: (index: number) => {
     const pane = arena.breakableWindows[Math.max(0, Math.min(arena.breakableWindows.length - 1, Math.floor(index)))];
     return pane ? breakWindowsInGrenadeBlast(pane.mesh.getWorldPosition(new THREE.Vector3()), randomNonce(), true) : 0;
@@ -27950,10 +31944,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   teleportPlayer: (x, y, z, yaw = player.yaw, pitch = player.pitch) => {
     if (![x, y, z, yaw, pitch].every(Number.isFinite)) return;
+    discardPendingStickyAttachmentReceiptsForActor(player.id);
     localContinuity += 1;
     localPositionHistory.length = 0;
     resetFlashVictimLife();
-    resetStickyVictimUrgentAlertLife(localContinuity);
+    resetStickyUrgentAlertLife(localContinuity);
     if (gameStarted && matchState.phase === 'active' && network.role !== 'client') {
       // QA teleport starts a new local continuity domain. Keep host support
       // authority on that same life so real test-bay F interactions are not
@@ -28157,6 +32152,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       },
       entityYaw: activeChopper.attitude[1],
       aspect: camera.aspect,
+      assessWorldCandidate: (candidate) => assessDebugChopperExteriorReviewWorldCandidate({
+        min: sourceBounds.min as [number, number, number],
+        max: sourceBounds.max as [number, number, number],
+      }, candidate),
     });
     if (!pose) return null;
     debugChopperExteriorReviewTrackerRequested = true;
@@ -28177,6 +32176,20 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     return debugCaptureCameraRevision;
   },
   captureChopperExteriorHiddenControl: captureDebugChopperExteriorHiddenControl,
+  freezeChopperCockpitEvidenceFrame: freezeDebugChopperCockpitEvidenceFrame,
+  captureChopperCockpitHiddenControl: captureDebugChopperCockpitHiddenControl,
+  releaseChopperCockpitEvidenceFrame: releaseDebugChopperCockpitEvidenceFrame,
+  freezeChopperMissileEvidenceFrame: freezeDebugChopperMissileEvidenceFrame,
+  captureChopperMissileHiddenControl: captureDebugChopperMissileHiddenControl,
+  releaseChopperMissileEvidenceFrame: releaseDebugChopperMissileEvidenceFrame,
+  freezeNukeWarningEvidenceFrame: freezeDebugNukeWarningEvidenceFrame,
+  nukeWarningEvidenceFrame: currentDebugNukeWarningEvidenceFrame,
+  captureNukeWarningHiddenControl: captureDebugNukeWarningHiddenControl,
+  releaseNukeWarningEvidenceFrame: releaseDebugNukeWarningEvidenceFrame,
+  freezeThermalOperatorEvidenceFrame: freezeDebugThermalOperatorEvidenceFrame,
+  thermalOperatorEvidenceFrame: currentDebugThermalOperatorEvidenceFrame,
+  captureThermalOperatorHiddenControl: captureDebugThermalOperatorHiddenControl,
+  releaseThermalOperatorEvidenceFrame: releaseDebugThermalOperatorEvidenceFrame,
   setRiggedEvidenceCaptureTargets: (targets) => {
     lastDebugCapturePresentation = null;
     lastDebugCommittedCameraPresentation = null;
@@ -28437,16 +32450,21 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   recoverFromVisibilityRegain: () => recoverFromSchedulingInterruption('debug visibility regain'),
   openMenu: () => openActiveMatchPause('debug-pause'),
   fireOnce: () => {
+    const previousExplosiveBoltAction = lastLocalExplosiveBoltActionIdentity;
     debugInputUnlocked = true;
     setLocalTriggerHeld(true);
     tryFire(performance.now());
     setLocalTriggerHeld(false);
     debugInputUnlocked = false;
+    return lastLocalExplosiveBoltActionIdentity !== previousExplosiveBoltAction
+      ? lastLocalExplosiveBoltActionIdentity
+      : null;
   },
   setTriggerHeld: (held: boolean) => {
     mouseTriggerHeld = held;
     triggerHeld = held;
     if (!held) {
+      clearDebugChopperGunnerQaAimRequest();
       spinUpWeapon = null;
       spinUpStartedAtPerformanceMs = null;
       spinUpStartedAtHostTimeMs = null;
@@ -28524,7 +32542,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   equipWeapon: (weapon: WeaponId) => {
     if (PRIMARY_WEAPON_IDS.includes(weapon as PrimaryWeaponId)) {
       player.primaryWeapon = weapon as PrimaryWeaponId;
+      if (localMultiplayerQa) player.secondaryWeapon = handicapSidearm(player.primaryWeapon);
       if (selectedArena.id === 'gun-range') rangePrimaryUnlocked = true;
+    } else if (localMultiplayerQa && SIDEARM_WEAPON_IDS.includes(weapon as SidearmWeaponId)) {
+      player.secondaryWeapon = weapon as SidearmWeaponId;
     }
     player.weapon = weapon;
     player.ammo[weapon] = WEAPONS[weapon].mag;
@@ -28546,6 +32567,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   setGrenades: (count: number) => {
     if (Number.isFinite(count)) player.grenades = Math.max(0, Math.min(1, Math.floor(count)));
   },
+  setSelectedGrenade: (grenade: GrenadeId) => {
+    if (['frag', 'flash', 'smoke', 'semtex'].includes(grenade)) player.selectedGrenade = grenade;
+  },
   reload: () => reload(),
   melee: () => {
     const before = player.lastMeleeAt;
@@ -28559,6 +32583,38 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     keys.delete('ShiftRight');
     if (forward) keys.add('KeyW');
     if (forward && sprint) keys.add('ShiftLeft');
+  },
+  extendHf296HostedMatrixDuration: () => {
+    if (launchParams.get('multiplayerQa') !== '1' || network.role !== 'host'
+      || privateLobbySnapshot?.phase !== 'waiting') return null;
+    applyHostLobbyConfig({
+      ...privateMatchConfig,
+      durationMs: MAX_PRIVATE_MATCH_DURATION_MS,
+    });
+    return privateMatchConfig.durationMs;
+  },
+  authorizeHf296RemoteProjectionWeapon: (weapon) => {
+    if (!localMultiplayerQa || network.role === 'offline' || matchState.phase !== 'active'
+      || !WEAPON_IDS.includes(weapon)) return null;
+    const candidates = [...remotes.values()].filter((remote) => remote.snapshot.hp > 0);
+    if (candidates.length !== 1) return null;
+    const remote = candidates[0]!;
+    hf296RemoteProjectionWeaponAuthorizations.set(remote.snapshot.id, Object.freeze({
+      weapon,
+      expiresAt: performance.now() + HF296_REMOTE_PROJECTION_AUTHORIZATION_MS,
+    }));
+    return remote.snapshot.id;
+  },
+  publishHf296RemoteProjectionState: () => {
+    if (!localMultiplayerQa || network.role === 'offline' || matchState.phase !== 'active') return null;
+    const message = createStateMessage();
+    network.sendStateCommitReliably(message);
+    return Object.freeze({
+      playerId: message.player.id,
+      weapon: message.player.weapon,
+      stance: message.player.stance ?? 'stand',
+      sequence: message.player.seq,
+    });
   },
   sendRawChat: (text, claimedBy = player.id) => {
     if (new URLSearchParams(window.location.search).get('multiplayerQa') !== '1' || network.role === 'offline') return false;
@@ -28586,6 +32642,55 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     const projection = new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     const frustum = new THREE.Frustum().setFromProjectionMatrix(projection);
     const visible: Array<{ name: string; material: string; triangles: number }> = [];
+    const textureIdentity = (texture: THREE.Texture | null | undefined): string => {
+      if (!texture) return '-';
+      const image = texture.image as { currentSrc?: unknown; src?: unknown } | undefined;
+      const source = typeof image?.currentSrc === 'string' && image.currentSrc.length > 0
+        ? image.currentSrc
+        : typeof image?.src === 'string' ? image.src : '';
+      let stableSource = source;
+      try {
+        const parsed = new URL(source, window.location.href);
+        stableSource = `${parsed.pathname}${parsed.search}`;
+      } catch { /* Retain the source string when it is not URL-shaped. */ }
+      return encodeURIComponent(texture.name || stableSource || '(anonymous-texture)');
+    };
+    const materialIdentity = (material: THREE.Material): string => {
+      const visual = material as THREE.Material & {
+        color?: THREE.Color;
+        emissive?: THREE.Color;
+        roughness?: number;
+        metalness?: number;
+        map?: THREE.Texture | null;
+        normalMap?: THREE.Texture | null;
+        roughnessMap?: THREE.Texture | null;
+        metalnessMap?: THREE.Texture | null;
+        emissiveMap?: THREE.Texture | null;
+        alphaMap?: THREE.Texture | null;
+        aoMap?: THREE.Texture | null;
+        lightMap?: THREE.Texture | null;
+      };
+      return [
+        material.type,
+        encodeURIComponent(material.name || '(unnamed)'),
+        visual.color?.getHexString() ?? '-',
+        visual.emissive?.getHexString() ?? '-',
+        Number.isFinite(visual.roughness) ? visual.roughness : '-',
+        Number.isFinite(visual.metalness) ? visual.metalness : '-',
+        material.opacity,
+        material.transparent,
+        material.side,
+        material.blending,
+        textureIdentity(visual.map),
+        textureIdentity(visual.normalMap),
+        textureIdentity(visual.roughnessMap),
+        textureIdentity(visual.metalnessMap),
+        textureIdentity(visual.emissiveMap),
+        textureIdentity(visual.alphaMap),
+        textureIdentity(visual.aoMap),
+        textureIdentity(visual.lightMap),
+      ].join('|');
+    };
     scene.traverse((node) => {
       if (!(node instanceof THREE.Mesh) || !node.layers.test(camera.layers)) return;
       let ancestor: THREE.Object3D | null = node;
@@ -28599,7 +32704,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       const triangles = Math.floor((node.geometry.index?.count ?? positionCount) / 3);
       visible.push({
         name: node.name || node.parent?.name || '(unnamed)',
-        material: materials.map((material) => `${material.type}:${material.name || material.uuid.slice(0, 8)}`).join(','),
+        material: materials.map(materialIdentity).join(','),
         triangles,
       });
     });
@@ -28740,6 +32845,28 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     ));
     return entity ? requestKillstreakControl(entity.id, 'toggle-chopper-gunner') : false;
   },
+  requestPossessedChopperEvidenceControl: (control) => {
+    const possession = localKillstreakActorSnapshot()?.possession;
+    if (possession?.kind !== 'chopper-gunner' || !control || typeof control !== 'object') return false;
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.id === possession.entityId && candidate.kind === 'chopper'
+      && candidate.ownerId === player.id && candidate.expiresInMs > 0
+    ));
+    if (!entity || ![control.thrustQ, control.strafeQ, control.verticalQ]
+      .every((value) => value === undefined || Number.isFinite(value))) return false;
+    const accepted = requestKillstreakControl(entity.id, 'pilot-control', {
+      yawQ: player.yaw,
+      pitchQ: player.pitch,
+      thrustQ: THREE.MathUtils.clamp(control.thrustQ ?? 0, -1, 1),
+      strafeQ: THREE.MathUtils.clamp(control.strafeQ ?? 0, -1, 1),
+      verticalQ: THREE.MathUtils.clamp(control.verticalQ ?? 0, -1, 1),
+      fire: control.fire === true,
+      missileFire: control.missileFire === true,
+    });
+    debugChopperEvidenceControlOverrideActive = accepted;
+    return accepted;
+  },
+  releasePossessedChopperEvidenceControl: () => { debugChopperEvidenceControlOverrideActive = false; },
   forceBotGrenade: (fuseMs = 1_100, grenade: GrenadeId = 'frag') => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     return bot ? throwBotGrenade(bot, performance.now(), fuseMs, player.position, player.stance, grenade) : false;

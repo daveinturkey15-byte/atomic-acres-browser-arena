@@ -1,0 +1,35 @@
+Players and first-person presentation still clip through nearby floors and walls, especially while prone; identify and correct the real authority and presentation paths without changing camera, muzzle or shot results.
+
+First-person arms still disappear or terminate inside the viewport, look thin or detached, and align or animate badly for firearms, the pistol and the knife; use the supplied generated image only as a composition and proportion baseline.
+
+The first admitted grenade throw must not freeze the game or perform cold effect, physics, audio or rendering work on the action frame.
+
+M14 EBR and Railgun authorized wall reveals must work again and show one clear animated operator body treatment, without stacked orange and purple models, returning to normal presentation when unobstructed where supported.
+
+Piloted Drone thermal perception must show one exact animated operator model through walls rather than overlapping duplicate models.
+
+The captured renderer error reporting no GPU progress for 1,146 ms with two submissions pending must be reproduced, attributed and corrected without weakening the watchdog.
+
+The intermittent unintended buzzing noise must be located and removed without muting intended match audio.
+
+Atomic Acres on the Quality profile must retain its authored graphics, assets and textures rather than silently downgrading presentation quality.
+
+Glass must break reliably across the maps and weapon catalog, and detached shards must fall or settle instead of remaining suspended in mid-air.
+
+The Nuke pre-explosion sequence must remain visible from the Gun Range killstreak room and become more dramatic and threatening while retaining bounded sensory safety.
+
+The Chopper Gunner cockpit side bars must extend higher while preserving a clear centre crosshair corridor.
+
+The Chopper Gunner machine gun must use host-authoritative splash damage with an effective hit volume three times the preceding direct-hit volume.
+
+Chopper Gunner missiles must visibly originate from the possessed chopper rather than descending from the sky while retaining six rounds and the one-second cadence.
+
+Entering Chopper Gunner possession must not freeze the game or perform cold cockpit, weapon, missile, audio or rendering work on the entry frame.
+
+Semtex and explosive-crossbow attachments must present a loud central red STUCK flash for exactly 500 ms both when the local player successfully sticks a target and when the local living player is the victim, in addition to compact status.
+
+Firefox frame pacing must be measured against Chrome in the same supported scene and corrected so there is no unexplained severe 20 to 30 percent performance path, software fallback or silent quality downgrade.
+
+Touched gameplay, rendering, audio and presentation systems must be streamlined only where measured duplication, cold ownership or structural friction is found, with complete regression coverage rather than a broad risky rewrite.
+
+Integrate the complete correction, publish it live as Pass 71 replacing public Pass 70, and preserve retained Pass 69 and byte-exact Pass 63 as independently selectable rollback channels.

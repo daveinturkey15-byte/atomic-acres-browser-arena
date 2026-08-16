@@ -13,6 +13,19 @@ export type ReleaseChannelConfig = {
     pass: string;
     path: string;
   };
+  retained: {
+    label: string;
+    description: string;
+    pass: string;
+    sourceSha: string;
+    pagesSha: string;
+    pagesPath: string;
+    runtimeFileCount: number;
+    runtimeTreeSha256: string;
+    pagesSubtreeFileCount: number;
+    pagesSubtreeTreeSha256: string;
+    path: string;
+  };
   stable: {
     label: string;
     description: string;
@@ -22,6 +35,8 @@ export type ReleaseChannelConfig = {
     pagesPath?: string;
     runtimeFileCount?: number;
     runtimeTreeSha256?: string;
+    pagesSubtreeFileCount?: number;
+    pagesSubtreeTreeSha256?: string;
     path: string;
   };
   rollback?: {
@@ -33,6 +48,8 @@ export type ReleaseChannelConfig = {
     pagesPath: string;
     runtimeFileCount: number;
     runtimeTreeSha256: string;
+    pagesSubtreeFileCount: number;
+    pagesSubtreeTreeSha256: string;
     path: string;
     rebuiltFromSource: boolean;
   };

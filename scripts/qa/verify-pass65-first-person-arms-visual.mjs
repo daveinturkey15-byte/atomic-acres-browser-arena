@@ -38,6 +38,8 @@ function fatalBrowserErrors(errors) {
 }
 
 const finiteArray = (values) => Array.isArray(values) && values.every(Number.isFinite);
+const minimumArmBranchNdcY = -1.05;
+const proximalSleeveContract = 'shoulder-bound-authored-pbr-lower-crop-continuation-v1';
 
 function presentationViolations(label, state) {
   const violations = [];
@@ -60,6 +62,23 @@ function presentationViolations(label, state) {
   if ((animation?.upperChainTracksExcluded ?? 0) < 1) violations.push(`${label}: upper-chain exclusion was not exercised`);
   const framing = presentation.armFraming;
   if (!framing?.finite || !framing?.nearPlaneClear || !framing?.intersectsViewport) violations.push(`${label}: arm framing is nonfinite, clipped by the near plane, or offscreen`);
+  const branchFraming = presentation.armBranchFraming;
+  for (const side of ['left', 'right']) {
+    const branch = branchFraming?.[side];
+    const continuation = presentation.proximalSleeveContinuations?.find((entry) => entry.side === side);
+    if (continuation?.contract !== proximalSleeveContract
+      || continuation?.parent !== `UpperArm${side === 'left' ? 'L' : 'R'}`
+      || continuation?.materialKind !== 'MeshStandardMaterial'
+      || continuation?.authoredSleeveMaterial !== true
+      || continuation?.opaque !== true) {
+      violations.push(`${label}/${side}: authored proximal sleeve continuation is invalid ${JSON.stringify(continuation)}`);
+    }
+    if (!branch?.finite || !branch?.nearPlaneClear || !branch?.intersectsViewport) {
+      violations.push(`${label}/${side}: deformed branch framing is missing, clipped, or offscreen`);
+    } else if (branch.ndcMin?.[1] > minimumArmBranchNdcY) {
+      violations.push(`${label}/${side}: detached sleeve envelope ${JSON.stringify(branch)}`);
+    }
+  }
   if (!Array.isArray(presentation.riggedArms) || presentation.riggedArms.length !== 2) {
     violations.push(`${label}: expected two solved arm chains`);
   } else if (presentation.riggedArms.every((arm) => arm.action === 'melee')) {
@@ -72,27 +91,20 @@ function presentationViolations(label, state) {
     const policy = presentation.riggedArms.find((arm) => arm.handPolicy)?.handPolicy;
     const activeArms = presentation.riggedArms.filter((arm) => arm.active === true);
     const stowedArms = presentation.riggedArms.filter((arm) => arm.stowed === true);
-    if (policy?.contract !== 'right-firing-hand-handgun-support-reload-only-v1') violations.push(`${label}: hand policy is missing`);
+    if (policy?.contract !== 'right-firing-hand-two-hand-support-v2') violations.push(`${label}: two-hand policy is missing`);
     if (activeArms.length !== policy?.activeChainCount) violations.push(`${label}: ${activeArms.length} active chains do not match policy ${policy?.activeChainCount}`);
-    if (policy?.activeChainCount === 1) {
-      if (stowedArms.length !== 1 || stowedArms[0]?.side !== 'left'
-        || Math.abs(stowedArms[0]?.supportChainScale - 1) > 1e-6
-        || stowedArms[0]?.stowedWithoutScaling !== true) {
-        violations.push(`${label}: one-hand sidearm did not stow the intact left support chain`);
-      }
-    } else if (stowedArms.length !== 0) {
-      violations.push(`${label}: a two-hand grip unexpectedly stowed an arm`);
-    }
+    if (policy?.activeChainCount !== 2 || stowedArms.length !== 0) violations.push(`${label}: both authored chains must remain visible`);
     for (const arm of activeArms) {
-      if (!arm.finite || !arm.withinStableReach || arm.authoredSegmentDirectionsPreserved !== true) violations.push(`${label}/${arm.side}: unstable or nonfinite authored-chain IK`);
+      if (!arm.finite || !arm.withinStableReach || !arm.meaningfulElbowBend || arm.authoredSegmentDirectionsPreserved !== true) violations.push(`${label}/${arm.side}: unstable, straight, or nonfinite authored-chain IK`);
+      if (!Number.isFinite(arm.elbowFlexRadians) || arm.elbowFlexRadians < 0.36) violations.push(`${label}/${arm.side}: elbow flex ${arm.elbowFlexRadians} is too straight`);
       if (!Number.isFinite(arm.contactError) || arm.contactError > 0.01) violations.push(`${label}/${arm.side}: authored palm contact error ${arm.contactError}`);
       if (!Number.isFinite(arm.palmOrientationError) || arm.palmOrientationError > 0.2) violations.push(`${label}/${arm.side}: palm orientation error ${arm.palmOrientationError}`);
       if (!Number.isFinite(arm.socketReachRatio) || arm.socketReachRatio > 1.04) violations.push(`${label}/${arm.side}: authored socket reach ratio ${arm.socketReachRatio}`);
       if (!Number.isFinite(arm.gripSocketCalibration) || arm.gripSocketCalibration > 0.01) violations.push(`${label}/${arm.side}: grip calibration ${arm.gripSocketCalibration}m exceeds authored tolerance`);
-      // The bone origin can sit a few pixels inside the viewport while the
-      // skinned cuff itself already crosses the bottom edge; native captures
-      // are the falsifier for visible floating sleeves.
-      if (!finiteArray(arm.shoulderEntryNdc) || arm.shoulderEntryNdc[1] > -0.98) violations.push(`${label}/${arm.side}: sleeve entry ${JSON.stringify(arm.shoulderEntryNdc)} does not continue below frame`);
+      // A shoulder bone may legitimately remain in-frame while the weighted
+      // proximal sleeve exits below it; armBranchFraming above measures the
+      // current deformed vertices for each side independently.
+      if (!finiteArray(arm.shoulderEntryNdc)) violations.push(`${label}/${arm.side}: shoulder entry telemetry is nonfinite`);
       if (arm.segmentLengthScale !== 1 || arm.bindOffsetsPreserved !== true) violations.push(`${label}/${arm.side}: authored segment length changed ${arm.segmentLengthScale}`);
       for (const key of ['shoulder', 'elbow', 'wrist', 'palm', 'palmQuaternion', 'palmTargetQuaternion', 'target', 'shoulderQuaternion', 'elbowQuaternion']) {
         if (!finiteArray(arm[key])) violations.push(`${label}/${arm.side}: nonfinite ${key}`);
@@ -138,6 +150,8 @@ function evidenceFor(label, state, screenshot, cadence = null) {
     authoredFingerBoneCount: presentation.authoredFingerBoneCount,
     authoredArmAnimation: presentation.authoredArmAnimation,
     armFraming: presentation.armFraming,
+    armBranchFraming: presentation.armBranchFraming,
+    proximalSleeveContinuations: presentation.proximalSleeveContinuations,
     importedModel: presentation.importedModel,
     meleeKnifeFraming: presentation.meleeKnifeFraming,
     viewmodelViewport: presentation.viewmodelViewport,

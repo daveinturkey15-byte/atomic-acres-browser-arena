@@ -53,7 +53,7 @@ async function reviewRecord(relative, cameraId, expectedWidth, expectedHeight) {
 }
 
 const sourceScript = await fileRecord('scripts/blender/create-pass65-support-vehicles.py');
-const chopperSourceBlend = await fileRecord('source-assets/blender/pass65-chopper-gunner.blend');
+const chopperSourceBlend = await fileRecord('source-assets/blender/pass71-chopper-gunner.blend');
 const aircraftSourceBlend = await fileRecord('source-assets/blender/pass65-support-aircraft-family.blend');
 
 const chopper = await auditedLods('chopper', [0, 1, 2].map((lod) => `public/assets/original/models/support/pass65-chopper-gunner-lod${lod}.glb`));
@@ -74,7 +74,7 @@ const chopperRenders = await Promise.all([
   reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-rear-fuselage-quarter.png', 'rear-fuselage-quarter', 512, 512),
   reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-canopy-armour-closeup.png', 'canopy-armour-closeup', 512, 512),
   reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-ordnance-mechanics-closeup.png', 'ordnance-mechanics-closeup', 512, 512),
-  reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png', 'accepted-first-person-instruments', 960, 540),
+  reviewRecord('docs/assets/pass65-vehicles/chopper/pass71-chopper-first-person-instruments-16x9.png', 'accepted-first-person-instruments', 960, 540),
 ]);
 const chopperContactSheet = await reviewRecord(
   'docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png', 'accepted-contact-sheet', 1536, 1024,
@@ -124,6 +124,7 @@ const chopperProvenance = {
   visualRevision: 'pass70-connected-rear-tail-airframe-v7',
   detailContract: 'continuous-rear-tail-silhouette-cockpit-clear-sightline-v7',
   materialRevision: 'pass70-daylight-readable-olive-pbr-v1',
+  firstPersonCockpitFraming: 'pass71-tall-pillars-centre-clear-v1',
   sourceBlend: chopperSourceBlend,
   sharedConsumers: ['menu-prerecorded-map-preview', 'ai-flown-chopper-gunner', 'player-optional-chopper-gunner'],
   worldGlbs: chopper.records,
@@ -221,6 +222,7 @@ replaceSupport('chopper-gunner-vehicle-v1', {
   placeholderStatus: 'forbidden-and-not-present', sharedConsumers: chopperProvenance.sharedConsumers, runtimeForwardAxis: '-Z',
   visualRevision: chopperProvenance.visualRevision, detailContract: chopperProvenance.detailContract,
   materialRevision: chopperProvenance.materialRevision,
+  firstPersonCockpitFraming: chopperProvenance.firstPersonCockpitFraming,
   sourceBlend: chopperSourceBlend, sourceScript, worldGlbs: chopper.records, firstPersonGlb: chopper.records[0], pbrMaps: chopperPbrMaps,
   provenance: chopperProvenanceRecord, sockets: SUPPORT_VEHICLE_SPECS.chopper.sockets,
   semanticNodes: SUPPORT_VEHICLE_SPECS.chopper.nodes, actions: SUPPORT_VEHICLE_SPECS.chopper.actions,
@@ -252,7 +254,7 @@ upsertAsset({
   sourceProvenance: chopperProvenanceRecord.path, sourceProvenanceSha256: chopperProvenanceRecord.sha256,
   preview: chopperContactSheet.path,
   format: 'Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, complete armoured tandem attack-helicopter silhouette, authored full cockpit/dashboard/HUD/weapon view, detailed exterior rotors/gun/sockets and eight animation clips',
-  modifications: 'Project-original Pass 70 v7 attack-helicopter presentation with a continuous rear-cabin to TailRootCollar, tail-boom and tail-fin silhouette; daylight-readable olive armour; transparent canopy and HUD glass; separated gunmetal/frame values; overlapping side and dorsal armour; raised fasteners and louvers; faceted pilot/gunner glazing; armoured nose and cheeks; dual-aperture nose sensor; braced pylons; finned missiles; rocket pods; mechanical rotor hardware; gun armour/feed chute and damped skid gear. Possessed view presents the complete cockpit while excluding exterior shell and rotors; runtime gameplay authority remains TypeScript-owned.',
+  modifications: 'Project-original Pass 70 v7 attack-helicopter presentation with a continuous rear-cabin to TailRootCollar, tail-boom and tail-fin silhouette; daylight-readable olive armour; transparent canopy and HUD glass; separated gunmetal/frame values; overlapping side and dorsal armour; raised fasteners and louvers; faceted pilot/gunner glazing; armoured nose and cheeks; dual-aperture nose sensor; braced pylons; finned missiles; rocket pods; mechanical rotor hardware; gun armour/feed chute and damped skid gear. Pass 71 authors taller first-person windscreen pillars, glow rails and header at semantic endpoints mechanically projected above and outside the protected reticle corridor. Possessed view presents the complete cockpit while excluding exterior shell and rotors; runtime gameplay authority remains TypeScript-owned.',
   attributionRequired: false,
 });
 upsertAsset({

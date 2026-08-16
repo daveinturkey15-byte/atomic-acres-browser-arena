@@ -37,8 +37,8 @@ const stagedChannelDirectories = readdirSync(join(dist, 'channels'), { withFileT
   .map((entry) => entry.name)
   .sort();
 const expectedDirectories = rollbackStaged
-  ? ['pass63-rollback', 'pass69-retained', 'recent-stable', 'the-big-one']
-  : ['pass69-retained', 'recent-stable', 'the-big-one'];
+  ? ['pass63-rollback', 'pass70-retained', 'recent-stable', 'the-big-one']
+  : ['pass70-retained', 'recent-stable', 'the-big-one'];
 if (JSON.stringify(stagedChannelDirectories) !== JSON.stringify(expectedDirectories)) {
   throw new Error(`Unexpected staged channels: ${stagedChannelDirectories.join(', ')}`);
 }
@@ -80,17 +80,24 @@ const retainedFiles = verifyPinned(config.retained);
 const retainedRoot = resolve(dist, config.retained.path);
 const retainedEmbedded = JSON.parse(readFileSync(join(retainedRoot, 'channel-provenance.json'), 'utf8'));
 const retainedWrapper = JSON.parse(readFileSync(join(retainedRoot, 'pinned-channel-provenance.json'), 'utf8'));
-if (retainedEmbedded.releasePass !== config.retained.pass
+const retainedPinnedFiles = walkFiles(retainedRoot)
+  .filter((path) => path !== join(retainedRoot, 'pinned-channel-provenance.json'));
+if (retainedFiles !== config.retained.pagesSubtreeFileCount
+  || retainedPinnedFiles.length !== retainedFiles
+  || retainedEmbedded.releasePass !== config.retained.pass
   || retainedEmbedded.sourceSha !== config.retained.sourceSha
   || retainedEmbedded.path !== config.retained.pagesPath
   || retainedEmbedded.exactRootFileCount !== config.retained.runtimeFileCount
   || retainedEmbedded.treeSha256 !== config.retained.runtimeTreeSha256
-  || retainedWrapper.channel !== 'pass69-retained'
+  || retainedWrapper.channel !== 'pass70-retained'
   || retainedWrapper.pagesSha !== config.retained.pagesSha
   || retainedWrapper.pagesPath !== config.retained.pagesPath
   || retainedWrapper.path !== config.retained.path
+  || retainedWrapper.exactRootFileCount !== config.retained.pagesSubtreeFileCount
+  || retainedWrapper.treeSha256 !== config.retained.pagesSubtreeTreeSha256
+  || retainedWrapper.treeSha256 !== treeDigest(retainedRoot, retainedPinnedFiles)
   || retainedWrapper.pinnedRuntime?.treeSha256 !== config.retained.runtimeTreeSha256) {
-  throw new Error('Retained Pass 69 does not match the exact previously hosted runtime');
+  throw new Error('Retained Pass 70 does not match the exact restored runtime');
 }
 const stableRoot = resolve(dist, config.stable.path);
 const rebuiltStableProvenancePath = join(stableRoot, 'channel-provenance.json');
@@ -122,11 +129,18 @@ if (rebuiltStable?.rebuiltFromSource === true) {
   stableFiles = verifyPinned(config.stable);
   const stableProvenanceFile = config.stable.pagesPath ? 'pinned-channel-provenance.json' : 'channel-provenance.json';
   const stableProvenance = JSON.parse(readFileSync(join(stableRoot, stableProvenanceFile), 'utf8'));
-  if (stableProvenance.schemaVersion !== 4
+  const stablePinnedFiles = walkFiles(stableRoot)
+    .filter((path) => path !== join(stableRoot, 'pinned-channel-provenance.json'));
+  if (stableFiles !== config.stable.pagesSubtreeFileCount
+    || stablePinnedFiles.length !== stableFiles
+    || stableProvenance.schemaVersion !== 4
     || stableProvenance.releasePass !== config.stable.pass
     || stableProvenance.sourceSha !== config.stable.sourceSha
     || stableProvenance.pagesSha !== config.stable.pagesSha
     || stableProvenance.pagesPath !== config.stable.pagesPath
+    || stableProvenance.exactRootFileCount !== config.stable.pagesSubtreeFileCount
+    || stableProvenance.treeSha256 !== config.stable.pagesSubtreeTreeSha256
+    || stableProvenance.treeSha256 !== treeDigest(stableRoot, stablePinnedFiles)
     || stableProvenance.pinnedRuntime?.exactRootFileCount !== config.stable.runtimeFileCount
     || stableProvenance.pinnedRuntime?.treeSha256 !== config.stable.runtimeTreeSha256) {
     throw new Error('Stable Pass 67.1 provenance does not match the exact configured source and Pages SHAs');
@@ -148,13 +162,32 @@ if (config.rollback && existsSync(join(dist, config.rollback.path))) {
   if (!rollbackAssets.some((name) => readFileSync(join(rollbackRoot, 'assets', name)).includes(Buffer.from(config.rollback.pass)))) {
     throw new Error(`Rollback channel does not contain ${config.rollback.pass}`);
   }
-  const rollbackProvenance = JSON.parse(readFileSync(join(rollbackRoot, 'channel-provenance.json'), 'utf8'));
-  if (rollbackProvenance.schemaVersion !== 4
-    || rollbackProvenance.releasePass !== config.rollback.pass
-    || rollbackProvenance.sourceSha !== config.rollback.sourceSha
-    || rollbackProvenance.path !== config.rollback.path
-    || rollbackProvenance.rebuiltFromSource !== true) {
-    throw new Error('Rollback provenance does not match the configured Pass 63 rebuilt-source record');
+  const rollbackFiles = verifyPinned(config.rollback);
+  const rollbackEmbedded = JSON.parse(readFileSync(join(rollbackRoot, 'channel-provenance.json'), 'utf8'));
+  const rollbackWrapper = JSON.parse(readFileSync(join(rollbackRoot, 'pinned-channel-provenance.json'), 'utf8'));
+  const rollbackPinnedFiles = walkFiles(rollbackRoot)
+    .filter((path) => path !== join(rollbackRoot, 'pinned-channel-provenance.json'));
+  if (rollbackFiles !== config.rollback.pagesSubtreeFileCount
+    || rollbackPinnedFiles.length !== rollbackFiles
+    || rollbackEmbedded.schemaVersion !== 4
+    || rollbackEmbedded.releasePass !== config.rollback.pass
+    || rollbackEmbedded.sourceSha !== config.rollback.sourceSha
+    || rollbackEmbedded.path !== config.rollback.pagesPath
+    || rollbackEmbedded.exactRootFileCount !== config.rollback.runtimeFileCount
+    || rollbackEmbedded.treeSha256 !== config.rollback.runtimeTreeSha256
+    || rollbackWrapper.schemaVersion !== 4
+    || rollbackWrapper.channel !== 'rollback'
+    || rollbackWrapper.releasePass !== config.rollback.pass
+    || rollbackWrapper.sourceSha !== config.rollback.sourceSha
+    || rollbackWrapper.pagesSha !== config.rollback.pagesSha
+    || rollbackWrapper.pagesPath !== config.rollback.pagesPath
+    || rollbackWrapper.path !== config.rollback.path
+    || rollbackWrapper.exactRootFileCount !== config.rollback.pagesSubtreeFileCount
+    || rollbackWrapper.treeSha256 !== config.rollback.pagesSubtreeTreeSha256
+    || rollbackWrapper.treeSha256 !== treeDigest(rollbackRoot, rollbackPinnedFiles)
+    || rollbackWrapper.pinnedRuntime?.exactRootFileCount !== config.rollback.runtimeFileCount
+    || rollbackWrapper.pinnedRuntime?.treeSha256 !== config.rollback.runtimeTreeSha256) {
+    throw new Error('Rollback Pass 63 does not match the exact configured Pages subtree and embedded runtime');
   }
 }
 console.log(JSON.stringify({ releaseTopology: 'verified', retainedFiles, stableFiles, experimentalAssets: experimentalAssets.length }));

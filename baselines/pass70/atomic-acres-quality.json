@@ -1,0 +1,306 @@
+{
+  "schemaVersion": 1,
+  "designation": "pass70-atomic-acres-quality-published-reference",
+  "designatedAt": "2026-08-12T19:48:30.000Z",
+  "releasePass": "PASS 70",
+  "immutable": true,
+  "sourceSha": "130fd59bd2cf1e1719b802463219ddf36e2484d5",
+  "pagesSha": "ecd683116163b4940566f82f7edb87ed9c964cb6",
+  "pagesPath": "channels/the-big-one",
+  "runtimeFileCount": 515,
+  "runtimeTreeSha256": "1a0e90676ffc411eaefeaebef0c970481aad416084a1dc21e9bf7de6de369196",
+  "guardPolicySha256": "d99a62cdf2f6e9a5419609e0dfbfd02d7e9040c206fe0399b9ff724d164c80de",
+  "runtimeDigestPolicy": "Hash sorted path, NUL, blob bytes, NUL for every file beneath channels/the-big-one except channel-provenance.json; the complete published subtree contains 516 files including that provenance wrapper.",
+  "basis": {
+    "ownerAssessment": "Pass 70 is the exact published build immediately preceding the reported Pass 71 Quality-profile downgrade. This record does not claim Dave visually approved every Pass 70 frame.",
+    "mechanicalEvidence": "The Pages commit subject and embedded channel-provenance.json bind PASS 70 to the exact source SHA, 515-file runtime set and recorded tree digest. Candidate checks retain the provenance-named arena GLB and source-texture wildcard, authored sky, operator LOD assets and Quality scene contracts."
+  },
+  "sourceFileTreeSha256": "39d5a7611a9bf373eee25828018ed93b12a8527258f716869946cb79866363ed",
+  "protectedSourceFiles": [
+    "scripts/assets/compress-quality-glbs.mjs",
+    "scripts/blender/create-atomic-acres-blender-arena.py",
+    "scripts/blender/export-atomic-acres-arena-spec.ts",
+    "source-assets/blender/atomic-acres-arena-spec.json",
+    "source-assets/blender/atomic-acres-blender-arena.blend",
+    "source-assets/blender/atomic-acres-blender-arena.provenance.json",
+    "source-assets/skies/atomic-acres-sunset-generated.png",
+    "source-assets/skies/atomic-acres-sunset.provenance.json",
+    "src/adaptive-quality.ts",
+    "src/arena-contrast-lighting.ts",
+    "src/arena-layout.ts",
+    "src/art-kit.ts",
+    "src/atomic-profile-authority-parity.ts",
+    "src/atmosphere-system.ts",
+    "src/ballistics.ts",
+    "src/blender-environment.ts",
+    "src/blender-lighting.ts",
+    "src/environment-assets.ts",
+    "src/graphics-refinement.ts",
+    "src/graphics-settings-registry.ts",
+    "src/grass-placement.ts",
+    "src/grass-system.ts",
+    "src/house-navigation.ts",
+    "src/map.ts",
+    "src/material-compatibility.ts",
+    "src/operator-model.ts",
+    "src/pass65-settings.ts",
+    "src/render-profile.ts",
+    "src/rendering/arena-visual-definition.ts",
+    "src/rendering/arena-visual-stream.ts",
+    "src/rendering/arenas/atomic-acres.ts",
+    "src/rendering/arenas/shared.ts",
+    "src/rendering/pass64-tsl-scene.ts",
+    "src/rendering/runtime-shadow-budget.ts",
+    "src/rendering/sky-backdrop.ts",
+    "src/weapon-model.ts",
+    "src/world-identity-presentation.ts"
+  ],
+  "auditedSourceVariants": [
+    {
+      "path": "src/physics.ts",
+      "baselineGitBlobSha": "a4f6cc5830f8d9927989d65b4b3408f2d7bfa2c1",
+      "baselineSha256": "728ef221a1dc8a025fdca5e5b06b6c36a03af7f797482226c0fb69aa4d194b57",
+      "allowedVariants": [
+        {
+          "auditSourceSha": "7e6ad8153e1fa82a380c96ccae32d11bfa8418a7",
+          "gitBlobSha": "1ce8d6a809ef2eb10daba25555871f32df5fd450",
+          "sha256": "7e3dab56439bd5344db470c88e40c277ca3222e31c123af6374000a6c14d0c3b",
+          "classification": "Exact audited read-only character contact/capsule evidence surface; controller, movement, stance, collision shape and contact configuration remain protected below."
+        },
+        {
+          "auditSourceSha": "73c6b5ab5fc9f082b6648a60ebef5a680c00b6e4",
+          "gitBlobSha": "43b51ae8220f13d22fcf6a8c65c54a9659e5222b",
+          "sha256": "4c6eafbd3d5065bf7255f80249fe3cd2b4a2626149e715e49dfafc91266c8883",
+          "classification": "Exact audited canonical world-floor extraction: Rapier retains the same -0.2m to 0m collider while presentation fallback consumes that collision-owned shape; protected controller, movement, stance, collision and contact semantics remain unchanged."
+        }
+      ]
+    },
+    {
+      "path": "src/legacy-main.ts",
+      "baselineGitBlobSha": "c4260f4a202cb238a5e39885bc8758a93893dd1f",
+      "baselineSha256": "c78c4e21a06e3dfab3382fdf151aa0791a04a4a3128116966f9394537d736690",
+      "allowedVariants": [
+        {
+          "auditSourceSha": "c08ccaa45ef7b2ba2655406d494b3b06d8c184ee",
+          "gitBlobSha": "533bcf0f2d6e4698964ad6a3ed3710ec08701e4b",
+          "sha256": "992f7f8592b62f0a4bc3d161fd407c44801f2e9c0b8fe2beb5d99730d6c1feef",
+          "classification": "Exact audited Pass 71 runtime composition at candidate A: owner-feedback gameplay and evidence wiring plus the final sparse-frame glass-debris lifecycle and exact crossbow impacted-pane line-of-sight exclusion. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no broader legacy-main variant is admitted."
+        },
+        {
+          "auditSourceSha": "e219fbfdd88d21b9a1ce5a84375bbf3c97a4f4ba",
+          "gitBlobSha": "6a8cfc22f4b837cf1534b9dc5fe18770f997844c",
+          "sha256": "9c6112cb57280fc8e5e6d781be874801b0ba30c3bcc6447c4e6ae72b01ed2678",
+          "classification": "Exact audited Pass 71 runtime composition at the final candidate A product freeze: retains the previously admitted owner-feedback and glass lifecycle wiring, adds the plain-data window-debris fallback snapshot, and binds Chopper exterior review tracking plus trusted-trigger-only bounded gunner aim and feedback evidence to current authoritative aircraft and gun-ray state. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted."
+        },
+        {
+          "auditSourceSha": "7c920e78fe0a655ff4b3dcd40834353d12833c0d",
+          "gitBlobSha": "095f9ae7f73d3393d2f23054c4a87d3420b31cfa",
+          "sha256": "f8c1423d8423baa2baf581371d33af9b270f1e41a04881b6aeaf5c4ffd5c7bd6",
+          "classification": "Exact audited Pass 71 runtime composition at the final candidate A product freeze: retains every previously admitted owner-feedback, glass lifecycle and Chopper evidence path, synchronously admits the prewarmed Rapier window-debris body and its real post-sync pose, and records a bounded exact explosive-bolt intact-pane impact receipt for sparse-frame observation. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted."
+        },
+        {
+          "auditSourceSha": "e81f13c8b39ca1292913d298612f08b6439fd451",
+          "gitBlobSha": "fc6481e7c075f09651028087cd1e8a3cddf99cef",
+          "sha256": "f20c4732103e28a40b96979ffa50d731a38ee7d939be7c742e810aaf302e0a53",
+          "classification": "Exact audited Pass 71 runtime composition at the repaired candidate A product freeze: retains every previously admitted owner-feedback, glass lifecycle, Chopper and exact explosive-bolt impact path, while preventing a post-policy Rapier snapshot from replacing the earlier real debris pose or publishing a late moving milestone ahead of retained support-aware fallback catch-up. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted."
+        },
+        {
+          "auditSourceSha": "3c32323b4499442912bbfb0760b45858394f9b73",
+          "gitBlobSha": "2bff921e313d108ba45b0724977f0f8f65f9f2d4",
+          "sha256": "01cdfae3bc1c7af43c82d51f1d538d72feabfb3ef5b1937d3d9c48cd8278da2f",
+          "classification": "Exact audited Pass 71 runtime composition for the owner-tested local HITL product freeze: retains every previously admitted owner-feedback, glass, Chopper, debris and explosive-bolt path, and adds only bounded local-multiplayer-QA weapon-projection authorization, hosted-matrix duration and signed-contact readiness needed to observe the existing HF-296 authority contract. Production gameplay authority remains protected by the localMultiplayerQa and non-offline gates. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted."
+        },
+        {
+          "auditSourceSha": "7034aa446acf65ed05d37905cfd977beec28ec32",
+          "gitBlobSha": "e4d7c6d2eeefa0940ffa3a3a398ecbb7532c6cc6",
+          "sha256": "cde8387a4af09d4a1922e15545e62d3f39e653713d118d28ad3b31fd65c0eedc",
+          "classification": "Exact audited Pass 71 runtime composition for the repaired owner-test candidate product freeze: retains every previously admitted owner-feedback, glass, Chopper, debris, explosive-bolt and bounded local-multiplayer-QA path, and makes live-host retention symmetric by allowing only the exact lobby host identity to survive pose-admission silence while its bound event channel continues delivering recent schema-valid authenticated host traffic. Other remote identities and stale or closed host channels retain the existing 12-second fail-closed timeout. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted."
+        },
+        {
+          "auditSourceSha": "f2bb3a56f07370be3d4a35fa7a1177da2bda4e82",
+          "gitBlobSha": "10fd592422711eda076da8235471b2a4ef67a473",
+          "sha256": "7ba164c4d33d98f43d163ad4d7ad88edb00aafe025ed88c90c7cd0e1e5efffac",
+          "classification": "Exact audited Pass 71 runtime composition for the repaired owner-test candidate product freeze: retains every previously admitted owner-feedback, glass, Chopper, debris, explosive-bolt, authenticated-host-liveness and bounded local-multiplayer-QA path, and adds only an explicit reliable mirror of the current schema-valid player state for HF-296 projection evidence after exact local staging. The mirror remains restricted to active local multiplayer QA, traverses the real network validator and remote admission path, and does not alter production gameplay authority or ordinary state cadence. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted."
+        },
+        {
+          "auditSourceSha": "04d3a9d5b8c08dccd32924275359129da0b2b471",
+          "gitBlobSha": "db970b2e19c9df981990f46c6d8b4da87c64670f",
+          "sha256": "86836a2efe940a0d02feb845de626ae874e98b5aec4db51706ffe9e64ba18765",
+          "classification": "Exact audited Pass 71 runtime composition for the repaired owner-test candidate product freeze: retains every previously admitted owner-feedback, glass, Chopper, debris, explosive-bolt, authenticated-host-liveness, reliable projection and bounded local-multiplayer-QA path, and admits only a one-step QA teleport continuity increment as an immediate movement resynchronization before the ordinary envelope check. The exception remains restricted to local multiplayer QA; production movement bounds, remote identity, health authority, claim requalification and continuity checks remain fail-closed. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted."
+        },
+        {
+          "auditSourceSha": "d3e76619e6e8c7b4bb2bea03e48452360e8b60ea",
+          "gitBlobSha": "6a42ff5857cf9b74f4b2aa597001411d0fef3855",
+          "sha256": "0026258350c7752e5febfa8ed2076fca9c3bfd516b152e0c73f042a617145fcc",
+          "classification": "Exact audited Pass 71 runtime composition for the repaired owner-test candidate product freeze: retains every previously admitted owner-feedback, glass, Chopper, debris, explosive-bolt, authenticated-host-liveness, reliable projection and bounded local-multiplayer-QA path, and admits only a strictly newer safe-integer QA teleport continuity as an immediate movement resynchronization before the ordinary envelope check. Equal or backward generations still reject, the exception remains restricted to local multiplayer QA, and production movement bounds, identity, health authority and claim requalification remain fail-closed. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted."
+        },
+        {
+          "auditSourceSha": "d9c896a6ada6d6ccb4a7b079cc54726fd05a725a",
+          "gitBlobSha": "b3e8f0f3fd54cf240cda812c37936028b5b3e475",
+          "sha256": "34f3c2d2b0b378353339a6530d5986ba0c3040ba81861850adcc4a2cb67a7208",
+          "classification": "Exact audited Pass 71 runtime composition for the recovery candidate: retains every previously admitted owner-feedback, glass, Chopper, debris, explosive-bolt, authenticated-host-liveness, reliable projection and bounded local-multiplayer-QA path, and adds only a trusted-input clock-order guard before the existing Chopper QA admission. The guard defers admission when the sampled RAF time predates the trusted arming edge; it does not change Quality assets, renderer selection, scene composition, gameplay damage, range, cadence or evidence deadlines. Immutable Pass 70 source and asset checks, together with semantic-function parity, continue to protect Atomic Quality selection, house structure, visibility and lighting; no other legacy-main variant is admitted."
+        }
+      ]
+    }
+  ],
+  "protectedSourceSets": [
+    {
+      "path": "public/assets/original/textures",
+      "extension": ".png",
+      "recursive": false,
+      "fileCount": 94,
+      "treeSha256": "bd01bbf45f1f51d0eef1282131935915bdd010ccaf36dbd52b731eddffa03e74",
+      "pagesPath": "channels/the-big-one/assets/original/textures",
+      "basis": "The immutable arena provenance names public/assets/original/textures/*.png as its authored source-texture wildcard."
+    }
+  ],
+  "protectedManifestEntries": [
+    {
+      "path": "assets.manifest.json",
+      "id": "atomic-acres-aesthetic-overhaul-2026-07-22",
+      "canonicalSha256": "acfc9ab104e0d77b13a02d121ccdf935819da6c005641e603e02b3ccce26c746"
+    }
+  ],
+  "runtimeAssetMappings": [
+    {
+      "sourcePath": "public/assets/original/models/atomic-acres-blender-arena.glb",
+      "pagesPath": "channels/the-big-one/assets/original/models/atomic-acres-blender-arena.glb"
+    },
+    {
+      "sourcePath": "public/assets/original/skies/atomic-acres-sunset.webp",
+      "pagesPath": "channels/the-big-one/assets/original/skies/atomic-acres-sunset.webp"
+    },
+    {
+      "sourcePath": "public/assets/original/models/operators/pass65-first-person-arms-lod0.glb",
+      "pagesPath": "channels/the-big-one/assets/original/models/operators/pass65-first-person-arms-lod0.glb"
+    },
+    {
+      "sourcePath": "public/assets/original/models/operators/pass65-first-person-arms-lod1.glb",
+      "pagesPath": "channels/the-big-one/assets/original/models/operators/pass65-first-person-arms-lod1.glb"
+    },
+    {
+      "sourcePath": "public/assets/original/models/operators/pass65-third-person-operator-lod0.glb",
+      "pagesPath": "channels/the-big-one/assets/original/models/operators/pass65-third-person-operator-lod0.glb"
+    },
+    {
+      "sourcePath": "public/assets/original/models/operators/pass65-third-person-operator-lod1.glb",
+      "pagesPath": "channels/the-big-one/assets/original/models/operators/pass65-third-person-operator-lod1.glb"
+    },
+    {
+      "sourcePath": "public/assets/original/models/operators/pass65-third-person-operator-lod2.glb",
+      "pagesPath": "channels/the-big-one/assets/original/models/operators/pass65-third-person-operator-lod2.glb"
+    }
+  ],
+  "runtimeAssetTreeSha256": "589c13fd9766ce5c9d389b83a39bfe0f9e45df74011a7feaf6e75c4ac4d8d244",
+  "arenaGlb": {
+    "sourcePath": "public/assets/original/models/atomic-acres-blender-arena.glb",
+    "pagesPath": "channels/the-big-one/assets/original/models/atomic-acres-blender-arena.glb",
+    "sceneSignatureSha256": "41391c79a0a90f9734e0d1104cf61ea064af965cebd7554738d9dabb67a7fd4e"
+  },
+  "semanticDeclarationParity": [
+    {
+      "path": "src/physics.ts",
+      "declarations": [
+        "CHARACTER_PHYSICS_CONFIG",
+        "STANCE_SHAPES",
+        "WORLD_BOUNDARY_THICKNESS",
+        "WORLD_BOUNDARY_MIN_Y",
+        "WORLD_BOUNDARY_MAX_Y"
+      ]
+    }
+  ],
+  "semanticFunctionParity": [
+    {
+      "path": "src/legacy-main.ts",
+      "functions": [
+        "ensureAtomicQualityPresentation",
+        "ensureSelectedQualityPresentation",
+        "atomicQualityHousePresentationActive",
+        "syncAtomicHouseStructuralPresentation",
+        "setArenaPresentationVisibility",
+        "applyArenaLightingForSelection"
+      ]
+    },
+    {
+      "path": "src/atomic-signal.ts",
+      "functions": [
+        "atomicSignalPrincipalHdrSamples",
+        "atomicSignalConfig",
+        "atomicSignalTextureSamples",
+        "renderSceneWithoutOverlayLayer",
+        "renderSceneOverlayLayer",
+        "renderSceneWithOverlayLayer",
+        "renderSceneLayerWithoutBackground"
+      ]
+    },
+    {
+      "path": "src/physics.ts",
+      "functions": [
+        "worldBoundaryColliders"
+      ]
+    }
+  ],
+  "semanticMethodParity": [
+    {
+      "path": "src/physics.ts",
+      "className": "CharacterPhysics",
+      "methods": [
+        "teleportEye",
+        "eyePosition",
+        "setStance",
+        "currentStance",
+        "move"
+      ]
+    }
+  ],
+  "semanticTokenParity": [
+    {
+      "path": "src/atomic-signal.ts",
+      "tokens": [
+        { "token": "step(bloomDepth, sceneSampleDepth + 0.0025)", "count": 1 },
+        { "token": "smoothstep(1.05, 2.1, luminance(sampleColor))", "count": 1 },
+        { "token": "float kernel = (x == 0 && y == 0) ? 0.18 : ((x == 0 || y == 0) ? 0.12 : 0.085);", "count": 1 },
+        { "token": "* 2.2", "count": 1 },
+        { "token": "bloom / max(weight, 0.001)", "count": 1 }
+      ]
+    },
+    {
+      "path": "src/physics.ts",
+      "tokens": [
+        { "token": "this.controller = world.createCharacterController(CHARACTER_PHYSICS_CONFIG.controllerOffset);", "count": 1 },
+        { "token": "this.controller.setSlideEnabled(true);", "count": 1 },
+        { "token": "this.controller.setApplyImpulsesToDynamicBodies(true);", "count": 1 },
+        { "token": "this.controller.setCharacterMass(78);", "count": 1 },
+        { "token": "this.controller.enableAutostep(CHARACTER_PHYSICS_CONFIG.autostepHeight, CHARACTER_PHYSICS_CONFIG.autostepMinimumWidth, false);", "count": 2 },
+        { "token": "this.controller.enableSnapToGround(CHARACTER_PHYSICS_CONFIG.snapToGround);", "count": 1 },
+        { "token": "this.controller.setMaxSlopeClimbAngle(CHARACTER_PHYSICS_CONFIG.maximumSlopeClimbDegrees * Math.PI / 180);", "count": 1 },
+        { "token": "this.controller.setMinSlopeSlideAngle(CHARACTER_PHYSICS_CONFIG.minimumSlopeSlideDegrees * Math.PI / 180);", "count": 1 },
+        { "token": ".setFriction(0)", "count": 1 },
+        { "token": ".setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.ALL)", "count": 1 }
+      ]
+    }
+  ],
+  "pagesBundleTokens": [
+    "PASS 70",
+    "130fd59bd2cf1e1719b802463219ddf36e2484d5",
+    "atomic-acres-blender-arena.glb?v=pass63-20260724-apertures1",
+    "Nuke Town Quality art"
+  ],
+  "candidateBundleTokens": [
+    "atomic-acres-blender-arena.glb?v=pass63-20260724-apertures1",
+    "Nuke Town Quality art",
+    "atomic-acres/house-profile-authority-parity@1"
+  ],
+  "allowedRendererOptimization": {
+    "paths": [
+      "src/atomic-signal.ts",
+      "src/rendering/render-runtime.ts",
+      "src/legacy-main.ts"
+    ],
+    "contract": "Implementation may move the retained selective-bloom isolation, sampled-ray depth guard and 3x3 authored kernel to a bounded prefilter target, but may not change Quality grading, HDR samples, scene layering, authored asset selection, material/texture corpus, lighting, shadows, geometry detail or authority binding."
+  },
+  "limitations": {
+    "pixelParityBlocker": "The immutable Pass 70 source and Pages commits retain no exact-camera native-GPU pixel corpus or driver/backend receipt, and this task forbids launching a native browser/GPU. This comparator therefore proves deterministic source, published-asset and scene-contract parity, not pixel-equivalent rendering or subjective visual quality."
+  },
+  "rollbackPolicy": "Serve the exact ecd683116163b4940566f82f7edb87ed9c964cb6 channels/the-big-one bytes without rebuilding when a Pass 70 visual rollback is required."
+}

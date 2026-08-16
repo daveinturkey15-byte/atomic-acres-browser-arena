@@ -227,9 +227,149 @@ function frameWindowValid(window, label, minimumDurationMs, minimumFrames) {
     && Math.abs(window.maximumMs - rounded(sorted[sorted.length - 1])) <= 0.001;
 }
 
+const TARGET_FRAME_BUDGET_MS = 1_000 / 60;
+const BASELINE_OBSERVATION_MS = 350;
+const MINIMUM_BASELINE_FRAME_SAMPLES = 10;
+const MAXIMUM_BASELINE_P95_FRAME_BUDGETS = 1.5;
+const MAXIMUM_BASELINE_GAP_FRAME_BUDGETS = 3;
+const MAXIMUM_BASELINE_COMPLETION_FRAME_BUDGETS = 3;
+const MINIMUM_ACTION_FRAME_BUDGETS = 2;
+const MAXIMUM_ACTION_FRAME_BUDGETS = 3;
+const ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS = 1;
+const MAXIMUM_SYNCHRONOUS_ACTION_FRAME_BUDGETS = 2;
+
+function frameActionBaselineValid(baseline, label) {
+  if (baseline?.label !== label
+    || !finite(baseline.observationMs) || baseline.observationMs < BASELINE_OBSERVATION_MS
+    || !Number.isSafeInteger(baseline.frameSamples)
+    || baseline.frameSamples < MINIMUM_BASELINE_FRAME_SAMPLES
+    || !Array.isArray(baseline.gapsMs) || baseline.gapsMs.length !== baseline.frameSamples
+    || !baseline.gapsMs.every((gap) => finite(gap) && gap >= 0)
+    || !finite(baseline.p50GapMs) || !finite(baseline.p95GapMs) || !finite(baseline.maximumGapMs)
+    || !finite(baseline.firstPresentedFrameDelayMs) || baseline.firstPresentedFrameDelayMs < 0
+    || !finite(baseline.firstSubmissionDelayMs) || baseline.firstSubmissionDelayMs < 0
+    || !finite(baseline.firstCompletionDelayMs) || baseline.firstCompletionDelayMs < 0
+    || !finite(baseline.maximumPendingForMs) || baseline.maximumPendingForMs < 0
+    || !['healthy', 'synchronous'].includes(baseline.presentationStatus)
+    || baseline.completionFailures !== 0
+    || !Number.isSafeInteger(baseline.startingPresentedFrame)
+    || !Number.isSafeInteger(baseline.endingPresentedFrame)
+    || baseline.endingPresentedFrame <= baseline.startingPresentedFrame
+    || !Number.isSafeInteger(baseline.startingSubmissionSequence)
+    || !Number.isSafeInteger(baseline.startingCompletedSequence)
+    || !Number.isSafeInteger(baseline.targetSubmissionSequence)
+    || !Number.isSafeInteger(baseline.endingSubmissionSequence)
+    || !Number.isSafeInteger(baseline.endingCompletedSequence)
+    || baseline.endingSubmissionSequence < baseline.startingSubmissionSequence
+    || baseline.endingCompletedSequence < baseline.startingCompletedSequence
+    || baseline.endingCompletedSequence < baseline.targetSubmissionSequence
+    || baseline.p95GapMs >= TARGET_FRAME_BUDGET_MS * MAXIMUM_BASELINE_P95_FRAME_BUDGETS
+    || baseline.maximumGapMs >= TARGET_FRAME_BUDGET_MS * MAXIMUM_BASELINE_GAP_FRAME_BUDGETS
+    || baseline.firstCompletionDelayMs
+      >= TARGET_FRAME_BUDGET_MS * MAXIMUM_BASELINE_COMPLETION_FRAME_BUDGETS) return false;
+  const sorted = [...baseline.gapsMs].sort((left, right) => left - right);
+  return Math.abs(baseline.p50GapMs - rounded(percentile(sorted, 0.5))) <= 0.001
+    && Math.abs(baseline.p95GapMs - rounded(percentile(sorted, 0.95))) <= 0.001
+    && Math.abs(baseline.maximumGapMs - rounded(sorted[sorted.length - 1])) <= 0.001;
+}
+
+function deriveFrameActionBudget(baseline) {
+  const referenceBaselineMs = Math.max(
+    baseline.p95GapMs,
+    baseline.firstPresentedFrameDelayMs,
+    baseline.firstSubmissionDelayMs,
+    baseline.firstCompletionDelayMs,
+  );
+  return {
+    targetFrameBudgetMs: rounded(TARGET_FRAME_BUDGET_MS),
+    maximumActionMs: rounded(Math.min(
+      TARGET_FRAME_BUDGET_MS * MAXIMUM_ACTION_FRAME_BUDGETS,
+      Math.max(
+        TARGET_FRAME_BUDGET_MS * MINIMUM_ACTION_FRAME_BUDGETS,
+        referenceBaselineMs + TARGET_FRAME_BUDGET_MS * ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS,
+      ),
+    )),
+    maximumSynchronousActionMs: rounded(
+      TARGET_FRAME_BUDGET_MS * MAXIMUM_SYNCHRONOUS_ACTION_FRAME_BUDGETS,
+    ),
+    referenceBaselineMs: rounded(referenceBaselineMs),
+  };
+}
+
+function glassThresholdsValid(thresholds, baseline, budget) {
+  return budget && typeof budget === 'object'
+    && thresholds?.targetFrameBudgetMs === rounded(TARGET_FRAME_BUDGET_MS)
+    && thresholds.maximumBaselineP95FrameBudgets === MAXIMUM_BASELINE_P95_FRAME_BUDGETS
+    && thresholds.maximumBaselineGapFrameBudgets === MAXIMUM_BASELINE_GAP_FRAME_BUDGETS
+    && thresholds.maximumBaselineCompletionFrameBudgets === MAXIMUM_BASELINE_COMPLETION_FRAME_BUDGETS
+    && thresholds.minimumActionFrameBudgets === MINIMUM_ACTION_FRAME_BUDGETS
+    && thresholds.maximumActionFrameBudgets === MAXIMUM_ACTION_FRAME_BUDGETS
+    && thresholds.actionRelativeAllowanceFrameBudgets === ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS
+    && thresholds.maximumActionMs === budget.maximumActionMs
+    && thresholds.maximumSynchronousActionMs === budget.maximumSynchronousActionMs
+    && thresholds.maximumM14TransitionReadyMs === 5_000
+    && budget.targetFrameBudgetMs === rounded(TARGET_FRAME_BUDGET_MS)
+    && budget.maximumActionMs === deriveFrameActionBudget(baseline).maximumActionMs
+    && budget.maximumSynchronousActionMs === deriveFrameActionBudget(baseline).maximumSynchronousActionMs
+    && budget.referenceBaselineMs === deriveFrameActionBudget(baseline).referenceBaselineMs;
+}
+
+function glassActionProbeValid(probe, action, label, budget) {
+  return probe?.action === action
+    && probe.label === label
+    && finite(probe.synchronousMs) && probe.synchronousMs >= 0
+    && probe.synchronousMs < budget.maximumSynchronousActionMs
+    && finite(probe.eventToPresentedFrameMs) && probe.eventToPresentedFrameMs >= 0
+    && probe.eventToPresentedFrameMs < budget.maximumActionMs
+    && finite(probe.eventToCompletionMs) && probe.eventToCompletionMs >= 0
+    && probe.eventToCompletionMs < budget.maximumActionMs
+    && finite(probe.maximumPendingForMs) && probe.maximumPendingForMs >= 0
+    && probe.maximumPendingForMs < budget.maximumActionMs
+    && Number.isSafeInteger(probe.presentedFrameDelta) && probe.presentedFrameDelta > 0
+    && ['healthy', 'synchronous'].includes(probe.presentationStatus)
+    && probe.completionFailures === 0
+    && Number.isSafeInteger(probe.startingSubmissionSequence)
+    && Number.isSafeInteger(probe.startingCompletedSequence)
+    && Number.isSafeInteger(probe.targetSubmissionSequence)
+    && Number.isSafeInteger(probe.endingSubmissionSequence)
+    && Number.isSafeInteger(probe.endingCompletedSequence)
+    && probe.endingSubmissionSequence >= probe.startingSubmissionSequence
+    && probe.endingCompletedSequence >= probe.startingCompletedSequence
+    && probe.endingCompletedSequence >= probe.targetSubmissionSequence;
+}
+
+function glassM14TransitionProbeValid(probe, action, label, thermalActive, budget) {
+  const readiness = probe?.readiness;
+  return glassActionProbeValid(probe, action, label, budget)
+    && finite(probe.readyMs) && probe.readyMs >= probe.eventToPresentedFrameMs && probe.readyMs < 5_000
+    && finite(probe.maximumAnimationFrameGapMs) && probe.maximumAnimationFrameGapMs >= 0
+    && probe.maximumAnimationFrameGapMs < budget.maximumActionMs
+    && readiness?.requestedWeapon === 'm14-ebr'
+    && readiness.ready === true
+    && readiness.modelLoaded === true
+    && readiness.gpuReady === true
+    && readiness.resident === true
+    && readiness.catalogPrewarming === false
+    && readiness.importedWeapon === 'm14-ebr'
+    && readiness.mountedIsRequested === true
+    && readiness.assetCacheLoading === 0
+    && readiness.dmrThermalActive === thermalActive
+    && finite(readiness.adsProgress) && readiness.adsProgress >= 0
+    && Number.isSafeInteger(readiness.dmrThermalContacts) && readiness.dmrThermalContacts >= 0
+    && finite(readiness.cameraFov)
+    && finite(readiness.expectedFov)
+    && (!thermalActive || (
+      readiness.adsProgress >= 0.9
+      && readiness.dmrThermalContacts > 0
+      && Math.abs(readiness.cameraFov - readiness.expectedFov) < 0.35
+    ));
+}
+
 function glassM14EvidenceValid(receipt) {
   const evidence = receipt.evidence;
   const probes = evidence?.probes;
+  const frameActionBaseline = evidence?.frameActionBaseline;
+  const frameActionBudget = evidence?.frameActionBudget;
   const expectedProbes = [
     ['noop', 'baseline-noop'],
     ['fire', 'cold-carbine-empty-sky'],
@@ -240,8 +380,8 @@ function glassM14EvidenceValid(receipt) {
     ['fire', 'cold-glass-breach'],
     ['fire', 'warm-glass-breach'],
   ];
-  if (!thresholdsValid(receipt.thresholds, false)
-    || receipt.thresholds.maximumM14TransitionReadyMs !== 5_000
+  if (!frameActionBaselineValid(frameActionBaseline, 'glass-m14-preaction-baseline')
+    || !glassThresholdsValid(receipt.thresholds, frameActionBaseline, frameActionBudget)
     || evidence?.retainedGlassBefore?.pool?.contract !== 'retained-exact-instanced-render-object-v1'
     || evidence.retainedGlassBefore.pool.retained !== 6
     || evidence.retainedGlassBefore.pool.currentArenaRetained !== 6
@@ -250,15 +390,16 @@ function glassM14EvidenceValid(receipt) {
     || evidence?.glassAfter?.coldWindowBroken !== true
     || evidence.glassAfter.warmWindowBroken !== true
     || !Array.isArray(probes) || probes.length !== expectedProbes.length
-    || !probes.every((probe, index) => actionProbeValid(probe, ...expectedProbes[index]))
-    || !m14TransitionProbeValid(probes[2], 'equip-m14', 'm14-cold-equip', false)
-    || !m14TransitionProbeValid(probes[3], 'ads-on', 'm14-cold-ads-on', true)) return false;
-  const baseline = probes[0];
-  return probes.slice(1).every((probe) => (
-    probe.eventToPresentedFrameMs < baseline.eventToPresentedFrameMs * 4 + 40
-  )) && [probes[2], probes[3]].every((probe) => (
-    probe.maximumAnimationFrameGapMs < baseline.eventToPresentedFrameMs * 4 + 40
-  ));
+    || !probes.every((probe, index) => glassActionProbeValid(
+      probe, expectedProbes[index][0], expectedProbes[index][1], frameActionBudget,
+    ))
+    || !glassM14TransitionProbeValid(
+      probes[2], 'equip-m14', 'm14-cold-equip', false, frameActionBudget,
+    )
+    || !glassM14TransitionProbeValid(
+      probes[3], 'ads-on', 'm14-cold-ads-on', true, frameActionBudget,
+    )) return false;
+  return true;
 }
 
 function flamethrowerEvidenceValid(receipt) {

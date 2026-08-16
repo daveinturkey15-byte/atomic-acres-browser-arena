@@ -358,9 +358,9 @@
       "sourceBlend": "source-assets/blender/pass65-support-aircraft-family.blend",
       "sourceBlendSha256": "d604ee311755cfe89caefe297c826b64274c51f4f010cc8f53af619111ea1292",
       "sourceScript": "scripts/blender/create-pass65-support-vehicles.py",
-      "sourceScriptSha256": "e3ae50f79360081d669e3a1de6c15d5809dd4c43fbe9c978a1d0db5fa813afa4",
+      "sourceScriptSha256": "295ade944607de19bef999eef832fae75a749f9b85648aff50f333760b0e041e",
       "sourceProvenance": "source-assets/blender/pass65-support-aircraft-family.provenance.json",
-      "sourceProvenanceSha256": "e8e8f1ee4cd54724ba6ea2be58aff4b8cb0013ff4ce0f7693f9108fdbe7793e3",
+      "sourceProvenanceSha256": "32cd89744be12bce2e6ee8a6332d71c3fb05d23c41295f62a60e2f172325b37a",
       "preview": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-contact-sheet.png",
       "format": "Distinct heavy four-turbofan Care transport and tailless flying-wing Carpet bomber three-LOD GLBs plus two-LOD rigged parachute crate, variant-specific embedded WebP PBR maps, semantic cargo/bomb sockets and authored actions",
       "modifications": "Project-original close-range v4 support family with daylight-readable material revision v1: Care and Carpet now use independent brighter low-metallic, high-roughness PBR sets, with authored underside and leading-edge value breaks; Care also separates its tail and engine-nacelle values. Existing hull, flight-deck, turbofan, gear, ramp, intake, service-panel, bomb-bay, drop-rig and gameplay-owned socket contracts remain unchanged.",
@@ -376,24 +376,24 @@
       "files": [
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-          "sha256": "d1ce0b797f5f1176f23b69b74717c64bb17d4bf29c42539d2ecea757a93a180d",
+          "sha256": "2d9884607ae42ac25d857d4d0916d56aac6bd4cbc9634bb65c0ba33c1f9044b9",
           "lod": 0,
           "triangles": 59948,
-          "bytes": 952336
+          "bytes": 955584
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod1.glb",
-          "sha256": "3faeb020eb3e11f144b4438f93811fa0b17e9d0447ccf4ba5e19e3c97ae9ad62",
+          "sha256": "77ebffdc15428be7bb860aa55e9a3a6ed01b49e1124cef174bec311cf61f8a7c",
           "lod": 1,
           "triangles": 49964,
-          "bytes": 831436
+          "bytes": 830812
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod2.glb",
-          "sha256": "a397f5b628acc49a541628b4f5280a98517231161465be1876c32ed9e51f4f36",
+          "sha256": "e386f1ec84483274cc88fe9da413374ea1347be628673ba81430cd86cbfe4709",
           "lod": 2,
           "triangles": 29344,
-          "bytes": 571380
+          "bytes": 570048
         },
         {
           "path": "public/assets/original/textures/support/pass65-chopper-albedo.png",
@@ -420,15 +420,15 @@
           "height": 512
         }
       ],
-      "sourceBlend": "source-assets/blender/pass65-chopper-gunner.blend",
-      "sourceBlendSha256": "25a2556e5eccddf53e8214acbe71386820e818e359f35aa5b6a074cc3b4142c5",
+      "sourceBlend": "source-assets/blender/pass71-chopper-gunner.blend",
+      "sourceBlendSha256": "452d718a0ff60208a80202bb4cf58166a7b3b96bc6ca6d1cac5270cfa5e06593",
       "sourceScript": "scripts/blender/create-pass65-support-vehicles.py",
-      "sourceScriptSha256": "e3ae50f79360081d669e3a1de6c15d5809dd4c43fbe9c978a1d0db5fa813afa4",
+      "sourceScriptSha256": "295ade944607de19bef999eef832fae75a749f9b85648aff50f333760b0e041e",
       "sourceProvenance": "source-assets/blender/pass65-chopper-gunner.provenance.json",
-      "sourceProvenanceSha256": "44c1cf46e87f4b36811306cb1f2f0bda790bfcaff62880098815610dd4112897",
+      "sourceProvenanceSha256": "ef55e017efbc8d80f2eec7f81fab75c1d979355e1a0c4dcc9c75e8aa7b32715d",
       "preview": "docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png",
       "format": "Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, complete armoured tandem attack-helicopter silhouette, authored full cockpit/dashboard/HUD/weapon view, detailed exterior rotors/gun/sockets and eight animation clips",
-      "modifications": "Project-original Pass 70 v7 attack-helicopter presentation with a continuous rear-cabin to TailRootCollar, tail-boom and tail-fin silhouette; daylight-readable olive armour; transparent canopy and HUD glass; separated gunmetal/frame values; overlapping side and dorsal armour; raised fasteners and louvers; faceted pilot/gunner glazing; armoured nose and cheeks; dual-aperture nose sensor; braced pylons; finned missiles; rocket pods; mechanical rotor hardware; gun armour/feed chute and damped skid gear. Possessed view presents the complete cockpit while excluding exterior shell and rotors; runtime gameplay authority remains TypeScript-owned.",
+      "modifications": "Project-original Pass 70 v7 attack-helicopter presentation with a continuous rear-cabin to TailRootCollar, tail-boom and tail-fin silhouette; daylight-readable olive armour; transparent canopy and HUD glass; separated gunmetal/frame values; overlapping side and dorsal armour; raised fasteners and louvers; faceted pilot/gunner glazing; armoured nose and cheeks; dual-aperture nose sensor; braced pylons; finned missiles; rocket pods; mechanical rotor hardware; gun armour/feed chute and damped skid gear. Pass 71 authors taller first-person windscreen pillars, glow rails and header at semantic endpoints mechanically projected above and outside the protected reticle corridor. Possessed view presents the complete cockpit while excluding exterior shell and rotors; runtime gameplay authority remains TypeScript-owned.",
       "attributionRequired": false
     },
     {

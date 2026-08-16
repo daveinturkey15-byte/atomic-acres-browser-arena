@@ -10,6 +10,9 @@ export type SupportDamageScreenAnchor = Readonly<{
 }>;
 
 const MAX_SUPPORT_DAMAGE_FEEDBACK_SAMPLES = 24;
+export const LOCAL_SUPPORT_SHOT_PRESENTATION_RECEIPT_CAPACITY = 64;
+export const LOCAL_SUPPORT_SHOT_PRESENTATION_MATCH_WINDOW_MS = 500;
+const LOCAL_SUPPORT_SHOT_PRESENTATION_RETENTION_MS = 2_000;
 
 export type SupportDamageFeedbackSample = Readonly<{
   resultId: string;
@@ -18,6 +21,9 @@ export type SupportDamageFeedbackSample = Readonly<{
   targetId: string;
   targetLifeId: number;
   targetPosition: readonly number[];
+  origin: readonly number[];
+  endpoint: readonly number[];
+  tracerOrigin: readonly number[];
   damage: number;
   atMs: number;
   visible: boolean;
@@ -39,6 +45,95 @@ export type SupportDamageFeedbackTelemetrySnapshot = Readonly<{
   recent: readonly SupportDamageFeedbackSample[];
   bounded: boolean;
 }>;
+
+export type PlannedSupportDamageFeedback = Readonly<{
+  event: KillstreakDamageEvent;
+  firstForShot: boolean;
+}>;
+
+type LocalSupportShotPresentationReceipt = Readonly<{
+  activationId: string;
+  source: 'chopper';
+  presentedAtHostTimeMs: number;
+}>;
+
+/**
+ * Bounded proof that this client actually rendered a possessed Chopper round.
+ * Canonical hit feedback consumes the nearest matching proof instead of
+ * inferring presentation merely because the player still owns a cockpit.
+ */
+export class LocalSupportShotPresentationReceipts {
+  private readonly receipts: LocalSupportShotPresentationReceipt[] = [];
+
+  record(receipt: LocalSupportShotPresentationReceipt): boolean {
+    if (!receipt.activationId
+      || receipt.source !== 'chopper'
+      || !Number.isFinite(receipt.presentedAtHostTimeMs)
+      || receipt.presentedAtHostTimeMs < 0) return false;
+    this.prune(receipt.presentedAtHostTimeMs);
+    this.receipts.push(Object.freeze({ ...receipt }));
+    if (this.receipts.length > LOCAL_SUPPORT_SHOT_PRESENTATION_RECEIPT_CAPACITY) {
+      this.receipts.splice(0, this.receipts.length - LOCAL_SUPPORT_SHOT_PRESENTATION_RECEIPT_CAPACITY);
+    }
+    return true;
+  }
+
+  consume(event: KillstreakDamageEvent, receivedAtHostTimeMs: number): boolean {
+    if (event.source !== 'chopper' || !Number.isFinite(receivedAtHostTimeMs) || receivedAtHostTimeMs < 0) return false;
+    this.prune(receivedAtHostTimeMs);
+    let closestIndex = -1;
+    let closestDeltaMs = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < this.receipts.length; index += 1) {
+      const receipt = this.receipts[index]!;
+      if (receipt.activationId !== event.activationId) continue;
+      const deltaMs = Math.abs(receipt.presentedAtHostTimeMs - event.atMs);
+      if (deltaMs <= LOCAL_SUPPORT_SHOT_PRESENTATION_MATCH_WINDOW_MS && deltaMs < closestDeltaMs) {
+        closestIndex = index;
+        closestDeltaMs = deltaMs;
+      }
+    }
+    if (closestIndex < 0) return false;
+    this.receipts.splice(closestIndex, 1);
+    return true;
+  }
+
+  reset(): void {
+    this.receipts.length = 0;
+  }
+
+  size(): number {
+    return this.receipts.length;
+  }
+
+  private prune(nowHostTimeMs: number): void {
+    for (let index = this.receipts.length - 1; index >= 0; index -= 1) {
+      if (nowHostTimeMs - this.receipts[index]!.presentedAtHostTimeMs > LOCAL_SUPPORT_SHOT_PRESENTATION_RETENTION_MS) {
+        this.receipts.splice(index, 1);
+      }
+    }
+  }
+}
+
+/**
+ * Splash damage fans one admitted Chopper round into several target receipts.
+ * Presentation/audio must still run once for that round, while target-bound
+ * damage numbers and authority remain one receipt per target.
+ */
+export function supportDamageShotKey(event: KillstreakDamageEvent): string {
+  return `${event.activationId}\u0000${event.source}\u0000${event.atMs}\u0000${event.endpoint.join(',')}\u0000${event.tracerOrigin.join(',')}`;
+}
+
+export function planSupportDamageFeedback(
+  events: readonly KillstreakDamageEvent[],
+): readonly PlannedSupportDamageFeedback[] {
+  const seen = new Set<string>();
+  return Object.freeze(events.map((event) => {
+    const key = supportDamageShotKey(event);
+    const firstForShot = !seen.has(key);
+    if (firstForShot) seen.add(key);
+    return Object.freeze({ event, firstForShot });
+  }));
+}
 
 /**
  * Bounded evidence for owner support feedback. This records only presentation
@@ -70,6 +165,9 @@ export class SupportDamageFeedbackTelemetry {
       targetId: event.targetId,
       targetLifeId: event.targetLifeId,
       targetPosition: Object.freeze([...event.targetPosition]),
+      origin: Object.freeze([...event.origin]),
+      endpoint: Object.freeze([...event.endpoint]),
+      tracerOrigin: Object.freeze([...event.tracerOrigin]),
       damage: event.damage,
       atMs: event.atMs,
       visible: anchor.visible,

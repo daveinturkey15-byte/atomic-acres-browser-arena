@@ -3,14 +3,155 @@ import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import sharp from 'sharp';
+import {
+  assertFrameActionEvidenceEnvironment,
+  armFrameActionBaseline,
+  awaitArmedFrameActionBaseline,
+  BASELINE_CAPTURE_DEADLINE_MS,
+  BASELINE_OBSERVATION_MS,
+  cancelArmedFrameActionBaseline,
+  deriveFrameActionBudget,
+  isContinuousIntegrationEnvironment,
+  minimumActionFrameSamples,
+  NATIVE_NO_FREEZE_FRAME_ACTION_MODE,
+  resolveFrameActionEvidenceMode,
+  SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE,
+  type ArmedFrameActionBaseline,
+  type ArmedFrameActionBaselineReceipt,
+  type FrameActionBudget,
+} from './frame-action-budget';
 
 const renderer = process.env.PASS70_CHOPPER_RENDERER === 'webgpu' ? 'webgpu' : 'webgl2';
+const continuousIntegration = isContinuousIntegrationEnvironment(process.env.CI);
+const evidenceMode = resolveFrameActionEvidenceMode(
+  process.env.PASS70_CHOPPER_EVIDENCE_MODE
+    ?? (continuousIntegration
+      ? SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE
+      : NATIVE_NO_FREEZE_FRAME_ACTION_MODE),
+);
+assertFrameActionEvidenceEnvironment(evidenceMode, continuousIntegration);
 const loadout = Object.freeze({
   schemaVersion: 1,
   slots: ['care-package', 'piloted-drone', 'carpet-bomber', 'chopper', 'drone-swarm'],
 });
 
+// This spec measures an exact browser-frame envelope. Playwright's retained
+// screencast trace materially changes that envelope on software CI; the spec
+// retains its purpose-built JSON and raster evidence instead.
+test.use({ trace: 'off' });
+
 type PresentedReceiptKind = 'rigged' | 'camera-only';
+
+type ChopperPossessionEntryReceipt = Readonly<{
+  accepted: boolean;
+  synchronousMs: number;
+  eventToPresentedFrameMs: number;
+  eventToCompletionMs: number;
+  maximumAnimationFrameGapMs: number;
+  maximumPendingForMs: number;
+  presentationStatus: string;
+  startingPresentedFrame: number;
+  endingPresentedFrame: number;
+  startingSubmissionSequence: number;
+  startingCompletedSequence: number;
+  targetSubmissionSequence: number;
+  endingSubmissionSequence: number;
+  endingCompletedSequence: number;
+  completionFailures: number;
+  possession: string;
+}>;
+
+async function captureFirstChopperPossessionEntry(page: Page): Promise<ChopperPossessionEntryReceipt> {
+  return page.evaluate(() => new Promise<ChopperPossessionEntryReceipt>((resolveEntry, rejectEntry) => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    requestAnimationFrame(() => {
+      const startedAt = performance.now();
+      const startingPresentedFrame = debug.admissionState().presentedGameplayFrame;
+      const startingPresentation = debug.samplePresentationTelemetry() as any;
+      const synchronous = startingPresentation.status === 'synchronous';
+      const accepted = debug.toggleChopperGunnerControl();
+      const synchronousMs = performance.now() - startedAt;
+      let previousAnimationFrameAt = startedAt;
+      let maximumAnimationFrameGapMs = 0;
+      let maximumPendingForMs = startingPresentation.pendingForMs as number;
+      let eventToPresentedFrameMs: number | null = null;
+      let eventToCompletionMs: number | null = null;
+      let targetSubmissionSequence: number | null = synchronous ? 0 : null;
+      let endingPresentedFrame = startingPresentedFrame;
+      let endingPresentation = startingPresentation;
+      const deadline = startedAt + 2_000;
+      const rounded = (value: number) => Number(value.toFixed(3));
+      const inspect = () => {
+        const now = performance.now();
+        maximumAnimationFrameGapMs = Math.max(maximumAnimationFrameGapMs, now - previousAnimationFrameAt);
+        previousAnimationFrameAt = now;
+        endingPresentedFrame = debug.admissionState().presentedGameplayFrame;
+        endingPresentation = debug.samplePresentationTelemetry() as any;
+        maximumPendingForMs = Math.max(maximumPendingForMs, endingPresentation.pendingForMs as number);
+        if (eventToPresentedFrameMs === null && endingPresentedFrame > startingPresentedFrame) {
+          eventToPresentedFrameMs = now - startedAt;
+          if (synchronous) eventToCompletionMs = eventToPresentedFrameMs;
+        }
+        if (!synchronous && targetSubmissionSequence === null
+          && endingPresentation.submissionSequence > startingPresentation.submissionSequence) {
+          targetSubmissionSequence = endingPresentation.submissionSequence;
+        }
+        if (!synchronous && eventToCompletionMs === null && targetSubmissionSequence !== null
+          && endingPresentation.completedSequence >= targetSubmissionSequence) {
+          eventToCompletionMs = now - startedAt;
+        }
+        if (eventToPresentedFrameMs !== null && eventToCompletionMs !== null
+          && targetSubmissionSequence !== null) {
+          resolveEntry({
+            accepted,
+            synchronousMs: rounded(synchronousMs),
+            eventToPresentedFrameMs: rounded(eventToPresentedFrameMs),
+            eventToCompletionMs: rounded(eventToCompletionMs),
+            maximumAnimationFrameGapMs: rounded(maximumAnimationFrameGapMs),
+            maximumPendingForMs: rounded(maximumPendingForMs),
+            presentationStatus: endingPresentation.status,
+            startingPresentedFrame,
+            endingPresentedFrame,
+            startingSubmissionSequence: startingPresentation.submissionSequence,
+            startingCompletedSequence: startingPresentation.completedSequence,
+            targetSubmissionSequence,
+            endingSubmissionSequence: endingPresentation.submissionSequence,
+            endingCompletedSequence: endingPresentation.completedSequence,
+            completionFailures: endingPresentation.completionFailures,
+            possession: document.documentElement.dataset.killstreakPossession ?? 'none',
+          });
+          return;
+        }
+        if (now >= deadline) {
+          rejectEntry(new Error('First Chopper possession did not reach a completed presented frame within 2000ms'));
+          return;
+        }
+        requestAnimationFrame(inspect);
+      };
+      requestAnimationFrame(inspect);
+    });
+  }));
+}
+
+function assertBoundedChopperPossessionEntry(
+  receipt: ChopperPossessionEntryReceipt,
+  budget: FrameActionBudget,
+): void {
+  const evidence = JSON.stringify({ receipt, budget });
+  expect(receipt.accepted, evidence).toBe(true);
+  expect(receipt.synchronousMs, `${evidence}: synchronous control admission`).toBeLessThan(budget.maximumSynchronousActionMs);
+  expect(receipt.eventToPresentedFrameMs, `${evidence}: next presented gameplay frame`).toBeLessThan(budget.maximumActionMs);
+  expect(receipt.eventToCompletionMs, `${evidence}: completed presentation frontier`).toBeLessThan(budget.maximumActionMs);
+  expect(receipt.maximumAnimationFrameGapMs, `${evidence}: no possession-entry hitch`).toBeLessThan(budget.maximumActionMs);
+  expect(receipt.maximumPendingForMs, `${evidence}: no hidden completion backlog`).toBeLessThan(budget.maximumActionMs);
+  expect(receipt.completionFailures, evidence).toBe(0);
+  expect(receipt.presentationStatus, evidence).toMatch(/^(?:healthy|synchronous)$/u);
+  expect(receipt.endingPresentedFrame, evidence).toBeGreaterThan(receipt.startingPresentedFrame);
+  expect(receipt.endingSubmissionSequence, evidence).toBeGreaterThanOrEqual(receipt.startingSubmissionSequence);
+  expect(receipt.endingCompletedSequence, evidence).toBeGreaterThanOrEqual(receipt.startingCompletedSequence);
+  expect(receipt.endingCompletedSequence, evidence).toBeGreaterThanOrEqual(receipt.targetSubmissionSequence);
+  expect(receipt.possession, evidence).toBe('chopper-gunner');
+}
 
 function projectWorldBounds(
   bounds: { min: number[]; max: number[] },
@@ -156,6 +297,232 @@ async function pauseCompletedPresentedFrame(
   return { committed, paused, completion, stable };
 }
 
+async function captureTrackedChopperExteriorFrame(
+  page: Page,
+  expected: Readonly<{ entityId: string; activationId: string }>,
+) {
+  const transaction = await page.evaluate(({ entityId, activationId }) => new Promise<any>((resolveReceipt, rejectReceipt) => {
+    const key = '__PASS70_TRACKED_CHOPPER_PRESENTATION__';
+    if ((globalThis as any)[key]) {
+      rejectReceipt(new Error('A tracked Chopper presentation observer is already armed'));
+      return;
+    }
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const baselinePresentedGameplayFrame = (debug.admissionState() as any).presentedGameplayFrame as number;
+    const baselineReceipt = (debug.snapshot() as any).deterministicReview.presentedCamera;
+    const armedAtMs = performance.now();
+    let captureRevision: number | null = null;
+    let watchdogId: number | null = null;
+    let settled = false;
+    let completionPending = false;
+    const transactionStartedAtMs = performance.now();
+    const deadlineAtMs = transactionStartedAtMs + 8_000;
+    const exactBounds = (left: any, right: any) => (
+      left && right
+        && ['min', 'max'].every((edge) => [0, 1, 2].every((axis) => (
+          left[edge]?.[axis] === right[edge]?.[axis]
+        )))
+    );
+    const dispose = () => {
+      if (watchdogId !== null) {
+        clearTimeout(watchdogId);
+        watchdogId = null;
+      }
+      if ((globalThis as any)[key]?.entityId === entityId) delete (globalThis as any)[key];
+    };
+    const reject = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      dispose();
+      rejectReceipt(error);
+    };
+    const completeCurrentReceipt = async (
+      currentFrame: number,
+      receipt: any,
+      currentEntity: any,
+    ) => {
+      debug.setRenderPaused(true);
+      const pausedFrame = (debug.admissionState() as any).presentedGameplayFrame as number;
+      const pausedSnapshot = debug.snapshot() as any;
+      const pausedReceipt = pausedSnapshot.deterministicReview.presentedCamera;
+      const pausedEntity = pausedSnapshot.killstreak.entities
+        .find((candidate: any) => candidate.id === entityId);
+      if (pausedFrame !== currentFrame
+        || pausedReceipt?.frame !== currentFrame
+        || pausedReceipt.captureRevision !== captureRevision
+        || pausedReceipt.submissionSequence !== receipt.submissionSequence
+        || pausedReceipt.chopperReviewTracker?.entityId !== entityId
+        || pausedReceipt.reviewedChopper?.entityId !== entityId
+        || pausedEntity?.activationId !== activationId
+        || !(pausedEntity.expiresInMs > 1_000)
+        || !exactBounds(
+          pausedReceipt.reviewedChopper.drawableStableBounds,
+          pausedReceipt.chopperReviewTracker.submittedSceneDrawableBounds,
+        )) {
+        debug.setRenderPaused(false);
+        completionPending = false;
+        requestAnimationFrame(inspect);
+        return;
+      }
+      const completion = await debug.awaitCommittedCameraCompletion() as any;
+      if (settled) return;
+      const completedFrame = (debug.admissionState() as any).presentedGameplayFrame as number;
+      const completedSnapshot = debug.snapshot() as any;
+      const completedReceipt = completedSnapshot.deterministicReview.presentedCamera;
+      const completedEntity = completedSnapshot.killstreak.entities
+        .find((candidate: any) => candidate.id === entityId);
+      if (completion.submissionSequence !== pausedReceipt.submissionSequence
+        || completion.completedSequence < pausedReceipt.submissionSequence
+        || completedFrame !== pausedFrame
+        || completedReceipt?.frame !== pausedFrame
+        || completedReceipt.captureRevision !== captureRevision
+        || completedReceipt.submissionSequence !== pausedReceipt.submissionSequence
+        || completedReceipt.chopperReviewTracker?.entityId !== entityId
+        || completedReceipt.reviewedChopper?.entityId !== entityId
+        || completedEntity?.activationId !== activationId
+        || !(completedEntity.expiresInMs > 1_000)
+        || !exactBounds(
+          completedReceipt.reviewedChopper.drawableStableBounds,
+          completedReceipt.chopperReviewTracker.submittedSceneDrawableBounds,
+        )) {
+        throw new Error('Completed submission did not retain the paused exact current tracked Chopper receipt');
+      }
+      settled = true;
+      dispose();
+      resolveReceipt({
+        entityId,
+        activationId: currentEntity.activationId,
+        baselinePresentedGameplayFrame,
+        baselineCaptureRevision: baselineReceipt?.captureRevision ?? null,
+        armedAtMs,
+        transactionStartedAtMs,
+        deadlineAtMs,
+        captureRevision,
+        observedPresentedGameplayFrame: currentFrame,
+        viewport: [innerWidth, innerHeight],
+        receipt: pausedReceipt,
+        completion,
+        presentation: debug.samplePresentationTelemetry(),
+        debugRenderPaused: pausedSnapshot.deterministicReview.debugRenderPaused,
+      });
+    };
+    const observer = { entityId, armedAtMs, transactionStartedAtMs, deadlineAtMs };
+    (globalThis as any)[key] = observer;
+    requestAnimationFrame(inspect);
+    watchdogId = window.setTimeout(() => {
+      reject(new Error('Tracked authored Chopper receipt watchdog expired after 8000ms'));
+    }, 8_000);
+    try {
+      const snapshot = debug.snapshot() as any;
+      const expected = snapshot.killstreak.entities.find((candidate: any) => candidate.id === entityId);
+      if (!expected || expected.kind !== 'chopper' || expected.activationId !== activationId
+        || !(expected.expiresInMs > 1_000)) {
+        throw new Error('Expected Chopper identity changed before tracking was enabled');
+      }
+      captureRevision = debug.setChopperExteriorReviewTracking(true);
+      if (captureRevision === null) throw new Error('Tracked authored Chopper camera was not admitted');
+    } catch (error) {
+      reject(error);
+    }
+    function inspect() {
+      if (settled) return;
+      try {
+        if (performance.now() >= deadlineAtMs) {
+          reject(new Error('Tracked authored Chopper did not publish an exact current presented receipt within 8000ms'));
+          return;
+        }
+        const currentFrame = (debug.admissionState() as any).presentedGameplayFrame as number;
+        const snapshot = debug.snapshot() as any;
+        const receipt = snapshot.deterministicReview.presentedCamera;
+        const tracker = receipt?.chopperReviewTracker;
+        const reviewed = receipt?.reviewedChopper;
+        const currentEntity = snapshot.killstreak.entities.find((candidate: any) => candidate.id === entityId);
+        const currentDetail = snapshot.killstreakPresentation.entityDetails
+          .find((candidate: any) => candidate.entityId === entityId);
+        if (!completionPending
+          && captureRevision !== null
+          && currentFrame > baselinePresentedGameplayFrame
+          && receipt?.captureRevision === captureRevision
+          && receipt.frame === currentFrame
+          && receipt.targetCount === 0
+          && receipt.riggedActorTargetCount === 0
+          && receipt.chopperAutonomousFireHeld === true
+          && Array.isArray(receipt.activeChopperTransientActions)
+          && receipt.activeChopperTransientActions.length === 0
+          && tracker?.active === true
+          && tracker.entityId === entityId
+          && tracker.frame === currentFrame
+          && tracker.captureRevision === captureRevision
+          && tracker.submissionSequence === receipt.submissionSequence
+          && tracker.cameraColliderClear === true
+          && tracker.lineOfSightSampleCount === tracker.clearLineOfSightSampleCount
+          && tracker.submittedSceneDrawableMeshCount > 0
+          && reviewed?.entityId === entityId
+          && reviewed.rootVisible === true
+          && reviewed.activeLodIndex === 0
+          && reviewed.expiresInMs > 1_000
+          && reviewed.drawableStableMeshCount === tracker.submittedSceneDrawableMeshCount
+          && exactBounds(reviewed.drawableStableBounds, tracker.submittedSceneDrawableBounds)
+          && currentEntity?.activationId === activationId
+          && currentEntity.expiresInMs > 1_000
+          && currentDetail?.entityId === entityId) {
+          completionPending = true;
+          void completeCurrentReceipt(currentFrame, receipt, currentEntity).catch(reject);
+          return;
+        }
+        requestAnimationFrame(inspect);
+      } catch (error) {
+        reject(error);
+      }
+    }
+  }), expected);
+  expect(transaction.debugRenderPaused).toBe(true);
+  expect(transaction.deadlineAtMs - transaction.transactionStartedAtMs).toBe(8_000);
+  expect(transaction.observedPresentedGameplayFrame).toBe(transaction.receipt.frame);
+  expect(transaction.receipt.frame).toBeGreaterThan(transaction.baselinePresentedGameplayFrame);
+  expect(transaction.receipt.submissionSequence).toBe(transaction.presentation.submissionSequence);
+  const completion = transaction.completion as any;
+  expect(completion.submissionSequence).toBe(transaction.receipt.submissionSequence);
+  expect(completion.completedSequence).toBeGreaterThanOrEqual(completion.submissionSequence);
+  for (let boundary = 0; boundary < 2; boundary += 1) {
+    await page.evaluate(() => new Promise<void>((resolveBoundary) => requestAnimationFrame(() => resolveBoundary())));
+  }
+  const stable = await page.evaluate(() => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const snapshot = debug.snapshot() as any;
+    return {
+      frame: (debug.admissionState() as any).presentedGameplayFrame,
+      captureRevision: snapshot.deterministicReview.presentedCamera?.captureRevision ?? null,
+      debugRenderPaused: snapshot.deterministicReview.debugRenderPaused,
+      presentation: debug.samplePresentationTelemetry() as any,
+    };
+  });
+  expect(stable).toMatchObject({
+    frame: transaction.receipt.frame,
+    captureRevision: transaction.captureRevision,
+    debugRenderPaused: true,
+  });
+  expect(stable.presentation.submissionSequence).toBe(transaction.receipt.submissionSequence);
+  expect(stable.presentation.completedSequence).toBeGreaterThanOrEqual(completion.completedSequence);
+  return {
+    transaction,
+    committed: {
+      frame: transaction.receipt.frame,
+      captureRevision: transaction.captureRevision,
+      receipt: transaction.receipt,
+    },
+    paused: {
+      frame: transaction.receipt.frame,
+      captureRevision: transaction.captureRevision,
+      receipt: transaction.receipt,
+      presentation: transaction.presentation,
+      debugRenderPaused: true,
+    },
+    completion,
+    stable,
+  };
+}
+
 test('renders the complete possessed Chopper cockpit and cleans up on exit', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   const errors: string[] = [];
@@ -180,261 +547,48 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       && snapshot.supportVehiclePresentation?.state === 'ready'
       && snapshot.killstreakPresentation?.prewarmedAuthoredSupportFamilies?.includes('chopper');
   }, undefined, { timeout: 60_000 });
-  expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setChopperExteriorReviewHold(true))).toBe(true);
+  const evidence = resolve(process.cwd(), `artifacts/pass70/chopper-gunner/${renderer}`);
+  mkdirSync(evidence, { recursive: true });
+  let exteriorReviewHoldActive = false;
+  let possessionEntryBaselineObserver: ArmedFrameActionBaseline | null = null;
+  let possessionEntryBaselineStarted = false;
+  let exteriorCleanupCompleted = false;
+  try {
+  const exteriorReviewHoldEnabled = await page.evaluate(() => (
+    window.__ATOMIC_ACRES_DEBUG__.setChopperExteriorReviewHold(true)
+  ));
+  exteriorReviewHoldActive = exteriorReviewHoldEnabled;
+  expect(exteriorReviewHoldEnabled).toBe(true);
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.earnSupport(15));
   expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.activateKillstreak('chopper'))).toBe(true);
   await page.waitForFunction(() => (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).killstreak.entities
     .some((entity: any) => entity.kind === 'chopper' && entity.phase === 'orbiting'), undefined, { timeout: 30_000 });
-  const evidence = resolve(process.cwd(), `artifacts/pass70/chopper-gunner/${renderer}`);
-  mkdirSync(evidence, { recursive: true });
   await page.evaluate(() => {
     window.__ATOMIC_ACRES_DEBUG__.setCaptureViewmodelHidden(true);
     const hud = document.querySelector<HTMLElement>('#hud');
     if (hud) hud.style.visibility = 'hidden';
   });
-  const roughExteriorPose = await page.evaluate(() => {
+  const expectedExteriorEntity = await page.evaluate(() => {
     const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
     const detail = snapshot.killstreakPresentation.entityDetails
-      .find((entry: any) => entry.poolKey === 'chopper');
-    const entity = snapshot.killstreak.entities.find((entry: any) => entry.id === detail?.entityId);
-    if (!detail || !entity || !Number.isFinite(entity.attitude?.[1])) {
-      throw new Error('Live authored Chopper disappeared before exterior evidence capture');
+      .find((candidate: any) => candidate.poolKey === 'chopper');
+    const entity = snapshot.killstreak.entities
+      .find((candidate: any) => candidate.id === detail?.entityId);
+    if (!detail || !entity || entity.kind !== 'chopper' || !(entity.expiresInMs > 1_000)) {
+      throw new Error('Exact live authored Chopper identity was unavailable before tracker admission');
     }
-    const [x, y, z] = detail.worldPosition;
-    const visibleBounds = detail.stableAirframeBounds;
-    if (!visibleBounds || !(detail.stableAirframeMeshCount > 0)) {
-      throw new Error('Live authored Chopper has no stable airframe-only runtime bounds');
-    }
-    const target = [
-      (visibleBounds.min[0] + visibleBounds.max[0]) / 2,
-      (visibleBounds.min[1] + visibleBounds.max[1]) / 2,
-      (visibleBounds.min[2] + visibleBounds.max[2]) / 2,
-    ];
-    const entityYaw = entity.attitude[1];
-    const inTestBay = x >= 50;
-    const bounds = inTestBay
-      ? { minX: 52.8, maxX: 99.2, minZ: -25.2, maxZ: 37.2, maxCameraY: 22 }
-      : { minX: -19.2, maxX: 19.2, minZ: -47.8, maxZ: 19, maxCameraY: 5.8 };
-    const wallDistances = [
-      { wall: 'min-x', distance: x - bounds.minX },
-      { wall: 'max-x', distance: bounds.maxX - x },
-      { wall: 'min-z', distance: z - bounds.minZ },
-      { wall: 'max-z', distance: bounds.maxZ - z },
-    ].sort((left, right) => left.distance - right.distance);
-    const nearestWall = wallDistances[0].wall;
-    const wallInsetM = 0.8;
-    const visibleSpan = [
-      visibleBounds.max[0] - visibleBounds.min[0],
-      visibleBounds.max[1] - visibleBounds.min[1],
-      visibleBounds.max[2] - visibleBounds.min[2],
-    ];
-    const cameraDistanceM = inTestBay ? 8.6 : 6.4;
-    const sideCandidates = [-1, 1].map((side) => {
-      // Authored support assets face local -Z. A 60-degree nose/side quarter
-      // keeps the complete tail, rotor and tandem cockpit readable instead of
-      // foreshortening the airframe into a head-on stack.
-      const angle = entityYaw + Math.PI + (side * Math.PI / 3);
-      const candidate = {
-        side,
-        x: Math.max(
-          bounds.minX + wallInsetM,
-          Math.min(bounds.maxX - wallInsetM, target[0] + (Math.sin(angle) * cameraDistanceM)),
-        ),
-        z: Math.max(
-          bounds.minZ + wallInsetM,
-          Math.min(bounds.maxZ - wallInsetM, target[2] + (Math.cos(angle) * cameraDistanceM)),
-        ),
-      };
-      const clearance = Math.min(
-        candidate.x - bounds.minX,
-        bounds.maxX - candidate.x,
-        candidate.z - bounds.minZ,
-        bounds.maxZ - candidate.z,
-      );
-      return { ...candidate, clearance, distance: Math.hypot(candidate.x - target[0], candidate.z - target[2]) };
-    });
-    const candidate = sideCandidates.sort((left, right) =>
-      (right.clearance + right.distance) - (left.clearance + left.distance))[0];
-    const cameraY = Math.max(1.8, Math.min(bounds.maxCameraY, target[1] + (inTestBay ? 1 : 0.7)));
-    const horizontalDistanceM = Math.hypot(candidate.x - target[0], candidate.z - target[2]);
-    const cameraYaw = Math.atan2(candidate.x - target[0], candidate.z - target[2]);
-    const cameraPitch = Math.atan2(target[1] - cameraY, horizontalDistanceM);
-    window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(
-      candidate.x,
-      cameraY,
-      candidate.z,
-      cameraYaw,
-      cameraPitch,
-      50,
-    );
-    return {
-      entityId: entity.id,
-      worldPosition: [x, y, z],
-      entityYaw,
-      cameraPosition: [candidate.x, cameraY, candidate.z],
-      cameraYaw,
-      cameraPitch,
-      cameraSide: candidate.side,
-      cameraClearanceM: candidate.clearance,
-      target,
-      visibleBounds,
-      stableAirframeMeshCount: detail.stableAirframeMeshCount,
-      visibleSpan,
-      inTestBay,
-      nearestWall,
-    };
+    return { entityId: entity.id, activationId: entity.activationId };
   });
-  await page.waitForFunction(() => {
-    const detail = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).killstreakPresentation.entityDetails
-      .find((entry: any) => entry.poolKey === 'chopper');
-    return detail?.visible === true
-      && detail.presentationSource === 'project-original-blender-glb'
-      && detail.activeLodIndex === 0;
-  }, undefined, { timeout: 5_000 });
-  const exteriorPose = await page.evaluate((roughPose) => {
-    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
-    const detail = snapshot.killstreakPresentation.entityDetails
-      .find((entry: any) => entry.entityId === roughPose.entityId);
-    const entity = snapshot.killstreak.entities.find((entry: any) => entry.id === roughPose.entityId);
-    if (!detail?.drawableStableAirframeBounds || !(detail.drawableStableAirframeMeshCount > 0)
-      || detail.activeLodIndex !== 0 || !Number.isFinite(entity?.attitude?.[1])) {
-      throw new Error('Drawable authored Chopper LOD0 bounds were unavailable for the final runtime evidence pose');
-    }
-    const visibleBounds = detail.drawableStableAirframeBounds;
-    const target = [
-      (visibleBounds.min[0] + visibleBounds.max[0]) / 2,
-      (visibleBounds.min[1] + visibleBounds.max[1]) / 2,
-      (visibleBounds.min[2] + visibleBounds.max[2]) / 2,
-    ];
-    const visibleSpan = [
-      visibleBounds.max[0] - visibleBounds.min[0],
-      visibleBounds.max[1] - visibleBounds.min[1],
-      visibleBounds.max[2] - visibleBounds.min[2],
-    ];
-    const inTestBay = detail.worldPosition[0] >= 50;
-    const bounds = inTestBay
-      ? { minX: 52.8, maxX: 99.2, minZ: -25.2, maxZ: 37.2, maxCameraY: 22 }
-      : { minX: -19.2, maxX: 19.2, minZ: -47.8, maxZ: 19, maxCameraY: 5.8 };
-    const fov = 50;
-    const verticalTangent = Math.tan((fov * Math.PI / 180) / 2);
-    const horizontalTangent = verticalTangent * (innerWidth / innerHeight);
-    const horizontalSpan = Math.max(visibleSpan[0], visibleSpan[2]);
-    const fitDistance = Math.max(
-      visibleSpan[1] / (2 * verticalTangent * 0.55),
-      horizontalSpan / (2 * horizontalTangent * 0.55),
-      5.5,
-    ) + 1.2;
-    const cameraDistanceM = Math.min(18, fitDistance);
-    const wallInsetM = 0.8;
-    const sideCandidates = [-1, 1].map((side) => {
-      const angle = entity.attitude[1] + Math.PI + (side * Math.PI / 3);
-      const candidate = {
-        side,
-        x: Math.max(bounds.minX + wallInsetM, Math.min(
-          bounds.maxX - wallInsetM,
-          target[0] + (Math.sin(angle) * cameraDistanceM),
-        )),
-        z: Math.max(bounds.minZ + wallInsetM, Math.min(
-          bounds.maxZ - wallInsetM,
-          target[2] + (Math.cos(angle) * cameraDistanceM),
-        )),
-      };
-      const clearance = Math.min(
-        candidate.x - bounds.minX,
-        bounds.maxX - candidate.x,
-        candidate.z - bounds.minZ,
-        bounds.maxZ - candidate.z,
-      );
-      return { ...candidate, clearance, distance: Math.hypot(candidate.x - target[0], candidate.z - target[2]) };
-    });
-    const candidate = sideCandidates.sort((left, right) =>
-      (right.distance + right.clearance) - (left.distance + left.clearance))[0];
-    const cameraY = Math.max(1.8, Math.min(bounds.maxCameraY, target[1] + Math.max(0.55, visibleSpan[1] * 0.06)));
-    const horizontalDistanceM = Math.hypot(candidate.x - target[0], candidate.z - target[2]);
-    const cameraYaw = Math.atan2(candidate.x - target[0], candidate.z - target[2]);
-    const cameraPitch = Math.atan2(target[1] - cameraY, horizontalDistanceM);
-    const captureRevision = window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(
-      candidate.x, cameraY, candidate.z, cameraYaw, cameraPitch, fov,
-    );
-    if (captureRevision === null) throw new Error('Final authored Chopper evidence camera was not admitted');
-
-    const forward = [target[0] - candidate.x, target[1] - cameraY, target[2] - candidate.z];
-    const forwardLength = Math.hypot(...forward);
-    for (let index = 0; index < 3; index += 1) forward[index] /= forwardLength;
-    const right = [-forward[2], 0, forward[0]];
-    const rightLength = Math.hypot(...right);
-    for (let index = 0; index < 3; index += 1) right[index] /= rightLength;
-    const up = [
-      right[1] * forward[2] - right[2] * forward[1],
-      right[2] * forward[0] - right[0] * forward[2],
-      right[0] * forward[1] - right[1] * forward[0],
-    ];
-    const projected = [] as { x: number; y: number; depth: number }[];
-    for (const cornerX of [visibleBounds.min[0], visibleBounds.max[0]]) {
-      for (const cornerY of [visibleBounds.min[1], visibleBounds.max[1]]) {
-        for (const cornerZ of [visibleBounds.min[2], visibleBounds.max[2]]) {
-          const relative = [cornerX - candidate.x, cornerY - cameraY, cornerZ - candidate.z];
-          const depth = relative[0] * forward[0] + relative[1] * forward[1] + relative[2] * forward[2];
-          const cameraX = relative[0] * right[0] + relative[1] * right[1] + relative[2] * right[2];
-          const cameraYProjected = relative[0] * up[0] + relative[1] * up[1] + relative[2] * up[2];
-          projected.push({
-            x: innerWidth * (0.5 + cameraX / Math.max(0.001, depth) / horizontalTangent / 2),
-            y: innerHeight * (0.5 - cameraYProjected / Math.max(0.001, depth) / verticalTangent / 2),
-            depth,
-          });
-        }
-      }
-    }
-    const viewportBounds = {
-      minX: Math.min(...projected.map((point) => point.x)),
-      maxX: Math.max(...projected.map((point) => point.x)),
-      minY: Math.min(...projected.map((point) => point.y)),
-      maxY: Math.max(...projected.map((point) => point.y)),
-    };
-    return {
-      entityId: entity.id,
-      activeLodIndex: detail.activeLodIndex,
-      worldPosition: detail.worldPosition,
-      entityYaw: entity.attitude[1],
-      cameraPosition: [candidate.x, cameraY, candidate.z],
-      cameraYaw,
-      cameraPitch,
-      cameraSide: candidate.side,
-      cameraClearanceM: candidate.clearance,
-      cameraDistanceM: candidate.distance,
-      target,
-      visibleBounds,
-      stableAirframeMeshCount: detail.stableAirframeMeshCount,
-      drawableStableAirframeMeshCount: detail.drawableStableAirframeMeshCount,
-      visibleSpan,
-      viewportBounds,
-      viewportCoverage: {
-        width: (viewportBounds.maxX - viewportBounds.minX) / innerWidth,
-        height: (viewportBounds.maxY - viewportBounds.minY) / innerHeight,
-      },
-      allBoundsInFront: projected.every((point) => point.depth > 0),
-      viewport: [innerWidth, innerHeight],
-      inTestBay,
-      roughPose,
-      captureRevision,
-    };
-  }, roughExteriorPose);
-  expect(exteriorPose).toMatchObject({ activeLodIndex: 0, allBoundsInFront: true });
-  expect(exteriorPose.stableAirframeMeshCount).toBeGreaterThan(0);
-  expect(exteriorPose.drawableStableAirframeMeshCount).toBeGreaterThan(0);
-  expect(exteriorPose.viewportCoverage.width).toBeGreaterThan(0.36);
-  expect(exteriorPose.viewportCoverage.width).toBeLessThan(0.84);
-  expect(exteriorPose.viewportCoverage.height).toBeGreaterThan(0.18);
-  expect(exteriorPose.viewportCoverage.height).toBeLessThan(0.92);
-  expect(exteriorPose.viewportBounds.minX).toBeGreaterThan(exteriorPose.viewport[0] * 0.03);
-  expect(exteriorPose.viewportBounds.maxX).toBeLessThan(exteriorPose.viewport[0] * 0.97);
-  expect(exteriorPose.viewportBounds.minY).toBeGreaterThan(exteriorPose.viewport[1] * 0.03);
-  expect(exteriorPose.viewportBounds.maxY).toBeLessThan(exteriorPose.viewport[1] * 0.97);
-  const trackerRevision = await page.evaluate(() => (
-    window.__ATOMIC_ACRES_DEBUG__.setChopperExteriorReviewTracking(true)
-  ));
+  const exteriorCaptureCommit = await captureTrackedChopperExteriorFrame(
+    page,
+    expectedExteriorEntity,
+  );
+  expect(exteriorCaptureCommit.transaction).toMatchObject({
+    entityId: expectedExteriorEntity.entityId,
+    activationId: expectedExteriorEntity.activationId,
+  });
+  const trackerRevision = exteriorCaptureCommit.transaction.captureRevision as number;
   expect(trackerRevision).toEqual(expect.any(Number));
-  const exteriorCaptureCommit = await pauseCompletedPresentedFrame(page, trackerRevision, 'camera-only');
   expect(exteriorCaptureCommit.committed.receipt).toMatchObject({
     targetCount: 0,
     riggedActorTargetCount: 0,
@@ -466,6 +620,10 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       distanceM: number;
       clearanceM: number;
       inTestBay: boolean;
+      cameraColliderClear: boolean;
+      cameraClearanceRadiusM: number;
+      lineOfSightSampleCount: number;
+      clearLineOfSightSampleCount: number;
       submittedSceneDrawableMeshCount: number;
       submittedSceneDrawableBounds: { min: number[]; max: number[] };
       submissionSequence: number;
@@ -482,6 +640,10 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
     };
   };
   const tracker = exteriorReceipt.chopperReviewTracker;
+  const exteriorPose = {
+    entityId: expectedExteriorEntity.entityId,
+    viewport: exteriorCaptureCommit.transaction.viewport as number[],
+  };
   expect(tracker).toMatchObject({
     active: true,
     entityId: exteriorPose.entityId,
@@ -491,6 +653,10 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
   });
   expect(tracker.submittedSceneDrawableMeshCount).toBeGreaterThan(0);
   expect(tracker.submittedSceneDrawableBounds).not.toBeNull();
+  expect(tracker.cameraColliderClear).toBe(true);
+  expect(tracker.cameraClearanceRadiusM).toBe(0.4);
+  expect(tracker.lineOfSightSampleCount).toBe(9);
+  expect(tracker.clearLineOfSightSampleCount).toBe(tracker.lineOfSightSampleCount);
   expect(exteriorReceipt.reviewedChopper).toMatchObject({
     entityId: tracker.entityId,
     rootVisible: true,
@@ -565,7 +731,7 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
   const exteriorEvidence = {
     renderer,
     viewport: exteriorPose.viewport,
-    pretrackLod0Rehearsal: exteriorPose,
+    trackedEntityAdmission: expectedExteriorEntity,
     tracker,
     presentedCamera: {
       frame: exteriorReceipt.frame,
@@ -588,9 +754,14 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
     contentType: 'application/json',
   });
   writeFileSync(resolve(evidence, 'exterior-pose.json'), `${JSON.stringify(exteriorEvidence, null, 2)}\n`, 'utf8');
-  try {
-    const exteriorPng = await page.screenshot({ animations: 'allow' });
+  const exteriorPng = await page.screenshot({ animations: 'allow' });
     writeFileSync(resolve(evidence, 'exterior-front-quarter.png'), exteriorPng);
+    const hiddenControl = await page.evaluate(async () => (
+      window.__ATOMIC_ACRES_DEBUG__.captureChopperExteriorHiddenControl()
+    )) as any;
+    const hiddenControlPng = await page.screenshot({ animations: 'allow' });
+    const hiddenControlPath = resolve(evidence, 'exterior-hidden-control.nonpublishable.png');
+    writeFileSync(hiddenControlPath, hiddenControlPng);
     const pixelBounds = receiptProjection.viewportBounds;
     const left = Math.max(0, Math.floor(pixelBounds.minX));
     const top = Math.max(0, Math.floor(pixelBounds.minY));
@@ -623,9 +794,6 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
     expect(rasterVisibility.visiblePixelRatio).toBeGreaterThan(0.01);
     expect(rasterVisibility.highContrastPixelRatio).toBeGreaterThan(0.0025);
     expect(rasterVisibility.maximumLuminance).toBeGreaterThan(32);
-    const hiddenControl = await page.evaluate(async () => (
-      window.__ATOMIC_ACRES_DEBUG__.captureChopperExteriorHiddenControl()
-    )) as any;
     expect(hiddenControl).toMatchObject({
       contract: 'chopper-exterior-hidden-control-v1',
       nonPublishable: true,
@@ -667,9 +835,6 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       captureRevision: hiddenControl.controlCaptureRevision,
       frame: exteriorReceipt.frame,
     });
-    const hiddenControlPng = await page.screenshot({ animations: 'allow' });
-    const hiddenControlPath = resolve(evidence, 'exterior-hidden-control.nonpublishable.png');
-    writeFileSync(hiddenControlPath, hiddenControlPng);
     const { data: controlData, info: controlInfo } = await sharp(hiddenControlPng)
       .extract({ left, top, width, height })
       .removeAlpha()
@@ -711,26 +876,176 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
       path: hiddenControlPath,
       contentType: 'image/png',
     });
-    writeFileSync(resolve(evidence, 'exterior-pose.json'), `${JSON.stringify({
-      ...exteriorEvidence,
-      rasterVisibility,
-      attributableRasterDifference,
-    }, null, 2)}\n`, 'utf8');
+  writeFileSync(resolve(evidence, 'exterior-pose.json'), `${JSON.stringify({
+    ...exteriorEvidence,
+    rasterVisibility,
+    attributableRasterDifference,
+  }, null, 2)}\n`, 'utf8');
+    possessionEntryBaselineObserver = await armFrameActionBaseline(
+      page,
+      'chopper-first-possession-preaction-baseline',
+      expectedExteriorEntity,
+      evidenceMode,
+    );
   } finally {
-    await page.evaluate(() => {
-      window.__ATOMIC_ACRES_DEBUG__.setChopperExteriorReviewTracking(false);
-      window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(null);
-      window.__ATOMIC_ACRES_DEBUG__.setCaptureViewmodelHidden(false);
-      window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false);
-      const hud = document.querySelector<HTMLElement>('#hud');
-      if (hud) hud.style.visibility = '';
-    });
+    let exteriorCleanupFailure: Error | null = null;
+    try {
+      const cleanup = await page.evaluate((armedBaseline) => {
+        const debug = window.__ATOMIC_ACRES_DEBUG__;
+        const failures: string[] = [];
+        const attempt = (label: string, action: () => void) => {
+          try {
+            action();
+          } catch (error) {
+            failures.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        };
+        let observer: any = null;
+        let exactIdentity = false;
+        if (armedBaseline) {
+          attempt('baseline identity', () => {
+            observer = (globalThis as any)[armedBaseline.key];
+            const snapshot = debug.snapshot() as any;
+            const entity = snapshot.killstreak.entities.find((candidate: any) => (
+              candidate.id === armedBaseline.identity.entityId
+            ));
+            exactIdentity = Boolean(observer
+              && observer.label === armedBaseline.label
+              && observer.identity.entityId === armedBaseline.identity.entityId
+              && observer.identity.activationId === armedBaseline.identity.activationId
+              && entity?.activationId === armedBaseline.identity.activationId
+              && entity.expiresInMs > 0);
+            if (!exactIdentity) {
+              throw new Error('The armed Chopper baseline did not retain its exact cleanup identity');
+            }
+          });
+        }
+        attempt('review tracking', () => { debug.setChopperExteriorReviewTracking(false); });
+        attempt('capture camera', () => { debug.setCaptureCameraPose(null); });
+        attempt('capture viewmodel', () => { debug.setCaptureViewmodelHidden(false); });
+        attempt('HUD visibility', () => {
+          const hud = document.querySelector<HTMLElement>('#hud');
+          if (hud) hud.style.visibility = '';
+        });
+        let holdReleased = false;
+        attempt('exterior review hold', () => {
+          holdReleased = debug.setChopperExteriorReviewHold(false);
+          if (!holdReleased) throw new Error('Exterior review hold release was rejected');
+        });
+        attempt('render pause', () => { debug.setRenderPaused(false); });
+        let baselineStarted = false;
+        if (armedBaseline && exactIdentity && holdReleased && failures.length === 0) {
+          attempt('baseline start', () => {
+            baselineStarted = observer.start();
+            if (!baselineStarted) throw new Error('The armed baseline rejected its first start');
+          });
+        }
+        return { failures, holdReleased, baselineStarted };
+      }, possessionEntryBaselineObserver);
+      if (cleanup.holdReleased) exteriorReviewHoldActive = false;
+      possessionEntryBaselineStarted = cleanup.baselineStarted;
+      exteriorCleanupCompleted = cleanup.failures.length === 0;
+      if (cleanup.failures.length > 0) {
+        exteriorCleanupFailure = new Error(`Chopper exterior cleanup failed: ${cleanup.failures.join('; ')}`);
+      }
+    } catch (error) {
+      exteriorCleanupFailure = error instanceof Error ? error : new Error(String(error));
+    } finally {
+      if (!exteriorCleanupCompleted) {
+        try {
+          const fallback = await page.evaluate(() => {
+            const debug = window.__ATOMIC_ACRES_DEBUG__;
+            const failures: string[] = [];
+            const attempt = (label: string, action: () => void) => {
+              try {
+                action();
+              } catch (error) {
+                failures.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+              }
+            };
+            attempt('review tracking', () => { debug.setChopperExteriorReviewTracking(false); });
+            attempt('capture camera', () => { debug.setCaptureCameraPose(null); });
+            attempt('capture viewmodel', () => { debug.setCaptureViewmodelHidden(false); });
+            attempt('HUD visibility', () => {
+              const hud = document.querySelector<HTMLElement>('#hud');
+              if (hud) hud.style.visibility = '';
+            });
+            let holdReleased = false;
+            attempt('exterior review hold', () => {
+              holdReleased = debug.setChopperExteriorReviewHold(false);
+              if (!holdReleased) throw new Error('Exterior review hold release was rejected');
+            });
+            attempt('render pause', () => { debug.setRenderPaused(false); });
+            return { failures, holdReleased };
+          });
+          if (fallback.holdReleased) exteriorReviewHoldActive = false;
+          if (fallback.failures.length > 0) {
+            const message = `Chopper exterior fallback cleanup failed: ${fallback.failures.join('; ')}`;
+            exteriorCleanupFailure = exteriorCleanupFailure
+              ? new Error(`${exteriorCleanupFailure.message}; ${message}`)
+              : new Error(message);
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          exteriorCleanupFailure = exteriorCleanupFailure
+            ? new Error(`${exteriorCleanupFailure.message}; fallback transport failed: ${message}`)
+            : new Error(`Chopper exterior fallback transport failed: ${message}`);
+        }
+      }
+      if (exteriorReviewHoldActive) {
+        exteriorCleanupFailure = exteriorCleanupFailure
+          ?? new Error('Chopper exterior cleanup did not release its review hold');
+      }
+      if (possessionEntryBaselineObserver && !possessionEntryBaselineStarted) {
+        await cancelArmedFrameActionBaseline(
+          page,
+          possessionEntryBaselineObserver,
+          'The Chopper baseline transaction was cancelled during exterior cleanup',
+        ).catch(() => undefined);
+      }
+      if (exteriorCleanupFailure) throw exteriorCleanupFailure;
+    }
   }
-  expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setChopperExteriorReviewHold(false))).toBe(true);
+  if (!possessionEntryBaselineObserver || !possessionEntryBaselineStarted) {
+    throw new Error('The Chopper first-possession baseline was not started during exterior cleanup');
+  }
+  let possessionEntryBaseline: ArmedFrameActionBaselineReceipt;
+  try {
+    possessionEntryBaseline = await awaitArmedFrameActionBaseline(page, possessionEntryBaselineObserver);
+  } catch (error) {
+    await cancelArmedFrameActionBaseline(
+      page,
+      possessionEntryBaselineObserver,
+      'The Chopper baseline transaction was cancelled before possession entry',
+    ).catch(() => undefined);
+    throw error;
+  }
+  const possessionEntryBudget = deriveFrameActionBudget(possessionEntryBaseline, evidenceMode);
+  expect(possessionEntryBaseline.observationMs).toBeGreaterThanOrEqual(BASELINE_OBSERVATION_MS);
+  expect(possessionEntryBaseline.observationMs).toBeLessThan(BASELINE_CAPTURE_DEADLINE_MS);
+  expect(possessionEntryBaseline.frameSamples).toBeGreaterThanOrEqual(
+    minimumActionFrameSamples(evidenceMode),
+  );
+  expect(possessionEntryBudget.evidenceMode).toBe(evidenceMode);
+  expect(possessionEntryBudget.releaseAcceptanceModeEligible)
+    .toBe(evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE);
+  const possessionEntry = await captureFirstChopperPossessionEntry(page);
+  assertBoundedChopperPossessionEntry(possessionEntry, possessionEntryBudget);
   expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRiggedEvidenceCaptureTargets([
     { kind: 'training-dummy', id: 'test-dummy-alpha' },
   ]))).toBe(true);
-  expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.toggleChopperGunnerControl())).toBe(true);
+  await testInfo.attach(`pass70-chopper-${renderer}-first-possession-frame-budget`, {
+    body: Buffer.from(`${JSON.stringify({
+      distinction: 'input-handler-through-next-presented-and-completed-frame; excludes intentional cockpit dwell time',
+      claim: evidenceMode === SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE
+        ? 'software-CI semantic first-possession evidence only; not native HF-309 or release-acceptance evidence'
+        : 'native no-freeze first-possession evidence',
+      baseline: possessionEntryBaseline,
+      budget: possessionEntryBudget,
+      receipt: possessionEntry,
+    }, null, 2)}\n`, 'utf8'),
+    contentType: 'application/json',
+  });
   await page.waitForFunction(() => Boolean(
     (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).killstreakPresentation.firstPersonSightline?.alignment,
   ));

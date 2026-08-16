@@ -22,6 +22,8 @@ jobs:
       reason: ${{ steps.impact.outputs.reason }}
       windows_groups: ${{ steps.impact.outputs.windows_groups }}
       linux_groups: ${{ steps.impact.outputs.linux_groups }}
+      windows_supplemental_groups: ${{ steps.impact.outputs.windows_supplemental_groups }}
+      linux_supplemental_groups: ${{ steps.impact.outputs.linux_supplemental_groups }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -61,11 +63,17 @@ jobs:
       - run: npm run verify:provenance
       - run: npm run verify:killstreak-catalog
       - run: npm test
+      - name: Verify Pass 71 manifest-embedded STUCK evidence contract
+        run: npm run qa:pass71:stuck-evidence:contract
       - run: npm run leaderboard:check
       - run: npm run build
         env:
           VITE_MATCH_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}
           VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
+      - name: Fetch immutable Pass 70 Quality baseline
+        run: git fetch --no-tags origin ecd683116163b4940566f82f7edb87ed9c964cb6
+      - name: Verify Pass 71 Atomic Acres Quality baseline
+        run: npm run qa:pass71:atomic-quality-baseline -- --candidate-dist dist
       - run: npm run verify:release-tree
       - name: Write immutable PR preview receipt
         if: github.event_name == 'pull_request' && runner.os == 'Linux' && needs.classify-change.outputs.mode != 'none'
@@ -86,9 +94,40 @@ jobs:
         run: npm run audit:dependencies
 
   requirements-acceptance:
-    needs: [classify-change, static-and-unit]
+    needs: [classify-change, static-and-unit, bounded-browser-linux-supplemental, bounded-browser-windows-supplemental]
+    if: always()
     runs-on: ubuntu-latest
     steps:
+      - name: Require static and supplemental browser predecessors
+        shell: bash
+        env:
+          STATIC_RESULT: ${{ needs.static-and-unit.result }}
+          WINDOWS_SUPPLEMENTAL_GROUPS: ${{ needs.classify-change.outputs.windows_supplemental_groups }}
+          WINDOWS_SUPPLEMENTAL_RESULT: ${{ needs.bounded-browser-windows-supplemental.result }}
+          LINUX_SUPPLEMENTAL_GROUPS: ${{ needs.classify-change.outputs.linux_supplemental_groups }}
+          LINUX_SUPPLEMENTAL_RESULT: ${{ needs.bounded-browser-linux-supplemental.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$STATIC_RESULT" != "success" ]]; then
+            echo "::error::static-and-unit concluded $STATIC_RESULT"
+            exit 1
+          fi
+          if [[ -n "$WINDOWS_SUPPLEMENTAL_GROUPS" && "$WINDOWS_SUPPLEMENTAL_RESULT" != "success" ]]; then
+            echo "::error::required Windows supplemental groups ($WINDOWS_SUPPLEMENTAL_GROUPS) concluded $WINDOWS_SUPPLEMENTAL_RESULT"
+            exit 1
+          fi
+          if [[ -z "$WINDOWS_SUPPLEMENTAL_GROUPS" && "$WINDOWS_SUPPLEMENTAL_RESULT" != "skipped" ]]; then
+            echo "::error::empty Windows supplemental groups unexpectedly concluded $WINDOWS_SUPPLEMENTAL_RESULT"
+            exit 1
+          fi
+          if [[ -n "$LINUX_SUPPLEMENTAL_GROUPS" && "$LINUX_SUPPLEMENTAL_RESULT" != "success" ]]; then
+            echo "::error::required Linux supplemental groups ($LINUX_SUPPLEMENTAL_GROUPS) concluded $LINUX_SUPPLEMENTAL_RESULT"
+            exit 1
+          fi
+          if [[ -z "$LINUX_SUPPLEMENTAL_GROUPS" && "$LINUX_SUPPLEMENTAL_RESULT" != "skipped" ]]; then
+            echo "::error::empty Linux supplemental groups unexpectedly concluded $LINUX_SUPPLEMENTAL_RESULT"
+            exit 1
+          fi
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -99,22 +138,19 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - name: Build exact frozen-evidence candidate bytes
-        if: hashFiles('acceptance/pass-69.json') != ''
         run: npm run build
-      - name: Verify exact Pass 69 evidence catalog and frozen runtime
-        if: hashFiles('acceptance/pass-69.json') != ''
-        run: node scripts/release/acceptance-gate.mjs --phase ci --impact "${{ needs.classify-change.outputs.mode }}" --base "${{ github.event.pull_request.base.sha || github.event.before }}" --head "${{ github.event.pull_request.head.sha || github.sha }}"
-      - name: Verify immutable Pass 69 preview provenance and bytes
-        if: hashFiles('acceptance/pass-69.json') != ''
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/release/verify-pr-preview-provenance.mjs --manifest acceptance/pass-69.json --output artifacts/pipeline/pr-preview-provenance.json
       - name: Verify complete requirement-to-evidence coverage and exact preview approval
+        id: acceptance
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           IMPACT: ${{ needs.classify-change.outputs.mode }}
-        run: node scripts/release/acceptance-gate.mjs --phase ci --impact "$IMPACT" --base "$BASE_SHA" --head "$HEAD_SHA" --output artifacts/pipeline/acceptance-coverage.json
+        run: node scripts/release/acceptance-gate.mjs --phase ci --impact "$IMPACT" --base "$BASE_SHA" --head "$HEAD_SHA" --output artifacts/pipeline/acceptance-coverage.json --github-output "$GITHUB_OUTPUT"
+      - name: Verify immutable selected preview provenance and exact bytes
+        if: steps.acceptance.outputs.manifest_selected == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release/verify-pr-preview-provenance.mjs --manifest "${{ steps.acceptance.outputs.manifest_path }}" --output artifacts/pipeline/pr-preview-provenance.json
       - name: Upload acceptance coverage receipt
         if: always()
         uses: actions/upload-artifact@v4
@@ -192,9 +228,142 @@ jobs:
           QA_E2E_GROUPS: ${{ needs.classify-change.outputs.linux_groups }}
         run: npm run test:e2e:bounded
 
+  bounded-browser-windows-supplemental-shard:
+    needs: [classify-change, static-and-unit]
+    if: needs.classify-change.outputs.windows_supplemental_groups != ''
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        group:
+          - pass71-grenade-first-action
+          - pass70-chopper-gunner
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install chromium
+      - run: npm run build
+        env:
+          VITE_MATCH_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}
+          VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
+      - name: Run Pass 71 Windows software-CI semantic grenade shard
+        if: matrix.group == 'pass71-grenade-first-action'
+        env:
+          QA_E2E_GROUPS: ${{ matrix.group }}
+          PASS71_GRENADE_EVIDENCE_MODE: software-ci-semantic
+        run: npm run test:e2e:bounded
+      - name: Run Pass 71 Windows non-grenade supplemental browser shard
+        if: matrix.group != 'pass71-grenade-first-action'
+        env:
+          QA_E2E_GROUPS: ${{ matrix.group }}
+        run: npm run test:e2e:bounded
+      - name: Upload Pass 71 Windows supplemental evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pass71-windows-supplemental-${{ matrix.group }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            artifacts/pass70/chopper-gunner/**
+            artifacts/pass71/**
+            artifacts/pass25a/playwright-results/**
+            playwright-report/**
+          if-no-files-found: error
+          retention-days: 30
+
+  bounded-browser-windows-supplemental:
+    needs: [classify-change, bounded-browser-windows-supplemental-shard]
+    if: always() && needs.classify-change.outputs.windows_supplemental_groups != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every Pass 71 Windows supplemental browser shard
+        shell: bash
+        env:
+          SHARD_RESULT: ${{ needs.bounded-browser-windows-supplemental-shard.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$SHARD_RESULT" != "success" ]]; then
+            echo "::error::Pass 71 Windows supplemental browser shards concluded $SHARD_RESULT"
+            exit 1
+          fi
+
+  bounded-browser-linux-supplemental-shard:
+    needs: [classify-change, static-and-unit]
+    if: needs.classify-change.outputs.linux_supplemental_groups != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        group:
+          - pass71-glass-quality-bullet
+          - pass71-glass-quality-knife
+          - pass71-glass-quality-grenade
+          - pass71-glass-quality-flare
+          - pass71-glass-quality-crossbow
+          - pass71-glass-performance-bullet
+          - pass71-glass-performance-knife
+          - pass71-glass-performance-grenade
+          - pass71-glass-performance-flare
+          - pass71-glass-performance-crossbow
+          - pass71-nuke-warning
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+        env:
+          VITE_MATCH_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}
+          VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
+      - name: Run Pass 71 Linux supplemental browser shard
+        env:
+          QA_E2E_GROUPS: ${{ matrix.group }}
+        run: npm run test:e2e:bounded
+      - name: Upload Pass 71 Linux supplemental evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pass71-linux-supplemental-${{ matrix.group }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            artifacts/pass71/**
+            artifacts/pass25a/playwright-results/**
+            playwright-report/**
+          if-no-files-found: error
+          retention-days: 30
+
+  bounded-browser-linux-supplemental:
+    needs: [classify-change, bounded-browser-linux-supplemental-shard]
+    if: always() && needs.classify-change.outputs.linux_supplemental_groups != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every Pass 71 Linux supplemental browser shard
+        shell: bash
+        env:
+          SHARD_RESULT: ${{ needs.bounded-browser-linux-supplemental-shard.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$SHARD_RESULT" != "success" ]]; then
+            echo "::error::Pass 71 Linux supplemental browser shards concluded $SHARD_RESULT"
+            exit 1
+          fi
+
   pipeline-metrics:
     if: always()
-    needs: [classify-change, requirements-acceptance, static-and-unit, bounded-browser-linux, bounded-browser-windows]
+    needs: [classify-change, requirements-acceptance, static-and-unit, bounded-browser-linux, bounded-browser-windows, bounded-browser-linux-supplemental, bounded-browser-windows-supplemental]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

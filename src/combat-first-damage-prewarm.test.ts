@@ -39,7 +39,7 @@ describe('HF-282 first-combat preparation contract', () => {
     expect(lowHealth).toContain('parameter.setTargetAtTime(');
   });
 
-  it('prepares three muted tonal sources during unlock and before deployment admission', () => {
+  it('transactionally prepares three muted tonal sources during unlock and before deployment admission', () => {
     const prepare = between(audioSource, '\n  prepareCombat(): boolean {', '\n  prepareGlassImpact(');
     expect(prepare.match(/this\.context\.createOscillator\(\)/g)).toHaveLength(3);
     expect(prepare).not.toContain('createBufferSource(');
@@ -49,7 +49,9 @@ describe('HF-282 first-combat preparation contract', () => {
     expect(prepare).toContain('damageGain.gain.value = 0');
 
     const unlock = between(audioSource, '\n  unlock(): void {', '\n  suspend(): void {');
-    expect(unlock.indexOf('this.prepareCombat();')).toBeLessThan(unlock.indexOf('this.startArenaBed('));
+    expect(unlock).toContain('this.prepareCombat() && this.prepareGlassImpact() && this.prepareGrenadeEffects()');
+    expect(unlock.indexOf('this.prepareCombat()')).toBeLessThan(unlock.indexOf('this.prepareChopperRotors()'));
+    expect(unlock).not.toContain('this.startArenaBed(');
     const admission = between(mainSource, 'async function startGame(', '\nfunction randomNonce()');
     expect(admission.indexOf('audio.unlock()')).toBeLessThan(admission.indexOf('audio.prepareCombat()'));
     expect(admission.indexOf('audio.prepareCombat()')).toBeLessThan(admission.indexOf('prepareDeploymentTransition()'));

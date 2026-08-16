@@ -66,6 +66,16 @@ class FakeCompressorNode extends FakeAudioNode {
   readonly attack = new FakeAudioParam();
   readonly release = new FakeAudioParam();
 }
+class FakePannerNode extends FakeAudioNode {
+  panningModel: PanningModelType = 'equalpower';
+  distanceModel: DistanceModelType = 'inverse';
+  refDistance = 1;
+  maxDistance = 10_000;
+  rolloffFactor = 1;
+  readonly positionX = new FakeAudioParam();
+  readonly positionY = new FakeAudioParam();
+  readonly positionZ = new FakeAudioParam();
+}
 
 class FakeAudioContext {
   static readonly instances: FakeAudioContext[] = [];
@@ -75,6 +85,7 @@ class FakeAudioContext {
   readonly bufferSources: FakeBufferSourceNode[] = [];
   readonly gains: FakeGainNode[] = [];
   readonly filters: FakeFilterNode[] = [];
+  readonly panners: FakePannerNode[] = [];
   state: AudioContextState = 'running';
   currentTime = 0;
 
@@ -99,6 +110,11 @@ class FakeAudioContext {
     const source = new FakeBufferSourceNode();
     this.bufferSources.push(source);
     return source;
+  }
+  createPanner(): FakePannerNode {
+    const node = new FakePannerNode();
+    this.panners.push(node);
+    return node;
   }
   createBuffer(_channels: number, length: number, sampleRate: number): { duration: number; getChannelData: () => Float32Array } {
     return { duration: length / sampleRate, getChannelData: () => new Float32Array(length) };
@@ -128,15 +144,24 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
       bufferSources: context.bufferSources.length,
       gains: context.gains.length,
       filters: context.filters.length,
+      panners: context.panners.length,
     };
 
-    expect(preparedFactories).toEqual({ oscillators: 3, bufferSources: 0, gains: 11, filters: 2 });
+    expect(preparedFactories).toEqual({ oscillators: 12, bufferSources: 0, gains: 20, filters: 11, panners: 4 });
     expect(context.oscillators.every((source) => source.startCount === 1 && !source.ended)).toBe(true);
     expect(audio.telemetry()).toMatchObject({
       combatPrewarm: { prepared: true, runs: 1, sources: 3, nodes: 5, broadbandLoopSources: 0 },
       lowHealth: { prepared: true, sources: 2, active: false, broadbandSources: 0 },
       damageFeedback: { prepared: true, sources: 1, pulses: 0 },
-      runtime: { voices: 3 },
+      glassImpactPrewarm: { prepared: true, sources: 2, nodes: 4, retainedBroadbandLoops: 0 },
+      grenadeEffectsPrewarm: { prepared: true, sources: 3, nodes: 6, retainedBroadbandLoops: 0 },
+      support: {
+        chopperRotorPrewarm: {
+          prepared: true, runs: 1, capacity: 4, sources: 4, nodes: 12, factoryCalls: 16,
+          lastSyncFactoryDelta: 0, retainedBroadbandLoops: 0,
+        },
+      },
+      runtime: { voices: 12, retainedSources: 12, spatialChains: 4 },
     });
 
     audio.damage();
@@ -156,6 +181,7 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
       bufferSources: context.bufferSources.length,
       gains: context.gains.length,
       filters: context.filters.length,
+      panners: context.panners.length,
     }).toEqual(preparedFactories);
     expect(audio.prepareCombat()).toBe(true);
     expect(audio.telemetry()).toMatchObject({
@@ -170,7 +196,7 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
     });
     expect(audio.telemetry()).toMatchObject({
       lowHealth: { active: true, audible: false, automationWrites: 4 },
-      runtime: { voices: 3 },
+      runtime: { voices: 12, retainedSources: 12, spatialChains: 4 },
     });
     audio.setLowHealthFeedback({
       active: false, severity: 0, vignetteOpacity: 0,
@@ -186,11 +212,14 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
       combatPrewarm: { prepared: false, sources: 0 },
       lowHealth: { prepared: false, active: false },
       damageFeedback: { prepared: false, sources: 0 },
-      runtime: { voices: 0 },
+      glassImpactPrewarm: { prepared: false, sources: 0 },
+      grenadeEffectsPrewarm: { prepared: false, sources: 0 },
+      support: { chopperRotorPrewarm: { prepared: false, sources: 0 } },
+      runtime: { voices: 0, spatialChains: 0 },
     });
   });
 
-  it('prewarms the exact glass impact graph once at zero gain without retaining broadband loops', () => {
+  it('preowns glass and grenade effect graphs once and makes their live cues allocation-free', () => {
     vi.stubGlobal('AudioContext', FakeAudioContext);
     const audio = new ArenaAudio();
     audio.unlock();
@@ -200,24 +229,26 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
       bufferSources: context.bufferSources.length,
       gains: context.gains.length,
       filters: context.filters.length,
+      panners: context.panners.length,
     };
     expect(audio.prepareGlassImpact()).toBe(true);
+    expect(audio.prepareGrenadeEffects()).toBe(true);
+    expect(audio.prepareChopperRotors()).toBe(true);
     expect({
       oscillators: context.oscillators.length,
       bufferSources: context.bufferSources.length,
       gains: context.gains.length,
       filters: context.filters.length,
-    }).toEqual({
-      oscillators: before.oscillators + 1,
-      bufferSources: before.bufferSources + 1,
-      gains: before.gains + 2,
-      filters: before.filters + 1,
-    });
-    expect(context.gains.slice(-2).every((gain) => gain.gain.value === 0)).toBe(true);
-    expect(context.bufferSources.at(-1)).toMatchObject({ loop: false, startCount: 1 });
+      panners: context.panners.length,
+    }).toEqual(before);
+    expect(context.gains.slice(-5).every((gain) => gain.gain.value === 0)).toBe(true);
+    expect(context.bufferSources).toHaveLength(0);
     expect(audio.telemetry().glassImpactPrewarm).toEqual({
       prepared: true,
       runs: 1,
+      sources: 2,
+      nodes: 4,
+      pulses: 0,
       retainedBroadbandLoops: 0,
     });
     const afterFirst = {
@@ -227,12 +258,53 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
       filters: context.filters.length,
     };
     expect(audio.prepareGlassImpact()).toBe(true);
+    audio.impact('glass', 4);
+    audio.grenadeBounce(8);
+    expect(audio.grenadeFuseBeep(500, 1_000)).toBe(true);
+    expect(audio.explosion(1_000)).toBe(true);
     expect({
       oscillators: context.oscillators.length,
       bufferSources: context.bufferSources.length,
       gains: context.gains.length,
       filters: context.filters.length,
     }).toEqual(afterFirst);
+    expect(audio.telemetry()).toMatchObject({
+      glassImpactPrewarm: { pulses: 1 },
+      grenadeEffectsPrewarm: { prepared: true, runs: 1, sources: 3, nodes: 6, automations: 7 },
+      runtime: { retainedSources: 12 },
+    });
+
+    const beforeRotorSync = {
+      oscillators: context.oscillators.length,
+      gains: context.gains.length,
+      filters: context.filters.length,
+      panners: context.panners.length,
+    };
+    audio.syncChopperRotors([{ id: 'chopper-1', position: { x: 4, y: 12, z: -8 }, phase: 'orbiting' }]);
+    expect({
+      oscillators: context.oscillators.length,
+      gains: context.gains.length,
+      filters: context.filters.length,
+      panners: context.panners.length,
+    }).toEqual(beforeRotorSync);
+    expect(audio.telemetry().support.chopperRotorPrewarm).toMatchObject({
+      prepared: true,
+      syncs: 1,
+      activeSyncs: 1,
+      lastSyncFactoryDelta: 0,
+      liveIds: ['chopper-1'],
+      firstActiveSync: { cold: true, factoryDelta: 0, admitted: 1, contextState: 'running' },
+    });
+    audio.syncChopperRotors([]);
+    expect(audio.telemetry()).toMatchObject({
+      support: {
+        chopperRotorActive: false,
+        chopperRotorStarts: 1,
+        chopperRotorStops: 1,
+        chopperRotorPrewarm: { sources: 4, lastSyncFactoryDelta: 0, liveIds: [] },
+      },
+      runtime: { retainedSources: 12, retainedAudibleGains: 0 },
+    });
     audio.dispose();
     expect(audio.telemetry().glassImpactPrewarm).toMatchObject({ prepared: false, runs: 1 });
   });

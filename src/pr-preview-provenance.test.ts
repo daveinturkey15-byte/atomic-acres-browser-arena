@@ -1,11 +1,22 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
+  PASS71_CANDIDATE_A_REQUIRED_SUCCESS_JOBS,
   computePreviewTree,
+  collectPass71CandidateAArtifactReferences,
+  inspectPass71CandidateAAcceptanceArtifactZip,
+  inspectPass71CandidateAShardArtifactZip,
   inspectPreviewArtifactZip,
   parsePreviewManifest,
+  validatePass71CandidateAWorkflowJobs,
+  validatePass71MissingManifestLog,
   verifyPreviewProvenance,
   type PreviewIdentity,
 } from '../scripts/release/verify-pr-preview-provenance.mjs';
+import {
+  pass71CandidateAArtifactNames,
+  parsePass71CandidateAArtifactReference,
+} from '../scripts/release/pass71-candidate-artifact-reference.mjs';
 
 const SOURCE_SHA = 'a'.repeat(40);
 const OTHER_SHA = 'b'.repeat(40);
@@ -15,6 +26,40 @@ const PREVIEW_CREATED_AT = '2026-07-30T03:00:00Z';
 const NOW = new Date('2026-07-30T04:00:00Z');
 const ARTIFACT_NAME = `pr-preview-41-${SOURCE_SHA}`;
 const encoder = new TextEncoder();
+const MISSING_PASS71_MANIFEST = 'runtime/release-shell or acceptance-finalizer changes must add or update exactly one enforced pass manifest; found 0';
+
+function pass71CandidateAJobs(overrides: Readonly<Record<string, string>> = {}) {
+  const jobs: Array<{
+    id: number;
+    name: string;
+    status: string;
+    conclusion: string;
+    run_attempt: number;
+    steps: Array<{ name: string; conclusion: string }>;
+  }> = PASS71_CANDIDATE_A_REQUIRED_SUCCESS_JOBS.map((name, index) => ({
+    id: index + 1,
+    name,
+    status: 'completed',
+    conclusion: overrides[name] ?? 'success',
+    run_attempt: 1,
+    steps: [],
+  }));
+  jobs.push({
+    id: 10_000,
+    name: 'requirements-acceptance',
+    status: 'completed',
+    conclusion: overrides['requirements-acceptance'] ?? 'failure',
+    run_attempt: 1,
+    steps: overrides['requirements-step'] === 'predecessor'
+      ? [{ name: 'Require static and supplemental browser predecessors', conclusion: 'failure' }]
+      : [
+        { name: 'Require static and supplemental browser predecessors', conclusion: 'success' },
+        { name: 'Verify complete requirement-to-evidence coverage and exact preview approval', conclusion: 'failure' },
+        { name: 'Upload acceptance coverage receipt', conclusion: 'success' },
+      ],
+  });
+  return jobs;
+}
 
 function acceptedManifest() {
   return {
@@ -416,5 +461,123 @@ describe('Pass 66 immutable preview provenance', () => {
     const exact = previewZip();
     await expect(verify([artifact(1), artifact(2)], new Map([[1, wrong], [2, exact]])))
       .resolves.toMatchObject({ ok: true, artifactId: 2, exactNameArtifactCount: 2, matchingLiveArtifactCount: 2 });
+  });
+});
+
+describe('Pass 71 candidate A workflow provenance', () => {
+  it('freezes two Windows and eleven Linux exact-SHA supplemental artifacts', () => {
+    const names = pass71CandidateAArtifactNames(SOURCE_SHA);
+    expect(names).toHaveLength(13);
+    expect(new Set(names)).toHaveLength(13);
+    expect(names).toContain(`pass71-windows-supplemental-pass70-chopper-gunner-${SOURCE_SHA}`);
+    expect(names).toContain(`pass71-linux-supplemental-pass71-nuke-warning-${SOURCE_SHA}`);
+    expect(() => parsePass71CandidateAArtifactReference('artifact://chooser/accepted.png', SOURCE_SHA))
+      .toThrow(/invalid canonical shape/);
+  });
+
+  it('collects and byte-verifies exact referenced candidate-A shard files', () => {
+    const artifactName = `pass71-linux-supplemental-pass71-nuke-warning-${SOURCE_SHA}`;
+    const image = encoder.encode('lossless-png-fixture');
+    const imageSha = createHash('sha256').update(image).digest('hex');
+    const manifest = acceptedManifest();
+    manifest.releasePass = 'PASS 71';
+    manifest.requirements[0].evidence.push({
+      kind: 'visual',
+      ref: `artifact://candidate-a/${artifactName}/artifacts/pass71/nuke-warning/active.png?sha256=${imageSha}&bytes=${image.length}`,
+      command: 'not-required-for-visual-evidence',
+      note: 'Exact candidate-A Nuke warning raster.',
+    });
+    const references = collectPass71CandidateAArtifactReferences(manifest, SOURCE_SHA);
+    expect(references).toEqual([{
+      artifactName,
+      path: 'artifacts/pass71/nuke-warning/active.png',
+      sha256: imageSha,
+      byteLength: image.length,
+    }]);
+    expect(inspectPass71CandidateAShardArtifactZip(storedZip([{
+      name: 'artifacts/pass71/nuke-warning/active.png', bytes: image,
+    }]), references)).toMatchObject({ fileCount: 1, referencedFiles: references.map(({ path, sha256, byteLength }) => ({ path, sha256, byteLength })) });
+    expect(() => inspectPass71CandidateAShardArtifactZip(storedZip([{
+      name: 'artifacts/pass71/nuke-warning/active.png', bytes: encoder.encode('changed'),
+    }]), references)).toThrow(/byte length differs|SHA-256 differs/);
+  });
+
+  it('requires the exact green static, broad and sharded browser topology with only requirements red', () => {
+    expect(validatePass71CandidateAWorkflowJobs(pass71CandidateAJobs())).toMatchObject({
+      id: 10_000,
+      name: 'requirements-acceptance',
+      conclusion: 'failure',
+    });
+  });
+
+  it.each([
+    'static-and-unit (ubuntu-latest)',
+    'bounded-browser-windows',
+    'bounded-browser-windows-supplemental-shard (pass71-grenade-first-action)',
+    'bounded-browser-linux-supplemental-shard (pass71-glass-performance-crossbow)',
+    'bounded-browser-linux-supplemental',
+  ])('rejects a non-green required candidate A job: %s', (name) => {
+    expect(() => validatePass71CandidateAWorkflowJobs(pass71CandidateAJobs({ [name]: 'failure' })))
+      .toThrow(/not green|additional non-green/);
+  });
+
+  it('rejects requirements failure in the predecessor guard rather than the manifest gate', () => {
+    expect(() => validatePass71CandidateAWorkflowJobs(pass71CandidateAJobs({
+      'requirements-step': 'predecessor',
+    }))).toThrow(/did not fail solely in the acceptance-manifest step/);
+  });
+
+  it('rejects any additional failed workflow job even when the named topology is green', () => {
+    const jobs = [...pass71CandidateAJobs(), {
+      id: 20_000, name: 'future-required-check', status: 'completed', conclusion: 'failure', run_attempt: 1, steps: [],
+    }];
+    expect(() => validatePass71CandidateAWorkflowJobs(jobs)).toThrow(/additional non-green job/);
+  });
+
+  it('requires exactly one canonical missing-manifest error in the exact requirements job log', () => {
+    expect(validatePass71MissingManifestLog(`before\n${MISSING_PASS71_MANIFEST}\nafter`)).toBe(true);
+    expect(() => validatePass71MissingManifestLog('Process completed with exit code 1'))
+      .toThrow(/exactly one canonical missing-manifest failure/);
+    expect(() => validatePass71MissingManifestLog(`${MISSING_PASS71_MANIFEST}\n${MISSING_PASS71_MANIFEST}`))
+      .toThrow(/exactly one canonical missing-manifest failure/);
+  });
+
+  it('accepts only the exact machine-readable missing-manifest coverage receipt', () => {
+    const receipt = {
+      schemaVersion: 1,
+      ok: false,
+      phase: 'ci',
+      impact: 'full',
+      errors: [MISSING_PASS71_MANIFEST],
+    };
+    const archive = storedZip([{
+      name: 'acceptance-coverage.json',
+      bytes: encoder.encode(`${JSON.stringify(receipt)}\n`),
+    }]);
+    expect(inspectPass71CandidateAAcceptanceArtifactZip(archive)).toEqual(receipt);
+    for (const invalid of [
+      { ...receipt, errors: [MISSING_PASS71_MANIFEST, 'another semantic failure'] },
+      { ...receipt, errors: [] },
+      { ...receipt, ok: true },
+      { ...receipt, headSha: SOURCE_SHA },
+    ]) {
+      const invalidArchive = storedZip([{
+        name: 'acceptance-coverage.json',
+        bytes: encoder.encode(JSON.stringify(invalid)),
+      }]);
+      expect(() => inspectPass71CandidateAAcceptanceArtifactZip(invalidArchive))
+        .toThrow(/receipt|errors|identity|schema/);
+    }
+    const extraFile = storedZip([
+      { name: 'acceptance-coverage.json', bytes: encoder.encode(JSON.stringify(receipt)) },
+      { name: 'extra.json', bytes: encoder.encode('{}') },
+    ]);
+    expect(() => inspectPass71CandidateAAcceptanceArtifactZip(extraFile)).toThrow(/contain only/);
+  });
+
+  it('rejects rerun-attempt jobs explicitly instead of mixing attempts', () => {
+    const jobs = pass71CandidateAJobs();
+    jobs[0] = { ...jobs[0], run_attempt: 2 };
+    expect(() => validatePass71CandidateAWorkflowJobs(jobs)).toThrow(/required attempt 1/);
   });
 });

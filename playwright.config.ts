@@ -13,6 +13,31 @@ const previewPort = Number(process.env.QA_PREVIEW_PORT ?? '4173');
 const externalPreview = process.env.QA_EXTERNAL_PREVIEW === '1';
 const requireOwnedFreshPreview = process.env.QA_REQUIRE_OWNED_FRESH_PREVIEW === '1';
 const installedEdgeChannel = process.env.QA_INSTALLED_EDGE === '1' ? 'msedge' as const : undefined;
+const pass71GrenadeEdgeExecutable = process.env.PASS71_GRENADE_EDGE_EXECUTABLE;
+const pass71Hf296EdgeExecutable = process.env.PASS71_HF296_EDGE_EXECUTABLE;
+const pass71Hf297FullEdgeExecutable = process.env.PASS71_HF297_FULL_EDGE_EXECUTABLE;
+const pass71Hf304EdgeExecutable = process.env.PASS71_HF304_EDGE_EXECUTABLE;
+const pass71Hf301EdgeExecutable = process.env.PASS71_HF301_EDGE_EXECUTABLE;
+const pass71Hf299EdgeExecutable = process.env.PASS71_HF299_EDGE_EXECUTABLE;
+const pass71Hf300EdgeExecutable = process.env.PASS71_HF300_EDGE_EXECUTABLE;
+const pass71Hf305EdgeExecutable = process.env.PASS71_HF305_EDGE_EXECUTABLE;
+const pass71Hf306EdgeExecutable = process.env.PASS71_HF306_EDGE_EXECUTABLE;
+const pass71Hf307EdgeExecutable = process.env.PASS71_HF307_EDGE_EXECUTABLE;
+const pass71Hf308EdgeExecutable = process.env.PASS71_HF308_EDGE_EXECUTABLE;
+const pass71Hf309EdgeExecutable = process.env.PASS71_HF309_EDGE_EXECUTABLE;
+const pass71OwnedEdgeExecutable = pass71GrenadeEdgeExecutable
+  ?? pass71Hf296EdgeExecutable
+  ?? pass71Hf297FullEdgeExecutable
+  ?? pass71Hf304EdgeExecutable
+  ?? pass71Hf301EdgeExecutable
+  ?? pass71Hf299EdgeExecutable
+  ?? pass71Hf300EdgeExecutable
+  ?? pass71Hf305EdgeExecutable
+  ?? pass71Hf306EdgeExecutable
+  ?? pass71Hf307EdgeExecutable
+  ?? pass71Hf308EdgeExecutable
+  ?? pass71Hf309EdgeExecutable;
+const pass71AudioBrowserExecutable = process.env.PASS71_AUDIO_BROWSER_EXECUTABLE;
 const ownedMultiplayerGate = process.env.QA_OWNED_GATE === 'multiplayer-stability';
 const requestedMultiplayerChannel = process.env[PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV];
 const multiplayerChromeChannel = ownedMultiplayerGate
@@ -33,6 +58,56 @@ if (!ownedMultiplayerGate && requestedMultiplayerChannel !== undefined) {
 }
 if (ownedMultiplayerGate && installedEdgeChannel) {
   throw new Error('Owned multiplayer stability cannot be combined with QA_INSTALLED_EDGE');
+}
+if (pass71GrenadeEdgeExecutable && !installedEdgeChannel) {
+  throw new Error('PASS71_GRENADE_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
+}
+if (pass71Hf296EdgeExecutable && !installedEdgeChannel) {
+  throw new Error('PASS71_HF296_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
+}
+if (pass71Hf297FullEdgeExecutable && !installedEdgeChannel) {
+  throw new Error('PASS71_HF297_FULL_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
+}
+if (pass71Hf304EdgeExecutable && !installedEdgeChannel) {
+  throw new Error('PASS71_HF304_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
+}
+if (pass71Hf301EdgeExecutable && !installedEdgeChannel) {
+  throw new Error('PASS71_HF301_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
+}
+if (pass71Hf299EdgeExecutable && !installedEdgeChannel) {
+  throw new Error('PASS71_HF299_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
+}
+if (pass71Hf300EdgeExecutable && !installedEdgeChannel) {
+  throw new Error('PASS71_HF300_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
+}
+if (pass71Hf305EdgeExecutable && !installedEdgeChannel) {
+  throw new Error('PASS71_HF305_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
+}
+if (pass71Hf306EdgeExecutable && !installedEdgeChannel) {
+  throw new Error('PASS71_HF306_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
+}
+if (pass71Hf307EdgeExecutable && !installedEdgeChannel) {
+  throw new Error('PASS71_HF307_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
+}
+if (pass71Hf308EdgeExecutable && !installedEdgeChannel) {
+  throw new Error('PASS71_HF308_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
+}
+if (pass71Hf309EdgeExecutable && !installedEdgeChannel) {
+  throw new Error('PASS71_HF309_EDGE_EXECUTABLE is reserved for installed-Edge evidence');
+}
+if ([pass71GrenadeEdgeExecutable, pass71Hf296EdgeExecutable, pass71Hf297FullEdgeExecutable,
+  pass71Hf304EdgeExecutable,
+  pass71Hf301EdgeExecutable, pass71Hf299EdgeExecutable, pass71Hf300EdgeExecutable,
+  pass71Hf305EdgeExecutable, pass71Hf306EdgeExecutable, pass71Hf307EdgeExecutable,
+  pass71Hf308EdgeExecutable, pass71Hf309EdgeExecutable]
+  .filter(Boolean).length > 1) {
+  throw new Error('Pass 71 installed-Edge evidence gates require separate Playwright launches');
+}
+if (pass71AudioBrowserExecutable && process.env.PASS71_AUDIO_NATIVE !== '1') {
+  throw new Error('PASS71_AUDIO_BROWSER_EXECUTABLE is reserved for the owned audio-native gate');
+}
+if (pass71AudioBrowserExecutable && pass71OwnedEdgeExecutable) {
+  throw new Error('Audio-native and installed-Edge evidence cannot share one Playwright launch');
 }
 
 export default defineConfig({
@@ -68,6 +143,11 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         channel: multiplayerChromeChannel ?? installedEdgeChannel,
+        launchOptions: pass71OwnedEdgeExecutable
+          ? { executablePath: pass71OwnedEdgeExecutable }
+          : pass71AudioBrowserExecutable
+            ? { executablePath: pass71AudioBrowserExecutable }
+            : undefined,
         userAgent: resolvePass70ChromiumProjectUserAgent({
           desktopChromeUserAgent: devices['Desktop Chrome'].userAgent,
           installedEdgeChannel,

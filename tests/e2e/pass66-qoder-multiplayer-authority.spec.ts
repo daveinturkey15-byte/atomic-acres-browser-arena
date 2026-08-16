@@ -1,4 +1,9 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { expect, test, type Browser, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
+import sharp from 'sharp';
 import {
   assertPass66OwnedCandidatePage,
   startOwnedPeerServer,
@@ -16,6 +21,23 @@ const HOST_RECOVERY_END_TO_END_TIMEOUT_MS = 90_000;
 const GUEST_RENDER_RESUME_FRAME_TIMEOUT_MS = 10_000;
 const DEATH_DROP_AUTHORITY_TTL_MARGIN_MS = 5_000;
 const REMOTE_STAGE_ACK_TIMEOUT_MS = 10_000;
+const STUCK_RASTER_SOURCE_SHA = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true }).trim();
+const STUCK_RASTER_ROOT = resolve('artifacts/pass71/stuck-warning', STUCK_RASTER_SOURCE_SHA);
+const STUCK_EVIDENCE_COMPONENT_PATH = process.env.PASS71_STUCK_EVIDENCE_COMPONENT_PATH;
+const STUCK_EVIDENCE_EXPECTED_SOURCE_SHA = process.env.PASS71_STUCK_EXPECTED_SOURCE_SHA;
+const STUCK_EVIDENCE_CHROME_EXECUTABLE = STUCK_EVIDENCE_COMPONENT_PATH
+  ? process.env.QA_MULTIPLAYER_BROWSER_EXECUTABLE_PATH
+  : undefined;
+
+const STUCK_EVIDENCE_LAYOUTS = Object.freeze([
+  Object.freeze({ id: 'desktop', width: 1_280, height: 720, reducedSensory: false }),
+  Object.freeze({ id: 'mobile-landscape', width: 844, height: 390, reducedSensory: false }),
+  Object.freeze({ id: 'reduced-sensory', width: 1_280, height: 720, reducedSensory: true }),
+] as const);
+
+type StuckEvidenceLayout = typeof STUCK_EVIDENCE_LAYOUTS[number];
+type StickySource = 'semtex' | 'explosive-crossbow';
+type StickyAudience = 'attacker' | 'victim';
 
 type Position3 = readonly [number, number, number];
 
@@ -47,8 +69,384 @@ type RejoinAdmissionSample = Readonly<{
 
 type TimedRejoinAdmissionSample = RejoinAdmissionSample & Readonly<{ elapsedMs: number }>;
 
+type StickyWarningBounds = Readonly<{
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}>;
+
+async function stickyWarningPixelEvidence(
+  screenshot: Buffer,
+  bounds: StickyWarningBounds,
+): Promise<Readonly<{
+  crop: Readonly<{ left: number; top: number; width: number; height: number }>;
+  pixelCount: number;
+  brightRedPixels: number;
+  darkPanelPixels: number;
+  brightRedFraction: number;
+  darkPanelFraction: number;
+  imageWidth: number;
+  imageHeight: number;
+}>> {
+  const metadata = await sharp(screenshot).metadata();
+  if (!metadata.width || !metadata.height) throw new Error('STUCK raster has no dimensions');
+  const left = Math.max(0, Math.floor(bounds.left));
+  const top = Math.max(0, Math.floor(bounds.top));
+  const width = Math.max(1, Math.min(metadata.width - left, Math.ceil(bounds.width)));
+  const height = Math.max(1, Math.min(metadata.height - top, Math.ceil(bounds.height)));
+  const { data, info } = await sharp(screenshot).extract({
+    left,
+    top,
+    width,
+    height,
+  }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  let brightRedPixels = 0;
+  let darkPanelPixels = 0;
+  for (let offset = 0; offset < data.length; offset += info.channels) {
+    const red = data[offset];
+    const green = data[offset + 1];
+    const blue = data[offset + 2];
+    if (red >= 120 && red >= green + 40 && red >= blue + 30) brightRedPixels += 1;
+    if (red >= 18 && red <= 105 && red >= green * 1.35 && red >= blue * 1.2) darkPanelPixels += 1;
+  }
+  const pixels = info.width * info.height;
+  return Object.freeze({
+    crop: Object.freeze({ left, top, width, height }),
+    pixelCount: pixels,
+    brightRedPixels,
+    darkPanelPixels,
+    brightRedFraction: brightRedPixels / pixels,
+    darkPanelFraction: darkPanelPixels / pixels,
+    imageWidth: metadata.width,
+    imageHeight: metadata.height,
+  });
+}
+
+function rounded(value: number): number {
+  return Number(value.toFixed(3));
+}
+
+function sha256(bytes: Buffer): string {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+async function captureStickyWarningRasters(
+  host: Page,
+  guest: Page,
+  source: StickySource,
+  layout: StuckEvidenceLayout,
+  testInfo: TestInfo,
+  onCaptureArmed?: () => void,
+  captureTriggered?: Promise<void>,
+): Promise<readonly Readonly<Record<string, unknown>>[]> {
+  const records = await Promise.all(([
+    ['attacker', host],
+    ['victim', guest],
+  ] as const).map(async ([audience, page]) => {
+    const legacyArtifactPath = resolve(
+      STUCK_RASTER_ROOT,
+      `${source}-${audience}-${layout.width}x${layout.height}.png`,
+    );
+    let captured: Readonly<Record<string, unknown>> | null = null;
+    let lastAlert: Readonly<Record<string, unknown>> | null = null;
+    const cdp = await page.context().newCDPSession(page);
+    onCaptureArmed?.();
+    if (captureTriggered) await captureTriggered;
+    const deadline = Date.now() + 2_000;
+    while (Date.now() < deadline && captured === null) {
+      const alert = await page.locator('#sticky-warning').evaluate((warning: HTMLElement) => {
+        const bounds = warning.getBoundingClientRect();
+        const style = getComputedStyle(warning);
+        const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+        return {
+          visible: !warning.hidden,
+          source: warning.dataset.source ?? null,
+          audience: warning.dataset.audience ?? null,
+          label: warning.querySelector('strong')?.textContent?.trim() ?? null,
+          sublabel: warning.querySelector('small')?.textContent?.trim() ?? null,
+          dataset: {
+            source: warning.dataset.source ?? null,
+            audience: warning.dataset.audience ?? null,
+            targetId: warning.dataset.targetId ?? null,
+            targetLifeId: warning.dataset.targetLifeId === undefined ? null : Number(warning.dataset.targetLifeId),
+            actionNonce: warning.dataset.actionNonce === undefined ? null : Number(warning.dataset.actionNonce),
+            presentedAtMs: warning.dataset.presentedAtMs === undefined ? null : Number(warning.dataset.presentedAtMs),
+            expiresAtMs: warning.dataset.expiresAtMs === undefined ? null : Number(warning.dataset.expiresAtMs),
+          },
+          style: {
+            warningDurationCss: warning.style.getPropertyValue('--sticky-warning-duration'),
+            position: style.position,
+            zIndex: Number(style.zIndex),
+            display: style.display,
+            textAlign: style.textAlign,
+            pointerEvents: style.pointerEvents,
+            animationName: style.animationName,
+            animationDuration: style.animationDuration,
+            boxShadow: style.boxShadow,
+            backgroundColor: style.backgroundColor,
+            borderTopColor: style.borderTopColor,
+            borderTopWidth: style.borderTopWidth,
+            borderLeftWidth: style.borderLeftWidth,
+          },
+          bounds: { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height },
+          viewportCentre: { x: innerWidth * 0.5, y: innerHeight * 0.5 },
+          centreErrorPx: Math.hypot(
+            bounds.left + bounds.width * 0.5 - innerWidth * 0.5,
+            bounds.top + bounds.height * 0.5 - innerHeight * 0.5,
+          ),
+          accessibility: {
+            requestedReducedSensoryEffects: state.settings.requested.accessibility.reducedSensoryEffects,
+            effectiveReducedSensory: state.settings.accessibility.reducedSensory,
+            reasons: [...state.settings.accessibility.reasons],
+            htmlDataReducedSensory: document.documentElement.dataset.reducedSensory ?? null,
+          },
+        };
+      });
+      lastAlert = alert;
+      if (alert.visible && alert.source === source && alert.audience === audience) {
+        const captureStartedAtEpochMs = Date.now();
+        const captureStarted = await page.evaluate(() => {
+          const warning = document.querySelector<HTMLElement>('#sticky-warning')!;
+          return {
+            nowMs: performance.now(),
+            visible: !warning.hidden,
+            source: warning.dataset.source ?? null,
+            audience: warning.dataset.audience ?? null,
+          };
+        });
+        const surface = await cdp.send('Page.captureScreenshot', {
+          format: 'png',
+          fromSurface: true,
+          captureBeyondViewport: false,
+        });
+        const captureCompleted = await page.evaluate(() => {
+          const warning = document.querySelector<HTMLElement>('#sticky-warning')!;
+          return {
+            nowMs: performance.now(),
+            visible: !warning.hidden,
+            source: warning.dataset.source ?? null,
+            audience: warning.dataset.audience ?? null,
+          };
+        });
+        const screenshot = Buffer.from(surface.data, 'base64');
+        const pixels = await stickyWarningPixelEvidence(screenshot, alert.bounds);
+        if (captureStarted.visible && captureCompleted.visible
+          && captureStarted.source === source && captureCompleted.source === source
+          && captureStarted.audience === audience && captureCompleted.audience === audience
+          && pixels.brightRedFraction > 0.01 && pixels.darkPanelFraction > 0.12) {
+          await page.waitForFunction((stickySource) => {
+            const probe = (window as any).__PASS71_STICKY_TIMING__;
+            return probe?.source === stickySource && probe.hiddenAtMs !== null;
+          }, source, { timeout: 5_000 });
+          const timingProbe = await page.evaluate(() => ({ ...(window as any).__PASS71_STICKY_TIMING__ }));
+          captured = Object.freeze({
+            id: `${layout.id}-${source}-${audience}`,
+            layout: {
+              id: layout.id,
+              width: layout.width,
+              height: layout.height,
+              deviceScaleFactor: 1,
+              reducedSensory: layout.reducedSensory,
+            },
+            source,
+            audience,
+            timing: {
+              presentedAtMs: timingProbe.shownAtMs,
+              expiresAtMs: timingProbe.expiresAtMs,
+              captureStartedAtMs: captureStarted.nowMs,
+              captureCompletedAtMs: captureCompleted.nowMs,
+              visibleAtCaptureStart: captureStarted.visible,
+              visibleAtCaptureCompletion: captureCompleted.visible,
+              hiddenAtMs: timingProbe.hiddenAtMs,
+              captureStartedAtEpochMs,
+              durationMs: timingProbe.expiresAtMs - timingProbe.shownAtMs,
+              captureDelayMs: rounded(captureStarted.nowMs - timingProbe.shownAtMs),
+              captureDurationMs: rounded(captureCompleted.nowMs - captureStarted.nowMs),
+              remainingAtCaptureMs: rounded(timingProbe.expiresAtMs - captureCompleted.nowMs),
+              hideLatenessMs: rounded(timingProbe.hiddenAtMs - timingProbe.expiresAtMs),
+            },
+            warning: {
+              visible: alert.visible,
+              label: alert.label,
+              sublabel: alert.sublabel,
+              dataset: alert.dataset,
+              style: alert.style,
+              bounds: alert.bounds,
+              viewportCentre: alert.viewportCentre,
+              centreErrorPx: alert.centreErrorPx,
+            },
+            accessibility: {
+              ...alert.accessibility,
+              presentation: layout.reducedSensory ? 'reduced-static' : 'standard-animated',
+            },
+            pixels: {
+              crop: pixels.crop,
+              pixelCount: pixels.pixelCount,
+              brightRedPixels: pixels.brightRedPixels,
+              darkPanelPixels: pixels.darkPanelPixels,
+              brightRedFraction: pixels.brightRedFraction,
+              darkPanelFraction: pixels.darkPanelFraction,
+            },
+            image: {
+              mimeType: 'image/png',
+              width: pixels.imageWidth,
+              height: pixels.imageHeight,
+              byteLength: screenshot.byteLength,
+              sha256: sha256(screenshot),
+              dataBase64: screenshot.toString('base64'),
+            },
+            ...(STUCK_EVIDENCE_COMPONENT_PATH ? {} : {
+              artifact: { path: legacyArtifactPath.replaceAll('\\', '/') },
+            }),
+          });
+          if (STUCK_EVIDENCE_COMPONENT_PATH) {
+            await testInfo.attach(`pass71-stuck-${layout.id}-${source}-${audience}`, {
+              body: screenshot,
+              contentType: 'image/png',
+            });
+          } else {
+            mkdirSync(STUCK_RASTER_ROOT, { recursive: true });
+            writeFileSync(legacyArtifactPath, screenshot);
+            await testInfo.attach(`pass71-stuck-${source}-${audience}`, {
+              path: legacyArtifactPath,
+              contentType: 'image/png',
+            });
+          }
+          break;
+        }
+      }
+      await page.waitForTimeout(10);
+    }
+    await cdp.detach();
+    expect(captured, `${source}/${audience}: captured live warning; last=${JSON.stringify(lastAlert)}`).not.toBeNull();
+    expect(captured!.warning).toMatchObject({
+      label: 'STUCK',
+      sublabel: 'EXPLOSIVE ATTACHED',
+      dataset: { source, audience },
+      style: { warningDurationCss: '500ms', position: 'fixed', zIndex: 120 },
+    });
+    expect((captured!.warning as { centreErrorPx: number }).centreErrorPx, `${source}/${audience}: true viewport centre`).toBeLessThanOrEqual(1);
+    return captured!;
+  }));
+  if (!STUCK_EVIDENCE_COMPONENT_PATH) {
+    const receiptPath = resolve(STUCK_RASTER_ROOT, `${source}-receipt.json`);
+    writeFileSync(receiptPath, `${JSON.stringify({
+      schemaVersion: 2,
+      contract: 'atomic-acres/pass71-stuck-centred-raster@2',
+      sourceSha: STUCK_RASTER_SOURCE_SHA,
+      layout,
+      records: records.map((record: any) => ({
+        ...record,
+        image: { ...record.image, dataBase64: undefined },
+      })),
+    }, null, 2)}\n`, 'utf8');
+    await testInfo.attach(`pass71-stuck-${source}-receipt`, { path: receiptPath, contentType: 'application/json' });
+  }
+  return records;
+}
+
+async function authorStickyWithImmediateAlert(
+  host: Page,
+  source: 'semtex' | 'explosive-crossbow',
+): Promise<Readonly<{
+  result: any;
+  alert: Readonly<{
+    visible: boolean;
+    source: string | null;
+    audience: string | null;
+    remainingMs: number | null;
+    presentedDurationMs: number | null;
+    centreErrorPx: number;
+  }>;
+}>> {
+  return host.evaluate((stickySource) => {
+    const result = (window as any).__ATOMIC_ACRES_DEBUG__.authorStickyEffect(stickySource);
+    const warning = document.querySelector<HTMLElement>('#sticky-warning')!;
+    const bounds = warning.getBoundingClientRect();
+    const expiresAtMs = warning.dataset.expiresAtMs === undefined
+      ? null
+      : Number(warning.dataset.expiresAtMs);
+    const presentedAtMs = warning.dataset.presentedAtMs === undefined
+      ? null
+      : Number(warning.dataset.presentedAtMs);
+    return {
+      result,
+      alert: {
+        visible: !warning.hidden,
+        source: warning.dataset.source ?? null,
+        audience: warning.dataset.audience ?? null,
+        remainingMs: expiresAtMs === null ? null : expiresAtMs - performance.now(),
+        presentedDurationMs: expiresAtMs === null || presentedAtMs === null
+          ? null
+          : expiresAtMs - presentedAtMs,
+        centreErrorPx: Math.hypot(
+          bounds.left + bounds.width * 0.5 - innerWidth * 0.5,
+          bounds.top + bounds.height * 0.5 - innerHeight * 0.5,
+        ),
+      },
+    };
+  }, source);
+}
+
+async function installStickyTimingProbe(
+  pages: readonly Page[],
+  source: 'semtex' | 'explosive-crossbow',
+): Promise<void> {
+  await Promise.all(pages.map((page) => page.evaluate((stickySource) => {
+    const warning = document.querySelector<HTMLElement>('#sticky-warning')!;
+    const probe = {
+      source: stickySource,
+      shownAtMs: null as number | null,
+      expiresAtMs: null as number | null,
+      hiddenAtMs: null as number | null,
+    };
+    (window as any).__PASS71_STICKY_TIMING__ = probe;
+    const observer = new MutationObserver(() => {
+      if (probe.shownAtMs === null
+        && !warning.hidden
+        && warning.dataset.source === stickySource) {
+        probe.shownAtMs = Number(warning.dataset.presentedAtMs);
+        probe.expiresAtMs = Number(warning.dataset.expiresAtMs);
+        return;
+      }
+      if (probe.shownAtMs !== null && probe.hiddenAtMs === null && warning.hidden) {
+        probe.hiddenAtMs = performance.now();
+        observer.disconnect();
+      }
+    });
+    observer.observe(warning, { attributes: true });
+  }, source)));
+}
+
+async function expectStickyTimingCompleted(
+  pages: readonly Page[],
+  source: 'semtex' | 'explosive-crossbow',
+): Promise<void> {
+  const probes = await Promise.all(pages.map(async (page) => {
+    await page.waitForFunction((stickySource) => {
+      const probe = (window as any).__PASS71_STICKY_TIMING__;
+      return probe?.source === stickySource && probe.hiddenAtMs !== null;
+    }, source, { timeout: 5_000 });
+    return page.evaluate(() => ({ ...(window as any).__PASS71_STICKY_TIMING__ }));
+  }));
+  for (const probe of probes) {
+    expect(probe).toMatchObject({ source });
+    expect(probe.expiresAtMs - probe.shownAtMs).toBe(500);
+    expect(probe.hiddenAtMs).toBeGreaterThanOrEqual(probe.expiresAtMs);
+  }
+}
+
+async function setStickyRasterRenderPaused(pages: readonly Page[], paused: boolean): Promise<void> {
+  // Freeze only 3D submissions; DOM, network and the real 500 ms timeout stay live.
+  await Promise.all(pages.map((page) => page.evaluate((value) => (
+    (window as any).__ATOMIC_ACRES_DEBUG__.setRenderPaused(value)
+  ), paused)));
+}
+
 test.use({
   launchOptions: {
+    ...(STUCK_EVIDENCE_CHROME_EXECUTABLE ? { executablePath: STUCK_EVIDENCE_CHROME_EXECUTABLE } : {}),
     args: [
       '--disable-background-timer-throttling',
       '--disable-renderer-backgrounding',
@@ -73,6 +471,7 @@ test.afterAll(async () => {
 async function openPlayer(context: BrowserContext, name: string, seed: string): Promise<Page> {
   if (!peerServer) throw new Error('Owned PeerJS server is not ready');
   const page = await context.newPage();
+  if (STUCK_EVIDENCE_COMPONENT_PATH) await page.emulateMedia({ reducedMotion: 'no-preference' });
   const url = new URL(test.info().project.use.baseURL as string);
   for (const [key, value] of Object.entries({
     release: 'latest', renderer: 'webgl2', render: 'performance', signal: 'off', grass: 'off', mist: 'off',
@@ -198,17 +597,48 @@ async function waitForRejoinPresentation(guest: Page, rejoinStartedAt: number): 
   }
 }
 
+async function configureStuckEvidenceAccessibility(
+  pages: readonly Page[],
+  reducedSensory: boolean,
+): Promise<void> {
+  await Promise.all(pages.map(async (page) => {
+    if (reducedSensory) {
+      await page.getByRole('tab', { name: 'OPTIONS' }).click();
+      await page.locator('#reduced-sensory-effects').check();
+      await expect(page.locator('html')).toHaveAttribute('data-reduced-sensory', 'true');
+      await page.locator('#menu-tab-deploy').click();
+    }
+    const accessibility = await page.evaluate(() => {
+      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+      return {
+        requested: state.settings.requested.accessibility.reducedSensoryEffects,
+        effective: state.settings.accessibility.reducedSensory,
+        reasons: state.settings.accessibility.reasons,
+        html: document.documentElement.dataset.reducedSensory,
+      };
+    });
+    expect(accessibility.requested).toBe(reducedSensory);
+    expect(accessibility.effective).toBe(reducedSensory);
+    expect(accessibility.html).toBe(reducedSensory ? 'true' : 'false');
+    if (reducedSensory) expect(accessibility.reasons).toContain('Reduced sensory effects');
+  }));
+}
+
 async function startMatch(
   hostContext: BrowserContext,
   guestContext: BrowserContext,
   names: readonly [string, string],
   seeds: readonly [string, string],
   hostedBots: '0' | '2' = '0',
+  reducedSensory = false,
 ): Promise<{ host: Page; guest: Page; roomCode: string }> {
   const [host, guest] = await Promise.all([
     openPlayer(hostContext, names[0], seeds[0]),
     openPlayer(guestContext, names[1], seeds[1]),
   ]);
+  if (STUCK_EVIDENCE_COMPONENT_PATH) {
+    await configureStuckEvidenceAccessibility([host, guest], reducedSensory);
+  }
   await host.locator('#team').selectOption('0');
   await guest.locator('#team').selectOption('1');
   await host.locator('#host').click();
@@ -232,6 +662,180 @@ async function startMatch(
       && state.killstreak.actors.length === 2;
   }, Number(hostedBots), { timeout: 75_000 })));
   return { host, guest, roomCode };
+}
+
+async function readStuckServedCandidate(page: Page): Promise<Readonly<Record<string, unknown>>> {
+  return page.evaluate(async () => {
+    const response = await fetch(new URL('channel-provenance.json', window.location.href), {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
+    if (!response.ok) throw new Error(`HF-310 candidate provenance returned HTTP ${response.status}`);
+    return response.json();
+  });
+}
+
+async function captureStuckSourceEvidence(
+  host: Page,
+  guest: Page,
+  source: StickySource,
+  layout: StuckEvidenceLayout,
+  testInfo: TestInfo,
+): Promise<readonly Readonly<Record<string, unknown>>[]> {
+  await installStickyTimingProbe([host, guest], source);
+  await setStickyRasterRenderPaused([host, guest], true);
+  try {
+    let armedCount = 0;
+    let resolveArmed: (() => void) | null = null;
+    let releaseCapture: (() => void) | null = null;
+    const armed = new Promise<void>((resolveReady) => { resolveArmed = resolveReady; });
+    const captureTriggered = new Promise<void>((resolveTrigger) => { releaseCapture = resolveTrigger; });
+    const rasters = captureStickyWarningRasters(
+      host,
+      guest,
+      source,
+      layout,
+      testInfo,
+      () => {
+        armedCount += 1;
+        if (armedCount === 2) resolveArmed?.();
+      },
+      captureTriggered,
+    );
+    await Promise.race([
+      armed,
+      rasters.then(() => { throw new Error(`${layout.id}/${source}: raster capture completed before both CDP sessions armed`); }),
+    ]);
+    let authored: Awaited<ReturnType<typeof authorStickyWithImmediateAlert>>;
+    try {
+      authored = await authorStickyWithImmediateAlert(host, source);
+    } catch (error) {
+      releaseCapture?.();
+      await Promise.allSettled([rasters]);
+      throw error;
+    }
+    releaseCapture?.();
+    const records = await rasters;
+    expect(authored.alert).toMatchObject({ visible: true, source, audience: 'attacker' });
+    expect(authored.alert.remainingMs).toBeGreaterThan(0);
+    expect(authored.alert.remainingMs).toBeLessThanOrEqual(500);
+    expect(authored.alert.presentedDurationMs).toBe(500);
+    expect(authored.alert.centreErrorPx).toBeLessThanOrEqual(1);
+    expect(authored.result, `${layout.id}/${source}: canonical QA authority projection`).not.toBeNull();
+    return Object.freeze(records.map((record) => Object.freeze({
+      ...record,
+      authority: Object.freeze({
+        projection: 'canonical-qa-sticky-authority',
+        targetId: authored.result.targetId,
+        targetLifeId: authored.result.targetLifeId,
+        actionNonce: authored.result.actionNonce,
+        canonicalNonce: authored.result.canonicalNonce,
+      }),
+    })));
+  } finally {
+    await setStickyRasterRenderPaused([host, guest], false);
+  }
+}
+
+async function runPass71StuckEvidenceMode(
+  browser: Browser,
+  browserName: string,
+  testInfo: TestInfo,
+): Promise<void> {
+  test.setTimeout(480_000);
+  expect(STUCK_EVIDENCE_COMPONENT_PATH).toBeTruthy();
+  expect(STUCK_EVIDENCE_EXPECTED_SOURCE_SHA).toMatch(/^[a-f0-9]{40}$/u);
+  expect(STUCK_EVIDENCE_CHROME_EXECUTABLE).toMatch(/[\\/]Google[\\/]Chrome[\\/]Application[\\/]chrome\.exe$/iu);
+  expect(STUCK_RASTER_SOURCE_SHA).toBe(STUCK_EVIDENCE_EXPECTED_SOURCE_SHA);
+  expect(browserName).toBe('chromium');
+  expect(peerServer, 'HF-310 owns one fresh PeerJS process inside the spec').not.toBeNull();
+
+  const frames: Readonly<Record<string, unknown>>[] = [];
+  const faults: string[] = [];
+  let servedCandidate: Readonly<Record<string, unknown>> | null = null;
+  let userAgent: string | null = null;
+  for (const layout of STUCK_EVIDENCE_LAYOUTS) {
+    const [hostContext, guestContext] = await Promise.all([
+      browser.newContext({ viewport: { width: layout.width, height: layout.height }, deviceScaleFactor: 1 }),
+      browser.newContext({ viewport: { width: layout.width, height: layout.height }, deviceScaleFactor: 1 }),
+    ]);
+    try {
+      for (const [role, context] of [['host', hostContext], ['guest', guestContext]] as const) {
+        context.on('page', (page) => {
+          page.on('pageerror', (error) => faults.push(`${layout.id}/${role}/pageerror: ${error.message}`));
+          page.on('console', (message) => {
+            if (message.type() === 'error') faults.push(`${layout.id}/${role}/console: ${message.text()}`);
+          });
+        });
+      }
+      const layoutLabel = layout.id === 'desktop' ? 'D' : layout.id === 'mobile-landscape' ? 'M' : 'R';
+      const { host, guest } = await startMatch(
+        hostContext,
+        guestContext,
+        [`HF310 ${layoutLabel} Host`, `HF310 ${layoutLabel} Guest`],
+        [`pass71-hf310-${layout.id}-host`, `pass71-hf310-${layout.id}-guest`],
+        '0',
+        layout.reducedSensory,
+      );
+      const [hostCandidate, guestCandidate] = await Promise.all([
+        readStuckServedCandidate(host),
+        readStuckServedCandidate(guest),
+      ]);
+      expect(guestCandidate).toEqual(hostCandidate);
+      if (servedCandidate === null) servedCandidate = hostCandidate;
+      else expect(hostCandidate).toEqual(servedCandidate);
+      const observedUserAgent = await host.evaluate(() => navigator.userAgent);
+      if (userAgent === null) userAgent = observedUserAgent;
+      else expect(observedUserAgent).toBe(userAgent);
+      await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.setStance('prone'));
+      for (const source of ['semtex', 'explosive-crossbow'] as const) {
+        frames.push(...await captureStuckSourceEvidence(host, guest, source, layout, testInfo));
+      }
+    } finally {
+      await Promise.all([hostContext.close(), guestContext.close()]);
+    }
+  }
+  expect(frames).toHaveLength(12);
+  expect(faults).toEqual([]);
+  expect(servedCandidate).not.toBeNull();
+  expect(userAgent).toMatch(/Chrome\//u);
+  expect(userAgent).not.toMatch(/Edg\//u);
+
+  const component = {
+    schemaVersion: 1,
+    contract: 'atomic-acres/pass71-hf310-stuck-browser-component@1',
+    expectedSourceSha: STUCK_EVIDENCE_EXPECTED_SOURCE_SHA,
+    checkoutSourceSha: STUCK_RASTER_SOURCE_SHA,
+    servedCandidate,
+    browser: {
+      project: browserName,
+      version: browser.version(),
+      userAgent,
+    },
+    topology: {
+      peerCount: 2,
+      roles: ['host-attacker', 'guest-victim'],
+      peerServer: {
+        host: '127.0.0.1',
+        port: peerServer!.port,
+        path: peerServer!.path,
+        processId: peerServer!.pid,
+        owned: true,
+      },
+      layoutContextCount: STUCK_EVIDENCE_LAYOUTS.length * 2,
+      roomCodePersisted: false,
+    },
+    authorityProjection: {
+      mode: 'canonical-qa-sticky-authority',
+      receiverAttachmentAuthority: true,
+      hostResultAuthority: true,
+      physicalProjectilePath: false,
+    },
+    frames,
+    faults,
+  };
+  mkdirSync(dirname(STUCK_EVIDENCE_COMPONENT_PATH!), { recursive: true });
+  writeFileSync(STUCK_EVIDENCE_COMPONENT_PATH!, `${JSON.stringify(component, null, 2)}\n`, 'utf8');
 }
 
 async function rejoinGuest(guest: Page, roomCode: string, name: string): Promise<void> {
@@ -864,8 +1468,12 @@ test('a guest death-drop scavenge converges through host authority exactly once'
   }
 });
 
-test('Semtex and crossbolt sticky results apply once under duplicate, reorder and guest rejoin', async ({ browser, browserName }) => {
+test('Semtex and crossbolt sticky results apply once under duplicate, reorder and guest rejoin', async ({ browser, browserName }, testInfo) => {
   test.skip(browserName === 'firefox', 'Two simultaneous headless Firefox SWGL pages are covered by the serial browser matrix.');
+  if (STUCK_EVIDENCE_COMPONENT_PATH) {
+    await runPass71StuckEvidenceMode(browser, browserName, testInfo);
+    return;
+  }
   const [hostContext, guestContext] = await Promise.all([
     browser.newContext(),
     browser.newContext(),
@@ -881,19 +1489,36 @@ test('Semtex and crossbolt sticky results apply once under duplicate, reorder an
     host.on('pageerror', (error) => errors.push(`host: ${error.message}`));
     guest.on('pageerror', (error) => errors.push(`guest: ${error.message}`));
     await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.setStance('prone'));
-    const semtex = await host.evaluate(() => (
-      (window as any).__ATOMIC_ACRES_DEBUG__.authorStickyEffect('semtex')
-    ));
+    await installStickyTimingProbe([host, guest], 'semtex');
+    await setStickyRasterRenderPaused([host, guest], true);
+    const semtexRasters = captureStickyWarningRasters(host, guest, 'semtex', STUCK_EVIDENCE_LAYOUTS[0], testInfo);
+    const authoredSemtex = await authorStickyWithImmediateAlert(host, 'semtex');
+    expect(authoredSemtex.alert).toMatchObject({
+      visible: true,
+      source: 'semtex',
+      audience: 'attacker',
+    });
+    expect(authoredSemtex.alert.remainingMs).toBeGreaterThan(0);
+    expect(authoredSemtex.alert.remainingMs).toBeLessThanOrEqual(500);
+    expect(authoredSemtex.alert.presentedDurationMs).toBe(500);
+    expect(authoredSemtex.alert.centreErrorPx).toBeLessThanOrEqual(1);
+    await semtexRasters;
+    await setStickyRasterRenderPaused([host, guest], false);
+    const semtex = authoredSemtex.result;
     expect(semtex).not.toBeNull();
     expect(semtex.stuckDamage).toBeCloseTo(semtex.baseDamage * 2, 6);
     expect(semtex.stuckRadiusM).toBeCloseTo(semtex.baseRadiusM * 2, 6);
     await expect.poll(async () => guest.evaluate(() => {
       const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
-      return { hp: state.player.hp, feedback: state.stickyAuthority };
+      return {
+        hp: state.player.hp,
+        feedback: state.stickyAuthority,
+      };
     })).toMatchObject({
       hp: semtex.healthAfter,
       feedback: { victimFeedbackCount: 1, lastVictimFeedback: { label: 'STUCK', source: 'semtex' } },
     });
+    await expectStickyTimingCompleted([host, guest], 'semtex');
     expect(await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.replayStickyEffect('semtex'))).toBe(true);
     await guest.waitForTimeout(350);
     expect(await guest.evaluate(() => {
@@ -913,16 +1538,38 @@ test('Semtex and crossbolt sticky results apply once under duplicate, reorder an
       return { hp: state.player.hp, count: state.stickyAuthority.victimFeedbackCount };
     })).toEqual({ hp: semtex.healthAfter, count: 0 });
 
-    const crossbolt = await host.evaluate(() => (
-      (window as any).__ATOMIC_ACRES_DEBUG__.authorStickyEffect('explosive-crossbow')
-    ));
+    await installStickyTimingProbe([host, guest], 'explosive-crossbow');
+    await setStickyRasterRenderPaused([host, guest], true);
+    const crossboltRasters = captureStickyWarningRasters(host, guest, 'explosive-crossbow', STUCK_EVIDENCE_LAYOUTS[0], testInfo);
+    const authoredCrossbolt = await authorStickyWithImmediateAlert(host, 'explosive-crossbow');
+    expect(authoredCrossbolt.alert).toMatchObject({
+      visible: true,
+      source: 'explosive-crossbow',
+      audience: 'attacker',
+    });
+    expect(authoredCrossbolt.alert.remainingMs).toBeGreaterThan(0);
+    expect(authoredCrossbolt.alert.remainingMs).toBeLessThanOrEqual(500);
+    expect(authoredCrossbolt.alert.presentedDurationMs).toBe(500);
+    expect(authoredCrossbolt.alert.centreErrorPx).toBeLessThanOrEqual(1);
+    await crossboltRasters;
+    await setStickyRasterRenderPaused([host, guest], false);
+    const crossbolt = authoredCrossbolt.result;
     expect(crossbolt).not.toBeNull();
     expect(crossbolt.stuckDamage).toBeCloseTo(crossbolt.baseDamage * 2, 6);
     expect(crossbolt.stuckRadiusM).toBeCloseTo(crossbolt.baseRadiusM * 2, 6);
     await expect.poll(async () => guest.evaluate(() => {
       const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
-      return { hp: state.player.hp, count: state.stickyAuthority.victimFeedbackCount, source: state.stickyAuthority.lastVictimFeedback?.source };
-    })).toEqual({ hp: crossbolt.healthAfter, count: 1, source: 'explosive-crossbow' });
+      return {
+        hp: state.player.hp,
+        count: state.stickyAuthority.victimFeedbackCount,
+        source: state.stickyAuthority.lastVictimFeedback?.source,
+      };
+    })).toEqual({
+      hp: crossbolt.healthAfter,
+      count: 1,
+      source: 'explosive-crossbow',
+    });
+    await expectStickyTimingCompleted([host, guest], 'explosive-crossbow');
     expect(await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.replayStickyEffect('explosive-crossbow'))).toBe(true);
     expect(await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.replayStickyEffect('semtex'))).toBe(true);
     await guest.waitForTimeout(350);

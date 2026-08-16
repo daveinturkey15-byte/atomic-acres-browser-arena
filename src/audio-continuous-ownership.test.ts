@@ -102,11 +102,42 @@ class FakeAudioContext {
 
 describe('HF-165 bounded continuous audio ownership', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     FakeAudioContext.instances.length = 0;
   });
 
-  it('keeps two arena beds plus three muted combat voices protected, broadband-free and fully owned', () => {
+  it('never allocates or schedules arena noise across a ninety-second idle clock', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('AudioContext', FakeAudioContext);
+    const audio = new ArenaAudio();
+    audio.setArena('atomic-acres');
+    audio.unlock();
+    const context = FakeAudioContext.instances[0];
+
+    expect(context.bufferSources).toHaveLength(0);
+    expect(audio.telemetry().ambience).toEqual({
+      continuousSources: 0,
+      transientSources: 0,
+      events: 0,
+      lastDurationMs: 0,
+      nextInMs: null,
+      busGain: 0.12,
+      arena: 'atomic-acres',
+    });
+
+    vi.advanceTimersByTime(90_000);
+    audio.setArena('gun-range');
+    vi.advanceTimersByTime(90_000);
+
+    expect(context.bufferSources).toHaveLength(0);
+    expect(audio.telemetry().ambience).toMatchObject({
+      continuousSources: 0, transientSources: 0, events: 0, lastDurationMs: 0, nextInMs: null, arena: 'gun-range',
+    });
+    audio.dispose();
+  });
+
+  it('keeps twelve muted effect/rotor voices owned while arena ambience stays bounded and non-continuous', () => {
     vi.stubGlobal('AudioContext', FakeAudioContext);
     const audio = new ArenaAudio();
     audio.setArena('atomic-acres');
@@ -114,26 +145,22 @@ describe('HF-165 bounded continuous audio ownership', () => {
     const context = FakeAudioContext.instances[0];
     const internals = audio as unknown as {
       arenaSources: FakeScheduledSource[];
-      arenaNodes: FakeAudioNode[];
       continuousVoiceOwners: Map<FakeScheduledSource, unknown>;
       activeVoices: Map<FakeScheduledSource, { protectedContinuous: boolean }>;
     };
 
-    expect(audio.telemetry().ambience.continuousSources).toBe(2);
-    expect(internals.arenaSources.every((source) => source instanceof FakeOscillatorNode)).toBe(true);
+    expect(audio.telemetry().ambience).toMatchObject({ continuousSources: 0, transientSources: 0, events: 0 });
+    expect(internals.arenaSources).toEqual([]);
     expect(context.bufferSources.filter((source) => source.loop)).toHaveLength(0);
-    expect(internals.continuousVoiceOwners.size).toBe(5);
+    expect(context.oscillators).toHaveLength(12);
+    expect(internals.continuousVoiceOwners.size).toBe(12);
     expect([...internals.activeVoices.values()].every((voice) => voice.protectedContinuous)).toBe(true);
 
-    const firstSources = [...internals.arenaSources];
-    const firstNodes = [...internals.arenaNodes];
     audio.overdriveAvailable();
     audio.setArena('skyline-terminal');
-    expect(firstSources.every((source) => source.ended)).toBe(true);
-    expect(firstNodes.every((node) => node.disconnected)).toBe(true);
-    expect(audio.telemetry().ambience.continuousSources).toBe(2);
-    expect(internals.continuousVoiceOwners.size).toBe(5);
-    expect([...internals.activeVoices.values()].filter((voice) => voice.protectedContinuous)).toHaveLength(5);
+    expect(audio.telemetry().ambience.continuousSources).toBe(0);
+    expect(internals.continuousVoiceOwners.size).toBe(12);
+    expect([...internals.activeVoices.values()].filter((voice) => voice.protectedContinuous)).toHaveLength(12);
 
     audio.dispose();
     expect(internals.continuousVoiceOwners.size).toBe(0);

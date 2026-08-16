@@ -26,6 +26,19 @@ export const STANCE_SHAPES: Readonly<Record<Stance, { halfHeight: number; radius
 export const WORLD_BOUNDARY_THICKNESS = 0.5;
 export const WORLD_BOUNDARY_MIN_Y = -2;
 export const WORLD_BOUNDARY_MAX_Y = 14;
+const WORLD_FLOOR_THICKNESS = 0.2;
+
+/** Canonical floor collider consumed by Rapier and presentation fallback support. */
+export function worldFloorCollider(bounds: Box2): Box2 {
+  return Object.freeze({
+    minX: bounds.minX,
+    maxX: bounds.maxX,
+    minY: -WORLD_FLOOR_THICKNESS,
+    maxY: 0,
+    minZ: bounds.minZ,
+    maxZ: bounds.maxZ,
+  });
+}
 
 /** Physics-only perimeter walls. Their inner faces exactly match playable bounds. */
 export function worldBoundaryColliders(bounds: Box2): readonly Box2[] {
@@ -46,6 +59,26 @@ export type CharacterMoveResult = {
   slopeAdjusted: boolean;
   appliedDelta: Point3;
 };
+
+export type CharacterContactDebugSnapshot = Readonly<{
+  stance: Stance;
+  controllerOffset: number;
+  capsule: Readonly<{
+    center: Point3;
+    halfHeight: number;
+    radius: number;
+  }>;
+  contacts: readonly Readonly<{
+    source: string;
+    distance: number;
+    normalOnCharacter: Point3;
+  }>[];
+  sweepCollisions: readonly Readonly<{
+    source: string;
+    timeOfImpact: number;
+    normalOnObstacle: Point3;
+  }>[];
+}>;
 
 export type DynamicWorldCollider = Readonly<{
   id: string;
@@ -119,6 +152,7 @@ export class CharacterPhysics {
   private readonly body: RapierTypes.RigidBody;
   private readonly collider: RapierTypes.Collider;
   private readonly controller: RapierTypes.KinematicCharacterController;
+  private readonly colliderDebugSources: Map<number, string>;
   private readonly dynamicColliders = new Map<string, RapierTypes.Collider>();
   private readonly majorDebrisBodies = new Map<string, {
     readonly body: RapierTypes.RigidBody;
@@ -132,6 +166,7 @@ export class CharacterPhysics {
     world: RapierTypes.World,
     body: RapierTypes.RigidBody,
     collider: RapierTypes.Collider,
+    colliderDebugSources: Map<number, string>,
     private readonly makeCapsule: (halfHeight: number, radius: number) => RapierTypes.Shape,
     private readonly makeCuboidDescriptor: (halfX: number, halfY: number, halfZ: number) => RapierTypes.ColliderDesc,
     private readonly makeDynamicBodyDescriptor: () => RapierTypes.RigidBodyDesc,
@@ -139,6 +174,7 @@ export class CharacterPhysics {
     this.world = world;
     this.body = body;
     this.collider = collider;
+    this.colliderDebugSources = colliderDebugSources;
     this.controller = world.createCharacterController(CHARACTER_PHYSICS_CONFIG.controllerOffset);
     this.controller.setSlideEnabled(true);
     this.controller.setApplyImpulsesToDynamicBodies(true);
@@ -170,24 +206,36 @@ export class CharacterPhysics {
 
     // The world floor and four thin boundary walls make falling out impossible even if
     // an authored visual mesh is missing or still loading.
-    world.createCollider(
+    const colliderDebugSources = new Map<number, string>();
+    const floorShape = boxShape(worldFloorCollider(bounds));
+    const floor = world.createCollider(
       RAPIER.ColliderDesc.cuboid(
-        (bounds.maxX - bounds.minX) / 2,
-        0.1,
-        (bounds.maxZ - bounds.minZ) / 2,
+        floorShape.halfExtents.x,
+        floorShape.halfExtents.y,
+        floorShape.halfExtents.z,
       ).setTranslation(
-        (bounds.minX + bounds.maxX) / 2,
-        -0.1,
-        (bounds.minZ + bounds.maxZ) / 2,
+        floorShape.centre.x,
+        floorShape.centre.y,
+        floorShape.centre.z,
       ),
     );
+    colliderDebugSources.set(floor.handle, 'world-floor');
 
-    for (const box of [...worldBoundaryColliders(bounds), ...colliders]) {
+    for (const [index, box] of worldBoundaryColliders(bounds).entries()) {
       const shape = boxShape(box);
       const descriptor = RAPIER.ColliderDesc.cuboid(shape.halfExtents.x, shape.halfExtents.y, shape.halfExtents.z)
         .setTranslation(shape.centre.x, shape.centre.y, shape.centre.z)
         .setRotation(shape.rotation);
-      world.createCollider(descriptor);
+      const boundary = world.createCollider(descriptor);
+      colliderDebugSources.set(boundary.handle, `world-boundary:${index}`);
+    }
+    for (const [index, box] of colliders.entries()) {
+      const shape = boxShape(box);
+      const descriptor = RAPIER.ColliderDesc.cuboid(shape.halfExtents.x, shape.halfExtents.y, shape.halfExtents.z)
+        .setTranslation(shape.centre.x, shape.centre.y, shape.centre.z)
+        .setRotation(shape.rotation);
+      const authored = world.createCollider(descriptor);
+      colliderDebugSources.set(authored.handle, `static:${index}`);
     }
 
     const body = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased());
@@ -201,6 +249,7 @@ export class CharacterPhysics {
       world,
       body,
       collider,
+      colliderDebugSources,
       (halfHeight, radius) => new RAPIER.Capsule(halfHeight, radius),
       (halfX, halfY, halfZ) => RAPIER.ColliderDesc.cuboid(halfX, halfY, halfZ),
       () => RAPIER.RigidBodyDesc.dynamic(),
@@ -266,6 +315,57 @@ export class CharacterPhysics {
     return this.stance;
   }
 
+  /** Read-only signed contacts for the shipped capsule and the KCC's latest sweep. */
+  debugContactSnapshot(): CharacterContactDebugSnapshot {
+    const center = this.collider.translation();
+    const shape = this.collider.shape as RapierTypes.Capsule;
+    const sourceOf = (collider: RapierTypes.Collider): string =>
+      this.colliderDebugSources.get(collider.handle) ?? `collider:${collider.handle}`;
+    const point = (value: RapierTypes.Vector): Point3 => Object.freeze({
+      x: value.x,
+      y: value.y,
+      z: value.z,
+    });
+    const contacts: Array<CharacterContactDebugSnapshot['contacts'][number]> = [];
+    this.world.colliders.forEach((collider) => {
+      if (collider.handle === this.collider.handle || !collider.isEnabled()) return;
+      // Rapier's witness can sit a few tenths of a millimetre outside the
+      // configured KCC offset after its normal nudge. Include that numerical
+      // shell so an actual computed collision never disappears from evidence.
+      const contact = this.collider.contactCollider(collider, this.controller.offset() + 1e-3);
+      if (!contact) return;
+      contacts.push(Object.freeze({
+        source: sourceOf(collider),
+        distance: contact.distance,
+        normalOnCharacter: point(contact.normal1),
+      }));
+    });
+    contacts.sort((left, right) => left.source.localeCompare(right.source));
+
+    const sweepCollisions: Array<CharacterContactDebugSnapshot['sweepCollisions'][number]> = [];
+    for (let index = 0; index < this.controller.numComputedCollisions(); index += 1) {
+      const collision = this.controller.computedCollision(index);
+      if (!collision?.collider) continue;
+      sweepCollisions.push(Object.freeze({
+        source: sourceOf(collision.collider),
+        timeOfImpact: collision.toi,
+        normalOnObstacle: point(collision.normal1),
+      }));
+    }
+
+    return Object.freeze({
+      stance: this.stance,
+      controllerOffset: this.controller.offset(),
+      capsule: Object.freeze({
+        center: point(center),
+        halfHeight: shape.halfHeight,
+        radius: shape.radius,
+      }),
+      contacts: Object.freeze(contacts),
+      sweepCollisions: Object.freeze(sweepCollisions),
+    });
+  }
+
   /**
    * Reconciles one revisioned dynamic collision view without rebuilding the
    * Rapier world. Doors and authored shed panels therefore move/disappear in
@@ -279,6 +379,7 @@ export class CharacterPhysics {
     const retained = new Set(ids);
     for (const [id, collider] of this.dynamicColliders) {
       if (retained.has(id)) continue;
+      this.colliderDebugSources.delete(collider.handle);
       this.world.removeCollider(collider, true);
       this.dynamicColliders.delete(id);
     }
@@ -292,6 +393,7 @@ export class CharacterPhysics {
             .setRotation(shape.rotation),
         );
         this.dynamicColliders.set(entry.id, collider);
+        this.colliderDebugSources.set(collider.handle, `dynamic:${entry.id}`);
         continue;
       }
       const cuboid = collider.shape;
@@ -300,6 +402,7 @@ export class CharacterPhysics {
         if (Math.abs(halfExtents.x - shape.halfExtents.x) > 1e-6
           || Math.abs(halfExtents.y - shape.halfExtents.y) > 1e-6
           || Math.abs(halfExtents.z - shape.halfExtents.z) > 1e-6) {
+          this.colliderDebugSources.delete(collider.handle);
           this.world.removeCollider(collider, true);
           collider = this.world.createCollider(
             this.makeCuboidDescriptor(shape.halfExtents.x, shape.halfExtents.y, shape.halfExtents.z)
@@ -307,6 +410,7 @@ export class CharacterPhysics {
               .setRotation(shape.rotation),
           );
           this.dynamicColliders.set(entry.id, collider);
+          this.colliderDebugSources.set(collider.handle, `dynamic:${entry.id}`);
           continue;
         }
       }
@@ -537,6 +641,7 @@ export class CharacterPhysics {
   }
 
   dispose(): void {
+    this.colliderDebugSources.clear();
     this.dynamicColliders.clear();
     this.majorDebrisBodies.clear();
     this.world.free();

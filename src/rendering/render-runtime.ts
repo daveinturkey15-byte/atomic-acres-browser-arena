@@ -12,6 +12,17 @@ export type RenderBackendId = 'webgl2' | 'webgpu';
 
 export type WebGpuSubmissionMode = 'serialized' | 'warmed-live';
 
+export function geometryFreeCompositeCanvasConfig(principalHdrSamples: number): Readonly<{
+  antialias: false;
+  samples: 1;
+  principalHdrSamples: number;
+}> {
+  if (!Number.isSafeInteger(principalHdrSamples) || principalHdrSamples < 1) {
+    throw new Error('Principal HDR sample count must be a positive integer');
+  }
+  return Object.freeze({ antialias: false, samples: 1, principalHdrSamples });
+}
+
 export type RenderRuntimeRequest = Readonly<{
   requestedBackend: RenderBackendId;
   requireWebGPU: boolean;
@@ -76,6 +87,8 @@ export type PresentationFreshnessTelemetry = Readonly<{
   lastCompletionLatencyMs: number | null;
   completionFailures: number;
   lastFailure: string | null;
+  completionDeadlineMs: number;
+  completionDeadlineExceeded: boolean;
   backpressureActive: boolean;
   skippedSubmissions: number;
   progress: PresentationProgressTelemetry;
@@ -216,8 +229,11 @@ export function shouldBackpressureWebGpuSubmissions(
     && now - pendingSince >= thresholdMs;
 }
 
-export function maximumInFlightWebGpuSubmissions(mode: WebGpuSubmissionMode): 1 | 2 {
-  return mode === 'warmed-live' ? 2 : 1;
+export function maximumInFlightWebGpuSubmissions(mode: WebGpuSubmissionMode): 1 | 3 {
+  // Firefox's WebGPU compositor needs the normal triple-buffered live
+  // frontier to overlap queue completion with the next encode. Cold compile,
+  // transitions and forced evidence remain strictly one-deep.
+  return mode === 'warmed-live' ? 3 : 1;
 }
 
 export function pendingCompletionStartAfterProgress(input: Readonly<{
@@ -373,6 +389,30 @@ function webGlAdapterLabel(renderer: THREE.WebGLRenderer): string {
   return info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : String(gl.getParameter(gl.RENDERER));
 }
 
+/**
+ * Read the adapter before creating the long-lived renderer so callers can
+ * choose which framebuffer owns antialiasing. The probe is immediately lost;
+ * it never compiles scene programs or remains resident beside gameplay.
+ */
+export function probeWebGl2AdapterLabel(
+  powerPreference: WebGLPowerPreference = 'high-performance',
+): string | null {
+  if (typeof document === 'undefined') return null;
+  const probe = document.createElement('canvas');
+  const gl = probe.getContext('webgl2', {
+    alpha: false,
+    antialias: false,
+    powerPreference,
+  });
+  if (!gl) return null;
+  const info = gl.getExtension('WEBGL_debug_renderer_info') as { UNMASKED_RENDERER_WEBGL: number } | null;
+  const label = info
+    ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL))
+    : String(gl.getParameter(gl.RENDERER));
+  gl.getExtension('WEBGL_lose_context')?.loseContext();
+  return label;
+}
+
 function suppressUnrelatedRenderables(
   scene: THREE.Scene,
   roots: readonly THREE.Object3D[],
@@ -474,6 +514,8 @@ export class LegacyWebGlRenderRuntime {
       lastCompletionLatencyMs: null,
       completionFailures: 0,
       lastFailure: lost ? 'WebGL context lost' : null,
+      completionDeadlineMs: 0,
+      completionDeadlineExceeded: false,
       backpressureActive: false,
       skippedSubmissions: 0,
       progress: {
@@ -495,7 +537,11 @@ export class LegacyWebGlRenderRuntime {
     };
   }
 
-  resetPresentationProgressTelemetry(_reason?: string, _now?: number): void { /* Synchronous WebGL has no queue frontier. */ }
+  resetPresentationProgressTelemetry(
+    _reason?: string,
+    _now?: number,
+    _rebasePendingCompletion?: boolean,
+  ): void { /* Synchronous WebGL has no queue frontier. */ }
 
   resetPresentationProgressWindow(_now?: number): void { /* Synchronous WebGL has no queue frontier. */ }
 
@@ -733,9 +779,9 @@ export class WebGpuRenderRuntime {
   private static readonly COMPLETION_PROBE_INTERVAL_MS = 250;
   private static readonly SUBMISSION_BACKPRESSURE_MS = 250;
   // Cold compilation, prewarm, transitions and explicit renderer mutations
-  // remain one-deep. Only the already-fenced, warmed live path may keep two
-  // submissions in flight; that is the smallest frontier which avoids making
-  // every presented frame wait for its own queue-completion promise.
+  // remain one-deep. Only the already-fenced, warmed live path may fill the
+  // normal triple-buffered presentation frontier; this avoids making every
+  // Firefox frame wait for its own queue-completion promise.
   // Cold shader/shadow compilation on the frozen owner hardware can retire in
   // ~2.4 s. Backpressure still stops new work at 250 ms; twelve seconds matches
   // the explicit cold-generation fence and distinguishes cold work from a hang.
@@ -954,6 +1000,8 @@ export class WebGpuRenderRuntime {
       lastCompletionLatencyMs: this.lastCompletionLatencyMs,
       completionFailures: this.completionFailures,
       lastFailure: this.lastFailure,
+      completionDeadlineMs: WebGpuRenderRuntime.PRESENTATION_STALL_MS,
+      completionDeadlineExceeded: pendingForMs >= WebGpuRenderRuntime.PRESENTATION_STALL_MS,
       backpressureActive: shouldBackpressureWebGpuSubmissions(
         this.pendingCompletionStartedAt,
         now,
@@ -981,13 +1029,17 @@ export class WebGpuRenderRuntime {
     };
   }
 
-  resetPresentationProgressTelemetry(reason = 'presentation progress reset', now = this.clock()): void {
+  resetPresentationProgressTelemetry(
+    reason = 'presentation progress reset',
+    now = this.clock(),
+    rebasePendingCompletion = true,
+  ): void {
     this.submissionPacing.reset(reason);
     this.completionPacing.reset(reason);
     // Full lifecycle resets (not endurance-window samples) establish a new
     // foreground observation epoch. An unresolved queue item may remain, but
     // hidden-tab time must not count against its foreground completion fence.
-    if (this.pendingCompletionStartedAt !== null) this.pendingCompletionStartedAt = now;
+    if (rebasePendingCompletion && this.pendingCompletionStartedAt !== null) this.pendingCompletionStartedAt = now;
     this.resetPresentationProgressWindow(now);
   }
 
@@ -1285,8 +1337,8 @@ export class WebGpuRenderRuntime {
     this.submissionPacing.record(submissionGapMs);
     this.progressLastSubmissionAt = submittedAt;
     this.lastSubmittedAt = submittedAt;
-    // Attach one observer to the current completion frontier. A warmed live
-    // frame may join behind that target, but never creates a second mutable
+    // Attach one observer to the current completion frontier. Warmed live
+    // frames may join behind that target, but never create a second mutable
     // probe; the next observer is attached only after this frontier retires.
     this.scheduleCompletionProbe(submittedAt, true);
     return true;

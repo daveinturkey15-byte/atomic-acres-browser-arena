@@ -250,12 +250,16 @@ test('Qoder host recovery isolates a co-located software renderer within the fro
   const failureEnd = source.indexOf('async function selectClearDeathDropApproach(', samplerEnd);
   const ladderStart = source.indexOf("test('post-death ladders survive authenticated replacements");
   const ladderEnd = source.indexOf("test('a guest death-drop scavenge", ladderStart);
+  const stickyRasterPauseStart = source.indexOf('async function setStickyRasterRenderPaused(');
+  const stickyRasterPauseEnd = source.indexOf('test.use(', stickyRasterPauseStart);
   assert.ok(samplerStart >= 0 && samplerEnd > samplerStart);
   assert.ok(failureEnd > samplerEnd);
   assert.ok(ladderStart >= 0 && ladderEnd > ladderStart);
+  assert.ok(stickyRasterPauseStart >= 0 && stickyRasterPauseEnd > stickyRasterPauseStart);
   const sampler = source.slice(samplerStart, samplerEnd);
   const failureDiagnostic = source.slice(samplerEnd, failureEnd);
   const ladder = source.slice(ladderStart, ladderEnd);
+  const stickyRasterPause = source.slice(stickyRasterPauseStart, stickyRasterPauseEnd);
 
   assert.match(source, /HOST_RECOVERY_END_TO_END_TIMEOUT_MS = 90_000/u);
   assert.match(source, /GUEST_RENDER_RESUME_FRAME_TIMEOUT_MS = 10_000/u);
@@ -265,8 +269,9 @@ test('Qoder host recovery isolates a co-located software renderer within the fro
     ladder.match(/remainingHostRecoveryTimeoutMs\(hostRecoveryStartedAt\)/gu)?.length,
     4,
   );
-  assert.equal(source.match(/setRenderPaused\(/gu)?.length, 2);
   assert.equal(ladder.match(/setRenderPaused\(/gu)?.length, 2);
+  assert.equal(stickyRasterPause.match(/setRenderPaused\(/gu)?.length, 1);
+  assert.match(stickyRasterPause, /DOM, network and the real 500 ms timeout stay live/u);
 
   const topologyAt = ladder.indexOf('const guestRecoveryTopology = await guest.evaluate');
   const softwareAdapterAt = ladder.indexOf('state.render.runtime.softwareAdapter === true', topologyAt);

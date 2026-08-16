@@ -8,6 +8,7 @@ export function buildProductionReceipt(input: Readonly<{
   pages: Record<string, unknown>;
   liveSmoke: Record<string, unknown>;
   acceptance: Record<string, unknown>;
+  previewProvenance?: Record<string, unknown> | null;
 }>): Readonly<{
   schemaVersion: number;
   durations: Readonly<{

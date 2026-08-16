@@ -68,6 +68,13 @@ describe('Pass 65 renderer feature inventory', () => {
     }
   });
 
+  it('uses the allocation-light admission surface for both slow-runner Pass 64 startup gates', () => {
+    const spec = readFileSync('tests/e2e/pass64-renderer-foundation.spec.ts', 'utf8');
+    expect(spec.match(/\.admissionState\(\)\.gameStarted === true/gu)).toHaveLength(2);
+    expect(spec).not.toContain('__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true');
+    expect(spec.match(/timeout: 60_000/gu)).toHaveLength(2);
+  });
+
   it('keeps the checked-in generated JSON tied to the canonical registry', () => {
     const report = pass65RendererFeatureInventoryReport();
     const inventorySha256 = createHash('sha256').update(JSON.stringify(report.features)).digest('hex');

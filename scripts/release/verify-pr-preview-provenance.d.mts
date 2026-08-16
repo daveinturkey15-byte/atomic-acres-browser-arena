@@ -23,6 +23,42 @@ export function inspectPreviewArtifactZip(
   options?: Readonly<{ maxUncompressedBytes?: number }>,
 ): PreviewTree & Readonly<{ receipt: unknown }>;
 
+export function inspectPass71CandidateAAcceptanceArtifactZip(bytes: Uint8Array): Readonly<{
+  schemaVersion: 1;
+  ok: false;
+  phase: 'ci';
+  impact: 'full';
+  errors: readonly string[];
+}>;
+
+export type Pass71CandidateAArtifactReference = Readonly<{
+  artifactName: string;
+  path: string;
+  sha256: string;
+  byteLength: number;
+}>;
+
+export function collectPass71CandidateAArtifactReferences(
+  manifest: unknown,
+  sourceSha: string,
+): readonly Pass71CandidateAArtifactReference[];
+
+export function inspectPass71CandidateAShardArtifactZip(
+  bytes: Uint8Array,
+  expectedReferences?: readonly Pass71CandidateAArtifactReference[],
+): Readonly<{
+  fileCount: number;
+  referencedFiles: readonly Readonly<{ path: string; sha256: string; byteLength: number }>[];
+}>;
+
+export const PASS71_CANDIDATE_A_REQUIRED_SUCCESS_JOBS: readonly string[];
+
+export function validatePass71CandidateAWorkflowJobs(
+  jobs: readonly unknown[],
+): Readonly<{ id: number; name: string; conclusion: string }>;
+
+export function validatePass71MissingManifestLog(log: string): true;
+
 export type PreviewProvenanceOptions = Readonly<{
   repositoryRoot?: string;
   manifestPath?: string;

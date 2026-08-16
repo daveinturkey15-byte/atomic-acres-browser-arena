@@ -8,27 +8,31 @@ const pass62Benchmark = JSON.parse(readFileSync('baselines/pass62/best-netcode-b
 const shell = readFileSync('release-shell/release-shell.js', 'utf8');
 const shellHtml = readFileSync('release-shell/index.html', 'utf8');
 const staging = readFileSync('scripts/release/stage-release-topology.mjs', 'utf8');
+const staticVerifier = readFileSync('scripts/qa/verify-release-topology.mjs', 'utf8');
+const liveVerifier = readFileSync('scripts/qa/verify-release-topology-browser.mjs', 'utf8');
 const playwrightServer = readFileSync('scripts/qa/playwright-web-server.mjs', 'utf8');
 
-describe('Pass 70 release topology', () => {
-  it('identifies this source as Pass 70 without moving protected fallback pins', () => {
+describe('Pass 71 release topology', () => {
+  it('identifies this source as Pass 71 without moving protected fallback pins', () => {
     expect(PASS66_RELEASE_IDENTITY).toMatchObject({
-      pass: 'PASS 70',
-      label: 'PASS 70',
+      pass: 'PASS 71',
+      label: 'PASS 71',
       state: 'RELEASE CANDIDATE',
       route: 'channels/the-big-one',
-      runtimeLabel: 'PASS 70',
+      runtimeLabel: 'PASS 71',
     });
-    expect(config.latest.label).toBe('PASS 70');
+    expect(config.latest.label).toBe('PASS 71');
     expect(config.stable.sourceSha).toBe('8c3ad1cd4d819aba79f07c01c16c8c4294fd14c1');
     expect(config.retained).toMatchObject({
-      pass: 'PASS 69',
-      sourceSha: '685ed7865018e107df5acf6cb6f7498b4468940c',
-      pagesSha: '71ec5616504d8e24241450742d01b25c1d6ff4e4',
+      pass: 'PASS 70',
+      sourceSha: '130fd59bd2cf1e1719b802463219ddf36e2484d5',
+      pagesSha: '3b5e675c54eaea2a2dd721eca6f247c933361587',
       pagesPath: 'channels/the-big-one',
       runtimeFileCount: 515,
-      runtimeTreeSha256: '5ace26fdf83a4cf695d0075a40523f70e0d6fcee02cb6ae5b42666b6679107b9',
-      path: 'channels/pass69-retained',
+      runtimeTreeSha256: 'c8f6aeed492cd747ef83aa41bdc0d05f2fd86264418d40d0ebbd0916c85d6160',
+      pagesSubtreeFileCount: 516,
+      pagesSubtreeTreeSha256: '59ca7375a99d79ee644857df7c219b1beee2803ce3d077ba054ec44abd9adfa6',
+      path: 'channels/pass70-retained',
     });
     expect(config.rollback.sourceSha).toBe('ac85e9b8b46cc2370aee903d564ecf3c4682b24c');
     expect(config.rollback).toMatchObject({
@@ -37,6 +41,8 @@ describe('Pass 70 release topology', () => {
       pagesPath: 'channels/pass63-rollback',
       runtimeFileCount: 119,
       runtimeTreeSha256: 'b7416e02c190d8ff0403a65cd7a7c894970507bc6a8de7b196cc2d7979d69bce',
+      pagesSubtreeFileCount: 120,
+      pagesSubtreeTreeSha256: '43e97691b33240be8992f1f1238f5d3effb292e3765e7528b27756c04695f579',
       path: 'channels/pass63-rollback',
     });
   });
@@ -66,11 +72,13 @@ describe('Pass 70 release topology', () => {
       pagesPath: 'channels/recent-stable',
       runtimeFileCount: 508,
       runtimeTreeSha256: 'd8d444578e83a408c2e4d63ca4d1c2c5b705521f565fee6a58daffeb1e205ce9',
+      pagesSubtreeFileCount: 509,
+      pagesSubtreeTreeSha256: '10e408e5663dda8fef820aae89bbcda174699bd2661b9d94387d060fdb55914a',
       path: 'channels/recent-stable',
     });
   });
 
-  it('stages the Pass 70 candidate at the promotable path and removes old channels', () => {
+  it('stages the Pass 71 candidate at the promotable path and removes old channels', () => {
     expect(config.experimental).toEqual({
       pass: PASS66_RELEASE_IDENTITY.pass,
       label: PASS66_RELEASE_IDENTITY.label,
@@ -83,17 +91,17 @@ describe('Pass 70 release topology', () => {
     expect(JSON.stringify(config)).not.toContain('channels/new-netcode');
   });
 
-  it('shows Pass 70, exact retained Pass 69 and stable Pass 63 WebGL', () => {
+  it('shows Pass 71, exact retained Pass 70 and stable Pass 63 WebGL', () => {
     expect(shell).toContain("['experimental', 'retained', 'stable']");
     expect(shell).not.toContain("['experimental', 'stable', 'rollback']");
     expect(shell).not.toContain("['normal', 'stable', 'experimental']");
     expect(shell).toContain("channel.deploymentState === 'live' ? 'LIVE' : 'RELEASE CANDIDATE'");
     expect(shell).toContain("requested === 'stable' || requested === 'rollback') return route('stable')");
-    expect(shell).toContain("requested === 'previous' || requested === 'pass69') return route('retained')");
+    expect(shell).toContain("requested === 'previous' || requested === 'pass70') return route('retained')");
     expect(shell).toContain("if (!channel) continue");
+    expect(shellHtml).toContain('Pass 71');
     expect(shellHtml).toContain('Pass 70');
-    expect(shellHtml).toContain('Pass 69');
-    expect(shellHtml).not.toContain('local Pass 70');
+    expect(shellHtml).not.toContain('local Pass 71');
     expect(shellHtml).not.toContain('The Big One');
     expect(shellHtml).toContain('stable Pass 63 WebGL');
     expect(shellHtml).toContain('Nuke Town');
@@ -101,7 +109,7 @@ describe('Pass 70 release topology', () => {
     expect(shellHtml).not.toContain('Pass 59');
   });
 
-  it('routes root rooms and legacy latest or normal aliases to Pass 70', () => {
+  it('routes root rooms and legacy latest or normal aliases to Pass 71', () => {
     expect(shell).toContain("requested === 'latest' || requested === 'normal') return route('experimental')");
     expect(shell).toContain("requested === 'experimental'");
     expect(shell).toContain("requested === 'stable' || requested === 'rollback'");
@@ -123,23 +131,42 @@ describe('Pass 70 release topology', () => {
     expect(staging).toContain('process.env.REQUIRE_STABLE_RELEASE_TIMESTAMP');
     expect(staging).toContain("stageRebuilt('recent-stable', config.stable");
     expect(staging).toContain("stagePinned('recent-stable', config.stable)");
-    expect(staging).toContain("stagePinned('pass69-retained', config.retained)");
+    expect(staging).toContain("stagePinned('pass70-retained', config.retained)");
     expect(staging).toContain('STABLE_RELEASED_AT must be one strict UTC ISO-8601 instant');
     expect(staging).toContain("channel: liveChannelId");
     expect(staging).toContain('channel.pagesPath');
+    expect(staging).toContain('paths.length !== channel.pagesSubtreeFileCount');
+    expect(staging).toContain('digest !== channel.pagesSubtreeTreeSha256');
     expect(staging).toContain("'pinned-channel-provenance.json'");
     expect(staging).not.toContain("stagePinned('new-netcode'");
     expect(staging).toContain('experimental: {');
     expect(staging).toContain('...(rollback ? {');
     expect(staging).toContain('stable: {');
-    expect(staging).toContain("RELEASE_ROLLBACK_DIST");
-    expect(staging).toContain("pagesSha: '46d366d188bfc5ebc5ee7a991fd52b792575316c'");
-    expect(staging).toContain("rollback = stagePinned('rollback', { ...config.rollback, ...PASS63_PREVIEW_PIN })");
+    expect(staging).not.toContain('RELEASE_ROLLBACK_DIST');
+    expect(staging).not.toContain('PASS63_PREVIEW_PIN');
+    expect(staging).toContain("rollback = stagePinned('rollback', config.rollback)");
+    expect(staticVerifier).toContain('const rollbackFiles = verifyPinned(config.rollback)');
+    expect(staticVerifier).toContain('rollbackFiles !== config.rollback.pagesSubtreeFileCount');
+    expect(staticVerifier).toContain('retainedWrapper.treeSha256 !== config.retained.pagesSubtreeTreeSha256');
+    expect(staticVerifier).toContain('stableProvenance.treeSha256 !== config.stable.pagesSubtreeTreeSha256');
+    expect(staticVerifier).toContain('rollbackWrapper.treeSha256 !== config.rollback.pagesSubtreeTreeSha256');
+    expect(staticVerifier).toContain('retainedWrapper.treeSha256 !== treeDigest(retainedRoot, retainedPinnedFiles)');
+    expect(staticVerifier).toContain('stableProvenance.treeSha256 !== treeDigest(stableRoot, stablePinnedFiles)');
+    expect(liveVerifier).toContain('channelConfig.retained.pagesSubtreeFileCount');
+    expect(liveVerifier).toContain('channelConfig.retained.pagesSubtreeTreeSha256');
+    expect(liveVerifier).toContain('channelConfig.stable.pagesSubtreeFileCount');
+    expect(liveVerifier).toContain('channelConfig.stable.pagesSubtreeTreeSha256');
+    expect(liveVerifier).toContain('channelConfig.rollback.pagesSubtreeFileCount');
+    expect(liveVerifier).toContain('channelConfig.rollback.pagesSubtreeTreeSha256');
+    expect(liveVerifier).toContain('retainedWrapper.pinnedRuntime?.treeSha256');
+    expect(liveVerifier).toContain('rollbackWrapper.pinnedRuntime?.treeSha256');
+    expect(staticVerifier).toContain('rollbackEmbedded.treeSha256 !== config.rollback.runtimeTreeSha256');
+    expect(staticVerifier).toContain('rollbackWrapper.pagesSha !== config.rollback.pagesSha');
     expect(staging).toContain("schemaVersion: 4");
     expect(staging).toContain("process.env.RELEASE_BUILT_AT?.trim() ? 'live' : 'candidate'");
     expect(staging).toContain('deploymentState,');
     expect(staging).toContain("deploymentState === 'live'");
-    expect(staging).toContain('Publication remains disabled until owner approval.');
+    expect(staging).toContain('Publication remains disabled until the release gates pass.');
   });
 
   it('stages the production channel topology before browser regression tests', () => {
@@ -149,7 +176,7 @@ describe('Pass 70 release topology', () => {
   });
 
   it('tracks the current release acceptance lifecycle without allowing premature publication', () => {
-    const manifestPath = 'acceptance/pass-70.json';
+    const manifestPath = 'acceptance/pass-71.json';
     if (!existsSync(manifestPath)) {
       expect(() => evaluateAcceptance({ phase: 'release', pass: PASS66_RELEASE_IDENTITY.pass }))
         .toThrow(`acceptance manifest does not exist: ${manifestPath}`);

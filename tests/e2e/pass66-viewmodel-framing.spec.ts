@@ -11,6 +11,29 @@ const VIEWPORTS: readonly Viewport[] = Object.freeze([
 
 const SHOULDER_ENTRY_NDC = Object.freeze({ left: -1.12, right: -1.07 });
 const AUTHORED_ARM_SEGMENT_LENGTH_SCALE = 1;
+const ARM_BRANCH_CROP_NDC_Y = -1.05;
+const PROXIMAL_SLEEVE_CONTRACT = 'shoulder-bound-authored-pbr-lower-crop-continuation-v1';
+
+function assertIndependentArmBranchCrop(presentation: any, label: string): void {
+  for (const [side, suffix] of [['left', 'L'], ['right', 'R']] as const) {
+    const branch = presentation.armBranchFraming?.[side];
+    expect(branch, `${label}: ${side} branch framing`).toMatchObject({
+      finite: true, nearPlaneClear: true, intersectsViewport: true,
+    });
+    expect(branch.ndcMin[1], `${label}: ${side} sleeve independently exits bottom`)
+      .toBeLessThanOrEqual(ARM_BRANCH_CROP_NDC_Y);
+    expect(
+      presentation.proximalSleeveContinuations?.find((entry: { side: string }) => entry.side === side),
+      `${label}: ${side} shoulder-bound PBR continuation`,
+    ).toMatchObject({
+      contract: PROXIMAL_SLEEVE_CONTRACT,
+      parent: `UpperArm${suffix}`,
+      materialKind: 'MeshStandardMaterial',
+      authoredSleeveMaterial: true,
+      opaque: true,
+    });
+  }
+}
 
 function assertAuthoredArmCropAndGrip(presentation: any, label: string, maximumContactError: number): void {
   expect(presentation.armsSource, `${label}: authored two-chain source`).toBe('authored-two-chain');
@@ -20,6 +43,7 @@ function assertAuthoredArmCropAndGrip(presentation: any, label: string, maximumC
     intersectsViewport: true,
   });
   expect(presentation.armFraming.ndcMin[1], `${label}: no detached lower sleeve edge`).toBeLessThanOrEqual(-1.2);
+  assertIndependentArmBranchCrop(presentation, label);
   expect(presentation.riggedArms, `${label}: both authored arms diagnosed`).toHaveLength(2);
   for (const side of ['right', 'left'] as const) {
     const arm = presentation.riggedArms.find((candidate: { side: string }) => candidate.side === side);
@@ -199,6 +223,7 @@ test('keeps authored arms and knife readable at 1440p, 4K and ultrawide', async 
     expect(melee.authoredMeleeGripError, `${viewport.name}: grip-to-socket contact`).toBeLessThanOrEqual(0.001);
     expect(melee.authoredMeleeHandContactError, `${viewport.name}: knife remains in the posed firing hand`).toBeLessThanOrEqual(0.015);
     expect(melee.armFraming.ndcMin[1], `${viewport.name}: melee sleeves continue below viewport`).toBeLessThanOrEqual(-1.2);
+    assertIndependentArmBranchCrop(melee, `${viewport.name}: melee`);
     await capture(page, testInfo, viewport, 'melee-0_42');
 
     await page.evaluate(() => {

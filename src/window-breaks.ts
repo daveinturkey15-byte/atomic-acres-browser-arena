@@ -1,5 +1,14 @@
 import { isBlocked, pointInsideBounds, segmentIntersectsBox, type Box2, type Point3 } from './collision';
 
+export function windowBlastLineOfSightColliders(
+  colliders: readonly Box2[],
+  impactWindowId: string | null,
+  windowIdForCollider: (collider: Box2) => string | null,
+): readonly Box2[] {
+  if (impactWindowId === null) return colliders;
+  return Object.freeze(colliders.filter((collider) => windowIdForCollider(collider) !== impactWindowId));
+}
+
 export function windowBreakPathBlocked(
   origin: Point3,
   centre: Point3,
@@ -11,7 +20,7 @@ export function windowBreakPathBlocked(
   const dz = origin.z - centre.z;
   const distance = Math.hypot(dx, dy, dz);
   if (distance <= Math.max(0, endpointInset)) return false;
-  const inset = Math.min(Math.max(0, endpointInset), distance * 0.25);
+  const inset = Math.min(Math.max(0, endpointInset), distance);
   const end = {
     x: centre.x + dx / distance * inset,
     y: centre.y + dy / distance * inset,

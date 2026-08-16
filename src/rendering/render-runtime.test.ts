@@ -6,6 +6,7 @@ import {
   classifyPresentationFreshness,
   configureSceneLightShadowSchedule,
   detectLivePresentationStall,
+  geometryFreeCompositeCanvasConfig,
   shouldResetPresentationAfterSchedulerGap,
   formatWebGpuUncapturedError,
   maximumInFlightWebGpuSubmissions,
@@ -55,6 +56,15 @@ describe('Pass 64 render runtime boundary', () => {
     expect(toneMappingForMode('aces')).toBe(THREE.ACESFilmicToneMapping);
     expect(toneMappingForMode('agx')).toBe(THREE.AgXToneMapping);
     expect(toneMappingForMode('neutral')).toBe(THREE.NeutralToneMapping);
+  });
+
+  it('keeps Quality MSAA on the principal HDR scene target without multisampling the geometry-free canvas composite', () => {
+    expect(geometryFreeCompositeCanvasConfig(4)).toEqual({
+      antialias: false,
+      samples: 1,
+      principalHdrSamples: 4,
+    });
+    expect(() => geometryFreeCompositeCanvasConfig(0)).toThrow('Principal HDR sample count');
   });
 
   it('prewarms one WebGL presentation root without redrawing unrelated arena meshes', async () => {
@@ -426,7 +436,7 @@ describe('Pass 64 render runtime boundary', () => {
 
   it('bounds submissions while an earlier WebGPU completion probe is lagging', () => {
     expect(maximumInFlightWebGpuSubmissions('serialized')).toBe(1);
-    expect(maximumInFlightWebGpuSubmissions('warmed-live')).toBe(2);
+    expect(maximumInFlightWebGpuSubmissions('warmed-live')).toBe(3);
     expect(shouldBackpressureWebGpuSubmissions(null, 1_000, 250)).toBe(false);
     expect(shouldBackpressureWebGpuSubmissions(800, 1_049, 250)).toBe(false);
     expect(shouldBackpressureWebGpuSubmissions(800, 1_050, 250)).toBe(true);
@@ -489,7 +499,7 @@ describe('Pass 64 render runtime boundary', () => {
     expect(pending).toHaveLength(1);
   });
 
-  it('admits exactly two warmed-live frames behind one completion-frontier probe', async () => {
+  it('fills one triple-buffered warmed-live frontier behind a single completion probe', async () => {
     const pending: Array<() => void> = [];
     const renderer = {
       backend: { isWebGPUBackend: true },
@@ -520,31 +530,32 @@ describe('Pass 64 render runtime boundary', () => {
 
     expect(runtime.submitFrame(100, false, 'warmed-live')).toBe(true);
     expect(runtime.submitFrame(110, false, 'warmed-live')).toBe(true);
-    expect(runtime.submitFrame(120, false, 'warmed-live')).toBe(false);
-    expect(render).toHaveBeenCalledTimes(2);
+    expect(runtime.submitFrame(120, false, 'warmed-live')).toBe(true);
+    expect(runtime.submitFrame(125, false, 'warmed-live')).toBe(false);
+    expect(render).toHaveBeenCalledTimes(3);
     expect(pending).toHaveLength(1);
     expect(runtime.presentationTelemetry()).toMatchObject({
       submissionMode: 'warmed-live',
-      maximumInFlightSubmissions: 2,
-      inFlightSubmissions: 2,
+      maximumInFlightSubmissions: 3,
+      inFlightSubmissions: 3,
       completionProbeTargetSequence: 1,
       completionProbeCount: 1,
-      submissionSequence: 2,
+      submissionSequence: 3,
       completedSequence: 0,
     });
-    expect(() => runtime.submitFrame(125, true, 'serialized'))
+    expect(() => runtime.submitFrame(126, true, 'serialized'))
       .toThrow('Forced WebGPU submission requires an idle completion frontier');
-    expect(render).toHaveBeenCalledTimes(2);
+    expect(render).toHaveBeenCalledTimes(3);
 
     pending.shift()?.();
     await settleProbe();
     expect(runtime.submitFrame(130, false, 'warmed-live')).toBe(true);
     expect(pending).toHaveLength(1);
     expect(runtime.presentationTelemetry()).toMatchObject({
-      inFlightSubmissions: 2,
-      completionProbeTargetSequence: 3,
+      inFlightSubmissions: 3,
+      completionProbeTargetSequence: 4,
       completionProbeCount: 2,
-      submissionSequence: 3,
+      submissionSequence: 4,
       completedSequence: 1,
     });
     pending.shift()?.();
@@ -552,8 +563,8 @@ describe('Pass 64 render runtime boundary', () => {
     expect(runtime.presentationTelemetry()).toMatchObject({
       inFlightSubmissions: 0,
       completionProbeTargetSequence: null,
-      submissionSequence: 3,
-      completedSequence: 3,
+      submissionSequence: 4,
+      completedSequence: 4,
     });
   });
 
@@ -655,6 +666,10 @@ describe('Pass 64 render runtime boundary', () => {
     runtime.resetPresentationProgressTelemetry('tab visibility regained', now);
     expect(runtime.presentationTelemetry(now)).toMatchObject({ pendingSince: 5_000, pendingForMs: 0 });
     const beforeFence = runtime.presentationTelemetry(5_999);
+    expect(beforeFence).toMatchObject({
+      completionDeadlineMs: 12_000,
+      completionDeadlineExceeded: false,
+    });
     expect(detectLivePresentationStall({
       activeMatch: true,
       menuHidden: true,
@@ -682,6 +697,22 @@ describe('Pass 64 render runtime boundary', () => {
       pendingForMs: atFence.pendingForMs,
       stallThresholdMs: 1_000,
     })).toEqual({ kind: 'pending-completion', elapsedMs: 1_000 });
+    // The renderer retains a broader deadline for explicit cold admission
+    // fences, while active gameplay independently treats this exact one-second
+    // detector result as fatal. Never substitute the 12-second cold bound for
+    // the live no-progress contract.
+    expect(atFence.completionDeadlineExceeded).toBe(false);
+    expect(runtime.presentationTelemetry(17_000)).toMatchObject({
+      pendingForMs: 12_000,
+      completionDeadlineMs: 12_000,
+      completionDeadlineExceeded: true,
+    });
+
+    runtime.resetPresentationProgressTelemetry('foreground scheduler gap', 6_200, false);
+    expect(runtime.presentationTelemetry(6_200)).toMatchObject({
+      pendingSince: 5_000,
+      pendingForMs: 1_200,
+    });
 
     now = 5_025;
     pending.shift()?.();

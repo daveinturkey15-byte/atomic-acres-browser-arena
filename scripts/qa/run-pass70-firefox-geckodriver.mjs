@@ -32,7 +32,16 @@ import {
 
 const root = resolve(process.cwd());
 const identity = PASS70_FIREFOX_GECKODRIVER_IDENTITY;
-const evidenceRoot = resolve(root, 'artifacts', 'pass70', 'firefox-geckodriver');
+const pass71Webgpu = process.argv[2] === 'pass71-webgpu';
+const expectedRenderer = pass71Webgpu ? 'webgpu' : 'webgl2';
+const expectedRenderProfile = pass71Webgpu ? 'blender' : 'compat';
+const expectedHeadless = !pass71Webgpu;
+const expectedReleasePass = pass71Webgpu ? 'PASS 71' : identity.releasePass;
+const receiptIdentity = pass71Webgpu
+  ? Object.freeze({ schema: 'atomic-acres/pass71-firefox-webgpu-lobby@1', schemaVersion: 1, gate: 'firefox-webgpu-lobby' })
+  : identity;
+const evidenceRelativeRoot = `artifacts/${pass71Webgpu ? 'pass71/firefox-webgpu-lobby' : 'pass70/firefox-geckodriver'}`;
+const evidenceRoot = resolve(root, evidenceRelativeRoot);
 const receiptPath = join(evidenceRoot, 'receipt.json');
 const defaultArchivePath = resolve(root, '..', 'browser-tools', identity.geckodriver.archiveName);
 const archivePath = resolve(process.env.PASS70_GECKODRIVER_ARCHIVE_PATH ?? defaultArchivePath);
@@ -98,6 +107,19 @@ function gitDirty() {
     encoding: 'utf8',
     windowsHide: true,
   }).trim();
+}
+
+function stagedCandidateFailures(value, expected) {
+  if (!pass71Webgpu) return pass70StagedCandidateFailures(value, expected);
+  const errors = [];
+  if (!value || value.schemaVersion !== 4 || value.channel !== 'the-big-one'
+    || value.releasePass !== expectedReleasePass || value.path !== 'channels/the-big-one') {
+    errors.push('served candidate identity mismatch');
+  }
+  if (value?.sourceSha !== expected.sourceSha) errors.push('served candidate source SHA mismatch');
+  if (value?.treeSha256 !== expected.treeSha256) errors.push('served candidate tree digest mismatch');
+  if (value?.exactRootFileCount !== expected.exactRootFileCount) errors.push('served candidate file count mismatch');
+  return errors;
 }
 
 function delay(milliseconds) {
@@ -474,7 +496,7 @@ class OwnedGeckoDriver {
           pageLoadStrategy: 'normal',
           'moz:firefoxOptions': {
             binary: firefoxExecutable,
-            args: ['-headless'],
+            args: expectedHeadless ? ['-headless'] : [],
             prefs: {
               'browser.shell.checkDefaultBrowser': false,
               'browser.startup.page': 0,
@@ -491,7 +513,7 @@ class OwnedGeckoDriver {
     if (!this.sessionId || !this.capabilities) throw new Error(`${this.role} Firefox returned an incomplete session: ${JSON.stringify(created)}`);
     if (this.capabilities.browserName !== 'firefox'
       || this.capabilities.browserVersion !== identity.firefox.version
-      || this.capabilities['moz:headless'] !== true
+      || this.capabilities['moz:headless'] !== expectedHeadless
       || this.capabilities['moz:geckodriverVersion'] !== identity.geckodriver.version
       || typeof this.capabilities.webSocketUrl !== 'string'
       || !Number.isSafeInteger(this.capabilities['moz:processID'])
@@ -637,7 +659,8 @@ class OwnedGeckoDriver {
 function candidateRoute(seed) {
   const url = new URL(baseUrl);
   for (const [key, value] of Object.entries({
-    release: 'latest', renderer: 'webgl2', render: 'compat', signal: 'off', grass: 'off', mist: 'off',
+    release: 'latest', renderer: expectedRenderer, render: expectedRenderProfile,
+    ...(pass71Webgpu ? { requireWebGPU: '1' } : {}), signal: 'off', grass: 'off', mist: 'off',
     clouds: 'off', rays: 'off', externalServices: 'off', multiplayerQa: '1',
     peerQaPort: String(peerPort), peerQaPath: peerPath, seed,
   })) url.searchParams.set(key, value);
@@ -651,7 +674,7 @@ async function readServedCandidate(expected) {
   });
   if (!response.ok) throw new Error(`Candidate provenance returned HTTP ${response.status}`);
   const value = await response.json();
-  const failures = pass70StagedCandidateFailures(value, expected);
+  const failures = stagedCandidateFailures(value, expected);
   if (failures.length > 0) throw new Error(`Served candidate provenance mismatch: ${failures.join('; ')}`);
   return value;
 }
@@ -670,10 +693,17 @@ async function preparePlayer(driver, name, seed) {
       joinEnabled: document.querySelector('#join')?.disabled === false,
       runtimeLogPresent: document.querySelector('#runtime-error-log') !== null,
       bannerPresent: document.querySelector('#banner') !== null,
+      renderer: state?.render?.runtime?.actualBackend ?? null,
+      renderProfile: state?.render?.profile ?? null,
+      rendererInitialized: state?.render?.runtime?.initialized === true,
+      rendererDeviceLost: state?.render?.runtime?.deviceLost === true,
+      rendererUncapturedErrors: state?.render?.runtime?.uncapturedErrors ?? null,
       url: location.href,
     };
   `), (state) => state?.stage === 'ready' && state.weaponReady && state.soloEnabled
-    && state.hostEnabled && state.joinEnabled && state.runtimeLogPresent && state.bannerPresent, 90_000);
+    && state.hostEnabled && state.joinEnabled && state.runtimeLogPresent && state.bannerPresent
+    && state.renderer === expectedRenderer && state.renderProfile === expectedRenderProfile
+    && state.rendererInitialized && !state.rendererDeviceLost && state.rendererUncapturedErrors === 0, 120_000);
   await driver.fill('#player-name', name);
   return bidiStartIndex;
 }
@@ -909,12 +939,19 @@ async function runSoloCycle(driver, label) {
       matchPhase: state.matchPhase,
       botCount: state.bots?.length,
       backend: state.render?.runtime?.actualBackend ?? null,
+      renderProfile: state.render?.profile ?? null,
+      rendererInitialized: state.render?.runtime?.initialized === true,
+      rendererDeviceLost: state.render?.runtime?.deviceLost === true,
+      rendererUncapturedErrors: state.render?.runtime?.uncapturedErrors ?? null,
       webglVersion: state.render?.webglVersion ?? null,
       userAgent: navigator.userAgent,
       weapon: state.player?.weapon,
     } : null;
   `), (state) => state?.gameStarted && state.matchPhase === 'active' && state.botCount === 1, 90_000);
-  if (active.weapon !== 'carbine' || active.backend !== 'webgl2' || !String(active.webglVersion).includes('WebGL 2')) {
+  if (active.weapon !== 'carbine' || active.backend !== expectedRenderer
+    || active.renderProfile !== expectedRenderProfile || !active.rendererInitialized
+    || active.rendererDeviceLost || active.rendererUncapturedErrors !== 0
+    || (!pass71Webgpu && !String(active.webglVersion).includes('WebGL 2'))) {
     throw new Error(`${label} Firefox one-bot backend/weapon mismatch: ${JSON.stringify(active)}`);
   }
   const setup = await driver.execute(`
@@ -1085,6 +1122,10 @@ async function runSoloCycle(driver, label) {
     matchPhase: active.matchPhase,
     botCount: active.botCount,
     backend: active.backend,
+    renderProfile: active.renderProfile,
+    rendererInitialized: active.rendererInitialized,
+    rendererDeviceLost: active.rendererDeviceLost,
+    rendererUncapturedErrors: active.rendererUncapturedErrors,
     webglVersion: active.webglVersion,
     userAgent: active.userAgent,
     pointerLock: eventState.pointerLock,
@@ -1117,10 +1158,17 @@ async function waitForActivePair(host, guest, label) {
       remotePlayers: state.remotePlayers?.length ?? 0,
       playerId: state.player?.id ?? null,
       hostedBotCount: state.privateMatch?.hostedBotCount ?? null,
+      renderer: state.render?.runtime?.actualBackend ?? null,
+      renderProfile: state.render?.profile ?? null,
+      rendererInitialized: state.render?.runtime?.initialized === true,
+      rendererDeviceLost: state.render?.runtime?.deviceLost === true,
+      rendererUncapturedErrors: state.render?.runtime?.uncapturedErrors ?? null,
     } : null;
   `), (state) => state?.gameStarted && state.matchPhase === 'active'
     && state.members.length === 2 && state.members.every((member) => member.connected)
-    && state.remotePlayers === 1, 90_000)));
+    && state.remotePlayers === 1 && state.renderer === expectedRenderer
+    && state.renderProfile === expectedRenderProfile && state.rendererInitialized
+    && !state.rendererDeviceLost && state.rendererUncapturedErrors === 0, 90_000)));
 }
 
 async function runMultiplayer(host, guest) {
@@ -1217,6 +1265,13 @@ async function runMultiplayer(host, guest) {
     initialGuestId,
     hostedBotCountBefore: { host: initialStates[0].hostedBotCount, guest: initialStates[1].hostedBotCount },
     remotePlayersBefore: { host: initialStates[0].remotePlayers, guest: initialStates[1].remotePlayers },
+    renderersBefore: initialStates.map((state) => ({
+      renderer: state.renderer,
+      profile: state.renderProfile,
+      initialized: state.rendererInitialized,
+      deviceLost: state.rendererDeviceLost,
+      uncapturedErrors: state.rendererUncapturedErrors,
+    })),
     guestPageDestroyed: true,
     hostObservedDisconnect: true,
     originalGuestWindow,
@@ -1231,6 +1286,13 @@ async function runMultiplayer(host, guest) {
     rosterPreservedAfterRejoin,
     hostedBotCountAfter: { host: rejoinedStates[0].hostedBotCount, guest: rejoinedStates[1].hostedBotCount },
     remotePlayersAfter: { host: rejoinedStates[0].remotePlayers, guest: rejoinedStates[1].remotePlayers },
+    renderersAfter: rejoinedStates.map((state) => ({
+      renderer: state.renderer,
+      profile: state.renderProfile,
+      initialized: state.rendererInitialized,
+      deviceLost: state.rendererDeviceLost,
+      uncapturedErrors: state.rendererUncapturedErrors,
+    })),
     trustedLobbyEvents: { host: hostEvents, guest: guestEvents, rejoinedGuest: rejoinedGuestEvents },
     frames: { host: hostFrames, guest: guestFrames },
     faults: { host: hostFaults, guest: guestFaults },
@@ -1259,6 +1321,44 @@ function verifyScreenshotRecord(record) {
   if (JSON.stringify(current) !== JSON.stringify(record)) throw new Error(`Screenshot bytes drifted: ${record.path}`);
 }
 
+function assertPass71FirefoxWebgpuReceipt(receipt, expected) {
+  const fail = (message) => { throw new Error(`Invalid Pass 71 installed-Firefox WebGPU receipt: ${message}`); };
+  if (receipt?.schema !== receiptIdentity.schema || receipt.schemaVersion !== receiptIdentity.schemaVersion
+    || receipt.status !== 'PASS' || receipt.gate !== receiptIdentity.gate
+    || receipt.releasePass !== 'PASS 71' || receipt.sourceSha !== expected.sourceSha) fail('identity mismatch');
+  if (receipt.sourceState?.startingSha !== expected.sourceSha || receipt.sourceState?.endingSha !== expected.sourceSha
+    || receipt.sourceState?.cleanBefore !== true || receipt.sourceState?.cleanAfter !== true) fail('clean exact source proof');
+  if (JSON.stringify(receipt.servedCandidateBefore) !== JSON.stringify(receipt.servedCandidateAfter)
+    || stagedCandidateFailures(receipt.servedCandidateAfter, expected).length > 0) fail('served candidate drift');
+  if (receipt.toolchain?.firefox?.sha256 !== identity.firefox.sha256
+    || receipt.toolchain.firefox.expectedVersion !== identity.firefox.version
+    || receipt.toolchain.firefox.headless !== false
+    || receipt.toolchain.firefox.automation !== 'raw-w3c-http+bidi'
+    || receipt.toolchain.firefox.sessionVersions?.some((version) => version !== identity.firefox.version)) {
+    fail('installed Firefox provenance');
+  }
+  if (receipt.cleanup?.allOwnedPortsReleased !== true || receipt.cleanup?.allOwnedProcessesExited !== true
+    || receipt.ownership?.drivers?.length !== 2
+    || receipt.ownership.drivers[0]?.firefoxProcessId === receipt.ownership.drivers[1]?.firefoxProcessId) {
+    fail('independent sessions or cleanup proof');
+  }
+  if (!Array.isArray(receipt.soloCycles) || receipt.soloCycles.length !== 0) fail('lobby-only scope');
+  const multiplayer = receipt.multiplayer;
+  if (multiplayer?.hostGuestIndependentSessions !== true || multiplayer.initiallyConverged !== true
+    || multiplayer.guestPageDestroyed !== true || multiplayer.hostObservedDisconnect !== true
+    || multiplayer.rejoinAvailable !== true || multiplayer.rejoinIdentityPreserved !== true
+    || multiplayer.activeAfterRejoin !== true || multiplayer.membersConnectedAfterRejoin !== true
+    || multiplayer.rosterPreservedAfterRejoin !== true
+    || JSON.stringify(multiplayer.initialMemberIds?.host) !== JSON.stringify(multiplayer.initialMemberIds?.guest)
+    || JSON.stringify(multiplayer.rejoinedMemberIds?.host) !== JSON.stringify(multiplayer.rejoinedMemberIds?.guest)
+    || [...(multiplayer.renderersBefore ?? []), ...(multiplayer.renderersAfter ?? [])].length !== 4
+    || [...multiplayer.renderersBefore, ...multiplayer.renderersAfter].some((renderer) => renderer.renderer !== 'webgpu'
+      || renderer.profile !== 'blender' || renderer.initialized !== true
+      || renderer.deviceLost !== false || renderer.uncapturedErrors !== 0)) {
+    fail('host/join/start/disconnect/rejoin convergence proof');
+  }
+}
+
 async function executeGate() {
   assertStaticPreconditions();
   await assertPortsInitiallyFree();
@@ -1276,7 +1376,7 @@ async function executeGate() {
     env: {
       ...buildEnvironment,
       SOURCE_SHA: sourceSha,
-      RELEASE_PASS: identity.releasePass,
+      RELEASE_PASS: expectedReleasePass,
       RELEASE_DIST_ROOT: temporaryDist,
       RELEASE_TOPOLOGY_RECEIPT_PATH: topologyReceiptPath,
     },
@@ -1285,11 +1385,11 @@ async function executeGate() {
   });
   const topology = JSON.parse(readFileSync(topologyReceiptPath, 'utf8'));
   if (topology?.schemaVersion !== 4 || topology.sourceSha !== sourceSha
-    || topology.releasePass !== identity.releasePass || topology.root?.kind !== 'chooser-only') {
+    || topology.releasePass !== expectedReleasePass || topology.root?.kind !== 'chooser-only') {
     throw new Error(`Pass 70 staged topology identity mismatch: ${JSON.stringify(topology)}`);
   }
   const candidate = topology.channels?.experimental;
-  const candidateFailures = pass70StagedCandidateFailures(candidate, {
+  const candidateFailures = stagedCandidateFailures(candidate, {
     sourceSha,
     treeSha256: candidate?.treeSha256,
     exactRootFileCount: candidate?.exactRootFileCount,
@@ -1324,16 +1424,19 @@ async function executeGate() {
     || hostOwnership.profile === guestOwnership.profile) {
     throw new Error('Firefox host and guest sessions are not independent');
   }
-  const soloCycles = [
+  const soloCycles = pass71Webgpu ? [] : [
     await runSoloCycle(hostDriver, 'cold'),
     await runSoloCycle(hostDriver, 'warm'),
   ];
-  const soloArtifactPath = 'artifacts/pass70/firefox-geckodriver/firefox-warm-one-bot.png';
-  const soloAbsolutePath = resolve(root, soloArtifactPath);
-  await hostDriver.screenshot(soloAbsolutePath);
-  const soloScreenshot = pngMetadata(soloAbsolutePath, soloArtifactPath);
+  let soloScreenshot = null;
+  if (!pass71Webgpu) {
+    const soloArtifactPath = `${evidenceRelativeRoot}/firefox-warm-one-bot.png`;
+    const soloAbsolutePath = resolve(root, soloArtifactPath);
+    await hostDriver.screenshot(soloAbsolutePath);
+    soloScreenshot = pngMetadata(soloAbsolutePath, soloArtifactPath);
+  }
   const multiplayer = await runMultiplayer(hostDriver, guestDriver);
-  const multiplayerArtifactPath = 'artifacts/pass70/firefox-geckodriver/firefox-multiplayer-rejoin.png';
+  const multiplayerArtifactPath = `${evidenceRelativeRoot}/firefox-multiplayer-rejoin.png`;
   const multiplayerAbsolutePath = resolve(root, multiplayerArtifactPath);
   await hostDriver.screenshot(multiplayerAbsolutePath);
   const multiplayerScreenshot = pngMetadata(multiplayerAbsolutePath, multiplayerArtifactPath);
@@ -1345,11 +1448,11 @@ async function executeGate() {
   completed = {
     expected,
     receipt: {
-      schema: identity.schema,
-      schemaVersion: identity.schemaVersion,
+      schema: receiptIdentity.schema,
+      schemaVersion: receiptIdentity.schemaVersion,
       status: 'PASS',
-      gate: identity.gate,
-      releasePass: identity.releasePass,
+      gate: receiptIdentity.gate,
+      releasePass: expectedReleasePass,
       sourceSha,
       sourceState: null,
       servedCandidateBefore,
@@ -1363,7 +1466,7 @@ async function executeGate() {
           expectedVersion: identity.firefox.version,
           sessionVersions: [hostDriver.capabilities.browserVersion, guestDriver.capabilities.browserVersion],
           userAgents,
-          headless: true,
+          headless: expectedHeadless,
           automation: 'raw-w3c-http+bidi',
         },
         geckodriver: {
@@ -1459,15 +1562,16 @@ if (endingSha !== sourceSha || endingDirty) {
   rmSync(evidenceRoot, { recursive: true, force: true });
   throw new Error(`Pass 70 Firefox source drifted during verification: SHA=${endingSha}, dirty=${endingDirty || '(clean)'}`);
 }
-assertPass70FirefoxGeckodriverReceipt(completed.receipt, completed.expected);
-verifyScreenshotRecord(completed.receipt.screenshots.solo);
+if (pass71Webgpu) assertPass71FirefoxWebgpuReceipt(completed.receipt, completed.expected);
+else assertPass70FirefoxGeckodriverReceipt(completed.receipt, completed.expected);
+if (!pass71Webgpu) verifyScreenshotRecord(completed.receipt.screenshots.solo);
 verifyScreenshotRecord(completed.receipt.screenshots.multiplayer);
 const temporaryReceiptPath = `${receiptPath}.tmp`;
 writeFileSync(temporaryReceiptPath, `${JSON.stringify(completed.receipt, null, 2)}\n`, 'utf8');
 renameSync(temporaryReceiptPath, receiptPath);
 console.log(JSON.stringify({
   status: 'PASS',
-  gate: identity.gate,
+  gate: receiptIdentity.gate,
   sourceSha,
   receiptPath: relative(root, receiptPath).replaceAll('\\', '/'),
 }, null, 2));

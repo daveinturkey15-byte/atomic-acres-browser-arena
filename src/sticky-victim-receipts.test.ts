@@ -17,6 +17,7 @@ class MemoryStorage {
 const receipt: StickyVictimReceipt = {
   matchEpoch: 42,
   ownerId: 'host-1',
+  ownerLifeId: 2,
   targetId: 'guest-1',
   targetLifeId: 4,
   source: 'semtex',
@@ -30,6 +31,7 @@ describe('sticky victim reconnect receipts', () => {
     expect(saveStickyVictimReceipt(storage, receipt, 10_000)).toBe(true);
     const restored = loadStickyVictimReceiptKeys(storage, 42, 'guest-1', 20_000);
     expect(restored.has(stickyVictimReceiptKey(receipt))).toBe(true);
+    expect(restored.has(stickyVictimReceiptKey({ ...receipt, ownerLifeId: 3 }))).toBe(false);
     expect(storage.values.get(STICKY_VICTIM_RECEIPT_STORAGE_KEY)).not.toMatch(/token|credential|name/i);
   });
 
@@ -40,11 +42,11 @@ describe('sticky victim reconnect receipts', () => {
     expect(loadStickyVictimReceiptKeys(storage, 42, 'other-guest', 20_000).size).toBe(0);
     expect(loadStickyVictimReceiptKeys(storage, 42, 'guest-1', 100_000).size).toBe(0);
     storage.values.set(STICKY_VICTIM_RECEIPT_STORAGE_KEY, JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       receipts: [{ ...receipt, expiresAtEpochMs: 20_000 + STICKY_VICTIM_RECEIPT_TTL_MS + 1 }],
     }));
     expect(loadStickyVictimReceiptKeys(storage, 42, 'guest-1', 20_000).size).toBe(0);
-    storage.values.set(STICKY_VICTIM_RECEIPT_STORAGE_KEY, JSON.stringify({ schemaVersion: 1, receipts: [{ ...receipt, extra: true }] }));
+    storage.values.set(STICKY_VICTIM_RECEIPT_STORAGE_KEY, JSON.stringify({ schemaVersion: 2, receipts: [{ ...receipt, extra: true }] }));
     expect(loadStickyVictimReceiptKeys(storage, 42, 'guest-1', 20_000).size).toBe(0);
   });
 

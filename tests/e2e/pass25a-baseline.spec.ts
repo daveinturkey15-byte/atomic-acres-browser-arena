@@ -137,7 +137,10 @@ test.describe('Pass 25A baseline and lifecycle', () => {
         await assertAimAlignment(page);
 
         await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setAds(true));
-        await expect.poll(async () => (await snapshot(page)).weaponPresentation.adsProgress, { timeout: 5_000 }).toBeGreaterThanOrEqual(0.9);
+        await page.waitForFunction(() => (
+          (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => Pass25State } })
+            .__ATOMIC_ACRES_DEBUG__.snapshot().weaponPresentation.adsProgress >= 0.9
+        ), undefined, { timeout: 5_000 });
         await assertAimAlignment(page);
         const shotsBeforeAdsFire = (await snapshot(page)).weaponPresentation.shotsPresented;
         await page.evaluate(({ selected }) => {

@@ -14,14 +14,14 @@ describe('release channel entry routing', () => {
     expect(releaseChannelDecision('?release=choose', 'localhost', canonical)).toBe('choose');
   });
 
-  it('routes latest, normal and experimental aliases to the Pass 70 candidate', () => {
+  it('routes latest, normal and experimental aliases to the Pass 71 candidate', () => {
     expect(releaseChannelDecision('?release=latest', canonical, canonical)).toBe('latest');
     expect(releaseChannelDecision('?release=normal', canonical, canonical)).toBe('latest');
     expect(releaseChannelDecision('?release=experimental', canonical, canonical)).toBe('latest');
     expect(releaseChannelDecision('?release=stable', canonical, canonical)).toBe('stable');
   });
 
-  it('keeps room invitations on the Pass 70 multiplayer candidate', () => {
+  it('keeps room invitations on the Pass 71 multiplayer candidate', () => {
     expect(releaseChannelDecision('?room=abc&autojoin=1&release=choose', canonical, canonical)).toBe('latest');
   });
 

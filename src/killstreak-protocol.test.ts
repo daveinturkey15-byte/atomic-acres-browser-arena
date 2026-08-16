@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { parseKillstreakLoadout } from './killstreak-catalog';
-import { HostKillstreakRuntime, MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD } from './killstreak-runtime';
+import {
+  CHOPPER_MISSILE_FLIGHT_MS,
+  HostKillstreakRuntime,
+  MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD,
+} from './killstreak-runtime';
 import {
   admitKillstreakCareCaptureResultMessage,
   admitKillstreakStateMessage,
@@ -90,8 +94,8 @@ describe('killstreak protocol', () => {
       type: 'killstreak-damage-result' as const,
       by: 'host', matchEpoch: 7, revision: 3, events: [],
       impacts: [
-        { activationId: 'ks-activation-7-1', source: 'carpet-bomber' as const, ordinal: 0, phase: 'drop' as const, position: [1, 0, 2] as const, impactAtMs: 2_000, atMs: 1_580 },
-        { activationId: 'ks-activation-7-1', source: 'carpet-bomber' as const, ordinal: 0, phase: 'impact' as const, position: [1, 0, 2] as const, impactAtMs: 2_000, atMs: 2_000 },
+        { activationId: 'ks-activation-7-1', source: 'carpet-bomber' as const, ordinal: 0, phase: 'drop' as const, position: [1, 0, 2] as const, launchPosition: null, impactAtMs: 2_000, atMs: 1_580 },
+        { activationId: 'ks-activation-7-1', source: 'carpet-bomber' as const, ordinal: 0, phase: 'impact' as const, position: [1, 0, 2] as const, launchPosition: null, impactAtMs: 2_000, atMs: 2_000 },
       ],
       nonce: 9,
     };
@@ -106,11 +110,28 @@ describe('killstreak protocol', () => {
     const chopperMissile = {
       ...message,
       impacts: [
-        { activationId: 'ks-activation-7-2', source: 'chopper' as const, ordinal: 5, phase: 'drop' as const, position: [3, 0, 4] as const, impactAtMs: 2_780, atMs: 2_000 },
-        { activationId: 'ks-activation-7-2', source: 'chopper' as const, ordinal: 5, phase: 'impact' as const, position: [3, 0, 4] as const, impactAtMs: 2_780, atMs: 2_780 },
+        { activationId: 'ks-activation-7-2', source: 'chopper' as const, ordinal: 5, phase: 'drop' as const, position: [3, 0, 4] as const, launchPosition: [1, 18, 2] as const, impactAtMs: 2_780, atMs: 2_000 },
+        { activationId: 'ks-activation-7-2', source: 'chopper' as const, ordinal: 5, phase: 'impact' as const, position: [3, 0, 4] as const, launchPosition: [1, 18, 2] as const, impactAtMs: 2_780, atMs: 2_780 },
       ],
     };
     expect(isKillstreakProtocolMessage(chopperMissile)).toBe(true);
+    const fractionalDropAtMs = 2_000.123456789;
+    expect(isKillstreakProtocolMessage({
+      ...chopperMissile,
+      impacts: [{
+        ...chopperMissile.impacts[0],
+        atMs: fractionalDropAtMs,
+        impactAtMs: fractionalDropAtMs + CHOPPER_MISSILE_FLIGHT_MS,
+      }],
+    })).toBe(true);
+    expect(isKillstreakProtocolMessage({
+      ...chopperMissile,
+      impacts: [{
+        ...chopperMissile.impacts[0],
+        atMs: fractionalDropAtMs,
+        impactAtMs: fractionalDropAtMs + CHOPPER_MISSILE_FLIGHT_MS + 0.001,
+      }],
+    })).toBe(false);
     expect(isKillstreakProtocolMessage({ ...chopperMissile, impacts: [{ ...chopperMissile.impacts[0], ordinal: 6 }] })).toBe(false);
     expect(isKillstreakProtocolMessage({ ...chopperMissile, impacts: [{ ...chopperMissile.impacts[0], atMs: 2_001 }] })).toBe(false);
     expect(isKillstreakProtocolMessage({ ...chopperMissile, impacts: [{ ...chopperMissile.impacts[1], atMs: 2_781 }] })).toBe(false);

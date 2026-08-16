@@ -65,12 +65,13 @@ import {
   type BotWeaponPresentationMessage,
 } from './bot-weapon-presentation';
 import { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
+import { WEAPON_CATALOG } from './combat/weapon-catalog';
 import { validateKillstreakLoadout, type KillstreakLoadoutV1 } from './killstreak-catalog';
 
 export { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 
 export type Team = 0 | 1;
-export const MULTIPLAYER_PROTOCOL_VERSION = 17;
+export const MULTIPLAYER_PROTOCOL_VERSION = 20;
 export type PrimaryWeaponId =
   | 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper'
   | 'mini-uzi' | 'mp5' | 'm4a1' | 'ak-47' | 'minigun' | 'm14-ebr' | 'slug-shotgun';
@@ -311,6 +312,26 @@ export type HitMessage = {
   timing?: CombatTiming;
   nonce: number;
 };
+/**
+ * Host-confirmed sticky attachment onset. This is deliberately separate from
+ * the later explosive hit so both parties receive immediate, replay-safe HUD
+ * feedback without treating guest collision prediction as authority.
+ */
+export type StickyAttachmentReceiptMessage = {
+  type: 'sticky-attachment-receipt';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string;
+  forPlayerId: string;
+  matchEpoch: number;
+  source: 'semtex' | 'explosive-crossbow';
+  ownerId: string;
+  ownerLifeId: number;
+  targetId: string;
+  targetLifeId: number;
+  actionNonce: number;
+  attachedAtHostTimeMs: number;
+  nonce: number;
+};
 export type SupportActivateMessage = {
   type: 'support-activate';
   by: string;
@@ -345,10 +366,13 @@ export type PickupMessage = {
 };
 export type WindowBreakMessage = {
   type: 'window-break';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
   by: string;
   windowId: string;
   origin: [number, number, number];
   kind?: 'shot' | 'knife' | 'explosive';
+  /** Present for a projectile impact/detonation or host-canonical bot ballistic action. */
+  weapon?: WeaponId;
   actionNonce?: number;
   /** Added only by the host after receiver simulation canonicalizes the break. */
   hostAuthority?: HostWindowBreakAuthority;
@@ -528,18 +552,38 @@ export type ChatHistoryMessage = {
   by: string; forPlayerId: string; entries: ChatEntry[]; nonce: number;
 };
 
-export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | GrenadeResultMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
+export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | GrenadeResultMessage | HitMessage | StickyAttachmentReceiptMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
   | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
   | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage
   | TimedMapWeaponProtocolMessage | FlarePresentationProtocolMessage | BotWeaponPresentationMessage;
 
 const weapons = new Set<WeaponId>(WEAPON_IDS);
+/**
+ * Protocol projection of bot-owned instantaneous glass actions. This is
+ * derived from the canonical weapon catalog so a newly eligible family cannot
+ * silently borrow the wire lane without satisfying the decoder tests.
+ */
+export const HOSTED_BOT_BALLISTIC_WINDOW_WEAPON_IDS: readonly WeaponId[] = Object.freeze(
+  WEAPON_CATALOG
+    .filter((definition) => definition.policies.bot === 'eligible'
+      && definition.projectileId === null
+      && (definition.fireKind === 'hitscan'
+        || definition.fireKind === 'pellet'
+        || definition.fireKind === 'slug'))
+    .map((definition) => definition.id as WeaponId),
+);
+const hostedBotBallisticWindowWeapons = new Set<WeaponId>(HOSTED_BOT_BALLISTIC_WINDOW_WEAPON_IDS);
 const primaryWeapons = new Set<PrimaryWeaponId>(PRIMARY_WEAPON_IDS);
 const sidearmWeapons = new Set<SidearmWeaponId>(SIDEARM_WEAPON_IDS);
 const specialWeapons = new Set<SpecialWeaponId>(SPECIAL_WEAPON_IDS);
 const grenades = new Set<GrenadeId>(GRENADE_IDS);
 const offensiveSupportSources = new Set<OffensiveSupportSource>(['yardhawk', 'tri-pass', 'hunter-swarm', 'nuke']);
+const boundedPlayerIdPattern = /^[A-Za-z0-9_-]{1,80}$/;
+
+function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  return Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+}
 
 export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
   if (!value || typeof value !== 'object') return false;
@@ -858,6 +902,25 @@ export function isGameMessage(value: unknown): value is GameMessage {
               && msg.hostAuthority.stickyAttachment.targetLifeId === msg.hostAuthority.targetLifeId))
         && isOptionalCombatTiming(msg.timing)
         && Number.isFinite(msg.nonce);
+    case 'sticky-attachment-receipt':
+      return hasExactKeys(msg, [
+        'type', 'protocolVersion', 'by', 'forPlayerId', 'matchEpoch', 'source', 'ownerId', 'ownerLifeId',
+        'targetId', 'targetLifeId', 'actionNonce', 'attachedAtHostTimeMs', 'nonce',
+      ])
+        && msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && boundedPlayerIdPattern.test(msg.by)
+        && typeof msg.forPlayerId === 'string' && boundedPlayerIdPattern.test(msg.forPlayerId)
+        && msg.by !== msg.forPlayerId
+        && typeof msg.ownerId === 'string' && boundedPlayerIdPattern.test(msg.ownerId)
+        && typeof msg.targetId === 'string' && boundedPlayerIdPattern.test(msg.targetId)
+        && (msg.forPlayerId === msg.ownerId || msg.forPlayerId === msg.targetId)
+        && Number.isSafeInteger(msg.matchEpoch) && Number(msg.matchEpoch) >= 0
+        && (msg.source === 'semtex' || msg.source === 'explosive-crossbow')
+        && Number.isSafeInteger(msg.ownerLifeId) && Number(msg.ownerLifeId) >= 0
+        && Number.isSafeInteger(msg.targetLifeId) && Number(msg.targetLifeId) >= 0
+        && Number.isSafeInteger(msg.actionNonce) && Number(msg.actionNonce) >= 0
+        && Number.isFinite(msg.attachedAtHostTimeMs) && Number(msg.attachedAtHostTimeMs) >= 0
+        && Number.isSafeInteger(msg.nonce) && Number(msg.nonce) >= 0;
     case 'support-activate':
       return typeof msg.by === 'string'
         && offensiveSupportSources.has(msg.source as OffensiveSupportSource)
@@ -922,10 +985,20 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Array.isArray(msg.position) && msg.position.length === 3 && msg.position.every(Number.isFinite)
         && Number.isFinite(msg.nonce);
     case 'window-break':
-      return typeof msg.by === 'string'
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && typeof msg.windowId === 'string' && msg.windowId.length > 0 && msg.windowId.length <= 160
         && (msg.kind === undefined || msg.kind === 'shot' || msg.kind === 'knife' || msg.kind === 'explosive')
-        && (msg.kind === 'explosive' ? Number.isFinite(msg.actionNonce) : msg.actionNonce === undefined)
+        && (msg.weapon === undefined
+          || msg.weapon === 'flare-gun'
+          || msg.weapon === 'explosive-crossbow'
+          || /^host-bot-[0-3]$/.test(msg.by)
+            && isHostWindowBreakAuthority(msg.hostAuthority)
+            && hostedBotBallisticWindowWeapons.has(msg.weapon as WeaponId))
+        && (msg.weapon === undefined || msg.kind === 'shot')
+        && (msg.kind === 'explosive' || msg.weapon !== undefined
+          ? Number.isSafeInteger(msg.actionNonce) && Number(msg.actionNonce) >= 0
+          : msg.actionNonce === undefined)
         && (msg.hostAuthority === undefined || isHostWindowBreakAuthority(msg.hostAuthority))
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
         && Number.isFinite(msg.nonce);
@@ -1139,6 +1212,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'grenade-throw':
     case 'grenade-result':
     case 'hit':
+    case 'sticky-attachment-receipt':
     case 'support-activate':
     case 'ping':
     case 'pickup':
@@ -1203,6 +1277,7 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'flare-presentation-state'
     || message.type === 'bot-weapon-presentation'
     || message.type === 'railgun-shot-result'
+    || message.type === 'sticky-attachment-receipt'
     || message.type === 'bot-state'
     || message.type === 'bot-damage'
     || message.type === 'hit' && message.hostAuthority !== undefined

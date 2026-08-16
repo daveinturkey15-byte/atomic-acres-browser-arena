@@ -27,17 +27,27 @@ describe('presentation prewarm startup contract', () => {
     expect(flame).toContain('boundedLightIntensity: this.light.intensity');
   });
 
-  it('keeps WebKit on real basic-depth shadows instead of invalid PCF comparison samplers', () => {
+  it('classifies the actual adapter before selecting fail-closed WebKit/software shadow samplers', () => {
     const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
-    expect(source).toContain("const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent);");
+    const rendererLabel = source.indexOf('const rendererLabel = renderRuntime.telemetry().adapterLabel;');
+    const softwareClassification = source.indexOf('const softwareRenderer = isSoftwareWebGLRenderer(rendererLabel);');
+    const shadowSelection = source.indexOf('const shadowSamplerMode = webGlShadowSamplerMode(');
+    const shadowConfiguration = source.indexOf('renderRuntime.configureShadows({');
+    expect(rendererLabel).toBeGreaterThan(-1);
+    expect(rendererLabel).toBeLessThan(softwareClassification);
+    expect(softwareClassification).toBeLessThan(shadowSelection);
+    expect(shadowSelection).toBeLessThan(shadowConfiguration);
+    expect(source.slice(shadowSelection, shadowConfiguration)).toContain(
+      "renderRuntime.backend === 'webgl2' && softwareRenderer",
+    );
     expect(source).toContain("shadowSamplerMode === 'basic-depth' ? THREE.BasicShadowMap : THREE.PCFShadowMap");
     expect(source.match(/type: webGlShadowMapType/g)).toHaveLength(2);
     expect(source).not.toContain('type: THREE.PCFShadowMap');
   });
 
-  it('keeps cold work one-deep and bounds warmed live work to a two-frame completion frontier', () => {
+  it('keeps cold work one-deep and bounds warmed live work to a triple-buffered completion frontier', () => {
     const source = readFileSync(new URL('./rendering/render-runtime.ts', import.meta.url), 'utf8');
-    expect(source).toContain("mode === 'warmed-live' ? 2 : 1");
+    expect(source).toContain("mode === 'warmed-live' ? 3 : 1");
     expect(source).toContain('Forced WebGPU submission requires an idle completion frontier');
     expect(source).toContain('await this.waitForSubmittedWork(12_000);');
     expect(source).toContain('completionProbeTargetSequence: this.completionProbeTargetSequence');
@@ -562,8 +572,10 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain("source: 'webgpu-submission' as const");
     expect(source).toContain('LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000');
     expect(source).toContain('detectLivePresentationStall({');
+    expect(source).toContain("if (liveStall?.kind === 'pending-completion') {");
+    expect(source).not.toContain("liveStall?.kind === 'pending-completion' && presentation.completionDeadlineExceeded");
     expect(source).toContain('documentFocused: document.hasFocus()');
-    expect(source).toContain("resetWebGpuPresentationEpoch('foreground scheduler gap', now);");
+    expect(source).toContain("resetWebGpuPresentationEpoch('foreground scheduler gap', now, false);");
     expect(source).toContain('currentSubmissionGapMs: presentation.progress.currentSubmissionGapMs');
     expect(source).toContain('backpressureActive: presentation.backpressureActive');
     expect(source).toContain('debugRenderPaused,');
@@ -924,7 +936,7 @@ describe('presentation prewarm startup contract', () => {
     const runtimeSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     const enduranceHealth = runtimeSource.slice(
       runtimeSource.indexOf('function sampleEnduranceHealth('),
-      runtimeSource.indexOf('const debugWindow = window'),
+      runtimeSource.indexOf('\nfunction sampleAdmissionState()', runtimeSource.indexOf('function sampleEnduranceHealth(')),
     );
     expect(enduranceHealth).toContain('renderRuntime.healthTelemetry()');
     expect(enduranceHealth).toContain('weaponView.browserCatalogHealth()');

@@ -7,6 +7,7 @@ import {
   WORLD_BOUNDARY_MAX_Y,
   WORLD_BOUNDARY_MIN_Y,
   worldBoundaryColliders,
+  worldFloorCollider,
 } from './physics';
 
 const bounds: Box2 = { minX: -10, maxX: 10, minZ: -10, maxZ: 10 };
@@ -26,6 +27,10 @@ describe('CharacterPhysics', () => {
     expect(walls).toContainEqual(expect.objectContaining({ minX: bounds.maxX, minZ: bounds.minZ, maxZ: bounds.maxZ }));
     expect(walls).toContainEqual(expect.objectContaining({ maxZ: bounds.minZ, minX: bounds.minX, maxX: bounds.maxX }));
     expect(walls).toContainEqual(expect.objectContaining({ minZ: bounds.maxZ, minX: bounds.minX, maxX: bounds.maxX }));
+  });
+
+  it('exports the exact canonical world-floor collider used by debris fallback', () => {
+    expect(worldFloorCollider(bounds)).toEqual({ ...bounds, minY: -0.2, maxY: 0 });
   });
 
   it('stands on the ground instead of falling through it', async () => {

@@ -66,7 +66,7 @@
   const requested = params.get('release')?.trim().toLowerCase();
   if (params.get('room')?.trim() || requested === 'latest' || requested === 'normal') return route('experimental');
   if (requested === 'stable' || requested === 'rollback') return route('stable');
-  if (requested === 'previous' || requested === 'pass69') return route('retained');
+    if (requested === 'previous' || requested === 'pass70') return route('retained');
   if (requested === 'experimental') return route('experimental');
 
   const options = document.querySelector('#release-channel-options');

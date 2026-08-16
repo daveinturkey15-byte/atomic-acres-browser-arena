@@ -28,7 +28,7 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('admitKillstreakStateMessage(message, {');
     expect(source).toContain('seenNonces: processedNonces');
     expect(source).toContain('event.targetLifeId !== localContinuity');
-    expect(source).toContain('killstreakPresentation.presentImpacts(message.impacts, presentedAt)');
+    expect(source).toContain('killstreakPresentation.presentImpacts(admission.impacts, presentedAt)');
   });
 
   it('admits the one-life guest match-start race and targets one exact duplicate ACK without granting continuity', () => {
@@ -232,31 +232,36 @@ describe('Pass 65 playable killstreak integration', () => {
     const start = source.indexOf('function updateKillstreakPossession(');
     const end = source.indexOf('\nfunction updatePass65KillstreakRuntime(', start);
     const block = source.slice(start, end);
+    const presentationStart = source.indexOf('function presentLocalPossessedSupportGun(');
+    const presentationEnd = source.indexOf('\nfunction updateKillstreakPossession(', presentationStart);
+    const shotPresentation = source.slice(presentationStart, presentationEnd);
     expect(block).toContain("possession.kind === 'chopper-gunner'");
     expect(block).toContain('chopperGunnerCameraOrigin(entity.position, entity.attitude)');
-    expect(block).toContain('killstreakPresentation.presentChopperWeaponAction(entity.id)');
+    expect(shotPresentation).toContain('killstreakPresentation.presentChopperWeaponAction(entity.id)');
     expect(block).toContain('killstreakPossessionCameraScratch.set(origin[0], origin[1], origin[2])');
-    expect(block).toContain('chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch)');
-    expect(block).toContain('new THREE.Vector3(...shotRay.tracerOrigin)');
-    expect(block).toContain('new THREE.Vector3(...shotRay.direction)');
+    expect(shotPresentation).toContain('chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch)');
+    expect(shotPresentation).toContain('new THREE.Vector3(...shotRay.tracerOrigin)');
+    expect(shotPresentation).toContain('new THREE.Vector3(...shotRay.direction)');
     expect(block).toContain('resetKillstreakPossessionPresentation()');
     expect(block).not.toContain('new THREE.Vector3(...chopperGunnerCameraOrigin');
     expect(block).not.toContain('camera.getWorldPosition(new THREE.Vector3())');
   });
 
   it('plays the authored chopper impact action for host-applied and client-received authoritative hits', () => {
-    const start = source.indexOf('function updatePass65KillstreakRuntime(');
-    const end = source.indexOf('\nfunction updateFieldSupportHud(', start);
-    const block = source.slice(start, end);
-    expect(block).toContain("if (event.source === 'chopper')");
-    expect(block).toContain('entity.activationId === event.activationId');
-    expect(block).toContain('killstreakPresentation.presentChopperImpactAction(presented.id)');
+    const feedbackStart = source.indexOf('function presentKillstreakDamageFeedback(');
+    const feedbackEnd = source.indexOf('\nfunction killstreakActorModifiers(', feedbackStart);
+    const feedback = source.slice(feedbackStart, feedbackEnd);
+    expect(feedback).toContain("if (event.source === 'chopper'");
+    expect(feedback).toContain('entity.activationId === event.activationId');
+    expect(feedback).toContain('killstreakPresentation.presentChopperImpactAction(presented.id)');
+
+    const hostStart = source.indexOf('function updatePass65KillstreakRuntime(');
+    const hostEnd = source.indexOf('\nfunction overdriveStateMessage(', hostStart);
+    expect(source.slice(hostStart, hostEnd)).toContain('presentKillstreakDamageFeedback(applied)');
     const clientStart = source.indexOf("if (message.type === 'killstreak-damage-result')");
     const clientEnd = source.indexOf("\n  if (message.type === 'railgun-state')", clientStart);
     const clientBlock = source.slice(clientStart, clientEnd);
-    expect(clientBlock).toContain("if (event.source === 'chopper')");
-    expect(clientBlock).toContain('entity.activationId === event.activationId');
-    expect(clientBlock).toContain('killstreakPresentation.presentChopperImpactAction(presented.id)');
+    expect(clientBlock).toContain('presentKillstreakDamageFeedback(admission.events)');
   });
 
   it('uses a world-space crosshair for Care/Carpet placement and host-owned surface height', () => {

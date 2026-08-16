@@ -1,0 +1,741 @@
+import type { Page } from '@playwright/test';
+
+export const TARGET_FRAME_BUDGET_MS = 1_000 / 60;
+export const BASELINE_OBSERVATION_MS = 350;
+export const MINIMUM_BASELINE_FRAME_SAMPLES = 10;
+export const MINIMUM_NATIVE_ACTION_FRAME_SAMPLES = MINIMUM_BASELINE_FRAME_SAMPLES;
+export const MINIMUM_SOFTWARE_CI_ACTION_FRAME_SAMPLES = 2;
+export const BASELINE_CAPTURE_DEADLINE_MS = 2_000;
+export const MAXIMUM_BASELINE_P95_FRAME_BUDGETS = 1.5;
+export const MAXIMUM_BASELINE_GAP_FRAME_BUDGETS = 3;
+export const MAXIMUM_BASELINE_COMPLETION_FRAME_BUDGETS = 3;
+export const MINIMUM_ACTION_FRAME_BUDGETS = 2;
+export const MAXIMUM_ACTION_FRAME_BUDGETS = 3;
+export const ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS = 1;
+export const MAXIMUM_SYNCHRONOUS_ACTION_FRAME_BUDGETS = 2;
+
+export const NATIVE_NO_FREEZE_FRAME_ACTION_MODE = 'native-no-freeze';
+export const SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE = 'software-ci-semantic';
+export const REQUIRED_RELEASE_ACCEPTANCE_FRAME_ACTION_MODE = NATIVE_NO_FREEZE_FRAME_ACTION_MODE;
+
+export type FrameActionEvidenceMode =
+  | typeof NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+  | typeof SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE;
+
+export type FrameActionReleaseAcceptanceIdentity = Readonly<{
+  evidenceMode: FrameActionEvidenceMode;
+  expectedSourceSha: string | undefined;
+  checkoutSourceSha: string | undefined;
+  servedSourceSha: string | undefined;
+  renderer: 'webgl2' | 'webgpu';
+  browserChannel: 'msedge' | 'configured-chromium';
+  browserUserAgent: string;
+  installedBrowser: boolean;
+  softwareAdapter: boolean | undefined;
+  adapterLabel: string | undefined;
+}>;
+
+export type FrameActionBaseline = Readonly<{
+  label: string;
+  observationMs: number;
+  frameSamples: number;
+  gapsMs: readonly number[];
+  p50GapMs: number;
+  p95GapMs: number;
+  maximumGapMs: number;
+  presentationStatus: string;
+  startingPresentedFrame: number;
+  endingPresentedFrame: number;
+  startingSubmissionSequence: number;
+  startingCompletedSequence: number;
+  targetSubmissionSequence: number;
+  endingSubmissionSequence: number;
+  endingCompletedSequence: number;
+  firstPresentedFrameDelayMs: number;
+  firstSubmissionDelayMs: number;
+  firstCompletionDelayMs: number;
+  maximumPendingForMs: number;
+  completionFailures: number;
+}>;
+
+export type FrameActionBaselineIdentity = Readonly<{
+  entityId: string;
+  activationId: string;
+}>;
+
+export type ArmedFrameActionBaseline = Readonly<{
+  key: string;
+  label: string;
+  identity: FrameActionBaselineIdentity;
+}>;
+
+export type ArmedFrameActionBaselineReceipt = FrameActionBaseline & Readonly<{
+  observerArmedAtMs: number;
+  startRequestedAtMs: number;
+  startedAtMs: number;
+  identity: FrameActionBaselineIdentity;
+  startingRemainingLifetimeMs: number;
+  endingRemainingLifetimeMs: number;
+}>;
+
+export type FrameActionBudget = Readonly<{
+  evidenceMode: FrameActionEvidenceMode;
+  releaseAcceptanceModeEligible: boolean;
+  targetFrameBudgetMs: number;
+  maximumActionMs: number;
+  maximumSynchronousActionMs: number;
+  maximumFrameWorkMs: number;
+  maximumAnimationFrameGapMs: number;
+  maximumFirstSubmissionDelayMs: number;
+  maximumFirstCompletionDelayMs: number;
+  maximumPendingForMs: number;
+  referenceBaselineMs: number;
+}>;
+
+export type FrameActionMeasurement = Readonly<{
+  internalHandlerSyncMs: number;
+  outerHandlerSyncMs: number;
+  eventToNextAnimationFrameMs: number;
+  maximumAnimationFrameGapMs: number;
+  maximumFrameWorkMs: number;
+  maximumPendingForMs: number;
+  firstSubmissionDelayMs: number;
+  firstCompletionDelayMs: number;
+}>;
+
+function rounded(value: number): number {
+  return Number(value.toFixed(3));
+}
+
+function percentile(values: readonly number[], quantile: number): number {
+  const sorted = [...values].sort((left, right) => left - right);
+  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * quantile) - 1))]!;
+}
+
+function requireFiniteNonNegative(value: number, label: string): void {
+  if (!Number.isFinite(value) || value < 0) throw new Error(`${label} must be finite and non-negative`);
+}
+
+export function resolveFrameActionEvidenceMode(value: string | undefined): FrameActionEvidenceMode {
+  if (value === undefined || value === '' || value === NATIVE_NO_FREEZE_FRAME_ACTION_MODE) {
+    return NATIVE_NO_FREEZE_FRAME_ACTION_MODE;
+  }
+  if (value === SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE) return SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE;
+  throw new Error(`Unknown frame-action evidence mode: ${value}`);
+}
+
+export function assertFrameActionEvidenceEnvironment(
+  evidenceMode: FrameActionEvidenceMode,
+  continuousIntegration: boolean,
+): void {
+  if (evidenceMode === SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE && !continuousIntegration) {
+    throw new Error('software-ci-semantic frame-action evidence is CI-only');
+  }
+}
+
+export function isContinuousIntegrationEnvironment(value: string | undefined): boolean {
+  return value === '1' || value?.toLowerCase() === 'true';
+}
+
+const SOFTWARE_ADAPTER_PATTERN = /swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic/iu;
+const SOURCE_SHA_PATTERN = /^[a-f0-9]{40}$/u;
+
+export function minimumActionFrameSamples(evidenceMode: FrameActionEvidenceMode): number {
+  return evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+    ? MINIMUM_NATIVE_ACTION_FRAME_SAMPLES
+    : MINIMUM_SOFTWARE_CI_ACTION_FRAME_SAMPLES;
+}
+
+export function frameActionReleaseAcceptanceFailures(
+  identity: FrameActionReleaseAcceptanceIdentity,
+): readonly string[] {
+  const failures: string[] = [];
+  if (identity.evidenceMode !== REQUIRED_RELEASE_ACCEPTANCE_FRAME_ACTION_MODE) {
+    failures.push('native-no-freeze evidence mode required');
+  }
+  if (!SOURCE_SHA_PATTERN.test(identity.expectedSourceSha ?? '')
+    || identity.checkoutSourceSha !== identity.expectedSourceSha
+    || identity.servedSourceSha !== identity.expectedSourceSha) {
+    failures.push('exact expected checkout and served source SHA required');
+  }
+  if (identity.renderer !== 'webgpu') failures.push('WebGPU renderer required');
+  if (!identity.installedBrowser || identity.browserChannel !== 'msedge'
+    || !/Edg\//u.test(identity.browserUserAgent)) {
+    failures.push('installed Edge identity required');
+  }
+  if (identity.softwareAdapter !== false
+    || typeof identity.adapterLabel !== 'string'
+    || identity.adapterLabel.trim() === ''
+    || SOFTWARE_ADAPTER_PATTERN.test(identity.adapterLabel)) {
+    failures.push('non-software adapter identity required');
+  }
+  return failures;
+}
+
+export function frameActionReleaseAcceptanceEligible(
+  identity: FrameActionReleaseAcceptanceIdentity,
+): boolean {
+  return frameActionReleaseAcceptanceFailures(identity).length === 0;
+}
+
+function validateCompletedFrameActionBaseline(
+  baseline: FrameActionBaseline,
+  evidenceMode: FrameActionEvidenceMode,
+): void {
+  for (const [label, value] of [
+    ['observationMs', baseline.observationMs],
+    ['p50GapMs', baseline.p50GapMs],
+    ['p95GapMs', baseline.p95GapMs],
+    ['maximumGapMs', baseline.maximumGapMs],
+    ['firstPresentedFrameDelayMs', baseline.firstPresentedFrameDelayMs],
+    ['firstSubmissionDelayMs', baseline.firstSubmissionDelayMs],
+    ['firstCompletionDelayMs', baseline.firstCompletionDelayMs],
+    ['maximumPendingForMs', baseline.maximumPendingForMs],
+  ] as const) requireFiniteNonNegative(value, `${baseline.label}.${label}`);
+  if (baseline.observationMs < BASELINE_OBSERVATION_MS) {
+    throw new Error(`${baseline.label} did not cover the ${BASELINE_OBSERVATION_MS}ms baseline window`);
+  }
+  const minimumFrameSamples = minimumActionFrameSamples(evidenceMode);
+  if (!Number.isSafeInteger(baseline.frameSamples)
+    || baseline.frameSamples < minimumFrameSamples
+    || baseline.gapsMs.length !== baseline.frameSamples) {
+    throw new Error(`${baseline.label} has an incomplete frame sample set`);
+  }
+  if (!baseline.gapsMs.every((gap) => Number.isFinite(gap) && gap >= 0)) {
+    throw new Error(`${baseline.label} contains an invalid animation-frame gap`);
+  }
+  if (Math.abs(rounded(percentile(baseline.gapsMs, 0.5)) - baseline.p50GapMs) > 0.001
+    || Math.abs(rounded(percentile(baseline.gapsMs, 0.95)) - baseline.p95GapMs) > 0.001
+    || Math.abs(rounded(Math.max(...baseline.gapsMs)) - baseline.maximumGapMs) > 0.001) {
+    throw new Error(`${baseline.label} percentile summary does not match its raw frame samples`);
+  }
+  if (baseline.presentationStatus !== 'healthy' && baseline.presentationStatus !== 'synchronous') {
+    throw new Error(`${baseline.label} presentation frontier is ${baseline.presentationStatus}`);
+  }
+  if (baseline.completionFailures !== 0
+    || baseline.endingPresentedFrame <= baseline.startingPresentedFrame
+    || baseline.endingSubmissionSequence < baseline.startingSubmissionSequence
+    || baseline.endingCompletedSequence < baseline.startingCompletedSequence
+    || baseline.endingCompletedSequence < baseline.targetSubmissionSequence) {
+    throw new Error(`${baseline.label} did not advance a healthy completed presentation frontier`);
+  }
+}
+
+export function deriveFrameActionBudget(
+  baseline: FrameActionBaseline,
+  evidenceMode: FrameActionEvidenceMode = NATIVE_NO_FREEZE_FRAME_ACTION_MODE,
+): FrameActionBudget {
+  if (evidenceMode !== NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+    && evidenceMode !== SOFTWARE_CI_SEMANTIC_FRAME_ACTION_MODE) {
+    throw new Error(`Unknown frame-action evidence mode: ${String(evidenceMode)}`);
+  }
+  validateCompletedFrameActionBaseline(baseline, evidenceMode);
+
+  const maximumBaselineP95Ms = TARGET_FRAME_BUDGET_MS * MAXIMUM_BASELINE_P95_FRAME_BUDGETS;
+  const maximumBaselineGapMs = TARGET_FRAME_BUDGET_MS * MAXIMUM_BASELINE_GAP_FRAME_BUDGETS;
+  const maximumBaselineCompletionMs = TARGET_FRAME_BUDGET_MS
+    * MAXIMUM_BASELINE_COMPLETION_FRAME_BUDGETS;
+  if (evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+    && (baseline.p95GapMs >= maximumBaselineP95Ms
+      || baseline.maximumGapMs >= maximumBaselineGapMs
+      || baseline.firstCompletionDelayMs >= maximumBaselineCompletionMs)) {
+    throw new Error(
+      `${baseline.label} baseline is already outside the no-freeze envelope: ${JSON.stringify({
+        p95GapMs: baseline.p95GapMs,
+        maximumGapMs: baseline.maximumGapMs,
+        firstCompletionDelayMs: baseline.firstCompletionDelayMs,
+        maximumBaselineP95Ms,
+        maximumBaselineGapMs,
+        maximumBaselineCompletionMs,
+      })}`,
+    );
+  }
+
+  const referenceBaselineMs = Math.max(
+    baseline.p95GapMs,
+    baseline.firstPresentedFrameDelayMs,
+    baseline.firstSubmissionDelayMs,
+    baseline.firstCompletionDelayMs,
+  );
+  const maximumActionMs = Math.min(
+    TARGET_FRAME_BUDGET_MS * MAXIMUM_ACTION_FRAME_BUDGETS,
+    Math.max(
+      TARGET_FRAME_BUDGET_MS * MINIMUM_ACTION_FRAME_BUDGETS,
+      referenceBaselineMs + TARGET_FRAME_BUDGET_MS * ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS,
+    ),
+  );
+  const relativeAllowanceMs = TARGET_FRAME_BUDGET_MS * ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS;
+  const maximumSynchronousActionMs = rounded(
+    TARGET_FRAME_BUDGET_MS * MAXIMUM_SYNCHRONOUS_ACTION_FRAME_BUDGETS,
+  );
+  const softwareSemanticThresholds = Object.freeze({
+    maximumAnimationFrameGapMs: rounded(baseline.maximumGapMs + relativeAllowanceMs),
+    // The profile starts before the accepted handler returns, so these first
+    // frontiers include the separately bounded synchronous handler interval.
+    maximumFirstSubmissionDelayMs: rounded(
+      Math.max(baseline.p95GapMs, baseline.firstSubmissionDelayMs) + maximumSynchronousActionMs,
+    ),
+    maximumFirstCompletionDelayMs: rounded(
+      Math.max(baseline.p95GapMs, baseline.firstCompletionDelayMs) + maximumSynchronousActionMs,
+    ),
+    maximumPendingForMs: rounded(baseline.maximumPendingForMs + relativeAllowanceMs),
+  });
+  const nativeThreshold = rounded(maximumActionMs);
+  const maximumFrameWorkMs = evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+    ? nativeThreshold
+    // The software shard samples whole live-frame CPU work, not grenade-only
+    // work. Its immediately preceding completed rAF p95 is the conservative
+    // same-page ambient ceiling; retain the existing 50ms floor for fast CI.
+    : rounded(Math.max(
+      TARGET_FRAME_BUDGET_MS * MAXIMUM_ACTION_FRAME_BUDGETS,
+      baseline.p95GapMs,
+    ));
+  const thresholds = evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+    ? Object.freeze({
+      maximumAnimationFrameGapMs: nativeThreshold,
+      maximumFirstSubmissionDelayMs: nativeThreshold,
+      maximumFirstCompletionDelayMs: nativeThreshold,
+      maximumPendingForMs: nativeThreshold,
+    })
+    : softwareSemanticThresholds;
+  return Object.freeze({
+    evidenceMode,
+    // Mode is the first acceptance fence. The exact receipt must additionally
+    // prove an installed browser and a non-software adapter.
+    releaseAcceptanceModeEligible: evidenceMode === REQUIRED_RELEASE_ACCEPTANCE_FRAME_ACTION_MODE,
+    targetFrameBudgetMs: rounded(TARGET_FRAME_BUDGET_MS),
+    maximumActionMs: evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+      ? nativeThreshold
+      : Math.max(...Object.values(softwareSemanticThresholds)),
+    maximumSynchronousActionMs,
+    maximumFrameWorkMs,
+    ...thresholds,
+    referenceBaselineMs: rounded(referenceBaselineMs),
+  });
+}
+
+export function frameActionBudgetFailures(
+  budget: FrameActionBudget,
+  measurement: FrameActionMeasurement,
+): readonly string[] {
+  const thresholds = [
+    ['internal-handler-sync', measurement.internalHandlerSyncMs, budget.maximumSynchronousActionMs],
+    ['outer-handler-sync', measurement.outerHandlerSyncMs, budget.maximumSynchronousActionMs],
+    // Hosted software WebGL yields only 2-3 post-action rAF samples. Their
+    // ordinal scheduler gaps cannot distinguish action work from runner jitter:
+    // the same long gap may land first, second, or third. Retain every gap and
+    // frontier in the diagnostic receipt, but gate software action overhead
+    // through the directly attributable handler, frame-work, and presentation
+    // work below. Native acceptance still gates every complete rAF frontier.
+    ...(budget.evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+      ? [['event-to-next-animation-frame', measurement.eventToNextAnimationFrameMs,
+        budget.maximumAnimationFrameGapMs] as const]
+      : []),
+    ...(budget.evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+      ? [['maximum-animation-frame-gap', measurement.maximumAnimationFrameGapMs,
+        budget.maximumAnimationFrameGapMs] as const]
+      : []),
+    ['maximum-frame-work', measurement.maximumFrameWorkMs, budget.maximumFrameWorkMs],
+    ['maximum-presentation-pending', measurement.maximumPendingForMs, budget.maximumPendingForMs],
+    ...(budget.evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+      ? [['first-submission-delay', measurement.firstSubmissionDelayMs,
+        budget.maximumFirstSubmissionDelayMs] as const]
+      : []),
+    ...(budget.evidenceMode === NATIVE_NO_FREEZE_FRAME_ACTION_MODE
+      ? [['first-completion-delay', measurement.firstCompletionDelayMs,
+        budget.maximumFirstCompletionDelayMs] as const]
+      : []),
+  ] as const;
+  return thresholds.flatMap(([label, value, maximum]) => (
+    Number.isFinite(value) && value >= 0 && value < maximum
+      ? []
+      : [`${label}:${String(value)}>=${maximum}`]
+  ));
+}
+
+/**
+ * Arms a paused-frontier baseline without starting its functional deadline.
+ * The page-owned `start` method is intentionally exposed on the opaque handle
+ * so a caller can invoke it in the same task that resumes presentation.
+ */
+export async function armFrameActionBaseline(
+  page: Page,
+  label: string,
+  identity: FrameActionBaselineIdentity,
+  evidenceMode: FrameActionEvidenceMode = NATIVE_NO_FREEZE_FRAME_ACTION_MODE,
+): Promise<ArmedFrameActionBaseline> {
+  const key = '__ATOMIC_ACRES_ARMED_FRAME_ACTION_BASELINE__';
+  await page.evaluate(({
+    observerKey,
+    baselineLabel,
+    expectedIdentity,
+    captureDeadlineMs,
+    minimumFrameSamples,
+    minimumObservationMs,
+  }) => {
+    if ((globalThis as any)[observerKey]) {
+      throw new Error('A frame-action baseline observer is already armed');
+    }
+    const debug = (window as any).__ATOMIC_ACRES_DEBUG__ as any;
+    if (!debug) throw new Error('Atomic Acres debug surface is unavailable');
+    const observerArmedAtMs = performance.now();
+    const startingPresentation = debug.samplePresentationTelemetry() as any;
+    const startingPresentedFrame = debug.admissionState().presentedGameplayFrame as number;
+    const synchronous = startingPresentation.status === 'synchronous';
+    let resolveBaseline!: (receipt: ArmedFrameActionBaselineReceipt) => void;
+    let rejectBaseline!: (error: unknown) => void;
+    const promise = new Promise<ArmedFrameActionBaselineReceipt>((resolve, reject) => {
+      resolveBaseline = resolve;
+      rejectBaseline = reject;
+    });
+    const observer = {
+      key: observerKey,
+      label: baselineLabel,
+      identity: expectedIdentity,
+      observerArmedAtMs,
+      startRequestedAtMs: null as number | null,
+      startedAtMs: null as number | null,
+      settled: false,
+      promise,
+      start: () => {
+        if (observer.settled || observer.startRequestedAtMs !== null) return false;
+        observer.startRequestedAtMs = performance.now();
+        requestAnimationFrame((frameAt) => {
+          if (observer.settled) return;
+          try {
+            const startingSnapshot = debug.snapshot() as any;
+            const startingEntity = startingSnapshot.killstreak.entities.find((candidate: any) => (
+              candidate.id === expectedIdentity.entityId
+            ));
+            if (startingEntity?.activationId !== expectedIdentity.activationId
+              || !(startingEntity.expiresInMs > 0)) {
+              throw new Error('Armed frame-action baseline lost its Chopper activation before the first resumed frame');
+            }
+            const startedAt = frameAt;
+            observer.startedAtMs = startedAt;
+            let previousFrameAt = frameAt;
+            let targetSubmissionSequence: number | null = synchronous ? 0 : null;
+            let firstPresentedFrameDelayMs: number | null = null;
+            let firstSubmissionDelayMs: number | null = null;
+            let firstCompletionDelayMs: number | null = null;
+            let maximumPendingForMs = startingPresentation.pendingForMs as number;
+            let completionFailures = startingPresentation.completionFailures as number;
+            let endingPresentation = startingPresentation;
+            let endingPresentedFrame = startingPresentedFrame;
+            const gapsMs: number[] = [];
+            const deadline = startedAt + captureDeadlineMs;
+            const round = (value: number) => Number(value.toFixed(3));
+
+            const fail = (error: unknown) => {
+              if (observer.settled) return;
+              observer.settled = true;
+              rejectBaseline(error);
+            };
+            const inspect = (sampleAt = performance.now()) => {
+              if (observer.settled) return;
+              try {
+                const now = sampleAt;
+                const elapsedMs = now - startedAt;
+                gapsMs.push(now - previousFrameAt);
+                previousFrameAt = now;
+                endingPresentation = debug.samplePresentationTelemetry() as any;
+                endingPresentedFrame = debug.admissionState().presentedGameplayFrame as number;
+                maximumPendingForMs = Math.max(maximumPendingForMs, endingPresentation.pendingForMs as number);
+                completionFailures = Math.max(completionFailures, endingPresentation.completionFailures as number);
+                if (firstPresentedFrameDelayMs === null && endingPresentedFrame > startingPresentedFrame) {
+                  firstPresentedFrameDelayMs = elapsedMs;
+                  if (synchronous) {
+                    firstSubmissionDelayMs = elapsedMs;
+                    firstCompletionDelayMs = elapsedMs;
+                  }
+                }
+                if (!synchronous && targetSubmissionSequence === null
+                  && endingPresentation.submissionSequence > startingPresentation.submissionSequence) {
+                  targetSubmissionSequence = endingPresentation.submissionSequence;
+                  firstSubmissionDelayMs = elapsedMs;
+                }
+                if (!synchronous && firstCompletionDelayMs === null && targetSubmissionSequence !== null
+                  && endingPresentation.completedSequence >= targetSubmissionSequence) {
+                  firstCompletionDelayMs = elapsedMs;
+                }
+                const complete = now < deadline
+                  && elapsedMs >= minimumObservationMs
+                  && gapsMs.length >= minimumFrameSamples
+                  && firstPresentedFrameDelayMs !== null
+                  && firstSubmissionDelayMs !== null
+                  && firstCompletionDelayMs !== null
+                  && targetSubmissionSequence !== null;
+                if (complete) {
+                  const endingSnapshot = debug.snapshot() as any;
+                  const endingEntity = endingSnapshot.killstreak.entities.find((candidate: any) => (
+                    candidate.id === expectedIdentity.entityId
+                  ));
+                  if (endingEntity?.activationId !== expectedIdentity.activationId
+                    || !(endingEntity.expiresInMs > 0)) {
+                    throw new Error('Armed frame-action baseline lost its bound Chopper activation');
+                  }
+                  const sorted = [...gapsMs].sort((left, right) => left - right);
+                  const sample = (quantile: number) => sorted[
+                    Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * quantile) - 1))
+                  ]!;
+                  observer.settled = true;
+                  resolveBaseline({
+                    label: baselineLabel,
+                    observationMs: round(elapsedMs),
+                    frameSamples: gapsMs.length,
+                    gapsMs: gapsMs.map(round),
+                    p50GapMs: round(sample(0.5)),
+                    p95GapMs: round(sample(0.95)),
+                    maximumGapMs: round(sorted[sorted.length - 1]!),
+                    presentationStatus: endingPresentation.status,
+                    startingPresentedFrame,
+                    endingPresentedFrame,
+                    startingSubmissionSequence: startingPresentation.submissionSequence,
+                    startingCompletedSequence: startingPresentation.completedSequence,
+                    targetSubmissionSequence: targetSubmissionSequence!,
+                    endingSubmissionSequence: endingPresentation.submissionSequence,
+                    endingCompletedSequence: endingPresentation.completedSequence,
+                    firstPresentedFrameDelayMs: round(firstPresentedFrameDelayMs!),
+                    firstSubmissionDelayMs: round(firstSubmissionDelayMs!),
+                    firstCompletionDelayMs: round(firstCompletionDelayMs!),
+                    maximumPendingForMs: round(maximumPendingForMs),
+                    completionFailures,
+                    observerArmedAtMs,
+                    startRequestedAtMs: observer.startRequestedAtMs!,
+                    startedAtMs: observer.startedAtMs!,
+                    identity: expectedIdentity,
+                    startingRemainingLifetimeMs: startingEntity.expiresInMs,
+                    endingRemainingLifetimeMs: endingEntity.expiresInMs,
+                  });
+                  return;
+                }
+                if (now >= deadline) {
+                  const diagnostics = {
+                    samples: gapsMs.length,
+                    elapsedMs: round(elapsedMs),
+                    gapsMs: gapsMs.map(round),
+                    startingPresentedFrame,
+                    endingPresentedFrame,
+                    startingSubmissionSequence: startingPresentation.submissionSequence,
+                    endingSubmissionSequence: endingPresentation.submissionSequence,
+                    startingCompletedSequence: startingPresentation.completedSequence,
+                    endingCompletedSequence: endingPresentation.completedSequence,
+                    firstPresentedFrameDelayMs,
+                    firstSubmissionDelayMs,
+                    firstCompletionDelayMs,
+                    maximumPendingForMs: round(maximumPendingForMs),
+                    completionFailures,
+                  };
+                  fail(new Error(
+                    `${baselineLabel} did not complete a ${minimumFrameSamples}-sample presentation frontier within ${captureDeadlineMs}ms`
+                      + `: ${JSON.stringify(diagnostics)}`,
+                  ));
+                  return;
+                }
+                requestAnimationFrame(inspect);
+              } catch (error) {
+                fail(error);
+              }
+            };
+            // `frameAt` is the browser's timestamp for this presentation
+            // opportunity and can predate the `performance.now()` call that
+            // requested it from the same frame. Keep it only as the exact
+            // first-resumed-frame anchor; sample 1 is the next real rAF gap.
+            requestAnimationFrame(inspect);
+          } catch (error) {
+            observer.settled = true;
+            rejectBaseline(error);
+          }
+        });
+        return true;
+      },
+      cancel: (message: string) => {
+        if (observer.settled) return;
+        observer.settled = true;
+        rejectBaseline(new Error(message));
+      },
+    };
+    void promise.catch(() => undefined);
+    (globalThis as any)[observerKey] = observer;
+  }, {
+    observerKey: key,
+    baselineLabel: label,
+    expectedIdentity: identity,
+    captureDeadlineMs: BASELINE_CAPTURE_DEADLINE_MS,
+    minimumFrameSamples: minimumActionFrameSamples(evidenceMode),
+    minimumObservationMs: BASELINE_OBSERVATION_MS,
+  });
+  return Object.freeze({ key, label, identity });
+}
+
+export async function awaitArmedFrameActionBaseline(
+  page: Page,
+  armed: ArmedFrameActionBaseline,
+): Promise<ArmedFrameActionBaselineReceipt> {
+  return page.evaluate(async ({ observerKey, baselineLabel, expectedIdentity }) => {
+    const observer = (globalThis as any)[observerKey];
+    if (!observer
+      || observer.label !== baselineLabel
+      || observer.identity.entityId !== expectedIdentity.entityId
+      || observer.identity.activationId !== expectedIdentity.activationId
+      || observer.startRequestedAtMs === null) {
+      throw new Error('The expected started frame-action baseline observer is unavailable');
+    }
+    try {
+      return await observer.promise;
+    } finally {
+      if ((globalThis as any)[observerKey] === observer) delete (globalThis as any)[observerKey];
+    }
+  }, { observerKey: armed.key, baselineLabel: armed.label, expectedIdentity: armed.identity });
+}
+
+export async function cancelArmedFrameActionBaseline(
+  page: Page,
+  armed: ArmedFrameActionBaseline,
+  message: string,
+): Promise<void> {
+  await page.evaluate(({ observerKey, baselineLabel, expectedIdentity, reason }) => {
+    const observer = (globalThis as any)[observerKey];
+    if (observer
+      && observer.label === baselineLabel
+      && observer.identity.entityId === expectedIdentity.entityId
+      && observer.identity.activationId === expectedIdentity.activationId) {
+      observer.cancel(reason);
+      if ((globalThis as any)[observerKey] === observer) delete (globalThis as any)[observerKey];
+    }
+  }, {
+    observerKey: armed.key,
+    baselineLabel: armed.label,
+    expectedIdentity: armed.identity,
+    reason: message,
+  });
+}
+
+export async function captureFrameActionBaseline(
+  page: Page,
+  label: string,
+): Promise<FrameActionBaseline> {
+  return page.evaluate(({
+    baselineLabel,
+    captureDeadlineMs,
+    minimumFrameSamples,
+    minimumObservationMs,
+  }) => new Promise<FrameActionBaseline>((resolve, reject) => {
+    const debug = (window as any).__ATOMIC_ACRES_DEBUG__ as any;
+    if (!debug) {
+      reject(new Error('Atomic Acres debug surface is unavailable'));
+      return;
+    }
+    requestAnimationFrame(() => {
+      const startedAt = performance.now();
+      const startingPresentation = debug.samplePresentationTelemetry() as any;
+      const startingPresentedFrame = debug.admissionState().presentedGameplayFrame;
+      const synchronous = startingPresentation.status === 'synchronous';
+      let previousFrameAt = startedAt;
+      let targetSubmissionSequence: number | null = synchronous ? 0 : null;
+      let firstPresentedFrameDelayMs: number | null = null;
+      let firstSubmissionDelayMs: number | null = synchronous ? null : null;
+      let firstCompletionDelayMs: number | null = synchronous ? null : null;
+      let maximumPendingForMs = startingPresentation.pendingForMs as number;
+      let completionFailures = startingPresentation.completionFailures as number;
+      let endingPresentation = startingPresentation;
+      let endingPresentedFrame = startingPresentedFrame;
+      const gapsMs: number[] = [];
+      const deadline = startedAt + captureDeadlineMs;
+      const round = (value: number) => Number(value.toFixed(3));
+
+      const inspect = () => {
+        const now = performance.now();
+        const elapsedMs = now - startedAt;
+        gapsMs.push(now - previousFrameAt);
+        previousFrameAt = now;
+        endingPresentation = debug.samplePresentationTelemetry() as any;
+        endingPresentedFrame = debug.admissionState().presentedGameplayFrame;
+        maximumPendingForMs = Math.max(maximumPendingForMs, endingPresentation.pendingForMs as number);
+        completionFailures = Math.max(completionFailures, endingPresentation.completionFailures as number);
+        if (firstPresentedFrameDelayMs === null && endingPresentedFrame > startingPresentedFrame) {
+          firstPresentedFrameDelayMs = elapsedMs;
+          if (synchronous) {
+            firstSubmissionDelayMs = elapsedMs;
+            firstCompletionDelayMs = elapsedMs;
+          }
+        }
+        if (!synchronous && targetSubmissionSequence === null
+          && endingPresentation.submissionSequence > startingPresentation.submissionSequence) {
+          targetSubmissionSequence = endingPresentation.submissionSequence;
+          firstSubmissionDelayMs = elapsedMs;
+        }
+        if (!synchronous && firstCompletionDelayMs === null && targetSubmissionSequence !== null
+          && endingPresentation.completedSequence >= targetSubmissionSequence) {
+          firstCompletionDelayMs = elapsedMs;
+        }
+        const complete = now < deadline
+          && elapsedMs >= minimumObservationMs
+          && gapsMs.length >= minimumFrameSamples
+          && firstPresentedFrameDelayMs !== null
+          && firstSubmissionDelayMs !== null
+          && firstCompletionDelayMs !== null
+          && targetSubmissionSequence !== null;
+        if (complete) {
+          const sorted = [...gapsMs].sort((left, right) => left - right);
+          const sample = (quantile: number) => sorted[
+            Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * quantile) - 1))
+          ]!;
+          resolve({
+            label: baselineLabel,
+            observationMs: round(elapsedMs),
+            frameSamples: gapsMs.length,
+            gapsMs: gapsMs.map(round),
+            p50GapMs: round(sample(0.5)),
+            p95GapMs: round(sample(0.95)),
+            maximumGapMs: round(sorted[sorted.length - 1]!),
+            presentationStatus: endingPresentation.status,
+            startingPresentedFrame,
+            endingPresentedFrame,
+            startingSubmissionSequence: startingPresentation.submissionSequence,
+            startingCompletedSequence: startingPresentation.completedSequence,
+            targetSubmissionSequence: targetSubmissionSequence!,
+            endingSubmissionSequence: endingPresentation.submissionSequence,
+            endingCompletedSequence: endingPresentation.completedSequence,
+            firstPresentedFrameDelayMs: round(firstPresentedFrameDelayMs!),
+            firstSubmissionDelayMs: round(firstSubmissionDelayMs!),
+            firstCompletionDelayMs: round(firstCompletionDelayMs!),
+            maximumPendingForMs: round(maximumPendingForMs),
+            completionFailures,
+          });
+          return;
+        }
+        if (now >= deadline) {
+          const diagnostics = {
+            samples: gapsMs.length,
+            elapsedMs: round(elapsedMs),
+            gapsMs: gapsMs.map(round),
+            startingPresentedFrame,
+            endingPresentedFrame,
+            startingSubmissionSequence: startingPresentation.submissionSequence,
+            endingSubmissionSequence: endingPresentation.submissionSequence,
+            startingCompletedSequence: startingPresentation.completedSequence,
+            endingCompletedSequence: endingPresentation.completedSequence,
+            firstPresentedFrameDelayMs,
+            firstSubmissionDelayMs,
+            firstCompletionDelayMs,
+            maximumPendingForMs: round(maximumPendingForMs),
+            completionFailures,
+          };
+          reject(new Error(
+            `${baselineLabel} did not complete a ${minimumFrameSamples}-sample presentation frontier within ${captureDeadlineMs}ms`
+              + `: ${JSON.stringify(diagnostics)}`,
+          ));
+          return;
+        }
+        requestAnimationFrame(inspect);
+      };
+      requestAnimationFrame(inspect);
+    });
+  }), {
+    baselineLabel: label,
+    captureDeadlineMs: BASELINE_CAPTURE_DEADLINE_MS,
+    minimumFrameSamples: MINIMUM_BASELINE_FRAME_SAMPLES,
+    minimumObservationMs: BASELINE_OBSERVATION_MS,
+  });
+}

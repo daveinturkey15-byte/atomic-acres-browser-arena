@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   AUDIO_RUNTIME_BUDGET,
+  ARENA_AMBIENCE_POLICY,
   ARENA_AUDIO_DEFINITIONS,
   AudioOcclusionBudget,
   FootstepEmitterRegistry,
@@ -51,32 +52,46 @@ describe('spatial audio contracts', () => {
     expect(selectVoiceToSteal(active, { id: 'weak', priority: 1, distance: 1, startedAt: 30 }, 3)).toBeNull();
   });
 
-  it('covers all arenas with distinct original beds inside continuous budgets', () => {
+  it('covers all arenas with distinct event-driven identities and no generated noise', () => {
     expect(validateArenaAudioDefinitions()).toEqual([]);
+    expect(ARENA_AMBIENCE_POLICY).toEqual({
+      mode: 'event-driven-discrete-cues-only',
+      continuousNoiseVoices: 0,
+      scheduledNoiseEvents: 0,
+      sharedNoiseBufferEvents: 0,
+    });
     expect(new Set(Object.values(ARENA_AUDIO_DEFINITIONS).map((definition) => definition.identity)).size).toBe(4);
-    expect(Object.values(ARENA_AUDIO_DEFINITIONS).every((definition) => definition.continuousVoices <= 2)).toBe(true);
+    for (const definition of Object.values(ARENA_AUDIO_DEFINITIONS)) {
+      expect(definition).toMatchObject({
+        ambienceMode: ARENA_AMBIENCE_POLICY.mode,
+        continuousVoices: 0,
+        scheduledNoiseEvents: 0,
+        sharedNoiseBufferEvents: 0,
+      });
+      expect(definition.discreteCueIdentities.length).toBeGreaterThanOrEqual(2);
+      expect([definition.identity, ...definition.discreteCueIdentities].join(' '))
+        .not.toMatch(/\b(?:buzz|hum|wind|hvac|ventilation|duct|noise)\b|engine-wash/iu);
+    }
     expect(AUDIO_RUNTIME_BUDGET.continuousVoices).toBeGreaterThanOrEqual(8);
   });
 
-  it('keeps continuous air beds narrow, quiet and slowly modulated instead of broadband white hiss', () => {
-    for (const definition of Object.values(ARENA_AUDIO_DEFINITIONS)) {
-      expect(definition.airGain).toBeGreaterThan(0);
-      expect(definition.airGain).toBeLessThanOrEqual(0.01);
-      expect(definition.airQ).toBeGreaterThanOrEqual(1.4);
-      expect(definition.airLowpassHz).toBeGreaterThan(definition.airFrequencyHz);
-      expect(definition.airLowpassHz).toBeLessThanOrEqual(900);
-      expect(definition.modulationHz).toBeGreaterThan(0);
-      expect(definition.modulationDepth).toBeGreaterThan(0);
-      expect(definition.modulationDepth).toBeLessThanOrEqual(0.2);
-    }
+  it('has no arena scheduler or shared-noise arena source to recreate the intermittent buzz', () => {
     const audioSource = readFileSync(new URL('./audio.ts', import.meta.url), 'utf8');
-    const arenaBed = audioSource.slice(
-      audioSource.indexOf('private startArenaBed('),
-      audioSource.indexOf('private sweepSequence('),
+    const arenaSelection = audioSource.slice(
+      audioSource.indexOf('setArena(arenaId: ArenaId)'),
+      audioSource.indexOf('updateListener(position: SpatialPoint'),
     );
-    expect(arenaBed).toContain("const air = this.context.createOscillator();");
-    expect(arenaBed).toContain("air.type = 'triangle';");
-    expect(arenaBed).not.toContain('const air = this.context.createBufferSource();');
+    expect(arenaSelection).toContain('this.activeArena = arenaId;');
+    expect(arenaSelection).not.toContain('this.noiseBuffer');
+    expect(arenaSelection).not.toContain('createBufferSource');
+    expect(arenaSelection).not.toContain('setTimeout');
+    for (const removedPath of [
+      'ARENA_AMBIENCE_EVENT_',
+      'arenaAmbienceTimer',
+      'arenaEventSources',
+      'scheduleArenaAmbienceEvent',
+      'playArenaAmbienceEvent',
+    ]) expect(audioSource).not.toContain(removedPath);
   });
 
   it('maps footsteps to each arena dominant authored walkable material', () => {

@@ -27,18 +27,19 @@ type ScopeKind = 'm40' | 'm14-ebr' | 'railgun';
 type ExactOperatorRevealReceipt = Readonly<{
   contract: string;
   activeTargets: number;
+  occludedTargets: number;
   activeSourceBodyLayers: number;
   activeModelLayers: number;
-  activeHaloLayers: number;
-  activeNormalMaterialSlots: number;
+  activeThermalLayers: number;
+  activeHaloLayers: 0;
   geometryIdentity: boolean;
   skeletonIdentity: boolean;
   bindMatrixIdentity: boolean;
   meshWorldMatrixIdentity: boolean;
-  haloWorldMatrixIdentity: boolean;
   boneWorldMatrixIdentity: boolean;
-  normalMaterialEquivalence: boolean;
   silhouetteLayerIdentity: boolean;
+  monochromeThermal: boolean;
+  treatmentsPerTarget: 1;
   completeOperatorModels: boolean;
   incompleteTargets: number;
   proxyMeshes: 0;
@@ -135,46 +136,49 @@ async function equipRailgunBehindWall(page: Page): Promise<boolean> {
 
 function assertExactOperatorReveal(scope: 'm14-ebr' | 'railgun', reveal: any): ExactOperatorRevealReceipt {
   expect(reveal, `${scope}: exact animated source-model reveal telemetry`).toMatchObject({
-    contract: 'exact-animated-operator-plus-orange-halo-v1',
+    contract: 'occlusion-conditioned-single-exact-animated-thermal-operator-v2',
     geometryIdentity: true,
     skeletonIdentity: true,
     bindMatrixIdentity: true,
     meshWorldMatrixIdentity: true,
-    haloWorldMatrixIdentity: true,
     boneWorldMatrixIdentity: true,
-    normalMaterialEquivalence: true,
     silhouetteLayerIdentity: true,
     throughGeometry: true,
-    orangeHalo: true,
+    monochromeThermal: true,
+    orangeHalo: false,
+    treatmentsPerTarget: 1,
+    activeHaloLayers: 0,
+    exactModelMaterials: 0,
+    haloMaterials: 0,
+    ownedMaterials: 1,
     proxyMeshes: 0,
     completeOperatorModels: true,
     incompleteTargets: 0,
     materialBudgetExceeded: false,
   });
   expect(reveal.activeTargets, `${scope}: at least one admitted live operator`).toBeGreaterThanOrEqual(1);
+  expect(reveal.occludedTargets, `${scope}: reveal is admitted only behind world geometry`).toBeGreaterThanOrEqual(1);
   expect(reveal.activeSourceBodyLayers, `${scope}: complete source silhouette has body layers`).toBeGreaterThan(0);
-  expect(reveal.activeModelLayers, `${scope}: every source layer has an exact normal-model layer`)
+  expect(reveal.activeModelLayers, `${scope}: every source layer has one exact thermal layer`)
     .toBe(reveal.activeSourceBodyLayers);
-  expect(reveal.activeHaloLayers, `${scope}: every source layer has an orange halo layer`)
-    .toBe(reveal.activeSourceBodyLayers);
-  expect(reveal.activeNormalMaterialSlots, `${scope}: normal source materials remain bound`).toBeGreaterThanOrEqual(
-    reveal.activeSourceBodyLayers,
-  );
+  expect(reveal.activeThermalLayers, `${scope}: thermal layer count is exact`).toBe(reveal.activeSourceBodyLayers);
+  expect(reveal.activeHaloLayers, `${scope}: no stacked halo model`).toBe(0);
   return Object.freeze({
     contract: reveal.contract,
     activeTargets: reveal.activeTargets,
+    occludedTargets: reveal.occludedTargets,
     activeSourceBodyLayers: reveal.activeSourceBodyLayers,
     activeModelLayers: reveal.activeModelLayers,
+    activeThermalLayers: reveal.activeThermalLayers,
     activeHaloLayers: reveal.activeHaloLayers,
-    activeNormalMaterialSlots: reveal.activeNormalMaterialSlots,
     geometryIdentity: reveal.geometryIdentity,
     skeletonIdentity: reveal.skeletonIdentity,
     bindMatrixIdentity: reveal.bindMatrixIdentity,
     meshWorldMatrixIdentity: reveal.meshWorldMatrixIdentity,
-    haloWorldMatrixIdentity: reveal.haloWorldMatrixIdentity,
     boneWorldMatrixIdentity: reveal.boneWorldMatrixIdentity,
-    normalMaterialEquivalence: reveal.normalMaterialEquivalence,
     silhouetteLayerIdentity: reveal.silhouetteLayerIdentity,
+    monochromeThermal: reveal.monochromeThermal,
+    treatmentsPerTarget: reveal.treatmentsPerTarget,
     completeOperatorModels: reveal.completeOperatorModels,
     incompleteTargets: reveal.incompleteTargets,
     proxyMeshes: reveal.proxyMeshes,

@@ -110,7 +110,7 @@ type DebugState = {
     profile: { disposeMs: number; audioMs: number; visualMs: number; targetDamageMs: number; selfDamageMs: number; totalSyncMs: number };
   };
   audio: {
-    ambience: { continuousSources: number; busGain: number };
+    ambience: { continuousSources: number; transientSources: number; busGain: number };
     grenadeFuse: { beeps: number; startMs: number };
     support: { cues: number };
     buses: Record<string, { configuredGain: number; muted: boolean; effectiveGain: number }>;
@@ -139,12 +139,31 @@ type DebugState = {
     hunterSwarmLaunches: number;
     hunterSwarmImpacts: number;
     gamepadSelection: 'scout-sweep' | 'yardhawk' | 'tri-pass' | 'hunter-swarm' | 'nuke';
-    nuke: { active: boolean; detonated: boolean; detonateInMs: number; finishInMs: number };
+    nuke: {
+      active: boolean;
+      detonated: boolean;
+      detonateInMs: number;
+      finishInMs: number;
+      warning?: {
+        visible: boolean;
+        arenaId: string;
+        position: number[];
+        scale: number;
+        coreOpacity: number;
+        ringOpacity: number;
+        reducedSensory: boolean;
+      };
+    };
     nukeActivations: number;
     nukeDetonations: number;
     explosionProfile: { source: string | null; totalSyncMs: number };
     explosionFrameProfile: { sources: string[]; impacts: number; totalSyncMs: number; maxImpactSyncMs: number };
-    prewarmedNuke: { shockwaveInScene: boolean; prewarmed: boolean; dynamicLights: number };
+    prewarmedNuke: {
+      shockwaveInScene: boolean;
+      warningBeaconInScene: boolean;
+      prewarmed: boolean;
+      dynamicLights: number;
+    };
   };
   overdrive: {
     generation: number;
@@ -1071,7 +1090,7 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'MAX', 'CUSTOM']);
     await expect(page.locator('#audio-settings')).toBeVisible();
     await expect(page.locator('#accessibility-settings')).toBeVisible();
-    expect((await debug(page)).audio.ambience.continuousSources).toBe(2);
+    expect((await debug(page)).audio.ambience).toMatchObject({ continuousSources: 0, transientSources: 0 });
     await page.locator('#controller-sensitivity').evaluate((input) => {
       const slider = input as HTMLInputElement;
       slider.value = '1.45';
@@ -2098,7 +2117,12 @@ test.describe('solo mechanics', () => {
 
   test('arms and detonates the 15-elimination Nuke with a bounded warning sequence', async ({ page }) => {
     test.setTimeout(120_000);
-    expect((await debug(page)).fieldSupport.prewarmedNuke).toEqual({ shockwaveInScene: true, prewarmed: true, dynamicLights: 0 });
+    expect((await debug(page)).fieldSupport.prewarmedNuke).toEqual({
+      shockwaveInScene: true,
+      warningBeaconInScene: true,
+      prewarmed: true,
+      dynamicLights: 0,
+    });
     await page.evaluate(() => {
       const flash = document.querySelector<HTMLElement>('#nuke-flash')!;
       document.documentElement.dataset.qaNukeFlashObserved = String(!flash.hidden);
@@ -2118,7 +2142,20 @@ test.describe('solo mechanics', () => {
       api.activateSupport('nuke');
     });
     await expect(page.locator('#nuke-warning')).toBeVisible();
-    expect((await debug(page)).fieldSupport.nukeActivations).toBe(1);
+    const armed = (await debug(page)).fieldSupport;
+    expect(armed.nukeActivations).toBe(1);
+    expect(armed.nuke).toMatchObject({
+      active: true,
+      detonated: false,
+      warning: {
+        visible: true,
+        arenaId: 'atomic-acres',
+        reducedSensory: false,
+      },
+    });
+    expect(armed.nuke.warning.scale).toBeGreaterThanOrEqual(0.65);
+    expect(armed.nuke.warning.coreOpacity).toBeGreaterThan(0);
+    expect(armed.nuke.warning.ringOpacity).toBeGreaterThan(0);
     await expect.poll(async () => (await debug(page)).fieldSupport.nukeDetonations, { timeout: 15_000 }).toBe(1);
     const detonated = (await debug(page)).fieldSupport;
     expect(detonated.explosionProfile.source).toBe('nuke');

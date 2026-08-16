@@ -5,6 +5,18 @@ import {
   frameHitchRoute,
   writeOfficialFrameHitchReceipt,
 } from './pass69-3-frame-hitch-evidence';
+import {
+  ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS,
+  captureFrameActionBaseline,
+  deriveFrameActionBudget,
+  MAXIMUM_ACTION_FRAME_BUDGETS,
+  MAXIMUM_BASELINE_COMPLETION_FRAME_BUDGETS,
+  MAXIMUM_BASELINE_GAP_FRAME_BUDGETS,
+  MAXIMUM_BASELINE_P95_FRAME_BUDGETS,
+  MINIMUM_ACTION_FRAME_BUDGETS,
+  TARGET_FRAME_BUDGET_MS,
+  type FrameActionBudget,
+} from './frame-action-budget';
 
 type ProbeAction = 'noop' | 'fire' | 'equip-m14' | 'ads-on' | 'ads-off';
 
@@ -13,7 +25,16 @@ type FrameProbe = Readonly<{
   action: ProbeAction;
   synchronousMs: number;
   eventToPresentedFrameMs: number;
+  eventToCompletionMs: number;
   presentedFrameDelta: number;
+  presentationStatus: string;
+  startingSubmissionSequence: number;
+  startingCompletedSequence: number;
+  targetSubmissionSequence: number;
+  endingSubmissionSequence: number;
+  endingCompletedSequence: number;
+  maximumPendingForMs: number;
+  completionFailures: number;
 }>;
 
 type M14TransitionReadiness = Readonly<{
@@ -39,8 +60,6 @@ type M14TransitionProbe = FrameProbe & Readonly<{
   readiness: M14TransitionReadiness;
 }>;
 
-const MAX_EVENT_TO_PRESENTED_FRAME_MS = 120;
-const MAX_SYNCHRONOUS_ACTION_MS = 50;
 const MAX_M14_TRANSITION_READY_MS = 5_000;
 
 async function deploy(page: Page): Promise<void> {
@@ -64,26 +83,60 @@ async function eventToNextPresentedFrame(page: Page, label: string, action: Prob
     requestAnimationFrame(() => {
       const startedAt = performance.now();
       const presentedBefore = debug.admissionState().presentedGameplayFrame;
+      const presentationBefore = debug.samplePresentationTelemetry() as any;
+      const synchronous = presentationBefore.status === 'synchronous';
       if (selectedAction === 'fire') debug.fireOnce();
       else if (selectedAction === 'equip-m14') debug.equipWeapon('m14-ebr');
       else if (selectedAction === 'ads-on') debug.setAds(true);
       else if (selectedAction === 'ads-off') debug.setAds(false);
       const synchronousMs = performance.now() - startedAt;
       const deadline = startedAt + 2_000;
+      let firstPresentedAtMs: number | null = null;
+      let firstPresentedFrameDelta = 0;
+      let targetSubmissionSequence: number | null = synchronous ? 0 : null;
+      let firstCompletionAtMs: number | null = null;
+      let maximumPendingForMs = presentationBefore.pendingForMs as number;
+      let presentationAfter = presentationBefore;
       const inspect = () => {
+        const now = performance.now();
         const presentedAfter = debug.admissionState().presentedGameplayFrame;
-        if (presentedAfter > presentedBefore) {
+        presentationAfter = debug.samplePresentationTelemetry() as any;
+        maximumPendingForMs = Math.max(maximumPendingForMs, presentationAfter.pendingForMs as number);
+        if (firstPresentedAtMs === null && presentedAfter > presentedBefore) {
+          firstPresentedAtMs = now - startedAt;
+          firstPresentedFrameDelta = presentedAfter - presentedBefore;
+          if (synchronous) firstCompletionAtMs = firstPresentedAtMs;
+        }
+        if (!synchronous && targetSubmissionSequence === null
+          && presentationAfter.submissionSequence > presentationBefore.submissionSequence) {
+          targetSubmissionSequence = presentationAfter.submissionSequence;
+        }
+        if (!synchronous && firstCompletionAtMs === null && targetSubmissionSequence !== null
+          && presentationAfter.completedSequence >= targetSubmissionSequence) {
+          firstCompletionAtMs = now - startedAt;
+        }
+        if (firstPresentedAtMs !== null && firstCompletionAtMs !== null
+          && targetSubmissionSequence !== null) {
           resolve({
             label: selectedLabel,
             action: selectedAction,
             synchronousMs: Number(synchronousMs.toFixed(3)),
-            eventToPresentedFrameMs: Number((performance.now() - startedAt).toFixed(3)),
-            presentedFrameDelta: presentedAfter - presentedBefore,
+            eventToPresentedFrameMs: Number(firstPresentedAtMs.toFixed(3)),
+            eventToCompletionMs: Number(firstCompletionAtMs.toFixed(3)),
+            presentedFrameDelta: firstPresentedFrameDelta,
+            presentationStatus: presentationAfter.status,
+            startingSubmissionSequence: presentationBefore.submissionSequence,
+            startingCompletedSequence: presentationBefore.completedSequence,
+            targetSubmissionSequence,
+            endingSubmissionSequence: presentationAfter.submissionSequence,
+            endingCompletedSequence: presentationAfter.completedSequence,
+            maximumPendingForMs: Number(maximumPendingForMs.toFixed(3)),
+            completionFailures: presentationAfter.completionFailures,
           });
           return;
         }
-        if (performance.now() >= deadline) {
-          reject(new Error(`${selectedAction} did not reach another presented gameplay frame within 2000ms`));
+        if (now >= deadline) {
+          reject(new Error(`${selectedAction} did not reach a completed gameplay frame within 2000ms`));
           return;
         }
         requestAnimationFrame(inspect);
@@ -106,6 +159,8 @@ async function m14TransitionToReady(
       requestAnimationFrame(() => {
         const startedAt = performance.now();
         const presentedBefore = debug.admissionState().presentedGameplayFrame;
+        const presentationBefore = debug.samplePresentationTelemetry() as any;
+        const synchronous = presentationBefore.status === 'synchronous';
         if (selectedAction === 'equip-m14') debug.equipWeapon('m14-ebr');
         else debug.setAds(true);
         const synchronousMs = performance.now() - startedAt;
@@ -114,6 +169,10 @@ async function m14TransitionToReady(
         let maximumAnimationFrameGapMs = 0;
         let firstPresentedAtMs: number | null = null;
         let firstPresentedFrameDelta = 0;
+        let targetSubmissionSequence: number | null = synchronous ? 0 : null;
+        let firstCompletionAtMs: number | null = null;
+        let maximumPendingForMs = presentationBefore.pendingForMs as number;
+        let presentationAfter = presentationBefore;
         let lastReadiness: M14TransitionReadiness | null = null;
         const inspect = () => {
           const now = performance.now();
@@ -123,6 +182,17 @@ async function m14TransitionToReady(
           if (firstPresentedAtMs === null && presentedAfter > presentedBefore) {
             firstPresentedAtMs = now - startedAt;
             firstPresentedFrameDelta = presentedAfter - presentedBefore;
+            if (synchronous) firstCompletionAtMs = firstPresentedAtMs;
+          }
+          presentationAfter = debug.samplePresentationTelemetry() as any;
+          maximumPendingForMs = Math.max(maximumPendingForMs, presentationAfter.pendingForMs as number);
+          if (!synchronous && targetSubmissionSequence === null
+            && presentationAfter.submissionSequence > presentationBefore.submissionSequence) {
+            targetSubmissionSequence = presentationAfter.submissionSequence;
+          }
+          if (!synchronous && firstCompletionAtMs === null && targetSubmissionSequence !== null
+            && presentationAfter.completedSequence >= targetSubmissionSequence) {
+            firstCompletionAtMs = now - startedAt;
           }
           const weapon = debug.sampleActiveWeaponReadiness();
           const importedM14Ready = weapon.requestedWeapon === 'm14-ebr'
@@ -146,6 +216,8 @@ async function m14TransitionToReady(
           };
           const requiredPresentationReady = selectedRequiredState === 'equipped' || thermal.active;
           if (firstPresentedAtMs !== null
+            && firstCompletionAtMs !== null
+            && targetSubmissionSequence !== null
             && importedM14Ready
             && assetCacheLoading === 0
             && requiredPresentationReady) {
@@ -154,7 +226,16 @@ async function m14TransitionToReady(
               action: selectedAction,
               synchronousMs: Number(synchronousMs.toFixed(3)),
               eventToPresentedFrameMs: Number(firstPresentedAtMs.toFixed(3)),
+              eventToCompletionMs: Number(firstCompletionAtMs.toFixed(3)),
               presentedFrameDelta: firstPresentedFrameDelta,
+              presentationStatus: presentationAfter.status,
+              startingSubmissionSequence: presentationBefore.submissionSequence,
+              startingCompletedSequence: presentationBefore.completedSequence,
+              targetSubmissionSequence,
+              endingSubmissionSequence: presentationAfter.submissionSequence,
+              endingCompletedSequence: presentationAfter.completedSequence,
+              maximumPendingForMs: Number(maximumPendingForMs.toFixed(3)),
+              completionFailures: presentationAfter.completionFailures,
               readyMs: Number((now - startedAt).toFixed(3)),
               maximumAnimationFrameGapMs: Number(maximumAnimationFrameGapMs.toFixed(3)),
               readiness: lastReadiness,
@@ -180,20 +261,34 @@ async function m14TransitionToReady(
   });
 }
 
-function expectBoundedProbe(probe: FrameProbe): void {
+function expectBoundedProbe(probe: FrameProbe, budget: FrameActionBudget): void {
   const evidence = `${probe.label}/${probe.action} ${JSON.stringify(probe)}`;
   expect(probe.presentedFrameDelta, `${evidence}: presentation must advance`).toBeGreaterThan(0);
-  expect(probe.synchronousMs, `${evidence}: synchronous action budget`).toBeLessThan(MAX_SYNCHRONOUS_ACTION_MS);
-  expect(probe.eventToPresentedFrameMs, `${evidence}: event-to-next-presented-frame budget`)
-    .toBeLessThan(MAX_EVENT_TO_PRESENTED_FRAME_MS);
+  expect(probe.synchronousMs, `${evidence}: synchronous action budget`)
+    .toBeLessThan(budget.maximumSynchronousActionMs);
+  expect(probe.eventToPresentedFrameMs, `${evidence}: baseline-relative event-to-presented-frame budget`)
+    .toBeLessThan(budget.maximumActionMs);
+  expect(probe.eventToCompletionMs, `${evidence}: actual completion-frontier budget`)
+    .toBeLessThan(budget.maximumActionMs);
+  expect(probe.maximumPendingForMs, `${evidence}: no hidden completion backlog`)
+    .toBeLessThan(budget.maximumActionMs);
+  expect(probe.completionFailures, evidence).toBe(0);
+  expect(probe.presentationStatus, evidence).toMatch(/^(?:healthy|synchronous)$/u);
+  expect(probe.endingSubmissionSequence, evidence).toBeGreaterThanOrEqual(probe.startingSubmissionSequence);
+  expect(probe.endingCompletedSequence, evidence).toBeGreaterThanOrEqual(probe.startingCompletedSequence);
+  expect(probe.endingCompletedSequence, evidence).toBeGreaterThanOrEqual(probe.targetSubmissionSequence);
 }
 
-function expectM14TransitionReady(probe: M14TransitionProbe, thermalActive: boolean): void {
+function expectM14TransitionReady(
+  probe: M14TransitionProbe,
+  thermalActive: boolean,
+  budget: FrameActionBudget,
+): void {
   const evidence = `${probe.label}/${probe.action} ${JSON.stringify(probe)}`;
-  expectBoundedProbe(probe);
+  expectBoundedProbe(probe, budget);
   expect(probe.readyMs, `${evidence}: bounded readiness deadline`).toBeLessThan(MAX_M14_TRANSITION_READY_MS);
   expect(probe.maximumAnimationFrameGapMs, `${evidence}: no hidden transition freeze`)
-    .toBeLessThan(MAX_EVENT_TO_PRESENTED_FRAME_MS);
+    .toBeLessThan(budget.maximumActionMs);
   expect(probe.readiness, `${evidence}: exact retained imported M14`).toMatchObject({
     requestedWeapon: 'm14-ebr',
     ready: true,
@@ -233,16 +328,25 @@ test('cold carbine control, isolated first M14 EBR use and glass breach reach th
       panes: snapshot.breakableWindows.map((window: any) => window.retainedDebrisPrewarmed),
     };
   });
-  expect(retainedGlassBefore).toEqual({
+  expect(retainedGlassBefore).toMatchObject({
     pool: {
       contract: 'retained-exact-instanced-render-object-v1',
       retained: 6,
       currentArenaRetained: 6,
       active: 0,
+      activePhysics: 0,
+      lifecycle: {
+        poseGraceMs: 180,
+        noProgressMs: 450,
+        maxPhysicsMs: 1_800,
+        maxLifetimeMs: 4_500,
+      },
     },
     panes: [true, true, true, true, true, true],
   });
 
+  const frameActionBaseline = await captureFrameActionBaseline(page, 'glass-m14-preaction-baseline');
+  const frameActionBudget = deriveFrameActionBudget(frameActionBaseline);
   const baseline = await eventToNextPresentedFrame(page, 'baseline-noop', 'noop');
 
   await page.evaluate(() => {
@@ -308,6 +412,44 @@ test('cold carbine control, isolated first M14 EBR use and glass breach reach th
     };
   });
   expect(glassAfter).toMatchObject({ coldWindowBroken: true, warmWindowBroken: true });
+  const debrisSamples: any[] = [];
+  for (const elapsedMs of [250, 750, 1_500, 2_500, 4_750]) {
+    await page.waitForTimeout(elapsedMs - (debrisSamples.at(-1)?.elapsedMs ?? 0));
+    debrisSamples.push(await page.evaluate((sampleElapsedMs) => {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
+      return {
+        elapsedMs: sampleElapsedMs,
+        pool: snapshot.windowGlassDebrisPool,
+        debris: snapshot.persistentWindowDebris,
+        panes: snapshot.breakableWindows.slice(0, 2).map((pane: any) => ({
+          id: pane.id,
+          broken: pane.broken,
+          apertureOpen: pane.authority?.apertureOpen,
+        })),
+      };
+    }, elapsedMs));
+  }
+  for (const sample of debrisSamples) {
+    for (const debris of sample.debris) {
+      expect(debris.position.every(Number.isFinite), `${sample.elapsedMs}ms finite shard root`).toBe(true);
+      expect(
+        !debris.fallbackSettled || debris.support.restY !== null && debris.position[1] <= debris.support.restY + 0.04,
+        `${sample.elapsedMs}ms debris cannot report mid-air settled: ${JSON.stringify(debris)}`,
+      ).toBe(true);
+      expect(
+        !debris.physicsActive || debris.noProgressMs < sample.pool.lifecycle.noProgressMs + 80,
+        `${sample.elapsedMs}ms active body must make progress: ${JSON.stringify(debris)}`,
+      ).toBe(true);
+    }
+  }
+  expect(debrisSamples.at(-1)).toMatchObject({
+    pool: { retained: 6, currentArenaRetained: 6, active: 0, activePhysics: 0 },
+    debris: [],
+    panes: [
+      { broken: true, apertureOpen: true },
+      { broken: true, apertureOpen: true },
+    ],
+  });
   const runtimeAfter = await captureFrameHitchRendererEvidence(page, testInfo);
   expectFrameHitchRendererEvidence(runtimeAfter, 'atomic-acres', 'glass/M14 final runtime');
 
@@ -315,45 +457,48 @@ test('cold carbine control, isolated first M14 EBR use and glass breach reach th
   await testInfo.attach('event-to-presented-frame-receipt', {
     body: Buffer.from(JSON.stringify({
       renderer: runtimeAfter.runtime.actualBackend,
-      maximumEventToPresentedFrameMs: MAX_EVENT_TO_PRESENTED_FRAME_MS,
-      maximumSynchronousActionMs: MAX_SYNCHRONOUS_ACTION_MS,
+      targetFrameBudgetMs: Number(TARGET_FRAME_BUDGET_MS.toFixed(3)),
+      maximumBaselineP95FrameBudgets: MAXIMUM_BASELINE_P95_FRAME_BUDGETS,
+      maximumBaselineGapFrameBudgets: MAXIMUM_BASELINE_GAP_FRAME_BUDGETS,
+      maximumBaselineCompletionFrameBudgets: MAXIMUM_BASELINE_COMPLETION_FRAME_BUDGETS,
+      minimumActionFrameBudgets: MINIMUM_ACTION_FRAME_BUDGETS,
+      maximumActionFrameBudgets: MAXIMUM_ACTION_FRAME_BUDGETS,
+      actionRelativeAllowanceFrameBudgets: ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS,
+      maximumActionMs: frameActionBudget.maximumActionMs,
+      maximumSynchronousActionMs: frameActionBudget.maximumSynchronousActionMs,
       maximumM14TransitionReadyMs: MAX_M14_TRANSITION_READY_MS,
       runtimeBefore,
       runtimeAfter,
+      frameActionBaseline,
+      frameActionBudget,
       retainedGlassBefore,
       glassAfter,
+      debrisSamples,
       probes,
     }, null, 2)),
     contentType: 'application/json',
   });
-  for (const probe of probes) expectBoundedProbe(probe);
-  expectM14TransitionReady(m14Equip, false);
-  expectM14TransitionReady(m14Ads, true);
-  for (const transition of [m14Equip, m14Ads]) {
-    expect(
-      transition.maximumAnimationFrameGapMs,
-      `${transition.action}: transition gaps must remain within 4x the no-op frame plus 40ms`,
-    ).toBeLessThan(baseline.eventToPresentedFrameMs * 4 + 40);
-  }
-  for (const probe of [coldCarbine, m14Equip, m14Ads, m14Shot, m14AdsRelease, coldGlass, warmGlass]) {
-    expect(
-      probe.eventToPresentedFrameMs,
-      `${probe.action}: regression must remain within 4x the no-op frame plus 40ms`,
-    ).toBeLessThan(baseline.eventToPresentedFrameMs * 4 + 40);
-  }
+  for (const probe of probes) expectBoundedProbe(probe, frameActionBudget);
+  expectM14TransitionReady(m14Equip, false, frameActionBudget);
+  expectM14TransitionReady(m14Ads, true, frameActionBudget);
   expect(browserErrors).toEqual([]);
   writeOfficialFrameHitchReceipt(
     'glass-m14',
     runtimeBefore,
     runtimeAfter,
     {
-      maximumEventToPresentedFrameMs: MAX_EVENT_TO_PRESENTED_FRAME_MS,
-      maximumSynchronousActionMs: MAX_SYNCHRONOUS_ACTION_MS,
+      targetFrameBudgetMs: Number(TARGET_FRAME_BUDGET_MS.toFixed(3)),
+      maximumBaselineP95FrameBudgets: MAXIMUM_BASELINE_P95_FRAME_BUDGETS,
+      maximumBaselineGapFrameBudgets: MAXIMUM_BASELINE_GAP_FRAME_BUDGETS,
+      maximumBaselineCompletionFrameBudgets: MAXIMUM_BASELINE_COMPLETION_FRAME_BUDGETS,
+      minimumActionFrameBudgets: MINIMUM_ACTION_FRAME_BUDGETS,
+      maximumActionFrameBudgets: MAXIMUM_ACTION_FRAME_BUDGETS,
+      actionRelativeAllowanceFrameBudgets: ACTION_RELATIVE_ALLOWANCE_FRAME_BUDGETS,
+      maximumActionMs: frameActionBudget.maximumActionMs,
+      maximumSynchronousActionMs: frameActionBudget.maximumSynchronousActionMs,
       maximumM14TransitionReadyMs: MAX_M14_TRANSITION_READY_MS,
-      maximumRelativeMultiplier: 4,
-      maximumRelativeAllowanceMs: 40,
     },
-    { retainedGlassBefore, glassAfter, probes },
+    { frameActionBaseline, frameActionBudget, retainedGlassBefore, glassAfter, debrisSamples, probes },
     browserErrors,
   );
 });

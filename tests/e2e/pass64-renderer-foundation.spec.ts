@@ -33,8 +33,8 @@ test('reports the active WebGL adapter and offscreen HDR samples separately', as
     api.setCaptureViewmodelHidden(true);
   });
   await page.waitForFunction(() => (
-    window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
-  ).__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true, undefined, { timeout: 60_000 });
+    window as unknown as { __ATOMIC_ACRES_DEBUG__: { admissionState: () => { gameStarted: boolean } } }
+  ).__ATOMIC_ACRES_DEBUG__.admissionState().gameStarted === true, undefined, { timeout: 60_000 });
   await page.waitForFunction(() => {
     const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any } }).__ATOMIC_ACRES_DEBUG__?.snapshot();
     return state?.render?.atomicSignal?.samples > 0;
@@ -71,8 +71,8 @@ test('renders Terminal cabin ceiling with only shadowed contrast keys and an ope
     api.setCaptureViewmodelHidden(true);
   });
   await page.waitForFunction(() => (
-    window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
-  ).__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true, undefined, { timeout: 60_000 });
+    window as unknown as { __ATOMIC_ACRES_DEBUG__: { admissionState: () => { gameStarted: boolean } } }
+  ).__ATOMIC_ACRES_DEBUG__.admissionState().gameStarted === true, undefined, { timeout: 60_000 });
   await page.evaluate(() => {
     const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: any }).__ATOMIC_ACRES_DEBUG__;
     api.setCaptureCameraPose(0, 4.25, 2, -Math.PI / 2, -0.38);

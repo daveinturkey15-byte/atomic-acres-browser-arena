@@ -10,6 +10,8 @@ const REQUIRED_CHECKS = Object.freeze([
   'static-and-unit (windows-latest)',
   'bounded-browser-linux',
   'bounded-browser-windows',
+  'bounded-browser-linux-supplemental',
+  'bounded-browser-windows-supplemental',
 ]);
 
 function run(command, args, options = {}) {

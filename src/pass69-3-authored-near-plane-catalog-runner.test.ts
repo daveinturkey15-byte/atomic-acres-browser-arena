@@ -23,6 +23,9 @@ describe('Pass 69.3 real-authored near-plane evidence boundary', () => {
       "QA_INSTALLED_EDGE: '1'",
       'PASS69_3_NEAR_PLANE_SOURCE_SHA: sourceSha',
       'PASS69_3_NEAR_PLANE_TARGET: targetName',
+      'PASS69_3_NEAR_PLANE_RELEASE_PASS: releasePass',
+      'releasePass !== releaseChannels?.experimental?.pass',
+      'receipt.servedCandidate.releasePass !== releasePass',
       "!key.toUpperCase().startsWith('VITE_')",
       'runtime.softwareAdapter === false',
       'runtime.actualBackend === target.renderer',
@@ -38,6 +41,9 @@ describe('Pass 69.3 real-authored near-plane evidence boundary', () => {
     const runner = readFileSync('scripts/qa/run-pass69-3-authored-near-plane-catalog.mjs', 'utf8');
     expect(WEAPON_IDS).toHaveLength(20);
     expect(spec).toContain('satisfies Readonly<Record<WeaponId, number>>');
+    expect(spec).toContain('const expectedReleasePass = process.env.PASS69_3_NEAR_PLANE_RELEASE_PASS');
+    expect(spec).toContain('expectedReleasePass !== releaseChannels.experimental?.pass');
+    expect(spec).toContain('releasePass: expectedReleasePass');
     expect(spec).toContain("expect(Object.keys(EXPECTED_CONTACT_RETREAT).sort()).toEqual([...WEAPON_IDS].sort())");
     expect(spec).toContain('for (const [index, weapon] of WEAPON_IDS.entries())');
     expect(spec).toContain("lmg: 0.1");

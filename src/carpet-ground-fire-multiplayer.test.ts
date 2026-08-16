@@ -35,6 +35,7 @@ const impact = (overrides: Partial<KillstreakImpactEvent> = {}): KillstreakImpac
     ordinal: 4,
     phase: 'impact',
     position: [2, 0, 3],
+    launchPosition: null,
     impactAtMs: 1_000,
     atMs: 1_000,
   };

@@ -26,7 +26,9 @@ describe('Pass 65 explosive crossbolt runtime integration', () => {
 
     const spawnStart = source.indexOf('function spawnExplosiveBolt(');
     const spawnEnd = source.indexOf('\nfunction disposeExplosiveBolt(', spawnStart);
-    expect(source.slice(spawnStart, spawnEnd)).toContain('velocity: normalized.multiplyScalar(EXPLOSIVE_BOLT_SPEED_MPS)');
+    const spawn = source.slice(spawnStart, spawnEnd);
+    expect(spawn).toContain('velocity: normalized.multiplyScalar(EXPLOSIVE_BOLT_SPEED_MPS)');
+    expect(spawn).toContain('impactWindowId: null,');
 
     const updateStart = source.indexOf('function updateExplosiveBolts(');
     const updateEnd = source.indexOf('\nfunction throwGrenade(', updateStart);
@@ -39,16 +41,19 @@ describe('Pass 65 explosive crossbolt runtime integration', () => {
     expect(update).toContain('const targetHitLifeId = targetHit.lifeId;');
     expect(update).toContain('bolt.targetId = targetHitId;');
     expect(update).toContain('bolt.targetLifeId = targetHitLifeId;');
-    expect(update).toContain('if (targetHitId === player.id) {');
-    expect(update).toContain("'explosive-crossbow', targetHitId, targetHitLifeId, bolt.actionNonce, now,");
-    expect(update).toContain("addFeed('STUCK', 'coral');");
-    expect(update).toContain("else if (bolt.ownerId === player.id) addFeed('STUCK', 'gold');");
+    expect(update).toContain('bolt.impactWindowId = worldCollision !== null && worldFraction <= glassFraction');
+    expect(update).toContain('? activeGlassColliderWindowIds.get(worldCollision.box) ?? null');
+    expect(update).toContain('const recordedAttachment = bolt.authority ? recordReceiverStickyAttachment({');
+    expect(update).toContain("source: 'explosive-crossbow'");
+    expect(update).toContain('if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment);');
     expect(update).toContain('explosiveBoltTargetBuffer.findIndex(bolt.targetId, bolt.targetLifeId)');
     expect(update).toContain('let targetHitIndex = -1;');
     expect(update).not.toContain('let targetHit:');
     const attachmentWrite = update.indexOf('recordReceiverStickyAttachment({');
     expect(attachmentWrite).toBeGreaterThan(update.indexOf('const targetHitLifeId = targetHit.lifeId;'));
     expect(update.slice(attachmentWrite)).not.toContain('targetHit.');
+    expect(update.indexOf('bolt.impactWindowId = worldCollision !== null && worldFraction <= glassFraction'))
+      .toBeLessThan(update.indexOf('bolt.impactedAt = now;', update.indexOf('} else if (worldCollision || glassCollision)')));
 
     const segmentStart = source.indexOf('function segmentSphereFraction(');
     const segmentEnd = source.indexOf('\nfunction createExplosiveBoltMesh(', segmentStart);
@@ -56,6 +61,30 @@ describe('Pass 65 explosive crossbolt runtime integration', () => {
     expect(segment).not.toContain('.clone()');
     expect(segment).not.toContain('new THREE.Vector3');
     expect(segment).toContain('nearestX * nearestX + nearestY * nearestY + nearestZ * nearestZ');
+  });
+
+  it('binds a pane impact to target-only blast LOS exclusion without discarding other cover', () => {
+    expect(source).toContain('impactWindowId: string | null;');
+
+    const detonateStart = source.indexOf('function detonateExplosiveBoltEntity(');
+    const detonateEnd = source.indexOf('\nfunction updateExplosiveBolts(', detonateStart);
+    const detonate = source.slice(detonateStart, detonateEnd);
+    expect(detonate).toContain("'explosive-crossbow',\n      bolt.impactWindowId,");
+
+    const blastStart = source.indexOf('function breakWindowsInWeaponBlast(');
+    const blastEnd = source.indexOf('\nfunction synchronizeSmokePresentation(', blastStart);
+    const blast = source.slice(blastStart, blastEnd);
+    expect(blast).toContain('impactWindowId: string | null,');
+    expect(blast.match(/activeWorldColliders\(\)/gu)).toHaveLength(1);
+    expect(blast).toContain('const worldColliderSnapshot = Object.freeze([...activeWorldColliders()]);');
+    expect(blast).toContain('windowBlastLineOfSightColliders(');
+    expect(blast).toContain('(collider) => activeGlassColliderWindowIds.get(collider) ?? null,');
+    expect(blast).toContain('windowBreakPathBlocked(point, centre, blastLineOfSightColliders)');
+    expect(blast).not.toContain('windowBreakPathBlocked(point, centre, activeWorldColliders())');
+
+    const snapshotStart = source.indexOf('projectileGlass: {');
+    const snapshotEnd = source.indexOf('\n    dmrThermal:', snapshotStart);
+    expect(source.slice(snapshotStart, snapshotEnd)).toContain('impactWindowId: bolt.impactWindowId,');
   });
 
   it('derives stuck radius and damage once from the shared exact 2x oracle', () => {

@@ -82,15 +82,29 @@ function changedPaths(base, head) {
 
 export function outputsFor(classification) {
   if (classification.mode === 'none') {
-    return { ...classification, windows_groups: '', linux_groups: '' };
+    return {
+      ...classification,
+      windows_groups: '',
+      linux_groups: '',
+      windows_supplemental_groups: '',
+      linux_supplemental_groups: '',
+    };
   }
   if (classification.mode === 'smoke') {
-    return { ...classification, windows_groups: 'release-shell', linux_groups: 'release-shell' };
+    return {
+      ...classification,
+      windows_groups: 'release-shell',
+      linux_groups: 'release-shell',
+      windows_supplemental_groups: '',
+      linux_supplemental_groups: '',
+    };
   }
   return {
     ...classification,
     windows_groups: 'release-shell,pass25a-capability-chromium,boot-and-authored,pass64-renderer-foundation',
     linux_groups: 'release-shell,pass25a-baseline,pass25a-capability-chromium,pass64-hud-contracts,pass64-renderer-foundation',
+    windows_supplemental_groups: 'pass71-grenade-first-action,pass70-chopper-gunner',
+    linux_supplemental_groups: 'pass71-glass-quality-bullet,pass71-glass-quality-knife,pass71-glass-quality-grenade,pass71-glass-quality-flare,pass71-glass-quality-crossbow,pass71-glass-performance-bullet,pass71-glass-performance-knife,pass71-glass-performance-grenade,pass71-glass-performance-flare,pass71-glass-performance-crossbow,pass71-nuke-warning',
   };
 }
 

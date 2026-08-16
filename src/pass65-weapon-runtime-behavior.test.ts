@@ -232,16 +232,16 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(riggedSupportWristRollRadians(1)).toBeCloseTo(THREE.MathUtils.degToRad(-20), 12);
   });
 
-  it('uses one firing hand for sidearms and admits the support hand only during reload', () => {
+  it('keeps both authored arm chains active for sidearms, reloads and long guns', () => {
     expect(firstPersonHandPolicy('pistol')).toEqual({
       contract: FIRST_PERSON_HAND_POLICY_CONTRACT,
       gripFamily: 'handgun',
       firingHand: 'right',
-      supportHand: 'reload-only-stowed',
-      activeChainCount: 1,
+      supportHand: 'active',
+      activeChainCount: 2,
     });
     expect(firstPersonHandPolicy('flare-gun')).toMatchObject({
-      gripFamily: 'handgun', supportHand: 'reload-only-stowed', activeChainCount: 1,
+      gripFamily: 'handgun', supportHand: 'active', activeChainCount: 2,
     });
     expect(firstPersonHandPolicy('pistol', 0.5)).toMatchObject({
       supportHand: 'active', activeChainCount: 2,
@@ -462,6 +462,51 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(fillLight?.intensity).toBeGreaterThan(0);
     expect(muzzleLight?.intensity).toBe(0);
     expect(presentation.presentationState().fullscreenSuppression.active).toBe(false);
+  });
+
+  it('keeps contact-foreshortened viewmodel exposure physically stable without changing authority', () => {
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), false);
+    presentation.setWeapon('m4a1', true);
+    presentation.setPresentationVisible(true);
+    const basePose = {
+      dt: 1 / 60, moving: false, sprinting: false, crouched: false, prone: false,
+      ads: false, phase: 0, landingImpulse: 0, lateralSpeed: 0, reloadProgress: null,
+    };
+    presentation.update(basePose);
+    const open = presentation.presentationState();
+    const openFill = open.fullscreenSuppression.structuralLights
+      .find((light) => light.name === 'first-person-viewmodel-fill');
+    expect(open.contactFillLighting).toMatchObject({
+      contract: 'inverse-square-contact-scale-compensation-v1',
+      authoredIntensity: 17.5,
+      contactScale: 1,
+      compensatedIntensity: 17.5,
+      authority: 'presentation-only',
+    });
+    expect(openFill?.intensity).toBe(17.5);
+
+    presentation.update({
+      ...basePose,
+      prone: true,
+      surfaceRetreat: 0.82,
+      surfaceLift: 0.1898,
+    });
+    const contact = presentation.presentationState();
+    const contactFill = contact.fullscreenSuppression.structuralLights
+      .find((light) => light.name === 'first-person-viewmodel-fill');
+    expect(contact.contactResponse).toMatchObject({
+      profileId: 'm4a1',
+      wallBlend: 1,
+      scale: 0.78,
+      aimAuthority: 'camera-forward-unchanged',
+    });
+    expect(contact.contactResponse.floorBlend).toBeCloseTo(0.88, 8);
+    expect(contact.contactFillLighting.compensatedIntensity).toBeCloseTo(10.647, 6);
+    expect(contactFill?.intensity).toBeCloseTo(10.647, 6);
+    presentation.suppressForFullscreenPresentation(true);
+    expect(presentation.presentationState().contactFillLighting.compensatedIntensity).toBe(0);
+    presentation.suppressForFullscreenPresentation(false);
+    expect(presentation.presentationState().contactFillLighting.compensatedIntensity).toBeCloseTo(10.647, 6);
   });
 
   it('keeps a rapid loadout switch atomic while initial browser assets are delayed', async () => {
@@ -1058,6 +1103,18 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(sleeveFixture).toBeInstanceOf(THREE.Mesh);
     expect(((sleeveFixture as THREE.Mesh).material as THREE.MeshStandardMaterial).normalScale.toArray())
       .toEqual([1, 1]);
+    for (const [side, suffix] of [['left', 'L'], ['right', 'R']] as const) {
+      const shoulder = arms?.getObjectByName(`UpperArm${suffix}`);
+      const continuation = arms?.getObjectByName(`${side}-proximal-sleeve-continuation`);
+      expect(continuation, `${side} shoulder-bound sleeve continuation`).toBeInstanceOf(THREE.Mesh);
+      expect(continuation?.parent).toBe(shoulder);
+      expect((continuation as THREE.Mesh).material).toBe((sleeveFixture as THREE.Mesh).material);
+      expect(continuation?.userData).toMatchObject({
+        contract: 'shoulder-bound-authored-pbr-lower-crop-continuation-v1',
+        side,
+        authoredSleeveMaterial: true,
+      });
+    }
 
     presentation.melee();
     presentation.setMeleeCaptureProgress(0.42);
@@ -1078,6 +1135,18 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       knifeVisible: true,
     });
     expect(active.authoredMeleeGripError).toBeLessThan(1e-6);
+    expect(active.proximalSleeveContinuations).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        side: 'left', contract: 'shoulder-bound-authored-pbr-lower-crop-continuation-v1',
+        materialKind: 'MeshStandardMaterial', authoredSleeveMaterial: true, opaque: true,
+      }),
+      expect.objectContaining({
+        side: 'right', contract: 'shoulder-bound-authored-pbr-lower-crop-continuation-v1',
+        materialKind: 'MeshStandardMaterial', authoredSleeveMaterial: true, opaque: true,
+      }),
+    ]));
+    expect(active.armBranchFraming?.left?.ndcMin[1]).toBeLessThanOrEqual(-1.05);
+    expect(active.armBranchFraming?.right?.ndcMin[1]).toBeLessThanOrEqual(-1.05);
     expect(arms?.getObjectByName('pass70-left-forearm-volume-reinforcement')).toBeUndefined();
     expect(arms?.getObjectByName('pass70-right-forearm-volume-reinforcement')).toBeUndefined();
     expect(active.riggedArms).toEqual(expect.arrayContaining([

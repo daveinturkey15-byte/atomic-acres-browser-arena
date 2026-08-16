@@ -434,18 +434,20 @@ function isDamageEvent(value: unknown): value is KillstreakDamageEvent {
 
 function isImpactEvent(value: unknown): value is KillstreakImpactEvent {
   if (!object(value)) return false;
-  if (!exactKeys(value, ['activationId', 'source', 'ordinal', 'phase', 'position', 'impactAtMs', 'atMs'])
+  if (!exactKeys(value, ['activationId', 'source', 'ordinal', 'phase', 'position', 'launchPosition', 'impactAtMs', 'atMs'])
     || !activationId(value.activationId)
     || (value.source !== 'carpet-bomber' && value.source !== 'chopper')
     || typeof value.ordinal !== 'number' || !Number.isSafeInteger(value.ordinal) || value.ordinal < 0
     || value.ordinal >= (value.source === 'chopper' ? CHOPPER_MISSILE_CAPACITY : CARPET_BOMBER_IMPACT_COUNT)
     || (value.phase !== 'drop' && value.phase !== 'impact')
     || !vec3(value.position)
+    || value.launchPosition !== null && !vec3(value.launchPosition)
     || !finite(value.impactAtMs, 0, Number.MAX_SAFE_INTEGER)
     || !finite(value.atMs, 0, Number.MAX_SAFE_INTEGER)) return false;
-  if (value.source === 'chopper') return value.phase === 'drop'
-    ? value.impactAtMs - value.atMs === CHOPPER_MISSILE_FLIGHT_MS
-    : value.atMs === value.impactAtMs;
+  if (value.source === 'chopper') return vec3(value.launchPosition) && (value.phase === 'drop'
+    ? Math.abs((value.impactAtMs - value.atMs) - CHOPPER_MISSILE_FLIGHT_MS) <= 1e-6
+    : value.atMs === value.impactAtMs);
+  if (value.launchPosition !== null) return false;
   return value.phase === 'drop' ? value.atMs <= value.impactAtMs : value.atMs >= value.impactAtMs;
 }
 

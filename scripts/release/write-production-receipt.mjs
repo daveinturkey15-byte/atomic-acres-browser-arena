@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { createPass71Hf313LivePostcondition } from '../qa/pass71-hf313-release-evidence-contract.mjs';
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, 'utf8'));
@@ -13,13 +14,22 @@ function durationMs(start, end) {
 }
 
 export function buildProductionReceipt(input) {
-  const { sourceSha, releasePass, releaseStartedAt, releaseBuiltAt, workflowRun, topology, pages, liveSmoke, acceptance } = input;
+  const {
+    sourceSha, releasePass, releaseStartedAt, releaseBuiltAt, workflowRun,
+    topology, pages, liveSmoke, acceptance, previewProvenance = null,
+  } = input;
   if (topology.sourceSha !== sourceSha || topology.releasePass !== releasePass) throw new Error('Topology identity mismatch');
   if (pages.status !== 'built' || !/^[0-9a-f]{40}$/.test(pages.pagesSha ?? '')) throw new Error('Pages build is not exact and built');
   if (!liveSmoke.ok || liveSmoke.releasePass !== releasePass || liveSmoke.sourceSha !== sourceSha) throw new Error('Live smoke identity mismatch');
   if (!acceptance.ok || (acceptance.releasePass && acceptance.releasePass !== releasePass)) throw new Error('Acceptance receipt mismatch');
+  const hf313 = releasePass === 'PASS 71'
+    ? createPass71Hf313LivePostcondition({
+      sourceSha, releasePass, topology, pages, liveSmoke, acceptance, previewProvenance,
+    })
+    : null;
+  if (hf313 && hf313.status !== 'live-verified') throw new Error('HF-313 production postcondition is not live-verified');
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     sourceSha,
     pagesSha: pages.pagesSha,
     releasePass,
@@ -36,9 +46,19 @@ export function buildProductionReceipt(input) {
       pagesToLiveMs: durationMs(pages.updatedAt, liveSmoke.verifiedAt),
       totalMs: durationMs(releaseStartedAt, liveSmoke.verifiedAt),
     },
+    candidate: {
+      candidateASourceSha: releasePass === 'PASS 71' ? acceptance.previewSourceSha : null,
+      candidateBSourceSha: sourceSha,
+      manifestOnlyFinalizer: releasePass === 'PASS 71'
+        ? acceptance.approvalParity?.ok === true
+          && JSON.stringify(acceptance.approvalParity.paths) === JSON.stringify(['acceptance/pass-71.json'])
+        : null,
+    },
     acceptance,
+    previewProvenance,
     topology,
     liveSmoke,
+    postconditions: hf313 ? { hf313 } : {},
   };
 }
 
@@ -53,6 +73,9 @@ if (process.argv[1]?.endsWith('write-production-receipt.mjs')) {
     pages: readJson('artifacts/pipeline/pages-build.json'),
     liveSmoke: readJson('artifacts/pipeline/live-release-smoke.json'),
     acceptance: readJson('artifacts/pipeline/acceptance-coverage.json'),
+    previewProvenance: existsSync('artifacts/pipeline/pr-preview-provenance.json')
+      ? readJson('artifacts/pipeline/pr-preview-provenance.json')
+      : null,
   });
   writeFileSync('artifacts/pipeline/production-release-receipt.json', `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(receipt, null, 2));

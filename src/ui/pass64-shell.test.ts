@@ -11,7 +11,7 @@ describe('Pass 66 command shell', () => {
   it('renders the new command hierarchy and ordered player-facing arenas', () => {
     const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
     expect(markup).toContain('class="panel pass64-command-deck"');
-    expect(markup).toMatch(/PASS 70/);
+    expect(markup).toMatch(/PASS 71/);
     expect(markup).not.toContain('THE BIG ONE');
     expect(markup).not.toContain('HITL REVIEW DECK');
     expect(markup).not.toContain('LIVE SYSTEMS READY');

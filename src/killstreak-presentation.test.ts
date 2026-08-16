@@ -432,6 +432,7 @@ const carpetImpacts = (count: number, phase: KillstreakImpactEvent['phase'] = 'i
     ordinal,
     phase,
     position: [ordinal * 0.5, 0, ordinal * -0.25],
+    launchPosition: null,
     impactAtMs: 1_000,
     atMs: phase === 'drop' ? 580 : 1_000,
   }),
@@ -679,7 +680,7 @@ describe('killstreak presentation', () => {
         expect(presentation.root.getObjectByName('pass65-impact-flash-pool-20')?.visible).toBe(true);
         expect(presentation.root.getObjectByName('pass65-bomb-shell-pool-20')?.visible).toBe(true);
         expect(presentation.root.getObjectByName('pass65-ember-pool-120')?.visible).toBe(true);
-        expect(presentation.root.getObjectByName('piloted-drone-hostile-sensor-16')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('piloted-drone-hostile-sensor-16')).toBeUndefined();
         expect(presentation.root.getObjectByName('prewarmed-support-placement-ground-x')?.visible).toBe(true);
         expect(presentation.root.getObjectByName('prewarmed-support-placement-corridor')?.visible).toBe(true);
         expect(lod.autoUpdate).toBe(false);
@@ -860,8 +861,11 @@ describe('killstreak presentation', () => {
       ]),
       impactFlashes: 0,
       bombShells: 0,
+      chopperMissileShells: [],
       emberParticles: 0,
       sensorContacts: 0,
+      sensorProxyMeshes: 0,
+      sensorPresentation: 'shared-exact-animated-thermal-operator',
       placementMarkers: 0,
       prewarmed: 6,
       pooledEntityInstances: 29,
@@ -1114,17 +1118,18 @@ describe('killstreak presentation', () => {
     presentation.dispose();
   });
 
-  it('renders only host-admitted piloted-drone sensor contacts through depth', () => {
+  it('delegates host-admitted piloted-drone contacts to the shared exact animated operator renderer', () => {
     const presentation = new KillstreakPresentation(new THREE.Scene());
     presentation.sync(snapshot(1, [{
       id: 'enemy', kind: 'player', team: 1, lifeId: 3, position: [4, 1.7, 8], relation: 'hostile', throughWall: true,
     }]), 1_000);
-    expect(presentation.telemetry().sensorContacts).toBe(1);
-    const silhouette = presentation.root.getObjectByName('piloted-drone-hostile-sensor-1') as THREE.Group;
-    expect(silhouette.visible).toBe(true);
-    expect(silhouette.userData).toMatchObject({ contactId: 'enemy', relation: 'hostile', throughWall: true });
-    const material = (silhouette.getObjectByName('drone-sensor-head') as THREE.Mesh).material as THREE.MeshBasicMaterial;
-    expect(material.depthTest).toBe(false);
+    expect(presentation.telemetry()).toMatchObject({
+      sensorContacts: 1,
+      sensorProxyMeshes: 0,
+      sensorPresentation: 'shared-exact-animated-thermal-operator',
+    });
+    expect(presentation.root.getObjectByName('piloted-drone-hostile-sensor-1')).toBeUndefined();
+    expect(presentation.root.children.some((node) => node.name.startsWith('drone-sensor-'))).toBe(false);
     presentation.dispose();
   });
 
@@ -1182,7 +1187,7 @@ describe('killstreak presentation', () => {
     const shellPool = presentation.root.getObjectByName('pass65-bomb-shell-pool') as THREE.Group;
     const delayedDrop = [{
       activationId: 'ks-carpet-delayed', source: 'carpet-bomber' as const, ordinal: 0, phase: 'drop' as const,
-      position: [2, 0, -3] as const, atMs: 1_080, impactAtMs: 1_500,
+      position: [2, 0, -3] as const, launchPosition: null, atMs: 1_080, impactAtMs: 1_500,
     }];
     presentation.presentImpacts(delayedDrop, 1_200);
     const shell = shellPool.children[0]!;
@@ -1204,7 +1209,7 @@ describe('killstreak presentation', () => {
     const shellPool = presentation.root.getObjectByName('pass65-bomb-shell-pool') as THREE.Group;
     presentation.presentImpacts([{
       activationId: 'ks-carpet-offset-domain', source: 'carpet-bomber', ordinal: 0, phase: 'drop',
-      position: [0, 0, 0], atMs: 5_000, impactAtMs: 5_420,
+      position: [0, 0, 0], launchPosition: null, atMs: 5_000, impactAtMs: 5_420,
     }], 2_000);
     const shell = shellPool.children[0]!;
     presentation.sync(snapshot(0), 2_419);
@@ -1213,11 +1218,47 @@ describe('killstreak presentation', () => {
     expect(shell.visible).toBe(false);
     presentation.presentImpacts([{
       activationId: 'ks-carpet-negative-offset', source: 'carpet-bomber', ordinal: 1, phase: 'drop',
-      position: [0, 0, 0], atMs: -1_000, impactAtMs: -580,
+      position: [0, 0, 0], launchPosition: null, atMs: -1_000, impactAtMs: -580,
     }], 3_000);
     presentation.sync(snapshot(0), 3_419);
     expect(shell.visible).toBe(true);
     presentation.sync(snapshot(0), 3_420);
+    expect(shell.visible).toBe(false);
+    presentation.dispose();
+  });
+
+  it('launches a Chopper missile from the replicated aircraft socket instead of a sky offset', () => {
+    const presentation = new KillstreakPresentation(new THREE.Scene());
+    const shellPool = presentation.root.getObjectByName('pass65-bomb-shell-pool') as THREE.Group;
+    const launchPosition = [12, 18, -4] as const;
+    const impactPosition = [18, 0, -22] as const;
+    presentation.presentImpacts([{
+      activationId: 'ks-chopper-socket-launch', source: 'chopper', ordinal: 0, phase: 'drop',
+      position: impactPosition, launchPosition, atMs: 2_000, impactAtMs: 2_780,
+    }], 4_000);
+    const shell = shellPool.children[0]!;
+    expect(shell.name).toBe('pass70-chopper-missile-shell');
+    expect(shell.position.toArray()).toEqual(launchPosition);
+    expect(presentation.chopperMissileShellRoot('ks-chopper-socket-launch', 0)).toBe(shell);
+    expect(presentation.telemetry().chopperMissileShells).toEqual([
+      expect.objectContaining({
+        trajectoryId: 'ks-chopper-socket-launch:missile:0',
+        activationId: 'ks-chopper-socket-launch',
+        ordinal: 0,
+        visible: true,
+        worldPosition: launchPosition,
+        launchPosition,
+        targetPosition: [impactPosition[0], impactPosition[1] + 0.35, impactPosition[2]],
+        progress: 0,
+        distanceFromTrajectoryM: 0,
+      }),
+    ]);
+    expect(shell.position.y).not.toBe(impactPosition[1] + 14);
+    presentation.sync(snapshot(0), 4_390);
+    expect(presentation.telemetry().chopperMissileShells[0]).toMatchObject({ progress: 0.5 });
+    expect(shell.position.distanceTo(new THREE.Vector3(...launchPosition))).toBeGreaterThan(0);
+    expect(shell.position.distanceTo(new THREE.Vector3(...impactPosition))).toBeGreaterThan(0);
+    presentation.sync(snapshot(0), 4_780);
     expect(shell.visible).toBe(false);
     presentation.dispose();
   });

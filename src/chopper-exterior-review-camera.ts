@@ -8,9 +8,12 @@ export type ChopperExteriorReviewCameraInput = Readonly<{
   entityYaw: number;
   aspect: number;
   preferredSide?: -1 | 1 | null;
+  assessWorldCandidate: (
+    candidate: ChopperExteriorReviewCameraCandidate,
+  ) => ChopperExteriorReviewWorldAssessment;
 }>;
 
-export type ChopperExteriorReviewCameraPose = Readonly<{
+export type ChopperExteriorReviewCameraCandidate = Readonly<{
   side: -1 | 1;
   position: readonly [number, number, number];
   target: readonly [number, number, number];
@@ -20,6 +23,17 @@ export type ChopperExteriorReviewCameraPose = Readonly<{
   distanceM: number;
   clearanceM: number;
   inTestBay: boolean;
+}>;
+
+export type ChopperExteriorReviewWorldAssessment = Readonly<{
+  cameraColliderClear: boolean;
+  cameraClearanceRadiusM: number;
+  lineOfSightSampleCount: number;
+  clearLineOfSightSampleCount: number;
+}>;
+
+export type ChopperExteriorReviewCameraPose = ChopperExteriorReviewCameraCandidate & Readonly<{
+  world: ChopperExteriorReviewWorldAssessment;
 }>;
 
 export async function withExactChopperRootHiddenForControl<T>(
@@ -43,6 +57,7 @@ export const CHOPPER_EXTERIOR_REVIEW_CAMERA_CONTRACT = Object.freeze({
   fitPaddingM: 1.2,
   maximumDistanceM: 18,
   wallInsetM: 0.8,
+  cameraColliderClearanceRadiusM: 0.4,
   minimumCameraY: 1.8,
   minimumVerticalOffsetM: 0.55,
   verticalOffsetSpanRatio: 0.06,
@@ -65,6 +80,7 @@ export function chopperExteriorReviewCameraPose(
     || !Number.isFinite(input.entityYaw)
     || !Number.isFinite(input.aspect)
     || input.aspect <= 0
+    || typeof input.assessWorldCandidate !== 'function'
     || (input.preferredSide !== undefined
       && input.preferredSide !== null
       && input.preferredSide !== -1
@@ -89,9 +105,9 @@ export function chopperExteriorReviewCameraPose(
     contract.minimumDistanceM,
   ) + contract.fitPaddingM;
   const cameraDistanceM = Math.min(contract.maximumDistanceM, fittedDistance);
-  const sides = input.preferredSide === -1 || input.preferredSide === 1
-    ? [input.preferredSide]
-    : [-1, 1] as const;
+  const sides: readonly (-1 | 1)[] = input.preferredSide === -1 || input.preferredSide === 1
+    ? [input.preferredSide, input.preferredSide === -1 ? 1 : -1]
+    : [-1, 1];
   const candidates = sides.map((side) => {
     const angle = input.entityYaw + Math.PI + (side * contract.quarterAngleRadians);
     const x = Math.max(
@@ -109,29 +125,45 @@ export function chopperExteriorReviewCameraPose(
       arena.maxZ - z,
     );
     const distanceM = Math.hypot(x - target[0], z - target[2]);
-    return { side, x, z, clearanceM, distanceM };
+    const cameraY = Math.max(
+      contract.minimumCameraY,
+      Math.min(
+        arena.maxCameraY,
+        target[1] + Math.max(contract.minimumVerticalOffsetM, span[1] * contract.verticalOffsetSpanRatio),
+      ),
+    );
+    const horizontalDistanceM = Math.hypot(x - target[0], z - target[2]);
+    return Object.freeze({
+      side,
+      position: Object.freeze([x, cameraY, z] as [number, number, number]),
+      target: Object.freeze([...target] as [number, number, number]),
+      yaw: Math.atan2(x - target[0], z - target[2]),
+      pitch: Math.atan2(target[1] - cameraY, Math.max(0.001, horizontalDistanceM)),
+      fov: contract.fovDegrees,
+      distanceM,
+      clearanceM,
+      inTestBay,
+    }) satisfies ChopperExteriorReviewCameraCandidate;
   });
-  candidates.sort((left, right) => (
-    (right.clearanceM + right.distanceM) - (left.clearanceM + left.distanceM)
-  ));
-  const candidate = candidates[0]!;
-  const cameraY = Math.max(
-    contract.minimumCameraY,
-    Math.min(
-      arena.maxCameraY,
-      target[1] + Math.max(contract.minimumVerticalOffsetM, span[1] * contract.verticalOffsetSpanRatio),
-    ),
-  );
-  const horizontalDistanceM = Math.hypot(candidate.x - target[0], candidate.z - target[2]);
-  return Object.freeze({
-    side: candidate.side,
-    position: Object.freeze([candidate.x, cameraY, candidate.z] as [number, number, number]),
-    target: Object.freeze([...target] as [number, number, number]),
-    yaw: Math.atan2(candidate.x - target[0], candidate.z - target[2]),
-    pitch: Math.atan2(target[1] - cameraY, Math.max(0.001, horizontalDistanceM)),
-    fov: contract.fovDegrees,
-    distanceM: candidate.distanceM,
-    clearanceM: candidate.clearanceM,
-    inTestBay,
-  });
+  if (input.preferredSide !== -1 && input.preferredSide !== 1) {
+    candidates.sort((left, right) => (
+      (right.clearanceM + right.distanceM) - (left.clearanceM + left.distanceM)
+    ));
+  }
+  for (const candidate of candidates) {
+    let world: ChopperExteriorReviewWorldAssessment;
+    try {
+      world = input.assessWorldCandidate(candidate);
+    } catch {
+      continue;
+    }
+    if (!world.cameraColliderClear
+      || !Number.isFinite(world.cameraClearanceRadiusM)
+      || world.cameraClearanceRadiusM <= 0
+      || !Number.isInteger(world.lineOfSightSampleCount)
+      || world.lineOfSightSampleCount <= 0
+      || world.clearLineOfSightSampleCount !== world.lineOfSightSampleCount) continue;
+    return Object.freeze({ ...candidate, world: Object.freeze({ ...world }) });
+  }
+  return null;
 }

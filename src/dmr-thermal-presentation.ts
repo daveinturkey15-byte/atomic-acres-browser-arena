@@ -7,7 +7,7 @@ export const DMR_THERMAL_WORLD_DRAW_CALLS = 0;
 export const DMR_THERMAL_OCCLUSION_CHECKS_PER_FRAME = 2;
 export const DMR_THERMAL_TARGET_POLICY = 'living-friendly-and-hostile' as const;
 export const DMR_THERMAL_OCCLUSION_POLICY = 'through-wall-reveal' as const;
-export const DMR_THERMAL_MODEL_POLICY = 'shared-exact-animated-operator-plus-orange-halo' as const;
+export const DMR_THERMAL_MODEL_POLICY = 'occlusion-conditioned-single-exact-animated-thermal-operator' as const;
 
 export type DmrThermalRelation = 'friendly' | 'hostile';
 

@@ -400,13 +400,30 @@
       "outcomeProjectionSha256": "b9b5db4494d47b6f0ed248b20eebd60f7fcda71c7c86bc0f8af825bff0aaee2f"
     },
     {
+      "id": "SRC-CODEX-P71-AUG13-001",
+      "kind": "codex-owner-feedback",
+      "externalLocator": "codex-task:pass71-owner-feedback-2026-08-13#feedback-and-publication-instruction",
+      "rawByteLength": 3172,
+      "rawSha256": "2bdd25b24988751ce7c6f73f92082d24791bc7acbac3ee8b4bfd1be2d64b7994",
+      "rawEndsWithCrLf": false,
+      "normalizedRepositoryPath": "docs/pass71-sources/codex-owner-feedback-2026-08-13.txt",
+      "normalization": "UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged",
+      "normalizedByteLength": 3139,
+      "normalizedSha256": "d63460747310522c02daea68eaf284e37914aff5c6a81c3d209cda6d96fee366",
+      "outcomeCollection": "codexPass71August13Outcomes",
+      "outcomeIdPrefix": "P71AUG13",
+      "outcomeCount": 18,
+      "lineAtomCounts": {"1":1,"3":1,"5":1,"7":1,"9":1,"11":1,"13":1,"15":1,"17":1,"19":1,"21":1,"23":1,"25":1,"27":1,"29":1,"31":1,"33":1,"35":1},
+      "outcomeProjectionSha256": "4ee51cf4436b9b6f7bb041b426c059b2bb2c669e29dd315fca609e91db58a153"
+    },
+    {
       "id": "SRC-CORRECTION-LEDGER-001",
       "kind": "canonical-correction-ledger",
       "repositoryPath": "docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md",
       "ledgerVersion": 1,
-      "latestFeedbackId": "HF-295",
-      "outcomeCount": 295,
-      "stateIndependentOutcomeSha256": "685cb870e171bbb85381a57f78d0349211131a516bed6e41acd9ca85ea6e8e91"
+      "latestFeedbackId": "HF-313",
+      "outcomeCount": 313,
+      "stateIndependentOutcomeSha256": "98ef6c593748d487cd555bb6ec4de0764c29bd613132081a5baa19431d781c1a"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -1090,7 +1107,7 @@
     "outcomeIdTemplate": "CORR-{feedbackId}",
     "sourceLocatorTemplate": "{feedbackId}.observation",
     "feedbackIdStart": "HF-001",
-    "feedbackIdEnd": "HF-295"
+    "feedbackIdEnd": "HF-313"
   },
   "supersessions": [
     {
@@ -1625,6 +1642,55 @@
         "HF-295"
       ],
       "canonicalText": "`HF-295` supersedes `HF-271`'s stop-before-publication requirement for this correction: Dave explicitly directs publication of the mechanically green exact Pass 70 hotfix without another local HITL run, while the immutable preview, acceptance manifest, exact-SHA gates and byte/provenance-exact retained Pass 69 and Pass 63 protections remain mandatory; this authorization does not claim Dave already tested the new immutable preview."
+    },
+    {
+      "id": "SUP-038",
+      "ledgerOrdinal": 38,
+      "sourceOutcomeIds": ["P71AUG13-001","CORR-HF-278","CORR-HF-287","CORR-HF-296"],
+      "feedbackIds": ["HF-278","HF-287","HF-296"],
+      "canonicalText": "`HF-296` reopens and strengthens `HF-278` and `HF-287`: the prior near-plane and synthetic contact evidence did not establish visible separation from actual shipped wall and floor geometry, so Pass 71 must independently falsify both player-shape escape and viewmodel intersection across real stance and map contact."
+    },
+    {
+      "id": "SUP-039",
+      "ledgerOrdinal": 39,
+      "sourceOutcomeIds": ["P71AUG13-002","CORR-HF-283","CORR-HF-288","CORR-HF-297"],
+      "feedbackIds": ["HF-283","HF-288","HF-297"],
+      "canonicalText": "`HF-297` reopens and strengthens `HF-283` and `HF-288`: prior procedural crop and bone telemetry did not establish acceptable complete-catalog anatomy or animation, and Pass 71 must include the pistol and knife while treating the supplied generated image as compositional evidence rather than a distributable asset."
+    },
+    {
+      "id": "SUP-040",
+      "ledgerOrdinal": 40,
+      "sourceOutcomeIds": ["P71AUG13-004","CORR-HF-281","CORR-HF-290","CORR-HF-299"],
+      "feedbackIds": ["HF-281","HF-290","HF-299"],
+      "canonicalText": "`HF-299` reopens and strengthens `HF-281` and `HF-290`: M14 EBR and Railgun wall reveal must be occlusion-conditioned, use one exact animated body presentation with one coherent thermal treatment, and never stack normal, orange and purple duplicate bodies."
+    },
+    {
+      "id": "SUP-041",
+      "ledgerOrdinal": 41,
+      "sourceOutcomeIds": ["P70AUG10-028","P70HOTFIX2-003","P71AUG13-009","CORR-HF-248","CORR-HF-289","CORR-HF-304"],
+      "feedbackIds": ["HF-248","HF-289","HF-304"],
+      "canonicalText": "`HF-304` reopens and strengthens `HF-248` and `HF-289`: cold-path preownership alone did not establish reliable break authority or gravity-backed debris lifecycle, so every authored pane and eligible weapon must converge without suspended fragments."
+    },
+    {
+      "id": "SUP-042",
+      "ledgerOrdinal": 42,
+      "sourceOutcomeIds": ["P70HITL3-008","P70HOTFIX2-008","P71AUG13-015","CORR-HF-285","CORR-HF-294","CORR-HF-310"],
+      "feedbackIds": ["HF-285","HF-294","HF-310"],
+      "canonicalText": "`HF-310` reopens and strengthens `HF-285` and `HF-294`: controller and CSS existence did not establish that actual local-success or local-victim Semtex and crossbow paths visibly present the central red alert, so both trusted attacker confirmation and canonical two-peer victim onset are mandatory evidence."
+    },
+    {
+      "id": "SUP-043",
+      "ledgerOrdinal": 43,
+      "sourceOutcomeIds": ["P70FFMP-001","P70FFMP-007","P70FFMP-008","P70FFMP-010","P71AUG13-016","CORR-HF-272","CORR-HF-274","CORR-HF-276","CORR-HF-311"],
+      "feedbackIds": ["HF-272","HF-274","HF-276","HF-311"],
+      "canonicalText": "`HF-311` strengthens `HF-272`, `HF-274` and `HF-276`: launch and compatibility evidence does not establish acceptable Firefox frame pacing, so Pass 71 freezes a same-machine, same-scene, same-Quality parity contract against installed Chrome without silent renderer or quality substitution."
+    },
+    {
+      "id": "SUP-044",
+      "ledgerOrdinal": 44,
+      "sourceOutcomeIds": ["P70HOTFIX2-009","P71AUG13-018","CORR-HF-295","CORR-HF-313"],
+      "feedbackIds": ["HF-295","HF-313"],
+      "canonicalText": "`HF-313` supersedes `HF-295`'s Pass 70 publication target: Dave explicitly directs the complete mechanically verified correction to replace public Pass 70 as live Pass 71 while retained Pass 69 and byte-exact Pass 63 remain independently selectable; this instruction authorizes protected publication after exact gates but does not fabricate unperformed manual HITL."
     }
   ],
   "testCatalog": [
@@ -7559,7 +7625,25 @@
     {"id":"HF-292","sourceOutcomeIds":["CORR-HF-292","P70HOTFIX2-006"],"planningRequirementIds":["R108","R113","R235","R304","R504","R608","R609"],"canonicalOwner":"Chopper cockpit framing and HUD","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-SUPPORT-RUNTIME","T-SUPPORT-VEHICLE-GATE","T-HUD-UNIT"],"artifactRefs":[]}},
     {"id":"HF-293","sourceOutcomeIds":["CORR-HF-293","P70HOTFIX2-007"],"planningRequirementIds":["R110","R304","R608","R609","R613"],"canonicalOwner":"Gun Range door depth and lighting presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-GUN-RANGE-TEST-BAY","T-PROFILE-AUTHORITY-E2E"],"artifactRefs":[]}},
     {"id":"HF-294","sourceOutcomeIds":["CORR-HF-294","P70HOTFIX2-008"],"planningRequirementIds":["R109","R223","R236","R304","R600","R604","R609","R610","R613"],"canonicalOwner":"Sticky-ordnance urgent HUD regression","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-HUD-E2E","T-HUD-UNIT","T-TIMED-MAP-WEAPONS"],"artifactRefs":[]}},
-    {"id":"HF-295","sourceOutcomeIds":["CORR-HF-295","P70HOTFIX2-009"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"],"canonicalOwner":"Pass 70 hotfix integration and protected release","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OWNER-GATE","T-RELEASE-SHELL"],"artifactRefs":[]}}
+    {"id":"HF-295","sourceOutcomeIds":["CORR-HF-295","P70HOTFIX2-009"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"],"canonicalOwner":"Pass 70 hotfix integration and protected release","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OWNER-GATE","T-RELEASE-SHELL"],"artifactRefs":[]}},
+    {"id":"HF-296","sourceOutcomeIds":["CORR-HF-296","P71AUG13-001"],"planningRequirementIds":["R105","R108","R110","R232","R307","R600","R605","R608","R610","R613"],"canonicalOwner":"Pass 71 player and viewmodel contact authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-VIEWMODEL-FRAMING","T-PRONE-CONTACT-MATRIX","T-WEAPON-PRESENTATION","T-PROFILE-AUTHORITY-E2E","T-NATIVE-FRAME-PACING"],"artifactRefs":[]}},
+    {"id":"HF-297","sourceOutcomeIds":["CORR-HF-297","P71AUG13-002"],"planningRequirementIds":["R105","R108","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R600","R608","R609","R613"],"canonicalOwner":"Pass 71 first-person arm rig and action framing","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-VIEWMODEL-FRAMING","T-WEAPON-PRESENTATION","T-WEAPON-ASSET-GATE"],"artifactRefs":[]}},
+    {"id":"HF-298","sourceOutcomeIds":["CORR-HF-298","P71AUG13-003"],"planningRequirementIds":["R003","R105","R108","R109","R232","R304","R307","R511","R600","R608","R610","R613"],"canonicalOwner":"First-grenade cold-path frame pacing","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FRAME-POLICY","T-NATIVE-FRAME-PACING","T-WEBGPU-ENDURANCE","T-TIMED-MAP-WEAPONS"],"artifactRefs":[]}},
+    {"id":"HF-299","sourceOutcomeIds":["CORR-HF-299","P71AUG13-004"],"planningRequirementIds":["R105","R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R236","R304","R510","R600","R605","R608","R609","R610","R613"],"canonicalOwner":"Occlusion-conditioned exact operator reveal","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RAILGUN","T-OPERATOR-GATE","T-WEAPON-PRESENTATION","T-PASS69-3-GLASS-M14-HITCH"],"artifactRefs":[]}},
+    {"id":"HF-300","sourceOutcomeIds":["CORR-HF-300","P71AUG13-005"],"planningRequirementIds":["R108","R109","R232","R304","R507","R508","R600","R605","R608","R609","R610","R613"],"canonicalOwner":"Piloted Drone exact thermal operator presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OPERATOR-GATE","T-SUPPORT-VISUAL-E2E","T-SUPPORT-VEHICLE-GATE"],"artifactRefs":[]}},
+    {"id":"HF-301","sourceOutcomeIds":["CORR-HF-301","P71AUG13-006"],"planningRequirementIds":["R003","R105","R108","R109","R232","R304","R307","R511","R600","R608","R610","R613"],"canonicalOwner":"Renderer forward-progress and submission ownership","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FRAME-POLICY","T-NATIVE-FRAME-PACING","T-WEBGPU-ENDURANCE"],"artifactRefs":[]}},
+    {"id":"HF-302","sourceOutcomeIds":["CORR-HF-302","P71AUG13-007"],"planningRequirementIds":["R109","R304","R307","R600","R609","R610","R613"],"canonicalOwner":"Long-run audio graph and buzz ownership","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-AUDIO","T-AUDIO-LONG-RUN","T-NATIVE-FRAME-PACING"],"artifactRefs":[]}},
+    {"id":"HF-303","sourceOutcomeIds":["CORR-HF-303","P71AUG13-008"],"planningRequirementIds":["R108","R110","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R304","R307","R600","R605","R608","R609","R610","R613"],"canonicalOwner":"Atomic Acres Quality-profile fidelity","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-PROFILE-AUTHORITY-E2E","T-SKY-WEBGPU","T-NATIVE-FRAME-PACING"],"artifactRefs":[]}},
+    {"id":"HF-304","sourceOutcomeIds":["CORR-HF-304","P71AUG13-009"],"planningRequirementIds":["R105","R108","R109","R111","R232","R307","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R600","R605","R608","R610","R613"],"canonicalOwner":"Glass break authority and debris lifecycle","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-DESTRUCTIBLE","T-PASS69-3-GLASS-M14-HITCH","T-PROFILE-AUTHORITY-E2E"],"artifactRefs":[]}},
+    {"id":"HF-305","sourceOutcomeIds":["CORR-HF-305","P71AUG13-010"],"planningRequirementIds":["R108","R110","R113","R304","R509","R511","R600","R608","R609","R613"],"canonicalOwner":"Gun Range Nuke warning presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-KILLSTREAK-DEMO-VIDEOS","T-SUPPORT-VISUAL-E2E","T-GUN-RANGE-TEST-BAY"],"artifactRefs":[]}},
+    {"id":"HF-306","sourceOutcomeIds":["CORR-HF-306","P71AUG13-011"],"planningRequirementIds":["R108","R113","R235","R304","R504","R608","R609","R613"],"canonicalOwner":"Pass 71 Chopper cockpit framing","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-SUPPORT-VISUAL-E2E","T-SUPPORT-VEHICLE-GATE","T-HUD-UNIT"],"artifactRefs":[]}},
+    {"id":"HF-307","sourceOutcomeIds":["CORR-HF-307","P71AUG13-012"],"planningRequirementIds":["R109","R113","R232","R304","R504","R510","R600","R604","R608","R610","R613"],"canonicalOwner":"Chopper machine-gun splash authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-SUPPORT-RUNTIME","T-SUPPORT-DAMAGE","T-NETWORK","T-MULTIPLAYER-STABILITY"],"artifactRefs":[]}},
+    {"id":"HF-308","sourceOutcomeIds":["CORR-HF-308","P71AUG13-013"],"planningRequirementIds":["R108","R109","R113","R232","R304","R504","R510","R600","R604","R608","R609","R610","R613"],"canonicalOwner":"Chopper missile spatial authority and presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-SUPPORT-RUNTIME","T-SUPPORT-FORWARD","T-SUPPORT-VISUAL-E2E","T-NETWORK","T-MULTIPLAYER-STABILITY"],"artifactRefs":[]}},
+    {"id":"HF-309","sourceOutcomeIds":["CORR-HF-309","P71AUG13-014"],"planningRequirementIds":["R003","R108","R109","R113","R304","R504","R511","R600","R608","R610","R613"],"canonicalOwner":"Chopper possession cold-path frame pacing","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FRAME-POLICY","T-NATIVE-FRAME-PACING","T-SUPPORT-VISUAL-E2E"],"artifactRefs":[]}},
+    {"id":"HF-310","sourceOutcomeIds":["CORR-HF-310","P71AUG13-015"],"planningRequirementIds":["R109","R223","R236","R304","R600","R604","R609","R610","R613"],"canonicalOwner":"Pass 71 local STUCK HUD authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-HUD-E2E","T-HUD-UNIT","T-TIMED-MAP-WEAPONS","T-MULTIPLAYER-STABILITY"],"artifactRefs":[]}},
+    {"id":"HF-311","sourceOutcomeIds":["CORR-HF-311","P71AUG13-016"],"planningRequirementIds":["R002","R003","R004","R105","R108","R304","R307","R511","R600","R604","R608","R610","R613"],"canonicalOwner":"Firefox cross-engine frame-pacing parity","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-INSTALLED-FIREFOX","T-NATIVE-FRAME-PACING","T-FRAME-POLICY"],"artifactRefs":[]}},
+    {"id":"HF-312","sourceOutcomeIds":["CORR-HF-312","P71AUG13-017"],"planningRequirementIds":["R003","R304","R307","R600","R608","R610","R613"],"canonicalOwner":"Pass 71 bounded code-health consolidation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FRAME-POLICY","T-OWNER-GATE","T-TEXT-INTEGRITY"],"artifactRefs":[]}},
+    {"id":"HF-313","sourceOutcomeIds":["CORR-HF-313","P71AUG13-018"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"],"canonicalOwner":"Pass 71 integration and protected release","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OWNER-GATE","T-RELEASE-SHELL"],"artifactRefs":[]}}
   ],
   "desktopUntitledOutcomes": [
     {
@@ -9352,5 +9436,25 @@
     {"id":"P70HOTFIX2-007","sourceLocator":"L13#1","normalizedOutcome":"Gun Range killstreak-room entrance blue and orange bars or lights must not flicker or z-fight.","feedbackIds":["HF-293"],"planningRequirementIds":["R110","R304","R608","R609","R613"]},
     {"id":"P70HOTFIX2-008","sourceLocator":"L15#1","normalizedOutcome":"Semtex and explosive-crossbow attachments must present the loud central red 500 ms STUCK warning in addition to compact status.","feedbackIds":["HF-294"],"planningRequirementIds":["R109","R223","R236","R304","R600","R604","R609","R610","R613"]},
     {"id":"P70HOTFIX2-009","sourceLocator":"L17#1","normalizedOutcome":"Publish the mechanically green correction live as Pass 70 without another local HITL run while retaining exact Pass 69 and Pass 63.","feedbackIds":["HF-295"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"]}
+  ],
+  "codexPass71August13Outcomes": [
+    {"id":"P71AUG13-001","sourceLocator":"L1#1","normalizedOutcome":"Correct both authoritative-player and first-person-presentation floor or wall clipping, especially while prone, without changing camera, muzzle or shot results.","feedbackIds":["HF-296"],"planningRequirementIds":["R105","R108","R110","R232","R307","R600","R605","R608","R610","R613"]},
+    {"id":"P71AUG13-002","sourceLocator":"L3#1","normalizedOutcome":"Make both arms remain connected beyond the lower crop with strong natural proportions and correct firearm, pistol and knife alignment and animation, using the supplied image only as composition reference.","feedbackIds":["HF-297"],"planningRequirementIds":["R105","R108","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R600","R608","R609","R613"]},
+    {"id":"P71AUG13-003","sourceLocator":"L5#1","normalizedOutcome":"Eliminate the first-grenade throw freeze by preowning the exact projectile, physics, audio, effect and renderer path before the action frame.","feedbackIds":["HF-298"],"planningRequirementIds":["R003","R105","R108","R109","R232","R304","R307","R511","R600","R608","R610","R613"]},
+    {"id":"P71AUG13-004","sourceLocator":"L7#1","normalizedOutcome":"Restore M14 EBR and Railgun wall reveals as one clear exact animated operator treatment with no orange and purple stack and normal presentation when unobstructed.","feedbackIds":["HF-299"],"planningRequirementIds":["R105","R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R236","R304","R510","R600","R605","R608","R609","R610","R613"]},
+    {"id":"P71AUG13-005","sourceLocator":"L9#1","normalizedOutcome":"Piloted Drone thermal perception must show one exact animated operator model rather than overlapping duplicates.","feedbackIds":["HF-300"],"planningRequirementIds":["R108","R109","R232","R304","R507","R508","R600","R605","R608","R609","R610","R613"]},
+    {"id":"P71AUG13-006","sourceLocator":"L11#1","normalizedOutcome":"Reproduce and correct the captured 1146 ms no-GPU-progress failure with two pending submissions without weakening the renderer watchdog.","feedbackIds":["HF-301"],"planningRequirementIds":["R003","R105","R108","R109","R232","R304","R307","R511","R600","R608","R610","R613"]},
+    {"id":"P71AUG13-007","sourceLocator":"L13#1","normalizedOutcome":"Locate and remove the intermittent unintended buzzing while preserving intended match audio.","feedbackIds":["HF-302"],"planningRequirementIds":["R109","R304","R307","R600","R609","R610","R613"]},
+    {"id":"P71AUG13-008","sourceLocator":"L15#1","normalizedOutcome":"Restore Atomic Acres authored assets, textures and presentation fidelity on the Quality profile without silently changing gameplay authority.","feedbackIds":["HF-303"],"planningRequirementIds":["R108","R110","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R304","R307","R600","R605","R608","R609","R610","R613"]},
+    {"id":"P71AUG13-009","sourceLocator":"L17#1","normalizedOutcome":"Make every authored pane break reliably under eligible weapons and ensure detached glass falls, settles and disposes instead of floating in mid-air.","feedbackIds":["HF-304"],"planningRequirementIds":["R105","R108","R109","R111","R232","R307","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R600","R605","R608","R610","R613"]},
+    {"id":"P71AUG13-010","sourceLocator":"L19#1","normalizedOutcome":"Keep the Nuke pre-explosion visible inside the Gun Range killstreak room and make its bounded warning more dramatic and threatening.","feedbackIds":["HF-305"],"planningRequirementIds":["R108","R110","R113","R304","R509","R511","R600","R608","R609","R613"]},
+    {"id":"P71AUG13-011","sourceLocator":"L21#1","normalizedOutcome":"Extend Chopper Gunner cockpit side bars higher without approaching or obscuring the crosshair.","feedbackIds":["HF-306"],"planningRequirementIds":["R108","R113","R235","R304","R504","R608","R609","R613"]},
+    {"id":"P71AUG13-012","sourceLocator":"L23#1","normalizedOutcome":"Give the Chopper Gunner machine gun host-authoritative splash damage with an effective hit volume exactly three times the preceding direct tolerance.","feedbackIds":["HF-307"],"planningRequirementIds":["R109","R113","R232","R304","R504","R510","R600","R604","R608","R610","R613"]},
+    {"id":"P71AUG13-013","sourceLocator":"L25#1","normalizedOutcome":"Make possessed Chopper Gunner missiles originate at the chopper rather than the sky while retaining the six-round one-second-cadence authority.","feedbackIds":["HF-308"],"planningRequirementIds":["R108","R109","R113","R232","R304","R504","R510","R600","R604","R608","R609","R610","R613"]},
+    {"id":"P71AUG13-014","sourceLocator":"L27#1","normalizedOutcome":"Eliminate the first Chopper Gunner entry freeze by preparing cockpit, support, weapon, audio and renderer resources before possession.","feedbackIds":["HF-309"],"planningRequirementIds":["R003","R108","R109","R113","R304","R504","R511","R600","R608","R610","R613"]},
+    {"id":"P71AUG13-015","sourceLocator":"L29#1","normalizedOutcome":"Show a loud true-centre red STUCK alert for exactly 500 ms both on trusted local-success and canonical local-victim Semtex and explosive-crossbow attachments.","feedbackIds":["HF-310"],"planningRequirementIds":["R109","R223","R236","R304","R600","R604","R609","R610","R613"]},
+    {"id":"P71AUG13-016","sourceLocator":"L31#1","normalizedOutcome":"Measure and correct Firefox same-scene Quality frame pacing so it is essentially comparable to Chrome without software fallback, silent quality loss or threshold weakening.","feedbackIds":["HF-311"],"planningRequirementIds":["R002","R003","R004","R105","R108","R304","R307","R511","R600","R604","R608","R610","R613"]},
+    {"id":"P71AUG13-017","sourceLocator":"L33#1","normalizedOutcome":"Streamline only the touched systems where measured duplicate ownership, cold factories or structural friction exists, with complete regression coverage and no broad rewrite.","feedbackIds":["HF-312"],"planningRequirementIds":["R003","R304","R307","R600","R608","R610","R613"]},
+    {"id":"P71AUG13-018","sourceLocator":"L35#1","normalizedOutcome":"Publish the complete correction as live Pass 71 replacing Pass 70 while preserving independently selectable Pass 69 and byte-exact Pass 63.","feedbackIds":["HF-313"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"]}
   ]
 }

@@ -192,7 +192,6 @@ describe('Pass 65 sound-event inventory', () => {
       'support.carpet-aircraft',
       'support.drone-rotor',
       'shed.door-motion',
-      'ambience.arena-bed',
     ];
     const worldLoops = SOUND_EVENT_INVENTORY.filter((event) =>
       event.concurrency.aggregatePoolId === 'world-continuous');
@@ -240,6 +239,12 @@ describe('Pass 65 sound-event inventory', () => {
     expect(verifySoundEventInventory(SOUND_EVENT_INVENTORY, {
       observedRuntimeEmitterSymbols: observed.map((callsite) => callsite.emitterSymbol),
     })).toEqual([]);
+    expect(expected).toContainEqual({
+      sourcePath: 'src/legacy-main.ts',
+      emitterSymbol: 'nukeWarning',
+      argumentSignature: 'accessibilityRuntime.reducedSensory',
+      occurrences: 1,
+    });
   });
 
   it('resolves every observed emitter symbol and maps every current event to semantic callsites', () => {
@@ -252,12 +257,19 @@ describe('Pass 65 sound-event inventory', () => {
     for (const symbol of emitterSymbols) expect(audioSource).toMatch(new RegExp(`\\n  ${symbol}\\(`));
   });
 
-  it('pins current weapon variants and all four implemented arena ambience identities', () => {
+  it('pins current weapon variants and all four event-driven arena ambience identities', () => {
     expect(PASS64_WEAPON_AUDIO_VARIANTS).toEqual(WEAPON_IDS);
     const ambience = SOUND_EVENT_INVENTORY.find((event) => event.id === 'ambience.arena-bed');
     expect(ambience).toBeDefined();
     const coveredArenaIds = new Set(ambience!.variants.ids.map((variant) => variant.split('.')[0]));
     expect(coveredArenaIds).toEqual(new Set(ARENA_SELECTIONS.map((arena) => arena.id)));
+    expect(ambience).toMatchObject({
+      spatialProfileId: 'arena-event-driven-detail-v1',
+      concurrency: { scope: 'global', aggregatePoolId: 'world-dense-transient' },
+      coverage: { status: 'partial' },
+    });
+    expect(ambience!.variants.ids.join(' ')).not.toMatch(/\b(?:buzz|hum|wind|hvac|ventilation|duct|noise)\b|engine-wash/iu);
+    expect(ambience!.coverage.detail).toContain('owns no scheduled, shared-noise, narrowband, broadband, or continuous source');
   });
 
   it('keeps observed and planned provenance claims mechanically distinct', () => {
@@ -275,7 +287,7 @@ describe('Pass 65 sound-event inventory', () => {
   it('has a stable inventory digest', () => {
     const digest = createHash('sha256').update(canonicalSoundEventInventoryJson()).digest('hex');
     expect(REQUIRED_SOUND_EVENT_IDS).toHaveLength(SOUND_EVENT_INVENTORY.length);
-    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('1e33f1b8b8ab4a334d63bcca8731f4b98e9222f772f4733210e653bbb09c3a55');
+    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('d92cb47cb29f4b2607bfd76b6bc59ea8c214f15d07978ecb75b97fbc1318aabb');
     expect(digest).toBe(SOUND_EVENT_INVENTORY_SHA256);
   });
 });

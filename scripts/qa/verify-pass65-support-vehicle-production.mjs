@@ -38,6 +38,7 @@ const expectedRefinementContracts = Object.freeze({
     visualRevision: 'pass70-connected-rear-tail-airframe-v7',
     detailContract: 'continuous-rear-tail-silhouette-cockpit-clear-sightline-v7',
     materialRevision: 'pass70-daylight-readable-olive-pbr-v1',
+    firstPersonCockpitFraming: 'pass71-tall-pillars-centre-clear-v1',
   }),
   care: Object.freeze({
     visualRevision: 'close-range-heavy-cargo-aircraft-v4',
@@ -64,8 +65,9 @@ for (const [label, entry] of [['chopper', chopperEntry], ['aircraft', aircraftEn
 }
 if (chopperEntry.visualRevision !== expectedRefinementContracts.chopper.visualRevision
   || chopperEntry.detailContract !== expectedRefinementContracts.chopper.detailContract
-  || chopperEntry.materialRevision !== expectedRefinementContracts.chopper.materialRevision) {
-  failures.push('chopper: production manifest does not pin the Pass 70 complete authored vehicle/material refinement');
+  || chopperEntry.materialRevision !== expectedRefinementContracts.chopper.materialRevision
+  || chopperEntry.firstPersonCockpitFraming !== expectedRefinementContracts.chopper.firstPersonCockpitFraming) {
+  failures.push('chopper: production manifest does not pin the complete authored vehicle/material/Pass 71 cockpit framing refinement');
 }
 for (const [variant, expected] of Object.entries(expectedRefinementContracts)) {
   if (variant === 'chopper') continue;
@@ -87,10 +89,17 @@ const menuPreviewProvenance = JSON.parse(await readFile(
   resolveRepoPath('source-assets/menu/pass65-preview-masters/provenance.json'),
   'utf8',
 ));
-if (menuPreviewProvenance.authoredCockpit?.assetId !== chopperEntry.id
-  || menuPreviewProvenance.authoredCockpit?.sha256 !== chopperEntry.sourceBlend.sha256
-  || menuPreviewProvenance.authoredCockpit?.qualityTier !== 'LOD0') {
-  failures.push('prerecorded menu previews are stale against the release-ready authored chopper cockpit');
+const menuPreviewCockpit = menuPreviewProvenance.authoredCockpit;
+if (menuPreviewCockpit?.assetId !== chopperEntry.id
+  || menuPreviewCockpit?.qualityTier !== 'LOD0'
+  || typeof menuPreviewCockpit?.path !== 'string'
+  || typeof menuPreviewCockpit?.sha256 !== 'string') {
+  failures.push('prerecorded menu previews lack their exact retained authored cockpit reference');
+} else {
+  await verifyRecord(
+    { path: menuPreviewCockpit.path, sha256: menuPreviewCockpit.sha256 },
+    'prerecorded menu preview retained cockpit source',
+  );
 }
 if (JSON.stringify(menuPreviewProvenance.sources?.map((source) => source.arenaId).sort())
   !== JSON.stringify(['atomic-acres', 'gun-range', 'rustworks-1v1', 'skyline-terminal'])) {
@@ -109,7 +118,7 @@ else {
     'assert len(roots)==3',
     "required={'chopper-rear-fuselage','chopper-tail-boom','chopper-tail-fin','chopper-first-person-cockpit','chopper-gunner-sightline','chopper-gunner-weapon-view','chopper-nose-sensor'}",
     "assert all(required.issubset({c.get('canonical_node_name') for c in r.children_recursive}) for r in roots)",
-    "assert all(r.get('visual_revision')=='pass70-connected-rear-tail-airframe-v7' and r.get('detail_contract')=='continuous-rear-tail-silhouette-cockpit-clear-sightline-v7' and r.get('material_revision')=='pass70-daylight-readable-olive-pbr-v1' for r in roots)",
+    "assert all(r.get('visual_revision')=='pass70-connected-rear-tail-airframe-v7' and r.get('detail_contract')=='continuous-rear-tail-silhouette-cockpit-clear-sightline-v7' and r.get('material_revision')=='pass70-daylight-readable-olive-pbr-v1' and r.get('first_person_cockpit_framing')=='pass71-tall-pillars-centre-clear-v1' for r in roots)",
     "names=lambda r:[str(c.get('canonical_node_name','')) for c in r.children_recursive]",
     "count=lambda r,prefix:sum(n.startswith(prefix) for n in names(r))",
     "lod0=next(r for r in roots if r.get('quality_tier')=='LOD0')",

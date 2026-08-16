@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { segmentIntersectsBox, type Box2 } from './collision';
-import { selectPlayableWindowApproach, windowBreakPathBlocked } from './window-breaks';
+import {
+  selectPlayableWindowApproach,
+  windowBlastLineOfSightColliders,
+  windowBreakPathBlocked,
+} from './window-breaks';
 
 const bounds: Box2 = { minX: -40, maxX: 40, minZ: -40, maxZ: 40 };
 
@@ -14,6 +18,47 @@ describe('breakable-window admission geometry', () => {
 
     const realCover: Box2 = { minX: -2, maxX: 2, minZ: 1.5, maxZ: 2, minY: 0, maxY: 3 };
     expect(windowBreakPathBlocked(origin, centre, [realCover])).toBe(true);
+  });
+
+  it('does not let a target pane occlude its own projectile contact blast', () => {
+    const origin = { x: 0, y: 1.6, z: 0.21 };
+    const centre = { x: 0, y: 1.6, z: 0 };
+    const targetPane: Box2 = { minX: -2, maxX: 2, minZ: -0.04, maxZ: 0.04, minY: 0, maxY: 3 };
+    expect(segmentIntersectsBox(origin, centre, targetPane)).toBe(true);
+    expect(windowBreakPathBlocked(origin, centre, [targetPane])).toBe(false);
+
+    const realCover: Box2 = { minX: -2, maxX: 2, minZ: 0.13, maxZ: 0.17, minY: 0, maxY: 3 };
+    expect(windowBreakPathBlocked(origin, centre, [targetPane, realCover])).toBe(true);
+  });
+
+  it('excludes only the exact impacted pane while retaining real cover and every other pane', () => {
+    const targetPane: Box2 = Object.freeze({ minX: -2, maxX: 2, minZ: -0.04, maxZ: 0.04, minY: 0, maxY: 3 });
+    const otherPane: Box2 = Object.freeze({ minX: -2, maxX: 2, minZ: 0.5, maxZ: 0.54, minY: 0, maxY: 3 });
+    const realCover: Box2 = Object.freeze({ minX: -2, maxX: 2, minZ: 0.13, maxZ: 0.17, minY: 0, maxY: 3 });
+    const paneIds = new WeakMap<Box2, string>([
+      [targetPane, 'target-pane'],
+      [otherPane, 'other-pane'],
+    ]);
+    const snapshot = Object.freeze([targetPane, realCover, otherPane]);
+    const filtered = windowBlastLineOfSightColliders(
+      snapshot,
+      'target-pane',
+      (collider) => paneIds.get(collider) ?? null,
+    );
+
+    expect(filtered).toEqual([realCover, otherPane]);
+    expect(filtered[0]).toBe(realCover);
+    expect(filtered[1]).toBe(otherPane);
+    expect(Object.isFrozen(filtered)).toBe(true);
+    expect(windowBreakPathBlocked(
+      { x: 0, y: 1.6, z: 0.21 },
+      { x: 0, y: 1.6, z: 0 },
+      filtered,
+    )).toBe(true);
+    expect(windowBlastLineOfSightColliders(snapshot, 'missing-pane', (collider) => (
+      paneIds.get(collider) ?? null
+    ))).toEqual(snapshot);
+    expect(windowBlastLineOfSightColliders(snapshot, null, () => null)).toBe(snapshot);
   });
 
   it('selects an in-bounds playable side when the requested exterior pose crosses the arena edge', () => {

@@ -168,23 +168,23 @@ describe('railgun report presentation', () => {
       bus,
       firstReportVoices.filter((voice) => voice.bus === bus).length,
     ]));
-    expect(audio.telemetry().runtime).toMatchObject({ voices: 13, spatialChains: 2, dropped: 0 });
+    expect(audio.telemetry().runtime).toMatchObject({ voices: 22, spatialChains: 6, dropped: 0 });
     expect(audio.telemetry().railgun.layerCount).toBe(firstReportVoices.length);
     expect(firstBusCounts).toEqual({ sfx: 7, ambience: 3 });
     expect(firstBusCounts.sfx).toBeLessThanOrEqual(AUDIO_RUNTIME_BUDGET.perBus.sfx);
     expect(firstBusCounts.ambience).toBeLessThanOrEqual(AUDIO_RUNTIME_BUDGET.perBus.ambience);
     expect(firstVoices.length).toBeLessThanOrEqual(AUDIO_RUNTIME_BUDGET.globalVoices);
-    expect(context.panners).toHaveLength(2);
+    expect(context.panners).toHaveLength(6);
     expect(context.panners.every((panner) => !panner.disconnected)).toBe(true);
 
     await vi.advanceTimersByTimeAsync(1_100);
-    expect(audio.telemetry().runtime).toMatchObject({ voices: 3, spatialChains: 0 });
-    expect(context.panners.every((panner) => panner.disconnected)).toBe(true);
+    expect(audio.telemetry().runtime).toMatchObject({ voices: 12, spatialChains: 4 });
+    expect(context.panners.filter((panner) => !panner.disconnected)).toHaveLength(4);
 
     audio.railgunReport(true, { x: -18, y: 2.1, z: 32 });
-    expect(audio.telemetry().runtime).toMatchObject({ voices: 13, spatialChains: 2, dropped: 0 });
-    expect(context.panners).toHaveLength(4);
-    expect(context.panners.filter((panner) => !panner.disconnected)).toHaveLength(2);
+    expect(audio.telemetry().runtime).toMatchObject({ voices: 22, spatialChains: 6, dropped: 0 });
+    expect(context.panners).toHaveLength(8);
+    expect(context.panners.filter((panner) => !panner.disconnected)).toHaveLength(6);
     audio.dispose();
     expect(audio.telemetry().runtime).toMatchObject({ voices: 0, spatialChains: 0 });
     expect(context.panners.every((panner) => panner.disconnected)).toBe(true);

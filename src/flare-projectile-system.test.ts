@@ -254,6 +254,26 @@ describe('flare projectile system', () => {
     expect(pulse).not.toHaveBeenCalled();
   });
 
+  it('carries the exact collided pane into the impact event', () => {
+    const system = new FlareProjectileSystem(new THREE.Scene(), true);
+    const impact = vi.fn();
+    expect(system.spawn({
+      ownerId: 'player-a', ownerTeam: 0, origin: new THREE.Vector3(), direction: new THREE.Vector3(1, 0, 0),
+      authority: true, actionNonce: 89, now: 0,
+    })).toBe(true);
+    system.update(0.05, 50, callbacks({
+      worldCollisionFraction: () => Object.freeze({
+        fraction: 0.5,
+        breakableWindowId: 'atomic-aqua:ground-window-glass',
+      }),
+      onImpact: impact,
+    }));
+    expect(impact).toHaveBeenCalledWith(expect.objectContaining({
+      breakableWindowId: 'atomic-aqua:ground-window-glass',
+      actionNonce: 89,
+    }));
+  });
+
   it('fails closed when the fixed pool is exhausted', () => {
     const system = new FlareProjectileSystem(new THREE.Scene(), true);
     for (let index = 0; index < FLARE_PROJECTILE_EFFECT.poolCapacity; index += 1) {

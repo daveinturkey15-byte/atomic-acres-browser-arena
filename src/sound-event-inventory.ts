@@ -245,7 +245,8 @@ type PlannedEventInput = Readonly<{
 }>;
 
 export const RUNTIME_AUDIO_NON_EVENT_METHODS = Object.freeze([
-  'configure', 'dispose', 'prepareCombat', 'prepareGlassImpact', 'resume', 'suspend', 'telemetry', 'unlock', 'updateListener',
+  'configure', 'dispose', 'prepareChopperRotors', 'prepareCombat', 'prepareGlassImpact', 'prepareGrenadeEffects',
+  'resume', 'suspend', 'telemetry', 'unlock', 'updateListener',
 ] as const);
 
 export type RuntimeSoundCallsiteContractEntry = Readonly<{
@@ -321,7 +322,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('minigunDrive', "weaponView.minigunSpoolFraction(),weaponView.minigunSpoolPhase(),gameStarted && player.alive && player.weapon === 'minigun'", 1, ['weapon.minigun-drive']),
   runtimeCallsite('nearMiss', 'nearMissStrength(player.position, origin, visibleEnd)', 2, ['combat.near-miss']),
   runtimeCallsite('nukeDetonation', '', 1, ['support.nuke-detonation']),
-  runtimeCallsite('nukeWarning', '', 1, ['support.nuke-warning']),
+    runtimeCallsite('nukeWarning', 'accessibilityRuntime.reducedSensory', 1, ['support.nuke-warning']),
   runtimeCallsite('overdriveAvailable', '', 1, ['pickup.overdrive-available']),
   runtimeCallsite('overdriveExpire', '', 1, ['pickup.overdrive-expired']),
   runtimeCallsite('overdrivePickup', '', 1, ['pickup.overdrive-claimed']),
@@ -970,15 +971,16 @@ const events: SoundEventInventoryEntry[] = [
   }),
   existingEvent({
     id: 'ambience.arena-bed', family: 'arena-ambience', bus: 'ambience', delivery: 'world-spatial',
-    spatialProfileId: 'arena-ambience-bed-v1',
+    spatialProfileId: 'arena-event-driven-detail-v1',
     variants: [
-      'atomic-acres.wind', 'atomic-acres.grid-hum',
-      'skyline-terminal.hvac', 'skyline-terminal.engine-wash',
-      'rustworks-1v1.duct', 'rustworks-1v1.stressed-metal',
-      'gun-range.ventilation', 'gun-range.ballast-buzz',
+      'atomic-acres.zone-transition', 'atomic-acres.world-actions',
+      'skyline-terminal.surface-footsteps', 'skyline-terminal.support-actions',
+      'rustworks-1v1.surface-footsteps', 'rustworks-1v1.shed-actions',
+      'gun-range.surface-footsteps', 'gun-range.test-bay-actions',
     ],
-    emitterSymbols: ['setArena'], contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'arena-generation',
-    coverageDetail: 'Every arena owns two distinct repository-procedural continuous sources, replaced atomically at arena generation changes.',
+    emitterSymbols: ['setArena'], contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'arena-generation',
+    coverageStatus: 'partial',
+    coverageDetail: 'Arena selection owns no scheduled, shared-noise, narrowband, broadband, or continuous source. Bounded event-driven footsteps, impacts, interactions, and support actions retain arena detail through their semantic emitters.',
   }),
   plannedEvent({
     id: 'ambience.menu-helicopter', family: 'arena-ambience', bus: 'ambience', delivery: 'world-spatial',
@@ -1004,7 +1006,7 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
   schemaVersion: SOUND_EVENT_INVENTORY_SCHEMA_VERSION,
   events: SOUND_EVENT_INVENTORY,
 });
-export const SOUND_EVENT_INVENTORY_SHA256 = '1e33f1b8b8ab4a334d63bcca8731f4b98e9222f772f4733210e653bbb09c3a55';
+export const SOUND_EVENT_INVENTORY_SHA256 = 'd92cb47cb29f4b2607bfd76b6bc59ea8c214f15d07978ecb75b97fbc1318aabb';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

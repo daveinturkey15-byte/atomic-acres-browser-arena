@@ -38,14 +38,21 @@ describe('Semtex live-stick runtime integration', () => {
     const armStart = source.indexOf('function armImpactGrenade(');
     const armEnd = source.indexOf('\nfunction updateGrenades(', armStart);
     const arm = source.slice(armStart, armEnd);
-    expect(arm).toContain('if (targetId === player.id) {');
-    expect(arm).toContain("presentStickyVictimUrgentAlert('semtex', targetId, targetLifeId, grenade.actionNonce, now)");
+    expect(arm).toContain('const recordedAttachment = receiverCanAuthorAttachment ? recordReceiverStickyAttachment({');
+    expect(arm).toContain("source: 'semtex'");
+    expect(arm).toContain('if (recordedAttachment) publishStickyAttachmentOnset(recordedAttachment);');
 
-    const alertStart = source.indexOf('function presentStickyVictimUrgentAlert(');
+    const alertStart = source.indexOf('function presentStickyUrgentAlert(');
     const alertEnd = source.indexOf('\nconst hostTriggerAuthorities', alertStart);
     const alert = source.slice(alertStart, alertEnd);
-    expect(alert).toContain('targetId !== player.id || targetLifeId !== localContinuity');
+    expect(alert).toContain("audience === 'victim' && attachedTargetId !== player.id");
+    expect(alert).toContain('recipientId: player.id');
+    expect(alert).toContain("network.role === 'client' ? localHostConfirmedContinuity : localContinuity");
+    expect(alert).toContain('if (recipientLifeId === null) return false;');
+    expect(alert).toContain('recipientLifeId,');
     expect(alert).toContain("warning.style.setProperty('--sticky-warning-duration', `${STICKY_VICTIM_URGENT_ALERT_DURATION_MS}ms`)");
-    expect(alert).toContain('Math.max(0, alert.expiresAtMs - performance.now())');
+    expect(alert).toContain('const presentedAtMs = performance.now();');
+    expect(alert).toContain('const expiresAtMs = presentedAtMs + STICKY_VICTIM_URGENT_ALERT_DURATION_MS;');
+    expect(alert).toContain('Math.max(0, expiresAtMs - performance.now())');
   });
 });
