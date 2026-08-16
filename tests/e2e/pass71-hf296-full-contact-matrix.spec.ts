@@ -629,6 +629,9 @@ async function runRemoteProjectionSweep(
     }
     let markerObserved: any = null;
     for (let attempt = 0; attempt < 360; attempt += 1) {
+      if (api.authorizeHf296RemoteProjectionWeapon('flashlight-pistol') !== markerRemote?.id) {
+        throw new Error(`HF-296 sentinel-ready marker authorization renewal failed ${arenaId}/${projectionRole}`);
+      }
       markerObserved = api.sampleHf296RemoteProjection()[0];
       if (markerObserved?.weapon === 'flashlight-pistol') break;
       await frame();
@@ -664,13 +667,13 @@ async function runRemoteProjectionSweep(
     }
     let actorAcknowledgement: any = null;
     for (let attempt = 0; attempt < 360; attempt += 1) {
+      if (api.authorizeHf296RemoteProjectionWeapon('explosive-crossbow') !== markerRemote?.id) {
+        throw new Error(`HF-296 sentinel acknowledgement authorization renewal failed ${arenaId}/${projectionRole}`);
+      }
       actorAcknowledgement = api.sampleHf296RemoteProjection()[0];
       if (actorAcknowledgement?.weapon === 'explosive-crossbow'
         && actorAcknowledgement?.stance === 'crouch') break;
-      if (attempt > 0 && attempt % 15 === 0) {
-        if (api.authorizeHf296RemoteProjectionWeapon('explosive-crossbow') !== markerRemote?.id) {
-          throw new Error(`HF-296 sentinel acknowledgement authorization renewal failed ${arenaId}/${projectionRole}`);
-        }
+      if (attempt > 0) {
         const retry = api.publishHf296RemoteProjectionState();
         if (retry?.weapon !== 'flare-gun' || retry?.stance !== 'prone') {
           throw new Error(`HF-296 sentinel retry publication failed ${arenaId}/${projectionRole}`);
@@ -711,6 +714,9 @@ async function runRemoteProjectionSweep(
       }
       let remote: any = null;
       for (let attempt = 0; attempt < 360; attempt += 1) {
+        if (api.authorizeHf296RemoteProjectionWeapon(weapon) !== expectedSourcePlayerId) {
+          throw new Error(`HF-296 projection authorization renewal failed ${arenaId}/${projectionRole}/${fixture.kind}/${stance}/${weapon}`);
+        }
         remote = api.sampleHf296RemoteProjection()[0];
         const fixtureDistance = finiteVector(remote?.authoritativePosition)
           ? Math.hypot(remote.authoritativePosition[0] - fixture.x, remote.authoritativePosition[2] - fixture.z)
@@ -723,15 +729,11 @@ async function runRemoteProjectionSweep(
         // confirmation before a slow native peer samples it. Republish the
         // same still-current confirmation until the actor answers with the
         // position-bound first cell; later cells use their normal ack chain.
-        if (cellIndex === 0 && attempt > 0 && attempt % 15 === 0) {
+        if (cellIndex === 0 && attempt > 0) {
           const retry = api.publishHf296RemoteProjectionState();
           if (retry?.weapon !== 'pistol' || retry?.stance !== 'crouch') {
             throw new Error(`HF-296 observer confirmation retry failed ${arenaId}/${projectionRole}`);
           }
-        }
-        if (attempt > 0 && attempt % 60 === 0
-          && api.authorizeHf296RemoteProjectionWeapon(weapon) !== expectedSourcePlayerId) {
-          throw new Error(`HF-296 projection authorization renewal failed ${arenaId}/${projectionRole}/${fixture.kind}/${stance}/${weapon}`);
         }
         await frame();
       }
@@ -868,12 +870,12 @@ async function runRemoteProjectionSweep(
     let sentinel = false;
     let sentinelObserved: any = null;
     for (let attempt = 0; attempt < 360; attempt += 1) {
+      if (api.authorizeHf296RemoteProjectionWeapon('flare-gun') !== sentinelRemote?.id) {
+        throw new Error(`HF-296 sentinel authorization renewal failed ${arenaId}/${projectionRole}`);
+      }
       sentinelObserved = api.sampleHf296RemoteProjection()[0];
       if (sentinelObserved?.weapon === 'flare-gun' && sentinelObserved?.stance === 'prone') { sentinel = true; break; }
-      if (attempt > 0 && attempt % 15 === 0) {
-        if (api.authorizeHf296RemoteProjectionWeapon('flare-gun') !== sentinelRemote?.id) {
-          throw new Error(`HF-296 sentinel authorization renewal failed ${arenaId}/${projectionRole}`);
-        }
+      if (attempt > 0) {
         const retry = api.publishHf296RemoteProjectionState();
         if (retry?.weapon !== 'flashlight-pistol') {
           throw new Error(`HF-296 actor sentinel retry publication failed ${arenaId}/${projectionRole}`);
@@ -899,13 +901,13 @@ async function runRemoteProjectionSweep(
     let observerConfirmed = false;
     let observerConfirmation: any = null;
     for (let attempt = 0; attempt < 360; attempt += 1) {
+      if (api.authorizeHf296RemoteProjectionWeapon('pistol') !== sentinelRemote?.id) {
+        throw new Error(`HF-296 observer confirmation authorization renewal failed ${arenaId}/${projectionRole}`);
+      }
       observerConfirmation = api.sampleHf296RemoteProjection()[0];
       if (observerConfirmation?.weapon === 'pistol'
         && observerConfirmation?.stance === 'crouch') { observerConfirmed = true; break; }
-      if (attempt > 0 && attempt % 15 === 0) {
-        if (api.authorizeHf296RemoteProjectionWeapon('pistol') !== sentinelRemote?.id) {
-          throw new Error(`HF-296 observer confirmation authorization renewal failed ${arenaId}/${projectionRole}`);
-        }
+      if (attempt > 0) {
         const retry = api.publishHf296RemoteProjectionState();
         if (retry?.weapon !== 'explosive-crossbow' || retry?.stance !== 'crouch') {
           throw new Error(`HF-296 actor sentinel acknowledgement retry failed ${arenaId}/${projectionRole}`);
@@ -948,9 +950,12 @@ async function runRemoteProjectionSweep(
         }
         let acknowledged = false;
         for (let attempt = 0; attempt < 360; attempt += 1) {
+          if (api.authorizeHf296RemoteProjectionWeapon(weapon) !== remote?.id) {
+            throw new Error(`HF-296 acknowledgement authorization renewal failed ${arenaId}/${projectionRole}/${fixture.kind}/${stance}/${weapon}`);
+          }
           const remote = api.sampleHf296RemoteProjection()[0];
           if (remote?.weapon === weapon && remote?.stance === stance) { acknowledged = true; break; }
-          if (attempt > 0 && attempt % 15 === 0) {
+          if (attempt > 0) {
             const retry = api.publishHf296RemoteProjectionState();
             if (retry?.weapon !== weapon || retry?.stance !== stance) {
               throw new Error(`HF-296 actor retry publication failed ${arenaId}/${projectionRole}/${fixture.kind}/${stance}/${weapon}`);
