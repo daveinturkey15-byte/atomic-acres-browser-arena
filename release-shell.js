@@ -69,6 +69,7 @@
   if (requested === 'rollback') return route('rollback');
   if (requested === 'experimental') return route('experimental');
   if (requested === 'pre-pass' || requested === 'prepass') return route('prePass');
+  if (requested === 'pre-pass-70' || requested === 'pass70' || requested === 'prepass70') return route('pass70');
 
   const options = document.querySelector('#release-channel-options');
   // The internal channel pass code (e.g. PASS 66) is not player-facing branding;
@@ -78,15 +79,15 @@
     const version = String(channel.label || '').match(/v\d+(?:\.\d+)+/);
     return version ? `PASS ${version[0].slice(1)}` : channel.pass;
   };
-  for (const key of ['experimental', 'prePass', 'stable', 'rollback']) {
+  for (const key of ['experimental', 'prePass', 'pass70', 'stable', 'rollback']) {
     const channel = config[key];
     if (!channel) continue;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `release-channel-option ${key}`;
-    const choice = key === 'prePass' ? 'pre-pass' : key === 'experimental' ? 'latest' : key;
+    const choice = key === 'prePass' ? 'pre-pass' : key === 'pass70' ? 'pre-pass-70' : key === 'experimental' ? 'latest' : key;
     button.dataset.releaseChoice = choice;
-    const badge = key === 'stable' ? 'STABLE' : key === 'rollback' ? 'ROLLBACK' : key === 'prePass' ? 'PRE-PASS' : 'LIVE';
+    const badge = key === 'stable' ? 'STABLE' : key === 'rollback' ? 'ROLLBACK' : key === 'prePass' || key === 'pass70' ? 'PRE-PASS' : 'LIVE';
     button.innerHTML = `<small>${displayPass(key, channel)} · ${badge}</small><strong>${channel.label}</strong><span>${channel.description}</span>`;
     button.addEventListener('click', () => route(key));
     options.append(button);
