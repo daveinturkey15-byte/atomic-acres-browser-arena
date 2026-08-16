@@ -5,5 +5,16 @@
   "sourceSha": "8c3ad1cd4d819aba79f07c01c16c8c4294fd14c1",
   "path": "channels/recent-stable",
   "exactRootFileCount": 508,
-  "treeSha256": "d8d444578e83a408c2e4d63ca4d1c2c5b705521f565fee6a58daffeb1e205ce9"
+  "treeSha256": "966bcecfa49804f08e47b33d855855661a97c7eec6cb6509b036944c8b539ea8",
+  "rebuiltFromSource": true,
+  "releasedAt": "2026-08-03T11:48:01Z",
+  "originalPagesSha": "271cea28299570af8def30e879701ddbd3c4bc12",
+  "originalPagesPath": "channels/recent-stable",
+  "passEvidenceFiles": [
+    "assets/legacy-main-CRKoHaI-.js",
+    "assets/release-identity-CywxsJ6f.js"
+  ],
+  "sourceEvidenceFiles": [
+    "assets/legacy-main-CRKoHaI-.js"
+  ]
 }
