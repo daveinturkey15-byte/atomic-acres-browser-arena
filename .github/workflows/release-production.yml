@@ -81,7 +81,7 @@ jobs:
           echo "STABLE_RELEASED_AT=$stable_released_at" >> "$GITHUB_ENV"
       - name: Install topology browser
         run: npx playwright install --with-deps chromium
-      - name: Stage live Pass 71, exact retained Pass 69, rebuilt Pass 67.1 and exact Pass 63 rollback
+      - name: Stage live Pass 71, exact retained Pass 70, rebuilt Pass 67.1 and exact Pass 63 rollback
         run: |
           test -n "${RELEASE_BUILT_AT:-}"
           git fetch --no-tags origin gh-pages:refs/remotes/origin/gh-pages

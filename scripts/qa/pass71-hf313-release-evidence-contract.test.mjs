@@ -33,7 +33,7 @@ const sourceAudit = {
   releaseConfig: {
     schemaVersion: 4, latestLabel: 'PASS 71',
     experimental: { label: 'PASS 71', pass: 'PASS 71', path: 'channels/the-big-one' },
-    retained: { label: 'PASS 69 · PREVIOUS LIVE', description: 'retained', ...PASS71_HF313_PINNED_CHANNELS.retained },
+    retained: { label: 'PASS 70 · PREVIOUS LIVE', description: 'retained', ...PASS71_HF313_PINNED_CHANNELS.retained },
     internalStable: { label: 'STABLE SINGLEPLAYER', pass: 'PASS 67.1' },
     rollback: { label: 'PASS 63 · STABLE WEBGL', description: 'rollback', ...PASS71_HF313_PINNED_CHANNELS.rollback, rebuiltFromSource: true },
   },
@@ -90,7 +90,7 @@ function productionInput() {
       schemaVersion: 4, sourceSha: candidateB, releasePass: 'PASS 71', root: { kind: 'chooser-only' },
       channels: {
         experimental: { releasePass: 'PASS 71', sourceSha: candidateB, path: 'channels/the-big-one', treeSha256: 'e'.repeat(64) },
-        retained: pinnedTopologyChannel(PASS71_HF313_PINNED_CHANNELS.retained, 'pass69-retained'),
+        retained: pinnedTopologyChannel(PASS71_HF313_PINNED_CHANNELS.retained, 'pass70-retained'),
         rollback: pinnedTopologyChannel(PASS71_HF313_PINNED_CHANNELS.rollback, 'rollback'),
       },
     },
@@ -107,10 +107,10 @@ function productionInput() {
     },
     liveSmoke: {
       ok: true, sourceSha: candidateB, releasePass: 'PASS 71', verifiedAt: '2026-08-13T10:30:00.000Z',
-      chooserLabels: ['PASS 71', 'PASS 69', 'PASS 63'], failures: [],
+      chooserLabels: ['PASS 71', 'PASS 70', 'PASS 63'], failures: [],
       routes: {
         experimental: { url: 'https://example/channels/the-big-one/?release=latest', eyebrow: 'PASS 71' },
-        retained: { url: 'https://example/channels/pass69-retained/?release=latest', eyebrow: 'PASS 69' },
+        retained: { url: 'https://example/channels/pass70-retained/?release=latest', eyebrow: 'PASS 70' },
         stable: { url: 'https://example/channels/pass63-rollback/?release=latest', eyebrow: 'PASS 63' },
         latest: {}, normal: {}, room: {},
       },

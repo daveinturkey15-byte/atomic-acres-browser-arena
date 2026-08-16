@@ -76,7 +76,7 @@ async function verifyPublishedProvenance() {
   assertEqual(retainedEmbedded.exactRootFileCount, channelConfig.retained.runtimeFileCount, 'Retained embedded file count');
   assertEqual(retainedEmbedded.treeSha256, channelConfig.retained.runtimeTreeSha256, 'Retained embedded digest');
   const retainedWrapper = await fetchJson(`${channelConfig.retained.path}/pinned-channel-provenance.json`);
-  assertEqual(retainedWrapper.channel, 'pass69-retained', 'Retained wrapper channel');
+  assertEqual(retainedWrapper.channel, 'pass70-retained', 'Retained wrapper channel');
   assertEqual(retainedWrapper.releasePass, channelConfig.retained.pass, 'Retained wrapper pass');
   assertEqual(retainedWrapper.sourceSha, channelConfig.retained.sourceSha, 'Retained wrapper source SHA');
   assertEqual(retainedWrapper.pagesSha, channelConfig.retained.pagesSha, 'Retained wrapper Pages SHA');
@@ -203,7 +203,7 @@ async function openChooser(page) {
   const expectedBadge = expectedReleasedAt ? 'LIVE' : 'RELEASE CANDIDATE';
   if (await buttons.count() !== 3
     || !labels.some((text) => text.includes(channelConfig.experimental.pass) && text.includes(expectedBadge) && !text.includes('THE BIG ONE'))
-    || !labels.some((text) => text.includes('PASS 69') && text.includes('PREVIOUS LIVE'))
+    || !labels.some((text) => text.includes('PASS 70') && text.includes('PREVIOUS LIVE'))
     || !labels.some((text) => text.includes('PASS 63') && text.includes('STABLE') && text.includes('WEBGL'))
     || labels.some((text) => text.includes('PASS 66') || text.includes('PASS 65') || text.includes('PASS 64') || text.includes('PASS 59'))) {
     throw new Error(`Unexpected chooser labels: ${JSON.stringify(labels)}`);
@@ -324,7 +324,7 @@ try {
   }
 
   await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass71');
-  await verifyChoice('retained', 'channels/pass69-retained', 'PASS 69', 'pass69');
+  await verifyChoice('retained', 'channels/pass70-retained', 'PASS 70', 'pass70');
   await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63');
   if (releasePass && !normalizedPass(routes.experimental.eyebrow).includes(normalizedPass(releasePass))) {
     throw new Error(`Experimental runtime ${routes.experimental.eyebrow} does not match ${releasePass}`);

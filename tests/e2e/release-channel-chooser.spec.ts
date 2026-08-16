@@ -9,7 +9,7 @@ const releaseChannels = JSON.parse(readFileSync(resolve(process.cwd(), 'release-
   retained: { label: string; pass: string };
 };
 
-test('offers Pass 71, exact retained Pass 69 and stable Pass 63 WebGL', async ({ page }, testInfo) => {
+test('offers Pass 71, exact retained Pass 70 and stable Pass 63 WebGL', async ({ page }, testInfo) => {
   await page.goto('/?release=choose&renderer=webgl2');
 
   await expect(page.locator('#release-channel-gate')).toBeVisible();
@@ -33,9 +33,9 @@ test('offers Pass 71, exact retained Pass 69 and stable Pass 63 WebGL', async ({
 
   const artifactRoot = resolve(process.cwd(), 'artifacts/pass71/release-shell');
   mkdirSync(artifactRoot, { recursive: true });
-  const screenshot = resolve(artifactRoot, 'pass71-pass69-pass63-chooser.png');
+  const screenshot = resolve(artifactRoot, 'pass71-pass70-pass63-chooser.png');
   await page.screenshot({ path: screenshot, animations: 'disabled', fullPage: true });
-  await testInfo.attach('pass71-pass69-pass63-chooser', { path: screenshot, contentType: 'image/png' });
+  await testInfo.attach('pass71-pass70-pass63-chooser', { path: screenshot, contentType: 'image/png' });
 
   await page.locator('[data-release-choice="experimental"]').click();
   await expect(page).toHaveURL(/\/channels\/the-big-one\/.*release=latest/);
@@ -66,11 +66,11 @@ test('routes the stable choice to retained Pass 63 WebGL', async ({ page }) => {
   await expect(page).toHaveURL(/\/channels\/pass63-rollback\/\?release=latest/);
 });
 
-test('routes the previous-live choice to exact retained Pass 69', async ({ page }) => {
+test('routes the previous-live choice to exact retained Pass 70', async ({ page }) => {
   await page.goto('/?release=choose');
   await page.locator('[data-release-choice="retained"]').click();
-  await expect(page).toHaveURL(/\/channels\/pass69-retained\/\?release=latest/);
-  await expect(page.locator('.command-brand span')).toContainText('PASS 69');
+  await expect(page).toHaveURL(/\/channels\/pass70-retained\/\?release=latest/);
+  await expect(page.locator('.command-brand span')).toContainText('PASS 70');
 });
 
 test('keeps legacy latest, normal and room entries on Pass 71', async ({ page }) => {

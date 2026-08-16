@@ -37,8 +37,8 @@ const stagedChannelDirectories = readdirSync(join(dist, 'channels'), { withFileT
   .map((entry) => entry.name)
   .sort();
 const expectedDirectories = rollbackStaged
-  ? ['pass63-rollback', 'pass69-retained', 'recent-stable', 'the-big-one']
-  : ['pass69-retained', 'recent-stable', 'the-big-one'];
+  ? ['pass63-rollback', 'pass70-retained', 'recent-stable', 'the-big-one']
+  : ['pass70-retained', 'recent-stable', 'the-big-one'];
 if (JSON.stringify(stagedChannelDirectories) !== JSON.stringify(expectedDirectories)) {
   throw new Error(`Unexpected staged channels: ${stagedChannelDirectories.join(', ')}`);
 }
@@ -89,7 +89,7 @@ if (retainedFiles !== config.retained.pagesSubtreeFileCount
   || retainedEmbedded.path !== config.retained.pagesPath
   || retainedEmbedded.exactRootFileCount !== config.retained.runtimeFileCount
   || retainedEmbedded.treeSha256 !== config.retained.runtimeTreeSha256
-  || retainedWrapper.channel !== 'pass69-retained'
+  || retainedWrapper.channel !== 'pass70-retained'
   || retainedWrapper.pagesSha !== config.retained.pagesSha
   || retainedWrapper.pagesPath !== config.retained.pagesPath
   || retainedWrapper.path !== config.retained.path
@@ -97,7 +97,7 @@ if (retainedFiles !== config.retained.pagesSubtreeFileCount
   || retainedWrapper.treeSha256 !== config.retained.pagesSubtreeTreeSha256
   || retainedWrapper.treeSha256 !== treeDigest(retainedRoot, retainedPinnedFiles)
   || retainedWrapper.pinnedRuntime?.treeSha256 !== config.retained.runtimeTreeSha256) {
-  throw new Error('Retained Pass 69 does not match the exact previously hosted runtime');
+  throw new Error('Retained Pass 70 does not match the exact restored runtime');
 }
 const stableRoot = resolve(dist, config.stable.path);
 const rebuiltStableProvenancePath = join(stableRoot, 'channel-provenance.json');

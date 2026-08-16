@@ -320,6 +320,7 @@ type ChopperEntity = EntityBase & {
     aimPitch: number;
     ownerLifeId: number;
     controlSequence: number;
+    requestedAtMs: number;
   }> | null;
   missilesRemaining: number;
   nextMissileAtMs: number;
@@ -2090,6 +2091,7 @@ export class HostKillstreakRuntime {
             aimPitch: entity.aimPitch,
             ownerLifeId: actor.lifeId,
             controlSequence: intent.sequence,
+            requestedAtMs: nowMs,
           });
       } else if (entity.kind === 'drone' && entity.mode === 'piloted') {
         if (intent.missileFire === true) return reject('missile-unavailable');
@@ -2521,6 +2523,7 @@ export class HostKillstreakRuntime {
 
     if (entity.pendingPlayerMissile !== null
       && entity.gunController !== 'ai'
+      && nowMs >= entity.pendingPlayerMissile.requestedAtMs
       && impactEvents.length < MAX_SUPPORT_IMPACT_EVENTS_PER_STEP) {
       const request = entity.pendingPlayerMissile;
       entity.pendingPlayerMissile = null;

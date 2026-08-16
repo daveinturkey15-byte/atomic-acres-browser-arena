@@ -22000,6 +22000,10 @@ function updateKillstreakPossession(now: number): void {
   if (debugChopperGunnerQaAimRequest && now > debugChopperGunnerQaAimRequest.deadlineAtMs) {
     clearDebugChopperGunnerQaAimRequest();
   }
+  // A trusted input can arrive after the current RAF timestamp was sampled.
+  // Defer its admission to the next frame so authority can never predate the
+  // trusted arming edge recorded with performance.now().
+  if (debugChopperGunnerQaAimRequest && now < debugChopperGunnerQaAimRequest.armedAtMs) return;
   if (possession.kind === 'chopper-gunner' && debugChopperEvidenceControlOverrideActive) return;
   if (now - lastKillstreakControlSentAt < 50) return;
   const controlThrottle = chopperGunnerQaAimThrottleEvidence(now, lastKillstreakControlSentAt);

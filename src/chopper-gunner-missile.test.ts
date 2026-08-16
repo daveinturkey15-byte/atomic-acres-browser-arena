@@ -216,6 +216,29 @@ describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
     })]);
   });
 
+  it('never launches a trusted missile request on an older sampled frame timestamp', () => {
+    const { runtime, entityId } = setup();
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId,
+      action: 'pilot-control', yawQ: 0, pitchQ: -1, missileFire: true,
+    }, 1_100).accepted).toBe(true);
+
+    expect(runtime.advance(1_099, world()).impactEvents).toEqual([]);
+    expect(runtime.chopperMissileAuthorityEvidence().events).toEqual([]);
+    expect(runtime.chopperMissileAuthorityEvidence().aircraft[0]).toMatchObject({
+      pendingRequest: true,
+      missilesRemaining: CHOPPER_MISSILE_CAPACITY,
+    });
+
+    expect(runtime.advance(1_100, world()).impactEvents).toEqual([
+      expect.objectContaining({ source: 'chopper', ordinal: 0, phase: 'drop', atMs: 1_100 }),
+    ]);
+    expect(runtime.chopperMissileAuthorityEvidence().events[0]).toMatchObject({
+      phase: 'launch',
+      launchAtMs: 1_100,
+    });
+  });
+
   it('clears a pending RMB request on exit, death, and match teardown', () => {
     const exit = setup();
     expect(exit.runtime.control({

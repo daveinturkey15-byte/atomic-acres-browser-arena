@@ -41,12 +41,12 @@ if (!/^PASS [1-9][0-9]*$/.test(config.experimental.pass) || config.experimental.
 if (config.stable.pass !== 'PASS 67.1' || config.stable.label !== 'STABLE SINGLEPLAYER') {
   throw new Error('Pass 67.1 must remain the approved-source stable singleplayer channel');
 }
-if (config.retained.pass !== 'PASS 69'
-  || config.retained.sourceSha !== '685ed7865018e107df5acf6cb6f7498b4468940c'
-  || config.retained.pagesSha !== '71ec5616504d8e24241450742d01b25c1d6ff4e4'
+if (config.retained.pass !== 'PASS 70'
+  || config.retained.sourceSha !== '130fd59bd2cf1e1719b802463219ddf36e2484d5'
+  || config.retained.pagesSha !== '3b5e675c54eaea2a2dd721eca6f247c933361587'
   || config.retained.pagesPath !== 'channels/the-big-one'
-  || config.retained.path !== 'channels/pass69-retained') {
-  throw new Error('Retained Pass 69 must remain pinned to the exact previously hosted Pages runtime');
+  || config.retained.path !== 'channels/pass70-retained') {
+  throw new Error('Retained Pass 70 must remain pinned to the exact restored Pages runtime');
 }
 if (config.rollback && (config.rollback.pass !== 'PASS 63' || config.rollback.path !== 'channels/pass63-rollback')) {
   throw new Error('Rollback must be the exact pinned Pass 63 Pages subtree at channels/pass63-rollback');
@@ -216,7 +216,7 @@ if (stableRebuildRequired && (!configuredStableDist || !isAbsolute(configuredSta
 const stable = configuredStableDist
   ? stageRebuilt('recent-stable', config.stable, configuredStableDist, process.env.STABLE_RELEASED_AT)
   : stagePinned('recent-stable', config.stable);
-const retained = stagePinned('pass69-retained', config.retained);
+const retained = stagePinned('pass70-retained', config.retained);
 const experimentalFiles = walkFiles(experimentalRoot);
 const experimental = {
   schemaVersion: 4, channel: liveChannelId, releasePass,

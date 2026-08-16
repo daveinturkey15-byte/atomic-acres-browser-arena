@@ -12,17 +12,17 @@
     "path": "channels/the-big-one"
   },
   "retained": {
-    "label": "PASS 69 · PREVIOUS LIVE",
-    "description": "The exact previously hosted Pass 69 build, retained byte-for-byte for comparison and fallback testing.",
-    "pass": "PASS 69",
-    "sourceSha": "685ed7865018e107df5acf6cb6f7498b4468940c",
-    "pagesSha": "71ec5616504d8e24241450742d01b25c1d6ff4e4",
+    "label": "PASS 70 · PREVIOUS LIVE",
+    "description": "The exact restored Pass 70 build previously hosted live, retained byte-for-byte for comparison and fallback testing.",
+    "pass": "PASS 70",
+    "sourceSha": "130fd59bd2cf1e1719b802463219ddf36e2484d5",
+    "pagesSha": "3b5e675c54eaea2a2dd721eca6f247c933361587",
     "pagesPath": "channels/the-big-one",
     "runtimeFileCount": 515,
-    "runtimeTreeSha256": "5ace26fdf83a4cf695d0075a40523f70e0d6fcee02cb6ae5b42666b6679107b9",
+    "runtimeTreeSha256": "c8f6aeed492cd747ef83aa41bdc0d05f2fd86264418d40d0ebbd0916c85d6160",
     "pagesSubtreeFileCount": 516,
-    "pagesSubtreeTreeSha256": "04e3fcf121db14038a1cd27661ec9ac5fdf62939af470c070fa92cfbb45388ec",
-    "path": "channels/pass69-retained"
+    "pagesSubtreeTreeSha256": "59ca7375a99d79ee644857df7c219b1beee2803ce3d077ba054ec44abd9adfa6",
+    "path": "channels/pass70-retained"
   },
   "stable": {
     "label": "STABLE SINGLEPLAYER",

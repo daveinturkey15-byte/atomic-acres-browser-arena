@@ -48,6 +48,9 @@ describe('trusted current-frame Chopper QA aim main integration', () => {
 
   it('recomputes current identity/pose after override and exact throttle, then presents and admits native held fire', () => {
     const update = block('function updateKillstreakPossession(', '\nfunction updatePass65KillstreakRuntime(');
+    const trustedClock = update.indexOf(
+      'now < debugChopperGunnerQaAimRequest.armedAtMs) return;',
+    );
     const override = update.indexOf('debugChopperEvidenceControlOverrideActive) return;');
     const throttle = update.indexOf('now - lastKillstreakControlSentAt < 50) return;');
     const resolve = update.indexOf('resolveChopperGunnerQaAim(request, {');
@@ -56,7 +59,8 @@ describe('trusted current-frame Chopper QA aim main integration', () => {
     const presentation = update.lastIndexOf('presentLocalPossessedSupportGun(now, possession, entity);');
     const admission = update.indexOf("requestKillstreakControl(entity.id, 'pilot-control', {");
     const receipt = update.indexOf('chopperGunnerQaAimReceipt(', admission);
-    expect(override).toBeGreaterThan(-1);
+    expect(trustedClock).toBeGreaterThan(-1);
+    expect(trustedClock).toBeLessThan(override);
     expect(override).toBeLessThan(throttle);
     expect(throttle).toBeLessThan(resolve);
     expect(resolve).toBeLessThan(currentPose);

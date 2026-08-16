@@ -34,11 +34,11 @@ export function pass71ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
   const released = releasedAt !== PENDING_PRODUCTION_RELEASE;
   return Object.freeze({
     summary: released
-      ? 'Pass 71 hardens first-person weapon contact and anatomy, cold-action frame pacing, thermal wall reveals, glass destruction, support streaks and combat audio without moving the retained Pass 69 or Pass 63 fallbacks.'
+      ? 'Pass 71 hardens first-person weapon contact and anatomy, cold-action frame pacing, thermal wall reveals, glass destruction, support streaks and combat audio while retaining exact Pass 70 and Pass 63 fallbacks.'
       : 'Pass 71 is the local release candidate for first-person weapon contact and anatomy, cold-action frame pacing, thermal wall reveals, glass destruction, support streaks and combat audio; release gates remain pending.',
     lineage: released
-      ? 'Pass 70 remains in the release history, Pass 69 remains the immutable comparison build and Pass 63 remains the selectable stable WebGL fallback'
-      : 'Pass 70 remains the current live build, Pass 69 remains the immutable comparison build and Pass 63 remains the selectable stable WebGL fallback until this exact candidate clears release gates',
+      ? 'Pass 70 remains the immutable previous-live comparison build and Pass 63 remains the selectable stable WebGL fallback'
+      : 'Pass 70 remains the current live build and Pass 63 remains the selectable stable WebGL fallback until this exact candidate clears release gates',
   });
 }
 

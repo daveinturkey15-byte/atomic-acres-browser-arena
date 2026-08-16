@@ -61,7 +61,7 @@ export function projectMapReleaseCopy(releasedAt: string): Readonly<{
   const released = releasedAt !== PENDING_PRODUCTION_RELEASE;
   return Object.freeze({
     summary: released
-      ? 'Pass 71 is the current released build for first-person presentation, thermal vision, destruction, support, audio and frame-pacing corrections; the retained Pass 69 and stable Pass 63 fallbacks stay frozen.'
+      ? 'Pass 71 is the current released build for first-person presentation, thermal vision, destruction, support, audio and frame-pacing corrections; the retained Pass 70 and stable Pass 63 fallbacks stay frozen.'
       : 'Pass 71 is the current local release candidate for first-person presentation, thermal vision, destruction, support, audio and frame-pacing corrections; release gates remain pending and the retained fallbacks stay frozen.',
     approvalHighlight: released
       ? 'Pass 71 was promoted only after its immutable candidate cleared the release gates'
@@ -86,7 +86,7 @@ export const PROJECT_MAP_RELEASE: ChangelogEntry = Object.freeze({
     'Chopper gun splash, hardpoint missiles, cockpit framing and Nuke warning presentation retain host-owned support authority',
     'Firefox presentation pacing removes redundant canvas work while Quality assets and HDR settings remain unchanged',
     projectMapCopy.approvalHighlight,
-    'Pass 69 stays frozen as the exact retained comparison build and Pass 63 stays frozen as the selectable stable WebGL fallback',
+    'Pass 70 stays frozen as the exact previous-live comparison build and Pass 63 stays frozen as the selectable stable WebGL fallback',
   ]),
 });
 

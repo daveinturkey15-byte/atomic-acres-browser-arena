@@ -29,7 +29,7 @@ describe('production receipt v4', () => {
   it('owns HF-313 live verification only after exact candidate A, candidate B, Pages, and live topology agree', () => {
     const candidateA = 'a'.repeat(40);
     const candidateB = 'b'.repeat(40);
-    const pinned = (channel: 'pass69-retained' | 'rollback', value: typeof PASS71_HF313_PINNED_CHANNELS.retained) => ({
+    const pinned = (channel: 'pass70-retained' | 'rollback', value: typeof PASS71_HF313_PINNED_CHANNELS.retained) => ({
       schemaVersion: 4,
       channel,
       releasePass: value.pass,
@@ -59,7 +59,7 @@ describe('production receipt v4', () => {
         root: { kind: 'chooser-only' },
         channels: {
           experimental: { releasePass: 'PASS 71', sourceSha: candidateB, path: 'channels/the-big-one', treeSha256: '1'.repeat(64) },
-          retained: pinned('pass69-retained', PASS71_HF313_PINNED_CHANNELS.retained),
+          retained: pinned('pass70-retained', PASS71_HF313_PINNED_CHANNELS.retained),
           rollback: pinned('rollback', PASS71_HF313_PINNED_CHANNELS.rollback),
         },
       },
@@ -88,11 +88,11 @@ describe('production receipt v4', () => {
         sourceSha: candidateB,
         releasePass: 'PASS 71',
         verifiedAt: '2026-08-13T08:03:00Z',
-        chooserLabels: ['PASS 71', 'PASS 69', 'PASS 63'],
+        chooserLabels: ['PASS 71', 'PASS 70', 'PASS 63'],
         failures: [],
         routes: {
           experimental: { url: 'https://example/channels/the-big-one/', eyebrow: 'PASS 71' },
-          retained: { url: 'https://example/channels/pass69-retained/', eyebrow: 'PASS 69' },
+          retained: { url: 'https://example/channels/pass70-retained/', eyebrow: 'PASS 70' },
           stable: { url: 'https://example/channels/pass63-rollback/', eyebrow: 'PASS 63' },
           latest: {}, normal: {}, room: {},
         },

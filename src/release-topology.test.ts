@@ -24,15 +24,15 @@ describe('Pass 71 release topology', () => {
     expect(config.latest.label).toBe('PASS 71');
     expect(config.stable.sourceSha).toBe('8c3ad1cd4d819aba79f07c01c16c8c4294fd14c1');
     expect(config.retained).toMatchObject({
-      pass: 'PASS 69',
-      sourceSha: '685ed7865018e107df5acf6cb6f7498b4468940c',
-      pagesSha: '71ec5616504d8e24241450742d01b25c1d6ff4e4',
+      pass: 'PASS 70',
+      sourceSha: '130fd59bd2cf1e1719b802463219ddf36e2484d5',
+      pagesSha: '3b5e675c54eaea2a2dd721eca6f247c933361587',
       pagesPath: 'channels/the-big-one',
       runtimeFileCount: 515,
-      runtimeTreeSha256: '5ace26fdf83a4cf695d0075a40523f70e0d6fcee02cb6ae5b42666b6679107b9',
+      runtimeTreeSha256: 'c8f6aeed492cd747ef83aa41bdc0d05f2fd86264418d40d0ebbd0916c85d6160',
       pagesSubtreeFileCount: 516,
-      pagesSubtreeTreeSha256: '04e3fcf121db14038a1cd27661ec9ac5fdf62939af470c070fa92cfbb45388ec',
-      path: 'channels/pass69-retained',
+      pagesSubtreeTreeSha256: '59ca7375a99d79ee644857df7c219b1beee2803ce3d077ba054ec44abd9adfa6',
+      path: 'channels/pass70-retained',
     });
     expect(config.rollback.sourceSha).toBe('ac85e9b8b46cc2370aee903d564ecf3c4682b24c');
     expect(config.rollback).toMatchObject({
@@ -91,16 +91,16 @@ describe('Pass 71 release topology', () => {
     expect(JSON.stringify(config)).not.toContain('channels/new-netcode');
   });
 
-  it('shows Pass 71, exact retained Pass 69 and stable Pass 63 WebGL', () => {
+  it('shows Pass 71, exact retained Pass 70 and stable Pass 63 WebGL', () => {
     expect(shell).toContain("['experimental', 'retained', 'stable']");
     expect(shell).not.toContain("['experimental', 'stable', 'rollback']");
     expect(shell).not.toContain("['normal', 'stable', 'experimental']");
     expect(shell).toContain("channel.deploymentState === 'live' ? 'LIVE' : 'RELEASE CANDIDATE'");
     expect(shell).toContain("requested === 'stable' || requested === 'rollback') return route('stable')");
-    expect(shell).toContain("requested === 'previous' || requested === 'pass69') return route('retained')");
+    expect(shell).toContain("requested === 'previous' || requested === 'pass70') return route('retained')");
     expect(shell).toContain("if (!channel) continue");
     expect(shellHtml).toContain('Pass 71');
-    expect(shellHtml).toContain('Pass 69');
+    expect(shellHtml).toContain('Pass 70');
     expect(shellHtml).not.toContain('local Pass 71');
     expect(shellHtml).not.toContain('The Big One');
     expect(shellHtml).toContain('stable Pass 63 WebGL');
@@ -131,7 +131,7 @@ describe('Pass 71 release topology', () => {
     expect(staging).toContain('process.env.REQUIRE_STABLE_RELEASE_TIMESTAMP');
     expect(staging).toContain("stageRebuilt('recent-stable', config.stable");
     expect(staging).toContain("stagePinned('recent-stable', config.stable)");
-    expect(staging).toContain("stagePinned('pass69-retained', config.retained)");
+    expect(staging).toContain("stagePinned('pass70-retained', config.retained)");
     expect(staging).toContain('STABLE_RELEASED_AT must be one strict UTC ISO-8601 instant');
     expect(staging).toContain("channel: liveChannelId");
     expect(staging).toContain('channel.pagesPath');

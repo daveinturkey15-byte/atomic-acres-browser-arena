@@ -29,15 +29,15 @@ export const PASS71_HF313_PUBLIC_CHOICES = Object.freeze(['experimental', 'retai
 
 export const PASS71_HF313_PINNED_CHANNELS = Object.freeze({
   retained: Object.freeze({
-    pass: 'PASS 69',
-    sourceSha: '685ed7865018e107df5acf6cb6f7498b4468940c',
-    pagesSha: '71ec5616504d8e24241450742d01b25c1d6ff4e4',
+    pass: 'PASS 70',
+    sourceSha: '130fd59bd2cf1e1719b802463219ddf36e2484d5',
+    pagesSha: '3b5e675c54eaea2a2dd721eca6f247c933361587',
     pagesPath: 'channels/the-big-one',
-    path: 'channels/pass69-retained',
+    path: 'channels/pass70-retained',
     runtimeFileCount: 515,
-    runtimeTreeSha256: '5ace26fdf83a4cf695d0075a40523f70e0d6fcee02cb6ae5b42666b6679107b9',
+    runtimeTreeSha256: 'c8f6aeed492cd747ef83aa41bdc0d05f2fd86264418d40d0ebbd0916c85d6160',
     pagesSubtreeFileCount: 516,
-    pagesSubtreeTreeSha256: '04e3fcf121db14038a1cd27661ec9ac5fdf62939af470c070fa92cfbb45388ec',
+    pagesSubtreeTreeSha256: '59ca7375a99d79ee644857df7c219b1beee2803ce3d077ba054ec44abd9adfa6',
   }),
   rollback: Object.freeze({
     pass: 'PASS 63',
@@ -60,7 +60,7 @@ export const PASS71_HF313_WORKFLOW_STEPS = Object.freeze([
   'Reproduce static release gates',
   'Build production bytes',
   'Verify exact production bytes',
-  'Stage live Pass 71, exact retained Pass 69, rebuilt Pass 67.1 and exact Pass 63 rollback',
+  'Stage live Pass 71, exact retained Pass 70, rebuilt Pass 67.1 and exact Pass 63 rollback',
   'Publish complete exact dist snapshot',
   'Wait for exact Pages build',
   'Verify canonical live release',
@@ -288,7 +288,7 @@ export function pass71Hf313EvidenceFailures(record, expected = {}) {
   if (!same(record?.sourceAudit, expected.sourceAudit)
     || record?.sourceAudit?.manifestAbsent !== true
     || record?.sourceAudit?.releaseConfig?.latestLabel !== 'PASS 71'
-    || !retainedPinned || retainedConfig?.label !== 'PASS 69 · PREVIOUS LIVE'
+    || !retainedPinned || retainedConfig?.label !== 'PASS 70 · PREVIOUS LIVE'
     || !rollbackPinned || rollbackConfig?.label !== 'PASS 63 · STABLE WEBGL'
     || rollbackConfig?.rebuiltFromSource !== true
     || record?.sourceAudit?.releaseConfig?.experimental?.pass !== 'PASS 71'
@@ -442,7 +442,7 @@ export function pass71Hf313ProductionPostconditionFailures(input) {
     || topology?.channels?.experimental?.sourceSha !== sourceSha
     || topology?.channels?.experimental?.path !== 'channels/the-big-one'
     || !SHA256.test(topology?.channels?.experimental?.treeSha256 ?? '')
-    || !exactPinnedChannel(topology?.channels?.retained, PASS71_HF313_PINNED_CHANNELS.retained, 'pass69-retained')
+    || !exactPinnedChannel(topology?.channels?.retained, PASS71_HF313_PINNED_CHANNELS.retained, 'pass70-retained')
     || !exactPinnedChannel(topology?.channels?.rollback, PASS71_HF313_PINNED_CHANNELS.rollback, 'rollback')) {
     failures.push('staged-release-topology');
   }
@@ -454,8 +454,8 @@ export function pass71Hf313ProductionPostconditionFailures(input) {
     || !same(Object.keys(routes).sort(), ['experimental', 'latest', 'normal', 'retained', 'room', 'stable'])
     || !routes.experimental?.url?.includes('/channels/the-big-one/')
     || !routes.experimental?.eyebrow?.replace(/\s+/gu, '').toUpperCase().includes('PASS71')
-    || !routes.retained?.url?.includes('/channels/pass69-retained/')
-    || !routes.retained?.eyebrow?.replace(/\s+/gu, '').toUpperCase().includes('PASS69')
+    || !routes.retained?.url?.includes('/channels/pass70-retained/')
+    || !routes.retained?.eyebrow?.replace(/\s+/gu, '').toUpperCase().includes('PASS70')
     || !routes.stable?.url?.includes('/channels/pass63-rollback/')
     || !routes.stable?.eyebrow?.replace(/\s+/gu, '').toUpperCase().includes('PASS63')
     || !Array.isArray(liveSmoke.failures) || liveSmoke.failures.length !== 0) failures.push('canonical-live-routes');
