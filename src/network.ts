@@ -539,6 +539,19 @@ export class ArenaNetwork {
     this.startHostPeer(attempt, onReady, preferred, recoveryRequired, 0);
   }
 
+  /**
+   * Intentionally invalidate the current host room and start a fresh one.
+   * This is deliberately separate from crash recovery: recovery preserves the
+   * room code and retained authority, while a reset closes every old channel
+   * and admits nobody from the invalidated room.
+   */
+  resetLobby(onReady: () => void): boolean {
+    if (this.role !== 'host' || this.manualClose) return false;
+    this.close();
+    this.host(onReady);
+    return true;
+  }
+
   private startHostPeer(
     attempt: LiveConnectionAttempt,
     onReady: () => void,

@@ -3,6 +3,7 @@ import { MAX_HIGH_SCORE_ENTRIES, isHighScoreEntry, type HighScoreEntry } from '.
 import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
 import { isHostedBotSnapshot, type HostedBotSnapshot } from './hosted-bots';
 import type { KillCause } from './kill-provenance';
+import { isSquadColor, isSquadName, type SquadColor } from './squad-presentation';
 import type { CombatTiming } from './network-fairness';
 import { isDhv, type Dhv } from './handicap';
 import {
@@ -391,6 +392,8 @@ export type LobbyJoinMessage = {
   connectionEpoch: string;
   name: string;
   requestedTeam: Team;
+  squadName?: string;
+  squadColor?: SquadColor;
   resumeToken: string;
   nonce: number;
 };
@@ -455,6 +458,7 @@ export type GuestResumeAckMessage = {
 export type LobbyReadyMessage = { type: 'lobby-ready'; by: string; ready: boolean; nonce: number };
 export type LobbyTeamMessage = { type: 'lobby-team'; by: string; team: Team; nonce: number };
 export type LobbyHandicapMessage = { type: 'lobby-handicap'; by: string; dhv: Dhv; nonce: number };
+export type LobbySquadMessage = { type: 'lobby-squad'; by: string; squadName: string; squadColor: SquadColor; nonce: number };
 export type RedeployRequestMessage = {
   type: 'redeploy-request'; protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
   by: string; primary: PrimaryWeaponId; secondary: SidearmWeaponId; grenade: GrenadeId; nonce: number;
@@ -529,7 +533,7 @@ export type ChatHistoryMessage = {
 };
 
 export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | GrenadeResultMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
-  | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
+  | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | LobbySquadMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
   | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage
   | TimedMapWeaponProtocolMessage | FlarePresentationProtocolMessage | BotWeaponPresentationMessage;
@@ -968,6 +972,8 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && /^[a-zA-Z0-9_-]+$/.test(msg.connectionEpoch)
         && typeof msg.name === 'string' && msg.name.length > 0 && msg.name.length <= 20
         && (msg.requestedTeam === 0 || msg.requestedTeam === 1)
+        && (msg.squadName === undefined || isSquadName(msg.squadName))
+        && (msg.squadColor === undefined || isSquadColor(msg.squadColor))
         && typeof msg.resumeToken === 'string' && msg.resumeToken.length >= 24 && msg.resumeToken.length <= 128
         && /^[a-zA-Z0-9_-]+$/.test(msg.resumeToken)
         && Number.isFinite(msg.nonce);
@@ -980,6 +986,9 @@ export function isGameMessage(value: unknown): value is GameMessage {
     case 'lobby-handicap':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && isDhv(msg.dhv) && Number.isFinite(msg.nonce);
+    case 'lobby-squad':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && isSquadName(msg.squadName) && isSquadColor(msg.squadColor) && Number.isFinite(msg.nonce);
     case 'redeploy-request':
       return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
         && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
@@ -1150,6 +1159,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'lobby-ready':
     case 'lobby-team':
     case 'lobby-handicap':
+    case 'lobby-squad':
     case 'redeploy-request':
     case 'redeploy-commit':
     case 'reload-intent':

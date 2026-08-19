@@ -31,6 +31,7 @@ export const HEADSHOT_DAMAGE_MULTIPLIER = 1.5;
 export const SNIPER_HEADSHOT_DAMAGE_MULTIPLIER = 3;
 export const FALL_DAMAGE_SAFE_SPEED = 9.5;
 export const FALL_DAMAGE_LETHAL_SPEED = 22;
+export const FALL_DAMAGE_MULTIPLIER = 0.5;
 
 export type WeaponSpec = LegacyWeaponSpec;
 export const WEAPONS = LEGACY_WEAPONS;
@@ -219,13 +220,13 @@ export function weaponCanCritical(weapon: WeaponSpec): boolean {
   return weapon.id !== 'minigun' && weapon.headMultiplier > 1;
 }
 
-/** BO2-like bounded landing damage: normal jumps are safe; severe drops become lethal. */
+/** BO2-like bounded landing damage: impact speed stays authoritative; Pass 72 halves the envelope. */
 export function computeFallDamage(impactSpeed: number): number {
   const speed = Number.isFinite(impactSpeed) ? Math.max(0, impactSpeed) : 0;
   if (speed <= FALL_DAMAGE_SAFE_SPEED) return 0;
-  if (speed >= FALL_DAMAGE_LETHAL_SPEED) return 100;
+  if (speed >= FALL_DAMAGE_LETHAL_SPEED) return Math.round(100 * FALL_DAMAGE_MULTIPLIER);
   const normalized = (speed - FALL_DAMAGE_SAFE_SPEED) / (FALL_DAMAGE_LETHAL_SPEED - FALL_DAMAGE_SAFE_SPEED);
-  return Math.max(1, Math.round(100 * Math.pow(normalized, 1.35)));
+  return Math.max(1, Math.round(100 * Math.pow(normalized, 1.35) * FALL_DAMAGE_MULTIPLIER));
 }
 
 /** Full-HP player TTK for a single pellet/shot at point-blank (no Overdrive). */

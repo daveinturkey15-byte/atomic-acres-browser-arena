@@ -84,6 +84,7 @@ describe('Pass 65 canonical weapon catalog', () => {
     });
     expect(byId['m14-ebr']).toMatchObject({
       displayName: 'M14 EBR', optic: { kind: 'thermal-smoke-only', magnification: 2.5 },
+      damage: { base: 37.2, minimum: 24, falloffStartM: 38, falloffEndM: 100, headMultiplier: 1.7 },
     });
     expect(byId['slug-shotgun']).toMatchObject({ displayName: 'Benelli M4 Slug', fireKind: 'slug', pellets: 1 });
     expect(byId['flashlight-pistol']).toMatchObject({

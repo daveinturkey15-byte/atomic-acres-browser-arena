@@ -78,6 +78,18 @@ describe('headshot damage contract', () => {
     expect(computeDamage(WEAPONS.railgun, 220, 'limb')).toBe(50);
   });
 
+  it('reduces the M14 damage envelope by exactly 40% without changing range or headshot policy', () => {
+    const m14 = WEAPONS['m14-ebr'];
+    expect(m14.damage).toBeCloseTo(37.2, 8);
+    expect(m14.minimumDamage).toBeCloseTo(24, 8);
+    expect(m14.falloffStart).toBe(38);
+    expect(m14.falloffEnd).toBe(100);
+    expect(m14.headMultiplier).toBe(1.7);
+    expect(computeDamage(m14, 10, 'body')).toBe(37);
+    expect(computeDamage(m14, 10, 'head')).toBe(63);
+    expect(computeDamage(m14, 100, 'body')).toBe(24);
+  });
+
   it('SMG body is 23 and headshot is 1.5× (35), never a one-shot from full HP', () => {
     expect(computeDamage(WEAPONS.smg, 8, 'body')).toBe(23);
     expect(computeDamage(WEAPONS.smg, 8, 'head')).toBe(35);
@@ -96,6 +108,15 @@ describe('headshot damage contract', () => {
     expect(isSingleShotLethalFromFullHp(WEAPONS['machine-pistol'], 'head')).toBe(false);
     // Scattergun multi-pellet at point blank is intentionally lethal.
     expect(isSingleShotLethalFromFullHp(WEAPONS.scattergun, 'body')).toBe(true);
+  });
+});
+
+describe('authoritative fall damage', () => {
+  it('halves damage while retaining the authored impact-speed thresholds', () => {
+    expect(computeFallDamage(9.5)).toBe(0);
+    expect(computeFallDamage(22)).toBe(50);
+    expect(computeFallDamage(40)).toBe(50);
+    expect(computeFallDamage(Number.NaN)).toBe(0);
   });
 });
 
@@ -320,7 +341,7 @@ describe('fall damage', () => {
     expect(computeFallDamage(9.5)).toBe(0);
     expect(computeFallDamage(14)).toBeGreaterThan(0);
     expect(computeFallDamage(18)).toBeGreaterThan(computeFallDamage(14));
-    expect(computeFallDamage(22)).toBe(100);
+    expect(computeFallDamage(22)).toBe(50);
     expect(computeFallDamage(Number.NaN)).toBe(0);
   });
 });
