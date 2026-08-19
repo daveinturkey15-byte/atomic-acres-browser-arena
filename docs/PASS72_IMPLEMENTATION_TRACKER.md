@@ -1,8 +1,8 @@
 # Pass 72 implementation tracker
 
-**Recorded:** 2026-08-19T19:10:17+01:00  
-**Impact:** `runtime`  
-**Worktree:** `contrib/dave-gaming-pc/hermes/pass72-future-features`  
+**Recorded:** 2026-08-19T19:10:17+01:00
+**Impact:** `runtime`
+**Worktree:** `contrib/dave-gaming-pc/hermes/pass72-future-features`
 **Source base:** `origin/main` at `130fd59bd2cf1e1719b802463219ddf36e2484d5`
 
 ## Observations
