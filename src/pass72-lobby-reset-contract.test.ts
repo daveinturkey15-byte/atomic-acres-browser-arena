@@ -15,9 +15,20 @@ describe('Pass 72 explicit lobby reset contract', () => {
   it('only lets the active host invalidate the room and opens a fresh code', () => {
     expect(network).toMatch(/resetLobby\(onReady: \(\) => void\): boolean \{[\s\S]*?this\.role !== 'host'/);
     expect(network).toMatch(/resetLobby\(onReady: \(\) => void\): boolean \{[\s\S]*?this\.close\(\);[\s\S]*?this\.host\(onReady\);/);
-    expect(main).toContain("if (network.role !== 'host') return;");
-    expect(main).toContain('clearStoredHostMatchCheckpoint();');
-    expect(main).toContain('network.resetLobby(initializeHostLobby)');
+    const resetStart = main.indexOf("element<HTMLButtonElement>('#lobby-reset').addEventListener('click'");
+    const resetEnd = main.indexOf("element<HTMLButtonElement>('#lobby-balance').addEventListener('click'", resetStart);
+    expect(resetStart).toBeGreaterThanOrEqual(0);
+    expect(resetEnd).toBeGreaterThan(resetStart);
+    const resetHandler = main.slice(resetStart, resetEnd);
+    const hostGuard = resetHandler.indexOf("if (network.role !== 'host') return;");
+    const durableRoomInvalidation = resetHandler.indexOf('clearLastHostedRoomCode(clientPersistentStorage())');
+    const checkpointInvalidation = resetHandler.indexOf('clearStoredHostMatchCheckpoint();');
+    const freshHostAttempt = resetHandler.indexOf('network.resetLobby(initializeHostLobby)');
+    expect(hostGuard).toBeGreaterThanOrEqual(0);
+    expect(durableRoomInvalidation).toBeGreaterThan(hostGuard);
+    expect(checkpointInvalidation).toBeGreaterThan(durableRoomInvalidation);
+    expect(freshHostAttempt).toBeGreaterThan(checkpointInvalidation);
+    expect(resetHandler).toMatch(/if \(!clearLastHostedRoomCode\(clientPersistentStorage\(\)\)\) \{[\s\S]*?return;[\s\S]*?\}/);
   });
 
   it('does not label recovery as reset: the old room is intentionally invalidated', () => {

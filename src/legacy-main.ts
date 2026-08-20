@@ -212,6 +212,11 @@ import {
   type KillstreakStateMessage,
 } from './killstreak-protocol';
 import {
+  isOwnerSupportDamageFeedback,
+  presentSupportShotAudio,
+  SupportShotReplayGuard,
+} from './support-combat-presentation';
+import {
   acknowledgeClientWorldRepairActor,
   beginClientWorldRepair,
   clientWorldRepairCanAttempt,
@@ -488,6 +493,7 @@ import {
   type MatchAdmissionToken,
 } from './match-admission-transaction';
 import { loadRoomRejoinIdentity, releaseRoomRejoinIdentityLease, saveRoomRejoinIdentity, saveLastRoomCode, loadLastRoomCode } from './room-rejoin-identity';
+import { clearLastHostedRoomCode, loadLastHostedRoomCode, saveLastHostedRoomCode } from './host-room-recovery';
 import { guestRejoinAffordance } from './guest-rejoin-affordance';
 import {
   HOST_MATCH_CHECKPOINT_SCHEMA_VERSION,
@@ -890,7 +896,7 @@ import {
   WeaponId,
   WindowBreakMessage,
 } from './protocol';
-import { defaultSquadPresentation, sanitizeSquadPresentation } from './squad-presentation';
+import { defaultSquadPresentation, renderSquadRosterBadge, sanitizeSquadPresentation } from './squad-presentation';
 import {
   captureGuestCombatInventory,
   captureGuestCombatInventoryProjection,
@@ -2122,6 +2128,7 @@ function updateFlamethrowerGroundFires(now: number): void {
       matchEpoch: killstreakMatchEpoch,
       revision: killstreakSnapshot.revision,
       events: pendingCarpetGroundFireDamageEvents.slice(offset, offset + MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP),
+      shots: [],
       impacts: [],
       nonce: randomNonce(),
     };
@@ -4387,6 +4394,7 @@ const SUPPORT_STATUS_HUD_REFRESH_INTERVAL_MS = 100;
 let lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
 let lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
 const appliedKillstreakDamageResults = new Set<string>();
+const supportShotReplay = new SupportShotReplayGuard();
 const killstreakRegisteredActors = new Set<string>();
 const hostKillstreakLoadoutAcks = new HostKillstreakLoadoutAckRegistry();
 let displayedCareReward: Pass65KillstreakId | null = null;
@@ -6490,16 +6498,6 @@ function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot
   renderTextChat();
 }
 
-const LAST_HOSTED_ROOM_KEY = 'atomic-acres:last-hosted-room';
-function saveLastHostedRoomCode(roomCode: string): void {
-  const trimmed = roomCode.trim();
-  if (!trimmed) return;
-  try { localStorage.setItem(LAST_HOSTED_ROOM_KEY, trimmed); } catch { /* Rehost affordance is best effort. */ }
-}
-function loadLastHostedRoomCode(): string | null {
-  try { return localStorage.getItem(LAST_HOSTED_ROOM_KEY); } catch { return null; }
-}
-
 function hostLobbyAdmissionAttemptCurrent(attempt: HostLobbyAdmissionAttempt): boolean {
   const queuedReplacement = pendingHostRecoveryJoins.get(attempt.playerId);
   return hostLobbyAdmissionAttemptIsCurrent(attempt, {
@@ -6826,7 +6824,7 @@ function clearStoredHostMatchCheckpoint(): void {
 }
 
 function refreshHostMatchRecoveryAffordance(): HostMatchCheckpoint | null {
-  const roomCode = loadLastHostedRoomCode()?.trim() ?? '';
+  const roomCode = loadLastHostedRoomCode(clientPersistentStorage()) ?? '';
   const storage = clientPersistentStorage();
   pendingHostMatchRecovery = roomCode && storage
     ? loadHostMatchCheckpoint(storage, MULTIPLAYER_PROTOCOL_VERSION, roomCode)
@@ -6970,7 +6968,7 @@ function initializeFreshHostLobby(): void {
   gunRangeTestBayDoorBroadcastPending = false;
   // Remember the room code so a host who crashes can reclaim it on rehost,
   // letting guests who still have it saved rejoin the same lobby.
-  saveLastHostedRoomCode(network.roomCode);
+  saveLastHostedRoomCode(network.roomCode, clientPersistentStorage());
   privateMatchConfig = selectedArena.id === 'gun-range'
     ? { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: selectedArena.matchRules.durationMs ?? 120_000 }
     : { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id };
@@ -7034,7 +7032,7 @@ function initializeRecoveredHostLobby(checkpoint: HostMatchCheckpoint): boolean 
   if (!timing || checkpoint.roomCode !== network.roomCode) return false;
   hostMatchRecoveryPreparing = true;
   pendingHostMatchRecovery = checkpoint;
-  saveLastHostedRoomCode(network.roomCode);
+  saveLastHostedRoomCode(network.roomCode, clientPersistentStorage());
   privateMatchConfig = checkpoint.config;
   privateMatchMode = checkpoint.config.mode;
   privateMatchActiveAtHostTimeMs = timing.activeAtLocalMonoMs;
@@ -8550,7 +8548,7 @@ function renderPrivateLobby(): void {
     const quality = latencyQuality(ping);
     const role = member.id === snapshot?.hostId || member.id === player.id && network.role === 'host' ? 'HOST' : 'PEER';
     const team = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa' ? 'FFA' : member.team === 0 ? 'AQUA' : 'CORAL';
-    const squad = escapeHtml(member.squadName ?? defaultSquadPresentation(member.team).name);
+    const squad = renderSquadRosterBadge(member.squadName, member.squadColor, member.team);
     const handicapControl = member.id === player.id && (snapshot?.phase ?? 'waiting') === 'waiting'
       ? `<label class="lobby-dhv">DHV<select data-lobby-dhv aria-label="Damage Handicap Value">${DHV_VALUES.map((value) => `<option value="${value}"${member.dhv === value ? ' selected' : ''}>${value}</option>`).join('')}</select><small>${dhvLabel(member.dhv)}</small></label>`
       : `<span class="lobby-dhv-badge" title="${dhvLabel(member.dhv)}">DHV ${member.dhv}</span>`;
@@ -9736,6 +9734,12 @@ function onNetworkMessage(message: GameMessage): void {
   }
   if (message.type === 'killstreak-damage-result') {
     if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.matchEpoch !== killstreakMatchEpoch) return;
+    presentSupportShotAudio(
+      message.shots,
+      { playerId: player.id, team: player.team, mode: privateMatchMode },
+      (kind) => audio.supportGun(kind),
+      supportShotReplay,
+    );
     for (const event of message.events) {
       if (event.ownerId === player.id) recordOwnerSupportDamage(event);
       if (event.targetId === player.id) applyKillstreakDamageEvent(event);
@@ -13523,6 +13527,7 @@ async function startGame(
   localCareCaptureRequiresHold = false;
   displayedCareReward = null;
   appliedKillstreakDamageResults.clear();
+  supportShotReplay.clear();
   killstreakRegisteredActors.clear();
   hostKillstreakLoadoutAcks.clear();
   killstreakPresentation.clear();
@@ -19059,16 +19064,8 @@ function updateFInteractionPrompt(now = performance.now()): void {
 }
 
 function recordOwnerSupportDamage(event: KillstreakDamageEvent): void {
-  if (event.damage <= 0) return;
+  if (!isOwnerSupportDamageFeedback(event, player.id)) return;
   const targetPosition = new THREE.Vector3(...event.targetPosition);
-  if (targetPosition && (event.source === 'chopper' || event.source === 'piloted-drone' || event.source === 'drone-swarm')) {
-    const drone = event.source === 'piloted-drone' || event.source === 'drone-swarm';
-    // Damage is host-owned, but the weapon report is a replicated presentation
-    // cue. Every client that receives the admitted event must hear the same
-    // Chopper/Drone shot; only the owner gets the local tracer and damage HUD.
-    audio.supportGun(drone ? 'drone' : 'chopper');
-  }
-  if (event.ownerId !== player.id) return;
   if (event.source === 'chopper' || event.source === 'piloted-drone' || event.source === 'drone-swarm') {
     const drone = event.source === 'piloted-drone' || event.source === 'drone-swarm';
     spawnTracer(new THREE.Vector3(...event.tracerOrigin), new THREE.Vector3(...event.endpoint), drone ? 0x52e8ff : 0xffc65c);
@@ -19903,10 +19900,8 @@ function updateKillstreakPossession(now: number): void {
   // Exact operator reveal targets are synchronized once per frame by
   // updateThermalGhosts after all weapon/support optic lifecycles settle.
   if (triggerHeld && now >= nextLocalSupportGunReportAt) {
-    audio.supportGun(possession.kind === 'chopper-gunner' ? 'chopper' : 'drone');
-    // Owner feedback: it was hard to tell the mounted gun was actually firing.
-    // Stream a bright tracer down the aim line on every admitted shot so the
-    // trigger is unmistakable (presentation-only; the host owns real hits).
+    // Stream an immediate owner-only tracer down the aim line while the host's
+    // separate shot event remains the sole authority for audible gun reports.
     if (possession.kind === 'chopper-gunner') {
       killstreakPresentation.presentChopperWeaponAction(entity.id);
       const shotRay = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch);
@@ -19960,6 +19955,12 @@ function updatePass65KillstreakRuntime(now: number): void {
   }
   if (network.role !== 'client' && matchState.phase === 'active') {
     const result = killstreakRuntime.advance(now, killstreakWorldState());
+    presentSupportShotAudio(
+      result.shotEvents,
+      { playerId: player.id, team: player.team, mode: privateMatchMode },
+      (kind) => audio.supportGun(kind),
+      supportShotReplay,
+    );
     const applied = result.damageEvents.map(applyKillstreakDamageEvent).filter((event): event is KillstreakDamageEvent => event !== null && event.damage > 0);
     for (const event of applied) {
       recordOwnerSupportDamage(event);
@@ -20023,11 +20024,11 @@ function updatePass65KillstreakRuntime(now: number): void {
     applyInteractiveWorldExplosions(carpetWorldImpacts);
     killstreakPresentation.presentImpacts(result.impactEvents, now);
     refreshLocalKillstreakSnapshot(now,
-      result.damageEvents.length > 0 || result.impactEvents.length > 0 || result.expiredEntityIds.length > 0);
-    if (network.role === 'host' && (applied.length > 0 || result.impactEvents.length > 0)) {
+      result.damageEvents.length > 0 || result.shotEvents.length > 0 || result.impactEvents.length > 0 || result.expiredEntityIds.length > 0);
+    if (network.role === 'host' && (applied.length > 0 || result.shotEvents.length > 0 || result.impactEvents.length > 0)) {
       const message: KillstreakDamageResultMessage = {
         type: 'killstreak-damage-result', by: player.id, matchEpoch: killstreakMatchEpoch,
-        revision: killstreakSnapshot.revision, events: applied, impacts: result.impactEvents, nonce: randomNonce(),
+        revision: killstreakSnapshot.revision, events: applied, shots: result.shotEvents, impacts: result.impactEvents, nonce: randomNonce(),
       };
       network.send(message);
     }
@@ -24329,7 +24330,7 @@ element<HTMLButtonElement>('#host').addEventListener('click', () => {
   }
   if (!requirePlayerName()) return;
   const recovery = refreshHostMatchRecoveryAffordance();
-  const preferredRoomCode = recovery?.roomCode ?? loadLastHostedRoomCode() ?? undefined;
+  const preferredRoomCode = recovery?.roomCode ?? loadLastHostedRoomCode(clientPersistentStorage()) ?? undefined;
   resetForMode();
   resetPrivateLobbyState();
   pendingHostMatchRecovery = recovery;
@@ -24413,6 +24414,10 @@ element<HTMLInputElement>('#lobby-squad-name').addEventListener('change', commit
 element<HTMLInputElement>('#lobby-squad-color').addEventListener('change', commitLocalSquadPresentation);
 element<HTMLButtonElement>('#lobby-reset').addEventListener('click', () => {
   if (network.role !== 'host') return;
+  if (!clearLastHostedRoomCode(clientPersistentStorage())) {
+    setStatus('Saved room recovery could not be invalidated; fresh-code reset cancelled.', 'error');
+    return;
+  }
   clearStoredHostMatchCheckpoint();
   pendingHostMatchRecovery = null;
   gameStarted = false;

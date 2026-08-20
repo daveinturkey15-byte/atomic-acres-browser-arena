@@ -46,11 +46,11 @@ export function pass72ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
   const released = releasedAt !== PENDING_PRODUCTION_RELEASE;
   return Object.freeze({
     summary: released
-      ? 'Pass 72 adds host-authoritative private-lobby controls, combat corrections, readable support audio and squad presentation while preserving the tested release fallbacks.'
-      : 'Pass 72 is the local owner-review candidate, adding host-authoritative private-lobby controls, combat corrections, readable support audio and squad presentation while preserving the tested release fallbacks.',
+      ? 'Pass 72 adds host-authoritative private-lobby controls, combat corrections, teammate-scoped support-shot audio dispatch and squad presentation while preserving the tested release fallbacks.'
+      : 'Pass 72 is the mechanically gated publication candidate, adding host-authoritative private-lobby controls, combat corrections, teammate-scoped support-shot audio dispatch and squad presentation while preserving the tested release fallbacks.',
     lineage: released
-      ? 'Pass 70 remains the exact previous live runtime, Pass 69 remains the immutable comparison build, and Pass 63 remains the stable WebGL fallback'
-      : 'Pass 70 remains the exact previous live runtime, Pass 69 remains the immutable comparison build, and Pass 63 remains the stable WebGL fallback until this exact candidate is approved',
+      ? 'Pass 70 remains the exact previous live runtime, Pass 69 remains the immutable comparison build, and Pass 63 remains the stable WebGL fallback while public owner HITL for Pass 72 remains pending'
+      : 'Pass 70 remains the exact previous live runtime, Pass 69 remains the immutable comparison build, and Pass 63 remains the stable WebGL fallback; publication-first authorization is recorded and public owner HITL follows the protected Pages release',
   });
 }
 
@@ -76,9 +76,9 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
     highlights: Object.freeze([
       'Private lobbies default to Free For All with selectable Team Deathmatch, host-only reset-to-new-code authority and checkpoint invalidation that prevents stale-room reuse',
       'Replicated squad names and colours improve presentation without replacing authoritative gameplay-team ownership or network validation',
-      'M14 EBR damage is exactly 37.2 body / 24 head, the fall-damage envelope is halved without weakening impact-speed thresholds, and flare collision radius is 0.24 metres',
+      'M14 EBR base / minimum body-damage values are exactly 37.2 / 24 while the 1.7 head multiplier remains unchanged; the fall-damage envelope is halved without weakening impact-speed thresholds, and flare collision radius is 0.24 metres',
       'Carpet Bomber environment kills retain map-owned attribution, while hosted explosive-crossbow glass breaking remains occlusion-aware and authoritative',
-      'Chopper and Drone support-shot audio is teammate-visible while owner-local HUD and tracer presentation stays local and bounded',
+      'Chopper and Drone support-shot audio dispatch reaches the owner and eligible Team Deathmatch teammates while HUD and tracer presentation stays owner-local and bounded',
       'The exact Pass 70 live runtime is pinned as a selectable previous channel; Pass 69, Pass 67.1 and Pass 63 remain preserved for comparison, stable testing and rollback',
       pass72Copy.lineage,
     ]),
@@ -516,6 +516,6 @@ export function formatChangelogTimestampDetail(isoTimestamp: string): string {
 }
 
 export function lastUpdatedButtonLabel(entry: ChangelogEntry = latestChangelogEntry()): string {
-  if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) return 'CURRENT CANDIDATE · OWNER REVIEW PENDING';
+  if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) return 'CURRENT CANDIDATE · PUBLIC HITL AFTER RELEASE';
   return `LAST RELEASE · ${formatChangelogTimestamp(entry.releasedAt)}`;
 }

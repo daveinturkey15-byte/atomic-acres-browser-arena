@@ -5,6 +5,7 @@ import {
   defaultSquadPresentation,
   isSquadColor,
   isSquadName,
+  renderSquadRosterBadge,
   sanitizeSquadPresentation,
 } from './squad-presentation';
 
@@ -43,5 +44,17 @@ describe('Pass 72 squad presentation', () => {
       playerId: 'guest', connectionEpoch: 'epoch_1234', name: 'Guest', requestedTeam: 0,
       squadName: 'North Wing', squadColor: '#55e6ff', resumeToken: 'x'.repeat(24), nonce: 1,
     })).toBe(true);
+  });
+
+  it('renders the replicated colour as a visible, injection-safe roster swatch', () => {
+    expect(renderSquadRosterBadge('North Wing', '#55E6FF', 0)).toBe(
+      '<span class="lobby-squad-badge" style="--lobby-squad-color:#55e6ff"><span class="lobby-squad-swatch" aria-hidden="true"></span>North Wing</span>',
+    );
+    const rejected = renderSquadRosterBadge('bad<script>', 'red; background:url(evil)', 1);
+    expect(rejected).toContain('--lobby-squad-color:#ff6b73');
+    expect(rejected).toContain('CORAL');
+    expect(rejected).not.toMatch(/<script>|url\(/);
+    expect(renderSquadRosterBadge('North Wing', '#123456', 0))
+      .not.toBe(renderSquadRosterBadge('North Wing', '#654321', 0));
   });
 });

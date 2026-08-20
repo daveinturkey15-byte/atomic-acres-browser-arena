@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseKillstreakLoadout } from './killstreak-catalog';
 import {
   CHOPPER_MISSILE_CADENCE_MS,
+  CHOPPER_MISSILE_BLAST_RADIUS_M,
   CHOPPER_MISSILE_CAPACITY,
   CHOPPER_MISSILE_FLIGHT_MS,
   HostKillstreakRuntime,
@@ -62,6 +63,7 @@ describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
       }, now).accepted).toBe(true);
       sequence += 1;
       const launch = runtime.advance(now, world());
+      expect(launch.shotEvents).toEqual([]);
       expect(launch.impactEvents).toContainEqual(expect.objectContaining({
         source: 'chopper', ordinal, phase: 'drop', atMs: now, impactAtMs: now + CHOPPER_MISSILE_FLIGHT_MS,
       }));
@@ -77,6 +79,7 @@ describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
         }, now + 500).accepted).toBe(true);
         sequence += 1;
         const cooldown = runtime.advance(now + 500, world());
+        expect(cooldown.shotEvents).toEqual([]);
         expect(cooldown.impactEvents.filter((event) => event.phase === 'drop')).toEqual([]);
         expect(runtime.snapshotFor('owner', now + 500).entities[0].missileAmmo).toBe(5);
       }
@@ -98,22 +101,31 @@ describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
     const impactWorld = world([{
       id: 'enemy', kind: 'player', team: 1, lifeId: 4, alive: true,
       position: [targetPoint[0], targetPoint[1] + 1.1, targetPoint[2]],
+    }, {
+      id: 'enemy-two', kind: 'player', team: 1, lifeId: 5, alive: true,
+      position: [targetPoint[0] + CHOPPER_MISSILE_BLAST_RADIUS_M / 2, targetPoint[1] + 1.1, targetPoint[2]],
     }]);
     expect(runtime.control({
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId,
       action: 'pilot-control', yawQ: 0, pitchQ: -1.2, missileFire: true,
     }, 1_100).accepted).toBe(true);
     const launch = runtime.advance(1_100, impactWorld);
+    expect(launch.shotEvents).toEqual([]);
     expect(launch.impactEvents).toEqual([expect.objectContaining({
       source: 'chopper', ordinal: 0, phase: 'drop', position: targetPoint,
     })]);
     const impact = runtime.advance(1_100 + CHOPPER_MISSILE_FLIGHT_MS, impactWorld);
+    expect(impact.shotEvents).toEqual([]);
     expect(impact.impactEvents).toEqual([expect.objectContaining({
       source: 'chopper', ordinal: 0, phase: 'impact', position: targetPoint,
     })]);
-    expect(impact.damageEvents).toEqual([expect.objectContaining({
+    expect(impact.damageEvents).toHaveLength(2);
+    expect(impact.damageEvents).toContainEqual(expect.objectContaining({
       source: 'chopper', ownerId: 'owner', targetId: 'enemy', targetLifeId: 4,
-    })]);
+    }));
+    expect(impact.damageEvents).toContainEqual(expect.objectContaining({
+      source: 'chopper', ownerId: 'owner', targetId: 'enemy-two', targetLifeId: 5,
+    }));
   });
 
   it('clears a pending RMB request on exit, death, and match teardown', () => {
@@ -145,7 +157,7 @@ describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
     }, 1_100);
     expect(rematch.runtime.endMatch()).toContain(rematch.entityId);
     expect(rematch.runtime.advance(2_000, world())).toEqual({
-      damageEvents: [], impactEvents: [], expiredEntityIds: [],
+      damageEvents: [], shotEvents: [], impactEvents: [], expiredEntityIds: [],
     });
   });
 });

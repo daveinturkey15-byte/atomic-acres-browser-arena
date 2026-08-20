@@ -61,7 +61,7 @@ describe('Pass 70 Gun Range test-bay runtime integration', () => {
     expect(heartbeat.indexOf('synchronizeGunRangeTestBayDoorWorld(doorState, false);'))
       .toBeLessThan(heartbeat.indexOf('flushGunRangeTestBayDoorBroadcast();'));
 
-    const broadcast = functionBlock('broadcastHostLobby(', 'saveLastHostedRoomCode(');
+    const broadcast = functionBlock('broadcastHostLobby(', 'hostLobbyAdmissionAttemptCurrent(');
     expect(broadcast.indexOf('synchronizeGunRangeTestBayDoorWorld('))
       .toBeLessThan(broadcast.indexOf('network.send(message);'));
   });

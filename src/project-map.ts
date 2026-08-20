@@ -49,10 +49,10 @@ export type ProjectMapBundle = Readonly<{
 }>;
 
 /**
- * The project map describes the active review candidate or the same bytes after
+ * The project map describes the active publication candidate or the same bytes after
  * protected timestamp injection. Keeping this copy state-aware prevents either
- * an unpublished pass claiming to be live or a promoted build claiming approval
- * is still pending.
+ * an unpublished pass claiming to be live or a publication-first release
+ * claiming that owner HITL already happened.
  */
 export function projectMapReleaseCopy(releasedAt: string): Readonly<{
   summary: string;
@@ -62,10 +62,10 @@ export function projectMapReleaseCopy(releasedAt: string): Readonly<{
   return Object.freeze({
     summary: released
       ? 'Pass 72 is the current released build for private lobbies, combat corrections, support presentation and squad metadata; the exact Pass 70 previous-live channel and stable Pass 63 WebGL fallback stay frozen.'
-      : 'Pass 72 is the current local HITL candidate for private lobbies, combat corrections, support presentation and squad metadata; the exact Pass 70 previous-live channel and stable Pass 63 WebGL fallback stay frozen.',
+      : 'Pass 72 is the mechanically gated publication candidate for private lobbies, combat corrections, support presentation and squad metadata; the exact Pass 70 previous-live channel and stable Pass 63 WebGL fallback stay frozen.',
     approvalHighlight: released
-      ? 'Pass 72 was promoted only after approval of its immutable preview'
-      : 'Owner approval remains pending on the immutable Pass 72 preview',
+      ? 'Pass 72 was published under Dave\'s publication-first authorization after mechanical gates; public owner HITL remains pending'
+      : 'Dave\'s publication-first authorization is recorded; he did not inspect the immutable Pass 72 preview and public owner HITL follows protected publication',
   });
 }
 
@@ -83,7 +83,7 @@ export const PROJECT_MAP_RELEASE: ChangelogEntry = Object.freeze({
     'Private lobbies default to Free For All with selectable Team Deathmatch, host-only reset-to-new-code authority and checkpoint invalidation',
     'Replicated squad names and colours improve presentation without replacing authoritative gameplay-team ownership or network validation',
     'M14 EBR damage, fall-damage envelope and flare collision radius now use the exact Pass 72 balance contract',
-    'Carpet Bomber environment attribution, hosted occlusion-aware crossbow glass breaking and teammate-visible support-shot audio remain bounded and authoritative',
+    'Carpet Bomber environment attribution, hosted occlusion-aware crossbow glass breaking and support-shot audio dispatch for the owner and eligible Team Deathmatch teammates remain bounded and authoritative',
     'The release chooser preserves exact Pass 70, Pass 69, Pass 67.1 and Pass 63 evidence paths for comparison and rollback',
     projectMapCopy.approvalHighlight,
     'Pass 63 stays frozen as the selectable stable WebGL fallback',

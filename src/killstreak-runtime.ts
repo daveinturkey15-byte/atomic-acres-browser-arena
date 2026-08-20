@@ -102,6 +102,7 @@ export const MAX_ACTIVE_SUPPORT_ENTITIES = 32;
  */
 export const MAX_ACTIVE_CARPET_BOMBER_RESERVATIONS = MAX_ACTIVE_SUPPORT_ENTITIES;
 export const MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP = 64;
+export const MAX_SUPPORT_SHOT_EVENTS_PER_STEP = 64;
 export const MAX_REPLICATED_KILLSTREAK_STREAK = 100_000;
 /** Recipient-protocol bound for a single banked reward count. */
 export const MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD = 255;
@@ -178,6 +179,16 @@ export type KillstreakDamageEvent = Readonly<{
   atMs: number;
 }>;
 
+export type KillstreakSupportShotEvent = Readonly<{
+  activationId: string;
+  entityId: string;
+  source: 'chopper' | 'piloted-drone' | 'drone-swarm';
+  ownerId: string;
+  ownerTeam: 0 | 1;
+  ordinal: number;
+  atMs: number;
+}>;
+
 export type KillstreakImpactEvent = Readonly<{
   activationId: string;
   source: Pass65KillstreakId;
@@ -240,6 +251,7 @@ type ChopperEntity = EntityBase & {
   routeCentre: [number, number, number];
   gunController: 'ai' | Readonly<{ actorId: string; lifeId: number }>;
   nextShotAtMs: number;
+  nextShotOrdinal: number;
   aimYaw: number;
   aimPitch: number;
   pendingPlayerFire: boolean;
@@ -263,6 +275,7 @@ type DroneEntity = EntityBase & {
   reserveClips: number | null;
   reloadCompletesAtMs: number | null;
   nextShotAtMs: number;
+  nextShotOrdinal: number;
   targetId: string | null;
   yaw: number;
   pitch: number;
@@ -412,6 +425,7 @@ export type CareCaptureAdmissionReason =
 
 export type KillstreakAdvanceResult = Readonly<{
   damageEvents: readonly KillstreakDamageEvent[];
+  shotEvents: readonly KillstreakSupportShotEvent[];
   impactEvents: readonly KillstreakImpactEvent[];
   expiredEntityIds: readonly string[];
 }>;
@@ -1557,7 +1571,7 @@ export class HostKillstreakRuntime {
         createdAtMs: nowMs, expiresAtMs: nowMs + CHOPPER_DURATION_MS,
         position: [centre[0], centre[1], centre[2]], velocity: [0, 0, 0], attitude: [0, 0, 0], health: CHOPPER_HEALTH, revision: 0,
         kind: 'chopper', phase: 'inbound', seed, routeCentre: centre, gunController: 'ai',
-        nextShotAtMs: nowMs + 600, aimYaw: 0, aimPitch: 0, pendingPlayerFire: false,
+        nextShotAtMs: nowMs + 600, nextShotOrdinal: 0, aimYaw: 0, aimPitch: 0, pendingPlayerFire: false,
         pendingPlayerMissile: null, missilesRemaining: CHOPPER_MISSILE_CAPACITY,
         nextMissileAtMs: nowMs, nextMissileOrdinal: 0, pendingMissiles: [],
       };
@@ -1576,7 +1590,7 @@ export class HostKillstreakRuntime {
         position: admittedSpawn, velocity: [0, 0, 0], attitude: [0, 0, 0], health: DRONE_HEALTH, revision: 0,
         kind: 'drone', mode: 'piloted', phase: 'active', seed,
         magazine: DRONE_MAGAZINE_SIZE, reserveClips: PILOTED_DRONE_RESERVE_CLIPS,
-        reloadCompletesAtMs: null, nextShotAtMs: nowMs, targetId: null,
+        reloadCompletesAtMs: null, nextShotAtMs: nowMs, nextShotOrdinal: 0, targetId: null,
         yaw: 0, pitch: 0, thrust: 0, strafe: 0, vertical: 0, pendingPlayerFire: false,
         gunProfileId: DRONE_SUPPORT_DEFINITIONS.piloted.gunProfileId,
         nextSensorRefreshAtMs: nowMs,
@@ -1620,7 +1634,7 @@ export class HostKillstreakRuntime {
           attitude: [0, supportYawForDirection(ingressDx, ingressDz), 0], health: DRONE_HEALTH, revision: 0,
           kind: 'drone', mode: 'swarm', phase: 'active', seed: seed ^ index,
           magazine: DRONE_MAGAZINE_SIZE, reserveClips: null,
-          reloadCompletesAtMs: null, nextShotAtMs: nowMs + 500 + index * 35, targetId: null,
+          reloadCompletesAtMs: null, nextShotAtMs: nowMs + 500 + index * 35, nextShotOrdinal: 0, targetId: null,
           yaw: 0, pitch: 0, thrust: 0, strafe: 0, vertical: 0, pendingPlayerFire: false,
           gunProfileId: DRONE_SUPPORT_DEFINITIONS.swarm.gunProfileId,
           nextSensorRefreshAtMs: Number.POSITIVE_INFINITY,
@@ -2013,10 +2027,10 @@ export class HostKillstreakRuntime {
 
   advance(nowMs: number, world: KillstreakWorld): KillstreakAdvanceResult {
     if (!Number.isFinite(nowMs)) return Object.freeze({
-      damageEvents: Object.freeze([]), impactEvents: Object.freeze([]), expiredEntityIds: Object.freeze([]),
+      damageEvents: Object.freeze([]), shotEvents: Object.freeze([]), impactEvents: Object.freeze([]), expiredEntityIds: Object.freeze([]),
     });
     if (this.lastAdvancedAtMs !== 0 && nowMs < this.lastAdvancedAtMs) return Object.freeze({
-      damageEvents: Object.freeze([]), impactEvents: Object.freeze([]), expiredEntityIds: Object.freeze([]),
+      damageEvents: Object.freeze([]), shotEvents: Object.freeze([]), impactEvents: Object.freeze([]), expiredEntityIds: Object.freeze([]),
     });
     const canonicalNowMs = Math.max(this.lastAdvancedAtMs, nowMs);
     const previousAt = this.lastAdvancedAtMs === 0 ? canonicalNowMs : this.lastAdvancedAtMs;
@@ -2024,6 +2038,7 @@ export class HostKillstreakRuntime {
     this.lastAdvancedAtMs = canonicalNowMs;
     const hadRuntimeState = this.entities.size > 0 || this.carpetBombers.size > 0 || this.timedActivations.size > 0;
     const damageEvents: KillstreakDamageEvent[] = [];
+    const shotEvents: KillstreakSupportShotEvent[] = [];
     const impactEvents: KillstreakImpactEvent[] = [];
     const expiredEntityIds: string[] = [];
     // One host step may advance all 24 swarm drones for the same owner. Build
@@ -2129,8 +2144,8 @@ export class HostKillstreakRuntime {
       if (entity.kind === 'aircraft') {
         if (entity.variant !== 'carpet') this.advanceAircraft(entity, canonicalNowMs, dt, world);
       } else if (entity.kind === 'care-crate') this.advanceCareCrate(entity, canonicalNowMs, dt, world);
-      else if (entity.kind === 'chopper') this.advanceChopper(entity, canonicalNowMs, dt, world, damageEvents, impactEvents);
-      else this.advanceDrone(entity, canonicalNowMs, dt, world, damageEvents);
+      else if (entity.kind === 'chopper') this.advanceChopper(entity, canonicalNowMs, dt, world, damageEvents, shotEvents, impactEvents);
+      else this.advanceDrone(entity, canonicalNowMs, dt, world, damageEvents, shotEvents);
     }
     this.enforceSwarmSeparation(dt, world);
     // Recipient admission is keyed by this aggregate revision. Every mutable
@@ -2139,6 +2154,7 @@ export class HostKillstreakRuntime {
     if (hadRuntimeState) this.revision += 1;
     return Object.freeze({
       damageEvents: Object.freeze(damageEvents.slice(0, MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP)),
+      shotEvents: Object.freeze(shotEvents),
       impactEvents: Object.freeze(impactEvents),
       expiredEntityIds: Object.freeze(expiredEntityIds),
     });
@@ -2235,6 +2251,7 @@ export class HostKillstreakRuntime {
     dt: number,
     world: KillstreakWorld,
     damageEvents: KillstreakDamageEvent[],
+    shotEvents: KillstreakSupportShotEvent[],
     impactEvents: KillstreakImpactEvent[],
   ): void {
     const elapsed = clamp((nowMs - entity.createdAtMs) / CHOPPER_DURATION_MS, 0, 1);
@@ -2323,10 +2340,13 @@ export class HostKillstreakRuntime {
     }
 
     const shouldFire = entity.gunController === 'ai' ? nowMs >= entity.nextShotAtMs : entity.pendingPlayerFire && nowMs >= entity.nextShotAtMs;
-    if (!shouldFire || damageEvents.length >= MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP) return;
+    if (!shouldFire
+      || damageEvents.length >= MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP
+      || shotEvents.length >= MAX_SUPPORT_SHOT_EVENTS_PER_STEP) return;
     if (entity.gunController === 'ai') {
       const target = this.nearestVisibleTarget(firingPosition, owner.actorId, owner.team, world);
       if (target) {
+        shotEvents.push(this.supportShotEvent(entity, 'chopper', owner, nowMs));
         const admittedDamage = supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, distance(firingPosition, target.position));
         if (admittedDamage > 0) damageEvents.push(this.damageEvent(
           entity.activationId,
@@ -2339,6 +2359,7 @@ export class HostKillstreakRuntime {
         ));
       }
     } else {
+      shotEvents.push(this.supportShotEvent(entity, 'chopper', owner, nowMs));
       const ray = chopperGunnerAuthoritativeRay(firingPosition, firingAttitude, entity.aimYaw, entity.aimPitch);
       const hit = this.visibleTargetAlongRay(
         ray.origin,
@@ -2377,6 +2398,7 @@ export class HostKillstreakRuntime {
     dt: number,
     world: KillstreakWorld,
     damageEvents: KillstreakDamageEvent[],
+    shotEvents: KillstreakSupportShotEvent[],
   ): void {
     const owner = this.actors.get(entity.ownerId);
     if (!owner) return;
@@ -2416,7 +2438,8 @@ export class HostKillstreakRuntime {
       entity.position = next;
       entity.attitude = [entity.pitch, entity.yaw, 0];
       if (entity.pendingPlayerFire && nowMs >= entity.nextShotAtMs) {
-        if (entity.magazine > 0) {
+        if (entity.magazine > 0 && shotEvents.length < MAX_SUPPORT_SHOT_EVENTS_PER_STEP) {
+          shotEvents.push(this.supportShotEvent(entity, 'piloted-drone', owner, nowMs));
           const target = this.aimedVisibleTarget(
             entity.position,
             entity.yaw,
@@ -2520,13 +2543,16 @@ export class HostKillstreakRuntime {
             );
           }
           const canHit = range <= gunProfile.maximumRangeM && lineOfSight(world, entity.position, target.position);
-          const canFireOwnGun = canHit && nowMs >= entity.nextShotAtMs && entity.magazine > 0;
+          const canFireOwnGun = canHit && nowMs >= entity.nextShotAtMs && entity.magazine > 0
+            && shotEvents.length < MAX_SUPPORT_SHOT_EVENTS_PER_STEP;
           const fireLaneAdmitted = entity.mode !== 'swarm' || this.claimSwarmFireLane(entity, nowMs, canFireOwnGun);
           if (canFireOwnGun && fireLaneAdmitted) {
+            const source = entity.mode === 'piloted' ? 'piloted-drone' : 'drone-swarm';
+            shotEvents.push(this.supportShotEvent(entity, source, owner, nowMs));
             const admittedDamage = supportGunDamageAtDistance(gunProfile, range);
             if (admittedDamage > 0) damageEvents.push(this.damageEvent(
               entity.activationId,
-              entity.mode === 'piloted' ? 'piloted-drone' : 'drone-swarm',
+              source,
               owner.actorId,
               target,
               admittedDamage,
@@ -2916,6 +2942,25 @@ export class HostKillstreakRuntime {
       origin: Object.freeze([...origin]) as unknown as SupportVec3,
       endpoint: Object.freeze([...endpoint]) as unknown as SupportVec3,
       tracerOrigin: Object.freeze([...tracerOrigin]) as unknown as SupportVec3,
+      atMs: nowMs,
+    });
+  }
+
+  private supportShotEvent(
+    entity: ChopperEntity | DroneEntity,
+    source: KillstreakSupportShotEvent['source'],
+    owner: ActorAuthorityState,
+    nowMs: number,
+  ): KillstreakSupportShotEvent {
+    const ordinal = entity.nextShotOrdinal;
+    entity.nextShotOrdinal += 1;
+    return Object.freeze({
+      activationId: entity.activationId,
+      entityId: entity.id,
+      source,
+      ownerId: owner.actorId,
+      ownerTeam: owner.team,
+      ordinal,
       atMs: nowMs,
     });
   }

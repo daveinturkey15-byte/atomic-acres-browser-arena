@@ -50,14 +50,19 @@ describe('project map', () => {
 
   it('keeps candidate and timestamped-production release copy mutually truthful', () => {
     expect(projectMapReleaseCopy('PENDING_PRODUCTION')).toMatchObject({
-      summary: expect.stringContaining('current local HITL candidate'),
-      approvalHighlight: expect.stringContaining('Owner approval remains pending'),
+      summary: expect.stringContaining('mechanically gated publication candidate'),
+      approvalHighlight: expect.stringContaining('publication-first authorization'),
     });
+    const candidate = projectMapReleaseCopy('PENDING_PRODUCTION');
+    expect(candidate.approvalHighlight).toContain('did not inspect');
+    expect(candidate.approvalHighlight).toContain('public owner HITL follows');
+    expect(candidate.approvalHighlight).not.toContain('Owner approval remains pending');
     const released = projectMapReleaseCopy('2026-08-09T20:00:00Z');
     expect(released.summary).toContain('current released build');
-    expect(released.summary).not.toContain('local HITL candidate');
-    expect(released.approvalHighlight).toContain('was promoted only after approval');
-    expect(released.approvalHighlight).not.toContain('remains pending');
+    expect(released.summary).not.toContain('publication candidate');
+    expect(released.approvalHighlight).toContain('publication-first authorization');
+    expect(released.approvalHighlight).toContain('public owner HITL remains pending');
+    expect(released.approvalHighlight).not.toContain('approval of its immutable preview');
   });
 
   it('serializes agent JSON and human Markdown from the same bundle', () => {

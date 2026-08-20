@@ -29,7 +29,12 @@ describe('changelog', () => {
     expect(formatChangelogTimestampDetail('2026-07-23T22:51:43Z')).toBe(
       '23 JUL 2026 · 23:51 BST · UTC+1 · 23:51:43',
     );
-    expect(lastUpdatedButtonLabel(latest)).toBe('CURRENT CANDIDATE · OWNER REVIEW PENDING');
+    expect(lastUpdatedButtonLabel(latest)).toBe('CURRENT CANDIDATE · PUBLIC HITL AFTER RELEASE');
+    expect(latest.highlights.join('\n')).toContain('base / minimum body-damage values are exactly 37.2 / 24');
+    expect(latest.highlights.join('\n')).toContain('1.7 head multiplier remains unchanged');
+    expect(latest.highlights.join('\n')).toContain('owner and eligible Team Deathmatch teammates');
+    expect(latest.highlights.join('\n')).not.toContain('37.2 body / 24 head');
+    expect(latest.highlights.join('\n')).not.toContain('teammate-visible');
   });
 
   it('uses the successful production promotion rather than implementation time', () => {
@@ -72,11 +77,14 @@ describe('changelog', () => {
 
   it('keeps Pass 72 candidate and timestamped production copy mutually truthful', () => {
     expect(pass72ReleaseCopy(PENDING_PRODUCTION_RELEASE)).toMatchObject({
-      summary: expect.stringContaining('local owner-review candidate'),
-      lineage: expect.stringContaining('until this exact candidate is approved'),
+      summary: expect.stringContaining('mechanically gated publication candidate'),
+      lineage: expect.stringContaining('publication-first authorization'),
     });
+    expect(pass72ReleaseCopy(PENDING_PRODUCTION_RELEASE).lineage).toContain('public owner HITL follows');
+    expect(pass72ReleaseCopy(PENDING_PRODUCTION_RELEASE).summary).not.toContain('owner-review candidate');
     const released72 = pass72ReleaseCopy('2026-08-20T08:00:00Z');
     expect(released72.summary).not.toContain('candidate');
+    expect(released72.lineage).toContain('public owner HITL for Pass 72 remains pending');
     expect(released72.lineage).not.toContain('until this exact candidate is approved');
     expect(pass70ReleaseCopy(PENDING_PRODUCTION_RELEASE)).toMatchObject({
       summary: expect.stringContaining('local owner-review candidate'),

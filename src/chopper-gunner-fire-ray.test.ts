@@ -113,7 +113,17 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId,
       action: 'pilot-control', yawQ: 0, pitchQ: -0.2, fire: true,
     }, 1_599).accepted).toBe(true);
-    expect(runtime.advance(1_600, world([oldConeTarget])).damageEvents).toEqual([]);
+    const missed = runtime.advance(1_600, world([oldConeTarget]));
+    expect(missed.damageEvents).toEqual([]);
+    expect(missed.shotEvents).toEqual([expect.objectContaining({
+      activationId: expect.stringMatching(/^ks-activation-7-/),
+      entityId,
+      source: 'chopper',
+      ownerId: 'owner',
+      ownerTeam: 0,
+      ordinal: 0,
+      atMs: 1_600,
+    })]);
 
     runtime.advance(1_879, world());
     entity = activeChopper(runtime, 1_879);
@@ -125,6 +135,7 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
     }, 1_879).accepted).toBe(true);
     const nearResult = runtime.advance(1_880, world([near]));
     expect(nearResult.damageEvents).toHaveLength(1);
+    expect(nearResult.shotEvents).toEqual([expect.objectContaining({ entityId, source: 'chopper', ordinal: 1 })]);
     expect(nearResult.damageEvents[0]).toMatchObject({ targetId: 'near-centre', source: 'chopper' });
 
     runtime.advance(2_159, world());
@@ -137,6 +148,7 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
     }, 2_159).accepted).toBe(true);
     const farResult = runtime.advance(2_160, world([far]));
     expect(farResult.damageEvents).toHaveLength(1);
+    expect(farResult.shotEvents).toEqual([expect.objectContaining({ entityId, source: 'chopper', ordinal: 2 })]);
     expect(farResult.damageEvents[0]).toMatchObject({ targetId: 'far-centre', source: 'chopper' });
     expect(farResult.damageEvents[0]!.damage).toBeLessThanOrEqual(CHOPPER_GUN_PROFILE.damage);
     const admittedRay = ray;

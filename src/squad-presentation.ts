@@ -28,3 +28,15 @@ export function sanitizeSquadPresentation(
     color: isSquadColor(color) ? color.toLowerCase() : fallback.color,
   };
 }
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>'"]/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+  }[character]!));
+}
+
+/** Render only sanitized presentation metadata; gameplay team remains authoritative. */
+export function renderSquadRosterBadge(name: unknown, color: unknown, team: 0 | 1): string {
+  const squad = sanitizeSquadPresentation(name, color, team);
+  return `<span class="lobby-squad-badge" style="--lobby-squad-color:${squad.color}"><span class="lobby-squad-swatch" aria-hidden="true"></span>${escapeHtml(squad.name)}</span>`;
+}

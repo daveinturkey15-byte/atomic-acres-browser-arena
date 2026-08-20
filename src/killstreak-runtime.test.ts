@@ -439,7 +439,7 @@ describe('host killstreak runtime', () => {
     expect(ended.actors[0].possession).toBeNull();
     expect(runtime.modifiersForActor('owner', 1_005).active).toBe(false);
     expect(runtime.advance(20_000, DEFAULT_WORLD)).toEqual({
-      damageEvents: [], impactEvents: [], expiredEntityIds: [],
+      damageEvents: [], shotEvents: [], impactEvents: [], expiredEntityIds: [],
     });
     expect(runtime.endMatch()).toEqual([]);
   });
@@ -840,7 +840,11 @@ describe('host killstreak runtime', () => {
     const entityId = runtime.activate(intent('piloted-drone', 2), 1_000, DEFAULT_WORLD).entityIds[0];
     expect(runtime.snapshotFor('owner', 1_000).entities[0]).toMatchObject({ magazine: 20, reserveClips: 2, mode: 'piloted' });
     expect(runtime.snapshotFor('owner', 1_000).actors[0].possession).toBeNull();
-    expect(runtime.advance(1_001, DEFAULT_WORLD).damageEvents[0]).toMatchObject({ source: 'piloted-drone', ownerId: 'owner' });
+    const autonomousShot = runtime.advance(1_001, DEFAULT_WORLD);
+    expect(autonomousShot.damageEvents[0]).toMatchObject({ source: 'piloted-drone', ownerId: 'owner' });
+    expect(autonomousShot.shotEvents).toEqual([expect.objectContaining({
+      entityId, source: 'piloted-drone', ownerId: 'owner', ownerTeam: 0, ordinal: 0,
+    })]);
     expect(runtime.control({
       by: 'other', matchEpoch: 7, lifeId: 9, sequence: 1, entityId, action: 'pilot-control', yawQ: 0, pitchQ: 0, thrustQ: 1, verticalQ: 1, fire: true,
     }, 1_001)).toMatchObject({ accepted: false, reason: 'entity-unavailable' });
@@ -853,7 +857,19 @@ describe('host killstreak runtime', () => {
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId, action: 'pilot-control', yawQ: 0, pitchQ: 0, thrustQ: 1, verticalQ: 1, fire: true,
     }, 1_003).accepted).toBe(true);
     const before = runtime.snapshotFor('owner', 1_003).entities[0].position;
-    expect(runtime.advance(1_601, firstPersonForwardWorld).damageEvents).toHaveLength(1);
+    const controlledMiss = runtime.advance(1_301, {
+      ...DEFAULT_WORLD,
+      targets: DEFAULT_WORLD.targets.filter((target) => target.id === 'owner'),
+    });
+    expect(controlledMiss.damageEvents).toEqual([]);
+    expect(controlledMiss.shotEvents).toEqual([expect.objectContaining({
+      entityId, source: 'piloted-drone', ownerId: 'owner', ownerTeam: 0, ordinal: 1,
+    })]);
+    const controlledHit = runtime.advance(1_601, firstPersonForwardWorld);
+    expect(controlledHit.damageEvents).toHaveLength(1);
+    expect(controlledHit.shotEvents).toEqual([expect.objectContaining({
+      entityId, source: 'piloted-drone', ordinal: 2,
+    })]);
     runtime.advance(1_617, firstPersonForwardWorld);
     const after = runtime.snapshotFor('owner', 1_617).entities[0].position;
     expect(after[2]).toBeLessThan(before[2]);
@@ -1086,7 +1102,7 @@ describe('host killstreak runtime', () => {
 
     const beforeInvalid = regressedClock.revision;
     expect(runtime.advance(Number.NaN, DEFAULT_WORLD)).toEqual({
-      damageEvents: [], impactEvents: [], expiredEntityIds: [],
+      damageEvents: [], shotEvents: [], impactEvents: [], expiredEntityIds: [],
     });
     expect(runtime.snapshotFor('owner', 2_000).revision).toBe(beforeInvalid);
   });
