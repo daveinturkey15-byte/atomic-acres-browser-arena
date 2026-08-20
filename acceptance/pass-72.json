@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 72",
+  "feedbackReceivedAt": "2026-08-19T18:10:17.000Z",
+  "status": "accepted",
+  "preview": {
+    "kind": "github-actions-artifact",
+    "ref": "pr-preview-61-45a6ea2ffc4b7628c96c39458058b1d9ffa8b120",
+    "sourceSha": "45a6ea2ffc4b7628c96c39458058b1d9ffa8b120",
+    "createdAt": "2026-08-20T09:31:48.387Z"
+  },
+  "humanAcceptance": {
+    "state": "approved",
+    "approvedBy": "Dave",
+    "approvedAt": "2026-08-20T10:11:06.000Z",
+    "evidence": "Dave explicitly instructed Codex to finish and test all requested Pass 72 work, push it, and make it live on GitHub Pages while preserving the prior live and stable versions. Dave will perform the public GitHub Pages HITL after this exact candidate has passed the automated smoke, static, unit and bounded-browser gates. This approval authorizes protected publication of the exact candidate; it does not claim that Dave inspected or tested the immutable preview, and the public HITL remains explicitly deferred below."
+  },
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "Promote the exact Pass 72 candidate for public GitHub Pages HITL",
+      "expected": "The exact approved candidate is eligible for the protected production workflow as Pass 72, with root, legacy and room links selecting the Pass 72 runtime after publication.",
+      "falsifier": "A different SHA is promoted, the production workflow is invoked without the exact Pass 72 candidate, or the root/legacy/room routes select an older runtime.",
+      "acceptance": "human",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "manual",
+          "ref": "owner-authorization://pass72/2026-08-20T10:11:06.000Z",
+          "note": "Dave's current instruction authorizes publication after the automated gates and explicitly reserves public GitHub Pages HITL for his own testing once the URL is live."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "Preserve the exact previous and stable release channels",
+      "expected": "Pass 72 is selectable as the candidate, the exact current Pass 70 runtime is pinned at channels/pass70-retained, Pass 69 remains byte-pinned at channels/pass69-retained, Pass 67.1 remains staged as the non-selectable stable-source pin, and Pass 63 remains the selectable stable WebGL rollback.",
+      "falsifier": "Any prior channel disappears, a pinned source SHA or runtime digest changes, Pass 67.1 becomes selectable, or any chooser/legacy route resolves to the wrong channel.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "src/release-topology.test.ts",
+          "command": "npx vitest run src/release-topology.test.ts src/release-pipeline.test.ts --reporter=dot",
+          "note": "The local topology and pipeline contracts passed 30 tests, including exact Pass 70 Pages pin 3b5e675c54eaea2a2dd721eca6f247c933361587, Pass 69 pin, Pass 67.1 staging and Pass 63 rollback."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/release-channel-chooser.spec.ts",
+          "command": "QA_E2E_GROUPS=release-shell node scripts/qa/run-bounded-e2e.mjs",
+          "note": "The local four-choice release-shell smoke passed 6/6; exact CI run 32354015850 independently passed bounded-browser-linux and bounded-browser-windows."
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "summary": "Ship every requested Pass 72 gameplay and presentation correction",
+      "expected": "The candidate contains the FFA-default selectable-TDM private lobby, host-only reset-to-new-code and checkpoint invalidation, replicated squad presentation metadata, exact M14 EBR 37.2/24 damage, halved fall-damage envelope with unchanged impact thresholds, 0.24 metre flare radius, map-owned Carpet Bomber attribution, hosted occlusion-aware explosive-crossbow glass breaking, and teammate-visible Chopper/Drone support-shot audio with owner-local HUD/tracers.",
+      "falsifier": "Any requested correction is absent, a focused adversarial contract fails, a full static/unit suite fails, or teammate/owner presentation authority is reversed or client-authored.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "src/pass72-lobby-reset-contract.test.ts",
+          "command": "npx vitest run src/pass72-lobby-reset-contract.test.ts src/pass72-crossbow-glass-contract.test.ts src/pass72-chopper-audio-contract.test.ts src/squad-presentation.test.ts src/kill-provenance.test.ts src/flare-projectile-system.test.ts src/combat/weapon-catalog.test.ts",
+          "note": "The focused Pass 72 lobby, squad, weapon, flare, provenance, crossbow and support-audio contracts passed locally."
+        },
+        {
+          "kind": "unit",
+          "ref": "src/private-match.test.ts",
+          "command": "npm test -- --run --reporter=dot",
+          "note": "The complete local suite passed 367 test files and 2,580 tests with 1 file and 2 tests skipped; exact CI run 32354015850 passed both Windows and Ubuntu static/unit jobs."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/release-channel-chooser.spec.ts",
+          "command": "npm run test:e2e:bounded",
+          "note": "The exact CI run 32354015850 passed bounded browser Linux and Windows; the local release-shell smoke also passed all six tests."
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "summary": "Complete Dave's visual, audio, feel and network HITL on the public Pages build",
+      "expected": "Dave can test the exact published Pass 72 URL and report any remaining visual, audio, collision, networking or frame-pacing defect while retaining Pass 70, Pass 69 and Pass 63 access.",
+      "falsifier": "The public Pass 72 URL is unavailable, does not bind the released SHA, or the preserved prior channels are inaccessible during Dave's test.",
+      "acceptance": "human",
+      "state": "deferred",
+      "deferApproval": {
+        "approvedBy": "Dave",
+        "approvedAt": "2026-08-20T10:11:06.000Z",
+        "reason": "Dave explicitly instructed publication first and will perform HITL on the GitHub Pages version once it is live and has passed the agent's own smoke tests and debugging. This requirement is intentionally deferred and is not represented as completed acceptance."
+      }
+    }
+  ]
+}
