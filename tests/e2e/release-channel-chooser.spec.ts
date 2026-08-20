@@ -44,7 +44,7 @@ test('offers Pass 72, exact previous Pass 70, retained Pass 69 and stable Pass 6
   await expect(page).toHaveURL(/\/channels\/the-big-one\/.*release=latest/);
   await expect(page.locator('#release-channel-gate')).toHaveCount(0);
   await expect(page.locator('#menu')).toBeVisible();
-  await expect(page.locator('#last-updated-btn')).toHaveText('CURRENT CANDIDATE · OWNER REVIEW PENDING');
+  await expect(page.locator('#last-updated-btn')).toHaveText('CURRENT CANDIDATE · PUBLIC HITL AFTER RELEASE');
   await page.locator('#last-updated-btn').click();
   const current = page.locator('#changelog-list > li').first();
   await expect(current).toHaveAttribute('data-changelog-id', 'pass72');
