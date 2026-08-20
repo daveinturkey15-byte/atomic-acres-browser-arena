@@ -76,11 +76,19 @@ jobs:
           echo "STABLE_RELEASED_AT=$stable_released_at" >> "$GITHUB_ENV"
       - name: Install topology browser
         run: npx playwright install --with-deps chromium
-      - name: Rebuild Pass 63 rollback from approved source
+      - name: Rebuild Pass 63 rollback with its original Pages publication timestamp
+        shell: bash
         run: |
-          git worktree add artifacts/pass63-rollback-src ac85e9b8b46cc2370aee903d564ecf3c4682b24c
-          (cd artifacts/pass63-rollback-src && npm ci --ignore-scripts && VITE_MATCH_BUILD_ID=ac85e9b8b46cc2370aee903d564ecf3c4682b24c VITE_RELEASED_AT="$RELEASE_BUILT_AT" npm run build)
+          set -euo pipefail
+          rollback_source_sha="$(node -e "console.log(JSON.parse(require('fs').readFileSync('release-channels.json','utf8')).rollback.sourceSha)")"
+          rollback_pages_sha="$(node -e "console.log(JSON.parse(require('fs').readFileSync('release-channels.json','utf8')).rollback.pagesSha)")"
+          git cat-file -e "${rollback_source_sha}^{commit}" 2>/dev/null || git fetch --no-tags origin "$rollback_source_sha"
+          git cat-file -e "${rollback_pages_sha}^{commit}" 2>/dev/null || git fetch --no-tags origin "$rollback_pages_sha"
+          rollback_released_at="$(date -u -d "$(git show -s --format=%cI "$rollback_pages_sha")" +'%Y-%m-%dT%H:%M:%SZ')"
+          git worktree add artifacts/pass63-rollback-src "$rollback_source_sha"
+          (cd artifacts/pass63-rollback-src && npm ci --ignore-scripts && VITE_MATCH_BUILD_ID="$rollback_source_sha" VITE_RELEASED_AT="$rollback_released_at" npm run build)
           echo "RELEASE_ROLLBACK_DIST=$(pwd)/artifacts/pass63-rollback-src/dist" >> "$GITHUB_ENV"
+          echo "ROLLBACK_RELEASED_AT=$rollback_released_at" >> "$GITHUB_ENV"
       - name: Stage live Pass 72, exact previous Pass 70, retained Pass 69, rebuilt Pass 67.1 and Pass 63 rollback
         run: |
           test -n "${RELEASE_BUILT_AT:-}"
@@ -103,6 +111,8 @@ jobs:
           STABLE_RELEASED_AT: ${{ env.STABLE_RELEASED_AT }}
           REQUIRE_STABLE_RELEASE_TIMESTAMP: '1'
           RELEASE_ROLLBACK_DIST: ${{ env.RELEASE_ROLLBACK_DIST }}
+          ROLLBACK_RELEASED_AT: ${{ env.ROLLBACK_RELEASED_AT }}
+          REQUIRE_ROLLBACK_RELEASE_TIMESTAMP: '1'
       - name: Configure release commit identity
         run: |
           git config user.name "github-actions[bot]"

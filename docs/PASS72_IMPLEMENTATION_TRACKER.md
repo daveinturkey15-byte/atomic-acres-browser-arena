@@ -36,6 +36,7 @@ owner HITL are complete; those remain separate work unless explicitly evidenced.
 - Promoted the candidate identity and player-facing changelog to Pass 72.
 - Added an exact pinned `PASS 70` previous-live channel at `channels/pass70-retained`, sourced from Pages SHA `3b5e675c54eaea2a2dd721eca6f247c933361587` and runtime tree digest `c8f6aeed492cd747ef83aa41bdc0d05f2fd86264418d40d0ebbd0916c85d6160`.
 - Kept the exact Pass 69 retained channel, Pass 67.1 stable-source pin, Pass 63 stable WebGL rollback, and Pass 62 best-ever benchmark record unchanged.
+- Bound both source-rebuilt fallbacks to the immutable timestamp of their pinned original Pages publication; Pass 63 can no longer inherit the new Pass 72 production-build time, and topology plus browser verification now check its exact timestamp and original Pages identity.
 - Extended the chooser and browser smoke matrix to verify Pass 72, Pass 70, Pass 69 and Pass 63 independently, including legacy `release=previous` and `release=pass69` routes.
 
 ## Verified

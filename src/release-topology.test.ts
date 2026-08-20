@@ -126,7 +126,7 @@ describe('Pass 72 release topology', () => {
     expect(shell).toContain('localStorage.removeItem(key)');
   });
 
-  it('moves the candidate under experimental and requires a timestamped stable rebuild in production', () => {
+  it('moves the candidate under experimental and requires timestamped retained-source rebuilds in production', () => {
     expect(staging).toContain('process.env.RELEASE_DIST_ROOT');
     expect(staging).toContain('process.env.RELEASE_TOPOLOGY_RECEIPT_PATH');
     expect(staging).toContain("renameSync(join(distRoot, 'index.html'), join(experimentalRoot, 'index.html'))");
@@ -145,6 +145,11 @@ describe('Pass 72 release topology', () => {
     expect(staging).toContain('...(rollback ? {');
     expect(staging).toContain('stable: {');
     expect(staging).toContain("RELEASE_ROLLBACK_DIST");
+    expect(staging).toContain('ROLLBACK_RELEASED_AT must be one strict UTC ISO-8601 instant');
+    expect(staging).toContain("releasedAt: rollbackReleasedAt");
+    expect(staging).toContain("originalPagesSha: exactSha(config.rollback.pagesSha, 'rollback.pagesSha')");
+    expect(staging).toContain('originalPagesPath: config.rollback.pagesPath');
+    expect(staging).toContain('rollbackSourceEvidence');
     expect(staging).toContain("pagesSha: '46d366d188bfc5ebc5ee7a991fd52b792575316c'");
     expect(staging).toContain("rollback = stagePinned('rollback', { ...config.rollback, ...PASS63_PREVIEW_PIN })");
     expect(staging).toContain("schemaVersion: 4");

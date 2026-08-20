@@ -12,7 +12,12 @@ const sourceSha = process.env.SOURCE_SHA ?? null;
 const outputPath = process.env.QA_OUTPUT ?? null;
 const screenshotDirectory = process.env.QA_SCREENSHOT_DIR ?? null;
 const expectedReleasedAt = process.env.RELEASE_BUILT_AT?.trim() || null;
+const expectedRollbackReleasedAt = process.env.ROLLBACK_RELEASED_AT?.trim() || null;
 if (expectedReleasedAt && !releasePass) throw new Error('RELEASE_PASS is required with RELEASE_BUILT_AT');
+if (expectedRollbackReleasedAt && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(expectedRollbackReleasedAt)
+  || Number.isNaN(Date.parse(expectedRollbackReleasedAt)))) {
+  throw new Error('ROLLBACK_RELEASED_AT must be one strict UTC ISO-8601 instant');
+}
 const rootUrl = new URL(baseUrl);
 if (sourceSha) rootUrl.searchParams.set('qa', sourceSha);
 // The production runner is intentionally GPU-less. Route/chooser validation
@@ -134,6 +139,20 @@ async function verifyPublishedProvenance() {
     assertEqual(stableWrapper.pinnedRuntime?.treeSha256, stableOriginal.treeSha256, 'Stable wrapper embedded digest');
     provenance.stable = { wrapper: stableWrapper, embedded: stableOriginal };
   }
+  if (channelConfig.rollback) {
+    const rollbackOriginal = await fetchJson(`${channelConfig.rollback.path}/channel-provenance.json`);
+    assertEqual(rollbackOriginal.schemaVersion, 4, 'Rollback provenance schema');
+    assertEqual(rollbackOriginal.releasePass, channelConfig.rollback.pass, 'Rollback provenance pass');
+    assertEqual(rollbackOriginal.sourceSha, channelConfig.rollback.sourceSha, 'Rollback provenance source SHA');
+    assertEqual(rollbackOriginal.path, channelConfig.rollback.path, 'Rollback provenance route');
+    if (expectedRollbackReleasedAt) {
+      assertEqual(rollbackOriginal.rebuiltFromSource, true, 'Rollback rebuilt-source marker');
+      assertEqual(rollbackOriginal.releasedAt, expectedRollbackReleasedAt, 'Rollback original release timestamp');
+      assertEqual(rollbackOriginal.originalPagesSha, channelConfig.rollback.pagesSha, 'Rollback original Pages SHA');
+      assertEqual(rollbackOriginal.originalPagesPath, channelConfig.rollback.pagesPath, 'Rollback original Pages path');
+    }
+    provenance.rollback = { rebuilt: rollbackOriginal };
+  }
 }
 
 async function observedPage() {
@@ -207,7 +226,7 @@ async function openChooser(page) {
   return labels;
 }
 
-async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelogId) {
+async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelogId, expectedRouteReleasedAt = null) {
   await page.waitForSelector('#menu', { timeout: 60_000 });
   await page.waitForSelector('#solo:not([disabled])', { timeout: 60_000 });
   await page.waitForTimeout(2_500);
@@ -250,9 +269,11 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
     } else if (!releasedAt || Number.isNaN(Date.parse(releasedAt)) || timeText.includes('NOT PUBLISHED')) {
       throw new Error(`${expectedPass} Last Release timestamp is not a published instant: ${JSON.stringify(releasedAt)}`);
     }
-    if (expectedReleasedAt && normalizedPass(expectedPass) === normalizedPass(releasePass)) {
+    const exactExpectedReleasedAt = expectedRouteReleasedAt
+      ?? (expectedReleasedAt && normalizedPass(expectedPass) === normalizedPass(releasePass) ? expectedReleasedAt : null);
+    if (exactExpectedReleasedAt) {
       verifyProductionReleaseTimestamp({
-        expectedReleasedAt,
+        expectedReleasedAt: exactExpectedReleasedAt,
         observedReleasedAt: releasedAt,
         observedLabel: lastReleaseLabel,
         observedState: releaseState,
@@ -263,7 +284,7 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
   return { runtimeIdentity, lastRelease };
 }
 
-async function verifyChoice(choice, expectedPath, expectedPass, expectedChangelogId) {
+async function verifyChoice(choice, expectedPath, expectedPass, expectedChangelogId, expectedRouteReleasedAt = null) {
   const observed = await observedPage();
   const { page } = observed;
   try {
@@ -271,7 +292,7 @@ async function verifyChoice(choice, expectedPath, expectedPass, expectedChangelo
     const button = page.locator(`[data-release-choice="${choice}"]`);
     const label = (await button.textContent())?.trim() ?? '';
     await button.click();
-    const runtime = await verifyRuntime(page, expectedPath, expectedPass, expectedChangelogId);
+    const runtime = await verifyRuntime(page, expectedPath, expectedPass, expectedChangelogId, expectedRouteReleasedAt);
     if (screenshotDirectory) {
       mkdirSync(screenshotDirectory, { recursive: true });
       await page.screenshot({ path: join(screenshotDirectory, `${choice}.png`), fullPage: true });
@@ -317,7 +338,7 @@ try {
   await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass72');
   await verifyChoice('previous', 'channels/pass70-retained', 'PASS 70', 'pass70');
   await verifyChoice('retained', 'channels/pass69-retained', 'PASS 69', 'pass69');
-  await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63');
+  await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63', expectedRollbackReleasedAt);
   if (releasePass && !normalizedPass(routes.experimental.eyebrow).includes(normalizedPass(releasePass))) {
     throw new Error(`Experimental runtime ${routes.experimental.eyebrow} does not match ${releasePass}`);
   }

@@ -245,6 +245,7 @@ if (config.rollback) {
   // production. Browser previews reuse the exact currently hosted subtree.
   // Provenance remains explicit in both cases.
   const configuredRollbackDist = process.env.RELEASE_ROLLBACK_DIST;
+  const rollbackReleasedAt = process.env.ROLLBACK_RELEASED_AT?.trim();
   const rollbackRequired = process.env.REQUIRE_ROLLBACK_CHANNEL === '1';
   if (!configuredRollbackDist || !isAbsolute(configuredRollbackDist)) {
     if (!rollbackRequired) {
@@ -257,6 +258,10 @@ if (config.rollback) {
       throw new Error('RELEASE_ROLLBACK_DIST must be an absolute path to the Pass 63 rebuilt dist');
     }
   } else {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(rollbackReleasedAt ?? '')
+    || Number.isNaN(Date.parse(rollbackReleasedAt))) {
+    throw new Error('ROLLBACK_RELEASED_AT must be one strict UTC ISO-8601 instant');
+  }
   const rollbackDist = resolve(configuredRollbackDist);
   const rollbackSourceSha = exactSha(config.rollback.sourceSha, 'rollback.sourceSha');
   const rollbackFiles = walkFiles(rollbackDist).filter((path) => path.endsWith('index.html') || path.includes(`${sep}assets${sep}`));
@@ -272,13 +277,20 @@ if (config.rollback) {
     copyFileSync(path, target);
   }
   const rollbackEvidence = rollbackFiles.filter((path) => path.endsWith('.js') && readFileSync(path).includes(Buffer.from(config.rollback.pass)));
+  const rollbackSourceEvidence = rollbackFiles.filter((path) => path.endsWith('.js') && readFileSync(path).includes(Buffer.from(rollbackSourceSha)));
   if (rollbackEvidence.length === 0) throw new Error(`${config.rollback.pass} rebuilt dist does not contain ${config.rollback.pass}`);
+  if (rollbackSourceEvidence.length === 0) throw new Error(`${config.rollback.pass} rebuilt dist does not contain its source SHA`);
   rollback = {
     schemaVersion: 4, channel: 'rollback', releasePass: config.rollback.pass,
     sourceSha: rollbackSourceSha, path: config.rollback.path,
     exactRootFileCount: rollbackFiles.length,
     treeSha256: treeDigest(rollbackRoot, rollbackFiles.map((path) => resolve(rollbackRoot, relative(rollbackDist, path)))),
-    rebuiltFromSource: true, passEvidenceFiles: rollbackEvidence.map((path) => relative(rollbackRoot, resolve(rollbackRoot, relative(rollbackDist, path)))),
+    rebuiltFromSource: true,
+    releasedAt: rollbackReleasedAt,
+    originalPagesSha: exactSha(config.rollback.pagesSha, 'rollback.pagesSha'),
+    originalPagesPath: config.rollback.pagesPath,
+    passEvidenceFiles: rollbackEvidence.map((path) => relative(rollbackRoot, resolve(rollbackRoot, relative(rollbackDist, path)))),
+    sourceEvidenceFiles: rollbackSourceEvidence.map((path) => relative(rollbackRoot, resolve(rollbackRoot, relative(rollbackDist, path)))),
   };
   writeFileSync(join(rollbackRoot, 'channel-provenance.json'), `${JSON.stringify(rollback, null, 2)}\n`);
   }

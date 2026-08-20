@@ -47,7 +47,7 @@ describe('production release workflow', () => {
     expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}');
     expect(workflow).toContain('RELEASE_PASS: ${{ inputs.release_pass }}');
     expect(workflow).toContain('RELEASE_ROLLBACK_DIST: ${{ env.RELEASE_ROLLBACK_DIST }}');
-    expect(workflow).toContain('git worktree add artifacts/pass63-rollback-src ac85e9b8b46cc2370aee903d564ecf3c4682b24c');
+    expect(workflow).toContain('git worktree add artifacts/pass63-rollback-src "$rollback_source_sha"');
     expect(workflow).not.toContain('stage:stable-channel');
     expect(workflow).toContain('Stage live Pass 72, exact previous Pass 70, retained Pass 69, rebuilt Pass 67.1 and Pass 63 rollback');
     expect(workflow).toContain('RETAINED_PAGES_SHA=$(node -e');
@@ -63,7 +63,7 @@ describe('production release workflow', () => {
     expect(liveTopologyVerifier).toContain('await buttons.count() !== 4');
     expect(liveTopologyVerifier).toContain("for (const choice of ['experimental', 'previous', 'retained', 'stable'])");
     expect(liveTopologyVerifier).toContain("await verifyChoice('retained', 'channels/pass69-retained', 'PASS 69', 'pass69');");
-    expect(liveTopologyVerifier).toContain("await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63');");
+    expect(liveTopologyVerifier).toContain("await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63', expectedRollbackReleasedAt);");
     expect(liveTopologyVerifier).not.toContain("await verifyChoice('rollback'");
   });
 
@@ -85,6 +85,16 @@ describe('production release workflow', () => {
     expect(workflow).toContain('Rebuild Pass 67.1 stable with its original Pages publication timestamp');
     expect(workflow).toContain('VITE_RELEASED_AT="$stable_released_at"');
     expect(workflow).toContain('REQUIRE_STABLE_RELEASE_TIMESTAMP: \'1\'');
+    expect(workflow).toContain('Rebuild Pass 63 rollback with its original Pages publication timestamp');
+    expect(workflow).toContain('rollback_pages_sha="$(node -e');
+    expect(workflow).toContain('VITE_RELEASED_AT="$rollback_released_at"');
+    expect(workflow).not.toContain('VITE_RELEASED_AT="$RELEASE_BUILT_AT" npm run build');
+    expect(workflow).toContain('ROLLBACK_RELEASED_AT=$rollback_released_at');
+    expect(workflow).toContain('REQUIRE_ROLLBACK_RELEASE_TIMESTAMP: \'1\'');
+    expect(staticTopologyVerifier).toContain('rollbackProvenance.releasedAt !== expectedRollbackReleasedAt');
+    expect(staticTopologyVerifier).toContain('rollbackProvenance.exactRootFileCount !== rollbackFiles.length');
+    expect(staticTopologyVerifier).toContain('rollbackProvenance.treeSha256 !== treeDigest(rollbackRoot, rollbackFiles)');
+    expect(topologyBrowserVerifier).toContain('rollbackOriginal.releasedAt, expectedRollbackReleasedAt');
     expect(topologyBrowserVerifier).toContain('expectsPendingCandidate = isCurrentCandidate && !expectedReleasedAt');
     expect(topologyBrowserVerifier).toContain("lastReleaseLabel !== 'CURRENT CANDIDATE · OWNER REVIEW PENDING'");
     expect(topologyBrowserVerifier).toContain('verifyProductionReleaseTimestamp');
@@ -322,7 +332,7 @@ describe('production release workflow', () => {
   it('binds the live browser proof to public Pass 72, previous Pass 70 and Pass 63 choices, internal stable provenance, aliases, and Last Release', () => {
     expect(liveTopologyVerifier).toContain("verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass72')");
     expect(liveTopologyVerifier).toContain("verifyChoice('previous', 'channels/pass70-retained', 'PASS 70', 'pass70')");
-    expect(liveTopologyVerifier).toContain("verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63')");
+    expect(liveTopologyVerifier).toContain("verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63', expectedRollbackReleasedAt)");
     expect(liveTopologyVerifier).not.toContain("verifyChoice('rollback'");
     expect(liveTopologyVerifier).toContain('pinned-channel-provenance.json');
     expect(liveTopologyVerifier).toContain('Stable embedded runtime digest');

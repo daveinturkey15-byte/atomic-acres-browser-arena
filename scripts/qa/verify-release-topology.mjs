@@ -6,6 +6,12 @@ import { join, relative, resolve, sep } from 'node:path';
 const root = resolve('.');
 const dist = join(root, 'dist');
 const config = JSON.parse(readFileSync(join(root, 'release-channels.json'), 'utf8'));
+const expectedRollbackReleasedAt = process.env.ROLLBACK_RELEASED_AT?.trim() || null;
+const requireRollbackReleaseTimestamp = process.env.REQUIRE_ROLLBACK_RELEASE_TIMESTAMP === '1';
+if (requireRollbackReleaseTimestamp && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(expectedRollbackReleasedAt ?? '')
+  || Number.isNaN(Date.parse(expectedRollbackReleasedAt)))) {
+  throw new Error('Production topology requires one strict ROLLBACK_RELEASED_AT UTC instant');
+}
 if (config.schemaVersion !== 4) throw new Error('release topology verifier requires schemaVersion 4');
 const rootIndex = readFileSync(join(dist, 'index.html'), 'utf8');
 if (!rootIndex.includes('release-shell.js') || rootIndex.includes('type="module"') || existsSync(join(dist, 'assets'))) {
@@ -171,13 +177,26 @@ if (config.rollback && existsSync(join(dist, config.rollback.path))) {
   if (!rollbackAssets.some((name) => readFileSync(join(rollbackRoot, 'assets', name)).includes(Buffer.from(config.rollback.pass)))) {
     throw new Error(`Rollback channel does not contain ${config.rollback.pass}`);
   }
-  const rollbackProvenance = JSON.parse(readFileSync(join(rollbackRoot, 'channel-provenance.json'), 'utf8'));
+  const rollbackProvenancePath = join(rollbackRoot, 'channel-provenance.json');
+  const rollbackProvenance = JSON.parse(readFileSync(rollbackProvenancePath, 'utf8'));
+  const rollbackFiles = walkFiles(rollbackRoot).filter((path) => path !== rollbackProvenancePath);
+  const rollbackPassEvidence = rollbackFiles.some((path) => path.endsWith('.js') && readFileSync(path).includes(Buffer.from(config.rollback.pass)));
+  const rollbackSourceEvidence = rollbackFiles.some((path) => path.endsWith('.js') && readFileSync(path).includes(Buffer.from(config.rollback.sourceSha)));
   if (rollbackProvenance.schemaVersion !== 4
     || rollbackProvenance.releasePass !== config.rollback.pass
     || rollbackProvenance.sourceSha !== config.rollback.sourceSha
     || rollbackProvenance.path !== config.rollback.path
-    || rollbackProvenance.rebuiltFromSource !== true) {
+    || rollbackProvenance.rebuiltFromSource !== true
+    || rollbackProvenance.exactRootFileCount !== rollbackFiles.length
+    || rollbackProvenance.treeSha256 !== treeDigest(rollbackRoot, rollbackFiles)
+    || !rollbackPassEvidence
+    || !rollbackSourceEvidence) {
     throw new Error('Rollback provenance does not match the configured Pass 63 rebuilt-source record');
+  }
+  if (requireRollbackReleaseTimestamp && (rollbackProvenance.releasedAt !== expectedRollbackReleasedAt
+    || rollbackProvenance.originalPagesSha !== config.rollback.pagesSha
+    || rollbackProvenance.originalPagesPath !== config.rollback.pagesPath)) {
+    throw new Error('Rollback provenance does not match its original Pages publication timestamp and identity');
   }
 }
 console.log(JSON.stringify({ releaseTopology: 'verified', previousFiles, retainedFiles, stableFiles, experimentalAssets: experimentalAssets.length }));

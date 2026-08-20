@@ -44,8 +44,8 @@
     {
       "id": "R2",
       "summary": "Preserve the exact retained release topology while promoting Pass 72",
-      "expected": "Pass 72 is the candidate and eventual live route; Pass 70 remains the exact previous release, Pass 69 remains byte-pinned, Pass 67.1 remains the non-selectable stable-source pin, and Pass 63 remains the selectable WebGL rollback across root, legacy and room routes.",
-      "falsifier": "A retained channel disappears or changes identity, Pass 67.1 becomes selectable, or a chooser, legacy or room route resolves to the wrong channel.",
+      "expected": "Pass 72 is the candidate and eventual live route; Pass 70 remains the exact previous release, Pass 69 remains byte-pinned, Pass 67.1 remains the non-selectable stable-source pin, and Pass 63 remains the selectable WebGL rollback across root, legacy and room routes. Rebuilt Pass 67.1 and Pass 63 bytes display the immutable publication timestamp of their pinned original Pages commit rather than the new Pass 72 build time.",
+      "falsifier": "A retained channel disappears or changes identity, Pass 67.1 becomes selectable, a rebuilt fallback displays a timestamp other than its pinned original Pages publication, or a chooser, legacy or room route resolves to the wrong channel.",
       "acceptance": "mechanical",
       "state": "verified",
       "evidence": [
@@ -53,7 +53,7 @@
           "kind": "contract",
           "ref": "src/release-topology.test.ts",
           "command": "npx vitest run src/release-topology.test.ts src/release-pipeline.test.ts --reporter=dot",
-          "note": "The topology and production-pipeline contracts pin the Pass 72, Pass 70, Pass 69, Pass 67.1 and Pass 63 identities and route policy."
+          "note": "The topology and production-pipeline contracts pin the Pass 72, Pass 70, Pass 69, Pass 67.1 and Pass 63 identities, route policy and original Pages timestamps for retained-source rebuilds."
         },
         {
           "kind": "browser",
