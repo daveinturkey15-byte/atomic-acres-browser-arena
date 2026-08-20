@@ -22,7 +22,7 @@ import {
   replaceGuestPeerOwner,
   stateTrafficUsesFallback,
 } from './network';
-import { MULTIPLAYER_PROTOCOL_VERSION } from './protocol';
+import { isGameMessage, MULTIPLAYER_PROTOCOL_VERSION } from './protocol';
 
 class FakeConnection {
   readonly peer: string;
@@ -609,6 +609,48 @@ describe('guest event connection lifecycle', () => {
     const predecessorVersion = MULTIPLAYER_PROTOCOL_VERSION - 1;
     expect(initialLobbyJoinHasProtocolMismatch({ ...join, protocolVersion: predecessorVersion })).toBe(true);
     expect(initialLobbyJoinHasProtocolMismatch({ type: 'chat-submit', protocolVersion: predecessorVersion })).toBe(false);
+  });
+
+  it('rejects a v17 peer before it can mix with the required v18 support-shot schema', () => {
+    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(18);
+    const currentSupportResult = {
+      type: 'killstreak-damage-result' as const,
+      by: 'host',
+      matchEpoch: 7,
+      revision: 1,
+      events: [],
+      shots: [{
+        activationId: 'ks-activation-7-1',
+        entityId: 'ks-7-chopper-1',
+        source: 'chopper' as const,
+        ownerId: 'owner',
+        ownerTeam: 0 as const,
+        ordinal: 0,
+        atMs: 1_000,
+      }],
+      impacts: [],
+      nonce: 1,
+    };
+    expect(isGameMessage(currentSupportResult)).toBe(true);
+    const { shots: _requiredShots, ...v17SupportResult } = currentSupportResult;
+    expect(isGameMessage(v17SupportResult)).toBe(false);
+
+    vi.stubGlobal('window', {
+      location: { search: '', hostname: 'localhost' },
+      setTimeout: (callback: () => void) => { callback(); return 0; },
+    });
+    const delivered: unknown[] = [];
+    const network = new ArenaNetwork((message) => delivered.push(message), () => undefined);
+    const internals = network as unknown as NetworkInternals;
+    internals.role = 'host';
+    const connection = new FakeConnection('peer-v17');
+    internals.wireGuestEvents(connection as unknown as DataConnection);
+    connection.emit('data', { ...lobbyJoin('12345678-1234-1234-1234-123456789abc'), protocolVersion: 17 });
+
+    expect(delivered).toEqual([]);
+    expect(internals.guestBundles.has('player-1')).toBe(false);
+    expect(connection.sent).toEqual([expect.objectContaining({ type: 'lobby-reject', reason: 'protocol-mismatch' })]);
+    expect(connection.open).toBe(false);
   });
 
   it('keeps movement flowing over the reliable event lane when the transient lane degrades', () => {

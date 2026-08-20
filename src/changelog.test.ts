@@ -33,6 +33,7 @@ describe('changelog', () => {
     expect(latest.highlights.join('\n')).toContain('base / minimum body-damage values are exactly 37.2 / 24');
     expect(latest.highlights.join('\n')).toContain('1.7 head multiplier remains unchanged');
     expect(latest.highlights.join('\n')).toContain('owner and eligible Team Deathmatch teammates');
+    expect(latest.highlights.join('\n')).toContain('Multiplayer protocol 18 rejects cached protocol-17 peers');
     expect(latest.highlights.join('\n')).not.toContain('37.2 body / 24 head');
     expect(latest.highlights.join('\n')).not.toContain('teammate-visible');
   });

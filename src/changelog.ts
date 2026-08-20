@@ -79,6 +79,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
       'M14 EBR base / minimum body-damage values are exactly 37.2 / 24 while the 1.7 head multiplier remains unchanged; the fall-damage envelope is halved without weakening impact-speed thresholds, and flare collision radius is 0.24 metres',
       'Carpet Bomber environment kills retain map-owned attribution, while hosted explosive-crossbow glass breaking remains occlusion-aware and authoritative',
       'Chopper and Drone support-shot audio dispatch reaches the owner and eligible Team Deathmatch teammates while HUD and tracer presentation stays owner-local and bounded',
+      'Multiplayer protocol 18 rejects cached protocol-17 peers before new squad or support-shot payloads can be silently dropped; every peer must reload onto the same release',
       'The exact Pass 70 live runtime is pinned as a selectable previous channel; Pass 69, Pass 67.1 and Pass 63 remain preserved for comparison, stable testing and rollback',
       pass72Copy.lineage,
     ]),
