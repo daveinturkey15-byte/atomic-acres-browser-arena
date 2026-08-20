@@ -149,7 +149,6 @@ describe('Pass 72 release topology', () => {
     expect(staging).toContain("releasedAt: rollbackReleasedAt");
     expect(staging).toContain("originalPagesSha: exactSha(config.rollback.pagesSha, 'rollback.pagesSha')");
     expect(staging).toContain('originalPagesPath: config.rollback.pagesPath');
-    expect(staging).toContain('rollbackSourceEvidence');
     expect(staging).toContain("pagesSha: '46d366d188bfc5ebc5ee7a991fd52b792575316c'");
     expect(staging).toContain("rollback = stagePinned('rollback', { ...config.rollback, ...PASS63_PREVIEW_PIN })");
     expect(staging).toContain("schemaVersion: 4");

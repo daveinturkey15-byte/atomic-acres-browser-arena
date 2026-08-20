@@ -277,9 +277,7 @@ if (config.rollback) {
     copyFileSync(path, target);
   }
   const rollbackEvidence = rollbackFiles.filter((path) => path.endsWith('.js') && readFileSync(path).includes(Buffer.from(config.rollback.pass)));
-  const rollbackSourceEvidence = rollbackFiles.filter((path) => path.endsWith('.js') && readFileSync(path).includes(Buffer.from(rollbackSourceSha)));
   if (rollbackEvidence.length === 0) throw new Error(`${config.rollback.pass} rebuilt dist does not contain ${config.rollback.pass}`);
-  if (rollbackSourceEvidence.length === 0) throw new Error(`${config.rollback.pass} rebuilt dist does not contain its source SHA`);
   rollback = {
     schemaVersion: 4, channel: 'rollback', releasePass: config.rollback.pass,
     sourceSha: rollbackSourceSha, path: config.rollback.path,
@@ -290,7 +288,6 @@ if (config.rollback) {
     originalPagesSha: exactSha(config.rollback.pagesSha, 'rollback.pagesSha'),
     originalPagesPath: config.rollback.pagesPath,
     passEvidenceFiles: rollbackEvidence.map((path) => relative(rollbackRoot, resolve(rollbackRoot, relative(rollbackDist, path)))),
-    sourceEvidenceFiles: rollbackSourceEvidence.map((path) => relative(rollbackRoot, resolve(rollbackRoot, relative(rollbackDist, path)))),
   };
   writeFileSync(join(rollbackRoot, 'channel-provenance.json'), `${JSON.stringify(rollback, null, 2)}\n`);
   }

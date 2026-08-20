@@ -245,7 +245,7 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
     const isCurrentCandidate = expectedPath === channelConfig.experimental.path;
     const expectsPendingCandidate = isCurrentCandidate && !expectedReleasedAt;
     if (expectsPendingCandidate
-      ? lastReleaseLabel !== 'CURRENT CANDIDATE · OWNER REVIEW PENDING'
+      ? lastReleaseLabel !== 'CURRENT CANDIDATE · PUBLIC HITL AFTER RELEASE'
       : !lastReleaseLabel.includes('LAST RELEASE') || lastReleaseLabel.includes('PENDING_PRODUCTION')) {
       throw new Error(`Invalid Last Release label for ${expectedPass}: ${JSON.stringify(lastReleaseLabel)}`);
     }

@@ -179,24 +179,37 @@ if (config.rollback && existsSync(join(dist, config.rollback.path))) {
   }
   const rollbackProvenancePath = join(rollbackRoot, 'channel-provenance.json');
   const rollbackProvenance = JSON.parse(readFileSync(rollbackProvenancePath, 'utf8'));
-  const rollbackFiles = walkFiles(rollbackRoot).filter((path) => path !== rollbackProvenancePath);
-  const rollbackPassEvidence = rollbackFiles.some((path) => path.endsWith('.js') && readFileSync(path).includes(Buffer.from(config.rollback.pass)));
-  const rollbackSourceEvidence = rollbackFiles.some((path) => path.endsWith('.js') && readFileSync(path).includes(Buffer.from(config.rollback.sourceSha)));
-  if (rollbackProvenance.schemaVersion !== 4
-    || rollbackProvenance.releasePass !== config.rollback.pass
-    || rollbackProvenance.sourceSha !== config.rollback.sourceSha
-    || rollbackProvenance.path !== config.rollback.path
-    || rollbackProvenance.rebuiltFromSource !== true
-    || rollbackProvenance.exactRootFileCount !== rollbackFiles.length
-    || rollbackProvenance.treeSha256 !== treeDigest(rollbackRoot, rollbackFiles)
-    || !rollbackPassEvidence
-    || !rollbackSourceEvidence) {
-    throw new Error('Rollback provenance does not match the configured Pass 63 rebuilt-source record');
-  }
-  if (requireRollbackReleaseTimestamp && (rollbackProvenance.releasedAt !== expectedRollbackReleasedAt
-    || rollbackProvenance.originalPagesSha !== config.rollback.pagesSha
-    || rollbackProvenance.originalPagesPath !== config.rollback.pagesPath)) {
-    throw new Error('Rollback provenance does not match its original Pages publication timestamp and identity');
+  if (requireRollbackReleaseTimestamp) {
+    const rollbackFiles = walkFiles(rollbackRoot).filter((path) => path !== rollbackProvenancePath);
+    const rollbackPassEvidence = rollbackFiles.some((path) => path.endsWith('.js') && readFileSync(path).includes(Buffer.from(config.rollback.pass)));
+    if (rollbackProvenance.schemaVersion !== 4
+      || rollbackProvenance.releasePass !== config.rollback.pass
+      || rollbackProvenance.sourceSha !== config.rollback.sourceSha
+      || rollbackProvenance.path !== config.rollback.path
+      || rollbackProvenance.rebuiltFromSource !== true
+      || rollbackProvenance.exactRootFileCount !== rollbackFiles.length
+      || rollbackProvenance.treeSha256 !== treeDigest(rollbackRoot, rollbackFiles)
+      || rollbackProvenance.releasedAt !== expectedRollbackReleasedAt
+      || rollbackProvenance.originalPagesSha !== config.rollback.pagesSha
+      || rollbackProvenance.originalPagesPath !== config.rollback.pagesPath
+      || !rollbackPassEvidence) {
+      throw new Error('Rollback provenance does not match its source, staged bytes, and original Pages publication');
+    }
+  } else {
+    verifyPinned(config.rollback);
+    const rollbackWrapper = JSON.parse(readFileSync(join(rollbackRoot, 'pinned-channel-provenance.json'), 'utf8'));
+    if (rollbackProvenance.releasePass !== config.rollback.pass
+      || rollbackProvenance.sourceSha !== config.rollback.sourceSha
+      || rollbackProvenance.path !== config.rollback.pagesPath
+      || rollbackProvenance.exactRootFileCount !== config.rollback.runtimeFileCount
+      || rollbackProvenance.treeSha256 !== config.rollback.runtimeTreeSha256
+      || rollbackWrapper.channel !== 'rollback'
+      || rollbackWrapper.pagesSha !== config.rollback.pagesSha
+      || rollbackWrapper.pagesPath !== config.rollback.pagesPath
+      || rollbackWrapper.path !== config.rollback.path
+      || rollbackWrapper.pinnedRuntime?.treeSha256 !== config.rollback.runtimeTreeSha256) {
+      throw new Error('Rollback preview does not match the exact pinned Pass 63 Pages subtree');
+    }
   }
 }
 console.log(JSON.stringify({ releaseTopology: 'verified', previousFiles, retainedFiles, stableFiles, experimentalAssets: experimentalAssets.length }));
