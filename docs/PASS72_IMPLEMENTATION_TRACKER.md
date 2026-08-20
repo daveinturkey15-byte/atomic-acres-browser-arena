@@ -41,7 +41,7 @@ owner HITL are complete; those remain separate work unless explicitly evidenced.
 
 ## Verified
 
-- `npx vitest run --exclude src/release-topology.test.ts --reporter=dot`: 370 files passed, 1 skipped; 2,625 tests passed, 2 skipped. The commit-sensitive release-topology test remains pending until the final manifest is committed and rebound to the superseding immutable preview receipt.
+- `npm run verify:pass25a:core` on committed receipt finalizer `38e5906dfc8a751ea04b4ff65c138d34b766c1ac`: passed 371 files with 1 skipped and 2,635 tests with 2 skipped, including commit-bound release-topology and acceptance verification; frozen gameplay/replay, Pass 62 benchmark, asset provenance, production build/tree and production dependency audit gates also passed.
 - `npx tsc -p tsconfig.json --noEmit`: passed.
 - `npm run build`: passed; generated `dist/` with `legacy-main` 1,435.96 kB, Rapier 2,234.73 kB, Three vendor 1,427.98 kB. Vite emitted the existing large-chunk advisory; it was not suppressed.
 - Focused death-outcome/integration, Railgun ordering, provenance, Carpet damage, protocol, participant identity, connection lifecycle, changelog and acceptance-gate suites passed: 11 files and 142 tests.
@@ -51,9 +51,13 @@ owner HITL are complete; those remain separate work unless explicitly evidenced.
 - The participant-identity and network lifecycle suites cover both reserved namespaces and prove `map:` / `host-bot-` joins are rejected before any resume token, guest bundle or provisional replacement is bound.
 - Local staged-topology verification passed: Pass 72 candidate, 516-file Pass 70 previous wrapper, 516-file Pass 69 wrapper, Pass 67.1 stable and Pass 63 rollback.
 - Local chooser/provenance browser smoke passed for all four public choices and legacy routes.
+- Exact source run `32418092275` bound immutable preview artifact `9425149837` to `69bea107a865d7741e0d1c237abab9dd1b4b55ea`: the embedded and independently recomputed tree both contain 515 files with SHA-256 `71a88e6f246e6c9b682305d055e9b327c6e04c1bae36547312219bd354ec618b`.
+- Both static jobs and Linux bounded-browser passed on that exact source. The first Windows attempt had one isolated match-ready timing failure in the retained Pass 65 lifecycle file; the unchanged case passed 3/3 locally, the full local file passed 10/10, and the exact-source failed-job rerun passed bounded groups, 21 HUD tests and all 10 lifecycle tests without changing a runtime path, assertion, retry policy or timeout.
+- CI now uploads retained Playwright traces, screenshots and reports only when a required browser job fails, so a future hosted-run failure remains diagnosable instead of existing only on an ephemeral runner.
+- The exact CI acceptance gate on committed finalizer `38e5906dfc8a751ea04b4ff65c138d34b766c1ac` passed with manifest SHA-256 `cd817b814a128ddb59834f61e43713de9b41f46dc6e0ac2ef71a993609358423`, 12 verified requirements, one explicitly deferred public owner-HITL requirement and process-only post-preview parity.
 - The first fresh Windows CI run exposed only a default 5-second timeout on the exhaustive arm-rig catalog test; the unchanged assertions now have a 15-second cross-platform harness budget and passed in the current non-topology suite.
 - The next hosted Windows run exposed the owned Vite preview server's exact 60-second startup ceiling; only the web-server budget is now 180 seconds, while Playwright's 60-second test timeout and all browser assertions remain unchanged.
-- The first pre-implementation repository preflight passed. The second preflight correctly refused while the worktree was dirty; it must be rerun after commit.
+- The first pre-implementation repository preflight passed and the second correctly refused while the worktree was dirty. Final clean-worktree preflight is required against the remote finalizer head and belongs in the PR contribution receipt; a dirty refusal is never substituted for it.
 
 ## Unknowns / explicit falsifiers
 
