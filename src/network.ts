@@ -10,6 +10,7 @@ import {
 } from './protocol';
 import { pingMatchesBoundTeam, shouldRelayMessageToTeam } from './social-ping';
 import { clientRuntimeLogEntryFromError, type ClientRuntimeLogEntry } from './client-runtime-log';
+import { isReservedMultiplayerParticipantId } from './participant-identity';
 
 export type NetworkRole = 'offline' | 'host' | 'client';
 
@@ -304,6 +305,12 @@ export function initialLobbyJoinHasProtocolMismatch(payload: unknown): boolean {
   return Boolean(payload && typeof payload === 'object'
     && (payload as { type?: unknown }).type === 'lobby-join'
     && !isGameMessage(payload));
+}
+
+export function initialLobbyJoinUsesReservedParticipantId(payload: unknown): boolean {
+  return Boolean(payload && typeof payload === 'object'
+    && (payload as { type?: unknown }).type === 'lobby-join'
+    && isReservedMultiplayerParticipantId((payload as { playerId?: unknown }).playerId));
 }
 
 export function replaceGuestPeerOwner(
@@ -941,6 +948,10 @@ export class ArenaNetwork {
     const transportGeneration = connectionTransportGeneration(connection);
     const pendingStateKey = pendingStateConnectionKey(connection.peer, transportEpoch, transportGeneration);
     connection.on('data', (payload) => {
+      if (!playerId && initialLobbyJoinUsesReservedParticipantId(payload)) {
+        this.rejectConnection(connection, 'rejoin-denied');
+        return;
+      }
       if (!isGameMessage(payload)) {
         if (!playerId && initialLobbyJoinHasProtocolMismatch(payload)) {
           this.rejectConnection(connection, 'protocol-mismatch');

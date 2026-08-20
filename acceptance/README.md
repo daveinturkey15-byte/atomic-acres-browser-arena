@@ -14,15 +14,33 @@ gaps and each records:
 - concrete evidence references and exact commands;
 - `verified`, or an explicit `deferred` decision approved by Dave.
 
+`status: accepted` means the release gate accepts the manifest. It does not by
+itself mean that Dave completed owner HITL, inspected a preview, or accepted the
+player-visible result. Those claims belong in the numbered requirements and
+must match their evidence and state.
+
 Visual requirements need both a served-browser check and a visual artifact.
-Human approval names the immutable preview SHA and timestamp. After that
-preview, only process/manifest changes may be added; any runtime or release-shell
-change invalidates approval and requires a new preview.
+Human authorization normally names an immutable preview SHA and records
+`kind: preview-approval` with `previewInspection: performed`. After that preview,
+only process/manifest changes and non-shipping test corrections may be added;
+any shipped runtime or release-shell change invalidates approval and requires a
+new preview. Existing schema-v1 manifests without `kind` retain the original
+post-preview timestamp rule for rollback compatibility.
+
+When Dave explicitly orders publication before his public-build HITL, the
+manifest may instead record `kind: standing-publication-authorization` with
+`previewInspection: not-performed`. That form must include the exact structured
+`releaseDecision` enforced by the gate, explicitly disclaim preview inspection,
+and retain a deferred human public-HITL requirement. Its authorization timestamp
+may precede preview creation because the gate binds it mechanically to the final
+preview SHA and still rejects every later runtime or release-shell change. It is
+publication authority, not visual or experiential acceptance.
 
 CI uploads the exact `dist/` tree as
 `pr-preview-<pr>-<head-sha>` even when the human-acceptance gate is still
-pending. After Dave tests that candidate, update only the manifest with the
-preview receipt and approval, then push the approval commit.
+pending. After Dave tests that candidate, or after a standing publication-first
+authorization is bound to it, update only process/manifest paths with the exact
+preview receipt, then push the finalizer commit.
 
 The gate is run directly so it also works before package scripts change:
 

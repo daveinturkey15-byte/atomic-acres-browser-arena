@@ -34,6 +34,10 @@ describe('changelog', () => {
     expect(latest.highlights.join('\n')).toContain('1.7 head multiplier remains unchanged');
     expect(latest.highlights.join('\n')).toContain('owner and eligible Team Deathmatch teammates');
     expect(latest.highlights.join('\n')).toContain('Multiplayer protocol 18 rejects cached protocol-17 peers');
+    expect(latest.highlights.join('\n')).toContain('death transitions are host-authored');
+    expect(latest.highlights.join('\n')).toContain('initial guest identities in the map: and host-bot- namespaces are rejected before credential binding');
+    expect(latest.highlights.join('\n')).toContain('Carpet Bomber environment kills increment the victim death');
+    expect(latest.highlights.join('\n')).toContain('without awarding a player kill');
     expect(latest.highlights.join('\n')).not.toContain('37.2 body / 24 head');
     expect(latest.highlights.join('\n')).not.toContain('teammate-visible');
   });

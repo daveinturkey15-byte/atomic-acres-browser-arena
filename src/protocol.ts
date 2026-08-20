@@ -6,6 +6,7 @@ import type { KillCause } from './kill-provenance';
 import { isSquadColor, isSquadName, type SquadColor } from './squad-presentation';
 import type { CombatTiming } from './network-fairness';
 import { isDhv, type Dhv } from './handicap';
+import { isReservedMultiplayerParticipantId } from './participant-identity';
 import {
   CHAT_HISTORY_LIMIT,
   isCanonicalChatText,
@@ -968,6 +969,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
     case 'lobby-join':
       return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
         && typeof msg.playerId === 'string' && msg.playerId.length > 0 && msg.playerId.length <= 80
+        && !isReservedMultiplayerParticipantId(msg.playerId)
         && typeof msg.connectionEpoch === 'string' && msg.connectionEpoch.length >= 8 && msg.connectionEpoch.length <= 128
         && /^[a-zA-Z0-9_-]+$/.test(msg.connectionEpoch)
         && typeof msg.name === 'string' && msg.name.length > 0 && msg.name.length <= 20
@@ -1201,6 +1203,7 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'lobby-start'
     || message.type === 'lobby-reject'
     || message.type === 'clock-pong'
+    || message.type === 'death'
     || message.type === 'shot-result'
     || message.type === 'grenade-result'
     || message.type === 'match-score'

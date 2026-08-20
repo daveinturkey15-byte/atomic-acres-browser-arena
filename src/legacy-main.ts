@@ -571,7 +571,6 @@ import {
   freeForAllLeaders,
   latencyQuality,
   playersAreHostile,
-  recordPlayerDamage,
   teamTotals,
   type LobbyMember,
   type LobbySnapshot,
@@ -641,7 +640,14 @@ import {
   type AuthoritativeRemoteDamageResult,
   type RemoteHealthAuthorityState,
 } from './remote-health-authority';
-import { isKillstreakEligible, killAttributionId, killCauseFromHit, killCauseFromKillstreak, type KillCause } from './kill-provenance';
+import { isKillstreakEligible, killAttributionId, killCauseFromHit, killCauseFromKillstreak, MAP_CARPET_BOMBER_KILLER_ID, type KillCause } from './kill-provenance';
+import {
+  MAP_CARPET_BOMBER_LABEL,
+  commitAuthoritativeDeathOutcome,
+  recordAuthoritativeDamageScores,
+  resolveAuthoritativeDeathOutcome,
+  type DeathOutcomeCombatant,
+} from './authoritative-death-outcome';
 import { reconstructShooterPoseAtFireTime, recordCombatantPose, rewindCombatantPose, rewindCombatantPoseStrict, type CombatantPoseSample } from './lag-compensation';
 import { appendClientRuntimeLog, readClientRuntimeLog } from './client-runtime-log';
 import {
@@ -5299,6 +5305,7 @@ function beginMatchDiagnostics(mode: 'solo' | 'host' | 'client', startedAt: numb
 }
 
 function combatantLabel(id: string): { name: string; kind: string } {
+  if (id === MAP_CARPET_BOMBER_KILLER_ID) return { name: MAP_CARPET_BOMBER_LABEL, kind: 'environment' };
   if (id === player.id) return { name: player.name, kind: 'player' };
   const remote = remotes.get(id);
   if (remote) return { name: remote.snapshot.name, kind: 'player' };
@@ -5313,6 +5320,18 @@ function combatantLabel(id: string): { name: string; kind: string } {
   };
   if (id === 'environment') return { name: 'Environment', kind: 'environment' };
   return { name: 'Unknown combatant', kind: 'unknown' };
+}
+
+function deathOutcomeCombatant(id: string): DeathOutcomeCombatant {
+  const label = combatantLabel(id);
+  const scoreParticipant = hostLobbyMembers.get(id) ?? bots.get(id);
+  return {
+    id,
+    name: label.name,
+    kind: label.kind,
+    team: scoreParticipant?.team ?? null,
+    scoreEligible: scoreParticipant !== undefined,
+  };
 }
 
 type DamageRecord = Readonly<{
@@ -7872,7 +7891,7 @@ function recordAuthoritativeDamage(attackerId: string, victimId: string, damage:
   if (killstreakRuntime.recordActorDamage(victimId)) broadcastKillstreakState();
   if (attackerId === victimId) return;
   const previousLocal = authoritativeScores.get(player.id);
-  const next = recordPlayerDamage(authoritativeScores, attackerId, victimId, damage);
+  const next = recordAuthoritativeDamageScores(authoritativeScores, attackerId, victimId, damage);
   authoritativeScores.clear();
   for (const [id, score] of next) authoritativeScores.set(id, score);
   presentLocalDamageDelta(previousLocal, authoritativeScores.get(player.id));
@@ -12690,21 +12709,18 @@ function processDeath(message: DeathMessage): void {
   // Capture the canonical live rig state before authoritative item drops mutate
   // the holder back to their primary weapon.
   const fallenOperatorSource = corpseSource(message.victim);
+  const outcomeKiller = deathOutcomeCombatant(message.killer);
+  const outcomeVictim = deathOutcomeCombatant(message.victim);
+  const deathOutcome = resolveAuthoritativeDeathOutcome({
+    role: network.role,
+    message,
+    scores: authoritativeScores,
+    killer: outcomeKiller,
+    victim: outcomeVictim,
+    hostile: outcomeKiller.team !== null && outcomeVictim.team !== null
+      && areCombatantsHostile(outcomeKiller.id, outcomeKiller.team, outcomeVictim.id, outcomeVictim.team),
+  });
   if (network.role === 'host') hostTriggerAuthorities.reset(message.victim, 'death');
-  const deathSource = message.cause.kind === 'gun'
-    ? message.cause.weapon
-    : message.cause.kind === 'killstreak'
-      ? message.cause.effect
-      : message.cause.kind;
-  recordMatchDiagnostic('death-authoritative', network.role === 'client' ? 'observed' : 'accepted', {
-    actorId: message.killer,
-    actorKind: combatantLabel(message.killer).kind,
-    targetId: message.victim,
-    targetKind: combatantLabel(message.victim).kind,
-    weaponOrEffect: deathSource,
-    healthAfter: 0,
-    reason: 'authoritative-death-transition',
-  }, `death-${message.nonce}`);
   const victimPoint = message.victim === player.id ? player.position : remotes.get(message.victim)?.target ?? bots.get(message.victim)?.position;
   if (victimPoint) recordSpawnDeath(victimPoint);
   if (victimPoint && network.role !== 'client') {
@@ -12712,8 +12728,6 @@ function processDeath(message: DeathMessage): void {
     dropHeldRailgun(message.victim, dropPoint);
     dropHeldTimedMapWeapons(message.victim, dropPoint);
   }
-  const killer = message.killer === player.id ? player.name : remotes.get(message.killer)?.snapshot.name ?? bots.get(message.killer)?.name ?? 'Unknown';
-  const victim = message.victim === player.id ? player.name : remotes.get(message.victim)?.snapshot.name ?? bots.get(message.victim)?.name ?? 'Unknown';
   spawnCorpsePresentation(message.victim, fallenOperatorSource);
   spawnDeathDrop(message);
   if (message.victim === player.id && player.alive) {
@@ -12749,22 +12763,6 @@ function processDeath(message: DeathMessage): void {
       setGuestCombatInventoryGrenades(inventory, deadGrenadeAuthority.remaining),
     );
   }
-  if (network.role === 'host' && message.killer !== message.victim) {
-    const killerMember = hostLobbyMembers.get(message.killer) ?? bots.get(message.killer);
-    const victimMember = hostLobbyMembers.get(message.victim) ?? bots.get(message.victim);
-    if (killerMember && victimMember && areCombatantsHostile(killerMember.id, killerMember.team, victimMember.id, victimMember.team)) {
-      const killerScore = authoritativeScores.get(message.killer) ?? emptyPlayerScore(message.killer);
-      const victimScore = authoritativeScores.get(message.victim) ?? emptyPlayerScore(message.victim);
-      authoritativeScores.set(message.killer, { ...killerScore, kills: killerScore.kills + 1 });
-      authoritativeScores.set(message.victim, { ...victimScore, deaths: victimScore.deaths + 1 });
-      const hostScore = authoritativeScores.get(player.id);
-      if (hostScore) {
-        player.kills = hostScore.kills;
-        player.deaths = hostScore.deaths;
-      }
-      sendAuthoritativeScores();
-    }
-  }
   if (network.role !== 'client') {
     const now = performance.now();
     const dropPosition = overdriveDropPosition(message.victim);
@@ -12785,13 +12783,39 @@ function processDeath(message: DeathMessage): void {
       verifiedRemoteKills.set(message.killer, (verifiedRemoteKills.get(message.killer) ?? 0) + 1);
     }
   }
-  const eliminationFeedText = `${killer} eliminated ${victim}`;
+  const eliminationFeedText = deathOutcome.feedText;
   if (message.cause.kind === 'gun' && message.cause.weapon === 'railgun') {
     railgunDeathPresentationCount += 1;
     railgunDeathPresentations.push({ killerId: message.killer, victimId: message.victim, text: eliminationFeedText });
     if (railgunDeathPresentations.length > 32) railgunDeathPresentations.shift();
   }
-  addFeed(eliminationFeedText, message.killer === player.id ? 'gold' : undefined);
+  commitAuthoritativeDeathOutcome(deathOutcome, {
+    recordDiagnostic: (outcome) => recordMatchDiagnostic(
+      'death-authoritative',
+      network.role === 'client' ? 'observed' : 'accepted',
+      {
+        actorId: message.killer,
+        actorKind: outcome.actor.kind,
+        targetId: message.victim,
+        targetKind: outcome.target.kind,
+        weaponOrEffect: outcome.weaponOrEffect,
+        healthAfter: 0,
+        reason: 'authoritative-death-transition',
+      },
+      `death-${message.nonce}`,
+    ),
+    replaceScores: (scores) => {
+      authoritativeScores.clear();
+      for (const [id, score] of scores) authoritativeScores.set(id, score);
+      const hostScore = authoritativeScores.get(player.id);
+      if (hostScore) {
+        player.kills = hostScore.kills;
+        player.deaths = hostScore.deaths;
+      }
+    },
+    broadcastScores: sendAuthoritativeScores,
+    presentFeed: (text) => addFeed(text, message.killer === player.id ? 'gold' : undefined),
+  });
   const remote = remotes.get(message.victim);
   if (remote) {
     remote.snapshot = { ...remote.snapshot, hp: 0 };
@@ -16299,6 +16323,13 @@ function applyBotDamage(
     network.send(death);
     processDeath(death);
     broadcastHostedBotState();
+  } else if (network.role === 'offline'
+    && attackerId === MAP_CARPET_BOMBER_KILLER_ID
+    && cause.kind === 'environment') {
+    // Offline bots do not otherwise enter the multiplayer processDeath path.
+    // Map-owned Carpet deaths still use its canonical diagnostic/feed seam,
+    // while the offline outcome deliberately performs no score replacement.
+    processDeath(death);
   } else {
     const source = corpseSource(bot.id);
     if (deferPresentation) deferDeathPresentation(bot.id, source, death, now);
@@ -19711,7 +19742,7 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
   remoteHealthAuthorities.set(event.targetId, result.state);
   remote.snapshot = { ...remote.snapshot, hp: result.state.hp };
   remote.root.visible = result.state.alive;
-  recordAuthoritativeDamage(event.ownerId, event.targetId, result.damageApplied);
+  recordAuthoritativeDamage(attributionId, event.targetId, result.damageApplied);
   if (result.died) {
     const death: DeathMessage = { type: 'death', killer: attributionId, victim: event.targetId, cause, nonce: randomNonce() };
     processedNonces.add(death.nonce);

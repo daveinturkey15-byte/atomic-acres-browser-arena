@@ -5,37 +5,47 @@
   "status": "accepted",
   "preview": {
     "kind": "github-actions-artifact",
-    "ref": "pr-preview-61-45a6ea2ffc4b7628c96c39458058b1d9ffa8b120",
-    "sourceSha": "45a6ea2ffc4b7628c96c39458058b1d9ffa8b120",
-    "createdAt": "2026-08-20T09:31:48.387Z"
+    "ref": "pr-preview-61-6c8abe03f9af8ed622587f8aeaae2e6023d6699a",
+    "sourceSha": "6c8abe03f9af8ed622587f8aeaae2e6023d6699a",
+    "createdAt": "2026-08-20T19:29:15.111Z",
+    "artifactId": 9421351771,
+    "fileCount": 515,
+    "treeSha256": "6976c16e9cd729bbdec470f5d10ada8cde507fdc4eccf0657ee18b97e43b2e1c"
+  },
+  "releaseDecision": {
+    "state": "publication-authorized",
+    "condition": "all-required-mechanical-gates-green",
+    "ownerHitl": "deferred-until-public-pages"
   },
   "humanAcceptance": {
     "state": "approved",
     "approvedBy": "Dave",
     "approvedAt": "2026-08-20T10:11:06.000Z",
-    "evidence": "Dave explicitly instructed Codex to finish and test all requested Pass 72 work, push it, and make it live on GitHub Pages while preserving the prior live and stable versions. Dave will perform the public GitHub Pages HITL after this exact candidate has passed the automated smoke, static, unit and bounded-browser gates. This approval authorizes protected publication of the exact candidate; it does not claim that Dave inspected or tested the immutable preview, and the public HITL remains explicitly deferred below."
+    "kind": "standing-publication-authorization",
+    "previewInspection": "not-performed",
+    "evidence": "Dave instructed Codex to improve, mechanically test and publish the final exact Pass 72 candidate autonomously while preserving the retained releases. This is standing publication-first authorization, not preview acceptance: Dave did not inspect or test the immutable preview and will perform owner HITL only after the GitHub Pages build is live."
   },
   "requirements": [
     {
       "id": "R1",
-      "summary": "Promote the exact Pass 72 candidate for public GitHub Pages HITL",
-      "expected": "The exact approved candidate is eligible for the protected production workflow as Pass 72, with root, legacy and room links selecting the Pass 72 runtime after publication.",
-      "falsifier": "A different SHA is promoted, the production workflow is invoked without the exact Pass 72 candidate, or the root/legacy/room routes select an older runtime.",
+      "summary": "Bind publication to Dave's standing publication-first authorization",
+      "expected": "The exact immutable Pass 72 preview may enter the protected production workflow only after every required mechanical gate is green; this records authorization to publish, not preview inspection or completed gameplay HITL.",
+      "falsifier": "Publication uses a different runtime SHA, bypasses a required mechanical gate, or represents Dave as having inspected or tested the immutable preview.",
       "acceptance": "human",
       "state": "verified",
       "evidence": [
         {
           "kind": "manual",
           "ref": "owner-authorization://pass72/2026-08-20T10:11:06.000Z",
-          "note": "Dave's current instruction authorizes publication after the automated gates and explicitly reserves public GitHub Pages HITL for his own testing once the URL is live."
+          "note": "Dave's instruction provides standing publication-first authority for the mechanically green exact candidate. It does not provide preview inspection or public gameplay HITL evidence."
         }
       ]
     },
     {
       "id": "R2",
-      "summary": "Preserve the exact previous and stable release channels",
-      "expected": "Pass 72 is selectable as the candidate, the exact current Pass 70 runtime is pinned at channels/pass70-retained, Pass 69 remains byte-pinned at channels/pass69-retained, Pass 67.1 remains staged as the non-selectable stable-source pin, and Pass 63 remains the selectable stable WebGL rollback.",
-      "falsifier": "Any prior channel disappears, a pinned source SHA or runtime digest changes, Pass 67.1 becomes selectable, or any chooser/legacy route resolves to the wrong channel.",
+      "summary": "Preserve the exact retained release topology while promoting Pass 72",
+      "expected": "Pass 72 is the candidate and eventual live route; Pass 70 remains the exact previous release, Pass 69 remains byte-pinned, Pass 67.1 remains the non-selectable stable-source pin, and Pass 63 remains the selectable WebGL rollback across root, legacy and room routes.",
+      "falsifier": "A retained channel disappears or changes identity, Pass 67.1 becomes selectable, or a chooser, legacy or room route resolves to the wrong channel.",
       "acceptance": "mechanical",
       "state": "verified",
       "evidence": [
@@ -43,55 +53,205 @@
           "kind": "contract",
           "ref": "src/release-topology.test.ts",
           "command": "npx vitest run src/release-topology.test.ts src/release-pipeline.test.ts --reporter=dot",
-          "note": "The local topology and pipeline contracts passed 30 tests, including exact Pass 70 Pages pin 3b5e675c54eaea2a2dd721eca6f247c933361587, Pass 69 pin, Pass 67.1 staging and Pass 63 rollback."
+          "note": "The topology and production-pipeline contracts pin the Pass 72, Pass 70, Pass 69, Pass 67.1 and Pass 63 identities and route policy."
         },
         {
           "kind": "browser",
           "ref": "tests/e2e/release-channel-chooser.spec.ts",
-          "command": "QA_E2E_GROUPS=release-shell node scripts/qa/run-bounded-e2e.mjs",
-          "note": "The local four-choice release-shell smoke passed 6/6; exact CI run 32354015850 independently passed bounded-browser-linux and bounded-browser-windows."
+          "command": "npx playwright test tests/e2e/release-channel-chooser.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "The served chooser test exercises all selectable choices plus root, legacy and room routing."
         }
       ]
     },
     {
       "id": "R3",
-      "summary": "Ship every requested Pass 72 gameplay and presentation correction",
-      "expected": "The candidate contains the FFA-default selectable-TDM private lobby, host-only reset-to-new-code and checkpoint invalidation, replicated squad presentation metadata, exact M14 EBR 37.2/24 damage, halved fall-damage envelope with unchanged impact thresholds, 0.24 metre flare radius, map-owned Carpet Bomber attribution, hosted occlusion-aware explosive-crossbow glass breaking, and teammate-visible Chopper/Drone support-shot audio with owner-local HUD/tracers.",
-      "falsifier": "Any requested correction is absent, a focused adversarial contract fails, a full static/unit suite fails, or teammate/owner presentation authority is reversed or client-authored.",
+      "summary": "Default private matches to FFA while retaining explicit TDM selection",
+      "expected": "A new private lobby visibly defaults to free-for-all, the host can explicitly select team deathmatch, and FFA hostility remains player-based even when presentation team values match.",
+      "falsifier": "A new lobby defaults to TDM, TDM cannot be selected, or matching presentation values make distinct FFA players friendly.",
       "acceptance": "mechanical",
       "state": "verified",
       "evidence": [
         {
-          "kind": "contract",
-          "ref": "src/pass72-lobby-reset-contract.test.ts",
-          "command": "npx vitest run src/pass72-lobby-reset-contract.test.ts src/pass72-crossbow-glass-contract.test.ts src/pass72-chopper-audio-contract.test.ts src/squad-presentation.test.ts src/kill-provenance.test.ts src/flare-projectile-system.test.ts src/combat/weapon-catalog.test.ts",
-          "note": "The focused Pass 72 lobby, squad, weapon, flare, provenance, crossbow and support-audio contracts passed locally."
-        },
-        {
           "kind": "unit",
           "ref": "src/private-match.test.ts",
-          "command": "npm test -- --run --reporter=dot",
-          "note": "The complete local suite passed 367 test files and 2,580 tests with 1 file and 2 tests skipped; exact CI run 32354015850 passed both Windows and Ubuntu static/unit jobs."
-        },
-        {
-          "kind": "browser",
-          "ref": "tests/e2e/release-channel-chooser.spec.ts",
-          "command": "npm run test:e2e:bounded",
-          "note": "The exact CI run 32354015850 passed bounded browser Linux and Windows; the local release-shell smoke also passed all six tests."
+          "command": "npx vitest run src/private-match.test.ts --reporter=dot",
+          "note": "The lobby model contract covers FFA defaulting, explicit TDM selection and FFA hostility."
         }
       ]
     },
     {
       "id": "R4",
-      "summary": "Complete Dave's visual, audio, feel and network HITL on the public Pages build",
-      "expected": "Dave can test the exact published Pass 72 URL and report any remaining visual, audio, collision, networking or frame-pacing defect while retaining Pass 70, Pass 69 and Pass 63 access.",
-      "falsifier": "The public Pass 72 URL is unavailable, does not bind the released SHA, or the preserved prior channels are inaccessible during Dave's test.",
+      "summary": "Reset a hosted lobby to one distinct fresh room code",
+      "expected": "Only the active host can reset; the old durable hosted-room key is synchronously cleared in the reset click turn before reload, and exactly one distinct replacement room code is opened and stored after Peer admission.",
+      "falsifier": "A guest can reset, the invalidated room remains recoverable in storage, a duplicate host attempt is opened, or the replacement code is blank or equal to the old code.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "src/host-room-recovery.test.ts",
+          "command": "npx vitest run src/host-room-recovery.test.ts src/network-connection-attempt.test.ts src/pass72-lobby-reset-contract.test.ts --reporter=dot",
+          "note": "The production storage helper, exactly-once connection attempt model and integration contract cover host authority, synchronous invalidation and fresh-code recovery."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass72-lobby-squad-reset.spec.ts",
+          "command": "npx playwright test tests/e2e/pass72-lobby-squad-reset.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "The native browser test reads localStorage in the reset click turn, then verifies a nonempty distinct room code and its durable replacement value."
+        }
+      ]
+    },
+    {
+      "id": "R5",
+      "summary": "Replicate safe squad names and colours without changing combat teams",
+      "expected": "Bounded squad names and six-digit colours replicate from guest to host, render as injection-safe roster text and a visible colour swatch, and remain presentation metadata with no effect on hostility.",
+      "falsifier": "Invalid metadata is admitted, replicated values do not reach both rosters, the colour is not visibly rendered, injection markup executes, or squad metadata changes combat hostility.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/squad-presentation.test.ts",
+          "command": "npx vitest run src/squad-presentation.test.ts --reporter=dot",
+          "note": "The production squad parser and roster renderer are tested for bounds, legacy compatibility, safe rendering and hostility separation."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass72-lobby-squad-reset.spec.ts",
+          "command": "npx playwright test tests/e2e/pass72-lobby-squad-reset.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "The host-and-guest browser test changes the guest squad name and colour and checks replicated DOM text plus computed swatch colour."
+        }
+      ]
+    },
+    {
+      "id": "R6",
+      "summary": "Apply the exact M14 EBR damage envelope",
+      "expected": "The M14 EBR uses a 37.2 base and 24 minimum body-damage envelope, 38-to-100 metre falloff and a 1.7 head multiplier in both gameplay and the canonical weapon catalog.",
+      "falsifier": "Either runtime or catalog differs from any authored value, or close, head or maximum-range computed damage escapes the pinned contract.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/gameplay.test.ts",
+          "command": "npx vitest run src/gameplay.test.ts src/combat/weapon-catalog.test.ts --reporter=dot",
+          "note": "The gameplay computation and canonical catalog independently pin the M14 base, minimum, falloff and head multiplier."
+        }
+      ]
+    },
+    {
+      "id": "R7",
+      "summary": "Halve fall damage without moving its impact thresholds",
+      "expected": "Authoritative fall damage remains zero through the 9.5 metre-per-second safe threshold, scales through the existing envelope, reaches 50 at 22 metres per second and never exceeds 50.",
+      "falsifier": "Either threshold moves, an ordinary landing gains damage, maximum fall damage differs from 50, or invalid inputs produce damage.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/gameplay.test.ts",
+          "command": "npx vitest run src/gameplay.test.ts --reporter=dot",
+          "note": "The authoritative fall-damage contract pins 9.5 and 22 metre-per-second thresholds, the halved 50-point cap and fail-closed invalid input."
+        }
+      ]
+    },
+    {
+      "id": "R8",
+      "summary": "Use the 0.24 metre flare projectile radius without weakening authority",
+      "expected": "The flare projectile resolves with a bounded 0.24 metre radius while retaining occlusion, direct-hit, burn, duplicate-action, prediction and authority-migration protections.",
+      "falsifier": "The radius differs from 0.24 metres, a flare admits a through-wall target, a peer prediction causes damage, or replay and migration can duplicate a hit or burn pulse.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/flare-projectile-system.test.ts",
+          "command": "npx vitest run src/flare-projectile-system.test.ts --reporter=dot",
+          "note": "The flare system tests the widened bounded intersection together with occlusion, authoritative lifecycle, replay and prediction constraints."
+        }
+      ]
+    },
+    {
+      "id": "R9",
+      "summary": "Attribute Carpet Bomber deaths to the map without recursive streak credit",
+      "expected": "Carpet Bomber impact and residual-fire deaths resolve as environment kills under the canonical map killer identity, retain the victim's authoritative damage/death totals, broadcast the updated scoreboard and emit a canonical Carpet Bomber feed/diagnostic entry without a synthetic map score, player kill or recursive streak credit.",
+      "falsifier": "A Carpet Bomber victim death is missing from authoritative scores, the score update is not broadcast, feed or diagnostics identify an unknown/player killer, a map PlayerScore appears, the activating player receives the kill, hosted occlusion is bypassed, or a replay duplicates residual damage.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/kill-provenance.test.ts",
+          "command": "npx vitest run src/kill-provenance.test.ts src/authoritative-death-outcome.test.ts src/carpet-death-main-integration.test.ts src/carpet-ground-fire-multiplayer.test.ts --reporter=dot",
+          "note": "Behavioral death-outcome and real processDeath integration tests pin victim-only death scoring, score broadcast wiring, canonical environment feed/diagnostics, no synthetic map row or player kill, while the hosted residual-fire suite covers occlusion, receipts and replay deduplication."
+        }
+      ]
+    },
+    {
+      "id": "R10",
+      "summary": "Break glass from hosted explosive-crossbow detonations through the shared occlusion policy",
+      "expected": "An admitted explosive-crossbow detonation reaches the same host-owned, occlusion-aware and replicated glass mutation path as grenades, opening a pane only after the admitted impact is replicated.",
+      "falsifier": "A guest mutates glass authoritatively, cover behind or before the pane is classified incorrectly, an explosion breaks through real cover, or peers receive an aperture before its admitted impact identity.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "src/pass72-crossbow-glass-contract.test.ts",
+          "command": "npx vitest run src/pass72-crossbow-glass-contract.test.ts src/window-breaks.test.ts src/glass-main-integration.test.ts --reporter=dot",
+          "note": "The integration seam, admission geometry and runtime replication tests cover shared crossbow/grenade policy, occlusion and impact-before-aperture ordering."
+        }
+      ]
+    },
+    {
+      "id": "R11",
+      "summary": "Present support-shot audio to the correct audience while keeping feedback owner-only",
+      "expected": "Every host-admitted Chopper or Drone shot plays once for its owner and for an eligible TDM teammate; enemies and same-team-valued FFA rivals hear neither, while damage HUD and tracers remain restricted to the support owner.",
+      "falsifier": "A teammate misses admitted support audio, an enemy or FFA rival hears it, a non-owner receives damage feedback, a missed shot emits no shot event, or replay causes duplicate audio.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/support-combat-presentation.test.ts",
+          "command": "npx vitest run src/support-combat-presentation.test.ts src/chopper-gunner-fire-ray.test.ts src/killstreak-runtime.test.ts src/killstreak-protocol.test.ts --reporter=dot",
+          "note": "Behavioral tests cover owner and teammate playback, enemy and FFA exclusion, exact call counts, owner-only feedback, miss and cadence emission, replay bounds and strict transport validation."
+        }
+      ]
+    },
+    {
+      "id": "R12",
+      "summary": "Keep death transitions host-authored on the protocol-18 topology",
+      "expected": "Protocol 18 rejects cached protocol-17 peers before new wire fields can be discarded, initial guest joins using the reserved map: or host-bot- participant namespaces are rejected before credential binding, guest event connections drop forged death messages before app delivery, and validated host-authored death transitions still replicate to clients.",
+      "falsifier": "A protocol-17 peer binds to the protocol-18 room, an initial guest join using map: or host-bot- binds a credential, a guest-authored death reaches the host application, or a host-authored death fails to reach the client event lane.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/participant-identity.test.ts",
+          "command": "npx vitest run src/participant-identity.test.ts --reporter=dot",
+          "note": "The participant-identity contract reserves exactly the map: and host-bot- namespaces while retaining ordinary participant IDs."
+        },
+        {
+          "kind": "contract",
+          "ref": "src/network-lifecycle.test.ts",
+          "command": "npx vitest run src/protocol.test.ts src/network-lifecycle.test.ts --reporter=dot",
+          "note": "Protocol and real connection-lifecycle tests reject stale peers and reserved-namespace joins before credential binding, drop a forged guest death before host app delivery, preserve the next valid guest event and deliver the same validated death shape from host to client."
+        }
+      ]
+    },
+    {
+      "id": "R13",
+      "summary": "Complete owner visual, audio, feel and network HITL on the public Pages build",
+      "expected": "After protected publication, Dave can test the exact public Pass 72 Pages build for visual quality, support audio, weapon and movement feel, native browser behavior and real LAN, WAN and NAT multiplayer while retained channels remain available.",
+      "falsifier": "The public build does not bind the released SHA, a retained fallback is inaccessible during review, or Dave reports a release-blocking defect in public HITL.",
       "acceptance": "human",
       "state": "deferred",
       "deferApproval": {
         "approvedBy": "Dave",
         "approvedAt": "2026-08-20T10:11:06.000Z",
-        "reason": "Dave explicitly instructed publication first and will perform HITL on the GitHub Pages version once it is live and has passed the agent's own smoke tests and debugging. This requirement is intentionally deferred and is not represented as completed acceptance."
+        "reason": "Dave authorized publication first and reserved owner HITL for the public GitHub Pages build. He did not inspect or test the immutable preview; subjective visual, audio and feel review plus native browser and real LAN, WAN and NAT validation remain unperformed and explicitly deferred."
       }
     }
   ]

@@ -98,23 +98,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts
-      - name: Build exact frozen-evidence candidate bytes
-        if: hashFiles('acceptance/pass-69.json') != ''
+      - name: Build candidate bytes for acceptance verification
         run: npm run build
-      - name: Verify exact Pass 69 evidence catalog and frozen runtime
-        if: hashFiles('acceptance/pass-69.json') != ''
-        run: node scripts/release/acceptance-gate.mjs --phase ci --impact "${{ needs.classify-change.outputs.mode }}" --base "${{ github.event.pull_request.base.sha || github.event.before }}" --head "${{ github.event.pull_request.head.sha || github.sha }}"
-      - name: Verify immutable Pass 69 preview provenance and bytes
-        if: hashFiles('acceptance/pass-69.json') != ''
+      - name: Verify changed acceptance manifest and write the selector receipt
+        run: node scripts/release/acceptance-gate.mjs --phase ci --impact "${{ needs.classify-change.outputs.mode }}" --base "${{ github.event.pull_request.base.sha || github.event.before }}" --head "${{ github.event.pull_request.head.sha || github.sha }}" --output artifacts/pipeline/acceptance-coverage.json
+      - name: Verify the selected immutable preview provenance and bytes
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/release/verify-pr-preview-provenance.mjs --manifest acceptance/pass-69.json --output artifacts/pipeline/pr-preview-provenance.json
-      - name: Verify complete requirement-to-evidence coverage and exact preview approval
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          IMPACT: ${{ needs.classify-change.outputs.mode }}
-        run: node scripts/release/acceptance-gate.mjs --phase ci --impact "$IMPACT" --base "$BASE_SHA" --head "$HEAD_SHA" --output artifacts/pipeline/acceptance-coverage.json
+        run: node scripts/release/verify-pr-preview-provenance.mjs --acceptance-receipt artifacts/pipeline/acceptance-coverage.json --output artifacts/pipeline/pr-preview-provenance.json
       - name: Upload acceptance coverage receipt
         if: always()
         uses: actions/upload-artifact@v4

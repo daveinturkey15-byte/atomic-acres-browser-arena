@@ -37,4 +37,16 @@ export function pass66FinalizerOutputPaths(previewSha: string, graph?: unknown):
 
 export function selectCiAcceptanceManifest(impact: string, manifestPaths: readonly string[]): string | null;
 
+export function assertCiImpactMatchesPaths(
+  impact: string,
+  paths: readonly string[],
+): Readonly<{ mode: 'none' | 'smoke' | 'full'; reason: string }>;
+
+export function committedManifestBytes(
+  worktreeBytes: Buffer,
+  headBytes: Buffer,
+  manifestPath: string,
+  head: string,
+): Buffer;
+
 export function evaluateAcceptance(values: Readonly<Record<string, string>>): unknown;

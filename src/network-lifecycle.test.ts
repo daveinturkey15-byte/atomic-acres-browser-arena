@@ -12,6 +12,7 @@ import {
   guestMessageEndsSession,
   hostRoomReclaimAction,
   initialLobbyJoinHasProtocolMismatch,
+  initialLobbyJoinUsesReservedParticipantId,
   isCurrentClientConnection,
   isCurrentGuestEventConnection,
   isCurrentGuestStateConnection,
@@ -83,8 +84,10 @@ type NetworkInternals = {
   lastValidHostMessageMonoMs: number | null;
   foregroundProbeGraceUntilMonoMs: number | null;
   lastClientHostLivenessCheckMonoMs: number | null;
+  hostEventConnection: DataConnection | null;
   wireGuestEvents(connection: DataConnection): void;
   wireGuestState(connection: DataConnection): void;
+  wireHostChannel(connection: DataConnection, kind: 'events' | 'state'): void;
 };
 
 const lobbyJoin = (resumeToken: string, connectionEpoch = 'connection_epoch_player_1') => ({
@@ -482,6 +485,56 @@ describe('guest event connection lifecycle', () => {
     expect(delivered.map((message) => message.type)).toEqual(['lobby-join', 'lobby-join', 'lobby-ready']);
   });
 
+  it.each(['map:carpet-bomber', 'host-bot-0'])(
+    'rejects reserved participant %s before binding its credential',
+    (reservedId) => {
+      vi.stubGlobal('window', {
+        location: { search: '', hostname: 'localhost' },
+        setTimeout: (callback: () => void) => { callback(); return 0; },
+      });
+      const delivered: Array<{ type: string }> = [];
+      const network = new ArenaNetwork((message) => delivered.push(message), () => undefined);
+      const internals = network as unknown as NetworkInternals;
+      internals.role = 'host';
+      const connection = new FakeConnection(`peer-${reservedId}`);
+      internals.wireGuestEvents(connection as unknown as DataConnection);
+
+      const join = { ...lobbyJoin('12345678-1234-1234-1234-123456789abc'), playerId: reservedId };
+      expect(initialLobbyJoinUsesReservedParticipantId(join)).toBe(true);
+      connection.emit('data', join);
+
+      expect(connection.sent).toEqual([expect.objectContaining({ type: 'lobby-reject', reason: 'rejoin-denied' })]);
+      expect(connection.open).toBe(false);
+      expect(delivered).toEqual([]);
+      expect(internals.guestResumeTokens.has(reservedId)).toBe(false);
+      expect(internals.guestBundles.has(reservedId)).toBe(false);
+      expect(internals.provisionalGuestReplacements.has(reservedId)).toBe(false);
+    },
+  );
+
+  it('retains an ordinary first lobby join after the reserved-id wire check', () => {
+    vi.stubGlobal('window', {
+      location: { search: '', hostname: 'localhost' },
+      setTimeout: (callback: () => void) => { callback(); return 0; },
+    });
+    const delivered: Array<{ type: string }> = [];
+    const network = new ArenaNetwork((message) => delivered.push(message), () => undefined);
+    const internals = network as unknown as NetworkInternals;
+    internals.role = 'host';
+    const connection = new FakeConnection('peer-ordinary');
+    internals.wireGuestEvents(connection as unknown as DataConnection);
+    const join = lobbyJoin('12345678-1234-1234-1234-123456789abc');
+
+    expect(initialLobbyJoinUsesReservedParticipantId(join)).toBe(false);
+    connection.emit('data', join);
+
+    expect(connection.open).toBe(true);
+    expect(connection.sent).toEqual([]);
+    expect(delivered.map((message) => message.type)).toEqual(['lobby-join']);
+    expect(internals.guestResumeTokens.get('player-1')).toBe(join.resumeToken);
+    expect(internals.guestBundles.get('player-1')).toMatchObject({ admitted: false, events: connection });
+  });
+
   it('scopes asynchronous admission completion to the exact application connection epoch', () => {
     vi.stubGlobal('window', {
       location: { search: '', hostname: 'localhost' },
@@ -651,6 +704,49 @@ describe('guest event connection lifecycle', () => {
     expect(internals.guestBundles.has('player-1')).toBe(false);
     expect(connection.sent).toEqual([expect.objectContaining({ type: 'lobby-reject', reason: 'protocol-mismatch' })]);
     expect(connection.open).toBe(false);
+  });
+
+  it('drops a forged guest death before app delivery while preserving host death replication', () => {
+    vi.stubGlobal('window', {
+      location: { search: '', hostname: 'localhost' },
+      setTimeout: (callback: () => void) => { callback(); return 0; },
+    });
+    const death = {
+      type: 'death' as const,
+      killer: 'player-2',
+      victim: 'player-1',
+      cause: { kind: 'gun' as const, weapon: 'carbine' as const },
+      nonce: 41,
+    };
+
+    const hostDelivered: Array<{ type: string }> = [];
+    const hostNetwork = new ArenaNetwork((message) => hostDelivered.push(message), () => undefined);
+    const hostInternals = hostNetwork as unknown as NetworkInternals;
+    hostInternals.role = 'host';
+    const guestConnection = new FakeConnection('peer-forged-death');
+    hostInternals.wireGuestEvents(guestConnection as unknown as DataConnection);
+    const token = '12345678-1234-1234-1234-123456789abc';
+    guestConnection.emit('data', lobbyJoin(token));
+    expect(hostNetwork.confirmPlayerAdmission('player-1', token, 'connection_epoch_player_1')).toBe(true);
+    hostDelivered.length = 0;
+
+    guestConnection.emit('data', death);
+    expect(hostDelivered).toEqual([]);
+    guestConnection.emit('data', { type: 'lobby-ready', by: 'player-1', ready: true, nonce: 42 });
+    expect(hostDelivered.map((message) => message.type)).toEqual(['lobby-ready']);
+    hostNetwork.send(death);
+    expect(guestConnection.sent.at(-1)).toEqual(death);
+
+    const clientDelivered: unknown[] = [];
+    const clientNetwork = new ArenaNetwork((message) => clientDelivered.push(message), () => undefined);
+    const clientInternals = clientNetwork as unknown as NetworkInternals;
+    clientInternals.role = 'client';
+    const hostConnection = new FakeConnection('host-peer');
+    clientInternals.hostEventConnection = hostConnection as unknown as DataConnection;
+    clientInternals.wireHostChannel(hostConnection as unknown as DataConnection, 'events');
+    hostConnection.emit('data', death);
+
+    expect(clientDelivered).toEqual([death]);
   });
 
   it('keeps movement flowing over the reliable event lane when the transient lane degrades', () => {

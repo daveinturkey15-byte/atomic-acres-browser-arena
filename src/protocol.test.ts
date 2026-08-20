@@ -61,6 +61,22 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ type: 'script', body: 'alert(1)' })).toBe(false);
   });
 
+  it('rejects protocol-owned participant ids while retaining ordinary lobby joins', () => {
+    const join = {
+      type: 'lobby-join' as const,
+      protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      playerId: '35bff532-7307-41ca-a869-4fc8482c73c4',
+      connectionEpoch: 'connection_epoch_player_1',
+      name: 'Player 1',
+      requestedTeam: 0 as const,
+      resumeToken: '12345678-1234-1234-1234-123456789abc',
+      nonce: 1,
+    };
+    expect(isGameMessage(join)).toBe(true);
+    expect(isGameMessage({ ...join, playerId: 'map:carpet-bomber' })).toBe(false);
+    expect(isGameMessage({ ...join, playerId: 'host-bot-0' })).toBe(false);
+  });
+
   it('validates shot vectors and known weapon ids', () => {
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'smg', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], nonce: 3 })).toBe(true);
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'sniper', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], nonce: 4 })).toBe(true);
@@ -422,8 +438,20 @@ describe('network protocol guards', () => {
     expect(messageBelongsToPlayer({ type: 'melee', by: 'spoof', origin: [0, 1.7, 0], direction: [0, 0, -1], nonce: 7 }, 'abc')).toBe(false);
     expect(messageBelongsToPlayer({ type: 'ping', by: 'abc', team: 0, kind: 'regroup', position: [0, 1.7, 0], nonce: 8 }, 'abc')).toBe(true);
     expect(messageBelongsToPlayer({ type: 'ping', by: 'spoof', team: 0, kind: 'regroup', position: [0, 1.7, 0], nonce: 8 }, 'abc')).toBe(false);
-    expect(messageBelongsToPlayer({ type: 'death', killer: 'enemy', victim: 'abc', cause: { kind: 'gun', weapon: 'carbine' }, nonce: 2 }, 'abc')).toBe(true);
-    expect(messageBelongsToPlayer({ type: 'death', killer: 'abc', victim: 'other', cause: { kind: 'gun', weapon: 'carbine' }, nonce: 2 }, 'abc')).toBe(false);
+  });
+
+  it('keeps death transitions host-authored even when the victim id matches a guest', () => {
+    const death = {
+      type: 'death' as const,
+      killer: 'enemy',
+      victim: 'abc',
+      cause: { kind: 'gun' as const, weapon: 'carbine' as const },
+      nonce: 2,
+    };
+    expect(isGameMessage(death)).toBe(true);
+    expect(messageBelongsToPlayer(death, 'abc')).toBe(true);
+    expect(isHostAuthorityMessage(death)).toBe(true);
+    expect(messageBelongsToPlayer({ ...death, killer: 'abc', victim: 'other' }, 'abc')).toBe(false);
   });
 
   it('binds chat submissions to the guest and accepts only bounded host-authoritative history', () => {

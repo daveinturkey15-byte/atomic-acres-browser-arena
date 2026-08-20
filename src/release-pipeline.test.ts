@@ -284,24 +284,26 @@ describe('production release workflow', () => {
     expect(mutationRunner).toContain('spawnSync(process.execPath');
   });
 
-  it('makes exact Pass 69 evidence and real preview provenance mandatory in the required acceptance job', () => {
+  it('selects the changed acceptance manifest once and verifies its exact preview provenance', () => {
     const acceptanceJob = verifyWorkflow.indexOf('requirements-acceptance:');
     const metricsJob = verifyWorkflow.indexOf('pipeline-metrics:');
     const section = verifyWorkflow.slice(acceptanceJob, metricsJob);
     const installStep = section.indexOf('npm ci --ignore-scripts');
-    const buildStep = section.indexOf('Build exact frozen-evidence candidate bytes');
-    const candidateStep = section.indexOf('Verify exact Pass 69 evidence catalog and frozen runtime');
-    const provenanceStep = section.indexOf('Verify immutable Pass 69 preview provenance and bytes');
-    const acceptanceStep = section.indexOf('Verify complete requirement-to-evidence coverage and exact preview approval');
+    const buildStep = section.indexOf('Build candidate bytes for acceptance verification');
+    const acceptanceStep = section.indexOf('Verify changed acceptance manifest and write the selector receipt');
+    const provenanceStep = section.indexOf('Verify the selected immutable preview provenance and bytes');
 
     expect(section).toContain('needs: [classify-change, static-and-unit]');
     expect(installStep).toBeGreaterThan(-1);
     expect(buildStep).toBeGreaterThan(installStep);
-    expect(candidateStep).toBeGreaterThan(buildStep);
-    expect(provenanceStep).toBeGreaterThan(candidateStep);
-    expect(acceptanceStep).toBeGreaterThan(provenanceStep);
+    expect(acceptanceStep).toBeGreaterThan(buildStep);
+    expect(provenanceStep).toBeGreaterThan(acceptanceStep);
     expect(section).toContain('scripts/release/acceptance-gate.mjs --phase ci');
+    expect(section.match(/scripts\/release\/acceptance-gate\.mjs --phase ci/gu)).toHaveLength(1);
+    expect(section).toContain('--output artifacts/pipeline/acceptance-coverage.json');
     expect(section).toContain('scripts/release/verify-pr-preview-provenance.mjs');
+    expect(section).toContain('--acceptance-receipt artifacts/pipeline/acceptance-coverage.json');
+    expect(section).not.toContain('acceptance/pass-69.json');
     expect(section).toContain('GITHUB_TOKEN: ${{ github.token }}');
     expect(section).toContain('artifacts/pipeline/pr-preview-provenance.json');
   });

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { inflateRawSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
@@ -11,13 +11,19 @@ const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPOSITORY_ROOT = resolve(dirname(SCRIPT_PATH), '..', '..');
 const DEFAULT_MANIFEST_PATH = 'acceptance/pass-69.json';
 const DEFAULT_OUTPUT_PATH = 'artifacts/pipeline/pass69-preview-provenance.json';
+const DEFAULT_ACCEPTANCE_RECEIPT_PATH = 'artifacts/pipeline/acceptance-coverage.json';
 const DEFAULT_API_BASE = 'https://api.github.com';
 const DEFAULT_MAX_ARCHIVE_BYTES = 1024 * 1024 * 1024;
 const DEFAULT_MAX_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024;
+const MAX_SELECTOR_JSON_BYTES = 1024 * 1024;
 const MAX_ARTIFACT_RESULTS = 1000;
 const PREVIEW_REF = /^pr-preview-([1-9][0-9]*)-([0-9a-f]{40})$/;
+const ACCEPTANCE_MANIFEST_PATH = /^acceptance\/pass-([1-9][0-9]*)\.json$/;
+const SHA40 = /^[0-9a-f]{40}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
+const PROCESS_ONLY_EXEMPT_REASON = 'process-only with no enforced pass manifest change';
+const PROCESS_ONLY_EXEMPT_KEYS = Object.freeze(['exempt', 'impact', 'ok', 'phase', 'reason', 'schemaVersion']);
 const textDecoder = new TextDecoder('utf-8', { fatal: true });
 
 class ProvenanceError extends Error {
@@ -38,7 +44,7 @@ function parseArgs(argv) {
     const token = argv[index];
     if (!token.startsWith('--')) throw new Error(`Unexpected argument: ${token}`);
     const name = token.slice(2);
-    if (!['manifest', 'output', 'repository', 'api-base'].includes(name)) {
+    if (!['manifest', 'acceptance-receipt', 'output', 'repository', 'api-base'].includes(name)) {
       throw new Error(`Unknown argument: ${token}`);
     }
     const value = argv[index + 1];
@@ -63,6 +69,69 @@ function safeJson(bytes, label) {
   } catch (error) {
     throw new ProvenanceError(`${label} is not valid UTF-8 JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+function boundedRepositoryJson(repositoryRoot, requestedPath, label) {
+  const absolute = isAbsolute(requestedPath) ? resolve(requestedPath) : resolve(repositoryRoot, requestedPath);
+  const pathRelative = relative(repositoryRoot, absolute);
+  invariant(!isAbsolute(pathRelative) && pathRelative !== '..'
+    && !pathRelative.startsWith('../') && !pathRelative.startsWith('..\\'),
+  `${label} path must stay inside the repository`);
+  let stat;
+  try {
+    stat = lstatSync(absolute);
+  } catch (error) {
+    throw new ProvenanceError(`cannot stat ${pathRelative}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  invariant(stat.isFile(), `${label} must be a regular file inside the repository`);
+  invariant(stat.size > 0 && stat.size <= MAX_SELECTOR_JSON_BYTES,
+    `${label} must be between 1 and ${MAX_SELECTOR_JSON_BYTES} bytes`);
+  let bytes;
+  try {
+    bytes = readFileSync(absolute);
+  } catch (error) {
+    throw new ProvenanceError(`cannot read ${pathRelative}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  invariant(bytes.length === stat.size && bytes.length <= MAX_SELECTOR_JSON_BYTES,
+    `${label} changed size while being read`);
+  return { absolute, relative: pathRelative.replaceAll('\\', '/'), bytes, value: safeJson(bytes, label) };
+}
+
+export function selectPreviewManifestFromAcceptanceReceipt(receipt) {
+  invariant(isObject(receipt), 'acceptance receipt must be an object');
+  invariant(receipt.schemaVersion === 1, 'acceptance receipt schemaVersion must be 1');
+  invariant(receipt.ok === true, 'acceptance receipt must be green before preview provenance verification');
+  invariant(receipt.phase === 'ci', 'acceptance receipt phase must be ci');
+  invariant(['none', 'smoke', 'full'].includes(receipt.impact), 'acceptance receipt impact must be none, smoke, or full');
+
+  if (receipt.exempt === true) {
+    invariant(JSON.stringify(Object.keys(receipt).sort()) === JSON.stringify(PROCESS_ONLY_EXEMPT_KEYS)
+      && receipt.impact === 'none'
+      && receipt.reason === PROCESS_ONLY_EXEMPT_REASON
+      && receipt.manifestPath === undefined,
+    'preview provenance may be skipped only for the exact process-only acceptance exemption');
+    return { exempt: true, reason: PROCESS_ONLY_EXEMPT_REASON };
+  }
+
+  invariant(receipt.exempt === undefined || receipt.exempt === false,
+    'acceptance receipt exempt flag is invalid');
+  const match = ACCEPTANCE_MANIFEST_PATH.exec(receipt.manifestPath ?? '');
+  invariant(match, 'acceptance receipt manifestPath must be exactly acceptance/pass-<number>.json');
+  invariant(receipt.releasePass === `PASS ${Number(match[1])}`,
+    'acceptance receipt manifestPath does not match releasePass');
+  invariant(SHA40.test(receipt.headSha ?? ''), 'acceptance receipt headSha must be one exact Git SHA');
+  invariant(SHA256.test(receipt.manifestSha256 ?? ''), 'acceptance receipt manifestSha256 must be one exact SHA-256');
+  invariant(Array.isArray(receipt.errors) && receipt.errors.length === 0,
+    'green acceptance receipt must contain an empty errors array');
+  invariant(isObject(receipt.approvalParity) && receipt.approvalParity.ok === true,
+    'acceptance receipt approvalParity must be green');
+  return {
+    exempt: false,
+    manifestPath: receipt.manifestPath,
+    manifestSha256: receipt.manifestSha256,
+    headSha: receipt.headSha,
+    releasePass: receipt.releasePass,
+  };
 }
 
 function sha256(bytes) {
@@ -102,11 +171,24 @@ export function parsePreviewManifest(manifest) {
   invariant(Number.isSafeInteger(pullRequest) && pullRequest > 0, 'preview pull request number is invalid');
   invariant(manifest.preview.sourceSha === sourceSha, 'preview.sourceSha must exactly match preview.ref');
   invariant(isIsoUtc(manifest.preview.createdAt), 'preview.createdAt must be an ISO UTC timestamp');
+  const hasAnyExactPin = ['artifactId', 'fileCount', 'treeSha256']
+    .some((field) => manifest.preview[field] !== undefined);
+  if (hasAnyExactPin) {
+    invariant(Number.isSafeInteger(manifest.preview.artifactId) && manifest.preview.artifactId > 0,
+      'preview.artifactId must be a positive safe integer when exact pins are declared');
+    invariant(Number.isSafeInteger(manifest.preview.fileCount) && manifest.preview.fileCount > 0,
+      'preview.fileCount must be a positive safe integer when exact pins are declared');
+    invariant(SHA256.test(manifest.preview.treeSha256 ?? ''),
+      'preview.treeSha256 must be one lowercase SHA-256 when exact pins are declared');
+  }
   return {
     artifactName: manifest.preview.ref,
     sourceSha,
     pullRequest,
     createdAt: manifest.preview.createdAt,
+    artifactId: hasAnyExactPin ? manifest.preview.artifactId : null,
+    fileCount: hasAnyExactPin ? manifest.preview.fileCount : null,
+    treeSha256: hasAnyExactPin ? manifest.preview.treeSha256 : null,
   };
 }
 
@@ -328,6 +410,12 @@ export function inspectPreviewArtifactZip(zipBytes, identity, options = {}) {
   const tree = computePreviewTree(distFiles);
   const receipt = safeJson(receiptBytes, 'embedded preview receipt');
   verifyEmbeddedReceipt(receipt, identity, tree);
+  if (identity.fileCount !== null && identity.fileCount !== undefined) {
+    invariant(identity.fileCount === tree.fileCount,
+      `manifest preview.fileCount ${identity.fileCount} does not match recomputed ${tree.fileCount}`);
+    invariant(identity.treeSha256 === tree.treeSha256,
+      `manifest preview.treeSha256 ${identity.treeSha256} does not match recomputed ${tree.treeSha256}`);
+  }
   return { receipt, ...tree };
 }
 
@@ -444,6 +532,9 @@ function verifyWorkflowRun(run, artifact, identity, repository) {
 
 function validArtifactMetadata(artifact, identity, nowMs) {
   const errors = [];
+  if (identity.artifactId !== null && identity.artifactId !== undefined && artifact.id !== identity.artifactId) {
+    errors.push(`artifact id ${artifact.id} does not match manifest preview.artifactId ${identity.artifactId}`);
+  }
   if (artifact.expired !== false) errors.push('artifact is marked expired');
   if (!isIsoUtc(artifact.created_at)) errors.push('artifact created_at is invalid');
   if (!isIsoUtc(artifact.expires_at) || Date.parse(artifact.expires_at) <= nowMs) errors.push('artifact expires_at is not in the future');
@@ -656,6 +747,43 @@ export async function verifyPreviewProvenance(options = {}) {
   };
 }
 
+export async function verifyPreviewProvenanceFromAcceptanceReceipt(options = {}) {
+  const repositoryRoot = resolve(options.repositoryRoot ?? REPOSITORY_ROOT);
+  const acceptanceReceiptPath = options.acceptanceReceiptPath ?? DEFAULT_ACCEPTANCE_RECEIPT_PATH;
+  const receiptFile = options.acceptanceReceipt === undefined
+    ? boundedRepositoryJson(repositoryRoot, acceptanceReceiptPath, 'acceptance receipt')
+    : null;
+  const receipt = options.acceptanceReceipt ?? receiptFile.value;
+  const selection = selectPreviewManifestFromAcceptanceReceipt(receipt);
+  if (selection.exempt) {
+    return {
+      schemaVersion: 1,
+      ok: true,
+      kind: 'pr-preview-provenance-exempt',
+      exempt: true,
+      reason: selection.reason,
+      acceptanceReceiptPath: receiptFile?.relative ?? null,
+    };
+  }
+
+  const manifestFile = boundedRepositoryJson(repositoryRoot, selection.manifestPath, 'selected acceptance manifest');
+  invariant(sha256(manifestFile.bytes) === selection.manifestSha256,
+    'selected acceptance manifest bytes do not match acceptance receipt manifestSha256');
+  const result = await verifyPreviewProvenance({
+    ...options,
+    repositoryRoot,
+    manifestPath: selection.manifestPath,
+    manifest: manifestFile.value,
+  });
+  return {
+    ...result,
+    acceptanceReceiptPath: receiptFile?.relative ?? null,
+    selectedManifestPath: selection.manifestPath,
+    selectedManifestSha256: selection.manifestSha256,
+    acceptanceHeadSha: selection.headSha,
+  };
+}
+
 function writeReceipt(path, receipt) {
   const absolute = isAbsolute(path) ? resolve(path) : resolve(REPOSITORY_ROOT, path);
   mkdirSync(dirname(absolute), { recursive: true });
@@ -667,11 +795,22 @@ if (resolve(process.argv[1] ?? '') === SCRIPT_PATH) {
   let result;
   try {
     values = parseArgs(process.argv.slice(2));
-    result = await verifyPreviewProvenance({
-      manifestPath: values.manifest,
+    if (values.manifest && values['acceptance-receipt']) {
+      throw new Error('--manifest and --acceptance-receipt are mutually exclusive');
+    }
+    const common = {
       repository: values.repository,
       apiBase: values['api-base'],
-    });
+    };
+    result = values['acceptance-receipt']
+      ? await verifyPreviewProvenanceFromAcceptanceReceipt({
+        ...common,
+        acceptanceReceiptPath: values['acceptance-receipt'],
+      })
+      : await verifyPreviewProvenance({
+        ...common,
+        manifestPath: values.manifest,
+      });
   } catch (error) {
     result = {
       schemaVersion: 1,
