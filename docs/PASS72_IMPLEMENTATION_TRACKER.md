@@ -40,6 +40,7 @@
 - Local staged-topology verification passed: Pass 72 candidate, 516-file Pass 70 previous wrapper, 516-file Pass 69 wrapper, Pass 67.1 stable and Pass 63 rollback.
 - Local chooser/provenance browser smoke passed for all four public choices and legacy routes.
 - The first fresh Windows CI run exposed only a default 5-second timeout on the exhaustive arm-rig catalog test; the unchanged assertions now have a 15-second cross-platform harness budget, and the full local suite remains green.
+- The next hosted Windows run exposed the owned Vite preview server's exact 60-second startup ceiling; only the web-server budget is now 180 seconds, while Playwright's 60-second test timeout and all browser assertions remain unchanged.
 - The first pre-implementation repository preflight passed. The second preflight correctly refused while the worktree was dirty; it must be rerun after commit.
 
 ## Unknowns / explicit falsifiers
