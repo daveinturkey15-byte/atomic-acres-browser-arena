@@ -39,6 +39,7 @@
 - Focused Pass 72/lobby/protocol/provenance/crossbow/audio suites passed.
 - Local staged-topology verification passed: Pass 72 candidate, 516-file Pass 70 previous wrapper, 516-file Pass 69 wrapper, Pass 67.1 stable and Pass 63 rollback.
 - Local chooser/provenance browser smoke passed for all four public choices and legacy routes.
+- The first fresh Windows CI run exposed only a default 5-second timeout on the exhaustive arm-rig catalog test; the unchanged assertions now have a 15-second cross-platform harness budget, and the full local suite remains green.
 - The first pre-implementation repository preflight passed. The second preflight correctly refused while the worktree was dirty; it must be rerun after commit.
 
 ## Unknowns / explicit falsifiers

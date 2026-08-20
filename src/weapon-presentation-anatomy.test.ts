@@ -312,6 +312,9 @@ describe('first-person anatomical presentation', () => {
     }
   });
 
+  // This is a deliberately exhaustive synthetic catalog (every weapon × five
+  // poses × 45 settling frames). Keep the cross-platform runner budget above
+  // the default 5s without weakening any geometry assertion.
   it('keeps the shipped arm rig fixed-length, connected and reachable across the action catalog', async () => {
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
     const presentation = new WeaponPresentation(camera, false);
@@ -362,7 +365,7 @@ describe('first-person anatomical presentation', () => {
         if (scenario.name === 'fire') presentation.setFireCaptureAgeMs(1_000);
       }
     }
-  });
+  }, 15_000);
 
   it('keeps the complete long-gun geometry camera-side of the calibrated wall and prone floor planes', async () => {
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
