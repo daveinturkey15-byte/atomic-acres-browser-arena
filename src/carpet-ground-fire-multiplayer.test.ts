@@ -113,6 +113,7 @@ describe('Pass 70 hosted Carpet Bomber residual fire', () => {
       matchEpoch: 73,
       revision: 1,
       events,
+      shots: [],
       impacts: [],
       nonce: 99,
     })).toBe(true);

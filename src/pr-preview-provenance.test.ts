@@ -3,7 +3,9 @@ import {
   computePreviewTree,
   inspectPreviewArtifactZip,
   parsePreviewManifest,
+  selectPreviewManifestFromAcceptanceReceipt,
   verifyPreviewProvenance,
+  verifyPreviewProvenanceFromAcceptanceReceipt,
   type PreviewIdentity,
 } from '../scripts/release/verify-pr-preview-provenance.mjs';
 
@@ -14,6 +16,7 @@ const API_BASE = 'https://api.example.test';
 const PREVIEW_CREATED_AT = '2026-07-30T03:00:00Z';
 const NOW = new Date('2026-07-30T04:00:00Z');
 const ARTIFACT_NAME = `pr-preview-41-${SOURCE_SHA}`;
+const MANIFEST_SHA256 = 'c'.repeat(64);
 const encoder = new TextEncoder();
 
 function acceptedManifest() {
@@ -229,6 +232,93 @@ function identity(): PreviewIdentity {
   return parsePreviewManifest(acceptedManifest());
 }
 
+function pinnedManifest(overrides: Record<string, unknown> = {}) {
+  const manifest = acceptedManifest();
+  const tree = computePreviewTree(distFiles);
+  Object.assign(manifest.preview, {
+    artifactId: 1,
+    fileCount: tree.fileCount,
+    treeSha256: tree.treeSha256,
+    ...overrides,
+  });
+  return manifest;
+}
+
+function acceptanceReceipt(overrides: Record<string, unknown> = {}) {
+  return {
+    schemaVersion: 1,
+    ok: true,
+    phase: 'ci',
+    impact: 'full',
+    manifestPath: 'acceptance/pass-72.json',
+    manifestSha256: MANIFEST_SHA256,
+    headSha: SOURCE_SHA,
+    releasePass: 'PASS 72',
+    errors: [],
+    approvalParity: { ok: true, paths: [], reason: 'only process/acceptance paths changed after preview' },
+    ...overrides,
+  };
+}
+
+describe('acceptance-receipt preview selector', () => {
+  it('selects the one manifest already validated by the acceptance gate', () => {
+    expect(selectPreviewManifestFromAcceptanceReceipt(acceptanceReceipt())).toEqual({
+      exempt: false,
+      manifestPath: 'acceptance/pass-72.json',
+      manifestSha256: MANIFEST_SHA256,
+      headSha: SOURCE_SHA,
+      releasePass: 'PASS 72',
+    });
+  });
+
+  it('skips GitHub access only for the exact green process-only exemption', async () => {
+    const receipt = {
+      schemaVersion: 1,
+      ok: true,
+      phase: 'ci',
+      impact: 'none',
+      exempt: true,
+      reason: 'process-only with no enforced pass manifest change',
+    };
+    await expect(verifyPreviewProvenanceFromAcceptanceReceipt({
+      acceptanceReceipt: receipt,
+      fetchImpl: (async () => { throw new Error('must not access GitHub'); }) as typeof fetch,
+    })).resolves.toMatchObject({
+      ok: true,
+      exempt: true,
+      kind: 'pr-preview-provenance-exempt',
+    });
+  });
+
+  it.each([
+    ['failed gate', acceptanceReceipt({ ok: false }), /must be green/],
+    ['wrong phase', acceptanceReceipt({ phase: 'release' }), /phase must be ci/],
+    ['unsafe path', acceptanceReceipt({ manifestPath: '../acceptance/pass-72.json' }), /manifestPath must be exactly/],
+    ['pass mismatch', acceptanceReceipt({ releasePass: 'PASS 71' }), /does not match releasePass/],
+    ['bad manifest digest', acceptanceReceipt({ manifestSha256: 'nope' }), /manifestSha256/],
+    ['failed parity', acceptanceReceipt({ approvalParity: { ok: false } }), /approvalParity must be green/],
+    ['near exemption', {
+      schemaVersion: 1,
+      ok: true,
+      phase: 'ci',
+      impact: 'none',
+      exempt: true,
+      reason: 'process-only, probably safe',
+    }, /exact process-only acceptance exemption/],
+    ['exemption with unrecognized state', {
+      schemaVersion: 1,
+      ok: true,
+      phase: 'ci',
+      impact: 'none',
+      exempt: true,
+      reason: 'process-only with no enforced pass manifest change',
+      errors: [],
+    }, /exact process-only acceptance exemption/],
+  ])('rejects %s instead of selecting or skipping provenance', (_label, receipt, expected) => {
+    expect(() => selectPreviewManifestFromAcceptanceReceipt(receipt)).toThrow(expected);
+  });
+});
+
 describe('Pass 66 immutable preview provenance', () => {
   it('binds the manifest, workflow head, embedded receipt, and recomputed dist bytes', async () => {
     const zip = previewZip();
@@ -243,6 +333,32 @@ describe('Pass 66 immutable preview provenance', () => {
       exactNameArtifactCount: 1,
       matchingLiveArtifactCount: 1,
     });
+  });
+
+  it('binds optional manifest artifact pins to the exact artifact and recomputed dist tree', async () => {
+    const zip = previewZip();
+    await expect(verify([artifact(1)], new Map([[1, zip]]), pinnedManifest()))
+      .resolves.toMatchObject({ ok: true, artifactId: 1, fileCount: 2 });
+
+    await expect(verify([artifact(1)], new Map([[1, zip]]), pinnedManifest({ artifactId: 2 })))
+      .rejects.toThrow(/does not match manifest preview\.artifactId 2/);
+    await expect(verify([artifact(1)], new Map([[1, zip]]), pinnedManifest({ fileCount: 99 })))
+      .rejects.toThrow(/manifest preview\.fileCount 99 does not match/);
+    await expect(verify([artifact(1)], new Map([[1, zip]]), pinnedManifest({ treeSha256: '0'.repeat(64) })))
+      .rejects.toThrow(/manifest preview\.treeSha256 .* does not match/);
+  });
+
+  it('requires all exact manifest pins together and uses artifactId to resolve same-name reruns', async () => {
+    const incomplete = acceptedManifest();
+    Object.assign(incomplete.preview, { artifactId: 1 });
+    expect(() => parsePreviewManifest(incomplete)).toThrow(/preview\.fileCount must be a positive safe integer/);
+
+    const zip = previewZip();
+    await expect(verify(
+      [artifact(1), artifact(2)],
+      new Map([[1, zip], [2, zip]]),
+      pinnedManifest({ artifactId: 2 }),
+    )).resolves.toMatchObject({ ok: true, artifactId: 2, exactNameArtifactCount: 2, matchingLiveArtifactCount: 1 });
   });
 
   it('follows the signed archive redirect without forwarding the GitHub token', async () => {

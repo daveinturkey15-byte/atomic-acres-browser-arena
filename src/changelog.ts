@@ -42,7 +42,21 @@ export function pass70ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
   });
 }
 
-const pass70ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+export function pass72ReleaseCopy(releasedAt: string): Readonly<{ summary: string; lineage: string }> {
+  const released = releasedAt !== PENDING_PRODUCTION_RELEASE;
+  return Object.freeze({
+    summary: released
+      ? 'Pass 72 adds host-authoritative private-lobby controls, combat corrections, teammate-scoped support-shot audio dispatch and squad presentation while preserving the tested release fallbacks.'
+      : 'Pass 72 is the mechanically gated publication candidate, adding host-authoritative private-lobby controls, combat corrections, teammate-scoped support-shot audio dispatch and squad presentation while preserving the tested release fallbacks.',
+    lineage: released
+      ? 'Pass 70 remains the exact previous live runtime, Pass 69 remains the immutable comparison build, and Pass 63 remains the stable WebGL fallback while public owner HITL for Pass 72 remains pending'
+      : 'Pass 70 remains the exact previous live runtime, Pass 69 remains the immutable comparison build, and Pass 63 remains the stable WebGL fallback; publication-first authorization is recorded and public owner HITL follows the protected Pages release',
+  });
+}
+
+const pass72ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+const pass72Copy = pass72ReleaseCopy(pass72ReleasedAt);
+const pass70ReleasedAt = '2026-08-16T19:32:01Z';
 const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
 
 /**
@@ -52,6 +66,24 @@ const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
  * the pending sentinel until the production workflow injects its build time.
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
+  Object.freeze({
+    id: 'pass72',
+    pass: 'PASS 72',
+    title: 'Pass 72 · Private Lobbies, Combat & Release Preservation',
+    releasedAt: pass72ReleasedAt,
+    areas: Object.freeze(['PRIVATE LOBBIES', 'COMBAT', 'SUPPORT', 'SQUADS', 'MULTIPLAYER', 'STABILITY']),
+    summary: pass72Copy.summary,
+    highlights: Object.freeze([
+      'Private lobbies default to Free For All with selectable Team Deathmatch, host-only reset-to-new-code authority and checkpoint invalidation that prevents stale-room reuse',
+      'Replicated squad names and colours improve presentation without replacing authoritative gameplay-team ownership or network validation',
+      'M14 EBR base / minimum body-damage values are exactly 37.2 / 24 while the 1.7 head multiplier remains unchanged; the fall-damage envelope is halved without weakening impact-speed thresholds, and flare collision radius is 0.24 metres',
+      'Carpet Bomber environment kills increment the victim death and publish a canonical map feed/diagnostic entry without awarding a player kill, while hosted explosive-crossbow glass breaking remains occlusion-aware and authoritative',
+      'Chopper and Drone support-shot audio dispatch reaches the owner and eligible Team Deathmatch teammates while HUD and tracer presentation stays owner-local and bounded',
+      'Multiplayer protocol 18 rejects cached protocol-17 peers before new squad or support-shot payloads can be silently dropped; death transitions are host-authored, guest-forged death packets are rejected, and initial guest identities in the map: and host-bot- namespaces are rejected before credential binding',
+      'The exact Pass 70 live runtime is pinned as a selectable previous channel; Pass 69, Pass 67.1 and Pass 63 remain preserved for comparison, stable testing and rollback',
+      pass72Copy.lineage,
+    ]),
+  }),
   Object.freeze({
     id: 'pass70',
     pass: 'PASS 70',
@@ -485,6 +517,6 @@ export function formatChangelogTimestampDetail(isoTimestamp: string): string {
 }
 
 export function lastUpdatedButtonLabel(entry: ChangelogEntry = latestChangelogEntry()): string {
-  if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) return 'CURRENT CANDIDATE · OWNER REVIEW PENDING';
+  if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) return 'CURRENT CANDIDATE · PUBLIC HITL AFTER RELEASE';
   return `LAST RELEASE · ${formatChangelogTimestamp(entry.releasedAt)}`;
 }

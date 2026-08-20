@@ -113,7 +113,9 @@ describe('Pass 65 playable killstreak integration', () => {
     const updateBlock = source.slice(updateStart, updateEnd);
     expect(updateBlock).toContain('killstreakRuntime.advance(now, killstreakWorldState())');
     expect(updateBlock).toContain('refreshLocalKillstreakSnapshot(now,');
-    expect(updateBlock).toContain('result.damageEvents.length > 0 || result.impactEvents.length > 0 || result.expiredEntityIds.length > 0');
+    expect(updateBlock).toContain('result.damageEvents.length > 0 || result.shotEvents.length > 0 || result.impactEvents.length > 0 || result.expiredEntityIds.length > 0');
+    expect(updateBlock).toContain('presentSupportShotAudio(');
+    expect(updateBlock).toContain('shots: result.shotEvents');
     expect(updateBlock.indexOf('killstreakRuntime.advance(now, killstreakWorldState())'))
       .toBeLessThan(updateBlock.indexOf('refreshLocalKillstreakSnapshot(now,'));
 

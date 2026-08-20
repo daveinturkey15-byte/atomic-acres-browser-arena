@@ -3331,7 +3331,7 @@
           "color": 10283775,
           "crouchRecoilMultiplier": 0.74,
           "crouchSpreadMultiplier": 0.7,
-          "damage": 62,
+          "damage": 37.2,
           "falloffEnd": 100,
           "falloffStart": 38,
           "fireKind": "hitscan",
@@ -3342,7 +3342,7 @@
           "limbMultiplier": 0.82,
           "mag": 20,
           "maximumSpread": 0.062,
-          "minimumDamage": 40,
+          "minimumDamage": 24,
           "movementMultiplier": 0.94,
           "movementSpreadMultiplier": 1.85,
           "muzzleFlashScale": 1.08,
@@ -4008,7 +4008,8 @@
       "pass68-m14-ebr-75-percent-wallbang-reduction-half-fire-rate",
       "pass68-flamethrower-triple-damage-and-five-second-ground-fire",
       "pass68-flare-gun-five-second-burn",
-      "pass68-adrenaline-instant-regen-restart-plus-one-hp-per-second"
+      "pass68-adrenaline-instant-regen-restart-plus-one-hp-per-second",
+      "pass72-m14-ebr-forty-percent-base-and-minimum-damage-reduction"
     ]
   }
 }

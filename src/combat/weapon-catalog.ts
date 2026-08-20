@@ -217,7 +217,9 @@ const RAW_B1_WEAPON_DEFINITIONS = [
   {
     id: 'm14-ebr', displayName: 'M14 EBR', slot: 'primary', family: 'marksman',
     fireKind: 'hitscan', fireMode: 'semi', rpm: 37, pellets: 1, spinUpMs: 0, movementMultiplier: 0.94,
-    damage: { policy: 'standard', base: 62, minimum: 40, falloffStartM: 38, falloffEndM: 100, headMultiplier: 1.7, limbMultiplier: 0.82 },
+    // Pass 72 balance correction: reduce the complete damage envelope by
+    // exactly 40%; range and hit-zone multipliers remain authored unchanged.
+    damage: { policy: 'standard', base: 37.2, minimum: 24, falloffStartM: 38, falloffEndM: 100, headMultiplier: 1.7, limbMultiplier: 0.82 },
     spread: { hipRadians: 0.032, adsMultiplier: 0.08, movementMultiplier: 1.85, standMultiplier: 1, crouchMultiplier: 0.7, proneMultiplier: 0.5, sustainedPerShot: 0.004, maximumRadians: 0.062 },
     recoil: { pitchRadians: 0.045, yawRadians: 0.012, recoveryPerSecond: 7.5, adsMultiplier: 0.62, standMultiplier: 1, crouchMultiplier: 0.74, proneMultiplier: 0.5, deterministicPatternId: 'm14-ebr-pattern-v1' },
     ammo: { magazine: 20, reserve: 80, reloadSeconds: 2.35, emptyReloadSeconds: 2.65, switchSeconds: 0.66 },

@@ -63,6 +63,7 @@ const contract = {
       'pass68-flamethrower-triple-damage-and-five-second-ground-fire',
       'pass68-flare-gun-five-second-burn',
       'pass68-adrenaline-instant-regen-restart-plus-one-hp-per-second',
+      'pass72-m14-ebr-forty-percent-base-and-minimum-damage-reduction',
     ],
     generatedBy: 'scripts/qa/generate-pass25a-baselines.ts',
     dependencies,

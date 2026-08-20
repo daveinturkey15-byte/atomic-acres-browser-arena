@@ -43,6 +43,11 @@ const snapshot = (changes: Partial<LobbySnapshot> = {}): LobbySnapshot => ({
 });
 
 describe('private match lobby', () => {
+  it('defaults new lobbies to FFA while retaining explicit TDM selection', () => {
+    expect(DEFAULT_PRIVATE_MATCH_CONFIG.mode).toBe('ffa');
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, mode: 'tdm' })).toBe(true);
+  });
+
   it('holds an identity through 89.9 seconds and expires it at 90 seconds on monotonic time', () => {
     expect(rejoinReservationExpired(1_000, 90_999)).toBe(false);
     expect(rejoinReservationExpired(1_000, 91_000)).toBe(true);

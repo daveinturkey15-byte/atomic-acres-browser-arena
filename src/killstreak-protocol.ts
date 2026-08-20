@@ -9,6 +9,7 @@ import type {
   KillstreakImpactEvent,
   KillstreakPlacementMarkerSnapshot,
   KillstreakRecipientSnapshot,
+  KillstreakSupportShotEvent,
 } from './killstreak-runtime';
 import {
   CARE_TARGET_MARKER_MAX_LIFETIME_MS,
@@ -21,6 +22,7 @@ import {
   MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD,
   MAX_REPLICATED_KILLSTREAK_STREAK,
   MAX_SUPPORT_IMPACT_EVENTS_PER_STEP,
+  MAX_SUPPORT_SHOT_EVENTS_PER_STEP,
   SUPPORT_TARGET_CORRIDOR_MAX_HALF_WIDTH_M,
   SUPPORT_TARGET_CORRIDOR_MAX_LENGTH_M,
 } from './killstreak-runtime';
@@ -99,6 +101,8 @@ export type KillstreakDamageResultMessage = Readonly<{
   matchEpoch: number;
   revision: number;
   events: readonly KillstreakDamageEvent[];
+  /** Public host-authored gun reports; unlike damage receipts these include admitted misses. */
+  shots: readonly KillstreakSupportShotEvent[];
   /** Public host-authored payload choreography, including no-damage impacts. */
   impacts: readonly KillstreakImpactEvent[];
   nonce: number;
@@ -432,6 +436,25 @@ function isDamageEvent(value: unknown): value is KillstreakDamageEvent {
     && finite(value.atMs, 0, Number.MAX_SAFE_INTEGER);
 }
 
+function supportShotEntityMatchesSource(event: KillstreakSupportShotEvent): boolean {
+  if (event.source === 'chopper') return /^ks-[0-9]+-chopper-[0-9]+$/.test(event.entityId);
+  if (event.source === 'piloted-drone') return /^ks-[0-9]+-pilot-drone-[0-9]+$/.test(event.entityId);
+  return /^ks-[0-9]+-swarm-drone-[0-9]+$/.test(event.entityId);
+}
+
+function isSupportShotEvent(value: unknown): value is KillstreakSupportShotEvent {
+  if (!object(value)
+    || !exactKeys(value, ['activationId', 'entityId', 'source', 'ownerId', 'ownerTeam', 'ordinal', 'atMs'])
+    || !activationId(value.activationId)
+    || !hostEntityId(value.entityId)
+    || (value.source !== 'chopper' && value.source !== 'piloted-drone' && value.source !== 'drone-swarm')
+    || !actorId(value.ownerId)
+    || (value.ownerTeam !== 0 && value.ownerTeam !== 1)
+    || !safeCounter(value.ordinal)
+    || !finite(value.atMs, 0, Number.MAX_SAFE_INTEGER)) return false;
+  return supportShotEntityMatchesSource(value as KillstreakSupportShotEvent);
+}
+
 function isImpactEvent(value: unknown): value is KillstreakImpactEvent {
   if (!object(value)) return false;
   if (!exactKeys(value, ['activationId', 'source', 'ordinal', 'phase', 'position', 'impactAtMs', 'atMs'])
@@ -541,10 +564,20 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
     return finite(value.nonce, 0, Number.MAX_SAFE_INTEGER);
   }
   if (value.type === 'killstreak-damage-result') {
-    return exactKeys(value, ['type', 'by', 'matchEpoch', 'revision', 'events', 'impacts', 'nonce'])
+    return exactKeys(value, ['type', 'by', 'matchEpoch', 'revision', 'events', 'shots', 'impacts', 'nonce'])
       && actorId(value.by) && safeCounter(value.matchEpoch) && safeCounter(value.revision)
       && Array.isArray(value.events) && value.events.length <= 64 && value.events.every(isDamageEvent)
       && new Set(value.events.map((event) => (event as KillstreakDamageEvent).resultId)).size === value.events.length
+      && Array.isArray(value.shots) && value.shots.length <= MAX_SUPPORT_SHOT_EVENTS_PER_STEP && value.shots.every(isSupportShotEvent)
+      && value.shots.every((shot) => {
+        const event = shot as KillstreakSupportShotEvent;
+        return event.entityId.startsWith(`ks-${Number(value.matchEpoch)}-`)
+          && event.activationId.startsWith(`ks-activation-${Number(value.matchEpoch)}-`);
+      })
+      && new Set(value.shots.map((shot) => {
+        const event = shot as KillstreakSupportShotEvent;
+        return `${event.entityId}:${event.ordinal}`;
+      })).size === value.shots.length
       && Array.isArray(value.impacts) && value.impacts.length <= MAX_SUPPORT_IMPACT_EVENTS_PER_STEP && value.impacts.every(isImpactEvent)
       && new Set(value.impacts.map((impact) => {
         const event = impact as KillstreakImpactEvent;
@@ -560,7 +593,8 @@ export function killstreakMessageBelongsToPlayer(message: KillstreakProtocolMess
   if (message.type === 'killstreak-care-capture-result') return message.by === playerId || message.forPlayerId === playerId;
   if (message.type === 'killstreak-state') return message.by === playerId || message.forPlayerId === playerId;
   if (message.type === 'killstreak-carpet-fire-state') return message.by === playerId || message.forPlayerId === playerId;
-  if (message.type === 'killstreak-damage-result') return message.impacts.length > 0
+  if (message.type === 'killstreak-damage-result') return message.shots.length > 0
+    || message.impacts.length > 0
     || message.by === playerId
     || message.events.some((event) => event.ownerId === playerId || event.targetId === playerId);
   return message.by === playerId;

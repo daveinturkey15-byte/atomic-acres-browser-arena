@@ -98,9 +98,9 @@ export default defineConfig({
     // Release evidence runners opt into an owned server and fail if the port
     // is already occupied. Ordinary developer runs retain convenient reuse.
     reuseExistingServer: requireOwnedFreshPreview ? false : !process.env.CI,
-    // Windows CI hosted runners routinely exceed 30s to build+start the Vite
-    // preview (observed 55s+ on an uncontended run); give the owned server the
-    // same SwiftShader-style headroom as the boot timeouts.
-    timeout: 60000,
+    // Windows CI hosted runners routinely exceed 60s to build+start the Vite
+    // preview (the exact hosted failure was the old 60s ceiling); give the
+    // owned server bounded headroom without changing the 60s test timeout.
+    timeout: 180000,
   },
 });

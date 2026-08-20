@@ -8,6 +8,7 @@ import {
 } from './gun-range-match-clock-authority';
 import { GUN_RANGE_ROUND_MS } from './gun-range-rules';
 import type { GunRangeTestBayDoorState } from './gun-range-test-bay';
+import { isSquadColor, isSquadName, type SquadColor } from './squad-presentation';
 
 export const ROOM_CAPACITIES = [4, 6] as const;
 export type RoomCapacity = typeof ROOM_CAPACITIES[number];
@@ -32,6 +33,9 @@ export type LobbyMember = Readonly<{
   connected: boolean;
   pingMs: number | null;
   dhv: Dhv;
+  /** Presentation-only squad identity; team remains the authority boundary. */
+  squadName?: string;
+  squadColor?: SquadColor;
 }>;
 
 export type PlayerScore = Readonly<{
@@ -61,7 +65,9 @@ export type LobbySnapshot = Readonly<{
 
 export const DEFAULT_PRIVATE_MATCH_CONFIG: PrivateMatchConfig = Object.freeze({
   arenaId: 'atomic-acres',
-  mode: 'tdm',
+  // FFA is the least surprising lobby default. Team Deathmatch remains an
+  // explicit host selection and still owns team balancing/colour semantics.
+  mode: 'ffa',
   capacity: 4,
   hostedBotCount: 0,
   autoBalance: true,
@@ -119,6 +125,8 @@ export function isLobbyMember(value: unknown): value is LobbyMember {
     && typeof member.ready === 'boolean'
     && typeof member.connected === 'boolean'
     && isDhv(member.dhv)
+    && (member.squadName === undefined || isSquadName(member.squadName))
+    && (member.squadColor === undefined || isSquadColor(member.squadColor))
     && (member.pingMs === null || Number.isFinite(member.pingMs) && Number(member.pingMs) >= 0 && Number(member.pingMs) <= MAX_CLOCK_RTT_MS);
 }
 

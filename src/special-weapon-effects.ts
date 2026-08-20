@@ -11,7 +11,10 @@ export const FLAMETHROWER_EFFECT = Object.freeze({
 export const FLARE_PROJECTILE_EFFECT = Object.freeze({
   speedMps: 52,
   gravityMps2: 5.4,
-  collisionRadiusM: 0.16,
+  // The projectile reads as a substantial signal round in flight. This radius
+  // is shared by host sweep and presentation admission; it is not splash
+  // damage and never bypasses the world collision fraction.
+  collisionRadiusM: 0.24,
   maximumFlightMs: 5_500,
   burnDurationMs: 5_000,
   directDamage: 42,

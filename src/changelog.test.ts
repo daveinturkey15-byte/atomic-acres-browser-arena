@@ -6,18 +6,20 @@ import {
   lastUpdatedButtonLabel,
   latestChangelogEntry,
   pass70ReleaseCopy,
+  pass72ReleaseCopy,
   PENDING_PRODUCTION_RELEASE,
   resolveProductionReleasedAt,
 } from './changelog';
 
 describe('changelog', () => {
-  it('keeps the pending Pass 70 release first and freezes the published Pass 69 timestamp', () => {
+  it('keeps the pending Pass 72 release first and freezes the published Pass 70 and Pass 69 timestamps', () => {
     expect(CHANGELOG.length).toBeGreaterThan(0);
     const latest = latestChangelogEntry();
-    expect(latest.id).toBe('pass70');
+    expect(latest.id).toBe('pass72');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
-    expect(latest.title).toContain('Pass 70');
-    expect(latest.summary).toContain('Pass 70');
+    expect(latest.title).toContain('Pass 72');
+    expect(latest.summary).toContain('Pass 72');
+    expect(CHANGELOG.find((entry) => entry.id === 'pass70')?.releasedAt).toBe('2026-08-16T19:32:01Z');
     expect(CHANGELOG.find((entry) => entry.id === 'pass69')?.releasedAt).toBe('2026-08-10T21:19:47Z');
     expect(formatChangelogTimestamp('2026-07-22T15:43:16+01:00')).toBe('22 JUL 2026 · 15:43 BST');
     expect(formatChangelogTimestampDetail('2026-07-22T15:43:16+01:00')).toBe(
@@ -27,7 +29,17 @@ describe('changelog', () => {
     expect(formatChangelogTimestampDetail('2026-07-23T22:51:43Z')).toBe(
       '23 JUL 2026 · 23:51 BST · UTC+1 · 23:51:43',
     );
-    expect(lastUpdatedButtonLabel(latest)).toBe('CURRENT CANDIDATE · OWNER REVIEW PENDING');
+    expect(lastUpdatedButtonLabel(latest)).toBe('CURRENT CANDIDATE · PUBLIC HITL AFTER RELEASE');
+    expect(latest.highlights.join('\n')).toContain('base / minimum body-damage values are exactly 37.2 / 24');
+    expect(latest.highlights.join('\n')).toContain('1.7 head multiplier remains unchanged');
+    expect(latest.highlights.join('\n')).toContain('owner and eligible Team Deathmatch teammates');
+    expect(latest.highlights.join('\n')).toContain('Multiplayer protocol 18 rejects cached protocol-17 peers');
+    expect(latest.highlights.join('\n')).toContain('death transitions are host-authored');
+    expect(latest.highlights.join('\n')).toContain('initial guest identities in the map: and host-bot- namespaces are rejected before credential binding');
+    expect(latest.highlights.join('\n')).toContain('Carpet Bomber environment kills increment the victim death');
+    expect(latest.highlights.join('\n')).toContain('without awarding a player kill');
+    expect(latest.highlights.join('\n')).not.toContain('37.2 body / 24 head');
+    expect(latest.highlights.join('\n')).not.toContain('teammate-visible');
   });
 
   it('uses the successful production promotion rather than implementation time', () => {
@@ -68,7 +80,17 @@ describe('changelog', () => {
       .toThrow('Invalid VITE_RELEASED_AT');
   });
 
-  it('keeps Pass 70 candidate and timestamped production copy mutually truthful', () => {
+  it('keeps Pass 72 candidate and timestamped production copy mutually truthful', () => {
+    expect(pass72ReleaseCopy(PENDING_PRODUCTION_RELEASE)).toMatchObject({
+      summary: expect.stringContaining('mechanically gated publication candidate'),
+      lineage: expect.stringContaining('publication-first authorization'),
+    });
+    expect(pass72ReleaseCopy(PENDING_PRODUCTION_RELEASE).lineage).toContain('public owner HITL follows');
+    expect(pass72ReleaseCopy(PENDING_PRODUCTION_RELEASE).summary).not.toContain('owner-review candidate');
+    const released72 = pass72ReleaseCopy('2026-08-20T08:00:00Z');
+    expect(released72.summary).not.toContain('candidate');
+    expect(released72.lineage).toContain('public owner HITL for Pass 72 remains pending');
+    expect(released72.lineage).not.toContain('until this exact candidate is approved');
     expect(pass70ReleaseCopy(PENDING_PRODUCTION_RELEASE)).toMatchObject({
       summary: expect.stringContaining('local owner-review candidate'),
       lineage: expect.stringContaining('until this exact candidate is approved'),

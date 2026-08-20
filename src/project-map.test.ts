@@ -25,9 +25,9 @@ describe('project map', () => {
   it('keeps the current snapshot first and the complete older history in the archive', () => {
     const bundle = createProjectMapBundle('2026-07-24T17:00:00Z');
     expect(bundle.current.release).toEqual(PROJECT_MAP_RELEASE);
-    expect(bundle.current.previousRelease).toBe('PASS 69');
+    expect(bundle.current.previousRelease).toBe('PASS 70');
     expect(bundle.archive).toEqual(CHANGELOG);
-    // The current snapshot replaces the pending PASS 70 ledger entry at the
+    // The current snapshot replaces the pending PASS 72 ledger entry at the
     // front of the combined changes list instead of duplicating the pass.
     expect(bundle.changes).toEqual([
       PROJECT_MAP_RELEASE,
@@ -35,7 +35,7 @@ describe('project map', () => {
     ]);
     expect(bundle.current.releaseState).toBe('release-candidate');
     expect(bundle.publishedChannels.liveTarget).toMatchObject({
-      pass: 'PASS 70', label: 'PASS 70', path: 'channels/the-big-one', state: 'release-candidate',
+      pass: 'PASS 72', label: 'PASS 72', path: 'channels/the-big-one', state: 'release-candidate',
     });
     expect(bundle.publishedChannels.failedRegressionEvidence).toMatchObject({
       pass: 'PASS 64', role: 'published-failed-regression-evidence',
@@ -50,14 +50,19 @@ describe('project map', () => {
 
   it('keeps candidate and timestamped-production release copy mutually truthful', () => {
     expect(projectMapReleaseCopy('PENDING_PRODUCTION')).toMatchObject({
-      summary: expect.stringContaining('current local HITL candidate'),
-      approvalHighlight: expect.stringContaining('Owner approval remains pending'),
+      summary: expect.stringContaining('mechanically gated publication candidate'),
+      approvalHighlight: expect.stringContaining('publication-first authorization'),
     });
+    const candidate = projectMapReleaseCopy('PENDING_PRODUCTION');
+    expect(candidate.approvalHighlight).toContain('did not inspect');
+    expect(candidate.approvalHighlight).toContain('public owner HITL follows');
+    expect(candidate.approvalHighlight).not.toContain('Owner approval remains pending');
     const released = projectMapReleaseCopy('2026-08-09T20:00:00Z');
     expect(released.summary).toContain('current released build');
-    expect(released.summary).not.toContain('local HITL candidate');
-    expect(released.approvalHighlight).toContain('was promoted only after approval');
-    expect(released.approvalHighlight).not.toContain('remains pending');
+    expect(released.summary).not.toContain('publication candidate');
+    expect(released.approvalHighlight).toContain('publication-first authorization');
+    expect(released.approvalHighlight).toContain('public owner HITL remains pending');
+    expect(released.approvalHighlight).not.toContain('approval of its immutable preview');
   });
 
   it('serializes agent JSON and human Markdown from the same bundle', () => {
@@ -71,7 +76,7 @@ describe('project map', () => {
     expect(markdown.indexOf('## Current release snapshot')).toBeLessThan(markdown.indexOf('## Release archive'));
     expect(markdown).toContain(`### ${CHANGELOG[0]?.pass}: ${CHANGELOG[0]?.title}`);
     expect(markdown).toContain('TypeScript and Rapier own physics');
-    expect(markdown).toMatch(/Live target: PASS 70 \(PASS 70\); release-candidate/);
+    expect(markdown).toMatch(/Live target: PASS 72 \(PASS 72\); release-candidate/);
     expect(markdown).toContain('Failed-regression evidence: PASS 64');
   });
 

@@ -10,6 +10,7 @@ import {
 } from './protocol';
 import { pingMatchesBoundTeam, shouldRelayMessageToTeam } from './social-ping';
 import { clientRuntimeLogEntryFromError, type ClientRuntimeLogEntry } from './client-runtime-log';
+import { isReservedMultiplayerParticipantId } from './participant-identity';
 
 export type NetworkRole = 'offline' | 'host' | 'client';
 
@@ -306,6 +307,12 @@ export function initialLobbyJoinHasProtocolMismatch(payload: unknown): boolean {
     && !isGameMessage(payload));
 }
 
+export function initialLobbyJoinUsesReservedParticipantId(payload: unknown): boolean {
+  return Boolean(payload && typeof payload === 'object'
+    && (payload as { type?: unknown }).type === 'lobby-join'
+    && isReservedMultiplayerParticipantId((payload as { playerId?: unknown }).playerId));
+}
+
 export function replaceGuestPeerOwner(
   owners: Map<string, string>,
   playerId: string,
@@ -537,6 +544,19 @@ export class ArenaNetwork {
     // have it saved rejoin the same lobby. Fresh hosts may fall back to a random
     // room, but recovery retains the exact ID throughout its bounded retries.
     this.startHostPeer(attempt, onReady, preferred, recoveryRequired, 0);
+  }
+
+  /**
+   * Intentionally invalidate the current host room and start a fresh one.
+   * This is deliberately separate from crash recovery: recovery preserves the
+   * room code and retained authority, while a reset closes every old channel
+   * and admits nobody from the invalidated room.
+   */
+  resetLobby(onReady: () => void): boolean {
+    if (this.role !== 'host' || this.manualClose) return false;
+    this.close();
+    this.host(onReady);
+    return true;
   }
 
   private startHostPeer(
@@ -928,6 +948,10 @@ export class ArenaNetwork {
     const transportGeneration = connectionTransportGeneration(connection);
     const pendingStateKey = pendingStateConnectionKey(connection.peer, transportEpoch, transportGeneration);
     connection.on('data', (payload) => {
+      if (!playerId && initialLobbyJoinUsesReservedParticipantId(payload)) {
+        this.rejectConnection(connection, 'rejoin-denied');
+        return;
+      }
       if (!isGameMessage(payload)) {
         if (!playerId && initialLobbyJoinHasProtocolMismatch(payload)) {
           this.rejectConnection(connection, 'protocol-mismatch');

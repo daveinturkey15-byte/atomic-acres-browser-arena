@@ -49,10 +49,10 @@ export type ProjectMapBundle = Readonly<{
 }>;
 
 /**
- * The project map describes the active review candidate or the same bytes after
+ * The project map describes the active publication candidate or the same bytes after
  * protected timestamp injection. Keeping this copy state-aware prevents either
- * an unpublished pass claiming to be live or a promoted build claiming approval
- * is still pending.
+ * an unpublished pass claiming to be live or a publication-first release
+ * claiming that owner HITL already happened.
  */
 export function projectMapReleaseCopy(releasedAt: string): Readonly<{
   summary: string;
@@ -61,11 +61,11 @@ export function projectMapReleaseCopy(releasedAt: string): Readonly<{
   const released = releasedAt !== PENDING_PRODUCTION_RELEASE;
   return Object.freeze({
     summary: released
-      ? 'Pass 70 is the current released build for first-person combat, support, Gun Range, loadout and multiplayer improvements; the stable Pass 63 WebGL fallback stays frozen.'
-      : 'Pass 70 is the current local HITL candidate for first-person combat, support, Gun Range, loadout and multiplayer improvements; the stable Pass 63 WebGL fallback stays frozen.',
+      ? 'Pass 72 is the current released build for private lobbies, combat corrections, support presentation and squad metadata; the exact Pass 70 previous-live channel and stable Pass 63 WebGL fallback stay frozen.'
+      : 'Pass 72 is the mechanically gated publication candidate for private lobbies, combat corrections, support presentation and squad metadata; the exact Pass 70 previous-live channel and stable Pass 63 WebGL fallback stay frozen.',
     approvalHighlight: released
-      ? 'Pass 70 was promoted only after approval of its immutable preview'
-      : 'Owner approval remains pending on the immutable Pass 70 preview',
+      ? 'Pass 72 was published under Dave\'s publication-first authorization after mechanical gates; public owner HITL remains pending'
+      : 'Dave\'s publication-first authorization is recorded; he did not inspect the immutable Pass 72 preview and public owner HITL follows protected publication',
   });
 }
 
@@ -73,18 +73,18 @@ const projectMapReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELE
 const projectMapCopy = projectMapReleaseCopy(projectMapReleasedAt);
 
 export const PROJECT_MAP_RELEASE: ChangelogEntry = Object.freeze({
-  id: 'pass70',
+  id: 'pass72',
   pass: PASS66_RELEASE_IDENTITY.pass,
-  title: 'Pass 70',
+  title: 'Pass 72',
   releasedAt: projectMapReleasedAt,
-  areas: Object.freeze(['FIRST-PERSON', 'SUPPORT', 'MULTIPLAYER', 'GUN RANGE', 'LOADOUT', 'HITL']),
+  areas: Object.freeze(['PRIVATE LOBBIES', 'COMBAT', 'SUPPORT', 'SQUADS', 'MULTIPLAYER', 'HITL']),
   summary: projectMapCopy.summary,
   highlights: Object.freeze([
-    'Opaque weapon bodies retain only their authored clear lens and reticle corridors, with connected hands and bounded wall or prone contact poses',
-    'Railgun and Chopper Gunner presentation has explicit activation, firing, death, match-end and exit cleanup rather than persistent overlays',
-    'The secure test bay shares visible, movement, Rapier and ballistic structure authority while its timer freezes only inside the room',
-    'Field Kit cards and the Manage/Rename inspector share one desktop/mobile DPS and five-stat projection with verified selected and save states',
-    'Multiplayer pickup, recovery, duration, accessibility and soak contracts are corrected against the immutable Pass 69 comparison evidence',
+    'Private lobbies default to Free For All with selectable Team Deathmatch, host-only reset-to-new-code authority and checkpoint invalidation',
+    'Replicated squad names and colours improve presentation without replacing authoritative gameplay-team ownership or network validation',
+    'M14 EBR damage, fall-damage envelope and flare collision radius now use the exact Pass 72 balance contract',
+    'Carpet Bomber environment attribution, hosted occlusion-aware crossbow glass breaking and support-shot audio dispatch for the owner and eligible Team Deathmatch teammates remain bounded and authoritative',
+    'The release chooser preserves exact Pass 70, Pass 69, Pass 67.1 and Pass 63 evidence paths for comparison and rollback',
     projectMapCopy.approvalHighlight,
     'Pass 63 stays frozen as the selectable stable WebGL fallback',
   ]),

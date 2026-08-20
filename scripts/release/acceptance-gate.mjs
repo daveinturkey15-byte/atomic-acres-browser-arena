@@ -22,6 +22,20 @@ const LOCAL_EVIDENCE = new Set(['unit', 'contract', 'browser', 'trace']);
 const MECHANICAL_EVIDENCE = new Set(['unit', 'contract', 'browser', 'trace']);
 const ACCEPTANCE_TYPES = new Set(['mechanical', 'visual', 'human', 'mixed']);
 const REQUIREMENT_STATES = new Set(['verified', 'deferred']);
+const HUMAN_ACCEPTANCE_KINDS = new Set(['preview-approval', 'standing-publication-authorization']);
+const STANDING_PUBLICATION_AUTHORIZATION = 'standing-publication-authorization';
+const STRUCTURED_AUTHORIZATION_FROM_PASS = 72;
+const EXACT_PREVIEW_PINS_FROM_PASS = 72;
+const SHA256 = /^[0-9a-f]{64}$/;
+const STANDING_RELEASE_DECISION = Object.freeze({
+  state: 'publication-authorized',
+  condition: 'all-required-mechanical-gates-green',
+  ownerHitl: 'deferred-until-public-pages',
+});
+const POST_PREVIEW_SHIPPING_CONTROLS = Object.freeze([
+  /^\.github\/workflows\/release-production\.ya?ml$/,
+  /^scripts\/release\/stage-release-topology\.mjs$/,
+]);
 
 function parseArgs(argv) {
   const values = {};
@@ -80,12 +94,40 @@ function changedPaths(base, head) {
     .map((path) => path.replaceAll('\\', '/'));
 }
 
-function changedManifestPaths(base, head, policy) {
+export function committedManifestBytes(worktreeBytes, headBytes, manifestPath, head) {
+  if (!Buffer.isBuffer(worktreeBytes) || !Buffer.isBuffer(headBytes)) {
+    throw new Error('acceptance manifest comparison requires exact byte buffers');
+  }
+  if (!worktreeBytes.equals(headBytes)) {
+    throw new Error(`${manifestPath} worktree bytes differ from committed ${head}; acceptance receipts may use only committed manifest bytes`);
+  }
+  return headBytes;
+}
+
+function readCommittedManifest(manifestPath, head) {
+  if (!SHA40.test(head ?? '')) throw new Error('acceptance manifest binding requires one exact --head SHA');
+  try {
+    return execFileSync('git', ['-C', REPOSITORY_ROOT, 'show', `${head}:${manifestPath}`]);
+  } catch (error) {
+    throw new Error(`cannot read committed acceptance manifest ${manifestPath} at ${head}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function enforcedManifestPaths(paths, policy) {
   const pattern = new RegExp(`^${policy.manifestDirectory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\/pass-([1-9][0-9]*)\\.json$`);
-  return changedPaths(base, head).filter((path) => {
+  return paths.filter((path) => {
     const match = pattern.exec(path);
     return match && Number(match[1]) >= policy.enforceFromPass;
   });
+}
+
+export function assertCiImpactMatchesPaths(impact, paths) {
+  if (!['none', 'smoke', 'full'].includes(impact)) throw new Error('--impact must be none, smoke, or full');
+  const actual = classifyPaths(paths);
+  if (actual.mode !== impact) {
+    throw new Error(`CI impact ${impact} does not match independently classified ${actual.mode} (${actual.reason})`);
+  }
+  return actual;
 }
 
 function validateEvidence(requirement, errors, policy) {
@@ -177,10 +219,70 @@ export function validateAcceptanceManifest(manifest, options = {}) {
       errors.push('GitHub Actions preview ref must be pr-preview-<pr>-<sourceSha> and match preview.sourceSha');
     }
   }
+  const hasAnyExactPreviewPin = preview && ['artifactId', 'fileCount', 'treeSha256']
+    .some((field) => preview[field] !== undefined);
+  const requiresExactPreviewPins = number !== null && number >= EXACT_PREVIEW_PINS_FROM_PASS;
+  if (requiresExactPreviewPins && preview?.kind !== 'github-actions-artifact') {
+    errors.push(`PASS ${EXACT_PREVIEW_PINS_FROM_PASS}+ requires a GitHub Actions preview artifact`);
+  }
+  if (requiresExactPreviewPins || hasAnyExactPreviewPin) {
+    if (!Number.isSafeInteger(preview?.artifactId) || preview.artifactId <= 0
+      || !Number.isSafeInteger(preview?.fileCount) || preview.fileCount <= 0
+      || !SHA256.test(preview?.treeSha256 ?? '')) {
+      errors.push('preview exact pins require a positive artifactId, positive fileCount, and lowercase SHA-256 treeSha256');
+    }
+  }
   const approval = manifest.humanAcceptance;
   if (!approval || approval.state !== 'approved' || approval.approvedBy !== policy.ownerHandle
     || !isIsoDate(approval.approvedAt) || !nonEmpty(approval.evidence)) {
     errors.push(`humanAcceptance must be approved by ${policy.ownerHandle} with timestamped evidence`);
+  }
+  const approvalKind = approval?.kind;
+  const standingPublicationAuthorization = approvalKind === STANDING_PUBLICATION_AUTHORIZATION;
+  if (number !== null && number >= STRUCTURED_AUTHORIZATION_FROM_PASS && !HUMAN_ACCEPTANCE_KINDS.has(approvalKind)) {
+    errors.push(`PASS ${STRUCTURED_AUTHORIZATION_FROM_PASS}+ requires an explicit structured humanAcceptance.kind`);
+  }
+  if (approvalKind !== undefined && !HUMAN_ACCEPTANCE_KINDS.has(approvalKind)) {
+    errors.push('humanAcceptance.kind must be preview-approval or standing-publication-authorization');
+  }
+  if (approvalKind === 'preview-approval' && approval.previewInspection !== 'performed') {
+    errors.push('preview-approval requires humanAcceptance.previewInspection to be performed');
+  }
+  if (standingPublicationAuthorization) {
+    if (approval.previewInspection !== 'not-performed') {
+      errors.push('standing-publication-authorization requires humanAcceptance.previewInspection to be not-performed');
+    }
+    const decision = manifest.releaseDecision;
+    if (!decision || decision.state !== STANDING_RELEASE_DECISION.state
+      || decision.condition !== STANDING_RELEASE_DECISION.condition
+      || decision.ownerHitl !== STANDING_RELEASE_DECISION.ownerHitl) {
+      errors.push('standing-publication-authorization requires the exact publication-authorized, mechanically-gated, public-HITL-deferred releaseDecision');
+    }
+    const evidence = nonEmpty(approval.evidence) ? approval.evidence.toLowerCase() : '';
+    const bindsPublicationFirst = /\bpublication[- ]first\b/.test(evidence)
+      || /\bstanding\b/.test(evidence) && /\bpublication\b/.test(evidence);
+    const explicitlyDisclaimsInspection = /\b(?:did\s+not|has\s+not|was\s+not)\b/.test(evidence)
+      && /\b(?:inspect(?:ed|ion)?|test(?:ed|ing)?|review(?:ed)?)\b/.test(evidence)
+      && /\bpreview\b/.test(evidence);
+    if (!bindsPublicationFirst || !explicitlyDisclaimsInspection) {
+      errors.push('standing-publication-authorization evidence must bind publication-first authority and explicitly state that Dave did not inspect or test the immutable preview');
+    }
+    const hasDeferredPublicHitl = Array.isArray(manifest.requirements) && manifest.requirements.some((requirement) => {
+      if (requirement?.state !== 'deferred' || requirement.acceptance !== 'human') return false;
+      const description = [
+        requirement.summary,
+        requirement.expected,
+        requirement.deferApproval?.reason,
+      ].filter(nonEmpty).join(' ');
+      return /\bpublic\b/i.test(description) && /\bhitl\b/i.test(description);
+    });
+    if (!hasDeferredPublicHitl) {
+      errors.push('standing-publication-authorization requires an explicitly deferred human public-HITL requirement');
+    }
+    if (isIsoDate(manifest.feedbackReceivedAt) && isIsoDate(approval.approvedAt)
+      && Date.parse(approval.approvedAt) < Date.parse(manifest.feedbackReceivedAt)) {
+      errors.push('standing publication authorization cannot precede feedbackReceivedAt');
+    }
   }
   if (manifest.releasePass === 'PASS 66' && approval && nonEmpty(approval.evidence)) {
     const evidence = approval.evidence.toLowerCase();
@@ -192,7 +294,8 @@ export function validateAcceptanceManifest(manifest, options = {}) {
       errors.push('PASS 66 humanAcceptance.evidence must bind Dave\'s standing conditional authorization and explicitly state that he did not inspect or test the immutable preview');
     }
   }
-  if (preview && approval && isIsoDate(preview.createdAt) && isIsoDate(approval.approvedAt)
+  if (!standingPublicationAuthorization && preview && approval
+    && isIsoDate(preview.createdAt) && isIsoDate(approval.approvedAt)
     && Date.parse(approval.approvedAt) < Date.parse(preview.createdAt)) {
     errors.push('humanAcceptance.approvedAt cannot precede preview.createdAt');
   }
@@ -310,6 +413,15 @@ export function classifyPreviewDelta(paths, manifestPath, previewSha = null, opt
         reason: `Pass 66 post-preview delta differs from the exact finalizer output set (missing=${missing.join(',') || '<none>'}; unexpected=${unexpected.join(',') || '<none>'})`,
       };
   }
+  const shippingControlPaths = normalizedPaths.filter((path) => POST_PREVIEW_SHIPPING_CONTROLS
+    .some((pattern) => pattern.test(path)));
+  if (shippingControlPaths.length > 0) {
+    return {
+      ok: false,
+      paths: shippingControlPaths,
+      reason: `production shipping controls changed after preview (${shippingControlPaths.join(',')})`,
+    };
+  }
   // Test sources never enter the shipped Vite tree. They must still classify
   // as full CI impact in change-impact.mjs so the edited gate is exercised,
   // but correcting a non-shipping assertion must not invalidate approval of
@@ -361,7 +473,9 @@ export function evaluateAcceptance(values) {
     if (!/^[0-9a-f]{40}$/.test(values.base ?? '') || !/^[0-9a-f]{40}$/.test(head)) {
       throw new Error('CI acceptance needs full --base and --head SHAs');
     }
-    const manifests = changedManifestPaths(values.base, head, policy);
+    const paths = changedPaths(values.base, head);
+    assertCiImpactMatchesPaths(values.impact, paths);
+    const manifests = enforcedManifestPaths(paths, policy);
     manifestPath = selectCiAcceptanceManifest(values.impact, manifests);
     if (manifestPath === null) {
       return {
@@ -391,7 +505,13 @@ export function evaluateAcceptance(values) {
 
   const absolute = join(REPOSITORY_ROOT, manifestPath);
   if (!existsSync(absolute)) throw new Error(`acceptance manifest does not exist: ${manifestPath}`);
-  const bytes = readFileSync(absolute);
+  const worktreeBytes = readFileSync(absolute);
+  const bytes = committedManifestBytes(
+    worktreeBytes,
+    readCommittedManifest(manifestPath, head),
+    manifestPath,
+    head,
+  );
   const manifest = JSON.parse(bytes.toString('utf8'));
   if (releasePass && manifest.releasePass !== releasePass) {
     throw new Error(`${manifestPath} declares ${manifest.releasePass}, expected ${releasePass}`);

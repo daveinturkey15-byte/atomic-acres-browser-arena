@@ -56,4 +56,10 @@ describe('release change impact', () => {
     expect(output.windows_groups.split(',')).not.toContain('pass64-hud-contracts');
     expect(output.linux_groups.split(',')).toContain('pass64-hud-contracts');
   });
+
+  it('runs the Pass 72 correction evidence on both full-impact operating systems', () => {
+    const output = outputsFor(classifyPaths(['src/network.ts']));
+    expect(output.windows_groups.split(',')).toContain('pass72-corrections');
+    expect(output.linux_groups.split(',')).toContain('pass72-corrections');
+  });
 });

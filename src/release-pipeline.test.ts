@@ -41,28 +41,29 @@ describe('production release workflow', () => {
     expect(workflow).not.toContain('git config --global');
   });
 
-  it('stages live Pass 70, retained Pass 69, stable Pass 67.1 and rollback Pass 63 before a complete publish', () => {
+  it('stages live Pass 72, previous Pass 70, retained Pass 69, stable Pass 67.1 and rollback Pass 63 before a complete publish', () => {
     expect(workflow).toContain('npm run stage:release-topology');
     expect(workflow).toContain('npm run verify:release-topology');
     expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}');
     expect(workflow).toContain('RELEASE_PASS: ${{ inputs.release_pass }}');
     expect(workflow).toContain('RELEASE_ROLLBACK_DIST: ${{ env.RELEASE_ROLLBACK_DIST }}');
-    expect(workflow).toContain('git worktree add artifacts/pass63-rollback-src ac85e9b8b46cc2370aee903d564ecf3c4682b24c');
+    expect(workflow).toContain('git worktree add artifacts/pass63-rollback-src "$rollback_source_sha"');
     expect(workflow).not.toContain('stage:stable-channel');
-    expect(workflow).toContain('Stage live Pass 70, exact retained Pass 69, rebuilt Pass 67.1 and Pass 63 rollback');
+    expect(workflow).toContain('Stage live Pass 72, exact previous Pass 70, retained Pass 69, rebuilt Pass 67.1 and Pass 63 rollback');
     expect(workflow).toContain('RETAINED_PAGES_SHA=$(node -e');
     expect(readFileSync('package.json', 'utf8')).toContain('"deploy:ci": "gh-pages -d dist"');
     expect(readFileSync('package.json', 'utf8')).not.toContain('"deploy:ci": "gh-pages -d dist --add"');
   });
 
-  it('verifies public Pass 70, retained Pass 69 and Pass 63 choices while retaining internal stable provenance', () => {
-    expect(staticTopologyVerifier).toContain("const expectedChannelKeys = rollbackStaged ? ['experimental', 'retained', 'stable'] : ['experimental', 'retained'];");
+  it('verifies public Pass 72, previous Pass 70, retained Pass 69 and Pass 63 choices while retaining internal stable provenance', () => {
+    expect(staticTopologyVerifier).toContain("['experimental', 'previous', 'retained', 'stable']");
+    expect(staticTopologyVerifier).toContain("['experimental', 'previous', 'retained']");
     expect(staticTopologyVerifier).toContain('publicConfig.retained.pass !== config.retained.pass');
     expect(staticTopologyVerifier).toContain('publicConfig.stable.pass !== config.rollback.pass');
-    expect(liveTopologyVerifier).toContain('await buttons.count() !== 3');
-    expect(liveTopologyVerifier).toContain("for (const choice of ['experimental', 'retained', 'stable'])");
+    expect(liveTopologyVerifier).toContain('await buttons.count() !== 4');
+    expect(liveTopologyVerifier).toContain("for (const choice of ['experimental', 'previous', 'retained', 'stable'])");
     expect(liveTopologyVerifier).toContain("await verifyChoice('retained', 'channels/pass69-retained', 'PASS 69', 'pass69');");
-    expect(liveTopologyVerifier).toContain("await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63');");
+    expect(liveTopologyVerifier).toContain("await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63', expectedRollbackReleasedAt);");
     expect(liveTopologyVerifier).not.toContain("await verifyChoice('rollback'");
   });
 
@@ -84,8 +85,18 @@ describe('production release workflow', () => {
     expect(workflow).toContain('Rebuild Pass 67.1 stable with its original Pages publication timestamp');
     expect(workflow).toContain('VITE_RELEASED_AT="$stable_released_at"');
     expect(workflow).toContain('REQUIRE_STABLE_RELEASE_TIMESTAMP: \'1\'');
+    expect(workflow).toContain('Rebuild Pass 63 rollback with its original Pages publication timestamp');
+    expect(workflow).toContain('rollback_pages_sha="$(node -e');
+    expect(workflow).toContain('VITE_RELEASED_AT="$rollback_released_at"');
+    expect(workflow).not.toContain('VITE_RELEASED_AT="$RELEASE_BUILT_AT" npm run build');
+    expect(workflow).toContain('ROLLBACK_RELEASED_AT=$rollback_released_at');
+    expect(workflow).toContain('REQUIRE_ROLLBACK_RELEASE_TIMESTAMP: \'1\'');
+    expect(staticTopologyVerifier).toContain('rollbackProvenance.releasedAt !== expectedRollbackReleasedAt');
+    expect(staticTopologyVerifier).toContain('rollbackProvenance.exactRootFileCount !== rollbackFiles.length');
+    expect(staticTopologyVerifier).toContain('rollbackProvenance.treeSha256 !== treeDigest(rollbackRoot, rollbackFiles)');
+    expect(topologyBrowserVerifier).toContain('rollbackOriginal.releasedAt, expectedRollbackReleasedAt');
     expect(topologyBrowserVerifier).toContain('expectsPendingCandidate = isCurrentCandidate && !expectedReleasedAt');
-    expect(topologyBrowserVerifier).toContain("lastReleaseLabel !== 'CURRENT CANDIDATE · OWNER REVIEW PENDING'");
+    expect(topologyBrowserVerifier).toContain("lastReleaseLabel !== 'CURRENT CANDIDATE · PUBLIC HITL AFTER RELEASE'");
     expect(topologyBrowserVerifier).toContain('verifyProductionReleaseTimestamp');
     expect(workflow.match(/test -n "\$\{RELEASE_BUILT_AT:-\}"/g)).toHaveLength(2);
     expect(topologyBrowserVerifier).toContain('process.env.RELEASE_BUILT_AT?.trim()');
@@ -179,6 +190,24 @@ describe('production release workflow', () => {
     expect(windowsJob).toContain('name: Run Pass 65 menu lifecycle contracts');
     expect(windowsJob).toContain('timeout-minutes: 13');
     expect(windowsJob).toContain('node node_modules/@playwright/test/cli.js test tests/e2e/pass65-menu-lifecycle.spec.ts --project=chromium --workers=1 --retries=0');
+    expect(windowsJob).toContain('name: Upload Windows browser failure evidence');
+    expect(windowsJob).toContain("if: failure() && needs.classify-change.outputs.mode != 'none'");
+    expect(windowsJob).toContain('name: bounded-browser-windows-failure-${{ github.event.pull_request.head.sha || github.sha }}');
+    expect(windowsJob).toContain('artifacts/pass25a/playwright-results/');
+    expect(windowsJob).toContain('artifacts/pass65/menu-lifecycle/');
+    expect(windowsJob).toContain('playwright-report/');
+    expect(windowsJob).toContain('if-no-files-found: warn');
+
+    const linuxJob = verifyWorkflow.slice(
+      verifyWorkflow.indexOf('bounded-browser-linux:'),
+      verifyWorkflow.indexOf('pipeline-metrics:'),
+    );
+    expect(linuxJob).toContain('name: Upload Linux browser failure evidence');
+    expect(linuxJob).toContain("if: failure() && needs.classify-change.outputs.mode != 'none'");
+    expect(linuxJob).toContain('name: bounded-browser-linux-failure-${{ github.event.pull_request.head.sha || github.sha }}');
+    expect(linuxJob).toContain('artifacts/pass25a/playwright-results/');
+    expect(linuxJob).toContain('playwright-report/');
+    expect(linuxJob).toContain('if-no-files-found: warn');
   });
 
   it('owns and closes the local preview lifecycle for every catalogued Playwright gate', () => {
@@ -283,24 +312,26 @@ describe('production release workflow', () => {
     expect(mutationRunner).toContain('spawnSync(process.execPath');
   });
 
-  it('makes exact Pass 69 evidence and real preview provenance mandatory in the required acceptance job', () => {
+  it('selects the changed acceptance manifest once and verifies its exact preview provenance', () => {
     const acceptanceJob = verifyWorkflow.indexOf('requirements-acceptance:');
     const metricsJob = verifyWorkflow.indexOf('pipeline-metrics:');
     const section = verifyWorkflow.slice(acceptanceJob, metricsJob);
     const installStep = section.indexOf('npm ci --ignore-scripts');
-    const buildStep = section.indexOf('Build exact frozen-evidence candidate bytes');
-    const candidateStep = section.indexOf('Verify exact Pass 69 evidence catalog and frozen runtime');
-    const provenanceStep = section.indexOf('Verify immutable Pass 69 preview provenance and bytes');
-    const acceptanceStep = section.indexOf('Verify complete requirement-to-evidence coverage and exact preview approval');
+    const buildStep = section.indexOf('Build candidate bytes for acceptance verification');
+    const acceptanceStep = section.indexOf('Verify changed acceptance manifest and write the selector receipt');
+    const provenanceStep = section.indexOf('Verify the selected immutable preview provenance and bytes');
 
     expect(section).toContain('needs: [classify-change, static-and-unit]');
     expect(installStep).toBeGreaterThan(-1);
     expect(buildStep).toBeGreaterThan(installStep);
-    expect(candidateStep).toBeGreaterThan(buildStep);
-    expect(provenanceStep).toBeGreaterThan(candidateStep);
-    expect(acceptanceStep).toBeGreaterThan(provenanceStep);
+    expect(acceptanceStep).toBeGreaterThan(buildStep);
+    expect(provenanceStep).toBeGreaterThan(acceptanceStep);
     expect(section).toContain('scripts/release/acceptance-gate.mjs --phase ci');
+    expect(section.match(/scripts\/release\/acceptance-gate\.mjs --phase ci/gu)).toHaveLength(1);
+    expect(section).toContain('--output artifacts/pipeline/acceptance-coverage.json');
     expect(section).toContain('scripts/release/verify-pr-preview-provenance.mjs');
+    expect(section).toContain('--acceptance-receipt artifacts/pipeline/acceptance-coverage.json');
+    expect(section).not.toContain('acceptance/pass-69.json');
     expect(section).toContain('GITHUB_TOKEN: ${{ github.token }}');
     expect(section).toContain('artifacts/pipeline/pr-preview-provenance.json');
   });
@@ -316,9 +347,10 @@ describe('production release workflow', () => {
     expect(workflow).not.toContain('gh run watch');
   });
 
-  it('binds the live browser proof to public Pass 70 and Pass 63 choices, internal stable provenance, aliases, and Last Release', () => {
-    expect(liveTopologyVerifier).toContain("verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass70')");
-    expect(liveTopologyVerifier).toContain("verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63')");
+  it('binds the live browser proof to public Pass 72, previous Pass 70 and Pass 63 choices, internal stable provenance, aliases, and Last Release', () => {
+    expect(liveTopologyVerifier).toContain("verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass72')");
+    expect(liveTopologyVerifier).toContain("verifyChoice('previous', 'channels/pass70-retained', 'PASS 70', 'pass70')");
+    expect(liveTopologyVerifier).toContain("verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63', expectedRollbackReleasedAt)");
     expect(liveTopologyVerifier).not.toContain("verifyChoice('rollback'");
     expect(liveTopologyVerifier).toContain('pinned-channel-provenance.json');
     expect(liveTopologyVerifier).toContain('Stable embedded runtime digest');
@@ -326,7 +358,7 @@ describe('production release workflow', () => {
     expect(liveTopologyVerifier).toContain("verifyLegacyRoute('normal'");
     expect(liveTopologyVerifier).toContain("verifyLegacyRoute('room'");
     expect(liveTopologyVerifier).toContain('Last Release timestamp is not a published instant');
-    expect(liveTopologyVerifier).toContain("lastReleaseLabel !== 'CURRENT CANDIDATE · OWNER REVIEW PENDING'");
+    expect(liveTopologyVerifier).toContain("lastReleaseLabel !== 'CURRENT CANDIDATE · PUBLIC HITL AFTER RELEASE'");
     expect(liveTopologyVerifier).toContain("releaseState !== 'LOCAL CANDIDATE'");
     expect(liveTopologyVerifier).toContain("timeText.includes('NOT PUBLISHED')");
     expect(liveTopologyVerifier).not.toContain("'channels/the-big-one', 'PASS 65'");

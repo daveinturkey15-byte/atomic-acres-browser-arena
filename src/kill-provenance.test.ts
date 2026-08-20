@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { isKillstreakEligible, killCauseFromHit } from './kill-provenance';
+import {
+  isKillstreakEligible,
+  killAttributionId,
+  killCauseFromHit,
+  killCauseFromKillstreak,
+  MAP_CARPET_BOMBER_KILLER_ID,
+} from './kill-provenance';
 
 describe('kill provenance', () => {
   it('allows only gun kills to progress killstreak rewards', () => {
@@ -18,5 +24,13 @@ describe('kill provenance', () => {
       kind: 'killstreak',
       effect: 'hunter-swarm',
     });
+  });
+
+  it('keeps map-owned Carpet Bomber kills out of player attribution', () => {
+    const cause = killCauseFromKillstreak('carpet-bomber');
+    expect(cause).toEqual({ kind: 'environment' });
+    expect(isKillstreakEligible(cause)).toBe(false);
+    expect(killAttributionId('player-1', cause)).toBe(MAP_CARPET_BOMBER_KILLER_ID);
+    expect(killAttributionId('player-1', killCauseFromKillstreak('chopper'))).toBe('player-1');
   });
 });

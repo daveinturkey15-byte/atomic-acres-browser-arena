@@ -46,7 +46,7 @@ function compatibilityProjection(definition: Record<string, any>): Record<string
 
 describe('Pass 65 canonical weapon catalog', () => {
   it('contains exactly the current-protocol roster in a stable enumeration order', () => {
-    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(17);
+    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(18);
     expect(LEGACY_WEAPON_ENUMERATION_ORDER).toEqual([
       ...PASS65_WEAPON_IDS,
       ...PASS66_SPECIAL_WEAPON_IDS,
@@ -84,6 +84,7 @@ describe('Pass 65 canonical weapon catalog', () => {
     });
     expect(byId['m14-ebr']).toMatchObject({
       displayName: 'M14 EBR', optic: { kind: 'thermal-smoke-only', magnification: 2.5 },
+      damage: { base: 37.2, minimum: 24, falloffStartM: 38, falloffEndM: 100, headMultiplier: 1.7 },
     });
     expect(byId['slug-shotgun']).toMatchObject({ displayName: 'Benelli M4 Slug', fireKind: 'slug', pellets: 1 });
     expect(byId['flashlight-pistol']).toMatchObject({

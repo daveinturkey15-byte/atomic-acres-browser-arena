@@ -77,9 +77,11 @@ describe('railgun result delivery contract', () => {
   it('records durable Railgun death attribution at the exact user-facing elimination feed boundary', () => {
     const death = main.slice(main.indexOf('function processDeath('), main.indexOf('function removeRemote('));
     const railgunAudit = death.indexOf("message.cause.kind === 'gun' && message.cause.weapon === 'railgun'");
-    const feed = death.indexOf('addFeed(eliminationFeedText');
+    const outcomeCommit = death.indexOf('commitAuthoritativeDeathOutcome(deathOutcome, {');
+    const feed = death.indexOf('presentFeed: (text) => addFeed(text', outcomeCommit);
     expect(railgunAudit).toBeGreaterThan(-1);
-    expect(feed).toBeGreaterThan(railgunAudit);
+    expect(outcomeCommit).toBeGreaterThan(railgunAudit);
+    expect(feed).toBeGreaterThan(outcomeCommit);
     expect(death).toContain('killerId: message.killer, victimId: message.victim, text: eliminationFeedText');
   });
 

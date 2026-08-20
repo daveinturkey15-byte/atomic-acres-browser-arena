@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { parseKillstreakLoadout } from './killstreak-catalog';
-import { HostKillstreakRuntime, MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD } from './killstreak-runtime';
+import {
+  HostKillstreakRuntime,
+  MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD,
+  MAX_SUPPORT_SHOT_EVENTS_PER_STEP,
+} from './killstreak-runtime';
 import {
   admitKillstreakCareCaptureResultMessage,
   admitKillstreakStateMessage,
@@ -89,6 +93,7 @@ describe('killstreak protocol', () => {
     const message = {
       type: 'killstreak-damage-result' as const,
       by: 'host', matchEpoch: 7, revision: 3, events: [],
+      shots: [],
       impacts: [
         { activationId: 'ks-activation-7-1', source: 'carpet-bomber' as const, ordinal: 0, phase: 'drop' as const, position: [1, 0, 2] as const, impactAtMs: 2_000, atMs: 1_580 },
         { activationId: 'ks-activation-7-1', source: 'carpet-bomber' as const, ordinal: 0, phase: 'impact' as const, position: [1, 0, 2] as const, impactAtMs: 2_000, atMs: 2_000 },
@@ -125,7 +130,7 @@ describe('killstreak protocol', () => {
     };
     const message = {
       type: 'killstreak-damage-result' as const,
-      by: 'host', matchEpoch: 7, revision: 4, events: [event], impacts: [], nonce: 10,
+      by: 'host', matchEpoch: 7, revision: 4, events: [event], shots: [], impacts: [], nonce: 10,
     };
     expect(isKillstreakProtocolMessage(message)).toBe(true);
     expect(isKillstreakProtocolMessage({ ...message, events: [{ ...event, endpoint: [0, Number.NaN, -19.38] }] })).toBe(false);
@@ -133,6 +138,42 @@ describe('killstreak protocol', () => {
     const missingEndpoint = Object.fromEntries(Object.entries(event).filter(([key]) => key !== 'endpoint'));
     expect(isKillstreakProtocolMessage({ ...message, events: [missingEndpoint] })).toBe(false);
     expect(isKillstreakProtocolMessage({ ...message, events: [{ ...event, clientRay: [0, 0, -1] }] })).toBe(false);
+  });
+
+  it('admits bounded public support-shot reports with strict entity/source identity', () => {
+    const shot = {
+      activationId: 'ks-activation-7-1',
+      entityId: 'ks-7-chopper-1',
+      source: 'chopper' as const,
+      ownerId: 'owner',
+      ownerTeam: 0 as const,
+      ordinal: 0,
+      atMs: 2_000,
+    };
+    const message = {
+      type: 'killstreak-damage-result' as const,
+      by: 'host', matchEpoch: 7, revision: 4, events: [], shots: [shot], impacts: [], nonce: 11,
+    };
+    expect(isKillstreakProtocolMessage(message)).toBe(true);
+    expect(killstreakMessageBelongsToPlayer(message, 'observer')).toBe(true);
+    expect(isKillstreakProtocolMessage({ ...message, shots: [{ ...shot, entityId: 'ks-7-pilot-drone-1' }] })).toBe(false);
+    expect(isKillstreakProtocolMessage({ ...message, shots: [{ ...shot, activationId: 'ks-activation-8-1' }] })).toBe(false);
+    expect(isKillstreakProtocolMessage({ ...message, shots: [{ ...shot, entityId: 'ks-8-chopper-1' }] })).toBe(false);
+    expect(isKillstreakProtocolMessage({ ...message, shots: [{ ...shot, ownerTeam: 2 }] })).toBe(false);
+    expect(isKillstreakProtocolMessage({ ...message, shots: [shot, shot] })).toBe(false);
+    expect(isKillstreakProtocolMessage({
+      ...message,
+      shots: Array.from({ length: MAX_SUPPORT_SHOT_EVENTS_PER_STEP + 1 }, (_, ordinal) => ({
+        ...shot,
+        ordinal,
+      })),
+    })).toBe(false);
+
+    const droneShots = [
+      { ...shot, activationId: 'ks-activation-7-2', entityId: 'ks-7-pilot-drone-2', source: 'piloted-drone' as const },
+      { ...shot, activationId: 'ks-activation-7-3', entityId: 'ks-7-swarm-drone-3', source: 'drone-swarm' as const },
+    ];
+    expect(isKillstreakProtocolMessage({ ...message, shots: droneShots })).toBe(true);
   });
 
   it('admits bounded recipient snapshots, rejects entity storms, and classifies host authority', () => {

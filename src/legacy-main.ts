@@ -212,6 +212,11 @@ import {
   type KillstreakStateMessage,
 } from './killstreak-protocol';
 import {
+  isOwnerSupportDamageFeedback,
+  presentSupportShotAudio,
+  SupportShotReplayGuard,
+} from './support-combat-presentation';
+import {
   acknowledgeClientWorldRepairActor,
   beginClientWorldRepair,
   clientWorldRepairCanAttempt,
@@ -488,6 +493,7 @@ import {
   type MatchAdmissionToken,
 } from './match-admission-transaction';
 import { loadRoomRejoinIdentity, releaseRoomRejoinIdentityLease, saveRoomRejoinIdentity, saveLastRoomCode, loadLastRoomCode } from './room-rejoin-identity';
+import { clearLastHostedRoomCode, loadLastHostedRoomCode, saveLastHostedRoomCode } from './host-room-recovery';
 import { guestRejoinAffordance } from './guest-rejoin-affordance';
 import {
   HOST_MATCH_CHECKPOINT_SCHEMA_VERSION,
@@ -565,7 +571,6 @@ import {
   freeForAllLeaders,
   latencyQuality,
   playersAreHostile,
-  recordPlayerDamage,
   teamTotals,
   type LobbyMember,
   type LobbySnapshot,
@@ -635,7 +640,14 @@ import {
   type AuthoritativeRemoteDamageResult,
   type RemoteHealthAuthorityState,
 } from './remote-health-authority';
-import { isKillstreakEligible, killCauseFromHit, type KillCause } from './kill-provenance';
+import { isKillstreakEligible, killAttributionId, killCauseFromHit, killCauseFromKillstreak, MAP_CARPET_BOMBER_KILLER_ID, type KillCause } from './kill-provenance';
+import {
+  MAP_CARPET_BOMBER_LABEL,
+  commitAuthoritativeDeathOutcome,
+  recordAuthoritativeDamageScores,
+  resolveAuthoritativeDeathOutcome,
+  type DeathOutcomeCombatant,
+} from './authoritative-death-outcome';
 import { reconstructShooterPoseAtFireTime, recordCombatantPose, rewindCombatantPose, rewindCombatantPoseStrict, type CombatantPoseSample } from './lag-compensation';
 import { appendClientRuntimeLog, readClientRuntimeLog } from './client-runtime-log';
 import {
@@ -853,6 +865,7 @@ import {
   GuestResumeNackMessage,
   LobbyJoinMessage,
   LobbyHandicapMessage,
+  LobbySquadMessage,
   LobbyReadyMessage,
   LobbyStateMessage,
   LobbyTeamMessage,
@@ -889,6 +902,7 @@ import {
   WeaponId,
   WindowBreakMessage,
 } from './protocol';
+import { defaultSquadPresentation, renderSquadRosterBadge, sanitizeSquadPresentation } from './squad-presentation';
 import {
   captureGuestCombatInventory,
   captureGuestCombatInventoryProjection,
@@ -1974,8 +1988,9 @@ function applyFlamethrowerGroundFirePulse(fire: Readonly<{
     ? 'carpet-bomber-napalm' as const
     : 'flamethrower-ground-fire' as const;
   const cause: KillCause = fire.damageSource === 'carpet-bomber'
-    ? { kind: 'killstreak', effect: 'carpet-bomber' }
+    ? { kind: 'environment' }
     : { kind: 'gun', weapon: 'flamethrower' };
+  const attributionId = killAttributionId(fire.ownerId, cause);
   const r2 = FLAMETHROWER_GROUND_FIRE_RADIUS_M * FLAMETHROWER_GROUND_FIRE_RADIUS_M;
   const carpetCollisionSolids = fire.damageSource === 'carpet-bomber' ? activeWorldColliders() : null;
   const carpetFireCanReach = (x: number, y: number, z: number): boolean => !carpetCollisionSolids
@@ -1987,7 +2002,7 @@ function applyFlamethrowerGroundFirePulse(fire: Readonly<{
   if (player.alive && player.position.distanceToSquared(fire.point) < r2
     && carpetFireCanReach(player.position.x, player.position.y, player.position.z)
     && flameDamageAllowsTarget(flameSource, fire.ownerId, fire.ownerTeam, player.id, player.team)) {
-    applyDamage(FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, fire.ownerId, 1, false, cause);
+    applyDamage(FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, attributionId, 1, false, cause);
   }
   if (!flamethrowerGroundFireBotSnapshotReady) {
     flamethrowerGroundFireBotSnapshot.length = 0;
@@ -2001,7 +2016,7 @@ function applyFlamethrowerGroundFirePulse(fire: Readonly<{
     if (dx * dx + dz * dz < r2
       && carpetFireCanReach(bot.position.x, bot.position.y + 1.15, bot.position.z)
       && flameDamageAllowsTarget(flameSource, fire.ownerId, fire.ownerTeam, bot.id, bot.team)) {
-      applyBotDamage(bot, FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, 'body', cause, fire.ownerId);
+      applyBotDamage(bot, FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, 'body', cause, attributionId);
     }
   }
   if (network.role === 'host' && fire.damageSource === 'carpet-bomber' && fire.activationId) {
@@ -2119,6 +2134,7 @@ function updateFlamethrowerGroundFires(now: number): void {
       matchEpoch: killstreakMatchEpoch,
       revision: killstreakSnapshot.revision,
       events: pendingCarpetGroundFireDamageEvents.slice(offset, offset + MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP),
+      shots: [],
       impacts: [],
       nonce: randomNonce(),
     };
@@ -4384,6 +4400,7 @@ const SUPPORT_STATUS_HUD_REFRESH_INTERVAL_MS = 100;
 let lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
 let lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
 const appliedKillstreakDamageResults = new Set<string>();
+const supportShotReplay = new SupportShotReplayGuard();
 const killstreakRegisteredActors = new Set<string>();
 const hostKillstreakLoadoutAcks = new HostKillstreakLoadoutAckRegistry();
 let displayedCareReward: Pass65KillstreakId | null = null;
@@ -4772,7 +4789,9 @@ let activeMatchAdmissionRun: Readonly<{
 }> | null = null;
 let refreshWarningUntil = 0;
 let gameMode: 'solo' | 'host' | 'client' = 'solo';
-let privateMatchMode: MatchMode = 'tdm';
+let privateMatchMode: MatchMode = 'ffa';
+let localSquadName = defaultSquadPresentation(0).name;
+let localSquadColor = defaultSquadPresentation(0).color;
 let privateMatchConfig: PrivateMatchConfig = DEFAULT_PRIVATE_MATCH_CONFIG;
 let privateLobbySnapshot: LobbySnapshot | null = null;
 let privateLobbyRevision = 0;
@@ -5286,6 +5305,7 @@ function beginMatchDiagnostics(mode: 'solo' | 'host' | 'client', startedAt: numb
 }
 
 function combatantLabel(id: string): { name: string; kind: string } {
+  if (id === MAP_CARPET_BOMBER_KILLER_ID) return { name: MAP_CARPET_BOMBER_LABEL, kind: 'environment' };
   if (id === player.id) return { name: player.name, kind: 'player' };
   const remote = remotes.get(id);
   if (remote) return { name: remote.snapshot.name, kind: 'player' };
@@ -5300,6 +5320,18 @@ function combatantLabel(id: string): { name: string; kind: string } {
   };
   if (id === 'environment') return { name: 'Environment', kind: 'environment' };
   return { name: 'Unknown combatant', kind: 'unknown' };
+}
+
+function deathOutcomeCombatant(id: string): DeathOutcomeCombatant {
+  const label = combatantLabel(id);
+  const scoreParticipant = hostLobbyMembers.get(id) ?? bots.get(id);
+  return {
+    id,
+    name: label.name,
+    kind: label.kind,
+    team: scoreParticipant?.team ?? null,
+    scoreEligible: scoreParticipant !== undefined,
+  };
 }
 
 type DamageRecord = Readonly<{
@@ -6120,7 +6152,7 @@ function resetPrivateLobbyState(): void {
   privateLobbyRevision = 0;
   privateMatchActiveAtHostTimeMs = null;
   privateMatchActiveAtEpochMs = null;
-  privateMatchMode = 'tdm';
+  privateMatchMode = 'ffa';
   privateMatchConfig = DEFAULT_PRIVATE_MATCH_CONFIG;
   hostTimeMapping = createHostTimeMapping();
   interpolationDelayState = createInterpolationDelayState(performance.now());
@@ -6485,16 +6517,6 @@ function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot
   renderTextChat();
 }
 
-const LAST_HOSTED_ROOM_KEY = 'atomic-acres:last-hosted-room';
-function saveLastHostedRoomCode(roomCode: string): void {
-  const trimmed = roomCode.trim();
-  if (!trimmed) return;
-  try { localStorage.setItem(LAST_HOSTED_ROOM_KEY, trimmed); } catch { /* Rehost affordance is best effort. */ }
-}
-function loadLastHostedRoomCode(): string | null {
-  try { return localStorage.getItem(LAST_HOSTED_ROOM_KEY); } catch { return null; }
-}
-
 function hostLobbyAdmissionAttemptCurrent(attempt: HostLobbyAdmissionAttempt): boolean {
   const queuedReplacement = pendingHostRecoveryJoins.get(attempt.playerId);
   return hostLobbyAdmissionAttemptIsCurrent(attempt, {
@@ -6821,7 +6843,7 @@ function clearStoredHostMatchCheckpoint(): void {
 }
 
 function refreshHostMatchRecoveryAffordance(): HostMatchCheckpoint | null {
-  const roomCode = loadLastHostedRoomCode()?.trim() ?? '';
+  const roomCode = loadLastHostedRoomCode(clientPersistentStorage()) ?? '';
   const storage = clientPersistentStorage();
   pendingHostMatchRecovery = roomCode && storage
     ? loadHostMatchCheckpoint(storage, MULTIPLAYER_PROTOCOL_VERSION, roomCode)
@@ -6965,11 +6987,14 @@ function initializeFreshHostLobby(): void {
   gunRangeTestBayDoorBroadcastPending = false;
   // Remember the room code so a host who crashes can reclaim it on rehost,
   // letting guests who still have it saved rejoin the same lobby.
-  saveLastHostedRoomCode(network.roomCode);
+  saveLastHostedRoomCode(network.roomCode, clientPersistentStorage());
   privateMatchConfig = selectedArena.id === 'gun-range'
     ? { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: selectedArena.matchRules.durationMs ?? 120_000 }
     : { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id };
   privateMatchMode = privateMatchConfig.mode;
+  const squad = sanitizeSquadPresentation(localSquadName, localSquadColor, player.team);
+  localSquadName = squad.name;
+  localSquadColor = squad.color;
   localResumeToken = randomLobbyCredential();
   hostLobbyTokens.set(player.id, localResumeToken);
   hostLobbyConnectionEpochs.set(player.id, localConnectionEpoch);
@@ -6981,6 +7006,8 @@ function initializeFreshHostLobby(): void {
     connected: true,
     pingMs: 0,
     dhv: localDhv,
+    squadName: localSquadName,
+    squadColor: localSquadColor,
   });
   authoritativeScores.set(player.id, emptyPlayerScore(player.id));
   roomCard.hidden = false;
@@ -7024,7 +7051,7 @@ function initializeRecoveredHostLobby(checkpoint: HostMatchCheckpoint): boolean 
   if (!timing || checkpoint.roomCode !== network.roomCode) return false;
   hostMatchRecoveryPreparing = true;
   pendingHostMatchRecovery = checkpoint;
-  saveLastHostedRoomCode(network.roomCode);
+  saveLastHostedRoomCode(network.roomCode, clientPersistentStorage());
   privateMatchConfig = checkpoint.config;
   privateMatchMode = checkpoint.config.mode;
   privateMatchActiveAtHostTimeMs = timing.activeAtLocalMonoMs;
@@ -7106,6 +7133,8 @@ function sendLobbyJoin(): void {
     connectionEpoch: localConnectionEpoch,
     name: player.name,
     requestedTeam: player.team,
+    squadName: localSquadName,
+    squadColor: localSquadColor,
     resumeToken: localResumeToken,
     nonce: randomNonce(),
   };
@@ -7588,6 +7617,7 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
       hostLobbyConnectionEpochs.set(message.playerId, message.connectionEpoch);
       authoritativeShotAdmissions.delete(message.playerId);
       hostTriggerAuthorities.reset(message.playerId, 'connection-epoch');
+      const squad = sanitizeSquadPresentation(message.squadName, message.squadColor, message.requestedTeam);
       hostLobbyMembers.set(message.playerId, {
         id: message.playerId,
         name: message.name,
@@ -7596,6 +7626,8 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
         connected: true,
         pingMs: null,
         dhv: 10,
+        squadName: squad.name,
+        squadColor: squad.color,
       });
       authoritativeScores.set(message.playerId, emptyPlayerScore(message.playerId));
     }
@@ -7659,6 +7691,26 @@ function updateHostHandicap(message: LobbyHandicapMessage): void {
   hostLobbyMembers.set(message.by, { ...member, dhv: message.dhv, ready: false });
   if (message.by === player.id) localDhv = message.dhv;
   broadcastHostLobby('waiting');
+}
+
+function updateHostSquad(message: LobbySquadMessage): void {
+  if (network.role !== 'host') return;
+  const phase = privateLobbySnapshot?.phase ?? 'waiting';
+  if (phase !== 'waiting' && phase !== 'countdown' && phase !== 'active') return;
+  const member = hostLobbyMembers.get(message.by);
+  if (!member?.connected) return;
+  const squad = sanitizeSquadPresentation(message.squadName, message.squadColor, member.team);
+  hostLobbyMembers.set(message.by, {
+    ...member,
+    squadName: squad.name,
+    squadColor: squad.color,
+    ...(phase === 'waiting' ? { ready: false } : {}),
+  });
+  if (message.by === player.id) {
+    localSquadName = squad.name;
+    localSquadColor = squad.color;
+  }
+  broadcastHostLobby(phase);
 }
 
 function applyHostLobbyConfig(config: PrivateMatchConfig): void {
@@ -7839,7 +7891,7 @@ function recordAuthoritativeDamage(attackerId: string, victimId: string, damage:
   if (killstreakRuntime.recordActorDamage(victimId)) broadcastKillstreakState();
   if (attackerId === victimId) return;
   const previousLocal = authoritativeScores.get(player.id);
-  const next = recordPlayerDamage(authoritativeScores, attackerId, victimId, damage);
+  const next = recordAuthoritativeDamageScores(authoritativeScores, attackerId, victimId, damage);
   authoritativeScores.clear();
   for (const [id, score] of next) authoritativeScores.set(id, score);
   presentLocalDamageDelta(previousLocal, authoritativeScores.get(player.id));
@@ -8268,6 +8320,10 @@ function handleLobbyMessage(message: GameMessage): boolean {
     updateHostHandicap(message);
     return true;
   }
+  if (message.type === 'lobby-squad') {
+    updateHostSquad(message);
+    return true;
+  }
   if (message.type === 'redeploy-request') {
     if (network.role === 'host' && gameStarted && matchState.phase === 'active' && !processedNonces.has(message.nonce)) {
       const member = hostLobbyMembers.get(message.by);
@@ -8477,6 +8533,17 @@ function renderPrivateLobby(): void {
   balanceInput.disabled = !hostControls || modeInput.value === 'ffa' || rangeLobby;
   element<HTMLButtonElement>('#lobby-balance').disabled = !hostControls || modeInput.value === 'ffa' || rangeLobby;
   const localMember = members.find((member) => member.id === player.id);
+  const squadNameInput = element<HTMLInputElement>('#lobby-squad-name');
+  const squadColorInput = element<HTMLInputElement>('#lobby-squad-color');
+  const localSquad = sanitizeSquadPresentation(
+    localMember?.squadName ?? localSquadName,
+    localMember?.squadColor ?? localSquadColor,
+    localMember?.team ?? player.team,
+  );
+  squadNameInput.value = localSquad.name;
+  squadColorInput.value = localSquad.color;
+  squadNameInput.disabled = !localMember?.connected;
+  squadColorInput.disabled = !localMember?.connected;
   const lobbyArenaSynchronized = !snapshot
     || arenaSelectionReady && selectedArena.id === snapshot.config.arenaId;
   localLobbyReady = localMember?.ready ?? localLobbyReady;
@@ -8487,6 +8554,11 @@ function renderPrivateLobby(): void {
   const start = element<HTMLButtonElement>('#lobby-start');
   start.hidden = network.role !== 'host';
   start.disabled = network.role !== 'host' || !snapshot || !lobbyArenaSynchronized || !canHostCommitStart(snapshot);
+  const resetLobby = element<HTMLButtonElement>('#lobby-reset');
+  resetLobby.disabled = network.role !== 'host';
+  resetLobby.title = network.role === 'host'
+    ? 'Close this room and create a fresh code; the old room cannot be reclaimed.'
+    : 'Only the host can invalidate the room and create a fresh code.';
   const teamInput = element<HTMLSelectElement>('#team');
   teamInput.disabled = (snapshot?.phase ?? 'waiting') !== 'waiting' || (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
   const roster = element<HTMLElement>('#lobby-roster');
@@ -8495,10 +8567,11 @@ function renderPrivateLobby(): void {
     const quality = latencyQuality(ping);
     const role = member.id === snapshot?.hostId || member.id === player.id && network.role === 'host' ? 'HOST' : 'PEER';
     const team = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa' ? 'FFA' : member.team === 0 ? 'AQUA' : 'CORAL';
+    const squad = renderSquadRosterBadge(member.squadName, member.squadColor, member.team);
     const handicapControl = member.id === player.id && (snapshot?.phase ?? 'waiting') === 'waiting'
       ? `<label class="lobby-dhv">DHV<select data-lobby-dhv aria-label="Damage Handicap Value">${DHV_VALUES.map((value) => `<option value="${value}"${member.dhv === value ? ' selected' : ''}>${value}</option>`).join('')}</select><small>${dhvLabel(member.dhv)}</small></label>`
       : `<span class="lobby-dhv-badge" title="${dhvLabel(member.dhv)}">DHV ${member.dhv}</span>`;
-    return `<div class="lobby-player ${member.connected ? '' : 'disconnected'}"><span><strong>${escapeHtml(member.name)}</strong><small>${role} · ${team}</small></span><b class="latency-${quality}">${ping === null ? '—' : `${Math.round(ping)} ms`}</b>${handicapControl}<em>${member.connected ? member.ready ? 'READY' : 'SETTING UP' : 'REJOINING…'}</em></div>`;
+    return `<div class="lobby-player ${member.connected ? '' : 'disconnected'}"><span><strong>${escapeHtml(member.name)}</strong><small>${role} · ${team} · ${squad}</small></span><b class="latency-${quality}">${ping === null ? '—' : `${Math.round(ping)} ms`}</b>${handicapControl}<em>${member.connected ? member.ready ? 'READY' : 'SETTING UP' : 'REJOINING…'}</em></div>`;
   }).join('') || '<div class="lobby-player disconnected"><span><strong>CONNECTING…</strong></span></div>';
   const isFfa = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
   element<HTMLElement>('#lobby-guidance').textContent = !lobbyArenaSynchronized
@@ -9680,6 +9753,12 @@ function onNetworkMessage(message: GameMessage): void {
   }
   if (message.type === 'killstreak-damage-result') {
     if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.matchEpoch !== killstreakMatchEpoch) return;
+    presentSupportShotAudio(
+      message.shots,
+      { playerId: player.id, team: player.team, mode: privateMatchMode },
+      (kind) => audio.supportGun(kind),
+      supportShotReplay,
+    );
     for (const event of message.events) {
       if (event.ownerId === player.id) recordOwnerSupportDamage(event);
       if (event.targetId === player.id) applyKillstreakDamageEvent(event);
@@ -12630,21 +12709,18 @@ function processDeath(message: DeathMessage): void {
   // Capture the canonical live rig state before authoritative item drops mutate
   // the holder back to their primary weapon.
   const fallenOperatorSource = corpseSource(message.victim);
+  const outcomeKiller = deathOutcomeCombatant(message.killer);
+  const outcomeVictim = deathOutcomeCombatant(message.victim);
+  const deathOutcome = resolveAuthoritativeDeathOutcome({
+    role: network.role,
+    message,
+    scores: authoritativeScores,
+    killer: outcomeKiller,
+    victim: outcomeVictim,
+    hostile: outcomeKiller.team !== null && outcomeVictim.team !== null
+      && areCombatantsHostile(outcomeKiller.id, outcomeKiller.team, outcomeVictim.id, outcomeVictim.team),
+  });
   if (network.role === 'host') hostTriggerAuthorities.reset(message.victim, 'death');
-  const deathSource = message.cause.kind === 'gun'
-    ? message.cause.weapon
-    : message.cause.kind === 'killstreak'
-      ? message.cause.effect
-      : message.cause.kind;
-  recordMatchDiagnostic('death-authoritative', network.role === 'client' ? 'observed' : 'accepted', {
-    actorId: message.killer,
-    actorKind: combatantLabel(message.killer).kind,
-    targetId: message.victim,
-    targetKind: combatantLabel(message.victim).kind,
-    weaponOrEffect: deathSource,
-    healthAfter: 0,
-    reason: 'authoritative-death-transition',
-  }, `death-${message.nonce}`);
   const victimPoint = message.victim === player.id ? player.position : remotes.get(message.victim)?.target ?? bots.get(message.victim)?.position;
   if (victimPoint) recordSpawnDeath(victimPoint);
   if (victimPoint && network.role !== 'client') {
@@ -12652,8 +12728,6 @@ function processDeath(message: DeathMessage): void {
     dropHeldRailgun(message.victim, dropPoint);
     dropHeldTimedMapWeapons(message.victim, dropPoint);
   }
-  const killer = message.killer === player.id ? player.name : remotes.get(message.killer)?.snapshot.name ?? bots.get(message.killer)?.name ?? 'Unknown';
-  const victim = message.victim === player.id ? player.name : remotes.get(message.victim)?.snapshot.name ?? bots.get(message.victim)?.name ?? 'Unknown';
   spawnCorpsePresentation(message.victim, fallenOperatorSource);
   spawnDeathDrop(message);
   if (message.victim === player.id && player.alive) {
@@ -12689,22 +12763,6 @@ function processDeath(message: DeathMessage): void {
       setGuestCombatInventoryGrenades(inventory, deadGrenadeAuthority.remaining),
     );
   }
-  if (network.role === 'host' && message.killer !== message.victim) {
-    const killerMember = hostLobbyMembers.get(message.killer) ?? bots.get(message.killer);
-    const victimMember = hostLobbyMembers.get(message.victim) ?? bots.get(message.victim);
-    if (killerMember && victimMember && areCombatantsHostile(killerMember.id, killerMember.team, victimMember.id, victimMember.team)) {
-      const killerScore = authoritativeScores.get(message.killer) ?? emptyPlayerScore(message.killer);
-      const victimScore = authoritativeScores.get(message.victim) ?? emptyPlayerScore(message.victim);
-      authoritativeScores.set(message.killer, { ...killerScore, kills: killerScore.kills + 1 });
-      authoritativeScores.set(message.victim, { ...victimScore, deaths: victimScore.deaths + 1 });
-      const hostScore = authoritativeScores.get(player.id);
-      if (hostScore) {
-        player.kills = hostScore.kills;
-        player.deaths = hostScore.deaths;
-      }
-      sendAuthoritativeScores();
-    }
-  }
   if (network.role !== 'client') {
     const now = performance.now();
     const dropPosition = overdriveDropPosition(message.victim);
@@ -12725,13 +12783,39 @@ function processDeath(message: DeathMessage): void {
       verifiedRemoteKills.set(message.killer, (verifiedRemoteKills.get(message.killer) ?? 0) + 1);
     }
   }
-  const eliminationFeedText = `${killer} eliminated ${victim}`;
+  const eliminationFeedText = deathOutcome.feedText;
   if (message.cause.kind === 'gun' && message.cause.weapon === 'railgun') {
     railgunDeathPresentationCount += 1;
     railgunDeathPresentations.push({ killerId: message.killer, victimId: message.victim, text: eliminationFeedText });
     if (railgunDeathPresentations.length > 32) railgunDeathPresentations.shift();
   }
-  addFeed(eliminationFeedText, message.killer === player.id ? 'gold' : undefined);
+  commitAuthoritativeDeathOutcome(deathOutcome, {
+    recordDiagnostic: (outcome) => recordMatchDiagnostic(
+      'death-authoritative',
+      network.role === 'client' ? 'observed' : 'accepted',
+      {
+        actorId: message.killer,
+        actorKind: outcome.actor.kind,
+        targetId: message.victim,
+        targetKind: outcome.target.kind,
+        weaponOrEffect: outcome.weaponOrEffect,
+        healthAfter: 0,
+        reason: 'authoritative-death-transition',
+      },
+      `death-${message.nonce}`,
+    ),
+    replaceScores: (scores) => {
+      authoritativeScores.clear();
+      for (const [id, score] of scores) authoritativeScores.set(id, score);
+      const hostScore = authoritativeScores.get(player.id);
+      if (hostScore) {
+        player.kills = hostScore.kills;
+        player.deaths = hostScore.deaths;
+      }
+    },
+    broadcastScores: sendAuthoritativeScores,
+    presentFeed: (text) => addFeed(text, message.killer === player.id ? 'gold' : undefined),
+  });
   const remote = remotes.get(message.victim);
   if (remote) {
     remote.snapshot = { ...remote.snapshot, hp: 0 };
@@ -13467,6 +13551,7 @@ async function startGame(
   localCareCaptureRequiresHold = false;
   displayedCareReward = null;
   appliedKillstreakDamageResults.clear();
+  supportShotReplay.clear();
   killstreakRegisteredActors.clear();
   hostKillstreakLoadoutAcks.clear();
   killstreakPresentation.clear();
@@ -16238,6 +16323,13 @@ function applyBotDamage(
     network.send(death);
     processDeath(death);
     broadcastHostedBotState();
+  } else if (network.role === 'offline'
+    && attackerId === MAP_CARPET_BOMBER_KILLER_ID
+    && cause.kind === 'environment') {
+    // Offline bots do not otherwise enter the multiplayer processDeath path.
+    // Map-owned Carpet deaths still use its canonical diagnostic/feed seam,
+    // while the offline outcome deliberately performs no score replacement.
+    processDeath(death);
   } else {
     const source = corpseSource(bot.id);
     if (deferPresentation) deferDeathPresentation(bot.id, source, death, now);
@@ -17205,6 +17297,10 @@ function detonateExplosiveBoltEntity(bolt: ExplosiveBoltEntity, now: number): vo
   const stuck = sealedAttachment !== null;
   const blastRadiusM = explosiveBoltBlastRadiusM(stuck);
   applyInteractiveWorldExplosion(point, blastRadiusM, EXPLOSIVE_BOLT_BLAST_MAX_DAMAGE * (stuck ? 2 : 1));
+  // Tactical/explosive bolts share the hosted grenade glass policy: the
+  // detonation may break a reachable pane, but never through an intervening
+  // solid collider or by mutating presentation-only glass on a guest.
+  breakWindowsInGrenadeBlast(point, bolt.actionNonce, true, blastRadiusM);
   const targetCount = fillExplosiveBoltTargets(bolt.ownerId, bolt.ownerTeam);
   for (let targetIndex = 0; targetIndex < targetCount; targetIndex += 1) {
     const target = explosiveBoltTargetBuffer.at(targetIndex);
@@ -18999,12 +19095,11 @@ function updateFInteractionPrompt(now = performance.now()): void {
 }
 
 function recordOwnerSupportDamage(event: KillstreakDamageEvent): void {
-  if (event.ownerId !== player.id || event.damage <= 0) return;
+  if (!isOwnerSupportDamageFeedback(event, player.id)) return;
   const targetPosition = new THREE.Vector3(...event.targetPosition);
-  if (targetPosition && (event.source === 'chopper' || event.source === 'piloted-drone' || event.source === 'drone-swarm')) {
+  if (event.source === 'chopper' || event.source === 'piloted-drone' || event.source === 'drone-swarm') {
     const drone = event.source === 'piloted-drone' || event.source === 'drone-swarm';
     spawnTracer(new THREE.Vector3(...event.tracerOrigin), new THREE.Vector3(...event.endpoint), drone ? 0x52e8ff : 0xffc65c);
-    audio.supportGun(drone ? 'drone' : 'chopper');
   }
   const viewport = {
     width: window.innerWidth,
@@ -19601,7 +19696,8 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
     const oldest = appliedKillstreakDamageResults.values().next().value;
     if (oldest) appliedKillstreakDamageResults.delete(oldest);
   }
-  const cause: KillCause = { kind: 'killstreak', effect: event.source };
+  const cause = killCauseFromKillstreak(event.source);
+  const attributionId = killAttributionId(event.ownerId, cause);
   if (event.targetId === player.id) {
     if (event.targetLifeId !== localContinuity) return null;
     const before = player.hp;
@@ -19610,10 +19706,10 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
     // event loop - mutating the killstreak runtime and broadcasting snapshots
     // mid-advance, which crashed. Apply only the health loss here and defer the
     // death bookkeeping until the killstreak update has fully settled.
-    applyDamage(event.damage, event.ownerId, 1, true, cause);
+    applyDamage(event.damage, attributionId, 1, true, cause);
     const applied = Math.max(0, before - player.hp);
     if (player.hp <= 0 && player.alive) {
-      deferredLocalKillstreakDeath = { attacker: event.ownerId, cause };
+      deferredLocalKillstreakDeath = { attacker: attributionId, cause };
     }
     return { ...event, damage: applied };
   }
@@ -19629,7 +19725,7 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
   const bot = bots.get(event.targetId);
   if (bot && network.role !== 'client') {
     if (event.targetLifeId !== bot.continuity) return null;
-    const damage = applyBotDamage(bot, event.damage, 'body', cause, event.ownerId);
+    const damage = applyBotDamage(bot, event.damage, 'body', cause, attributionId);
     return { ...event, damage };
   }
   if (network.role !== 'host') return event;
@@ -19646,9 +19742,9 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
   remoteHealthAuthorities.set(event.targetId, result.state);
   remote.snapshot = { ...remote.snapshot, hp: result.state.hp };
   remote.root.visible = result.state.alive;
-  recordAuthoritativeDamage(event.ownerId, event.targetId, result.damageApplied);
+  recordAuthoritativeDamage(attributionId, event.targetId, result.damageApplied);
   if (result.died) {
-    const death: DeathMessage = { type: 'death', killer: event.ownerId, victim: event.targetId, cause, nonce: randomNonce() };
+    const death: DeathMessage = { type: 'death', killer: attributionId, victim: event.targetId, cause, nonce: randomNonce() };
     processedNonces.add(death.nonce);
     network.send(death);
     processDeath(death);
@@ -19835,10 +19931,8 @@ function updateKillstreakPossession(now: number): void {
   // Exact operator reveal targets are synchronized once per frame by
   // updateThermalGhosts after all weapon/support optic lifecycles settle.
   if (triggerHeld && now >= nextLocalSupportGunReportAt) {
-    audio.supportGun(possession.kind === 'chopper-gunner' ? 'chopper' : 'drone');
-    // Owner feedback: it was hard to tell the mounted gun was actually firing.
-    // Stream a bright tracer down the aim line on every admitted shot so the
-    // trigger is unmistakable (presentation-only; the host owns real hits).
+    // Stream an immediate owner-only tracer down the aim line while the host's
+    // separate shot event remains the sole authority for audible gun reports.
     if (possession.kind === 'chopper-gunner') {
       killstreakPresentation.presentChopperWeaponAction(entity.id);
       const shotRay = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch);
@@ -19892,6 +19986,12 @@ function updatePass65KillstreakRuntime(now: number): void {
   }
   if (network.role !== 'client' && matchState.phase === 'active') {
     const result = killstreakRuntime.advance(now, killstreakWorldState());
+    presentSupportShotAudio(
+      result.shotEvents,
+      { playerId: player.id, team: player.team, mode: privateMatchMode },
+      (kind) => audio.supportGun(kind),
+      supportShotReplay,
+    );
     const applied = result.damageEvents.map(applyKillstreakDamageEvent).filter((event): event is KillstreakDamageEvent => event !== null && event.damage > 0);
     for (const event of applied) {
       recordOwnerSupportDamage(event);
@@ -19955,11 +20055,11 @@ function updatePass65KillstreakRuntime(now: number): void {
     applyInteractiveWorldExplosions(carpetWorldImpacts);
     killstreakPresentation.presentImpacts(result.impactEvents, now);
     refreshLocalKillstreakSnapshot(now,
-      result.damageEvents.length > 0 || result.impactEvents.length > 0 || result.expiredEntityIds.length > 0);
-    if (network.role === 'host' && (applied.length > 0 || result.impactEvents.length > 0)) {
+      result.damageEvents.length > 0 || result.shotEvents.length > 0 || result.impactEvents.length > 0 || result.expiredEntityIds.length > 0);
+    if (network.role === 'host' && (applied.length > 0 || result.shotEvents.length > 0 || result.impactEvents.length > 0)) {
       const message: KillstreakDamageResultMessage = {
         type: 'killstreak-damage-result', by: player.id, matchEpoch: killstreakMatchEpoch,
-        revision: killstreakSnapshot.revision, events: applied, impacts: result.impactEvents, nonce: randomNonce(),
+        revision: killstreakSnapshot.revision, events: applied, shots: result.shotEvents, impacts: result.impactEvents, nonce: randomNonce(),
       };
       network.send(message);
     }
@@ -24261,7 +24361,7 @@ element<HTMLButtonElement>('#host').addEventListener('click', () => {
   }
   if (!requirePlayerName()) return;
   const recovery = refreshHostMatchRecoveryAffordance();
-  const preferredRoomCode = recovery?.roomCode ?? loadLastHostedRoomCode() ?? undefined;
+  const preferredRoomCode = recovery?.roomCode ?? loadLastHostedRoomCode(clientPersistentStorage()) ?? undefined;
   resetForMode();
   resetPrivateLobbyState();
   pendingHostMatchRecovery = recovery;
@@ -24324,6 +24424,44 @@ element<HTMLElement>('#lobby-roster').addEventListener('change', (event) => {
 });
 element<HTMLButtonElement>('#lobby-start').addEventListener('click', hostStartPrivateMatch);
 element<HTMLButtonElement>('#lobby-leave').addEventListener('click', returnToMainMenu);
+const commitLocalSquadPresentation = (): void => {
+  if (network.role !== 'host' && network.role !== 'client') return;
+  const member = privateLobbySnapshot?.members.find((entry) => entry.id === player.id)
+    ?? hostLobbyMembers.get(player.id);
+  const squad = sanitizeSquadPresentation(
+    element<HTMLInputElement>('#lobby-squad-name').value,
+    element<HTMLInputElement>('#lobby-squad-color').value,
+    member?.team ?? player.team,
+  );
+  localSquadName = squad.name;
+  localSquadColor = squad.color;
+  const message: LobbySquadMessage = {
+    type: 'lobby-squad', by: player.id, squadName: squad.name, squadColor: squad.color, nonce: randomNonce(),
+  };
+  if (network.role === 'host') updateHostSquad(message);
+  else network.send(message);
+};
+element<HTMLInputElement>('#lobby-squad-name').addEventListener('change', commitLocalSquadPresentation);
+element<HTMLInputElement>('#lobby-squad-color').addEventListener('change', commitLocalSquadPresentation);
+element<HTMLButtonElement>('#lobby-reset').addEventListener('click', () => {
+  if (network.role !== 'host') return;
+  if (!clearLastHostedRoomCode(clientPersistentStorage())) {
+    setStatus('Saved room recovery could not be invalidated; fresh-code reset cancelled.', 'error');
+    return;
+  }
+  clearStoredHostMatchCheckpoint();
+  pendingHostMatchRecovery = null;
+  gameStarted = false;
+  matchFinished = false;
+  resetForMode();
+  resetPrivateLobbyState();
+  if (!network.resetLobby(initializeHostLobby)) {
+    setStatus('Only the active host can reset this lobby.', 'warn');
+    return;
+  }
+  setStatus('Old room invalidated — opening a fresh lobby code…', 'warn');
+  syncArenaSelectionUi();
+});
 element<HTMLButtonElement>('#lobby-balance').addEventListener('click', () => {
   if (network.role !== 'host' || !privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting') return;
   for (const member of balanceLobbyTeams([...hostLobbyMembers.values()])) hostLobbyMembers.set(member.id, { ...member, ready: false });

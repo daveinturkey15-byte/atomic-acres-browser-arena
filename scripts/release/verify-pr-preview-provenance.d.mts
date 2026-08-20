@@ -3,6 +3,9 @@ export type PreviewIdentity = Readonly<{
   sourceSha: string;
   pullRequest: number;
   createdAt: string;
+  artifactId: number | null;
+  fileCount: number | null;
+  treeSha256: string | null;
 }>;
 
 export type PreviewTree = Readonly<{
@@ -16,6 +19,19 @@ export function computePreviewTree(
 ): PreviewTree;
 
 export function parsePreviewManifest(manifest: unknown): PreviewIdentity;
+
+export type AcceptanceReceiptSelection = Readonly<
+  | { exempt: true; reason: string }
+  | {
+    exempt: false;
+    manifestPath: string;
+    manifestSha256: string;
+    headSha: string;
+    releasePass: string;
+  }
+>;
+
+export function selectPreviewManifestFromAcceptanceReceipt(receipt: unknown): AcceptanceReceiptSelection;
 
 export function inspectPreviewArtifactZip(
   bytes: Uint8Array,
@@ -37,3 +53,12 @@ export type PreviewProvenanceOptions = Readonly<{
 }>;
 
 export function verifyPreviewProvenance(options?: PreviewProvenanceOptions): Promise<unknown>;
+
+export type AcceptanceReceiptProvenanceOptions = PreviewProvenanceOptions & Readonly<{
+  acceptanceReceiptPath?: string;
+  acceptanceReceipt?: unknown;
+}>;
+
+export function verifyPreviewProvenanceFromAcceptanceReceipt(
+  options?: AcceptanceReceiptProvenanceOptions,
+): Promise<unknown>;

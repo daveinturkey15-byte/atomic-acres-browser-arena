@@ -20,6 +20,13 @@ function callbacks(overrides: Partial<FlareProjectileCallbacks> = {}): FlareProj
 }
 
 describe('flare projectile system', () => {
+  it('uses a wider bounded projectile volume without changing through-wall admission', () => {
+    expect(FLARE_PROJECTILE_EFFECT.collisionRadiusM).toBe(0.24);
+    expect(FLARE_PROJECTILE_EFFECT.collisionRadiusM).toBeLessThan(0.5);
+    const blocked = callbacks({ worldCollisionFraction: () => 0.25 });
+    expect(blocked.worldCollisionFraction?.(new THREE.Vector3(), new THREE.Vector3(1, 0, 0), 0.24)).toBe(0.25);
+  });
+
   it('resolves bounded segment/sphere intersections', () => {
     expect(flareSegmentSphereFraction(
       new THREE.Vector3(0, 0, 0),
