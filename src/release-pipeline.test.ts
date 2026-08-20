@@ -190,6 +190,24 @@ describe('production release workflow', () => {
     expect(windowsJob).toContain('name: Run Pass 65 menu lifecycle contracts');
     expect(windowsJob).toContain('timeout-minutes: 13');
     expect(windowsJob).toContain('node node_modules/@playwright/test/cli.js test tests/e2e/pass65-menu-lifecycle.spec.ts --project=chromium --workers=1 --retries=0');
+    expect(windowsJob).toContain('name: Upload Windows browser failure evidence');
+    expect(windowsJob).toContain("if: failure() && needs.classify-change.outputs.mode != 'none'");
+    expect(windowsJob).toContain('name: bounded-browser-windows-failure-${{ github.event.pull_request.head.sha || github.sha }}');
+    expect(windowsJob).toContain('artifacts/pass25a/playwright-results/');
+    expect(windowsJob).toContain('artifacts/pass65/menu-lifecycle/');
+    expect(windowsJob).toContain('playwright-report/');
+    expect(windowsJob).toContain('if-no-files-found: warn');
+
+    const linuxJob = verifyWorkflow.slice(
+      verifyWorkflow.indexOf('bounded-browser-linux:'),
+      verifyWorkflow.indexOf('pipeline-metrics:'),
+    );
+    expect(linuxJob).toContain('name: Upload Linux browser failure evidence');
+    expect(linuxJob).toContain("if: failure() && needs.classify-change.outputs.mode != 'none'");
+    expect(linuxJob).toContain('name: bounded-browser-linux-failure-${{ github.event.pull_request.head.sha || github.sha }}');
+    expect(linuxJob).toContain('artifacts/pass25a/playwright-results/');
+    expect(linuxJob).toContain('playwright-report/');
+    expect(linuxJob).toContain('if-no-files-found: warn');
   });
 
   it('owns and closes the local preview lifecycle for every catalogued Playwright gate', () => {

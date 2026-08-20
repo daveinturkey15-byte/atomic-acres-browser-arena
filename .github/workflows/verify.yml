@@ -156,6 +156,17 @@ jobs:
         if: needs.classify-change.outputs.mode == 'full'
         timeout-minutes: 13
         run: node node_modules/@playwright/test/cli.js test tests/e2e/pass65-menu-lifecycle.spec.ts --project=chromium --workers=1 --retries=0
+      - name: Upload Windows browser failure evidence
+        if: failure() && needs.classify-change.outputs.mode != 'none'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bounded-browser-windows-failure-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            artifacts/pass25a/playwright-results/
+            artifacts/pass65/menu-lifecycle/
+            playwright-report/
+          if-no-files-found: warn
+          retention-days: 14
 
   bounded-browser-linux:
     needs: [classify-change, static-and-unit]
@@ -182,6 +193,16 @@ jobs:
         env:
           QA_E2E_GROUPS: ${{ needs.classify-change.outputs.linux_groups }}
         run: npm run test:e2e:bounded
+      - name: Upload Linux browser failure evidence
+        if: failure() && needs.classify-change.outputs.mode != 'none'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bounded-browser-linux-failure-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            artifacts/pass25a/playwright-results/
+            playwright-report/
+          if-no-files-found: warn
+          retention-days: 14
 
   pipeline-metrics:
     if: always()

@@ -5,12 +5,12 @@
   "status": "accepted",
   "preview": {
     "kind": "github-actions-artifact",
-    "ref": "pr-preview-61-6c8abe03f9af8ed622587f8aeaae2e6023d6699a",
-    "sourceSha": "6c8abe03f9af8ed622587f8aeaae2e6023d6699a",
-    "createdAt": "2026-08-20T19:29:15.111Z",
-    "artifactId": 9421351771,
+    "ref": "pr-preview-61-69bea107a865d7741e0d1c237abab9dd1b4b55ea",
+    "sourceSha": "69bea107a865d7741e0d1c237abab9dd1b4b55ea",
+    "createdAt": "2026-08-20T21:27:33.814Z",
+    "artifactId": 9425149837,
     "fileCount": 515,
-    "treeSha256": "6976c16e9cd729bbdec470f5d10ada8cde507fdc4eccf0657ee18b97e43b2e1c"
+    "treeSha256": "71a88e6f246e6c9b682305d055e9b327c6e04c1bae36547312219bd354ec618b"
   },
   "releaseDecision": {
     "state": "publication-authorized",
