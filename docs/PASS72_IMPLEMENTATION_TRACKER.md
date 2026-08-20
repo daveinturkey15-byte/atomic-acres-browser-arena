@@ -24,12 +24,21 @@
 - Routed explosive crossbow bolt detonation through the existing occlusion-aware replicated glass-break helper.
 - Allowed replicated Chopper/Drone support-shot audio cues on teammates while retaining owner-only tracer/damage HUD presentation.
 
+## Release topology added for this pass
+
+- Promoted the candidate identity and player-facing changelog to Pass 72.
+- Added an exact pinned `PASS 70` previous-live channel at `channels/pass70-retained`, sourced from Pages SHA `3b5e675c54eaea2a2dd721eca6f247c933361587` and runtime tree digest `c8f6aeed492cd747ef83aa41bdc0d05f2fd86264418d40d0ebbd0916c85d6160`.
+- Kept the exact Pass 69 retained channel, Pass 67.1 stable-source pin, Pass 63 stable WebGL rollback, and Pass 62 best-ever benchmark record unchanged.
+- Extended the chooser and browser smoke matrix to verify Pass 72, Pass 70, Pass 69 and Pass 63 independently, including legacy `release=previous` and `release=pass69` routes.
+
 ## Verified
 
 - `npm test -- --run --reporter=dot`: 367 files passed, 1 skipped; 2,580 tests passed, 2 skipped.
 - `npx tsc -p tsconfig.json --noEmit`: passed.
 - `npm run build`: passed; generated `dist/` with `legacy-main` 1,433.01 kB, Rapier 2,234.73 kB, Three vendor 1,427.98 kB. Vite emitted the existing large-chunk advisory; it was not suppressed.
 - Focused Pass 72/lobby/protocol/provenance/crossbow/audio suites passed.
+- Local staged-topology verification passed: Pass 72 candidate, 516-file Pass 70 previous wrapper, 516-file Pass 69 wrapper, Pass 67.1 stable and Pass 63 rollback.
+- Local chooser/provenance browser smoke passed for all four public choices and legacy routes.
 - The first pre-implementation repository preflight passed. The second preflight correctly refused while the worktree was dirty; it must be rerun after commit.
 
 ## Unknowns / explicit falsifiers

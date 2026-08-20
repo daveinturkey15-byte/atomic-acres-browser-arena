@@ -2,17 +2,28 @@
   "schemaVersion": 4,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 70",
-    "description": "Pass 70: gameplay, weapons, support, multiplayer, mobile and visual improvements."
+    "label": "PASS 72",
+    "description": "Pass 72: private lobbies, combat corrections, support readability and preserved release channels."
   },
   "experimental": {
-    "label": "PASS 70",
-    "description": "Pass 70 gameplay and presentation build.",
-    "pass": "PASS 70",
+    "label": "PASS 72",
+    "description": "Pass 72 gameplay, private-lobby and presentation build.",
+    "pass": "PASS 72",
     "path": "channels/the-big-one"
   },
+  "previous": {
+    "label": "PASS 70 · PREVIOUS LIVE",
+    "description": "The exact current Pass 70 Pages runtime, retained byte-for-byte for comparison and rollback testing.",
+    "pass": "PASS 70",
+    "sourceSha": "130fd59bd2cf1e1719b802463219ddf36e2484d5",
+    "pagesSha": "3b5e675c54eaea2a2dd721eca6f247c933361587",
+    "pagesPath": "channels/the-big-one",
+    "runtimeFileCount": 515,
+    "runtimeTreeSha256": "c8f6aeed492cd747ef83aa41bdc0d05f2fd86264418d40d0ebbd0916c85d6160",
+    "path": "channels/pass70-retained"
+  },
   "retained": {
-    "label": "PASS 69 · PREVIOUS LIVE",
+    "label": "PASS 69 · PREVIOUS STABLE",
     "description": "The exact previously hosted Pass 69 build, retained byte-for-byte for comparison and fallback testing.",
     "pass": "PASS 69",
     "sourceSha": "685ed7865018e107df5acf6cb6f7498b4468940c",

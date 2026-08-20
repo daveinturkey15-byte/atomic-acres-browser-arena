@@ -40,9 +40,9 @@ const exactSha = (value, label) => {
 };
 exactSha(sourceSha, 'SOURCE_SHA');
 if (config.schemaVersion !== 4) throw new Error('release-channels.json schemaVersion must be 4');
-if (!/^PASS [1-9][0-9]*$/.test(config.experimental.pass) || config.experimental.label !== 'PASS 70'
+if (!/^PASS [1-9][0-9]*$/.test(config.experimental.pass) || config.experimental.label !== 'PASS 72'
   || config.experimental.path !== 'channels/the-big-one') {
-  throw new Error('Experimental production topology must stage PASS 70 at channels/the-big-one');
+  throw new Error('Experimental production topology must stage PASS 72 at channels/the-big-one');
 }
 if (config.stable.pass !== 'PASS 67.1' || config.stable.label !== 'STABLE SINGLEPLAYER') {
   throw new Error('Pass 67.1 must remain the approved-source stable singleplayer channel');
@@ -53,6 +53,15 @@ if (config.retained.pass !== 'PASS 69'
   || config.retained.pagesPath !== 'channels/the-big-one'
   || config.retained.path !== 'channels/pass69-retained') {
   throw new Error('Retained Pass 69 must remain pinned to the exact previously hosted Pages runtime');
+}
+if (config.previous.pass !== 'PASS 70'
+  || config.previous.sourceSha !== '130fd59bd2cf1e1719b802463219ddf36e2484d5'
+  || config.previous.pagesSha !== '3b5e675c54eaea2a2dd721eca6f247c933361587'
+  || config.previous.pagesPath !== 'channels/the-big-one'
+  || config.previous.runtimeFileCount !== 515
+  || config.previous.runtimeTreeSha256 !== 'c8f6aeed492cd747ef83aa41bdc0d05f2fd86264418d40d0ebbd0916c85d6160'
+  || config.previous.path !== 'channels/pass70-retained') {
+  throw new Error('Previous Pass 70 must remain pinned to the exact current live Pages runtime');
 }
 if (config.rollback && (config.rollback.pass !== 'PASS 63' || config.rollback.path !== 'channels/pass63-rollback')) {
   throw new Error('Rollback must be the Pass 63 rebuild at channels/pass63-rollback');
@@ -218,6 +227,7 @@ if (stableRebuildRequired && (!configuredStableDist || !isAbsolute(configuredSta
 const stable = configuredStableDist
   ? stageRebuilt('recent-stable', config.stable, configuredStableDist, process.env.STABLE_RELEASED_AT)
   : stagePinned('recent-stable', config.stable);
+const previous = stagePinned('pass70-retained', config.previous);
 const retained = stagePinned('pass69-retained', config.retained);
 const experimentalFiles = walkFiles(experimentalRoot);
 const experimental = {
@@ -281,11 +291,17 @@ const publicConfig = {
   experimental: {
     label: config.experimental.label,
     description: deploymentState === 'live'
-      ? 'The approved Pass 70 gameplay and presentation build.'
-      : 'The local Pass 70 HITL candidate. Publication remains disabled until owner approval.',
+      ? 'The approved Pass 72 gameplay, private-lobby and presentation build.'
+      : 'The local Pass 72 HITL candidate. Publication remains disabled until owner approval.',
     pass: config.experimental.pass,
     path: config.experimental.path,
     deploymentState,
+  },
+  previous: {
+    label: config.previous.label,
+    description: config.previous.description,
+    pass: config.previous.pass,
+    path: config.previous.path,
   },
   retained: {
     label: config.retained.label,
@@ -308,11 +324,12 @@ mkdirSync(dirname(topologyReceiptPath), { recursive: true });
 const topology = {
   schemaVersion: 4, sourceSha, releasePass,
   root: { kind: 'chooser-only', files: ['index.html', 'release-shell.css', 'release-shell.js', 'release-channel-config.js'] },
-  channels: Object.fromEntries(Object.entries({ experimental, retained, stable, rollback }).filter(([, channel]) => channel)),
+  channels: Object.fromEntries(Object.entries({ experimental, previous, retained, stable, rollback }).filter(([, channel]) => channel)),
 };
 writeFileSync(topologyReceiptPath, `${JSON.stringify(topology, null, 2)}\n`);
 console.log(JSON.stringify({ releaseTopology: 'ok', sourceSha, channels: {
   experimental: { pass: experimental.releasePass, sourceSha, digest: experimental.treeSha256 },
+  previous: { pass: previous.releasePass, pagesSha: previous.pagesSha, digest: previous.treeSha256 },
   retained: { pass: retained.releasePass, pagesSha: retained.pagesSha, digest: retained.treeSha256 },
   stable: { pass: stable.releasePass, pagesSha: stable.pagesSha, digest: stable.treeSha256 },
   ...(rollback ? { rollback: { pass: rollback.releasePass, sourceSha: rollback.sourceSha, digest: rollback.treeSha256 } } : {}),

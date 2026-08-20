@@ -14,13 +14,20 @@ if (!rootIndex.includes('release-shell.js') || rootIndex.includes('type="module"
 const publicConfigSource = readFileSync(join(dist, 'release-channel-config.js'), 'utf8');
 const publicConfig = JSON.parse(publicConfigSource.slice(publicConfigSource.indexOf('=') + 1).replace(/;\s*$/, ''));
 const rollbackStaged = Boolean(config.rollback && existsSync(join(dist, config.rollback.path)));
-const expectedChannelKeys = rollbackStaged ? ['experimental', 'retained', 'stable'] : ['experimental', 'retained'];
+const expectedChannelKeys = rollbackStaged
+  ? ['experimental', 'previous', 'retained', 'stable']
+  : ['experimental', 'previous', 'retained'];
 if (JSON.stringify(Object.keys(publicConfig)) !== JSON.stringify(expectedChannelKeys)) {
   throw new Error(`Root chooser must expose exactly ${expectedChannelKeys.join(', ')}: ${Object.keys(publicConfig).join(', ')}`);
 }
 if (publicConfig.experimental.pass !== config.experimental.pass || publicConfig.experimental.label !== config.experimental.label
   || publicConfig.experimental.path !== 'channels/the-big-one') {
   throw new Error(`Root chooser is missing live ${config.experimental.pass}`);
+}
+if (publicConfig.previous.pass !== config.previous.pass
+  || publicConfig.previous.label !== config.previous.label
+  || publicConfig.previous.path !== config.previous.path) {
+  throw new Error(`Root chooser is missing previous ${config.previous.pass}`);
 }
 if (publicConfig.retained.pass !== config.retained.pass
   || publicConfig.retained.label !== config.retained.label
@@ -37,8 +44,8 @@ const stagedChannelDirectories = readdirSync(join(dist, 'channels'), { withFileT
   .map((entry) => entry.name)
   .sort();
 const expectedDirectories = rollbackStaged
-  ? ['pass63-rollback', 'pass69-retained', 'recent-stable', 'the-big-one']
-  : ['pass69-retained', 'recent-stable', 'the-big-one'];
+  ? ['pass63-rollback', 'pass69-retained', 'pass70-retained', 'recent-stable', 'the-big-one']
+  : ['pass69-retained', 'pass70-retained', 'recent-stable', 'the-big-one'];
 if (JSON.stringify(stagedChannelDirectories) !== JSON.stringify(expectedDirectories)) {
   throw new Error(`Unexpected staged channels: ${stagedChannelDirectories.join(', ')}`);
 }
@@ -75,6 +82,22 @@ function verifyPinned(channel) {
     if (!staged.equals(pinned)) throw new Error(`${channel.pass} staged byte mismatch: ${path}`);
   }
   return paths.length;
+}
+const previousFiles = verifyPinned(config.previous);
+const previousRoot = resolve(dist, config.previous.path);
+const previousEmbedded = JSON.parse(readFileSync(join(previousRoot, 'channel-provenance.json'), 'utf8'));
+const previousWrapper = JSON.parse(readFileSync(join(previousRoot, 'pinned-channel-provenance.json'), 'utf8'));
+if (previousEmbedded.releasePass !== config.previous.pass
+  || previousEmbedded.sourceSha !== config.previous.sourceSha
+  || previousEmbedded.path !== config.previous.pagesPath
+  || previousEmbedded.exactRootFileCount !== config.previous.runtimeFileCount
+  || previousEmbedded.treeSha256 !== config.previous.runtimeTreeSha256
+  || previousWrapper.channel !== 'pass70-retained'
+  || previousWrapper.pagesSha !== config.previous.pagesSha
+  || previousWrapper.pagesPath !== config.previous.pagesPath
+  || previousWrapper.path !== config.previous.path
+  || previousWrapper.pinnedRuntime?.treeSha256 !== config.previous.runtimeTreeSha256) {
+  throw new Error('Previous Pass 70 does not match the exact current live runtime');
 }
 const retainedFiles = verifyPinned(config.retained);
 const retainedRoot = resolve(dist, config.retained.path);
@@ -157,4 +180,4 @@ if (config.rollback && existsSync(join(dist, config.rollback.path))) {
     throw new Error('Rollback provenance does not match the configured Pass 63 rebuilt-source record');
   }
 }
-console.log(JSON.stringify({ releaseTopology: 'verified', retainedFiles, stableFiles, experimentalAssets: experimentalAssets.length }));
+console.log(JSON.stringify({ releaseTopology: 'verified', previousFiles, retainedFiles, stableFiles, experimentalAssets: experimentalAssets.length }));

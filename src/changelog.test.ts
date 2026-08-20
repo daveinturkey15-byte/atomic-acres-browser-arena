@@ -6,18 +6,20 @@ import {
   lastUpdatedButtonLabel,
   latestChangelogEntry,
   pass70ReleaseCopy,
+  pass72ReleaseCopy,
   PENDING_PRODUCTION_RELEASE,
   resolveProductionReleasedAt,
 } from './changelog';
 
 describe('changelog', () => {
-  it('keeps the pending Pass 70 release first and freezes the published Pass 69 timestamp', () => {
+  it('keeps the pending Pass 72 release first and freezes the published Pass 70 and Pass 69 timestamps', () => {
     expect(CHANGELOG.length).toBeGreaterThan(0);
     const latest = latestChangelogEntry();
-    expect(latest.id).toBe('pass70');
+    expect(latest.id).toBe('pass72');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
-    expect(latest.title).toContain('Pass 70');
-    expect(latest.summary).toContain('Pass 70');
+    expect(latest.title).toContain('Pass 72');
+    expect(latest.summary).toContain('Pass 72');
+    expect(CHANGELOG.find((entry) => entry.id === 'pass70')?.releasedAt).toBe('2026-08-16T19:32:01Z');
     expect(CHANGELOG.find((entry) => entry.id === 'pass69')?.releasedAt).toBe('2026-08-10T21:19:47Z');
     expect(formatChangelogTimestamp('2026-07-22T15:43:16+01:00')).toBe('22 JUL 2026 · 15:43 BST');
     expect(formatChangelogTimestampDetail('2026-07-22T15:43:16+01:00')).toBe(
@@ -68,7 +70,14 @@ describe('changelog', () => {
       .toThrow('Invalid VITE_RELEASED_AT');
   });
 
-  it('keeps Pass 70 candidate and timestamped production copy mutually truthful', () => {
+  it('keeps Pass 72 candidate and timestamped production copy mutually truthful', () => {
+    expect(pass72ReleaseCopy(PENDING_PRODUCTION_RELEASE)).toMatchObject({
+      summary: expect.stringContaining('local owner-review candidate'),
+      lineage: expect.stringContaining('until this exact candidate is approved'),
+    });
+    const released72 = pass72ReleaseCopy('2026-08-20T08:00:00Z');
+    expect(released72.summary).not.toContain('candidate');
+    expect(released72.lineage).not.toContain('until this exact candidate is approved');
     expect(pass70ReleaseCopy(PENDING_PRODUCTION_RELEASE)).toMatchObject({
       summary: expect.stringContaining('local owner-review candidate'),
       lineage: expect.stringContaining('until this exact candidate is approved'),
