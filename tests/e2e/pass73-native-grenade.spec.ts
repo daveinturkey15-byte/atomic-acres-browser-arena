@@ -6,6 +6,7 @@ import {
   PASS73_NATIVE_GRENADE_PROFILES,
   PASS73_NATIVE_GRENADE_SCHEMA,
   assertPass73NativeGrenadeReceipt,
+  pass73NativeGrenadeFailures,
 } from '../../scripts/qa/pass73-native-grenade-contract.mjs';
 
 const enabled = process.env.PASS73_NATIVE_WEBGPU === '1';
@@ -262,6 +263,12 @@ test('first grenade stays inside the warm envelope in three fresh Quality and Pe
     },
     trials,
   };
+  const receiptFailures = pass73NativeGrenadeFailures(receipt, {
+    head: expectedHead,
+    tree: expectedTree,
+    executableSha256: chromeSha256,
+  });
+  receipt.verdict = receiptFailures.length === 0 ? 'pass' : 'fail';
   mkdirSync(artifactRoot, { recursive: true });
   writeFileSync(`${artifactRoot}/receipt.json`, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
   assertPass73NativeGrenadeReceipt(receipt, { head: expectedHead, tree: expectedTree, executableSha256: chromeSha256 });
