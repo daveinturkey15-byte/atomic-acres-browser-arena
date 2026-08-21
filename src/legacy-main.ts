@@ -4439,6 +4439,12 @@ type GrenadeFirstActionProfile = {
   frameP99Ms: number;
   maximumAnimationFrameGapMs: number;
   maximumFrameWorkMs: number;
+  maximumFrameBreakdown: Readonly<{
+    totalMs: number;
+    grenadeUpdateMs: number;
+    renderSubmitMs: number;
+    otherMs: number;
+  }>;
   frameSamples: number;
   completionFailures: number;
   status: string;
@@ -4506,6 +4512,12 @@ function beginGrenadeFirstActionProfile(grenade: GrenadeId, startedAt: number): 
     frameP99Ms: 0,
     maximumAnimationFrameGapMs: 0,
     maximumFrameWorkMs: 0,
+    maximumFrameBreakdown: Object.freeze({
+      totalMs: 0,
+      grenadeUpdateMs: 0,
+      renderSubmitMs: 0,
+      otherMs: 0,
+    }),
     frameSamples: 0,
     completionFailures: presentation.completionFailures,
     status: presentation.status,
@@ -4547,7 +4559,12 @@ function completeGrenadeActionHandler(
   });
 }
 
-function sampleGrenadeFirstActionProfile(frameNow: number, frameWorkMs: number): void {
+function sampleGrenadeFirstActionProfile(
+  frameNow: number,
+  frameWorkMs: number,
+  grenadeUpdateMs: number,
+  renderSubmitMs: number,
+): void {
   const profile = lastGrenadeFirstActionProfile;
   if (!profile || profile.observationComplete) return;
   const elapsedMs = Math.max(0, frameNow - profile.startedAt);
@@ -4558,7 +4575,16 @@ function sampleGrenadeFirstActionProfile(frameNow: number, frameWorkMs: number):
   profile.frameP95Ms = framePercentile(profile.frameGapsMs, 0.95);
   profile.frameP99Ms = framePercentile(profile.frameGapsMs, 0.99);
   profile.maximumAnimationFrameGapMs = Math.max(profile.maximumAnimationFrameGapMs, gapMs);
-  profile.maximumFrameWorkMs = Math.max(profile.maximumFrameWorkMs, Math.max(0, frameWorkMs));
+  const boundedFrameWorkMs = Math.max(0, frameWorkMs);
+  if (boundedFrameWorkMs >= profile.maximumFrameWorkMs) {
+    profile.maximumFrameBreakdown = Object.freeze({
+      totalMs: boundedFrameWorkMs,
+      grenadeUpdateMs: Math.max(0, grenadeUpdateMs),
+      renderSubmitMs: Math.max(0, renderSubmitMs),
+      otherMs: Math.max(0, boundedFrameWorkMs - grenadeUpdateMs - renderSubmitMs),
+    });
+  }
+  profile.maximumFrameWorkMs = Math.max(profile.maximumFrameWorkMs, boundedFrameWorkMs);
   profile.frameSamples += 1;
 
   const presentation = renderRuntime.presentationTelemetry(frameNow);
@@ -25288,6 +25314,10 @@ function frame(now: number, scheduleNext = true): void {
     lastPresentedFrameAt = advancePresentationFrameAnchor(now, lastPresentedFrameAt, graphicsRuntime.frameRateLimit);
   }
   const frameWorkStartedAt = performance.now();
+  const profileGrenadeFrame = lastGrenadeFirstActionProfile !== null
+    && !lastGrenadeFirstActionProfile.observationComplete;
+  let grenadeUpdateWorkMs = 0;
+  let renderSubmitWorkMs = 0;
   frameCount += 1;
   try {
     const rawFrameMs = Math.max(0, now - lastFrame);
@@ -25351,7 +25381,9 @@ function frame(now: number, scheduleNext = true): void {
     const visualNow = debugCaptureFixedVisualTimeMs ?? now;
     updateTargets(visualNow);
     updateBots(frameDt, now);
+    const grenadeUpdateStartedAt = profileGrenadeFrame ? performance.now() : 0;
     updateGrenades(frameDt, now);
+    if (profileGrenadeFrame) grenadeUpdateWorkMs = performance.now() - grenadeUpdateStartedAt;
     updateExplosiveBolts(frameDt, now);
     updateFlareProjectiles(frameDt, now);
     flamethrowerStreamPresentation.update(frameDt);
@@ -25445,6 +25477,7 @@ function frame(now: number, scheduleNext = true): void {
     if (rendererFrameEligible && !debugRenderPaused && !renderSubmissionPaused && !webglContextLost
       && document.visibilityState === 'visible' && document.hasFocus()) {
       let frameSubmitted = false;
+      const renderSubmitStartedAt = profileGrenadeFrame ? performance.now() : 0;
       try {
         if (renderRuntime.backend === 'webgpu') {
           const submissionMode: WebGpuSubmissionMode = gameStarted && matchState.phase === 'active'
@@ -25457,6 +25490,7 @@ function frame(now: number, scheduleNext = true): void {
           frameSubmitted = true;
         }
       } finally {
+        if (profileGrenadeFrame) renderSubmitWorkMs = performance.now() - renderSubmitStartedAt;
         debugRiggedEvidenceMainCameraDrawSession?.restorePrincipalWritesAfterRenderCall();
       }
       if (frameSubmitted && gameStarted && menuLifecycle.surface === 'hidden') {
@@ -25474,7 +25508,12 @@ function frame(now: number, scheduleNext = true): void {
     if (scheduleNext) {
       const frameWorkMs = Math.max(0, performance.now() - frameWorkStartedAt);
       recentFrameWorkMs.push(frameWorkMs);
-      sampleGrenadeFirstActionProfile(performance.now(), frameWorkMs);
+      sampleGrenadeFirstActionProfile(
+        performance.now(),
+        frameWorkMs,
+        grenadeUpdateWorkMs,
+        renderSubmitWorkMs,
+      );
       if (recentFrameWorkMs.length > FRAME_WORK_SAMPLE_LIMIT) {
         recentFrameWorkMs.splice(0, recentFrameWorkMs.length - FRAME_WORK_SAMPLE_LIMIT);
       }
@@ -26053,6 +26092,7 @@ function sampleGrenadeColdPathTelemetry() {
       deviceLost: runtime.deviceLost,
       uncapturedErrors: runtime.uncapturedErrors,
       lastUncapturedError: runtime.lastUncapturedError,
+      slowNodeBuilds: Object.freeze([...(runtime.slowNodeBuilds ?? [])].map((entry) => Object.freeze({ ...entry }))),
       compiledPipelineIds: Object.freeze([...(pass64TslSystems?.compiledPipelineIds ?? [])]),
       presentation: Object.freeze({ ...runtime.presentation }),
     }),

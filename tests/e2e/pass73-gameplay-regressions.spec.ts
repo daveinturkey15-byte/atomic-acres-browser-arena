@@ -144,9 +144,14 @@ async function captureThermalContribution(page: Page, weapon: 'm14-ebr' | 'railg
   return { weapon, botId, baselineNoise, revealedDelta, telemetry };
 }
 
-async function deploy(page: Page, renderer: 'webgl2' | 'webgpu' = 'webgl2'): Promise<void> {
+async function deploy(
+  page: Page,
+  renderer: 'webgl2' | 'webgpu' = 'webgl2',
+  traceNodeBuilds = false,
+): Promise<void> {
   const requireWebGpu = renderer === 'webgpu' ? '&requireWebGPU=1' : '';
-  await page.goto(`/?release=latest&map=atomic-acres&renderer=${renderer}${requireWebGpu}&render=performance&signal=off&grass=off&mist=off&clouds=off&rays=off&externalServices=off&seed=pass73-gameplay`);
+  const nodeBuildTrace = traceNodeBuilds ? '&traceNodeBuilds=1' : '';
+  await page.goto(`/?release=latest&map=atomic-acres&renderer=${renderer}${requireWebGpu}${nodeBuildTrace}&render=performance&signal=off&grass=off&mist=off&clouds=off&rays=off&externalServices=off&seed=pass73-gameplay`);
   await expect(page.locator('#solo')).toBeEnabled({ timeout: 30_000 });
   await page.locator('#player-name').fill('Pass 73 Gameplay');
   // Trusted input owns AudioContext resume; debug-only admission would leave
@@ -341,7 +346,7 @@ test.describe('Pass 73 gameplay regression behavior', () => {
   test('the immediate first grenade frame window stays within the warm second-throw envelope', async ({ page }, testInfo) => {
     test.skip(process.env.PASS73_NATIVE_WEBGPU !== '1', 'Run explicitly on installed Chrome with native hardware WebGPU.');
     test.setTimeout(150_000);
-    await deploy(page, 'webgpu');
+    await deploy(page, 'webgpu', true);
     const readiness = await page.evaluate(() => (
       window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }
     ).__ATOMIC_ACRES_DEBUG__.sampleGrenadeColdPathTelemetry());
@@ -445,6 +450,8 @@ test.describe('Pass 73 gameplay regression behavior', () => {
       expect(sample.telemetryAfter.pool.exhaustions, evidence).toBe(sample.telemetryBefore.pool.exhaustions);
       expect(sample.telemetryAfter.render.compiledPipelineIds, evidence)
         .toEqual(sample.telemetryBefore.render.compiledPipelineIds);
+      expect(sample.telemetryAfter.render.slowNodeBuilds, evidence)
+        .toEqual(sample.telemetryBefore.render.slowNodeBuilds);
       expect(sample.telemetryAfter.render, evidence).toMatchObject({
         actualBackend: 'webgpu',
         softwareAdapter: false,

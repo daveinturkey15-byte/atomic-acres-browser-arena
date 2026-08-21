@@ -24,6 +24,7 @@ describe('Pass 73 native-WebGPU first-grenade gate', () => {
       'audio.telemetry().grenadeEffectsPrewarm',
       'grenadeExplosionPresentation.telemetry()',
       'compiledPipelineIds',
+      'slowNodeBuilds',
       'softwareAdapter: runtime.softwareAdapter',
       'action: copyGrenadeFirstActionProfile(lastGrenadeFirstActionProfile)',
     ]) expect(sampler).toContain(token);
@@ -57,6 +58,7 @@ describe('Pass 73 native-WebGPU first-grenade gate', () => {
       'expect(first.resourceLoads, evidence).toEqual([])',
       'expect(second.resourceLoads, evidence).toEqual([])',
       '.toEqual(sample.telemetryBefore.render.compiledPipelineIds)',
+      '.toEqual(sample.telemetryBefore.render.slowNodeBuilds)',
       'expect(sample.telemetryAfter.pool.total, evidence).toBe(sample.telemetryBefore.pool.total)',
       'uncapturedErrors: 0',
       'expect(sample.telemetryAfter.render.presentation.completionFailures, evidence).toBe(0)',
