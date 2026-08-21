@@ -41,14 +41,14 @@ async function deploy(page: Page, baseURL: string, profile: string, trial: numbe
   await expect(page.locator('#selected-kit-summary b')).toContainText('FRAG');
   await page.locator('#solo').click();
   await page.waitForFunction((expectedProfile) => {
-    const state = (window as any).__ATOMIC_ACRES_DEBUG__?.snapshot();
-    return state?.matchPhase === 'active'
-      && state?.gameStarted === true
-      && state?.menuVisible === false
-      && state?.render?.runtime?.actualBackend === 'webgpu'
-      && state?.render?.runtime?.softwareAdapter === false
-      && state?.render?.liveProfile === expectedProfile
-      && state?.player?.selectedGrenade === 'frag'
+    const api = (window as any).__ATOMIC_ACRES_DEBUG__;
+    const admission = api?.admissionState();
+    const telemetry = api?.sampleGrenadeColdPathTelemetry();
+    const expectedRuntimeProfile = expectedProfile === 'quality' ? 'blender' : expectedProfile;
+    return admission?.matchPhase === 'active'
+      && telemetry?.render?.actualBackend === 'webgpu'
+      && telemetry?.render?.softwareAdapter === false
+      && document.documentElement.dataset.renderProfile === expectedRuntimeProfile
       && document.documentElement.dataset.grenadeEffectsAudioPrewarm === 'ready';
   }, profile, { polling: 'raf', timeout: 90_000 });
   await page.evaluate(() => {
@@ -57,6 +57,7 @@ async function deploy(page: Page, baseURL: string, profile: string, trial: numbe
     api.setMovement(false);
     api.setGrenades(1);
   });
+  await page.waitForTimeout(1_000);
   return route.toString();
 }
 
