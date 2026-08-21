@@ -161,14 +161,14 @@
  * labels effectively disappear on the bright shell. */
 #menu-panel-options .options-heading span {
   max-width: 62ch;
-  color: #526b70;
+  color: #c4d8d7;
   font-size: var(--pass66-copy);
   line-height: 1.5;
   letter-spacing: 0.025em;
 }
 
 #menu-panel-options > .settings-grid label {
-  color: #314b51;
+  color: #c4d8d7;
   font-size: var(--pass66-copy);
   line-height: 1.25;
 }
@@ -232,7 +232,7 @@
 }
 #menu-panel-options .privacy-setting-row .setting-check { color: #eefaf8; font-size: var(--pass66-copy); }
 #menu-panel-options .controls { font-size: var(--pass66-copy); line-height: 1.7; }
-#menu-panel-options .legal { color: #60797c; font-size: var(--pass66-micro); line-height: 1.5; }
+#menu-panel-options .legal { color: #879f9d; font-size: var(--pass66-micro); line-height: 1.5; }
 
 #advanced-graphics .advanced-graphics-category {
   border-color: rgba(99, 229, 226, 0.22);
@@ -387,13 +387,15 @@
 }
 
 /* HF-184/HF-185: readable equipped chain plus a bounded local presentation
- * rail. It owns only DOM/poster media and never submits the gameplay renderer. */
+ * rail on dark console palette. */
 #menu-panel-streaks {
-  padding: 34px;
+  padding: clamp(20px, 2.2vw, 34px);
   overflow: auto;
   background:
-    radial-gradient(circle at 80% 14%, rgba(0, 109, 116, 0.08), transparent 30%),
-    rgba(248, 250, 246, 0.94);
+    radial-gradient(circle at 80% 14%, rgba(57, 230, 239, 0.08), transparent 35%),
+    linear-gradient(140deg, rgba(8, 24, 29, 0.98), rgba(4, 12, 16, 0.99));
+  color: #eff9f8;
+  border-color: rgba(67, 207, 214, 0.28);
 }
 
 #menu.pass64-command-deck:has(#menu-panel-streaks.active) {
@@ -415,18 +417,24 @@
 .killstreak-slot-card {
   min-height: 146px;
   padding: 17px;
-  border-color: rgba(101, 220, 216, 0.18);
+  border-color: rgba(101, 220, 216, 0.22);
   background:
     radial-gradient(circle at 100% 0, rgba(112, 238, 225, 0.08), transparent 42%),
     linear-gradient(145deg, #0c1a20, #071116);
-  box-shadow: 0 12px 28px rgba(7, 20, 24, 0.12);
+  box-shadow: 0 12px 28px rgba(7, 20, 24, 0.18);
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+.killstreak-slot-card:hover {
+  transform: translateY(-2px);
+  border-color: #39e6ef;
+  box-shadow: 0 16px 36px rgba(7, 20, 24, 0.3), 0 0 14px rgba(57, 230, 239, 0.2);
 }
 .killstreak-slot-card:nth-child(5) { grid-column: 1 / -1; }
 .killstreak-slot-card.is-previewed {
   border-color: var(--killstreak-demo-accent, #70eee1);
   box-shadow: inset 3px 0 var(--killstreak-demo-accent, #70eee1), 0 15px 34px rgba(7, 20, 24, 0.2);
 }
-.killstreak-slot-card > span { color: #72e4e0; }
+.killstreak-slot-card > span { color: #39e6ef; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
 .killstreak-slot-card > strong { min-height: 0; color: #f2fbfa; }
 .killstreak-slot-card small { color: #a3b8ba; }
 .killstreak-slot-card select {

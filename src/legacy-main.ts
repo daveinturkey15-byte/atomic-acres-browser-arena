@@ -482,7 +482,6 @@ import {
   DEATH_DROP_INTERACTION_RANGE,
   DEATH_DROP_SCAVENGE_RANGE,
   MAX_DEATH_DROPS,
-  DEATH_DROP_LIFETIME_MS,
   consumeDeathDropWeapon,
   createDeathDrop,
   deathDropAmmoAvailable,
@@ -490,6 +489,7 @@ import {
   deathDropWeaponAvailable,
   isPrimaryWeaponId,
   nearestScavengeDeathDrop,
+  placeSwappedDeathDrop,
   pruneDeathDrops,
   scavengeDeathDrop,
   selectDeathDropWeaponPickup,
@@ -902,6 +902,8 @@ import {
   OverdriveStateMessage,
   PlayerSnapshot,
   PickupMessage,
+  PickupResultDropRecord,
+  PickupResultMessage,
   PRIMARY_WEAPON_IDS,
   PrimaryWeaponId,
   SIDEARM_WEAPON_IDS,
@@ -952,6 +954,15 @@ import {
   createGuestReloadAuthorityState,
   type GuestReloadAuthorityState,
 } from './guest-reload-authority';
+import {
+  applyReloadResult,
+  cancelRequested,
+  createPendingReload,
+  createReloadActionSequenceAllocator,
+  isExpired,
+  isStale,
+  type LocalReloadPending,
+} from './local-reload-authority';
 import {
   hostLobbyAdmissionAttemptIsCurrent,
   type HostLobbyAdmissionAttempt,
@@ -4963,14 +4974,19 @@ const pendingLocalOrdinaryShots = new Map<string, Readonly<{
 }>>();
 let lastAppliedLocalCombatAuthorityRevision = -1;
 let lastAppliedLocalShotResultSeq = -1;
-let localReloadActionSequence = 0;
-let pendingLocalReloadAuthority: Readonly<{
-  connectionEpoch: string;
-  lifeId: number;
-  startSequence: number;
-  cancelSequence: number | null;
-  weapon: OrdinaryWeaponId;
-}> | null = null;
+const localReloadActionSequence = createReloadActionSequenceAllocator();
+let pendingLocalReloadAuthority: LocalReloadPending | null = null;
+type PendingLocalPickup = Readonly<{
+  nonce: number;
+  dropId: string;
+  priorInventory: GuestCombatInventory;
+  priorPrimaryWeapon: PrimaryWeaponId;
+  priorWeapon: WeaponId;
+  priorSwitchingUntil: number;
+  priorDrop: DeathDrop;
+  sentAt: number;
+}>;
+let pendingLocalPickup: PendingLocalPickup | null = null;
 let applyingLocalReloadAuthority = false;
 let localConnectionEpoch: string = crypto.randomUUID();
 const resolvedShotRequests = new Map<string, ShotResultMessage>();
@@ -5286,6 +5302,22 @@ function sendRemoteReloadResult(
   network.sendToPlayer(playerId, result);
 }
 
+function clearExpiredLocalReloadAuthority(now = performance.now()): boolean {
+  const pending = pendingLocalReloadAuthority;
+  if (network.role !== 'client' || !pending) return false;
+  const stale = isStale(pending, localContinuity);
+  const expired = isExpired(pending, now);
+  if (!stale && !expired) return false;
+  pendingLocalReloadAuthority = null;
+  recordMatchDiagnostic('reload-authority', 'rejected', {
+    actorId: player.id,
+    weaponOrEffect: pending.weapon,
+    reason: 'reload-authority expired',
+    modifiers: [stale ? 'stale-life' : 'expired'],
+  });
+  return true;
+}
+
 function sendRemoteGrenadeResult(
   request: Extract<GameMessage, { type: 'grenade-throw' }>,
   status: GrenadeResultMessage['status'],
@@ -5414,20 +5446,21 @@ function acceptRemoteReloadIntent(message: ReloadIntentMessage): void {
 function acceptLocalReloadResult(message: ReloadResultMessage): void {
   if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.forPlayerId !== player.id
     || message.connectionEpoch !== localConnectionEpoch || message.lifeId !== localContinuity) return;
-  const pending = pendingLocalReloadAuthority;
-  if (!pending || pending.connectionEpoch !== message.connectionEpoch || pending.lifeId !== message.lifeId
-    || pending.weapon !== message.weapon) return;
-  const expectedSequence = pending.cancelSequence ?? pending.startSequence;
-  if (message.actionSequence !== expectedSequence && !(message.status === 'committed'
-    && message.actionSequence === pending.startSequence && pending.cancelSequence === null)) return;
-  if (message.status === 'started') return;
+  const outcome = applyReloadResult(
+    pendingLocalReloadAuthority,
+    message,
+    { localConnectionEpoch, currentLifeId: localContinuity },
+  );
+  pendingLocalReloadAuthority = outcome.pending;
+  if (outcome.action === 'ignore' || outcome.action === 'acknowledge-started') return;
   applyLocalCombatInventoryProjection(message.combatInventory, true, message.shotSequenceWatermark);
-  applyingLocalReloadAuthority = true;
-  player.reloadState = null;
-  weaponView.cancelReload();
-  applyingLocalReloadAuthority = false;
-  pendingLocalReloadAuthority = null;
-  if (message.status === 'rejected' && message.reason !== 'no-pending-reload') {
+  if (outcome.action === 'clear-and-apply-projection') {
+    applyingLocalReloadAuthority = true;
+    player.reloadState = null;
+    weaponView.cancelReload();
+    applyingLocalReloadAuthority = false;
+  }
+  if (outcome.recordRejectedDiagnostic) {
     recordMatchDiagnostic('reload-authority', 'rejected', {
       actorId: player.id, weaponOrEffect: message.weapon, reason: message.reason,
       modifiers: [`sequence:${message.actionSequence}`],
@@ -5877,12 +5910,14 @@ function setLocalTriggerHeld(held: boolean): void {
 }
 
 function sendLocalReloadCancel(): void {
+  clearExpiredLocalReloadAuthority();
   const pending = pendingLocalReloadAuthority;
-  if (network.role !== 'client' || !pending || pending.cancelSequence !== null
+  if (network.role !== 'client' || !pending
     || applyingLocalReloadAuthority || awaitingCanonicalGuestAuthority || pendingClientWorldRepair()) return;
-  const actionSequence = localReloadActionSequence;
-  localReloadActionSequence += 1;
-  pendingLocalReloadAuthority = Object.freeze({ ...pending, cancelSequence: actionSequence });
+  const actionSequence = localReloadActionSequence.next();
+  const cancelling = cancelRequested(pending, actionSequence);
+  if (!cancelling) return;
+  pendingLocalReloadAuthority = cancelling;
   const message: ReloadIntentMessage = {
     type: 'reload-intent', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
     by: player.id, connectionEpoch: localConnectionEpoch, lifeId: localContinuity,
@@ -6519,7 +6554,8 @@ function resetPrivateLobbyState(): void {
   remoteReloadAuthorities.clear();
   pendingLocalOrdinaryShots.clear();
   pendingLocalReloadAuthority = null;
-  localReloadActionSequence = 0;
+  pendingLocalPickup = null;
+  localReloadActionSequence.reset();
   lastAppliedLocalCombatAuthorityRevision = -1;
   lastAppliedLocalShotResultSeq = -1;
   authoritativeScores.clear();
@@ -7825,7 +7861,8 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   lastAppliedLocalShotResultSeq = -1;
   pendingLocalOrdinaryShots.clear();
   pendingLocalReloadAuthority = null;
-  localReloadActionSequence = 0;
+  pendingLocalPickup = null;
+  localReloadActionSequence.reset();
   player.invulnerableUntil = 0;
   localContinuity = projection.continuity;
   localHostConfirmedContinuity = projection.continuity;
@@ -10199,6 +10236,10 @@ function onNetworkMessage(message: GameMessage): void {
     acceptLocalReloadResult(message);
     return;
   }
+  if (message.type === 'pickup-result') {
+    acceptLocalPickupResult(message);
+    return;
+  }
   if (message.type === 'shot-result') {
     acceptAuthoritativeShotResult(message);
     return;
@@ -10484,7 +10525,20 @@ function onNetworkMessage(message: GameMessage): void {
       if (network.role === 'host' && admittedIncoming.weapon === 'railgun' && railgunState.holderId !== admittedIncoming.id) return;
       if (network.role === 'host' && isTimedMapWeaponId(admittedIncoming.weapon)
         && timedMapWeaponStates[admittedIncoming.weapon].holderId !== admittedIncoming.id) return;
-      if (admittedIncoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed) return;
+      if (admittedIncoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed) {
+        if (network.role === 'host') {
+          const canonicalInventory = remoteCombatInventoryProjection(admittedIncoming.id);
+          network.sendStateCommitReliablyToPlayer(admittedIncoming.id, {
+            type: 'state',
+            player: remote.snapshot,
+            hostTimeMs: currentHostTimeMs(),
+            continuity: remote.continuity,
+            rateHz: remote.snapshotRateHz,
+            ...(canonicalInventory ? { combatInventory: canonicalInventory } : {}),
+          });
+        }
+        return;
+      }
       if ((admittedIncoming.secondary !== remote.snapshot.secondary || admittedIncoming.grenade !== remote.snapshot.grenade)
         && !respawned) return;
       if (pickupAllowed) authorizedRemotePickups.delete(admittedIncoming.id);
@@ -12098,6 +12152,7 @@ function interactWithShedDoor(expectedPlacementId?: string): boolean {
 
 function interactWithDeathDrop(now = performance.now(), expectedTargetId?: string): boolean {
   if (!player.alive || matchState.phase !== 'active') return false;
+  if (network.role === 'client' && pendingLocalPickup) return false;
   const drop = selectDeathDropWeaponPickup(
     deathDrops.map((entity) => entity.drop),
     player.position,
@@ -12108,6 +12163,11 @@ function interactWithDeathDrop(now = performance.now(), expectedTargetId?: strin
   if (!drop) return false;
   const entity = deathDrops.find((candidate) => candidate.drop.id === drop.id);
   if (!entity) return false;
+  const priorInventory = localGuestCombatInventory();
+  const priorPrimaryWeapon = player.primaryWeapon;
+  const priorWeapon = player.weapon;
+  const priorSwitchingUntil = player.switchingUntil;
+  const priorDrop: DeathDrop = { ...entity.drop, position: { ...entity.drop.position } };
   const result = consumeDeathDropWeapon(
     drop,
     { primary: player.primaryWeapon, ammo: player.ammo[player.primaryWeapon], reserve: player.reserve[player.primaryWeapon] },
@@ -12116,18 +12176,11 @@ function interactWithDeathDrop(now = performance.now(), expectedTargetId?: strin
   );
   if (!result.consumed) return false;
   interruptReload(true, now);
-  entity.drop = result.drop;
-  // Owner requirement: the swapped-out weapon and its ammo stay on the ground
-  // for a full 30 seconds from the swap so the player can re-swap freely. The
-  // drop otherwise kept its original (possibly near-expired) creation time and
-  // despawned almost immediately after the exchange.
-  entity.drop.expiresAt = now + DEATH_DROP_LIFETIME_MS;
-  // On a real weapon swap the gun you dropped must land at YOUR feet (where
-  // the one you just picked up was), not back at the old drop's position - so
-  // you can swap straight back. A replenish keeps the same gun, so it stays put.
+  const floorY = player.position.y - stanceEyeHeight(player.stance) + 0.18;
+  entity.drop = result.mode === 'pickup'
+    ? placeSwappedDeathDrop(result.drop, player.position, floorY, now)
+    : result.drop;
   if (result.mode !== 'replenish') {
-    const floorY = player.position.y - stanceEyeHeight(player.stance) + 0.18;
-    entity.drop.position = { x: player.position.x, y: floorY, z: player.position.z };
     entity.root.position.set(player.position.x, floorY, player.position.z);
   }
   player.primaryWeapon = result.inventory.primary;
@@ -12149,6 +12202,18 @@ function interactWithDeathDrop(now = performance.now(), expectedTargetId?: strin
     position: player.position.toArray(),
     nonce: randomNonce(),
   };
+  if (network.role === 'client') {
+    pendingLocalPickup = Object.freeze({
+      nonce: pickup.nonce,
+      dropId: pickup.dropId,
+      priorInventory,
+      priorPrimaryWeapon,
+      priorWeapon,
+      priorSwitchingUntil,
+      priorDrop,
+      sentAt: now,
+    });
+  }
   network.send(pickup);
   recordMatchDiagnostic('weapon-pickup', network.role === 'client' ? 'observed' : 'accepted', {
     actorId: player.id,
@@ -12207,6 +12272,7 @@ function autoScavengeDeathDrop(now: number): boolean {
 }
 
 function updateDeathDrops(now: number): void {
+  expirePendingLocalPickup(now);
   autoScavengeDeathDrop(now);
   const retained = new Set(pruneDeathDrops(deathDrops.map((entity) => entity.drop), now, MAX_DEATH_DROPS).map((drop) => drop.id));
   for (let index = deathDrops.length - 1; index >= 0; index -= 1) {
@@ -12223,11 +12289,170 @@ function updateDeathDrops(now: number): void {
   }
 }
 
+function pickupResultDropRecord(drop: DeathDrop | undefined, now: number): PickupResultDropRecord | 'removed' {
+  if (!drop || !deathDropAvailable(drop, now)) return 'removed';
+  return {
+    weapon: drop.weapon,
+    ammo: drop.ammo,
+    reserve: drop.reserve,
+    position: [drop.position.x, drop.position.y, drop.position.z],
+    expiresAt: drop.expiresAt,
+  };
+}
+
+function remotePickupCombatInventoryProjection(playerId: string): GuestCombatInventoryProjection {
+  const projected = remoteCombatInventoryProjection(playerId);
+  if (projected) return projected;
+  const remote = remotes.get(playerId);
+  const primary = remote?.snapshot.primary ?? player.primaryWeapon;
+  const sidearm = remote ? remoteLoadoutSidearm(remote.snapshot) : player.secondaryWeapon;
+  const inventory = createGuestCombatInventory(
+    primary,
+    sidearm,
+    remoteGrenadeAuthorities.get(playerId)?.remaining ?? 1,
+  );
+  return createGuestCombatInventoryProjection(
+    inventory,
+    Math.max(0, remoteCombatInventoryRevisions.get(playerId) ?? 0),
+    primary,
+    sidearm,
+  );
+}
+
+function sendRemotePickupResult(
+  message: PickupMessage,
+  status: PickupResultMessage['status'],
+  reason: PickupResultMessage['reason'],
+  drop: DeathDrop | undefined,
+  now: number,
+): void {
+  if (network.role !== 'host') return;
+  const result: PickupResultMessage = {
+    type: 'pickup-result',
+    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+    by: player.id,
+    forPlayerId: message.by,
+    dropId: message.dropId,
+    status,
+    reason,
+    combatInventory: remotePickupCombatInventoryProjection(message.by),
+    drop: pickupResultDropRecord(drop, now),
+    nonce: message.nonce,
+  };
+  network.sendToPlayer(message.by, result);
+}
+
+function rejectRemotePickup(
+  message: PickupMessage,
+  reason: PickupResultMessage['reason'],
+  drop: DeathDrop | undefined,
+  now: number,
+): void {
+  processedNonces.add(message.nonce);
+  sendRemotePickupResult(message, 'rejected', reason, drop, now);
+  recordMatchDiagnostic('weapon-pickup', 'rejected', {
+    actorId: message.by,
+    weaponOrEffect: message.weapon,
+    position: message.position,
+    reason,
+  });
+  trimNonceSet();
+}
+
+function restorePendingLocalPickup(pending: PendingLocalPickup): void {
+  player.primaryWeapon = pending.priorPrimaryWeapon;
+  player.weapon = pending.priorWeapon;
+  player.switchingUntil = pending.priorSwitchingUntil;
+  for (const weapon of ORDINARY_WEAPON_IDS) {
+    player.ammo[weapon] = pending.priorInventory.ammo[weapon];
+    player.reserve[weapon] = pending.priorInventory.reserve[weapon];
+  }
+  player.grenades = pending.priorInventory.grenades;
+  const entity = deathDrops.find((candidate) => candidate.drop.id === pending.dropId);
+  if (entity) {
+    entity.drop = { ...pending.priorDrop, position: { ...pending.priorDrop.position } };
+    entity.root.position.set(entity.drop.position.x, entity.drop.position.y, entity.drop.position.z);
+    updateDeathDropPresentation(entity);
+  }
+  weaponView.setWeapon(player.weapon, true);
+  renderFieldKitSelection();
+}
+
+function applyCanonicalPickupDrop(message: PickupResultMessage, now: number): void {
+  const entity = deathDrops.find((candidate) => candidate.drop.id === message.dropId);
+  if (message.drop === 'removed') {
+    if (entity) removeDeathDrop(entity);
+    return;
+  }
+  if (!entity) return;
+  const canonical = message.drop;
+  entity.drop = {
+    ...entity.drop,
+    weapon: canonical.weapon,
+    ammo: canonical.ammo,
+    reserve: canonical.reserve,
+    position: { x: canonical.position[0], y: canonical.position[1], z: canonical.position[2] },
+    expiresAt: canonical.expiresAt,
+    ammoConsumedAt: null,
+    weaponConsumedAt: null,
+  };
+  entity.root.position.set(canonical.position[0], canonical.position[1], canonical.position[2]);
+  updateDeathDropPresentation(entity, now);
+}
+
+function acceptLocalPickupResult(message: PickupResultMessage): void {
+  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId
+    || message.forPlayerId !== player.id) return;
+  const pending = pendingLocalPickup;
+  if (pending && (pending.nonce !== message.nonce || pending.dropId !== message.dropId)) return;
+  if (message.status === 'rejected') {
+    if (pending) restorePendingLocalPickup(pending);
+    pendingLocalPickup = null;
+    return;
+  }
+  applyLocalCombatInventoryProjection(message.combatInventory, true);
+  const wasUsingPrimary = pending?.priorWeapon === pending?.priorPrimaryWeapon;
+  player.primaryWeapon = message.combatInventory.primary.weapon;
+  if (wasUsingPrimary || pending === null) player.weapon = message.combatInventory.primary.weapon;
+  applyCanonicalPickupDrop(message, performance.now());
+  pendingLocalPickup = null;
+  weaponView.setWeapon(player.weapon, true);
+  renderFieldKitSelection();
+}
+
+function expirePendingLocalPickup(now: number): void {
+  const pending = pendingLocalPickup;
+  if (network.role !== 'client' || !pending || now - pending.sentAt <= 1_500) return;
+  restorePendingLocalPickup(pending);
+  pendingLocalPickup = null;
+  recordMatchDiagnostic('weapon-pickup', 'rejected', {
+    actorId: player.id,
+    reason: 'pickup-result-timeout',
+    modifiers: ['deadline:1500ms'],
+  });
+}
+
 function acceptRemotePickup(message: PickupMessage, now = performance.now()): void {
-  if (message.by === player.id || processedNonces.has(message.nonce)) return;
+  if (message.by === player.id) return;
+  if (processedNonces.has(message.nonce)) {
+    const entity = deathDrops.find((candidate) => candidate.drop.id === message.dropId);
+    rejectRemotePickup(message, 'duplicate', entity?.drop, now);
+    return;
+  }
   const remote = remotes.get(message.by);
   const entity = deathDrops.find((candidate) => candidate.drop.id === message.dropId);
-  if (!remote || !entity || entity.drop.weapon !== message.weapon) return;
+  if (!remote) {
+    rejectRemotePickup(message, 'unknown-sender', entity?.drop, now);
+    return;
+  }
+  if (!entity) {
+    rejectRemotePickup(message, 'unknown-drop', undefined, now);
+    return;
+  }
+  if (entity.drop.weapon !== message.weapon) {
+    rejectRemotePickup(message, 'weapon-mismatch', entity.drop, now);
+    return;
+  }
   const position = new THREE.Vector3(...message.position);
   const senderPosition = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
   const dropPosition = new THREE.Vector3(entity.drop.position.x, entity.drop.position.y, entity.drop.position.z);
@@ -12237,26 +12462,64 @@ function acceptRemotePickup(message: PickupMessage, now = performance.now()): vo
     : position.distanceTo(dropPosition) <= DEATH_DROP_INTERACTION_RANGE + 0.5;
   const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
   const expectedGrenadeGranted = message.mode === 'scavenge' && grenadeAuthority?.remaining === 0 ? 1 : 0;
-  if (!pointInsideBounds(position, arena.bounds, 0.44)
-    || position.distanceTo(senderPosition) > 2.8
-    || !validDropDistance
-    || message.mode === 'scavenge' && !deathDropAmmoAvailable(entity.drop, now)
-    || message.mode === 'weapon' && (!isPrimaryWeaponId(message.weapon) || !deathDropWeaponAvailable(entity.drop, now))
-    || message.selectedGrenade !== remote.snapshot.grenade
-    || message.grenadeGranted !== expectedGrenadeGranted) return;
+  if (!pointInsideBounds(position, arena.bounds, 0.44)) {
+    rejectRemotePickup(message, 'out-of-bounds', entity.drop, now);
+    return;
+  }
+  if (position.distanceTo(senderPosition) > 2.8) {
+    rejectRemotePickup(message, 'sender-distance', entity.drop, now);
+    return;
+  }
+  if (!validDropDistance) {
+    rejectRemotePickup(message, 'drop-distance', entity.drop, now);
+    return;
+  }
+  if (message.mode === 'scavenge' && !deathDropAmmoAvailable(entity.drop, now)) {
+    rejectRemotePickup(message, entity.drop.expiresAt <= now ? 'expired' : 'payload-consumed', entity.drop, now);
+    return;
+  }
+  if (message.mode === 'weapon' && !isPrimaryWeaponId(message.weapon)) {
+    rejectRemotePickup(message, 'not-consumable', entity.drop, now);
+    return;
+  }
+  if (message.mode === 'weapon' && !deathDropWeaponAvailable(entity.drop, now)) {
+    rejectRemotePickup(message, entity.drop.expiresAt <= now ? 'expired' : 'payload-consumed', entity.drop, now);
+    return;
+  }
+  if (message.mode === 'scavenge' && message.selectedGrenade !== remote.snapshot.grenade) {
+    rejectRemotePickup(message, 'grenade-state', entity.drop, now);
+    return;
+  }
+  if (message.mode === 'scavenge' && message.grenadeGranted !== expectedGrenadeGranted) {
+    rejectRemotePickup(message, 'grenade-grant', entity.drop, now);
+    return;
+  }
   const inventory = remoteCombatInventories.get(message.by);
-  if (!inventory) return;
+  if (!inventory) {
+    rejectRemotePickup(message, 'no-inventory', entity.drop, now);
+    return;
+  }
   if (message.mode === 'scavenge') {
     const activeWeapon = remote.snapshot.weapon;
     const ordinary = ORDINARY_WEAPON_IDS.find((weapon) => weapon === activeWeapon);
-    if (!ordinary) return;
+    if (!ordinary) {
+      rejectRemotePickup(message, 'not-consumable', entity.drop, now);
+      return;
+    }
     const result = scavengeDeathDrop(
       entity.drop,
       { weapon: ordinary, reserve: inventory.reserve[ordinary], grenades: inventory.grenades },
       WEAPONS[ordinary].reserve,
       now,
     );
-    if (!result.scavenged || result.grenadeGranted !== message.grenadeGranted) return;
+    if (!result.scavenged) {
+      rejectRemotePickup(message, 'nothing-to-scavenge', entity.drop, now);
+      return;
+    }
+    if (result.grenadeGranted !== message.grenadeGranted) {
+      rejectRemotePickup(message, 'grenade-grant', entity.drop, now);
+      return;
+    }
     const replenished = setGuestCombatInventoryWeapon(
       inventory,
       ordinary,
@@ -12272,7 +12535,10 @@ function acceptRemotePickup(message: PickupMessage, now = performance.now()): vo
       remoteGrenadeAuthorities.set(message.by, replenishRemoteGrenadeAuthorityState(grenadeAuthority));
     }
   } else {
-    if (!isPrimaryWeaponId(message.weapon)) return;
+    if (!isPrimaryWeaponId(message.weapon)) {
+      rejectRemotePickup(message, 'not-consumable', entity.drop, now);
+      return;
+    }
     const result = consumeDeathDropWeapon(
       entity.drop,
       {
@@ -12283,7 +12549,10 @@ function acceptRemotePickup(message: PickupMessage, now = performance.now()): vo
       WEAPONS[remote.snapshot.primary].reserve,
       now,
     );
-    if (!result.consumed) return;
+    if (!result.consumed) {
+      rejectRemotePickup(message, 'payload-consumed', entity.drop, now);
+      return;
+    }
     const relinquished = setGuestCombatInventoryWeapon(inventory, remote.snapshot.primary, 0, 0);
     setRemoteCombatInventory(message.by, setGuestCombatInventoryWeapon(
       relinquished,
@@ -12291,12 +12560,17 @@ function acceptRemotePickup(message: PickupMessage, now = performance.now()): vo
       result.inventory.ammo,
       result.inventory.reserve,
     ));
-    entity.drop = result.drop;
+    const floorY = position.y - stanceEyeHeight(remote.snapshot.stance) + 0.18;
+    entity.drop = result.mode === 'pickup'
+      ? placeSwappedDeathDrop(result.drop, position, floorY, now)
+      : result.drop;
+    if (result.mode === 'pickup') entity.root.position.set(position.x, floorY, position.z);
     remote.snapshot = { ...remote.snapshot, primary: result.inventory.primary, weapon: result.inventory.primary };
     authorizedRemotePickups.set(message.by, { weapon: message.weapon, expiresAt: now + 2_000 });
     setOperatorWeapon(remote.root.userData.operator as THREE.Group, message.weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
   }
   processedNonces.add(message.nonce);
+  sendRemotePickupResult(message, 'accepted', 'accepted', entity.drop, now);
   if (deathDropAvailable(entity.drop, now)) updateDeathDropPresentation(entity);
   else removeDeathDrop(entity);
   trimNonceSet();
@@ -13171,7 +13445,7 @@ function processDeath(message: DeathMessage): void {
   const victimAuthority = remoteSupportAuthorities.get(message.victim);
   if (victimAuthority) remoteSupportAuthorities.set(message.victim, recordRemoteSupportDeath(victimAuthority));
   if (network.role === 'host' && message.victim !== player.id) {
-    clearRemoteReloadAuthority(message.victim);
+    cancelRemoteReloadAuthority(message.victim, 'cancelled');
     killstreakRuntime.recordActorDeath(message.victim, (remotes.get(message.victim)?.continuity ?? 0) + 1);
     broadcastKillstreakState();
   }
@@ -13751,6 +14025,10 @@ function respawn(
   if (respawnTimer) clearTimeout(respawnTimer);
   respawnTimer = null;
   interruptReload(true);
+  if (startsNewLife) {
+    clearExpiredLocalReloadAuthority();
+    pendingLocalPickup = null;
+  }
   clearGameplayInput();
   player.stance = 'stand';
   characterPhysics?.setStance('stand');
@@ -14060,7 +14338,8 @@ async function startGame(
   localWeaponSequences.clear();
   pendingLocalOrdinaryShots.clear();
   pendingLocalReloadAuthority = null;
-  localReloadActionSequence = 0;
+  pendingLocalPickup = null;
+  localReloadActionSequence.reset();
   lastAppliedLocalCombatAuthorityRevision = -1;
   lastAppliedLocalShotResultSeq = -1;
   localTriggerActionSequence = 0;
@@ -15595,12 +15874,14 @@ function switchWeapon(index: number): void {
 function reload(): void {
   if (!player.alive || matchState.phase !== 'active') return;
   if (player.weapon === 'railgun') return;
+  const now = performance.now();
+  clearExpiredLocalReloadAuthority(now);
   if (network.role === 'client' && pendingLocalReloadAuthority) return;
   const spec = WEAPONS[player.weapon];
   const ammo = player.ammo[player.weapon];
   const availableReserve = reloadSupply(selectedArena.id, player.reserve[player.weapon], spec.mag);
   if (player.reloadState || ammo >= spec.mag || availableReserve <= 0) return;
-  const reloadStartedAt = performance.now();
+  const reloadStartedAt = now;
   const reloadState = beginReload(spec, ammo, availableReserve, reloadStartedAt);
   const reloadDuration = killstreakActorModifiers(player.id, reloadStartedAt).reloadDuration;
   player.reloadState = reloadState ? {
@@ -15609,14 +15890,14 @@ function reload(): void {
     endsAt: reloadStartedAt + (reloadState.endsAt - reloadStartedAt) * reloadDuration,
   } : null;
   if (network.role === 'client' && player.reloadState && isOrdinaryWeapon(player.weapon)) {
-    const actionSequence = localReloadActionSequence;
-    localReloadActionSequence += 1;
-    pendingLocalReloadAuthority = Object.freeze({
+    const actionSequence = localReloadActionSequence.next();
+    pendingLocalReloadAuthority = createPendingReload({
       connectionEpoch: localConnectionEpoch,
       lifeId: localContinuity,
-      startSequence: actionSequence,
-      cancelSequence: null,
+      actionSequence,
       weapon: player.weapon,
+      nowMs: reloadStartedAt,
+      expectedCompletionMs: player.reloadState.endsAt,
     });
     const message: ReloadIntentMessage = {
       type: 'reload-intent', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
@@ -25525,6 +25806,7 @@ function frame(now: number, scheduleNext = true): void {
   // A pending rAF can run after beforeunload has begun. Never touch renderer
   // resources once page-exit teardown has started, and do not reschedule it.
   if (gameplayRuntimeDisposing) return;
+  clearExpiredLocalReloadAuthority(now);
   const schedulingDecision = reconcilePresentationScheduling('animation frame eligibility');
   if (schedulingDecision.mode !== 'foreground-presentation') {
     // The prerecorded menu/loading media owns its own browser compositor path.
