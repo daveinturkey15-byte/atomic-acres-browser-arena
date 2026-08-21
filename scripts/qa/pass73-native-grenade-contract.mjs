@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-export const PASS73_NATIVE_GRENADE_SCHEMA = 'atomic-acres/pass73-native-grenade@1';
+export const PASS73_NATIVE_GRENADE_SCHEMA = 'atomic-acres/pass73-native-grenade@2';
 export const PASS73_NATIVE_GRENADE_PROFILES = Object.freeze(['quality', 'performance']);
 export const PASS73_NATIVE_GRENADE_CONTEXTS_PER_PROFILE = 3;
 
@@ -109,6 +109,7 @@ function validateActionWindow(windowValue, actionValue, label, failures) {
     || action.physics?.fuseMs !== 2_300
     || !finite(action.handlerSyncMs) || !finite(action.firstPresentedDelayMs)
     || action.firstPresentedDelayMs > 20 || action.maximumAnimationFrameGapMs > 20
+    || !finite(action.maximumFrameWorkMs) || action.maximumFrameWorkMs > 20
     || !finite(action.frameP95Ms) || !finite(action.frameP99Ms)
     || action.startingSubmissionSequence >= action.targetSubmissionSequence
     || !finite(action.firstSubmissionDelayMs) || !finite(action.firstCompletionDelayMs)
@@ -133,18 +134,19 @@ function validateTrial(trialValue, profile, trialNumber, failures) {
   validateActionWindow(trial.first?.window, trial.first?.action, `${label} cold throw`, failures);
   validateActionWindow(trial.second?.window, trial.second?.action, `${label} warm throw`, failures);
 
-  const firstWindow = object(trial.first?.window);
-  const secondWindow = object(trial.second?.window);
   const firstAction = object(trial.first?.action);
   const secondAction = object(trial.second?.action);
   if (firstAction.sequence !== 0 || firstAction.cold !== true
     || secondAction.sequence !== 1 || secondAction.cold !== false) {
     failures.push(`${label} did not compare the true first action with the second action`);
   }
-  if (firstWindow.maximumGapMs > secondWindow.maximumGapMs + 4
-    || firstWindow.p95Ms > secondWindow.p95Ms + 3
-    || firstWindow.p99Ms > secondWindow.p99Ms + 4
-    || firstAction.handlerSyncMs > secondAction.handlerSyncMs + 3
+  // The independent rAF window remains the hard absolute hitch/Long Task/
+  // resource observer above. Do not use its refresh-quantized percentiles for
+  // cold/warm comparison: at high refresh rates an otherwise identical window
+  // can move between one- and two-vblank buckets. The in-loop action profile
+  // measures the frames that actually simulate and submit the grenade.
+  if (firstAction.handlerSyncMs > secondAction.handlerSyncMs + 3
+    || firstAction.maximumFrameWorkMs > secondAction.maximumFrameWorkMs + 3
     || firstAction.frameP95Ms > secondAction.frameP95Ms + 3
     || firstAction.frameP99Ms > secondAction.frameP99Ms + 4
     || firstAction.maximumAnimationFrameGapMs > secondAction.maximumAnimationFrameGapMs + 4) {

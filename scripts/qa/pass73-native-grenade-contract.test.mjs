@@ -71,6 +71,7 @@ function action(sequence, cold, maximumGapMs) {
     frameP95Ms: maximumGapMs,
     frameP99Ms: maximumGapMs,
     maximumAnimationFrameGapMs: maximumGapMs,
+    maximumFrameWorkMs: Math.max(0, maximumGapMs - 1),
   };
 }
 
@@ -178,4 +179,16 @@ test('rejects changed kinematics, missing matrix rows, and source drift', () => 
   const drifted = structuredClone(validReceipt());
   drifted.source.endingHead = 'd'.repeat(40);
   assert.match(pass73NativeGrenadeFailures(drifted).join('\n'), /clean immutable Git source/u);
+});
+
+test('compares cold and warm throws using measured game-loop work rather than refresh buckets', () => {
+  const refreshBucketVariance = structuredClone(validReceipt());
+  refreshBucketVariance.trials[0].first.window.p95Ms = 14;
+  refreshBucketVariance.trials[0].second.window.p95Ms = 7;
+  assert.doesNotThrow(() => assertPass73NativeGrenadeReceipt(refreshBucketVariance));
+
+  const coldGameLoopWork = structuredClone(validReceipt());
+  coldGameLoopWork.trials[0].first.action.maximumFrameWorkMs = 11.1;
+  coldGameLoopWork.trials[0].second.action.maximumFrameWorkMs = 8;
+  assert.match(pass73NativeGrenadeFailures(coldGameLoopWork).join('\n'), /cold throw exceeded/u);
 });
