@@ -20,6 +20,7 @@ const groups = [
   { name: 'pass69-3-ads-physical', timeoutMs: 900_000, args: ['tests/e2e/pass69-3-ads-physical-clearance.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass69-3-frame-hitch', timeoutMs: 900_000, args: ['tests/e2e/pass69-3-glass-m14-frame-hitch.spec.ts', 'tests/e2e/pass69-3-special-weapon-frame-hitch.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass72-corrections', default: false, timeoutMs: 600_000, args: ['tests/e2e/pass72-lobby-squad-reset.spec.ts', '--project=chromium', '--workers=1'] },
+  { name: 'pass73-gameplay-regressions', default: false, timeoutMs: 600_000, args: ['tests/e2e/pass73-gameplay-regressions.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass64-hud-contracts', default: false, timeoutMs: 900_000, args: ['tests/e2e/pass64-hud-menu.spec.ts', 'tests/e2e/pass65-menu-lifecycle.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass64-renderer-foundation', default: false, timeoutMs: 420_000, args: ['tests/e2e/pass64-renderer-foundation.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'capability-firefox', default: false, xvfb: true, args: ['tests/e2e/pass25a-capability.spec.ts', '--project=firefox', '--workers=1', '--headed'] },

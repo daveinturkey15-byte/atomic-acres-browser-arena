@@ -61,6 +61,8 @@ jobs:
       - run: npm run verify:provenance
       - run: npm run verify:killstreak-catalog
       - run: npm test
+      - name: Verify Pass 73 required browser-group wiring
+        run: npm run qa:pass73:ci-wiring-contract
       - run: npm run leaderboard:check
       - run: npm run build
         env:
