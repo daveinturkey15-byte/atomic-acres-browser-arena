@@ -31,7 +31,9 @@ describe('presentation prewarm startup contract', () => {
     const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     expect(source).toContain("const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent);");
     expect(source).toContain("shadowSamplerMode === 'basic-depth' ? THREE.BasicShadowMap : THREE.PCFShadowMap");
-    expect(source.match(/type: webGlShadowMapType/g)).toHaveLength(2);
+    // Renderer construction, exact-composition prewarm, and the live graphics
+    // transaction must all retain the browser-safe sampler selection.
+    expect(source.match(/type: webGlShadowMapType/g)).toHaveLength(3);
     expect(source).not.toContain('type: THREE.PCFShadowMap');
   });
 

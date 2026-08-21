@@ -73,10 +73,13 @@ try {
   await page.locator('#graphics-save').click();
   await page.waitForFunction(() => {
     const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+    const effectiveLabel = document.querySelector('#graphics-effective')?.textContent ?? '';
     return state?.render?.liveProfile === 'performance'
       && state?.settings?.displayedGraphicsPreset === 'performance'
       && state?.render?.drawingBuffer?.[0] <= 1920
-      && state?.render?.drawingBuffer?.[1] <= 1080;
+      && state?.render?.drawingBuffer?.[1] <= 1080
+      && effectiveLabel.includes('APPLIED LIVE: PERFORMANCE')
+      && effectiveLabel.includes('FULL PRESET NEXT ARENA:');
   }, undefined, { timeout: 15_000 });
   // Options intentionally hides the Deploy-panel resume control. The real
   // Escape transaction flushes the same pending settings and resumes the
@@ -139,6 +142,10 @@ try {
   assert.ok(after.render.atomicSignal.advancedGraphics.bloomStrength < before.render.atomicSignal.advancedGraphics.bloomStrength);
   assert.ok(after.render.atomicSignal.advancedGraphics.filmGrainScale < before.render.atomicSignal.advancedGraphics.filmGrainScale);
   assert.ok(after.render.graphicsApplication.appliedAt > 0);
+  assert.equal(after.render.graphicsApplication.requestedProfile, 'performance');
+  assert.equal(after.render.graphicsApplication.constructionProfile, 'blender');
+  assert.equal(after.render.graphicsApplication.state, 'live-safe-applied-topology-pending');
+  assert.equal(after.render.graphicsApplication.fullPresetEffective, false);
   assert.deepEqual(
     [...after.render.graphicsApplication.stagedReconstruction].sort(),
     ['antiAliasing', 'geometryDetail'].sort(),
@@ -170,6 +177,8 @@ try {
       drawingBuffer: after.render.drawingBuffer,
       shadows: after.render.shadows,
       effects: after.render.atomicSignal.advancedGraphics,
+      applicationState: after.render.graphicsApplication.state,
+      fullPresetEffective: after.render.graphicsApplication.fullPresetEffective,
       stagedReconstruction: after.render.graphicsApplication.stagedReconstruction,
       pendingRendererReload: after.render.graphicsApplication.pendingRendererReload,
       matchEpoch: after.killstreak.matchEpoch,

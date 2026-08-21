@@ -23377,9 +23377,14 @@ function reloadForGraphicsRuntime(): void {
 
 function refreshGraphicsPendingBadge(): void {
   const pending = pendingGraphicsPreset !== null || advancedGraphicsBinding.hasPendingEdits();
-  element<HTMLElement>('#graphics-effective').textContent = pending
-    ? 'PENDING · SAVES WHEN YOU LEAVE OPTIONS'
-    : `EFFECTIVE: ${displayedGraphicsPreset.toUpperCase()}${graphicsRuntime.reason ? ` · ${graphicsRuntime.reason.toUpperCase()}` : ''}`;
+  const badge = element<HTMLElement>('#graphics-effective');
+  if (pending) {
+    badge.textContent = 'PENDING · SAVES WHEN YOU LEAVE OPTIONS';
+  } else if (pendingRendererReload && stagedGraphicsReconstruction.length > 0) {
+    badge.textContent = `APPLIED LIVE: ${displayedGraphicsPreset.toUpperCase()} DPR / LIGHTING / EFFECTS · FULL PRESET NEXT ARENA: ${stagedGraphicsReconstruction.join(' + ').toUpperCase()}`;
+  } else {
+    badge.textContent = `EFFECTIVE: ${displayedGraphicsPreset.toUpperCase()}${graphicsRuntime.reason ? ` · ${graphicsRuntime.reason.toUpperCase()}` : ''}`;
+  }
 }
 
 function flushPendingGraphics(): void {
@@ -23403,8 +23408,8 @@ function flushPendingGraphics(): void {
   advancedGraphicsBinding.clearPendingEdits();
   pendingGraphicsPreset = null;
   lastLiveGraphicsApply = applyLiveGraphicsSettings();
-  refreshGraphicsPendingBadge();
   pendingRendererReload = lastLiveGraphicsApply.staged.length > 0;
+  refreshGraphicsPendingBadge();
   if (gameStarted) {
     const stagedSuffix = pendingRendererReload
       ? ` · ${lastLiveGraphicsApply.staged.join(', ')} staged for the next renderer construction`
@@ -28048,6 +28053,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       representation: activeRenderConfig.representation,
       graphicsApplication: {
         appliedAt: liveGraphicsAppliedAt,
+        requestedProfile: liveGraphicsProfile,
+        constructionProfile: rendererConstructionGraphics.profile,
+        state: stagedGraphicsReconstruction.length > 0
+          ? 'live-safe-applied-topology-pending'
+          : 'fully-effective',
+        fullPresetEffective: stagedGraphicsReconstruction.length === 0,
         stagedReconstruction: [...stagedGraphicsReconstruction],
         pendingRendererReload,
         requestedPixelRatioCap: activeRenderConfig.pixelRatioCap,
