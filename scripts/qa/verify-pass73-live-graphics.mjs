@@ -141,6 +141,33 @@ try {
   assert.ok(after.render.atomicSignal.advancedGraphics.volumetricScale < before.render.atomicSignal.advancedGraphics.volumetricScale);
   assert.ok(after.render.atomicSignal.advancedGraphics.bloomStrength < before.render.atomicSignal.advancedGraphics.bloomStrength);
   assert.ok(after.render.atomicSignal.advancedGraphics.filmGrainScale < before.render.atomicSignal.advancedGraphics.filmGrainScale);
+  assert.notEqual(after.render.lighting.runtime.hemisphere.intensity, before.render.lighting.runtime.hemisphere.intensity);
+  assert.notEqual(after.render.lighting.runtime.fill.intensity, before.render.lighting.runtime.fill.intensity);
+  assert.equal(after.render.lighting.runtime.hemisphere.color, after.render.lighting.hemisphereSky);
+  assert.equal(after.render.lighting.runtime.hemisphere.groundColor, after.render.lighting.hemisphereGround);
+  assert.equal(after.render.lighting.runtime.fill.color, after.render.lighting.fillColor);
+  assert.deepEqual(after.render.lighting.runtime.fill.position, after.render.lighting.fillPosition);
+  assert.equal(after.render.arenaContrastLighting.profile, 'performance');
+  assert.ok(before.render.arenaContrastLighting.activeLights > 0);
+  assert.equal(after.render.arenaContrastLighting.activeLights, 0);
+  assert.equal(after.render.arenaContrastLighting.shadowCastingLights, 0);
+  assert.ok(
+    after.render.atomicSignal.advancedGraphics.volumetricActual.scale
+      < before.render.atomicSignal.advancedGraphics.volumetricActual.scale,
+  );
+  assert.ok(
+    after.render.atomicSignal.advancedGraphics.volumetricActual.mistOpacity
+      < before.render.atomicSignal.advancedGraphics.volumetricActual.mistOpacity,
+  );
+  assert.ok(
+    after.render.atomicSignal.advancedGraphics.volumetricActual.dustMotes
+      < before.render.atomicSignal.advancedGraphics.volumetricActual.dustMotes,
+  );
+  assert.equal(
+    after.render.atomicSignal.advancedGraphics.oceanWaveAmplitude,
+    before.render.atomicSignal.advancedGraphics.oceanWaveAmplitude,
+    'graphics changes must not alter authoritative ocean/buoyancy amplitude',
+  );
   assert.ok(after.render.graphicsApplication.appliedAt > 0);
   assert.equal(after.render.graphicsApplication.requestedProfile, 'performance');
   assert.equal(after.render.graphicsApplication.constructionProfile, 'blender');
@@ -168,6 +195,10 @@ try {
       drawingBuffer: before.render.drawingBuffer,
       shadows: before.render.shadows,
       effects: before.render.atomicSignal.advancedGraphics,
+      lighting: before.render.lighting,
+      sky: before.render.sky,
+      atmosphere: before.render.atmosphere,
+      water: before.render.water,
       matchEpoch: before.killstreak.matchEpoch,
       frameCount: before.frameCount,
     },
@@ -177,6 +208,10 @@ try {
       drawingBuffer: after.render.drawingBuffer,
       shadows: after.render.shadows,
       effects: after.render.atomicSignal.advancedGraphics,
+      lighting: after.render.lighting,
+      sky: after.render.sky,
+      atmosphere: after.render.atmosphere,
+      water: after.render.water,
       applicationState: after.render.graphicsApplication.state,
       fullPresetEffective: after.render.graphicsApplication.fullPresetEffective,
       stagedReconstruction: after.render.graphicsApplication.stagedReconstruction,

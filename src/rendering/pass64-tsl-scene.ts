@@ -501,7 +501,13 @@ function applyArenaSystemLayout(
   const grass = root.getObjectByName('Pass 64 TSL grass');
   if (grass) grass.visible = definition.id === 'atomic-acres';
   const water = root.getObjectByName('Pass 64 TSL perimeter water');
-  if (water) water.visible = definition.id === 'rustworks-1v1';
+  if (water) {
+    water.visible = definition.id === 'rustworks-1v1';
+    const amplitude = graphics.oceanWaveAmplitude ?? RUSTWORKS_OCEAN_AMPLITUDE.blender;
+    const amplitudeUniform = water.userData.waveAmplitudeUniform as { value: number } | undefined;
+    if (amplitudeUniform) amplitudeUniform.value = amplitude;
+    water.userData.waveAmplitude = amplitude;
+  }
   const sky = root.getObjectByName('Pass 64 TSL atmosphere sky') as SkyMesh | undefined;
   const preset = definition.atmosphere.preset;
   let atmosphereSkyOpacity = 0;
@@ -661,6 +667,7 @@ function makeWater(
   water.renderOrder = -5;
   water.frustumCulled = false;
   water.userData.animationTimeUniform = animationTime;
+  water.userData.waveAmplitudeUniform = waveAmplitude;
   water.userData.waveBands = OCEAN_WAVES.length;
   water.userData.waveAmplitude = amplitude;
   water.userData.waveAuthority = RUSTWORKS_OCEAN_AUTHORITY_ID;
@@ -859,9 +866,23 @@ export function createPass64TslSceneSystems(
   const scenePass = hdr.scenePass;
   applyArenaSystemLayout(root, definition, definition.reviewCameras[0]?.seed ?? 6401, graphics);
   const publishActualGraphics = (): void => {
+    const mist = root.getObjectByName('Pass 64 TSL mist');
+    const smoke = root.getObjectByName('Pass 64 TSL smoke');
+    const dust = root.getObjectByName('Pass 64 TSL deterministic dust') as THREE.Points | undefined;
+    const water = root.getObjectByName('Pass 64 TSL perimeter water');
     root.userData.pass65AdvancedGraphics = {
       principalSamples: graphics.principalSamples,
       volumetricScale: activeGraphics.volumetricScale,
+      volumetricActual: {
+        scale: root.userData.tslVolumetricScale,
+        mistOpacity: Number((mist?.userData.opacityUniform as { value?: number } | undefined)?.value ?? 0),
+        mistLayers: mist?.children.filter(({ visible }) => visible).length ?? 0,
+        smokeOpacity: Number((smoke?.userData.opacityUniform as { value?: number } | undefined)?.value ?? 0),
+        smokeLayers: smoke?.children.filter(({ visible }) => visible).length ?? 0,
+        dustOpacity: Number((dust?.userData.opacityUniform as { value?: number } | undefined)?.value ?? 0),
+        dustMotes: dust?.geometry.drawRange.count ?? 0,
+      },
+      oceanWaveAmplitude: Number(water?.userData.waveAmplitude ?? 0),
       bloomStrength: activeGraphics.post.bloomStrength,
       filmGrainScale: activeGraphics.post.filmGrainScale,
       vignetteStrength: activeGraphics.post.vignetteStrength,

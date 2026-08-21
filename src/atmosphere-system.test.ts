@@ -58,4 +58,30 @@ describe('Pass 30 atmosphere budget', () => {
     system.setDensityScale(0.5);
     expect(system.telemetry()).toMatchObject({ densityScale: 0.5, mistCards: 5, smokeCards: 3, dustMotes: 32, triangles: 16 });
   });
+
+  it('rebinds retained atmosphere counts and material density when the live profile changes', () => {
+    const system = new AtmosphereSystem(new THREE.Scene(), 'blender', 'ANGLE (NVIDIA RTX)', null);
+    expect(system.telemetry()).toMatchObject({
+      profile: 'blender', dustMotes: 64, mistOpacity: 0.11, smokeOpacity: 0.055, dustOpacity: 0.11,
+    });
+    system.setProfile('performance');
+    expect(system.telemetry()).toMatchObject({
+      profile: 'performance', dustMotes: 40, mistOpacity: 0.08, smokeOpacity: 0.04, dustOpacity: 0.08,
+    });
+    system.setProfile('blender');
+    expect(system.telemetry()).toMatchObject({
+      profile: 'blender', dustMotes: 64, mistOpacity: 0.11, smokeOpacity: 0.055, dustOpacity: 0.11,
+    });
+    const dust = system.root.getObjectByName('pass32-subtle-airborne-dust') as THREE.Points;
+    expect(dust.geometry.getAttribute('position').count).toBeGreaterThanOrEqual(dust.geometry.drawRange.count);
+  });
+
+  it('retains enough dust capacity for a Performance-to-Quality live rebound', () => {
+    const system = new AtmosphereSystem(new THREE.Scene(), 'performance', 'ANGLE (NVIDIA RTX)', null, 'rustworks-1v1');
+    const dust = system.root.getObjectByName('pass32-subtle-airborne-dust') as THREE.Points;
+    expect(dust.geometry.getAttribute('position').count).toBe(96);
+    system.setProfile('blender');
+    expect(system.telemetry()).toMatchObject({ profile: 'blender', dustMotes: 96 });
+    expect(dust.geometry.drawRange.count).toBeLessThanOrEqual(dust.geometry.getAttribute('position').count);
+  });
 });

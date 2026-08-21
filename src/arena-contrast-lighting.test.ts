@@ -93,6 +93,17 @@ describe('Pass 62 arena contrast lighting', () => {
     expect(compat.telemetry()).toMatchObject({ activeLights: 0, shadowCastingLights: 0 });
   });
 
+  it('removes retained Quality practicals when the live profile changes to Performance', () => {
+    const scene = new THREE.Scene();
+    const rig = new ArenaContrastLighting(scene, 'blender');
+    rig.applyDefinition(atomicDefinition);
+    expect(rig.telemetry()).toMatchObject({ profile: 'blender', activeLights: 2, shadowCastingLights: 2 });
+    rig.setProfile('performance');
+    rig.applyDefinition(atomicDefinition);
+    expect(rig.telemetry()).toMatchObject({ profile: 'performance', activeLights: 0, shadowCastingLights: 0 });
+    expect(scene.children.filter((node) => node.name.includes('definition-practicals'))).toHaveLength(0);
+  });
+
   it('bypasses the extra rig on software WebGL', () => {
     const rig = new ArenaContrastLighting(new THREE.Scene(), 'blender', true);
     expect(rig.telemetry()).toMatchObject({ activeLights: 0, shadowCastingLights: 0 });

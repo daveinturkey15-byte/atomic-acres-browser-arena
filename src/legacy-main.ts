@@ -3957,7 +3957,7 @@ document.documentElement.dataset.arenaId = selectedArena.id;
 function applyArenaFogProfile(): void {
   const fog = activeArenaVisualDefinition?.id === selectedArena.id
     ? activeArenaVisualDefinition.fog
-    : atmosphereFogRange(renderProfile, selectedArena.id);
+    : atmosphereFogRange(liveGraphicsProfile, selectedArena.id);
   if (scene.fog instanceof THREE.Fog) {
     scene.fog.near = fog.near;
     scene.fog.far = fog.far;
@@ -23566,6 +23566,14 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
   );
   smokeVolumePresentationPool.setQualityScale(live.smokeScale);
   grassSystem?.setAdaptivePixelRatio(pixelRatioCap);
+  atmosphereSystem?.setProfile(desiredProfile);
+  waterSystem.configure(selectedArena.id, desiredProfile, {
+    halfX: Math.max(Math.abs(arena.bounds.minX), Math.abs(arena.bounds.maxX)),
+    halfZ: Math.max(Math.abs(arena.bounds.minZ), Math.abs(arena.bounds.maxZ)),
+  }, {
+    night: selectedArena.id === 'rustworks-1v1',
+    waterLevel: selectedArena.id === 'rustworks-1v1' ? -19.5 : -0.55,
+  });
   pass64TslSystems?.applyGraphics({
     principalSamples: Math.max(1, pass64TslSystems.principalHdrTarget.samples) as 1 | 2 | 4,
     volumetricScale: live.volumetricScale,
@@ -23573,6 +23581,12 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
     post: live.post,
     oceanWaveAmplitude: rustworksOceanAmplitude(desiredProfile),
   });
+  // Rebind the complete retained arena presentation after the profile state is
+  // committed. Updating only the three ambient intensities leaves the real
+  // sun, sky uniforms, fog, water and refinement owners on the prior preset
+  // while telemetry claims the new one.
+  applyArenaFogProfile();
+  applyArenaLightingForSelection();
   applyAdaptiveRenderBudget(pixelRatioCap);
   graphicsRefinement.refreshSelectiveBloom(scene);
   document.documentElement.dataset.graphicsPreset = displayedGraphicsPreset;
@@ -24308,6 +24322,7 @@ function applyArenaLightingForSelection(): void {
     fillLight.intensity = lighting.fillIntensity * graphicsRuntime.indirectLightScale;
     fillLight.position.set(...lighting.fillPosition);
   }
+  arenaContrastLighting.setProfile(liveGraphicsProfile);
   if (definition) arenaContrastLighting.applyDefinition(definition);
   if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
 }
@@ -28123,16 +28138,36 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         ...activeLighting,
         fogNear: scene.fog instanceof THREE.Fog ? scene.fog.near : activeLighting.fogNear,
         fogFar: scene.fog instanceof THREE.Fog ? scene.fog.far : activeLighting.fogFar,
+        runtime: {
+          fogColor: scene.fog instanceof THREE.Fog ? scene.fog.color.getHex() : null,
+          hemisphere: {
+            color: hemisphereLight.color.getHex(),
+            groundColor: hemisphereLight.groundColor.getHex(),
+            intensity: hemisphereLight.intensity,
+          },
+          ambient: { color: ambientLight.color.getHex(), intensity: ambientLight.intensity },
+          sun: {
+            color: sunLight.color.getHex(),
+            intensity: sunLight.intensity,
+            position: sunLight.position.toArray(),
+            castShadow: sunLight.castShadow,
+          },
+          fill: {
+            color: fillLight.color.getHex(),
+            intensity: fillLight.intensity,
+            position: fillLight.position.toArray(),
+          },
+        },
       },
       sky: {
         pass: 30,
-        top: `#${activeLighting.skyTop.toString(16).padStart(6, '0')}`,
-        horizon: `#${activeLighting.skyHorizon.toString(16).padStart(6, '0')}`,
-        bottom: `#${activeLighting.skyBottom.toString(16).padStart(6, '0')}`,
-        cloudShadow: `#${activeLighting.skyCloudShadow.toString(16).padStart(6, '0')}`,
-        cloudLight: `#${activeLighting.skyCloudLight.toString(16).padStart(6, '0')}`,
+        top: `#${(skyMaterial?.uniforms.top.value.getHex() ?? activeLighting.skyTop).toString(16).padStart(6, '0')}`,
+        horizon: `#${(skyMaterial?.uniforms.horizon.value.getHex() ?? activeLighting.skyHorizon).toString(16).padStart(6, '0')}`,
+        bottom: `#${(skyMaterial?.uniforms.bottom.value.getHex() ?? activeLighting.skyBottom).toString(16).padStart(6, '0')}`,
+        cloudShadow: `#${(skyMaterial?.uniforms.cloudShadow.value.getHex() ?? activeLighting.skyCloudShadow).toString(16).padStart(6, '0')}`,
+        cloudLight: `#${(skyMaterial?.uniforms.cloudLight.value.getHex() ?? activeLighting.skyCloudLight).toString(16).padStart(6, '0')}`,
         cloudBands: skyCloudsEnabled ? 2 : 0,
-        fogColor: `#${activeLighting.fogColor.toString(16).padStart(6, '0')}`,
+        fogColor: `#${(scene.fog instanceof THREE.Fog ? scene.fog.color.getHex() : activeLighting.fogColor).toString(16).padStart(6, '0')}`,
         fogNear: scene.fog instanceof THREE.Fog ? scene.fog.near : activeLighting.fogNear,
         fogFar: scene.fog instanceof THREE.Fog ? scene.fog.far : activeLighting.fogFar,
         godRayStrength: actualGodRayStrength,

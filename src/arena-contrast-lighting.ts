@@ -108,11 +108,16 @@ export class ArenaContrastLighting {
 
   constructor(
     private readonly scene: THREE.Scene,
-    private readonly profile: RenderProfile,
+    private profile: RenderProfile,
     private readonly softwareRenderer = false,
   ) {
     // Definition application below is the sole construction boundary. No
     // lighting roots for non-selected arenas exist in the gameplay scene.
+  }
+
+  /** Updates the retained rig policy before the current definition is rebound. */
+  setProfile(profile: RenderProfile): void {
+    this.profile = profile;
   }
 
   applyDefinition(definition: ArenaVisualDefinition): void {

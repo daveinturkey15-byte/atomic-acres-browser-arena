@@ -42,7 +42,7 @@ describe('WaterSystem', () => {
 
   it('uses the same deterministic multi-direction wave field for rendering and physics', () => {
     expect(OCEAN_WAVES).toHaveLength(5);
-    expect(rustworksOceanAmplitude('performance')).toBe(1.15);
+    expect(rustworksOceanAmplitude('performance')).toBe(1.55);
     expect(rustworksOceanAmplitude('blender')).toBe(1.55);
     const first = sampleOceanWave(42, -18, 7.25, 1.9);
     const repeat = sampleOceanWave(42, -18, 7.25, 1.9);
@@ -69,6 +69,18 @@ describe('WaterSystem', () => {
     expect(Math.min(...heights)).toBeLessThan(-1);
     expect(Math.max(...heights) - Math.min(...heights)).toBeGreaterThan(2.5);
     expect(Math.max(...velocities) - Math.min(...velocities)).toBeGreaterThan(1);
+  });
+
+  it('keeps buoyancy authority byte-equivalent across graphics profiles', () => {
+    const point = new THREE.Vector3(90, -19.2, 80);
+    const time = 7.25;
+    const samples = (['compat', 'performance', 'blender'] as const).map((profile) => {
+      const water = new WaterSystem(new THREE.Scene());
+      water.configure('rustworks-1v1', profile, { halfX: 27, halfZ: 29 });
+      return water.samplePhysics(point, time);
+    });
+    expect(samples[1]).toEqual(samples[0]);
+    expect(samples[2]).toEqual(samples[0]);
   });
 
   it('stays off for gun range', () => {
