@@ -118,7 +118,7 @@ type Pair = Readonly<{
   errors: string[];
 }>;
 
-async function startPair(browser: Browser, label: string, arenaId = 'rustworks-1v1'): Promise<Pair> {
+async function startPair(browser: Browser, label: string, arenaId = 'rustworks-1v1', mode: 'ffa' | 'tdm' = 'ffa'): Promise<Pair> {
   const context = await browser.newContext({ viewport: { width: 1_280, height: 720 }, deviceScaleFactor: 1 });
   await context.addInitScript((loadout) => {
     try { localStorage.setItem('atomic-acres:killstreak-loadout:v1', JSON.stringify(loadout)); } catch { /* about:blank */ }
@@ -157,6 +157,7 @@ async function startPair(browser: Browser, label: string, arenaId = 'rustworks-1
   }
   const roomCode = (await host.locator('#room-code').textContent())?.trim() ?? '';
   expect(roomCode.length).toBeGreaterThan(0);
+  if (mode === 'tdm') await host.locator('#lobby-mode').selectOption('tdm');
   await guest.locator('#room-input').fill(roomCode);
   await guest.locator('#join').click();
   await Promise.all([host, guest].map((page) => page.waitForFunction(
@@ -575,6 +576,65 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
         feedback: hiddenState.supportDamageFeedback,
         browserErrors: errors,
       });
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('keeps replicated Chopper gun audio owner-local and suppresses it for a TDM opponent', async ({ browser }) => {
+    test.setTimeout(150_000);
+    const pair = await startPair(browser, 'SUPPORT AUDIO AUDIENCE', 'rustworks-1v1', 'tdm');
+    const { context, host, guest, errors } = pair;
+    try {
+      await host.bringToFront();
+      await host.locator('#game').click({ position: { x: 100, y: 100 }, force: true });
+      const baseline = await Promise.all([host, guest].map(async (page) => {
+        const snapshot = await state(page);
+        return {
+          playerId: snapshot.player.id,
+          team: snapshot.player.team,
+          mode: snapshot.privateMatch.mode,
+          supportCues: snapshot.audio.support.cues,
+          gunShots: snapshot.audio.support.gunShots,
+        };
+      }));
+      expect(baseline[0].mode).toBe('tdm');
+      expect(baseline[0].team).not.toBe(baseline[1].team);
+      const activated = await host.evaluate(() => {
+        const api = window.__ATOMIC_ACRES_DEBUG__;
+        api.earnSupport(15);
+        api.aimAtRemoteWithOffset(0, 0);
+        return api.activateKillstreak('chopper');
+      });
+      expect(activated).toBe(true);
+      await expect.poll(async () => (await state(host)).killstreak.entities
+        .some((entity: any) => entity.kind === 'chopper'), { timeout: 20_000 }).toBe(true);
+      const chopperEntityId = (await state(host)).killstreak.entities
+        .find((entity: any) => entity.kind === 'chopper').id;
+      expect(await host.evaluate((entityId) => window.__ATOMIC_ACRES_DEBUG__.toggleChopperGunnerControl(entityId), chopperEntityId)).toBe(true);
+      await expect.poll(async () => {
+        const snapshot = await state(host);
+        return snapshot.killstreak.actors
+          .find((actor: any) => actor.actorId === snapshot.player.id)?.possession?.entityId ?? null;
+      }).toBe(chopperEntityId);
+      // The authoritative host emits the shot event, then the guest receives
+      // the same bounded event through killstreak-damage-result. The owner
+      // hears it; the opposing TDM listener must not.
+      await host.mouse.down({ button: 'left' });
+      for (let attempt = 0; attempt < 24; attempt += 1) {
+        await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.aimAtRemoteWithOffset(0, 0));
+        if ((await state(host)).audio.support.gunShots > baseline[0].gunShots) break;
+        await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+      }
+      await host.mouse.up({ button: 'left' });
+      await expect.poll(async () => (await state(host)).audio.support.gunShots, { timeout: 35_000 })
+        .toBeGreaterThan(baseline[0].gunShots);
+      await new Promise((resolveWait) => setTimeout(resolveWait, 500));
+      const after = await Promise.all([host, guest].map(state));
+      expect(after[0].audio.support.gunShots).toBeGreaterThan(baseline[0].gunShots);
+      expect(after[1].audio.support.gunShots).toBe(baseline[1].gunShots);
+      expect(after[0].audio.support.chopperRotorStarts).toBeGreaterThanOrEqual(1);
+      expect(errors).toEqual([]);
     } finally {
       await context.close();
     }

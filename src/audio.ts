@@ -379,6 +379,7 @@ export class ArenaAudio {
   private readonly liveChopperRotorIds = new Set<string>();
   private chopperRotorStarts = 0;
   private chopperRotorStops = 0;
+  private supportGunShots = 0;
   private supportCuePlays = 0;
   private matchCountdownCuePlays = 0;
   private lastMatchCountdownCue: MatchCountdownAudioCueId | null = null;
@@ -1329,6 +1330,7 @@ export class ArenaAudio {
   }
 
   supportGun(kind: 'chopper' | 'drone'): void {
+    this.supportGunShots += 1;
     if (kind === 'chopper') {
       this.sweep(104, 38, 0.16, 0.21, 'sawtooth', this.weapons);
       this.noise({ duration: 0.19, volume: 0.28, filter: 'lowpass', frequency: 2_500, q: 0.7 }, this.weapons);
@@ -1564,7 +1566,7 @@ export class ArenaAudio {
     grenadeFuse: { beeps: number; startMs: number };
     crossbowFuse: { beeps: number; lastRemainingMs: number; lastDistanceM: number; startMs: number };
     minigunDrive: { active: boolean; starts: number; stops: number; fraction: number; phase: MinigunSpoolPhase };
-    support: { cues: number; chopperRotorActive: boolean; chopperRotorStarts: number; chopperRotorStops: number };
+    support: { cues: number; gunShots: number; chopperRotorActive: boolean; chopperRotorStarts: number; chopperRotorStops: number };
     countdown: { cues: number; lastCue: MatchCountdownAudioCueId | null; maximumVoicesPerCue: number; maximumCueWindowSeconds: number; buses: readonly ['announcements', 'ui'] };
     railgun: {
       local: number;
@@ -1654,6 +1656,7 @@ export class ArenaAudio {
       },
       support: {
         cues: this.supportCuePlays,
+        gunShots: this.supportGunShots,
         chopperRotorActive: this.chopperRotorLoops.size > 0,
         chopperRotorStarts: this.chopperRotorStarts,
         chopperRotorStops: this.chopperRotorStops,
