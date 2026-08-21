@@ -99,16 +99,38 @@ async function deploy(page: Page, baseURL: string, profile: string, weapon: stri
   await expect(page.locator('#solo')).toBeEnabled({ timeout: 90_000 });
   await page.locator('#player-name').fill(`Pass 73 ADS ${profile} ${weapon}`);
   await page.locator('#solo').click();
-  await page.waitForFunction((expectedProfile) => {
-    const api = (window as any).__ATOMIC_ACRES_DEBUG__;
-    const state = api?.snapshot();
-    const runtimeProfile = expectedProfile === 'quality' ? 'blender' : expectedProfile;
-    return state?.matchPhase === 'active'
-      && state?.render?.runtime?.actualBackend === 'webgpu'
-      && state?.render?.runtime?.softwareAdapter === false
-      && state?.render?.runtime?.presentation?.status === 'healthy'
-      && document.documentElement.dataset.renderProfile === runtimeProfile;
-  }, profile, { polling: 'raf', timeout: 90_000 });
+  try {
+    await page.waitForFunction((expectedProfile) => {
+      const api = (window as any).__ATOMIC_ACRES_DEBUG__;
+      const state = api?.snapshot();
+      const runtimeProfile = expectedProfile === 'quality' ? 'blender' : expectedProfile;
+      return state?.matchPhase === 'active'
+        && state?.render?.runtime?.actualBackend === 'webgpu'
+        && state?.render?.runtime?.softwareAdapter === false
+        && state?.render?.runtime?.presentation?.status === 'healthy'
+        && document.documentElement.dataset.renderProfile === runtimeProfile;
+    }, profile, { polling: 'raf', timeout: 90_000 });
+  } catch (error) {
+    const diagnostic = await page.evaluate(() => {
+      const api = (window as any).__ATOMIC_ACRES_DEBUG__;
+      const state = api?.snapshot();
+      return {
+        bootstrap: state?.bootstrap ?? null,
+        gameStarted: state?.gameStarted ?? null,
+        matchPhase: state?.matchPhase ?? null,
+        arenaSelection: state?.arenaSelection ?? null,
+        renderRuntime: state?.render?.runtime ?? null,
+        weaponReady: state?.weaponReady ?? null,
+        dataset: { ...document.documentElement.dataset },
+        deploymentTransition: { ...document.querySelector<HTMLElement>('#deployment-transition')?.dataset },
+        status: document.querySelector<HTMLElement>('#network-status')?.textContent ?? null,
+        runtimeLog: localStorage.getItem('atomic-acres:client-runtime-log:v1'),
+      };
+    });
+    throw new Error(`Native ADS deployment did not reach the active WebGPU profile: ${JSON.stringify(diagnostic, null, 2)}`, {
+      cause: error,
+    });
+  }
   await page.evaluate(() => {
     const api = (window as any).__ATOMIC_ACRES_DEBUG__;
     api.setBotsFrozen(true);
