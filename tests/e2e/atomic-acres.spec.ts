@@ -299,6 +299,11 @@ type DebugState = {
       contactError?: number; palmOrientationError?: number; shoulderEntryNdc?: [number, number, number];
     }>;
     importedModel: { source: string; weapon: string; clips: number; meshes: number; renderPrimitives: number; triangles: number; detailMeshes: number; socketContractReady: boolean; muzzleForwardDot: number | null; sightForwardDot: number | null } | null;
+    worldPlaneClearance: {
+      contract: 'current-rendered-mesh-world-bounds-v1';
+      arms: { min: readonly number[]; max: readonly number[] } | null;
+      weapon: { min: readonly number[]; max: readonly number[] } | null;
+    };
   };
   sniperScope: { active: boolean; magnification: number; baseFov: number; cameraFov: number; viewmodelVisible: boolean };
   weaponActionHistory: string[];
@@ -527,6 +532,61 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('boot and authored presentation', () => {
+  test('keeps authored first-person arms above the floor and behind contact planes in every shipped pose', async ({ page }) => {
+    test.setTimeout(180_000);
+    await pageReady(page);
+    await startSolo(page);
+    const captures: Array<{ weapon: string; pose: string; bounds: DebugState['weaponPresentation']['worldPlaneClearance']['arms'] }> = [];
+    const sample = async (weapon: string, pose: string, action: () => Promise<void> = async () => {}) => {
+      await page.evaluate((selected) => {
+        const debug = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { equipWeapon: (weapon: string) => void } }).__ATOMIC_ACRES_DEBUG__;
+        debug.equipWeapon(selected);
+      }, weapon);
+      await expect.poll(async () => (await debug(page)).weaponPresentation.weapon).toBe(weapon);
+      await action();
+      await page.waitForTimeout(120);
+      const state = await debug(page);
+      captures.push({ weapon, pose, bounds: state.weaponPresentation.worldPlaneClearance.arms });
+    };
+    const shippedWeapons = ['carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'railgun', 'pistol', 'magnum', 'machine-pistol', 'mini-uzi', 'mp5', 'm4a1', 'ak-47', 'minigun', 'm14-ebr', 'slug-shotgun', 'flashlight-pistol'] as const;
+    for (const weapon of shippedWeapons) await sample(weapon, 'catalog-stand');
+    await sample('carbine', 'stand');
+    await sample('m14-ebr', 'crouch', async () => page.evaluate(() => {
+      const debug = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setStance: (stance: 'crouch') => void } }).__ATOMIC_ACRES_DEBUG__;
+      debug.setStance('crouch');
+    }));
+    await sample('explosive-crossbow', 'prone-ads', async () => page.evaluate(() => {
+      const debug = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setStance: (stance: 'prone') => void; setAds: (held: boolean) => void } }).__ATOMIC_ACRES_DEBUG__;
+      debug.setStance('prone');
+      debug.setAds(true);
+    }));
+    await sample('carbine', 'sprint-reload', async () => page.evaluate(() => {
+      const debug = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void; setMovement: (forward: boolean, sprint?: boolean) => void; setReloadCaptureProgress: (progress: number | null) => void } }).__ATOMIC_ACRES_DEBUG__;
+      debug.setAds(false);
+      debug.setMovement(true, true);
+      debug.setReloadCaptureProgress(0.46);
+    }));
+    await sample('pistol', 'knife', async () => page.evaluate(() => {
+      const debug = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setMovement: (forward: boolean, sprint?: boolean) => void; setReloadCaptureProgress: (progress: number | null) => void; setMeleeCaptureProgress: (progress: number | null) => void } }).__ATOMIC_ACRES_DEBUG__;
+      debug.setMovement(false, false);
+      debug.setReloadCaptureProgress(null);
+      debug.setMeleeCaptureProgress(0.5);
+    }));
+    expect(captures).toHaveLength(shippedWeapons.length + 5);
+    for (const capture of captures) {
+      const bounds = capture.bounds;
+      expect(bounds, `${capture.weapon}/${capture.pose}:arm bounds`).not.toBeNull();
+      if (!bounds) continue;
+      expect(bounds.min.length, `${capture.weapon}/${capture.pose}:min`).toBe(3);
+      expect(bounds.max.length, `${capture.weapon}/${capture.pose}:max`).toBe(3);
+      expect([...bounds.min, ...bounds.max].every(Number.isFinite), `${capture.weapon}/${capture.pose}:finite`).toBe(true);
+      // The authored viewmodel is camera-parented, so this is the retained
+      // world-space floor plane for the playable arena (0.4 m safety margin).
+      expect(bounds.min[1], `${capture.weapon}/${capture.pose}:above-floor`).toBeGreaterThan(-0.4);
+      expect(bounds.max[2], `${capture.weapon}/${capture.pose}:behind-near-contact-plane`).toBeLessThan(-0.05);
+    }
+  });
+
   test('keeps the reduced desktop gameplay HUD and tall Field Support column legible', async ({ page }) => {
     await pageReady(page);
     await startSolo(page);
