@@ -72,6 +72,7 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         channel: pass73NativeWebGpu ? 'chrome' : multiplayerChromeChannel ?? installedEdgeChannel,
+        headless: pass73NativeWebGpu ? false : undefined,
         userAgent: resolvePass70ChromiumProjectUserAgent({
           desktopChromeUserAgent: devices['Desktop Chrome'].userAgent,
           installedEdgeChannel,
@@ -83,6 +84,8 @@ export default defineConfig({
             '--disable-background-timer-throttling',
             '--disable-renderer-backgrounding',
             '--disable-backgrounding-occluded-windows',
+            '--window-position=-32000,-32000',
+            '--window-size=2640,1520',
           ],
         } : undefined,
         viewport: { width: 1280, height: 720 },

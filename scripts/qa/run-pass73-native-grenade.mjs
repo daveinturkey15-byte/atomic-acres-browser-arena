@@ -66,6 +66,7 @@ const result = spawnSync(process.execPath, [
     PASS73_NATIVE_TREE_SHA: tree,
     PASS73_NATIVE_CHROME_PATH: chromePath,
     PASS73_NATIVE_CHROME_SHA256: chromeSha256,
+    PASS73_NATIVE_COMPOSITOR: 'headed-offscreen',
     QA_PREVIEW_PORT: String(previewPort),
   },
   stdio: 'inherit',

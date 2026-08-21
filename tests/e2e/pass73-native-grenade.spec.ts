@@ -13,6 +13,7 @@ const expectedHead = process.env.PASS73_NATIVE_SOURCE_SHA ?? '';
 const expectedTree = process.env.PASS73_NATIVE_TREE_SHA ?? '';
 const chromePath = process.env.PASS73_NATIVE_CHROME_PATH ?? '';
 const chromeSha256 = process.env.PASS73_NATIVE_CHROME_SHA256 ?? '';
+const compositor = process.env.PASS73_NATIVE_COMPOSITOR ?? '';
 const artifactRoot = 'artifacts/pass73/native-grenade';
 
 test.describe.configure({ mode: 'serial' });
@@ -257,6 +258,7 @@ test('first grenade stays inside the warm envelope in three fresh Quality and Pe
       backend: 'native-hardware-webgpu',
       input: 'trusted-keyboard-KeyG',
       freshBrowserContextPerTrial: true,
+      compositor,
     },
     trials,
   };

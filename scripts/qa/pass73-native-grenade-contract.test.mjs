@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   PASS73_NATIVE_GRENADE_CONTEXTS_PER_PROFILE,
   PASS73_NATIVE_GRENADE_PROFILES,
@@ -11,6 +14,7 @@ import {
 const head = 'a'.repeat(40);
 const tree = 'b'.repeat(40);
 const executableSha256 = 'c'.repeat(64);
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 function render(sequence) {
   return {
@@ -104,6 +108,7 @@ function validReceipt() {
       backend: 'native-hardware-webgpu',
       input: 'trusted-keyboard-KeyG',
       freshBrowserContextPerTrial: true,
+      compositor: 'headed-offscreen',
     },
     trials: PASS73_NATIVE_GRENADE_PROFILES.flatMap((profile) => (
       Array.from({ length: PASS73_NATIVE_GRENADE_CONTEXTS_PER_PROFILE }, (_, index) => trial(profile, index + 1))
@@ -113,6 +118,16 @@ function validReceipt() {
 
 test('accepts the complete exact-source six-context Quality and Performance receipt', () => {
   assert.doesNotThrow(() => assertPass73NativeGrenadeReceipt(validReceipt(), { head, tree, executableSha256 }));
+});
+
+test('owned runner binds the receipt claim to a headed offscreen installed-Chrome compositor', () => {
+  const config = readFileSync(resolve(root, 'playwright.config.ts'), 'utf8');
+  const runner = readFileSync(resolve(root, 'scripts/qa/run-pass73-native-grenade.mjs'), 'utf8');
+  assert.match(config, /headless: pass73NativeWebGpu \? false : undefined/u);
+  assert.match(config, /'--window-position=-32000,-32000'/u);
+  assert.match(config, /'--window-size=2640,1520'/u);
+  assert.match(config, /'--disable-backgrounding-occluded-windows'/u);
+  assert.match(runner, /PASS73_NATIVE_COMPOSITOR: 'headed-offscreen'/u);
 });
 
 test('rejects debug input, a hitch, resource or pipeline work, and software WebGPU', () => {

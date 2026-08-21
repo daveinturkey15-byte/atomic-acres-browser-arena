@@ -190,7 +190,8 @@ export function pass73NativeGrenadeFailures(receiptValue, expected = {}) {
     || !exactArray(gate.viewport, [2_560, 1_440]) || gate.deviceScaleFactor !== 1
     || gate.backend !== 'native-hardware-webgpu'
     || gate.input !== 'trusted-keyboard-KeyG'
-    || gate.freshBrowserContextPerTrial !== true) {
+    || gate.freshBrowserContextPerTrial !== true
+    || gate.compositor !== 'headed-offscreen') {
     failures.push('gate matrix identity is invalid');
   }
   const trials = array(receipt.trials);
