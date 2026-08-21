@@ -1,11 +1,14 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import sharp from 'sharp';
 import { createServer } from 'vite';
 import {
+  analyzeArmIdMask,
   analyzeViewmodelSilhouetteMask,
+  capArmIdMask,
   viewmodelSilhouetteRoi,
 } from './viewmodel-silhouette-contract.mjs';
 
@@ -37,6 +40,9 @@ const executablePath = [
   'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
 ].filter(Boolean).find((candidate) => existsSync(candidate));
 if (!executablePath) throw new Error('Pass 66 viewmodel framing gate requires installed Google Chrome');
+const browserExecutableSha256 = createHash('sha256')
+  .update(await readFile(executablePath))
+  .digest('hex');
 
 const requestedViewports = new Set((process.env.PASS66_VIEWMODEL_VIEWPORTS ?? '')
   .split(',').map((id) => id.trim()).filter(Boolean));
@@ -58,9 +64,11 @@ const gripFamilyMatrix = Object.freeze([
   { weapon: 'pistol', family: 'handgun', pose: 'reload-0.46', reloadProgress: 0.46 },
 ]);
 const gripFamilyViewportIds = new Set(['1440p', 'iphone-15-landscape']);
-const dualArmSilhouetteProfile = (viewport) => (
-  viewport.id === 'iphone-15-landscape' ? 'dual-arm-overlap' : 'dual-arm'
-);
+// Every call using this profile is coupled to exact two-chain weapon/family,
+// bind-offset, segment-length, socket-contact and palm-orientation telemetry.
+// It accepts ordinary separated sleeves first, then a stronger dense union
+// when the weapon/forearms genuinely occlude the two entries at any aspect.
+const dualArmSilhouetteProfile = () => 'dual-arm-overlap';
 const route = `http://127.0.0.1:${port}/?release=latest&renderer=webgl2&render=blender&map=gun-range&grass=off&mist=off&seed=660214`;
 const sourceRevision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 if (!/^[a-f0-9]{40}$/u.test(sourceRevision)) {
@@ -263,9 +271,10 @@ function temporalActionViolations(label, presentation, action, progress) {
     violations.push(`${label}: articulated knife arm is not finite or visibly posed`);
   }
   if (!left || left.action !== 'melee' || Math.abs(left.supportChainScale - 1) > 1e-6
-    || left.stowedWithoutScaling !== true
-    || left.supportChainPolicy !== 'one-hand-action-stowed-outside-frustum-v1') {
-    violations.push(`${label}: one-handed melee support chain is not safely stowed`);
+    || left.supportChainVisible !== true
+    || left.supportChainPolicy !== 'two-chain-intact-melee-guard-v1'
+    || ![left.shoulder, left.elbow, left.wrist, left.palm].every(finiteVector)) {
+    violations.push(`${label}: melee support chain is not a visible intact authored guard`);
   }
   if (presentation?.passiveKnifeVisible || presentation?.browserProceduralMeleeArmViolation) {
     violations.push(`${label}: invalid passive/procedural knife presentation is visible`);
@@ -463,6 +472,161 @@ async function renderedSilhouetteEvidence(label, captureResult, artifactToken, p
   });
 }
 
+function sha256(buffer) {
+  return createHash('sha256').update(buffer).digest('hex');
+}
+
+function armEvidenceProvenanceViolations(label, side, telemetry, backgroundTelemetry) {
+  const violations = [];
+  if (telemetry?.contract !== 'actual-skinned-vertex-arm-only-material-id-v1'
+    || telemetry?.mode !== side || telemetry?.selectedSide !== side) {
+    violations.push(`${label}/${side}: capture is not the truthful per-arm skinned material-ID mode`);
+  }
+  if (telemetry?.skinnedMeshCount !== 4 || telemetry?.eligibleSkinnedMeshCount !== 4
+    || !Number.isFinite(telemetry?.selectedVertexCount) || telemetry.selectedVertexCount <= 0
+    || !Number.isFinite(telemetry?.oppositeVertexCount) || telemetry.oppositeVertexCount <= 0) {
+    violations.push(`${label}/${side}: shipped four-skin vertex ownership was not independently partitioned`);
+  }
+  if (telemetry?.weaponMeshesMutated !== 0 || telemetry?.knifeMutated !== false
+    || telemetry?.ownershipPassOcclusionPolicy !== 'selected-real-arm-xray-weapon-render-retained-v1'
+    || telemetry?.weaponMeshCount !== backgroundTelemetry?.weaponMeshCount
+    || telemetry?.visibleWeaponMeshCount !== backgroundTelemetry?.visibleWeaponMeshCount) {
+    violations.push(`${label}/${side}: weapon/knife changed during the arm-only ID pair`);
+  }
+  if (backgroundTelemetry?.contract !== 'actual-skinned-vertex-arm-only-material-id-v1'
+    || backgroundTelemetry?.mode !== 'background'
+    || backgroundTelemetry?.selectedSide !== null
+    || backgroundTelemetry?.skinnedMeshCount !== 4) {
+    violations.push(`${label}/${side}: paired weapon-only background did not hide exactly the shipped arm skins`);
+  }
+  return violations;
+}
+
+async function writeArmIdMask(frame, backgroundFrame, artifactPath, side) {
+  const { data, info } = await sharp(frame).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const background = await sharp(backgroundFrame).removeAlpha().raw().toBuffer();
+  const mask = new Uint8Array(info.width * info.height);
+  const rgba = Buffer.alloc(info.width * info.height * 4);
+  for (let offset = 0, pixel = 0; offset < data.length; offset += info.channels, pixel += 1) {
+    const difference = Math.sqrt(
+      (data[offset] - background[offset]) ** 2
+      + (data[offset + 1] - background[offset + 1]) ** 2
+      + (data[offset + 2] - background[offset + 2]) ** 2,
+    );
+    const materialIdMatch = side === 'left'
+      ? data[offset] >= 110 && data[offset] < 180
+        && data[offset + 1] >= 200 && data[offset + 2] >= 80 && data[offset + 2] < 150
+        && data[offset + 1] - data[offset] >= 55
+      : data[offset] >= 220 && data[offset + 1] < 90 && data[offset + 2] < 150;
+    const visible = difference >= 7 && materialIdMatch;
+    mask[pixel] = visible ? 1 : 0;
+    const output = pixel * 4;
+    rgba[output] = visible ? (side === 'right' ? 255 : 25) : 4;
+    rgba[output + 1] = visible ? (side === 'left' ? 255 : 23) : 8;
+    rgba[output + 2] = visible ? (side === 'left' ? 74 : 79) : 12;
+    rgba[output + 3] = 255;
+  }
+  await sharp(rgba, { raw: { width: info.width, height: info.height, channels: 4 } })
+    .png().toFile(artifactPath);
+  return { mask, width: info.width, height: info.height, metrics: analyzeArmIdMask(mask, info.width, info.height, side) };
+}
+
+async function captureArmIdEvidence(page, label, artifactToken, negativeControls = false) {
+  const backgroundArtifact = `${artifactRoot}/${artifactToken}-weapon-only-background.png`;
+  const sides = [];
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+  try {
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
+    const backgroundAccepted = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setArmEvidenceCapture('background'));
+    if (!backgroundAccepted) throw new Error(`${label}: arm-only background capture was rejected`);
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+    const backgroundFrame = await isolatedGameCanvasFrame(page);
+    await writeFile(backgroundArtifact, backgroundFrame);
+    const backgroundState = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+    for (const side of ['left', 'right']) {
+      await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
+      const accepted = await page.evaluate((selectedSide) => (
+        window.__ATOMIC_ACRES_DEBUG__.setArmEvidenceCapture(selectedSide)
+      ), side);
+      if (!accepted) throw new Error(`${label}/${side}: skinned arm-only capture was rejected`);
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
+      await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+      const sourceFrame = await isolatedGameCanvasFrame(page);
+      const sourceArtifact = `${artifactRoot}/${artifactToken}-${side}-arm-id-source.png`;
+      const maskArtifact = `${artifactRoot}/${artifactToken}-${side}-arm-id-mask.png`;
+      await writeFile(sourceArtifact, sourceFrame);
+      const state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+      const rendered = await writeArmIdMask(sourceFrame, backgroundFrame, maskArtifact, side);
+      const sideViolations = [
+        ...armEvidenceProvenanceViolations(
+          label,
+          side,
+          state.weaponPresentation?.armEvidenceCapture,
+          backgroundState.weaponPresentation?.armEvidenceCapture,
+        ),
+        ...rendered.metrics.violations.map((violation) => `${label}/${side}: ${violation}`),
+      ];
+      const mutation = negativeControls ? (() => {
+        const capped = capArmIdMask(rendered.mask, rendered.width, rendered.height);
+        const metrics = analyzeArmIdMask(capped, rendered.width, rendered.height, side);
+        return { capped, metrics };
+      })() : null;
+      let mutationReceipt = null;
+      if (mutation) {
+        const cappedArtifact = `${artifactRoot}/${artifactToken}-${side}-arm-id-mask-CAPPED-MUST-FAIL.png`;
+        const cappedRgba = Buffer.alloc(rendered.width * rendered.height * 4);
+        for (let pixel = 0; pixel < mutation.capped.length; pixel += 1) {
+          const visible = mutation.capped[pixel] === 1;
+          const output = pixel * 4;
+          cappedRgba[output] = visible ? 255 : 4;
+          cappedRgba[output + 1] = visible ? 138 : 8;
+          cappedRgba[output + 2] = visible ? 20 : 12;
+          cappedRgba[output + 3] = 255;
+        }
+        await sharp(cappedRgba, { raw: { width: rendered.width, height: rendered.height, channels: 4 } })
+          .png().toFile(cappedArtifact);
+        if (mutation.metrics.passed || mutation.metrics.violations.length === 0) {
+          sideViolations.push(`${label}/${side}: capped-sleeve negative control incorrectly passed while weapon stayed`);
+        }
+        mutationReceipt = Object.freeze({
+          contract: 'cap-selected-arm-mask-non-arm-source-byte-exact-v1',
+          artifact: cappedArtifact,
+          sourceFrameSha256: sha256(sourceFrame),
+          pairedWeaponBackgroundSha256: sha256(backgroundFrame),
+          nonArmSourcePixelsChanged: 0,
+          expectedVerdict: 'fail',
+          actualVerdict: mutation.metrics.passed ? 'pass' : 'fail',
+          metrics: mutation.metrics,
+        });
+      }
+      sides.push(Object.freeze({
+        side,
+        sourceArtifact,
+        maskArtifact,
+        sourceFrameSha256: sha256(sourceFrame),
+        backgroundFrameSha256: sha256(backgroundFrame),
+        provenance: state.weaponPresentation?.armEvidenceCapture,
+        metrics: rendered.metrics,
+        mutation: mutationReceipt,
+        violations: Object.freeze(sideViolations),
+      }));
+    }
+    return Object.freeze({
+      label,
+      backgroundArtifact,
+      backgroundFrameSha256: sha256(backgroundFrame),
+      backgroundProvenance: backgroundState.weaponPresentation?.armEvidenceCapture,
+      sides: Object.freeze(sides),
+      violations: Object.freeze(sides.flatMap((entry) => entry.violations)),
+    });
+  } finally {
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setArmEvidenceCapture(null));
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  }
+}
+
 function readabilityViolations(label, readability, melee) {
   const violations = [];
   const arms = readability?.arms;
@@ -590,10 +754,12 @@ async function writeContactSheet(entries, outputPath, maximumColumns = 5) {
 
 const server = await createServer({ server: { host: '127.0.0.1', port, strictPort: true }, logLevel: 'error' });
 let browser;
+let rendererRuntime;
 const errors = [];
 const violations = [];
 const evidence = [];
 const temporalEvidence = [];
+const armIdEvidence = [];
 try {
   await server.listen();
   browser = await chromium.launch({
@@ -611,6 +777,7 @@ try {
     return state?.bootstrap?.stage === 'ready' && state?.weaponReady === true
       && state?.render?.runtime?.actualBackend === 'webgl2';
   }, undefined, { timeout: 60_000 });
+  rendererRuntime = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.render?.runtime ?? null);
   await page.evaluate(() => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
     api.startSolo(); api.setBotsFrozen(true); api.setMovement(false);
@@ -639,6 +806,10 @@ try {
       const snapshot = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
       return snapshot?.gameStarted === true && snapshot?.matchPhase === 'active';
     }, undefined, { timeout: 45_000 });
+    // Let the real deploy presentation clear and the weapon switch settle;
+    // review frames and geometry masks must represent stable play, not the
+    // transient ENGAGE banner or a partially blended equip pose.
+    await page.waitForTimeout(1_200);
     const mobileTouchLayout = viewport.id === 'iphone-15-landscape';
     await page.evaluate((enableMobileTouchLayout) => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
@@ -694,6 +865,14 @@ try {
       readability: hipReadability,
       silhouette: hipSilhouette,
     });
+    const hipArmIds = await captureArmIdEvidence(
+      page,
+      hipLabel,
+      `${viewport.id}-m4a1-hip`,
+      viewport.id === '1440p',
+    );
+    violations.push(...hipArmIds.violations);
+    armIdEvidence.push(hipArmIds);
 
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.adsProgress > 0.98);
@@ -729,6 +908,52 @@ try {
       readability: adsReadability,
       silhouette: adsSilhouetteEvidence.silhouette,
     });
+    const adsArmIds = await captureArmIdEvidence(page, adsLabel, `${viewport.id}-m4a1-ads`);
+    violations.push(...adsArmIds.violations);
+    armIdEvidence.push(adsArmIds);
+
+    const priorShotsPresented = Number(state.weaponPresentation?.shotsPresented ?? 0);
+    await page.evaluate(() => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      api.setAds(false);
+      api.fireOnce();
+      api.setFireCaptureAgeMs(24);
+    });
+    await page.waitForFunction((priorShots) => {
+      const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation;
+      return presentation?.adsProgress < 0.02 && presentation?.shotsPresented > priorShots;
+    }, priorShotsPresented);
+    await page.waitForTimeout(80);
+    state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+    const fireLabel = `${viewport.id}/fire-kick`;
+    violations.push(...presentationViolations(fireLabel, state.weaponPresentation, false));
+    violations.push(...dualArmProportionViolations(fireLabel, state.weaponPresentation, 'm4a1', 'long-gun'));
+    const fireCapture = await capture(page, `${viewport.id}-m4a1-fire-kick`);
+    const fireReadability = {
+      arms: await readabilityMetrics(fireCapture.canvasFrame, fireCapture.backgroundFrame, state.weaponPresentation.armFraming),
+      weapon: await readabilityMetrics(fireCapture.canvasFrame, fireCapture.backgroundFrame, state.weaponPresentation.weaponFraming),
+    };
+    const fireSilhouetteEvidence = await renderedSilhouetteEvidence(
+      fireLabel,
+      fireCapture,
+      `${viewport.id}-m4a1-fire-kick`,
+      dualArmSilhouetteProfile(viewport),
+    );
+    violations.push(...fireSilhouetteEvidence.violations);
+    violations.push(...readabilityViolations(fireLabel, fireReadability, false));
+    evidence.push({
+      label: fireLabel,
+      viewport,
+      screenshot: fireCapture.path,
+      silhouetteArtifact: fireSilhouetteEvidence.artifact,
+      presentation: state.weaponPresentation,
+      readability: fireReadability,
+      silhouette: fireSilhouetteEvidence.silhouette,
+    });
+    const fireArmIds = await captureArmIdEvidence(page, fireLabel, `${viewport.id}-m4a1-fire-kick`);
+    violations.push(...fireArmIds.violations);
+    armIdEvidence.push(fireArmIds);
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setFireCaptureAgeMs(1_000));
 
     await page.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
@@ -766,6 +991,9 @@ try {
       silhouette: reloadSilhouetteEvidence.silhouette,
     };
     evidence.push(reloadEntry);
+    const reloadArmIds = await captureArmIdEvidence(page, reloadLabel, `${viewport.id}-m4a1-reload-0_46`);
+    violations.push(...reloadArmIds.violations);
+    armIdEvidence.push(reloadArmIds);
     if (viewport.id === '1440p' || viewport.id === '4k') {
       violations.push(...temporalActionViolations(`${viewport.id}/reload-temporal-0.46`, state.weaponPresentation, 'reload', 0.46));
       temporalEvidence.push({ ...reloadEntry, label: `${viewport.id}/reload-temporal-0.46`, action: 'reload', progress: 0.46 });
@@ -806,13 +1034,21 @@ try {
       const api = window.__ATOMIC_ACRES_DEBUG__;
       api.setMeleeCaptureProgress(null);
       api.setReloadCaptureProgress(null);
+      api.setGrenadeCaptureProgress(null);
       api.setAds(false);
       api.triggerGrenadePresentationCapture();
     });
-    await page.waitForFunction(() => {
+    const liveGrenadeProgressHandle = await page.waitForFunction(() => {
       const action = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.grenadeAction;
-      return action?.active === true && action.progress >= 0.34 && action.progress <= 0.58;
+      return action?.active === true && action.progress >= 0.34 && action.progress <= 0.58
+        ? action.progress
+        : false;
     }, undefined, { timeout: 3_000, polling: 20 });
+    const observedGrenadeProgress = Number(await liveGrenadeProgressHandle.jsonValue());
+    await liveGrenadeProgressHandle.dispose();
+    await page.evaluate((progress) => {
+      window.__ATOMIC_ACRES_DEBUG__.setGrenadeCaptureProgress(progress);
+    }, observedGrenadeProgress);
     state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
     const grenadeLabel = `${viewport.id}/grenade-throw`;
     violations.push(...presentationViolations(grenadeLabel, state.weaponPresentation, false));
@@ -820,7 +1056,8 @@ try {
     if (state.weaponPresentation?.grenadeAction?.active !== true
       || state.weaponPresentation.grenadeAction.progress < 0.34
       || state.weaponPresentation.grenadeAction.progress > 0.62
-      || state.weaponPresentation.grenadeAction.arc < 0.8) {
+      || state.weaponPresentation.grenadeAction.arc < 0.8
+      || state.weaponPresentation.grenadeAction.capturePinned !== true) {
       violations.push(`${grenadeLabel}: capture missed the substantial live throw arc`);
     }
     const grenadeCapture = await capture(page, `${viewport.id}-m4a1-grenade-throw`);
@@ -844,8 +1081,13 @@ try {
       presentation: state.weaponPresentation,
       readability: grenadeReadability,
       silhouette: grenadeSilhouetteEvidence.silhouette,
+      observedLiveGrenadeProgress: observedGrenadeProgress,
       grenadeAction: state.weaponPresentation.grenadeAction,
     });
+    const grenadeArmIds = await captureArmIdEvidence(page, grenadeLabel, `${viewport.id}-m4a1-grenade-throw`);
+    violations.push(...grenadeArmIds.violations);
+    armIdEvidence.push(grenadeArmIds);
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setGrenadeCaptureProgress(null));
     await page.waitForFunction(() => (
       window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.grenadeAction?.active === false
     ), undefined, { timeout: 3_000 });
@@ -905,6 +1147,13 @@ try {
           gripFamily: matrixCase.family,
           matrixPose: matrixCase.pose,
         });
+        const familyArmIds = await captureArmIdEvidence(
+          page,
+          familyLabel,
+          `${viewport.id}-${matrixCase.weapon}-${matrixCase.pose}-grip-family`,
+        );
+        violations.push(...familyArmIds.violations);
+        armIdEvidence.push(familyArmIds);
       }
       await page.evaluate(() => {
         const api = window.__ATOMIC_ACRES_DEBUG__;
@@ -916,6 +1165,42 @@ try {
         return presentation?.weapon === 'm4a1' && presentation?.importedModel?.weapon === 'm4a1';
       }, undefined, { timeout: 30_000 });
     }
+
+    // The arm-ID evidence pass renders three truthful views (weapon-only,
+    // left ownership, right ownership) for every action. On matrix viewports
+    // that pushes this point past Gun Range's two-minute production round.
+    // Start a fresh real match before the remaining melee/contact/stance
+    // states so their absence can never be mistaken for an arm failure.
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.rematch());
+    await page.waitForFunction(() => {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      return snapshot?.gameStarted === true && snapshot?.matchPhase === 'active';
+    }, undefined, { timeout: 45_000 });
+    await page.waitForTimeout(1_200);
+    await page.evaluate((enableMobileTouchLayout) => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.setMobileControlsForViewportCapture(enableMobileTouchLayout);
+      api.setAds(false);
+      api.setReloadCaptureProgress(null);
+      api.setMeleeCaptureProgress(null);
+      api.equipWeapon('m4a1');
+      api.setStance('stand');
+      api.teleportPlayer(0, 1.7, 0, Math.PI / 2, 0);
+    }, mobileTouchLayout);
+    await page.waitForFunction(() => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      const snapshot = api?.snapshot();
+      if (!api || !snapshot) return false;
+      if (snapshot.player?.stance !== 'stand') api.setStance('stand');
+      const current = api.snapshot();
+      return current?.matchPhase === 'active'
+        && current?.weaponPresentation?.weapon === 'm4a1'
+        && current?.weaponPresentation?.importedModel?.weapon === 'm4a1'
+        && current?.weaponPresentation?.adsProgress < 0.02
+        && current?.player?.stance === 'stand';
+    }, undefined, { timeout: 10_000, polling: 50 });
+    await page.waitForTimeout(220);
 
     await page.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
@@ -952,6 +1237,9 @@ try {
       silhouette: meleeSilhouetteEvidence.silhouette,
     };
     evidence.push(meleeEntry);
+    const meleeArmIds = await captureArmIdEvidence(page, meleeLabel, `${viewport.id}-melee-0_42`);
+    violations.push(...meleeArmIds.violations);
+    armIdEvidence.push(meleeArmIds);
     if (viewport.id === '1440p' || viewport.id === '4k') {
       violations.push(...temporalActionViolations(`${viewport.id}/melee-temporal-0.42`, state.weaponPresentation, 'melee', 0.42));
       temporalEvidence.push({ ...meleeEntry, label: `${viewport.id}/melee-temporal-0.42`, action: 'melee', progress: 0.42 });
@@ -994,13 +1282,53 @@ try {
       // Face the current authored west-wall collider. The older 12/-32.55
       // fixture became open floor when the Gun Range shell/test-bay route was
       // rebuilt, so it could only prove the open-prone 0.09 m baseline.
-      api.setStance('prone'); api.teleportPlayer(-19.65, 1.7, -14.5, Math.PI / 2, 0);
+      api.setStance('stand'); api.teleportPlayer(-19.65, 1.7, -14.5, Math.PI / 2, 0);
     });
     await page.waitForFunction(() => {
       const snapshot = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
-      return snapshot?.player?.stance === 'prone'
+      return snapshot?.player?.stance === 'stand'
+        && snapshot?.weaponPresentation?.contactResponse?.highReadyBlend > 0.8
         && snapshot?.weaponPresentation?.weaponFraming?.intersectsViewport === true;
     }, undefined, { timeout: 10_000 });
+    await page.waitForTimeout(320);
+    state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+    const highReadyLabel = `${viewport.id}/high-ready-wall`;
+    violations.push(...presentationViolations(highReadyLabel, state.weaponPresentation, false));
+    violations.push(...dualArmProportionViolations(highReadyLabel, state.weaponPresentation, 'm4a1', 'long-gun'));
+    if (state.weaponPresentation.surfaceRetreat < 0.8
+      || state.weaponPresentation.contactResponse?.highReadyBlend <= 0.8) {
+      violations.push(`${highReadyLabel}: wall obstruction did not reach the authored high-ready envelope`);
+    }
+    const highReadyCapture = await capture(page, `${viewport.id}-high-ready-wall`);
+    const highReadyReadability = {
+      arms: await readabilityMetrics(highReadyCapture.canvasFrame, highReadyCapture.backgroundFrame, state.weaponPresentation.armFraming),
+      weapon: await readabilityMetrics(highReadyCapture.canvasFrame, highReadyCapture.backgroundFrame, state.weaponPresentation.weaponFraming),
+    };
+    const highReadySilhouetteEvidence = await renderedSilhouetteEvidence(
+      highReadyLabel,
+      highReadyCapture,
+      `${viewport.id}-high-ready-wall`,
+      dualArmSilhouetteProfile(viewport),
+    );
+    violations.push(...highReadySilhouetteEvidence.violations);
+    violations.push(...readabilityViolations(highReadyLabel, highReadyReadability, false));
+    evidence.push({
+      label: highReadyLabel,
+      viewport,
+      screenshot: highReadyCapture.path,
+      silhouetteArtifact: highReadySilhouetteEvidence.artifact,
+      presentation: state.weaponPresentation,
+      readability: highReadyReadability,
+      silhouette: highReadySilhouetteEvidence.silhouette,
+    });
+    const highReadyArmIds = await captureArmIdEvidence(page, highReadyLabel, `${viewport.id}-high-ready-wall`);
+    violations.push(...highReadyArmIds.violations);
+    armIdEvidence.push(highReadyArmIds);
+
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setStance('prone'));
+    await page.waitForFunction(() => (
+      window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.player?.stance === 'prone'
+    ), undefined, { timeout: 5_000 });
     await page.waitForTimeout(320);
     state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
     const proneLabel = `${viewport.id}/prone-wall-floor`;
@@ -1038,6 +1366,9 @@ try {
       readability: proneReadability,
       silhouette: proneSilhouette,
     });
+    const proneArmIds = await captureArmIdEvidence(page, proneLabel, `${viewport.id}-prone-wall-floor`);
+    violations.push(...proneArmIds.violations);
+    armIdEvidence.push(proneArmIds);
   }
 
   const hipEvidence = evidence.filter((entry) => entry.label.endsWith('/hip'));
@@ -1069,6 +1400,17 @@ try {
   violations.push(...fatalBrowserErrors(errors).map((message) => `browser error: ${message}`));
   const contactSheet = `${artifactRoot}/contact-sheet.png`;
   await writeContactSheet(evidence, contactSheet);
+  const armIdContactSheetEntries = armIdEvidence.flatMap((entry) => entry.sides.map((side) => ({
+    label: `${entry.label}/${side.side}-arm-ID`,
+    screenshot: side.maskArtifact,
+  })));
+  const armIdContactSheet = `${artifactRoot}/arm-id-contact-sheet.png`;
+  await writeContactSheet(armIdContactSheetEntries, armIdContactSheet, 6);
+  const armId1440ContactSheetEntries = armIdContactSheetEntries.filter((entry) => entry.label.startsWith('1440p/'));
+  const armId1440ContactSheet = armId1440ContactSheetEntries.length > 0
+    ? `${artifactRoot}/arm-id-contact-sheet-1440p.png`
+    : null;
+  if (armId1440ContactSheet) await writeContactSheet(armId1440ContactSheetEntries, armId1440ContactSheet, 6);
   const actionOrder = Object.freeze({ reload: 0, melee: 1 });
   const viewportOrder = Object.freeze({ '1440p': 0, '4k': 1 });
   const orderedTemporalEvidence = [...temporalEvidence].sort((first, second) => (
@@ -1086,7 +1428,7 @@ try {
     throw new Error(`Pass 66 viewmodel framing source drifted during capture (${sourceRevision} -> ${endingRevision})`);
   }
   const receipt = {
-    schema: 'atomic-acres/pass66-viewmodel-framing@3',
+    schema: 'atomic-acres/pass66-viewmodel-framing@4',
     verdict: violations.length === 0 ? 'pass' : 'fail',
     sourceRevision,
     sourceState: {
@@ -1100,14 +1442,23 @@ try {
     },
     route,
     browser: browser.version(),
+    browserProvenance: {
+      executablePath,
+      executableSha256: browserExecutableSha256,
+      version: browser.version(),
+      rendererRuntime,
+    },
     captureMode,
     viewports,
     gripFamilyMatrix,
     gripFamilyViewportIds: [...gripFamilyViewportIds],
     contactSheet,
+    armIdContactSheet,
+    armId1440ContactSheet,
     temporalContactSheet,
     temporalMotion,
     evidence,
+    armIdEvidence,
     temporalEvidence: orderedTemporalEvidence,
     browserErrors: fatalBrowserErrors(errors),
     violations,

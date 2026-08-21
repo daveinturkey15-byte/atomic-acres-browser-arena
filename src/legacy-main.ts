@@ -26475,6 +26475,7 @@ const debugWindow = window as Window & {
     ) => Record<string, unknown>;
     setPass64SystemVisibility: (name: 'sky' | 'mist' | 'smoke' | 'dust' | 'grass' | 'water', visible: boolean) => boolean;
     setCaptureViewmodelHidden: (hidden: boolean) => void;
+    setArmEvidenceCapture: (mode: 'background' | 'left' | 'right' | null) => boolean;
     setThermalRevealEvidenceHidden: (hidden: boolean) => boolean;
     stageLoadingCaptureSquad: () => { staged: boolean; characters: number; positions: number[][] };
     collisionProbe: (x: number, z: number) => boolean;
@@ -26518,6 +26519,7 @@ const debugWindow = window as Window & {
     sendRawChat: (text: string, claimedBy?: string) => boolean;
     setMeleeCaptureProgress: (progress: number | null) => void;
     setFireCaptureAgeMs: (ageMs: number | null) => void;
+    setGrenadeCaptureProgress: (progress: number | null) => void;
     setReloadCaptureProgress: (progress: number | null) => void;
     setGrassTime: (timeSeconds: number | null) => void;
     setGrassInteractionProbe: (x: number | null, z: number | null) => void;
@@ -29301,6 +29303,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     debugCaptureViewmodelHidden = hidden;
     weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
   },
+  setArmEvidenceCapture: (mode) => weaponView.setArmEvidenceCapture(mode),
   setThermalRevealEvidenceHidden: (hidden) => thermalGhostPresentation.setEvidenceControlHidden(hidden),
   stageLoadingCaptureSquad: () => {
     if (selectedArena.id !== 'atomic-acres' || gameMode !== 'solo' || !gameStarted) {
@@ -29593,6 +29596,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   setMeleeCaptureProgress: (progress: number | null) => weaponView.setMeleeCaptureProgress(progress),
   setFireCaptureAgeMs: (ageMs: number | null) => weaponView.setFireCaptureAgeMs(ageMs),
+  setGrenadeCaptureProgress: (progress: number | null) => weaponView.setGrenadeCaptureProgress(progress),
   setReloadCaptureProgress: (progress: number | null) => {
     debugReloadProgress = progress === null ? null : THREE.MathUtils.clamp(progress, 0, 1);
   },

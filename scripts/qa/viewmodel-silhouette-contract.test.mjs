@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { analyzeViewmodelSilhouetteMask } from './viewmodel-silhouette-contract.mjs';
+import {
+  analyzeArmIdMask,
+  analyzeViewmodelSilhouetteMask,
+  capArmIdMask,
+} from './viewmodel-silhouette-contract.mjs';
 
 const width = 400;
 const height = 240;
@@ -119,4 +123,48 @@ test('accepts a substantial one-hand action only through its right-edge action c
     [330, 185, 355, 240],
   ]), width, height, { profile: 'one-hand-action' });
   assert.equal(belowRetainedSubstantialMass.passed, false);
+});
+
+for (const side of ['left', 'right']) {
+  test(`accepts a substantial connected ${side} arm-only material-ID chain`, () => {
+    const arm = maskWith([
+      [248, 188, 274, 240],
+      [238, 172, 272, 202],
+      [224, 150, 254, 185],
+    ]);
+    const result = analyzeArmIdMask(arm, width, height, side);
+    assert.equal(result.passed, true);
+    assert.equal(result.principalComponent.bounds.maxY, height - 1);
+    assert.ok(result.principalComponent.metrics.lowerEdge.maximumRunRatio >= 0.04);
+  });
+
+  test(`rejects a capped ${side} sleeve while an unrelated weapon mask could remain`, () => {
+    const arm = maskWith([
+      [248, 188, 274, 240],
+      [238, 172, 272, 202],
+      [224, 150, 254, 185],
+    ]);
+    const capped = capArmIdMask(arm, width, height);
+    const result = analyzeArmIdMask(capped, width, height, side);
+    assert.equal(result.passed, false);
+    assert.match(result.violations.join('\n'), /capped|lowerEdge|lowerCrop/u);
+  });
+}
+
+test('rejects a thin connected arm-only tendril even when it reaches the final row', () => {
+  const result = analyzeArmIdMask(maskWith([
+    [245, 150, 275, 215],
+    [258, 215, 261, 240],
+  ]), width, height, 'left');
+  assert.equal(result.passed, false);
+  assert.match(result.violations.join('\n'), /thinner/u);
+});
+
+test('rejects disconnected hand/cuff and sleeve components', () => {
+  const result = analyzeArmIdMask(maskWith([
+    [205, 130, 265, 184],
+    [248, 188, 274, 240],
+  ]), width, height, 'right');
+  assert.equal(result.passed, false);
+  assert.match(result.violations.join('\n'), /bottom screen edge/u);
 });
