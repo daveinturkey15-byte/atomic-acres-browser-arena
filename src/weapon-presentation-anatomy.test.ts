@@ -6,6 +6,7 @@ import {
   FIRST_PERSON_ARM_BIND_SEGMENT_LENGTH_SCALE,
   FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE,
   FIRST_PERSON_ARM_RELOAD_SCALE_LIFT,
+  FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC,
   FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC,
   FIRST_PERSON_ARM_UNIFORM_SCALE,
   FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC,
@@ -18,6 +19,7 @@ import {
   WeaponPresentation,
   authoredNearPlaneContactRetreat,
   firstPersonArmPresentationScale,
+  firstPersonArmShoulderEntryNdc,
 } from './weapon-presentation';
 import {
   VIEWMODEL_CONTACT_PROFILES,
@@ -49,6 +51,19 @@ describe('first-person anatomical presentation', () => {
       8,
     );
     expect(firstPersonArmPresentationScale(0, 1)).toBeCloseTo(FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE, 8);
+    expect(firstPersonArmShoulderEntryNdc('left', 'heavy', 1, 1))
+      .toBe(FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC.left);
+    expect(firstPersonArmShoulderEntryNdc('right', 'long-gun', 0, 0))
+      .toBe(FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC.right);
+    expect(firstPersonArmShoulderEntryNdc('right', 'heavy', 0, 0))
+      .toBe(FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC);
+    expect(firstPersonArmShoulderEntryNdc('right', 'long-gun', 1, 0))
+      .toBe(FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC);
+    expect(firstPersonArmShoulderEntryNdc('right', 'long-gun', 0, 1))
+      .toBe(FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC);
+    expect(firstPersonArmShoulderEntryNdc('right', 'long-gun', 0.5, 0))
+      .toBeCloseTo((FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC.right
+        + FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC) / 2, 8);
   });
 
   it('starts at the readable hip framing shared by high-resolution displays', () => {
@@ -571,7 +586,7 @@ describe('first-person anatomical presentation', () => {
     expect(shoulder.scale.toArray()).toEqual([1, 1, 1]);
     expect(elbow.scale.toArray()).toEqual([1, 1, 1]);
     expect(wrist.scale.toArray()).toEqual([1, 1, 1]);
-    expect(FIRST_PERSON_ARM_PROPORTION_CONTRACT).toBe('authored-fixed-length-strong-operator-arms-v4');
+    expect(FIRST_PERSON_ARM_PROPORTION_CONTRACT).toBe('authored-fixed-length-strong-operator-arms-v5');
 
     const cropScenarios = Object.freeze([
       Object.freeze({ name: 'hip', rotation: [0, 0, 0] as const }),
@@ -597,7 +612,7 @@ describe('first-person anatomical presentation', () => {
     );
     expect(meleeCrop.ndc[1]).toBeCloseTo(FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC - 0.01, 8);
     expect(FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT)
-      .toBe('fixed-length-reachable-shoulders-continuous-sleeve-crop-v4');
+      .toBe('fixed-length-reachable-shoulders-continuous-sleeve-crop-v5');
     expect(FIRST_PERSON_ARM_BIND_SEGMENT_LENGTH_SCALE).toBe(1);
 
     shoulder.position.copy(rig.bindShoulderPosition);

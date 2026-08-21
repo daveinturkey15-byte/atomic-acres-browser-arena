@@ -390,18 +390,16 @@ export const MELEE_VIEWMODEL_PEAK_SCALE_LIFT = 0.3;
 // hand inside the retained 15 mm socket-calibration contract while preserving
 // a real (non-zero) anti-singularity margin.
 const RIGGED_ARM_MAX_REACH_RATIO = 0.996;
-export const FIRST_PERSON_ARM_PROPORTION_CONTRACT = 'authored-fixed-length-strong-operator-arms-v4';
+export const FIRST_PERSON_ARM_PROPORTION_CONTRACT = 'authored-fixed-length-strong-operator-arms-v5';
 /** Uniform root scaling preserves the authored skeleton, palms and joint radii. */
 export const FIRST_PERSON_ARM_UNIFORM_SCALE = 1.12;
-// Retain a visibly strong sleeve/forearm mass even under the maximum authored
-// wall-contact retreat. This is a small uniform presentation lift over the
-// prior candidate; the authored mesh, joints and both segment lengths remain
-// unchanged, while the on-screen sleeve width no longer reads as a thin tube.
-export const FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE = 1.56;
+// Retain the reviewed hip/action scale so melee and grenade poses preserve
+// their established screen lane and near-plane clearance.
+export const FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE = 1.48;
 // Do not shrink the operator's arms while aiming. Apart from making the ADS
 // silhouette look implausibly skinny, the old shrink broke the lower-frame
 // sleeve continuation on short landscape viewports.
-export const FIRST_PERSON_ARM_ADS_PRESENTATION_SCALE = FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE;
+export const FIRST_PERSON_ARM_ADS_PRESENTATION_SCALE = 1.56;
 export const FIRST_PERSON_ARM_RELOAD_SCALE_LIFT = 0.16;
 /**
  * Keeps every axis uniform while adding mass at the two poses where the arms
@@ -419,15 +417,32 @@ export function firstPersonArmPresentationScale(adsBlend: number, reloadProgress
     aim,
   ) + reloadLift;
 }
-export const FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT = 'fixed-length-reachable-shoulders-continuous-sleeve-crop-v4';
+export const FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT = 'fixed-length-reachable-shoulders-continuous-sleeve-crop-v5';
 export const FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC = Object.freeze({
   left: -1.12,
-  // The manual master extends weighted sleeve geometry well beyond the actual
-  // shoulder. Keep the joint inside a narrow lower-frame continuation band so
-  // a substantial upper-arm section remains visible, while the real proximal
-  // sleeve and its closed cap continue beyond the bottom crop.
-  right: -0.82,
+  // Ordinary hip/fire poses need the closed proximal sleeve safely below the
+  // crop. Raised/ADS/heavy poses use the lifted lane below instead.
+  right: -0.97,
 });
+export const FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC = -0.82;
+export function firstPersonArmShoulderEntryNdc(
+  side: 'left' | 'right',
+  gripFamily: ViewmodelGripFamily,
+  adsBlend: number,
+  highReadyBlend: number,
+): number {
+  if (side === 'left') return FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC.left;
+  const raisedBlend = Math.max(
+    gripFamily === 'heavy' ? 1 : 0,
+    THREE.MathUtils.clamp(adsBlend, 0, 1),
+    THREE.MathUtils.clamp(highReadyBlend, 0, 1),
+  );
+  return THREE.MathUtils.lerp(
+    FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC.right,
+    FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC,
+    raisedBlend,
+  );
+}
 /** The one-handed knife arc needs extra proximal sleeve travel at peak extension. */
 export const FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC = -1.23;
 /** Runtime IK rotates joints and may translate the shoulder, but never stretches a skinned segment. */
@@ -3915,7 +3930,17 @@ export class WeaponPresentation {
         const reloadSocket = activeModel.getObjectByName('reload-socket-l');
         if (reloadSocket) target.lerp(reloadSocket.getWorldPosition(scratch.handTarget), reloadPose.handToReload);
       }
-      const initialShoulderEntry = this.placeRiggedShoulderEntryBelowFrame(rig, cameraRotation);
+      const shoulderEntryTargetNdcY = firstPersonArmShoulderEntryNdc(
+        rig.side,
+        handPolicy.gripFamily,
+        this.adsBlend,
+        this.contactResponse.highReadyBlend,
+      );
+      const initialShoulderEntry = this.placeRiggedShoulderEntryBelowFrame(
+        rig,
+        cameraRotation,
+        shoulderEntryTargetNdcY,
+      );
       const shoulderPosition = rig.shoulder.getWorldPosition(scratch.shoulderPosition);
       const elbowPosition = rig.elbow.getWorldPosition(scratch.elbowPosition);
       const wristPosition = rig.wrist.getWorldPosition(scratch.wristPosition);
@@ -3934,6 +3959,7 @@ export class WeaponPresentation {
         cameraRotation,
         socketTarget,
         maximumSocketReach,
+        shoulderEntryTargetNdcY,
       );
       rig.shoulder.getWorldPosition(shoulderPosition);
       rig.elbow.getWorldPosition(elbowPosition);
