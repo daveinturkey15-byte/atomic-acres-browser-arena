@@ -6,6 +6,10 @@ export type ThermalGhostTarget = Readonly<{
   id: string;
   relation: ThermalGhostRelation;
   root: THREE.Object3D;
+  /** Authoritative respawn/death generation for stale-reveal rejection. */
+  lifeId?: number;
+  /** Authoritative movement/replication continuity for stale-pose rejection. */
+  continuityId?: number;
 }>;
 
 export const THERMAL_GHOST_ORANGE_HEX = 0xff7a1a;
@@ -22,11 +26,33 @@ export const THERMAL_GHOST_MAX_OWNED_MATERIALS = THERMAL_GHOST_MAX_EXACT_MODEL_M
 export const THERMAL_GHOST_HALO_SCALE = 1.045;
 export const THERMAL_GHOST_PRESENTATION_CONTRACT = 'exact-animated-operator-plus-orange-halo-v1';
 
+export type ThermalGhostTargetTelemetry = Readonly<{
+  id: string;
+  lifeId: number | null;
+  continuityId: number | null;
+  active: boolean;
+  sourceRootUuid: string;
+  sourceVisualUuid: string;
+  sourceRootAttached: boolean;
+  sourceVisualAttached: boolean;
+  sourceBodyLayers: number;
+  exactModelLayers: number;
+  haloLayers: number;
+  detachedLayers: number;
+  extraneousModelLayers: number;
+  extraneousHaloLayers: number;
+  sourcePoseDigest: string;
+  modelPoseDigest: string;
+  poseIdentity: boolean;
+  lastSeenGeneration: number;
+}>;
+
 export type ThermalGhostTelemetry = Readonly<{
   contract: typeof THERMAL_GHOST_PRESENTATION_CONTRACT;
   trackedTargets: number;
   activeTargets: number;
   activeTargetIds: readonly string[];
+  targets?: readonly ThermalGhostTargetTelemetry[];
   activeModelLayers: number;
   activeHaloLayers: number;
   activeSourceBodyLayers?: number;
@@ -40,6 +66,14 @@ export type ThermalGhostTelemetry = Readonly<{
   normalMaterialEquivalence?: boolean;
   silhouetteLayerIdentity?: boolean;
   siblingParentIdentity?: boolean;
+  lifeIdentityCurrent?: boolean;
+  poseIdentity?: boolean;
+  sourceRootsAttached?: boolean;
+  sourceRootIdentityUnique?: boolean;
+  detachedLayers?: number;
+  extraneousModelLayers?: number;
+  extraneousHaloLayers?: number;
+  duplicateSourceRootInputs?: number;
   evidenceControlHidden: boolean;
   exactModelVisible: boolean;
   exactModelColorWrite: boolean;
@@ -84,10 +118,17 @@ type GhostRecord = {
   relation: ThermalGhostRelation;
   layers: GhostLayer[];
   sourceRoot: THREE.Object3D;
+  sourceVisual: THREE.Object3D;
+  lifeId: number | null;
+  continuityId: number | null;
   lastSeenGeneration: number;
   complete: boolean;
   sourceBodyLayers: number;
 };
+
+function identityGeneration(value: number | undefined): number | null {
+  return Number.isSafeInteger(value) && value! >= 0 ? value! : null;
+}
 
 function sourceMaterials(source: THREE.Mesh): THREE.Material[] {
   return Array.isArray(source.material) ? source.material : [source.material];
@@ -285,6 +326,39 @@ function matrixEquals(left: THREE.Matrix4, right: THREE.Matrix4, tolerance = 1e-
   return true;
 }
 
+function poseDigest(layers: readonly GhostLayer[], kind: 'source' | 'model'): string {
+  let hash = 0x811c9dc5;
+  const mix = (value: number): void => {
+    const quantized = Number.isFinite(value) ? Math.round(value * 100_000) | 0 : 0x7fffffff;
+    for (let shift = 0; shift < 32; shift += 8) {
+      hash ^= (quantized >>> shift) & 0xff;
+      hash = Math.imul(hash, 0x01000193);
+    }
+  };
+  for (const layer of layers) {
+    if (!layer.active) continue;
+    const mesh = kind === 'source' ? layer.source : layer.model;
+    mesh.updateWorldMatrix(true, false);
+    for (const value of mesh.matrixWorld.elements) mix(value);
+    if (mesh instanceof THREE.SkinnedMesh) {
+      for (const bone of mesh.skeleton.bones) {
+        bone.updateWorldMatrix(true, false);
+        for (const value of bone.matrixWorld.elements) mix(value);
+      }
+    }
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function descendantOf(object: THREE.Object3D, root: THREE.Object3D): boolean {
+  let cursor: THREE.Object3D | null = object;
+  while (cursor) {
+    if (cursor === root) return true;
+    cursor = cursor.parent;
+  }
+  return false;
+}
+
 const HALO_SCALE_VECTOR = new THREE.Vector3(
   THERMAL_GHOST_HALO_SCALE,
   THERMAL_GHOST_HALO_SCALE,
@@ -349,6 +423,7 @@ export class ThermalGhostPresentation {
     trackedTargets: 0,
     activeTargets: 0,
     activeTargetIds: [],
+    targets: [],
     activeModelLayers: 0,
     activeHaloLayers: 0,
     activeSourceBodyLayers: 0,
@@ -362,6 +437,14 @@ export class ThermalGhostPresentation {
     normalMaterialEquivalence: true,
     silhouetteLayerIdentity: true,
     siblingParentIdentity: true,
+    lifeIdentityCurrent: true,
+    poseIdentity: true,
+    sourceRootsAttached: true,
+    sourceRootIdentityUnique: true,
+    detachedLayers: 0,
+    extraneousModelLayers: 0,
+    extraneousHaloLayers: 0,
+    duplicateSourceRootInputs: 0,
     evidenceControlHidden: false,
     exactModelVisible: false,
     exactModelColorWrite: false,
@@ -396,6 +479,7 @@ export class ThermalGhostPresentation {
   private materialBudgetExceeded = false;
   private haloMaterialDisposed = false;
   private evidenceControlHidden = false;
+  private duplicateSourceRootInputs = 0;
 
   private acquireExactModelMaterials(source: THREE.Mesh): THREE.Material[] | null {
     const originals = sourceMaterials(source);
@@ -497,6 +581,9 @@ export class ThermalGhostPresentation {
       relation: target.relation,
       layers,
       sourceRoot: target.root,
+      sourceVisual: operatorVisual,
+      lifeId: identityGeneration(target.lifeId),
+      continuityId: identityGeneration(target.continuityId),
       lastSeenGeneration: this.generation,
       complete: complete && layers.length === sourceBodyMeshes.length,
       sourceBodyLayers: sourceBodyMeshes.length,
@@ -537,19 +624,30 @@ export class ThermalGhostPresentation {
     this.activeHaloLayers = 0;
     this.activeSourceBodyLayers = 0;
     this.activeNormalMaterialSlots = 0;
+    this.duplicateSourceRootInputs = 0;
     if (active) {
       const admitted: ThermalGhostTarget[] = [];
       const seenIds = new Set<string>();
+      const seenRoots = new Set<THREE.Object3D>();
       for (const target of targets) {
         if (seenIds.has(target.id)) continue;
+        if (seenRoots.has(target.root)) {
+          this.duplicateSourceRootInputs += 1;
+          continue;
+        }
         seenIds.add(target.id);
+        seenRoots.add(target.root);
         admitted.push(target);
         if (admitted.length === THERMAL_GHOST_MAX_TARGETS) break;
       }
       const admittedIds = new Set(admitted.map((target) => target.id));
       for (const target of admitted) {
         let record = this.records.get(target.id);
-        if (record && record.sourceRoot !== target.root) {
+        const targetLifeId = identityGeneration(target.lifeId);
+        const targetContinuityId = identityGeneration(target.continuityId);
+        if (record && (record.sourceRoot !== target.root
+          || record.lifeId !== targetLifeId
+          || record.continuityId !== targetContinuityId)) {
           this.releaseRecord(record);
           this.records.delete(target.id);
           record = undefined;
@@ -570,6 +668,8 @@ export class ThermalGhostPresentation {
         // Relationship controls eligibility upstream, never appearance. An
         // allegiance transition must not rebuild identical model/halo layers.
         record.relation = target.relation;
+        record.lifeId = targetLifeId;
+        record.continuityId = targetContinuityId;
         record.lastSeenGeneration = this.generation;
         let visibleLayers = 0;
         for (const layer of record.layers) {
@@ -633,6 +733,7 @@ export class ThermalGhostPresentation {
     this.activeSourceBodyLayers = 0;
     this.activeNormalMaterialSlots = 0;
     this.materialBudgetExceeded = false;
+    this.duplicateSourceRootInputs = 0;
   }
 
   /** Presentation-only paired-raster control; gameplay target state is untouched. */
@@ -643,7 +744,7 @@ export class ThermalGhostPresentation {
     return this.evidenceControlHidden === hidden;
   }
 
-  telemetry(): ThermalGhostTelemetry {
+  telemetry(identityAudit = false): ThermalGhostTelemetry {
     let geometryIdentity = true;
     let skeletonIdentity = true;
     let bindMatrixIdentity = true;
@@ -665,9 +766,41 @@ export class ThermalGhostPresentation {
     let haloColorAndSide = this.activeHaloLayers > 0;
     let completeOperatorModels = true;
     let incompleteTargets = 0;
+    let lifeIdentityCurrent = true;
+    let poseIdentity = true;
+    let sourceRootsAttached = true;
+    let detachedLayers = 0;
+    let extraneousModelLayers = 0;
+    let extraneousHaloLayers = 0;
+    const sourceRootUuids = new Set<string>();
+    const targets: ThermalGhostTargetTelemetry[] = [];
     for (const record of this.records.values()) {
       completeOperatorModels &&= record.complete;
       if (!record.complete) incompleteTargets += 1;
+      let recordDetachedLayers = 0;
+      let recordExtraneousModels = 0;
+      let recordExtraneousHalos = 0;
+      if (identityAudit) {
+        sourceRootsAttached &&= record.sourceRoot.parent !== null;
+        sourceRootUuids.add(record.sourceRoot.uuid);
+        let observedModels = 0;
+        let observedHalos = 0;
+        record.sourceRoot.traverse((node) => {
+          if (node.name === 'through-wall-exact-operator-model') observedModels += 1;
+          if (node.name === 'through-wall-operator-orange-halo') observedHalos += 1;
+        });
+        recordDetachedLayers = record.layers.filter((layer) => (
+          layer.model.parent !== layer.source.parent
+          || layer.halo.parent !== layer.source.parent
+          || !descendantOf(layer.model, record.sourceRoot)
+          || !descendantOf(layer.halo, record.sourceRoot)
+        )).length;
+        recordExtraneousModels = Math.max(0, observedModels - record.layers.length);
+        recordExtraneousHalos = Math.max(0, observedHalos - record.layers.length);
+        detachedLayers += recordDetachedLayers;
+        extraneousModelLayers += recordExtraneousModels;
+        extraneousHaloLayers += recordExtraneousHalos;
+      }
       for (const layer of record.layers) {
         layer.source.updateWorldMatrix(true, false);
         layer.model.updateWorldMatrix(true, false);
@@ -713,11 +846,41 @@ export class ThermalGhostPresentation {
           && halo.color.getHex() === THERMAL_GHOST_ORANGE_HEX
           && halo.side === THREE.BackSide;
       }
+      if (identityAudit) {
+        const sourcePoseDigest = poseDigest(record.layers, 'source');
+        const modelPoseDigest = poseDigest(record.layers, 'model');
+        const recordPoseIdentity = sourcePoseDigest === modelPoseDigest;
+        poseIdentity &&= recordPoseIdentity;
+        const activeRecord = record.lastSeenGeneration === this.generation
+          && this.activeTargetIds.includes(record.targetId);
+        lifeIdentityCurrent &&= !activeRecord || (record.lifeId !== null && record.continuityId !== null);
+        targets.push(Object.freeze({
+          id: record.targetId,
+          lifeId: record.lifeId,
+          continuityId: record.continuityId,
+          active: activeRecord,
+          sourceRootUuid: record.sourceRoot.uuid,
+          sourceVisualUuid: record.sourceVisual.uuid,
+          sourceRootAttached: record.sourceRoot.parent !== null,
+          sourceVisualAttached: descendantOf(record.sourceVisual, record.sourceRoot),
+          sourceBodyLayers: record.sourceBodyLayers,
+          exactModelLayers: record.layers.length,
+          haloLayers: record.layers.length,
+          detachedLayers: recordDetachedLayers,
+          extraneousModelLayers: recordExtraneousModels,
+          extraneousHaloLayers: recordExtraneousHalos,
+          sourcePoseDigest,
+          modelPoseDigest,
+          poseIdentity: recordPoseIdentity,
+          lastSeenGeneration: record.lastSeenGeneration,
+        }));
+      }
     }
     const state = this.telemetryState;
     state.trackedTargets = this.records.size;
     state.activeTargets = this.activeTargets;
     state.activeTargetIds = Object.freeze([...this.activeTargetIds]);
+    if (identityAudit) state.targets = Object.freeze(targets);
     state.activeModelLayers = this.activeModelLayers;
     state.activeHaloLayers = this.activeHaloLayers;
     state.activeSourceBodyLayers = this.activeSourceBodyLayers;
@@ -732,6 +895,16 @@ export class ThermalGhostPresentation {
     state.silhouetteLayerIdentity = this.activeSourceBodyLayers === this.activeModelLayers
       && this.activeSourceBodyLayers === this.activeHaloLayers;
     state.siblingParentIdentity = siblingParentIdentity;
+    if (identityAudit) {
+      state.lifeIdentityCurrent = lifeIdentityCurrent;
+      state.poseIdentity = poseIdentity;
+      state.sourceRootsAttached = sourceRootsAttached;
+      state.sourceRootIdentityUnique = sourceRootUuids.size === this.records.size;
+      state.detachedLayers = detachedLayers;
+      state.extraneousModelLayers = extraneousModelLayers;
+      state.extraneousHaloLayers = extraneousHaloLayers;
+      state.duplicateSourceRootInputs = this.duplicateSourceRootInputs;
+    }
     state.evidenceControlHidden = this.evidenceControlHidden;
     state.exactModelVisible = exactModelVisible;
     state.exactModelColorWrite = exactModelColorWrite;

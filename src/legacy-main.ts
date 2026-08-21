@@ -809,6 +809,10 @@ import {
   ThermalGhostPresentation,
   type ThermalGhostTarget,
 } from './thermal-ghost-presentation';
+import {
+  pass73AdsRevealReadbackRegion,
+  quantizePass73AdsRevealReadback,
+} from './pass73-ads-reveal-readback';
 import { applySkyBackdrop, waitForSkyBackdropAdmission } from './rendering/sky-backdrop';
 import {
   SmokeVolumePresentationPool,
@@ -15402,12 +15406,24 @@ function prewarmThermalGhostPipelines(): void {
   for (const remote of remotes.values()) {
     if (remote.snapshot.hp <= 0) continue;
     const relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id: remote.snapshot.id, relation, root: remote.root });
+    targets.push({
+      id: remote.snapshot.id,
+      relation,
+      root: remote.root,
+      lifeId: remote.snapshot.deaths,
+      continuityId: remote.continuity,
+    });
   }
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
     const relation = mode === 'tdm' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id: bot.id, relation, root: bot.root });
+    targets.push({
+      id: bot.id,
+      relation,
+      root: bot.root,
+      lifeId: bot.deaths,
+      continuityId: bot.continuity,
+    });
   }
   // Match admission has already staged the retained corpse operators visible
   // behind the opaque deployment surface. Fill any remaining target slots
@@ -15446,22 +15462,33 @@ function updateThermalGhosts(): void {
     team: Team,
     kind: 'player' | 'bot',
     root: THREE.Object3D,
+    lifeId: number,
+    continuityId: number,
   ): void => {
     if (targets.some((target) => target.id === id)) return;
     if (railgunRevealActive && !dmrThermalActive && !chopperThermal
       && !railgunThermalTargetEligible(observer, { id, team, alive: true, kind }, mode)) return;
     const relation = mode === 'tdm' && team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id, relation, root });
+    targets.push({ id, relation, root, lifeId, continuityId });
   };
   for (const remote of remotes.values()) {
     if (remote.snapshot.hp <= 0) continue;
-    addTarget(remote.snapshot.id, remote.snapshot.team, 'player', remote.root);
+    addTarget(
+      remote.snapshot.id,
+      remote.snapshot.team,
+      'player',
+      remote.root,
+      remote.snapshot.deaths,
+      remote.continuity,
+    );
   }
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
-    addTarget(bot.id, bot.team, 'bot', bot.root);
+    addTarget(bot.id, bot.team, 'bot', bot.root, bot.deaths, bot.continuity);
   }
   thermalGhostPresentation.sync(targets, true);
+  // The default telemetry path is allocation-bounded. Root/life/pose traversal
+  // is reserved for explicit debug receipt calls with identityAudit enabled.
   railgunPresentation.syncExactOperatorReveal(railgunRevealActive, thermalGhostPresentation.telemetry());
 }
 
@@ -16450,6 +16477,9 @@ function spawnEarnedBotReinforcement(): void {
 }
 
 function clearBots(): void {
+  for (const targetId of [...pass73AdsRevealNormalVisibility.keys()]) {
+    setPass73AdsRevealNormalBodyHidden(targetId, false);
+  }
   for (const bot of bots.values()) {
     scheduleDeferredGpuRetirement(bot.root);
     footstepEmitters.reset(`bot:${bot.id}`);
@@ -17098,7 +17128,9 @@ function updateBots(dt: number, now: number): void {
       });
     }
     if (botsFrozen) {
-      poseOperator(bot.root, debugBotStanceOverride ?? 'stand', debugBotSpeedOverride, now * 0.001, 1, 0, dt);
+      if (pass73AdsRevealCaptureFrozenTargetId !== bot.id) {
+        poseOperator(bot.root, debugBotStanceOverride ?? 'stand', debugBotSpeedOverride, now * 0.001, 1, 0, dt);
+      }
       continue;
     }
     // A corrupted position can never become an out-of-arena damage source.
@@ -26231,7 +26263,7 @@ function sampleDmrThermalReadiness() {
     adsProgress: weaponView.adsProgress(),
     cameraFov: camera.fov,
     expectedFov: magnifiedFovDegrees(preferredFov, DMR_THERMAL_MAGNIFICATION),
-    exactOperatorReveal: thermalGhostPresentation.telemetry(),
+    exactOperatorReveal: thermalGhostPresentation.telemetry(true),
   });
 }
 
@@ -26323,6 +26355,205 @@ function sampleGrenadeColdPathTelemetry() {
 }
 
 type DebugPlayerPose = Readonly<{ yaw: number; pitch: number }>;
+
+const pass73AdsRevealNormalVisibility = new Map<string, Array<Readonly<{
+  mesh: THREE.Mesh;
+  visible: boolean;
+}>>>();
+let pass73AdsRevealCaptureFrozenTargetId: string | null = null;
+
+function pass73AdsRevealSourceBodyMeshes(root: THREE.Object3D): THREE.Mesh[] {
+  const visual = root.getObjectByName('rigged-operator-visual') ?? root;
+  const candidates: THREE.Mesh[] = [];
+  const skinned: THREE.SkinnedMesh[] = [];
+  const pending = [visual];
+  while (pending.length > 0) {
+    const node = pending.pop()!;
+    pending.push(...node.children);
+    if (!(node instanceof THREE.Mesh) || node.userData.thermalGhost === true || node instanceof THREE.InstancedMesh) continue;
+    candidates.push(node);
+    if (node instanceof THREE.SkinnedMesh) skinned.push(node);
+  }
+  return visual !== root && skinned.length > 0 ? skinned : candidates;
+}
+
+function setPass73AdsRevealNormalBodyHidden(targetId: string, hidden: boolean): boolean {
+  const root = bots.get(targetId)?.root ?? remotes.get(targetId)?.root;
+  if (!root) return false;
+  if (hidden) {
+    if (pass73AdsRevealNormalVisibility.has(targetId)) return true;
+    const records = pass73AdsRevealSourceBodyMeshes(root).map((mesh) => Object.freeze({ mesh, visible: mesh.visible }));
+    if (records.length === 0) return false;
+    pass73AdsRevealNormalVisibility.set(targetId, records);
+    for (const record of records) record.mesh.visible = false;
+    return true;
+  }
+  const records = pass73AdsRevealNormalVisibility.get(targetId);
+  if (!records) return true;
+  for (const record of records) record.mesh.visible = record.visible;
+  pass73AdsRevealNormalVisibility.delete(targetId);
+  return true;
+}
+
+function samplePass73AdsRevealTarget(targetId: string) {
+  const bot = bots.get(targetId);
+  const remote = remotes.get(targetId);
+  const root = bot?.root ?? remote?.root;
+  if (!root) return null;
+  const team = bot?.team ?? remote!.snapshot.team;
+  const lifeId = bot?.deaths ?? remote!.snapshot.deaths;
+  const continuityId = bot?.continuity ?? remote!.continuity;
+  const position = bot?.position ?? remote!.target;
+  const target = position.clone().add(new THREE.Vector3(0, 1.05, 0));
+  const blockers = activeWorldColliders().filter((box) => segmentIntersectsBox(camera.position, target, box));
+  const targetNdc = target.clone().project(camera);
+  const normalBodyMeshes = pass73AdsRevealSourceBodyMeshes(root);
+  const reveal = thermalGhostPresentation.telemetry(true);
+  return Object.freeze({
+    contract: 'pass73-native-ads-reveal-staged-target-v1' as const,
+    id: targetId,
+    kind: bot ? 'bot' as const : 'player' as const,
+    team,
+    hostile: team !== player.team,
+    alive: bot ? bot.alive : remote!.snapshot.hp > 0,
+    lifeId,
+    continuityId,
+    position: Object.freeze(position.toArray()),
+    sourceRootUuid: root.uuid,
+    sourceRootAttached: root.parent !== null,
+    normalBodyLayers: normalBodyMeshes.length,
+    normalBodyHidden: pass73AdsRevealNormalVisibility.has(targetId),
+    targetNdc: Object.freeze(targetNdc.toArray()),
+    blockerCount: blockers.length,
+    blockers: Object.freeze(blockers.map((box) => Object.freeze({
+      minX: box.minX,
+      maxX: box.maxX,
+      minY: box.minY ?? null,
+      maxY: box.maxY ?? null,
+      minZ: box.minZ,
+      maxZ: box.maxZ,
+      rotation: box.rotation ? Object.freeze([...box.rotation]) : null,
+    }))),
+    animatedPose: Object.freeze({
+      stance: debugBotStanceOverride ?? 'stand',
+      speed: debugBotSpeedOverride,
+    }),
+    revealTarget: reveal.targets?.find(({ id }) => id === targetId) ?? null,
+  });
+}
+
+function stagePass73NativeAdsRevealTarget() {
+  if (selectedArena.id !== 'atomic-acres' || gameMode !== 'solo' || matchState.phase !== 'active') return null;
+  const bot = bots.values().next().value as BotPlayer | undefined;
+  const api = debugWindow.__ATOMIC_ACRES_DEBUG__;
+  if (!bot || !api) return null;
+  for (const other of bots.values()) {
+    if (other === bot) continue;
+    other.hp = 0;
+    other.alive = false;
+    other.respawnAt = Number.POSITIVE_INFINITY;
+    other.root.visible = false;
+  }
+  setPass73AdsRevealNormalBodyHidden(bot.id, false);
+  bot.team = player.team === 0 ? 1 : 0;
+  bot.hp = 100;
+  bot.alive = true;
+  bot.root.visible = true;
+  bot.invulnerableUntil = performance.now() + 60_000;
+  const haze = bot.root.getObjectByName('neon-purple-bot-haze');
+  if (haze) haze.visible = false;
+  api.teleportPlayer(-9, 1.7, -12.5, 0, 0);
+  api.placeBotRelative(0, 9);
+  api.setBotPresentation('stand', 2.4, 'carbine');
+  api.aimAtBot('body');
+  bot.root.updateWorldMatrix(true, true);
+  camera.updateWorldMatrix(true, false);
+  const sample = samplePass73AdsRevealTarget(bot.id);
+  return sample?.hostile === true && sample.alive === true && sample.blockerCount > 0
+    ? sample
+    : null;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
+
+async function readbackPass73NativeAdsRevealRoi() {
+  if (renderRuntime.backend !== 'webgpu' || !pass64TslSystems) {
+    throw new Error('Pass 73 ADS reveal ROI requires native WebGPU');
+  }
+  const previousRenderPaused = debugRenderPaused;
+  debugRenderPaused = true;
+  try {
+    await flushWebGpuFrames(8_000);
+    await submitForegroundWebGpuFrame();
+    await flushWebGpuFrames(8_000);
+    const target = pass64TslSystems.principalHdrTarget;
+    const region = pass73AdsRevealReadbackRegion(target.width, target.height);
+    const pixels = await renderRuntime.readRenderTargetPixels(
+      target,
+      region.x,
+      region.y,
+      region.width,
+      region.height,
+    );
+    const quantized = quantizePass73AdsRevealReadback(pixels, region.width * region.height);
+    let hash = 0x811c9dc5;
+    for (const byte of quantized.rgba8) {
+      hash ^= byte;
+      hash = Math.imul(hash, 0x01000193);
+    }
+    return Object.freeze({
+      contract: 'pass73-native-ads-reveal-hdr-roi-v1' as const,
+      ...region,
+      bytes: quantized.rgba8.byteLength,
+      componentType: quantized.componentType,
+      channels: quantized.channels,
+      nonFiniteComponents: quantized.nonFiniteComponents,
+      hash: (hash >>> 0).toString(16).padStart(8, '0'),
+      rgba8Base64: bytesToBase64(quantized.rgba8),
+      render: Object.freeze({ ...activeRuntimeTelemetry() }),
+    });
+  } finally {
+    debugRenderPaused = previousRenderPaused;
+  }
+}
+
+async function capturePass73NativeAdsRevealRoiTriplet(targetId: string) {
+  if (!bots.has(targetId) && !remotes.has(targetId)) {
+    throw new Error(`Pass 73 ADS reveal target ${targetId} is no longer current`);
+  }
+  const previousRenderPaused = debugRenderPaused;
+  const previousFrozenTargetId = pass73AdsRevealCaptureFrozenTargetId;
+  debugRenderPaused = true;
+  pass73AdsRevealCaptureFrozenTargetId = targetId;
+  try {
+    setPass73AdsRevealNormalBodyHidden(targetId, false);
+    if (!thermalGhostPresentation.setEvidenceControlHidden(false)) {
+      throw new Error('Pass 73 ADS reveal shown control was not admitted');
+    }
+    const revealShown = await readbackPass73NativeAdsRevealRoi();
+    if (!thermalGhostPresentation.setEvidenceControlHidden(true)) {
+      throw new Error('Pass 73 ADS reveal suppressed control was not admitted');
+    }
+    const revealSuppressed = await readbackPass73NativeAdsRevealRoi();
+    if (!setPass73AdsRevealNormalBodyHidden(targetId, true)) {
+      throw new Error('Pass 73 ADS reveal normal-body hidden control was not admitted');
+    }
+    const normalHidden = await readbackPass73NativeAdsRevealRoi();
+    return Object.freeze({ revealShown, revealSuppressed, normalHidden });
+  } finally {
+    setPass73AdsRevealNormalBodyHidden(targetId, false);
+    thermalGhostPresentation.setEvidenceControlHidden(false);
+    pass73AdsRevealCaptureFrozenTargetId = previousFrozenTargetId;
+    debugRenderPaused = previousRenderPaused;
+  }
+}
 
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
@@ -26498,6 +26729,13 @@ const debugWindow = window as Window & {
     setCaptureViewmodelHidden: (hidden: boolean) => void;
     setArmEvidenceCapture: (mode: 'background' | 'left' | 'right' | null) => boolean;
     setThermalRevealEvidenceHidden: (hidden: boolean) => boolean;
+    stagePass73NativeAdsRevealTarget: () => ReturnType<typeof stagePass73NativeAdsRevealTarget>;
+    samplePass73AdsRevealTarget: (targetId: string) => ReturnType<typeof samplePass73AdsRevealTarget>;
+    setPass73AdsRevealNormalBodyHidden: (targetId: string, hidden: boolean) => boolean;
+    readbackPass73NativeAdsRevealRoi: () => ReturnType<typeof readbackPass73NativeAdsRevealRoi>;
+    capturePass73NativeAdsRevealRoiTriplet: (
+      targetId: string,
+    ) => ReturnType<typeof capturePass73NativeAdsRevealRoiTriplet>;
     stageLoadingCaptureSquad: () => { staged: boolean; characters: number; positions: number[][] };
     collisionProbe: (x: number, z: number) => boolean;
     collisionProbeAt: (x: number, y: number, z: number) => boolean;
@@ -27469,7 +27707,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     },
     dmrThermal: {
       ...dmrThermalPresentation.telemetry(),
-      exactOperatorReveal: thermalGhostPresentation.telemetry(),
+      exactOperatorReveal: thermalGhostPresentation.telemetry(true),
       weapon: player.weapon,
       magnification: DMR_THERMAL_MAGNIFICATION,
       cameraFov: camera.fov,
@@ -29327,6 +29565,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   setArmEvidenceCapture: (mode) => weaponView.setArmEvidenceCapture(mode),
   setThermalRevealEvidenceHidden: (hidden) => thermalGhostPresentation.setEvidenceControlHidden(hidden),
+  stagePass73NativeAdsRevealTarget,
+  samplePass73AdsRevealTarget,
+  setPass73AdsRevealNormalBodyHidden,
+  readbackPass73NativeAdsRevealRoi,
+  capturePass73NativeAdsRevealRoiTriplet,
   stageLoadingCaptureSquad: () => {
     if (selectedArena.id !== 'atomic-acres' || gameMode !== 'solo' || !gameStarted) {
       return { staged: false, characters: 0, positions: [] };

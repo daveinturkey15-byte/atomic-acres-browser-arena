@@ -384,6 +384,89 @@ describe('M14 thermal ghost residency', () => {
     presentation.terminalDispose();
   });
 
+  it('binds active reveal records to the current life, continuity, attached root, and animated pose', () => {
+    const scene = new THREE.Scene();
+    const root = new THREE.Group();
+    const source = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    root.add(source);
+    scene.add(root);
+    const presentation = new ThermalGhostPresentation();
+    presentation.sync([{ id: 'live-operator', relation: 'hostile', root, lifeId: 3, continuityId: 8 }], true);
+    const first = presentation.telemetry(true);
+    expect(first).toMatchObject({
+      lifeIdentityCurrent: true,
+      poseIdentity: true,
+      sourceRootsAttached: true,
+      sourceRootIdentityUnique: true,
+      detachedLayers: 0,
+      extraneousModelLayers: 0,
+      extraneousHaloLayers: 0,
+      duplicateSourceRootInputs: 0,
+      targets: [{
+        id: 'live-operator', lifeId: 3, continuityId: 8, active: true,
+        sourceRootAttached: true, sourceVisualAttached: true, poseIdentity: true,
+      }],
+    });
+    const firstPose = first.targets?.[0]!.sourcePoseDigest;
+    source.rotation.y = 0.64;
+    presentation.sync([{ id: 'live-operator', relation: 'hostile', root, lifeId: 3, continuityId: 8 }], true);
+    const second = presentation.telemetry(true);
+    expect(second.targets?.[0]!.sourcePoseDigest).not.toBe(firstPose);
+    expect(second.targets?.[0]!.modelPoseDigest).toBe(second.targets?.[0]!.sourcePoseDigest);
+    presentation.terminalDispose();
+  });
+
+  it('rebuilds an identical target id at a new life and rejects duplicate source roots', () => {
+    const scene = new THREE.Scene();
+    const root = new THREE.Group();
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()));
+    scene.add(root);
+    const presentation = new ThermalGhostPresentation();
+    presentation.sync([{ id: 'respawned', relation: 'hostile', root, lifeId: 1, continuityId: 4 }], true);
+    const oldModelUuid = root.getObjectByName('through-wall-exact-operator-model')!.uuid;
+    presentation.sync([{ id: 'respawned', relation: 'hostile', root, lifeId: 2, continuityId: 5 }], true);
+    expect(root.getObjectByName('through-wall-exact-operator-model')!.uuid).not.toBe(oldModelUuid);
+    expect(presentation.telemetry(true)).toMatchObject({
+      activeTargets: 1,
+      lifeIdentityCurrent: true,
+      targets: [{ id: 'respawned', lifeId: 2, continuityId: 5 }],
+    });
+
+    presentation.sync([
+      { id: 'respawned', relation: 'hostile', root, lifeId: 2, continuityId: 5 },
+      { id: 'duplicate-alias', relation: 'hostile', root, lifeId: 2, continuityId: 5 },
+    ], true);
+    expect(presentation.telemetry(true)).toMatchObject({
+      activeTargetIds: ['respawned'],
+      duplicateSourceRootInputs: 1,
+      sourceRootIdentityUnique: true,
+      extraneousModelLayers: 0,
+      extraneousHaloLayers: 0,
+    });
+    presentation.terminalDispose();
+  });
+
+  it('reports detached and duplicate reveal layers instead of certifying a split model', () => {
+    const scene = new THREE.Scene();
+    const root = new THREE.Group();
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()));
+    scene.add(root);
+    const presentation = new ThermalGhostPresentation();
+    presentation.sync([{ id: 'structural-adversary', relation: 'hostile', root, lifeId: 0, continuityId: 1 }], true);
+    const model = root.getObjectByName('through-wall-exact-operator-model')!;
+    model.removeFromParent();
+    expect(presentation.telemetry(true)).toMatchObject({ detachedLayers: 1, siblingParentIdentity: false });
+    root.add(model);
+    const duplicate = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    duplicate.name = 'through-wall-exact-operator-model';
+    root.add(duplicate);
+    expect(presentation.telemetry(true)).toMatchObject({ extraneousModelLayers: 1 });
+    duplicate.removeFromParent();
+    duplicate.geometry.dispose();
+    (duplicate.material as THREE.Material).dispose();
+    presentation.terminalDispose();
+  });
+
   it('fails closed instead of drawing a partial body above the frozen layer bound', () => {
     const root = new THREE.Group();
     const visual = new THREE.Group();
