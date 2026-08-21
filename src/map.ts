@@ -23,6 +23,7 @@ import {
 } from './house-destruction';
 import { Team } from './protocol';
 import type { GlassState } from './glass-authority';
+import { bindPass73CollisionVisualOwner } from './pass73-collision-route-authority';
 
 export type PracticeTarget = {
   id: string;
@@ -447,6 +448,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
       if (solid.kind === 'ramp') {
         const rendered = box(solid.name, solid.position, solid.size, solidMaterial, false, true, false);
         if (solid.rotation) rendered.rotation.set(...solid.rotation);
+        bindPass73CollisionVisualOwner(rendered, architecture, solid);
         physicsColliders.push(solidBounds(solid));
         continue;
       }
@@ -466,6 +468,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
         isBreakableGlass ? solid.id : undefined,
       );
       if (solid.rotation) rendered.rotation.set(...solid.rotation);
+      bindPass73CollisionVisualOwner(rendered, architecture, solid);
       if (destructionDefinition) bindPreauthoredFragment(rendered, destructionDefinition);
       if (isBreakableGlass) {
         rendered.userData.breakableWindowId = solid.id;

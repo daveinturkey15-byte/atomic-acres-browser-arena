@@ -114,7 +114,12 @@ export function batchStaticMeshes(
       }
       return false;
     })();
-    if (!(node instanceof THREE.Mesh) || !node.visible || hasDynamicAncestor || node.userData.targetRoot || Array.isArray(node.material)) return;
+    if (!(node instanceof THREE.Mesh)
+      || !node.visible
+      || hasDynamicAncestor
+      || node.userData.targetRoot
+      || node.userData.pass73CollisionVisualOwner === true
+      || Array.isArray(node.material)) return;
     const sourceMaterial = node.material as THREE.MeshBasicMaterial;
     const canvasMap = typeof HTMLCanvasElement !== 'undefined' && sourceMaterial.map?.image instanceof HTMLCanvasElement;
     if (simplifyMaterials && canvasMap) return;

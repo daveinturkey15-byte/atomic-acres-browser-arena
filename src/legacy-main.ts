@@ -356,6 +356,13 @@ import {
   auditAtomicHouseAuthorityParity,
   type AtomicHouseAuthorityParityReport,
 } from './atomic-profile-authority-parity';
+import {
+  assertPass73CollisionRouteAuthority,
+  auditPass73CollisionRouteAuthority,
+  pass73CollisionRouteFixtures,
+  type Pass73CollisionRouteAuthorityReport,
+  type Pass73CollisionRouteFixture,
+} from './pass73-collision-route-authority';
 import { rustworksBlenderTelemetry, setRustworksProceduralPresentationVisible } from './rustworks-blender';
 import {
   createRustworksQualityLights,
@@ -4117,6 +4124,7 @@ scene.add(nukeShockwave);
 let arenaArtRoot: THREE.Group | null = null;
 let blenderArenaActive = false;
 let atomicHouseAuthorityParity: AtomicHouseAuthorityParityReport | null = null;
+let atomicCollisionRouteAuthority: Pass73CollisionRouteAuthorityReport | null = null;
 let atomicAuthoredLoadPromise: Promise<THREE.Group | null> | null = null;
 let atomicQualityLoadPromise: Promise<THREE.Group | null> | null = null;
 const qualityAssetStreaming = {
@@ -4140,6 +4148,18 @@ function selectedArenaAuthority(expected: ArenaId): ArenaMap {
     throw new Error(`Cannot stream ${expected} presentation while ${selectedArena.id} owns gameplay authority`);
   }
   return arena;
+}
+
+function currentAtomicCollisionRouteAuthority(): Readonly<{
+  report: Pass73CollisionRouteAuthorityReport;
+  fixtures: readonly Pass73CollisionRouteFixture[];
+}> | null {
+  if (selectedArena.id !== 'atomic-acres' || arena.id !== 'atomic-acres') return null;
+  const quality = blenderArenaActive && arenaArtRoot?.visible === true;
+  const profile = quality ? 'quality' as const : 'performance' as const;
+  const presentationRoot = quality ? arenaArtRoot! : arena.root;
+  const report = auditPass73CollisionRouteAuthority(arena, presentationRoot, profile);
+  return Object.freeze({ report, fixtures: pass73CollisionRouteFixtures(arena, profile) });
 }
 
 function bindAtomicPresentationRaycasts(root: THREE.Group, authority: ArenaMap): void {
@@ -24613,6 +24633,13 @@ async function performArenaSelection(
     setBootstrapStage('batching-static-meshes');
     batchSelectedArenaPresentation();
     setArenaPresentationVisibility();
+    const collisionRouteAuthority = currentAtomicCollisionRouteAuthority();
+    if (collisionRouteAuthority) {
+      atomicCollisionRouteAuthority = collisionRouteAuthority.report;
+      assertPass73CollisionRouteAuthority(atomicCollisionRouteAuthority);
+    } else {
+      atomicCollisionRouteAuthority = null;
+    }
     profileArenaTransition('match-authority-reset');
     matchState = createMatch(performance.now(), selectedArena.matchRules);
     lastPlayerSpawnIndex = -1;
@@ -26452,6 +26479,10 @@ const debugWindow = window as Window & {
     stageLoadingCaptureSquad: () => { staged: boolean; characters: number; positions: number[][] };
     collisionProbe: (x: number, z: number) => boolean;
     collisionProbeAt: (x: number, y: number, z: number) => boolean;
+    collisionRouteAuthority: () => Readonly<{
+      report: Pass73CollisionRouteAuthorityReport;
+      fixtures: readonly Pass73CollisionRouteFixture[];
+    }> | null;
     segmentBlocked: (x1: number, z1: number, x2: number, z2: number) => boolean;
     selectTriPassWorldTargets: (points: [number, number][]) => boolean;
     captureShadowProbeFrame: (horizontalOffset: number) => string;
@@ -29318,6 +29349,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   collisionProbeAt: (x, y, z) => [x, y, z].every(Number.isFinite)
     ? isBlocked({ x, y, z }, activeWorldColliders(), 0.36)
     : true,
+  collisionRouteAuthority: () => currentAtomicCollisionRouteAuthority(),
   segmentBlocked: (x1, z1, x2, z2) => activeWorldColliders().some((box) => segmentIntersectsBox(
     new THREE.Vector3(x1, 0.2, z1),
     new THREE.Vector3(x2, 1.1, z2),

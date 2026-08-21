@@ -4,8 +4,12 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import type { ArenaMap } from './map';
 import type { ArenaId } from './map-selection';
 import { ARENA_ROUTE_IDENTITIES } from './world-identity';
+import {
+  assertPass73CollisionRouteAuthority,
+  auditPass73CollisionRouteAuthority,
+} from './pass73-collision-route-authority';
 
-export const BLENDER_ARENA_ASSET = './assets/original/models/atomic-acres-blender-arena.glb?v=pass63-20260724-apertures1';
+export const BLENDER_ARENA_ASSET = './assets/original/models/atomic-acres-blender-arena.glb?v=pass73-20260821-route-authority1';
 
 export type BlenderArenaTelemetry = {
   status: 'idle' | 'loading' | 'ready' | 'fallback';
@@ -28,6 +32,8 @@ export type BlenderArenaTelemetry = {
   largeCoverAssets: number;
   housePropSets: number;
   collisionAuditVisuals: number;
+  collisionVisualOwners: number;
+  collisionRouteAuthorityPass: boolean;
   surfaceSeparationPass: boolean;
   worldIdentityPass: boolean;
   proceduralWorldHidden: boolean;
@@ -55,6 +61,8 @@ const telemetry: BlenderArenaTelemetry = {
   largeCoverAssets: 0,
   housePropSets: 0,
   collisionAuditVisuals: 0,
+  collisionVisualOwners: 0,
+  collisionRouteAuthorityPass: false,
   surfaceSeparationPass: false,
   worldIdentityPass: false,
   proceduralWorldHidden: false,
@@ -75,6 +83,8 @@ export function markBlenderArenaFallback(error: unknown): void {
   telemetry.error = error instanceof Error ? error.message : String(error);
   telemetry.proceduralWorldHidden = false;
   telemetry.surfaceSeparationPass = false;
+  telemetry.collisionVisualOwners = 0;
+  telemetry.collisionRouteAuthorityPass = false;
 }
 
 export function mirrorAtomicCollisionAuditVisuals(proceduralWorld: THREE.Object3D, qualityRoot: THREE.Group): number {
@@ -135,6 +145,7 @@ export async function loadBlenderArena(
   let transparentUpperWindows = 0;
   let meshCount = 0;
   let triangleCount = 0;
+  let collisionVisualOwners = 0;
   root.traverse((node) => {
     node.userData.blenderAuthoredEnvironment = true;
     if (node.userData.atomic_semantic === 'aperture-audit') {
@@ -153,6 +164,7 @@ export async function loadBlenderArena(
     if (node.userData.atomic_asset_class === 'physical-transit-bus') modeledBuses += 1;
     if (node.userData.atomic_asset_class === 'authored-large-physical-cover') largeCoverAssets += 1;
     if (node.userData.atomic_asset_class === 'authored-house-furnishing-set') housePropSets += 1;
+    if (node.userData.atomic_semantic === 'collision-visual-owner') collisionVisualOwners += 1;
     const routeId = typeof node.userData.atomic_route_id === 'string' ? node.userData.atomic_route_id : null;
     if (node.userData.atomic_semantic === 'route-landmark' && routeId) routeLandmarks.add(routeId);
     if (!(node instanceof THREE.Mesh)) return;
@@ -234,6 +246,8 @@ export async function loadBlenderArena(
       throw new Error(`Blender arena aperture audit class mismatch: ${opening.id}`);
     }
   }
+  const collisionRouteAuthority = auditPass73CollisionRouteAuthority(arena, root, 'quality');
+  assertPass73CollisionRouteAuthority(collisionRouteAuthority);
 
   // Retain the original visual meshes underneath as invisible presentation and
   // authoritative ray targets. Raycast/collision authority never comes from GLB art.
@@ -268,6 +282,8 @@ export async function loadBlenderArena(
   telemetry.largeCoverAssets = largeCoverAssets;
   telemetry.housePropSets = housePropSets;
   telemetry.collisionAuditVisuals = collisionAuditVisuals;
+  telemetry.collisionVisualOwners = collisionVisualOwners;
+  telemetry.collisionRouteAuthorityPass = collisionRouteAuthority.pass;
   telemetry.surfaceSeparationPass = true;
   telemetry.worldIdentityPass = routeLandmarks.size === ARENA_ROUTE_IDENTITIES.length;
   telemetry.proceduralWorldHidden = true;

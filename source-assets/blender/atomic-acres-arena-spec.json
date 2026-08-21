@@ -650,12 +650,12 @@
           "name": "upper-window-sill-wall",
           "position": [
             -9,
-            3.77,
+            3.64,
             -19.8
           ],
           "size": [
             3.2,
-            0.58,
+            0.32,
             0.42
           ],
           "surface": "aqua",
@@ -686,12 +686,12 @@
           "name": "upper-window-glass",
           "position": [
             -9,
-            5.045,
+            4.915,
             -19.78
           ],
           "size": [
             3.2,
-            1.9699999999999998,
+            2.23,
             0.12
           ],
           "surface": "glass",
@@ -859,6 +859,24 @@
           "surface": "trim",
           "collidable": false,
           "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:entrance-canopy",
+          "name": "entrance-canopy",
+          "position": [
+            -8.45,
+            3.05,
+            -19.22
+          ],
+          "size": [
+            4.4,
+            0.16,
+            1.4
+          ],
+          "surface": "metal",
+          "collidable": true,
+          "kind": "landing",
           "breakable": false
         },
         {
@@ -1206,12 +1224,12 @@
           "kind": "window",
           "centre": [
             -9,
-            5.045,
+            4.915,
             -19.8
           ],
           "width": 3.2,
-          "height": 1.9699999999999998,
-          "route": false
+          "height": 2.23,
+          "route": true
         }
       ],
       "anchors": [
@@ -2053,12 +2071,12 @@
           "name": "upper-window-sill-wall",
           "position": [
             9,
-            3.77,
+            3.64,
             19.8
           ],
           "size": [
             3.2,
-            0.58,
+            0.32,
             0.42
           ],
           "surface": "coral",
@@ -2089,12 +2107,12 @@
           "name": "upper-window-glass",
           "position": [
             9,
-            5.045,
+            4.915,
             19.78
           ],
           "size": [
             3.2,
-            1.9699999999999998,
+            2.23,
             0.12
           ],
           "surface": "glass",
@@ -2262,6 +2280,24 @@
           "surface": "trim",
           "collidable": false,
           "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:entrance-canopy",
+          "name": "entrance-canopy",
+          "position": [
+            8.45,
+            3.05,
+            19.22
+          ],
+          "size": [
+            4.4,
+            0.16,
+            1.4
+          ],
+          "surface": "metal",
+          "collidable": true,
+          "kind": "landing",
           "breakable": false
         },
         {
@@ -2609,12 +2645,12 @@
           "kind": "window",
           "centre": [
             9,
-            5.045,
+            4.915,
             19.8
           ],
           "width": 3.2,
-          "height": 1.9699999999999998,
-          "route": false
+          "height": 2.23,
+          "route": true
         }
       ],
       "anchors": [
