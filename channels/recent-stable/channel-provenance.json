@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "channel": "recent-stable",
   "releasePass": "PASS 67.1",
   "sourceSha": "8c3ad1cd4d819aba79f07c01c16c8c4294fd14c1",

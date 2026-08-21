@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 5,
+  "channel": "pass72-retained",
+  "releasePass": "PASS 72",
+  "pagesSha": "d5b77dc3b9e46608264c52eb0737b50590d70eb5",
+  "pagesPath": "channels/the-big-one",
+  "sourceSha": "5da686551d92387d08b00be40125386c391bb3ed",
+  "sourceSubject": "PASS 72 from 5da686551d92387d08b00be40125386c391bb3ed",
+  "path": "channels/pass72-retained",
+  "exactRootFileCount": 516,
+  "passEvidenceFiles": [
+    "assets/changelog-BV6bJymd.js",
+    "assets/release-identity-CQm2FM1H.js"
+  ],
+  "treeSha256": "594ed5be34d78ea1f93a28f7b457c91cababbac8ea737bb6dd06701fee25b22d",
+  "pinnedRuntime": {
+    "schemaVersion": 4,
+    "channel": "the-big-one",
+    "releasePass": "PASS 72",
+    "sourceSha": "5da686551d92387d08b00be40125386c391bb3ed",
+    "path": "channels/the-big-one",
+    "exactRootFileCount": 515,
+    "treeSha256": "62fafc5e5c39fa744dfc4f7067b3e0953dd190d8ffecc04e203b2b86d6a8974f"
+  }
+}

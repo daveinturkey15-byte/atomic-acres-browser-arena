@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "channel": "rollback",
   "releasePass": "PASS 63",
   "sourceSha": "ac85e9b8b46cc2370aee903d564ecf3c4682b24c",
