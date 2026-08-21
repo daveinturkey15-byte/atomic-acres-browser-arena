@@ -25292,7 +25292,9 @@ window.addEventListener('pagehide', () => {
   persistRoomIdentityForCloseTabRejoin();
   matchDiagnosticUploader.flushForPageLifecycle();
 });
+let gameplayRuntimeDisposing = false;
 window.addEventListener('beforeunload', () => {
+  gameplayRuntimeDisposing = true;
   persistActiveHostMatchCheckpoint(true);
   persistRoomIdentityForCloseTabRejoin();
   matchDiagnosticUploader.flushForPageLifecycle();
@@ -25517,6 +25519,9 @@ function reportRuntimeError(context: string, error: unknown): void {
 }
 
 function frame(now: number, scheduleNext = true): void {
+  // A pending rAF can run after beforeunload has begun. Never touch renderer
+  // resources once page-exit teardown has started, and do not reschedule it.
+  if (gameplayRuntimeDisposing) return;
   const schedulingDecision = reconcilePresentationScheduling('animation frame eligibility');
   if (schedulingDecision.mode !== 'foreground-presentation') {
     // The prerecorded menu/loading media owns its own browser compositor path.
