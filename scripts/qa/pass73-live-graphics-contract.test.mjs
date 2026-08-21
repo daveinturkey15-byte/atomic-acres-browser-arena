@@ -179,6 +179,7 @@ function activePhase({
         },
       },
       atmosphere: {
+        owner: 'pass64.atmosphere.tsl',
         profile: liveProfile,
         dustMotes: qualityOwners ? 100 : 50,
         mistOpacity: qualityOwners ? 0.4 : 0.2,
@@ -297,6 +298,10 @@ function expectRejected(receipt, pattern) {
 test('accepts one exact staged headed-hardware Quality -> Performance lifecycle receipt', () => {
   assert.deepEqual(pass73LiveGraphicsFailures(validReceipt(), expected), []);
   assert.equal(assertPass73LiveGraphicsReceipt(validReceipt(), expected).verdict, 'pass');
+});
+
+test('rejects atmosphere evidence from an inactive renderer owner', () => {
+  expectRejected(mutate('phases.performanceLive.render.atmosphere.owner', 'pass30.legacy-glsl'), /profile labels/iu);
 });
 
 test('rejects label-only Performance when the real render owners remain Quality', () => {

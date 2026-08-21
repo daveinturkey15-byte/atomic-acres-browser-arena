@@ -74,6 +74,7 @@ function ownerCoherenceFailures(phase, label, profile, constructionProfile, pres
     || phase.ui?.graphicsLiveProfile !== profile
     || post?.owner !== 'pass64-webgpu-tsl' || post?.liveProfile !== profile
     || render.refinement?.profile !== profile || render.contrast?.profile !== profile
+    || render.atmosphere?.owner !== 'pass64.atmosphere.tsl'
     || render.atmosphere?.profile !== profile) {
     failures.push(`${label} profile labels and live runtime owners are incoherent`);
   }

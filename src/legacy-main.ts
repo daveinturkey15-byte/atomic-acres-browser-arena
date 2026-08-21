@@ -25810,6 +25810,35 @@ function activePostTelemetry(): Record<string, unknown> {
   };
 }
 
+function activeAtmosphereTelemetry(): Record<string, unknown> {
+  if (atmosphereSystem) return atmosphereSystem.telemetry();
+  const advanced = pass64TslSystems?.root.userData.pass65AdvancedGraphics as {
+    volumetricActual?: {
+      scale?: number;
+      mistOpacity?: number;
+      mistLayers?: number;
+      smokeOpacity?: number;
+      smokeLayers?: number;
+      dustOpacity?: number;
+      dustMotes?: number;
+    };
+  } | undefined;
+  const actual = advanced?.volumetricActual;
+  return {
+    enabled: pass64TslSystems !== null,
+    owner: 'pass64.atmosphere.tsl',
+    profile: liveGraphicsProfile,
+    arenaId: selectedArena.id,
+    densityScale: Number(actual?.scale ?? 0),
+    mistCards: Number(actual?.mistLayers ?? 0),
+    smokeCards: Number(actual?.smokeLayers ?? 0),
+    dustMotes: Number(actual?.dustMotes ?? 0),
+    mistOpacity: Number(actual?.mistOpacity ?? 0),
+    smokeOpacity: Number(actual?.smokeOpacity ?? 0),
+    dustOpacity: Number(actual?.dustOpacity ?? 0),
+  };
+}
+
 function activeRuntimeTelemetry(): ReturnType<LegacyWebGlRenderRuntime['telemetry']> {
   if (renderRuntime.backend === 'webgpu') {
     return renderRuntime.telemetry(runtimeRequest.requestedBackend);
@@ -28662,7 +28691,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         linearHdr: true,
       },
       grass: grassSystem?.telemetry() ?? { enabled: true, owner: 'pass64.grass.tsl.v1' },
-      atmosphere: atmosphereSystem?.telemetry() ?? { enabled: true, owner: 'pass64.atmosphere.tsl' },
+      atmosphere: activeAtmosphereTelemetry(),
       water: waterSystem.telemetry(),
       blenderEnvironment: {
         ...blenderArenaTelemetry(),
