@@ -390,12 +390,14 @@ export const MELEE_VIEWMODEL_PEAK_SCALE_LIFT = 0.3;
 // hand inside the retained 15 mm socket-calibration contract while preserving
 // a real (non-zero) anti-singularity margin.
 const RIGGED_ARM_MAX_REACH_RATIO = 0.996;
-export const FIRST_PERSON_ARM_PROPORTION_CONTRACT = 'authored-fixed-length-strong-operator-arms-v3';
+export const FIRST_PERSON_ARM_PROPORTION_CONTRACT = 'authored-fixed-length-strong-operator-arms-v4';
 /** Uniform root scaling preserves the authored skeleton, palms and joint radii. */
 export const FIRST_PERSON_ARM_UNIFORM_SCALE = 1.12;
 // Retain a visibly strong sleeve/forearm mass even under the maximum authored
-// wall-contact retreat; all axes remain uniform and bone lengths stay fixed.
-export const FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE = 1.48;
+// wall-contact retreat. This is a small uniform presentation lift over the
+// prior candidate; the authored mesh, joints and both segment lengths remain
+// unchanged, while the on-screen sleeve width no longer reads as a thin tube.
+export const FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE = 1.56;
 // Do not shrink the operator's arms while aiming. Apart from making the ADS
 // silhouette look implausibly skinny, the old shrink broke the lower-frame
 // sleeve continuation on short landscape viewports.
@@ -417,14 +419,14 @@ export function firstPersonArmPresentationScale(adsBlend: number, reloadProgress
     aim,
   ) + reloadLift;
 }
-export const FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT = 'fixed-length-reachable-shoulders-continuous-sleeve-crop-v3';
+export const FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT = 'fixed-length-reachable-shoulders-continuous-sleeve-crop-v4';
 export const FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC = Object.freeze({
   left: -1.12,
-  // The old -1.07 centre buried most of the firing sleeve below short/mobile
-  // frames during recoil and compact/heavy grips. The solver's retained 0.01
-  // margin puts this centre at -0.98 NDC: still beyond the crop, while keeping
-  // a substantial fixed-length upper-arm section visible above it.
-  right: -0.97,
+  // The manual master extends weighted sleeve geometry well beyond the actual
+  // shoulder. Keep the joint inside a narrow lower-frame continuation band so
+  // a substantial upper-arm section remains visible, while the real proximal
+  // sleeve and its closed cap continue beyond the bottom crop.
+  right: -0.82,
 });
 /** The one-handed knife arc needs extra proximal sleeve travel at peak extension. */
 export const FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC = -1.23;
@@ -3572,14 +3574,17 @@ export class WeaponPresentation {
     const cameraRight = scratch.cameraRight.set(1, 0, 0).applyQuaternion(cameraRotation).normalize();
     entry.addScaledVector(cameraDown, 0.1)
       .addScaledVector(cameraRight, rig.side === 'right' ? 0.012 : -0.012);
-    // A shoulder close to -1 NDC still exposed the sleeve endpoint during
-    // recoil and prone contact. Both authored chains enter below the crop.
+    // Pin the joint to its reviewed continuation lane from either direction.
+    // The previous one-sided clamp could leave heavy/mobile firing shoulders
+    // arbitrarily far below the frame, exposing only a thin folded fragment.
+    // The authored proximal sleeve extends past this joint and remains the
+    // actual below-screen continuation; no procedural cover geometry is used.
     const projectedEntry = scratch.shoulderProjected.copy(entry).project(this.camera);
-    if (projectedEntry.y > targetNdcY) {
+    if (Math.abs(projectedEntry.y - (targetNdcY - 0.01)) > 1e-6) {
       // Preserve exact projected depth, move the point directly below the
-      // crop, then convert that world point back through the authored parent.
+      // reviewed lane, then convert it back through the authored parent.
       // This is deterministic under recoil/reload rotations and replaces the
-      // former bounded iteration that could stop with the sleeve still visible.
+      // former unbounded below-frame placement.
       projectedEntry.y = targetNdcY - 0.01;
       entry.copy(projectedEntry.unproject(this.camera));
     }

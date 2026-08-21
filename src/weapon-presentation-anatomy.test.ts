@@ -571,7 +571,7 @@ describe('first-person anatomical presentation', () => {
     expect(shoulder.scale.toArray()).toEqual([1, 1, 1]);
     expect(elbow.scale.toArray()).toEqual([1, 1, 1]);
     expect(wrist.scale.toArray()).toEqual([1, 1, 1]);
-    expect(FIRST_PERSON_ARM_PROPORTION_CONTRACT).toBe('authored-fixed-length-strong-operator-arms-v3');
+    expect(FIRST_PERSON_ARM_PROPORTION_CONTRACT).toBe('authored-fixed-length-strong-operator-arms-v4');
 
     const cropScenarios = Object.freeze([
       Object.freeze({ name: 'hip', rotation: [0, 0, 0] as const }),
@@ -584,7 +584,7 @@ describe('first-person anatomical presentation', () => {
       parent.rotation.set(scenario.rotation[0], scenario.rotation[1], scenario.rotation[2]);
       camera.updateMatrixWorld(true);
       const crop = privatePresentation.placeRiggedShoulderEntryBelowFrame(rig, camera.quaternion);
-      expect(crop.ndc[1], scenario.name).toBeLessThanOrEqual(FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC.right);
+      expect(crop.ndc[1], scenario.name).toBeCloseTo(FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC.right - 0.01, 8);
       expect(crop.displacementMeters, scenario.name).toBeGreaterThan(0);
     }
     shoulder.position.copy(rig.bindShoulderPosition);
@@ -595,9 +595,9 @@ describe('first-person anatomical presentation', () => {
       camera.quaternion,
       FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC,
     );
-    expect(meleeCrop.ndc[1]).toBeLessThanOrEqual(FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC);
+    expect(meleeCrop.ndc[1]).toBeCloseTo(FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC - 0.01, 8);
     expect(FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT)
-      .toBe('fixed-length-reachable-shoulders-continuous-sleeve-crop-v3');
+      .toBe('fixed-length-reachable-shoulders-continuous-sleeve-crop-v4');
     expect(FIRST_PERSON_ARM_BIND_SEGMENT_LENGTH_SCALE).toBe(1);
 
     shoulder.position.copy(rig.bindShoulderPosition);
