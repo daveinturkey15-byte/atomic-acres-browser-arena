@@ -6,6 +6,7 @@ type DebugApi = {
   startSolo(): void;
   admissionState(): { matchPhase: string };
   snapshot(): any;
+  sampleGrenadeColdPathTelemetry(): GrenadeColdPathTelemetry;
   setBotsFrozen(frozen: boolean): void;
   setBotPresentation(stance: 'stand' | 'crouch' | 'prone' | null, speed?: number, weapon?: string): void;
   placeBotAhead(distance?: number): unknown;
@@ -31,13 +32,25 @@ type DebugApi = {
   setGrenades(count: number): void;
 };
 
+type GrenadeColdPathTelemetry = Readonly<{
+  sampledAtMs: number;
+  audio: any;
+  pool: any;
+  explosion: any;
+  prewarm: any;
+  render: any;
+  action: any;
+}>;
+
 type GrenadeFrameWindow = Readonly<{
   handlerMs: number;
   gapsMs: readonly number[];
   maximumGapMs: number;
   longTasks: readonly Readonly<{ startTime: number; duration: number }>[];
-  audioBefore: any;
-  audioAfter: any;
+  telemetryBefore: GrenadeColdPathTelemetry;
+  telemetryAfter: GrenadeColdPathTelemetry;
+  resourceLoads: readonly Readonly<{ path: string; initiatorType: string; duration: number; decodedBodySize: number }>[];
+  heap: Readonly<{ beforeBytes: number | null; afterBytes: number | null }>;
 }>;
 
 async function changedPixelFraction(left: Buffer, right: Buffer): Promise<number> {
@@ -164,6 +177,16 @@ async function captureImmediateGrenadeFrameWindow(page: Page): Promise<GrenadeFr
   return page.evaluate(() => new Promise<GrenadeFrameWindow>((resolve) => {
     const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__;
     api.setGrenades(1);
+    // Capture diagnostics before scheduling the measured rAF. A full debug
+    // snapshot walks the complete world and manufactured a 64-72 ms Long Task
+    // inside the old action callback, falsely attributing observer cost to the
+    // throw. This narrow seam is the only diagnostic read used by this gate.
+    const telemetryBefore = api.sampleGrenadeColdPathTelemetry();
+    const resourceEntryCountBefore = performance.getEntriesByType('resource').length;
+    const performanceMemory = performance as Performance & { memory?: { usedJSHeapSize?: number } };
+    const heapBefore = Number.isFinite(performanceMemory.memory?.usedJSHeapSize)
+      ? Number(performanceMemory.memory?.usedJSHeapSize)
+      : null;
     const longTasks: Array<{ startTime: number; duration: number }> = [];
     const observer = typeof PerformanceObserver === 'function'
       ? new PerformanceObserver((list) => {
@@ -172,7 +195,6 @@ async function captureImmediateGrenadeFrameWindow(page: Page): Promise<GrenadeFr
       : null;
     try { observer?.observe({ type: 'longtask', buffered: true }); } catch { /* optional browser evidence */ }
     requestAnimationFrame((actionFrameAt) => {
-      const audioBefore = api.snapshot().audio.grenadeEffectsPrewarm;
       const handlerStartedAt = performance.now();
       api.throwGrenade();
       const handlerCompletedAt = performance.now();
@@ -190,13 +212,30 @@ async function captureImmediateGrenadeFrameWindow(page: Page): Promise<GrenadeFr
         const relevantLongTasks = longTasks.filter(({ startTime, duration }) => (
           startTime + duration >= handlerStartedAt && startTime <= handlerStartedAt + 350
         ));
+        const telemetryAfter = api.sampleGrenadeColdPathTelemetry();
+        const resourceLoads = performance.getEntriesByType('resource')
+          .slice(resourceEntryCountBefore)
+          .map((entry) => {
+            const resource = entry as PerformanceResourceTiming;
+            return {
+              path: new URL(resource.name, location.href).pathname,
+              initiatorType: resource.initiatorType,
+              duration: resource.duration,
+              decodedBodySize: resource.decodedBodySize,
+            };
+          });
+        const heapAfter = Number.isFinite(performanceMemory.memory?.usedJSHeapSize)
+          ? Number(performanceMemory.memory?.usedJSHeapSize)
+          : null;
         resolve({
           handlerMs,
           gapsMs,
           maximumGapMs: Math.max(0, ...gapsMs),
           longTasks: relevantLongTasks,
-          audioBefore,
-          audioAfter: api.snapshot().audio.grenadeEffectsPrewarm,
+          telemetryBefore,
+          telemetryAfter,
+          resourceLoads,
+          heap: { beforeBytes: heapBefore, afterBytes: heapAfter },
         });
       };
       requestAnimationFrame(sample);
@@ -303,10 +342,10 @@ test.describe('Pass 73 gameplay regression behavior', () => {
     test.skip(process.env.PASS73_NATIVE_WEBGPU !== '1', 'Run explicitly on installed Chrome with native hardware WebGPU.');
     test.setTimeout(150_000);
     await deploy(page, 'webgpu');
-    const runtime = await page.evaluate(() => (
+    const readiness = await page.evaluate(() => (
       window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }
-    ).__ATOMIC_ACRES_DEBUG__.snapshot().render.runtime);
-    expect(runtime).toMatchObject({
+    ).__ATOMIC_ACRES_DEBUG__.sampleGrenadeColdPathTelemetry());
+    expect(readiness.render).toMatchObject({
       requestedBackend: 'webgpu',
       actualBackend: 'webgpu',
       initialized: true,
@@ -318,40 +357,57 @@ test.describe('Pass 73 gameplay regression behavior', () => {
     const prewarm = await page.evaluate(() => ({
       dataset: document.documentElement.dataset.grenadeEffectsAudioPrewarm,
       telemetry: (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi })
-        .__ATOMIC_ACRES_DEBUG__.snapshot().audio.grenadeEffectsPrewarm,
+        .__ATOMIC_ACRES_DEBUG__.sampleGrenadeColdPathTelemetry(),
     }));
     expect(prewarm).toMatchObject({
       dataset: 'ready',
       telemetry: {
-        prepared: true,
-        runs: 1,
-        warmupSources: 7,
-        warmupNodes: 9,
-        retainedSources: 0,
-        retainedBroadbandLoops: 0,
-        liveRecipe: 'sawtooth-pressure-plus-dual-filtered-noise-v1',
+        audio: {
+          prepared: true,
+          runs: 1,
+          warmupSources: 7,
+          warmupNodes: 9,
+          retainedSources: 0,
+          retainedBroadbandLoops: 0,
+          liveRecipe: 'sawtooth-pressure-plus-dual-filtered-noise-v1',
+        },
+        pool: { active: 0, exhaustions: 0, prewarmBlockedAcquisitions: 0 },
+        explosion: { active: 0, prewarmed: true },
+        prewarm: { worldOrdnance: { name: 'world-ordnance' } },
       },
     });
+    expect(prewarm.telemetry.pool.gpuPrewarmGeneration).toBeGreaterThanOrEqual(0);
+    expect(prewarm.telemetry.pool.gpuPrewarmGeneration).toBe(prewarm.telemetry.prewarm.sceneGeneration);
 
     const first = await captureImmediateGrenadeFrameWindow(page);
     await page.waitForFunction(() => {
       const profile = (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi })
-        .__ATOMIC_ACRES_DEBUG__.snapshot().grenadeFirstAction;
+        .__ATOMIC_ACRES_DEBUG__.sampleGrenadeColdPathTelemetry().action;
       return profile?.sequence === 0 && profile.observationComplete === true;
     }, undefined, { polling: 'raf', timeout: 10_000 });
     const firstProfile = await page.evaluate(() => (
       window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }
-    ).__ATOMIC_ACRES_DEBUG__.snapshot().grenadeFirstAction);
-    await page.waitForTimeout(3_000);
+    ).__ATOMIC_ACRES_DEBUG__.sampleGrenadeColdPathTelemetry().action);
+    // The old fixed 3 s delay raced the first frag's detonation against the
+    // second action and sometimes measured explosion work as a warm throw.
+    // Wait on the observable retained-pool/explosion lifecycle instead.
+    await page.waitForFunction(() => {
+      const telemetry = (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi })
+        .__ATOMIC_ACRES_DEBUG__.sampleGrenadeColdPathTelemetry();
+      return telemetry.pool.active === 0
+        && telemetry.explosion.total >= 1
+        && telemetry.explosion.active === 0
+        && (telemetry.explosion.lastExplosionAgeMs ?? 0) >= 250;
+    }, undefined, { polling: 'raf', timeout: 12_000 });
     const second = await captureImmediateGrenadeFrameWindow(page);
     await page.waitForFunction(() => {
       const profile = (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi })
-        .__ATOMIC_ACRES_DEBUG__.snapshot().grenadeFirstAction;
+        .__ATOMIC_ACRES_DEBUG__.sampleGrenadeColdPathTelemetry().action;
       return profile?.sequence === 1 && profile.observationComplete === true;
     }, undefined, { polling: 'raf', timeout: 10_000 });
     const secondProfile = await page.evaluate(() => (
       window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }
-    ).__ATOMIC_ACRES_DEBUG__.snapshot().grenadeFirstAction);
+    ).__ATOMIC_ACRES_DEBUG__.sampleGrenadeColdPathTelemetry().action);
     const external = {
       first: {
         ...first,
@@ -375,9 +431,28 @@ test.describe('Pass 73 gameplay regression behavior', () => {
     expect(external.first.p95Ms, evidence).toBeLessThanOrEqual(external.second.p95Ms + 8);
     expect(external.first.p99Ms, evidence).toBeLessThanOrEqual(external.second.p99Ms + 12);
     expect(first.longTasks, evidence).toEqual([]);
-    expect(first.audioBefore, evidence).toMatchObject({ prepared: true, warmupSources: 7, retainedSources: 0 });
-    expect(first.audioAfter, evidence).toMatchObject({ prepared: true, warmupSources: 7, retainedSources: 0 });
-    expect(second.audioAfter, evidence).toMatchObject({ prepared: true, warmupSources: 7, retainedSources: 0 });
+    expect(second.longTasks, evidence).toEqual([]);
+    expect(first.telemetryBefore.audio, evidence).toMatchObject({ prepared: true, warmupSources: 7, retainedSources: 0 });
+    expect(first.telemetryAfter.audio, evidence).toMatchObject({ prepared: true, warmupSources: 7, retainedSources: 0 });
+    expect(second.telemetryAfter.audio, evidence).toMatchObject({ prepared: true, warmupSources: 7, retainedSources: 0 });
+    expect(first.resourceLoads, evidence).toEqual([]);
+    expect(second.resourceLoads, evidence).toEqual([]);
+    for (const sample of [first, second]) {
+      expect(sample.telemetryAfter.pool.total, evidence).toBe(sample.telemetryBefore.pool.total);
+      expect(sample.telemetryAfter.pool.gpuPrewarmGeneration, evidence)
+        .toBe(sample.telemetryBefore.pool.gpuPrewarmGeneration);
+      expect(sample.telemetryAfter.pool.acquisitions - sample.telemetryBefore.pool.acquisitions, evidence).toBe(1);
+      expect(sample.telemetryAfter.pool.exhaustions, evidence).toBe(sample.telemetryBefore.pool.exhaustions);
+      expect(sample.telemetryAfter.render.compiledPipelineIds, evidence)
+        .toEqual(sample.telemetryBefore.render.compiledPipelineIds);
+      expect(sample.telemetryAfter.render, evidence).toMatchObject({
+        actualBackend: 'webgpu',
+        softwareAdapter: false,
+        deviceLost: false,
+        uncapturedErrors: 0,
+      });
+      expect(sample.telemetryAfter.render.presentation.completionFailures, evidence).toBe(0);
+    }
     expect(firstProfile, evidence).toMatchObject({
       sequence: 0,
       cold: true,

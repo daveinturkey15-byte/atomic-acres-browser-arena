@@ -26003,6 +26003,63 @@ function sampleWeaponActionReadiness() {
   });
 }
 
+function copyGrenadeFirstActionProfile(profile: GrenadeFirstActionProfile | null) {
+  return profile ? Object.freeze({
+    ...profile,
+    audio: Object.freeze({ ...profile.audio }),
+    pool: Object.freeze({ ...profile.pool }),
+    animation: Object.freeze({ ...profile.animation }),
+    physics: Object.freeze({ ...profile.physics }),
+    frameGapsMs: Object.freeze([...profile.frameGapsMs]),
+  }) : null;
+}
+
+/**
+ * Narrow, allocation-bounded evidence for the measured grenade action frame.
+ * A complete debug snapshot walks every operator, collider and presentation
+ * surface and can itself create a Long Task. Performance probes must use this
+ * seam so their observation does not manufacture the hitch they are testing.
+ */
+function sampleGrenadeColdPathTelemetry() {
+  const runtime = activeRuntimeTelemetry();
+  const pool = grenadeWorldPresentationPool.telemetry();
+  const grenadeAudio = audio.telemetry().grenadeEffectsPrewarm;
+  const explosion = grenadeExplosionPresentation.telemetry();
+  const effectPrewarm = lastArenaEffectPrewarmProfile;
+  const worldOrdnance = effectPrewarm?.groups.find(({ name }) => name === 'world-ordnance') ?? null;
+  return Object.freeze({
+    sampledAtMs: performance.now(),
+    audio: Object.freeze({ ...grenadeAudio }),
+    pool: Object.freeze({ ...pool }),
+    explosion: Object.freeze({
+      total: grenadeExplosions,
+      active: explosion.active,
+      capacity: explosion.capacity,
+      prewarmed: explosion.prewarmed,
+      lastExplosionAgeMs: lastGrenadeExplosionFrameAt > 0
+        ? Math.max(0, performance.now() - lastGrenadeExplosionFrameAt)
+        : null,
+    }),
+    prewarm: Object.freeze({
+      sceneGeneration: effectPrewarm?.sceneGeneration ?? null,
+      worldOrdnance: worldOrdnance ? Object.freeze({ ...worldOrdnance }) : null,
+    }),
+    render: Object.freeze({
+      requestedBackend: runtime.requestedBackend,
+      actualBackend: runtime.actualBackend,
+      initialized: runtime.initialized,
+      failClosed: runtime.failClosed,
+      softwareAdapter: runtime.softwareAdapter,
+      deviceLost: runtime.deviceLost,
+      uncapturedErrors: runtime.uncapturedErrors,
+      lastUncapturedError: runtime.lastUncapturedError,
+      compiledPipelineIds: Object.freeze([...(pass64TslSystems?.compiledPipelineIds ?? [])]),
+      presentation: Object.freeze({ ...runtime.presentation }),
+    }),
+    action: copyGrenadeFirstActionProfile(lastGrenadeFirstActionProfile),
+  });
+}
+
 type DebugPlayerPose = Readonly<{ yaw: number; pitch: number }>;
 
 const debugWindow = window as Window & {
@@ -26016,6 +26073,7 @@ const debugWindow = window as Window & {
     sampleWeaponAssetCache: () => ReturnType<typeof pass65WeaponCacheTelemetry>;
     sampleDmrThermalReadiness: () => ReturnType<typeof sampleDmrThermalReadiness>;
     sampleWeaponActionReadiness: () => ReturnType<typeof sampleWeaponActionReadiness>;
+    sampleGrenadeColdPathTelemetry: () => ReturnType<typeof sampleGrenadeColdPathTelemetry>;
     traceBallistics: (
       weapon: WeaponId,
       origin: [number, number, number],
@@ -26968,6 +27026,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleWeaponAssetCache: () => pass65WeaponCacheTelemetry(),
   sampleDmrThermalReadiness,
   sampleWeaponActionReadiness,
+  sampleGrenadeColdPathTelemetry,
   snapshot: () => ({
     bootstrap: {
       stage: bootstrapStage,
@@ -27571,22 +27630,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       lastExplosionAgeMs: lastGrenadeExplosionFrameAt > 0 ? Math.max(0, performance.now() - lastGrenadeExplosionFrameAt) : null,
       profile: { ...lastGrenadeExplosionProfile },
     },
-    grenadeFirstAction: lastGrenadeFirstActionProfile ? {
-      ...lastGrenadeFirstActionProfile,
-      audio: { ...lastGrenadeFirstActionProfile.audio },
-      pool: { ...lastGrenadeFirstActionProfile.pool },
-      animation: { ...lastGrenadeFirstActionProfile.animation },
-      physics: { ...lastGrenadeFirstActionProfile.physics },
-      frameGapsMs: [...lastGrenadeFirstActionProfile.frameGapsMs],
-    } : null,
-    grenadeFirstActions: grenadeFirstActionProfiles.map((profile) => ({
-      ...profile,
-      audio: { ...profile.audio },
-      pool: { ...profile.pool },
-      animation: { ...profile.animation },
-      physics: { ...profile.physics },
-      frameGapsMs: [...profile.frameGapsMs],
-    })),
+    grenadeFirstAction: copyGrenadeFirstActionProfile(lastGrenadeFirstActionProfile),
+    grenadeFirstActions: grenadeFirstActionProfiles.map((profile) => copyGrenadeFirstActionProfile(profile)),
     audio: { ...audio.telemetry(), occlusion: audioOcclusionBudget.telemetry() },
     settings: {
       requested: pass65Settings,
