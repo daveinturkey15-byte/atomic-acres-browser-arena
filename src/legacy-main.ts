@@ -4424,6 +4424,9 @@ type GrenadeFirstActionProfile = {
   physics: Readonly<{
     path: 'deterministic-kinematic-no-rapier-body';
     rapierBodiesAcquired: 0;
+    initialOrigin: readonly [number, number, number] | null;
+    initialVelocity: readonly [number, number, number] | null;
+    fuseMs: number | null;
   }>;
   startingPresentedGameplayFrame: number;
   firstPresentedGameplayFrame: number | null;
@@ -4497,7 +4500,13 @@ function beginGrenadeFirstActionProfile(grenade: GrenadeId, startedAt: number): 
       activeOnFirstPresentedFrame: null,
       progressOnFirstPresentedFrame: null,
     }),
-    physics: Object.freeze({ path: 'deterministic-kinematic-no-rapier-body', rapierBodiesAcquired: 0 }),
+    physics: Object.freeze({
+      path: 'deterministic-kinematic-no-rapier-body',
+      rapierBodiesAcquired: 0,
+      initialOrigin: null,
+      initialVelocity: null,
+      fuseMs: null,
+    }),
     startingPresentedGameplayFrame: lastGameplayPresentedFrame,
     firstPresentedGameplayFrame: null,
     firstPresentedDelayMs: null,
@@ -4535,6 +4544,9 @@ function completeGrenadeActionHandler(
   profile: GrenadeFirstActionProfile,
   actionNonce: number,
   mesh: THREE.Object3D,
+  origin: THREE.Vector3,
+  velocity: THREE.Vector3,
+  fuseMs: number,
   completedAt: number,
 ): void {
   if (lastGrenadeFirstActionProfile !== profile) return;
@@ -4556,6 +4568,12 @@ function completeGrenadeActionHandler(
     startedAt: animation.startedAt,
     activeAtHandlerEnd: animation.active,
     progressAtHandlerEnd: animation.progress,
+  });
+  profile.physics = Object.freeze({
+    ...profile.physics,
+    initialOrigin: Object.freeze(origin.toArray() as [number, number, number]),
+    initialVelocity: Object.freeze(velocity.toArray() as [number, number, number]),
+    fuseMs,
   });
 }
 
@@ -18243,7 +18261,15 @@ function throwGrenade(): void {
     attachedTargetId: null,
     attachedTargetLifeId: null,
   });
-  completeGrenadeActionHandler(firstActionProfile, actionNonce, mesh, performance.now());
+  completeGrenadeActionHandler(
+    firstActionProfile,
+    actionNonce,
+    mesh,
+    origin,
+    velocity,
+    impactDetonated || sticky ? SEMTEX_HITL_CONTRACT.maximumNoImpactLifetimeMs : 2_300,
+    performance.now(),
+  );
 }
 
 function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-throw' }>, ownerTeam: Team): void {
@@ -26115,6 +26141,9 @@ function sampleGrenadeColdPathTelemetry() {
       actualBackend: runtime.actualBackend,
       initialized: runtime.initialized,
       failClosed: runtime.failClosed,
+      adapterLabel: runtime.adapterLabel,
+      adapterClass: runtime.adapterClass,
+      deviceClass: runtime.deviceClass,
       softwareAdapter: runtime.softwareAdapter,
       deviceLost: runtime.deviceLost,
       uncapturedErrors: runtime.uncapturedErrors,
