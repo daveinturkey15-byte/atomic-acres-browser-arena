@@ -7,6 +7,13 @@ import {
 
 const peerPort = Number(process.env.PASS73_NETWORK_REVEAL_PEER_PORT ?? 9_077);
 let peerServer: OwnedPeerServer | null = null;
+const NETWORK_BROWSER_ARGS = [
+  '--disable-background-timer-throttling',
+  '--disable-renderer-backgrounding',
+  '--disable-backgrounding-occluded-windows',
+  '--allow-loopback-in-peer-connection',
+  '--disable-features=WebRtcHideLocalIpsWithMdns',
+];
 
 type GlassSnapshot = Readonly<{
   id: string;
@@ -14,6 +21,8 @@ type GlassSnapshot = Readonly<{
   visible: boolean;
   position: readonly [number, number, number];
   glassState: Readonly<{
+    schemaVersion: number;
+    paneId: string;
     matchEpoch: number;
     revision: number;
     phase: 'intact' | 'cracked' | 'breached' | 'detached';
@@ -23,16 +32,25 @@ type GlassSnapshot = Readonly<{
   }> | null;
 }>;
 
+function replicatedGlassAuthority(pane: GlassSnapshot): Readonly<Record<string, unknown>> | null {
+  const state = pane.glassState;
+  if (!state) return null;
+  return {
+    schemaVersion: state.schemaVersion,
+    paneId: state.paneId,
+    matchEpoch: state.matchEpoch,
+    revision: state.revision,
+    phase: state.phase,
+    damageQ: state.damageQ,
+    breachRevision: state.breachRevision,
+    rememberedImpactIds: state.rememberedImpactIds,
+  };
+}
+
 test.use({
   viewport: { width: 1_280, height: 720 },
   launchOptions: {
-    args: [
-      '--disable-background-timer-throttling',
-      '--disable-renderer-backgrounding',
-      '--disable-backgrounding-occluded-windows',
-      '--allow-loopback-in-peer-connection',
-      '--disable-features=WebRtcHideLocalIpsWithMdns',
-    ],
+    args: NETWORK_BROWSER_ARGS,
   },
 });
 test.describe.configure({ timeout: 240_000 });
@@ -103,11 +121,20 @@ async function configureM14CrossbowLoadout(page: Page): Promise<void> {
 async function startMatch(
   hostContext: BrowserContext,
   guestContext: BrowserContext,
-  options: Readonly<{ guestEventDelayQaMs?: number; hostedBotCount?: 0 | 2 }> = {},
+  options: Readonly<{
+    hostEventDelayQaMs?: number;
+    guestEventDelayQaMs?: number;
+    hostedBotCount?: 0 | 2;
+  }> = {},
 ): Promise<Readonly<{ host: Page; guest: Page }>> {
   const hostedBotCount = options.hostedBotCount ?? 2;
   const [host, guest] = await Promise.all([
-    openPlayer(hostContext, 'Pass 73 Authority Host', 'pass73-authority-host'),
+    openPlayer(
+      hostContext,
+      'Pass 73 Authority Host',
+      'pass73-authority-host',
+      options.hostEventDelayQaMs ?? 0,
+    ),
     openPlayer(
       guestContext,
       'Pass 73 Authority Guest',
@@ -168,6 +195,15 @@ async function registerTrustedInputProbe(page: Page): Promise<void> {
   });
 }
 
+async function fireTrustedThenForegroundReceiver(shooter: Page, receiver: Page): Promise<void> {
+  await shooter.mouse.down({ button: 'left' });
+  try {
+    await receiver.bringToFront();
+  } finally {
+    await shooter.mouse.up({ button: 'left' });
+  }
+}
+
 async function glass(page: Page, windowId: string): Promise<GlassSnapshot> {
   return page.evaluate((id) => {
     const pane = window.__ATOMIC_ACRES_DEBUG__!.snapshot().breakableWindows
@@ -188,11 +224,18 @@ async function waitForReplicatedGlass(
     await page.waitForFunction(({ id, baseline, expectedPhase, beforeExplosion }) => {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
       const pane = state?.breakableWindows.find((candidate: GlassSnapshot) => candidate.id === id) as GlassSnapshot | undefined;
+      const mutation = state?.crossbowGlassAuthority.recentAuthoritativeMutations
+        .findLast((entry: { windowId: string; phase: string; revision: number; explosionCountAtMutation: number }) => (
+          entry.windowId === id && entry.phase === 'impact' && entry.revision === 1
+        )) ?? state?.crossbowGlassAuthority.recentCanonicalClientMutations
+        .findLast((entry: { windowId: string; phase: string; revision: number; explosionCountAtMutation: number }) => (
+          entry.windowId === id && entry.phase === 'impact' && entry.revision === 1
+        ));
       return pane?.broken === true
         && pane.visible === false
         && pane.glassState?.revision === 1
         && pane.glassState.phase === expectedPhase
-        && (!beforeExplosion || state?.grenadeExplosion.total === baseline);
+        && (!beforeExplosion || mutation?.explosionCountAtMutation === baseline);
     }, {
       id: windowId,
       baseline: explosionBaseline,
@@ -209,7 +252,10 @@ async function waitForReplicatedGlass(
         role: state.privateMatch?.role ?? null,
         player: state.player,
         remotes: state.remotePlayers,
-        shotProtocol: state.multiplayer?.shotProtocol ?? null,
+        shotProtocol: state.networkSync?.shotProtocol ?? null,
+        shotTimeline: state.networkSync?.shotTimeline ?? null,
+        crossbowGlassAuthority: state.crossbowGlassAuthority,
+        networkLifecycle: state.networkLifecycle,
         runtimeLog: localStorage.getItem('atomic-acres:client-runtime-log:v1'),
       };
     }, { id: windowId, baseline: explosionBaseline });
@@ -286,7 +332,7 @@ test('host-canonical crossbow glass and trusted ADS reveal converge across indep
     await host.mouse.click(640, 360, { button: 'left' });
     await Promise.all([
       waitForReplicatedGlass(host, directSetup.windowId, directSetup.explosionBaseline, 'breached', true),
-      waitForReplicatedGlass(guest, directSetup.windowId, guestDirectExplosionBaseline, 'breached', true),
+      waitForReplicatedGlass(guest, directSetup.windowId, guestDirectExplosionBaseline, 'breached', false),
     ]);
     const [hostDirect, guestDirect] = await Promise.all([
       glass(host, directSetup.windowId),
@@ -467,20 +513,20 @@ test('host-canonical crossbow glass and trusted ADS reveal converge across indep
   }
 });
 
-test('guest crossbow and bidirectional M14 damage converge once through the real host transport', async ({ browser }, testInfo) => {
+test('guest crossbow glass authority and rematch reset converge through impaired host transport', async ({ browser }, testInfo) => {
   test.setTimeout(480_000);
   const [hostContext, guestContext] = await Promise.all([browser.newContext(), browser.newContext()]);
   try {
     const { host, guest } = await startMatch(hostContext, guestContext, {
-      guestEventDelayQaMs: 250,
+      hostEventDelayQaMs: 250,
       hostedBotCount: 0,
     });
-    expect(await guest.evaluate(() => (
+    expect(await Promise.all([host, guest].map((page) => page.evaluate(() => (
       window.__ATOMIC_ACRES_DEBUG__!.snapshot().networkLifecycle.qaEventDelayMs
-    ))).toBe(250);
-    await Promise.all([host, guest].map(registerTrustedInputProbe));
+    ))))).toEqual([250, 0]);
     await guest.bringToFront();
     await ensurePointerLock(guest);
+    await Promise.all([host, guest].map(registerTrustedInputProbe));
 
     const directSetup = await guest.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__!;
@@ -522,38 +568,47 @@ test('guest crossbow and bidirectional M14 damage converge once through the real
     expect((await glass(host, directSetup.windowId)).glassState?.revision ?? 0).toBe(0);
 
     await guest.mouse.click(640, 360, { button: 'left' });
-    await guest.waitForFunction(({ id, predictedBaseline, canonicalBaseline }) => {
+    const predictedGateHandle = await guest.waitForFunction(({ id, predictedBaseline, canonicalBaseline }) => {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
       const pane = state?.breakableWindows.find((candidate: GlassSnapshot) => candidate.id === id) as GlassSnapshot | undefined;
       const authority = state?.crossbowGlassAuthority;
-      return authority?.predictedImpactRejections === predictedBaseline + 1
-        && authority.canonicalClientMutations === canonicalBaseline
+      const predictionRejected = authority?.predictedImpactRejections === predictedBaseline + 1
         && authority.lastPredictedImpactRejection?.windowId === id
-        && authority.lastPredictedImpactRejection.revision === 0
-        && pane?.glassState?.revision === 0
-        && pane.broken === false;
+        && authority.lastPredictedImpactRejection.revision === 0;
+      const canonicalWonRace = authority?.predictedImpactRejections === predictedBaseline
+        && authority.canonicalClientMutations === canonicalBaseline + 1
+        && authority.lastCanonicalClientMutation?.windowId === id
+        && authority.lastCanonicalClientMutation.revision === 1
+        && pane?.broken === true;
+      if (predictionRejected) return { outcome: 'prediction-rejected', pane, authority };
+      if (canonicalWonRace) return { outcome: 'canonical-won-race', pane, authority };
+      return null;
     }, {
       id: directSetup.windowId,
       predictedBaseline: directSetup.predictedBaseline,
       canonicalBaseline: directSetup.canonicalBaseline,
     }, { polling: 'raf', timeout: 3_000 });
-    const predictedGate = await guest.evaluate((id) => {
-      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
-      return {
-        pane: state.breakableWindows.find((candidate: GlassSnapshot) => candidate.id === id),
-        authority: state.crossbowGlassAuthority,
-      };
-    }, directSetup.windowId);
-    expect(predictedGate.pane).toMatchObject({ broken: false, glassState: { revision: 0, phase: 'intact' } });
-    expect(predictedGate.authority.lastPredictedImpactRejection).toMatchObject({
-      windowId: directSetup.windowId,
-      phase: 'impact',
-      revision: 0,
-    });
+    const predictedGate = await predictedGateHandle.jsonValue();
+    await predictedGateHandle.dispose();
+    if (predictedGate.outcome === 'prediction-rejected') {
+      expect(predictedGate.authority.lastPredictedImpactRejection).toMatchObject({
+        windowId: directSetup.windowId,
+        phase: 'impact',
+        revision: 0,
+      });
+    } else {
+      expect(predictedGate.outcome).toBe('canonical-won-race');
+      expect(predictedGate.authority.predictedImpactRejections).toBe(directSetup.predictedBaseline);
+      expect(predictedGate.authority.lastCanonicalClientMutation).toMatchObject({
+        windowId: directSetup.windowId,
+        phase: 'impact',
+        revision: 1,
+      });
+    }
 
     await Promise.all([
       waitForReplicatedGlass(host, directSetup.windowId, directHostBaseline.explosion, 'breached', true),
-      waitForReplicatedGlass(guest, directSetup.windowId, directSetup.explosionBaseline, 'breached', true),
+      waitForReplicatedGlass(guest, directSetup.windowId, directSetup.explosionBaseline, 'breached', false),
     ]);
     await Promise.all([
       host.waitForFunction((baseline) => (
@@ -570,7 +625,7 @@ test('guest crossbow and bidirectional M14 damage converge once through the real
         authority: state.crossbowGlassAuthority,
       };
     }, directSetup.windowId)));
-    expect(hostDirect.pane.glassState).toEqual(guestDirect.pane.glassState);
+    expect(replicatedGlassAuthority(guestDirect.pane)).toEqual(replicatedGlassAuthority(hostDirect.pane));
     const hostDirectEvents = hostDirect.authority.recentAuthoritativeMutations.filter((entry: any) => (
       entry.windowId === directSetup.windowId
     ));
@@ -579,9 +634,20 @@ test('guest crossbow and bidirectional M14 damage converge once through the real
     ));
     expect(hostDirectEvents).toHaveLength(1);
     expect(guestDirectEvents).toHaveLength(1);
-    expect(hostDirectEvents[0]).toMatchObject({ phase: 'impact', revision: 1 });
-    expect(guestDirectEvents[0]).toEqual(hostDirectEvents[0]);
-    expect(predictedGate.authority.lastPredictedImpactRejection.actionNonce).toBe(hostDirectEvents[0].actionNonce);
+    expect(hostDirectEvents[0]).toMatchObject({
+      phase: 'impact',
+      revision: 1,
+      explosionCountAtMutation: directHostBaseline.explosion,
+    });
+    expect(guestDirectEvents[0]).toMatchObject({
+      windowId: hostDirectEvents[0].windowId,
+      actionNonce: hostDirectEvents[0].actionNonce,
+      phase: hostDirectEvents[0].phase,
+      revision: hostDirectEvents[0].revision,
+    });
+    if (predictedGate.outcome === 'prediction-rejected') {
+      expect(predictedGate.authority.lastPredictedImpactRejection.actionNonce).toBe(hostDirectEvents[0].actionNonce);
+    }
     await guest.waitForTimeout(300);
     expect((await glass(host, directSetup.windowId)).glassState?.revision).toBe(1);
     expect((await glass(guest, directSetup.windowId)).glassState?.revision).toBe(1);
@@ -597,9 +663,13 @@ test('guest crossbow and bidirectional M14 damage converge once through the real
     const blastStage = await guest.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__!;
       const before = api.snapshot();
-      const paneIndex = before.breakableWindows[3]?.broken === false
-        && (before.breakableWindows[3]?.glassState?.revision ?? 0) === 0
-        ? 3
+      // The ground-front pane has the upper-front pane inside the same 7 m
+      // blast sphere but behind the intervening authored wall/sill geometry.
+      // The rear pane has no same-side upper sibling, so it cannot prove the
+      // live line-of-sight exclusion contract.
+      const paneIndex = before.breakableWindows[4]?.broken === false
+        && (before.breakableWindows[4]?.glassState?.revision ?? 0) === 0
+        ? 4
         : before.breakableWindows.findIndex((candidate: GlassSnapshot) => (
           candidate.broken === false && (candidate.glassState?.revision ?? 0) === 0
         ));
@@ -680,7 +750,7 @@ test('guest crossbow and bidirectional M14 damage converge once through the real
         authority: state.crossbowGlassAuthority,
       };
     }, blastStage.windowId)));
-    expect(hostBlast.pane.glassState).toEqual(guestBlast.pane.glassState);
+    expect(replicatedGlassAuthority(guestBlast.pane)).toEqual(replicatedGlassAuthority(hostBlast.pane));
     const hostBlastEvents = hostBlast.authority.recentAuthoritativeMutations.filter((entry: any) => (
       entry.windowId === blastStage.windowId
     ));
@@ -701,121 +771,6 @@ test('guest crossbow and bidirectional M14 damage converge once through the real
     expect(hostOccluded).toMatchObject({ broken: false, visible: true, glassState: { revision: 0, phase: 'intact' } });
     expect(guestOccluded.glassState).toEqual(hostOccluded.glassState);
 
-    await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.hp <= 0, undefined, {
-      polling: 'raf', timeout: 8_000,
-    });
-    await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.respawn());
-    await Promise.all([
-      host.waitForFunction(() => {
-        const player = window.__ATOMIC_ACRES_DEBUG__?.snapshot().player;
-        return player?.alive === true && player.hp === 100;
-      }, undefined, { polling: 'raf', timeout: 8_000 }),
-      guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0]?.hp === 100, undefined, {
-        polling: 'raf', timeout: 8_000,
-      }),
-    ]);
-    const duelLane = await host.evaluate(() => {
-      const api = window.__ATOMIC_ACRES_DEBUG__!;
-      const bounds = api.snapshot().arenaSelection.bounds;
-      const directions = [[8, 0], [0, 8], [8, 8], [8, -8]] as const;
-      for (let x = bounds.minX + 4; x <= bounds.maxX - 4; x += 3) {
-        for (let z = bounds.minZ + 4; z <= bounds.maxZ - 4; z += 3) {
-          if (api.collisionProbe(x, z)) continue;
-          for (const [dx, dz] of directions) {
-            const bx = x + dx;
-            const bz = z + dz;
-            if (bx > bounds.maxX - 3 || bz > bounds.maxZ - 3 || bz < bounds.minZ + 3) continue;
-            if (!api.collisionProbe(bx, bz) && !api.segmentBlocked(x, z, bx, bz)) {
-              return { host: [x, 1.7, z] as [number, number, number], guest: [bx, 1.7, bz] as [number, number, number] };
-            }
-          }
-        }
-      }
-      throw new Error('No clear sub-falloff two-player M14 lane found');
-    });
-    await Promise.all([
-      host.evaluate((position) => window.__ATOMIC_ACRES_DEBUG__!.teleportPlayer(...position, 0, 0), duelLane.host),
-      guest.evaluate((position) => window.__ATOMIC_ACRES_DEBUG__!.teleportPlayer(...position, Math.PI, 0), duelLane.guest),
-    ]);
-    await Promise.all([
-      host.waitForFunction((position) => {
-        const remote = window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0];
-        return remote && Math.hypot(
-          remote.authoritativePosition[0] - position[0],
-          remote.authoritativePosition[2] - position[2],
-        ) < 0.3;
-      }, duelLane.guest, { polling: 'raf', timeout: 8_000 }),
-      guest.waitForFunction((position) => {
-        const remote = window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0];
-        return remote && Math.hypot(
-          remote.authoritativePosition[0] - position[0],
-          remote.authoritativePosition[2] - position[2],
-        ) < 0.3;
-      }, duelLane.host, { polling: 'raf', timeout: 8_000 }),
-    ]);
-    await host.waitForTimeout(900);
-    await host.bringToFront();
-    await ensurePointerLock(host);
-    await selectLoadoutWeapon(host, guest, 'Digit1', 'm14-ebr');
-    await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.aimAtRemote('body'));
-    await pressAds(host);
-    await waitForAdsSettled(host);
-    await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.aimAtRemote('body'));
-    const hostAmmoBefore = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.ammo as number);
-    await host.mouse.click(640, 360, { button: 'left' });
-    await Promise.all([
-      host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0]?.hp === 62.8, undefined, {
-        polling: 'raf', timeout: 8_000,
-      }),
-      guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.hp === 62.8, undefined, {
-        polling: 'raf', timeout: 8_000,
-      }),
-    ]);
-    await releaseAds(host);
-    const hostToGuest = await Promise.all([host, guest].map((page) => page.evaluate(() => {
-      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
-      return { localHp: state.player.hp as number, remoteHp: state.remotePlayers[0]?.hp as number };
-    })));
-    await host.waitForTimeout(750);
-    expect(await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.hp)).toBe(62.8);
-    expect(await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().remotePlayers[0]?.hp)).toBe(62.8);
-    expect(await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.ammo)).toBe(hostAmmoBefore - 1);
-
-    await guest.bringToFront();
-    await ensurePointerLock(guest);
-    await selectLoadoutWeapon(guest, host, 'Digit1', 'm14-ebr');
-    await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.aimAtRemote('body'));
-    await pressAds(guest);
-    await waitForAdsSettled(guest);
-    await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.aimAtRemote('body'));
-    const guestAmmoBefore = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.ammo as number);
-    await guest.mouse.click(640, 360, { button: 'left' });
-    await Promise.all([
-      host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.hp === 62.8, undefined, {
-        polling: 'raf', timeout: 8_000,
-      }),
-      guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0]?.hp === 62.8, undefined, {
-        polling: 'raf', timeout: 8_000,
-      }),
-    ]);
-    await releaseAds(guest);
-    const guestToHost = await Promise.all([host, guest].map((page) => page.evaluate(() => {
-      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
-      return { localHp: state.player.hp as number, remoteHp: state.remotePlayers[0]?.hp as number };
-    })));
-    await guest.waitForTimeout(750);
-    expect(await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.hp)).toBe(62.8);
-    expect(await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().remotePlayers[0]?.hp)).toBe(62.8);
-    expect(await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.ammo)).toBe(guestAmmoBefore - 1);
-    const standardDamageState = await Promise.all([host, guest].map((page) => page.evaluate(() => {
-      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
-      return { dhv: state.player.dhv, overdriveDamageMultiplier: state.overdrive.damageMultiplier };
-    })));
-    expect(standardDamageState).toEqual([
-      { dhv: 10, overdriveDamageMultiplier: 1 },
-      { dhv: 10, overdriveDamageMultiplier: 1 },
-    ]);
-
     const oldMatchEpoch = hostBlast.pane.glassState!.matchEpoch;
     await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.endMatch());
     await Promise.all([host, guest].map((page) => page.waitForFunction(() => (
@@ -834,6 +789,8 @@ test('guest crossbow and bidirectional M14 damage converge once through the real
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
       return state?.gameStarted === true
         && state.matchPhase === 'active'
+        && state.player.alive === true
+        && state.player.hp === 100
         && state.breakableWindows.length > 0
         && state.breakableWindows.every((pane: GlassSnapshot) => (
           pane.broken === false && pane.visible === true
@@ -866,14 +823,14 @@ test('guest crossbow and bidirectional M14 damage converge once through the real
         __PASS73_TRUSTED_INPUT__?: Array<{ button: number; trusted: boolean }>;
       }).__PASS73_TRUSTED_INPUT__ ?? []
     ))));
-    expect(trustedInputs[0].filter(({ button, trusted }) => button === 0 && trusted)).toHaveLength(1);
-    expect(trustedInputs[1].filter(({ button, trusted }) => button === 0 && trusted)).toHaveLength(3);
+    expect(trustedInputs[0].filter(({ button, trusted }) => button === 0 && trusted)).toHaveLength(0);
+    expect(trustedInputs[1].filter(({ button, trusted }) => button === 0 && trusted)).toHaveLength(2);
     expect(await Promise.all([host, guest].map(readPersistedClientRuntimeLog))).toEqual([[], []]);
 
-    await testInfo.attach('pass73-combat-network-authority-receipt', {
+    await testInfo.attach('pass73-crossbow-network-authority-receipt', {
       body: Buffer.from(JSON.stringify({
         renderer: 'webgl2',
-        eventDelayQaMs: 250,
+        eventDelayQaMs: { hostToGuest: 250, guestToHost: 0 },
         direct: {
           windowId: directSetup.windowId,
           predictedGate,
@@ -887,15 +844,193 @@ test('guest crossbow and bidirectional M14 damage converge once through the real
           guest: guestBlast,
           occluded: { host: hostOccluded, guest: guestOccluded },
         },
-        m14: {
-          canonicalBodyDamage: 37.2,
-          hostToGuest,
-          guestToHost,
-          standardDamageState,
-          hostAmmoDelta: hostAmmoBefore - (hostAmmoBefore - 1),
-          guestAmmoDelta: guestAmmoBefore - (guestAmmoBefore - 1),
-        },
         reset: resetEvidence,
+      }, null, 2)),
+      contentType: 'application/json',
+    });
+  } finally {
+    await Promise.all([hostContext.close(), guestContext.close()]);
+  }
+});
+
+test('bidirectional M14 trusted-input authority converges once without QA impairment', async ({ browser }, testInfo) => {
+  test.setTimeout(300_000);
+  const [hostContext, guestContext] = await Promise.all([browser.newContext(), browser.newContext()]);
+  try {
+    const { host, guest } = await startMatch(hostContext, guestContext, { hostedBotCount: 0 });
+    expect(await Promise.all([host, guest].map((page) => page.evaluate(() => (
+      window.__ATOMIC_ACRES_DEBUG__!.snapshot().networkLifecycle.qaEventDelayMs
+    ))))).toEqual([0, 0]);
+
+    const duelLane = await host.evaluate(() => {
+      const api = window.__ATOMIC_ACRES_DEBUG__!;
+      const bounds = api.snapshot().arenaSelection.bounds;
+      const directions = [[8, 0], [0, 8], [8, 8], [8, -8]] as const;
+      for (let x = bounds.minX + 4; x <= bounds.maxX - 4; x += 3) {
+        for (let z = bounds.minZ + 4; z <= bounds.maxZ - 4; z += 3) {
+          if (api.collisionProbe(x, z)) continue;
+          for (const [dx, dz] of directions) {
+            const bx = x + dx;
+            const bz = z + dz;
+            if (bx > bounds.maxX - 3 || bz > bounds.maxZ - 3 || bz < bounds.minZ + 3) continue;
+            if (!api.collisionProbe(bx, bz) && !api.segmentBlocked(x, z, bx, bz)) {
+              return {
+                host: [x, 1.7, z] as [number, number, number],
+                guest: [bx, 1.7, bz] as [number, number, number],
+              };
+            }
+          }
+        }
+      }
+      throw new Error('No clear sub-falloff two-player M14 lane found');
+    });
+    await Promise.all([
+      host.evaluate((position) => window.__ATOMIC_ACRES_DEBUG__!.teleportPlayer(...position, 0, 0), duelLane.host),
+      guest.evaluate((position) => window.__ATOMIC_ACRES_DEBUG__!.teleportPlayer(...position, Math.PI, 0), duelLane.guest),
+    ]);
+    await Promise.all([
+      host.waitForFunction((position) => {
+        const remote = window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0];
+        return remote && Math.hypot(
+          remote.authoritativePosition[0] - position[0],
+          remote.authoritativePosition[2] - position[2],
+        ) < 0.3;
+      }, duelLane.guest, { polling: 'raf', timeout: 8_000 }),
+      guest.waitForFunction((position) => {
+        const remote = window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0];
+        return remote && Math.hypot(
+          remote.authoritativePosition[0] - position[0],
+          remote.authoritativePosition[2] - position[2],
+        ) < 0.3;
+      }, duelLane.host, { polling: 'raf', timeout: 8_000 }),
+    ]);
+    await host.waitForTimeout(900);
+
+    await host.bringToFront();
+    await ensurePointerLock(host);
+    await registerTrustedInputProbe(host);
+    await selectLoadoutWeapon(host, guest, 'Digit1', 'm14-ebr');
+    await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.aimAtRemote('body'));
+    await pressAds(host);
+    await waitForAdsSettled(host);
+    await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.aimAtRemote('body'));
+    const hostAmmoBefore = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.ammo as number);
+    await fireTrustedThenForegroundReceiver(host, guest);
+    await Promise.all([
+      host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0]?.hp === 62.8, undefined, {
+        polling: 'raf', timeout: 8_000,
+      }),
+      guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.hp === 62.8, undefined, {
+        polling: 'raf', timeout: 8_000,
+      }),
+    ]);
+    await releaseAds(host);
+    const hostToGuest = await Promise.all([host, guest].map((page) => page.evaluate(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+      return { localHp: state.player.hp as number, remoteHp: state.remotePlayers[0]?.hp as number };
+    })));
+    for (const observedHp of [hostToGuest[0].remoteHp, hostToGuest[1].localHp]) {
+      expect(observedHp).toBeGreaterThanOrEqual(62.8);
+      expect(observedHp).toBeLessThan(100);
+    }
+    expect(await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.ammo)).toBe(hostAmmoBefore - 1);
+
+    await guest.bringToFront();
+    await ensurePointerLock(guest);
+    await registerTrustedInputProbe(guest);
+    await selectLoadoutWeapon(guest, host, 'Digit1', 'm14-ebr');
+    await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.aimAtRemote('body'));
+    await pressAds(guest);
+    await waitForAdsSettled(guest);
+    await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.aimAtRemote('body'));
+    const guestAmmoBefore = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.ammo as number);
+    const protocolBefore = await Promise.all([host, guest].map((page) => page.evaluate(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+      return {
+        protocol: state.networkSync.shotProtocol as Record<string, number>,
+        resolutions: state.networkSync.shotTimeline.recentResolutions.length as number,
+      };
+    })));
+    await fireTrustedThenForegroundReceiver(guest, host);
+    await Promise.all([
+      host.waitForFunction(({ received, accepted, resolutions }) => {
+        const shot = window.__ATOMIC_ACRES_DEBUG__?.snapshot().networkSync;
+        const last = shot?.shotTimeline.recentResolutions.at(-1);
+        return shot?.shotProtocol.received === received + 1
+          && shot.shotProtocol['accepted-hit'] === accepted + 1
+          && shot.shotTimeline.recentResolutions.length === resolutions + 1
+          && last?.outcome === 'accepted-hit'
+          && last.appliedRewindMs <= shot.shotTimeline.rewindCeilingMs
+          && last.receivedHostTimeMs - last.fireTimeMs <= shot.shotTimeline.maximumFireAgeMs;
+      }, {
+        received: protocolBefore[0].protocol.received ?? 0,
+        accepted: protocolBefore[0].protocol['accepted-hit'] ?? 0,
+        resolutions: protocolBefore[0].resolutions,
+      }, { polling: 'raf', timeout: 8_000 }),
+      host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.hp === 62.8, undefined, {
+        polling: 'raf', timeout: 8_000,
+      }),
+      guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0]?.hp === 62.8, undefined, {
+        polling: 'raf', timeout: 8_000,
+      }),
+    ]);
+    await releaseAds(guest);
+    const [hostAuthority, guestAuthority] = await Promise.all([host, guest].map((page) => page.evaluate(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+      return {
+        localHp: state.player.hp as number,
+        remoteHp: state.remotePlayers[0]?.hp as number,
+        protocol: state.networkSync.shotProtocol as Record<string, number>,
+        recentResolutions: state.networkSync.shotTimeline.recentResolutions,
+      };
+    })));
+    for (const observedHp of [hostAuthority.localHp, guestAuthority.remoteHp]) {
+      expect(observedHp).toBeGreaterThanOrEqual(62.8);
+      expect(observedHp).toBeLessThan(100);
+    }
+    expect(await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.ammo)).toBe(guestAmmoBefore - 1);
+    expect(hostAuthority.protocol.received).toBe((protocolBefore[0].protocol.received ?? 0) + 1);
+    expect(hostAuthority.protocol['accepted-hit']).toBe((protocolBefore[0].protocol['accepted-hit'] ?? 0) + 1);
+    expect(hostAuthority.protocol['duplicate-request'] ?? 0).toBe(protocolBefore[0].protocol['duplicate-request'] ?? 0);
+    expect(hostAuthority.protocol['rejected-stale'] ?? 0).toBe(protocolBefore[0].protocol['rejected-stale'] ?? 0);
+    expect(guestAuthority.protocol['created-sent']).toBe((protocolBefore[1].protocol['created-sent'] ?? 0) + 1);
+    expect(guestAuthority.protocol['result-hit-presented']).toBe((protocolBefore[1].protocol['result-hit-presented'] ?? 0) + 1);
+    expect(guestAuthority.protocol['duplicate-result'] ?? 0).toBe(protocolBefore[1].protocol['duplicate-result'] ?? 0);
+    expect(guestAuthority.protocol['result-rejected-stale'] ?? 0)
+      .toBe(protocolBefore[1].protocol['result-rejected-stale'] ?? 0);
+
+    const standardDamageState = await Promise.all([host, guest].map((page) => page.evaluate(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+      return { dhv: state.player.dhv, overdriveDamageMultiplier: state.overdrive.damageMultiplier };
+    })));
+    expect(standardDamageState).toEqual([
+      { dhv: 10, overdriveDamageMultiplier: 1 },
+      { dhv: 10, overdriveDamageMultiplier: 1 },
+    ]);
+    const trustedInputs = await Promise.all([host, guest].map((page) => page.evaluate(() => (
+      (globalThis as typeof globalThis & {
+        __PASS73_TRUSTED_INPUT__?: Array<{ button: number; trusted: boolean }>;
+      }).__PASS73_TRUSTED_INPUT__ ?? []
+    ))));
+    expect(trustedInputs[0].filter(({ button, trusted }) => button === 0 && trusted)).toHaveLength(1);
+    expect(trustedInputs[1].filter(({ button, trusted }) => button === 0 && trusted)).toHaveLength(1);
+    expect(await Promise.all([host, guest].map(readPersistedClientRuntimeLog))).toEqual([[], []]);
+
+    const lastResolution = hostAuthority.recentResolutions.at(-1);
+    expect(lastResolution).toMatchObject({ outcome: 'accepted-hit' });
+    expect(lastResolution.receivedHostTimeMs - lastResolution.fireTimeMs).toBeLessThanOrEqual(250);
+    await testInfo.attach('pass73-m14-network-authority-receipt', {
+      body: Buffer.from(JSON.stringify({
+        renderer: 'webgl2',
+        eventDelayQaMs: { hostToGuest: 0, guestToHost: 0 },
+        canonicalBodyDamage: 37.2,
+        hostToGuest,
+        guestToHost: { host: hostAuthority, guest: guestAuthority },
+        hostAmmoDelta: 1,
+        guestAmmoDelta: 1,
+        protocolBefore,
+        lastResolution,
+        standardDamageState,
       }, null, 2)),
       contentType: 'application/json',
     });

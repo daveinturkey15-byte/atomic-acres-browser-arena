@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_AUTHORITATIVE_REWIND_MS,
   MAX_CLOCK_UNCERTAINTY_ALLOWANCE_MS,
+  MAX_PROJECTILE_SHOT_FIRE_AGE_MS,
   admitAuthoritativeShot,
   canonicalShotDirection,
   createAuthoritativeShotAdmissionState,
   freezeAuthoredBulletRecord,
   freezeAuthoredShotTimeline,
+  maximumShotFireAgeMs,
   validateShotOrigin,
   type AuthoritativeShotAdmissionContext,
 } from './authoritative-shot';
@@ -84,6 +86,38 @@ describe('host-authored bullet admission', () => {
     const stale = admitAuthoritativeShot(request(0, 1_000), sender, 1_276,
       createAuthoritativeShotAdmissionState(), uncertain);
     expect(stale).toMatchObject({ accepted: false, reason: 'stale', appliedRewindMs: 0 });
+  });
+
+  it('retains the hitscan ceiling while admitting projectiles only inside host muzzle history', () => {
+    const crossbowSender: PlayerSnapshot = {
+      ...sender,
+      primary: 'sniper',
+      secondary: 'explosive-crossbow',
+      weapon: 'explosive-crossbow',
+    };
+    const projectile = request(0, 1_000, {
+      weapon: 'explosive-crossbow',
+      direction: [0, 0, -1],
+      pelletDirections: [[0, 0, -1]],
+    });
+    expect(maximumShotFireAgeMs('machine-pistol')).toBe(250);
+    expect(maximumShotFireAgeMs('explosive-crossbow')).toBe(MAX_PROJECTILE_SHOT_FIRE_AGE_MS);
+    expect(admitAuthoritativeShot(
+      projectile,
+      crossbowSender,
+      1_000 + MAX_PROJECTILE_SHOT_FIRE_AGE_MS,
+      createAuthoritativeShotAdmissionState(),
+      context(),
+    ).accepted).toBe(true);
+    expect(admitAuthoritativeShot(
+      projectile,
+      crossbowSender,
+      1_001 + MAX_PROJECTILE_SHOT_FIRE_AGE_MS,
+      createAuthoritativeShotAdmissionState(),
+      context(),
+    )).toMatchObject({ accepted: false, reason: 'stale' });
+    expect(freezeAuthoredShotTimeline(2_000, 80, [], 'explosive-crossbow').maximumFireAgeMs)
+      .toBe(MAX_PROJECTILE_SHOT_FIRE_AGE_MS);
   });
 
   it('treats 250 ms as the target-view hard ceiling and never clamps an invalid timeline', () => {

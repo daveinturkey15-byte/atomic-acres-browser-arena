@@ -597,6 +597,7 @@ import { admitRemoteSnapshotMovement, remoteCanClaimTimedPickup } from './remote
 import { admitRemoteBaseDamage, deriveAuthoritativeShotOutcomes, deriveRemoteShotBaseDamage, maximumRemoteExplosiveBaseDamage, resolveRemotePoweredDamage } from './remote-hit-admission';
 import {
   MAX_AUTHORITATIVE_REWIND_MS,
+  MAX_PROJECTILE_SHOT_FIRE_AGE_MS,
   MAX_SHOT_FIRE_AGE_MS,
   admitAuthoritativeShot,
   canonicalShotDirection,
@@ -4347,6 +4348,7 @@ type CrossbowGlassMutationTrace = Readonly<{
   actionNonce: number;
   phase: CrossbowGlassPhase;
   revision: number;
+  explosionCountAtMutation: number;
 }>;
 const crossbowGlassAuthorityTelemetry = {
   matchEpoch: interactiveWorldMatchEpoch,
@@ -12701,6 +12703,7 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
         actionNonce: message.actionNonce!,
         phase: message.crossbowPhase!,
         revision,
+        explosionCountAtMutation: grenadeExplosions,
       });
       crossbowGlassAuthorityTelemetry.recentCanonicalClientMutations.push(
         crossbowGlassAuthorityTelemetry.lastCanonicalClientMutation,
@@ -13960,6 +13963,7 @@ async function startGame(
     interactiveWorldRuntime.setHostAuthority(mode !== 'client');
     syncInteractiveWorldPhysics(true);
   }
+  resetBreakableWindows();
   killstreakRuntime = new HostKillstreakRuntime(killstreakMatchEpoch);
   killstreakActivationSequence = 0;
   killstreakControlSequence = 0;
@@ -15744,6 +15748,7 @@ function tryFire(now: number): void {
         currentHostTimeMs(),
         interpolationDelayState.delayMs,
         [...remotes.values()].map((remote) => remote.renderedHostTimeMs),
+        player.weapon,
       )
     : null;
   if (shotTimeline) lastAuthoredShotTimeline = shotTimeline;
@@ -18264,6 +18269,7 @@ function updateExplosiveBolts(dt: number, now: number): void {
                 actionNonce: bolt.actionNonce,
                 phase: 'impact',
                 revision: pane.glassState?.revision ?? 0,
+                explosionCountAtMutation: grenadeExplosions,
               });
               crossbowGlassAuthorityTelemetry.recentAuthoritativeMutations.push(
                 crossbowGlassAuthorityTelemetry.lastAuthoritativeMutation,
@@ -18281,6 +18287,7 @@ function updateExplosiveBolts(dt: number, now: number): void {
             actionNonce: bolt.actionNonce,
             phase: 'impact',
             revision: pane?.glassState?.revision ?? 0,
+            explosionCountAtMutation: grenadeExplosions,
           });
         }
         bolt.impactedAt = now;
@@ -18467,6 +18474,7 @@ function breakWindowsInCrossbowBlast(
         actionNonce,
         phase: 'explosion',
         revision: pane.glassState?.revision ?? 0,
+        explosionCountAtMutation: grenadeExplosions,
       });
       crossbowGlassAuthorityTelemetry.recentAuthoritativeMutations.push(
         crossbowGlassAuthorityTelemetry.lastAuthoritativeMutation,
@@ -22787,6 +22795,7 @@ function updateMatchState(now: number): void {
           recentResolutions: [...recentShotResolutionTraces],
           rewindCeilingMs: MAX_AUTHORITATIVE_REWIND_MS,
           maximumFireAgeMs: MAX_SHOT_FIRE_AGE_MS,
+          maximumProjectileFireAgeMs: MAX_PROJECTILE_SHOT_FIRE_AGE_MS,
           timing: shotTimingTelemetry.snapshot(),
         },
         interpolationDelay: {
@@ -26230,6 +26239,18 @@ function sampleWeaponActionReadiness() {
   const now = performance.now();
   return Object.freeze({
     weapon: player.weapon,
+    ammo: player.ammo[player.weapon],
+    alive: player.alive,
+    gameplayActive: gameStarted && matchState.phase === 'active',
+    pointerLock: document.pointerLockElement === canvas,
+    textChatTyping: isTextChatTyping(),
+    triggerHeld,
+    reloadActive: player.reloadState !== null,
+    supportTargeting: pointSupportTargeting !== null && !tacticalMapOpen,
+    possessed: localKillstreakActorSnapshot()?.possession?.kind ?? null,
+    stanceRecoveryRemainingMs: Math.max(0, stanceRecoveryUntil - now),
+    sprintRecoveryRemainingMs: Math.max(0, sprintRecoveryUntil - now),
+    nextShotRemainingMs: Math.max(0, player.nextShotAt - now),
     switchingReady: now >= player.switchingUntil,
     switchingRemainingMs: Math.max(0, player.switchingUntil - now),
     configuredSpinUpMs: WEAPONS[player.weapon].spinUpMs ?? 0,
@@ -27787,6 +27808,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         recentResolutions: [...recentShotResolutionTraces],
         rewindCeilingMs: MAX_AUTHORITATIVE_REWIND_MS,
         maximumFireAgeMs: MAX_SHOT_FIRE_AGE_MS,
+        maximumProjectileFireAgeMs: MAX_PROJECTILE_SHOT_FIRE_AGE_MS,
         timing: shotTimingTelemetry.snapshot(),
       },
       interpolationDelay: {

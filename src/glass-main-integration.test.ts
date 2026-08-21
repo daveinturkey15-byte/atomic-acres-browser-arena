@@ -23,4 +23,16 @@ describe('glass authority runtime integration', () => {
     const remote = block('function acceptRemoteWindowBreak(', '\nfunction resetBreakableWindows(');
     expect(remote).toMatch(/breakHouseWindow\([\s\S]*message\.kind \?\? 'shot',[\s\S]*message\.actionNonce,[\s\S]*message\.by,[\s\S]*message\.nonce,[\s\S]*\);/);
   });
+
+  it('reinitializes every pane only after the active match epoch and interactive runtime are committed', () => {
+    const start = source.indexOf('interactiveWorldMatchEpoch = killstreakMatchEpoch;');
+    const runtimeReset = source.indexOf('interactiveWorldRuntime.reset(interactiveWorldMatchEpoch)', start);
+    const paneReset = source.indexOf('resetBreakableWindows();', runtimeReset);
+    const killstreakRuntime = source.indexOf('killstreakRuntime = new HostKillstreakRuntime', paneReset);
+
+    expect(start).toBeGreaterThan(-1);
+    expect(runtimeReset).toBeGreaterThan(start);
+    expect(paneReset).toBeGreaterThan(runtimeReset);
+    expect(killstreakRuntime).toBeGreaterThan(paneReset);
+  });
 });

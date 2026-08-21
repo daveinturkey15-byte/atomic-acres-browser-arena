@@ -44,6 +44,10 @@ export type AuthoredShotTimeline = Readonly<{
 
 export const MAX_AUTHORITATIVE_REWIND_MS = 250;
 export const MAX_SHOT_FIRE_AGE_MS = 250;
+// Projectile requests create a new host-owned simulation at receipt rather
+// than rewinding an instantaneous hit. Keep them admissible only while the
+// host can still reconstruct the exact authored muzzle from retained history.
+export const MAX_PROJECTILE_SHOT_FIRE_AGE_MS = 750;
 export const MAX_CLOCK_UNCERTAINTY_ALLOWANCE_MS = 25;
 const MAX_FUTURE_SHOT_MS = 120;
 const MAX_SHOT_SEQUENCE_GAP = 512;
@@ -56,6 +60,12 @@ export function createAuthoritativeShotAdmissionState(): AuthoritativeShotAdmiss
 
 function boundedClockUncertainty(value: number): number {
   return Number.isFinite(value) ? Math.max(0, Math.min(MAX_CLOCK_UNCERTAINTY_ALLOWANCE_MS, value)) : 0;
+}
+
+export function maximumShotFireAgeMs(weapon: ShotRequestMessage['weapon']): number {
+  return WEAPONS[weapon].fireKind === 'projectile'
+    ? MAX_PROJECTILE_SHOT_FIRE_AGE_MS
+    : MAX_SHOT_FIRE_AGE_MS;
 }
 
 export function admitAuthoritativeShot(
@@ -106,7 +116,7 @@ export function admitAuthoritativeShot(
     if (hostHeldMs + AUTHORED_CADENCE_TOLERANCE_MS < spinUpMs) return reject('spin-up');
   }
   if (request.pelletDirections.length !== WEAPONS[request.weapon].pellets) return reject('invalid-pellets');
-  if (fireAgeMs > MAX_SHOT_FIRE_AGE_MS + clockUncertaintyAllowanceMs) return reject('stale');
+  if (fireAgeMs > maximumShotFireAgeMs(request.weapon) + clockUncertaintyAllowanceMs) return reject('stale');
   if (fireAgeMs < -MAX_FUTURE_SHOT_MS - clockUncertaintyAllowanceMs) return reject('future');
   const appliedRewindMs = request.fireTimeMs - request.targetViewTimeMs;
   if (!Number.isFinite(appliedRewindMs) || appliedRewindMs < 0 || appliedRewindMs > MAX_AUTHORITATIVE_REWIND_MS) {
@@ -163,6 +173,7 @@ export function freezeAuthoredShotTimeline(
   triggerHostTimeMs: number,
   interpolationDelayMs: number,
   presentedTargetHostTimes: readonly number[] = [],
+  weapon?: ShotRequestMessage['weapon'],
 ): AuthoredShotTimeline {
   const fireTimeMs = Number.isFinite(triggerHostTimeMs) ? Math.max(0, triggerHostTimeMs) : 0;
   const targetViewDelayMs = Number.isFinite(interpolationDelayMs)
@@ -176,7 +187,7 @@ export function freezeAuthoredShotTimeline(
     fireTimeMs,
     targetViewTimeMs: Math.max(0, fireTimeMs - targetViewDelayMs),
     targetViewDelayMs,
-    maximumFireAgeMs: MAX_SHOT_FIRE_AGE_MS,
+    maximumFireAgeMs: weapon ? maximumShotFireAgeMs(weapon) : MAX_SHOT_FIRE_AGE_MS,
     presentedTargetCount: targetAges.length,
     presentedTargetAgeSpreadMs: targetAgeSpread,
   });
