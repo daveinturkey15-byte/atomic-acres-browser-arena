@@ -89,8 +89,8 @@ export function outputsFor(classification) {
   }
   return {
     ...classification,
-    windows_groups: 'release-shell,pass25a-capability-chromium,boot-and-authored,pass64-renderer-foundation,pass72-corrections,pass73-gameplay-regressions',
-    linux_groups: 'release-shell,pass25a-baseline,pass25a-capability-chromium,pass64-hud-contracts,pass64-renderer-foundation,pass72-corrections,pass73-gameplay-regressions',
+    windows_groups: 'release-shell,pass25a-capability-chromium,boot-and-authored,pass64-renderer-foundation,pass72-corrections,pass73-gameplay-regressions,pass74-selector-layout',
+    linux_groups: 'release-shell,pass25a-baseline,pass25a-capability-chromium,pass64-hud-contracts,pass64-renderer-foundation,pass72-corrections,pass73-gameplay-regressions,pass74-selector-layout',
   };
 }
 

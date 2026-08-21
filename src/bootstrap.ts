@@ -4,6 +4,7 @@ import './style.css';
 import './ui/tactical-ui.css';
 import './ui/pass66-readability.css';
 import './ui/pass66-overhaul.css';
+import './ui/pass74-killstreak-selector.css';
 import {
   releaseChannelDecision,
   stableReleaseUrl,
