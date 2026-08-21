@@ -119,10 +119,10 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
       <div class="menu-actions">
         <button id="resume" class="primary" hidden>RETURN TO MATCH</button>
         <button id="main-menu" hidden>MAIN MENU · CHANGE MAP</button>
-        <button id="solo" class="primary">${soloLaunchLabel(ARENA_SELECTIONS[0]!)}</button>
-        <button id="host">HOST LOBBY</button>
+        <button id="solo" class="primary" disabled>${soloLaunchLabel(ARENA_SELECTIONS[0]!)}</button>
+        <button id="host" disabled>HOST LOBBY</button>
       </div>
-      <div class="join-row"><input id="room-input" placeholder="Paste room code" autocomplete="off"><button id="join">JOIN</button></div>
+      <div class="join-row"><input id="room-input" placeholder="Paste room code" autocomplete="off" disabled><button id="join" disabled>JOIN</button></div>
       <div id="room-card" hidden><span>ROOM CODE</span><strong id="room-code"></strong><button id="copy-room" class="small-button" aria-label="Copy lobby code">COPY CODE</button></div>
       <section id="private-lobby" hidden aria-labelledby="private-lobby-title">
         <div class="private-lobby-heading"><span><small>PRIVATE MATCH</small><strong id="private-lobby-title">WAITING ROOM</strong></span><b id="lobby-capacity-label">1 / 4</b></div>
