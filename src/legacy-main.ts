@@ -4322,6 +4322,25 @@ let lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
 let flashHostAuthority = new FlashHostAuthority(interactiveWorldMatchEpoch, 'host');
 let flashVictimConsumer = new FlashVictimResultConsumer(interactiveWorldMatchEpoch, 'pending-player', 0);
 const explosiveBolts: ExplosiveBoltEntity[] = [];
+type CrossbowGlassMutationTrace = Readonly<{
+  windowId: string;
+  actionNonce: number;
+  phase: CrossbowGlassPhase;
+  revision: number;
+}>;
+const crossbowGlassAuthorityTelemetry = {
+  matchEpoch: interactiveWorldMatchEpoch,
+  predictedImpactRejections: 0,
+  authoritativeImpactMutations: 0,
+  authoritativeExplosionMutations: 0,
+  canonicalClientMutations: 0,
+  canonicalClientRejections: 0,
+  recentAuthoritativeMutations: [] as CrossbowGlassMutationTrace[],
+  recentCanonicalClientMutations: [] as CrossbowGlassMutationTrace[],
+  lastPredictedImpactRejection: null as CrossbowGlassMutationTrace | null,
+  lastAuthoritativeMutation: null as CrossbowGlassMutationTrace | null,
+  lastCanonicalClientMutation: null as CrossbowGlassMutationTrace | null,
+};
 const explosiveBoltStartScratch = new THREE.Vector3();
 const explosiveBoltDeltaScratch = new THREE.Vector3();
 const explosiveBoltImpactPointScratch = new THREE.Vector3();
@@ -12631,13 +12650,16 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
       paneDistanceM: paneBounds.isEmpty() ? Number.POSITIVE_INFINITY : paneBounds.distanceToPoint(origin),
       blastRadiusM,
     });
-    if (!admission.accepted || !action) return;
+    if (!admission.accepted || !action) {
+      crossbowGlassAuthorityTelemetry.canonicalClientRejections += 1;
+      return;
+    }
     processedNonces.add(message.nonce);
     action.targets.add(panePhaseKey);
     const normal = centre.clone().sub(origin);
     if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
     else normal.normalize().multiplyScalar(-1);
-    breakHouseWindow(
+    const mutated = breakHouseWindow(
       message.windowId,
       paneBounds.clampPoint(origin, new THREE.Vector3()),
       normal,
@@ -12651,6 +12673,24 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
       message.crossbowPhase,
       message.crossbowBlastRadiusM,
     );
+    if (mutated) {
+      const revision = window.glassState?.revision ?? 0;
+      crossbowGlassAuthorityTelemetry.canonicalClientMutations += 1;
+      crossbowGlassAuthorityTelemetry.lastCanonicalClientMutation = Object.freeze({
+        windowId: message.windowId,
+        actionNonce: message.actionNonce!,
+        phase: message.crossbowPhase!,
+        revision,
+      });
+      crossbowGlassAuthorityTelemetry.recentCanonicalClientMutations.push(
+        crossbowGlassAuthorityTelemetry.lastCanonicalClientMutation,
+      );
+      if (crossbowGlassAuthorityTelemetry.recentCanonicalClientMutations.length > 16) {
+        crossbowGlassAuthorityTelemetry.recentCanonicalClientMutations.shift();
+      }
+    } else {
+      crossbowGlassAuthorityTelemetry.canonicalClientRejections += 1;
+    }
     trimNonceSet();
     return;
   }
@@ -12734,6 +12774,17 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
 
 function resetBreakableWindows(): void {
   clearPersistentWindowDebris();
+  crossbowGlassAuthorityTelemetry.matchEpoch = interactiveWorldMatchEpoch;
+  crossbowGlassAuthorityTelemetry.predictedImpactRejections = 0;
+  crossbowGlassAuthorityTelemetry.authoritativeImpactMutations = 0;
+  crossbowGlassAuthorityTelemetry.authoritativeExplosionMutations = 0;
+  crossbowGlassAuthorityTelemetry.canonicalClientMutations = 0;
+  crossbowGlassAuthorityTelemetry.canonicalClientRejections = 0;
+  crossbowGlassAuthorityTelemetry.recentAuthoritativeMutations.length = 0;
+  crossbowGlassAuthorityTelemetry.recentCanonicalClientMutations.length = 0;
+  crossbowGlassAuthorityTelemetry.lastPredictedImpactRejection = null;
+  crossbowGlassAuthorityTelemetry.lastAuthoritativeMutation = null;
+  crossbowGlassAuthorityTelemetry.lastCanonicalClientMutation = null;
   for (const window of arena.breakableWindows) {
     window.glassState = createGlassState(window.id, interactiveWorldMatchEpoch);
     window.broken = false;
@@ -18165,14 +18216,15 @@ function updateExplosiveBolts(dt: number, now: number): void {
         const impactWindowId = worldGlassWindowId
           ?? (glassCollision && glassFraction <= worldFraction + 1e-6 ? glassCollision.windowId : null);
         bolt.impactWindowId = impactWindowId;
-        if (impactWindowId && admitCrossbowGlassMutation(bolt.authority).accepted) {
+        const mutationAdmission = admitCrossbowGlassMutation(bolt.authority);
+        if (impactWindowId && mutationAdmission.accepted) {
           const pane = arena.breakableWindows.find(({ id }) => id === impactWindowId);
           if (pane) {
             const impactPoint = explosiveBoltImpactPointScratch.copy(bolt.mesh.position);
             const normal = worldCollision && worldGlassWindowId === impactWindowId
               ? new THREE.Vector3(worldCollision.normal.x, worldCollision.normal.y, worldCollision.normal.z)
               : pane.mesh.getWorldPosition(new THREE.Vector3()).sub(impactPoint).normalize().multiplyScalar(-1);
-            breakHouseWindow(
+            const mutated = breakHouseWindow(
               pane.id,
               impactPoint,
               normal,
@@ -18185,7 +18237,31 @@ function updateExplosiveBolts(dt: number, now: number): void {
               'explosive-crossbow',
               'impact',
             );
+            if (mutated) {
+              crossbowGlassAuthorityTelemetry.authoritativeImpactMutations += 1;
+              crossbowGlassAuthorityTelemetry.lastAuthoritativeMutation = Object.freeze({
+                windowId: pane.id,
+                actionNonce: bolt.actionNonce,
+                phase: 'impact',
+                revision: pane.glassState?.revision ?? 0,
+              });
+              crossbowGlassAuthorityTelemetry.recentAuthoritativeMutations.push(
+                crossbowGlassAuthorityTelemetry.lastAuthoritativeMutation,
+              );
+              if (crossbowGlassAuthorityTelemetry.recentAuthoritativeMutations.length > 16) {
+                crossbowGlassAuthorityTelemetry.recentAuthoritativeMutations.shift();
+              }
+            }
           }
+        } else if (impactWindowId) {
+          const pane = arena.breakableWindows.find(({ id }) => id === impactWindowId);
+          crossbowGlassAuthorityTelemetry.predictedImpactRejections += 1;
+          crossbowGlassAuthorityTelemetry.lastPredictedImpactRejection = Object.freeze({
+            windowId: impactWindowId,
+            actionNonce: bolt.actionNonce,
+            phase: 'impact',
+            revision: pane?.glassState?.revision ?? 0,
+          });
         }
         bolt.impactedAt = now;
         bolt.detonatesAt = Math.min(bolt.expiresAt, now + EXPLOSIVE_BOLT_ARM_DELAY_MS);
@@ -18363,9 +18439,51 @@ function breakWindowsInCrossbowBlast(
       'explosive-crossbow',
       'explosion',
       canonicalRadius,
-    )) broken += 1;
+    )) {
+      broken += 1;
+      crossbowGlassAuthorityTelemetry.authoritativeExplosionMutations += 1;
+      crossbowGlassAuthorityTelemetry.lastAuthoritativeMutation = Object.freeze({
+        windowId: pane.id,
+        actionNonce,
+        phase: 'explosion',
+        revision: pane.glassState?.revision ?? 0,
+      });
+      crossbowGlassAuthorityTelemetry.recentAuthoritativeMutations.push(
+        crossbowGlassAuthorityTelemetry.lastAuthoritativeMutation,
+      );
+      if (crossbowGlassAuthorityTelemetry.recentAuthoritativeMutations.length > 16) {
+        crossbowGlassAuthorityTelemetry.recentAuthoritativeMutations.shift();
+      }
+    }
   }
   return broken;
+}
+
+function inspectCrossbowBlastWindows(
+  pointTuple: readonly [number, number, number],
+  impactWindowId: string | null,
+  radiusM: number,
+) {
+  if (pointTuple.length !== 3 || !pointTuple.every(Number.isFinite)
+    || !Number.isFinite(radiusM) || radiusM <= 0 || radiusM > 7) return [];
+  const point = new THREE.Vector3(...pointTuple);
+  const blastColliders = crossbowBlastLineOfSightColliders(
+    Object.freeze([...activeWorldColliders()]),
+    impactWindowId,
+    (collider) => activeGlassColliderWindowIds.get(collider) ?? null,
+  );
+  return arena.breakableWindows.map((pane) => {
+    const centre = pane.mesh.getWorldPosition(new THREE.Vector3());
+    const distanceM = centre.distanceTo(point);
+    return Object.freeze({
+      windowId: pane.id,
+      revision: pane.glassState?.revision ?? 0,
+      phase: pane.glassState?.phase ?? 'intact',
+      distanceM,
+      inRadius: distanceM <= radiusM,
+      pathBlocked: windowBreakPathBlocked(point, centre, blastColliders),
+    });
+  });
 }
 
 function synchronizeSmokePresentation(snapshot: SmokeAuthoritySnapshot, nowHostTimeMs: number): void {
@@ -26237,6 +26355,18 @@ const debugWindow = window as Window & {
       detonationPoint: number[];
       radiusM: number;
     } | null;
+    inspectCrossbowBlastWindows: (
+      point: [number, number, number],
+      impactWindowId?: string | null,
+      radiusM?: number,
+    ) => Array<{
+      windowId: string;
+      revision: number;
+      phase: string;
+      distanceM: number;
+      inRadius: boolean;
+      pathBlocked: boolean;
+    }>;
     stageYardhawkWall: (team?: Team) => boolean;
     stageBotAtIndoorRamp: (team?: Team, descending?: boolean) => boolean;
     damageBot: (amount: number, zone?: HitZone) => void;
@@ -27874,6 +28004,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       position: [entity.drop.position.x, entity.drop.position.y, entity.drop.position.z],
       expiresInMs: Math.max(0, entity.drop.expiresAt - performance.now()),
     })),
+    crossbowGlassAuthority: {
+      ...crossbowGlassAuthorityTelemetry,
+      activeBolts: explosiveBolts.map((bolt) => ({
+        ownerId: bolt.ownerId,
+        actionNonce: bolt.actionNonce,
+        authority: bolt.authority,
+        impacted: bolt.impactedAt !== null,
+        impactWindowId: bolt.impactWindowId,
+      })),
+    },
     breakableWindows: arena.breakableWindows.map((window) => ({
       id: window.id,
       broken: window.broken,
@@ -28621,6 +28761,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       radiusM: explosiveBoltBlastRadiusM(false),
     };
   },
+  inspectCrossbowBlastWindows: (point, impactWindowId = null, radiusM = 7) => (
+    inspectCrossbowBlastWindows(point, impactWindowId, radiusM)
+  ),
   stageYardhawkWall: (team: Team = 0) => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     const house = arena.houses.find((candidate) => candidate.team === team);

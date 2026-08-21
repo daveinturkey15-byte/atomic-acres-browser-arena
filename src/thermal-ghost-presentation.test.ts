@@ -298,6 +298,61 @@ describe('M14 thermal ghost residency', () => {
     presentation.terminalDispose();
   });
 
+  it('fails telemetry closed for model and halo opacity, visibility, colorWrite, or depthTest mutations', () => {
+    const root = new THREE.Group();
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()));
+    const presentation = new ThermalGhostPresentation();
+    presentation.sync([{ id: 'material-adversary', relation: 'hostile', root }], true);
+    const model = root.getObjectByName('through-wall-exact-operator-model') as THREE.Mesh;
+    const halo = root.getObjectByName('through-wall-operator-orange-halo') as THREE.Mesh;
+    const modelMaterial = model.material as THREE.Material;
+    const haloMaterial = halo.material as THREE.Material;
+
+    expect(presentation.telemetry()).toMatchObject({
+      exactModelVisible: true,
+      exactModelColorWrite: true,
+      exactModelOpacity: 1,
+      exactModelDepthTestDisabled: true,
+      exactModelDepthWriteDisabled: true,
+      haloVisible: true,
+      haloColorWrite: true,
+      haloOpacity: 0.88,
+      haloDepthTestDisabled: true,
+      haloDepthWriteDisabled: true,
+      throughGeometry: true,
+      orangeHalo: true,
+    });
+
+    const assertModelFailure = (field: 'exactModelVisible' | 'exactModelColorWrite'
+      | 'exactModelDepthTestDisabled', mutate: () => void, restore: () => void): void => {
+      mutate();
+      expect(presentation.telemetry()).toMatchObject({ [field]: false, throughGeometry: false });
+      restore();
+    };
+    modelMaterial.opacity = 0;
+    expect(presentation.telemetry()).toMatchObject({ exactModelOpacity: 0, throughGeometry: false });
+    modelMaterial.opacity = 1;
+    assertModelFailure('exactModelVisible', () => { modelMaterial.visible = false; }, () => { modelMaterial.visible = true; });
+    assertModelFailure('exactModelColorWrite', () => { modelMaterial.colorWrite = false; }, () => { modelMaterial.colorWrite = true; });
+    assertModelFailure('exactModelDepthTestDisabled', () => { modelMaterial.depthTest = true; }, () => { modelMaterial.depthTest = false; });
+
+    const assertHaloFailure = (field: 'haloVisible' | 'haloColorWrite'
+      | 'haloDepthTestDisabled', mutate: () => void, restore: () => void): void => {
+      mutate();
+      expect(presentation.telemetry()).toMatchObject({ [field]: false, throughGeometry: false, orangeHalo: false });
+      restore();
+    };
+    haloMaterial.opacity = 0;
+    expect(presentation.telemetry()).toMatchObject({ haloOpacity: 0, throughGeometry: false, orangeHalo: false });
+    haloMaterial.opacity = 0.88;
+    assertHaloFailure('haloVisible', () => { haloMaterial.visible = false; }, () => { haloMaterial.visible = true; });
+    assertHaloFailure('haloColorWrite', () => { haloMaterial.colorWrite = false; }, () => { haloMaterial.colorWrite = true; });
+    assertHaloFailure('haloDepthTestDisabled', () => { haloMaterial.depthTest = true; }, () => { haloMaterial.depthTest = false; });
+
+    expect(presentation.telemetry()).toMatchObject({ throughGeometry: true, orangeHalo: true });
+    presentation.terminalDispose();
+  });
+
   it('supports paired-raster hiding without changing the admitted target set', () => {
     const root = new THREE.Group();
     root.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()));
@@ -313,6 +368,10 @@ describe('M14 thermal ghost residency', () => {
       activeTargetIds: ['paired-raster'],
       activeTargets: 1,
       evidenceControlHidden: true,
+      exactModelVisible: false,
+      haloVisible: false,
+      throughGeometry: false,
+      orangeHalo: false,
     });
     expect(presentation.setEvidenceControlHidden(false)).toBe(true);
     presentation.sync([{ id: 'paired-raster', relation: 'hostile', root }], true);

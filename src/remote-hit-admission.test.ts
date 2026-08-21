@@ -21,7 +21,7 @@ describe('remote hit admission', () => {
       const falloff = distance <= 38 ? 0 : Math.min(1, (distance - 38) / (100 - 38));
       const previousBase = previousEnvelope.base
         + (previousEnvelope.minimum - previousEnvelope.base) * falloff;
-      return Math.max(1, Math.round(previousBase * 0.6 * multiplier));
+      return Math.max(1, Math.round(previousBase * 0.6 * multiplier * 10) / 10);
     };
     for (const [distance, zone, multiplier] of [
       [0, 'body', 1], [0, 'head', 1.7], [0, 'limb', 0.82],
@@ -33,9 +33,9 @@ describe('remote hit admission', () => {
 
     // The legacy recipient derives the ray itself before clamping an untrusted
     // claim; neither close body/head nor far body receives a second 0.6 factor.
-    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.0, 6], [[0, 0, -1]], target)).toBe(37);
-    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.58, 6], [[0, 0, -1]], target)).toBe(63);
-    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.0, 100], [[0, 0, -1]], target)).toBe(24);
+    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.0, 6], [[0, 0, -1]], target)).toBe(37.2);
+    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.58, 6], [[0, 0, -1]], target)).toBe(63.2);
+    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.0, 100], [[0, 0, -1]], target)).toBe(24.1);
     expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.0, 6], [[0, 0, -1]], target, () => 0.5)).toBe(19);
 
     // The host shot-request lane uses the multi-target canonical derivation
@@ -43,11 +43,11 @@ describe('remote hit admission', () => {
     const host = deriveAuthoritativeShotOutcomes(
       'm14-ebr', [0, 1.0, 6], [[0, 0, -1]], [target],
     ).get(target.id);
-    expect(host).toMatchObject({ damage: 37, rawDamage: 37, pelletHits: 1, hitZone: 'body' });
-    expect(maximumRemoteShotBaseDamage('m14-ebr')).toBe(63);
-    expect(admitRemoteBaseDamage(63, maximumRemoteShotBaseDamage('m14-ebr'))).toBe(true);
+    expect(host).toMatchObject({ damage: 37.2, rawDamage: 37.2, pelletHits: 1, hitZone: 'body' });
+    expect(maximumRemoteShotBaseDamage('m14-ebr')).toBe(63.2);
+    expect(admitRemoteBaseDamage(63.2, maximumRemoteShotBaseDamage('m14-ebr'))).toBe(true);
     expect(admitRemoteBaseDamage(64, maximumRemoteShotBaseDamage('m14-ebr'))).toBe(false);
-    expect(resolveRemotePoweredDamage(37, 2)).toBe(74);
+    expect(resolveRemotePoweredDamage(37.2, 2)).toBe(74.4);
   });
 
   it('hits the visible standing skull and rejects the former empty-air crit point', () => {

@@ -85,8 +85,8 @@ describe('headshot damage contract', () => {
     expect(m14.falloffStart).toBe(38);
     expect(m14.falloffEnd).toBe(100);
     expect(m14.headMultiplier).toBe(1.7);
-    expect(computeDamage(m14, 10, 'body')).toBe(37);
-    expect(computeDamage(m14, 10, 'head')).toBe(63);
+    expect(computeDamage(m14, 10, 'body')).toBe(37.2);
+    expect(computeDamage(m14, 10, 'head')).toBe(63.2);
     expect(computeDamage(m14, 100, 'body')).toBe(24);
   });
 

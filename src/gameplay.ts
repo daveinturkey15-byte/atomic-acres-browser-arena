@@ -208,7 +208,11 @@ export function computeDamage(weapon: WeaponSpec, distance: number, zone: HitZon
     : Math.min(1, (clampedDistance - weapon.falloffStart) / Math.max(0.001, weapon.falloffEnd - weapon.falloffStart));
   const base = weapon.damage + (weapon.minimumDamage - weapon.damage) * falloff;
   const multiplier = zone === 'head' ? weapon.headMultiplier : zone === 'limb' ? weapon.limbMultiplier : 1;
-  return Math.max(1, Math.round(base * multiplier));
+  // Fractional authored envelopes (currently the exact 0.6x M14 rebalance)
+  // retain one decimal through live health authority. Integer-authored guns
+  // keep their existing whole-damage behavior.
+  const precision = weapon.id === 'm14-ebr' ? 10 : 1;
+  return Math.max(1, Math.round(base * multiplier * precision) / precision);
 }
 
 /** Minigun impacts retain proxy geometry but never enter the critical-hit semantic/UI path. */

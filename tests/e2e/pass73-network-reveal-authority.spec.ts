@@ -46,7 +46,12 @@ test.afterAll(async () => {
   peerServer = null;
 });
 
-async function openPlayer(context: BrowserContext, name: string, seed: string): Promise<Page> {
+async function openPlayer(
+  context: BrowserContext,
+  name: string,
+  seed: string,
+  eventDelayQaMs = 0,
+): Promise<Page> {
   if (!peerServer) throw new Error('Owned PeerJS server is not ready');
   const page = await context.newPage();
   const url = new URL(test.info().project.use.baseURL as string);
@@ -66,6 +71,7 @@ async function openPlayer(context: BrowserContext, name: string, seed: string): 
     peerQaPath: peerServer.path,
     previewTime: '0',
     seed,
+    eventDelayQaMs: String(eventDelayQaMs),
   })) url.searchParams.set(key, value);
   await page.goto(url.toString());
   await page.waitForFunction(() => {
@@ -78,27 +84,38 @@ async function openPlayer(context: BrowserContext, name: string, seed: string): 
   return page;
 }
 
-async function startMatch(
-  hostContext: BrowserContext,
-  guestContext: BrowserContext,
-): Promise<Readonly<{ host: Page; guest: Page }>> {
-  const [host, guest] = await Promise.all([
-    openPlayer(hostContext, 'Pass 73 Authority Host', 'pass73-authority-host'),
-    openPlayer(guestContext, 'Pass 73 Authority Guest', 'pass73-authority-guest'),
-  ]);
-  await host.locator('[data-menu-tab="kit"]').click();
-  await host.locator('[data-custom-preset-id="custom-2"] [data-custom-modify]').click();
-  await expect(host.locator('#loadout-manager')).toBeVisible();
-  await host.locator('#loadout-manage-preset').selectOption('custom-2');
-  await host.locator('#loadout-primary').selectOption('m14-ebr');
-  await host.locator('#loadout-secondary').selectOption('explosive-crossbow');
-  await host.locator('#loadout-save').click();
-  await expect(host.locator('#loadout-manager')).toBeHidden();
-  await host.locator('[data-menu-tab="deploy"]').click();
-  expect(await host.evaluate(() => {
+async function configureM14CrossbowLoadout(page: Page): Promise<void> {
+  await page.locator('[data-menu-tab="kit"]').click();
+  await page.locator('[data-custom-preset-id="custom-2"] [data-custom-modify]').click();
+  await expect(page.locator('#loadout-manager')).toBeVisible();
+  await page.locator('#loadout-manage-preset').selectOption('custom-2');
+  await page.locator('#loadout-primary').selectOption('m14-ebr');
+  await page.locator('#loadout-secondary').selectOption('explosive-crossbow');
+  await page.locator('#loadout-save').click();
+  await expect(page.locator('#loadout-manager')).toBeHidden();
+  await page.locator('[data-menu-tab="deploy"]').click();
+  expect(await page.evaluate(() => {
     const player = window.__ATOMIC_ACRES_DEBUG__!.snapshot().player;
     return { primary: player.primaryWeapon, secondary: player.secondaryWeapon };
   })).toEqual({ primary: 'm14-ebr', secondary: 'explosive-crossbow' });
+}
+
+async function startMatch(
+  hostContext: BrowserContext,
+  guestContext: BrowserContext,
+  options: Readonly<{ guestEventDelayQaMs?: number; hostedBotCount?: 0 | 2 }> = {},
+): Promise<Readonly<{ host: Page; guest: Page }>> {
+  const hostedBotCount = options.hostedBotCount ?? 2;
+  const [host, guest] = await Promise.all([
+    openPlayer(hostContext, 'Pass 73 Authority Host', 'pass73-authority-host'),
+    openPlayer(
+      guestContext,
+      'Pass 73 Authority Guest',
+      'pass73-authority-guest',
+      options.guestEventDelayQaMs ?? 0,
+    ),
+  ]);
+  await Promise.all([host, guest].map(configureM14CrossbowLoadout));
   await host.locator('#team').selectOption('0');
   await guest.locator('#team').selectOption('1');
   await host.locator('#host').click();
@@ -110,18 +127,18 @@ async function startMatch(
   await Promise.all([host, guest].map((page) => page.waitForFunction(() => (
     window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.members.length === 2
   ), undefined, { timeout: 30_000 })));
-  await host.locator('#lobby-bots').selectOption('2');
+  await host.locator('#lobby-bots').selectOption(String(hostedBotCount));
   await host.locator('#lobby-ready').click();
   await guest.locator('#lobby-ready').click();
   await expect(host.locator('#lobby-start')).toBeEnabled();
   await host.locator('#lobby-start').click();
-  await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
+  await Promise.all([host, guest].map((page) => page.waitForFunction((expectedBots) => {
     const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
     return state?.gameStarted === true
       && state?.matchPhase === 'active'
       && state?.remotePlayers.length === 1
-      && state?.bots.length === 2;
-  }, undefined, { timeout: 90_000 })));
+      && state?.bots.length === expectedBots;
+  }, hostedBotCount, { timeout: 90_000 })));
   await Promise.all([host, guest].map((page) => page.evaluate(() => {
     window.__ATOMIC_ACRES_DEBUG__!.setBotsFrozen(true);
   })));
@@ -217,21 +234,28 @@ async function releaseAds(page: Page): Promise<void> {
 }
 
 async function selectLoadoutWeapon(
-  host: Page,
-  guest: Page,
+  shooter: Page,
+  observer: Page,
   key: 'Digit1' | 'Digit2',
   weapon: 'm14-ebr' | 'explosive-crossbow',
 ): Promise<void> {
-  await host.keyboard.press(key);
+  await shooter.keyboard.press(key);
   await Promise.all([
-    host.waitForFunction((weaponId) => (
+    shooter.waitForFunction((weaponId) => (
       window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.weapon === weaponId
     ), weapon, { polling: 'raf', timeout: 8_000 }),
-    guest.waitForFunction((weaponId) => {
+    observer.waitForFunction((weaponId) => {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
       return state?.remotePlayers.length === 1 && state.remotePlayers[0]?.weapon === weaponId;
     }, weapon, { polling: 'raf', timeout: 8_000 }),
   ]);
+}
+
+async function waitForAdsSettled(page: Page): Promise<void> {
+  await page.waitForFunction(() => {
+    const readiness = window.__ATOMIC_ACRES_DEBUG__?.sampleDmrThermalReadiness();
+    return readiness?.weapon === 'm14-ebr' && readiness.adsProgress >= 0.95;
+  }, undefined, { polling: 'raf', timeout: 8_000 });
 }
 
 test('host-canonical crossbow glass and trusted ADS reveal converge across independent peers', async ({ browser }) => {
@@ -376,7 +400,15 @@ test('host-canonical crossbow glass and trusted ADS reveal converge across indep
         && reveal.activeTargetIds.includes(botId)
         && reveal.geometryIdentity === true
         && reveal.skeletonIdentity === true
-        && reveal.boneWorldMatrixIdentity === true;
+        && reveal.boneWorldMatrixIdentity === true
+        && reveal.exactModelVisible === true
+        && reveal.exactModelColorWrite === true
+        && reveal.exactModelOpacity > 0
+        && reveal.exactModelDepthTestDisabled === true
+        && reveal.haloVisible === true
+        && reveal.haloColorWrite === true
+        && reveal.haloOpacity === 0.88
+        && reveal.haloDepthTestDisabled === true;
     }, { remoteId: targetIds.remote, botId: targetIds.bot }, { polling: 'raf', timeout: 10_000 });
     await releaseAds(host);
     await host.waitForFunction(() => (
@@ -396,11 +428,21 @@ test('host-canonical crossbow glass and trusted ADS reveal converge across indep
     await host.waitForFunction(({ remoteId, botId }) => {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
       const reveal = state?.dmrThermal.exactOperatorReveal;
+      const railgunReveal = state?.railgun.presentation;
       return state?.player.weapon === 'railgun'
         && state?.railgun.thermalVisible === true
         && reveal?.activeTargetIds.includes(remoteId)
         && reveal.activeTargetIds.includes(botId)
-        && reveal.boneWorldMatrixIdentity === true;
+        && reveal.boneWorldMatrixIdentity === true
+        && railgunReveal?.exactModelVisible === true
+        && railgunReveal.exactModelColorWrite === true
+        && railgunReveal.exactModelOpacity > 0
+        && railgunReveal.exactModelDepthTestDisabled === true
+        && railgunReveal.exactHaloVisible === true
+        && railgunReveal.exactHaloColorWrite === true
+        && railgunReveal.exactHaloOpacity === 0.88
+        && railgunReveal.exactHaloDepthTestDisabled === true
+        && railgunReveal.exactOperatorComplete === true;
     }, { remoteId: targetIds.remote, botId: targetIds.bot }, { polling: 'raf', timeout: 10_000 });
 
     await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.equipWeapon('sniper'));
@@ -420,6 +462,443 @@ test('host-canonical crossbow glass and trusted ADS reveal converge across indep
     expect(trustedInputs.filter(({ button, trusted }) => button === 0 && trusted)).toHaveLength(2);
     expect(trustedInputs.filter(({ button, trusted }) => button === 2 && trusted)).toHaveLength(2);
     expect(await Promise.all([host, guest].map(readPersistedClientRuntimeLog))).toEqual([[], []]);
+  } finally {
+    await Promise.all([hostContext.close(), guestContext.close()]);
+  }
+});
+
+test('guest crossbow and bidirectional M14 damage converge once through the real host transport', async ({ browser }, testInfo) => {
+  test.setTimeout(480_000);
+  const [hostContext, guestContext] = await Promise.all([browser.newContext(), browser.newContext()]);
+  try {
+    const { host, guest } = await startMatch(hostContext, guestContext, {
+      guestEventDelayQaMs: 250,
+      hostedBotCount: 0,
+    });
+    expect(await guest.evaluate(() => (
+      window.__ATOMIC_ACRES_DEBUG__!.snapshot().networkLifecycle.qaEventDelayMs
+    ))).toBe(250);
+    await Promise.all([host, guest].map(registerTrustedInputProbe));
+    await guest.bringToFront();
+    await ensurePointerLock(guest);
+
+    const directSetup = await guest.evaluate(() => {
+      const api = window.__ATOMIC_ACRES_DEBUG__!;
+      const before = api.snapshot();
+      const paneIndex = before.breakableWindows.findIndex((candidate: GlassSnapshot, index: number) => (
+        index !== 3 && candidate.broken === false && (candidate.glassState?.revision ?? 0) === 0
+      ));
+      if (paneIndex < 0) throw new Error('No pristine direct-impact pane remains after match admission');
+      api.stageWindow(paneIndex, 3);
+      const state = api.snapshot();
+      const pane = state.breakableWindows[paneIndex] as GlassSnapshot;
+      if (!pane || pane.broken || (pane.glassState?.revision ?? 0) !== 0) throw new Error('Guest direct pane is not pristine');
+      return {
+        paneIndex,
+        windowId: pane.id,
+        playerPosition: state.player.position as [number, number, number],
+        explosionBaseline: state.grenadeExplosion.total as number,
+        predictedBaseline: state.crossbowGlassAuthority.predictedImpactRejections as number,
+        canonicalBaseline: state.crossbowGlassAuthority.canonicalClientMutations as number,
+      };
+    });
+    await host.waitForFunction(({ position }) => {
+      const remote = window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0];
+      return remote && Math.hypot(
+        remote.authoritativePosition[0] - position[0],
+        remote.authoritativePosition[1] - position[1],
+        remote.authoritativePosition[2] - position[2],
+      ) < 0.35;
+    }, { position: directSetup.playerPosition }, { polling: 'raf', timeout: 8_000 });
+    await selectLoadoutWeapon(guest, host, 'Digit2', 'explosive-crossbow');
+    const directHostBaseline = await host.evaluate(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+      return {
+        explosion: state.grenadeExplosion.total as number,
+        impactMutations: state.crossbowGlassAuthority.authoritativeImpactMutations as number,
+      };
+    });
+    expect(await glass(host, directSetup.windowId)).toMatchObject({ broken: false });
+    expect((await glass(host, directSetup.windowId)).glassState?.revision ?? 0).toBe(0);
+
+    await guest.mouse.click(640, 360, { button: 'left' });
+    await guest.waitForFunction(({ id, predictedBaseline, canonicalBaseline }) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      const pane = state?.breakableWindows.find((candidate: GlassSnapshot) => candidate.id === id) as GlassSnapshot | undefined;
+      const authority = state?.crossbowGlassAuthority;
+      return authority?.predictedImpactRejections === predictedBaseline + 1
+        && authority.canonicalClientMutations === canonicalBaseline
+        && authority.lastPredictedImpactRejection?.windowId === id
+        && authority.lastPredictedImpactRejection.revision === 0
+        && pane?.glassState?.revision === 0
+        && pane.broken === false;
+    }, {
+      id: directSetup.windowId,
+      predictedBaseline: directSetup.predictedBaseline,
+      canonicalBaseline: directSetup.canonicalBaseline,
+    }, { polling: 'raf', timeout: 3_000 });
+    const predictedGate = await guest.evaluate((id) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+      return {
+        pane: state.breakableWindows.find((candidate: GlassSnapshot) => candidate.id === id),
+        authority: state.crossbowGlassAuthority,
+      };
+    }, directSetup.windowId);
+    expect(predictedGate.pane).toMatchObject({ broken: false, glassState: { revision: 0, phase: 'intact' } });
+    expect(predictedGate.authority.lastPredictedImpactRejection).toMatchObject({
+      windowId: directSetup.windowId,
+      phase: 'impact',
+      revision: 0,
+    });
+
+    await Promise.all([
+      waitForReplicatedGlass(host, directSetup.windowId, directHostBaseline.explosion, 'breached', true),
+      waitForReplicatedGlass(guest, directSetup.windowId, directSetup.explosionBaseline, 'breached', true),
+    ]);
+    await Promise.all([
+      host.waitForFunction((baseline) => (
+        window.__ATOMIC_ACRES_DEBUG__!.snapshot().grenadeExplosion.total > baseline
+      ), directHostBaseline.explosion, { timeout: 8_000 }),
+      guest.waitForFunction((baseline) => (
+        window.__ATOMIC_ACRES_DEBUG__!.snapshot().grenadeExplosion.total > baseline
+      ), directSetup.explosionBaseline, { timeout: 8_000 }),
+    ]);
+    const [hostDirect, guestDirect] = await Promise.all([host, guest].map((page) => page.evaluate((id) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+      return {
+        pane: state.breakableWindows.find((candidate: GlassSnapshot) => candidate.id === id) as GlassSnapshot,
+        authority: state.crossbowGlassAuthority,
+      };
+    }, directSetup.windowId)));
+    expect(hostDirect.pane.glassState).toEqual(guestDirect.pane.glassState);
+    const hostDirectEvents = hostDirect.authority.recentAuthoritativeMutations.filter((entry: any) => (
+      entry.windowId === directSetup.windowId
+    ));
+    const guestDirectEvents = guestDirect.authority.recentCanonicalClientMutations.filter((entry: any) => (
+      entry.windowId === directSetup.windowId
+    ));
+    expect(hostDirectEvents).toHaveLength(1);
+    expect(guestDirectEvents).toHaveLength(1);
+    expect(hostDirectEvents[0]).toMatchObject({ phase: 'impact', revision: 1 });
+    expect(guestDirectEvents[0]).toEqual(hostDirectEvents[0]);
+    expect(predictedGate.authority.lastPredictedImpactRejection.actionNonce).toBe(hostDirectEvents[0].actionNonce);
+    await guest.waitForTimeout(300);
+    expect((await glass(host, directSetup.windowId)).glassState?.revision).toBe(1);
+    expect((await glass(guest, directSetup.windowId)).glassState?.revision).toBe(1);
+
+    await guest.keyboard.press('KeyR');
+    await guest.waitForFunction(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      return state?.player.weapon === 'explosive-crossbow'
+        && state.player.ammo === 1
+        && state.player.reloading === false;
+    }, undefined, { polling: 'raf', timeout: 8_000 });
+
+    const blastStage = await guest.evaluate(() => {
+      const api = window.__ATOMIC_ACRES_DEBUG__!;
+      const before = api.snapshot();
+      const paneIndex = before.breakableWindows[3]?.broken === false
+        && (before.breakableWindows[3]?.glassState?.revision ?? 0) === 0
+        ? 3
+        : before.breakableWindows.findIndex((candidate: GlassSnapshot) => (
+          candidate.broken === false && (candidate.glassState?.revision ?? 0) === 0
+        ));
+      if (paneIndex < 0) throw new Error('No pristine blast pane remains after match admission');
+      api.stageWindow(paneIndex, 6);
+      const state = api.snapshot();
+      const pane = state.breakableWindows[paneIndex] as GlassSnapshot;
+      if (!pane || pane.broken || (pane.glassState?.revision ?? 0) !== 0) throw new Error('Guest blast pane is not pristine');
+      return {
+        paneIndex,
+        windowId: pane.id,
+        playerPosition: state.player.position as [number, number, number],
+        explosionBaseline: state.grenadeExplosion.total as number,
+      };
+    });
+    await host.waitForFunction(({ position }) => {
+      const remote = window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0];
+      return remote && Math.hypot(
+        remote.authoritativePosition[0] - position[0],
+        remote.authoritativePosition[1] - position[1],
+        remote.authoritativePosition[2] - position[2],
+      ) < 0.35;
+    }, { position: blastStage.playerPosition }, { polling: 'raf', timeout: 8_000 });
+    const blastFixture = await host.evaluate(({ targetWindowId, guestPosition, guestYaw }) => {
+      const api = window.__ATOMIC_ACRES_DEBUG__!;
+      const forward = [-Math.sin(guestYaw), -Math.cos(guestYaw)] as const;
+      const targetEye: [number, number, number] = [
+        guestPosition[0] + forward[0] * 4.2,
+        1.7,
+        guestPosition[2] + forward[1] * 4.2,
+      ];
+      if (api.collisionProbe(targetEye[0], targetEye[2])) {
+        throw new Error('Guest blast target position is blocked');
+      }
+      api.teleportPlayer(...targetEye, guestYaw + Math.PI, 0);
+      const blastPoint: [number, number, number] = [targetEye[0], 0.98, targetEye[2]];
+      const inspection = api.inspectCrossbowBlastWindows(blastPoint, null, 7);
+      const state = api.snapshot();
+      return {
+        targetWindowId,
+        targetEye,
+        blastPoint,
+        inspection,
+        hostExplosionBaseline: state.grenadeExplosion.total as number,
+        authorityBaseline: state.crossbowGlassAuthority.authoritativeExplosionMutations as number,
+      };
+    }, {
+      targetWindowId: blastStage.windowId,
+      guestPosition: blastStage.playerPosition,
+      guestYaw: await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.yaw as number),
+    });
+    await guest.waitForFunction((position) => {
+      const remote = window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0];
+      return remote?.hp === 100 && Math.hypot(
+        remote.authoritativePosition[0] - position[0],
+        remote.authoritativePosition[1] - position[1],
+        remote.authoritativePosition[2] - position[2],
+      ) < 0.25;
+    }, blastFixture.targetEye, { polling: 'raf', timeout: 8_000 });
+    await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.aimAtRemote('body'));
+    const targetInspection = blastFixture.inspection.find((entry: any) => entry.windowId === blastStage.windowId);
+    const occludedPane = blastFixture.inspection.find((entry: any) => (
+      entry.windowId !== blastStage.windowId && entry.revision === 0 && entry.inRadius && entry.pathBlocked
+    ));
+    expect(targetInspection).toMatchObject({ revision: 0, inRadius: true, pathBlocked: false });
+    expect(occludedPane, JSON.stringify(blastFixture.inspection, null, 2)).toBeDefined();
+    expect((await glass(guest, blastStage.windowId)).glassState?.revision ?? 0).toBe(0);
+
+    await guest.mouse.click(640, 360, { button: 'left' });
+    await Promise.all([
+      waitForReplicatedGlass(host, blastStage.windowId, blastFixture.hostExplosionBaseline, 'detached', false),
+      waitForReplicatedGlass(guest, blastStage.windowId, blastStage.explosionBaseline, 'detached', false),
+    ]);
+    const [hostBlast, guestBlast] = await Promise.all([host, guest].map((page) => page.evaluate((id) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+      return {
+        pane: state.breakableWindows.find((candidate: GlassSnapshot) => candidate.id === id) as GlassSnapshot,
+        authority: state.crossbowGlassAuthority,
+      };
+    }, blastStage.windowId)));
+    expect(hostBlast.pane.glassState).toEqual(guestBlast.pane.glassState);
+    const hostBlastEvents = hostBlast.authority.recentAuthoritativeMutations.filter((entry: any) => (
+      entry.windowId === blastStage.windowId
+    ));
+    const guestBlastEvents = guestBlast.authority.recentCanonicalClientMutations.filter((entry: any) => (
+      entry.windowId === blastStage.windowId
+    ));
+    expect(hostBlastEvents).toHaveLength(1);
+    expect(guestBlastEvents).toHaveLength(1);
+    expect(hostBlastEvents[0]).toMatchObject({ phase: 'explosion', revision: 1 });
+    expect(guestBlastEvents[0]).toEqual(hostBlastEvents[0]);
+    expect(hostBlast.authority.authoritativeExplosionMutations).toBeGreaterThan(
+      blastFixture.authorityBaseline,
+    );
+    const [hostOccluded, guestOccluded] = await Promise.all([
+      glass(host, occludedPane!.windowId),
+      glass(guest, occludedPane!.windowId),
+    ]);
+    expect(hostOccluded).toMatchObject({ broken: false, visible: true, glassState: { revision: 0, phase: 'intact' } });
+    expect(guestOccluded.glassState).toEqual(hostOccluded.glassState);
+
+    await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.hp <= 0, undefined, {
+      polling: 'raf', timeout: 8_000,
+    });
+    await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.respawn());
+    await Promise.all([
+      host.waitForFunction(() => {
+        const player = window.__ATOMIC_ACRES_DEBUG__?.snapshot().player;
+        return player?.alive === true && player.hp === 100;
+      }, undefined, { polling: 'raf', timeout: 8_000 }),
+      guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0]?.hp === 100, undefined, {
+        polling: 'raf', timeout: 8_000,
+      }),
+    ]);
+    const duelLane = await host.evaluate(() => {
+      const api = window.__ATOMIC_ACRES_DEBUG__!;
+      const bounds = api.snapshot().arenaSelection.bounds;
+      const directions = [[8, 0], [0, 8], [8, 8], [8, -8]] as const;
+      for (let x = bounds.minX + 4; x <= bounds.maxX - 4; x += 3) {
+        for (let z = bounds.minZ + 4; z <= bounds.maxZ - 4; z += 3) {
+          if (api.collisionProbe(x, z)) continue;
+          for (const [dx, dz] of directions) {
+            const bx = x + dx;
+            const bz = z + dz;
+            if (bx > bounds.maxX - 3 || bz > bounds.maxZ - 3 || bz < bounds.minZ + 3) continue;
+            if (!api.collisionProbe(bx, bz) && !api.segmentBlocked(x, z, bx, bz)) {
+              return { host: [x, 1.7, z] as [number, number, number], guest: [bx, 1.7, bz] as [number, number, number] };
+            }
+          }
+        }
+      }
+      throw new Error('No clear sub-falloff two-player M14 lane found');
+    });
+    await Promise.all([
+      host.evaluate((position) => window.__ATOMIC_ACRES_DEBUG__!.teleportPlayer(...position, 0, 0), duelLane.host),
+      guest.evaluate((position) => window.__ATOMIC_ACRES_DEBUG__!.teleportPlayer(...position, Math.PI, 0), duelLane.guest),
+    ]);
+    await Promise.all([
+      host.waitForFunction((position) => {
+        const remote = window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0];
+        return remote && Math.hypot(
+          remote.authoritativePosition[0] - position[0],
+          remote.authoritativePosition[2] - position[2],
+        ) < 0.3;
+      }, duelLane.guest, { polling: 'raf', timeout: 8_000 }),
+      guest.waitForFunction((position) => {
+        const remote = window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0];
+        return remote && Math.hypot(
+          remote.authoritativePosition[0] - position[0],
+          remote.authoritativePosition[2] - position[2],
+        ) < 0.3;
+      }, duelLane.host, { polling: 'raf', timeout: 8_000 }),
+    ]);
+    await host.waitForTimeout(900);
+    await host.bringToFront();
+    await ensurePointerLock(host);
+    await selectLoadoutWeapon(host, guest, 'Digit1', 'm14-ebr');
+    await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.aimAtRemote('body'));
+    await pressAds(host);
+    await waitForAdsSettled(host);
+    await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.aimAtRemote('body'));
+    const hostAmmoBefore = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.ammo as number);
+    await host.mouse.click(640, 360, { button: 'left' });
+    await Promise.all([
+      host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0]?.hp === 62.8, undefined, {
+        polling: 'raf', timeout: 8_000,
+      }),
+      guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.hp === 62.8, undefined, {
+        polling: 'raf', timeout: 8_000,
+      }),
+    ]);
+    await releaseAds(host);
+    const hostToGuest = await Promise.all([host, guest].map((page) => page.evaluate(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+      return { localHp: state.player.hp as number, remoteHp: state.remotePlayers[0]?.hp as number };
+    })));
+    await host.waitForTimeout(750);
+    expect(await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.hp)).toBe(62.8);
+    expect(await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().remotePlayers[0]?.hp)).toBe(62.8);
+    expect(await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.ammo)).toBe(hostAmmoBefore - 1);
+
+    await guest.bringToFront();
+    await ensurePointerLock(guest);
+    await selectLoadoutWeapon(guest, host, 'Digit1', 'm14-ebr');
+    await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.aimAtRemote('body'));
+    await pressAds(guest);
+    await waitForAdsSettled(guest);
+    await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.aimAtRemote('body'));
+    const guestAmmoBefore = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.ammo as number);
+    await guest.mouse.click(640, 360, { button: 'left' });
+    await Promise.all([
+      host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.hp === 62.8, undefined, {
+        polling: 'raf', timeout: 8_000,
+      }),
+      guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0]?.hp === 62.8, undefined, {
+        polling: 'raf', timeout: 8_000,
+      }),
+    ]);
+    await releaseAds(guest);
+    const guestToHost = await Promise.all([host, guest].map((page) => page.evaluate(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+      return { localHp: state.player.hp as number, remoteHp: state.remotePlayers[0]?.hp as number };
+    })));
+    await guest.waitForTimeout(750);
+    expect(await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.hp)).toBe(62.8);
+    expect(await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().remotePlayers[0]?.hp)).toBe(62.8);
+    expect(await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.ammo)).toBe(guestAmmoBefore - 1);
+    const standardDamageState = await Promise.all([host, guest].map((page) => page.evaluate(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+      return { dhv: state.player.dhv, overdriveDamageMultiplier: state.overdrive.damageMultiplier };
+    })));
+    expect(standardDamageState).toEqual([
+      { dhv: 10, overdriveDamageMultiplier: 1 },
+      { dhv: 10, overdriveDamageMultiplier: 1 },
+    ]);
+
+    const oldMatchEpoch = hostBlast.pane.glassState!.matchEpoch;
+    await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.endMatch());
+    await Promise.all([host, guest].map((page) => page.waitForFunction(() => (
+      window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'ended'
+    ), undefined, { timeout: 8_000 })));
+    await host.locator('#rematch').click();
+    await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      return state?.gameStarted === false && state.privateMatch?.phase === 'waiting';
+    }, undefined, { timeout: 8_000 })));
+    await host.locator('#lobby-ready').click();
+    await guest.locator('#lobby-ready').click();
+    await expect(host.locator('#lobby-start')).toBeEnabled();
+    await host.locator('#lobby-start').click();
+    await Promise.all([host, guest].map((page) => page.waitForFunction((priorEpoch) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      return state?.gameStarted === true
+        && state.matchPhase === 'active'
+        && state.breakableWindows.length > 0
+        && state.breakableWindows.every((pane: GlassSnapshot) => (
+          pane.broken === false && pane.visible === true
+            && pane.glassState?.matchEpoch > priorEpoch
+            && pane.glassState.revision === 0
+            && pane.glassState.phase === 'intact'
+        ))
+        && state.crossbowGlassAuthority.matchEpoch > priorEpoch
+        && state.crossbowGlassAuthority.predictedImpactRejections === 0
+        && state.crossbowGlassAuthority.authoritativeImpactMutations === 0
+        && state.crossbowGlassAuthority.authoritativeExplosionMutations === 0
+        && state.crossbowGlassAuthority.canonicalClientMutations === 0;
+    }, oldMatchEpoch, { polling: 'raf', timeout: 90_000 })));
+    const resetEvidence = await Promise.all([host, guest].map((page) => page.evaluate(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+      return {
+        matchEpoch: state.breakableWindows[0].glassState.matchEpoch as number,
+        revisions: state.breakableWindows.map((pane: GlassSnapshot) => pane.glassState?.revision),
+        phases: state.breakableWindows.map((pane: GlassSnapshot) => pane.glassState?.phase),
+        telemetry: state.crossbowGlassAuthority,
+      };
+    })));
+    expect(resetEvidence[0].matchEpoch).toBeGreaterThan(oldMatchEpoch);
+    expect(resetEvidence[1].matchEpoch).toBe(resetEvidence[0].matchEpoch);
+    expect(resetEvidence[1].revisions).toEqual(resetEvidence[0].revisions);
+    expect(resetEvidence[1].phases).toEqual(resetEvidence[0].phases);
+
+    const trustedInputs = await Promise.all([host, guest].map((page) => page.evaluate(() => (
+      (globalThis as typeof globalThis & {
+        __PASS73_TRUSTED_INPUT__?: Array<{ button: number; trusted: boolean }>;
+      }).__PASS73_TRUSTED_INPUT__ ?? []
+    ))));
+    expect(trustedInputs[0].filter(({ button, trusted }) => button === 0 && trusted)).toHaveLength(1);
+    expect(trustedInputs[1].filter(({ button, trusted }) => button === 0 && trusted)).toHaveLength(3);
+    expect(await Promise.all([host, guest].map(readPersistedClientRuntimeLog))).toEqual([[], []]);
+
+    await testInfo.attach('pass73-combat-network-authority-receipt', {
+      body: Buffer.from(JSON.stringify({
+        renderer: 'webgl2',
+        eventDelayQaMs: 250,
+        direct: {
+          windowId: directSetup.windowId,
+          predictedGate,
+          host: hostDirect,
+          guest: guestDirect,
+        },
+        blast: {
+          windowId: blastStage.windowId,
+          occludedWindowId: occludedPane!.windowId,
+          host: hostBlast,
+          guest: guestBlast,
+          occluded: { host: hostOccluded, guest: guestOccluded },
+        },
+        m14: {
+          canonicalBodyDamage: 37.2,
+          hostToGuest,
+          guestToHost,
+          standardDamageState,
+          hostAmmoDelta: hostAmmoBefore - (hostAmmoBefore - 1),
+          guestAmmoDelta: guestAmmoBefore - (guestAmmoBefore - 1),
+        },
+        reset: resetEvidence,
+      }, null, 2)),
+      contentType: 'application/json',
+    });
   } finally {
     await Promise.all([hostContext.close(), guestContext.close()]);
   }

@@ -132,14 +132,30 @@ describe('Pass 73 trusted ADS exact-operator reveal lifecycle', () => {
   });
 
   it('removes a dead remote without disturbing a living bot reveal', () => {
+    const scene = new THREE.Scene();
     const remote = target('remote-dead', 'player', -1);
     const bot = target('bot-live', 'bot', 1);
+    scene.add(remote.root, bot.root);
     const presentation = new ThermalGhostPresentation();
     presentation.sync(admittedTargets('railgun', [remote, bot]), true);
     expect(presentation.telemetry().activeTargetIds).toEqual(['remote-dead', 'bot-live']);
     const deadRemote = { ...remote, alive: false };
     presentation.sync(admittedTargets('railgun', [deadRemote, bot]), true);
-    expect(presentation.telemetry().activeTargetIds).toEqual(['bot-live']);
+    expect(presentation.telemetry()).toMatchObject({
+      trackedTargets: 2,
+      activeTargetIds: ['bot-live'],
+      exactModelVisible: true,
+      haloVisible: true,
+      throughGeometry: true,
+    });
+    expect((remote.root.getObjectByName('through-wall-exact-operator-model') as THREE.Mesh).visible).toBe(false);
+    expect((remote.root.getObjectByName('through-wall-operator-orange-halo') as THREE.Mesh).visible).toBe(false);
+
+    remote.root.removeFromParent();
+    presentation.sync(admittedTargets('railgun', [deadRemote, bot]), true);
+    expect(presentation.telemetry()).toMatchObject({ trackedTargets: 1, activeTargetIds: ['bot-live'] });
+    expect(remote.root.getObjectsByProperty('name', 'through-wall-exact-operator-model')).toHaveLength(0);
+    expect(remote.root.getObjectsByProperty('name', 'through-wall-operator-orange-halo')).toHaveLength(0);
     presentation.terminalDispose();
   });
 });
