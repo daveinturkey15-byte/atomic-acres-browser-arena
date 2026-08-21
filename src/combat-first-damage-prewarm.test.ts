@@ -37,6 +37,8 @@ describe('HF-282 first-combat preparation contract', () => {
     expect(damage).not.toContain('this.sweep(');
     expect(damage).toContain('this.damageFeedbackSource.frequency');
     expect(lowHealth).toContain('parameter.setTargetAtTime(');
+    expect(lowHealth).toContain('breathingGain: 0');
+    expect(lowHealth).toContain('heartbeatGain: 0');
   });
 
   it('prepares three muted tonal sources during unlock and before deployment admission', () => {

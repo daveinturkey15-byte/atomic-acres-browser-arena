@@ -160,7 +160,10 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
     expect(audio.prepareCombat()).toBe(true);
     expect(audio.telemetry()).toMatchObject({
       combatPrewarm: { prepared: true, runs: 1, sources: 3 },
-      lowHealth: { active: true, audible: true, automationWrites: 2, broadbandSources: 0 },
+      lowHealth: {
+        active: true, audible: false, breathingGain: 0, heartbeatGain: 0,
+        automationWrites: 0, broadbandSources: 0,
+      },
       damageFeedback: { pulses: 2 },
     });
 
@@ -169,14 +172,17 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
       breathingGain: 0, heartbeatGain: 0, pulseHz: 0,
     });
     expect(audio.telemetry()).toMatchObject({
-      lowHealth: { active: true, audible: false, automationWrites: 4 },
+      lowHealth: {
+        active: true, audible: false, breathingGain: 0, heartbeatGain: 0,
+        automationWrites: 0,
+      },
       runtime: { voices: 3 },
     });
     audio.setLowHealthFeedback({
       active: false, severity: 0, vignetteOpacity: 0,
       breathingGain: 0, heartbeatGain: 0, pulseHz: 0,
     });
-    expect(audio.telemetry().lowHealth).toMatchObject({ active: false, audible: false, automationWrites: 4 });
+    expect(audio.telemetry().lowHealth).toMatchObject({ active: false, audible: false, automationWrites: 0 });
     expect(context.oscillators.every((source) => !source.ended)).toBe(true);
 
     audio.dispose();

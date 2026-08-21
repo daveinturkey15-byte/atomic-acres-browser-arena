@@ -872,8 +872,11 @@ export class ArenaAudio {
     if (!this.context || !this.combatFeedbackPrepared || this.lowHealthGains.length !== 2) return;
     const applied = Object.freeze({
       active: presentation.active,
-      breathingGain: presentation.active ? Math.max(0, presentation.breathingGain) : 0,
-      heartbeatGain: presentation.active ? Math.max(0, presentation.heartbeatGain) : 0,
+      // Pass 74: keep the prewarmed low-health voices and their state/telemetry
+      // path, but suppress the player-facing breathing/heartbeat presentation.
+      // The sensory layer still owns severity, hysteresis, and the vignette.
+      breathingGain: 0,
+      heartbeatGain: 0,
     });
     const gainsUnchanged = this.lowHealthAppliedState?.breathingGain === applied.breathingGain
       && this.lowHealthAppliedState.heartbeatGain === applied.heartbeatGain;
@@ -1547,7 +1550,16 @@ export class ArenaAudio {
       retainedBroadbandLoops: 0;
       liveRecipe: 'sawtooth-pressure-plus-dual-filtered-noise-v1';
     };
-    lowHealth: { prepared: boolean; sources: number; active: boolean; audible: boolean; automationWrites: number; broadbandSources: 0 };
+    lowHealth: {
+      prepared: boolean;
+      sources: number;
+      active: boolean;
+      audible: boolean;
+      breathingGain: number;
+      heartbeatGain: number;
+      automationWrites: number;
+      broadbandSources: 0;
+    };
     damageFeedback: { prepared: boolean; sources: number; pulses: number };
     grenadeFuse: { beeps: number; startMs: number };
     crossbowFuse: { beeps: number; lastRemainingMs: number; lastDistanceM: number; startMs: number };
@@ -1616,6 +1628,8 @@ export class ArenaAudio {
         sources: this.combatFeedbackPrepared ? 2 : 0,
         active: this.lowHealthFeedbackActive,
         audible: this.lowHealthFeedbackAudible,
+        breathingGain: this.lowHealthAppliedState?.breathingGain ?? 0,
+        heartbeatGain: this.lowHealthAppliedState?.heartbeatGain ?? 0,
         automationWrites: this.lowHealthAutomationWrites,
         broadbandSources: 0,
       },
