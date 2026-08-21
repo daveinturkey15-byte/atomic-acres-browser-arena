@@ -15486,7 +15486,10 @@ function updateThermalGhosts(): void {
     if (!bot.alive) continue;
     addTarget(bot.id, bot.team, 'bot', bot.root, bot.deaths, bot.continuity);
   }
-  thermalGhostPresentation.sync(targets, true);
+  // Admission prewarm may retain attached corpse-corpus records. The live
+  // target set owns the visible reveal and releases every unseen prewarm ID so
+  // one ADS cannot carry hidden duplicate model/material residency.
+  thermalGhostPresentation.sync(targets, true, true);
   // The default telemetry path is allocation-bounded. Root/life/pose traversal
   // is reserved for explicit debug receipt calls with identityAudit enabled.
   railgunPresentation.syncExactOperatorReveal(railgunRevealActive, thermalGhostPresentation.telemetry());
@@ -26516,6 +26519,10 @@ async function readbackPass73NativeAdsRevealRoi() {
       channels: quantized.channels,
       nonFiniteComponents: quantized.nonFiniteComponents,
       hash: (hash >>> 0).toString(16).padStart(8, '0'),
+      controls: Object.freeze({
+        viewmodelHidden: debugCaptureViewmodelHidden,
+        targetPoseFrozen: pass73AdsRevealCaptureFrozenTargetId !== null,
+      }),
       rgba8Base64: bytesToBase64(quantized.rgba8),
       render: Object.freeze({ ...activeRuntimeTelemetry() }),
     });
@@ -26530,8 +26537,15 @@ async function capturePass73NativeAdsRevealRoiTriplet(targetId: string) {
   }
   const previousRenderPaused = debugRenderPaused;
   const previousFrozenTargetId = pass73AdsRevealCaptureFrozenTargetId;
+  const previousViewmodelHidden = debugCaptureViewmodelHidden;
   debugRenderPaused = true;
   pass73AdsRevealCaptureFrozenTargetId = targetId;
+  // The paired raster measures only the through-wall target. A normal hip-fire
+  // viewmodel occupies the upper-right of this centred ROI and GPU edge
+  // quantization between forced submissions otherwise masquerades as a body
+  // leak even though the occluded world pixels are byte-identical.
+  debugCaptureViewmodelHidden = true;
+  weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
   try {
     setPass73AdsRevealNormalBodyHidden(targetId, false);
     if (!thermalGhostPresentation.setEvidenceControlHidden(false)) {
@@ -26551,6 +26565,8 @@ async function capturePass73NativeAdsRevealRoiTriplet(targetId: string) {
     setPass73AdsRevealNormalBodyHidden(targetId, false);
     thermalGhostPresentation.setEvidenceControlHidden(false);
     pass73AdsRevealCaptureFrozenTargetId = previousFrozenTargetId;
+    debugCaptureViewmodelHidden = previousViewmodelHidden;
+    weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
     debugRenderPaused = previousRenderPaused;
   }
 }

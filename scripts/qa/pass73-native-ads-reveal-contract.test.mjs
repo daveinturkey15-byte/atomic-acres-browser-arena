@@ -120,6 +120,7 @@ function readback(profile, weapon, state, artifacts, ordinal) {
     channels: 4,
     nonFiniteComponents: 0,
     hash: ordinal.toString(16).padStart(8, '0'),
+    controls: { viewmodelHidden: true, targetPoseFrozen: true },
     artifactPath,
     artifactSha256,
     artifactBytes,
@@ -291,6 +292,11 @@ test('rejects source drift and weakened frozen pixel bounds', () => {
   expectMutation((receipt) => { receipt.gate.roi.pixelDelta = 1; }, /ROI, or frozen pixel bounds/iu);
 });
 
+test('rejects a paired raster contaminated by the viewmodel or an advancing target pose', () => {
+  expectMutation((receipt) => { receipt.cells[0].ads.readbacks.revealShown.controls.viewmodelHidden = false; }, /GPU ROI/iu);
+  expectMutation((receipt) => { receipt.cells[0].outsideAds.readbacks.normalHidden.controls.targetPoseFrozen = false; }, /GPU ROI/iu);
+});
+
 test('accepts the checked-in spec, runner, config, and runtime static ownership', () => {
   const sources = {
     spec: readFileSync(resolve(root, 'tests/e2e/pass73-native-ads-reveal.spec.ts'), 'utf8'),
@@ -318,7 +324,7 @@ test('static contract rejects synthetic input, source drift gaps, unpinned Chrom
       'PASS73_ADS_REVEAL_MIN_ORANGE_FRACTION = 0.00005',
       'PASS73_ADS_REVEAL_MAX_ORANGE_FRACTION = 0.08',
     ].join('\n'),
-    legacy: 'readbackPass73NativeAdsRevealRoi setPass73AdsRevealNormalBodyHidden capturePass73NativeAdsRevealRoiTriplet pass73AdsRevealCaptureFrozenTargetId railgunPresentation.syncExactOperatorReveal(railgunRevealActive, thermalGhostPresentation.telemetry())',
+    legacy: 'readbackPass73NativeAdsRevealRoi setPass73AdsRevealNormalBodyHidden capturePass73NativeAdsRevealRoiTriplet pass73AdsRevealCaptureFrozenTargetId debugCaptureViewmodelHidden = true railgunPresentation.syncExactOperatorReveal(railgunRevealActive, thermalGhostPresentation.telemetry())',
   };
   assert.deepEqual(pass73NativeAdsRevealStaticFailures(sources), []);
   assert.match(pass73NativeAdsRevealStaticFailures({ ...sources, spec: `${sources.spec}; dispatchEvent(new MouseEvent('mousedown'))` }).join('\n'), /synthetic ADS/iu);

@@ -616,7 +616,7 @@ export class ThermalGhostPresentation {
   }
 
   /** Show exact-model layers for exactly the authority-approved target set. */
-  sync(targets: readonly ThermalGhostTarget[], active: boolean): void {
+  sync(targets: readonly ThermalGhostTarget[], active: boolean, releaseUnseen = false): void {
     this.generation += 1;
     this.activeTargets = 0;
     this.activeTargetIds.length = 0;
@@ -715,7 +715,7 @@ export class ThermalGhostPresentation {
         layer.model.visible = false;
         layer.halo.visible = false;
       }
-      if (!record.sourceRoot.parent) {
+      if (releaseUnseen || !record.sourceRoot.parent) {
         this.releaseRecord(record);
         this.records.delete(id);
       }

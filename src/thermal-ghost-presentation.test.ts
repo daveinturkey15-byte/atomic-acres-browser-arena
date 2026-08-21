@@ -67,6 +67,24 @@ describe('M14 thermal ghost residency', () => {
     presentation.terminalDispose();
   });
 
+  it('releases unseen admission-prewarm records when the live reveal set takes ownership', () => {
+    const scene = new THREE.Scene();
+    const prewarmRoot = new THREE.Group();
+    const liveRoot = new THREE.Group();
+    prewarmRoot.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial()));
+    liveRoot.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial()));
+    scene.add(prewarmRoot, liveRoot);
+    const presentation = new ThermalGhostPresentation();
+
+    presentation.sync([{ id: 'thermal-prewarm-corpse-0', relation: 'hostile', root: prewarmRoot }], true);
+    presentation.sync([{ id: 'bot-live', relation: 'hostile', root: liveRoot }], true, true);
+
+    expect(presentation.telemetry()).toMatchObject({ trackedTargets: 1, activeTargetIds: ['bot-live'] });
+    expect(prewarmRoot.getObjectsByProperty('name', 'through-wall-exact-operator-model')).toHaveLength(0);
+    expect(prewarmRoot.getObjectsByProperty('name', 'through-wall-operator-orange-halo')).toHaveLength(0);
+    presentation.terminalDispose();
+  });
+
   it('shares exact geometry and a live skeleton while rendering normal model plus orange halo', () => {
     const scene = new THREE.Scene();
     const root = new THREE.Group();

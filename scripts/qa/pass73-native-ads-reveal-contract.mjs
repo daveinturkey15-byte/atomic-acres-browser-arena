@@ -77,7 +77,9 @@ function validateReadback(readbackValue, label, artifactsByPath, referencedArtif
     || !Number.isSafeInteger(readback.targetWidth) || !Number.isSafeInteger(readback.targetHeight)
     || readback.targetWidth < readback.width || readback.targetHeight < readback.height
     || readback.x !== Math.floor((readback.targetWidth - readback.width) / 2)
-    || readback.y !== Math.floor((readback.targetHeight - readback.height) / 2)) {
+    || readback.y !== Math.floor((readback.targetHeight - readback.height) / 2)
+    || readback.controls?.viewmodelHidden !== true
+    || readback.controls?.targetPoseFrozen !== true) {
     failures.push(`${label} has an empty, malformed, off-centre, or non-finite GPU ROI`);
   }
   const artifact = artifactsByPath.get(readback.artifactPath);
@@ -338,6 +340,7 @@ export function pass73NativeAdsRevealStaticFailures(sourcesValue) {
     'setPass73AdsRevealNormalBodyHidden',
     'capturePass73NativeAdsRevealRoiTriplet',
     'pass73AdsRevealCaptureFrozenTargetId',
+    'debugCaptureViewmodelHidden = true',
     'railgunPresentation.syncExactOperatorReveal(railgunRevealActive, thermalGhostPresentation.telemetry())',
   ]) if (!legacy.includes(token)) failures.push(`runtime is missing ${token}`);
   for (const token of [
