@@ -19,7 +19,7 @@ const requestedMultiplayerChannel = process.env[PASS66_MULTIPLAYER_BROWSER_CHANN
 const multiplayerChromeChannel = ownedMultiplayerGate
   ? PASS66_MULTIPLAYER_BROWSER_CHANNEL as 'chrome'
   : undefined;
-const nativeEngineUserAgent = pass70NativeEngineUserAgentEnabled(
+const nativeEngineUserAgent = pass73NativeWebGpu || pass70NativeEngineUserAgentEnabled(
   process.env[PASS70_NATIVE_USER_AGENT_ENV],
 );
 
@@ -72,7 +72,7 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         channel: pass73NativeWebGpu ? 'chrome' : multiplayerChromeChannel ?? installedEdgeChannel,
-        userAgent: pass73NativeWebGpu ? undefined : resolvePass70ChromiumProjectUserAgent({
+        userAgent: resolvePass70ChromiumProjectUserAgent({
           desktopChromeUserAgent: devices['Desktop Chrome'].userAgent,
           installedEdgeChannel,
           nativeEngineUserAgent,

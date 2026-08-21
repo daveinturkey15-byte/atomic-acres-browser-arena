@@ -4313,6 +4313,7 @@ let flashVictimConsumer = new FlashVictimResultConsumer(interactiveWorldMatchEpo
 const explosiveBolts: ExplosiveBoltEntity[] = [];
 const explosiveBoltStartScratch = new THREE.Vector3();
 const explosiveBoltDeltaScratch = new THREE.Vector3();
+const explosiveBoltImpactPointScratch = new THREE.Vector3();
 const explosiveBoltTargetPositionScratch = new THREE.Vector3();
 const EXPLOSIVE_BOLT_PRESENTATION_POOL_CAPACITY = 32;
 const explosiveBoltShaftGeometry = new THREE.CylinderGeometry(0.018, 0.018, 0.72, 8);
@@ -18108,7 +18109,7 @@ function updateExplosiveBolts(dt: number, now: number): void {
         if (impactWindowId && admitCrossbowGlassMutation(bolt.authority).accepted) {
           const pane = arena.breakableWindows.find(({ id }) => id === impactWindowId);
           if (pane) {
-            const impactPoint = bolt.mesh.position.clone();
+            const impactPoint = explosiveBoltImpactPointScratch.copy(bolt.mesh.position);
             const normal = worldCollision && worldGlassWindowId === impactWindowId
               ? new THREE.Vector3(worldCollision.normal.x, worldCollision.normal.y, worldCollision.normal.z)
               : pane.mesh.getWorldPosition(new THREE.Vector3()).sub(impactPoint).normalize().multiplyScalar(-1);
