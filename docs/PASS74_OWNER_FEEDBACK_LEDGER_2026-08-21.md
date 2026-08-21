@@ -249,6 +249,33 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   authority. Owner taste is HITL.
 - Status: OPEN
 
+### HF-363 — filmic grading, canopy light and procedural-jungle visual quality
+- Source: owner shared https://x.com/prasenx/status/2087604022849184080 as "a great example of high
+  quality visuals from Claude" and asked for methods that bring that quality here.
+- Reference resolved: a fully procedural first-person Three.js jungle (zero external art assets;
+  every texture, mesh and sound generated in code), built with the Gauntlet Loop. Companion repo
+  `StarKnightt/jungle-trail` is **MIT licensed**, so it is a legitimate reference — but per the repo
+  contract the techniques are REIMPLEMENTED in typed WebGPU/TSL; no GLSL or source is copied.
+- Techniques adopted: (1) filmic grade chain in strict order — ASC CDL slope/offset/power plus
+  channel crosstalk on the LINEAR side, then transfer function, then toe/midtone-contrast/split-tone,
+  with tone mapping LAST; measured bloom and luminance grain; (2) atmospheric scattering baked to a
+  cube and PMREM-prefiltered so sky and IBL share one function; (3) analytic canopy transmittance
+  instead of leaf cards in shadow maps; (4) half-res dithered raymarch light shafts; (5) every
+  procedural texture as a bakeable surface function with normals derived by Sobel sampling;
+  (6) high-count instanced vegetation from two primitives (bent leaf card, swept tube) plus one large
+  leaf atlas, with per-instance wind phase; (7) thin-lens DOF and depth-reconstructed motion blur;
+  (8) mutually incommensurate ambient loop lengths so ambience never audibly repeats — folded into
+  HF-351.
+- Combat-safety bound: grading must not crush shadow detail where enemies hide, bloom must not blind,
+  grain stays subtle, and vegetation gains no collision it did not already have.
+- Gauntlet Loop assessment (recorded honestly): its published skill deliberately refuses to define
+  round counts, scoring or stopping conditions and names the human as the only brake. That is
+  incompatible with unattended operation, and this repo's frozen gates plus adversarial verification
+  are already stricter. Adopt the shape — fan-out builders, a separate harsh critic, blind A/B
+  against a reference — and keep our mechanical stop conditions. No licence is published for the
+  gauntlet-loop skill repo, so nothing is copied from it.
+- Status: IN PROGRESS — grading chain and farcrysis jungle quality dispatched.
+
 ## Retained positives — regression guards
 
 ### HF-353 — Railgun see-through-walls behaviour is right
