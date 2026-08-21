@@ -2932,6 +2932,30 @@ export class WeaponPresentation {
     const armCenter = armBox && !armBox.isEmpty() ? armBox.getCenter(new THREE.Vector3()) : null;
     const armSize = armBox && !armBox.isEmpty() ? armBox.getSize(new THREE.Vector3()) : null;
     const armProjected = armCenter?.clone().project(this.camera) ?? null;
+    const visibleWorldBounds = (root: THREE.Object3D | undefined): Readonly<{
+      min: readonly number[];
+      max: readonly number[];
+    }> | null => {
+      if (!root?.visible) return null;
+      root.updateWorldMatrix(true, true);
+      const bounds = new THREE.Box3().makeEmpty();
+      root.traverse((child) => {
+        if (!(child instanceof THREE.Mesh) || !child.visible) return;
+        if (child instanceof THREE.SkinnedMesh) {
+          child.computeBoundingBox();
+          if (child.boundingBox) bounds.union(child.boundingBox.clone().applyMatrix4(child.matrixWorld));
+          return;
+        }
+        child.geometry.computeBoundingBox();
+        if (child.geometry.boundingBox) bounds.union(child.geometry.boundingBox.clone().applyMatrix4(child.matrixWorld));
+      });
+      return bounds.isEmpty() ? null : Object.freeze({
+        min: Object.freeze(bounds.min.toArray()),
+        max: Object.freeze(bounds.max.toArray()),
+      });
+    };
+    const armWorldBounds = visibleWorldBounds(arms);
+    const weaponWorldBounds = visibleWorldBounds(model);
     const importedModel = importedWeaponTelemetry(model);
     const detailsReady = importedModel
       ? importedModel.socketContractReady && importedModel.meshes > 0
@@ -3109,6 +3133,11 @@ export class WeaponPresentation {
         size: armSize.toArray(),
         projected: armProjected.toArray(),
       } : null,
+      worldPlaneClearance: {
+        contract: 'current-rendered-mesh-world-bounds-v1',
+        arms: armWorldBounds,
+        weapon: weaponWorldBounds,
+      },
       armFraming: arms?.visible
         ? measureCameraFraming(arms, this.camera, isAuthoredArmMesh)
         : null,

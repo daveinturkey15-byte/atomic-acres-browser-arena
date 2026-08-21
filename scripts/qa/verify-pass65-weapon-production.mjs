@@ -272,11 +272,11 @@ if (manifest.operatorArms?.releaseState !== 'release-ready') {
     if (arms.renderBudget?.[field] !== expected) failures.push(`operator arms: render budget ${field} must equal ${expected}`);
   }
   for (const [field, expected] of Object.entries({
-    visualRevision: 'pass70-manual-anatomical-viewmodel-v1',
+    visualRevision: 'pass73-authored-continuous-proximal-sleeves-v2',
     materialContrastContract: 'owned-basecolor-contrast-retone-v1',
-    limbProfileContract: 'manual-continuous-cuff-forearm-deformation-v1',
+    limbProfileContract: 'manual-thick-continuous-cuff-forearm-deformation-v2',
     handPoseContract: 'manual-separated-articulated-digit-contact-v1',
-    shoulderEntryContract: 'weighted-capped-fps-frame-edge-sleeve-v2',
+    shoulderEntryContract: 'weighted-continuous-beyond-crop-sleeve-v3',
     gloveConstructionContract: 'opaque-manual-cuff-palm-digit-continuity-v1',
     palmContactContract: 'authored-wrist-parented-full-transform-v1',
     weaponGripReviewContract: 'seven-view-actual-weapon-contact-v2',

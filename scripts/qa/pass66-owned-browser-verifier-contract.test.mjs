@@ -57,8 +57,18 @@ test('accepts a current multiplayer release pass without weakening staged source
 
 test('rejects stale or incomplete installed-Firefox receipts', () => {
   const cycle = {
-    label: 'cold', backend: 'webgl2', webglVersion: 'WebGL 2.0', contextState: 'ready',
+    label: 'cold', requestedBackend: 'webgpu', backend: 'webgpu', failClosed: true,
+    deviceLost: false, uncapturedErrors: 0, liveProfile: 'blender', qualityAssetState: 'ready',
+    adapterLabel: 'NVIDIA GeForce RTX 5080', softwareAdapter: false,
+    viewport: [2_560, 1_440], pixelRatio: 1, drawingBuffer: [2_560, 1_440],
+    post: { depthAwareBloom: true, advancedGraphics: { bloomStrength: 0.14, volumetricScale: 1 } },
+    performance: { elapsedMs: 5_100, sampleCount: 280, callbackFps: 58, p50FrameTimeMs: 17, p95FrameTimeMs: 20, maximumFrameTimeMs: 42 },
     gameStarted: true, matchPhase: 'active',
+  };
+  const chrome = {
+    ...cycle,
+    label: undefined,
+    performance: { ...cycle.performance, p50FrameTimeMs: 16, p95FrameTimeMs: 18 },
   };
   const receipt = {
     schemaVersion: 1,
@@ -68,6 +78,14 @@ test('rejects stale or incomplete installed-Firefox receipts', () => {
     servedCandidate: candidate,
     browser: 'installed-firefox',
     cycles: [cycle, { ...cycle, label: 'warm' }],
+    parity: {
+      contract: 'same-content-native-webgpu-firefox-chrome-80pct-median-125pct-p95-v1',
+      seed: 'pass73-installed-browser-webgpu-parity', viewport: [2_560, 1_440],
+      profile: 'blender', map: 'atomic-acres', backend: 'webgpu', chrome,
+      firefoxMedianThroughputFps: 58.82, chromeMedianThroughputFps: 62.5,
+      medianThroughputRatio: 0.94, p95FrameTimeRatio: 1.11,
+      identicalGraphicsContract: true, passed: true,
+    },
   };
   const expected = { gate: 'installed-firefox', sourceSha, treeSha256, exactRootFileCount: 12 };
   assert.deepEqual(ownedBrowserVerifierReceiptFailures(receipt, expected), []);
@@ -79,6 +97,14 @@ test('rejects stale or incomplete installed-Firefox receipts', () => {
     ...receipt,
     servedCandidate: { ...candidate, sourceSha: 'c'.repeat(40) },
   }, expected).join('\n'), /served candidate sourceSha mismatch/u);
+  assert.match(ownedBrowserVerifierReceiptFailures({
+    ...receipt,
+    parity: { ...receipt.parity, medianThroughputRatio: 0.79 },
+  }, expected).join('\n'), /paired installed Chrome/u);
+  assert.match(ownedBrowserVerifierReceiptFailures({
+    ...receipt,
+    parity: { ...receipt.parity, chrome: { ...chrome, adapterLabel: 'Google SwiftShader', softwareAdapter: true } },
+  }, expected).join('\n'), /paired installed Chrome/u);
 });
 
 test('requires tokenized owned local signaling in the private-lobby receipt', () => {

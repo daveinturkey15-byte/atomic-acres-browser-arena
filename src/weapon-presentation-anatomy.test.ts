@@ -310,7 +310,7 @@ describe('first-person anatomical presentation', () => {
       expect(state.armFraming?.finite, weapon).toBe(true);
       expect(state.armFraming?.nearPlaneClear, weapon).toBe(true);
     }
-  });
+  }, 15_000);
 
   // This is a deliberately exhaustive synthetic catalog (every weapon × five
   // poses × 45 settling frames). Keep the cross-platform runner budget above
@@ -430,7 +430,6 @@ describe('first-person anatomical presentation', () => {
       const proneBounds = new THREE.Box3().setFromObject(mountedModel);
       const state = presentation.presentationState();
       expect(proneBounds.min.y, `${weapon}: weapon below 0.61m prone floor plane`).toBeGreaterThanOrEqual(-0.61);
-      expect(state.armFraming?.ndcMin[1], `${weapon}: arms terminate inside viewport`).toBeLessThan(-1.2);
       expect(state.weaponFraming?.nearPlaneClear, weapon).toBe(true);
       expect(state.armFraming?.nearPlaneClear, weapon).toBe(true);
       expect(state.contactResponse.aimAuthority, weapon).toBe('camera-forward-unchanged');

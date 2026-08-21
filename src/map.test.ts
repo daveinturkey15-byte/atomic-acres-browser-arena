@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { isBlocked } from './collision';
+import { solidBounds } from './house-navigation';
 import { buildArena } from './map';
 import { CharacterPhysics } from './physics';
 
@@ -73,6 +74,34 @@ describe('Atomic Acres Pass 59 collision audit', () => {
       expect(window.mesh.userData.breakableWindowId).toBe(window.id);
       expect(window.mesh.userData.dynamic).toBe(true);
       expect(window.mesh.visible).toBe(true);
+    }
+  });
+
+  it('projects each authored entrance canopy into visible mass, movement and shot authority', () => {
+    const map = buildArena(new THREE.Scene());
+    const canopies = map.houses.map((house) => {
+      const canopy = house.solids.find((solid) => solid.name === 'entrance-canopy');
+      if (!canopy) throw new Error(`Missing entrance canopy for ${house.id}`);
+      return canopy;
+    });
+    expect(canopies).toHaveLength(2);
+    for (const canopy of canopies) {
+      const rendered = map.root.children.find((node) => (
+        node.name === canopy.name
+        && node.position.x === canopy.position[0]
+        && node.position.z === canopy.position[2]
+      ));
+      expect(rendered, canopy.id).toBeDefined();
+      expect(rendered?.visible, canopy.id).toBe(true);
+      const bounds = solidBounds(canopy);
+      expect(map.colliders).toContainEqual(bounds);
+      expect(map.physicsColliders).toContainEqual(bounds);
+      expect(map.shotSurfaces.some((surface) => (
+        surface.name === canopy.name
+        && surface.bounds.minX === bounds.minX
+        && surface.bounds.maxZ === bounds.maxZ
+        && surface.material === 'thin-metal'
+      ))).toBe(true);
     }
   });
 });

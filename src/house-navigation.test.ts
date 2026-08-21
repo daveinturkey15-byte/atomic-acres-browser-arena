@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Point3 } from './collision';
 import { integrateHorizontalVelocity, movementProfile } from './gameplay';
 import { createHouseArchitecture, solidBounds, type HouseArchitecture, type HouseOpening } from './house-navigation';
-import { CharacterPhysics } from './physics';
+import { CHARACTER_PHYSICS_CONFIG, CharacterPhysics } from './physics';
 import type { Team } from './protocol';
 
 async function walkToward(physics: CharacterPhysics, target: Point3, maxSteps = 1_800): Promise<Point3> {
@@ -187,7 +187,7 @@ describe('simplified two-floor house architecture', () => {
         'upper-floor-main', 'upper-floor-ramp-front', 'upper-floor-ramp-rear',
       ]);
       expect(platforms.filter((entry) => entry.kind === 'landing').map((entry) => entry.name).sort()).toEqual([
-        'interior-ramp-top-landing', 'ramp-top-landing',
+        'entrance-canopy', 'interior-ramp-top-landing', 'ramp-top-landing',
       ]);
       if (!ground) throw new Error('Missing declared ground floor solid');
       expect(ground.size[0]).toBeGreaterThanOrEqual(architecture.dimensions.width - 0.2);
@@ -196,6 +196,8 @@ describe('simplified two-floor house architecture', () => {
         for (let second = first + 1; second < platforms.length; second += 1) {
           const a = solidBounds(platforms[first]);
           const b = solidBounds(platforms[second]);
+          const overlapY = Math.max(0, Math.min(a.maxY, b.maxY) - Math.max(a.minY, b.minY));
+          if (overlapY <= 1e-8) continue;
           const overlapX = Math.max(0, Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX));
           const overlapZ = Math.max(0, Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ));
           expect(overlapX * overlapZ, `${architecture.id}:${platforms[first].name}:${platforms[second].name}`).toBeLessThan(1e-8);
@@ -280,7 +282,7 @@ describe('simplified two-floor house architecture', () => {
     }
   });
 
-  it('keeps ground windows breakable while sealing the dark upper facade panel', () => {
+  it('keeps every window breakable while making the upstairs front opening a real route', () => {
     for (const team of [0, 1] as Team[]) {
       const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
       const glass = architecture.solids.filter((entry) => entry.kind === 'glass');
@@ -289,7 +291,63 @@ describe('simplified two-floor house architecture', () => {
       expect(glass.filter((entry) => entry.breakable)).toHaveLength(3);
       const upper = glass.find((entry) => entry.name === 'upper-window-glass');
       expect(upper).toMatchObject({ collidable: false, breakable: true });
-      expect(architecture.openings.find((entry) => entry.id === 'upper-window')?.route).toBe(false);
+      expect(architecture.openings.find((entry) => entry.id === 'upper-window')?.route).toBe(true);
+      const sill = architecture.solids.find((entry) => entry.name === 'upper-window-sill-wall');
+      if (!sill) throw new Error('Missing upper-window-sill-wall');
+      expect(sill.size[1]).toBeLessThanOrEqual(CHARACTER_PHYSICS_CONFIG.autostepHeight);
+    }
+  });
+
+  it.each([0, 1] as Team[])('binds the visible entrance canopy as a standable metal landing for team %s', async (team) => {
+    const facing = team === 0 ? 1 : -1;
+    const architecture = createHouseArchitecture(team, 0, 0, facing);
+    const canopy = architecture.solids.find((entry) => entry.name === 'entrance-canopy');
+    expect(canopy).toMatchObject({
+      size: [4.4, 0.16, 1.4],
+      position: [team === 0 ? 0.55 : -0.55, 3.05, facing * 8.78],
+      surface: 'metal',
+      kind: 'landing',
+      collidable: true,
+    });
+    if (!canopy) throw new Error('Missing entrance-canopy');
+    const physics = await CharacterPhysics.create(
+      architecture.solids.filter((entry) => entry.collidable).map(solidBounds),
+      { minX: -16, maxX: 16, minZ: -16, maxZ: 16 },
+    );
+    try {
+      physics.teleportEye({ x: canopy.position[0], y: 5.3, z: canopy.position[2] });
+      let grounded = false;
+      for (let step = 0; step < 180; step += 1) {
+        const moved = physics.move({ x: 0, y: -0.04, z: 0 }, 1 / 120);
+        grounded ||= moved.grounded;
+      }
+      const settled = physics.eyePosition();
+      expect(grounded).toBe(true);
+      expect(settled.y).toBeGreaterThan(4.4);
+      expect(settled.y).toBeLessThan(5.1);
+      expect(Math.abs(settled.z - canopy.position[2])).toBeLessThan(0.05);
+    } finally {
+      physics.dispose();
+    }
+  });
+
+  it.each([0, 1] as Team[])('walks through the upstairs front-window route without an invisible blocker for team %s', async (team) => {
+    const facing = team === 0 ? 1 : -1;
+    const architecture = createHouseArchitecture(team, 0, 0, facing);
+    const opening = architecture.openings.find((entry) => entry.id === 'upper-window');
+    if (!opening) throw new Error('Missing upper-window');
+    const physics = await CharacterPhysics.create(
+      architecture.solids.filter((entry) => entry.collidable).map(solidBounds),
+      { minX: -16, maxX: 16, minZ: -16, maxZ: 16 },
+    );
+    try {
+      const inside = { x: opening.centre[0], y: 5.18, z: opening.centre[2] - facing * 1.2 };
+      const outside = { x: opening.centre[0], y: 5.18, z: opening.centre[2] + facing * 0.72 };
+      physics.teleportEye(inside);
+      const result = await walkToward(physics, outside, 360);
+      expect(Math.hypot(result.x - outside.x, result.z - outside.z)).toBeLessThan(0.38);
+    } finally {
+      physics.dispose();
     }
   });
 

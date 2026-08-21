@@ -209,6 +209,10 @@ export function viewmodelContactResponse(
     additionalLiftMeters: profile.maximumAdditionalLiftMeters
       * Math.max(wallBlend, floorBlend)
       * (0.72 + 0.28 * adsRemaining)
+      // The probe's measured floor pressure is real world-space clearance.
+      // Carry it into the camera-space root so the complete skinned sleeves and
+      // receiver remain above the prone floor instead of only reporting lift.
+      + lift * floorBlend
       // Retain the accepted wall-drop telemetry and response, while a real
       // floor contact counter-lifts ninety-two percent of it. This keeps the
       // connected weapon/hands above the prone plane without weakening the

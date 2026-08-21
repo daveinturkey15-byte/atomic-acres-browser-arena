@@ -637,8 +637,8 @@ class OwnedGeckoDriver {
 function candidateRoute(seed) {
   const url = new URL(baseUrl);
   for (const [key, value] of Object.entries({
-    release: 'latest', renderer: 'webgl2', render: 'compat', signal: 'off', grass: 'off', mist: 'off',
-    clouds: 'off', rays: 'off', externalServices: 'off', multiplayerQa: '1',
+    release: 'latest', renderer: 'webgpu', requireWebGPU: '1', render: 'blender',
+    externalServices: 'off', multiplayerQa: '1',
     peerQaPort: String(peerPort), peerQaPath: peerPath, seed,
   })) url.searchParams.set(key, value);
   return url.toString();
@@ -909,12 +909,21 @@ async function runSoloCycle(driver, label) {
       matchPhase: state.matchPhase,
       botCount: state.bots?.length,
       backend: state.render?.runtime?.actualBackend ?? null,
+      requestedBackend: state.render?.runtime?.requestedBackend ?? null,
+      failClosed: state.render?.runtime?.failClosed ?? null,
+      deviceLost: state.render?.runtime?.deviceLost ?? null,
+      uncapturedErrors: state.render?.runtime?.uncapturedErrors ?? null,
+      qualityAssetState: state.render?.qualityAssetStreaming?.atomicAcres ?? null,
+      post: state.render?.atomicSignal ?? null,
       webglVersion: state.render?.webglVersion ?? null,
       userAgent: navigator.userAgent,
       weapon: state.player?.weapon,
     } : null;
   `), (state) => state?.gameStarted && state.matchPhase === 'active' && state.botCount === 1, 90_000);
-  if (active.weapon !== 'carbine' || active.backend !== 'webgl2' || !String(active.webglVersion).includes('WebGL 2')) {
+  if (active.weapon !== 'carbine' || active.requestedBackend !== 'webgpu' || active.backend !== 'webgpu'
+    || active.failClosed !== true || active.deviceLost !== false || active.uncapturedErrors !== 0
+    || active.qualityAssetState !== 'ready' || active.post?.depthAwareBloom !== true
+    || active.post?.advancedGraphics?.bloomStrength <= 0) {
     throw new Error(`${label} Firefox one-bot backend/weapon mismatch: ${JSON.stringify(active)}`);
   }
   const setup = await driver.execute(`
@@ -1085,6 +1094,12 @@ async function runSoloCycle(driver, label) {
     matchPhase: active.matchPhase,
     botCount: active.botCount,
     backend: active.backend,
+    requestedBackend: active.requestedBackend,
+    failClosed: active.failClosed,
+    deviceLost: active.deviceLost,
+    uncapturedErrors: active.uncapturedErrors,
+    qualityAssetState: active.qualityAssetState,
+    post: active.post,
     webglVersion: active.webglVersion,
     userAgent: active.userAgent,
     pointerLock: eventState.pointerLock,

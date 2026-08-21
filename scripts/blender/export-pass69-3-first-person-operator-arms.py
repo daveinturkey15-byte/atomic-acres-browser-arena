@@ -138,6 +138,47 @@ def weight_metrics(meshes: list[bpy.types.Object]) -> dict:
     }
 
 
+def authored_sleeve_geometry_metrics(
+    sleeve: bpy.types.Object,
+    armature: bpy.types.Object,
+) -> dict:
+    """Measure visible sleeve mass, not merely off-screen armature reach."""
+    report = {}
+    for side in ("L", "R"):
+        bone = armature.data.bones[f"UpperArm{side}"]
+        head = bone.head_local.copy()
+        axis = (bone.tail_local - head).normalized()
+        length = (bone.tail_local - head).length
+        group = sleeve.vertex_groups.get(f"UpperArm{side}")
+        samples = []
+        if group is not None:
+            for vertex in sleeve.data.vertices:
+                weight = next((item.weight for item in vertex.groups if item.group == group.index), 0.0)
+                if weight <= 0.05:
+                    continue
+                offset = vertex.co - head
+                along = offset.dot(axis) / length
+                radial = (offset - axis * offset.dot(axis)).length
+                samples.append((along, radial))
+        if not samples:
+            raise RuntimeError(f"{side} sleeve has no weighted visible geometry")
+        radii = sorted(radial for _along, radial in samples)
+        entry = {
+            "weightedVertices": len(samples),
+            "minimumProximalT": round(min(along for along, _radial in samples), 6),
+            "medianRadius": round(radii[len(radii) // 2], 6),
+            "p90Radius": round(radii[min(len(radii) - 1, math.floor(len(radii) * 0.9))], 6),
+        }
+        if entry["minimumProximalT"] > -0.25 or entry["medianRadius"] < 6.4:
+            raise RuntimeError(f"{side} authored sleeve silhouette contract failed: {entry}")
+        report[side] = entry
+    return {
+        "contract": "authored-weighted-sleeve-mass-v1",
+        "sides": report,
+        "passed": True,
+    }
+
+
 def validate_master() -> tuple[bpy.types.Object, bpy.types.Object, list[bpy.types.Object], dict]:
     if Path(bpy.data.filepath).resolve() != MASTER.resolve():
         raise RuntimeError(f"exporter must open exact manual master {MASTER}; got {bpy.data.filepath}")
@@ -152,8 +193,14 @@ def validate_master() -> tuple[bpy.types.Object, bpy.types.Object, list[bpy.type
         raise RuntimeError("manual master 37-bone skeleton drift")
     if root.get("manual_master_contract") != "checked-in-editable-blend-export-only-v1":
         raise RuntimeError("manual master export-only authority marker missing")
-    if root.get("visual_revision") != "pass70-manual-anatomical-viewmodel-v1":
+    if root.get("visual_revision") != "pass73-authored-continuous-proximal-sleeves-v2":
         raise RuntimeError("manual master visual revision drift")
+    if root.get("pass73_silhouette_patch") != "pass73-authored-continuous-proximal-sleeves-v2":
+        raise RuntimeError("manual master Pass 73 silhouette patch marker missing")
+    if root.get("limb_profile_contract") != "manual-thick-continuous-cuff-forearm-deformation-v2":
+        raise RuntimeError("manual master Pass 73 thick limb profile contract missing")
+    if root.get("shoulder_entry_contract") != "weighted-continuous-beyond-crop-sleeve-v3":
+        raise RuntimeError("manual master Pass 73 beyond-crop sleeve contract missing")
     if root.get("material_contrast_contract") != "owned-basecolor-contrast-retone-v1":
         raise RuntimeError("manual master owned base-color contrast-retone marker missing")
     for obj in meshes:
@@ -202,6 +249,10 @@ def validate_master() -> tuple[bpy.types.Object, bpy.types.Object, list[bpy.type
         "clips": list(CORE_ACTIONS),
         "palmContacts": contact_receipts,
         "weighting": weight_metrics(meshes),
+        "authoredSleeveGeometry": authored_sleeve_geometry_metrics(
+            bpy.data.objects["Pass65_Arms_Batch_Sleeve"],
+            armature,
+        ),
     }
 
 
@@ -285,6 +336,7 @@ REVIEW_DIR.mkdir(parents=True, exist_ok=True)
 root, armature, meshes, audit = validate_master()
 reset_pose(armature)
 export_glb(root, LOD0_GLB)
+lod0_sha256 = sha256(LOD0_GLB)
 
 camera = add_review_stage()
 reviews = []
@@ -320,6 +372,7 @@ if not 0 < lod1_triangles < lod0_triangles:
 root["delivery_triangle_count"] = lod1_triangles
 root["lod_reduction_ratio"] = lod1_triangles / lod0_triangles
 export_glb(root, LOD1_GLB)
+lod1_sha256 = sha256(LOD1_GLB)
 
 receipt = {
     "schemaVersion": 1,
@@ -329,8 +382,8 @@ receipt = {
     "manualMaster": str(MASTER.relative_to(ROOT)).replace("\\", "/"),
     "audit": audit,
     "lods": {
-        "lod0": {"path": str(LOD0_GLB.relative_to(ROOT)).replace("\\", "/"), "triangles": lod0_triangles},
-        "lod1": {"path": str(LOD1_GLB.relative_to(ROOT)).replace("\\", "/"), "triangles": lod1_triangles},
+        "lod0": {"path": str(LOD0_GLB.relative_to(ROOT)).replace("\\", "/"), "triangles": lod0_triangles, "sha256": lod0_sha256},
+        "lod1": {"path": str(LOD1_GLB.relative_to(ROOT)).replace("\\", "/"), "triangles": lod1_triangles, "sha256": lod1_sha256},
     },
     "review": reviews,
     "retainedWeaponContactBaseline": {

@@ -4,6 +4,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import sharp from 'sharp';
 import { createServer } from 'vite';
+import { analyzeViewmodelSilhouetteMask } from './viewmodel-silhouette-contract.mjs';
 
 const captureMode = process.env.PASS66_VIEWMODEL_CAPTURE_MODE === 'live' ? 'live' : 'paused';
 // Local iteration may capture a dirty candidate, but the default release gate
@@ -360,6 +361,32 @@ async function readabilityMetrics(frame, backgroundFrame, framing) {
   });
 }
 
+async function renderedSilhouetteMetrics(frame, backgroundFrame, artifactPath) {
+  const { data, info } = await sharp(frame).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const background = await sharp(backgroundFrame).removeAlpha().raw().toBuffer();
+  const mask = new Uint8Array(info.width * info.height);
+  const maskRgba = Buffer.alloc(info.width * info.height * 4);
+  for (let offset = 0, pixel = 0; offset < data.length; offset += info.channels, pixel += 1) {
+    const difference = Math.sqrt(
+      (data[offset] - background[offset]) ** 2
+      + (data[offset + 1] - background[offset + 1]) ** 2
+      + (data[offset + 2] - background[offset + 2]) ** 2,
+    );
+    const insideViewmodelRoi = pixel % info.width >= Math.floor(info.width * 0.42)
+      && pixel % info.width < Math.ceil(info.width * 0.78);
+    const visible = difference >= 7 && insideViewmodelRoi;
+    mask[pixel] = visible ? 1 : 0;
+    const output = pixel * 4;
+    maskRgba[output] = visible ? 255 : 5;
+    maskRgba[output + 1] = visible ? 70 : 10;
+    maskRgba[output + 2] = visible ? 210 : 15;
+    maskRgba[output + 3] = 255;
+  }
+  await sharp(maskRgba, { raw: { width: info.width, height: info.height, channels: 4 } })
+    .png().toFile(artifactPath);
+  return analyzeViewmodelSilhouetteMask(mask, info.width, info.height);
+}
+
 function readabilityViolations(label, readability, melee) {
   const violations = [];
   const arms = readability?.arms;
@@ -531,8 +558,23 @@ try {
       arms: await readabilityMetrics(hipCapture.canvasFrame, hipCapture.backgroundFrame, state.weaponPresentation.armFraming),
       weapon: await readabilityMetrics(hipCapture.canvasFrame, hipCapture.backgroundFrame, state.weaponPresentation.weaponFraming),
     };
+    const hipSilhouetteArtifact = `${artifactRoot}/${viewport.id}-m4a1-hip-silhouette.png`;
+    const hipSilhouette = await renderedSilhouetteMetrics(
+      hipCapture.canvasFrame,
+      hipCapture.backgroundFrame,
+      hipSilhouetteArtifact,
+    );
+    violations.push(...hipSilhouette.violations.map((violation) => `${hipLabel}: ${violation}`));
     violations.push(...readabilityViolations(hipLabel, hipReadability, false));
-    evidence.push({ label: hipLabel, viewport, screenshot: hipCapture.path, presentation: state.weaponPresentation, readability: hipReadability });
+    evidence.push({
+      label: hipLabel,
+      viewport,
+      screenshot: hipCapture.path,
+      silhouetteArtifact: hipSilhouetteArtifact,
+      presentation: state.weaponPresentation,
+      readability: hipReadability,
+      silhouette: hipSilhouette,
+    });
 
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.adsProgress > 0.98);
@@ -685,16 +727,34 @@ try {
     if (state.weaponPresentation.surfaceLift < 0.13 || state.weaponPresentation.surfaceLift > 0.5) {
       violations.push(`${proneLabel}: prone floor lift ${state.weaponPresentation.surfaceLift} is outside 0.13..0.5m`);
     }
-    if (state.weaponPresentation.surfaceRetreat <= 0.25 || state.weaponPresentation.surfaceRetreat > 0.7) {
-      violations.push(`${proneLabel}: wall retreat ${state.weaponPresentation.surfaceRetreat} is outside 0.25..0.7m`);
+    // The M4's authored swept envelope is 0.82 m. A stale universal 0.70 m
+    // upper bound rejected the complete physical response even though the
+    // probe correctly reached the M4 profile's full-contact stop.
+    if (state.weaponPresentation.surfaceRetreat < 0.8 || state.weaponPresentation.surfaceRetreat > 0.821) {
+      violations.push(`${proneLabel}: M4 wall retreat ${state.weaponPresentation.surfaceRetreat} is outside its full-contact 0.8..0.821m band`);
     }
     const proneCapture = await capture(page, `${viewport.id}-prone-wall-floor`);
     const proneReadability = {
       arms: await readabilityMetrics(proneCapture.canvasFrame, proneCapture.backgroundFrame, state.weaponPresentation.armFraming),
       weapon: await readabilityMetrics(proneCapture.canvasFrame, proneCapture.backgroundFrame, state.weaponPresentation.weaponFraming),
     };
+    const proneSilhouetteArtifact = `${artifactRoot}/${viewport.id}-prone-wall-floor-silhouette.png`;
+    const proneSilhouette = await renderedSilhouetteMetrics(
+      proneCapture.canvasFrame,
+      proneCapture.backgroundFrame,
+      proneSilhouetteArtifact,
+    );
+    violations.push(...proneSilhouette.violations.map((violation) => `${proneLabel}: ${violation}`));
     violations.push(...readabilityViolations(proneLabel, proneReadability, false));
-    evidence.push({ label: proneLabel, viewport, screenshot: proneCapture.path, presentation: state.weaponPresentation, readability: proneReadability });
+    evidence.push({
+      label: proneLabel,
+      viewport,
+      screenshot: proneCapture.path,
+      silhouetteArtifact: proneSilhouetteArtifact,
+      presentation: state.weaponPresentation,
+      readability: proneReadability,
+      silhouette: proneSilhouette,
+    });
   }
 
   const hipEvidence = evidence.filter((entry) => entry.label.endsWith('/hip'));

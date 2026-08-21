@@ -131,6 +131,7 @@
     "qa:pass65:weapon-assets": "node scripts/qa/verify-pass65-weapon-production.mjs && node scripts/qa/verify-pass65-first-person-arms-weighting.mjs && node scripts/qa/validate-pass65-weapon-glbs.mjs && node scripts/qa/finalize-pass65-firearm-corpus-gate.mjs",
     "qa:pass66:weapon-assets-evidence": "npm run qa:pass65:weapon-assets && npm run qa:pass65:first-person-arms-visual",
     "qa:pass66:viewmodel-framing": "node scripts/qa/verify-pass66-viewmodel-framing.mjs",
+    "qa:pass73:live-graphics": "node scripts/qa/verify-pass73-live-graphics.mjs",
     "qa:pass66:prone-contact-matrix": "node scripts/qa/run-pass66-prone-contact-matrix.mjs",
     "qa:pass65:first-person-arms-visual": "node scripts/qa/verify-pass65-first-person-arms-visual.mjs",
     "qa:pass65:weapon-gltf": "node scripts/qa/validate-pass65-weapon-glbs.mjs",

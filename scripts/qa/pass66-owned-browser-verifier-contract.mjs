@@ -3,6 +3,7 @@ import { multiplayerStabilityReceiptFailures } from './pass66-multiplayer-stabil
 const SHA40 = /^[a-f0-9]{40}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const OWNED_PEER_PATH = /^\/peerjs-[a-f0-9]{24}$/u;
+const SOFTWARE_ADAPTER = /swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic|fallback/iu;
 
 function record(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -73,10 +74,56 @@ export function ownedBrowserVerifierReceiptFailures(value, expected) {
     if (!Array.isArray(value.cycles) || value.cycles.length !== 2
       || value.cycles[0]?.label !== 'cold' || value.cycles[1]?.label !== 'warm') {
       errors.push('Firefox receipt must contain cold then warm cycles');
-    } else if (value.cycles.some((cycle) => cycle.backend !== 'webgl2'
-      || typeof cycle.webglVersion !== 'string' || !cycle.webglVersion.includes('WebGL 2')
-      || cycle.contextState !== 'ready' || cycle.gameStarted !== true || cycle.matchPhase !== 'active')) {
+    } else if (value.cycles.some((cycle) => cycle.requestedBackend !== 'webgpu' || cycle.backend !== 'webgpu'
+      || cycle.failClosed !== true || cycle.deviceLost !== false || cycle.uncapturedErrors !== 0
+      || cycle.softwareAdapter !== false || typeof cycle.adapterLabel !== 'string'
+      || cycle.adapterLabel.length < 3 || SOFTWARE_ADAPTER.test(cycle.adapterLabel)
+      || cycle.liveProfile !== 'blender' || cycle.qualityAssetState !== 'ready'
+      || cycle.post?.depthAwareBloom !== true || cycle.post?.advancedGraphics?.bloomStrength <= 0
+      || cycle.post?.advancedGraphics?.volumetricScale <= 0
+      || JSON.stringify(cycle.viewport) !== JSON.stringify([2_560, 1_440])
+      || !finite(cycle.pixelRatio) || cycle.pixelRatio <= 0
+      || !Array.isArray(cycle.drawingBuffer) || cycle.drawingBuffer.length !== 2
+      || cycle.drawingBuffer.some((dimension) => !Number.isSafeInteger(dimension) || dimension <= 0)
+      || cycle.gameStarted !== true || cycle.matchPhase !== 'active'
+      || cycle.performance?.elapsedMs < 5_000 || cycle.performance?.sampleCount < 150
+      || cycle.performance?.callbackFps < 30 || !finite(cycle.performance?.p50FrameTimeMs)
+      || cycle.performance.p50FrameTimeMs > 34 || cycle.performance?.p95FrameTimeMs > 50
+      || cycle.performance?.maximumFrameTimeMs > 250)) {
       errors.push('Firefox receipt contains an invalid admission cycle');
+    }
+    const warm = value.cycles?.[1];
+    const parity = value.parity;
+    const chrome = parity?.chrome;
+    if (parity?.contract !== 'same-content-native-webgpu-firefox-chrome-80pct-median-125pct-p95-v1'
+      || parity.seed !== 'pass73-installed-browser-webgpu-parity'
+      || JSON.stringify(parity.viewport) !== JSON.stringify([2_560, 1_440])
+      || parity.profile !== 'blender' || parity.map !== 'atomic-acres' || parity.backend !== 'webgpu'
+      || chrome?.requestedBackend !== 'webgpu' || chrome?.backend !== 'webgpu' || chrome?.failClosed !== true
+      || chrome?.deviceLost !== false || chrome?.uncapturedErrors !== 0
+      || chrome?.softwareAdapter !== false || typeof chrome?.adapterLabel !== 'string'
+      || chrome.adapterLabel.length < 3 || SOFTWARE_ADAPTER.test(chrome.adapterLabel)
+      || chrome?.liveProfile !== 'blender' || chrome?.qualityAssetState !== 'ready'
+      || chrome?.post?.depthAwareBloom !== true || chrome?.post?.advancedGraphics?.bloomStrength <= 0
+      || chrome?.post?.advancedGraphics?.volumetricScale <= 0
+      || JSON.stringify(chrome?.viewport) !== JSON.stringify([2_560, 1_440])
+      || !finite(chrome?.pixelRatio) || chrome.pixelRatio <= 0
+      || !Array.isArray(chrome?.drawingBuffer) || chrome.drawingBuffer.length !== 2
+      || chrome.drawingBuffer.some((dimension) => !Number.isSafeInteger(dimension) || dimension <= 0)
+      || chrome?.performance?.elapsedMs < 5_000 || chrome?.performance?.sampleCount < 150
+      || !finite(chrome?.performance?.p50FrameTimeMs) || !finite(chrome?.performance?.p95FrameTimeMs)
+      || parity.identicalGraphicsContract !== true
+      || warm?.liveProfile !== chrome?.liveProfile
+      || warm?.qualityAssetState !== chrome?.qualityAssetState
+      || warm?.post?.depthAwareBloom !== chrome?.post?.depthAwareBloom
+      || warm?.post?.advancedGraphics?.bloomStrength !== chrome?.post?.advancedGraphics?.bloomStrength
+      || warm?.post?.advancedGraphics?.volumetricScale !== chrome?.post?.advancedGraphics?.volumetricScale
+      || warm?.pixelRatio !== chrome?.pixelRatio
+      || JSON.stringify(warm?.drawingBuffer) !== JSON.stringify(chrome?.drawingBuffer)
+      || !finite(parity.medianThroughputRatio) || parity.medianThroughputRatio < 0.8
+      || !finite(parity.p95FrameTimeRatio) || parity.p95FrameTimeRatio > 1.25
+      || parity.passed !== true) {
+      errors.push('Firefox receipt lacks paired installed Chrome native-WebGPU parity');
     }
   } else if (expected.gate === 'private-lobby') {
     if (value.schema !== 'atomic-acres/pass66-private-lobby@2') errors.push('private-lobby schema mismatch');

@@ -1559,7 +1559,7 @@ if (!pass65Settings.privacy.shareGlobalLeaderboard) forgetLeaderboardInstallId(l
 const explicitRenderQuery = new URLSearchParams(window.location.search).get('render');
 const offlineMenuPreviewCapture = new URLSearchParams(window.location.search).get('menuPreviewCapture') === '1';
 const queryRenderProfile = explicitRenderQuery ? resolveRenderProfile(window.location.search, null) : null;
-const graphicsRuntime = resolveGraphicsRuntime(pass65Settings.graphics, queryRenderProfile === 'compat');
+let graphicsRuntime = resolveGraphicsRuntime(pass65Settings.graphics, queryRenderProfile === 'compat');
 const reducedTransparencyMedia = window.matchMedia('(prefers-reduced-transparency: reduce)');
 let accessibilityRuntime = resolveAccessibilityRuntime(pass65Settings.accessibility, {
   reducedMotion: reducedMotionMedia.matches,
@@ -1588,8 +1588,19 @@ const renderProfile: RenderProfile = resolveRenderProfile(
   explicitRenderQuery ? window.location.search : '',
   queryRenderProfile ?? graphicsRuntime.renderProfile,
 );
-const activeRenderConfig = resolveActiveGraphicsConfig(graphicsRuntime, renderProfile, queryRenderProfile);
-const displayedGraphicsPreset: GraphicsPreset = resolveDisplayedGraphicsPreset(pass65Settings.graphics.preset, queryRenderProfile);
+let activeRenderConfig = resolveActiveGraphicsConfig(graphicsRuntime, renderProfile, queryRenderProfile);
+let displayedGraphicsPreset: GraphicsPreset = resolveDisplayedGraphicsPreset(pass65Settings.graphics.preset, queryRenderProfile);
+// Geometry representation and target topology remain owned by renderProfile;
+// this profile tracks the renderer/effects values that can be changed live.
+let liveGraphicsProfile: RenderProfile = renderProfile;
+let stagedGraphicsReconstruction: readonly string[] = Object.freeze([]);
+let liveGraphicsAppliedAt = 0;
+const rendererConstructionGraphics = Object.freeze({
+  profile: renderProfile,
+  antialiasSamples: graphicsRuntime.antialiasSamples,
+  ambientOcclusionEnabled: graphicsRuntime.ambientOcclusion.enabled,
+  representation: activeRenderConfig.representation,
+});
 const atomicLighting = arenaLightingProfile(renderProfile, 'atomic-acres');
 let activeLighting = arenaLightingProfile(
   renderProfile,
@@ -2265,18 +2276,18 @@ const displayCadencePromise = new Promise<number>((resolve) => {
 setBootstrapStage('measuring-display');
 const detectedDisplayFrameMs = await displayCadencePromise;
 setBootstrapStage('module-ready');
-const configuredAdaptiveLevels = configuredAdaptiveQualityLevels(
-  renderProfile,
-  activeRenderConfig.pixelRatioCap,
-  graphicsRuntime.adaptive,
-);
-const adaptiveQuality = new AdaptiveQualityController({
-  profile: renderProfile,
+const createAdaptiveQualityController = (): AdaptiveQualityController => new AdaptiveQualityController({
+  profile: liveGraphicsProfile,
   targetFrameMs: Math.max(detectedDisplayFrameMs, 1_000 / graphicsRuntime.targetFps),
   initialPixelRatioCap: activeRenderConfig.pixelRatioCap,
   enabled: graphicsRuntime.adaptive,
-  levels: configuredAdaptiveLevels,
+  levels: configuredAdaptiveQualityLevels(
+    liveGraphicsProfile,
+    activeRenderConfig.pixelRatioCap,
+    graphicsRuntime.adaptive,
+  ),
 });
+let adaptiveQuality = createAdaptiveQualityController();
 const deferredWebGpuAdaptivePixelRatio = new DeferredAdaptivePixelRatio();
 const MATCH_ADMISSION_ADAPTIVE_WARMUP_SUBMISSIONS = 8;
 const MATCH_ADMISSION_ADAPTIVE_SAMPLE_COUNT = 60;
@@ -2321,11 +2332,11 @@ let activeArenaVisualDefinition: ArenaVisualDefinition | null = null;
 
 function applyAdaptiveRenderBudget(pixelRatioCap: number): void {
   renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
-  const effectsBudget = applyGraphicsPreferenceBudget(graphicsEffectsBudget(renderProfile, pixelRatioCap));
+  const effectsBudget = applyGraphicsPreferenceBudget(graphicsEffectsBudget(liveGraphicsProfile, pixelRatioCap));
   graphicsRefinement.setBudget(effectsBudget);
   atomicSignal?.setEffectsBudget(effectsBudget);
   applyPresentationEffectsBudget?.(effectsBudget);
-  const shadowsEnabled = adaptiveShadowsEnabled(renderProfile, activeRenderConfig.shadows, pixelRatioCap)
+  const shadowsEnabled = adaptiveShadowsEnabled(liveGraphicsProfile, activeRenderConfig.shadows, pixelRatioCap)
     && (activeArenaVisualDefinition?.shadows.enabled ?? true);
   if (renderRuntime.shadowsEnabled() !== shadowsEnabled) {
     renderRuntime.setShadowsEnabled(shadowsEnabled);
@@ -23321,6 +23332,12 @@ function applyPrivacySettings(): void {
 // settings never kicks them out of the graphics menu or the match per control.
 let pendingGraphicsPreset: GraphicsPreset | null = null;
 let pendingRendererReload = false;
+type LiveGraphicsApplyResult = Readonly<{
+  profile: RenderProfile;
+  pixelRatioCap: number;
+  staged: readonly string[];
+}>;
+let lastLiveGraphicsApply: LiveGraphicsApplyResult | null = null;
 
 function reloadForGraphicsRuntime(): void {
   const url = new URL(window.location.href);
@@ -23355,15 +23372,17 @@ function flushPendingGraphics(): void {
   }
   advancedGraphicsBinding.clearPendingEdits();
   pendingGraphicsPreset = null;
+  lastLiveGraphicsApply = applyLiveGraphicsSettings();
   refreshGraphicsPendingBadge();
+  pendingRendererReload = lastLiveGraphicsApply.staged.length > 0;
   if (gameStarted) {
-    // Never yank the player out of a session: the renderer reload waits until
-    // they are back at the main menu.
-    pendingRendererReload = true;
-    setStatus('Graphics saved · new renderer settings apply when you return to the main menu.');
+    const stagedSuffix = pendingRendererReload
+      ? ` · ${lastLiveGraphicsApply.staged.join(', ')} staged for the next renderer construction`
+      : '';
+    setStatus(`GRAPHICS SAVED · live renderer updated${stagedSuffix}.`);
     return;
   }
-  reloadForGraphicsRuntime();
+  if (pendingRendererReload) reloadForGraphicsRuntime();
 }
 
 const advancedGraphicsBinding = bindAdvancedGraphicsControls(document, pass65Settings.graphics, () => {
@@ -23430,28 +23449,103 @@ graphicsProfileInput.addEventListener('change', () => {
 });
 
 /**
- * Apply the presentation-side effects budget AND every renderer setting that
- * can be changed without device recreation the moment SAVE is pressed, so a
- * graphics change is visible immediately mid-match. The full renderer rebuild
- * (MSAA, antialias, render scale) still happens at the next menu boundary —
- * that part requires the page reload — but resolution cap, shadows, bloom and
- * effects density now respond at once instead of looking dead until redeploy.
+ * Apply every renderer value backed by a mutable runtime owner. Only principal
+ * target multisampling, authored representation and an AO MRT topology change
+ * remain staged because those require graph/arena reconstruction.
  */
-function applyLiveGraphicsEffects(): void {
-  if (!applyPresentationEffectsBudget) return;
-  const live = resolveGraphicsRuntime(pass65Settings.graphics, renderRuntime.backend === 'webgl2');
-  applyPresentationEffectsBudget(applyGraphicsPreferenceBudget(
-    graphicsEffectsBudget(live.renderProfile, adaptiveQuality.telemetry().pixelRatioCap),
-  ));
-  // Re-anchor the adaptive pixel-ratio cap to the saved profile so resolution
-  // scaling responds immediately (the controller re-samples from here).
-  const savedCap = live.renderProfile === 'compat' ? 0.2 : live.renderProfile === 'performance' ? 0.75 : 1;
-  adaptiveQuality.seedPixelRatioCap(savedCap, 'graphics-save-live');
-  // Shadow toggling is backend-safe and applies without a rebuild. Max and
-  // Quality both resolve to the Blender render profile; Performance and
-  // Compatibility run without shadow maps.
-  renderRuntime.setShadowsEnabled(live.renderProfile === 'blender');
+function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
+  // WebGL2 is a backend, not the Compatibility profile. Only an explicit
+  // render=compat route is allowed to force the compatibility budget.
+  const live = resolveGraphicsRuntime(pass65Settings.graphics, queryRenderProfile === 'compat');
+  const desiredProfile = resolveRenderProfile(
+    explicitRenderQuery ? window.location.search : '',
+    queryRenderProfile ?? live.renderProfile,
+  );
+  const desiredConfig = resolveActiveGraphicsConfig(live, desiredProfile, queryRenderProfile);
+  const staged: string[] = [];
+  if (live.antialiasSamples !== rendererConstructionGraphics.antialiasSamples) staged.push('antiAliasing');
+  if (desiredConfig.representation !== rendererConstructionGraphics.representation) staged.push('geometryDetail');
+  if (live.ambientOcclusion.enabled !== rendererConstructionGraphics.ambientOcclusionEnabled) {
+    staged.push('ambientOcclusionTopology');
+  }
+
+  graphicsRuntime = live;
+  liveGraphicsProfile = desiredProfile;
+  displayedGraphicsPreset = resolveDisplayedGraphicsPreset(pass65Settings.graphics.preset, queryRenderProfile);
+  // Preserve topology/representation fields from renderer construction while
+  // adopting every field whose owner is mutable in the active runtime.
+  activeRenderConfig = Object.freeze({
+    ...activeRenderConfig,
+    pixelRatioCap: desiredConfig.pixelRatioCap,
+    shadows: desiredConfig.shadows,
+    shadowMapSize: desiredConfig.shadowMapSize,
+    shadowMode: desiredConfig.shadowMode,
+  });
+  stagedGraphicsReconstruction = Object.freeze(staged);
+  liveGraphicsAppliedAt = performance.now();
+
+  adaptiveQuality = createAdaptiveQualityController();
+  const pixelRatioCap = adaptiveQuality.telemetry().pixelRatioCap;
+  renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
+  applyViewportSize();
+  activeLighting = rustworksLightingTint(
+    arenaLightingProfile(desiredProfile, selectedArena.id),
+    desiredProfile,
+    selectedArena.id,
+  );
+  renderRuntime.configureOutput(effectiveGraphicsExposure(activeLighting.exposure), live.post.toneMapping);
+
+  hemisphereLight.intensity = activeLighting.hemisphereIntensity * live.indirectLightScale;
+  ambientLight.intensity = activeLighting.ambientIntensity * live.indirectLightScale;
+  fillLight.intensity = activeLighting.fillIntensity * live.indirectLightScale;
+  const shadowsEnabled = adaptiveShadowsEnabled(desiredProfile, desiredConfig.shadows, pixelRatioCap)
+    && (activeArenaVisualDefinition?.shadows.enabled ?? true);
+  const priorShadowMapSize = sunLight.shadow.mapSize.width;
+  sunLight.castShadow = shadowsEnabled;
+  sunLight.shadow.mapSize.set(desiredConfig.shadowMapSize, desiredConfig.shadowMapSize);
+  if (sunLight.shadow.map && priorShadowMapSize !== desiredConfig.shadowMapSize) {
+    sunLight.shadow.map.dispose();
+    sunLight.shadow.map = null;
+  }
+  renderRuntime.configureShadows({
+    enabled: shadowsEnabled,
+    type: webGlShadowMapType,
+    autoUpdate: desiredConfig.shadowMode === 'dynamic',
+    needsUpdate: shadowsEnabled,
+  });
+  renderRuntime.configureLightShadows(scene, desiredConfig.shadowMode === 'dynamic', shadowsEnabled);
+
+  // The profile and environment budget are one live transaction. Applying
+  // material reflection using the construction-time budget for even one frame
+  // makes the UI claim Performance while Quality reflections are still live.
+  const effectsBudget = applyGraphicsPreferenceBudget(graphicsEffectsBudget(desiredProfile, pixelRatioCap));
+  graphicsRefinement.setBudget(effectsBudget);
+  graphicsRefinement.setRuntimeConfiguration(
+    desiredProfile,
+    live.maximumAnisotropy,
+    live.reflectionScale,
+    maximumAnisotropy,
+  );
+  smokeVolumePresentationPool.setQualityScale(live.smokeScale);
+  grassSystem?.setAdaptivePixelRatio(pixelRatioCap);
+  pass64TslSystems?.applyGraphics({
+    principalSamples: Math.max(1, pass64TslSystems.principalHdrTarget.samples) as 1 | 2 | 4,
+    volumetricScale: live.volumetricScale,
+    ambientOcclusion: live.ambientOcclusion,
+    post: live.post,
+    oceanWaveAmplitude: rustworksOceanAmplitude(desiredProfile),
+  });
+  applyAdaptiveRenderBudget(pixelRatioCap);
   graphicsRefinement.refreshSelectiveBloom(scene);
+  document.documentElement.dataset.graphicsPreset = displayedGraphicsPreset;
+  document.documentElement.dataset.graphicsLiveProfile = desiredProfile;
+  document.documentElement.dataset.graphicsFrameRateLimit = live.frameRateLimit === 0 ? 'uncapped' : String(live.frameRateLimit);
+  document.documentElement.dataset.graphicsToneMapping = live.post.toneMapping;
+  document.documentElement.dataset.graphicsStaged = staged.join(',');
+  document.documentElement.classList.toggle('compat-render', desiredProfile === 'compat');
+  document.documentElement.classList.toggle('performance-render', desiredProfile === 'performance');
+  document.documentElement.classList.toggle('blender-render', desiredProfile === 'blender');
+  return Object.freeze({ profile: desiredProfile, pixelRatioCap, staged: Object.freeze(staged) });
 }
 
 graphicsSaveButton.addEventListener('click', () => {
@@ -23461,12 +23555,10 @@ graphicsSaveButton.addEventListener('click', () => {
     setStatus('Graphics already saved · no pending changes.');
     return;
   }
-  applyLiveGraphicsEffects();
-  if (gameStarted) {
-    setStatus('GRAPHICS SAVED · resolution, shadows, bloom and effects applied now · full renderer rebuild on menu return.');
-  } else {
-    setStatus('GRAPHICS SAVED · applying renderer settings.');
-  }
+  const staged = lastLiveGraphicsApply?.staged ?? [];
+  setStatus(staged.length > 0
+    ? `GRAPHICS SAVED · live values applied · ${staged.join(', ')} staged for renderer reconstruction.`
+    : 'GRAPHICS SAVED · all selected values are live.');
 });
 
 for (const id of AUDIO_BUS_IDS) {
@@ -24088,7 +24180,7 @@ function setArenaPresentationVisibility(): void {
   }
   atmosphereSystem?.setArena(selectedArena.id);
   if (atmosphereSystem) atmosphereSystem.root.visible = atmosphereSystem.telemetry().enabled;
-  waterSystem.configure(selectedArena.id, renderProfile, {
+  waterSystem.configure(selectedArena.id, liveGraphicsProfile, {
     halfX: Math.max(Math.abs(arena.bounds.minX), Math.abs(arena.bounds.maxX)),
     halfZ: Math.max(Math.abs(arena.bounds.minZ), Math.abs(arena.bounds.maxZ)),
   }, { night: selectedArena.id === 'rustworks-1v1', waterLevel: selectedArena.id === 'rustworks-1v1' ? -19.5 : -0.55 });
@@ -24110,8 +24202,8 @@ function setArenaPresentationVisibility(): void {
 
 function applyArenaLightingForSelection(): void {
   activeLighting = rustworksLightingTint(
-    arenaLightingProfile(renderProfile, selectedArena.id),
-    renderProfile,
+    arenaLightingProfile(liveGraphicsProfile, selectedArena.id),
+    liveGraphicsProfile,
     selectedArena.id,
   );
   const lighting = activeLighting;
@@ -24148,7 +24240,7 @@ function applyArenaLightingForSelection(): void {
     sunLight.position.set(...lighting.sunPosition);
     sunLight.shadow.radius = lighting.softShadows ? 2.2 : 1;
     const shadowsEnabled = adaptiveShadowsEnabled(
-      renderProfile,
+      liveGraphicsProfile,
       activeRenderConfig.shadows && (definition?.shadows.enabled ?? true),
       adaptiveQuality.telemetry().pixelRatioCap,
     );
@@ -25414,15 +25506,16 @@ function activePostTelemetry(): Record<string, unknown> {
   return {
     enabled: true,
     profile: renderProfile,
+    liveProfile: liveGraphicsProfile,
     owner: 'pass64-webgpu-tsl',
     fallbackReason: null,
     bypassReason: null,
     samples: frameCount,
-    canvasAntialias: graphicsRuntime.antialiasSamples > 0,
-    canvasSamples: Math.max(1, graphicsRuntime.antialiasSamples),
+    canvasAntialias: rendererConstructionGraphics.antialiasSamples > 0,
+    canvasSamples: Math.max(1, rendererConstructionGraphics.antialiasSamples),
     principalHdrSamples: target?.samples ?? 0,
     bloomSamples: pass64TslSystems?.bloomSamples ?? 0,
-    targetValidated: target?.samples === Math.max(1, graphicsRuntime.antialiasSamples),
+    targetValidated: target?.samples === Math.max(1, rendererConstructionGraphics.antialiasSamples),
     outputValidated: pass64TslSystems?.depthAwareBloom === true,
     depthAwareBloom: pass64TslSystems?.depthAwareBloom === true,
     bloomGraphId: pass64TslSystems?.bloomGraphId ?? null,
@@ -27499,6 +27592,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       requested: pass65Settings,
       graphics: graphicsRuntime,
       displayedGraphicsPreset,
+      liveApplication: {
+        profile: liveGraphicsProfile,
+        appliedAt: liveGraphicsAppliedAt,
+        stagedReconstruction: [...stagedGraphicsReconstruction],
+        pendingRendererReload,
+      },
       accessibility: accessibilityRuntime,
       playerProfile: {
         schemaVersion: playerProfileStore.current.schemaVersion,
@@ -27856,7 +27955,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     },
     render: {
       profile: renderProfile,
+      liveProfile: liveGraphicsProfile,
       representation: activeRenderConfig.representation,
+      graphicsApplication: {
+        appliedAt: liveGraphicsAppliedAt,
+        stagedReconstruction: [...stagedGraphicsReconstruction],
+        pendingRendererReload,
+        requestedPixelRatioCap: activeRenderConfig.pixelRatioCap,
+      },
       atomicSignal: activePostTelemetry(),
       runtime: activeRuntimeTelemetry(),
       playableScene: playableSceneProof(),

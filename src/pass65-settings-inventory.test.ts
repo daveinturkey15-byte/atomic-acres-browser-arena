@@ -19,7 +19,11 @@ describe('Pass 65 setting inventory', () => {
     expect(graphics.map(({ key }) => key)).toEqual([
       'graphics.preset', ...ADVANCED_GRAPHICS_CONTROLS.map(({ key }) => `graphics.${key}`),
     ]);
-    expect(graphics.every(({ applyMode }) => applyMode === 'arena-reload')).toBe(true);
+    expect(graphics.filter(({ key }) => key !== 'graphics.antiAliasing' && key !== 'graphics.geometryDetail' && key !== 'graphics.ambientOcclusion')
+      .every(({ applyMode }) => applyMode === 'live')).toBe(true);
+    expect(graphics.find(({ key }) => key === 'graphics.antiAliasing')?.applyMode).toBe('pipeline-rebuild');
+    expect(graphics.find(({ key }) => key === 'graphics.geometryDetail')?.applyMode).toBe('arena-reload');
+    expect(graphics.find(({ key }) => key === 'graphics.ambientOcclusion')?.applyMode).toBe('pipeline-rebuild');
     expect(graphics.slice(1).every(({ runtimeConsumer }) => typeof runtimeConsumer === 'string' && runtimeConsumer.length > 0)).toBe(true);
     expect(graphics.every(({ runtimeEvidence }) => (runtimeEvidence?.length ?? 0) > 0)).toBe(true);
     expect(accessibility).toHaveLength(5);

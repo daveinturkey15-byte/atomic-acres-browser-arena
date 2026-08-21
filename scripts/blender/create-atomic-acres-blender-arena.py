@@ -449,11 +449,11 @@ for house_index, house in enumerate(spec["houses"]):
     add_box(f"BLD_HOUSE_{prefix}_roof_plant", [x + 4.8, 7.52, z - facing * 2.2], [2.5, 0.58, 1.7], M["boundary"], 0.12)
     for offset in (-0.72, 0.72):
         add_box(f"BLD_HOUSE_{prefix}_roof_vent_{offset}", [x + 4.8 + offset, 7.92, z - facing * 2.2], [0.1, 0.24, 1.15], M["metal_light"], 0.02)
-    # Lightweight entrance canopy and recessed wayfinding light: presentation
-    # only, above the traversal envelope, batched into existing materials.
+    # Recessed entrance wayfinding art. The canopy itself is emitted above from
+    # the shared HouseSolid declaration so its authored mass and collision stay
+    # exact across both render profiles.
     entrance_z = z + facing * (depth / 2 + 0.58)
     entrance_x = x + (0.55 if house["team"] == 0 else -0.55)
-    add_box(f"BLD_HOUSE_{prefix}_entrance_canopy", [entrance_x, 3.05, entrance_z], [4.4, 0.16, 1.4], M["metal"], 0.04)
     for side in (-1, 1):
         add_box(f"BLD_HOUSE_{prefix}_entrance_frame_{side}", [entrance_x + side * 2.05, 1.65, entrance_z - facing * 0.34], [0.18, 2.8, 0.18], accent, 0.025)
     add_box(f"BLD_HOUSE_{prefix}_entrance_light", [x, 2.92, entrance_z - facing * 0.18], [2.4, 0.05, 0.12], M["emissive_aqua"] if house["team"] == 0 else M["emissive_amber"], 0.01)
