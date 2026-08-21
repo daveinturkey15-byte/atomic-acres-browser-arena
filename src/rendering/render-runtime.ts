@@ -10,7 +10,7 @@ import {
 
 export type RenderBackendId = 'webgl2' | 'webgpu';
 
-export type WebGpuSubmissionMode = 'serialized' | 'warmed-live';
+export type WebGpuSubmissionMode = 'serialized' | 'warmed-live' | 'input-response';
 
 export type RenderRuntimeRequest = Readonly<{
   requestedBackend: RenderBackendId;
@@ -216,7 +216,8 @@ export function shouldBackpressureWebGpuSubmissions(
     && now - pendingSince >= thresholdMs;
 }
 
-export function maximumInFlightWebGpuSubmissions(mode: WebGpuSubmissionMode): 1 | 2 {
+export function maximumInFlightWebGpuSubmissions(mode: WebGpuSubmissionMode): 1 | 2 | 3 {
+  if (mode === 'input-response') return 3;
   return mode === 'warmed-live' ? 2 : 1;
 }
 

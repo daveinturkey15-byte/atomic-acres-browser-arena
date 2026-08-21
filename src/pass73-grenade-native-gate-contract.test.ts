@@ -32,6 +32,8 @@ describe('Pass 73 native-WebGPU first-grenade gate', () => {
     expect(runtimeSource).toContain(
       'await grenadeWorldPresentationPool.withStagedFirstAcquisitionVocabulary(',
     );
+    expect(runtimeSource).toContain("? 'input-response'");
+    expect(runtimeSource).toContain(" : 'warmed-live'");
   });
 
   it('keeps diagnostic collection outside the measured action and waits on the real explosion lifecycle', () => {

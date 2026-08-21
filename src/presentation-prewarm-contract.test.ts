@@ -50,7 +50,8 @@ describe('presentation prewarm startup contract', () => {
     const legacy = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     expect(legacy).toContain("matchState.phase === 'active'");
     expect(legacy).toContain("menuLifecycle.surface === 'hidden' && arenaSelectionReady");
-    expect(legacy).toContain("? 'warmed-live'");
+    expect(legacy).toContain("? 'input-response'");
+    expect(legacy).toContain(": 'warmed-live'");
     expect(legacy).toContain("submitWebGpuFrame(now, false, submissionMode)");
     const coldSettlement = legacy.slice(
       legacy.indexOf('async function settleWebGpuPresentation('),

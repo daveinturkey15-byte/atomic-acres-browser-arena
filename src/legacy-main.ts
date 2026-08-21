@@ -25730,7 +25730,13 @@ function frame(now: number, scheduleNext = true): void {
         if (renderRuntime.backend === 'webgpu') {
           const submissionMode: WebGpuSubmissionMode = gameStarted && matchState.phase === 'active'
             && menuLifecycle.surface === 'hidden' && arenaSelectionReady && !renderSubmissionPaused
-            ? 'warmed-live'
+            ? profileGrenadeFrame && lastGrenadeFirstActionProfile?.firstPresentedGameplayFrame === null
+              // Admit exactly one additional already-warmed frame so a grenade
+              // input cannot be hidden behind the normal two-frame queue cap.
+              // The action profile is marked presented below and every later
+              // frame immediately returns to the regular warmed-live budget.
+              ? 'input-response'
+              : 'warmed-live'
             : 'serialized';
           frameSubmitted = submitWebGpuFrame(now, false, submissionMode);
         } else {
