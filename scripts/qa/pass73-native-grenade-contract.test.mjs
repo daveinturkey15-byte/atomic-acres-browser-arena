@@ -123,11 +123,17 @@ test('accepts the complete exact-source six-context Quality and Performance rece
 test('owned runner binds the receipt claim to a headed offscreen installed-Chrome compositor', () => {
   const config = readFileSync(resolve(root, 'playwright.config.ts'), 'utf8');
   const runner = readFileSync(resolve(root, 'scripts/qa/run-pass73-native-grenade.mjs'), 'utf8');
+  const spec = readFileSync(resolve(root, 'tests/e2e/pass73-native-grenade.spec.ts'), 'utf8');
   assert.match(config, /headless: pass73NativeWebGpu \? false : undefined/u);
   assert.match(config, /'--window-position=-32000,-32000'/u);
   assert.match(config, /'--window-size=2640,1520'/u);
   assert.match(config, /'--disable-backgrounding-occluded-windows'/u);
   assert.match(runner, /PASS73_NATIVE_COMPOSITOR: 'headed-offscreen'/u);
+  assert.ok(
+    spec.indexOf('const telemetryBefore = api.sampleGrenadeColdPathTelemetry();')
+      < spec.indexOf('const onKeyDown = (event: KeyboardEvent): void =>'),
+    'large diagnostic snapshots must be captured before the trusted input timing window',
+  );
 });
 
 test('rejects debug input, a hitch, resource or pipeline work, and software WebGPU', () => {

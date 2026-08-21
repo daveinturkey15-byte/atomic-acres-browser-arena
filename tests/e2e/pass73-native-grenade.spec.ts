@@ -75,12 +75,16 @@ async function captureTrustedGrenadeWindow(page: Page): Promise<any> {
       })
       : null;
     try { observer?.observe({ type: 'longtask', buffered: false } as PerformanceObserverInit); } catch { /* unsupported is recorded below */ }
+    // Capture the large renderer/pipeline snapshot before the trusted input
+    // window. With traceNodeBuilds enabled this object can exceed 1 MB; cloning
+    // it from a capture-phase key listener would make the verifier itself delay
+    // the game's KeyG handler and contaminate the first-frame measurement.
+    const telemetryBefore = api.sampleGrenadeColdPathTelemetry();
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.code !== 'KeyG' || !scope.__PASS73_GRENADE_PROBE__?.armed) return;
       scope.__PASS73_GRENADE_PROBE__.armed = false;
       window.removeEventListener('keydown', onKeyDown, true);
       const startedAt = performance.now();
-      const telemetryBefore = api.sampleGrenadeColdPathTelemetry();
       const resourceEntryCountBefore = performance.getEntriesByType('resource').length;
       const performanceMemory = performance as Performance & { memory?: { usedJSHeapSize?: number } };
       const heapBefore = Number.isFinite(performanceMemory.memory?.usedJSHeapSize)
