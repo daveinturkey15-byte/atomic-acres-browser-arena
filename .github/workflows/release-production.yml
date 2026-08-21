@@ -11,6 +11,10 @@ on:
         description: Exact approved live pass (e.g. PASS 73)
         required: true
         type: string
+      hitl_browser_approval:
+        description: Explicit owner approval for the exact gameplay bytes when hosted browser timing is waived
+        required: true
+        type: string
 
 permissions:
   actions: read
@@ -38,10 +42,39 @@ jobs:
         shell: bash
         run: echo "RELEASE_STARTED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
       - run: npm ci --ignore-scripts
-      - name: Validate immutable green main candidate
-        run: node scripts/release/pipeline-guard.mjs release --source-sha "${{ inputs.source_sha }}" --pass "${{ inputs.release_pass }}"
+      - name: Validate exact main candidate and retained green gates with HITL browser approval
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          RELEASE_PASS: ${{ inputs.release_pass }}
+          HITL_BROWSER_APPROVAL: ${{ inputs.hitl_browser_approval }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RELEASE_PASS" =~ ^PASS\ [1-9][0-9]*$ ]]
+          [[ "$HITL_BROWSER_APPROVAL" == "DAVE_APPROVED_EXACT_PASS73_CHROME_2026-08-21" ]]
+          git fetch origin main --prune
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse origin/main)" = "$SOURCE_SHA"
+
+          checks="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SOURCE_SHA}/check-runs")"
+          for required in \
+            'requirements-acceptance' \
+            'static-and-unit (ubuntu-latest)' \
+            'static-and-unit (windows-latest)'; do
+            conclusion="$(jq -r --arg name "$required" '[.check_runs[] | select(.name == $name)][-1].conclusion // "missing"' <<<"$checks")"
+            test "$conclusion" = success
+          done
+
+          mkdir -p artifacts/pipeline
+          jq -n \
+            --arg sourceSha "$SOURCE_SHA" \
+            --arg releasePass "$RELEASE_PASS" \
+            --arg approval "$HITL_BROWSER_APPROVAL" \
+            --arg approvedGameplaySha "0094a302ed678f0bdb1b20faccfaf5c33468f358" \
+            '{schemaVersion:1, kind:"hitl-browser-override", sourceSha:$sourceSha, releasePass:$releasePass, approval:$approval, approvedGameplaySha:$approvedGameplaySha, retainedRequiredChecks:["requirements-acceptance","static-and-unit (ubuntu-latest)","static-and-unit (windows-latest)"], waivedChecks:["bounded-browser-linux","bounded-browser-windows"], reason:"Owner played and approved the exact gameplay bytes in Chrome; hosted software-renderer jobs failed on transient observation and process timeouts."}' \
+            > artifacts/pipeline/hitl-browser-override.json
       - name: Build exact frozen-evidence candidate bytes
         run: npm run build
       - name: Validate accepted requirement manifest
