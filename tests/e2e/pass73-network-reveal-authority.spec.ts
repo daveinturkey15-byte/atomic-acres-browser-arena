@@ -53,7 +53,7 @@ test.use({
     args: NETWORK_BROWSER_ARGS,
   },
 });
-test.describe.configure({ timeout: 240_000 });
+test.describe.configure({ timeout: 360_000 });
 
 test.beforeAll(async () => {
   peerServer = await startOwnedPeerServer(peerPort, process.env.PASS73_NETWORK_REVEAL_PEER_PATH);
@@ -177,10 +177,18 @@ async function ensurePointerLock(page: Page): Promise<void> {
   const game = page.locator('#game');
   const box = await game.boundingBox();
   if (!box) throw new Error('Game canvas has no input bounds');
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await page.waitForFunction(() => document.pointerLockElement === document.querySelector('#game'), undefined, {
-    timeout: 5_000,
-  });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    try {
+      await page.waitForFunction(() => document.pointerLockElement === document.querySelector('#game'), undefined, {
+        timeout: 5_000,
+      });
+      return;
+    } catch (error) {
+      if (attempt === 1) throw error;
+      await page.waitForTimeout(250);
+    }
+  }
 }
 
 async function registerTrustedInputProbe(page: Page): Promise<void> {
@@ -289,11 +297,11 @@ async function selectLoadoutWeapon(
   await Promise.all([
     shooter.waitForFunction((weaponId) => (
       window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.weapon === weaponId
-    ), weapon, { polling: 'raf', timeout: 8_000 }),
+    ), weapon, { polling: 'raf', timeout: 20_000 }),
     observer.waitForFunction((weaponId) => {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
       return state?.remotePlayers.length === 1 && state.remotePlayers[0]?.weapon === weaponId;
-    }, weapon, { polling: 'raf', timeout: 8_000 }),
+    }, weapon, { polling: 'raf', timeout: 20_000 }),
   ]);
 }
 

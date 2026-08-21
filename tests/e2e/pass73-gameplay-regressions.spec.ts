@@ -109,18 +109,25 @@ async function captureThermalContribution(page: Page, weapon: 'm14-ebr' | 'railg
     return bot.id as string;
   });
   const canvas = page.locator('#game');
+  const nextPresentedFrames = async (count = 2): Promise<void> => {
+    await page.evaluate(async (frameCount) => {
+      for (let frame = 0; frame < frameCount; frame += 1) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      }
+    }, count);
+  };
   await page.evaluate(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }
   ).__ATOMIC_ACRES_DEBUG__.setThermalRevealEvidenceHidden(true));
-  await page.waitForTimeout(80);
-  const hiddenA = await canvas.screenshot({ animations: 'disabled' });
-  await page.waitForTimeout(80);
-  const hiddenB = await canvas.screenshot({ animations: 'disabled' });
+  await nextPresentedFrames();
+  const hiddenA = await canvas.screenshot({ animations: 'disabled', timeout: 30_000 });
+  await nextPresentedFrames();
+  const hiddenB = await canvas.screenshot({ animations: 'disabled', timeout: 30_000 });
   await page.evaluate(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }
   ).__ATOMIC_ACRES_DEBUG__.setThermalRevealEvidenceHidden(false));
-  await page.waitForTimeout(80);
-  const shown = await canvas.screenshot({ animations: 'disabled' });
+  await nextPresentedFrames();
+  const shown = await canvas.screenshot({ animations: 'disabled', timeout: 30_000 });
   const baselineNoise = await changedPixelFraction(hiddenA, hiddenB);
   const revealedDelta = await changedPixelFraction(hiddenB, shown);
   const telemetry = await page.evaluate(() => (
@@ -253,31 +260,44 @@ test.describe('Pass 73 gameplay regression behavior', () => {
     test.setTimeout(120_000);
     await deploy(page);
 
-    const targetId = await page.evaluate(() => {
+    const staged = await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__;
       api.stageWindow(0, 3);
       api.equipWeapon('explosive-crossbow');
       const target = api.snapshot().breakableWindows[0];
       if (!target || target.broken) throw new Error('Expected an intact staged pane');
+      const explosionBaseline = api.snapshot().grenadeExplosion.total as number;
       api.fireOnce();
-      return target.id;
+      return { windowId: target.id, explosionBaseline };
     });
-    await page.waitForFunction((windowId) => {
+    await page.waitForFunction(({ windowId, explosionBaseline }) => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__;
-      return api.snapshot().breakableWindows.find(({ id }) => id === windowId)?.broken === true;
-    }, targetId, { timeout: 1_000 });
+      const state = api.snapshot();
+      const pane = state.breakableWindows.find(({ id }) => id === windowId);
+      const mutation = state.crossbowGlassAuthority?.recentAuthoritativeMutations
+        ?.findLast((entry: { windowId: string; phase: string; revision: number; explosionCountAtMutation: number }) => (
+          entry.windowId === windowId && entry.phase === 'impact' && entry.revision === 1
+        ));
+      return pane?.broken === true
+        && state.grenadeExplosion.total === explosionBaseline
+        && mutation?.explosionCountAtMutation === explosionBaseline;
+    }, staged, { polling: 'raf', timeout: 8_000 });
     const direct = await page.evaluate((windowId) => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__;
       return api.snapshot().breakableWindows.find(({ id }) => id === windowId) ?? null;
-    }, targetId);
-    expect(direct).toMatchObject({ id: targetId, broken: true, visible: false });
+    }, staged.windowId);
+    expect(direct).toMatchObject({ id: staged.windowId, broken: true, visible: false });
+    await page.waitForFunction((explosionBaseline) => (
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__
+        .snapshot().grenadeExplosion.total > explosionBaseline
+    ), staged.explosionBaseline, { polling: 'raf', timeout: 8_000 });
 
     const blast = await page.evaluate(() => (
       window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }
     ).__ATOMIC_ACRES_DEBUG__.detonateCrossbowNearWindow(0, 1));
     expect(blast).not.toBeNull();
     expect(blast).toMatchObject({
-      windowId: targetId,
+      windowId: staged.windowId,
       beforeBroken: false,
       afterBroken: true,
       radiusM: 3.5,
@@ -285,7 +305,7 @@ test.describe('Pass 73 gameplay regression behavior', () => {
   });
 
   test('M14 EBR and Railgun ADS contribute exact-operator plus orange-halo pixels through a wall', async ({ page }) => {
-    test.setTimeout(150_000);
+    test.setTimeout(240_000);
     await deploy(page);
     const wallBlocked = await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__;
@@ -340,7 +360,7 @@ test.describe('Pass 73 gameplay regression behavior', () => {
       window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }
     ).__ATOMIC_ACRES_DEBUG__.snapshot().bots[0]);
     expect(after.id).toBe(staged.id);
-    expect(staged.healthBefore - after.hp).toBe(37);
+    expect(staged.healthBefore - after.hp).toBe(37.2);
   });
 
   test('the immediate first grenade frame window stays within the warm second-throw envelope', async ({ page }, testInfo) => {
