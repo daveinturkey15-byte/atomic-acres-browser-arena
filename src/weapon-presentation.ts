@@ -91,6 +91,25 @@ type RiggedViewArm = FirstPersonArmChain & {
   bindElbowScale: THREE.Vector3;
   bindWristScale: THREE.Vector3;
 };
+export type ViewmodelArmEvidenceCaptureMode = 'background' | 'left' | 'right' | null;
+type ViewmodelArmEvidenceMeshRestore = {
+  mesh: THREE.SkinnedMesh;
+  visible: boolean;
+  renderOrder: number;
+  material: THREE.Material | THREE.Material[];
+  ownershipAttribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined;
+};
+type RiggedMeleeSupportPose = Readonly<{
+  shoulderPosition: THREE.Vector3;
+  shoulderQuaternion: THREE.Quaternion;
+  shoulderScale: THREE.Vector3;
+  elbowPosition: THREE.Vector3;
+  elbowQuaternion: THREE.Quaternion;
+  elbowScale: THREE.Vector3;
+  wristPosition: THREE.Vector3;
+  wristQuaternion: THREE.Quaternion;
+  wristScale: THREE.Vector3;
+}>;
 type ViewArmRig = {
   side: 'left' | 'right';
   shoulder: THREE.Group;
@@ -99,6 +118,62 @@ type ViewArmRig = {
   upperLength: number;
   lowerLength: number;
 };
+
+const VIEWMODEL_ARM_EVIDENCE_ATTRIBUTE = 'viewmodelArmEvidenceOwnership';
+export const VIEWMODEL_ARM_EVIDENCE_CONTRACT = 'actual-skinned-vertex-arm-only-material-id-v1';
+
+function firstPersonArmBoneSide(name: string): 'left' | 'right' | null {
+  // The shipped first-person skeleton uses Blender's explicit L/R terminal
+  // suffixes (UpperArmL, WristR, Index1L, ...). Do not infer ownership from
+  // mesh/material names: every one of the four authored skins contains both
+  // arms, so mesh-level visibility would make an arm-only proof untruthful.
+  if (/^(?:UpperArm|LowerArm|Wrist|Hand|Palm|Index\d+|Middle\d+|Ring\d+|Pinky\d+|Thumb\d+)L$/u.test(name)) {
+    return 'left';
+  }
+  if (/^(?:UpperArm|LowerArm|Wrist|Hand|Palm|Index\d+|Middle\d+|Ring\d+|Pinky\d+|Thumb\d+)R$/u.test(name)) {
+    return 'right';
+  }
+  return null;
+}
+
+function createViewmodelArmEvidenceMaterial(side: 'left' | 'right'): THREE.MeshBasicMaterial {
+  const material = new THREE.MeshBasicMaterial({
+    // Deliberately non-art colors make the material-ID pixels machine
+    // selectable even when the paired action advances by a few render frames.
+    color: side === 'left' ? 0x19ff4a : 0xff174f,
+    // ID capture is an ownership/x-ray pass. Draw the selected actual skin on
+    // top so the receiver cannot split the hand/cuff from its sleeve and turn
+    // a continuous chain into two apparent components in evidence space.
+    depthTest: false,
+    depthWrite: false,
+    fog: false,
+    side: THREE.FrontSide,
+    toneMapped: false,
+  });
+  material.name = `qa-${side}-arm-skinned-material-id`;
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        `#include <common>\nattribute float ${VIEWMODEL_ARM_EVIDENCE_ATTRIBUTE};\nvarying float vViewmodelArmEvidenceOwnership;`,
+      )
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>\nvViewmodelArmEvidenceOwnership = ${VIEWMODEL_ARM_EVIDENCE_ATTRIBUTE};`,
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nvarying float vViewmodelArmEvidenceOwnership;',
+      )
+      .replace(
+        '#include <clipping_planes_fragment>',
+        '#include <clipping_planes_fragment>\nif (vViewmodelArmEvidenceOwnership < 0.25) discard;',
+      );
+  };
+  material.customProgramCacheKey = () => `${VIEWMODEL_ARM_EVIDENCE_CONTRACT}:${side}`;
+  return material;
+}
 
 type HandRotationSet = { left: [number, number, number]; right: [number, number, number] };
 const WEAPON_HAND_ROTATIONS: Record<WeaponId, HandRotationSet> = {
@@ -315,18 +390,69 @@ export const MELEE_VIEWMODEL_PEAK_SCALE_LIFT = 0.3;
 // hand inside the retained 15 mm socket-calibration contract while preserving
 // a real (non-zero) anti-singularity margin.
 const RIGGED_ARM_MAX_REACH_RATIO = 0.996;
-export const FIRST_PERSON_ARM_PROPORTION_CONTRACT = 'authored-fixed-length-strong-operator-arms-v3';
+export const FIRST_PERSON_ARM_PROPORTION_CONTRACT = 'authored-fixed-length-strong-operator-arms-v5';
 /** Uniform root scaling preserves the authored skeleton, palms and joint radii. */
 export const FIRST_PERSON_ARM_UNIFORM_SCALE = 1.12;
-export const FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT = 'fixed-length-reachable-shoulders-continuous-sleeve-crop-v3';
+// Retain the reviewed hip/action scale so melee and grenade poses preserve
+// their established screen lane and near-plane clearance.
+export const FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE = 1.48;
+// Do not shrink the operator's arms while aiming. Apart from making the ADS
+// silhouette look implausibly skinny, the old shrink broke the lower-frame
+// sleeve continuation on short landscape viewports.
+export const FIRST_PERSON_ARM_ADS_PRESENTATION_SCALE = 1.56;
+export const FIRST_PERSON_ARM_RELOAD_SCALE_LIFT = 0.16;
+/**
+ * Keeps every axis uniform while adding mass at the two poses where the arms
+ * previously narrowed to a disconnected lower-crop silhouette. Reload lift is
+ * smooth and returns exactly to the hip scale at both action boundaries.
+ */
+export function firstPersonArmPresentationScale(adsBlend: number, reloadProgress: number | null): number {
+  const aim = THREE.MathUtils.clamp(adsBlend, 0, 1);
+  const reloadLift = reloadProgress === null
+    ? 0
+    : Math.sin(THREE.MathUtils.clamp(reloadProgress, 0, 1) * Math.PI) * FIRST_PERSON_ARM_RELOAD_SCALE_LIFT;
+  return THREE.MathUtils.lerp(
+    FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE,
+    FIRST_PERSON_ARM_ADS_PRESENTATION_SCALE,
+    aim,
+  ) + reloadLift;
+}
+export const FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT = 'fixed-length-reachable-shoulders-continuous-sleeve-crop-v5';
 export const FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC = Object.freeze({
   left: -1.12,
-  right: -1.07,
+  // Ordinary hip/fire poses need the closed proximal sleeve safely below the
+  // crop. Raised/ADS/heavy poses use the lifted lane below instead.
+  right: -0.97,
 });
+export const FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC = -0.82;
+export function firstPersonArmShoulderEntryNdc(
+  side: 'left' | 'right',
+  gripFamily: ViewmodelGripFamily,
+  adsBlend: number,
+  highReadyBlend: number,
+): number {
+  if (side === 'left') return FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC.left;
+  const raisedBlend = Math.max(
+    gripFamily === 'heavy' ? 1 : 0,
+    THREE.MathUtils.clamp(adsBlend, 0, 1),
+    THREE.MathUtils.clamp(highReadyBlend, 0, 1),
+  );
+  return THREE.MathUtils.lerp(
+    FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC.right,
+    FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC,
+    raisedBlend,
+  );
+}
 /** The one-handed knife arc needs extra proximal sleeve travel at peak extension. */
 export const FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC = -1.23;
 /** Runtime IK rotates joints and may translate the shoulder, but never stretches a skinned segment. */
 export const FIRST_PERSON_ARM_BIND_SEGMENT_LENGTH_SCALE = 1;
+// The firing elbow must flare camera-up/out from the below-frame shoulder.
+// A camera-down pole folded compact and heavy forearms entirely underneath the
+// crop, leaving a glove apparently cut off at the wrist even though the IK
+// endpoint remained attached. This pole preserves the real two-bone lengths
+// and grip socket while making the intervening forearm the visible connection.
+const FIRST_PERSON_FIRING_ELBOW_BEND_HINT = Object.freeze(new THREE.Vector3(0.7, 0.35, 0.25).normalize());
 /** Unit -Z blade axis reused by the per-frame melee knife alignment. */
 const KNIFE_BLADE_AXIS = Object.freeze(new THREE.Vector3(0, 0, -1));
 export const HIP_VIEWMODEL_POSITION = Object.freeze({ x: 0.34, y: -0.44, z: -1.08 });
@@ -898,7 +1024,9 @@ export class WeaponPresentation {
   private meleeStart = 0;
   private meleePresentationFrames = 0;
   private debugMeleeProgress: number | null = null;
+  private riggedMeleeSupportPose: RiggedMeleeSupportPose | null = null;
   private grenadeStart = 0;
+  private debugGrenadeProgress: number | null = null;
   private readonly muzzleLight: THREE.PointLight;
   private readonly muzzleFlash: THREE.Group;
   private readonly viewmodelFill: THREE.PointLight;
@@ -932,6 +1060,12 @@ export class WeaponPresentation {
   private readonly meleeHandWorld = new THREE.Vector3();
   private readonly frameTargetPosition = new THREE.Vector3();
   private authoredArmsRoot: THREE.Group | null = null;
+  private readonly armEvidenceMaterials = Object.freeze({
+    left: createViewmodelArmEvidenceMaterial('left'),
+    right: createViewmodelArmEvidenceMaterial('right'),
+  });
+  private armEvidenceRestore: ViewmodelArmEvidenceMeshRestore[] = [];
+  private armEvidenceCaptureTelemetry: Readonly<Record<string, unknown>> | null = null;
   private riggedArmDiagnostics: Array<Record<string, unknown>> = [];
   private nextRiggedArmDiagnosticsAt = 0;
   private readonly riggedArmSolveScratch = {
@@ -2482,6 +2616,113 @@ export class WeaponPresentation {
       : 0;
   }
 
+  private restoreArmEvidenceCapture(): void {
+    for (const entry of this.armEvidenceRestore) {
+      entry.mesh.visible = entry.visible;
+      entry.mesh.renderOrder = entry.renderOrder;
+      entry.mesh.material = entry.material;
+      if (entry.ownershipAttribute) {
+        entry.mesh.geometry.setAttribute(VIEWMODEL_ARM_EVIDENCE_ATTRIBUTE, entry.ownershipAttribute);
+      } else {
+        entry.mesh.geometry.deleteAttribute(VIEWMODEL_ARM_EVIDENCE_ATTRIBUTE);
+      }
+    }
+    this.armEvidenceRestore = [];
+    this.armEvidenceCaptureTelemetry = null;
+  }
+
+  /**
+   * QA-only truthful material-ID pass over the actual shipped skinned arms.
+   * The active weapon/knife is deliberately untouched. `background` hides only
+   * the arm skins; left/right keep only vertices influenced by that side's
+   * authored bones. A screenshot difference therefore cannot be satisfied by
+   * the receiver, knife, HUD, world, or the opposite arm.
+   */
+  setArmEvidenceCapture(mode: ViewmodelArmEvidenceCaptureMode): boolean {
+    this.restoreArmEvidenceCapture();
+    if (mode === null) return true;
+    const arms = this.authoredArmsRoot;
+    if (!arms || (mode !== 'background' && mode !== 'left' && mode !== 'right')) return false;
+    const selectedSide = mode === 'background' ? null : mode;
+    let skinnedMeshCount = 0;
+    let eligibleSkinnedMeshCount = 0;
+    let selectedVertexCount = 0;
+    let oppositeVertexCount = 0;
+    let unownedVertexCount = 0;
+    let weaponMeshCount = 0;
+    let visibleWeaponMeshCount = 0;
+    const activeModel = this.mountedModel();
+    activeModel?.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      weaponMeshCount += 1;
+      if (node.visible) visibleWeaponMeshCount += 1;
+    });
+    arms.traverse((node) => {
+      if (!(node instanceof THREE.SkinnedMesh)) return;
+      skinnedMeshCount += 1;
+      const geometry = node.geometry;
+      const skinIndex = geometry.getAttribute('skinIndex');
+      const skinWeight = geometry.getAttribute('skinWeight');
+      const position = geometry.getAttribute('position');
+      this.armEvidenceRestore.push({
+        mesh: node,
+        visible: node.visible,
+        renderOrder: node.renderOrder,
+        material: node.material,
+        ownershipAttribute: geometry.getAttribute(VIEWMODEL_ARM_EVIDENCE_ATTRIBUTE),
+      });
+      if (selectedSide === null) {
+        node.visible = false;
+        return;
+      }
+      if (!skinIndex || !skinWeight || !position
+        || skinIndex.itemSize !== 4 || skinWeight.itemSize !== 4
+        || skinIndex.count !== position.count || skinWeight.count !== position.count) {
+        node.visible = false;
+        return;
+      }
+      eligibleSkinnedMeshCount += 1;
+      const ownership = new Float32Array(position.count);
+      for (let vertex = 0; vertex < position.count; vertex += 1) {
+        let selectedWeight = 0;
+        let oppositeWeight = 0;
+        for (let slot = 0; slot < 4; slot += 1) {
+          const boneIndex = skinIndex.getComponent(vertex, slot);
+          const weight = skinWeight.getComponent(vertex, slot);
+          const owner = firstPersonArmBoneSide(node.skeleton.bones[boneIndex]?.name ?? '');
+          if (owner === selectedSide) selectedWeight += weight;
+          else if (owner !== null) oppositeWeight += weight;
+        }
+        ownership[vertex] = selectedWeight;
+        if (selectedWeight >= 0.25) selectedVertexCount += 1;
+        else if (oppositeWeight >= 0.25) oppositeVertexCount += 1;
+        else unownedVertexCount += 1;
+      }
+      geometry.setAttribute(VIEWMODEL_ARM_EVIDENCE_ATTRIBUTE, new THREE.Float32BufferAttribute(ownership, 1));
+      node.material = this.armEvidenceMaterials[selectedSide];
+      node.renderOrder = 10_000;
+      node.visible = node.visible && ownership.some((weight) => weight >= 0.25);
+    });
+    this.armEvidenceCaptureTelemetry = Object.freeze({
+      contract: VIEWMODEL_ARM_EVIDENCE_CONTRACT,
+      mode,
+      selectedSide,
+      skinnedMeshCount,
+      eligibleSkinnedMeshCount,
+      selectedVertexCount,
+      oppositeVertexCount,
+      unownedVertexCount,
+      weaponMeshCount,
+      visibleWeaponMeshCount,
+      weaponMeshesMutated: 0,
+      knifeMutated: false,
+      ownershipPassOcclusionPolicy: 'selected-real-arm-xray-weapon-render-retained-v1',
+    });
+    return selectedSide === null
+      ? skinnedMeshCount > 0
+      : eligibleSkinnedMeshCount > 0 && selectedVertexCount > 0 && oppositeVertexCount > 0;
+  }
+
   /**
    * Keep the prepared viewmodel render objects and structural lights resident
    * while a full-screen optic or support cockpit owns the sight picture.
@@ -2767,6 +3008,18 @@ export class WeaponPresentation {
       && this.riggedArmRigs.length === 2
       && this.authoredMeleeKnife !== null
       && this.authoredMeleeSocket !== null;
+    const leftRig = this.riggedArmRigs.find((rig) => rig.side === 'left');
+    this.riggedMeleeSupportPose = authoredReady && leftRig ? Object.freeze({
+      shoulderPosition: leftRig.shoulder.position.clone(),
+      shoulderQuaternion: leftRig.shoulder.quaternion.clone(),
+      shoulderScale: leftRig.shoulder.scale.clone(),
+      elbowPosition: leftRig.elbow.position.clone(),
+      elbowQuaternion: leftRig.elbow.quaternion.clone(),
+      elbowScale: leftRig.elbow.scale.clone(),
+      wristPosition: leftRig.wrist.position.clone(),
+      wristQuaternion: leftRig.wrist.quaternion.clone(),
+      wristScale: leftRig.wrist.scale.clone(),
+    }) : null;
     this.meleeRig.visible = !this.browserRuntime;
     this.meleeKnife.visible = !this.browserRuntime || authoredReady;
     this.meleePresentationActive = true;
@@ -2801,6 +3054,32 @@ export class WeaponPresentation {
 
   throwGrenade(): void {
     this.grenadeStart = performance.now();
+  }
+
+  setGrenadeCaptureProgress(progress: number | null): void {
+    this.debugGrenadeProgress = progress === null ? null : THREE.MathUtils.clamp(progress, 0, 0.999);
+  }
+
+  grenadeActionTelemetry(now = performance.now()): Readonly<{
+    startedAt: number;
+    elapsedMs: number | null;
+    progress: number;
+    active: boolean;
+    arc: number;
+    capturePinned: boolean;
+  }> {
+    const elapsedMs = this.grenadeStart > 0 ? Math.max(0, now - this.grenadeStart) : null;
+    const progress = this.debugGrenadeProgress
+      ?? (elapsedMs === null ? 1 : THREE.MathUtils.clamp(elapsedMs / 620, 0, 1));
+    const active = elapsedMs !== null && progress < 1;
+    return Object.freeze({
+      startedAt: this.grenadeStart,
+      elapsedMs,
+      progress,
+      active,
+      arc: active ? Math.sin(progress * Math.PI) : 0,
+      capturePinned: this.debugGrenadeProgress !== null,
+    });
   }
 
   addMouseDelta(x: number, y: number): void {
@@ -2913,6 +3192,30 @@ export class WeaponPresentation {
     const armCenter = armBox && !armBox.isEmpty() ? armBox.getCenter(new THREE.Vector3()) : null;
     const armSize = armBox && !armBox.isEmpty() ? armBox.getSize(new THREE.Vector3()) : null;
     const armProjected = armCenter?.clone().project(this.camera) ?? null;
+    const visibleWorldBounds = (root: THREE.Object3D | undefined): Readonly<{
+      min: readonly number[];
+      max: readonly number[];
+    }> | null => {
+      if (!root?.visible) return null;
+      root.updateWorldMatrix(true, true);
+      const bounds = new THREE.Box3().makeEmpty();
+      root.traverse((child) => {
+        if (!(child instanceof THREE.Mesh) || !child.visible) return;
+        if (child instanceof THREE.SkinnedMesh) {
+          child.computeBoundingBox();
+          if (child.boundingBox) bounds.union(child.boundingBox.clone().applyMatrix4(child.matrixWorld));
+          return;
+        }
+        child.geometry.computeBoundingBox();
+        if (child.geometry.boundingBox) bounds.union(child.geometry.boundingBox.clone().applyMatrix4(child.matrixWorld));
+      });
+      return bounds.isEmpty() ? null : Object.freeze({
+        min: Object.freeze(bounds.min.toArray()),
+        max: Object.freeze(bounds.max.toArray()),
+      });
+    };
+    const armWorldBounds = visibleWorldBounds(arms);
+    const weaponWorldBounds = visibleWorldBounds(model);
     const importedModel = importedWeaponTelemetry(model);
     const detailsReady = importedModel
       ? importedModel.socketContractReady && importedModel.meshes > 0
@@ -3090,6 +3393,11 @@ export class WeaponPresentation {
         size: armSize.toArray(),
         projected: armProjected.toArray(),
       } : null,
+      worldPlaneClearance: {
+        contract: 'current-rendered-mesh-world-bounds-v1',
+        arms: armWorldBounds,
+        weapon: weaponWorldBounds,
+      },
       armFraming: arms?.visible
         ? measureCameraFraming(arms, this.camera, isAuthoredArmMesh)
         : null,
@@ -3104,6 +3412,9 @@ export class WeaponPresentation {
         rootRotation: [this.root.rotation.x, this.root.rotation.y, this.root.rotation.z],
       },
       actionContract: this.actionContract,
+      // Read-only action telemetry lets the browser evidence gate capture the
+      // real 620 ms throw arc without introducing a synthetic gameplay state.
+      grenadeAction: this.grenadeActionTelemetry(),
       surfaceRetreat: this.surfaceRetreat,
       surfaceLift: this.surfaceLift,
       contactResponse: this.contactResponse,
@@ -3123,6 +3434,7 @@ export class WeaponPresentation {
         ? this.authoredMeleeHandContactError : null,
       authoredFingerBoneCount: this.riggedFingerBones.length,
       authoredArmAnimation: firstPersonArmAnimationState(this.authoredArmsRoot ?? undefined),
+      armEvidenceCapture: this.armEvidenceCaptureTelemetry,
       knifeVisible: this.meleePresentationActive && this.meleeKnife.visible,
       passiveKnifeVisible: this.passiveKnife.visible,
       passiveKnifeModel: this.passiveKnife.getObjectByName('passive-field-knife-model') !== undefined,
@@ -3277,14 +3589,17 @@ export class WeaponPresentation {
     const cameraRight = scratch.cameraRight.set(1, 0, 0).applyQuaternion(cameraRotation).normalize();
     entry.addScaledVector(cameraDown, 0.1)
       .addScaledVector(cameraRight, rig.side === 'right' ? 0.012 : -0.012);
-    // A shoulder close to -1 NDC still exposed the sleeve endpoint during
-    // recoil and prone contact. Both authored chains enter below the crop.
+    // Pin the joint to its reviewed continuation lane from either direction.
+    // The previous one-sided clamp could leave heavy/mobile firing shoulders
+    // arbitrarily far below the frame, exposing only a thin folded fragment.
+    // The authored proximal sleeve extends past this joint and remains the
+    // actual below-screen continuation; no procedural cover geometry is used.
     const projectedEntry = scratch.shoulderProjected.copy(entry).project(this.camera);
-    if (projectedEntry.y > targetNdcY) {
+    if (Math.abs(projectedEntry.y - (targetNdcY - 0.01)) > 1e-6) {
       // Preserve exact projected depth, move the point directly below the
-      // crop, then convert that world point back through the authored parent.
+      // reviewed lane, then convert it back through the authored parent.
       // This is deterministic under recoil/reload rotations and replaces the
-      // former bounded iteration that could stop with the sleeve still visible.
+      // former unbounded below-frame placement.
       projectedEntry.y = targetNdcY - 0.01;
       entry.copy(projectedEntry.unproject(this.camera));
     }
@@ -3446,6 +3761,23 @@ export class WeaponPresentation {
           FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC,
         );
       }
+      if (left && this.riggedMeleeSupportPose) {
+        // Keep the intact off-hand guard from the immediately preceding armed
+        // pose. The old +40 m stow made a real arm vanish during every knife
+        // frame; preserving its authored local joint transforms keeps both
+        // sleeves substantial without inventing geometry or scaling a chain.
+        const support = this.riggedMeleeSupportPose;
+        left.shoulder.position.copy(support.shoulderPosition);
+        left.shoulder.quaternion.copy(support.shoulderQuaternion);
+        left.shoulder.scale.copy(support.shoulderScale);
+        left.elbow.position.copy(support.elbowPosition);
+        left.elbow.quaternion.copy(support.elbowQuaternion);
+        left.elbow.scale.copy(support.elbowScale);
+        left.wrist.position.copy(support.wristPosition);
+        left.wrist.quaternion.copy(support.wristQuaternion);
+        left.wrist.scale.copy(support.wristScale);
+        this.placeRiggedShoulderEntryBelowFrame(left, cameraRotation);
+      }
       arms.updateWorldMatrix(true, true);
       const armsWorldRotation = arms.getWorldQuaternion(scratch.meleeArmsWorldRotation);
       const poseChain = (
@@ -3480,18 +3812,6 @@ export class WeaponPresentation {
           scratch.target.set(0.055, -0.025, 0.075),
         );
       }
-      if (left) {
-        // The knife action is one-handed. The combined-material arm skins do
-        // not provide a per-side visibility node, so move the complete support
-        // chain outside the camera at its exact authored scale. This avoids the
-        // torn floating sleeve produced by collapsing a live skinned chain.
-        left.shoulder.position.set(
-          left.bindShoulderPosition.x + 40,
-          left.bindShoulderPosition.y,
-          left.bindShoulderPosition.z,
-        );
-        left.shoulder.scale.copy(left.bindShoulderScale);
-      }
     }
     this.root.updateWorldMatrix(true, true);
     if (this.authoredMeleeKnife && this.authoredMeleeSocket) {
@@ -3524,8 +3844,9 @@ export class WeaponPresentation {
       wristBindDelta: rig.wrist.quaternion.angleTo(rig.bindWrist),
       knifeAttachedToRightWrist: rig.side === 'right' && this.authoredMeleeSocket?.parent === rig.wrist,
       supportChainScale: rig.side === 'left' ? rig.shoulder.scale.x : null,
-      supportChainPolicy: rig.side === 'left' ? 'one-hand-action-stowed-outside-frustum-v1' : null,
-      stowedWithoutScaling: rig.side === 'left' ? rig.shoulder.scale.equals(rig.bindShoulderScale) : null,
+      supportChainPolicy: rig.side === 'left' ? 'two-chain-intact-melee-guard-v1' : null,
+      supportChainVisible: rig.side === 'left',
+      stowedWithoutScaling: rig.side === 'left' ? false : null,
       shoulder: rig.shoulder.getWorldPosition(new THREE.Vector3()).toArray(),
       elbow: rig.elbow.getWorldPosition(new THREE.Vector3()).toArray(),
       wrist: rig.wrist.getWorldPosition(new THREE.Vector3()).toArray(),
@@ -3609,7 +3930,17 @@ export class WeaponPresentation {
         const reloadSocket = activeModel.getObjectByName('reload-socket-l');
         if (reloadSocket) target.lerp(reloadSocket.getWorldPosition(scratch.handTarget), reloadPose.handToReload);
       }
-      const initialShoulderEntry = this.placeRiggedShoulderEntryBelowFrame(rig, cameraRotation);
+      const shoulderEntryTargetNdcY = firstPersonArmShoulderEntryNdc(
+        rig.side,
+        handPolicy.gripFamily,
+        this.adsBlend,
+        this.contactResponse.highReadyBlend,
+      );
+      const initialShoulderEntry = this.placeRiggedShoulderEntryBelowFrame(
+        rig,
+        cameraRotation,
+        shoulderEntryTargetNdcY,
+      );
       const shoulderPosition = rig.shoulder.getWorldPosition(scratch.shoulderPosition);
       const elbowPosition = rig.elbow.getWorldPosition(scratch.elbowPosition);
       const wristPosition = rig.wrist.getWorldPosition(scratch.wristPosition);
@@ -3628,6 +3959,7 @@ export class WeaponPresentation {
         cameraRotation,
         socketTarget,
         maximumSocketReach,
+        shoulderEntryTargetNdcY,
       );
       rig.shoulder.getWorldPosition(shoulderPosition);
       rig.elbow.getWorldPosition(elbowPosition);
@@ -3636,7 +3968,10 @@ export class WeaponPresentation {
       const socketReachRatio = socketReach / Math.max(physicalReach, 1e-6);
       const calibratedReach = physicalReach * RIGGED_ARM_MAX_REACH_RATIO;
       let gripSocketCalibration = 0;
-      const bendHint = scratch.bendHint.set(rig.side === 'left' ? -0.7 : 0.7, -1, 0.25).applyQuaternion(cameraRotation);
+      const bendHint = rig.side === 'left'
+        ? scratch.bendHint.set(-0.7, -1, 0.25)
+        : scratch.bendHint.copy(FIRST_PERSON_FIRING_ELBOW_BEND_HINT);
+      bendHint.applyQuaternion(cameraRotation);
       const weaponRotation = activeModel.getWorldQuaternion(scratch.weaponRotation);
       const muzzle = activeModel.getObjectByName('muzzle-socket');
       const weaponForward = muzzle
@@ -3786,7 +4121,7 @@ export class WeaponPresentation {
       // behind the camera with this shallow, bounded clearance adjustment.
       arms.position.y = THREE.MathUtils.lerp(0.02, 0.012, this.adsBlend);
       arms.position.z = THREE.MathUtils.lerp(0, -0.08, this.adsBlend);
-      arms.scale.setScalar(THREE.MathUtils.lerp(1.24, 1.18, this.adsBlend));
+      arms.scale.setScalar(firstPersonArmPresentationScale(this.adsBlend, pose.reloadProgress));
       arms.traverse((node) => {
         if (!(node instanceof THREE.Mesh)) return;
         const material = node.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial;
@@ -3988,8 +4323,8 @@ export class WeaponPresentation {
     } else if (wasMeleeActive) {
       this.restoreRiggedArmBindPose();
     }
-    const grenadeProgress = THREE.MathUtils.clamp((performance.now() - this.grenadeStart) / 620, 0, 1);
-    const grenadeArc = this.grenadeStart > 0 && grenadeProgress < 1 ? Math.sin(grenadeProgress * Math.PI) : 0;
+    const grenadeAction = this.grenadeActionTelemetry();
+    const grenadeArc = grenadeAction.arc;
 
     const viewmodelBaseX = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.x, ADS_VIEWMODEL_BASE_POSITION.x, this.adsBlend);
     const viewmodelBaseY = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.y, ADS_VIEWMODEL_BASE_POSITION.y, this.adsBlend)

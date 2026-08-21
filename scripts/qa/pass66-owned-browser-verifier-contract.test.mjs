@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  hardwareAdapterVendor,
+  nextOuterRectForContentViewport,
   ownedBrowserVerifierReceiptFailures,
   stagedTopologyFailures,
 } from './pass66-owned-browser-verifier-contract.mjs';
@@ -55,30 +57,232 @@ test('accepts a current multiplayer release pass without weakening staged source
   assert.match(stagedTopologyFailures(topology, sourceSha, 'PASS 69').join('\n'), /releasePass/u);
 });
 
+test('binds schema 5 Pass 73 topology and compensates outer chrome to an exact content viewport', () => {
+  const topology = {
+    schemaVersion: 5,
+    sourceSha,
+    releasePass: 'PASS 73',
+    root: { kind: 'chooser-only' },
+    channels: { experimental: { ...candidate, schemaVersion: 5, releasePass: 'PASS 73' } },
+  };
+  assert.deepEqual(stagedTopologyFailures(topology, sourceSha, 'PASS 73', 5), []);
+  assert.match(stagedTopologyFailures(topology, sourceSha, 'PASS 73', 4).join('\n'), /schemaVersion/u);
+  assert.deepEqual(nextOuterRectForContentViewport({
+    innerWidth: 2_500, innerHeight: 1_300, outerWidth: 2_516, outerHeight: 1_390,
+  }), { width: 2_576, height: 1_530 });
+  assert.throws(() => nextOuterRectForContentViewport({
+    innerWidth: 0, innerHeight: 1_300, outerWidth: 2_516, outerHeight: 1_390,
+  }), /positive integer/u);
+  assert.equal(hardwareAdapterVendor('0x10de / 0x2c02'), 'nvidia');
+  assert.equal(hardwareAdapterVendor('Intel(R) Graphics / 0x8086'), 'intel');
+  assert.equal(hardwareAdapterVendor('Default Adapter'), null);
+});
+
 test('rejects stale or incomplete installed-Firefox receipts', () => {
+  const currentCandidate = { ...candidate, schemaVersion: 5, releasePass: 'PASS 73' };
+  const coldRoute = 'http://127.0.0.1:4526/channels/the-big-one/?release=latest&map=atomic-acres&renderer=webgpu&requireWebGPU=1&render=quality&externalServices=off&multiplayerQa=1&seed=pass73-installed-browser-webgpu-cold';
+  const route = 'http://127.0.0.1:4526/channels/the-big-one/?release=latest&map=atomic-acres&renderer=webgpu&requireWebGPU=1&render=quality&externalServices=off&multiplayerQa=1&seed=pass73-installed-browser-webgpu-parity';
+  const graphicsContract = {
+    arenaId: 'atomic-acres', humanProfile: 'quality', internalRenderProfile: 'blender',
+    renderer: {
+      requestedBackend: 'webgpu', actualBackend: 'webgpu', pixelRatio: 1,
+      drawingBuffer: [2_560, 1_440], viewport: [2_560, 1_440], shadows: true,
+      authoredShadows: true, shadowMode: 'static', canvasAntialias: true,
+      canvasSamples: 4, principalHdrSamples: 4, bloomSamples: 0,
+      renderPipelineApi: 'three-r185-render-pipeline',
+    },
+    effects: {
+      depthAwareBloom: true,
+      advancedGraphics: { bloomStrength: 0.14, volumetricScale: 1 },
+      lighting: { profile: 'blender' }, sky: { linearHdr: true },
+      grass: { enabled: true }, atmosphere: { enabled: true }, water: { enabled: false },
+    },
+    assets: {
+      qualityAssetState: 'ready', qualityArtRootVisible: true,
+      proceduralRootActuallyVisible: false, overlappingPrimaryArenaRoots: false,
+      asset: './assets/original/models/atomic-acres-blender-arena.glb?v=test',
+      meshCount: 120, triangleCount: 42_000, surfaceSeparationPass: true,
+      worldIdentityPass: true, proceduralWorldHidden: true,
+    },
+  };
+  const performance = {
+    metricSource: 'webgpu-submission', elapsedMs: 5_100,
+    callbackSampleCount: 280, callbackFps: 280 * 1_000 / 5_100, submissionSampleCount: 180,
+    frameDelta: 282, submissionDelta: 280, completionDelta: 279, completionCaughtUp: true,
+    p50FrameTimeMs: 17, p95FrameTimeMs: 20, p99FrameTimeMs: 24,
+    maximumFrameTimeMs: 42,
+    finalPresentation: {
+      status: 'healthy', submissionSequence: 500, completedSequence: 499, maximumInFlightSubmissions: 2,
+    },
+  };
   const cycle = {
-    label: 'cold', backend: 'webgl2', webglVersion: 'WebGL 2.0', contextState: 'ready',
-    gameStarted: true, matchPhase: 'active',
+    label: 'cold', requestedBackend: 'webgpu', backend: 'webgpu', failClosed: false,
+    deviceLost: false, uncapturedErrors: 0, liveProfile: 'blender', qualityAssetState: 'ready',
+    adapterLabel: 'NVIDIA GeForce RTX 5080', adapterClass: 'GPUAdapter', deviceClass: 'GPUDevice',
+    adapterVendor: 'nvidia', softwareAdapter: false,
+    viewport: [2_560, 1_440], pixelRatio: 1, drawingBuffer: [2_560, 1_440],
+    post: { depthAwareBloom: true, advancedGraphics: { bloomStrength: 0.14, volumetricScale: 1 } },
+    performance, graphicsContract, route, userAgent: 'Mozilla/5.0 Firefox/142.0',
+    gameStarted: true, matchPhase: 'active', navigatorGpu: true,
+    visibilityState: 'visible', documentHasFocus: true,
+  };
+  const chromeCycle = {
+    ...cycle, userAgent: 'Mozilla/5.0 HeadlessChrome/140.0.0.0',
+    performance: { ...performance, p50FrameTimeMs: 16, p95FrameTimeMs: 18 },
+  };
+  const chrome = {
+    browserVersion: '140.0.0.0', executable: browserExecutablePath,
+    executableSha256: browserExecutableSha256, headless: true, presentationMode: 'headless',
+    nativeUserAgent: true, userAgent: chromeCycle.userAgent,
+    cycles: [{ ...chromeCycle, label: 'cold', route: coldRoute }, { ...chromeCycle, label: 'warm' }],
+    viewportControl: {
+      mechanism: 'playwright-content-viewport', requestedContentViewport: [2_560, 1_440], matched: true,
+      final: { innerWidth: 2_560, innerHeight: 1_440, outerWidth: 2_560, outerHeight: 1_440, devicePixelRatio: 1 },
+    },
   };
   const receipt = {
     schemaVersion: 1,
     status: 'PASS',
     gate: 'installed-firefox',
+    releasePass: 'PASS 73',
+    topologySchemaVersion: 5,
     sourceSha,
-    servedCandidate: candidate,
+    servedCandidate: currentCandidate,
+    servedCandidateAfter: currentCandidate,
     browser: 'installed-firefox',
-    cycles: [cycle, { ...cycle, label: 'warm' }],
+    executable: 'C:\\Program Files\\Mozilla Firefox\\firefox.exe',
+    hiddenHeadful: false,
+    cycles: [{ ...cycle, route: coldRoute }, { ...cycle, label: 'warm' }],
+    firefoxSessionClosedBeforeChrome: true,
+    toolchain: {
+      firefox: {
+        executable: 'C:\\Program Files\\Mozilla Firefox\\firefox.exe',
+        executableSha256: 'd'.repeat(64), browserVersion: '142.0', headless: true,
+        presentationMode: 'headless', graphicsMode: 'default', nativeUserAgent: true, userAgent: cycle.userAgent,
+      },
+      chrome: {
+        executable: browserExecutablePath, executableSha256: browserExecutableSha256, browserVersion: chrome.browserVersion,
+        headless: true, presentationMode: 'headless', nativeUserAgent: true, userAgent: chrome.userAgent,
+      },
+    },
+    viewportControl: {
+      firefox: {
+        mechanism: 'webdriver-outer-compensation', requestedContentViewport: [2_560, 1_440], matched: true,
+        attempts: [{
+          requestedOuterRect: { width: 2_576, height: 1_530 },
+          sample: {
+            innerWidth: 2_560, innerHeight: 1_440, outerWidth: 2_576, outerHeight: 1_530,
+            devicePixelRatio: 1, windowRect: { width: 2_576, height: 1_530, x: 0, y: 0 },
+          },
+        }],
+        final: {
+          innerWidth: 2_560, innerHeight: 1_440, outerWidth: 2_576, outerHeight: 1_530,
+          devicePixelRatio: 1, windowRect: { width: 2_576, height: 1_530, x: 0, y: 0 },
+        },
+      },
+      chrome: chrome.viewportControl,
+    },
+    parity: {
+      contract: 'same-content-matched-mode-native-webgpu-firefox-chrome-80pct-median-125pct-p95-v2',
+      seed: 'pass73-installed-browser-webgpu-parity', viewport: [2_560, 1_440],
+      routeParameters: {
+        release: 'latest', map: 'atomic-acres', renderer: 'webgpu', requireWebGPU: '1', render: 'quality',
+        externalServices: 'off', multiplayerQa: '1',
+      },
+      profile: 'quality', internalRenderProfile: 'blender', map: 'atomic-acres', backend: 'webgpu',
+      presentationMode: 'headless', chrome,
+      firefoxMedianThroughputFps: 1_000 / 17, chromeMedianThroughputFps: 1_000 / 16,
+      medianThroughputRatio: 16 / 17, p95FrameTimeRatio: 20 / 18,
+      identicalGraphicsContract: true, passed: true,
+    },
+    sourceState: { startingSha: sourceSha, endingSha: sourceSha, cleanBefore: true, cleanAfter: true },
   };
-  const expected = { gate: 'installed-firefox', sourceSha, treeSha256, exactRootFileCount: 12 };
+  const expected = {
+    gate: 'installed-firefox', releasePass: 'PASS 73', topologySchemaVersion: 5,
+    sourceSha, treeSha256, exactRootFileCount: 12,
+    baseUrl: 'http://127.0.0.1:4526/channels/the-big-one/',
+  };
   assert.deepEqual(ownedBrowserVerifierReceiptFailures(receipt, expected), []);
   assert.match(ownedBrowserVerifierReceiptFailures({
     ...receipt,
-    cycles: [cycle, { ...cycle, label: 'warm', backend: null }],
-  }, expected).join('\n'), /invalid admission cycle/u);
+    cycles: [receipt.cycles[0], { ...receipt.cycles[1], backend: null }],
+  }, expected).join('\n'), /native-WebGPU admission identity/u);
   assert.match(ownedBrowserVerifierReceiptFailures({
     ...receipt,
-    servedCandidate: { ...candidate, sourceSha: 'c'.repeat(40) },
+    parity: {
+      ...receipt.parity,
+      chrome: {
+        ...chrome,
+        cycles: chrome.cycles.map((entry) => ({
+          ...entry, adapterLabel: 'Intel Arc Graphics', adapterVendor: 'intel',
+        })),
+      },
+    },
+  }, expected).join('\n'), /paired installed Chrome/u);
+  assert.match(ownedBrowserVerifierReceiptFailures({
+    ...receipt,
+    cycles: [receipt.cycles[0], { ...receipt.cycles[1], failClosed: true }],
+  }, expected).join('\n'), /native-WebGPU admission identity/u);
+  assert.match(ownedBrowserVerifierReceiptFailures({
+    ...receipt,
+    servedCandidate: { ...currentCandidate, sourceSha: 'c'.repeat(40) },
   }, expected).join('\n'), /served candidate sourceSha mismatch/u);
+  assert.match(ownedBrowserVerifierReceiptFailures({
+    ...receipt,
+    servedCandidateAfter: { ...currentCandidate, treeSha256: 'f'.repeat(64) },
+  }, expected).join('\n'), /served candidate tree digest mismatch/u);
+  assert.match(ownedBrowserVerifierReceiptFailures({
+    ...receipt,
+    parity: { ...receipt.parity, medianThroughputRatio: 0.79 },
+  }, expected).join('\n'), /paired installed Chrome/u);
+  assert.match(ownedBrowserVerifierReceiptFailures({
+    ...receipt,
+    parity: {
+      ...receipt.parity,
+      chrome: {
+        ...chrome,
+        cycles: chrome.cycles.map((entry, index) => index === 1
+          ? { ...entry, adapterLabel: 'Google SwiftShader', softwareAdapter: true }
+          : entry),
+      },
+    },
+  }, expected).join('\n'), /native-WebGPU admission identity/u);
+  assert.match(ownedBrowserVerifierReceiptFailures({
+    ...receipt,
+    cycles: [receipt.cycles[0], {
+      ...receipt.cycles[1], performance: { ...performance, metricSource: 'animation-frame' },
+    }],
+  }, expected).join('\n'), /submission performance evidence/u);
+  assert.match(ownedBrowserVerifierReceiptFailures({
+    ...receipt,
+    viewportControl: {
+      ...receipt.viewportControl,
+      firefox: {
+        ...receipt.viewportControl.firefox,
+        final: { ...receipt.viewportControl.firefox.final, innerHeight: 1_340 },
+      },
+    },
+  }, expected).join('\n'), /content viewport control/u);
+  assert.match(ownedBrowserVerifierReceiptFailures({
+    ...receipt,
+    parity: { ...receipt.parity, chrome: { ...chrome, headless: false, presentationMode: 'headed' } },
+  }, expected).join('\n'), /paired installed Chrome/u);
+  assert.match(ownedBrowserVerifierReceiptFailures({
+    ...receipt,
+    parity: {
+      ...receipt.parity,
+      chrome: {
+        ...chrome,
+        cycles: chrome.cycles.map((entry, index) => index === 1
+          ? { ...entry, graphicsContract: { ...entry.graphicsContract, humanProfile: 'performance' } }
+          : entry),
+      },
+    },
+  }, expected).join('\n'), /Quality graphics\/assets\/effects|paired installed Chrome/u);
+  assert.match(ownedBrowserVerifierReceiptFailures({
+    ...receipt,
+    sourceState: { ...receipt.sourceState, cleanAfter: false },
+  }, expected).join('\n'), /clean source/u);
 });
 
 test('requires tokenized owned local signaling in the private-lobby receipt', () => {

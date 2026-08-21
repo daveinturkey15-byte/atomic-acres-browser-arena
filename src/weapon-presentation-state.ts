@@ -146,7 +146,13 @@ export const VIEWMODEL_CONTACT_PROFILES: Readonly<Record<WeaponId, ViewmodelCont
   sniper: contactProfile('sniper', 0.96, 0.75, 1.95, 0.31, 0.3, 0.35, 0.98, -0.17, 0.1, 0.065, 0.25),
   'mini-uzi': contactProfile('mini-uzi', 0.62, 0.85, 1.25, 0.18, 0.2, 0.22, 0.64, -0.1, 0.07, 0.04, 0.18),
   mp5: contactProfile('mp5', 0.7, 0.82, 1.5, 0.22, 0.23, 0.26, 0.74, -0.12, 0.08, 0.05, 0.2),
-  m4a1: contactProfile('m4a1', 0.84, 0.78, 1.7, 0.25, 0.26, 0.3, 0.82),
+  // The generic 22 cm wall drop turned the M4 fold into a low-ready pose and
+  // buried the complete firing sleeve. Its 84-degree pitch plus 82 cm retreat
+  // already clears the authored envelope; retain the catalog's 17 cm minimum
+  // drop and counter it with a physical 12 cm high-ready lift so both hands
+  // and the intervening forearms remain visible while the shoulders still
+  // continue through the crop.
+  m4a1: contactProfile('m4a1', 0.84, 0.86, 1.7, 0.25, 0.26, 0.3, 0.82, -0.14, 0.09, 0.12, 0.17),
   'ak-47': contactProfile('ak-47', 0.86, 0.78, 1.75, 0.26, 0.27, 0.31, 0.86, -0.15),
   minigun: contactProfile('minigun', 1, 0.74, 1.95, 0.36, 0.32, 0.4, 1, -0.18, 0.11, 0.07, 0.27),
   'm14-ebr': contactProfile('m14-ebr', 0.94, 0.76, 1.9, 0.3, 0.29, 0.34, 0.96, -0.16, 0.1, 0.065, 0.25),
@@ -209,6 +215,10 @@ export function viewmodelContactResponse(
     additionalLiftMeters: profile.maximumAdditionalLiftMeters
       * Math.max(wallBlend, floorBlend)
       * (0.72 + 0.28 * adsRemaining)
+      // The probe's measured floor pressure is real world-space clearance.
+      // Carry it into the camera-space root so the complete skinned sleeves and
+      // receiver remain above the prone floor instead of only reporting lift.
+      + lift * floorBlend
       // Retain the accepted wall-drop telemetry and response, while a real
       // floor contact counter-lifts ninety-two percent of it. This keeps the
       // connected weapon/hands above the prone plane without weakening the

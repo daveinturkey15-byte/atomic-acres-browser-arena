@@ -41,7 +41,7 @@ describe('production release workflow', () => {
     expect(workflow).not.toContain('git config --global');
   });
 
-  it('stages live Pass 72, previous Pass 70, retained Pass 69, stable Pass 67.1 and rollback Pass 63 before a complete publish', () => {
+  it('stages live Pass 73, previous Pass 72, retained Pass 70 and Pass 69, stable Pass 67.1 and rollback Pass 63 before a complete publish', () => {
     expect(workflow).toContain('npm run stage:release-topology');
     expect(workflow).toContain('npm run verify:release-topology');
     expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}');
@@ -49,21 +49,27 @@ describe('production release workflow', () => {
     expect(workflow).toContain('RELEASE_ROLLBACK_DIST: ${{ env.RELEASE_ROLLBACK_DIST }}');
     expect(workflow).toContain('git worktree add artifacts/pass63-rollback-src "$rollback_source_sha"');
     expect(workflow).not.toContain('stage:stable-channel');
-    expect(workflow).toContain('Stage live Pass 72, exact previous Pass 70, retained Pass 69, rebuilt Pass 67.1 and Pass 63 rollback');
-    expect(workflow).toContain('RETAINED_PAGES_SHA=$(node -e');
+    expect(workflow).toContain('Stage live Pass 73, exact previous Pass 72, retained Pass 70 and Pass 69, rebuilt Pass 67.1 and Pass 63 rollback');
+    expect(workflow).toContain('for channel_key in previous retained historical; do');
+    expect(workflow).toContain('git cat-file -e "${pinned_pages_sha}^{commit}"');
     expect(readFileSync('package.json', 'utf8')).toContain('"deploy:ci": "gh-pages -d dist"');
     expect(readFileSync('package.json', 'utf8')).not.toContain('"deploy:ci": "gh-pages -d dist --add"');
   });
 
-  it('verifies public Pass 72, previous Pass 70, retained Pass 69 and Pass 63 choices while retaining internal stable provenance', () => {
-    expect(staticTopologyVerifier).toContain("['experimental', 'previous', 'retained', 'stable']");
-    expect(staticTopologyVerifier).toContain("['experimental', 'previous', 'retained']");
+  it('verifies four public choices while retaining unlinked stable provenance', () => {
+    expect(staticTopologyVerifier).toContain("['experimental', 'previous', 'retained', 'historical', 'stable']");
+    expect(staticTopologyVerifier).toContain("['experimental', 'previous', 'retained', 'historical']");
     expect(staticTopologyVerifier).toContain('publicConfig.retained.pass !== config.retained.pass');
+    expect(staticTopologyVerifier).toContain('publicConfig.historical.pass !== config.historical.pass');
     expect(staticTopologyVerifier).toContain('publicConfig.stable.pass !== config.rollback.pass');
     expect(liveTopologyVerifier).toContain('await buttons.count() !== 4');
-    expect(liveTopologyVerifier).toContain("for (const choice of ['experimental', 'previous', 'retained', 'stable'])");
-    expect(liveTopologyVerifier).toContain("await verifyChoice('retained', 'channels/pass69-retained', 'PASS 69', 'pass69');");
-    expect(liveTopologyVerifier).toContain("await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63', expectedRollbackReleasedAt);");
+    expect(liveTopologyVerifier).toContain("for (const choice of ['experimental', 'previous', 'retained', 'historical'])");
+    expect(liveTopologyVerifier).toContain("await verifyChoice('previous', 'channels/pass72-retained', 'PASS 72', 'pass72');");
+    expect(liveTopologyVerifier).toContain("await verifyChoice('retained', 'channels/pass70-retained', 'PASS 70', 'pass70');");
+    expect(liveTopologyVerifier).toContain("await verifyChoice('historical', 'channels/pass69-retained', 'PASS 69', 'pass69');");
+    expect(liveTopologyVerifier).not.toContain("await verifyChoice('stable'");
+    expect(liveTopologyVerifier).toContain("verifyLegacyRoute('stable', (params) => params.set('release', 'stable'), 'channels/pass72-retained', 'PASS 72')");
+    expect(liveTopologyVerifier).toContain("verifyLegacyRoute('rollback', (params) => params.set('release', 'rollback'), 'channels/pass72-retained', 'PASS 72')");
     expect(liveTopologyVerifier).not.toContain("await verifyChoice('rollback'");
   });
 
@@ -96,7 +102,7 @@ describe('production release workflow', () => {
     expect(staticTopologyVerifier).toContain('rollbackProvenance.treeSha256 !== treeDigest(rollbackRoot, rollbackFiles)');
     expect(topologyBrowserVerifier).toContain('rollbackOriginal.releasedAt, expectedRollbackReleasedAt');
     expect(topologyBrowserVerifier).toContain('expectsPendingCandidate = isCurrentCandidate && !expectedReleasedAt');
-    expect(topologyBrowserVerifier).toContain("lastReleaseLabel !== 'CURRENT CANDIDATE · PUBLIC HITL AFTER RELEASE'");
+    expect(topologyBrowserVerifier).toContain("lastReleaseLabel !== 'HITL CANDIDATE · NOT LIVE'");
     expect(topologyBrowserVerifier).toContain('verifyProductionReleaseTimestamp');
     expect(workflow.match(/test -n "\$\{RELEASE_BUILT_AT:-\}"/g)).toHaveLength(2);
     expect(topologyBrowserVerifier).toContain('process.env.RELEASE_BUILT_AT?.trim()');
@@ -178,12 +184,16 @@ describe('production release workflow', () => {
     expect(verifyWorkflow).toContain('scripts/release/workflow-metrics.mjs');
   });
 
-  it('runs the Windows HUD and lifecycle files in separate fail-closed browser processes', () => {
+  it('runs Pass 73, Windows HUD and lifecycle files in separate fail-closed browser processes', () => {
     const windowsJob = verifyWorkflow.slice(
       verifyWorkflow.indexOf('bounded-browser-windows:'),
       verifyWorkflow.indexOf('bounded-browser-linux:'),
     );
-    expect(windowsJob).toContain('timeout-minutes: 60');
+    expect(windowsJob).toContain('timeout-minutes: 90');
+    expect(windowsJob).toContain('name: Run Pass 73 gameplay regression contracts');
+    expect(windowsJob).toContain('timeout-minutes: 25');
+    expect(windowsJob).toContain('tests/e2e/pass73-gameplay-regressions.spec.ts tests/e2e/pass73-network-reveal-authority.spec.ts --project=chromium --workers=1 --retries=0');
+    expect(windowsJob).toContain("Where-Object { $_ -ne 'pass73-gameplay-regressions' }");
     expect(windowsJob).toContain('name: Run Pass 64 HUD browser contracts');
     expect(windowsJob).toContain('timeout-minutes: 10');
     expect(windowsJob).toContain('node node_modules/@playwright/test/cli.js test tests/e2e/pass64-hud-menu.spec.ts --project=chromium --workers=1 --retries=0');
@@ -202,6 +212,11 @@ describe('production release workflow', () => {
       verifyWorkflow.indexOf('bounded-browser-linux:'),
       verifyWorkflow.indexOf('pipeline-metrics:'),
     );
+    expect(linuxJob).toContain('timeout-minutes: 65');
+    expect(linuxJob).not.toContain('name: Run Pass 73 gameplay regression contracts');
+    expect(linuxJob).not.toContain('tests/e2e/pass73-gameplay-regressions.spec.ts');
+    expect(linuxJob).not.toContain('tests/e2e/pass73-network-reveal-authority.spec.ts');
+    expect(linuxJob).toContain("group !== 'pass73-gameplay-regressions'");
     expect(linuxJob).toContain('name: Upload Linux browser failure evidence');
     expect(linuxJob).toContain("if: failure() && needs.classify-change.outputs.mode != 'none'");
     expect(linuxJob).toContain('name: bounded-browser-linux-failure-${{ github.event.pull_request.head.sha || github.sha }}');
@@ -336,7 +351,7 @@ describe('production release workflow', () => {
     expect(section).toContain('artifacts/pipeline/pr-preview-provenance.json');
   });
 
-  it('records the schema 3 two-channel topology in the production receipt', () => {
+  it('records the schema 3 receipt envelope with the complete staged topology', () => {
     expect(workflow).toContain('node scripts/release/write-production-receipt.mjs');
     expect(receiptWriter).toContain('schemaVersion: 3');
     expect(receiptWriter).toContain('topology,');
@@ -347,10 +362,12 @@ describe('production release workflow', () => {
     expect(workflow).not.toContain('gh run watch');
   });
 
-  it('binds the live browser proof to public Pass 72, previous Pass 70 and Pass 63 choices, internal stable provenance, aliases, and Last Release', () => {
-    expect(liveTopologyVerifier).toContain("verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass72')");
-    expect(liveTopologyVerifier).toContain("verifyChoice('previous', 'channels/pass70-retained', 'PASS 70', 'pass70')");
-    expect(liveTopologyVerifier).toContain("verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63', expectedRollbackReleasedAt)");
+  it('binds live browser proof to four public builds, retained provenance, remapped legacy aliases, and Last Release', () => {
+    expect(liveTopologyVerifier).toContain("verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass73')");
+    expect(liveTopologyVerifier).toContain("verifyChoice('previous', 'channels/pass72-retained', 'PASS 72', 'pass72')");
+    expect(liveTopologyVerifier).toContain("verifyChoice('retained', 'channels/pass70-retained', 'PASS 70', 'pass70')");
+    expect(liveTopologyVerifier).toContain("verifyChoice('historical', 'channels/pass69-retained', 'PASS 69', 'pass69')");
+    expect(liveTopologyVerifier).not.toContain("verifyChoice('stable'");
     expect(liveTopologyVerifier).not.toContain("verifyChoice('rollback'");
     expect(liveTopologyVerifier).toContain('pinned-channel-provenance.json');
     expect(liveTopologyVerifier).toContain('Stable embedded runtime digest');
@@ -358,7 +375,7 @@ describe('production release workflow', () => {
     expect(liveTopologyVerifier).toContain("verifyLegacyRoute('normal'");
     expect(liveTopologyVerifier).toContain("verifyLegacyRoute('room'");
     expect(liveTopologyVerifier).toContain('Last Release timestamp is not a published instant');
-    expect(liveTopologyVerifier).toContain("lastReleaseLabel !== 'CURRENT CANDIDATE · PUBLIC HITL AFTER RELEASE'");
+    expect(liveTopologyVerifier).toContain("lastReleaseLabel !== 'HITL CANDIDATE · NOT LIVE'");
     expect(liveTopologyVerifier).toContain("releaseState !== 'LOCAL CANDIDATE'");
     expect(liveTopologyVerifier).toContain("timeText.includes('NOT PUBLISHED')");
     expect(liveTopologyVerifier).not.toContain("'channels/the-big-one', 'PASS 65'");

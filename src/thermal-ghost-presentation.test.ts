@@ -67,6 +67,24 @@ describe('M14 thermal ghost residency', () => {
     presentation.terminalDispose();
   });
 
+  it('releases unseen admission-prewarm records when the live reveal set takes ownership', () => {
+    const scene = new THREE.Scene();
+    const prewarmRoot = new THREE.Group();
+    const liveRoot = new THREE.Group();
+    prewarmRoot.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial()));
+    liveRoot.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial()));
+    scene.add(prewarmRoot, liveRoot);
+    const presentation = new ThermalGhostPresentation();
+
+    presentation.sync([{ id: 'thermal-prewarm-corpse-0', relation: 'hostile', root: prewarmRoot }], true);
+    presentation.sync([{ id: 'bot-live', relation: 'hostile', root: liveRoot }], true, true);
+
+    expect(presentation.telemetry()).toMatchObject({ trackedTargets: 1, activeTargetIds: ['bot-live'] });
+    expect(prewarmRoot.getObjectsByProperty('name', 'through-wall-exact-operator-model')).toHaveLength(0);
+    expect(prewarmRoot.getObjectsByProperty('name', 'through-wall-operator-orange-halo')).toHaveLength(0);
+    presentation.terminalDispose();
+  });
+
   it('shares exact geometry and a live skeleton while rendering normal model plus orange halo', () => {
     const scene = new THREE.Scene();
     const root = new THREE.Group();
@@ -92,13 +110,23 @@ describe('M14 thermal ghost residency', () => {
     source.userData.presentationOnly = true;
     source.add(hip);
     source.bind(skeleton);
-    root.add(source);
+    const visual = new THREE.Group();
+    visual.name = 'rigged-operator-visual';
+    visual.add(source);
+    // Runtime-authored static attachments below the visual must not make the
+    // shipped nine-skinned-mesh body fail its 12-layer exact-model bound.
+    for (let index = 0; index < 4; index += 1) {
+      const attachment = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+      attachment.name = `runtime-static-attachment-${index}`;
+      visual.add(attachment);
+    }
+    root.add(visual);
     scene.add(root);
     const presentation = new ThermalGhostPresentation();
 
     presentation.sync([{ id: 'animated-operator', relation: 'hostile', root }], true);
-    const model = source.getObjectByName('through-wall-exact-operator-model') as THREE.SkinnedMesh;
-    const halo = source.getObjectByName('through-wall-operator-orange-halo') as THREE.SkinnedMesh;
+    const model = root.getObjectByName('through-wall-exact-operator-model') as THREE.SkinnedMesh;
+    const halo = root.getObjectByName('through-wall-operator-orange-halo') as THREE.SkinnedMesh;
     expect(model).toBeInstanceOf(THREE.SkinnedMesh);
     expect(halo).toBeInstanceOf(THREE.SkinnedMesh);
     expect(model.geometry).toBe(source.geometry);
@@ -111,7 +139,17 @@ describe('M14 thermal ghost residency', () => {
     expect((model.material as THREE.Material).depthWrite).toBe(false);
     expect((halo.material as THREE.MeshBasicMaterial).color.getHex()).toBe(THERMAL_GHOST_ORANGE_HEX);
     expect((halo.material as THREE.MeshBasicMaterial).side).toBe(THREE.BackSide);
-    expect(halo.scale.toArray()).toEqual([THERMAL_GHOST_HALO_SCALE, THERMAL_GHOST_HALO_SCALE, THERMAL_GHOST_HALO_SCALE]);
+    expect(model.parent).toBe(source.parent);
+    expect(halo.parent).toBe(source.parent);
+    expect(model.parent).not.toBe(source);
+    expect(root.getObjectsByProperty('name', 'through-wall-exact-operator-model')).toHaveLength(1);
+    expect(root.getObjectsByProperty('name', 'through-wall-operator-orange-halo')).toHaveLength(1);
+    expect(model.matrix.equals(source.matrix)).toBe(true);
+    expect(halo.matrix.equals(source.matrix.clone().scale(new THREE.Vector3(
+      THERMAL_GHOST_HALO_SCALE,
+      THERMAL_GHOST_HALO_SCALE,
+      THERMAL_GHOST_HALO_SCALE,
+    )))).toBe(true);
     expect(model.raycast(new THREE.Raycaster(), [])).toBeUndefined();
     expect(halo.raycast(new THREE.Raycaster(), [])).toBeUndefined();
     leg.rotation.x = 0.62;
@@ -129,6 +167,7 @@ describe('M14 thermal ghost residency', () => {
       boneWorldMatrixIdentity: true,
       normalMaterialEquivalence: true,
       silhouetteLayerIdentity: true,
+      siblingParentIdentity: true,
       proxyMeshes: 0,
     });
     presentation.terminalDispose();
@@ -149,7 +188,7 @@ describe('M14 thermal ghost residency', () => {
     const presentation = new ThermalGhostPresentation();
 
     presentation.sync([target], true);
-    const model = source.getObjectByName('through-wall-exact-operator-model') as THREE.Mesh;
+    const model = root.getObjectByName('through-wall-exact-operator-model') as THREE.Mesh;
     const residentMaterial = model.material as THREE.MeshStandardMaterial;
     const map = new THREE.Texture();
     sourceMaterial.color.setHex(0x8a4f2a);
@@ -274,6 +313,175 @@ describe('M14 thermal ghost residency', () => {
     material.colorWrite = true;
     presentation.sync([target], true);
     expect(presentation.telemetry()).toMatchObject({ activeTargets: 1, throughGeometry: true, orangeHalo: true });
+    presentation.terminalDispose();
+  });
+
+  it('fails telemetry closed for model and halo opacity, visibility, colorWrite, or depthTest mutations', () => {
+    const root = new THREE.Group();
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()));
+    const presentation = new ThermalGhostPresentation();
+    presentation.sync([{ id: 'material-adversary', relation: 'hostile', root }], true);
+    const model = root.getObjectByName('through-wall-exact-operator-model') as THREE.Mesh;
+    const halo = root.getObjectByName('through-wall-operator-orange-halo') as THREE.Mesh;
+    const modelMaterial = model.material as THREE.Material;
+    const haloMaterial = halo.material as THREE.Material;
+
+    expect(presentation.telemetry()).toMatchObject({
+      exactModelVisible: true,
+      exactModelColorWrite: true,
+      exactModelOpacity: 1,
+      exactModelDepthTestDisabled: true,
+      exactModelDepthWriteDisabled: true,
+      haloVisible: true,
+      haloColorWrite: true,
+      haloOpacity: 0.88,
+      haloDepthTestDisabled: true,
+      haloDepthWriteDisabled: true,
+      throughGeometry: true,
+      orangeHalo: true,
+    });
+
+    const assertModelFailure = (field: 'exactModelVisible' | 'exactModelColorWrite'
+      | 'exactModelDepthTestDisabled', mutate: () => void, restore: () => void): void => {
+      mutate();
+      expect(presentation.telemetry()).toMatchObject({ [field]: false, throughGeometry: false });
+      restore();
+    };
+    modelMaterial.opacity = 0;
+    expect(presentation.telemetry()).toMatchObject({ exactModelOpacity: 0, throughGeometry: false });
+    modelMaterial.opacity = 1;
+    assertModelFailure('exactModelVisible', () => { modelMaterial.visible = false; }, () => { modelMaterial.visible = true; });
+    assertModelFailure('exactModelColorWrite', () => { modelMaterial.colorWrite = false; }, () => { modelMaterial.colorWrite = true; });
+    assertModelFailure('exactModelDepthTestDisabled', () => { modelMaterial.depthTest = true; }, () => { modelMaterial.depthTest = false; });
+
+    const assertHaloFailure = (field: 'haloVisible' | 'haloColorWrite'
+      | 'haloDepthTestDisabled', mutate: () => void, restore: () => void): void => {
+      mutate();
+      expect(presentation.telemetry()).toMatchObject({ [field]: false, throughGeometry: false, orangeHalo: false });
+      restore();
+    };
+    haloMaterial.opacity = 0;
+    expect(presentation.telemetry()).toMatchObject({ haloOpacity: 0, throughGeometry: false, orangeHalo: false });
+    haloMaterial.opacity = 0.88;
+    assertHaloFailure('haloVisible', () => { haloMaterial.visible = false; }, () => { haloMaterial.visible = true; });
+    assertHaloFailure('haloColorWrite', () => { haloMaterial.colorWrite = false; }, () => { haloMaterial.colorWrite = true; });
+    assertHaloFailure('haloDepthTestDisabled', () => { haloMaterial.depthTest = true; }, () => { haloMaterial.depthTest = false; });
+
+    expect(presentation.telemetry()).toMatchObject({ throughGeometry: true, orangeHalo: true });
+    presentation.terminalDispose();
+  });
+
+  it('supports paired-raster hiding without changing the admitted target set', () => {
+    const root = new THREE.Group();
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()));
+    const presentation = new ThermalGhostPresentation();
+    presentation.sync([{ id: 'paired-raster', relation: 'hostile', root }], true);
+    expect(presentation.telemetry()).toMatchObject({
+      activeTargetIds: ['paired-raster'],
+      activeTargets: 1,
+      evidenceControlHidden: false,
+    });
+    expect(presentation.setEvidenceControlHidden(true)).toBe(true);
+    expect(presentation.telemetry()).toMatchObject({
+      activeTargetIds: ['paired-raster'],
+      activeTargets: 1,
+      evidenceControlHidden: true,
+      exactModelVisible: false,
+      haloVisible: false,
+      throughGeometry: false,
+      orangeHalo: false,
+    });
+    expect(presentation.setEvidenceControlHidden(false)).toBe(true);
+    presentation.sync([{ id: 'paired-raster', relation: 'hostile', root }], true);
+    expect(presentation.telemetry()).toMatchObject({
+      activeTargetIds: ['paired-raster'],
+      activeTargets: 1,
+      evidenceControlHidden: false,
+      normalMaterialEquivalence: true,
+    });
+    presentation.terminalDispose();
+  });
+
+  it('binds active reveal records to the current life, continuity, attached root, and animated pose', () => {
+    const scene = new THREE.Scene();
+    const root = new THREE.Group();
+    const source = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    root.add(source);
+    scene.add(root);
+    const presentation = new ThermalGhostPresentation();
+    presentation.sync([{ id: 'live-operator', relation: 'hostile', root, lifeId: 3, continuityId: 8 }], true);
+    const first = presentation.telemetry(true);
+    expect(first).toMatchObject({
+      lifeIdentityCurrent: true,
+      poseIdentity: true,
+      sourceRootsAttached: true,
+      sourceRootIdentityUnique: true,
+      detachedLayers: 0,
+      extraneousModelLayers: 0,
+      extraneousHaloLayers: 0,
+      duplicateSourceRootInputs: 0,
+      targets: [{
+        id: 'live-operator', lifeId: 3, continuityId: 8, active: true,
+        sourceRootAttached: true, sourceVisualAttached: true, poseIdentity: true,
+      }],
+    });
+    const firstPose = first.targets?.[0]!.sourcePoseDigest;
+    source.rotation.y = 0.64;
+    presentation.sync([{ id: 'live-operator', relation: 'hostile', root, lifeId: 3, continuityId: 8 }], true);
+    const second = presentation.telemetry(true);
+    expect(second.targets?.[0]!.sourcePoseDigest).not.toBe(firstPose);
+    expect(second.targets?.[0]!.modelPoseDigest).toBe(second.targets?.[0]!.sourcePoseDigest);
+    presentation.terminalDispose();
+  });
+
+  it('rebuilds an identical target id at a new life and rejects duplicate source roots', () => {
+    const scene = new THREE.Scene();
+    const root = new THREE.Group();
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()));
+    scene.add(root);
+    const presentation = new ThermalGhostPresentation();
+    presentation.sync([{ id: 'respawned', relation: 'hostile', root, lifeId: 1, continuityId: 4 }], true);
+    const oldModelUuid = root.getObjectByName('through-wall-exact-operator-model')!.uuid;
+    presentation.sync([{ id: 'respawned', relation: 'hostile', root, lifeId: 2, continuityId: 5 }], true);
+    expect(root.getObjectByName('through-wall-exact-operator-model')!.uuid).not.toBe(oldModelUuid);
+    expect(presentation.telemetry(true)).toMatchObject({
+      activeTargets: 1,
+      lifeIdentityCurrent: true,
+      targets: [{ id: 'respawned', lifeId: 2, continuityId: 5 }],
+    });
+
+    presentation.sync([
+      { id: 'respawned', relation: 'hostile', root, lifeId: 2, continuityId: 5 },
+      { id: 'duplicate-alias', relation: 'hostile', root, lifeId: 2, continuityId: 5 },
+    ], true);
+    expect(presentation.telemetry(true)).toMatchObject({
+      activeTargetIds: ['respawned'],
+      duplicateSourceRootInputs: 1,
+      sourceRootIdentityUnique: true,
+      extraneousModelLayers: 0,
+      extraneousHaloLayers: 0,
+    });
+    presentation.terminalDispose();
+  });
+
+  it('reports detached and duplicate reveal layers instead of certifying a split model', () => {
+    const scene = new THREE.Scene();
+    const root = new THREE.Group();
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()));
+    scene.add(root);
+    const presentation = new ThermalGhostPresentation();
+    presentation.sync([{ id: 'structural-adversary', relation: 'hostile', root, lifeId: 0, continuityId: 1 }], true);
+    const model = root.getObjectByName('through-wall-exact-operator-model')!;
+    model.removeFromParent();
+    expect(presentation.telemetry(true)).toMatchObject({ detachedLayers: 1, siblingParentIdentity: false });
+    root.add(model);
+    const duplicate = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    duplicate.name = 'through-wall-exact-operator-model';
+    root.add(duplicate);
+    expect(presentation.telemetry(true)).toMatchObject({ extraneousModelLayers: 1 });
+    duplicate.removeFromParent();
+    duplicate.geometry.dispose();
+    (duplicate.material as THREE.Material).dispose();
     presentation.terminalDispose();
   });
 

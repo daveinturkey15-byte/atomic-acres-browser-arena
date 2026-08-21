@@ -1,5 +1,15 @@
 import { isBlocked, pointInsideBounds, segmentIntersectsBox, type Box2, type Point3 } from './collision';
 
+/** Keep every collider except the pane on which the bolt itself detonated. */
+export function crossbowBlastLineOfSightColliders(
+  colliders: readonly Box2[],
+  impactWindowId: string | null,
+  windowIdForCollider: (collider: Box2) => string | null,
+): readonly Box2[] {
+  if (impactWindowId === null) return colliders;
+  return Object.freeze(colliders.filter((collider) => windowIdForCollider(collider) !== impactWindowId));
+}
+
 export function windowBreakPathBlocked(
   origin: Point3,
   centre: Point3,

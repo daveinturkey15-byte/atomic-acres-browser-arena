@@ -362,6 +362,14 @@ surface_material = {
     "timber": M["timber"], "concrete": M["concrete"], "trim": M["trim"], "glass": M["glass"],
     "metal": M["metal"], "ceiling": M["ceiling"], "light": M["emissive_amber"],
 }
+PASS73_COLLISION_VISUAL_ROLES = {
+    "ground-west-wall": "wall",
+    "upper-floor-main": "floor",
+    "front-door-lintel": "underside",
+    "entrance-canopy": "canopy",
+    "upper-window-sill-wall": "window-approach",
+}
+collision_visual_owners = []
 for house_index, house in enumerate(spec["houses"]):
     prefix = "AQUA" if house["team"] == 0 else "CORAL"
     for solid_index, solid in enumerate(house["solids"]):
@@ -379,19 +387,35 @@ for house_index, house in enumerate(spec["houses"]):
                 solid_material = M["aqua_upper"] if house["team"] == 0 else M["coral_upper"]
             elif solid["name"].startswith("rear-ground"):
                 solid_material = M["aqua_rear"] if house["team"] == 0 else M["coral_rear"]
-        add_box(
+        rendered_solid = add_box(
             f"BLD_HOUSE_{prefix}_{solid_index:03d}_{solid['name']}", solid["position"], solid["size"],
             solid_material, 0.025 if solid["kind"] != "glass" else 0,
             rotation=rotation, semantic=semantic,
         )
+        route_role = PASS73_COLLISION_VISUAL_ROLES.get(solid["name"])
+        if route_role is not None:
+            rendered_solid["atomic_semantic"] = "collision-visual-owner"
+            rendered_solid["atomic_house_id"] = house["id"]
+            rendered_solid["atomic_solid_id"] = solid["id"]
+            rendered_solid["atomic_route_role"] = route_role
+            rendered_solid["atomic_collision_bounds"] = [
+                solid["position"][0] - solid["size"][0] / 2,
+                solid["position"][1] - solid["size"][1] / 2,
+                solid["position"][2] - solid["size"][2] / 2,
+                solid["position"][0] + solid["size"][0] / 2,
+                solid["position"][1] + solid["size"][1] / 2,
+                solid["position"][2] + solid["size"][2] / 2,
+            ]
+            collision_visual_owners.append(rendered_solid)
         if upper_floor:
-            position = list(solid["position"])
-            size = list(solid["size"])
-            position[1] += size[1] / 2 + 0.012
-            add_box(
-                f"BLD_HOUSE_{prefix}_{solid_index:03d}_{solid['name']}_timber_wear_surface",
-                position, [size[0], 0.024, size[2]], M["timber"], 0,
-            )
+            # Keep the visible walking face inside the exact authoritative slab
+            # Box3. The former 24 mm overlay floated above movement/support
+            # authority and made feet/viewmodels visibly clip into the floor.
+            rendered_solid.data.materials.append(M["timber"])
+            apply_box_uvs(rendered_solid, M["timber"])
+            for polygon in rendered_solid.data.polygons:
+                if polygon.normal.z > 0.5:
+                    polygon.material_index = 1
     x, z = house["origin"]["x"], house["origin"]["z"]
     facing = house["origin"]["facing"]
     width, depth = house["dimensions"]["width"], house["dimensions"]["depth"]
@@ -449,11 +473,11 @@ for house_index, house in enumerate(spec["houses"]):
     add_box(f"BLD_HOUSE_{prefix}_roof_plant", [x + 4.8, 7.52, z - facing * 2.2], [2.5, 0.58, 1.7], M["boundary"], 0.12)
     for offset in (-0.72, 0.72):
         add_box(f"BLD_HOUSE_{prefix}_roof_vent_{offset}", [x + 4.8 + offset, 7.92, z - facing * 2.2], [0.1, 0.24, 1.15], M["metal_light"], 0.02)
-    # Lightweight entrance canopy and recessed wayfinding light: presentation
-    # only, above the traversal envelope, batched into existing materials.
-    entrance_z = z + facing * (depth / 2 + 0.58)
-    entrance_x = x + (0.55 if house["team"] == 0 else -0.55)
-    add_box(f"BLD_HOUSE_{prefix}_entrance_canopy", [entrance_x, 3.05, entrance_z], [4.4, 0.16, 1.4], M["metal"], 0.04)
+    # The canopy is emitted once from the shared HouseSolid above. A second
+    # presentation-only copy here previously produced overlapping triangles and
+    # a visible surface with no unique movement/shot/support owner.
+    entrance_canopy = next(solid for solid in house["solids"] if solid["name"] == "entrance-canopy")
+    entrance_x, _, entrance_z = entrance_canopy["position"]
     for side in (-1, 1):
         add_box(f"BLD_HOUSE_{prefix}_entrance_frame_{side}", [entrance_x + side * 2.05, 1.65, entrance_z - facing * 0.34], [0.18, 2.8, 0.18], accent, 0.025)
     add_box(f"BLD_HOUSE_{prefix}_entrance_light", [x, 2.92, entrance_z - facing * 0.18], [2.4, 0.05, 0.12], M["emissive_aqua"] if house["team"] == 0 else M["emissive_amber"], 0.01)
@@ -815,7 +839,7 @@ aperture_audit_markers = audit_house_apertures()
 
 # Join ordinary non-semantic meshes by material to keep browser draw calls bounded.
 window_objects = {obj for obj in env.objects if obj.get("atomic_semantic") == "breakable-window"}
-protected_objects = window_objects
+protected_objects = window_objects | set(collision_visual_owners)
 for material in list(M.values()):
     objects = [obj for obj in env.objects if obj.type == "MESH" and obj not in protected_objects and obj.data.materials and obj.data.materials[0] == material]
     if not objects:
@@ -946,6 +970,7 @@ triangles = sum(len(obj.data.loop_triangles) if obj.data.loop_triangles else (ob
 print(json.dumps({
     "blend": str(BLEND_PATH), "glb": str(GLB_PATH), "preview": str(PREVIEW_PATH),
     "meshes": len(meshes), "materials": len(M), "semanticWindows": len(window_objects),
+    "collisionVisualOwners": len(collision_visual_owners),
     "auditedApertures": len(aperture_audit_markers), "apertureSamples": sum(
         marker["atomic_aperture_samples"] for marker in aperture_audit_markers
     ), "triangles": triangles,

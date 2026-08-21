@@ -10,6 +10,7 @@ import {
   DMR_THERMAL_TARGET_POLICY,
   DMR_THERMAL_WORLD_DRAW_CALLS,
   DmrThermalPresentation,
+  deriveDmrThermalRevealActive,
   dmrThermalOcclusionBudget,
   selectDmrThermalContacts,
   type DmrThermalContact,
@@ -28,6 +29,28 @@ function contact(id: string, overrides: Partial<DmrThermalContact> = {}): DmrThe
 }
 
 describe('M14 EBR 2.5x thermal presentation policy', () => {
+  it('binds reveal to admitted M14 ADS and tears down on release, swap, or death', () => {
+    const baseFov = 82;
+    const cameraFov = Math.atan(Math.tan(baseFov * Math.PI / 360) / DMR_THERMAL_MAGNIFICATION) * 360 / Math.PI;
+    const active = {
+      alive: true,
+      weapon: 'm14-ebr' as const,
+      adsHeld: true,
+      adsProgress: 1,
+      baseFov,
+      cameraFov,
+    };
+    expect(deriveDmrThermalRevealActive(active)).toBe(true);
+    expect(deriveDmrThermalRevealActive({ ...active, adsHeld: false })).toBe(false);
+    expect(deriveDmrThermalRevealActive({ ...active, weapon: 'railgun' })).toBe(false);
+    expect(deriveDmrThermalRevealActive({ ...active, weapon: 'sniper' })).toBe(false);
+    expect(deriveDmrThermalRevealActive({ ...active, alive: false })).toBe(false);
+    expect(deriveDmrThermalRevealActive({ ...active, adsProgress: 0.899 })).toBe(false);
+    expect(deriveDmrThermalRevealActive({ ...active, cameraFov: cameraFov + 0.36 })).toBe(false);
+    expect(deriveDmrThermalRevealActive({ ...active, baseFov: Number.NaN })).toBe(false);
+    expect(deriveDmrThermalRevealActive({ ...active, cameraFov: Number.NaN })).toBe(false);
+  });
+
   it('shows living hostiles and friendlies through smoke while keeping team identity explicit', () => {
     const selected = selectDmrThermalContacts([
       contact('hostile'),

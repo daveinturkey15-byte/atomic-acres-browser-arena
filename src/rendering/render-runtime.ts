@@ -10,7 +10,7 @@ import {
 
 export type RenderBackendId = 'webgl2' | 'webgpu';
 
-export type WebGpuSubmissionMode = 'serialized' | 'warmed-live';
+export type WebGpuSubmissionMode = 'serialized' | 'warmed-live' | 'input-response';
 
 export type RenderRuntimeRequest = Readonly<{
   requestedBackend: RenderBackendId;
@@ -216,7 +216,8 @@ export function shouldBackpressureWebGpuSubmissions(
     && now - pendingSince >= thresholdMs;
 }
 
-export function maximumInFlightWebGpuSubmissions(mode: WebGpuSubmissionMode): 1 | 2 {
+export function maximumInFlightWebGpuSubmissions(mode: WebGpuSubmissionMode): 1 | 2 | 3 {
+  if (mode === 'input-response') return 3;
   return mode === 'warmed-live' ? 2 : 1;
 }
 
@@ -664,6 +665,7 @@ export class WebGpuRenderRuntime {
   readonly renderer: WebGPURenderer;
   readonly renderPipeline: RenderPipeline;
   private deviceLost = false;
+  private disposed = false;
   private readonly canvasAntialias: boolean;
   private readonly canvasSamples: number;
   private readonly adapterLabel: string;
@@ -772,9 +774,12 @@ export class WebGpuRenderRuntime {
     this.installNodeBuildTrace();
     identity.device.addEventListener?.('uncapturederror', this.uncapturedErrorListener);
     void identity.device.lost?.then((info) => {
-      this.deviceLost = true;
       const record = info as { reason?: unknown; message?: unknown } | undefined;
       const reason = record?.reason === undefined ? 'unknown' : String(record.reason);
+      // device.destroy() resolves GPUDevice.lost with reason "destroyed".
+      // That is successful page-exit cleanup, not a live renderer failure.
+      if (this.disposed && reason === 'destroyed') return;
+      this.deviceLost = true;
       const message = record?.message === undefined ? '' : `: ${String(record.message)}`;
       this.lastFailure = `WebGPU device lost (${reason})${message}`;
     });
@@ -1240,6 +1245,7 @@ export class WebGpuRenderRuntime {
     force = false,
     submissionMode: WebGpuSubmissionMode = 'serialized',
   ): boolean {
+    if (this.disposed) return false;
     if (this.deviceLost) throw new Error(this.lastFailure ?? 'WebGPU device lost');
     if (this.uncapturedErrors > 0) throw new Error(this.lastFailure ?? 'WebGPU uncaptured error');
     if (!browserOwnsForegroundPresentation()) return false;
@@ -1329,6 +1335,8 @@ export class WebGpuRenderRuntime {
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     this.device.removeEventListener?.('uncapturederror', this.uncapturedErrorListener);
     this.renderPipeline.dispose();
     this.renderer.dispose();

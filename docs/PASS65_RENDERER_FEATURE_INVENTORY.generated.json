@@ -7,7 +7,7 @@
   "settings": [
     {
       "key": "graphics.preset",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "preset-resolver",
       "runtimeEvidence": [
@@ -20,7 +20,7 @@
     },
     {
       "key": "graphics.renderScale",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "adaptive-quality",
       "runtimeEvidence": [
@@ -33,7 +33,7 @@
     },
     {
       "key": "graphics.adaptiveResolution",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "adaptive-quality",
       "runtimeEvidence": [
@@ -46,7 +46,7 @@
     },
     {
       "key": "graphics.targetFps",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "adaptive-quality",
       "runtimeEvidence": [
@@ -59,7 +59,7 @@
     },
     {
       "key": "graphics.frameRateLimit",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "frame-scheduler",
       "runtimeEvidence": [
@@ -72,7 +72,7 @@
     },
     {
       "key": "graphics.antiAliasing",
-      "applyMode": "arena-reload",
+      "applyMode": "pipeline-rebuild",
       "authorityAffecting": false,
       "runtimeConsumer": "renderer-init",
       "runtimeEvidence": [
@@ -98,7 +98,7 @@
     },
     {
       "key": "graphics.shadows",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "shadow-runtime",
       "runtimeEvidence": [
@@ -111,7 +111,7 @@
     },
     {
       "key": "graphics.shadowResolution",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "shadow-runtime",
       "runtimeEvidence": [
@@ -124,7 +124,7 @@
     },
     {
       "key": "graphics.shadowUpdateMode",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "shadow-runtime",
       "runtimeEvidence": [
@@ -137,7 +137,7 @@
     },
     {
       "key": "graphics.indirectLighting",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "arena-lighting",
       "runtimeEvidence": [
@@ -150,7 +150,7 @@
     },
     {
       "key": "graphics.ambientOcclusion",
-      "applyMode": "arena-reload",
+      "applyMode": "pipeline-rebuild",
       "authorityAffecting": false,
       "runtimeConsumer": "ambient-occlusion",
       "runtimeEvidence": [
@@ -163,7 +163,7 @@
     },
     {
       "key": "graphics.reflectionQuality",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "material-refinement",
       "runtimeEvidence": [
@@ -176,7 +176,7 @@
     },
     {
       "key": "graphics.volumetricQuality",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "atmosphere-runtime",
       "runtimeEvidence": [
@@ -189,7 +189,7 @@
     },
     {
       "key": "graphics.smokeQuality",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "smoke-presentation",
       "runtimeEvidence": [
@@ -202,7 +202,7 @@
     },
     {
       "key": "graphics.particleQuality",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "presentation-budget",
       "runtimeEvidence": [
@@ -215,7 +215,7 @@
     },
     {
       "key": "graphics.anisotropy",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "material-refinement",
       "runtimeEvidence": [
@@ -228,7 +228,7 @@
     },
     {
       "key": "graphics.decalQuality",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "presentation-budget",
       "runtimeEvidence": [
@@ -241,7 +241,7 @@
     },
     {
       "key": "graphics.bloomQuality",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "hdr-pipeline",
       "runtimeEvidence": [
@@ -254,7 +254,7 @@
     },
     {
       "key": "graphics.exposure",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "hdr-pipeline",
       "runtimeEvidence": [
@@ -267,7 +267,7 @@
     },
     {
       "key": "graphics.toneMapping",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "hdr-pipeline",
       "runtimeEvidence": [
@@ -280,7 +280,7 @@
     },
     {
       "key": "graphics.filmGrain",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "hdr-pipeline",
       "runtimeEvidence": [
@@ -293,7 +293,7 @@
     },
     {
       "key": "graphics.vignette",
-      "applyMode": "arena-reload",
+      "applyMode": "live",
       "authorityAffecting": false,
       "runtimeConsumer": "hdr-pipeline",
       "runtimeEvidence": [

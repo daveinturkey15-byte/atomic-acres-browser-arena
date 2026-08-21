@@ -414,6 +414,10 @@ export class ArenaAudio {
   private combatFeedbackPrepareRuns = 0;
   private glassImpactPrepared = false;
   private glassImpactPrepareRuns = 0;
+  private grenadeEffectsPrepared = false;
+  private grenadeEffectsPrepareRuns = 0;
+  private grenadeEffectWarmupSources = 0;
+  private grenadeEffectWarmupNodes = 0;
   private lowHealthFeedbackActive = false;
   private lowHealthFeedbackAudible = false;
   private lowHealthAppliedState: Readonly<{
@@ -785,6 +789,81 @@ export class ArenaAudio {
         try { node.disconnect(); } catch { /* partially connected browser node */ }
       }
       this.glassImpactPrepared = false;
+      return false;
+    }
+  }
+
+  /**
+   * Exercises every grenade cue factory at zero gain before match admission.
+   * The live bounce/fuse/blast recipe remains byte-for-byte unchanged: in
+   * particular, explosions retain both broadband layers and their authored
+   * sawtooth pressure sweep instead of degrading into persistent tonal loops.
+   */
+  prepareGrenadeEffects(): boolean {
+    if (this.grenadeEffectsPrepared) return true;
+    if (!this.context || !this.feedback || !this.weapons || !this.noiseBuffer) return false;
+    this.grenadeEffectsPrepareRuns += 1;
+    const sources: AudioScheduledSourceNode[] = [];
+    const nodes: AudioNode[] = [];
+    const now = this.context.currentTime;
+    try {
+      // Bounce/fuse cover all four live oscillator waveforms. The silent blast
+      // sweep exercises the same oscillator/gain path used by explosion().
+      for (const [type, frequency] of [
+        ['triangle', 310], ['square', 185], ['square', 920], ['sine', 1_840], ['sawtooth', 96],
+      ] as const) {
+        const source = this.context.createOscillator();
+        const gain = this.context.createGain();
+        sources.push(source);
+        nodes.push(gain);
+        source.type = type;
+        source.frequency.value = frequency;
+        gain.gain.value = 0;
+        source.connect(gain).connect(type === 'sawtooth' ? this.weapons : this.feedback);
+        source.onended = () => {
+          try { source.disconnect(); } catch { /* silent warmup already released */ }
+          try { gain.disconnect(); } catch { /* silent warmup already released */ }
+        };
+        source.start(now);
+        source.stop(now + 0.001);
+      }
+      // The two live broadband layers share the retained noise sample but own
+      // distinct filter/gain/source nodes. Warm those exact constructors and
+      // connections without registering or emitting a live voice.
+      for (const [filterType, frequency] of [['lowpass', 2_100], ['highpass', 3_100]] as const) {
+        const source = this.context.createBufferSource();
+        const filter = this.context.createBiquadFilter();
+        const gain = this.context.createGain();
+        sources.push(source);
+        nodes.push(filter, gain);
+        source.buffer = this.noiseBuffer;
+        filter.type = filterType;
+        filter.frequency.value = frequency;
+        gain.gain.value = 0;
+        source.connect(filter).connect(gain).connect(this.weapons);
+        source.onended = () => {
+          try { source.disconnect(); } catch { /* silent warmup already released */ }
+          try { filter.disconnect(); } catch { /* silent warmup already released */ }
+          try { gain.disconnect(); } catch { /* silent warmup already released */ }
+        };
+        source.start(now, 0, 0.001);
+        source.stop(now + 0.002);
+      }
+      this.grenadeEffectWarmupSources = sources.length;
+      this.grenadeEffectWarmupNodes = nodes.length;
+      this.grenadeEffectsPrepared = true;
+      return true;
+    } catch {
+      for (const source of sources) {
+        try { source.stop(); } catch { /* partially started silent warmup */ }
+        try { source.disconnect(); } catch { /* partially connected silent warmup */ }
+      }
+      for (const node of nodes) {
+        try { node.disconnect(); } catch { /* partially connected silent warmup */ }
+      }
+      this.grenadeEffectWarmupSources = 0;
+      this.grenadeEffectWarmupNodes = 0;
+      this.grenadeEffectsPrepared = false;
       return false;
     }
   }
@@ -1459,6 +1538,15 @@ export class ArenaAudio {
     ambience: { continuousSources: number; busGain: number; arena: ArenaId | null };
     combatPrewarm: { prepared: boolean; runs: number; sources: number; nodes: number; broadbandLoopSources: 0 };
     glassImpactPrewarm: { prepared: boolean; runs: number; retainedBroadbandLoops: 0 };
+    grenadeEffectsPrewarm: {
+      prepared: boolean;
+      runs: number;
+      warmupSources: number;
+      warmupNodes: number;
+      retainedSources: 0;
+      retainedBroadbandLoops: 0;
+      liveRecipe: 'sawtooth-pressure-plus-dual-filtered-noise-v1';
+    };
     lowHealth: { prepared: boolean; sources: number; active: boolean; audible: boolean; automationWrites: number; broadbandSources: 0 };
     damageFeedback: { prepared: boolean; sources: number; pulses: number };
     grenadeFuse: { beeps: number; startMs: number };
@@ -1513,6 +1601,15 @@ export class ArenaAudio {
         prepared: this.glassImpactPrepared,
         runs: this.glassImpactPrepareRuns,
         retainedBroadbandLoops: 0,
+      },
+      grenadeEffectsPrewarm: {
+        prepared: this.grenadeEffectsPrepared,
+        runs: this.grenadeEffectsPrepareRuns,
+        warmupSources: this.grenadeEffectWarmupSources,
+        warmupNodes: this.grenadeEffectWarmupNodes,
+        retainedSources: 0,
+        retainedBroadbandLoops: 0,
+        liveRecipe: 'sawtooth-pressure-plus-dual-filtered-noise-v1',
       },
       lowHealth: {
         prepared: this.combatFeedbackPrepared && this.lowHealthGains.length === 2,
@@ -1797,6 +1894,9 @@ export class ArenaAudio {
     this.damageFeedbackGain = null;
     this.combatFeedbackPrepared = false;
     this.glassImpactPrepared = false;
+    this.grenadeEffectsPrepared = false;
+    this.grenadeEffectWarmupSources = 0;
+    this.grenadeEffectWarmupNodes = 0;
     this.lowHealthFeedbackActive = false;
     this.lowHealthFeedbackAudible = false;
     this.lowHealthAppliedState = null;

@@ -77,6 +77,16 @@ export class RailgunPresentation {
   private exactOperatorThroughGeometry = false;
   private exactOperatorGeometryIdentity = false;
   private exactOperatorSkeletonIdentity = false;
+  private exactModelVisible = false;
+  private exactModelColorWrite = false;
+  private exactModelOpacity = 0;
+  private exactModelDepthTestDisabled = false;
+  private exactModelDepthWriteDisabled = false;
+  private exactHaloVisible = false;
+  private exactHaloColorWrite = false;
+  private exactHaloOpacity = 0;
+  private exactHaloDepthTestDisabled = false;
+  private exactHaloDepthWriteDisabled = false;
   private exactOperatorOrangeHalo = false;
   private exactOperatorComplete = false;
   private exactOperatorMaterialBudgetExceeded = false;
@@ -456,19 +466,33 @@ export class RailgunPresentation {
 
   /** Bind Railgun compatibility telemetry to the actual shared render layers. */
   syncExactOperatorReveal(active: boolean, telemetry: ThermalGhostTelemetry | null): void {
-    const complete = active
+    const structurallyComplete = active
       && telemetry !== null
       && telemetry.completeOperatorModels
       && !telemetry.materialBudgetExceeded
       && telemetry.activeModelLayers > 0
       && telemetry.activeModelLayers === telemetry.activeHaloLayers;
-    this.exactOperatorModels = complete ? telemetry.activeModelLayers : 0;
-    this.exactOperatorHalos = complete ? telemetry.activeHaloLayers : 0;
-    this.exactOperatorThroughGeometry = complete && telemetry.throughGeometry;
-    this.exactOperatorGeometryIdentity = complete && telemetry.geometryIdentity;
-    this.exactOperatorSkeletonIdentity = complete && telemetry.skeletonIdentity;
-    this.exactOperatorOrangeHalo = complete && telemetry.orangeHalo;
-    this.exactOperatorComplete = complete;
+    this.exactOperatorModels = structurallyComplete ? telemetry.activeModelLayers : 0;
+    this.exactOperatorHalos = structurallyComplete ? telemetry.activeHaloLayers : 0;
+    this.exactOperatorThroughGeometry = structurallyComplete && telemetry.throughGeometry;
+    this.exactOperatorGeometryIdentity = structurallyComplete && telemetry.geometryIdentity;
+    this.exactOperatorSkeletonIdentity = structurallyComplete && telemetry.skeletonIdentity;
+    this.exactModelVisible = structurallyComplete && telemetry.exactModelVisible;
+    this.exactModelColorWrite = structurallyComplete && telemetry.exactModelColorWrite;
+    this.exactModelOpacity = structurallyComplete ? telemetry.exactModelOpacity : 0;
+    this.exactModelDepthTestDisabled = structurallyComplete && telemetry.exactModelDepthTestDisabled;
+    this.exactModelDepthWriteDisabled = structurallyComplete && telemetry.exactModelDepthWriteDisabled;
+    this.exactHaloVisible = structurallyComplete && telemetry.haloVisible;
+    this.exactHaloColorWrite = structurallyComplete && telemetry.haloColorWrite;
+    this.exactHaloOpacity = structurallyComplete ? telemetry.haloOpacity : 0;
+    this.exactHaloDepthTestDisabled = structurallyComplete && telemetry.haloDepthTestDisabled;
+    this.exactHaloDepthWriteDisabled = structurallyComplete && telemetry.haloDepthWriteDisabled;
+    this.exactOperatorOrangeHalo = structurallyComplete && telemetry.orangeHalo;
+    this.exactOperatorComplete = structurallyComplete
+      && telemetry.geometryIdentity
+      && telemetry.skeletonIdentity
+      && telemetry.throughGeometry
+      && telemetry.orangeHalo;
     this.exactOperatorMaterialBudgetExceeded = active && telemetry?.materialBudgetExceeded === true;
   }
 
@@ -485,6 +509,16 @@ export class RailgunPresentation {
     exactOperatorHalos: number;
     exactGeometryIdentity: boolean;
     exactSkeletonIdentity: boolean;
+    exactModelVisible: boolean;
+    exactModelColorWrite: boolean;
+    exactModelOpacity: number;
+    exactModelDepthTestDisabled: boolean;
+    exactModelDepthWriteDisabled: boolean;
+    exactHaloVisible: boolean;
+    exactHaloColorWrite: boolean;
+    exactHaloOpacity: number;
+    exactHaloDepthTestDisabled: boolean;
+    exactHaloDepthWriteDisabled: boolean;
     orangeHalo: boolean;
     exactOperatorComplete: boolean;
     exactOperatorMaterialBudgetExceeded: boolean;
@@ -558,6 +592,16 @@ export class RailgunPresentation {
       exactOperatorHalos: this.exactOperatorHalos,
       exactGeometryIdentity: this.exactOperatorGeometryIdentity,
       exactSkeletonIdentity: this.exactOperatorSkeletonIdentity,
+      exactModelVisible: this.exactModelVisible,
+      exactModelColorWrite: this.exactModelColorWrite,
+      exactModelOpacity: this.exactModelOpacity,
+      exactModelDepthTestDisabled: this.exactModelDepthTestDisabled,
+      exactModelDepthWriteDisabled: this.exactModelDepthWriteDisabled,
+      exactHaloVisible: this.exactHaloVisible,
+      exactHaloColorWrite: this.exactHaloColorWrite,
+      exactHaloOpacity: this.exactHaloOpacity,
+      exactHaloDepthTestDisabled: this.exactHaloDepthTestDisabled,
+      exactHaloDepthWriteDisabled: this.exactHaloDepthWriteDisabled,
       orangeHalo: this.exactOperatorOrangeHalo,
       exactOperatorComplete: this.exactOperatorComplete,
       exactOperatorMaterialBudgetExceeded: this.exactOperatorMaterialBudgetExceeded,

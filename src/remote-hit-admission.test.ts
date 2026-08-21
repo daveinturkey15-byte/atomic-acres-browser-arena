@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { buildGunRange } from './additional-maps';
 import { traceBallisticPath } from './ballistics';
-import { WEAPONS } from './gameplay';
+import { computeDamage, WEAPONS } from './gameplay';
 import {
   admitRemoteBaseDamage,
+  deriveAuthoritativeShotOutcomes,
   deriveRemoteShotBaseDamage,
   maximumRemoteExplosiveBaseDamage,
   maximumRemoteShotBaseDamage,
@@ -12,6 +13,43 @@ import {
 } from './remote-hit-admission';
 
 describe('remote hit admission', () => {
+  it('carries the exact 0.6x M14 envelope through offline, legacy-remote and host-canonical derivation', () => {
+    const m14 = WEAPONS['m14-ebr'];
+    const target = { id: 'target', x: 0, y: 1.7, z: 0, yaw: 0, stance: 'stand' as const };
+    const previousEnvelope = { base: 62, minimum: 40 } as const;
+    const independentlyScaledDamage = (distance: number, multiplier: number): number => {
+      const falloff = distance <= 38 ? 0 : Math.min(1, (distance - 38) / (100 - 38));
+      const previousBase = previousEnvelope.base
+        + (previousEnvelope.minimum - previousEnvelope.base) * falloff;
+      return Math.max(1, Math.round(previousBase * 0.6 * multiplier * 10) / 10);
+    };
+    for (const [distance, zone, multiplier] of [
+      [0, 'body', 1], [0, 'head', 1.7], [0, 'limb', 0.82],
+      [69, 'body', 1], [69, 'head', 1.7], [69, 'limb', 0.82],
+      [100, 'body', 1], [100, 'head', 1.7], [100, 'limb', 0.82],
+    ] as const) {
+      expect(computeDamage(m14, distance, zone)).toBe(independentlyScaledDamage(distance, multiplier));
+    }
+
+    // The legacy recipient derives the ray itself before clamping an untrusted
+    // claim; neither close body/head nor far body receives a second 0.6 factor.
+    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.0, 6], [[0, 0, -1]], target)).toBe(37.2);
+    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.58, 6], [[0, 0, -1]], target)).toBe(63.2);
+    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.0, 100], [[0, 0, -1]], target)).toBe(24.1);
+    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.0, 6], [[0, 0, -1]], target, () => 0.5)).toBe(19);
+
+    // The host shot-request lane uses the multi-target canonical derivation
+    // and therefore returns the same exact close-body value and modifiers.
+    const host = deriveAuthoritativeShotOutcomes(
+      'm14-ebr', [0, 1.0, 6], [[0, 0, -1]], [target],
+    ).get(target.id);
+    expect(host).toMatchObject({ damage: 37.2, rawDamage: 37.2, pelletHits: 1, hitZone: 'body' });
+    expect(maximumRemoteShotBaseDamage('m14-ebr')).toBe(63.2);
+    expect(admitRemoteBaseDamage(63.2, maximumRemoteShotBaseDamage('m14-ebr'))).toBe(true);
+    expect(admitRemoteBaseDamage(64, maximumRemoteShotBaseDamage('m14-ebr'))).toBe(false);
+    expect(resolveRemotePoweredDamage(37.2, 2)).toBe(74.4);
+  });
+
   it('hits the visible standing skull and rejects the former empty-air crit point', () => {
     const target = { x: 0, y: 1.7, z: 0, yaw: 0, stance: 'stand' as const };
     const body = deriveRemoteShotBaseDamage('smg', [0, 1.0, 6], [[0, 0, -1]], target);

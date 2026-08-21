@@ -61,6 +61,12 @@ const WINDOW_SILL_TOP = 0.58;
 const WINDOW_OPENING_TOP = 2.55;
 const WINDOW_OPENING_HEIGHT = WINDOW_OPENING_TOP - WINDOW_SILL_TOP;
 const WINDOW_CENTRE_Y = (WINDOW_OPENING_TOP + WINDOW_SILL_TOP) / 2;
+// The upstairs front window is an intentional traversal route. Keep its sill
+// within the shared character-controller autostep envelope instead of reusing
+// the taller ground-window sill that blocked the apparently open exit.
+const UPPER_WINDOW_SILL_TOP = 0.32;
+const UPPER_WINDOW_OPENING_HEIGHT = WINDOW_OPENING_TOP - UPPER_WINDOW_SILL_TOP;
+const UPPER_WINDOW_CENTRE_Y = (WINDOW_OPENING_TOP + UPPER_WINDOW_SILL_TOP) / 2;
 const RAMP_BOTTOM_Z = 6;
 const RAMP_TOP_Z = -3.4;
 const RAMP_ENTRY_Z = -4.8;
@@ -182,9 +188,9 @@ function upperFrontWall(surface: 'aqua' | 'coral'): LocalSolid[] {
   return [
     solid('front-upper-left', [(-HALF_WIDTH + left) / 2, FLOOR_Y + UPPER_HEIGHT / 2, HALF_DEPTH], [left + HALF_WIDTH, UPPER_HEIGHT, WALL], surface),
     solid('front-upper-right', [(right + HALF_WIDTH) / 2, FLOOR_Y + UPPER_HEIGHT / 2, HALF_DEPTH], [HALF_WIDTH - right, UPPER_HEIGHT, WALL], surface),
-    solid('upper-window-sill-wall', [windowX, FLOOR_Y + WINDOW_SILL_TOP / 2, HALF_DEPTH], [windowWidth, WINDOW_SILL_TOP, WALL], surface),
+    solid('upper-window-sill-wall', [windowX, FLOOR_Y + UPPER_WINDOW_SILL_TOP / 2, HALF_DEPTH], [windowWidth, UPPER_WINDOW_SILL_TOP, WALL], surface),
     solid('upper-window-lintel-wall', [windowX, (openingTop + FLOOR_Y + UPPER_HEIGHT) / 2, HALF_DEPTH], [windowWidth, FLOOR_Y + UPPER_HEIGHT - openingTop, WALL], surface),
-    solid('upper-window-glass', [windowX, FLOOR_Y + WINDOW_CENTRE_Y, HALF_DEPTH + 0.02], [windowWidth, WINDOW_OPENING_HEIGHT, 0.12], 'glass', false, 'glass'),
+    solid('upper-window-glass', [windowX, FLOOR_Y + UPPER_WINDOW_CENTRE_Y, HALF_DEPTH + 0.02], [windowWidth, UPPER_WINDOW_OPENING_HEIGHT, 0.12], 'glass', false, 'glass'),
   ];
 }
 
@@ -311,6 +317,19 @@ function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
     solid('floor-seam-west', [-HALF_WIDTH - SEAM_OUTSET, FLOOR_Y - 0.05, 0], [0.14, 0.18, DEPTH], 'trim', false, 'frame'),
     solid('floor-seam-east', [HALF_WIDTH + SEAM_OUTSET, FLOOR_Y - 0.05, 0], [0.14, 0.18, DEPTH], 'trim', false, 'frame'),
 
+    // This is the exact authored entrance canopy below the upstairs front
+    // window. It was formerly Quality-only presentation mass, so players fell
+    // through it despite the visible landing. One shared solid now owns the
+    // Performance mesh, movement collider and ballistic surface.
+    solid(
+      'entrance-canopy',
+      [surface === 'aqua' ? 0.55 : -0.55, 3.05, HALF_DEPTH + 0.58],
+      [4.4, 0.16, 1.4],
+      'metal',
+      true,
+      'landing',
+    ),
+
     ...upperFloorSolids(indoorRampSide),
     solid(
       'ramp-top-landing',
@@ -346,7 +365,7 @@ function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
     { id: 'upper-ramp-entry', kind: 'ramp-entry', centre: [rampWallX, FLOOR_Y + 1.4, RAMP_ENTRY_Z], width: 2.6, height: 2.8, route: true },
     { id: 'front-ground-window', kind: 'window', centre: [4.8, WINDOW_CENTRE_Y, HALF_DEPTH], width: 2.8, height: WINDOW_OPENING_HEIGHT, route: true },
     { id: 'rear-ground-window', kind: 'window', centre: [-4.8, WINDOW_CENTRE_Y, -HALF_DEPTH], width: 2.8, height: WINDOW_OPENING_HEIGHT, route: true },
-    { id: 'upper-window', kind: 'window', centre: [0, FLOOR_Y + WINDOW_CENTRE_Y, HALF_DEPTH], width: 3.2, height: WINDOW_OPENING_HEIGHT, route: false },
+    { id: 'upper-window', kind: 'window', centre: [0, FLOOR_Y + UPPER_WINDOW_CENTRE_Y, HALF_DEPTH], width: 3.2, height: UPPER_WINDOW_OPENING_HEIGHT, route: true },
   ];
   const rampX = rampSide * (HALF_WIDTH + RAMP_SIDE_OUTSET);
   const indoorRampX = indoorRampSide * INDOOR_RAMP_X;

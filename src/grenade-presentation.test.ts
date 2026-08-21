@@ -133,4 +133,35 @@ describe('grenade world presentation residency', () => {
     pool.terminalDispose();
     expect(pool.root.parent).toBeNull();
   });
+
+  it('stages the first slot of both families without consuming a live acquisition', async () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.05, 100);
+    camera.position.set(2, 3, 4);
+    camera.lookAt(2, 3, 0);
+    const pool = new GrenadeWorldPresentationPool(scene, 2);
+    let stagedNames: string[] = [];
+
+    await pool.withStagedFirstAcquisitionVocabulary(camera, async () => {
+      stagedNames = pool.root.children.filter((root) => root.visible).map((root) => root.name);
+      expect(pool.telemetry()).toMatchObject({
+        active: 2,
+        acquisitions: 0,
+        releases: 0,
+        exhaustions: 0,
+        activeByFamily: { frag: 1, semtex: 1 },
+      });
+    });
+
+    expect(stagedNames).toEqual(['frag-grenade-fallback', 'semtex-bundle-fallback']);
+    expect(pool.root.children.every((root) => root.visible === false)).toBe(true);
+    expect(pool.telemetry()).toMatchObject({
+      active: 0,
+      acquisitions: 0,
+      releases: 0,
+      exhaustions: 0,
+      highWater: 0,
+    });
+    pool.terminalDispose();
+  });
 });

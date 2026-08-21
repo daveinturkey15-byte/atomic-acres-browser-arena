@@ -400,13 +400,95 @@
       "outcomeProjectionSha256": "b9b5db4494d47b6f0ed248b20eebd60f7fcda71c7c86bc0f8af825bff0aaee2f"
     },
     {
+      "id": "SRC-CODEX-P73-AUG21-OWNER-001",
+      "kind": "codex-owner-feedback",
+      "externalLocator": "codex-task:pass73-owner-feedback-2026-08-21#direct-feedback",
+      "rawByteLength": 1539,
+      "rawSha256": "dd7bf8d6e2bd9ef5eaab42931d9a971ab48b6ca290df89adbd9430b0f9e6a6cd",
+      "rawEndsWithCrLf": false,
+      "normalizedRepositoryPath": "docs/pass73-sources/codex-owner-feedback-2026-08-21.txt",
+      "normalization": "UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged",
+      "normalizedByteLength": 1510,
+      "normalizedSha256": "f5b92c28ed9266fd489fa8f9a46ac0e0959b45220e059f2da8bdbd9b91591748",
+      "outcomeCollection": "codexPass73August21OwnerOutcomes",
+      "outcomeIdPrefix": "P73AUG21",
+      "outcomeCount": 19,
+      "lineAtomCounts": {
+        "1": 2,
+        "3": 1,
+        "5": 1,
+        "7": 1,
+        "9": 1,
+        "11": 1,
+        "13": 2,
+        "15": 1,
+        "17": 1,
+        "19": 1,
+        "21": 1,
+        "23": 1,
+        "25": 1,
+        "27": 2,
+        "29": 1,
+        "31": 1
+      },
+      "outcomeProjectionSha256": "25e5c8b91d702a0cd77e5ac5bacba6fb6c98a771c8a258743242aab0d6316ae7"
+    },
+    {
+      "id": "SRC-VIDEO-P73-AUG21-REVIEW-001",
+      "kind": "owner-supplied-video-review-notes",
+      "externalLocator": "file:C:/Users/david/Desktop/clip.mp4#sha256-6841a21aee71adc57de0e4f6b45126f39f64d5350c3b607fa18812dcf9bb09ef",
+      "rawByteLength": 1115,
+      "rawSha256": "f7e91c83e0011c57757c542e9dd9a288350c48e74928d623b29c616eaab6cad7",
+      "rawEndsWithCrLf": false,
+      "normalizedRepositoryPath": "docs/pass73-sources/clip-owner-review-notes-2026-08-21.txt",
+      "normalization": "UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged",
+      "normalizedByteLength": 1108,
+      "normalizedSha256": "929e86f52ebce252e98a2187fc3fc8204097c0565929b4ac00e3158db2c129af",
+      "outcomeCollection": "clipPass73August21ReviewOutcomes",
+      "outcomeIdPrefix": "P73CLIP",
+      "outcomeCount": 10,
+      "lineAtomCounts": {
+        "1": 1,
+        "3": 1,
+        "5": 2,
+        "7": 4,
+        "9": 2
+      },
+      "outcomeProjectionSha256": "c0753820d5138c615dcb0b76d8fcb460fbd56c12358288f3b3e40cde11bf4e9d"
+    },
+    {
+      "id": "SRC-CODEX-P73-AUG21-GENERATION-001",
+      "kind": "codex-owner-external-reference-feedback",
+      "externalLocator": "codex-task:pass73-owner-generation-references-2026-08-21#links",
+      "rawByteLength": 897,
+      "rawSha256": "a2f55b5a8237e3f8084cd38fe9ef36af8d1274a7ab48eb6787c7172e71dcbc12",
+      "rawEndsWithCrLf": false,
+      "normalizedRepositoryPath": "docs/pass73-sources/codex-owner-generation-references-2026-08-21.txt",
+      "normalization": "UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged",
+      "normalizedByteLength": 886,
+      "normalizedSha256": "680ff04cefaf1f12198fb0ede3cda6ab8be1cef7c545f3af7540c7e5dd464c55",
+      "outcomeCollection": "codexPass73August21GenerationOutcomes",
+      "outcomeIdPrefix": "P73GEN",
+      "outcomeCount": 7,
+      "lineAtomCounts": {
+        "1": 1,
+        "3": 1,
+        "5": 1,
+        "7": 1,
+        "9": 1,
+        "11": 1,
+        "13": 1
+      },
+      "outcomeProjectionSha256": "c5b04059fa80cf379b9eab2420c8a251348508ae835912aff5726353d7f46379"
+    },
+    {
       "id": "SRC-CORRECTION-LEDGER-001",
       "kind": "canonical-correction-ledger",
       "repositoryPath": "docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md",
       "ledgerVersion": 1,
-      "latestFeedbackId": "HF-295",
-      "outcomeCount": 295,
-      "stateIndependentOutcomeSha256": "685cb870e171bbb85381a57f78d0349211131a516bed6e41acd9ca85ea6e8e91"
+      "latestFeedbackId": "HF-314",
+      "outcomeCount": 314,
+      "stateIndependentOutcomeSha256": "0a5a6a85be285a963b08e6b2ac45d34ec87bd6a199137591a9a6a6b51b732134"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -1090,7 +1172,7 @@
     "outcomeIdTemplate": "CORR-{feedbackId}",
     "sourceLocatorTemplate": "{feedbackId}.observation",
     "feedbackIdStart": "HF-001",
-    "feedbackIdEnd": "HF-295"
+    "feedbackIdEnd": "HF-314"
   },
   "supersessions": [
     {
@@ -1625,6 +1707,176 @@
         "HF-295"
       ],
       "canonicalText": "`HF-295` supersedes `HF-271`'s stop-before-publication requirement for this correction: Dave explicitly directs publication of the mechanically green exact Pass 70 hotfix without another local HITL run, while the immutable preview, acceptance manifest, exact-SHA gates and byte/provenance-exact retained Pass 69 and Pass 63 protections remain mandatory; this authorization does not claim Dave already tested the new immutable preview."
+    },
+    {
+      "id": "SUP-038",
+      "ledgerOrdinal": 38,
+      "sourceOutcomeIds": [
+        "P73AUG21-003",
+        "P73AUG21-004",
+        "P73AUG21-005",
+        "CORR-HF-296",
+        "CORR-HF-297"
+      ],
+      "feedbackIds": [
+        "HF-283",
+        "HF-288",
+        "HF-296",
+        "HF-297"
+      ],
+      "canonicalText": "`HF-296` and `HF-297` reopen and strengthen `HF-283` and `HF-288`: the current owner capture falsifies their claimed implementation sufficiency because the arms still visibly terminate inside the viewport and remain too thin; prior code/tests do not close either row without new reference-matched catalog evidence."
+    },
+    {
+      "id": "SUP-039",
+      "ledgerOrdinal": 39,
+      "sourceOutcomeIds": [
+        "P73AUG21-007",
+        "CORR-HF-299"
+      ],
+      "feedbackIds": [
+        "HF-290",
+        "HF-299"
+      ],
+      "canonicalText": "`HF-299` reopens `HF-290`: the current live owner report of no Railgun wall reveal falsifies the earlier implementation claim until exact-version native-browser evidence proves the complete ADS lifecycle again."
+    },
+    {
+      "id": "SUP-040",
+      "ledgerOrdinal": 40,
+      "sourceOutcomeIds": [
+        "P73AUG21-008",
+        "P73AUG21-009",
+        "CORR-HF-300",
+        "CORR-HF-301"
+      ],
+      "feedbackIds": [
+        "HF-169",
+        "HF-300",
+        "HF-301"
+      ],
+      "canonicalText": "`HF-300` and `HF-301` strengthen `HF-169`: explosive-crossbow direct contact and explosive blast are independent required glass admissions and each needs solo plus hosted evidence; proving only the shared explosion helper or another damage family cannot close either row."
+    },
+    {
+      "id": "SUP-041",
+      "ledgerOrdinal": 41,
+      "sourceOutcomeIds": [
+        "P73AUG21-011",
+        "CORR-HF-302"
+      ],
+      "feedbackIds": [
+        "HF-302"
+      ],
+      "canonicalText": "`HF-302` freezes the M14 EBR correction at exactly one `original * 0.6` application (`62 -> 37.2`, `40 -> 24`) across the complete canonical value path; a stale upstream value and a duplicated downstream nerf are equally wrong."
+    },
+    {
+      "id": "SUP-042",
+      "ledgerOrdinal": 42,
+      "sourceOutcomeIds": [
+        "P73AUG21-012",
+        "CORR-HF-303"
+      ],
+      "feedbackIds": [
+        "HF-303"
+      ],
+      "canonicalText": "`HF-303` supersedes the `R229` phrase “never through solid walls” only for the named canonical M14 EBR: its owner-authorized trusted ADS wall reveal is restored without granting wall perception to unrelated DMRs or changing hit authority."
+    },
+    {
+      "id": "SUP-043",
+      "ledgerOrdinal": 43,
+      "sourceOutcomeIds": [
+        "P73AUG21-014",
+        "CORR-HF-304"
+      ],
+      "feedbackIds": [
+        "HF-200",
+        "HF-272",
+        "HF-274",
+        "HF-304"
+      ],
+      "canonicalText": "`HF-304` strengthens `HF-200`, `HF-272` and `HF-274`: Firefox admission or API compatibility alone is not acceptance when the explicit native-WebGPU game collapses to roughly 10 FPS versus Chrome's roughly 150 FPS or silently removes the requested presentation."
+    },
+    {
+      "id": "SUP-044",
+      "ledgerOrdinal": 44,
+      "sourceOutcomeIds": [
+        "P73AUG21-017",
+        "P73CLIP-004",
+        "P73CLIP-006",
+        "P73CLIP-007",
+        "CORR-HF-305",
+        "CORR-HF-306",
+        "CORR-HF-307"
+      ],
+      "feedbackIds": [
+        "HF-245",
+        "HF-287",
+        "HF-305",
+        "HF-306",
+        "HF-307"
+      ],
+      "canonicalText": "`HF-305`, `HF-306` and `HF-307` reopen and split `HF-287` and the relevant `HF-245` collision contract into visible-surface penetration, invisible open-route blockers and missing support under visible platforms; success in one topology does not establish the other two."
+    },
+    {
+      "id": "SUP-045",
+      "ledgerOrdinal": 45,
+      "sourceOutcomeIds": [
+        "P73AUG21-018",
+        "CORR-HF-308"
+      ],
+      "feedbackIds": [
+        "HF-117",
+        "HF-156",
+        "HF-308"
+      ],
+      "canonicalText": "`HF-308` strengthens `HF-117` and `HF-156`: remaining in the match or changing the selected label is insufficient unless the complete effective Performance vector reaches live renderer/scene consumers and is visible in telemetry and captures."
+    },
+    {
+      "id": "SUP-046",
+      "ledgerOrdinal": 46,
+      "sourceOutcomeIds": [
+        "P73AUG21-002",
+        "P73AUG21-016",
+        "CORR-HF-309"
+      ],
+      "feedbackIds": [
+        "HF-295",
+        "HF-309"
+      ],
+      "canonicalText": "`HF-309` supersedes any prose or CI-only “live” claim, including the publication authorization in `HF-295`: only one agreeing exact-SHA source/artifact/workflow/Pages/route chain proves which correction is public."
+    },
+    {
+      "id": "SUP-047",
+      "ledgerOrdinal": 47,
+      "sourceOutcomeIds": [
+        "P73AUG21-001",
+        "P73AUG21-010",
+        "CORR-HF-310"
+      ],
+      "feedbackIds": [
+        "HF-310"
+      ],
+      "canonicalText": "`HF-310` makes the scoped Desktop/spec/transcript/attachment audit a release prerequisite while preserving authority boundaries: direct owner text is normative input; assistant summaries and implementation claims remain leads requiring independent falsification."
+    },
+    {
+      "id": "SUP-048",
+      "ledgerOrdinal": 48,
+      "sourceOutcomeIds": [
+        "P73GEN-001",
+        "P73GEN-002",
+        "P73GEN-003",
+        "P73GEN-004",
+        "P73GEN-005",
+        "P73GEN-006",
+        "P73GEN-007",
+        "CORR-HF-312",
+        "CORR-HF-313",
+        "CORR-HF-314"
+      ],
+      "feedbackIds": [
+        "HF-312",
+        "HF-313",
+        "HF-314"
+      ],
+      "canonicalText": "`HF-312` to `HF-314` record external workflow assimilation as governed process requirements, not gameplay completion: source pages are evidence rather than authority, untrusted repositories are never auto-installed, territory/licence restrictions bind, and paid API credits require explicit approval."
     }
   ],
   "testCatalog": [
@@ -7559,7 +7811,26 @@
     {"id":"HF-292","sourceOutcomeIds":["CORR-HF-292","P70HOTFIX2-006"],"planningRequirementIds":["R108","R113","R235","R304","R504","R608","R609"],"canonicalOwner":"Chopper cockpit framing and HUD","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-SUPPORT-RUNTIME","T-SUPPORT-VEHICLE-GATE","T-HUD-UNIT"],"artifactRefs":[]}},
     {"id":"HF-293","sourceOutcomeIds":["CORR-HF-293","P70HOTFIX2-007"],"planningRequirementIds":["R110","R304","R608","R609","R613"],"canonicalOwner":"Gun Range door depth and lighting presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-GUN-RANGE-TEST-BAY","T-PROFILE-AUTHORITY-E2E"],"artifactRefs":[]}},
     {"id":"HF-294","sourceOutcomeIds":["CORR-HF-294","P70HOTFIX2-008"],"planningRequirementIds":["R109","R223","R236","R304","R600","R604","R609","R610","R613"],"canonicalOwner":"Sticky-ordnance urgent HUD regression","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-HUD-E2E","T-HUD-UNIT","T-TIMED-MAP-WEAPONS"],"artifactRefs":[]}},
-    {"id":"HF-295","sourceOutcomeIds":["CORR-HF-295","P70HOTFIX2-009"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"],"canonicalOwner":"Pass 70 hotfix integration and protected release","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OWNER-GATE","T-RELEASE-SHELL"],"artifactRefs":[]}}
+    {"id":"HF-295","sourceOutcomeIds":["CORR-HF-295","P70HOTFIX2-009"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"],"canonicalOwner":"Pass 70 hotfix integration and protected release","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OWNER-GATE","T-RELEASE-SHELL"],"artifactRefs":[]}},
+    {"id":"HF-296","sourceOutcomeIds":["CORR-HF-296","P73AUG21-003","P73AUG21-005","P73CLIP-003"],"planningRequirementIds":["R105","R108","R608","R609","R613"],"canonicalOwner":"First-person arm offscreen continuity","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-VIEWMODEL-FRAMING","T-WEAPON-PRESENTATION","T-WEAPON-ASSET-GATE"],"artifactRefs":[]}},
+    {"id":"HF-297","sourceOutcomeIds":["CORR-HF-297","P73AUG21-004","P73AUG21-005","P73CLIP-005"],"planningRequirementIds":["R105","R108","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R600","R608","R609","R613"],"canonicalOwner":"First-person arm thickness and reference proportions","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-VIEWMODEL-FRAMING","T-WEAPON-PRESENTATION","T-WEAPON-ASSET-GATE"],"artifactRefs":[]}},
+    {"id":"HF-298","sourceOutcomeIds":["CORR-HF-298","P73AUG21-006","P73CLIP-001"],"planningRequirementIds":["R003","R109","R232","R307","R511","R600","R608","R610","R613"],"canonicalOwner":"First-grenade cold frame pacing","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-NATIVE-FRAME-PACING","T-PASS69-3-GLASS-M14-HITCH","T-TIMED-MAP-WEAPONS"],"artifactRefs":[]}},
+    {"id":"HF-299","sourceOutcomeIds":["CORR-HF-299","P73AUG21-007"],"planningRequirementIds":["R105","R108","R109","R232","R236","R304","R510","R600","R605","R608","R609","R610","R613"],"canonicalOwner":"Railgun ADS wall-reveal regression","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RAILGUN","T-OPERATOR-GATE","T-WEAPON-PRESENTATION"],"artifactRefs":[]}},
+    {"id":"HF-300","sourceOutcomeIds":["CORR-HF-300","P73AUG21-008"],"planningRequirementIds":["R109","R110","R223","R232","R236","R510","R600","R603","R604","R608","R610","R613"],"canonicalOwner":"Crossbow direct-impact glass authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-DESTRUCTIBLE","T-TIMED-MAP-WEAPONS"],"artifactRefs":[]}},
+    {"id":"HF-301","sourceOutcomeIds":["CORR-HF-301","P73AUG21-009"],"planningRequirementIds":["R109","R110","R223","R232","R236","R510","R600","R603","R604","R608","R610","R613"],"canonicalOwner":"Crossbow blast glass authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-DESTRUCTIBLE","T-TIMED-MAP-WEAPONS"],"artifactRefs":[]}},
+    {"id":"HF-302","sourceOutcomeIds":["CORR-HF-302","P73AUG21-011"],"planningRequirementIds":["R229","R232","R236","R510","R600","R603","R608","R613"],"canonicalOwner":"M14 EBR exact damage authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-WEAPON-CATALOG","T-TIMED-MAP-WEAPONS"],"artifactRefs":[]}},
+    {"id":"HF-303","sourceOutcomeIds":["CORR-HF-303","P73AUG21-012"],"planningRequirementIds":["R105","R108","R229","R232","R236","R510","R600","R605","R608","R609","R610","R613"],"canonicalOwner":"M14 EBR ADS wall-reveal regression","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OPERATOR-GATE","T-TIMED-MAP-WEAPONS","T-WEAPON-PRESENTATION"],"artifactRefs":[]}},
+    {"id":"HF-304","sourceOutcomeIds":["CORR-HF-304","P73AUG21-014"],"planningRequirementIds":["R003","R009","R301","R307","R605","R606","R608","R610","R613"],"canonicalOwner":"Firefox native-WebGPU performance and feature parity","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-INSTALLED-FIREFOX","T-NATIVE-FRAME-PACING","T-PROFILE-AUTHORITY-E2E"],"artifactRefs":[]}},
+    {"id":"HF-305","sourceOutcomeIds":["CORR-HF-305","P73AUG21-017","P73CLIP-006"],"planningRequirementIds":["R105","R108","R110","R232","R307","R600","R605","R608","R610","R613"],"canonicalOwner":"Visible-surface collision and viewmodel contact","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-PRONE-CONTACT-MATRIX","T-VIEWMODEL-FRAMING","T-RUSTRIG-PHYSICS","T-GUN-RANGE-TEST-BAY"],"artifactRefs":[]}},
+    {"id":"HF-306","sourceOutcomeIds":["CORR-HF-306","P73CLIP-004","P73CLIP-010"],"planningRequirementIds":["R110","R301","R605","R608","R610","R613"],"canonicalOwner":"Open-route invisible-blocker authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-PROFILE-AUTHORITY-E2E","T-RUSTRIG-PHYSICS","T-GUN-RANGE-TEST-BAY"],"artifactRefs":[]}},
+    {"id":"HF-307","sourceOutcomeIds":["CORR-HF-307","P73CLIP-007"],"planningRequirementIds":["R110","R301","R304","R605","R608","R610","R613"],"canonicalOwner":"Visible-canopy and platform support collision","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RUSTRIG-PHYSICS","T-GUN-RANGE-TEST-BAY","T-PROFILE-AUTHORITY-E2E"],"artifactRefs":[]}},
+    {"id":"HF-308","sourceOutcomeIds":["CORR-HF-308","P73AUG21-018"],"planningRequirementIds":["R300","R301","R302","R306","R307","R605","R606","R608","R610","R613"],"canonicalOwner":"Truthful live graphics-profile application","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-SETTINGS","T-PROFILE-AUTHORITY-UNIT","T-PROFILE-AUTHORITY-E2E","T-NATIVE-FRAME-PACING"],"artifactRefs":[]}},
+    {"id":"HF-309","sourceOutcomeIds":["CORR-HF-309","P73AUG21-002","P73AUG21-016"],"planningRequirementIds":["R001","R002","R003","R005","R006","R009","R010","R600","R611","R612","R613"],"canonicalOwner":"Exact live version and false-green prevention","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL","T-OWNER-GATE","T-PROVENANCE"],"artifactRefs":[]}},
+    {"id":"HF-310","sourceOutcomeIds":["CORR-HF-310","P73AUG21-001","P73AUG21-010"],"planningRequirementIds":["R005","R009","R613"],"canonicalOwner":"Owner-input completeness and evidence authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OWNER-GATE","T-TEXT-INTEGRITY"],"artifactRefs":[]}},
+    {"id":"HF-311","sourceOutcomeIds":["CORR-HF-311","P73CLIP-002","P73CLIP-009"],"planningRequirementIds":["R109","R304","R505","R510","R600","R604","R608","R609","R610","R613"],"canonicalOwner":"Carpet Bomber and Tri-Pass targeting identity","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-SUPPORT-RUNTIME","T-SUPPORT-VISUAL-E2E"],"artifactRefs":[]}},
+    {"id":"HF-312","sourceOutcomeIds":["CORR-HF-312","P73GEN-001","P73GEN-002","P73GEN-003","P73GEN-004","P73GEN-005"],"planningRequirementIds":["R008","R009","R105","R108","R109","R304","R307","R608","R613"],"canonicalOwner":"External asset-animation-environment workflow assimilation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-PROVENANCE","T-OWNER-GATE"],"artifactRefs":[]}},
+    {"id":"HF-313","sourceOutcomeIds":["CORR-HF-313","P73GEN-007"],"planningRequirementIds":["R008","R009","R105","R108","R600","R608","R613"],"canonicalOwner":"Pinned image2threejs workflow boundary","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-PROVENANCE","T-OWNER-GATE"],"artifactRefs":[]}},
+    {"id":"HF-314","sourceOutcomeIds":["CORR-HF-314","P73GEN-006"],"planningRequirementIds":["R005","R009","R608","R613"],"canonicalOwner":"Bounded fresh-critic verification loop","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OWNER-GATE","T-TEXT-INTEGRITY"],"artifactRefs":[]}}
   ],
   "desktopUntitledOutcomes": [
     {
@@ -9352,5 +9623,47 @@
     {"id":"P70HOTFIX2-007","sourceLocator":"L13#1","normalizedOutcome":"Gun Range killstreak-room entrance blue and orange bars or lights must not flicker or z-fight.","feedbackIds":["HF-293"],"planningRequirementIds":["R110","R304","R608","R609","R613"]},
     {"id":"P70HOTFIX2-008","sourceLocator":"L15#1","normalizedOutcome":"Semtex and explosive-crossbow attachments must present the loud central red 500 ms STUCK warning in addition to compact status.","feedbackIds":["HF-294"],"planningRequirementIds":["R109","R223","R236","R304","R600","R604","R609","R610","R613"]},
     {"id":"P70HOTFIX2-009","sourceLocator":"L17#1","normalizedOutcome":"Publish the mechanically green correction live as Pass 70 without another local HITL run while retaining exact Pass 69 and Pass 63.","feedbackIds":["HF-295"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"]}
+  ],
+  "codexPass73August21OwnerOutcomes": [
+    {"id":"P73AUG21-001","sourceLocator":"L1#1","normalizedOutcome":"Audit the scoped Atomic Acres Desktop handoffs and Desky/Hermes work before implementation.","feedbackIds":["HF-310"],"planningRequirementIds":["R005","R009","R613"]},
+    {"id":"P73AUG21-002","sourceLocator":"L1#2","normalizedOutcome":"Publish only the correctly tested latest correction rather than an ambiguous or stale live version.","feedbackIds":["HF-309"],"planningRequirementIds":["R001","R002","R003","R005","R006","R009","R010","R600","R611","R612","R613"]},
+    {"id":"P73AUG21-003","sourceLocator":"L3#1","normalizedOutcome":"First-person arms must connect naturally and continue beyond the screen instead of ending in mid-air.","feedbackIds":["HF-296"],"planningRequirementIds":["R105","R108","R608","R609","R613"]},
+    {"id":"P73AUG21-004","sourceLocator":"L5#1","normalizedOutcome":"First-person arms remain too skinny and require stronger proportions.","feedbackIds":["HF-297"],"planningRequirementIds":["R105","R108","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R600","R608","R609","R613"]},
+    {"id":"P73AUG21-005","sourceLocator":"L7#1","normalizedOutcome":"Previously supplied screenshots remain required evidence for arm proportions and layout.","feedbackIds":["HF-296","HF-297"],"planningRequirementIds":["R105","R108","R608","R609","R613","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R600"]},
+    {"id":"P73AUG21-006","sourceLocator":"L9#1","normalizedOutcome":"Remove the remaining tiny cold hitch on the first grenade throw of a match.","feedbackIds":["HF-298"],"planningRequirementIds":["R003","R109","R232","R307","R511","R600","R608","R610","R613"]},
+    {"id":"P73AUG21-007","sourceLocator":"L11#1","normalizedOutcome":"Restore the Railgun ADS through-wall reveal regression.","feedbackIds":["HF-299"],"planningRequirementIds":["R105","R108","R109","R232","R236","R304","R510","R600","R605","R608","R609","R610","R613"]},
+    {"id":"P73AUG21-008","sourceLocator":"L13#1","normalizedOutcome":"An explosive-crossbow bolt must break glass on direct impact.","feedbackIds":["HF-300"],"planningRequirementIds":["R109","R110","R223","R232","R236","R510","R600","R603","R604","R608","R610","R613"]},
+    {"id":"P73AUG21-009","sourceLocator":"L13#2","normalizedOutcome":"An explosive-crossbow explosion must break eligible glass in its blast.","feedbackIds":["HF-301"],"planningRequirementIds":["R109","R110","R223","R232","R236","R510","R600","R603","R604","R608","R610","R613"]},
+    {"id":"P73AUG21-010","sourceLocator":"L15#1","normalizedOutcome":"Reconcile all scoped Desktop files and chat context so specified fixes are not omitted.","feedbackIds":["HF-310"],"planningRequirementIds":["R005","R009","R613"]},
+    {"id":"P73AUG21-011","sourceLocator":"L17#1","normalizedOutcome":"Apply the requested exact 40 percent M14 EBR damage reduction without path drift.","feedbackIds":["HF-302"],"planningRequirementIds":["R229","R232","R236","R510","R600","R603","R608","R613"]},
+    {"id":"P73AUG21-012","sourceLocator":"L19#1","normalizedOutcome":"Restore the M14 EBR through-wall reveal regression.","feedbackIds":["HF-303"],"planningRequirementIds":["R105","R108","R229","R232","R236","R510","R600","R605","R608","R609","R610","R613"]},
+    {"id":"P73AUG21-013","sourceLocator":"L21#1","normalizedOutcome":"The owner identifies the attached three-minute video as supporting evidence.","feedbackIds":[],"planningRequirementIds":[],"disposition":"excluded-nonproduct","exclusionReason":"Attachment locator only; concrete product atoms are projected from the reviewed timestamp notes."},
+    {"id":"P73AUG21-014","sourceLocator":"L23#1","normalizedOutcome":"Fix the roughly 10 FPS Firefox result versus roughly 150 FPS in Chrome.","feedbackIds":["HF-304"],"planningRequirementIds":["R003","R009","R301","R307","R605","R606","R608","R610","R613"]},
+    {"id":"P73AUG21-015","sourceLocator":"L25#1","normalizedOutcome":"The owner gives an umbrella assessment that the specified issues do not feel fixed.","feedbackIds":[],"planningRequirementIds":[],"disposition":"excluded-nonproduct","exclusionReason":"Redundant summary sentiment; each concrete independently falsifiable issue is mapped on its own source line."},
+    {"id":"P73AUG21-016","sourceLocator":"L27#1","normalizedOutcome":"Prove that the correct exact version was pushed and is live.","feedbackIds":["HF-309"],"planningRequirementIds":["R001","R002","R003","R005","R006","R009","R010","R600","R611","R612","R613"]},
+    {"id":"P73AUG21-017","sourceLocator":"L27#2","normalizedOutcome":"Remove the remaining visible floor clipping.","feedbackIds":["HF-305"],"planningRequirementIds":["R105","R108","R110","R232","R307","R600","R605","R608","R610","R613"]},
+    {"id":"P73AUG21-018","sourceLocator":"L29#1","normalizedOutcome":"Make an in-match Quality-to-Performance switch actually update effective graphics.","feedbackIds":["HF-308"],"planningRequirementIds":["R300","R301","R302","R306","R307","R605","R606","R608","R610","R613"]},
+    {"id":"P73AUG21-019","sourceLocator":"L31#1","normalizedOutcome":"Continue autonomously until all concrete issues are fixed.","feedbackIds":[],"planningRequirementIds":[],"disposition":"excluded-nonproduct","exclusionReason":"Workflow continuation directive only; it adds no independently testable product outcome beyond the mapped atoms."}
+  ],
+  "clipPass73August21ReviewOutcomes": [
+    {"id":"P73CLIP-001","sourceLocator":"L1#1","normalizedOutcome":"The reviewed grenade segment cannot disprove the separately reported remaining cold first-throw hitch.","feedbackIds":["HF-298"],"planningRequirementIds":["R003","R109","R232","R307","R511","R600","R608","R610","R613"]},
+    {"id":"P73CLIP-002","sourceLocator":"L3#1","normalizedOutcome":"Verify the selected support identity before changing Carpet or Tri-Pass targeting behavior.","feedbackIds":["HF-311"],"planningRequirementIds":["R109","R304","R505","R510","R600","R604","R608","R609","R610","R613"]},
+    {"id":"P73CLIP-003","sourceLocator":"L5#1","normalizedOutcome":"The supplied capture shows first-person arms terminating inside the viewport.","feedbackIds":["HF-296"],"planningRequirementIds":["R105","R108","R608","R609","R613"]},
+    {"id":"P73CLIP-004","sourceLocator":"L5#2","normalizedOutcome":"The supplied capture shows an invisible geometry obstruction on an intended route.","feedbackIds":["HF-306"],"planningRequirementIds":["R110","R301","R605","R608","R610","R613"]},
+    {"id":"P73CLIP-005","sourceLocator":"L7#1","normalizedOutcome":"The owner describes the knife and first-person arms as too thin.","feedbackIds":["HF-297"],"planningRequirementIds":["R105","R108","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R600","R608","R609","R613"]},
+    {"id":"P73CLIP-006","sourceLocator":"L7#2","normalizedOutcome":"Held weapons and arms penetrate nearby wall, floor or underside geometry.","feedbackIds":["HF-305"],"planningRequirementIds":["R105","R108","R110","R232","R307","R600","R605","R608","R610","R613"]},
+    {"id":"P73CLIP-007","sourceLocator":"L7#3","normalizedOutcome":"The player falls through a visibly solid canopy or platform.","feedbackIds":["HF-307"],"planningRequirementIds":["R110","R301","R304","R605","R608","R610","R613"]},
+    {"id":"P73CLIP-008","sourceLocator":"L7#4","normalizedOutcome":"A large freeze is audible but its triggering subsystem is not isolated by the recording.","feedbackIds":[],"planningRequirementIds":[],"disposition":"excluded-nonproduct","exclusionReason":"Observed symptom lacks a reproducible trigger; retain as an unknown for profiling rather than inventing a cause."},
+    {"id":"P73CLIP-009","sourceLocator":"L9#1","normalizedOutcome":"The visible three-target surface is explicitly Tri-Pass and must not be misclassified as Carpet Bomber.","feedbackIds":["HF-311"],"planningRequirementIds":["R109","R304","R505","R510","R600","R604","R608","R609","R610","R613"]},
+    {"id":"P73CLIP-010","sourceLocator":"L9#2","normalizedOutcome":"The later segment shows another invisible geometry obstruction.","feedbackIds":["HF-306"],"planningRequirementIds":["R110","R301","R605","R608","R610","R613"]}
+  ],
+  "codexPass73August21GenerationOutcomes": [
+    {"id":"P73GEN-001","sourceLocator":"L1#1","normalizedOutcome":"Evaluate the mocap-to-animation reference through licence-aware offline asset gates.","feedbackIds":["HF-312"],"planningRequirementIds":["R008","R009","R105","R108","R109","R304","R307","R608","R613"]},
+    {"id":"P73GEN-002","sourceLocator":"L3#1","normalizedOutcome":"Evaluate the large Three.js ocean reference as an algorithmic environment candidate.","feedbackIds":["HF-312"],"planningRequirementIds":["R008","R009","R105","R108","R109","R304","R307","R608","R613"]},
+    {"id":"P73GEN-003","sourceLocator":"L5#1","normalizedOutcome":"Evaluate the stylized water reference against the project WebGPU and TSL contract.","feedbackIds":["HF-312"],"planningRequirementIds":["R008","R009","R105","R108","R109","R304","R307","R608","R613"]},
+    {"id":"P73GEN-004","sourceLocator":"L7#1","normalizedOutcome":"Evaluate the H3-style animation and asset workflow subject to territorial and output rights.","feedbackIds":["HF-312"],"planningRequirementIds":["R008","R009","R105","R108","R109","R304","R307","R608","R613"]},
+    {"id":"P73GEN-005","sourceLocator":"L9#1","normalizedOutcome":"Use Modern Claudefare only as a visual comparator separated from gameplay quality.","feedbackIds":["HF-312"],"planningRequirementIds":["R008","R009","R105","R108","R109","R304","R307","R608","R613"]},
+    {"id":"P73GEN-006","sourceLocator":"L11#1","normalizedOutcome":"Evaluate Gauntlet Loop as a bounded builder and fresh-critic workflow.","feedbackIds":["HF-314"],"planningRequirementIds":["R005","R009","R608","R613"]},
+    {"id":"P73GEN-007","sourceLocator":"L13#1","normalizedOutcome":"Resolve image2threejs to one canonical pinned and licence-verified upstream before use.","feedbackIds":["HF-313"],"planningRequirementIds":["R008","R009","R105","R108","R600","R608","R613"]}
   ]
 }

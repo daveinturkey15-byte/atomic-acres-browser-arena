@@ -31,7 +31,9 @@ describe('presentation prewarm startup contract', () => {
     const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     expect(source).toContain("const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent);");
     expect(source).toContain("shadowSamplerMode === 'basic-depth' ? THREE.BasicShadowMap : THREE.PCFShadowMap");
-    expect(source.match(/type: webGlShadowMapType/g)).toHaveLength(2);
+    // Renderer construction, exact-composition prewarm, and the live graphics
+    // transaction must all retain the browser-safe sampler selection.
+    expect(source.match(/type: webGlShadowMapType/g)).toHaveLength(3);
     expect(source).not.toContain('type: THREE.PCFShadowMap');
   });
 
@@ -48,7 +50,8 @@ describe('presentation prewarm startup contract', () => {
     const legacy = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     expect(legacy).toContain("matchState.phase === 'active'");
     expect(legacy).toContain("menuLifecycle.surface === 'hidden' && arenaSelectionReady");
-    expect(legacy).toContain("? 'warmed-live'");
+    expect(legacy).toContain("? 'input-response'");
+    expect(legacy).toContain(": 'warmed-live'");
     expect(legacy).toContain("submitWebGpuFrame(now, false, submissionMode)");
     const coldSettlement = legacy.slice(
       legacy.indexOf('async function settleWebGpuPresentation('),
@@ -339,6 +342,9 @@ describe('presentation prewarm startup contract', () => {
     expect(matchBoundFirstShots).toContain('prewarmExactWebGlMatchComposition(token.signal)');
     expect(matchBoundFirstShots).toContain("weaponView.prewarmBrowserWeaponFirePresentation('m14-ebr',");
     expect(matchBoundFirstShots).toContain('prewarmMatchBoundDmrThermalAdsPresentation(submitExactMatchComposition, token);');
+    expect(matchBoundFirstShots).toContain(
+      'await grenadeWorldPresentationPool.withStagedFirstAcquisitionVocabulary(',
+    );
     const glassImpactStage = matchBoundFirstShots.indexOf(
       'await impactPresentation.withStagedVocabulary(camera,',
     );
@@ -353,10 +359,15 @@ describe('presentation prewarm startup contract', () => {
     const ordinaryFireStage = matchBoundFirstShots.indexOf(
       'weaponView.prewarmBrowserWeaponFirePresentation(player.weapon,',
     );
+    const grenadeVocabularyStage = matchBoundFirstShots.indexOf(
+      'await grenadeWorldPresentationPool.withStagedFirstAcquisitionVocabulary(',
+    );
     expect(glassImpactStage).toBeGreaterThan(-1);
     expect(glassPoolStage).toBeGreaterThan(glassImpactStage);
     expect(glassImpactSubmit).toBeGreaterThan(glassPoolStage);
     expect(glassImpactStage).toBeLessThan(ordinaryFireStage);
+    expect(grenadeVocabularyStage).toBeGreaterThan(glassImpactSubmit);
+    expect(grenadeVocabularyStage).toBeLessThan(ordinaryFireStage);
     expect(matchBoundFirstShots.slice(glassImpactStage, ordinaryFireStage))
       .toContain('arenaTransitionGeneration');
     expect(matchBoundFirstShots.indexOf('player.weapon'))
@@ -560,6 +571,7 @@ describe('presentation prewarm startup contract', () => {
     expect(presentationEpochReset).toContain('lastObservedWebGpuCompletionSequence = renderRuntime.presentationTelemetry(now).completedSequence;');
     expect(presentationEpochReset).toContain('deferredWebGpuAdaptivePixelRatio.clear();');
     expect(source).toContain("source: 'webgpu-submission' as const");
+    expect(source).toContain('document.documentElement.dataset.graphicsLiveProfile = liveGraphicsProfile;');
     expect(source).toContain('LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000');
     expect(source).toContain('detectLivePresentationStall({');
     expect(source).toContain('documentFocused: document.hasFocus()');

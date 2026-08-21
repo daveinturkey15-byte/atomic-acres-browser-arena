@@ -9,7 +9,7 @@ export type Box2 = {
   rotation?: [number, number, number];
 };
 export type Point3 = { x: number; y: number; z: number };
-export type SweptSphereHit = { time: number; normal: Point3 };
+export type SweptSphereHit = { time: number; normal: Point3; box: Box2 };
 export type OrientedBoxSweepEnvelope = Readonly<{
   halfExtents: Readonly<Point3>;
   /** Envelope centre relative to the presentation root before yaw rotation. */
@@ -376,12 +376,13 @@ export function sweepOrientedBoxAgainstBoxes(
   const centreStart = orientedEnvelopeCentre(rootStart, envelope);
   let bestTime = Number.POSITIVE_INFINITY;
   let bestFrame: BoxFrame | null = null;
+  let bestBox: Box2 | null = null;
   let bestAxis = -1;
   let bestSign = 0;
   for (const box of boxes) {
     const frame = boxFrame(box);
     if (orientedBoxIntersectsBox(rootStart, envelope, box)) {
-      return { time: 0, normal: startOverlapNormal(centreStart, frame, rootDelta) };
+      return { time: 0, normal: startOverlapNormal(centreStart, frame, rootDelta), box };
     }
     worldPointToLocalInto(frame, centreStart, collisionLocalStartScratch);
     worldVectorToLocalInto(frame, rootDelta, collisionLocalDeltaScratch);
@@ -398,11 +399,12 @@ export function sweepOrientedBoxAgainstBoxes(
       || collisionSlabHitScratch.near >= bestTime) continue;
     bestTime = collisionSlabHitScratch.near;
     bestFrame = frame;
+    bestBox = box;
     bestAxis = collisionSlabHitScratch.nearAxis;
     bestSign = collisionSlabHitScratch.nearSign;
   }
-  if (!bestFrame) return null;
-  return { time: bestTime, normal: localAxisNormalToWorld(bestFrame, bestAxis, bestSign) };
+  if (!bestFrame || !bestBox) return null;
+  return { time: bestTime, normal: localAxisNormalToWorld(bestFrame, bestAxis, bestSign), box: bestBox };
 }
 
 function cross2d(origin: ProjectedPoint, a: ProjectedPoint, b: ProjectedPoint): number {
@@ -539,6 +541,7 @@ export function sweepSphereAgainstBoxes(
 ): SweptSphereHit | null {
   let bestTime = Number.POSITIVE_INFINITY;
   let bestFrame: BoxFrame | null = null;
+  let bestBox: Box2 | null = null;
   let bestAxis = -1;
   let bestSign = 0;
   for (const box of boxes) {
@@ -558,11 +561,12 @@ export function sweepSphereAgainstBoxes(
       || collisionSlabHitScratch.near >= bestTime) continue;
     bestTime = collisionSlabHitScratch.near;
     bestFrame = frame;
+    bestBox = box;
     bestAxis = collisionSlabHitScratch.nearAxis;
     bestSign = collisionSlabHitScratch.nearSign;
   }
-  if (!bestFrame) return null;
-  return { time: bestTime, normal: localAxisNormalToWorld(bestFrame, bestAxis, bestSign) };
+  if (!bestFrame || !bestBox) return null;
+  return { time: bestTime, normal: localAxisNormalToWorld(bestFrame, bestAxis, bestSign), box: bestBox };
 }
 
 /** Exact sphere overlap against an authored axis-aligned or oriented box. */

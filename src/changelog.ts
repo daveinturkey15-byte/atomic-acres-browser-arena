@@ -49,12 +49,26 @@ export function pass72ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
       ? 'Pass 72 adds host-authoritative private-lobby controls, combat corrections, teammate-scoped support-shot audio dispatch and squad presentation while preserving the tested release fallbacks.'
       : 'Pass 72 is the mechanically gated publication candidate, adding host-authoritative private-lobby controls, combat corrections, teammate-scoped support-shot audio dispatch and squad presentation while preserving the tested release fallbacks.',
     lineage: released
-      ? 'Pass 70 remains the exact previous live runtime, Pass 69 remains the immutable comparison build, and Pass 63 remains the stable WebGL fallback while public owner HITL for Pass 72 remains pending'
+      ? 'Pass 70 remains the exact retained live runtime, Pass 69 remains the immutable comparison build, and Pass 63 remains the stable WebGL fallback; public owner HITL subsequently identified the corrections tracked in Pass 73'
       : 'Pass 70 remains the exact previous live runtime, Pass 69 remains the immutable comparison build, and Pass 63 remains the stable WebGL fallback; publication-first authorization is recorded and public owner HITL follows the protected Pages release',
   });
 }
 
-const pass72ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+export function pass73ReleaseCopy(releasedAt: string): Readonly<{ summary: string; lineage: string }> {
+  const released = releasedAt !== PENDING_PRODUCTION_RELEASE;
+  return Object.freeze({
+    summary: released
+      ? 'Pass 73 corrects first-person arm continuity, thermal target presentation, explosive-crossbow glass authority, first-grenade preparation, live graphics switching, collision integrity and cross-browser performance.'
+      : 'Pass 73 is the mechanically gated publication candidate for first-person arm continuity, thermal target presentation, explosive-crossbow glass authority, first-grenade preparation, live graphics switching, collision integrity and cross-browser performance.',
+    lineage: released
+      ? 'Pass 72 remains the exact previous live runtime, Pass 70 and Pass 69 remain byte-pinned comparison builds, and Pass 63 remains the stable WebGL fallback while public owner HITL for Pass 73 remains pending'
+      : 'Pass 72 remains the exact previous live runtime, Pass 70 and Pass 69 remain byte-pinned comparison builds, and Pass 63 remains the stable WebGL fallback; publication-first authorization is recorded and public owner HITL follows the protected Pages release',
+  });
+}
+
+const pass73ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+const pass73Copy = pass73ReleaseCopy(pass73ReleasedAt);
+const pass72ReleasedAt = '2026-08-21T00:25:40Z';
 const pass72Copy = pass72ReleaseCopy(pass72ReleasedAt);
 const pass70ReleasedAt = '2026-08-16T19:32:01Z';
 const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
@@ -66,6 +80,26 @@ const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
  * the pending sentinel until the production workflow injects its build time.
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
+  Object.freeze({
+    id: 'pass73',
+    pass: 'PASS 73',
+    title: 'Pass 73 · Owner-Reported Behavioral Corrections',
+    releasedAt: pass73ReleasedAt,
+    areas: Object.freeze(['FIRST-PERSON', 'COMBAT', 'GLASS', 'COLLISION', 'GRAPHICS', 'FIREFOX', 'STABILITY']),
+    summary: pass73Copy.summary,
+    highlights: Object.freeze([
+      'Authored first-person sleeves are thicker and extend beyond the lower frame so arms no longer terminate visibly in mid-air across the weapon and stance catalog',
+      'The first grenade path is prepared before combat without replacing its authored sound or adding retained broadband loops, keeping first and later throws on the same bounded presentation path',
+      'Railgun and M14 EBR ADS restore exact-model thermal target presentation through occluding world geometry while ordinary raster bodies remain hidden behind cover',
+      'Explosive-crossbow direct impacts and admitted blast apertures use one host-owned, replicated and occlusion-aware glass lifecycle',
+      'M14 EBR body damage remains the single exact 40-percent reduction to 37.2 / 24 across offline, host-authoritative and replicated hit paths rather than receiving a second reduction',
+      'Quality-to-Performance changes apply live-safe resolution, shadow, effect and refinement settings in the current match while topology-changing options remain explicitly staged instead of pretending to apply',
+      'Nuke Town canopy, floor and opening authority is reconciled so visible mass, movement collision and projectile collision agree on the reported routes',
+      'Installed Firefox is measured against the same native-WebGPU Quality scene, resolution, assets and effects as Chromium and fails closed on software-adapter or fallback execution',
+      'The exact Pass 72 live runtime is pinned as the selectable previous channel; Pass 70, Pass 69, Pass 67.1 and Pass 63 remain preserved for comparison, stable testing and rollback',
+      pass73Copy.lineage,
+    ]),
+  }),
   Object.freeze({
     id: 'pass72',
     pass: 'PASS 72',
@@ -517,6 +551,6 @@ export function formatChangelogTimestampDetail(isoTimestamp: string): string {
 }
 
 export function lastUpdatedButtonLabel(entry: ChangelogEntry = latestChangelogEntry()): string {
-  if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) return 'CURRENT CANDIDATE · PUBLIC HITL AFTER RELEASE';
+  if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) return 'HITL CANDIDATE · NOT LIVE';
   return `LAST RELEASE · ${formatChangelogTimestamp(entry.releasedAt)}`;
 }

@@ -1,5 +1,23 @@
 {
   "audit": {
+    "authoredSleeveGeometry": {
+      "contract": "authored-weighted-sleeve-mass-v1",
+      "passed": true,
+      "sides": {
+        "L": {
+          "medianRadius": 7.057966,
+          "minimumProximalT": -0.695355,
+          "p90Radius": 8.382441,
+          "weightedVertices": 285
+        },
+        "R": {
+          "medianRadius": 6.652999,
+          "minimumProximalT": -0.695355,
+          "p90Radius": 7.942342,
+          "weightedVertices": 292
+        }
+      }
+    },
     "baselineBlendSha256": "cfcdca753520317b110179c675b6196156593dfc209ca4b7ea9ced8e7f3e17fa",
     "baselineContactReceiptSha256": "f6bc60dd5c55f8cb775180ecb0c2785bc302be44c3d4be5d52ea90d14f738bfb",
     "bones": 37,
@@ -18,7 +36,7 @@
       "melee",
       "inspect"
     ],
-    "masterSha256": "936348c930d6132bd97da4ba557349bd7f13b9c57362e37e831ee45c019ff27c",
+    "masterSha256": "464e5821cae0ea48b5da3587ee8edab98a1cf02fbe0a7c6770c721def8180742",
     "meshTriangles": {
       "Pass65_Arms_Batch_Glove": 3010,
       "Pass65_Arms_Batch_Skin": 2702,
@@ -119,10 +137,12 @@
   "lods": {
     "lod0": {
       "path": "artifacts/blender-operator-arms/pass70-manual-master/pass65-first-person-arms-lod0.glb",
+      "sha256": "8c0243bbb566f301066478ad61b4707a7301a3a61d5cf97eae291cea12e33a6d",
       "triangles": 9744
     },
     "lod1": {
       "path": "artifacts/blender-operator-arms/pass70-manual-master/pass65-first-person-arms-lod1.glb",
+      "sha256": "58aaffa351f927c84cabb2bad5488f93ec56144c529d88cd78ca12b97209cbad",
       "triangles": 7703
     }
   },

@@ -6,6 +6,10 @@ export type ThermalGhostTarget = Readonly<{
   id: string;
   relation: ThermalGhostRelation;
   root: THREE.Object3D;
+  /** Authoritative respawn/death generation for stale-reveal rejection. */
+  lifeId?: number;
+  /** Authoritative movement/replication continuity for stale-pose rejection. */
+  continuityId?: number;
 }>;
 
 export const THERMAL_GHOST_ORANGE_HEX = 0xff7a1a;
@@ -22,10 +26,33 @@ export const THERMAL_GHOST_MAX_OWNED_MATERIALS = THERMAL_GHOST_MAX_EXACT_MODEL_M
 export const THERMAL_GHOST_HALO_SCALE = 1.045;
 export const THERMAL_GHOST_PRESENTATION_CONTRACT = 'exact-animated-operator-plus-orange-halo-v1';
 
+export type ThermalGhostTargetTelemetry = Readonly<{
+  id: string;
+  lifeId: number | null;
+  continuityId: number | null;
+  active: boolean;
+  sourceRootUuid: string;
+  sourceVisualUuid: string;
+  sourceRootAttached: boolean;
+  sourceVisualAttached: boolean;
+  sourceBodyLayers: number;
+  exactModelLayers: number;
+  haloLayers: number;
+  detachedLayers: number;
+  extraneousModelLayers: number;
+  extraneousHaloLayers: number;
+  sourcePoseDigest: string;
+  modelPoseDigest: string;
+  poseIdentity: boolean;
+  lastSeenGeneration: number;
+}>;
+
 export type ThermalGhostTelemetry = Readonly<{
   contract: typeof THERMAL_GHOST_PRESENTATION_CONTRACT;
   trackedTargets: number;
   activeTargets: number;
+  activeTargetIds: readonly string[];
+  targets?: readonly ThermalGhostTargetTelemetry[];
   activeModelLayers: number;
   activeHaloLayers: number;
   activeSourceBodyLayers?: number;
@@ -38,6 +65,26 @@ export type ThermalGhostTelemetry = Readonly<{
   boneWorldMatrixIdentity?: boolean;
   normalMaterialEquivalence?: boolean;
   silhouetteLayerIdentity?: boolean;
+  siblingParentIdentity?: boolean;
+  lifeIdentityCurrent?: boolean;
+  poseIdentity?: boolean;
+  sourceRootsAttached?: boolean;
+  sourceRootIdentityUnique?: boolean;
+  detachedLayers?: number;
+  extraneousModelLayers?: number;
+  extraneousHaloLayers?: number;
+  duplicateSourceRootInputs?: number;
+  evidenceControlHidden: boolean;
+  exactModelVisible: boolean;
+  exactModelColorWrite: boolean;
+  exactModelOpacity: number;
+  exactModelDepthTestDisabled: boolean;
+  exactModelDepthWriteDisabled: boolean;
+  haloVisible: boolean;
+  haloColorWrite: boolean;
+  haloOpacity: number;
+  haloDepthTestDisabled: boolean;
+  haloDepthWriteDisabled: boolean;
   throughGeometry: boolean;
   orangeHalo: boolean;
   proxyMeshes: 0;
@@ -57,6 +104,7 @@ type GhostLayer = {
   model: THREE.Mesh;
   halo: THREE.Mesh;
   sourceMaterials: THREE.Material[];
+  active: boolean;
 };
 
 type ExactMaterialLease = {
@@ -70,10 +118,17 @@ type GhostRecord = {
   relation: ThermalGhostRelation;
   layers: GhostLayer[];
   sourceRoot: THREE.Object3D;
+  sourceVisual: THREE.Object3D;
+  lifeId: number | null;
+  continuityId: number | null;
   lastSeenGeneration: number;
   complete: boolean;
   sourceBodyLayers: number;
 };
+
+function identityGeneration(value: number | undefined): number | null {
+  return Number.isSafeInteger(value) && value! >= 0 ? value! : null;
+}
 
 function sourceMaterials(source: THREE.Mesh): THREE.Material[] {
   return Array.isArray(source.material) ? source.material : [source.material];
@@ -98,9 +153,14 @@ function presentationMesh(source: THREE.Mesh, material: THREE.Material | THREE.M
     const mesh = new THREE.SkinnedMesh(source.geometry, material);
     mesh.bind(source.skeleton, source.bindMatrix);
     mesh.bindMode = source.bindMode;
+    mesh.morphTargetInfluences = source.morphTargetInfluences;
+    mesh.morphTargetDictionary = source.morphTargetDictionary;
     return mesh;
   }
-  return new THREE.Mesh(source.geometry, material);
+  const mesh = new THREE.Mesh(source.geometry, material);
+  mesh.morphTargetInfluences = source.morphTargetInfluences;
+  mesh.morphTargetDictionary = source.morphTargetDictionary;
+  return mesh;
 }
 
 function effectivelyVisible(source: THREE.Object3D, targetRoot: THREE.Object3D): boolean {
@@ -114,7 +174,9 @@ function effectivelyVisible(source: THREE.Object3D, targetRoot: THREE.Object3D):
 }
 
 function hasRenderableSourceMaterial(source: THREE.Mesh): boolean {
-  return sourceMaterials(source).some((material) => material.visible && material.colorWrite);
+  return sourceMaterials(source).some((material) => (
+    material.visible && material.colorWrite && material.opacity > 0
+  ));
 }
 
 const MATERIAL_PROGRAM_VALUE_KEYS = Object.freeze([
@@ -264,6 +326,39 @@ function matrixEquals(left: THREE.Matrix4, right: THREE.Matrix4, tolerance = 1e-
   return true;
 }
 
+function poseDigest(layers: readonly GhostLayer[], kind: 'source' | 'model'): string {
+  let hash = 0x811c9dc5;
+  const mix = (value: number): void => {
+    const quantized = Number.isFinite(value) ? Math.round(value * 100_000) | 0 : 0x7fffffff;
+    for (let shift = 0; shift < 32; shift += 8) {
+      hash ^= (quantized >>> shift) & 0xff;
+      hash = Math.imul(hash, 0x01000193);
+    }
+  };
+  for (const layer of layers) {
+    if (!layer.active) continue;
+    const mesh = kind === 'source' ? layer.source : layer.model;
+    mesh.updateWorldMatrix(true, false);
+    for (const value of mesh.matrixWorld.elements) mix(value);
+    if (mesh instanceof THREE.SkinnedMesh) {
+      for (const bone of mesh.skeleton.bones) {
+        bone.updateWorldMatrix(true, false);
+        for (const value of bone.matrixWorld.elements) mix(value);
+      }
+    }
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function descendantOf(object: THREE.Object3D, root: THREE.Object3D): boolean {
+  let cursor: THREE.Object3D | null = object;
+  while (cursor) {
+    if (cursor === root) return true;
+    cursor = cursor.parent;
+  }
+  return false;
+}
+
 const HALO_SCALE_VECTOR = new THREE.Vector3(
   THERMAL_GHOST_HALO_SCALE,
   THERMAL_GHOST_HALO_SCALE,
@@ -282,12 +377,6 @@ function exactMeshMaterialsEquivalent(layer: GhostLayer): boolean {
     && exactMaterialAppearanceEquivalent(layer.sourceMaterials[0]!, layer.model.material);
 }
 
-function materialsRenderThroughGeometry(material: THREE.Material | THREE.Material[]): boolean {
-  if (!Array.isArray(material)) return !material.depthTest && !material.depthWrite;
-  for (const entry of material) if (entry.depthTest || entry.depthWrite) return false;
-  return true;
-}
-
 function sharedBoneWorldMatricesMatch(source: THREE.SkinnedMesh, model: THREE.SkinnedMesh): boolean {
   if (model.skeleton.bones.length !== source.skeleton.bones.length) return false;
   for (let index = 0; index < source.skeleton.bones.length; index += 1) {
@@ -296,6 +385,24 @@ function sharedBoneWorldMatricesMatch(source: THREE.SkinnedMesh, model: THREE.Sk
     if (sourceBone !== modelBone || !matrixEquals(sourceBone.matrixWorld, modelBone.matrixWorld)) return false;
   }
   return true;
+}
+
+/**
+ * Thermal layers are siblings of the source mesh. Parenting them to the
+ * SkinnedMesh applied its local transform twice to bind-space vertices and
+ * moved the reveal away from the real operator behind the wall.
+ */
+function syncSiblingTransforms(layer: GhostLayer): void {
+  const { source, model, halo } = layer;
+  if (source.matrixAutoUpdate) source.updateMatrix();
+  model.matrix.copy(source.matrix);
+  halo.matrix.copy(source.matrix).scale(HALO_SCALE_VECTOR);
+  model.matrixWorldNeedsUpdate = true;
+  halo.matrixWorldNeedsUpdate = true;
+  if (source.morphTargetInfluences) {
+    model.morphTargetInfluences = source.morphTargetInfluences;
+    halo.morphTargetInfluences = source.morphTargetInfluences;
+  }
 }
 
 /**
@@ -315,6 +422,8 @@ export class ThermalGhostPresentation {
     contract: THERMAL_GHOST_PRESENTATION_CONTRACT,
     trackedTargets: 0,
     activeTargets: 0,
+    activeTargetIds: [],
+    targets: [],
     activeModelLayers: 0,
     activeHaloLayers: 0,
     activeSourceBodyLayers: 0,
@@ -327,6 +436,26 @@ export class ThermalGhostPresentation {
     boneWorldMatrixIdentity: true,
     normalMaterialEquivalence: true,
     silhouetteLayerIdentity: true,
+    siblingParentIdentity: true,
+    lifeIdentityCurrent: true,
+    poseIdentity: true,
+    sourceRootsAttached: true,
+    sourceRootIdentityUnique: true,
+    detachedLayers: 0,
+    extraneousModelLayers: 0,
+    extraneousHaloLayers: 0,
+    duplicateSourceRootInputs: 0,
+    evidenceControlHidden: false,
+    exactModelVisible: false,
+    exactModelColorWrite: false,
+    exactModelOpacity: 0,
+    exactModelDepthTestDisabled: false,
+    exactModelDepthWriteDisabled: false,
+    haloVisible: false,
+    haloColorWrite: false,
+    haloOpacity: 0,
+    haloDepthTestDisabled: false,
+    haloDepthWriteDisabled: false,
     throughGeometry: false,
     orangeHalo: false,
     proxyMeshes: 0,
@@ -342,12 +471,15 @@ export class ThermalGhostPresentation {
   };
   private generation = 0;
   private activeTargets = 0;
+  private readonly activeTargetIds: string[] = [];
   private activeModelLayers = 0;
   private activeHaloLayers = 0;
   private activeSourceBodyLayers = 0;
   private activeNormalMaterialSlots = 0;
   private materialBudgetExceeded = false;
   private haloMaterialDisposed = false;
+  private evidenceControlHidden = false;
+  private duplicateSourceRootInputs = 0;
 
   private acquireExactModelMaterials(source: THREE.Mesh): THREE.Material[] | null {
     const originals = sourceMaterials(source);
@@ -392,8 +524,10 @@ export class ThermalGhostPresentation {
     // Attached guns, haze and shadow proxies are not the operator body. The
     // named rigged visual is the exact animated model authority when present;
     // the target root remains the deterministic test/fallback boundary.
-    const operatorVisual = target.root.getObjectByName('rigged-operator-visual') ?? target.root;
-    const sourceBodyMeshes: THREE.Mesh[] = [];
+    const namedOperatorVisual = target.root.getObjectByName('rigged-operator-visual');
+    const operatorVisual = namedOperatorVisual ?? target.root;
+    const candidateMeshes: THREE.Mesh[] = [];
+    const skinnedBodyMeshes: THREE.SkinnedMesh[] = [];
     let unsupportedInstancedBody = false;
     operatorVisual.traverse((node) => {
       if (node.userData.thermalGhost === true) return;
@@ -402,8 +536,18 @@ export class ThermalGhostPresentation {
         unsupportedInstancedBody = true;
         return;
       }
-      sourceBodyMeshes.push(node);
+      candidateMeshes.push(node);
+      if (node instanceof THREE.SkinnedMesh) skinnedBodyMeshes.push(node);
     });
+    // The shipped rig owns exactly nine skinned body primitives. Static meshes
+    // can be attached below the named visual at runtime (weapon/gear effects),
+    // but they are not part of the animated operator corpus and previously
+    // pushed every real actor above the 12-layer fail-closed bound. Procedural
+    // fixtures and fallback actors without a skinned visual retain all meshes.
+    const sourceBodyMeshes: THREE.Mesh[] = namedOperatorVisual && skinnedBodyMeshes.length > 0
+      ? skinnedBodyMeshes
+      : candidateMeshes;
+    if (namedOperatorVisual && skinnedBodyMeshes.length > 0) unsupportedInstancedBody = false;
     const requiredNewMaterials = new Set(
       sourceBodyMeshes.flatMap((mesh) => sourceMaterials(mesh))
         .filter((material) => !this.exactMaterialCache.has(material)),
@@ -416,6 +560,8 @@ export class ThermalGhostPresentation {
       this.materialBudgetExceeded = true;
     }
     if (complete) for (const node of sourceBodyMeshes) {
+      const parent = node.parent;
+      if (!parent) continue;
       const sourceLayerMaterials = sourceMaterials(node);
       const modelMaterials = this.acquireExactModelMaterials(node);
       // The complete-record preflight above makes this unreachable unless a
@@ -423,16 +569,21 @@ export class ThermalGhostPresentation {
       if (!modelMaterials) break;
       const model = presentationMesh(node, Array.isArray(node.material) ? modelMaterials : modelMaterials[0]);
       const halo = presentationMesh(node, this.sharedHaloMaterial);
-      this.prepareLayer(model, 'through-wall-exact-operator-model', 998, 1);
-      this.prepareLayer(halo, 'through-wall-operator-orange-halo', 999, THERMAL_GHOST_HALO_SCALE);
-      node.add(model, halo);
-      layers.push({ source: node, model, halo, sourceMaterials: sourceLayerMaterials });
+      this.prepareLayer(model, 'through-wall-exact-operator-model', 998);
+      this.prepareLayer(halo, 'through-wall-operator-orange-halo', 999);
+      const layer = { source: node, model, halo, sourceMaterials: sourceLayerMaterials, active: false };
+      syncSiblingTransforms(layer);
+      parent.add(model, halo);
+      layers.push(layer);
     }
     const record: GhostRecord = {
       targetId: target.id,
       relation: target.relation,
       layers,
       sourceRoot: target.root,
+      sourceVisual: operatorVisual,
+      lifeId: identityGeneration(target.lifeId),
+      continuityId: identityGeneration(target.continuityId),
       lastSeenGeneration: this.generation,
       complete: complete && layers.length === sourceBodyMeshes.length,
       sourceBodyLayers: sourceBodyMeshes.length,
@@ -441,15 +592,13 @@ export class ThermalGhostPresentation {
     return record;
   }
 
-  private prepareLayer(mesh: THREE.Mesh, name: string, renderOrder: number, scale: number): void {
+  private prepareLayer(mesh: THREE.Mesh, name: string, renderOrder: number): void {
     mesh.name = name;
     mesh.userData.thermalGhost = true;
     mesh.userData.presentationOnly = true;
     mesh.userData.authority = 'none';
+    mesh.userData.attachment = 'source-sibling';
     mesh.matrixAutoUpdate = false;
-    mesh.matrix.identity();
-    mesh.scale.setScalar(scale);
-    mesh.updateMatrix();
     mesh.frustumCulled = false;
     mesh.renderOrder = renderOrder;
     mesh.castShadow = false;
@@ -467,26 +616,38 @@ export class ThermalGhostPresentation {
   }
 
   /** Show exact-model layers for exactly the authority-approved target set. */
-  sync(targets: readonly ThermalGhostTarget[], active: boolean): void {
+  sync(targets: readonly ThermalGhostTarget[], active: boolean, releaseUnseen = false): void {
     this.generation += 1;
     this.activeTargets = 0;
+    this.activeTargetIds.length = 0;
     this.activeModelLayers = 0;
     this.activeHaloLayers = 0;
     this.activeSourceBodyLayers = 0;
     this.activeNormalMaterialSlots = 0;
+    this.duplicateSourceRootInputs = 0;
     if (active) {
       const admitted: ThermalGhostTarget[] = [];
       const seenIds = new Set<string>();
+      const seenRoots = new Set<THREE.Object3D>();
       for (const target of targets) {
         if (seenIds.has(target.id)) continue;
+        if (seenRoots.has(target.root)) {
+          this.duplicateSourceRootInputs += 1;
+          continue;
+        }
         seenIds.add(target.id);
+        seenRoots.add(target.root);
         admitted.push(target);
         if (admitted.length === THERMAL_GHOST_MAX_TARGETS) break;
       }
       const admittedIds = new Set(admitted.map((target) => target.id));
       for (const target of admitted) {
         let record = this.records.get(target.id);
-        if (record && record.sourceRoot !== target.root) {
+        const targetLifeId = identityGeneration(target.lifeId);
+        const targetContinuityId = identityGeneration(target.continuityId);
+        if (record && (record.sourceRoot !== target.root
+          || record.lifeId !== targetLifeId
+          || record.continuityId !== targetContinuityId)) {
           this.releaseRecord(record);
           this.records.delete(target.id);
           record = undefined;
@@ -507,14 +668,24 @@ export class ThermalGhostPresentation {
         // Relationship controls eligibility upstream, never appearance. An
         // allegiance transition must not rebuild identical model/halo layers.
         record.relation = target.relation;
+        record.lifeId = targetLifeId;
+        record.continuityId = targetContinuityId;
         record.lastSeenGeneration = this.generation;
         let visibleLayers = 0;
         for (const layer of record.layers) {
+          layer.active = false;
+          syncSiblingTransforms(layer);
           for (const sourceMaterial of layer.sourceMaterials) {
             const lease = this.exactMaterialCache.get(sourceMaterial);
             if (!lease || lease.lastSyncedGeneration === this.generation) continue;
             syncExactMaterialAppearance(sourceMaterial, lease.material);
             lease.lastSyncedGeneration = this.generation;
+          }
+          if (this.evidenceControlHidden) {
+            for (const sourceMaterial of layer.sourceMaterials) {
+              const lease = this.exactMaterialCache.get(sourceMaterial);
+              if (lease) lease.material.visible = false;
+            }
           }
           // A child-visible flag alone false-greens hidden LODs and materials.
           // Mirror the renderer's effective source visibility to the admitted
@@ -524,22 +695,27 @@ export class ThermalGhostPresentation {
           layer.model.visible = visible;
           layer.halo.visible = visible;
           if (!visible) continue;
+          layer.active = true;
           visibleLayers += 1;
           this.activeSourceBodyLayers += 1;
           this.activeNormalMaterialSlots += layer.sourceMaterials.length;
           this.activeModelLayers += 1;
           this.activeHaloLayers += 1;
         }
-        if (visibleLayers > 0) this.activeTargets += 1;
+        if (visibleLayers > 0) {
+          this.activeTargets += 1;
+          this.activeTargetIds.push(target.id);
+        }
       }
     }
     for (const [id, record] of this.records) {
       if (record.lastSeenGeneration === this.generation && active) continue;
       for (const layer of record.layers) {
+        layer.active = false;
         layer.model.visible = false;
         layer.halo.visible = false;
       }
-      if (!record.sourceRoot.parent) {
+      if (releaseUnseen || !record.sourceRoot.parent) {
         this.releaseRecord(record);
         this.records.delete(id);
       }
@@ -547,35 +723,90 @@ export class ThermalGhostPresentation {
   }
 
   clear(): void {
+    this.setEvidenceControlHidden(false);
     for (const record of this.records.values()) this.releaseRecord(record);
     this.records.clear();
     this.activeTargets = 0;
+    this.activeTargetIds.length = 0;
     this.activeModelLayers = 0;
     this.activeHaloLayers = 0;
     this.activeSourceBodyLayers = 0;
     this.activeNormalMaterialSlots = 0;
     this.materialBudgetExceeded = false;
+    this.duplicateSourceRootInputs = 0;
   }
 
-  telemetry(): ThermalGhostTelemetry {
+  /** Presentation-only paired-raster control; gameplay target state is untouched. */
+  setEvidenceControlHidden(hidden: boolean): boolean {
+    this.evidenceControlHidden = hidden;
+    this.sharedHaloMaterial.visible = !hidden;
+    for (const material of this.ownedExactMaterials) material.visible = !hidden;
+    return this.evidenceControlHidden === hidden;
+  }
+
+  telemetry(identityAudit = false): ThermalGhostTelemetry {
     let geometryIdentity = true;
     let skeletonIdentity = true;
     let bindMatrixIdentity = true;
     let meshWorldMatrixIdentity = true;
     let haloWorldMatrixIdentity = true;
     let boneWorldMatrixIdentity = true;
+    let siblingParentIdentity = true;
     let normalMaterialEquivalence = true;
-    let throughGeometry = this.activeModelLayers > 0;
-    let orangeHalo = this.activeHaloLayers > 0;
+    let exactModelVisible = this.activeModelLayers > 0;
+    let exactModelColorWrite = this.activeModelLayers > 0;
+    let exactModelOpacity = this.activeModelLayers > 0 ? Number.POSITIVE_INFINITY : 0;
+    let exactModelDepthTestDisabled = this.activeModelLayers > 0;
+    let exactModelDepthWriteDisabled = this.activeModelLayers > 0;
+    let haloVisible = this.activeHaloLayers > 0;
+    let haloColorWrite = this.activeHaloLayers > 0;
+    let haloOpacity = this.activeHaloLayers > 0 ? Number.POSITIVE_INFINITY : 0;
+    let haloDepthTestDisabled = this.activeHaloLayers > 0;
+    let haloDepthWriteDisabled = this.activeHaloLayers > 0;
+    let haloColorAndSide = this.activeHaloLayers > 0;
     let completeOperatorModels = true;
     let incompleteTargets = 0;
+    let lifeIdentityCurrent = true;
+    let poseIdentity = true;
+    let sourceRootsAttached = true;
+    let detachedLayers = 0;
+    let extraneousModelLayers = 0;
+    let extraneousHaloLayers = 0;
+    const sourceRootUuids = new Set<string>();
+    const targets: ThermalGhostTargetTelemetry[] = [];
     for (const record of this.records.values()) {
       completeOperatorModels &&= record.complete;
       if (!record.complete) incompleteTargets += 1;
+      let recordDetachedLayers = 0;
+      let recordExtraneousModels = 0;
+      let recordExtraneousHalos = 0;
+      if (identityAudit) {
+        sourceRootsAttached &&= record.sourceRoot.parent !== null;
+        sourceRootUuids.add(record.sourceRoot.uuid);
+        let observedModels = 0;
+        let observedHalos = 0;
+        record.sourceRoot.traverse((node) => {
+          if (node.name === 'through-wall-exact-operator-model') observedModels += 1;
+          if (node.name === 'through-wall-operator-orange-halo') observedHalos += 1;
+        });
+        recordDetachedLayers = record.layers.filter((layer) => (
+          layer.model.parent !== layer.source.parent
+          || layer.halo.parent !== layer.source.parent
+          || !descendantOf(layer.model, record.sourceRoot)
+          || !descendantOf(layer.halo, record.sourceRoot)
+        )).length;
+        recordExtraneousModels = Math.max(0, observedModels - record.layers.length);
+        recordExtraneousHalos = Math.max(0, observedHalos - record.layers.length);
+        detachedLayers += recordDetachedLayers;
+        extraneousModelLayers += recordExtraneousModels;
+        extraneousHaloLayers += recordExtraneousHalos;
+      }
       for (const layer of record.layers) {
         layer.source.updateWorldMatrix(true, false);
         layer.model.updateWorldMatrix(true, false);
         layer.halo.updateWorldMatrix(true, false);
+        siblingParentIdentity &&= layer.model.parent === layer.source.parent
+          && layer.halo.parent === layer.source.parent;
         meshWorldMatrixIdentity &&= matrixEquals(layer.source.matrixWorld, layer.model.matrixWorld);
         this.expectedHaloWorldMatrix.copy(layer.source.matrixWorld).scale(HALO_SCALE_VECTOR);
         haloWorldMatrixIdentity &&= matrixEquals(this.expectedHaloWorldMatrix, layer.halo.matrixWorld);
@@ -597,18 +828,59 @@ export class ThermalGhostPresentation {
           boneWorldMatrixIdentity &&= model !== null && sharedBoneWorldMatricesMatch(layer.source, model);
         }
         normalMaterialEquivalence &&= exactMeshMaterialsEquivalent(layer);
-        throughGeometry &&= materialsRenderThroughGeometry(layer.model.material)
-          && materialsRenderThroughGeometry(layer.halo.material);
+        if (!layer.active) continue;
+        const modelMaterials = Array.isArray(layer.model.material) ? layer.model.material : [layer.model.material];
+        exactModelVisible &&= layer.model.visible && modelMaterials.every((material) => material.visible);
+        exactModelColorWrite &&= modelMaterials.every((material) => material.colorWrite);
+        exactModelOpacity = Math.min(exactModelOpacity, ...modelMaterials.map((material) => material.opacity));
+        exactModelDepthTestDisabled &&= modelMaterials.every((material) => !material.depthTest);
+        exactModelDepthWriteDisabled &&= modelMaterials.every((material) => !material.depthWrite);
+        const haloMaterials = Array.isArray(layer.halo.material) ? layer.halo.material : [layer.halo.material];
+        haloVisible &&= layer.halo.visible && haloMaterials.every((material) => material.visible);
+        haloColorWrite &&= haloMaterials.every((material) => material.colorWrite);
+        haloOpacity = Math.min(haloOpacity, ...haloMaterials.map((material) => material.opacity));
+        haloDepthTestDisabled &&= haloMaterials.every((material) => !material.depthTest);
+        haloDepthWriteDisabled &&= haloMaterials.every((material) => !material.depthWrite);
         const halo = Array.isArray(layer.halo.material) ? layer.halo.material[0] : layer.halo.material;
-        orangeHalo &&= halo instanceof THREE.MeshBasicMaterial
+        haloColorAndSide &&= halo instanceof THREE.MeshBasicMaterial
           && halo.color.getHex() === THERMAL_GHOST_ORANGE_HEX
-          && halo.side === THREE.BackSide
-          && layer.halo.scale.x === THERMAL_GHOST_HALO_SCALE;
+          && halo.side === THREE.BackSide;
+      }
+      if (identityAudit) {
+        const sourcePoseDigest = poseDigest(record.layers, 'source');
+        const modelPoseDigest = poseDigest(record.layers, 'model');
+        const recordPoseIdentity = sourcePoseDigest === modelPoseDigest;
+        poseIdentity &&= recordPoseIdentity;
+        const activeRecord = record.lastSeenGeneration === this.generation
+          && this.activeTargetIds.includes(record.targetId);
+        lifeIdentityCurrent &&= !activeRecord || (record.lifeId !== null && record.continuityId !== null);
+        targets.push(Object.freeze({
+          id: record.targetId,
+          lifeId: record.lifeId,
+          continuityId: record.continuityId,
+          active: activeRecord,
+          sourceRootUuid: record.sourceRoot.uuid,
+          sourceVisualUuid: record.sourceVisual.uuid,
+          sourceRootAttached: record.sourceRoot.parent !== null,
+          sourceVisualAttached: descendantOf(record.sourceVisual, record.sourceRoot),
+          sourceBodyLayers: record.sourceBodyLayers,
+          exactModelLayers: record.layers.length,
+          haloLayers: record.layers.length,
+          detachedLayers: recordDetachedLayers,
+          extraneousModelLayers: recordExtraneousModels,
+          extraneousHaloLayers: recordExtraneousHalos,
+          sourcePoseDigest,
+          modelPoseDigest,
+          poseIdentity: recordPoseIdentity,
+          lastSeenGeneration: record.lastSeenGeneration,
+        }));
       }
     }
     const state = this.telemetryState;
     state.trackedTargets = this.records.size;
     state.activeTargets = this.activeTargets;
+    state.activeTargetIds = Object.freeze([...this.activeTargetIds]);
+    if (identityAudit) state.targets = Object.freeze(targets);
     state.activeModelLayers = this.activeModelLayers;
     state.activeHaloLayers = this.activeHaloLayers;
     state.activeSourceBodyLayers = this.activeSourceBodyLayers;
@@ -622,8 +894,39 @@ export class ThermalGhostPresentation {
     state.normalMaterialEquivalence = normalMaterialEquivalence;
     state.silhouetteLayerIdentity = this.activeSourceBodyLayers === this.activeModelLayers
       && this.activeSourceBodyLayers === this.activeHaloLayers;
-    state.throughGeometry = throughGeometry;
-    state.orangeHalo = orangeHalo;
+    state.siblingParentIdentity = siblingParentIdentity;
+    if (identityAudit) {
+      state.lifeIdentityCurrent = lifeIdentityCurrent;
+      state.poseIdentity = poseIdentity;
+      state.sourceRootsAttached = sourceRootsAttached;
+      state.sourceRootIdentityUnique = sourceRootUuids.size === this.records.size;
+      state.detachedLayers = detachedLayers;
+      state.extraneousModelLayers = extraneousModelLayers;
+      state.extraneousHaloLayers = extraneousHaloLayers;
+      state.duplicateSourceRootInputs = this.duplicateSourceRootInputs;
+    }
+    state.evidenceControlHidden = this.evidenceControlHidden;
+    state.exactModelVisible = exactModelVisible;
+    state.exactModelColorWrite = exactModelColorWrite;
+    state.exactModelOpacity = Number.isFinite(exactModelOpacity) ? exactModelOpacity : 0;
+    state.exactModelDepthTestDisabled = exactModelDepthTestDisabled;
+    state.exactModelDepthWriteDisabled = exactModelDepthWriteDisabled;
+    state.haloVisible = haloVisible;
+    state.haloColorWrite = haloColorWrite;
+    state.haloOpacity = Number.isFinite(haloOpacity) ? haloOpacity : 0;
+    state.haloDepthTestDisabled = haloDepthTestDisabled;
+    state.haloDepthWriteDisabled = haloDepthWriteDisabled;
+    state.throughGeometry = exactModelVisible
+      && exactModelColorWrite
+      && state.exactModelOpacity > 0
+      && exactModelDepthTestDisabled
+      && exactModelDepthWriteDisabled
+      && haloVisible
+      && haloColorWrite
+      && state.haloOpacity > 0
+      && haloDepthTestDisabled
+      && haloDepthWriteDisabled;
+    state.orangeHalo = state.throughGeometry && haloColorAndSide;
     state.exactModelMaterials = this.ownedExactMaterials.size;
     state.haloMaterials = this.haloMaterialDisposed ? 0 : 1;
     state.ownedMaterials = this.ownedExactMaterials.size + (this.haloMaterialDisposed ? 0 : 1);

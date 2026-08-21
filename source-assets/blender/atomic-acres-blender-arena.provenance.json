@@ -3,7 +3,7 @@
   "title": "Atomic Acres-owned Quality Graphics Arena Aesthetic Overhaul",
   "creator": "Atomic Acres project / Jigglyclaw",
   "created": "2026-07-22",
-  "updated": "2026-07-24",
+  "updated": "2026-08-21",
   "license": "Project-original; no third-party assets",
   "inspirationBoundary": "Original early-2010s near-future military-suburb atmosphere only. No copied commercial map geometry, meshes, textures, logos, UI, names, or audio.",
   "blenderVersion": "5.1.2",
@@ -14,18 +14,20 @@
   "sourceBlend": "source-assets/blender/atomic-acres-blender-arena.blend",
   "runtimeGlb": "public/assets/original/models/atomic-acres-blender-arena.glb",
   "preview": "artifacts/blender-render/atomic-acres-blender-arena-preview.png",
-  "runtimeGlbSha256": "138544ec14384637f84b8f38c8b47e20ddb361a2e163074c17da43195b088794",
-  "sourceBlendSha256": "62a4fa55774ed9e32a04aae20e0922629bcc24918a53614cdc3231a782e618ed",
-  "sourceSpecSha256": "c36653f2102893c5ac01e19d2e73605d3e185679d209150077ea751c0c23866f",
+  "runtimeGlbSha256": "3626e4f368bd225d049e267a61c965e990b0292a682f2d1d5e5b53f6cf96c68a",
+  "sourceBlendSha256": "b860e8f0a4ea72f93066bccce00ac1f8d53b693f47aa102b2af8b85832daa88a",
+  "sourceSpecSha256": "08d20deac38baf8a06e0e9a7cb84e001d2dc4c0c10a0dfd15449658565ce8bfc",
   "runtimeAudit": {
-    "bytes": 3499092,
-    "meshNodes": 35,
+    "bytes": 3512080,
+    "meshNodes": 45,
     "materials": 29,
-    "triangles": 44372,
+    "triangles": 44300,
     "semanticBreakableWindows": 6,
     "auditedHouseApertures": 16,
     "apertureAuditSamples": 144,
     "semanticRouteLandmarks": 3,
+    "collisionVisualOwners": 10,
+    "collisionVisualAuthoritySchema": "atomic-acres/collision-route-authority@1",
     "modeledTransitBuses": 2,
     "authoredLargePhysicalCoverAssets": 4,
     "authoredHouseFurnishingSets": 2,
@@ -39,15 +41,15 @@
     "command": "npm run assets:compress:quality",
     "geometry": "EXT_meshopt_compression plus KHR_mesh_quantization",
     "textures": "lossless EXT_texture_webp",
-    "uncompressedBytes": 7105724,
-    "compressedBytes": 3499092,
-    "reductionPercent": 50.8
+    "uncompressedBytes": 7118404,
+    "compressedBytes": 3512080,
+    "reductionPercent": 50.7
   },
   "determinism": {
     "command": "npm run author:blender-arena && npm run assets:compress:quality",
     "cleanFactoryStartup": true,
     "pythonHashSeed": 0,
     "twoConsecutiveGlbBuildsByteIdentical": false,
-    "note": "The committed Blender 5.1.2 artifact includes a deterministic 144-ray audit over all 16 declared house apertures. The runtime GLB, editable .blend and deterministic JSON specification are checksum-tracked exactly; reproducibility is semantic rather than byte-identical across Blender authoring runs."
+    "note": "The committed Blender 5.1.2 artifact includes a deterministic 144-ray audit over all 16 declared house apertures and ten separately named collision-visual owners. The runtime GLB, editable .blend and deterministic JSON specification are checksum-tracked exactly; reproducibility is semantic rather than byte-identical across Blender authoring runs."
   }
 }

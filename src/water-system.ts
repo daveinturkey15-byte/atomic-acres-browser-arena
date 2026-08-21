@@ -30,8 +30,11 @@ export const OCEAN_WAVES = Object.freeze([
 ] as const);
 
 export const RUSTWORKS_OCEAN_AMPLITUDE = Object.freeze({
-  compat: 1.15,
-  performance: 1.15,
+  // Wave height participates in buoyancy and is therefore gameplay authority,
+  // not a graphics-quality knob. Every profile and peer must sample the same
+  // spectrum; Performance reduces presentation tessellation instead.
+  compat: 1.55,
+  performance: 1.55,
   blender: 1.55,
 } as const);
 
@@ -87,7 +90,7 @@ export class WaterSystem {
   private material: THREE.ShaderMaterial | null = null;
   private arenaId: ArenaId | null = null;
   private enabled = false;
-  private waveAmp = 1.15;
+  private waveAmp: number = RUSTWORKS_OCEAN_AMPLITUDE.blender;
   private segments = 140;
   /** Metres below the playable deck (oil-rig height). */
   private waterLevel = -19.5;

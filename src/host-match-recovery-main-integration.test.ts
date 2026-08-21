@@ -180,7 +180,8 @@ describe('same-browser hosted active-match recovery integration', () => {
     expect(nonForcedPrelude).not.toContain('createHostMatchCheckpoint()');
     expect(main).toContain("if (document.visibilityState === 'hidden') persistActiveHostMatchCheckpoint(true)");
     expect(main).toContain("window.addEventListener('pagehide', () => {\n  persistActiveHostMatchCheckpoint(true);");
-    expect(main).toContain("window.addEventListener('beforeunload', () => {\n  persistActiveHostMatchCheckpoint(true);");
+    expect(main).toContain("window.addEventListener('beforeunload', () => {\n  gameplayRuntimeDisposing = true;\n  persistActiveHostMatchCheckpoint(true);");
+    expect(main).toContain('if (gameplayRuntimeDisposing) return;');
   });
 
   it('reports the exact owned recovery admission reason and pose-write diagnostics', () => {

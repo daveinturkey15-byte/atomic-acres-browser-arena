@@ -13,12 +13,16 @@ const previewPort = Number(process.env.QA_PREVIEW_PORT ?? '4173');
 const externalPreview = process.env.QA_EXTERNAL_PREVIEW === '1';
 const requireOwnedFreshPreview = process.env.QA_REQUIRE_OWNED_FRESH_PREVIEW === '1';
 const installedEdgeChannel = process.env.QA_INSTALLED_EDGE === '1' ? 'msedge' as const : undefined;
+const pass73NativeWebGpu = process.env.PASS73_NATIVE_WEBGPU === '1';
+const pass73NativeChromePath = pass73NativeWebGpu
+  ? process.env.PASS73_NATIVE_CHROME_PATH
+  : undefined;
 const ownedMultiplayerGate = process.env.QA_OWNED_GATE === 'multiplayer-stability';
 const requestedMultiplayerChannel = process.env[PASS66_MULTIPLAYER_BROWSER_CHANNEL_ENV];
 const multiplayerChromeChannel = ownedMultiplayerGate
   ? PASS66_MULTIPLAYER_BROWSER_CHANNEL as 'chrome'
   : undefined;
-const nativeEngineUserAgent = pass70NativeEngineUserAgentEnabled(
+const nativeEngineUserAgent = pass73NativeWebGpu || pass70NativeEngineUserAgentEnabled(
   process.env[PASS70_NATIVE_USER_AGENT_ENV],
 );
 
@@ -33,6 +37,9 @@ if (!ownedMultiplayerGate && requestedMultiplayerChannel !== undefined) {
 }
 if (ownedMultiplayerGate && installedEdgeChannel) {
   throw new Error('Owned multiplayer stability cannot be combined with QA_INSTALLED_EDGE');
+}
+if (pass73NativeWebGpu && (ownedMultiplayerGate || installedEdgeChannel)) {
+  throw new Error('Pass 73 native WebGPU must own installed Chrome without another browser gate');
 }
 
 export default defineConfig({
@@ -67,12 +74,26 @@ export default defineConfig({
       // instead of repeating the Chromium fixture string.
       use: {
         ...devices['Desktop Chrome'],
-        channel: multiplayerChromeChannel ?? installedEdgeChannel,
+        channel: pass73NativeWebGpu
+          ? pass73NativeChromePath ? undefined : 'chrome'
+          : multiplayerChromeChannel ?? installedEdgeChannel,
+        headless: pass73NativeWebGpu ? false : undefined,
         userAgent: resolvePass70ChromiumProjectUserAgent({
           desktopChromeUserAgent: devices['Desktop Chrome'].userAgent,
           installedEdgeChannel,
           nativeEngineUserAgent,
         }),
+        launchOptions: pass73NativeWebGpu ? {
+          executablePath: pass73NativeChromePath,
+          args: [
+            '--enable-unsafe-webgpu',
+            '--disable-background-timer-throttling',
+            '--disable-renderer-backgrounding',
+            '--disable-backgrounding-occluded-windows',
+            '--window-position=-32000,-32000',
+            '--window-size=2640,1520',
+          ],
+        } : undefined,
         viewport: { width: 1280, height: 720 },
         deviceScaleFactor: 1,
       },

@@ -902,10 +902,28 @@ test.describe('boot and authored presentation', () => {
     const deployedState = await debug(page);
     expect(deployedState.render).toMatchObject({
       blenderEnvironment: {
-        status: 'ready', meshCount: 35, materialCount: 29, texturedMaterials: 20, pbrMaterials: 20, textureCount: 33, triangleCount: 44_372,
+        status: 'ready', meshCount: 48, materialCount: 29, texturedMaterials: 20, pbrMaterials: 20, textureCount: 33, triangleCount: 44_300,
         semanticWindows: 6, boundWindows: 6, transparentUpperWindows: 2, routeLandmarks: 3, modeledBuses: 2, largeCoverAssets: 4, housePropSets: 2, worldIdentityPass: true,
         proceduralWorldHidden: true, error: null,
       },
+    });
+    const collisionRoute = await page.evaluate(() => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: {
+        collisionRouteAuthority: () => { report: {
+          schema: string; profile: string; pass: boolean; expectedOwners: number; passedOwners: number;
+          expectedRouteClearances: number; passedRouteClearances: number; issues: string[];
+        } } | null;
+      };
+    }).__ATOMIC_ACRES_DEBUG__.collisionRouteAuthority());
+    expect(collisionRoute?.report).toMatchObject({
+      schema: 'atomic-acres/collision-route-authority@1',
+      profile: 'quality',
+      pass: true,
+      expectedOwners: 10,
+      passedOwners: 10,
+      expectedRouteClearances: 48,
+      passedRouteClearances: 48,
+      issues: [],
     });
     expect(deployedState.worldIdentity).toMatchObject({ pass: 'world-identity-27', cuesInsideBounds: true });
     expect(deployedState.worldIdentity.routes).toHaveLength(3);

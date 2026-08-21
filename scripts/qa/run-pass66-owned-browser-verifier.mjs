@@ -59,10 +59,16 @@ const target = targets[gate];
 if (!target) throw new Error(`Owned Pass 66 browser verifier must be one of ${Object.keys(targets).join(', ')}; received ${gate || '(missing)'}`);
 
 const root = process.cwd();
-const configuredReleasePass = JSON.parse(readFileSync(resolve(root, 'release-channels.json'), 'utf8'))?.experimental?.pass;
-const releasePass = gate === 'multiplayer-stability' ? configuredReleasePass : 'PASS 66';
+const releaseChannels = JSON.parse(readFileSync(resolve(root, 'release-channels.json'), 'utf8'));
+const configuredReleasePass = releaseChannels?.experimental?.pass;
+const topologySchemaVersion = releaseChannels?.schemaVersion;
+const currentCandidateGate = gate === 'multiplayer-stability' || gate === 'installed-firefox';
+const releasePass = currentCandidateGate ? configuredReleasePass : 'PASS 66';
 if (!/^PASS \d+(?:\.\d+)?$/u.test(releasePass ?? '')) {
   throw new Error(`Owned ${gate} verifier could not resolve an experimental release pass`);
+}
+if (!Number.isSafeInteger(topologySchemaVersion) || topologySchemaVersion < 1) {
+  throw new Error(`Owned ${gate} verifier could not resolve the release topology schema`);
 }
 const receiptPath = resolve(root, target.receipt);
 if (target.evidenceRoot) rmSync(resolve(root, target.evidenceRoot), { recursive: true, force: true });
@@ -318,7 +324,7 @@ try {
     windowsHide: true,
   });
   const topology = JSON.parse(readFileSync(topologyReceiptPath, 'utf8'));
-  const candidate = assertStagedTopology(topology, sourceSha, releasePass);
+  const candidate = assertStagedTopology(topology, sourceSha, releasePass, topologySchemaVersion);
 
   server = await preview({
     build: { outDir: temporaryDist },
@@ -333,6 +339,7 @@ try {
     BASE_URL: baseUrl,
     QA_OWNED_GATE: gate,
     QA_OWNED_RELEASE_PASS: releasePass,
+    QA_OWNED_TOPOLOGY_SCHEMA_VERSION: String(topologySchemaVersion),
     QA_OWNED_SOURCE_SHA: sourceSha,
     QA_OWNED_TREE_SHA256: candidate.treeSha256,
     QA_OWNED_FILE_COUNT: String(candidate.exactRootFileCount),
@@ -369,7 +376,7 @@ try {
     throw new Error('Installed Chrome executable changed during multiplayer stability verification');
   }
   const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
-  if (gate === 'support-operate-prompt') {
+  if (gate === 'support-operate-prompt' || gate === 'installed-firefox') {
     receipt.sourceState = {
       startingSha: sourceSha,
       endingSha: finalSha,
@@ -384,6 +391,7 @@ try {
   assertOwnedBrowserVerifierReceipt(receipt, {
     gate,
     releasePass,
+    topologySchemaVersion,
     sourceSha,
     treeSha256: candidate.treeSha256,
     exactRootFileCount: candidate.exactRootFileCount,

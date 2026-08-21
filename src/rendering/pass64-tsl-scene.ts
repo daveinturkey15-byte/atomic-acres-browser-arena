@@ -97,6 +97,8 @@ export type Pass64TslSceneSystems = Readonly<{
    */
   precompileExactScenePass(root: THREE.Object3D): Promise<void>;
   applyDefinition(definition: ArenaVisualDefinition): void;
+  /** Applies values backed by existing uniforms/scene nodes; target topology is unchanged. */
+  applyGraphics(graphics: Pass65TslGraphicsOptions): void;
   setReviewCamera(camera: ArenaReviewCamera): void;
   clearReviewCamera(): void;
   update(timeMs: number): void;
@@ -499,7 +501,13 @@ function applyArenaSystemLayout(
   const grass = root.getObjectByName('Pass 64 TSL grass');
   if (grass) grass.visible = definition.id === 'atomic-acres';
   const water = root.getObjectByName('Pass 64 TSL perimeter water');
-  if (water) water.visible = definition.id === 'rustworks-1v1';
+  if (water) {
+    water.visible = definition.id === 'rustworks-1v1';
+    const amplitude = graphics.oceanWaveAmplitude ?? RUSTWORKS_OCEAN_AMPLITUDE.blender;
+    const amplitudeUniform = water.userData.waveAmplitudeUniform as { value: number } | undefined;
+    if (amplitudeUniform) amplitudeUniform.value = amplitude;
+    water.userData.waveAmplitude = amplitude;
+  }
   const sky = root.getObjectByName('Pass 64 TSL atmosphere sky') as SkyMesh | undefined;
   const preset = definition.atmosphere.preset;
   let atmosphereSkyOpacity = 0;
@@ -659,6 +667,7 @@ function makeWater(
   water.renderOrder = -5;
   water.frustumCulled = false;
   water.userData.animationTimeUniform = animationTime;
+  water.userData.waveAmplitudeUniform = waveAmplitude;
   water.userData.waveBands = OCEAN_WAVES.length;
   water.userData.waveAmplitude = amplitude;
   water.userData.waveAuthority = RUSTWORKS_OCEAN_AUTHORITY_ID;
@@ -726,8 +735,11 @@ function configureHdrPipeline(
 ): Readonly<{
   scenePass: ReturnType<typeof pass>;
   applyDefinition(next: ArenaVisualDefinition): void;
+  applyGraphics(next: Pass65TslGraphicsOptions): void;
   dispose(): void;
 }> {
+  let activeDefinition = definition;
+  let activeGraphics = graphics;
   const scenePass = pass(scene, camera, { samples: graphics.principalSamples });
   if (graphics.ambientOcclusion.enabled) scenePass.setMRT(mrt({ output, normal: normalView }));
   const sceneColor = scenePass.getTextureNode('output');
@@ -750,6 +762,7 @@ function configureHdrPipeline(
   // adding the dither in linear HDR; using it as a 0-1 scalar creates noise.
   const grain = uniform(definition.colorPipeline.grain.strength / 255 * graphics.post.filmGrainScale);
   const vignette = uniform(graphics.post.vignetteStrength);
+  const contactOcclusionStrength = uniform(graphics.ambientOcclusion.enabled ? graphics.ambientOcclusion.strength : 0);
   const luma = dot(sceneColor.rgb, vec3(0.2126, 0.7152, 0.0722));
   const saturated = mix(vec3(luma), sceneColor.rgb, saturation);
   const contrasted = saturated.sub(0.5).mul(contrast).add(0.5);
@@ -766,7 +779,7 @@ function configureHdrPipeline(
   const depthEdgeGuard = float(1).sub(smoothstep(0.00035, 0.0035, depthDiscontinuity));
   const emissiveBloom = bloom(sceneColor, graphics.post.bloomStrength, 0.32, 0.92);
   const contactOcclusion = gtaoPass
-    ? mix(float(1), gtaoPass.getTextureNode().r, float(graphics.ambientOcclusion.strength))
+    ? mix(float(1), gtaoPass.getTextureNode().r, contactOcclusionStrength)
     : float(1);
   const hdrWithBloom = contrasted.mul(contactOcclusion).add(emissiveBloom.rgb.mul(depthEdgeGuard));
   const vignetteDistance = dot(screenUV.sub(0.5), screenUV.sub(0.5));
@@ -777,9 +790,24 @@ function configureHdrPipeline(
   return {
     scenePass,
     applyDefinition(next) {
+      activeDefinition = next;
       saturation.value = next.colorPipeline.grade.saturation;
       contrast.value = next.colorPipeline.grade.contrast;
-      grain.value = next.colorPipeline.grain.strength / 255 * graphics.post.filmGrainScale;
+      grain.value = next.colorPipeline.grain.strength / 255 * activeGraphics.post.filmGrainScale;
+    },
+    applyGraphics(next) {
+      activeGraphics = next;
+      grain.value = activeDefinition.colorPipeline.grain.strength / 255 * next.post.filmGrainScale;
+      vignette.value = next.post.vignetteStrength;
+      emissiveBloom.strength.value = next.post.bloomStrength;
+      contactOcclusionStrength.value = gtaoPass && next.ambientOcclusion.enabled
+        ? next.ambientOcclusion.strength
+        : 0;
+      if (gtaoPass && next.ambientOcclusion.enabled) {
+        gtaoPass.resolutionScale = next.ambientOcclusion.resolutionScale;
+        gtaoPass.samples.value = next.ambientOcclusion.samples;
+        gtaoPass.radius.value = next.ambientOcclusion.radius;
+      }
     },
     dispose() {
       gtaoPass?.dispose();
@@ -816,6 +844,7 @@ export function createPass64TslSceneSystems(
   graphics: Pass65TslGraphicsOptions = DEFAULT_TSL_GRAPHICS_OPTIONS,
 ): Pass64TslSceneSystems {
   let activeDefinition = definition;
+  let activeGraphics = graphics;
   let activeReviewCamera: ArenaReviewCamera | null = null;
   const root = new THREE.Group();
   root.name = 'Pass 64 WebGPU TSL presentation systems';
@@ -836,14 +865,34 @@ export function createPass64TslSceneSystems(
   const hdr = configureHdrPipeline(renderPipeline, scene, camera, definition, graphics);
   const scenePass = hdr.scenePass;
   applyArenaSystemLayout(root, definition, definition.reviewCameras[0]?.seed ?? 6401, graphics);
-  root.userData.pass65AdvancedGraphics = {
-    principalSamples: graphics.principalSamples,
-    volumetricScale: graphics.volumetricScale,
-    bloomStrength: graphics.post.bloomStrength,
-    filmGrainScale: graphics.post.filmGrainScale,
-    vignetteStrength: graphics.post.vignetteStrength,
-    ambientOcclusion: Object.freeze({ ...graphics.ambientOcclusion }),
+  const publishActualGraphics = (): void => {
+    const mist = root.getObjectByName('Pass 64 TSL mist');
+    const smoke = root.getObjectByName('Pass 64 TSL smoke');
+    const dust = root.getObjectByName('Pass 64 TSL deterministic dust') as THREE.Points | undefined;
+    const water = root.getObjectByName('Pass 64 TSL perimeter water');
+    root.userData.pass65AdvancedGraphics = {
+      principalSamples: graphics.principalSamples,
+      volumetricScale: activeGraphics.volumetricScale,
+      volumetricActual: {
+        scale: root.userData.tslVolumetricScale,
+        mistOpacity: Number((mist?.userData.opacityUniform as { value?: number } | undefined)?.value ?? 0),
+        mistLayers: mist?.children.filter(({ visible }) => visible).length ?? 0,
+        smokeOpacity: Number((smoke?.userData.opacityUniform as { value?: number } | undefined)?.value ?? 0),
+        smokeLayers: smoke?.children.filter(({ visible }) => visible).length ?? 0,
+        dustOpacity: Number((dust?.userData.opacityUniform as { value?: number } | undefined)?.value ?? 0),
+        dustMotes: dust?.geometry.drawRange.count ?? 0,
+      },
+      oceanWaveAmplitude: Number(water?.userData.waveAmplitude ?? 0),
+      bloomStrength: activeGraphics.post.bloomStrength,
+      filmGrainScale: activeGraphics.post.filmGrainScale,
+      vignetteStrength: activeGraphics.post.vignetteStrength,
+      ambientOcclusion: Object.freeze({
+        ...activeGraphics.ambientOcclusion,
+        enabled: graphics.ambientOcclusion.enabled && activeGraphics.ambientOcclusion.enabled,
+      }),
+    };
   };
+  publishActualGraphics();
   setAnimationTime(root, 0);
   const compiledPipelineIds = Object.freeze(TSL_MIGRATION_INVENTORY.map((entry) => entry.replacementPipelineId));
   return Object.freeze({
@@ -884,12 +933,18 @@ export function createPass64TslSceneSystems(
       activeDefinition = nextDefinition;
       activeReviewCamera = null;
       delete root.userData.tslReviewCameraId;
-      applyArenaSystemLayout(root, nextDefinition, nextDefinition.reviewCameras[0]?.seed ?? 6401, graphics);
+      applyArenaSystemLayout(root, nextDefinition, nextDefinition.reviewCameras[0]?.seed ?? 6401, activeGraphics);
       hdr.applyDefinition(nextDefinition);
+    },
+    applyGraphics: (nextGraphics) => {
+      activeGraphics = nextGraphics;
+      applyArenaSystemLayout(root, activeDefinition, activeDefinition.reviewCameras[0]?.seed ?? 6401, activeGraphics);
+      hdr.applyGraphics(activeGraphics);
+      publishActualGraphics();
     },
     setReviewCamera: (reviewCamera) => {
       activeReviewCamera = reviewCamera;
-      applyArenaSystemLayout(root, activeDefinition, reviewCamera.seed, graphics);
+      applyArenaSystemLayout(root, activeDefinition, reviewCamera.seed, activeGraphics);
       setAnimationTime(root, reviewCamera.fixedTimeMs);
       root.userData.tslReviewCameraId = reviewCamera.id;
     },

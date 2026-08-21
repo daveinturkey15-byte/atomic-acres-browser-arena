@@ -429,6 +429,74 @@ export class GrenadeWorldPresentationPool {
     }
   }
 
+  /**
+   * Rehearse the first retained slot from each material family in the final
+   * match-bound render graph. Arena prewarm owns every Object3D and buffer, but
+   * it runs before the match light graph is final; Three keys node builds by
+   * that dynamic context, so the first live frag pin otherwise pays the build.
+   */
+  async withStagedFirstAcquisitionVocabulary(
+    camera: THREE.Camera,
+    action: () => Promise<void>,
+  ): Promise<void> {
+    if (this.disposed) throw new Error('Cannot stage a disposed grenade presentation pool');
+    while (this.gpuPrewarmPromise) await this.gpuPrewarmPromise;
+    this.ensureInitialized();
+    if (this.slots.some((slot) => slot.inUse)) {
+      throw new Error('Match-bound grenade staging cannot overlap active projectile leases');
+    }
+    const staged = (['frag', 'semtex'] as const).map((family) => {
+      const slot = this.slots.find((candidate) => candidate.family === family);
+      if (!slot) throw new Error(`Grenade presentation pool is missing its first ${family} slot`);
+      return {
+        slot,
+        visible: slot.root.visible,
+        position: slot.root.position.clone(),
+        quaternion: slot.root.quaternion.clone(),
+        selection: slot.root.userData.grenadeSelection,
+      };
+    });
+    const rootVisible = this.root.visible;
+    const rootFrustumCulled = this.root.frustumCulled;
+    this.root.visible = true;
+    this.root.frustumCulled = false;
+    camera.updateWorldMatrix(true, false);
+    this.root.updateWorldMatrix(true, false);
+    const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
+    const forward = camera.getWorldDirection(new THREE.Vector3());
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+    for (let index = 0; index < staged.length; index += 1) {
+      const { slot } = staged[index]!;
+      slot.inUse = true;
+      slot.root.userData.presentationPoolInUse = true;
+      slot.root.userData.grenadeSelection = slot.family;
+      slot.root.visible = true;
+      slot.root.position.copy(this.root.worldToLocal(
+        cameraPosition.clone()
+          .addScaledVector(forward, 1.4)
+          .addScaledVector(right, (index - 0.5) * 0.5),
+      ));
+      slot.root.quaternion.identity();
+    }
+    this.root.updateWorldMatrix(true, true);
+    try {
+      await action();
+    } finally {
+      for (const state of staged) {
+        state.slot.inUse = false;
+        state.slot.root.userData.presentationPoolInUse = false;
+        if (state.selection === undefined) delete state.slot.root.userData.grenadeSelection;
+        else state.slot.root.userData.grenadeSelection = state.selection;
+        state.slot.root.visible = state.visible;
+        state.slot.root.position.copy(state.position);
+        state.slot.root.quaternion.copy(state.quaternion);
+      }
+      this.root.visible = rootVisible;
+      this.root.frustumCulled = rootFrustumCulled;
+      this.root.updateWorldMatrix(true, true);
+    }
+  }
+
   telemetry(): Readonly<{
     capacityPerFamily: number;
     total: number;

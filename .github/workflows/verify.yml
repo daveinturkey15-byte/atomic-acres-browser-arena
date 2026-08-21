@@ -61,6 +61,8 @@ jobs:
       - run: npm run verify:provenance
       - run: npm run verify:killstreak-catalog
       - run: npm test
+      - name: Verify Pass 73 required browser-group wiring
+        run: npm run qa:pass73:ci-wiring-contract
       - run: npm run leaderboard:check
       - run: npm run build
         env:
@@ -120,7 +122,7 @@ jobs:
   bounded-browser-windows:
     needs: [classify-change, static-and-unit]
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - name: Record browser gate decision
         run: echo "mode=${{ needs.classify-change.outputs.mode }} reason=${{ needs.classify-change.outputs.reason }}"
@@ -143,11 +145,17 @@ jobs:
         env:
           VITE_MATCH_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}
           VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
+      - name: Run Pass 73 gameplay regression contracts
+        if: needs.classify-change.outputs.mode == 'full'
+        timeout-minutes: 25
+        run: node node_modules/@playwright/test/cli.js test tests/e2e/pass73-gameplay-regressions.spec.ts tests/e2e/pass73-network-reveal-authority.spec.ts --project=chromium --workers=1 --retries=0
       - name: Run bounded browser groups
         if: needs.classify-change.outputs.mode != 'none'
         env:
           QA_E2E_GROUPS: ${{ needs.classify-change.outputs.windows_groups }}
-        run: npm run test:e2e:bounded
+        run: |
+          $env:QA_E2E_GROUPS = (($env:QA_E2E_GROUPS -split ',') | Where-Object { $_ -ne 'pass73-gameplay-regressions' }) -join ','
+          npm run test:e2e:bounded
       - name: Run Pass 64 HUD browser contracts
         if: needs.classify-change.outputs.mode == 'full'
         timeout-minutes: 10
@@ -171,7 +179,7 @@ jobs:
   bounded-browser-linux:
     needs: [classify-change, static-and-unit]
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 65
     steps:
       - name: Record browser gate decision
         run: echo "mode=${{ needs.classify-change.outputs.mode }} reason=${{ needs.classify-change.outputs.reason }}"
@@ -192,7 +200,12 @@ jobs:
       - if: needs.classify-change.outputs.mode != 'none'
         env:
           QA_E2E_GROUPS: ${{ needs.classify-change.outputs.linux_groups }}
-        run: npm run test:e2e:bounded
+        run: |
+          # Pass 73's real-time multiplayer gate is Windows Chrome-owned. The
+          # Linux headless software renderer runs at 1-2 FPS and cannot make a
+          # truthful gameplay-timing claim; retain the remaining Linux matrix.
+          export QA_E2E_GROUPS="$(node -e "process.stdout.write(process.env.QA_E2E_GROUPS.split(',').filter((group) => group !== 'pass73-gameplay-regressions').join(','))")"
+          npm run test:e2e:bounded
       - name: Upload Linux browser failure evidence
         if: failure() && needs.classify-change.outputs.mode != 'none'
         uses: actions/upload-artifact@v4

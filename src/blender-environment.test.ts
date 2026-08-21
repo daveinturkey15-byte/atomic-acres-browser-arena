@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { BLENDER_ARENA_ASSET, enforceAtomicMaterialDepthContract, mirrorAtomicCollisionAuditVisuals, proceduralArenaRootVisible } from './blender-environment';
+import { definition as atomicAcresVisualDefinition } from './rendering/arenas/atomic-acres';
 
 const assetPath = new URL(`../public/${BLENDER_ARENA_ASSET.split('?')[0].replace(/^\.\/assets\//, 'assets/')}`, import.meta.url);
 const specPath = new URL('../source-assets/blender/atomic-acres-arena-spec.json', import.meta.url);
@@ -18,6 +19,10 @@ function glbJson(buffer: Buffer): Record<string, unknown> {
 }
 
 describe('Quality Graphics environment asset', () => {
+  it('declares the exact cache-busted runtime GLB in the selected-arena stream contract', () => {
+    expect(atomicAcresVisualDefinition.assetDependencies).toContain(BLENDER_ARENA_ASSET);
+  });
+
   it('never renders the coplanar procedural and Quality arena roots together', () => {
     expect(proceduralArenaRootVisible('atomic-acres', true)).toBe(false);
     expect(proceduralArenaRootVisible('atomic-acres', false)).toBe(true);
@@ -86,9 +91,10 @@ describe('Quality Graphics environment asset', () => {
     const modeledBuses = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_asset_class === 'physical-transit-bus');
     const largeCoverAssets = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_asset_class === 'authored-large-physical-cover');
     const housePropSets = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_asset_class === 'authored-house-furnishing-set');
+    const collisionVisualOwners = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_semantic === 'collision-visual-owner');
     expect(buffer.byteLength).toBeGreaterThan(50_000);
     expect(buffer.byteLength).toBeLessThan(7_500_000);
-    expect(gltf.meshes?.length).toBe(35);
+    expect(gltf.meshes?.length).toBe(45);
     expect(gltf.materials?.length).toBe(29);
     expect(gltf.images).toHaveLength(33);
     expect(gltf.textures).toHaveLength(33);
@@ -108,6 +114,13 @@ describe('Quality Graphics environment asset', () => {
     expect(modeledBuses).toHaveLength(2);
     expect(largeCoverAssets).toHaveLength(4);
     expect(housePropSets).toHaveLength(2);
+    expect(collisionVisualOwners).toHaveLength(10);
+    expect(new Set(collisionVisualOwners.map((node) => node.extras?.atomic_solid_id)).size).toBe(10);
+    expect(new Set(collisionVisualOwners.map((node) => node.extras?.atomic_route_role))).toEqual(new Set([
+      'wall', 'floor', 'underside', 'canopy', 'window-approach',
+    ]));
+    expect(collisionVisualOwners.every((node) => Array.isArray(node.extras?.atomic_collision_bounds)
+      && (node.extras?.atomic_collision_bounds as unknown[]).length === 6)).toBe(true);
     expect(modeledBuses.every((node) => node.extras?.atomic_collision_authority === 'typescript-vehicle-boxes')).toBe(true);
     expect(largeCoverAssets.every((node) => node.extras?.atomic_collision_authority === 'typescript-cover-box')).toBe(true);
     expect(new Set(routeLandmarks.map((node) => node.extras?.atomic_route_id))).toEqual(new Set([
@@ -146,7 +159,7 @@ describe('Quality Graphics environment asset', () => {
     expect(provenance.title).toBe('Atomic Acres-owned Quality Graphics Arena Aesthetic Overhaul');
     expect(createHash('sha256').update(buffer).digest('hex')).toBe(provenance.runtimeGlbSha256);
     expect(buffer.byteLength).toBe(provenance.runtimeAudit.bytes);
-    expect(provenance.runtimeAudit.triangles).toBe(44_372);
+    expect(provenance.runtimeAudit.triangles).toBe(44_300);
     expect(provenance.runtimeAudit.auditedHouseApertures).toBe(16);
     expect(provenance.runtimeAudit.apertureAuditSamples).toBe(144);
   });

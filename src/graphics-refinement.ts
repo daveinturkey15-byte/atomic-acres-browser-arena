@@ -147,6 +147,11 @@ export type GraphicsRefinementTelemetry = Readonly<{
 export class GraphicsRefinementSystem {
   private readonly refined = new WeakSet<THREE.Material>();
   private readonly refinedTextureSet = new WeakSet<THREE.Texture>();
+  private readonly authoredMaterial = new WeakMap<THREE.MeshStandardMaterial, Readonly<{
+    roughness: number;
+    environmentIntensity: number;
+    dithering: boolean;
+  }>>();
   private environmentTarget: THREE.WebGLRenderTarget | null = null;
   private environmentFailure: string | null = null;
   private refinedMaterials = 0;
@@ -159,11 +164,11 @@ export class GraphicsRefinementSystem {
   constructor(
     renderer: THREE.WebGLRenderer | null,
     private readonly scene: THREE.Scene,
-    private readonly profile: RenderProfile,
+    private profile: RenderProfile,
     softwareRenderer: boolean,
     initialPixelRatioCap: number,
-    private readonly requestedAnisotropy = profile === 'blender' ? 8 : 4,
-    private readonly reflectionScale = 1,
+    private requestedAnisotropy = profile === 'blender' ? 8 : 4,
+    private reflectionScale = 1,
   ) {
     this.budget = graphicsEffectsBudget(profile, initialPixelRatioCap);
     if (!renderer || profile === 'compat' || softwareRenderer) return;
@@ -192,6 +197,20 @@ export class GraphicsRefinementSystem {
     this.applyEnvironmentIntensity();
   }
 
+  /** Re-applies mutable material knobs without rebuilding geometry or render targets. */
+  setRuntimeConfiguration(
+    profile: RenderProfile,
+    requestedAnisotropy: number,
+    reflectionScale: number,
+    maximumAnisotropy: number,
+  ): void {
+    this.profile = profile;
+    this.requestedAnisotropy = requestedAnisotropy;
+    this.reflectionScale = reflectionScale;
+    this.refine(this.scene, maximumAnisotropy);
+    this.applyEnvironmentIntensity();
+  }
+
   private applyEnvironmentIntensity(): void {
     if (!this.scene.environment) return;
     this.scene.environmentIntensity = this.budget.environmentIntensity * arenaEnvironmentScale(this.arenaId) * this.reflectionScale;
@@ -201,24 +220,37 @@ export class GraphicsRefinementSystem {
     const anisotropy = Math.max(1, Math.min(maximumAnisotropy, this.requestedAnisotropy));
     root.traverse((node) => {
       for (const material of materialsOf(node)) {
-        if (!(material instanceof THREE.MeshStandardMaterial) || this.refined.has(material)) continue;
-        this.refined.add(material);
-        this.refinedMaterials += 1;
-        material.roughness = effectivePbrRoughness(material.roughness, material.transparent, this.reflectionScale);
+        if (!(material instanceof THREE.MeshStandardMaterial)) continue;
+        let authored = this.authoredMaterial.get(material);
+        if (!authored) {
+          authored = Object.freeze({
+            roughness: material.roughness,
+            environmentIntensity: material.envMapIntensity,
+            dithering: material.dithering,
+          });
+          this.authoredMaterial.set(material, authored);
+        }
+        if (!this.refined.has(material)) {
+          this.refined.add(material);
+          this.refinedMaterials += 1;
+        }
+        material.roughness = effectivePbrRoughness(authored.roughness, material.transparent, this.reflectionScale);
         material.metalness = THREE.MathUtils.clamp(material.metalness, 0, 1);
         const authoredEnvironmentIntensity = material.transparent
-          ? Math.max(material.envMapIntensity, 0.48)
+          ? Math.max(authored.environmentIntensity, 0.48)
           : material.metalness >= 0.45
-            ? Math.max(material.envMapIntensity, 0.82)
-            : Math.max(material.envMapIntensity, 0.3);
+            ? Math.max(authored.environmentIntensity, 0.82)
+            : Math.max(authored.environmentIntensity, 0.3);
         material.envMapIntensity = authoredEnvironmentIntensity * this.reflectionScale;
-        material.dithering = this.profile === 'blender';
+        material.dithering = this.profile === 'blender' || authored.dithering;
         const record = material as THREE.MeshStandardMaterial & Record<string, THREE.Texture | null | unknown>;
         for (const key of TEXTURE_KEYS) {
           const texture = record[key];
-          if (!(texture instanceof THREE.Texture) || this.refinedTextureSet.has(texture)) continue;
-          this.refinedTextureSet.add(texture);
-          this.refinedTextures += 1;
+          if (!(texture instanceof THREE.Texture)) continue;
+          if (!this.refinedTextureSet.has(texture)) {
+            this.refinedTextureSet.add(texture);
+            this.refinedTextures += 1;
+          }
           texture.anisotropy = anisotropy;
           texture.needsUpdate = true;
         }

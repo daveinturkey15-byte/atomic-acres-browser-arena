@@ -254,6 +254,18 @@ export function auditOperatorArmsGlb(json, lod, bytes) {
     && deliveryRoot?.extras?.palm_contact_contract === 'authored-wrist-parented-full-transform-v1'
     && deliveryRoot?.extras?.manual_master_contract === 'checked-in-editable-blend-export-only-v1'
     && deliveryRoot?.extras?.weapon_grip_review_contract === 'seven-view-actual-weapon-contact-v2';
+  const manualPass73Contract = licensedDerivative
+    && deliveryRoot?.extras?.creator === 'DJMaesen; Atomic Acres integration'
+    && deliveryRoot?.extras?.license === 'CC-BY-4.0'
+    && deliveryRoot?.extras?.source_mirror_commit === '96fdc4c94ba6c37786b0af6e8caf44b6cf2913f0'
+    && deliveryRoot?.extras?.visual_revision === 'pass73-authored-continuous-proximal-sleeves-v2'
+    && deliveryRoot?.extras?.limb_profile_contract === 'manual-thick-continuous-cuff-forearm-deformation-v2'
+    && deliveryRoot?.extras?.hand_pose_contract === 'manual-separated-articulated-digit-contact-v1'
+    && deliveryRoot?.extras?.shoulder_entry_contract === 'weighted-continuous-beyond-crop-sleeve-v3'
+    && deliveryRoot?.extras?.glove_construction_contract === 'opaque-manual-cuff-palm-digit-continuity-v1'
+    && deliveryRoot?.extras?.palm_contact_contract === 'authored-wrist-parented-full-transform-v1'
+    && deliveryRoot?.extras?.manual_master_contract === 'checked-in-editable-blend-export-only-v1'
+    && deliveryRoot?.extras?.weapon_grip_review_contract === 'seven-view-actual-weapon-contact-v2';
   const legacyContract = !licensedDerivative
     && deliveryRoot?.extras?.visual_revision === 'continuous-manifold-viewmodel-v6'
     && deliveryRoot?.extras?.limb_profile_contract === 'continuous-shoulder-elbow-wrist-manifold-shell-v6'
@@ -261,11 +273,11 @@ export function auditOperatorArmsGlb(json, lod, bytes) {
     && deliveryRoot?.extras?.shoulder_entry_contract === 'full-profile-frame-edge-sleeve-v6'
     && deliveryRoot?.extras?.glove_construction_contract === 'opaque-continuous-palm-wrapped-fingers-cloth-v6'
     && deliveryRoot?.extras?.weapon_grip_review_contract === 'all-family-runtime-plus-m4-contact-v5';
-  if (!(licensedContract || manualPass70Contract || legacyContract)
+  if (!(licensedContract || manualPass70Contract || manualPass73Contract || legacyContract)
     || deliveryRoot?.extras?.runtime_animation_contract !== 'authored-fingers-under-runtime-chain-ik-v1'
     || deliveryRoot?.extras?.finger_segment_count !== 30
     || deliveryRoot?.extras?.weapon_grip_review_frames !== (licensedDerivative ? 7 : 3)) {
-    failures.push(`${label}: accepted Pass70 manual, licensed-v8 or legacy-v6 silhouette, hand, glove, animation and grip-review contract missing`);
+    failures.push(`${label}: accepted Pass73/Pass70 manual, licensed-v8 or legacy-v6 silhouette, hand, glove, animation and grip-review contract missing`);
   }
   const blendedVertexCount = Number(deliveryRoot?.extras?.blended_vertex_count);
   const multiBoneWeightedParts = Number(deliveryRoot?.extras?.multi_bone_weighted_part_count);

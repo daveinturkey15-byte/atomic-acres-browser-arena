@@ -268,6 +268,16 @@ describe('Pass 64 authored TSL pipeline set', () => {
     expect(systems.root.userData.pass65AdvancedGraphics).toEqual({
       principalSamples: 2,
       volumetricScale: 0.5,
+      volumetricActual: {
+        scale: 0.5,
+        mistOpacity: (0.035 + 0.28 * 0.09) * 0.5,
+        mistLayers: 3,
+        smokeOpacity: (0.035 + 0.28 * 0.12) * 0.5,
+        smokeLayers: 2,
+        dustOpacity: 0.076,
+        dustMotes: 48,
+      },
+      oceanWaveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.performance,
       bloomStrength: 0,
       filmGrainScale: 0,
       vignetteStrength: 0.35,
@@ -284,6 +294,30 @@ describe('Pass 64 authored TSL pipeline set', () => {
     expect(dust.geometry.drawRange.count).toBe(48);
     expect(systems.root.getObjectByName('Pass 64 TSL smoke')?.children.filter(({ visible }) => visible)).toHaveLength(2);
     expect(renderPipeline.outputNode).not.toBeNull();
+    systems.applyGraphics({
+      principalSamples: 2,
+      volumetricScale: 1,
+      ambientOcclusion: {
+        quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0,
+      },
+      post: {
+        bloomStrength: 0.14,
+        exposureScale: 1,
+        toneMapping: 'aces',
+        filmGrainScale: 1,
+        vignetteStrength: 0,
+      },
+      oceanWaveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.blender,
+    });
+    expect(systems.root.userData.pass65AdvancedGraphics).toMatchObject({
+      principalSamples: 2,
+      volumetricScale: 1,
+      volumetricActual: { scale: 1, mistLayers: 5, smokeLayers: 3, dustMotes: 96 },
+      oceanWaveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.blender,
+      ambientOcclusion: { enabled: false },
+    });
+    expect((systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh).userData.waveAmplitudeUniform.value)
+      .toBe(RUSTWORKS_OCEAN_AMPLITUDE.blender);
     systems.dispose();
   });
 });

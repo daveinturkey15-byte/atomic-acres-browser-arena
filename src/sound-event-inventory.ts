@@ -245,7 +245,7 @@ type PlannedEventInput = Readonly<{
 }>;
 
 export const RUNTIME_AUDIO_NON_EVENT_METHODS = Object.freeze([
-  'configure', 'dispose', 'prepareCombat', 'prepareGlassImpact', 'resume', 'suspend', 'telemetry', 'unlock', 'updateListener',
+  'configure', 'dispose', 'prepareCombat', 'prepareGlassImpact', 'prepareGrenadeEffects', 'resume', 'suspend', 'telemetry', 'unlock', 'updateListener',
 ] as const);
 
 export type RuntimeSoundCallsiteContractEntry = Readonly<{

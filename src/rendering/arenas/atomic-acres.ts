@@ -8,7 +8,7 @@ export const definition = createProceduralArenaVisualDefinition({
   displayLabel: 'Nuke Town',
   moduleId: 'arena.visual.atomic-acres.v1',
   assetDependencies: [
-    './assets/original/models/atomic-acres-blender-arena.glb?v=pass63-20260724-apertures1',
+    './assets/original/models/atomic-acres-blender-arena.glb?v=pass73-20260821-route-authority1',
     ATOMIC_ACRES_GENERATED_SKY_ASSET_URL,
   ],
   sharedAssetDependencies: SHARED_GAMEPLAY_ASSETS,

@@ -198,8 +198,13 @@ function soloCycleFailures(value, expectedLabel) {
   if (value.gameStarted !== true || value.matchPhase !== 'active' || value.botCount !== 1) {
     errors.push(`${label} did not enter an exact one-bot active match`);
   }
-  if (value.backend !== 'webgl2' || typeof value.webglVersion !== 'string' || !value.webglVersion.includes('WebGL 2')) {
-    errors.push(`${label} did not use WebGL2 compatibility`);
+  if (value.requestedBackend !== 'webgpu' || value.backend !== 'webgpu' || value.failClosed !== true
+    || value.deviceLost !== false || value.uncapturedErrors !== 0) {
+    errors.push(`${label} did not use fail-closed native WebGPU`);
+  }
+  if (value.qualityAssetState !== 'ready' || value.post?.depthAwareBloom !== true
+    || value.post?.advancedGraphics?.bloomStrength <= 0) {
+    errors.push(`${label} did not retain Quality assets and post effects`);
   }
   if (!FIREFOX_USER_AGENT.test(value.userAgent ?? '')) errors.push(`${label} user agent is not pinned Firefox`);
   if (value.pointerLock !== true || value.adsHeldObserved !== true || value.adsReleasedObserved !== true) {

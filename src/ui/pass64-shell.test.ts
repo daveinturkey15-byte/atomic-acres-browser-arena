@@ -30,6 +30,15 @@ describe('Pass 66 command shell', () => {
     ]);
   });
 
+  it('keeps deployment controls inert until the gameplay module binds their handlers', () => {
+    const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
+    expect(markup).toContain('id="solo" class="primary" disabled');
+    expect(markup).toContain('id="host" disabled');
+    expect(markup).toContain('id="room-input" placeholder="Paste room code" autocomplete="off" disabled');
+    expect(markup).toContain('id="join" disabled');
+    expect(markup.match(/class="map-card[^>]+disabled/g)).toHaveLength(4);
+  });
+
   it('renders four curated kits, exactly three custom slots with nested EDIT, and one manager', () => {
     const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
     expect([...markup.matchAll(/data-kit-id="([^"]+)"/g)].map((match) => match[1])).toEqual([

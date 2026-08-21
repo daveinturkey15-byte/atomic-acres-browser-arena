@@ -256,7 +256,7 @@ import {
   weaponPrewarmCatalogForArena,
 } from './weapon-prewarm-catalog';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
-import { clampPointToBounds, damp, firstSegmentBoxHit, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes } from './collision';
+import { clampPointToBounds, damp, firstSegmentBoxHit, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes, type Box2 } from './collision';
 import {
   applyPenetrationDamage,
   ballisticImpactSurface,
@@ -314,6 +314,12 @@ import {
   type GlassImpactProfile,
 } from './glass-authority';
 import {
+  admitCanonicalCrossbowGlassBreak,
+  admitCrossbowGlassMutation,
+  retainInFlightCrossbowGlassActions,
+  type CrossbowGlassPhase,
+} from './crossbow-glass-authority';
+import {
   activeSoloBotTarget,
   arenaCanvasLabel,
   arenaSelection,
@@ -350,6 +356,13 @@ import {
   auditAtomicHouseAuthorityParity,
   type AtomicHouseAuthorityParityReport,
 } from './atomic-profile-authority-parity';
+import {
+  assertPass73CollisionRouteAuthority,
+  auditPass73CollisionRouteAuthority,
+  pass73CollisionRouteFixtures,
+  type Pass73CollisionRouteAuthorityReport,
+  type Pass73CollisionRouteFixture,
+} from './pass73-collision-route-authority';
 import { rustworksBlenderTelemetry, setRustworksProceduralPresentationVisible } from './rustworks-blender';
 import {
   createRustworksQualityLights,
@@ -584,6 +597,7 @@ import { admitRemoteSnapshotMovement, remoteCanClaimTimedPickup } from './remote
 import { admitRemoteBaseDamage, deriveAuthoritativeShotOutcomes, deriveRemoteShotBaseDamage, maximumRemoteExplosiveBaseDamage, resolveRemotePoweredDamage } from './remote-hit-admission';
 import {
   MAX_AUTHORITATIVE_REWIND_MS,
+  MAX_PROJECTILE_SHOT_FIRE_AGE_MS,
   MAX_SHOT_FIRE_AGE_MS,
   admitAuthoritativeShot,
   canonicalShotDirection,
@@ -788,13 +802,17 @@ import {
   CarpetGroundFireGuestPresentationAdmission,
   carpetGroundFireStateChunks,
 } from './carpet-ground-fire-multiplayer';
-import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
+import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, deriveDmrThermalRevealActive, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
 import { runStagedDmrThermalPrewarm } from './dmr-thermal-prewarm-lifecycle';
 import {
   THERMAL_GHOST_MAX_TARGETS,
   ThermalGhostPresentation,
   type ThermalGhostTarget,
 } from './thermal-ghost-presentation';
+import {
+  pass73AdsRevealReadbackRegion,
+  quantizePass73AdsRevealReadback,
+} from './pass73-ads-reveal-readback';
 import { applySkyBackdrop, waitForSkyBackdropAdmission } from './rendering/sky-backdrop';
 import {
   SmokeVolumePresentationPool,
@@ -843,7 +861,11 @@ import {
   type RailgunShotResultMessage,
   type RailgunStateMessage,
 } from './railgun-authority';
-import { selectPlayableWindowApproach, windowBreakPathBlocked } from './window-breaks';
+import {
+  crossbowBlastLineOfSightColliders,
+  selectPlayableWindowApproach,
+  windowBreakPathBlocked,
+} from './window-breaks';
 import { resolveRenderProfile, type RenderProfile } from './render-profile';
 import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRandom, runtimeRandomTelemetry, runtimeSeed } from './runtime-random';
 import {
@@ -1074,6 +1096,7 @@ type ExplosiveBoltEntity = {
   nextFuseBeepAt: number | null;
   targetId: string | null;
   targetLifeId: number | null;
+  impactWindowId: string | null;
   actionNonce: number;
 };
 
@@ -1548,7 +1571,7 @@ if (!pass65Settings.privacy.shareGlobalLeaderboard) forgetLeaderboardInstallId(l
 const explicitRenderQuery = new URLSearchParams(window.location.search).get('render');
 const offlineMenuPreviewCapture = new URLSearchParams(window.location.search).get('menuPreviewCapture') === '1';
 const queryRenderProfile = explicitRenderQuery ? resolveRenderProfile(window.location.search, null) : null;
-const graphicsRuntime = resolveGraphicsRuntime(pass65Settings.graphics, queryRenderProfile === 'compat');
+let graphicsRuntime = resolveGraphicsRuntime(pass65Settings.graphics, queryRenderProfile === 'compat');
 const reducedTransparencyMedia = window.matchMedia('(prefers-reduced-transparency: reduce)');
 let accessibilityRuntime = resolveAccessibilityRuntime(pass65Settings.accessibility, {
   reducedMotion: reducedMotionMedia.matches,
@@ -1577,8 +1600,19 @@ const renderProfile: RenderProfile = resolveRenderProfile(
   explicitRenderQuery ? window.location.search : '',
   queryRenderProfile ?? graphicsRuntime.renderProfile,
 );
-const activeRenderConfig = resolveActiveGraphicsConfig(graphicsRuntime, renderProfile, queryRenderProfile);
-const displayedGraphicsPreset: GraphicsPreset = resolveDisplayedGraphicsPreset(pass65Settings.graphics.preset, queryRenderProfile);
+let activeRenderConfig = resolveActiveGraphicsConfig(graphicsRuntime, renderProfile, queryRenderProfile);
+let displayedGraphicsPreset: GraphicsPreset = resolveDisplayedGraphicsPreset(pass65Settings.graphics.preset, queryRenderProfile);
+// Geometry representation and target topology remain owned by renderProfile;
+// this profile tracks the renderer/effects values that can be changed live.
+let liveGraphicsProfile: RenderProfile = renderProfile;
+let stagedGraphicsReconstruction: readonly string[] = Object.freeze([]);
+let liveGraphicsAppliedAt = 0;
+const rendererConstructionGraphics = Object.freeze({
+  profile: renderProfile,
+  antialiasSamples: graphicsRuntime.antialiasSamples,
+  ambientOcclusionEnabled: graphicsRuntime.ambientOcclusion.enabled,
+  representation: activeRenderConfig.representation,
+});
 const atomicLighting = arenaLightingProfile(renderProfile, 'atomic-acres');
 let activeLighting = arenaLightingProfile(
   renderProfile,
@@ -1593,6 +1627,7 @@ document.documentElement.classList.toggle('performance-render', renderProfile ==
 document.documentElement.classList.toggle('blender-render', renderProfile === 'blender');
 document.documentElement.dataset.renderProfile = renderProfile;
 document.documentElement.dataset.graphicsPreset = displayedGraphicsPreset;
+document.documentElement.dataset.graphicsLiveProfile = liveGraphicsProfile;
 document.documentElement.dataset.graphicsFrameRateLimit = graphicsRuntime.frameRateLimit === 0
   ? 'uncapped'
   : String(graphicsRuntime.frameRateLimit);
@@ -2254,18 +2289,18 @@ const displayCadencePromise = new Promise<number>((resolve) => {
 setBootstrapStage('measuring-display');
 const detectedDisplayFrameMs = await displayCadencePromise;
 setBootstrapStage('module-ready');
-const configuredAdaptiveLevels = configuredAdaptiveQualityLevels(
-  renderProfile,
-  activeRenderConfig.pixelRatioCap,
-  graphicsRuntime.adaptive,
-);
-const adaptiveQuality = new AdaptiveQualityController({
-  profile: renderProfile,
+const createAdaptiveQualityController = (): AdaptiveQualityController => new AdaptiveQualityController({
+  profile: liveGraphicsProfile,
   targetFrameMs: Math.max(detectedDisplayFrameMs, 1_000 / graphicsRuntime.targetFps),
   initialPixelRatioCap: activeRenderConfig.pixelRatioCap,
   enabled: graphicsRuntime.adaptive,
-  levels: configuredAdaptiveLevels,
+  levels: configuredAdaptiveQualityLevels(
+    liveGraphicsProfile,
+    activeRenderConfig.pixelRatioCap,
+    graphicsRuntime.adaptive,
+  ),
 });
+let adaptiveQuality = createAdaptiveQualityController();
 const deferredWebGpuAdaptivePixelRatio = new DeferredAdaptivePixelRatio();
 const MATCH_ADMISSION_ADAPTIVE_WARMUP_SUBMISSIONS = 8;
 const MATCH_ADMISSION_ADAPTIVE_SAMPLE_COUNT = 60;
@@ -2310,11 +2345,11 @@ let activeArenaVisualDefinition: ArenaVisualDefinition | null = null;
 
 function applyAdaptiveRenderBudget(pixelRatioCap: number): void {
   renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
-  const effectsBudget = applyGraphicsPreferenceBudget(graphicsEffectsBudget(renderProfile, pixelRatioCap));
+  const effectsBudget = applyGraphicsPreferenceBudget(graphicsEffectsBudget(liveGraphicsProfile, pixelRatioCap));
   graphicsRefinement.setBudget(effectsBudget);
   atomicSignal?.setEffectsBudget(effectsBudget);
   applyPresentationEffectsBudget?.(effectsBudget);
-  const shadowsEnabled = adaptiveShadowsEnabled(renderProfile, activeRenderConfig.shadows, pixelRatioCap)
+  const shadowsEnabled = adaptiveShadowsEnabled(liveGraphicsProfile, activeRenderConfig.shadows, pixelRatioCap)
     && (activeArenaVisualDefinition?.shadows.enabled ?? true);
   if (renderRuntime.shadowsEnabled() !== shadowsEnabled) {
     renderRuntime.setShadowsEnabled(shadowsEnabled);
@@ -3360,6 +3395,8 @@ function activeGunRangeTestBayDoorColliders(activeArena: ArenaMap = arena): read
     : [];
 }
 
+const activeGlassColliderWindowIds = new WeakMap<Box2, string>();
+
 function activeGlassDynamicColliders(activeArena: ArenaMap = arena): readonly DynamicWorldCollider[] {
   const entries: DynamicWorldCollider[] = [];
   for (const pane of activeArena.breakableWindows) {
@@ -3372,16 +3409,18 @@ function activeGlassDynamicColliders(activeArena: ArenaMap = arena): readonly Dy
     if (bounds.isEmpty() || ![
       bounds.min.x, bounds.max.x, bounds.min.y, bounds.max.y, bounds.min.z, bounds.max.z,
     ].every(Number.isFinite)) continue;
+    const colliderBounds = Object.freeze({
+      minX: bounds.min.x,
+      maxX: bounds.max.x,
+      minY: bounds.min.y,
+      maxY: bounds.max.y,
+      minZ: bounds.min.z,
+      maxZ: bounds.max.z,
+    });
+    activeGlassColliderWindowIds.set(colliderBounds, pane.id);
     entries.push(Object.freeze({
       id: `glass:${pane.id}`,
-      bounds: Object.freeze({
-        minX: bounds.min.x,
-        maxX: bounds.max.x,
-        minY: bounds.min.y,
-        maxY: bounds.max.y,
-        minZ: bounds.min.z,
-        maxZ: bounds.max.z,
-      }),
+      bounds: colliderBounds,
     }));
   }
   return Object.freeze(entries);
@@ -3931,7 +3970,7 @@ document.documentElement.dataset.arenaId = selectedArena.id;
 function applyArenaFogProfile(): void {
   const fog = activeArenaVisualDefinition?.id === selectedArena.id
     ? activeArenaVisualDefinition.fog
-    : atmosphereFogRange(renderProfile, selectedArena.id);
+    : atmosphereFogRange(liveGraphicsProfile, selectedArena.id);
   if (scene.fog instanceof THREE.Fog) {
     scene.fog.near = fog.near;
     scene.fog.far = fog.far;
@@ -4091,6 +4130,7 @@ scene.add(nukeShockwave);
 let arenaArtRoot: THREE.Group | null = null;
 let blenderArenaActive = false;
 let atomicHouseAuthorityParity: AtomicHouseAuthorityParityReport | null = null;
+let atomicCollisionRouteAuthority: Pass73CollisionRouteAuthorityReport | null = null;
 let atomicAuthoredLoadPromise: Promise<THREE.Group | null> | null = null;
 let atomicQualityLoadPromise: Promise<THREE.Group | null> | null = null;
 const qualityAssetStreaming = {
@@ -4114,6 +4154,18 @@ function selectedArenaAuthority(expected: ArenaId): ArenaMap {
     throw new Error(`Cannot stream ${expected} presentation while ${selectedArena.id} owns gameplay authority`);
   }
   return arena;
+}
+
+function currentAtomicCollisionRouteAuthority(): Readonly<{
+  report: Pass73CollisionRouteAuthorityReport;
+  fixtures: readonly Pass73CollisionRouteFixture[];
+}> | null {
+  if (selectedArena.id !== 'atomic-acres' || arena.id !== 'atomic-acres') return null;
+  const quality = blenderArenaActive && arenaArtRoot?.visible === true;
+  const profile = quality ? 'quality' as const : 'performance' as const;
+  const presentationRoot = quality ? arenaArtRoot! : arena.root;
+  const report = auditPass73CollisionRouteAuthority(arena, presentationRoot, profile);
+  return Object.freeze({ report, fixtures: pass73CollisionRouteFixtures(arena, profile) });
 }
 
 function bindAtomicPresentationRaycasts(root: THREE.Group, authority: ArenaMap): void {
@@ -4296,8 +4348,29 @@ let lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
 let flashHostAuthority = new FlashHostAuthority(interactiveWorldMatchEpoch, 'host');
 let flashVictimConsumer = new FlashVictimResultConsumer(interactiveWorldMatchEpoch, 'pending-player', 0);
 const explosiveBolts: ExplosiveBoltEntity[] = [];
+type CrossbowGlassMutationTrace = Readonly<{
+  windowId: string;
+  actionNonce: number;
+  phase: CrossbowGlassPhase;
+  revision: number;
+  explosionCountAtMutation: number;
+}>;
+const crossbowGlassAuthorityTelemetry = {
+  matchEpoch: interactiveWorldMatchEpoch,
+  predictedImpactRejections: 0,
+  authoritativeImpactMutations: 0,
+  authoritativeExplosionMutations: 0,
+  canonicalClientMutations: 0,
+  canonicalClientRejections: 0,
+  recentAuthoritativeMutations: [] as CrossbowGlassMutationTrace[],
+  recentCanonicalClientMutations: [] as CrossbowGlassMutationTrace[],
+  lastPredictedImpactRejection: null as CrossbowGlassMutationTrace | null,
+  lastAuthoritativeMutation: null as CrossbowGlassMutationTrace | null,
+  lastCanonicalClientMutation: null as CrossbowGlassMutationTrace | null,
+};
 const explosiveBoltStartScratch = new THREE.Vector3();
 const explosiveBoltDeltaScratch = new THREE.Vector3();
+const explosiveBoltImpactPointScratch = new THREE.Vector3();
 const explosiveBoltTargetPositionScratch = new THREE.Vector3();
 const EXPLOSIVE_BOLT_PRESENTATION_POOL_CAPACITY = 32;
 const explosiveBoltShaftGeometry = new THREE.CylinderGeometry(0.018, 0.018, 0.72, 8);
@@ -4363,6 +4436,256 @@ let lastGrenadeExplosionProfile = {
   selfDamageMs: 0,
   totalSyncMs: 0,
 };
+type GrenadeFirstActionProfile = {
+  sequence: number;
+  actionNonce: number | null;
+  grenade: GrenadeId;
+  cold: boolean;
+  startedAt: number;
+  handlerCompletedAt: number;
+  handlerSyncMs: number;
+  audio: Readonly<{
+    contextState: string;
+    prewarmed: boolean;
+    warmupSources: number;
+    retainedSources: number;
+    liveRecipe: string;
+  }>;
+  pool: Readonly<{
+    prewarmGeneration: number;
+    acquisitionsBefore: number;
+    acquisitionsAfter: number;
+    acquiredRetainedMesh: boolean;
+    activeAfter: number;
+    slot: number | null;
+    family: string | null;
+  }>;
+  animation: Readonly<{
+    startedAt: number;
+    activeAtHandlerEnd: boolean;
+    progressAtHandlerEnd: number;
+    activeOnFirstPresentedFrame: boolean | null;
+    progressOnFirstPresentedFrame: number | null;
+  }>;
+  physics: Readonly<{
+    path: 'deterministic-kinematic-no-rapier-body';
+    rapierBodiesAcquired: 0;
+    initialOrigin: readonly [number, number, number] | null;
+    initialVelocity: readonly [number, number, number] | null;
+    fuseMs: number | null;
+  }>;
+  startingPresentedGameplayFrame: number;
+  firstPresentedGameplayFrame: number | null;
+  firstPresentedDelayMs: number | null;
+  meshVisibleOnFirstPresentedFrame: boolean | null;
+  startingSubmissionSequence: number;
+  targetSubmissionSequence: number | null;
+  firstSubmissionDelayMs: number | null;
+  firstCompletionDelayMs: number | null;
+  frameGapsMs: number[];
+  frameP50Ms: number;
+  frameP95Ms: number;
+  frameP99Ms: number;
+  maximumAnimationFrameGapMs: number;
+  maximumFrameWorkMs: number;
+  maximumFrameBreakdown: Readonly<{
+    totalMs: number;
+    grenadeUpdateMs: number;
+    renderSubmitMs: number;
+    otherMs: number;
+  }>;
+  frameSamples: number;
+  completionFailures: number;
+  status: string;
+  observationComplete: boolean;
+  lastAnimationFrameAt: number;
+};
+let grenadeActionProfileSequence = 0;
+let lastGrenadeFirstActionProfile: GrenadeFirstActionProfile | null = null;
+const grenadeFirstActionProfiles: GrenadeFirstActionProfile[] = [];
+
+function framePercentile(samples: readonly number[], percentile: number): number {
+  if (samples.length === 0) return 0;
+  const ordered = [...samples].sort((left, right) => left - right);
+  const index = Math.min(ordered.length - 1, Math.max(0, Math.ceil(ordered.length * percentile) - 1));
+  return ordered[index]!;
+}
+
+function beginGrenadeFirstActionProfile(grenade: GrenadeId, startedAt: number): GrenadeFirstActionProfile {
+  const presentation = renderRuntime.presentationTelemetry(startedAt);
+  const audioTelemetry = audio.telemetry();
+  const pool = grenadeWorldPresentationPool.telemetry();
+  const profile: GrenadeFirstActionProfile = {
+    sequence: grenadeActionProfileSequence,
+    actionNonce: null,
+    grenade,
+    cold: grenadeActionProfileSequence === 0,
+    startedAt,
+    handlerCompletedAt: startedAt,
+    handlerSyncMs: 0,
+    audio: Object.freeze({
+      contextState: audioTelemetry.context.state,
+      prewarmed: audioTelemetry.grenadeEffectsPrewarm.prepared,
+      warmupSources: audioTelemetry.grenadeEffectsPrewarm.warmupSources,
+      retainedSources: audioTelemetry.grenadeEffectsPrewarm.retainedSources,
+      liveRecipe: audioTelemetry.grenadeEffectsPrewarm.liveRecipe,
+    }),
+    pool: Object.freeze({
+      prewarmGeneration: pool.gpuPrewarmGeneration,
+      acquisitionsBefore: pool.acquisitions,
+      acquisitionsAfter: pool.acquisitions,
+      acquiredRetainedMesh: false,
+      activeAfter: pool.active,
+      slot: null,
+      family: null,
+    }),
+    animation: Object.freeze({
+      startedAt: 0,
+      activeAtHandlerEnd: false,
+      progressAtHandlerEnd: 1,
+      activeOnFirstPresentedFrame: null,
+      progressOnFirstPresentedFrame: null,
+    }),
+    physics: Object.freeze({
+      path: 'deterministic-kinematic-no-rapier-body',
+      rapierBodiesAcquired: 0,
+      initialOrigin: null,
+      initialVelocity: null,
+      fuseMs: null,
+    }),
+    startingPresentedGameplayFrame: lastGameplayPresentedFrame,
+    firstPresentedGameplayFrame: null,
+    firstPresentedDelayMs: null,
+    meshVisibleOnFirstPresentedFrame: null,
+    startingSubmissionSequence: presentation.submissionSequence,
+    targetSubmissionSequence: null,
+    firstSubmissionDelayMs: null,
+    firstCompletionDelayMs: null,
+    frameGapsMs: [],
+    frameP50Ms: 0,
+    frameP95Ms: 0,
+    frameP99Ms: 0,
+    maximumAnimationFrameGapMs: 0,
+    maximumFrameWorkMs: 0,
+    maximumFrameBreakdown: Object.freeze({
+      totalMs: 0,
+      grenadeUpdateMs: 0,
+      renderSubmitMs: 0,
+      otherMs: 0,
+    }),
+    frameSamples: 0,
+    completionFailures: presentation.completionFailures,
+    status: presentation.status,
+    observationComplete: false,
+    lastAnimationFrameAt: startedAt,
+  };
+  grenadeActionProfileSequence += 1;
+  lastGrenadeFirstActionProfile = profile;
+  grenadeFirstActionProfiles.push(profile);
+  if (grenadeFirstActionProfiles.length > 2) grenadeFirstActionProfiles.shift();
+  return profile;
+}
+
+function completeGrenadeActionHandler(
+  profile: GrenadeFirstActionProfile,
+  actionNonce: number,
+  mesh: THREE.Object3D,
+  origin: THREE.Vector3,
+  velocity: THREE.Vector3,
+  fuseMs: number,
+  completedAt: number,
+): void {
+  if (lastGrenadeFirstActionProfile !== profile) return;
+  const pool = grenadeWorldPresentationPool.telemetry();
+  const animation = weaponView.grenadeActionTelemetry(completedAt);
+  profile.actionNonce = actionNonce;
+  profile.handlerCompletedAt = completedAt;
+  profile.handlerSyncMs = Math.max(0, completedAt - profile.startedAt);
+  profile.pool = Object.freeze({
+    ...profile.pool,
+    acquisitionsAfter: pool.acquisitions,
+    acquiredRetainedMesh: mesh.userData.presentationPoolInUse === true && mesh.parent !== null,
+    activeAfter: pool.active,
+    slot: typeof mesh.userData.presentationPoolSlot === 'number' ? mesh.userData.presentationPoolSlot : null,
+    family: typeof mesh.userData.presentationPoolFamily === 'string' ? mesh.userData.presentationPoolFamily : null,
+  });
+  profile.animation = Object.freeze({
+    ...profile.animation,
+    startedAt: animation.startedAt,
+    activeAtHandlerEnd: animation.active,
+    progressAtHandlerEnd: animation.progress,
+  });
+  profile.physics = Object.freeze({
+    ...profile.physics,
+    initialOrigin: Object.freeze(origin.toArray() as [number, number, number]),
+    initialVelocity: Object.freeze(velocity.toArray() as [number, number, number]),
+    fuseMs,
+  });
+}
+
+function sampleGrenadeFirstActionProfile(
+  frameNow: number,
+  frameWorkMs: number,
+  grenadeUpdateMs: number,
+  renderSubmitMs: number,
+): void {
+  const profile = lastGrenadeFirstActionProfile;
+  if (!profile || profile.observationComplete) return;
+  const elapsedMs = Math.max(0, frameNow - profile.startedAt);
+  const gapMs = Math.max(0, frameNow - profile.lastAnimationFrameAt);
+  profile.lastAnimationFrameAt = frameNow;
+  profile.frameGapsMs.push(gapMs);
+  profile.frameP50Ms = framePercentile(profile.frameGapsMs, 0.5);
+  profile.frameP95Ms = framePercentile(profile.frameGapsMs, 0.95);
+  profile.frameP99Ms = framePercentile(profile.frameGapsMs, 0.99);
+  profile.maximumAnimationFrameGapMs = Math.max(profile.maximumAnimationFrameGapMs, gapMs);
+  const boundedFrameWorkMs = Math.max(0, frameWorkMs);
+  if (boundedFrameWorkMs >= profile.maximumFrameWorkMs) {
+    profile.maximumFrameBreakdown = Object.freeze({
+      totalMs: boundedFrameWorkMs,
+      grenadeUpdateMs: Math.max(0, grenadeUpdateMs),
+      renderSubmitMs: Math.max(0, renderSubmitMs),
+      otherMs: Math.max(0, boundedFrameWorkMs - grenadeUpdateMs - renderSubmitMs),
+    });
+  }
+  profile.maximumFrameWorkMs = Math.max(profile.maximumFrameWorkMs, boundedFrameWorkMs);
+  profile.frameSamples += 1;
+
+  const presentation = renderRuntime.presentationTelemetry(frameNow);
+  if (profile.targetSubmissionSequence === null
+    && presentation.submissionSequence > profile.startingSubmissionSequence) {
+    profile.targetSubmissionSequence = presentation.submissionSequence;
+    profile.firstSubmissionDelayMs = elapsedMs;
+  }
+  if (profile.firstCompletionDelayMs === null && profile.targetSubmissionSequence !== null
+    && presentation.completedSequence >= profile.targetSubmissionSequence) {
+    profile.firstCompletionDelayMs = elapsedMs;
+  }
+  profile.completionFailures = presentation.completionFailures;
+  profile.status = presentation.status;
+
+  if (profile.firstPresentedGameplayFrame === null
+    && lastGameplayPresentedFrame > profile.startingPresentedGameplayFrame) {
+    const entity = profile.actionNonce === null
+      ? null
+      : grenades.find((grenade) => grenade.actionNonce === profile.actionNonce) ?? null;
+    const animation = weaponView.grenadeActionTelemetry(frameNow);
+    profile.firstPresentedGameplayFrame = lastGameplayPresentedFrame;
+    profile.firstPresentedDelayMs = elapsedMs;
+    profile.meshVisibleOnFirstPresentedFrame = entity !== null
+      && entity.mesh.visible
+      && entity.mesh.userData.presentationPoolInUse === true
+      && entity.mesh.parent !== null;
+    profile.animation = Object.freeze({
+      ...profile.animation,
+      activeOnFirstPresentedFrame: animation.active,
+      progressOnFirstPresentedFrame: animation.progress,
+    });
+  }
+  profile.observationComplete = elapsedMs >= 350
+    && profile.firstPresentedGameplayFrame !== null
+    && (renderRuntime.backend !== 'webgpu' || profile.firstCompletionDelayMs !== null);
+}
 let lastBotEliminationProfile = {
   deathDropMs: 0,
   deathPoseMs: 0,
@@ -7204,7 +7527,10 @@ function resetAuthenticatedGuestReplacement(playerId: string): void {
   }
   authoritativeShotAdmissions.delete(playerId);
   remoteShotAdmissions.delete(playerId);
-  admittedRemoteShots.delete(playerId);
+  const retainedCrossbowActions = admittedRemoteShots.get(playerId);
+  if (retainInFlightCrossbowGlassActions(retainedCrossbowActions, interactiveWorldMatchEpoch, now) === 0) {
+    admittedRemoteShots.delete(playerId);
+  }
   admittedRemoteMelees.delete(playerId);
   admittedRemoteExplosions.delete(playerId);
   remoteMeleeAdmissions.delete(playerId);
@@ -12208,13 +12534,18 @@ function breakHouseWindow(
   actionNonce?: number,
   impactOwnerId = player.id,
   impactNonce = randomNonce(),
+  weapon?: Extract<WeaponId, 'explosive-crossbow'>,
+  crossbowPhase?: CrossbowGlassPhase,
+  crossbowBlastRadiusM?: 3.5 | 7,
 ): boolean {
   const window = arena.breakableWindows.find((candidate) => candidate.id === windowId);
   if (!window) return false;
   const state = window.glassState?.matchEpoch === interactiveWorldMatchEpoch
     ? window.glassState
     : createGlassState(window.id, interactiveWorldMatchEpoch);
-  const profile: GlassImpactProfile = kind === 'explosive' ? 'explosion' : kind === 'knife' ? 'knife' : 'bullet';
+  const profile: GlassImpactProfile = weapon === 'explosive-crossbow'
+    ? crossbowPhase === 'explosion' ? 'explosion' : 'bullet'
+    : kind === 'explosive' ? 'explosion' : kind === 'knife' ? 'knife' : 'bullet';
   const impactId = `${profile}:${impactOwnerId}:${impactNonce}:${state.revision}`;
   const result = admitGlassImpact(state, {
     // Network-originated mutations reach this point only after the existing
@@ -12239,7 +12570,8 @@ function breakHouseWindow(
       windowId,
       origin: origin.toArray(),
       kind,
-      ...(kind === 'explosive' ? { actionNonce } : {}),
+      ...(weapon ? { weapon, crossbowPhase, crossbowBlastRadiusM } : {}),
+      ...(kind === 'explosive' || weapon ? { actionNonce } : {}),
       nonce: impactNonce,
     };
     network.send(network.role === 'host' ? canonicalHostWindowBreak(message, performance.now()) : message);
@@ -12293,7 +12625,7 @@ function breakWindowsAlongBallisticTrace(
 }
 
 function canonicalHostWindowBreak(message: WindowBreakMessage, now: number): WindowBreakMessage {
-  const sticky = message.kind === 'explosive' && Number.isFinite(message.actionNonce)
+  const sticky = !message.weapon && message.kind === 'explosive' && Number.isFinite(message.actionNonce)
     ? hostStickyVerificationForAction(message.by, 'semtex', message.actionNonce!, message.origin, now)
     : null;
   const attachment = sticky?.verification.status === 'verified' ? sticky.verification.attachment : null;
@@ -12309,17 +12641,90 @@ function canonicalHostWindowBreak(message: WindowBreakMessage, now: number): Win
 }
 
 function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
-  if (message.by === player.id || processedNonces.has(message.nonce)) return;
+  const crossbowEvent = message.weapon === 'explosive-crossbow';
+  const localCanonicalCrossbow = crossbowEvent && network.role === 'client' && message.by === player.id;
+  if (message.by === player.id && !localCanonicalCrossbow || processedNonces.has(message.nonce)) return;
   if (network.role === 'client') {
     if (!message.hostAuthority || message.hostAuthority.hostId !== privateLobbySnapshot?.hostId) return;
   } else if (message.hostAuthority !== undefined) {
     return;
   }
-  const remote = remotes.get(message.by);
   const window = arena.breakableWindows.find((candidate) => candidate.id === message.windowId);
-  if (!remote || !window || window.broken) return;
-  const sender = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
+  if (!window || window.broken) return;
   const centre = window.mesh.getWorldPosition(new THREE.Vector3());
+  if (message.weapon === 'explosive-crossbow') {
+    const now = performance.now();
+    const action = currentAdmittedShotAction(message.by, message.actionNonce!, now);
+    const panePhaseKey = `glass:${message.windowId}:${message.crossbowPhase}`;
+    const origin = new THREE.Vector3(...message.origin);
+    window.mesh.updateWorldMatrix(true, false);
+    const paneBounds = new THREE.Box3().setFromObject(window.mesh);
+    const blastRadiusM = message.crossbowBlastRadiusM ?? explosiveBoltBlastRadiusM(false);
+    const admission = admitCanonicalCrossbowGlassBreak({
+      receiverRole: network.role === 'host' ? 'host' : 'client',
+      hostAuthorityValid: network.role === 'client'
+        && message.hostAuthority?.hostId === privateLobbySnapshot?.hostId,
+      weapon: message.weapon,
+      fireKind: WEAPONS[message.weapon].fireKind,
+      phase: message.crossbowPhase!,
+      actionNonce: message.actionNonce!,
+      actionCurrent: action !== undefined,
+      actionWeapon: action?.message.weapon ?? null,
+      actionNonceObserved: action?.message.nonce ?? null,
+      eventReplay: processedNonces.has(message.nonce),
+      panePhaseAlreadyAdmitted: action?.targets.has(panePhaseKey) ?? false,
+      originInsideArena: pointInsideBounds(origin, arena.bounds, 0.44),
+      paneDistanceM: paneBounds.isEmpty() ? Number.POSITIVE_INFINITY : paneBounds.distanceToPoint(origin),
+      blastRadiusM,
+    });
+    if (!admission.accepted || !action) {
+      crossbowGlassAuthorityTelemetry.canonicalClientRejections += 1;
+      return;
+    }
+    processedNonces.add(message.nonce);
+    action.targets.add(panePhaseKey);
+    const normal = centre.clone().sub(origin);
+    if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
+    else normal.normalize().multiplyScalar(-1);
+    const mutated = breakHouseWindow(
+      message.windowId,
+      paneBounds.clampPoint(origin, new THREE.Vector3()),
+      normal,
+      false,
+      origin,
+      message.kind,
+      message.actionNonce,
+      message.by,
+      message.nonce,
+      message.weapon,
+      message.crossbowPhase,
+      message.crossbowBlastRadiusM,
+    );
+    if (mutated) {
+      const revision = window.glassState?.revision ?? 0;
+      crossbowGlassAuthorityTelemetry.canonicalClientMutations += 1;
+      crossbowGlassAuthorityTelemetry.lastCanonicalClientMutation = Object.freeze({
+        windowId: message.windowId,
+        actionNonce: message.actionNonce!,
+        phase: message.crossbowPhase!,
+        revision,
+        explosionCountAtMutation: grenadeExplosions,
+      });
+      crossbowGlassAuthorityTelemetry.recentCanonicalClientMutations.push(
+        crossbowGlassAuthorityTelemetry.lastCanonicalClientMutation,
+      );
+      if (crossbowGlassAuthorityTelemetry.recentCanonicalClientMutations.length > 16) {
+        crossbowGlassAuthorityTelemetry.recentCanonicalClientMutations.shift();
+      }
+    } else {
+      crossbowGlassAuthorityTelemetry.canonicalClientRejections += 1;
+    }
+    trimNonceSet();
+    return;
+  }
+  const remote = remotes.get(message.by);
+  if (!remote) return;
+  const sender = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
   const explosive = message.kind === 'explosive';
   const grenadeAuthority = explosive ? remoteGrenadeAuthorities.get(message.by) : undefined;
   const grenade = explosive && grenadeAuthority && Number.isFinite(message.actionNonce)
@@ -12397,6 +12802,17 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
 
 function resetBreakableWindows(): void {
   clearPersistentWindowDebris();
+  crossbowGlassAuthorityTelemetry.matchEpoch = interactiveWorldMatchEpoch;
+  crossbowGlassAuthorityTelemetry.predictedImpactRejections = 0;
+  crossbowGlassAuthorityTelemetry.authoritativeImpactMutations = 0;
+  crossbowGlassAuthorityTelemetry.authoritativeExplosionMutations = 0;
+  crossbowGlassAuthorityTelemetry.canonicalClientMutations = 0;
+  crossbowGlassAuthorityTelemetry.canonicalClientRejections = 0;
+  crossbowGlassAuthorityTelemetry.recentAuthoritativeMutations.length = 0;
+  crossbowGlassAuthorityTelemetry.recentCanonicalClientMutations.length = 0;
+  crossbowGlassAuthorityTelemetry.lastPredictedImpactRejection = null;
+  crossbowGlassAuthorityTelemetry.lastAuthoritativeMutation = null;
+  crossbowGlassAuthorityTelemetry.lastCanonicalClientMutation = null;
   for (const window of arena.breakableWindows) {
     window.glassState = createGlassState(window.id, interactiveWorldMatchEpoch);
     window.broken = false;
@@ -12602,6 +13018,10 @@ async function prewarmMatchBoundFirstShotPresentations(token: MatchAdmissionToke
       () => submitExactMatchComposition(),
     )
   ));
+  await grenadeWorldPresentationPool.withStagedFirstAcquisitionVocabulary(
+    camera,
+    submitExactMatchComposition,
+  );
 
   // Ordinary fire owns shared muzzle-smoke and casing programs without a
   // transient world light. Special weapons then add their complete retained
@@ -12864,7 +13284,10 @@ function removeRemote(id: string, reason: string, allowRejoinReservation = true)
   verifiedRemoteKills.delete(id);
   remoteShotAdmissions.delete(id);
   hostTriggerAuthorities.reset(id, 'disconnect');
-  admittedRemoteShots.delete(id);
+  const retainedCrossbowActions = admittedRemoteShots.get(id);
+  if (retainInFlightCrossbowGlassActions(retainedCrossbowActions, interactiveWorldMatchEpoch, performance.now()) === 0) {
+    admittedRemoteShots.delete(id);
+  }
   admittedRemoteMelees.delete(id);
   admittedRemoteExplosions.delete(id);
   remoteStickyAttachmentAuthority = removeRemoteStickyAttachmentsForActor(remoteStickyAttachmentAuthority, id);
@@ -13454,6 +13877,7 @@ async function startGame(
   audio.unlock();
   document.documentElement.dataset.combatAudioPrewarm = audio.prepareCombat() ? 'ready' : 'unavailable';
   document.documentElement.dataset.glassImpactAudioPrewarm = audio.prepareGlassImpact() ? 'ready' : 'unavailable';
+  document.documentElement.dataset.grenadeEffectsAudioPrewarm = audio.prepareGrenadeEffects() ? 'ready' : 'unavailable';
   prepareDeploymentTransition();
   applyMenuLifecycle({ type: 'match-start' });
   syncMenuPreviewCanvasPlacement();
@@ -13544,6 +13968,7 @@ async function startGame(
     interactiveWorldRuntime.setHostAuthority(mode !== 'client');
     syncInteractiveWorldPhysics(true);
   }
+  resetBreakableWindows();
   killstreakRuntime = new HostKillstreakRuntime(killstreakMatchEpoch);
   killstreakActivationSequence = 0;
   killstreakControlSequence = 0;
@@ -14982,12 +15407,24 @@ function prewarmThermalGhostPipelines(): void {
   for (const remote of remotes.values()) {
     if (remote.snapshot.hp <= 0) continue;
     const relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id: remote.snapshot.id, relation, root: remote.root });
+    targets.push({
+      id: remote.snapshot.id,
+      relation,
+      root: remote.root,
+      lifeId: remote.snapshot.deaths,
+      continuityId: remote.continuity,
+    });
   }
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
     const relation = mode === 'tdm' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id: bot.id, relation, root: bot.root });
+    targets.push({
+      id: bot.id,
+      relation,
+      root: bot.root,
+      lifeId: bot.deaths,
+      continuityId: bot.continuity,
+    });
   }
   // Match admission has already staged the retained corpse operators visible
   // behind the opaque deployment surface. Fill any remaining target slots
@@ -15026,22 +15463,36 @@ function updateThermalGhosts(): void {
     team: Team,
     kind: 'player' | 'bot',
     root: THREE.Object3D,
+    lifeId: number,
+    continuityId: number,
   ): void => {
     if (targets.some((target) => target.id === id)) return;
     if (railgunRevealActive && !dmrThermalActive && !chopperThermal
       && !railgunThermalTargetEligible(observer, { id, team, alive: true, kind }, mode)) return;
     const relation = mode === 'tdm' && team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id, relation, root });
+    targets.push({ id, relation, root, lifeId, continuityId });
   };
   for (const remote of remotes.values()) {
     if (remote.snapshot.hp <= 0) continue;
-    addTarget(remote.snapshot.id, remote.snapshot.team, 'player', remote.root);
+    addTarget(
+      remote.snapshot.id,
+      remote.snapshot.team,
+      'player',
+      remote.root,
+      remote.snapshot.deaths,
+      remote.continuity,
+    );
   }
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
-    addTarget(bot.id, bot.team, 'bot', bot.root);
+    addTarget(bot.id, bot.team, 'bot', bot.root, bot.deaths, bot.continuity);
   }
-  thermalGhostPresentation.sync(targets, true);
+  // Admission prewarm may retain attached corpse-corpus records. The live
+  // target set owns the visible reveal and releases every unseen prewarm ID so
+  // one ADS cannot carry hidden duplicate model/material residency.
+  thermalGhostPresentation.sync(targets, true, true);
+  // The default telemetry path is allocation-bounded. Root/life/pose traversal
+  // is reserved for explicit debug receipt calls with identityAudit enabled.
   railgunPresentation.syncExactOperatorReveal(railgunRevealActive, thermalGhostPresentation.telemetry());
 }
 
@@ -15328,6 +15779,7 @@ function tryFire(now: number): void {
         currentHostTimeMs(),
         interpolationDelayState.delayMs,
         [...remotes.values()].map((remote) => remote.renderedHostTimeMs),
+        player.weapon,
       )
     : null;
   if (shotTimeline) lastAuthoredShotTimeline = shotTimeline;
@@ -15482,8 +15934,7 @@ function tryFire(now: number): void {
     timing: nextCombatTiming(),
     nonce: shotActionNonce,
   };
-  if (player.weapon === 'flamethrower'
-    || network.role === 'client' && player.weapon === 'flare-gun') {
+  if (player.weapon === 'flamethrower') {
     const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
     for (const [nonce, action] of actions) {
       if (now - action.receivedAt > admittedShotActionLifetimeMs(action.message.weapon)) actions.delete(nonce);
@@ -15501,17 +15952,15 @@ function tryFire(now: number): void {
     );
   }
   if (projectileShot) {
-    if (network.role !== 'client') {
-      const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
-      for (const [nonce, action] of actions) {
-        const lifetimeMs = admittedShotActionLifetimeMs(action.message.weapon);
-        if (now - action.receivedAt > lifetimeMs) actions.delete(nonce);
-      }
-      actions.set(shot.nonce, {
-        message: shot, receivedAt: now, matchEpoch: interactiveWorldMatchEpoch, targets: new Set(),
-      });
-      admittedRemoteShots.set(player.id, actions);
+    const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
+    for (const [nonce, action] of actions) {
+      const lifetimeMs = admittedShotActionLifetimeMs(action.message.weapon);
+      if (now - action.receivedAt > lifetimeMs) actions.delete(nonce);
     }
+    actions.set(shot.nonce, {
+      message: shot, receivedAt: now, matchEpoch: interactiveWorldMatchEpoch, targets: new Set(),
+    });
+    admittedRemoteShots.set(player.id, actions);
     if (player.weapon === 'flare-gun') {
       const spawned = flareProjectileSystem.spawn({
         ownerId: player.id, ownerTeam: player.team, origin,
@@ -16032,6 +16481,9 @@ function spawnEarnedBotReinforcement(): void {
 }
 
 function clearBots(): void {
+  for (const targetId of [...pass73AdsRevealNormalVisibility.keys()]) {
+    setPass73AdsRevealNormalBodyHidden(targetId, false);
+  }
   for (const bot of bots.values()) {
     scheduleDeferredGpuRetirement(bot.root);
     footstepEmitters.reset(`bot:${bot.id}`);
@@ -16680,7 +17132,9 @@ function updateBots(dt: number, now: number): void {
       });
     }
     if (botsFrozen) {
-      poseOperator(bot.root, debugBotStanceOverride ?? 'stand', debugBotSpeedOverride, now * 0.001, 1, 0, dt);
+      if (pass73AdsRevealCaptureFrozenTargetId !== bot.id) {
+        poseOperator(bot.root, debugBotStanceOverride ?? 'stand', debugBotSpeedOverride, now * 0.001, 1, 0, dt);
+      }
       continue;
     }
     // A corrupted position can never become an out-of-arena damage source.
@@ -17198,6 +17652,7 @@ function spawnExplosiveBolt(
     nextFuseBeepAt: null,
     targetId: null,
     targetLifeId: null,
+    impactWindowId: null,
     actionNonce,
   });
 }
@@ -17297,10 +17752,13 @@ function detonateExplosiveBoltEntity(bolt: ExplosiveBoltEntity, now: number): vo
   const stuck = sealedAttachment !== null;
   const blastRadiusM = explosiveBoltBlastRadiusM(stuck);
   applyInteractiveWorldExplosion(point, blastRadiusM, EXPLOSIVE_BOLT_BLAST_MAX_DAMAGE * (stuck ? 2 : 1));
-  // Tactical/explosive bolts share the hosted grenade glass policy: the
-  // detonation may break a reachable pane, but never through an intervening
-  // solid collider or by mutating presentation-only glass on a guest.
-  breakWindowsInGrenadeBlast(point, bolt.actionNonce, true, blastRadiusM);
+  breakWindowsInCrossbowBlast(
+    point,
+    bolt.actionNonce,
+    blastRadiusM,
+    bolt.ownerId,
+    bolt.impactWindowId,
+  );
   const targetCount = fillExplosiveBoltTargets(bolt.ownerId, bolt.ownerTeam);
   for (let targetIndex = 0; targetIndex < targetCount; targetIndex += 1) {
     const target = explosiveBoltTargetBuffer.at(targetIndex);
@@ -17813,6 +18271,61 @@ function updateExplosiveBolts(dt: number, now: number): void {
       } else if (worldCollision || glassCollision) {
         const collisionFraction = Math.min(worldFraction, glassFraction);
         bolt.mesh.position.copy(start).addScaledVector(delta, collisionFraction);
+        const worldGlassWindowId = worldCollision
+          ? activeGlassColliderWindowIds.get(worldCollision.box) ?? null
+          : null;
+        const impactWindowId = worldGlassWindowId
+          ?? (glassCollision && glassFraction <= worldFraction + 1e-6 ? glassCollision.windowId : null);
+        bolt.impactWindowId = impactWindowId;
+        const mutationAdmission = admitCrossbowGlassMutation(bolt.authority);
+        if (impactWindowId && mutationAdmission.accepted) {
+          const pane = arena.breakableWindows.find(({ id }) => id === impactWindowId);
+          if (pane) {
+            const impactPoint = explosiveBoltImpactPointScratch.copy(bolt.mesh.position);
+            const normal = worldCollision && worldGlassWindowId === impactWindowId
+              ? new THREE.Vector3(worldCollision.normal.x, worldCollision.normal.y, worldCollision.normal.z)
+              : pane.mesh.getWorldPosition(new THREE.Vector3()).sub(impactPoint).normalize().multiplyScalar(-1);
+            const mutated = breakHouseWindow(
+              pane.id,
+              impactPoint,
+              normal,
+              true,
+              impactPoint,
+              'shot',
+              bolt.actionNonce,
+              bolt.ownerId,
+              randomNonce(),
+              'explosive-crossbow',
+              'impact',
+            );
+            if (mutated) {
+              crossbowGlassAuthorityTelemetry.authoritativeImpactMutations += 1;
+              crossbowGlassAuthorityTelemetry.lastAuthoritativeMutation = Object.freeze({
+                windowId: pane.id,
+                actionNonce: bolt.actionNonce,
+                phase: 'impact',
+                revision: pane.glassState?.revision ?? 0,
+                explosionCountAtMutation: grenadeExplosions,
+              });
+              crossbowGlassAuthorityTelemetry.recentAuthoritativeMutations.push(
+                crossbowGlassAuthorityTelemetry.lastAuthoritativeMutation,
+              );
+              if (crossbowGlassAuthorityTelemetry.recentAuthoritativeMutations.length > 16) {
+                crossbowGlassAuthorityTelemetry.recentAuthoritativeMutations.shift();
+              }
+            }
+          }
+        } else if (impactWindowId) {
+          const pane = arena.breakableWindows.find(({ id }) => id === impactWindowId);
+          crossbowGlassAuthorityTelemetry.predictedImpactRejections += 1;
+          crossbowGlassAuthorityTelemetry.lastPredictedImpactRejection = Object.freeze({
+            windowId: impactWindowId,
+            actionNonce: bolt.actionNonce,
+            phase: 'impact',
+            revision: pane?.glassState?.revision ?? 0,
+            explosionCountAtMutation: grenadeExplosions,
+          });
+        }
         bolt.impactedAt = now;
         bolt.detonatesAt = Math.min(bolt.expiresAt, now + EXPLOSIVE_BOLT_ARM_DELAY_MS);
         bolt.nextFuseBeepAt = now;
@@ -17843,6 +18356,7 @@ function throwGrenade(): void {
     return;
   }
   if (!player.alive || player.grenades <= 0 || matchState.phase !== 'active') return;
+  const firstActionProfile = beginGrenadeFirstActionProfile(player.selectedGrenade, performance.now());
   endSpawnProtectionOnOffense(performance.now());
   player.grenades -= 1;
   weaponView.throwGrenade();
@@ -17886,6 +18400,15 @@ function throwGrenade(): void {
     attachedTargetId: null,
     attachedTargetLifeId: null,
   });
+  completeGrenadeActionHandler(
+    firstActionProfile,
+    actionNonce,
+    mesh,
+    origin,
+    velocity,
+    impactDetonated || sticky ? SEMTEX_HITL_CONTRACT.maximumNoImpactLifetimeMs : 2_300,
+    performance.now(),
+  );
 }
 
 function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-throw' }>, ownerTeam: Team): void {
@@ -17941,6 +18464,90 @@ function breakWindowsInGrenadeBlast(point: THREE.Vector3, actionNonce: number, r
     if (breakHouseWindow(pane.id, centre, normal, replicate, point, 'explosive', actionNonce)) broken += 1;
   }
   return broken;
+}
+
+function breakWindowsInCrossbowBlast(
+  point: THREE.Vector3,
+  actionNonce: number,
+  radius: number,
+  ownerId: string,
+  impactWindowId: string | null,
+): number {
+  const worldColliders = Object.freeze([...activeWorldColliders()]);
+  const blastColliders = crossbowBlastLineOfSightColliders(
+    worldColliders,
+    impactWindowId,
+    (collider) => activeGlassColliderWindowIds.get(collider) ?? null,
+  );
+  const canonicalRadius: 3.5 | 7 = radius > 3.5 ? 7 : 3.5;
+  let broken = 0;
+  for (const pane of arena.breakableWindows) {
+    if (pane.broken) continue;
+    const centre = pane.mesh.getWorldPosition(new THREE.Vector3());
+    if (centre.distanceTo(point) > radius) continue;
+    if (windowBreakPathBlocked(point, centre, blastColliders)) continue;
+    const normal = centre.clone().sub(point);
+    if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
+    else normal.normalize().multiplyScalar(-1);
+    if (breakHouseWindow(
+      pane.id,
+      centre,
+      normal,
+      true,
+      point,
+      'explosive',
+      actionNonce,
+      ownerId,
+      randomNonce(),
+      'explosive-crossbow',
+      'explosion',
+      canonicalRadius,
+    )) {
+      broken += 1;
+      crossbowGlassAuthorityTelemetry.authoritativeExplosionMutations += 1;
+      crossbowGlassAuthorityTelemetry.lastAuthoritativeMutation = Object.freeze({
+        windowId: pane.id,
+        actionNonce,
+        phase: 'explosion',
+        revision: pane.glassState?.revision ?? 0,
+        explosionCountAtMutation: grenadeExplosions,
+      });
+      crossbowGlassAuthorityTelemetry.recentAuthoritativeMutations.push(
+        crossbowGlassAuthorityTelemetry.lastAuthoritativeMutation,
+      );
+      if (crossbowGlassAuthorityTelemetry.recentAuthoritativeMutations.length > 16) {
+        crossbowGlassAuthorityTelemetry.recentAuthoritativeMutations.shift();
+      }
+    }
+  }
+  return broken;
+}
+
+function inspectCrossbowBlastWindows(
+  pointTuple: readonly [number, number, number],
+  impactWindowId: string | null,
+  radiusM: number,
+) {
+  if (pointTuple.length !== 3 || !pointTuple.every(Number.isFinite)
+    || !Number.isFinite(radiusM) || radiusM <= 0 || radiusM > 7) return [];
+  const point = new THREE.Vector3(...pointTuple);
+  const blastColliders = crossbowBlastLineOfSightColliders(
+    Object.freeze([...activeWorldColliders()]),
+    impactWindowId,
+    (collider) => activeGlassColliderWindowIds.get(collider) ?? null,
+  );
+  return arena.breakableWindows.map((pane) => {
+    const centre = pane.mesh.getWorldPosition(new THREE.Vector3());
+    const distanceM = centre.distanceTo(point);
+    return Object.freeze({
+      windowId: pane.id,
+      revision: pane.glassState?.revision ?? 0,
+      phase: pane.glassState?.phase ?? 'intact',
+      distanceM,
+      inRadius: distanceM <= radiusM,
+      pathBlocked: windowBreakPathBlocked(point, centre, blastColliders),
+    });
+  });
 }
 
 function synchronizeSmokePresentation(snapshot: SmokeAuthoritySnapshot, nowHostTimeMs: number): void {
@@ -20507,10 +21114,10 @@ function drawUsFlagLogo(): HTMLCanvasElement | null {
 }
 
 function canvasLogoDataUrl(draw: () => HTMLCanvasElement | null): string {
-  const canvas = draw();
-  if (!canvas) return '';
+  const logoCanvas = draw();
+  if (!logoCanvas) return '';
   try {
-    return canvas.toDataURL('image/png');
+    return logoCanvas.toDataURL('image/png');
   } catch {
     return '';
   }
@@ -21838,11 +22445,14 @@ function updatePhysics(dt: number): void {
     && Math.abs(camera.fov - aimingFov) < 0.35;
   sniperScopeOverlay.hidden = !sniperScopeActive;
   hudRoot.classList.toggle('sniper-scope-active', sniperScopeActive);
-  dmrThermalActive = player.alive
-    && player.weapon === 'm14-ebr'
-    && adsHeld
-    && weaponView.adsProgress() >= 0.9
-    && Math.abs(camera.fov - aimingFov) < 0.35;
+  dmrThermalActive = deriveDmrThermalRevealActive({
+    alive: player.alive,
+    weapon: player.weapon,
+    adsHeld,
+    adsProgress: weaponView.adsProgress(),
+    baseFov: preferredFov,
+    cameraFov: camera.fov,
+  });
   hudRoot.classList.toggle('dmr-thermal-active', dmrThermalActive);
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
@@ -22221,6 +22831,7 @@ function updateMatchState(now: number): void {
           recentResolutions: [...recentShotResolutionTraces],
           rewindCeilingMs: MAX_AUTHORITATIVE_REWIND_MS,
           maximumFireAgeMs: MAX_SHOT_FIRE_AGE_MS,
+          maximumProjectileFireAgeMs: MAX_PROJECTILE_SHOT_FIRE_AGE_MS,
           timing: shotTimingTelemetry.snapshot(),
         },
         interpolationDelay: {
@@ -22963,6 +23574,12 @@ function applyPrivacySettings(): void {
 // settings never kicks them out of the graphics menu or the match per control.
 let pendingGraphicsPreset: GraphicsPreset | null = null;
 let pendingRendererReload = false;
+type LiveGraphicsApplyResult = Readonly<{
+  profile: RenderProfile;
+  pixelRatioCap: number;
+  staged: readonly string[];
+}>;
+let lastLiveGraphicsApply: LiveGraphicsApplyResult | null = null;
 
 function reloadForGraphicsRuntime(): void {
   const url = new URL(window.location.href);
@@ -22972,9 +23589,14 @@ function reloadForGraphicsRuntime(): void {
 
 function refreshGraphicsPendingBadge(): void {
   const pending = pendingGraphicsPreset !== null || advancedGraphicsBinding.hasPendingEdits();
-  element<HTMLElement>('#graphics-effective').textContent = pending
-    ? 'PENDING · SAVES WHEN YOU LEAVE OPTIONS'
-    : `EFFECTIVE: ${displayedGraphicsPreset.toUpperCase()}${graphicsRuntime.reason ? ` · ${graphicsRuntime.reason.toUpperCase()}` : ''}`;
+  const badge = element<HTMLElement>('#graphics-effective');
+  if (pending) {
+    badge.textContent = 'PENDING · SAVES WHEN YOU LEAVE OPTIONS';
+  } else if (pendingRendererReload && stagedGraphicsReconstruction.length > 0) {
+    badge.textContent = `APPLIED LIVE: ${displayedGraphicsPreset.toUpperCase()} DPR / LIGHTING / EFFECTS · FULL PRESET NEXT ARENA: ${stagedGraphicsReconstruction.join(' + ').toUpperCase()}`;
+  } else {
+    badge.textContent = `EFFECTIVE: ${displayedGraphicsPreset.toUpperCase()}${graphicsRuntime.reason ? ` · ${graphicsRuntime.reason.toUpperCase()}` : ''}`;
+  }
 }
 
 function flushPendingGraphics(): void {
@@ -22997,15 +23619,17 @@ function flushPendingGraphics(): void {
   }
   advancedGraphicsBinding.clearPendingEdits();
   pendingGraphicsPreset = null;
+  lastLiveGraphicsApply = applyLiveGraphicsSettings();
+  pendingRendererReload = lastLiveGraphicsApply.staged.length > 0;
   refreshGraphicsPendingBadge();
   if (gameStarted) {
-    // Never yank the player out of a session: the renderer reload waits until
-    // they are back at the main menu.
-    pendingRendererReload = true;
-    setStatus('Graphics saved · new renderer settings apply when you return to the main menu.');
+    const stagedSuffix = pendingRendererReload
+      ? ` · ${lastLiveGraphicsApply.staged.join(', ')} staged for the next renderer construction`
+      : '';
+    setStatus(`GRAPHICS SAVED · live renderer updated${stagedSuffix}.`);
     return;
   }
-  reloadForGraphicsRuntime();
+  if (pendingRendererReload) reloadForGraphicsRuntime();
 }
 
 const advancedGraphicsBinding = bindAdvancedGraphicsControls(document, pass65Settings.graphics, () => {
@@ -23072,28 +23696,117 @@ graphicsProfileInput.addEventListener('change', () => {
 });
 
 /**
- * Apply the presentation-side effects budget AND every renderer setting that
- * can be changed without device recreation the moment SAVE is pressed, so a
- * graphics change is visible immediately mid-match. The full renderer rebuild
- * (MSAA, antialias, render scale) still happens at the next menu boundary —
- * that part requires the page reload — but resolution cap, shadows, bloom and
- * effects density now respond at once instead of looking dead until redeploy.
+ * Apply every renderer value backed by a mutable runtime owner. Only principal
+ * target multisampling, authored representation and an AO MRT topology change
+ * remain staged because those require graph/arena reconstruction.
  */
-function applyLiveGraphicsEffects(): void {
-  if (!applyPresentationEffectsBudget) return;
-  const live = resolveGraphicsRuntime(pass65Settings.graphics, renderRuntime.backend === 'webgl2');
-  applyPresentationEffectsBudget(applyGraphicsPreferenceBudget(
-    graphicsEffectsBudget(live.renderProfile, adaptiveQuality.telemetry().pixelRatioCap),
-  ));
-  // Re-anchor the adaptive pixel-ratio cap to the saved profile so resolution
-  // scaling responds immediately (the controller re-samples from here).
-  const savedCap = live.renderProfile === 'compat' ? 0.2 : live.renderProfile === 'performance' ? 0.75 : 1;
-  adaptiveQuality.seedPixelRatioCap(savedCap, 'graphics-save-live');
-  // Shadow toggling is backend-safe and applies without a rebuild. Max and
-  // Quality both resolve to the Blender render profile; Performance and
-  // Compatibility run without shadow maps.
-  renderRuntime.setShadowsEnabled(live.renderProfile === 'blender');
+function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
+  // WebGL2 is a backend, not the Compatibility profile. Only an explicit
+  // render=compat route is allowed to force the compatibility budget.
+  const live = resolveGraphicsRuntime(pass65Settings.graphics, queryRenderProfile === 'compat');
+  const desiredProfile = resolveRenderProfile(
+    explicitRenderQuery ? window.location.search : '',
+    queryRenderProfile ?? live.renderProfile,
+  );
+  const desiredConfig = resolveActiveGraphicsConfig(live, desiredProfile, queryRenderProfile);
+  const staged: string[] = [];
+  if (live.antialiasSamples !== rendererConstructionGraphics.antialiasSamples) staged.push('antiAliasing');
+  if (desiredConfig.representation !== rendererConstructionGraphics.representation) staged.push('geometryDetail');
+  if (live.ambientOcclusion.enabled !== rendererConstructionGraphics.ambientOcclusionEnabled) {
+    staged.push('ambientOcclusionTopology');
+  }
+
+  graphicsRuntime = live;
+  liveGraphicsProfile = desiredProfile;
+  displayedGraphicsPreset = resolveDisplayedGraphicsPreset(pass65Settings.graphics.preset, queryRenderProfile);
+  // Preserve topology/representation fields from renderer construction while
+  // adopting every field whose owner is mutable in the active runtime.
+  activeRenderConfig = Object.freeze({
+    ...activeRenderConfig,
+    pixelRatioCap: desiredConfig.pixelRatioCap,
+    shadows: desiredConfig.shadows,
+    shadowMapSize: desiredConfig.shadowMapSize,
+    shadowMode: desiredConfig.shadowMode,
+  });
+  stagedGraphicsReconstruction = Object.freeze(staged);
+  liveGraphicsAppliedAt = performance.now();
+
+  adaptiveQuality = createAdaptiveQualityController();
+  const pixelRatioCap = adaptiveQuality.telemetry().pixelRatioCap;
+  renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
+  applyViewportSize();
+  activeLighting = rustworksLightingTint(
+    arenaLightingProfile(desiredProfile, selectedArena.id),
+    desiredProfile,
+    selectedArena.id,
+  );
+  renderRuntime.configureOutput(effectiveGraphicsExposure(activeLighting.exposure), live.post.toneMapping);
+
+  hemisphereLight.intensity = activeLighting.hemisphereIntensity * live.indirectLightScale;
+  ambientLight.intensity = activeLighting.ambientIntensity * live.indirectLightScale;
+  fillLight.intensity = activeLighting.fillIntensity * live.indirectLightScale;
+  const shadowsEnabled = adaptiveShadowsEnabled(desiredProfile, desiredConfig.shadows, pixelRatioCap)
+    && (activeArenaVisualDefinition?.shadows.enabled ?? true);
+  const priorShadowMapSize = sunLight.shadow.mapSize.width;
+  sunLight.castShadow = shadowsEnabled;
+  sunLight.shadow.mapSize.set(desiredConfig.shadowMapSize, desiredConfig.shadowMapSize);
+  if (sunLight.shadow.map && priorShadowMapSize !== desiredConfig.shadowMapSize) {
+    sunLight.shadow.map.dispose();
+    sunLight.shadow.map = null;
+  }
+  renderRuntime.configureShadows({
+    enabled: shadowsEnabled,
+    type: webGlShadowMapType,
+    autoUpdate: desiredConfig.shadowMode === 'dynamic',
+    needsUpdate: shadowsEnabled,
+  });
+  renderRuntime.configureLightShadows(scene, desiredConfig.shadowMode === 'dynamic', shadowsEnabled);
+
+  // The profile and environment budget are one live transaction. Applying
+  // material reflection using the construction-time budget for even one frame
+  // makes the UI claim Performance while Quality reflections are still live.
+  const effectsBudget = applyGraphicsPreferenceBudget(graphicsEffectsBudget(desiredProfile, pixelRatioCap));
+  graphicsRefinement.setBudget(effectsBudget);
+  graphicsRefinement.setRuntimeConfiguration(
+    desiredProfile,
+    live.maximumAnisotropy,
+    live.reflectionScale,
+    maximumAnisotropy,
+  );
+  smokeVolumePresentationPool.setQualityScale(live.smokeScale);
+  grassSystem?.setAdaptivePixelRatio(pixelRatioCap);
+  atmosphereSystem?.setProfile(desiredProfile);
+  waterSystem.configure(selectedArena.id, desiredProfile, {
+    halfX: Math.max(Math.abs(arena.bounds.minX), Math.abs(arena.bounds.maxX)),
+    halfZ: Math.max(Math.abs(arena.bounds.minZ), Math.abs(arena.bounds.maxZ)),
+  }, {
+    night: selectedArena.id === 'rustworks-1v1',
+    waterLevel: selectedArena.id === 'rustworks-1v1' ? -19.5 : -0.55,
+  });
+  pass64TslSystems?.applyGraphics({
+    principalSamples: Math.max(1, pass64TslSystems.principalHdrTarget.samples) as 1 | 2 | 4,
+    volumetricScale: live.volumetricScale,
+    ambientOcclusion: live.ambientOcclusion,
+    post: live.post,
+    oceanWaveAmplitude: rustworksOceanAmplitude(desiredProfile),
+  });
+  // Rebind the complete retained arena presentation after the profile state is
+  // committed. Updating only the three ambient intensities leaves the real
+  // sun, sky uniforms, fog, water and refinement owners on the prior preset
+  // while telemetry claims the new one.
+  applyArenaFogProfile();
+  applyArenaLightingForSelection();
+  applyAdaptiveRenderBudget(pixelRatioCap);
   graphicsRefinement.refreshSelectiveBloom(scene);
+  document.documentElement.dataset.graphicsPreset = displayedGraphicsPreset;
+  document.documentElement.dataset.graphicsLiveProfile = desiredProfile;
+  document.documentElement.dataset.graphicsFrameRateLimit = live.frameRateLimit === 0 ? 'uncapped' : String(live.frameRateLimit);
+  document.documentElement.dataset.graphicsToneMapping = live.post.toneMapping;
+  document.documentElement.dataset.graphicsStaged = staged.join(',');
+  document.documentElement.classList.toggle('compat-render', desiredProfile === 'compat');
+  document.documentElement.classList.toggle('performance-render', desiredProfile === 'performance');
+  document.documentElement.classList.toggle('blender-render', desiredProfile === 'blender');
+  return Object.freeze({ profile: desiredProfile, pixelRatioCap, staged: Object.freeze(staged) });
 }
 
 graphicsSaveButton.addEventListener('click', () => {
@@ -23103,12 +23816,10 @@ graphicsSaveButton.addEventListener('click', () => {
     setStatus('Graphics already saved · no pending changes.');
     return;
   }
-  applyLiveGraphicsEffects();
-  if (gameStarted) {
-    setStatus('GRAPHICS SAVED · resolution, shadows, bloom and effects applied now · full renderer rebuild on menu return.');
-  } else {
-    setStatus('GRAPHICS SAVED · applying renderer settings.');
-  }
+  const staged = lastLiveGraphicsApply?.staged ?? [];
+  setStatus(staged.length > 0
+    ? `GRAPHICS SAVED · live values applied · ${staged.join(', ')} staged for renderer reconstruction.`
+    : 'GRAPHICS SAVED · all selected values are live.');
 });
 
 for (const id of AUDIO_BUS_IDS) {
@@ -23730,7 +24441,7 @@ function setArenaPresentationVisibility(): void {
   }
   atmosphereSystem?.setArena(selectedArena.id);
   if (atmosphereSystem) atmosphereSystem.root.visible = atmosphereSystem.telemetry().enabled;
-  waterSystem.configure(selectedArena.id, renderProfile, {
+  waterSystem.configure(selectedArena.id, liveGraphicsProfile, {
     halfX: Math.max(Math.abs(arena.bounds.minX), Math.abs(arena.bounds.maxX)),
     halfZ: Math.max(Math.abs(arena.bounds.minZ), Math.abs(arena.bounds.maxZ)),
   }, { night: selectedArena.id === 'rustworks-1v1', waterLevel: selectedArena.id === 'rustworks-1v1' ? -19.5 : -0.55 });
@@ -23752,8 +24463,8 @@ function setArenaPresentationVisibility(): void {
 
 function applyArenaLightingForSelection(): void {
   activeLighting = rustworksLightingTint(
-    arenaLightingProfile(renderProfile, selectedArena.id),
-    renderProfile,
+    arenaLightingProfile(liveGraphicsProfile, selectedArena.id),
+    liveGraphicsProfile,
     selectedArena.id,
   );
   const lighting = activeLighting;
@@ -23790,7 +24501,7 @@ function applyArenaLightingForSelection(): void {
     sunLight.position.set(...lighting.sunPosition);
     sunLight.shadow.radius = lighting.softShadows ? 2.2 : 1;
     const shadowsEnabled = adaptiveShadowsEnabled(
-      renderProfile,
+      liveGraphicsProfile,
       activeRenderConfig.shadows && (definition?.shadows.enabled ?? true),
       adaptiveQuality.telemetry().pixelRatioCap,
     );
@@ -23820,6 +24531,7 @@ function applyArenaLightingForSelection(): void {
     fillLight.intensity = lighting.fillIntensity * graphicsRuntime.indirectLightScale;
     fillLight.position.set(...lighting.fillPosition);
   }
+  arenaContrastLighting.setProfile(liveGraphicsProfile);
   if (definition) arenaContrastLighting.applyDefinition(definition);
   if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
 }
@@ -23966,6 +24678,13 @@ async function performArenaSelection(
     setBootstrapStage('batching-static-meshes');
     batchSelectedArenaPresentation();
     setArenaPresentationVisibility();
+    const collisionRouteAuthority = currentAtomicCollisionRouteAuthority();
+    if (collisionRouteAuthority) {
+      atomicCollisionRouteAuthority = collisionRouteAuthority.report;
+      assertPass73CollisionRouteAuthority(atomicCollisionRouteAuthority);
+    } else {
+      atomicCollisionRouteAuthority = null;
+    }
     profileArenaTransition('match-authority-reset');
     matchState = createMatch(performance.now(), selectedArena.matchRules);
     lastPlayerSpawnIndex = -1;
@@ -24221,6 +24940,9 @@ function resetForMode(preserveAdmission = false): void {
   lastHostedBotStateSeq = -1;
   clearGrenades();
   clearGrenadeExplosionVisuals();
+  grenadeActionProfileSequence = 0;
+  lastGrenadeFirstActionProfile = null;
+  grenadeFirstActionProfiles.length = 0;
   clearFieldSupport();
   clearDeathDrops();
   clearCorpsePresentations();
@@ -24571,7 +25293,9 @@ window.addEventListener('pagehide', () => {
   persistRoomIdentityForCloseTabRejoin();
   matchDiagnosticUploader.flushForPageLifecycle();
 });
+let gameplayRuntimeDisposing = false;
 window.addEventListener('beforeunload', () => {
+  gameplayRuntimeDisposing = true;
   persistActiveHostMatchCheckpoint(true);
   persistRoomIdentityForCloseTabRejoin();
   matchDiagnosticUploader.flushForPageLifecycle();
@@ -24796,6 +25520,9 @@ function reportRuntimeError(context: string, error: unknown): void {
 }
 
 function frame(now: number, scheduleNext = true): void {
+  // A pending rAF can run after beforeunload has begun. Never touch renderer
+  // resources once page-exit teardown has started, and do not reschedule it.
+  if (gameplayRuntimeDisposing) return;
   const schedulingDecision = reconcilePresentationScheduling('animation frame eligibility');
   if (schedulingDecision.mode !== 'foreground-presentation') {
     // The prerecorded menu/loading media owns its own browser compositor path.
@@ -24835,6 +25562,10 @@ function frame(now: number, scheduleNext = true): void {
     lastPresentedFrameAt = advancePresentationFrameAnchor(now, lastPresentedFrameAt, graphicsRuntime.frameRateLimit);
   }
   const frameWorkStartedAt = performance.now();
+  const profileGrenadeFrame = lastGrenadeFirstActionProfile !== null
+    && !lastGrenadeFirstActionProfile.observationComplete;
+  let grenadeUpdateWorkMs = 0;
+  let renderSubmitWorkMs = 0;
   frameCount += 1;
   try {
     const rawFrameMs = Math.max(0, now - lastFrame);
@@ -24898,7 +25629,9 @@ function frame(now: number, scheduleNext = true): void {
     const visualNow = debugCaptureFixedVisualTimeMs ?? now;
     updateTargets(visualNow);
     updateBots(frameDt, now);
+    const grenadeUpdateStartedAt = profileGrenadeFrame ? performance.now() : 0;
     updateGrenades(frameDt, now);
+    if (profileGrenadeFrame) grenadeUpdateWorkMs = performance.now() - grenadeUpdateStartedAt;
     updateExplosiveBolts(frameDt, now);
     updateFlareProjectiles(frameDt, now);
     flamethrowerStreamPresentation.update(frameDt);
@@ -24992,11 +25725,18 @@ function frame(now: number, scheduleNext = true): void {
     if (rendererFrameEligible && !debugRenderPaused && !renderSubmissionPaused && !webglContextLost
       && document.visibilityState === 'visible' && document.hasFocus()) {
       let frameSubmitted = false;
+      const renderSubmitStartedAt = profileGrenadeFrame ? performance.now() : 0;
       try {
         if (renderRuntime.backend === 'webgpu') {
           const submissionMode: WebGpuSubmissionMode = gameStarted && matchState.phase === 'active'
             && menuLifecycle.surface === 'hidden' && arenaSelectionReady && !renderSubmissionPaused
-            ? 'warmed-live'
+            ? profileGrenadeFrame && lastGrenadeFirstActionProfile?.firstPresentedGameplayFrame === null
+              // Admit exactly one additional already-warmed frame so a grenade
+              // input cannot be hidden behind the normal two-frame queue cap.
+              // The action profile is marked presented below and every later
+              // frame immediately returns to the regular warmed-live budget.
+              ? 'input-response'
+              : 'warmed-live'
             : 'serialized';
           frameSubmitted = submitWebGpuFrame(now, false, submissionMode);
         } else {
@@ -25004,6 +25744,7 @@ function frame(now: number, scheduleNext = true): void {
           frameSubmitted = true;
         }
       } finally {
+        if (profileGrenadeFrame) renderSubmitWorkMs = performance.now() - renderSubmitStartedAt;
         debugRiggedEvidenceMainCameraDrawSession?.restorePrincipalWritesAfterRenderCall();
       }
       if (frameSubmitted && gameStarted && menuLifecycle.surface === 'hidden') {
@@ -25019,7 +25760,14 @@ function frame(now: number, scheduleNext = true): void {
       if (activeRenderConfig.shadowMode === 'static') requestStaticShadowRefresh(false);
     }
     if (scheduleNext) {
-      recentFrameWorkMs.push(Math.max(0, performance.now() - frameWorkStartedAt));
+      const frameWorkMs = Math.max(0, performance.now() - frameWorkStartedAt);
+      recentFrameWorkMs.push(frameWorkMs);
+      sampleGrenadeFirstActionProfile(
+        performance.now(),
+        frameWorkMs,
+        grenadeUpdateWorkMs,
+        renderSubmitWorkMs,
+      );
       if (recentFrameWorkMs.length > FRAME_WORK_SAMPLE_LIMIT) {
         recentFrameWorkMs.splice(0, recentFrameWorkMs.length - FRAME_WORK_SAMPLE_LIMIT);
       }
@@ -25051,20 +25799,50 @@ function activePostTelemetry(): Record<string, unknown> {
   return {
     enabled: true,
     profile: renderProfile,
+    liveProfile: liveGraphicsProfile,
     owner: 'pass64-webgpu-tsl',
     fallbackReason: null,
     bypassReason: null,
     samples: frameCount,
-    canvasAntialias: graphicsRuntime.antialiasSamples > 0,
-    canvasSamples: Math.max(1, graphicsRuntime.antialiasSamples),
+    canvasAntialias: rendererConstructionGraphics.antialiasSamples > 0,
+    canvasSamples: Math.max(1, rendererConstructionGraphics.antialiasSamples),
     principalHdrSamples: target?.samples ?? 0,
     bloomSamples: pass64TslSystems?.bloomSamples ?? 0,
-    targetValidated: target?.samples === Math.max(1, graphicsRuntime.antialiasSamples),
+    targetValidated: target?.samples === Math.max(1, rendererConstructionGraphics.antialiasSamples),
     outputValidated: pass64TslSystems?.depthAwareBloom === true,
     depthAwareBloom: pass64TslSystems?.depthAwareBloom === true,
     bloomGraphId: pass64TslSystems?.bloomGraphId ?? null,
     bloomOcclusionSource: pass64TslSystems?.bloomOcclusionSource ?? null,
     advancedGraphics: pass64TslSystems?.root.userData.pass65AdvancedGraphics ?? null,
+  };
+}
+
+function activeAtmosphereTelemetry(): Record<string, unknown> {
+  if (atmosphereSystem) return atmosphereSystem.telemetry();
+  const advanced = pass64TslSystems?.root.userData.pass65AdvancedGraphics as {
+    volumetricActual?: {
+      scale?: number;
+      mistOpacity?: number;
+      mistLayers?: number;
+      smokeOpacity?: number;
+      smokeLayers?: number;
+      dustOpacity?: number;
+      dustMotes?: number;
+    };
+  } | undefined;
+  const actual = advanced?.volumetricActual;
+  return {
+    enabled: pass64TslSystems !== null,
+    owner: 'pass64.atmosphere.tsl',
+    profile: liveGraphicsProfile,
+    arenaId: selectedArena.id,
+    densityScale: Number(actual?.scale ?? 0),
+    mistCards: Number(actual?.mistLayers ?? 0),
+    smokeCards: Number(actual?.smokeLayers ?? 0),
+    dustMotes: Number(actual?.dustMotes ?? 0),
+    mistOpacity: Number(actual?.mistOpacity ?? 0),
+    smokeOpacity: Number(actual?.smokeOpacity ?? 0),
+    dustOpacity: Number(actual?.dustOpacity ?? 0),
   };
 }
 
@@ -25529,7 +26307,7 @@ function sampleDmrThermalReadiness() {
     adsProgress: weaponView.adsProgress(),
     cameraFov: camera.fov,
     expectedFov: magnifiedFovDegrees(preferredFov, DMR_THERMAL_MAGNIFICATION),
-    exactOperatorReveal: thermalGhostPresentation.telemetry(),
+    exactOperatorReveal: thermalGhostPresentation.telemetry(true),
   });
 }
 
@@ -25537,6 +26315,18 @@ function sampleWeaponActionReadiness() {
   const now = performance.now();
   return Object.freeze({
     weapon: player.weapon,
+    ammo: player.ammo[player.weapon],
+    alive: player.alive,
+    gameplayActive: gameStarted && matchState.phase === 'active',
+    pointerLock: document.pointerLockElement === canvas,
+    textChatTyping: isTextChatTyping(),
+    triggerHeld,
+    reloadActive: player.reloadState !== null,
+    supportTargeting: pointSupportTargeting !== null && !tacticalMapOpen,
+    possessed: localKillstreakActorSnapshot()?.possession?.kind ?? null,
+    stanceRecoveryRemainingMs: Math.max(0, stanceRecoveryUntil - now),
+    sprintRecoveryRemainingMs: Math.max(0, sprintRecoveryUntil - now),
+    nextShotRemainingMs: Math.max(0, player.nextShotAt - now),
     switchingReady: now >= player.switchingUntil,
     switchingRemainingMs: Math.max(0, player.switchingUntil - now),
     configuredSpinUpMs: WEAPONS[player.weapon].spinUpMs ?? 0,
@@ -25547,7 +26337,280 @@ function sampleWeaponActionReadiness() {
   });
 }
 
+function copyGrenadeFirstActionProfile(profile: GrenadeFirstActionProfile | null) {
+  return profile ? Object.freeze({
+    ...profile,
+    audio: Object.freeze({ ...profile.audio }),
+    pool: Object.freeze({ ...profile.pool }),
+    animation: Object.freeze({ ...profile.animation }),
+    physics: Object.freeze({ ...profile.physics }),
+    frameGapsMs: Object.freeze([...profile.frameGapsMs]),
+  }) : null;
+}
+
+/**
+ * Narrow, allocation-bounded evidence for the measured grenade action frame.
+ * A complete debug snapshot walks every operator, collider and presentation
+ * surface and can itself create a Long Task. Performance probes must use this
+ * seam so their observation does not manufacture the hitch they are testing.
+ */
+function sampleGrenadeColdPathTelemetry() {
+  const runtime = activeRuntimeTelemetry();
+  const pool = grenadeWorldPresentationPool.telemetry();
+  const grenadeAudio = audio.telemetry().grenadeEffectsPrewarm;
+  const explosion = grenadeExplosionPresentation.telemetry();
+  const effectPrewarm = lastArenaEffectPrewarmProfile;
+  const worldOrdnance = effectPrewarm?.groups.find(({ name }) => name === 'world-ordnance') ?? null;
+  return Object.freeze({
+    sampledAtMs: performance.now(),
+    audio: Object.freeze({ ...grenadeAudio }),
+    pool: Object.freeze({ ...pool }),
+    explosion: Object.freeze({
+      total: grenadeExplosions,
+      active: explosion.active,
+      capacity: explosion.capacity,
+      prewarmed: explosion.prewarmed,
+      lastExplosionAgeMs: lastGrenadeExplosionFrameAt > 0
+        ? Math.max(0, performance.now() - lastGrenadeExplosionFrameAt)
+        : null,
+    }),
+    prewarm: Object.freeze({
+      sceneGeneration: effectPrewarm?.sceneGeneration ?? null,
+      worldOrdnance: worldOrdnance ? Object.freeze({ ...worldOrdnance }) : null,
+    }),
+    render: Object.freeze({
+      requestedBackend: runtime.requestedBackend,
+      actualBackend: runtime.actualBackend,
+      initialized: runtime.initialized,
+      failClosed: runtime.failClosed,
+      adapterLabel: runtime.adapterLabel,
+      adapterClass: runtime.adapterClass,
+      deviceClass: runtime.deviceClass,
+      softwareAdapter: runtime.softwareAdapter,
+      deviceLost: runtime.deviceLost,
+      uncapturedErrors: runtime.uncapturedErrors,
+      lastUncapturedError: runtime.lastUncapturedError,
+      slowNodeBuilds: Object.freeze([...(runtime.slowNodeBuilds ?? [])].map((entry) => Object.freeze({ ...entry }))),
+      compiledPipelineIds: Object.freeze([...(pass64TslSystems?.compiledPipelineIds ?? [])]),
+      presentation: Object.freeze({ ...runtime.presentation }),
+    }),
+    action: copyGrenadeFirstActionProfile(lastGrenadeFirstActionProfile),
+  });
+}
+
 type DebugPlayerPose = Readonly<{ yaw: number; pitch: number }>;
+
+const pass73AdsRevealNormalVisibility = new Map<string, Array<Readonly<{
+  mesh: THREE.Mesh;
+  visible: boolean;
+}>>>();
+let pass73AdsRevealCaptureFrozenTargetId: string | null = null;
+
+function pass73AdsRevealSourceBodyMeshes(root: THREE.Object3D): THREE.Mesh[] {
+  const visual = root.getObjectByName('rigged-operator-visual') ?? root;
+  const candidates: THREE.Mesh[] = [];
+  const skinned: THREE.SkinnedMesh[] = [];
+  const pending = [visual];
+  while (pending.length > 0) {
+    const node = pending.pop()!;
+    pending.push(...node.children);
+    if (!(node instanceof THREE.Mesh) || node.userData.thermalGhost === true || node instanceof THREE.InstancedMesh) continue;
+    candidates.push(node);
+    if (node instanceof THREE.SkinnedMesh) skinned.push(node);
+  }
+  return visual !== root && skinned.length > 0 ? skinned : candidates;
+}
+
+function setPass73AdsRevealNormalBodyHidden(targetId: string, hidden: boolean): boolean {
+  const root = bots.get(targetId)?.root ?? remotes.get(targetId)?.root;
+  if (!root) return false;
+  if (hidden) {
+    if (pass73AdsRevealNormalVisibility.has(targetId)) return true;
+    const records = pass73AdsRevealSourceBodyMeshes(root).map((mesh) => Object.freeze({ mesh, visible: mesh.visible }));
+    if (records.length === 0) return false;
+    pass73AdsRevealNormalVisibility.set(targetId, records);
+    for (const record of records) record.mesh.visible = false;
+    return true;
+  }
+  const records = pass73AdsRevealNormalVisibility.get(targetId);
+  if (!records) return true;
+  for (const record of records) record.mesh.visible = record.visible;
+  pass73AdsRevealNormalVisibility.delete(targetId);
+  return true;
+}
+
+function samplePass73AdsRevealTarget(targetId: string) {
+  const bot = bots.get(targetId);
+  const remote = remotes.get(targetId);
+  const root = bot?.root ?? remote?.root;
+  if (!root) return null;
+  const team = bot?.team ?? remote!.snapshot.team;
+  const lifeId = bot?.deaths ?? remote!.snapshot.deaths;
+  const continuityId = bot?.continuity ?? remote!.continuity;
+  const position = bot?.position ?? remote!.target;
+  const target = position.clone().add(new THREE.Vector3(0, 1.05, 0));
+  const blockers = activeWorldColliders().filter((box) => segmentIntersectsBox(camera.position, target, box));
+  const targetNdc = target.clone().project(camera);
+  const normalBodyMeshes = pass73AdsRevealSourceBodyMeshes(root);
+  const reveal = thermalGhostPresentation.telemetry(true);
+  return Object.freeze({
+    contract: 'pass73-native-ads-reveal-staged-target-v1' as const,
+    id: targetId,
+    kind: bot ? 'bot' as const : 'player' as const,
+    team,
+    hostile: team !== player.team,
+    alive: bot ? bot.alive : remote!.snapshot.hp > 0,
+    lifeId,
+    continuityId,
+    position: Object.freeze(position.toArray()),
+    sourceRootUuid: root.uuid,
+    sourceRootAttached: root.parent !== null,
+    normalBodyLayers: normalBodyMeshes.length,
+    normalBodyHidden: pass73AdsRevealNormalVisibility.has(targetId),
+    targetNdc: Object.freeze(targetNdc.toArray()),
+    blockerCount: blockers.length,
+    blockers: Object.freeze(blockers.map((box) => Object.freeze({
+      minX: box.minX,
+      maxX: box.maxX,
+      minY: box.minY ?? null,
+      maxY: box.maxY ?? null,
+      minZ: box.minZ,
+      maxZ: box.maxZ,
+      rotation: box.rotation ? Object.freeze([...box.rotation]) : null,
+    }))),
+    animatedPose: Object.freeze({
+      stance: debugBotStanceOverride ?? 'stand',
+      speed: debugBotSpeedOverride,
+    }),
+    revealTarget: reveal.targets?.find(({ id }) => id === targetId) ?? null,
+  });
+}
+
+function stagePass73NativeAdsRevealTarget() {
+  if (selectedArena.id !== 'atomic-acres' || gameMode !== 'solo' || matchState.phase !== 'active') return null;
+  const bot = bots.values().next().value as BotPlayer | undefined;
+  const api = debugWindow.__ATOMIC_ACRES_DEBUG__;
+  if (!bot || !api) return null;
+  for (const other of bots.values()) {
+    if (other === bot) continue;
+    other.hp = 0;
+    other.alive = false;
+    other.respawnAt = Number.POSITIVE_INFINITY;
+    other.root.visible = false;
+  }
+  setPass73AdsRevealNormalBodyHidden(bot.id, false);
+  bot.team = player.team === 0 ? 1 : 0;
+  bot.hp = 100;
+  bot.alive = true;
+  bot.root.visible = true;
+  bot.invulnerableUntil = performance.now() + 60_000;
+  const haze = bot.root.getObjectByName('neon-purple-bot-haze');
+  if (haze) haze.visible = false;
+  api.teleportPlayer(-9, 1.7, -12.5, 0, 0);
+  api.placeBotRelative(0, 9);
+  api.setBotPresentation('stand', 2.4, 'carbine');
+  api.aimAtBot('body');
+  bot.root.updateWorldMatrix(true, true);
+  camera.updateWorldMatrix(true, false);
+  const sample = samplePass73AdsRevealTarget(bot.id);
+  return sample?.hostile === true && sample.alive === true && sample.blockerCount > 0
+    ? sample
+    : null;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
+
+async function readbackPass73NativeAdsRevealRoi() {
+  if (renderRuntime.backend !== 'webgpu' || !pass64TslSystems) {
+    throw new Error('Pass 73 ADS reveal ROI requires native WebGPU');
+  }
+  const previousRenderPaused = debugRenderPaused;
+  debugRenderPaused = true;
+  try {
+    await flushWebGpuFrames(8_000);
+    await submitForegroundWebGpuFrame();
+    await flushWebGpuFrames(8_000);
+    const target = pass64TslSystems.principalHdrTarget;
+    const region = pass73AdsRevealReadbackRegion(target.width, target.height);
+    const pixels = await renderRuntime.readRenderTargetPixels(
+      target,
+      region.x,
+      region.y,
+      region.width,
+      region.height,
+    );
+    const quantized = quantizePass73AdsRevealReadback(pixels, region.width * region.height);
+    let hash = 0x811c9dc5;
+    for (const byte of quantized.rgba8) {
+      hash ^= byte;
+      hash = Math.imul(hash, 0x01000193);
+    }
+    return Object.freeze({
+      contract: 'pass73-native-ads-reveal-hdr-roi-v1' as const,
+      ...region,
+      bytes: quantized.rgba8.byteLength,
+      componentType: quantized.componentType,
+      channels: quantized.channels,
+      nonFiniteComponents: quantized.nonFiniteComponents,
+      hash: (hash >>> 0).toString(16).padStart(8, '0'),
+      controls: Object.freeze({
+        viewmodelHidden: debugCaptureViewmodelHidden,
+        targetPoseFrozen: pass73AdsRevealCaptureFrozenTargetId !== null,
+      }),
+      rgba8Base64: bytesToBase64(quantized.rgba8),
+      render: Object.freeze({ ...activeRuntimeTelemetry() }),
+    });
+  } finally {
+    debugRenderPaused = previousRenderPaused;
+  }
+}
+
+async function capturePass73NativeAdsRevealRoiTriplet(targetId: string) {
+  if (!bots.has(targetId) && !remotes.has(targetId)) {
+    throw new Error(`Pass 73 ADS reveal target ${targetId} is no longer current`);
+  }
+  const previousRenderPaused = debugRenderPaused;
+  const previousFrozenTargetId = pass73AdsRevealCaptureFrozenTargetId;
+  const previousViewmodelHidden = debugCaptureViewmodelHidden;
+  debugRenderPaused = true;
+  pass73AdsRevealCaptureFrozenTargetId = targetId;
+  // The paired raster measures only the through-wall target. A normal hip-fire
+  // viewmodel occupies the upper-right of this centred ROI and GPU edge
+  // quantization between forced submissions otherwise masquerades as a body
+  // leak even though the occluded world pixels are byte-identical.
+  debugCaptureViewmodelHidden = true;
+  weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
+  try {
+    setPass73AdsRevealNormalBodyHidden(targetId, false);
+    if (!thermalGhostPresentation.setEvidenceControlHidden(false)) {
+      throw new Error('Pass 73 ADS reveal shown control was not admitted');
+    }
+    const revealShown = await readbackPass73NativeAdsRevealRoi();
+    if (!thermalGhostPresentation.setEvidenceControlHidden(true)) {
+      throw new Error('Pass 73 ADS reveal suppressed control was not admitted');
+    }
+    const revealSuppressed = await readbackPass73NativeAdsRevealRoi();
+    if (!setPass73AdsRevealNormalBodyHidden(targetId, true)) {
+      throw new Error('Pass 73 ADS reveal normal-body hidden control was not admitted');
+    }
+    const normalHidden = await readbackPass73NativeAdsRevealRoi();
+    return Object.freeze({ revealShown, revealSuppressed, normalHidden });
+  } finally {
+    setPass73AdsRevealNormalBodyHidden(targetId, false);
+    thermalGhostPresentation.setEvidenceControlHidden(false);
+    pass73AdsRevealCaptureFrozenTargetId = previousFrozenTargetId;
+    debugCaptureViewmodelHidden = previousViewmodelHidden;
+    weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
+    debugRenderPaused = previousRenderPaused;
+  }
+}
 
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
@@ -25560,6 +26623,7 @@ const debugWindow = window as Window & {
     sampleWeaponAssetCache: () => ReturnType<typeof pass65WeaponCacheTelemetry>;
     sampleDmrThermalReadiness: () => ReturnType<typeof sampleDmrThermalReadiness>;
     sampleWeaponActionReadiness: () => ReturnType<typeof sampleWeaponActionReadiness>;
+    sampleGrenadeColdPathTelemetry: () => ReturnType<typeof sampleGrenadeColdPathTelemetry>;
     traceBallistics: (
       weapon: WeaponId,
       origin: [number, number, number],
@@ -25620,6 +26684,25 @@ const debugWindow = window as Window & {
     aimAtRemoteWithOffset: (yawOffset: number, pitchOffset?: number) => void;
     stageWindow: (index: number, distance?: number) => void;
     detonateGrenadeAtWindow: (index: number) => number;
+    detonateCrossbowNearWindow: (index: number, distance?: number) => {
+      windowId: string;
+      beforeBroken: boolean;
+      afterBroken: boolean;
+      detonationPoint: number[];
+      radiusM: number;
+    } | null;
+    inspectCrossbowBlastWindows: (
+      point: [number, number, number],
+      impactWindowId?: string | null,
+      radiusM?: number,
+    ) => Array<{
+      windowId: string;
+      revision: number;
+      phase: string;
+      distanceM: number;
+      inRadius: boolean;
+      pathBlocked: boolean;
+    }>;
     stageYardhawkWall: (team?: Team) => boolean;
     stageBotAtIndoorRamp: (team?: Team, descending?: boolean) => boolean;
     damageBot: (amount: number, zone?: HitZone) => void;
@@ -25701,9 +26784,22 @@ const debugWindow = window as Window & {
     ) => Record<string, unknown>;
     setPass64SystemVisibility: (name: 'sky' | 'mist' | 'smoke' | 'dust' | 'grass' | 'water', visible: boolean) => boolean;
     setCaptureViewmodelHidden: (hidden: boolean) => void;
+    setArmEvidenceCapture: (mode: 'background' | 'left' | 'right' | null) => boolean;
+    setThermalRevealEvidenceHidden: (hidden: boolean) => boolean;
+    stagePass73NativeAdsRevealTarget: () => ReturnType<typeof stagePass73NativeAdsRevealTarget>;
+    samplePass73AdsRevealTarget: (targetId: string) => ReturnType<typeof samplePass73AdsRevealTarget>;
+    setPass73AdsRevealNormalBodyHidden: (targetId: string, hidden: boolean) => boolean;
+    readbackPass73NativeAdsRevealRoi: () => ReturnType<typeof readbackPass73NativeAdsRevealRoi>;
+    capturePass73NativeAdsRevealRoiTriplet: (
+      targetId: string,
+    ) => ReturnType<typeof capturePass73NativeAdsRevealRoiTriplet>;
     stageLoadingCaptureSquad: () => { staged: boolean; characters: number; positions: number[][] };
     collisionProbe: (x: number, z: number) => boolean;
     collisionProbeAt: (x: number, y: number, z: number) => boolean;
+    collisionRouteAuthority: () => Readonly<{
+      report: Pass73CollisionRouteAuthorityReport;
+      fixtures: readonly Pass73CollisionRouteFixture[];
+    }> | null;
     segmentBlocked: (x1: number, z1: number, x2: number, z2: number) => boolean;
     selectTriPassWorldTargets: (points: [number, number][]) => boolean;
     captureShadowProbeFrame: (horizontalOffset: number) => string;
@@ -25723,6 +26819,8 @@ const debugWindow = window as Window & {
     replayLastFlashResult: (targetId: string) => boolean;
     sendForgedFlashResult: () => boolean;
     throwGrenade: () => void;
+    triggerGrenadePresentationCapture: () => void;
+    setMobileControlsForViewportCapture: (enabled: boolean) => void;
     switchWeapon: (index: number) => void;
     equipKit: (id: FieldKitId) => void;
     equipWeapon: (weapon: WeaponId) => void;
@@ -25737,6 +26835,7 @@ const debugWindow = window as Window & {
     sendRawChat: (text: string, claimedBy?: string) => boolean;
     setMeleeCaptureProgress: (progress: number | null) => void;
     setFireCaptureAgeMs: (ageMs: number | null) => void;
+    setGrenadeCaptureProgress: (progress: number | null) => void;
     setReloadCaptureProgress: (progress: number | null) => void;
     setGrassTime: (timeSeconds: number | null) => void;
     setGrassInteractionProbe: (x: number | null, z: number | null) => void;
@@ -26504,6 +27603,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleWeaponAssetCache: () => pass65WeaponCacheTelemetry(),
   sampleDmrThermalReadiness,
   sampleWeaponActionReadiness,
+  sampleGrenadeColdPathTelemetry,
   snapshot: () => ({
     bootstrap: {
       stage: bootstrapStage,
@@ -26664,7 +27764,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     },
     dmrThermal: {
       ...dmrThermalPresentation.telemetry(),
-      exactOperatorReveal: thermalGhostPresentation.telemetry(),
+      exactOperatorReveal: thermalGhostPresentation.telemetry(true),
       weapon: player.weapon,
       magnification: DMR_THERMAL_MAGNIFICATION,
       cameraFov: camera.fov,
@@ -27003,6 +28103,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         recentResolutions: [...recentShotResolutionTraces],
         rewindCeilingMs: MAX_AUTHORITATIVE_REWIND_MS,
         maximumFireAgeMs: MAX_SHOT_FIRE_AGE_MS,
+        maximumProjectileFireAgeMs: MAX_PROJECTILE_SHOT_FIRE_AGE_MS,
         timing: shotTimingTelemetry.snapshot(),
       },
       interpolationDelay: {
@@ -27107,11 +28208,19 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       lastExplosionAgeMs: lastGrenadeExplosionFrameAt > 0 ? Math.max(0, performance.now() - lastGrenadeExplosionFrameAt) : null,
       profile: { ...lastGrenadeExplosionProfile },
     },
+    grenadeFirstAction: copyGrenadeFirstActionProfile(lastGrenadeFirstActionProfile),
+    grenadeFirstActions: grenadeFirstActionProfiles.map((profile) => copyGrenadeFirstActionProfile(profile)),
     audio: { ...audio.telemetry(), occlusion: audioOcclusionBudget.telemetry() },
     settings: {
       requested: pass65Settings,
       graphics: graphicsRuntime,
       displayedGraphicsPreset,
+      liveApplication: {
+        profile: liveGraphicsProfile,
+        appliedAt: liveGraphicsAppliedAt,
+        stagedReconstruction: [...stagedGraphicsReconstruction],
+        pendingRendererReload,
+      },
       accessibility: accessibilityRuntime,
       playerProfile: {
         schemaVersion: playerProfileStore.current.schemaVersion,
@@ -27247,11 +28356,25 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       position: [entity.drop.position.x, entity.drop.position.y, entity.drop.position.z],
       expiresInMs: Math.max(0, entity.drop.expiresAt - performance.now()),
     })),
+    crossbowGlassAuthority: {
+      ...crossbowGlassAuthorityTelemetry,
+      activeBolts: explosiveBolts.map((bolt) => ({
+        ownerId: bolt.ownerId,
+        actionNonce: bolt.actionNonce,
+        authority: bolt.authority,
+        impacted: bolt.impactedAt !== null,
+        impactWindowId: bolt.impactWindowId,
+      })),
+    },
     breakableWindows: arena.breakableWindows.map((window) => ({
       id: window.id,
       broken: window.broken,
       visible: window.mesh.visible,
       position: window.mesh.getWorldPosition(new THREE.Vector3()).toArray(),
+      glassState: window.glassState ? {
+        ...window.glassState,
+        rememberedImpactIds: [...window.glassState.rememberedImpactIds],
+      } : null,
       persistentDebrisId: [...persistentWindowDebris.values()].find((entry) => entry.windowId === window.id)?.id ?? null,
       retainedDebrisPrewarmed: pooledWindowDebris.has(windowDebrisPoolKey(arena.id, window.id)),
     })),
@@ -27469,7 +28592,20 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     },
     render: {
       profile: renderProfile,
+      liveProfile: liveGraphicsProfile,
       representation: activeRenderConfig.representation,
+      graphicsApplication: {
+        appliedAt: liveGraphicsAppliedAt,
+        requestedProfile: liveGraphicsProfile,
+        constructionProfile: rendererConstructionGraphics.profile,
+        state: stagedGraphicsReconstruction.length > 0
+          ? 'live-safe-applied-topology-pending'
+          : 'fully-effective',
+        fullPresetEffective: stagedGraphicsReconstruction.length === 0,
+        stagedReconstruction: [...stagedGraphicsReconstruction],
+        pendingRendererReload,
+        requestedPixelRatioCap: activeRenderConfig.pixelRatioCap,
+      },
       atomicSignal: activePostTelemetry(),
       runtime: activeRuntimeTelemetry(),
       playableScene: playableSceneProof(),
@@ -27523,16 +28659,36 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         ...activeLighting,
         fogNear: scene.fog instanceof THREE.Fog ? scene.fog.near : activeLighting.fogNear,
         fogFar: scene.fog instanceof THREE.Fog ? scene.fog.far : activeLighting.fogFar,
+        runtime: {
+          fogColor: scene.fog instanceof THREE.Fog ? scene.fog.color.getHex() : null,
+          hemisphere: {
+            color: hemisphereLight.color.getHex(),
+            groundColor: hemisphereLight.groundColor.getHex(),
+            intensity: hemisphereLight.intensity,
+          },
+          ambient: { color: ambientLight.color.getHex(), intensity: ambientLight.intensity },
+          sun: {
+            color: sunLight.color.getHex(),
+            intensity: sunLight.intensity,
+            position: sunLight.position.toArray(),
+            castShadow: sunLight.castShadow,
+          },
+          fill: {
+            color: fillLight.color.getHex(),
+            intensity: fillLight.intensity,
+            position: fillLight.position.toArray(),
+          },
+        },
       },
       sky: {
         pass: 30,
-        top: `#${activeLighting.skyTop.toString(16).padStart(6, '0')}`,
-        horizon: `#${activeLighting.skyHorizon.toString(16).padStart(6, '0')}`,
-        bottom: `#${activeLighting.skyBottom.toString(16).padStart(6, '0')}`,
-        cloudShadow: `#${activeLighting.skyCloudShadow.toString(16).padStart(6, '0')}`,
-        cloudLight: `#${activeLighting.skyCloudLight.toString(16).padStart(6, '0')}`,
+        top: `#${(skyMaterial?.uniforms.top.value.getHex() ?? activeLighting.skyTop).toString(16).padStart(6, '0')}`,
+        horizon: `#${(skyMaterial?.uniforms.horizon.value.getHex() ?? activeLighting.skyHorizon).toString(16).padStart(6, '0')}`,
+        bottom: `#${(skyMaterial?.uniforms.bottom.value.getHex() ?? activeLighting.skyBottom).toString(16).padStart(6, '0')}`,
+        cloudShadow: `#${(skyMaterial?.uniforms.cloudShadow.value.getHex() ?? activeLighting.skyCloudShadow).toString(16).padStart(6, '0')}`,
+        cloudLight: `#${(skyMaterial?.uniforms.cloudLight.value.getHex() ?? activeLighting.skyCloudLight).toString(16).padStart(6, '0')}`,
         cloudBands: skyCloudsEnabled ? 2 : 0,
-        fogColor: `#${activeLighting.fogColor.toString(16).padStart(6, '0')}`,
+        fogColor: `#${(scene.fog instanceof THREE.Fog ? scene.fog.color.getHex() : activeLighting.fogColor).toString(16).padStart(6, '0')}`,
         fogNear: scene.fog instanceof THREE.Fog ? scene.fog.near : activeLighting.fogNear,
         fogFar: scene.fog instanceof THREE.Fog ? scene.fog.far : activeLighting.fogFar,
         godRayStrength: actualGodRayStrength,
@@ -27542,7 +28698,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         linearHdr: true,
       },
       grass: grassSystem?.telemetry() ?? { enabled: true, owner: 'pass64.grass.tsl.v1' },
-      atmosphere: atmosphereSystem?.telemetry() ?? { enabled: true, owner: 'pass64.atmosphere.tsl' },
+      atmosphere: activeAtmosphereTelemetry(),
       water: waterSystem.telemetry(),
       blenderEnvironment: {
         ...blenderArenaTelemetry(),
@@ -27926,6 +29082,40 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     const pane = arena.breakableWindows[Math.max(0, Math.min(arena.breakableWindows.length - 1, Math.floor(index)))];
     return pane ? breakWindowsInGrenadeBlast(pane.mesh.getWorldPosition(new THREE.Vector3()), randomNonce(), true) : 0;
   },
+  detonateCrossbowNearWindow: (index: number, distance = 1) => {
+    const pane = arena.breakableWindows[Math.max(0, Math.min(arena.breakableWindows.length - 1, Math.floor(index)))];
+    if (!pane || network.role === 'client') return null;
+    resetBreakableWindows();
+    const centre = pane.mesh.getWorldPosition(new THREE.Vector3());
+    const house = arena.houses.reduce((nearest, candidate) => {
+      const currentDistance = Math.hypot(centre.x - candidate.origin.x, centre.z - candidate.origin.z);
+      const nearestDistance = Math.hypot(centre.x - nearest.origin.x, centre.z - nearest.origin.z);
+      return currentDistance < nearestDistance ? candidate : nearest;
+    }, arena.houses[0]);
+    const approach = selectPlayableWindowApproach(centre, house.origin, arena.bounds, activeWorldColliders(), 2);
+    if (!approach) return null;
+    const outward = new THREE.Vector3(approach.x - centre.x, approach.y - centre.y, approach.z - centre.z).normalize();
+    const point = centre.clone().addScaledVector(outward, THREE.MathUtils.clamp(distance, 0.35, 3));
+    const beforeBroken = pane.broken;
+    const now = performance.now();
+    spawnExplosiveBolt(player.id, player.team, point, outward, true, randomNonce(), now);
+    const bolt = explosiveBolts.at(-1);
+    if (!bolt) return null;
+    bolt.mesh.position.copy(point);
+    bolt.impactedAt = now;
+    bolt.detonatesAt = now;
+    detonateExplosiveBoltEntity(bolt, now);
+    return {
+      windowId: pane.id,
+      beforeBroken,
+      afterBroken: pane.broken,
+      detonationPoint: point.toArray(),
+      radiusM: explosiveBoltBlastRadiusM(false),
+    };
+  },
+  inspectCrossbowBlastWindows: (point, impactWindowId = null, radiusM = 7) => (
+    inspectCrossbowBlastWindows(point, impactWindowId, radiusM)
+  ),
   stageYardhawkWall: (team: Team = 0) => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     const house = arena.houses.find((candidate) => candidate.team === team);
@@ -28430,6 +29620,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     debugCaptureViewmodelHidden = hidden;
     weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
   },
+  setArmEvidenceCapture: (mode) => weaponView.setArmEvidenceCapture(mode),
+  setThermalRevealEvidenceHidden: (hidden) => thermalGhostPresentation.setEvidenceControlHidden(hidden),
+  stagePass73NativeAdsRevealTarget,
+  samplePass73AdsRevealTarget,
+  setPass73AdsRevealNormalBodyHidden,
+  readbackPass73NativeAdsRevealRoi,
+  capturePass73NativeAdsRevealRoiTriplet,
   stageLoadingCaptureSquad: () => {
     if (selectedArena.id !== 'atomic-acres' || gameMode !== 'solo' || !gameStarted) {
       return { staged: false, characters: 0, positions: [] };
@@ -28479,6 +29676,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   collisionProbeAt: (x, y, z) => [x, y, z].every(Number.isFinite)
     ? isBlocked({ x, y, z }, activeWorldColliders(), 0.36)
     : true,
+  collisionRouteAuthority: () => currentAtomicCollisionRouteAuthority(),
   segmentBlocked: (x1, z1, x2, z2) => activeWorldColliders().some((box) => segmentIntersectsBox(
     new THREE.Vector3(x1, 0.2, z1),
     new THREE.Vector3(x2, 1.1, z2),
@@ -28655,6 +29853,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     return true;
   },
   throwGrenade: () => throwGrenade(),
+  // Gun Range correctly rejects gameplay grenades. Visual QA still needs the
+  // exact timed production viewmodel arc without spawning an authoritative
+  // grenade or weakening that arena rule.
+  triggerGrenadePresentationCapture: () => weaponView.throwGrenade(),
+  // Lets the viewport verifier enter the same persisted, production mobile
+  // HUD/control path a touch user can select in Options. It does not synthesize
+  // input or bypass gameplay authority.
+  setMobileControlsForViewportCapture: (enabled: boolean) => setMobileControlsEnabled(enabled),
   switchWeapon: (index: number) => switchWeapon(index),
   equipKit: (id: FieldKitId) => {
     chooseFieldKit(id);
@@ -28712,6 +29918,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   setMeleeCaptureProgress: (progress: number | null) => weaponView.setMeleeCaptureProgress(progress),
   setFireCaptureAgeMs: (ageMs: number | null) => weaponView.setFireCaptureAgeMs(ageMs),
+  setGrenadeCaptureProgress: (progress: number | null) => weaponView.setGrenadeCaptureProgress(progress),
   setReloadCaptureProgress: (progress: number | null) => {
     debugReloadProgress = progress === null ? null : THREE.MathUtils.clamp(progress, 0, 1);
   },

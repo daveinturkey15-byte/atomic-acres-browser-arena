@@ -319,6 +319,37 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ ...pickup, mode: 'scavenge', weapon: 'pistol' })).toBe(true);
     expect(isGameMessage(brokenWindow)).toBe(true);
     expect(isGameMessage({ ...brokenWindow, kind: 'explosive' })).toBe(false);
+    expect(isGameMessage({
+      ...brokenWindow,
+      kind: 'shot',
+      weapon: 'explosive-crossbow',
+      crossbowPhase: 'impact',
+      actionNonce: 91,
+    })).toBe(true);
+    expect(isGameMessage({
+      ...brokenWindow,
+      kind: 'explosive',
+      weapon: 'explosive-crossbow',
+      crossbowPhase: 'explosion',
+      crossbowBlastRadiusM: 3.5,
+      actionNonce: 91,
+    })).toBe(true);
+    expect(isGameMessage({
+      ...brokenWindow,
+      kind: 'shot',
+      weapon: 'explosive-crossbow',
+      crossbowPhase: 'explosion',
+      crossbowBlastRadiusM: 3.5,
+      actionNonce: 91,
+    })).toBe(false);
+    expect(isGameMessage({
+      ...brokenWindow,
+      kind: 'explosive',
+      weapon: 'explosive-crossbow',
+      crossbowPhase: 'explosion',
+      crossbowBlastRadiusM: 4,
+      actionNonce: 91,
+    })).toBe(false);
     expect(isGameMessage({ ...brokenWindow, kind: 'explosive', actionNonce: 55 })).toBe(true);
     expect(isGameMessage({ ...brokenWindow, kind: 'shot', actionNonce: 55 })).toBe(false);
     expect(isGameMessage({ ...brokenWindow, kind: 'magic' })).toBe(false);

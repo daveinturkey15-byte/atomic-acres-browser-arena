@@ -17,7 +17,7 @@ export type SettingDefinition = Readonly<{
 
 const graphicsSettings: readonly SettingDefinition[] = Object.freeze([
   Object.freeze({
-    key: 'graphics.preset', applyMode: 'arena-reload', authorityAffecting: false, runtimeConsumer: 'preset-resolver',
+    key: 'graphics.preset', applyMode: 'live', authorityAffecting: false, runtimeConsumer: 'preset-resolver',
     runtimeEvidence: Object.freeze([Object.freeze({
       path: 'src/pass65-settings.ts',
       symbol: 'resolveDisplayedGraphicsPreset',

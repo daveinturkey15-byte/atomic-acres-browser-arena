@@ -58,11 +58,11 @@
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/export-pass69-3-first-person-operator-arms.py",
-    "sha256": "6b7303c620bf532c2c0d386fac80d77729aa5529d5ca416d8e17437766748438"
+    "sha256": "04239b76c587cb8e1b6cb8619c81e07be84081d907ec77a79a385cde7183a5d3"
   },
   "sourceBlend": {
     "path": "source-assets/blender/pass69-3-first-person-operator-arms.blend",
-    "sha256": "936348c930d6132bd97da4ba557349bd7f13b9c57362e37e831ee45c019ff27c"
+    "sha256": "464e5821cae0ea48b5da3587ee8edab98a1cf02fbe0a7c6770c721def8180742"
   },
   "rejectedBaseline": {
     "sourceBlend": {
@@ -82,10 +82,10 @@
   "firstPersonGlbs": [
     {
       "path": "public/assets/original/models/operators/pass65-first-person-arms-lod0.glb",
-      "sha256": "ff4db4971cab4ca8bca20941ad090eb12b3d94b21b6e981904895e19f15885a6",
+      "sha256": "c17b3fb653a161fe3fecad81235e3c1c70c7fc5037b83cfd5078d02533359574",
       "lod": 0,
       "triangles": 9744,
-      "bytes": 343572,
+      "bytes": 343688,
       "skinnedMeshNodes": 4,
       "renderPrimitives": 4,
       "skins": 4,
@@ -97,10 +97,10 @@
     },
     {
       "path": "public/assets/original/models/operators/pass65-first-person-arms-lod1.glb",
-      "sha256": "9672274b3832d5021ec069791a91bb75127e465088ca992b997e99a8c86fd04c",
+      "sha256": "552fb405b761b7e8fd899370f4c8bf8993fcad3f627a6ec41ceb00fc8a08f0f0",
       "lod": 1,
       "triangles": 7703,
-      "bytes": 327824,
+      "bytes": 327720,
       "skinnedMeshNodes": 4,
       "renderPrimitives": 4,
       "skins": 4,
@@ -201,10 +201,10 @@
   ],
   "materialContract": "All visible materials OPAQUE with depth writes; no alpha fading or see-through anatomy.",
   "materialContrastContract": "owned-basecolor-contrast-retone-v1",
-  "visualRevision": "pass70-manual-anatomical-viewmodel-v1",
-  "limbProfileContract": "manual-continuous-cuff-forearm-deformation-v1",
+  "visualRevision": "pass73-authored-continuous-proximal-sleeves-v2",
+  "limbProfileContract": "manual-thick-continuous-cuff-forearm-deformation-v2",
   "handPoseContract": "manual-separated-articulated-digit-contact-v1",
-  "shoulderEntryContract": "weighted-capped-fps-frame-edge-sleeve-v2",
+  "shoulderEntryContract": "weighted-continuous-beyond-crop-sleeve-v3",
   "gloveConstructionContract": "opaque-manual-cuff-palm-digit-continuity-v1",
   "palmContactContract": "authored-wrist-parented-full-transform-v1",
   "weaponGripReviewContract": "seven-view-actual-weapon-contact-v2",
@@ -228,6 +228,7 @@
     "Added local wrist/cuff topology, smoothed the firing/support forearm-to-glove volume and repainted LowerArm/Wrist transition weights.",
     "Separated and rounded the five articulated digit branches per hand while preserving the licensed UVs and action tracks.",
     "Retoned the owned packed tactical base color to increase hand and sleeve separation on the Gun Range shadow floor.",
+    "Thickened both authored skinned arm silhouettes and extended each weighted proximal sleeve beyond the first-person crop plane.",
     "Added full-transform left/right palm contact nodes below the authored wrist bones without changing runtime IK, weapon-ray or gameplay authority.",
     "Exported a reduced LOD1 from the pinned manual master and generated five deterministic deformation/anatomy review frames."
   ],
@@ -243,35 +244,35 @@
     "renders": [
       {
         "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-neutral-front.png",
-        "sha256": "17caf75ead2f9046ce17e00da8ab6fae8085cab3d6445f768143f868633536ca",
+        "sha256": "22645c53a97ecebca425db209b855acd84475702752da4537f68a4ee90cbae8a",
         "width": 800,
         "height": 800,
         "cameraId": "neutral-front"
       },
       {
         "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-forearm-wrist-quarter.png",
-        "sha256": "cc12fff9d6421960c1cb8f4268a765d6a01790bedfa2e52db92aef3d703cebc1",
+        "sha256": "b2d8bfe6e155e7d10cbc202e4917cb64b20bced9800cb287d6ceb613532f9e6e",
         "width": 800,
         "height": 800,
         "cameraId": "forearm-wrist-quarter"
       },
       {
         "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-hand-anatomy-closeup.png",
-        "sha256": "d979db84ec2f0c88d4c08f2520d0766b00ba9c86958817ccf945a1c70db608c8",
+        "sha256": "0dc5a8e1d42ee1d37143bc62a406be5c77c9e71992a846e89435d0ecb89e1308",
         "width": 800,
         "height": 800,
         "cameraId": "hand-anatomy-closeup"
       },
       {
         "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-reload-cuff-flex.png",
-        "sha256": "9baae6c655f17fe360b49295f026a0f377f6ba82ae88655a2fc22e7e8f3ac224",
+        "sha256": "d9b391cb34c19bcdf7d696de6e9d096314dada69357af4e94ea6efe60f47e765",
         "width": 800,
         "height": 800,
         "cameraId": "reload-cuff-flex"
       },
       {
         "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-firing-digit-separation.png",
-        "sha256": "8ea4045b9243ee861e773723c6caf1bd9282e22302ee0188fc3e10d66994f4ff",
+        "sha256": "8e29c26c3ad10f5458c2a9ab1808dd616c9824859386730cf81566310c1565a6",
         "width": 800,
         "height": 800,
         "cameraId": "firing-digit-separation"
@@ -279,13 +280,13 @@
     ],
     "contactSheet": {
       "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-review-sheet.png",
-      "sha256": "6baf43c2c606ea4051d15a0c6664919bed4374f7c3a6513832e3fed391ecacf2",
+      "sha256": "cf13c04bde929b5726980d7ae08eaa92641a0d4e5064e5122ff00918da92df17",
       "width": 2400,
       "height": 1708
     },
     "contactReceipt": {
       "path": "source-assets/blender/pass69-3-first-person-operator-arms-contact-receipt.json",
-      "sha256": "e64280cb3c84d390d7bb23d27037b551cc959f2ad48c53f4147f8bcc0a35fb0b"
+      "sha256": "651db7d32c5506f2f1f8f85e3f6acc2b4bce82b005e2204a26b4238df3961314"
     },
     "retainedWeaponContactBaseline": {
       "path": "source-assets/blender/pass65-first-person-operator-arms-contact-receipt.json",
@@ -297,7 +298,7 @@
       {
         "lod": 0,
         "triangles": 9744,
-        "bytes": 343572,
+        "bytes": 343688,
         "meshNodes": 4,
         "skinnedMeshNodes": 4,
         "renderPrimitives": 4,
@@ -411,7 +412,7 @@
       {
         "lod": 1,
         "triangles": 7703,
-        "bytes": 327824,
+        "bytes": 327720,
         "meshNodes": 4,
         "skinnedMeshNodes": 4,
         "renderPrimitives": 4,

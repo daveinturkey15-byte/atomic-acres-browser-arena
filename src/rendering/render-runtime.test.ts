@@ -293,6 +293,52 @@ describe('Pass 64 render runtime boundary', () => {
     });
   });
 
+  it('treats an explicitly destroyed page-exit device as clean idempotent disposal', async () => {
+    vi.stubGlobal('document', { visibilityState: 'visible', hasFocus: () => true });
+    let resolveLost!: (info: Readonly<{ reason: string; message: string }>) => void;
+    const lost = new Promise<Readonly<{ reason: string; message: string }>>((resolve) => { resolveLost = resolve; });
+    const renderer = {
+      backend: { isWebGPUBackend: true },
+      info: { reset: vi.fn(), render: { calls: 0, triangles: 0, points: 0, lines: 0 } },
+      dispose: vi.fn(),
+    };
+    const pipeline = { render: vi.fn(), dispose: vi.fn() };
+    const device = {
+      queue: { onSubmittedWorkDone: async () => undefined },
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      destroy: vi.fn(() => resolveLost({ reason: 'destroyed', message: 'Device was destroyed.' })),
+      lost,
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, pipeline, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+    });
+
+    runtime.dispose();
+    runtime.dispose();
+    await lost;
+    await Promise.resolve();
+
+    expect(pipeline.dispose).toHaveBeenCalledTimes(1);
+    expect(renderer.dispose).toHaveBeenCalledTimes(1);
+    expect(device.destroy).toHaveBeenCalledTimes(1);
+    expect(runtime.submitFrame(100, true)).toBe(false);
+    expect(runtime.telemetry()).toMatchObject({
+      deviceLost: false,
+      presentation: { status: 'warming', lastFailure: null },
+    });
+  });
+
   it('admits the cutover only after every custom GLSL owner has a verified TSL graph', () => {
     expect(TSL_MIGRATION_INVENTORY.map((entry) => entry.id)).toEqual([
       'procedural-atmosphere-sky',
@@ -427,6 +473,7 @@ describe('Pass 64 render runtime boundary', () => {
   it('bounds submissions while an earlier WebGPU completion probe is lagging', () => {
     expect(maximumInFlightWebGpuSubmissions('serialized')).toBe(1);
     expect(maximumInFlightWebGpuSubmissions('warmed-live')).toBe(2);
+    expect(maximumInFlightWebGpuSubmissions('input-response')).toBe(3);
     expect(shouldBackpressureWebGpuSubmissions(null, 1_000, 250)).toBe(false);
     expect(shouldBackpressureWebGpuSubmissions(800, 1_049, 250)).toBe(false);
     expect(shouldBackpressureWebGpuSubmissions(800, 1_050, 250)).toBe(true);
@@ -554,6 +601,47 @@ describe('Pass 64 render runtime boundary', () => {
       completionProbeTargetSequence: null,
       submissionSequence: 3,
       completedSequence: 3,
+    });
+  });
+
+  it('admits one bounded input-response frame beyond the warmed-live frontier', () => {
+    const pending: Array<() => void> = [];
+    const renderer = {
+      backend: { isWebGPUBackend: true },
+      info: { reset: vi.fn(), render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
+    };
+    const render = vi.fn();
+    const device = {
+      queue: { onSubmittedWorkDone: () => new Promise<void>((resolve) => pending.push(resolve)) },
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, { render }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+    });
+
+    expect(runtime.submitFrame(100, false, 'warmed-live')).toBe(true);
+    expect(runtime.submitFrame(110, false, 'warmed-live')).toBe(true);
+    expect(runtime.submitFrame(120, false, 'input-response')).toBe(true);
+    expect(runtime.submitFrame(130, false, 'input-response')).toBe(false);
+    expect(render).toHaveBeenCalledTimes(3);
+    expect(pending).toHaveLength(1);
+    expect(runtime.presentationTelemetry()).toMatchObject({
+      submissionMode: 'input-response',
+      maximumInFlightSubmissions: 3,
+      inFlightSubmissions: 3,
+      submissionSequence: 3,
+      completedSequence: 0,
     });
   });
 

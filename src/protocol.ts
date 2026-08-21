@@ -351,6 +351,10 @@ export type WindowBreakMessage = {
   windowId: string;
   origin: [number, number, number];
   kind?: 'shot' | 'knife' | 'explosive';
+  /** Host-canonical projectile identity; absent for hitscan, melee and grenades. */
+  weapon?: Extract<WeaponId, 'explosive-crossbow'>;
+  crossbowPhase?: 'impact' | 'explosion';
+  crossbowBlastRadiusM?: 3.5 | 7;
   actionNonce?: number;
   /** Added only by the host after receiver simulation canonicalizes the break. */
   hostAuthority?: HostWindowBreakAuthority;
@@ -930,7 +934,18 @@ export function isGameMessage(value: unknown): value is GameMessage {
       return typeof msg.by === 'string'
         && typeof msg.windowId === 'string' && msg.windowId.length > 0 && msg.windowId.length <= 160
         && (msg.kind === undefined || msg.kind === 'shot' || msg.kind === 'knife' || msg.kind === 'explosive')
-        && (msg.kind === 'explosive' ? Number.isFinite(msg.actionNonce) : msg.actionNonce === undefined)
+        && (msg.weapon === undefined || msg.weapon === 'explosive-crossbow')
+        && (msg.crossbowPhase === undefined || msg.crossbowPhase === 'impact' || msg.crossbowPhase === 'explosion')
+        && (msg.weapon === 'explosive-crossbow'
+          ? msg.crossbowPhase === 'impact' && msg.kind === 'shot'
+            || msg.crossbowPhase === 'explosion' && msg.kind === 'explosive'
+          : msg.crossbowPhase === undefined)
+        && (msg.crossbowPhase === 'explosion'
+          ? msg.crossbowBlastRadiusM === 3.5 || msg.crossbowBlastRadiusM === 7
+          : msg.crossbowBlastRadiusM === undefined)
+        && (msg.kind === 'explosive' || msg.weapon === 'explosive-crossbow'
+          ? Number.isFinite(msg.actionNonce)
+          : msg.actionNonce === undefined)
         && (msg.hostAuthority === undefined || isHostWindowBreakAuthority(msg.hostAuthority))
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
         && Number.isFinite(msg.nonce);

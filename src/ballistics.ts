@@ -349,7 +349,10 @@ export function pointAlongBallisticPath(origin: Point3, direction: Point3, dista
 
 export function applyPenetrationDamage(baseDamage: number, multiplier: number): number {
   if (!Number.isFinite(baseDamage) || baseDamage <= 0 || !Number.isFinite(multiplier) || multiplier <= 0) return 0;
-  return Math.max(1, Math.round(baseDamage * Math.min(1, multiplier)));
+  const boundedMultiplier = Math.min(1, multiplier);
+  // A clear trace must preserve the canonical damage value byte-for-byte;
+  // wallbang attenuation retains the existing integer admission envelope.
+  return boundedMultiplier >= 1 ? baseDamage : Math.max(1, Math.round(baseDamage * boundedMultiplier));
 }
 
 export function ballisticImpactSurface(material: BallisticMaterialId): ImpactSurface {

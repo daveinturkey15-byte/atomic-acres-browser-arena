@@ -69,7 +69,7 @@ type GraphicsControlBase = Readonly<{
   category: GraphicsSettingCategory;
   label: string;
   description: string;
-  applyMode: 'arena-reload';
+  applyMode: 'live' | 'pipeline-rebuild' | 'arena-reload';
   runtimeConsumer: GraphicsRuntimeConsumer;
 }>;
 
@@ -112,30 +112,30 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     key: 'renderScale', id: 'graphics-render-scale', category: 'display', label: 'Render scale',
     description: 'Internal framebuffer scale. Values above native supersample before output.',
     kind: 'range', minimum: 0.5, maximum: 1.25, step: 0.05, unit: 'percent',
-    applyMode: 'arena-reload', runtimeConsumer: 'adaptive-quality',
+    applyMode: 'live', runtimeConsumer: 'adaptive-quality',
   }),
   control({
     key: 'adaptiveResolution', id: 'graphics-adaptive', category: 'display', label: 'Adaptive quality',
     description: 'Changes presentation budgets after sustained frame-time pressure; gameplay authority is unchanged.',
-    kind: 'toggle', applyMode: 'arena-reload', runtimeConsumer: 'adaptive-quality',
+    kind: 'toggle', applyMode: 'live', runtimeConsumer: 'adaptive-quality',
   }),
   control({
     key: 'targetFps', id: 'graphics-target-fps', category: 'display', label: 'Adaptive target',
     description: 'Target used by the adaptive workload controller. It is not the output frame limiter.',
     kind: 'range', minimum: 30, maximum: 360, step: 1, unit: 'fps',
-    applyMode: 'arena-reload', runtimeConsumer: 'adaptive-quality',
+    applyMode: 'live', runtimeConsumer: 'adaptive-quality',
   }),
   control({
     key: 'frameRateLimit', id: 'graphics-frame-rate-limit', category: 'display', label: 'Maximum FPS',
     description: 'Bounds presentation work without changing the fixed-step simulation. The final slider position is uncapped.',
     kind: 'range', minimum: 30, maximum: 361, step: 1, unit: 'fps', unlimitedSentinel: 361,
-    applyMode: 'arena-reload', runtimeConsumer: 'frame-scheduler',
+    applyMode: 'live', runtimeConsumer: 'frame-scheduler',
   }),
   control({
     key: 'antiAliasing', id: 'graphics-anti-aliasing', category: 'display', label: 'Anti-aliasing',
     description: 'Multisampling on the principal HDR scene target, not merely the canvas.',
     kind: 'select', options: selectOptions(['off', 'OFF'], ['msaa-2x', 'MSAA 2X'], ['msaa-4x', 'MSAA 4X']),
-    applyMode: 'arena-reload', runtimeConsumer: 'renderer-init',
+    applyMode: 'pipeline-rebuild', runtimeConsumer: 'renderer-init',
   }),
   control({
     key: 'geometryDetail', id: 'graphics-geometry-detail', category: 'geometry', label: 'Geometry detail',
@@ -147,97 +147,97 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     key: 'shadows', id: 'graphics-shadows', category: 'lighting', label: 'Sun shadows',
     description: 'Enables arena-authored shadow volumes and occlusion.',
     kind: 'select', options: selectOptions(['off', 'OFF'], ['high', 'ON']),
-    applyMode: 'arena-reload', runtimeConsumer: 'shadow-runtime',
+    applyMode: 'live', runtimeConsumer: 'shadow-runtime',
   }),
   control({
     key: 'shadowResolution', id: 'graphics-shadow-resolution', category: 'lighting', label: 'Shadow resolution',
     description: 'Selects a bounded 1024 or arena-authored 2048 shadow map.',
     kind: 'select', options: selectOptions(['medium', 'MEDIUM'], ['high', 'HIGH']),
-    applyMode: 'arena-reload', runtimeConsumer: 'shadow-runtime',
+    applyMode: 'live', runtimeConsumer: 'shadow-runtime',
   }),
   control({
     key: 'shadowUpdateMode', id: 'graphics-shadow-update', category: 'lighting', label: 'Shadow updates',
     description: 'Static refreshes on material scene changes; Dynamic refreshes every presented frame.',
     kind: 'select', options: selectOptions(['static', 'STATIC'], ['dynamic', 'DYNAMIC']),
-    applyMode: 'arena-reload', runtimeConsumer: 'shadow-runtime',
+    applyMode: 'live', runtimeConsumer: 'shadow-runtime',
   }),
   control({
     key: 'indirectLighting', id: 'graphics-indirect-lighting', category: 'lighting', label: 'Indirect light',
     description: 'Scales arena hemisphere and ambient bounce approximations without inventing path tracing.',
     kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
-    applyMode: 'arena-reload', runtimeConsumer: 'arena-lighting',
+    applyMode: 'live', runtimeConsumer: 'arena-lighting',
   }),
   control({
     key: 'ambientOcclusion', id: 'graphics-ambient-occlusion', category: 'lighting', label: 'Contact shadows (GTAO)',
     description: 'Adds bounded WebGPU ground-truth ambient occlusion from the scene depth buffer. Higher tiers increase samples and resolution.',
     kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH'], ['ultra', 'ULTRA']),
-    applyMode: 'arena-reload', runtimeConsumer: 'ambient-occlusion',
+    applyMode: 'pipeline-rebuild', runtimeConsumer: 'ambient-occlusion',
   }),
   control({
     key: 'reflectionQuality', id: 'graphics-reflections', category: 'lighting', label: 'Specular response',
     description: 'Scales bounded PBR environment/specular response on authored materials.',
     kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
-    applyMode: 'arena-reload', runtimeConsumer: 'material-refinement',
+    applyMode: 'live', runtimeConsumer: 'material-refinement',
   }),
   control({
     key: 'volumetricQuality', id: 'graphics-volumetrics', category: 'atmosphere', label: 'Volumetrics',
     description: 'Controls ambient mist, smoke stacks and deterministic dust density. Gameplay smoke remains visible at every tier.',
     kind: 'select', options: selectOptions(['low', 'LOW'], ['high', 'HIGH'], ['ultra', 'ULTRA']),
-    applyMode: 'arena-reload', runtimeConsumer: 'atmosphere-runtime',
+    applyMode: 'live', runtimeConsumer: 'atmosphere-runtime',
   }),
   control({
     key: 'smokeQuality', id: 'graphics-smoke-quality', category: 'atmosphere', label: 'Smoke presentation',
     description: 'Changes cards and opacity detail while keeping the same authoritative smoke volume and lifetime.',
     kind: 'select', options: selectOptions(['low', 'LOW'], ['high', 'HIGH'], ['ultra', 'ULTRA']),
-    applyMode: 'arena-reload', runtimeConsumer: 'smoke-presentation',
+    applyMode: 'live', runtimeConsumer: 'smoke-presentation',
   }),
   control({
     key: 'particleQuality', id: 'graphics-particles', category: 'atmosphere', label: 'Particles',
     description: 'Scales bounded impact and environmental particles from prewarmed pools.',
     kind: 'select', options: selectOptions(['low', 'LOW'], ['high', 'HIGH'], ['ultra', 'ULTRA']),
-    applyMode: 'arena-reload', runtimeConsumer: 'presentation-budget',
+    applyMode: 'live', runtimeConsumer: 'presentation-budget',
   }),
   control({
     key: 'anisotropy', id: 'graphics-anisotropy', category: 'materials', label: 'Texture filtering',
     description: 'Maximum anisotropic filtering, clamped to the active GPU capability.',
     kind: 'select', options: selectOptions(['1', '1X'], ['2', '2X'], ['4', '4X'], ['8', '8X'], ['16', '16X']),
-    applyMode: 'arena-reload', runtimeConsumer: 'material-refinement',
+    applyMode: 'live', runtimeConsumer: 'material-refinement',
   }),
   control({
     key: 'decalQuality', id: 'graphics-decals', category: 'materials', label: 'Impact decals',
     description: 'Scales the bounded persistent-mark capacity and lifetime on collision surfaces.',
     kind: 'select', options: selectOptions(['low', 'LOW'], ['high', 'HIGH'], ['ultra', 'ULTRA']),
-    applyMode: 'arena-reload', runtimeConsumer: 'presentation-budget',
+    applyMode: 'live', runtimeConsumer: 'presentation-budget',
   }),
   control({
     key: 'bloomQuality', id: 'graphics-bloom', category: 'post', label: 'Depth-aware bloom',
     description: 'Controls the TSL HDR bloom strength while retaining the scene-depth edge guard.',
     kind: 'select', options: selectOptions(['off', 'OFF'], ['subtle', 'SUBTLE'], ['cinematic', 'CINEMATIC']),
-    applyMode: 'arena-reload', runtimeConsumer: 'hdr-pipeline',
+    applyMode: 'live', runtimeConsumer: 'hdr-pipeline',
   }),
   control({
     key: 'exposure', id: 'graphics-exposure', category: 'post', label: 'Exposure',
     description: 'Multiplies the calibrated per-arena exposure inside the renderer output pipeline.',
     kind: 'range', minimum: 0.75, maximum: 1.25, step: 0.05, unit: 'multiplier',
-    applyMode: 'arena-reload', runtimeConsumer: 'hdr-pipeline',
+    applyMode: 'live', runtimeConsumer: 'hdr-pipeline',
   }),
   control({
     key: 'toneMapping', id: 'graphics-tone-mapping', category: 'post', label: 'Tone mapping',
     description: 'Selects a supported renderer output transform; deterministic review receipts record the effective mode.',
     kind: 'select', options: selectOptions(['aces', 'ACES FILMIC'], ['agx', 'AGX'], ['neutral', 'NEUTRAL']),
-    applyMode: 'arena-reload', runtimeConsumer: 'hdr-pipeline',
+    applyMode: 'live', runtimeConsumer: 'hdr-pipeline',
   }),
   control({
     key: 'filmGrain', id: 'graphics-film-grain', category: 'post', label: 'Film grain',
     description: 'Scales deterministic TSL grain; zero disables it.',
     kind: 'range', minimum: 0, maximum: 1, step: 0.01, unit: 'percent',
-    applyMode: 'arena-reload', runtimeConsumer: 'hdr-pipeline',
+    applyMode: 'live', runtimeConsumer: 'hdr-pipeline',
   }),
   control({
     key: 'vignette', id: 'graphics-vignette', category: 'post', label: 'Vignette',
     description: 'Applies a bounded TSL edge falloff after bloom and grading; zero disables it.',
     kind: 'range', minimum: 0, maximum: 1, step: 0.01, unit: 'percent',
-    applyMode: 'arena-reload', runtimeConsumer: 'hdr-pipeline',
+    applyMode: 'live', runtimeConsumer: 'hdr-pipeline',
   }),
 ]);
 
@@ -398,7 +398,8 @@ export function validateAdvancedGraphicsRegistry(): readonly string[] {
     if (JSON.stringify(normalizeAdvancedGraphicsValues(preset, preset)) !== JSON.stringify(preset)) issues.push('noncanonical-preset');
   }
   for (const definition of ADVANCED_GRAPHICS_CONTROLS) {
-    if (!definition.runtimeConsumer || !definition.description || definition.applyMode !== 'arena-reload') {
+    if (!definition.runtimeConsumer || !definition.description
+      || !['live', 'pipeline-rebuild', 'arena-reload'].includes(definition.applyMode)) {
       issues.push(`incomplete-control:${definition.key}`);
     }
     if ((ADVANCED_GRAPHICS_RUNTIME_EVIDENCE[definition.key]?.length ?? 0) === 0) {

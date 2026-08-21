@@ -65,9 +65,10 @@
   const params = new URLSearchParams(window.location.search);
   const requested = params.get('release')?.trim().toLowerCase();
   if (params.get('room')?.trim() || requested === 'latest' || requested === 'normal') return route('experimental');
-  if (requested === 'stable' || requested === 'rollback') return route('stable');
-  if (requested === 'previous' || requested === 'pass70') return route('previous');
-  if (requested === 'pass69') return route('retained');
+  if (requested === 'stable' || requested === 'rollback') return route('previous');
+  if (requested === 'previous' || requested === 'pass72') return route('previous');
+  if (requested === 'pass70') return route('retained');
+  if (requested === 'pass69') return route('historical');
   if (requested === 'experimental') return route('experimental');
 
   const options = document.querySelector('#release-channel-options');
@@ -94,7 +95,7 @@
     const version = String(channel.label || '').match(/v\d+(?:\.\d+)+/);
     return version ? `PASS ${version[0].slice(1)}` : channel.pass;
   };
-  for (const key of ['experimental', 'previous', 'retained', 'stable']) {
+  for (const key of ['experimental', 'previous', 'retained', 'historical']) {
     const channel = config[key];
     if (!channel) continue;
     const button = document.createElement('button');
@@ -106,8 +107,10 @@
       : key === 'previous'
         ? 'PREVIOUS LIVE'
         : key === 'retained'
-          ? 'PREVIOUS STABLE'
-          : channel.deploymentState === 'live' ? 'LIVE' : 'RELEASE CANDIDATE';
+          ? 'RETAINED LIVE'
+          : key === 'historical'
+            ? 'RETAINED STABLE'
+            : channel.deploymentState === 'live' ? 'LIVE' : 'RELEASE CANDIDATE';
     button.innerHTML = `<small>${displayPass(key, channel)} · ${badge}</small><strong>${channel.label}</strong><span>${channel.description}</span>`;
     button.addEventListener('click', () => route(key));
     options.append(button);

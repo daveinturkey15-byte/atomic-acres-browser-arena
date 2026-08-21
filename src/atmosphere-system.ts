@@ -7,6 +7,7 @@ export type AtmosphereTelemetry = Readonly<{
   pass: 30;
   enabled: boolean;
   bypassReason: string | null;
+  profile: RenderProfile;
   arenaId: ArenaId;
   mistCards: number;
   smokeCards: number;
@@ -17,6 +18,9 @@ export type AtmosphereTelemetry = Readonly<{
   volumetricRayMarching: false;
   perFrameAllocations: 0;
   densityScale: number;
+  mistOpacity: number;
+  smokeOpacity: number;
+  dustOpacity: number;
   time: number;
 }>;
 
@@ -77,6 +81,7 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.f
 
 const MAX_MIST_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
 const MAX_SMOKE_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.smoke.length));
+const MAX_DUST_MOTES = 96;
 
 function atmosphereDustLayout(profile: RenderProfile, arenaId: ArenaId): DustLayout {
   const quality = profile === 'blender';
@@ -122,7 +127,7 @@ export class AtmosphereSystem {
   private submissionFrame = -1;
   private time = 0;
   private readonly bypass: string | null;
-  private readonly profile: RenderProfile;
+  private profile: RenderProfile;
   private arenaId: ArenaId;
   private densityScale = 1;
 
@@ -317,7 +322,11 @@ export class AtmosphereSystem {
     this.root.add(smokeMesh);
     this.setArena(arenaId);
 
-    const dustCount = profile === 'blender' ? 96 : 64;
+    // Allocate the retained maximum once. A live Performance-to-Quality
+    // rebound may raise the draw range, so construction-profile capacity would
+    // otherwise under-allocate and make telemetry claim vertices that do not
+    // exist.
+    const dustCount = MAX_DUST_MOTES;
     const dustPositions = new Float32Array(dustCount * 3);
     const dustPhases = new Float32Array(dustCount);
     for (let index = 0; index < dustCount; index += 1) {
@@ -446,6 +455,16 @@ export class AtmosphereSystem {
     }
   }
 
+  /**
+   * Rebinds every profile-owned value that is safe to change on the retained
+   * atmosphere pool. Compat/runtime bypass still requires reconstruction, but
+   * Quality-to-Performance can change counts and material density in place.
+   */
+  setProfile(profile: RenderProfile): void {
+    this.profile = profile;
+    this.setArena(this.arenaId);
+  }
+
   setDensityScale(scale: number): void {
     this.densityScale = THREE.MathUtils.clamp(Number.isFinite(scale) ? scale : 1, 0.35, 1);
     this.setArena(this.arenaId);
@@ -474,6 +493,7 @@ export class AtmosphereSystem {
       pass: 30,
       enabled: this.material !== null,
       bypassReason: this.bypass,
+      profile: this.profile,
       arenaId: this.arenaId,
       mistCards: this.mesh?.count ?? 0,
       smokeCards: this.smokeMesh?.count ?? 0,
@@ -484,6 +504,9 @@ export class AtmosphereSystem {
       volumetricRayMarching: false,
       perFrameAllocations: 0,
       densityScale: this.densityScale,
+      mistOpacity: Number(this.material?.uniforms.uOpacity.value ?? 0),
+      smokeOpacity: Number(this.smokeMaterial?.uniforms.uOpacity.value ?? 0),
+      dustOpacity: Number(this.dustMaterial?.uniforms.uOpacity.value ?? 0),
       time: this.time,
     };
   }

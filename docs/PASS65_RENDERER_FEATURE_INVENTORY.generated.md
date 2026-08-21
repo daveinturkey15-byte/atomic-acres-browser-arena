@@ -42,7 +42,7 @@ Every player-visible graphics setting follows the same checked chain: registry `
 |---|---|---:|---:|---:|---|
 | performance | performance | 0.75 | true | false | balanced |
 | high | blender | 1 | true | true | full |
-| max | blender | 1.25 | false | true | full |
+| max | blender | 1.15 | true | true | full |
 
 ## Feature-to-setting or rationale map
 
