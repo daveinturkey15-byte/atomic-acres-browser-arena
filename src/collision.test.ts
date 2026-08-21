@@ -120,6 +120,7 @@ describe('arena collision', () => {
     expect(hit!.time).toBeGreaterThan(0.15);
     expect(hit!.time).toBeLessThan(0.3);
     expect(hit!.normal).toEqual({ x: -1, y: 0, z: 0 });
+    expect(hit!.box).toBe(wall);
     expect(sweepSphereAgainstBoxes({ x: 0, y: 4, z: 0 }, { x: 4, y: 0, z: 0 }, [wall])).toBeNull();
   });
 

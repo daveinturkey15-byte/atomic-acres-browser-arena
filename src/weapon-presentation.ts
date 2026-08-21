@@ -2803,6 +2803,25 @@ export class WeaponPresentation {
     this.grenadeStart = performance.now();
   }
 
+  grenadeActionTelemetry(now = performance.now()): Readonly<{
+    startedAt: number;
+    elapsedMs: number | null;
+    progress: number;
+    active: boolean;
+    arc: number;
+  }> {
+    const elapsedMs = this.grenadeStart > 0 ? Math.max(0, now - this.grenadeStart) : null;
+    const progress = elapsedMs === null ? 1 : THREE.MathUtils.clamp(elapsedMs / 620, 0, 1);
+    const active = elapsedMs !== null && progress < 1;
+    return Object.freeze({
+      startedAt: this.grenadeStart,
+      elapsedMs,
+      progress,
+      active,
+      arc: active ? Math.sin(progress * Math.PI) : 0,
+    });
+  }
+
   addMouseDelta(x: number, y: number): void {
     this.swayX = THREE.MathUtils.clamp(this.swayX + x * 0.00008, -0.025, 0.025);
     this.swayY = THREE.MathUtils.clamp(this.swayY + y * 0.00006, -0.02, 0.02);
@@ -3988,8 +4007,8 @@ export class WeaponPresentation {
     } else if (wasMeleeActive) {
       this.restoreRiggedArmBindPose();
     }
-    const grenadeProgress = THREE.MathUtils.clamp((performance.now() - this.grenadeStart) / 620, 0, 1);
-    const grenadeArc = this.grenadeStart > 0 && grenadeProgress < 1 ? Math.sin(grenadeProgress * Math.PI) : 0;
+    const grenadeAction = this.grenadeActionTelemetry();
+    const grenadeArc = grenadeAction.arc;
 
     const viewmodelBaseX = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.x, ADS_VIEWMODEL_BASE_POSITION.x, this.adsBlend);
     const viewmodelBaseY = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.y, ADS_VIEWMODEL_BASE_POSITION.y, this.adsBlend)

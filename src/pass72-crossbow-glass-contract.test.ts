@@ -1,28 +1,70 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { admitCanonicalCrossbowGlassBreak, admitCrossbowGlassMutation } from './crossbow-glass-authority';
+import { admitGlassImpact, createGlassState, glassAuthorityProjection } from './glass-authority';
+import { crossbowBlastLineOfSightColliders, windowBreakPathBlocked } from './window-breaks';
 
-const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
-
-function body(name: string, nextName: string): string {
-  const start = source.indexOf(`function ${name}`);
-  const end = source.indexOf(`function ${nextName}`, start + 1);
-  expect(start).toBeGreaterThanOrEqual(0);
-  expect(end).toBeGreaterThan(start);
-  return source.slice(start, end);
-}
-
-describe('Pass 72 hosted crossbow glass contract', () => {
-  it('routes bolt detonation through the same occlusion-aware glass mutation as grenades', () => {
-    const detonate = body('detonateExplosiveBoltEntity', 'updateExplosiveBolts');
-    expect(detonate).toContain('breakWindowsInGrenadeBlast(point, bolt.actionNonce, true, blastRadiusM)');
-    expect(detonate).toContain("breakWindowsInGrenadeBlast");
-    expect(detonate).toContain('if (!bolt.authority) return;');
+describe('hosted crossbow glass behavior', () => {
+  it('opens a solid pane on authoritative bolt impact', () => {
+    const initial = createGlassState('front-pane', 73);
+    expect(glassAuthorityProjection(initial).movementSolid).toBe(true);
+    expect(admitCrossbowGlassMutation(true).accepted).toBe(true);
+    const impact = admitGlassImpact(initial, {
+      isHost: true,
+      matchEpoch: 73,
+      expectedRevision: initial.revision,
+      impactId: 'crossbow:impact:73',
+      tick: 8,
+      profile: 'bullet',
+    });
+    expect(impact.accepted).toBe(true);
+    expect(glassAuthorityProjection(impact.state)).toMatchObject({
+      phase: 'breached',
+      apertureOpen: true,
+      movementSolid: false,
+      ballisticSolid: false,
+    });
   });
 
-  it('keeps the shared break policy path occlusion-aware and replicated from the host', () => {
-    const helper = body('breakWindowsInGrenadeBlast', 'synchronizeSmokePresentation');
-    expect(helper).toContain('windowBreakPathBlocked(point, centre, activeWorldColliders())');
-    expect(helper).toContain("'explosive'");
-    expect(helper).toContain('replicate');
+  it('keeps real cover while excluding only the struck pane from blast LOS', () => {
+    const struckPane = { minX: -0.4, maxX: 0.4, minY: 0, maxY: 2, minZ: 0, maxZ: 0.08 };
+    const wall = { minX: -1, maxX: 1, minY: 0, maxY: 3, minZ: 1, maxZ: 1.2 };
+    const ids = new Map([[struckPane, 'front-pane']]);
+    const withoutStruckPane = crossbowBlastLineOfSightColliders(
+      [struckPane, wall],
+      'front-pane',
+      (collider) => ids.get(collider) ?? null,
+    );
+    expect(withoutStruckPane).toEqual([wall]);
+    expect(windowBreakPathBlocked(
+      { x: 0, y: 1, z: 0 },
+      { x: 0, y: 1, z: 2 },
+      withoutStruckPane,
+    )).toBe(true);
+  });
+
+  it('admits one host-canonical in-radius explosion pane on the guest', () => {
+    expect(admitCanonicalCrossbowGlassBreak({
+      receiverRole: 'client',
+      hostAuthorityValid: true,
+      weapon: 'explosive-crossbow',
+      fireKind: 'projectile',
+      phase: 'explosion',
+      actionNonce: 73,
+      actionCurrent: true,
+      actionWeapon: 'explosive-crossbow',
+      actionNonceObserved: 73,
+      eventReplay: false,
+      panePhaseAlreadyAdmitted: false,
+      originInsideArena: true,
+      paneDistanceM: 3.5,
+      blastRadiusM: 3.5,
+    })).toEqual({ accepted: true, reason: 'accepted' });
+  });
+
+  it('never lets a predicted guest bolt mutate glass before the host result', () => {
+    expect(admitCrossbowGlassMutation(false)).toEqual({
+      accepted: false,
+      reason: 'presentation-only-prediction',
+    });
   });
 });

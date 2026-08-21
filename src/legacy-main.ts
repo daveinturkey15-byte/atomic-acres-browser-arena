@@ -256,7 +256,7 @@ import {
   weaponPrewarmCatalogForArena,
 } from './weapon-prewarm-catalog';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
-import { clampPointToBounds, damp, firstSegmentBoxHit, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes } from './collision';
+import { clampPointToBounds, damp, firstSegmentBoxHit, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes, type Box2 } from './collision';
 import {
   applyPenetrationDamage,
   ballisticImpactSurface,
@@ -313,6 +313,12 @@ import {
   glassAuthorityProjection,
   type GlassImpactProfile,
 } from './glass-authority';
+import {
+  admitCanonicalCrossbowGlassBreak,
+  admitCrossbowGlassMutation,
+  retainInFlightCrossbowGlassActions,
+  type CrossbowGlassPhase,
+} from './crossbow-glass-authority';
 import {
   activeSoloBotTarget,
   arenaCanvasLabel,
@@ -843,7 +849,11 @@ import {
   type RailgunShotResultMessage,
   type RailgunStateMessage,
 } from './railgun-authority';
-import { selectPlayableWindowApproach, windowBreakPathBlocked } from './window-breaks';
+import {
+  crossbowBlastLineOfSightColliders,
+  selectPlayableWindowApproach,
+  windowBreakPathBlocked,
+} from './window-breaks';
 import { resolveRenderProfile, type RenderProfile } from './render-profile';
 import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRandom, runtimeRandomTelemetry, runtimeSeed } from './runtime-random';
 import {
@@ -1074,6 +1084,7 @@ type ExplosiveBoltEntity = {
   nextFuseBeepAt: number | null;
   targetId: string | null;
   targetLifeId: number | null;
+  impactWindowId: string | null;
   actionNonce: number;
 };
 
@@ -3360,6 +3371,8 @@ function activeGunRangeTestBayDoorColliders(activeArena: ArenaMap = arena): read
     : [];
 }
 
+const activeGlassColliderWindowIds = new WeakMap<Box2, string>();
+
 function activeGlassDynamicColliders(activeArena: ArenaMap = arena): readonly DynamicWorldCollider[] {
   const entries: DynamicWorldCollider[] = [];
   for (const pane of activeArena.breakableWindows) {
@@ -3372,16 +3385,18 @@ function activeGlassDynamicColliders(activeArena: ArenaMap = arena): readonly Dy
     if (bounds.isEmpty() || ![
       bounds.min.x, bounds.max.x, bounds.min.y, bounds.max.y, bounds.min.z, bounds.max.z,
     ].every(Number.isFinite)) continue;
+    const colliderBounds = Object.freeze({
+      minX: bounds.min.x,
+      maxX: bounds.max.x,
+      minY: bounds.min.y,
+      maxY: bounds.max.y,
+      minZ: bounds.min.z,
+      maxZ: bounds.max.z,
+    });
+    activeGlassColliderWindowIds.set(colliderBounds, pane.id);
     entries.push(Object.freeze({
       id: `glass:${pane.id}`,
-      bounds: Object.freeze({
-        minX: bounds.min.x,
-        maxX: bounds.max.x,
-        minY: bounds.min.y,
-        maxY: bounds.max.y,
-        minZ: bounds.min.z,
-        maxZ: bounds.max.z,
-      }),
+      bounds: colliderBounds,
     }));
   }
   return Object.freeze(entries);
@@ -4363,6 +4378,212 @@ let lastGrenadeExplosionProfile = {
   selfDamageMs: 0,
   totalSyncMs: 0,
 };
+type GrenadeFirstActionProfile = {
+  sequence: number;
+  actionNonce: number | null;
+  grenade: GrenadeId;
+  cold: boolean;
+  startedAt: number;
+  handlerCompletedAt: number;
+  handlerSyncMs: number;
+  audio: Readonly<{
+    contextState: string;
+    prewarmed: boolean;
+    warmupSources: number;
+    retainedSources: number;
+    liveRecipe: string;
+  }>;
+  pool: Readonly<{
+    prewarmGeneration: number;
+    acquisitionsBefore: number;
+    acquisitionsAfter: number;
+    acquiredRetainedMesh: boolean;
+    activeAfter: number;
+    slot: number | null;
+    family: string | null;
+  }>;
+  animation: Readonly<{
+    startedAt: number;
+    activeAtHandlerEnd: boolean;
+    progressAtHandlerEnd: number;
+    activeOnFirstPresentedFrame: boolean | null;
+    progressOnFirstPresentedFrame: number | null;
+  }>;
+  physics: Readonly<{
+    path: 'deterministic-kinematic-no-rapier-body';
+    rapierBodiesAcquired: 0;
+  }>;
+  startingPresentedGameplayFrame: number;
+  firstPresentedGameplayFrame: number | null;
+  firstPresentedDelayMs: number | null;
+  meshVisibleOnFirstPresentedFrame: boolean | null;
+  startingSubmissionSequence: number;
+  targetSubmissionSequence: number | null;
+  firstSubmissionDelayMs: number | null;
+  firstCompletionDelayMs: number | null;
+  frameGapsMs: number[];
+  frameP50Ms: number;
+  frameP95Ms: number;
+  frameP99Ms: number;
+  maximumAnimationFrameGapMs: number;
+  maximumFrameWorkMs: number;
+  frameSamples: number;
+  completionFailures: number;
+  status: string;
+  observationComplete: boolean;
+  lastAnimationFrameAt: number;
+};
+let grenadeActionProfileSequence = 0;
+let lastGrenadeFirstActionProfile: GrenadeFirstActionProfile | null = null;
+const grenadeFirstActionProfiles: GrenadeFirstActionProfile[] = [];
+
+function framePercentile(samples: readonly number[], percentile: number): number {
+  if (samples.length === 0) return 0;
+  const ordered = [...samples].sort((left, right) => left - right);
+  const index = Math.min(ordered.length - 1, Math.max(0, Math.ceil(ordered.length * percentile) - 1));
+  return ordered[index]!;
+}
+
+function beginGrenadeFirstActionProfile(grenade: GrenadeId, startedAt: number): GrenadeFirstActionProfile {
+  const presentation = renderRuntime.presentationTelemetry(startedAt);
+  const audioTelemetry = audio.telemetry();
+  const pool = grenadeWorldPresentationPool.telemetry();
+  const profile: GrenadeFirstActionProfile = {
+    sequence: grenadeActionProfileSequence,
+    actionNonce: null,
+    grenade,
+    cold: grenadeActionProfileSequence === 0,
+    startedAt,
+    handlerCompletedAt: startedAt,
+    handlerSyncMs: 0,
+    audio: Object.freeze({
+      contextState: audioTelemetry.context.state,
+      prewarmed: audioTelemetry.grenadeEffectsPrewarm.prepared,
+      warmupSources: audioTelemetry.grenadeEffectsPrewarm.warmupSources,
+      retainedSources: audioTelemetry.grenadeEffectsPrewarm.retainedSources,
+      liveRecipe: audioTelemetry.grenadeEffectsPrewarm.liveRecipe,
+    }),
+    pool: Object.freeze({
+      prewarmGeneration: pool.gpuPrewarmGeneration,
+      acquisitionsBefore: pool.acquisitions,
+      acquisitionsAfter: pool.acquisitions,
+      acquiredRetainedMesh: false,
+      activeAfter: pool.active,
+      slot: null,
+      family: null,
+    }),
+    animation: Object.freeze({
+      startedAt: 0,
+      activeAtHandlerEnd: false,
+      progressAtHandlerEnd: 1,
+      activeOnFirstPresentedFrame: null,
+      progressOnFirstPresentedFrame: null,
+    }),
+    physics: Object.freeze({ path: 'deterministic-kinematic-no-rapier-body', rapierBodiesAcquired: 0 }),
+    startingPresentedGameplayFrame: lastGameplayPresentedFrame,
+    firstPresentedGameplayFrame: null,
+    firstPresentedDelayMs: null,
+    meshVisibleOnFirstPresentedFrame: null,
+    startingSubmissionSequence: presentation.submissionSequence,
+    targetSubmissionSequence: null,
+    firstSubmissionDelayMs: null,
+    firstCompletionDelayMs: null,
+    frameGapsMs: [],
+    frameP50Ms: 0,
+    frameP95Ms: 0,
+    frameP99Ms: 0,
+    maximumAnimationFrameGapMs: 0,
+    maximumFrameWorkMs: 0,
+    frameSamples: 0,
+    completionFailures: presentation.completionFailures,
+    status: presentation.status,
+    observationComplete: false,
+    lastAnimationFrameAt: startedAt,
+  };
+  grenadeActionProfileSequence += 1;
+  lastGrenadeFirstActionProfile = profile;
+  grenadeFirstActionProfiles.push(profile);
+  if (grenadeFirstActionProfiles.length > 2) grenadeFirstActionProfiles.shift();
+  return profile;
+}
+
+function completeGrenadeActionHandler(
+  profile: GrenadeFirstActionProfile,
+  actionNonce: number,
+  mesh: THREE.Object3D,
+  completedAt: number,
+): void {
+  if (lastGrenadeFirstActionProfile !== profile) return;
+  const pool = grenadeWorldPresentationPool.telemetry();
+  const animation = weaponView.grenadeActionTelemetry(completedAt);
+  profile.actionNonce = actionNonce;
+  profile.handlerCompletedAt = completedAt;
+  profile.handlerSyncMs = Math.max(0, completedAt - profile.startedAt);
+  profile.pool = Object.freeze({
+    ...profile.pool,
+    acquisitionsAfter: pool.acquisitions,
+    acquiredRetainedMesh: mesh.userData.presentationPoolInUse === true && mesh.parent !== null,
+    activeAfter: pool.active,
+    slot: typeof mesh.userData.presentationPoolSlot === 'number' ? mesh.userData.presentationPoolSlot : null,
+    family: typeof mesh.userData.presentationPoolFamily === 'string' ? mesh.userData.presentationPoolFamily : null,
+  });
+  profile.animation = Object.freeze({
+    ...profile.animation,
+    startedAt: animation.startedAt,
+    activeAtHandlerEnd: animation.active,
+    progressAtHandlerEnd: animation.progress,
+  });
+}
+
+function sampleGrenadeFirstActionProfile(frameNow: number, frameWorkMs: number): void {
+  const profile = lastGrenadeFirstActionProfile;
+  if (!profile || profile.observationComplete) return;
+  const elapsedMs = Math.max(0, frameNow - profile.startedAt);
+  const gapMs = Math.max(0, frameNow - profile.lastAnimationFrameAt);
+  profile.lastAnimationFrameAt = frameNow;
+  profile.frameGapsMs.push(gapMs);
+  profile.frameP50Ms = framePercentile(profile.frameGapsMs, 0.5);
+  profile.frameP95Ms = framePercentile(profile.frameGapsMs, 0.95);
+  profile.frameP99Ms = framePercentile(profile.frameGapsMs, 0.99);
+  profile.maximumAnimationFrameGapMs = Math.max(profile.maximumAnimationFrameGapMs, gapMs);
+  profile.maximumFrameWorkMs = Math.max(profile.maximumFrameWorkMs, Math.max(0, frameWorkMs));
+  profile.frameSamples += 1;
+
+  const presentation = renderRuntime.presentationTelemetry(frameNow);
+  if (profile.targetSubmissionSequence === null
+    && presentation.submissionSequence > profile.startingSubmissionSequence) {
+    profile.targetSubmissionSequence = presentation.submissionSequence;
+    profile.firstSubmissionDelayMs = elapsedMs;
+  }
+  if (profile.firstCompletionDelayMs === null && profile.targetSubmissionSequence !== null
+    && presentation.completedSequence >= profile.targetSubmissionSequence) {
+    profile.firstCompletionDelayMs = elapsedMs;
+  }
+  profile.completionFailures = presentation.completionFailures;
+  profile.status = presentation.status;
+
+  if (profile.firstPresentedGameplayFrame === null
+    && lastGameplayPresentedFrame > profile.startingPresentedGameplayFrame) {
+    const entity = profile.actionNonce === null
+      ? null
+      : grenades.find((grenade) => grenade.actionNonce === profile.actionNonce) ?? null;
+    const animation = weaponView.grenadeActionTelemetry(frameNow);
+    profile.firstPresentedGameplayFrame = lastGameplayPresentedFrame;
+    profile.firstPresentedDelayMs = elapsedMs;
+    profile.meshVisibleOnFirstPresentedFrame = entity !== null
+      && entity.mesh.visible
+      && entity.mesh.userData.presentationPoolInUse === true
+      && entity.mesh.parent !== null;
+    profile.animation = Object.freeze({
+      ...profile.animation,
+      activeOnFirstPresentedFrame: animation.active,
+      progressOnFirstPresentedFrame: animation.progress,
+    });
+  }
+  profile.observationComplete = elapsedMs >= 350
+    && profile.firstPresentedGameplayFrame !== null
+    && (renderRuntime.backend !== 'webgpu' || profile.firstCompletionDelayMs !== null);
+}
 let lastBotEliminationProfile = {
   deathDropMs: 0,
   deathPoseMs: 0,
@@ -7204,7 +7425,10 @@ function resetAuthenticatedGuestReplacement(playerId: string): void {
   }
   authoritativeShotAdmissions.delete(playerId);
   remoteShotAdmissions.delete(playerId);
-  admittedRemoteShots.delete(playerId);
+  const retainedCrossbowActions = admittedRemoteShots.get(playerId);
+  if (retainInFlightCrossbowGlassActions(retainedCrossbowActions, interactiveWorldMatchEpoch, now) === 0) {
+    admittedRemoteShots.delete(playerId);
+  }
   admittedRemoteMelees.delete(playerId);
   admittedRemoteExplosions.delete(playerId);
   remoteMeleeAdmissions.delete(playerId);
@@ -12208,13 +12432,18 @@ function breakHouseWindow(
   actionNonce?: number,
   impactOwnerId = player.id,
   impactNonce = randomNonce(),
+  weapon?: Extract<WeaponId, 'explosive-crossbow'>,
+  crossbowPhase?: CrossbowGlassPhase,
+  crossbowBlastRadiusM?: 3.5 | 7,
 ): boolean {
   const window = arena.breakableWindows.find((candidate) => candidate.id === windowId);
   if (!window) return false;
   const state = window.glassState?.matchEpoch === interactiveWorldMatchEpoch
     ? window.glassState
     : createGlassState(window.id, interactiveWorldMatchEpoch);
-  const profile: GlassImpactProfile = kind === 'explosive' ? 'explosion' : kind === 'knife' ? 'knife' : 'bullet';
+  const profile: GlassImpactProfile = weapon === 'explosive-crossbow'
+    ? crossbowPhase === 'explosion' ? 'explosion' : 'bullet'
+    : kind === 'explosive' ? 'explosion' : kind === 'knife' ? 'knife' : 'bullet';
   const impactId = `${profile}:${impactOwnerId}:${impactNonce}:${state.revision}`;
   const result = admitGlassImpact(state, {
     // Network-originated mutations reach this point only after the existing
@@ -12239,7 +12468,8 @@ function breakHouseWindow(
       windowId,
       origin: origin.toArray(),
       kind,
-      ...(kind === 'explosive' ? { actionNonce } : {}),
+      ...(weapon ? { weapon, crossbowPhase, crossbowBlastRadiusM } : {}),
+      ...(kind === 'explosive' || weapon ? { actionNonce } : {}),
       nonce: impactNonce,
     };
     network.send(network.role === 'host' ? canonicalHostWindowBreak(message, performance.now()) : message);
@@ -12293,7 +12523,7 @@ function breakWindowsAlongBallisticTrace(
 }
 
 function canonicalHostWindowBreak(message: WindowBreakMessage, now: number): WindowBreakMessage {
-  const sticky = message.kind === 'explosive' && Number.isFinite(message.actionNonce)
+  const sticky = !message.weapon && message.kind === 'explosive' && Number.isFinite(message.actionNonce)
     ? hostStickyVerificationForAction(message.by, 'semtex', message.actionNonce!, message.origin, now)
     : null;
   const attachment = sticky?.verification.status === 'verified' ? sticky.verification.attachment : null;
@@ -12309,17 +12539,68 @@ function canonicalHostWindowBreak(message: WindowBreakMessage, now: number): Win
 }
 
 function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
-  if (message.by === player.id || processedNonces.has(message.nonce)) return;
+  const crossbowEvent = message.weapon === 'explosive-crossbow';
+  const localCanonicalCrossbow = crossbowEvent && network.role === 'client' && message.by === player.id;
+  if (message.by === player.id && !localCanonicalCrossbow || processedNonces.has(message.nonce)) return;
   if (network.role === 'client') {
     if (!message.hostAuthority || message.hostAuthority.hostId !== privateLobbySnapshot?.hostId) return;
   } else if (message.hostAuthority !== undefined) {
     return;
   }
-  const remote = remotes.get(message.by);
   const window = arena.breakableWindows.find((candidate) => candidate.id === message.windowId);
-  if (!remote || !window || window.broken) return;
-  const sender = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
+  if (!window || window.broken) return;
   const centre = window.mesh.getWorldPosition(new THREE.Vector3());
+  if (crossbowEvent) {
+    const now = performance.now();
+    const action = currentAdmittedShotAction(message.by, message.actionNonce!, now);
+    const panePhaseKey = `glass:${message.windowId}:${message.crossbowPhase}`;
+    const origin = new THREE.Vector3(...message.origin);
+    window.mesh.updateWorldMatrix(true, false);
+    const paneBounds = new THREE.Box3().setFromObject(window.mesh);
+    const blastRadiusM = message.crossbowBlastRadiusM ?? explosiveBoltBlastRadiusM(false);
+    const admission = admitCanonicalCrossbowGlassBreak({
+      receiverRole: network.role === 'host' ? 'host' : 'client',
+      hostAuthorityValid: network.role === 'client'
+        && message.hostAuthority?.hostId === privateLobbySnapshot?.hostId,
+      weapon: message.weapon,
+      fireKind: WEAPONS[message.weapon].fireKind,
+      phase: message.crossbowPhase!,
+      actionNonce: message.actionNonce!,
+      actionCurrent: action !== undefined,
+      actionWeapon: action?.message.weapon ?? null,
+      actionNonceObserved: action?.message.nonce ?? null,
+      eventReplay: processedNonces.has(message.nonce),
+      panePhaseAlreadyAdmitted: action?.targets.has(panePhaseKey) ?? false,
+      originInsideArena: pointInsideBounds(origin, arena.bounds, 0.44),
+      paneDistanceM: paneBounds.isEmpty() ? Number.POSITIVE_INFINITY : paneBounds.distanceToPoint(origin),
+      blastRadiusM,
+    });
+    if (!admission.accepted || !action) return;
+    processedNonces.add(message.nonce);
+    action.targets.add(panePhaseKey);
+    const normal = centre.clone().sub(origin);
+    if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
+    else normal.normalize().multiplyScalar(-1);
+    breakHouseWindow(
+      message.windowId,
+      paneBounds.clampPoint(origin, new THREE.Vector3()),
+      normal,
+      false,
+      origin,
+      message.kind,
+      message.actionNonce,
+      message.by,
+      message.nonce,
+      message.weapon,
+      message.crossbowPhase,
+      message.crossbowBlastRadiusM,
+    );
+    trimNonceSet();
+    return;
+  }
+  const remote = remotes.get(message.by);
+  if (!remote) return;
+  const sender = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
   const explosive = message.kind === 'explosive';
   const grenadeAuthority = explosive ? remoteGrenadeAuthorities.get(message.by) : undefined;
   const grenade = explosive && grenadeAuthority && Number.isFinite(message.actionNonce)
@@ -12864,7 +13145,10 @@ function removeRemote(id: string, reason: string, allowRejoinReservation = true)
   verifiedRemoteKills.delete(id);
   remoteShotAdmissions.delete(id);
   hostTriggerAuthorities.reset(id, 'disconnect');
-  admittedRemoteShots.delete(id);
+  const retainedCrossbowActions = admittedRemoteShots.get(id);
+  if (retainInFlightCrossbowGlassActions(retainedCrossbowActions, interactiveWorldMatchEpoch, performance.now()) === 0) {
+    admittedRemoteShots.delete(id);
+  }
   admittedRemoteMelees.delete(id);
   admittedRemoteExplosions.delete(id);
   remoteStickyAttachmentAuthority = removeRemoteStickyAttachmentsForActor(remoteStickyAttachmentAuthority, id);
@@ -13454,6 +13738,7 @@ async function startGame(
   audio.unlock();
   document.documentElement.dataset.combatAudioPrewarm = audio.prepareCombat() ? 'ready' : 'unavailable';
   document.documentElement.dataset.glassImpactAudioPrewarm = audio.prepareGlassImpact() ? 'ready' : 'unavailable';
+  document.documentElement.dataset.grenadeEffectsAudioPrewarm = audio.prepareGrenadeEffects() ? 'ready' : 'unavailable';
   prepareDeploymentTransition();
   applyMenuLifecycle({ type: 'match-start' });
   syncMenuPreviewCanvasPlacement();
@@ -15482,8 +15767,7 @@ function tryFire(now: number): void {
     timing: nextCombatTiming(),
     nonce: shotActionNonce,
   };
-  if (player.weapon === 'flamethrower'
-    || network.role === 'client' && player.weapon === 'flare-gun') {
+  if (player.weapon === 'flamethrower') {
     const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
     for (const [nonce, action] of actions) {
       if (now - action.receivedAt > admittedShotActionLifetimeMs(action.message.weapon)) actions.delete(nonce);
@@ -15501,17 +15785,15 @@ function tryFire(now: number): void {
     );
   }
   if (projectileShot) {
-    if (network.role !== 'client') {
-      const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
-      for (const [nonce, action] of actions) {
-        const lifetimeMs = admittedShotActionLifetimeMs(action.message.weapon);
-        if (now - action.receivedAt > lifetimeMs) actions.delete(nonce);
-      }
-      actions.set(shot.nonce, {
-        message: shot, receivedAt: now, matchEpoch: interactiveWorldMatchEpoch, targets: new Set(),
-      });
-      admittedRemoteShots.set(player.id, actions);
+    const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
+    for (const [nonce, action] of actions) {
+      const lifetimeMs = admittedShotActionLifetimeMs(action.message.weapon);
+      if (now - action.receivedAt > lifetimeMs) actions.delete(nonce);
     }
+    actions.set(shot.nonce, {
+      message: shot, receivedAt: now, matchEpoch: interactiveWorldMatchEpoch, targets: new Set(),
+    });
+    admittedRemoteShots.set(player.id, actions);
     if (player.weapon === 'flare-gun') {
       const spawned = flareProjectileSystem.spawn({
         ownerId: player.id, ownerTeam: player.team, origin,
@@ -17198,6 +17480,7 @@ function spawnExplosiveBolt(
     nextFuseBeepAt: null,
     targetId: null,
     targetLifeId: null,
+    impactWindowId: null,
     actionNonce,
   });
 }
@@ -17297,10 +17580,13 @@ function detonateExplosiveBoltEntity(bolt: ExplosiveBoltEntity, now: number): vo
   const stuck = sealedAttachment !== null;
   const blastRadiusM = explosiveBoltBlastRadiusM(stuck);
   applyInteractiveWorldExplosion(point, blastRadiusM, EXPLOSIVE_BOLT_BLAST_MAX_DAMAGE * (stuck ? 2 : 1));
-  // Tactical/explosive bolts share the hosted grenade glass policy: the
-  // detonation may break a reachable pane, but never through an intervening
-  // solid collider or by mutating presentation-only glass on a guest.
-  breakWindowsInGrenadeBlast(point, bolt.actionNonce, true, blastRadiusM);
+  breakWindowsInCrossbowBlast(
+    point,
+    bolt.actionNonce,
+    blastRadiusM,
+    bolt.ownerId,
+    bolt.impactWindowId,
+  );
   const targetCount = fillExplosiveBoltTargets(bolt.ownerId, bolt.ownerTeam);
   for (let targetIndex = 0; targetIndex < targetCount; targetIndex += 1) {
     const target = explosiveBoltTargetBuffer.at(targetIndex);
@@ -17813,6 +18099,34 @@ function updateExplosiveBolts(dt: number, now: number): void {
       } else if (worldCollision || glassCollision) {
         const collisionFraction = Math.min(worldFraction, glassFraction);
         bolt.mesh.position.copy(start).addScaledVector(delta, collisionFraction);
+        const worldGlassWindowId = worldCollision
+          ? activeGlassColliderWindowIds.get(worldCollision.box) ?? null
+          : null;
+        const impactWindowId = worldGlassWindowId
+          ?? (glassCollision && glassFraction <= worldFraction + 1e-6 ? glassCollision.windowId : null);
+        bolt.impactWindowId = impactWindowId;
+        if (impactWindowId && admitCrossbowGlassMutation(bolt.authority).accepted) {
+          const pane = arena.breakableWindows.find(({ id }) => id === impactWindowId);
+          if (pane) {
+            const impactPoint = bolt.mesh.position.clone();
+            const normal = worldCollision && worldGlassWindowId === impactWindowId
+              ? new THREE.Vector3(worldCollision.normal.x, worldCollision.normal.y, worldCollision.normal.z)
+              : pane.mesh.getWorldPosition(new THREE.Vector3()).sub(impactPoint).normalize().multiplyScalar(-1);
+            breakHouseWindow(
+              pane.id,
+              impactPoint,
+              normal,
+              true,
+              impactPoint,
+              'shot',
+              bolt.actionNonce,
+              bolt.ownerId,
+              randomNonce(),
+              'explosive-crossbow',
+              'impact',
+            );
+          }
+        }
         bolt.impactedAt = now;
         bolt.detonatesAt = Math.min(bolt.expiresAt, now + EXPLOSIVE_BOLT_ARM_DELAY_MS);
         bolt.nextFuseBeepAt = now;
@@ -17843,6 +18157,7 @@ function throwGrenade(): void {
     return;
   }
   if (!player.alive || player.grenades <= 0 || matchState.phase !== 'active') return;
+  const firstActionProfile = beginGrenadeFirstActionProfile(player.selectedGrenade, performance.now());
   endSpawnProtectionOnOffense(performance.now());
   player.grenades -= 1;
   weaponView.throwGrenade();
@@ -17886,6 +18201,7 @@ function throwGrenade(): void {
     attachedTargetId: null,
     attachedTargetLifeId: null,
   });
+  completeGrenadeActionHandler(firstActionProfile, actionNonce, mesh, performance.now());
 }
 
 function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-throw' }>, ownerTeam: Team): void {
@@ -17939,6 +18255,47 @@ function breakWindowsInGrenadeBlast(point: THREE.Vector3, actionNonce: number, r
     if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
     else normal.normalize().multiplyScalar(-1);
     if (breakHouseWindow(pane.id, centre, normal, replicate, point, 'explosive', actionNonce)) broken += 1;
+  }
+  return broken;
+}
+
+function breakWindowsInCrossbowBlast(
+  point: THREE.Vector3,
+  actionNonce: number,
+  radius: number,
+  ownerId: string,
+  impactWindowId: string | null,
+): number {
+  const worldColliders = Object.freeze([...activeWorldColliders()]);
+  const blastColliders = crossbowBlastLineOfSightColliders(
+    worldColliders,
+    impactWindowId,
+    (collider) => activeGlassColliderWindowIds.get(collider) ?? null,
+  );
+  const canonicalRadius: 3.5 | 7 = radius > 3.5 ? 7 : 3.5;
+  let broken = 0;
+  for (const pane of arena.breakableWindows) {
+    if (pane.broken) continue;
+    const centre = pane.mesh.getWorldPosition(new THREE.Vector3());
+    if (centre.distanceTo(point) > radius) continue;
+    if (windowBreakPathBlocked(point, centre, blastColliders)) continue;
+    const normal = centre.clone().sub(point);
+    if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
+    else normal.normalize().multiplyScalar(-1);
+    if (breakHouseWindow(
+      pane.id,
+      centre,
+      normal,
+      true,
+      point,
+      'explosive',
+      actionNonce,
+      ownerId,
+      randomNonce(),
+      'explosive-crossbow',
+      'explosion',
+      canonicalRadius,
+    )) broken += 1;
   }
   return broken;
 }
@@ -24221,6 +24578,9 @@ function resetForMode(preserveAdmission = false): void {
   lastHostedBotStateSeq = -1;
   clearGrenades();
   clearGrenadeExplosionVisuals();
+  grenadeActionProfileSequence = 0;
+  lastGrenadeFirstActionProfile = null;
+  grenadeFirstActionProfiles.length = 0;
   clearFieldSupport();
   clearDeathDrops();
   clearCorpsePresentations();
@@ -25019,7 +25379,9 @@ function frame(now: number, scheduleNext = true): void {
       if (activeRenderConfig.shadowMode === 'static') requestStaticShadowRefresh(false);
     }
     if (scheduleNext) {
-      recentFrameWorkMs.push(Math.max(0, performance.now() - frameWorkStartedAt));
+      const frameWorkMs = Math.max(0, performance.now() - frameWorkStartedAt);
+      recentFrameWorkMs.push(frameWorkMs);
+      sampleGrenadeFirstActionProfile(performance.now(), frameWorkMs);
       if (recentFrameWorkMs.length > FRAME_WORK_SAMPLE_LIMIT) {
         recentFrameWorkMs.splice(0, recentFrameWorkMs.length - FRAME_WORK_SAMPLE_LIMIT);
       }
@@ -25620,6 +25982,13 @@ const debugWindow = window as Window & {
     aimAtRemoteWithOffset: (yawOffset: number, pitchOffset?: number) => void;
     stageWindow: (index: number, distance?: number) => void;
     detonateGrenadeAtWindow: (index: number) => number;
+    detonateCrossbowNearWindow: (index: number, distance?: number) => {
+      windowId: string;
+      beforeBroken: boolean;
+      afterBroken: boolean;
+      detonationPoint: number[];
+      radiusM: number;
+    } | null;
     stageYardhawkWall: (team?: Team) => boolean;
     stageBotAtIndoorRamp: (team?: Team, descending?: boolean) => boolean;
     damageBot: (amount: number, zone?: HitZone) => void;
@@ -25701,6 +26070,7 @@ const debugWindow = window as Window & {
     ) => Record<string, unknown>;
     setPass64SystemVisibility: (name: 'sky' | 'mist' | 'smoke' | 'dust' | 'grass' | 'water', visible: boolean) => boolean;
     setCaptureViewmodelHidden: (hidden: boolean) => void;
+    setThermalRevealEvidenceHidden: (hidden: boolean) => boolean;
     stageLoadingCaptureSquad: () => { staged: boolean; characters: number; positions: number[][] };
     collisionProbe: (x: number, z: number) => boolean;
     collisionProbeAt: (x: number, y: number, z: number) => boolean;
@@ -27107,6 +27477,22 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       lastExplosionAgeMs: lastGrenadeExplosionFrameAt > 0 ? Math.max(0, performance.now() - lastGrenadeExplosionFrameAt) : null,
       profile: { ...lastGrenadeExplosionProfile },
     },
+    grenadeFirstAction: lastGrenadeFirstActionProfile ? {
+      ...lastGrenadeFirstActionProfile,
+      audio: { ...lastGrenadeFirstActionProfile.audio },
+      pool: { ...lastGrenadeFirstActionProfile.pool },
+      animation: { ...lastGrenadeFirstActionProfile.animation },
+      physics: { ...lastGrenadeFirstActionProfile.physics },
+      frameGapsMs: [...lastGrenadeFirstActionProfile.frameGapsMs],
+    } : null,
+    grenadeFirstActions: grenadeFirstActionProfiles.map((profile) => ({
+      ...profile,
+      audio: { ...profile.audio },
+      pool: { ...profile.pool },
+      animation: { ...profile.animation },
+      physics: { ...profile.physics },
+      frameGapsMs: [...profile.frameGapsMs],
+    })),
     audio: { ...audio.telemetry(), occlusion: audioOcclusionBudget.telemetry() },
     settings: {
       requested: pass65Settings,
@@ -27926,6 +28312,37 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     const pane = arena.breakableWindows[Math.max(0, Math.min(arena.breakableWindows.length - 1, Math.floor(index)))];
     return pane ? breakWindowsInGrenadeBlast(pane.mesh.getWorldPosition(new THREE.Vector3()), randomNonce(), true) : 0;
   },
+  detonateCrossbowNearWindow: (index: number, distance = 1) => {
+    const pane = arena.breakableWindows[Math.max(0, Math.min(arena.breakableWindows.length - 1, Math.floor(index)))];
+    if (!pane || network.role === 'client') return null;
+    resetBreakableWindows();
+    const centre = pane.mesh.getWorldPosition(new THREE.Vector3());
+    const house = arena.houses.reduce((nearest, candidate) => {
+      const currentDistance = Math.hypot(centre.x - candidate.origin.x, centre.z - candidate.origin.z);
+      const nearestDistance = Math.hypot(centre.x - nearest.origin.x, centre.z - nearest.origin.z);
+      return currentDistance < nearestDistance ? candidate : nearest;
+    }, arena.houses[0]);
+    const approach = selectPlayableWindowApproach(centre, house.origin, arena.bounds, activeWorldColliders(), 2);
+    if (!approach) return null;
+    const outward = new THREE.Vector3(approach.x - centre.x, approach.y - centre.y, approach.z - centre.z).normalize();
+    const point = centre.clone().addScaledVector(outward, THREE.MathUtils.clamp(distance, 0.35, 3));
+    const beforeBroken = pane.broken;
+    const now = performance.now();
+    spawnExplosiveBolt(player.id, player.team, point, outward, true, randomNonce(), now);
+    const bolt = explosiveBolts.at(-1);
+    if (!bolt) return null;
+    bolt.mesh.position.copy(point);
+    bolt.impactedAt = now;
+    bolt.detonatesAt = now;
+    detonateExplosiveBoltEntity(bolt, now);
+    return {
+      windowId: pane.id,
+      beforeBroken,
+      afterBroken: pane.broken,
+      detonationPoint: point.toArray(),
+      radiusM: explosiveBoltBlastRadiusM(false),
+    };
+  },
   stageYardhawkWall: (team: Team = 0) => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     const house = arena.houses.find((candidate) => candidate.team === team);
@@ -28430,6 +28847,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     debugCaptureViewmodelHidden = hidden;
     weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
   },
+  setThermalRevealEvidenceHidden: (hidden) => thermalGhostPresentation.setEvidenceControlHidden(hidden),
   stageLoadingCaptureSquad: () => {
     if (selectedArena.id !== 'atomic-acres' || gameMode !== 'solo' || !gameStarted) {
       return { staged: false, characters: 0, positions: [] };

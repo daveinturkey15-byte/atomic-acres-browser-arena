@@ -1,10 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import { segmentIntersectsBox, type Box2 } from './collision';
-import { selectPlayableWindowApproach, windowBreakPathBlocked } from './window-breaks';
+import {
+  crossbowBlastLineOfSightColliders,
+  selectPlayableWindowApproach,
+  windowBreakPathBlocked,
+} from './window-breaks';
 
 const bounds: Box2 = { minX: -40, maxX: 40, minZ: -40, maxZ: 40 };
 
 describe('breakable-window admission geometry', () => {
+  it('removes only the struck pane from crossbow blast line of sight', () => {
+    const wall: Box2 = { minX: -1, maxX: 1, minY: 0, maxY: 3, minZ: 1, maxZ: 1.2 };
+    const struckPane: Box2 = { minX: -1, maxX: 1, minY: 0.8, maxY: 2.4, minZ: 2, maxZ: 2.08 };
+    const otherPane: Box2 = { minX: 3, maxX: 4, minY: 0.8, maxY: 2.4, minZ: 2, maxZ: 2.08 };
+    const ids = new Map<Box2, string>([[struckPane, 'front-window'], [otherPane, 'side-window']]);
+    const filtered = crossbowBlastLineOfSightColliders(
+      [wall, struckPane, otherPane],
+      'front-window',
+      (collider) => ids.get(collider) ?? null,
+    );
+    expect(filtered).toEqual([wall, otherPane]);
+    expect(crossbowBlastLineOfSightColliders(
+      [wall, struckPane, otherPane],
+      null,
+      (collider) => ids.get(collider) ?? null,
+    )).toEqual([wall, struckPane, otherPane]);
+  });
+
   it('ignores only collider contact behind the pane endpoint but keeps real mid-path cover', () => {
     const origin = { x: 0, y: 1.6, z: 4 };
     const centre = { x: 0, y: 1.6, z: 0 };

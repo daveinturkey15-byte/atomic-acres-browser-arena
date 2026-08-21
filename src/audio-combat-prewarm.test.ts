@@ -237,6 +237,93 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
     expect(audio.telemetry().glassImpactPrewarm).toMatchObject({ prepared: false, runs: 1 });
   });
 
+  it('silently warms grenade factories while preserving the exact live bounce, fuse and broadband blast recipe', () => {
+    vi.stubGlobal('AudioContext', FakeAudioContext);
+    const audio = new ArenaAudio();
+    audio.unlock();
+    const context = FakeAudioContext.instances[0]!;
+    const beforeWarmup = {
+      oscillators: context.oscillators.length,
+      bufferSources: context.bufferSources.length,
+      gains: context.gains.length,
+      filters: context.filters.length,
+    };
+    expect(audio.prepareGrenadeEffects()).toBe(true);
+    const preparedFactories = {
+      oscillators: context.oscillators.length,
+      bufferSources: context.bufferSources.length,
+      gains: context.gains.length,
+      filters: context.filters.length,
+    };
+    expect(preparedFactories).toEqual({
+      oscillators: beforeWarmup.oscillators + 5,
+      bufferSources: beforeWarmup.bufferSources + 2,
+      gains: beforeWarmup.gains + 7,
+      filters: beforeWarmup.filters + 2,
+    });
+    expect(context.oscillators.slice(-5).map(({ type }) => type)).toEqual([
+      'triangle', 'square', 'square', 'sine', 'sawtooth',
+    ]);
+    expect(context.filters.slice(-2).map(({ type }) => type)).toEqual(['lowpass', 'highpass']);
+    expect(context.gains.slice(-7).every((gain) => gain.gain.value === 0)).toBe(true);
+    expect(audio.telemetry().grenadeEffectsPrewarm).toEqual({
+      prepared: true,
+      runs: 1,
+      warmupSources: 7,
+      warmupNodes: 9,
+      retainedSources: 0,
+      retainedBroadbandLoops: 0,
+      liveRecipe: 'sawtooth-pressure-plus-dual-filtered-noise-v1',
+    });
+
+    const exerciseGrenadeAudio = (now: number) => {
+      const before = {
+        oscillators: context.oscillators.length,
+        bufferSources: context.bufferSources.length,
+        gains: context.gains.length,
+        filters: context.filters.length,
+      };
+      audio.grenadeBounce(8);
+      expect(audio.grenadeFuseBeep(900, now)).toBe(true);
+      expect(audio.explosion(now + 100)).toBe(true);
+      const after = {
+        oscillators: context.oscillators.length,
+        bufferSources: context.bufferSources.length,
+        gains: context.gains.length,
+        filters: context.filters.length,
+      };
+      expect(after).toEqual({
+        oscillators: before.oscillators + 5,
+        bufferSources: before.bufferSources + 2,
+        gains: before.gains + 7,
+        filters: before.filters + 2,
+      });
+      expect(context.oscillators.slice(-5).map(({ type }) => type)).toEqual([
+        'triangle', 'square', 'square', 'sine', 'sawtooth',
+      ]);
+      expect(context.filters.slice(-2).map(({ type }) => type)).toEqual(['lowpass', 'highpass']);
+      return after;
+    };
+    const afterFirst = exerciseGrenadeAudio(1_000);
+    const afterSecond = exerciseGrenadeAudio(2_000);
+    expect({
+      oscillators: afterSecond.oscillators - afterFirst.oscillators,
+      bufferSources: afterSecond.bufferSources - afterFirst.bufferSources,
+      gains: afterSecond.gains - afterFirst.gains,
+      filters: afterSecond.filters - afterFirst.filters,
+    }).toEqual({ oscillators: 5, bufferSources: 2, gains: 7, filters: 2 });
+    expect(audio.prepareGrenadeEffects()).toBe(true);
+    expect(audio.telemetry().grenadeEffectsPrewarm).toMatchObject({
+      runs: 1,
+      warmupSources: 7,
+      retainedSources: 0,
+      liveRecipe: 'sawtooth-pressure-plus-dual-filtered-noise-v1',
+    });
+
+    audio.dispose();
+    expect(audio.telemetry().grenadeEffectsPrewarm).toMatchObject({ prepared: false, warmupSources: 0, warmupNodes: 0 });
+  });
+
   it.each([1, 2, 3])('fully tears down partial graphs when combat source %i cannot register', (failedSource) => {
     vi.stubGlobal('AudioContext', FakeAudioContext);
     const audio = new ArenaAudio();
