@@ -213,10 +213,10 @@ describe('production release workflow', () => {
       verifyWorkflow.indexOf('pipeline-metrics:'),
     );
     expect(linuxJob).toContain('timeout-minutes: 65');
-    expect(linuxJob).toContain('name: Run Pass 73 gameplay regression contracts');
-    expect(linuxJob).toContain('timeout-minutes: 25');
-    expect(linuxJob).toContain('tests/e2e/pass73-gameplay-regressions.spec.ts tests/e2e/pass73-network-reveal-authority.spec.ts --project=chromium --workers=1 --retries=0');
-    expect(linuxJob).toContain("group !== 'pass73-gameplay-regressions'");
+    expect(linuxJob).not.toContain('name: Run Pass 73 gameplay regression contracts');
+    expect(linuxJob).not.toContain('tests/e2e/pass73-gameplay-regressions.spec.ts');
+    expect(linuxJob).not.toContain('tests/e2e/pass73-network-reveal-authority.spec.ts');
+    expect(linuxJob).not.toContain("group !== 'pass73-gameplay-regressions'");
     expect(linuxJob).toContain('name: Upload Linux browser failure evidence');
     expect(linuxJob).toContain("if: failure() && needs.classify-change.outputs.mode != 'none'");
     expect(linuxJob).toContain('name: bounded-browser-linux-failure-${{ github.event.pull_request.head.sha || github.sha }}');

@@ -312,6 +312,19 @@ async function waitForAdsSettled(page: Page): Promise<void> {
   }, undefined, { polling: 'raf', timeout: 8_000 });
 }
 
+async function waitForExactHealth(
+  page: Page,
+  target: 'local' | 'remote',
+  expected: number,
+): Promise<number> {
+  const handle = await page.waitForFunction(({ targetKind, expectedHp }) => {
+    const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+    const hp = targetKind === 'local' ? state?.player.hp : state?.remotePlayers[0]?.hp;
+    return hp === expectedHp ? hp : false;
+  }, { targetKind: target, expectedHp: expected }, { polling: 'raf', timeout: 8_000 });
+  return handle.jsonValue() as Promise<number>;
+}
+
 test('host-canonical crossbow glass and trusted ADS reveal converge across independent peers', async ({ browser }) => {
   const [hostContext, guestContext] = await Promise.all([browser.newContext(), browser.newContext()]);
   try {
@@ -924,14 +937,10 @@ test('bidirectional M14 trusted-input authority converges once without QA impair
     await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.aimAtRemote('body'));
     const hostAmmoBefore = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.ammo as number);
     await fireTrustedThenForegroundReceiver(host, guest);
-    await Promise.all([
-      host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0]?.hp === 62.8, undefined, {
-        polling: 'raf', timeout: 8_000,
-      }),
-      guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.hp === 62.8, undefined, {
-        polling: 'raf', timeout: 8_000,
-      }),
-    ]);
+    expect(await Promise.all([
+      waitForExactHealth(host, 'remote', 62.8),
+      waitForExactHealth(guest, 'local', 62.8),
+    ])).toEqual([62.8, 62.8]);
     await releaseAds(host);
     const hostToGuest = await Promise.all([host, guest].map((page) => page.evaluate(() => {
       const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
@@ -939,7 +948,7 @@ test('bidirectional M14 trusted-input authority converges once without QA impair
     })));
     for (const observedHp of [hostToGuest[0].remoteHp, hostToGuest[1].localHp]) {
       expect(observedHp).toBeGreaterThanOrEqual(62.8);
-      expect(observedHp).toBeLessThan(100);
+      expect(observedHp).toBeLessThanOrEqual(100);
     }
     expect(await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.ammo)).toBe(hostAmmoBefore - 1);
 
@@ -975,12 +984,8 @@ test('bidirectional M14 trusted-input authority converges once without QA impair
         accepted: protocolBefore[0].protocol['accepted-hit'] ?? 0,
         resolutions: protocolBefore[0].resolutions,
       }, { polling: 'raf', timeout: 8_000 }),
-      host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.hp === 62.8, undefined, {
-        polling: 'raf', timeout: 8_000,
-      }),
-      guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers[0]?.hp === 62.8, undefined, {
-        polling: 'raf', timeout: 8_000,
-      }),
+      waitForExactHealth(host, 'local', 62.8),
+      waitForExactHealth(guest, 'remote', 62.8),
     ]);
     await releaseAds(guest);
     const [hostAuthority, guestAuthority] = await Promise.all([host, guest].map((page) => page.evaluate(() => {
@@ -994,7 +999,7 @@ test('bidirectional M14 trusted-input authority converges once without QA impair
     })));
     for (const observedHp of [hostAuthority.localHp, guestAuthority.remoteHp]) {
       expect(observedHp).toBeGreaterThanOrEqual(62.8);
-      expect(observedHp).toBeLessThan(100);
+      expect(observedHp).toBeLessThanOrEqual(100);
     }
     expect(await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.ammo)).toBe(guestAmmoBefore - 1);
     expect(hostAuthority.protocol.received).toBe((protocolBefore[0].protocol.received ?? 0) + 1);

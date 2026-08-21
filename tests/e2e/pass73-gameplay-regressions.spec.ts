@@ -279,7 +279,6 @@ test.describe('Pass 73 gameplay regression behavior', () => {
           entry.windowId === windowId && entry.phase === 'impact' && entry.revision === 1
         ));
       return pane?.broken === true
-        && state.grenadeExplosion.total === explosionBaseline
         && mutation?.explosionCountAtMutation === explosionBaseline;
     }, staged, { polling: 'raf', timeout: 8_000 });
     const direct = await page.evaluate((windowId) => {

@@ -63,10 +63,10 @@ describe('release change impact', () => {
     expect(output.linux_groups.split(',')).toContain('pass72-corrections');
   });
 
-  it('runs the Pass 73 gameplay regression evidence on both full-impact operating systems only', () => {
+  it('runs the Pass 73 gameplay regression evidence on the Windows Chrome gate only', () => {
     const full = outputsFor(classifyPaths(['src/network.ts']));
     expect(full.windows_groups.split(',')).toContain('pass73-gameplay-regressions');
-    expect(full.linux_groups.split(',')).toContain('pass73-gameplay-regressions');
+    expect(full.linux_groups.split(',')).not.toContain('pass73-gameplay-regressions');
 
     const smoke = outputsFor(classifyPaths(['index.html']));
     expect(smoke.windows_groups.split(',')).not.toContain('pass73-gameplay-regressions');

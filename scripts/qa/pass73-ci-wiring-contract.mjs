@@ -49,8 +49,8 @@ export function pass73CiWiringFailures({
   if (!exactlyOnce(windows, PASS73_BOUNDED_GROUP)) {
     failures.push(`full Windows impact must select ${PASS73_BOUNDED_GROUP} exactly once`);
   }
-  if (!exactlyOnce(linux, PASS73_BOUNDED_GROUP)) {
-    failures.push(`full Linux impact must select ${PASS73_BOUNDED_GROUP} exactly once`);
+  if (linux.includes(PASS73_BOUNDED_GROUP)) {
+    failures.push(`Linux software-rasterizer impact must not claim ${PASS73_BOUNDED_GROUP}`);
   }
 
   if (!workflowSource.includes('npm run qa:pass73:ci-wiring-contract')) {
@@ -60,13 +60,16 @@ export function pass73CiWiringFailures({
   const linuxJob = workflowSection(workflowSource, '  bounded-browser-linux:', '  pipeline-metrics:');
   if (!windowsJob.includes('QA_E2E_GROUPS: ${{ needs.classify-change.outputs.windows_groups }}')
     || !windowsJob.includes('npm run test:e2e:bounded')
+    || !windowsJob.includes(`${PASS73_BROWSER_SPEC} ${PASS73_NETWORK_REVEAL_SPEC} --project=chromium --workers=1 --retries=0`)
     || windowsJob.includes('continue-on-error: true')) {
     failures.push('Windows bounded job does not fail closed on its selected groups');
   }
   if (!linuxJob.includes('QA_E2E_GROUPS: ${{ needs.classify-change.outputs.linux_groups }}')
     || !linuxJob.includes('npm run test:e2e:bounded')
+    || linuxJob.includes(PASS73_BROWSER_SPEC)
+    || linuxJob.includes(PASS73_NETWORK_REVEAL_SPEC)
     || linuxJob.includes('continue-on-error: true')) {
-    failures.push('Linux bounded job does not fail closed on its selected groups');
+    failures.push('Linux bounded job must stay fail closed without claiming the Windows gameplay gate');
   }
   return failures;
 }

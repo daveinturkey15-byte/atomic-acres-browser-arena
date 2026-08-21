@@ -197,16 +197,10 @@ jobs:
         run: npm ci --ignore-scripts
       - if: needs.classify-change.outputs.mode != 'none'
         run: npx playwright install --with-deps chromium
-      - name: Run Pass 73 gameplay regression contracts
-        if: needs.classify-change.outputs.mode == 'full'
-        timeout-minutes: 25
-        run: node node_modules/@playwright/test/cli.js test tests/e2e/pass73-gameplay-regressions.spec.ts tests/e2e/pass73-network-reveal-authority.spec.ts --project=chromium --workers=1 --retries=0
       - if: needs.classify-change.outputs.mode != 'none'
         env:
           QA_E2E_GROUPS: ${{ needs.classify-change.outputs.linux_groups }}
-        run: |
-          export QA_E2E_GROUPS="$(node -e "process.stdout.write(process.env.QA_E2E_GROUPS.split(',').filter((group) => group !== 'pass73-gameplay-regressions').join(','))")"
-          npm run test:e2e:bounded
+        run: npm run test:e2e:bounded
       - name: Upload Linux browser failure evidence
         if: failure() && needs.classify-change.outputs.mode != 'none'
         uses: actions/upload-artifact@v4
