@@ -20906,10 +20906,10 @@ function drawUsFlagLogo(): HTMLCanvasElement | null {
 }
 
 function canvasLogoDataUrl(draw: () => HTMLCanvasElement | null): string {
-  const canvas = draw();
-  if (!canvas) return '';
+  const logoCanvas = draw();
+  if (!logoCanvas) return '';
   try {
-    return canvas.toDataURL('image/png');
+    return logoCanvas.toDataURL('image/png');
   } catch {
     return '';
   }
