@@ -2,6 +2,16 @@ const VIEWMODEL_ROI = Object.freeze({
   leftFraction: 0.42,
   rightFraction: 0.78,
 });
+const ONE_HAND_ACTION_ROI = Object.freeze({
+  leftFraction: 0.64,
+  rightFraction: 0.995,
+});
+const SILHOUETTE_PROFILES = new Set(['dual-arm', 'dual-arm-overlap', 'heavy-overlap', 'one-hand-action']);
+
+export function viewmodelSilhouetteRoi(profile = 'dual-arm') {
+  if (!SILHOUETTE_PROFILES.has(profile)) throw new TypeError(`unknown viewmodel silhouette profile: ${profile}`);
+  return profile === 'one-hand-action' ? ONE_HAND_ACTION_ROI : VIEWMODEL_ROI;
+}
 
 function columnRuns(mask, width, height, startY, endY, startX, endX) {
   const runs = [];
@@ -51,15 +61,16 @@ function bandMetrics(mask, width, height, startFraction, endFraction, roi) {
  * detached cap and a one-pixel/tendril continuation while allowing the two
  * weapon-gripping arms to overlap into one substantial silhouette.
  */
-export function analyzeViewmodelSilhouetteMask(mask, width, height) {
+export function analyzeViewmodelSilhouetteMask(mask, width, height, options = {}) {
   if (!(mask instanceof Uint8Array) || mask.length !== width * height || width < 64 || height < 64) {
     throw new TypeError('viewmodel silhouette requires one byte per pixel and a render-sized image');
   }
+  const profile = options.profile ?? 'dual-arm';
   // The ammo/status HUD lives at the lower-right edge and the vitals HUD at
   // the lower-left. Restrict every crop measurement to the authored M4/arms
   // presentation corridor so changing HUD digits or FPS text cannot satisfy a
   // rendered-sleeve requirement.
-  const roi = VIEWMODEL_ROI;
+  const roi = viewmodelSilhouetteRoi(profile);
   const lowerEdge = bandMetrics(mask, width, height, 0.985, 1, roi);
   const lowerCrop = bandMetrics(mask, width, height, 0.94, 0.975, roi);
   const lowerBody = bandMetrics(mask, width, height, 0.86, 0.91, roi);
@@ -77,24 +88,68 @@ export function analyzeViewmodelSilhouetteMask(mask, width, height) {
     && lowerCrop.maximumRunRatio >= 0.065
     && lowerCrop.foregroundRatio >= 0.05
     && lowerBody.secondRunRatio >= 0.04;
-  if (!separatedCropEntries && !mergedCropEntry) {
+  // Heavy support weapons can occlude both independently validated authored
+  // chains into one silhouette. This is not a relaxed generic merge: it must
+  // retain at least 20% of the whole viewport as one dense continuous mass in
+  // every band, over three times the retained ordinary merge width.
+  const ultraMergedCropEntry = profile === 'heavy-overlap'
+    && lowerEdge.maximumRunRatio >= 0.2
+    && lowerEdge.foregroundRatio >= 0.18
+    && lowerCrop.maximumRunRatio >= 0.2
+    && lowerCrop.foregroundRatio >= 0.18
+    && lowerBody.maximumRunRatio >= 0.2
+    && lowerBody.foregroundRatio >= 0.18;
+  // Short landscape viewports make two telemetry-proven chains overlap more
+  // often. Admit that union only when it remains at least 8% wide and 7.5%
+  // dense in every band—strictly stronger than the ordinary 6.5%/5.5% merge.
+  const dualArmOverlapEntry = profile === 'dual-arm-overlap'
+    && lowerEdge.maximumRunRatio >= 0.08
+    && lowerEdge.foregroundRatio >= 0.075
+    && lowerCrop.maximumRunRatio >= 0.08
+    && lowerCrop.foregroundRatio >= 0.075
+    && lowerBody.maximumRunRatio >= 0.08
+    && lowerBody.foregroundRatio >= 0.075;
+  // A melee strike intentionally stows one intact full-scale chain. Its live
+  // knife arm occupies the right action corridor and must remain at least as
+  // broad and dense as the retained substantial-mass floor in every band all
+  // the way off-screen. This profile changes topology, never the thresholds.
+  const oneHandActionEntry = profile === 'one-hand-action'
+    && lowerEdge.maximumRunRatio >= 0.065
+    && lowerEdge.foregroundRatio >= 0.055
+    && lowerCrop.maximumRunRatio >= 0.065
+    && lowerCrop.foregroundRatio >= 0.055
+    && lowerBody.maximumRunRatio >= 0.065
+    && lowerBody.foregroundRatio >= 0.055;
+  if (!separatedCropEntries && !mergedCropEntry && !ultraMergedCropEntry
+    && !dualArmOverlapEntry && !oneHandActionEntry) {
     violations.push('rendered arm/viewmodel mass does not continue through the lower screen crop');
   }
-  if (lowerCrop.maximumRunRatio < 0.06 || lowerCrop.foregroundRatio < 0.045) {
+  const lowerCropThin = lowerCrop.maximumRunRatio < 0.06 || lowerCrop.foregroundRatio < 0.045;
+  if (lowerCropThin) {
     violations.push('lower-crop silhouette is too thin or disconnected');
   }
-  if (lowerBody.maximumRunRatio < 0.065 || lowerBody.foregroundRatio < 0.045) {
+  const lowerBodyThin = lowerBody.maximumRunRatio < 0.065 || lowerBody.foregroundRatio < 0.045;
+  if (lowerBodyThin) {
     violations.push('visible lower-arm silhouette lacks substantial authored mass');
   }
   return Object.freeze({
-    contract: 'rendered-lower-crop-substantial-silhouette-v1',
+    contract: 'rendered-lower-crop-substantial-silhouette-v2',
+    profile,
     width,
     height,
     roi,
     lowerEdge,
     lowerCrop,
     lowerBody,
-    cropEntryMode: separatedCropEntries ? 'separated' : mergedCropEntry ? 'merged' : 'invalid',
+    cropEntryMode: separatedCropEntries
+      ? 'separated'
+      : mergedCropEntry
+        ? 'merged'
+        : ultraMergedCropEntry
+          ? 'ultra-merged'
+          : dualArmOverlapEntry
+            ? 'dual-arm-overlap'
+            : oneHandActionEntry ? 'one-hand-action' : 'invalid',
     violations: Object.freeze(violations),
     passed: violations.length === 0,
   });

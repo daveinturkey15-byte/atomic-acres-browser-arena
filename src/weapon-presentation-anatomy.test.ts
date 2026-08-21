@@ -2,7 +2,10 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
   FIRST_PERSON_ARM_PROPORTION_CONTRACT,
+  FIRST_PERSON_ARM_ADS_PRESENTATION_SCALE,
   FIRST_PERSON_ARM_BIND_SEGMENT_LENGTH_SCALE,
+  FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE,
+  FIRST_PERSON_ARM_RELOAD_SCALE_LIFT,
   FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC,
   FIRST_PERSON_ARM_UNIFORM_SCALE,
   FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC,
@@ -14,6 +17,7 @@ import {
   VIEWMODEL_NEAR_PLANE_CLEARANCE,
   WeaponPresentation,
   authoredNearPlaneContactRetreat,
+  firstPersonArmPresentationScale,
 } from './weapon-presentation';
 import {
   VIEWMODEL_CONTACT_PROFILES,
@@ -36,6 +40,17 @@ const REST_POSE = {
 };
 
 describe('first-person anatomical presentation', () => {
+  it('adds action-state mass with uniform scale and no retained reload deformation', () => {
+    expect(firstPersonArmPresentationScale(0, null)).toBeCloseTo(FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE, 8);
+    expect(firstPersonArmPresentationScale(1, null)).toBeCloseTo(FIRST_PERSON_ARM_ADS_PRESENTATION_SCALE, 8);
+    expect(firstPersonArmPresentationScale(0, 0)).toBeCloseTo(FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE, 8);
+    expect(firstPersonArmPresentationScale(0, 0.5)).toBeCloseTo(
+      FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE + FIRST_PERSON_ARM_RELOAD_SCALE_LIFT,
+      8,
+    );
+    expect(firstPersonArmPresentationScale(0, 1)).toBeCloseTo(FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE, 8);
+  });
+
   it('starts at the readable hip framing shared by high-resolution displays', () => {
     const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), false);
     expect(presentation.root.scale.x).toBeCloseTo(HIP_VIEWMODEL_SCALE, 8);

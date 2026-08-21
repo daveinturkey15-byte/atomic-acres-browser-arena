@@ -318,6 +318,28 @@ const RIGGED_ARM_MAX_REACH_RATIO = 0.996;
 export const FIRST_PERSON_ARM_PROPORTION_CONTRACT = 'authored-fixed-length-strong-operator-arms-v3';
 /** Uniform root scaling preserves the authored skeleton, palms and joint radii. */
 export const FIRST_PERSON_ARM_UNIFORM_SCALE = 1.12;
+export const FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE = 1.34;
+// Do not shrink the operator's arms while aiming. Apart from making the ADS
+// silhouette look implausibly skinny, the old shrink broke the lower-frame
+// sleeve continuation on short landscape viewports.
+export const FIRST_PERSON_ARM_ADS_PRESENTATION_SCALE = FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE;
+export const FIRST_PERSON_ARM_RELOAD_SCALE_LIFT = 0.16;
+/**
+ * Keeps every axis uniform while adding mass at the two poses where the arms
+ * previously narrowed to a disconnected lower-crop silhouette. Reload lift is
+ * smooth and returns exactly to the hip scale at both action boundaries.
+ */
+export function firstPersonArmPresentationScale(adsBlend: number, reloadProgress: number | null): number {
+  const aim = THREE.MathUtils.clamp(adsBlend, 0, 1);
+  const reloadLift = reloadProgress === null
+    ? 0
+    : Math.sin(THREE.MathUtils.clamp(reloadProgress, 0, 1) * Math.PI) * FIRST_PERSON_ARM_RELOAD_SCALE_LIFT;
+  return THREE.MathUtils.lerp(
+    FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE,
+    FIRST_PERSON_ARM_ADS_PRESENTATION_SCALE,
+    aim,
+  ) + reloadLift;
+}
 export const FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT = 'fixed-length-reachable-shoulders-continuous-sleeve-crop-v3';
 export const FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC = Object.freeze({
   left: -1.12,
@@ -3152,6 +3174,9 @@ export class WeaponPresentation {
         rootRotation: [this.root.rotation.x, this.root.rotation.y, this.root.rotation.z],
       },
       actionContract: this.actionContract,
+      // Read-only action telemetry lets the browser evidence gate capture the
+      // real 620 ms throw arc without introducing a synthetic gameplay state.
+      grenadeAction: this.grenadeActionTelemetry(),
       surfaceRetreat: this.surfaceRetreat,
       surfaceLift: this.surfaceLift,
       contactResponse: this.contactResponse,
@@ -3834,7 +3859,7 @@ export class WeaponPresentation {
       // behind the camera with this shallow, bounded clearance adjustment.
       arms.position.y = THREE.MathUtils.lerp(0.02, 0.012, this.adsBlend);
       arms.position.z = THREE.MathUtils.lerp(0, -0.08, this.adsBlend);
-      arms.scale.setScalar(THREE.MathUtils.lerp(1.24, 1.18, this.adsBlend));
+      arms.scale.setScalar(firstPersonArmPresentationScale(this.adsBlend, pose.reloadProgress));
       arms.traverse((node) => {
         if (!(node instanceof THREE.Mesh)) return;
         const material = node.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial;

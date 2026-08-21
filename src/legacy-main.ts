@@ -26502,6 +26502,8 @@ const debugWindow = window as Window & {
     replayLastFlashResult: (targetId: string) => boolean;
     sendForgedFlashResult: () => boolean;
     throwGrenade: () => void;
+    triggerGrenadePresentationCapture: () => void;
+    setMobileControlsForViewportCapture: (enabled: boolean) => void;
     switchWeapon: (index: number) => void;
     equipKit: (id: FieldKitId) => void;
     equipWeapon: (weapon: WeaponId) => void;
@@ -29526,6 +29528,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     return true;
   },
   throwGrenade: () => throwGrenade(),
+  // Gun Range correctly rejects gameplay grenades. Visual QA still needs the
+  // exact timed production viewmodel arc without spawning an authoritative
+  // grenade or weakening that arena rule.
+  triggerGrenadePresentationCapture: () => weaponView.throwGrenade(),
+  // Lets the viewport verifier enter the same persisted, production mobile
+  // HUD/control path a touch user can select in Options. It does not synthesize
+  // input or bypass gameplay authority.
+  setMobileControlsForViewportCapture: (enabled: boolean) => setMobileControlsEnabled(enabled),
   switchWeapon: (index: number) => switchWeapon(index),
   equipKit: (id: FieldKitId) => {
     chooseFieldKit(id);

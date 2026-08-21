@@ -68,3 +68,55 @@ test('rejects changing lower HUD pixels outside the viewmodel corridor', () => {
   assert.equal(result.passed, false);
   assert.deepEqual(result.lowerEdge.runs, []);
 });
+
+test('accepts only an ultra-substantial continuous merge for a telemetry-proven heavy dual-chain pose', () => {
+  const accepted = analyzeViewmodelSilhouetteMask(maskWith([
+    [205, 185, 305, 240],
+  ]), width, height, { profile: 'heavy-overlap' });
+  assert.equal(accepted.passed, true);
+  assert.equal(accepted.cropEntryMode, 'ultra-merged');
+
+  const ordinaryBroadProxy = analyzeViewmodelSilhouetteMask(maskWith([
+    [220, 185, 295, 240],
+  ]), width, height, { profile: 'heavy-overlap' });
+  assert.equal(ordinaryBroadProxy.passed, false);
+});
+
+test('accepts a short-landscape dual-arm union only above the stronger overlap floor', () => {
+  const accepted = analyzeViewmodelSilhouetteMask(maskWith([
+    [220, 185, 256, 240],
+  ]), width, height, { profile: 'dual-arm-overlap' });
+  assert.equal(accepted.passed, true);
+  assert.equal(accepted.cropEntryMode, 'dual-arm-overlap');
+
+  const ordinaryMergedWidth = analyzeViewmodelSilhouetteMask(maskWith([
+    [225, 185, 255, 240],
+  ]), width, height, { profile: 'dual-arm-overlap' });
+  assert.equal(ordinaryMergedWidth.passed, false);
+});
+
+test('accepts a substantial one-hand action only through its right-edge action corridor', () => {
+  const accepted = analyzeViewmodelSilhouetteMask(maskWith([
+    [330, 185, 370, 240],
+  ]), width, height, { profile: 'one-hand-action' });
+  assert.equal(accepted.passed, true);
+  assert.equal(accepted.cropEntryMode, 'one-hand-action');
+
+  const detachedCap = analyzeViewmodelSilhouetteMask(maskWith([
+    [330, 225, 370, 240],
+  ]), width, height, { profile: 'one-hand-action' });
+  assert.equal(detachedCap.passed, false);
+  assert.match(detachedCap.violations.join('\n'), /lower-arm silhouette/u);
+
+  const edgeMassWithTendril = analyzeViewmodelSilhouetteMask(maskWith([
+    [330, 236, 370, 240],
+    [348, 185, 351, 236],
+  ]), width, height, { profile: 'one-hand-action' });
+  assert.equal(edgeMassWithTendril.passed, false);
+  assert.match(edgeMassWithTendril.violations.join('\n'), /too thin|lower-arm silhouette/u);
+
+  const belowRetainedSubstantialMass = analyzeViewmodelSilhouetteMask(maskWith([
+    [330, 185, 355, 240],
+  ]), width, height, { profile: 'one-hand-action' });
+  assert.equal(belowRetainedSubstantialMass.passed, false);
+});
