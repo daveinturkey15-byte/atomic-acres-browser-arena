@@ -29,6 +29,9 @@ describe('Pass 73 native-WebGPU first-grenade gate', () => {
       'action: copyGrenadeFirstActionProfile(lastGrenadeFirstActionProfile)',
     ]) expect(sampler).toContain(token);
     expect(sampler).not.toContain('debugWindow.__ATOMIC_ACRES_DEBUG__?.snapshot');
+    expect(runtimeSource).toContain(
+      'await grenadeWorldPresentationPool.withStagedFirstAcquisitionVocabulary(',
+    );
   });
 
   it('keeps diagnostic collection outside the measured action and waits on the real explosion lifecycle', () => {

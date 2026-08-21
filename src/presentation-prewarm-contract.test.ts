@@ -339,6 +339,9 @@ describe('presentation prewarm startup contract', () => {
     expect(matchBoundFirstShots).toContain('prewarmExactWebGlMatchComposition(token.signal)');
     expect(matchBoundFirstShots).toContain("weaponView.prewarmBrowserWeaponFirePresentation('m14-ebr',");
     expect(matchBoundFirstShots).toContain('prewarmMatchBoundDmrThermalAdsPresentation(submitExactMatchComposition, token);');
+    expect(matchBoundFirstShots).toContain(
+      'await grenadeWorldPresentationPool.withStagedFirstAcquisitionVocabulary(',
+    );
     const glassImpactStage = matchBoundFirstShots.indexOf(
       'await impactPresentation.withStagedVocabulary(camera,',
     );
@@ -353,10 +356,15 @@ describe('presentation prewarm startup contract', () => {
     const ordinaryFireStage = matchBoundFirstShots.indexOf(
       'weaponView.prewarmBrowserWeaponFirePresentation(player.weapon,',
     );
+    const grenadeVocabularyStage = matchBoundFirstShots.indexOf(
+      'await grenadeWorldPresentationPool.withStagedFirstAcquisitionVocabulary(',
+    );
     expect(glassImpactStage).toBeGreaterThan(-1);
     expect(glassPoolStage).toBeGreaterThan(glassImpactStage);
     expect(glassImpactSubmit).toBeGreaterThan(glassPoolStage);
     expect(glassImpactStage).toBeLessThan(ordinaryFireStage);
+    expect(grenadeVocabularyStage).toBeGreaterThan(glassImpactSubmit);
+    expect(grenadeVocabularyStage).toBeLessThan(ordinaryFireStage);
     expect(matchBoundFirstShots.slice(glassImpactStage, ordinaryFireStage))
       .toContain('arenaTransitionGeneration');
     expect(matchBoundFirstShots.indexOf('player.weapon'))

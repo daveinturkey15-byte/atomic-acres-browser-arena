@@ -12921,6 +12921,10 @@ async function prewarmMatchBoundFirstShotPresentations(token: MatchAdmissionToke
       () => submitExactMatchComposition(),
     )
   ));
+  await grenadeWorldPresentationPool.withStagedFirstAcquisitionVocabulary(
+    camera,
+    submitExactMatchComposition,
+  );
 
   // Ordinary fire owns shared muzzle-smoke and casing programs without a
   // transient world light. Special weapons then add their complete retained
