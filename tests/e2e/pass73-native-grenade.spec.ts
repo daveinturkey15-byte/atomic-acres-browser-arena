@@ -38,7 +38,7 @@ async function deploy(page: Page, baseURL: string, profile: string, trial: numbe
   await page.goto(route.toString(), { waitUntil: 'domcontentloaded', timeout: 90_000 });
   await expect(page.locator('#solo')).toBeEnabled({ timeout: 90_000 });
   await page.locator('#player-name').fill(`Pass 73 Grenade ${profile} ${trial}`);
-  await expect(page.locator('[data-active-loadout-equipment]')).toContainText('FRAG');
+  await expect(page.locator('#selected-kit-summary b')).toContainText('FRAG');
   await page.locator('#solo').click();
   await page.waitForFunction((expectedProfile) => {
     const state = (window as any).__ATOMIC_ACRES_DEBUG__?.snapshot();
