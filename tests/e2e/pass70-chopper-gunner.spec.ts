@@ -753,6 +753,11 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
   await expect(page.locator('html')).toHaveAttribute('data-killstreak-possession', 'chopper-gunner');
   await expect(page.locator('#gunner-cockpit-hud')).toBeVisible();
   await expect(page.locator('#gunner-cockpit-hud')).toHaveAttribute('data-support-kind', 'chopper-gunner');
+  await expect(page.locator('#gunner-control-strip')).toBeVisible();
+  await expect(page.locator('#gunner-gun-control')).toContainText('LMB');
+  await expect(page.locator('#gunner-gun-control')).toContainText('GUN');
+  await expect(page.locator('#gunner-missile-status')).toContainText('RMB');
+  await expect(page.locator('#gunner-missile-status')).toContainText('MISSILES');
   await expect(page.locator('#gunner-altitude')).not.toHaveText(/NaN/u);
   const desktopHud = await page.evaluate(() => {
     const suppressedSelectors = [
@@ -829,6 +834,8 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
   expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.toggleChopperGunnerControl())).toBe(true);
   await expect(page.locator('#gunner-cockpit-hud')).toBeHidden();
   await expect(page.locator('#gunner-cockpit-hud')).toHaveAttribute('data-support-kind', 'none');
+  await expect(page.locator('#gunner-control-strip')).toBeHidden();
+  await expect(page.locator('#gunner-control-strip')).toHaveAttribute('aria-hidden', 'true');
   await expect(page.locator('#gunner-target-confirm')).toBeHidden();
   await expect(page.locator('#chopper-thermal')).toBeHidden();
 
@@ -837,6 +844,8 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.damage(1_000));
   await expect(page.locator('#gunner-cockpit-hud')).toBeHidden();
   await expect(page.locator('#gunner-cockpit-hud')).toHaveAttribute('data-support-kind', 'none');
+  await expect(page.locator('#gunner-control-strip')).toBeHidden();
+  await expect(page.locator('#gunner-control-strip')).toHaveAttribute('aria-hidden', 'true');
   await expect(page.locator('#gunner-target-confirm')).toBeHidden();
   await expect(page.locator('#chopper-thermal')).toBeHidden();
   await expect(page.locator('html')).toHaveAttribute('data-killstreak-possession', 'none');

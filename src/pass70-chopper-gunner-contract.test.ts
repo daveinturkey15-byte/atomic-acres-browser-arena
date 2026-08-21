@@ -27,8 +27,11 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     for (const id of [
       'gunner-hull', 'gunner-ammo', 'gunner-altitude', 'gunner-speed', 'gunner-time', 'gunner-damage',
       'gunner-target-confirm', 'gunner-platform', 'gunner-weapon-mode',
+      'gunner-control-strip', 'gunner-gun-control', 'gunner-control-gun-ammo',
       'gunner-missile-status', 'gunner-missile-ammo', 'gunner-missile-cooldown',
     ]) expect(shell).toContain(`id="${id}"`);
+    expect(shell).toContain('<kbd>LMB</kbd><span>GUN</span>');
+    expect(shell).toContain('<kbd>RMB</kbd><span>MISSILES</span>');
     expect(shell).toContain('data-centre-clear="true"');
     expect(shell).not.toContain('class="gunner-reticle"><i></i><b></b>');
     expect(hudCss).toContain('.gunner-reticle .north { bottom: 58%; top: auto; }');
@@ -40,6 +43,7 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(hudCss).toContain('#gunner-cockpit-hud[data-support-kind="chopper-gunner"]::before');
     expect(hudCss).toContain('height: clamp(190px, 38vh, 410px);');
     expect(hudCss).toContain('#gunner-missile-status[data-ready="true"] em');
+    expect(hudCss).toContain('#gunner-control-strip[hidden] { display: none; }');
     expect(legacy).toContain("event.button === 2 && localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner'");
     expect(legacy).toContain('missileFire: true');
   });
@@ -70,6 +74,8 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(hide).toContain("hud.dataset.hitConfirm = 'false'");
     expect(hide).toContain("element<HTMLElement>('#chopper-thermal').hidden = true");
     expect(hide).toContain("element<HTMLElement>('#gunner-missile-status')");
+    expect(hide).toContain("element<HTMLElement>('#gunner-control-strip')");
+    expect(hide).toContain("controlStrip.setAttribute('aria-hidden', 'true')");
     expect(hide).toContain("missileStatus.dataset.ready = 'false'");
     expect(hide).toContain('nextLocalSupportGunReportAt = 0');
     expect(legacy).toContain('if (!possession || !player.alive)');
