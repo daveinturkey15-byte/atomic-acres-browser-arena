@@ -794,7 +794,7 @@ import {
   CarpetGroundFireGuestPresentationAdmission,
   carpetGroundFireStateChunks,
 } from './carpet-ground-fire-multiplayer';
-import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
+import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, deriveDmrThermalRevealActive, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
 import { runStagedDmrThermalPrewarm } from './dmr-thermal-prewarm-lifecycle';
 import {
   THERMAL_GHOST_MAX_TARGETS,
@@ -22237,11 +22237,14 @@ function updatePhysics(dt: number): void {
     && Math.abs(camera.fov - aimingFov) < 0.35;
   sniperScopeOverlay.hidden = !sniperScopeActive;
   hudRoot.classList.toggle('sniper-scope-active', sniperScopeActive);
-  dmrThermalActive = player.alive
-    && player.weapon === 'm14-ebr'
-    && adsHeld
-    && weaponView.adsProgress() >= 0.9
-    && Math.abs(camera.fov - aimingFov) < 0.35;
+  dmrThermalActive = deriveDmrThermalRevealActive({
+    alive: player.alive,
+    weapon: player.weapon,
+    adsHeld,
+    adsProgress: weaponView.adsProgress(),
+    baseFov: preferredFov,
+    cameraFov: camera.fov,
+  });
   hudRoot.classList.toggle('dmr-thermal-active', dmrThermalActive);
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
@@ -27832,6 +27835,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       broken: window.broken,
       visible: window.mesh.visible,
       position: window.mesh.getWorldPosition(new THREE.Vector3()).toArray(),
+      glassState: window.glassState ? {
+        ...window.glassState,
+        rememberedImpactIds: [...window.glassState.rememberedImpactIds],
+      } : null,
       persistentDebrisId: [...persistentWindowDebris.values()].find((entry) => entry.windowId === window.id)?.id ?? null,
       retainedDebrisPrewarmed: pooledWindowDebris.has(windowDebrisPoolKey(arena.id, window.id)),
     })),

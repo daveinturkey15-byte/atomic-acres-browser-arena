@@ -6,6 +6,7 @@ import { outputsFor } from '../release/change-impact.mjs';
 
 export const PASS73_BOUNDED_GROUP = 'pass73-gameplay-regressions';
 export const PASS73_BROWSER_SPEC = 'tests/e2e/pass73-gameplay-regressions.spec.ts';
+export const PASS73_NETWORK_REVEAL_SPEC = 'tests/e2e/pass73-network-reveal-authority.spec.ts';
 
 function splitGroups(value) {
   return String(value ?? '').split(',').map((group) => group.trim()).filter(Boolean);
@@ -35,6 +36,9 @@ export function pass73CiWiringFailures({
     failures.push(`bounded runner lacks ${PASS73_BOUNDED_GROUP}`);
   } else {
     if (!groupLine.includes(`'${PASS73_BROWSER_SPEC}'`)) failures.push('Pass 73 group lost its gameplay spec');
+    if (!groupLine.includes(`'${PASS73_NETWORK_REVEAL_SPEC}'`)) {
+      failures.push('Pass 73 group lost its network reveal authority spec');
+    }
     if (!groupLine.includes("'--project=chromium'")) failures.push('Pass 73 group must select Chromium explicitly');
     if (!groupLine.includes("'--workers=1'")) failures.push('Pass 73 group must stay single-worker');
     if (!groupLine.includes('default: false')) failures.push('Pass 73 group must run only through explicit impact selection');

@@ -1,7 +1,11 @@
 import * as THREE from 'three';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
+import type { WeaponId } from './protocol';
+import { magnifiedFovDegrees } from './weapon-presentation-state';
 
 export const DMR_THERMAL_MAGNIFICATION = 2.5;
+export const DMR_THERMAL_SETTLED_ADS_PROGRESS = 0.9;
+export const DMR_THERMAL_FOV_TOLERANCE_DEGREES = 0.35;
 export const DMR_THERMAL_MAX_CONTACTS = 16;
 export const DMR_THERMAL_WORLD_DRAW_CALLS = 0;
 export const DMR_THERMAL_OCCLUSION_CHECKS_PER_FRAME = 2;
@@ -19,6 +23,29 @@ export type DmrThermalContact = Readonly<{
   living: boolean;
   solidOccluded: boolean;
 }>;
+
+export type DmrThermalRevealInput = Readonly<{
+  alive: boolean;
+  weapon: WeaponId;
+  /** Already-admitted local RMB/pad/touch hold; raw remote state is never accepted here. */
+  adsHeld: boolean;
+  adsProgress: number;
+  baseFov: number;
+  cameraFov: number;
+}>;
+
+/** One pure gate for the M14 optic and its exact-operator through-wall layer. */
+export function deriveDmrThermalRevealActive(input: DmrThermalRevealInput): boolean {
+  if (!Number.isFinite(input.baseFov)) return false;
+  const targetFov = magnifiedFovDegrees(input.baseFov, DMR_THERMAL_MAGNIFICATION);
+  return input.alive
+    && input.weapon === 'm14-ebr'
+    && input.adsHeld
+    && Number.isFinite(input.adsProgress)
+    && input.adsProgress >= DMR_THERMAL_SETTLED_ADS_PROGRESS
+    && Number.isFinite(input.cameraFov)
+    && Math.abs(input.cameraFov - targetFov) < DMR_THERMAL_FOV_TOLERANCE_DEGREES;
+}
 
 /**
  * Selection remains the existing authority-approved living-contact set. The

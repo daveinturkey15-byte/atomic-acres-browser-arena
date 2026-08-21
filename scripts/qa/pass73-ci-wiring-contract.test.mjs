@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   PASS73_BOUNDED_GROUP,
+  PASS73_NETWORK_REVEAL_SPEC,
   assertPass73CiWiring,
   pass73CiWiringFailures,
   repositoryInputs,
@@ -25,6 +26,17 @@ test('rejects a bounded group that no longer executes the Pass 73 spec', () => {
     ),
   };
   assert.match(pass73CiWiringFailures(mutated).join('\n'), /lost its gameplay spec/u);
+});
+
+test('rejects a bounded group that drops network reveal authority coverage', () => {
+  const mutated = {
+    ...actual,
+    boundedRunnerSource: actual.boundedRunnerSource.replace(
+      PASS73_NETWORK_REVEAL_SPEC,
+      'tests/e2e/pass72-lobby-squad-reset.spec.ts',
+    ),
+  };
+  assert.match(pass73CiWiringFailures(mutated).join('\n'), /lost its network reveal authority spec/u);
 });
 
 test('rejects either operating-system matrix omitting the Pass 73 group', () => {
