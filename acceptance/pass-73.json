@@ -145,8 +145,8 @@
     {
       "id": "R11",
       "summary": "Promote Pass 73 without losing any retained release",
-      "expected": "Pass 73 is the only live target; exact Pass 72 is selectable as Previous at channels/pass72-retained; exact Pass 70 and Pass 69 remain selectable; Pass 67.1 remains direct-only; Pass 63 remains selectable rollback; every alias, provenance wrapper, source timestamp and byte pin is verified before publication.",
-      "falsifier": "Any retained channel disappears or changes bytes, Pass 67.1 becomes selectable, Pass 63 is missing, wrapper provenance overwrites embedded provenance, an alias enters the wrong pass, or candidate bytes are described as live without a receipt.",
+      "expected": "Pass 73 is the only live target; exact Pass 72 is selectable as Previous; exact Pass 70 and Pass 69 remain selectable; Pass 67.1 and Pass 63 remain unlinked recovery evidence; stable and rollback aliases resolve to Pass 72; every provenance wrapper, source timestamp and byte pin is verified before publication.",
+      "falsifier": "Any selectable retained channel disappears or changes bytes, Pass 67.1 or Pass 63 appears in the chooser, stable or rollback enters Pass 63, wrapper provenance overwrites embedded provenance, or candidate bytes are described as live without a receipt.",
       "acceptance": "mechanical",
       "state": "pending",
       "plannedEvidence": [

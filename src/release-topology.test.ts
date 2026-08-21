@@ -101,12 +101,12 @@ describe('Pass 73 release topology', () => {
     expect(JSON.stringify(config)).not.toContain('channels/new-netcode');
   });
 
-  it('shows Pass 73, exact previous Pass 72, retained Pass 70 and Pass 69, and stable Pass 63 WebGL', () => {
-    expect(shell).toContain("['experimental', 'previous', 'retained', 'historical', 'stable']");
+  it('shows Pass 73, exact previous Pass 72, retained Pass 70 and Pass 69 without a Pass 63 action', () => {
+    expect(shell).toContain("['experimental', 'previous', 'retained', 'historical']");
     expect(shell).not.toContain("['experimental', 'stable', 'rollback']");
     expect(shell).not.toContain("['normal', 'stable', 'experimental']");
     expect(shell).toContain("channel.deploymentState === 'live' ? 'LIVE' : 'RELEASE CANDIDATE'");
-    expect(shell).toContain("requested === 'stable' || requested === 'rollback') return route('stable')");
+    expect(shell).toContain("requested === 'stable' || requested === 'rollback') return route('previous')");
     expect(shell).toContain("requested === 'previous' || requested === 'pass72') return route('previous')");
     expect(shell).toContain("requested === 'pass70') return route('retained')");
     expect(shell).toContain("requested === 'pass69') return route('historical')");
@@ -117,7 +117,7 @@ describe('Pass 73 release topology', () => {
     expect(shellHtml).toContain('Pass 69');
     expect(shellHtml).not.toContain('local Pass 70');
     expect(shellHtml).not.toContain('The Big One');
-    expect(shellHtml).toContain('stable Pass 63 WebGL');
+    expect(shellHtml).not.toContain('Pass 63');
     expect(shellHtml).toContain('Nuke Town');
     expect(shellHtml).not.toContain('Atomic Acres');
     expect(shellHtml).not.toContain('Pass 59');
@@ -126,7 +126,7 @@ describe('Pass 73 release topology', () => {
   it('routes root rooms and legacy latest or normal aliases to Pass 73', () => {
     expect(shell).toContain("requested === 'latest' || requested === 'normal') return route('experimental')");
     expect(shell).toContain("requested === 'experimental'");
-    expect(shell).toContain("requested === 'stable' || requested === 'rollback'");
+    expect(shell).toContain("requested === 'stable' || requested === 'rollback') return route('previous')");
     expect(shell).toContain("target.searchParams.set('release', 'latest')");
   });
 

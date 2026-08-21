@@ -229,13 +229,12 @@ async function openChooser(page) {
   const buttons = page.locator('#release-channel-options button');
   const labels = await buttons.allTextContents();
   const expectedBadge = expectedReleasedAt ? 'LIVE' : 'RELEASE CANDIDATE';
-  if (await buttons.count() !== 5
+  if (await buttons.count() !== 4
     || !labels.some((text) => text.includes(channelConfig.experimental.pass) && text.includes(expectedBadge) && !text.includes('THE BIG ONE'))
     || !labels.some((text) => text.includes('PASS 72') && text.includes('PREVIOUS LIVE'))
     || !labels.some((text) => text.includes('PASS 70') && text.includes('RETAINED LIVE'))
     || !labels.some((text) => text.includes('PASS 69') && text.includes('RETAINED STABLE'))
-    || !labels.some((text) => text.includes('PASS 63') && text.includes('STABLE') && text.includes('WEBGL'))
-    || labels.some((text) => text.includes('PASS 66') || text.includes('PASS 65') || text.includes('PASS 64') || text.includes('PASS 59'))) {
+    || labels.some((text) => text.includes('PASS 63') || text.includes('PASS 66') || text.includes('PASS 65') || text.includes('PASS 64') || text.includes('PASS 59'))) {
     throw new Error(`Unexpected chooser labels: ${JSON.stringify(labels)}`);
   }
   if (expectedReleasedAt && labels.some((text) => /candidate/iu.test(text))) {
@@ -343,13 +342,13 @@ try {
   const chooser = await observedPage();
   try {
     chooserLabels = await openChooser(chooser.page);
-    for (const choice of ['experimental', 'previous', 'retained', 'historical', 'stable']) {
+    for (const choice of ['experimental', 'previous', 'retained', 'historical']) {
       if (await chooser.page.locator(`[data-release-choice="${choice}"]`).count() !== 1) {
         throw new Error(`Missing unique ${choice} chooser action: ${JSON.stringify(chooserLabels)}`);
       }
     }
-    if (await chooser.page.locator('[data-release-choice="rollback"]').count() !== 0) {
-      throw new Error(`Rollback alias must not duplicate the stable chooser action: ${JSON.stringify(chooserLabels)}`);
+    if (await chooser.page.locator('[data-release-choice="stable"], [data-release-choice="rollback"]').count() !== 0) {
+      throw new Error(`Removed Pass 63 chooser action is still present: ${JSON.stringify(chooserLabels)}`);
     }
   } finally {
     await chooser.close();
@@ -359,7 +358,6 @@ try {
   await verifyChoice('previous', 'channels/pass72-retained', 'PASS 72', 'pass72');
   await verifyChoice('retained', 'channels/pass70-retained', 'PASS 70', 'pass70');
   await verifyChoice('historical', 'channels/pass69-retained', 'PASS 69', 'pass69');
-  await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63', expectedRollbackReleasedAt);
   if (releasePass && !normalizedPass(routes.experimental.eyebrow).includes(normalizedPass(releasePass))) {
     throw new Error(`Experimental runtime ${routes.experimental.eyebrow} does not match ${releasePass}`);
   }
@@ -370,6 +368,8 @@ try {
   await verifyLegacyRoute('pass72', (params) => params.set('release', 'pass72'), 'channels/pass72-retained', 'PASS 72');
   await verifyLegacyRoute('pass70', (params) => params.set('release', 'pass70'), 'channels/pass70-retained', 'PASS 70');
   await verifyLegacyRoute('pass69', (params) => params.set('release', 'pass69'), 'channels/pass69-retained', 'PASS 69');
+  await verifyLegacyRoute('stable', (params) => params.set('release', 'stable'), 'channels/pass72-retained', 'PASS 72');
+  await verifyLegacyRoute('rollback', (params) => params.set('release', 'rollback'), 'channels/pass72-retained', 'PASS 72');
   await verifyLegacyRoute('room', (params) => {
     params.set('room', 'qa-room');
     params.set('autojoin', '1');

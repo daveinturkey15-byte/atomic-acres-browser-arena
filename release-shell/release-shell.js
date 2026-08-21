@@ -65,7 +65,7 @@
   const params = new URLSearchParams(window.location.search);
   const requested = params.get('release')?.trim().toLowerCase();
   if (params.get('room')?.trim() || requested === 'latest' || requested === 'normal') return route('experimental');
-  if (requested === 'stable' || requested === 'rollback') return route('stable');
+  if (requested === 'stable' || requested === 'rollback') return route('previous');
   if (requested === 'previous' || requested === 'pass72') return route('previous');
   if (requested === 'pass70') return route('retained');
   if (requested === 'pass69') return route('historical');
@@ -95,7 +95,7 @@
     const version = String(channel.label || '').match(/v\d+(?:\.\d+)+/);
     return version ? `PASS ${version[0].slice(1)}` : channel.pass;
   };
-  for (const key of ['experimental', 'previous', 'retained', 'historical', 'stable']) {
+  for (const key of ['experimental', 'previous', 'retained', 'historical']) {
     const channel = config[key];
     if (!channel) continue;
     const button = document.createElement('button');

@@ -9,7 +9,7 @@ This contribution is `release-shell`. It changes the player-facing build chooser
 - Production workflow run `32432483550` succeeded for Pass 72 source `5da686551d92387d08b00be40125386c391bb3ed`.
 - Its production receipt names Pages commit `d5b77dc3b9e46608264c52eb0737b50590d70eb5` and production build timestamp `2026-08-21T00:25:40Z`.
 - The embedded Pass 72 provenance at historical path `channels/the-big-one` names 515 runtime files and tree digest `62fafc5e5c39fa744dfc4f7067b3e0953dd190d8ffecc04e203b2b86d6a8974f`. The complete copied subtree has one additional embedded provenance file.
-- Pass 70, Pass 69, direct-only Pass 67.1, selectable Pass 63 and the offline Pass 62 benchmark retain their existing exact source, Pages and digest pins.
+- Pass 70, Pass 69, direct-only Pass 67.1, unlinked Pass 63 recovery evidence and the offline Pass 62 benchmark retain their existing exact source, Pages and digest pins.
 - Dave's latest instruction requires a playable human-in-the-loop candidate and his review before production publication. This supersedes the earlier publication-first instruction; he has not yet approved an immutable Pass 73 preview.
 
 ## Intended schema 5 topology
@@ -21,9 +21,9 @@ This contribution is `release-shell`. It changes the player-facing build chooser
 | Retained | Pass 70 | `channels/pass70-retained` | Existing exact Pages pin |
 | Historical | Pass 69 | `channels/pass69-retained` | Existing exact Pages pin |
 | Direct-only stable source | Pass 67.1 | `channels/recent-stable` | Rebuilt only from its pinned source with its original Pages timestamp; no chooser card |
-| Selectable rollback | Pass 63 | `channels/pass63-rollback` | Rebuilt only from its pinned source with its original Pages timestamp |
+| Unlinked recovery evidence | Pass 63 | `channels/pass63-rollback` | Rebuilt only from its pinned source with its original Pages timestamp; absent from the chooser and aliases |
 
-The root chooser exposes five actions: Pass 73, Pass 72, Pass 70, Pass 69 and Pass 63. Room links plus `latest`, `normal` and `experimental` enter Pass 73. `previous` and `pass72` enter Pass 72; `pass70` and `pass69` preserve their named routes; `stable` and `rollback` enter Pass 63.
+The root chooser exposes four actions: Pass 73, Pass 72, Pass 70 and Pass 69. Room links plus `latest`, `normal` and `experimental` enter Pass 73. `previous`, `pass72`, `stable` and `rollback` enter Pass 72; `pass70` and `pass69` preserve their named routes. Pass 63 remains unlinked recovery evidence and is not a selectable build.
 
 ## Inferences and assumptions
 
@@ -41,7 +41,7 @@ The root chooser exposes five actions: Pass 73, Pass 72, Pass 70, Pass 69 and Pa
 
 - Any copied Pass 72, Pass 70 or Pass 69 byte differs from its pinned Pages blob.
 - The wrapper provenance replaces or alters an embedded provenance file rather than using `pinned-channel-provenance.json`.
-- Pass 67.1 appears as a chooser card, Pass 63 disappears, or an alias resolves to a different pass than declared above.
+- Pass 67.1 or Pass 63 appears as a chooser card, Pass 63 recovery evidence changes bytes, or an alias resolves to a different pass than declared above.
 - A candidate labels itself Live without `RELEASE_BUILT_AT`, or production retains candidate/public-HITL-pending timestamp text.
 - The acceptance manifest names a guessed preview SHA, artifact ID, file count, digest or unrun evidence.
 

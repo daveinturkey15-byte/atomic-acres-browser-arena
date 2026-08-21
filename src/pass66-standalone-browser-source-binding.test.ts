@@ -38,11 +38,12 @@ describe('Pass 66 standalone browser evidence source binding', () => {
 
     const staleEvidenceRemoval = source.indexOf('await rm(artifactRoot, { recursive: true, force: true })');
     const sourceStatusCheck = source.indexOf("['status', '--porcelain', '--untracked-files=all']");
-    const firstReceiptWrite = source.indexOf('await writeFile(', staleEvidenceRemoval);
     const finalSourceCheck = source.indexOf('endingRevision !== sourceRevision', staleEvidenceRemoval);
+    const firstReceiptWrite = source.indexOf('await writeFile(', finalSourceCheck);
     expect(staleEvidenceRemoval).toBeGreaterThanOrEqual(0);
     expect(staleEvidenceRemoval).toBeLessThan(sourceStatusCheck);
     expect(finalSourceCheck).toBeGreaterThan(staleEvidenceRemoval);
     expect(firstReceiptWrite).toBeGreaterThan(finalSourceCheck);
+    expect(source.slice(firstReceiptWrite, firstReceiptWrite + 160)).toMatch(/receipt\.json/);
   });
 });
