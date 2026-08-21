@@ -5,9 +5,12 @@
   "sourceSha": "ac85e9b8b46cc2370aee903d564ecf3c4682b24c",
   "path": "channels/pass63-rollback",
   "exactRootFileCount": 119,
-  "treeSha256": "e692d16e1da39abdf80636eab6c4bfcbf30be1df8b93acee68124bd104593f82",
+  "treeSha256": "f6aed613e93dad5d56959621a29e01fdce2a7e48910a847b7031c027bbf2bf87",
   "rebuiltFromSource": true,
+  "releasedAt": "2026-08-08T16:16:33Z",
+  "originalPagesSha": "46d366d188bfc5ebc5ee7a991fd52b792575316c",
+  "originalPagesPath": "channels/pass63-rollback",
   "passEvidenceFiles": [
-    "assets/preload-helper-CD48NuKG.js"
+    "assets/preload-helper-DE1dM0Oy.js"
   ]
 }

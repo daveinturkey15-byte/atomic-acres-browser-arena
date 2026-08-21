@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 4,
+  "channel": "pass70-retained",
+  "releasePass": "PASS 70",
+  "pagesSha": "3b5e675c54eaea2a2dd721eca6f247c933361587",
+  "pagesPath": "channels/the-big-one",
+  "sourceSha": "130fd59bd2cf1e1719b802463219ddf36e2484d5",
+  "sourceSubject": "PASS 70 from 130fd59bd2cf1e1719b802463219ddf36e2484d5",
+  "path": "channels/pass70-retained",
+  "exactRootFileCount": 516,
+  "passEvidenceFiles": [
+    "assets/changelog-Cc2a_7xf.js",
+    "assets/release-identity-DClff7eD.js"
+  ],
+  "treeSha256": "59ca7375a99d79ee644857df7c219b1beee2803ce3d077ba054ec44abd9adfa6",
+  "pinnedRuntime": {
+    "schemaVersion": 4,
+    "channel": "the-big-one",
+    "releasePass": "PASS 70",
+    "sourceSha": "130fd59bd2cf1e1719b802463219ddf36e2484d5",
+    "path": "channels/the-big-one",
+    "exactRootFileCount": 515,
+    "treeSha256": "c8f6aeed492cd747ef83aa41bdc0d05f2fd86264418d40d0ebbd0916c85d6160"
+  }
+}
