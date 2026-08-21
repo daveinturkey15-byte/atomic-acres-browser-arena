@@ -98,6 +98,35 @@ async function deploy(page: Page, baseURL: string, profile: string, weapon: stri
   await page.goto(route.toString(), { waitUntil: 'domcontentloaded', timeout: 90_000 });
   await expect(page.locator('#solo')).toBeEnabled({ timeout: 90_000 });
   await page.locator('#player-name').fill(`Pass 73 ADS ${profile} ${weapon}`);
+  await page.evaluate(() => {
+    const scope = window as any;
+    const samples: Array<Record<string, unknown>> = [];
+    const sample = (phase: string, event?: MouseEvent): void => {
+      const api = scope.__ATOMIC_ACRES_DEBUG__;
+      samples.push({
+        phase,
+        at: performance.now(),
+        trusted: event?.isTrusted ?? null,
+        defaultPrevented: event?.defaultPrevented ?? null,
+        admission: api?.admissionState?.() ?? null,
+        menuHidden: document.querySelector<HTMLElement>('#menu')?.hidden ?? null,
+        status: document.querySelector<HTMLElement>('#network-status')?.textContent ?? null,
+      });
+    };
+    const targetIsSolo = (event: MouseEvent): boolean => (
+      event.target instanceof Element && event.target.closest('#solo') !== null
+    );
+    document.addEventListener('click', (event) => {
+      if (!targetIsSolo(event)) return;
+      sample('capture', event);
+      queueMicrotask(() => sample('microtask'));
+      window.setTimeout(() => sample('timeout'), 0);
+    }, { capture: true, once: true });
+    document.addEventListener('click', (event) => {
+      if (targetIsSolo(event)) sample('bubble', event);
+    }, { once: true });
+    scope.__PASS73_SOLO_CLICK_PROBE__ = samples;
+  });
   await page.locator('#solo').click();
   try {
     await page.waitForFunction((expectedProfile) => {
@@ -121,6 +150,7 @@ async function deploy(page: Page, baseURL: string, profile: string, weapon: stri
         arenaSelection: state?.arenaSelection ?? null,
         renderRuntime: state?.render?.runtime ?? null,
         weaponReady: state?.weaponReady ?? null,
+        soloClickProbe: (window as any).__PASS73_SOLO_CLICK_PROBE__ ?? null,
         dataset: { ...document.documentElement.dataset },
         deploymentTransition: { ...document.querySelector<HTMLElement>('#deployment-transition')?.dataset },
         status: document.querySelector<HTMLElement>('#network-status')?.textContent ?? null,
