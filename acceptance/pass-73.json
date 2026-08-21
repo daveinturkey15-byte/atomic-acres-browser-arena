@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 73",
+  "feedbackReceivedAt": "2026-08-21T08:23:56.049Z",
+  "status": "accepted",
+  "bindingState": "awaiting-immutable-preview-and-integrated-evidence",
+  "preview": null,
+  "releaseDecision": {
+    "state": "publication-authorized",
+    "condition": "all-required-mechanical-gates-green",
+    "ownerHitl": "deferred-until-public-pages"
+  },
+  "humanAcceptance": {
+    "state": "approved",
+    "approvedBy": "Dave",
+    "approvedAt": "2026-08-21T08:23:56.049Z",
+    "kind": "standing-publication-authorization",
+    "previewInspection": "not-performed",
+    "evidence": "Dave directed Codex to continue autonomously, fix every reported regression, complete the tests properly and get the latest version live. This is standing publication-first authorization conditioned on every required mechanical gate. Dave has not inspected or tested an immutable Pass 73 preview; no such preview existed when this authorization was bound."
+  },
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "Bind publication to Dave's standing publication-first authorization",
+      "expected": "Only the exact immutable Pass 73 preview whose integrated mechanical, visual, hardware and release gates are all green may enter the protected production workflow; this is publication authority, not preview inspection or completed gameplay HITL.",
+      "falsifier": "Publication uses different runtime bytes, bypasses a required gate, or represents Dave as having inspected or tested an immutable Pass 73 preview.",
+      "acceptance": "human",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "manual",
+          "ref": "owner-authorization://pass73/2026-08-21T08:23:56.049Z",
+          "note": "The active owner instruction provides standing publication-first authority after genuine mechanical closure and explicitly does not provide immutable-preview inspection or public gameplay HITL evidence."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "Render connected, correctly proportioned first-person arms beyond the frame",
+      "expected": "Both authored first-person sleeves are materially thicker than Pass 72 and continue below the lower viewport edge across weapons, ADS, high-ready, prone, wall-contact, reload, grenade and knife actions without a visible floating cap.",
+      "falsifier": "Either arm visibly terminates inside the gameplay viewport, reads as a skinny disconnected tube, disappears behind HUD-only pixels, or a catalog action reintroduces the cutoff.",
+      "acceptance": "mixed",
+      "state": "pending",
+      "plannedEvidence": [
+        "scripts/qa/viewmodel-silhouette-contract.mjs",
+        "scripts/qa/verify-pass66-viewmodel-framing.mjs",
+        "served native-WebGPU action-catalog captures at representative viewports"
+      ]
+    },
+    {
+      "id": "R3",
+      "summary": "Remove the first-grenade cold hitch without changing grenade behavior or sound",
+      "expected": "The first grenade throw of a fresh hardware-WebGPU match stays inside the retained frame-time envelope and uses the same mesh, animation, kinematic trajectory and authored sound recipe as later throws, with no retained broadband warmup loop.",
+      "falsifier": "The first throw produces a unique frame stall, warmup changes gameplay or sound, a software adapter is reported as proof, or only a later warm throw is measured.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "plannedEvidence": [
+        "src/audio-combat-prewarm.test.ts",
+        "tests/e2e/pass73-gameplay-regressions.spec.ts",
+        "exact-SHA installed-Chrome native-WebGPU cold-start receipt"
+      ]
+    },
+    {
+      "id": "R4",
+      "summary": "Restore Railgun and M14 EBR ADS target presentation through walls",
+      "expected": "ADS with the Railgun or M14 EBR presents the exact animated target silhouette plus restrained thermal halo through occluding geometry, while ordinary raster bodies remain correctly occluded and the presentation neither double-transforms nor detaches.",
+      "falsifier": "An admitted target behind cover is absent, a target is shown outside the intended ADS state, the ghost uses stale or duplicate transforms, or the normal body becomes visible through the wall.",
+      "acceptance": "mixed",
+      "state": "pending",
+      "plannedEvidence": [
+        "src/thermal-ghost-presentation.test.ts",
+        "tests/e2e/pass73-gameplay-regressions.spec.ts",
+        "served Railgun and M14 behind-cover captures"
+      ]
+    },
+    {
+      "id": "R5",
+      "summary": "Break glass from explosive-crossbow direct impact and admitted blast",
+      "expected": "A crossbow bolt directly striking a pane and its host-admitted explosion both advance the same occlusion-aware authoritative pane lifecycle, replicate impact before aperture and never let a guest prediction mutate glass authority.",
+      "falsifier": "Direct impact leaves intact glass, the explosion fails to open the admitted pane, real cover is bypassed, multiple panes break without line of sight, or peers receive a pane mutation before the impact identity.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "plannedEvidence": [
+        "src/crossbow-glass-authority.test.ts",
+        "src/pass72-crossbow-glass-contract.test.ts",
+        "src/window-breaks.test.ts",
+        "tests/e2e/pass73-gameplay-regressions.spec.ts"
+      ]
+    },
+    {
+      "id": "R6",
+      "summary": "Apply the M14 EBR 40-percent damage reduction exactly once",
+      "expected": "The M14 EBR retains the exact 37.2 base and 24 minimum body-damage envelope produced by one reduction from 62 / 40, across offline shots, legacy replicated shots and host-canonical admission; ordinary modifiers remain explicit and separate.",
+      "falsifier": "Any authority path still uses 62 / 40, applies another reduction, produces an ordinary close body hit other than 37.2 before explicit modifiers, or diverges from the canonical catalog.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "plannedEvidence": [
+        "src/remote-hit-admission.test.ts",
+        "src/combat/weapon-catalog.test.ts",
+        "tests/e2e/pass73-gameplay-regressions.spec.ts"
+      ]
+    },
+    {
+      "id": "R7",
+      "summary": "Reconcile the reported floor, canopy and route clipping with collision authority",
+      "expected": "The reported Nuke Town floor, canopy and upper-window routes keep visible mass, movement sweep identity, projectile authority and profile parity aligned, with no invisible blocker, fall-through or clipped floor edge on either team approach.",
+      "falsifier": "A player collides with empty air, falls through a visible floor, crosses visible solid mass, shots disagree with movement collision, or Quality and Performance expose different authority.",
+      "acceptance": "mixed",
+      "state": "pending",
+      "plannedEvidence": [
+        "src/collision.test.ts",
+        "src/map.test.ts",
+        "served two-team route traversal and shot-probe captures in Quality and Performance"
+      ]
+    },
+    {
+      "id": "R8",
+      "summary": "Apply Quality-to-Performance changes truthfully during the active match",
+      "expected": "Switching from Quality to Performance in one active match preserves player and match continuity while immediately updating live-safe DPR, drawing buffer, shadows, effects, lighting and refinement; options that require pipeline or arena reconstruction are explicitly staged rather than falsely shown as applied.",
+      "falsifier": "Only the label changes, live-safe telemetry remains unchanged, the match or player restarts, a staged topology option is claimed live, or the next required rebuild does not consume the staged setting.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "plannedEvidence": [
+        "scripts/qa/verify-pass73-live-graphics.mjs",
+        "renderer profile unit contracts",
+        "same-match native-WebGPU Quality-to-Performance telemetry receipt"
+      ]
+    },
+    {
+      "id": "R9",
+      "summary": "Restore installed Firefox native-WebGPU performance parity",
+      "expected": "Installed Firefox runs the same map, seed, Quality profile, resolution, assets and effects as installed Chromium on a hardware WebGPU adapter, with median throughput at least 80 percent of Chromium and p95 frame time no more than 1.25 times Chromium.",
+      "falsifier": "Firefox uses WebGL2, reduced effects, a software adapter or different scene; reports roughly 10 FPS under the matched gate; misses either ratio; or a user-agent mock substitutes for installed Firefox.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "plannedEvidence": [
+        "scripts/qa/pass70-cross-browser-native-user-agent-contract.test.mjs",
+        "scripts/qa/pass70-firefox-geckodriver-contract.test.mjs",
+        "paired exact-SHA installed-Chromium and installed-Firefox native-WebGPU receipt"
+      ]
+    },
+    {
+      "id": "R10",
+      "summary": "Reconcile every owner report and video observation against the implemented evidence",
+      "expected": "Every atomized owner report has one canonical ledger row and requirement path; the video is used as observation evidence without conflating Carpet Bomber with Tri-Pass or treating previous assistant claims as proof.",
+      "falsifier": "A reported issue has no requirement and falsifier, a video identity is guessed, a prior green claim replaces current behavior evidence, or owner wording is silently omitted.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "plannedEvidence": [
+        "docs/PASS73_OWNER_FEEDBACK_SOURCE_AUDIT_2026-08-21.md",
+        "docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md",
+        "docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json",
+        "npm run qa:pass65:owner-feedback"
+      ]
+    },
+    {
+      "id": "R11",
+      "summary": "Promote Pass 73 without losing any retained release",
+      "expected": "Pass 73 is the only live target; exact Pass 72 is selectable as Previous at channels/pass72-retained; exact Pass 70 and Pass 69 remain selectable; Pass 67.1 remains direct-only; Pass 63 remains selectable rollback; every alias, provenance wrapper, source timestamp and byte pin is verified before publication.",
+      "falsifier": "Any retained channel disappears or changes bytes, Pass 67.1 becomes selectable, Pass 63 is missing, wrapper provenance overwrites embedded provenance, an alias enters the wrong pass, or candidate bytes are described as live without a receipt.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "plannedEvidence": [
+        "src/release-topology.test.ts",
+        "src/release-pipeline.test.ts",
+        "tests/e2e/release-channel-chooser.spec.ts",
+        "npm run stage:release-topology && npm run verify:release-topology"
+      ]
+    },
+    {
+      "id": "R12",
+      "summary": "Complete owner visual, audio, feel and network HITL on the public Pages build",
+      "expected": "After protected publication, Dave can test the exact public Pass 73 Pages build for arm proportions, weapon and movement feel, thermal presentation, grenade pacing, collision, graphics switching, Firefox behavior and real multiplayer while every retained channel remains available.",
+      "falsifier": "The public build does not bind the released SHA, a retained fallback is inaccessible during review, or Dave reports a release-blocking defect in public HITL.",
+      "acceptance": "human",
+      "state": "deferred",
+      "deferApproval": {
+        "approvedBy": "Dave",
+        "approvedAt": "2026-08-21T08:23:56.049Z",
+        "reason": "Dave authorized publication first and reserved owner public HITL for the final GitHub Pages build. He has not inspected or tested an immutable Pass 73 preview; subjective visual, audio and feel review plus native-browser and real-network validation remain unperformed and explicitly deferred."
+      }
+    }
+  ]
+}

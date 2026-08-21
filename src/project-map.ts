@@ -61,11 +61,11 @@ export function projectMapReleaseCopy(releasedAt: string): Readonly<{
   const released = releasedAt !== PENDING_PRODUCTION_RELEASE;
   return Object.freeze({
     summary: released
-      ? 'Pass 72 is the current released build for private lobbies, combat corrections, support presentation and squad metadata; the exact Pass 70 previous-live channel and stable Pass 63 WebGL fallback stay frozen.'
-      : 'Pass 72 is the mechanically gated publication candidate for private lobbies, combat corrections, support presentation and squad metadata; the exact Pass 70 previous-live channel and stable Pass 63 WebGL fallback stay frozen.',
+      ? 'Pass 73 is the current released build for owner-reported first-person, combat, collision, graphics and Firefox corrections; the exact Pass 72 previous-live channel and stable Pass 63 WebGL fallback stay frozen.'
+      : 'Pass 73 is the mechanically gated publication candidate for owner-reported first-person, combat, collision, graphics and Firefox corrections; the exact Pass 72 previous-live channel and stable Pass 63 WebGL fallback stay frozen.',
     approvalHighlight: released
-      ? 'Pass 72 was published under Dave\'s publication-first authorization after mechanical gates; public owner HITL remains pending'
-      : 'Dave\'s publication-first authorization is recorded; he did not inspect the immutable Pass 72 preview and public owner HITL follows protected publication',
+      ? 'Pass 73 was published under Dave\'s publication-first authorization after mechanical gates; public owner HITL remains pending'
+      : 'Dave\'s publication-first authorization is recorded; he did not inspect the immutable Pass 73 preview and public owner HITL follows protected publication',
   });
 }
 
@@ -73,18 +73,19 @@ const projectMapReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELE
 const projectMapCopy = projectMapReleaseCopy(projectMapReleasedAt);
 
 export const PROJECT_MAP_RELEASE: ChangelogEntry = Object.freeze({
-  id: 'pass72',
+  id: 'pass73',
   pass: PASS66_RELEASE_IDENTITY.pass,
-  title: 'Pass 72',
+  title: 'Pass 73',
   releasedAt: projectMapReleasedAt,
-  areas: Object.freeze(['PRIVATE LOBBIES', 'COMBAT', 'SUPPORT', 'SQUADS', 'MULTIPLAYER', 'HITL']),
+  areas: Object.freeze(['FIRST-PERSON', 'COMBAT', 'COLLISION', 'GRAPHICS', 'FIREFOX', 'HITL']),
   summary: projectMapCopy.summary,
   highlights: Object.freeze([
-    'Private lobbies default to Free For All with selectable Team Deathmatch, host-only reset-to-new-code authority and checkpoint invalidation',
-    'Replicated squad names and colours improve presentation without replacing authoritative gameplay-team ownership or network validation',
-    'M14 EBR damage, fall-damage envelope and flare collision radius now use the exact Pass 72 balance contract',
-    'Carpet Bomber environment attribution, hosted occlusion-aware crossbow glass breaking and support-shot audio dispatch for the owner and eligible Team Deathmatch teammates remain bounded and authoritative',
-    'The release chooser preserves exact Pass 70, Pass 69, Pass 67.1 and Pass 63 evidence paths for comparison and rollback',
+    'Authored first-person sleeves are thicker and extend beyond the lower frame across the weapon and stance catalog',
+    'Railgun and M14 EBR ADS thermal target presentation, first-grenade preparation and explosive-crossbow glass authority are explicit behavioral contracts',
+    'M14 EBR damage stays at the single exact 40-percent reduction while offline, host-authoritative and replicated paths share the same values',
+    'Live-safe graphics controls update inside the current match and staged topology changes are reported honestly',
+    'Nuke Town floor, canopy and opening authority plus native-WebGPU Firefox parity remain release-blocking evidence lanes',
+    'The release chooser preserves exact Pass 72, Pass 70, Pass 69, Pass 67.1 and Pass 63 evidence paths for comparison and rollback',
     projectMapCopy.approvalHighlight,
     'Pass 63 stays frozen as the selectable stable WebGL fallback',
   ]),

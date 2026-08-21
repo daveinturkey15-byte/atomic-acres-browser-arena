@@ -41,7 +41,7 @@ describe('production release workflow', () => {
     expect(workflow).not.toContain('git config --global');
   });
 
-  it('stages live Pass 72, previous Pass 70, retained Pass 69, stable Pass 67.1 and rollback Pass 63 before a complete publish', () => {
+  it('stages live Pass 73, previous Pass 72, retained Pass 70 and Pass 69, stable Pass 67.1 and rollback Pass 63 before a complete publish', () => {
     expect(workflow).toContain('npm run stage:release-topology');
     expect(workflow).toContain('npm run verify:release-topology');
     expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}');
@@ -49,20 +49,24 @@ describe('production release workflow', () => {
     expect(workflow).toContain('RELEASE_ROLLBACK_DIST: ${{ env.RELEASE_ROLLBACK_DIST }}');
     expect(workflow).toContain('git worktree add artifacts/pass63-rollback-src "$rollback_source_sha"');
     expect(workflow).not.toContain('stage:stable-channel');
-    expect(workflow).toContain('Stage live Pass 72, exact previous Pass 70, retained Pass 69, rebuilt Pass 67.1 and Pass 63 rollback');
-    expect(workflow).toContain('RETAINED_PAGES_SHA=$(node -e');
+    expect(workflow).toContain('Stage live Pass 73, exact previous Pass 72, retained Pass 70 and Pass 69, rebuilt Pass 67.1 and Pass 63 rollback');
+    expect(workflow).toContain('for channel_key in previous retained historical; do');
+    expect(workflow).toContain('git cat-file -e "${pinned_pages_sha}^{commit}"');
     expect(readFileSync('package.json', 'utf8')).toContain('"deploy:ci": "gh-pages -d dist"');
     expect(readFileSync('package.json', 'utf8')).not.toContain('"deploy:ci": "gh-pages -d dist --add"');
   });
 
-  it('verifies public Pass 72, previous Pass 70, retained Pass 69 and Pass 63 choices while retaining internal stable provenance', () => {
-    expect(staticTopologyVerifier).toContain("['experimental', 'previous', 'retained', 'stable']");
-    expect(staticTopologyVerifier).toContain("['experimental', 'previous', 'retained']");
+  it('verifies public Pass 73, previous Pass 72, retained Pass 70 and Pass 69, and Pass 63 choices while retaining internal stable provenance', () => {
+    expect(staticTopologyVerifier).toContain("['experimental', 'previous', 'retained', 'historical', 'stable']");
+    expect(staticTopologyVerifier).toContain("['experimental', 'previous', 'retained', 'historical']");
     expect(staticTopologyVerifier).toContain('publicConfig.retained.pass !== config.retained.pass');
+    expect(staticTopologyVerifier).toContain('publicConfig.historical.pass !== config.historical.pass');
     expect(staticTopologyVerifier).toContain('publicConfig.stable.pass !== config.rollback.pass');
-    expect(liveTopologyVerifier).toContain('await buttons.count() !== 4');
-    expect(liveTopologyVerifier).toContain("for (const choice of ['experimental', 'previous', 'retained', 'stable'])");
-    expect(liveTopologyVerifier).toContain("await verifyChoice('retained', 'channels/pass69-retained', 'PASS 69', 'pass69');");
+    expect(liveTopologyVerifier).toContain('await buttons.count() !== 5');
+    expect(liveTopologyVerifier).toContain("for (const choice of ['experimental', 'previous', 'retained', 'historical', 'stable'])");
+    expect(liveTopologyVerifier).toContain("await verifyChoice('previous', 'channels/pass72-retained', 'PASS 72', 'pass72');");
+    expect(liveTopologyVerifier).toContain("await verifyChoice('retained', 'channels/pass70-retained', 'PASS 70', 'pass70');");
+    expect(liveTopologyVerifier).toContain("await verifyChoice('historical', 'channels/pass69-retained', 'PASS 69', 'pass69');");
     expect(liveTopologyVerifier).toContain("await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63', expectedRollbackReleasedAt);");
     expect(liveTopologyVerifier).not.toContain("await verifyChoice('rollback'");
   });
@@ -336,7 +340,7 @@ describe('production release workflow', () => {
     expect(section).toContain('artifacts/pipeline/pr-preview-provenance.json');
   });
 
-  it('records the schema 3 two-channel topology in the production receipt', () => {
+  it('records the schema 3 receipt envelope with the complete staged topology', () => {
     expect(workflow).toContain('node scripts/release/write-production-receipt.mjs');
     expect(receiptWriter).toContain('schemaVersion: 3');
     expect(receiptWriter).toContain('topology,');
@@ -347,9 +351,11 @@ describe('production release workflow', () => {
     expect(workflow).not.toContain('gh run watch');
   });
 
-  it('binds the live browser proof to public Pass 72, previous Pass 70 and Pass 63 choices, internal stable provenance, aliases, and Last Release', () => {
-    expect(liveTopologyVerifier).toContain("verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass72')");
-    expect(liveTopologyVerifier).toContain("verifyChoice('previous', 'channels/pass70-retained', 'PASS 70', 'pass70')");
+  it('binds the live browser proof to public Pass 73, previous Pass 72, retained Pass 70 and Pass 69, Pass 63, internal stable provenance, aliases, and Last Release', () => {
+    expect(liveTopologyVerifier).toContain("verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass73')");
+    expect(liveTopologyVerifier).toContain("verifyChoice('previous', 'channels/pass72-retained', 'PASS 72', 'pass72')");
+    expect(liveTopologyVerifier).toContain("verifyChoice('retained', 'channels/pass70-retained', 'PASS 70', 'pass70')");
+    expect(liveTopologyVerifier).toContain("verifyChoice('historical', 'channels/pass69-retained', 'PASS 69', 'pass69')");
     expect(liveTopologyVerifier).toContain("verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63', expectedRollbackReleasedAt)");
     expect(liveTopologyVerifier).not.toContain("verifyChoice('rollback'");
     expect(liveTopologyVerifier).toContain('pinned-channel-provenance.json');

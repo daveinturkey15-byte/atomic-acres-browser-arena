@@ -21,6 +21,7 @@ const sourceSha = process.env.SOURCE_SHA ?? execFileSync('git', ['rev-parse', 'H
 const releasePass = process.env.RELEASE_PASS ?? config.experimental.pass;
 const liveChannelId = config.experimental.path.split('/').at(-1);
 const deploymentState = process.env.RELEASE_BUILT_AT?.trim() ? 'live' : 'candidate';
+const TOPOLOGY_SCHEMA_VERSION = 5;
 const PASS63_PREVIEW_PIN = Object.freeze({
   pagesSha: '46d366d188bfc5ebc5ee7a991fd52b792575316c',
   pagesPath: 'channels/pass63-rollback',
@@ -39,29 +40,42 @@ const exactSha = (value, label) => {
   return value;
 };
 exactSha(sourceSha, 'SOURCE_SHA');
-if (config.schemaVersion !== 4) throw new Error('release-channels.json schemaVersion must be 4');
-if (!/^PASS [1-9][0-9]*$/.test(config.experimental.pass) || config.experimental.label !== 'PASS 72'
+if (config.schemaVersion !== TOPOLOGY_SCHEMA_VERSION) {
+  throw new Error(`release-channels.json schemaVersion must be ${TOPOLOGY_SCHEMA_VERSION}`);
+}
+if (!/^PASS [1-9][0-9]*$/.test(config.experimental.pass) || config.experimental.label !== 'PASS 73'
   || config.experimental.path !== 'channels/the-big-one') {
-  throw new Error('Experimental production topology must stage PASS 72 at channels/the-big-one');
+  throw new Error('Experimental production topology must stage PASS 73 at channels/the-big-one');
 }
 if (config.stable.pass !== 'PASS 67.1' || config.stable.label !== 'STABLE SINGLEPLAYER') {
   throw new Error('Pass 67.1 must remain the approved-source stable singleplayer channel');
 }
-if (config.retained.pass !== 'PASS 69'
-  || config.retained.sourceSha !== '685ed7865018e107df5acf6cb6f7498b4468940c'
-  || config.retained.pagesSha !== '71ec5616504d8e24241450742d01b25c1d6ff4e4'
-  || config.retained.pagesPath !== 'channels/the-big-one'
-  || config.retained.path !== 'channels/pass69-retained') {
-  throw new Error('Retained Pass 69 must remain pinned to the exact previously hosted Pages runtime');
-}
-if (config.previous.pass !== 'PASS 70'
-  || config.previous.sourceSha !== '130fd59bd2cf1e1719b802463219ddf36e2484d5'
-  || config.previous.pagesSha !== '3b5e675c54eaea2a2dd721eca6f247c933361587'
+if (config.previous.pass !== 'PASS 72'
+  || config.previous.sourceSha !== '5da686551d92387d08b00be40125386c391bb3ed'
+  || config.previous.pagesSha !== 'd5b77dc3b9e46608264c52eb0737b50590d70eb5'
   || config.previous.pagesPath !== 'channels/the-big-one'
   || config.previous.runtimeFileCount !== 515
-  || config.previous.runtimeTreeSha256 !== 'c8f6aeed492cd747ef83aa41bdc0d05f2fd86264418d40d0ebbd0916c85d6160'
-  || config.previous.path !== 'channels/pass70-retained') {
-  throw new Error('Previous Pass 70 must remain pinned to the exact current live Pages runtime');
+  || config.previous.runtimeTreeSha256 !== '62fafc5e5c39fa744dfc4f7067b3e0953dd190d8ffecc04e203b2b86d6a8974f'
+  || config.previous.path !== 'channels/pass72-retained') {
+  throw new Error('Previous Pass 72 must remain pinned to the exact previously live Pages runtime');
+}
+if (config.retained.pass !== 'PASS 70'
+  || config.retained.sourceSha !== '130fd59bd2cf1e1719b802463219ddf36e2484d5'
+  || config.retained.pagesSha !== '3b5e675c54eaea2a2dd721eca6f247c933361587'
+  || config.retained.pagesPath !== 'channels/the-big-one'
+  || config.retained.runtimeFileCount !== 515
+  || config.retained.runtimeTreeSha256 !== 'c8f6aeed492cd747ef83aa41bdc0d05f2fd86264418d40d0ebbd0916c85d6160'
+  || config.retained.path !== 'channels/pass70-retained') {
+  throw new Error('Retained Pass 70 must remain pinned to the exact hosted Pages runtime');
+}
+if (config.historical.pass !== 'PASS 69'
+  || config.historical.sourceSha !== '685ed7865018e107df5acf6cb6f7498b4468940c'
+  || config.historical.pagesSha !== '71ec5616504d8e24241450742d01b25c1d6ff4e4'
+  || config.historical.pagesPath !== 'channels/the-big-one'
+  || config.historical.runtimeFileCount !== 515
+  || config.historical.runtimeTreeSha256 !== '5ace26fdf83a4cf695d0075a40523f70e0d6fcee02cb6ae5b42666b6679107b9'
+  || config.historical.path !== 'channels/pass69-retained') {
+  throw new Error('Historical Pass 69 must remain pinned to the exact previously hosted Pages runtime');
 }
 if (config.rollback && (config.rollback.pass !== 'PASS 63' || config.rollback.path !== 'channels/pass63-rollback')) {
   throw new Error('Rollback must be the Pass 63 rebuild at channels/pass63-rollback');
@@ -159,7 +173,7 @@ function stagePinned(channelName, channel) {
   if (passEvidenceFiles.length === 0) throw new Error(`${pagesSha} does not contain configured ${channel.pass}`);
   const digest = treeDigest(targetRoot, paths.map((path) => join(targetRoot, path)));
   const provenance = {
-    schemaVersion: 4, channel: channelName, releasePass: channel.pass,
+    schemaVersion: TOPOLOGY_SCHEMA_VERSION, channel: channelName, releasePass: channel.pass,
     pagesSha, pagesPath: pagesPath || '.', sourceSha: pinnedSourceSha, sourceSubject, path: channel.path,
     exactRootFileCount: paths.length, passEvidenceFiles, treeSha256: digest, pinnedRuntime,
   };
@@ -201,7 +215,7 @@ function stageRebuilt(channelName, channel, configuredDist, releasedAt) {
   if (passEvidenceFiles.length === 0) throw new Error(`${channel.pass} rebuilt stable dist does not contain its pass identity`);
   if (sourceEvidenceFiles.length === 0) throw new Error(`${channel.pass} rebuilt stable dist does not contain its source SHA`);
   const provenance = {
-    schemaVersion: 4,
+    schemaVersion: TOPOLOGY_SCHEMA_VERSION,
     channel: channelName,
     releasePass: channel.pass,
     sourceSha: rebuiltSourceSha,
@@ -227,11 +241,12 @@ if (stableRebuildRequired && (!configuredStableDist || !isAbsolute(configuredSta
 const stable = configuredStableDist
   ? stageRebuilt('recent-stable', config.stable, configuredStableDist, process.env.STABLE_RELEASED_AT)
   : stagePinned('recent-stable', config.stable);
-const previous = stagePinned('pass70-retained', config.previous);
-const retained = stagePinned('pass69-retained', config.retained);
+const previous = stagePinned('pass72-retained', config.previous);
+const retained = stagePinned('pass70-retained', config.retained);
+const historical = stagePinned('pass69-retained', config.historical);
 const experimentalFiles = walkFiles(experimentalRoot);
 const experimental = {
-  schemaVersion: 4, channel: liveChannelId, releasePass,
+  schemaVersion: TOPOLOGY_SCHEMA_VERSION, channel: liveChannelId, releasePass,
   sourceSha, path: config.experimental.path,
   exactRootFileCount: experimentalFiles.length,
   treeSha256: treeDigest(experimentalRoot, experimentalFiles),
@@ -250,7 +265,7 @@ if (config.rollback) {
   if (!configuredRollbackDist || !isAbsolute(configuredRollbackDist)) {
     if (!rollbackRequired) {
       // Browser-QA previews pin the exact currently hosted Pass 63 subtree so
-      // the two-choice chooser is exercised without rebuilding historical code.
+      // the selectable rollback is exercised without rebuilding historical code.
       // Production still supplies RELEASE_ROLLBACK_DIST and stages the separate
       // source-bound rebuild below.
       rollback = stagePinned('rollback', { ...config.rollback, ...PASS63_PREVIEW_PIN });
@@ -279,7 +294,7 @@ if (config.rollback) {
   const rollbackEvidence = rollbackFiles.filter((path) => path.endsWith('.js') && readFileSync(path).includes(Buffer.from(config.rollback.pass)));
   if (rollbackEvidence.length === 0) throw new Error(`${config.rollback.pass} rebuilt dist does not contain ${config.rollback.pass}`);
   rollback = {
-    schemaVersion: 4, channel: 'rollback', releasePass: config.rollback.pass,
+    schemaVersion: TOPOLOGY_SCHEMA_VERSION, channel: 'rollback', releasePass: config.rollback.pass,
     sourceSha: rollbackSourceSha, path: config.rollback.path,
     exactRootFileCount: rollbackFiles.length,
     treeSha256: treeDigest(rollbackRoot, rollbackFiles.map((path) => resolve(rollbackRoot, relative(rollbackDist, path)))),
@@ -300,8 +315,8 @@ const publicConfig = {
   experimental: {
     label: config.experimental.label,
     description: deploymentState === 'live'
-      ? 'The approved Pass 72 gameplay, private-lobby and presentation build.'
-      : 'The local Pass 72 HITL candidate. Publication remains disabled until owner approval.',
+      ? 'The approved Pass 73 first-person, gameplay, world-integrity and renderer-correction build.'
+      : 'The local Pass 73 mechanically gated candidate. Publication remains disabled until exact preview binding.',
     pass: config.experimental.pass,
     path: config.experimental.path,
     deploymentState,
@@ -318,6 +333,12 @@ const publicConfig = {
     pass: config.retained.pass,
     path: config.retained.path,
   },
+  historical: {
+    label: config.historical.label,
+    description: config.historical.description,
+    pass: config.historical.pass,
+    path: config.historical.path,
+  },
   ...(rollback ? {
     stable: {
       label: config.rollback.label,
@@ -331,15 +352,17 @@ writeFileSync(join(distRoot, 'release-channel-config.js'), `window.__ATOMIC_ACRE
 
 mkdirSync(dirname(topologyReceiptPath), { recursive: true });
 const topology = {
-  schemaVersion: 4, sourceSha, releasePass,
+  schemaVersion: TOPOLOGY_SCHEMA_VERSION, sourceSha, releasePass,
   root: { kind: 'chooser-only', files: ['index.html', 'release-shell.css', 'release-shell.js', 'release-channel-config.js'] },
-  channels: Object.fromEntries(Object.entries({ experimental, previous, retained, stable, rollback }).filter(([, channel]) => channel)),
+  channels: Object.fromEntries(Object.entries({ experimental, previous, retained, historical, stable, rollback })
+    .filter(([, channel]) => channel)),
 };
 writeFileSync(topologyReceiptPath, `${JSON.stringify(topology, null, 2)}\n`);
 console.log(JSON.stringify({ releaseTopology: 'ok', sourceSha, channels: {
   experimental: { pass: experimental.releasePass, sourceSha, digest: experimental.treeSha256 },
   previous: { pass: previous.releasePass, pagesSha: previous.pagesSha, digest: previous.treeSha256 },
   retained: { pass: retained.releasePass, pagesSha: retained.pagesSha, digest: retained.treeSha256 },
+  historical: { pass: historical.releasePass, pagesSha: historical.pagesSha, digest: historical.treeSha256 },
   stable: { pass: stable.releasePass, pagesSha: stable.pagesSha, digest: stable.treeSha256 },
   ...(rollback ? { rollback: { pass: rollback.releasePass, sourceSha: rollback.sourceSha, digest: rollback.treeSha256 } } : {}),
 } }));

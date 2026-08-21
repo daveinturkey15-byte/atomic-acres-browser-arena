@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "designation": "pass73-start-exact-pass72-live-runtime",
+  "designatedAt": "2026-08-21T00:30:15Z",
+  "releasePass": "PASS 72",
+  "immutable": true,
+  "sourceSha": "5da686551d92387d08b00be40125386c391bb3ed",
+  "pagesSha": "d5b77dc3b9e46608264c52eb0737b50590d70eb5",
+  "pagesPath": "channels/the-big-one",
+  "runtimeFileCount": 515,
+  "runtimeTreeSha256": "62fafc5e5c39fa744dfc4f7067b3e0953dd190d8ffecc04e203b2b86d6a8974f",
+  "runtimeDigestPolicy": {
+    "excludedFiles": [
+      "channel-provenance.json"
+    ],
+    "completeSubtreeFileCount": 516,
+    "wrapperProvenanceFile": "pinned-channel-provenance.json"
+  },
+  "basis": {
+    "ownerAssessment": "Dave tested the public Pass 72 build and reported release-blocking behavioral, visual, collision, graphics-switching and Firefox regressions. It is retained as the exact immediately previous live comparator and rollback, not designated as defect-free or best-ever.",
+    "mechanicalEvidence": "Required-check run 32429656209, protected production run 32432483550, Pages deployment run 32432743778, receipt artifact 9429706272 and cache-busted live smoke all agree on the source, Pages path, file count and runtime digest."
+  },
+  "requiredChecksRun": 32429656209,
+  "productionWorkflowRun": 32432483550,
+  "pagesWorkflowRun": 32432743778,
+  "productionReceiptArtifact": {
+    "id": 9429706272,
+    "name": "production-release-receipt-5da686551d92387d08b00be40125386c391bb3ed"
+  },
+  "acceptanceManifestSha256": "cd817b814a128ddb59834f61e43713de9b41f46dc6e0ac2ef71a993609358423",
+  "retainedContracts": [
+    "Pass 72 remains an exact Pages-byte copy at channels/pass72-retained and is never rebuilt with Pass 73 source or shared runtime code",
+    "the embedded Pass 72 channel-provenance.json remains unchanged and wrapper provenance is written separately",
+    "Pass 70 and Pass 69 remain separate exact hosted comparators",
+    "Pass 67.1 remains direct-only and Pass 63 remains the selectable stable WebGL rollback",
+    "the frozen Pass 62 best-ever netcode benchmark remains independently enforced"
+  ],
+  "rollbackPolicy": "Serve the exact pinned Pass 72 Pages bytes and reject rebuilds, reinterpretation through Pass 73 code, or replacement of embedded provenance."
+}

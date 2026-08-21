@@ -1,5 +1,20 @@
 export type ReleaseChannelDecision = 'choose' | 'latest' | 'stable';
 
+type RoutedReleaseChannel = {
+  label: string;
+  description: string;
+  pass: string;
+  path: string;
+};
+
+type PinnedReleaseChannel = RoutedReleaseChannel & {
+  sourceSha: string;
+  pagesSha: string;
+  pagesPath: string;
+  runtimeFileCount: number;
+  runtimeTreeSha256: string;
+};
+
 export type ReleaseChannelConfig = {
   schemaVersion: number;
   canonicalHostname: string;
@@ -7,33 +22,12 @@ export type ReleaseChannelConfig = {
     label: string;
     description: string;
   };
-  experimental: {
-    label: string;
-    description: string;
-    pass: string;
-    path: string;
-  };
-  stable: {
-    label: string;
-    description: string;
-    pass: string;
-    sourceSha: string;
-    pagesSha: string;
-    pagesPath?: string;
-    runtimeFileCount?: number;
-    runtimeTreeSha256?: string;
-    path: string;
-  };
-  rollback?: {
-    label: string;
-    description: string;
-    pass: string;
-    sourceSha: string;
-    pagesSha: string;
-    pagesPath: string;
-    runtimeFileCount: number;
-    runtimeTreeSha256: string;
-    path: string;
+  experimental: RoutedReleaseChannel;
+  previous: PinnedReleaseChannel;
+  retained: PinnedReleaseChannel;
+  historical: PinnedReleaseChannel;
+  stable: PinnedReleaseChannel;
+  rollback?: PinnedReleaseChannel & {
     rebuiltFromSource: boolean;
   };
 };

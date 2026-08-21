@@ -1,19 +1,30 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 72",
-    "description": "Pass 72: private lobbies, combat corrections, support readability and preserved release channels."
+    "label": "PASS 73",
+    "description": "Pass 73: first-person, combat, collision, live-graphics and cross-browser corrections with preserved release channels."
   },
   "experimental": {
-    "label": "PASS 72",
-    "description": "Pass 72 gameplay, private-lobby and presentation build.",
-    "pass": "PASS 72",
+    "label": "PASS 73",
+    "description": "Pass 73 first-person, gameplay, world-integrity and renderer-correction build.",
+    "pass": "PASS 73",
     "path": "channels/the-big-one"
   },
   "previous": {
-    "label": "PASS 70 · PREVIOUS LIVE",
-    "description": "The exact current Pass 70 Pages runtime, retained byte-for-byte for comparison and rollback testing.",
+    "label": "PASS 72 · PREVIOUS LIVE",
+    "description": "The exact previously live Pass 72 Pages runtime, retained byte-for-byte for comparison and immediate rollback testing.",
+    "pass": "PASS 72",
+    "sourceSha": "5da686551d92387d08b00be40125386c391bb3ed",
+    "pagesSha": "d5b77dc3b9e46608264c52eb0737b50590d70eb5",
+    "pagesPath": "channels/the-big-one",
+    "runtimeFileCount": 515,
+    "runtimeTreeSha256": "62fafc5e5c39fa744dfc4f7067b3e0953dd190d8ffecc04e203b2b86d6a8974f",
+    "path": "channels/pass72-retained"
+  },
+  "retained": {
+    "label": "PASS 70 · RETAINED LIVE",
+    "description": "The exact Pass 70 Pages runtime, retained byte-for-byte for comparison and fallback testing.",
     "pass": "PASS 70",
     "sourceSha": "130fd59bd2cf1e1719b802463219ddf36e2484d5",
     "pagesSha": "3b5e675c54eaea2a2dd721eca6f247c933361587",
@@ -22,8 +33,8 @@
     "runtimeTreeSha256": "c8f6aeed492cd747ef83aa41bdc0d05f2fd86264418d40d0ebbd0916c85d6160",
     "path": "channels/pass70-retained"
   },
-  "retained": {
-    "label": "PASS 69 · PREVIOUS STABLE",
+  "historical": {
+    "label": "PASS 69 · RETAINED STABLE",
     "description": "The exact previously hosted Pass 69 build, retained byte-for-byte for comparison and fallback testing.",
     "pass": "PASS 69",
     "sourceSha": "685ed7865018e107df5acf6cb6f7498b4468940c",

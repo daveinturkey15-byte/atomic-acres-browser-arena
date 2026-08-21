@@ -64,7 +64,7 @@ async function fetchJson(relativePath) {
 
 async function verifyPublishedProvenance() {
   const live = await fetchJson(`${channelConfig.experimental.path}/channel-provenance.json`);
-  assertEqual(live.schemaVersion, 4, 'Live provenance schema');
+  assertEqual(live.schemaVersion, 5, 'Live provenance schema');
   assertEqual(live.channel, 'the-big-one', 'Live provenance channel');
   assertEqual(live.releasePass, channelConfig.experimental.pass, 'Live provenance pass');
   assertEqual(live.path, channelConfig.experimental.path, 'Live provenance path');
@@ -81,7 +81,8 @@ async function verifyPublishedProvenance() {
   assertEqual(previousEmbedded.exactRootFileCount, channelConfig.previous.runtimeFileCount, 'Previous embedded file count');
   assertEqual(previousEmbedded.treeSha256, channelConfig.previous.runtimeTreeSha256, 'Previous embedded digest');
   const previousWrapper = await fetchJson(`${channelConfig.previous.path}/pinned-channel-provenance.json`);
-  assertEqual(previousWrapper.channel, 'pass70-retained', 'Previous wrapper channel');
+  assertEqual(previousWrapper.schemaVersion, 5, 'Previous wrapper schema');
+  assertEqual(previousWrapper.channel, 'pass72-retained', 'Previous wrapper channel');
   assertEqual(previousWrapper.releasePass, channelConfig.previous.pass, 'Previous wrapper pass');
   assertEqual(previousWrapper.sourceSha, channelConfig.previous.sourceSha, 'Previous wrapper source SHA');
   assertEqual(previousWrapper.pagesSha, channelConfig.previous.pagesSha, 'Previous wrapper Pages SHA');
@@ -97,7 +98,8 @@ async function verifyPublishedProvenance() {
   assertEqual(retainedEmbedded.exactRootFileCount, channelConfig.retained.runtimeFileCount, 'Retained embedded file count');
   assertEqual(retainedEmbedded.treeSha256, channelConfig.retained.runtimeTreeSha256, 'Retained embedded digest');
   const retainedWrapper = await fetchJson(`${channelConfig.retained.path}/pinned-channel-provenance.json`);
-  assertEqual(retainedWrapper.channel, 'pass69-retained', 'Retained wrapper channel');
+  assertEqual(retainedWrapper.schemaVersion, 5, 'Retained wrapper schema');
+  assertEqual(retainedWrapper.channel, 'pass70-retained', 'Retained wrapper channel');
   assertEqual(retainedWrapper.releasePass, channelConfig.retained.pass, 'Retained wrapper pass');
   assertEqual(retainedWrapper.sourceSha, channelConfig.retained.sourceSha, 'Retained wrapper source SHA');
   assertEqual(retainedWrapper.pagesSha, channelConfig.retained.pagesSha, 'Retained wrapper Pages SHA');
@@ -105,9 +107,26 @@ async function verifyPublishedProvenance() {
   assertEqual(retainedWrapper.path, channelConfig.retained.path, 'Retained wrapper route');
   assertEqual(retainedWrapper.pinnedRuntime?.treeSha256, retainedEmbedded.treeSha256, 'Retained wrapper embedded digest');
   provenance.retained = { wrapper: retainedWrapper, embedded: retainedEmbedded };
+  const historicalEmbedded = await fetchJson(`${channelConfig.historical.path}/channel-provenance.json`);
+  assertEqual(historicalEmbedded.schemaVersion, 4, 'Historical embedded provenance schema');
+  assertEqual(historicalEmbedded.releasePass, channelConfig.historical.pass, 'Historical embedded pass');
+  assertEqual(historicalEmbedded.sourceSha, channelConfig.historical.sourceSha, 'Historical embedded source SHA');
+  assertEqual(historicalEmbedded.path, channelConfig.historical.pagesPath, 'Historical embedded source path');
+  assertEqual(historicalEmbedded.exactRootFileCount, channelConfig.historical.runtimeFileCount, 'Historical embedded file count');
+  assertEqual(historicalEmbedded.treeSha256, channelConfig.historical.runtimeTreeSha256, 'Historical embedded digest');
+  const historicalWrapper = await fetchJson(`${channelConfig.historical.path}/pinned-channel-provenance.json`);
+  assertEqual(historicalWrapper.schemaVersion, 5, 'Historical wrapper schema');
+  assertEqual(historicalWrapper.channel, 'pass69-retained', 'Historical wrapper channel');
+  assertEqual(historicalWrapper.releasePass, channelConfig.historical.pass, 'Historical wrapper pass');
+  assertEqual(historicalWrapper.sourceSha, channelConfig.historical.sourceSha, 'Historical wrapper source SHA');
+  assertEqual(historicalWrapper.pagesSha, channelConfig.historical.pagesSha, 'Historical wrapper Pages SHA');
+  assertEqual(historicalWrapper.pagesPath, channelConfig.historical.pagesPath, 'Historical wrapper Pages path');
+  assertEqual(historicalWrapper.path, channelConfig.historical.path, 'Historical wrapper route');
+  assertEqual(historicalWrapper.pinnedRuntime?.treeSha256, historicalEmbedded.treeSha256, 'Historical wrapper embedded digest');
+  provenance.historical = { wrapper: historicalWrapper, embedded: historicalEmbedded };
   const stableOriginal = await fetchJson(`${channelConfig.stable.path}/channel-provenance.json`);
   if (stableOriginal.rebuiltFromSource === true) {
-    assertEqual(stableOriginal.schemaVersion, 4, 'Stable rebuilt provenance schema');
+    assertEqual(stableOriginal.schemaVersion, 5, 'Stable rebuilt provenance schema');
     assertEqual(stableOriginal.channel, 'recent-stable', 'Stable rebuilt channel');
     assertEqual(stableOriginal.releasePass, channelConfig.stable.pass, 'Stable rebuilt pass');
     assertEqual(stableOriginal.sourceSha, channelConfig.stable.sourceSha, 'Stable rebuilt sourceSha');
@@ -127,7 +146,7 @@ async function verifyPublishedProvenance() {
     assertEqual(stableOriginal.treeSha256, channelConfig.stable.runtimeTreeSha256, 'Stable embedded runtime digest');
 
     const stableWrapper = await fetchJson(`${channelConfig.stable.path}/pinned-channel-provenance.json`);
-    assertEqual(stableWrapper.schemaVersion, 4, 'Stable wrapper provenance schema');
+    assertEqual(stableWrapper.schemaVersion, 5, 'Stable wrapper provenance schema');
     assertEqual(stableWrapper.channel, 'recent-stable', 'Stable wrapper channel');
     assertEqual(stableWrapper.releasePass, channelConfig.stable.pass, 'Stable wrapper pass');
     assertEqual(stableWrapper.sourceSha, channelConfig.stable.sourceSha, 'Stable wrapper sourceSha');
@@ -141,7 +160,7 @@ async function verifyPublishedProvenance() {
   }
   if (channelConfig.rollback) {
     const rollbackOriginal = await fetchJson(`${channelConfig.rollback.path}/channel-provenance.json`);
-    assertEqual(rollbackOriginal.schemaVersion, 4, 'Rollback provenance schema');
+    assertEqual(rollbackOriginal.schemaVersion, expectedRollbackReleasedAt ? 5 : 4, 'Rollback provenance schema');
     assertEqual(rollbackOriginal.releasePass, channelConfig.rollback.pass, 'Rollback provenance pass');
     assertEqual(rollbackOriginal.sourceSha, channelConfig.rollback.sourceSha, 'Rollback provenance source SHA');
     assertEqual(rollbackOriginal.path, channelConfig.rollback.path, 'Rollback provenance route');
@@ -210,10 +229,11 @@ async function openChooser(page) {
   const buttons = page.locator('#release-channel-options button');
   const labels = await buttons.allTextContents();
   const expectedBadge = expectedReleasedAt ? 'LIVE' : 'RELEASE CANDIDATE';
-  if (await buttons.count() !== 4
+  if (await buttons.count() !== 5
     || !labels.some((text) => text.includes(channelConfig.experimental.pass) && text.includes(expectedBadge) && !text.includes('THE BIG ONE'))
-    || !labels.some((text) => text.includes('PASS 70') && text.includes('PREVIOUS LIVE'))
-    || !labels.some((text) => text.includes('PASS 69') && text.includes('PREVIOUS STABLE'))
+    || !labels.some((text) => text.includes('PASS 72') && text.includes('PREVIOUS LIVE'))
+    || !labels.some((text) => text.includes('PASS 70') && text.includes('RETAINED LIVE'))
+    || !labels.some((text) => text.includes('PASS 69') && text.includes('RETAINED STABLE'))
     || !labels.some((text) => text.includes('PASS 63') && text.includes('STABLE') && text.includes('WEBGL'))
     || labels.some((text) => text.includes('PASS 66') || text.includes('PASS 65') || text.includes('PASS 64') || text.includes('PASS 59'))) {
     throw new Error(`Unexpected chooser labels: ${JSON.stringify(labels)}`);
@@ -323,7 +343,7 @@ try {
   const chooser = await observedPage();
   try {
     chooserLabels = await openChooser(chooser.page);
-    for (const choice of ['experimental', 'previous', 'retained', 'stable']) {
+    for (const choice of ['experimental', 'previous', 'retained', 'historical', 'stable']) {
       if (await chooser.page.locator(`[data-release-choice="${choice}"]`).count() !== 1) {
         throw new Error(`Missing unique ${choice} chooser action: ${JSON.stringify(chooserLabels)}`);
       }
@@ -335,9 +355,10 @@ try {
     await chooser.close();
   }
 
-  await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass72');
-  await verifyChoice('previous', 'channels/pass70-retained', 'PASS 70', 'pass70');
-  await verifyChoice('retained', 'channels/pass69-retained', 'PASS 69', 'pass69');
+  await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass73');
+  await verifyChoice('previous', 'channels/pass72-retained', 'PASS 72', 'pass72');
+  await verifyChoice('retained', 'channels/pass70-retained', 'PASS 70', 'pass70');
+  await verifyChoice('historical', 'channels/pass69-retained', 'PASS 69', 'pass69');
   await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63', expectedRollbackReleasedAt);
   if (releasePass && !normalizedPass(routes.experimental.eyebrow).includes(normalizedPass(releasePass))) {
     throw new Error(`Experimental runtime ${routes.experimental.eyebrow} does not match ${releasePass}`);
@@ -345,7 +366,9 @@ try {
 
   await verifyLegacyRoute('latest', (params) => params.set('release', 'latest'));
   await verifyLegacyRoute('normal', (params) => params.set('release', 'normal'));
-  await verifyLegacyRoute('previous', (params) => params.set('release', 'previous'), 'channels/pass70-retained', 'PASS 70');
+  await verifyLegacyRoute('previous', (params) => params.set('release', 'previous'), 'channels/pass72-retained', 'PASS 72');
+  await verifyLegacyRoute('pass72', (params) => params.set('release', 'pass72'), 'channels/pass72-retained', 'PASS 72');
+  await verifyLegacyRoute('pass70', (params) => params.set('release', 'pass70'), 'channels/pass70-retained', 'PASS 70');
   await verifyLegacyRoute('pass69', (params) => params.set('release', 'pass69'), 'channels/pass69-retained', 'PASS 69');
   await verifyLegacyRoute('room', (params) => {
     params.set('room', 'qa-room');
