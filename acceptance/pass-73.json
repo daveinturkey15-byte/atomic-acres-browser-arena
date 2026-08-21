@@ -29,9 +29,9 @@
   "requirements": [
     {
       "id": "R1",
-      "summary": "Require Dave's approval of the exact immutable Pass 73 preview before publication",
-      "expected": "Only the exact immutable Pass 73 preview whose integrated mechanical, visual, hardware and release gates are all green and which Dave has played and approved may enter the protected production workflow.",
-      "falsifier": "Publication uses different runtime bytes, bypasses a required gate, proceeds before Dave's preview decision, or represents Dave as having approved an uninspected candidate.",
+      "summary": "Bind protected publication to Dave's standing publication-first authorization",
+      "expected": "The exact immutable Pass 73 preview may enter the protected production workflow after every required mechanical gate is green, while the record distinguishes Dave's approval of the unchanged 0094a302 gameplay candidate from inspection of the later chooser-only immutable preview.",
+      "falsifier": "Publication uses different runtime bytes, bypasses a required mechanical gate, or represents Dave as having inspected or tested the later immutable preview.",
       "acceptance": "human",
       "state": "verified",
       "evidence": [
@@ -48,26 +48,12 @@
       "expected": "Both authored first-person sleeves are materially thicker than Pass 72 and continue below the lower viewport edge across weapons, ADS, high-ready, prone, wall-contact, reload, grenade and knife actions without a visible floating cap.",
       "falsifier": "Either arm visibly terminates inside the gameplay viewport, reads as a skinny disconnected tube, disappears behind HUD-only pixels, or a catalog action reintroduces the cutoff.",
       "acceptance": "mixed",
-      "state": "verified",
-      "evidence": [
-        {
-          "kind": "contract",
-          "ref": "scripts/qa/viewmodel-silhouette-contract.mjs",
-          "command": "node scripts/qa/viewmodel-silhouette-contract.mjs",
-          "note": "The silhouette contract pins connected sleeves, thickness, lower-frame continuation and catalog action coverage."
-        },
-        {
-          "kind": "browser",
-          "ref": "scripts/qa/verify-pass66-viewmodel-framing.mjs",
-          "command": "node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-pass66-viewmodel-framing.mjs",
-          "note": "The served native-WebGPU framing verifier exercises representative viewports and weapon actions."
-        },
-        {
-          "kind": "visual",
-          "ref": "artifact://pass73/viewmodel-framing/contact-sheet.png",
-          "note": "Exact gameplay candidate captures show the connected thicker sleeves, and Dave approved the gameplay candidate after playing it."
-        }
-      ]
+      "state": "deferred",
+      "deferApproval": {
+        "approvedBy": "Dave",
+        "approvedAt": "2026-08-21T17:00:11.283Z",
+        "reason": "Dave played the unchanged 0094a302 gameplay candidate, said the build felt nice and authorized publication, but the local native-WebGPU framing captures were not retained in a remotely resolvable release artifact. The mechanical and browser gates passed; durable mixed visual evidence is deferred to public HITL rather than represented by an unresolved URI."
+      }
     },
     {
       "id": "R3",
@@ -88,26 +74,12 @@
       "expected": "ADS with the Railgun or M14 EBR presents the exact animated target silhouette plus restrained thermal halo through occluding geometry, while ordinary raster bodies remain correctly occluded and the presentation neither double-transforms nor detaches.",
       "falsifier": "An admitted target behind cover is absent, a target is shown outside the intended ADS state, the ghost uses stale or duplicate transforms, or the normal body becomes visible through the wall.",
       "acceptance": "mixed",
-      "state": "verified",
-      "evidence": [
-        {
-          "kind": "contract",
-          "ref": "src/thermal-ghost-presentation.test.ts",
-          "command": "npx vitest run src/thermal-ghost-presentation.test.ts --reporter=dot",
-          "note": "The presentation contract pins ADS-only thermal ghosts, current transforms and ordinary-body occlusion."
-        },
-        {
-          "kind": "browser",
-          "ref": "tests/e2e/pass73-native-ads-reveal.spec.ts",
-          "command": "npx playwright test tests/e2e/pass73-native-ads-reveal.spec.ts --project=chromium --workers=1 --retries=0",
-          "note": "The native Chromium test exercises Railgun and M14 target reveal behind cover."
-        },
-        {
-          "kind": "visual",
-          "ref": "artifact://pass73/native-ads-reveal/contact-sheet.png",
-          "note": "Served native-WebGPU captures retain the through-wall silhouette and halo while ordinary bodies remain occluded."
-        }
-      ]
+      "state": "deferred",
+      "deferApproval": {
+        "approvedBy": "Dave",
+        "approvedAt": "2026-08-21T17:00:11.283Z",
+        "reason": "The native Chromium contract and browser gates passed and Dave authorized publication after playing the unchanged gameplay candidate, but the generated ADS PNG set was not retained in a remotely resolvable release artifact. Durable mixed visual evidence is deferred to public HITL rather than represented by an unresolved URI."
+      }
     },
     {
       "id": "R5",
@@ -159,26 +131,12 @@
       "expected": "The reported Nuke Town floor, canopy and upper-window routes keep visible mass, movement sweep identity, projectile authority and profile parity aligned, with no invisible blocker, fall-through or clipped floor edge on either team approach.",
       "falsifier": "A player collides with empty air, falls through a visible floor, crosses visible solid mass, shots disagree with movement collision, or Quality and Performance expose different authority.",
       "acceptance": "mixed",
-      "state": "verified",
-      "evidence": [
-        {
-          "kind": "contract",
-          "ref": "src/pass73-collision-route-authority.test.ts",
-          "command": "npx vitest run src/pass73-collision-route-authority.test.ts src/collision.test.ts src/map.test.ts --reporter=dot",
-          "note": "The route-authority contract aligns visible mass, player sweep and shot collision across profiles."
-        },
-        {
-          "kind": "browser",
-          "ref": "tests/e2e/pass73-collision-route-authority.spec.ts",
-          "command": "npx playwright test tests/e2e/pass73-collision-route-authority.spec.ts --project=chromium --workers=1 --retries=0",
-          "note": "The served Chromium test traverses and probes the reported routes for both teams and both graphics profiles."
-        },
-        {
-          "kind": "visual",
-          "ref": "artifact://pass73/collision-route-authority/native-webgpu/quality/contact-sheet.png",
-          "note": "Native-WebGPU captures retain the visible floor, canopy and route geometry used by the authority probes."
-        }
-      ]
+      "state": "deferred",
+      "deferApproval": {
+        "approvedBy": "Dave",
+        "approvedAt": "2026-08-21T17:00:11.283Z",
+        "reason": "The collision authority contracts and native Chromium route probes passed and Dave authorized publication after playing the unchanged gameplay candidate, but the generated route PNG set was not retained in a remotely resolvable release artifact. Durable mixed visual evidence is deferred to public HITL rather than represented by an unresolved URI."
+      }
     },
     {
       "id": "R8",
@@ -255,9 +213,9 @@
     },
     {
       "id": "R12",
-      "summary": "Complete owner visual, audio, feel and network HITL before production",
-      "expected": "Dave can test the exact Pass 73 candidate for arm proportions, weapon and movement feel, thermal presentation, grenade pacing, collision, graphics switching and real multiplayer before the production route changes; Firefox remains explicitly deferred to the next pass.",
-      "falsifier": "The tested build does not bind the candidate SHA, production moves before the decision, or Dave reports a release-blocking defect in candidate HITL.",
+      "summary": "Complete owner visual, audio, feel and network HITL on the public Pages build",
+      "expected": "After protected publication, Dave can test the exact public Pass 73 Pages build for arm proportions, weapon and movement feel, thermal presentation, grenade pacing, collision, graphics switching and real multiplayer; Firefox remains explicitly deferred to the next pass.",
+      "falsifier": "The public build does not bind the released SHA, a retained fallback is inaccessible during review, or Dave reports a release-blocking defect in public HITL.",
       "acceptance": "human",
       "state": "deferred",
       "deferApproval": {
