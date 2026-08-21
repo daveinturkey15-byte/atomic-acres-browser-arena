@@ -38,14 +38,14 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Two readings, both to be investigated: (a) menu slots 3/4 share a pool and must stay distinct —
   picking the sibling's reward is a silent disabled-option no-op; correction is an automatic swap;
   (b) in-match activation key 3 (slot 1, Care Package) sometimes refuses to activate.
-- Status: OPEN
+- Status: MODULES LANDED (aa114737) — swap-on-conflict in killstreak-loadout + killstreak-activation-gate module, tested. Menu/in-match wiring pending wave 2.
 
 ### HF-317 — Carpet Bomber must be a strafing run, not a point drop
 - Source: pass74.txt ("carpet bomb is still like carepackage not tri pass as requested? fix it").
 - `carpet-bomber` is currently `PointSupportTargeting` beside `care-package`. Correction: a
   map-targeted bombing corridor (start and end point), visually and mechanically a pass, distinct
   from Care Package's single point and from Tri-Pass's three discrete targets.
-- Status: OPEN
+- Status: MODULES LANDED (aa114737) — carpet-corridor-targeting module + catalog activation target-line, tested. legacy-main targeting flow pending wave 2.
 
 ### HF-318 — killstreak test-area bots lack proper collision
 - Source: pass74.txt ("fix bots in killstreak area they don't have collision properly I thin?") and
@@ -67,7 +67,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Source: atomicnext.txt ("flare gun needs a much better hitbox, wider and higher when as a
   projectile"; flare appears not to damage Killstreak-test-bay bots). No through-wall or oversized
   splash admissions.
-- Status: OPEN
+- Status: MODULE LANDED (aa114737) — flare vertical-capsule admission, tested. legacy-main target snapshots pending wave 2.
 
 ## P0 — lobby, host and match lifecycle
 
@@ -123,7 +123,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   same features. Diagnose live on this machine (installed Firefox, RTX 5080): determine
   WebGPU-vs-WebGL2 route actually taken, caps/VSync, adapter identity, long tasks, and frame-time
   distribution; fix without removing features. Edge/WebKit/Opera/mobile stay secondary.
-- Status: OPEN
+- Status: PHASE 1 LANDED (aa114737) — inverted fail-closed assertion fixed, Firefox pin corrected to installed 154.0 (sha 44f07412...), stale no-WebGPU comments removed, live runbook written. LIVE PROBE STILL OWED — must run headed on this machine to close.
 
 ### HF-332 — first use of every explosive family must not hitch or freeze
 - Source: atomicnext.txt P0-1 (Frag, Flash, Smoke, Semtex, explosive crossbow, flare impact,
@@ -144,14 +144,14 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Source: pass74.txt ("add 10% chance in care package to get a flamethrower"). The flamethrower is a
   timed map weapon with holder authority; the grant path must respect that authority. Recorded
   consequence: the existing killstreak pool keeps its internal shape inside the remaining 90%.
-- Status: OPEN
+- Status: MODULE LANDED (aa114737) — care-package-weapon-reward 10-in-100 flamethrower band + careWeaponGrantEvents on the host result, tested. Grant application pending wave 2.
 
 ### HF-335 — Chopper Gunner HUD and missiles regressed; restore the better implementation
 - Source: pass74.txt ("chopper gunner hud and missiles regressed, should be abetter branch
   somewhere?"; "the HUD of it regreed too, check old branches? had a better one"; "not sure if it
   can see through walls anymore like it shjud be able to") plus atomicnext.txt row 9 (legible
   LMB GUN | RMB MISSILES ×N strip, readable at all resolutions).
-- Status: OPEN
+- Status: PARTIALLY LANDED (aa114737) — Pass 71 missile launch position + splash policy ported. Cockpit HUD sizing pending wave 2.
 
 ### HF-336 — non-controlling players lag severely while a Chopper Gunner is flying
 - Source: pass74.txt ("when chopper gunner is flying and I am against it or on the same team but not
@@ -170,7 +170,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-339 — rare-weapon spawn announcements unmistakable to every player
 - Source: atomicnext.txt ("need clearer announce of rare weapon spawns mid game to all in the
   match").
-- Status: OPEN
+- Status: MODULE LANDED (aa114737) — rare-weapon-announcement presenter, tested. Triple-channel wiring pending wave 2.
 
 ## P1 — arms, weapons and presentation
 
@@ -182,7 +182,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-341 — arms look bad with pistol and during knife stab
 - Source: pass74.txt ("arms look abd with pistol and when stabbing with knife") plus atomicnext.txt
   row 10 (full shipped-catalog arms pass).
-- Status: OPEN
+- Status: LANDED (aa114737) — hand policy v2: two-hand support always active, replacing the handgun +40m reload-only stow teleport.
 
 ### HF-342 — arms and gun clip through floors and walls
 - Source: pass74.txt ("arms and gun still clip through floor and walls etc").
@@ -266,7 +266,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Source: owner directive ("get the mobile verison of the game a bit smoother in control/UI/HUD etc,
   landscape and horiztonal"). Improve touch controls feel, HUD scaling/legibility and orientation
   handling; mobile remains secondary to Chrome/Firefox desktop but must not be janky.
-- Status: OPEN
+- Status: PARTIALLY LANDED (aa114737) — frame-rate-independent look stick + mobile legibility floor raised to >=9px. Remaining: dead-CSS purge, 48px targets.
 
 ### HF-358 — water/ocean upgrade via typed WebGPU/TSL rewrite; swimmable water volumes
 - Source: owner directives (mega-ocean, stylized-water and water+swim references; Forge map 3
@@ -275,13 +275,13 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   comparator/technique references. No code copying. Scope includes a swim movement state (enter/exit
   water volume, buoyancy, swim speed, restricted weapon handling, audio) so island water is
   traversable rather than a death barrier — host-authoritative like every movement state.
-- Status: OPEN
+- Status: MODULES LANDED (aa114737) — src/water/ ocean-spectrum, water-authoring, ocean-tsl, water-quality, swim-state. Arena/legacy-main integration pending wave 2.
 
 ### HF-359 — revive and improve the "farcrysis" map from a previous branch
 - Source: owner directive ("improve and bring back the farcrysis map which was in a previous
   branch"). Locate the branch, assess state, restore into the candidate improved, pass the forging
   review (no floating geometry, matching authority, both profiles).
-- Status: OPEN
+- Status: LANDED (aa114737) — farcrysis revived as the FIFTH arena. 15 modules ported and reconciled across 273 commits of drift; dropped god-ray/cloud/fog wiring restored; nav data ported; visual-definition, sound-event and spatial-audio entries authored. GAP: no prerecorded menu preview flyover video exists and none was faked — that asset is outstanding before farcrysis can ship.
 
 ### HF-360 — original character archetype skins lane (separate branch, staged)
 - Source: owner reminder ("H3 and Blender offline to create original, copyright-safe character
