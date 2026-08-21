@@ -188,6 +188,38 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
     )).toBeGreaterThan(0.5);
   });
 
+  it('admits an occluded hostile at exactly half cannon damage', () => {
+    const { runtime, entityId } = setupPlayerGunner();
+    runtime.advance(1_599, world());
+    const entity = activeChopper(runtime, 1_599);
+    const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, 0.4, -0.35);
+    const victim = target('occluded-hostile', pointAlong(ray, 18));
+    const losEvidence: Array<{ from: SupportVec3; to: SupportVec3; occluded: boolean }> = [];
+
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId,
+      action: 'pilot-control', yawQ: 0.4, pitchQ: -0.35, fire: true,
+    }, 1_599).accepted).toBe(true);
+    const result = runtime.advance(1_600, world([victim], (from, to) => {
+      losEvidence.push({ from, to, occluded: true });
+      return false;
+    }));
+
+    expect(losEvidence).toHaveLength(1);
+    expect(losEvidence[0]!.occluded).toBe(true);
+    expect(losEvidence[0]!.from).toEqual(result.damageEvents[0]!.origin);
+    expect(result.shotEvents).toHaveLength(1);
+    expect(result.damageEvents).toHaveLength(1);
+    expect(result.damageEvents[0]).toMatchObject({
+      targetId: victim.id,
+      source: 'chopper',
+      damage: CHOPPER_GUN_PROFILE.damage * 0.5,
+    });
+    vecClose(result.damageEvents[0]!.endpoint, ray.origin.map(
+      (value, index) => value + ray.direction[index]! * 17,
+    ));
+  });
+
   it('resolves an accepted player shot from its snapshot camera before a low-FPS flight step', () => {
     const { runtime, entityId } = setupPlayerGunner();
     runtime.advance(1_599, world());
