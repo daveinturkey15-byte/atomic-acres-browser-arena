@@ -223,6 +223,7 @@ describe('railgun presentation', () => {
       contract: 'exact-animated-operator-plus-orange-halo-v1',
       trackedTargets: 1,
       activeTargets: 1,
+      activeTargetIds: ['bot-1'],
       activeModelLayers: 6,
       activeHaloLayers: 6,
       geometryIdentity: true,
@@ -239,6 +240,7 @@ describe('railgun presentation', () => {
       completeOperatorModels: true,
       incompleteTargets: 0,
       maxBodyLayers: 12,
+      evidenceControlHidden: false,
     });
     expect(presentation.telemetry()).toMatchObject({
       worldSilhouettes: 6,
@@ -253,11 +255,12 @@ describe('railgun presentation', () => {
     });
     presentation.syncExactOperatorReveal(true, {
       contract: 'exact-animated-operator-plus-orange-halo-v1',
-      trackedTargets: 1, activeTargets: 1, activeModelLayers: 6, activeHaloLayers: 6,
+      trackedTargets: 1, activeTargets: 1, activeTargetIds: ['bot-1'], activeModelLayers: 6, activeHaloLayers: 6,
       geometryIdentity: true, skeletonIdentity: true, throughGeometry: true,
       orangeHalo: true, proxyMeshes: 0, maxTargets: 16,
       exactModelMaterials: 4, haloMaterials: 1, ownedMaterials: 5, maxOwnedMaterials: 81,
       materialBudgetExceeded: false, completeOperatorModels: false, incompleteTargets: 1, maxBodyLayers: 12,
+      evidenceControlHidden: false,
     });
     expect(presentation.telemetry()).toMatchObject({
       worldSilhouettes: 0,

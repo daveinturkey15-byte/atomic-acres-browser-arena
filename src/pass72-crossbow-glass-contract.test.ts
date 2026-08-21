@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { admitCanonicalCrossbowGlassBreak, admitCrossbowGlassMutation } from './crossbow-glass-authority';
 import { admitGlassImpact, createGlassState, glassAuthorityProjection } from './glass-authority';
 import { crossbowBlastLineOfSightColliders, windowBreakPathBlocked } from './window-breaks';
+import type { Box2 } from './collision';
 
 describe('hosted crossbow glass behavior', () => {
   it('opens a solid pane on authoritative bolt impact', () => {
@@ -28,7 +29,7 @@ describe('hosted crossbow glass behavior', () => {
   it('keeps real cover while excluding only the struck pane from blast LOS', () => {
     const struckPane = { minX: -0.4, maxX: 0.4, minY: 0, maxY: 2, minZ: 0, maxZ: 0.08 };
     const wall = { minX: -1, maxX: 1, minY: 0, maxY: 3, minZ: 1, maxZ: 1.2 };
-    const ids = new Map([[struckPane, 'front-pane']]);
+    const ids = new Map<Box2, string>([[struckPane, 'front-pane']]);
     const withoutStruckPane = crossbowBlastLineOfSightColliders(
       [struckPane, wall],
       'front-pane',

@@ -12550,7 +12550,7 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
   const window = arena.breakableWindows.find((candidate) => candidate.id === message.windowId);
   if (!window || window.broken) return;
   const centre = window.mesh.getWorldPosition(new THREE.Vector3());
-  if (crossbowEvent) {
+  if (message.weapon === 'explosive-crossbow') {
     const now = performance.now();
     const action = currentAdmittedShotAction(message.by, message.actionNonce!, now);
     const panePhaseKey = `glass:${message.windowId}:${message.crossbowPhase}`;
