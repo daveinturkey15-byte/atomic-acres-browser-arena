@@ -29,6 +29,31 @@ import {
 } from './weapon-presentation-state';
 import { weaponFamilyPresentation } from './weapon-family-presentation';
 import {
+  MELEE_LEFT_GUARD_BEND_HINT_GLTF,
+  MELEE_LEFT_GUARD_HAND_DIRECTION_GLTF,
+  MELEE_LEFT_GUARD_WRIST_TARGET_GLTF,
+  firstPersonFiringElbowPole,
+  firstPersonFiringWristRollRadians,
+  firstPersonSupportElbowPole,
+  meleeSupportPoseReusable,
+  viewmodelGripFamily,
+  type ViewmodelGripFamily,
+} from './weapon-presentation-pose-profiles';
+// Pass 74 extraction (HF-340/HF-341): grip families and arm stance profiles
+// moved into their own typed module; re-export to keep the public surface.
+export {
+  FIRST_PERSON_ELBOW_POLE_CONTRACT,
+  FIRST_PERSON_FIRING_ELBOW_POLE_BY_FAMILY,
+  FIRST_PERSON_FIRING_ELBOW_POLE_LOWERED,
+  FIRST_PERSON_FIRING_ELBOW_POLE_RAISED,
+  FIRST_PERSON_SUPPORT_ELBOW_POLE,
+  firstPersonFiringElbowPole,
+  firstPersonFiringWristRollRadians,
+  firstPersonSupportElbowPole,
+  viewmodelGripFamily,
+  type ViewmodelGripFamily,
+} from './weapon-presentation-pose-profiles';
+import {
   PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT,
   PASS70_FIRST_PERSON_OPTIC_WINDOW_OPACITY,
   capturePass70FirstPersonMaterialState,
@@ -245,35 +270,29 @@ const RELOAD_HAND_ROTATIONS: Record<WeaponId, [number, number, number]> = {
   'flare-gun': [-0.92, 0.42, -0.68],
 };
 
-export type ViewmodelGripFamily = 'long-gun' | 'compact' | 'handgun' | 'heavy' | 'crossbow';
-
-export function viewmodelGripFamily(weapon: WeaponId): ViewmodelGripFamily {
-  if (weapon === 'pistol' || weapon === 'magnum' || weapon === 'machine-pistol' || weapon === 'flashlight-pistol' || weapon === 'flare-gun') return 'handgun';
-  if (weapon === 'smg' || weapon === 'mini-uzi' || weapon === 'mp5') return 'compact';
-  if (weapon === 'lmg' || weapon === 'minigun' || weapon === 'flamethrower') return 'heavy';
-  if (weapon === 'explosive-crossbow') return 'crossbow';
-  return 'long-gun';
-}
-
 export const RIGGED_HAND_POSE_CHAIN_CONTRACT = 'authored-palm-full-transform-to-socket-frame-v2';
-export const FIRST_PERSON_HAND_POLICY_CONTRACT = 'right-firing-hand-handgun-support-reload-only-v1';
+// HF-341 contract bump: v1 ('right-firing-hand-handgun-support-reload-only-v1')
+// stowed the handgun support arm by teleporting its shoulder +40 m and toggled
+// that stow across a single frame at every reload boundary. Handguns now keep
+// a posed two-hand grip on the authored support-socket-l at all times, so the
+// support chain is always active and reload transitions blend continuously.
+export const FIRST_PERSON_HAND_POLICY_CONTRACT = 'right-firing-hand-two-hand-support-always-active-v2';
 export type FirstPersonHandPolicy = Readonly<{
   contract: typeof FIRST_PERSON_HAND_POLICY_CONTRACT;
   gripFamily: ViewmodelGripFamily;
   firingHand: 'right';
-  supportHand: 'active' | 'reload-only-stowed';
-  activeChainCount: 1 | 2;
+  supportHand: 'active';
+  activeChainCount: 2;
 }>;
 
-export function firstPersonHandPolicy(weapon: WeaponId, reloadBlend = 0): FirstPersonHandPolicy {
+export function firstPersonHandPolicy(weapon: WeaponId): FirstPersonHandPolicy {
   const gripFamily = viewmodelGripFamily(weapon);
-  const supportStowed = gripFamily === 'handgun' && THREE.MathUtils.clamp(reloadBlend, 0, 1) <= 0.02;
   return Object.freeze({
     contract: FIRST_PERSON_HAND_POLICY_CONTRACT,
     gripFamily,
     firingHand: 'right',
-    supportHand: supportStowed ? 'reload-only-stowed' : 'active',
-    activeChainCount: supportStowed ? 1 : 2,
+    supportHand: 'active',
+    activeChainCount: 2,
   });
 }
 const RIGGED_SUPPORT_HAND_DIRECTION_LOCAL = Object.freeze(new THREE.Vector3(0.85, -0.20, -0.45).normalize());
@@ -447,12 +466,12 @@ export function firstPersonArmShoulderEntryNdc(
 export const FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC = -1.23;
 /** Runtime IK rotates joints and may translate the shoulder, but never stretches a skinned segment. */
 export const FIRST_PERSON_ARM_BIND_SEGMENT_LENGTH_SCALE = 1;
-// The firing elbow must flare camera-up/out from the below-frame shoulder.
-// A camera-down pole folded compact and heavy forearms entirely underneath the
-// crop, leaving a glove apparently cut off at the wrist even though the IK
-// endpoint remained attached. This pole preserves the real two-bone lengths
-// and grip socket while making the intervening forearm the visible connection.
-const FIRST_PERSON_FIRING_ELBOW_BEND_HINT = Object.freeze(new THREE.Vector3(0.7, 0.35, 0.25).normalize());
+// HF-340: the firing elbow pole now comes from the per-grip-family stance
+// profile module. Long-gun/handgun/crossbow bend lateral-and-slightly-down
+// like the accepted left arm; the camera-up pole that 14a9344c applied to
+// every family (and which bent the right arm strangely) is reserved for the
+// compact/heavy hip poses whose forearms folded under the crop, plus the
+// high-ready blend where the folded forearm genuinely rises.
 /** Unit -Z blade axis reused by the per-frame melee knife alignment. */
 const KNIFE_BLADE_AXIS = Object.freeze(new THREE.Vector3(0, 0, -1));
 export const HIP_VIEWMODEL_POSITION = Object.freeze({ x: 0.34, y: -0.44, z: -1.08 });
@@ -3009,7 +3028,14 @@ export class WeaponPresentation {
       && this.authoredMeleeKnife !== null
       && this.authoredMeleeSocket !== null;
     const leftRig = this.riggedArmRigs.find((rig) => rig.side === 'left');
-    this.riggedMeleeSupportPose = authoredReady && leftRig ? Object.freeze({
+    // HF-341: only reuse the immediately preceding support pose when it is a
+    // real near-bind pose. The removed handgun stow teleported this shoulder
+    // +40 m; replaying such a capture played the whole 520 ms stab one-armed.
+    // Without a reusable capture, poseRiggedMeleeArms solves the authored
+    // left-arm guard instead.
+    const supportPoseReusable = leftRig !== undefined
+      && meleeSupportPoseReusable(leftRig.shoulder.position, leftRig.bindShoulderPosition);
+    this.riggedMeleeSupportPose = authoredReady && leftRig && supportPoseReusable ? Object.freeze({
       shoulderPosition: leftRig.shoulder.position.clone(),
       shoulderQuaternion: leftRig.shoulder.quaternion.clone(),
       shoulderScale: leftRig.shoulder.scale.clone(),
@@ -3812,6 +3838,27 @@ export class WeaponPresentation {
           scratch.target.set(0.055, -0.025, 0.075),
         );
       }
+      if (left && !this.riggedMeleeSupportPose) {
+        // HF-341: no reusable pre-stab capture (for example the preceding pose
+        // was the legacy off-screen stow). Solve the authored left-arm guard
+        // with the real two-bone chain so the stab still shows both arms.
+        this.placeRiggedShoulderEntryBelowFrame(left, cameraRotation);
+        const shoulder = left.shoulder.getWorldPosition(scratch.shoulderPosition);
+        const elbow = left.elbow.getWorldPosition(scratch.elbowPosition);
+        const wrist = left.wrist.getWorldPosition(scratch.wristPosition);
+        const upperLength = shoulder.distanceTo(elbow);
+        const lowerLength = elbow.distanceTo(wrist);
+        const wristTarget = arms.localToWorld(
+          scratch.meleeWristTargetWorld.copy(MELEE_LEFT_GUARD_WRIST_TARGET_GLTF),
+        );
+        const bendHint = scratch.meleeBendHintWorld.copy(MELEE_LEFT_GUARD_BEND_HINT_GLTF)
+          .applyQuaternion(armsWorldRotation).normalize();
+        const handDirection = scratch.meleeHandDirectionWorld.copy(MELEE_LEFT_GUARD_HAND_DIRECTION_GLTF)
+          .applyQuaternion(armsWorldRotation).normalize();
+        this.poseRiggedArmToWristTarget(
+          left, wristTarget, shoulder, upperLength, lowerLength, bendHint, handDirection,
+        );
+      }
     }
     this.root.updateWorldMatrix(true, true);
     if (this.authoredMeleeKnife && this.authoredMeleeSocket) {
@@ -3845,6 +3892,11 @@ export class WeaponPresentation {
       knifeAttachedToRightWrist: rig.side === 'right' && this.authoredMeleeSocket?.parent === rig.wrist,
       supportChainScale: rig.side === 'left' ? rig.shoulder.scale.x : null,
       supportChainPolicy: rig.side === 'left' ? 'two-chain-intact-melee-guard-v1' : null,
+      // HF-341: names whether the left arm replays the captured pre-stab pose
+      // or was solved fresh onto the authored guard target.
+      supportPoseSource: rig.side === 'left'
+        ? (this.riggedMeleeSupportPose ? 'captured-preceding-pose' : 'solved-authored-guard')
+        : null,
       supportChainVisible: rig.side === 'left',
       stowedWithoutScaling: rig.side === 'left' ? false : null,
       shoulder: rig.shoulder.getWorldPosition(new THREE.Vector3()).toArray(),
@@ -3890,31 +3942,13 @@ export class WeaponPresentation {
     const captureDiagnostics = now >= this.nextRiggedArmDiagnosticsAt;
     const diagnostics: Array<Record<string, unknown>> | null = captureDiagnostics ? [] : null;
     if (captureDiagnostics) this.nextRiggedArmDiagnosticsAt = now + 250;
-    const handPolicy = firstPersonHandPolicy(this.active, reloadPose.handToReload);
+    // HF-341: the handgun-family '+40 m support stow' branch that used to live
+    // here is gone. It teleported a real arm off-screen (the exact pattern the
+    // melee path condemns) and popped it back across one frame at every reload
+    // boundary. Handguns now hold a posed two-hand grip on the authored
+    // support-socket-l, and every reload transition blends via handToReload.
+    const handPolicy = firstPersonHandPolicy(this.active);
     for (const rig of this.riggedArmRigs) {
-      if (rig.side === 'left' && handPolicy.supportHand === 'reload-only-stowed') {
-        rig.shoulder.position.set(
-          rig.bindShoulderPosition.x + 40,
-          rig.bindShoulderPosition.y,
-          rig.bindShoulderPosition.z,
-        );
-        rig.shoulder.scale.copy(rig.bindShoulderScale);
-        if (diagnostics) diagnostics.push({
-          side: rig.side,
-          weapon: this.active,
-          gripFamily: handPolicy.gripFamily,
-          handPolicy,
-          active: false,
-          finite: true,
-          stowed: true,
-          supportChainScale: rig.shoulder.scale.x,
-          stowedWithoutScaling: rig.shoulder.scale.equals(rig.bindShoulderScale),
-          supportChainPolicy: FIRST_PERSON_HAND_POLICY_CONTRACT,
-          poseChainContract: RIGGED_HAND_POSE_CHAIN_CONTRACT,
-          shoulder: rig.shoulder.getWorldPosition(scratch.diagnosticShoulder).toArray(),
-        });
-        continue;
-      }
       // Keep the authored segment translations byte-for-byte intact. The
       // previous reach fix multiplied these offsets as far as 2.2x, stretching
       // weighted sleeves into thin tubes at elbows and wrists. Reach is now
@@ -3968,9 +4002,16 @@ export class WeaponPresentation {
       const socketReachRatio = socketReach / Math.max(physicalReach, 1e-6);
       const calibratedReach = physicalReach * RIGGED_ARM_MAX_REACH_RATIO;
       let gripSocketCalibration = 0;
+      // HF-340: per-family firing pole (lateral-dominant, slightly camera-down
+      // for long-gun/handgun/crossbow) restores left/right bend symmetry; the
+      // raised pole survives only for compact/heavy and the high-ready blend.
       const bendHint = rig.side === 'left'
-        ? scratch.bendHint.set(-0.7, -1, 0.25)
-        : scratch.bendHint.copy(FIRST_PERSON_FIRING_ELBOW_BEND_HINT);
+        ? firstPersonSupportElbowPole(scratch.bendHint)
+        : firstPersonFiringElbowPole(
+          handPolicy.gripFamily,
+          this.contactResponse.highReadyBlend,
+          scratch.bendHint,
+        );
       bendHint.applyQuaternion(cameraRotation);
       const weaponRotation = activeModel.getWorldQuaternion(scratch.weaponRotation);
       const muzzle = activeModel.getObjectByName('muzzle-socket');
@@ -3980,9 +4021,11 @@ export class WeaponPresentation {
       const handDirection = rig.side === 'left'
         ? riggedSupportHandDirectionLocal(reloadPose.handToReload, scratch.handDirection).applyQuaternion(weaponRotation).normalize()
         : scratch.handDirection.copy(weaponForward);
+      // HF-341: the firing wrist takes the per-family stance roll (slight
+      // inward cant for the two-hand handgun grip, neutral elsewhere).
       const wristRollRadians = rig.side === 'left'
         ? riggedSupportWristRollRadians(reloadPose.handToReload)
-        : 0;
+        : firstPersonFiringWristRollRadians(handPolicy.gripFamily);
       const palmTargetRotation = this.palmTargetWorldRotation(socket, handDirection, wristRollRadians);
       const contactIterationErrors: number[] | null = diagnostics ? [] : null;
       let palmOrientationError = Number.POSITIVE_INFINITY;

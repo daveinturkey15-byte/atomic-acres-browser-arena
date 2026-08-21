@@ -52,8 +52,9 @@ describe('support flight navigation', () => {
   });
 
   it('declares arena-owned nav data for every stable arena identity', () => {
+    // HF-359: now 5 arenas including farcrysis
     expect(Object.keys(PASS65_FLIGHT_NAVIGATION).sort()).toEqual([
-      'atomic-acres', 'gun-range', 'rustworks-1v1', 'skyline-terminal',
+      'atomic-acres', 'farcrysis', 'gun-range', 'rustworks-1v1', 'skyline-terminal',
     ]);
     for (const entry of Object.values(PASS65_FLIGHT_NAVIGATION)) {
       expect(entry.noFlyPolicy).toBe('authoritative-static-and-dynamic-solids');

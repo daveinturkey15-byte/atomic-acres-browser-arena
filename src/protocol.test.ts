@@ -362,6 +362,59 @@ describe('network protocol guards', () => {
     expect(messageBelongsToPlayer({ ...brokenWindow, by: 'spoof' }, 'abc')).toBe(false);
   });
 
+  // HF-315(a): the host answers every pickup request so an optimistic guest
+  // swap is confirmed against canonical authority or reverted, never diverged.
+  it('validates canonical host pickup results with an echoed request nonce', () => {
+    const drop = {
+      weapon: 'carbine' as const, ammo: 12, reserve: 40,
+      position: [1, 0.2, 2] as [number, number, number], expiresAt: 31_000,
+    };
+    const result = {
+      type: 'pickup-result' as const, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'host', forPlayerId: 'abc', dropId: 'death-77',
+      status: 'accepted' as const, reason: 'accepted' as const,
+      combatInventory: {
+        revision: 9,
+        primary: { weapon: 'sniper' as const, ammo: 5, reserve: 0 },
+        sidearm: { weapon: 'pistol' as const, ammo: 12, reserve: 48 },
+        grenades: 1 as const,
+      },
+      drop,
+      nonce: 77,
+    } as const;
+    expect(isGameMessage(result)).toBe(true);
+    expect(isHostAuthorityMessage(result)).toBe(true);
+    expect(messageBelongsToPlayer(result, 'host')).toBe(true);
+    expect(messageBelongsToPlayer(result, 'abc')).toBe(false);
+    expect(isGameMessage({ ...result, drop: 'removed' })).toBe(true);
+    expect(isGameMessage({ ...result, status: 'rejected' as const, reason: 'expired' as const })).toBe(true);
+    // Accepted results carry exactly 'accepted'; rejections must name a guard.
+    expect(isGameMessage({ ...result, status: 'rejected' })).toBe(false);
+    expect(isGameMessage({ ...result, reason: 'expired' })).toBe(false);
+    expect(isGameMessage({ ...result, status: 'rejected', reason: 'because' })).toBe(false);
+    expect(isGameMessage({ ...result, drop: { ...drop, ammo: -1 } })).toBe(false);
+    expect(isGameMessage({ ...result, drop: { ...drop, reserve: 10_001 } })).toBe(false);
+    expect(isGameMessage({ ...result, drop: { ...drop, weapon: 'laser' } })).toBe(false);
+    expect(isGameMessage({ ...result, drop: { ...drop, expiresAt: Number.NaN } })).toBe(false);
+    expect(isGameMessage({ ...result, drop: { ...drop, position: [1, Infinity, 2] } })).toBe(false);
+    expect(isGameMessage({ ...result, drop: { ...drop, extra: 1 } })).toBe(false);
+    expect(isGameMessage({ ...result, dropId: '' })).toBe(false);
+    expect(isGameMessage({ ...result, combatInventory: { ...result.combatInventory, revision: -1 } })).toBe(false);
+    expect(isGameMessage({ ...result, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION - 1 })).toBe(false);
+  });
+
+  // HF-326 residual polish: the intentional-reset farewell is host authority
+  // and can never be forged or replayed on behalf of a guest.
+  it('validates the terminal host lobby-closed farewell as unforgeable host authority', () => {
+    const farewell = { type: 'lobby-closed' as const, reason: 'host-reset' as const, nonce: 9 };
+    expect(isGameMessage(farewell)).toBe(true);
+    expect(isHostAuthorityMessage(farewell)).toBe(true);
+    expect(messageBelongsToPlayer(farewell, 'abc')).toBe(false);
+    expect(messageBelongsToPlayer(farewell, 'host')).toBe(false);
+    expect(isGameMessage({ ...farewell, reason: 'rage-quit' })).toBe(false);
+    expect(isGameMessage({ ...farewell, nonce: Number.NaN })).toBe(false);
+  });
+
   it('validates bounded host-authoritative Overdrive claims and state', () => {
     const claim = { type: 'overdrive-claim' as const, by: 'abc', position: [0, 1.7, 0] as [number, number, number], generation: 2, nonce: 90 };
     const state = { type: 'overdrive-state' as const, by: 'host', holderId: 'abc', available: false, generation: 3, position: [0, 0.82, 0] as [number, number, number], activeRemainingMs: 30_000, nextSpawnInMs: 120_000, nonce: 91 };

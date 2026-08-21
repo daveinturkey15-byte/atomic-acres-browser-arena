@@ -36,6 +36,8 @@ const MAP_TRAP_RADIUS: Readonly<Record<ArenaId, number>> = Object.freeze({
   'rustworks-1v1': 7,
   'gun-range': 8,
   'skyline-terminal': 10,
+  // HF-359 (Pass 74): ported from the Pass 69 hidden lane.
+  'farcrysis': 8,
 });
 
 export const FFA_MINIMUM_SPAWN_SEPARATION = 8;

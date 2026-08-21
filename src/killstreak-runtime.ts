@@ -1,6 +1,5 @@
 import {
   PASS65_KILLSTREAK_CATALOG,
-  rewardForCarePackageUnit,
   type KillstreakCatalog,
   type Pass65KillstreakId,
 } from './killstreak-catalog';
@@ -26,6 +25,12 @@ import {
   supportAircraftRootClearance,
   type SupportAircraftCollisionEnvelope,
 } from './support-aircraft-collision';
+import {
+  rollCarePackageReward,
+  downgradeCarePackageWeaponReward,
+  type CarePackageReward,
+  type CarePackageWeaponRewardId,
+} from './care-package-weapon-reward';
 
 export const ADRENALINE_DURATION_MS = 15_000;
 export const ADRENALINE_DAMAGE_MULTIPLIER = 1.1;
@@ -57,6 +62,17 @@ export const CARPET_BOMBER_PREVIOUS_MAX_DAMAGE = 80;
 export const CARPET_BOMBER_DAMAGE_MULTIPLIER = 3;
 export const CARPET_BOMBER_MAX_DAMAGE = CARPET_BOMBER_PREVIOUS_MAX_DAMAGE * CARPET_BOMBER_DAMAGE_MULTIPLIER;
 export const CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS = 5_000;
+/**
+ * HF-317 (owner: "carpet bomb is still like carepackage not tri pass as
+ * requested? fix it" — reaffirmed twice): the run length now follows the
+ * owner's two-point tactical-map corridor. A facing magnitude at or below the
+ * hint threshold keeps the historical fixed-length run for legacy peers.
+ */
+export const CARPET_BOMBER_DEFAULT_RUN_LENGTH_M = 34;
+export const CARPET_BOMBER_MIN_RUN_LENGTH_M = 20;
+export const CARPET_BOMBER_MAX_RUN_LENGTH_M = 60;
+/** Facing vectors at or below this magnitude remain heading-only hints. */
+export const CARPET_BOMBER_CORRIDOR_INTENT_MIN_MAGNITUDE = 1.5;
 export const CARPET_BOMBER_ROUTE_CLEARANCE_M = 0.05;
 const CARPET_BOMBER_ROUTE_ADMISSION_EPSILON_M = 0.002;
 const CARPET_BOMBER_ROUTE_HEADING_OFFSETS = Object.freeze([
@@ -303,7 +319,8 @@ type CareCrateEntity = EntityBase & {
   descentStartPosition: [number, number, number];
   descentStartsAtMs: number;
   aircraftId: string;
-  reward: Pass65KillstreakId;
+  /** HF-334: killstreak from the pool, or the layered 10% flamethrower band. */
+  reward: CarePackageReward<Pass65KillstreakId>;
   rollUnit: number;
   captureActorId: string | null;
   captureStartedAtMs: number | null;
@@ -373,7 +390,15 @@ export type KillstreakActivationIntent = Readonly<{
   activationId: string;
   expectedId: Pass65KillstreakId;
   anchor?: SupportVec3;
-  /** Horizontal owner-facing hint used only for bounded support ingress choreography. */
+  /**
+   * Horizontal direction hint for bounded support ingress choreography. For
+   * Carpet Bomber (HF-317) the vector is corridor-native: its direction is the
+   * requested run heading and a magnitude above
+   * CARPET_BOMBER_CORRIDOR_INTENT_MIN_MAGNITUDE is the requested run length in
+   * metres, host-clamped to [CARPET_BOMBER_MIN_RUN_LENGTH_M,
+   * CARPET_BOMBER_MAX_RUN_LENGTH_M]. Magnitudes at or below the threshold stay
+   * heading-only hints with the CARPET_BOMBER_DEFAULT_RUN_LENGTH_M run.
+   */
   facing?: SupportVec3;
 }>;
 
@@ -423,11 +448,39 @@ export type CareCaptureAdmissionReason =
   | 'actor-already-capturing'
   | 'capture-admission-failed';
 
+/**
+ * HF-334: host-only outcome of a completed care capture whose crate carried
+ * the layered flamethrower band. The grant deliberately bypasses careRewards
+ * (and the killstreak recipient protocol, which validates catalog ids only) —
+ * the host applies it through the timed-map-weapon authority channel instead.
+ */
+export type CareWeaponGrantEvent = Readonly<{
+  activationId: string;
+  crateId: string;
+  actorId: string;
+  /** Capturing actor's life at grant time; the host drops stale grants. */
+  lifeId: number;
+  weaponId: CarePackageWeaponRewardId;
+  atMs: number;
+}>;
+
+/**
+ * HF-334: narrow host-injected admissibility port. The flamethrower band is
+ * only open while the host can actually honor a grant (authority not held, no
+ * other pending grant). Absent port = fail-closed: the roll reproduces the
+ * original pool distribution exactly, so no capture can strand a reward.
+ */
+export type CarePackageWeaponGrantPort = Readonly<{
+  isFlamethrowerGrantAdmissible: () => boolean;
+}>;
+
 export type KillstreakAdvanceResult = Readonly<{
   damageEvents: readonly KillstreakDamageEvent[];
   shotEvents: readonly KillstreakSupportShotEvent[];
   impactEvents: readonly KillstreakImpactEvent[];
   expiredEntityIds: readonly string[];
+  /** HF-334: weapon grants completed by enemy-hold captures this host step. */
+  careWeaponGrantEvents: readonly CareWeaponGrantEvent[];
 }>;
 
 export type KillstreakActorSnapshot = Readonly<{
@@ -1085,11 +1138,31 @@ export class HostKillstreakRuntime {
   private lastAdvancedAtMs = 0;
   private readonly hostileTargetCache = new Map<string, readonly KillstreakTarget[]>();
   private readonly sortedHostileTargetCache = new Map<string, readonly KillstreakTarget[]>();
+  /** HF-334: host-injected grant-admissibility port; null = band closed. */
+  private readonly carePackageWeaponGrantPort: CarePackageWeaponGrantPort | null;
 
-  constructor(matchEpoch: number, catalog: KillstreakCatalog<string> = PASS65_KILLSTREAK_CATALOG) {
+  constructor(
+    matchEpoch: number,
+    catalog: KillstreakCatalog<string> = PASS65_KILLSTREAK_CATALOG,
+    carePackageWeaponGrantPort: CarePackageWeaponGrantPort | null = null,
+  ) {
     if (!Number.isSafeInteger(matchEpoch) || matchEpoch < 0) throw new Error('match epoch must be a non-negative safe integer');
     this.matchEpoch = matchEpoch;
     this.catalog = catalog;
+    this.carePackageWeaponGrantPort = carePackageWeaponGrantPort;
+  }
+
+  /**
+   * HF-334: the flamethrower band is open only while the injected host port
+   * reports the grant honorable AND no already-rolled crate is still carrying
+   * one (prevents two flamethrowers under the single-instance authority).
+   */
+  private isFlamethrowerRollAdmissible(): boolean {
+    if (this.carePackageWeaponGrantPort?.isFlamethrowerGrantAdmissible() !== true) return false;
+    for (const entity of this.entities.values()) {
+      if (entity.kind === 'care-crate' && entity.reward.kind === 'timed-map-weapon') return false;
+    }
+    return true;
   }
 
   registerActor(actorId: string, team: 0 | 1, lifeId: number, loadout: KillstreakLoadoutV1): void {
@@ -1498,8 +1571,14 @@ export class HostKillstreakRuntime {
       actor.adrenalineUntilMs = nowMs + ADRENALINE_DURATION_MS;
       this.timedActivations.set(activationId, { activationId, ownerId: actor.actorId, id: actualId, expiresAtMs: actor.adrenalineUntilMs });
     } else if (actualId === 'care-package') {
-      const rollUnit = seed % this.catalog.carePackagePool.totalWeightUnits;
-      const reward = rewardForCarePackageUnit(this.catalog, rollUnit) as Pass65KillstreakId;
+      // HF-334: the layered roll opens a fixed 10% flamethrower band over the
+      // pool when the host grant path is admissible; otherwise it reproduces
+      // the original pool distribution exactly (fail-closed, no new authority).
+      const roll = rollCarePackageReward(this.catalog, seed, {
+        flamethrowerAdmissible: this.isFlamethrowerRollAdmissible(),
+      });
+      const reward = roll.reward as CarePackageReward<Pass65KillstreakId>;
+      const rollUnit = roll.rollUnit;
       const id = this.nextEntityId('care');
       const aircraftId = this.nextEntityId('care-aircraft');
       const top = Math.min(world.bounds.ceilingY - 1, Math.max(world.bounds.floorY + 12, world.bounds.floorY + 24));
@@ -1726,8 +1805,16 @@ export class HostKillstreakRuntime {
       anchor[1],
       clamp(anchor[2], impactMinZ, impactMaxZ),
     ] as const);
+    // HF-317: a corridor-native intent encodes the requested run length as the
+    // facing magnitude (end - start, unnormalized). The host clamps it so no
+    // peer can force a degenerate or overlong corridor; hint-only magnitudes
+    // keep the historical fixed-length run.
+    const runLengthM = Number.isFinite(requestedLength)
+      && requestedLength > CARPET_BOMBER_CORRIDOR_INTENT_MIN_MAGNITUDE
+      ? clamp(requestedLength, CARPET_BOMBER_MIN_RUN_LENGTH_M, CARPET_BOMBER_MAX_RUN_LENGTH_M)
+      : CARPET_BOMBER_DEFAULT_RUN_LENGTH_M;
     const impacts = Object.freeze(Array.from({ length: CARPET_BOMBER_IMPACT_COUNT }, (_, index) => {
-      const along = (index / (CARPET_BOMBER_IMPACT_COUNT - 1) - 0.5) * 34;
+      const along = (index / (CARPET_BOMBER_IMPACT_COUNT - 1) - 0.5) * runLengthM;
       const zigzag = (index % 2 === 0 ? -1 : 1) * (3.4 + unit(seed, index + 2) * 2.2);
       const deltaX = forward[0] * along + side[0] * zigzag;
       const deltaZ = forward[1] * along + side[1] * zigzag;
@@ -1957,12 +2044,20 @@ export class HostKillstreakRuntime {
   beginCareCapture(actorId: string, lifeId: number, crateId: string, nowMs: number, world: KillstreakWorld): Readonly<{
     accepted: boolean;
     reason: CareCaptureAdmissionReason;
+    /** HF-334: present only when a tap capture transferred a weapon grant. */
+    weaponGrant?: CareWeaponGrantEvent;
   }> {
     const actor = this.actors.get(actorId);
     const entity = this.entities.get(crateId);
     if (!actor || actor.lifeId !== lifeId) return Object.freeze({ accepted: false, reason: 'identity-mismatch' });
     if (!Number.isFinite(nowMs)) return Object.freeze({ accepted: false, reason: 'invalid-time' });
-    if (actor.careRewards.length >= MAX_RETAINED_CARE_REWARDS) {
+    // HF-334: a weapon grant bypasses careRewards entirely, so its capacity
+    // gate only applies when the transfer would actually enter that queue
+    // (killstreak reward, or a weapon reward downgrading on a closed port).
+    const grantPortOpen = this.carePackageWeaponGrantPort?.isFlamethrowerGrantAdmissible() === true;
+    const entersCareRewards = !(entity?.kind === 'care-crate'
+      && entity.reward.kind === 'timed-map-weapon' && grantPortOpen);
+    if (entersCareRewards && actor.careRewards.length >= MAX_RETAINED_CARE_REWARDS) {
       return Object.freeze({ accepted: false, reason: 'reward-capacity' });
     }
     if (!entity || entity.kind !== 'care-crate' || entity.phase !== 'landed') return Object.freeze({ accepted: false, reason: 'crate-unavailable' });
@@ -1979,7 +2074,26 @@ export class HostKillstreakRuntime {
     // exactly once. Enemy theft retains the longer continuous-hold lifecycle
     // below.
     if (actor.team === entity.team) {
-      actor.careRewards.push(entity.reward);
+      if (entity.reward.kind === 'timed-map-weapon' && grantPortOpen) {
+        // HF-334: the weapon grant surfaces on the admission result; the host
+        // applies it through the timed-map-weapon authority, never careRewards.
+        const weaponGrant: CareWeaponGrantEvent = Object.freeze({
+          activationId: entity.activationId,
+          crateId: entity.id,
+          actorId: actor.actorId,
+          lifeId: actor.lifeId,
+          weaponId: entity.reward.weaponId,
+          atMs: nowMs,
+        });
+        this.entities.delete(entity.id);
+        this.revision += 1;
+        return Object.freeze({ accepted: true, reason: 'accepted', weaponGrant });
+      }
+      // HF-334: a weapon reward whose grant became inadmissible between roll
+      // and capture downgrades deterministically so no capture drops a reward.
+      actor.careRewards.push(entity.reward.kind === 'killstreak'
+        ? entity.reward.id
+        : downgradeCarePackageWeaponReward(this.catalog, entity.rollUnit) as Pass65KillstreakId);
       this.entities.delete(entity.id);
       this.revision += 1;
       return Object.freeze({ accepted: true, reason: 'accepted' });
@@ -2028,9 +2142,11 @@ export class HostKillstreakRuntime {
   advance(nowMs: number, world: KillstreakWorld): KillstreakAdvanceResult {
     if (!Number.isFinite(nowMs)) return Object.freeze({
       damageEvents: Object.freeze([]), shotEvents: Object.freeze([]), impactEvents: Object.freeze([]), expiredEntityIds: Object.freeze([]),
+      careWeaponGrantEvents: Object.freeze([]),
     });
     if (this.lastAdvancedAtMs !== 0 && nowMs < this.lastAdvancedAtMs) return Object.freeze({
       damageEvents: Object.freeze([]), shotEvents: Object.freeze([]), impactEvents: Object.freeze([]), expiredEntityIds: Object.freeze([]),
+      careWeaponGrantEvents: Object.freeze([]),
     });
     const canonicalNowMs = Math.max(this.lastAdvancedAtMs, nowMs);
     const previousAt = this.lastAdvancedAtMs === 0 ? canonicalNowMs : this.lastAdvancedAtMs;
@@ -2041,6 +2157,7 @@ export class HostKillstreakRuntime {
     const shotEvents: KillstreakSupportShotEvent[] = [];
     const impactEvents: KillstreakImpactEvent[] = [];
     const expiredEntityIds: string[] = [];
+    const careWeaponGrantEvents: CareWeaponGrantEvent[] = [];
     // One host step may advance all 24 swarm drones for the same owner. Build
     // and sort that owner's hostile set once instead of allocating it again
     // for every target lookup, sensor scan and area-damage query.
@@ -2143,7 +2260,7 @@ export class HostKillstreakRuntime {
       }
       if (entity.kind === 'aircraft') {
         if (entity.variant !== 'carpet') this.advanceAircraft(entity, canonicalNowMs, dt, world);
-      } else if (entity.kind === 'care-crate') this.advanceCareCrate(entity, canonicalNowMs, dt, world);
+      } else if (entity.kind === 'care-crate') this.advanceCareCrate(entity, canonicalNowMs, dt, world, careWeaponGrantEvents);
       else if (entity.kind === 'chopper') this.advanceChopper(entity, canonicalNowMs, dt, world, damageEvents, shotEvents, impactEvents);
       else this.advanceDrone(entity, canonicalNowMs, dt, world, damageEvents, shotEvents);
     }
@@ -2157,6 +2274,7 @@ export class HostKillstreakRuntime {
       shotEvents: Object.freeze(shotEvents),
       impactEvents: Object.freeze(impactEvents),
       expiredEntityIds: Object.freeze(expiredEntityIds),
+      careWeaponGrantEvents: Object.freeze(careWeaponGrantEvents),
     });
   }
 
@@ -2190,7 +2308,13 @@ export class HostKillstreakRuntime {
     entity.revision += 1;
   }
 
-  private advanceCareCrate(entity: CareCrateEntity, nowMs: number, dt: number, world: KillstreakWorld): void {
+  private advanceCareCrate(
+    entity: CareCrateEntity,
+    nowMs: number,
+    dt: number,
+    world: KillstreakWorld,
+    careWeaponGrantEvents: CareWeaponGrantEvent[],
+  ): void {
     const previous: SupportVec3 = [...entity.position];
     if (nowMs < entity.descentStartsAtMs) {
       entity.phase = 'inbound';
@@ -2232,6 +2356,22 @@ export class HostKillstreakRuntime {
     }
     const requiredMs = captureActor.team === entity.team ? 1_250 : 2_500;
     if (nowMs - entity.captureStartedAtMs < requiredMs) return;
+    if (entity.reward.kind === 'timed-map-weapon'
+      && this.carePackageWeaponGrantPort?.isFlamethrowerGrantAdmissible() === true) {
+      // HF-334: a completed hold on a weapon crate surfaces a grant event this
+      // host step; it bypasses careRewards and its capacity gate entirely.
+      careWeaponGrantEvents.push(Object.freeze({
+        activationId: entity.activationId,
+        crateId: entity.id,
+        actorId: captureActor.actorId,
+        lifeId: captureActor.lifeId,
+        weaponId: entity.reward.weaponId,
+        atMs: nowMs,
+      }));
+      this.entities.delete(entity.id);
+      this.revision += 1;
+      return;
+    }
     if (captureActor.careRewards.length >= MAX_RETAINED_CARE_REWARDS) {
       entity.phase = 'landed';
       entity.captureActorId = null;
@@ -2240,7 +2380,11 @@ export class HostKillstreakRuntime {
       this.revision += 1;
       return;
     }
-    captureActor.careRewards.push(entity.reward);
+    // HF-334: weapon rewards reaching this line downgrade deterministically
+    // (grant became inadmissible mid-hold) so the capture never drops a reward.
+    captureActor.careRewards.push(entity.reward.kind === 'killstreak'
+      ? entity.reward.id
+      : downgradeCarePackageWeaponReward(this.catalog, entity.rollUnit) as Pass65KillstreakId);
     this.entities.delete(entity.id);
     this.revision += 1;
   }

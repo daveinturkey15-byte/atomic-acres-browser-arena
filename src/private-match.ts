@@ -33,7 +33,13 @@ export type LobbyMember = Readonly<{
   connected: boolean;
   pingMs: number | null;
   dhv: Dhv;
-  /** Presentation-only squad identity; team remains the authority boundary. */
+  /**
+   * HF-328: canonical colour-name identity stamped host-side from `team`
+   * (AQUA / CORAL) via team-prescription.ts; team remains the authority
+   * boundary. Optional and bounded-tolerant so pre-Pass-74 checkpoints and
+   * rejoin envelopes still restore — renderers collapse any legacy free-form
+   * value back to the canonical pair.
+   */
   squadName?: string;
   squadColor?: SquadColor;
 }>;
@@ -212,6 +218,12 @@ export function isLobbySnapshot(value: unknown): value is LobbySnapshot {
     && validTestBayDoor;
 }
 
+/**
+ * Deterministic host-first / stable-id / alternate-fill assignment.
+ * HF-328: wrapped by team-prescription.ts `prescribeTeams`, the prescription
+ * authority that also stamps canonical squad identities; new host-side call
+ * sites should go through that module rather than calling this directly.
+ */
 export function balanceLobbyTeams(members: readonly LobbyMember[]): LobbyMember[] {
   const connected = members.filter((member) => member.connected)
     .sort((a, b) => Number(b.id === members[0]?.id) - Number(a.id === members[0]?.id) || a.id.localeCompare(b.id));

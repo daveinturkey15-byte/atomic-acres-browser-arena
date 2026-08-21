@@ -129,8 +129,10 @@ export function bindKillstreakLoadoutMenu(
     selects.forEach((select, index) => {
       select.value = selected.slots[index];
       select.disabled = matchActive;
-      const otherHeavy = index === 2 ? selected.slots[3] : index === 3 ? selected.slots[2] : null;
-      for (const option of [...select.options]) option.disabled = otherHeavy !== null && option.value === otherHeavy;
+      // HF-316 owner correction: the sibling heavy slot's current pick is no
+      // longer a disabled (silently unpickable) option — choosing it now swaps
+      // the two heavy slots via KillstreakLoadoutController.select.
+      for (const option of [...select.options]) option.disabled = false;
     });
     renderDetails(root, controller);
     const activePreview = selects.find((select) => Number(select.dataset.killstreakSlot) === previewedSlot) ?? selects[0];
@@ -146,14 +148,21 @@ export function bindKillstreakLoadoutMenu(
     select.addEventListener('change', () => {
       const slot = Number(select.dataset.killstreakSlot) as 1 | 2 | 3 | 4 | 5;
       const id = select.value as Pass65KillstreakId;
+      // sync() rewrites the status line, so outcome messages (swap notice or
+      // rejection) are applied after it to stay visible.
+      let statusOverride: string | null = null;
       try {
-        controller.select(slot, id);
+        const result = controller.select(slot, id);
+        // HF-316 owner correction: a sibling heavy-slot conflict swaps the two
+        // picks instead of being blocked; tell the player what moved where.
+        if (result.swappedSlot !== null) statusOverride = `SWAPPED WITH SLOT ${result.swappedSlot}`;
         onChange(id, slot);
       } catch (error) {
-        if (status) status.textContent = error instanceof Error ? error.message.toUpperCase() : 'SELECTION REJECTED';
+        statusOverride = error instanceof Error ? error.message.toUpperCase() : 'SELECTION REJECTED';
       }
       previewSlot(select);
       sync();
+      if (statusOverride !== null && status) status.textContent = statusOverride;
     });
   }
   sync();

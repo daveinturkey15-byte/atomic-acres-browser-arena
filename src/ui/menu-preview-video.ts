@@ -79,6 +79,25 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     width: 2560,
     height: 1440,
   }),
+  // HF-359 (Pass 74): farcrysis revived from the Pass 69 hidden lane. The
+  // authored helicopter flyover media (farcrysis.webm/.mp4/.webp) is NOT yet
+  // rendered — it must be produced by the deterministic offline recipe before
+  // the arena ships selectable (AGENTS.md prerecorded-preview contract). The
+  // definition is registered now so the inventory stays mechanically complete.
+  'farcrysis': Object.freeze({
+    arenaId: 'farcrysis',
+    frame: 'helicopter',
+    label: 'PRERECORDED HELO // FARCRYSIS',
+    motionLabel: 'AUTHORED COCKPIT FLYOVER',
+    reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
+    presentationId: 'menu-video-runtime-helo-farcrysis-v1',
+    webm: `${ROOT}/farcrysis.webm?v=${CACHE_KEY}`,
+    mp4: `${ROOT}/farcrysis.mp4?v=${CACHE_KEY}`,
+    poster: `${ROOT}/farcrysis.webp?v=${CACHE_KEY}`,
+    durationSeconds: 8,
+    width: 2560,
+    height: 1440,
+  }),
 } satisfies Record<ArenaId, MenuPreviewVideoDefinition>);
 
 export function menuPreviewVideoDefinition(arenaId: ArenaId): MenuPreviewVideoDefinition {

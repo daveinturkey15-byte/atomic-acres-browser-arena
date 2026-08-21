@@ -129,8 +129,9 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
         <div class="lobby-settings">
           <label>MAP<select id="lobby-arena">${ARENA_SELECTIONS.map((entry) => `<option value="${entry.id}">${entry.displayName.toUpperCase()}</option>`).join('')}</select></label>
           <label>MODE<select id="lobby-mode"><option value="ffa" selected>FREE FOR ALL</option><option value="tdm">TEAM DEATHMATCH</option></select></label>
-          <label>SQUAD NAME<input id="lobby-squad-name" maxlength="20" value="AQUA" autocomplete="off"></label>
-          <label>SQUAD COLOUR<input id="lobby-squad-color" type="color" value="#55e6ff" aria-label="Squad colour"></label>
+          <!-- HF-328: squad identity is prescribed (AQUA/CORAL colour names); the free name input and colour picker were removed. Swap-after stays available via the host-checked SWAP SIDES request. -->
+          <div class="lobby-squad-identity" id="lobby-squad-identity"><small>SQUAD</small><strong id="lobby-squad-label" style="--lobby-squad-color:#55e6ff">AQUA</strong></div>
+          <button id="lobby-swap-sides" type="button" disabled title="Request to swap sides — the host accepts only swaps that keep teams within one player.">SWAP SIDES</button>
           <label>CAPACITY<select id="lobby-capacity"><option value="4">4 PLAYERS</option><option value="6">6 PLAYERS</option></select></label>
           <label>HOSTED BOTS<select id="lobby-bots"><option value="0">NO BOTS</option><option value="2">2 BOTS</option><option value="4">4 BOTS</option></select></label>
           <label class="lobby-check"><input id="lobby-auto-balance" type="checkbox" checked> AUTO BALANCE</label>

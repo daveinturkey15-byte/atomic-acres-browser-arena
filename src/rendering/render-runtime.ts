@@ -55,6 +55,11 @@ export type RenderRuntimeTelemetry = Readonly<{
 
 export type RenderRuntimeHealthTelemetry = Readonly<{
   actualBackend: RenderBackendId;
+  // HF-331: adapter identity rides on the live health/diagnostics surface so
+  // live Firefox probing can confirm which physical adapter (or masked
+  // "WebGPU adapter info unavailable" label) backs the reported backend
+  // without a separate full telemetry() sample. Additive only.
+  adapterLabel: string;
   deviceLost: boolean;
   uncapturedErrors: number;
   presentation: PresentationFreshnessTelemetry;
@@ -360,10 +365,13 @@ export function resolveRenderRuntimeRequest(search: string, webGpuAvailable = tr
   // the compatibility backend.
   if (explicit === 'webgl2') return { requestedBackend: 'webgl2', requireWebGPU: false };
   if (explicit === 'webgpu') return { requestedBackend: 'webgpu', requireWebGPU: true };
-  // Default: prefer WebGPU, but on browsers that do not expose it at all
-  // (Firefox and Safari ship without WebGPU; older Edge too) gracefully use
-  // WebGL2 so the game still runs. The backend reported back is still the true
-  // one, so nothing is misrepresented as WebGPU.
+  // Default: prefer WebGPU whenever navigator.gpu exists. HF-331 note: Firefox
+  // ships WebGPU on Windows since 141 (installed Firefox 154 exposes
+  // navigator.gpu here), so Firefox takes this WebGPU route today - the old
+  // "Firefox and Safari ship without WebGPU" assumption is stale. Browsers
+  // without navigator.gpu (Safari today, older Edge) gracefully use WebGL2 so
+  // the game still runs. The backend reported back is still the true one, so
+  // nothing is misrepresented as WebGPU.
   if (!webGpuAvailable) return { requestedBackend: 'webgl2', requireWebGPU: false };
   return { requestedBackend: 'webgpu', requireWebGPU: true };
 }
@@ -450,6 +458,7 @@ export class LegacyWebGlRenderRuntime {
     const deviceLost = this.renderer.getContext().isContextLost();
     return {
       actualBackend: 'webgl2',
+      adapterLabel: this.adapterLabel,
       deviceLost,
       uncapturedErrors: 0,
       presentation: this.presentationTelemetry(now),
@@ -909,6 +918,7 @@ export class WebGpuRenderRuntime {
     const backend = this.renderer.backend as WebGpuBackendShape;
     return {
       actualBackend: backend.isWebGPUBackend === true ? 'webgpu' : 'webgl2',
+      adapterLabel: this.adapterLabel,
       deviceLost: this.deviceLost,
       uncapturedErrors: this.uncapturedErrors,
       presentation: this.presentationTelemetry(now),

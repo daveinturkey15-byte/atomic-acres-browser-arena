@@ -27,7 +27,9 @@ export const WORLD_COLLISION_CONSUMERS = Object.freeze([
 ] as const);
 
 export type WorldCollisionConsumer = typeof WORLD_COLLISION_CONSUMERS[number];
-export type ShedArenaId = 'atomic-acres' | 'skyline-terminal' | 'rustworks-1v1' | 'gun-range';
+// HF-359 (Pass 74): 'farcrysis' revived from the Pass 69 hidden lane; it
+// carries zero authored shed placements (see PASS65_SHED_ELIGIBILITY).
+export type ShedArenaId = 'atomic-acres' | 'skyline-terminal' | 'rustworks-1v1' | 'gun-range' | 'farcrysis';
 export type DamageableSheetRole = 'wall' | 'roof' | 'door' | 'detached-chunk';
 export type ShedDoorBlockerKind = 'player' | 'major-debris' | 'bullet';
 

@@ -6,6 +6,8 @@ import {
   isStateTrafficMessage,
   messageBelongsToPlayer,
   type LeaveMessage,
+  type LobbyClosedMessage,
+  type LobbyClosedReason,
   type Team,
 } from './protocol';
 import { pingMatchesBoundTeam, shouldRelayMessageToTeam } from './social-ping';
@@ -68,6 +70,7 @@ type NetworkDiagnostics = Record<string, unknown> & {
   clientHostLivenessRecoveries: number;
   stateFallbackActive: boolean;
   stateFallbackMessages: number;
+  lobbyClosedFarewells: number;
   qaEventDelayMs: number;
   qaEventJitterMs: number;
 };
@@ -78,6 +81,10 @@ const RECONNECT_WINDOW_MS = 90_000;
 const RECONNECT_DELAYS_MS = [500, 1_500, 3_000, 5_000] as const;
 const HOST_ROOM_RECLAIM_DELAYS_MS = [350, 750, 1_500, 2_500, 4_000] as const;
 export const HOST_ROOM_RECLAIM_WINDOW_MS = 60_000;
+/** HF-326: upper bound on how long the lobby-closed farewell may delay an
+ * intentional reset. Long enough for the tiny farewell to leave the SCTP
+ * buffers, far below anything a host would perceive as an unresponsive reset. */
+export const LOBBY_CLOSED_FAREWELL_FLUSH_MS = 250;
 export const CLIENT_HOST_SILENCE_TIMEOUT_MS = 15_000;
 const CLIENT_HOST_LIVENESS_POLL_MS = 1_000;
 export const CLIENT_HOST_LIVENESS_MAX_SCHEDULING_GAP_MS = CLIENT_HOST_LIVENESS_POLL_MS * 3;
@@ -383,6 +390,8 @@ export class ArenaNetwork {
   private pendingStateConnections = new Map<string, DataConnection>();
   private joinDeadline: ReturnType<typeof setTimeout> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingLobbyResetTimer: number | null = null;
+  private lobbyClosedFarewells = 0;
   private onMessage: MessageHandler;
   private onStatus: StatusHandler;
   private onDiagnostic: DiagnosticHandler;
@@ -551,12 +560,50 @@ export class ArenaNetwork {
    * This is deliberately separate from crash recovery: recovery preserves the
    * room code and retained authority, while a reset closes every old channel
    * and admits nobody from the invalidated room.
+   *
+   * HF-326 residual polish: connected guests first receive a best-effort
+   * 'lobby-closed' farewell so they stop the 90-second rejoin loop against a
+   * room id that no longer exists. The farewell is fail-open and never delays
+   * the reset by more than LOBBY_CLOSED_FAREWELL_FLUSH_MS.
    */
   resetLobby(onReady: () => void): boolean {
     if (this.role !== 'host' || this.manualClose) return false;
-    this.close();
-    this.host(onReady);
+    if (this.pendingLobbyResetTimer !== null) return true;
+    const notified = this.announceLobbyClosed('host-reset');
+    const finishReset = (): void => {
+      this.pendingLobbyResetTimer = null;
+      if (this.role !== 'host' || this.manualClose) return;
+      this.close();
+      this.host(onReady);
+    };
+    if (notified === 0) {
+      finishReset();
+      return true;
+    }
+    this.pendingLobbyResetTimer = window.setTimeout(finishReset, LOBBY_CLOSED_FAREWELL_FLUSH_MS);
     return true;
+  }
+
+  /**
+   * Best-effort HF-326 farewell to every admitted guest before an intentional
+   * reset closes their channels. Fail-open: a transmission problem simply
+   * means that guest misses the courtesy notice; it never blocks the reset.
+   */
+  announceLobbyClosed(reason: LobbyClosedReason = 'host-reset'): number {
+    if (this.role !== 'host') return 0;
+    let notified = 0;
+    const farewell: LobbyClosedMessage = { type: 'lobby-closed', reason, nonce: Date.now() };
+    for (const bundle of this.guestBundles.values()) {
+      if (!bundle.admitted || !bundle.events.open) continue;
+      try {
+        this.transmit(bundle.events, farewell, false);
+        notified += 1;
+      } catch {
+        // Fail-open: never let one broken channel stall the lobby reset.
+      }
+    }
+    this.lobbyClosedFarewells += notified;
+    return notified;
   }
 
   private startHostPeer(
@@ -809,6 +856,8 @@ export class ArenaNetwork {
         ? stateTrafficUsesFallback(Boolean(this.hostStateConnection?.open), Boolean(this.hostEventConnection?.open))
         : [...this.guestBundles.values()].some((bundle) => stateTrafficUsesFallback(Boolean(bundle.state?.open), bundle.events.open)),
       stateFallbackMessages: this.stateFallbackMessages,
+      lobbyClosedFarewells: this.lobbyClosedFarewells,
+      pendingLobbyReset: this.pendingLobbyResetTimer !== null,
       qaEventDelayMs: qaImpairment.delayMs,
       qaEventJitterMs: qaImpairment.jitterMs,
     };
@@ -819,6 +868,10 @@ export class ArenaNetwork {
     this.liveConnectionAttempt = null;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
+    // A close during the farewell flush window cancels the deferred reset so a
+    // stale timer can never tear down a session started after this close.
+    if (this.pendingLobbyResetTimer !== null) clearTimeout(this.pendingLobbyResetTimer);
+    this.pendingLobbyResetTimer = null;
     this.stopClientHostLivenessWatchdog();
     this.clearJoinDeadline();
     try { this.hostEventConnection?.close(); } catch { /* no-op */ }
@@ -1155,6 +1208,15 @@ export class ArenaNetwork {
       if (!current() || !isGameMessage(payload)) return;
       if (kind === 'state' && !isStateTrafficMessage(payload)) return;
       this.noteValidHostMessage();
+      if (payload.type === 'lobby-closed') {
+        // HF-326: the host intentionally invalidated this room. Surface the
+        // farewell to the app, then end the session immediately instead of
+        // retrying a dead room id for the 90-second rejoin window.
+        this.onMessage(payload);
+        this.close();
+        this.onStatus('Host opened a fresh room — ask for the new invite code.', 'warn');
+        return;
+      }
       this.onMessage(payload);
     });
     connection.on('close', () => {

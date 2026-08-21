@@ -252,7 +252,8 @@ describe('Pass 65 sound-event inventory', () => {
     for (const symbol of emitterSymbols) expect(audioSource).toMatch(new RegExp(`\\n  ${symbol}\\(`));
   });
 
-  it('pins current weapon variants and all four implemented arena ambience identities', () => {
+  // HF-359: 5 implemented arena ambience identities
+  it('pins current weapon variants and all five implemented arena ambience identities', () => {
     expect(PASS64_WEAPON_AUDIO_VARIANTS).toEqual(WEAPON_IDS);
     const ambience = SOUND_EVENT_INVENTORY.find((event) => event.id === 'ambience.arena-bed');
     expect(ambience).toBeDefined();
@@ -275,7 +276,8 @@ describe('Pass 65 sound-event inventory', () => {
   it('has a stable inventory digest', () => {
     const digest = createHash('sha256').update(canonicalSoundEventInventoryJson()).digest('hex');
     expect(REQUIRED_SOUND_EVENT_IDS).toHaveLength(SOUND_EVENT_INVENTORY.length);
-    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('1e33f1b8b8ab4a334d63bcca8731f4b98e9222f772f4733210e653bbb09c3a55');
+    // HF-359: updated expected digest for farcrysis registration
+    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('e9d7237b40ce94c0f70c785cb106af6114a55cf954d25a177904e61853618a59');
     expect(digest).toBe(SOUND_EVENT_INVENTORY_SHA256);
   });
 });

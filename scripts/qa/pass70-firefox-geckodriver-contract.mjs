@@ -4,10 +4,13 @@ export const PASS70_FIREFOX_GECKODRIVER_IDENTITY = Object.freeze({
   gate: 'firefox-geckodriver',
   releasePass: 'PASS 70',
   firefox: Object.freeze({
-    version: '153.0.4',
-    userAgentMajor: '153.0',
+    // HF-331 environment update, Firefox auto-updated 153.0.4 -> 154.0
+    // (2026-08-21): pin re-verified against the installed
+    // C:/Program Files/Mozilla Firefox/firefox.exe on the QA machine.
+    version: '154.0',
+    userAgentMajor: '154.0',
     executableName: 'firefox.exe',
-    sha256: 'b0648cfd61ca4344177e940c8b44001b79344f81bba8f571790d0d3939d0cb2e',
+    sha256: '44f0741288e3e884ecc30e31b2d7633505650dffa3238e5fdd3cabb8429d0fc2',
   }),
   geckodriver: Object.freeze({
     version: '0.37.1',
@@ -198,7 +201,13 @@ function soloCycleFailures(value, expectedLabel) {
   if (value.gameStarted !== true || value.matchPhase !== 'active' || value.botCount !== 1) {
     errors.push(`${label} did not enter an exact one-bot active match`);
   }
-  if (value.requestedBackend !== 'webgpu' || value.backend !== 'webgpu' || value.failClosed !== true
+  // HF-331: failClosed reports "requested WebGPU but did NOT get it"
+  // (render-runtime.ts telemetry: requestedBackend === 'webgpu' && actualBackend !== 'webgpu'),
+  // so a healthy fail-closed WebGPU run reports failClosed === false. The prior
+  // `!== true` polarity (introduced in 42d0f48b) made this gate unsatisfiable
+  // together with backend === 'webgpu'; corrected to match the de476b56 fix in
+  // verify-installed-firefox.mjs.
+  if (value.requestedBackend !== 'webgpu' || value.backend !== 'webgpu' || value.failClosed !== false
     || value.deviceLost !== false || value.uncapturedErrors !== 0) {
     errors.push(`${label} did not use fail-closed native WebGPU`);
   }

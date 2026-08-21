@@ -515,6 +515,9 @@ describe('Pass 64 render runtime boundary', () => {
     });
     expect(runtime.healthTelemetry()).toMatchObject({
       actualBackend: 'webgpu',
+      // HF-331: adapter identity is surfaced on the live health/diagnostics
+      // object so a live Firefox probe can read backend + adapter together.
+      adapterLabel: 'test adapter',
       deviceLost: false,
       uncapturedErrors: 0,
       presentation: { status: 'warming' },

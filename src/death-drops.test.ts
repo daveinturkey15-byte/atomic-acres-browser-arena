@@ -9,6 +9,7 @@ import {
   deathDropWeaponAvailable,
   nearestDeathDrop,
   nearestScavengeDeathDrop,
+  placeSwappedDeathDrop,
   pruneDeathDrops,
   scavengeDeathDrop,
   selectDeathDropWeaponPickup,
@@ -76,6 +77,40 @@ describe('death-drop inventory contract', () => {
     expect(swappedBack.consumed).toBe(true);
     expect(swappedBack.inventory.primary).toBe('carbine');
     expect(swappedBack.drop.weapon).toBe('sniper');
+  });
+
+  // HF-315(a): both roles must commit the identical swapped-drop placement so
+  // the host drop record can never diverge from what the guest sees on screen.
+  it('places a swapped-out gun at the picker feet with a fresh full lifetime on both roles', () => {
+    const drop = createDeathDrop('death-swap', 'sniper', { x: 9, y: 0.3, z: -4 }, 5, 6, 1_000);
+    const picked = consumeDeathDropWeapon(drop, { primary: 'carbine', ammo: 30, reserve: 120 }, 25, 29_500);
+    expect(picked.consumed).toBe(true);
+    expect(picked.mode).toBe('pickup');
+    const placed = placeSwappedDeathDrop(picked.drop, { x: 1.5, y: 1.7, z: 2.5 }, 0.18, 29_500);
+    expect(placed.position).toEqual({ x: 1.5, y: 0.18, z: 2.5 });
+    expect(placed.expiresAt).toBe(29_500 + DEATH_DROP_LIFETIME_MS);
+    // The rest of the record is the untouched consumption result.
+    expect(placed).toEqual({ ...picked.drop, position: placed.position, expiresAt: placed.expiresAt });
+    expect(placed.weapon).toBe('carbine');
+    expect(placed.ammo).toBe(30);
+    expect(placed.reserve).toBe(120);
+    // A near-expired drop stays swappable for a full 30 s from the swap...
+    expect(deathDropWeaponAvailable(placed, 29_500 + DEATH_DROP_LIFETIME_MS - 1)).toBe(true);
+    expect(deathDropWeaponAvailable(placed, 29_500 + DEATH_DROP_LIFETIME_MS)).toBe(false);
+    // ...and swapping straight back works against the placed record.
+    const swappedBack = consumeDeathDropWeapon(placed, picked.inventory, 120, 30_000);
+    expect(swappedBack.consumed).toBe(true);
+    expect(swappedBack.inventory.primary).toBe('carbine');
+    // Pure: the input drop is never mutated.
+    expect(picked.drop.position).toEqual({ x: 9, y: 0.3, z: -4 });
+    expect(picked.drop.expiresAt).toBe(31_000);
+  });
+
+  it('coerces non-finite swapped-drop placement coordinates instead of corrupting the record', () => {
+    const drop = createDeathDrop('death-nan', 'smg', { x: 0, y: 0, z: 0 }, 10, 20, 1_000);
+    const placed = placeSwappedDeathDrop(drop, { x: Number.NaN, y: 1.7, z: Infinity }, Number.NaN, 2_000);
+    expect(placed.position).toEqual({ x: 0, y: 0, z: 0 });
+    expect(placed.expiresAt).toBe(2_000 + DEATH_DROP_LIFETIME_MS);
   });
 
   it('explicitly replenishes a matching gun only when its ammo payload remains', () => {

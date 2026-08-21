@@ -158,6 +158,9 @@ describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
     expect(rematch.runtime.endMatch()).toContain(rematch.entityId);
     expect(rematch.runtime.advance(2_000, world())).toEqual({
       damageEvents: [], shotEvents: [], impactEvents: [], expiredEntityIds: [],
+      // HF-334: host killstreak result object includes careWeaponGrantEvents
+      // (care-package weapon grants, e.g. the 10% flamethrower reward).
+      careWeaponGrantEvents: [],
     });
   });
 });

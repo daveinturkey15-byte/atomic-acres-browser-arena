@@ -10,15 +10,17 @@ import {
 } from './map-selection';
 
 describe('opening arena selection', () => {
-  it('publishes four unique, fully described maps', () => {
+  it('publishes five unique, fully described maps', () => {
+    // HF-359: farcrysis added as fifth arena
     expect(ARENA_SELECTIONS.map((entry) => entry.id)).toEqual([
       'atomic-acres',
       'skyline-terminal',
       'rustworks-1v1',
       'gun-range',
+      'farcrysis',
     ]);
-    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range']);
-    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(4);
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis']);
+    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(5);
     for (const entry of ARENA_SELECTIONS) {
       expect(entry.selectorLabel.length).toBeGreaterThan(3);
       expect(entry.summary.length).toBeGreaterThan(12);
@@ -61,25 +63,42 @@ describe('opening arena selection', () => {
       rulesLabel: '5 MIN · HOST UP TO 6 · 1 BOT SOLO',
       matchRules: { durationMs: 300_000, scoreLimit: null },
     });
+    // HF-359: 2-bot solo combat map with fieldSupport disabled
+    expect(arenaSelection('farcrysis')).toMatchObject({
+      id: 'farcrysis',
+      selectorLabel: 'FARCrySIS',
+      displayName: 'Farcrysis',
+      multiplayer: true,
+      fieldSupport: false,
+      overdrive: false,
+      soloBotCount: 2,
+      maximumSoloBots: 2,
+      rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
+      matchRules: { durationMs: 300_000, scoreLimit: null },
+    });
   });
 
   it('binds hosted round clocks and canvas labels to the selected arena', () => {
+    // HF-359: includes farcrysis round clock and canvas label
     expect(ARENA_SELECTIONS.map((selection) => hostedArenaDurationMs(selection)))
-      .toEqual([300_000, 300_000, 300_000, 120_000]);
+      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000]);
     expect(ARENA_SELECTIONS.map((selection) => arenaCanvasLabel(selection))).toEqual([
       'Nuke Town multiplayer arena',
       'Terminal multiplayer arena',
       'RustRig multiplayer arena',
       'Gun Range multiplayer arena',
+      'Farcrysis multiplayer arena',
     ]);
   });
 
   it('enables support presentation in every arena, including Gun Range training stations', () => {
+    // HF-359: farcrysis has fieldSupport disabled
     expect(Object.fromEntries(ARENA_SELECTIONS.map((entry) => [entry.id, entry.fieldSupport]))).toEqual({
       'atomic-acres': true,
       'skyline-terminal': true,
       'rustworks-1v1': true,
       'gun-range': true,
+      'farcrysis': false,
     });
   });
 
@@ -90,14 +109,17 @@ describe('opening arena selection', () => {
     expect(activeSoloBotTarget(arenaSelection('rustworks-1v1'), 100)).toBe(1);
     expect(activeSoloBotTarget(arenaSelection('gun-range'), 100)).toBe(0);
     expect(activeSoloBotTarget(arenaSelection('skyline-terminal'), 100)).toBe(1);
+    expect(activeSoloBotTarget(arenaSelection('farcrysis'), 100)).toBe(2); // HF-359
   });
 
   it('derives the solo launch label from the canonical arena catalog', () => {
+    // HF-359: farcrysis has 2-bot solo skirmish launch label
     expect(ARENA_SELECTIONS.map(soloLaunchLabel)).toEqual([
       '1 BOT SKIRMISH',
       '1 BOT SKIRMISH',
       '1 BOT SKIRMISH',
       'START RANGE',
+      '2 BOTS SKIRMISH',
     ]);
   });
 
@@ -108,6 +130,11 @@ describe('opening arena selection', () => {
     expect(decodeArenaId('atomic-acres')).toBe('atomic-acres');
     expect(decodeArenaId('skyline-terminal')).toBe('skyline-terminal');
     expect(decodeArenaId('rustworks-1v1')).toBe('rustworks-1v1');
+    // HF-359: farcrysis route id and legacy aliases
+    expect(decodeArenaId('farcrysis')).toBe('farcrysis');
+    expect(decodeArenaId('f4rcry515')).toBe('farcrysis');
+    expect(decodeArenaId('farcry')).toBe('farcrysis');
+    expect(decodeArenaId('f4rcry')).toBe('farcrysis');
   });
 
   it('falls back safely to Nuke Town', () => {

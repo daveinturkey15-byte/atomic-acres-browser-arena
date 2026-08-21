@@ -165,6 +165,16 @@ describe('private match lobby', () => {
     }))).toBe(false);
   });
 
+  it('tolerates legacy free-form squad metadata on restored members while keeping wire bounds (HF-328)', () => {
+    // HF-328: identity is prescribed (canonical AQUA/CORAL), but pre-Pass-74
+    // checkpoints and rejoin envelopes may still carry free-form values —
+    // validators stay tolerant; renderers collapse to the canonical pair.
+    const legacy = members.map((member) => ({ ...member, squadName: 'North Wing', squadColor: '#123456' }));
+    expect(isLobbySnapshot(snapshot({ members: legacy }))).toBe(true);
+    expect(isLobbySnapshot(snapshot({ members }))).toBe(true);
+    expect(isLobbySnapshot(snapshot({ members: members.map((member) => ({ ...member, squadColor: 'red' })) }))).toBe(false);
+  });
+
   it('returns host and guests to a valid readyable lobby before a second match', () => {
     const ended = snapshot({
       phase: 'ended',

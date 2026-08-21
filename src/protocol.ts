@@ -345,6 +345,42 @@ export type PickupMessage = {
   position: [number, number, number];
   nonce: number;
 };
+/** Every named admission guard of the host pickup transaction. 'accepted' is
+ * reserved for accepted results; each rejection names the exact failed guard so
+ * a guest can revert its optimistic swap instead of silently diverging. */
+export type PickupResultReason = 'accepted' | 'duplicate' | 'unknown-sender' | 'unknown-drop'
+  | 'weapon-mismatch' | 'out-of-bounds' | 'sender-distance' | 'drop-distance' | 'expired'
+  | 'payload-consumed' | 'grenade-state' | 'grenade-grant' | 'no-inventory'
+  | 'nothing-to-scavenge' | 'not-consumable';
+/** Host-canonical record of what remains on the ground after the transaction. */
+export type PickupResultDropRecord = Readonly<{
+  weapon: WeaponId;
+  ammo: number;
+  reserve: number;
+  position: [number, number, number];
+  expiresAt: number;
+}>;
+/**
+ * Owner requirement (HF-315a): the host answers EVERY pickup request —
+ * accepted or rejected with a named reason — so an optimistic guest swap can
+ * be confirmed against the canonical inventory projection or reverted, instead
+ * of silently diverging host and guest combat authority.
+ */
+export type PickupResultMessage = {
+  type: 'pickup-result';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string;
+  forPlayerId: string;
+  dropId: string;
+  status: 'accepted' | 'rejected';
+  reason: PickupResultReason;
+  /** Host-canonical equipped inventory after the transaction resolved. */
+  combatInventory: GuestCombatInventoryProjection;
+  /** Canonical surviving drop record, or 'removed' when nothing remains. */
+  drop: PickupResultDropRecord | 'removed';
+  /** Echo of the originating PickupMessage nonce for guest correlation. */
+  nonce: number;
+};
 export type WindowBreakMessage = {
   type: 'window-break';
   by: string;
@@ -513,6 +549,13 @@ export type LobbyStartMessage = {
 };
 export type LobbyRejectReason = 'room-full' | 'identity-in-use' | 'rejoin-denied' | 'match-active' | 'invalid-config' | 'protocol-mismatch';
 export type LobbyRejectMessage = { type: 'lobby-reject'; reason: LobbyRejectReason; nonce: number };
+export type LobbyClosedReason = 'host-reset';
+/**
+ * HF-326 residual polish: a best-effort host farewell sent just before an
+ * intentional lobby reset closes every channel, so guests of the invalidated
+ * room stop the 90-second rejoin loop and ask for the fresh code instead.
+ */
+export type LobbyClosedMessage = { type: 'lobby-closed'; reason: LobbyClosedReason; nonce: number };
 export type ClockPingMessage = {
   type: 'clock-ping'; by: string; guestSentMonoMs: number;
   reportedOffsetMs: number | null; reportedRttMs: number | null; reportedJitterMs: number | null;
@@ -537,8 +580,8 @@ export type ChatHistoryMessage = {
   by: string; forPlayerId: string; entries: ChatEntry[]; nonce: number;
 };
 
-export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | GrenadeResultMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
-  | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | LobbySquadMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
+export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | GrenadeResultMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | PickupResultMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
+  | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | LobbySquadMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | LobbyClosedMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
   | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage
   | TimedMapWeaponProtocolMessage | FlarePresentationProtocolMessage | BotWeaponPresentationMessage;
@@ -643,6 +686,24 @@ function isNormalizedDirection(value: unknown): value is [number, number, number
   if (!Array.isArray(value) || value.length !== 3 || !value.every(Number.isFinite)) return false;
   const magnitude = Math.hypot(Number(value[0]), Number(value[1]), Number(value[2]));
   return magnitude >= 0.96 && magnitude <= 1.04;
+}
+
+const pickupResultReasons = new Set<PickupResultReason>([
+  'accepted', 'duplicate', 'unknown-sender', 'unknown-drop', 'weapon-mismatch', 'out-of-bounds',
+  'sender-distance', 'drop-distance', 'expired', 'payload-consumed', 'grenade-state',
+  'grenade-grant', 'no-inventory', 'nothing-to-scavenge', 'not-consumable',
+]);
+
+function isPickupResultDropRecord(value: unknown): value is PickupResultDropRecord {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const drop = value as Record<string, unknown>;
+  return Object.keys(drop).length === 5
+    && ['weapon', 'ammo', 'reserve', 'position', 'expiresAt'].every((key) => Object.hasOwn(drop, key))
+    && weapons.has(drop.weapon as WeaponId)
+    && Number.isSafeInteger(drop.ammo) && Number(drop.ammo) >= 0 && Number(drop.ammo) <= 10_000
+    && Number.isSafeInteger(drop.reserve) && Number(drop.reserve) >= 0 && Number(drop.reserve) <= 10_000
+    && Array.isArray(drop.position) && drop.position.length === 3 && drop.position.every(Number.isFinite)
+    && Number.isFinite(drop.expiresAt) && Number(drop.expiresAt) >= 0;
 }
 
 const shotRejectReasons = new Set<ShotRejectReason>([
@@ -930,6 +991,19 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && (msg.grenadeGranted === 0 || msg.grenadeGranted === 1)
         && Array.isArray(msg.position) && msg.position.length === 3 && msg.position.every(Number.isFinite)
         && Number.isFinite(msg.nonce);
+    case 'pickup-result':
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && typeof msg.forPlayerId === 'string' && msg.forPlayerId.length > 0 && msg.forPlayerId.length <= 80
+        && typeof msg.dropId === 'string' && msg.dropId.length > 0 && msg.dropId.length <= 120
+        && (msg.status === 'accepted' || msg.status === 'rejected')
+        && pickupResultReasons.has(msg.reason as PickupResultReason)
+        && (msg.status === 'accepted' ? msg.reason === 'accepted' : msg.reason !== 'accepted')
+        && isGuestCombatInventoryProjection(msg.combatInventory)
+        && (msg.drop === 'removed' || isPickupResultDropRecord(msg.drop))
+        // The nonce echoes the originating pickup request, whose own validator
+        // only requires a finite number.
+        && Number.isFinite(msg.nonce);
     case 'window-break':
       return typeof msg.by === 'string'
         && typeof msg.windowId === 'string' && msg.windowId.length > 0 && msg.windowId.length <= 160
@@ -1083,6 +1157,8 @@ export function isGameMessage(value: unknown): value is GameMessage {
       return (msg.reason === 'room-full' || msg.reason === 'identity-in-use' || msg.reason === 'rejoin-denied'
         || msg.reason === 'match-active' || msg.reason === 'invalid-config' || msg.reason === 'protocol-mismatch')
         && Number.isFinite(msg.nonce);
+    case 'lobby-closed':
+      return msg.reason === 'host-reset' && Number.isFinite(msg.nonce);
     case 'clock-ping':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && Number.isFinite(msg.guestSentMonoMs) && Number(msg.guestSentMonoMs) >= 0
@@ -1168,6 +1244,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'support-activate':
     case 'ping':
     case 'pickup':
+    case 'pickup-result':
     case 'window-break':
     case 'high-score':
     case 'leaderboard-sync':
@@ -1202,6 +1279,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'leave':
       return message.playerId === playerId;
     case 'lobby-reject':
+    case 'lobby-closed':
       return false;
   }
 }
@@ -1217,6 +1295,7 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'lobby-state'
     || message.type === 'lobby-start'
     || message.type === 'lobby-reject'
+    || message.type === 'lobby-closed'
     || message.type === 'clock-pong'
     || message.type === 'death'
     || message.type === 'shot-result'
@@ -1226,6 +1305,7 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'chat-history'
     || message.type === 'redeploy-commit'
     || message.type === 'reload-result'
+    || message.type === 'pickup-result'
     || message.type === 'railgun-state'
     || message.type === 'timed-map-weapon-state'
     || message.type === 'flare-presentation-state'

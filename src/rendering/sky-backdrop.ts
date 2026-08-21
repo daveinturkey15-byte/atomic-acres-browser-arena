@@ -20,7 +20,8 @@ type GradientStop = readonly [offset: number, css: string];
  *
  * This is a `scene.background` equirectangular gradient rather than dome
  * geometry, so it is identical on the WebGPU path and the WebGL2 compatibility
- * path (Firefox / Safari have no WebGPU by default). It is drawn behind every
+ * path (HF-331: Firefox 141+ on Windows ships WebGPU and takes the WebGPU
+ * route; WebGL2 remains for Safari and older browsers). It is drawn behind every
  * object, so it can never be frustum-clipped by the 180 m camera far plane nor
  * washed out by the gameplay fog band - both of which previously left arenas
  * with no visible sky at all.
@@ -61,8 +62,10 @@ const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly Gradie
 });
 
 /**
- * Per-preset cloud fields baked into the backdrop so every backend (WebGPU and
- * WebGL2/Firefox alike) gets a real sky with clouds, not a flat gradient.
+ * Per-preset cloud fields baked into the backdrop so every backend (WebGPU -
+ * including Firefox 141+, which ships WebGPU on Windows per HF-331 - and the
+ * WebGL2 compatibility path alike) gets a real sky with clouds, not a flat
+ * gradient.
  * Bands are vertical fractions of the texture (0 = zenith, 1 = horizon).
  */
 export const SKY_BACKDROP_CLOUDS: Readonly<Record<SkyBackdropPreset, Readonly<{

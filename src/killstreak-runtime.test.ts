@@ -440,6 +440,9 @@ describe('host killstreak runtime', () => {
     expect(runtime.modifiersForActor('owner', 1_005).active).toBe(false);
     expect(runtime.advance(20_000, DEFAULT_WORLD)).toEqual({
       damageEvents: [], shotEvents: [], impactEvents: [], expiredEntityIds: [],
+      // HF-334: host killstreak result object includes careWeaponGrantEvents
+      // (care-package weapon grants, e.g. the 10% flamethrower reward).
+      careWeaponGrantEvents: [],
     });
     expect(runtime.endMatch()).toEqual([]);
   });
@@ -1103,6 +1106,9 @@ describe('host killstreak runtime', () => {
     const beforeInvalid = regressedClock.revision;
     expect(runtime.advance(Number.NaN, DEFAULT_WORLD)).toEqual({
       damageEvents: [], shotEvents: [], impactEvents: [], expiredEntityIds: [],
+      // HF-334: host killstreak result object includes careWeaponGrantEvents
+      // (care-package weapon grants, e.g. the 10% flamethrower reward).
+      careWeaponGrantEvents: [],
     });
     expect(runtime.snapshotFor('owner', 2_000).revision).toBe(beforeInvalid);
   });

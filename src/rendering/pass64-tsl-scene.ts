@@ -150,6 +150,12 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaVisualDefinition['id'], Atmospher
     [[-18, 16, 2.4, 4.2], [18, 16, 2.4, 4.2], [0, -22, 2.2, 3.8]],
     { count: 80, minX: -34, maxX: 34, minZ: -34, maxZ: 34 },
   ),
+  // HF-359 (Pass 74): farcrysis review layout ported from the Pass 69 hidden lane.
+  'farcrysis': atmosphereLayout(
+    [[-26, -26, 12, 4.0], [26, 26, 12, 4.0], [-8, -14, 10, 3.2], [0, -26, 12, 3.4]],
+    [[-20, -20, 2.2, 4.0], [20, 20, 2.2, 4.0], [0, -18, 2.4, 4.4], [0, 0, 2.6, 5.0]],
+    { count: 72, minX: -31, maxX: 31, minZ: -31, maxZ: 31 },
+  ),
 });
 const MAX_MIST_LAYERS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
 

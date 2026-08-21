@@ -2,9 +2,9 @@ import { MATCH_DURATION_MS, type MatchRules } from './gameplay';
 import { MAX_SOLO_BOTS, SOLO_BOT_COUNT, soloBotTargetForDeaths } from './bot-ai';
 import { GUN_RANGE_ROUND_MS } from './gun-range-rules';
 
-export type ArenaId = 'atomic-acres' | 'rustworks-1v1' | 'gun-range' | 'skyline-terminal';
+export type ArenaId = 'atomic-acres' | 'rustworks-1v1' | 'gun-range' | 'skyline-terminal' | 'farcrysis';
 
-export type ArenaRouteId = 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range';
+export type ArenaRouteId = 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range' | 'farcrysis';
 
 export type ArenaSelection = Readonly<{
   id: ArenaId;
@@ -103,6 +103,29 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     fieldSupport: true,
     overdrive: false,
     matchRules: Object.freeze({ durationMs: GUN_RANGE_ROUND_MS, scoreLimit: null }),
+  }),
+  // HF-359 (Pass 74): revived Pass 69 hidden-lane arena (branch
+  // contrib/dave-gaming-pc/hermes/pass69-hidden-farcrysis @ 83395da4).
+  // Display position: fifth, after Gun Range. Stable id 'farcrysis' is the
+  // network/storage boundary; owner codename aliases decode at this boundary
+  // only and are never emitted as current UI text.
+  Object.freeze({
+    id: 'farcrysis' as const,
+    routeId: 'farcrysis' as const,
+    legacyAliases: Object.freeze(['f4rcry515', 'farcry', 'f4rcry']),
+    selectorLabel: 'FARCrySIS',
+    displayName: 'Farcrysis',
+    titleLead: 'FARCry',
+    titleAccent: 'SIS',
+    menuLede: 'Fight through a flooded jungle research station — an original beach-and-jungle homage with dense collision cover, a ruined core, and golden-hour beach light.',
+    summary: 'Jungle island research station · dense cover · golden-hour beach',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
+    soloBotCount: 2,
+    maximumSoloBots: 2,
+    multiplayer: true,
+    fieldSupport: false,
+    overdrive: false,
+    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
 ]);
 

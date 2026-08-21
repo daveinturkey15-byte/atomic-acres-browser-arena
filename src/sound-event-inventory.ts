@@ -975,6 +975,7 @@ const events: SoundEventInventoryEntry[] = [
       'skyline-terminal.hvac', 'skyline-terminal.engine-wash',
       'rustworks-1v1.duct', 'rustworks-1v1.stressed-metal',
       'gun-range.ventilation', 'gun-range.ballast-buzz',
+      'farcrysis.jungle-insect', 'farcrysis.breeze',
     ],
     emitterSymbols: ['setArena'], contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'arena-generation',
     coverageDetail: 'Every arena owns two distinct repository-procedural continuous sources, replaced atomically at arena generation changes.',
@@ -992,7 +993,7 @@ const events: SoundEventInventoryEntry[] = [
   }),
   plannedEvent({
     id: 'music.game', family: 'music', bus: 'game-music', delivery: 'global-nonspatial',
-    variants: ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'],
+    variants: ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis'],
     contractRefs: ['R303', 'R304', 'R307', 'R308'], concurrency: GAME_MUSIC_LOOP, lifecycleOwner: 'arena-generation',
     coverageDetail: 'In-game music is arena-generation-owned, independently controlled, and fully manifested before runtime use.',
   }),
@@ -1003,7 +1004,8 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
   schemaVersion: SOUND_EVENT_INVENTORY_SCHEMA_VERSION,
   events: SOUND_EVENT_INVENTORY,
 });
-export const SOUND_EVENT_INVENTORY_SHA256 = '1e33f1b8b8ab4a334d63bcca8731f4b98e9222f772f4733210e653bbb09c3a55';
+// HF-359: digest updated for farcrysis arena ambience and game music variants
+export const SOUND_EVENT_INVENTORY_SHA256 = 'e9d7237b40ce94c0f70c785cb106af6114a55cf954d25a177904e61853618a59';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

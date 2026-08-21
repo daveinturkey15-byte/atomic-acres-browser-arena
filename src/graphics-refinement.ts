@@ -29,6 +29,8 @@ const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.free
   'rustworks-1v1': Object.freeze({ halfWidth: 41, halfHeight: 48, near: 4, far: 180 }),
   'gun-range': Object.freeze({ halfWidth: 38, halfHeight: 66, near: 4, far: 188 }),
   'skyline-terminal': Object.freeze({ halfWidth: 49, halfHeight: 56, near: 4, far: 182 }),
+  // HF-359 (Pass 74): ported from the Pass 69 hidden lane (64x64 island).
+  'farcrysis': Object.freeze({ halfWidth: 44, halfHeight: 44, near: 4, far: 150 }),
 });
 
 // RoomEnvironment is deliberately only a reflection/indirect-light accent.
@@ -39,6 +41,8 @@ const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freez
   'rustworks-1v1': 0.14,
   'gun-range': 0.1,
   'skyline-terminal': 0.22,
+  // HF-359 (Pass 74): ported from the Pass 69 hidden lane.
+  'farcrysis': 0.18,
 });
 
 export function arenaEnvironmentScale(arenaId: ArenaId): number {

@@ -232,18 +232,18 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(riggedSupportWristRollRadians(1)).toBeCloseTo(THREE.MathUtils.degToRad(-20), 12);
   });
 
-  it('uses one firing hand for sidearms and admits the support hand only during reload', () => {
+  it('keeps two-hand support active for sidearms and long guns under v2 hand policy', () => {
     expect(firstPersonHandPolicy('pistol')).toEqual({
       contract: FIRST_PERSON_HAND_POLICY_CONTRACT,
       gripFamily: 'handgun',
       firingHand: 'right',
-      supportHand: 'reload-only-stowed',
-      activeChainCount: 1,
+      supportHand: 'active',
+      activeChainCount: 2,
     });
     expect(firstPersonHandPolicy('flare-gun')).toMatchObject({
-      gripFamily: 'handgun', supportHand: 'reload-only-stowed', activeChainCount: 1,
+      gripFamily: 'handgun', supportHand: 'active', activeChainCount: 2,
     });
-    expect(firstPersonHandPolicy('pistol', 0.5)).toMatchObject({
+    expect(firstPersonHandPolicy('pistol')).toMatchObject({
       supportHand: 'active', activeChainCount: 2,
     });
     expect(firstPersonHandPolicy('m4a1')).toMatchObject({

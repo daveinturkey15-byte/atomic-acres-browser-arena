@@ -53,7 +53,8 @@ describe('spatial audio contracts', () => {
 
   it('covers all arenas with distinct original beds inside continuous budgets', () => {
     expect(validateArenaAudioDefinitions()).toEqual([]);
-    expect(new Set(Object.values(ARENA_AUDIO_DEFINITIONS).map((definition) => definition.identity)).size).toBe(4);
+    // HF-359: now 5 distinct arena identities including farcrysis
+    expect(new Set(Object.values(ARENA_AUDIO_DEFINITIONS).map((definition) => definition.identity)).size).toBe(5);
     expect(Object.values(ARENA_AUDIO_DEFINITIONS).every((definition) => definition.continuousVoices <= 2)).toBe(true);
     expect(AUDIO_RUNTIME_BUDGET.continuousVoices).toBeGreaterThanOrEqual(8);
   });

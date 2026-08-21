@@ -74,6 +74,7 @@ import {
   buildSkylineTerminal,
   updateGunRangePresentation,
 } from './additional-maps';
+import { buildFarcrysis } from './farcrysis';
 import { RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES } from './rigged-bot-visual-evidence-contract';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
@@ -3097,6 +3098,7 @@ const arenaFactories: Readonly<Record<ArenaId, (target: THREE.Scene) => ArenaMap
   'rustworks-1v1': buildRustworks1v1,
   'gun-range': buildGunRange,
   'skyline-terminal': buildSkylineTerminal,
+  farcrysis: buildFarcrysis,
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;

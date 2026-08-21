@@ -77,6 +77,18 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.f
       [-18, 16, 2.4, 4.2, 1.1], [18, 16, 2.4, 4.2, 3.5], [0, -22, 2.2, 3.8, 2.1],
     ] as SmokeCard[]),
   }),
+  // HF-359 (Pass 74): farcrysis layout ported from the Pass 69 hidden lane.
+  'farcrysis': Object.freeze({
+    mist: Object.freeze([
+      [-26, -26, 12, 4.0], [26, 26, 12, 4.0], [-18, 18, 11, 3.6],
+      [18, -18, 11, 3.6], [-8, -14, 10, 3.2], [8, 14, 10, 3.2],
+      [-4, 4, 9, 3.0], [4, -4, 9, 3.0], [0, -26, 12, 3.4], [0, 26, 12, 3.4],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-20, -20, 2.2, 4.0, 0.9], [20, 20, 2.2, 4.0, 3.1], [0, -18, 2.4, 4.4, 2.2],
+      [0, 0, 2.6, 5.0, 4.5], [-6, 20, 2.0, 3.6, 1.6],
+    ] as SmokeCard[]),
+  }),
 });
 
 const MAX_MIST_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
@@ -94,6 +106,11 @@ function atmosphereDustLayout(profile: RenderProfile, arenaId: ArenaId): DustLay
   if (arenaId === 'skyline-terminal') return {
     count: quality ? 80 : 48, minX: -34, maxX: 34, minZ: -34, maxZ: 34, color: 0xe2d6c3, opacity: quality ? 0.17 : 0.12,
   };
+  // HF-359 (Pass 74): warm golden pollen-dust across the whole 64x64 island
+  // (the Pass 69 branch fell through to the gun-range lane strip here).
+  if (arenaId === 'farcrysis') return {
+    count: quality ? 72 : 40, minX: -31, maxX: 31, minZ: -31, maxZ: 31, color: 0xe8d4a8, opacity: quality ? 0.13 : 0.09,
+  };
   return {
     count: quality ? 32 : 24, minX: -15, maxX: 15, minZ: -44, maxZ: -3, color: 0xc4cbc4, opacity: quality ? 0.12 : 0.09,
   };
@@ -104,6 +121,10 @@ export function atmosphereFogRange(profile: RenderProfile, arenaId: ArenaId): Re
   if (arenaId === 'atomic-acres') return profile === 'blender' ? { near: 52, far: 142 } : { near: 56, far: 148 };
   if (arenaId === 'rustworks-1v1') return profile === 'blender' ? { near: 26, far: 90 } : { near: 30, far: 94 };
   if (arenaId === 'skyline-terminal') return profile === 'blender' ? { near: 40, far: 122 } : { near: 44, far: 130 };
+  // HF-359 (Pass 74): dense tropical haze keeps farcrysis engagement
+  // short-range (COD feel) — you can hear the jungle but only see the next
+  // clearing. Ported from the Pass 69 hidden lane.
+  if (arenaId === 'farcrysis') return profile === 'blender' ? { near: 14, far: 46 } : { near: 18, far: 52 };
   return profile === 'blender' ? { near: 38, far: 96 } : { near: 42, far: 105 };
 }
 

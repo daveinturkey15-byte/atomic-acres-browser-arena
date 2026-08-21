@@ -75,6 +75,43 @@ export function replaceKillstreakSlot(
   return parseKillstreakLoadout({ schemaVersion: 1, slots });
 }
 
+export type KillstreakSlotSelectionResult = Readonly<{
+  loadout: KillstreakLoadoutV1;
+  /** HF-316 owner correction: when the requested id was already held by the
+   * sibling heavy slot (3 <-> 4), the sibling that received the displaced pick;
+   * null when no swap was needed. */
+  swappedSlot: 3 | 4 | null;
+}>;
+
+/**
+ * HF-316 owner correction (swap-on-conflict): slots 3 and 4 share one heavy
+ * pool and must stay distinct. Picking the sibling's current reward used to be
+ * blocked as a silent no-op in the menu; the requested resolution is an
+ * automatic swap — the displaced pick moves into the sibling slot, then the
+ * whole loadout is re-validated. Non-conflicting picks behave exactly like
+ * replaceKillstreakSlot.
+ */
+export function replaceKillstreakSlotWithSwap(
+  loadout: KillstreakLoadoutV1,
+  slot: 1 | 2 | 3 | 4 | 5,
+  id: Pass65KillstreakId,
+): KillstreakSlotSelectionResult {
+  const definition = PASS65_KILLSTREAK_SLOT_DEFINITIONS[slot - 1];
+  if (!definition.allowedIds.includes(id)) throw new Error(`slot ${slot} does not allow ${id}`);
+  const sibling: 3 | 4 | null = slot === 3 ? 4 : slot === 4 ? 3 : null;
+  const displaced = loadout.slots[slot - 1];
+  const slots = [...loadout.slots] as Pass65KillstreakId[];
+  slots[slot - 1] = id;
+  let swappedSlot: 3 | 4 | null = null;
+  if (sibling !== null && loadout.slots[sibling - 1] === id && displaced !== id) {
+    slots[sibling - 1] = displaced;
+    swappedSlot = sibling;
+  }
+  const validation = validateKillstreakLoadout({ schemaVersion: 1, slots });
+  if (!validation.valid) throw new Error(validation.errors.join('; '));
+  return Object.freeze({ loadout: parseKillstreakLoadout({ schemaVersion: 1, slots }), swappedSlot });
+}
+
 /**
  * Owns the editable persisted selection and the immutable match-start snapshot.
  * UI edits never mutate a running match, even if a caller forgets to disable a
@@ -103,9 +140,11 @@ export class KillstreakLoadoutController {
     return this.frozenMatch ? cloneLoadout(this.frozenMatch) : null;
   }
 
-  select(slot: 1 | 2 | 3 | 4 | 5, id: Pass65KillstreakId): KillstreakLoadoutV1 {
+  /** HF-316 owner correction: routes through replaceKillstreakSlotWithSwap so
+   * a sibling heavy-slot (3 <-> 4) conflict swaps instead of throwing. */
+  select(slot: 1 | 2 | 3 | 4 | 5, id: Pass65KillstreakId): KillstreakSlotSelectionResult {
     if (this.frozenMatch) throw new Error('killstreak loadout is frozen for the active match');
-    const next = replaceKillstreakSlot(this.editable, slot, id);
+    const { loadout: next, swappedSlot } = replaceKillstreakSlotWithSwap(this.editable, slot, id);
     const persisted = this.persistSelection
       ? this.persistSelection(next)
       : persistKillstreakLoadout(this.storage, next);
@@ -113,7 +152,7 @@ export class KillstreakLoadoutController {
       throw new Error('killstreak loadout persistence verification failed');
     }
     this.editable = next;
-    return this.selected;
+    return Object.freeze({ loadout: this.selected, swappedSlot });
   }
 
   freezeAtMatchStart(): KillstreakLoadoutV1 {

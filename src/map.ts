@@ -40,7 +40,8 @@ export type PracticeTarget = {
 };
 export type BreakableWindow = { id: string; mesh: THREE.Mesh; broken: boolean; glassState?: GlassState };
 export type ArenaMap = {
-  id: 'atomic-acres' | 'rustworks-1v1' | 'gun-range' | 'skyline-terminal';
+  // HF-359 (Pass 74): 'farcrysis' revived from the Pass 69 hidden lane.
+  id: 'atomic-acres' | 'rustworks-1v1' | 'gun-range' | 'skyline-terminal' | 'farcrysis';
   label: string;
   root: THREE.Group;
   colliders: Box2[];
