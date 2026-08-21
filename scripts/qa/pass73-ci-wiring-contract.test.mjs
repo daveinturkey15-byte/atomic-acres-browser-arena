@@ -39,7 +39,7 @@ test('rejects a bounded group that drops network reveal authority coverage', () 
   assert.match(pass73CiWiringFailures(mutated).join('\n'), /lost its network reveal authority spec/u);
 });
 
-test('requires the Pass 73 group on Windows and excludes it from software-rasterized Linux', () => {
+test('rejects either operating-system matrix omitting the Pass 73 group', () => {
   const withoutPass73 = (value) => value.split(',').filter((group) => group !== PASS73_BOUNDED_GROUP).join(',');
   assert.match(pass73CiWiringFailures({
     ...actual,
@@ -47,8 +47,8 @@ test('requires the Pass 73 group on Windows and excludes it from software-raster
   }).join('\n'), /full Windows impact/u);
   assert.match(pass73CiWiringFailures({
     ...actual,
-    linuxGroups: `${actual.linuxGroups},${PASS73_BOUNDED_GROUP}`,
-  }).join('\n'), /Linux software-rasterizer impact/u);
+    linuxGroups: withoutPass73(actual.linuxGroups),
+  }).join('\n'), /full Linux impact/u);
 });
 
 test('rejects a workflow bypass or advisory-only bounded job', () => {

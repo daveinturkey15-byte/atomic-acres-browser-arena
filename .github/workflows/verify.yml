@@ -200,7 +200,12 @@ jobs:
       - if: needs.classify-change.outputs.mode != 'none'
         env:
           QA_E2E_GROUPS: ${{ needs.classify-change.outputs.linux_groups }}
-        run: npm run test:e2e:bounded
+        run: |
+          # Pass 73's real-time multiplayer gate is Windows Chrome-owned. The
+          # Linux headless software renderer runs at 1-2 FPS and cannot make a
+          # truthful gameplay-timing claim; retain the remaining Linux matrix.
+          export QA_E2E_GROUPS="$(node -e "process.stdout.write(process.env.QA_E2E_GROUPS.split(',').filter((group) => group !== 'pass73-gameplay-regressions').join(','))")"
+          npm run test:e2e:bounded
       - name: Upload Linux browser failure evidence
         if: failure() && needs.classify-change.outputs.mode != 'none'
         uses: actions/upload-artifact@v4
