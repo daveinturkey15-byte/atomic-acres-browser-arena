@@ -31,7 +31,7 @@ describe('changelog', () => {
     expect(formatChangelogTimestampDetail('2026-07-23T22:51:43Z')).toBe(
       '23 JUL 2026 · 23:51 BST · UTC+1 · 23:51:43',
     );
-    expect(lastUpdatedButtonLabel(latest)).toBe('CURRENT CANDIDATE · PUBLIC HITL AFTER RELEASE');
+    expect(lastUpdatedButtonLabel(latest)).toBe('HITL CANDIDATE · NOT LIVE');
     expect(latest.highlights.join('\n')).toContain('sleeves are thicker and extend beyond the lower frame');
     expect(latest.highlights.join('\n')).toContain('Railgun and M14 EBR ADS');
     expect(latest.highlights.join('\n')).toContain('single exact 40-percent reduction to 37.2 / 24');

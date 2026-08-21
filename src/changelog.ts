@@ -551,6 +551,6 @@ export function formatChangelogTimestampDetail(isoTimestamp: string): string {
 }
 
 export function lastUpdatedButtonLabel(entry: ChangelogEntry = latestChangelogEntry()): string {
-  if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) return 'CURRENT CANDIDATE · PUBLIC HITL AFTER RELEASE';
+  if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) return 'HITL CANDIDATE · NOT LIVE';
   return `LAST RELEASE · ${formatChangelogTimestamp(entry.releasedAt)}`;
 }

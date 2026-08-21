@@ -10,7 +10,7 @@ This contribution is `release-shell`. It changes the player-facing build chooser
 - Its production receipt names Pages commit `d5b77dc3b9e46608264c52eb0737b50590d70eb5` and production build timestamp `2026-08-21T00:25:40Z`.
 - The embedded Pass 72 provenance at historical path `channels/the-big-one` names 515 runtime files and tree digest `62fafc5e5c39fa744dfc4f7067b3e0953dd190d8ffecc04e203b2b86d6a8974f`. The complete copied subtree has one additional embedded provenance file.
 - Pass 70, Pass 69, direct-only Pass 67.1, selectable Pass 63 and the offline Pass 62 benchmark retain their existing exact source, Pages and digest pins.
-- Dave ordered the corrected build published after autonomous mechanical verification. He has not inspected or tested an immutable Pass 73 preview.
+- Dave's latest instruction requires a playable human-in-the-loop candidate and his review before production publication. This supersedes the earlier publication-first instruction; he has not yet approved an immutable Pass 73 preview.
 
 ## Intended schema 5 topology
 
@@ -34,7 +34,7 @@ The root chooser exposes five actions: Pass 73, Pass 72, Pass 70, Pass 69 and Pa
 ## Unknowns and blockers
 
 - `acceptance/pass-73.json` intentionally has no preview object and leaves incomplete mechanical requirements in `pending`. The acceptance gate must remain red until the final integrated evidence exists.
-- Owner public HITL remains explicitly deferred until after protected publication. This is not preview approval and must not be rewritten as one.
+- Owner HITL is required on the exact candidate before protected production publication. The superseded publication-first instruction must not be used as approval.
 - No local or contribution-branch result establishes that Pass 73 is live.
 
 ## Falsifiers

@@ -100,7 +100,7 @@ describe('production release workflow', () => {
     expect(staticTopologyVerifier).toContain('rollbackProvenance.treeSha256 !== treeDigest(rollbackRoot, rollbackFiles)');
     expect(topologyBrowserVerifier).toContain('rollbackOriginal.releasedAt, expectedRollbackReleasedAt');
     expect(topologyBrowserVerifier).toContain('expectsPendingCandidate = isCurrentCandidate && !expectedReleasedAt');
-    expect(topologyBrowserVerifier).toContain("lastReleaseLabel !== 'CURRENT CANDIDATE · PUBLIC HITL AFTER RELEASE'");
+    expect(topologyBrowserVerifier).toContain("lastReleaseLabel !== 'HITL CANDIDATE · NOT LIVE'");
     expect(topologyBrowserVerifier).toContain('verifyProductionReleaseTimestamp');
     expect(workflow.match(/test -n "\$\{RELEASE_BUILT_AT:-\}"/g)).toHaveLength(2);
     expect(topologyBrowserVerifier).toContain('process.env.RELEASE_BUILT_AT?.trim()');
@@ -364,7 +364,7 @@ describe('production release workflow', () => {
     expect(liveTopologyVerifier).toContain("verifyLegacyRoute('normal'");
     expect(liveTopologyVerifier).toContain("verifyLegacyRoute('room'");
     expect(liveTopologyVerifier).toContain('Last Release timestamp is not a published instant');
-    expect(liveTopologyVerifier).toContain("lastReleaseLabel !== 'CURRENT CANDIDATE · PUBLIC HITL AFTER RELEASE'");
+    expect(liveTopologyVerifier).toContain("lastReleaseLabel !== 'HITL CANDIDATE · NOT LIVE'");
     expect(liveTopologyVerifier).toContain("releaseState !== 'LOCAL CANDIDATE'");
     expect(liveTopologyVerifier).toContain("timeText.includes('NOT PUBLISHED')");
     expect(liveTopologyVerifier).not.toContain("'channels/the-big-one', 'PASS 65'");

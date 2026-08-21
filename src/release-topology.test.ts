@@ -187,11 +187,8 @@ describe('Pass 73 release topology', () => {
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
     const validation = validateAcceptanceManifest(manifest);
     if (!manifest.preview) {
-      expect(manifest.bindingState).toBe('awaiting-immutable-preview-and-integrated-evidence');
-      expect(manifest.humanAcceptance).toMatchObject({
-        kind: 'standing-publication-authorization',
-        previewInspection: 'not-performed',
-      });
+      expect(manifest.bindingState).toBe('awaiting-immutable-preview-and-owner-hitl');
+      expect(manifest.humanAcceptance).toBeNull();
       expect(manifest.requirements.some((requirement: { state?: string }) => requirement.state === 'pending')).toBe(true);
       expect(validation.ok).toBe(false);
       expect(validation.errors).toContain('preview must name its kind, immutable reference, full source SHA, and createdAt timestamp');

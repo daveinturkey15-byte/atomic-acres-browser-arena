@@ -2,36 +2,25 @@
   "schemaVersion": 1,
   "releasePass": "PASS 73",
   "feedbackReceivedAt": "2026-08-21T08:23:56.049Z",
-  "status": "accepted",
-  "bindingState": "awaiting-immutable-preview-and-integrated-evidence",
+  "status": "pending",
+  "bindingState": "awaiting-immutable-preview-and-owner-hitl",
   "preview": null,
   "releaseDecision": {
-    "state": "publication-authorized",
-    "condition": "all-required-mechanical-gates-green",
-    "ownerHitl": "deferred-until-public-pages"
+    "state": "awaiting-preview-approval",
+    "condition": "exact-candidate-mechanical-closure-and-owner-hitl",
+    "ownerHitl": "required-before-production"
   },
-  "humanAcceptance": {
-    "state": "approved",
-    "approvedBy": "Dave",
-    "approvedAt": "2026-08-21T08:23:56.049Z",
-    "kind": "standing-publication-authorization",
-    "previewInspection": "not-performed",
-    "evidence": "Dave directed Codex to continue autonomously, fix every reported regression, complete the tests properly and get the latest version live. This is standing publication-first authorization conditioned on every required mechanical gate. Dave has not inspected or tested an immutable Pass 73 preview; no such preview existed when this authorization was bound."
-  },
+  "humanAcceptance": null,
   "requirements": [
     {
       "id": "R1",
-      "summary": "Bind publication to Dave's standing publication-first authorization",
-      "expected": "Only the exact immutable Pass 73 preview whose integrated mechanical, visual, hardware and release gates are all green may enter the protected production workflow; this is publication authority, not preview inspection or completed gameplay HITL.",
-      "falsifier": "Publication uses different runtime bytes, bypasses a required gate, or represents Dave as having inspected or tested an immutable Pass 73 preview.",
+      "summary": "Require Dave's approval of the exact immutable Pass 73 preview before publication",
+      "expected": "Only the exact immutable Pass 73 preview whose integrated mechanical, visual, hardware and release gates are all green and which Dave has played and approved may enter the protected production workflow.",
+      "falsifier": "Publication uses different runtime bytes, bypasses a required gate, proceeds before Dave's preview decision, or represents Dave as having approved an uninspected candidate.",
       "acceptance": "human",
-      "state": "verified",
-      "evidence": [
-        {
-          "kind": "manual",
-          "ref": "owner-authorization://pass73/2026-08-21T08:23:56.049Z",
-          "note": "The active owner instruction provides standing publication-first authority after genuine mechanical closure and explicitly does not provide immutable-preview inspection or public gameplay HITL evidence."
-        }
+      "state": "pending",
+      "plannedEvidence": [
+        "Dave's explicit decision after playing the exact immutable Pass 73 preview"
       ]
     },
     {
@@ -169,16 +158,14 @@
     },
     {
       "id": "R12",
-      "summary": "Complete owner visual, audio, feel and network HITL on the public Pages build",
-      "expected": "After protected publication, Dave can test the exact public Pass 73 Pages build for arm proportions, weapon and movement feel, thermal presentation, grenade pacing, collision, graphics switching, Firefox behavior and real multiplayer while every retained channel remains available.",
-      "falsifier": "The public build does not bind the released SHA, a retained fallback is inaccessible during review, or Dave reports a release-blocking defect in public HITL.",
+      "summary": "Complete owner visual, audio, feel and network HITL before production",
+      "expected": "Dave can test the exact Pass 73 candidate for arm proportions, weapon and movement feel, thermal presentation, grenade pacing, collision, graphics switching and real multiplayer before the production route changes; Firefox remains explicitly deferred to the next pass.",
+      "falsifier": "The tested build does not bind the candidate SHA, production moves before the decision, or Dave reports a release-blocking defect in candidate HITL.",
       "acceptance": "human",
-      "state": "deferred",
-      "deferApproval": {
-        "approvedBy": "Dave",
-        "approvedAt": "2026-08-21T08:23:56.049Z",
-        "reason": "Dave authorized publication first and reserved owner public HITL for the final GitHub Pages build. He has not inspected or tested an immutable Pass 73 preview; subjective visual, audio and feel review plus native-browser and real-network validation remain unperformed and explicitly deferred."
-      }
+      "state": "pending",
+      "plannedEvidence": [
+        "Dave's explicit HITL playtest decision on the exact candidate"
+      ]
     }
   ]
 }
