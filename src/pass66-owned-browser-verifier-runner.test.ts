@@ -16,6 +16,7 @@ describe('Pass 66 owned browser verifier runners', () => {
   it('routes browser evidence gates through the clean owned topology runner', () => {
     expect(packageJson.scripts['qa:private-lobby']).toContain('run-pass66-owned-browser-verifier.mjs private-lobby');
     expect(packageJson.scripts['qa:pass66:installed-firefox']).toContain('run-pass66-owned-browser-verifier.mjs installed-firefox');
+    expect(packageJson.scripts['qa:pass73:installed-firefox']).toContain('run-pass66-owned-browser-verifier.mjs installed-firefox');
     expect(packageJson.scripts['qa:pass61:netcode']).toContain('run-pass66-owned-browser-verifier.mjs pass61-netcode');
     expect(packageJson.scripts['qa:pass66:support-operate-prompt']).toContain('run-pass66-owned-browser-verifier.mjs support-operate-prompt');
     expect(packageJson.scripts['qa:multiplayer:stability']).toContain('run-pass66-owned-browser-verifier.mjs multiplayer-stability');
@@ -36,7 +37,7 @@ describe('Pass 66 owned browser verifier runners', () => {
       "SOURCE_SHA: sourceSha",
       "RELEASE_DIST_ROOT: temporaryDist",
       "RELEASE_TOPOLOGY_RECEIPT_PATH: topologyReceiptPath",
-      "assertStagedTopology(topology, sourceSha, releasePass)",
+      "assertStagedTopology(topology, sourceSha, releasePass, topologySchemaVersion)",
       "assertOwnedBrowserVerifierReceipt(receipt",
       "Refusing stale or unowned listener on PeerJS port",
       "'support-operate-prompt': Object.freeze",
@@ -73,16 +74,39 @@ describe('Pass 66 owned browser verifier runners', () => {
   });
 
   it('uses the real runtime backend field and tokenized owned PeerJS path', () => {
-    expect(firefox).toContain('state.render?.runtime?.actualBackend ?? null');
+    expect(firefox).toContain('backend: runtime?.actualBackend ?? null');
     expect(firefox).toContain('const url = new URL(baseUrl)');
     expect(firefox).not.toContain("new URL('/', baseUrl)");
-    expect(firefox).toContain("active.backend !== 'webgl2'");
+    expect(firefox).toContain("active.backend !== 'webgpu'");
     expect(firefox).not.toContain('state.render?.backend ?? null');
     expect(privateLobby).toContain("url.searchParams.set('peerQaPath', peerPath)");
     expect(privateLobby).toContain("schema: 'atomic-acres/pass66-private-lobby@2'");
     expect(privateLobby).not.toContain("path', '/peerjs'");
     expect(authoritativeNetcode).toContain("url.searchParams.set('peerQaPath', peerPath)");
     expect(authoritativeNetcode).toContain("schema: 'atomic-acres/pass61-authoritative-netcode@1'");
+  });
+
+  it('matches browser mode, exact content viewport and real WebGPU submission pacing without UA mocks', () => {
+    for (const marker of [
+      'nextOuterRectForContentViewport',
+      "mechanism: 'webdriver-outer-compensation'",
+      "mechanism: 'playwright-content-viewport'",
+      'headless: parityHeadless',
+      'runChromeParityCycles',
+      "metricSource: pacing?.source ?? null",
+      "render: 'quality'",
+      'firefoxSessionClosedBeforeChrome',
+      'submissionDelta:',
+      'completionCaughtUp:',
+      'active.failClosed !== false',
+      'hardwareAdapterVendor',
+      'userAgentMatchesBrowserVersion',
+    ]) expect(firefox).toContain(marker);
+    expect(firefox).not.toContain('--user-agent');
+    expect(firefox).not.toContain('general.useragent.override');
+    expect(firefox).not.toContain('--disable-background-timer-throttling');
+    expect(firefox).not.toContain('--disable-renderer-backgrounding');
+    expect(firefox).not.toContain('browser.newPage(');
   });
 
   it('freezes the renderer and binds both single-surface support actions to the served candidate', () => {

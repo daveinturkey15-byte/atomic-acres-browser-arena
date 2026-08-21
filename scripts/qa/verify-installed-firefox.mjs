@@ -1,13 +1,20 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import process from 'node:process';
 import { chromium } from '@playwright/test';
+import {
+  hardwareAdapterVendor,
+  nextOuterRectForContentViewport,
+} from './pass66-owned-browser-verifier-contract.mjs';
 
 const root = path.resolve(process.cwd());
 const baseUrl = process.env.QA_BASE_URL ?? process.env.BASE_URL ?? '';
 const expectedGate = process.env.PASS66_OWNED_GATE ?? '';
+const expectedReleasePass = process.env.QA_OWNED_RELEASE_PASS ?? '';
+const expectedTopologySchemaVersion = Number(process.env.QA_OWNED_TOPOLOGY_SCHEMA_VERSION ?? Number.NaN);
 const expectedSourceSha = process.env.PASS66_OWNED_SOURCE_SHA ?? '';
 const expectedTreeSha256 = process.env.PASS66_OWNED_TREE_SHA256 ?? '';
 const expectedFileCount = Number(process.env.PASS66_OWNED_FILE_COUNT ?? Number.NaN);
@@ -31,28 +38,28 @@ const chromeExecutable = [
 const driverExecutable = driverCandidates.find((candidate) => candidate === 'geckodriver.exe' || existsSync(candidate));
 const driverLauncher = process.env.QA_GECKODRIVER_LAUNCHER;
 const hiddenHeadful = process.env.QA_FIREFOX_HEADFUL_HIDDEN === '1';
+const parityHeadless = !hiddenHeadful;
+const presentationMode = parityHeadless ? 'headless' : 'headed';
 const parityViewport = Object.freeze([2_560, 1_440]);
 const parityRouteParameters = Object.freeze({
-  release: 'latest', map: 'atomic-acres', renderer: 'webgpu', requireWebGPU: '1', render: 'blender',
+  release: 'latest', map: 'atomic-acres', renderer: 'webgpu', requireWebGPU: '1', render: 'quality',
   externalServices: 'off', multiplayerQa: '1',
 });
-const softwareAdapterPattern = /swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic|fallback/iu;
-const firefoxGraphicsPrefs = process.env.QA_FIREFOX_GRAPHICS === 'basic'
+const parityContract = 'same-content-matched-mode-native-webgpu-firefox-chrome-80pct-median-125pct-p95-v2';
+const softwareAdapterPattern = /swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic|fallback|unavailable|unknown/iu;
+const firefoxGraphicsMode = process.env.QA_FIREFOX_GRAPHICS ?? 'default';
+const firefoxGraphicsPrefs = firefoxGraphicsMode === 'hardware'
   ? {
-    'gfx.webrender.force-disabled': true,
+    'gfx.webrender.all': true,
+    'gfx.webrender.force-disabled': false,
     'gfx.webrender.software': false,
-    'layers.acceleration.disabled': true,
+    'layers.acceleration.disabled': false,
   }
-  : process.env.QA_FIREFOX_GRAPHICS === 'hardware'
-    ? {
-      'gfx.webrender.all': true,
-      'gfx.webrender.force-disabled': false,
-      'gfx.webrender.software': false,
-      'layers.acceleration.disabled': false,
-    }
-    : {};
+  : {};
 
-if (expectedGate !== 'installed-firefox' || !/^https?:\/\/127\.0\.0\.1:\d+\/channels\/the-big-one\/$/u.test(baseUrl)
+if (expectedGate !== 'installed-firefox' || !/^PASS \d+(?:\.\d+)?$/u.test(expectedReleasePass)
+  || !Number.isSafeInteger(expectedTopologySchemaVersion) || expectedTopologySchemaVersion < 1
+  || !/^https?:\/\/127\.0\.0\.1:\d+\/channels\/the-big-one\/$/u.test(baseUrl)
   || !/^[a-f0-9]{40}$/u.test(expectedSourceSha) || !/^[a-f0-9]{64}$/u.test(expectedTreeSha256)
   || !Number.isSafeInteger(expectedFileCount) || expectedFileCount < 2 || !path.isAbsolute(receiptPath)) {
   throw new Error('Installed Firefox QA must run through the clean-SHA owned Pass 66 verifier wrapper');
@@ -76,6 +83,24 @@ if (hiddenHeadful && !driverLauncher) {
 if (!Number.isSafeInteger(driverPort) || driverPort < 1_024 || driverPort > 65_535) {
   throw new Error(`QA_GECKODRIVER_PORT is invalid: ${process.env.QA_GECKODRIVER_PORT}`);
 }
+if (!['default', 'hardware'].includes(firefoxGraphicsMode)) {
+  throw new Error('Installed Firefox native-WebGPU parity rejects non-hardware QA_FIREFOX_GRAPHICS overrides');
+}
+
+function sha256File(file) {
+  return createHash('sha256').update(readFileSync(file)).digest('hex');
+}
+
+function userAgentMatchesBrowserVersion(userAgent, browserVersion, family) {
+  if (typeof userAgent !== 'string' || typeof browserVersion !== 'string') return false;
+  const userAgentVersion = family === 'firefox'
+    ? /Firefox\/(\d+)/u.exec(userAgent)?.[1]
+    : /(?:Chrome|HeadlessChrome)\/(\d+)/u.exec(userAgent)?.[1];
+  return userAgentVersion !== undefined && userAgentVersion === /^(\d+)/u.exec(browserVersion)?.[1];
+}
+
+const firefoxExecutableSha256 = sha256File(firefoxExecutable);
+const chromeExecutableSha256 = sha256File(chromeExecutable);
 
 function listenerPresent(port) {
   return new Promise((resolveListener) => {
@@ -179,7 +204,8 @@ async function readServedCandidate() {
   });
   if (!response.ok) throw new Error(`Candidate provenance returned HTTP ${response.status}`);
   const value = await response.json();
-  if (value?.schemaVersion !== 4 || value.channel !== 'the-big-one' || value.releasePass !== 'PASS 66'
+  if (value?.schemaVersion !== expectedTopologySchemaVersion || value.channel !== 'the-big-one'
+    || value.releasePass !== expectedReleasePass
     || value.path !== 'channels/the-big-one' || value.sourceSha !== expectedSourceSha
     || value.treeSha256 !== expectedTreeSha256 || value.exactRootFileCount !== expectedFileCount) {
     throw new Error(`Served candidate provenance mismatch: ${JSON.stringify(value)}`);
@@ -191,6 +217,230 @@ function parityUrl(seed) {
   const url = new URL(baseUrl);
   for (const [key, value] of Object.entries({ ...parityRouteParameters, seed })) url.searchParams.set(key, value);
   return url;
+}
+
+function collectActiveBrowserState() {
+  const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+  const runtime = state.render?.runtime ?? null;
+  const post = state.render?.atomicSignal ?? null;
+  const grass = state.render?.grass ?? null;
+  const atmosphere = state.render?.atmosphere ?? null;
+  const water = state.render?.water ?? null;
+  const blenderEnvironment = state.render?.blenderEnvironment ?? null;
+  return {
+    stage: state.bootstrap?.stage ?? null,
+    error: state.bootstrap?.error ?? null,
+    matchPhase: state.matchPhase ?? null,
+    gameStarted: state.gameStarted === true,
+    frameCount: state.frameCount ?? 0,
+    backend: runtime?.actualBackend ?? null,
+    requestedBackend: runtime?.requestedBackend ?? null,
+    failClosed: runtime?.failClosed ?? null,
+    deviceLost: runtime?.deviceLost ?? null,
+    uncapturedErrors: runtime?.uncapturedErrors ?? null,
+    adapterLabel: runtime?.adapterLabel ?? null,
+    adapterClass: runtime?.adapterClass ?? null,
+    deviceClass: runtime?.deviceClass ?? null,
+    softwareAdapter: runtime?.softwareAdapter ?? null,
+    liveProfile: state.render?.liveProfile ?? null,
+    qualityAssetState: state.render?.qualityAssetStreaming?.atomicAcres ?? null,
+    post,
+    pixelRatio: state.render?.pixelRatio ?? null,
+    drawingBuffer: state.render?.drawingBuffer ?? null,
+    viewport: [window.innerWidth, window.innerHeight],
+    pointerLock: typeof document.querySelector('#game')?.requestPointerLock === 'function',
+    webRtc: typeof window.RTCPeerConnection === 'function',
+    navigatorGpu: typeof navigator.gpu !== 'undefined',
+    visibilityState: document.visibilityState,
+    documentHasFocus: document.hasFocus(),
+    runtimeErrorVisible: document.querySelector('#runtime-error')?.hidden === false,
+    userAgent: navigator.userAgent,
+    graphicsContract: {
+      arenaId: state.arena?.id ?? null,
+      humanProfile: 'quality',
+      internalRenderProfile: state.render?.liveProfile ?? null,
+      renderer: {
+        requestedBackend: runtime?.requestedBackend ?? null,
+        actualBackend: runtime?.actualBackend ?? null,
+        pixelRatio: state.render?.pixelRatio ?? null,
+        drawingBuffer: state.render?.drawingBuffer ?? null,
+        viewport: [window.innerWidth, window.innerHeight],
+        shadows: state.render?.shadows ?? null,
+        authoredShadows: state.render?.authoredShadows ?? null,
+        shadowMode: state.render?.shadowMode ?? null,
+        canvasAntialias: runtime?.canvasAntialias ?? null,
+        canvasSamples: runtime?.canvasSamples ?? null,
+        principalHdrSamples: runtime?.principalHdrSamples ?? null,
+        bloomSamples: runtime?.bloomSamples ?? null,
+        renderPipelineApi: runtime?.renderPipelineApi ?? null,
+      },
+      effects: {
+        depthAwareBloom: post?.depthAwareBloom ?? null,
+        advancedGraphics: post?.advancedGraphics ?? null,
+        lighting: state.render?.lighting ?? null,
+        sky: state.render?.sky ? {
+          cloudBands: state.render.sky.cloudBands,
+          godRayStrength: state.render.sky.godRayStrength,
+          godRayLobes: state.render.sky.godRayLobes,
+          linearHdr: state.render.sky.linearHdr,
+        } : null,
+        grass: grass ? {
+          profile: grass.profile,
+          enabled: grass.enabled,
+          bypassReason: grass.bypassReason,
+          layoutId: grass.layoutId,
+          instances: grass.instances,
+          blades: grass.blades,
+          checksum: grass.checksum,
+          chunks: grass.chunks,
+          triangles: grass.triangles,
+          triangleLimit: grass.triangleLimit,
+          maximumDistance: grass.maximumDistance,
+          adaptiveDistance: grass.adaptiveDistance,
+        } : null,
+        atmosphere: atmosphere ? {
+          enabled: atmosphere.enabled,
+          bypassReason: atmosphere.bypassReason,
+          arenaId: atmosphere.arenaId,
+          mistCards: atmosphere.mistCards,
+          smokeCards: atmosphere.smokeCards,
+          dustMotes: atmosphere.dustMotes,
+          triangles: atmosphere.triangles,
+          densityScale: atmosphere.densityScale,
+        } : null,
+        water,
+      },
+      assets: {
+        qualityAssetState: state.render?.qualityAssetStreaming?.atomicAcres ?? null,
+        qualityArtRootVisible: blenderEnvironment?.qualityArtRootVisible ?? null,
+        proceduralRootActuallyVisible: blenderEnvironment?.proceduralRootActuallyVisible ?? null,
+        overlappingPrimaryArenaRoots: blenderEnvironment?.overlappingPrimaryArenaRoots ?? null,
+        asset: blenderEnvironment?.asset ?? null,
+        meshCount: blenderEnvironment?.meshCount ?? null,
+        triangleCount: blenderEnvironment?.triangleCount ?? null,
+        surfaceSeparationPass: blenderEnvironment?.surfaceSeparationPass ?? null,
+        worldIdentityPass: blenderEnvironment?.worldIdentityPass ?? null,
+        proceduralWorldHidden: blenderEnvironment?.proceduralWorldHidden ?? null,
+      },
+    },
+  };
+}
+
+function startBrowserFrameProbe(probeKey) {
+  const api = window.__ATOMIC_ACRES_DEBUG__;
+  const state = api.snapshot();
+  const presentation = api.samplePresentationTelemetry();
+  const probe = {
+    startedAt: globalThis.performance.now(),
+    lastAt: 0,
+    intervals: [],
+    startingFrame: state.frameCount,
+    startingSubmissionSequence: presentation.submissionSequence,
+    startingCompletedSequence: presentation.completedSequence,
+    active: true,
+  };
+  window[probeKey] = probe;
+  const tick = (now) => {
+    if (!probe.active) return;
+    if (probe.lastAt > 0) probe.intervals.push(now - probe.lastAt);
+    probe.lastAt = now;
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+  return true;
+}
+
+function finishBrowserFrameProbe(probeKey) {
+  const api = window.__ATOMIC_ACRES_DEBUG__;
+  const probe = window[probeKey];
+  if (!probe) throw new Error(`WebGPU frame probe ${probeKey} is missing`);
+  probe.active = false;
+  const state = api.snapshot();
+  const pacing = state.render?.framePacing;
+  const presentation = api.samplePresentationTelemetry();
+  const sorted = probe.intervals
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => a - b);
+  const callbackPercentile = (fraction) => sorted[
+    Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * fraction) - 1))
+  ] ?? null;
+  const elapsedMs = globalThis.performance.now() - probe.startedAt;
+  return {
+    metricSource: pacing?.source ?? null,
+    elapsedMs,
+    callbackSampleCount: sorted.length,
+    callbackFps: sorted.length * 1_000 / elapsedMs,
+    callbackP50Ms: callbackPercentile(0.5),
+    callbackP95Ms: callbackPercentile(0.95),
+    frameDelta: state.frameCount - probe.startingFrame,
+    submissionSampleCount: pacing?.sampleCount ?? 0,
+    submissionDelta: presentation.submissionSequence - probe.startingSubmissionSequence,
+    completionDelta: presentation.completedSequence - probe.startingCompletedSequence,
+    completionCaughtUp: presentation.completedSequence
+      >= presentation.submissionSequence - presentation.maximumInFlightSubmissions,
+    p50FrameTimeMs: pacing?.medianMs ?? null,
+    p95FrameTimeMs: pacing?.p95Ms ?? null,
+    p99FrameTimeMs: pacing?.p99Ms ?? null,
+    maximumFrameTimeMs: pacing?.maxMs ?? null,
+    finalPresentation: presentation,
+  };
+}
+
+function assertFramePerformance(label, framePerformance) {
+  if (framePerformance.metricSource !== 'webgpu-submission'
+    || framePerformance.elapsedMs < 5_000 || framePerformance.callbackSampleCount < 150
+    || framePerformance.callbackFps < 30 || framePerformance.submissionSampleCount < 180
+    || framePerformance.submissionDelta < 180 || framePerformance.completionDelta < 1
+    || framePerformance.completionCaughtUp !== true
+    || !Number.isFinite(framePerformance.p50FrameTimeMs) || framePerformance.p50FrameTimeMs <= 0
+    || !Number.isFinite(framePerformance.p95FrameTimeMs) || framePerformance.p95FrameTimeMs <= 0
+    || !Number.isFinite(framePerformance.p99FrameTimeMs) || framePerformance.p99FrameTimeMs <= 0
+    || !Number.isFinite(framePerformance.maximumFrameTimeMs) || framePerformance.maximumFrameTimeMs <= 0
+    || framePerformance.p50FrameTimeMs > 34 || framePerformance.p95FrameTimeMs > 50
+    || framePerformance.maximumFrameTimeMs > 250
+    || !['healthy', 'synchronous'].includes(framePerformance.finalPresentation?.status)) {
+    throw new Error(`${label} native WebGPU submission performance failed: ${JSON.stringify(framePerformance)}`);
+  }
+}
+
+async function firefoxContentViewportSample() {
+  const [rect, content] = await Promise.all([
+    request('GET', `/session/${sessionId}/window/rect`),
+    execute(`return {
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+      outerWidth: window.outerWidth,
+      outerHeight: window.outerHeight,
+      devicePixelRatio: window.devicePixelRatio,
+    };`),
+  ]);
+  return { ...content, windowRect: rect };
+}
+
+async function setFirefoxContentViewport() {
+  const attempts = [];
+  let requestedOuterRect = { width: parityViewport[0], height: parityViewport[1] };
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    await request('POST', `/session/${sessionId}/window/rect`, requestedOuterRect);
+    const sample = await firefoxContentViewportSample();
+    attempts.push({ requestedOuterRect, sample });
+    if (sample.innerWidth === parityViewport[0] && sample.innerHeight === parityViewport[1]) {
+      if (sample.devicePixelRatio !== 1
+        || sample.outerWidth !== sample.windowRect?.width
+        || sample.outerHeight !== sample.windowRect?.height) {
+        throw new Error(`Firefox content viewport has unbound pixel/outer dimensions: ${JSON.stringify(sample)}`);
+      }
+      return {
+        mechanism: 'webdriver-outer-compensation',
+        requestedContentViewport: parityViewport,
+        attempts,
+        final: sample,
+        matched: true,
+      };
+    }
+    requestedOuterRect = nextOuterRectForContentViewport(sample, parityViewport);
+  }
+  throw new Error(`Firefox could not establish exact ${parityViewport.join('x')} content viewport: ${JSON.stringify(attempts)}`);
 }
 
 async function runAdmissionCycle(label, seed) {
@@ -210,190 +460,180 @@ async function runAdmissionCycle(label, seed) {
     };
   `), (sample) => sample?.stage === 'ready' && sample.weaponReady && sample.soloEnabled, 90_000);
   if (menu.error) throw new Error(`${label} bootstrap error: ${menu.error}`);
-  await execute('window.__ATOMIC_ACRES_DEBUG__.startSolo(); return true;');
-  const active = await poll(`${label} match admission`, () => execute(`
-    const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
-    if (!state) return null;
-    return {
-      stage: state.bootstrap?.stage ?? null,
-      error: state.bootstrap?.error ?? null,
-      matchPhase: state.matchPhase ?? null,
-      gameStarted: state.gameStarted === true,
-      frameCount: state.frameCount ?? 0,
-      backend: state.render?.runtime?.actualBackend ?? null,
-      webglVersion: state.render?.webglVersion ?? null,
-      requestedBackend: state.render?.runtime?.requestedBackend ?? null,
-      failClosed: state.render?.runtime?.failClosed ?? null,
-      deviceLost: state.render?.runtime?.deviceLost ?? null,
-      uncapturedErrors: state.render?.runtime?.uncapturedErrors ?? null,
-      adapterLabel: state.render?.runtime?.adapterLabel ?? null,
-      softwareAdapter: state.render?.runtime?.softwareAdapter ?? null,
-      liveProfile: state.render?.liveProfile ?? null,
-      qualityAssetState: state.render?.qualityAssetStreaming?.atomicAcres ?? null,
-      post: state.render?.atomicSignal ?? null,
-      pixelRatio: state.render?.pixelRatio ?? null,
-      drawingBuffer: state.render?.drawingBuffer ?? null,
-      viewport: [innerWidth, innerHeight],
-      pointerLock: typeof document.querySelector('#game')?.requestPointerLock === 'function',
-      webRtc: typeof window.RTCPeerConnection === 'function',
-      navigatorGpu: typeof navigator.gpu !== 'undefined',
-      runtimeErrorVisible: document.querySelector('#runtime-error')?.hidden === false,
-      userAgent: navigator.userAgent,
-    };
-  `), (sample) => sample?.gameStarted && sample.matchPhase === 'active' && sample.frameCount > menu.frameCount + 1, 90_000);
+  await execute(`
+    window.__ATOMIC_ACRES_DEBUG__.startSolo();
+    window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true);
+    return true;
+  `);
+  const active = await poll(`${label} match admission`, () => execute(
+    `return (${collectActiveBrowserState.toString()})();`,
+  ), (sample) => sample?.gameStarted && sample.matchPhase === 'active' && sample.frameCount > menu.frameCount + 1, 90_000);
   if (active.error || active.runtimeErrorVisible) {
     throw new Error(`${label} reported a runtime fault: ${JSON.stringify(active)}`);
   }
-  if (active.requestedBackend !== 'webgpu' || active.backend !== 'webgpu' || active.failClosed !== true
+  if (active.requestedBackend !== 'webgpu' || active.backend !== 'webgpu' || active.failClosed !== false
     || active.deviceLost !== false || active.uncapturedErrors !== 0
     || active.softwareAdapter !== false || typeof active.adapterLabel !== 'string'
     || active.adapterLabel.length < 3 || softwareAdapterPattern.test(active.adapterLabel)
+    || active.adapterClass !== 'GPUAdapter' || active.deviceClass !== 'GPUDevice'
     || active.liveProfile !== 'blender'
     || active.qualityAssetState !== 'ready' || active.post?.depthAwareBloom !== true
-    || active.post?.advancedGraphics?.bloomStrength <= 0 || active.post?.advancedGraphics?.volumetricScale <= 0
+    || !Number.isFinite(active.post?.advancedGraphics?.bloomStrength)
+    || active.post.advancedGraphics.bloomStrength <= 0
+    || !Number.isFinite(active.post?.advancedGraphics?.volumetricScale)
+    || active.post.advancedGraphics.volumetricScale <= 0
     || JSON.stringify(active.viewport) !== JSON.stringify(parityViewport)
+    || active.pixelRatio !== 1 || JSON.stringify(active.drawingBuffer) !== JSON.stringify(parityViewport)
+    || active.visibilityState !== 'visible' || active.documentHasFocus !== true
     || !active.navigatorGpu || !active.pointerLock || !active.webRtc) {
     throw new Error(`${label} capability contract failed: ${JSON.stringify(active)}`);
   }
-  await execute(`
-    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-    window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true);
-    const probe = { startedAt: performance.now(), lastAt: 0, intervals: [], startingFrame: state.frameCount, active: true };
-    window.__PASS73_FIREFOX_WEBGPU_FRAME_PROBE__ = probe;
-    const tick = (now) => {
-      if (!probe.active) return;
-      if (probe.lastAt > 0) probe.intervals.push(now - probe.lastAt);
-      probe.lastAt = now;
-      requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-    return true;
-  `);
-  await poll(`${label} WebGPU performance window`, () => execute(`
-    const probe = window.__PASS73_FIREFOX_WEBGPU_FRAME_PROBE__;
-    return probe ? { elapsedMs: performance.now() - probe.startedAt, samples: probe.intervals.length } : null;
-  `), (sample) => sample?.elapsedMs >= 5_000, 12_000);
-  const framePerformance = await execute(`
-    const probe = window.__PASS73_FIREFOX_WEBGPU_FRAME_PROBE__;
-    if (!probe) throw new Error('Firefox WebGPU frame probe missing');
-    probe.active = false;
-    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-    const sorted = probe.intervals.filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
-    const percentile = (fraction) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * fraction) - 1))] ?? null;
-    const elapsedMs = performance.now() - probe.startedAt;
-    return {
-      elapsedMs,
-      sampleCount: sorted.length,
-      callbackFps: sorted.length * 1000 / elapsedMs,
-      frameDelta: state.frameCount - probe.startingFrame,
-      p50FrameTimeMs: percentile(0.5),
-      p95FrameTimeMs: percentile(0.95),
-      p99FrameTimeMs: percentile(0.99),
-      maximumFrameTimeMs: sorted.length > 0 ? Math.max(...sorted) : null,
-      finalPresentation: state.render?.runtime?.presentation ?? null,
-    };
-  `);
-  if (framePerformance.elapsedMs < 5_000 || framePerformance.sampleCount < 150
-    || framePerformance.frameDelta < 150 || framePerformance.callbackFps < 30
-    || framePerformance.p50FrameTimeMs > 34 || framePerformance.p95FrameTimeMs > 50
-    || framePerformance.maximumFrameTimeMs > 250
-    || !['healthy', 'synchronous'].includes(framePerformance.finalPresentation?.status)) {
-    throw new Error(`${label} Firefox native WebGPU performance failed: ${JSON.stringify(framePerformance)}`);
+  const adapterVendor = hardwareAdapterVendor(active.adapterLabel);
+  if (adapterVendor === null) {
+    throw new Error(`${label} Firefox did not expose a recognized hardware adapter vendor: ${active.adapterLabel}`);
   }
-  return { label, admissionMs: Date.now() - startedAt, ...active, performance: framePerformance };
+  const probeKey = '__PASS73_FIREFOX_WEBGPU_FRAME_PROBE__';
+  await execute(`return (${startBrowserFrameProbe.toString()})(${JSON.stringify(probeKey)});`);
+  await poll(`${label} WebGPU performance window`, () => execute(`
+    const probe = window[${JSON.stringify(probeKey)}];
+    const presentation = window.__ATOMIC_ACRES_DEBUG__?.samplePresentationTelemetry();
+    return probe && presentation ? {
+      elapsedMs: performance.now() - probe.startedAt,
+      samples: probe.intervals.length,
+      submissionDelta: presentation.submissionSequence - probe.startingSubmissionSequence,
+    } : null;
+  `), (sample) => sample?.elapsedMs >= 5_000 && sample?.submissionDelta >= 180, 25_000);
+  const framePerformance = await execute(
+    `return (${finishBrowserFrameProbe.toString()})(${JSON.stringify(probeKey)});`,
+  );
+  assertFramePerformance(`${label} Firefox`, framePerformance);
+  return {
+    label,
+    route: url.toString(),
+    admissionMs: Date.now() - startedAt,
+    ...active,
+    adapterVendor,
+    performance: framePerformance,
+  };
 }
 
-async function runChromeParityCycle(seed) {
+async function runChromeParityCycles(seed) {
   const browser = await chromium.launch({
     executablePath: chromeExecutable,
-    headless: true,
-    args: ['--enable-unsafe-webgpu', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
+    headless: parityHeadless,
+    args: ['--enable-unsafe-webgpu'],
   });
   try {
-    const page = await browser.newPage({
+    const context = await browser.newContext({
       viewport: { width: parityViewport[0], height: parityViewport[1] },
       deviceScaleFactor: 1,
     });
-    const url = parityUrl(seed);
-    await page.goto(url.toString(), { waitUntil: 'domcontentloaded', timeout: 45_000 });
-    await page.waitForFunction(() => {
-      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
-      return state?.bootstrap?.stage === 'ready' && state?.weaponReady === true;
-    }, undefined, { timeout: 90_000 });
-    await page.evaluate(() => {
-      window.__ATOMIC_ACRES_DEBUG__.startSolo();
-      window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true);
-    });
-    await page.waitForFunction(() => {
-      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
-      return state?.gameStarted === true && state?.matchPhase === 'active' && state?.frameCount > 2;
-    }, undefined, { timeout: 90_000 });
-    const active = await page.evaluate(() => {
-      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-      return {
-        backend: state.render?.runtime?.actualBackend ?? null,
-        requestedBackend: state.render?.runtime?.requestedBackend ?? null,
-        failClosed: state.render?.runtime?.failClosed ?? null,
-        deviceLost: state.render?.runtime?.deviceLost ?? null,
-        uncapturedErrors: state.render?.runtime?.uncapturedErrors ?? null,
-        adapterLabel: state.render?.runtime?.adapterLabel ?? null,
-        softwareAdapter: state.render?.runtime?.softwareAdapter ?? null,
-        liveProfile: state.render?.liveProfile ?? null,
-        qualityAssetState: state.render?.qualityAssetStreaming?.atomicAcres ?? null,
-        post: state.render?.atomicSignal ?? null,
-        pixelRatio: state.render?.pixelRatio ?? null,
-        drawingBuffer: state.render?.drawingBuffer ?? null,
-        viewport: [innerWidth, innerHeight],
-        navigatorGpu: typeof navigator.gpu !== 'undefined',
-        userAgent: navigator.userAgent,
-      };
-    });
-    if (active.requestedBackend !== 'webgpu' || active.backend !== 'webgpu' || active.failClosed !== true
-      || active.deviceLost !== false || active.uncapturedErrors !== 0
-      || active.softwareAdapter !== false || typeof active.adapterLabel !== 'string'
-      || active.adapterLabel.length < 3 || softwareAdapterPattern.test(active.adapterLabel)
-      || active.liveProfile !== 'blender'
-      || active.qualityAssetState !== 'ready' || active.post?.depthAwareBloom !== true
-      || active.post?.advancedGraphics?.bloomStrength <= 0 || active.post?.advancedGraphics?.volumetricScale <= 0
-      || JSON.stringify(active.viewport) !== JSON.stringify(parityViewport) || !active.navigatorGpu) {
-      throw new Error(`installed Chrome native WebGPU parity capability failed: ${JSON.stringify(active)}`);
+    const page = await context.newPage();
+    const finalViewport = await page.evaluate(() => ({
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+      outerWidth: window.outerWidth,
+      outerHeight: window.outerHeight,
+      devicePixelRatio: window.devicePixelRatio,
+    }));
+    const viewportControl = {
+      mechanism: 'playwright-content-viewport',
+      requestedContentViewport: parityViewport,
+      final: finalViewport,
+      matched: finalViewport.innerWidth === parityViewport[0]
+        && finalViewport.innerHeight === parityViewport[1]
+        && finalViewport.devicePixelRatio === 1,
+    };
+    if (!viewportControl.matched) {
+      throw new Error(`Chrome could not establish exact ${parityViewport.join('x')} content viewport: ${JSON.stringify(viewportControl)}`);
     }
-    await page.evaluate(() => {
-      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-      const probe = { startedAt: performance.now(), lastAt: 0, intervals: [], startingFrame: state.frameCount, active: true };
-      window.__PASS73_CHROME_WEBGPU_FRAME_PROBE__ = probe;
-      const tick = (now) => {
-        if (!probe.active) return;
-        if (probe.lastAt > 0) probe.intervals.push(now - probe.lastAt);
-        probe.lastAt = now;
-        requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
-    });
-    await page.waitForFunction(() => {
-      const probe = window.__PASS73_CHROME_WEBGPU_FRAME_PROBE__;
-      return probe && performance.now() - probe.startedAt >= 5_000;
-    }, undefined, { timeout: 12_000 });
-    const performance = await page.evaluate(() => {
-      const probe = window.__PASS73_CHROME_WEBGPU_FRAME_PROBE__;
-      probe.active = false;
-      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-      const sorted = probe.intervals.filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
-      const percentile = (fraction) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * fraction) - 1))] ?? null;
-      const elapsedMs = performance.now() - probe.startedAt;
+
+    async function runCycle(label, cycleSeed) {
+      const url = parityUrl(cycleSeed);
+      const startedAt = Date.now();
+      await page.goto(url.toString(), { waitUntil: 'domcontentloaded', timeout: 45_000 });
+      const menuFrame = await page.waitForFunction(() => {
+        const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+        return state?.bootstrap?.stage === 'ready' && state?.weaponReady === true
+          && document.querySelector('#solo')?.disabled === false
+          ? state.frameCount
+          : null;
+      }, undefined, { timeout: 90_000 }).then((handle) => handle.jsonValue());
+      await page.evaluate(() => {
+        window.__ATOMIC_ACRES_DEBUG__.startSolo();
+        window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true);
+      });
+      await page.waitForFunction((startingFrame) => {
+        const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+        return state?.gameStarted === true && state?.matchPhase === 'active'
+          && state?.frameCount > startingFrame + 1;
+      }, menuFrame, { timeout: 90_000 });
+      const active = await page.evaluate(collectActiveBrowserState);
+      if (active.error || active.runtimeErrorVisible) {
+        throw new Error(`${label} Chrome reported a runtime fault: ${JSON.stringify(active)}`);
+      }
+      if (active.requestedBackend !== 'webgpu' || active.backend !== 'webgpu' || active.failClosed !== false
+        || active.deviceLost !== false || active.uncapturedErrors !== 0
+        || active.softwareAdapter !== false || typeof active.adapterLabel !== 'string'
+        || active.adapterLabel.length < 3 || softwareAdapterPattern.test(active.adapterLabel)
+        || active.adapterClass !== 'GPUAdapter' || active.deviceClass !== 'GPUDevice'
+        || active.liveProfile !== 'blender'
+        || active.qualityAssetState !== 'ready' || active.post?.depthAwareBloom !== true
+        || !Number.isFinite(active.post?.advancedGraphics?.bloomStrength)
+        || active.post.advancedGraphics.bloomStrength <= 0
+        || !Number.isFinite(active.post?.advancedGraphics?.volumetricScale)
+        || active.post.advancedGraphics.volumetricScale <= 0
+        || JSON.stringify(active.viewport) !== JSON.stringify(parityViewport)
+        || active.pixelRatio !== 1 || JSON.stringify(active.drawingBuffer) !== JSON.stringify(parityViewport)
+        || active.visibilityState !== 'visible' || active.documentHasFocus !== true
+        || !active.navigatorGpu || !active.pointerLock || !active.webRtc) {
+        throw new Error(`${label} installed Chrome native WebGPU capability failed: ${JSON.stringify(active)}`);
+      }
+      const adapterVendor = hardwareAdapterVendor(active.adapterLabel);
+      if (adapterVendor === null) {
+        throw new Error(`${label} Chrome did not expose a recognized hardware adapter vendor: ${active.adapterLabel}`);
+      }
+      const probeKey = '__PASS73_CHROME_WEBGPU_FRAME_PROBE__';
+      await page.evaluate(startBrowserFrameProbe, probeKey);
+      await page.waitForFunction((key) => {
+        const probe = window[key];
+        const presentation = window.__ATOMIC_ACRES_DEBUG__?.samplePresentationTelemetry();
+        return probe && presentation && performance.now() - probe.startedAt >= 5_000
+          && presentation.submissionSequence - probe.startingSubmissionSequence >= 180;
+      }, probeKey, { timeout: 25_000 });
+      const framePerformance = await page.evaluate(finishBrowserFrameProbe, probeKey);
+      assertFramePerformance(`${label} Chrome`, framePerformance);
       return {
-        elapsedMs,
-        sampleCount: sorted.length,
-        callbackFps: sorted.length * 1000 / elapsedMs,
-        frameDelta: state.frameCount - probe.startingFrame,
-        p50FrameTimeMs: percentile(0.5),
-        p95FrameTimeMs: percentile(0.95),
-        p99FrameTimeMs: percentile(0.99),
-        maximumFrameTimeMs: sorted.length > 0 ? Math.max(...sorted) : null,
-        finalPresentation: state.render?.runtime?.presentation ?? null,
+        label,
+        route: url.toString(),
+        admissionMs: Date.now() - startedAt,
+        ...active,
+        adapterVendor,
+        performance: framePerformance,
       };
-    });
-    return { browser: browser.version(), executable: chromeExecutable, route: url.toString(), ...active, performance };
+    }
+
+    const cycles = [
+      await runCycle('cold', 'pass73-installed-browser-webgpu-cold'),
+      await runCycle('warm', seed),
+    ];
+    const browserVersion = browser.version();
+    const userAgent = cycles[1].userAgent;
+    const nativeUserAgent = userAgentMatchesBrowserVersion(userAgent, browserVersion, 'chrome');
+    if (!nativeUserAgent) {
+      throw new Error(`Chrome user agent does not match installed browser ${browserVersion}: ${userAgent}`);
+    }
+    return {
+      browserVersion,
+      executable: chromeExecutable,
+      executableSha256: chromeExecutableSha256,
+      headless: parityHeadless,
+      presentationMode,
+      nativeUserAgent,
+      userAgent,
+      cycles,
+      viewportControl,
+    };
   } finally {
     await browser.close();
   }
@@ -410,7 +650,7 @@ async function main() {
         pageLoadStrategy: 'normal',
         'moz:firefoxOptions': {
           binary: firefoxExecutable,
-          args: hiddenHeadful ? [] : ['-headless'],
+          args: parityHeadless ? ['-headless'] : [],
           prefs: {
             'browser.shell.checkDefaultBrowser': false,
             'browser.startup.page': 0,
@@ -419,6 +659,7 @@ async function main() {
             'webgl.disabled': false,
             'dom.webgpu.enabled': true,
             'gfx.webgpu.force-enabled': true,
+            'layout.css.devPixelsPerPx': '1.0',
             ...firefoxGraphicsPrefs,
           },
         },
@@ -427,48 +668,91 @@ async function main() {
   }, 45_000);
   sessionId = created?.sessionId;
   if (!sessionId) throw new Error(`geckodriver did not return a session id: ${JSON.stringify(created)}`);
-  await request('POST', `/session/${sessionId}/window/rect`, { width: 2_560, height: 1_440 });
-  const cold = await runAdmissionCycle('cold', 'pass66-installed-firefox-cold');
+  const firefoxViewportControl = await setFirefoxContentViewport();
+  const cold = await runAdmissionCycle('cold', 'pass73-installed-browser-webgpu-cold');
   const paritySeed = 'pass73-installed-browser-webgpu-parity';
   const warm = await runAdmissionCycle('warm', paritySeed);
-  const chrome = await runChromeParityCycle(paritySeed);
+  const firefoxBrowserVersion = created?.capabilities?.browserVersion ?? null;
+  const firefoxNativeUserAgent = userAgentMatchesBrowserVersion(warm.userAgent, firefoxBrowserVersion, 'firefox');
+  if (!firefoxNativeUserAgent) {
+    throw new Error(`Firefox user agent does not match installed browser ${firefoxBrowserVersion}: ${warm.userAgent}`);
+  }
+  await request('DELETE', `/session/${sessionId}`, undefined, 30_000);
+  sessionId = null;
+  const firefoxSessionClosedBeforeChrome = true;
+  const chrome = await runChromeParityCycles(paritySeed);
+  const chromeWarm = chrome.cycles[1];
   const firefoxMedianThroughputFps = 1_000 / warm.performance.p50FrameTimeMs;
-  const chromeMedianThroughputFps = 1_000 / chrome.performance.p50FrameTimeMs;
+  const chromeMedianThroughputFps = 1_000 / chromeWarm.performance.p50FrameTimeMs;
   const medianThroughputRatio = firefoxMedianThroughputFps / chromeMedianThroughputFps;
-  const p95FrameTimeRatio = warm.performance.p95FrameTimeMs / chrome.performance.p95FrameTimeMs;
-  const identicalGraphicsContract = warm.liveProfile === chrome.liveProfile
-    && warm.qualityAssetState === chrome.qualityAssetState
-    && warm.post?.depthAwareBloom === chrome.post?.depthAwareBloom
-    && warm.post?.advancedGraphics?.bloomStrength === chrome.post?.advancedGraphics?.bloomStrength
-    && warm.post?.advancedGraphics?.volumetricScale === chrome.post?.advancedGraphics?.volumetricScale
-    && warm.pixelRatio === chrome.pixelRatio
-    && JSON.stringify(warm.drawingBuffer) === JSON.stringify(chrome.drawingBuffer)
-    && JSON.stringify(warm.viewport) === JSON.stringify(chrome.viewport);
-  if (!identicalGraphicsContract || medianThroughputRatio < 0.8 || p95FrameTimeRatio > 1.25) {
+  const p95FrameTimeRatio = warm.performance.p95FrameTimeMs / chromeWarm.performance.p95FrameTimeMs;
+  const identicalGraphicsContract = JSON.stringify(cold.graphicsContract) === JSON.stringify(chrome.cycles[0].graphicsContract)
+    && JSON.stringify(warm.graphicsContract) === JSON.stringify(chromeWarm.graphicsContract)
+    && cold.route === chrome.cycles[0].route
+    && warm.route === chromeWarm.route;
+  if (!identicalGraphicsContract || warm.adapterVendor !== chromeWarm.adapterVendor
+    || medianThroughputRatio < 0.8 || p95FrameTimeRatio > 1.25) {
     throw new Error(`installed Firefox/Chrome native WebGPU parity failed: ${JSON.stringify({
       firefoxMedianThroughputFps, chromeMedianThroughputFps, medianThroughputRatio, p95FrameTimeRatio,
-      firefox: warm.performance, chrome: chrome.performance,
+      firefox: warm.performance, chrome: chromeWarm.performance,
     })}`);
   }
+  if (sha256File(firefoxExecutable) !== firefoxExecutableSha256
+    || sha256File(chromeExecutable) !== chromeExecutableSha256) {
+    throw new Error('Installed Firefox or Chrome executable changed during parity verification');
+  }
+  const servedCandidateAfter = await readServedCandidate();
   const receipt = {
     schemaVersion: 1,
     status: 'PASS',
     gate: 'installed-firefox',
+    releasePass: expectedReleasePass,
+    topologySchemaVersion: expectedTopologySchemaVersion,
     sourceSha: expectedSourceSha,
     servedCandidate,
+    servedCandidateAfter,
     browser: 'installed-firefox',
     executable: firefoxExecutable,
     driver: driverExecutable,
     launcher: driverLauncher ?? null,
     hiddenHeadful,
+    firefoxSessionClosedBeforeChrome,
+    toolchain: {
+      firefox: {
+        executable: firefoxExecutable,
+        executableSha256: firefoxExecutableSha256,
+        browserVersion: firefoxBrowserVersion,
+        headless: parityHeadless,
+        presentationMode,
+        graphicsMode: firefoxGraphicsMode,
+        nativeUserAgent: firefoxNativeUserAgent,
+        userAgent: warm.userAgent,
+      },
+      chrome: {
+        executable: chrome.executable,
+        executableSha256: chrome.executableSha256,
+        browserVersion: chrome.browserVersion,
+        headless: chrome.headless,
+        presentationMode: chrome.presentationMode,
+        nativeUserAgent: chrome.nativeUserAgent,
+        userAgent: chrome.userAgent,
+      },
+    },
+    viewportControl: {
+      firefox: firefoxViewportControl,
+      chrome: chrome.viewportControl,
+    },
     cycles: [cold, warm],
     parity: {
-      contract: 'same-content-native-webgpu-firefox-chrome-80pct-median-125pct-p95-v1',
+      contract: parityContract,
       seed: paritySeed,
+      routeParameters: parityRouteParameters,
       viewport: parityViewport,
-      profile: 'blender',
+      profile: 'quality',
+      internalRenderProfile: 'blender',
       map: 'atomic-acres',
       backend: 'webgpu',
+      presentationMode,
       chrome,
       firefoxMedianThroughputFps,
       chromeMedianThroughputFps,

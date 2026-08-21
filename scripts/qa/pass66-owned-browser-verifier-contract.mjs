@@ -3,7 +3,13 @@ import { multiplayerStabilityReceiptFailures } from './pass66-multiplayer-stabil
 const SHA40 = /^[a-f0-9]{40}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const OWNED_PEER_PATH = /^\/peerjs-[a-f0-9]{24}$/u;
-const SOFTWARE_ADAPTER = /swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic|fallback/iu;
+const SOFTWARE_ADAPTER = /swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic|fallback|unavailable|unknown/iu;
+const PARITY_VIEWPORT = Object.freeze([2_560, 1_440]);
+const PARITY_CONTRACT = 'same-content-matched-mode-native-webgpu-firefox-chrome-80pct-median-125pct-p95-v2';
+const PARITY_ROUTE_PARAMETERS = Object.freeze({
+  release: 'latest', map: 'atomic-acres', renderer: 'webgpu', requireWebGPU: '1', render: 'quality',
+  externalServices: 'off', multiplayerQa: '1',
+});
 
 function record(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -11,6 +17,30 @@ function record(value) {
 
 function finite(value) {
   return typeof value === 'number' && Number.isFinite(value);
+}
+
+function expectedParityRoute(baseUrl, seed) {
+  try {
+    const url = new URL(baseUrl);
+    for (const [key, value] of Object.entries({ ...PARITY_ROUTE_PARAMETERS, seed })) {
+      url.searchParams.set(key, value);
+    }
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+export function nextOuterRectForContentViewport(sample, target = PARITY_VIEWPORT) {
+  if (!record(sample) || !Array.isArray(target) || target.length !== 2
+    || ![sample.innerWidth, sample.innerHeight, sample.outerWidth, sample.outerHeight, ...target]
+      .every((value) => Number.isSafeInteger(value) && value > 0)) {
+    throw new Error('content viewport resize requires positive integer inner, outer and target dimensions');
+  }
+  return Object.freeze({
+    width: sample.outerWidth + target[0] - sample.innerWidth,
+    height: sample.outerHeight + target[1] - sample.innerHeight,
+  });
 }
 
 function ownedPeerFailures(value, expected, label) {
@@ -22,17 +52,172 @@ function ownedPeerFailures(value, expected, label) {
   return [];
 }
 
-export function stagedTopologyFailures(value, expectedSourceSha, expectedReleasePass = 'PASS 66') {
+function exactParityViewport(value) {
+  return JSON.stringify(value) === JSON.stringify(PARITY_VIEWPORT);
+}
+
+export function hardwareAdapterVendor(label) {
+  if (typeof label !== 'string') return null;
+  const normalized = label.toLowerCase();
+  if (/\bnvidia\b|(?:^|\W)(?:0x)?10de(?:\W|$)/u.test(normalized)) return 'nvidia';
+  if (/\bamd\b|\bradeon\b|advanced micro devices|(?:^|\W)(?:0x)?1002(?:\W|$)/u.test(normalized)) return 'amd';
+  if (/\bintel\b|(?:^|\W)(?:0x)?8086(?:\W|$)/u.test(normalized)) return 'intel';
+  if (/\bapple\b|(?:^|\W)(?:0x)?106b(?:\W|$)/u.test(normalized)) return 'apple';
+  if (/\bqualcomm\b|\badreno\b|(?:^|\W)(?:0x)?5143(?:\W|$)/u.test(normalized)) return 'qualcomm';
+  return null;
+}
+
+function userAgentMajorVersion(userAgent, family) {
+  if (typeof userAgent !== 'string') return null;
+  const match = family === 'firefox'
+    ? /Firefox\/(\d+)/u.exec(userAgent)
+    : /(?:Chrome|HeadlessChrome)\/(\d+)/u.exec(userAgent);
+  return match?.[1] ?? null;
+}
+
+function browserMajorVersion(version) {
+  return typeof version === 'string' ? /^(\d+)/u.exec(version)?.[1] ?? null : null;
+}
+
+function viewportControlFailures(value, mechanism, label) {
+  if (!record(value) || value.mechanism !== mechanism || value.matched !== true
+    || !exactParityViewport(value.requestedContentViewport)
+    || value.final?.innerWidth !== PARITY_VIEWPORT[0]
+    || value.final?.innerHeight !== PARITY_VIEWPORT[1]
+    || value.final?.devicePixelRatio !== 1) {
+    return [`${label} content viewport control is invalid`];
+  }
+  if (mechanism === 'webdriver-outer-compensation') {
+    if (!Array.isArray(value.attempts) || value.attempts.length < 1 || value.attempts.length > 6) {
+      return [`${label} content viewport compensation attempts are invalid`];
+    }
+    const lastAttempt = value.attempts.at(-1);
+    const requested = lastAttempt?.requestedOuterRect;
+    const sampled = lastAttempt?.sample;
+    if (![requested?.width, requested?.height, sampled?.outerWidth, sampled?.outerHeight]
+      .every((dimension) => Number.isSafeInteger(dimension) && dimension > 0)
+      || sampled?.windowRect?.width !== requested.width || sampled?.windowRect?.height !== requested.height
+      || sampled.outerWidth !== sampled.windowRect.width || sampled.outerHeight !== sampled.windowRect.height
+      || JSON.stringify(value.final) !== JSON.stringify(sampled)) {
+      return [`${label} content viewport compensation attempts are not bound to the final outer rect`];
+    }
+  }
+  return [];
+}
+
+function nativeWebGpuCycleFailures(cycle, label) {
+  const errors = [];
+  if (!record(cycle) || cycle.label !== label || cycle.requestedBackend !== 'webgpu'
+    || cycle.backend !== 'webgpu' || cycle.failClosed !== false || cycle.deviceLost !== false
+    || cycle.uncapturedErrors !== 0 || cycle.softwareAdapter !== false
+    || typeof cycle.adapterLabel !== 'string' || cycle.adapterLabel.length < 3
+    || SOFTWARE_ADAPTER.test(cycle.adapterLabel) || cycle.adapterClass !== 'GPUAdapter'
+    || cycle.deviceClass !== 'GPUDevice' || cycle.navigatorGpu !== true
+    || cycle.adapterVendor !== hardwareAdapterVendor(cycle.adapterLabel)
+    || cycle.adapterVendor === null
+    || cycle.visibilityState !== 'visible' || cycle.documentHasFocus !== true
+    || cycle.liveProfile !== 'blender'
+    || cycle.qualityAssetState !== 'ready' || cycle.post?.depthAwareBloom !== true
+    || !finite(cycle.post?.advancedGraphics?.bloomStrength)
+    || cycle.post.advancedGraphics.bloomStrength <= 0
+    || !finite(cycle.post?.advancedGraphics?.volumetricScale)
+    || cycle.post.advancedGraphics.volumetricScale <= 0
+    || !exactParityViewport(cycle.viewport) || cycle.pixelRatio !== 1
+    || !exactParityViewport(cycle.drawingBuffer)
+    || cycle.gameStarted !== true || cycle.matchPhase !== 'active'
+    || typeof cycle.route !== 'string' || !cycle.route.includes('/channels/the-big-one/?')
+    || typeof cycle.userAgent !== 'string' || cycle.userAgent.length < 12) {
+    errors.push(`${label} native-WebGPU admission identity is invalid`);
+  }
+  const graphics = cycle?.graphicsContract;
+  if (!record(graphics) || graphics.arenaId !== 'atomic-acres' || graphics.humanProfile !== 'quality'
+    || graphics.internalRenderProfile !== 'blender' || graphics.assets?.qualityAssetState !== 'ready'
+    || graphics.assets?.qualityArtRootVisible !== true
+    || graphics.assets?.proceduralRootActuallyVisible !== false
+    || graphics.assets?.overlappingPrimaryArenaRoots !== false
+    || graphics.effects?.depthAwareBloom !== true
+    || !finite(graphics.effects?.advancedGraphics?.bloomStrength)
+    || graphics.effects.advancedGraphics.bloomStrength <= 0
+    || !finite(graphics.effects?.advancedGraphics?.volumetricScale)
+    || graphics.effects.advancedGraphics.volumetricScale <= 0
+    || !record(graphics.effects?.lighting)
+    || graphics.effects?.sky?.linearHdr !== true
+    || graphics.effects?.grass?.enabled !== true
+    || graphics.effects?.atmosphere?.enabled !== true
+    || !record(graphics.effects?.water)
+    || graphics.renderer?.requestedBackend !== 'webgpu'
+    || graphics.renderer?.actualBackend !== 'webgpu'
+    || graphics.renderer?.pixelRatio !== 1
+    || !exactParityViewport(graphics.renderer?.drawingBuffer)
+    || !exactParityViewport(graphics.renderer?.viewport)
+    || graphics.renderer?.shadows !== true || graphics.renderer?.authoredShadows !== true
+    || graphics.renderer?.shadowMode !== 'static' || graphics.renderer?.canvasAntialias !== true
+    || graphics.renderer?.canvasSamples !== 4 || graphics.renderer?.principalHdrSamples !== 4
+    || graphics.renderer?.bloomSamples !== 0
+    || graphics.renderer?.renderPipelineApi !== 'three-r185-render-pipeline'
+    || typeof graphics.assets?.asset !== 'string'
+    || !graphics.assets.asset.includes('atomic-acres-blender-arena.glb')
+    || !Number.isSafeInteger(graphics.assets?.meshCount) || graphics.assets.meshCount <= 0
+    || !Number.isSafeInteger(graphics.assets?.triangleCount) || graphics.assets.triangleCount <= 0
+    || graphics.assets?.surfaceSeparationPass !== true
+    || graphics.assets?.worldIdentityPass !== true
+    || graphics.assets?.proceduralWorldHidden !== true) {
+    errors.push(`${label} matched Quality graphics/assets/effects contract is invalid`);
+  }
+  const performance = cycle?.performance;
+  if (!record(performance) || performance.metricSource !== 'webgpu-submission'
+    || !finite(performance.elapsedMs) || performance.elapsedMs < 5_000
+    || !Number.isSafeInteger(performance.callbackSampleCount) || performance.callbackSampleCount < 150
+    || !finite(performance.callbackFps) || performance.callbackFps < 30
+    || Math.abs(performance.callbackFps - performance.callbackSampleCount * 1_000 / performance.elapsedMs) > 1e-9
+    || performance.submissionSampleCount !== 180
+    || !Number.isSafeInteger(performance.submissionDelta) || performance.submissionDelta < 180
+    || !Number.isSafeInteger(performance.completionDelta)
+    || performance.completionDelta < performance.submissionDelta - 4
+    || !Number.isSafeInteger(performance.frameDelta) || performance.frameDelta < performance.submissionDelta
+    || performance.completionCaughtUp !== true || !finite(performance.p50FrameTimeMs)
+    || performance.p50FrameTimeMs <= 0 || performance.p50FrameTimeMs > 34
+    || !finite(performance.p95FrameTimeMs) || performance.p95FrameTimeMs <= 0
+    || performance.p95FrameTimeMs > 50 || !finite(performance.p99FrameTimeMs)
+    || performance.p99FrameTimeMs < performance.p95FrameTimeMs
+    || performance.p95FrameTimeMs < performance.p50FrameTimeMs
+    || !finite(performance.maximumFrameTimeMs)
+    || performance.maximumFrameTimeMs < performance.p99FrameTimeMs
+    || performance.maximumFrameTimeMs <= 0 || performance.maximumFrameTimeMs > 250
+    || !['healthy', 'synchronous'].includes(performance.finalPresentation?.status)
+    || !Number.isSafeInteger(performance.finalPresentation?.submissionSequence)
+    || !Number.isSafeInteger(performance.finalPresentation?.completedSequence)
+    || !Number.isSafeInteger(performance.finalPresentation?.maximumInFlightSubmissions)
+    || performance.finalPresentation.maximumInFlightSubmissions < 0
+    || performance.finalPresentation.completedSequence
+      < performance.finalPresentation.submissionSequence
+        - performance.finalPresentation.maximumInFlightSubmissions) {
+    errors.push(`${label} WebGPU submission performance evidence is invalid`);
+  }
+  return errors;
+}
+
+export function stagedTopologyFailures(
+  value,
+  expectedSourceSha,
+  expectedReleasePass = 'PASS 66',
+  expectedSchemaVersion = 4,
+) {
   const errors = [];
   if (!SHA40.test(expectedSourceSha ?? '')) errors.push('expected source SHA is invalid');
+  if (!Number.isSafeInteger(expectedSchemaVersion) || expectedSchemaVersion < 1) {
+    errors.push('expected topology schemaVersion is invalid');
+  }
   if (!record(value)) return [...errors, 'topology receipt must be an object'];
-  if (value.schemaVersion !== 4) errors.push('topology schemaVersion must be 4');
+  if (value.schemaVersion !== expectedSchemaVersion) {
+    errors.push(`topology schemaVersion must be ${expectedSchemaVersion}`);
+  }
   if (value.sourceSha !== expectedSourceSha) errors.push('topology sourceSha mismatch');
   if (value.releasePass !== expectedReleasePass) errors.push(`topology releasePass must be ${expectedReleasePass}`);
   if (value.root?.kind !== 'chooser-only') errors.push('topology root must remain chooser-only');
   const candidate = value.channels?.experimental;
   if (!record(candidate)) return [...errors, 'topology experimental channel is missing'];
-  if (candidate.schemaVersion !== 4 || candidate.channel !== 'the-big-one'
+  if (candidate.schemaVersion !== expectedSchemaVersion || candidate.channel !== 'the-big-one'
     || candidate.releasePass !== expectedReleasePass || candidate.sourceSha !== expectedSourceSha
     || candidate.path !== 'channels/the-big-one') {
     errors.push('topology experimental identity mismatch');
@@ -47,7 +232,7 @@ export function stagedTopologyFailures(value, expectedSourceSha, expectedRelease
 export function servedCandidateFailures(value, expected) {
   if (!record(value)) return ['served candidate provenance must be an object'];
   const errors = [];
-  if (value.schemaVersion !== 4 || value.channel !== 'the-big-one'
+  if (value.schemaVersion !== (expected.topologySchemaVersion ?? 4) || value.channel !== 'the-big-one'
     || value.releasePass !== (expected.releasePass ?? 'PASS 66') || value.path !== 'channels/the-big-one') {
     errors.push('served candidate identity mismatch');
   }
@@ -70,60 +255,108 @@ export function ownedBrowserVerifierReceiptFailures(value, expected) {
   errors.push(...servedCandidateFailures(value.servedCandidate, expected));
 
   if (expected.gate === 'installed-firefox') {
-    if (value.browser !== 'installed-firefox') errors.push('Firefox receipt browser mismatch');
+    if (value.browser !== 'installed-firefox' || value.releasePass !== expected.releasePass
+      || value.topologySchemaVersion !== expected.topologySchemaVersion) {
+      errors.push('Firefox receipt release identity mismatch');
+    }
+    errors.push(...servedCandidateFailures(value.servedCandidateAfter, expected));
     if (!Array.isArray(value.cycles) || value.cycles.length !== 2
       || value.cycles[0]?.label !== 'cold' || value.cycles[1]?.label !== 'warm') {
       errors.push('Firefox receipt must contain cold then warm cycles');
-    } else if (value.cycles.some((cycle) => cycle.requestedBackend !== 'webgpu' || cycle.backend !== 'webgpu'
-      || cycle.failClosed !== true || cycle.deviceLost !== false || cycle.uncapturedErrors !== 0
-      || cycle.softwareAdapter !== false || typeof cycle.adapterLabel !== 'string'
-      || cycle.adapterLabel.length < 3 || SOFTWARE_ADAPTER.test(cycle.adapterLabel)
-      || cycle.liveProfile !== 'blender' || cycle.qualityAssetState !== 'ready'
-      || cycle.post?.depthAwareBloom !== true || cycle.post?.advancedGraphics?.bloomStrength <= 0
-      || cycle.post?.advancedGraphics?.volumetricScale <= 0
-      || JSON.stringify(cycle.viewport) !== JSON.stringify([2_560, 1_440])
-      || !finite(cycle.pixelRatio) || cycle.pixelRatio <= 0
-      || !Array.isArray(cycle.drawingBuffer) || cycle.drawingBuffer.length !== 2
-      || cycle.drawingBuffer.some((dimension) => !Number.isSafeInteger(dimension) || dimension <= 0)
-      || cycle.gameStarted !== true || cycle.matchPhase !== 'active'
-      || cycle.performance?.elapsedMs < 5_000 || cycle.performance?.sampleCount < 150
-      || cycle.performance?.callbackFps < 30 || !finite(cycle.performance?.p50FrameTimeMs)
-      || cycle.performance.p50FrameTimeMs > 34 || cycle.performance?.p95FrameTimeMs > 50
-      || cycle.performance?.maximumFrameTimeMs > 250)) {
-      errors.push('Firefox receipt contains an invalid admission cycle');
+    } else {
+      errors.push(...nativeWebGpuCycleFailures(value.cycles[0], 'cold'));
+      errors.push(...nativeWebGpuCycleFailures(value.cycles[1], 'warm'));
     }
     const warm = value.cycles?.[1];
     const parity = value.parity;
     const chrome = parity?.chrome;
-    if (parity?.contract !== 'same-content-native-webgpu-firefox-chrome-80pct-median-125pct-p95-v1'
+    const chromeWarm = chrome?.cycles?.[1];
+    const computedFirefoxMedianFps = 1_000 / warm?.performance?.p50FrameTimeMs;
+    const computedChromeMedianFps = 1_000 / chromeWarm?.performance?.p50FrameTimeMs;
+    const computedMedianRatio = computedFirefoxMedianFps / computedChromeMedianFps;
+    const computedP95Ratio = warm?.performance?.p95FrameTimeMs / chromeWarm?.performance?.p95FrameTimeMs;
+    const firefoxVersion = value.toolchain?.firefox?.browserVersion;
+    const chromeVersion = chrome?.browserVersion;
+    const firefoxUserAgent = value.toolchain?.firefox?.userAgent;
+    const chromeUserAgent = chrome?.userAgent;
+    const expectedColdRoute = expectedParityRoute(expected.baseUrl, 'pass73-installed-browser-webgpu-cold');
+    const expectedWarmRoute = expectedParityRoute(expected.baseUrl, 'pass73-installed-browser-webgpu-parity');
+    if (parity?.contract !== PARITY_CONTRACT
       || parity.seed !== 'pass73-installed-browser-webgpu-parity'
-      || JSON.stringify(parity.viewport) !== JSON.stringify([2_560, 1_440])
-      || parity.profile !== 'blender' || parity.map !== 'atomic-acres' || parity.backend !== 'webgpu'
-      || chrome?.requestedBackend !== 'webgpu' || chrome?.backend !== 'webgpu' || chrome?.failClosed !== true
-      || chrome?.deviceLost !== false || chrome?.uncapturedErrors !== 0
-      || chrome?.softwareAdapter !== false || typeof chrome?.adapterLabel !== 'string'
-      || chrome.adapterLabel.length < 3 || SOFTWARE_ADAPTER.test(chrome.adapterLabel)
-      || chrome?.liveProfile !== 'blender' || chrome?.qualityAssetState !== 'ready'
-      || chrome?.post?.depthAwareBloom !== true || chrome?.post?.advancedGraphics?.bloomStrength <= 0
-      || chrome?.post?.advancedGraphics?.volumetricScale <= 0
-      || JSON.stringify(chrome?.viewport) !== JSON.stringify([2_560, 1_440])
-      || !finite(chrome?.pixelRatio) || chrome.pixelRatio <= 0
-      || !Array.isArray(chrome?.drawingBuffer) || chrome.drawingBuffer.length !== 2
-      || chrome.drawingBuffer.some((dimension) => !Number.isSafeInteger(dimension) || dimension <= 0)
-      || chrome?.performance?.elapsedMs < 5_000 || chrome?.performance?.sampleCount < 150
-      || !finite(chrome?.performance?.p50FrameTimeMs) || !finite(chrome?.performance?.p95FrameTimeMs)
+      || JSON.stringify(parity.routeParameters) !== JSON.stringify(PARITY_ROUTE_PARAMETERS)
+      || !exactParityViewport(parity.viewport)
+      || parity.profile !== 'quality' || parity.internalRenderProfile !== 'blender'
+      || parity.map !== 'atomic-acres' || parity.backend !== 'webgpu'
+      || !record(chrome) || !Array.isArray(chrome.cycles) || chrome.cycles.length !== 2
+      || chrome.cycles[0]?.label !== 'cold' || chrome.cycles[1]?.label !== 'warm'
+      || chrome.headless !== value.toolchain?.firefox?.headless
+      || chrome.presentationMode !== value.toolchain?.firefox?.presentationMode
+      || parity.presentationMode !== chrome.presentationMode
+      || value.hiddenHeadful !== !value.toolchain?.firefox?.headless
+      || chrome.nativeUserAgent !== true || value.toolchain?.firefox?.nativeUserAgent !== true
+      || !['default', 'hardware'].includes(value.toolchain?.firefox?.graphicsMode)
+      || !SHA256.test(chrome.executableSha256 ?? '')
+      || !SHA256.test(value.toolchain?.firefox?.executableSha256 ?? '')
+      || typeof chrome.browserVersion !== 'string' || chrome.browserVersion.length < 3
+      || typeof value.toolchain?.firefox?.browserVersion !== 'string'
+      || value.toolchain.firefox.browserVersion.length < 3
+      || value.toolchain?.chrome?.executableSha256 !== chrome.executableSha256
+      || value.toolchain?.chrome?.browserVersion !== chrome.browserVersion
+      || value.toolchain?.chrome?.headless !== chrome.headless
+      || value.toolchain?.chrome?.presentationMode !== chrome.presentationMode
+      || value.toolchain?.chrome?.nativeUserAgent !== true
+      || value.toolchain?.chrome?.userAgent !== chrome.userAgent
+      || value.toolchain?.firefox?.executable !== value.executable
+      || value.toolchain?.chrome?.executable !== chrome.executable
+      || !/^Mozilla\/5\.0.*Firefox\/[0-9.]+/u.test(value.toolchain?.firefox?.userAgent ?? '')
+      || !/^Mozilla\/5\.0.*(?:Chrome|HeadlessChrome)\/[0-9.]+/u.test(chrome.userAgent ?? '')
+      || userAgentMajorVersion(firefoxUserAgent, 'firefox') !== browserMajorVersion(firefoxVersion)
+      || userAgentMajorVersion(chromeUserAgent, 'chrome') !== browserMajorVersion(chromeVersion)
+      || warm?.userAgent !== value.toolchain?.firefox?.userAgent
+      || value.cycles[0]?.userAgent !== warm?.userAgent
+      || chrome.cycles[1]?.userAgent !== chrome.userAgent
+      || chrome.cycles[0]?.userAgent !== chrome.cycles[1]?.userAgent
+      || warm?.adapterVendor !== chrome.cycles[1]?.adapterVendor
+      || value.cycles[0]?.adapterVendor !== warm?.adapterVendor
+      || chrome.cycles[0]?.adapterVendor !== chrome.cycles[1]?.adapterVendor
+      || value.firefoxSessionClosedBeforeChrome !== true
       || parity.identicalGraphicsContract !== true
-      || warm?.liveProfile !== chrome?.liveProfile
-      || warm?.qualityAssetState !== chrome?.qualityAssetState
-      || warm?.post?.depthAwareBloom !== chrome?.post?.depthAwareBloom
-      || warm?.post?.advancedGraphics?.bloomStrength !== chrome?.post?.advancedGraphics?.bloomStrength
-      || warm?.post?.advancedGraphics?.volumetricScale !== chrome?.post?.advancedGraphics?.volumetricScale
-      || warm?.pixelRatio !== chrome?.pixelRatio
-      || JSON.stringify(warm?.drawingBuffer) !== JSON.stringify(chrome?.drawingBuffer)
+      || JSON.stringify(value.cycles?.[0]?.graphicsContract) !== JSON.stringify(chrome.cycles[0]?.graphicsContract)
+      || JSON.stringify(warm?.graphicsContract) !== JSON.stringify(chrome.cycles[1]?.graphicsContract)
+      || expectedColdRoute === null || value.cycles?.[0]?.route !== expectedColdRoute
+      || chrome.cycles[0]?.route !== expectedColdRoute
+      || expectedWarmRoute === null || warm?.route !== expectedWarmRoute
+      || chrome.cycles[1]?.route !== expectedWarmRoute
+      || !finite(parity.firefoxMedianThroughputFps) || parity.firefoxMedianThroughputFps <= 0
+      || Math.abs(parity.firefoxMedianThroughputFps - computedFirefoxMedianFps) > 1e-9
+      || !finite(parity.chromeMedianThroughputFps) || parity.chromeMedianThroughputFps <= 0
+      || Math.abs(parity.chromeMedianThroughputFps - computedChromeMedianFps) > 1e-9
       || !finite(parity.medianThroughputRatio) || parity.medianThroughputRatio < 0.8
-      || !finite(parity.p95FrameTimeRatio) || parity.p95FrameTimeRatio > 1.25
+      || Math.abs(parity.medianThroughputRatio - computedMedianRatio) > 1e-9
+      || !finite(parity.p95FrameTimeRatio) || parity.p95FrameTimeRatio <= 0
+      || Math.abs(parity.p95FrameTimeRatio - computedP95Ratio) > 1e-9
+      || parity.p95FrameTimeRatio > 1.25
       || parity.passed !== true) {
       errors.push('Firefox receipt lacks paired installed Chrome native-WebGPU parity');
+    }
+    if (record(chrome) && Array.isArray(chrome.cycles) && chrome.cycles.length === 2) {
+      errors.push(...nativeWebGpuCycleFailures(chrome.cycles[0], 'cold'));
+      errors.push(...nativeWebGpuCycleFailures(chrome.cycles[1], 'warm'));
+    }
+    errors.push(...viewportControlFailures(
+      value.viewportControl?.firefox,
+      'webdriver-outer-compensation',
+      'Firefox',
+    ));
+    errors.push(...viewportControlFailures(
+      value.viewportControl?.chrome,
+      'playwright-content-viewport',
+      'Chrome',
+    ));
+    if (!record(value.sourceState) || value.sourceState.startingSha !== expected.sourceSha
+      || value.sourceState.endingSha !== expected.sourceSha
+      || value.sourceState.cleanBefore !== true || value.sourceState.cleanAfter !== true) {
+      errors.push('Firefox clean source before/after proof is incomplete');
     }
   } else if (expected.gate === 'private-lobby') {
     if (value.schema !== 'atomic-acres/pass66-private-lobby@2') errors.push('private-lobby schema mismatch');
@@ -235,8 +468,13 @@ export function ownedBrowserVerifierReceiptFailures(value, expected) {
   return errors;
 }
 
-export function assertStagedTopology(value, expectedSourceSha, expectedReleasePass = 'PASS 66') {
-  const failures = stagedTopologyFailures(value, expectedSourceSha, expectedReleasePass);
+export function assertStagedTopology(
+  value,
+  expectedSourceSha,
+  expectedReleasePass = 'PASS 66',
+  expectedSchemaVersion = 4,
+) {
+  const failures = stagedTopologyFailures(value, expectedSourceSha, expectedReleasePass, expectedSchemaVersion);
   if (failures.length > 0) throw new Error(`Invalid staged ${expectedReleasePass} topology: ${failures.join('; ')}`);
   return value.channels.experimental;
 }

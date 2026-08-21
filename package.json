@@ -75,6 +75,7 @@
     "qa:pass66:adrenaline-lifecycle": "npm run qa:pass66:multiplayer-stability",
     "qa:pass66:pass63-multiplayer-comparator": "node scripts/qa/run-pass66-pass63-multiplayer-comparator.mjs",
     "qa:pass66:installed-firefox": "npm run qa:pass66:owned-browser-verifier-contract && node scripts/qa/run-pass66-owned-browser-verifier.mjs installed-firefox",
+    "qa:pass73:installed-firefox": "npm run qa:pass66:owned-browser-verifier-contract && node scripts/qa/run-pass66-owned-browser-verifier.mjs installed-firefox",
     "qa:pass66:support-operate-prompt": "npm run qa:pass66:owned-browser-verifier-contract && node scripts/qa/run-pass66-owned-browser-verifier.mjs support-operate-prompt",
     "qa:pass66:browser-admission:edge-webgl2": "node scripts/qa/run-pass66-browser-admission.mjs edge-webgl2",
     "qa:pass66:browser-admission:edge-webgpu": "node scripts/qa/run-pass66-browser-admission.mjs edge-webgpu",
