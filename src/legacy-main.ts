@@ -1627,6 +1627,7 @@ document.documentElement.classList.toggle('performance-render', renderProfile ==
 document.documentElement.classList.toggle('blender-render', renderProfile === 'blender');
 document.documentElement.dataset.renderProfile = renderProfile;
 document.documentElement.dataset.graphicsPreset = displayedGraphicsPreset;
+document.documentElement.dataset.graphicsLiveProfile = liveGraphicsProfile;
 document.documentElement.dataset.graphicsFrameRateLimit = graphicsRuntime.frameRateLimit === 0
   ? 'uncapped'
   : String(graphicsRuntime.frameRateLimit);

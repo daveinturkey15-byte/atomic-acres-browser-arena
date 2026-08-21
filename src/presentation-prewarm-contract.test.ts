@@ -570,6 +570,7 @@ describe('presentation prewarm startup contract', () => {
     expect(presentationEpochReset).toContain('lastObservedWebGpuCompletionSequence = renderRuntime.presentationTelemetry(now).completedSequence;');
     expect(presentationEpochReset).toContain('deferredWebGpuAdaptivePixelRatio.clear();');
     expect(source).toContain("source: 'webgpu-submission' as const");
+    expect(source).toContain('document.documentElement.dataset.graphicsLiveProfile = liveGraphicsProfile;');
     expect(source).toContain('LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000');
     expect(source).toContain('detectLivePresentationStall({');
     expect(source).toContain('documentFocused: document.hasFocus()');
