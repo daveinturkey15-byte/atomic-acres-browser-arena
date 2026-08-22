@@ -173,7 +173,18 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Source: pass74.txt ("add 10% chance in care package to get a flamethrower"). The flamethrower is a
   timed map weapon with holder authority; the grant path must respect that authority. Recorded
   consequence: the existing killstreak pool keeps its internal shape inside the remaining 90%.
-- Status: OPEN - GENUINELY UNWIRED, and naive wiring was REFUTED on 2026-08-22. An analyst produced seven anchor-verified legacy-main patches; adversarial verification rejected them for two concrete reasons. (1) The owner's 'exactly 10%' CANNOT be met from legacy-main alone: the port only returns true when the flamethrower's timed-map-weapon authority is grantable, and that authority is arena-bound (src/timed-map-weapon-authority.ts pins flamethrower to one arenaId), so the real rate is conditional, not 10%. (2) SINGLE-INSTANCE CANNIBALISATION: the only admissible transition is claimTimedMapWeapon, so a care-package grant CONSUMES the world pickup - on rustworks-1v1 the physical flamethrower would silently vanish mid-match with no feedback to a player already walking toward it. Closing this row honestly needs a weapon-instance decision, not a wiring patch.
+- Status: DONE (af1d6f8b, 2026-08-22) - owner decided the instancing question: "make a
+  different one that does maybe 30% less damage and looks a different colour... make it red."
+  `crimson-flamethrower` is now a separate WeaponId with its own finite fuel (100, no reserve),
+  granted through an ordinary personal weapon path that never touches timed-map-weapon authority -
+  so a care-package roll can no longer consume the world pickup. Damage is exactly 70% of the map
+  flamethrower (56.7 vs 81); range/falloff unchanged. Red tracer, red ADS reticle, a `tintHex`
+  livery field over the shared albedo, a hue-shifted hero still, and its own audio report so the
+  two are distinguishable in one match. "Exactly 10%" is now EXACT, not approximated: the
+  care-package pool supports fixed-percentage rewards (Nuke 1%, crimson 10%, weighted entries
+  share 89%). A WEAPON_LIVERY_ALIASES registry records that it reuses the flamethrower's authored
+  GLB, so prewarm, the corpus budget and the Blender production manifest all skip it - a repaint
+  ships no second delivery. 12 new tests; gameplay-contract baseline +48 lines / 0 changed.
 
 ### HF-335 — Chopper Gunner HUD and missiles regressed; restore the better implementation
 - Source: pass74.txt ("chopper gunner hud and missiles regressed, should be abetter branch
@@ -284,7 +295,22 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   4.5:1; min sizes per AGENTS.md at 1280x720; "alive" = purposeful motion (transitions, pulses,
   scan accents) gated by prefers-reduced-motion and the accessibility scale; zero new gameplay
   authority. Owner taste is HITL.
-- Status: IMPLEMENTED (51c440f0) — full CSS reskin against the style guide: palette, type scale, spacing, component states, motion behind prefers-reduced-motion. Layout and every surface preserved. Owner taste is HITL.
+- Status: IMPLEMENTED (51c440f0), then CORRECTED 2026-08-22 (cc4e16df) after the owner reported the
+  result still reads stale and the killstreak screen is "hard to see, read and use". The earlier
+  reskin had left three concrete defects, all now fixed in src/ui/pass74-visual-refresh.css:
+  (1) #menu-panel-streaks was painted a "full dark console plate" (rgba(8,24,29,.98) ->
+  rgba(4,12,16,.99)) with #0c1a20 cards inside an otherwise light deck - a near-black island, and
+  a direct AGENTS.md brightness violation; it now shares the deck surface.
+  (2) Each card's plain-language reward description sat at the 10px floor of --pass66-micro in
+  #a3b8ba; descriptions are now 13px body text at 1280x720 and selection is signalled three
+  redundant ways (accent fill, inset bar, elevation) instead of a 1px border colour.
+  (3) REAL LAYOUT BUG on every navigation tab: tactical-ui.css:382 absolutely positions the `01`
+  badge while pass66-overhaul.css:174 lays the button out as `30px minmax(0,1fr)` assuming the
+  badge occupies column 1, so the title fell into the badge column and printed on top of the
+  sublabel ("DEPLOY" over "ARENA + LOBBY"). Fixed with explicit grid areas.
+  Also: every sub-9px violation in the deck is gone (8px settings/leaderboard labels, a 7px
+  advanced-graphics note) - a DOM sweep of all four tabs reports ZERO elements below the contract
+  floor at 1280x720 and 1920x1080 with zero horizontal overflow. Owner taste remains HITL.
 
 ### HF-363 — filmic grading, canopy light and procedural-jungle visual quality
 - Source: owner shared https://x.com/prasenx/status/2087604022849184080 as "a great example of high
