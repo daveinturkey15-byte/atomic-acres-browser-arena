@@ -151,7 +151,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   somewhere?"; "the HUD of it regreed too, check old branches? had a better one"; "not sure if it
   can see through walls anymore like it shjud be able to") plus atomicnext.txt row 9 (legible
   LMB GUN | RMB MISSILES ×N strip, readable at all resolutions).
-- Status: PARTIALLY LANDED (aa114737) — Pass 71 missile launch position + splash policy ported. Cockpit HUD sizing pending wave 2.
+- Status: IMPLEMENTED (aa114737 HUD + this commit trajectory) - HUD strip and authoritative ammo landed earlier; the regressed VISUAL flight path is restored: alternating wing-socket launch, lookAt orientation, full 3D lerp. launchPosition rides the impact event as an optional fail-open field so older peers keep the vertical-drop fallback. Damage/cadence/capacity were proven never to have regressed (docs/PASS74_HF335_MISSILE_DIAGNOSIS.md).
 
 ### HF-336 — non-controlling players lag severely while a Chopper Gunner is flying
 - Source: pass74.txt ("when chopper gunner is flying and I am against it or on the same team but not
