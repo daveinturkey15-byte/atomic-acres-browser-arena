@@ -88,7 +88,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-325 — host disconnect: hand over or recover authority without kicking; rejoin after refresh
 - Source: atomicnext.txt ("if host dc, cant rejoin, can it hand host and not kick others? even if
   pause and reload?"; "rejoin last match even though refresh?"; de-sync after re-host needs re-sync).
-- Status: PARTIAL (cbca7f68) — safe subset shipped: deterministic successor election with four guards, 72 tests, plus guest-visible host-loss handling and lobby-closed now surfacing instead of a silent 90s retry. FULL host migration deliberately NOT shipped: the recovery checkpoint never crosses the wire, so a promoted guest would rebuild authority from its own partial view and manufacture the reported de-sync.
+- Status: PARTIAL (bcad57e4) - the checkpoint can now CROSS THE WIRE: satellite protocol module plus a pure send/receive/promote state machine, 48 tests, no protocol version bump (old peers drop the messages at the transport, which is the required fail-closed fallback). PROMOTION REMAINS DISABLED. Still owed, and none of it is cosmetic: network.ts has no role flip, no host stand-down path (a host can lose its signalling id while still serving guests, so two peers could both believe they own the match), and followers do not re-point at a promoted host. A separate real defect was found in host-migration.ts - authorizeSelfPromotion compares the guest's Date.now() against a host-stamped expiry with no rebase, the same class of bug the checkpoint clock rebase exists to prevent.
 
 ### HF-326 — host-only "reset lobby / new room code" action
 - Source: atomicnext.txt ("host button to refresh room/code for fresh lobby total reset and new
@@ -198,7 +198,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-344 — invisible blockers across maps, including the Atomic Acres upstairs front window
 - Source: atomicnext.txt P0-2 ("Invisible blocker at the upstairs front house window";
   "issues with invisible assets blocking me in many maps").
-- Status: IMPLEMENTED (cbca7f68) — glass movement colliders derive from authored solid bounds instead of GLB AABBs, so a visually open window is traversable in both graphics profiles.
+- Status: IMPLEMENTED (bcad57e4) - genuinely wired this time. The cbca7f68 claim was false: glass-collider-bounds.ts had zero production importers and legacy-main still used Box3.setFromObject. Wiring it alone was a REGRESSION - Skyline Terminal ships houses: [] so authored resolution returned null and six intact facade windows became walk-through, proven by probe. Fixed with an authored-geometry fallback (the mesh's own geometry box, NOT setFromObject, whose descendant union is what caused HF-344 originally). Four behavioural tests pin it; the previous source-text test passed throughout the regression.
 
 ### HF-345 — prone clipping near walls across arenas
 - Source: atomicnext.txt ("clipping when prone and near walls in many maps too").
@@ -207,7 +207,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-346 — Terminal z-fighting; zero persistent coplanar flicker on any level
 - Source: pass74.txt ("rust and terminal still issues") + atomicnext.txt ("z fighting on some assets
   in terminal map, should be none on any level").
-- Status: IMPLEMENTED (56f166c2) — resolved on the third attempt via polygon-offset tiering (66 assignments) after the wired audit named every pair and proved re-spacing was impossible: ~15 tiers between y=0.032 and y=0.105 against an 18mm minimum, needing ~270mm of range that flat markings do not have. All five arenas pass the audit; the 18mm threshold is unchanged and the assertions were strengthened.
+- Status: IMPLEMENTED (bcad57e4) - the exemption is now direction-aware. Positive offsets are rejected outright and the visually-upper surface must hold the more negative effective bias. skyline-floor-joint-z -2 -> -3. Coupling verified by reverting that single offset, which reports exactly the 5 inverted pairs the audit named. All five arenas: zero pairs.
 
 ### HF-347 — RustRig, Terminal and Gun Range multiplayer faults
 - Source: pass74.txt ("rust and terminal still issues anmd gun test level when multoiplayer").
@@ -333,7 +333,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   if a build containing H3-derived assets is later published, those assets ship with it — revisit at
   release time. The lane still starts from the Blender procedural operator pipeline, with H3
   assisting texture/concept work. All archetypes are original designs — no franchise likenesses.
-- Status: PARTIAL (skins branch 90c4b90f) — three original archetype specs, authoring script and canonical catalog with 26 tests. NO GLB produced: the Blender run and its pre-run critic died when opencode-go hit its monthly quota.
+- Status: SUBSTANTIALLY LANDED (skins branch b1f0bac5) - the pipeline RUNS and three original archetypes exist: explorer 1.0001/1.0, symbiote 1.0022/1.1, navalops 1.0000/1.0, none clamped. Nine GLBs verified by parsing the binaries rather than the receipts: 62 joints and 24 clips in every file, LOD reduction 8558 -> 6231 -> 3949 triangles. Three script defects were the real blocker: procedural objects were never linked into a collection (so matrix_world never updated, the silhouette gate measured every accessory at the world origin, and select_set made export impossible - which is why no GLB had ever been produced); an accessory hung 126mm below the floor; and the envelope baseline was measured after proportion edits, exempting the bulk multipliers from their own cap. NOT INTEGRATED - nothing imports these assets (HF-364).
 
 ### HF-361 — mocap-to-animation route evaluated for in-game third-person animation
 - Source: owner directive (mocap X references). `mixamo-llm-mocap` (MIT, pin `00dfd53`) is an
