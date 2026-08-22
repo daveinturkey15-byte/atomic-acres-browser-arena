@@ -110,6 +110,12 @@ export function makeTslFoliageMaterial(opts: FoliageOptions): MeshStandardNodeMa
     metalness: opts.metalness ?? 0.03,
     side: opts.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
   });
+  // pass74-arena-boot-smoke: WebGLRenderer queries shaderIDs[material.type] during
+  // WebGLProgram construction. MeshStandardNodeMaterial's default type is unmapped,
+  // causing parameters.vertexShader to be undefined and resolveIncludes(undefined) to throw.
+  // Setting type to MeshStandardMaterial ensures WebGL2 compiles ShaderLib.physical while
+  // WebGPURenderer continues evaluating TSL positionNode/colorNode via isNodeMaterial.
+  mat.type = 'MeshStandardMaterial';
 
   const baseColor = color(opts.color);
 

@@ -64,6 +64,37 @@ export function oceanAmplitudeForBody(body: WaterBodyDefinition): number {
 }
 
 /**
+ * Stage-1 PBR material constants (graphics register: MATERIAL RESPONSE only —
+ * positionNode and OCEAN_BANDS math are untouched; buoyancy parity HF-358).
+ */
+/** Roughness for flat water: tight GGX lobe so directional light yields real sun/moon glints. */
+export const OCEAN_ROUGHNESS_FLAT = 0.15;
+/** Roughness ceiling at maximum wave slope: broad, never mirror-sharp (bloom safety). */
+export const OCEAN_ROUGHNESS_ROUGH = 0.62;
+/** Slope magnitude treated as "fully rough" when mapping wave slope -> roughness. */
+export const OCEAN_SLOPE_FULL_ROUGHNESS = 1.2;
+/**
+ * Albedo share of the authored look moved out of emissive so directional
+ * lights shape the surface. Emissive keeps the authored deep-water glow
+ * (night arenas must not go black). ALBEDO + EMISSIVE <= 1 keeps every
+ * authored term strictly below the grade-chain bloom threshold (> 1.0 linear,
+ * lowest profile 1.08) reserved for TRUE emitters.
+ */
+export const OCEAN_ALBEDO_SCALE = 0.62;
+export const OCEAN_EMISSIVE_SCALE = 0.38;
+
+/**
+ * Slope-modulated roughness (stage-1 PBR): steeper local Gerstner slope means
+ * rougher micro-facets, i.e. broader glints on choppy crests and tight glossy
+ * reflections on calm water. Uses the analytic normals already computed from
+ * the SAME frozen band table the CPU buoyancy sampler reads.
+ */
+export function oceanRoughnessFromSlope(slopeMagnitude: number): number {
+  const t = Math.min(1, Math.max(0, slopeMagnitude / OCEAN_SLOPE_FULL_ROUGHNESS));
+  return OCEAN_ROUGHNESS_FLAT + (OCEAN_ROUGHNESS_ROUGH - OCEAN_ROUGHNESS_FLAT) * t;
+}
+
+/**
  * Builds the WebGPU water mesh for one authored body. The caller owns
  * visibility scheduling; the mesh starts visible (bodies only exist where
  * water is authored).
@@ -125,6 +156,14 @@ export function createOceanTslWater(
   const oceanNormalLocal = vec3(slopeX.negate(), 1, slopeZ.negate()).normalize();
   material.normalNode = transformNormalToView(oceanNormalLocal);
   const slope = vec2(slopeX, slopeZ).length();
+  // Slope-modulated roughness (stage-1 PBR): steeper local Gerstner slope ->
+  // rougher micro-facets -> broader glints; calm water stays glossy at
+  // OCEAN_ROUGHNESS_FLAT. Mirrors oceanRoughnessFromSlope() on the TSL graph.
+  const roughnessFromSlope = float(OCEAN_ROUGHNESS_FLAT).add(
+    float(OCEAN_ROUGHNESS_ROUGH).sub(OCEAN_ROUGHNESS_FLAT).mul(
+      slope.div(OCEAN_SLOPE_FULL_ROUGHNESS).clamp(0, 1),
+    ),
+  );
   const normalizedCrest = height.div(max(waveAmplitude, float(0.001))).mul(0.5).add(0.5);
   const crestFoam = smoothstep(float(0.88), float(1.28), normalizedCrest)
     .mul(smoothstep(float(0.06), float(0.2), slope));
@@ -139,12 +178,33 @@ export function createOceanTslWater(
     : vec3(0.45, 0.72, -0.22).normalize();
   const keyFacing = dot(oceanNormalLocal, keyLight).max(0).mul(0.44).add(0.56);
   const authoredWater = mix(darkWater, color(body.palette.foam), authoredFoam.mul(0.68)).mul(keyFacing);
-  // Bounded emissive presentation keeps the analytic-normal readability without
-  // letting key lights bloom into a white bar (pre-HF-358 behaviour retained).
-  material.colorNode = color(0x010407);
-  material.roughnessNode = float(1);
+  // HF-37x stage-1 PBR response (graphics register: material response only —
+  // positionNode above stays the frozen sampleOcean transcription).
+  //
+  // Roughness is SLOPE-MODULATED using the analytic Gerstner normals already
+  // computed above: a steeper local slope means micro-facet spread, so glints
+  // broaden instead of sharpening into aliasing sparkles. Flat water keeps a
+  // tight, glossy 0.15 roughness so directional sun/moon light produces real
+  // specular response; steep choppy slopes open up toward 0.62.
+  material.roughnessNode = roughnessFromSlope;
   material.metalnessNode = float(0);
-  material.emissiveNode = authoredWater.mul(0.58);
+  // The authored look moves OUT of emissive-only into albedo so directional
+  // lights shape the surface (previously colorNode was near-black and the whole
+  // look lived in emissiveNode with zero specular response). A REDUCED
+  // emissive term (OCEAN_EMISSIVE_SCALE) retains the authored deep-water glow
+  // so night arenas (rustworks) do not go black under the grade chain.
+  //
+  // Bloom-threshold contract (HF-362, grade-profile.ts): profile thresholds
+  // are 1.08..1.15 linear and fail-closed asserted > 1.0. Every
+  // material-authored term is bounded: palette channels are <= 1 by
+  // construction, keyFacing <= 1, and the mix/smoothstep chains are convex
+  // combinations, so authoredWater <= 1. With OCEAN_ALBEDO_SCALE + 
+  // OCEAN_EMISSIVE_SCALE <= 1, the summed static terms stay <= 1.0 linear,
+  // strictly below the lowest profile threshold 1.08. Specular cannot bridge
+  // the gap because roughness floors at OCEAN_ROUGHNESS_FLAT = 0.15 (no
+  // mirror-sharp delta lobe) — true emitters above 1.0 remain reserved.
+  material.colorNode = authoredWater.mul(OCEAN_ALBEDO_SCALE);
+  material.emissiveNode = authoredWater.mul(OCEAN_EMISSIVE_SCALE);
   const dryFootprintMask = uniform(body.dryFootprintMask === 'rectangular' ? 1 : 0);
   const islandHalf = uniform(new THREE.Vector2(body.island.halfX + 0.8, body.island.halfZ + 0.8));
   const normalizedDryFootprint = max(
