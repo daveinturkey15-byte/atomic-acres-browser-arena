@@ -211,7 +211,15 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 
 ### HF-347 — RustRig, Terminal and Gun Range multiplayer faults
 - Source: pass74.txt ("rust and terminal still issues anmd gun test level when multoiplayer").
-- Status: OPEN
+- Status: PARTIAL — Gun Range lane closed at source (5952893f, 2026-08-22): training-dummy
+  damage is now host-authoritative end to end. Poses already replicated on host time
+  (currentHostTimeMs); now resolveAuthoritativeShot targets dummies at the exact host-time
+  pose, guests never self-apply dummy damage (shot result reconciles health/score/feed with
+  the exact host respawn stamp so lifeIds match), and lobby snapshots replicate
+  {active, health, respawnAtHostTimeMs} every heartbeat for observers/rejoiners.
+  18 new tests (`gun-range-dummy-replication.test.ts`). Diagnosis: PASS74_HF347_GUNRANGE_DIAGNOSIS.md.
+  Still owed: the live two-browser host/guest matrix (close-out bar), and the RustRig and
+  Terminal lanes, which are separate faults ("cant move" — see HF-347 source rows).
 
 ### HF-348 — tactical/explosive crossbow bolts break glass in solo and hosted authority
 - Source: atomicnext.txt ("tac crossbow bolt and explosion didn't break glass").
