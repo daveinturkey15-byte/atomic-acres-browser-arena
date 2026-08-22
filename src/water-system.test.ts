@@ -205,4 +205,52 @@ describe('WaterSystem', () => {
     expect(water.root.visible).toBe(false);
     expect(water.samplePhysics(new THREE.Vector3(40, -1, 0), 0).inWater).toBe(true);
   });
+
+  // HF-358 fix: the WebGL2 GLSL presentation must displace with the SAME
+  // Gerstner band table the CPU buoyancy sampler reads — previously it used
+  // the legacy warped-sine field and drifted ~1m from the drawn surface.
+  // This parses the band constants injected into the built vertex shader and
+  // re-evaluates them against sampleOcean() so the two cannot silently drift.
+  it('builds the WebGL2 surface from the buoyancy spectrum, not the legacy warped sine (HF-358)', async () => {
+    const { sampleOcean } = await import('./water/ocean-spectrum');
+    const scene = new THREE.Scene();
+    const water = new WaterSystem(scene);
+    water.configure('rustworks-1v1', 'compat');
+    const mesh = scene.getObjectByName('arena-ocean-surface') as THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
+    const vertexShader = mesh.material.vertexShader;
+    // The legacy warp terms must be gone from the presentation path.
+    expect(vertexShader).not.toContain('warpPhase');
+    expect(vertexShader).toContain('sampleBand');
+    // Re-evaluate every injected band call exactly as GLSL would.
+    const calls = [...vertexShader.matchAll(/sampleBand\(p,\s*vec2\(([-\d.]+), ([-\d.]+)\),\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+),\s*vec2\(([-\d.]+), ([-\d.]+)\)\)/g)].map((m) => m.slice(1).map(Number));
+    expect(calls).toHaveLength(5);
+    const amp = mesh.material.uniforms.uAmp.value;
+    const time = 12.5;
+    for (const [x, z] of [[40, 0], [-120, 80], [7, -333], [210, 210]] as const) {
+      let height = 0;
+      let slopeX = 0;
+      let slopeZ = 0;
+      for (const [dx, dz, k, omega, weight, phase] of calls) {
+        const ph = (x * dx + z * dz) * k - time * omega + phase;
+        height += Math.sin(ph) * weight * amp;
+        slopeX += Math.cos(ph) * weight * amp * k * dx;
+        slopeZ += Math.cos(ph) * weight * amp * k * dz;
+      }
+      const cpu = sampleOcean(x, z, time, amp);
+      expect(height).toBeCloseTo(cpu.height, 9);
+      expect(slopeX).toBeCloseTo(cpu.slopeX, 9);
+      expect(slopeZ).toBeCloseTo(cpu.slopeZ, 9);
+    }
+    // Gameplay contract: identical gameplay surface height for the same input
+    // regardless of render profile (WebGL2 compat vs any other profile).
+    const point = new THREE.Vector3(64, -20, -48);
+    const profiles = (['compat', 'performance', 'blender'] as const).map((profile) => {
+      const w = new WaterSystem(new THREE.Scene());
+      w.configure('rustworks-1v1', profile);
+      return w.samplePhysics(point, time);
+    });
+    expect(profiles[1].surfaceY).toBe(profiles[0].surfaceY);
+    expect(profiles[2].surfaceY).toBe(profiles[0].surfaceY);
+    expect(profiles[1].buoyancy).toBe(profiles[0].buoyancy);
+  });
 });
