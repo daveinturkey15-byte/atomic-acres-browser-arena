@@ -39,7 +39,7 @@ import sys
 from pathlib import Path
 
 import bpy
-from mathutils import Euler, Vector
+from mathutils import Euler, Vector, Matrix
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -413,6 +413,7 @@ def import_and_prepare(context: dict) -> tuple[bpy.types.Object, list[bpy.types.
             for kind in ("baseColor", "normal", "roughness", "metallic")
         }
         configure_material(material, material_images, context)
+    context["materials"] = {name: bpy.data.materials.get(name) for name in MATERIAL_NAMES}
 
     verify_canonical_rig(armature, body_meshes, "import")
 
@@ -552,6 +553,28 @@ def side_sign(joint: str) -> float:
     return 1.0 if joint.endswith(".L") else -1.0
 
 
+def link_new_object(name: str, mesh: bpy.types.Mesh) -> bpy.types.Object:
+    """Create an object AND link it into the scene collection.
+
+    `bpy.data.objects.new` creates a datablock that belongs to no collection, and an
+    unlinked object is not in the depsgraph. Two things then fail silently:
+
+    1. `view_layer.update()` never evaluates it, so `matrix_world` keeps its
+       creation-time identity no matter what is assigned to `location`/`scale`. The
+       silhouette envelope was consequently measuring every procedural accessory AT
+       THE WORLD ORIGIN, which made the clamp fail-open - it enforced nothing, and
+       reported a breach whose magnitude was just the accessory's own half-height.
+    2. `obj.select_set(True)` in the export path raises for objects outside the view
+       layer, so no GLB could ever be written. That is why this lane had produced no
+       asset despite the script compiling cleanly.
+
+    Linking at creation fixes both at the source rather than papering over either.
+    """
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    return obj
+
+
 def box_object(name: str, sx: float, sy: float, sz: float) -> bpy.types.Object:
     mesh = bpy.data.meshes.new(name)
     hx, hy, hz = sx / 2.0, sy / 2.0, sz / 2.0
@@ -563,7 +586,7 @@ def box_object(name: str, sx: float, sy: float, sz: float) -> bpy.types.Object:
     mesh.from_pydata(verts, [], faces)
     mesh.validate()
     mesh.update()
-    return bpy.data.objects.new(name, mesh)
+    return link_new_object(name, mesh)
 
 
 def cylinder_object(name: str, radius_bottom: float, radius_top: float, depth: float, segments: int = 16) -> bpy.types.Object:
@@ -583,7 +606,7 @@ def cylinder_object(name: str, radius_bottom: float, radius_top: float, depth: f
     mesh.from_pydata(verts, [], faces)
     mesh.validate()
     mesh.update()
-    return bpy.data.objects.new(name, mesh)
+    return link_new_object(name, mesh)
 
 
 def finish_accessory(
@@ -688,7 +711,6 @@ def build_compass_chest_strap(context: dict, armature: bpy.types.Object) -> list
         anchor + Vector((length * 0.16, -length * 0.115, 0.0)),
         Euler((math.radians(90.0), 0.0, 0.0)),
     )
-    del strap
     return [strap, compass_body, compass_face]
 
 
@@ -1053,19 +1075,97 @@ def build_accessories(context: dict, armature: bpy.types.Object) -> list[bpy.typ
 
 
 def silhouette_measure(objects: list[bpy.types.Object]) -> tuple[float, float]:
+    radius, height, _ = silhouette_measure_attributed(objects)
+    return radius, height
+
+
+def silhouette_measure_attributed(
+    objects: list[bpy.types.Object],
+) -> tuple[float, float, dict[str, dict[str, float]]]:
+    """Silhouette extents plus per-object attribution.
+
+    The bare extents say the envelope was breached; they never say BY WHAT, and a
+    clamp failure that cannot name its cause costs an authoring cycle to diagnose.
+    Attribution is carried alongside so the failure path can name the driving
+    dimension and the objects responsible.
+
+    `axisOffset` is the distance of the object's ORIGIN from the vertical axis,
+    reported separately from its radial extent: object scale shrinks extent but
+    cannot shrink offset, so the two need different remedies.
+    """
     radius = 0.0
     z_min = float("inf")
     z_max = float("-inf")
+    attribution: dict[str, dict[str, float]] = {}
     for obj in objects:
         world = obj.matrix_world
+        obj_radius = 0.0
+        obj_z_min = float("inf")
+        obj_z_max = float("-inf")
         for vertex in obj.data.vertices:
             co = world @ vertex.co
-            radius = max(radius, math.hypot(co.x, co.y))
-            z_min = min(z_min, co.z)
-            z_max = max(z_max, co.z)
+            obj_radius = max(obj_radius, math.hypot(co.x, co.y))
+            obj_z_min = min(obj_z_min, co.z)
+            obj_z_max = max(obj_z_max, co.z)
+        if obj_z_min > obj_z_max:
+            continue
+        origin = world.translation
+        attribution[obj.name] = {
+            "radius": obj_radius,
+            "zMin": obj_z_min,
+            "zMax": obj_z_max,
+            "axisOffset": math.hypot(origin.x, origin.y),
+        }
+        radius = max(radius, obj_radius)
+        z_min = min(z_min, obj_z_min)
+        z_max = max(z_max, obj_z_max)
     if radius <= 0.0 or z_min >= z_max:
         raise RuntimeError("silhouette measurement found degenerate geometry")
-    return radius, z_max - z_min
+    return radius, z_max - z_min, attribution
+
+
+def enforce_ground_plane(
+    armature: bpy.types.Object,
+    body_meshes: list[bpy.types.Object],
+    accessories: list[bpy.types.Object],
+) -> dict[str, float]:
+    """No accessory may hang below the body's own ground contact.
+
+    The operator's soles define the floor. An accessory that dips below them clips
+    through the ground every frame the character stands still - a visible defect in
+    a first-person shooter - and it also inflates the composed silhouette SPAN, so
+    the envelope clamp reads a breach and responds by shrinking the accessory. That
+    is the wrong remedy: the accessory is not too big, it is too low. Shrinking it
+    to clear the floor would distort an authored design to compensate for a
+    placement error, and converges only after ~120 iterations because the shrink
+    step is derived from the whole-body ratio rather than the offending part.
+
+    Lifting each offender by exactly its deficit is the correct remedy: it is
+    deterministic, preserves authored proportions, and applies to every archetype
+    rather than being tuned per accessory. The envelope clamp still has to pass
+    afterwards - this corrects a fault, it does not relax a gate.
+    """
+    bpy.context.view_layer.update()
+    _, _, body_attribution = silhouette_measure_attributed(body_meshes)
+    body_floor = min(values["zMin"] for values in body_attribution.values())
+
+    # Accessory transforms are parent-relative; convert the world-space lift through
+    # the armature basis rather than assuming the two spaces coincide.
+    to_local = armature.matrix_world.inverted().to_3x3()
+    lifted: dict[str, float] = {}
+    for accessory in accessories:
+        _, _, attribution = silhouette_measure_attributed([accessory])
+        entry = attribution.get(accessory.name)
+        if entry is None:
+            continue
+        deficit = body_floor - entry["zMin"]
+        if deficit <= 1e-6:
+            continue
+        accessory.location = accessory.location + (to_local @ Vector((0.0, 0.0, deficit)))
+        lifted[accessory.name] = round(deficit, 5)
+    if lifted:
+        bpy.context.view_layer.update()
+    return lifted
 
 
 def enforce_silhouette_envelope(
@@ -1083,14 +1183,39 @@ def enforce_silhouette_envelope(
     allowed through (spec silhouetteBoundNote).
     """
     cap = context["silhouette_cap"]
+    # Measure the baseline from the PRISTINE bind pose, not from the body as passed
+    # in. build_archetype applies the proportion edits before calling this, so
+    # measuring here compared the composed silhouette against the already-bulked
+    # body - the ratio came out ~1.0 for every archetype and the bulk multipliers
+    # were structurally exempt from the cap that exists to bound them. Symbiote is
+    # the case that matters: its spec note says "even with bulk multipliers applied,
+    # the composed silhouette must stay within 1.1x the authoritative hit-proxy
+    # capsule", and it was passing at 1.0000/1.1 while carrying a 1.16 torso.
+    #
+    # The capsule is what hit registration uses. A visual silhouette wider than it
+    # means shots that look like hits miss, so this gate is a gameplay contract,
+    # not a modelling nicety.
+    restore_bind_pose(body_meshes, pristine)
+    bpy.context.view_layer.update()
     base_radius, base_height = silhouette_measure(body_meshes)
     effective = dict(context["proportions"])
+    apply_proportion_edits(armature, body_meshes, effective)
     accessory_scale = 1.0
     measured_scale = float("inf")
+    trace: list[dict] = []
+    attribution: dict[str, dict[str, float]] = {}
     for _attempt in range(8):
         bpy.context.view_layer.update()
-        radius, height = silhouette_measure(body_meshes + accessories)
-        measured_scale = max(radius / base_radius, height / base_height)
+        radius, height, attribution = silhouette_measure_attributed(body_meshes + accessories)
+        radius_ratio = radius / base_radius
+        height_ratio = height / base_height
+        measured_scale = max(radius_ratio, height_ratio)
+        trace.append({
+            "attempt": _attempt,
+            "radiusRatio": round(radius_ratio, 4),
+            "heightRatio": round(height_ratio, 4),
+            "accessoryScale": round(accessory_scale, 4),
+        })
         if measured_scale <= cap * 1.001:
             return {
                 "effectiveProportions": effective,
@@ -1113,9 +1238,46 @@ def enforce_silhouette_envelope(
         accessory_scale *= shrink
         for accessory in accessories:
             accessory.scale = (accessory.scale[0] * shrink, accessory.scale[1] * shrink, accessory.scale[2] * shrink)
+    # A clamp failure must be actionable. Name the driving dimension, the per-attempt
+    # trace (so a solver that is not converging is distinguishable from an envelope
+    # that is genuinely too tight), and the objects responsible - splitting radial
+    # EXTENT from axis OFFSET, because shrinking an object's scale reduces the first
+    # and can never reduce the second.
+    driver = "radius" if trace[-1]["radiusRatio"] >= trace[-1]["heightRatio"] else "height"
+    if driver == "radius":
+        worst = sorted(attribution.items(), key=lambda kv: -kv[1]["radius"])[:4]
+        blame = ", ".join(
+            f"{name} extent={vals['radius']:.4f} axisOffset={vals['axisOffset']:.4f}"
+            for name, vals in worst
+        )
+    else:
+        # Height is a SPAN, so it can be breached from either end. Report the top and
+        # the bottom: an accessory hanging below the feet breaches the envelope just
+        # as surely as a tall one, and only the bottom list makes that visible.
+        high = sorted(attribution.items(), key=lambda kv: -kv[1]["zMax"])[:3]
+        low = sorted(attribution.items(), key=lambda kv: kv[1]["zMin"])[:3]
+        blame = ("HIGH " + ", ".join(f"{n} zMax={v['zMax']:.4f}" for n, v in high)
+                 + " | LOW " + ", ".join(f"{n} zMin={v['zMin']:.4f}" for n, v in low))
+    # Dump the transform chain of the single worst offender. A placement bug and a
+    # genuinely over-sized envelope look identical in the ratio alone; the parent
+    # matrix is what tells them apart.
+    offender_name = (worst[0][0] if driver == "radius" else low[0][0])
+    offender = next((o for o in body_meshes + accessories if o.name == offender_name), None)
+    chain = "unavailable"
+    if offender is not None:
+        chain = (f"{offender_name}: loc={tuple(round(v, 4) for v in offender.location)} "
+                 f"scale={tuple(round(v, 4) for v in offender.scale)} "
+                 f"world_t={tuple(round(v, 4) for v in offender.matrix_world.translation)} "
+                 f"parent={offender.parent.name if offender.parent else None} "
+                 f"parent_type={offender.parent_type} "
+                 f"mpi_is_identity={offender.matrix_parent_inverse == Matrix.Identity(4)} "
+                 f"armature_world_t={tuple(round(v, 4) for v in armature.matrix_world.translation)} "
+                 f"armature_world_is_identity={armature.matrix_world == Matrix.Identity(4)}")
     raise RuntimeError(
         f"{context['id']}: composed silhouette {measured_scale:.4f} refuses to converge "
-        f"inside maxSilhouetteScale {cap}"
+        f"inside maxSilhouetteScale {cap}; OFFENDER {chain}; driver={driver} "
+        f"base_radius={base_radius:.4f} base_height={base_height:.4f}; "
+        f"trace={trace}; top contributors: {blame}"
     )
 
 
@@ -1365,7 +1527,9 @@ def build_archetype(archetype: dict) -> str:
     pristine = snapshot_bind_pose(body_meshes)
     apply_proportion_edits(armature, body_meshes, context["proportions"])
     accessories = build_accessories(context, armature)
+    ground_lifts = enforce_ground_plane(armature, body_meshes, accessories)
     envelope = enforce_silhouette_envelope(context, armature, body_meshes, pristine, accessories)
+    envelope["groundPlaneLifts"] = ground_lifts
     verify_canonical_rig(armature, body_meshes, "post-edit")
 
     glb_paths = [export_lod(context, armature, body_meshes, accessories, 0)]
