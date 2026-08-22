@@ -1885,8 +1885,9 @@ export function buildOperator(
   flattenMaterials = false,
   weaponId: WeaponId | null = 'carbine',
   appearance: OperatorAppearance = 'team',
+  skinId = 'default', // HF-360
 ): THREE.Group {
-  const rigged = createRiggedOperator(team, name, flattenMaterials, appearance);
+  const rigged = createRiggedOperator(team, name, flattenMaterials, appearance, skinId);
   if (rigged) {
     const { root, weaponSocket } = rigged;
     const hitProxyRoot = new THREE.Group();

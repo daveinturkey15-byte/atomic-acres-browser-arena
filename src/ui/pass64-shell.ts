@@ -14,6 +14,7 @@ import { PASS66_RELEASE_IDENTITY } from '../release-identity';
 import { advancedGraphicsMarkup } from './advanced-graphics-controls';
 import './advanced-graphics.css';
 import { menuPreviewVideoDefinition, menuPreviewVideoMarkup } from './menu-preview-video';
+import { OPERATOR_SKIN_CATALOG } from '../operator-skin-catalog'; // HF-360
 import { weaponMenuPresentationMarkup, weaponMenuStatDeckMarkup } from './field-kit-weapon-presentation';
 
 export type Pass64ShellViewModel = Readonly<{
@@ -113,6 +114,10 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
       <div class="setup-grid">
         <label>CALLSIGN<input id="player-name" maxlength="16" autocomplete="nickname" required aria-describedby="player-name-error" placeholder="Enter callsign" value="${model.playerName}"><small id="player-name-error" class="input-error" hidden>Enter a callsign before deployment.</small></label>
         <label>SQUAD<select id="team"><option value="0">Aqua</option><option value="1">Coral</option></select></label>
+        <label>OPERATOR SKIN<select id="operator-skin">${OPERATOR_SKIN_CATALOG.definitions
+          .filter((definition) => definition.availability === 'selectable')
+          .map((definition) => `<option value="${definition.id}">${escapeAttribute(definition.displayName.toUpperCase())}</option>`)
+          .join('')}</select></label>
       </div>
       <div id="selected-kit-summary" class="selected-kit-summary"></div>
       <button id="field-kit-redeploy" type="button" hidden>REDEPLOY NOW WITH SELECTED FIELD KIT</button>

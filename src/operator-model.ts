@@ -287,6 +287,62 @@ let firstPersonArmsAsset: FirstPersonArmsAsset | null = null;
 let operatorAssetPromise: Promise<void> | null = null;
 let firstPersonArmsAssetPromise: Promise<void> | null = null;
 
+/**
+ * HF-360: per-skin third-person operator deliveries. Every archetype GLB was
+ * authored on the SAME canonical rig (62 joints, 24 clips —
+ * pass65-third-person-operator-family-v1, verified from the binaries), so a
+ * skin swap is a model swap with identical animation, sockets and hit proxies.
+ * Assets load lazily per selected skin; nobody pays for skins nobody picked.
+ * The 'default' id maps to the retained pass65 operator via operatorAssets.
+ */
+export const OPERATOR_SKIN_MODEL_URLS: Readonly<Record<string, Readonly<{ quality: string; performance: string }>>> = Object.freeze({
+  explorer: Object.freeze({
+    quality: './assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-explorer-lod0.glb',
+    performance: './assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-explorer-lod1.glb',
+  }),
+  symbiote: Object.freeze({
+    quality: './assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-symbiote-lod0.glb',
+    performance: './assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-symbiote-lod1.glb',
+  }),
+  navalops: Object.freeze({
+    quality: './assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-navalops-lod0.glb',
+    performance: './assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-navalops-lod1.glb',
+  }),
+});
+
+const operatorSkinAssets = new Map<string, Partial<Record<'quality' | 'performance', RiggedOperatorAsset>>>();
+const operatorSkinAssetPromises = new Map<string, Promise<void>>();
+
+/** Lazily loads both LODs for a non-default skin. Unknown ids resolve without
+ * loading anything, so a stale peer selection can never wedge deployment. */
+export function loadOperatorSkinAsset(skinId: string): Promise<void> {
+  if (skinId === 'default') return loadRiggedOperatorAsset();
+  const urls = OPERATOR_SKIN_MODEL_URLS[skinId];
+  if (!urls) return Promise.resolve();
+  const existing = operatorSkinAssetPromises.get(skinId);
+  if (existing) return existing;
+  const promise = Promise.all([
+    loadRiggedGltf(urls.quality).then((operator) => {
+      const store = operatorSkinAssets.get(skinId) ?? {};
+      store.quality = describeOperatorAsset(operator, 0, urls.quality);
+      operatorSkinAssets.set(skinId, store);
+    }),
+    loadRiggedGltf(urls.performance).then((operator) => {
+      const store = operatorSkinAssets.get(skinId) ?? {};
+      store.performance = describeOperatorAsset(operator, 1, urls.performance);
+      operatorSkinAssets.set(skinId, store);
+    }),
+  ]).then(() => undefined);
+  operatorSkinAssetPromises.set(skinId, promise);
+  return promise;
+}
+
+export function operatorSkinAssetReady(skinId: string): boolean {
+  if (skinId === 'default') return operatorAssets.quality !== undefined && operatorAssets.performance !== undefined;
+  const store = operatorSkinAssets.get(skinId);
+  return store?.quality !== undefined && store?.performance !== undefined;
+}
+
 const STANCE_PIVOT_HEIGHT = 0.84;
 const EMBEDDED_WEAPON_NAME = /(^|[\s_.-])(pistol|rifle|shotgun|smg|gun|weapon)([\s_.-]|$)/i;
 const PRONE_WEAPON_MOUNT: Record<string, { x: number; y: number; z: number }> = {
@@ -971,8 +1027,17 @@ export function createRiggedOperator(
   name: string,
   flattenMaterials: boolean,
   appearance: OperatorAppearance = 'team',
+  skinId = 'default',
 ): RiggedOperatorInstance | null {
-  const operatorAsset = flattenMaterials ? operatorAssets.performance : operatorAssets.quality;
+  // HF-360: a selected skin whose asset has not finished loading falls back to
+  // the default operator rather than blocking or failing the spawn — the skin
+  // is presentation only, and lobby-time prefetch makes the race unlikely.
+  const skinStore = skinId !== 'default' && operatorSkinAssetReady(skinId)
+    ? operatorSkinAssets.get(skinId)
+    : undefined;
+  const operatorAsset = flattenMaterials
+    ? skinStore?.performance ?? operatorAssets.performance
+    : skinStore?.quality ?? operatorAssets.quality;
   if (!operatorAsset) return null;
   const root = new THREE.Group();
   root.name = name;

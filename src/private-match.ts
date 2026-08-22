@@ -9,6 +9,7 @@ import {
 import { GUN_RANGE_ROUND_MS } from './gun-range-rules';
 import type { GunRangeTestBayDoorState } from './gun-range-test-bay';
 import { isSquadColor, isSquadName, type SquadColor } from './squad-presentation';
+import { isSelectableOperatorSkinId } from './operator-skin-catalog'; // HF-360
 
 export const ROOM_CAPACITIES = [4, 6] as const;
 export type RoomCapacity = typeof ROOM_CAPACITIES[number];
@@ -42,6 +43,8 @@ export type LobbyMember = Readonly<{
    */
   squadName?: string;
   squadColor?: SquadColor;
+  /** HF-360: host-validated operator-skin selection; absent means default. */
+  skinId?: string;
 }>;
 
 export type PlayerScore = Readonly<{
@@ -146,6 +149,7 @@ export function isLobbyMember(value: unknown): value is LobbyMember {
     && isDhv(member.dhv)
     && (member.squadName === undefined || isSquadName(member.squadName))
     && (member.squadColor === undefined || isSquadColor(member.squadColor))
+    && (member.skinId === undefined || isSelectableOperatorSkinId(member.skinId))
     && (member.pingMs === null || Number.isFinite(member.pingMs) && Number(member.pingMs) >= 0 && Number(member.pingMs) <= MAX_CLOCK_RTT_MS);
 }
 

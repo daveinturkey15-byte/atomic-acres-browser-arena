@@ -802,7 +802,8 @@ import {
 } from './interactive-world-protocol';
 import { TracerPool } from './tracer-pool';
 import { AsyncSerialQueue } from './async-serial-queue';
-import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, resolveRiggedOperatorRuntimeRoot, riggedOperatorAssetReady, riggedOperatorCanonicalEvidenceManifest, riggedOperatorHandEvidenceIdentity, riggedOperatorTelemetry } from './operator-model';
+import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadOperatorSkinAsset, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, resolveRiggedOperatorRuntimeRoot, riggedOperatorAssetReady, riggedOperatorCanonicalEvidenceManifest, riggedOperatorHandEvidenceIdentity, riggedOperatorTelemetry } from './operator-model';
+import { isSelectableOperatorSkinId } from './operator-skin-catalog'; // HF-360
 import {
   WeaponPresentation,
   type WeaponViewmodelCatalogGpuPrewarmer,
@@ -966,6 +967,7 @@ import {
   GuestResumeNackMessage,
   LobbyJoinMessage,
   LobbyHandicapMessage,
+  LobbySkinMessage,
   LobbySquadMessage,
   LobbyReadyMessage,
   LobbyStateMessage,
@@ -5242,6 +5244,17 @@ let activeMatchAdmissionRun: Readonly<{
 let refreshWarningUntil = 0;
 let gameMode: 'solo' | 'host' | 'client' = 'solo';
 let privateMatchMode: MatchMode = 'ffa';
+// HF-360: locally persisted operator-skin choice; validated on read so a
+// stale or hand-edited storage value can never leave the catalog.
+const OPERATOR_SKIN_STORAGE_KEY = 'atomic-acres-operator-skin';
+let localOperatorSkinId: string = (() => {
+  try {
+    const stored = localStorage.getItem(OPERATOR_SKIN_STORAGE_KEY);
+    return stored !== null && isSelectableOperatorSkinId(stored) ? stored : 'default';
+  } catch {
+    return 'default';
+  }
+})();
 let localSquadName = defaultSquadPresentation(0).name;
 /** HF-328: last squad identity replicated to peers, so a prescribed change is sent once. */
 let lastCommittedSquadKey = '';
@@ -7825,6 +7838,7 @@ function sendLobbyJoin(): void {
     requestedTeam: player.team,
     squadName: localSquadName,
     squadColor: localSquadColor,
+    skinId: localOperatorSkinId, // HF-360
     resumeToken: localResumeToken,
     nonce: randomNonce(),
   };
@@ -8372,6 +8386,9 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
       authoritativeShotAdmissions.delete(message.playerId);
       hostTriggerAuthorities.reset(message.playerId, 'connection-epoch');
       const squad = sanitizeSquadPresentation(message.squadName, message.squadColor, message.requestedTeam);
+      // HF-360: adopt a valid joiner skin preference and start its asset load.
+      const joinSkinId = isSelectableOperatorSkinId(message.skinId) ? message.skinId : undefined;
+      if (joinSkinId) void loadOperatorSkinAsset(joinSkinId);
       hostLobbyMembers.set(message.playerId, {
         id: message.playerId,
         name: message.name,
@@ -8382,6 +8399,7 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
         dhv: 10,
         squadName: squad.name,
         squadColor: squad.color,
+        ...(joinSkinId ? { skinId: joinSkinId } : {}),
       });
       authoritativeScores.set(message.playerId, emptyPlayerScore(message.playerId));
     }
@@ -8480,6 +8498,28 @@ function updateHostSquad(message: LobbySquadMessage): void {
     localSquadColor = squad.color;
   }
   broadcastHostLobby(phase);
+}
+
+/** HF-360: host-authoritative skin adoption, mirroring updateHostSquad. A
+ * cosmetic choice never clears anybody's readiness. */
+function updateHostSkin(message: LobbySkinMessage): void {
+  if (network.role !== 'host') return;
+  const phase = privateLobbySnapshot?.phase ?? 'waiting';
+  if (phase !== 'waiting' && phase !== 'countdown' && phase !== 'active') return;
+  const member = hostLobbyMembers.get(message.by);
+  if (!member?.connected || !isSelectableOperatorSkinId(message.skinId)) return;
+  hostLobbyMembers.set(message.by, { ...member, skinId: message.skinId });
+  void loadOperatorSkinAsset(message.skinId);
+  broadcastHostLobby(phase);
+}
+
+/** HF-360: the replicated skin for a peer's third-person presentation. Falls
+ * back to the retained default operator for anything absent or off-catalog. */
+function memberOperatorSkinId(id: string): string {
+  const member = privateLobbySnapshot?.members.find((entry) => entry.id === id)
+    ?? hostLobbyMembers.get(id);
+  const skinId = member?.skinId ?? (id === player.id ? localOperatorSkinId : undefined);
+  return skinId !== undefined && isSelectableOperatorSkinId(skinId) ? skinId : 'default';
 }
 
 function applyHostLobbyConfig(config: PrivateMatchConfig): void {
@@ -9047,6 +9087,13 @@ function acceptLobbyState(message: LobbyStateMessage): void {
   gunRangeMatchClockState = message.snapshot.matchClock;
   gunRangeTestBayDoorState = message.snapshot.testBayDoor;
   applyReplicatedGunRangeDummyState(message.snapshot.testDummies);
+  // HF-360: prefetch every member's selected skin so third-person spawns never
+  // race the lazy asset load.
+  for (const member of message.snapshot.members) {
+    if (member.skinId !== undefined && isSelectableOperatorSkinId(member.skinId)) {
+      void loadOperatorSkinAsset(member.skinId);
+    }
+  }
   if (!gunRangeMatchClockState) gunRangeMatchClockOccupantIds = Object.freeze([]);
   lobbyArenaSyncPromise = lobbyArenaSyncPromise
     .catch(() => undefined)
@@ -9174,6 +9221,10 @@ function handleLobbyMessage(message: GameMessage): boolean {
   }
   if (message.type === 'lobby-squad') {
     updateHostSquad(message);
+    return true;
+  }
+  if (message.type === 'lobby-skin') {
+    updateHostSkin(message);
     return true;
   }
   if (message.type === 'redeploy-request') {
@@ -9982,7 +10033,10 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   root.rotation.order = 'YXZ';
   root.userData.playerId = snapshot.id;
 
-  const operator = buildOperator(snapshot.team, 'remote-player-model', flattenOperatorMaterials, snapshot.weapon);
+  const operator = buildOperator(
+    snapshot.team, 'remote-player-model', flattenOperatorMaterials, snapshot.weapon,
+    'team', memberOperatorSkinId(snapshot.id), // HF-360
+  );
   operator.userData.playerId = snapshot.id;
   operator.traverse((child) => {
     child.userData.playerId = snapshot.id;
@@ -26412,6 +26466,24 @@ const commitLocalSquadPresentation = (): void => {
   if (network.role === 'host') updateHostSquad(message);
   else network.send(message);
 };
+// HF-360: operator-skin selection. Local choice persists, prefetches its
+// asset, and replicates through the host (host validates against the catalog
+// and rebroadcasts via the lobby snapshot).
+const operatorSkinSelect = element<HTMLSelectElement>('#operator-skin');
+operatorSkinSelect.value = localOperatorSkinId;
+operatorSkinSelect.addEventListener('change', () => {
+  const chosen = operatorSkinSelect.value;
+  if (!isSelectableOperatorSkinId(chosen)) {
+    operatorSkinSelect.value = localOperatorSkinId;
+    return;
+  }
+  localOperatorSkinId = chosen;
+  try { localStorage.setItem(OPERATOR_SKIN_STORAGE_KEY, chosen); } catch { /* selection still applies this session */ }
+  void loadOperatorSkinAsset(chosen);
+  const message: LobbySkinMessage = { type: 'lobby-skin', by: player.id, skinId: chosen, nonce: randomNonce() };
+  if (network.role === 'host') updateHostSkin(message);
+  else if (network.role === 'client') network.send(message);
+});
 // HF-328: the free squad-name input and colour picker were removed from the lobby -
 // identity is prescribed - so there are no change events to bind here. Squad identity
 // is committed by the team-assignment path instead.

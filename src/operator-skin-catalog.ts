@@ -95,6 +95,15 @@ export function getOperatorSkinDefinition<Id extends string>(catalog: OperatorSk
   return catalog.definitions.find((def) => def.id === id);
 }
 
+/**
+ * Wire-safe membership check for the canonical catalog: exactly the currently
+ * SELECTABLE ids. Retired ids fail here, so a stale client cannot force a
+ * retired skin back onto other peers' screens.
+ */
+export function isSelectableOperatorSkinId(value: unknown): value is Pass74OperatorSkinId {
+  return typeof value === 'string' && validateOperatorSkinId(OPERATOR_SKIN_CATALOG, value);
+}
+
 export const OPERATOR_SKIN_SOURCES = freezeSourceDefinitions([
   { id: 'default', displayName: 'Standard Operator', archetype: 'standard', assetId: 'pass65-third-person-operator-family-v1', availability: 'selectable' },
   { id: 'explorer', displayName: 'Sunspire Wayfarer', archetype: 'explorer', assetId: 'explorer-trailworn-canvas-v1', availability: 'selectable' },
