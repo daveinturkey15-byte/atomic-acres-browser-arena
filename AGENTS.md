@@ -81,3 +81,20 @@ These rules apply to Codex, Hermes, Gemini/AGY, and any future human or automate
 **Symptom -> Cause -> Correction -> Verify:** a corpse or low-detail path shows the retired block-built humanoid while live combatants use the authored rig -> character presentation was given a separate primitive fallback or a caller could opt out of the canonical rig -> all players, bots, reinforcements, and corpses must use `buildOperator` with the same loaded rig, team appearance, and carried weapon; performance profiles may simplify materials but never substitute anatomy -> run `src/corpse-presentation-contract.test.ts` and the canonical rigged death browser check.
 
 **Symptom -> Cause -> Correction -> Verify:** gameplay simulation/audio continue but the visible native-WebGPU frame freezes for seconds -> the active renderer periodically copied the presented game canvas into a 2D pause canvas and forced a synchronous GPU readback -> remove active/periodic canvas capture, use CSS compositor blur for WebGPU, and retain at most one backend-guarded pause-open copy for WebGL2 -> run `npm run qa:pass65:frame-pacing-policy`, both lifecycle gates, and the clean exact-SHA installed-Chrome 2560x1440 Atomic-versus-Terminal p50/p95/p99/max and >20/33/50/100 ms gate before headed owner HITL.
+
+## Enshrined maintenance cadence
+
+Streamlining this repository is scheduled work, not a favor:
+
+- The machine-local `hermes-repo-steward` timer (weekly, sourced from the
+  hermes-universal-orchestration repository) audits this repo on every
+  governed machine; acting on its prune list is sanctioned recurring cleanup
+  under the existing recurring-cleanup rule.
+- A local branch already merged into `origin/main` is deleted promptly. A
+  contrib branch left unpushed for more than seven days is a defect, not a
+  stash.
+- Worktrees are removed when their branch merges. Per-pass QA scripts are
+  folded into the impact-classified tiers or deleted when their pass retires.
+- Deep guards (nightly property + gameplay-contract, weekly mutation,
+  dispatchable network-chaos soak; `deep-guards` workflow) run against
+  `origin/main`. A red deep-guard run is triaged before new pass work starts.
