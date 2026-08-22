@@ -11,8 +11,12 @@ function buildDummyCollider(definition: GunRangeTestBayDummyDefinition, nowMs: n
   const bounds: Box2 = Object.freeze({
     minX: pose.position.x - DUMMY_HALF_EXTENTS.x,
     maxX: pose.position.x + DUMMY_HALF_EXTENTS.x,
-    minY: pose.position.y - DUMMY_HALF_EXTENTS.y,
-    maxY: pose.position.y + DUMMY_HALF_EXTENTS.y,
+    // HF-318 audit fix: the pose position is the dummy's FEET, not its centre.
+    // Subtracting the half-extent buried half the collider underground and left
+    // only the lower half of a 2.1 m dummy solid, so shots and sweeps passed
+    // through its head and torso. Span upward from the feet instead.
+    minY: pose.position.y,
+    maxY: pose.position.y + DUMMY_HALF_EXTENTS.y * 2,
     minZ: pose.position.z - DUMMY_HALF_EXTENTS.z,
     maxZ: pose.position.z + DUMMY_HALF_EXTENTS.z,
   });

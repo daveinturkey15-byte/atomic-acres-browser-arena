@@ -38,7 +38,9 @@ describe('Gun Range test-bay dummy movement colliders (HF-318)', () => {
       const centreZ = (collider.bounds.minZ + collider.bounds.maxZ) / 2;
 
       expect(centreX).toBeCloseTo(pose.position.x, 6);
-      expect(centreY).toBeCloseTo(pose.position.y, 6); // y centre is at dummy's pose y (ground level for these dummies)
+      // HF-318 audit fix: the pose y is the dummy's FEET, so a body standing on it
+      // has its centre one half-height above, not at, that point.
+      expect(centreY).toBeCloseTo(pose.position.y + 1.05, 6);
       expect(centreZ).toBeCloseTo(pose.position.z, 6);
     }
   });
@@ -131,9 +133,12 @@ describe('Gun Range test-bay dummy movement colliders (HF-318)', () => {
   it('collider y-bounds extend from ground to ~2.1m (dummy height)', () => {
     const colliders = gunRangeTestBayDummyColliders(['test-dummy-alpha'], 0);
     const c = colliders[0]!.bounds;
-    // Y min should be at -1.05 (center at 0, half-extent 1.05)
-    // Y max should be at 1.05 (center at 0, half-extent 1.05)
-    expect(c.minY ?? 0).toBeCloseTo(-1.05, 6);
-    expect(c.maxY ?? 0).toBeCloseTo(1.05, 6);
+    // HF-318 audit fix: this test's TITLE was always right and its assertion was
+    // always wrong. The pose position is the dummy's FEET, so centring the collider
+    // on it buried half underground and left only the lower half of a 2.1 m dummy
+    // solid - shots and sweeps passed through its head and torso while the suite
+    // stayed green. The collider now spans upward from the ground, as the name says.
+    expect(c.minY ?? 0).toBeCloseTo(0, 6);
+    expect(c.maxY ?? 0).toBeCloseTo(2.1, 6);
   });
 });
