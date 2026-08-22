@@ -68,6 +68,8 @@ export type ArenaMap = {
     performanceVisualMeshes?: number;
   }>;
   bounds: Box2;
+  /** Optional physics-only fail-safe floor. Defaults to y=0 for legacy arenas. */
+  physicsSafetyFloorY?: number;
   houseTelemetry: {
     houses: number;
     groundRooms: number;

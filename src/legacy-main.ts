@@ -22,6 +22,7 @@ import { auditLocalLightOcclusion } from './rendering/light-occlusion';
 import { webGlShadowSamplerMode } from './webgl-shadow-compatibility';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
+import { shouldEliminateArenaOverboard } from './arena-overboard';
 import { PASS66_RELEASE_IDENTITY } from './release-identity';
 import { drawPass70DroneSwarmLogo } from './pass70-drone-swarm-logo';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
@@ -23080,6 +23081,10 @@ function updatePhysics(dt: number): void {
   player.position.set(movement.position.x, movement.position.y, movement.position.z);
   playerGrounded = movement.grounded;
   const postWater = waterSystem.samplePhysics(player.position);
+  if (shouldEliminateArenaOverboard(selectedArena.id, postWater)) {
+    applyDamage(Math.max(100, player.hp), player.id, 0, true, { kind: 'environment' }, true);
+    return;
+  }
   if (postWater.inWater && player.position.y < postWater.surfaceY + 0.35) {
     // Soft float toward surface so OOB falls feel like water, not a void clip.
     player.position.y = Math.min(postWater.surfaceY + 0.55, Math.max(player.position.y, postWater.surfaceY - 0.9));
@@ -25413,7 +25418,11 @@ async function performArenaSelection(
       assertAdmission();
     }
     profileArenaTransition('physics-construction');
-    nextPhysics = await CharacterPhysics.create(nextArena.physicsColliders, nextArena.bounds);
+    nextPhysics = await CharacterPhysics.create(
+      nextArena.physicsColliders,
+      nextArena.bounds,
+      nextArena.physicsSafetyFloorY,
+    );
     assertAdmission();
     profileArenaTransition('authority-commit');
     characterPhysics = nextPhysics;

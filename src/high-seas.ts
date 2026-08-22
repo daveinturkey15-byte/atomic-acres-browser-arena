@@ -18,6 +18,9 @@ export const HIGH_SEAS_LEVELS = Object.freeze({
   ocean: -2.2,
 });
 
+/** Below the keel and waterline; playable engine support is authored explicitly. */
+export const HIGH_SEAS_SAFETY_FLOOR_Y = -6;
+
 export const HIGH_SEAS_BOUNDS: Box2 = Object.freeze({
   minX: -12,
   maxX: 12,
@@ -657,14 +660,15 @@ function addEngineRoom(
   bow: ReturnType<typeof addRamp>;
   stern: ReturnType<typeof addRamp>;
 }> {
-  const floor = box(builder, 'high-seas-engine-floor-presentation', [0, 0.012, 0], [5.8, 0.024, 40.2], floorMaterial, {
-    solid: false,
-    shots: true,
-    ballisticMaterial: 'structural-metal',
-    cast: false,
-    externalPhysicsAuthority: 'character-physics-bounds-floor-y0',
-  });
-  floor.userData.externalPhysicsAuthority = 'character-physics-bounds-floor-y0';
+  addWalkableBox(
+    builder,
+    'engine-floor',
+    [0, -0.06, 0],
+    [5.8, 0.12, 40.2],
+    floorMaterial,
+    HIGH_SEAS_LEVELS.engine,
+    'bot',
+  ).castShadow = false;
 
   for (const x of [-3.02, 3.02]) {
     box(builder, `high-seas-engine-corridor-wall-${x}`, [x, 1.42, 0], [0.24, 2.84, 40.2], wallMaterial, {
@@ -836,10 +840,14 @@ function addRails(
       ballisticMaterial: 'thin-metal',
     });
   };
-  addRail('starboard', 10.34, 0, 0.12, 86.7);
-  addRail('port-bow', -10.34, -27.35, 0.12, 32.3);
+  addRail('starboard', 10.34, 1.48, 0.12, 83.72);
+  addRail('port-bow', -10.34, -25.85, 0.12, 29.3);
   addRail('port-center-outer', -11.73, 0, 0.12, 22.0);
   addRail('port-stern', -10.34, 27.35, 0.12, 32.3);
+  addRail('bow-tip-port', -3.94, -42.18, 0.12, 3.24);
+  addRail('bow-tip-starboard', 3.94, -42.18, 0.12, 3.24);
+  addRail('bow-shoulder-port', -7.17, -40.56, 6.46, 0.12);
+  addRail('bow-shoulder-starboard', 7.17, -40.56, 6.46, 0.12);
   addRail('bow-tip', 0, -43.82, 8.0, 0.12);
   addRail('stern', 0, 43.48, 20.7, 0.12);
 
@@ -1092,8 +1100,8 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
     version: 'pass75-shared-platform-authority-v1',
     engineFloor: Object.freeze({
       y: HIGH_SEAS_LEVELS.engine,
-      physicsAuthority: 'character-physics-bounds-floor-y0',
-      presentationName: 'high-seas-engine-floor-presentation',
+      physicsAuthority: 'high-seas-platform-engine-floor',
+      presentationName: 'high-seas-platform-engine-floor',
     }),
     platforms: Object.freeze(builder.walkable.map((entry) => Object.freeze({
       id: entry.id,
@@ -1134,6 +1142,7 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
     runtimeBranding: 'high-seas-original-only',
     surroundingWaterAuthority: 'shared-water-authoring-path',
     expectedWaveEnvelope: Object.freeze({ minimumY: -2.55, maximumY: -1.85 }),
+    safetyFloorY: HIGH_SEAS_SAFETY_FLOOR_Y,
     containedWaterFeatures: Object.freeze(['hot-tub', 'stern-pool']),
   });
   root.userData.highSeasReviewCameras = Object.freeze([
@@ -1161,6 +1170,7 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
     breakableWindows: [],
     physicalCover: builder.physicalCover,
     bounds: { ...HIGH_SEAS_BOUNDS },
+    physicsSafetyFloorY: HIGH_SEAS_SAFETY_FLOOR_Y,
     houseTelemetry: emptyTelemetry(),
   };
 }

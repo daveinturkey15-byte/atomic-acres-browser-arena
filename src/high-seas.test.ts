@@ -6,6 +6,7 @@ import {
   HIGH_SEAS_BOUNDS,
   HIGH_SEAS_ENGINE_ACCESS,
   HIGH_SEAS_LEVELS,
+  HIGH_SEAS_SAFETY_FLOOR_Y,
   buildHighSeas,
   type HighSeasPortal,
   type HighSeasRouteAnchor,
@@ -160,7 +161,9 @@ describe('High Seas clean-room arena geometry', () => {
       copiedAssets: [],
       surroundingWaterAuthority: 'shared-water-authoring-path',
       expectedWaveEnvelope: { minimumY: -2.55, maximumY: -1.85 },
+      safetyFloorY: HIGH_SEAS_SAFETY_FLOOR_Y,
     });
+    expect(map.physicsSafetyFloorY).toBe(HIGH_SEAS_SAFETY_FLOOR_Y);
   });
 
   it('places six supported and well-separated opposed spawns at main-deck eye height', () => {
@@ -199,13 +202,14 @@ describe('High Seas clean-room arena geometry', () => {
       && entry.ballisticAuthority)).toBe(true);
     expect(map.shotSurfaces.every((surface) => surface.classification === 'explicit')).toBe(true);
     expect(new Set(map.shotSurfaces.map((surface) => surface.id)).size).toBe(map.shotSurfaces.length);
-    const shotOnly = authority.filter((entry) => !entry.solid && entry.shots);
-    expect(shotOnly).toEqual([
-      expect.objectContaining({
-        name: 'high-seas-engine-floor-presentation',
-        externalPhysicsAuthority: 'character-physics-bounds-floor-y0',
-      }),
-    ]);
+    expect(authority.filter((entry) => !entry.solid && entry.shots)).toEqual([]);
+    expect(authority.find((entry) => entry.name === 'high-seas-platform-engine-floor')).toMatchObject({
+      solid: true,
+      shots: true,
+      movementAuthority: true,
+      physicsAuthority: true,
+      externalPhysicsAuthority: null,
+    });
     for (const cover of map.physicalCover) {
       expect(map.colliders).toContain(cover.bounds);
       expect(map.physicsColliders).toContain(cover.bounds);
@@ -238,8 +242,8 @@ describe('High Seas clean-room arena geometry', () => {
     expect(support.version).toBe('pass75-shared-platform-authority-v1');
     expect(support.engineFloor).toEqual({
       y: 0,
-      physicsAuthority: 'character-physics-bounds-floor-y0',
-      presentationName: 'high-seas-engine-floor-presentation',
+      physicsAuthority: 'high-seas-platform-engine-floor',
+      presentationName: 'high-seas-platform-engine-floor',
     });
     expect(support.platforms.every((entry) => entry.movementAuthority && entry.physicsAuthority && entry.shotAuthority)).toBe(true);
     expect(support.platforms.some((entry) => entry.y === HIGH_SEAS_LEVELS.mainDeck)).toBe(true);
@@ -317,7 +321,7 @@ describe('High Seas clean-room arena geometry', () => {
 
   it('walks the complete engine shortcut in both directions with Rapier-backed collision', async () => {
     const map = buildHighSeas(new THREE.Scene());
-    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
+    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds, map.physicsSafetyFloorY);
     try {
       const route = routeRecord(map.root)['engine-through-route'];
       await traverseFeetRoute(physics, route);
@@ -329,7 +333,7 @@ describe('High Seas clean-room arena geometry', () => {
 
   it('walks an internal and external upper access for each cabin in both directions', async () => {
     const map = buildHighSeas(new THREE.Scene());
-    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
+    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds, map.physicsSafetyFloorY);
     try {
       const routes = routeRecord(map.root);
       for (const id of [
@@ -345,6 +349,40 @@ describe('High Seas clean-room arena geometry', () => {
       physics.dispose();
     }
   }, 45_000);
+
+  it('closes the tapered bow shoulder and keeps the fail-safe floor below the ocean', async () => {
+    const map = buildHighSeas(new THREE.Scene());
+    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds, map.physicsSafetyFloorY);
+    try {
+      physics.teleportEye({ x: 8, y: 4.9, z: -40 });
+      for (let step = 0; step < 140; step += 1) physics.move({ x: 0, y: -0.01, z: -0.02 }, 1 / 120);
+      const blockedAtShoulder = physics.eyePosition();
+      expect(blockedAtShoulder.z).toBeGreaterThan(-40.3);
+      expect(blockedAtShoulder.y).toBeGreaterThan(4.7);
+
+      physics.teleportEye({ x: 8, y: 4.9, z: -42.8 });
+      for (let step = 0; step < 220; step += 1) physics.move({ x: 0, y: -0.04, z: 0 }, 1 / 120);
+      const overboard = physics.eyePosition();
+      expect(overboard.y).toBeLessThan(HIGH_SEAS_LEVELS.ocean);
+      expect(overboard.y).toBeGreaterThan(HIGH_SEAS_SAFETY_FLOOR_Y);
+
+      const underwaterEdges = [
+        { start: { x: 11.2, y: -3, z: 0 }, delta: { x: 0.03, y: 0, z: 0 }, axis: 'x', maximum: HIGH_SEAS_BOUNDS.maxX },
+        { start: { x: -11.2, y: -3, z: 0 }, delta: { x: -0.03, y: 0, z: 0 }, axis: 'x', minimum: HIGH_SEAS_BOUNDS.minX },
+        { start: { x: 0, y: -3, z: 43.2 }, delta: { x: 0, y: 0, z: 0.03 }, axis: 'z', maximum: HIGH_SEAS_BOUNDS.maxZ },
+        { start: { x: 0, y: -3, z: -43.2 }, delta: { x: 0, y: 0, z: -0.03 }, axis: 'z', minimum: HIGH_SEAS_BOUNDS.minZ },
+      ] as const;
+      for (const edge of underwaterEdges) {
+        physics.teleportEye(edge.start);
+        for (let step = 0; step < 120; step += 1) physics.move(edge.delta, 1 / 120);
+        const result = physics.eyePosition()[edge.axis];
+        if ('maximum' in edge) expect(result).toBeLessThan(edge.maximum);
+        if ('minimum' in edge) expect(result).toBeGreaterThan(edge.minimum);
+      }
+    } finally {
+      physics.dispose();
+    }
+  }, 30_000);
 
   it('stays beneath the geometry budget and exposes deterministic review viewpoints', () => {
     const map = buildHighSeas(new THREE.Scene());
