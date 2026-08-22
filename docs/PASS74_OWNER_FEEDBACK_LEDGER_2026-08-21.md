@@ -88,7 +88,21 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-325 — host disconnect: hand over or recover authority without kicking; rejoin after refresh
 - Source: atomicnext.txt ("if host dc, cant rejoin, can it hand host and not kick others? even if
   pause and reload?"; "rejoin last match even though refresh?"; de-sync after re-host needs re-sync).
-- Status: PARTIAL (bcad57e4) - the checkpoint can now CROSS THE WIRE: satellite protocol module plus a pure send/receive/promote state machine, 48 tests, no protocol version bump (old peers drop the messages at the transport, which is the required fail-closed fallback). PROMOTION REMAINS DISABLED. Still owed, and none of it is cosmetic: network.ts has no role flip, no host stand-down path (a host can lose its signalling id while still serving guests, so two peers could both believe they own the match), and followers do not re-point at a promoted host. A separate real defect was found in host-migration.ts - authorizeSelfPromotion compares the guest's Date.now() against a host-stamped expiry with no rebase, the same class of bug the checkpoint clock rebase exists to prevent.
+- Status: IMPLEMENTED, ARMED (ea932116 + e0f707cb, 2026-08-22) - the full succession path now
+  exists end to end: mandate broadcast after every lobby-state, adoptable mirror unicast to the
+  elected successor on the checkpoint tick, guest receive handlers, and the promotion trigger in
+  updateHostLossPresentation adopting through the EXISTING recovery path
+  (initializeRecoveredHostLobby). network.ts gained promoteToHost - the client-to-host role flip
+  that claims the room-code peer id as the G3 mutual-exclusion lock and aborts PERMANENTLY on
+  unavailable-id (pinned: no retry ramp, no fresh-room fallback) - and the stand-down half: a
+  superseded host (observed higher term, or its released id claimed while away) farewells guests
+  with 'host-superseded' and goes offline. Followers re-point via the existing reconnect loop
+  (same room-code id). The authorizeSelfPromotion clock defect is fixed: mandate epoch stamps are
+  rebased into the receiver's clock exactly once on arrival (tests pin both skew directions).
+  HOST_MIGRATION_PROMOTION_ENABLED flipped to true with the pin test updated in the same commit.
+  Verified mechanically: tsc 0, vitest 3,268 (39 wire + 4 network-lifecycle promotion tests).
+  Still owed for DONE: the live two-browser matrix - host dc mid-match, successor promotes,
+  follower lands on the promoted host, old host returns and stands down.
 
 ### HF-326 — host-only "reset lobby / new room code" action
 - Source: atomicnext.txt ("host button to refresh room/code for fresh lobby total reset and new
