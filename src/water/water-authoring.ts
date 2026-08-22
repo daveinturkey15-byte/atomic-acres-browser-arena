@@ -120,7 +120,7 @@ const HIGH_SEAS_WATER: WaterBodyDefinition = Object.freeze({
 
 /** Every authored water body, keyed by arena. Arenas absent here have none. */
 /**
- * HF-358 audit correction: farcrysis is deliberately NOT registered.
+ * HF-358 audit history: farcrysis was deliberately NOT registered in Pass 74.
  *
  * The arena already authors three of its own water layers at y = -0.28/-0.24/-0.22
  * (src/farcrysis-art.ts), so registering it here built a SECOND ocean 20mm below
