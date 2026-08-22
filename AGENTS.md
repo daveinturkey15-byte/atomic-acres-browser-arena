@@ -25,6 +25,25 @@ These rules apply to Codex, Hermes, Gemini/AGY, and any future human or automate
 - Solo skirmish starts with exactly one enemy bot on every bot-enabled arena. Hosted-lobby choices, arena-specific reinforcements and hard caps remain separate catalog values; graphics profiles never change gameplay counts.
 - Smoke colour, lifetime, radius, shot corridors, human LOS and bot perception are projections of one host-authoritative volume contract. Glass presentation, collision, damage state and projectile aperture are likewise one authoritative lifecycle in every graphics profile.
 
+## Multi-agent discipline (all harnesses)
+
+**Read `docs/MULTI_AGENT_REPO_DISCIPLINE.md` before writing anything in this repository.**
+It applies to Claude Code, Codex, Cursor, Antigravity/Gemini, Pi, OMP, Hermes desktop and
+Hermes headless alike, and every rule in it was written after a real incident on this
+machine. The five that cause the most damage when ignored:
+
+- **Confirm the worktree path and branch; never infer them.** There are 365 worktrees and
+  458 branches here. A worker once wrote into the protected Pass 62 benchmark checkout and
+  its critic then reviewed that copy and approved it.
+- **Feature worktrees edit and test; they never publish.** One canonical checkout performs
+  release, compliance, vault sync and backup.
+- **Exit code 0 is not success.** Six of eleven workers once reported success having done
+  nothing — quota rejections that still exit 0. Verify against the repository.
+- **Never weaken a test, threshold or assertion to reach green.** A correct failure stays
+  failing and its row stays OPEN. A red test you can trust beats a green one you cannot.
+- **Boot the app before claiming a candidate works.** 2,858 passing tests once accompanied a
+  build that would not start, because unit tests never boot the DOM.
+
 ## Contribution isolation
 
 - Fetch `origin/main`, create a clean isolated worktree, and use `contrib/<machine>/<harness>/<slug>` for new work.
