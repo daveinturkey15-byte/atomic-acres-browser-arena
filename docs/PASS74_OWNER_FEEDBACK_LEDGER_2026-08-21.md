@@ -138,6 +138,21 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   WebGPU-vs-WebGL2 route actually taken, caps/VSync, adapter identity, long tasks, and frame-time
   distribution; fix without removing features. Edge/WebKit/Opera/mobile stay secondary.
 - Status: PARTIAL - phase 1 landed (aa114737); phase 2 MEASURED IN PART on 2026-08-22 and the harness is now in the repo (scripts/qa/measure-hf331-firefox-gap.mjs). Established: (a) a headless measurement is WORTHLESS here - headless Chromium falls back to SwiftShader (software=true) and would have invented a gap; the script says so and defaults to headed. (b) On the real RTX 5080, chromium on ?renderer=webgl2 runs the quality Atomic Acres scene at 49.3 Hz against 150+ on WebGPU. So the WebGL2 COMPAT PATH ITSELF costs about 3x in Chrome, before Firefox is involved at all - and Firefox has no WebGPU on this machine, so 49 Hz is its structural ceiling. NOT established: the Firefox number. Playwright's Firefox would not get past launch/newPage on a machine saturated by concurrent swarms, and it left orphaned processes; the earlier combined run also hung because page.evaluate has no timeout and a starved rAF never resolves (fixed in the stage probe). The remaining question is precise: the owner sees ~10 FPS, the compat path explains 49, so about a further 5x is unaccounted for. Re-run both scripts headed on a QUIET machine to close it.
+- QUIET-MACHINE ATTEMPT 2026-08-22 (late): the machine was genuinely idle (fleet dead, no swarms).
+  (a) Chromium/webgl2 control RE-MEASURED at HEAD via the stage probe: 178 Hz menu, 73.9 Hz
+  in-match on hardware ANGLE D3D11 / RTX 5080, software=false - the compat path improved from
+  49.3 to ~74 Hz since the graphics work landed (per-arena IBL, ocean PBR).
+  (b) Playwright's BUNDLED Firefox hangs inside firefox.launch() even on the idle machine, so
+  swarm contention was NOT the cause; the stage probe never printed its first stage. Bundled
+  Firefox is a dead instrument on this machine - do not spend another lane on it.
+  (c) The installed-browser WebGPU parity harness (measure-browser-frame-parity.mjs, vite build +
+  preview + installed Chrome + installed Firefox via geckodriver) ran end to end but both probes
+  FAILED_LAUNCH: Chrome loaded the production preview yet __ATOMIC_ACRES_DEBUG__ never appeared
+  within 60 s, and Firefox died on a geckodriver-path null. Receipt retained at
+  artifacts/qa/browser-frame-parity-receipt.json. The harness itself needs repair (whether the
+  debug hook exists on production builds behind multiplayerQa=1 is the first thing to check)
+  before the Firefox number can be measured mechanically; the alternative close-out is the owner
+  simply playing one minute in installed Firefox with the FPS readout up.
 
 ### HF-332 — first use of every explosive family must not hitch or freeze
 - Source: atomicnext.txt P0-1 (Frag, Flash, Smoke, Semtex, explosive crossbow, flare impact,

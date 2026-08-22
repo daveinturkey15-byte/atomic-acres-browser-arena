@@ -1,11 +1,25 @@
 export type OperatorSkinAvailability = 'selectable' | 'retired';
 
+/**
+ * The skeleton-and-clips identity a skin GLB must share for clip retargeting
+ * to be sound. Enforcement used to live only in the Blender pipeline; the
+ * catalog now refuses any entry that diverges from the canonical rig, so a
+ * mis-authored delivery fails at module load instead of silently breaking
+ * animation at runtime.
+ */
+export type OperatorSkinRigContract = Readonly<{
+  rigId: string;
+  jointCount: number;
+  animationClipCount: number;
+}>;
+
 export type OperatorSkinCatalogSourceDefinition<Id extends string = string> = Readonly<{
   id: Id;
   displayName: string;
   archetype: string;
   assetId: string;
   availability: OperatorSkinAvailability;
+  rigContract: OperatorSkinRigContract;
 }>;
 
 export type OperatorSkinDefinition<Id extends string = string> = OperatorSkinCatalogSourceDefinition<Id>;
@@ -20,7 +34,10 @@ const SOURCE_KEYS = Object.freeze([
   'archetype',
   'assetId',
   'availability',
+  'rigContract',
 ] as const);
+
+const RIG_CONTRACT_KEYS = Object.freeze(['rigId', 'jointCount', 'animationClipCount'] as const);
 
 const AVAILABILITIES: readonly OperatorSkinAvailability[] = ['selectable', 'retired'];
 
@@ -52,6 +69,12 @@ function validateSourceDefinition(value: unknown, index: number): asserts value 
     throw new Error(`${label} has invalid assetId`);
   }
   if (!AVAILABILITIES.includes(value.availability as OperatorSkinAvailability)) throw new Error(`${label} has invalid availability`);
+  if (!isPlainObject(value.rigContract)) throw new Error(`${label} has invalid rig contract`);
+  const rig = value.rigContract;
+  exactKeys(rig, RIG_CONTRACT_KEYS, `${label}.rigContract`);
+  if (typeof rig.rigId !== 'string' || !/^[a-z0-9][a-z0-9-]{0,95}$/.test(rig.rigId)) throw new Error(`${label} has invalid rig id`);
+  if (!Number.isSafeInteger(rig.jointCount) || Number(rig.jointCount) < 1 || Number(rig.jointCount) > 500) throw new Error(`${label} has invalid rig joint count`);
+  if (!Number.isSafeInteger(rig.animationClipCount) || Number(rig.animationClipCount) < 1 || Number(rig.animationClipCount) > 500) throw new Error(`${label} has invalid rig clip count`);
 }
 
 function freezeSourceDefinitions<const Sources extends readonly OperatorSkinCatalogSourceDefinition[]>(sources: Sources): Sources {
@@ -80,7 +103,21 @@ export function createOperatorSkinCatalog<const Id extends string>(
   if (!defaultEntry) throw new Error('default operator skin is required');
   if (defaultEntry.availability !== 'selectable') throw new Error('default must be selectable');
 
-  const definitions = Object.freeze(sources.map((source) => Object.freeze({ ...source }))) as readonly OperatorSkinDefinition<Id>[];
+  // One rig family for the whole catalog: every skin must share the default's
+  // skeleton and clip identity, or its animations cannot retarget.
+  const canonicalRig = defaultEntry.rigContract;
+  for (const source of sources) {
+    if (source.rigContract.rigId !== canonicalRig.rigId
+      || source.rigContract.jointCount !== canonicalRig.jointCount
+      || source.rigContract.animationClipCount !== canonicalRig.animationClipCount) {
+      throw new Error(`${source.id} rig contract diverges from the canonical rig; clips cannot retarget`);
+    }
+  }
+
+  const definitions = Object.freeze(sources.map((source) => Object.freeze({
+    ...source,
+    rigContract: Object.freeze({ ...source.rigContract }),
+  }))) as readonly OperatorSkinDefinition<Id>[];
 
   return Object.freeze({
     definitions,
@@ -105,10 +142,10 @@ export function isSelectableOperatorSkinId(value: unknown): value is Pass74Opera
 }
 
 export const OPERATOR_SKIN_SOURCES = freezeSourceDefinitions([
-  { id: 'default', displayName: 'Standard Operator', archetype: 'standard', assetId: 'pass65-third-person-operator-family-v1', availability: 'selectable' },
-  { id: 'explorer', displayName: 'Sunspire Wayfarer', archetype: 'explorer', assetId: 'explorer-trailworn-canvas-v1', availability: 'selectable' },
-  { id: 'symbiote', displayName: 'Carapace Bulwark', archetype: 'symbiote', assetId: 'symbiote-graftplate-composite-v1', availability: 'selectable' },
-  { id: 'navalops', displayName: 'Tidewrack Operative', archetype: 'navalops', assetId: 'navalops-bluewater-lowprofile-v1', availability: 'selectable' },
+  { id: 'default', displayName: 'Standard Operator', archetype: 'standard', assetId: 'pass65-third-person-operator-family-v1', availability: 'selectable', rigContract: { rigId: 'pass65-third-person-operator-family-v1', jointCount: 62, animationClipCount: 24 } },
+  { id: 'explorer', displayName: 'Sunspire Wayfarer', archetype: 'explorer', assetId: 'explorer-trailworn-canvas-v1', availability: 'selectable', rigContract: { rigId: 'pass65-third-person-operator-family-v1', jointCount: 62, animationClipCount: 24 } },
+  { id: 'symbiote', displayName: 'Carapace Bulwark', archetype: 'symbiote', assetId: 'symbiote-graftplate-composite-v1', availability: 'selectable', rigContract: { rigId: 'pass65-third-person-operator-family-v1', jointCount: 62, animationClipCount: 24 } },
+  { id: 'navalops', displayName: 'Tidewrack Operative', archetype: 'navalops', assetId: 'navalops-bluewater-lowprofile-v1', availability: 'selectable', rigContract: { rigId: 'pass65-third-person-operator-family-v1', jointCount: 62, animationClipCount: 24 } },
 ] as const satisfies readonly OperatorSkinCatalogSourceDefinition[]);
 
 export type Pass74OperatorSkinId = typeof OPERATOR_SKIN_SOURCES[number]['id'];

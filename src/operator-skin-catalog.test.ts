@@ -10,6 +10,8 @@ import {
   type OperatorSkinCatalogSourceDefinition,
 } from './operator-skin-catalog';
 
+const RIG = { rigId: 'pass65-third-person-operator-family-v1', jointCount: 62, animationClipCount: 24 } as const;
+
 describe('operator skin catalog', () => {
   describe('source definitions', () => {
     it('has exactly four entries', () => {
@@ -106,60 +108,60 @@ describe('operator skin catalog', () => {
 
     it('rejects unknown keys in source definition', () => {
       const sources: OperatorSkinCatalogSourceDefinition[] = [
-        { id: 'default', displayName: 'Standard Operator', archetype: 'standard', assetId: 'pass65-third-person-operator-family-v1', availability: 'selectable', unknownKey: 'value' } as any,
-        { id: 'explorer', displayName: 'Sunspire Wayfarer', archetype: 'explorer', assetId: 'explorer-trailworn-canvas-v1', availability: 'selectable' },
-        { id: 'symbiote', displayName: 'Carapace Bulwark', archetype: 'symbiote', assetId: 'symbiote-graftplate-composite-v1', availability: 'selectable' },
-        { id: 'navalops', displayName: 'Tidewrack Operative', archetype: 'navalops', assetId: 'navalops-bluewater-lowprofile-v1', availability: 'selectable' },
+        { id: 'default', displayName: 'Standard Operator', archetype: 'standard', assetId: 'pass65-third-person-operator-family-v1', availability: 'selectable', unknownKey: 'value', rigContract: RIG } as any,
+        { id: 'explorer', displayName: 'Sunspire Wayfarer', archetype: 'explorer', assetId: 'explorer-trailworn-canvas-v1', availability: 'selectable', rigContract: RIG },
+        { id: 'symbiote', displayName: 'Carapace Bulwark', archetype: 'symbiote', assetId: 'symbiote-graftplate-composite-v1', availability: 'selectable', rigContract: RIG },
+        { id: 'navalops', displayName: 'Tidewrack Operative', archetype: 'navalops', assetId: 'navalops-bluewater-lowprofile-v1', availability: 'selectable', rigContract: RIG },
       ];
       expect(() => createOperatorSkinCatalog(sources)).toThrow('keys invalid');
     });
 
     it('rejects missing keys in source definition', () => {
       const sources: OperatorSkinCatalogSourceDefinition[] = [
-        { id: 'default', displayName: 'Standard Operator', archetype: 'standard', assetId: 'pass65-third-person-operator-family-v1', availability: 'selectable' },
-        { id: 'explorer', displayName: 'Sunspire Wayfarer', archetype: 'explorer', availability: 'selectable' } as any,
-        { id: 'symbiote', displayName: 'Carapace Bulwark', archetype: 'symbiote', assetId: 'symbiote-graftplate-composite-v1', availability: 'selectable' },
-        { id: 'navalops', displayName: 'Tidewrack Operative', archetype: 'navalops', assetId: 'navalops-bluewater-lowprofile-v1', availability: 'selectable' },
+        { id: 'default', displayName: 'Standard Operator', archetype: 'standard', assetId: 'pass65-third-person-operator-family-v1', availability: 'selectable', rigContract: RIG },
+        { id: 'explorer', displayName: 'Sunspire Wayfarer', archetype: 'explorer', availability: 'selectable', rigContract: RIG } as any,
+        { id: 'symbiote', displayName: 'Carapace Bulwark', archetype: 'symbiote', assetId: 'symbiote-graftplate-composite-v1', availability: 'selectable', rigContract: RIG },
+        { id: 'navalops', displayName: 'Tidewrack Operative', archetype: 'navalops', assetId: 'navalops-bluewater-lowprofile-v1', availability: 'selectable', rigContract: RIG },
       ];
       expect(() => createOperatorSkinCatalog(sources)).toThrow('keys invalid');
     });
 
     it('rejects invalid ID format', () => {
       const sources: OperatorSkinCatalogSourceDefinition[] = [
-        { id: 'Invalid_ID', displayName: 'Standard Operator', archetype: 'standard', assetId: 'pass65-third-person-operator-family-v1', availability: 'selectable' },
-        { id: 'explorer', displayName: 'Sunspire Wayfarer', archetype: 'explorer', assetId: 'explorer-trailworn-canvas-v1', availability: 'selectable' },
-        { id: 'symbiote', displayName: 'Carapace Bulwark', archetype: 'symbiote', assetId: 'symbiote-graftplate-composite-v1', availability: 'selectable' },
-        { id: 'navalops', displayName: 'Tidewrack Operative', archetype: 'navalops', assetId: 'navalops-bluewater-lowprofile-v1', availability: 'selectable' },
+        { id: 'Invalid_ID', displayName: 'Standard Operator', archetype: 'standard', assetId: 'pass65-third-person-operator-family-v1', availability: 'selectable', rigContract: RIG },
+        { id: 'explorer', displayName: 'Sunspire Wayfarer', archetype: 'explorer', assetId: 'explorer-trailworn-canvas-v1', availability: 'selectable', rigContract: RIG },
+        { id: 'symbiote', displayName: 'Carapace Bulwark', archetype: 'symbiote', assetId: 'symbiote-graftplate-composite-v1', availability: 'selectable', rigContract: RIG },
+        { id: 'navalops', displayName: 'Tidewrack Operative', archetype: 'navalops', assetId: 'navalops-bluewater-lowprofile-v1', availability: 'selectable', rigContract: RIG },
       ];
       expect(() => createOperatorSkinCatalog(sources)).toThrow('has invalid ID');
     });
 
     it('rejects empty displayName', () => {
       const sources: OperatorSkinCatalogSourceDefinition[] = [
-        { id: 'default', displayName: 'Standard Operator', archetype: 'standard', assetId: 'pass65-third-person-operator-family-v1', availability: 'selectable' },
-        { id: 'explorer', displayName: '', archetype: 'explorer', assetId: 'explorer-trailworn-canvas-v1', availability: 'selectable' },
-        { id: 'symbiote', displayName: 'Carapace Bulwark', archetype: 'symbiote', assetId: 'symbiote-graftplate-composite-v1', availability: 'selectable' },
-        { id: 'navalops', displayName: 'Tidewrack Operative', archetype: 'navalops', assetId: 'navalops-bluewater-lowprofile-v1', availability: 'selectable' },
+        { id: 'default', displayName: 'Standard Operator', archetype: 'standard', assetId: 'pass65-third-person-operator-family-v1', availability: 'selectable', rigContract: RIG },
+        { id: 'explorer', displayName: '', archetype: 'explorer', assetId: 'explorer-trailworn-canvas-v1', availability: 'selectable', rigContract: RIG },
+        { id: 'symbiote', displayName: 'Carapace Bulwark', archetype: 'symbiote', assetId: 'symbiote-graftplate-composite-v1', availability: 'selectable', rigContract: RIG },
+        { id: 'navalops', displayName: 'Tidewrack Operative', archetype: 'navalops', assetId: 'navalops-bluewater-lowprofile-v1', availability: 'selectable', rigContract: RIG },
       ];
       expect(() => createOperatorSkinCatalog(sources)).toThrow('has invalid display name');
     });
 
     it('rejects invalid availability', () => {
       const sources: OperatorSkinCatalogSourceDefinition[] = [
-        { id: 'default', displayName: 'Standard Operator', archetype: 'standard', assetId: 'pass65-third-person-operator-family-v1', availability: 'selectable' },
-        { id: 'explorer', displayName: 'Sunspire Wayfarer', archetype: 'explorer', assetId: 'explorer-trailworn-canvas-v1', availability: 'invalid' } as any,
-        { id: 'symbiote', displayName: 'Carapace Bulwark', archetype: 'symbiote', assetId: 'symbiote-graftplate-composite-v1', availability: 'selectable' },
-        { id: 'navalops', displayName: 'Tidewrack Operative', archetype: 'navalops', assetId: 'navalops-bluewater-lowprofile-v1', availability: 'selectable' },
+        { id: 'default', displayName: 'Standard Operator', archetype: 'standard', assetId: 'pass65-third-person-operator-family-v1', availability: 'selectable', rigContract: RIG },
+        { id: 'explorer', displayName: 'Sunspire Wayfarer', archetype: 'explorer', assetId: 'explorer-trailworn-canvas-v1', availability: 'invalid', rigContract: RIG } as any,
+        { id: 'symbiote', displayName: 'Carapace Bulwark', archetype: 'symbiote', assetId: 'symbiote-graftplate-composite-v1', availability: 'selectable', rigContract: RIG },
+        { id: 'navalops', displayName: 'Tidewrack Operative', archetype: 'navalops', assetId: 'navalops-bluewater-lowprofile-v1', availability: 'selectable', rigContract: RIG },
       ];
       expect(() => createOperatorSkinCatalog(sources)).toThrow('has invalid availability');
     });
 
     it('rejects invalid assetId format', () => {
       const sources: OperatorSkinCatalogSourceDefinition[] = [
-        { id: 'default', displayName: 'Standard Operator', archetype: 'standard', assetId: 'pass65-third-person-operator-family-v1', availability: 'selectable' },
-        { id: 'explorer', displayName: 'Sunspire Wayfarer', archetype: 'explorer', assetId: 'Invalid Asset ID', availability: 'selectable' },
-        { id: 'symbiote', displayName: 'Carapace Bulwark', archetype: 'symbiote', assetId: 'symbiote-graftplate-composite-v1', availability: 'selectable' },
-        { id: 'navalops', displayName: 'Tidewrack Operative', archetype: 'navalops', assetId: 'navalops-bluewater-lowprofile-v1', availability: 'selectable' },
+        { id: 'default', displayName: 'Standard Operator', archetype: 'standard', assetId: 'pass65-third-person-operator-family-v1', availability: 'selectable', rigContract: RIG },
+        { id: 'explorer', displayName: 'Sunspire Wayfarer', archetype: 'explorer', assetId: 'Invalid Asset ID', availability: 'selectable', rigContract: RIG },
+        { id: 'symbiote', displayName: 'Carapace Bulwark', archetype: 'symbiote', assetId: 'symbiote-graftplate-composite-v1', availability: 'selectable', rigContract: RIG },
+        { id: 'navalops', displayName: 'Tidewrack Operative', archetype: 'navalops', assetId: 'navalops-bluewater-lowprofile-v1', availability: 'selectable', rigContract: RIG },
       ];
       expect(() => createOperatorSkinCatalog(sources)).toThrow('has invalid assetId');
     });
