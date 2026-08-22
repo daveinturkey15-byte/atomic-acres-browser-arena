@@ -9,6 +9,7 @@ export type MenuPreviewVideoDefinition = Readonly<{
   motionLabel: string;
   reducedMotionLabel: string;
   presentationId: string;
+  mediaAvailable: boolean; // HF-359: genuine offline flyover media is authored and shipped
   webm: string;
   mp4: string;
   poster: string;
@@ -30,6 +31,7 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     motionLabel: 'AUTHORED COCKPIT FLYOVER',
     reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
     presentationId: 'menu-video-runtime-helo-nuke-town-v7',
+    mediaAvailable: true,
     webm: `${ROOT}/atomic-acres.webm?v=${CACHE_KEY}`,
     mp4: `${ROOT}/atomic-acres.mp4?v=${CACHE_KEY}`,
     poster: `${ROOT}/atomic-acres.webp?v=${CACHE_KEY}`,
@@ -44,6 +46,7 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     motionLabel: 'AUTHORED COCKPIT FLYOVER',
     reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
     presentationId: 'menu-video-runtime-helo-terminal-v7',
+    mediaAvailable: true,
     webm: `${ROOT}/skyline-terminal.webm?v=${CACHE_KEY}`,
     mp4: `${ROOT}/skyline-terminal.mp4?v=${CACHE_KEY}`,
     poster: `${ROOT}/skyline-terminal.webp?v=${CACHE_KEY}`,
@@ -58,6 +61,7 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     motionLabel: 'AUTHORED COCKPIT FLYOVER',
     reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
     presentationId: 'menu-video-runtime-helo-rustrig-v7',
+    mediaAvailable: true,
     webm: `${ROOT}/rustworks-1v1.webm?v=${CACHE_KEY}`,
     mp4: `${ROOT}/rustworks-1v1.mp4?v=${CACHE_KEY}`,
     poster: `${ROOT}/rustworks-1v1.webp?v=${CACHE_KEY}`,
@@ -72,6 +76,7 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     motionLabel: 'JOYFUL FIRST-PERSON PROWL',
     reducedMotionLabel: 'CURIOUS CAT-CAM HOLD',
     presentationId: 'menu-video-runtime-cat-gun-range-v5',
+    mediaAvailable: true,
     webm: `${ROOT}/gun-range.webm?v=${CACHE_KEY}`,
     mp4: `${ROOT}/gun-range.mp4?v=${CACHE_KEY}`,
     poster: `${ROOT}/gun-range.webp?v=${CACHE_KEY}`,
@@ -79,21 +84,24 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     width: 2560,
     height: 1440,
   }),
-  // HF-359 (Pass 74): farcrysis revived from the Pass 69 hidden lane. The
-  // authored helicopter flyover media (farcrysis.webm/.mp4/.webp) is NOT yet
-  // rendered — it must be produced by the deterministic offline recipe before
-  // the arena ships selectable (AGENTS.md prerecorded-preview contract). The
-  // definition is registered now so the inventory stays mechanically complete.
+  // HF-359 (Pass 74): farcrysis revived from the Pass 69 hidden lane.
+  // The authored helicopter flyover video and poster (farcrysis.{webm,mp4,webp})
+  // have NOT yet been rendered by the deterministic offline recipe. Faking a video
+  // or copying media violates the repo contract. We declare mediaAvailable: false
+  // so the menu degrades cleanly into a deliberate labelled placeholder (cockpit HUD
+  // + PREVIEW STANDBY) without issuing three failing 404 network requests.
+  // Outstanding deliverable: render genuine farcrysis flyover via offline recipe.
   'farcrysis': Object.freeze({
     arenaId: 'farcrysis',
     frame: 'helicopter',
     label: 'PRERECORDED HELO // FARCRYSIS',
-    motionLabel: 'AUTHORED COCKPIT FLYOVER',
-    reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
+    motionLabel: 'AUTHORED FLYOVER PENDING OFFLINE RENDER',
+    reducedMotionLabel: 'STABILIZED PREVIEW FRAME PENDING',
     presentationId: 'menu-video-runtime-helo-farcrysis-v1',
-    webm: `${ROOT}/farcrysis.webm?v=${CACHE_KEY}`,
-    mp4: `${ROOT}/farcrysis.mp4?v=${CACHE_KEY}`,
-    poster: `${ROOT}/farcrysis.webp?v=${CACHE_KEY}`,
+    mediaAvailable: false,
+    webm: '',
+    mp4: '',
+    poster: '',
     durationSeconds: 8,
     width: 2560,
     height: 1440,
@@ -106,6 +114,19 @@ export function menuPreviewVideoDefinition(arenaId: ArenaId): MenuPreviewVideoDe
 
 export function menuPreviewVideoMarkup(arenaId: ArenaId = 'atomic-acres'): string {
   const definition = menuPreviewVideoDefinition(arenaId);
+  // HF-359: render deliberate standby placeholder when offline flyover media is unavailable
+  if (!definition.mediaAvailable) {
+    return `<div id="menu-preview-frame" data-frame="${definition.frame}" data-arena="${definition.arenaId}" data-motion="static" data-presentation="${definition.presentationId}" data-renderer-submissions="0" data-media-state="poster-fallback">
+    <img id="menu-preview-poster" src="" width="${definition.width}" height="${definition.height}" alt="" decoding="async" fetchpriority="high" hidden>
+    <video id="menu-preview-video" width="${definition.width}" height="${definition.height}" autoplay loop muted playsinline preload="none" aria-hidden="true" hidden>
+    </video>
+    <div class="preview-cockpit-hud" aria-hidden="true">
+      <div class="cockpit-heading"><span>33</span><b>N</b><span>03</span></div>
+      <div class="cockpit-instruments"><span><small>ALT</small><b>024 M</b></span><span><small>HDG</small><b>049</b></span><span><small>ROTOR</small><b>ARMED</b></span></div>
+    </div>
+    <span class="menu-preview-fallback" aria-hidden="true">PREVIEW STANDBY</span>
+  </div>`;
+  }
   return `<div id="menu-preview-frame" data-frame="${definition.frame}" data-arena="${definition.arenaId}" data-motion="video" data-presentation="${definition.presentationId}" data-renderer-submissions="0" data-media-state="poster">
     <img id="menu-preview-poster" src="${definition.poster}" width="${definition.width}" height="${definition.height}" alt="" decoding="async" fetchpriority="high">
     <video id="menu-preview-video" width="${definition.width}" height="${definition.height}" autoplay loop muted playsinline preload="metadata" poster="${definition.poster}" aria-hidden="true">
@@ -185,7 +206,7 @@ export class MenuPreviewVideoController {
   setActive(active: boolean): void {
     this.active = active;
     this.elements.frame.dataset.active = String(active);
-    if (!active || this.reducedMotion) {
+    if (!active || this.reducedMotion || !this.selected.mediaAvailable) {
       this.elements.video.pause();
       return;
     }
@@ -246,6 +267,28 @@ export class MenuPreviewVideoController {
 
     video.pause();
     this.detachSources();
+
+    // HF-359 (Pass 74): if media is unavailable (e.g. farcrysis pending offline flyover render),
+    // cleanly degrade to labelled standby placeholder without issuing failing network requests.
+    if (!definition.mediaAvailable) {
+      poster.removeAttribute('src');
+      poster.hidden = true;
+      video.removeAttribute('poster');
+      video.removeAttribute('src');
+      video.hidden = true;
+      frame.dataset.frame = definition.frame;
+      frame.dataset.arena = definition.arenaId;
+      frame.dataset.motion = 'static';
+      frame.dataset.presentation = definition.presentationId;
+      frame.dataset.mediaState = 'poster-fallback';
+      frame.dataset.generation = String(generation);
+      frame.dataset.rendererSubmissions = '0';
+      label.textContent = definition.label;
+      motion.textContent = definition.motionLabel;
+      queueMicrotask(() => this.resolveFirstFrame(generation));
+      return;
+    }
+
     poster.src = definition.poster;
     poster.width = definition.width;
     poster.height = definition.height;
@@ -285,11 +328,12 @@ export class MenuPreviewVideoController {
       return;
     }
 
+    const doc = video.ownerDocument ?? globalThis.document;
     for (const source of [
       { src: definition.webm, type: WEBM_MIME_TYPE },
       { src: definition.mp4, type: MP4_MIME_TYPE },
     ]) {
-      const element = document.createElement('source');
+      const element = doc.createElement('source');
       element.src = source.src;
       element.type = source.type;
       video.append(element);
@@ -344,7 +388,7 @@ export class MenuPreviewVideoController {
   }
 
   private requestPlay(generation: number): void {
-    if (!this.active || this.reducedMotion || generation !== this.generation) return;
+    if (!this.active || this.reducedMotion || !this.selected.mediaAvailable || generation !== this.generation) return;
     const attempted = this.elements.video.play();
     if (!attempted) return;
     void attempted.catch(() => {
@@ -364,6 +408,8 @@ export function assertMenuPreviewVideoInventory(): void {
   }
   const paths = new Set<string>();
   for (const definition of Object.values(MENU_PREVIEW_VIDEO_DEFINITIONS)) {
+    // HF-359: only assert path distinctness for definitions with available media
+    if (!definition.mediaAvailable) continue;
     for (const path of [definition.webm, definition.mp4, definition.poster]) {
       if (paths.has(path)) throw new Error(`Menu preview asset is not distinct: ${path}`);
       paths.add(path);

@@ -401,6 +401,20 @@ import {
   type LowHealthFeedbackState,
 } from './sensory-feedback';
 import { FramePacingSampler, cadenceWithNoProgressAge } from './frame-pacing';
+import { advanceLocalHealthRegen } from './local-health-regen';
+import {
+  addCameraShakeImpulse,
+  createCameraShakeState,
+  integrateCameraShake,
+  sampleCameraShake,
+  type CameraShakeState,
+} from './camera-shake';
+import {
+  createKillConfirmPulseState,
+  sampleKillConfirmPulse,
+  triggerKillConfirmPulse,
+  type KillConfirmPulseState,
+} from './kill-confirm-pulse';
 import { GrenadeExplosionPresentation } from './grenade-explosion-presentation';
 import { SupportExplosionPresentation } from './support-explosion-presentation';
 import { GrassSystem } from './grass-system';
@@ -5515,6 +5529,9 @@ const audioOcclusionBudget = new AudioOcclusionBudget();
 let directionalDamageState: DirectionalDamageState = createDirectionalDamageState();
 let lowHealthFeedbackState: LowHealthFeedbackState = createLowHealthFeedbackState();
 let lastSensoryPresentationAt = -Infinity;
+// HF-352: Camera shake and kill-confirm pulse presentation states
+let cameraShakeState: CameraShakeState = createCameraShakeState();
+let killConfirmPulseState: KillConfirmPulseState = createKillConfirmPulseState(accessibilityRuntime.weaponMotionScale);
 
 function isFootstepOccluded(source: Readonly<{ x: number; y: number; z: number }>): boolean {
   if (!audioOcclusionBudget.admit(frameCount)) return false;
@@ -10274,6 +10291,13 @@ function onNetworkMessage(message: GameMessage): void {
         impact.source === 'chopper' ? CHOPPER_MISSILE_BLAST_RADIUS_M : CARPET_BOMBER_BLAST_RADIUS_M,
         presentedAt,
       );
+      // HF-352: Camera shake from remote support impact
+      cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+        distanceUnits: point.distanceTo(player.position),
+        family: 'support',
+        sensoryScale: accessibilityRuntime.weaponMotionScale,
+        now: presentedAt,
+      });
     }
     killstreakPresentation.presentImpacts(message.impacts, presentedAt);
     return;
@@ -11847,11 +11871,13 @@ function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
     return;
   }
   const headshot = message.outcomes.some((outcome) => outcome.hitZone === 'head');
+  const wasElimination = message.outcomes.some((outcome) => outcome.died || outcome.resultingHealth <= 0);
   const flareBurnResult = message.shotId.includes(':flare-burn:');
   const totalDamage = message.outcomes.reduce((total, outcome) => total + outcome.damage, 0);
   const totalRawDamage = message.outcomes.reduce((total, outcome) => total + (outcome.rawDamage ?? outcome.damage), 0);
   const totalHealthBefore = message.outcomes.reduce((total, outcome) => total + outcome.damage + outcome.resultingHealth, 0);
-  showHitmarker(headshot);
+  // HF-352: Drive kill-confirm pulse from confirmed eliminations
+  showHitmarker(headshot, wasElimination);
   showDamageNumber(totalRawDamage, headshot ? 'head' : 'body', totalHealthBefore);
   audio.hit(headshot);
   if (!flareBurnResult) {
@@ -11946,6 +11972,19 @@ function updateSensoryFeedback(now: number): void {
   // after the first grenade, on every map. Idempotent and self-guarding, so it is
   // safe above the 30 Hz presentation gate below.
   audio.recoverAmbienceDuck();
+  // HF-352: Sample kill-confirm pulse on hitmarker
+  const pulse = sampleKillConfirmPulse(killConfirmPulseState, now);
+  killConfirmPulseState = pulse.state;
+  const hitmarkerElement = element<HTMLElement>('#hitmarker');
+  if (pulse.presentation.active) {
+    hitmarkerElement.style.setProperty('--kill-confirm-opacity', String(pulse.presentation.opacity));
+    hitmarkerElement.style.setProperty('--kill-confirm-scale', String(pulse.presentation.scale));
+    hitmarkerElement.classList.add('kill-confirm');
+  } else {
+    hitmarkerElement.style.removeProperty('--kill-confirm-opacity');
+    hitmarkerElement.style.removeProperty('--kill-confirm-scale');
+    hitmarkerElement.classList.remove('kill-confirm');
+  }
   if (now - lastSensoryPresentationAt < 1000 / 30) return;
   lastSensoryPresentationAt = now;
   const directions = directionalDamagePresentation(directionalDamageState, now, player.yaw);
@@ -12020,6 +12059,15 @@ function applyDamage(
   lastDamageAt = now;
   audio.damage();
   showDamageDirection(attacker, appliedDamage, now);
+  // HF-352: Camera shake impulse from taking damage
+  if (appliedDamage > 0) {
+    cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+      distanceUnits: 1.5,
+      family: cause.kind === 'grenade' || cause.kind === 'killstreak' ? 'semtex' : 'crossbow',
+      sensoryScale: accessibilityRuntime.weaponMotionScale,
+      now,
+    });
+  }
   if (accessibilityRuntime.damageFlashScale > 0) {
     damageFlash.classList.remove('combat-prewarm', 'pulse');
     requestAnimationFrame(replayDamageFlash);
@@ -14196,6 +14244,9 @@ function respawn(
   footstepEmitters.reset(`local:${player.id}`);
   directionalDamageState = createDirectionalDamageState();
   lowHealthFeedbackState = createLowHealthFeedbackState();
+  // HF-352: Reset camera shake and kill-confirm pulse on match/player reset
+  cameraShakeState = createCameraShakeState();
+  killConfirmPulseState = createKillConfirmPulseState(accessibilityRuntime.weaponMotionScale);
   audio.setLowHealthFeedback({ active: false, severity: 0, vignetteOpacity: 0, breathingGain: 0, heartbeatGain: 0, pulseHz: 0 });
   damageDirectionIndicator.replaceChildren();
   lowHealthVignette.style.setProperty('--low-health-opacity', '0');
@@ -15497,7 +15548,7 @@ function presentLocalRailgunFeedback(outcomes: RailgunShotResultMessage['outcome
   railgunLocalFeedbackPresentations += 1;
   const damageApplied = outcomes.reduce((total, outcome) => total + outcome.damageApplied, 0);
   const lethalHits = outcomes.filter((outcome) => outcome.died).length;
-  showHitmarker(false);
+  showHitmarker(false, lethalHits > 0);
   showDamageNumber(damageApplied, 'body');
   audio.hit(false);
   roundHitShots += 1;
@@ -17176,8 +17227,9 @@ function applyBotDamage(
   if (network.role === 'host') recordAuthoritativeDamage(attackerId, bot.id, dealt);
   else if (attackerId === player.id) addFeed('DAMAGE DONE +' + Math.round(dealt), 'gold', { damageDealt: dealt });
   bot.hp = Math.max(0, bot.hp - damage);
+  const wasElimination = bot.hp <= 0;
   if (attackerId === player.id && !suppressAttackerFeedback) {
-    showHitmarker(zone === 'head');
+    showHitmarker(zone === 'head', wasElimination);
     audio.hit(zone === 'head');
   }
   if (bot.hp > 0) {
@@ -18167,6 +18219,12 @@ function detonateExplosiveBoltEntity(bolt: ExplosiveBoltEntity, now: number): vo
   disposeExplosiveBolt(bolt);
   spawnGrenadeExplosionVisual(point, now);
   audio.explosion(now);
+  cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+    distanceUnits: point.distanceTo(player.position),
+    family: 'crossbow',
+    sensoryScale: accessibilityRuntime.weaponMotionScale,
+    now,
+  });
   if (!bolt.authority) return;
   const stuck = sealedAttachment !== null;
   const blastRadiusM = explosiveBoltBlastRadiusM(stuck);
@@ -18473,7 +18531,8 @@ function applyFlareTargetDamage(
   }
   if (applied <= 0) return null;
   if (ownerId === player.id && target.kind !== 'bot') {
-    showHitmarker(false);
+    const wasElimination = healthBefore > 0 && resultingHealth <= 0;
+    showHitmarker(false, wasElimination);
     showDamageNumber(applied, 'body', healthBefore);
     audio.hit(false);
     roundDamageDealt += applied;
@@ -19334,6 +19393,12 @@ function explodeGrenade(entity: GrenadeEntity): void {
   audio.explosion(afterPresentationDetach);
   const afterAudio = performance.now();
   spawnGrenadeExplosionVisual(point, afterAudio);
+  cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+    distanceUnits: point.distanceTo(player.position),
+    family: 'semtex',
+    sensoryScale: accessibilityRuntime.weaponMotionScale,
+    now: afterAudio,
+  });
   const attachedTargetId = entity.attachedTargetId;
   const attachedTargetLifeId = entity.attachedTargetLifeId;
   let liveAttachedTargetFound = false;
@@ -19638,7 +19703,8 @@ function hitPracticeTarget(
   });
   targetHits += 1;
   const headshot = selectedArena.id === 'gun-range' && zone === 'head';
-  showHitmarker(headshot);
+  const wasElimination = target.health <= 0;
+  showHitmarker(headshot, wasElimination);
   showDamageNumber(appliedDamage, zone);
   audio.hit(headshot);
   if (selectedArena.id === 'gun-range') {
@@ -19704,10 +19770,14 @@ function spawnTracer(start: THREE.Vector3, end: THREE.Vector3, color: number): v
   tracerPool.emit(start, end, color);
 }
 
-function showHitmarker(headshot = false): void {
+function showHitmarker(headshot = false, wasElimination = false): void {
   const marker = element<HTMLElement>('#hitmarker');
-  marker.classList.remove('show', 'headshot');
+  marker.classList.remove('show', 'headshot', 'kill-confirm');
   if (headshot) marker.classList.add('headshot');
+  if (wasElimination) {
+    killConfirmPulseState = triggerKillConfirmPulse(killConfirmPulseState, performance.now());
+    marker.classList.add('kill-confirm');
+  }
   requestAnimationFrame(() => marker.classList.add('show'));
 }
 
@@ -21072,10 +21142,22 @@ function updatePass65KillstreakRuntime(now: number): void {
         }
         audio.explosion(now);
         supportExplosionPresentation.emit(point, CARPET_BOMBER_BLAST_RADIUS_M, now);
+        cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+          distanceUnits: point.distanceTo(player.position),
+          family: 'support',
+          sensoryScale: accessibilityRuntime.weaponMotionScale,
+          now,
+        });
       } else {
         applyInteractiveWorldExplosion(point, CHOPPER_MISSILE_BLAST_RADIUS_M, CHOPPER_MISSILE_MAX_DAMAGE);
         audio.explosion(now);
         supportExplosionPresentation.emit(point, CHOPPER_MISSILE_BLAST_RADIUS_M, now);
+        cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+          distanceUnits: point.distanceTo(player.position),
+          family: 'support',
+          sensoryScale: accessibilityRuntime.weaponMotionScale,
+          now,
+        });
       }
     }
     applyInteractiveWorldExplosions(carpetWorldImpacts);
@@ -21728,6 +21810,12 @@ function supportBlast(
   audio.explosion(started);
   const afterAudio = performance.now();
   supportExplosionPresentation.emit(point, radius, started);
+  cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+    distanceUnits: point.distanceTo(player.position),
+    family: 'support',
+    sensoryScale: accessibilityRuntime.weaponMotionScale,
+    now: started,
+  });
   const afterVisual = performance.now();
   if (maximumDamage > 0) applyInteractiveWorldExplosion(
     point,
@@ -22724,21 +22812,6 @@ function updatePhysics(dt: number): void {
   player.velocity.x = integrated.x;
   player.velocity.z = integrated.z;
 
-  // Adrenaline boost instantly restarts health regen and adds +1 hp/s passive
-  // regen for its duration. The 5s damage-delay is waived while the boost runs.
-  const adrenalineActive = (localKillstreakActorSnapshot()?.adrenalineRemainingMs ?? 0) > 0;
-  if (player.hp < 100 && (adrenalineActive || now - lastDamageAt >= 5_000)) {
-    const healthBeforeRegen = player.hp;
-    player.hp = Math.min(100, player.hp + (adrenalineActive ? 19 : 18) * dt);
-    if (Math.floor(healthBeforeRegen) !== Math.floor(player.hp) || player.hp === 100) {
-      recordMatchDiagnostic('health-regen', 'accepted', {
-        actorId: player.id,
-        actorKind: 'player',
-        healthBefore: healthBeforeRegen,
-        healthAfter: player.hp,
-      });
-    }
-  }
   if (playerGrounded) lastGroundedAt = now;
   const jumpBuffered = now - jumpQueuedAt <= 125;
   const coyoteGrounded = playerGrounded || now - lastGroundedAt <= 95;
@@ -22878,6 +22951,13 @@ function updatePhysics(dt: number): void {
   camera.rotation.y = player.yaw + recoilCamera.yaw;
   camera.rotation.x = THREE.MathUtils.clamp(player.pitch - recoilCamera.pitch, -1.42, 1.42);
   camera.rotation.z = cameraRoll * accessibilityRuntime.weaponMotionScale;
+  cameraShakeState = integrateCameraShake(cameraShakeState, now);
+  const shakeSample = sampleCameraShake(cameraShakeState, now);
+  if (shakeSample.intensity > 0) {
+    camera.position.addScaledVector(right, shakeSample.offsetX);
+    camera.position.y += shakeSample.offsetY;
+    camera.rotation.z += shakeSample.rollRadians;
+  }
 }
 
 function interpolationSourceSnapshotRateHz(): 20 | 30 | 40 {
@@ -23975,6 +24055,7 @@ function applyAccessibilitySettings(): void {
   });
   document.documentElement.dataset.reducedSensory = accessibilityRuntime.reducedSensory ? 'true' : 'false';
   document.documentElement.dataset.reducedMotion = accessibilityRuntime.reducedMotion ? 'true' : 'false';
+  killConfirmPulseState = createKillConfirmPulseState(accessibilityRuntime.weaponMotionScale);
   configureMenuPreviewAudio();
   damageFlash.style.setProperty('--damage-flash-scale', String(accessibilityRuntime.damageFlashScale));
   element<HTMLElement>('#accessibility-effective').textContent = accessibilityRuntime.reducedSensory
@@ -26067,6 +26148,25 @@ function frame(now: number, scheduleNext = true): void {
     let iterations = 0;
     while (accumulator >= step && iterations < 6) {
       updatePhysics(step);
+      if (gameStarted && player.alive && matchState.phase === 'active') {
+        const adrenalineActive = (localKillstreakActorSnapshot()?.adrenalineRemainingMs ?? 0) > 0;
+        const healthBeforeRegen = player.hp;
+        player.hp = advanceLocalHealthRegen({
+          hp: player.hp,
+          lastDamageAt,
+          adrenalineActive,
+          now,
+          dtSeconds: step,
+        });
+        if (Math.floor(healthBeforeRegen) !== Math.floor(player.hp) || player.hp === 100) {
+          recordMatchDiagnostic('health-regen', 'accepted', {
+            actorId: player.id,
+            actorKind: 'player',
+            healthBefore: healthBeforeRegen,
+            healthAfter: player.hp,
+          });
+        }
+      }
       stepInteractiveWorldAuthority();
       accumulator -= step;
       iterations += 1;
@@ -30766,6 +30866,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     const detonatedAt = performance.now();
     audio.explosion(detonatedAt);
     spawnGrenadeExplosionVisual(point, detonatedAt);
+    cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+      distanceUnits: point.distanceTo(player.position),
+      family: 'semtex',
+      sensoryScale: accessibilityRuntime.weaponMotionScale,
+      now: detonatedAt,
+    });
     breakWindowsInGrenadeBlast(point, randomNonce(), true, GRENADE_RADIUS);
     const accepted = applyInteractiveWorldExplosion(point, GRENADE_RADIUS, 100, 'grenade-major-collapse');
     const envelopeAfter = interactiveWorldRuntime.stateEnvelope();
