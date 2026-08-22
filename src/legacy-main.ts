@@ -22,7 +22,6 @@ import { auditLocalLightOcclusion } from './rendering/light-occlusion';
 import { webGlShadowSamplerMode } from './webgl-shadow-compatibility';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
-import { shouldEliminateArenaOverboard } from './arena-overboard';
 import { sharedWaterBodyForArena } from './water/water-authoring';
 import { PASS66_RELEASE_IDENTITY } from './release-identity';
 import { drawPass70DroneSwarmLogo } from './pass70-drone-swarm-logo';
@@ -279,6 +278,7 @@ import {
   BOT_DAMAGE_MULTIPLIER,
   GRENADE_RADIUS,
   MATCH_WARMUP_MS,
+  PLAYER_JUMP_GRAVITY,
   SIMULATION_HZ,
   WEAPONS,
   advanceMatch,
@@ -23058,7 +23058,7 @@ function updatePhysics(dt: number): void {
     playerGrounded = false;
     jumpQueuedAt = -10_000;
   } else {
-    player.velocity.y -= 24.5 * dt;
+    player.velocity.y += PLAYER_JUMP_GRAVITY * dt;
     if (playerGrounded) player.velocity.y = Math.max(0, player.velocity.y);
   }
 
@@ -23080,10 +23080,6 @@ function updatePhysics(dt: number): void {
   player.position.set(movement.position.x, movement.position.y, movement.position.z);
   playerGrounded = movement.grounded;
   const postWater = waterSystem.samplePhysics(player.position);
-  if (shouldEliminateArenaOverboard(selectedArena.id, postWater)) {
-    applyDamage(Math.max(100, player.hp), player.id, 0, true, { kind: 'environment' }, true);
-    return;
-  }
   if (postWater.inWater && player.position.y < postWater.surfaceY + 0.35) {
     // Soft float toward surface so OOB falls feel like water, not a void clip.
     player.position.y = Math.min(postWater.surfaceY + 0.55, Math.max(player.position.y, postWater.surfaceY - 0.9));

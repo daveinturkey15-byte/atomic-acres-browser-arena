@@ -11,6 +11,7 @@ import {
   type HighSeasPortal,
   type HighSeasRouteAnchor,
 } from './high-seas';
+import { movementProfile, PLAYER_JUMP_GRAVITY, SIMULATION_HZ } from './gameplay';
 import { CharacterPhysics, STANCE_SHAPES } from './physics';
 import type { ArenaVerticalNavigation } from './vertical-navigation';
 import { authoredElevationAt } from './vertical-navigation';
@@ -139,6 +140,36 @@ async function traverseFeetRoute(
     ).toBeLessThan(0.58);
     expect(Math.abs(result.y - target.y), `${anchor.id}: vertical result=${JSON.stringify(result)}`).toBeLessThan(0.58);
   }
+}
+
+async function sprintJump(
+  physics: CharacterPhysics,
+  start: Point3,
+  direction: Readonly<{ x: number; z: number }>,
+): Promise<Readonly<{ positions: readonly Point3[]; maximumFeetY: number }>> {
+  const dt = 1 / SIMULATION_HZ;
+  const profile = movementProfile({ crouched: false, ads: false, sprinting: true, grounded: true });
+  const length = Math.hypot(direction.x, direction.z);
+  const horizontal = {
+    x: direction.x / length * profile.maxSpeed,
+    z: direction.z / length * profile.maxSpeed,
+  };
+  physics.teleportEye(start);
+  let verticalVelocity = profile.jumpVelocity;
+  let maximumFeetY = start.y - 1.7;
+  const positions: Point3[] = [];
+  for (let frame = 0; frame < 120; frame += 1) {
+    const movement = physics.move({
+      x: horizontal.x * dt,
+      y: verticalVelocity * dt,
+      z: horizontal.z * dt,
+    }, dt);
+    positions.push({ ...movement.position });
+    maximumFeetY = Math.max(maximumFeetY, movement.position.y - 1.7);
+    verticalVelocity += PLAYER_JUMP_GRAVITY * dt;
+    if (movement.grounded && frame > 4) break;
+  }
+  return Object.freeze({ positions: Object.freeze(positions), maximumFeetY });
 }
 
 describe('High Seas clean-room arena geometry', () => {
@@ -378,6 +409,36 @@ describe('High Seas clean-room arena geometry', () => {
         const result = physics.eyePosition()[edge.axis];
         if ('maximum' in edge) expect(result).toBeLessThan(edge.maximum);
         if ('minimum' in edge) expect(result).toBeGreaterThan(edge.minimum);
+      }
+    } finally {
+      physics.dispose();
+    }
+  }, 30_000);
+
+  it('contains real sprint-jumps at representative outer rails without invisible extensions', async () => {
+    const map = buildHighSeas(new THREE.Scene());
+    const visibleRailAuthority = map.root.userData.highSeasAuthorityAudit as readonly AuthorityAuditEntry[];
+    const renderedRails = visibleRailAuthority.filter((entry) => entry.name.startsWith('high-seas-perimeter-rail-'));
+    expect(renderedRails).toHaveLength(10);
+    for (const rail of renderedRails) {
+      expect((rail.bounds.maxY ?? 0) - (rail.bounds.minY ?? 0)).toBeCloseTo(1.04);
+      expect(rail.shots).toBe(true);
+    }
+
+    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds, map.physicsSafetyFloorY);
+    try {
+      const cases = [
+        { id: 'bow-shoulder', start: { x: 8, y: 4.9, z: -38.28 }, direction: { x: 0, z: -1 }, inside: (position: Point3) => position.z > -40.3 },
+        { id: 'bow-seam-diagonal', start: { x: 7.15, y: 4.9, z: -38.45 }, direction: { x: 0.38, z: -1 }, inside: (position: Point3) => position.z > -40.3 && position.x < 10.1 },
+        { id: 'starboard', start: { x: 8.08, y: 4.9, z: 8 }, direction: { x: 1, z: 0 }, inside: (position: Point3) => position.x < 10.05 },
+        { id: 'port-catwalk', start: { x: -9.5, y: 4.9, z: 0 }, direction: { x: -1, z: 0 }, inside: (position: Point3) => position.x > -11.45 },
+        { id: 'stern', start: { x: 0, y: 4.9, z: 41.2 }, direction: { x: 0, z: 1 }, inside: (position: Point3) => position.z < 43.2 },
+      ] as const;
+      for (const entry of cases) {
+        const result = await sprintJump(physics, entry.start, entry.direction);
+        expect(result.maximumFeetY, entry.id).toBeGreaterThan(HIGH_SEAS_LEVELS.mainDeck + 0.7);
+        expect(result.positions.every(entry.inside), entry.id).toBe(true);
+        expect(result.positions.at(-1)?.y, entry.id).toBeGreaterThan(HIGH_SEAS_LEVELS.ocean);
       }
     } finally {
       physics.dispose();
