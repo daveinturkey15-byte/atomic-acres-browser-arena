@@ -1750,14 +1750,14 @@ export class ArenaAudio {
   }
 
   /** HF-337: positional support gunfire at the firing chopper/drone world position. Reuses the railgun spatial-chain pattern. */
-  supportGunPositional(kind: 'chopper' | 'drone', emitter: SpatialPoint): void {
+  supportGunPositional(kind: 'chopper' | 'drone', emitter: SpatialPoint, isEnemy = false): void {
     const position = emitter;
     const distance = Math.hypot(
       emitter.x - this.listenerPosition.x,
       emitter.y - this.listenerPosition.y,
       emitter.z - this.listenerPosition.z,
     );
-    const weaponDestination = this.createSupportGunSpatialDestination(position, distance) ?? this.weapons;
+    const weaponDestination = this.createSupportGunSpatialDestination(position, distance, isEnemy) ?? this.weapons;
     if (kind === 'chopper') {
       this.sweep(104, 38, 0.16, 0.21, 'sawtooth', weaponDestination);
       this.noise({ duration: 0.19, volume: 0.28, filter: 'lowpass', frequency: 2_500, q: 0.7 }, weaponDestination);
@@ -1771,7 +1771,12 @@ export class ArenaAudio {
   private createSupportGunSpatialDestination(
     emitter: SpatialPoint,
     distance: number,
+    isEnemy = false,
   ): PannerNode | null {
+    // HF-337 Fix 3: cull beyond maxDistance (180) so distant emitters don't burn spatial chains
+    if (distance > 180) {
+      return null;
+    }
     if (!this.context || !this.weapons
       || ![emitter.x, emitter.y, emitter.z, distance].every(Number.isFinite)
       || this.spatialChains + 1 > AUDIO_RUNTIME_BUDGET.spatialVoices) {
@@ -1787,24 +1792,32 @@ export class ArenaAudio {
     panner.positionX.value = emitter.x;
     panner.positionY.value = emitter.y;
     panner.positionZ.value = emitter.z;
-    panner.connect(this.weapons);
+    // HF-337 Fix 4: apply enemy gain reduction (documented but was not implemented)
+    const enemyGain = isEnemy ? 0.35 : 1;
+    const gain = this.context!.createGain();
+    gain.gain.value = enemyGain;
+    panner.connect(gain).connect(this.weapons);
     this.busIdentity.set(panner, 'sfx');
     this.spatialReportDestinations.add(panner);
     this.spatialReportDistances.set(panner, distance);
-    this.railgunSpatialNodes.push(panner);
+    this.railgunSpatialNodes.push(panner, gain);
     this.spatialChains += 1;
-    this.railgunSpatialChainCount += 1;
+    this.railgunSpatialChainCount += 2;
+    // HF-337 Fix 2: shorten hold to ~180ms (below 280ms chopper / 300ms drone cadence)
+    // so 4-5 firing entities cannot exhaust the 12-voice spatial budget.
     const cleanup = () => {
-      const index = this.railgunSpatialNodes.indexOf(panner);
-      if (index >= 0) this.railgunSpatialNodes.splice(index, 1);
-      this.busIdentity.delete(panner);
-      panner.disconnect();
+      for (const node of [panner, gain]) {
+        const index = this.railgunSpatialNodes.indexOf(node);
+        if (index >= 0) this.railgunSpatialNodes.splice(index, 1);
+        this.busIdentity.delete(node);
+        try { node.disconnect(); } catch { /* already disconnected */ }
+      }
       this.spatialChains = Math.max(0, this.spatialChains - 1);
-      this.railgunSpatialChainCount = Math.max(0, this.railgunSpatialChainCount - 1);
+      this.railgunSpatialChainCount = Math.max(0, this.railgunSpatialChainCount - 2);
       const timerIndex = this.railgunSpatialTimers.indexOf(timer);
       if (timerIndex >= 0) this.railgunSpatialTimers.splice(timerIndex, 1);
     };
-    const timer = setTimeout(cleanup, Math.ceil((0.25 + 0.12) * 1_000));
+    const timer = setTimeout(cleanup, 180);
     this.railgunSpatialTimers.push(timer);
     return panner;
   }

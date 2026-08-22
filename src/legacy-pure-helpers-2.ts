@@ -1,0 +1,82 @@
+/**
+ * Pure helpers extracted verbatim from src/legacy-main.ts (HF-355 round 2).
+ *
+ * Every function here is a pure move: it reads only its parameters and
+ * `THREE.MathUtils` (an imported namespace). No closure capture over module
+ * state, no DOM access, no network. Behaviour is unchanged — legacy-main.ts
+ * still owns the deletion; this module becomes the canonical home once the
+ * orchestrator rewires imports.
+ */
+
+import type { PlayerSnapshot } from './protocol';
+import type { GameMessage, ShotMessage, MeleeMessage } from './protocol';
+import type { StickyAttachmentRecord } from './remote-sticky-attachment-authority';
+import type { HostVerifiedStickyAttachment } from './protocol';
+import type { MajorDebrisBodyDefinition, MajorDebrisBodySnapshot } from './physics';
+import type { HostMatchCheckpoint } from './host-match-checkpoint';
+
+/**
+ * REJECTED FROM THIS MODULE: disposeDetachedRootResources.
+ *
+ * It was moved here as part of round two and it was neither pure nor verbatim.
+ * The moved copy collected geometries and materials into Sets and then returned
+ * without disposing anything - it dropped the array-material branch, the light
+ * shadow-map disposal, BOTH dispose loops and the final root.clear(). Rewiring
+ * legacy-main to it would have leaked every geometry, material and shadow map on
+ * each arena switch, silently, while tsc stayed clean.
+ *
+ * It was never eligible regardless: disposing GPU resources is a side effect, and
+ * the original consults isSharedMeshGeometry, which is module state. It stays in
+ * legacy-main.ts, unchanged.
+ */
+
+/**
+ * legacy-main.ts:9698-9700 — stance eye height.
+ */
+export function stanceEyeHeight(stance: PlayerSnapshot['stance']): number {
+  return stance === 'prone' ? 0.61 : stance === 'crouch' ? 1.16 : 1.7;
+}
+
+/**
+ * legacy-main.ts:9858-9864 — timed combat message type guard.
+ */
+export function isTimedCombatMessage(message: GameMessage): message is ShotMessage | MeleeMessage | Extract<GameMessage, {
+  type: 'grenade-throw' | 'hit' | 'support-activate' | 'killstreak-activate-intent' | 'killstreak-control-intent' | 'killstreak-care-capture-intent';
+}> {
+  return message.type === 'shot' || message.type === 'melee' || message.type === 'grenade-throw' || message.type === 'hit'
+        || message.type === 'support-activate' || message.type === 'killstreak-activate-intent';
+}
+
+/**
+ * legacy-main.ts:9961-9963 — verified sticky attachment.
+ */
+export function verifiedStickyAttachment(record: StickyAttachmentRecord): HostVerifiedStickyAttachment {
+  return Object.freeze({ targetId: record.targetId, targetLifeId: record.targetLifeId });
+}
+
+
+/**
+ * legacy-main.ts:3639-3651 — major debris definition from snapshot.
+ */
+export function majorDebrisDefinitionFromSnapshot(
+  definition: MajorDebrisBodyDefinition,
+  snapshot: MajorDebrisBodySnapshot,
+): MajorDebrisBodyDefinition {
+  return Object.freeze({
+    ...definition,
+    position: snapshot.position,
+    rotation: snapshot.rotation,
+    linearVelocity: snapshot.linearVelocity,
+    angularVelocity: snapshot.angularVelocity,
+    sleeping: snapshot.sleeping,
+  });
+}
+
+/**
+ * legacy-main.ts:7394-7396 — recovery remaining milliseconds.
+ * Note: the default argument for `nowEpochMs` uses `Date.now()`, which is impure.
+ * The function body is pure if `nowEpochMs` is provided by the caller.
+ */
+export function recoveryRemainingMs(value: number, checkpoint: HostMatchCheckpoint, nowEpochMs = Date.now()): number {
+  return Math.max(0, value - Math.max(0, nowEpochMs - checkpoint.savedAtEpochMs));
+}

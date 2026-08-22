@@ -6,7 +6,12 @@ import type { RenderProfile } from './render-profile';
 // WebGL2 route reads the same registry as the WebGPU TSL factory so both
 // presentations can never drift apart.
 import { waterBodyForArena } from './water/water-authoring';
-import { sampleOcean } from './water/ocean-spectrum';
+import {
+  OCEAN_BANDS,
+  OCEAN_CHOP_PRESENTATION_GAIN,
+  OCEAN_STEEPNESS_GAIN,
+  sampleOcean,
+} from './water/ocean-spectrum';
 
 export type WaterTelemetry = Readonly<{
   enabled: boolean;
@@ -178,7 +183,14 @@ export class WaterSystem {
     const deep = this.night ? new THREE.Color(0x020814) : new THREE.Color(0x0a3a4a);
     const shallow = this.night ? new THREE.Color(0x0a2a44) : new THREE.Color(0x2a8fa8);
     const foam = this.night ? new THREE.Color(0x7ec8e8) : new THREE.Color(0xd8f4ff);
-    const glslWaveExpression = OCEAN_WAVES.map((wave) => `sampleWave(p, vec2(${wave.x.toFixed(6)}, ${wave.z.toFixed(6)}), ${wave.frequency.toFixed(6)}, ${wave.speed.toFixed(6)}, ${wave.weight.toFixed(6)}, ${wave.phase.toFixed(6)}, vec2(${wave.warpX.toFixed(6)}, ${wave.warpZ.toFixed(6)}), ${wave.warpFrequency.toFixed(6)}, ${wave.warpSpeed.toFixed(6)}, ${wave.warpAmount.toFixed(6)}, ${wave.warpPhase.toFixed(6)})`)
+    // HF-358 fix: the WebGL2 presentation previously displaced with the legacy
+    // warped-sine OCEAN_WAVES field while CPU buoyancy sampled the frozen
+    // Gerstner spectrum (sampleOcean) — two different phase fields diverging
+    // ~1m on average, a profile-dependent gameplay surface. The vertex shader
+    // now transcribes the SAME OCEAN_BANDS table sampleOcean() reads,
+    // mirroring ocean-tsl.ts exactly (vertical field authoritative; lateral
+    // chop is presentation-only at OCEAN_CHOP_PRESENTATION_GAIN).
+    const glslWaveExpression = OCEAN_BANDS.map((band) => `sampleBand(p, vec2(${band.directionX.toFixed(12)}, ${band.directionZ.toFixed(12)}), ${band.waveNumber.toFixed(12)}, ${band.angularFrequency.toFixed(12)}, ${band.weight.toFixed(12)}, ${band.phase.toFixed(12)}, vec2(${((OCEAN_CHOP_PRESENTATION_GAIN / OCEAN_STEEPNESS_GAIN) * band.steepness * band.directionX).toFixed(12)}, ${((OCEAN_CHOP_PRESENTATION_GAIN / OCEAN_STEEPNESS_GAIN) * band.steepness * band.directionZ).toFixed(12)}))`)
       .join('\n            + ');
     this.material = new THREE.ShaderMaterial({
       transparent: true,
@@ -201,40 +213,44 @@ export class WaterSystem {
         varying float vWave;
         varying vec3 vNormalW;
         varying float vSlope;
-        vec3 sampleWave(
+        // Presentation-only lateral Gerstner chop accumulator (ocean-tsl.ts
+        // parity): displaces XZ, never the vertical field.
+        vec2 chopDisplacement;
+        vec3 sampleBand(
           vec3 p,
           vec2 direction,
-          float frequency,
-          float speed,
+          float waveNumber,
+          float angularFrequency,
           float weight,
           float phaseOffset,
-          vec2 warpDirection,
-          float warpFrequency,
-          float warpSpeed,
-          float warpAmount,
-          float warpOffset
+          vec2 chop
         ) {
-          float warpPhase = dot(p.xz, warpDirection) * warpFrequency + uTime * warpSpeed + warpOffset;
-          float warpCos = cos(warpPhase);
-          float wavePhase = dot(p.xz, direction) * frequency
-            + uTime * speed
-            + phaseOffset
-            + sin(warpPhase) * warpAmount;
+          // HF-358: literal transcription of ocean-spectrum.sampleOcean()'s
+          // phase — k*(d.p) - omega*t + phi — so the drawn surface and the
+          // CPU buoyancy surface are one sea. No warp term. Returns
+          // vec3(height, slopeX, slopeZ) exactly like sampleOcean().
+          float wavePhase = dot(p.xz, direction) * waveNumber - uTime * angularFrequency + phaseOffset;
           float scaledAmplitude = weight * uAmp;
-          vec2 phaseDerivative = direction * frequency
-            + warpDirection * (warpCos * warpAmount * warpFrequency);
+          float sinPhase = sin(wavePhase);
+          float cosPhase = cos(wavePhase);
+          // Presentation-only lateral Gerstner chop (ocean-tsl.ts parity):
+          // displaces XZ, never the vertical field, so no horizontal-
+          // displacement inversion ever enters gameplay sampling.
+          chopDisplacement += -cosPhase * chop;
           return vec3(
-            sin(wavePhase) * scaledAmplitude,
-            cos(wavePhase) * scaledAmplitude * phaseDerivative.x,
-            cos(wavePhase) * scaledAmplitude * phaseDerivative.y
+            sinPhase * scaledAmplitude,
+            cosPhase * scaledAmplitude * waveNumber * direction.x,
+            cosPhase * scaledAmplitude * waveNumber * direction.y
           );
         }
         void main() {
           vec3 p = position;
-          // Deterministically warped long swells avoid the repeating sine-grid
-          // look while keeping the CPU buoyancy sampler exactly in agreement.
+          // HF-358: summed Gerstner bands — the SAME field CPU buoyancy
+          // (sampleOcean) integrates; lateral chop is presentation-only.
+          chopDisplacement = vec2(0.0);
           vec3 wave = ${glslWaveExpression};
           p.y += wave.x;
+          p.xz += chopDisplacement;
           vNormalW = normalize(mat3(modelMatrix) * vec3(-wave.y, 1.0, -wave.z));
           vSlope = length(wave.yz);
           vWave = wave.x;

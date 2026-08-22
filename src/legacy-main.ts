@@ -10419,7 +10419,7 @@ function onNetworkMessage(message: GameMessage): void {
         const entity = killstreakSnapshot.entities.find((e) => e.id === entityId);
         return entity ? { x: entity.position[0], y: entity.position[1], z: entity.position[2] } : null;
       },
-      (kind, emitter) => audio.supportGunPositional(kind, emitter),
+      (kind, emitter, isEnemy) => audio.supportGunPositional(kind, emitter, isEnemy),
       supportShotReplay,
     );
     for (const event of message.events) {
@@ -21351,7 +21351,7 @@ function updatePass65KillstreakRuntime(now: number): void {
         const entity = killstreakSnapshot.entities.find((e) => e.id === entityId);
         return entity ? { x: entity.position[0], y: entity.position[1], z: entity.position[2] } : null;
       },
-      (kind, emitter) => audio.supportGunPositional(kind, emitter),
+      (kind, emitter, isEnemy) => audio.supportGunPositional(kind, emitter, isEnemy),
       supportShotReplay,
     );
     const applied = result.damageEvents.map(applyKillstreakDamageEvent).filter((event): event is KillstreakDamageEvent => event !== null && event.damage > 0);
