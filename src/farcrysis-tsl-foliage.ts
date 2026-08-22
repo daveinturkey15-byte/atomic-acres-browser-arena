@@ -46,6 +46,24 @@ interface WindUniforms {
 
 const _windUniforms: WindUniforms[] = [];
 
+/**
+ * HF-363: number of live registered wind uniforms (test/diagnostic hook).
+ */
+export function tslWindUniformCount(): number {
+  return _windUniforms.length;
+}
+
+/**
+ * HF-363: drop every registered wind uniform.
+ *
+ * Safety net for arena teardown paths that dispose foliage materials without
+ * per-material cleanup; tslAdvanceWind must never keep writing uniforms that
+ * belong to a disposed arena.
+ */
+export function tslResetWindUniforms(): void {
+  _windUniforms.length = 0;
+}
+
 /** Advance every TSL wind uniform. Call once per frame (terrain-mesh driver). */
 export function tslAdvanceWind(time: number): void {
   for (let i = 0; i < _windUniforms.length; i++) _windUniforms[i].time.value = time;
@@ -126,7 +144,16 @@ export function makeTslFoliageMaterial(opts: FoliageOptions): MeshStandardNodeMa
   // ---- PER-INSTANCE PHASE-OFFSET WIND (HF-359) ---------------------------
   if ((opts.swayAmount ?? 0) > 0) {
     const t = uniform(0);
-    _windUniforms.push({ time: t });
+    // HF-363: register the uniform against this material and remove it
+    // automatically when the material is disposed, so disposed arenas stop
+    // receiving per-frame wind writes (legacy-main's disposeRetiredArena /
+    // disposeArenaPresentationRoot dispose every foliage material).
+    const entry: WindUniforms = { time: t };
+    _windUniforms.push(entry);
+    mat.addEventListener('dispose', () => {
+      const idx = _windUniforms.indexOf(entry);
+      if (idx !== -1) _windUniforms.splice(idx, 1);
+    });
 
     const amount = float(opts.swayAmount ?? 0.06);
     const speed = opts.swaySpeed ?? 1.0;

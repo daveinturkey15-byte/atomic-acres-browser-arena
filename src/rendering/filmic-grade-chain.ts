@@ -37,8 +37,8 @@
  * - Split toning is exactly luminance preserving: it is renormalized back to
  *   the incoming Rec.709 luma, so it can only move hue, never visibility.
  * - Grain is achromatic and hard-clamped to <= 1/3 of one 8-bit step, and is
- *   applied display-referred so it is uniform across the tonal range instead
- *   of piling into the shadows the way linear-side dither does.
+ *   applied display-referred so it is uniform across the tonal range. The linear-
+ *   side ordered dither that piled into shadows was removed in HF-363.
  * - Bloom thresholds come from the profile and are asserted > 1.0, so only
  *   true HDR emitters glow and no bright wall washes out a sightline.
  */

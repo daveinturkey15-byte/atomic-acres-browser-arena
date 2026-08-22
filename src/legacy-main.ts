@@ -3835,6 +3835,17 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
       });
     }
     appliedTslArenaDefinitions += 1;
+    // HF-363: hand the arena's authored grain to the display-referred grade stage.
+    // Removing the linear-side ordered dither orphaned the scene pass's own grain
+    // uniform - it is still updated on every definition change but no longer feeds
+    // any node - and setGradeGrainStrength had no production caller, so without this
+    // every arena would silently fall back to the chain's default grain and the
+    // authored per-arena value would reach the picture through nothing at all.
+    // filmGrainScale is carried across because the linear path applied it too;
+    // dropping it here would quietly change what the graphics presets do.
+    renderRuntime.setGradeGrainStrength(
+      module.definition.colorPipeline.grain.strength * graphicsRuntime.post.filmGrainScale,
+    );
     renderRuntime.setRenderTargetTelemetry(pass64TslSystems.principalHdrTarget.samples, pass64TslSystems.bloomSamples);
     const traversal = auditRuntimeTslTraversal(scene, pass64TslSystems.compiledPipelineIds);
     assertRuntimeTslTraversal(traversal);
@@ -26648,11 +26659,21 @@ function frame(now: number, scheduleNext = true): void {
     } else if (selectedArena.id === 'rustworks-1v1') {
       atmosphereSystem?.update(visualNow / 1_000);
     } else if (selectedArena.id === 'gun-range') {
-      updateGunRangePresentation(arena.root, visualNow);
+      // HF-347: pose the training dummies on HOST time, not this peer's own clock.
+      // gunRangeTestBayRenderedDummyPose is a pure function of time with no
+      // replicated phase input, so a guest feeding it its own performance.now()
+      // renders every dummy somewhere the host does not think it is - the guest
+      // aims at a dummy that, host-side, has already moved. currentHostTimeMs()
+      // returns performance.now() unchanged for solo and host, and the monotonic
+      // host-mapped time for a client, so the patrol converges across peers with
+      // no protocol change. The debug capture override still wins so deterministic
+      // visual captures stay reproducible.
+      const dummyNow = debugCaptureFixedVisualTimeMs ?? currentHostTimeMs();
+      updateGunRangePresentation(arena.root, dummyNow);
       // HF-318: derive the dummy colliders on the same clock that just posed the
       // rendered dummies, so the solid volume tracks the visible patrol position
       // rather than lagging it by a frame.
-      refreshGunRangeTestBayDummyColliders(visualNow);
+      refreshGunRangeTestBayDummyColliders(dummyNow);
       const doorState = updateGunRangeTestBayDoorAuthority(now)
         ?? gunRangeTestBayDoorState
         ?? createGunRangeTestBayDoorState(now);

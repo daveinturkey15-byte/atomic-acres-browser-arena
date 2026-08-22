@@ -358,4 +358,26 @@ describe('Pass 64 authored TSL pipeline set', () => {
     expect((placeholder.userData.waterBody as unknown)).toBeUndefined();
     systems.dispose();
   });
+
+  it('HF-358: arena switch disposes the retired water subtree including the child horizon ring', async () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['rustworks-1v1']()).definition;
+    const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition);
+    const water = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
+    // The horizon skirt is a CHILD of the water mesh with its own geometry/material.
+    const horizon = water.getObjectByName('Pass 66 curved RustRig ocean horizon') as THREE.Mesh;
+    expect(horizon).toBeInstanceOf(THREE.Mesh);
+    const horizonGeometryDispose = vi.spyOn(horizon.geometry, 'dispose');
+    const horizonMaterialDispose = vi.spyOn(
+      horizon.material as THREE.Material,
+      'dispose',
+    );
+    // Switching to a waterless arena retires the whole water node.
+    systems.applyDefinition((await ARENA_VISUAL_REGISTRY['gun-range']()).definition);
+    expect(horizonGeometryDispose).toHaveBeenCalled();
+    expect(horizonMaterialDispose).toHaveBeenCalled();
+    systems.dispose();
+  });
 });

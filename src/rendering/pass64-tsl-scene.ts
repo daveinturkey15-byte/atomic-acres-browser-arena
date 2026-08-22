@@ -13,7 +13,6 @@ import {
   color,
   dot,
   float,
-  fract,
   instanceIndex,
   mix,
   max,
@@ -523,9 +522,24 @@ function applyArenaSystemLayout(
     // retired arena's water appears to leak into an arena that has none.
     existingWater.visible = false;
     existingWater.removeFromParent();
-    (existingWater.geometry as THREE.BufferGeometry).dispose();
-    const materials = Array.isArray(existingWater.material) ? existingWater.material : [existingWater.material];
-    for (const material of materials) material.dispose();
+    // HF-358: dispose the whole retired SUBTREE, not just the root mesh. The
+    // horizon skirt (src/water/ocean-tsl.ts) is a CHILD of the water mesh with
+    // its own RingGeometry and MeshBasicMaterial; once detached it is invisible
+    // to any later scene-graph traversal, so skipping descendants leaks one
+    // ring geometry and one material per arena switch, without bound.
+    existingWater.traverse((descendant) => {
+      const meshLike = descendant as {
+        geometry?: THREE.BufferGeometry;
+        material?: THREE.Material | THREE.Material[];
+      };
+      meshLike.geometry?.dispose();
+      const descendantMaterials = Array.isArray(meshLike.material)
+        ? meshLike.material
+        : [meshLike.material];
+      for (const material of descendantMaterials) {
+        if (material) material.dispose();
+      }
+    });
     const next = makeWater(definition.id, graphics.oceanWaveAmplitude);
     if (parent && index >= 0) {
       parent.children.splice(Math.min(index, parent.children.length), 0, next);
@@ -709,17 +723,15 @@ function configureHdrPipeline(
   }
   const saturation = uniform(definition.colorPipeline.grade.saturation);
   const contrast = uniform(definition.colorPipeline.grade.contrast);
-  // Definition strength is authored in 8-bit output steps. Convert it before
-  // adding the dither in linear HDR; using it as a 0-1 scalar creates noise.
+  // HF-363: linear-side ordered dither removed — display-referred grain now lives
+  // in the filmic grade chain (per-frame-luminance-grain stage). Linear vignette
+  // is retained as a separate deliberate stage.
   const grain = uniform(definition.colorPipeline.grain.strength / 255 * graphics.post.filmGrainScale);
   const vignette = uniform(graphics.post.vignetteStrength);
   const contactOcclusionStrength = uniform(graphics.ambientOcclusion.enabled ? graphics.ambientOcclusion.strength : 0);
   const luma = dot(sceneColor.rgb, vec3(0.2126, 0.7152, 0.0722));
   const saturated = mix(vec3(luma), sceneColor.rgb, saturation);
   const contrasted = saturated.sub(0.5).mul(contrast).add(0.5);
-  const orderedDither = fract(sin(dot(screenUV.mul(vec2(4096, 2160)), vec2(12.9898, 78.233))).mul(43758.5453))
-    .sub(0.5)
-    .mul(grain);
   const pixel = vec2(1).div(screenSize);
   const depthRight = sceneDepth.sample(screenUV.add(vec2(pixel.x, 0)));
   const depthUp = sceneDepth.sample(screenUV.add(vec2(0, pixel.y)));
@@ -730,41 +742,41 @@ function configureHdrPipeline(
   const depthEdgeGuard = float(1).sub(smoothstep(0.00035, 0.0035, depthDiscontinuity));
   const emissiveBloom = bloom(sceneColor, graphics.post.bloomStrength, 0.32, 0.92);
   const contactOcclusion = gtaoPass
-    ? mix(float(1), gtaoPass.getTextureNode().r, contactOcclusionStrength)
-    : float(1);
-  const hdrWithBloom = contrasted.mul(contactOcclusion).add(emissiveBloom.rgb.mul(depthEdgeGuard));
-  const vignetteDistance = dot(screenUV.sub(0.5), screenUV.sub(0.5));
-  const vignetteFalloff = smoothstep(0.12, 0.5, vignetteDistance).mul(vignette).mul(0.42);
-  const postColor = hdrWithBloom.add(orderedDither).mul(float(1).sub(vignetteFalloff));
-  renderPipeline.outputNode = vec4(postColor, sceneColor.a);
-  renderPipeline.needsUpdate = true;
-  return {
-    scenePass,
-    applyDefinition(next) {
-      activeDefinition = next;
-      saturation.value = next.colorPipeline.grade.saturation;
-      contrast.value = next.colorPipeline.grade.contrast;
-      grain.value = next.colorPipeline.grain.strength / 255 * activeGraphics.post.filmGrainScale;
-    },
-    applyGraphics(next) {
-      activeGraphics = next;
-      grain.value = activeDefinition.colorPipeline.grain.strength / 255 * next.post.filmGrainScale;
-      vignette.value = next.post.vignetteStrength;
-      emissiveBloom.strength.value = next.post.bloomStrength;
-      contactOcclusionStrength.value = gtaoPass && next.ambientOcclusion.enabled
-        ? next.ambientOcclusion.strength
-        : 0;
-      if (gtaoPass && next.ambientOcclusion.enabled) {
-        gtaoPass.resolutionScale = next.ambientOcclusion.resolutionScale;
-        gtaoPass.samples.value = next.ambientOcclusion.samples;
-        gtaoPass.radius.value = next.ambientOcclusion.radius;
-      }
-    },
-    dispose() {
-      gtaoPass?.dispose();
-    },
-  };
-}
+      ? mix(float(1), gtaoPass.getTextureNode().r, contactOcclusionStrength)
+      : float(1);
+    const hdrWithBloom = contrasted.mul(contactOcclusion).add(emissiveBloom.rgb.mul(depthEdgeGuard));
+    const vignetteDistance = dot(screenUV.sub(0.5), screenUV.sub(0.5));
+    const vignetteFalloff = smoothstep(0.12, 0.5, vignetteDistance).mul(vignette).mul(0.42);
+    const postColor = hdrWithBloom.mul(float(1).sub(vignetteFalloff));
+    renderPipeline.outputNode = vec4(postColor, sceneColor.a);
+    renderPipeline.needsUpdate = true;
+    return {
+      scenePass,
+      applyDefinition(next) {
+        activeDefinition = next;
+        saturation.value = next.colorPipeline.grade.saturation;
+        contrast.value = next.colorPipeline.grade.contrast;
+        grain.value = next.colorPipeline.grain.strength / 255 * activeGraphics.post.filmGrainScale;
+      },
+      applyGraphics(next) {
+        activeGraphics = next;
+        grain.value = activeDefinition.colorPipeline.grain.strength / 255 * next.post.filmGrainScale;
+        vignette.value = next.post.vignetteStrength;
+        emissiveBloom.strength.value = next.post.bloomStrength;
+        contactOcclusionStrength.value = gtaoPass && next.ambientOcclusion.enabled
+          ? next.ambientOcclusion.strength
+          : 0;
+        if (gtaoPass && next.ambientOcclusion.enabled) {
+            gtaoPass.resolutionScale = next.ambientOcclusion.resolutionScale;
+            gtaoPass.samples.value = next.ambientOcclusion.samples;
+            gtaoPass.radius.value = next.ambientOcclusion.radius;
+          }
+        },
+        dispose() {
+          gtaoPass?.dispose();
+        },
+      };
+    }
 
 function disposeRoot(root: THREE.Group): void {
   const geometries = new Set<THREE.BufferGeometry>();
