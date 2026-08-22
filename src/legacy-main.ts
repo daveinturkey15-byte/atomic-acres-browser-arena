@@ -804,6 +804,10 @@ import { TracerPool } from './tracer-pool';
 import { AsyncSerialQueue } from './async-serial-queue';
 import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadOperatorSkinAsset, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, resolveRiggedOperatorRuntimeRoot, riggedOperatorAssetReady, riggedOperatorCanonicalEvidenceManifest, riggedOperatorHandEvidenceIdentity, riggedOperatorTelemetry } from './operator-model';
 import { isSelectableOperatorSkinId } from './operator-skin-catalog'; // HF-360
+// HF-339/HF-355: the centre banner has ONE owner. Every write goes through
+// presentBanner/clearCentreBanner below; direct element('#banner') writes are
+// banned (they reintroduce the overwrite race the arbiter closes).
+import { clearBanners, createBannerState, expireBanner, requestBanner, type BannerPriority, type BannerState, type BannerTransition } from './banner-arbiter';
 import {
   WeaponPresentation,
   type WeaponViewmodelCatalogGpuPrewarmer,
@@ -6442,9 +6446,7 @@ function showFatalError(error: unknown): void {
   setLocalTriggerHeld(false);
   setStatus(`Game paused: ${message}`, 'error');
   applyMenuLifecycle({ type: 'fatal-error' });
-  const banner = element<HTMLElement>('#banner');
-  banner.innerHTML = '<strong>SYSTEM PAUSED</strong><span>Reload the page to re-enter the test block.</span>';
-  banner.hidden = false;
+  presentBanner('fatal', 'SYSTEM PAUSED', 'Reload the page to re-enter the test block.', null);
   console.error('[Nuke Town fatal]', error);
 }
 
@@ -6455,6 +6457,50 @@ if (!webRtcSupported) {
   setStatus('This browser lacks WebRTC; solo training is still available.', 'warn');
 } else if (typeof canvas.requestPointerLock !== 'function') {
   setStatus('Pointer lock is unavailable; keyboard movement works but mouse aim may not.', 'warn');
+}
+
+// HF-339: centre-banner ownership. See banner-arbiter.ts for the ranking.
+let centreBannerState: BannerState = createBannerState();
+let centreBannerRequestSeq = 0;
+
+function applyCentreBannerTransition(transition: BannerTransition): void {
+  centreBannerState = transition.state;
+  if (transition.display.kind === 'none') return;
+  const banner = element<HTMLElement>('#banner');
+  if (transition.display.kind === 'hide') {
+    banner.hidden = true;
+    return;
+  }
+  banner.innerHTML = transition.display.html
+    ?? `<strong>${transition.display.headline}</strong><span>${transition.display.subline}</span>`;
+  banner.hidden = false;
+}
+
+/** Composite screens (match end) present raw markup but still take ownership
+ * through the arbiter, so no stale lower-rank expiry can hide them. */
+function presentBannerHtml(priority: BannerPriority, ownershipHeadline: string, html: string, durationMs: number | null): number {
+  const id = ++centreBannerRequestSeq;
+  applyCentreBannerTransition(requestBanner(centreBannerState, {
+    id, priority, headline: ownershipHeadline, subline: '', durationMs, html,
+  }));
+  if (durationMs !== null) {
+    window.setTimeout(() => applyCentreBannerTransition(expireBanner(centreBannerState, id)), durationMs);
+  }
+  return id;
+}
+
+/** The only sanctioned writer of #banner. Returns the request id. */
+function presentBanner(priority: BannerPriority, headline: string, subline: string, durationMs: number | null): number {
+  const id = ++centreBannerRequestSeq;
+  applyCentreBannerTransition(requestBanner(centreBannerState, { id, priority, headline, subline, durationMs }));
+  if (durationMs !== null) {
+    window.setTimeout(() => applyCentreBannerTransition(expireBanner(centreBannerState, id)), durationMs);
+  }
+  return id;
+}
+
+function clearCentreBanner(): void {
+  applyCentreBannerTransition(clearBanners());
 }
 
 function setNetworkStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
@@ -9023,7 +9069,7 @@ function returnPrivateMatchToLobby(asHost: boolean, admissionToken?: MatchAdmiss
   matchWebGpuQualityFrozen = false;
   weaponView.setPresentationVisible(false);
   hudRoot.hidden = true;
-  element<HTMLElement>('#banner').hidden = true;
+  clearCentreBanner(); // HF-339
   element<HTMLElement>('#countdown').hidden = true;
   applyMenuLifecycle({ type: 'return-pre-match' });
   setArenaMenuCamera();
@@ -15856,12 +15902,10 @@ function presentRareWeaponSpawn(input: RareWeaponAnnouncementInput): void {
   const presentation = presentRareWeaponAnnouncement(input);
   addFeed(presentation.feed.text, presentation.feed.tone);
   if (presentation.banner) {
-    const banner = element<HTMLElement>('#banner');
-    banner.innerHTML = `<strong>${presentation.banner.headline}</strong><span>${presentation.banner.subline}</span>`;
-    banner.hidden = false;
-    window.setTimeout(() => {
-      if (banner.textContent?.includes(presentation.banner!.headline)) banner.hidden = true;
-    }, presentation.banner.durationMs);
+    // HF-339: routed through the arbiter, so a spawn announcement inside the
+    // ENGAGE window queues and is promoted when ENGAGE expires, instead of
+    // being overwritten and then hidden by ENGAGE's own timeout.
+    presentBanner('announcement', presentation.banner.headline, presentation.banner.subline, presentation.banner.durationMs);
   }
   // HF-339: the audible half of "unmistakable to every player". Reuses the
   // overdrive-available sting rather than adding a new audio method, so the
@@ -23971,18 +24015,23 @@ function updateMatchState(now: number): void {
     }
   } else if (matchState.phase !== 'active' || lastMatchCountdownCue !== 'engage') hideMatchCountdownCue();
   if (previous === matchState.phase) return;
-  const banner = element<HTMLElement>('#banner');
   if (matchState.phase === 'active') {
     const engageSequence = presentMatchCountdownCue('engage');
     audio.matchCountdown('engage');
     lastMatchCountdownCue = 'engage';
     if (network.role === 'host' && privateLobbySnapshot?.phase !== 'active') broadcastHostLobby('active');
     else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'active' };
-    banner.innerHTML = `<strong>ENGAGE</strong><span>${privateMatchMode === 'ffa' && gameMode !== 'solo' ? 'FREE FOR ALL · EVERY PLAYER HOSTILE' : selectedArena.rulesLabel}</span>`;
-    banner.hidden = false;
+    // HF-339: the arbiter's expiry can only hide ENGAGE while ENGAGE is still
+    // the active banner, so this timeout can never hide a rare-weapon
+    // announcement that took over or queued behind it.
+    presentBanner(
+      'match-flow',
+      'ENGAGE',
+      privateMatchMode === 'ffa' && gameMode !== 'solo' ? 'FREE FOR ALL · EVERY PLAYER HOSTILE' : selectedArena.rulesLabel,
+      900,
+    );
     window.setTimeout(() => {
       if (matchState.phase !== 'active') return;
-      banner.hidden = true;
       if (element<HTMLElement>('#countdown').dataset.cueSequence === String(engageSequence)) hideMatchCountdownCue();
     }, 900);
     return;
@@ -24161,8 +24210,12 @@ function updateMatchState(now: number): void {
       };
       syncMatchReportDownloads();
     }
-    banner.innerHTML = `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span>${statsMarkup}<div class="match-end-actions"><button id="download-match-summary" type="button">HUMAN SUMMARY JSON</button><button id="download-match-diagnostics" type="button">TECHNICAL DEBUG JSON</button><button id="rematch" type="button" ${privateMatch && network.role !== 'host' ? 'disabled' : ''}>${returnLabel}</button><button id="match-main-menu" type="button">MAIN MENU</button></div>`;
-    banner.hidden = false;
+    presentBannerHtml(
+      'match-flow',
+      presentation.headline ?? 'MATCH COMPLETE',
+      `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span>${statsMarkup}<div class="match-end-actions"><button id="download-match-summary" type="button">HUMAN SUMMARY JSON</button><button id="download-match-diagnostics" type="button">TECHNICAL DEBUG JSON</button><button id="rematch" type="button" ${privateMatch && network.role !== 'host' ? 'disabled' : ''}>${returnLabel}</button><button id="match-main-menu" type="button">MAIN MENU</button></div>`,
+      null,
+    );
     element<HTMLButtonElement>('#download-match-summary').addEventListener('click', downloadMatchSummary);
     element<HTMLButtonElement>('#download-match-diagnostics').addEventListener('click', downloadMatchDiagnostics);
     const rematch = element<HTMLButtonElement>('#rematch');
@@ -26271,7 +26324,7 @@ function resetForMode(preserveAdmission = false): void {
   resetBreakableWindows();
   for (const id of remotes.keys()) removeRemote(id, 'cleared', false);
   verifiedRemoteKills.clear();
-  element<HTMLElement>('#banner').hidden = true;
+  clearCentreBanner(); // HF-339
   element<HTMLElement>('#countdown').hidden = true;
   element<HTMLElement>('#respawn').hidden = true;
   element<HTMLElement>('#death-fade').classList.remove('death-wash', 'respawn-flash');
