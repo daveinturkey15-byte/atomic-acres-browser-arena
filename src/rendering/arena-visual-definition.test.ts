@@ -8,6 +8,7 @@ import type { ArenaId } from '../map-selection';
 import type { ArenaVisualDefinition, LoadedArenaVisual } from './arena-visual-definition';
 import { createIdempotentRootDisposer, validateArenaVisualDefinition } from './arena-visual-definition';
 import { ARENA_VISUAL_REGISTRY, ArenaVisualStreamController, type ArenaVisualRegistry } from './arena-visual-stream';
+import { skyBackdropAssetForPreset, skyBackdropPreset } from './sky-backdrop';
 
 const ARENA_IDS: readonly ArenaId[] = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal', 'farcrysis', 'high-seas'];
 
@@ -35,6 +36,15 @@ describe('Pass 64 arena visual definitions', () => {
         if (practical.policy === 'shadowed-local') expect(practical.castsShadow).toBe(true);
         else expect(practical.castsShadow).toBe(false);
       }
+    }
+  });
+
+  it('declares the exact generated sky selected by every supported arena preset', async () => {
+    for (const id of ARENA_IDS) {
+      const { definition } = await ARENA_VISUAL_REGISTRY[id]();
+      expect(skyBackdropPreset(definition.atmosphere.preset)).toBe(definition.atmosphere.preset);
+      const selectedSky = skyBackdropAssetForPreset(definition.atmosphere.preset);
+      if (selectedSky) expect(definition.assetDependencies).toContain(selectedSky);
     }
   });
 

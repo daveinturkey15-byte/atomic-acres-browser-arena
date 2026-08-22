@@ -2875,7 +2875,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   addPalletStack('east', 24, 22, false);
 
   for (let z = -10; z <= 30; z += 10) {
-    box(builder, 'skyline-tarmac-stripe', [0, 0.02, z], [1.2, 0.03, 4.0], hazardMat, { solid: false, shots: false });
+    box(builder, 'skyline-tarmac-stripe', [0, 0.027, z], [1.2, 0.03, 4.0], hazardMat, { solid: false, shots: false });
   }
 
   // A repeated apron grid and stand envelope give the large exterior plane
@@ -2884,7 +2884,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     detailBox('apron-marking', `skyline-apron-seam-x-${seamX}`, [seamX, 0.023, 8], [0.035, 0.018, 54], stainMat);
   }
   for (let seamZ = -16; seamZ <= 32; seamZ += 8) {
-    detailBox('apron-marking', `skyline-apron-seam-z-${seamZ}`, [0, 0.024, seamZ], [68, 0.018, 0.035], stainMat);
+    detailBox('apron-marking', `skyline-apron-seam-z-${seamZ}`, [0, 0.028, seamZ], [68, 0.018, 0.035], stainMat);
   }
   for (const [name, x, z, width, depth] of [
     ['north', 0, -0.15, 43, 0.16],
@@ -2892,7 +2892,8 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     ['west', -21.4, 2, 0.16, 4.45],
     ['east', 21.4, 2, 0.16, 4.45],
   ] as const) {
-    detailBox('apron-marking', `skyline-aircraft-stand-${name}`, [x, 0.036, z], [width, 0.025, depth], hazardMat);
+    const markingY = name === 'west' || name === 'east' ? 0.041 : 0.036;
+    detailBox('apron-marking', `skyline-aircraft-stand-${name}`, [x, markingY, z], [width, 0.025, depth], hazardMat);
   }
   detailBox('apron-marking', 'skyline-apron-lead-in-dark', [0, 0.034, 20], [0.35, 0.025, 28], floorBorderMat);
   detailBox('apron-marking', 'skyline-apron-lead-in-amber', [0, 0.049, 20], [0.12, 0.02, 28], hazardMat);
@@ -2902,7 +2903,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     detailBox('apron-marking', `skyline-apron-gate-chevron-${z}`, [0, 0.054, z], [8.6, 0.022, 0.12], z === 12 ? magentaPracticalMat : practicalMat);
   }
   for (const [z, rotationY] of [[12, 0.08], [-8, -0.08]] as const) {
-    detailBox('apron-marking', `skyline-engine-stain-${z}`, [0, 0.031, z], [3.4, 0.022, 5.2], stainMat, 'performance', [0, rotationY, 0]);
+    detailBox('apron-marking', `skyline-engine-stain-${z}`, [0, 0.041, z], [3.4, 0.022, 5.2], stainMat, 'performance', [0, rotationY, 0]);
   }
 
   box(builder, 'skyline-concourse-floor', [0, 0.02, -23], [60, 0.08, 22], floorMat, { solid: false });
@@ -2919,14 +2920,14 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   // from either spawn and through the glass facade.
   detailBox('floor-language', 'skyline-floor-cyan-runner-west', [-2.3, 0.091, -22.5], [0.16, 0.022, 20.2], practicalMat);
   detailBox('floor-language', 'skyline-floor-cyan-runner-east', [2.3, 0.091, -22.5], [0.16, 0.022, 20.2], practicalMat);
-  detailBox('floor-language', 'skyline-floor-magenta-crossing', [0, 0.093, -20.4], [24, 0.024, 0.16], magentaPracticalMat);
-  detailBox('floor-language', 'skyline-floor-window-border', [0, 0.074, -12.55], [59.2, 0.028, 0.52], floorBorderMat);
+  detailBox('floor-language', 'skyline-floor-magenta-crossing', [0, 0.095, -20.4], [24, 0.024, 0.16], magentaPracticalMat);
+  detailBox('floor-language', 'skyline-floor-window-border', [0, 0.080, -12.55], [59.2, 0.028, 0.52], floorBorderMat);
   detailBox('floor-language', 'skyline-floor-backwall-border', [0, 0.074, -33.4], [59.2, 0.028, 0.52], floorBorderMat);
   for (let tileX = -27; tileX <= 27; tileX += 6) {
     detailBox('floor-language', `skyline-floor-joint-x-${tileX}`, [tileX, 0.076, -23], [0.025, 0.018, 20.2], floorBorderMat);
   }
   for (let tileZ = -31; tileZ <= -15; tileZ += 4) {
-    detailBox('floor-language', `skyline-floor-joint-z-${tileZ}`, [0, 0.077, tileZ], [58.5, 0.018, 0.025], floorBorderMat);
+    detailBox('floor-language', `skyline-floor-joint-z-${tileZ}`, [0, 0.084, tileZ], [58.5, 0.018, 0.025], floorBorderMat);
   }
   // Split the mezzanine around both escalators. A monolithic slab creates a
   // low underside above each ramp and physically stops the character halfway.
@@ -2951,8 +2952,8 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     detailBox('terminal-story', `skyline-mezzanine-front-coffer-light-${x}`, [x, 2.981, -25.2], [4.6, 0.022, 0.13], x === 0 ? magentaPracticalMat : practicalMat);
   }
   for (const lightX of [-18, -10, 0, 10, 18]) {
-    detailBox('terminal-story', `skyline-mezzanine-underlight-${lightX}`, [lightX, 3.005, -29.8], [5.4, 0.025, 0.11], practicalMat);
-    detailBox('terminal-story', `skyline-mezzanine-underlight-front-${lightX}`, [lightX, 3.005, -24.3], [5.4, 0.025, 0.11], practicalMat);
+    detailBox('terminal-story', `skyline-mezzanine-underlight-${lightX}`, [lightX, 3.007, -29.8], [5.4, 0.025, 0.11], practicalMat);
+    detailBox('terminal-story', `skyline-mezzanine-underlight-front-${lightX}`, [lightX, 3.007, -24.3], [5.4, 0.025, 0.11], practicalMat);
   }
   detailBox('floor-language', 'skyline-mezzanine-front-edge', [0, 3.36, -22.12], [52, 0.12, 0.34], floorBorderMat);
   for (const x of [-23.5, -16, -8, 0, 8, 16, 23.5]) {

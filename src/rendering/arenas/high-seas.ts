@@ -1,13 +1,13 @@
 import { buildHighSeas } from '../../high-seas';
 import { createProceduralArenaVisualDefinition } from '../arena-visual-definition';
-import { ATOMIC_ACRES_GENERATED_SKY_ASSET_URL } from '../sky-backdrop';
+import { TERMINAL_GENERATED_SKY_ASSET_URL } from '../sky-backdrop';
 import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared';
 
 export const definition = createProceduralArenaVisualDefinition({
   id: 'high-seas',
   displayLabel: 'High Seas',
   moduleId: 'arena.visual.high-seas.v1',
-  assetDependencies: [ATOMIC_ACRES_GENERATED_SKY_ASSET_URL],
+  assetDependencies: [TERMINAL_GENERATED_SKY_ASSET_URL],
   sharedAssetDependencies: SHARED_GAMEPLAY_ASSETS,
   lighting: {
     sunColor: 0xffe3bb, sunIntensity: 3, ambientColor: 0x9fc7cf, ambientIntensity: 0.4,
@@ -19,7 +19,7 @@ export const definition = createProceduralArenaVisualDefinition({
   },
   fog: { color: 0xb8d6dc, near: 42, far: 132 },
   shadows: { enabled: true, mapSize: 2048, maximumDistance: 150, normalBias: 0.03 },
-  atmosphere: { preset: 'open-ocean-daybreak', mist: 0.16, dust: 0.04, clouds: true },
+  atmosphere: { preset: 'airport-dawn', mist: 0.16, dust: 0.04, clouds: true },
   colorPipeline: colorPipeline('pass75.high-seas.hdr.v1', 1.06),
   budgets: budgets({ maximumDrawCalls: 480, maximumTriangles: 950_000 }),
   reviewCameras: [

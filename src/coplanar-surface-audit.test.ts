@@ -65,6 +65,24 @@ describe('coplanar surface audit', () => {
     expect(audit.pairs.length).toBeGreaterThan(0);
   });
 
+  it('audits each instanced box at its own world transform', () => {
+    const root = new THREE.Group();
+    const instances = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(2, 0.01, 2),
+      new THREE.MeshStandardMaterial(),
+      2,
+    );
+    instances.name = 'litter';
+    instances.setMatrixAt(0, new THREE.Matrix4().makeTranslation(-5, 0.01, 0));
+    instances.setMatrixAt(1, new THREE.Matrix4().makeTranslation(5, 0.012, 0));
+    root.add(instances);
+
+    const specs = collectHorizontalOverlaySpecs(root);
+    expect(specs.map(({ name }) => name)).toEqual(['litter[0]', 'litter[1]']);
+    expect(specs.map(({ minX, maxX }) => [minX, maxX])).toEqual([[-6, -4], [4, 6]]);
+    expect(findNearCoplanarPairs(specs, 0.004)).toEqual([]);
+  });
+
 function installCanvasDocument(): () => void {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'document');
   const contextState: Record<PropertyKey, unknown> = { font: '900 30px sans-serif' };
@@ -113,6 +131,7 @@ function installCanvasDocument(): () => void {
       const { buildSkylineTerminal, buildRustworks1v1, buildGunRange } = await import('./additional-maps');
       const { buildArena } = await import('./map');
       const { buildFarcrysis } = await import('./farcrysis');
+      const { buildHighSeas } = await import('./high-seas');
 
       const arenas = [
         { name: 'Skyline Terminal', map: buildSkylineTerminal(new THREE.Scene()), near: 0.08, far: 190, maxDist: 71.72 },
@@ -120,11 +139,20 @@ function installCanvasDocument(): () => void {
         { name: 'Gun Range', map: buildGunRange(new THREE.Scene()), near: 0.08, far: 190, maxDist: 44.66 },
         { name: 'Atomic Acres', map: buildArena(new THREE.Scene()), near: 0.08, far: 190, maxDist: 68.88 },
         { name: 'Farcrysis', map: buildFarcrysis(new THREE.Scene()), near: 0.08, far: 190, maxDist: 40.0 },
+        { name: 'High Seas', map: buildHighSeas(new THREE.Scene()), near: 0.08, far: 190, maxDist: 88.0 },
       ];
 
-      const results = arenas.map(({ name, map, near, far, maxDist }) => {
+      const audits = arenas.map(({ name, map, near, far, maxDist }) => {
         const audit = arenaHorizontalSurfaceAudit(map.root, near, far, maxDist);
-        return `${name}: threshold=${audit.threshold}, pairs=${audit.pairs.length}, pass=${audit.pass}`;
+        return { name, audit };
+      });
+      const failures = audits.filter(({ audit }) => !audit.pass);
+      if (failures.length === 0) return;
+      const results = failures.map(({ name, audit }) => {
+        const examples = audit.pairs.slice(0, 12)
+          .map((pair) => `${pair.a} <> ${pair.b} dy=${pair.dy} overlap=${pair.overlapX}x${pair.overlapZ}`)
+          .join('\n  ');
+        return `${name}: threshold=${audit.threshold}, pairs=${audit.pairs.length}, pass=${audit.pass}${examples ? `\n  ${examples}` : ''}`;
       }).join('\n');
       throw new Error(results);
     } finally {
@@ -132,11 +160,6 @@ function installCanvasDocument(): () => void {
     }
   }, 20_000);
 });
-
-
-
-
-
 
 
 

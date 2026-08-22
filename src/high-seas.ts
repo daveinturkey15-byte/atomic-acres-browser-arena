@@ -794,8 +794,8 @@ function addSpawnFeatures(
     [-Math.PI / 2, 0, 0],
   );
   landingRing.userData.markingLanguage = 'original-unbranded-emergency-circle';
-  for (const rotationY of [0, Math.PI / 3, -Math.PI / 3]) {
-    detailBox(builder, `high-seas-bow-circle-spoke-${rotationY}`, [0, 3.22, -35.8], [0.16, 0.025, 4.8], trimMaterial, [0, rotationY, 0]);
+  for (const [index, rotationY] of [0, Math.PI / 3, -Math.PI / 3].entries()) {
+    detailBox(builder, `high-seas-bow-circle-spoke-${rotationY}`, [0, 3.22 + index * 0.007, -35.8], [0.16, 0.025, 4.8], trimMaterial, [0, rotationY, 0]);
   }
   box(builder, 'high-seas-bow-canopy', [0, 5.66, -31.2], [7.4, 0.24, 3.2], wallMaterial, {
     ballisticMaterial: 'structural-metal',
