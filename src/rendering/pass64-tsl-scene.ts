@@ -542,7 +542,14 @@ function applyArenaSystemLayout(
     const body = waterBodyForArena(definition.id);
     water.visible = body !== null && (water.userData.waveBands ?? 0) > 0;
     const defaultAmplitude = body ? oceanAmplitudeForBody(body) : 0;
-    const amplitude = graphics.oceanWaveAmplitude ?? defaultAmplitude;
+    // HF-358 audit correction: the graphics setting is a PROFILE gain, not an
+    // arena's authored sea state. Reading it with `?? default` made every
+    // authored amplitudeScale dead code, because the runtime always supplies a
+    // value - so a calm shore inherited the RustRig storm. Scale the profile gain
+    // by the body's authored factor instead of letting it replace it.
+    const amplitude = graphics.oceanWaveAmplitude !== undefined && body
+      ? graphics.oceanWaveAmplitude * body.amplitudeScale
+      : graphics.oceanWaveAmplitude ?? defaultAmplitude;
     const amplitudeUniform = water.userData.waveAmplitudeUniform as { value: number } | undefined;
     if (amplitudeUniform) amplitudeUniform.value = amplitude;
     water.userData.waveAmplitude = amplitude;

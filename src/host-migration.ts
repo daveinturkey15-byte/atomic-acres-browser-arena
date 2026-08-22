@@ -47,11 +47,18 @@
  * No transport, no role flip, no authority transfer. Those live in network.ts /
  * protocol.ts / legacy-main.ts and are owned elsewhere; see
  * scratchpad/wave2-handoffs/hf325-host-migration.md for the exact deltas.
- * Critically, the promoted guest has no match authority to adopt: the 90s
- * checkpoint is written to the *host's own* localStorage and is never shipped
- * over the wire, so no guest holds one. Until a host->guest authority mirror
- * exists, `authorizeSelfPromotion` can be satisfied but promotion still must not
- * be enabled — the handoff spells out why.
+ * The authority a promoted guest would adopt is now built in
+ * `host-authority-mirror.ts`: it reshapes a host checkpoint so the successor's
+ * own entry becomes `hostPlayer`, and it re-expresses the document in the
+ * receiver's clock so wall-clock skew cannot masquerade as downtime. That
+ * removes the reason promotion could never be safe, but it does NOT enable
+ * promotion: nothing ships the mirror over the wire yet, `network.ts` still has
+ * no `role: 'client' -> 'host'` flip, and — decisively — the stale-host
+ * stand-down path does not exist, so during a signalling blip two peers could
+ * still both believe they own the match. `authorizeSelfPromotion` therefore
+ * keeps refusing with `no-authority-to-adopt` for every real caller, because no
+ * real caller can yet set `holdsMirroredAuthority`. Do not wire it until all
+ * three land; the handoff spells out why.
  */
 
 import { REJOIN_GRACE_MS } from './private-match';
@@ -474,8 +481,12 @@ export type SelfPromotionSample = Readonly<{
   roster: SuccessionRoster;
   /**
    * Whether this guest actually holds mirrored match authority for the room.
-   * False today for every guest: the checkpoint is host-local and never sent.
-   * Promotion without it would resume a match nobody can reconstruct, so it is
+   * Compute it with `mirrorGrantsAuthorityTo` from `host-authority-mirror.ts`,
+   * never by inspecting a checkpoint by hand: the mirror must name THIS peer,
+   * THIS room and THIS term, or it authorises nothing.
+   *
+   * False today for every guest, because no wire message ships a mirror yet.
+   * Promotion without one would resume a match nobody can reconstruct, so it is
    * a hard refusal rather than a best-effort guess.
    */
   holdsMirroredAuthority: boolean;

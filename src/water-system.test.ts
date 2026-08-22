@@ -94,13 +94,16 @@ describe('WaterSystem', () => {
   // HF-358: the water-authoring registry replaces the hard-coded rustworks
   // gate as the single source of which arenas have water.
   it('drives configuration from the per-arena water body registry (HF-358)', () => {
+    // HF-358 audit correction: farcrysis is deliberately NOT registered. It authors
+    // its own three water layers, so registering it built a SECOND ocean 20mm below
+    // the real one - and because the runtime always supplies oceanWaveAmplitude, the
+    // authored amplitudeScale of 0.2 never applied and the arena inherited RustRig's
+    // storm, cresting ~2m above a play space with a ~1.6m eye height. Registering it
+    // again requires replacing the arena's own layers first, not duplicating them.
     const farcrysis = new WaterSystem(new THREE.Scene());
     farcrysis.configure('farcrysis' as ArenaId, 'blender', { halfX: 32, halfZ: 32 });
-    const telemetry = farcrysis.telemetry();
-    expect(telemetry.enabled).toBe(true);
-    expect(telemetry.waterLevel).toBe(-0.3);
-    expect(farcrysis.swimmable).toBe(true);
-    expect(farcrysis.body?.arenaId).toBe('farcrysis');
+    expect(farcrysis.body).toBeNull();
+    expect(farcrysis.telemetry().enabled).toBe(false);
 
     // RustRig regression guard: exact pre-HF-358 behaviour preserved.
     const rustworks = new WaterSystem(new THREE.Scene());

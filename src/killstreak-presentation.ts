@@ -434,31 +434,151 @@ function applyAuthoredSupportShadowBudget(
     // colour pass. Shadow maps only need the major opaque silhouette; making
     // every instrument, emissive chip, line and transparent rotor disc a
     // caster multiplied support-streak submissions without a visible benefit.
-    // HF-336: non-controlling observers additionally pay for every caster of
-    // every LOD level even though only one level renders per frame, so the
-    // caller restricts casters to one low-detail silhouette level via
-    // options.castShadows. Receiving shadows stays unconditional.
+    // HF-336: the possessing player hides the whole exterior, so every other
+    // player is the only one paying for the airframe's casters. Passing
+    // castShadows:false retires the authored mesh set from the shadow map
+    // entirely; one merged silhouette proxy casts in its place. Receiving
+    // shadows stays unconditional.
     node.castShadow = (options.castShadows ?? true)
       && materials.some((entry) => authoredSupportMaterialCastsShadow(family, entry.name));
   });
 }
 
 /**
- * Coarsest authored vehicle LOD level used as the single shadow-map caster
+ * Coarsest authored vehicle LOD level baked into the single shadow-map caster
  * silhouette (HF-336). Shadow maps only need a believable airframe outline;
- * rendering casters from LOD0's full mesh set made every observer pay for the
- * possessor's hidden detail. Families with fewer levels collapse to level 0.
+ * casting from LOD0's full mesh set made every observer pay for detail the
+ * possessor never renders. Families with fewer levels collapse to level 0.
  */
 export const SUPPORT_VEHICLE_SHADOW_SILHOUETTE_LEVEL = 2;
 
+/** HF-336: node name of the merged low-detail shadow caster proxy. */
+export const SUPPORT_SHADOW_SILHOUETTE_NODE_NAME = 'pass74-support-shadow-silhouette';
+
 /**
- * HF-336: exactly one LOD level casts shadows. The coarsest available level
- * wins so the shadow pass samples the cheapest geometry regardless of which
- * level the colour pass currently displays.
+ * HF-336: index of the authored LOD level the shadow silhouette is baked from.
+ * Returns -1 when there is no level to bake.
  */
-export function authoredSupportLevelCastsShadows(levelCount: number, levelIndex: number): boolean {
-  if (levelCount <= 0 || levelIndex < 0 || levelIndex >= levelCount) return false;
-  return levelIndex === Math.min(SUPPORT_VEHICLE_SHADOW_SILHOUETTE_LEVEL, levelCount - 1);
+export function authoredSupportShadowSilhouetteLevel(levelCount: number): number {
+  if (levelCount <= 0) return -1;
+  return Math.min(SUPPORT_VEHICLE_SHADOW_SILHOUETTE_LEVEL, levelCount - 1);
+}
+
+/**
+ * Subtrees kept out of the baked silhouette (HF-336). The proxy is rigid, so
+ * animated rotors would freeze mid-sweep; at 18-30m operating altitude a blade
+ * shadow is sub-texel anyway. First-person and transient muzzle/tracer/impact
+ * subtrees never belonged in an exterior shadow at all.
+ */
+const SUPPORT_SHADOW_SILHOUETTE_EXCLUDED_SUBTREES = Object.freeze(new Set([
+  'chopper-main-rotor',
+  'chopper-tail-rotor',
+  'chopper-first-person-cockpit',
+  'chopper-gunner-sightline',
+  'chopper-gunner-weapon-view',
+  'chopper-muzzle-flash',
+  'chopper-tracer-action',
+  'chopper-impact-action',
+]));
+
+function isShadowSilhouetteSourceNode(source: THREE.Object3D, node: THREE.Object3D): boolean {
+  let cursor: THREE.Object3D | null = node;
+  while (cursor && cursor !== source) {
+    if (SUPPORT_SHADOW_SILHOUETTE_EXCLUDED_SUBTREES.has(cursor.name)
+      || cursor.userData.firstPersonOnly === true
+      || cursor.userData.gunnerSightline === true) return false;
+    cursor = cursor.parent;
+  }
+  return true;
+}
+
+/**
+ * HF-336: bake one position-only silhouette out of the coarsest authored LOD
+ * level. Only materials already admitted by the shadow budget contribute, every
+ * qualifying mesh is flattened into the level's own space, and the result is a
+ * single non-indexed triangle soup - one draw call in the shadow pass instead
+ * of the authored airframe's whole caster set, per shadow-casting light, for
+ * every player who is not the one flying it.
+ */
+export function mergeAuthoredSupportShadowSilhouette(
+  source: THREE.Object3D,
+  family: keyof typeof AUTHORED_SUPPORT_SHADOW_MATERIALS,
+): THREE.BufferGeometry | null {
+  source.updateWorldMatrix(true, true);
+  // Bake into the source level's own parent space (the LOD group, which the
+  // builder never transforms), so the proxy can hang off the vehicle root with
+  // an identity transform and still carry the level's authored scale.
+  const bakeBase = new THREE.Matrix4().multiplyMatrices(
+    source.matrix,
+    new THREE.Matrix4().copy(source.matrixWorld).invert(),
+  );
+  const relative = new THREE.Matrix4();
+  const vertex = new THREE.Vector3();
+  const positions: number[] = [];
+  source.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || !isShadowSilhouetteSourceNode(source, node)) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    if (!materials.some((entry) => authoredSupportMaterialCastsShadow(family, entry.name))) return;
+    if (!node.geometry.hasAttribute('position')) return;
+    const attribute = node.geometry.getAttribute('position');
+    relative.multiplyMatrices(bakeBase, node.matrixWorld);
+    const append = (vertexIndex: number): void => {
+      vertex.fromBufferAttribute(attribute, vertexIndex).applyMatrix4(relative);
+      positions.push(vertex.x, vertex.y, vertex.z);
+    };
+    const index = node.geometry.getIndex();
+    if (index) for (let cursor = 0; cursor < index.count; cursor += 1) append(index.getX(cursor));
+    else for (let cursor = 0; cursor < attribute.count; cursor += 1) append(cursor);
+  });
+  if (positions.length === 0) return null;
+  const merged = new THREE.BufferGeometry();
+  merged.name = `${family}-shadow-silhouette`;
+  merged.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+  merged.computeBoundingBox();
+  merged.computeBoundingSphere();
+  // One geometry per family is shared by every presented instance, so the
+  // pooled retirement path must never dispose it out from under a live root.
+  merged.userData[GPU_SHARED_GEOMETRY_KEY] = `${family}-shadow-silhouette`;
+  return merged;
+}
+
+/**
+ * Colour-pass no-op: the proxy must stay visible so three.js submits it to the
+ * shadow map (WebGLShadowMap skips `visible === false`), but it writes neither
+ * colour nor depth, so the beauty pass sees nothing.
+ */
+const supportShadowSilhouetteMaterial = new THREE.MeshBasicMaterial({
+  name: SUPPORT_SHADOW_SILHOUETTE_NODE_NAME,
+  colorWrite: false,
+  depthWrite: false,
+  toneMapped: false,
+  fog: false,
+});
+
+const supportShadowSilhouetteGeometries = new Map<string, THREE.BufferGeometry | null>();
+
+function buildAuthoredSupportShadowSilhouette(
+  family: keyof typeof AUTHORED_SUPPORT_SHADOW_MATERIALS,
+  source: THREE.Object3D | null,
+): THREE.Mesh | null {
+  let geometry = supportShadowSilhouetteGeometries.get(family);
+  if (geometry === undefined) {
+    geometry = source ? mergeAuthoredSupportShadowSilhouette(source, family) : null;
+    if (source) supportShadowSilhouetteGeometries.set(family, geometry);
+  }
+  if (!geometry) return null;
+  const silhouette = new THREE.Mesh(geometry, supportShadowSilhouetteMaterial);
+  silhouette.name = SUPPORT_SHADOW_SILHOUETTE_NODE_NAME;
+  silhouette.castShadow = true;
+  silhouette.receiveShadow = false;
+  silhouette.raycast = () => undefined;
+  silhouette.userData.presentationOnly = true;
+  silhouette.userData.authoredSharedAsset = true;
+  silhouette.userData.shadowSilhouette = true;
+  // Never fold the proxy into a colour-pass static batch: it owns a distinct
+  // caster-only material and must keep its own castShadow flag.
+  silhouette.userData.supportStaticBatchBoundary = true;
+  return silhouette;
 }
 
 const CHOPPER_DISPLAY_MATERIALS = Object.freeze(new Map<string, Readonly<{
@@ -1450,6 +1570,9 @@ function isFirstPersonOnlyNode(root: THREE.Object3D, node: THREE.Object3D): bool
 }
 
 const SUPPORT_STABLE_AIRFRAME_EXCLUDED_SUBTREES = Object.freeze(new Set([
+  // HF-336: the shadow-caster proxy is colour-pass inert; exterior review
+  // evidence must keep measuring the authored airframe, not the proxy.
+  SUPPORT_SHADOW_SILHOUETTE_NODE_NAME,
   'chopper-first-person-cockpit',
   'chopper-gunner-sightline',
   'chopper-gunner-weapon-view',
@@ -1703,6 +1826,8 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
   lod.name = `${runtimeName}-authored-lods`;
   const mixers: THREE.AnimationMixer[] = [];
   const oneShotActions = new Map<string, THREE.AnimationAction[]>();
+  /** HF-336: coarsest authored level, baked into the shadow-caster proxy. */
+  let shadowSilhouetteSource: THREE.Object3D | null = null;
   for (const [index, source] of template.lods.entries()) {
     const level = source.scene.clone(true);
     level.name = `${runtimeName}-authored-lod${index}`;
@@ -1719,14 +1844,11 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
       gunnerSightline.userData.firstPersonOnly = true;
     }
     markSharedPresentationAsset(level);
-    if (family === 'chopper') {
-      // HF-336: only the coarsest silhouette level (LOD2) feeds the shadow
-      // map. Every observer previously paid for LOD0's full caster set even
-      // while displaying LOD1/LOD2, and the possessor never rendered any of
-      // it — an asymmetric cost exactly when a chopper is overhead.
-      applyAuthoredSupportShadowBudget(level, family, {
-        castShadows: authoredSupportLevelCastsShadows(template.lods.length, index),
-      });
+    // HF-336: the shadow budget is applied once to the finished root below.
+    // Applying it here was dead work - the closing markSharedPresentationAsset
+    // pass re-enabled castShadow on every mesh it had just retired.
+    if (family === 'chopper' && index === authoredSupportShadowSilhouetteLevel(template.lods.length)) {
+      shadowSilhouetteSource = level;
     }
     // Support vehicles operate 18-30m above the arena, so the old 34m/68m
     // switches meant players almost never saw LOD0's full detailing - the
@@ -1774,6 +1896,16 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
     }
   }
   markSharedPresentationAsset(root);
+  if (family === 'chopper') {
+    // HF-336: retire the whole authored mesh set from the shadow map and let a
+    // single merged low-detail silhouette cast in its place. This runs after
+    // markSharedPresentationAsset because that pass sets castShadow = true on
+    // every mesh it touches, which is what silently reinstated LOD0's full
+    // caster set for every player who was not the one flying the chopper.
+    applyAuthoredSupportShadowBudget(root, 'chopper', { castShadows: false });
+    const silhouette = buildAuthoredSupportShadowSilhouette('chopper', shadowSilhouetteSource);
+    if (silhouette) root.add(silhouette);
+  }
   // HF-336: expose the authored LOD graph so per-frame mixer advancement can
   // follow the level the renderer actually displays.
   return presentedEntity(root, null, mixers, true, oneShotActions, lod);

@@ -1,17 +1,21 @@
 import * as THREE from 'three';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
+import { GPU_SHARED_GEOMETRY_KEY } from './gpu-resource-ownership';
 import {
   HUNTER_DRONE_ASSET,
   SUPPORT_VEHICLE_ASSETS,
   SUPPORT_VEHICLE_LOD_DISTANCES,
   SUPPORT_VEHICLE_PREWARM_DISTANCES,
+  SUPPORT_VEHICLE_SHADOW_SILHOUETTE_LEVEL,
   SUPPORT_VEHICLE_TEXTURE_MEMORY_EXPECTATION,
   KillstreakPresentation,
   SupportVehicleTextureCanonicalizer,
   applyAuthoredChopperReadability,
+  authoredSupportShadowSilhouetteLevel,
   authoredSupportStaticGeometryCanBatch,
   authoredSupportMaterialCastsShadow,
+  mergeAuthoredSupportShadowSilhouette,
   cloneAuthoredSupportStaticGeometryForTransform,
   deriveSupportVehiclePrewarmDistances,
   hunterDronePresentationTelemetry,
@@ -34,6 +38,74 @@ describe('authored support shadow budget', () => {
     expect(authoredSupportMaterialCastsShadow('chopper', 'MAT_Pass65Chopper_CanopyGlass')).toBe(false);
     expect(authoredSupportMaterialCastsShadow('drone', 'MAT_HunterDrone_IdentityLight')).toBe(false);
     expect(authoredSupportMaterialCastsShadow('drone', 'MAT_FutureDrone_Gunmetal')).toBe(false);
+  });
+
+  // HF-336: the possessing player hides the chopper exterior outright, so every
+  // other player is the only one paying for its shadow casters. One merged
+  // low-detail silhouette replaces the authored mesh set in the shadow map.
+  it('bakes the coarsest authored level into one shared caster silhouette', () => {
+    expect(SUPPORT_VEHICLE_SHADOW_SILHOUETTE_LEVEL).toBe(2);
+    expect(authoredSupportShadowSilhouetteLevel(3)).toBe(2);
+    expect(authoredSupportShadowSilhouetteLevel(2)).toBe(1);
+    expect(authoredSupportShadowSilhouetteLevel(1)).toBe(0);
+    expect(authoredSupportShadowSilhouetteLevel(0)).toBe(-1);
+
+    const source = new THREE.Group();
+    source.name = 'pass65-chopper-gunner-authored-lod2';
+    source.scale.setScalar(2);
+    const hull = new THREE.Mesh(
+      new THREE.BoxGeometry(2, 1, 1),
+      new THREE.MeshStandardMaterial({ name: 'MAT_Pass65Chopper_Armor_PBR' }),
+    );
+    hull.name = 'chopper-fuselage';
+    hull.position.set(1, 0, 0);
+    const glass = new THREE.Mesh(
+      new THREE.BoxGeometry(40, 40, 40),
+      new THREE.MeshStandardMaterial({ name: 'MAT_Pass65Chopper_CanopyGlass' }),
+    );
+    glass.name = 'chopper-sleek-cockpit-canopy';
+    const rotor = new THREE.Group();
+    rotor.name = 'chopper-main-rotor';
+    const blade = new THREE.Mesh(
+      new THREE.BoxGeometry(60, 0.1, 0.4),
+      new THREE.MeshStandardMaterial({ name: 'MAT_Pass65Chopper_RotorBlade' }),
+    );
+    rotor.add(blade);
+    const cockpit = new THREE.Group();
+    cockpit.name = 'chopper-first-person-cockpit';
+    cockpit.userData.firstPersonOnly = true;
+    const cockpitMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(30, 30, 30),
+      new THREE.MeshStandardMaterial({ name: 'MAT_Pass65Chopper_Gunmetal' }),
+    );
+    cockpit.add(cockpitMesh);
+    source.add(hull, glass, rotor, cockpit);
+
+    const merged = mergeAuthoredSupportShadowSilhouette(source, 'chopper');
+    expect(merged).not.toBeNull();
+    // Exactly the hull: glass is not an admitted caster material, the rotor is
+    // animated and the cockpit is first-person only. One non-indexed,
+    // position-only triangle soup, with the authored level scale baked in.
+    expect(Object.keys(merged!.attributes)).toEqual(['position']);
+    expect(merged!.getIndex()).toBeNull();
+    expect(merged!.getAttribute('position').count).toBe(36);
+    expect(merged!.boundingBox!.min.toArray()).toEqual([0, -1, -1]);
+    expect(merged!.boundingBox!.max.toArray()).toEqual([4, 1, 1]);
+    // Shared across every presented instance, so pooled retirement must not
+    // dispose it out from under a live root.
+    expect(typeof merged!.userData[GPU_SHARED_GEOMETRY_KEY]).toBe('string');
+
+    const rotorsOnly = new THREE.Group();
+    const orphanRotor = new THREE.Group();
+    orphanRotor.name = 'chopper-tail-rotor';
+    orphanRotor.add(new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({ name: 'MAT_Pass65Chopper_RotorBlade' }),
+    ));
+    rotorsOnly.add(orphanRotor);
+    expect(mergeAuthoredSupportShadowSilhouette(rotorsOnly, 'chopper')).toBeNull();
+
+    merged!.dispose();
   });
 });
 

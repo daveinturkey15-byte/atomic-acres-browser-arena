@@ -27,6 +27,7 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     for (const id of [
       'gunner-hull', 'gunner-ammo', 'gunner-altitude', 'gunner-speed', 'gunner-time', 'gunner-damage',
       'gunner-target-confirm', 'gunner-platform', 'gunner-weapon-mode',
+      'gunner-control-strip', 'gunner-gun-control', 'gunner-control-gun-ammo',
       'gunner-missile-status', 'gunner-missile-ammo', 'gunner-missile-cooldown',
     ]) expect(shell).toContain(`id="${id}"`);
     expect(shell).toContain('data-centre-clear="true"');
@@ -38,10 +39,45 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(hudCss).toContain('env(safe-area-inset-bottom)');
     expect(hudCss).toContain('top: max(54px, calc(env(safe-area-inset-top) + 52px));');
     expect(hudCss).toContain('#gunner-cockpit-hud[data-support-kind="chopper-gunner"]::before');
-    expect(hudCss).toContain('height: clamp(190px, 38vh, 410px);');
+    // HF-335: the taller authored canopy frame restored from the unmerged
+    // Pass 71 candidate lane, desktop and narrow-viewport values both locked.
+    expect(hudCss).toContain('height: clamp(280px, 58vh, 620px);');
+    expect(hudCss).toContain('height: clamp(210px, 48vh, 390px);');
     expect(hudCss).toContain('#gunner-missile-status[data-ready="true"] em');
     expect(legacy).toContain("event.button === 2 && localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner'");
     expect(legacy).toContain('missileFire: true');
+  });
+
+  it('HF-335: shows one legible LMB GUN / RMB MISSILES control strip that never crosses the sight corridor', () => {
+    // The owner asked for `LMB GUN | RMB MISSILES xN`, not a tutorial panel.
+    expect(shell).toContain('<kbd>LMB</kbd><span>GUN</span>');
+    expect(shell).toContain('<kbd>RMB</kbd><span>MISSILES</span>');
+    expect(shell).toContain('<i aria-hidden="true">&times;</i><b id="gunner-missile-ammo">');
+    // The missile readout keeps its own id/hidden/data-ready contract so the
+    // existing typed HUD lifecycle in legacy-main stays the only writer.
+    expect(shell).toMatch(/id="gunner-missile-status"[^>]*hidden[^>]*data-ready="false"/u);
+    // Gated by the HUD root's existing data-support-kind lifecycle only.
+    expect(hudCss).toContain('#gunner-cockpit-hud[data-support-kind="chopper-gunner"] #gunner-control-strip { display: flex; }');
+    expect(hudCss).toContain('#gunner-cockpit-hud[data-support-kind] #gunner-control-strip[hidden] { display: none; }');
+    // Bottom-right rail: opposite the instruments, clear of the centre reticle,
+    // the top-centre status band and the top-right thermal banner.
+    const strip = hudCss.slice(hudCss.indexOf('#gunner-control-strip {'), hudCss.indexOf('#gunner-control-strip .gunner-control {'));
+    expect(strip).toContain('right: max(18px, env(safe-area-inset-right));');
+    expect(strip).toContain('bottom: max(20px, calc(env(safe-area-inset-bottom) + 10px));');
+    expect(strip).not.toContain('left:');
+    expect(strip).not.toContain('top:');
+    // Legible from 1280x720 through ultrawide and high-DPI: every type ramp is
+    // clamp()ed against the viewport rather than pinned to one pixel size.
+    expect(hudCss).toContain('font: 900 clamp(11px, 0.86vw, 18px)/1 Inter, system-ui, sans-serif;');
+    expect(hudCss).toContain('font: 950 clamp(17px, 1.3vw, 27px)/1 Inter, system-ui, sans-serif;');
+    expect(hudCss).toContain('font: 900 clamp(9px, 0.62vw, 14px)/1 Inter, system-ui, sans-serif;');
+    // The cockpit-frame pillars are ::after content and paint over children, so
+    // the strip and both telemetry rails claim their own layer.
+    expect(strip).toContain('z-index: 1;');
+    expect(hudCss).toMatch(/\.gunner-instruments \{ z-index: 1; \}/u);
+    // Narrow viewports stack the strip above the instruments instead of over them.
+    const narrow = hudCss.slice(hudCss.indexOf('@media (max-width: 760px), (max-height: 520px)'));
+    expect(narrow).toContain('bottom: max(104px, calc(env(safe-area-inset-bottom) + 94px));');
   });
 
   it('uses authority geometry and target projection for shot and damage feedback', () => {
@@ -161,6 +197,26 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(e2e).toContain('setChopperExteriorReviewHold(true)');
     expect(e2e).toContain('targetCount: 0');
     expect(e2e).toContain('activeChopperTransientActions: []');
+  });
+
+  it('HF-336: casts chopper shadows from one merged silhouette, applied after the shared-asset pass', () => {
+    const start = presentation.indexOf('function buildAuthoredSupportVehicle(');
+    const end = presentation.indexOf('\nfunction buildProceduralChopperFallback(', start);
+    const build = presentation.slice(start, end);
+    // markSharedPresentationAsset sets castShadow = true on every mesh it
+    // touches, so the shadow budget has to be the last word or LOD0's full
+    // caster set is silently reinstated for every non-possessing player.
+    const sharedAssetPass = build.lastIndexOf('markSharedPresentationAsset(root);');
+    const shadowBudget = build.indexOf("applyAuthoredSupportShadowBudget(root, 'chopper', { castShadows: false });");
+    expect(sharedAssetPass).toBeGreaterThan(-1);
+    expect(shadowBudget).toBeGreaterThan(sharedAssetPass);
+    expect(build).toContain("buildAuthoredSupportShadowSilhouette('chopper', shadowSilhouetteSource)");
+    expect(build).not.toContain('applyAuthoredSupportShadowBudget(level,');
+    // The proxy stays visible so three.js submits it to the shadow map, but it
+    // writes neither colour nor depth in the beauty pass.
+    expect(presentation).toContain('colorWrite: false,');
+    expect(presentation).toContain('silhouette.castShadow = true;');
+    expect(presentation).toContain('silhouette.receiveShadow = false;');
   });
 
   it('keeps rear-fuselage and tail continuity visible without flattening the whole airframe', () => {

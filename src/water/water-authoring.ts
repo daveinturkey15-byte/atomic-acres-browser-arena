@@ -71,7 +71,8 @@ const RUSTWORKS_WATER: WaterBodyDefinition = Object.freeze({
   palette: Object.freeze({ deep: 0x071b2b, shallow: 0x165b71, foam: 0x68b9c9 }),
 });
 
-const FARCRYSIS_WATER: WaterBodyDefinition = Object.freeze({
+/** Authored intent, retained deliberately unregistered - see WATER_BODIES below. */
+export const FARCRYSIS_WATER: WaterBodyDefinition = Object.freeze({
   arenaId: 'farcrysis' as const,
   // HF-359 island ocean: level/palette/shore ramp read from the restored
   // farcrysis modules (buildWater in src/farcrysis-terrain.ts: water plane
@@ -91,9 +92,24 @@ const FARCRYSIS_WATER: WaterBodyDefinition = Object.freeze({
 });
 
 /** Every authored water body, keyed by arena. Arenas absent here have none. */
+/**
+ * HF-358 audit correction: farcrysis is deliberately NOT registered.
+ *
+ * The arena already authors three of its own water layers at y = -0.28/-0.24/-0.22
+ * (src/farcrysis-art.ts), so registering it here built a SECOND ocean 20mm below
+ * the real one. Worse, its authored `amplitudeScale: 0.2` never applied: the
+ * runtime unconditionally passes the RustRig storm amplitude (1.55), and the
+ * consumer reads `graphics.oceanWaveAmplitude ?? default`, so the nullish
+ * coalesce never fired. With band weights summing to ~1.525 that put opaque
+ * ~2.36m swells cresting ~2m ABOVE a 64x64 island whose eye height is ~1.6m -
+ * the map would have been unplayable on the first click.
+ *
+ * FARCRYSIS_WATER is retained above as the authored intent. Re-register it only
+ * once the arena's own water layers are replaced rather than duplicated, and
+ * once amplitudeScale is proven to reach the surface.
+ */
 export const WATER_BODIES: Readonly<Partial<Record<WaterArenaId, WaterBodyDefinition>>> = Object.freeze({
   'rustworks-1v1': RUSTWORKS_WATER,
-  farcrysis: FARCRYSIS_WATER,
 });
 
 /** Null for arenas without water — atomic-acres, gun-range, skyline-terminal. */

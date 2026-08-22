@@ -89,6 +89,8 @@ import {
   projectGunRangeTestBayDoorState,
   type GunRangeTestBayDoorState,
 } from './gun-range-test-bay';
+// HF-318: active test-bay training dummies own movement/LOS colliders.
+import { gunRangeTestBayDummyColliders } from './test-bay-dummy-colliders';
 import {
   advanceGunRangeMatchClock,
   createGunRangeMatchClockSnapshot,
@@ -264,6 +266,7 @@ import {
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
 import { clampPointToBounds, damp, firstSegmentBoxHit, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes, type Box2 } from './collision';
 import {
+  applyObstructionSpreadPenalty, // HF-343
   applyPenetrationDamage,
   ballisticImpactSurface,
   resolveBallisticHitscanAgainstTarget,
@@ -536,6 +539,11 @@ import {
 } from './match-admission-transaction';
 import { loadRoomRejoinIdentity, releaseRoomRejoinIdentityLease, saveRoomRejoinIdentity, saveLastRoomCode, loadLastRoomCode } from './room-rejoin-identity';
 import { clearLastHostedRoomCode, loadLastHostedRoomCode, saveLastHostedRoomCode } from './host-room-recovery';
+// HF-325 Part 1 only: guest-side host-loss visibility. Part 2 (election,
+// mandates, self-promotion, the role flip) is deliberately NOT wired — none of
+// mintSuccessionMandate/authorizeSelfPromotion/acceptPromotedHost is imported,
+// so no client can promote itself or author authority it was not given.
+import { evaluateHostLoss, hostLossPresentation, type HostLossState } from './host-migration';
 import { guestRejoinAffordance } from './guest-rejoin-affordance';
 import {
   HOST_MATCH_CHECKPOINT_SCHEMA_VERSION,
@@ -763,6 +771,7 @@ import {
   VIEWMODEL_CONTACT_PROBE_OFFSETS,
   VIEWMODEL_CONTACT_PROFILES,
   viewmodelContactProbePaddingMeters,
+  viewmodelFireAdmission, // HF-343
   viewmodelFloorClearance,
   viewmodelObstructionPose,
   type ViewmodelObstructionPose,
@@ -3093,9 +3102,11 @@ async function primeFinalWebGlMatchPresentation(): Promise<void> {
 function buildSky(): void {
   // The arena-specific equirectangular backdrop is the one sky owner on both
   // render backends. Retaining the former WebGL-only opaque sphere would hide
-  // that authored backdrop and leave Firefox/Safari with a different sky from
-  // the WebGPU path. WebGPU adds its transparent cloud veil later; neither path
-  // needs a second opaque sky volume here.
+  // that authored backdrop and leave the WebGL2 path (Safari and other browsers
+  // without navigator.gpu — HF-331: Firefox 141+ ships WebGPU and takes the
+  // WebGPU route) with a different sky from the WebGPU path. WebGPU adds its
+  // transparent cloud veil later; neither path needs a second opaque sky volume
+  // here.
   skyMaterial = null;
   hemisphereLight = new THREE.HemisphereLight(
     activeLighting.hemisphereSky,
@@ -3429,11 +3440,38 @@ let presentedGunRangeTestBayDoorThumpSequence = 0;
 let gunRangeTestBayDoorBroadcastPending = false;
 let gunRangeMatchClockState: GunRangeMatchClockSnapshot | null = null;
 let gunRangeMatchClockOccupantIds: readonly string[] = Object.freeze([]);
+/**
+ * HF-318: this frame's movement/LOS colliders for the active test-bay training
+ * dummies. Derived once per gun-range frame like the door's, so every consumer
+ * inside one frame sees the same patrol pose.
+ */
+let gunRangeTestBayDummyColliderFrame: readonly DynamicWorldCollider[] = Object.freeze([]);
 
 function activeGunRangeTestBayDoorColliders(activeArena: ArenaMap = arena): readonly DynamicWorldCollider[] {
   return activeArena === arena && selectedArena.id === 'gun-range'
     ? gunRangeTestBayDoorColliders
     : [];
+}
+
+/** HF-318: mirrors the door accessor — dummies are solid only on the live gun range. */
+function activeGunRangeTestBayDummyColliders(activeArena: ArenaMap = arena): readonly DynamicWorldCollider[] {
+  return activeArena === arena && selectedArena.id === 'gun-range'
+    ? gunRangeTestBayDummyColliderFrame
+    : [];
+}
+
+/**
+ * HF-318: recompute the dummy colliders from the live active-target set. A
+ * retired dummy simply stops appearing in that set, so its collider disappears
+ * on the next frame with no disposal bookkeeping.
+ */
+function refreshGunRangeTestBayDummyColliders(nowLocalMonoMs: number): void {
+  gunRangeTestBayDummyColliderFrame = selectedArena.id === 'gun-range' && Number.isFinite(nowLocalMonoMs)
+    ? gunRangeTestBayDummyColliders(
+      activeGunRangeTrainingDummies().map((target) => target.id),
+      Math.max(0, nowLocalMonoMs),
+    )
+    : Object.freeze([]);
 }
 
 const activeGlassColliderWindowIds = new WeakMap<Box2, string>();
@@ -3468,11 +3506,16 @@ function activeGlassDynamicColliders(activeArena: ArenaMap = arena): readonly Dy
 }
 
 function activeWorldColliders(activeArena: ArenaMap = arena): ArenaMap['colliders'] {
+  // HF-318: patrolling dummies move every frame, so they are appended outside
+  // the revision-keyed cache below rather than baked into it (a cached patrol
+  // pose would leave an invisible wall behind the dummy).
+  const dummyColliders = activeGunRangeTestBayDummyColliders(activeArena);
   if (activeArena !== arena || !interactiveWorldRuntime) {
     return [
       ...activeArena.colliders,
       ...activeGlassDynamicColliders(activeArena).map((entry) => entry.bounds),
       ...activeGunRangeTestBayDoorColliders(activeArena).map((entry) => entry.bounds),
+      ...dummyColliders.map((entry) => entry.bounds), // HF-318
     ];
   }
   const collision = interactiveWorldRuntime.collisions();
@@ -3490,7 +3533,11 @@ function activeWorldColliders(activeArena: ArenaMap = arena): ArenaMap['collider
       ...activeGunRangeTestBayDoorColliders(activeArena).map((entry) => entry.bounds),
     ];
   }
-  return activeWorldColliderCache;
+  // HF-318: off the gun range this is empty, so every other arena keeps the
+  // cached array identity and allocates nothing extra.
+  return dummyColliders.length === 0
+    ? activeWorldColliderCache
+    : [...activeWorldColliderCache, ...dummyColliders.map((entry) => entry.bounds)];
 }
 
 function syncInteractiveWorldPhysics(authoritativeResync = false): void {
@@ -3749,7 +3796,9 @@ function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): 
   sunLight.shadow.camera.updateProjectionMatrix();
   arenaContrastLighting.applyDefinition(definition);
   // Backend-agnostic sky. Every outdoor arena owns one selected panorama while
-  // Firefox/Safari's WebGL2 path shares the same immediate procedural fallback.
+  // the WebGL2 compatibility path (Safari and browsers without navigator.gpu;
+  // HF-331: Firefox 141+ takes the WebGPU route) shares the same immediate
+  // procedural fallback.
   applySkyBackdrop(scene, definition.atmosphere.preset, (url) => {
     arenaVisualStream.recordSelectedAssetRequest(definition.id, url);
   });
@@ -6023,6 +6072,49 @@ function setStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
   if (menuLifecycle.surface === 'deploying') {
     deploymentTransitionStatus.textContent = text;
     deploymentTransition.dataset.statusKind = kind;
+  }
+}
+
+/**
+ * HF-325 Part 1: a guest whose host dies used to grind silently through the 90s
+ * retry and a guest of a reset room retried a room id that will never exist
+ * again. network.ts already samples the raw link state; this turns that sample
+ * into something the player actually sees.
+ *
+ * Read-only presentation. It never promotes, never adopts authority and never
+ * writes a position, health, ammo, admission or match-start value — Part 2 of
+ * the handoff stays disabled.
+ */
+let lastHostLossState: HostLossState = 'inactive';
+let lastHostLossCountdownSeconds = -1;
+
+function updateHostLossPresentation(nowMonoMs: number): void {
+  const assessment = evaluateHostLoss(network.hostLinkSample(nowMonoMs));
+  const presentation = hostLossPresentation(assessment);
+  const countdownSeconds = assessment.remainingMs === null
+    ? -1
+    : Math.max(0, Math.ceil(assessment.remainingMs / 1_000));
+  const stateChanged = assessment.state !== lastHostLossState;
+  // 'reconnecting' carries a live whole-second countdown in its detail line;
+  // refresh on the second boundary only so the status element is not rewritten
+  // every frame.
+  const countdownChanged = !stateChanged
+    && assessment.state === 'reconnecting'
+    && countdownSeconds !== lastHostLossCountdownSeconds;
+  if (!stateChanged && !countdownChanged) return;
+  const previousState = lastHostLossState;
+  lastHostLossState = assessment.state;
+  lastHostLossCountdownSeconds = countdownSeconds;
+  if (presentation.visible) {
+    setStatus(`${presentation.headline} — ${presentation.detail}`, presentation.tone);
+    if (stateChanged) addFeed(presentation.headline, presentation.tone === 'error' ? 'coral' : 'gold');
+    return;
+  }
+  // Only report recovery when something was previously being reported, so this
+  // never overwrites an unrelated lobby status line.
+  if (previousState === 'unstable' || previousState === 'reconnecting') {
+    setStatus('Host connection restored.', 'ok');
+    addFeed('HOST CONNECTION RESTORED', 'aqua');
   }
 }
 
@@ -16254,6 +16346,29 @@ function tryFire(now: number): void {
     tryFireRailgun(now);
     return;
   }
+  // HF-343: the near-cover weapon raise used to be presentation-only — the gun
+  // rose against the wall but still shot straight down the crosshair. Gate the
+  // trigger on the same forward contact probe the viewmodel is posed from.
+  // Fully raised against cover refuses the shot outright, before any ammo,
+  // recoil, audio, shot ray or network send; a partial raise only widens the
+  // cone below. The admission carries aimAuthority: 'camera-forward-unchanged',
+  // so the authoritative ray origin, direction and hit timing never move.
+  //
+  // surfaceLift is deliberately passed as 0 rather than the probed floor lift:
+  // viewmodelContactResponse folds floorBlend into the same highReadyBlend the
+  // admission thresholds on, and prone on flat ground already sits at ~0.88 of
+  // that blend with no wall anywhere. Feeding it here would have taxed every
+  // prone shot in the open. The wall component alone is what the owner's row
+  // ("when behind cover") is about.
+  const fireContactPose = currentViewmodelObstructionPose();
+  const fireAdmission = viewmodelFireAdmission(
+    player.weapon,
+    fireContactPose.retreat,
+    0,
+    player.stance === 'prone',
+    weaponView.adsProgress(),
+  );
+  if (fireAdmission.fireBlocked) return;
   if (isTimedMapWeaponId(player.weapon)) {
     const authority = timedMapWeaponStates[player.weapon];
     if (authority.holderId !== player.id || authority.status !== 'held' || authority.shotsRemaining <= 0) {
@@ -16349,6 +16464,11 @@ function tryFire(now: number): void {
     prone: player.stance === 'prone',
     sustainedShots: player.sustainedShots,
   });
+  // HF-343: graduated obstruction penalty on the sampled cone only. baseDirection
+  // is still exactly camera-forward and the shot is still cast this same frame,
+  // so neither the authoritative ray nor hit timing moves. Open space reports a
+  // zero penalty, which leaves this byte-for-byte identical to the old cone.
+  const admittedSpread = applyObstructionSpreadPenalty(spread, fireAdmission.spreadPenaltyRadians);
   const shotTimeline = network.role === 'client'
     ? freezeAuthoredShotTimeline(
         currentHostTimeMs(),
@@ -16375,7 +16495,7 @@ function tryFire(now: number): void {
   const flamethrowerShot = player.weapon === 'flamethrower';
   const maximumShotDistance = flamethrowerShot ? FLAMETHROWER_EFFECT.rangeM : 90;
   for (let pellet = 0; pellet < spec.pellets; pellet += 1) {
-    const sample = sampleWeaponPellet(spec, pellet, spread, gameplayRandom(), gameplayRandom());
+    const sample = sampleWeaponPellet(spec, pellet, admittedSpread, gameplayRandom(), gameplayRandom()); // HF-343
     const direction = baseDirection.clone()
       .addScaledVector(cameraRight, sample.x)
       .addScaledVector(cameraUp, sample.y)
@@ -16388,7 +16508,9 @@ function tryFire(now: number): void {
         sample: [sample.x, sample.y],
         direction: direction.toArray(),
         cameraDirection: baseDirection.toArray(),
-        spread,
+        // HF-343: report the cone the pellet was actually sampled from so the
+        // ray-matrix invariant (angularError <= spread) stays exact near cover.
+        spread: admittedSpread,
         ads: adsSettled,
         stance: player.stance,
         moving,
@@ -18413,6 +18535,8 @@ type MutableFlareTargetSnapshot = {
   kind: FlareProjectileTarget['kind'];
   position: THREE.Vector3;
   radiusM: number;
+  /** HF-321: vertical half-height of the direct-hit capsule; 0 keeps the legacy sphere. */
+  halfHeightM: number;
 };
 type FlareTargetSnapshotEntry = {
   target: MutableFlareTargetSnapshot;
@@ -18438,6 +18562,7 @@ function upsertFlareTargetSnapshot(
   team: Team,
   practiceOnly: boolean,
   radiusM: number,
+  halfHeightM: number, // HF-321
   x: number,
   y: number,
   z: number,
@@ -18453,7 +18578,7 @@ function upsertFlareTargetSnapshot(
     }
     if (flareTargetSnapshots.size >= FLARE_TARGET_SNAPSHOT_CAPACITY) return;
     entry = {
-      target: { id, lifeId, kind, position: new THREE.Vector3(), radiusM },
+      target: { id, lifeId, kind, position: new THREE.Vector3(), radiusM, halfHeightM }, // HF-321
       team,
       practiceOnly,
       active: true,
@@ -18463,6 +18588,7 @@ function upsertFlareTargetSnapshot(
   entry.target.lifeId = lifeId;
   entry.target.kind = kind;
   entry.target.radiusM = radiusM;
+  entry.target.halfHeightM = halfHeightM; // HF-321
   entry.target.position.set(x, y, z);
   entry.team = team;
   entry.practiceOnly = practiceOnly;
@@ -18472,33 +18598,42 @@ function upsertFlareTargetSnapshot(
 function prepareFlareTargetSnapshots(): void {
   flareTargetSnapshotGeneration += 1;
   for (const entry of flareTargetSnapshots.values()) entry.active = false;
+  // HF-321: the direct-hit admission volume is a vertical capsule, not a sphere
+  // around one snapshot centre, so a torso or head hit on a standing target
+  // admits instead of only a shot near that centre. halfHeightM is
+  // snapshot-local: it is never checkpointed, serialized or replicated, and the
+  // through-wall guard in flare-projectile-system is untouched.
   if (player.alive) {
     upsertFlareTargetSnapshot(
-      player.id, localContinuity, 'player', player.team, false, 0.62,
+      player.id, localContinuity, 'player', player.team, false, 0.62, 0.85,
       player.position.x, player.position.y - 0.7, player.position.z,
     );
   }
   for (const [id, remote] of remotes) {
     if (remote.snapshot.hp <= 0) continue;
     upsertFlareTargetSnapshot(
-      id, remote.continuity, 'player', remote.snapshot.team, false, 0.62,
+      id, remote.continuity, 'player', remote.snapshot.team, false, 0.62, 0.85,
       remote.snapshot.x, remote.snapshot.y - 0.7, remote.snapshot.z,
     );
   }
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
     upsertFlareTargetSnapshot(
-      bot.id, bot.continuity, 'bot', bot.team, false, 0.64,
+      bot.id, bot.continuity, 'bot', bot.team, false, 0.64, 0.85,
       bot.position.x, bot.position.y + 1, bot.position.z,
     );
   }
   if (selectedArena.id === 'gun-range') {
     for (const target of arena.targets) {
       if (!target.active) continue;
-      upsertFlareTargetSnapshot(target.id, 1, 'practice-target', player.team, true, 0.58, 0, 0, 0);
+      // HF-321: a practice target's root origin sits at its FEET while its
+      // meshes span roughly y 0..2.1, so the legacy foot-centred sphere only
+      // admitted ankle shots. Re-centre on the torso and give it the capsule.
+      upsertFlareTargetSnapshot(target.id, 1, 'practice-target', player.team, true, 0.6, 1, 0, 0, 0);
       const entry = flareTargetSnapshots.get(target.id);
       if (!entry) continue;
       target.root.getWorldPosition(entry.target.position);
+      entry.target.position.y += 1.05; // HF-321: feet origin -> capsule centre
     }
   }
 }
@@ -26043,6 +26178,9 @@ function scheduleStateBroadcast(): void {
         synchronizeGunRangeTestBayDoorWorld(doorState, false);
         flushGunRangeTestBayDoorBroadcast();
       }
+      // HF-318: a hidden host still simulates bots, so keep the dummy colliders
+      // current on the authority heartbeat as well as on presented frames.
+      refreshGunRangeTestBayDummyColliders(now);
       updateGunRangeMatchClockAuthority(now);
       updateTimedMapWeapons(now);
     }
@@ -26520,6 +26658,10 @@ function frame(now: number, scheduleNext = true): void {
       atmosphereSystem?.update(visualNow / 1_000);
     } else if (selectedArena.id === 'gun-range') {
       updateGunRangePresentation(arena.root, visualNow);
+      // HF-318: derive the dummy colliders on the same clock that just posed the
+      // rendered dummies, so the solid volume tracks the visible patrol position
+      // rather than lagging it by a frame.
+      refreshGunRangeTestBayDummyColliders(visualNow);
       const doorState = updateGunRangeTestBayDoorAuthority(now)
         ?? gunRangeTestBayDoorState
         ?? createGunRangeTestBayDoorState(now);
@@ -26529,6 +26671,7 @@ function frame(now: number, scheduleNext = true): void {
     waterSystem.update(visualNow / 1_000);
     if (gameStarted) updateMinimap(now);
     updateGunRangeMatchClockAuthority(now);
+    updateHostLossPresentation(now); // HF-325 Part 1
     updateHud(now);
     arenaContrastLighting.update(visualNow);
     pass64TslSystems?.update(visualNow);
