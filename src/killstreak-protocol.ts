@@ -455,15 +455,19 @@ function isSupportShotEvent(value: unknown): value is KillstreakSupportShotEvent
   return supportShotEntityMatchesSource(value as KillstreakSupportShotEvent);
 }
 
-function isImpactEvent(value: unknown): value is KillstreakImpactEvent {
+export function isImpactEvent(value: unknown): value is KillstreakImpactEvent {
   if (!object(value)) return false;
-  if (!exactKeys(value, ['activationId', 'source', 'ordinal', 'phase', 'position', 'impactAtMs', 'atMs'])
+  // HF-335: launchPosition is an OPTIONAL fail-open presentation field. Older
+  // peers legitimately omit it; present peers must carry a finite vec3 when it
+  // is present. Existing required-key validation bounds are unchanged.
+  if (!exactKeys(value, ['activationId', 'source', 'ordinal', 'phase', 'position', 'impactAtMs', 'atMs'], ['launchPosition'])
     || !activationId(value.activationId)
     || (value.source !== 'carpet-bomber' && value.source !== 'chopper')
     || typeof value.ordinal !== 'number' || !Number.isSafeInteger(value.ordinal) || value.ordinal < 0
     || value.ordinal >= (value.source === 'chopper' ? CHOPPER_MISSILE_CAPACITY : CARPET_BOMBER_IMPACT_COUNT)
     || (value.phase !== 'drop' && value.phase !== 'impact')
     || !vec3(value.position)
+    || (value.launchPosition !== undefined && !vec3(value.launchPosition))
     || !finite(value.impactAtMs, 0, Number.MAX_SAFE_INTEGER)
     || !finite(value.atMs, 0, Number.MAX_SAFE_INTEGER)) return false;
   if (value.source === 'chopper') return value.phase === 'drop'

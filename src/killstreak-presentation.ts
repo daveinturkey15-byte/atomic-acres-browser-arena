@@ -1454,6 +1454,8 @@ type PooledBombShell = {
   impactPosition: THREE.Vector3;
   active: boolean;
   startY: number;
+  // HF-335: true 3D flight for chopper missiles. Null = legacy vertical drop.
+  startOrigin: THREE.Vector3 | null;
   createdAtMs: number;
   impactAtMs: number;
 };
@@ -2446,6 +2448,7 @@ function createPooledBombShell(index: number): PooledBombShell {
     impactPosition: new THREE.Vector3(),
     active: false,
     startY: 0,
+    startOrigin: null, // HF-335
     createdAtMs: 0,
     impactAtMs: 0,
   };
@@ -3360,7 +3363,12 @@ export class KillstreakPresentation {
       if (!shell.active) continue;
       const dropDurationMs = Math.max(1, shell.impactAtMs - shell.createdAtMs);
       const progress = THREE.MathUtils.clamp((nowMs - shell.createdAtMs) / dropDurationMs, 0, 1);
-      shell.root.position.y = THREE.MathUtils.lerp(shell.startY, shell.impactPosition.y, progress);
+      if (shell.startOrigin) {
+        // HF-335: true 3D flight along the launch→impact vector.
+        shell.root.position.lerpVectors(shell.startOrigin, shell.impactPosition, progress);
+      } else {
+        shell.root.position.y = THREE.MathUtils.lerp(shell.startY, shell.impactPosition.y, progress);
+      }
       if (progress >= 1) this.deactivateBombShell(shell);
     }
   }
@@ -3463,16 +3471,33 @@ export class KillstreakPresentation {
         shell.startY = impact.position[1] + (isChopperMissile
           ? CHOPPER_MISSILE_PRESENTATION_ALTITUDE_M
           : CARPET_BOMB_SHELL_PRESENTATION_ALTITUDE_M);
+        // HF-335: when the host supplies the true 3D launch origin, fly the
+        // missile along it with lookAt orientation; otherwise keep the legacy
+        // vertical drop (fail-open for older peers).
+        shell.startOrigin = isChopperMissile && impact.launchPosition
+          ? new THREE.Vector3(impact.launchPosition[0], impact.launchPosition[1], impact.launchPosition[2])
+          : null;
         shell.impactPosition.set(impact.position[0], impact.position[1] + 0.35, impact.position[2]);
         shell.root.name = isChopperMissile ? 'pass70-chopper-missile-shell' : 'pass65-carpet-bomb-shell';
-        shell.root.rotation.x = isChopperMissile ? 0 : Math.PI / 2;
-        shell.root.scale.set(
-          isChopperMissile ? 1.6 : 1,
-          isChopperMissile ? 3.5 : 1,
-          isChopperMissile ? 1.6 : 1,
-        );
+        if (shell.startOrigin) {
+          shell.root.rotation.set(0, 0, 0);
+          shell.root.scale.setScalar(1);
+        } else {
+          shell.root.rotation.x = isChopperMissile ? 0 : Math.PI / 2;
+          shell.root.scale.set(
+            isChopperMissile ? 1.6 : 1,
+            isChopperMissile ? 3.5 : 1,
+            isChopperMissile ? 1.6 : 1,
+          );
+        }
         shell.root.material.color.setHex(isChopperMissile ? 0xb09a58 : 0x2a2a2a);
-        shell.root.position.set(impact.position[0], shell.startY, impact.position[2]);
+        if (shell.startOrigin) {
+          shell.root.position.copy(shell.startOrigin);
+          // HF-335: orient nose-first along the true flight vector.
+          shell.root.lookAt(shell.impactPosition);
+        } else {
+          shell.root.position.set(impact.position[0], shell.startY, impact.position[2]);
+        }
         shell.root.visible = true;
         continue;
       }

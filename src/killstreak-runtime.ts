@@ -42,6 +42,10 @@ export const CHOPPER_HEALTH = 800;
 export const CHOPPER_MISSILE_CAPACITY = 6;
 export const CHOPPER_MISSILE_CADENCE_MS = 1_000;
 export const CHOPPER_MISSILE_FLIGHT_MS = 780;
+// HF-335: alternating wing sockets the missiles launch from, in the chopper's
+// local YXZ frame. Presentation-only; the authoritative impact point is and
+// remains the ground-target vector.
+export const CHOPPER_MISSILE_SOCKET_LOCAL_M: SupportVec3 = [-1.15, -0.45, -0.6];
 export const CHOPPER_MISSILE_MAX_RANGE_M = 120;
 export const CHOPPER_MISSILE_BLAST_RADIUS_M = 4.5;
 export const CHOPPER_MISSILE_MAX_DAMAGE = 240;
@@ -213,6 +217,9 @@ export type KillstreakImpactEvent = Readonly<{
   position: SupportVec3;
   impactAtMs: number;
   atMs: number;
+  // HF-335: optional 3D launch origin for the drop-phase presentation. Older
+  // peers omit it and fall back to the vertical-drop behaviour.
+  launchPosition?: SupportVec3;
 }>;
 
 type ActorAuthorityState = {
@@ -279,6 +286,9 @@ type ChopperEntity = EntityBase & {
     ordinal: number;
     position: SupportVec3;
     impactAtMs: number;
+    // HF-335: presentation-only 3D launch origin, forwarded on drop/impact
+    // events for the true-vector flight replay.
+    launchPosition: SupportVec3;
   }>>;
 };
 
@@ -2435,6 +2445,9 @@ export class HostKillstreakRuntime {
           ordinal: missile.ordinal,
           phase: 'impact',
           position: missile.position,
+          // HF-335: forward the launch origin so guests can replay the true
+          // 3D flight vector. Absent on older peers (fail-open vertical drop).
+          launchPosition: missile.launchPosition,
           impactAtMs: missile.impactAtMs,
           atMs: missile.impactAtMs,
         }));
@@ -2470,13 +2483,23 @@ export class HostKillstreakRuntime {
         world,
       );
       const impactAtMs = nowMs + CHOPPER_MISSILE_FLIGHT_MS;
-      entity.pendingMissiles.push(Object.freeze({ ordinal, position, impactAtMs }));
+      // HF-335: alternate between the two wing sockets so launches read as
+      // rail-fired rather than dropped from a single belly point.
+      const socketSide = ordinal % 2 === 0 ? 1 : -1;
+      const launchSocket: SupportVec3 = [
+        CHOPPER_MISSILE_SOCKET_LOCAL_M[0] * socketSide,
+        CHOPPER_MISSILE_SOCKET_LOCAL_M[1],
+        CHOPPER_MISSILE_SOCKET_LOCAL_M[2],
+      ];
+      const launchPosition = translatedSupportOffset(firingPosition, firingAttitude, launchSocket);
+      entity.pendingMissiles.push(Object.freeze({ ordinal, position, impactAtMs, launchPosition }));
       impactEvents.push(Object.freeze({
         activationId: entity.activationId,
         source: 'chopper',
         ordinal,
         phase: 'drop',
         position,
+        launchPosition,
         impactAtMs,
         atMs: nowMs,
       }));
