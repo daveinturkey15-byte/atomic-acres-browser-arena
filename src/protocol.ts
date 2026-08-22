@@ -562,7 +562,9 @@ export type LobbyStartMessage = {
 };
 export type LobbyRejectReason = 'room-full' | 'identity-in-use' | 'rejoin-denied' | 'match-active' | 'invalid-config' | 'protocol-mismatch';
 export type LobbyRejectMessage = { type: 'lobby-reject'; reason: LobbyRejectReason; nonce: number };
-export type LobbyClosedReason = 'host-reset';
+/** 'host-superseded' (HF-325): the sender observed a newer succession term and
+ * surrendered the room; guests should stop rejoin attempts against it. */
+export type LobbyClosedReason = 'host-reset' | 'host-superseded';
 /**
  * HF-326 residual polish: a best-effort host farewell sent just before an
  * intentional lobby reset closes every channel, so guests of the invalidated
@@ -1180,7 +1182,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
         || msg.reason === 'match-active' || msg.reason === 'invalid-config' || msg.reason === 'protocol-mismatch')
         && Number.isFinite(msg.nonce);
     case 'lobby-closed':
-      return msg.reason === 'host-reset' && Number.isFinite(msg.nonce);
+      return (msg.reason === 'host-reset' || msg.reason === 'host-superseded') && Number.isFinite(msg.nonce);
     case 'clock-ping':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && Number.isFinite(msg.guestSentMonoMs) && Number(msg.guestSentMonoMs) >= 0

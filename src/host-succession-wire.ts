@@ -384,6 +384,44 @@ export function createSuccessorHoldings(): SuccessorHoldings {
   });
 }
 
+/**
+ * HF-325 gap-4 fix: rebase a mandate's epoch stamps into the receiver's clock,
+ * exactly once, on arrival — the same discipline `rebaseMirroredCheckpointClock`
+ * applies to the checkpoint. `authorizeSelfPromotion` compares the guest's own
+ * `Date.now()` against `expiresAtEpochMs`; without this rebase a guest whose
+ * wall clock runs ahead of the host's refuses every mandate with
+ * 'mandate-expired' (liveness), and one running behind honours an expired
+ * mandate for that much longer.
+ *
+ * `hostEpochMs` is the sender's `Date.now()` at send time when the envelope
+ * carries one (the mirror does); a mandate broadcast carries none, but it is
+ * always freshly minted when broadcast, so its own issue stamp IS the send
+ * stamp. The residual error is one-way latency — tens of milliseconds against
+ * a 90-second TTL. The invariant `expires === issued + TTL` that
+ * `isSuccessionMandate` pins is preserved by shifting both stamps together.
+ */
+function rebaseMandateClock(
+  mandate: SuccessionMandate,
+  hostEpochMs: number | null,
+  receivedAtEpochMs: number,
+): SuccessionMandate {
+  const hostNowMs = hostEpochMs ?? mandate.issuedAtEpochMs;
+  if (!Number.isFinite(hostNowMs) || !Number.isFinite(receivedAtEpochMs)) return mandate;
+  const offsetMs = hostNowMs - receivedAtEpochMs;
+  const issuedAtEpochMs = Math.round(mandate.issuedAtEpochMs - offsetMs);
+  // A rebase that would leave the bounded-integer envelope falls back to the
+  // original stamps: fail-closed to the pre-fix behaviour, never to a mandate
+  // `isSuccessionMandate` rejects.
+  if (!Number.isSafeInteger(issuedAtEpochMs) || issuedAtEpochMs < 1 || issuedAtEpochMs > 10_000_000_000_000) {
+    return mandate;
+  }
+  return Object.freeze({
+    ...mandate,
+    issuedAtEpochMs,
+    expiresAtEpochMs: issuedAtEpochMs + HOST_SUCCESSION_MANDATE_TTL_MS,
+  });
+}
+
 export type MandateAcceptRefusal =
   | 'malformed-mandate'
   | 'room-mismatch'
@@ -406,14 +444,18 @@ export function acceptSuccessionMandate(
   holdings: SuccessorHoldings,
   message: HostSuccessionMandateMessage,
   roomCode: string,
+  /** This machine's own `Date.now()` at the moment the message arrived. */
+  receivedAtEpochMs: number,
 ): MandateAcceptResult {
   const refuse = (reason: MandateAcceptRefusal): MandateAcceptResult =>
     Object.freeze({ holdings, accepted: false, reason });
 
   if (!isSuccessionMandate(message.mandate)) return refuse('malformed-mandate');
-  const mandate = message.mandate;
-  if (typeof roomCode !== 'string' || mandate.roomCode !== roomCode) return refuse('room-mismatch');
-  if (mandate.term < holdings.highestObservedTerm) return refuse('stale-term');
+  if (typeof roomCode !== 'string' || message.mandate.roomCode !== roomCode) return refuse('room-mismatch');
+  if (message.mandate.term < holdings.highestObservedTerm) return refuse('stale-term');
+  // Gap-4 fix: stored in THIS machine's clock so authorizeSelfPromotion's
+  // Date.now() comparison is honest across machines. Exactly once, on arrival.
+  const mandate = rebaseMandateClock(message.mandate, null, receivedAtEpochMs);
 
   return Object.freeze({
     holdings: Object.freeze({
@@ -520,7 +562,9 @@ export function acceptAuthorityMirror(
   return Object.freeze({
     holdings: Object.freeze({
       ...holdings,
-      mandate,
+      // Gap-4 fix: the stored mandate is rebased with the mirror's own fresh
+      // host send stamp, so its expiry is honest on this machine's clock.
+      mandate: rebaseMandateClock(mandate, message.hostEpochMs, input.receivedAtEpochMs),
       highestObservedTerm: Math.max(holdings.highestObservedTerm, mandate.term),
       mirror: rebase.checkpoint,
       mirrorTerm: term,

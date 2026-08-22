@@ -1,4 +1,4 @@
-import type { HostLinkSample } from './host-migration'; // HF-325
+import { resolveRoomClaimOutcome, type HostLinkSample } from './host-migration'; // HF-325
 import { DataConnection, Peer } from 'peerjs';
 import {
   type GameMessage,
@@ -413,6 +413,10 @@ export class ArenaNetwork {
   private clientReadyNotified = false;
   /** HF-325: set once a host farewell arrives; a deliberate reset is not a crash to retry. */
   private lobbyClosedByHost = false;
+  /** HF-325: true while a promoted guest is claiming the room id. An
+   * `unavailable-id` during this claim aborts PERMANENTLY (someone else owns
+   * the room), never the crashed-host reclaim ramp and never a fresh room. */
+  private promotionClaim = false;
   private lastClientHostLivenessCheckMonoMs: number | null = null;
   private qaEventSendSequence = 0;
   private qaEventLastDue = new WeakMap<DataConnection, number>();
@@ -576,6 +580,30 @@ export class ArenaNetwork {
   }
 
   /**
+   * HF-325: adopt the host role for a room this peer joined as a client.
+   * Callers MUST hold an `evaluateSelfPromotion(...).promote === true`.
+   *
+   * Claiming the room-code peer id is the mutual-exclusion lock (G3): if any
+   * other peer — including a still-live original host — holds the id, the
+   * claim fails `unavailable-id` and this peer aborts PERMANENTLY, going
+   * offline with the host-lost presentation. It never retries (that would race
+   * a possibly-live host) and never falls back to a fresh room code (its
+   * followers are pointed at THIS room).
+   */
+  promoteToHost(roomCode: string, onReady: () => void): void {
+    const preferred = roomCode.trim();
+    if (this.role !== 'client' || !preferred || preferred !== this.roomCode) return;
+    const attempt = this.beginExplicitConnectionAttempt('host', hostConnectionAttemptKey(preferred, false));
+    if (!attempt) return;
+    this.manualClose = false;
+    this.role = 'host';
+    this.onReady = onReady;
+    this.promotionClaim = true;
+    this.onStatus('Host lost — promoting this peer to host of the same room…', 'warn');
+    this.startHostPeer(attempt, onReady, preferred, false, 0);
+  }
+
+  /**
    * Intentionally invalidate the current host room and start a fresh one.
    * This is deliberately separate from crash recovery: recovery preserves the
    * room code and retained authority, while a reset closes every old channel
@@ -646,6 +674,7 @@ export class ArenaNetwork {
     this.peer = peer;
     peer.on('open', (id) => {
       if (this.peer !== peer || !this.isCurrentConnectionAttempt(attempt) || this.role !== 'host' || this.manualClose) return;
+      this.promotionClaim = false; // HF-325: the room-id claim succeeded
       const signallingRestored = this.roomCode.length > 0;
       this.roomCode = id;
       this.markConnectionAttemptActive(attempt);
@@ -659,6 +688,28 @@ export class ArenaNetwork {
     peer.on('error', (error) => {
       if (this.peer !== peer || !this.isCurrentConnectionAttempt(attempt) || this.role !== 'host' || this.manualClose) return;
       this.reportNetworkIssue('peerjs:host-signalling', error, 'Host signalling failed');
+      if ((error as { type?: string }).type === 'unavailable-id' && this.promotionClaim) {
+        // HF-325 G3: someone else holds the room id — possibly the original
+        // host, alive after all. resolveRoomClaimOutcome maps this to a
+        // PERMANENT abort: no retry ramp (that races a live host), no fresh
+        // room (followers are pointed at this one). Offline + host-lost UI.
+        this.promotionClaim = false;
+        if (resolveRoomClaimOutcome('unavailable-id') === 'abort') {
+          this.onStatus('Another peer already owns this room — promotion abandoned.', 'error');
+          this.close();
+          return;
+        }
+      }
+      if ((error as { type?: string }).type === 'unavailable-id' && !preferred && this.roomCode) {
+        // HF-325 stand-down: an ESTABLISHED host whose signalling dropped and
+        // whose released id has since been claimed — a successor was promoted
+        // while this host was away. Surrender: farewell the guests still
+        // attached, stop admitting, and go offline. Never fight for the id.
+        this.onStatus('This room now belongs to a newer host — standing down.', 'error');
+        this.announceLobbyClosed('host-superseded');
+        this.close();
+        return;
+      }
       if (preferred && (error as { type?: string }).type === 'unavailable-id') {
         const reclaim = hostRoomReclaimAction(recoveryRequired, reclaimAttempt);
         if (reclaim.action === 'retry') {
@@ -924,6 +975,7 @@ export class ArenaNetwork {
     this.onReady = null;
     this.reconnectDeadlineMonoMs = null;
     this.lobbyClosedByHost = false; // HF-325
+    this.promotionClaim = false; // HF-325
   }
 
   private connectClient(reconnecting: boolean): void {

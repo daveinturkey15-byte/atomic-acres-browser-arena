@@ -569,6 +569,23 @@ import { clearLastHostedRoomCode, loadLastHostedRoomCode, saveLastHostedRoomCode
 // mintSuccessionMandate/authorizeSelfPromotion/acceptPromotedHost is imported,
 // so no client can promote itself or author authority it was not given.
 import { evaluateHostLoss, hostLossPresentation, type HostLossState } from './host-migration';
+// HF-325: succession carriage. The mandate and the mirror go on the wire; the
+// promotion trigger stays behind HOST_MIGRATION_PROMOTION_ENABLED.
+import {
+  acceptAuthorityMirror,
+  acceptHostPromoted,
+  acceptSuccessionMandate,
+  buildHostPromotedMessage,
+  createHostSuccessionPublisher,
+  createSuccessorHoldings,
+  evaluateSelfPromotion,
+  observeHostPromotion,
+  planAuthorityMirrorSend,
+  publishSuccessionMandate,
+  type HostSuccessionPublisher,
+  type SuccessorHoldings,
+} from './host-succession-wire';
+import type { SuccessionRoster } from './host-migration';
 import { guestRejoinAffordance } from './guest-rejoin-affordance';
 import {
   HOST_MATCH_CHECKPOINT_SCHEMA_VERSION,
@@ -5234,6 +5251,25 @@ let localSquadColor = defaultSquadPresentation(0).color;
 let privateMatchConfig: PrivateMatchConfig = DEFAULT_PRIVATE_MATCH_CONFIG;
 let privateLobbySnapshot: LobbySnapshot | null = null;
 let privateLobbyRevision = 0;
+// HF-325 succession state. `hostSuccessionPublisher` is only meaningful while
+// role === 'host'; `successorHoldings` only while role === 'client'.
+let hostSuccessionPublisher: HostSuccessionPublisher = createHostSuccessionPublisher();
+let successorHoldings: SuccessorHoldings = createSuccessorHoldings();
+
+/**
+ * HF-325 G2: the election-relevant projection of the host-authored roster.
+ * Both ends must build it from the SAME host-authored snapshot, which is why
+ * the guest reads `privateLobbySnapshot` and not its own view of who is around.
+ */
+function successionRoster(): SuccessionRoster | null {
+  const snapshot = privateLobbySnapshot;
+  if (!snapshot || snapshot.members.length === 0) return null;
+  return {
+    revision: snapshot.revision,
+    hostId: snapshot.hostId,
+    members: snapshot.members.map((member) => ({ id: member.id, connected: member.connected })),
+  };
+}
 let privateMatchActiveAtHostTimeMs: number | null = null;
 let privateMatchActiveAtEpochMs: number | null = null;
 let hostTimeMapping: HostTimeMapping = createHostTimeMapping();
@@ -6094,8 +6130,66 @@ function setStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
 let lastHostLossState: HostLossState = 'inactive';
 let lastHostLossCountdownSeconds = -1;
 
+/**
+ * HF-325: adopt the mirrored checkpoint through the EXISTING host recovery
+ * path (initializeRecoveredHostLobby → resumeRecoveredHostMatch →
+ * restoreGuestAuthorities / restoreRailgunAuthority /
+ * restoreTimedMapWeaponAuthorities / resolveHostMatchResumeTiming). That path
+ * is already tested against downtime; the arrival-time clock rebase is what
+ * makes its Date.now() arithmetic honest on this second machine. Never a
+ * bespoke adoption routine.
+ */
+function adoptMirroredHostAuthority(checkpoint: HostMatchCheckpoint): void {
+  if (network.role !== 'host' || checkpoint.roomCode !== network.roomCode) return;
+  if (!initializeRecoveredHostLobby(checkpoint)) {
+    // Fail closed: a promoted host that cannot adopt the ledger owns nothing.
+    setStatus('Promoted, but the mirrored match state could not be adopted. Room closed.', 'error');
+    network.announceLobbyClosed('host-superseded');
+    network.close();
+  }
+}
+
+/**
+ * HF-325 G4, host half: a higher succession term exists, so this host has been
+ * superseded. Stop broadcasting authority (the publisher is already stood
+ * down), farewell whatever guests are still attached so they stop rejoining a
+ * dead room, surrender the room, and tell the player.
+ */
+function standDownAsSupersededHost(observedTerm: number): void {
+  network.announceLobbyClosed('host-superseded');
+  network.close();
+  invalidateMatchAdmission(`Superseded by host succession term ${observedTerm}`);
+  setStatus('A newer host owns this match — this room has been closed.', 'error');
+  addFeed('HOST SUPERSEDED — ROOM CLOSED', 'coral');
+}
+
 function updateHostLossPresentation(nowMonoMs: number): void {
   const assessment = evaluateHostLoss(network.hostLinkSample(nowMonoMs));
+  // HF-325: the self-promotion trigger. Every guard — confirmed host loss,
+  // host-issued mandate naming this peer, term fence, roster re-election,
+  // survivor floor, mirror freshness — lives in evaluateSelfPromotion and
+  // authorizeSelfPromotion. The room-id claim in promoteToHost is the
+  // mutual-exclusion lock: if anything else owns the id, the claim aborts
+  // permanently and this peer goes offline instead of racing a live host.
+  if (assessment.state === 'host-lost' && network.role === 'client' && network.roomCode) {
+    const roster = successionRoster();
+    if (roster) {
+      const decision = evaluateSelfPromotion(successorHoldings, {
+        selfId: player.id,
+        roomCode: network.roomCode,
+        assessment,
+        roster,
+        nowEpochMs: Date.now(),
+      });
+      if (decision.promote) {
+        network.promoteToHost(decision.roomCode, () => {
+          const claim = buildHostPromotedMessage(decision, randomNonce());
+          if (claim) network.send(claim);
+          adoptMirroredHostAuthority(decision.checkpoint);
+        });
+      }
+    }
+  }
   const presentation = hostLossPresentation(assessment);
   const countdownSeconds = assessment.remainingMs === null
     ? -1
@@ -6665,6 +6759,8 @@ function resetPrivateLobbyState(): void {
   lobbyClockTimer = null;
   privateLobbySnapshot = null;
   privateLobbyRevision = 0;
+  hostSuccessionPublisher = createHostSuccessionPublisher(); // HF-325
+  successorHoldings = createSuccessorHoldings();             // HF-325
   privateMatchActiveAtHostTimeMs = null;
   privateMatchActiveAtEpochMs = null;
   privateMatchMode = 'ffa';
@@ -7045,8 +7141,48 @@ function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot
   for (const member of privateLobbySnapshot.members) network.setPlayerTeam(member.id, member.team);
   const message: LobbyStateMessage = { type: 'lobby-state', by: player.id, snapshot: privateLobbySnapshot, nonce: randomNonce() };
   network.send(message);
+  // HF-325: the mandate is elected from the roster revision that just shipped,
+  // so it must go out AFTER the lobby-state that guests will recompute from.
+  publishHostSuccessionMandate();
   renderPrivateLobby();
   renderTextChat();
+}
+
+/** HF-325: re-mint and rebroadcast the mandate whenever the roster moves. */
+function publishHostSuccessionMandate(): void {
+  if (network.role !== 'host' || !network.roomCode) return;
+  const roster = successionRoster();
+  if (!roster) return;
+  const result = publishSuccessionMandate(hostSuccessionPublisher, {
+    roster,
+    roomCode: network.roomCode,
+    nowEpochMs: Date.now(),
+    nonce: randomNonce(),
+  });
+  hostSuccessionPublisher = result.publisher;
+  if (result.broadcast) network.send(result.broadcast);
+}
+
+/**
+ * HF-325: ship the adoptable mirror to the current mandate holder, from the
+ * SAME checkpoint object that gets persisted, so what the successor holds is
+ * exactly what the host would itself have recovered from. Unicast, never
+ * broadcast: it carries every guest's resume-token digest.
+ */
+function shipAuthorityMirror(checkpoint: HostMatchCheckpoint): void {
+  if (network.role !== 'host') return;
+  const plan = planAuthorityMirrorSend(hostSuccessionPublisher, {
+    checkpoint,
+    nowMonoMs: performance.now(),
+    nowEpochMs: Date.now(),
+    nonce: randomNonce(),
+    // null is fine — the mirror stamps UNCLAIMABLE_RESUME_TOKEN_DIGEST and the
+    // demoted host re-joins through normal admission. Fail-closed.
+    outgoingHostResumeTokenSha256: null,
+  });
+  hostSuccessionPublisher = plan.publisher;
+  // A missing mirror costs a dead room; a wrong one costs a split brain.
+  if (plan.send) network.sendToPlayer(plan.send.forPlayerId, plan.send);
 }
 
 // HF-323: hold the start while any guest admission is in-flight or transport connection is pending
@@ -7354,6 +7490,7 @@ function persistActiveHostMatchCheckpoint(force = false): boolean {
   if (force) {
     lastHostCheckpointPersistAtEpochMs = Date.now();
     const checkpoint = createRecoverySafeHostMatchCheckpoint();
+    if (checkpoint) shipAuthorityMirror(checkpoint); // HF-325
     return checkpoint ? saveHostMatchCheckpoint(storage, checkpoint) : false;
   }
   if (hostCheckpointPersistScheduled) return true;
@@ -7377,7 +7514,10 @@ function persistActiveHostMatchCheckpoint(force = false): boolean {
     }
     lastHostCheckpointPersistAtEpochMs = nowEpochMs;
     const checkpoint = createRecoverySafeHostMatchCheckpoint();
-    if (checkpoint) saveHostMatchCheckpoint(deferredStorage, checkpoint);
+    if (checkpoint) {
+      saveHostMatchCheckpoint(deferredStorage, checkpoint);
+      shipAuthorityMirror(checkpoint); // HF-325
+    }
   }, HOST_CHECKPOINT_IDLE_TIMEOUT_MS);
   return true;
 }
@@ -8956,6 +9096,54 @@ function acceptRedeployCommit(message: RedeployCommitMessage): void {
 }
 
 function handleLobbyMessage(message: GameMessage): boolean {
+  // HF-325. These arrive only from the host: all three are
+  // isHostAuthorityMessage, so network.ts drops any of them sent by a guest.
+  if (message.type === 'host-succession-mandate') {
+    if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId) {
+      successorHoldings = acceptSuccessionMandate(
+        successorHoldings, message, network.roomCode, Date.now(),
+      ).holdings;
+    }
+    return true;
+  }
+  if (message.type === 'host-authority-mirror') {
+    if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId) {
+      const receivedAtEpochMs = Date.now();
+      successorHoldings = acceptAuthorityMirror(successorHoldings, message, {
+        selfId: player.id,
+        roomCode: network.roomCode,
+        receivedAtEpochMs,
+        // sender - receiver, which is the convention acceptAuthorityMirror
+        // documents and negates internally. One-way latency (tens of ms) is
+        // the error term; the point is to cancel HOURS of wall-clock skew, not
+        // milliseconds. Do NOT reuse hostTimeMapping.offsetMs — that is a
+        // performance.now() mapping, not an epoch offset.
+        hostClockOffsetMs: message.hostEpochMs - receivedAtEpochMs,
+      }).holdings;
+    }
+    return true;
+  }
+  if (message.type === 'host-promoted') {
+    const roster = successionRoster();
+    if (network.role === 'client' && roster) {
+      const result = acceptHostPromoted(successorHoldings, message, {
+        roomCode: network.roomCode,
+        roster,
+      });
+      successorHoldings = result.holdings;
+      // On acceptance the transport re-point rides the EXISTING reconnect
+      // loop: the promoted host claimed the SAME room-code peer id this
+      // client's reconnect attempts already target, so the next attempt lands
+      // on the new host and normal rejoin admission takes over. This branch
+      // fences the term so a stale host cannot win the follower back.
+    }
+    if (network.role === 'host') {
+      const conflict = observeHostPromotion(hostSuccessionPublisher, message);
+      hostSuccessionPublisher = conflict.publisher;
+      if (conflict.action === 'stand-down') standDownAsSupersededHost(message.term);
+    }
+    return true;
+  }
   if (message.type === 'chat-submit') {
     admitHostChatSubmit(message);
     return true;

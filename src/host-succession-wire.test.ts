@@ -189,7 +189,9 @@ function successorHoldings(options: {
 } = {}): { holdings: SuccessorHoldings; mirror: HostAuthorityMirrorMessage } {
   const { published, plan } = shipMirror({ checkpoint: options.checkpoint });
   expect(plan.send).not.toBeNull();
-  const afterMandate = acceptSuccessionMandate(createSuccessorHoldings(), published.broadcast!, ROOM);
+  const afterMandate = acceptSuccessionMandate(
+    createSuccessorHoldings(), published.broadcast!, ROOM, options.receivedAtEpochMs ?? HOST_SAVED_AT + 120,
+  );
   expect(afterMandate.accepted).toBe(true);
   const accepted = acceptAuthorityMirror(afterMandate.holdings, plan.send!, {
     selfId: SUCCESSOR_ID,
@@ -417,7 +419,7 @@ describe('HF-325 host succession wire — a mirror that arrives and promotes', (
     const follower = acceptSuccessionMandate(createSuccessorHoldings(), {
       type: 'host-succession-mandate', schemaVersion: 1, by: HOST_ID,
       mandate: holdings.mandate!, nonce: 3,
-    }, ROOM);
+    }, ROOM, HOST_SAVED_AT + 125);
     const accepted = acceptHostPromoted(follower.holdings, claim!, { roomCode: ROOM, roster: roster() });
     expect(accepted.acceptance.accept).toBe(true);
     expect(accepted.holdings.mirror).toBeNull();
@@ -468,7 +470,7 @@ describe('HF-325 host succession wire — a stale mirror is refused', () => {
     const { plan } = shipMirror();
     const mandateAccepted = acceptSuccessionMandate(createSuccessorHoldings(), {
       type: 'host-succession-mandate', schemaVersion: 1, by: HOST_ID, mandate: plan.send!.mandate, nonce: 1,
-    }, ROOM);
+    }, ROOM, HOST_SAVED_AT + HOST_MATCH_CHECKPOINT_TTL_MS);
     const result = acceptAuthorityMirror(mandateAccepted.holdings, plan.send!, {
       selfId: SUCCESSOR_ID, roomCode: ROOM,
       receivedAtEpochMs: HOST_SAVED_AT + HOST_MATCH_CHECKPOINT_TTL_MS,
@@ -519,14 +521,13 @@ describe('HF-325 host succession wire — a stale mirror is refused', () => {
     ).reason).toBe('mandate-superseded');
   });
 
-  it('refuses to promote from a mirror that went stale sitting in memory', () => {
-    // With both clocks agreeing, the mandate's own TTL expires first and
-    // `authorizeSelfPromotion` refuses with 'mandate-expired' — also correct,
-    // also fail-closed. The window this test targets is the skewed one: a guest
-    // whose clock trails the host's still sees a live mandate (that check reads
-    // the HOST's issuedAtEpochMs against the GUEST's now, unrebased — see the
-    // note in the handoff) long after the mirror it holds has aged out in its
-    // own clock. The mirror freshness check is what catches that.
+  it('refuses honestly when the mandate ages out, even on a clock 6h behind the host', () => {
+    // Gap-4 fix regression guard. Before the mandate rebase, a guest whose
+    // clock trailed the host's saw a host-stamped expiry hours in its future
+    // and only the mirror freshness check caught the staleness ('mirror-stale',
+    // the misleading reason this test used to pin). The mandate's stamps are
+    // now rebased into the receiver's clock on arrival, so 90 seconds after
+    // arrival the refusal is the honest one: the mandate itself expired.
     const offsetMs = 6 * 60 * 60 * 1_000;
     const receivedAtEpochMs = HOST_SAVED_AT - offsetMs + 200;
     const { holdings } = successorHoldings({ receivedAtEpochMs, hostClockOffsetMs: offsetMs });
@@ -537,7 +538,40 @@ describe('HF-325 host succession wire — a stale mirror is refused', () => {
     });
     expect(decision.promote).toBe(false);
     if (decision.promote) return;
+    expect(decision.reason).toBe('mandate-expired');
+  });
+
+  it('still refuses a live mandate whose mirror aged out in memory (mirror-stale)', () => {
+    // The checkpoint was already 40s old when the host shipped it, so the
+    // rebased mirror expires ~50s after arrival while the freshly-minted
+    // mandate stays live for 90s. Inside that window the mirror freshness
+    // check is the operative guard and must name the mirror, not the mandate.
+    const { holdings } = successorHoldings({
+      checkpoint: hostCheckpoint({ savedAtEpochMs: HOST_SAVED_AT - 40_000 }),
+    });
+    const decision = evaluateSelfPromotion(holdings, {
+      selfId: SUCCESSOR_ID, roomCode: ROOM, assessment: HOST_LOST, roster: roster(),
+      nowEpochMs: HOST_SAVED_AT + 120 + 65_000,
+      promotionEnabled: true,
+    });
+    expect(decision.promote).toBe(false);
+    if (decision.promote) return;
     expect(decision.reason).toBe('mirror-stale');
+  });
+
+  it('promotes on a clock 6h AHEAD of the host once the host is confirmed lost', () => {
+    // The liveness half of the gap-4 fix: pre-rebase, a fast guest computed
+    // nowEpochMs >= expiresAtEpochMs immediately and refused every mandate
+    // with 'mandate-expired', permanently disarming succession on that peer.
+    const offsetMs = 6 * 60 * 60 * 1_000;
+    const receivedAtEpochMs = HOST_SAVED_AT + offsetMs + 200;
+    const { holdings } = successorHoldings({ receivedAtEpochMs, hostClockOffsetMs: -offsetMs });
+    const decision = evaluateSelfPromotion(holdings, {
+      selfId: SUCCESSOR_ID, roomCode: ROOM, assessment: HOST_LOST, roster: roster(),
+      nowEpochMs: receivedAtEpochMs + 1_000,
+      promotionEnabled: true,
+    });
+    expect(decision.promote).toBe(true);
   });
 
   it('refuses to promote from a mirror stamped for a superseded succession', () => {
@@ -546,7 +580,7 @@ describe('HF-325 host succession wire — a stale mirror is refused', () => {
     const stale = acceptSuccessionMandate(holdings, {
       type: 'host-succession-mandate', schemaVersion: 1, by: HOST_ID,
       mandate: { ...holdings.mandate!, term: holdings.mandate!.term + 1 }, nonce: 9,
-    }, ROOM);
+    }, ROOM, HOST_SAVED_AT + 125);
     const decision = evaluateSelfPromotion(stale.holdings, {
       selfId: SUCCESSOR_ID, roomCode: ROOM, assessment: HOST_LOST, roster: roster(),
       nowEpochMs: HOST_SAVED_AT + 130, promotionEnabled: true,
@@ -562,7 +596,7 @@ describe('HF-325 host succession wire — no mirror falls back to current behavi
     const mandateOnly = acceptSuccessionMandate(createSuccessorHoldings(), {
       type: 'host-succession-mandate', schemaVersion: 1, by: HOST_ID,
       mandate: shipMirror().published.broadcast!.mandate, nonce: 1,
-    }, ROOM);
+    }, ROOM, HOST_SAVED_AT + 120);
     const decision = evaluateSelfPromotion(mandateOnly.holdings, {
       selfId: SUCCESSOR_ID, roomCode: ROOM, assessment: HOST_LOST, roster: roster(),
       nowEpochMs: HOST_SAVED_AT + 130, promotionEnabled: true,
@@ -677,7 +711,7 @@ describe('HF-325 host succession wire — a guest may not author before promotio
 
   it('refuses a mandate for another room outright', () => {
     const { published } = shipMirror();
-    expect(acceptSuccessionMandate(createSuccessorHoldings(), published.broadcast!, 'other-room').reason)
+    expect(acceptSuccessionMandate(createSuccessorHoldings(), published.broadcast!, 'other-room', HOST_SAVED_AT + 120).reason)
       .toBe('room-mismatch');
   });
 });
