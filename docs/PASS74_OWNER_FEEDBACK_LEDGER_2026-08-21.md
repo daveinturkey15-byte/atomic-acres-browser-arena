@@ -355,7 +355,14 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   if a build containing H3-derived assets is later published, those assets ship with it — revisit at
   release time. The lane still starts from the Blender procedural operator pipeline, with H3
   assisting texture/concept work. All archetypes are original designs — no franchise likenesses.
-- Status: SUBSTANTIALLY LANDED (skins branch b1f0bac5) - the pipeline RUNS and three original archetypes exist: explorer 1.0001/1.0, symbiote 1.0022/1.1, navalops 1.0000/1.0, none clamped. Nine GLBs verified by parsing the binaries rather than the receipts: 62 joints and 24 clips in every file, LOD reduction 8558 -> 6231 -> 3949 triangles. Three script defects were the real blocker: procedural objects were never linked into a collection (so matrix_world never updated, the silhouette gate measured every accessory at the world origin, and select_set made export impossible - which is why no GLB had ever been produced); an accessory hung 126mm below the floor; and the envelope baseline was measured after proportion edits, exempting the bulk multipliers from their own cap. NOT INTEGRATED - nothing imports these assets (HF-364).
+- Status: SUBSTANTIALLY LANDED (skins branch b1f0bac5) - the pipeline RUNS and three original archetypes exist: explorer 1.0001/1.0, symbiote 1.0022/1.1, navalops 1.0000/1.0, none clamped. Nine GLBs verified by parsing the binaries rather than the receipts: 62 joints and 24 clips in every file, LOD reduction 8558 -> 6231 -> 3949 triangles. Three script defects were the real blocker: procedural objects were never linked into a collection (so matrix_world never updated, the silhouette gate measured every accessory at the world origin, and select_set made export impossible - which is why no GLB had ever been produced); an accessory hung 126mm below the floor; and the envelope baseline was measured after proportion edits, exempting the bulk multipliers from their own cap.
+- INTEGRATED 2026-08-22 (a1934ac4 merge + a45b0f4e): skins lane merged into the integration line
+  and wired end to end - lazy per-skin loader (LOD0/LOD1 shipped per archetype), lobby-skin
+  protocol message + optional member/join skinId validated against the SELECTABLE catalog,
+  host-authoritative adoption mirroring squad identity, snapshot replication with guest
+  prefetch, OPERATOR SKIN lobby selector, and remote third-person presentation built from the
+  replicated member skin. 36 new tests. Owner HITL (visual taste + hit-proxy parity in a live
+  lobby) remains the close-out bar.
 
 ### HF-361 — mocap-to-animation route evaluated for in-game third-person animation
 - Source: owner directive (mocap X references). `mixamo-llm-mocap` (MIT, pin `00dfd53`) is an
