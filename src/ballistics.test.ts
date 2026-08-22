@@ -7,6 +7,7 @@ import {
   createBallisticSurface,
   penetrationEnergyRetention,
   traceBallisticPath,
+  applyObstructionSpreadPenalty,
   type BallisticMaterialId,
   type WeaponPenetrationProfile,
 } from './ballistics';
@@ -180,5 +181,35 @@ describe('shared wall-penetration authority', () => {
         typeof mesh.userData.ballisticSurfaceId === 'string' || dynamicTargetMeshes.includes(mesh)
       ))).toBe(true);
     }
+  });
+});
+
+describe('HF-343 obstruction spread penalty', () => {
+  it('applies an additive spread penalty in radians for partially raised weapons', () => {
+    const baseSpread = 0.012; // carbine hip spread
+    const penalty = 0.007; // half raised
+    const result = applyObstructionSpreadPenalty(baseSpread, penalty);
+    expect(result).toBeCloseTo(0.019, 6);
+    // Monotonic: larger penalty means larger spread
+    expect(applyObstructionSpreadPenalty(baseSpread, 0.01)).toBeGreaterThan(result);
+  });
+
+  it('saturates at the maximum penalty when the weapon is fully raised (fireBlocked)', () => {
+    const baseSpread = 0.012;
+    const maxPenalty = 0.014; // VIEWMODEL_FIRE_MAXIMUM_SPREAD_PENALTY_RADIANS
+    const result = applyObstructionSpreadPenalty(baseSpread, maxPenalty);
+    expect(result).toBeCloseTo(0.026, 6);
+  });
+
+  it('returns the base spread unchanged for zero or negative penalty', () => {
+    expect(applyObstructionSpreadPenalty(0.012, 0)).toBe(0.012);
+    expect(applyObstructionSpreadPenalty(0.012, -0.01)).toBe(0.012);
+    expect(applyObstructionSpreadPenalty(0.012, NaN)).toBe(0.012);
+  });
+
+  it('returns the base spread unchanged for non-finite or non-positive base', () => {
+    expect(applyObstructionSpreadPenalty(NaN, 0.01)).toBe(NaN);
+    expect(applyObstructionSpreadPenalty(0, 0.01)).toBe(0);
+    expect(applyObstructionSpreadPenalty(-0.01, 0.01)).toBe(-0.01);
   });
 });

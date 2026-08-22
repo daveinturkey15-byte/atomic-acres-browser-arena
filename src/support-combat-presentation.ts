@@ -1,5 +1,6 @@
 import type { MatchMode } from './private-match';
 import type { KillstreakDamageEvent, KillstreakSupportShotEvent } from './killstreak-runtime';
+import type { SpatialPoint } from './spatial-audio';
 
 export type SupportGunAudioKind = 'chopper' | 'drone';
 export const SUPPORT_SHOT_REPLAY_CAPACITY = 256;
@@ -48,9 +49,14 @@ export function supportShotAudioKindForListener(
 ): SupportGunAudioKind | null {
   const owner = event.ownerId === listener.playerId;
   const teammate = listener.mode === 'tdm' && event.ownerTeam === listener.team;
-  if (!owner && !teammate) return null;
+  const enemy = listener.mode === 'tdm' && event.ownerTeam !== listener.team;
+  // HF-337: enemies also hear chopper/drone gunfire positionally at reduced volume
+  if (!owner && !teammate && !enemy) return null;
   return event.source === 'chopper' ? 'chopper' : 'drone';
 }
+
+/** HF-337: positional audio callback with emitter position for spatial routing. */
+export type SupportGunPositionalCallback = (kind: SupportGunAudioKind, emitter: SpatialPoint) => void;
 
 export function presentSupportShotAudio(
   events: readonly KillstreakSupportShotEvent[],
@@ -64,6 +70,27 @@ export function presentSupportShotAudio(
     const kind = supportShotAudioKindForListener(event, listener);
     if (kind === null) continue;
     play(kind);
+    presented += 1;
+  }
+  return presented;
+}
+
+/** HF-337: positional overload with entity position lookup for spatial support gunfire. */
+export function presentSupportShotAudioPositional(
+  events: readonly KillstreakSupportShotEvent[],
+  listener: SupportCombatListener,
+  getEntityPosition: (entityId: string) => SpatialPoint | null,
+  playPositional: SupportGunPositionalCallback,
+  replayGuard?: SupportShotReplayGuard,
+): number {
+  let presented = 0;
+  for (const event of events) {
+    if (replayGuard && !replayGuard.admit(event)) continue;
+    const kind = supportShotAudioKindForListener(event, listener);
+    if (kind === null) continue;
+    const emitter = getEntityPosition(event.entityId);
+    if (!emitter) continue;
+    playPositional(kind, emitter);
     presented += 1;
   }
   return presented;

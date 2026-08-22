@@ -80,9 +80,12 @@ export const REQUIRED_SOUND_EVENT_IDS = Object.freeze([
   'support.care-capture',
   'support.chopper-rotor',
   'support.chopper-gun',
+  // HF-337: positional variants so teammates and enemies can locate support fire.
+  'support.chopper-gun.positional',
   'support.chopper-damage',
   'support.carpet-aircraft',
   'support.carpet-bomb',
+  'support.drone-gun.positional',
   'support.drone-rotor',
   'support.drone-gun',
   'support.drone-damage',
@@ -344,7 +347,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('shot', "'flare-gun',true,origin.distanceTo(camera.position)", 1, ['weapon.report.world']),
   runtimeCallsite('shot', 'message.weapon,true,origin.distanceTo(camera.position)', 3, ['weapon.report.world']),
   runtimeCallsite('shot', 'player.weapon', 1, ['weapon.report.local']),
-  runtimeCallsite('supportGun', 'kind', 2, ['support.chopper-gun', 'support.drone-gun']),
+  runtimeCallsite('supportGunPositional', 'kind,emitter', 2, ['support.chopper-gun.positional', 'support.drone-gun.positional']),
   runtimeCallsite('supportInbound', "'tri-pass'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', "'yardhawk'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', 'message.source', 1, ['support.inbound']),
@@ -857,17 +860,23 @@ const events: SoundEventInventoryEntry[] = [
   }),
   existingEvent({
     id: 'support.chopper-rotor', family: 'support', bus: 'sfx', delivery: 'world-spatial',
-    spatialProfileId: 'support-aircraft-world-v1', variants: ['approach', 'orbit-loop', 'depart'],
+    spatialProfileId: 'support-aircraft-world-v1', variants: ['approach', 'orbit-loop', 'depart', 'blade-slap'],
     emitterSymbols: ['syncChopperRotors'],
     contractRefs: ['R500', 'R504', 'R511', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'support-entity',
-    coverageDetail: 'One quiet HRTF rotor loop follows each replicated chopper pose and is stopped on entity retirement, match end, or audio disposal.',
+    coverageDetail: 'One quiet HRTF rotor loop follows each replicated chopper pose and is stopped on entity retirement, match end, or audio disposal. HF-337: raised base gain with altitude-aware attenuation and low-rate blade-slap noise layer for unmistakable rotor presence.',
   }),
-  existingEvent({
+  plannedEvent({
     id: 'support.chopper-gun', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'support-weapon-world-v1', variants: ['burst-near', 'burst-far'],
-    emitterSymbols: ['supportGun'],
     contractRefs: ['R500', 'R504', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
     coverageDetail: 'Gun bursts are position-bound, compressor-limited, and capped independently from player reports.',
+  }),
+  existingEvent({
+    id: 'support.chopper-gun.positional', family: 'support', bus: 'sfx', delivery: 'world-spatial',
+    spatialProfileId: 'support-weapon-world-v1', variants: ['burst-near', 'burst-far'],
+    emitterSymbols: ['supportGunPositional'],
+    contractRefs: ['R500', 'R504', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
+    coverageDetail: 'HF-337: positional chopper gunfire at firing entity world position. Audible to ALL players (owner, teammates, enemies) at reduced volume for enemies. Reuses railgun spatial-chain pattern with refDistance=8, maxDistance=180, rolloffFactor=0.18.',
   }),
   plannedEvent({
     id: 'support.chopper-damage', family: 'support', bus: 'sfx', delivery: 'world-spatial',
@@ -887,16 +896,22 @@ const events: SoundEventInventoryEntry[] = [
     contractRefs: ['R500', 'R505', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
     coverageDetail: 'Twenty-bomb presentation uses capped/coalesced voices without altering host-authored impact order.',
   }),
+  existingEvent({
+    id: 'support.drone-gun.positional', family: 'support', bus: 'sfx', delivery: 'world-spatial',
+    spatialProfileId: 'support-weapon-world-v1', variants: ['single', 'burst'],
+    emitterSymbols: ['supportGunPositional'],
+    contractRefs: ['R500', 'R506-R508', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
+    coverageDetail: 'HF-337: positional piloted-drone/swarm gunfire at firing entity world position. Audible to ALL players (owner, teammates, enemies) at reduced volume for enemies. Reuses railgun spatial-chain pattern with refDistance=8, maxDistance=180, rolloffFactor=0.18.',
+  }),
   plannedEvent({
     id: 'support.drone-rotor', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'support-drone-world-v1', variants: ['piloted', 'hunter', 'swarm'],
     contractRefs: ['R500', 'R506-R508', 'R511', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'support-entity',
     coverageDetail: 'Every active drone owns at most one pooled positional rotor voice and releases it on death/expiry/rematch.',
   }),
-  existingEvent({
+  plannedEvent({
     id: 'support.drone-gun', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'support-weapon-world-v1', variants: ['single', 'burst', 'dry-fire', 'reload'],
-    emitterSymbols: ['supportGun'],
     contractRefs: ['R500', 'R506-R508', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
     coverageDetail: 'Drone-gun audio follows admitted magazine/fire state and shares a hard support-weapon cap.',
   }),
@@ -1009,8 +1024,8 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
   schemaVersion: SOUND_EVENT_INVENTORY_SCHEMA_VERSION,
   events: SOUND_EVENT_INVENTORY,
 });
-// HF-359: digest updated for farcrysis arena ambience and game music variants
-export const SOUND_EVENT_INVENTORY_SHA256 = 'e9d7237b40ce94c0f70c785cb106af6114a55cf954d25a177904e61853618a59';
+// HF-337: digest updated for positional chopper and drone gun sound events
+export const SOUND_EVENT_INVENTORY_SHA256 = 'a5503dba3f6fed6eab7ac91a2dfa96c9f21f9191f3d4fb280efd8278449750c7';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

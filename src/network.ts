@@ -1,3 +1,4 @@
+import type { HostLinkSample } from './host-migration'; // HF-325
 import { DataConnection, Peer } from 'peerjs';
 import {
   type GameMessage,
@@ -410,6 +411,8 @@ export class ArenaNetwork {
   private selfStateEchoesSuppressed = 0;
   private stateFallbackMessages = 0;
   private clientReadyNotified = false;
+  /** HF-325: set once a host farewell arrives; a deliberate reset is not a crash to retry. */
+  private lobbyClosedByHost = false;
   private lastClientHostLivenessCheckMonoMs: number | null = null;
   private qaEventSendSequence = 0;
   private qaEventLastDue = new WeakMap<DataConnection, number>();
@@ -539,6 +542,23 @@ export class ArenaNetwork {
   pendingConnectionAttempt(): NetworkConnectionAttempt | null {
     const attempt = this.liveConnectionAttempt;
     return attempt?.phase === 'pending' ? { kind: attempt.kind, key: attempt.key } : null;
+  }
+
+  /**
+   * HF-325: raw inputs for host-migration.ts evaluateHostLoss(). Read-only - this
+   * exposes what the transport already knows so the guest can tell a deliberate host
+   * reset apart from a crash, instead of retrying a room that will never exist again.
+   */
+  hostLinkSample(nowMonoMs = performance.now()): HostLinkSample {
+    return {
+      role: this.role,
+      eventChannelOpen: this.hostEventConnection?.open ?? false,
+      reconnectPending: this.reconnectTimer !== null,
+      lastValidHostMessageMonoMs: this.lastValidHostMessageMonoMs,
+      reconnectDeadlineMonoMs: this.reconnectDeadlineMonoMs,
+      lobbyClosedByHost: this.lobbyClosedByHost,
+      nowMonoMs,
+    };
   }
 
   host(onReady: () => void, preferredRoomCode?: string, recoveryRequired = false): void {
@@ -903,6 +923,7 @@ export class ArenaNetwork {
     this.role = 'offline';
     this.onReady = null;
     this.reconnectDeadlineMonoMs = null;
+    this.lobbyClosedByHost = false; // HF-325
   }
 
   private connectClient(reconnecting: boolean): void {
@@ -1207,7 +1228,7 @@ export class ArenaNetwork {
     connection.on('data', (payload) => {
       if (!current() || !isGameMessage(payload)) return;
       if (kind === 'state' && !isStateTrafficMessage(payload)) return;
-      this.noteValidHostMessage();
+      this.noteValidHostMessage(payload);
       if (payload.type === 'lobby-closed') {
         // HF-326: the host intentionally invalidated this room. Surface the
         // farewell to the app, then end the session immediately instead of
@@ -1241,6 +1262,7 @@ export class ArenaNetwork {
     this.clearJoinDeadline();
     this.reconnectAttempts = 0;
     this.reconnectDeadlineMonoMs = null;
+    this.lobbyClosedByHost = false; // HF-325
     if (this.liveConnectionAttempt?.kind === 'join') this.markConnectionAttemptActive(this.liveConnectionAttempt);
     this.onStatus('Connected to host', 'ok');
     this.onReady?.();
@@ -1329,8 +1351,14 @@ export class ArenaNetwork {
     if (this.isCurrentConnectionAttempt(attempt)) this.close();
   }
 
-  private noteValidHostMessage(): void {
-    if (this.role === 'client') this.lastValidHostMessageMonoMs = performance.now();
+  private noteValidHostMessage(payload?: { type?: string }): void {
+    if (this.role !== 'client') return;
+    this.lastValidHostMessageMonoMs = performance.now();
+    // HF-325: a host farewell is a DELIBERATE room closure, not a crash. Recording it
+    // lets the guest stop retrying a room id that will never exist again - previously
+    // 'lobby-closed' was defined in the protocol, sent by the host, and handled nowhere,
+    // so a reset room left every guest grinding the full 90s reconnect window.
+    if (payload?.type === 'lobby-closed') this.lobbyClosedByHost = true;
   }
 
   private startClientHostLivenessWatchdog(): void {

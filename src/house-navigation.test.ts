@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { Point3 } from './collision';
 import { integrateHorizontalVelocity, movementProfile } from './gameplay';
-import { createHouseArchitecture, solidBounds, type HouseArchitecture, type HouseOpening } from './house-navigation';
+import {
+  createHouseArchitecture,
+  findHouseGlassSolid,
+  findHouseGlassSolidBounds,
+  houseGlassSolidBounds,
+  houseGlassSolids,
+  solidBounds,
+  type HouseArchitecture,
+  type HouseOpening,
+} from './house-navigation';
 import { CHARACTER_PHYSICS_CONFIG, CharacterPhysics } from './physics';
 import type { Team } from './protocol';
 
@@ -401,4 +410,26 @@ describe('simplified two-floor house architecture', () => {
       }
     }
   });
+
+  it('HF-344: exposes authored glass solids and bounds across both houses', () => {
+    for (const team of [0, 1] as Team[]) {
+      const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
+      const glass = houseGlassSolids(architecture);
+      expect(glass).toHaveLength(3);
+      const glassBounds = houseGlassSolidBounds(architecture);
+      expect(glassBounds).toHaveLength(3);
+      for (const item of glassBounds) {
+        expect(item.bounds.minX).toBeLessThan(item.bounds.maxX);
+        expect(item.bounds.minY).toBeLessThan(item.bounds.maxY);
+        expect(item.bounds.minZ).toBeLessThan(item.bounds.maxZ);
+      }
+      const upperSolid = findHouseGlassSolid([architecture], `${architecture.id}:upper-window-glass`);
+      expect(upperSolid).toBeDefined();
+      expect(upperSolid?.name).toBe('upper-window-glass');
+      const upperBounds = findHouseGlassSolidBounds([architecture], `${architecture.id}:upper-window-glass`);
+      expect(upperBounds).toBeDefined();
+      expect(upperBounds?.maxY).toBeCloseTo(3.48 + (2.55 + 0.32) / 2 + (2.55 - 0.32) / 2, 2);
+    }
+  });
 });
+

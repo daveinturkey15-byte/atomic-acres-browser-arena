@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import type { ArenaId } from './map-selection';
 import type { RenderProfile } from './render-profile';
+// HF-358: the per-arena WaterBodyDefinition registry is the single authored
+// source for where water exists, its level and its swimmability. The legacy
+// WebGL2 route reads the same registry as the WebGPU TSL factory so both
+// presentations can never drift apart.
+import { waterBodyForArena } from './water/water-authoring';
+import { sampleOcean } from './water/ocean-spectrum';
 
 export type WaterTelemetry = Readonly<{
   enabled: boolean;
@@ -119,9 +125,24 @@ export class WaterSystem {
     this.arenaId = arenaId;
     this.islandHalfX = island.halfX;
     this.islandHalfZ = island.halfZ;
-    this.enabled = arenaId === 'rustworks-1v1';
-    this.night = options?.night ?? arenaId === 'rustworks-1v1';
-    this.waterLevel = options?.waterLevel ?? (this.enabled ? -19.5 : -0.55);
+    // HF-358: registry-driven. The authored body (when present) supplies level,
+    // night palette and near/horizon sizes; caller-supplied live arena bounds
+    // still win for the island footprint so existing rustworks behaviour stays
+    // byte-compatible (see water-authoring.ts authority notes).
+    const body = waterBodyForArena(arenaId);
+    this.enabled = body !== null;
+    this.nearSize = body?.nearSize ?? this.nearSize;
+    this.horizonRadius = body?.horizonRadius ?? this.horizonRadius;
+    this.night = options?.night ?? (body?.night ?? false);
+    // The authored level is authoritative; options.waterLevel remains a
+    // legacy escape hatch that may only confirm, not contradict, an authored
+    // body (a contradicting value is ignored and logged once per configure).
+    if (body && options?.waterLevel !== undefined && options.waterLevel !== body.level) {
+      console.warn(
+        `[HF-358] waterSystem.configure: legacy waterLevel ${options.waterLevel} contradicts authored level ${body.level} for ${arenaId}; using authored value.`,
+      );
+    }
+    this.waterLevel = body?.level ?? options?.waterLevel ?? -0.55;
     this.waveAmp = rustworksOceanAmplitude(profile);
     this.segments = profile === 'blender' ? 160 : 96;
     // WebGPU owns the visible water through Pass64TslSceneSystems. This object
@@ -335,7 +356,11 @@ export class WaterSystem {
     const nx = Math.abs(position.x) / (this.islandHalfX + 0.8);
     const nz = Math.abs(position.z) / (this.islandHalfZ + 0.8);
     const outside = Math.max(nx, nz) >= 0.98;
-    const wave = sampleOceanWave(position.x, position.z, timeSeconds, this.waveAmp);
+    // HF-358: one shared frozen Gerstner spectrum (ocean-spectrum.ts) is the
+    // single CPU authority — the same table the WebGPU TSL surface displaces
+    // with. The legacy warped-sine OCEAN_WAVES field remains only for the
+    // WebGL2 GLSL presentation above.
+    const wave = sampleOcean(position.x, position.z, timeSeconds, this.waveAmp);
     const surfaceY = this.waterLevel + wave.height;
     const depth = surfaceY - position.y;
     const inWater = outside && depth > -1.2;
@@ -348,6 +373,16 @@ export class WaterSystem {
       drag: 0.7 + submerged * 0.15,
       surfaceVelocityY: wave.verticalVelocity,
     };
+  }
+
+  /** HF-358: the authored body driving this system (null when no water). */
+  get body(): ReturnType<typeof waterBodyForArena> {
+    return this.arenaId === null ? null : waterBodyForArena(this.arenaId);
+  }
+
+  /** HF-358: whether this body admits the swim state (registry-driven). */
+  get swimmable(): boolean {
+    return this.body?.swimmable ?? false;
   }
 
   telemetry(): WaterTelemetry {

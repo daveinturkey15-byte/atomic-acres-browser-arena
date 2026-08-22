@@ -320,4 +320,42 @@ describe('Pass 64 authored TSL pipeline set', () => {
       .toBe(RUSTWORKS_OCEAN_AMPLITUDE.blender);
     systems.dispose();
   });
+
+  // HF-358: WebGPU water is registry-driven (water-authoring) and built by the
+  // ocean-tsl factory over the shared frozen ocean-spectrum — the same band
+  // table CPU buoyancy samples. RustRig keeps its exact pre-HF-358 surface.
+  it('builds registry-driven ocean-tsl water with CPU/GPU parity metadata (HF-358)', async () => {
+    const { oceanSpectrumFingerprint, OCEAN_SPECTRUM_AUTHORITY_ID, OCEAN_BANDS, sampleOcean } = await import('../water/ocean-spectrum');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['rustworks-1v1']()).definition;
+    const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition);
+    const water = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
+    // RustRig regression guard: exact historical surface geometry.
+    water.geometry.computeBoundingBox();
+    expect(water.visible).toBe(true);
+    expect((water.geometry as THREE.PlaneGeometry).parameters.widthSegments).toBe(256);
+    expect(water.geometry.boundingBox?.getCenter(new THREE.Vector3()).y).toBeCloseTo(-19.5);
+    expect(water.userData).toMatchObject({
+      waveBands: OCEAN_BANDS.length,
+      waveAuthority: OCEAN_SPECTRUM_AUTHORITY_ID,
+      waveNormalAuthority: OCEAN_SPECTRUM_AUTHORITY_ID,
+      surfaceSegments: 256,
+      swimmable: false,
+    });
+    expect(water.userData.oceanSpectrumFingerprint).toBe(oceanSpectrumFingerprint());
+    expect(water.getObjectByName('Pass 66 curved RustRig ocean horizon')).toBeInstanceOf(THREE.Mesh);
+    // The GPU displacement expression is built from the same frozen table the
+    // CPU sampler reads; the fingerprint stamp is the machine-checkable proof.
+    const body = water.userData.waterBody as { level: number };
+    const cpu = sampleOcean(31, -17, 4.2);
+    expect(body.level + cpu.height).toBeCloseTo(-19.5 + cpu.height, 12);
+    // Registry-driven: a non-water arena swaps to the inert placeholder.
+    systems.applyDefinition((await ARENA_VISUAL_REGISTRY['gun-range']()).definition);
+    const placeholder = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
+    expect(placeholder.visible).toBe(false);
+    expect((placeholder.userData.waterBody as unknown)).toBeUndefined();
+    systems.dispose();
+  });
 });

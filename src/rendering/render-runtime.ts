@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import type { RenderPipeline, WebGPURenderer } from 'three/webgpu';
 import { assertTslCutoverReady } from './tsl-migration-inventory';
+import {
+  installFilmicGradeChain,
+  type FilmicGradeChainHandle,
+} from './filmic-grade-chain';
+import { DEFAULT_GRADE_PROFILE_ID, type GradeProfileId } from './grade-profile';
 import type { ToneMappingMode } from '../graphics-settings-registry';
 import { FramePacingSampler, type FramePacingSummary } from '../frame-pacing';
 import {
@@ -673,6 +678,13 @@ export class WebGpuRenderRuntime {
   readonly backend = 'webgpu' as const;
   readonly renderer: WebGPURenderer;
   readonly renderPipeline: RenderPipeline;
+  /**
+   * HF-362 — the filmic grade chain that owns everything after the scene
+   * pass's linear-HDR output, including the explicit tone map. It is installed
+   * on the RenderPipeline at construction so the profile reaches the screen
+   * regardless of which module assembles the scene pass.
+   */
+  private readonly filmicGrade: FilmicGradeChainHandle;
   private deviceLost = false;
   private disposed = false;
   private readonly canvasAntialias: boolean;
@@ -767,6 +779,7 @@ export class WebGpuRenderRuntime {
       softwareAdapter: boolean;
       device: GpuDeviceShape;
       now?: () => number;
+      gradeProfileId?: GradeProfileId;
     }>,
   ) {
     this.renderer = renderer;
@@ -779,6 +792,13 @@ export class WebGpuRenderRuntime {
     this.softwareAdapter = identity.softwareAdapter;
     this.device = identity.device;
     this.clock = identity.now ?? (() => performance.now());
+    // Install before any scene-pass assembler publishes an outputNode. The
+    // chain intercepts that assignment, keeps the published node as its
+    // linear-HDR source, and takes over the output transform (stage 7) so the
+    // display-referred stages can exist at all.
+    this.filmicGrade = installFilmicGradeChain(renderPipeline, {
+      profileId: identity.gradeProfileId ?? DEFAULT_GRADE_PROFILE_ID,
+    });
     this.resetPresentationProgressTelemetry('renderer initialized', this.clock());
     this.installNodeBuildTrace();
     identity.device.addEventListener?.('uncapturederror', this.uncapturedErrorListener);
@@ -850,6 +870,7 @@ export class WebGpuRenderRuntime {
     antialias: boolean;
     samples: number;
     requireWebGPU: boolean;
+    gradeProfileId?: GradeProfileId;
   }>): Promise<WebGpuRenderRuntime> {
     const gpu = (navigator as unknown as GpuNavigatorShape).gpu;
     if (!gpu) throw new Error('WebGPU was required, but navigator.gpu is unavailable');
@@ -885,6 +906,7 @@ export class WebGpuRenderRuntime {
       deviceClass: device.constructor?.name || 'GPUDevice',
       softwareAdapter: adapter.isFallbackAdapter === true || /swiftshader|llvmpipe|software|softpipe|\bwarp\b/i.test(adapterLabel),
       device,
+      gradeProfileId: parameters.gradeProfileId,
     });
   }
 
@@ -1101,10 +1123,47 @@ export class WebGpuRenderRuntime {
     this.bloomSamples = bloomSamples;
   }
 
-  configureOutput(exposure: number, toneMapping: ToneMappingMode = 'aces'): void {
+  configureOutput(
+    exposure: number,
+    toneMapping: ToneMappingMode = 'aces',
+    gradeProfileId?: GradeProfileId,
+  ): void {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = toneMappingForMode(toneMapping);
     this.renderer.toneMappingExposure = exposure;
+    // Tone mapping mode and exposure are consumed by the chain's explicit
+    // stage-7 renderOutput() through the RenderPipeline context, so both keep
+    // working unchanged; the pipeline rebuilds when either value moves.
+    if (gradeProfileId !== undefined) this.filmicGrade.setProfile(gradeProfileId);
+  }
+
+  /** HF-362 - selects the frozen filmic grade profile for this session. */
+  setGradeProfile(gradeProfileId: GradeProfileId): void {
+    this.filmicGrade.setProfile(gradeProfileId);
+  }
+
+  gradeProfileId(): GradeProfileId {
+    return this.filmicGrade.profileId();
+  }
+
+  /** The built chain receipt, in order. Matches GRADE_CHAIN_STAGES. */
+  gradeChainStages(): readonly string[] {
+    return this.filmicGrade.stages();
+  }
+
+  /**
+   * Hands the vignette over to the display-referred stage. Left at 0 while the
+   * scene-pass assembler still applies its own linear-side vignette, because
+   * stacking two of them darkens exactly the screen periphery enemies enter
+   * from.
+   */
+  setDisplayVignetteStrength(strength: number): void {
+    this.filmicGrade.setDisplayVignetteStrength(strength);
+  }
+
+  /** Arena-authored grain strength, in 8-bit output steps. */
+  setGradeGrainStrength(strength8Bit: number): void {
+    this.filmicGrade.setGrainStrength8Bit(strength8Bit);
   }
 
   setExposure(exposure: number): void {
@@ -1286,6 +1345,10 @@ export class WebGpuRenderRuntime {
       return false;
     }
     this.renderer.info.reset();
+    // Stage 12 advances on a profile-quantised clock, and the profile's bloom
+    // tuning is re-asserted here so a graphics-settings write cannot silently
+    // drop the threshold back under 1.0 linear.
+    this.filmicGrade.beforeRender(admissionCheckedAt);
     this.renderPipeline.render();
     // Queue latency begins only after Three has encoded/submitted the frame.
     // The rAF timestamp is intentionally not used: it predates simulation and
@@ -1348,6 +1411,7 @@ export class WebGpuRenderRuntime {
     if (this.disposed) return;
     this.disposed = true;
     this.device.removeEventListener?.('uncapturederror', this.uncapturedErrorListener);
+    this.filmicGrade.dispose();
     this.renderPipeline.dispose();
     this.renderer.dispose();
     this.device.destroy?.();

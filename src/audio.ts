@@ -1749,6 +1749,74 @@ export class ArenaAudio {
     this.noise({ duration: 0.1, volume: 0.16, filter: 'bandpass', frequency: 3_100, q: 0.9 }, this.weapons);
   }
 
+  /** HF-337: positional support gunfire at the firing chopper/drone world position. Reuses the railgun spatial-chain pattern. */
+  supportGunPositional(kind: 'chopper' | 'drone', emitter: SpatialPoint): void {
+    const position = emitter;
+    const distance = Math.hypot(
+      emitter.x - this.listenerPosition.x,
+      emitter.y - this.listenerPosition.y,
+      emitter.z - this.listenerPosition.z,
+    );
+    const spatialDestinations = this.createSupportGunSpatialDestinations(position, distance);
+    const weaponDestination = spatialDestinations?.weapons ?? this.weapons;
+    if (kind === 'chopper') {
+      this.sweep(104, 38, 0.16, 0.21, 'sawtooth', weaponDestination);
+      this.noise({ duration: 0.19, volume: 0.28, filter: 'lowpass', frequency: 2_500, q: 0.7 }, weaponDestination);
+      this.noise({ duration: 0.035, volume: 0.11, filter: 'highpass', frequency: 2_100, q: 0.45 }, weaponDestination);
+      return;
+    }
+    this.sweep(178, 72, 0.09, 0.13, 'square', weaponDestination);
+    this.noise({ duration: 0.1, volume: 0.16, filter: 'bandpass', frequency: 3_100, q: 0.9 }, weaponDestination);
+  }
+
+  private createSupportGunSpatialDestinations(
+    emitter: SpatialPoint,
+    distance: number,
+  ): Readonly<{ weapons: PannerNode; ambience: PannerNode }> | null {
+    if (!this.context || !this.weapons || !this.ambience
+      || ![emitter.x, emitter.y, emitter.z, distance].every(Number.isFinite)
+      || this.spatialChains + 2 > AUDIO_RUNTIME_BUDGET.spatialVoices) {
+      this.voicesDropped += 1;
+      return null;
+    }
+    const create = (bus: 'sfx' | 'ambience', destination: GainNode): PannerNode => {
+      const panner = this.context!.createPanner();
+      panner.panningModel = 'HRTF';
+      panner.distanceModel = 'inverse';
+      panner.refDistance = 8;
+      panner.maxDistance = 180;
+      panner.rolloffFactor = 0.18;
+      panner.positionX.value = emitter.x;
+      panner.positionY.value = emitter.y;
+      panner.positionZ.value = emitter.z;
+      panner.connect(destination);
+      this.busIdentity.set(panner, bus);
+      this.spatialReportDestinations.add(panner);
+      this.spatialReportDistances.set(panner, distance);
+      this.railgunSpatialNodes.push(panner);
+      return panner;
+    };
+    const weapons = create('sfx', this.weapons);
+    const ambience = create('ambience', this.ambience);
+    this.spatialChains += 2;
+    this.railgunSpatialChainCount += 2;
+    const cleanup = () => {
+      for (const node of [weapons, ambience]) {
+        const index = this.railgunSpatialNodes.indexOf(node);
+        if (index >= 0) this.railgunSpatialNodes.splice(index, 1);
+        this.busIdentity.delete(node);
+        node.disconnect();
+      }
+      this.spatialChains = Math.max(0, this.spatialChains - 2);
+      this.railgunSpatialChainCount = Math.max(0, this.railgunSpatialChainCount - 2);
+      const timerIndex = this.railgunSpatialTimers.indexOf(timer);
+      if (timerIndex >= 0) this.railgunSpatialTimers.splice(timerIndex, 1);
+    };
+    const timer = setTimeout(cleanup, Math.ceil((0.25 + 0.12) * 1_000));
+    this.railgunSpatialTimers.push(timer);
+    return { weapons, ambience };
+  }
+
   syncChopperRotors(sources: readonly Readonly<{
     id: string;
     position: SpatialPoint;
@@ -1777,6 +1845,9 @@ export class ArenaAudio {
         entry.position.y - this.listenerPosition.y,
         entry.position.z - this.listenerPosition.z,
       );
+      // HF-337: altitude-aware attenuation — higher altitude = more attenuation
+      const altitude = entry.position.y;
+      const altitudeAttenuation = Math.max(0.25, 1 - Math.min(1, altitude / 80));
       if (!loop) {
         const source = this.context.createOscillator();
         const filter = this.context.createBiquadFilter();
@@ -1787,12 +1858,13 @@ export class ArenaAudio {
         filter.type = 'lowpass';
         filter.frequency.value = 230;
         filter.Q.value = 0.62;
-        gain.gain.value = 0.011;
+        // HF-337: raised base gain with altitude attenuation
+        gain.gain.value = 0.018 * altitudeAttenuation;
         panner.panningModel = 'HRTF';
         panner.distanceModel = 'inverse';
-        panner.refDistance = 4;
-        panner.maxDistance = 110;
-        panner.rolloffFactor = 0.72;
+        panner.refDistance = 6;
+        panner.maxDistance = 160;
+        panner.rolloffFactor = 0.6;
         source.connect(filter).connect(gain).connect(panner).connect(this.ambience);
         if (!this.registerVoice(source, this.ambience, 1, true, listenerDistance)) {
           filter.disconnect();
@@ -1819,9 +1891,37 @@ export class ArenaAudio {
       loop.panner.positionY.value = entry.position.y;
       loop.panner.positionZ.value = entry.position.z;
       loop.source.frequency.value = entry.phase === 'inbound' ? 36 : entry.phase === 'outbound' ? 34 : 38;
-      loop.gain.gain.value = entry.phase === 'inbound' ? 0.009 : entry.phase === 'outbound' ? 0.007 : 0.011;
+      // HF-337: altitude-aware gain with blade-slap layer
+      loop.gain.gain.value = (entry.phase === 'inbound' ? 0.015 : entry.phase === 'outbound' ? 0.012 : 0.018) * altitudeAttenuation;
       const voice = this.activeVoices.get(loop.source);
       if (voice) voice.distance = listenerDistance;
+      // HF-337: low-rate blade-slap noise layer for unmistakable rotor presence
+      if (this.context && this.ambience && Math.random() < 0.025) {
+        const slapSource = this.context.createBufferSource();
+        const slapFilter = this.context.createBiquadFilter();
+        const slapGain = this.context.createGain();
+        const slapPanner = this.context.createPanner();
+        slapSource.buffer = this.noiseBuffer;
+        slapFilter.type = 'bandpass';
+        slapFilter.frequency.value = 380;
+        slapFilter.Q.value = 1.8;
+        slapGain.gain.value = 0.008 * altitudeAttenuation;
+        slapPanner.panningModel = 'HRTF';
+        slapPanner.distanceModel = 'inverse';
+        slapPanner.refDistance = 6;
+        slapPanner.maxDistance = 160;
+        slapPanner.rolloffFactor = 0.6;
+        slapPanner.positionX.value = entry.position.x;
+        slapPanner.positionY.value = entry.position.y;
+        slapPanner.positionZ.value = entry.position.z;
+        slapSource.connect(slapFilter).connect(slapGain).connect(slapPanner).connect(this.ambience);
+        slapSource.onended = () => {
+          slapFilter.disconnect();
+          slapGain.disconnect();
+          slapPanner.disconnect();
+        };
+        slapSource.start(this.context.currentTime, 0, 0.08);
+      }
       admittedCount += 1;
       if (admittedCount >= 4) break;
     }

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import './style.css';
+import { gradeProfileIdForGraphicsPreset } from './rendering/filmic-grade-chain'; // HF-363
 import { KILLSTREAK_ACTIVATION_DENIAL_LABELS, evaluateKillstreakActivation } from './killstreak-activation-gate'; // HF-316
 import { RARE_WEAPON_BANNER_DURATION_MS, presentRareWeaponAnnouncement, type RareWeaponAnnouncementInput } from './rare-weapon-announcement'; // HF-339
 import { applyTeamSwap, prescribeTeams } from './team-prescription'; // HF-328
@@ -217,7 +218,7 @@ import {
 } from './killstreak-protocol';
 import {
   isOwnerSupportDamageFeedback,
-  presentSupportShotAudio,
+  presentSupportShotAudioPositional,
   SupportShotReplayGuard,
 } from './support-combat-presentation';
 import {
@@ -477,6 +478,15 @@ import {
   type FieldSupportId,
   type TriPassTargeting,
 } from './field-support';
+// HF-317: Carpet Bomber authors a two-point bombing RUN on the tactical map
+// (owner: "carpet bomb is still like carepackage not tri pass as requested?").
+import {
+  CARPET_CORRIDOR_POINT_COUNT,
+  carpetCorridorIntent,
+  createCarpetCorridorTargeting,
+  registerCarpetCorridorPoint,
+  type CarpetCorridorTargeting,
+} from './carpet-corridor-targeting';
 import {
   controllableKillstreakId,
   selectControllableSupportEntity,
@@ -4805,8 +4815,19 @@ const hunterDrones: HunterDroneEntity[] = [];
 let supportPresentationRetirements = 0;
 let nukeSequence: NukeSequence | null = null;
 let triPassTargeting: TriPassTargeting | null = null;
-type PointSupportTargeting = Readonly<{ id: 'care-package' | 'carpet-bomber' }>;
+// HF-317: Carpet Bomber left the single-crosshair point path — only Care
+// Package still places one in-world marker. Carpet now picks a run start and
+// run end on the tactical map (see carpetCorridorTargeting below).
+type PointSupportTargeting = Readonly<{ id: 'care-package' }>;
 let pointSupportTargeting: PointSupportTargeting | null = null;
+/** HF-317: two-point tactical-map bombing corridor for Carpet Bomber. */
+let carpetCorridorTargeting: CarpetCorridorTargeting | null = null;
+/**
+ * HF-317: preview-only half width of the drawn corridor band. The host owns the
+ * real scatter (carpetImpactPattern zigzags each impact off the run centre); a
+ * fixed band just tells the caller roughly how wide the run lands.
+ */
+const CARPET_CORRIDOR_BAND_HALF_WIDTH_M = 6;
 let tacticalMapOpen = false;
 let lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
 let crosshairPreviewMarker: THREE.Group | null = null;
@@ -10297,10 +10318,14 @@ function onNetworkMessage(message: GameMessage): void {
   }
   if (message.type === 'killstreak-damage-result') {
     if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.matchEpoch !== killstreakMatchEpoch) return;
-    presentSupportShotAudio(
+    presentSupportShotAudioPositional(
       message.shots,
       { playerId: player.id, team: player.team, mode: privateMatchMode },
-      (kind) => audio.supportGun(kind),
+      (entityId) => {
+        const entity = killstreakSnapshot.entities.find((e) => e.id === entityId);
+        return entity ? { x: entity.position[0], y: entity.position[1], z: entity.position[2] } : null;
+      },
+      (kind, emitter) => audio.supportGunPositional(kind, emitter),
       supportShotReplay,
     );
     for (const event of message.events) {
@@ -15411,11 +15436,10 @@ function presentRareWeaponSpawn(input: RareWeaponAnnouncementInput): void {
       if (banner.textContent?.includes(presentation.banner!.headline)) banner.hidden = true;
     }, presentation.banner.durationMs);
   }
-  // HF-339: reuse the existing announcement sting rather than adding a new audio
-  // event here - src/audio.ts is owned by the HF-337 lane right now, and a bespoke
-  // cue would also need a sound-event-inventory row. Upgrade to a dedicated sting
-  // when that lane lands.
-  if (presentation.audioCue) audio.matchCountdown('engage');
+  // HF-339: the audio sting is deliberately NOT wired here. Borrowing an existing
+  // cue would add a call site to the sound-event callsite contract, which the HF-337
+  // audio lane is editing concurrently. The banner, feed line and minimap ping already
+  // make the spawn unmistakable; a dedicated sting lands with that lane.
   if (presentation.minimapPing) rareWeaponMinimapPing = {
     position: presentation.minimapPing.position,
     untilMs: performance.now() + RARE_WEAPON_BANNER_DURATION_MS,
@@ -20731,7 +20755,8 @@ function activateOrToggleFieldSupportSlot(slotIndex: number, now = performance.n
     matchPhase: matchState.phase,
     tacticalMapOpen,
     possessionActive: localKillstreakActorSnapshot()?.possession != null,
-    targetingActive: pointSupportTargeting !== null || triPassTargeting !== null,
+    // HF-317: an open carpet corridor is live targeting like the other modes.
+    targetingActive: pointSupportTargeting !== null || triPassTargeting !== null || carpetCorridorTargeting !== null,
     arenaSupportsFieldSupport: selectedArena.id !== 'gun-range',
     hasActorSnapshot: localKillstreakActorSnapshot() != null,
     gameplayInputEnabled: gameplayInputEnabled(),
@@ -21182,10 +21207,14 @@ function updatePass65KillstreakRuntime(now: number): void {
   }
   if (network.role !== 'client' && matchState.phase === 'active') {
     const result = killstreakRuntime.advance(now, killstreakWorldState());
-    presentSupportShotAudio(
+    presentSupportShotAudioPositional(
       result.shotEvents,
       { playerId: player.id, team: player.team, mode: privateMatchMode },
-      (kind) => audio.supportGun(kind),
+      (entityId) => {
+        const entity = killstreakSnapshot.entities.find((e) => e.id === entityId);
+        return entity ? { x: entity.position[0], y: entity.position[1], z: entity.position[2] } : null;
+      },
+      (kind, emitter) => audio.supportGunPositional(kind, emitter),
       supportShotReplay,
     );
     const applied = result.damageEvents.map(applyKillstreakDamageEvent).filter((event): event is KillstreakDamageEvent => event !== null && event.damage > 0);
@@ -22119,25 +22148,70 @@ function drawStrikeMap(now = performance.now()): void {
     context.fillStyle = '#10232a'; context.font = '900 18px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
     context.fillText(String(index + 1), x, y + 1);
   });
+  // HF-317: the Carpet Bomber run reads as a CORRIDOR — a banded start→end line
+  // with a heading arrow — so it is never mistaken for Tri-Pass's three
+  // numbered dots or for the Care Package's single drop marker.
+  const corridorPoints = carpetCorridorTargeting?.points ?? [];
+  if (corridorPoints.length > 0) {
+    const [originX] = worldToTacticalMap(0, 0, arena.bounds, width, height);
+    const [halfWidthProbeX] = worldToTacticalMap(CARPET_CORRIDOR_BAND_HALF_WIDTH_M, 0, arena.bounds, width, height);
+    const bandHalfWidth = Math.max(6, Math.abs(halfWidthProbeX - originX));
+    const canvasPoints = corridorPoints.map((point) => worldToTacticalMap(point.x, point.z, arena.bounds, width, height));
+    const [start] = canvasPoints;
+    const end = canvasPoints[1] ?? null;
+    if (end) {
+      context.strokeStyle = 'rgba(255, 179, 71, 0.28)';
+      context.lineWidth = bandHalfWidth * 2;
+      context.lineCap = 'round';
+      context.beginPath(); context.moveTo(start[0], start[1]); context.lineTo(end[0], end[1]); context.stroke();
+      context.lineCap = 'butt';
+      context.strokeStyle = '#ffb347';
+      context.lineWidth = 5;
+      context.beginPath(); context.moveTo(start[0], start[1]); context.lineTo(end[0], end[1]); context.stroke();
+      const heading = Math.atan2(end[1] - start[1], end[0] - start[0]);
+      context.fillStyle = '#ffb347';
+      context.beginPath();
+      context.moveTo(end[0] + Math.cos(heading) * 20, end[1] + Math.sin(heading) * 20);
+      context.lineTo(end[0] + Math.cos(heading + 2.5) * 16, end[1] + Math.sin(heading + 2.5) * 16);
+      context.lineTo(end[0] + Math.cos(heading - 2.5) * 16, end[1] + Math.sin(heading - 2.5) * 16);
+      context.closePath(); context.fill();
+    }
+    canvasPoints.forEach(([x, y], index) => {
+      context.fillStyle = '#ffb347';
+      context.beginPath(); context.arc(x, y, 15, 0, Math.PI * 2); context.fill();
+      context.strokeStyle = '#fff4d9'; context.lineWidth = 3; context.stroke();
+      context.fillStyle = '#10232a'; context.font = '900 15px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+      context.fillText(index === 0 ? 'START' : 'END', x, y + 1);
+    });
+  }
   context.textBaseline = 'alphabetic';
   context.fillStyle = '#fff4d9'; context.font = '900 22px sans-serif'; context.textAlign = 'center';
   context.fillText('N', width / 2, 28);
-  const targetCount = pointSupportTargeting ? 1 : 3;
-  element<HTMLElement>('#strike-target-mode').textContent = pointSupportTargeting
-    ? pointSupportTargeting.id === 'care-package' ? 'CARE PACKAGE' : 'CARPET BOMBER'
-    : 'TRI-PASS';
-  element<HTMLElement>('#strike-target-instruction').textContent = pointSupportTargeting
-    ? 'SELECT DELIVERY AREA'
-    : 'SELECT THREE TARGETS';
-  element<HTMLElement>('#strike-target-help').innerHTML = pointSupportTargeting
-    ? 'CLICK ONE LOCATION TO CONFIRM · <kbd>RMB</kbd> CANCELS AND REFUNDS'
-    : 'CLICK THREE LOCATIONS · <kbd>ESC</kbd> CANCELS AND REFUNDS';
-  element<HTMLElement>('#strike-target-count').textContent = `${points.length} / ${targetCount}`;
+  const carpetCorridorActive = carpetCorridorTargeting !== null;
+  const targetCount = carpetCorridorActive ? CARPET_CORRIDOR_POINT_COUNT : pointSupportTargeting ? 1 : 3;
+  const selectedCount = carpetCorridorActive ? corridorPoints.length : points.length;
+  element<HTMLElement>('#strike-target-mode').textContent = carpetCorridorActive
+    ? 'CARPET BOMBER'
+    : pointSupportTargeting
+      ? 'CARE PACKAGE'
+      : 'TRI-PASS';
+  element<HTMLElement>('#strike-target-instruction').textContent = carpetCorridorActive
+    ? 'SELECT RUN START AND END'
+    : pointSupportTargeting
+      ? 'SELECT DELIVERY AREA'
+      : 'SELECT THREE TARGETS';
+  element<HTMLElement>('#strike-target-help').innerHTML = carpetCorridorActive
+    ? 'CLICK RUN START THEN RUN END · <kbd>ESC</kbd> CANCELS AND REFUNDS'
+    : pointSupportTargeting
+      ? 'CLICK ONE LOCATION TO CONFIRM · <kbd>RMB</kbd> CANCELS AND REFUNDS'
+      : 'CLICK THREE LOCATIONS · <kbd>ESC</kbd> CANCELS AND REFUNDS';
+  element<HTMLElement>('#strike-target-count').textContent = `${selectedCount} / ${targetCount}`;
   lastStrikeMapDrawAt = now;
 }
 
 function beginTriPassTargeting(): void {
   pointSupportTargeting = null;
+  carpetCorridorTargeting = null;
   triPassTargeting = createTriPassTargeting();
   tacticalMapOpen = true;
   lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
@@ -22148,24 +22222,38 @@ function beginTriPassTargeting(): void {
   if (document.pointerLockElement === canvas) document.exitPointerLock();
 }
 
-function beginPointSupportTargeting(id: PointSupportTargeting['id']): void {
+/**
+ * HF-317: Carpet Bomber opens the same tactical map overlay Tri-Pass uses and
+ * collects TWO clicks — the run start and the run end — instead of dropping one
+ * Care-Package-style crosshair marker.
+ */
+function beginCarpetCorridorTargeting(): void {
+  pointSupportTargeting = null;
   triPassTargeting = null;
-  pointSupportTargeting = Object.freeze({ id });
-  tacticalMapOpen = false;
-  lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
-  if (id === 'care-package' || id === 'carpet-bomber') {
-    updateFieldSupportHud();
-    return;
-  }
+  carpetCorridorTargeting = createCarpetCorridorTargeting();
   tacticalMapOpen = true;
+  lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
   element<HTMLElement>('#strike-map-overlay').hidden = false;
   clearGameplayInput();
   drawStrikeMap();
   if (document.pointerLockElement === canvas) document.exitPointerLock();
 }
 
+function beginPointSupportTargeting(id: PointSupportTargeting['id']): void {
+  triPassTargeting = null;
+  carpetCorridorTargeting = null;
+  pointSupportTargeting = Object.freeze({ id });
+  tacticalMapOpen = false;
+  lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
+  // HF-317: only Care Package reaches the in-world crosshair placement now.
+  updateFieldSupportHud();
+}
+
 function cancelSupportTargeting(refund: boolean, reacquirePointer = true): void {
   const refundId = pointSupportTargeting?.id
+    // HF-317: an abandoned corridor refunds exactly like Tri-Pass and Care —
+    // a completed corridor has already spent the reward on the host request.
+    ?? (carpetCorridorTargeting !== null && !carpetCorridorTargeting.complete ? 'carpet-bomber' : null)
     ?? (triPassTargeting !== null && !triPassTargeting.complete ? 'tri-pass' : null);
   if (refund && refundId) {
     addFeed(`${GAMEPAD_SUPPORT_LABELS[refundId]} TARGETING CANCELLED · REWARD RETAINED`, 'gold');
@@ -22179,6 +22267,7 @@ function cancelSupportTargeting(refund: boolean, reacquirePointer = true): void 
   crosshairPreviewLastPoint = null;
   crosshairPreviewFacing = null;
   triPassTargeting = null;
+  carpetCorridorTargeting = null;
   pointSupportTargeting = null;
   tacticalMapOpen = false;
   triPassHostileMarkers = [];
@@ -22313,7 +22402,9 @@ function updateCrosshairSupportPreview(): void {
   }
   const arrow = crosshairPreviewMarker.getObjectByName('carpet-preview-direction-arrow');
   if (arrow) {
-    arrow.visible = pointSupportTargeting.id === 'carpet-bomber';
+    // HF-317: the run heading is authored on the tactical map now, so the
+    // crosshair's direction arrow never shows for the Care Package drop.
+    arrow.visible = false;
     if (crosshairPreviewFacing) arrow.rotation.y = -Math.atan2(crosshairPreviewFacing[2], crosshairPreviewFacing[0]);
   }
   crosshairPreviewMarker.position.copy(anchor);
@@ -22326,19 +22417,18 @@ function confirmCrosshairSupportTarget(confirmedAt = performance.now()): boolean
   const targeting = pointSupportTargeting;
   const point = crosshairPreviewLastPoint;
   if (!point) return false;
+  // HF-317: the crosshair path is Care-Package-only, so it never carries a
+  // corridor facing — Carpet Bomber's heading comes from the map corridor.
   if (!requestKillstreakActivation(
     targeting.id,
     confirmedAt,
     [point.x, point.y, point.z],
-    targeting.id === 'carpet-bomber' ? crosshairPreviewFacing ?? undefined : undefined,
   )) {
     addFeed(`${GAMEPAD_SUPPORT_LABELS[targeting.id]} AUTHORITY REJECTED · REWARD RETAINED`, 'coral');
     cancelSupportTargeting(false);
     return true;
   }
-  addFeed(targeting.id === 'care-package'
-    ? 'CARE PACKAGE · TARGET CONFIRMED · DELIVERY INBOUND'
-    : 'CARPET BOMBER · TARGET CONFIRMED · 20-IMPACT RUN INBOUND', 'gold');
+  addFeed('CARE PACKAGE · TARGET CONFIRMED · DELIVERY INBOUND', 'gold');
   cancelSupportTargeting(false);
   return true;
 }
@@ -22420,7 +22510,54 @@ function registerPointSupportClick(clientX: number, clientY: number, confirmedAt
   return true;
 }
 
+/**
+ * HF-317: commits a completed two-point corridor. `carpetCorridorIntent` gives
+ * the run midpoint as the anchor and an UNNORMALIZED facing whose magnitude is
+ * the requested run length — exactly the corridor-native activation intent the
+ * host already admits and clamps, so no protocol change is needed. The client
+ * only PROPOSES: the host generates the activation, re-derives every impact's
+ * surface height, and owns the run. Deliberately no
+ * `authorizeLocalOffensiveSupport` call — carpet stays host-driven so its
+ * events keep attributing to 'map:carpet-bomber' rather than to the caller.
+ */
+function commitCarpetCorridor(state: CarpetCorridorTargeting, confirmedAt: number): boolean {
+  const intent = carpetCorridorIntent(state);
+  if (!intent) return false;
+  if (!requestKillstreakActivation(
+    'carpet-bomber',
+    confirmedAt,
+    [intent.anchor[0], intent.anchor[1], intent.anchor[2]],
+    [intent.facing[0], intent.facing[1], intent.facing[2]],
+  )) {
+    addFeed(`${GAMEPAD_SUPPORT_LABELS['carpet-bomber']} AUTHORITY REJECTED · REWARD RETAINED`, 'coral');
+    cancelSupportTargeting(false);
+    return true;
+  }
+  addFeed(`CARPET BOMBER · RUN CONFIRMED · ${Math.round(intent.lengthM)} M CORRIDOR · 20-IMPACT RUN INBOUND`, 'gold');
+  cancelSupportTargeting(false);
+  return true;
+}
+
+/** HF-317: one tactical-map click of the Carpet Bomber run (start, then end). */
+function registerCarpetCorridorClick(clientX: number, clientY: number, confirmedAt = performance.now()): boolean {
+  const targeting = carpetCorridorTargeting;
+  if (!tacticalMapOpen || !targeting || targeting.complete) return false;
+  const rect = strikeMapCanvas.getBoundingClientRect();
+  const x = (clientX - rect.left) * strikeMapCanvas.width / Math.max(1, rect.width);
+  const y = (clientY - rect.top) * strikeMapCanvas.height / Math.max(1, rect.height);
+  const point = tacticalMapToWorld(x, y, arena.bounds, strikeMapCanvas.width, strikeMapCanvas.height);
+  const next = registerCarpetCorridorPoint(targeting, point, arena.bounds);
+  if (next === targeting) return false;
+  carpetCorridorTargeting = next;
+  drawStrikeMap();
+  if (!next.complete) return true;
+  return commitCarpetCorridor(next, confirmedAt);
+}
+
 strikeMapCanvas.addEventListener('click', (event) => {
+  // HF-317: carpet corridor picks are checked first; the other two modes are
+  // mutually exclusive with it because each begin* clears the others.
+  if (registerCarpetCorridorClick(event.clientX, event.clientY)) return;
   if (!registerPointSupportClick(event.clientX, event.clientY)) registerTriPassClick(event.clientX, event.clientY);
 });
 
@@ -22509,7 +22646,8 @@ function activateFieldSupport(id: FieldSupportId): void {
   } else if (activatedId === 'care-package') {
     beginPointSupportTargeting('care-package');
   } else if (activatedId === 'carpet-bomber') {
-    beginPointSupportTargeting('carpet-bomber');
+    // HF-317: a bombing RUN, not a point drop — two tactical-map clicks.
+    beginCarpetCorridorTargeting();
   } else if (activatedId === 'piloted-drone') {
     if (!requestKillstreakActivation(activatedId, now, [player.position.x, player.position.y, player.position.z])) return;
     addFeed('PILOTED DRONE · 20 ROUNDS + TWO SPARE CLIPS · PRESS SLOT KEY AGAIN TO ENTER', 'gold');
@@ -24415,6 +24553,12 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
   applyArenaLightingForSelection();
   applyAdaptiveRenderBudget(pixelRatioCap);
   graphicsRefinement.refreshSelectiveBloom(scene);
+  // HF-363: select the filmic grade profile for the player's graphics preset. Without
+  // this every preset ran the 'quality' default, so Performance paid for grading it did
+  // not choose and Max never got its wider look.
+  if (renderRuntime.backend === 'webgpu') {
+    renderRuntime.setGradeProfile(gradeProfileIdForGraphicsPreset(displayedGraphicsPreset));
+  }
   document.documentElement.dataset.graphicsPreset = displayedGraphicsPreset;
   document.documentElement.dataset.graphicsLiveProfile = desiredProfile;
   document.documentElement.dataset.graphicsFrameRateLimit = live.frameRateLimit === 0 ? 'uncapped' : String(live.frameRateLimit);
@@ -26930,7 +27074,10 @@ function sampleEnduranceHealth(detail: EnduranceHealthDetail = 'base') {
         } : null,
       } : null,
       carpetWorkflow: detail === 'carpet-workflow' && carpetPresentationHealth ? {
-        targetingMode: pointSupportTargeting?.id ?? (triPassTargeting ? 'tri-pass' : null),
+        // HF-317: an open carpet corridor reports as 'carpet-bomber' targeting.
+        targetingMode: pointSupportTargeting?.id
+          ?? (carpetCorridorTargeting ? 'carpet-bomber' as const : null)
+          ?? (triPassTargeting ? 'tri-pass' as const : null),
         crosshairTarget: crosshairPreviewLastPoint?.toArray() ?? null,
         markers: carpetPresentationHealth.markers,
         aircraft: carpetAircraft ? {
@@ -27470,6 +27617,8 @@ const debugWindow = window as Window & {
     }> | null;
     segmentBlocked: (x1: number, z1: number, x2: number, z2: number) => boolean;
     selectTriPassWorldTargets: (points: [number, number][]) => boolean;
+    /** HF-317: drives the two-point Carpet Bomber corridor from world coords. */
+    selectCarpetCorridorWorldPoints: (points: [number, number][]) => boolean;
     captureShadowProbeFrame: (horizontalOffset: number) => string;
     readbackWebGpuFrame: () => Promise<{ bytes: number; hash: string; x: number; y: number; width: number; height: number }>;
     sampleRendererResidency: () => ReturnType<typeof estimateRendererResidency>;
@@ -28939,9 +29088,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       } : { active: false, phase: null },
       yardhawkExplosions,
       tacticalMapOpen,
-      targetingMode: pointSupportTargeting?.id ?? (triPassTargeting ? 'tri-pass' : null),
+      // HF-317: an open carpet corridor reports as 'carpet-bomber' targeting.
+      targetingMode: pointSupportTargeting?.id
+        ?? (carpetCorridorTargeting ? 'carpet-bomber' as const : null)
+        ?? (triPassTargeting ? 'tri-pass' as const : null),
       crosshairTarget: crosshairPreviewLastPoint?.toArray() ?? null,
-      tacticalTargets: triPassTargeting?.points.map((point) => ({ ...point })) ?? [],
+      // HF-317: the corridor's start/end read out on the same channel.
+      tacticalTargets: triPassTargeting?.points.map((point) => ({ ...point }))
+        ?? carpetCorridorTargeting?.points.map((point) => ({ ...point }))
+        ?? [],
       tacticalHostiles: triPassHostileMarkers.map((marker) => ({
         id: marker.id,
         kind: marker.kind,
@@ -30367,6 +30522,19 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     scheduleTriPassMissiles(next.points, now);
     cancelSupportTargeting(false);
     return true;
+  },
+  // HF-317: same shape as selectTriPassWorldTargets, but two points and the
+  // production commit path so QA exercises the real corridor intent.
+  selectCarpetCorridorWorldPoints: (points) => {
+    if (!carpetCorridorTargeting || !tacticalMapOpen) return false;
+    let next = carpetCorridorTargeting;
+    for (const [x, z] of points.slice(0, CARPET_CORRIDOR_POINT_COUNT)) {
+      next = registerCarpetCorridorPoint(next, { x, z }, arena.bounds);
+    }
+    carpetCorridorTargeting = next;
+    drawStrikeMap();
+    if (!next.complete) return false;
+    return commitCarpetCorridor(next, performance.now());
   },
   captureShadowProbeFrame: (horizontalOffset) => {
     if (renderRuntime.backend === 'webgpu') {

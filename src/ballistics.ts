@@ -355,6 +355,20 @@ export function applyPenetrationDamage(baseDamage: number, multiplier: number): 
   return boundedMultiplier >= 1 ? baseDamage : Math.max(1, Math.round(baseDamage * boundedMultiplier));
 }
 
+// HF-343: apply a graduated obstruction/high-ready spread penalty from the viewmodel
+// fire admission so a partially raised weapon shoots less accurately without moving
+// the authoritative shot ray.
+export function applyObstructionSpreadPenalty(
+  baseSpreadRadians: number,
+  penaltyRadians: number,
+): number {
+  if (!Number.isFinite(baseSpreadRadians) || baseSpreadRadians <= 0) return baseSpreadRadians;
+  if (!Number.isFinite(penaltyRadians) || penaltyRadians <= 0) return baseSpreadRadians;
+  // Additive in radians matches the gameplay spread model; saturation is handled
+  // by the caller (fireBlocked means full penalty, not arbitrary escalation).
+  return baseSpreadRadians + penaltyRadians;
+}
+
 export function ballisticImpactSurface(material: BallisticMaterialId): ImpactSurface {
   if (material === 'glass') return 'glass';
   if (material === 'fence' || material === 'wood' || material === 'interior-wall') return 'wood';

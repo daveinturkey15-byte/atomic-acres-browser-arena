@@ -114,7 +114,9 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(updateBlock).toContain('killstreakRuntime.advance(now, killstreakWorldState())');
     expect(updateBlock).toContain('refreshLocalKillstreakSnapshot(now,');
     expect(updateBlock).toContain('result.damageEvents.length > 0 || result.shotEvents.length > 0 || result.impactEvents.length > 0 || result.expiredEntityIds.length > 0');
-    expect(updateBlock).toContain('presentSupportShotAudio(');
+    // HF-337: support shot audio is now positional - it plays at the firing chopper's
+    // world position rather than flat, so teammates and enemies can locate it.
+    expect(updateBlock).toContain('presentSupportShotAudioPositional(');
     expect(updateBlock).toContain('shots: result.shotEvents');
     expect(updateBlock.indexOf('killstreakRuntime.advance(now, killstreakWorldState())'))
       .toBeLessThan(updateBlock.indexOf('refreshLocalKillstreakSnapshot(now,'));
@@ -261,18 +263,15 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(clientBlock).toContain('killstreakPresentation.presentChopperImpactAction(presented.id)');
   });
 
-  it('uses a world-space crosshair for Care/Carpet placement and host-owned surface height', () => {
+  it('uses a world-space crosshair for Care Package placement and host-owned surface height', () => {
     expect(source).toContain("beginPointSupportTargeting('care-package')");
-    expect(source).toContain("beginPointSupportTargeting('carpet-bomber')");
     const targetingStart = source.indexOf('function beginPointSupportTargeting(');
     const targetingEnd = source.indexOf('\nfunction cancelSupportTargeting(', targetingStart);
     const targetingBlock = source.slice(targetingStart, targetingEnd);
     expect(targetingBlock).toContain('tacticalMapOpen = false;');
-    expect(targetingBlock).toContain("if (id === 'care-package' || id === 'carpet-bomber') {");
     expect(source).toContain('function updateCrosshairSupportPreview()');
     expect(source).toContain('function confirmCrosshairSupportTarget(');
-    expect(source).toMatch(/requestKillstreakActivation\(\s*targeting\.id,\s*confirmedAt,\s*\[point\.x, point\.y, point\.z\],\s*targeting\.id === 'carpet-bomber' \? crosshairPreviewFacing \?\? undefined : undefined,\s*\)/);
-    expect(source).toContain("targeting.id === 'carpet-bomber' ? crosshairPreviewFacing ?? undefined : undefined");
+    expect(source).toMatch(/requestKillstreakActivation\(\s*targeting\.id,\s*confirmedAt,\s*\[point\.x, point\.y, point\.z\],\s*\)/);
     expect(source).toContain("label.textContent = 'LEFT CLICK or [F] to confirm target  [RMB] to cancel'");
     expect(source).toContain("? 'CLICK ONE LOCATION TO CONFIRM · <kbd>RMB</kbd> CANCELS AND REFUNDS'");
     expect(source).not.toContain("LEFT CLICK or [F] to confirm target  [ESC] to cancel");
@@ -286,6 +285,66 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('CARE PACKAGE · TARGET CONFIRMED · DELIVERY INBOUND');
     expect(source).not.toContain('CARE PACKAGE · TARGET CONFIRMED · PRESS F TO SECURE');
     expect(source).not.toContain('nearestSupportTarget()?.point ?? player.position.clone().addScaledVector');
+  });
+
+  // HF-317 (owner, third ask): "carpet bomb is still like carepackage not tri
+  // pass as requested? fix it" — Carpet Bomber must author a two-point bombing
+  // RUN on the tactical map, never a single Care-Package-style point drop.
+  it('authors the Carpet Bomber run as a two-point tactical-map corridor, not a point drop', () => {
+    // The Care Package point path must no longer accept carpet at all.
+    expect(source).toContain("type PointSupportTargeting = Readonly<{ id: 'care-package' }>;");
+    expect(source).not.toContain("beginPointSupportTargeting('carpet-bomber')");
+    expect(source).not.toContain("targeting.id === 'carpet-bomber' ? crosshairPreviewFacing ?? undefined : undefined");
+    expect(source).toContain("beginCarpetCorridorTargeting();");
+
+    // The corridor opens the same tactical map overlay Tri-Pass uses.
+    const beginStart = source.indexOf('function beginCarpetCorridorTargeting(');
+    const beginBlock = source.slice(beginStart, source.indexOf('\nfunction beginPointSupportTargeting(', beginStart));
+    expect(beginStart).toBeGreaterThan(-1);
+    expect(beginBlock).toContain('carpetCorridorTargeting = createCarpetCorridorTargeting();');
+    expect(beginBlock).toContain('tacticalMapOpen = true;');
+    expect(beginBlock).toContain("element<HTMLElement>('#strike-map-overlay').hidden = false;");
+    expect(beginBlock).toContain('pointSupportTargeting = null;');
+    expect(beginBlock).toContain('triPassTargeting = null;');
+
+    // Two clicks, registered through the tested pure module.
+    const clickStart = source.indexOf('function registerCarpetCorridorClick(');
+    const clickBlock = source.slice(clickStart, source.indexOf("\nstrikeMapCanvas.addEventListener('click'", clickStart));
+    expect(clickStart).toBeGreaterThan(-1);
+    expect(clickBlock).toContain('if (!tacticalMapOpen || !targeting || targeting.complete) return false;');
+    expect(clickBlock).toContain('registerCarpetCorridorPoint(targeting, point, arena.bounds)');
+    expect(clickBlock).toContain('if (!next.complete) return true;');
+    expect(clickBlock).toContain('return commitCarpetCorridor(next, confirmedAt);');
+    expect(source).toContain('if (registerCarpetCorridorClick(event.clientX, event.clientY)) return;');
+
+    // The commit proposes an anchor + UNNORMALIZED facing; the host admits it.
+    const commitStart = source.indexOf('function commitCarpetCorridor(');
+    const commitBlock = source.slice(commitStart, source.indexOf('\nfunction registerCarpetCorridorClick(', commitStart));
+    expect(commitStart).toBeGreaterThan(-1);
+    expect(commitBlock).toContain('const intent = carpetCorridorIntent(state);');
+    expect(commitBlock).toMatch(/requestKillstreakActivation\(\s*'carpet-bomber',\s*confirmedAt,\s*\[intent\.anchor\[0\], intent\.anchor\[1\], intent\.anchor\[2\]\],\s*\[intent\.facing\[0\], intent\.facing\[1\], intent\.facing\[2\]\],\s*\)/);
+    expect(commitBlock).toContain('AUTHORITY REJECTED · REWARD RETAINED');
+    expect(commitBlock).toContain('cancelSupportTargeting(false);');
+    // Carpet stays host-driven so its events keep attributing to the map, not
+    // to the caller — the corridor commit must not self-authorize locally.
+    expect(commitBlock).not.toContain('authorizeLocalOffensiveSupport');
+
+    // Cancel/refund mirrors the other targeting modes.
+    const cancelStart = source.indexOf('function cancelSupportTargeting(');
+    const cancelBlock = source.slice(cancelStart, source.indexOf('\nfunction updateCrosshairSupportPreview(', cancelStart));
+    expect(cancelBlock).toContain("?? (carpetCorridorTargeting !== null && !carpetCorridorTargeting.complete ? 'carpet-bomber' : null)");
+    expect(cancelBlock).toContain('carpetCorridorTargeting = null;');
+
+    // Overlay copy names the run and counts to two.
+    expect(source).toContain("? 'CARPET BOMBER'");
+    expect(source).toContain("? 'SELECT RUN START AND END'");
+    expect(source).toContain("? 'CLICK RUN START THEN RUN END · <kbd>ESC</kbd> CANCELS AND REFUNDS'");
+    expect(source).toContain('const targetCount = carpetCorridorActive ? CARPET_CORRIDOR_POINT_COUNT : pointSupportTargeting ? 1 : 3;');
+    expect(source).toContain('`${selectedCount} / ${targetCount}`');
+
+    // The corridor draws as a line between two labelled ends, not Tri-Pass dots.
+    expect(source).toContain('const corridorPoints = carpetCorridorTargeting?.points ?? [];');
+    expect(source).toContain("context.fillText(index === 0 ? 'START' : 'END', x, y + 1);");
   });
 
   it('feeds arena-owned portal/no-fly data and current static plus dynamic solids into support flight', () => {

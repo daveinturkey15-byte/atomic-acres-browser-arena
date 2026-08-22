@@ -501,6 +501,52 @@ describe('host active-match checkpoint', () => {
     }, MULTIPLAYER_PROTOCOL_VERSION)).toBe(false);
   });
 
+  it('carries the HF-325 succession term so a recovered host cannot restart the fence at zero', () => {
+    const valid = checkpoint();
+    // Optional: pre-HF-325 checkpoints stay loadable.
+    expect(isHostMatchCheckpoint(valid, MULTIPLAYER_PROTOCOL_VERSION)).toBe(true);
+
+    expect(isHostMatchCheckpoint({
+      ...valid,
+      succession: { term: 4, successorId: 'guest-1' },
+    }, MULTIPLAYER_PROTOCOL_VERSION)).toBe(true);
+    // A host that never minted a mandate is at term zero with no successor.
+    expect(isHostMatchCheckpoint({
+      ...valid,
+      succession: { term: 0, successorId: null },
+    }, MULTIPLAYER_PROTOCOL_VERSION)).toBe(true);
+
+    for (const succession of [
+      // A named successor implies a minted mandate, so term zero is incoherent.
+      { term: 0, successorId: 'guest-1' },
+      // The successor must be a real non-host member of this very roster.
+      { term: 4, successorId: 'host-1' },
+      { term: 4, successorId: 'guest-who-left' },
+      { term: -1, successorId: null },
+      { term: 1.5, successorId: null },
+      { term: 4 },
+      { term: 4, successorId: 'guest-1', extra: true },
+      { term: 4, successorId: 7 },
+      null,
+      'succession',
+    ]) {
+      expect(isHostMatchCheckpoint({ ...valid, succession }, MULTIPLAYER_PROTOCOL_VERSION)).toBe(false);
+    }
+  });
+
+  it('round-trips a succession term through storage', () => {
+    const storage = new MemoryStorage();
+    const withSuccession = { ...checkpoint(), succession: { term: 6, successorId: 'guest-1' } } as HostMatchCheckpoint;
+    expect(saveHostMatchCheckpoint(storage, withSuccession)).toBe(true);
+    const loaded = loadHostMatchCheckpoint(
+      storage,
+      MULTIPLAYER_PROTOCOL_VERSION,
+      'atomic-room-a',
+      withSuccession.savedAtEpochMs + 1_000,
+    );
+    expect(loaded?.succession).toEqual({ term: 6, successorId: 'guest-1' });
+  });
+
   it('authenticates a recovered guest with a SHA-256 digest without persisting the raw token', async () => {
     const token = '12345678-1234-1234-1234-123456789abc';
     const digest = await sha256ResumeToken(token);

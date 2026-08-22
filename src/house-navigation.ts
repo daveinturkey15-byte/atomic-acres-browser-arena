@@ -450,3 +450,42 @@ export function solidBounds(solidEntry: HouseSolid): { minX: number; maxX: numbe
     rotation: solidEntry.rotation,
   };
 }
+
+/**
+ * HF-344: Returns all authored breakable glass solids for a house architecture.
+ */
+export function houseGlassSolids(architecture: HouseArchitecture): HouseSolid[] {
+  return architecture.solids.filter((entry) => entry.kind === 'glass');
+}
+
+/**
+ * HF-344: Returns the authored solid bounds for all breakable glass solids in a house architecture.
+ */
+export function houseGlassSolidBounds(architecture: HouseArchitecture): Array<{ id: string; bounds: ReturnType<typeof solidBounds> }> {
+  return houseGlassSolids(architecture).map((solid) => ({
+    id: solid.id,
+    bounds: solidBounds(solid),
+  }));
+}
+
+/**
+ * HF-344: Finds the authored solid for a glass pane across house architectures.
+ */
+export function findHouseGlassSolid(houses: readonly HouseArchitecture[], paneId: string): HouseSolid | null {
+  for (const house of houses) {
+    const found = house.solids.find(
+      (solid) => solid.id === paneId || solid.name === paneId || solid.id.endsWith(`:${paneId}`) || paneId.endsWith(`:${solid.id}`),
+    );
+    if (found && found.kind === 'glass') return found;
+  }
+  return null;
+}
+
+/**
+ * HF-344: Returns the authored solid bounds for a glass pane across house architectures.
+ */
+export function findHouseGlassSolidBounds(houses: readonly HouseArchitecture[], paneId: string): ReturnType<typeof solidBounds> | null {
+  const solid = findHouseGlassSolid(houses, paneId);
+  return solid ? solidBounds(solid) : null;
+}
+

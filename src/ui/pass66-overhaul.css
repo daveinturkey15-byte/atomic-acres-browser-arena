@@ -1337,15 +1337,6 @@
   background: radial-gradient(circle at 40% 35%, rgba(127, 246, 255, 0.6), rgba(31, 90, 96, 0.75));
   border: 2px solid rgba(127, 246, 255, 0.7);
 }
-#mobile-touch-controls .mtc-buttons {
-  position: absolute;
-  right: 172px;
-  bottom: 30px;
-  display: grid;
-  grid-template-columns: repeat(2, 62px);
-  gap: 9px;
-  pointer-events: auto;
-}
 #mobile-touch-controls .mtc-btn {
   height: 50px;
   border-radius: 12px;
@@ -1413,11 +1404,6 @@ body.mtc-live .reserve-stack em { font-size: 18px; }
   }
   body.mtc-live #mobile-touch-controls .mtc-stick-move { left: max(10px, env(safe-area-inset-left)); }
   body.mtc-live #mobile-touch-controls .mtc-stick-look { right: max(10px, env(safe-area-inset-right)); }
-  body.mtc-live #mobile-touch-controls .mtc-buttons {
-    right: calc(max(10px, env(safe-area-inset-right)) + 142px);
-    bottom: max(10px, env(safe-area-inset-bottom));
-    grid-template-columns: repeat(3, 54px);
-  }
   body.mtc-live #mobile-touch-controls .mtc-fire { grid-column: 1 / -1; }
 }
 
@@ -1435,15 +1421,6 @@ body.mtc-live .reserve-stack em { font-size: 18px; }
   }
   body.mtc-live #mobile-touch-controls .mtc-stick-move { left: max(8px, env(safe-area-inset-left)); }
   body.mtc-live #mobile-touch-controls .mtc-stick-look { right: max(8px, env(safe-area-inset-right)); }
-  body.mtc-live #mobile-touch-controls .mtc-buttons {
-    left: auto;
-    right: max(8px, env(safe-area-inset-right));
-    bottom: calc(max(10px, env(safe-area-inset-bottom)) + clamp(104px, 30vw, 116px) + 10px);
-    width: clamp(100px, 32vw, 124px);
-    transform: none;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 5px;
-  }
   body.mtc-live #mobile-touch-controls .mtc-btn { height: 44px; padding: 0 3px; font-size: 10px; }
   body.mtc-live #mobile-touch-controls .mtc-fire {
     grid-column: 1 / -1;
@@ -1455,14 +1432,17 @@ body.mtc-live .reserve-stack em { font-size: 18px; }
 
 /* Pass 69.3 mobile reconciliation. Safe-area tokens are declared on the live
    body so tests and embedded shells can supply deterministic insets. */
+/* Pass 69.3 mobile reconciliation. Safe-area tokens are declared on the live
+   body so tests and embedded shells can supply deterministic insets.
+   HF-357: raised --mtc-button-size to >=48px with adjusted group widths and typography. */
 body.mtc-live {
     --mtc-safe-top: max(8px, env(safe-area-inset-top));
     --mtc-safe-right: max(8px, env(safe-area-inset-right));
     --mtc-safe-bottom: max(8px, env(safe-area-inset-bottom));
     --mtc-safe-left: max(8px, env(safe-area-inset-left));
-    --mtc-button-size: 44px;
+    --mtc-button-size: 48px;
     --mtc-button-gap: 4px;
-    --mtc-action-width: 94px;
+    --mtc-action-width: 100px;
     --mtc-stick-size: 104px;
   }
 
@@ -1497,7 +1477,7 @@ body.mtc-live {
     padding: 0 2px;
     border-radius: 10px;
     background: var(--mtc-panel);
-    font-size: 10px;
+    font-size: 11px;
     line-height: 1;
   }
 
@@ -1506,7 +1486,7 @@ body.mtc-live {
     grid-column: auto;
     height: var(--mtc-button-size);
     min-height: var(--mtc-button-size);
-    font-size: 13px;
+    font-size: 14px;
   }
   body.mtc-live #mobile-touch-controls .mtc-primary-actions .mtc-reload { grid-area: 1 / 1; }
   body.mtc-live #mobile-touch-controls .mtc-primary-actions .mtc-switch-weapon { grid-area: 1 / 2; }
@@ -1683,18 +1663,18 @@ body.mtc-live {
 
   @media (orientation: portrait) {
     body.mtc-live {
-      --mtc-stick-size: clamp(96px, 28vw, 112px);
-      --mtc-action-width: clamp(94px, 26vw, 106px);
+      --mtc-stick-size: clamp(92px, 28vw, 108px);
+      --mtc-action-width: 100px;
     }
 
     body.mtc-live #mobile-touch-controls .mtc-primary-actions,
     body.mtc-live #mobile-touch-controls .mtc-context-actions {
-      bottom: calc(var(--mtc-safe-bottom) + var(--mtc-stick-size) + 8px);
+      bottom: calc(var(--mtc-safe-bottom) + var(--mtc-stick-size) + 4px);
     }
     body.mtc-live #mobile-touch-controls .mtc-primary-actions { right: var(--mtc-safe-right); }
     body.mtc-live #mobile-touch-controls .mtc-context-actions { left: var(--mtc-safe-left); }
     body.mtc-live #mobile-touch-controls .mtc-combat-actions {
-      left: calc(var(--mtc-safe-left) + var(--mtc-stick-size) + 6px);
+      left: calc(var(--mtc-safe-left) + var(--mtc-stick-size) + 4px);
       bottom: var(--mtc-safe-bottom);
     }
 
@@ -1744,16 +1724,16 @@ body.mtc-live {
 
   @media (orientation: landscape) {
     body.mtc-live {
-      --mtc-stick-size: clamp(88px, 30vh, 104px);
-      --mtc-action-width: 94px;
+      --mtc-stick-size: clamp(86px, 28vh, 104px);
+      --mtc-action-width: 100px;
     }
 
     body.mtc-live #mobile-touch-controls .mtc-primary-actions {
-      right: calc(var(--mtc-safe-right) + var(--mtc-stick-size) + 6px);
+      right: calc(var(--mtc-safe-right) + var(--mtc-stick-size) + 4px);
       bottom: var(--mtc-safe-bottom);
     }
     body.mtc-live #mobile-touch-controls .mtc-combat-actions {
-      left: calc(var(--mtc-safe-left) + var(--mtc-stick-size) + 6px);
+      left: calc(var(--mtc-safe-left) + var(--mtc-stick-size) + 4px);
       bottom: var(--mtc-safe-bottom);
     }
     body.mtc-live #mobile-touch-controls .mtc-context-actions {
@@ -1775,12 +1755,12 @@ body.mtc-live {
     }
     body.mtc-live .hud-operator-console {
       top: calc(var(--mtc-safe-top) + 84px);
-      left: calc(var(--mtc-safe-left) + var(--mtc-stick-size) + 6px);
+      left: calc(var(--mtc-safe-left) + var(--mtc-stick-size) + 4px);
       width: var(--mtc-action-width);
     }
     body.mtc-live .hud-weapon-console {
       top: calc(var(--mtc-safe-top) + 92px);
-      right: calc(var(--mtc-safe-right) + var(--mtc-stick-size) + 6px);
+      right: calc(var(--mtc-safe-right) + var(--mtc-stick-size) + 4px);
       width: var(--mtc-action-width);
     }
     body.mtc-live #support-block {
@@ -1797,5 +1777,23 @@ body.mtc-live {
     body.mtc-live #damage-feeds {
       top: calc(var(--mtc-safe-top) + 198px);
       right: var(--mtc-safe-right);
+    }
+  }
+
+  @media (orientation: landscape) and (max-height: 500px) {
+    body.mtc-live .hud-operator-console {
+      top: calc(var(--mtc-safe-top) + 72px);
+    }
+    body.mtc-live .hud-weapon-console {
+      top: calc(var(--mtc-safe-top) + 72px);
+    }
+    body.mtc-live #support-block {
+      top: calc(var(--mtc-safe-top) + 72px);
+    }
+    body.mtc-live #killfeed {
+      top: calc(var(--mtc-safe-top) + 128px);
+    }
+    body.mtc-live #damage-feeds {
+      top: calc(var(--mtc-safe-top) + 162px);
     }
   }

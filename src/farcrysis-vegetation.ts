@@ -14,8 +14,8 @@
  * Presentation only — never adds colliders.
  * Mount from farcrysis.ts buildFarcrysis to add dense jungle dressing over the arena.
  *
- * Wind: lightweight GPU vertex displacement via onBeforeCompile shader injection
- * on select wind-enabled materials. Subtle (~0.15m max displacement), no collision impact.
+ * Wind (HF-359): typed TSL per-instance phase-offset sway in positionNode —
+ * no onBeforeCompile, no ShaderMaterial. See farcrysis-tsl-foliage.ts.
  * LOD: far-distance impostor meshes (simple cross/cone) for palm + mangrove layers.
  * Ground: 3 new deterministic layers — fallen fronds (60), flower patches (5×8),
  * beach pebbles (40).
@@ -24,56 +24,32 @@ import * as THREE from 'three';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import {
+  makeTslFoliageMaterial,
+  tslAdvanceWind,
+  type FoliageOptions,
+} from './farcrysis-tsl-foliage';
 
 // ---------------------------------------------------------------------------
 // Wind-sway animation (module-level shared state)
 // ---------------------------------------------------------------------------
 
-/** Per-material wind uniform references pushed by onBeforeCompile. */
-const _windUniforms: Array<Record<string, { value: unknown }>> = [];
+// HF-359: wind moved from onBeforeCompile GLSL injection to typed TSL
+// MeshStandardNodeMaterial position nodes (farcrysis-tsl-foliage.ts).
+// The legacy uniform registry is kept only as a no-op shim so the
+// animateVegetationWind driver contract is unchanged.
+
+
+/** HF-359: wind is now TSL-side; this legacy comment kept for history. */
 
 /**
- * Wrap a MeshStandardMaterial with onBeforeCompile wind-displacement injection.
- * The shader gets uWindTime / uWindStrength / uWindDir uniforms, and gentle
- * position-based vertex sway (local-space, ~0.15m max displacement).
- * Safe to call multiple times on the same material (idempotent guard).
- */
-function makeWindMaterial(base: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
-  if ((base as any).__farcrysisWind) return base;
-  (base as any).__farcrysisWind = true;
-
-  base.onBeforeCompile = (shader: any) => {
-    shader.uniforms.uWindTime = { value: 0 };
-    shader.uniforms.uWindStrength = { value: 0.12 };
-    shader.uniforms.uWindDir = { value: new THREE.Vector2(0.3, 0.7) };
-    _windUniforms.push(shader.uniforms);
-
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <begin_vertex>',
-      `#include <begin_vertex>
-
-      // Wind sway — gentle vertex displacement in local space.
-      // position.y acts as height factor: more sway near the top of geometry.
-      float _windH = clamp(position.y / 3.2, 0.0, 1.0);
-      float _windN = sin(position.x * 2.5 + position.y * 1.3 + uWindTime * 4.0) * 0.5
-                   + cos(position.z * 3.1 - position.y * 0.7 + uWindTime * 2.7) * 0.3;
-      transformed.x += _windN * uWindDir.x * uWindStrength * _windH;
-      transformed.z += _windN * uWindDir.y * uWindStrength * _windH;`,
-    );
-  };
-
-  return base;
-}
-
-/**
- * Call once per frame to advance wind animation on all wind-enabled materials.
+ * Call once per frame to advance wind animation.
  * @param time Seconds elapsed (e.g. performance.now() / 1000 or a clock delta accumulator).
  */
 export function animateVegetationWind(time: number): void {
-  for (let i = 0; i < _windUniforms.length; i++) {
-    const u = _windUniforms[i];
-    if (u.uWindTime) u.uWindTime.value = time;
-  }
+  // HF-359: drive the TSL wind uniforms (the old onBeforeCompile uniforms
+  // registry is gone — nothing else to update here).
+  tslAdvanceWind(time);
 }
 
 // ---------------------------------------------------------------------------
@@ -537,7 +513,7 @@ function addPalms(root: THREE.Group): void {
   lodMesh.instanceMatrix.needsUpdate = true;
 
   // Wind-enable fronds for gentle sway
-  makeWindMaterial(fronds.material as THREE.MeshStandardMaterial);
+  // HF-359: fronds converted by _applyTslFoliage at end of build
 
   registerLODPair([trunks, fronds], [lodMesh]);
   root.add(lodMesh);
@@ -2314,35 +2290,176 @@ function addSmallRocks(root: THREE.Group): void {
 // Trunks, dead trees, pebbles, leaf litter, and LOD impostors are excluded.
 // ---------------------------------------------------------------------------
 
-function _windEnableAll(scene: THREE.Group): void {
-  const windNames: string[] = [
-    'farcrysis-vege-palm-fronds',        // already done in addPalms, but idempotent
-    'farcrysis-vege-banana-leaves',
-    'farcrysis-vege-bamboo-stems',
-    'farcrysis-vege-ferns',
-    'farcrysis-vege-grass-tufts',
-    'farcrysis-vege-vines',
-    'farcrysis-vege-coconut-fronds',
-    'farcrysis-vege-canopy-vines',
-    'farcrysis-vege-dense-grass',
-    'farcrysis-vege-flowering-accents',
-    'farcrysis-vege-understory-ferns',
-    'farcrysis-vege-bamboo-grove-stems',
-    'farcrysis-vege-flowering-blooms',
-    'farcrysis-vege-jungle-vine-clusters',
-    'farcrysis-vege-beach-grass',
-    'farcrysis-vege-large-ferns',
-    'farcrysis-vege-cycad-leaves',
-    'farcrysis-vege-grass-patches',
-  ];
+// HF-359/HF-363: layers that should sway, grouped by dapple strength.
+// Canopy leaves get subtle transmittance dapple; undergrowth medium;
+// ground-level litter/grass strong (sun breaks through to the floor there).
+const WIND_LAYER_DAPPLE: Array<[string, number]> = [
+  // strong ground dapple
+  ['farcrysis-vege-leaf-litter', 0.85],
+  ['farcrysis-vege-fallen-fronds', 0.8],
+  ['farcrysis-vege-grass-tufts', 0.75],
+  ['farcrysis-vege-dense-grass', 0.75],
+  ['farcrysis-vege-beach-grass', 0.75],
+  ['farcrysis-vege-grass-patches', 0.7],
+  ['farcrysis-vege-flower-patches', 0.6],
+  // medium undergrowth
+  ['farcrysis-vege-ferns', 0.55],
+  ['farcrysis-vege-large-ferns', 0.55],
+  ['farcrysis-vege-understory-ferns', 0.55],
+  ['farcrysis-vege-bushes', 0.45],
+  ['farcrysis-vege-flowering-bushes', 0.45],
+  ['farcrysis-vege-beach-scrub', 0.4],
+  ['farcrysis-vege-cycad-leaves', 0.4],
+  ['farcrysis-vege-banana-leaves', 0.4],
+  // subtle canopy dapple
+  ['farcrysis-vege-palm-fronds', 0.3],
+  ['farcrysis-vege-coconut-fronds', 0.3],
+  ['farcrysis-vege-canopy-vines', 0.25],
+  ['farcrysis-vege-jungle-vine-clusters', 0.25],
+  ['farcrysis-vege-vines', 0.25],
+];
 
+function dappleFor(name: string): number {
+  for (const [n, d] of WIND_LAYER_DAPPLE) {
+    if (name === n || name.startsWith(n)) return d;
+  }
+  return 0.35; // unnamed flexible foliage gets a gentle default
+}
+
+/**
+ * HF-359/HF-363: convert every named foliage InstancedMesh's material to a
+ * typed-TSL MeshStandardNodeMaterial carrying per-instance phase-offset wind
+ * (positionNode) and analytic canopy-transmittance dapple (colorNode).
+ * Replaces the old no-op onBeforeCompile shim walk.
+ */
+function _applyTslFoliage(scene: THREE.Group): void {
   for (let i = 0; i < scene.children.length; i++) {
     const child = scene.children[i];
     if (!(child instanceof THREE.InstancedMesh)) continue;
-    if (windNames.includes(child.name)) {
-      makeWindMaterial(child.material as THREE.MeshStandardMaterial);
-    }
+
+    const std = child.material as THREE.MeshStandardMaterial;
+    if (!(std && std.isMeshStandardMaterial)) continue;
+
+    child.geometry.computeBoundingBox();
+    const bb = child.geometry.boundingBox;
+    const height = Math.max(0.5, (bb ? bb.max.y - bb.min.y : 1));
+
+    const opts: FoliageOptions = {
+      color: std.color.getHex(),
+      roughness: std.roughness,
+      metalness: std.metalness,
+      dapple: dappleFor(child.name),
+      // Amplitude scales with card size so big fronds move more than blades.
+      swayAmount: Math.min(0.09, 0.02 + height * 0.02),
+      swayHeight: height,
+      doubleSided: true,
+    };
+    child.material = makeTslFoliageMaterial(opts);
   }
+}
+
+
+// ---------------------------------------------------------------------------
+// HF-363 density/species expansion (reference-technique, independently
+// authored): one bent leaf-card primitive + one swept-tube primitive cover two
+// whole new species families. Both are InstancedMesh with per-profile-safe
+// counts; presentation only, no colliders added.
+// ---------------------------------------------------------------------------
+
+/**
+ * HF-363 species #34 — "heliconia clumps": broad bent leaf cards (curved via
+ * multi-segment bend baked into merged geometry) rising from a tiny stem.
+ * Inland undergrowth filler; strong dapple + wind apply automatically.
+ */
+function addHeliconiaClumps(root: THREE.Group): void {
+  const count = 70;
+  const SEED = 0x5f11_c7a2;
+
+  // Bent leaf card: three stacked segments, each rotated ~18° more than the
+  // last so the blade arcs over like a real heliconia leaf.
+  const seg = new THREE.BoxGeometry(0.16, 0.55, 0.02);
+  const parts: Array<{ geom: THREE.BufferGeometry; matrix: THREE.Matrix4 }> = [];
+  for (let sgi = 0; sgi < 3; sgi++) {
+    const bend = sgi * 0.32;
+    parts.push({
+      geom: seg,
+      matrix: new THREE.Matrix4().compose(
+        new THREE.Vector3(Math.sin(bend) * 0.28, 0.24 + Math.cos(bend) * 0.26, 0),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(-bend, 0, 0)),
+        new THREE.Vector3(1 + sgi * 0.25, 1, 1),
+      ),
+    });
+  }
+  const clumpGeom = mergeTransformed(parts);
+
+  const clumps = new THREE.InstancedMesh(clumpGeom, vegeMat(0x3f7a2c, 0.84, 0.02), count);
+  clumps.name = 'farcrysis-vege-heliconia-clumps';
+
+  const matrix = new THREE.Matrix4();
+  const positions = layerPositions(count, 8, 28, 1.6, SEED);
+  const rng = mulberry32(SEED + 9);
+  for (let i = 0; i < positions.length; i++) {
+    const [x, z, groundY, angle] = positions[i];
+    const s = 0.65 + rng() * 0.75;
+    matrix.compose(
+      new THREE.Vector3(x, groundY + 0.02, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(rng() * 0.25, angle + rng() * Math.PI * 2, rng() * 0.25)),
+      new THREE.Vector3(s, s * (0.85 + rng() * 0.5), s),
+    );
+    clumps.setMatrixAt(i, matrix);
+  }
+  clumps.instanceMatrix.needsUpdate = true;
+  clumps.computeBoundingSphere();
+  root.add(register(clumps, 'heliconia', { castShadow: false, receiveShadow: true }));
+}
+
+/**
+ * HF-363 ground scatter #35 — "driftwood logs": weathered swept tubes washed
+ * up along the outer beach ring, breaking up flat sand. No collision — pure
+ * dressing (walk-through unchanged).
+ */
+function addDriftwoodLogs(root: THREE.Group): void {
+  const count = 26;
+  const SEED = 0x2ad9_40e1;
+
+  // Swept tube: slightly tapered cylinder laid on its side with a gentle bow.
+  const parts: Array<{ geom: THREE.BufferGeometry; matrix: THREE.Matrix4 }> = [];
+  for (let sgi = 0; sgi < 4; sgi++) {
+    const t0 = sgi / 4;
+    const bow = Math.sin(t0 * Math.PI) * 0.09;
+    parts.push({
+      geom: new THREE.CylinderGeometry(0.09 - t0 * 0.03, 0.1 - t0 * 0.03, 0.42, 6),
+      matrix: new THREE.Matrix4().compose(
+        new THREE.Vector3((t0 - 0.375) * 1.7, bow, 0),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI / 2 + (t0 - 0.5) * 0.22)),
+        new THREE.Vector3(1, 1, 1),
+      ),
+    });
+  }
+  const logGeom = mergeTransformed(parts);
+
+  const logs = new THREE.InstancedMesh(logGeom, vegeMat(0x8a7a64, 0.95, 0.01), count);
+  logs.name = 'farcrysis-vege-driftwood-logs';
+
+  const matrix = new THREE.Matrix4();
+  const positions = ringPositions(count, 24, 30);
+  const rng = mulberry32(SEED + 4);
+  for (let i = 0; i < positions.length; i++) {
+    const [x, z] = positions[i];
+    const groundY = terrainHeightAt(x, z);
+    if (!clearOfGameplay(x, z, 1.4)) continue;
+    matrix.compose(
+      new THREE.Vector3(x, groundY + 0.08, z),
+      new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(rng() * 0.15 - 0.07, rng() * Math.PI * 2, rng() * 0.12 - 0.06),
+      ),
+      new THREE.Vector3(0.8 + rng() * 0.9, 0.8 + rng() * 0.6, 0.8 + rng() * 0.7),
+    );
+    logs.setMatrixAt(i, matrix);
+  }
+  logs.instanceMatrix.needsUpdate = true;
+  logs.computeBoundingSphere();
+  root.add(register(logs, undefined, { castShadow: false, receiveShadow: true }));
 }
 
 // ---------------------------------------------------------------------------
@@ -2397,8 +2514,12 @@ export function buildVegetation(scene: THREE.Group): void {
   addTwigs(scene);               // #32 ground cover — 90 fallen twigs
   addSmallRocks(scene);          // #33 ground cover — 60 inland rocks
 
+  // ---- HF-363 density/species expansion ----
+  addHeliconiaClumps(scene);     // species #34 — 70 bent leaf-card clumps
+  addDriftwoodLogs(scene);       // ground scatter #35 — 26 beach driftwood logs
+
   // ---- Wind-enable remaining flexible vegetation (non-LOD-managed) ----
-  _windEnableAll(scene);
+  _applyTslFoliage(scene); // HF-359/HF-363: TSL wind + canopy dapple on foliage layers
 }
 
 // ---------------------------------------------------------------------------
@@ -2444,7 +2565,7 @@ export function buildAdditionalVegetation(root: THREE.Group): VegetationPolishSt
   addGrassPatches(root);
   addTwigs(root);
   addSmallRocks(root);
-  _windEnableAll(root);
+  _applyTslFoliage(root); // HF-359/HF-363: TSL wind + canopy dapple on foliage layers
 
   // Diff the set to get only newly added tree-type names
   const addedTreeTypes: string[] = [];

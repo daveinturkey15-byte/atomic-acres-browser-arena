@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import type { ArenaId } from './map-selection';
 import {
   OCEAN_WAVES,
   RUSTWORKS_OCEAN_AUTHORITY_ID,
@@ -88,5 +89,54 @@ describe('WaterSystem', () => {
     water.configure('gun-range', 'performance', { halfX: 15, halfZ: 42 });
     expect(water.telemetry().enabled).toBe(false);
     expect(water.root.visible).toBe(false);
+  });
+
+  // HF-358: the water-authoring registry replaces the hard-coded rustworks
+  // gate as the single source of which arenas have water.
+  it('drives configuration from the per-arena water body registry (HF-358)', () => {
+    const farcrysis = new WaterSystem(new THREE.Scene());
+    farcrysis.configure('farcrysis' as ArenaId, 'blender', { halfX: 32, halfZ: 32 });
+    const telemetry = farcrysis.telemetry();
+    expect(telemetry.enabled).toBe(true);
+    expect(telemetry.waterLevel).toBe(-0.3);
+    expect(farcrysis.swimmable).toBe(true);
+    expect(farcrysis.body?.arenaId).toBe('farcrysis');
+
+    // RustRig regression guard: exact pre-HF-358 behaviour preserved.
+    const rustworks = new WaterSystem(new THREE.Scene());
+    rustworks.configure('rustworks-1v1', 'compat', { halfX: 27, halfZ: 29 });
+    expect(rustworks.telemetry()).toMatchObject({ enabled: true, waterLevel: -19.5 });
+    expect(rustworks.swimmable).toBe(false);
+
+    // Arenas absent from the registry have no water.
+    const none = new WaterSystem(new THREE.Scene());
+    none.configure('skyline-terminal', 'performance', { halfX: 34, halfZ: 34 });
+    expect(none.telemetry().enabled).toBe(false);
+  });
+
+  // HF-358: CPU buoyancy must sample the SAME frozen band table the WebGPU TSL
+  // factory displaces with (ocean-spectrum), not a second hand-synced copy.
+  it('samples physics from the shared ocean-spectrum authority (HF-358)', async () => {
+    const { sampleOcean, oceanSpectrumFingerprint, OCEAN_SPECTRUM_AUTHORITY_ID } = await import('./water/ocean-spectrum');
+    const water = new WaterSystem(new THREE.Scene());
+    water.configure('rustworks-1v1', 'performance', { halfX: 27, halfZ: 29 });
+    const position = new THREE.Vector3(40, -21, 0);
+    const time = 12.5;
+    const physics = water.samplePhysics(position, time);
+    const reference = sampleOcean(position.x, position.z, time, RUSTWORKS_OCEAN_AMPLITUDE.performance);
+    expect(physics.surfaceY).toBeCloseTo(-19.5 + reference.height, 12);
+    expect(physics.surfaceVelocityY).toBeCloseTo(reference.verticalVelocity, 12);
+    // The WebGPU mesh stamps the fingerprint of the table it consumed; both
+    // sides reading one frozen table means these strings are identical.
+    const { createOceanTslWater } = await import('./water/ocean-tsl');
+    const tsl = createOceanTslWater(water.body!);
+    expect(tsl.mesh.userData.oceanSpectrumFingerprint).toBe(oceanSpectrumFingerprint());
+    expect(tsl.mesh.userData.waveAuthority).toBe(OCEAN_SPECTRUM_AUTHORITY_ID);
+    // Authored body amplitude = reference amplitude x host-authoritative scale.
+    const { OCEAN_REFERENCE_AMPLITUDE } = await import('./water/ocean-spectrum');
+    const { waterBodyForArena } = await import('./water/water-authoring');
+    const rustworksBody = waterBodyForArena('rustworks-1v1')!;
+    expect(tsl.mesh.userData.waveAmplitudeUniform.value)
+      .toBe(OCEAN_REFERENCE_AMPLITUDE * rustworksBody.amplitudeScale);
   });
 });

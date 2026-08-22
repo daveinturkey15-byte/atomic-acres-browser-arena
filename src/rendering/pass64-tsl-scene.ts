@@ -11,7 +11,6 @@ import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import {
   abs,
   color,
-  cos,
   dot,
   float,
   fract,
@@ -28,7 +27,6 @@ import {
   screenSize,
   sin,
   smoothstep,
-  transformNormalToView,
   uniform,
   vec2,
   vec3,
@@ -38,11 +36,12 @@ import type { ArenaReviewCamera, ArenaVisualDefinition } from './arena-visual-de
 import { createGrassPlacements } from '../grass-placement';
 import { TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
 import type { GraphicsRuntime } from '../pass65-settings';
-import {
-  OCEAN_WAVES,
-  RUSTWORKS_OCEAN_AMPLITUDE,
-  RUSTWORKS_OCEAN_AUTHORITY_ID,
-} from '../water-system';
+// HF-358: WebGPU water presentation comes from the ocean-tsl factory driven by
+// the shared frozen ocean-spectrum band table — one table for CPU buoyancy and
+// GPU surface. Arena gating comes from the water-authoring registry, not a
+// hard-coded rustworks check.
+import { createOceanTslWater, oceanAmplitudeForBody } from '../water/ocean-tsl';
+import { waterBodyForArena } from '../water/water-authoring';
 
 export type Pass65TslGraphicsOptions = Readonly<{
   principalSamples: 1 | 2 | 4;
@@ -506,10 +505,44 @@ function applyArenaSystemLayout(
   }
   const grass = root.getObjectByName('Pass 64 TSL grass');
   if (grass) grass.visible = definition.id === 'atomic-acres';
+  // HF-358: registry-driven water swap. The water node present at build time
+  // corresponds to the initially-applied arena; when applyDefinition moves to
+  // an arena whose authored body differs (present vs absent), rebuild the
+  // node in place so each arena gets exactly its registry-owned presentation.
+  const existingWater = root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh | undefined;
+  const existingBody = (existingWater?.userData.waterBody as { arenaId: string } | undefined)?.arenaId;
+  const desiredBody = waterBodyForArena(definition.id);
+  const existingBodyId = existingBody ?? null;
+  const desiredBodyId = desiredBody?.arenaId ?? null;
+  if (existingWater && existingBodyId !== desiredBodyId) {
+    const parent = existingWater.parent;
+    const index = parent ? parent.children.indexOf(existingWater) : -1;
+    // HF-358: hide before detaching. A retired water body is no longer presented,
+    // so anything still holding a reference to it must not read back visible - the
+    // swap replaces the object, and a stale handle claiming visibility is how a
+    // retired arena's water appears to leak into an arena that has none.
+    existingWater.visible = false;
+    existingWater.removeFromParent();
+    (existingWater.geometry as THREE.BufferGeometry).dispose();
+    const materials = Array.isArray(existingWater.material) ? existingWater.material : [existingWater.material];
+    for (const material of materials) material.dispose();
+    const next = makeWater(definition.id, graphics.oceanWaveAmplitude);
+    if (parent && index >= 0) {
+      parent.children.splice(Math.min(index, parent.children.length), 0, next);
+      next.parent = parent;
+    } else {
+      root.add(next);
+    }
+  }
   const water = root.getObjectByName('Pass 64 TSL perimeter water');
   if (water) {
-    water.visible = definition.id === 'rustworks-1v1';
-    const amplitude = graphics.oceanWaveAmplitude ?? RUSTWORKS_OCEAN_AMPLITUDE.blender;
+    // HF-358: registry-driven visibility — any arena with an authored body has
+    // WebGPU water, not just rustworks. Amplitude remains a presentation gain;
+    // authored bodies default to their own host-authoritative scale.
+    const body = waterBodyForArena(definition.id);
+    water.visible = body !== null && (water.userData.waveBands ?? 0) > 0;
+    const defaultAmplitude = body ? oceanAmplitudeForBody(body) : 0;
+    const amplitude = graphics.oceanWaveAmplitude ?? defaultAmplitude;
     const amplitudeUniform = water.userData.waveAmplitudeUniform as { value: number } | undefined;
     if (amplitudeUniform) amplitudeUniform.value = amplitude;
     water.userData.waveAmplitude = amplitude;
@@ -597,125 +630,30 @@ function makeGrass(arenaId: ArenaVisualDefinition['id']): THREE.InstancedMesh {
 
 function makeWater(
   arenaId: ArenaVisualDefinition['id'],
-  amplitude: number = RUSTWORKS_OCEAN_AMPLITUDE.blender,
+  amplitude?: number,
 ): THREE.Mesh {
-  // Dense 3.75 m cells retain curvature in the shortest 22 m chop band and
-  // prevent individual triangles reading as giant blue wedges at 1440p/4K.
-  const geometry = new THREE.PlaneGeometry(960, 960, 256, 256);
-  geometry.rotateX(-Math.PI / 2);
-  geometry.translate(0, -19.5, 0);
-  const material = new MeshStandardNodeMaterial({
-    transparent: false,
-    opacity: 1,
-    depthWrite: true,
-    roughness: 1,
-    metalness: 0,
-    side: DoubleSide,
-  });
-  const animationTime = uniform(0);
-  const waveAmplitude = uniform(amplitude);
-  const waveSamples = OCEAN_WAVES.map((band) => {
-    const warpPhase = positionLocal.x.mul(band.warpX * band.warpFrequency)
-      .add(positionLocal.z.mul(band.warpZ * band.warpFrequency))
-      .add(animationTime.mul(band.warpSpeed))
-      .add(band.warpPhase);
-    const warpCos = cos(warpPhase);
-    const phase = positionLocal.x.mul(band.x * band.frequency)
-      .add(positionLocal.z.mul(band.z * band.frequency))
-      .add(animationTime.mul(band.speed))
-      .add(band.phase)
-      .add(sin(warpPhase).mul(band.warpAmount));
-    const scaledAmplitude = waveAmplitude.mul(band.weight);
-    const phaseDerivativeX = float(band.x * band.frequency)
-      .add(warpCos.mul(band.warpAmount * band.warpFrequency * band.warpX));
-    const phaseDerivativeZ = float(band.z * band.frequency)
-      .add(warpCos.mul(band.warpAmount * band.warpFrequency * band.warpZ));
-    const phaseCos = cos(phase).mul(scaledAmplitude);
-    return {
-      height: sin(phase).mul(scaledAmplitude),
-      slopeX: phaseCos.mul(phaseDerivativeX),
-      slopeZ: phaseCos.mul(phaseDerivativeZ),
-    };
-  });
-  const wave = waveSamples.slice(1).reduce((sum, band) => sum.add(band.height), waveSamples[0].height);
-  const slopeX = waveSamples.slice(1).reduce((sum, band) => sum.add(band.slopeX), waveSamples[0].slopeX);
-  const slopeZ = waveSamples.slice(1).reduce((sum, band) => sum.add(band.slopeZ), waveSamples[0].slopeZ);
-  material.positionNode = positionLocal.add(vec3(0, wave, 0));
-  // MeshStandardNodeMaterial does not infer normals from positionNode.  Feed it
-  // the exact analytic derivatives used by the CPU buoyancy sampler so light,
-  // specular response, visible displacement and physics all describe one sea.
-  const oceanNormalLocal = vec3(slopeX.negate(), 1, slopeZ.negate()).normalize();
-  material.normalNode = transformNormalToView(oceanNormalLocal);
-  const slope = vec2(slopeX, slopeZ).length();
-  const normalizedCrest = wave.div(max(waveAmplitude, float(0.001))).mul(0.5).add(0.5);
-  const crestFoam = smoothstep(float(0.88), float(1.28), normalizedCrest)
-    .mul(smoothstep(float(0.06), float(0.2), slope));
-  const shimmer = sin(positionWorld.x.mul(0.071)
-    .add(positionWorld.z.mul(0.093))
-    .add(animationTime.mul(0.45))).mul(0.5).add(0.5);
-  const foamBreakup = smoothstep(float(0.58), float(0.92), shimmer);
-  const authoredFoam = crestFoam.mul(foamBreakup);
-  const darkWater = mix(color(0x071b2b), color(0x165b71), shimmer.mul(0.22).add(slope.mul(1.35)).min(1));
-  const moonFacing = dot(oceanNormalLocal, vec3(0.25, 0.85, 0.35).normalize()).max(0).mul(0.44).add(0.56);
-  const authoredWater = mix(darkWater, color(0x68b9c9), authoredFoam.mul(0.68)).mul(moonFacing);
-  // Keep direct PBR response near-black and present the deliberately bounded
-  // moonlit colour through emissive. This retains analytic-normal readability
-  // without allowing the high-intensity rig key light to bloom into a white bar.
-  material.colorNode = color(0x010407);
-  material.roughnessNode = float(1);
-  material.metalnessNode = float(0);
-  material.emissiveNode = authoredWater.mul(0.58);
-  tagPipeline(material, PIPELINE.water);
-  const water = new THREE.Mesh(geometry, material);
-  water.name = 'Pass 64 TSL perimeter water';
-  water.visible = arenaId === 'rustworks-1v1';
-  water.receiveShadow = true;
-  water.renderOrder = -5;
-  water.frustumCulled = false;
-  water.userData.animationTimeUniform = animationTime;
-  water.userData.waveAmplitudeUniform = waveAmplitude;
-  water.userData.waveBands = OCEAN_WAVES.length;
-  water.userData.waveAmplitude = amplitude;
-  water.userData.waveAuthority = RUSTWORKS_OCEAN_AUTHORITY_ID;
-  water.userData.waveNormalAuthority = RUSTWORKS_OCEAN_AUTHORITY_ID;
-  water.userData.surfaceSegments = 256;
-  // Carry the sea beyond the dense displaced square with a curved, low-cost
-  // skirt. Without this child, the 1,400 m RustRig camera exposed the 960 m
-  // plane edge as a flat cyan/void stripe at player eye height.
-  const horizonRadius = 3_200;
-  const horizonInnerRadius = 0.1;
-  const horizonGeometry = new THREE.RingGeometry(horizonInnerRadius, horizonRadius, 192, 24);
-  horizonGeometry.rotateX(-Math.PI / 2);
-  const horizonPositions = horizonGeometry.getAttribute('position') as THREE.BufferAttribute;
-  for (let index = 0; index < horizonPositions.count; index += 1) {
-    const x = horizonPositions.getX(index);
-    const z = horizonPositions.getZ(index);
-    const radius = Math.hypot(x, z);
-    const progress = THREE.MathUtils.clamp(
-      (radius - 420) / (horizonRadius - 420),
-      0,
-      1,
-    );
-    horizonPositions.setY(index, -23.5 - Math.pow(progress, 1.7) * 90);
+  // HF-358: the water-authoring registry is the single source for which arenas
+  // have water. The WebGPU surface is the ocean-tsl factory over the shared
+  // frozen ocean-spectrum — the exact table CPU buoyancy samples.
+  const body = waterBodyForArena(arenaId);
+  if (!body) {
+    // No authored water here: keep an inert named placeholder so callers that
+    // look the mesh up by name keep working; it stays invisible. It still
+    // carries the water pipeline tag so the fail-closed traversal audit keeps
+    // counting the full authored pipeline set regardless of arena.
+    const placeholder = new THREE.Mesh(new THREE.BufferGeometry(), new MeshStandardNodeMaterial());
+    placeholder.name = 'Pass 64 TSL perimeter water';
+    placeholder.visible = false;
+    tagPipeline(placeholder.material, PIPELINE.water);
+    placeholder.userData.waveBands = 0;
+    return placeholder;
   }
-  horizonPositions.needsUpdate = true;
-  horizonGeometry.computeVertexNormals();
-  const horizonMaterial = new THREE.MeshBasicMaterial({
-    color: 0x061a2a,
-    side: THREE.DoubleSide,
-    depthWrite: true,
-    fog: false,
-    toneMapped: true,
-  });
-  const horizon = new THREE.Mesh(horizonGeometry, horizonMaterial);
-  horizon.name = 'Pass 66 curved RustRig ocean horizon';
-  horizon.renderOrder = -6;
-  horizon.frustumCulled = false;
-  horizon.userData.horizonRadius = horizonRadius;
-  horizon.userData.radialSegments = 24;
-  horizon.userData.curvatureDrop = 90;
-  water.add(horizon);
-  return water;
+  const amplitudeOverride = amplitude ?? oceanAmplitudeForBody(body);
+  // Pass 64 contract: the water pipeline id stays tagged on this node material
+  // so assertRuntimeTslTraversal keeps failing closed if it disappears.
+  const tsl = createOceanTslWater(body, { amplitude: amplitudeOverride, pipelineId: PIPELINE.water });
+  tsl.mesh.visible = true;
+  return tsl.mesh;
 }
 
 function setAnimationTime(root: THREE.Group, timeMs: number): void {

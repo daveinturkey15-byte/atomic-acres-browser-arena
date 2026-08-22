@@ -41,6 +41,7 @@ import {
   isKillstreakRuntimeCheckpoint,
   type KillstreakRuntimeCheckpoint,
 } from './killstreak-runtime';
+import { INITIAL_HOST_TERM, MAX_HOST_TERM } from './host-migration';
 import {
   RAILGUN_TOTAL_ROUNDS,
   isRailgunAuthorityState,
@@ -146,6 +147,23 @@ export type RestoredGuestAuthority = Readonly<{
   health: RemoteHealthAuthorityState;
 }>;
 
+/**
+ * HF-325: the succession term this host had reached when it checkpointed.
+ *
+ * A host that crashes and recovers must NOT restart succession at term zero: a
+ * guest that was promoted in the meantime is running at a higher term, and the
+ * recovered host has to be able to recognise that it has been superseded rather
+ * than mint a fresh mandate that collides. Persisting the term is what makes the
+ * fence survive the very crash it exists to handle.
+ *
+ * `term` is 0 when this host never minted a mandate; `successorId` is the guest
+ * named by the last mandate it issued, or null when none was outstanding.
+ */
+export type HostSuccessionCheckpoint = Readonly<{
+  term: number;
+  successorId: string | null;
+}>;
+
 export type HostMatchCheckpoint = Readonly<{
   schemaVersion: typeof HOST_MATCH_CHECKPOINT_SCHEMA_VERSION;
   protocolVersion: number;
@@ -172,6 +190,8 @@ export type HostMatchCheckpoint = Readonly<{
   matchClock?: GunRangeMatchClockSnapshot;
   /** Optional for checkpoints captured before killstreak runtime admission. */
   killstreak?: KillstreakRuntimeCheckpoint;
+  /** Optional for checkpoints captured before HF-325 succession terms existed. */
+  succession?: HostSuccessionCheckpoint;
 }>;
 
 export type HostMatchResumeTiming = Readonly<{
@@ -397,12 +417,21 @@ function isRailgunCheckpoint(value: unknown): value is RailgunCheckpoint {
     && candidate.roundsRemaining === 0 && chamberRemainingMs === 0 && candidate.announcementSent === true;
 }
 
+function isHostSuccessionCheckpoint(value: unknown): value is HostSuccessionCheckpoint {
+  if (!isRecord(value) || !hasExactKeys(value, ['term', 'successorId'])) return false;
+  if (!isBoundedInteger(value.term, 0, MAX_HOST_TERM)) return false;
+  if (value.successorId === null) return true;
+  // A named successor only exists once a mandate has actually been minted.
+  return typeof value.successorId === 'string' && value.successorId.length >= 1 && value.successorId.length <= 80
+    && Number(value.term) >= INITIAL_HOST_TERM;
+}
+
 export function isHostMatchCheckpoint(value: unknown, expectedProtocolVersion?: number): value is HostMatchCheckpoint {
   if (!isRecord(value) || !hasExactKeys(value, [
     'schemaVersion', 'protocolVersion', 'savedAtEpochMs', 'expiresAtEpochMs', 'roomCode', 'activeAtEpochMs',
     'matchEpoch', 'phase', 'elapsedSinceActiveMs', 'lobbyRevision', 'config', 'members', 'scores', 'hostPlayer', 'guests', 'bots',
     'resumeTokenDigests', 'flareProjectiles', 'flareShotFeedback', 'railgun',
-  ], ['timedMapWeapons', 'matchClock', 'killstreak'])) return false;
+  ], ['timedMapWeapons', 'matchClock', 'killstreak', 'succession'])) return false;
   if (value.schemaVersion !== HOST_MATCH_CHECKPOINT_SCHEMA_VERSION
     || !isBoundedInteger(value.protocolVersion, 1, 1_000_000)
     || expectedProtocolVersion !== undefined && value.protocolVersion !== expectedProtocolVersion
@@ -429,7 +458,8 @@ export function isHostMatchCheckpoint(value: unknown, expectedProtocolVersion?: 
     || !isFlareShooterFeedbackCheckpoints(value.flareShotFeedback, value.flareProjectiles)
     || !isRailgunCheckpoint(value.railgun)
     || value.timedMapWeapons !== undefined && !isTimedMapWeaponCheckpoints(value.timedMapWeapons)
-    || value.killstreak !== undefined && !isKillstreakRuntimeCheckpoint(value.killstreak)) return false;
+    || value.killstreak !== undefined && !isKillstreakRuntimeCheckpoint(value.killstreak)
+    || value.succession !== undefined && !isHostSuccessionCheckpoint(value.succession)) return false;
 
   const members = value.members as LobbyMember[];
   const scores = value.scores as PlayerScore[];
@@ -441,6 +471,7 @@ export function isHostMatchCheckpoint(value: unknown, expectedProtocolVersion?: 
   const timedMapWeapons = value.timedMapWeapons as TimedMapWeaponCheckpoints | undefined;
   const railgun = value.railgun as RailgunCheckpoint;
   const killstreak = value.killstreak as KillstreakRuntimeCheckpoint | undefined;
+  const succession = value.succession as HostSuccessionCheckpoint | undefined;
   const flareProjectiles = value.flareProjectiles as FlareAuthorityContinuationCheckpoint;
   const flareShotFeedback = value.flareShotFeedback as readonly FlareShooterFeedbackCheckpoint[];
   const matchClock = value.matchClock as GunRangeMatchClockSnapshot | undefined;
@@ -508,6 +539,12 @@ export function isHostMatchCheckpoint(value: unknown, expectedProtocolVersion?: 
         return actor === undefined
           || actor.team === guest.snapshot.team && actor.lifeId === guest.continuity;
       })
+    ))
+    // A named successor must be a real non-host member of this very roster.
+    // A stale name would let a recovered host re-issue a mandate for someone who
+    // is not in the match any more.
+    && (succession === undefined || succession.successorId === null || (
+      succession.successorId !== hostPlayer.id && memberIds.includes(succession.successorId)
     ))
     && (flareProjectiles.effects.length === 0
       || config.arenaId === 'skyline-terminal'
