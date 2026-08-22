@@ -54,9 +54,11 @@ test.describe('Pass 64 command HUD and menu contract', () => {
   test('uses one ordered arena registry with new labels and stable machine ids', async ({ page }) => {
     await ready(page);
     const cards = page.locator('.map-card');
-    await expect(cards).toHaveCount(4);
+    // Six arenas ship since farcrysis and High Seas landed; this expectation
+    // still pinned the four-arena roster from before they were added.
+    await expect(cards).toHaveCount(6);
     await expect(cards).toHaveText([
-      /NUKE TOWN/, /TERMINAL/, /RUSTRIG/, /GUN RANGE/,
+      /NUKE TOWN/, /TERMINAL/, /RUSTRIG/, /GUN RANGE/, /FARCrySIS/, /HIGH SEAS/,
     ]);
     expect(await cards.evaluateAll((elements) => elements.map((element) => ({
       id: (element as HTMLElement).dataset.arenaId,
@@ -66,6 +68,8 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       { id: 'skyline-terminal', route: 'terminal' },
       { id: 'rustworks-1v1', route: 'rustrig' },
       { id: 'gun-range', route: 'gun-range' },
+      { id: 'farcrysis', route: 'farcrysis' },
+      { id: 'high-seas', route: 'high-seas' },
     ]);
 
     await expect(page.locator('#menu-showcase > #game')).toHaveCount(0);
@@ -148,7 +152,11 @@ test.describe('Pass 64 command HUD and menu contract', () => {
         - document.querySelector<HTMLElement>('#menu-panel-options')!.clientWidth,
       labelFontPx: Number.parseFloat(getComputedStyle(document.querySelector<HTMLElement>('.graphics-preset-row label')!).fontSize),
     }));
-    expect(layout).toEqual({ pageOverflowX: 0, panelOverflowX: 0, labelFontPx: 12 });
+    // HF-362 raised the --pass66-copy floor from 12px to 13px so settings
+    // labels clear the AGENTS.md >= 12px minimum with margin rather than
+    // sitting exactly on it. Overflow must still be zero, which is the part of
+    // this assertion that actually guards layout.
+    expect(layout).toEqual({ pageOverflowX: 0, panelOverflowX: 0, labelFontPx: 13 });
     const directory = resolve(process.cwd(), 'artifacts/pass65/graphics-options');
     mkdirSync(directory, { recursive: true });
     const screenshot = resolve(directory, 'advanced-webgpu-controls-1280x720.png');
@@ -420,7 +428,7 @@ test.describe('Pass 64 command HUD and menu contract', () => {
         pageOverflowX: 0,
         menuOverflowX: 0,
         withinViewport: true,
-        mapCardCount: 4,
+        mapCardCount: 6,
       });
       await captureReview(page, testInfo, 'setup', highDpiViewport);
     } finally {
