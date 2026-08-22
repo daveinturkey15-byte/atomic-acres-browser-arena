@@ -8,9 +8,11 @@ import type { ArenaId } from './map-selection';
 import type { LowHealthFeedbackPresentation } from './sensory-feedback';
 import { AUDIO_BUS_IDS, type AudioBusId, type AudioSettings } from './pass65-settings';
 import {
-  CHIPTUNE_LOOP_SECONDS,
   chiptuneLoopEvents,
+  chiptuneLoopSeconds,
+  selectChiptuneTrack,
   type ChiptuneEvent,
+  type ChiptuneTrackId,
 } from './chiptune-music';
 import { ARENA_AUDIO_DEFINITIONS, AUDIO_RUNTIME_BUDGET, selectVoiceToSteal, type FootstepMovement, type FootstepSurface as SpatialFootstepSurface, type SpatialPoint } from './spatial-audio';
 import { EXPLOSIVE_BOLT_ARM_DELAY_MS } from './combat/ordnance';
@@ -435,6 +437,11 @@ export class ArenaAudio {
   private musicLoopStartedAtSeconds = 0;
   private musicScheduledUntilSeconds = 0;
   private musicRunning = false;
+  private musicTrack: ChiptuneTrackId | null = null;
+  // Remembered ACROSS matches so rotation is felt over a session rather than
+  // re-rolled from nothing each time. Straight random would replay the same track
+  // back to back about half the time, which reads as the music never changing.
+  private musicLastTrack: ChiptuneTrackId | null = null;
   private readonly busIdentity = new Map<AudioNode, AudioBusId>();
   private audioSettings: AudioSettings | null = null;
   private noiseBuffer: AudioBuffer | null = null;
@@ -738,6 +745,9 @@ export class ArenaAudio {
       // Square lead over a square bass, the two-channel palette this loop was
       // written for. The bass sits two octaves down so they never mask each other.
       this.musicChannels = Object.freeze({ lead: build('square'), bass: build('square') });
+      // Pick a track for this match, excluding whatever played last.
+      this.musicTrack = selectChiptuneTrack(this.musicLastTrack, Math.random());
+      this.musicLastTrack = this.musicTrack;
       this.musicRunning = true;
       this.musicLoopStartedAtSeconds = this.context.currentTime + 0.12;
       this.musicScheduledUntilSeconds = this.musicLoopStartedAtSeconds;
@@ -754,6 +764,9 @@ export class ArenaAudio {
     this.musicChannels = null;
     this.musicRunning = false;
     this.musicScheduledUntilSeconds = 0;
+    // musicLastTrack deliberately SURVIVES a stop: it is what stops the next
+    // match replaying the track that just finished.
+    this.musicTrack = null;
     if (!channels) return;
     for (const channel of [channels.lead, channels.bass]) {
       try { channel.osc.stop(); } catch { /* may not have started */ }
@@ -767,6 +780,11 @@ export class ArenaAudio {
     return this.musicRunning;
   }
 
+  /** The track currently playing, or null when the music is stopped. */
+  get gameMusicTrack(): ChiptuneTrackId | null {
+    return this.musicTrack;
+  }
+
   /**
    * Schedules the next window of chiptune notes. Called every frame.
    *
@@ -778,7 +796,9 @@ export class ArenaAudio {
    */
   private pumpGameMusic(): void {
     const channels = this.musicChannels;
-    if (!this.musicRunning || !this.context || !channels) return;
+    const track = this.musicTrack;
+    if (!this.musicRunning || !this.context || !channels || !track) return;
+    const loopSeconds = chiptuneLoopSeconds(track);
     const horizon = this.context.currentTime + ArenaAudio.MUSIC_LOOKAHEAD_SECONDS;
     // Bound the work per frame. Without this a long tab-suspend would return and
     // try to schedule every note it "missed" in one go.
@@ -786,14 +806,14 @@ export class ArenaAudio {
     while (this.musicScheduledUntilSeconds < horizon && guard < 512) {
       guard += 1;
       const iteration = Math.floor(
-        (this.musicScheduledUntilSeconds - this.musicLoopStartedAtSeconds) / CHIPTUNE_LOOP_SECONDS);
-      const loopStart = this.musicLoopStartedAtSeconds + iteration * CHIPTUNE_LOOP_SECONDS;
-      for (const event of chiptuneLoopEvents()) {
+        (this.musicScheduledUntilSeconds - this.musicLoopStartedAtSeconds) / loopSeconds);
+      const loopStart = this.musicLoopStartedAtSeconds + iteration * loopSeconds;
+      for (const event of chiptuneLoopEvents(track)) {
         const at = loopStart + event.offsetSeconds;
         if (at < this.musicScheduledUntilSeconds - 1e-6 || at >= horizon) continue;
         this.scheduleChiptuneNote(channels[event.channel], event, at);
       }
-      this.musicScheduledUntilSeconds = loopStart + CHIPTUNE_LOOP_SECONDS;
+      this.musicScheduledUntilSeconds = loopStart + loopSeconds;
     }
   }
 
