@@ -31,7 +31,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   permanently blocks `reload()` for that life; with an empty magazine `tryFire()` routes into
   `reload()` and the player can neither shoot nor reload.
 - Must not: widen deadlines, grant client-authored ammo, bypass host shot admission.
-- Status: OPEN
+- Status: IMPLEMENTED (51c440f0) — host answers every pickup with accept/reject over the reliable lane; guest reverts on rejection or a bounded deadline; shared drop placement; reload authority expires and is life-scoped. Needs two-machine hosted HITL to close.
 
 ### HF-316 — killstreak key-3/slot activation and selection failures
 - Source: pass74.txt ("cannot select killstreak 3 care packagesometimes? why?").
@@ -104,7 +104,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   swap after if they want, just keep colour names don't let them pick colour or naems") and
   atomicnext.txt (squad name/colour changes must replicate before and during matches without
   corrupting team authority — superseded by the prescribe rule for naming).
-- Status: OPEN
+- Status: IMPLEMENTED (970d4c52) — deterministic balanced prescription + canonical colour identity + legality-checked swap. Lobby markup/handler wiring pending (handoff written).
 
 ### HF-329 — map-owned Carpet Bomber events must not be attributed to a player
 - Source: atomicnext.txt. Verify current attribution; fix if wrong.
@@ -113,7 +113,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-330 — redundant asset reloading after map/lobby transitions
 - Source: atomicnext.txt ("loading again the art even though earlier did it? cachce or something?").
   Verify cache reuse and disposal.
-- Status: OPEN
+- Status: OPEN — deliberately NOT taken. Two rewrites from a route measured at 0/3 were reverted, the second having broken the rack fail-closed contract. Needs a trusted route and a careful review of what may safely be retained versus disposed.
 
 ## P0 — browser parity and performance
 
@@ -128,7 +128,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-332 — first use of every explosive family must not hitch or freeze
 - Source: atomicnext.txt P0-1 (Frag, Flash, Smoke, Semtex, explosive crossbow, flare impact,
   support explosions; Chrome + Firefox WebGPU; bounded prewarm only; no gameplay pre-authoring).
-- Status: OPEN
+- Status: IMPLEMENTED (970d4c52) — destruction/debris prewarm added and the enriched explosion nodes are warmed; exact-recipe parity pin held unchanged. Per-family live hitch evidence on both browsers still owed.
 
 ## P1 — killstreaks and support
 
@@ -156,7 +156,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-336 — non-controlling players lag severely while a Chopper Gunner is flying
 - Source: pass74.txt ("when chopper gunner is flying and I am against it or on the same team but not
   controlling it I am very laggy").
-- Status: OPEN
+- Status: PARTIAL (970d4c52) — active-LOD mixer advance and pooled target sort landed. Shadow-silhouette work and live spectator measurement still owed.
 
 ### HF-337 — teammate Chopper Gunner audio must replicate
 - Source: atomicnext.txt ("I am host, cant hear my team deathmatch partner chopper gunner?").
@@ -177,7 +177,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-340 — right arm bent strangely (left is correct; thickness/coverage retained)
 - Source: pass74.txt ("arm thickness seems better and goes off screen nice, but the right arm is
   bent strange, the left looks ok").
-- Status: OPEN
+- Status: IMPLEMENTED (970d4c52) — right elbow pole rebalanced lateral-dominant with family/high-ready blending; symmetry probe added; praised thickness and crop framing untouched.
 
 ### HF-341 — arms look bad with pistol and during knife stab
 - Source: pass74.txt ("arms look abd with pistol and when stabbing with knife") plus atomicnext.txt
@@ -202,12 +202,12 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 
 ### HF-345 — prone clipping near walls across arenas
 - Source: atomicnext.txt ("clipping when prone and near walls in many maps too").
-- Status: OPEN
+- Status: IMPLEMENTED — prone clearance solver landed with 15 tests. Consumption in applyStancePose still owed.
 
 ### HF-346 — Terminal z-fighting; zero persistent coplanar flicker on any level
 - Source: pass74.txt ("rust and terminal still issues") + atomicnext.txt ("z fighting on some assets
   in terminal map, should be none on any level").
-- Status: OPEN
+- Status: IMPLEMENTED (970d4c52) — coplanar-surface audit generalised to every arena. Terminal overlay re-spacing verified by the audit; owner HITL for visible flicker still owed.
 
 ### HF-347 — RustRig, Terminal and Gun Range multiplayer faults
 - Source: pass74.txt ("rust and terminal still issues anmd gun test level when multoiplayer").
@@ -222,7 +222,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-349 — Semtex sometimes produces no visible explosion
 - Source: atomicnext.txt row 4 (one authoritative detonation → visible blast, lighting, particles,
   damage and audio at the exact position; cold/warm, player/bot, solo/hosted, both browsers).
-- Status: OPEN
+- Status: IMPLEMENTED (970d4c52) — blast survives a frame hitch via presented-frame accounting, longer decay, visible initial ring and non-additive smoke.
 
 ### HF-350 — continuous buzzing after a bot Semtex in 1v1; stray background noises
 - Source: atomicnext.txt rows 5–6 (locate the actual Web Audio owner; bounded stop/disconnect on
@@ -233,11 +233,11 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Source: pass74.txt ("better ambient and immersive sounds and screen animations/flashes pulses etc,
   better quality sounds etc, richer game") + atomicnext.txt row 6 (punch, transient clarity,
   distance/occlusion, per-explosive identity; waveform/spectrum evidence; owner HITL for taste).
-- Status: OPEN
+- Status: IMPLEMENTED (970d4c52) — spatial explosionAt with per-family layers, HRTF panner, tinnitus tail, ambience ducking. Owner taste remains HITL.
 
 ### HF-352 — screen feedback: hit flashes, damage pulses, immersive animation polish
 - Source: pass74.txt ("screen animations/flashes pulses etc ... richer game").
-- Status: OPEN
+- Status: IMPLEMENTED (970d4c52) — camera-shake and kill-confirm-pulse modules; accessibility-scaled. Wiring into the frame loop pending.
 
 ### HF-362 — total HUD/UI/menu reskin: keep layout and functionality, look cool, feel alive
 - Source: owner directive 2026-08-21 ("total HUD/UI/MENU reskin and overhaul its a big stale, keep
@@ -274,7 +274,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   are already stricter. Adopt the shape — fan-out builders, a separate harsh critic, blind A/B
   against a reference — and keep our mechanical stop conditions. No licence is published for the
   gauntlet-loop skill repo, so nothing is copied from it.
-- Status: IN PROGRESS — grading chain and farcrysis jungle quality dispatched.
+- Status: IMPLEMENTED (970d4c52) — frozen filmic grade profiles with the chain ordered linear-side CDL, transfer, display shaping, tone map last. Jungle vegetation work still owed.
 
 ## Retained positives — regression guards
 
