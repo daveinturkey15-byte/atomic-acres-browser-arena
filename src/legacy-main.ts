@@ -5147,6 +5147,8 @@ let refreshWarningUntil = 0;
 let gameMode: 'solo' | 'host' | 'client' = 'solo';
 let privateMatchMode: MatchMode = 'ffa';
 let localSquadName = defaultSquadPresentation(0).name;
+/** HF-328: last squad identity replicated to peers, so a prescribed change is sent once. */
+let lastCommittedSquadKey = '';
 let localSquadColor = defaultSquadPresentation(0).color;
 let privateMatchConfig: PrivateMatchConfig = DEFAULT_PRIVATE_MATCH_CONFIG;
 let privateLobbySnapshot: LobbySnapshot | null = null;
@@ -9024,17 +9026,30 @@ function renderPrivateLobby(): void {
   balanceInput.disabled = !hostControls || modeInput.value === 'ffa' || rangeLobby;
   element<HTMLButtonElement>('#lobby-balance').disabled = !hostControls || modeInput.value === 'ffa' || rangeLobby;
   const localMember = members.find((member) => member.id === player.id);
-  const squadNameInput = element<HTMLInputElement>('#lobby-squad-name');
-  const squadColorInput = element<HTMLInputElement>('#lobby-squad-color');
+  // HF-328: squad identity is prescribed, so the free name input and colour picker
+  // no longer exist in the lobby markup. Project the canonical identity into the
+  // read-only label instead.
+  const squadLabel = element<HTMLElement>('#lobby-squad-label');
   const localSquad = sanitizeSquadPresentation(
     localMember?.squadName ?? localSquadName,
     localMember?.squadColor ?? localSquadColor,
     localMember?.team ?? player.team,
   );
-  squadNameInput.value = localSquad.name;
-  squadColorInput.value = localSquad.color;
-  squadNameInput.disabled = !localMember?.connected;
-  squadColorInput.disabled = !localMember?.connected;
+  squadLabel.textContent = localSquad.name;
+  squadLabel.style.setProperty('--lobby-squad-color', localSquad.color);
+  // HF-328: with identity prescribed there is no input change event to replicate on,
+  // so replicate when the assigned identity actually changes - and only then, so the
+  // lobby refresh does not spam the event lane every tick.
+  const squadKey = `${localSquad.name}:${localSquad.color}`;
+  if (squadKey !== lastCommittedSquadKey) {
+    lastCommittedSquadKey = squadKey;
+    localSquadName = localSquad.name;
+    localSquadColor = localSquad.color;
+    commitLocalSquadPresentation();
+  }
+  // HF-328: a prescribed identity has nothing to disable; dim it when disconnected
+  // so the lobby still reads the member's connection state.
+  squadLabel.dataset.connected = localMember?.connected ? 'true' : 'false';
   const lobbyArenaSynchronized = !snapshot
     || arenaSelectionReady && selectedArena.id === snapshot.config.arenaId;
   localLobbyReady = localMember?.ready ?? localLobbyReady;
@@ -25678,9 +25693,11 @@ const commitLocalSquadPresentation = (): void => {
   if (network.role !== 'host' && network.role !== 'client') return;
   const member = privateLobbySnapshot?.members.find((entry) => entry.id === player.id)
     ?? hostLobbyMembers.get(player.id);
+  // HF-328: identity is prescribed from the member's team rather than typed, so the
+  // current local values are the source rather than removed form controls.
   const squad = sanitizeSquadPresentation(
-    element<HTMLInputElement>('#lobby-squad-name').value,
-    element<HTMLInputElement>('#lobby-squad-color').value,
+    localSquadName,
+    localSquadColor,
     member?.team ?? player.team,
   );
   localSquadName = squad.name;
@@ -25691,8 +25708,9 @@ const commitLocalSquadPresentation = (): void => {
   if (network.role === 'host') updateHostSquad(message);
   else network.send(message);
 };
-element<HTMLInputElement>('#lobby-squad-name').addEventListener('change', commitLocalSquadPresentation);
-element<HTMLInputElement>('#lobby-squad-color').addEventListener('change', commitLocalSquadPresentation);
+// HF-328: the free squad-name input and colour picker were removed from the lobby -
+// identity is prescribed - so there are no change events to bind here. Squad identity
+// is committed by the team-assignment path instead.
 element<HTMLButtonElement>('#lobby-reset').addEventListener('click', () => {
   if (network.role !== 'host') return;
   if (!clearLastHostedRoomCode(clientPersistentStorage())) {
