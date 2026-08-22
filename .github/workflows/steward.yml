@@ -1,0 +1,42 @@
+name: steward
+on:
+  schedule:
+    - cron: '10 5 * * 1'
+  workflow_dispatch: {}
+permissions:
+  contents: read
+  issues: write
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build report
+        run: |
+          {
+            echo "# Weekly steward report"
+            echo
+            echo "Generated $(date -u +%F) from $(git rev-parse --short HEAD)."
+            echo
+            echo "## Remote branches fully merged into main (prune candidates)"
+            for b in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin | grep -v -E 'origin/(main|gh-pages|HEAD)$'); do
+              if git merge-base --is-ancestor "$b" origin/main; then echo "- ${b#origin/}"; fi
+            done
+            echo
+            echo "## Open remote branches by last commit (oldest first)"
+            git for-each-ref --sort=committerdate --format='- %(committerdate:short) %(refname:short)' refs/remotes/origin | grep -v -E 'origin/(main|gh-pages|HEAD)$' | head -30
+          } > report.md
+          cat report.md
+      - name: Create or update issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=$(gh issue list --state open --search 'Weekly steward report in:title' --json number --jq '.[0].number')
+          if [ -n "$n" ] && [ "$n" != "null" ]; then
+            gh issue comment "$n" --body-file report.md
+          else
+            gh issue create --title "Weekly steward report" --body-file report.md
+          fi
