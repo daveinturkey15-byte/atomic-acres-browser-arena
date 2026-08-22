@@ -25417,6 +25417,22 @@ window.addEventListener('keydown', (event) => {
     openActiveMatchPause('escape');
     return;
   }
+  // HF-316 residual: killstreak slot keys must SAY why they refuse even while
+  // the blanket gameplay-input guard below is closed — pressing key-3 while
+  // dead or during warmup used to be indistinguishable from a dead key. This
+  // is a NARROW pre-check routed through the same evaluateKillstreakActivation
+  // gate (which denies with 'dead' / 'match-inactive' / 'input-disabled' into
+  // the HUD feed and can never activate while input is disabled). The HF-324
+  // blanket guard below is deliberately untouched.
+  if (!gameplayInputEnabled() && gameStarted && !event.repeat) {
+    const deniedKeyProfile = activeKeyBindingProfile();
+    for (let candidateSlot = 0; candidateSlot < 5; candidateSlot += 1) {
+      const action = supportSlotAction(candidateSlot);
+      if (!action || !actionMatchesCode(action, event.code, deniedKeyProfile)) continue;
+      activateOrToggleFieldSupportSlot(candidateSlot);
+      return;
+    }
+  }
   // HF-324: scope gameplay key handling to active gameplay so Tab is not swallowed
   // in the lobby or menus. Tab itself stays available for the scoreboard once a match
   // has started: players expect the roster while dead awaiting respawn, during warmup

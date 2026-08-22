@@ -133,3 +133,24 @@ describe('HF-316(b) killstreak activation pre-flight gate', () => {
     expect(Object.isFrozen(KILLSTREAK_ACTIVATION_DENIAL_LABELS)).toBe(true);
   });
 });
+
+// HF-316 residual: the keydown handler must route killstreak slot keys through
+// the gate BEFORE the HF-324 blanket gameplay-input return, so a player who is
+// dead or in warmup gets the gate's denial feed instead of a silent no-op.
+// Source-level pin because the wiring lives in the orchestrator-owned
+// legacy-main keydown listener, which has no unit seam of its own.
+describe('HF-316 keydown denial-feedback wiring', () => {
+  it('evaluates slot keys ahead of the blanket gameplay-input guard', async () => {
+    const { readFileSync } = await import('node:fs');
+    const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    const preCheck = main.indexOf('if (!gameplayInputEnabled() && gameStarted && !event.repeat) {');
+    const blanketGuard = main.indexOf("if (!gameplayInputEnabled() && (event.code !== 'Tab' || !gameStarted)) return;");
+    expect(preCheck).toBeGreaterThan(-1);
+    expect(blanketGuard).toBeGreaterThan(-1);
+    expect(preCheck).toBeLessThan(blanketGuard);
+    // The pre-check must route through the gated activation path, never a
+    // bespoke feed message or a direct activation.
+    const preCheckBlock = main.slice(preCheck, blanketGuard);
+    expect(preCheckBlock).toContain('activateOrToggleFieldSupportSlot(candidateSlot)');
+  });
+});
