@@ -22,6 +22,8 @@ const PASS65_WEAPON_IDS = [
 ] as const;
 
 const PASS66_SPECIAL_WEAPON_IDS = ['flamethrower', 'flare-gun'] as const;
+// HF-334: appended after the Pass 66 specials so every earlier index holds.
+const PASS74_LIVERY_WEAPON_IDS = ['crimson-flamethrower'] as const;
 
 function compatibilityProjection(definition: Record<string, any>): Record<string, any> {
   const copy = structuredClone(definition);
@@ -50,6 +52,7 @@ describe('Pass 65 canonical weapon catalog', () => {
     expect(LEGACY_WEAPON_ENUMERATION_ORDER).toEqual([
       ...PASS65_WEAPON_IDS,
       ...PASS66_SPECIAL_WEAPON_IDS,
+      ...PASS74_LIVERY_WEAPON_IDS,
     ]);
     expect(WEAPON_CATALOG.map((definition) => definition.id)).toEqual(LEGACY_WEAPON_ENUMERATION_ORDER);
     expect(new Set(WEAPON_CATALOG.map((definition) => definition.id))).toEqual(new Set(WEAPON_IDS));

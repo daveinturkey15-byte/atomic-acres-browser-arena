@@ -34,6 +34,8 @@ export const ADS_SIGHT_PROFILES: Readonly<Record<WeaponId, AdsSightProfile>> = O
   'explosive-crossbow': Object.freeze({ id: 'explosive-crossbow', marker: 'chevron', color: '#ff7048', ringSizePx: 29, dotSizePx: 4, rotationDeg: 0 }),
   railgun: Object.freeze({ id: 'railgun', marker: 'scope', color: '#64f4ff', ringSizePx: 0, dotSizePx: 0, rotationDeg: 0 }),
   flamethrower: Object.freeze({ id: 'flamethrower', marker: 'cross', color: '#ff9b42', ringSizePx: 32, dotSizePx: 2, rotationDeg: 45 }),
+  // HF-334: same reticle geometry as the map flamethrower, crimson tint.
+  'crimson-flamethrower': Object.freeze({ id: 'crimson-flamethrower', marker: 'cross', color: '#ff4133', ringSizePx: 32, dotSizePx: 2, rotationDeg: 45 }),
   'flare-gun': Object.freeze({ id: 'flare-gun', marker: 'bead', color: '#ff3f2f', ringSizePx: 16, dotSizePx: 7, rotationDeg: 0 }),
 });
 

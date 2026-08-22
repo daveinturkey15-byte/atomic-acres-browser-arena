@@ -26,6 +26,16 @@ export const PASS65_AUTHORED_FIREARM_IDS = Object.freeze([
 ] as const satisfies readonly WeaponId[]);
 export type Pass65AuthoredFirearmId = (typeof PASS65_AUTHORED_FIREARM_IDS)[number];
 
+/**
+ * HF-334: weapons that deliberately reuse another weapon's authored delivery.
+ * A livery variant is the same physical weapon in a different finish, so it
+ * ships no second multi-megabyte GLB and appears in no authored-asset roster.
+ * Anything listed here MUST differ only in finish/tuning, never in geometry.
+ */
+export const WEAPON_LIVERY_ALIASES: Readonly<Record<string, Pass65AuthoredFirearmId>> = Object.freeze({
+  'crimson-flamethrower': 'flamethrower',
+});
+
 export const PASS65_WEAPON_CACHE_BUDGET = Object.freeze({
   'first-person': 2,
   // Bots cycle the complete canonical arsenal and every corpse can retain its
@@ -37,7 +47,9 @@ export const PASS65_WEAPON_CACHE_BUDGET = Object.freeze({
 
 export const PASS65_RUNTIME_WEAPON_CORPUS_BUDGET = Object.freeze({
   variants: Object.freeze(['world', 'drop'] as const),
-  assets: (WEAPON_IDS.length + 1) * 2,
+  // HF-334: livery variants ship no GLB of their own - they reuse another
+  // weapon's delivery - so they must not inflate the on-disk corpus budget.
+  assets: (WEAPON_IDS.length - Object.keys(WEAPON_LIVERY_ALIASES).length + 1) * 2,
   maximumCompressedBytes: 12 * 1024 * 1024,
   // This retained-corpus budget is incremental over the already-required
   // first-person catalog. A separate all-variant ceiling below still accounts
@@ -320,16 +332,20 @@ export function loadPass65FieldKnifeAsset(variant: Pass65WeaponVariant): Promise
 }
 
 export function loadPass65WeaponPresentation(id: WeaponId, variant: Pass65WeaponVariant): Promise<void> {
-  return id === 'explosive-crossbow'
-    ? loadPass65CrossbowAssets(variant)
-    : loadPass65WeaponAsset(id as Pass65AuthoredFirearmId, variant);
+  if (id === 'explosive-crossbow') return loadPass65CrossbowAssets(variant);
+  // HF-334: a livery variant resolves to the asset it reuses, so prewarm loads
+  // one delivery for both and never asks for a URL that does not exist.
+  const authoredId = authoredFirearmIdFor(id);
+  return authoredId ? loadPass65WeaponAsset(authoredId, variant) : Promise.resolve();
 }
 
 function runtimeCorpusReady(): boolean {
   return PASS65_RUNTIME_WEAPON_CORPUS_BUDGET.variants.every((variant) => (
-    WEAPON_IDS.every((id) => id === 'explosive-crossbow'
-      ? pass65CrossbowAssets.has(variant)
-      : cache.has(cacheKey(id as Pass65AuthoredFirearmId, variant)))
+    WEAPON_IDS.every((id) => {
+      if (id === 'explosive-crossbow') return pass65CrossbowAssets.has(variant);
+      const authoredId = authoredFirearmIdFor(id);
+      return authoredId === null || cache.has(cacheKey(authoredId, variant));
+    })
     && pass65FieldKnifeAssets.has(variant)
   ));
 }
@@ -364,6 +380,10 @@ export async function prewarmPass65RuntimeWeaponCorpus(
   const operation = (async () => {
     for (const variant of PASS65_RUNTIME_WEAPON_CORPUS_BUDGET.variants) {
       for (const id of WEAPON_IDS) {
+        // HF-334: a livery variant resolves to an asset another weapon already
+        // loads, so counting it here would double-count one decode against the
+        // corpus budget and report progress the disk never did.
+        if (id in WEAPON_LIVERY_ALIASES) continue;
         await loadPass65WeaponPresentation(id, variant);
         loadedAssets += 1;
         if (loadedAssets % PASS65_RUNTIME_WEAPON_CORPUS_BUDGET.yieldEveryAssets === 0) {
@@ -919,14 +939,37 @@ export function createPass65CrossbowModel(
   return root;
 }
 
+/**
+ * HF-334: weapons that reuse another weapon's authored GLB. The crimson
+ * flamethrower is the map flamethrower's chassis in a different livery, so it
+ * resolves to the same authored asset and takes its colour at material time —
+ * no second multi-megabyte delivery ships for a repaint.
+ */
+export function authoredFirearmIdFor(id: WeaponId): Pass65AuthoredFirearmId | null {
+  const alias = WEAPON_LIVERY_ALIASES[id];
+  if (alias) return alias;
+  return (PASS65_AUTHORED_FIREARM_IDS as readonly WeaponId[]).includes(id)
+    ? id as Pass65AuthoredFirearmId
+    : null;
+}
+
 export function createPass65WeaponModel(
-  id: Pass65AuthoredFirearmId,
+  id: WeaponId,
   flattenMaterials: boolean,
   variant: Pass65WeaponVariant,
 ): THREE.Group | null {
-  const entry = cache.get(cacheKey(id, variant));
+  const authoredId = authoredFirearmIdFor(id);
+  if (!authoredId) return null;
+  const entry = cache.get(cacheKey(authoredId, variant));
   if (!entry) return null;
-  return instantiateWeaponAsset(id, variant, entry, PASS65_AUTHORED_WEAPON_URLS[id][variant], flattenMaterials, entry);
+  // Named for the weapon that ASKED for it, loaded from the asset it reuses:
+  // a livery variant is its own scene-graph instance, so presentation lookups
+  // by weapon id keep working (HF-334).
+  const model = instantiateWeaponAsset(id as PresentationAssetId, variant, entry, PASS65_AUTHORED_WEAPON_URLS[authoredId][variant], flattenMaterials, entry);
+  // The livery is the only difference; record which weapon actually asked for
+  // the asset so presentation tinting and telemetry stay truthful.
+  if (model) model.userData.liveryWeaponId = id;
+  return model;
 }
 
 export function createPass65FieldKnifeModel(

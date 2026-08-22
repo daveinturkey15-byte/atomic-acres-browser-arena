@@ -359,7 +359,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('syncChopperRotors', 'activeSupportRotorAudioSources', 1, ['support.chopper-rotor']),
   runtimeCallsite('testBayDoorThump', 'player.position.distanceTo(new THREE.Vector3(trigger.x, trigger.y, trigger.z))', 1, ['test-bay.door-thump']),
   runtimeCallsite('weaponAction', 'player.weapon,event', 1, ['weapon.reload-mechanic']),
-  runtimeCallsite('weaponSwitch', '', 6, ['weapon.switch', 'interaction.weapon-pickup']),
+  runtimeCallsite('weaponSwitch', '', 7, ['weapon.switch', 'interaction.weapon-pickup']),
   runtimeCallsite('worldFootstep', 'footstep.position,footstep.surface,footstep.movement,isFootstepOccluded(footstep.position)', 3, ['movement.footstep.world']),
 ]);
 
@@ -1031,7 +1031,7 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
 });
 // Recomputed over the Pass 74 positional-support plus Pass 75 High Seas union,
 // including the HF-337 isEnemy callsite and refined chopper/drone coverage rows.
-export const SOUND_EVENT_INVENTORY_SHA256 = '0d7ba248a31d9180e8aba91ab47ddfb5409ea23cd14fece311f0947044d24d47';
+export const SOUND_EVENT_INVENTORY_SHA256 = '56334acbe6bcb576c115b381736e0a23b10352f4b9f1f3ed09bc63645ddb0851';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

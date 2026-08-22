@@ -88,8 +88,13 @@ describe('Pass 65 canonical killstreak catalog', () => {
   });
 
   it('derives the complete care-package pool from every current or future source row', () => {
+    const fixedPercents = PASS65_KILLSTREAK_CATALOG.carePackagePool.fixedPercents;
+    const fixedIds = Object.keys(fixedPercents);
+    // Weighted entries share whatever the fixed rewards do not claim.
+    const weightedScale = CARE_PACKAGE_FIXED_DENOMINATOR
+      - Object.values(fixedPercents).reduce((sum, percent) => sum + percent, 0);
     const expectedBaseTotal = PASS65_KILLSTREAK_CATALOG.definitions
-      .filter((entry) => entry.availability !== 'retired' && entry.id !== 'care-package' && entry.id !== 'nuke')
+      .filter((entry) => entry.availability !== 'retired' && entry.id !== 'care-package' && !fixedIds.includes(entry.id))
       .reduce((sum, entry) => sum + entry.carePackageBaseWeightUnits, 0);
     expect(PASS65_KILLSTREAK_CATALOG.carePackagePool).toMatchObject({
       nonNukeBaseWeightTotal: expectedBaseTotal,
@@ -99,13 +104,21 @@ describe('Pass 65 canonical killstreak catalog', () => {
     for (const entry of PASS65_KILLSTREAK_CATALOG.definitions) {
       const expectedWeight = entry.availability === 'retired' || entry.id === 'care-package'
         ? 0
-        : entry.id === 'nuke'
-          ? expectedBaseTotal
-          : entry.carePackageBaseWeightUnits * 99;
+        : fixedPercents[entry.id] !== undefined
+          ? expectedBaseTotal * fixedPercents[entry.id]!
+          : entry.carePackageBaseWeightUnits * weightedScale;
       expect(entry.carePackageWeightUnits, entry.id).toBe(expectedWeight);
     }
-    const nuke = PASS65_KILLSTREAK_CATALOG.carePackagePool.entries.find((entry) => entry.id === 'nuke')!;
-    expect(nuke.weightUnits * CARE_PACKAGE_FIXED_DENOMINATOR).toBe(PASS65_KILLSTREAK_CATALOG.carePackagePool.totalWeightUnits);
+    // HF-334: every fixed reward lands on its EXACT percentage - Nuke at 1%,
+    // the crimson flamethrower at the owner's 10%. This is the invariant the
+    // pool exists to guarantee, so it is asserted as a ratio, not a constant.
+    const total = PASS65_KILLSTREAK_CATALOG.carePackagePool.totalWeightUnits;
+    for (const [fixedId, percent] of Object.entries(fixedPercents)) {
+      const fixedEntry = PASS65_KILLSTREAK_CATALOG.carePackagePool.entries.find((entry) => entry.id === fixedId)!;
+      expect(fixedEntry.weightUnits * CARE_PACKAGE_FIXED_DENOMINATOR, fixedId).toBe(total * percent);
+    }
+    expect(fixedPercents.nuke).toBe(1);
+    expect(fixedPercents['crimson-flamethrower']).toBe(10);
     const maximumBaseWeight = Math.max(...PASS65_KILLSTREAK_SOURCES.map((entry) => entry.carePackageBaseWeightUnits));
     expect(source('scout-sweep').carePackageBaseWeightUnits).toBe(maximumBaseWeight);
     expect(PASS65_KILLSTREAK_CATALOG.carePackagePool.entries.map((entry) => entry.id)).not.toContain('care-package');
@@ -156,8 +169,8 @@ describe('Pass 65 canonical killstreak catalog', () => {
     expect(catalog.carePackagePool.totalWeightUnits).toBe(13_500);
     expect(catalog.carePackagePool.entries.filter((entry) => entry.id === 'future-orbital-lance')).toHaveLength(1);
     expect(catalog.carePackagePool.entries.filter((entry) => entry.id === 'future-decoy-wing')).toHaveLength(1);
-    expect(catalog.carePackagePool.entries.find((entry) => entry.id === 'future-orbital-lance')?.weightUnits).toBe(495);
-    expect(catalog.carePackagePool.entries.find((entry) => entry.id === 'future-decoy-wing')?.weightUnits).toBe(693);
+    expect(catalog.carePackagePool.entries.find((entry) => entry.id === 'future-orbital-lance')?.weightUnits).toBe(445);
+    expect(catalog.carePackagePool.entries.find((entry) => entry.id === 'future-decoy-wing')?.weightUnits).toBe(623);
     expect(catalog.carePackagePool.entries.find((entry) => entry.id === 'nuke')?.weightUnits).toBe(135);
     for (const entry of catalog.carePackagePool.entries) {
       expect(rewardForCarePackageUnit(catalog, entry.startInclusive)).toBe(entry.id);
@@ -178,7 +191,7 @@ describe('Pass 65 canonical killstreak catalog', () => {
       : entry));
     expect(reweighted.carePackagePool.nonNukeBaseWeightTotal).toBe(131);
     expect(reweighted.carePackagePool.totalWeightUnits).toBe(13_100);
-    expect(reweighted.carePackagePool.entries.find((entry) => entry.id === 'future-strike')?.weightUnits).toBe(792);
+    expect(reweighted.carePackagePool.entries.find((entry) => entry.id === 'future-strike')?.weightUnits).toBe(712);
     expect(reweighted.carePackagePool.entries.find((entry) => entry.id === 'nuke')?.weightUnits).toBe(131);
 
     const retired = createKillstreakCatalog(added.map((entry) => entry.id === 'future-strike'

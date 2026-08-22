@@ -1,7 +1,7 @@
 import {
   PASS65_KILLSTREAK_CATALOG,
   PASS65_KILLSTREAK_SLOT_DEFINITIONS,
-  type Pass65KillstreakId,
+  type Pass65KillstreakId, type SelectableKillstreakId,
 } from '../killstreak-catalog';
 import {
   DEFAULT_KILLSTREAK_LOADOUT,
@@ -23,7 +23,7 @@ export function activeKillstreakDurationMs(id: Pass65KillstreakId): number {
   return definition.durationMs;
 }
 
-function killstreakDurationSeconds(id: Pass65KillstreakId): number {
+function killstreakDurationSeconds(id: SelectableKillstreakId): number {
   const durationMs = activeKillstreakDurationMs(id);
   if (durationMs <= 0 || durationMs % 1_000 !== 0) {
     throw new Error(`Killstreak ${id} requires a positive whole-second duration`);
@@ -36,6 +36,7 @@ function killstreakDurationSeconds(id: Pass65KillstreakId): number {
  * DOES, shown in the loadout menu so every reward is self-explanatory.
  */
 export const KILLSTREAK_DESCRIPTIONS: Readonly<Record<Pass65KillstreakId, string>> = Object.freeze({
+  'crimson-flamethrower': 'Care-package only (10% chance): a red flamethrower of your own, 30% weaker than the map one.',
   'scout-sweep': 'Reveals every enemy on your minimap for 12s.',
   'adrenaline': '+10% damage and move speed, -10% reload time for 15s.',
   'care-package': 'Calls a supply crate you can capture for a bonus reward.',
@@ -119,7 +120,7 @@ export function bindKillstreakLoadoutMenu(
   let previewedSlot = 1;
   const previewSlot = (select: HTMLSelectElement): void => {
     previewedSlot = Number(select.dataset.killstreakSlot);
-    demo.show(select.value as Pass65KillstreakId);
+    demo.show(select.value as SelectableKillstreakId);
     root.querySelectorAll<HTMLElement>('[data-killstreak-slot-card]').forEach((card) => {
       card.classList.toggle('is-previewed', Number(card.dataset.killstreakSlotCard) === previewedSlot);
     });

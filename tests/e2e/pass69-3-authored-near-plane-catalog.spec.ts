@@ -66,6 +66,8 @@ const EXPECTED_CONTACT_RETREAT = Object.freeze({
   'explosive-crossbow': 0,
   railgun: 0.1,
   flamethrower: 0,
+  // HF-334: shares the flamethrower chassis, so the same authored clearance.
+  'crimson-flamethrower': 0,
   'flare-gun': 0,
 } satisfies Readonly<Record<WeaponId, number>>);
 

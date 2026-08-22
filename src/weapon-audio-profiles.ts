@@ -46,6 +46,10 @@ export const WEAPON_REPORT_PROFILES: Readonly<Record<WeaponId, WeaponReportProfi
   'flashlight-pistol': report({ body: 76, bodyEnd: 26, duration: 0.22, crack: 2_880, crackEndRatio: 0.33, crackDuration: 0.041, noise: 0.29, lowpass: 2_700, tail: 320, tailDuration: 0.35, transientHighpass: 1_700, transientDuration: 0.037, mechanismPrimaryHz: 380, mechanismSecondaryHz: 305, mechanismDelay: 0.16 }),
   'explosive-crossbow': report({ body: 118, bodyEnd: 54, duration: 0.11, crack: 840, crackEndRatio: 0.52, crackDuration: 0.029, noise: 0.045, lowpass: 1_600, tail: 290, tailDuration: 0.14, transientHighpass: 900, transientDuration: 0.032, mechanismPrimaryHz: 240, mechanismSecondaryHz: 180, mechanismDelay: 0.09 }),
   flamethrower: report({ body: 86, bodyEnd: 34, duration: 0.19, crack: 620, crackEndRatio: 0.58, crackDuration: 0.06, noise: 0.52, lowpass: 1_450, tail: 220, tailDuration: 0.31, transientHighpass: 780, transientDuration: 0.05, mechanismPrimaryHz: 168, mechanismSecondaryHz: 126, mechanismDelay: 0.12 }),
+  // HF-334: the care-package unit is a compact single-tank igniter - tighter
+  // body, sharper hiss and a shorter tail than the mounted map flamethrower,
+  // so the two are audibly distinguishable in the same match.
+  'crimson-flamethrower': report({ body: 97, bodyEnd: 39, duration: 0.16, crack: 705, crackEndRatio: 0.64, crackDuration: 0.052, noise: 0.61, lowpass: 1_760, tail: 252, tailDuration: 0.25, transientHighpass: 890, transientDuration: 0.042, mechanismPrimaryHz: 194, mechanismSecondaryHz: 147, mechanismDelay: 0.09 }),
   'flare-gun': report({ body: 132, bodyEnd: 46, duration: 0.16, crack: 1_180, crackEndRatio: 0.35, crackDuration: 0.044, noise: 0.22, lowpass: 2_050, tail: 410, tailDuration: 0.28, transientHighpass: 1_620, transientDuration: 0.036, mechanismPrimaryHz: 340, mechanismSecondaryHz: 205, mechanismDelay: 0.18 }),
 });
 

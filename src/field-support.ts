@@ -1,15 +1,30 @@
 import { GRENADE_RADIUS, type Stance } from './gameplay';
 import type { ExplosiveSource } from './protocol';
 import { explosiveBoltBlastRadiusM } from './combat/ordnance';
-import { PASS65_KILLSTREAK_CATALOG, type KillstreakLoadoutV1, type Pass65KillstreakId } from './killstreak-catalog';
+import { PASS65_KILLSTREAK_CATALOG, type KillstreakLoadoutV1, type Pass65KillstreakId, type SelectableKillstreakId } from './killstreak-catalog';
 import { DEFAULT_KILLSTREAK_LOADOUT } from './killstreak-loadout';
 
-export const FIELD_SUPPORT_IDS: readonly Pass65KillstreakId[] = Object.freeze(
+type SelectableDefinition = (typeof PASS65_KILLSTREAK_CATALOG.definitions)[number] & { id: SelectableKillstreakId };
+
+/** HF-334: narrows the catalog's selectable rows so downstream ids exclude
+ * care-package-only rewards at the type level, not just at runtime. */
+function isSelectableDefinition(
+  definition: (typeof PASS65_KILLSTREAK_CATALOG.definitions)[number],
+): definition is SelectableDefinition {
+  return definition.availability === 'selectable';
+}
+
+export const FIELD_SUPPORT_IDS: readonly SelectableKillstreakId[] = Object.freeze(
   PASS65_KILLSTREAK_CATALOG.definitions
-    .filter((definition) => definition.availability === 'selectable')
+    .filter(isSelectableDefinition)
     .map((definition) => definition.id),
 );
-export type FieldSupportId = Pass65KillstreakId;
+/**
+ * HF-334: field supports are the killstreaks a player selects into a slot and
+ * activates. The constant above already filters to `selectable`, so the type
+ * now matches it — a care-package-only weapon reward is never a field support.
+ */
+export type FieldSupportId = SelectableKillstreakId;
 
 export type FieldSupportDefinition = {
   id: FieldSupportId;
@@ -20,7 +35,7 @@ export type FieldSupportDefinition = {
 
 export const FIELD_SUPPORT: readonly FieldSupportDefinition[] = Object.freeze(
   PASS65_KILLSTREAK_CATALOG.definitions
-    .filter((definition) => definition.availability === 'selectable')
+    .filter(isSelectableDefinition)
     .map((definition) => Object.freeze({
       id: definition.id,
       name: definition.displayName,
@@ -89,16 +104,20 @@ export type FieldSupportProjection = Readonly<{
   loadout: KillstreakLoadoutV1;
   available: Readonly<Record<FieldSupportId, boolean>>;
   availableCharges: Readonly<Record<FieldSupportId, number>>;
-  revealedCareReward: FieldSupportId | null;
+  /** HF-334: may be a weapon-grant reward (crimson flamethrower) rather than a
+   * field support, so it is any care-pool id. */
+  revealedCareReward: Pass65KillstreakId | null;
 }>;
 
 export type FieldSupportActorProjectionSource = Readonly<{
   streak: number;
   cycleProgress: number;
   loadout: KillstreakLoadoutV1;
-  available: readonly FieldSupportId[];
-  availableCharges: readonly Readonly<{ id: FieldSupportId; count: number }>[];
-  revealedCareRewards: readonly FieldSupportId[];
+  available: readonly Pass65KillstreakId[];
+  availableCharges: readonly Readonly<{ id: Pass65KillstreakId; count: number }>[];
+  /** HF-334: any care-pool reward, which since the crimson flamethrower may be
+   * a weapon grant rather than a field support. */
+  revealedCareRewards: readonly Pass65KillstreakId[];
 }>;
 
 export function projectFieldSupportActor(
@@ -109,12 +128,21 @@ export function projectFieldSupportActor(
   const available = supportFlags();
   const availableCharges = supportCounts();
   for (const charge of actor?.availableCharges ?? []) {
-    availableCharges[charge.id] = charge.count;
-    available[charge.id] = charge.count > 0;
+    // Charges are keyed by field support; a weapon-grant reward has no
+    // readiness slot here (HF-334) and is skipped rather than coerced.
+    if (!(FIELD_SUPPORT_IDS as readonly string[]).includes(charge.id)) continue;
+    const chargeId = charge.id as FieldSupportId;
+    availableCharges[chargeId] = charge.count;
+    available[chargeId] = charge.count > 0;
   }
   const revealedCareReward = actor?.revealedCareRewards[0] ?? null;
   if (revealedCareReward) {
-    available[revealedCareReward] = true;
+    // Only field supports have a readiness slot. A weapon-grant reward
+    // (crimson flamethrower) is delivered by the weapon path instead, so it
+    // must not be forced into the support-availability map.
+    if ((FIELD_SUPPORT_IDS as readonly string[]).includes(revealedCareReward)) {
+      available[revealedCareReward as FieldSupportId] = true;
+    }
     // A captured Care Package is still selected through slot one. Project its
     // readiness onto that slot without manufacturing a second reward queue.
     available[loadout.slots[0]] = true;

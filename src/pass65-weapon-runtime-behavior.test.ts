@@ -25,6 +25,7 @@ import {
 } from './weapon-prewarm-catalog';
 import {
   PASS65_AUTHORED_FIREARM_IDS,
+  WEAPON_LIVERY_ALIASES,
   createPass65WeaponModel,
   invalidatePass65PresentationTree,
   loadPass65WeaponAsset,
@@ -214,6 +215,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+// HF-334: every authored firearm stages a model, plus one per livery variant
+// (a variant is its own scene instance reusing another weapon's delivery).
+const STAGED_FIREARM_MODEL_COUNT = PASS65_AUTHORED_FIREARM_IDS.length + Object.keys(WEAPON_LIVERY_ALIASES).length;
+
 describe('Pass 65 managed weapon runtime behavior', () => {
   it('replays the accepted weapon-space palm direction and wrist roll instead of a camera-space approximation', () => {
     const expectedSupport = new THREE.Vector3(0.85, -0.20, -0.45).normalize();
@@ -278,7 +283,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       prewarming: false,
     });
     expect(loadSpy.mock.calls.some(([url]) => String(url).endsWith('pass65-field-knife-drop-lod0.glb'))).toBe(true);
-    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(STAGED_FIREARM_MODEL_COUNT);
   });
 
   it('awaits an exact WebGL match-start weapon before the synchronous visibility swap', async () => {
@@ -644,7 +649,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     for (const [id, model] of stagedModels) {
       expect(presentation.root.getObjectByName(`${id}-pass65-first-person-model`)).toBe(model);
     }
-    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(STAGED_FIREARM_MODEL_COUNT);
   });
 
   it('serializes asset-only catalog generations so the latest request owns residency', async () => {
@@ -711,7 +716,8 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       retainedCount: catalogIds.length,
       loaded: catalogIds.length,
       gpuReady: catalogIds.length,
-      available: PASS65_AUTHORED_FIREARM_IDS.length + 1,
+      // authored firearms + crossbow + livery variants (HF-334)
+      available: STAGED_FIREARM_MODEL_COUNT + 1,
       prewarming: false,
       unpreparedSwitches: 0,
       lastUnpreparedSwitch: null,
@@ -784,7 +790,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(selectedUpdate).toHaveBeenCalled();
     expect(inactiveWorldUpdate).not.toHaveBeenCalled();
     expect(inactiveRecursiveUpdate).not.toHaveBeenCalled();
-    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(STAGED_FIREARM_MODEL_COUNT);
   });
 
   it('prewarms the not-yet-ready deployment catalog in bounded yielded renderer batches', async () => {
@@ -839,7 +845,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(Object.isFrozen(presentation.browserCatalogHealth())).toBe(true);
     expect(presentation.browserCatalogReadiness()).toEqual(presentation.presentationState().browserWeaponCatalog);
     expect(Object.isFrozen(presentation.browserCatalogReadiness())).toBe(true);
-    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(STAGED_FIREARM_MODEL_COUNT);
   });
 
   it('retains the loaded catalog but re-prewarms every model after a render-pipeline change', async () => {
@@ -892,7 +898,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     for (const [id, model] of retainedModels) {
       expect(presentation.root.getObjectByName(`${id}-pass65-first-person-model`)).toBe(model);
     }
-    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(STAGED_FIREARM_MODEL_COUNT);
   });
 
   it('does not admit an old asynchronous GPU-prewarm generation after invalidation', async () => {
@@ -963,7 +969,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       prewarming: false,
     });
     expect(individualPrewarmer).toHaveBeenCalledTimes(1);
-    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(STAGED_FIREARM_MODEL_COUNT);
   });
 
   it('retires every rejected batch candidate and admits a clean retry', async () => {

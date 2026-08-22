@@ -45,7 +45,7 @@ describe('shared wall-penetration authority', () => {
   });
 
   it('gives every weapon a bounded calibre, distance, FMJ, and residual-damage profile', () => {
-    const noWallPenetration = new Set(['explosive-crossbow', 'flamethrower', 'flare-gun']);
+    const noWallPenetration = new Set(['explosive-crossbow', 'flamethrower', 'crimson-flamethrower', 'flare-gun']);
     expect(Object.values(WEAPONS)
       .filter((weapon) => weapon.penetration.maxPenetratedSurfaces === 0)
       .map((weapon) => weapon.id)

@@ -223,6 +223,7 @@ const WEAPON_HAND_ROTATIONS: Record<WeaponId, HandRotationSet> = {
   'flashlight-pistol': { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
   'explosive-crossbow': { left: [-0.42, 0.14, -0.24], right: [-0.24, 0.02, 0.1] },
   flamethrower: { left: [-0.31, 0.1, -0.2], right: [-0.22, -0.06, 0.24] },
+  'crimson-flamethrower': { left: [-0.31, 0.1, -0.2], right: [-0.22, -0.06, 0.24] },
   'flare-gun': { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
 };
 
@@ -246,6 +247,7 @@ const VIEWMODEL_GRIP_OFFSETS: Record<WeaponId, HandRotationSet> = {
   'flashlight-pistol': { left: [0.035, -0.02, 0.04], right: [0.07, -0.025, 0.015] },
   'explosive-crossbow': { left: [-0.015, -0.025, 0.03], right: [0.07, -0.025, 0.015] },
   flamethrower: { left: [-0.065, -0.03, 0.02], right: [0.08, -0.025, 0.015] },
+  'crimson-flamethrower': { left: [-0.065, -0.03, 0.02], right: [0.08, -0.025, 0.015] },
   'flare-gun': { left: [0.035, -0.02, 0.04], right: [0.07, -0.025, 0.015] },
 };
 
@@ -269,6 +271,7 @@ const RELOAD_HAND_ROTATIONS: Record<WeaponId, [number, number, number]> = {
   'flashlight-pistol': [-0.92, 0.42, -0.68],
   'explosive-crossbow': [-0.72, 0.28, -0.48],
   flamethrower: [-0.78, 0.35, -0.54],
+  'crimson-flamethrower': [-0.78, 0.35, -0.54],
   'flare-gun': [-0.92, 0.42, -0.68],
 };
 
@@ -520,6 +523,7 @@ export const FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT: Readonly<Record<WeaponId, 
   'explosive-crossbow': 0,
   railgun: 0.1,
   flamethrower: 0,
+  'crimson-flamethrower': 0,
   'flare-gun': 0,
 });
 
@@ -869,6 +873,7 @@ const FIRST_PERSON_HIDDEN_NODES: Readonly<Record<WeaponId, ReadonlySet<string>>>
   'flashlight-pistol': new Set<string>(),
   'explosive-crossbow': new Set<string>(),
   flamethrower: new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
+  'crimson-flamethrower': new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
   'flare-gun': new Set<string>(),
 });
 

@@ -410,6 +410,8 @@ describe('first-person anatomical presentation', () => {
       'slug-shotgun': -1.60,
       railgun: -1.85,
       flamethrower: -1.72,
+      // HF-334: shares the flamethrower chassis, so the same calibrated plane.
+      'crimson-flamethrower': -1.72,
     });
     expect(Object.keys(longGunWallPlanes).sort()).toEqual(
       WEAPON_IDS.filter((weapon) => VIEWMODEL_CONTACT_PROFILES[weapon].maximumSurfaceRetreatMeters >= 0.92).sort(),

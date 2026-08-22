@@ -278,7 +278,7 @@ function isActorSnapshot(value: unknown): boolean {
   const charges = value.availableCharges as unknown[];
   if (!charges.every((charge) => object(charge)
     && exactKeys(charge, ['id', 'count'])
-    && loadout.slots.includes(charge.id as Pass65KillstreakId)
+    && (loadout.slots as readonly string[]).includes(String(charge.id))
     && safeCounter(charge.count, MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD)
     && Number(charge.count) > 0)) return false;
   const chargedIds = charges.map((charge) => (charge as { id: Pass65KillstreakId }).id);

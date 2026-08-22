@@ -197,7 +197,8 @@ import {
 } from './deployment-loading-progress';
 import { flyingCatPose } from './gun-range-cat-choreography';
 import { KillstreakLoadoutController } from './killstreak-loadout';
-import type { KillstreakLoadoutV1, Pass65KillstreakId } from './killstreak-catalog';
+import { CRIMSON_FLAMETHROWER_KILLSTREAK_ID } from './killstreak-catalog'; // HF-334
+import type { KillstreakLoadoutV1, Pass65KillstreakId, SelectableKillstreakId } from './killstreak-catalog';
 import {
   CARPET_BOMBER_BLAST_RADIUS_M,
   CHOPPER_MISSILE_BLAST_RADIUS_M,
@@ -12806,7 +12807,7 @@ function interactWithGunRangeTestBayWeapon(now = performance.now(), expectedWeap
   return true;
 }
 
-function interactWithGunRangeTestBaySupport(expectedId?: Pass65KillstreakId): boolean {
+function interactWithGunRangeTestBaySupport(expectedId?: SelectableKillstreakId): boolean {
   const proximity = nearbyGunRangeTestBaySupportStation();
   const id = proximity?.station.id;
   if (!id || expectedId && expectedId !== id) return false;
@@ -21178,7 +21179,7 @@ function applyKillstreakEntityShot(
   return applied;
 }
 
-function killstreakSlotFor(id: Pass65KillstreakId): 1 | 2 | 3 | 4 | 5 | null {
+function killstreakSlotFor(id: SelectableKillstreakId): 1 | 2 | 3 | 4 | 5 | null {
   const careReward = localKillstreakActorSnapshot()?.revealedCareRewards[0];
   if (careReward === id) return 1;
   const index = localFieldSupportProjection().loadout.slots.indexOf(id);
@@ -21186,7 +21187,7 @@ function killstreakSlotFor(id: Pass65KillstreakId): 1 | 2 | 3 | 4 | 5 | null {
 }
 
 function requestKillstreakActivation(
-  id: Pass65KillstreakId,
+  id: SelectableKillstreakId,
   now: number,
   anchor?: [number, number, number],
   facing?: [number, number, number],
@@ -21397,7 +21398,7 @@ function executePinnedFInteraction(interaction: InteractionCandidate, now = perf
     return WEAPON_IDS.includes(weapon) && interactWithGunRangeTestBayWeapon(now, weapon);
   }
   if (interaction.kind === 'test-bay-support') {
-    const id = interaction.targetId.replace(/^test-bay-support:/, '') as Pass65KillstreakId;
+    const id = interaction.targetId.replace(/^test-bay-support:/, '') as SelectableKillstreakId;
     return interactWithGunRangeTestBaySupport(id);
   }
   if (interaction.kind === 'weapon-pickup') return interactWithWeaponPickup(now, interaction.targetId);
@@ -23135,12 +23136,44 @@ function authorizeLocalOffensiveSupport(
   return activationNonce;
 }
 
+/**
+ * HF-334: hand the player the crimson flamethrower from a care package.
+ *
+ * Deliberately NOT routed through timed-map-weapon authority: that authority is
+ * arena-bound and single-instance, so granting through it would make the world
+ * flamethrower vanish mid-match for whoever was walking toward it — the exact
+ * defect that got the naive wiring refused. This is an ordinary personal weapon
+ * grant with its own finite ammo, so both can exist at once.
+ */
+function grantCrimsonFlamethrower(now = performance.now()): void {
+  const weapon: WeaponId = 'crimson-flamethrower';
+  interruptReload(true, now);
+  player.weapon = weapon;
+  player.ammo[weapon] = WEAPONS[weapon].mag;
+  player.reserve[weapon] = WEAPONS[weapon].reserve;
+  player.nextShotAt = 0;
+  player.switchingUntil = now + 360;
+  player.sustainedShots = 0;
+  weaponView.setWeapon(weapon);
+  audio.weaponSwitch();
+  presentBanner('announcement', 'CRIMSON FLAMETHROWER', 'CARE PACKAGE · LIMITED FUEL', 2_600);
+  addFeed('CARE PACKAGE · CRIMSON FLAMETHROWER', 'gold');
+  renderFieldKitSelection();
+}
+
 function activateFieldSupport(id: FieldSupportId): void {
   if ((!selectedArena.fieldSupport && selectedArena.id !== 'gun-range')
     || !player.alive || matchState.phase !== 'active' || tacticalMapOpen) return;
   const fieldSupport = localFieldSupportProjection();
   const revealedCareReward = id === fieldSupport.loadout.slots[0] ? fieldSupport.revealedCareReward ?? undefined : undefined;
-  const activatedId = revealedCareReward ?? id;
+  // HF-334: the care package can roll a WEAPON grant rather than a streak. It
+  // is a separate weapon instance from the arena-bound map flamethrower, so it
+  // never touches that authority and never consumes the world pickup.
+  if (revealedCareReward === CRIMSON_FLAMETHROWER_KILLSTREAK_ID) {
+    grantCrimsonFlamethrower();
+    return;
+  }
+  const activatedId = (revealedCareReward ?? id) as FieldSupportId;
   if (!fieldSupport.available[activatedId]) return;
   const now = performance.now();
   endSpawnProtectionOnOffense(now);
@@ -25247,7 +25280,10 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('beforeunload', () => audio.dispose(), { once: true });
 
-const GAMEPAD_SUPPORT_LABELS: Record<FieldSupportId, string> = {
+// Display labels for every care-pool reward, not only slot-selectable ones:
+// the kill feed has to name a crimson flamethrower grant when it drops.
+const GAMEPAD_SUPPORT_LABELS: Record<Pass65KillstreakId, string> = {
+  'crimson-flamethrower': 'CRIMSON FLAMETHROWER',
   'scout-sweep': 'SCOUT SWEEP',
   adrenaline: 'ADRENALINE BOOST',
   'care-package': 'CARE PACKAGE',
@@ -28266,12 +28302,12 @@ const debugWindow = window as Window & {
     earnSupport: (eliminations: number) => void;
     earnSupportForActor: (actorId: string, eliminations: number) => boolean;
     activateKillstreak: (
-      id: Pass65KillstreakId,
+      id: SelectableKillstreakId,
       anchor?: [number, number, number],
       facing?: [number, number, number],
     ) => boolean;
     activateKillstreakWithReceipt: (
-      id: Pass65KillstreakId,
+      id: SelectableKillstreakId,
       anchor?: [number, number, number],
       facing?: [number, number, number],
     ) => { activationId: string; sequence: number; lifeId: number } | null;
@@ -31456,7 +31492,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     updateFieldSupportHud();
     return admitted > 0;
   },
-  activateKillstreak: (id: Pass65KillstreakId, anchor, facing) => Boolean(
+  activateKillstreak: (id: SelectableKillstreakId, anchor, facing) => Boolean(
     requestKillstreakActivation(id, performance.now(), anchor, facing),
   ),
   activateKillstreakWithReceipt: (id, anchor, facing) => {

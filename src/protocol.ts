@@ -87,7 +87,11 @@ export type PrimaryWeaponId =
   | 'mini-uzi' | 'mp5' | 'm4a1' | 'ak-47' | 'minigun' | 'm14-ebr' | 'slug-shotgun';
 export type SidearmWeaponId =
   | 'pistol' | 'machine-pistol' | 'magnum' | 'flashlight-pistol' | 'explosive-crossbow';
-export type SpecialWeaponId = 'railgun' | 'flamethrower' | 'flare-gun';
+/** HF-334: `crimson-flamethrower` is the care-package reward variant — a
+ * SEPARATE weapon instance from the arena-bound map `flamethrower`, so a
+ * package grant can never consume the world pickup. Red livery, 30% less
+ * direct damage. Owner decision 2026-08-22. */
+export type SpecialWeaponId = 'railgun' | 'flamethrower' | 'crimson-flamethrower' | 'flare-gun';
 export type WeaponId = PrimaryWeaponId | SidearmWeaponId | SpecialWeaponId;
 
 export const PRIMARY_WEAPON_IDS: readonly PrimaryWeaponId[] = Object.freeze([
@@ -98,7 +102,7 @@ export const SIDEARM_WEAPON_IDS: readonly SidearmWeaponId[] = Object.freeze([
   'pistol', 'machine-pistol', 'magnum', 'flashlight-pistol', 'explosive-crossbow',
 ]);
 export const SPECIAL_WEAPON_IDS: readonly SpecialWeaponId[] = Object.freeze([
-  'railgun', 'flamethrower', 'flare-gun',
+  'railgun', 'flamethrower', 'crimson-flamethrower', 'flare-gun',
 ]);
 export const WEAPON_IDS: readonly WeaponId[] = Object.freeze([
   ...PRIMARY_WEAPON_IDS,

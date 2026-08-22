@@ -1,4 +1,4 @@
-import type { Pass65KillstreakId } from '../killstreak-catalog';
+import type { SelectableKillstreakId } from '../killstreak-catalog';
 import { killstreakDemoPosterPath, killstreakDemoVideoPath } from '../killstreak-demo-capture-contract';
 
 export type KillstreakDemoKind =
@@ -20,7 +20,7 @@ export type KillstreakDemoMedia = Readonly<{
 }>;
 
 export type KillstreakDemoDefinition = Readonly<{
-  id: Pass65KillstreakId;
+  id: SelectableKillstreakId;
   kind: KillstreakDemoKind;
   eyebrow: string;
   title: string;
@@ -34,7 +34,7 @@ function definition(value: KillstreakDemoDefinition): KillstreakDemoDefinition {
   return Object.freeze({ ...value, beats: Object.freeze([...value.beats]) as KillstreakDemoDefinition['beats'], media: Object.freeze(value.media) });
 }
 
-export const KILLSTREAK_DEMO_MEDIA: Readonly<Record<Pass65KillstreakId, KillstreakDemoDefinition>> = Object.freeze({
+export const KILLSTREAK_DEMO_MEDIA: Readonly<Record<SelectableKillstreakId, KillstreakDemoDefinition>> = Object.freeze({
   'scout-sweep': definition({
     id: 'scout-sweep', kind: 'radar-sweep', eyebrow: 'RECON PULSE', title: 'SCOUT SWEEP',
     summary: 'A verified test-bay clip shows the real short reveal cadence without starting a menu gameplay renderer.',
@@ -111,7 +111,7 @@ function beatsMarkup(definitionValue: KillstreakDemoDefinition): string {
   return definitionValue.beats.map((beat, index) => `<li><i>0${index + 1}</i><span>${escapeHtml(beat)}</span></li>`).join('');
 }
 
-export function killstreakDemoRailMarkup(initialId: Pass65KillstreakId): string {
+export function killstreakDemoRailMarkup(initialId: SelectableKillstreakId): string {
   const initial = KILLSTREAK_DEMO_MEDIA[initialId];
   return `<aside id="killstreak-demo-rail" class="killstreak-demo-rail" aria-labelledby="killstreak-demo-title" data-demo-id="${initial.id}" data-demo-kind="${initial.kind}" data-motion="inactive" data-media="poster" style="--killstreak-demo-accent:${initial.accent}">
     <header><small data-demo-eyebrow>${initial.eyebrow}</small><strong id="killstreak-demo-title" data-demo-title>${initial.title}</strong></header>
@@ -128,12 +128,12 @@ export function killstreakDemoRailMarkup(initialId: Pass65KillstreakId): string 
 }
 
 export type KillstreakDemoRailBinding = Readonly<{
-  show: (id: Pass65KillstreakId) => void;
+  show: (id: SelectableKillstreakId) => void;
   syncMotion: () => void;
   dispose: () => void;
 }>;
 
-export function bindKillstreakDemoRail(root: ParentNode, initialId: Pass65KillstreakId): KillstreakDemoRailBinding {
+export function bindKillstreakDemoRail(root: ParentNode, initialId: SelectableKillstreakId): KillstreakDemoRailBinding {
   const rail = root.querySelector<HTMLElement>('#killstreak-demo-rail');
   if (!rail) return Object.freeze({ show: () => undefined, syncMotion: () => undefined, dispose: () => undefined });
   const motionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -206,7 +206,7 @@ export function bindKillstreakDemoRail(root: ParentNode, initialId: Pass65Killst
     playCurrent();
   };
 
-  const show = (id: Pass65KillstreakId): void => {
+  const show = (id: SelectableKillstreakId): void => {
     currentId = id;
     manualPaused = false;
     const next = KILLSTREAK_DEMO_MEDIA[id];

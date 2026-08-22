@@ -164,6 +164,7 @@ export const VIEWMODEL_CONTACT_PROFILES: Readonly<Record<WeaponId, ViewmodelCont
   'explosive-crossbow': contactProfile('explosive-crossbow', 0.78, 0.8, 1.75, 0.32, 0.26, 0.32, 0.86, -0.13, 0.085, 0.055, 0.22),
   railgun: contactProfile('railgun', 0.98, 0.75, 2, 0.34, 0.3, 0.36, 1, -0.18, 0.11, 0.07, 0.26),
   flamethrower: contactProfile('flamethrower', 0.96, 0.75, 1.9, 0.34, 0.3, 0.38, 0.98, -0.18, 0.11, 0.07, 0.26),
+  'crimson-flamethrower': contactProfile('crimson-flamethrower', 0.96, 0.75, 1.9, 0.34, 0.3, 0.38, 0.98, -0.18, 0.11, 0.07, 0.26),
   'flare-gun': contactProfile('flare-gun', 0.55, 0.87, 1.2, 0.18, 0.19, 0.21, 0.62, -0.08, 0.06, 0.035, 0.18),
 });
 

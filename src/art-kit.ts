@@ -353,7 +353,8 @@ const MAT = {
   gunmetal: (weapon: WeaponId) => {
     const finish = weaponFinishProfile(weapon);
     const material = texturedMaterial(finish.albedo, {
-      color: 0xffffff, roughness: 0.48, metalness: finish.metalness,
+      // HF-334: livery tint multiplies the shared albedo (crimson variant).
+      color: finish.tintHex ?? 0xffffff, roughness: 0.48, metalness: finish.metalness,
       repeatX: finish.textureRepeat, repeatY: finish.textureRepeat,
       normalPath: finish.normal, roughnessPath: finish.roughness,
       normalScale: finish.normalScale,
@@ -410,6 +411,7 @@ const PROCEDURAL_WEAPON_BASE: Partial<Record<WeaponId, WeaponId>> = {
   'flashlight-pistol': 'pistol',
   'explosive-crossbow': 'pistol',
   flamethrower: 'lmg',
+  'crimson-flamethrower': 'lmg', // HF-334: shares the flamethrower chassis
   'flare-gun': 'pistol',
 };
 
@@ -477,7 +479,7 @@ function buildProceduralWeaponVariant(id: WeaponId, baseId: WeaponId, flattenMat
     string.rotation.z = Math.PI / 2;
     string.position.set(0, 0.09, -0.66);
     root.add(string);
-  } else if (id === 'flamethrower') {
+  } else if (id === 'flamethrower' || id === 'crimson-flamethrower') { // HF-334: shared chassis
     const inheritedMagazine = root.getObjectByName('magazine');
     if (inheritedMagazine) inheritedMagazine.visible = false;
     for (const side of [-1, 1]) {
@@ -1181,6 +1183,7 @@ const RIGGED_SUPPORT_GRIP_POSITION: Record<WeaponId, [number, number, number]> =
   'flashlight-pistol': [-0.06, -0.15, 0.03],
   'explosive-crossbow': [-0.06, -0.12, -0.25],
   flamethrower: [-0.06, -0.13, -0.3],
+  'crimson-flamethrower': [-0.06, -0.13, -0.3],
   'flare-gun': [-0.06, -0.15, 0.03],
 };
 

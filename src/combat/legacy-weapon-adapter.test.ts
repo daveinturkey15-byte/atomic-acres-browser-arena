@@ -43,8 +43,10 @@ describe('Pass 65 runtime weapon adapter', () => {
   });
 
   it('rejects missing, duplicate, unknown, and reordered catalogs without a fallback', () => {
+    // The roster's last entry is the HF-334 livery variant; dropping it must
+    // still fail closed rather than silently shipping a short catalog.
     expect(() => adaptWeaponCatalogToLegacy(WEAPON_CATALOG.slice(0, -1)))
-      .toThrow(/missing flare-gun/);
+      .toThrow(/missing crimson-flamethrower/);
 
     const duplicate = [...WEAPON_CATALOG.slice(0, -1), WEAPON_CATALOG[0]];
     expect(() => adaptWeaponCatalogToLegacy(duplicate)).toThrow(/duplicate weapon id "carbine"/);

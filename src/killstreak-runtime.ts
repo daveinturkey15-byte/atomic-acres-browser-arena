@@ -623,7 +623,7 @@ function isKillstreakActorCheckpoint(value: unknown): value is KillstreakActorCh
   const earned = value.earned as unknown[];
   if (earned.length > loadout.slots.length || !earned.every(isCheckpointKillstreakId)
     || new Set(earned).size !== earned.length
-    || earned.some((id) => !loadout.slots.includes(id as Pass65KillstreakId))) return false;
+    || earned.some((id) => !(loadout.slots as readonly string[]).includes(String(id)))) return false;
   const expectedEarned = loadout.slots.filter((id) => (
     (exactDefinition(id, PASS65_KILLSTREAK_CATALOG)?.cost ?? Number.POSITIVE_INFINITY) <= Number(value.cycleProgress)
   ));
@@ -633,7 +633,7 @@ function isKillstreakActorCheckpoint(value: unknown): value is KillstreakActorCh
   const chargeIds: Pass65KillstreakId[] = [];
   for (const charge of charges) {
     if (!isCheckpointRecord(charge) || !hasCheckpointKeys(charge, ['id', 'count'])
-      || !isCheckpointKillstreakId(charge.id) || !loadout.slots.includes(charge.id)
+      || !isCheckpointKillstreakId(charge.id) || !(loadout.slots as readonly string[]).includes(String(charge.id))
       || !isCheckpointInteger(charge.count, 1, MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD)) return false;
     chargeIds.push(charge.id);
   }
