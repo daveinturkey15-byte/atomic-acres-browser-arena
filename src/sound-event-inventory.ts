@@ -351,7 +351,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('shot', "'flare-gun',true,origin.distanceTo(camera.position)", 1, ['weapon.report.world']),
   runtimeCallsite('shot', 'message.weapon,true,origin.distanceTo(camera.position)', 3, ['weapon.report.world']),
   runtimeCallsite('shot', 'player.weapon', 1, ['weapon.report.local']),
-  runtimeCallsite('supportGunPositional', 'kind,emitter', 2, ['support.chopper-gun.positional', 'support.drone-gun.positional']),
+  runtimeCallsite('supportGunPositional', 'kind,emitter,isEnemy', 2, ['support.chopper-gun.positional', 'support.drone-gun.positional']),
   runtimeCallsite('supportInbound', "'tri-pass'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', "'yardhawk'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', 'message.source', 1, ['support.inbound']),
@@ -880,7 +880,7 @@ const events: SoundEventInventoryEntry[] = [
     spatialProfileId: 'support-weapon-world-v1', variants: ['burst-near', 'burst-far'],
     emitterSymbols: ['supportGunPositional'],
     contractRefs: ['R500', 'R504', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
-    coverageDetail: 'HF-337: positional chopper gunfire at firing entity world position. Audible to ALL players (owner, teammates, enemies) at reduced volume for enemies. Reuses railgun spatial-chain pattern with refDistance=8, maxDistance=180, rolloffFactor=0.18.',
+    coverageDetail: 'HF-337: positional chopper gunfire at firing entity world position. Audible to ALL players (owner, teammates, enemies) at reduced volume for enemies (gain 0.35). Distance-culled beyond 180m. Spatial chain hold shortened to 180ms (below 280ms/300ms cadence) to prevent voice starvation. Reuses railgun spatial-chain pattern with refDistance=8, maxDistance=180, rolloffFactor=0.18.',
   }),
   plannedEvent({
     id: 'support.chopper-damage', family: 'support', bus: 'sfx', delivery: 'world-spatial',
@@ -905,7 +905,7 @@ const events: SoundEventInventoryEntry[] = [
     spatialProfileId: 'support-weapon-world-v1', variants: ['single', 'burst'],
     emitterSymbols: ['supportGunPositional'],
     contractRefs: ['R500', 'R506-R508', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
-    coverageDetail: 'HF-337: positional piloted-drone/swarm gunfire at firing entity world position. Audible to ALL players (owner, teammates, enemies) at reduced volume for enemies. Reuses railgun spatial-chain pattern with refDistance=8, maxDistance=180, rolloffFactor=0.18.',
+    coverageDetail: 'HF-337: positional piloted-drone/swarm gunfire at firing entity world position. Audible to ALL players (owner, teammates, enemies) at reduced volume for enemies (gain 0.35). Distance-culled beyond 180m. Spatial chain hold shortened to 180ms (below 280ms/300ms cadence) to prevent voice starvation. Reuses railgun spatial-chain pattern with refDistance=8, maxDistance=180, rolloffFactor=0.18.',
   }),
   plannedEvent({
     id: 'support.drone-rotor', family: 'support', bus: 'sfx', delivery: 'world-spatial',
@@ -1029,8 +1029,9 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
   schemaVersion: SOUND_EVENT_INVENTORY_SCHEMA_VERSION,
   events: SOUND_EVENT_INVENTORY,
 });
-// Recomputed over the Pass 74 positional-support plus Pass 75 High Seas union.
-export const SOUND_EVENT_INVENTORY_SHA256 = '6fe9b60ae3ad121cf1d58386d54ed907834b6d5178ad17054dcd6f502332895a';
+// Recomputed over the Pass 74 positional-support plus Pass 75 High Seas union,
+// including the HF-337 isEnemy callsite and refined chopper/drone coverage rows.
+export const SOUND_EVENT_INVENTORY_SHA256 = '0d7ba248a31d9180e8aba91ab47ddfb5409ea23cd14fece311f0947044d24d47';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

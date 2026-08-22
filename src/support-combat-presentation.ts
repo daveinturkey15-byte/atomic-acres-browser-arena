@@ -48,15 +48,20 @@ export function supportShotAudioKindForListener(
   listener: SupportCombatListener,
 ): SupportGunAudioKind | null {
   const owner = event.ownerId === listener.playerId;
-  const teammate = listener.mode === 'tdm' && event.ownerTeam === listener.team;
-  const enemy = listener.mode === 'tdm' && event.ownerTeam !== listener.team;
-  // HF-337: enemies also hear chopper/drone gunfire positionally at reduced volume
-  if (!owner && !teammate && !enemy) return null;
-  return event.source === 'chopper' ? 'chopper' : 'drone';
+  // HF-337: explicit listener policy — owner and teammates always hear support fire.
+  // Enemies in TDM hear it positionally at reduced volume (enforced in audio runtime).
+  // FFA non-owners hear nothing.
+  if (owner) return event.source === 'chopper' ? 'chopper' : 'drone';
+  if (listener.mode === 'tdm') {
+    // Teammates and enemies both hear; volume reduction is applied in the audio runtime.
+    return event.source === 'chopper' ? 'chopper' : 'drone';
+  }
+  // FFA: only owner hears support fire
+  return null;
 }
 
 /** HF-337: positional audio callback with emitter position for spatial routing. */
-export type SupportGunPositionalCallback = (kind: SupportGunAudioKind, emitter: SpatialPoint) => void;
+export type SupportGunPositionalCallback = (kind: SupportGunAudioKind, emitter: SpatialPoint, isEnemy?: boolean) => void;
 
 export function presentSupportShotAudio(
   events: readonly KillstreakSupportShotEvent[],
@@ -90,7 +95,9 @@ export function presentSupportShotAudioPositional(
     if (kind === null) continue;
     const emitter = getEntityPosition(event.entityId);
     if (!emitter) continue;
-    playPositional(kind, emitter);
+    // HF-337: determine if this is an enemy entity for the listener
+    const isEnemy = listener.mode === 'tdm' && event.ownerTeam !== listener.team;
+    playPositional(kind, emitter, isEnemy);
     presented += 1;
   }
   return presented;
