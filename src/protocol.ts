@@ -215,6 +215,11 @@ export type ShotOutcome = {
   hitZone: 'head' | 'body' | 'limb';
   wallbang: boolean;
   penetrationMultiplier: number;
+  /** HF-347: exact host respawn timestamp for a killed gun-range training
+   * dummy, so the guest's replicated respawnAt (and the lifeId derived from
+   * it) matches the host byte-for-byte instead of being re-derived from the
+   * guest's own clock. Only present on training-dummy death outcomes. */
+  targetRespawnAtHostTimeMs?: number;
 };
 export type ShotResultMessage = {
   type: 'shot-result';
@@ -869,10 +874,16 @@ export function isGameMessage(value: unknown): value is GameMessage {
             && Number.isSafeInteger(item.pelletHits) && Number(item.pelletHits) >= 1 && Number(item.pelletHits) <= 12
             && Number.isFinite(item.damage) && Number(item.damage) >= 0 && Number(item.damage) <= 400
             && (item.rawDamage === undefined || Number.isFinite(item.rawDamage) && Number(item.rawDamage) >= Number(item.damage) && Number(item.rawDamage) <= 9_999)
-            && Number.isFinite(item.resultingHealth) && Number(item.resultingHealth) >= 0 && Number(item.resultingHealth) <= 100
+            // HF-347: gun-range training dummies (test-dummy-*) carry 300 max
+            // health; every combatant target stays bounded at 100.
+            && Number.isFinite(item.resultingHealth) && Number(item.resultingHealth) >= 0
+            && Number(item.resultingHealth) <= (String(item.target).startsWith('test-dummy-') ? 500 : 100)
             && typeof item.died === 'boolean' && (item.hitZone === 'head' || item.hitZone === 'body' || item.hitZone === 'limb')
             && typeof item.wallbang === 'boolean'
-            && Number.isFinite(item.penetrationMultiplier) && Number(item.penetrationMultiplier) >= 0 && Number(item.penetrationMultiplier) <= 1;
+            && Number.isFinite(item.penetrationMultiplier) && Number(item.penetrationMultiplier) >= 0 && Number(item.penetrationMultiplier) <= 1
+            && (item.targetRespawnAtHostTimeMs === undefined
+              || String(item.target).startsWith('test-dummy-')
+                && Number.isFinite(item.targetRespawnAtHostTimeMs) && Number(item.targetRespawnAtHostTimeMs) >= 0);
         })
         && Number.isFinite(msg.nonce);
     case 'state-feedback':

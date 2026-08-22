@@ -103,9 +103,11 @@ import {
   GUN_RANGE_TEST_BAY_CONTRACT,
   advanceGunRangeTestBayDoorForObservers,
   createGunRangeTestBayDoorState,
+  gunRangeTestBayDummyPose,
   nearestGunRangeTestBaySupportStation,
   nearestGunRangeTestBayWeaponStation,
   projectGunRangeTestBayDoorState,
+  resolveGunRangeDummyDamage,
   type GunRangeTestBayDoorState,
 } from './gun-range-test-bay';
 // HF-318: active test-bay training dummies own movement/LOS colliders.
@@ -976,6 +978,7 @@ import {
   ReloadIntentMessage,
   ReloadResultMessage,
   ShotMessage,
+  ShotOutcome,
   ShotRequestMessage,
   ShotResultMessage,
   StateMessage,
@@ -6991,6 +6994,19 @@ function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phas
   const testBayDoor = phase === 'active'
     ? sampleAuthoritativeGunRangeTestBayDoor(snapshotHostTimeMs)
     : null;
+  // HF-347: every lobby heartbeat repairs guest training-dummy lifecycle
+  // state, so peers who never saw a shot result (observers, rejoiners) still
+  // converge on the host's active/health/respawn truth within one heartbeat.
+  const testDummies = phase === 'active' && privateMatchConfig.arenaId === 'gun-range'
+    ? arena.targets
+      .filter((target) => target.kind === 'training-dummy')
+      .map((target) => Object.freeze({
+        id: target.id,
+        active: target.active,
+        health: Math.max(0, target.health),
+        respawnAtHostTimeMs: Math.max(0, target.respawnAt),
+      }))
+    : null;
   return {
     revision: privateLobbyRevision,
     hostId: player.id,
@@ -7003,6 +7019,7 @@ function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phas
     activeAtEpochMs: privateMatchActiveAtEpochMs,
     matchClock,
     testBayDoor,
+    testDummies,
   };
 }
 
@@ -8836,6 +8853,23 @@ function returnPrivateMatchToLobby(asHost: boolean, admissionToken?: MatchAdmiss
   setStatus(asHost ? 'Lobby reset — ready up for another match.' : 'Host returned everyone to the lobby.', 'ok');
 }
 
+/** HF-347: adopt the host's training-dummy lifecycle state on a guest. The
+ * arena may not be built yet when an early snapshot arrives; unknown ids are
+ * skipped and the next heartbeat (every clock ping) self-heals. */
+function applyReplicatedGunRangeDummyState(entries: LobbySnapshot['testDummies']): void {
+  if (network.role !== 'client' || !entries || selectedArena.id !== 'gun-range') return;
+  for (const entry of entries) {
+    const dummy = arena.targets.find(
+      (target) => target.id === entry.id && target.kind === 'training-dummy',
+    );
+    if (!dummy) continue;
+    dummy.active = entry.active;
+    dummy.health = Math.max(0, Math.min(dummy.maxHealth, entry.health));
+    dummy.respawnAt = entry.respawnAtHostTimeMs;
+    dummy.root.visible = entry.active;
+  }
+}
+
 function acceptLobbyState(message: LobbyStateMessage): void {
   if (network.role !== 'client' || message.by !== message.snapshot.hostId) return;
   if (privateLobbySnapshot && message.snapshot.revision < privateLobbySnapshot.revision) return;
@@ -8872,6 +8906,7 @@ function acceptLobbyState(message: LobbyStateMessage): void {
   privateMatchActiveAtEpochMs = message.snapshot.activeAtEpochMs;
   gunRangeMatchClockState = message.snapshot.matchClock;
   gunRangeTestBayDoorState = message.snapshot.testBayDoor;
+  applyReplicatedGunRangeDummyState(message.snapshot.testDummies);
   if (!gunRangeMatchClockState) gunRangeMatchClockOccupantIds = Object.freeze([]);
   lobbyArenaSyncPromise = lobbyArenaSyncPromise
     .catch(() => undefined)
@@ -11792,6 +11827,28 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     if (!target.pose) continue;
     targetPoses.push({ id: bot.id, ...target.pose });
   }
+  // HF-347: gun-range training dummies are host-resolved targets like bots.
+  // Their patrol pose is a pure function of host time, so the lag-compensated
+  // pose at the guest's view time is exact rather than history-rewound. The
+  // pose y is the dummy's FEET; targetPoses carry eye height for the shared
+  // stand hit proxies (stanceEyeHeight subtracts it back out).
+  if (selectedArena.id === 'gun-range') {
+    for (const definition of GUN_RANGE_TEST_BAY_CONTRACT.dummies) {
+      const dummy = arena.targets.find(
+        (target) => target.id === definition.id && target.kind === 'training-dummy',
+      );
+      if (!dummy || !dummy.active) continue;
+      const pose = gunRangeTestBayDummyPose(definition, Math.max(0, request.targetViewTimeMs));
+      targetPoses.push({
+        id: definition.id,
+        x: pose.position.x,
+        y: pose.position.y + 1.7,
+        z: pose.position.z,
+        yaw: pose.yawRadians,
+        stance: 'stand',
+      });
+    }
+  }
 
   if (request.weapon === 'flamethrower') {
     const consumption = consumeTimedMapWeaponShot(timedMapWeaponStates.flamethrower, request.by, request.shotId);
@@ -11854,6 +11911,7 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     let reportedRawDamage = rawOutgoing;
     let resultingHealth = 0;
     let died = false;
+    let dummyRespawnAtHostTimeMs: number | null = null;
     if (targetId === player.id) {
       const healthBefore = player.hp;
       const finalDamage = applyDhvIncomingDamage(outgoing, player.hp, localDhv);
@@ -11867,6 +11925,25 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       appliedDamage = applyBotDamage(bot, outgoing, hit.hitZone, { kind: 'gun', weapon: request.weapon }, request.by, hit);
       resultingHealth = bot.hp;
       died = !bot.alive;
+    } else if (selectedArena.id === 'gun-range' && targetId.startsWith('test-dummy-')) {
+      // HF-347: host-authoritative dummy damage for a guest's shot. Dummies
+      // carry 300 HP, so apply the raw (uncapped-at-100) outgoing damage to
+      // match what the same shot does in solo. The guest reconciles from this
+      // outcome; every other peer converges on the next lobby heartbeat.
+      const dummy = arena.targets.find(
+        (target) => target.id === targetId && target.kind === 'training-dummy',
+      );
+      if (!dummy) continue;
+      const applied = applyPracticeTargetDamage(
+        dummy, rawOutgoing, hit.hitZone, request.by, request.weapon,
+        { wallbang: hit.wallbang, penetrationMultiplier: hit.penetrationMultiplier },
+      );
+      if (!applied) continue;
+      appliedDamage = applied.appliedDamage;
+      reportedRawDamage = Math.max(appliedDamage, rawOutgoing);
+      resultingHealth = dummy.health;
+      died = applied.died;
+      if (died) dummyRespawnAtHostTimeMs = dummy.respawnAt;
     } else {
       const remote = remotes.get(targetId);
       const health = remoteHealthAuthorities.get(targetId);
@@ -11910,6 +11987,7 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       rawDamage: Math.max(appliedDamage, reportedRawDamage),
       resultingHealth, died, hitZone: hit.hitZone, wallbang: hit.wallbang,
       penetrationMultiplier: hit.penetrationMultiplier,
+      ...(dummyRespawnAtHostTimeMs !== null ? { targetRespawnAtHostTimeMs: dummyRespawnAtHostTimeMs } : {}),
     });
   }
   admitAuthoritativeSmokeSegments(
@@ -11952,6 +12030,42 @@ function reconcileLocalAuthoritativeHealth(
   if (player.alive) player.hp = resultingHealth;
 }
 
+/** HF-347: apply a host-resolved training-dummy outcome on a guest. State
+ * (health/active/respawn) is the host's word; score and the gun-range feed
+ * are presented only when the local player fired the shot, mirroring what
+ * hitPracticeTarget shows a solo/host shooter. */
+function reconcileGuestDummyOutcome(outcome: ShotOutcome, shooterId: string): void {
+  const dummy = arena.targets.find(
+    (target) => target.id === outcome.target && target.kind === 'training-dummy',
+  );
+  if (!dummy) return;
+  dummy.health = Math.max(0, Math.min(dummy.maxHealth, outcome.resultingHealth));
+  const shooterIsLocal = shooterId === player.id;
+  if (shooterIsLocal) {
+    targetHits += 1;
+    addFeed(
+      `${outcome.hitZone === 'head' ? 'CRITICAL · ' : ''}${dummy.id.toUpperCase()} · +${Math.round(outcome.damage)} DMG · ${Math.ceil(dummy.health)} / ${dummy.maxHealth} HP`,
+      outcome.hitZone === 'head' ? 'gold' : 'aqua',
+      { damageDealt: outcome.damage },
+    );
+  }
+  if (!outcome.died) return;
+  dummy.active = false;
+  dummy.root.visible = false;
+  // The exact host respawn stamp keeps the lifeId (floor(respawnAt)) equal on
+  // every peer; the fallback only covers a host predating the outcome field.
+  dummy.respawnAt = outcome.targetRespawnAtHostTimeMs
+    ?? currentHostTimeMs() + (dummy.respawnDelayMs ?? 2_200);
+  if (shooterIsLocal) {
+    rangeScore = advanceRangeScore(rangeScore, dummy.scoreValue);
+    publishRangeScore();
+    addFeed(
+      `${outcome.hitZone === 'head' ? 'BULLSEYE · ' : ''}+${dummy.scoreValue} PTS · ${rangeScore} TOTAL · TARGET RESETTING`,
+      'gold',
+    );
+  }
+}
+
 function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
   if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId) return;
   shotTimingTelemetry.recordResultDelivery(performance.now());
@@ -11992,6 +12106,13 @@ function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
     }
   }
   for (const outcome of message.outcomes) {
+    // HF-347: a training-dummy outcome is the host's canonical dummy state
+    // after this shot. Apply it whether or not the local player fired — the
+    // score/feed below still only credit the shooter.
+    if (selectedArena.id === 'gun-range' && outcome.target.startsWith('test-dummy-')) {
+      reconcileGuestDummyOutcome(outcome, message.forPlayerId);
+      continue;
+    }
     if (outcome.target !== player.id || !player.alive) continue;
     reconcileLocalAuthoritativeHealth(
       outcome.resultingHealth,
@@ -16570,7 +16691,15 @@ function tryFire(now: number): void {
       const practiceTarget = arena.targets.find((target) => target.id === result.targetId);
       const zone = effectiveHitZoneForWeapon(spec, practiceTarget?.alwaysCritical ? 'head' : result.hitZone ?? 'body');
       const targetDamage = applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier);
-      if (targetDamage > 0) hitPracticeTarget(
+      // HF-347: a guest never applies training-dummy damage locally. The shot
+      // request already on its way carries this hit to the host resolver,
+      // which admits it against the host-time dummy pose; the shot result
+      // reconciles health/score and presents the hitmarker — the same flow a
+      // guest gets when shooting a bot. Local application here double-counted
+      // and desynced every peer's dummy lifecycle.
+      if (network.role === 'client' && practiceTarget?.kind === 'training-dummy') {
+        // host-resolved; presentation arrives with the shot result
+      } else if (targetDamage > 0) hitPracticeTarget(
           result.targetId,
           targetDamage,
           zone,
@@ -19870,6 +19999,63 @@ function updateGrenades(dt: number, now: number): void {
   }
 }
 
+type PracticeTargetDamageApplication = Readonly<{
+  appliedDamage: number;
+  healthBefore: number;
+  zone: HitZone;
+  died: boolean;
+}>;
+
+/** HF-347: authoritative practice-target state mutation, shared by the local
+ * (solo/host) presentation path and the host's resolution of guest shots. No
+ * UI, audio or score side effects — callers own their own presentation. */
+function applyPracticeTargetDamage(
+  target: (typeof arena.targets)[number],
+  damage: number,
+  zone: HitZone,
+  actorId: string,
+  weaponOrEffect: string,
+  evidence?: Readonly<{
+    wallbang?: boolean;
+    penetrationMultiplier?: number;
+    distanceMeters?: number;
+  }>,
+): PracticeTargetDamageApplication | null {
+  if (!target.active) return null;
+  if (target.alwaysCritical) zone = 'head';
+  const admittedDamage = Math.max(0, Number.isFinite(damage) ? damage : 0);
+  if (admittedDamage <= 0) return null;
+  const healthBefore = target.health;
+  const resolved = resolveGunRangeDummyDamage(
+    healthBefore,
+    admittedDamage,
+    performance.now(),
+    target.respawnDelayMs ?? 2_200,
+  );
+  target.health = resolved.healthAfter;
+  recordDamageEvent({
+    actorId,
+    targetId: target.id,
+    weaponOrEffect,
+    healthBefore,
+    healthAfter: target.health,
+    damageRequested: admittedDamage,
+    damageApplied: resolved.appliedDamage,
+    hitZone: zone,
+    critical: zone === 'head',
+    wallbang: evidence?.wallbang,
+    penetrationMultiplier: evidence?.penetrationMultiplier,
+    distanceMeters: evidence?.distanceMeters,
+    reason: 'gun-range-practice-target',
+  });
+  if (resolved.died) {
+    target.active = false;
+    target.respawnAt = resolved.respawnAtMs ?? performance.now() + (target.respawnDelayMs ?? 2_200);
+    target.root.visible = false;
+  }
+  return { appliedDamage: resolved.appliedDamage, healthBefore, zone, died: resolved.died };
+}
+
 function hitPracticeTarget(
   id: string,
   damage: number,
@@ -19883,27 +20069,17 @@ function hitPracticeTarget(
 ): void {
   const target = arena.targets.find((entry) => entry.id === id);
   if (!target || !target.active) return;
-  if (target.alwaysCritical) zone = 'head';
-  const admittedDamage = Math.max(0, Number.isFinite(damage) ? damage : 0);
-  if (admittedDamage <= 0) return;
-  const healthBefore = target.health;
-  target.health = Math.max(0, target.health - admittedDamage);
-  const appliedDamage = healthBefore - target.health;
-  recordDamageEvent({
-    actorId: player.id,
-    targetId: target.id,
-    weaponOrEffect: evidence?.weaponOrEffect ?? player.weapon,
-    healthBefore,
-    healthAfter: target.health,
-    damageRequested: admittedDamage,
-    damageApplied: appliedDamage,
-    hitZone: zone,
-    critical: zone === 'head',
-    wallbang: evidence?.wallbang,
-    penetrationMultiplier: evidence?.penetrationMultiplier,
-    distanceMeters: evidence?.distanceMeters,
-    reason: 'gun-range-practice-target',
-  });
+  const applied = applyPracticeTargetDamage(
+    target,
+    damage,
+    zone,
+    player.id,
+    evidence?.weaponOrEffect ?? player.weapon,
+    evidence,
+  );
+  if (!applied) return;
+  zone = applied.zone;
+  const appliedDamage = applied.appliedDamage;
   targetHits += 1;
   const headshot = selectedArena.id === 'gun-range' && zone === 'head';
   const wasElimination = target.health <= 0;
@@ -19917,12 +20093,9 @@ function hitPracticeTarget(
       { damageDealt: appliedDamage },
     );
   }
-  if (target.health > 0) {
+  if (!applied.died) {
     return;
   }
-  target.active = false;
-  target.respawnAt = performance.now() + (target.respawnDelayMs ?? 2_200);
-  target.root.visible = false;
   rangeScore = selectedArena.id === 'gun-range'
     ? advanceRangeScore(rangeScore, target.scoreValue)
     : rangeScore + 1;
@@ -26523,7 +26696,14 @@ function frame(now: number, scheduleNext = true): void {
     if (triggerHeld && WEAPONS[player.weapon].automatic && !localKillstreakActorSnapshot()?.possession) tryFire(now);
     finishReload(now);
     const visualNow = debugCaptureFixedVisualTimeMs ?? now;
-    updateTargets(visualNow);
+    // HF-347: gun-range target lifecycle (dummy respawn checks against the
+    // replicated host-time respawnAt, flying-cat pose) ticks on host-mapped
+    // time so every peer respawns and poses targets on one clock. For solo
+    // and host, currentHostTimeMs() IS performance.now(); other arenas keep
+    // the local visual clock unchanged.
+    updateTargets(selectedArena.id === 'gun-range'
+      ? debugCaptureFixedVisualTimeMs ?? currentHostTimeMs()
+      : visualNow);
     updateBots(frameDt, now);
     const grenadeUpdateStartedAt = profileGrenadeFrame ? performance.now() : 0;
     updateGrenades(frameDt, now);

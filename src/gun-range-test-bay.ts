@@ -385,6 +385,37 @@ export function gunRangeTestBayDummyPose(
   });
 }
 
+/** HF-347: pure host-side damage application for a training dummy. The host
+ * is the only writer of dummy health/active/respawn state; guests receive the
+ * result through shot outcomes and lobby-snapshot heartbeats. Keeping the
+ * reducer pure lets the host path and unit tests share one truth. */
+export type GunRangeDummyDamageResult = Readonly<{
+  appliedDamage: number;
+  healthAfter: number;
+  died: boolean;
+  /** Host-clock respawn timestamp when the hit was lethal; null otherwise. */
+  respawnAtMs: number | null;
+}>;
+
+export function resolveGunRangeDummyDamage(
+  healthBefore: number,
+  damage: number,
+  nowMs: number,
+  respawnDelayMs: number,
+): GunRangeDummyDamageResult {
+  if (!Number.isFinite(nowMs) || nowMs < 0) throw new TypeError('dummy damage time must be finite and non-negative');
+  const admitted = Math.max(0, Number.isFinite(damage) ? damage : 0);
+  const before = Math.max(0, Number.isFinite(healthBefore) ? healthBefore : 0);
+  const healthAfter = Math.max(0, before - admitted);
+  const died = before > 0 && healthAfter <= 0;
+  return Object.freeze({
+    appliedDamage: before - healthAfter,
+    healthAfter,
+    died,
+    respawnAtMs: died ? nowMs + Math.max(0, respawnDelayMs) : null,
+  });
+}
+
 /** Full rendered root transform, including the bounded presentation-only foot bob. */
 export function gunRangeTestBayRenderedDummyPose(
   definition: GunRangeTestBayDummyDefinition,

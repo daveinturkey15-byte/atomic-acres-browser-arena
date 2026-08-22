@@ -55,6 +55,16 @@ export type PlayerScore = Readonly<{
   rangeShots?: number;
 }>;
 
+/** HF-347: host-authoritative lifecycle state of one gun-range training dummy.
+ * Pose needs no replication (it is a pure function of host time); active,
+ * health and the exact host respawn timestamp are the replicated truth. */
+export type GunRangeDummySnapshotEntry = Readonly<{
+  id: string;
+  active: boolean;
+  health: number;
+  respawnAtHostTimeMs: number;
+}>;
+
 export type LobbySnapshot = Readonly<{
   revision: number;
   hostId: string;
@@ -67,6 +77,9 @@ export type LobbySnapshot = Readonly<{
   activeAtEpochMs: number | null;
   matchClock: GunRangeMatchClockSnapshot | null;
   testBayDoor: GunRangeTestBayDoorState | null;
+  /** HF-347: absent on snapshots from hosts predating the dummy authority;
+   * null outside an active gun-range match. Guests reconcile every heartbeat. */
+  testDummies?: readonly GunRangeDummySnapshotEntry[] | null;
 }>;
 
 export const DEFAULT_PRIVATE_MATCH_CONFIG: PrivateMatchConfig = Object.freeze({
@@ -149,6 +162,19 @@ export function isPlayerScore(value: unknown): value is PlayerScore {
     && (score.rangeShots === undefined || Number.isSafeInteger(score.rangeShots) && Number(score.rangeShots) >= 0 && Number(score.rangeShots) <= 100_000);
 }
 
+function isGunRangeDummySnapshotEntry(value: unknown): value is GunRangeDummySnapshotEntry {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const entry = value as Record<string, unknown>;
+  const keys = ['id', 'active', 'health', 'respawnAtHostTimeMs'];
+  return Object.keys(entry).length === keys.length
+    && keys.every((key) => Object.hasOwn(entry, key))
+    && typeof entry.id === 'string' && entry.id.startsWith('test-dummy-') && entry.id.length <= 80
+    && typeof entry.active === 'boolean'
+    && Number.isFinite(entry.health) && Number(entry.health) >= 0 && Number(entry.health) <= 500
+    && Number.isFinite(entry.respawnAtHostTimeMs) && Number(entry.respawnAtHostTimeMs) >= 0
+    && (entry.active === false || Number(entry.health) > 0);
+}
+
 function isLobbyTestBayDoorState(value: unknown): value is GunRangeTestBayDoorState {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const state = value as Record<string, unknown>;
@@ -212,9 +238,19 @@ export function isLobbySnapshot(value: unknown): value is LobbySnapshot {
     ? isLobbyTestBayDoorState(snapshot.testBayDoor)
       && snapshot.testBayDoor.updatedAtMs <= Number(snapshot.snapshotHostTimeMs)
     : snapshot.testBayDoor === null;
+  // HF-347: tolerate absence (older host), require well-formed entries when
+  // present, and reject dummy state outside an active gun-range match.
+  const validTestDummies = snapshot.testDummies === undefined
+    || (activeGunRange
+      ? Array.isArray(snapshot.testDummies)
+        && snapshot.testDummies.length <= 16
+        && snapshot.testDummies.every(isGunRangeDummySnapshotEntry)
+        && new Set((snapshot.testDummies as GunRangeDummySnapshotEntry[]).map((entry) => entry.id)).size === snapshot.testDummies.length
+      : snapshot.testDummies === null);
   return validHostStart && validEpochStart
     && (snapshot.activeAtHostTimeMs === null) === (snapshot.activeAtEpochMs === null)
     && validMatchClock
+    && validTestDummies
     && validTestBayDoor;
 }
 
