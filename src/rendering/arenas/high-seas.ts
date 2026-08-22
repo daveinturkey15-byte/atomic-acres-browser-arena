@@ -21,7 +21,7 @@ export const definition = createProceduralArenaVisualDefinition({
   shadows: { enabled: true, mapSize: 2048, maximumDistance: 150, normalBias: 0.03 },
   atmosphere: { preset: 'open-ocean-daybreak', mist: 0.16, dust: 0.04, clouds: true },
   colorPipeline: colorPipeline('pass75.high-seas.hdr.v1', 1.06),
-  budgets: budgets({ maximumDrawCalls: 480, maximumTriangles: 1_150_000 }),
+  budgets: budgets({ maximumDrawCalls: 480, maximumTriangles: 950_000 }),
   reviewCameras: [
     camera('high-seas-starboard-overview', [22, 18, 54], [0, 4.8, 0], 'overview', 1.06),
     camera('high-seas-stern-main-deck', [-8, 5.2, 34], [0, 4.9, 12], 'geometry', 1.06),

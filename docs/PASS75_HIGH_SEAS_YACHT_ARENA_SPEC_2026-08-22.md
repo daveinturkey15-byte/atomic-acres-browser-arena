@@ -1,10 +1,10 @@
 # Pass 75 — High Seas yacht arena
 
-Status: implementation and local-HITL candidate  
-Impact class: `runtime`  
-Integration branch: `contrib/dave-gaming-pc/codex/pass75-hijacked-yacht`  
-Exact base: Claude Pass 74 `0d2010fda01331a95817ef25a135c3f319498764`  
-Pass 73 ancestor: `506d6142ce09b8317279a8c705d2de25fa2ab84b`  
+Status: implementation and local-HITL candidate
+Impact class: `runtime`
+Integration branch: `contrib/dave-gaming-pc/codex/pass75-hijacked-yacht`
+Exact base: Claude Pass 74 `071468d2cbdf28a44e367b8b50b12b2a456896da`
+Pass 73 ancestor: `506d6142ce09b8317279a8c705d2de25fa2ab84b`
 Production boundary: contribution branch and PR only; no merge, Pages write, or release workflow.
 
 ## Player-visible outcome
@@ -36,10 +36,10 @@ Observed from those sources: small/narrow yacht; bow/stern starts; port/starboar
 - Engine floor: `y = 0`, using the retained Rapier safety floor.
 - Main deck top: approximately `y = 3.2`.
 - Cabin upper deck: approximately `y = 6.2`.
-- Playable hull: roughly 28 m wide by 72–78 m long, with visual taper at bow and stern.
+- Playable hull: 24 m wide by 88 m long (`x=-12..12`, `z=-44..44`), with visual taper at bow and stern.
 - Main surface routes: port, center and starboard; none may become an absolute chokepoint.
 - Engine route: two movement-and-shot-clear ramp portals connected by a lower corridor. The main-deck collision slabs must be split around both openings.
-- Upper cabin positions are player-reachable and have center-facing firing apertures, but bot patrol is limited to the main and engine decks until the existing two-band bot vertical planner can represent a third elevation honestly.
+- Upper cabin positions are player-reachable and have center-facing firing apertures; the authored navigation graph represents engine, main and upper elevations without changing retained Skyline tier behavior.
 - At least six authored spawn candidates per team. Opposing initial spawns have no direct shot line, and FFA can reserve six candidates with the retained 8 m separation rule.
 
 ## Authority ownership
@@ -91,7 +91,7 @@ Falsifier: bots fall to the safety floor, freeze against a deck slab, or a host/
 
 ### R7 — Presentation and atmosphere
 
-Original ivory/teak/metal yacht materials, ocean horizon, warm marine sunset, readable interior work lights and route-specific ambience render in Performance and Quality without changing authority.
+Original ivory/teak/metal yacht materials, ocean horizon, warm marine daybreak, readable interior work lights and route-specific ambience render in Performance and Quality without changing authority.
 
 Falsifier: ocean intersects the engine room, lighting crushes enemy readability, Quality/Performance expose different blockers, or unowned runtime media is requested.
 
