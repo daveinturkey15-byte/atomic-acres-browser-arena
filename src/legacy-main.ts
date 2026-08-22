@@ -15533,10 +15533,13 @@ function presentRareWeaponSpawn(input: RareWeaponAnnouncementInput): void {
       if (banner.textContent?.includes(presentation.banner!.headline)) banner.hidden = true;
     }, presentation.banner.durationMs);
   }
-  // HF-339: the audio sting is deliberately NOT wired here. Borrowing an existing
-  // cue would add a call site to the sound-event callsite contract, which the HF-337
-  // audio lane is editing concurrently. The banner, feed line and minimap ping already
-  // make the spawn unmistakable; a dedicated sting lands with that lane.
+  // HF-339: the audible half of "unmistakable to every player". Reuses the
+  // overdrive-available sting rather than adding a new audio method, so the
+  // sound-event callsite contract only gains an occurrence, not a vocabulary
+  // entry. The concurrency hold that deferred this (HF-337 editing audio.ts)
+  // is over. audioCue is null outside warmup/active, so a rare spawn during
+  // countdown stays silent by authored intent.
+  if (presentation.audioCue) audio.overdriveAvailable();
   if (presentation.minimapPing) rareWeaponMinimapPing = {
     position: presentation.minimapPing.position,
     untilMs: performance.now() + RARE_WEAPON_BANNER_DURATION_MS,

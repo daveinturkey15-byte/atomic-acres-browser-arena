@@ -334,7 +334,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('nearMiss', 'nearMissStrength(player.position, origin, visibleEnd)', 2, ['combat.near-miss']),
   runtimeCallsite('nukeDetonation', '', 1, ['support.nuke-detonation']),
   runtimeCallsite('nukeWarning', '', 1, ['support.nuke-warning']),
-  runtimeCallsite('overdriveAvailable', '', 1, ['pickup.overdrive-available']),
+  runtimeCallsite('overdriveAvailable', '', 2, ['pickup.overdrive-available']),
   runtimeCallsite('overdriveExpire', '', 1, ['pickup.overdrive-expired']),
   runtimeCallsite('overdrivePickup', '', 1, ['pickup.overdrive-claimed']),
   runtimeCallsite('railgunReport', '!local,railgunReportEmitter(message.beam, local)', 1, ['weapon.report.local', 'weapon.report.world']),
