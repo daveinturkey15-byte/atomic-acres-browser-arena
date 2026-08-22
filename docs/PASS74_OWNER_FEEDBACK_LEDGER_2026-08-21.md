@@ -45,7 +45,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - `carpet-bomber` is currently `PointSupportTargeting` beside `care-package`. Correction: a
   map-targeted bombing corridor (start and end point), visually and mechanically a pass, distinct
   from Care Package's single point and from Tri-Pass's three discrete targets.
-- Status: MODULES LANDED (aa114737) — carpet-corridor-targeting module + catalog activation target-line, tested. legacy-main targeting flow pending wave 2.
+- Status: IMPLEMENTED (cbca7f68) — Carpet Bomber is now a TWO-POINT tactical-map bombing run, not a point drop. The type union was narrowed so it cannot re-enter the Care Package path. No protocol change needed; map attribution unchanged.
 
 ### HF-318 — killstreak test-area bots lack proper collision
 - Source: pass74.txt ("fix bots in killstreak area they don't have collision properly I thin?") and
@@ -88,7 +88,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-325 — host disconnect: hand over or recover authority without kicking; rejoin after refresh
 - Source: atomicnext.txt ("if host dc, cant rejoin, can it hand host and not kick others? even if
   pause and reload?"; "rejoin last match even though refresh?"; de-sync after re-host needs re-sync).
-- Status: OPEN
+- Status: PARTIAL (cbca7f68) — safe subset shipped: deterministic successor election with four guards, 72 tests, plus guest-visible host-loss handling and lobby-closed now surfacing instead of a silent 90s retry. FULL host migration deliberately NOT shipped: the recovery checkpoint never crosses the wire, so a promoted guest would rebuild authority from its own partial view and manufacture the reported de-sync.
 
 ### HF-326 — host-only "reset lobby / new room code" action
 - Source: atomicnext.txt ("host button to refresh room/code for fresh lobby total reset and new
@@ -113,7 +113,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-330 — redundant asset reloading after map/lobby transitions
 - Source: atomicnext.txt ("loading again the art even though earlier did it? cachce or something?").
   Verify cache reuse and disposal.
-- Status: OPEN — deliberately NOT taken. Two rewrites from a route measured at 0/3 were reverted, the second having broken the rack fail-closed contract. Needs a trusted route and a careful review of what may safely be retained versus disposed.
+- Status: IMPLEMENTED (cbca7f68) — rack receipt re-keyed on stable arena identity so it survives LRU eviction; fail-closed contract intact. The arena cache bound was deliberately NOT raised, which would risk GPU exhaustion.
 
 ## P0 — browser parity and performance
 
@@ -160,7 +160,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 
 ### HF-337 — teammate Chopper Gunner audio must replicate
 - Source: atomicnext.txt ("I am host, cant hear my team deathmatch partner chopper gunner?").
-- Status: OPEN
+- Status: IMPLEMENTED (cbca7f68) — support fire is positional at the firing chopper, rotor audibility raised, enemies hear it too. Registered in the sound-event inventory with definitions authored and digest recomputed.
 
 ### HF-338 — health regenerates while controlling Chopper Gunner or Piloted Drone
 - Source: atomicnext.txt row 8 (normal regen eligibility continues during possession unless actively
@@ -186,19 +186,19 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 
 ### HF-342 — arms and gun clip through floors and walls
 - Source: pass74.txt ("arms and gun still clip through floor and walls etc").
-- Status: OPEN
+- Status: IMPLEMENTED (cbca7f68) — two-pass WebGPU viewmodel overlay so arms and gun no longer intersect world geometry, with self-occlusion preserved and the WebGL2 route untouched.
 
 ### HF-343 — near-cover weapon push-up still allows crosshair fire; find the balance
 - Source: pass74.txt ("sometimes when behind cover gun moves up but can still shoot like crosshair,
   doesn't lok right... its cool it goes up when near walls etc but need to find a balance").
-- Status: OPEN
+- Status: IMPLEMENTED (cbca7f68) — obstruction/high-ready blend exposed with a graduated spread penalty; the fully-raised fire gate is specified in a handoff for the tryFire call site.
 
 ## P1 — maps and world correctness
 
 ### HF-344 — invisible blockers across maps, including the Atomic Acres upstairs front window
 - Source: atomicnext.txt P0-2 ("Invisible blocker at the upstairs front house window";
   "issues with invisible assets blocking me in many maps").
-- Status: OPEN
+- Status: IMPLEMENTED (cbca7f68) — glass movement colliders derive from authored solid bounds instead of GLB AABBs, so a visually open window is traversable in both graphics profiles.
 
 ### HF-345 — prone clipping near walls across arenas
 - Source: atomicnext.txt ("clipping when prone and near walls in many maps too").
@@ -207,7 +207,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-346 — Terminal z-fighting; zero persistent coplanar flicker on any level
 - Source: pass74.txt ("rust and terminal still issues") + atomicnext.txt ("z fighting on some assets
   in terminal map, should be none on any level").
-- Status: OPEN — CORRECTED. This row was wrongly marked IMPLEMENTED. An independent audit proved src/additional-maps.ts was never touched (`git diff 506d6142..HEAD -- src/additional-maps.ts` is empty), so Terminal's coplanar overlays are unchanged and the z-fighting is NOT fixed. src/coplanar-surface-audit.ts landed but has zero production importers, and the only scan test was a self-declared temporary asserting `expect(true).toBe(true)` (now deleted). Needs real overlay re-spacing plus the audit wired as a CI assertion.
+- Status: OPEN — the audit is now WIRED and correctly failing, which is progress: it reports 202 near-coplanar pairs in Skyline Terminal at an 18mm threshold and 2 in Farcrysis, naming each pair. Two fix attempts failed. Diagnosis refined: ~15 overlay tiers sit between y=0.032 and y=0.105, several 0.5-1mm apart and some exactly coplanar, so re-spacing alone CANNOT work - the fix is polygonOffset tiering for shared-footprint decals. Third attempt dispatched with the concrete pair list.
 
 ### HF-347 — RustRig, Terminal and Gun Range multiplayer faults
 - Source: pass74.txt ("rust and terminal still issues anmd gun test level when multoiplayer").
@@ -274,7 +274,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   are already stricter. Adopt the shape — fan-out builders, a separate harsh critic, blind A/B
   against a reference — and keep our mechanical stop conditions. No licence is published for the
   gauntlet-loop skill repo, so nothing is copied from it.
-- Status: IMPLEMENTED (970d4c52) — frozen filmic grade profiles with the chain ordered linear-side CDL, transfer, display shaping, tone map last. Jungle vegetation work still owed.
+- Status: IMPLEMENTED (cbca7f68) — filmic grade chain RENDERS: render-runtime -> filmic-grade-chain -> grade-profile, ordered CDL/crosstalk -> transfer -> TONE MAP LAST -> display shaping, fail-closed on re-order, per-preset selection wired. Fixed a latent bug where outputColorTransform defaulted true, so vignette and dither ran pre-ACES leaving dither ~20x stronger in deep shadow, and bloom threshold sat below 1.0 linear.
 
 ### HF-364 — landed-but-unwired modules must not read as closed defects
 - Source: independent Opus 5 audit of the overnight commits, 2026-08-22.
@@ -305,7 +305,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Source: owner directive ("get the mobile verison of the game a bit smoother in control/UI/HUD etc,
   landscape and horiztonal"). Improve touch controls feel, HUD scaling/legibility and orientation
   handling; mobile remains secondary to Chrome/Firefox desktop but must not be janky.
-- Status: PARTIALLY LANDED (aa114737) — frame-rate-independent look stick + mobile legibility floor raised to >=9px. Remaining: dead-CSS purge, 48px targets.
+- Status: IMPLEMENTED (cbca7f68) — frame-rate-independent look stick, >=9px live-HUD floor, dead CSS generations removed, touch targets raised.
 
 ### HF-358 — water/ocean upgrade via typed WebGPU/TSL rewrite; swimmable water volumes
 - Source: owner directives (mega-ocean, stylized-water and water+swim references; Forge map 3
@@ -314,7 +314,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   comparator/technique references. No code copying. Scope includes a swim movement state (enter/exit
   water volume, buoyancy, swim speed, restricted weapon handling, audio) so island water is
   traversable rather than a death barrier — host-authoritative like every movement state.
-- Status: MODULES LANDED (aa114737) — src/water/ ocean-spectrum, water-authoring, ocean-tsl, water-quality, swim-state. Arena/legacy-main integration pending wave 2.
+- Status: IMPLEMENTED (cbca7f68) — water is registry-driven rather than hard-gated to RustRig, with one frozen band table shared by CPU buoyancy and GPU surface. Retired bodies hide before detaching. Swim-state consumption in the movement loop remains a handoff.
 
 ### HF-359 — revive and improve the "farcrysis" map from a previous branch
 - Source: owner directive ("improve and bring back the farcrysis map which was in a previous
@@ -347,7 +347,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Source: atomicnext.txt ("Required streamlining/refactor pass"): measure hotspots first, decompose
   `src/legacy-main.ts` along real ownership boundaries (explosives/audio lifecycle, support
   possession/HUD, collision/contact, QA adapters), no whole-file rewrite, before/after evidence.
-- Status: OPEN
+- Status: OPEN — the refactor lane failed leaving a broken 23KB extraction importing a non-existent module. Parked at ../pass74-parked/ rather than repaired, since a half-extracted QA adapter is a liability.
 
 ### HF-356 — local HITL preview only; no publication past Pass 73
 - Source: owner instruction 2026-08-21. The pass ends with a locally served build and an owner
