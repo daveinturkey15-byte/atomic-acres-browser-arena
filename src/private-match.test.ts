@@ -88,6 +88,14 @@ describe('private match lobby', () => {
     expect(canHostCommitStart(snapshot({ phase: 'active' }))).toBe(false);
   });
 
+  it('refuses to start when guest admission or transport connection is in flight (HF-323)', () => {
+    const readySnapshot = snapshot();
+    expect(canHostCommitStart(readySnapshot, false)).toBe(true);
+    expect(canHostCommitStart(readySnapshot, true)).toBe(false);
+    expect(canHostStart(readySnapshot, false)).toBe(true);
+    expect(canHostStart(readySnapshot, true)).toBe(false);
+  });
+
   it('treats colours as presentation-only in FFA', () => {
     expect(playersAreHostile('tdm', members[0], { ...members[1], team: 0 })).toBe(false);
     expect(playersAreHostile('ffa', members[0], { ...members[1], team: 0 })).toBe(true);

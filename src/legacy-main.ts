@@ -6889,6 +6889,20 @@ function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot
   renderTextChat();
 }
 
+// HF-323: hold the start while any guest admission is in-flight or transport connection is pending
+function hostHasPendingGuestConnection(): boolean {
+  if (network.role !== 'host') return false;
+  if (hostLobbyAdmissionInFlight.size > 0 || pendingHostRecoveryJoins.size > 0) return true;
+  try {
+    const diag = network.diagnostics();
+    if (Number(diag.guestConnections) > network.connectedPlayerIds().length) return true;
+    if (Number(diag.pendingStateChannels) > 0) return true;
+  } catch {
+    // network diagnostics unavailable or offline
+  }
+  return false;
+}
+
 function hostLobbyAdmissionAttemptCurrent(attempt: HostLobbyAdmissionAttempt): boolean {
   const queuedReplacement = pendingHostRecoveryJoins.get(attempt.playerId);
   return hostLobbyAdmissionAttemptIsCurrent(attempt, {
@@ -8010,6 +8024,8 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
     connectionEpoch: message.connectionEpoch,
   });
   hostLobbyAdmissionInFlight.set(message.playerId, attempt);
+  // HF-323: re-render lobby immediately so host sees PLAYER JOINING... and START is held
+  renderPrivateLobby();
   try {
     const existing = hostLobbyMembers.get(message.playerId);
     const joiningNewMember = existing === undefined;
@@ -8039,8 +8055,12 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
       hostLobbyMembers.set(message.playerId, restored);
       network.setPlayerTeam(message.playerId, restored.team);
     } else {
-      if (currentPhase !== 'waiting') {
+      // HF-323: reject new join with 'match-active' ONLY during phase 'active'. Phase 'countdown' is admitted.
+      if (currentPhase === 'active') {
         rejectLobbyPlayer(message.playerId, 'match-active', message.resumeToken, message.connectionEpoch);
+        return;
+      }
+      if (currentPhase !== 'waiting' && currentPhase !== 'countdown') {
         return;
       }
       if (hostLobbyMembers.size >= privateMatchConfig.capacity) {
@@ -8059,7 +8079,7 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
         id: message.playerId,
         name: message.name,
         team: message.requestedTeam,
-        ready: false,
+        ready: currentPhase === 'countdown',
         connected: true,
         pingMs: null,
         dhv: 10,
@@ -8098,6 +8118,8 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
           void admitLobbyJoin(queued);
         }
       }
+      // HF-323: re-render lobby UI once admission attempt completes
+      renderPrivateLobby();
     }
   }
 }
@@ -8559,8 +8581,14 @@ function beginPrivateMatch(
 
 function hostStartPrivateMatch(): void {
   if (network.role !== 'host') return;
+  // HF-323: refuse to start while a guest admission is in-flight or transport connection is pending
+  const pendingGuest = hostHasPendingGuestConnection();
+  if (pendingGuest) {
+    setStatus('A player is currently joining the room.', 'warn');
+    return;
+  }
   const candidate = hostSnapshot('waiting');
-  if (!canHostCommitStart(candidate)) {
+  if (!canHostCommitStart(candidate, pendingGuest)) {
     setStatus('Every connected guest must be ready before the host starts.', 'warn');
     return;
   }
@@ -8570,7 +8598,7 @@ function hostStartPrivateMatch(): void {
     hostLobbyMembers.set(player.id, { ...hostMember, ready: true });
   }
   const current = hostSnapshot('waiting');
-  if (!canHostStart(current)) {
+  if (!canHostStart(current, pendingGuest)) {
     setStatus('Every connected guest must be ready before the host starts.', 'warn');
     return;
   }
@@ -8999,7 +9027,9 @@ function renderPrivateLobby(): void {
   ready.disabled = !localMember?.connected || (snapshot?.phase ?? 'waiting') !== 'waiting' || !lobbyArenaSynchronized;
   const start = element<HTMLButtonElement>('#lobby-start');
   start.hidden = network.role !== 'host';
-  start.disabled = network.role !== 'host' || !snapshot || !lobbyArenaSynchronized || !canHostCommitStart(snapshot);
+  // HF-323: disable START control while a guest admission is in flight or connection is pending
+  const pendingGuest = hostHasPendingGuestConnection();
+  start.disabled = network.role !== 'host' || !snapshot || !lobbyArenaSynchronized || !canHostCommitStart(snapshot, pendingGuest);
   const resetLobby = element<HTMLButtonElement>('#lobby-reset');
   resetLobby.disabled = network.role !== 'host';
   resetLobby.title = network.role === 'host'
@@ -9008,7 +9038,7 @@ function renderPrivateLobby(): void {
   const teamInput = element<HTMLSelectElement>('#team');
   teamInput.disabled = (snapshot?.phase ?? 'waiting') !== 'waiting' || (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
   const roster = element<HTMLElement>('#lobby-roster');
-  roster.innerHTML = members.map((member) => {
+  const renderedMembers = members.map((member) => {
     const ping = member.id === player.id && network.role === 'client' ? localLobbyPingMs : member.pingMs;
     const quality = latencyQuality(ping);
     const role = member.id === snapshot?.hostId || member.id === player.id && network.role === 'host' ? 'HOST' : 'PEER';
@@ -9018,7 +9048,12 @@ function renderPrivateLobby(): void {
       ? `<label class="lobby-dhv">DHV<select data-lobby-dhv aria-label="Damage Handicap Value">${DHV_VALUES.map((value) => `<option value="${value}"${member.dhv === value ? ' selected' : ''}>${value}</option>`).join('')}</select><small>${dhvLabel(member.dhv)}</small></label>`
       : `<span class="lobby-dhv-badge" title="${dhvLabel(member.dhv)}">DHV ${member.dhv}</span>`;
     return `<div class="lobby-player ${member.connected ? '' : 'disconnected'}"><span><strong>${escapeHtml(member.name)}</strong><small>${role} · ${team} · ${squad}</small></span><b class="latency-${quality}">${ping === null ? '—' : `${Math.round(ping)} ms`}</b>${handicapControl}<em>${member.connected ? member.ready ? 'READY' : 'SETTING UP' : 'REJOINING…'}</em></div>`;
-  }).join('') || '<div class="lobby-player disconnected"><span><strong>CONNECTING…</strong></span></div>';
+  }).join('');
+  // HF-323: show PLAYER JOINING... roster row so host understands the wait
+  const pendingRow = pendingGuest
+    ? '<div class="lobby-player disconnected"><span><strong>PLAYER JOINING...</strong></span></div>'
+    : '';
+  roster.innerHTML = (renderedMembers + pendingRow) || '<div class="lobby-player disconnected"><span><strong>CONNECTING…</strong></span></div>';
   const isFfa = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
   element<HTMLElement>('#lobby-guidance').textContent = !lobbyArenaSynchronized
     ? `Synchronizing ${arenaSelection(snapshot!.config.arenaId).displayName} before ready-up…`
@@ -11906,6 +11941,11 @@ function showDamageDirection(attacker: string, damage = 12, now = performance.no
 
 function updateSensoryFeedback(now: number): void {
   audio.updateListener(camera.position, player.yaw);
+  // HF-350: the explosion ambience duck is armed by every blast and is only released
+  // here. Without this call the ambience bed stays at 40% for the rest of the match
+  // after the first grenade, on every map. Idempotent and self-guarding, so it is
+  // safe above the 30 Hz presentation gate below.
+  audio.recoverAmbienceDuck();
   if (now - lastSensoryPresentationAt < 1000 / 30) return;
   lastSensoryPresentationAt = now;
   const directions = directionalDamagePresentation(directionalDamageState, now, player.yaw);
@@ -24595,9 +24635,11 @@ window.addEventListener('keydown', (event) => {
     openActiveMatchPause('escape');
     return;
   }
-  // HF-324: Scope gameplay key handling (including Tab/scoreboard capture) to active gameplay only,
-  // so Tab is not swallowed in the lobby or menus.
-  if (!gameplayInputEnabled()) return;
+  // HF-324: scope gameplay key handling to active gameplay so Tab is not swallowed
+  // in the lobby or menus. Tab itself stays available for the scoreboard once a match
+  // has started: players expect the roster while dead awaiting respawn, during warmup
+  // and at match end, all of which report gameplayInputEnabled() false.
+  if (!gameplayInputEnabled() && (event.code !== 'Tab' || !gameStarted)) return;
   keys.add(event.code);
   const keyProfile = activeKeyBindingProfile();
   const supportPossession = localKillstreakActorSnapshot()?.possession ?? null;

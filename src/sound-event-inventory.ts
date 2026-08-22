@@ -245,7 +245,12 @@ type PlannedEventInput = Readonly<{
 }>;
 
 export const RUNTIME_AUDIO_NON_EVENT_METHODS = Object.freeze([
-  'configure', 'dispose', 'prepareCombat', 'prepareGlassImpact', 'prepareGrenadeEffects', 'resume', 'suspend', 'telemetry', 'unlock', 'updateListener',
+  'configure', 'dispose', 'prepareCombat', 'prepareGlassImpact', 'prepareGrenadeEffects',
+  // HF-350: restores the ambience bus gain after an explosion duck. It emits no
+  // sound of its own, so it is a lifecycle call like the rest of this list rather
+  // than a semantic sound event.
+  'recoverAmbienceDuck',
+  'resume', 'suspend', 'telemetry', 'unlock', 'updateListener',
 ] as const);
 
 export type RuntimeSoundCallsiteContractEntry = Readonly<{

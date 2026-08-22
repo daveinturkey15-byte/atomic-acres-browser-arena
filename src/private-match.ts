@@ -239,17 +239,20 @@ export function balanceLobbyTeams(members: readonly LobbyMember[]): LobbyMember[
   return members.map((member) => ({ ...member, team: assigned.get(member.id) ?? member.team }));
 }
 
-export function canHostStart(snapshot: LobbySnapshot): boolean {
+// HF-323: hold the start while any guest admission is in-flight or transport connection is pending
+export function canHostStart(snapshot: LobbySnapshot, hasPendingGuests = false): boolean {
   const connected = snapshot.members.filter((member) => member.connected);
-  return snapshot.phase === 'waiting'
+  return !hasPendingGuests
+    && snapshot.phase === 'waiting'
     && connected.length >= 1
     && connected.length <= snapshot.config.capacity
     && connected.every((member) => member.ready);
 }
 
-export function canHostCommitStart(snapshot: LobbySnapshot): boolean {
+export function canHostCommitStart(snapshot: LobbySnapshot, hasPendingGuests = false): boolean {
   const connected = snapshot.members.filter((member) => member.connected);
-  return snapshot.phase === 'waiting'
+  return !hasPendingGuests
+    && snapshot.phase === 'waiting'
     && connected.length >= 1
     && connected.length <= snapshot.config.capacity
     && connected.some((member) => member.id === snapshot.hostId)

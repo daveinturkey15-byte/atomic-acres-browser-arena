@@ -83,7 +83,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 
 ### HF-324 — cannot type in the lobby (chat/inputs)
 - Source: pass74.txt ("cant type in lobby").
-- Status: OPEN
+- Status: IMPLEMENTED (51c440f0, 9a8e5786, audit fix) — chat panel click affordance, lobby-visible input row, Enter no longer swallowed by focused lobby buttons. Audit caught that the Tab scoping had also killed the scoreboard while dead, during warmup and at match end; Tab now stays available once a match has started.
 
 ### HF-325 — host disconnect: hand over or recover authority without kicking; rejoin after refresh
 - Source: atomicnext.txt ("if host dc, cant rejoin, can it hand host and not kick others? even if
@@ -207,7 +207,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-346 — Terminal z-fighting; zero persistent coplanar flicker on any level
 - Source: pass74.txt ("rust and terminal still issues") + atomicnext.txt ("z fighting on some assets
   in terminal map, should be none on any level").
-- Status: IMPLEMENTED (970d4c52) — coplanar-surface audit generalised to every arena. Terminal overlay re-spacing verified by the audit; owner HITL for visible flicker still owed.
+- Status: OPEN — CORRECTED. This row was wrongly marked IMPLEMENTED. An independent audit proved src/additional-maps.ts was never touched (`git diff 506d6142..HEAD -- src/additional-maps.ts` is empty), so Terminal's coplanar overlays are unchanged and the z-fighting is NOT fixed. src/coplanar-surface-audit.ts landed but has zero production importers, and the only scan test was a self-declared temporary asserting `expect(true).toBe(true)` (now deleted). Needs real overlay re-spacing plus the audit wired as a CI assertion.
 
 ### HF-347 — RustRig, Terminal and Gun Range multiplayer faults
 - Source: pass74.txt ("rust and terminal still issues anmd gun test level when multoiplayer").
@@ -227,7 +227,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-350 — continuous buzzing after a bot Semtex in 1v1; stray background noises
 - Source: atomicnext.txt rows 5–6 (locate the actual Web Audio owner; bounded stop/disconnect on
   completion, death, map change, pause, rematch; never mute-all as a fix).
-- Status: OPEN
+- Status: IMPLEMENTED (audit fix) — ambience ducking now actually recovers. The duck was armed by every explosion while recoverAmbienceDuck() had ZERO callers, so after the first grenade the ambience bed stayed at 40% for the rest of the match on every map. Now released each frame from updateSensoryFeedback. Live bisect of the reported buzzing is still owed.
 
 ### HF-351 — explosion audio quality restored; ambient and immersive audio richer
 - Source: pass74.txt ("better ambient and immersive sounds and screen animations/flashes pulses etc,
@@ -276,6 +276,18 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   gauntlet-loop skill repo, so nothing is copied from it.
 - Status: IMPLEMENTED (970d4c52) — frozen filmic grade profiles with the chain ordered linear-side CDL, transfer, display shaping, tone map last. Jungle vegetation work still owed.
 
+### HF-364 — landed-but-unwired modules must not read as closed defects
+- Source: independent Opus 5 audit of the overnight commits, 2026-08-22.
+- Finding: roughly 1,400 lines across ten modules are fully tested but have ZERO production
+  callers — local-health-regen, team-prescription, killstreak-activation-gate, camera-shake,
+  kill-confirm-pulse, rare-weapon-announcement, carpet-corridor-targeting, prone-clearance,
+  coplanar-surface-audit, rendering/grade-profile — plus audio's HF-351 spatial path and the
+  mobile look-rate integration. The green suite is inflated by tests that exercise unreachable
+  code, and commit titles read as completions.
+- Rule: a module is "landed, not wired" until a production call site exists. The owner-facing
+  status of its row must say so, and no HITL package may imply those defects are fixed.
+- Status: STANDING
+
 ## Retained positives — regression guards
 
 ### HF-353 — Railgun see-through-walls behaviour is right
@@ -308,7 +320,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Source: owner directive ("improve and bring back the farcrysis map which was in a previous
   branch"). Locate the branch, assess state, restore into the candidate improved, pass the forging
   review (no floating geometry, matching authority, both profiles).
-- Status: LANDED (aa114737) — farcrysis revived as the FIFTH arena. 15 modules ported and reconciled across 273 commits of drift; dropped god-ray/cloud/fog wiring restored; nav data ported; visual-definition, sound-event and spatial-audio entries authored. GAP: no prerecorded menu preview flyover video exists and none was faked — that asset is outstanding before farcrysis can ship.
+- Status: IMPLEMENTED WITH KNOWN GAPS (aa114737, audit fixes) — farcrysis revived as the fifth arena. Audit found and fixed two criticals: the research-station core was sealed by full-width north/south walls making its whole interior unreachable (with a bot patrol point inside it), and the per-frame animation driver was attached to a THREE.Group so wind, water, god-rays and vegetation LOD never ran at all. REMAINING GAPS, not fixed: menu preview media does not exist so the map card will 404; visible terrain displaces ~2.2m while collision is a flat plane; a spawn sits 1.10m from a palm collider; the sightline assertion was replaced with a vacuous >=0 check and the metric itself has no occlusion test.
 
 ### HF-360 — original character archetype skins lane (separate branch, staged)
 - Source: owner reminder ("H3 and Blender offline to create original, copyright-safe character

@@ -37,6 +37,10 @@ describe('text chat UI contract', () => {
     expect(styleSource).toContain('#text-chat[data-context=lobby] #text-chat-form{display:grid}');
     expect(mainSource).toContain("textChatRoot.addEventListener('pointerdown'");
     expect(mainSource).toContain("textChatRoot.addEventListener('click'");
-    expect(mainSource).toContain("// HF-324: Scope gameplay key handling (including Tab/scoreboard capture) to active gameplay only");
+    // HF-324 audit correction: gameplay key handling is scoped to active gameplay so
+    // the lobby is not swallowed, but Tab must survive once a match has started - the
+    // scoreboard is wanted precisely while dead, during warmup and at match end, all of
+    // which report gameplayInputEnabled() false. Assert the guard itself, not prose.
+    expect(mainSource).toContain("if (!gameplayInputEnabled() && (event.code !== 'Tab' || !gameStarted)) return;");
   });
 });

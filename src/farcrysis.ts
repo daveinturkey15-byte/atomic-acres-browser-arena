@@ -285,8 +285,15 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // Core walls (structural, not cover-list — the station is a structure)
   const coreWall = (name: string, position: [number, number, number], size: [number, number, number]) =>
     box(builder, name, position, size, coreMat, { cast: true, ballistic: 'metal' });
-  coreWall('farcrysis-core-wall-n', [0, 1.6, -5.5], [12, 3.2, 0.6]);
-  coreWall('farcrysis-core-wall-s', [0, 1.6, 5.5], [12, 3.2, 0.6]);
+  // HF-359 audit fix: the north and south walls were emitted as single 12 m spans,
+  // sealing the core into a solid box. Everything inside — the command desk, crates,
+  // catwalk and ramp — was unreachable, and bot patrol point [0,0] sat inside the
+  // sealed volume. Each side is now two 4 m segments leaving a 4 m central doorway,
+  // which is the two-entrance design the comment above already described.
+  coreWall('farcrysis-core-wall-n-west', [-4, 1.6, -5.5], [4, 3.2, 0.6]);
+  coreWall('farcrysis-core-wall-n-east', [4, 1.6, -5.5], [4, 3.2, 0.6]);
+  coreWall('farcrysis-core-wall-s-west', [-4, 1.6, 5.5], [4, 3.2, 0.6]);
+  coreWall('farcrysis-core-wall-s-east', [4, 1.6, 5.5], [4, 3.2, 0.6]);
   coreWall('farcrysis-core-wall-w', [-5.5, 1.6, 0], [0.6, 3.2, 12]);
   coreWall('farcrysis-core-wall-e', [5.5, 1.6, 0], [0.6, 3.2, 12]);
   // Two entrances: north gap (0..4 x) and south gap (-4..0 x)

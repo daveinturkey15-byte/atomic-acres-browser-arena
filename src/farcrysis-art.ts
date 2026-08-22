@@ -855,10 +855,17 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
   // Enhanced water FX — shoreline foam, wave surface, caustics, edge ripples
   buildWaterFX(s);
 
-  // Per-frame animation driver (wind sway, water/foam, vegetation LOD).
-  // Uses the codebase's proven onBeforeRender self-drive pattern; safe no-op
-  // before build runs, idempotent every frame.
-  root.onBeforeRender = (_renderer, _scene, camera) => {
+  // Per-frame animation driver (wind sway, water/foam, god-rays, vegetation LOD).
+  //
+  // HF-359 audit fix: this was attached to `root`, a THREE.Group. three.js only
+  // invokes onBeforeRender for objects that enter the render list — Mesh, Line,
+  // Points, Sprite — so a Group's callback never fires and EVERY animated system
+  // here was inert, including the LOD switching the arena's triangle budget
+  // assumes. Bind it to a rendered mesh instead; the terrain is always visible.
+  const animationHost = root.getObjectByName('farcrysis-terrain-elevation')
+    ?? root.children.find((child): child is THREE.Mesh => (child as THREE.Mesh).isMesh === true)
+    ?? root;
+  animationHost.onBeforeRender = (_renderer, _scene, camera) => {
     const t = performance.now() * 0.001;
     animateVegetationWind(t);
     // animateWater removed — ShaderMaterial-based water replaced with standard materials
