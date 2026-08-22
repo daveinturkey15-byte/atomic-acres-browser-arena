@@ -106,6 +106,52 @@ function installCanvasDocument(): () => void {
 }
 
 
+  // HF-346: polygonOffset tiering tests.
+  it('recognises polygonOffset tiered materials as resolved coplanar layers', () => {
+    const root = new THREE.Group();
+    const matA = new THREE.MeshStandardMaterial();
+    matA.polygonOffset = true;
+    matA.polygonOffsetFactor = -1;
+    matA.polygonOffsetUnits = -1;
+
+    const matB = new THREE.MeshStandardMaterial();
+    matB.polygonOffset = true;
+    matB.polygonOffsetFactor = -2;
+    matB.polygonOffsetUnits = -2;
+
+    const a = new THREE.Mesh(new THREE.BoxGeometry(2, 0.01, 2), matA);
+    a.name = 'decal-a';
+    a.position.set(0, 0.01, 0);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(2, 0.01, 2), matB);
+    b.name = 'decal-b';
+    b.position.set(0, 0.01, 0);
+    root.add(a, b);
+
+    const specs = collectHorizontalOverlaySpecs(root);
+    const pairs = findNearCoplanarPairs(specs, 0.004);
+    expect(pairs.length).toBe(0);
+  });
+
+  it('still flags coplanar decals if they share the exact same polygonOffset tier', () => {
+    const root = new THREE.Group();
+    const sharedMat = new THREE.MeshStandardMaterial();
+    sharedMat.polygonOffset = true;
+    sharedMat.polygonOffsetFactor = -1;
+    sharedMat.polygonOffsetUnits = -1;
+
+    const a = new THREE.Mesh(new THREE.BoxGeometry(2, 0.01, 2), sharedMat);
+    a.name = 'decal-a';
+    a.position.set(0, 0.01, 0);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(2, 0.01, 2), sharedMat);
+    b.name = 'decal-b';
+    b.position.set(0, 0.01, 0);
+    root.add(a, b);
+
+    const specs = collectHorizontalOverlaySpecs(root);
+    const pairs = findNearCoplanarPairs(specs, 0.004);
+    expect(pairs.length).toBe(1);
+  });
+
   // HF-346: probe all arenas
   it('audits all arenas for near-coplanar horizontal surfaces', async () => {
     const uninstall = installCanvasDocument();
@@ -122,11 +168,11 @@ function installCanvasDocument(): () => void {
         { name: 'Farcrysis', map: buildFarcrysis(new THREE.Scene()), near: 0.08, far: 190, maxDist: 40.0 },
       ];
 
-      const results = arenas.map(({ name, map, near, far, maxDist }) => {
+      for (const { name, map, near, far, maxDist } of arenas) {
         const audit = arenaHorizontalSurfaceAudit(map.root, near, far, maxDist);
-        return `${name}: threshold=${audit.threshold}, pairs=${audit.pairs.length}, pass=${audit.pass}`;
-      }).join('\n');
-      throw new Error(results);
+        expect(audit.pairs, `${name} has ${audit.pairs.length} coplanar pairs`).toHaveLength(0);
+        expect(audit.pass, `${name} audit pass`).toBe(true);
+      }
     } finally {
       uninstall();
     }

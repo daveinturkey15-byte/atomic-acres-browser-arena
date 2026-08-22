@@ -2874,17 +2874,147 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   addPalletStack('west', -25, 9, true);
   addPalletStack('east', 24, 22, false);
 
+  // HF-346: polygonOffset tiering for co-planar / near-coplanar decals on the exterior apron.
+  // Preserves low profile without requiring 18mm vertical separation between overlapping markings.
+  const apronSeamXMat = stainMat.clone();
+  apronSeamXMat.name = 'skyline-apron-seam-x-material';
+  apronSeamXMat.polygonOffset = true;
+  apronSeamXMat.polygonOffsetFactor = -1;
+  apronSeamXMat.polygonOffsetUnits = -1;
+
+  const apronEngineStainMat = stainMat.clone();
+  apronEngineStainMat.name = 'skyline-engine-stain-material';
+  apronEngineStainMat.polygonOffset = true;
+  apronEngineStainMat.polygonOffsetFactor = -1.5;
+  apronEngineStainMat.polygonOffsetUnits = -1.5;
+
+  const apronSeamZMat = stainMat.clone();
+  apronSeamZMat.name = 'skyline-apron-seam-z-material';
+  apronSeamZMat.polygonOffset = true;
+  apronSeamZMat.polygonOffsetFactor = -2;
+  apronSeamZMat.polygonOffsetUnits = -2;
+
+  const apronLeadInDarkMat = floorBorderMat.clone();
+  apronLeadInDarkMat.name = 'skyline-apron-lead-in-dark-material';
+  apronLeadInDarkMat.polygonOffset = true;
+  apronLeadInDarkMat.polygonOffsetFactor = -2.5;
+  apronLeadInDarkMat.polygonOffsetUnits = -2.5;
+
+  const tarmacStripeMat = hazardMat.clone();
+  tarmacStripeMat.name = 'skyline-tarmac-stripe-material';
+  tarmacStripeMat.polygonOffset = true;
+  tarmacStripeMat.polygonOffsetFactor = -3;
+  tarmacStripeMat.polygonOffsetUnits = -3;
+
+  const apronLeadInAmberMat = hazardMat.clone();
+  apronLeadInAmberMat.name = 'skyline-apron-lead-in-amber-material';
+  apronLeadInAmberMat.polygonOffset = true;
+  apronLeadInAmberMat.polygonOffsetFactor = -3.5;
+  apronLeadInAmberMat.polygonOffsetUnits = -3.5;
+
+  const aircraftStandNSMat = hazardMat.clone();
+  aircraftStandNSMat.name = 'skyline-aircraft-stand-ns-material';
+  aircraftStandNSMat.polygonOffset = true;
+  aircraftStandNSMat.polygonOffsetFactor = -4;
+  aircraftStandNSMat.polygonOffsetUnits = -4;
+
+  const apronGuidanceCyanMat = practicalMat.clone();
+  apronGuidanceCyanMat.name = 'skyline-apron-guidance-cyan-material';
+  apronGuidanceCyanMat.polygonOffset = true;
+  apronGuidanceCyanMat.polygonOffsetFactor = -4.5;
+  apronGuidanceCyanMat.polygonOffsetUnits = -4.5;
+
+  const apronGuidanceMagentaMat = magentaPracticalMat.clone();
+  apronGuidanceMagentaMat.name = 'skyline-apron-guidance-magenta-material';
+  apronGuidanceMagentaMat.polygonOffset = true;
+  apronGuidanceMagentaMat.polygonOffsetFactor = -4.5;
+  apronGuidanceMagentaMat.polygonOffsetUnits = -4.5;
+
+  const aircraftStandEWMat = hazardMat.clone();
+  aircraftStandEWMat.name = 'skyline-aircraft-stand-ew-material';
+  aircraftStandEWMat.polygonOffset = true;
+  aircraftStandEWMat.polygonOffsetFactor = -5;
+  aircraftStandEWMat.polygonOffsetUnits = -5;
+
+  const apronChevronMat = practicalMat.clone();
+  apronChevronMat.name = 'skyline-apron-chevron-material';
+  apronChevronMat.polygonOffset = true;
+  apronChevronMat.polygonOffsetFactor = -5.5;
+  apronChevronMat.polygonOffsetUnits = -5.5;
+
+  const apronChevronMagentaMat = magentaPracticalMat.clone();
+  apronChevronMagentaMat.name = 'skyline-apron-chevron-magenta-material';
+  apronChevronMagentaMat.polygonOffset = true;
+  apronChevronMagentaMat.polygonOffsetFactor = -5.5;
+  apronChevronMagentaMat.polygonOffsetUnits = -5.5;
+
+  // HF-346: polygonOffset tiering for concourse floor decals and joints.
+  const floorJointXMat = floorBorderMat.clone();
+  floorJointXMat.name = 'skyline-floor-joint-x-material';
+  floorJointXMat.polygonOffset = true;
+  floorJointXMat.polygonOffsetFactor = -1;
+  floorJointXMat.polygonOffsetUnits = -1;
+
+  const floorJointZMat = floorBorderMat.clone();
+  floorJointZMat.name = 'skyline-floor-joint-z-material';
+  floorJointZMat.polygonOffset = true;
+  floorJointZMat.polygonOffsetFactor = -2;
+  floorJointZMat.polygonOffsetUnits = -2;
+
+  const floorDarkRunnerMat = floorInsetMat.clone();
+  floorDarkRunnerMat.name = 'skyline-floor-dark-runner-material';
+  floorDarkRunnerMat.polygonOffset = true;
+  floorDarkRunnerMat.polygonOffsetFactor = -2.5;
+  floorDarkRunnerMat.polygonOffsetUnits = -2.5;
+
+  const floorBorderDecalMat = floorBorderMat.clone();
+  floorBorderDecalMat.name = 'skyline-floor-border-decal-material';
+  floorBorderDecalMat.polygonOffset = true;
+  floorBorderDecalMat.polygonOffsetFactor = -3;
+  floorBorderDecalMat.polygonOffsetUnits = -3;
+
+  const floorCyanRunnerMat = practicalMat.clone();
+  floorCyanRunnerMat.name = 'skyline-floor-cyan-runner-material';
+  floorCyanRunnerMat.polygonOffset = true;
+  floorCyanRunnerMat.polygonOffsetFactor = -4;
+  floorCyanRunnerMat.polygonOffsetUnits = -4;
+
+  const floorMagentaCrossingMat = magentaPracticalMat.clone();
+  floorMagentaCrossingMat.name = 'skyline-floor-magenta-crossing-material';
+  floorMagentaCrossingMat.polygonOffset = true;
+  floorMagentaCrossingMat.polygonOffsetFactor = -5;
+  floorMagentaCrossingMat.polygonOffsetUnits = -5;
+
+  // HF-346: polygonOffset tiering for mezzanine underside coffers and underlights.
+  const mezzanineCofferMat = ivoryPanelMat.clone();
+  mezzanineCofferMat.name = 'skyline-mezzanine-coffer-material';
+  mezzanineCofferMat.polygonOffset = true;
+  mezzanineCofferMat.polygonOffsetFactor = -1;
+  mezzanineCofferMat.polygonOffsetUnits = -1;
+
+  const mezzanineUnderlightMat = practicalMat.clone();
+  mezzanineUnderlightMat.name = 'skyline-mezzanine-underlight-material';
+  mezzanineUnderlightMat.polygonOffset = true;
+  mezzanineUnderlightMat.polygonOffsetFactor = -2;
+  mezzanineUnderlightMat.polygonOffsetUnits = -2;
+
+  const mezzanineUnderlightMagentaMat = magentaPracticalMat.clone();
+  mezzanineUnderlightMagentaMat.name = 'skyline-mezzanine-underlight-magenta-material';
+  mezzanineUnderlightMagentaMat.polygonOffset = true;
+  mezzanineUnderlightMagentaMat.polygonOffsetFactor = -2;
+  mezzanineUnderlightMagentaMat.polygonOffsetUnits = -2;
+
   for (let z = -10; z <= 30; z += 10) {
-    box(builder, 'skyline-tarmac-stripe', [0, 0.02, z], [1.2, 0.03, 4.0], hazardMat, { solid: false, shots: false });
+    box(builder, 'skyline-tarmac-stripe', [0, 0.02, z], [1.2, 0.03, 4.0], tarmacStripeMat, { solid: false, shots: false });
   }
 
   // A repeated apron grid and stand envelope give the large exterior plane
   // authored scale while remaining one static batch per shared material.
   for (let seamX = -28; seamX <= 28; seamX += 7) {
-    detailBox('apron-marking', `skyline-apron-seam-x-${seamX}`, [seamX, 0.023, 8], [0.035, 0.018, 54], stainMat);
+    detailBox('apron-marking', `skyline-apron-seam-x-${seamX}`, [seamX, 0.023, 8], [0.035, 0.018, 54], apronSeamXMat);
   }
   for (let seamZ = -16; seamZ <= 32; seamZ += 8) {
-    detailBox('apron-marking', `skyline-apron-seam-z-${seamZ}`, [0, 0.024, seamZ], [68, 0.018, 0.035], stainMat);
+    detailBox('apron-marking', `skyline-apron-seam-z-${seamZ}`, [0, 0.024, seamZ], [68, 0.018, 0.035], apronSeamZMat);
   }
   for (const [name, x, z, width, depth] of [
     ['north', 0, -0.15, 43, 0.16],
@@ -2892,21 +3022,22 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     ['west', -21.4, 2, 0.16, 4.45],
     ['east', 21.4, 2, 0.16, 4.45],
   ] as const) {
-    detailBox('apron-marking', `skyline-aircraft-stand-${name}`, [x, 0.036, z], [width, 0.025, depth], hazardMat);
+    const standMat = (name === 'north' || name === 'south') ? aircraftStandNSMat : aircraftStandEWMat;
+    detailBox('apron-marking', `skyline-aircraft-stand-${name}`, [x, 0.036, z], [width, 0.025, depth], standMat);
   }
-  detailBox('apron-marking', 'skyline-apron-lead-in-dark', [0, 0.034, 20], [0.35, 0.025, 28], floorBorderMat);
-  detailBox('apron-marking', 'skyline-apron-lead-in-amber', [0, 0.049, 20], [0.12, 0.02, 28], hazardMat);
-  detailBox('apron-marking', 'skyline-apron-cyan-guidance-west', [-6.5, 0.051, 11], [0.11, 0.024, 46], practicalMat);
-  detailBox('apron-marking', 'skyline-apron-magenta-guidance-east', [6.5, 0.051, 11], [0.11, 0.024, 46], magentaPracticalMat);
+  detailBox('apron-marking', 'skyline-apron-lead-in-dark', [0, 0.034, 20], [0.35, 0.025, 28], apronLeadInDarkMat);
+  detailBox('apron-marking', 'skyline-apron-lead-in-amber', [0, 0.049, 20], [0.12, 0.02, 28], apronLeadInAmberMat);
+  detailBox('apron-marking', 'skyline-apron-cyan-guidance-west', [-6.5, 0.051, 11], [0.11, 0.024, 46], apronGuidanceCyanMat);
+  detailBox('apron-marking', 'skyline-apron-magenta-guidance-east', [6.5, 0.051, 11], [0.11, 0.024, 46], apronGuidanceMagentaMat);
   for (const z of [-8, 2, 12, 22, 32]) {
-    detailBox('apron-marking', `skyline-apron-gate-chevron-${z}`, [0, 0.054, z], [8.6, 0.022, 0.12], z === 12 ? magentaPracticalMat : practicalMat);
+    detailBox('apron-marking', `skyline-apron-gate-chevron-${z}`, [0, 0.054, z], [8.6, 0.022, 0.12], z === 12 ? apronChevronMagentaMat : apronChevronMat);
   }
   for (const [z, rotationY] of [[12, 0.08], [-8, -0.08]] as const) {
-    detailBox('apron-marking', `skyline-engine-stain-${z}`, [0, 0.031, z], [3.4, 0.022, 5.2], stainMat, 'performance', [0, rotationY, 0]);
+    detailBox('apron-marking', `skyline-engine-stain-${z}`, [0, 0.031, z], [3.4, 0.022, 5.2], apronEngineStainMat, 'performance', [0, rotationY, 0]);
   }
 
   box(builder, 'skyline-concourse-floor', [0, 0.02, -23], [60, 0.08, 22], floorMat, { solid: false });
-  detailBox('floor-language', 'skyline-floor-dark-runner', [0, 0.073, -22.5], [5.2, 0.025, 20.5], floorInsetMat);
+  detailBox('floor-language', 'skyline-floor-dark-runner', [0, 0.073, -22.5], [5.2, 0.025, 20.5], floorDarkRunnerMat);
   // A real roof and luminous ceiling make the terminal read as an interior,
   // not an outdoor grey blockout. It is above every route but remains
   // collision and shot authoritative for debug/fly-camera probes.
@@ -2917,16 +3048,16 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   }
   // The long runner is repeated in inset cyan and magenta so it is legible
   // from either spawn and through the glass facade.
-  detailBox('floor-language', 'skyline-floor-cyan-runner-west', [-2.3, 0.091, -22.5], [0.16, 0.022, 20.2], practicalMat);
-  detailBox('floor-language', 'skyline-floor-cyan-runner-east', [2.3, 0.091, -22.5], [0.16, 0.022, 20.2], practicalMat);
-  detailBox('floor-language', 'skyline-floor-magenta-crossing', [0, 0.093, -20.4], [24, 0.024, 0.16], magentaPracticalMat);
-  detailBox('floor-language', 'skyline-floor-window-border', [0, 0.074, -12.55], [59.2, 0.028, 0.52], floorBorderMat);
-  detailBox('floor-language', 'skyline-floor-backwall-border', [0, 0.074, -33.4], [59.2, 0.028, 0.52], floorBorderMat);
+  detailBox('floor-language', 'skyline-floor-cyan-runner-west', [-2.3, 0.091, -22.5], [0.16, 0.022, 20.2], floorCyanRunnerMat);
+  detailBox('floor-language', 'skyline-floor-cyan-runner-east', [2.3, 0.091, -22.5], [0.16, 0.022, 20.2], floorCyanRunnerMat);
+  detailBox('floor-language', 'skyline-floor-magenta-crossing', [0, 0.093, -20.4], [24, 0.024, 0.16], floorMagentaCrossingMat);
+  detailBox('floor-language', 'skyline-floor-window-border', [0, 0.074, -12.55], [59.2, 0.028, 0.52], floorBorderDecalMat);
+  detailBox('floor-language', 'skyline-floor-backwall-border', [0, 0.074, -33.4], [59.2, 0.028, 0.52], floorBorderDecalMat);
   for (let tileX = -27; tileX <= 27; tileX += 6) {
-    detailBox('floor-language', `skyline-floor-joint-x-${tileX}`, [tileX, 0.076, -23], [0.025, 0.018, 20.2], floorBorderMat);
+    detailBox('floor-language', `skyline-floor-joint-x-${tileX}`, [tileX, 0.076, -23], [0.025, 0.018, 20.2], floorJointXMat);
   }
   for (let tileZ = -31; tileZ <= -15; tileZ += 4) {
-    detailBox('floor-language', `skyline-floor-joint-z-${tileZ}`, [0, 0.077, tileZ], [58.5, 0.018, 0.025], floorBorderMat);
+    detailBox('floor-language', `skyline-floor-joint-z-${tileZ}`, [0, 0.077, tileZ], [58.5, 0.018, 0.025], floorJointZMat);
   }
   // Split the mezzanine around both escalators. A monolithic slab creates a
   // low underside above each ramp and physically stops the character halfway.
@@ -2943,16 +3074,16 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   // Overlay the formerly monolithic grey underside with a coffered silver
   // ceiling. These shallow panels do not alter the mezzanine collider.
   for (const x of [-21, -14, -7, 0, 7, 14, 21]) {
-    detailBox('wall-structure', `skyline-mezzanine-coffer-${x}`, [x, 3.002, -30.3], [5.65, 0.025, 3.9], ivoryPanelMat);
-    detailBox('terminal-story', `skyline-mezzanine-coffer-light-${x}`, [x, 2.982, -30.25], [3.8, 0.022, 0.13], x === 0 ? magentaPracticalMat : practicalMat);
+    detailBox('wall-structure', `skyline-mezzanine-coffer-${x}`, [x, 3.002, -30.3], [5.65, 0.025, 3.9], mezzanineCofferMat);
+    detailBox('terminal-story', `skyline-mezzanine-coffer-light-${x}`, [x, 2.982, -30.25], [3.8, 0.022, 0.13], x === 0 ? mezzanineUnderlightMagentaMat : mezzanineUnderlightMat);
   }
   for (const x of [-16, -8, 0, 8, 16]) {
-    detailBox('wall-structure', `skyline-mezzanine-front-coffer-${x}`, [x, 3.001, -25.3], [6.5, 0.024, 4.9], ivoryPanelMat);
-    detailBox('terminal-story', `skyline-mezzanine-front-coffer-light-${x}`, [x, 2.981, -25.2], [4.6, 0.022, 0.13], x === 0 ? magentaPracticalMat : practicalMat);
+    detailBox('wall-structure', `skyline-mezzanine-front-coffer-${x}`, [x, 3.001, -25.3], [6.5, 0.024, 4.9], mezzanineCofferMat);
+    detailBox('terminal-story', `skyline-mezzanine-front-coffer-light-${x}`, [x, 2.981, -25.2], [4.6, 0.022, 0.13], x === 0 ? mezzanineUnderlightMagentaMat : mezzanineUnderlightMat);
   }
   for (const lightX of [-18, -10, 0, 10, 18]) {
-    detailBox('terminal-story', `skyline-mezzanine-underlight-${lightX}`, [lightX, 3.005, -29.8], [5.4, 0.025, 0.11], practicalMat);
-    detailBox('terminal-story', `skyline-mezzanine-underlight-front-${lightX}`, [lightX, 3.005, -24.3], [5.4, 0.025, 0.11], practicalMat);
+    detailBox('terminal-story', `skyline-mezzanine-underlight-${lightX}`, [lightX, 3.005, -29.8], [5.4, 0.025, 0.11], mezzanineUnderlightMat);
+    detailBox('terminal-story', `skyline-mezzanine-underlight-front-${lightX}`, [lightX, 3.005, -24.3], [5.4, 0.025, 0.11], mezzanineUnderlightMat);
   }
   detailBox('floor-language', 'skyline-mezzanine-front-edge', [0, 3.36, -22.12], [52, 0.12, 0.34], floorBorderMat);
   for (const x of [-23.5, -16, -8, 0, 8, 16, 23.5]) {

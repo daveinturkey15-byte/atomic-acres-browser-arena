@@ -20,6 +20,9 @@ export type HorizontalSurfaceSpec = Readonly<{
   maxZ: number;
   height: number;
   material: THREE.Material | null;
+  polygonOffset?: boolean;
+  polygonOffsetFactor?: number;
+  polygonOffsetUnits?: number;
 }>;
 
 export type CoplanarPair = Readonly<{
@@ -82,6 +85,10 @@ export function collectHorizontalOverlaySpecs(
     const sx = params.width * cos + params.depth * sin;
     const sz = params.width * sin + params.depth * cos;
     const material = Array.isArray(node.material) ? node.material[0] ?? null : node.material;
+    // HF-346: inspect polygonOffset configuration on the material.
+    const polygonOffset = Boolean(material?.polygonOffset);
+    const polygonOffsetFactor = material?.polygonOffset ? (material.polygonOffsetFactor ?? 0) : 0;
+    const polygonOffsetUnits = material?.polygonOffset ? (material.polygonOffsetUnits ?? 0) : 0;
     specs.push({
       name: node.name,
       topY: p.y + params.height / 2,
@@ -91,12 +98,15 @@ export function collectHorizontalOverlaySpecs(
       maxZ: p.z + sz / 2,
       height: params.height,
       material: material ?? null,
+      polygonOffset,
+      polygonOffsetFactor,
+      polygonOffsetUnits,
     });
   });
   return specs;
 }
 
-/** HF-346: find horizontal overlay pairs whose vertical gap is below threshold. */
+/** HF-346: find horizontal overlay pairs whose vertical gap is below threshold and unhandled by polygon offset. */
 export function findNearCoplanarPairs(
   specs: readonly HorizontalSurfaceSpec[],
   threshold: number,
@@ -108,6 +118,23 @@ export function findNearCoplanarPairs(
       const b = specs[j];
       const dy = Math.abs(a.topY - b.topY);
       if (dy >= threshold) continue;
+
+      // HF-346: contract extension: when overlapping decals are legitimately resolved
+      // via distinct polygonOffset tiers (or one has polygonOffset enabled over an un-offset base),
+      // the GPU rasterizer handles depth resolution without requiring vertical geometry separation.
+      const aOffset = Boolean(a.polygonOffset);
+      const bOffset = Boolean(b.polygonOffset);
+      if (aOffset || bOffset) {
+        if (aOffset !== bOffset) {
+          // One layer has polygon offset enabled and the other does not (e.g. decal over base).
+          continue;
+        }
+        if (a.polygonOffsetFactor !== b.polygonOffsetFactor || a.polygonOffsetUnits !== b.polygonOffsetUnits) {
+          // Both layers have polygon offset enabled with distinct tiers.
+          continue;
+        }
+      }
+
       const overlapX = Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX);
       const overlapZ = Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ);
       if (overlapX > 1e-3 && overlapZ > 1e-3) {

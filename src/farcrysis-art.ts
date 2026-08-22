@@ -855,6 +855,46 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
   // Enhanced water FX — shoreline foam, wave surface, caustics, edge ripples
   buildWaterFX(s);
 
+  // HF-346: apply polygonOffset tiering to coplanar crate shards and floor litter overlays.
+  root.traverse((node) => {
+    if (node instanceof THREE.Mesh && node.name.includes('-shards-shard-')) {
+      const match = node.name.match(/-shards-shard-(\d+)$/);
+      const index = match ? parseInt(match[1], 10) : 0;
+      const originalMat = Array.isArray(node.material) ? node.material[0] : node.material;
+      if (originalMat) {
+        const mat = originalMat.clone();
+        mat.polygonOffset = true;
+        mat.polygonOffsetFactor = -1 - index;
+        mat.polygonOffsetUnits = -1 - index;
+        node.material = mat;
+      }
+    }
+  });
+
+  const vegeLitter = root.getObjectByName('farcrysis-vege-leaf-litter');
+  if (vegeLitter instanceof THREE.Mesh) {
+    const originalMat = Array.isArray(vegeLitter.material) ? vegeLitter.material[0] : vegeLitter.material;
+    if (originalMat) {
+      const mat = originalMat.clone();
+      mat.polygonOffset = true;
+      mat.polygonOffsetFactor = -1;
+      mat.polygonOffsetUnits = -1;
+      vegeLitter.material = mat;
+    }
+  }
+
+  const detailLitter = root.getObjectByName('farcrysis-detail-floor-litter');
+  if (detailLitter instanceof THREE.Mesh) {
+    const originalMat = Array.isArray(detailLitter.material) ? detailLitter.material[0] : detailLitter.material;
+    if (originalMat) {
+      const mat = originalMat.clone();
+      mat.polygonOffset = true;
+      mat.polygonOffsetFactor = -2;
+      mat.polygonOffsetUnits = -2;
+      detailLitter.material = mat;
+    }
+  }
+
   // Per-frame animation driver (wind sway, water/foam, god-rays, vegetation LOD).
   //
   // HF-359 audit fix: this was attached to `root`, a THREE.Group. three.js only
