@@ -413,4 +413,63 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
     audio.dispose();
     expect(context.state).toBe('closed');
   });
+
+  // HF-332: Interactive destruction and collapse debris audio prewarm
+  it('silently warms destruction/debris impact filters and sweeps at zero gain without retaining loops', () => {
+    vi.stubGlobal('AudioContext', FakeAudioContext);
+    const audio = new ArenaAudio();
+    audio.unlock();
+    const context = FakeAudioContext.instances[0]!;
+    const beforeWarmup = {
+      oscillators: context.oscillators.length,
+      bufferSources: context.bufferSources.length,
+      gains: context.gains.length,
+      filters: context.filters.length,
+    };
+    expect(audio.prepareDestructionEffects()).toBe(true);
+    const preparedFactories = {
+      oscillators: context.oscillators.length,
+      bufferSources: context.bufferSources.length,
+      gains: context.gains.length,
+      filters: context.filters.length,
+    };
+    expect(preparedFactories).toEqual({
+      oscillators: beforeWarmup.oscillators + 4,
+      bufferSources: beforeWarmup.bufferSources + 3,
+      gains: beforeWarmup.gains + 7,
+      filters: beforeWarmup.filters + 3,
+    });
+    expect(context.oscillators.slice(-4).map(({ type }) => type)).toEqual([
+      'square', 'triangle', 'triangle', 'triangle',
+    ]);
+    expect(context.filters.slice(-3).map(({ type }) => type)).toEqual(['bandpass', 'bandpass', 'bandpass']);
+    expect(context.gains.slice(-7).every((gain) => gain.gain.value === 0)).toBe(true);
+    expect(audio.telemetry().destructionEffectsPrewarm).toEqual({
+      prepared: true,
+      runs: 1,
+      warmupSources: 7,
+      warmupNodes: 10,
+      retainedSources: 0,
+      retainedBroadbandLoops: 0,
+    });
+
+    // Idempotent
+    expect(audio.prepareDestructionEffects()).toBe(true);
+    expect(audio.telemetry().destructionEffectsPrewarm.runs).toBe(1);
+
+    audio.dispose();
+    expect(context.state).toBe('closed');
+  });
+
+  it('handles destruction effects prewarm failure gracefully and re-arms for retry', () => {
+    const audio = new ArenaAudio();
+    expect(audio.prepareDestructionEffects()).toBe(false);
+    expect(audio.telemetry().destructionEffectsPrewarm.prepared).toBe(false);
+
+    vi.stubGlobal('AudioContext', FakeAudioContext);
+    audio.unlock();
+    expect(audio.prepareDestructionEffects()).toBe(true);
+    expect(audio.telemetry().destructionEffectsPrewarm.prepared).toBe(true);
+    audio.dispose();
+  });
 });

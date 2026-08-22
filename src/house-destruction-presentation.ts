@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import {
   HOUSE_POSITION_Q,
   HOUSE_ROTATION_Q,
@@ -66,6 +67,7 @@ export type HouseDestructionPresentationTelemetry = Readonly<{
   visibleInstances: number;
   activeDraws: number;
   externalProfileOwnsStaticFragments: boolean;
+  prewarmed: boolean;
 }>;
 
 /**
@@ -81,6 +83,9 @@ export class HouseDestructionPresentation {
   private state: HouseDestructionState;
   private externalProfileOwnsStaticFragments = false;
   private disposed = false;
+  // HF-332: Per-group prewarm generation and promise for interactive-destruction / collapse-debris
+  private gpuPrewarmGeneration: number | null = null;
+  private gpuPrewarmPromise: Promise<void> | null = null;
 
   constructor(
     private readonly definitions: readonly HouseFragmentDefinition[],
@@ -152,6 +157,55 @@ export class HouseDestructionPresentation {
     return Object.freeze([...this.meshes.values()].filter((mesh) => mesh.visible));
   }
 
+  // HF-332: Prewarms all presentation resources (wall, roof, furniture cuboids) for interactive destruction
+  async prewarm(
+    runtime: PresentationPrewarmRuntime,
+    camera: THREE.Camera,
+    sceneGeneration = 0,
+  ): Promise<void> {
+    if (this.gpuPrewarmGeneration === sceneGeneration) return;
+    while (this.gpuPrewarmPromise) {
+      const pending = this.gpuPrewarmPromise;
+      try {
+        await pending;
+      } catch {
+        if (this.gpuPrewarmPromise === pending) this.gpuPrewarmPromise = null;
+      }
+      if (this.gpuPrewarmGeneration === sceneGeneration) return;
+    }
+    const operation = this.performGpuPrewarm(runtime, camera, sceneGeneration);
+    this.gpuPrewarmPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.gpuPrewarmPromise === operation) this.gpuPrewarmPromise = null;
+    }
+  }
+
+  private async performGpuPrewarm(
+    runtime: PresentationPrewarmRuntime,
+    camera: THREE.Camera,
+    sceneGeneration: number,
+  ): Promise<void> {
+    const parentScene = this.root.parent;
+    if (!(parentScene instanceof THREE.Scene)) {
+      throw new Error('House destruction presentation must be attached to a scene before prewarm');
+    }
+    for (const [, mesh] of this.meshes) {
+      mesh.visible = true;
+      if (mesh.count > 0 && mesh.userData.visibleInstances === 0) {
+        mesh.setMatrixAt(0, new THREE.Matrix4().makeScale(1, 1, 1));
+        mesh.instanceMatrix.needsUpdate = true;
+      }
+    }
+    try {
+      await runtime.compileAndRender(this.root, camera, parentScene);
+      this.gpuPrewarmGeneration = sceneGeneration;
+    } finally {
+      this.sync(this.state);
+    }
+  }
+
   telemetry(): HouseDestructionPresentationTelemetry {
     const visibleInstances = [...this.meshes.values()]
       .reduce((sum, mesh) => sum + Number(mesh.userData.visibleInstances ?? 0), 0);
@@ -161,6 +215,7 @@ export class HouseDestructionPresentation {
       visibleInstances,
       activeDraws: [...this.meshes.values()].filter((mesh) => mesh.visible).length,
       externalProfileOwnsStaticFragments: this.externalProfileOwnsStaticFragments,
+      prewarmed: this.gpuPrewarmGeneration !== null,
     });
   }
 

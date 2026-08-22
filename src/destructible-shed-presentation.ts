@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import {
   SHED_ANGLE_Q,
   SHED_DAMAGE_REGION_RADIUS_Q,
@@ -345,6 +346,7 @@ export type ShedPresentationTelemetry = Readonly<{
   detachedChunks: number;
   retiredGeometries: number;
   frameCollapsed: boolean;
+  prewarmed: boolean;
 }>;
 
 function presentationTopologySignature(state: ShedState): string {
@@ -373,6 +375,9 @@ export class DestructibleShedPresentation {
   private topologySignature = '';
   private revision = -1;
   private disposed = false;
+  // HF-332: Per-group prewarm generation and promise for interactive-destruction / collapse-debris
+  private gpuPrewarmGeneration: number | null = null;
+  private gpuPrewarmPromise: Promise<void> | null = null;
 
   constructor(
     readonly definition: DestructibleShedDefinition,
@@ -630,6 +635,78 @@ export class DestructibleShedPresentation {
     else this.retiredGeometries.add(geometry);
   }
 
+  // HF-332: Prewarms all presentation resources (sheet, frame, rims, dents, debris) for interactive destruction
+  async prewarm(
+    runtime: PresentationPrewarmRuntime,
+    camera: THREE.Camera,
+    sceneGeneration = 0,
+  ): Promise<void> {
+    if (this.gpuPrewarmGeneration === sceneGeneration) return;
+    while (this.gpuPrewarmPromise) {
+      const pending = this.gpuPrewarmPromise;
+      try {
+        await pending;
+      } catch {
+        if (this.gpuPrewarmPromise === pending) this.gpuPrewarmPromise = null;
+      }
+      if (this.gpuPrewarmGeneration === sceneGeneration) return;
+    }
+    const operation = this.performGpuPrewarm(runtime, camera, sceneGeneration);
+    this.gpuPrewarmPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.gpuPrewarmPromise === operation) this.gpuPrewarmPromise = null;
+    }
+  }
+
+  private async performGpuPrewarm(
+    runtime: PresentationPrewarmRuntime,
+    camera: THREE.Camera,
+    sceneGeneration: number,
+  ): Promise<void> {
+    const parentScene = this.root.parent;
+    if (!(parentScene instanceof THREE.Scene)) {
+      throw new Error('Destructible shed presentation must be attached to a scene before prewarm');
+    }
+    const previousRimsCount = this.apertureRims.count;
+    const previousDentsCount = this.dents.count;
+    const previousDebrisCount = this.debris.count;
+
+    if (this.apertureRims.count === 0) {
+      placeBoxInstance(this.apertureRims, 0, new THREE.Vector3(0, 1.5, 0), new THREE.Vector3(0.5, 0.5, 0.05));
+      this.apertureRims.count = 1;
+      this.apertureRims.instanceMatrix.needsUpdate = true;
+    }
+    if (this.dents.count === 0) {
+      placeBoxInstance(this.dents, 0, new THREE.Vector3(0, 1.5, 0), new THREE.Vector3(0.5, 0.5, 0.05));
+      this.dents.setColorAt(0, regionalDamageTint(1));
+      this.dents.count = 1;
+      this.dents.instanceMatrix.needsUpdate = true;
+      if (this.dents.instanceColor) this.dents.instanceColor.needsUpdate = true;
+    }
+    if (this.debris.count === 0) {
+      placeBoxInstance(this.debris, 0, new THREE.Vector3(0, 0.1, 0), new THREE.Vector3(1, 1, 1));
+      this.debris.setColorAt(0, debrisTint(this.definition.preauthoredChunkIds[0] ?? 'chunk-0'));
+      this.debris.count = 1;
+      this.debris.instanceMatrix.needsUpdate = true;
+      if (this.debris.instanceColor) this.debris.instanceColor.needsUpdate = true;
+    }
+    try {
+      await runtime.compileAndRender(this.root, camera, parentScene);
+      this.gpuPrewarmGeneration = sceneGeneration;
+    } finally {
+      this.apertureRims.count = previousRimsCount;
+      this.apertureRims.instanceMatrix.needsUpdate = true;
+      this.dents.count = previousDentsCount;
+      this.dents.instanceMatrix.needsUpdate = true;
+      if (this.dents.instanceColor) this.dents.instanceColor.needsUpdate = true;
+      this.debris.count = previousDebrisCount;
+      this.debris.instanceMatrix.needsUpdate = true;
+      if (this.debris.instanceColor) this.debris.instanceColor.needsUpdate = true;
+    }
+  }
+
   telemetry(state: ShedState): ShedPresentationTelemetry {
     const optionalDraws = Number(this.apertureRims.count > 0) + Number(this.dents.count > 0) + Number(this.debris.count > 0);
     return Object.freeze({
@@ -640,6 +717,7 @@ export class DestructibleShedPresentation {
       detachedChunks: state.detachedChunkIds.length,
       retiredGeometries: this.retiredGeometries.size,
       frameCollapsed: this.frameToppled,
+      prewarmed: this.gpuPrewarmGeneration !== null,
     });
   }
 

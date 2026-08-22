@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import {
   GRENADE_EXPLOSION_DURATION_MS,
+  GRENADE_EXPLOSION_MIN_PRESENTED_FRAMES,
   GRENADE_EXPLOSION_POOL_CAPACITY,
+  GRENADE_EXPLOSION_RING_START_SCALE,
   GrenadeExplosionPresentation,
 } from './grenade-explosion-presentation';
 
@@ -29,14 +31,24 @@ describe('GrenadeExplosionPresentation', () => {
 
   it('reuses slots and expires them without allocating dynamic lights', () => {
     const presentation = new GrenadeExplosionPresentation(new THREE.Scene());
-    const firstRoot = presentation.root.children[0];
+    const firstRoot = presentation.root.children[0] as THREE.Group;
+    const firstRootRing = (firstRoot.children as THREE.Mesh[]).find((mesh) => mesh.name === 'grenade-blast-ring')!;
 
     presentation.emit(new THREE.Vector3(1, 2, 3), 1_000);
     expect(presentation.telemetry().active).toBe(1);
     expect(firstRoot.visible).toBe(true);
     expect(firstRoot.position.toArray()).toEqual([1, 2.055, 3]);
+    // HF-349: the shockwave ring must start at a clearly visible scale.
+    expect(firstRootRing.scale.x).toBeGreaterThanOrEqual(GRENADE_EXPLOSION_RING_START_SCALE);
 
-    presentation.update(1_000 + GRENADE_EXPLOSION_DURATION_MS);
+    // HF-349: expiry requires BOTH the minimum presented-frame count AND
+    // elapsed time - a single update past expiry with fewer presented frames
+    // than the gate must NOT swallow the effect (the frame-hitch regression).
+    presentation.update(1_000 + GRENADE_EXPLOSION_DURATION_MS + 50);
+    expect(presentation.telemetry().active).toBe(1);
+    for (let frame = 0; frame < GRENADE_EXPLOSION_MIN_PRESENTED_FRAMES; frame += 1) {
+      presentation.update(1_000 + GRENADE_EXPLOSION_DURATION_MS + 60);
+    }
     expect(presentation.telemetry().active).toBe(0);
     expect(firstRoot.visible).toBe(false);
 
@@ -86,11 +98,11 @@ describe('GrenadeExplosionPresentation', () => {
           const projected = slotRoot.getWorldPosition(new THREE.Vector3()).project(camera);
           expect(Math.abs(projected.x)).toBeLessThan(1);
           expect(Math.abs(projected.y)).toBeLessThan(1);
-          const [ring, core] = slotRoot.children as Array<THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>>;
-          expect(ring!.scale.x).toBeCloseTo(0.18);
-          expect(ring!.material.opacity).toBeCloseTo(0.68);
-          expect(core!.scale.x).toBe(1);
-          expect(core!.material.opacity).toBeCloseTo(0.82);
+          const [ring, core] = slotRoot.children.filter((node): node is THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> => node instanceof THREE.Mesh);
+          expect(ring!.scale.x).toBeCloseTo(0.42);
+          expect(ring!.material.opacity).toBeCloseTo(0.72);
+          expect(core!.scale.x).toBeCloseTo(0.9);
+          expect(core!.material.opacity).toBeCloseTo(0.85);
         }
       },
     }, camera, 3);
@@ -123,5 +135,33 @@ describe('GrenadeExplosionPresentation', () => {
     await second;
     expect(maxConcurrent).toBe(1);
     expect(snapshot()).toEqual(before);
+  });
+
+  it('HF-349: keeps a hitch-swallowed slot alive until it is actually presented', () => {
+    const presentation = new GrenadeExplosionPresentation(new THREE.Scene());
+    const slotRoot = presentation.root.children[0] as THREE.Group;
+    const meshes = slotRoot.children.filter((node): node is THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> => node instanceof THREE.Mesh);
+    const smoke = meshes.find((mesh) => mesh.name === 'grenade-blast-smoke');
+    expect(smoke).toBeDefined();
+    // HF-349: smoke is deliberately non-additive so the blast reads against bright sky.
+    expect(smoke!.material.blending).toBe(THREE.NormalBlending);
+
+    // Simulate a full stall: emit() followed by one huge frame hitch that
+    // overshoots the entire lifetime before the first presented frame.
+    presentation.emit(new THREE.Vector3(0, 0, 0), 5_000);
+    presentation.update(5_000 + GRENADE_EXPLOSION_DURATION_MS * 4);
+    expect(presentation.telemetry().active).toBe(1);
+    expect(slotRoot.visible).toBe(true);
+    // Held afterglow must stay faintly visible, not an invisible zombie.
+    expect(smoke!.material.opacity).toBeGreaterThan(0);
+
+    // Each further update is one presented frame; the gate opens on the third
+    // and only then does the elapsed-time expiry take effect.
+    presentation.update(5_000 + GRENADE_EXPLOSION_DURATION_MS * 4 + 16);
+    presentation.update(5_000 + GRENADE_EXPLOSION_DURATION_MS * 4 + 32);
+    expect(presentation.telemetry().active).toBe(1);
+    presentation.update(5_000 + GRENADE_EXPLOSION_DURATION_MS * 4 + 48);
+    expect(presentation.telemetry().active).toBe(0);
+    expect(slotRoot.visible).toBe(false);
   });
 });

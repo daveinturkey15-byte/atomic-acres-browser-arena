@@ -3,14 +3,19 @@ import {
   VIEWMODEL_CONTACT_PROBE_OFFSETS,
   VIEWMODEL_CONTACT_PROFILES,
   VIEWMODEL_CONTACT_RESPONSE_CONTRACT,
+  VIEWMODEL_FIRE_ADMISSION_CONTRACT,
+  VIEWMODEL_FIRE_BLOCK_HIGH_READY_BLEND,
+  VIEWMODEL_FIRE_MAXIMUM_SPREAD_PENALTY_RADIANS,
   advanceAdsBlend,
   advanceWeaponHeat,
   fireCycleAt,
   hitReactionAt,
   magnifiedFovDegrees,
+  viewmodelContactResponse,
+  viewmodelFireAdmission,
+  viewmodelFireAdmissionFromResponse,
   viewmodelFloorClearance,
   viewmodelContactProbePaddingMeters,
-  viewmodelContactResponse,
   viewmodelObstructionPose,
   viewmodelSurfaceRetreat,
 } from './weapon-presentation-state';
@@ -290,5 +295,80 @@ describe('weapon presentation state', () => {
     expect(adsContact.scale).toBeLessThan(1);
     expect(adsContact.additionalLiftMeters).toBeGreaterThan(0);
     expect(adsContact.additionalDropMeters).toBeGreaterThan(0);
+  });
+
+  // HF-343: the near-wall raise must gate firing, presentation-only no more.
+  it('recommends a typed fire policy from the contact response without touching aim authority', () => {
+    const open = viewmodelFireAdmission('carbine', 0, 0, false, 0);
+    expect(open).toMatchObject({
+      contract: VIEWMODEL_FIRE_ADMISSION_CONTRACT,
+      weapon: 'carbine',
+      policy: 'block-full-stow-graduate-partial-v1',
+      aimAuthority: 'camera-forward-unchanged',
+      obstructionBlend: 0,
+      highReadyBlend: 0,
+      fireBlocked: false,
+      blockReason: 'open-space',
+      spreadPenaltyRadians: 0,
+    });
+
+    // Fully raised against cover (retreat clamped at the profile maximum, the
+    // wall blend saturating) must block with the full-stow reason.
+    const profile = VIEWMODEL_CONTACT_PROFILES.carbine;
+    const raised = viewmodelFireAdmission('carbine', profile.maximumSurfaceRetreatMeters, 0, false, 0);
+    expect(raised.fireBlocked).toBe(true);
+    expect(raised.blockReason).toBe('full-stow');
+    expect(raised.spreadPenaltyRadians).toBe(VIEWMODEL_FIRE_MAXIMUM_SPREAD_PENALTY_RADIANS);
+
+    // A forward probe hit inside the authored full-stow distance blocks even
+    // when the smoothed retreat has not saturated yet.
+    const stow = viewmodelFireAdmissionFromResponse(
+      'carbine',
+      viewmodelContactResponse('carbine', 0.2, 0, false, 0),
+      profile.fullStowDistanceMeters,
+    );
+    expect(stow.fireBlocked).toBe(true);
+    expect(stow.blockReason).toBe('full-stow');
+
+    // Partially raised: graduated penalty, never blocked below the threshold.
+    const partial = viewmodelFireAdmission('carbine', profile.maximumSurfaceRetreatMeters * 0.5, 0, false, 0);
+    expect(partial.fireBlocked).toBe(false);
+    expect(partial.blockReason).toBe('open-space');
+    expect(partial.highReadyBlend).toBeGreaterThan(0);
+    expect(partial.highReadyBlend).toBeLessThan(VIEWMODEL_FIRE_BLOCK_HIGH_READY_BLEND);
+    expect(partial.spreadPenaltyRadians).toBeGreaterThan(0);
+    expect(partial.spreadPenaltyRadians).toBeLessThan(VIEWMODEL_FIRE_MAXIMUM_SPREAD_PENALTY_RADIANS);
+    // Monotonic graduation: raising further never reduces the penalty.
+    const moreRaised = viewmodelFireAdmission('carbine', profile.maximumSurfaceRetreatMeters * 0.75, 0, false, 0);
+    expect(moreRaised.spreadPenaltyRadians).toBeGreaterThan(partial.spreadPenaltyRadians);
+
+    // The high-ready threshold itself blocks with the dedicated reason when
+    // the wall blend alone has not saturated (floor-driven raise).
+    const floorRaised = viewmodelFireAdmissionFromResponse(
+      'carbine',
+      viewmodelContactResponse('carbine', 0, 1.7, false, 0),
+      5,
+    );
+    expect(floorRaised.highReadyBlend).toBeGreaterThanOrEqual(VIEWMODEL_FIRE_BLOCK_HIGH_READY_BLEND);
+    expect(floorRaised.fireBlocked).toBe(true);
+    expect(floorRaised.blockReason).toBe('high-ready');
+
+    // Settled ADS against cover still cannot fire through the wall.
+    const adsCover = viewmodelFireAdmission('carbine', profile.maximumSurfaceRetreatMeters, 0.2, true, 1);
+    expect(adsCover.fireBlocked).toBe(true);
+
+    for (const value of [raised.highReadyBlend, raised.spreadPenaltyRadians, partial.spreadPenaltyRadians]) {
+      expect(Number.isFinite(value)).toBe(true);
+    }
+  });
+
+  it('keeps every canonical weapon blockable at close cover and free in open space', () => {
+    for (const weapon of WEAPON_IDS) {
+      const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+      expect(viewmodelFireAdmission(weapon, 0, 0, false, 0).fireBlocked, weapon).toBe(false);
+      const blocked = viewmodelFireAdmission(weapon, profile.maximumSurfaceRetreatMeters, 0.2, true, 1);
+      expect(blocked.fireBlocked, weapon).toBe(true);
+      expect(blocked.spreadPenaltyRadians, weapon).toBe(VIEWMODEL_FIRE_MAXIMUM_SPREAD_PENALTY_RADIANS);
+    }
   });
 });

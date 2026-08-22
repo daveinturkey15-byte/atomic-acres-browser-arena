@@ -25,7 +25,9 @@ import {
   advanceWeaponHeat,
   fireCycleAt,
   viewmodelContactResponse,
+  viewmodelFireAdmissionFromResponse,
   type ViewmodelContactResponse,
+  type ViewmodelFireAdmission,
 } from './weapon-presentation-state';
 import { weaponFamilyPresentation } from './weapon-family-presentation';
 import {
@@ -3122,6 +3124,19 @@ export class WeaponPresentation {
     return this.adsBlend;
   }
 
+  /**
+   * HF-343: typed obstruction/high-ready fire admission derived from the same
+   * per-frame contact response that raises the weapon. Presentation applies
+   * nothing itself — this is the seam gameplay's tryFire gate consumes; the
+   * authoritative shot ray and hit timing never pass through here. Hosts that
+   * still hold the raw forward-probe distance should prefer
+   * viewmodelFireAdmissionFromResponse() with that distance for the exact
+   * full-stow check.
+   */
+  fireAdmission(): ViewmodelFireAdmission {
+    return viewmodelFireAdmissionFromResponse(this.active, this.contactResponse);
+  }
+
   minigunSpoolFraction(): number {
     return this.minigunSpool.fraction;
   }
@@ -3444,6 +3459,9 @@ export class WeaponPresentation {
       surfaceRetreat: this.surfaceRetreat,
       surfaceLift: this.surfaceLift,
       contactResponse: this.contactResponse,
+      // HF-343: typed fire admission so the browser evidence gate and the
+      // future tryFire gate read one frozen record, not re-derived blends.
+      fireAdmission: this.fireAdmission(),
       riggedArms: this.riggedArmDiagnostics,
       armsSource: arms?.userData.authoredFirstPersonArms === true
         ? 'authored-two-chain'

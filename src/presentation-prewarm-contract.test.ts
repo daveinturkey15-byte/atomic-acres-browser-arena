@@ -7,6 +7,8 @@ const presentationSources = [
   './grenade-explosion-presentation.ts',
   './support-explosion-presentation.ts',
   './death-drop-presentation.ts',
+  './destructible-shed-presentation.ts',
+  './house-destruction-presentation.ts',
 ] as const;
 
 describe('presentation prewarm startup contract', () => {

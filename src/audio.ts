@@ -22,6 +22,44 @@ const WEAPON_REPORT_GAIN = Object.freeze(Object.fromEntries(
 ) as Record<WeaponId, number>);
 
 export const EXPLOSION_AUDIO_COALESCE_MS = 90;
+
+/**
+ * HF-351 spatial explosion families.
+ *
+ * Procedural recipes (no sampled or proprietary audio):
+ * - semtex: sharper high-frequency crack plus a delayed debris-patter band;
+ * - crossbow: metallic ringing partials (inharmonic pair) on a short body;
+ * - support: deeper 30-40Hz pressure weight with a long low tail.
+ */
+export const EXPLOSION_SPATIAL_PROFILES = Object.freeze({
+  semtex: Object.freeze({ crackHz: 3_400, crackEndRatio: 0.42, crackVolume: 0.2, crackDuration: 0.05, debrisDelay: 0.075, debrisVolume: 0.14, bodySweep: Object.freeze([120, 30] as const), bodyDuration: 0.5, bodyVolume: 0.6, ringPartialHz: 0, ringVolume: 0, subHz: 44, subEndHz: 26, subVolume: 0.34, subDuration: 0.55, refDistance: 10, rolloff: 0.28 }),
+  crossbow: Object.freeze({ crackHz: 1_900, crackEndRatio: 0.55, crackVolume: 0.12, crackDuration: 0.04, debrisDelay: 0.06, debrisVolume: 0.08, bodySweep: Object.freeze([96, 34] as const), bodyDuration: 0.38, bodyVolume: 0.45, ringPartialHz: 1_240, ringVolume: 0.09, subHz: 52, subEndHz: 30, subVolume: 0.2, subDuration: 0.4, refDistance: 9, rolloff: 0.32 }),
+  support: Object.freeze({ crackHz: 1_450, crackEndRatio: 0.4, crackVolume: 0.15, crackDuration: 0.07, debrisDelay: 0.11, debrisVolume: 0.16, bodySweep: Object.freeze([84, 22] as const), bodyDuration: 0.72, bodyVolume: 0.66, ringPartialHz: 0, ringVolume: 0, subHz: 38, subEndHz: 21, subVolume: 0.46, subDuration: 0.95, refDistance: 12, rolloff: 0.22 }),
+} satisfies Record<'semtex' | 'crossbow' | 'support', {
+  crackHz: number; crackEndRatio: number; crackVolume: number; crackDuration: number;
+  debrisDelay: number; debrisVolume: number;
+  bodySweep: readonly [number, number]; bodyDuration: number; bodyVolume: number;
+  ringPartialHz: number; ringVolume: number;
+  subHz: number; subEndHz: number; subVolume: number; subDuration: number;
+  refDistance: number; rolloff: number;
+}>);
+
+export type ExplosionSpatialFamily = keyof typeof EXPLOSION_SPATIAL_PROFILES;
+
+/** HF-350: ambience bed ducks for this long after any explosion mix. */
+export const AMBIENCE_EXPLOSION_DUCK_MS = 4_000;
+/** HF-350: duck target multiplier and setTargetAtTime smoothing constant. */
+export const AMBIENCE_EXPLOSION_DUCK_GAIN = 0.4;
+export const AMBIENCE_EXPLOSION_DUCK_TIME_CONSTANT_S = 0.18;
+/**
+ * HF-351 (owner-supplied technique): give ambient bed loops MUTUALLY
+ * INCOMMENSURATE periods so the summed ambience never audibly repeats. Each
+ * bed voice drifts against the others; the combined pattern's repetition
+ * period is effectively unbounded. Values are prime-ish, irrational-ratio
+ * seconds and must never be integer multiples of each other.
+ */
+export const AMBIENCE_INCOMMENSURATE_PERIODS_SECONDS = Object.freeze([9.31, 11.73, 16.41] as const);
+
 export const GRENADE_FUSE_BEEP_START_MS = 1_450;
 
 export const FLASHBANG_AUDIO_PROFILE = Object.freeze({
@@ -37,6 +75,25 @@ export const FLASHBANG_AUDIO_PROFILE = Object.freeze({
   scheduledBeeps: 0,
   onsetDelayMs: 0,
 } as const);
+
+/**
+ * HF-351 near-blast tinnitus tail (reuses the flashbang recovery envelope
+ * pattern): soft sine sweeps that fade over ~2.4s when a blast detonates
+ * within NEAR_BLAST_TINNITUS_DISTANCE of the listener. Accessibility scaling
+ * multiplies the volume; reduced-sensory callers pass scale 0.
+ */
+export const NEAR_BLAST_TINNITUS_DISTANCE = 7;
+export const NEAR_BLAST_TINNITUS_TAIL_MS = 2_400;
+export const NEAR_BLAST_TINNITUS_PROFILE = Object.freeze({
+  firstFromHz: 5_200,
+  firstToHz: 2_300,
+  firstDurationSeconds: FLASHBANG_AUDIO_PROFILE.firstRecoveryDurationSeconds,
+  firstVolume: 0.05,
+  secondFromHz: 6_800,
+  secondToHz: 3_100,
+  secondDurationSeconds: FLASHBANG_AUDIO_PROFILE.secondRecoveryDurationSeconds,
+  secondVolume: 0.032,
+});
 
 export type FlashbangAudioEnvelope = Readonly<{
   audioGain: number;
@@ -383,6 +440,47 @@ export class ArenaAudio {
   private matchCountdownCuePlays = 0;
   private lastMatchCountdownCue: MatchCountdownAudioCueId | null = null;
   private explosionAudioGate = createExplosionAudioGate();
+  // HF-350: bounded ambience-duck bookkeeping. The duck is a single
+  // setTargetAtTime automation on the ambience bus; recovery is armed by wall
+  // clock and re-checked on each explosion mix (no timers to leak).
+  private ambienceDuckArmed = false;
+  private ambienceDuckStartedAtSeconds = Number.NEGATIVE_INFINITY;
+  private ambienceDuckCount = 0;
+  private lastAmbienceDuckRecoverySeconds = -1;
+  // HF-351: near-blast tinnitus tail counters (flashbang-pattern envelope).
+  private tinnitusTails = 0;
+  private lastTinnitusDistanceM = Number.NaN;
+  /** HF-351 accessibility scale for the tinnitus tail (0 mutes it entirely). */
+  private tinnitusAccessibilityScale: number | null = null;
+  // HF-351: last spatial explosion mix summary (telemetry + tests).
+  private lastSpatialExplosion: Readonly<{
+    family: ExplosionSpatialFamily;
+    distanceM: number;
+    spatial: boolean;
+    layers: number;
+    atSeconds: number;
+  }> | null = null;
+  /**
+   * HF-350/HF-351: observable explosion-audio ownership. The buzzing report can
+   * only be closed with evidence about what is actually running, so the duck,
+   * tinnitus and spatial-mix counters are readable rather than write-only.
+   */
+  explosionAudioDiagnostics(): Readonly<{
+    ambienceDucks: number;
+    lastAmbienceDuckRecoverySeconds: number;
+    tinnitusTails: number;
+    lastTinnitusDistanceM: number;
+    lastSpatialExplosion: ArenaAudio['lastSpatialExplosion'];
+  }> {
+    return Object.freeze({
+      ambienceDucks: this.ambienceDuckCount,
+      lastAmbienceDuckRecoverySeconds: this.lastAmbienceDuckRecoverySeconds,
+      tinnitusTails: this.tinnitusTails,
+      lastTinnitusDistanceM: this.lastTinnitusDistanceM,
+      lastSpatialExplosion: this.lastSpatialExplosion,
+    });
+  }
+
   private railgunReports = {
     local: 0,
     replicated: 0,
@@ -396,6 +494,8 @@ export class ArenaAudio {
   private readonly railgunSpatialNodes: AudioNode[] = [];
   private readonly railgunSpatialTimers: ReturnType<typeof setTimeout>[] = [];
   private railgunSpatialChainCount = 0;
+  /** HF-351: timers owning explosion spatial panner chains (railgun pattern). */
+  private readonly explosionSpatialTimers: ReturnType<typeof setTimeout>[] = [];
   private flashbangs = { plays: 0, lastAudioGain: 0, immediateOnsets: 0, scheduledBeeps: 0 };
   private activeVoices = new Map<AudioScheduledSourceNode, { id: number; bus: AudioBusId; startedAt: number; priority: number; spatial: boolean; distance: number; protectedContinuous: boolean }>();
   private readonly continuousVoiceOwners = new Map<AudioScheduledSourceNode, ContinuousVoiceOwnership>();
@@ -418,6 +518,11 @@ export class ArenaAudio {
   private grenadeEffectsPrepareRuns = 0;
   private grenadeEffectWarmupSources = 0;
   private grenadeEffectWarmupNodes = 0;
+  // HF-332: Interactive-destruction / collapse-debris audio prewarm state
+  private destructionEffectsPrepared = false;
+  private destructionEffectsPrepareRuns = 0;
+  private destructionEffectWarmupSources = 0;
+  private destructionEffectWarmupNodes = 0;
   private lowHealthFeedbackActive = false;
   private lowHealthFeedbackAudible = false;
   private lowHealthAppliedState: Readonly<{
@@ -532,6 +637,8 @@ export class ArenaAudio {
     this.stopAllChopperRotors();
     this.stopSources(this.arenaSources);
     this.disconnectNodes(this.arenaNodes);
+    this.ambienceDuckArmed = false;
+    for (const timer of this.explosionSpatialTimers.splice(0)) clearTimeout(timer);
     this.stopSources(this.combatFeedbackSources);
     this.disconnectNodes(this.combatFeedbackNodes);
     for (const source of [...this.activeVoices.keys()]) this.stopSource(source);
@@ -565,6 +672,9 @@ export class ArenaAudio {
     }
     this.footstepChains = [];
     this.resetCombatFeedbackState();
+    this.destructionEffectsPrepared = false;
+    this.destructionEffectWarmupSources = 0;
+    this.destructionEffectWarmupNodes = 0;
     this.noiseBuffer = null;
     if (context && context.state !== 'closed') void context.close();
   }
@@ -864,6 +974,80 @@ export class ArenaAudio {
       this.grenadeEffectWarmupSources = 0;
       this.grenadeEffectWarmupNodes = 0;
       this.grenadeEffectsPrepared = false;
+      return false;
+    }
+  }
+
+  /**
+   * HF-332: Prewarms interactive-destruction and collapse-debris audio graphs at
+   * zero gain before match admission. Prewarms metal, wood, and concrete impact
+   * filters/gains and structural sweep oscillators without retaining broadband loops.
+   */
+  prepareDestructionEffects(): boolean {
+    if (this.destructionEffectsPrepared) return true;
+    if (!this.context || !this.feedback || !this.noiseBuffer) return false;
+    this.destructionEffectsPrepareRuns += 1;
+    const sources: AudioScheduledSourceNode[] = [];
+    const nodes: AudioNode[] = [];
+    const now = this.context.currentTime;
+    try {
+      for (const [filterType, frequency, q] of [
+        ['bandpass', 3_150, 1.25],
+        ['bandpass', 980, 1.25],
+        ['bandpass', 1_780, 1.25],
+      ] as const) {
+        const source = this.context.createBufferSource();
+        const filter = this.context.createBiquadFilter();
+        const gain = this.context.createGain();
+        sources.push(source);
+        nodes.push(filter, gain);
+        source.buffer = this.noiseBuffer;
+        filter.type = filterType;
+        filter.frequency.value = frequency;
+        filter.Q.value = q;
+        gain.gain.value = 0;
+        source.connect(filter).connect(gain).connect(this.feedback);
+        source.onended = () => {
+          try { source.disconnect(); } catch { /* silent warmup already released */ }
+          try { filter.disconnect(); } catch { /* silent warmup already released */ }
+          try { gain.disconnect(); } catch { /* silent warmup already released */ }
+        };
+        source.start(now, 0, 0.001);
+        source.stop(now + 0.002);
+      }
+      for (const [type, frequency] of [
+        ['square', 960], ['triangle', 240], ['triangle', 410], ['triangle', 118],
+      ] as const) {
+        const source = this.context.createOscillator();
+        const gain = this.context.createGain();
+        sources.push(source);
+        nodes.push(gain);
+        source.type = type as OscillatorType;
+        source.frequency.value = frequency;
+        gain.gain.value = 0;
+        source.connect(gain).connect(this.feedback);
+        source.onended = () => {
+          try { source.disconnect(); } catch { /* silent warmup already released */ }
+          try { gain.disconnect(); } catch { /* silent warmup already released */ }
+        };
+        source.start(now);
+        source.stop(now + 0.001);
+      }
+      this.destructionEffectWarmupSources = sources.length;
+      this.destructionEffectWarmupNodes = nodes.length;
+      this.destructionEffectsPrepared = true;
+      return true;
+    } catch {
+      for (const source of sources) {
+        try { source.stop(); } catch { /* partially started silent warmup */ }
+        try { source.disconnect(); } catch { /* partially connected silent warmup */ }
+      }
+      for (const node of nodes) {
+        try { node.disconnect(); } catch { /* partially connected silent warmup */ }
+      }
+      this.destructionEffectWarmupSources = 0;
+      this.destructionEffectWarmupNodes = 0;
+      this.destructionEffectsPrepared = false;
       return false;
     }
   }
@@ -1278,15 +1462,244 @@ export class ArenaAudio {
     loop.gain.gain.value = 0.008 + boundedFraction * 0.036;
   }
 
+  /**
+   * Legacy non-spatial explosion cue. Preserves the exact authored broadband
+   * blast recipe (sawtooth pressure sweep plus lowpass and highpass noise).
+   */
   explosion(now = performance.now()): boolean {
     const admission = admitExplosionAudioMix(this.explosionAudioGate, now);
     this.explosionAudioGate = admission.state;
     if (!admission.admitted) return false;
     if (!this.weapons) return true;
     this.sweep(96, 24, 0.58, 0.29, 'sawtooth', this.weapons);
-    this.noise({ duration: 0.64, volume: 0.42, filter: 'lowpass', frequency: 2100, q: 0.5 }, this.weapons);
+    this.filteredNoise({ duration: 0.64, volume: 0.42, filter: 'lowpass', frequency: 2100, q: 0.5 }, this.weapons);
     this.noise({ duration: 0.18, volume: 0.12, filter: 'highpass', frequency: 3100, q: 0.4, delay: 0.035 }, this.weapons);
+    this.duckAmbienceForExplosion();
     return true;
+  }
+
+  /**
+   * HF-351 spatial, family-aware explosion mix. Distance gain plus a lowpass,
+   * HRTF panner chain (reusing the railgun spatial-chain pattern), per-family
+   * layers (semtex sharper crack + debris patter, crossbow metallic ring,
+   * support deeper 30-40Hz weight), and a near-blast tinnitus tail reusing the
+   * flashbang recovery envelope. Every layer runs through registerVoice(), so
+   * the global/bus voice budgets and steal policy still apply.
+   */
+  explosionAt(
+    point: SpatialPoint,
+    family: ExplosionSpatialFamily = 'semtex',
+    now = performance.now(),
+  ): boolean {
+    const admission = admitExplosionAudioMix(this.explosionAudioGate, now);
+    this.explosionAudioGate = admission.state;
+    if (!admission.admitted) return false;
+    const distance = Math.max(0, Math.hypot(
+      point.x - this.listenerPosition.x,
+      point.y - this.listenerPosition.y,
+      point.z - this.listenerPosition.z,
+    ));
+    const profile = EXPLOSION_SPATIAL_PROFILES[family];
+    // Distance gain: full inside refDistance, smooth inverse falloff beyond.
+    const distanceGain = distance <= profile.refDistance
+      ? 1
+      : Math.max(0.06, profile.refDistance / (profile.refDistance + profile.rolloff * (distance - profile.refDistance)));
+    const lowpassHz = Math.round(Math.min(16_000, Math.max(900, 9_500 * distanceGain)));
+    let destination: AudioNode | null = this.weapons;
+    let spatial = false;
+    if (this.context && this.weapons && Number.isFinite(point.x + point.y + point.z)) {
+      const panner = this.createExplosionSpatialPanner(point, distance, profile.refDistance, profile.rolloff, lowpassHz, Math.max(profile.bodyDuration + 0.1, family === 'support' ? NEAR_BLAST_TINNITUS_TAIL_MS / 1000 : 0));
+      if (panner) {
+        destination = panner;
+        spatial = true;
+      }
+    }
+    if (!destination) return true;
+    const attenuation = distanceGain;
+    let layers = 0;
+
+    // Layer 1 - pressure body sweep.
+    this.sweep(profile.bodySweep[0], profile.bodySweep[1], profile.bodyDuration, profile.bodyVolume * 0.55 * attenuation, 'sawtooth', destination);
+    layers += 1;
+    // Layer 2 - broadband blast noise through the same distance lowpass.
+    this.filteredNoise({
+      duration: Math.min(0.8, profile.bodyDuration),
+      volume: 0.42 * attenuation,
+      filter: 'lowpass',
+      frequency: lowpassHz,
+      q: 0.5,
+    }, destination);
+    layers += 1;
+    // Layer 3 - family crack.
+    this.sweep(profile.crackHz, Math.max(120, profile.crackHz * profile.crackEndRatio), profile.crackDuration, profile.crackVolume * attenuation, 'square', destination);
+    layers += 1;
+    // Layer 4 - debris patter (delayed band-passed noise).
+    this.noise({
+      duration: 0.22,
+      volume: profile.debrisVolume * attenuation,
+      filter: 'bandpass',
+      frequency: family === 'support' ? 900 : 1_650,
+      q: 0.6,
+      delay: profile.debrisDelay,
+    }, destination);
+    layers += 1;
+    // Layer 5 - crossbow metallic ring partials (inharmonic pair).
+    if (profile.ringPartialHz > 0 && profile.ringVolume > 0) {
+      this.tone(profile.ringPartialHz, 0.34, profile.ringVolume * attenuation, 'triangle', destination, 0.01);
+      this.tone(profile.ringPartialHz * 2.41, 0.26, profile.ringVolume * 0.7 * attenuation, 'sine', destination, 0.012);
+      layers += 2;
+    }
+    // Layer 6 - sub pressure weight (deepest on support).
+    this.sweep(profile.subHz, profile.subEndHz, profile.subDuration, profile.subVolume * attenuation, 'sine', destination);
+    layers += 1;
+
+    this.lastSpatialExplosion = Object.freeze({
+      family,
+      distanceM: Number(distance.toFixed(2)),
+      spatial,
+      layers,
+      atSeconds: this.context?.currentTime ?? 0,
+    });
+
+    // HF-350: duck the ambience bed for ~4s after any admitted explosion mix.
+    this.duckAmbienceForExplosion();
+    // HF-351: near-blast tinnitus tail inside NEAR_BLAST_TINNITUS_DISTANCE.
+    this.nearBlastTinnitus(distance);
+    return true;
+  }
+
+  /** HF-350 bounded ambience duck: one setTargetAtTime dip plus timed recovery. */
+  private duckAmbienceForExplosion(): void {
+    if (!this.context || !this.ambience) return;
+    const currentTime = this.context.currentTime;
+    if (!this.ambienceDuckArmed || currentTime - this.ambienceDuckStartedAtSeconds >= AMBIENCE_EXPLOSION_DUCK_MS / 1000) {
+      const scalar = this.currentAmbienceScalar();
+      this.ambience.gain.cancelScheduledValues(currentTime);
+      this.ambience.gain.setTargetAtTime(
+        Math.max(0, this.busBaseGain('ambience') * scalar * AMBIENCE_EXPLOSION_DUCK_GAIN),
+        currentTime,
+        AMBIENCE_EXPLOSION_DUCK_TIME_CONSTANT_S,
+      );
+      this.ambienceDuckArmed = true;
+      this.ambienceDuckStartedAtSeconds = currentTime;
+      this.ambienceDuckCount += 1;
+    }
+  }
+
+  /** Restores the ambience bus after AMBIENCE_EXPLOSION_DUCK_MS; call each frame. */
+  recoverAmbienceDuck(): void {
+    if (!this.context || !this.ambience) return;
+    if (!this.ambienceDuckArmed) return;
+    const currentTime = this.context.currentTime;
+    if (currentTime - this.ambienceDuckStartedAtSeconds < AMBIENCE_EXPLOSION_DUCK_MS / 1000) return;
+    const scalar = this.currentAmbienceScalar();
+    this.ambience.gain.cancelScheduledValues(currentTime);
+    this.ambience.gain.setTargetAtTime(
+      this.busBaseGain('ambience') * scalar,
+      currentTime,
+      AMBIENCE_EXPLOSION_DUCK_TIME_CONSTANT_S,
+    );
+    this.lastAmbienceDuckRecoverySeconds = currentTime;
+    this.ambienceDuckArmed = false;
+  }
+
+  private currentAmbienceScalar(): number {
+    const settings = this.audioSettings;
+    const muted = settings?.mutes.ambience ?? false;
+    const gain = settings?.gains.ambience ?? 100;
+    return muted ? 0 : Math.max(0, Math.min(1, gain / 100));
+  }
+
+  /** HF-351 near-blast tinnitus tail; volume scales with accessibility input. */
+  setNearBlastTinnitusScale(scale: number): void {
+    const bounded = Number.isFinite(scale) ? Math.max(0, Math.min(1, scale)) : 0;
+    this.tinnitusAccessibilityScale = bounded;
+  }
+
+  private nearBlastTinnitus(distance: number): void {
+    if (distance > NEAR_BLAST_TINNITUS_DISTANCE) return;
+    if ((this.tinnitusAccessibilityScale ?? 0) <= 0) return;
+    const scale = this.tinnitusAccessibilityScale!;
+    this.sweep(
+      NEAR_BLAST_TINNITUS_PROFILE.firstFromHz,
+      NEAR_BLAST_TINNITUS_PROFILE.firstToHz,
+      NEAR_BLAST_TINNITUS_PROFILE.firstDurationSeconds,
+      NEAR_BLAST_TINNITUS_PROFILE.firstVolume * scale,
+      'sine',
+      this.feedback,
+      FLASHBANG_AUDIO_PROFILE.firstRecoveryDelaySeconds,
+    );
+    this.sweep(
+      NEAR_BLAST_TINNITUS_PROFILE.secondFromHz,
+      NEAR_BLAST_TINNITUS_PROFILE.secondToHz,
+      NEAR_BLAST_TINNITUS_PROFILE.secondDurationSeconds,
+      NEAR_BLAST_TINNITUS_PROFILE.secondVolume * scale,
+      'sine',
+      this.feedback,
+      FLASHBANG_AUDIO_PROFILE.secondRecoveryDelaySeconds,
+    );
+    this.tinnitusTails += 1;
+    this.lastTinnitusDistanceM = Number(distance.toFixed(2));
+  }
+
+  /**
+   * HF-351 HRTF panner + lowpass chain for one spatial explosion, following
+   * the railgun spatial-chain lifecycle (tracked nodes, timer cleanup). The
+   * caller mixes all family layers through the returned node; the timer
+   * releases it once the longest family tail has decayed.
+   */
+  private createExplosionSpatialPanner(
+    point: SpatialPoint,
+    distance: number,
+    refDistance: number,
+    rolloffFactor: number,
+    lowpassHz: number,
+    tailSeconds: number,
+  ): PannerNode | null {
+    if (!this.context || !this.weapons
+      || this.spatialChains + 1 > AUDIO_RUNTIME_BUDGET.spatialVoices
+      // HF-351: spatialisation is an enhancement, never a requirement. Contexts
+      // without a panner (older engines, and the offline mocks the prewarm
+      // contract runs against) must still get the blast, just non-spatialised.
+      || typeof this.context.createPanner !== 'function') {
+      this.voicesDropped += 1;
+      return null;
+    }
+    const panner = this.context.createPanner();
+    panner.panningModel = 'HRTF';
+    panner.distanceModel = 'inverse';
+    panner.refDistance = Math.max(1, refDistance);
+    panner.maxDistance = 220;
+    panner.rolloffFactor = Math.max(0.05, rolloffFactor);
+    panner.positionX.value = point.x;
+    panner.positionY.value = point.y;
+    panner.positionZ.value = point.z;
+    const lowpass = this.context.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.value = lowpassHz;
+    lowpass.Q.value = 0.4;
+    lowpass.connect(panner).connect(this.weapons);
+    this.busIdentity.set(panner, 'sfx');
+    this.spatialReportDestinations.add(panner);
+    this.spatialReportDistances.set(panner, distance);
+    this.railgunSpatialNodes.push(panner, lowpass);
+    this.spatialChains += 1;
+    this.railgunSpatialChainCount += 2;
+    const cleanup = () => {
+      for (const node of [panner, lowpass]) {
+        const index = this.railgunSpatialNodes.indexOf(node);
+        if (index >= 0) this.railgunSpatialNodes.splice(index, 1);
+        this.busIdentity.delete(node);
+        try { node.disconnect(); } catch { /* already disconnected */ }
+      }
+      this.spatialChains = Math.max(0, this.spatialChains - 1);
+      this.railgunSpatialChainCount = Math.max(0, this.railgunSpatialChainCount - 2);
+      const timerIndex = this.explosionSpatialTimers.indexOf(timer);
+      if (timerIndex >= 0) this.explosionSpatialTimers.splice(timerIndex, 1);
+    };
+    const timer = setTimeout(cleanup, Math.ceil(Math.max(0.25, tailSeconds) * 1_000));
+    this.explosionSpatialTimers.push(timer);
+    return panner;
   }
 
   flashbang(audioGain = 1): void {
@@ -1547,6 +1960,14 @@ export class ArenaAudio {
       retainedBroadbandLoops: 0;
       liveRecipe: 'sawtooth-pressure-plus-dual-filtered-noise-v1';
     };
+    destructionEffectsPrewarm: {
+      prepared: boolean;
+      runs: number;
+      warmupSources: number;
+      warmupNodes: number;
+      retainedSources: 0;
+      retainedBroadbandLoops: 0;
+    };
     lowHealth: { prepared: boolean; sources: number; active: boolean; audible: boolean; automationWrites: number; broadbandSources: 0 };
     damageFeedback: { prepared: boolean; sources: number; pulses: number };
     grenadeFuse: { beeps: number; startMs: number };
@@ -1610,6 +2031,14 @@ export class ArenaAudio {
         retainedSources: 0,
         retainedBroadbandLoops: 0,
         liveRecipe: 'sawtooth-pressure-plus-dual-filtered-noise-v1',
+      },
+      destructionEffectsPrewarm: {
+        prepared: this.destructionEffectsPrepared,
+        runs: this.destructionEffectsPrepareRuns,
+        warmupSources: this.destructionEffectWarmupSources,
+        warmupNodes: this.destructionEffectWarmupNodes,
+        retainedSources: 0,
+        retainedBroadbandLoops: 0,
       },
       lowHealth: {
         prepared: this.combatFeedbackPrepared && this.lowHealthGains.length === 2,
@@ -1932,11 +2361,25 @@ export class ArenaAudio {
     const toneFilter = this.context.createBiquadFilter();
     const toneGain = this.context.createGain();
     const tonePanner = this.context.createPanner();
-    tone.type = arenaId === 'rustworks-1v1' ? 'sawtooth' : 'sine';
+    // HF-350: the rustworks bed was a raw sawtooth - its dense harmonic stack
+    // read as a continuous electrical buzz behind combat. A low-passed
+    // triangle keeps the same fundamental weight without that buzz signature.
+    tone.type = arenaId === 'rustworks-1v1' ? 'triangle' : 'sine';
     tone.frequency.value = definition.bedFrequencyHz;
     toneFilter.type = 'lowpass';
     toneFilter.frequency.value = definition.airFrequencyHz * 2;
     toneGain.gain.value = 0.012;
+    // HF-351 incommensurate bed loop #1 (9.31s): slow amplitude swell so the
+    // tone breathes instead of sitting at a constant drone level. Its period
+    // shares no integer ratio with the air-voice loops below, so the summed
+    // ambience has no audible repetition period.
+    {
+      const tonePeriodSeconds = AMBIENCE_INCOMMENSURATE_PERIODS_SECONDS[0];
+      const baseGain = 0.012;
+      toneGain.gain.setValueAtTime(baseGain * 0.85, now);
+      toneGain.gain.linearRampToValueAtTime(baseGain * 1.12, now + tonePeriodSeconds / 2);
+      toneGain.gain.linearRampToValueAtTime(baseGain * 0.85, now + tonePeriodSeconds);
+    }
     tonePanner.panningModel = 'HRTF';
     tonePanner.distanceModel = 'inverse';
     tonePanner.refDistance = 8;
@@ -1984,8 +2427,14 @@ export class ArenaAudio {
     // A filtered, gently modulated oscillator retains air movement without the
     // recurring broadband hiss that became obvious after loud combat tails.
     air.frequency.setValueAtTime(definition.airFrequencyHz, now);
-    const halfCycleSeconds = 0.5 / definition.modulationHz;
-    const scheduledHalfCycles = Math.ceil(120 / halfCycleSeconds);
+    // HF-351: the air voice drifts on an incommensurate LFO period (see
+    // AMBIENCE_INCOMMENSURATE_PERIODS_SECONDS) instead of the definition's
+    // modulation rate, so the bed never falls into an audible loop against
+    // the tone voice. The schedule window is 2x the period; startArenaBed()
+    // re-runs on every arena/map change, which refreshes the automation.
+    const driftPeriodSeconds = AMBIENCE_INCOMMENSURATE_PERIODS_SECONDS[0];
+    const halfCycleSeconds = driftPeriodSeconds * 0.5;
+    const scheduledHalfCycles = Math.ceil((driftPeriodSeconds * 2) / halfCycleSeconds);
     for (let step = 1; step <= scheduledHalfCycles; step += 1) {
       const direction = step % 2 === 0 ? -1 : 1;
       air.frequency.exponentialRampToValueAtTime(
@@ -2088,6 +2537,15 @@ export class ArenaAudio {
       gain.disconnect();
     };
     source.start(now, presentationRandom() * Math.max(0.001, this.noiseBuffer.duration - options.duration), options.duration);
+  }
+
+  /**
+   * HF-351: explicit-filter noise alias. The shared noise() already takes a
+   * filter frequency, so this simply forwards; it exists to keep the explosion
+   * mix call sites self-documenting about the distance lowpass stage.
+   */
+  private filteredNoise(options: NoiseOptions & { frequency: number }, destination: AudioNode | null): void {
+    this.noise(options, destination);
   }
 
   private sweep(

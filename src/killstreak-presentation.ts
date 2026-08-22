@@ -425,6 +425,7 @@ export function authoredSupportMaterialCastsShadow(
 function applyAuthoredSupportShadowBudget(
   root: THREE.Object3D,
   family: keyof typeof AUTHORED_SUPPORT_SHADOW_MATERIALS,
+  options: Readonly<{ castShadows?: boolean }> = {},
 ): void {
   root.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
@@ -433,8 +434,31 @@ function applyAuthoredSupportShadowBudget(
     // colour pass. Shadow maps only need the major opaque silhouette; making
     // every instrument, emissive chip, line and transparent rotor disc a
     // caster multiplied support-streak submissions without a visible benefit.
-    node.castShadow = materials.some((entry) => authoredSupportMaterialCastsShadow(family, entry.name));
+    // HF-336: non-controlling observers additionally pay for every caster of
+    // every LOD level even though only one level renders per frame, so the
+    // caller restricts casters to one low-detail silhouette level via
+    // options.castShadows. Receiving shadows stays unconditional.
+    node.castShadow = (options.castShadows ?? true)
+      && materials.some((entry) => authoredSupportMaterialCastsShadow(family, entry.name));
   });
+}
+
+/**
+ * Coarsest authored vehicle LOD level used as the single shadow-map caster
+ * silhouette (HF-336). Shadow maps only need a believable airframe outline;
+ * rendering casters from LOD0's full mesh set made every observer pay for the
+ * possessor's hidden detail. Families with fewer levels collapse to level 0.
+ */
+export const SUPPORT_VEHICLE_SHADOW_SILHOUETTE_LEVEL = 2;
+
+/**
+ * HF-336: exactly one LOD level casts shadows. The coarsest available level
+ * wins so the shadow pass samples the cheapest geometry regardless of which
+ * level the colour pass currently displays.
+ */
+export function authoredSupportLevelCastsShadows(levelCount: number, levelIndex: number): boolean {
+  if (levelCount <= 0 || levelIndex < 0 || levelIndex >= levelCount) return false;
+  return levelIndex === Math.min(SUPPORT_VEHICLE_SHADOW_SILHOUETTE_LEVEL, levelCount - 1);
 }
 
 const CHOPPER_DISPLAY_MATERIALS = Object.freeze(new Map<string, Readonly<{
@@ -829,6 +853,8 @@ type PresentedEntity = Readonly<{
   authored: boolean;
   cameraSocket: THREE.Object3D | null;
   cockpit: THREE.Object3D | null;
+  /** HF-336: authored LOD graph whose selected level drives mixer advancement. */
+  authoredLod: THREE.LOD | null;
 }>;
 
 function presentedEntity(
@@ -837,6 +863,7 @@ function presentedEntity(
   mixers: readonly THREE.AnimationMixer[],
   authored: boolean,
   oneShotActions: ReadonlyMap<string, readonly THREE.AnimationAction[]> = new Map(),
+  authoredLod: THREE.LOD | null = null,
 ): PresentedEntity {
   return Object.freeze({
     root,
@@ -851,6 +878,7 @@ function presentedEntity(
       ?? root.getObjectByName('chopper-first-person-camera-socket')
       ?? null,
     cockpit: root.getObjectByName('chopper-first-person-cockpit') ?? null,
+    authoredLod,
   });
 }
 
@@ -1691,7 +1719,15 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
       gunnerSightline.userData.firstPersonOnly = true;
     }
     markSharedPresentationAsset(level);
-    if (family === 'chopper') applyAuthoredSupportShadowBudget(level, 'chopper');
+    if (family === 'chopper') {
+      // HF-336: only the coarsest silhouette level (LOD2) feeds the shadow
+      // map. Every observer previously paid for LOD0's full caster set even
+      // while displaying LOD1/LOD2, and the possessor never rendered any of
+      // it — an asymmetric cost exactly when a chopper is overhead.
+      applyAuthoredSupportShadowBudget(level, family, {
+        castShadows: authoredSupportLevelCastsShadows(template.lods.length, index),
+      });
+    }
     // Support vehicles operate 18-30m above the arena, so the old 34m/68m
     // switches meant players almost never saw LOD0's full detailing - the
     // authored craft read as low-poly slabs. One or two active vehicles can
@@ -1738,7 +1774,9 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
     }
   }
   markSharedPresentationAsset(root);
-  return presentedEntity(root, null, mixers, true, oneShotActions);
+  // HF-336: expose the authored LOD graph so per-frame mixer advancement can
+  // follow the level the renderer actually displays.
+  return presentedEntity(root, null, mixers, true, oneShotActions, lod);
 }
 
 function buildProceduralChopperFallback(): PresentedEntity {
@@ -2556,6 +2594,51 @@ export class KillstreakPresentation {
     this.swarmInstanceBatches.length = 0;
   }
 
+  /**
+   * HF-336: advance only the animation mixer of the LOD level the renderer
+   * displays. Non-controlling observers previously evaluated every authored
+   * clip per level per entity every frame (three chopper levels of full-body
+   * and rotor work) while the possessor rendered none of it. The renderer's
+   * own LOD.update() already selected a level this frame, so its index is the
+   * authority; when no selection is known yet (first frame, hidden root,
+   * tests without a camera) all mixers still receive an exact absolute time so
+   * behaviour is unchanged until a level is actually displayed.
+   */
+  /**
+   * HF-336: index of the LOD level the renderer actually selected this frame, or
+   * -1 when no selection can be trusted. Returning -1 is the safe answer — the
+   * caller then advances every mixer, preserving the historic behaviour rather
+   * than silently freezing an animation on a level that is really on screen.
+   */
+  private static authoredActiveLodMixerIndex(
+    authoredLod: THREE.LOD | null,
+    mixerCount: number,
+  ): number {
+    if (!authoredLod || mixerCount <= 0) return -1;
+    // getCurrentLevel() reflects the last LOD.update(camera); before the first
+    // render (or in tests with no camera) it reads 0, which is indistinguishable
+    // from a genuine level-0 selection, so require a populated level list too.
+    const levels = authoredLod.levels;
+    if (!Array.isArray(levels) || levels.length === 0) return -1;
+    const level = typeof authoredLod.getCurrentLevel === 'function'
+      ? authoredLod.getCurrentLevel()
+      : -1;
+    if (!Number.isInteger(level) || level < 0 || level >= mixerCount) return -1;
+    return level;
+  }
+
+  private advanceActiveLevelMixers(presented: PresentedEntity, nowMs: number): void {
+    // HF-336: one mixer update per frame for authored vehicles; the fallback
+    // branch keeps the historic all-mixers behaviour for the frames before the
+    // renderer has selected a level (and for procedural entities with no LOD).
+    const activeIndex = KillstreakPresentation.authoredActiveLodMixerIndex(presented.authoredLod, presented.mixers.length);
+    if (activeIndex < 0) {
+      for (const mixer of presented.mixers) mixer.setTime(nowMs / 1_000);
+      return;
+    }
+    presented.mixers[activeIndex]!.setTime(nowMs / 1_000);
+  }
+
   private syncSwarmInstancing(): void {
     if (this.swarmInstanceBatches.length === 0) return;
     const active = this.activeSwarmEntries;
@@ -3012,7 +3095,7 @@ export class KillstreakPresentation {
         presented.root.quaternion.slerp(presented.attitudeTarget, blend);
       }
       presented.root.userData.supportSnapshotPhase = entity.phase;
-      for (const mixer of presented.mixers) mixer.setTime(nowMs / 1_000);
+      this.advanceActiveLevelMixers(presented, nowMs);
       if (!presented.authored) {
         if (presented.rotor) presented.rotor.rotation.y += entity.kind === 'chopper' ? 0.72 : 1.1;
         const tailRotor = presented.root.getObjectByName('chopper-tail-rotor');

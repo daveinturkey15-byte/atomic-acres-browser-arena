@@ -341,6 +341,108 @@ export function fireCycleAt(weapon: WeaponId, rawAgeMs: number, heat: number): F
   };
 }
 
+// HF-343: the near-wall high-ready raise was presentation-only with zero
+// effect on firing ("when behind cover gun moves up but can still shoot like
+// crosshair"). This typed admission is the handoff seam: the viewmodel contact
+// response already measures how far the weapon is raised, so gameplay (the
+// legacy-main tryFire gate) can consume one frozen record instead of
+// re-deriving blends. Presentation still applies nothing itself — the
+// authoritative shot ray, hit timing and recoil stay exactly where they are;
+// aimAuthority records that contract on every record.
+export const VIEWMODEL_FIRE_ADMISSION_CONTRACT = 'viewmodel-fire-admission-hf343-v1';
+/**
+ * Block firing once the weapon is fully raised against cover: either the
+ * forward probe hit within the authored full-stow distance, or the high-ready
+ * blend reached ~0.9 (the owner asked for "a balance", not a hair trigger).
+ */
+export const VIEWMODEL_FIRE_BLOCK_HIGH_READY_BLEND = 0.9;
+/**
+ * Graduated accuracy penalty while partially raised. 0.014 rad (~0.8 degrees)
+ * is comparable to the carbine's authored hip spread (0.012 rad): a half
+ * raised weapon shoots roughly like strafing, a fully raised one is blocked,
+ * and open space is untouched.
+ */
+export const VIEWMODEL_FIRE_MAXIMUM_SPREAD_PENALTY_RADIANS = 0.014;
+
+export type ViewmodelFireBlockReason = 'open-space' | 'full-stow' | 'high-ready';
+
+export type ViewmodelFireAdmission = Readonly<{
+  contract: typeof VIEWMODEL_FIRE_ADMISSION_CONTRACT;
+  weapon: WeaponId;
+  /** Typed obstruction/high-ready blends mirrored from the contact response. */
+  obstructionBlend: number;
+  highReadyBlend: number;
+  /** Recommended policy: true when the trigger should be refused this frame. */
+  fireBlocked: boolean;
+  blockReason: ViewmodelFireBlockReason;
+  /** Additive radians the host should add to the sampled spread cone. */
+  spreadPenaltyRadians: number;
+  policy: 'block-full-stow-graduate-partial-v1';
+  aimAuthority: 'camera-forward-unchanged';
+}>;
+
+/**
+ * HF-343 recommended fire policy from one contact response. Full stow is
+ * detected two equivalent ways: an explicit forward-probe distance at or
+ * inside the profile's full-stow range, or the wall blend saturating (the
+ * retreat already clamped to its maximum, which the obstruction pose only
+ * produces at that same distance). The spread penalty ramps linearly with the
+ * high-ready blend and saturates at the block threshold so blocked shots
+ * report the maximum penalty rather than an arbitrary one.
+ */
+export function viewmodelFireAdmissionFromResponse(
+  weapon: WeaponId,
+  response: ViewmodelContactResponse,
+  nearestForwardSurfaceMeters: number | null = null,
+): ViewmodelFireAdmission {
+  const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+  const distance = nearestForwardSurfaceMeters === null || !Number.isFinite(nearestForwardSurfaceMeters)
+    ? null
+    : Math.max(0, nearestForwardSurfaceMeters);
+  const fullStow = (distance !== null && distance <= profile.fullStowDistanceMeters)
+    || response.wallBlend >= 1;
+  const highReadyBlend = clamp01(finite(response.highReadyBlend));
+  const raisedPastThreshold = highReadyBlend >= VIEWMODEL_FIRE_BLOCK_HIGH_READY_BLEND;
+  const fireBlocked = fullStow || raisedPastThreshold;
+  const blockReason: ViewmodelFireBlockReason = !fireBlocked
+    ? 'open-space'
+    : fullStow ? 'full-stow' : 'high-ready';
+  const raiseRamp = clamp01(highReadyBlend / VIEWMODEL_FIRE_BLOCK_HIGH_READY_BLEND);
+  return Object.freeze({
+    contract: VIEWMODEL_FIRE_ADMISSION_CONTRACT,
+    weapon,
+    obstructionBlend: clamp01(finite(response.obstructionBlend)),
+    highReadyBlend,
+    fireBlocked,
+    blockReason,
+    spreadPenaltyRadians: fireBlocked
+      ? VIEWMODEL_FIRE_MAXIMUM_SPREAD_PENALTY_RADIANS
+      : VIEWMODEL_FIRE_MAXIMUM_SPREAD_PENALTY_RADIANS * raiseRamp,
+    policy: 'block-full-stow-graduate-partial-v1',
+    aimAuthority: 'camera-forward-unchanged',
+  });
+}
+
+/**
+ * HF-343 convenience wrapper mirroring viewmodelContactResponse's signature,
+ * so the host can gate firing from the same per-frame obstruction inputs the
+ * presentation consumes (plus the raw forward-probe distance when it has one).
+ */
+export function viewmodelFireAdmission(
+  weapon: WeaponId,
+  surfaceRetreatMeters: number,
+  surfaceLiftMeters: number,
+  prone: boolean,
+  adsBlend: number,
+  nearestForwardSurfaceMeters: number | null = null,
+): ViewmodelFireAdmission {
+  return viewmodelFireAdmissionFromResponse(
+    weapon,
+    viewmodelContactResponse(weapon, surfaceRetreatMeters, surfaceLiftMeters, prone, adsBlend),
+    nearestForwardSurfaceMeters,
+  );
+}
+
 /** Presentation-only reaction envelope; authoritative operator hit meshes do not consume these rotations. */
 export function hitReactionAt(rawAgeMs: number, zone: HitZone): HitReactionState {
   const ageMs = Math.max(0, finite(rawAgeMs));
