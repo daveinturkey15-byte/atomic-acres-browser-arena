@@ -51,7 +51,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Source: pass74.txt ("fix bots in killstreak area they don't have collision properly I thin?") and
   atomicnext.txt P0-3 (player clips through walls/floors in the killstreak test area — must never
   happen anywhere).
-- Status: OPEN
+- Status: IMPLEMENTED (97faa806) — test-bay dummies now derive per-tick movement colliders merged like the door colliders; still hittable by hitscan; released on retirement. 13 tests.
 
 ### HF-319 — M14 damage reduced by exactly 40%
 - Source: atomicnext.txt ("Lessen dmg of M14 by 40%" with damage/range/headshot tests). Verify
@@ -75,15 +75,15 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Source: pass74.txt ("cant move alot in host and guest lobby etc"; "cant mov when spawn into
   rustrig in host guest lobby") and atomicnext.txt (Terminal TDM "just cant move";
   "Synchronizing Terminal before ready-up… between swapping maps").
-- Status: OPEN
+- Status: IMPLEMENTED (9a8e5786) — all three permanent-freeze wedges fixed: identity flag no longer left armed on a waiting-phase join, repair handshake re-arms within its cap, exhausted repair surfaces a visible failure. Independent critic confirmed it PREVENTS/RECOVERS rather than bypassing admission. Tests are static source guards, so two-machine HITL still owed.
 
 ### HF-323 — the match must not start before all joined players are ready to play
 - Source: pass74.txt ("game starts bnefore all people join? Sort?").
-- Status: OPEN
+- Status: IMPLEMENTED (ba4cd584) — start is held while an admission is in flight, joiners are admitted during the countdown lead instead of bounced, and match-active rejection is scoped to phase active only.
 
 ### HF-324 — cannot type in the lobby (chat/inputs)
 - Source: pass74.txt ("cant type in lobby").
-- Status: IMPLEMENTED (51c440f0, 9a8e5786, audit fix) — chat panel click affordance, lobby-visible input row, Enter no longer swallowed by focused lobby buttons. Audit caught that the Tab scoping had also killed the scoreboard while dead, during warmup and at match end; Tab now stays available once a match has started.
+- Status: IMPLEMENTED (9a8e5786 + ba4cd584) — chat panel click affordance, lobby-visible input row, Enter no longer swallowed by focused lobby buttons; Tab retained for the scoreboard once a match has started.
 
 ### HF-325 — host disconnect: hand over or recover authority without kicking; rejoin after refresh
 - Source: atomicnext.txt ("if host dc, cant rejoin, can it hand host and not kick others? even if
@@ -138,7 +138,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   hard to see read and use now, revert it or just make a new pass that has decent colours and
   visuals etc?"). Direction chosen: a new pass in the retro-military dark console palette from
   `atomic-acres-ui-style-guide.md`, every text pair at 4.5:1 or better, legible at 1280x720.
-- Status: OPEN
+- Status: IMPLEMENTED via HF-362 (51c440f0) — killstreak panel brought onto the dark console palette with real contrast; owner taste remains HITL.
 
 ### HF-334 — Care Package may yield the Flamethrower at exactly 10%
 - Source: pass74.txt ("add 10% chance in care package to get a flamethrower"). The flamethrower is a
@@ -165,7 +165,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-338 — health regenerates while controlling Chopper Gunner or Piloted Drone
 - Source: atomicnext.txt row 8 (normal regen eligibility continues during possession unless actively
   damaged; host authority preserved; no client-authored healing).
-- Status: OPEN
+- Status: IMPLEMENTED (97faa806) — regen now runs from the fixed-step loop independent of playerSimulationEnabled(), so it continues during Chopper Gunner and drone possession; the old inline block was removed so exactly one regen path exists.
 
 ### HF-339 — rare-weapon spawn announcements unmistakable to every player
 - Source: atomicnext.txt ("need clearer announce of rare weapon spawns mid game to all in the
@@ -182,7 +182,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-341 — arms look bad with pistol and during knife stab
 - Source: pass74.txt ("arms look abd with pistol and when stabbing with knife") plus atomicnext.txt
   row 10 (full shipped-catalog arms pass).
-- Status: LANDED (aa114737) — hand policy v2: two-hand support always active, replacing the handgun +40m reload-only stow teleport.
+- Status: IMPLEMENTED (970d4c52) — handgun +40m support-arm stow teleport replaced with a posed two-hand grip blended across the reload boundary.
 
 ### HF-342 — arms and gun clip through floors and walls
 - Source: pass74.txt ("arms and gun still clip through floor and walls etc").
@@ -247,7 +247,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   4.5:1; min sizes per AGENTS.md at 1280x720; "alive" = purposeful motion (transitions, pulses,
   scan accents) gated by prefers-reduced-motion and the accessibility scale; zero new gameplay
   authority. Owner taste is HITL.
-- Status: OPEN
+- Status: IMPLEMENTED (51c440f0) — full CSS reskin against the style guide: palette, type scale, spacing, component states, motion behind prefers-reduced-motion. Layout and every surface preserved. Owner taste is HITL.
 
 ### HF-363 — filmic grading, canopy light and procedural-jungle visual quality
 - Source: owner shared https://x.com/prasenx/status/2087604022849184080 as "a great example of high
@@ -333,13 +333,13 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   if a build containing H3-derived assets is later published, those assets ship with it — revisit at
   release time. The lane still starts from the Blender procedural operator pipeline, with H3
   assisting texture/concept work. All archetypes are original designs — no franchise likenesses.
-- Status: OPEN
+- Status: PARTIAL (skins branch 90c4b90f) — three original archetype specs, authoring script and canonical catalog with 26 tests. NO GLB produced: the Blender run and its pre-run critic died when opencode-go hit its monthly quota.
 
 ### HF-361 — mocap-to-animation route evaluated for in-game third-person animation
 - Source: owner directive (mocap X references). `mixamo-llm-mocap` (MIT, pin `00dfd53`) is an
   offline third-person retargeting reference with separately governed dependencies; evaluate as an
   authoring-time route only, never runtime, and never for first-person arms.
-- Status: OPEN
+- Status: IMPLEMENTED (ba4cd584) — docs/PASS74_MOCAP_ROUTE_EVALUATION.md written. Recommendation: do NOT adopt until the GVHMR/SMPL-X licence sub-gate is cleared; the MIT repo licence does not cover them.
 
 ## Process rows
 
