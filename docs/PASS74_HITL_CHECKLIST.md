@@ -1,75 +1,61 @@
-# Pass 74 — owner HITL checklist
+# Pass 74 HITL checklist — regenerated 2026-08-22 (evening)
 
-**Preview:** <http://127.0.0.1:41874/> (local only; nothing published, nothing pushed)
-**Exact source SHA:** `97faa806349ca8e593e03f87d526b9546da95471`
-**Branch:** `contrib/dave-gaming-pc/claude/pass74-20260821` · base Pass 73 `506d6142`
-**Mechanical state:** TypeScript 0 errors · 392 test files / 2858 tests passing, 1 file + 2 tests skipped
+Play at **http://127.0.0.1:41876/** — the integration build: Pass 74 + Codex's High
+Seas + music. Local only; nothing is pushed or deployed.
 
-Add `?renderer=webgpu` to force the fail-closed WebGPU route. Chrome and Firefox
-are the two primary browsers.
+The previous version of this file contradicted the ledger in both directions - it
+claimed HF-334 landed (it did not), HF-317 unwired (it is wired), and HF-346 broken
+(it is fixed). It was regenerated from the ledger, which is the source of truth.
+When they disagree, believe the ledger and tell the orchestrator.
 
----
+## A. New since you last played
 
-## Read this first
+- **High Seas** — the sixth arena: Codex's original superyacht map, fully merged.
+  Twelve spawns, engine corridor, two-storey cabins, ocean at −2.2 m.
+- **Background music** — two original chiptune tracks rotating between matches,
+  never the same one twice in a row, quiet by design (Options → music slider,
+  default 68). *Nobody has heard these yet — you are the first listener.*
+- **Skins pipeline** — three original archetypes (explorer / symbiote / navalops)
+  now produce real GLBs: 62 joints, 24 clips, 3 LODs each. **Not yet selectable
+  in-game** — staged assets only (HF-360/HF-364).
 
-Three honest caveats, so nothing here is oversold:
+## B. Fixed this pass — worth testing deliberately
 
-1. **Nothing was published.** No push, no deploy, nothing past Pass 73, as instructed.
-2. **Green tests are not proof of your bugs being fixed.** Several rows below changed
-   real behaviour that only you can judge, and a few landed as tested modules whose
-   runtime effect still needs your eyes.
-3. **No live browser session was run.** Every claim below is from source and unit
-   tests. The Firefox 10 FPS report (HF-331) is completely unverified — the probe
-   runbook is written but was never executed, because measuring frame timings while
-   twenty agents hammered the machine would have produced worthless numbers.
+- **Chopper spectator lag** (HF-336) — LOD retune + decimated shadow. Fly the
+  chopper with a second player watching; the *watcher* should be smooth now.
+- **Support audio** (HF-337) — footsteps should stay audible during sustained
+  chopper/drone fire; enemies' support fire is quieter than your team's.
+- **Gun Range multiplayer** (HF-347, partial) — dummies now patrol identically for
+  host and guest. *Dummy damage is still peer-local — guests' hits on dummies
+  don't replicate yet.*
+- **Glass** (HF-344) — the Atomic Acres upstairs front window is walkable when
+  open; all six Terminal facade windows still block when intact.
+- **Terminal z-fighting** (HF-346) — **fixed**, zero coplanar pairs across all six
+  arenas, direction-verified.
+- **Chopper missiles** (HF-335) — launch from alternating wing sockets and fly a
+  true 3D path again *(landing in a lane as you read this — if they still drop
+  vertically from the sky, that lane hasn't merged yet)*.
+- **Rare-weapon announcements** (HF-339) — now audible (reuses the overdrive
+  sting), not just the banner.
+- **WebGL2 water** (HF-358) — if you float, you float on the water you can see;
+  the two surfaces were ~1 m apart on the compat path.
+- **Match start** (HF-323), **lobby movement/typing** (HF-322/324), **pickup/reload**
+  (HF-315), **regen while piloting** (HF-338) — all landed earlier this pass.
 
----
+## C. Known gaps — deliberately open, so you are not surprised
 
-## A. Please try these first — the things you complained loudest about
-
-| # | What to try | What should happen | Row |
-|---|---|---|---|
-| A1 | In a hosted match, walk over a dropped gun and pick it up, then shoot and reload it | Both work. Previously the host silently rejected the swap and you were left holding a gun it did not believe you had | HF-315 |
-| A2 | Reload repeatedly in a hosted match, ideally on a poor connection | Reload never stops working permanently. Previously one lost message disabled reload for the rest of the match | HF-315 |
-| A3 | Join a lobby, leave, rejoin quickly; also spawn into RustRig and Terminal TDM | You can always move. Previously a rejoin inside the 90s identity window could freeze you as a statue permanently, with no reason shown | HF-322 |
-| A4 | Click the ROOM CHAT box in the lobby, and press Enter after clicking READY | Chat opens and you can type. Previously there was no way to open it at all after touching any lobby button | HF-324 |
-| A5 | Start a match while someone is mid-join | The host waits for them rather than starting and bouncing them | HF-323 |
-| A6 | Man the Chopper Gunner or pilot a drone while damaged | Health regenerates during possession | HF-338 |
-| A7 | Fire a rocket/grenade near yourself, then listen to the map ambience for a minute | Ambience returns to normal. Previously the first explosion ducked it to 40% for the rest of the match, on every map | HF-350 |
-| A8 | Walk into a training dummy in the Gun Range test bay | It blocks you. Previously you walked straight through | HF-318 |
-| A9 | Look at your right arm with a rifle, pistol and knife | The elbow should read naturally. Thickness and how the arms run off-screen are deliberately unchanged — you liked those | HF-340 |
-| A10 | Open the KILLSTREAKS menu; try setting slot 3 to the reward already in slot 4 | It swaps instead of silently refusing. The panel should also read clearly now rather than as a washed-out white card | HF-316, HF-333/362 |
-
-## B. New and changed — worth a look
-
-- **Farcrysis is the fifth map.** Jungle/beach research station, revived from the
-  Pass 69 lane. Its centre building is enterable and its wind/god-rays/water now
-  actually animate — both were broken and fixed after an audit.
-- **Filmic grading** (HF-363) — the image should read richer without crushing shadow
-  detail where enemies hide, and without bloom blinding you.
-- **Explosions** (HF-349/351) — spatialised with per-family character, a near-blast
-  tinnitus tail, and blasts that survive a frame hitch instead of vanishing.
-- **Screen feel** (HF-352) — camera shake scaled by blast distance, kill-confirm pulse.
-- **TDM teams** (HF-328) — assigned, not picked, with fixed colour identities.
-- **Care package** (HF-334) — 10% chance of the flamethrower.
-- **Carpet Bomber** (HF-317) — corridor targeting module landed; **not yet wired**, so
-  in-match behaviour is unchanged this pass.
-
-## C. Known gaps — deliberately not fixed, so you are not surprised
-
-| Gap | Why |
+| Gap | State |
 |---|---|
-| **Farcrysis map card shows a standby placeholder, not a flyover** | The authored helicopter flyover video does not exist. A fake or borrowed video would have been worse; the real render is outstanding |
-| **Farcrysis terrain visually undulates ~2.2m but collision is flat** | Found by audit, not fixed. You will walk level through visible hills |
-| **Farcrysis spawn sits 1.10m from a palm collider** | Found by audit; below the intended 6m clearance |
-| **Terminal z-fighting (HF-346) is NOT fixed** | The ledger wrongly claimed it was. Arena geometry was never touched; corrected to OPEN |
-| **Gun-range rack caching (HF-330)** | Two attempts from an unreliable model were reverted, the second having broken the rack's fail-closed contract |
-| **Firefox performance (HF-331)** | Pin corrected and an inverted fail-closed assertion fixed, but the live probe was never run |
-| **Several modules are landed but unwired** | Carpet corridor, killstreak activation gate, rare-weapon announcement, prone clearance, team prescription, coplanar audit. Tested, not yet reachable in play — tracked as HF-364 |
-| **Operator skins produced no GLB** | Specs, authoring script and catalog exist; the Blender run died when a provider hit its monthly quota |
+| **Care package flamethrower (HF-334)** | **NOT implemented.** Every naive wiring was refuted: the grant would consume the world pickup (it would vanish mid-match for whoever was walking to it), and "exactly 10%" cannot be honest while flamethrower authority is arena-bound. Needs your call on weapon instancing. |
+| **Host disconnect (HF-325)** | Checkpoint replicates to the successor, but promotion is OFF: no host stand-down path exists yet, so enabling it could split-brain a match. If the host drops, everyone still gets kicked after the 90 s window. |
+| **Firefox (HF-331)** | Still slow. Measured so far: the WebGL2 path itself costs ~3× vs WebGPU *in Chrome* (49 Hz vs 150+). The remaining ~5× is unmeasured — needs a quiet machine. Play in Chrome. |
+| **Key-3 while dead / in warmup** | Still gives zero feedback (the input gate returns before the killstreak denial can speak). Known, recorded, needs its own row. |
+| **Skins not selectable** | GLBs exist; no lobby UI, protocol field or loader consumes them yet. |
+| **Farcrysis terrain vs collision** | Terrain visually undulates ~2.2 m but collision is flat — you walk level through visible hills. Found by audit; not yet fixed. |
+| **Farcrysis map card** | Standby placeholder, no flyover video — the authored render doesn't exist yet; a borrowed one would violate the asset policy. |
 
-## D. If something is wrong
+## D. If something breaks
 
-Everything is local commits on the contrib branch. `git log --oneline 506d6142..HEAD`
-shows the ten commits; any one can be reverted in isolation. Nothing was pushed, so
-Pass 73 remains exactly as it was.
+Say which arena, solo or hosted, and what you saw. The boot path is covered by an
+automated six-arena smoke now, but *your* eyes are still the only test for feel,
+mix levels and readability.
