@@ -31,8 +31,16 @@ describe('presentation prewarm startup contract', () => {
 
   it('keeps WebKit on real basic-depth shadows instead of invalid PCF comparison samplers', () => {
     const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
-    expect(source).toContain("const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent);");
-    expect(source).toContain("shadowSamplerMode === 'basic-depth' ? THREE.BasicShadowMap : THREE.PCFShadowMap");
+    // The WebKit floor is the guarantee here, not the exact call text: Pass 74
+    // added a quality-profile soft tier, so the selector now takes the profile
+    // as a second argument. What must never change is that the sampler comes
+    // from webGlShadowSamplerMode and that 'basic-depth' still maps to a real
+    // BasicShadowMap rather than a PCF comparison sampler.
+    expect(source).toMatch(/const shadowSamplerMode = webGlShadowSamplerMode\(navigator\.userAgent[^)]*\);/);
+    expect(source).toContain("shadowSamplerMode === 'basic-depth'");
+    expect(source).toContain('? THREE.BasicShadowMap');
+    // The soft tier is quality-only and must never capture the WebKit branch.
+    expect(source).toContain("shadowSamplerMode === 'pcf-soft' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap");
     // Renderer construction, exact-composition prewarm, and the live graphics
     // transaction must all retain the browser-safe sampler selection.
     expect(source.match(/type: webGlShadowMapType/g)).toHaveLength(3);

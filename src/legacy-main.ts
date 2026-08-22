@@ -1928,8 +1928,13 @@ function scheduleGpuRetirementDrain(): void {
 }
 document.documentElement.dataset.renderBackend = renderRuntime.backend;
 const effectiveGraphicsExposure = (authoredExposure: number): number => authoredExposure * graphicsRuntime.post.exposureScale;
-const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent);
-const webGlShadowMapType = shadowSamplerMode === 'basic-depth' ? THREE.BasicShadowMap : THREE.PCFShadowMap;
+const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent, renderProfile);
+// Pass 74: the quality profile finally honours the authored shadow radius -
+// only PCFSoftShadowMap reads it, so the penumbra farcrysis and the contrast
+// lighting pass author was previously discarded.
+const webGlShadowMapType = shadowSamplerMode === 'basic-depth'
+  ? THREE.BasicShadowMap
+  : shadowSamplerMode === 'pcf-soft' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
 document.documentElement.dataset.webglShadowSampler = shadowSamplerMode;
 renderRuntime.configureOutput(effectiveGraphicsExposure(activeLighting.exposure), graphicsRuntime.post.toneMapping);
 renderRuntime.configureShadows({
