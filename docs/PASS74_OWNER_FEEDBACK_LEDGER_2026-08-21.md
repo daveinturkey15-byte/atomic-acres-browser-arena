@@ -38,7 +38,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Two readings, both to be investigated: (a) menu slots 3/4 share a pool and must stay distinct —
   picking the sibling's reward is a silent disabled-option no-op; correction is an automatic swap;
   (b) in-match activation key 3 (slot 1, Care Package) sometimes refuses to activate.
-- Status: MODULES LANDED (aa114737) — swap-on-conflict in killstreak-loadout + killstreak-activation-gate module, tested. Menu/in-match wiring pending wave 2.
+- Status: IMPLEMENTED - LEDGER WAS STALE, verified 2026-08-22 by a Claude Opus 5 analyst plus two adversarial verifiers. The swap-on-conflict module (src/killstreak-loadout.ts replaceKillstreakSlotWithSwap) IS reached in production: KillstreakLoadoutController.select -> src/ui/killstreak-loadout-menu.ts:155, bound at legacy-main:5933 against the controller built at legacy-main:1621. The companion activation gate (src/killstreak-activation-gate.ts) is wired at legacy-main:20888 with denials routed to the HUD feed. The 'MODULES LANDED (aa114737)' note was true AT aa114737 - which touched legacy-main by only two farcrysis lines - but the wiring landed later in b7123bdd. RESIDUAL DEFECT, NOT CLOSED: the keydown handler bare-returns on gameplayInputEnabled() BEFORE dispatching to the gated activation, so the gate's 'dead', 'match-inactive' and 'input-disabled' feedback is unreachable from keyboard and touch. Pressing key-3 while down or during warmup still gives zero feedback, which is the other half of the owner's original report. Do NOT fix by weakening that guard - it is deliberate HF-324 scoping protecting every gameplay key; the correct shape is a narrow pre-check ahead of the blanket return, which deserves its own row and test.
 
 ### HF-317 — Carpet Bomber must be a strafing run, not a point drop
 - Source: pass74.txt ("carpet bomb is still like carepackage not tri pass as requested? fix it").
@@ -67,7 +67,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Source: atomicnext.txt ("flare gun needs a much better hitbox, wider and higher when as a
   projectile"; flare appears not to damage Killstreak-test-bay bots). No through-wall or oversized
   splash admissions.
-- Status: MODULE LANDED (aa114737) — flare vertical-capsule admission, tested. legacy-main target snapshots pending wave 2.
+- Status: IMPLEMENTED - LEDGER WAS STALE, verified 2026-08-22 by an analyst plus adversarial verification. Both halves of src/flare-projectile-system.ts are wired end to end. An explicit finding: applying a 'wiring' patch now would DOUBLE-WIRE prepareFlareTargetSnapshots and the halfHeightM arguments, which is the most likely way to reintroduce the defect.
 
 ## P0 — lobby, host and match lifecycle
 
@@ -144,7 +144,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Source: pass74.txt ("add 10% chance in care package to get a flamethrower"). The flamethrower is a
   timed map weapon with holder authority; the grant path must respect that authority. Recorded
   consequence: the existing killstreak pool keeps its internal shape inside the remaining 90%.
-- Status: MODULE LANDED (aa114737) — care-package-weapon-reward 10-in-100 flamethrower band + careWeaponGrantEvents on the host result, tested. Grant application pending wave 2.
+- Status: OPEN - GENUINELY UNWIRED, and naive wiring was REFUTED on 2026-08-22. An analyst produced seven anchor-verified legacy-main patches; adversarial verification rejected them for two concrete reasons. (1) The owner's 'exactly 10%' CANNOT be met from legacy-main alone: the port only returns true when the flamethrower's timed-map-weapon authority is grantable, and that authority is arena-bound (src/timed-map-weapon-authority.ts pins flamethrower to one arenaId), so the real rate is conditional, not 10%. (2) SINGLE-INSTANCE CANNIBALISATION: the only admissible transition is claimTimedMapWeapon, so a care-package grant CONSUMES the world pickup - on rustworks-1v1 the physical flamethrower would silently vanish mid-match with no feedback to a player already walking toward it. Closing this row honestly needs a weapon-instance decision, not a wiring patch.
 
 ### HF-335 — Chopper Gunner HUD and missiles regressed; restore the better implementation
 - Source: pass74.txt ("chopper gunner hud and missiles regressed, should be abetter branch
@@ -156,11 +156,11 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-336 — non-controlling players lag severely while a Chopper Gunner is flying
 - Source: pass74.txt ("when chopper gunner is flying and I am against it or on the same team but not
   controlling it I am very laggy").
-- Status: PARTIAL (970d4c52) — active-LOD mixer advance and pooled target sort landed. Shadow-silhouette work and live spectator measurement still owed.
+- Status: IMPLEMENTED (7851f1d6) - measured first this time. docs/PASS74_HF336_SPECTATOR_COST.md quantifies the asymmetry: the pilot hides the entire exterior airframe (zero exterior draw calls, zero shadow casters) while every other peer renders 87 draw calls, 59,948 beauty triangles and 11,344 shadow triangles into a 2048x2048 shadow map. SUPPORT_VEHICLE_LOD_DISTANCES retuned [0,95,190] -> [0,36,75] and the baked shadow silhouette decimated, with the geometry cache preserved. Presentation-only; no gameplay path touched. An earlier unmeasured attempt was reverted for allocating geometry per call and drawing the shadow as a flat disc.
 
 ### HF-337 — teammate Chopper Gunner audio must replicate
 - Source: atomicnext.txt ("I am host, cant hear my team deathmatch partner chopper gunner?").
-- Status: IMPLEMENTED (cbca7f68) — support fire is positional at the firing chopper, rotor audibility raised, enemies hear it too. Registered in the sound-event inventory with definitions authored and digest recomputed.
+- Status: IMPLEMENTED (cbca7f68, 7851f1d6) - support fire is positional, and the per-shot unfed spatial chain is gone: every shot used to build TWO panner chains and feed only one, burning one of just 12 spatial voices for silence, which is how footsteps and explosions were starved during firefights. Budget check corrected to spatialChains + 1 (the railgun path still checks + 2 because it genuinely creates two). REMAINING, dispatched: the TDM listener test is a tautology so every shot is presented to every client; the 370ms voice hold exceeds the 280ms chopper cadence; there is no distance cull despite maxDistance 180; and sound-event-inventory claims enemies hear support fire 'at reduced volume' when no such gain reduction exists.
 
 ### HF-338 — health regenerates while controlling Chopper Gunner or Piloted Drone
 - Source: atomicnext.txt row 8 (normal regen eligibility continues during possession unless actively
@@ -170,7 +170,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-339 — rare-weapon spawn announcements unmistakable to every player
 - Source: atomicnext.txt ("need clearer announce of rare weapon spawns mid game to all in the
   match").
-- Status: MODULE LANDED (aa114737) — rare-weapon-announcement presenter, tested. Triple-channel wiring pending wave 2.
+- Status: IMPLEMENTED WITH A KNOWN GAP - ledger status was stale, verified 2026-08-22. src/rare-weapon-announcement.ts is wired and the visual announcement reaches every player. GAP: the presenter's contract advertises four channels and legacy-main:15533 consumes three, dropping presentation.audioCue - so against the owner's literal wording, 'unmistakable to every player' is met visually but NOT audibly. Roughly a one-line re-wire. Second issue recorded: #banner is shared unarbitrated state with four other writers, so a rare spawn during the ENGAGE window overwrites the ENGAGE banner and the ENGAGE timeout then hides the banner unconditionally.
 
 ## P1 — arms, weapons and presentation
 

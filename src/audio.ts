@@ -1911,8 +1911,7 @@ export class ArenaAudio {
       emitter.y - this.listenerPosition.y,
       emitter.z - this.listenerPosition.z,
     );
-    const spatialDestinations = this.createSupportGunSpatialDestinations(position, distance);
-    const weaponDestination = spatialDestinations?.weapons ?? this.weapons;
+    const weaponDestination = this.createSupportGunSpatialDestination(position, distance) ?? this.weapons;
     if (kind === 'chopper') {
       this.sweep(104, 38, 0.16, 0.21, 'sawtooth', weaponDestination);
       this.noise({ duration: 0.19, volume: 0.28, filter: 'lowpass', frequency: 2_500, q: 0.7 }, weaponDestination);
@@ -1923,52 +1922,45 @@ export class ArenaAudio {
     this.noise({ duration: 0.1, volume: 0.16, filter: 'bandpass', frequency: 3_100, q: 0.9 }, weaponDestination);
   }
 
-  private createSupportGunSpatialDestinations(
+  private createSupportGunSpatialDestination(
     emitter: SpatialPoint,
     distance: number,
-  ): Readonly<{ weapons: PannerNode; ambience: PannerNode }> | null {
-    if (!this.context || !this.weapons || !this.ambience
+  ): PannerNode | null {
+    if (!this.context || !this.weapons
       || ![emitter.x, emitter.y, emitter.z, distance].every(Number.isFinite)
-      || this.spatialChains + 2 > AUDIO_RUNTIME_BUDGET.spatialVoices) {
+      || this.spatialChains + 1 > AUDIO_RUNTIME_BUDGET.spatialVoices) {
       this.voicesDropped += 1;
       return null;
     }
-    const create = (bus: 'sfx' | 'ambience', destination: GainNode): PannerNode => {
-      const panner = this.context!.createPanner();
-      panner.panningModel = 'HRTF';
-      panner.distanceModel = 'inverse';
-      panner.refDistance = 8;
-      panner.maxDistance = 180;
-      panner.rolloffFactor = 0.18;
-      panner.positionX.value = emitter.x;
-      panner.positionY.value = emitter.y;
-      panner.positionZ.value = emitter.z;
-      panner.connect(destination);
-      this.busIdentity.set(panner, bus);
-      this.spatialReportDestinations.add(panner);
-      this.spatialReportDistances.set(panner, distance);
-      this.railgunSpatialNodes.push(panner);
-      return panner;
-    };
-    const weapons = create('sfx', this.weapons);
-    const ambience = create('ambience', this.ambience);
-    this.spatialChains += 2;
-    this.railgunSpatialChainCount += 2;
+    const panner = this.context!.createPanner();
+    panner.panningModel = 'HRTF';
+    panner.distanceModel = 'inverse';
+    panner.refDistance = 8;
+    panner.maxDistance = 180;
+    panner.rolloffFactor = 0.18;
+    panner.positionX.value = emitter.x;
+    panner.positionY.value = emitter.y;
+    panner.positionZ.value = emitter.z;
+    panner.connect(this.weapons);
+    this.busIdentity.set(panner, 'sfx');
+    this.spatialReportDestinations.add(panner);
+    this.spatialReportDistances.set(panner, distance);
+    this.railgunSpatialNodes.push(panner);
+    this.spatialChains += 1;
+    this.railgunSpatialChainCount += 1;
     const cleanup = () => {
-      for (const node of [weapons, ambience]) {
-        const index = this.railgunSpatialNodes.indexOf(node);
-        if (index >= 0) this.railgunSpatialNodes.splice(index, 1);
-        this.busIdentity.delete(node);
-        node.disconnect();
-      }
-      this.spatialChains = Math.max(0, this.spatialChains - 2);
-      this.railgunSpatialChainCount = Math.max(0, this.railgunSpatialChainCount - 2);
+      const index = this.railgunSpatialNodes.indexOf(panner);
+      if (index >= 0) this.railgunSpatialNodes.splice(index, 1);
+      this.busIdentity.delete(panner);
+      panner.disconnect();
+      this.spatialChains = Math.max(0, this.spatialChains - 1);
+      this.railgunSpatialChainCount = Math.max(0, this.railgunSpatialChainCount - 1);
       const timerIndex = this.railgunSpatialTimers.indexOf(timer);
       if (timerIndex >= 0) this.railgunSpatialTimers.splice(timerIndex, 1);
     };
     const timer = setTimeout(cleanup, Math.ceil((0.25 + 0.12) * 1_000));
     this.railgunSpatialTimers.push(timer);
-    return { weapons, ambience };
+    return panner;
   }
 
   syncChopperRotors(sources: readonly Readonly<{
@@ -2050,7 +2042,7 @@ export class ArenaAudio {
       const voice = this.activeVoices.get(loop.source);
       if (voice) voice.distance = listenerDistance;
       // HF-337: low-rate blade-slap noise layer for unmistakable rotor presence
-      if (this.context && this.ambience && Math.random() < 0.025) {
+      if (this.context && this.ambience && this.noiseBuffer && Math.random() < 0.025) {
         const slapSource = this.context.createBufferSource();
         const slapFilter = this.context.createBiquadFilter();
         const slapGain = this.context.createGain();
@@ -2069,12 +2061,18 @@ export class ArenaAudio {
         slapPanner.positionY.value = entry.position.y;
         slapPanner.positionZ.value = entry.position.z;
         slapSource.connect(slapFilter).connect(slapGain).connect(slapPanner).connect(this.ambience);
-        slapSource.onended = () => {
+        if (!this.registerVoice(slapSource, this.ambience, 3, true, listenerDistance)) {
           slapFilter.disconnect();
           slapGain.disconnect();
           slapPanner.disconnect();
-        };
-        slapSource.start(this.context.currentTime, 0, 0.08);
+        } else {
+          slapSource.onended = () => {
+            slapFilter.disconnect();
+            slapGain.disconnect();
+            slapPanner.disconnect();
+          };
+          slapSource.start(this.context.currentTime, 0, 0.08);
+        }
       }
       admittedCount += 1;
       if (admittedCount >= 4) break;

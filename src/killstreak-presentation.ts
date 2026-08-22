@@ -117,7 +117,11 @@ const SUPPORT_VEHICLE_TARGET_DIMENSIONS: Readonly<Record<SupportVehicleAssetFami
   carpet: 17,
   crate: 3.2,
 });
-export const SUPPORT_VEHICLE_LOD_DISTANCES = Object.freeze([0, 95, 190] as const);
+// HF-336: the old [0, 95, 190] bands forced LOD0 (87 meshes / 59.9k tris) at
+// every practical gameplay range. A chopper operates at 25-35m altitude, so
+// these bands select LOD1 (84 meshes / 49.9k tris) or LOD2 (63 meshes /
+// 29.3k tris) for ground observers while keeping full detail in close passes.
+export const SUPPORT_VEHICLE_LOD_DISTANCES = Object.freeze([0, 36, 75] as const);
 
 export function deriveSupportVehiclePrewarmDistances(
   lodDistances: readonly [number, number, number] = SUPPORT_VEHICLE_LOD_DISTANCES,
@@ -531,15 +535,95 @@ export function mergeAuthoredSupportShadowSilhouette(
     else for (let cursor = 0; cursor < attribute.count; cursor += 1) append(cursor);
   });
   if (positions.length === 0) return null;
+  const decimated = decimateSupportShadowSilhouetteTriangles(positions);
   const merged = new THREE.BufferGeometry();
   merged.name = `${family}-shadow-silhouette`;
-  merged.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+  merged.setAttribute('position', new THREE.BufferAttribute(new Float32Array(decimated), 3));
   merged.computeBoundingBox();
   merged.computeBoundingSphere();
   // One geometry per family is shared by every presented instance, so the
   // pooled retirement path must never dispose it out from under a live root.
   merged.userData[GPU_SHARED_GEOMETRY_KEY] = `${family}-shadow-silhouette`;
   return merged;
+}
+
+/**
+ * HF-336: a 2048x2048 dynamic shadow map does not resolve airframe detail -
+ * only the OUTLINE reads. Uniform-grid vertex clustering (one cell per axis,
+ * cell size = 1.5% of the silhouette's longest bounds extent) welds interior
+ * detail triangles away while preserving the outer hull, rotor disc and tail
+ * boom profile, deterministically (stable quantisation, first-triangle-wins
+ * dedupe) so the baked result is identical on every client. Applied once at
+ * bake time inside mergeAuthoredSupportShadowSilhouette; the decimated result
+ * is what enters supportShadowSilhouetteGeometries, so per-frame cost stays
+ * one draw call over the reduced soup and there are still zero allocations
+ * per frame. Small fixtures pass through unchanged (they already fit the
+ * budget).
+ */
+const SUPPORT_SHADOW_SILHOUETTE_TRIANGLE_BUDGET = 1_200;
+
+function decimateSupportShadowSilhouetteTriangles(positions: number[]): number[] {
+  const sourceTriangles = positions.length / 3 / 3;
+  if (sourceTriangles <= SUPPORT_SHADOW_SILHOUETTE_TRIANGLE_BUDGET) return positions;
+  let min = { x: Infinity, y: Infinity, z: Infinity };
+  let max = { x: -Infinity, y: -Infinity, z: -Infinity };
+  for (let cursor = 0; cursor < positions.length; cursor += 3) {
+    min.x = Math.min(min.x, positions[cursor]);
+    min.y = Math.min(min.y, positions[cursor + 1]);
+    min.z = Math.min(min.z, positions[cursor + 2]);
+    max.x = Math.max(max.x, positions[cursor]);
+    max.y = Math.max(max.y, positions[cursor + 1]);
+    max.z = Math.max(max.z, positions[cursor + 2]);
+  }
+  const extent = Math.max(max.x - min.x, max.y - min.y, max.z - min.z, 1e-6);
+  // Start from a fine cluster grid and coarsen until the welded soup fits the
+  // outline budget - guarantees the upper bound for any authored level while
+  // keeping as much interior structure as the budget allows.
+  let cellRatio = 0.015;
+  for (let round = 0; round < 8; round += 1) {
+    const cell = extent * cellRatio;
+    const cellKey = (x: number, y: number, z: number): string =>
+      `${Math.floor((x - min.x) / cell)},${Math.floor((y - min.y) / cell)},${Math.floor((z - min.z) / cell)}`;
+    // Snap each triangle's vertices to their cluster representatives; drop
+    // degenerate triangles whose vertices collapse onto one another.
+    const snapped: number[] = [];
+    const representatives = new Map<string, [number, number, number]>();
+    for (let cursor = 0; cursor < positions.length; cursor += 3) {
+      const x = positions[cursor];
+      const y = positions[cursor + 1];
+      const z = positions[cursor + 2];
+      const key = cellKey(x, y, z);
+      let representative = representatives.get(key);
+      if (!representative) {
+        representative = [x, y, z];
+        representatives.set(key, representative);
+      }
+      snapped.push(representative[0], representative[1], representative[2]);
+    }
+    const output: number[] = [];
+    const seen = new Set<string>();
+    for (let cursor = 0; cursor < snapped.length; cursor += 9) {
+      const ax = snapped[cursor];
+      const ay = snapped[cursor + 1];
+      const az = snapped[cursor + 2];
+      const bx = snapped[cursor + 3];
+      const by = snapped[cursor + 4];
+      const bz = snapped[cursor + 5];
+      const cx = snapped[cursor + 6];
+      const cy = snapped[cursor + 7];
+      const cz = snapped[cursor + 8];
+      if (ax === bx && ay === by && az === bz) continue;
+      if (ax === cx && ay === cy && az === cz) continue;
+      if (bx === cx && by === cy && bz === cz) continue;
+      const key = `${ax},${ay},${az}|${bx},${by},${bz}|${cx},${cy},${cz}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      output.push(ax, ay, az, bx, by, bz, cx, cy, cz);
+    }
+    if (output.length / 9 <= SUPPORT_SHADOW_SILHOUETTE_TRIANGLE_BUDGET || round === 7) return output;
+    cellRatio *= 2;
+  }
+  return positions;
 }
 
 /**

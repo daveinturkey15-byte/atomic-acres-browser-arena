@@ -129,7 +129,10 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
   });
 
   it('prewarms the exact shared LOD bands at near-field scale and restores the gameplay projection', () => {
-    expect(presentation).toContain('export const SUPPORT_VEHICLE_LOD_DISTANCES = Object.freeze([0, 95, 190] as const);');
+    // HF-336: bands re-tuned from [0, 95, 190] to [0, 36, 75] so ground
+    // observers get LOD1/LOD2 at the chopper's 25-35m operating altitude
+    // instead of forced LOD0 at every practical range.
+    expect(presentation).toContain('export const SUPPORT_VEHICLE_LOD_DISTANCES = Object.freeze([0, 36, 75] as const);');
     expect(presentation).toContain('export const SUPPORT_VEHICLE_PREWARM_DISTANCES = deriveSupportVehiclePrewarmDistances();');
     expect(presentation).toContain('lod.addLevel(level, SUPPORT_VEHICLE_LOD_DISTANCES[index]');
     expect(presentation).toContain('SUPPORT_VEHICLE_PREWARM_DISTANCES.entries()');
