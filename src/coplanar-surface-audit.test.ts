@@ -152,6 +152,57 @@ function installCanvasDocument(): () => void {
     expect(pairs.length).toBe(1);
   });
 
+  // HF-346: direction-aware exemption tests.
+  it('flags an INVERTED pair where the lower surface has the winning (more negative) offset', () => {
+    const root = new THREE.Group();
+    // Visually upper decal, but its bias loses to the lower one.
+    const matUpper = new THREE.MeshStandardMaterial();
+    matUpper.polygonOffset = true;
+    matUpper.polygonOffsetFactor = -1;
+    matUpper.polygonOffsetUnits = -1;
+
+    // Lower surface with the more negative bias — it would draw over the upper decal.
+    const matLower = new THREE.MeshStandardMaterial();
+    matLower.polygonOffset = true;
+    matLower.polygonOffsetFactor = -2;
+    matLower.polygonOffsetUnits = -2;
+
+    const upper = new THREE.Mesh(new THREE.BoxGeometry(2, 0.01, 2), matUpper);
+    upper.name = 'decal-upper';
+    upper.position.set(0, 0.012, 0);
+    const lower = new THREE.Mesh(new THREE.BoxGeometry(2, 0.01, 2), matLower);
+    lower.name = 'decal-lower';
+    lower.position.set(0, 0.01, 0);
+    root.add(upper, lower);
+
+    const specs = collectHorizontalOverlaySpecs(root);
+    const pairs = findNearCoplanarPairs(specs, 0.004);
+    expect(pairs.length, 'inverted offset ordering must FAIL the audit').toBe(1);
+  });
+
+  it('flags a pair using a POSITIVE polygonOffset, which pushes a decal behind its base', () => {
+    const root = new THREE.Group();
+    const matBase = new THREE.MeshStandardMaterial();
+
+    // Positive offset pushes the decal BEHIND the base — never a valid resolution.
+    const matDecal = new THREE.MeshStandardMaterial();
+    matDecal.polygonOffset = true;
+    matDecal.polygonOffsetFactor = 1;
+    matDecal.polygonOffsetUnits = 1;
+
+    const base = new THREE.Mesh(new THREE.BoxGeometry(2, 0.01, 2), matBase);
+    base.name = 'decal-base';
+    base.position.set(0, 0.01, 0);
+    const decal = new THREE.Mesh(new THREE.BoxGeometry(2, 0.01, 2), matDecal);
+    decal.name = 'decal-positive-offset';
+    decal.position.set(0, 0.012, 0);
+    root.add(base, decal);
+
+    const specs = collectHorizontalOverlaySpecs(root);
+    const pairs = findNearCoplanarPairs(specs, 0.004);
+    expect(pairs.length, 'positive offset must FAIL the audit').toBe(1);
+  });
+
   // HF-346: probe all arenas
   it('audits all arenas for near-coplanar horizontal surfaces', async () => {
     const uninstall = installCanvasDocument();

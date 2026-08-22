@@ -2957,9 +2957,12 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
 
   const floorJointZMat = floorBorderMat.clone();
   floorJointZMat.name = 'skyline-floor-joint-z-material';
+  // HF-346 direction rule: joint-z sits ABOVE skyline-floor-dark-runner (topY 0.086 vs
+  // 0.0855), so it must carry the MORE NEGATIVE effective bias to win the WebGPU depth test.
+  // Previously -2/-2 lost to the runner's -2.5/-2.5 despite being higher.
   floorJointZMat.polygonOffset = true;
-  floorJointZMat.polygonOffsetFactor = -2;
-  floorJointZMat.polygonOffsetUnits = -2;
+  floorJointZMat.polygonOffsetFactor = -3;
+  floorJointZMat.polygonOffsetUnits = -3;
 
   const floorDarkRunnerMat = floorInsetMat.clone();
   floorDarkRunnerMat.name = 'skyline-floor-dark-runner-material';

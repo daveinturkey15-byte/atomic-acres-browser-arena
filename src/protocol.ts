@@ -66,6 +66,14 @@ import {
   isBotWeaponPresentationMessage,
   type BotWeaponPresentationMessage,
 } from './bot-weapon-presentation';
+// HF-325: host succession carriage. A satellite module on purpose — it must not
+// import protocol.ts back, and the checkpoint it carries is typed through an
+// erased `import type`, so protocol.ts stays free of runtime import cycles.
+import {
+  hostSuccessionMessageBelongsToPlayer,
+  isHostSuccessionProtocolMessage,
+  type HostSuccessionProtocolMessage,
+} from './host-succession-protocol';
 import { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 import { validateKillstreakLoadout, type KillstreakLoadoutV1 } from './killstreak-catalog';
 
@@ -584,7 +592,9 @@ export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDama
   | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | LobbySquadMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | LobbyClosedMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
   | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage
-  | TimedMapWeaponProtocolMessage | FlarePresentationProtocolMessage | BotWeaponPresentationMessage;
+  | TimedMapWeaponProtocolMessage | FlarePresentationProtocolMessage | BotWeaponPresentationMessage
+  // HF-325: host-succession-mandate | host-authority-mirror | host-promoted.
+  | HostSuccessionProtocolMessage;
 
 const weapons = new Set<WeaponId>(WEAPON_IDS);
 const primaryWeapons = new Set<PrimaryWeaponId>(PRIMARY_WEAPON_IDS);
@@ -721,6 +731,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
   if (isTimedMapWeaponProtocolMessage(value)) return true;
   if (isFlarePresentationProtocolMessage(value)) return true;
   if (isBotWeaponPresentationMessage(value)) return true;
+  if (isHostSuccessionProtocolMessage(value)) return true; // HF-325
   if (!value || typeof value !== 'object') return false;
   const msg = value as Record<string, unknown>;
   switch (msg.type) {
@@ -1218,6 +1229,8 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
   if (isTimedMapWeaponProtocolMessage(message)) return message.by === playerId;
   if (isFlarePresentationProtocolMessage(message)) return message.by === playerId;
   if (isBotWeaponPresentationMessage(message)) return message.by === playerId;
+  // HF-325: every succession message is signed by its own author.
+  if (isHostSuccessionProtocolMessage(message)) return hostSuccessionMessageBelongsToPlayer(message, playerId);
   switch (message.type) {
     case 'join':
     case 'state':
@@ -1286,6 +1299,11 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
 
 export function isHostAuthorityMessage(message: GameMessage): boolean {
   return isKillstreakProtocolMessage(message) && isKillstreakHostAuthorityMessage(message)
+    // HF-325: mandate, mirror and promotion claim are all host-authored, so
+    // network.ts drops every one of them arriving on a guest connection. A
+    // guest may never mint a mandate, inject a mirror, or announce a promotion
+    // to the sitting host.
+    || isHostSuccessionProtocolMessage(message)
     || isFlashProtocolMessage(message)
     || message.type === 'interactive-world-snapshot'
     || message.type === 'smoke-state'

@@ -323,6 +323,9 @@ import {
   type GlassImpactProfile,
 } from './glass-authority';
 import {
+  deriveGlassColliderBounds,
+} from './glass-collider-bounds'; // HF-344
+import {
   admitCanonicalCrossbowGlassBreak,
   admitCrossbowGlassMutation,
   retainInFlightCrossbowGlassActions,
@@ -3474,28 +3477,16 @@ function refreshGunRangeTestBayDummyColliders(nowLocalMonoMs: number): void {
     : Object.freeze([]);
 }
 
+// HF-344: movement colliders for breakable windows derive from authored solid
+// bounds rather than rendered GLB mesh AABBs (which can be oversized and differ
+// across graphics profiles, blocking open windows).
 const activeGlassColliderWindowIds = new WeakMap<Box2, string>();
 
 function activeGlassDynamicColliders(activeArena: ArenaMap = arena): readonly DynamicWorldCollider[] {
   const entries: DynamicWorldCollider[] = [];
   for (const pane of activeArena.breakableWindows) {
-    const solid = pane.glassState
-      ? glassAuthorityProjection(pane.glassState).movementSolid
-      : !pane.broken;
-    if (!solid) continue;
-    pane.mesh.updateWorldMatrix(true, false);
-    const bounds = new THREE.Box3().setFromObject(pane.mesh);
-    if (bounds.isEmpty() || ![
-      bounds.min.x, bounds.max.x, bounds.min.y, bounds.max.y, bounds.min.z, bounds.max.z,
-    ].every(Number.isFinite)) continue;
-    const colliderBounds = Object.freeze({
-      minX: bounds.min.x,
-      maxX: bounds.max.x,
-      minY: bounds.min.y,
-      maxY: bounds.max.y,
-      minZ: bounds.min.z,
-      maxZ: bounds.max.z,
-    });
+    const colliderBounds = deriveGlassColliderBounds(pane, activeArena);
+    if (!colliderBounds) continue;
     activeGlassColliderWindowIds.set(colliderBounds, pane.id);
     entries.push(Object.freeze({
       id: `glass:${pane.id}`,

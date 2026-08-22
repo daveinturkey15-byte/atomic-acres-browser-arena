@@ -116,6 +116,17 @@ function scanRuntimeSoundCallsites(): ObservedRuntimeSoundCallsite[] {
   const groups = new Map<string, ObservedRuntimeSoundCallsite>();
   for (const sourcePath of runtimeTypeScriptPaths()) {
     const source = readFileSync(sourcePath, 'utf8');
+    // Parsing every non-test source into a full TypeScript AST is what this scan
+    // costs, and legacy-main.ts alone is ~31.5k lines. The visitor below only ever
+    // matches a call whose expression is the IDENTIFIER `audio`, so a file whose
+    // text does not contain that substring anywhere cannot contribute a call site.
+    // Skipping those is a necessary-condition filter, not a narrowing of scope:
+    // the observed set is identical, and the digest assertion below would fail
+    // immediately if it were not.
+    //
+    // Not `audio.` - a call may legally be written with a line break before
+    // the dot, and a filter that missed that would silently drop a real call site.
+    if (!source.includes('audio')) continue;
     const sourceFile = ts.createSourceFile(sourcePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
     const visit = (node: ts.Node): void => {
       if (ts.isCallExpression(node)

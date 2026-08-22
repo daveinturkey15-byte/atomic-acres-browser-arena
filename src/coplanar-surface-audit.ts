@@ -122,17 +122,34 @@ export function findNearCoplanarPairs(
       // HF-346: contract extension: when overlapping decals are legitimately resolved
       // via distinct polygonOffset tiers (or one has polygonOffset enabled over an un-offset base),
       // the GPU rasterizer handles depth resolution without requiring vertical geometry separation.
+      //
+      // HF-346 direction rule: polygonOffset only resolves a pair when the offset that WINS
+      // the depth test belongs to the visually-upper surface. In the WebGPU mapping,
+      // polygonOffsetUnits maps to depthBias and MORE NEGATIVE wins; a positive offset pushes
+      // a surface BEHIND its pair and can make an upper decal vanish. So a pair is 'handled'
+      // only when: (1) no surface uses a positive factor or units, and (2) the surface with
+      // the greater topY has the strictly more negative effective bias (factor + units).
+      // Equal topY is decided purely by the offset tiers, so distinct non-positive tiers pass.
       const aOffset = Boolean(a.polygonOffset);
       const bOffset = Boolean(b.polygonOffset);
       if (aOffset || bOffset) {
-        if (aOffset !== bOffset) {
-          // One layer has polygon offset enabled and the other does not (e.g. decal over base).
-          continue;
+        const positiveOffset = (s: typeof a): boolean =>
+          Boolean(s.polygonOffset) &&
+          ((s.polygonOffsetFactor ?? 0) > 1e-6 || (s.polygonOffsetUnits ?? 0) > 1e-6);
+        const effectiveBias = (s: typeof a): number =>
+          s.polygonOffset ? (s.polygonOffsetFactor ?? 0) + (s.polygonOffsetUnits ?? 0) : 0;
+        if (!positiveOffset(a) && !positiveOffset(b)) {
+          if (a.topY === b.topY) {
+            // Same height: the distinct tier ordering alone resolves the draw.
+            if (effectiveBias(a) !== effectiveBias(b)) continue;
+          } else {
+            const upper = a.topY > b.topY ? a : b;
+            const lower = upper === a ? b : a;
+            // The visually-upper surface must win the depth test (more negative bias).
+            if (effectiveBias(upper) < effectiveBias(lower)) continue;
+          }
         }
-        if (a.polygonOffsetFactor !== b.polygonOffsetFactor || a.polygonOffsetUnits !== b.polygonOffsetUnits) {
-          // Both layers have polygon offset enabled with distinct tiers.
-          continue;
-        }
+        // Otherwise the pair is NOT handled and falls through to be reported.
       }
 
       const overlapX = Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX);

@@ -118,6 +118,67 @@ export function buildAuthoredGlassBoundsMap(
 }
 
 /**
+ * HF-344 follow-up: authored-geometry fallback for panes with no house solid.
+ *
+ * Not every arena registers its windows as house solids. Skyline Terminal builds
+ * six breakable facade windows procedurally and ships `houses: []`, so authored
+ * solid resolution finds nothing for them. Returning null there dropped their
+ * movement colliders entirely and made six intact windows walk-through - a worse
+ * defect than the invisible blocker HF-344 set out to fix, and one the
+ * source-text integration test could not see because the code still read
+ * correctly.
+ *
+ * The fallback reads the mesh's OWN geometry bounding box through its world
+ * matrix. That is deliberately NOT `Box3.setFromObject`: setFromObject unions in
+ * every descendant, which is exactly how a GLB window's frame and mullion
+ * children inflated the collider past the authored opening and created HF-344's
+ * invisible blocker. A procedurally authored box mesh has no such children, so
+ * its own geometry IS the authored truth.
+ *
+ * Precedence is authored-solid first, geometry second: where a house registers
+ * the opening, that remains the single source of truth.
+ */
+function authoredMeshBounds(mesh: unknown): Box2 | null {
+  if (!mesh || typeof mesh !== 'object') return null;
+  const candidate = mesh as {
+    geometry?: { boundingBox?: unknown; computeBoundingBox?: () => void };
+    updateWorldMatrix?: (parents: boolean, children: boolean) => void;
+    matrixWorld?: unknown;
+  };
+  const geometry = candidate.geometry;
+  if (!geometry || typeof geometry.computeBoundingBox !== 'function') return null;
+  if (!geometry.boundingBox) geometry.computeBoundingBox();
+  const box = geometry.boundingBox as
+    | { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
+    | undefined
+    | null;
+  if (!box) return null;
+  candidate.updateWorldMatrix?.(true, false);
+  const elements = (candidate.matrixWorld as { elements?: readonly number[] } | undefined)?.elements;
+  if (!elements || elements.length < 16) return null;
+
+  // Transform all eight corners: a rotated pane's axis-aligned extent is not the
+  // transform of its local extent, and Terminal's facade panes are rotated.
+  let minX = Infinity; let minY = Infinity; let minZ = Infinity;
+  let maxX = -Infinity; let maxY = -Infinity; let maxZ = -Infinity;
+  for (const cx of [box.min.x, box.max.x]) {
+    for (const cy of [box.min.y, box.max.y]) {
+      for (const cz of [box.min.z, box.max.z]) {
+        const x = elements[0] * cx + elements[4] * cy + elements[8] * cz + elements[12];
+        const y = elements[1] * cx + elements[5] * cy + elements[9] * cz + elements[13];
+        const z = elements[2] * cx + elements[6] * cy + elements[10] * cz + elements[14];
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+        if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+      }
+    }
+  }
+  if (![minX, maxX, minY, maxY, minZ, maxZ].every(Number.isFinite)) return null;
+  if (minX >= maxX || minY >= maxY || minZ >= maxZ) return null;
+  return Object.freeze({ minX, maxX, minY, maxY, minZ, maxZ });
+}
+
+/**
  * HF-344: Derives a dynamic movement collider for a single breakable glass pane.
  * Uses authored solid bounds rather than rendered mesh AABB.
  * Returns null if the pane is breached/broken (traversable) or if authored
@@ -129,7 +190,8 @@ export function deriveGlassMovementCollider(
 ): DynamicWorldCollider | null {
   if (!isGlassMovementSolid(pane)) return null;
 
-  const bounds = resolveAuthoredGlassBounds(pane.id, source);
+  const bounds = resolveAuthoredGlassBounds(pane.id, source)
+    ?? authoredMeshBounds(pane.mesh);
   if (!bounds) return null;
 
   const colliderBounds: Box2 = Object.freeze({

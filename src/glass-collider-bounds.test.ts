@@ -267,3 +267,59 @@ describe('HF-344: glass movement collider derivation from authored solid bounds'
     expect(halfColliders[0].id).toBe(`glass:${rearPaneId}`);
   });
 });
+
+describe('HF-344 follow-up: arenas that register no house solids', () => {
+  // Skyline Terminal builds six breakable facade windows procedurally and ships
+  // `houses: []`. Wiring deriveGlassColliderBounds into legacy-main without a
+  // fallback silently returned null for every one of them, so six INTACT windows
+  // became walk-through. tsc was clean and the source-text integration test still
+  // passed, because the code read correctly - only behaviour was wrong. These
+  // tests assert behaviour, which is what that guard was missing.
+
+  function terminalStylePane(id: string, broken = false) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(6.8, 5.0, 0.2));
+    mesh.position.set(6, 2.5, -12);
+    mesh.updateWorldMatrix(true, false);
+    return { id, broken, mesh };
+  }
+
+  it('an intact pane still yields a collider when no authored house solid exists', () => {
+    const bounds = deriveGlassColliderBounds(terminalStylePane('skyline-window-6'), { houses: [] });
+    expect(bounds).not.toBeNull();
+    // minY/maxY are OPTIONAL on Box2. A glass collider that omitted them would not
+    // be a subtly wrong collider, it would be a differently-shaped one, so assert
+    // they are present rather than asserting through a non-null shortcut.
+    expect(bounds!.minY).toBeTypeOf('number');
+    expect(bounds!.maxY).toBeTypeOf('number');
+    expect(bounds!.maxX - bounds!.minX).toBeCloseTo(6.8, 5);
+    expect(bounds!.maxY! - bounds!.minY!).toBeCloseTo(5.0, 5);
+    expect(bounds!.maxZ - bounds!.minZ).toBeCloseTo(0.2, 5);
+  });
+
+  it('a broken pane stays traversable even though the fallback could produce bounds', () => {
+    expect(deriveGlassColliderBounds(terminalStylePane('skyline-window-6', true), { houses: [] })).toBeNull();
+  });
+
+  it('a rotated pane reports the full axis-aligned extent of all eight corners', () => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(6.8, 5.0, 0.2));
+    mesh.position.set(0, 2.5, 0);
+    mesh.rotation.y = Math.PI / 4;
+    mesh.updateWorldMatrix(true, false);
+    const bounds = deriveGlassColliderBounds({ id: 'rotated', broken: false, mesh }, { houses: [] });
+    expect(bounds).not.toBeNull();
+    // A 45-degree rotation projects the 6.8 m span onto both axes, so the extent
+    // must GROW; taking the untransformed local box would understate it.
+    const expectedSpan = (6.8 + 0.2) * Math.SQRT1_2;
+    expect(bounds!.maxX - bounds!.minX).toBeCloseTo(expectedSpan, 4);
+    expect(bounds!.maxZ - bounds!.minZ).toBeCloseTo(expectedSpan, 4);
+  });
+
+  it('authored solid bounds take precedence over the geometry fallback', () => {
+    const paneId = 'authored-window';
+    const authored = { minX: -1, maxX: 1, minY: 0, maxY: 2, minZ: -0.05, maxZ: 0.05 };
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(50, 50, 50));
+    mesh.updateWorldMatrix(true, false);
+    const bounds = deriveGlassColliderBounds({ id: paneId, broken: false, mesh }, { [paneId]: authored });
+    expect(bounds).toEqual(expect.objectContaining(authored));
+  });
+});
