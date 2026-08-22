@@ -14,7 +14,12 @@ export const RARE_WEAPON_BANNER_DURATION_MS = 4_000;
 export const RARE_WEAPON_AUDIO_CUE = 'rare-weapon-spawned';
 
 export type RareWeaponAnnouncementInput = Readonly<{
-  weaponId: TimedMapWeaponId;
+  /**
+   * HF-339: any rare pickup worth announcing, not only the timed map weapons -
+   * the Railgun uses the identical three-channel announcement and is not a
+   * TimedMapWeaponId. This is a presentation label, never an authority key.
+   */
+  weaponId: TimedMapWeaponId | 'railgun';
   /** Catalog display name, e.g. "Orion Flare Pistol"; falls back to weaponId. */
   displayName: string;
   totalShots: number;

@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import './style.css';
+import { KILLSTREAK_ACTIVATION_DENIAL_LABELS, evaluateKillstreakActivation } from './killstreak-activation-gate'; // HF-316
+import { RARE_WEAPON_BANNER_DURATION_MS, presentRareWeaponAnnouncement, type RareWeaponAnnouncementInput } from './rare-weapon-announcement'; // HF-339
+import { applyTeamSwap, prescribeTeams } from './team-prescription'; // HF-328
 import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
 import { AdaptiveQualityController, DeferredAdaptivePixelRatio, adaptiveShadowsEnabled, assertWebGpuAdmissionCompletionLatency, classifyDisplayFrameMs, configuredAdaptiveQualityLevels, shouldFreezeAdaptiveQualityForMatch } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
@@ -5149,6 +5152,8 @@ let privateMatchMode: MatchMode = 'ffa';
 let localSquadName = defaultSquadPresentation(0).name;
 /** HF-328: last squad identity replicated to peers, so a prescribed change is sent once. */
 let lastCommittedSquadKey = '';
+/** HF-339: transient gold minimap marker for a rare-weapon spawn. */
+let rareWeaponMinimapPing: { position: readonly [number, number, number]; untilMs: number } | null = null;
 let localSquadColor = defaultSquadPresentation(0).color;
 let privateMatchConfig: PrivateMatchConfig = DEFAULT_PRIVATE_MATCH_CONFIG;
 let privateLobbySnapshot: LobbySnapshot | null = null;
@@ -8109,8 +8114,13 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
     }
     // Reconnecting an existing identity does not change lobby composition or
     // teams, so it must not clear everybody else's readiness.
-    if (joiningNewMember && currentPhase === 'waiting' && privateMatchConfig.autoBalance) {
-      for (const member of balanceLobbyTeams([...hostLobbyMembers.values()])) hostLobbyMembers.set(member.id, { ...member, ready: false });
+    // HF-328: in TDM a joiner is prescribed onto the smaller side and the whole
+    // roster is re-stamped with canonical identities. This no longer depends on the
+    // autoBalance toggle - prescription is the rule, not an option.
+    if (joiningNewMember && currentPhase === 'waiting' && privateMatchConfig.mode === 'tdm') {
+      for (const member of prescribeTeams([...hostLobbyMembers.values()])) {
+        hostLobbyMembers.set(member.id, { ...member, ready: false });
+      }
     }
     // This lobby envelope establishes the host identity, arena and active match
     // epoch. A reconnecting client must finish beginPrivateMatch() before any
@@ -8152,13 +8162,21 @@ function updateHostReady(message: LobbyReadyMessage): void {
 }
 
 function updateHostTeam(message: LobbyTeamMessage): void {
-  if (network.role !== 'host' || (privateLobbySnapshot?.phase ?? 'waiting') !== 'waiting' || privateMatchConfig.mode !== 'tdm') return;
-  const member = hostLobbyMembers.get(message.by);
-  if (!member?.connected) return;
-  hostLobbyMembers.set(message.by, { ...member, team: message.team, ready: false });
-  if (privateMatchConfig.autoBalance) {
-    for (const balanced of balanceLobbyTeams([...hostLobbyMembers.values()])) hostLobbyMembers.set(balanced.id, { ...balanced, ready: false });
-  }
+  if (network.role !== 'host') return;
+  // HF-328: teams are prescribed, not picked. A team message is now a SWAP SIDES
+  // REQUEST, and the host is the sole authority on whether it is legal - previously
+  // the requested team was written verbatim, so a client could author its own side.
+  // A refused swap is silently ignored rather than partially applied.
+  const members = [...hostLobbyMembers.values()];
+  const swap = applyTeamSwap(
+    members,
+    message.by,
+    message.team,
+    privateLobbySnapshot?.phase ?? 'waiting',
+    privateMatchConfig.mode,
+  );
+  if (!swap.accepted) return;
+  for (const member of swap.members) hostLobbyMembers.set(member.id, member);
   broadcastHostLobby('waiting');
 }
 
@@ -8202,8 +8220,10 @@ function applyHostLobbyConfig(config: PrivateMatchConfig): void {
   privateMatchConfig = config;
   privateMatchMode = config.mode;
   network.setCapacity(config.capacity);
-  const nextMembers = config.autoBalance && config.mode === 'tdm'
-    ? balanceLobbyTeams([...hostLobbyMembers.values()])
+  // HF-328: entering TDM prescribes teams deterministically and stamps the canonical
+  // AQUA/CORAL identities, rather than leaving it to the autoBalance toggle.
+  const nextMembers = config.mode === 'tdm'
+    ? prescribeTeams([...hostLobbyMembers.values()])
     : [...hostLobbyMembers.values()];
   for (const member of nextMembers) hostLobbyMembers.set(member.id, { ...member, ready: false });
   broadcastHostLobby('waiting');
@@ -14945,7 +14965,14 @@ function applyTimedMapWeaponStates(
     const state = timedMapWeaponStates[weaponId];
     const wasAnnounced = previous[weaponId].announcementSent;
     if (announce || state.announcementSent && !wasAnnounced) {
-      addFeed(TIMED_MAP_WEAPON_DEFINITIONS[weaponId].announcement, 'gold');
+      // HF-339: a single gold feed line was missable. Announce on three channels.
+      presentRareWeaponSpawn({
+        weaponId,
+        displayName: WEAPONS[weaponId]?.name ?? weaponId,
+        totalShots: TIMED_MAP_WEAPON_DEFINITIONS[weaponId].totalShots,
+        phase: matchState.phase,
+        pickupPosition: state.pickupPosition,
+      });
     }
   }
   timedMapWeaponPresentation.update(timedMapWeaponStates, performance.now());
@@ -15353,7 +15380,46 @@ function applyRailgunState(next: RailgunAuthorityState, announce = false): void 
   railgunState = next;
   syncRailgunHolderPresentation(previous, next);
   if (next.holderId === player.id) localRailgunPendingUntilHostTimeMs = 0;
-  if (announce || next.announcementSent && !previous.announcementSent) addFeed('RARE WEAPON SPAWNED', 'gold');
+  // HF-339: the Railgun spawn uses the same unmistakable three-channel announcement.
+  if (announce || next.announcementSent && !previous.announcementSent) {
+    presentRareWeaponSpawn({
+      weaponId: 'railgun',
+      displayName: WEAPONS.railgun?.name ?? 'RAILGUN',
+      totalShots: 0,
+      phase: matchState.phase,
+      pickupPosition: next.pickupPosition ?? null,
+    });
+  }
+}
+
+/**
+ * HF-339: owner asked for rare-weapon spawns to be unmistakable to everyone.
+ * One gold feed line was easy to miss mid-fight, so the replicated
+ * announcementSent transition now drives a centre banner, an audio sting and a
+ * minimap ping as well. The pure presenter decides what each channel gets and
+ * suppresses the banner outside warmup/active so it can never overwrite the
+ * match-end screen.
+ */
+function presentRareWeaponSpawn(input: RareWeaponAnnouncementInput): void {
+  const presentation = presentRareWeaponAnnouncement(input);
+  addFeed(presentation.feed.text, presentation.feed.tone);
+  if (presentation.banner) {
+    const banner = element<HTMLElement>('#banner');
+    banner.innerHTML = `<strong>${presentation.banner.headline}</strong><span>${presentation.banner.subline}</span>`;
+    banner.hidden = false;
+    window.setTimeout(() => {
+      if (banner.textContent?.includes(presentation.banner!.headline)) banner.hidden = true;
+    }, presentation.banner.durationMs);
+  }
+  // HF-339: reuse the existing announcement sting rather than adding a new audio
+  // event here - src/audio.ts is owned by the HF-337 lane right now, and a bespoke
+  // cue would also need a sound-event-inventory row. Upgrade to a dedicated sting
+  // when that lane lands.
+  if (presentation.audioCue) audio.matchCountdown('engage');
+  if (presentation.minimapPing) rareWeaponMinimapPing = {
+    position: presentation.minimapPing.position,
+    untilMs: performance.now() + RARE_WEAPON_BANNER_DURATION_MS,
+  };
 }
 
 function broadcastRailgunState(reliableCommit = true): void {
@@ -20655,6 +20721,25 @@ function activateOrToggleFieldSupportSlot(slotIndex: number, now = performance.n
   const fieldSupport = localFieldSupportProjection();
   const id = fieldSupport.loadout.slots[slotIndex];
   if (!id) return;
+  // HF-316: the owner reported killstreak keys that "sometimes" do nothing. Every
+  // refusal below used to be a bare return, so a blocked activation was
+  // indistinguishable from a dead key. Evaluate the pre-flight once and SAY why.
+  const gate = evaluateKillstreakActivation({
+    slotId: id,
+    projectionEarned: fieldSupport.available[id] === true,
+    playerAlive: player.alive,
+    matchPhase: matchState.phase,
+    tacticalMapOpen,
+    possessionActive: localKillstreakActorSnapshot()?.possession != null,
+    targetingActive: pointSupportTargeting !== null || triPassTargeting !== null,
+    arenaSupportsFieldSupport: selectedArena.id !== 'gun-range',
+    hasActorSnapshot: localKillstreakActorSnapshot() != null,
+    gameplayInputEnabled: gameplayInputEnabled(),
+  });
+  if (!gate.allowed) {
+    addFeed(KILLSTREAK_ACTIVATION_DENIAL_LABELS[gate.reason], 'gold');
+    return;
+  }
   if (!controllableKillstreakId(id)) {
     if (!localKillstreakActorSnapshot()?.possession) activateFieldSupport(id);
     return;
@@ -23548,6 +23633,23 @@ function updateMinimap(now: number): void {
   context.clearRect(0, 0, width, height);
   context.fillStyle = 'rgba(7, 15, 18, .86)';
   context.fillRect(0, 0, width, height);
+  // HF-339: pulsing gold marker at a rare-weapon spawn so the announcement can be
+  // acted on, not just read. Self-expiring, so no teardown path can leave it stuck.
+  if (rareWeaponMinimapPing) {
+    if (now >= rareWeaponMinimapPing.untilMs) rareWeaponMinimapPing = null;
+    else {
+      const [px, pz] = rareWeaponMinimapPing.position;
+      const [mx, my] = point(px, pz);
+      const pulse = 0.5 + 0.5 * Math.sin(now * 0.008);
+      context.save();
+      context.strokeStyle = `rgba(244, 196, 79, ${0.45 + 0.45 * pulse})`;
+      context.lineWidth = 2;
+      context.beginPath();
+      context.arc(mx, my, 5 + pulse * 4, 0, Math.PI * 2);
+      context.stroke();
+      context.restore();
+    }
+  }
   context.strokeStyle = 'rgba(244, 196, 79, .62)';
   context.lineWidth = 4;
   context.strokeRect(4, 4, width - 8, height - 8);

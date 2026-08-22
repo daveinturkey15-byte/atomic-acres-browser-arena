@@ -64,4 +64,79 @@ describe('coplanar surface audit', () => {
     expect(audit.pass).toBe(false);
     expect(audit.pairs.length).toBeGreaterThan(0);
   });
+
+function installCanvasDocument(): () => void {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  const contextState: Record<PropertyKey, unknown> = { font: '900 30px sans-serif' };
+  const context = new Proxy(contextState, {
+    get(target, property) {
+      if (property === 'measureText') {
+        return (text: string) => ({ width: text.length * Number.parseInt(String(target.font).match(/(\d+)px/)?.[1] ?? '30', 10) * 0.58 });
+      }
+      if (property === 'createLinearGradient' || property === 'createRadialGradient') {
+        return () => ({ addColorStop: () => undefined });
+      }
+      if (property in target) return target[property];
+      return () => undefined;
+    },
+    set(target, property, value) {
+      target[property] = value;
+      return true;
+    },
+  }) as unknown as CanvasRenderingContext2D;
+  const fakeDocument = {
+    createElement(tagName: string) {
+      if (tagName === 'canvas') {
+        return { width: 0, height: 0, getContext: () => context } as unknown as HTMLCanvasElement;
+      }
+      if (tagName === 'img') {
+        return { addEventListener: () => undefined, removeEventListener: () => undefined } as unknown as HTMLImageElement;
+      }
+      throw new Error(`Unexpected test element ${tagName}`);
+    },
+    createElementNS(_ns: string, tagName: string) {
+      return fakeDocument.createElement(tagName);
+    },
+  } as unknown as Document;
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: fakeDocument });
+  return () => {
+    if (previous) Object.defineProperty(globalThis, 'document', previous);
+    else Reflect.deleteProperty(globalThis, 'document');
+  };
+}
+
+
+  // HF-346: probe all arenas
+  it('audits all arenas for near-coplanar horizontal surfaces', async () => {
+    const uninstall = installCanvasDocument();
+    try {
+      const { buildSkylineTerminal, buildRustworks1v1, buildGunRange } = await import('./additional-maps');
+      const { buildArena } = await import('./map');
+      const { buildFarcrysis } = await import('./farcrysis');
+
+      const arenas = [
+        { name: 'Skyline Terminal', map: buildSkylineTerminal(new THREE.Scene()), near: 0.08, far: 190, maxDist: 71.72 },
+        { name: 'Rustworks', map: buildRustworks1v1(new THREE.Scene()), near: 0.08, far: 190, maxDist: 62.33 },
+        { name: 'Gun Range', map: buildGunRange(new THREE.Scene()), near: 0.08, far: 190, maxDist: 44.66 },
+        { name: 'Atomic Acres', map: buildArena(new THREE.Scene()), near: 0.08, far: 190, maxDist: 68.88 },
+        { name: 'Farcrysis', map: buildFarcrysis(new THREE.Scene()), near: 0.08, far: 190, maxDist: 40.0 },
+      ];
+
+      const results = arenas.map(({ name, map, near, far, maxDist }) => {
+        const audit = arenaHorizontalSurfaceAudit(map.root, near, far, maxDist);
+        return `${name}: threshold=${audit.threshold}, pairs=${audit.pairs.length}, pass=${audit.pass}`;
+      }).join('\n');
+      throw new Error(results);
+    } finally {
+      uninstall();
+    }
+  }, 20_000);
 });
+
+
+
+
+
+
+
+
