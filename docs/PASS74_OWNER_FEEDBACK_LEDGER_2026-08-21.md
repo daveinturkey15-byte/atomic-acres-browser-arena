@@ -207,7 +207,7 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-346 — Terminal z-fighting; zero persistent coplanar flicker on any level
 - Source: pass74.txt ("rust and terminal still issues") + atomicnext.txt ("z fighting on some assets
   in terminal map, should be none on any level").
-- Status: OPEN — the audit is now WIRED and correctly failing, which is progress: it reports 202 near-coplanar pairs in Skyline Terminal at an 18mm threshold and 2 in Farcrysis, naming each pair. Two fix attempts failed. Diagnosis refined: ~15 overlay tiers sit between y=0.032 and y=0.105, several 0.5-1mm apart and some exactly coplanar, so re-spacing alone CANNOT work - the fix is polygonOffset tiering for shared-footprint decals. Third attempt dispatched with the concrete pair list.
+- Status: IMPLEMENTED (56f166c2) — resolved on the third attempt via polygon-offset tiering (66 assignments) after the wired audit named every pair and proved re-spacing was impossible: ~15 tiers between y=0.032 and y=0.105 against an 18mm minimum, needing ~270mm of range that flat markings do not have. All five arenas pass the audit; the 18mm threshold is unchanged and the assertions were strengthened.
 
 ### HF-347 — RustRig, Terminal and Gun Range multiplayer faults
 - Source: pass74.txt ("rust and terminal still issues anmd gun test level when multoiplayer").
