@@ -149,7 +149,12 @@ function createPalmCrownGeometry(): THREE.BufferGeometry {
     const w0 = 0.34; // base half width
     const w1 = 0.6;  // mid half width
 
-    const bl = 4 + k * 11; // first vertex of this blade (11 verts per blade)
+    // First vertex of this blade: vertex 0 is the hub center, then 11 verts
+    // per blade (5 leaf + 6 spine). A previous `4 + k * 11` here shifted every
+    // blade's indices by +3 and drove the last blade's spine indices past the
+    // end of the position buffer — toNonIndexed() then read NaN, which is how
+    // the WebGL2 static batcher poisoned the whole render batch.
+    const bl = 1 + k * 11;
     const br = bl + 1;
 
     // Leaf: base-left, base-right, mid-left, mid-right, tip

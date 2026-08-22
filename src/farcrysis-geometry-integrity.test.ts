@@ -82,4 +82,34 @@ describe('farcrysis geometry position integrity', () => {
     }
     expect(bad, `NaN positions in:\n${bad.join('\n')}`).toEqual([]);
   });
+
+  // The boot-smoke NaN was never in a position attribute: the enhanced palm
+  // crown's index buffer referenced vertices past the end of its position
+  // buffer, and toNonIndexed() (run by the WebGL2 static batcher) read the
+  // out-of-range slots as NaN. Position scans cannot see that, so every
+  // index buffer must also be proven in range against its position count.
+  it('every index buffer references only existing vertices', () => {
+    const scene = new THREE.Scene();
+    buildFarcrysis(scene);
+
+    const bad: string[] = [];
+    scene.traverse((obj) => {
+      const anyObj = obj as unknown as { geometry?: THREE.BufferGeometry };
+      const geom = anyObj.geometry;
+      if (!geom || !geom.index) return;
+      const pos = geom.getAttribute('position') as THREE.BufferAttribute | undefined;
+      if (!pos) return;
+      let outOfRange = 0;
+      let maxIndex = -1;
+      for (let i = 0; i < geom.index.count; i++) {
+        const value = geom.index.array[i] as number;
+        if (value > maxIndex) maxIndex = value;
+        if (value < 0 || value >= pos.count) outOfRange++;
+      }
+      if (outOfRange > 0) {
+        bad.push(`${obj.name || obj.type}#${geom.id}: ${outOfRange} indices out of range (max ${maxIndex}, verts ${pos.count})`);
+      }
+    });
+    expect(bad, `Out-of-range indices in:\n${bad.join('\n')}`).toEqual([]);
+  });
 });
