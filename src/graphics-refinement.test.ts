@@ -51,7 +51,7 @@ describe('Pass 62 graphics refinement budgets', () => {
     expect(arenaShadowVolume('high-seas')).toEqual({ halfWidth: 32, halfHeight: 58, near: 4, far: 190 });
   });
 
-  it('applies requested anisotropy and reflection scaling to real material properties', () => {
+  it('applies requested anisotropy and clamps roughness to PBR range', () => {
     const scene = new THREE.Scene();
     const texture = new THREE.Texture();
     const material = new THREE.MeshStandardMaterial({ map: texture, metalness: 0.8, roughness: 0.24, envMapIntensity: 1 });
@@ -61,15 +61,17 @@ describe('Pass 62 graphics refinement budgets', () => {
     refinement.refine(scene, 8);
     expect(texture.anisotropy).toBe(8);
     expect(material.envMapIntensity).toBeCloseTo(0.62);
-    expect(material.roughness).toBeCloseTo(0.5288);
+    // Roughness is now clamped to PBR range [0.12, 1], not scaled by reflectionScale
+    expect(material.roughness).toBe(0.24);
     expect(refinement.telemetry()).toMatchObject({ requestedAnisotropy: 16, reflectionScale: 0.62 });
     refinement.dispose();
   });
 
-  it('keeps reflection tiers visibly distinct on WebGPU without an environment map', () => {
-    expect(effectivePbrRoughness(0.24, false, 1)).toBeCloseTo(0.24);
-    expect(effectivePbrRoughness(0.24, false, 0.62)).toBeCloseTo(0.5288);
-    expect(effectivePbrRoughness(0.24, false, 0)).toBe(1);
+  it('keeps reflectionScale on materials but no longer raises roughness', () => {
+    expect(effectivePbrRoughness(0.24, false)).toBe(0.24);
+    expect(effectivePbrRoughness(0.05, false)).toBe(0.12); // clamped to minimum for opaque
+    expect(effectivePbrRoughness(0.02, true)).toBe(0.04); // below the transparent floor, clamped up
+    expect(effectivePbrRoughness(0.05, true)).toBe(0.05); // above the floor, authored value survives
 
     const scene = new THREE.Scene();
     const material = new THREE.MeshStandardMaterial({ metalness: 0.72, roughness: 0.24 });
@@ -77,8 +79,9 @@ describe('Pass 62 graphics refinement budgets', () => {
     const webGpuRefinement = new GraphicsRefinementSystem(null, scene, 'blender', true, 1, 8, 0);
     webGpuRefinement.refine(scene, 8);
     expect(scene.environment).toBeNull();
-    expect(material.roughness).toBe(1);
-    expect(material.envMapIntensity).toBe(0);
+    // Roughness stays at authored value (clamped to PBR range), not raised to 1
+    expect(material.roughness).toBe(0.24);
+    expect(material.envMapIntensity).toBe(0); // envMapIntensity still scales with reflectionScale
     expect(webGpuRefinement.telemetry()).toMatchObject({ environmentEnabled: false, reflectionScale: 0 });
     webGpuRefinement.dispose();
   });

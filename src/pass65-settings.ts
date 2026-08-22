@@ -69,6 +69,8 @@ export type GraphicsRuntime = Readonly<{
     strength: number;
   }>;
   reflectionScale: number;
+  reflectionQuality: 'off' | 'low' | 'high';
+  environmentIntensity: number;
   volumetricScale: number;
   maximumAnisotropy: GraphicsSettings['anisotropy'];
   particleScale: number;
@@ -268,6 +270,8 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
       indirectLightScale: 0.45,
       ambientOcclusion: Object.freeze({ quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0 }),
       reflectionScale: 0,
+      reflectionQuality: 'off',
+      environmentIntensity: 0,
       volumetricScale: 0.4,
       maximumAnisotropy: 1,
       particleScale: 0.4,
@@ -292,6 +296,8 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
     indirectLightScale: lightingScale(settings.indirectLighting),
     ambientOcclusion,
     reflectionScale: lightingScale(settings.reflectionQuality),
+    reflectionQuality: settings.reflectionQuality,
+    environmentIntensity: lightingScale(settings.indirectLighting),
     volumetricScale: qualityScale(settings.volumetricQuality),
     maximumAnisotropy: settings.anisotropy,
     particleScale: qualityScale(settings.particleQuality),

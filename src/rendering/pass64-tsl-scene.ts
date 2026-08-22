@@ -4,6 +4,7 @@ import {
   MeshStandardNodeMaterial,
   PointsNodeMaterial,
   type RenderPipeline,
+  type WebGPURenderer,
 } from 'three/webgpu';
 import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
 import { ao } from 'three/addons/tsl/display/GTAONode.js';
@@ -41,6 +42,10 @@ import type { GraphicsRuntime } from '../pass65-settings';
 // hard-coded rustworks check.
 import { createOceanTslWater, oceanAmplitudeForBody } from '../water/ocean-tsl';
 import { sharedWaterBodyForArena } from '../water/water-authoring';
+import {
+  applyArenaEnvironmentIbl,
+  type ArenaIblState,
+} from './arena-environment-ibl';
 
 export type Pass65TslGraphicsOptions = Readonly<{
   principalSamples: 1 | 2 | 4;
@@ -48,6 +53,9 @@ export type Pass65TslGraphicsOptions = Readonly<{
   ambientOcclusion: GraphicsRuntime['ambientOcclusion'];
   post: GraphicsRuntime['post'];
   oceanWaveAmplitude?: number;
+  reflectionScale: number;
+  reflectionQuality: 'off' | 'low' | 'high';
+  environmentIntensity: number;
 }>;
 
 const DEFAULT_TSL_GRAPHICS_OPTIONS: Pass65TslGraphicsOptions = Object.freeze({
@@ -63,6 +71,9 @@ const DEFAULT_TSL_GRAPHICS_OPTIONS: Pass65TslGraphicsOptions = Object.freeze({
     filmGrainScale: 1,
     vignetteStrength: 0,
   }),
+  reflectionScale: 1,
+  reflectionQuality: 'high',
+  environmentIntensity: 1,
 });
 
 export type RuntimeTslTraversal = Readonly<{
@@ -94,9 +105,9 @@ export type Pass64TslSceneSystems = Readonly<{
    * forced RenderPipeline submission and completion fence.
    */
   precompileExactScenePass(root: THREE.Object3D): Promise<void>;
-  applyDefinition(definition: ArenaVisualDefinition): void;
+  applyDefinition(definition: ArenaVisualDefinition): Promise<void>;
   /** Applies values backed by existing uniforms/scene nodes; target topology is unchanged. */
-  applyGraphics(graphics: Pass65TslGraphicsOptions): void;
+  applyGraphics(graphics: Pass65TslGraphicsOptions): Promise<void>;
   setReviewCamera(camera: ArenaReviewCamera): void;
   clearReviewCamera(): void;
   update(timeMs: number): void;
@@ -836,10 +847,21 @@ export function createPass64TslSceneSystems(
   renderPipeline: RenderPipeline,
   definition: ArenaVisualDefinition,
   graphics: Pass65TslGraphicsOptions = DEFAULT_TSL_GRAPHICS_OPTIONS,
+  renderer?: WebGPURenderer,
 ): Pass64TslSceneSystems {
   let activeDefinition = definition;
   let activeGraphics = graphics;
   let activeReviewCamera: ArenaReviewCamera | null = null;
+  // IBL state for WebGPU arena environment maps
+  let activeIblState: ArenaIblState = {
+    environmentTexture: null,
+    pmremTarget: null,
+    arenaId: null,
+    resolutionTier: 128,
+    budgetEnvironmentIntensity: 0,
+    arenaEnvironmentScale: 0,
+    reflectionScale: 0,
+  };
   const root = new THREE.Group();
   root.name = 'Pass 64 WebGPU TSL presentation systems';
   root.userData.pass64TslPresentation = true;
@@ -923,18 +945,48 @@ export function createPass64TslSceneSystems(
         renderer.setMRT(previousMrt);
       }
     },
-    applyDefinition: (nextDefinition) => {
+    applyDefinition: async (nextDefinition) => {
       activeDefinition = nextDefinition;
       activeReviewCamera = null;
       delete root.userData.tslReviewCameraId;
       applyArenaSystemLayout(root, nextDefinition, nextDefinition.reviewCameras[0]?.seed ?? 6401, activeGraphics);
       hdr.applyDefinition(nextDefinition);
+      
+      // Apply arena environment IBL (PMREM from sky backdrop) on WebGPU path
+      if (renderer) {
+        activeIblState = await applyArenaEnvironmentIbl(
+          renderer,
+          scene,
+          nextDefinition.id,
+          nextDefinition.atmosphere.preset,
+          activeGraphics.reflectionQuality,
+          activeGraphics.environmentIntensity,
+          activeGraphics.reflectionScale,
+          activeIblState,
+        );
+      }
+      
       publishActualGraphics();
     },
-    applyGraphics: (nextGraphics) => {
+    applyGraphics: async (nextGraphics) => {
       activeGraphics = nextGraphics;
       applyArenaSystemLayout(root, activeDefinition, activeDefinition.reviewCameras[0]?.seed ?? 6401, activeGraphics);
       hdr.applyGraphics(activeGraphics);
+      
+      // Update IBL intensity when reflection settings change (same arena, no regeneration needed)
+      if (renderer && activeIblState.environmentTexture) {
+        activeIblState = await applyArenaEnvironmentIbl(
+          renderer,
+          scene,
+          activeDefinition.id,
+          activeDefinition.atmosphere.preset,
+          activeGraphics.reflectionQuality,
+          activeGraphics.environmentIntensity,
+          activeGraphics.reflectionScale,
+          activeIblState,
+        );
+      }
+      
       publishActualGraphics();
     },
     setReviewCamera: (reviewCamera) => {
@@ -951,6 +1003,14 @@ export function createPass64TslSceneSystems(
       setAnimationTime(root, activeReviewCamera?.fixedTimeMs ?? timeMs);
     },
     dispose: () => {
+      // Dispose IBL environment map resources
+      if (renderer && activeIblState.environmentTexture) {
+        if (scene.environment === activeIblState.environmentTexture) {
+          scene.environment = null;
+        }
+        activeIblState.environmentTexture.dispose();
+        activeIblState.pmremTarget?.dispose();
+      }
       disposeRoot(root);
       hdr.dispose();
       scenePass.dispose();

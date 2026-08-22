@@ -56,13 +56,12 @@ export function arenaShadowVolume(arenaId: ArenaId): ArenaShadowVolume {
 }
 
 /**
- * Reflection quality must remain visible on WebGPU even when no environment
- * map is available. Raising PBR roughness attenuates direct-light specular
- * response without inventing SSR or changing authored base colour/metalness.
+ * Returns the authored roughness clamped to valid PBR range.
+ * reflectionQuality no longer raises roughness (that was backwards).
+ * Instead, reflectionQuality gates PMREM resolution in arena-environment-ibl.
  */
-export function effectivePbrRoughness(authoredRoughness: number, transparent: boolean, reflectionScale: number): number {
-  const authored = THREE.MathUtils.clamp(authoredRoughness, transparent ? 0.04 : 0.12, 1);
-  return THREE.MathUtils.lerp(1, authored, THREE.MathUtils.clamp(reflectionScale, 0, 1));
+export function effectivePbrRoughness(authoredRoughness: number, transparent: boolean): number {
+  return THREE.MathUtils.clamp(authoredRoughness, transparent ? 0.04 : 0.12, 1);
 }
 
 export function graphicsEffectsBudget(profile: RenderProfile, pixelRatioCap: number): GraphicsEffectsBudget {
@@ -166,6 +165,8 @@ export class GraphicsRefinementSystem {
   private arenaId: ArenaId = 'atomic-acres';
   private shadowVolume: ArenaShadowVolume = arenaShadowVolume('atomic-acres');
   private budget: GraphicsEffectsBudget;
+  private requestedAnisotropy = 4;
+  private reflectionScale = 1;
 
   constructor(
     renderer: THREE.WebGLRenderer | null,
@@ -173,11 +174,15 @@ export class GraphicsRefinementSystem {
     private profile: RenderProfile,
     softwareRenderer: boolean,
     initialPixelRatioCap: number,
-    private requestedAnisotropy = profile === 'blender' ? 8 : 4,
-    private reflectionScale = 1,
+    requestedAnisotropy = profile === 'blender' ? 8 : 4,
+    initialReflectionScale = 1,
   ) {
     this.budget = graphicsEffectsBudget(profile, initialPixelRatioCap);
+    this.requestedAnisotropy = requestedAnisotropy;
+    this.reflectionScale = initialReflectionScale;
     if (!renderer || profile === 'compat' || softwareRenderer) return;
+    // NOTE: PMREM environment map is now handled by arena-environment-ibl.ts on the WebGPU path.
+    // This WebGL path keeps the RoomEnvironment fallback for compatibility.
     try {
       const pmrem = new THREE.PMREMGenerator(renderer);
       pmrem.compileCubemapShader();
@@ -240,7 +245,8 @@ export class GraphicsRefinementSystem {
           this.refined.add(material);
           this.refinedMaterials += 1;
         }
-        material.roughness = effectivePbrRoughness(authored.roughness, material.transparent, this.reflectionScale);
+        // Use authored roughness clamped to PBR range (reflectionQuality gates PMREM resolution, not roughness)
+        material.roughness = effectivePbrRoughness(authored.roughness, material.transparent);
         material.metalness = THREE.MathUtils.clamp(material.metalness, 0, 1);
         const authoredEnvironmentIntensity = material.transparent
           ? Math.max(authored.environmentIntensity, 0.48)

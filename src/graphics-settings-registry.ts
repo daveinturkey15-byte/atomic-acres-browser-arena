@@ -175,7 +175,7 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
   }),
   control({
     key: 'reflectionQuality', id: 'graphics-reflections', category: 'lighting', label: 'Specular response',
-    description: 'Scales bounded PBR environment/specular response on authored materials.',
+    description: 'Gates PMREM cubemap resolution (128/256) for arena environment IBL. Higher tiers capture sharper specular from the sky backdrop. Does NOT raise material roughness (that was backwards).',
     kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
     applyMode: 'live', runtimeConsumer: 'material-refinement',
   }),

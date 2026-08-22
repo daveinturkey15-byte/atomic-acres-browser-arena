@@ -3836,7 +3836,10 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
         ambientOcclusion: graphicsRuntime.ambientOcclusion,
         post: graphicsRuntime.post,
         oceanWaveAmplitude: rustworksOceanAmplitude(renderProfile),
-      });
+        reflectionScale: graphicsRuntime.reflectionScale,
+        reflectionQuality: graphicsRuntime.reflectionQuality,
+        environmentIntensity: graphicsRuntime.environmentIntensity,
+      }, renderRuntime.renderer);
     }
     appliedTslArenaDefinitions += 1;
     // HF-363: hand the arena's authored grain to the display-referred grade stage.
@@ -24685,6 +24688,9 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
     ambientOcclusion: live.ambientOcclusion,
     post: live.post,
     oceanWaveAmplitude: rustworksOceanAmplitude(desiredProfile),
+    reflectionScale: live.reflectionScale,
+    reflectionQuality: live.reflectionQuality,
+    environmentIntensity: live.environmentIntensity,
   });
   // Rebind the complete retained arena presentation after the profile state is
   // committed. Updating only the three ambient intensities leaves the real
@@ -25698,7 +25704,7 @@ async function performArenaSelection(
     }
     setStatus(`${selectedArena.displayName} selected · ${selectedArena.rulesLabel}.`);
   } catch (error) {
-    console.error('[Nuke Town map selection failed]', error);
+    console.error(`[${nextSelection.displayName} map selection failed]`, error);
     arenaTransitionPhase = 'rolling-back';
     arenaTransitionFailure = error instanceof Error ? error.message : String(error);
     profileArenaTransition('rollback');

@@ -229,6 +229,9 @@ describe('Pass 64 authored TSL pipeline set', () => {
       post: {
         bloomStrength: 0.14, exposureScale: 1, toneMapping: 'aces', filmGrainScale: 1, vignetteStrength: 0,
       },
+      reflectionScale: 1,
+      reflectionQuality: 'high',
+      environmentIntensity: 1,
     });
     const root = new THREE.Group();
     root.name = 'exact-coverage-root';
@@ -294,6 +297,9 @@ describe('Pass 64 authored TSL pipeline set', () => {
         vignetteStrength: 0.35,
       },
       oceanWaveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.performance,
+      reflectionScale: 1,
+      reflectionQuality: 'high',
+      environmentIntensity: 1,
     });
     expect(systems.principalHdrTarget.samples).toBe(2);
     expect(systems.principalHdrTarget.textures.map(({ name }) => name)).toEqual(['output', 'normal']);
@@ -340,6 +346,9 @@ describe('Pass 64 authored TSL pipeline set', () => {
         vignetteStrength: 0,
       },
       oceanWaveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.blender,
+      reflectionScale: 1,
+      reflectionQuality: 'high',
+      environmentIntensity: 1,
     });
     expect(systems.root.userData.pass65AdvancedGraphics).toMatchObject({
       principalSamples: 2,

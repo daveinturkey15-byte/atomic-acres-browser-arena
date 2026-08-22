@@ -2333,6 +2333,12 @@ function dappleFor(name: string): number {
  * Replaces the old no-op onBeforeCompile shim walk.
  */
 function _applyTslFoliage(scene: THREE.Group): void {
+  // pass74-arena-boot-smoke: WebGLRenderer cannot compile MeshStandardNodeMaterial (TSL).
+  // On WebGL2 compat paths, retain the authored MeshStandardMaterial so WebGLRenderer
+  // compiles clean without NodeMaterial / resolveIncludes errors.
+  if (typeof document !== 'undefined' && document.documentElement?.dataset.renderBackend === 'webgl2') {
+    return;
+  }
   for (let i = 0; i < scene.children.length; i++) {
     const child = scene.children[i];
     if (!(child instanceof THREE.InstancedMesh)) continue;
