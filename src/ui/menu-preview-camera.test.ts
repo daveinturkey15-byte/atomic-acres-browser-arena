@@ -31,7 +31,9 @@ describe('canonical prerecorded menu preview choreography', () => {
   it('defines the same eight-second authored recipe for every selectable arena', () => {
     for (const arena of ARENA_SELECTIONS) {
       const definition = menuPreviewDefinition(arena.id);
-      expect(definition.recipeId).toBe('pass66-authoritative-runtime-menu-preview-v2');
+      expect(definition.recipeId).toBe(arena.id === 'high-seas'
+        ? 'pass75-high-seas-menu-preview-v1'
+        : 'pass66-authoritative-runtime-menu-preview-v2');
       expect(definition.durationMs).toBe(8_000);
       expect(definition.reviewFrames).toEqual([1, 60, 120, 180, 240]);
       expect(definition.label).toContain(arena.selectorLabel);
@@ -41,7 +43,7 @@ describe('canonical prerecorded menu preview choreography', () => {
   });
 
   it('uses authored LOD0 helicopter framing and a dedicated cat POV for the range', () => {
-    for (const arenaId of ['atomic-acres', 'skyline-terminal', 'rustworks-1v1'] as const) {
+    for (const arenaId of ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'high-seas'] as const) {
       const definition = menuPreviewDefinition(arenaId);
       expect(definition.kind).toBe('helicopter');
       if (definition.kind !== 'helicopter') throw new Error('unreachable definition');
@@ -51,7 +53,7 @@ describe('canonical prerecorded menu preview choreography', () => {
   });
 
   it('holds occasional helicopter trim values and blends bounded seeded corrections', () => {
-    for (const arenaId of ['atomic-acres', 'skyline-terminal', 'rustworks-1v1'] as const) {
+    for (const arenaId of ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'high-seas'] as const) {
       const definition = menuPreviewDefinition(arenaId);
       const unique = new Set<string>();
       let heldFramePairs = 0;

@@ -1,4 +1,5 @@
 import choreographyJson from '../../source-assets/menu/pass65-preview-masters/choreography.json';
+import highSeasChoreographyJson from '../../source-assets/menu/pass75-high-seas-preview/choreography.json';
 import type { ArenaId } from '../map-selection';
 
 // Deterministic evaluator for authoring/tests only. The menu runtime consumes
@@ -122,7 +123,18 @@ type ChoreographyRecipe = Readonly<{
   arenas: Readonly<Record<ArenaId, ArenaRecipe>>;
 }>;
 
-const CHOREOGRAPHY = choreographyJson as unknown as ChoreographyRecipe;
+const RETAINED_CHOREOGRAPHY = choreographyJson as unknown as ChoreographyRecipe;
+const HIGH_SEAS_CHOREOGRAPHY = highSeasChoreographyJson as unknown as Readonly<{
+  recipeId: string;
+  arenas: Readonly<{ 'high-seas': HelicopterRecipe }>;
+}>;
+const CHOREOGRAPHY: ChoreographyRecipe = Object.freeze({
+  ...RETAINED_CHOREOGRAPHY,
+  arenas: Object.freeze({
+    ...RETAINED_CHOREOGRAPHY.arenas,
+    ...HIGH_SEAS_CHOREOGRAPHY.arenas,
+  }),
+});
 const DURATION_MS = CHOREOGRAPHY.durationSeconds * 1_000;
 
 export type MenuPreviewVariance = Readonly<{
@@ -299,7 +311,7 @@ export function menuPreviewDefinition(arenaId: ArenaId): MenuPreviewDefinition {
   return Object.freeze({
     ...CHOREOGRAPHY.arenas[arenaId],
     durationMs: DURATION_MS,
-    recipeId: CHOREOGRAPHY.recipeId,
+    recipeId: arenaId === 'high-seas' ? HIGH_SEAS_CHOREOGRAPHY.recipeId : CHOREOGRAPHY.recipeId,
     reviewFrames: CHOREOGRAPHY.reviewFrames,
   });
 }

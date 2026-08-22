@@ -23,6 +23,7 @@ import { webGlShadowSamplerMode } from './webgl-shadow-compatibility';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
 import { shouldEliminateArenaOverboard } from './arena-overboard';
+import { sharedWaterBodyForArena } from './water/water-authoring';
 import { PASS66_RELEASE_IDENTITY } from './release-identity';
 import { drawPass70DroneSwarmLogo } from './pass70-drone-swarm-logo';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
@@ -80,6 +81,7 @@ import {
   updateGunRangePresentation,
 } from './additional-maps';
 import { buildFarcrysis } from './farcrysis';
+import { buildHighSeas } from './high-seas';
 import { RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES } from './rigged-bot-visual-evidence-contract';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
@@ -263,7 +265,7 @@ import {
   weaponPrewarmCatalogForArena,
 } from './weapon-prewarm-catalog';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
-import { clampPointToBounds, damp, firstSegmentBoxHit, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes, type Box2 } from './collision';
+import { clampPointToBounds, collidersOverlappingVerticalSpan, damp, firstSegmentBoxHit, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes, type Box2 } from './collision';
 import {
   applyPenetrationDamage,
   ballisticImpactSurface,
@@ -727,7 +729,7 @@ import {
   type HumanDamageEventInput,
   type MatchParticipantReportInput,
 } from './match-report';
-import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, scoreSpawnCandidates, stableSpawnTieBreakSeed, type SpawnMode } from './spawn-safety';
+import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, scoreSpawnCandidates, stableSpawnTieBreakSeed, validArenaSpawnPoint, waypointEyePoint, type SpawnMode } from './spawn-safety';
 import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
 import {
   CharacterPhysics,
@@ -3139,6 +3141,7 @@ const arenaFactories: Readonly<Record<ArenaId, (target: THREE.Scene) => ArenaMap
   'gun-range': buildGunRange,
   'skyline-terminal': buildSkylineTerminal,
   farcrysis: buildFarcrysis,
+  'high-seas': buildHighSeas,
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;
@@ -4101,10 +4104,7 @@ const atmosphereSystem = renderRuntime.backend === 'webgl2'
   ? new AtmosphereSystem(scene, renderProfile, rendererLabel, mistQuery, selectedArena.id)
   : null;
 const waterSystem = new WaterSystem(scene, renderRuntime.backend === 'webgpu' ? 'external-tsl' : 'legacy-glsl');
-waterSystem.configure(selectedArena.id, renderProfile, {
-  halfX: Math.max(Math.abs(arena.bounds.minX), Math.abs(arena.bounds.maxX)),
-  halfZ: Math.max(Math.abs(arena.bounds.minZ), Math.abs(arena.bounds.maxZ)),
-}, { night: selectedArena.id === 'rustworks-1v1', waterLevel: selectedArena.id === 'rustworks-1v1' ? -19.5 : -0.55 });
+waterSystem.configure(selectedArena.id, renderProfile);
 ensureRustworksStarfield(scene, selectedArena.id);
 const grassSystem = renderRuntime.backend === 'webgl2'
   ? new GrassSystem(
@@ -13876,12 +13876,7 @@ function spawnPoint(): THREE.Vector3 {
   ];
   const validForSide = (side: Team) => arena.spawns[side]
     .map((point, localIndex) => ({ point, side, index: side * 100 + localIndex }))
-    .filter(({ point }) => {
-      const bodyPoint = { x: point.x, y: 0, z: point.z };
-      return Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z)
-        && pointInsideBounds(bodyPoint, arena.bounds, 0.44)
-        && !isBlocked(bodyPoint, activeWorldColliders(), 0.44);
-    });
+    .filter(({ point }) => validArenaSpawnPoint(point, arena.bounds, activeWorldColliders()));
   const home = validForSide(player.team);
   const oppositeTeam: Team = player.team === 0 ? 1 : 0;
   const opposite = validForSide(oppositeTeam);
@@ -16748,12 +16743,7 @@ function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vec
   ];
   const validForSide = (side: Team) => arena.spawns[side]
     .map((candidate, localIndex) => ({ candidate, index: side * 100 + localIndex }))
-    .filter(({ candidate }) => {
-      const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
-      return Number.isFinite(candidate.x) && Number.isFinite(candidate.z)
-        && pointInsideBounds(bodyPoint, arena.bounds, 0.44)
-        && !isBlocked(bodyPoint, activeWorldColliders(), 0.44);
-    });
+    .filter(({ candidate }) => validArenaSpawnPoint(candidate, arena.bounds, activeWorldColliders()));
   const home = validForSide(team);
   const opposite = validForSide(team === 0 ? 1 : 0);
   if (home.length === 0 && (spawnMode !== 'ffa' || opposite.length === 0)) throw new Error(`No valid authored spawn for team ${team}`);
@@ -17289,7 +17279,7 @@ function selectBotTacticalWaypoint(
 ): number {
   const target = { x: targetPosition.x, y: targetPosition.y, z: targetPosition.z };
   return chooseTacticalWaypoint(arena.patrolPoints.map((point, index) => {
-    const eye = { x: point.x, y: 1.42, z: point.z };
+    const eye = waypointEyePoint(point);
     return {
       index,
       distanceFromBot: point.distanceTo(bot.position),
@@ -17792,12 +17782,21 @@ function updateBots(dt: number, now: number): void {
           : routeMovement === 'strafe-right' ? side : new THREE.Vector3();
     const speed = routeMovement.startsWith('strafe') ? 4.05 : lineOfSight ? 4.65 : 5.85;
     const desired = bot.position.clone().addScaledVector(desiredDirection, speed * dt);
-    let resolved = resolveHorizontalMove(bot.position, desired, botNavigationColliders, arena.bounds, 0.44);
+    const botCapsuleHeight = 1.7;
+    const movementColliders = collidersOverlappingVerticalSpan(
+      botNavigationColliders,
+      bot.position.y,
+      bot.position.y + botCapsuleHeight,
+    );
+    const collisionPosition = bot.position.clone().setY(bot.position.y + botCapsuleHeight);
+    const collisionDesired = desired.clone().setY(desired.y + botCapsuleHeight);
+    let resolved = resolveHorizontalMove(collisionPosition, collisionDesired, movementColliders, arena.bounds, 0.44);
     const stalled = Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002
       && desiredDirection.lengthSq() > 0;
     if (stalled) {
       const detour = bot.position.clone().addScaledVector(side, bot.strafeSign * speed * dt * 1.5);
-      resolved = resolveHorizontalMove(bot.position, detour, botNavigationColliders, arena.bounds, 0.44);
+      const collisionDetour = detour.clone().setY(detour.y + botCapsuleHeight);
+      resolved = resolveHorizontalMove(collisionPosition, collisionDetour, movementColliders, arena.bounds, 0.44);
       const detourStalled = Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002;
       if (detourStalled) {
         if (bot.blockedSince === 0) bot.blockedSince = now;
@@ -24536,13 +24535,7 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
   smokeVolumePresentationPool.setQualityScale(live.smokeScale);
   grassSystem?.setAdaptivePixelRatio(pixelRatioCap);
   atmosphereSystem?.setProfile(desiredProfile);
-  waterSystem.configure(selectedArena.id, desiredProfile, {
-    halfX: Math.max(Math.abs(arena.bounds.minX), Math.abs(arena.bounds.maxX)),
-    halfZ: Math.max(Math.abs(arena.bounds.minZ), Math.abs(arena.bounds.maxZ)),
-  }, {
-    night: selectedArena.id === 'rustworks-1v1',
-    waterLevel: selectedArena.id === 'rustworks-1v1' ? -19.5 : -0.55,
-  });
+  waterSystem.configure(selectedArena.id, desiredProfile);
   pass64TslSystems?.applyGraphics({
     principalSamples: Math.max(1, pass64TslSystems.principalHdrTarget.samples) as 1 | 2 | 4,
     volumetricScale: live.volumetricScale,
@@ -25217,18 +25210,16 @@ function setArenaPresentationVisibility(): void {
     setWorldIdentityHouseShellPresentation(worldIdentityPresentation.root, atomicVisible && !blenderArenaActive);
   }
   if (neighbourhoodLifeRoot) neighbourhoodLifeRoot.visible = atomicVisible;
-  // Rustworks' ocean needs a long view frustum so water, not void, meets the horizon.
-  const desiredFarPlane = rustworksVisible ? 1_400 : 180;
+  // Shared surrounding oceans need a long view frustum so water, not void,
+  // meets the horizon. The authoring registry is the single ownership gate.
+  const desiredFarPlane = sharedWaterBodyForArena(selectedArena.id) ? 1_400 : 180;
   if (camera.far !== desiredFarPlane) {
     camera.far = desiredFarPlane;
     camera.updateProjectionMatrix();
   }
   atmosphereSystem?.setArena(selectedArena.id);
   if (atmosphereSystem) atmosphereSystem.root.visible = atmosphereSystem.telemetry().enabled;
-  waterSystem.configure(selectedArena.id, liveGraphicsProfile, {
-    halfX: Math.max(Math.abs(arena.bounds.minX), Math.abs(arena.bounds.maxX)),
-    halfZ: Math.max(Math.abs(arena.bounds.minZ), Math.abs(arena.bounds.maxZ)),
-  }, { night: selectedArena.id === 'rustworks-1v1', waterLevel: selectedArena.id === 'rustworks-1v1' ? -19.5 : -0.55 });
+  waterSystem.configure(selectedArena.id, liveGraphicsProfile);
   ensureRustworksStarfield(scene, selectedArena.id);
   applyArenaFogProfile();
   applyArenaLightingForSelection();
@@ -26523,10 +26514,7 @@ function frame(now: number, scheduleNext = true): void {
     if (selectedArena.id === 'atomic-acres') {
       if (arenaArtRoot && !blenderArenaActive) updateArenaArt(arenaArtRoot, visualNow);
       if (neighbourhoodLifeRoot) updateArenaArt(neighbourhoodLifeRoot, visualNow);
-      atmosphereSystem?.update(visualNow / 1_000);
       grassSystem?.update(visualNow / 1_000, camera.position, player.position, gameStarted);
-    } else if (selectedArena.id === 'rustworks-1v1') {
-      atmosphereSystem?.update(visualNow / 1_000);
     } else if (selectedArena.id === 'gun-range') {
       updateGunRangePresentation(arena.root, visualNow);
       const doorState = updateGunRangeTestBayDoorAuthority(now)
@@ -26535,6 +26523,7 @@ function frame(now: number, scheduleNext = true): void {
       synchronizeGunRangeTestBayDoorWorld(doorState, true);
       flushGunRangeTestBayDoorBroadcast();
     }
+    atmosphereSystem?.update(visualNow / 1_000);
     waterSystem.update(visualNow / 1_000);
     if (gameStarted) updateMinimap(now);
     updateGunRangeMatchClockAuthority(now);
@@ -29244,10 +29233,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     spawnSafety: ([0, 1] as Team[]).map((team) => ({
       team,
       authored: arena.spawns[team].length,
-      valid: arena.spawns[team].filter((point) => {
-        const bodyPoint = { x: point.x, y: 0, z: point.z };
-        return pointInsideBounds(bodyPoint, arena.bounds, 0.44) && !isBlocked(bodyPoint, activeWorldColliders(), 0.44);
-      }).length,
+      valid: arena.spawns[team].filter((point) => validArenaSpawnPoint(point, arena.bounds, activeWorldColliders())).length,
     })),
     houseNavigation: arena.houses.map((house) => ({
       id: house.id,
@@ -30207,7 +30193,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     return debugCaptureCameraRevision;
   },
   setCaptureCameraFarPlane: (far) => {
-    const arenaFarPlane = selectedArena.id === 'rustworks-1v1' ? 1_400 : 180;
+    const arenaFarPlane = sharedWaterBodyForArena(selectedArena.id) ? 1_400 : 180;
     const requestedFarPlane = Number.isFinite(far) ? THREE.MathUtils.clamp(far!, camera.near + 1, 2_000) : arenaFarPlane;
     if (camera.far === requestedFarPlane) return;
     camera.far = requestedFarPlane;

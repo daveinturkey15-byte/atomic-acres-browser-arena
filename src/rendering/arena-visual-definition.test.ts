@@ -9,8 +9,7 @@ import type { ArenaVisualDefinition, LoadedArenaVisual } from './arena-visual-de
 import { createIdempotentRootDisposer, validateArenaVisualDefinition } from './arena-visual-definition';
 import { ARENA_VISUAL_REGISTRY, ArenaVisualStreamController, type ArenaVisualRegistry } from './arena-visual-stream';
 
-// HF-359: includes farcrysis (5 arenas)
-const ARENA_IDS: readonly ArenaId[] = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal', 'farcrysis'];
+const ARENA_IDS: readonly ArenaId[] = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal', 'farcrysis', 'high-seas'];
 
 describe('Pass 64 arena visual definitions', () => {
   it('defines exactly one dynamically imported contract for every stable arena ID', async () => {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, scoreSpawnCandidates, stableSpawnTieBreakSeed, type SpawnMode } from './spawn-safety';
-import type { ArenaId } from './map-selection';
+import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, scoreSpawnCandidates, stableSpawnTieBreakSeed, validArenaSpawnPoint, waypointEyePoint, type SpawnMode } from './spawn-safety';
+import { ARENA_SELECTIONS, type ArenaId } from './map-selection';
 
-const arenas: ArenaId[] = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal'];
+const arenas: ArenaId[] = ARENA_SELECTIONS.map((selection) => selection.id);
 const modes: SpawnMode[] = ['solo', 'tdm', 'ffa'];
 
 describe('mode-aware deterministic spawn safety', () => {
@@ -101,5 +101,19 @@ describe('mode-aware deterministic spawn safety', () => {
     const base = { arenaId: 'rustworks-1v1' as const, mode: 'ffa' as const, population: 2, threats: [], occupants: [], recentDeaths: [], colliders: [], previousIndex: -1 };
     expect(() => scoreSpawnCandidates({ ...base, candidates: [] })).toThrow('No spawn candidates');
     expect(() => scoreSpawnCandidates({ ...base, candidates: [{ index: 0, point: { x: Number.NaN, y: 0, z: 0 } }] })).toThrow('No finite spawn candidates');
+  });
+
+  it('validates raised-deck spawns at their authored elevation', () => {
+    const bounds = { minX: -10, maxX: 10, minZ: -10, maxZ: 10 };
+    const lowBulkhead = { minX: -1, maxX: 1, minZ: -1, maxZ: 1, minY: -1, maxY: 2 };
+    const raisedBulkhead = { ...lowBulkhead, minY: 4, maxY: 7 };
+    expect(validArenaSpawnPoint({ x: 0, y: 5.5, z: 0 }, bounds, [lowBulkhead])).toBe(true);
+    expect(validArenaSpawnPoint({ x: 0, y: 5.5, z: 0 }, bounds, [raisedBulkhead])).toBe(false);
+    expect(validArenaSpawnPoint({ x: 0, y: Number.NaN, z: 0 }, bounds, [])).toBe(false);
+  });
+
+  it('adds bot eye height to each waypoint deck elevation', () => {
+    expect(waypointEyePoint({ x: 2, y: 5.5, z: -3 })).toEqual({ x: 2, y: 6.92, z: -3 });
+    expect(waypointEyePoint({ x: 2, z: -3 })).toEqual({ x: 2, y: 1.42, z: -3 });
   });
 });

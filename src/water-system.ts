@@ -17,6 +17,7 @@ export type WaterTelemetry = Readonly<{
   nearSize: number;
   horizonRadius: number;
   physicsActive: boolean;
+  swimmable: boolean;
   waveBands: number;
   waveAuthority: typeof RUSTWORKS_OCEAN_AUTHORITY_ID;
 }>;
@@ -96,6 +97,7 @@ export class WaterSystem {
   private material: THREE.ShaderMaterial | null = null;
   private arenaId: ArenaId | null = null;
   private enabled = false;
+  private presentationEnabled = false;
   private waveAmp: number = RUSTWORKS_OCEAN_AMPLITUDE.blender;
   private segments = 140;
   /** Metres below the playable deck (oil-rig height). */
@@ -105,6 +107,10 @@ export class WaterSystem {
   private islandHalfX = 27;
   private islandHalfZ = 29;
   private night = true;
+  private shoreInnerRadius = 27.8;
+  private shoreOuterRadius = 78;
+  private palette = { deep: 0x071b2b, shallow: 0x165b71, foam: 0x68b9c9 };
+  private dryFootprintMask: 'rectangular' | 'none' = 'rectangular';
 
   constructor(
     scene: THREE.Scene,
@@ -119,31 +125,39 @@ export class WaterSystem {
   configure(
     arenaId: ArenaId,
     profile: RenderProfile,
-    island: { halfX: number; halfZ: number },
-    options?: { night?: boolean; waterLevel?: number },
   ): void {
     this.arenaId = arenaId;
-    this.islandHalfX = island.halfX;
-    this.islandHalfZ = island.halfZ;
-    // HF-358: registry-driven. The authored body (when present) supplies level,
-    // night palette and near/horizon sizes; caller-supplied live arena bounds
-    // still win for the island footprint so existing rustworks behaviour stays
-    // byte-compatible (see water-authoring.ts authority notes).
     const body = waterBodyForArena(arenaId);
     this.enabled = body !== null;
-    this.nearSize = body?.nearSize ?? this.nearSize;
-    this.horizonRadius = body?.horizonRadius ?? this.horizonRadius;
-    this.night = options?.night ?? (body?.night ?? false);
-    // The authored level is authoritative; options.waterLevel remains a
-    // legacy escape hatch that may only confirm, not contradict, an authored
-    // body (a contradicting value is ignored and logged once per configure).
-    if (body && options?.waterLevel !== undefined && options.waterLevel !== body.level) {
-      console.warn(
-        `[HF-358] waterSystem.configure: legacy waterLevel ${options.waterLevel} contradicts authored level ${body.level} for ${arenaId}; using authored value.`,
-      );
+    this.presentationEnabled = body?.presentationOwner === 'shared-ocean';
+    if (body) {
+      this.islandHalfX = body.island.halfX;
+      this.islandHalfZ = body.island.halfZ;
+      this.night = body.night;
+      this.waterLevel = body.level;
+      this.waveAmp = rustworksOceanAmplitude(profile) * body.amplitudeScale;
+      this.nearSize = body.nearSize;
+      this.horizonRadius = body.horizonRadius;
+      this.shoreInnerRadius = body.shore.innerRadius;
+      this.shoreOuterRadius = body.shore.outerRadius;
+      this.palette = body.legacyPalette;
+      this.dryFootprintMask = body.dryFootprintMask;
+    } else {
+      // Clear the complete authored state on every arena switch. Leaving the
+      // previous body's level, mask or swim flag behind made disabled-water
+      // telemetry and CPU samples describe whichever arena ran before it.
+      this.islandHalfX = 0;
+      this.islandHalfZ = 0;
+      this.night = false;
+      this.waterLevel = 0;
+      this.waveAmp = 0;
+      this.nearSize = 0;
+      this.horizonRadius = 0;
+      this.shoreInnerRadius = 0;
+      this.shoreOuterRadius = 0;
+      this.palette = { deep: 0, shallow: 0, foam: 0 };
+      this.dryFootprintMask = 'none';
     }
-    this.waterLevel = body?.level ?? options?.waterLevel ?? -0.55;
-    this.waveAmp = rustworksOceanAmplitude(profile);
     this.segments = profile === 'blender' ? 160 : 96;
     // WebGPU owns the visible water through Pass64TslSceneSystems. This object
     // remains the deterministic CPU water/physics authority only.
@@ -168,16 +182,16 @@ export class WaterSystem {
       this.horizonMesh.material.dispose();
       this.horizonMesh = null;
     }
-    if (!this.enabled) {
+    if (!this.presentationEnabled) {
       this.root.visible = false;
       return;
     }
     const size = this.nearSize;
     const geometry = new THREE.PlaneGeometry(size, size, this.segments, this.segments);
     geometry.rotateX(-Math.PI / 2);
-    const deep = this.night ? new THREE.Color(0x020814) : new THREE.Color(0x0a3a4a);
-    const shallow = this.night ? new THREE.Color(0x0a2a44) : new THREE.Color(0x2a8fa8);
-    const foam = this.night ? new THREE.Color(0x7ec8e8) : new THREE.Color(0xd8f4ff);
+    const deep = new THREE.Color(this.palette.deep);
+    const shallow = new THREE.Color(this.palette.shallow);
+    const foam = new THREE.Color(this.palette.foam);
     const glslWaveExpression = OCEAN_WAVES.map((wave) => `sampleWave(p, vec2(${wave.x.toFixed(6)}, ${wave.z.toFixed(6)}), ${wave.frequency.toFixed(6)}, ${wave.speed.toFixed(6)}, ${wave.weight.toFixed(6)}, ${wave.phase.toFixed(6)}, vec2(${wave.warpX.toFixed(6)}, ${wave.warpZ.toFixed(6)}), ${wave.warpFrequency.toFixed(6)}, ${wave.warpSpeed.toFixed(6)}, ${wave.warpAmount.toFixed(6)}, ${wave.warpPhase.toFixed(6)})`)
       .join('\n            + ');
     this.material = new THREE.ShaderMaterial({
@@ -192,6 +206,8 @@ export class WaterSystem {
         uFoam: { value: foam },
         uMoon: { value: new THREE.Vector3(0.25, 0.85, 0.35).normalize() },
         uIsland: { value: new THREE.Vector2(this.islandHalfX + 0.8, this.islandHalfZ + 0.8) },
+        uExcludeDryFootprint: { value: this.dryFootprintMask === 'rectangular' ? 1 : 0 },
+        uShore: { value: new THREE.Vector2(this.shoreInnerRadius, this.shoreOuterRadius) },
         uNight: { value: this.night ? 1 : 0 },
       },
       vertexShader: /* glsl */ `
@@ -249,6 +265,8 @@ export class WaterSystem {
         uniform vec3 uFoam;
         uniform vec3 uMoon;
         uniform vec2 uIsland;
+        uniform float uExcludeDryFootprint;
+        uniform vec2 uShore;
         uniform float uNight;
         uniform float uTime;
         uniform float uAmp;
@@ -271,8 +289,9 @@ export class WaterSystem {
         void main() {
           float distIsland = max(abs(vWorld.x) / max(uIsland.x, 0.001), abs(vWorld.z) / max(uIsland.y, 0.001));
           // Ocean visible everywhere outside the deck footprint (including far under looking down).
-          if (distIsland < 0.97) discard;
-          float deepMix = smoothstep(1.0, 2.8, distIsland);
+          if (uExcludeDryFootprint > 0.5 && distIsland < 0.97) discard;
+          float distanceFromOrigin = max(abs(vWorld.x), abs(vWorld.z));
+          float deepMix = smoothstep(uShore.x, uShore.y, distanceFromOrigin);
           vec3 col = mix(uShallow, uDeep, deepMix);
           vec2 detailUv = vWorld.xz * 0.052 + vec2(uTime * 0.048, -uTime * 0.033);
           float detail = valueNoise(detailUv) * 0.62 + valueNoise(detailUv * 2.17 + 9.4) * 0.38;
@@ -280,7 +299,7 @@ export class WaterSystem {
           float foam = crest * smoothstep(0.38, 0.82, detail + vSlope * 2.6)
             * (0.45 + 0.55 * (1.0 - deepMix));
           // Bright lip under the rig edge.
-          float edge = 1.0 - smoothstep(0.97, 1.12, distIsland);
+          float edge = uExcludeDryFootprint * (1.0 - smoothstep(0.97, 1.12, distIsland));
           foam = max(foam, edge * 0.75);
           col = mix(col, uFoam, foam * (uNight > 0.5 ? 0.4 : 0.55));
           float detailX = valueNoise(detailUv + vec2(0.055, 0.0));
@@ -355,7 +374,7 @@ export class WaterSystem {
     }
     const nx = Math.abs(position.x) / (this.islandHalfX + 0.8);
     const nz = Math.abs(position.z) / (this.islandHalfZ + 0.8);
-    const outside = Math.max(nx, nz) >= 0.98;
+    const outside = this.dryFootprintMask === 'none' || Math.max(nx, nz) >= 0.98;
     // HF-358: one shared frozen Gerstner spectrum (ocean-spectrum.ts) is the
     // single CPU authority — the same table the WebGPU TSL surface displaces
     // with. The legacy warped-sine OCEAN_WAVES field remains only for the
@@ -395,6 +414,7 @@ export class WaterSystem {
       nearSize: this.nearSize,
       horizonRadius: this.horizonRadius,
       physicsActive: this.enabled,
+      swimmable: this.swimmable,
       waveBands: OCEAN_WAVES.length,
       waveAuthority: RUSTWORKS_OCEAN_AUTHORITY_ID,
     };

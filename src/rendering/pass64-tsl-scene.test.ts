@@ -53,22 +53,24 @@ describe('Pass 64 authored TSL pipeline set', () => {
     systems.applyDefinition(rustDefinition);
     expect(systems.root.userData.tslArenaVisualDefinitionId).toBe('rustworks-1v1');
     expect(systems.root.userData.tslAtmosphere).toEqual(rustDefinition.atmosphere);
-    const water = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
-    water.geometry.computeBoundingBox();
-    expect(water.visible).toBe(true);
-    expect(water.userData).toMatchObject({
+    const rustWater = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
+    rustWater.geometry.computeBoundingBox();
+    expect(rustWater.visible).toBe(true);
+    expect(rustWater.userData).toMatchObject({
       waveBands: OCEAN_WAVES.length,
       waveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.blender,
       waveAuthority: RUSTWORKS_OCEAN_AUTHORITY_ID,
       waveNormalAuthority: RUSTWORKS_OCEAN_AUTHORITY_ID,
       surfaceSegments: 256,
     });
-    expect((water.geometry as THREE.PlaneGeometry).parameters.widthSegments).toBe(256);
-    const waterMaterial = water.material as THREE.Material & { positionNode?: unknown; normalNode?: unknown };
+    expect((rustWater.geometry as THREE.PlaneGeometry).parameters.widthSegments).toBe(256);
+    const waterMaterial = rustWater.material as THREE.Material & { positionNode?: unknown; normalNode?: unknown; opacityNode?: unknown; alphaTestNode?: unknown };
     expect(waterMaterial.positionNode).toBeTruthy();
     expect(waterMaterial.normalNode).toBeTruthy();
+    expect(waterMaterial.opacityNode).toBeTruthy();
+    expect(waterMaterial.alphaTestNode).toBeTruthy();
     expect(waterMaterial).toMatchObject({ transparent: false, opacity: 1, depthWrite: true });
-    const oceanHorizon = water.getObjectByName('Pass 66 curved RustRig ocean horizon') as THREE.Mesh;
+    const oceanHorizon = rustWater.getObjectByName('Pass 66 curved RustRig ocean horizon') as THREE.Mesh;
     expect(oceanHorizon).toBeInstanceOf(THREE.Mesh);
     expect(oceanHorizon.userData).toMatchObject({
       horizonRadius: 3_200,
@@ -77,7 +79,8 @@ describe('Pass 64 authored TSL pipeline set', () => {
     });
     expect(oceanHorizon.frustumCulled).toBe(false);
     expect(systems.root.getObjectByName('Pass 64 TSL mist')?.children).toHaveLength(5);
-    expect(water.geometry.boundingBox?.getCenter(new THREE.Vector3()).y).toBeCloseTo(-19.5);
+    expect(rustWater.geometry.boundingBox?.getCenter(new THREE.Vector3()).y).toBeCloseTo(-19.5);
+    expect(rustWater.position.y).toBeCloseTo(0);
     expect(systems.root.getObjectByName('Pass 64 TSL grass')?.visible).toBe(false);
     const dust = systems.root.getObjectByName('Pass 64 TSL deterministic dust') as THREE.Points;
     expect(dust.geometry.drawRange.count).toBe(96);
@@ -88,8 +91,37 @@ describe('Pass 64 authored TSL pipeline set', () => {
     expect(systems.root.getObjectByName('Pass 66 galaxy band')?.visible).toBe(false);
     expect(systems.root.getObjectByName('Pass 66 aurora curtains')?.visible).toBe(false);
     expect(systems.root.getObjectByName('Pass 66 seamless cloud veil')?.visible).toBe(false);
+    const highSeasDefinition = (await ARENA_VISUAL_REGISTRY['high-seas']()).definition;
+    systems.applyDefinition(highSeasDefinition);
+    expect(rustWater.visible).toBe(false);
+    expect(rustWater.parent).toBeNull();
+    const highSeasWater = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
+    highSeasWater.geometry.computeBoundingBox();
+    expect(highSeasWater.visible).toBe(true);
+    expect(highSeasWater.geometry.boundingBox?.getCenter(new THREE.Vector3()).y).toBeCloseTo(-2.2);
+    expect(highSeasWater.position.y).toBeCloseTo(0);
+    expect(highSeasWater.userData).toMatchObject({
+      dryFootprintMask: 'none',
+      presentationOwner: 'shared-ocean',
+      nearSize: 960,
+      waterLevel: -2.2,
+      waveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.blender * 0.15,
+    });
+    expect(highSeasWater.userData.dryFootprintMaskUniform.value).toBe(0);
+    expect(highSeasWater.userData.islandHalfUniform.value.toArray()).toEqual([12.8, 44.8]);
     systems.applyDefinition(definition);
-    expect(water.visible).toBe(false);
+    expect(highSeasWater.visible).toBe(false);
+    expect(highSeasWater.parent).toBeNull();
+    const noWater = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
+    expect(noWater.visible).toBe(false);
+    expect(noWater.userData).toMatchObject({
+      waterLevel: null,
+      nearSize: 0,
+      presentationOwner: null,
+      dryFootprintMask: 'none',
+      waveAmplitude: 0,
+    });
+    expect(systems.root.userData.pass65AdvancedGraphics.oceanWaveAmplitude).toBe(0);
     expect(systems.root.getObjectByName('Pass 64 TSL grass')?.visible).toBe(true);
     expect(systems.root.getObjectByName('Pass 66 night stars')?.visible).toBe(false);
     const atmosphereSky = systems.root.getObjectByName('Pass 64 TSL atmosphere sky') as SkyMesh;

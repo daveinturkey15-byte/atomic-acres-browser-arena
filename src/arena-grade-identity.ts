@@ -106,7 +106,7 @@ export type FrozenArenaGradeIdentity = ArenaGradeIdentity;
 
 /**
  * HF-363 Competitive combat-safety bounds.
- * Verified across all 5 arenas to ensure zero unfair visibility loss.
+ * Verified across every registered arena to ensure zero unfair visibility loss.
  */
 export const COMBAT_SAFETY_BOUNDS = Object.freeze({
   /** Minimum ambient intensity to guarantee shadow separation from pitch black */
@@ -384,6 +384,57 @@ const FARCRYSIS_IDENTITY: ArenaGradeIdentity = Object.freeze({
   }),
 });
 
+// ---------------------------------------------------------------------------
+// 6. High Seas
+// ---------------------------------------------------------------------------
+const HIGH_SEAS_IDENTITY: ArenaGradeIdentity = Object.freeze({
+  id: 'high-seas',
+  displayName: 'High Seas',
+  description: 'Compact luxury yacht at clear ocean daybreak, with warm sun on white decks and cool maritime fill through the cabins.',
+  sunColor: 0xffe3bb,
+  sunIntensity: 3.0,
+  sunPosition: Object.freeze([-28, 32, -22] as const),
+  hemisphereSky: 0xc7e7ed,
+  hemisphereGround: 0x5a7074,
+  hemisphereIntensity: 0.78,
+  ambientColor: 0x9fc7cf,
+  ambientIntensity: 0.40,
+  ambientLevel: 0.40,
+  fogColor: 0xb8d6dc,
+  fogDensity: 0.0032,
+  sun: Object.freeze({
+    color: 0xffe3bb,
+    intensity: 3.0,
+    position: Object.freeze([-28, 32, -22] as const),
+  }),
+  hemisphere: Object.freeze({
+    skyColor: 0xc7e7ed,
+    groundColor: 0x5a7074,
+    intensity: 0.78,
+  }),
+  ambient: Object.freeze({
+    color: 0x9fc7cf,
+    intensity: 0.40,
+  }),
+  fog: Object.freeze({
+    color: 0xb8d6dc,
+    density: 0.0032,
+    derivation: 'Derived from the authored daybreak sky, white yacht superstructure, and cyan open ocean; density preserves the full 88 m bow-to-stern engagement lane.',
+  }),
+  grade: Object.freeze({
+    exposure: 1.06,
+    contrast: 1.03,
+    saturation: 1.02,
+    shadowTint: 0x294a58,
+    highlightTint: 0xffe3bb,
+    shadowLift: 0.042,
+  }),
+  combatMetrics: Object.freeze({
+    maxEngagementDistance: 88,
+    minEngagementVisibility: calculateFogTransmittance(0.0032, 88),
+  }),
+});
+
 /** Deeply frozen per-arena grade identity catalog */
 export const ARENA_GRADE_IDENTITIES: Readonly<Record<ArenaId, ArenaGradeIdentity>> = Object.freeze({
   'atomic-acres': ATOMIC_ACRES_IDENTITY,
@@ -391,6 +442,7 @@ export const ARENA_GRADE_IDENTITIES: Readonly<Record<ArenaId, ArenaGradeIdentity
   'rustworks-1v1': RUSTWORKS_1V1_IDENTITY,
   'gun-range': GUN_RANGE_IDENTITY,
   'farcrysis': FARCRYSIS_IDENTITY,
+  'high-seas': HIGH_SEAS_IDENTITY,
 });
 
 export const DEFAULT_ARENA_GRADE_ID: ArenaId = 'atomic-acres';

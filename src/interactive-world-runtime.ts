@@ -31,6 +31,7 @@ import {
   type QuantizedVector,
 } from './destructible-world';
 import type { MajorDebrisBodyDefinition, MajorDebrisBodySnapshot } from './physics';
+import { isArenaId } from './arena-identity';
 import { DestructibleShedPresentation } from './destructible-shed-presentation';
 import {
   FIELD_SHED_BALLISTIC_MATERIAL_ID,
@@ -119,8 +120,6 @@ export type InteractiveWorldStateEnvelope = Readonly<{
   hash: string;
 }>;
 
-const SHED_ARENA_IDS = Object.freeze(['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'] as const);
-
 function interactiveWorldEnvelopeHash(value: Omit<InteractiveWorldStateEnvelope, 'hashAlgorithm' | 'hash'>): string {
   return canonicalSha256(value);
 }
@@ -132,7 +131,7 @@ export function isInteractiveWorldStateEnvelope(value: unknown): value is Intera
     'arenaId', 'matchEpoch', 'revision', 'schemaVersion', 'sheds', 'houseDestruction', 'hashAlgorithm', 'hash',
   ].sort().join('|')
     || envelope.schemaVersion !== 1
-    || !SHED_ARENA_IDS.includes(envelope.arenaId as typeof SHED_ARENA_IDS[number])
+    || !isArenaId(envelope.arenaId)
     || !Number.isSafeInteger(envelope.matchEpoch) || Number(envelope.matchEpoch) < 1
     || !Number.isSafeInteger(envelope.revision) || Number(envelope.revision) < 0
     || envelope.hashAlgorithm !== 'sha256'

@@ -48,6 +48,13 @@ describe('private match lobby', () => {
     expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, mode: 'tdm' })).toBe(true);
   });
 
+  it('admits every canonical arena ID and rejects compatibility aliases on the wire', () => {
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'farcrysis' })).toBe(true);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'high-seas' })).toBe(true);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'nuke-town' as 'atomic-acres' })).toBe(false);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'unknown' as 'atomic-acres' })).toBe(false);
+  });
+
   it('holds an identity through 89.9 seconds and expires it at 90 seconds on monotonic time', () => {
     expect(rejoinReservationExpired(1_000, 90_999)).toBe(false);
     expect(rejoinReservationExpired(1_000, 91_000)).toBe(true);
@@ -147,6 +154,8 @@ describe('private match lobby', () => {
     expect(isLobbySnapshot(snapshot())).toBe(true);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'rustworks-1v1' } }))).toBe(true);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'skyline-terminal' } }))).toBe(true);
+    expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'farcrysis' } }))).toBe(true);
+    expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'high-seas' } }))).toBe(true);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: 120_000 } }))).toBe(true);
     expect(isLobbySnapshot(snapshot({
       phase: 'active',

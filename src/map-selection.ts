@@ -1,10 +1,11 @@
 import { MATCH_DURATION_MS, type MatchRules } from './gameplay';
 import { MAX_SOLO_BOTS, SOLO_BOT_COUNT, soloBotTargetForDeaths } from './bot-ai';
 import { GUN_RANGE_ROUND_MS } from './gun-range-rules';
+import type { ArenaId } from './arena-identity';
 
-export type ArenaId = 'atomic-acres' | 'rustworks-1v1' | 'gun-range' | 'skyline-terminal' | 'farcrysis';
+export { ARENA_IDS, isArenaId, type ArenaId } from './arena-identity';
 
-export type ArenaRouteId = 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range' | 'farcrysis';
+export type ArenaRouteId = 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range' | 'farcrysis' | 'high-seas';
 
 export type ArenaSelection = Readonly<{
   id: ArenaId;
@@ -124,6 +125,24 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     maximumSoloBots: 2,
     multiplayer: true,
     fieldSupport: false,
+    overdrive: false,
+    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
+  }),
+  Object.freeze({
+    id: 'high-seas' as const,
+    routeId: 'high-seas' as const,
+    legacyAliases: Object.freeze([]),
+    selectorLabel: 'HIGH SEAS',
+    displayName: 'High Seas',
+    titleLead: 'HIGH',
+    titleAccent: 'SEAS',
+    menuLede: 'Board an original superyacht arena where layered decks, compact interiors, and exposed bow-to-stern lanes reward constant movement.',
+    summary: 'Original superyacht · layered decks · close-quarters lanes',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
+    soloBotCount: 2,
+    maximumSoloBots: 2,
+    multiplayer: true,
+    fieldSupport: true,
     overdrive: false,
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),

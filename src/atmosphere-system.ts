@@ -89,6 +89,15 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.f
       [0, 0, 2.6, 5.0, 4.5], [-6, 20, 2.0, 3.6, 1.6],
     ] as SmokeCard[]),
   }),
+  'high-seas': Object.freeze({
+    mist: Object.freeze([
+      [-10, -31, 11, 3.2], [10, 24, 10, 3], [-9, 4, 8, 2.6],
+      [9, -9, 8, 2.6], [0, -18, 9, 2.8], [0, 15, 9, 2.8],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-7, -25, 2, 3.6, 0.8], [7, 20, 2, 3.6, 3.1], [0, 2, 1.8, 3.2, 4.7],
+    ] as SmokeCard[]),
+  }),
 });
 
 const MAX_MIST_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
@@ -111,6 +120,9 @@ function atmosphereDustLayout(profile: RenderProfile, arenaId: ArenaId): DustLay
   if (arenaId === 'farcrysis') return {
     count: quality ? 72 : 40, minX: -31, maxX: 31, minZ: -31, maxZ: 31, color: 0xe8d4a8, opacity: quality ? 0.13 : 0.09,
   };
+  if (arenaId === 'high-seas') return {
+    count: quality ? 48 : 28, minX: -14, maxX: 14, minZ: -44, maxZ: 44, color: 0xd7eef2, opacity: quality ? 0.1 : 0.07,
+  };
   return {
     count: quality ? 32 : 24, minX: -15, maxX: 15, minZ: -44, maxZ: -3, color: 0xc4cbc4, opacity: quality ? 0.12 : 0.09,
   };
@@ -125,6 +137,7 @@ export function atmosphereFogRange(profile: RenderProfile, arenaId: ArenaId): Re
   // short-range (COD feel) — you can hear the jungle but only see the next
   // clearing. Ported from the Pass 69 hidden lane.
   if (arenaId === 'farcrysis') return profile === 'blender' ? { near: 14, far: 46 } : { near: 18, far: 52 };
+  if (arenaId === 'high-seas') return profile === 'blender' ? { near: 42, far: 132 } : { near: 48, far: 142 };
   return profile === 'blender' ? { near: 38, far: 96 } : { near: 42, far: 105 };
 }
 
@@ -133,6 +146,7 @@ function atmosphereOpacity(profile: RenderProfile, arenaId: ArenaId): Readonly<{
   if (arenaId === 'atomic-acres') return quality ? { mist: 0.11, smoke: 0.055 } : { mist: 0.08, smoke: 0.04 };
   if (arenaId === 'rustworks-1v1') return quality ? { mist: 0.22, smoke: 0.12 } : { mist: 0.14, smoke: 0.08 };
   if (arenaId === 'skyline-terminal') return quality ? { mist: 0.15, smoke: 0.08 } : { mist: 0.11, smoke: 0.06 };
+  if (arenaId === 'high-seas') return quality ? { mist: 0.1, smoke: 0.05 } : { mist: 0.07, smoke: 0.035 };
   return quality ? { mist: 0.14, smoke: 0.08 } : { mist: 0.1, smoke: 0.06 };
 }
 
@@ -453,6 +467,8 @@ export class AtmosphereSystem {
         ? { shadow: 0x665f5c, light: 0xc08b68, smoke: 0x756d66, warm: 0xb97d58 }
         : arenaId === 'skyline-terminal'
           ? { shadow: 0x485868, light: 0xe8ad86, smoke: 0x59666c, warm: 0xd49b6a }
+          : arenaId === 'high-seas'
+            ? { shadow: 0x4f7380, light: 0xd9f0eb, smoke: 0x718b91, warm: 0xe1b77e }
           : { shadow: 0x708083, light: 0xb8c6c4, smoke: 0x77868a, warm: 0xaebdbc };
     (this.material.uniforms.uShadowColor.value as THREE.Color).setHex(palette.shadow);
     (this.material.uniforms.uLightColor.value as THREE.Color).setHex(palette.light);

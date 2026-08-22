@@ -31,6 +31,7 @@ export type FootstepMovement = 'walk' | 'sprint' | 'crouch' | 'prone';
 export function arenaFootstepSurface(arenaId: ArenaId, atomicSurface: FootstepSurface): FootstepSurface {
   if (arenaId === 'rustworks-1v1') return 'metal';
   if (arenaId === 'gun-range' || arenaId === 'skyline-terminal') return 'concrete';
+  if (arenaId === 'high-seas') return 'wood';
   return atomicSurface;
 }
 
@@ -260,6 +261,12 @@ export const ARENA_AUDIO_DEFINITIONS: Readonly<Record<ArenaId, ArenaAudioDefinit
     continuousVoices: 2, bedFrequencyHz: 52, airFrequencyHz: 163, airLowpassHz: 600, airQ: 1.75, airGain: 0.007,
     modulationHz: 0.11, modulationDepth: 0.08,
     bedPosition: Object.freeze({ x: -15, y: 3, z: 10 }), airPosition: Object.freeze({ x: 18, y: 6, z: -14 }),
+  }),
+  'high-seas': Object.freeze({
+    arenaId: 'high-seas', identity: 'diesel-engine-thrum-and-open-sea-wind', source: 'repository-procedural-original',
+    continuousVoices: 2, bedFrequencyHz: 46, airFrequencyHz: 151, airLowpassHz: 620, airQ: 1.85, airGain: 0.007,
+    modulationHz: 0.09, modulationDepth: 0.1,
+    bedPosition: Object.freeze({ x: 0, y: 0, z: 24 }), airPosition: Object.freeze({ x: 0, y: 8.92, z: -28 }),
   }),
 });
 

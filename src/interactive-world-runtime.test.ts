@@ -4,7 +4,7 @@ import { traceBallisticPath, type WeaponPenetrationProfile } from './ballistics'
 import { circleIntersectsBox, isBlocked, segmentIntersectsBox } from './collision';
 import type { ShedPlacement } from './destructible-world';
 import { FIELD_SHED_DEFINITION } from './destructible-shed-presentation';
-import { InteractiveWorldRuntime } from './interactive-world-runtime';
+import { InteractiveWorldRuntime, isInteractiveWorldStateEnvelope } from './interactive-world-runtime';
 
 const placement: ShedPlacement = Object.freeze({
   id: 'atomic-shed-vertical-slice',
@@ -27,6 +27,19 @@ const weakProfile: WeaponPenetrationProfile = Object.freeze({
 });
 
 describe('shared interactive-world runtime adapter', () => {
+  it('round-trips empty canonical state for shed-free High Seas and Farcrysis arenas', () => {
+    for (const arenaId of ['farcrysis', 'high-seas'] as const) {
+      const host = new InteractiveWorldRuntime(arenaId, 75, [], true);
+      const guest = new InteractiveWorldRuntime(arenaId, 75, [], false);
+      const envelope = JSON.parse(JSON.stringify(host.stateEnvelope()));
+      expect(isInteractiveWorldStateEnvelope(envelope)).toBe(true);
+      expect(guest.applyAuthoritativeEnvelope(envelope)).toBe(true);
+      expect(guest.stateEnvelope()).toEqual(host.stateEnvelope());
+      host.dispose();
+      guest.dispose();
+    }
+  });
+
   it('publishes one revision for movement, ballistics, rendering and diagnostics', () => {
     const runtime = new InteractiveWorldRuntime('atomic-acres', 7, [placement], true);
     const collision = runtime.collisions();

@@ -1,5 +1,5 @@
 import type { Team } from './protocol';
-import type { ArenaId } from './map-selection';
+import { isArenaId, type ArenaId } from './arena-identity';
 import { isHostedBotCount, type HostedBotCount } from './hosted-bots';
 import { isDhv, type Dhv } from './handicap';
 import {
@@ -107,7 +107,7 @@ export function isMatchMode(value: unknown): value is MatchMode {
 export function isPrivateMatchConfig(value: unknown): value is PrivateMatchConfig {
   if (!value || typeof value !== 'object') return false;
   const config = value as Record<string, unknown>;
-  return (config.arenaId === 'atomic-acres' || config.arenaId === 'rustworks-1v1' || config.arenaId === 'gun-range' || config.arenaId === 'skyline-terminal')
+  return isArenaId(config.arenaId)
     && isMatchMode(config.mode)
     && isRoomCapacity(config.capacity)
     && isHostedBotCount(config.hostedBotCount)

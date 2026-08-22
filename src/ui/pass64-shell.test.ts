@@ -22,14 +22,15 @@ describe('Pass 66 command shell', () => {
     expect(markup).toContain('class="hud-map-console"');
     expect(markup).toContain('class="hud-operator-console"');
     expect(markup).toContain('class="hud-weapon-console"');
-    // HF-359: now 5 selectable arenas including farcrysis
     expect([...markup.matchAll(/data-arena-route="([^"]+)"/g)].map((match) => match[1])).toEqual([
       'nuke-town',
       'terminal',
       'rustrig',
       'gun-range',
       'farcrysis',
+      'high-seas',
     ]);
+    expect(markup).toContain('6 deployable spaces · choose before launch');
   });
 
   it('keeps deployment controls inert until the gameplay module binds their handlers', () => {
@@ -38,8 +39,7 @@ describe('Pass 66 command shell', () => {
     expect(markup).toContain('id="host" disabled');
     expect(markup).toContain('id="room-input" placeholder="Paste room code" autocomplete="off" disabled');
     expect(markup).toContain('id="join" disabled');
-    // HF-359: now 5 disabled map cards
-    expect(markup.match(/class="map-card[^>]+disabled/g)).toHaveLength(5);
+    expect(markup.match(/class="map-card[^>]+disabled/g)).toHaveLength(6);
   });
 
   it('renders four curated kits, exactly three custom slots with nested EDIT, and one manager', () => {

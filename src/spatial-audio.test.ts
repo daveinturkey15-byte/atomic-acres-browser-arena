@@ -53,8 +53,7 @@ describe('spatial audio contracts', () => {
 
   it('covers all arenas with distinct original beds inside continuous budgets', () => {
     expect(validateArenaAudioDefinitions()).toEqual([]);
-    // HF-359: now 5 distinct arena identities including farcrysis
-    expect(new Set(Object.values(ARENA_AUDIO_DEFINITIONS).map((definition) => definition.identity)).size).toBe(5);
+    expect(new Set(Object.values(ARENA_AUDIO_DEFINITIONS).map((definition) => definition.identity)).size).toBe(6);
     expect(Object.values(ARENA_AUDIO_DEFINITIONS).every((definition) => definition.continuousVoices <= 2)).toBe(true);
     expect(AUDIO_RUNTIME_BUDGET.continuousVoices).toBeGreaterThanOrEqual(8);
   });
@@ -86,6 +85,12 @@ describe('spatial audio contracts', () => {
     expect(arenaFootstepSurface('rustworks-1v1', 'soil')).toBe('metal');
     expect(arenaFootstepSurface('gun-range', 'wood')).toBe('concrete');
     expect(arenaFootstepSurface('skyline-terminal', 'soil')).toBe('concrete');
+    expect(arenaFootstepSurface('high-seas', 'soil')).toBe('wood');
+    expect(ARENA_AUDIO_DEFINITIONS['high-seas']).toMatchObject({
+      identity: 'diesel-engine-thrum-and-open-sea-wind',
+      bedPosition: { x: 0, y: 0, z: 24 },
+      airPosition: { x: 0, y: 8.92, z: -28 },
+    });
   });
 
   it('hard-caps occlusion work per frame and resets only at a new frame', () => {
