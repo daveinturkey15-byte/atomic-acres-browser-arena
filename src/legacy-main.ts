@@ -1,4 +1,21 @@
 import * as THREE from 'three';
+import {
+  deterministicWindowUnit,
+  escapeHtml,
+  framePercentile,
+  percentile,
+  persistentWindowDebrisId,
+  prettyKeyCode,
+  segmentSphereFraction,
+  windowDebrisPoolKey,
+} from './legacy-pure-helpers'; // HF-355 round 1
+import {
+  isTimedCombatMessage,
+  majorDebrisDefinitionFromSnapshot,
+  recoveryRemainingMs,
+  stanceEyeHeight,
+  verifiedStickyAttachment,
+} from './legacy-pure-helpers-2'; // HF-355 round 2
 import './style.css';
 import { gradeProfileIdForGraphicsPreset } from './rendering/filmic-grade-chain'; // HF-363
 import { KILLSTREAK_ACTIVATION_DENIAL_LABELS, evaluateKillstreakActivation } from './killstreak-activation-gate'; // HF-316
@@ -921,7 +938,6 @@ import {
   GuestCombatInventory,
   GuestCombatInventoryProjection,
   HitMessage,
-  HostVerifiedStickyAttachment,
   GuestResumeAckMessage,
   GuestResumeAuthorityMessage,
   GuestResumeFailureMessage,
@@ -3636,19 +3652,6 @@ function updatePersistentWindowDebrisPhysics(dt = 1 / SIMULATION_HZ): void {
   if (retireSettledPhysics) syncInteractiveWorldPhysics();
 }
 
-function majorDebrisDefinitionFromSnapshot(
-  definition: MajorDebrisBodyDefinition,
-  snapshot: MajorDebrisBodySnapshot,
-): MajorDebrisBodyDefinition {
-  return Object.freeze({
-    ...definition,
-    position: snapshot.position,
-    rotation: snapshot.rotation,
-    linearVelocity: snapshot.linearVelocity,
-    angularVelocity: snapshot.angularVelocity,
-    sleeping: snapshot.sleeping,
-  });
-}
 
 function reconcileInteractiveWorldDoorObstructions(): boolean {
   if (!interactiveWorldRuntime?.hasHostAuthority()) return false;
@@ -4596,12 +4599,6 @@ let grenadeActionProfileSequence = 0;
 let lastGrenadeFirstActionProfile: GrenadeFirstActionProfile | null = null;
 const grenadeFirstActionProfiles: GrenadeFirstActionProfile[] = [];
 
-function framePercentile(samples: readonly number[], percentile: number): number {
-  if (samples.length === 0) return 0;
-  const ordered = [...samples].sort((left, right) => left - right);
-  const index = Math.min(ordered.length - 1, Math.max(0, Math.ceil(ordered.length * percentile) - 1));
-  return ordered[index]!;
-}
 
 function beginGrenadeFirstActionProfile(grenade: GrenadeId, startedAt: number): GrenadeFirstActionProfile {
   const presentation = renderRuntime.presentationTelemetry(startedAt);
@@ -7391,9 +7388,6 @@ function refreshGuestMatchRecoveryAffordance(): void {
   joinButton.title = affordance.title;
 }
 
-function recoveryRemainingMs(value: number, checkpoint: HostMatchCheckpoint, nowEpochMs = Date.now()): number {
-  return Math.max(0, value - Math.max(0, nowEpochMs - checkpoint.savedAtEpochMs));
-}
 
 function restoreRecoveredHostRuntime(checkpoint: HostMatchCheckpoint, nowMonoMs = performance.now()): number {
   const poseAudit = hostRecoveryPoseAudit(checkpoint);
@@ -9695,9 +9689,6 @@ viewFill.position.set(0, 0.4, 0.2);
 viewFill.layers.set(VIEWMODEL_RENDER_LAYER);
 camera.add(viewFill);
 
-function stanceEyeHeight(stance: PlayerSnapshot['stance']): number {
-  return stance === 'prone' ? 0.61 : stance === 'crouch' ? 1.16 : 1.7;
-}
 
 const viewmodelProbeDirection = new THREE.Vector3();
 const viewmodelProbeRight = new THREE.Vector3();
@@ -9855,14 +9846,6 @@ function nextCombatTiming(): CombatTiming {
   return timing;
 }
 
-function isTimedCombatMessage(message: GameMessage): message is ShotMessage | MeleeMessage | Extract<GameMessage, {
-  type: 'grenade-throw' | 'hit' | 'support-activate' | 'killstreak-activate-intent' | 'killstreak-control-intent' | 'killstreak-care-capture-intent';
-}> {
-  return message.type === 'shot' || message.type === 'melee' || message.type === 'grenade-throw' || message.type === 'hit'
-    || message.type === 'support-activate' || message.type === 'killstreak-activate-intent'
-    || message.type === 'killstreak-control-intent' || message.type === 'killstreak-care-capture-intent';
-}
-
 function admitIncomingCombatTiming(message: GameMessage): boolean {
   if (network.role !== 'host' || message.type === 'bot-damage' || message.type === 'bot-state' || !isTimedCombatMessage(message)) return true;
   if (message.by === player.id) return true;
@@ -9958,9 +9941,6 @@ function hostStickyVerification(message: HitMessage, now: number) {
     : null;
 }
 
-function verifiedStickyAttachment(record: StickyAttachmentRecord): HostVerifiedStickyAttachment {
-  return Object.freeze({ targetId: record.targetId, targetLifeId: record.targetLifeId });
-}
 
 function queuePendingHostStickyHit(message: GameMessage, now: number): boolean {
   if (network.role !== 'host' || message.type !== 'hit' || message.stuck !== true || message.hostAuthority !== undefined) return false;
@@ -12910,24 +12890,8 @@ function acceptRemotePickup(message: PickupMessage, now = performance.now()): vo
   trimNonceSet();
 }
 
-function deterministicWindowUnit(windowId: string, salt: number): number {
-  let hash = 0x811c9dc5 ^ salt;
-  for (let index = 0; index < windowId.length; index += 1) {
-    hash ^= windowId.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  hash ^= hash >>> 16;
-  return (hash >>> 0) / 0x1_0000_0000;
-}
 
-function persistentWindowDebrisId(windowId: string): string {
-  const canonical = windowId.toLowerCase().replace(/[^a-z0-9:-]/g, '-').slice(0, 104);
-  return `window-debris:${canonical}`;
-}
 
-function windowDebrisPoolKey(arenaId: ArenaId, windowId: string): string {
-  return `${arenaId}:${persistentWindowDebrisId(windowId)}`;
-}
 
 function windowDebrisHalfExtents(
   window: ArenaMap['breakableWindows'][number],
@@ -18202,22 +18166,6 @@ function explosiveBoltTargetDistance(
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-function segmentSphereFraction(start: THREE.Vector3, delta: THREE.Vector3, centre: THREE.Vector3, radius: number): number | null {
-  const denominator = delta.lengthSq();
-  if (denominator < 1e-9) return null;
-  const offsetX = centre.x - start.x;
-  const offsetY = centre.y - start.y;
-  const offsetZ = centre.z - start.z;
-  const alpha = THREE.MathUtils.clamp(
-    (offsetX * delta.x + offsetY * delta.y + offsetZ * delta.z) / denominator,
-    0,
-    1,
-  );
-  const nearestX = start.x + delta.x * alpha - centre.x;
-  const nearestY = start.y + delta.y * alpha - centre.y;
-  const nearestZ = start.z + delta.z * alpha - centre.z;
-  return nearestX * nearestX + nearestY * nearestY + nearestZ * nearestZ <= radius * radius ? alpha : null;
-}
 
 function createExplosiveBoltMesh(): THREE.Group {
   const root = new THREE.Group();
@@ -24275,9 +24223,6 @@ function updateRoster(): void {
   }).join('');
 }
 
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]!);
-}
 
 function applyViewportSize(): void {
   const width = window.innerWidth;
@@ -24354,19 +24299,6 @@ element<HTMLElement>('#graphics-effective').textContent = `EFFECTIVE: ${displaye
 
 // ---- Key binding profile UI ----
 let keyBindingCaptureAction: GameplayAction | null = null;
-const KEY_CODE_LABELS: Readonly<Record<string, string>> = Object.freeze({
-  Space: 'SPACE', ShiftLeft: 'L-SHIFT', ShiftRight: 'R-SHIFT', ControlLeft: 'L-CTRL',
-  ControlRight: 'R-CTRL', AltLeft: 'L-ALT', AltRight: 'R-ALT', Tab: 'TAB', Enter: 'ENTER',
-  Escape: 'ESC', Backspace: 'BACKSPACE', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←',
-  ArrowRight: '→', KeyW: 'W', KeyA: 'A', KeyS: 'S', KeyD: 'D', KeyC: 'C', KeyZ: 'Z',
-  KeyR: 'R', KeyV: 'V', KeyG: 'G', KeyF: 'F', Digit1: '1', Digit2: '2', Digit3: '3',
-  Digit4: '4', Digit5: '5', Digit6: '6', Digit7: '7', Digit8: '8', Digit9: '9', Digit0: '0',
-});
-function prettyKeyCode(code: string): string {
-  if (code.startsWith('Key')) return code.slice(3).toUpperCase();
-  if (code.startsWith('Digit')) return code.slice(5);
-  return KEY_CODE_LABELS[code] ?? code;
-}
 function renderKeyBindingRows(): void {
   const rows = element<HTMLElement>('#key-binding-rows');
   const profile = activeKeyBindingProfile();
@@ -26854,11 +26786,6 @@ type ArenaPerformanceBudgetSample = Readonly<{
 }>;
 let latestArenaPerformanceBudgetSample: ArenaPerformanceBudgetSample | null = null;
 
-function percentile(values: readonly number[], quantile: number): number {
-  if (values.length === 0) return Number.POSITIVE_INFINITY;
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor((sorted.length - 1) * THREE.MathUtils.clamp(quantile, 0, 1))];
-}
 
 function estimateRendererResidency() {
   return estimateResidentObjectMemory(scene, [

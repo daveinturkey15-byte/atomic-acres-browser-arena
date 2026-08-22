@@ -138,3 +138,21 @@ describe('legacy-pure-helpers-2 (moved from legacy-main.ts)', () => {
     });
   });
 });
+
+describe('isTimedCombatMessage covers every timed type', () => {
+  // The move initially DROPPED two types from the runtime check while the type
+  // predicate still named them - the compiler cannot catch that, because a type
+  // predicate is an assertion, not an implication. The original test missed it
+  // too, because it never probed those two types. This pins all eight, plus a
+  // negative, so the runtime check and the predicate cannot drift apart again.
+  const timed = ['shot', 'melee', 'grenade-throw', 'hit', 'support-activate',
+    'killstreak-activate-intent', 'killstreak-control-intent', 'killstreak-care-capture-intent'];
+  for (const type of timed) {
+    it(`admits ${type}`, () => {
+      expect(isTimedCombatMessage({ type } as never)).toBe(true);
+    });
+  }
+  it('rejects a non-combat message', () => {
+    expect(isTimedCombatMessage({ type: 'state' } as never)).toBe(false);
+  });
+});

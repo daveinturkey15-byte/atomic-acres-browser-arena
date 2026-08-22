@@ -6,7 +6,9 @@ const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8'
 describe('Pass 65 explosive crossbolt runtime integration', () => {
   it('uses the 3x speed constant and sticks to current-life player, remote, and bot targets', () => {
     const targetsStart = source.indexOf('function fillExplosiveBoltTargets(');
-    const targetsEnd = source.indexOf('\nfunction segmentSphereFraction(', targetsStart);
+    // HF-355 moved segmentSphereFraction into legacy-pure-helpers; the block now
+    // ends at the next remaining function. Anchor updated, assertions untouched.
+    const targetsEnd = source.indexOf('\nfunction explosiveBoltTargetDistance(', targetsStart);
     const targets = source.slice(targetsStart, targetsEnd);
     expect(targets).toContain("localContinuity, 'player', player.position, -0.62");
     expect(targets).toContain("remote.continuity, 'remote', remote.target, 1");
@@ -50,9 +52,14 @@ describe('Pass 65 explosive crossbolt runtime integration', () => {
     expect(attachmentWrite).toBeGreaterThan(update.indexOf('const targetHitLifeId = targetHit.lifeId;'));
     expect(update.slice(attachmentWrite)).not.toContain('targetHit.');
 
-    const segmentStart = source.indexOf('function segmentSphereFraction(');
-    const segmentEnd = source.indexOf('\nfunction createExplosiveBoltMesh(', segmentStart);
-    const segment = source.slice(segmentStart, segmentEnd);
+    // HF-355 moved segmentSphereFraction verbatim into legacy-pure-helpers.ts.
+    // The allocation-free contract travels with the function: same assertions,
+    // read from where the body now lives.
+    const helpers = readFileSync(new URL('./legacy-pure-helpers.ts', import.meta.url), 'utf8');
+    const segmentStart = helpers.indexOf('export function segmentSphereFraction(');
+    const segmentEnd = helpers.indexOf('\nexport function', segmentStart + 1);
+    const segment = segmentEnd === -1 ? helpers.slice(segmentStart) : helpers.slice(segmentStart, segmentEnd);
+    expect(segmentStart).toBeGreaterThanOrEqual(0);
     expect(segment).not.toContain('.clone()');
     expect(segment).not.toContain('new THREE.Vector3');
     expect(segment).toContain('nearestX * nearestX + nearestY * nearestY + nearestZ * nearestZ');

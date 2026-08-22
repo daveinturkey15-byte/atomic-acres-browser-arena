@@ -44,7 +44,8 @@ export function isTimedCombatMessage(message: GameMessage): message is ShotMessa
   type: 'grenade-throw' | 'hit' | 'support-activate' | 'killstreak-activate-intent' | 'killstreak-control-intent' | 'killstreak-care-capture-intent';
 }> {
   return message.type === 'shot' || message.type === 'melee' || message.type === 'grenade-throw' || message.type === 'hit'
-        || message.type === 'support-activate' || message.type === 'killstreak-activate-intent';
+    || message.type === 'support-activate' || message.type === 'killstreak-activate-intent'
+    || message.type === 'killstreak-control-intent' || message.type === 'killstreak-care-capture-intent';
 }
 
 /**
