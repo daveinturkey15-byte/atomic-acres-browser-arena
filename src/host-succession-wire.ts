@@ -94,11 +94,17 @@ import { MULTIPLAYER_PROTOCOL_VERSION } from './protocol';
  *   3. The `legacy-main.ts` call sites in
  *      scratchpad/wave2-handoffs/hf325-wire-path.md.
  *
- * Until then `evaluateSelfPromotion` refuses with `'migration-disabled'`, which
- * leaves today's behaviour — the 90-second rejoin window and the host-loss
- * banner from HF-325 Part 1 — completely untouched.
+ * ARMED 2026-08-22: all three prerequisites now exist and are tested —
+ * `network.promoteToHost` treats `unavailable-id` as a permanent abort
+ * (network-lifecycle.test.ts pins no-retry/no-fresh-room), the stand-down
+ * fires both on observed higher terms and on an established host discovering
+ * its released id was claimed, and the legacy-main call sites carry the
+ * mandate/mirror per hf325-wire-path.md with the gap-4 arrival-time clock
+ * rebase. Followers re-point through the existing reconnect loop because the
+ * promoted host claims the SAME room-code peer id their retries already
+ * target. Live two-browser HITL remains the close-out bar for the HF row.
  */
-export const HOST_MIGRATION_PROMOTION_ENABLED = false;
+export const HOST_MIGRATION_PROMOTION_ENABLED = true;
 
 /**
  * How often the host re-ships the mirror to its current mandate holder.

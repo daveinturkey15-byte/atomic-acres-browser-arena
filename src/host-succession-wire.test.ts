@@ -616,16 +616,26 @@ describe('HF-325 host succession wire — no mirror falls back to current behavi
     expect(decision.reason).toBe('no-mandate');
   });
 
-  it('ships promotion disabled, so production behaviour is unchanged', () => {
-    expect(HOST_MIGRATION_PROMOTION_ENABLED).toBe(false);
+  it('ships promotion ARMED, and still refuses when explicitly disabled', () => {
+    // Flipped 2026-08-22 with the full wire path landed: role flip with
+    // permanent unavailable-id abort, stand-down on both triggers, mandate and
+    // mirror on the wire, and the gap-4 mandate clock rebase. The explicit
+    // override below keeps the 'migration-disabled' refusal path itself
+    // covered so the switch remains a real switch.
+    expect(HOST_MIGRATION_PROMOTION_ENABLED).toBe(true);
     const { holdings } = successorHoldings();
-    const decision = evaluateSelfPromotion(holdings, {
+    const armed = evaluateSelfPromotion(holdings, {
       selfId: SUCCESSOR_ID, roomCode: ROOM, assessment: HOST_LOST, roster: roster(),
       nowEpochMs: HOST_SAVED_AT + 130,
     });
-    expect(decision.promote).toBe(false);
-    if (decision.promote) return;
-    expect(decision.reason).toBe('migration-disabled');
+    expect(armed.promote).toBe(true);
+    const disabled = evaluateSelfPromotion(holdings, {
+      selfId: SUCCESSOR_ID, roomCode: ROOM, assessment: HOST_LOST, roster: roster(),
+      nowEpochMs: HOST_SAVED_AT + 130, promotionEnabled: false,
+    });
+    expect(disabled.promote).toBe(false);
+    if (disabled.promote) return;
+    expect(disabled.reason).toBe('migration-disabled');
   });
 
   it('never announces a promotion it was refused', () => {
