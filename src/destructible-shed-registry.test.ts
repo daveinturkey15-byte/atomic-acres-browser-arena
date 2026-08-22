@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { buildGunRange, buildRustworks1v1, buildSkylineTerminal } from './additional-maps';
 import type { Box2 } from './collision';
 import {
+  PASS65_SHED_ELIGIBILITY,
   PASS65_SHED_PLACEMENTS,
   shedPlacementFootprint,
   shedPlacementsForArena,
@@ -23,6 +24,11 @@ describe('frozen Pass 65 shed placement registry', () => {
     expect(shedPlacementsForArena('rustworks-1v1')).toHaveLength(2);
     expect(shedPlacementsForArena('skyline-terminal')).toHaveLength(2);
     expect(shedPlacementsForArena('gun-range')).toEqual([]);
+    expect(shedPlacementsForArena('farcrysis')).toEqual([]);
+    expect(shedPlacementsForArena('high-seas')).toEqual([]);
+    expect(PASS65_SHED_ELIGIBILITY.map((row) => row.arenaId)).toEqual([
+      'atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas',
+    ]);
     expect(shedPlacementsForArena('skyline-terminal').every((placement) => placement.zone === 'terminal-apron' && placement.position.z >= 0)).toBe(true);
   });
 

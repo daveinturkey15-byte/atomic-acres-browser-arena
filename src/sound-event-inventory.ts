@@ -996,6 +996,7 @@ const events: SoundEventInventoryEntry[] = [
       'rustworks-1v1.duct', 'rustworks-1v1.stressed-metal',
       'gun-range.ventilation', 'gun-range.ballast-buzz',
       'farcrysis.jungle-insect', 'farcrysis.breeze',
+      'high-seas.diesel-engine', 'high-seas.open-sea-wind',
     ],
     emitterSymbols: ['setArena'], contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'arena-generation',
     coverageDetail: 'Every arena owns two distinct repository-procedural continuous sources, replaced atomically at arena generation changes.',
@@ -1013,7 +1014,7 @@ const events: SoundEventInventoryEntry[] = [
   }),
   plannedEvent({
     id: 'music.game', family: 'music', bus: 'game-music', delivery: 'global-nonspatial',
-    variants: ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis'],
+    variants: ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas'],
     contractRefs: ['R303', 'R304', 'R307', 'R308'], concurrency: GAME_MUSIC_LOOP, lifecycleOwner: 'arena-generation',
     coverageDetail: 'In-game music is arena-generation-owned, independently controlled, and fully manifested before runtime use.',
   }),
@@ -1024,8 +1025,8 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
   schemaVersion: SOUND_EVENT_INVENTORY_SCHEMA_VERSION,
   events: SOUND_EVENT_INVENTORY,
 });
-// HF-337: digest updated for positional chopper and drone gun sound events
-export const SOUND_EVENT_INVENTORY_SHA256 = 'a5503dba3f6fed6eab7ac91a2dfa96c9f21f9191f3d4fb280efd8278449750c7';
+// Recomputed over the Pass 74 positional-support plus Pass 75 High Seas union.
+export const SOUND_EVENT_INVENTORY_SHA256 = '6fe9b60ae3ad121cf1d58386d54ed907834b6d5178ad17054dcd6f502332895a';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

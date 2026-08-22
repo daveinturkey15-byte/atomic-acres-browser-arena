@@ -95,7 +95,7 @@ describe('Pass 69.3 clean exact-SHA support-aircraft live matrix', () => {
       'authoredLod.levels[currentLevel]?.object.visible === true',
     ]) expect(presentation).toContain(token);
     expect(legacyMain).toContain('setCaptureCameraFarPlane: (far: number | null) => void;');
-    expect(legacyMain).toContain("const arenaFarPlane = selectedArena.id === 'rustworks-1v1' ? 1_400 : 180;");
+    expect(legacyMain).toContain('const arenaFarPlane = sharedWaterBodyForArena(selectedArena.id) ? 1_400 : 180;');
     expect(legacyMain).toContain("THREE.MathUtils.clamp(far!, camera.near + 1, 2_000)");
     expect(runner).toContain('receipt.lodCaptures.length === expectedCaptures.length');
     expect(runner).toContain('statSync(screenshotFile).size > 10_000');

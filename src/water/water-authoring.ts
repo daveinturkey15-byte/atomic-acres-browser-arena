@@ -11,22 +11,20 @@
  *   constants: they gate buoyancy/swim outcomes and must never vary by render
  *   profile or peer. amplitudeScale is deliberately a single number, not a
  *   per-profile record.
- * - Island half-extents here are authored defaults. The legacy-main arena
- *   configure path still passes live arena bounds; caller-supplied extents win
- *   so existing rustworks behaviour is byte-compatible.
+ * - Island half-extents are authoritative water-mask inputs. Keeping them here
+ *   prevents broad gameplay bounds from cutting rectangular holes in the sea.
  */
 
 import type { ArenaId } from '../map-selection';
 
-/**
- * HF-359 restores the farcrysis arena from its Pass 69 branch; its ArenaId
- * lands with that lane's map-selection integration. Water authoring accepts it
- * today so the island ocean is ready for wave-2 wiring.
- */
-export type WaterArenaId = ArenaId | 'farcrysis';
+export type WaterArenaId = ArenaId;
 
 export type WaterBodyDefinition = Readonly<{
   arenaId: WaterArenaId;
+  /** Rendering owner while retained arena-specific oceans are migrated. */
+  presentationOwner: 'shared-ocean' | 'arena-builder';
+  /** Whether the ocean shader removes an authored rectangular dry footprint. */
+  dryFootprintMask: 'rectangular' | 'none';
   /** World Y of the mean water surface. */
   level: number;
   /**
@@ -54,10 +52,14 @@ export type WaterBodyDefinition = Readonly<{
   night: boolean;
   /** WebGPU/TSL presentation palette (hex). */
   palette: Readonly<{ deep: number; shallow: number; foam: number }>;
+  /** Legacy GLSL palette, retained separately when its accepted grade differs. */
+  legacyPalette: Readonly<{ deep: number; shallow: number; foam: number }>;
 }>;
 
 const RUSTWORKS_WATER: WaterBodyDefinition = Object.freeze({
   arenaId: 'rustworks-1v1' as const,
+  presentationOwner: 'shared-ocean',
+  dryFootprintMask: 'rectangular',
   // Deep ocean well below the raised oil-rig deck; unchanged from the
   // pre-HF-358 behaviour (non-swim float zone at y = -19.5).
   level: -19.5,
@@ -69,11 +71,15 @@ const RUSTWORKS_WATER: WaterBodyDefinition = Object.freeze({
   horizonRadius: 3_200,
   night: true,
   palette: Object.freeze({ deep: 0x071b2b, shallow: 0x165b71, foam: 0x68b9c9 }),
+  legacyPalette: Object.freeze({ deep: 0x020814, shallow: 0x0a2a44, foam: 0x7ec8e8 }),
 });
 
-/** Authored intent, retained deliberately unregistered - see WATER_BODIES below. */
 export const FARCRYSIS_WATER: WaterBodyDefinition = Object.freeze({
   arenaId: 'farcrysis' as const,
+  // The retained Pass 69 terrain builder still owns this surface. Recording
+  // that exception prevents the shared runtime from drawing a duplicate sea.
+  presentationOwner: 'arena-builder',
+  dryFootprintMask: 'rectangular',
   // HF-359 island ocean: level/palette/shore ramp read from the restored
   // farcrysis modules (buildWater in src/farcrysis-terrain.ts: water plane
   // 76 m at y = -0.3, shore factor ramp (chebyshev - 15) / 22). Owner scope
@@ -89,6 +95,27 @@ export const FARCRYSIS_WATER: WaterBodyDefinition = Object.freeze({
   horizonRadius: 1_400,
   night: false,
   palette: Object.freeze({ deep: 0x0d4a5c, shallow: 0x19a3a8, foam: 0xfffef9 }),
+  legacyPalette: Object.freeze({ deep: 0x0d4a5c, shallow: 0x19a3a8, foam: 0xfffef9 }),
+});
+
+const HIGH_SEAS_WATER: WaterBodyDefinition = Object.freeze({
+  arenaId: 'high-seas' as const,
+  presentationOwner: 'shared-ocean',
+  // The closed tapered hull crosses this plane; no rectangular cut-out is
+  // allowed because it would expose dry wedges around the bow and stern.
+  dryFootprintMask: 'none',
+  level: -2.2,
+  swimmable: false,
+  // Five spectral weights sum to 1.525, so 1.55 * 1.525 * 0.15 gives a
+  // theoretical +/-0.3546 m envelope around the authored mean waterline.
+  amplitudeScale: 0.15,
+  island: Object.freeze({ halfX: 12, halfZ: 44 }),
+  shore: Object.freeze({ innerRadius: 44, outerRadius: 94 }),
+  nearSize: 960,
+  horizonRadius: 3_200,
+  night: false,
+  palette: Object.freeze({ deep: 0x063650, shallow: 0x177d95, foam: 0xe7fbff }),
+  legacyPalette: Object.freeze({ deep: 0x063650, shallow: 0x177d95, foam: 0xe7fbff }),
 });
 
 /** Every authored water body, keyed by arena. Arenas absent here have none. */
@@ -104,15 +131,40 @@ export const FARCRYSIS_WATER: WaterBodyDefinition = Object.freeze({
  * ~2.36m swells cresting ~2m ABOVE a 64x64 island whose eye height is ~1.6m -
  * the map would have been unplayable on the first click.
  *
- * FARCRYSIS_WATER is retained above as the authored intent. Re-register it only
- * once the arena's own water layers are replaced rather than duplicated, and
- * once amplitudeScale is proven to reach the surface.
+ * PASS 75 RESOLVED THIS. Registration in this map no longer implies shared-ocean
+ * PRESENTATION, which is what both objections above were actually about. Pass 75
+ * added `presentationOwner`, and every presentation consumer goes through
+ * `sharedWaterBodyForArena` (pass64-tsl-scene.ts:518/566/688, legacy-main far-plane
+ * selection) which returns null for an `arena-builder` body. So farcrysis draws no
+ * second ocean while still being registered.
+ *
+ * Both original conditions are now met, checked rather than assumed:
+ *   1. Duplication - impossible: no shared-ocean presentation path resolves farcrysis.
+ *   2. amplitudeScale reaching the surface - the consumer now multiplies by
+ *      `body.amplitudeScale` explicitly instead of relying on a nullish coalesce that
+ *      never fired, and for farcrysis the shared ocean amplitude path does not run at
+ *      all.
+ *
+ * Leaving it unregistered had a real cost, which is why this was changed rather than
+ * left alone: `water-system.ts` (the WebGL2/CPU authority route) reads
+ * `waterBodyForArena`, so an unregistered farcrysis has NO authoritative level,
+ * swimmable flag or amplitudeScale on that path - the gameplay values disappear along
+ * with the unwanted presentation. Those values are host-authoritative and must not
+ * vary by render profile, so dropping them was the more dangerous of the two options.
  */
 export const WATER_BODIES: Readonly<Partial<Record<WaterArenaId, WaterBodyDefinition>>> = Object.freeze({
   'rustworks-1v1': RUSTWORKS_WATER,
+  farcrysis: FARCRYSIS_WATER,
+  'high-seas': HIGH_SEAS_WATER,
 });
 
 /** Null for arenas without water — atomic-acres, gun-range, skyline-terminal. */
 export function waterBodyForArena(arenaId: string): WaterBodyDefinition | null {
   return WATER_BODIES[arenaId as WaterArenaId] ?? null;
+}
+
+/** Null when an arena has no sea or deliberately retains an arena-owned surface. */
+export function sharedWaterBodyForArena(arenaId: string): WaterBodyDefinition | null {
+  const body = waterBodyForArena(arenaId);
+  return body?.presentationOwner === 'shared-ocean' ? body : null;
 }

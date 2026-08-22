@@ -24,6 +24,7 @@ import {
 import { Team } from './protocol';
 import type { GlassState } from './glass-authority';
 import { bindPass73CollisionVisualOwner } from './pass73-collision-route-authority';
+import type { ArenaId } from './map-selection';
 
 export type PracticeTarget = {
   id: string;
@@ -40,8 +41,7 @@ export type PracticeTarget = {
 };
 export type BreakableWindow = { id: string; mesh: THREE.Mesh; broken: boolean; glassState?: GlassState };
 export type ArenaMap = {
-  // HF-359 (Pass 74): 'farcrysis' revived from the Pass 69 hidden lane.
-  id: 'atomic-acres' | 'rustworks-1v1' | 'gun-range' | 'skyline-terminal' | 'farcrysis';
+  id: ArenaId;
   label: string;
   root: THREE.Group;
   colliders: Box2[];
@@ -68,6 +68,8 @@ export type ArenaMap = {
     performanceVisualMeshes?: number;
   }>;
   bounds: Box2;
+  /** Optional physics-only fail-safe floor. Defaults to y=0 for legacy arenas. */
+  physicsSafetyFloorY?: number;
   houseTelemetry: {
     houses: number;
     groundRooms: number;

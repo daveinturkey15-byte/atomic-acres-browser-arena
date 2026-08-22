@@ -5,7 +5,9 @@ export const MATCH_DIAGNOSTIC_MAX_PARTICIPANTS = 12;
 export const MATCH_DIAGNOSTIC_RETENTION_DAYS = 30;
 
 export const MATCH_DIAGNOSTIC_BACKENDS = ['webgpu', 'webgl-compatibility'] as const;
-export const MATCH_DIAGNOSTIC_ARENAS = ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'] as const;
+export const MATCH_DIAGNOSTIC_ARENAS = [
+  'atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas',
+] as const;
 export const MATCH_DIAGNOSTIC_MODES = ['solo', 'tdm', 'ffa'] as const;
 export const MATCH_DIAGNOSTIC_ROLES = ['offline', 'host', 'guest'] as const;
 export const MATCH_DIAGNOSTIC_ADMISSIONS = ['accepted', 'rejected', 'observed'] as const;

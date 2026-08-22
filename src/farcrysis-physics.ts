@@ -546,7 +546,7 @@ function addCrateShards(builder: any, name: string, x: number, z: number, size: 
     const sz = z + Math.sin(angle) * offsetR;
     const shard = new THREE.Mesh(shardGeom, shardMat);
     shard.name = `${name}-shard-${i}`;
-    shard.position.set(sx, yTop, sz);
+    shard.position.set(sx, yTop + i * 0.003, sz);
     shard.rotation.y = angle + ((seed + i * 13) % 17 - 8) * 0.07;
     shard.castShadow = false;
     shard.receiveShadow = false;

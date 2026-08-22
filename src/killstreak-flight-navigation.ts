@@ -22,10 +22,11 @@ const definition = (
   arenaId: ArenaId,
   ceilingY: number,
   portals: readonly FlightPortalHint[],
+  floorY = 0,
 ): ArenaFlightNavigationDefinition => Object.freeze({
   id: `${arenaId}-support-flight-v1`,
   arenaId,
-  floorY: 0,
+  floorY,
   ceilingY,
   noFlyPolicy: 'authoritative-static-and-dynamic-solids',
   portals: Object.freeze(portals.map((portal) => Object.freeze(portal))),
@@ -63,6 +64,11 @@ export const PASS65_FLIGHT_NAVIGATION: Readonly<Record<ArenaId, ArenaFlightNavig
     { id: 'beach-overflight', xQ: -0.7, zQ: 0.6, altitudeM: 15 },
     { id: 'jungle-air-gap', xQ: 0, zQ: 0, altitudeM: 20 },
   ]),
+  'high-seas': definition('high-seas', 50, [
+    { id: 'stern-air-gap', xQ: 0, zQ: 0.72, altitudeM: 14 },
+    { id: 'bow-air-gap', xQ: 0, zQ: -0.72, altitudeM: 14 },
+    { id: 'yacht-overflight', xQ: 0, zQ: 0, altitudeM: 26 },
+  ], 3.2),
 });
 
 export type SupportFlightStepInput = Readonly<{

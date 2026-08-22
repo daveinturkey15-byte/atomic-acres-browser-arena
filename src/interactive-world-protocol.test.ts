@@ -25,6 +25,8 @@ describe('strict interactive-world protocol', () => {
     } as const;
     expect(isShedInteractionIntentMessage(intent)).toBe(true);
     expect(isInteractiveWorldProtocolMessage(intent)).toBe(true);
+    expect(isShedInteractionIntentMessage({ ...intent, arenaId: 'farcrysis' })).toBe(true);
+    expect(isShedInteractionIntentMessage({ ...intent, arenaId: 'high-seas' })).toBe(true);
     expect(isShedInteractionIntentMessage({ ...intent, clientAngleQ: 9_000 })).toBe(false);
     expect(isShedInteractionIntentMessage({ ...intent, actionSequence: 0 })).toBe(false);
     expect(isShedInteractionIntentMessage({ ...intent, arenaId: 'Nuke Town' })).toBe(false);

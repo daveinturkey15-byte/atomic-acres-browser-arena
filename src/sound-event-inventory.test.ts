@@ -287,8 +287,7 @@ describe('Pass 65 sound-event inventory', () => {
   it('has a stable inventory digest', () => {
     const digest = createHash('sha256').update(canonicalSoundEventInventoryJson()).digest('hex');
     expect(REQUIRED_SOUND_EVENT_IDS).toHaveLength(SOUND_EVENT_INVENTORY.length);
-    // HF-337: updated expected digest for positional chopper and drone gun sound events
-    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('a5503dba3f6fed6eab7ac91a2dfa96c9f21f9191f3d4fb280efd8278449750c7');
+    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('6fe9b60ae3ad121cf1d58386d54ed907834b6d5178ad17054dcd6f502332895a');
     expect(digest).toBe(SOUND_EVENT_INVENTORY_SHA256);
   });
 });

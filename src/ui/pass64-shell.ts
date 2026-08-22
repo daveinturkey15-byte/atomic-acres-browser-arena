@@ -104,7 +104,7 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
         <div class="showcase-telemetry"><span id="menu-preview-label">PRERECORDED HELO // NUKE TOWN</span><b id="menu-preview-motion">AUTHORED COCKPIT FLYOVER</b></div>
       </aside>
       <section id="map-selector" class="map-selector" aria-label="Choose map">
-        <div class="map-selector-heading"><span>THEATRE INDEX</span><small>Five deployable spaces · choose before launch</small></div>
+        <div class="map-selector-heading"><span>THEATRE INDEX</span><small>${ARENA_SELECTIONS.length} deployable spaces · choose before launch</small></div>
         <div class="map-card-grid">${mapCardsMarkup()}</div>
       </section>
     </section>

@@ -106,6 +106,21 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     width: 2560,
     height: 1440,
   }),
+  'high-seas': Object.freeze({
+    arenaId: 'high-seas',
+    frame: 'helicopter',
+    label: 'PRERECORDED HELO // HIGH SEAS',
+    motionLabel: 'AUTHORED FLYOVER PENDING OFFLINE RENDER',
+    reducedMotionLabel: 'STABILIZED PREVIEW FRAME PENDING',
+    presentationId: 'menu-video-runtime-helo-high-seas-v1',
+    mediaAvailable: false,
+    webm: '',
+    mp4: '',
+    poster: '',
+    durationSeconds: 8,
+    width: 2560,
+    height: 1440,
+  }),
 } satisfies Record<ArenaId, MenuPreviewVideoDefinition>);
 
 export function menuPreviewVideoDefinition(arenaId: ArenaId): MenuPreviewVideoDefinition {

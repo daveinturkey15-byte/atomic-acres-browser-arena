@@ -40,7 +40,7 @@ import type { GraphicsRuntime } from '../pass65-settings';
 // GPU surface. Arena gating comes from the water-authoring registry, not a
 // hard-coded rustworks check.
 import { createOceanTslWater, oceanAmplitudeForBody } from '../water/ocean-tsl';
-import { waterBodyForArena } from '../water/water-authoring';
+import { sharedWaterBodyForArena } from '../water/water-authoring';
 
 export type Pass65TslGraphicsOptions = Readonly<{
   principalSamples: 1 | 2 | 4;
@@ -153,6 +153,11 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaVisualDefinition['id'], Atmospher
     [[-26, -26, 12, 4.0], [26, 26, 12, 4.0], [-8, -14, 10, 3.2], [0, -26, 12, 3.4]],
     [[-20, -20, 2.2, 4.0], [20, 20, 2.2, 4.0], [0, -18, 2.4, 4.4], [0, 0, 2.6, 5.0]],
     { count: 72, minX: -31, maxX: 31, minZ: -31, maxZ: 31 },
+  ),
+  'high-seas': atmosphereLayout(
+    [[-10, -31, 11, 3.2], [10, 24, 10, 3], [0, 0, 8, 2.6]],
+    [[-7, -25, 2, 3.6], [7, 20, 2, 3.6]],
+    { count: 48, minX: -14, maxX: 14, minZ: -44, maxZ: 44 },
   ),
 });
 const MAX_MIST_LAYERS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
@@ -510,7 +515,7 @@ function applyArenaSystemLayout(
   // node in place so each arena gets exactly its registry-owned presentation.
   const existingWater = root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh | undefined;
   const existingBody = (existingWater?.userData.waterBody as { arenaId: string } | undefined)?.arenaId;
-  const desiredBody = waterBodyForArena(definition.id);
+  const desiredBody = sharedWaterBodyForArena(definition.id);
   const existingBodyId = existingBody ?? null;
   const desiredBodyId = desiredBody?.arenaId ?? null;
   if (existingWater && existingBodyId !== desiredBodyId) {
@@ -527,6 +532,11 @@ function applyArenaSystemLayout(
     // its own RingGeometry and MeshBasicMaterial; once detached it is invisible
     // to any later scene-graph traversal, so skipping descendants leaks one
     // ring geometry and one material per arena switch, without bound.
+    // Pass 75 reached the same subtree traversal gated on `instanceof THREE.Mesh`;
+    // the duck-typed read below is a superset of that gate - every Mesh (High Seas
+    // shared-ocean surface and its horizon ring included) still disposes, plus any
+    // non-Mesh renderable a future body parents here, while plain Object3D nodes
+    // carry no geometry/material and fall through as no-ops.
     existingWater.traverse((descendant) => {
       const meshLike = descendant as {
         geometry?: THREE.BufferGeometry;
@@ -550,23 +560,42 @@ function applyArenaSystemLayout(
   }
   const water = root.getObjectByName('Pass 64 TSL perimeter water');
   if (water) {
-    // HF-358: registry-driven visibility — any arena with an authored body has
-    // WebGPU water, not just rustworks. Amplitude remains a presentation gain;
-    // authored bodies default to their own host-authoritative scale.
-    const body = waterBodyForArena(definition.id);
+    // Only shared-ocean bodies are presented here; retained arena builders keep
+    // their own surfaces. A graphics override is a reference amplitude, so the
+    // arena's host-authoritative scale always applies.
+    const body = sharedWaterBodyForArena(definition.id);
     water.visible = body !== null && (water.userData.waveBands ?? 0) > 0;
-    const defaultAmplitude = body ? oceanAmplitudeForBody(body) : 0;
     // HF-358 audit correction: the graphics setting is a PROFILE gain, not an
     // arena's authored sea state. Reading it with `?? default` made every
     // authored amplitudeScale dead code, because the runtime always supplies a
     // value - so a calm shore inherited the RustRig storm. Scale the profile gain
-    // by the body's authored factor instead of letting it replace it.
-    const amplitude = graphics.oceanWaveAmplitude !== undefined && body
-      ? graphics.oceanWaveAmplitude * body.amplitudeScale
-      : graphics.oceanWaveAmplitude ?? defaultAmplitude;
+    // by the body's authored factor instead of letting it replace it; with no
+    // override the body's own authored amplitude stands.
+    // Pass 75 keeps that gain x authored-scale rule byte-for-byte for every
+    // authored body (High Seas included) and additionally pins the bodyless case
+    // to 0, so a hidden placeholder can no longer report the retired arena's
+    // amplitude next to the null waterLevel/presentationOwner reset below.
+    const amplitude = body
+      ? (graphics.oceanWaveAmplitude === undefined
+          ? oceanAmplitudeForBody(body)
+          : graphics.oceanWaveAmplitude * body.amplitudeScale)
+      : 0;
     const amplitudeUniform = water.userData.waveAmplitudeUniform as { value: number } | undefined;
     if (amplitudeUniform) amplitudeUniform.value = amplitude;
     water.userData.waveAmplitude = amplitude;
+    if (body) {
+      water.userData.waterLevel = body.level;
+      water.userData.nearSize = body.nearSize;
+      water.userData.presentationOwner = body.presentationOwner;
+      water.userData.dryFootprintMask = body.dryFootprintMask;
+    } else {
+      // Hidden presentation state remains observable through diagnostics, so
+      // reset it atomically instead of leaking the previous arena's ocean.
+      water.userData.waterLevel = null;
+      water.userData.nearSize = 0;
+      water.userData.presentationOwner = null;
+      water.userData.dryFootprintMask = 'none';
+    }
   }
   const sky = root.getObjectByName('Pass 64 TSL atmosphere sky') as SkyMesh | undefined;
   const preset = definition.atmosphere.preset;
@@ -656,7 +685,7 @@ function makeWater(
   // HF-358: the water-authoring registry is the single source for which arenas
   // have water. The WebGPU surface is the ocean-tsl factory over the shared
   // frozen ocean-spectrum — the exact table CPU buoyancy samples.
-  const body = waterBodyForArena(arenaId);
+  const body = sharedWaterBodyForArena(arenaId);
   if (!body) {
     // No authored water here: keep an inert named placeholder so callers that
     // look the mesh up by name keep working; it stays invisible. It still
@@ -669,7 +698,9 @@ function makeWater(
     placeholder.userData.waveBands = 0;
     return placeholder;
   }
-  const amplitudeOverride = amplitude ?? oceanAmplitudeForBody(body);
+  const amplitudeOverride = amplitude === undefined
+    ? oceanAmplitudeForBody(body)
+    : amplitude * body.amplitudeScale;
   // Pass 64 contract: the water pipeline id stays tagged on this node material
   // so assertRuntimeTslTraversal keeps failing closed if it disappears.
   const tsl = createOceanTslWater(body, { amplitude: amplitudeOverride, pipelineId: PIPELINE.water });
@@ -898,6 +929,7 @@ export function createPass64TslSceneSystems(
       delete root.userData.tslReviewCameraId;
       applyArenaSystemLayout(root, nextDefinition, nextDefinition.reviewCameras[0]?.seed ?? 6401, activeGraphics);
       hdr.applyDefinition(nextDefinition);
+      publishActualGraphics();
     },
     applyGraphics: (nextGraphics) => {
       activeGraphics = nextGraphics;

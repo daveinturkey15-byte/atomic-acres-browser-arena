@@ -70,38 +70,62 @@ export function collectHorizontalOverlaySpecs(
     const geometry = node.geometry;
     if (!(geometry instanceof THREE.BoxGeometry)) return;
     if (node.userData.skylineQualityPlaceholder) return;
-    const q = new THREE.Quaternion();
-    node.getWorldQuaternion(q);
-    const e = new THREE.Euler().setFromQuaternion(q, 'XYZ');
-    // Only world-upward top faces; skip ramps/tilted beams.
-    if (Math.abs(e.x) > 1e-6 || Math.abs(e.z) > 1e-6) return;
-    const params = geometry.parameters;
-    if (params.height > maxHeight) return;
-    const p = new THREE.Vector3();
-    node.getWorldPosition(p);
-    const yaw = Math.abs(e.y) > 1e-6 ? e.y : 0;
-    const cos = Math.abs(Math.cos(yaw));
-    const sin = Math.abs(Math.sin(yaw));
-    const sx = params.width * cos + params.depth * sin;
-    const sz = params.width * sin + params.depth * cos;
+    // HF-346 (Pass 74): inspect polygonOffset configuration on the material.
+    // Hoisted out of collectMatrix because an InstancedMesh shares a single
+    // material across every instance, so each instance inherits the same tier.
     const material = Array.isArray(node.material) ? node.material[0] ?? null : node.material;
-    // HF-346: inspect polygonOffset configuration on the material.
     const polygonOffset = Boolean(material?.polygonOffset);
     const polygonOffsetFactor = material?.polygonOffset ? (material.polygonOffsetFactor ?? 0) : 0;
     const polygonOffsetUnits = material?.polygonOffset ? (material.polygonOffsetUnits ?? 0) : 0;
-    specs.push({
-      name: node.name,
-      topY: p.y + params.height / 2,
-      minX: p.x - sx / 2,
-      maxX: p.x + sx / 2,
-      minZ: p.z - sz / 2,
-      maxZ: p.z + sz / 2,
-      height: params.height,
-      material: material ?? null,
-      polygonOffset,
-      polygonOffsetFactor,
-      polygonOffsetUnits,
-    });
+    const collectMatrix = (matrix: THREE.Matrix4, name: string): void => {
+      const position = new THREE.Vector3();
+      const quaternion = new THREE.Quaternion();
+      const scale = new THREE.Vector3();
+      matrix.decompose(position, quaternion, scale);
+      const rotation = new THREE.Euler().setFromQuaternion(quaternion, 'XYZ');
+      // Only world-upward top faces; skip ramps, tilted beams and vertical
+      // instanced litter. Treating an InstancedMesh's untranslated root as one
+      // surface produced false pairs between unrelated instance layers.
+      if (Math.abs(rotation.x) > 1e-6 || Math.abs(rotation.z) > 1e-6) return;
+      const params = geometry.parameters;
+      const width = params.width * Math.abs(scale.x);
+      const height = params.height * Math.abs(scale.y);
+      const depth = params.depth * Math.abs(scale.z);
+      if (height > maxHeight) return;
+      const yaw = Math.abs(rotation.y) > 1e-6 ? rotation.y : 0;
+      const cos = Math.abs(Math.cos(yaw));
+      const sin = Math.abs(Math.sin(yaw));
+      const sizeX = width * cos + depth * sin;
+      const sizeZ = width * sin + depth * cos;
+      specs.push({
+        name,
+        topY: position.y + height / 2,
+        minX: position.x - sizeX / 2,
+        maxX: position.x + sizeX / 2,
+        minZ: position.z - sizeZ / 2,
+        maxZ: position.z + sizeZ / 2,
+        height,
+        material: material ?? null,
+        // HF-346: direction-aware polygonOffset exemption inputs (Pass 74).
+        polygonOffset,
+        polygonOffsetFactor,
+        polygonOffsetUnits,
+      });
+    };
+    // Pass 75: audit InstancedMesh per-instance transforms instead of the
+    // (usually identity) instanced root, so instanced geometry is visible to
+    // the coplanar sweep.
+    if (node instanceof THREE.InstancedMesh) {
+      const instanceMatrix = new THREE.Matrix4();
+      const worldMatrix = new THREE.Matrix4();
+      for (let index = 0; index < node.count; index += 1) {
+        node.getMatrixAt(index, instanceMatrix);
+        worldMatrix.multiplyMatrices(node.matrixWorld, instanceMatrix);
+        collectMatrix(worldMatrix, `${node.name}[${index}]`);
+      }
+      return;
+    }
+    collectMatrix(node.matrixWorld, node.name);
   });
   return specs;
 }

@@ -23,6 +23,7 @@ import {
   MeshStandardNodeMaterial,
 } from 'three/webgpu';
 import {
+  abs,
   color,
   cos,
   dot,
@@ -144,6 +145,15 @@ export function createOceanTslWater(
   material.roughnessNode = float(1);
   material.metalnessNode = float(0);
   material.emissiveNode = authoredWater.mul(0.58);
+  const dryFootprintMask = uniform(body.dryFootprintMask === 'rectangular' ? 1 : 0);
+  const islandHalf = uniform(new THREE.Vector2(body.island.halfX + 0.8, body.island.halfZ + 0.8));
+  const normalizedDryFootprint = max(
+    abs(positionWorld.x).div(islandHalf.x),
+    abs(positionWorld.z).div(islandHalf.y),
+  );
+  const outsideDryFootprint = smoothstep(float(0.965), float(0.975), normalizedDryFootprint);
+  material.opacityNode = mix(float(1), outsideDryFootprint, dryFootprintMask);
+  material.alphaTestNode = float(0.5);
   if (options?.pipelineId) material.userData.tslPipelineId = options.pipelineId;
 
   const water = new THREE.Mesh(geometry, material);
@@ -154,6 +164,8 @@ export function createOceanTslWater(
   water.frustumCulled = false;
   water.userData.animationTimeUniform = animationTime;
   water.userData.waveAmplitudeUniform = waveAmplitude;
+  water.userData.dryFootprintMaskUniform = dryFootprintMask;
+  water.userData.islandHalfUniform = islandHalf;
   water.userData.waveBands = OCEAN_BANDS.length;
   water.userData.waveAmplitude = waveAmplitude.value;
   water.userData.waveAuthority = OCEAN_SPECTRUM_AUTHORITY_ID;
@@ -163,6 +175,10 @@ export function createOceanTslWater(
   water.userData.totalSteepness = OCEAN_TOTAL_STEEPNESS;
   water.userData.waterBody = body;
   water.userData.swimmable = body.swimmable;
+  water.userData.waterLevel = body.level;
+  water.userData.nearSize = body.nearSize;
+  water.userData.presentationOwner = body.presentationOwner;
+  water.userData.dryFootprintMask = body.dryFootprintMask;
 
   // Curved low-cost skirt carrying the sea past the dense displaced square
   // (prevents the plane edge reading as a flat stripe at player eye height).

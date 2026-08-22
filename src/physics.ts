@@ -28,12 +28,15 @@ export const WORLD_BOUNDARY_MIN_Y = -2;
 export const WORLD_BOUNDARY_MAX_Y = 14;
 
 /** Physics-only perimeter walls. Their inner faces exactly match playable bounds. */
-export function worldBoundaryColliders(bounds: Box2): readonly Box2[] {
+export function worldBoundaryColliders(
+  bounds: Box2,
+  minimumY = WORLD_BOUNDARY_MIN_Y,
+): readonly Box2[] {
   return [
-    { minX: bounds.minX - WORLD_BOUNDARY_THICKNESS, maxX: bounds.minX, minZ: bounds.minZ, maxZ: bounds.maxZ, minY: WORLD_BOUNDARY_MIN_Y, maxY: WORLD_BOUNDARY_MAX_Y },
-    { minX: bounds.maxX, maxX: bounds.maxX + WORLD_BOUNDARY_THICKNESS, minZ: bounds.minZ, maxZ: bounds.maxZ, minY: WORLD_BOUNDARY_MIN_Y, maxY: WORLD_BOUNDARY_MAX_Y },
-    { minX: bounds.minX, maxX: bounds.maxX, minZ: bounds.minZ - WORLD_BOUNDARY_THICKNESS, maxZ: bounds.minZ, minY: WORLD_BOUNDARY_MIN_Y, maxY: WORLD_BOUNDARY_MAX_Y },
-    { minX: bounds.minX, maxX: bounds.maxX, minZ: bounds.maxZ, maxZ: bounds.maxZ + WORLD_BOUNDARY_THICKNESS, minY: WORLD_BOUNDARY_MIN_Y, maxY: WORLD_BOUNDARY_MAX_Y },
+    { minX: bounds.minX - WORLD_BOUNDARY_THICKNESS, maxX: bounds.minX, minZ: bounds.minZ, maxZ: bounds.maxZ, minY: minimumY, maxY: WORLD_BOUNDARY_MAX_Y },
+    { minX: bounds.maxX, maxX: bounds.maxX + WORLD_BOUNDARY_THICKNESS, minZ: bounds.minZ, maxZ: bounds.maxZ, minY: minimumY, maxY: WORLD_BOUNDARY_MAX_Y },
+    { minX: bounds.minX, maxX: bounds.maxX, minZ: bounds.minZ - WORLD_BOUNDARY_THICKNESS, maxZ: bounds.minZ, minY: minimumY, maxY: WORLD_BOUNDARY_MAX_Y },
+    { minX: bounds.minX, maxX: bounds.maxX, minZ: bounds.maxZ, maxZ: bounds.maxZ + WORLD_BOUNDARY_THICKNESS, minY: minimumY, maxY: WORLD_BOUNDARY_MAX_Y },
   ];
 }
 
@@ -149,7 +152,11 @@ export class CharacterPhysics {
     this.controller.setMinSlopeSlideAngle(CHARACTER_PHYSICS_CONFIG.minimumSlopeSlideDegrees * Math.PI / 180);
   }
 
-  static async create(colliders: readonly Box2[], bounds: Box2): Promise<CharacterPhysics> {
+  static async create(
+    colliders: readonly Box2[],
+    bounds: Box2,
+    safetyFloorY = 0,
+  ): Promise<CharacterPhysics> {
     const { default: RAPIER } = await import('@dimforge/rapier3d-compat');
     // Rapier 0.19.3's compatibility bundle calls its own wasm-bindgen loader with
     // the legacy positional form and emits a warning even though the public
@@ -168,8 +175,10 @@ export class CharacterPhysics {
     const world = new RAPIER.World({ x: 0, y: CHARACTER_PHYSICS_CONFIG.gravity, z: 0 });
     world.timestep = 1 / SIMULATION_HZ;
 
-    // The world floor and four thin boundary walls make falling out impossible even if
-    // an authored visual mesh is missing or still loading.
+    // The fail-safe floor and four thin boundary walls make falling out impossible
+    // even if an authored visual mesh is missing or still loading. Water arenas can
+    // lower this floor beneath the waterline while retaining explicit playable floors.
+    const resolvedSafetyFloorY = Number.isFinite(safetyFloorY) ? safetyFloorY : 0;
     world.createCollider(
       RAPIER.ColliderDesc.cuboid(
         (bounds.maxX - bounds.minX) / 2,
@@ -177,12 +186,13 @@ export class CharacterPhysics {
         (bounds.maxZ - bounds.minZ) / 2,
       ).setTranslation(
         (bounds.minX + bounds.maxX) / 2,
-        -0.1,
+        resolvedSafetyFloorY - 0.1,
         (bounds.minZ + bounds.maxZ) / 2,
       ),
     );
 
-    for (const box of [...worldBoundaryColliders(bounds), ...colliders]) {
+    const boundaryMinimumY = Math.min(WORLD_BOUNDARY_MIN_Y, resolvedSafetyFloorY - 2);
+    for (const box of [...worldBoundaryColliders(bounds, boundaryMinimumY), ...colliders]) {
       const shape = boxShape(box);
       const descriptor = RAPIER.ColliderDesc.cuboid(shape.halfExtents.x, shape.halfExtents.y, shape.halfExtents.z)
         .setTranslation(shape.centre.x, shape.centre.y, shape.centre.z)

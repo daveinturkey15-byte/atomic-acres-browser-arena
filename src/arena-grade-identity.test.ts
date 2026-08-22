@@ -20,14 +20,15 @@ const ALL_ARENA_IDS: readonly ArenaId[] = [
   'rustworks-1v1',
   'gun-range',
   'farcrysis',
+  'high-seas',
 ];
 
 describe('HF-363 — Per-Arena Ambience & Grade Identity Layer', () => {
   describe('Catalog completeness and immutability', () => {
-    it('contains all five authored arenas', () => {
+    it('contains all six authored arenas', () => {
       const registeredIds = Object.keys(ARENA_GRADE_IDENTITIES);
       expect(registeredIds.sort()).toEqual([...ALL_ARENA_IDS].sort());
-      expect(registeredIds.length).toBe(5);
+      expect(registeredIds.length).toBe(6);
     });
 
     it('is deeply frozen to prevent runtime mutation', () => {
@@ -139,10 +140,23 @@ describe('HF-363 — Per-Arena Ambience & Grade Identity Layer', () => {
       expect(farcrysis.grade.shadowTint).toBe(0x1e3828);
       expect(farcrysis.grade.highlightTint).toBe(0xffe2b8);
     });
+
+    it('grounds high-seas in warm daybreak yacht lighting with cool maritime fill', () => {
+      const highSeas = resolveArenaGradeIdentity('high-seas');
+      expect(highSeas.displayName).toBe('High Seas');
+      expect(highSeas.sun.color).toBe(0xffe3bb);
+      expect(highSeas.sun.intensity).toBe(3.0);
+      expect(highSeas.hemisphere.skyColor).toBe(0xc7e7ed);
+      expect(highSeas.ambient.color).toBe(0x9fc7cf);
+      expect(highSeas.fog.color).toBe(0xb8d6dc);
+      expect(highSeas.fog.density).toBe(0.0032);
+      expect(highSeas.grade.shadowTint).toBe(0x294a58);
+      expect(highSeas.grade.highlightTint).toBe(0xffe3bb);
+    });
   });
 
   describe('Combat-Safety Envelopes & Sightline Bounds (Competitive FPS)', () => {
-    it('enforces minimum shadow lift floor across all 5 arenas', () => {
+    it('enforces minimum shadow lift floor across all arenas', () => {
       for (const id of ALL_ARENA_IDS) {
         const identity = ARENA_GRADE_IDENTITIES[id];
         expect(identity.grade.shadowLift).toBeGreaterThanOrEqual(COMBAT_SAFETY_BOUNDS.minShadowLift);
@@ -150,7 +164,7 @@ describe('HF-363 — Per-Arena Ambience & Grade Identity Layer', () => {
       }
     });
 
-    it('enforces maximum fog density ceiling across all 5 arenas', () => {
+    it('enforces maximum fog density ceiling across all arenas', () => {
       for (const id of ALL_ARENA_IDS) {
         const identity = ARENA_GRADE_IDENTITIES[id];
         expect(identity.fog.density).toBeLessThanOrEqual(COMBAT_SAFETY_BOUNDS.maxFogDensity);

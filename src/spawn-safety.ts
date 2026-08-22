@@ -1,4 +1,4 @@
-import { segmentIntersectsBox, type Box2, type Point3 } from './collision';
+import { isBlocked, pointInsideBounds, segmentIntersectsBox, type Box2, type Point3 } from './collision';
 import type { ArenaId } from './map-selection';
 
 export type SpawnMode = 'solo' | 'tdm' | 'ffa';
@@ -38,6 +38,7 @@ const MAP_TRAP_RADIUS: Readonly<Record<ArenaId, number>> = Object.freeze({
   'skyline-terminal': 10,
   // HF-359 (Pass 74): ported from the Pass 69 hidden lane.
   'farcrysis': 8,
+  'high-seas': 8,
 });
 
 export const FFA_MINIMUM_SPAWN_SEPARATION = 8;
@@ -108,6 +109,26 @@ function distanceSq(a: Point3, b: Point3): number {
 
 function finitePoint(point: Point3): boolean {
   return Number.isFinite(point.x) && Number.isFinite(point.y ?? 0) && Number.isFinite(point.z);
+}
+
+/** Validates an authored spawn at its authored elevation, not an assumed ground plane. */
+export function validArenaSpawnPoint(
+  point: Point3,
+  bounds: Box2,
+  colliders: readonly Box2[],
+  radius = 0.44,
+): boolean {
+  return finitePoint(point)
+    && pointInsideBounds(point, bounds, radius)
+    && !isBlocked(point, colliders, radius);
+}
+
+/** Converts a floor/waypoint position to the bot's LOS eye without losing deck elevation. */
+export function waypointEyePoint(
+  point: Readonly<{ x: number; y?: number; z: number }>,
+  eyeHeight = 1.42,
+): Readonly<{ x: number; y: number; z: number }> {
+  return { x: point.x, y: (point.y ?? 0) + eyeHeight, z: point.z };
 }
 
 export function scoreSpawnCandidates(context: SpawnSelectionContext): SpawnSelection {

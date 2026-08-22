@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MATCH_DIAGNOSTIC_ARENAS,
   MATCH_DIAGNOSTIC_MAX_EVENTS,
   validateMatchDiagnosticEnvelope,
 } from './match-diagnostics-schema';
+import { ARENA_IDS } from '../src/arena-identity';
 
 const base = {
   schemaVersion: 1,
@@ -30,7 +32,10 @@ const base = {
 
 describe('shared automatic match diagnostic schema', () => {
   it('accepts only the exact bounded schema', () => {
+    expect(MATCH_DIAGNOSTIC_ARENAS).toEqual(ARENA_IDS);
     expect(validateMatchDiagnosticEnvelope(base)).toEqual({ envelope: base, error: null });
+    expect(validateMatchDiagnosticEnvelope({ ...base, arena: 'farcrysis' }).error).toBeNull();
+    expect(validateMatchDiagnosticEnvelope({ ...base, arena: 'high-seas' }).error).toBeNull();
     expect(validateMatchDiagnosticEnvelope({ ...base, rawPeerId: 'peer-real' }).error).toBe('invalid envelope shape');
     expect(validateMatchDiagnosticEnvelope({ ...base, pass: 'version sixty-four' }).error).toBe('invalid build identity');
     expect(validateMatchDiagnosticEnvelope({ ...base, completedAtEpochMinute: 1_800_001 }).error).toBe('invalid completion time');

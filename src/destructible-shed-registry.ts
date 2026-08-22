@@ -9,6 +9,7 @@ export const PASS65_SHED_ELIGIBILITY = Object.freeze([
   Object.freeze({ arenaId: 'gun-range' as const, zone: null, minimumSheds: 0 }),
   // HF-359 (Pass 74): farcrysis ships without authored sheds (jungle island).
   Object.freeze({ arenaId: 'farcrysis' as const, zone: null, minimumSheds: 0 }),
+  Object.freeze({ arenaId: 'high-seas' as const, zone: null, minimumSheds: 0 }),
 ]);
 
 /**

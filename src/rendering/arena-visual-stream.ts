@@ -13,6 +13,7 @@ export const ARENA_VISUAL_REGISTRY: ArenaVisualRegistry = Object.freeze({
   'skyline-terminal': () => import('./arenas/skyline-terminal'),
   // HF-359 (Pass 74): farcrysis revived from the Pass 69 hidden lane.
   'farcrysis': () => import('./arenas/farcrysis'),
+  'high-seas': () => import('./arenas/high-seas'),
 });
 
 export async function loadArenaVisualModule(

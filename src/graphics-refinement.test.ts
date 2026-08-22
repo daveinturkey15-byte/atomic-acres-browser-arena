@@ -8,6 +8,7 @@ import {
   graphicsEffectsBudget,
   SELECTIVE_BLOOM_LAYER,
 } from './graphics-refinement';
+import { ARENA_SELECTIONS } from './map-selection';
 
 describe('Pass 62 graphics refinement budgets', () => {
   it('degrades individual effects before exhausting resolution tiers', () => {
@@ -41,12 +42,13 @@ describe('Pass 62 graphics refinement budgets', () => {
   });
 
   it('keeps neutral IBL subordinate to authored key lights in every arena', () => {
-    for (const arenaId of ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal'] as const) {
+    for (const { id: arenaId } of ARENA_SELECTIONS) {
       expect(arenaEnvironmentScale(arenaId)).toBeGreaterThanOrEqual(0.1);
       expect(arenaEnvironmentScale(arenaId)).toBeLessThanOrEqual(0.3);
     }
     expect(arenaEnvironmentScale('rustworks-1v1')).toBeLessThan(arenaEnvironmentScale('atomic-acres'));
     expect(arenaEnvironmentScale('gun-range')).toBeLessThan(arenaEnvironmentScale('rustworks-1v1'));
+    expect(arenaShadowVolume('high-seas')).toEqual({ halfWidth: 32, halfHeight: 58, near: 4, far: 190 });
   });
 
   it('applies requested anisotropy and reflection scaling to real material properties', () => {

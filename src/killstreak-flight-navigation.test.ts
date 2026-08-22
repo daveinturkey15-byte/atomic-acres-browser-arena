@@ -52,14 +52,22 @@ describe('support flight navigation', () => {
   });
 
   it('declares arena-owned nav data for every stable arena identity', () => {
-    // HF-359: now 5 arenas including farcrysis
     expect(Object.keys(PASS65_FLIGHT_NAVIGATION).sort()).toEqual([
-      'atomic-acres', 'farcrysis', 'gun-range', 'rustworks-1v1', 'skyline-terminal',
+      'atomic-acres', 'farcrysis', 'gun-range', 'high-seas', 'rustworks-1v1', 'skyline-terminal',
     ]);
     for (const entry of Object.values(PASS65_FLIGHT_NAVIGATION)) {
       expect(entry.noFlyPolicy).toBe('authoritative-static-and-dynamic-solids');
       expect(entry.portals.length).toBeGreaterThan(0);
       expect(Object.isFrozen(entry)).toBe(true);
     }
+    expect(PASS65_FLIGHT_NAVIGATION['high-seas']).toMatchObject({
+      floorY: 3.2,
+      ceilingY: 50,
+      portals: [
+        { id: 'stern-air-gap', altitudeM: 14 },
+        { id: 'bow-air-gap', altitudeM: 14 },
+        { id: 'yacht-overflight', altitudeM: 26 },
+      ],
+    });
   });
 });

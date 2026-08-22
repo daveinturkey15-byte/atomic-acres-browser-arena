@@ -59,15 +59,18 @@ describe('prerecorded map-selection previews', () => {
     expect(menuPreviewVideoDefinition('gun-range').frame).toBe('cat');
     expect(menuPreviewVideoDefinition('gun-range').motionLabel).toContain('FIRST-PERSON');
     expect(menuPreviewVideoDefinition('farcrysis').frame).toBe('helicopter'); // HF-359
+    expect(menuPreviewVideoDefinition('high-seas').frame).toBe('helicopter');
+    expect(menuPreviewVideoDefinition('high-seas').mediaAvailable).toBe(false);
   });
 
-  it('honestly degrades farcrysis to a deliberate standby placeholder without network requests', async () => {
-    // HF-359: test markup and controller degradation for farcrysis
-    const markup = menuPreviewVideoMarkup('farcrysis');
-    expect(markup).toContain('data-arena="farcrysis"');
-    expect(markup).toContain('data-media-state="poster-fallback"');
-    expect(markup).toContain('PREVIEW STANDBY');
-    expect(markup).not.toContain('<source');
+  it('honestly degrades pending flyovers to standby without network requests', async () => {
+    for (const arenaId of ['farcrysis', 'high-seas'] as const) {
+      const markup = menuPreviewVideoMarkup(arenaId);
+      expect(markup).toContain(`data-arena="${arenaId}"`);
+      expect(markup).toContain('data-media-state="poster-fallback"');
+      expect(markup).toContain('PREVIEW STANDBY');
+      expect(markup).not.toContain('<source');
+    }
 
     const attributes = new Map<string, string>();
     const createMockElement = (): any => {
@@ -125,6 +128,18 @@ describe('prerecorded map-selection previews', () => {
 
     const gen = await controller.whenFirstFramePresented();
     expect(gen).toBe(snapshot.generation);
+
+    controller.select('high-seas', false);
+    const highSeasSnapshot = controller.snapshot();
+    expect(highSeasSnapshot).toMatchObject({
+      arenaId: 'high-seas',
+      mediaState: 'poster-fallback',
+      sourceCount: 0,
+      sources: { webm: '', mp4: '', poster: '' },
+    });
+    expect(label.textContent).toBe('PRERECORDED HELO // HIGH SEAS');
+    expect(motion.textContent).toContain('PENDING');
+    expect(await controller.whenFirstFramePresented()).toBe(highSeasSnapshot.generation);
 
     controller.dispose();
   });

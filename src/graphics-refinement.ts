@@ -31,6 +31,7 @@ const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.free
   'skyline-terminal': Object.freeze({ halfWidth: 49, halfHeight: 56, near: 4, far: 182 }),
   // HF-359 (Pass 74): ported from the Pass 69 hidden lane (64x64 island).
   'farcrysis': Object.freeze({ halfWidth: 44, halfHeight: 44, near: 4, far: 150 }),
+  'high-seas': Object.freeze({ halfWidth: 32, halfHeight: 58, near: 4, far: 190 }),
 });
 
 // RoomEnvironment is deliberately only a reflection/indirect-light accent.
@@ -43,6 +44,7 @@ const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freez
   'skyline-terminal': 0.22,
   // HF-359 (Pass 74): ported from the Pass 69 hidden lane.
   'farcrysis': 0.18,
+  'high-seas': 0.2,
 });
 
 export function arenaEnvironmentScale(arenaId: ArenaId): number {

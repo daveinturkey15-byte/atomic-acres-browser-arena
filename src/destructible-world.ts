@@ -1,5 +1,6 @@
 import { canonicalSha256 } from './canonical-state';
 import type { Point3 } from './collision';
+import { isArenaId, type ArenaId } from './arena-identity';
 
 export const SHED_MAX_APERTURES = 96;
 export const SHED_MAX_DENTS = 64;
@@ -27,9 +28,7 @@ export const WORLD_COLLISION_CONSUMERS = Object.freeze([
 ] as const);
 
 export type WorldCollisionConsumer = typeof WORLD_COLLISION_CONSUMERS[number];
-// HF-359 (Pass 74): 'farcrysis' revived from the Pass 69 hidden lane; it
-// carries zero authored shed placements (see PASS65_SHED_ELIGIBILITY).
-export type ShedArenaId = 'atomic-acres' | 'skyline-terminal' | 'rustworks-1v1' | 'gun-range' | 'farcrysis';
+export type ShedArenaId = ArenaId;
 export type DamageableSheetRole = 'wall' | 'roof' | 'door' | 'detached-chunk';
 export type ShedDoorBlockerKind = 'player' | 'major-debris' | 'bullet';
 
@@ -1273,7 +1272,7 @@ export function isShedState(value: unknown): value is ShedState {
   ])) return false;
   if (value.schemaVersion !== 1 || typeof value.shedId !== 'string' || !validId(value.shedId)
     || typeof value.placementId !== 'string' || !validId(value.placementId)
-    || !['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'].includes(String(value.arenaId))
+    || !isArenaId(value.arenaId)
     || !finiteInteger(Number(value.matchEpoch), 1) || !finiteInteger(Number(value.revision))
     || !finiteInteger(Number(value.nextApertureId), 1) || !finiteInteger(Number(value.nextDentId), 1)
     || !Array.isArray(value.surfaces) || !Array.isArray(value.detachedChunkIds)

@@ -32,6 +32,8 @@ export const SNIPER_HEADSHOT_DAMAGE_MULTIPLIER = 3;
 export const FALL_DAMAGE_SAFE_SPEED = 9.5;
 export const FALL_DAMAGE_LETHAL_SPEED = 22;
 export const FALL_DAMAGE_MULTIPLIER = 0.5;
+/** Shared vertical acceleration for the locally simulated player jump. */
+export const PLAYER_JUMP_GRAVITY = -24.5;
 
 export type WeaponSpec = LegacyWeaponSpec;
 export const WEAPONS = LEGACY_WEAPONS;

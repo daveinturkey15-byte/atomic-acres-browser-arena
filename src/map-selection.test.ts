@@ -1,26 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ARENA_IDS,
   ARENA_SELECTIONS,
   activeSoloBotTarget,
   arenaCanvasLabel,
   arenaSelection,
   decodeArenaId,
   hostedArenaDurationMs,
+  isArenaId,
   soloLaunchLabel,
 } from './map-selection';
 
 describe('opening arena selection', () => {
-  it('publishes five unique, fully described maps', () => {
-    // HF-359: farcrysis added as fifth arena
+  it('publishes six unique, fully described maps', () => {
     expect(ARENA_SELECTIONS.map((entry) => entry.id)).toEqual([
       'atomic-acres',
       'skyline-terminal',
       'rustworks-1v1',
       'gun-range',
       'farcrysis',
+      'high-seas',
     ]);
-    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis']);
-    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(5);
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas']);
+    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(6);
     for (const entry of ARENA_SELECTIONS) {
       expect(entry.selectorLabel.length).toBeGreaterThan(3);
       expect(entry.summary.length).toBeGreaterThan(12);
@@ -76,18 +78,31 @@ describe('opening arena selection', () => {
       rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
       matchRules: { durationMs: 300_000, scoreLimit: null },
     });
+    expect(arenaSelection('high-seas')).toMatchObject({
+      id: 'high-seas',
+      selectorLabel: 'HIGH SEAS',
+      displayName: 'High Seas',
+      multiplayer: true,
+      fieldSupport: true,
+      overdrive: false,
+      soloBotCount: 2,
+      maximumSoloBots: 2,
+      rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
+      matchRules: { durationMs: 300_000, scoreLimit: null },
+    });
   });
 
   it('binds hosted round clocks and canvas labels to the selected arena', () => {
     // HF-359: includes farcrysis round clock and canvas label
     expect(ARENA_SELECTIONS.map((selection) => hostedArenaDurationMs(selection)))
-      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000]);
+      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000, 300_000]);
     expect(ARENA_SELECTIONS.map((selection) => arenaCanvasLabel(selection))).toEqual([
       'Nuke Town multiplayer arena',
       'Terminal multiplayer arena',
       'RustRig multiplayer arena',
       'Gun Range multiplayer arena',
       'Farcrysis multiplayer arena',
+      'High Seas multiplayer arena',
     ]);
   });
 
@@ -99,6 +114,7 @@ describe('opening arena selection', () => {
       'rustworks-1v1': true,
       'gun-range': true,
       'farcrysis': false,
+      'high-seas': true,
     });
   });
 
@@ -110,6 +126,7 @@ describe('opening arena selection', () => {
     expect(activeSoloBotTarget(arenaSelection('gun-range'), 100)).toBe(0);
     expect(activeSoloBotTarget(arenaSelection('skyline-terminal'), 100)).toBe(1);
     expect(activeSoloBotTarget(arenaSelection('farcrysis'), 100)).toBe(2); // HF-359
+    expect(activeSoloBotTarget(arenaSelection('high-seas'), 100)).toBe(2);
   });
 
   it('derives the solo launch label from the canonical arena catalog', () => {
@@ -119,6 +136,7 @@ describe('opening arena selection', () => {
       '1 BOT SKIRMISH',
       '1 BOT SKIRMISH',
       'START RANGE',
+      '2 BOTS SKIRMISH',
       '2 BOTS SKIRMISH',
     ]);
   });
@@ -135,6 +153,17 @@ describe('opening arena selection', () => {
     expect(decodeArenaId('f4rcry515')).toBe('farcrysis');
     expect(decodeArenaId('farcry')).toBe('farcrysis');
     expect(decodeArenaId('f4rcry')).toBe('farcrysis');
+    expect(decodeArenaId('high-seas')).toBe('high-seas');
+  });
+
+  it('distinguishes strict current IDs from compatibility routes and aliases', () => {
+    expect(ARENA_SELECTIONS.map(({ id }) => id)).toEqual(ARENA_IDS);
+    for (const selection of ARENA_SELECTIONS) expect(isArenaId(selection.id)).toBe(true);
+    expect(isArenaId('nuke-town')).toBe(false);
+    expect(isArenaId('rustrig')).toBe(false);
+    expect(isArenaId('f4rcry515')).toBe(false);
+    expect(isArenaId('HIGH-SEAS')).toBe(false);
+    expect(isArenaId(null)).toBe(false);
   });
 
   it('falls back safely to Nuke Town', () => {
