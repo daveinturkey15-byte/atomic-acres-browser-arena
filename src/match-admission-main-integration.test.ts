@@ -168,4 +168,41 @@ describe('legacy match admission integration', () => {
     expect(handlers.match(/network\.role !== 'offline' \|\| network\.pendingConnectionAttempt\(\)/g)).toHaveLength(2);
     expect(handlers.match(/syncArenaSelectionUi\(\);/g)?.length).toBeGreaterThanOrEqual(4);
   });
+
+  it('HF-322: clears guest authority wedges for waiting lobbies, bounds repairs, and retries reconnect handshake', () => {
+    // W1: restoreRoomIdentity only treats as mid-match resume if lobby phase warrants it
+    const restore = slice('function restoreRoomIdentity(', 'function persistRoomIdentityForCloseTabRejoin(');
+    expect(restore).toContain("const isMidMatch = gameStarted || privateLobbySnapshot?.phase === 'active' || privateLobbySnapshot?.phase === 'countdown';");
+    expect(restore).toContain('awaitingAuthoritativeRejoinContinuity = isMidMatch;');
+    expect(restore).toContain('awaitingCanonicalGuestAuthority = isMidMatch;');
+
+    // W1: sendLobbyJoin only arms when active/countdown
+    const join = slice('function sendLobbyJoin()', 'function sendClientWorldRepairReady(');
+    expect(join).toContain('awaitingCanonicalGuestAuthority = false;');
+    expect(join).toContain('awaitingAuthoritativeRejoinContinuity = false;');
+
+    // W1: acceptLobbyState clears awaitingCanonicalGuestAuthority on waiting snapshot
+    const accept = slice('function acceptLobbyState(', 'function authorizeRedeploy(');
+    expect(accept).toContain("if (message.snapshot.phase === 'waiting') {");
+    expect(accept).toContain('awaitingCanonicalGuestAuthority = false;');
+    expect(accept).toContain('awaitingAuthoritativeRejoinContinuity = false;');
+    expect(accept).toContain('pendingClientReconnectWorldRepairConnectionEpoch = null;');
+
+    // W2: killstreak-state re-arms pendingClientReconnectWorldRepairConnectionEpoch on receiver-ready proof within attempt cap
+    const state = slice("if (message.type === 'killstreak-state') {", "if (message.type === 'killstreak-carpet-fire-state')");
+    expect(state).toContain('clientReconnectWorldRepairAttempts < MAX_CLIENT_WORLD_REPAIR_ATTEMPTS');
+    expect(state).toContain('pendingClientReconnectWorldRepairConnectionEpoch = localConnectionEpoch;');
+
+    // W3 & 4: pendingClientWorldRepair strictly gates client gameplay until host acknowledgement
+    const pendingRepair = slice('function pendingClientWorldRepair(): boolean {', 'function textChatAvailable(): boolean {');
+    expect(pendingRepair).toContain("return network.role === 'client' && clientWorldRepairPending(clientWorldRepairAdmission);");
+
+    // W3 & 4: exhausted repair and resume timeouts surface user-visible error state with setStatus and addFeed
+    const failureHandlers = slice('function handleClientWorldRepairFailure(', 'function clearGuestResumeTimeout(): void {');
+    expect(failureHandlers).toContain("clientWorldRepairAdmission = null;");
+    expect(failureHandlers).toContain("setStatus(`Match admission unacknowledged by host (${reason}). Rejoin to retry.`, 'error');");
+    expect(failureHandlers).toContain("addFeed('MATCH ADMISSION FAILED · RETRY FROM LOBBY');");
+    expect(failureHandlers).toContain("setStatus('Match resume authority timed out. Rejoin to retry.', 'error');");
+    expect(failureHandlers).toContain("addFeed('REJOIN AUTHORITY TIMEOUT · RETRY FROM LOBBY');");
+  });
 });

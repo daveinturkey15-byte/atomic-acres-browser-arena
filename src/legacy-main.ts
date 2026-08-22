@@ -223,6 +223,7 @@ import {
   clientWorldRepairCanAttempt,
   clientWorldRepairPending,
   clientWorldRepairReceiverReady,
+  MAX_CLIENT_WORLD_REPAIR_ATTEMPTS,
   recordClientWorldRepairAttempt,
   type ClientWorldRepairAdmission,
 } from './client-world-repair-admission';
@@ -5145,6 +5146,8 @@ let localDhv: Dhv = 10;
 let localResumeToken = '';
 let clientWorldRepairAdmission: ClientWorldRepairAdmission | null = null;
 let pendingClientReconnectWorldRepairConnectionEpoch: string | null = null;
+let clientReconnectWorldRepairAttempts = 0; // HF-322: bounded reconnect repair attempts
+let pendingClientWorldRepairTimeout: number | null = null; // HF-322: bounded admission/repair timeout
 let lobbyArenaSyncPromise: Promise<void> = Promise.resolve();
 let lobbyClockTimer: ReturnType<typeof setTimeout> | null = null;
 let stateBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -6210,6 +6213,8 @@ function setNetworkStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): v
     if (network.role !== 'client' || !network.diagnostics().hostConnectionOpen) {
       clientWorldRepairAdmission = null;
       pendingClientReconnectWorldRepairConnectionEpoch = null;
+      clientReconnectWorldRepairAttempts = 0;
+      clearClientWorldRepairTimeout();
     }
     const admissionToken = matchAdmissionCoordinator.token();
     if (admissionToken) {
@@ -6467,8 +6472,10 @@ function restoreRoomIdentity(roomCode: string): void {
     player.id = restored.playerId;
     localResumeToken = restored.token;
     localHostConfirmedContinuity = restored.authoritativeLifeId ?? null;
-    awaitingAuthoritativeRejoinContinuity = true;
-    awaitingCanonicalGuestAuthority = true;
+    // HF-322: Only treat a restored identity as a mid-match resume when the lobby phase actually warrants it
+    const isMidMatch = gameStarted || privateLobbySnapshot?.phase === 'active' || privateLobbySnapshot?.phase === 'countdown';
+    awaitingAuthoritativeRejoinContinuity = isMidMatch;
+    awaitingCanonicalGuestAuthority = isMidMatch;
     pendingGuestResumeAuthority = null;
     try { saveActiveRoomIdentity(roomCode); } catch { /* The in-memory credential remains valid. */ }
     return;
@@ -6477,6 +6484,8 @@ function restoreRoomIdentity(roomCode: string): void {
   awaitingAuthoritativeRejoinContinuity = false;
   awaitingCanonicalGuestAuthority = false;
   pendingGuestResumeAuthority = null;
+  clientReconnectWorldRepairAttempts = 0;
+  clearClientWorldRepairTimeout();
   clearGuestResumeTimeout();
   lastGuestResumeNackNonce = null;
   lastAppliedGuestResumeAuthority = null;
@@ -6525,6 +6534,8 @@ function resetPrivateLobbyState(): void {
   localResumeToken = '';
   clientWorldRepairAdmission = null;
   pendingClientReconnectWorldRepairConnectionEpoch = null;
+  clientReconnectWorldRepairAttempts = 0;
+  clearClientWorldRepairTimeout();
   hostKillstreakLoadoutAcks.clear();
   localHostConfirmedContinuity = null;
   awaitingAuthoritativeRejoinContinuity = false;
@@ -7475,9 +7486,16 @@ function sendLobbyJoin(): void {
   if (network.role !== 'client') return;
   clientWorldRepairAdmission = null;
   pendingClientReconnectWorldRepairConnectionEpoch = null;
+  clientReconnectWorldRepairAttempts = 0;
+  clearClientWorldRepairTimeout();
   if (!localResumeToken) restoreRoomIdentity(network.roomCode);
   if (gameStarted || privateLobbySnapshot?.phase === 'active' || privateLobbySnapshot?.phase === 'countdown') {
     awaitingCanonicalGuestAuthority = true;
+    pendingGuestResumeAuthority = null;
+  } else {
+    // HF-322: Joining a waiting lobby clears any armed mid-match guest authority
+    awaitingCanonicalGuestAuthority = false;
+    awaitingAuthoritativeRejoinContinuity = false;
     pendingGuestResumeAuthority = null;
   }
   localConnectionEpoch = randomLobbyCredential();
@@ -7522,6 +7540,7 @@ function sendClientWorldRepairReady(loadout = killstreakLoadoutController.active
   };
   network.send(loadoutMessage);
   if (admission) clientWorldRepairAdmission = recordClientWorldRepairAttempt(admission);
+  if (reconnectRepair) clientReconnectWorldRepairAttempts += 1;
   if (reconnectRepair) pendingClientReconnectWorldRepairConnectionEpoch = null;
 }
 
@@ -7751,6 +7770,57 @@ function acceptGuestResumeNack(message: GuestResumeNackMessage): boolean {
   return true;
 }
 
+// HF-322: Bounded timeout and failure handlers for client world repair and resume authority
+function clearClientWorldRepairTimeout(): void {
+  if (pendingClientWorldRepairTimeout !== null) window.clearTimeout(pendingClientWorldRepairTimeout);
+  pendingClientWorldRepairTimeout = null;
+}
+
+function handleClientWorldRepairFailure(reason = 'admission-unacknowledged'): void {
+  if (network.role !== 'client') return;
+  clearClientWorldRepairTimeout();
+  clientWorldRepairAdmission = null;
+  pendingClientReconnectWorldRepairConnectionEpoch = null;
+  clientReconnectWorldRepairAttempts = 0;
+  player.hp = 0;
+  player.alive = false;
+  clearGameplayInput();
+  weaponView.setPresentationVisible(false);
+  setStatus(`Match admission unacknowledged by host (${reason}). Rejoin to retry.`, 'error');
+  addFeed('MATCH ADMISSION FAILED · RETRY FROM LOBBY');
+}
+
+function handleGuestResumeTimeout(): void {
+  if (network.role !== 'client' || !awaitingCanonicalGuestAuthority) return;
+  clearGuestResumeTimeout();
+  clearClientWorldRepairTimeout();
+  clientWorldRepairAdmission = null;
+  pendingGuestResumeAuthority = null;
+  awaitingCanonicalGuestAuthority = false;
+  awaitingAuthoritativeRejoinContinuity = false;
+  pendingClientReconnectWorldRepairConnectionEpoch = null;
+  clientReconnectWorldRepairAttempts = 0;
+  player.hp = 0;
+  player.alive = false;
+  clearGameplayInput();
+  weaponView.setPresentationVisible(false);
+  setStatus('Match resume authority timed out. Rejoin to retry.', 'error');
+  addFeed('REJOIN AUTHORITY TIMEOUT · RETRY FROM LOBBY');
+}
+
+function scheduleClientWorldRepairTimeout(epoch: string, matchEpoch: number): void {
+  clearClientWorldRepairTimeout();
+  pendingClientWorldRepairTimeout = window.setTimeout(() => {
+    pendingClientWorldRepairTimeout = null;
+    if (network.role !== 'client' || !gameStarted || matchEpoch !== killstreakMatchEpoch || epoch !== localConnectionEpoch) return;
+    if (clientWorldRepairAdmission && !clientWorldRepairAdmission.acknowledged) {
+      handleClientWorldRepairFailure('admission-timeout');
+    } else if (awaitingCanonicalGuestAuthority) {
+      handleGuestResumeTimeout();
+    }
+  }, 5_000);
+}
+
 function clearGuestResumeTimeout(): void {
   if (pendingGuestResumeTimeout !== null) window.clearTimeout(pendingGuestResumeTimeout);
   pendingGuestResumeTimeout = null;
@@ -7789,6 +7859,7 @@ function acceptGuestResumeFailure(message: GuestResumeFailureMessage): boolean {
     || message.matchEpoch !== pending.matchEpoch || message.worldRevision !== pending.worldRevision
     || message.authorityNonce !== pending.nonce || message.attempt !== pending.attempt) return true;
   clearGuestResumeTimeout();
+  clearClientWorldRepairTimeout();
   pendingGuestResumeAuthority = null;
   awaitingCanonicalGuestAuthority = false;
   awaitingAuthoritativeRejoinContinuity = false;
@@ -7899,6 +7970,7 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   });
   processedNonces.add(message.nonce);
   clearGuestResumeTimeout();
+  clearClientWorldRepairTimeout();
   pendingGuestResumeAuthority = null;
   lastGuestResumeNackNonce = null;
   awaitingCanonicalGuestAuthority = false;
@@ -8602,6 +8674,15 @@ function acceptLobbyState(message: LobbyStateMessage): void {
     && previousSnapshot?.phase !== 'waiting';
   const endingFromHost = message.snapshot.phase === 'ended' && gameStarted && matchState.phase !== 'ended';
   privateLobbySnapshot = message.snapshot;
+  if (message.snapshot.phase === 'waiting') {
+    // HF-322: A join into a WAITING lobby must clear awaitingCanonicalGuestAuthority rather than leaving it armed
+    awaitingCanonicalGuestAuthority = false;
+    awaitingAuthoritativeRejoinContinuity = false;
+    pendingGuestResumeAuthority = null;
+    pendingClientReconnectWorldRepairConnectionEpoch = null;
+    clientReconnectWorldRepairAttempts = 0;
+    clearClientWorldRepairTimeout();
+  }
   privateMatchConfig = message.snapshot.config;
   privateMatchMode = message.snapshot.config.mode;
   privateMatchActiveAtHostTimeMs = message.snapshot.activeAtHostTimeMs;
@@ -10048,6 +10129,7 @@ function onNetworkMessage(message: GameMessage): void {
         actorId: actor.actorId,
         lifeId: actor.lifeId,
       });
+      if (exactActorAcknowledged) clearClientWorldRepairTimeout();
       // Only a recipient-specific snapshot admitted from the authenticated host
       // can confirm a replacement document's life identity. Persist it for a
       // later renderer replacement, and correct any forged/stale local copy
@@ -10079,16 +10161,26 @@ function onNetworkMessage(message: GameMessage): void {
       if (actor.streak > (previousActor?.streak ?? actor.streak)) recordImmediateStreak();
       updateFieldSupportHud();
     }
+    const reconnectCanAttempt = awaitingCanonicalGuestAuthority
+      && clientReconnectWorldRepairAttempts < MAX_CLIENT_WORLD_REPAIR_ATTEMPTS
+      && message.snapshot.matchEpoch === killstreakMatchEpoch;
     if (clientWorldRepairReceiverReady(clientWorldRepairAdmission, {
       connectionEpoch: localConnectionEpoch,
       matchEpoch: message.snapshot.matchEpoch,
       exactActorAcknowledged,
-    }) || awaitingCanonicalGuestAuthority
-      && pendingClientReconnectWorldRepairConnectionEpoch === localConnectionEpoch) {
-      // This authenticated recipient snapshot can only be authored by a live
-      // host runtime for the current match epoch. If our exact actor/life is
-      // absent, it is the bounded receiver-ready proof for one repair resend.
+    }) || reconnectCanAttempt) {
+      // HF-322: re-arm reconnect repair epoch on receiver-ready proof so lost reply can retry within attempt cap
+      if (reconnectCanAttempt && !pendingClientReconnectWorldRepairConnectionEpoch) {
+        pendingClientReconnectWorldRepairConnectionEpoch = localConnectionEpoch;
+      }
       sendClientWorldRepairReady();
+    } else if (clientWorldRepairAdmission && !clientWorldRepairAdmission.acknowledged
+      && clientWorldRepairAdmission.attempts >= MAX_CLIENT_WORLD_REPAIR_ATTEMPTS) {
+      // HF-322: surface clear user-visible failure when attempt cap exhausted
+      handleClientWorldRepairFailure('attempts-exhausted');
+    } else if (awaitingCanonicalGuestAuthority && clientReconnectWorldRepairAttempts >= MAX_CLIENT_WORLD_REPAIR_ATTEMPTS) {
+      // HF-322: surface clear user-visible failure when reconnect resume attempts exhausted
+      handleGuestResumeTimeout();
     }
     return;
   }
@@ -14303,6 +14395,10 @@ async function startGame(
     : null;
   resetFlashVictimLife();
   resetStickyVictimUrgentAlertLife(localContinuity);
+  if (mode === 'client') {
+    // HF-322: Bound the client admission and repair handshake with a timeout
+    scheduleClientWorldRepairTimeout(localConnectionEpoch, killstreakMatchEpoch);
+  }
   if (mode !== 'client') {
     if (hostRecovery?.killstreak) {
       if (!killstreakRuntime.restoreCheckpoint(
@@ -24435,6 +24531,16 @@ textChatInput.addEventListener('keydown', (event) => {
 });
 textChatInput.addEventListener('input', markTextChatActivity);
 textChatInput.addEventListener('keyup', (event) => event.stopPropagation());
+// HF-324: Clicking or tapping anywhere on the chat panel opens chat and focuses its input.
+const handleTextChatPanelOpenAffordance = (event: Event): void => {
+  if (!textChatAvailable()) return;
+  const target = event.target instanceof Element ? event.target : null;
+  if (target?.closest('button[type="submit"]')) return;
+  if (!textChatOpen) openTextChat();
+  else textChatInput.focus({ preventScroll: true });
+};
+textChatRoot.addEventListener('pointerdown', handleTextChatPanelOpenAffordance);
+textChatRoot.addEventListener('click', handleTextChatPanelOpenAffordance);
 window.addEventListener('keydown', (event) => {
   if (isTextChatTyping()) {
     if (event.target === textChatInput) return;
@@ -24445,8 +24551,12 @@ window.addEventListener('keydown', (event) => {
     return;
   }
   if (event.key !== 'Enter' || event.repeat || !textChatAvailable()) return;
+  // HF-324: Stop non-submit buttons (e.g. lobby buttons) from swallowing Enter,
+  // allowing Enter to open chat while preserving editable fields and form submit buttons.
   const target = event.target instanceof Element ? event.target : null;
-  if (target?.closest('input, textarea, select, button, [contenteditable="true"]')) return;
+  const button = target?.closest('button');
+  const isSubmitButton = button instanceof HTMLButtonElement && button.type === 'submit' && button.form !== null;
+  if (target?.closest('input, textarea, select, [contenteditable="true"]') || isSubmitButton) return;
   event.preventDefault();
   event.stopImmediatePropagation();
   openTextChat();
@@ -24485,8 +24595,10 @@ window.addEventListener('keydown', (event) => {
     openActiveMatchPause('escape');
     return;
   }
-  if (gameplayInputEnabled()) keys.add(event.code);
-  else if (event.code !== 'Tab') return;
+  // HF-324: Scope gameplay key handling (including Tab/scoreboard capture) to active gameplay only,
+  // so Tab is not swallowed in the lobby or menus.
+  if (!gameplayInputEnabled()) return;
+  keys.add(event.code);
   const keyProfile = activeKeyBindingProfile();
   const supportPossession = localKillstreakActorSnapshot()?.possession ?? null;
   if (!supportPossession) {
@@ -25359,7 +25471,8 @@ element<HTMLButtonElement>('#solo').addEventListener('click', () => {
   void startGame('solo');
 });
 refreshHostMatchRecoveryAffordance();
-element<HTMLButtonElement>('#host').addEventListener('click', () => {
+element<HTMLButtonElement>('#host').addEventListener('click', (event) => {
+  (event.currentTarget as HTMLElement)?.blur(); // HF-324: blur button after click
   if (network.role !== 'offline' || network.pendingConnectionAttempt()) {
     syncArenaSelectionUi();
     return;
@@ -25377,7 +25490,8 @@ element<HTMLButtonElement>('#host').addEventListener('click', () => {
   network.host(initializeHostLobby, preferredRoomCode, recovery !== null);
   syncArenaSelectionUi();
 });
-element<HTMLButtonElement>('#join').addEventListener('click', () => {
+element<HTMLButtonElement>('#join').addEventListener('click', (event) => {
+  (event.currentTarget as HTMLElement)?.blur(); // HF-324: blur button after click
   if (network.role !== 'offline' || network.pendingConnectionAttempt()) {
     syncArenaSelectionUi();
     return;
@@ -25393,7 +25507,8 @@ element<HTMLButtonElement>('#join').addEventListener('click', () => {
   network.join(code, sendLobbyJoin);
   syncArenaSelectionUi();
 });
-element<HTMLButtonElement>('#copy-room').addEventListener('click', async () => {
+element<HTMLButtonElement>('#copy-room').addEventListener('click', async (event) => {
+  (event.currentTarget as HTMLElement)?.blur(); // HF-324: blur button after click
   const roomCode = network.roomCode.trim();
   if (!roomCode) {
     setStatus('Room code is not ready yet', 'warn');
@@ -25411,7 +25526,8 @@ element<HTMLButtonElement>('#copy-room').addEventListener('click', async () => {
   }
   setStatus('Lobby code copied', 'ok');
 });
-element<HTMLButtonElement>('#lobby-ready').addEventListener('click', () => {
+element<HTMLButtonElement>('#lobby-ready').addEventListener('click', (event) => {
+  (event.currentTarget as HTMLElement)?.blur(); // HF-324: blur button after click
   if (!privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting') return;
   const ready = !localLobbyReady;
   if (network.role === 'host') updateHostReady({ type: 'lobby-ready', by: player.id, ready, nonce: randomNonce() });
@@ -25427,8 +25543,14 @@ element<HTMLElement>('#lobby-roster').addEventListener('change', (event) => {
   if (network.role === 'host') updateHostHandicap(message);
   else if (network.role === 'client') network.send(message);
 });
-element<HTMLButtonElement>('#lobby-start').addEventListener('click', hostStartPrivateMatch);
-element<HTMLButtonElement>('#lobby-leave').addEventListener('click', returnToMainMenu);
+element<HTMLButtonElement>('#lobby-start').addEventListener('click', (event) => {
+  (event.currentTarget as HTMLElement)?.blur(); // HF-324: blur button after click
+  hostStartPrivateMatch();
+});
+element<HTMLButtonElement>('#lobby-leave').addEventListener('click', (event) => {
+  (event.currentTarget as HTMLElement)?.blur(); // HF-324: blur button after click
+  returnToMainMenu();
+});
 const commitLocalSquadPresentation = (): void => {
   if (network.role !== 'host' && network.role !== 'client') return;
   const member = privateLobbySnapshot?.members.find((entry) => entry.id === player.id)

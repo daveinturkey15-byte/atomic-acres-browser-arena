@@ -12,7 +12,7 @@ describe('text chat UI contract', () => {
     expect(shellSource).toContain('id="text-chat-input"');
     expect(shellSource).toContain('maxlength="${CHAT_TEXT_MAX_CHARS}"');
     expect(shellSource).toContain('data-visible="false"');
-    expect(styleSource).not.toContain('#text-chat[data-context=lobby]');
+    expect(styleSource).toContain('#text-chat[data-context=lobby]');
     expect(styleSource).toContain('left:24px;right:auto;bottom:150px;transform:none');
     expect(styleSource).toContain('#text-chat[data-visible=false][data-open=false]{opacity:0;pointer-events:none}');
     expect(styleSource).toContain('#text-chat[data-open=true] #text-chat-log');
@@ -31,5 +31,12 @@ describe('text chat UI contract', () => {
     expect(mainSource).toContain('sender.textContent = entry.senderName;');
     expect(mainSource).toContain('message.textContent = entry.text;');
     expect(mainSource).not.toContain('textChatLog.innerHTML');
+  });
+
+  it('HF-324: provides lobby and click affordances for text chat', () => {
+    expect(styleSource).toContain('#text-chat[data-context=lobby] #text-chat-form{display:grid}');
+    expect(mainSource).toContain("textChatRoot.addEventListener('pointerdown'");
+    expect(mainSource).toContain("textChatRoot.addEventListener('click'");
+    expect(mainSource).toContain("// HF-324: Scope gameplay key handling (including Tab/scoreboard capture) to active gameplay only");
   });
 });

@@ -296,4 +296,11 @@ describe('same-browser hosted active-match recovery integration', () => {
     expect(admission).toContain("message.weaponGeneration !== timedMapWeaponStates['flare-gun'].generation");
     expect(admission).toContain('flareProjectileSystem.reconcilePresentationState(');
   });
+
+  it('HF-322: bounds guest resume authority handshake and allows retry within attempt cap', () => {
+    const mainText = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    expect(mainText).toContain('clientReconnectWorldRepairAttempts < MAX_CLIENT_WORLD_REPAIR_ATTEMPTS');
+    expect(mainText).toContain('pendingClientReconnectWorldRepairConnectionEpoch = localConnectionEpoch;');
+    expect(mainText).toContain('handleGuestResumeTimeout();');
+  });
 });
