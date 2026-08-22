@@ -253,6 +253,10 @@ export const RUNTIME_AUDIO_NON_EVENT_METHODS = Object.freeze([
   // sound of its own, so it is a lifecycle call like the rest of this list rather
   // than a semantic sound event.
   'recoverAmbienceDuck',
+  // Background chiptune lifecycle. The music is a continuous bed on the
+  // game-music bus, not a semantic sound event fired by a gameplay outcome,
+  // so like recoverAmbienceDuck these are lifecycle calls rather than emitters.
+  'startGameMusic', 'stopGameMusic',
   'resume', 'suspend', 'telemetry', 'unlock', 'updateListener',
 ] as const);
 

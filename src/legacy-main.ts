@@ -6325,6 +6325,9 @@ function showFatalError(error: unknown): void {
   setBootstrapStage('failed');
   bootstrapError = message;
   gameStarted = false;
+  // Silence the music with the match. A failed bootstrap leaves the player on an
+  // error screen, and a cheerful loop under a failure message reads as a bug.
+  audio.stopGameMusic();
   clearGameplayInput();
   setLocalTriggerHeld(false);
   setStatus(`Game paused: ${message}`, 'error');
@@ -14916,6 +14919,10 @@ async function startGame(
   resetWebGpuPresentationEpoch('match admitted', lastFrame);
   assertMatchAdmissionCurrent(token);
   gameStarted = true;
+  // Background chiptune rides the game-music bus, which already carries the
+  // player's music volume and mute from Options. Starting it here rather than at
+  // boot means it begins with the match, not under the menu.
+  audio.startGameMusic();
   setBootstrapStage('ready');
   if (mode === 'host' && matchState.phase === 'active' && privateLobbySnapshot?.phase !== 'active') {
     // A cold admission can finish after the shared active timestamp, creating

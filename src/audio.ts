@@ -7,6 +7,11 @@ import { WEAPON_CATALOG } from './combat/weapon-catalog';
 import type { ArenaId } from './map-selection';
 import type { LowHealthFeedbackPresentation } from './sensory-feedback';
 import { AUDIO_BUS_IDS, type AudioBusId, type AudioSettings } from './pass65-settings';
+import {
+  CHIPTUNE_LOOP_SECONDS,
+  chiptuneLoopEvents,
+  type ChiptuneEvent,
+} from './chiptune-music';
 import { ARENA_AUDIO_DEFINITIONS, AUDIO_RUNTIME_BUDGET, selectVoiceToSteal, type FootstepMovement, type FootstepSurface as SpatialFootstepSurface, type SpatialPoint } from './spatial-audio';
 import { EXPLOSIVE_BOLT_ARM_DELAY_MS } from './combat/ordnance';
 import type { MinigunSpoolPhase } from './minigun-spool';
@@ -412,7 +417,24 @@ export class ArenaAudio {
   private ui: GainNode | null = null;
   private announcements: GainNode | null = null;
   private ambience: GainNode | null = null;
+  /**
+   * How far ahead the chiptune commits notes to the audio clock, in seconds.
+   * Comfortably longer than a dropped frame or a GC pause, short enough that a
+   * stop takes effect promptly.
+   */
+  private static readonly MUSIC_LOOKAHEAD_SECONDS = 0.75;
+
   private readonly buses = new Map<AudioBusId, GainNode>();
+  // Background chiptune. Exactly TWO long-lived oscillators for the whole track,
+  // one per channel, matching AUDIO_RUNTIME_BUDGET.perBus['game-music'] = 2 by
+  // construction. They are deliberately NOT put through registerVoice(): that path
+  // is built for one-shot sources it may steal, and a stolen oscillator would kill
+  // the music permanently rather than drop a single note. The cap is respected
+  // because two is all that can ever exist, which chiptune-music.test.ts proves.
+  private musicChannels: Readonly<Record<'lead' | 'bass', { osc: OscillatorNode; gain: GainNode }>> | null = null;
+  private musicLoopStartedAtSeconds = 0;
+  private musicScheduledUntilSeconds = 0;
+  private musicRunning = false;
   private readonly busIdentity = new Map<AudioNode, AudioBusId>();
   private audioSettings: AudioSettings | null = null;
   private noiseBuffer: AudioBuffer | null = null;
@@ -687,12 +709,124 @@ export class ArenaAudio {
     this.startArenaBed(arenaId);
   }
 
+  /**
+   * Starts the background chiptune on the `game-music` bus.
+   *
+   * Safe to call repeatedly; a second call while running is a no-op rather than a
+   * second track. Silently does nothing when audio is unavailable, which keeps
+   * gameplay admission error-free on a device that refused an AudioContext.
+   */
+  startGameMusic(): void {
+    if (this.musicRunning || !this.context) return;
+    const bus = this.buses.get('game-music');
+    if (!bus) return;
+    try {
+      const build = (wave: OscillatorType): { osc: OscillatorNode; gain: GainNode } => {
+        const gain = this.context!.createGain();
+        gain.gain.value = 0;
+        gain.connect(bus);
+        const osc = this.context!.createOscillator();
+        osc.type = wave;
+        // A real starting frequency matters: an oscillator left at its 440 Hz
+        // default would sound the instant its gain envelope first opens, before
+        // the first scheduled note sets a pitch.
+        osc.frequency.value = 220;
+        osc.connect(gain);
+        osc.start();
+        return { osc, gain };
+      };
+      // Square lead over a square bass, the two-channel palette this loop was
+      // written for. The bass sits two octaves down so they never mask each other.
+      this.musicChannels = Object.freeze({ lead: build('square'), bass: build('square') });
+      this.musicRunning = true;
+      this.musicLoopStartedAtSeconds = this.context.currentTime + 0.12;
+      this.musicScheduledUntilSeconds = this.musicLoopStartedAtSeconds;
+      this.pumpGameMusic();
+    } catch {
+      // A device policy can still reject nodes after the context exists.
+      this.stopGameMusic();
+    }
+  }
+
+  /** Stops the chiptune and releases both oscillators. */
+  stopGameMusic(): void {
+    const channels = this.musicChannels;
+    this.musicChannels = null;
+    this.musicRunning = false;
+    this.musicScheduledUntilSeconds = 0;
+    if (!channels) return;
+    for (const channel of [channels.lead, channels.bass]) {
+      try { channel.osc.stop(); } catch { /* may not have started */ }
+      try { channel.osc.disconnect(); } catch { /* partial browser node */ }
+      try { channel.gain.disconnect(); } catch { /* partial browser node */ }
+    }
+  }
+
+  /** True while the background chiptune is scheduling. */
+  get gameMusicRunning(): boolean {
+    return this.musicRunning;
+  }
+
+  /**
+   * Schedules the next window of chiptune notes. Called every frame.
+   *
+   * Look-ahead scheduling rather than a per-note timer: Web Audio's clock is
+   * sample-accurate but JavaScript timers are not, so notes are committed to the
+   * audio clock ahead of time and the frame loop only tops the window up. A frame
+   * hitch therefore cannot make the music stutter, which matters because a hitch
+   * during a firefight is exactly when it would be most audible.
+   */
+  private pumpGameMusic(): void {
+    const channels = this.musicChannels;
+    if (!this.musicRunning || !this.context || !channels) return;
+    const horizon = this.context.currentTime + ArenaAudio.MUSIC_LOOKAHEAD_SECONDS;
+    // Bound the work per frame. Without this a long tab-suspend would return and
+    // try to schedule every note it "missed" in one go.
+    let guard = 0;
+    while (this.musicScheduledUntilSeconds < horizon && guard < 512) {
+      guard += 1;
+      const iteration = Math.floor(
+        (this.musicScheduledUntilSeconds - this.musicLoopStartedAtSeconds) / CHIPTUNE_LOOP_SECONDS);
+      const loopStart = this.musicLoopStartedAtSeconds + iteration * CHIPTUNE_LOOP_SECONDS;
+      for (const event of chiptuneLoopEvents()) {
+        const at = loopStart + event.offsetSeconds;
+        if (at < this.musicScheduledUntilSeconds - 1e-6 || at >= horizon) continue;
+        this.scheduleChiptuneNote(channels[event.channel], event, at);
+      }
+      this.musicScheduledUntilSeconds = loopStart + CHIPTUNE_LOOP_SECONDS;
+    }
+  }
+
+  /** Commits one note to a channel's oscillator: pitch, then a short envelope. */
+  private scheduleChiptuneNote(
+    channel: { osc: OscillatorNode; gain: GainNode },
+    event: ChiptuneEvent,
+    atSeconds: number,
+  ): void {
+    const attack = 0.006;
+    const release = Math.max(0.02, event.durationSeconds * 0.35);
+    const peak = atSeconds + attack;
+    const end = atSeconds + event.durationSeconds;
+    try {
+      channel.osc.frequency.setValueAtTime(event.frequencyHz, atSeconds);
+      channel.gain.gain.setValueAtTime(0, atSeconds);
+      channel.gain.gain.linearRampToValueAtTime(event.gain, peak);
+      // Ramp to a small floor rather than 0: exponential ramps reject zero, and a
+      // hard cut to silence on a square wave clicks audibly.
+      channel.gain.gain.setValueAtTime(event.gain, Math.max(peak, end - release));
+      channel.gain.gain.linearRampToValueAtTime(0.0001, end);
+    } catch {
+      // A browser can reject a param schedule if the time has already passed.
+    }
+  }
+
   updateListener(position: SpatialPoint, yawRadians: number): void {
     if (!this.context || ![position.x, position.y, position.z, yawRadians].every(Number.isFinite)) return;
     this.listenerPosition.x = position.x;
     this.listenerPosition.y = position.y;
     this.listenerPosition.z = position.z;
     this.listenerPoseMode = updateBrowserAudioListenerPose(this.context.listener, position, yawRadians);
+    this.pumpGameMusic();
   }
 
   worldFootstep(position: SpatialPoint, surface: SpatialFootstepSurface, movement: FootstepMovement, occluded = false): boolean {
