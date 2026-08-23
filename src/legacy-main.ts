@@ -757,7 +757,7 @@ import {
   type AuthoritativeRemoteDamageResult,
   type RemoteHealthAuthorityState,
 } from './remote-health-authority';
-import { isKillstreakEligible, killAttributionId, killCauseFromHit, killCauseFromKillstreak, MAP_CARPET_BOMBER_KILLER_ID, type KillCause } from './kill-provenance';
+import { isKillstreakEligible, killAttributionId, killCauseFromHit, killCauseFromKillstreak, killstreakEliminationSource, MAP_CARPET_BOMBER_KILLER_ID, type EliminationSource, type KillCause } from './kill-provenance';
 import {
   MAP_CARPET_BOMBER_LABEL,
   commitAuthoritativeDeathOutcome,
@@ -14642,7 +14642,7 @@ function processDeath(message: DeathMessage): void {
   }
   if (message.victim === player.id) scheduleLocalRespawn();
   if (message.killer !== message.victim && isKillstreakEligible(message.cause)) {
-    if (network.role === 'host' && message.killer !== player.id) killstreakRuntime.recordEligibleElimination(message.killer, 'weapon');
+    if (network.role === 'host' && message.killer !== player.id) killstreakRuntime.recordEligibleElimination(message.killer, killstreakEliminationSource(message.cause));
   }
   const victimAuthority = remoteSupportAuthorities.get(message.victim);
   if (victimAuthority) remoteSupportAuthorities.set(message.victim, recordRemoteSupportDeath(victimAuthority));
@@ -14673,7 +14673,7 @@ function processDeath(message: DeathMessage): void {
   }
   if (message.killer === player.id && message.victim !== player.id) {
     if (gameMode === 'solo') player.kills += 1;
-    if (isKillstreakEligible(message.cause)) awardSupportElimination();
+    if (isKillstreakEligible(message.cause)) awardSupportElimination(true, killstreakEliminationSource(message.cause));
     audio.kill();
   } else if (message.victim === player.id && message.killer !== player.id) {
     const remoteKiller = remotes.get(message.killer);
@@ -18513,7 +18513,7 @@ function applyBotDamage(
   const afterDeathPose = performance.now();
   if (gameMode === 'solo' && attackerId === player.id) {
     player.kills += 1;
-    if (isKillstreakEligible(cause)) awardSupportElimination();
+    if (isKillstreakEligible(cause)) awardSupportElimination(true, killstreakEliminationSource(cause));
     audio.kill();
     addFeed(`${player.name} eliminated ${bot.name}${zone === 'head' ? ' · HEADSHOT' : ''} · ${Math.round(damage)} DMG`, 'gold');
   }
@@ -22695,10 +22695,10 @@ function updateOverdrive(now: number): void {
   document.documentElement.dataset.overdrive = localRemaining > 0 ? 'active' : overdriveState.available ? 'available' : 'charging';
 }
 
-function awardSupportElimination(syncGlobalLeaderboard = true): void {
+function awardSupportElimination(syncGlobalLeaderboard = true, source: EliminationSource = 'weapon'): void {
   let newlyEarned: readonly Pass65KillstreakId[] = [];
   if (network.role !== 'client') {
-    newlyEarned = killstreakRuntime.recordEligibleElimination(player.id, 'weapon');
+    newlyEarned = killstreakRuntime.recordEligibleElimination(player.id, source);
     refreshLocalKillstreakSnapshot();
     broadcastKillstreakState();
   }

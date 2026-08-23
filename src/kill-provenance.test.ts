@@ -4,16 +4,23 @@ import {
   killAttributionId,
   killCauseFromHit,
   killCauseFromKillstreak,
+  killstreakEliminationSource,
   MAP_CARPET_BOMBER_KILLER_ID,
 } from './kill-provenance';
 
 describe('kill provenance', () => {
-  it('allows only gun kills to progress killstreak rewards', () => {
+  it('advances gun and lethal-ordnance kills toward killstreak rewards (HF-379)', () => {
     expect(isKillstreakEligible({ kind: 'gun', weapon: 'lmg' })).toBe(true);
-    expect(isKillstreakEligible({ kind: 'grenade' })).toBe(false);
+    expect(isKillstreakEligible({ kind: 'grenade' })).toBe(true);
     expect(isKillstreakEligible({ kind: 'melee' })).toBe(false);
     expect(isKillstreakEligible({ kind: 'environment' })).toBe(false);
     expect(isKillstreakEligible({ kind: 'killstreak', effect: 'nuke' })).toBe(false);
+  });
+
+  it('records grenade eliminations as ordnance, never as weapon or recursive streak progress', () => {
+    expect(killstreakEliminationSource({ kind: 'gun', weapon: 'carbine' })).toBe('weapon');
+    expect(killstreakEliminationSource({ kind: 'grenade' })).toBe('ordnance');
+    expect(killstreakEliminationSource({ kind: 'killstreak', effect: 'nuke' })).toBe('killstreak');
   });
 
   it('derives non-recursive provenance from admitted hits', () => {

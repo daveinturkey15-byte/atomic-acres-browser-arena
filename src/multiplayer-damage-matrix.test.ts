@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { botScaledDamage, grenadeDamage } from './gameplay';
 import { applyAuthoritativeRemoteDamage, createRemoteHealthAuthorityState } from './remote-health-authority';
 import { resolveRemotePoweredDamage } from './remote-hit-admission';
-import { isKillstreakEligible, type KillCause } from './kill-provenance';
+import { isKillstreakEligible, killstreakEliminationSource, type KillCause } from './kill-provenance';
 
 type MatrixCase = Readonly<{
   route: string;
@@ -45,7 +45,8 @@ describe('host-authoritative multiplayer damage matrix', () => {
     expect(grenadeDamage(20)).toBe(0);
   });
 
-  it.each(matrix)('$route only advances streaks for eligible gun provenance', ({ cause }) => {
-    expect(isKillstreakEligible(cause)).toBe(cause.kind === 'gun');
+  it.each(matrix)('$route only advances streaks for eligible gun or lethal-ordnance provenance', ({ cause }) => {
+    expect(isKillstreakEligible(cause)).toBe(cause.kind === 'gun' || cause.kind === 'grenade');
+    if (cause.kind === 'grenade') expect(killstreakEliminationSource(cause)).toBe('ordnance');
   });
 });
