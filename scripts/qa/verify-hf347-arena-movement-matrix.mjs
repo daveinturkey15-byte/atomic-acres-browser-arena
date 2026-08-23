@@ -44,6 +44,10 @@ const LANES = [
   // swapping maps", so the lane swaps away and back before ready-up.
   { arena: 'skyline-terminal', swaps: ['skyline-terminal', 'rustworks-1v1', 'skyline-terminal'] },
   { arena: 'atomic-acres', swaps: ['atomic-acres'] },
+  // Not owner-faulted, but the two arenas this pass reworked most heavily -
+  // multiplayer movement on them is HITL evidence the rework broke nothing.
+  { arena: 'farcrysis', swaps: ['farcrysis'] },
+  { arena: 'high-seas', swaps: ['high-seas'] },
 ];
 
 function peerServerReady() {

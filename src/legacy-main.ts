@@ -4218,6 +4218,7 @@ const waterSystem = new WaterSystem(scene, renderRuntime.backend === 'webgpu' ? 
 // float zone: you bobbed, you could not swim. This is the movement-loop
 // consumption the ledger recorded as an outstanding handoff.
 let localSwimState: SwimState = createSwimState();
+let swimWeaponHintShown = false;
 waterSystem.configure(selectedArena.id, renderProfile);
 ensureRustworksStarfield(scene, selectedArena.id);
 const grassSystem = renderRuntime.backend === 'webgl2'
@@ -10213,6 +10214,7 @@ function snapshot(): PlayerSnapshot {
     grenade: player.selectedGrenade,
     weapon: player.weapon,
     stance: player.stance,
+    swimming: localSwimState.swimming,
     seq: ++player.seq,
   };
 }
@@ -16766,6 +16768,17 @@ function tryFire(now: number): void {
   // that platform's host-admitted weapon. Rapid clicking previously discharged
   // the carried firearm from inside the cockpit.
   if (localKillstreakActorSnapshot()?.possession) return;
+  // HF-358: firearms stay low while swimming - the reducer has flagged the
+  // restriction since it landed, but nothing consumed it. One feed line per
+  // swim entry so the player knows the trigger is deliberately dead, not
+  // broken.
+  if (localSwimState.weaponRestricted) {
+    if (!swimWeaponHintShown) {
+      swimWeaponHintShown = true;
+      addFeed('WEAPON LOW · SWIMMING');
+    }
+    return;
+  }
   if (currentSprinting) {
     currentSprinting = false;
     sprintRecoveryUntil = Math.max(sprintRecoveryUntil, now + 150);
@@ -23696,6 +23709,7 @@ function updatePhysics(dt: number): void {
     dtSeconds: dt,
   });
   const swim = swimMovementModifiers(localSwimState);
+  if (!localSwimState.swimming) swimWeaponHintShown = false;
 
   const profile = {
     ...baseProfile,
@@ -23953,7 +23967,13 @@ function updateRemotes(dt: number, now: number): void {
     remote.targetYaw = renderedSnapshot.yaw;
     remote.renderedHostTimeMs = rendered?.renderedHostTimeMs ?? hostNow;
     remote.renderedWorldAgeMs = rendered?.renderedWorldAgeMs ?? 0;
-    const stance = renderedSnapshot.stance ?? 'stand';
+    // HF-358: a swimming remote is presented with the prone silhouette - the
+    // whole-pelvis pivot lays the rig flat, which at the water surface reads
+    // as swimming. No bespoke swim clips exist yet, and a flat body in water
+    // is honest; an upright body waist-deep in the sea was the alternative.
+    const stance = renderedSnapshot.swimming === true
+      ? 'prone'
+      : (renderedSnapshot.stance ?? 'stand');
     const operator = remote.root.userData.operator as THREE.Group;
     // HF-345: publish how much room the prone body actually has so the
     // presentation can seat it instead of pushing it through the wall. Measured

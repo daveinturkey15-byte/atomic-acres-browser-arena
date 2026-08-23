@@ -151,6 +151,8 @@ export type PlayerSnapshot = {
   grenade: GrenadeId;
   weapon: WeaponId;
   stance?: 'stand' | 'crouch' | 'prone';
+  /** HF-358: true while the swim movement state is engaged (swimmable water). */
+  swimming?: boolean;
   seq: number;
 };
 
@@ -631,6 +633,7 @@ export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
     && typeof p.hp === 'number' && Number.isFinite(p.hp) && p.hp >= 0 && p.hp <= 100
     && ['kills', 'deaths', 'seq'].every((key) => Number.isSafeInteger(p[key]) && Number(p[key]) >= 0)
     && (p.stance === undefined || p.stance === 'stand' || p.stance === 'crouch' || p.stance === 'prone')
+    && (p.swimming === undefined || typeof p.swimming === 'boolean')
     && primaryWeapons.has(p.primary as PrimaryWeaponId)
     && sidearmWeapons.has(p.secondary as SidearmWeaponId)
     && grenades.has(p.grenade as GrenadeId)

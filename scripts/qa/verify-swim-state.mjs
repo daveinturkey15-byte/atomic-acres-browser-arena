@@ -111,8 +111,11 @@ const half = Math.floor(settleWindow.length / 2);
 const mean = (values) => values.reduce((total, value) => total + value, 0) / Math.max(1, values.length);
 const earlyMean = mean(settleWindow.slice(0, half));
 const lateMean = mean(settleWindow.slice(half));
-// Still falling at ~9.8 m/s would drop metres between the halves; bobbing does not.
-const rustworksFloatHeld = settleWindow.length >= 4 && earlyMean - lateMean < 1.5;
+// Still falling would drop tens of metres between the halves. The rustworks
+// storm spectrum bobs a floating player by 1-2 m, which once tripped a 1.5 m
+// threshold and made this check flaky - so the bound is 3 m: far above any
+// bob, far below the unbounded descent of an actual fall-through.
+const rustworksFloatHeld = settleWindow.length >= 4 && earlyMean - lateMean < 3;
 const rustworksNeverSwims = floatSamples.every((entry) => entry.swimming === false);
 
 console.log(JSON.stringify({
