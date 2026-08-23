@@ -61,14 +61,49 @@ const url = `${BASE}/?release=latest&renderer=${RENDERER}&render=quality&seed=bo
 await page.goto(url, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 180_000 });
 
+// A shared dist-gauntlet outDir means another agent's `vite build` can empty
+// and repopulate the served tree MID-SWEEP. Requests during that window get the
+// SPA-fallback HTML instead of assets, THREE's GLTFLoader then parses
+// "<!doctype" as JSON, and map selection fails with exactly the signature of a
+// real arena-commit regression ("Selected arena X did not commit before match
+// start", phase failed). Pin the served bundle identity so those runs are
+// reported as invalidated measurements instead of arena failures.
+const servedBundle = () => page.evaluate(() => {
+  const entry = performance.getEntriesByType('resource')
+    .map((resource) => resource.name)
+    .find((name) => name.includes('/legacy-main-'));
+  return entry ? entry.slice(entry.lastIndexOf('/')) : null;
+}).catch(() => null);
+const BUNDLE_AT_START = await servedBundle();
+
 const backend = await page.evaluate(() => document.documentElement.dataset.renderBackend ?? null);
 console.error(`[boot-cdp] backend=${backend} renderer=${RENDERER}`);
 
 const results = [];
-for (const arena of ARENAS) {
+
+for (const [index, arena] of ARENAS.entries()) {
   errors.length = 0;
   const startedAt = Date.now();
   const record = { arena, ok: false, ms: 0 };
+  if (index > 0) {
+    // Strict reload gate for every arena after the first: the previous
+    // iteration navigated back to the menu. A swallowed wait here used to let
+    // the next arena fail in 5 ms with "Cannot read properties of undefined
+    // (reading 'selectArena')" - a harness race, reported as a wedged arena.
+    const debugReady = await page.waitForFunction(
+      () => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 180_000 },
+    ).then(() => true).catch(() => false);
+    const bundleNow = await servedBundle();
+    if (!debugReady || bundleNow !== BUNDLE_AT_START) {
+      record.environmentInvalid = !debugReady
+        ? 'page never re-exposed __ATOMIC_ACRES_DEBUG__ after reload'
+        : `served bundle changed mid-sweep (${BUNDLE_AT_START} -> ${bundleNow}); dist was rebuilt while measuring`;
+      record.ms = Date.now() - startedAt;
+      results.push(record);
+      console.error(`[boot-cdp] ${arena.padEnd(18)} INVALID ${record.ms} ms — ${record.environmentInvalid}`);
+      continue;
+    }
+  }
   try {
     await page.evaluate(async (id) => { await window.__ATOMIC_ACRES_DEBUG__.selectArena(id); }, arena);
     await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.startSolo(); });
@@ -97,14 +132,17 @@ for (const arena of ARENAS) {
   for (const line of record.errors) console.error(`             ${line}`);
   // Back to the menu so the next arena starts from a clean surface.
   await page.goto(url, { waitUntil: 'domcontentloaded' }).catch(() => {});
-  await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 180_000 }).catch(() => {});
 }
 
 await browser.close();
 
-const failed = results.filter((entry) => !entry.ok).map((entry) => entry.arena);
-const verdict = failed.length === 0 ? 'PASS' : 'FAIL';
+const failed = results.filter((entry) => !entry.ok && !entry.environmentInvalid).map((entry) => entry.arena);
+const invalidated = results.filter((entry) => entry.environmentInvalid).map((entry) => entry.arena);
+// An invalidated sweep is NOT a pass: the measurement is void and must be
+// rerun on a stable dist. Exit 2 so automation distinguishes "arena broken"
+// (1) from "measurement environment broke" (2). Never silently green.
+const verdict = failed.length > 0 ? 'FAIL' : invalidated.length > 0 ? 'INVALID' : 'PASS';
 mkdirSync(resolve('artifacts/qa'), { recursive: true });
-writeFileSync(resolve('artifacts/qa/arena-boot-cdp.json'), `${JSON.stringify({ verdict, backend, renderer: RENDERER, failed, results }, null, 2)}\n`);
-console.log(JSON.stringify({ verdict, backend, failed }, null, 2));
-process.exit(verdict === 'PASS' ? 0 : 1);
+writeFileSync(resolve('artifacts/qa/arena-boot-cdp.json'), `${JSON.stringify({ verdict, backend, renderer: RENDERER, bundleAtStart: BUNDLE_AT_START, failed, invalidated, results }, null, 2)}\n`);
+console.log(JSON.stringify({ verdict, backend, failed, invalidated }, null, 2));
+process.exit(verdict === 'PASS' ? 0 : verdict === 'INVALID' ? 2 : 1);

@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { ARENA_BOUNDS, CENTRAL_BUS, HOUSE_LAYOUT, SPAWN_LAYOUT, STREET_HALF_WIDTH } from './arena-layout';
 import { isBlocked } from './collision';
-import { movementProfile } from './gameplay';
 import { buildArena } from './map';
+import { movementProfile } from './gameplay';
+import type { ArenaMap } from './map';
 import { CharacterPhysics } from './physics';
 
 /**
@@ -23,6 +24,45 @@ const walkSpeed = movementProfile({ crouched: false, prone: false, ads: false, s
 
 const width = ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX;
 const depth = ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ;
+/** The reference map's longest legal standing sightline; measured on built colliders. */
+const MAX_STANDING_EYE_LINE_METRES = 40;
+
+/** Longest unobstructed straight eye-line between perimeter sample points on the built arena. */
+function longestClearEyeLine(map: ArenaMap, eyeHeight: number): {
+  metres: number;
+  from: [number, number];
+  to: [number, number];
+} {
+  const samples: Array<[number, number]> = [];
+  for (let x = ARENA_BOUNDS.minX + 1; x <= ARENA_BOUNDS.maxX - 1; x += 2) samples.push([x, ARENA_BOUNDS.minZ + 1], [x, ARENA_BOUNDS.maxZ - 1]);
+  for (let z = ARENA_BOUNDS.minZ + 1; z <= ARENA_BOUNDS.maxZ - 1; z += 2) samples.push([ARENA_BOUNDS.minX + 1, z], [ARENA_BOUNDS.maxX - 1, z]);
+  let best = { metres: 0, from: [0, 0] as [number, number], to: [0, 0] as [number, number] };
+  for (const [ax, az] of samples) {
+    for (const [bx, bz] of samples) {
+      const dx = bx - ax;
+      const dz = bz - az;
+      const metres = Math.hypot(dx, dz);
+      if (metres <= best.metres) continue;
+      const steps = Math.ceil(metres * 4);
+      let clear = true;
+      for (let i = 1; i < steps && clear; i++) {
+        const t = i / steps;
+        const x = ax + dx * t;
+        const z = az + dz * t;
+        for (const b of map.colliders) {
+          const minY = b.minY ?? 0;
+          const maxY = b.maxY ?? minY + 3;
+          if (x > b.minX - 0.05 && x < b.maxX + 0.05 && z > b.minZ - 0.05 && z < b.maxZ + 0.05 && eyeHeight > minY && eyeHeight < maxY) {
+            clear = false;
+            break;
+          }
+        }
+      }
+      if (clear) best = { metres, from: [ax, az], to: [bx, bz] };
+    }
+  }
+  return best;
+}
 
 describe('Nuke Town fidelity', () => {
   it('stays small: the whole map is crossed in under ten seconds at real sprint speed', () => {
@@ -198,5 +238,33 @@ describe('Nuke Town fidelity', () => {
     }
     expect(Math.abs(HOUSE_LAYOUT[0].z) + Math.abs(HOUSE_LAYOUT[1].z)).toBeLessThan(depth);
     expect(CENTRAL_BUS.size[0]).toBeGreaterThan(10);
+  });
+
+  it('keeps every standing eye-line short on the arena as actually built', () => {
+    // The bus alone does not guarantee short sightlines: the Pass 78 rebuild
+    // left a 68 m clear diagonal lane threading both yards and the road east
+    // of the bus. Measure the built collider set, not the authored constants.
+    const map = buildArena(new THREE.Scene());
+    const longest = longestClearEyeLine(map, 1.65);
+    expect(
+      longest.metres,
+      `clear lane ${JSON.stringify(longest.from)} -> ${JSON.stringify(longest.to)}`,
+    ).toBeLessThanOrEqual(MAX_STANDING_EYE_LINE_METRES);
+  });
+
+  it('measures its own playable footprint from the built fence colliders', () => {
+    const map = buildArena(new THREE.Scene());
+    const fence = map.colliders.filter((bounds) => (bounds.maxY ?? 0) >= 2.5 && (bounds.maxX - bounds.minX) * (bounds.maxZ - bounds.minZ) < 60);
+    const inner = fence.filter((b) => (b.maxX - b.minX) > (b.maxZ - b.minZ));
+    const sides = fence.filter((b) => (b.maxX - b.minX) <= (b.maxZ - b.minZ));
+    const playMinZ = Math.max(...inner.map((b) => b.minZ + (b.maxZ - b.minZ)));
+    const playMaxZ = Math.min(...inner.map((b) => b.minZ));
+    const playMinX = Math.max(...sides.map((b) => b.minX + (b.maxX - b.minX)));
+    const playMaxX = Math.min(...sides.map((b) => b.minX));
+    const area = (playMaxX - playMinX) * (playMaxZ - playMinZ);
+    // The reference map stays small; guard against footprint creep measured
+    // on geometry rather than on ARENA_BOUNDS.
+    expect(area).toBeGreaterThan(3000);
+    expect(area).toBeLessThan(4000);
   });
 });

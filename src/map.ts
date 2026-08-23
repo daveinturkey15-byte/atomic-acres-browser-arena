@@ -3,6 +3,16 @@ import { texturedMaterial } from './art-kit';
 import {
   ARENA_BOUNDS,
   CENTRAL_BUS,
+  PARKED_VAN_LAYOUT,
+  FRONT_HEDGE_LAYOUT,
+  FRONT_HEDGE_FIN_LAYOUT,
+  REAR_HEDGE_LAYOUT,
+  REAR_HEDGE_SIZE,
+  SIDE_HEDGE_LAYOUT,
+  SIDE_HEDGE_SIZE,
+  FRONT_HEDGE_FIN_SIZE,
+  FRONT_HEDGE_SIZE,
+  PARKED_VAN_SIZE,
   COVER_LAYOUT,
   GARAGE_LAYOUT,
   GARAGE_SIZE,
@@ -559,6 +569,25 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     }
   }
 
+  // Two delivery vans parked in the road, one beyond each end of the bus.
+  // They are the diagonal-lane authority: without them a standing player sees
+  // corner to corner across the yards and the open road (65 m measured). The
+  // visible body wraps the collider so presentation never hides authority.
+  const [vanLength, vanHeight, vanWidth] = PARKED_VAN_SIZE;
+  for (const van of PARKED_VAN_LAYOUT) {
+    box(van.id, [van.x, vanHeight / 2, van.z], [vanLength, vanHeight, vanWidth], palette.white, true, true, true, 'vehicle');
+    physicalCover.push({ id: van.id, bounds: { ...colliders[colliders.length - 1] }, blocksMovement: true, blocksShots: true });
+    // Cab and windscreen sit inside the collider envelope; wheels are
+    // presentation-only below the body line.
+    box(`${van.id} windscreen`, [van.x + (van.x > 0 ? -1.45 : 1.45), 1.85, van.z], [0.9, 0.7, vanWidth - 0.2], palette.glass, false, false);
+    for (const wheelX of [-vanLength / 2 + 0.95, vanLength / 2 - 0.95]) {
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 8), palette.dark);
+      wheel.rotation.x = Math.PI / 2;
+      wheel.position.set(van.x + wheelX, 0.42, van.z);
+      world.add(wheel);
+    }
+  }
+
   // Each garage is attached to the outboard end of its own house with the door
   // on the same building line, so both yards read as one property.
   const [garageWidth, garageHeight, garageDepth] = GARAGE_SIZE;
@@ -573,6 +602,26 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   // Waist-high yard fencing divides the two properties without sealing a route.
   for (const [index, [x, z, width, depth]] of YARD_FENCE_LAYOUT.entries()) {
     box(`yard fence ${index}`, [x, YARD_FENCE_HEIGHT / 2, z], [width, YARD_FENCE_HEIGHT, depth], palette.timber, true, true, true, 'wood');
+  }
+
+  // Front-garden hedges: the sightline authority for the street flanks. The
+  // houses alone leave shallow corner-to-corner rays that thread the verges
+  // beside them (60 m+ measured); these close those lanes the way the
+  // reference map's garden hedges do. Visible mass matches each collider.
+  for (const [index, hedge] of FRONT_HEDGE_LAYOUT.entries()) {
+    box(`front hedge ${index}`, [hedge.x, FRONT_HEDGE_SIZE.height / 2, hedge.z], [hedge.length, FRONT_HEDGE_SIZE.height, FRONT_HEDGE_SIZE.depth], palette.grassDark);
+  }
+  for (const [index, fin] of FRONT_HEDGE_FIN_LAYOUT.entries()) {
+    const [finWidth, finHeight, finDepth] = FRONT_HEDGE_FIN_SIZE;
+    box(`front hedge fin ${index}`, [fin.x, finHeight / 2, fin.z], [finWidth, finHeight, finDepth], palette.grassDark);
+  }
+  for (const [index, rear] of REAR_HEDGE_LAYOUT.entries()) {
+    const [rearLength, rearHeight, rearDepth] = REAR_HEDGE_SIZE;
+    box(`rear hedge ${index}`, [rear.x, rearHeight / 2, rear.z], [rearLength, rearHeight, rearDepth], palette.grassDark);
+  }
+  for (const [index, side] of SIDE_HEDGE_LAYOUT.entries()) {
+    const [sideDepth, sideHeight, sideLength] = SIDE_HEDGE_SIZE;
+    box(`side hedge ${index}`, [side.x, sideHeight / 2, side.z], [sideDepth, sideHeight, sideLength], palette.grassDark);
   }
 
   // Pass 59 collision audit objects: visible soft terrain keeps conservative AABB

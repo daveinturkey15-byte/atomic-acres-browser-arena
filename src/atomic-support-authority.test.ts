@@ -38,7 +38,17 @@ describe('Atomic Acres visible support authority', () => {
     expect(performance.teamIds[1]).toHaveLength(7);
     expect(performance.teamIds[0].every((id) => id.includes('aqua-irrigation-workshop'))).toBe(true);
     expect(performance.teamIds[1].every((id) => id.includes('coral-orchard-conservatory'))).toBe(true);
-    expect(performance.entries.filter((entry) => entry.kind === 'physical-cover')).toHaveLength(5);
+    // Pass 79 adds the two diagonal-lane parked vans; the full hard-cover
+    // inventory is pinned by id, not just by count.
+    expect(performance.entries.filter((entry) => entry.kind === 'physical-cover').map((entry) => entry.id).sort()).toEqual([
+      'physical-cover:central-transit-bus',
+      'physical-cover:east-generator-trailer',
+      'physical-cover:east-parked-van',
+      'physical-cover:north-cargo-stack',
+      'physical-cover:south-pipe-stack',
+      'physical-cover:west-parked-van',
+      'physical-cover:west-service-skip',
+    ]);
     expect(performance.entries.filter((entry) => entry.id.includes('ground-floor-slab'))).toEqual([
       expect.objectContaining({ movementAuthority: 'implicit-world-floor', projectileAuthority: 'implicit-world-ground' }),
       expect.objectContaining({ movementAuthority: 'implicit-world-floor', projectileAuthority: 'implicit-world-ground' }),
