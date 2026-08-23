@@ -438,7 +438,17 @@ describe('presentation prewarm startup contract', () => {
       .toBeLessThan(matchDeployment.indexOf('player.invulnerableUntil = matchStartedAt'));
     expect(matchDeployment).toContain('await weaponView.prepareBrowserWeapon(matchStartWeapon);');
     expect(matchDeployment).toContain('await prewarmExactWebGlMatchComposition();');
-    expect(matchDeployment).not.toContain('await renderRuntime.compileAndRender(scene, camera, scene);');
+    // Pass 79 MAX admission: exactly ONE unsuppressed full-scene compile is
+    // allowed inside match deployment - the cold-generation-fenced prewarm
+    // submitted BEFORE the first guarded MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS
+    // flush (the weapon-switch exercise). Every earlier prewarm renders one-deep,
+    // so without it the complete composition's first draw carries cold pipeline
+    // creation into a 4s-bounded flush and bounces MAX deployments to the menu.
+    // More than one whole-scene compile in startGame remains forbidden.
+    const fullSceneCompiles = matchDeployment.match(/await renderRuntime\.compileAndRender\(scene, camera, scene\);/g) ?? [];
+    expect(fullSceneCompiles).toHaveLength(1);
+    expect(matchDeployment.indexOf('await renderRuntime.compileAndRender(scene, camera, scene);'))
+      .toBeLessThan(matchDeployment.indexOf('await exercisePreparedWebGpuWeaponSwitches();'));
     const webGlMatchPrewarm = source.slice(
       source.indexOf('async function prewarmExactWebGlMatchComposition('),
       source.indexOf('function disposeCorpsePresentation('),
