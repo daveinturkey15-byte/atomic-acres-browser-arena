@@ -118,17 +118,22 @@ Fixed this pass:
 - **Skies** — Farcrysis and High Seas were wearing other arenas' skies, and a
   radius-180 dome sat exactly on the camera far plane, punching a hard-edged
   hole in the sky.
+- **Loading** — an unfocused window used to load forever. Alt-tab during the
+  loading screen now finishes normally.
 
 ---
 
 ## B. Known not-done, so you are not surprised
 
 - **Firefox frame rate (HF-331)** is still unmeasured. Chrome measures 142.9 fps
-  median on WebGPU via the new in-page probe. Firefox reaches the weapon-catalog
-  prewarm and stops there. Its WebGPU fences are all fine (proved separately),
-  so this is not a GPU fault — the current suspicion is the renderer's
-  foreground-ownership gate. **If you have a minute in Firefox, that single
-  data point closes the row.**
+  median on WebGPU via the new in-page probe. Firefox's WebGPU fences all
+  resolve fine (proved separately), so the browser was never the fault — and
+  chasing it turned up a real bug that is now **fixed**: an unfocused window
+  retried the cold prewarm forever and never finished loading, so alt-tabbing
+  during the loading screen hung the game on any browser. Firefox now gets past
+  that point, but the run still does not complete a measurement.
+  **One minute of you playing in Firefox with the FPS counter up closes this
+  row for good.**
 - **Depth-of-field / FSR1 upscale** — not wired.
 - **Two-machine multiplayer** — everything above is two windows on this PC.
   Real two-machine play is still the human close-out bar.
