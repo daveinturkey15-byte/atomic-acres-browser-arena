@@ -65,17 +65,24 @@ const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly Gradie
     [0, '#151d22'],
     [1, '#232f36'],
   ] as const),
-  // Late golden hour over a jungle island: a deep tropical zenith falling
-  // through haze into a hot, humid horizon. Warmer and far less purple than
-  // the farmland sunset, which farcrysis previously borrowed wholesale.
+  // Tropical DAYLIGHT over a jungle island - the Far Cry / Crysis showcase
+  // look the owner asked for: a saturated blue zenith washing to a bright
+  // humid haze at the waterline. This preset previously carried a golden-hour
+  // dusk band (deep blue through amber to warm cream) which, stacked on the
+  // arena's own warm light rig, rendered the whole island flat beige - the
+  // single most-reported thing about how farcrysis looked.
+  //
+  // The haze band is deliberately SHORT. A player at eye level looks at the
+  // bottom of this gradient, so a wide pale band there is all they ever see -
+  // the first daylight attempt kept blue at the zenith and still rendered a
+  // white sky in-game. Real blue now runs down to ~0.9.
   'jungle-golden-hour': Object.freeze([
-    [0, '#123a63'],
-    [0.22, '#245f83'],
-    [0.44, '#4d8f92'],
-    [0.62, '#96b585'],
-    [0.76, '#e0b264'],
-    [0.88, '#f5924a'],
-    [1, '#ffd39a'],
+    [0, '#08418c'],
+    [0.30, '#155fae'],
+    [0.55, '#2a7cc6'],
+    [0.75, '#4d9ad6'],
+    [0.90, '#87bce4'],
+    [1, '#c4dfef'],
   ] as const),
   // Open water under a high sun: saturated marine zenith, bleaching toward a
   // bright haze band where sea meets sky.
@@ -120,11 +127,17 @@ export const SKY_BACKDROP_CLOUDS: Readonly<Record<SkyBackdropPreset, Readonly<{
     alpha: 0.66, scale: 0.68,
   }),
   'indoor-range': null,
-  // Tall tropical build-ups, lit warm on top and holding deep shade beneath.
+  // Scattered trade-wind cumulus. The band is deliberately NARROW and the
+  // count low: a player at eye level looks at roughly v=0.35-0.55 of the
+  // equirect, so a wide dense band there covers the whole visible sky and the
+  // gradient underneath becomes irrelevant. An earlier tuning ran 30 clouds
+  // from 0.14 to 0.58 at alpha 0.62 and rendered a flat white sky - forcing
+  // the gradient to pure red changed nothing on screen, which is how the
+  // clouds were identified as the real cover.
   'jungle-golden-hour': Object.freeze({
-    count: 30, bandTop: 0.14, bandBottom: 0.58,
-    rgb: [255, 214, 168] as [number, number, number], shadowRgb: [46, 66, 88] as [number, number, number],
-    alpha: 0.52, scale: 0.86,
+    count: 13, bandTop: 0.08, bandBottom: 0.34,
+    rgb: [255, 255, 252] as [number, number, number], shadowRgb: [88, 118, 152] as [number, number, number],
+    alpha: 0.44, scale: 0.7,
   }),
   // Small, high, fast trade-wind cumulus - sparse so the sky stays open.
   'open-ocean-day': Object.freeze({
@@ -158,8 +171,9 @@ export const SKY_BACKDROP_SUN: Readonly<Record<SkyBackdropPreset, Readonly<{
   'industrial-night': null,
   'airport-dawn': Object.freeze({ x: 0.72, y: 0.38, coreRgb: [255, 252, 240] as [number, number, number], glowRgb: [255, 240, 205] as [number, number, number], coreRadius: 14, glowRadius: 70 }),
   'indoor-range': null,
-  // Low and wide: golden hour puts the sun near the horizon with a big glow.
-  'jungle-golden-hour': Object.freeze({ x: 0.64, y: 0.56, coreRgb: [255, 244, 214] as [number, number, number], glowRgb: [255, 176, 88] as [number, number, number], coreRadius: 17, glowRadius: 104 }),
+  // High and tight: a midday tropical sun is small and fierce, and its glow
+  // stays close to white rather than bleeding amber across the whole sky.
+  'jungle-golden-hour': Object.freeze({ x: 0.62, y: 0.24, coreRgb: [255, 253, 245] as [number, number, number], glowRgb: [214, 234, 250] as [number, number, number], coreRadius: 13, glowRadius: 66 }),
   // High and tight: midday sun over water is small, white and fierce.
   'open-ocean-day': Object.freeze({ x: 0.38, y: 0.22, coreRgb: [255, 255, 250] as [number, number, number], glowRgb: [214, 236, 255] as [number, number, number], coreRadius: 11, glowRadius: 58 }),
 });

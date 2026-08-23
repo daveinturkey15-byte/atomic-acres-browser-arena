@@ -114,7 +114,7 @@ function varyPalmInstanceColors(mesh: THREE.InstancedMesh, seed: number): void {
  *   - crown dish spans ~3-4 m across, ~0.3 m thick at the hub.
  * The crown's local origin is the hub center (where the trunk top sits).
  */
-function createPalmCrownGeometry(): THREE.BufferGeometry {
+export function createPalmCrownGeometry(): THREE.BufferGeometry {
   const bladeCount = 8;
   const positions: number[] = [];
   const indices: number[] = [];
@@ -259,12 +259,25 @@ export function enhancedPalmPlacements(): readonly PalmPlacement[] {
 // Main entry
 // ---------------------------------------------------------------------------
 
-export function buildEnhancedPalms(root: THREE.Group): {
+/**
+ * Instanced palm stand builder for an arbitrary placement list.
+ *
+ * Pass-76 consolidation: the arena used to carry THREE palm systems (gameplay
+ * box-trunk palms in farcrysis.ts, slab-frond palms in farcrysis-vegetation.ts
+ * and the enhanced palms here). All of them now render through this one
+ * builder so every palm in the arena shares the same crown/trunk silhouette;
+ * only placement lists differ. Presentation only — colliders stay authored in
+ * farcrysis.ts against the same deterministic placements.
+ */
+export function buildPalmStandInstances(
+  root: THREE.Group,
+  placements: readonly PalmPlacement[],
+  namePrefix: string,
+): {
   trunkInstances: THREE.InstancedMesh;
   frondInstances: THREE.InstancedMesh;
-  coconutInstances?: THREE.InstancedMesh;
+  coconutInstances: THREE.InstancedMesh;
 } {
-  const placements = buildPlacements();
   const count = placements.length;
 
   // Tapered trunk, translated so its base rests at y=0 (lean pivots at ground)
@@ -293,19 +306,19 @@ export function buildEnhancedPalms(root: THREE.Group): {
   });
 
   const trunkInstances = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, count);
-  trunkInstances.name = 'farcrysis-art-enhanced-palm-trunks';
+  trunkInstances.name = `${namePrefix}-trunks`;
   trunkInstances.castShadow = true;
   trunkInstances.receiveShadow = true;
   trunkInstances.userData.farcrysisArt = true;
 
   const frondInstances = new THREE.InstancedMesh(crownGeometry, frondMaterial, count);
-  frondInstances.name = 'farcrysis-art-enhanced-palm-fronds';
+  frondInstances.name = `${namePrefix}-fronds`;
   frondInstances.castShadow = true;
   frondInstances.receiveShadow = true;
   frondInstances.userData.farcrysisArt = true;
 
   const coconutInstances = new THREE.InstancedMesh(coconutGeometry, coconutMaterial, count * 3);
-  coconutInstances.name = 'farcrysis-art-enhanced-palm-coconuts';
+  coconutInstances.name = `${namePrefix}-coconuts`;
   coconutInstances.castShadow = true;
   coconutInstances.receiveShadow = true;
   coconutInstances.userData.farcrysisArt = true;
@@ -382,4 +395,12 @@ export function buildEnhancedPalms(root: THREE.Group): {
   root.add(coconutInstances);
 
   return { trunkInstances, frondInstances, coconutInstances };
+}
+
+export function buildEnhancedPalms(root: THREE.Group): {
+  trunkInstances: THREE.InstancedMesh;
+  frondInstances: THREE.InstancedMesh;
+  coconutInstances?: THREE.InstancedMesh;
+} {
+  return buildPalmStandInstances(root, buildPlacements(), 'farcrysis-art-enhanced-palm');
 }

@@ -266,8 +266,24 @@ export function softDotTexture(): THREE.DataTexture {
 // now softened (see buildGodRayShafts).
 // ---------------------------------------------------------------------------
 
+/** Seeded PRNG (mulberry32 — the arena-wide idiom) for stable atmosphere. */
+function mulberry32(seed: number): () => number {
+  let s = seed | 0;
+  return () => {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 function buildDustMotes(): THREE.Points {
-  const count = 200;
+  // Pass 76: 200 dust motes at size 0.12 / opacity 0.5 read as SNOWFALL over
+  // a tropical beach. Fewer, smaller, dimmer — pollen drifting through the
+  // sunbeams, only really visible inside a shaft. Also seeded (was
+  // Math.random — presentation-only, but the arena idiom is deterministic).
+  const count = 60;
+  const rng = mulberry32(0xd057);
   const positions = new Float32Array(count * 3);
   const origins = new Float32Array(count * 3);
   const phases = new Float32Array(count);
@@ -285,16 +301,16 @@ function buildDustMotes(): THREE.Points {
   const midpoint = new THREE.Vector3(0, 5, 0);
 
   for (let i = 0; i < count; i++) {
-    const r = Math.random() * cylinderRadius;
-    const angle = Math.random() * Math.PI * 2;
-    const along = (Math.random() - 0.5) * cylinderHalfLen * 2;
+    const r = rng() * cylinderRadius;
+    const angle = rng() * Math.PI * 2;
+    const along = (rng() - 0.5) * cylinderHalfLen * 2;
 
     const px = midpoint.x + perp1.x * Math.cos(angle) * r + perp2.x * Math.sin(angle) * r + sunAxis.x * along;
     const py = midpoint.y + perp1.y * Math.cos(angle) * r + perp2.y * Math.sin(angle) * r + sunAxis.y * along;
     const pz = midpoint.z + perp1.z * Math.cos(angle) * r + perp2.z * Math.sin(angle) * r + sunAxis.z * along;
 
     const cx = Math.max(FARCRYSIS_BOUNDS.minX, Math.min(FARCRYSIS_BOUNDS.maxX, px));
-    const cy = Math.max(0.2, Math.min(20, py));
+    const cy = Math.max(0.2, Math.min(14, py));
     const cz = Math.max(FARCRYSIS_BOUNDS.minZ, Math.min(FARCRYSIS_BOUNDS.maxZ, pz));
 
     origins[i * 3 + 0] = cx;
@@ -305,9 +321,9 @@ function buildDustMotes(): THREE.Points {
     positions[i * 3 + 1] = cy;
     positions[i * 3 + 2] = cz;
 
-    phases[i] = Math.random() * Math.PI * 2;
-    radii[i] = 0.3 + Math.random() * 2.5;
-    heightOffsets[i] = (Math.random() - 0.5) * 2.0;
+    phases[i] = rng() * Math.PI * 2;
+    radii[i] = 0.3 + rng() * 2.5;
+    heightOffsets[i] = (rng() - 0.5) * 2.0;
   }
 
   const geom = new THREE.BufferGeometry();
@@ -315,10 +331,10 @@ function buildDustMotes(): THREE.Points {
 
   const mat = new THREE.PointsMaterial({
     color: 0xffeedd,
-    size: 0.12,
+    size: 0.04,
     map: softDotTexture(),
     transparent: true,
-    opacity: 0.5,
+    opacity: 0.16,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
@@ -380,11 +396,12 @@ function buildFireflies(): THREE.Points {
   geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
   const mat = new THREE.PointsMaterial({
+    // Pass 76: smaller and dimmer — a subtle jungle shimmer, not fairy lights.
     color: 0xccff88,
-    size: 0.22,
+    size: 0.14,
     map: softDotTexture(),
     transparent: true,
-    opacity: 0.55,
+    opacity: 0.4,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
@@ -412,9 +429,11 @@ function buildFogLayer(): THREE.Mesh {
   geom.rotateX(-Math.PI / 2);
 
   const mat = new THREE.MeshBasicMaterial({
-    color: 0xffd9a0,
+    // Pass 76 regrade: warm-orange additive haze fed the beige wash; the
+    // ground mist now leans pale green-white (jungle humidity, not dust).
+    color: 0xdcead2,
     transparent: true,
-    opacity: 0.08,
+    opacity: 0.05,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     side: THREE.DoubleSide,
@@ -496,9 +515,10 @@ export function animateAtmosphere(time: number): void {
 
     posAttr.needsUpdate = true;
 
-    // Global opacity pulse — averages out individual phases into a nice shimmer
+    // Global opacity pulse — averages out individual phases into a nice
+    // shimmer. Pass 76: peak lowered so fireflies stay subtle in daylight.
     const mat = _fireflyPoints.material as THREE.PointsMaterial;
-    mat.opacity = 0.35 + 0.35 * (0.5 + 0.5 * Math.sin(time * 2.3 + 0.7));
+    mat.opacity = 0.18 + 0.22 * (0.5 + 0.5 * Math.sin(time * 2.3 + 0.7));
   }
 
   // --- Sun disk: breathing halo + gentle opacity shimmer ---

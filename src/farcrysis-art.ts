@@ -16,7 +16,7 @@ import {
   FARCRYSIS_GROUND_EXTENT_M,
 } from './farcrysis-ground-materials';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
-import { buildVegetation, buildAdditionalVegetation, animateVegetationWind, setVegetationLOD } from './farcrysis-vegetation';
+import { buildVegetation, buildAdditionalVegetation, animateVegetationWind, setVegetationLOD, lumpify } from './farcrysis-vegetation';
 // terrain.ts ShaderMaterial effects disabled for TSL review compatibility.
 // Terrain + water provided inline; lighting simplified to standard lights.
 import { applyFarcrysisTextures } from './farcrysis-textures';
@@ -78,8 +78,8 @@ export const FARCRYSIS_ART_FEEL = Object.freeze({
   // Presentation material tones
   beachSand: 0xd9c08a,
   palmTrunk: 0x7a5b36,
-  palmFrond: 0x2f6b2a,
-  bushGreen: 0x3d7a35,
+  palmFrond: 0x3f7c31, // pass 76: brightened for daylight grade
+  bushGreen: 0x468a3c,
   fernGreen: 0x3e8638,
   towerMetal: 0x6d7a83,
   antenna: 0x8b9aaa,
@@ -106,34 +106,72 @@ function addResearchTower(root: THREE.Group): void {
   const metal = mat(FARCRYSIS_ART_FEEL.towerMetal, 0.35, 0.65);
   const cornerMetal = mat(FARCRYSIS_ART_FEEL.antenna, 0.3, 0.7);
 
-  // Four vertical legs (thin box columns)
-  const legRadius = 0.14;
+  // Pass 76: the "tower" was four floating box columns with sparse strips.
+  // Now a proper derelict lattice: tubular legs with a slight inward rake,
+  // X-braced bays on every face, a railed lookout platform and rust tones.
+  const legRadius = 0.09;
   const legHeight = 4.8;
   const legHalf = 1.3;
-  const legGeom = new THREE.BoxGeometry(legRadius, legHeight, legRadius);
+  const rustMetal = mat(0x6e5a48, 0.7, 0.45); // weathered rust over the grey
+  const legGeom = new THREE.CylinderGeometry(legRadius * 0.7, legRadius, legHeight, 7);
   const legs: [number, number][] = [
     [-legHalf, -legHalf], [legHalf, -legHalf], [-legHalf, legHalf], [legHalf, legHalf],
   ];
   for (const [lx, lz] of legs) {
-    group.add(makeMesh(legGeom, cornerMetal, 'farcrysis-art-tower-leg', [lx, legHeight / 2, lz]));
+    const leg = makeMesh(legGeom, cornerMetal, 'farcrysis-art-tower-leg', [lx, legHeight / 2, lz]);
+    // Rake the leg tops toward centre (~0.25 m) for a real lattice-tower splay.
+    leg.rotation.set(lz > 0 ? -0.052 : 0.052, 0, lx > 0 ? 0.052 : -0.052);
+    group.add(leg);
   }
 
-  // Cross-bracing (thin horizontal / diagonal strips)
-  const braceGeomH = new THREE.BoxGeometry(legHalf * 2.1, 0.1, 0.1);
-  const braceGeomV = new THREE.BoxGeometry(0.1, 0.1, legHalf * 2.1);
-  for (let y = 1.2; y <= 3.6; y += 1.2) {
-    group.add(makeMesh(braceGeomH, cornerMetal, 'farcrysis-art-tower-brace-h', [0, y, -legHalf]));
-    group.add(makeMesh(braceGeomH, cornerMetal, 'farcrysis-art-tower-brace-h', [0, y, legHalf]));
-    group.add(makeMesh(braceGeomV, cornerMetal, 'farcrysis-art-tower-brace-v', [-legHalf, y, 0]));
-    group.add(makeMesh(braceGeomV, cornerMetal, 'farcrysis-art-tower-brace-v', [legHalf, y, 0]));
+  // X-bracing: two crossed diagonals per bay per face (the lattice look).
+  const bayHeights = [0.9, 2.1, 3.3];
+  const braceLength = Math.hypot(legHalf * 2, 1.2);
+  const braceGeom = new THREE.CylinderGeometry(0.03, 0.03, braceLength, 5);
+  const diagonalTilt = Math.atan2(legHalf * 2, 1.2);
+  for (const bayY of bayHeights) {
+    for (const side of [-1, 1] as const) {
+      for (const flip of [-1, 1] as const) {
+        // Faces perpendicular to Z
+        const braceZ = makeMesh(braceGeom, rustMetal, 'farcrysis-art-tower-brace-x', [0, bayY, side * legHalf]);
+        braceZ.rotation.set(0, 0, flip * diagonalTilt);
+        group.add(braceZ);
+        // Faces perpendicular to X
+        const braceX = makeMesh(braceGeom, rustMetal, 'farcrysis-art-tower-brace-z', [side * legHalf, bayY, 0]);
+        braceX.rotation.set(flip * diagonalTilt, 0, Math.PI / 2);
+        group.add(braceX);
+      }
+    }
+    // Horizontal ring closing each bay
+    const ringGeomH = new THREE.BoxGeometry(legHalf * 2.05, 0.07, 0.07);
+    const ringGeomV = new THREE.BoxGeometry(0.07, 0.07, legHalf * 2.05);
+    group.add(makeMesh(ringGeomH, cornerMetal, 'farcrysis-art-tower-ring-h', [0, bayY + 0.6, -legHalf]));
+    group.add(makeMesh(ringGeomH, cornerMetal, 'farcrysis-art-tower-ring-h', [0, bayY + 0.6, legHalf]));
+    group.add(makeMesh(ringGeomV, cornerMetal, 'farcrysis-art-tower-ring-v', [-legHalf, bayY + 0.6, 0]));
+    group.add(makeMesh(ringGeomV, cornerMetal, 'farcrysis-art-tower-ring-v', [legHalf, bayY + 0.6, 0]));
   }
 
-  // Top platform
+  // Lookout platform with a rail — a place a sniper COULD have lived.
   group.add(makeMesh(
-    new THREE.BoxGeometry(3.2, 0.16, 3.2), metal,
+    new THREE.BoxGeometry(3.0, 0.12, 3.0), metal,
     'farcrysis-art-tower-platform',
-    [0, legHeight + 0.08, 0],
+    [0, legHeight + 0.06, 0],
   ));
+  const railGeomH = new THREE.BoxGeometry(3.0, 0.05, 0.05);
+  const railGeomV = new THREE.BoxGeometry(0.05, 0.05, 3.0);
+  for (const side of [-1, 1] as const) {
+    group.add(makeMesh(railGeomH, rustMetal, 'farcrysis-art-tower-rail-h', [0, legHeight + 0.7, side * 1.48]));
+    // 1.5 cm drop where the rails lap at the corners — welded-pipe rails DO
+    // overlap like this, and it keeps the coplanar-surface audit clean.
+    group.add(makeMesh(railGeomV, rustMetal, 'farcrysis-art-tower-rail-v', [side * 1.48, legHeight + 0.685, 0]));
+    for (const other of [-1, 1] as const) {
+      group.add(makeMesh(
+        new THREE.BoxGeometry(0.05, 0.64, 0.05), rustMetal,
+        'farcrysis-art-tower-rail-post',
+        [side * 1.48, legHeight + 0.38, other * 1.48],
+      ));
+    }
+  }
 
   // Antenna mast (long thin cylinder)
   const antennaGeom = new THREE.CylinderGeometry(0.08, 0.1, 3.8, 8);
@@ -226,12 +264,16 @@ function addTikiMarkers(root: THREE.Group): void {
     // Main post
     post.add(makeMesh(new THREE.CylinderGeometry(0.22, 0.28, 2.4, 8), wood, 'farcrysis-art-tiki-post', [0, 1.2, 0]));
 
-    // Coloured bands (rings)
+    // Pass 76: the painted bands were torus rings hovering off the post.
+    // Carved bands are now slightly-proud cylinder sleeves flush with the
+    // tapered post so they read as painted carvings, not floating hoops.
     for (let b = 0; b < 3; b += 1) {
+      const bandY = 0.55 + b * 0.7;
+      const postRadiusAtBand = 0.28 - (bandY / 2.4) * 0.06; // follows the taper
       post.add(makeMesh(
-        new THREE.TorusGeometry(0.26, 0.1, 6, 8), band,
+        new THREE.CylinderGeometry(postRadiusAtBand + 0.02, postRadiusAtBand + 0.02, 0.18, 8), band,
         `farcrysis-art-tiki-band-${b}`,
-        [0, 0.55 + b * 0.7, 0],
+        [0, bandY, 0],
       ));
     }
 
@@ -310,7 +352,8 @@ function addCrateWordmarks(root: THREE.Group): void {
 
 function addInstancedBushes(root: THREE.Group): void {
   const count = 20;
-  const bushGeom = new THREE.BoxGeometry(1.4, 0.9, 1.4);
+  // Pass 76: leaf-box bushes → lumpified organic clumps.
+  const bushGeom = lumpify(new THREE.IcosahedronGeometry(0.72, 1), 0.14, 0xb05e);
 
   const instances = new THREE.InstancedMesh(bushGeom, mat(FARCRYSIS_ART_FEEL.bushGreen, 0.9, 0.01), count);
   instances.name = 'farcrysis-art-instanced-bushes';
@@ -346,10 +389,14 @@ function addInstancedBushes(root: THREE.Group): void {
 // ---------------------------------------------------------------------------
 
 function addInstancedFernClusters(root: THREE.Group): void {
-  const count = 18;
-  // A "fern cluster" is represented as a short flat vertical slab
-  // (like a frond leaf). At distance this reads as dense undergrowth.
-  const fernGeom = new THREE.BoxGeometry(0.4, 1.1, 0.14);
+  // Pass 76: one flat slab per "fern" read as a plank. Each cluster is now
+  // three arched leaf cards fanned around the cluster centre — 3x the
+  // instance count on the SAME single draw call.
+  const clusters = 18;
+  const bladesPerCluster = 3;
+  const count = clusters * bladesPerCluster;
+  const fernGeom = new THREE.BoxGeometry(0.42, 1.1, 0.05);
+  fernGeom.translate(0, 0.55, 0); // pivot at the root so tilts arch outward
 
   const instances = new THREE.InstancedMesh(fernGeom, mat(FARCRYSIS_ART_FEEL.fernGreen, 0.85, 0.02), count);
   instances.name = 'farcrysis-art-instanced-fern-clusters';
@@ -357,26 +404,36 @@ function addInstancedFernClusters(root: THREE.Group): void {
   instances.receiveShadow = true;
 
   const matrix = new THREE.Matrix4();
+  const quat = new THREE.Quaternion();
+  const euler = new THREE.Euler();
   const { minX, maxX, minZ, maxZ } = FARCRYSIS_BOUNDS;
 
-  for (let i = 0; i < count; i += 1) {
-    const angle = (i / count) * Math.PI * 2 + 0.15;
+  for (let i = 0; i < clusters; i += 1) {
+    const angle = (i / clusters) * Math.PI * 2 + 0.15;
     const radius = 5 + (i % 4) * 2.1;
     let px = Math.cos(angle) * radius;
     let pz = Math.sin(angle) * radius * 0.9;
     px = Math.max(minX + 2.5, Math.min(maxX - 2.5, px));
     pz = Math.max(minZ + 2.5, Math.min(maxZ - 2.5, pz));
-
-    // Slightly rotate each fern so they face random directions
-    matrix.makeRotationY(angle * 2.7 + i * 0.9);
-    const fernScaleY = 0.7 + (i % 4) * 0.2;
-    matrix.scale(new THREE.Vector3(0.8 + (i % 3) * 0.25, fernScaleY, 1));
     // HF-360: seat each fern cluster base on the terrain authority surface.
-    matrix.setPosition(px, terrainHeight(px, pz) + 0.55 * fernScaleY, pz);
-    instances.setMatrixAt(i, matrix);
+    const baseY = terrainHeight(px, pz) + 0.02;
+
+    for (let blade = 0; blade < bladesPerCluster; blade += 1) {
+      const bladeYaw = angle * 2.7 + i * 0.9 + (blade / bladesPerCluster) * Math.PI * 2;
+      euler.set(0.32 + (blade % 2) * 0.14, bladeYaw, 0);
+      quat.setFromEuler(euler);
+      const fernScaleY = 0.7 + ((i + blade) % 4) * 0.2;
+      matrix.compose(
+        new THREE.Vector3(px, baseY, pz),
+        quat,
+        new THREE.Vector3(0.8 + ((i + blade) % 3) * 0.25, fernScaleY, 1),
+      );
+      instances.setMatrixAt(i * bladesPerCluster + blade, matrix);
+    }
   }
 
   instances.instanceMatrix.needsUpdate = true;
+  instances.computeBoundingSphere();
   root.add(instances);
 }
 
@@ -474,12 +531,16 @@ function buildInlineTerrain(scene: THREE.Scene): void {
     pos.setY(i, h);
 
     const edgeDist = ARENA_HALF - Math.max(Math.abs(x), Math.abs(z));
+    // Pass 76 regrade: the interior tones were too pale, so under the warm
+    // light stack the whole arena flattened into one beige. The jungle floor
+    // is now a saturated humus green and the transition band leans green, so
+    // the beach→jungle read survives the lighting.
     if (edgeDist < 8) {
-      colors[i * 3 + 0] = 0.88; colors[i * 3 + 1] = 0.78; colors[i * 3 + 2] = 0.62; // white sand
+      colors[i * 3 + 0] = 0.88; colors[i * 3 + 1] = 0.79; colors[i * 3 + 2] = 0.6; // coral sand
     } else if (edgeDist < 14) {
-      colors[i * 3 + 0] = 0.42; colors[i * 3 + 1] = 0.44; colors[i * 3 + 2] = 0.28; // transition
+      colors[i * 3 + 0] = 0.29; colors[i * 3 + 1] = 0.41; colors[i * 3 + 2] = 0.15; // grassy transition
     } else {
-      colors[i * 3 + 0] = 0.30; colors[i * 3 + 1] = 0.40; colors[i * 3 + 2] = 0.20; // jungle floor
+      colors[i * 3 + 0] = 0.14; colors[i * 3 + 1] = 0.3; colors[i * 3 + 2] = 0.09; // jungle humus
     }
   }
   geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -497,65 +558,90 @@ function buildInlineTerrain(scene: THREE.Scene): void {
   terrainMesh.position.y = 0.04;
   group.add(terrainMesh);
 
-  // Cliff rock ring (28 IcosahedronGeometry rocks along the cliff band)
-  const cliffRockMat = new THREE.MeshStandardMaterial({ color: 0x5a5550, roughness: 0.88, metalness: 0.06 });
-  const cliffCount = 28;
-  const cliffRng = mulberry32(ART_SEED + 1);
-  for (let i = 0; i < cliffCount; i++) {
-    const angle = (i / cliffCount) * Math.PI * 2 + (cliffRng() - 0.5) * 0.6;
-    const rockDist = 18 + cliffRng() * 8;
-    const rx = Math.max(-ARENA_HALF + 2, Math.min(ARENA_HALF - 2, Math.cos(angle) * rockDist));
-    const rz = Math.max(-ARENA_HALF + 2, Math.min(ARENA_HALF - 2, Math.sin(angle) * rockDist));
-    const baseY = terrainHeight(rx, rz);
-    const detail = cliffRng() < 0.5 ? 2 : 1;
-    const rGeom = new THREE.IcosahedronGeometry(0.6 + cliffRng() * 1.4, detail);
-    const rock = new THREE.Mesh(rGeom, cliffRockMat);
-    rock.name = `farcrysis-cliff-rock-${i}`;
-    rock.position.set(rx, baseY + 0.4, rz);
-    rock.rotation.set(cliffRng() * Math.PI, cliffRng() * Math.PI, cliffRng() * Math.PI);
-    rock.scale.setScalar(0.7 + cliffRng() * 0.6);
-    rock.castShadow = true;
-    rock.receiveShadow = true;
-    group.add(rock);
+  // Pass 76: the rock dressing was raw IcosahedronGeometry at random 3-axis
+  // rotations — faceted d20s balancing on points. All three rock families now
+  // share one lumpified FLAT-BOTTOMED boulder geometry (yaw-only rotation so
+  // the flat base always seats on the ground), drawn as three InstancedMesh
+  // sets, with the arena's procedural ground PBR maps for surface grain.
+  const boulderGeometry = lumpify(new THREE.IcosahedronGeometry(1, 2), 0.2, 0xa7c1);
+  {
+    // Clamp the underside then rebase so y=0 is the seat plane.
+    const pos = boulderGeometry.getAttribute('position') as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i++) {
+      pos.setY(i, Math.max(pos.getY(i), -0.55) + 0.55);
+    }
+    pos.needsUpdate = true;
+    boulderGeometry.computeVertexNormals();
   }
+  const makeRockMaterial = (color: number): THREE.MeshStandardMaterial => {
+    const rockMat = new THREE.MeshStandardMaterial({ color, roughness: 0.92, metalness: 0.04 });
+    // Ground-material grain at rock scale (repeat 2 ≈ 0.5 m tiles on a
+    // metre-class boulder) so rocks share the terrain's surface language.
+    applyFarcrysisGroundMaterial(rockMat, 'terrain', 2);
+    rockMat.color.setHex(color); // applyFarcrysisGroundMaterial leaves colour, but be explicit
+    return rockMat;
+  };
+  const scatterBoulders = (
+    name: string,
+    color: number,
+    count: number,
+    seed: number,
+    place: (rng: () => number, index: number) => [number, number, number], // x, z, scale
+  ): void => {
+    const rocks = new THREE.InstancedMesh(boulderGeometry, makeRockMaterial(color), count);
+    rocks.name = name;
+    const rng = mulberry32(seed);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const euler = new THREE.Euler();
+    for (let i = 0; i < count; i++) {
+      const [rx, rz, s] = place(rng, i);
+      const baseY = terrainHeight(rx, rz);
+      euler.set(0, rng() * Math.PI * 2, 0);
+      q.setFromEuler(euler);
+      m.compose(
+        // Slight sink so the jagged base edge bites into the soil.
+        new THREE.Vector3(rx, baseY - 0.05 * s, rz),
+        q,
+        new THREE.Vector3(s * (0.85 + rng() * 0.4), s * (0.55 + rng() * 0.3), s),
+      );
+      rocks.setMatrixAt(i, m);
+    }
+    rocks.instanceMatrix.needsUpdate = true;
+    rocks.computeBoundingSphere();
+    rocks.castShadow = true;
+    rocks.receiveShadow = true;
+    group.add(rocks);
+  };
 
-  // Jungle floor boulders (scattered interior)
-  const boulderMat = new THREE.MeshStandardMaterial({ color: 0x7a7268, roughness: 0.85, metalness: 0.08 });
-  const boulderRng = mulberry32(ART_SEED + 2);
-  for (let i = 0; i < 12; i++) {
-    const angle = (i / 12) * Math.PI * 2 + boulderRng() * 0.5;
-    const placeDist = 5 + boulderRng() * 12;
-    const rx = Math.max(-ARENA_HALF + 3, Math.min(ARENA_HALF - 3, Math.cos(angle) * placeDist));
-    const rz = Math.max(-ARENA_HALF + 3, Math.min(ARENA_HALF - 3, Math.sin(angle) * placeDist));
-    const baseY = terrainHeight(rx, rz);
-    const rGeom = new THREE.IcosahedronGeometry(0.3 + boulderRng() * 0.6, 1);
-    const boulder = new THREE.Mesh(rGeom, boulderMat);
-    boulder.name = `farcrysis-boulder-${i}`;
-    boulder.position.set(rx, baseY + 0.15, rz);
-    boulder.rotation.set(boulderRng() * Math.PI, boulderRng() * Math.PI, boulderRng() * Math.PI);
-    boulder.castShadow = true;
-    boulder.receiveShadow = true;
-    group.add(boulder);
-  }
+  // Cliff rock ring along the jungle/beach transition band.
+  scatterBoulders('farcrysis-cliff-rocks', 0x716b60, 28, ART_SEED + 1, (rng, i) => {
+    const angle = (i / 28) * Math.PI * 2 + (rng() - 0.5) * 0.6;
+    const rockDist = 18 + rng() * 8;
+    return [
+      Math.max(-ARENA_HALF + 2, Math.min(ARENA_HALF - 2, Math.cos(angle) * rockDist)),
+      Math.max(-ARENA_HALF + 2, Math.min(ARENA_HALF - 2, Math.sin(angle) * rockDist)),
+      0.8 + rng() * 1.1,
+    ];
+  });
 
-  // Large boulders near water's edge
-  const shoreBoulderMat = new THREE.MeshStandardMaterial({ color: 0x6a6058, roughness: 0.9, metalness: 0.04 });
-  const shoreRng = mulberry32(ART_SEED + 3);
-  for (let i = 0; i < 8; i++) {
+  // Jungle floor boulders (scattered interior).
+  scatterBoulders('farcrysis-interior-boulders', 0x7a7268, 12, ART_SEED + 2, (rng, i) => {
+    const angle = (i / 12) * Math.PI * 2 + rng() * 0.5;
+    const placeDist = 5 + rng() * 12;
+    return [
+      Math.max(-ARENA_HALF + 3, Math.min(ARENA_HALF - 3, Math.cos(angle) * placeDist)),
+      Math.max(-ARENA_HALF + 3, Math.min(ARENA_HALF - 3, Math.sin(angle) * placeDist)),
+      0.35 + rng() * 0.5,
+    ];
+  });
+
+  // Large boulders near the water's edge.
+  scatterBoulders('farcrysis-shore-boulders', 0x6d655c, 8, ART_SEED + 3, (rng, i) => {
     const angle = (i / 8) * Math.PI * 2 + 0.2;
-    const shoreDist = ARENA_HALF - 2 + shoreRng() * 3;
-    const rx = Math.cos(angle) * shoreDist;
-    const rz = Math.sin(angle) * shoreDist;
-    const baseY = terrainHeight(rx, rz);
-    const rGeom = new THREE.IcosahedronGeometry(0.8 + shoreRng() * 1.2, 2);
-    const boulder = new THREE.Mesh(rGeom, shoreBoulderMat);
-    boulder.name = `farcrysis-shore-boulder-${i}`;
-    boulder.position.set(rx, baseY + 0.3, rz);
-    boulder.rotation.set(shoreRng() * Math.PI, shoreRng() * Math.PI, shoreRng() * Math.PI);
-    boulder.castShadow = true;
-    boulder.receiveShadow = true;
-    group.add(boulder);
-  }
+    const shoreDist = ARENA_HALF - 2 + rng() * 3;
+    return [Math.cos(angle) * shoreDist, Math.sin(angle) * shoreDist, 0.9 + rng() * 1.0];
+  });
 
   // ---- Pass 69 density polish: beach litter, driftwood, interior undergrowth ----
   addBeachLitter(group);
@@ -583,15 +669,23 @@ function buildInlineTerrain(scene: THREE.Scene): void {
 }
 
 function buildInlineLighting(scene: THREE.Scene): void {
-  const ambient = new THREE.AmbientLight(0xffe8cc, 0.55);
+  // Pass 76 regrade: the arena's OWN lights stack on top of the engine lights
+  // legacy-main creates from the visual definition, and the old values (warm
+  // cream ambient 0.55 + warm cream hemi 0.5 + orange sun 2.8) drowned every
+  // green in a beige golden wash — the audit's "beige golden-hour" P0. The
+  // brief is saturated tropical DAYLIGHT: blue sky influence from above, a
+  // warm (not orange) sun, and green bounce off the canopy from below.
+  const ambient = new THREE.AmbientLight(0xdcecdf, 0.16);
   ambient.name = 'farcrysis-ambient';
   scene.add(ambient);
 
-  const hemi = new THREE.HemisphereLight(0xffe8cc, 0x4a6b3a, 0.50);
+  // Sky/ground hemisphere carries most of the indirect light: pale tropical
+  // blue from the sky dome, deep foliage green rising off the jungle floor.
+  const hemi = new THREE.HemisphereLight(0x9fd0e8, 0x3c5f2c, 0.72);
   hemi.name = 'farcrysis-hemi';
   scene.add(hemi);
 
-  const sun = new THREE.DirectionalLight(0xffd9a0, 2.8);
+  const sun = new THREE.DirectionalLight(0xfff0d2, 2.1);
   sun.name = 'farcrysis-sun';
   sun.position.set(-18, 22, 25);
   sun.castShadow = true;
@@ -605,20 +699,23 @@ function buildInlineLighting(scene: THREE.Scene): void {
   sun.shadow.normalBias = 0.03;
   scene.add(sun);
 
-  // Low-intensity warm fill from below to soften underside shadows on rocks/boulders.
+  // Green canopy bounce from below softens undersides of rocks and fronds.
   // Deliberately does NOT castShadow so it cannot create secondary shadows.
-  const bounce = new THREE.DirectionalLight(0xffe0c0, 0.15);
+  const bounce = new THREE.DirectionalLight(0x9cc76e, 0.2);
   bounce.name = 'farcrysis-bounce';
   bounce.position.set(0, -2, 0);
   scene.add(bounce);
 
-  const fill = new THREE.DirectionalLight(0x7d9cc9, 0.28);
+  const fill = new THREE.DirectionalLight(0x8fb8d9, 0.3);
   fill.name = 'farcrysis-fill';
   fill.position.set(6, 10, -20);
   scene.add(fill);
 
-  const fogColor = new THREE.Color(0xffd4b3);
-  scene.fog = new THREE.FogExp2(fogColor, 0.0028);
+  // Fallback fog for review copies (the live renderer overwrites this with
+  // the visual definition's fog band) — same pale aqua-sage family so the
+  // depth haze pulls toward the sea/sky instead of tinting the jungle beige.
+  const fogColor = new THREE.Color(0xc9ddd2);
+  scene.fog = new THREE.FogExp2(fogColor, 0.0022);
 }
 
 function buildInlineWater(scene: THREE.Scene): void {
@@ -635,12 +732,17 @@ function buildInlineWater(scene: THREE.Scene): void {
   const deepGeom = new THREE.PlaneGeometry(deepSize, deepSize);
   deepGeom.rotateX(-Math.PI / 2);
 
+  // Pass 76: metalness 0.35 at roughness 0.15 is what made the sea read as
+  // glossy green marble — metallic water reflects only the environment and
+  // goes dark/waxy. Dielectric water: no metalness, moderate roughness, and
+  // a deeper blue so the shallow→deep gradient (turquoise lens over sand
+  // gradient ring, then this) reads like a real tropical shelf.
   const deepMat = new THREE.MeshStandardMaterial({
-    color: 0x0b6a7a,
-    roughness: 0.15,
-    metalness: 0.35,
+    color: 0x0e5e7e,
+    roughness: 0.3,
+    metalness: 0.02,
     transparent: true,
-    opacity: 0.82,
+    opacity: 0.88,
   });
 
   const deep = new THREE.Mesh(deepGeom, deepMat);
@@ -658,11 +760,13 @@ function buildInlineWater(scene: THREE.Scene): void {
   shallowGeom.rotateX(-Math.PI / 2);
 
   const shallowMat = new THREE.MeshStandardMaterial({
-    color: 0x2f9aa0,
-    roughness: 0.35,
-    metalness: 0.1,
+    // Pass 76: brighter turquoise, fully dielectric — the sunlit shallow lens
+    // over the sand shelf that sells "tropical lagoon" at a glance.
+    color: 0x3fc2b7,
+    roughness: 0.26,
+    metalness: 0.0,
     transparent: true,
-    opacity: 0.45,
+    opacity: 0.4,
     depthWrite: false,
   });
 
@@ -804,32 +908,58 @@ function addDriftwoodLogs(group: THREE.Group): void {
   }
 }
 
-/** Low flat undergrowth bushes inside the jungle interior (edgeDist ≥ 14). */
+/** Layered leaf-card undergrowth inside the jungle interior (edgeDist ≥ 14). */
 function addJungleUndergrowth(group: THREE.Group): void {
+  // Pass 76: this used to be 18 squashed BOXES — the audit's "undergrowth
+  // boxes" P1. It is now one instanced draw of arched leaf CARDS at ~4x the
+  // density: every accepted scatter point sprouts 4 tilted cards fanned at
+  // different yaws/heights, which reads as layered ground foliage.
   const undergrowthMat = mat(0x35682f, 0.9, 0.02);
-  const bushCount = 18;
+  undergrowthMat.side = THREE.DoubleSide; // tilted cards read from both faces
+  const clumpCount = 18;
+  const cardsPerClump = 4;
   const rng = mulberry32(ART_SEED + 7);
 
-  for (let i = 0; i < bushCount; i += 1) {
-    const angle = (i / bushCount) * Math.PI * 2 + (rng() - 0.5) * 1.2;
+  const cardGeom = new THREE.BoxGeometry(0.85, 0.62, 0.035);
+  cardGeom.translate(0, 0.31, 0); // pivot at the root so tilts arch outward
+  const cards = new THREE.InstancedMesh(cardGeom, undergrowthMat, clumpCount * cardsPerClump);
+  cards.name = 'farcrysis-undergrowth-leaf-cards';
+  cards.castShadow = true;
+  cards.receiveShadow = true;
+  cards.userData.farcrysisArt = true;
+
+  const matrix = new THREE.Matrix4();
+  const quat = new THREE.Quaternion();
+  const euler = new THREE.Euler();
+  let placed = 0;
+  for (let i = 0; i < clumpCount; i += 1) {
+    const angle = (i / clumpCount) * Math.PI * 2 + (rng() - 0.5) * 1.2;
     const dist = 7 + rng() * 9; // 7-16 → jungle interior
     const rx = Math.max(-ARENA_HALF + 4, Math.min(ARENA_HALF - 4, Math.cos(angle) * dist));
     const rz = Math.max(-ARENA_HALF + 4, Math.min(ARENA_HALF - 4, Math.sin(angle) * dist * 0.9));
-    const sx = 0.7 + rng() * 0.8;
-    const sz = 0.7 + rng() * 0.8;
     const rotY = rng() * Math.PI;
     const edgeDist = ARENA_HALF - Math.max(Math.abs(rx), Math.abs(rz));
     if (edgeDist < 14) continue; // keep strictly inside the jungle interior
     const baseY = terrainHeight(rx, rz);
 
-    group.add(makeMesh(
-      new THREE.BoxGeometry(1.2, 1.0, 1.2),
-      undergrowthMat,
-      `farcrysis-undergrowth-bush-${i}`,
-      [rx, baseY + 0.21, rz],
-      { rotation: [0, rotY, 0], scale: [sx, 0.42, sz], castShadow: true },
-    ));
+    for (let card = 0; card < cardsPerClump; card += 1) {
+      const cardYaw = rotY + (card / cardsPerClump) * Math.PI * 2 + rng() * 0.6;
+      const spread = 0.12 + rng() * 0.3;
+      euler.set(0.3 + rng() * 0.35, cardYaw, (rng() - 0.5) * 0.2);
+      quat.setFromEuler(euler);
+      matrix.compose(
+        new THREE.Vector3(rx + Math.cos(cardYaw) * spread, baseY + 0.02, rz + Math.sin(cardYaw) * spread),
+        quat,
+        new THREE.Vector3(0.7 + rng() * 0.7, 0.75 + rng() * 0.7, 1),
+      );
+      cards.setMatrixAt(placed, matrix);
+      placed += 1;
+    }
   }
+  cards.count = placed; // skip slots dropped by the edge-distance guard
+  cards.instanceMatrix.needsUpdate = true;
+  cards.computeBoundingSphere();
+  group.add(cards);
 }
 
 /**

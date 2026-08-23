@@ -40,17 +40,20 @@ const OCEAN_COLOR = 0x1f7086; // tropical open-ocean teal, warmed for sunset
 const OCEAN_ROUGHNESS = 0.3; // low roughness → golden-hour sun glitter path
 const OCEAN_METALNESS = 0.05;
 const OCEAN_EMISSIVE = 0x55260f; // faint warm glow — sunset colour grading on the water
-const OCEAN_EMISSIVE_INTENSITY = 0.22;
+const OCEAN_EMISSIVE_INTENSITY = 0.1; // pass 76: daylight grade, less sunset glow
 
 /** Horizontal sun azimuth — matches the golden-hour light at (-18, 22, 25). */
 const SUN_AZIMUTH = new THREE.Vector3(-18, 0, 25).normalize();
 
-/** Distant hazy green — sits inside the warm FogExp2 (0xffd4b3) haze. */
-const ISLAND_HAZE_COLOR = 0x4a6a5a;
+/**
+ * Distant jungle-ridge green. Pass 76: darkened — under the daylight grade
+ * the old 0x4a6a5a lit up near-white and the islands read as icebergs; a
+ * deeper green lets the (retuned) fog supply the haze instead.
+ */
+const ISLAND_HAZE_COLOR = 0x36523f;
 
-/** Low-poly island silhouette facets. */
+/** Low-poly island silhouette facets (shore apron; ridges use 9 radial). */
 const ISLAND_RADIAL_SEGMENTS = 8;
-const PEAK_RADIAL_SEGMENTS = 7;
 
 /** Five island centres, 143–150 m out, spread around the compass. */
 const ISLAND_POSITIONS: ReadonlyArray<readonly [number, number, number]> = [
@@ -143,7 +146,7 @@ function buildSunsetHorizonGlow(scene: THREE.Scene): void {
     new THREE.MeshBasicMaterial({
       color: 0xff8f3f,
       transparent: true,
-      opacity: 0.16,
+      opacity: 0.1,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       fog: false,
@@ -164,7 +167,7 @@ function buildSunsetHorizonGlow(scene: THREE.Scene): void {
     new THREE.MeshBasicMaterial({
       color: 0xffb469,
       transparent: true,
-      opacity: 0.30,
+      opacity: 0.2,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       fog: false,
@@ -264,6 +267,31 @@ function buildSunGlitterPath(scene: THREE.Scene): void {
 // Distant island silhouettes
 // ---------------------------------------------------------------------------
 
+/**
+ * Position-hashed radial displacement (deterministic, watertight — duplicated
+ * seam vertices share identical offsets because only position feeds the hash).
+ * Local copy: the vegetation module's lumpify would be an awkward import here.
+ */
+function ridgeDisplace(geometry: THREE.BufferGeometry, amplitude: number, salt: number): THREE.BufferGeometry {
+  const pos = geometry.getAttribute('position') as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i += 1) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const len = Math.sqrt(x * x + z * z);
+    if (len < 1e-5) continue; // apex/axis vertices stay put
+    const n = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719 + salt * 94.673) * 43758.5453;
+    const d = ((n - Math.floor(n)) - 0.5) * 2 * amplitude;
+    // Displace horizontally only, so ridgelines wander while summit heights
+    // stay authored — this is what turns a cone into a ridged massif.
+    pos.setX(i, x + (x / len) * d);
+    pos.setZ(i, z + (z / len) * d);
+  }
+  pos.needsUpdate = true;
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 function buildIsland(
   scene: THREE.Scene,
   index: number,
@@ -283,55 +311,53 @@ function buildIsland(
   group.position.set(position[0], position[1], position[2]);
   group.userData.farcrysisArt = true;
 
-  // ---- Rocky base — wide low cone rising out of the sea ----
-  const base = new THREE.Mesh(
-    new THREE.ConeGeometry(baseRadius, baseHeight, ISLAND_RADIAL_SEGMENTS, 1),
+  // Pass 76: the old islands were a clean cone + squashed sphere — the audit's
+  // "salmon cone + tan dome" (the salmon came from the beige fog). Every mass
+  // is now a ridge-displaced, elongated, tilted cone; three to five of them
+  // overlapping at different headings gives the layered ridgeline silhouette
+  // real volcanic islands have, and the (retuned) fog supplies the haze.
+  const massCount = 3 + Math.floor(rng() * 3);
+  for (let massIndex = 0; massIndex < massCount; massIndex++) {
+    const isMain = massIndex === 0;
+    const peakHeight = isMain
+      ? (16 + rng() * 12) * s   // main ridge ≈ 14–28 m over the sea
+      : (5 + rng() * 9) * s;    // shoulders and foothills
+    const peakRadius = (isMain ? 7 + rng() * 6 : 5 + rng() * 7) * s;
+    const offX = isMain ? 0 : (rng() - 0.5) * baseRadius * 1.3;
+    const offZ = isMain ? 0 : (rng() - 0.5) * baseRadius * 1.3;
+
+    const ridge = new THREE.Mesh(
+      ridgeDisplace(
+        new THREE.ConeGeometry(peakRadius, peakHeight, 9, 3),
+        peakRadius * 0.24,
+        index * 31 + massIndex * 7,
+      ),
+      islandMat,
+    );
+    // Elongate along a per-mass heading so ridgelines read as ridges, not tents.
+    ridge.scale.set(1.25 + rng() * 0.7, 1, 0.75 + rng() * 0.3);
+    ridge.rotation.y = rng() * Math.PI;
+    ridge.position.set(offX, baseTopY + peakHeight / 2 - 0.6 * s, offZ);
+    ridge.castShadow = true;
+    ridge.receiveShadow = true;
+    ridge.userData.farcrysisArt = true;
+    group.add(ridge);
+  }
+
+  // Low shore apron rising out of the sea under the ridges.
+  const apron = new THREE.Mesh(
+    ridgeDisplace(
+      new THREE.ConeGeometry(baseRadius, baseHeight, ISLAND_RADIAL_SEGMENTS, 2),
+      baseRadius * 0.18,
+      index * 53 + 11,
+    ),
     islandMat,
   );
-  base.position.y = baseTopY - baseHeight / 2; // bottom ~5–6 m below water
-  base.castShadow = true;
-  base.receiveShadow = true;
-  base.userData.farcrysisArt = true;
-  group.add(base);
-
-  // ---- Volcanic peaks (1–2 per island), 20–38 m above the mass ----
-  const peakCount = 1 + Math.floor(rng() * 2);
-  for (let p = 0; p < peakCount; p++) {
-    const peakRadius = (5 + rng() * 8) * s;
-    const peakHeight = (20 + rng() * 17) * s; // apex ≈ 18–36 m above the sea
-    const offX = (rng() - 0.5) * baseRadius * 1.1;
-    const offZ = (rng() - 0.5) * baseRadius * 1.1;
-
-    const peak = new THREE.Mesh(
-      new THREE.ConeGeometry(peakRadius, peakHeight, PEAK_RADIAL_SEGMENTS, 1),
-      islandMat,
-    );
-    peak.position.set(offX, baseTopY + peakHeight / 2 - 0.6 * s, offZ);
-    peak.rotation.y = rng() * Math.PI; // facet orientation varies per island
-    peak.castShadow = true;
-    peak.receiveShadow = true;
-    peak.userData.farcrysisArt = true;
-    group.add(peak);
-  }
-
-  // ---- Jungle dome hills (1–2 squashed spheres) ----
-  const hillCount = 1 + Math.floor(rng() * 2);
-  for (let h = 0; h < hillCount; h++) {
-    const hillRadius = (9 + rng() * 9) * s;
-    const offX = (rng() - 0.5) * baseRadius * 0.8;
-    const offZ = (rng() - 0.5) * baseRadius * 0.8;
-
-    const hill = new THREE.Mesh(
-      new THREE.SphereGeometry(hillRadius, 8, 5),
-      islandMat,
-    );
-    hill.scale.y = 0.5; // squash into a dome
-    hill.position.set(offX, baseTopY + hillRadius * 0.28, offZ);
-    hill.castShadow = true;
-    hill.receiveShadow = true;
-    hill.userData.farcrysisArt = true;
-    group.add(hill);
-  }
+  apron.position.y = baseTopY - baseHeight / 2; // bottom ~5–6 m below water
+  apron.castShadow = true;
+  apron.receiveShadow = true;
+  apron.userData.farcrysisArt = true;
+  group.add(apron);
 
   scene.add(group);
 }
@@ -391,15 +417,18 @@ function buildBirds(scene: THREE.Scene): void {
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
   const material = new THREE.PointsMaterial({
-    size: 1.8,
+    // Pass 76: 1.8 world units rendered every gull as a fat glowing bokeh
+    // ball against the sky (they read as snow together with the dust motes).
+    // Kept small and slightly translucent — distant specks, not orbs.
+    size: 0.9,
     sizeAttenuation: true,
-    // Untextured points are square. At 1.8 world units a distant seabird was a
+    // Untextured points are square. At this size a distant seabird was a
     // hard white block on the horizon; the soft dot reads as a bird at range.
     map: softDotTexture(),
     alphaTest: 0.12,
     vertexColors: true,
     transparent: true,
-    opacity: 0.95,
+    opacity: 0.8,
     depthWrite: false,
   });
 

@@ -858,6 +858,12 @@ export function applyFarcrysisTextures(root: THREE.Group): void {
     if (!(obj instanceof THREE.Mesh)) return;
 
     const mesh = obj;
+    // Pass 76: a mesh with no UV attribute cannot carry an image texture —
+    // three.js samples an undefined UV (effectively one corner texel) across
+    // the whole surface. The palm crown fan (custom BufferGeometry, positions
+    // only) matched the 'frond' classifier this way and rendered as a solid
+    // BROWN dome sampled from the leaf photo's stem corner.
+    if (!mesh.geometry.getAttribute('uv')) return;
     const category = classifyMesh(mesh);
     if (!category) return;
 

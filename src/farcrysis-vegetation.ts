@@ -24,6 +24,7 @@ import * as THREE from 'three';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { farcrysisTerrainHeight as terrainHeightAt } from './farcrysis-terrain-authority';
+import { buildPalmStandInstances, type PalmPlacement } from './farcrysis-palms-enhanced';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   makeTslFoliageMaterial,
@@ -71,14 +72,21 @@ function registerLODPair(near: THREE.InstancedMesh[], far: THREE.InstancedMesh[]
 
 /**
  * Call when camera distance changes to toggle near/far LOD impostors.
- * Threshold: dist < 35m → near (full detail); dist >= 35m → far (impostor).
- * Non-breaking: if no LOD pairs registered (e.g. buildVegetation not called yet),
- * this is a safe no-op.
+ * Threshold: dist < 80m → near (full detail); dist >= 80m → far (impostor).
+ *
+ * Pass 76: the old 35 m threshold was measured to the ARENA CENTRE, but a
+ * player standing at a corner spawn is already ~38 m out — the entire jungle
+ * swapped to crude impostor cones DURING NORMAL PLAY. In-arena cameras top
+ * out around 45 m from centre, so 80 m keeps full detail for every gameplay
+ * camera and reserves the impostors for menu fly-bys and review orbits.
+ *
+ * Non-breaking: if no LOD pairs registered (e.g. buildVegetation not called
+ * yet), this is a safe no-op.
  *
  * @param dist Camera-to-arena-centre distance in metres.
  */
 export function setVegetationLOD(dist: number): void {
-  const useNear = dist < 35;
+  const useNear = dist < 80;
   for (const pair of _lodPairs) {
     pair.near.forEach((m) => { m.visible = useNear; });
     pair.far.forEach((m) => { m.visible = !useNear; });
@@ -306,7 +314,7 @@ function positionHashNoise(x: number, y: number, z: number, salt: number): numbe
  * triangle counts are untouched (positions only), so the WebGL2 static
  * batcher's toNonIndexed() path sees an unchanged, in-range index set.
  */
-function lumpify(geometry: THREE.BufferGeometry, amplitude: number, salt: number): THREE.BufferGeometry {
+export function lumpify(geometry: THREE.BufferGeometry, amplitude: number, salt: number): THREE.BufferGeometry {
   const pos = geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
   if (!pos) return geometry;
   for (let i = 0; i < pos.count; i += 1) {
@@ -477,75 +485,76 @@ function grovePositions(
 // ---------------------------------------------------------------------------
 
 function addPalms(root: THREE.Group): void {
+  // Pass 76 consolidation: this layer used to be its OWN palm species — a
+  // straight cylinder wearing a flat 3.2 m slab of "fronds". It now renders
+  // through the shared enhanced-palm builder (fan crowns, tapered leaning
+  // trunks, coconuts), so all three palm systems in the arena are one look.
   const count = 22;
-  const trunkGeom = new THREE.CylinderGeometry(0.18, 0.34, 2.8, 8);
-  const frondGeom = new THREE.BoxGeometry(3.2, 0.16, 3.2);
-
-  const trunks = new THREE.InstancedMesh(trunkGeom, vegeMat(FARCRYSIS_ART_FEEL.palmTrunk, 0.88, 0.03), count);
-  trunks.name = 'farcrysis-vege-palm-trunks';
-  const fronds = new THREE.InstancedMesh(frondGeom, vegeMat(FARCRYSIS_ART_FEEL.palmFrond, 0.85, 0.02), count);
-  fronds.name = 'farcrysis-vege-palm-fronds';
-
-  const tMat = new THREE.Matrix4();
-  const fMat = new THREE.Matrix4();
   const positions = ringPositions(count, 19, 30);
+  const placements: PalmPlacement[] = positions.map(([x, z, angle], i) => {
+    const scale = 0.85 + (i % 3) * 0.12;
+    return {
+      x,
+      z,
+      // HF-360: seat each trunk on the terrain authority.
+      baseY: terrainHeightAt(x, z),
+      yaw: angle + 0.3,
+      lean: (i % 3 === 0 ? 0.07 : -0.06) * (Math.sin(angle) * 0.9),
+      scale,
+      crownSpin: angle * 1.3 + i * 0.15,
+      crownTilt: ((i % 3) - 1) * 0.06,
+      crownScale: scale * (0.95 + ((i * 5) % 4) * 0.04),
+    };
+  });
+  const { trunkInstances, frondInstances, coconutInstances } =
+    buildPalmStandInstances(root, placements, 'farcrysis-vege-palm');
+  register(trunkInstances, 'palm');
+  register(frondInstances, 'palm');
+  register(coconutInstances, 'palm', { castShadow: false, receiveShadow: true });
 
-  for (let i = 0; i < count; i += 1) {
-    const [x, z, angle] = positions[i];
-    // HF-360: seat each trunk on the terrain authority (was flat baseY=1.4,
-    // which buried palms on hills and floated them over the shore descent).
-    const baseY = terrainHeightAt(x, z) + 1.4;
-    const frondY = baseY + 2.7;
-    const lean = (i % 3 === 0 ? 0.07 : -0.06) * (Math.sin(angle) * 0.25);
-
-    tMat.compose(
-      new THREE.Vector3(x, baseY, z),
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(lean, angle + 0.3, 0)),
-      new THREE.Vector3(0.85 + (i % 3) * 0.12, 1.0, 0.85 + (i % 3) * 0.12),
-    );
-    trunks.setMatrixAt(i, tMat);
-
-    fMat.compose(
-      new THREE.Vector3(x, frondY, z),
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, angle * 1.3 + i * 0.15, 0)),
-      new THREE.Vector3(0.85 + (i % 4) * 0.1, 1.0, 0.85 + ((i + 1) % 4) * 0.1),
-    );
-    fronds.setMatrixAt(i, fMat);
+  // --- Palm far-LOD impostor: simplified dark palm (trunk + 5 frond cards),
+  // NEVER the old bare cone the audit flagged rendering as white spikes. ---
+  const lodParts: Array<{ geom: THREE.BufferGeometry; matrix: THREE.Matrix4 }> = [
+    {
+      geom: new THREE.CylinderGeometry(0.14, 0.26, 2.5, 5),
+      matrix: new THREE.Matrix4().makeTranslation(0, 1.25, 0),
+    },
+  ];
+  for (let f = 0; f < 5; f += 1) {
+    const frondAngle = (f / 5) * Math.PI * 2;
+    lodParts.push({
+      geom: new THREE.BoxGeometry(1.7, 0.05, 0.42),
+      matrix: new THREE.Matrix4().compose(
+        new THREE.Vector3(Math.cos(frondAngle) * 0.7, 2.5 - (f % 2) * 0.12, Math.sin(frondAngle) * 0.7),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.35, frondAngle, 0.1)),
+        new THREE.Vector3(1, 1, 1),
+      ),
+    });
   }
-
-  trunks.instanceMatrix.needsUpdate = true;
-  fronds.instanceMatrix.needsUpdate = true;
-
-  root.add(register(trunks, 'palm'));
-  root.add(register(fronds, 'palm'));
-
-  // --- Palm LOD impostor: simple cone (half triangle count) ---
-  const lodCount = count;
-  const lodGeom = new THREE.ConeGeometry(0.4, 5.0, 6, 1);
-  const lodMat = vegeMat(FARCRYSIS_ART_FEEL.palmFrond, 0.86, 0.02);
-  const lodMesh = new THREE.InstancedMesh(lodGeom, lodMat, lodCount);
-  lodMesh.name = 'farcrysis-vege-palm-lod';
+  const lodGeom = mergeTransformed(lodParts);
+  // Deep jungle green — distinct from the frond palette so the texture
+  // classifier never mistakes the impostor for a frond surface again.
+  const lodMat = vegeMat(0x2b4d26, 0.9, 0.02);
+  const lodMesh = new THREE.InstancedMesh(lodGeom, lodMat, count);
+  lodMesh.name = 'farcrysis-vege-palm-imposters';
   lodMesh.castShadow = false;
   lodMesh.receiveShadow = true;
   lodMesh.userData.farcrysisArt = true;
 
   const lodM = new THREE.Matrix4();
-  for (let i = 0; i < lodCount; i++) {
-    const [x, z, angle] = positions[i];
-    const frondY = terrainHeightAt(x, z) + 1.4 + 2.7; // match the seated frond centre
+  for (let i = 0; i < count; i++) {
+    const placement = placements[i];
     lodM.compose(
-      new THREE.Vector3(x, frondY - 0.5, z),
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, angle * 1.3 + i * 0.15, 0)),
-      new THREE.Vector3(1, 1, 1),
+      new THREE.Vector3(placement.x, placement.baseY, placement.z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, placement.crownSpin, 0)),
+      new THREE.Vector3(placement.scale, placement.scale, placement.scale),
     );
     lodMesh.setMatrixAt(i, lodM);
   }
   lodMesh.instanceMatrix.needsUpdate = true;
+  lodMesh.computeBoundingSphere();
 
-  // Wind-enable fronds for gentle sway
-  // HF-359: fronds converted by _applyTslFoliage at end of build
-
-  registerLODPair([trunks, fronds], [lodMesh]);
+  registerLODPair([trunkInstances, frondInstances, coconutInstances], [lodMesh]);
   root.add(lodMesh);
 }
 
@@ -562,7 +571,7 @@ function addBroadleafTrees(root: THREE.Group): void {
 
   const trunks = new THREE.InstancedMesh(trunkGeom, vegeMat(0x6b4e30, 0.92, 0.02), count);
   trunks.name = 'farcrysis-vege-broadleaf-trunks';
-  const canopies = new THREE.InstancedMesh(canopyGeom, vegeMat(0x3a6e32, 0.88, 0.01), count);
+  const canopies = new THREE.InstancedMesh(canopyGeom, vegeMat(0x4a8038, 0.88, 0.01), count);
   canopies.name = 'farcrysis-vege-broadleaf-canopies';
 
   const tMat = new THREE.Matrix4();
@@ -601,15 +610,39 @@ function addBroadleafTrees(root: THREE.Group): void {
 }
 
 // ---------------------------------------------------------------------------
-// 3. Conifer / cypress — tall columnar evergreen (mid ring)
+// 3. Traveller's fan palms — upright leaf fans on short trunks (mid ring)
+//
+// Pass 76: this slot used to be CONIFER cones — an alpine species that has no
+// business on a tropical island (the audit's "wrong biome" P1). Replaced with
+// a traveller's-palm archetype: a short trunk with a single plane of six
+// upright oval leaf cards fanned ±72°, which is unmistakably tropical.
 // ---------------------------------------------------------------------------
 
-function addConifers(root: THREE.Group): void {
+function addFanPalms(root: THREE.Group): void {
   const count = 20;
-  const coneGeom = new THREE.ConeGeometry(0.42, 3.6, 10, 1);
 
-  const cones = new THREE.InstancedMesh(coneGeom, vegeMat(0x2a5528, 0.9, 0.02), count);
-  cones.name = 'farcrysis-vege-conifers';
+  const parts: Array<{ geom: THREE.BufferGeometry; matrix: THREE.Matrix4 }> = [
+    {
+      geom: new THREE.CylinderGeometry(0.09, 0.15, 1.3, 7),
+      matrix: new THREE.Matrix4().makeTranslation(0, 0.65, 0),
+    },
+  ];
+  for (let leaf = 0; leaf < 6; leaf += 1) {
+    // Fan the leaves in ONE plane (traveller's palm signature): -72°..+72°
+    const fanAngle = (leaf / 5 - 0.5) * 2.4;
+    parts.push({
+      geom: new THREE.BoxGeometry(0.3, 1.7, 0.04),
+      matrix: new THREE.Matrix4().compose(
+        new THREE.Vector3(Math.sin(fanAngle) * 0.55, 1.3 + Math.cos(fanAngle) * 0.8, 0),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -fanAngle)),
+        new THREE.Vector3(1, 1, 1),
+      ),
+    });
+  }
+  const fanGeom = mergeTransformed(parts);
+
+  const fans = new THREE.InstancedMesh(fanGeom, vegeMat(0x2f6b2b, 0.88, 0.02), count);
+  fans.name = 'farcrysis-vege-fan-palms';
 
   const matrix = new THREE.Matrix4();
   const positions = discPositions(count, 16);
@@ -618,16 +651,17 @@ function addConifers(root: THREE.Group): void {
     const [x, z, angle] = positions[i];
     const s = 0.75 + (i % 5) * 0.14;
     matrix.compose(
-      // HF-360: seated on the terrain authority (was flat y=1.8).
-      new THREE.Vector3(x, terrainHeightAt(x, z) + 1.8, z),
+      // HF-360: seated on the terrain authority (base-origin geometry).
+      new THREE.Vector3(x, terrainHeightAt(x, z), z),
       new THREE.Quaternion().setFromEuler(new THREE.Euler(0, angle, 0)),
       new THREE.Vector3(s, 0.85 + (i % 4) * 0.1, s),
     );
-    cones.setMatrixAt(i, matrix);
+    fans.setMatrixAt(i, matrix);
   }
 
-  cones.instanceMatrix.needsUpdate = true;
-  root.add(register(cones, 'conifer'));
+  fans.instanceMatrix.needsUpdate = true;
+  fans.computeBoundingSphere();
+  root.add(register(fans, 'fan-palm'));
 }
 
 // ---------------------------------------------------------------------------
@@ -955,7 +989,7 @@ function addKapokTrees(root: THREE.Group): void {
 
   const trunks = new THREE.InstancedMesh(kapokTrunkGeom, vegeMat(0x7a5e3e, 0.9, 0.03), count);
   trunks.name = 'farcrysis-vege-kapok-trunks';
-  const canopies = new THREE.InstancedMesh(kapokCanopyGeom, vegeMat(0x3a7234, 0.86, 0.01), count);
+  const canopies = new THREE.InstancedMesh(kapokCanopyGeom, vegeMat(0x498540, 0.86, 0.01), count);
   canopies.name = 'farcrysis-vege-kapok-canopies';
 
   const tMat = new THREE.Matrix4();
@@ -1447,7 +1481,7 @@ function addMangroveTrees(root: THREE.Group): void {
 
   const trunks = new THREE.InstancedMesh(mangroveTrunkGeom, vegeMat(0x5a4232, 0.9, 0.04), count);
   trunks.name = 'farcrysis-vege-mangrove-trunks';
-  const canopies = new THREE.InstancedMesh(mangroveCanopyGeom, vegeMat(0x2a4a28, 0.88, 0.02), count);
+  const canopies = new THREE.InstancedMesh(mangroveCanopyGeom, vegeMat(0x3d6b38, 0.88, 0.02), count);
   canopies.name = 'farcrysis-vege-mangrove-canopies';
 
   const tMat = new THREE.Matrix4();
@@ -1483,10 +1517,24 @@ function addMangroveTrees(root: THREE.Group): void {
   root.add(register(trunks, 'mangrove', { castShadow: true, receiveShadow: true }));
   root.add(register(canopies, 'mangrove', { castShadow: false, receiveShadow: true }));
 
-  // --- Mangrove LOD impostor: simple cone (half triangle count) ---
+  // --- Mangrove far-LOD impostor: a lumpy canopy blob on a stub trunk.
+  // Pass 76: was a bare 4.5 m cone — a pine silhouette on a tropical shore.
   const lodCount = count;
-  const lodGeom = new THREE.ConeGeometry(0.35, 4.5, 6, 1);
-  const lodMat = vegeMat(0x2a4a28, 0.88, 0.02);
+  const lodGeom = mergeTransformed([
+    {
+      geom: new THREE.CylinderGeometry(0.12, 0.2, 1.6, 5),
+      matrix: new THREE.Matrix4().makeTranslation(0, -1.4, 0),
+    },
+    {
+      geom: lumpify(new THREE.IcosahedronGeometry(1.25, 1), 0.28, 0x9a47),
+      matrix: new THREE.Matrix4().compose(
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Quaternion(),
+        new THREE.Vector3(1, 0.72, 1),
+      ),
+    },
+  ]);
+  const lodMat = vegeMat(0x3d6b38, 0.88, 0.02);
   const lodMesh = new THREE.InstancedMesh(lodGeom, lodMat, lodCount);
   lodMesh.name = 'farcrysis-vege-mangrove-lod';
   lodMesh.castShadow = false;
@@ -2078,7 +2126,7 @@ function addBloomTrees(root: THREE.Group): void {
 
   const trunks = new THREE.InstancedMesh(trunkGeom, vegeMat(0x6d5438, 0.9, 0.03), count);
   trunks.name = 'farcrysis-vege-bloom-trunks';
-  const canopies = new THREE.InstancedMesh(canopyGeom, vegeMat(0x357a2e, 0.86, 0.01), count);
+  const canopies = new THREE.InstancedMesh(canopyGeom, vegeMat(0x428a38, 0.86, 0.01), count);
   canopies.name = 'farcrysis-vege-bloom-canopies';
   const blossoms = new THREE.InstancedMesh(blossomGeom, vegeMat(0xe8602a, 0.6, 0.02), bloomCount);
   blossoms.name = 'farcrysis-vege-bloom-blossoms';
@@ -2473,6 +2521,50 @@ function addHeliconiaClumps(root: THREE.Group): void {
 }
 
 /**
+ * Pass 76 species #36 — dense leaf-card undergrowth: clumps of three arched
+ * cards at ~3.5x the density of the old box shrubs. This is the layer that
+ * fills the space between the ground litter and the waist-high shrubs, which
+ * is where the Far Cry jungles get their depth.
+ */
+function addLeafCardUndergrowth(root: THREE.Group): void {
+  const clumps = 110;
+  const cardsPerClump = 3;
+  const count = clumps * cardsPerClump;
+  const SEED = 0x76c4_ad05;
+
+  const cardGeom = new THREE.BoxGeometry(0.5, 0.72, 0.03);
+  cardGeom.translate(0, 0.36, 0); // root pivot so tilts arch outward
+
+  const cardMat = vegeMat(0x2f6428, 0.86, 0.02);
+  cardMat.side = THREE.DoubleSide;
+  const cards = new THREE.InstancedMesh(cardGeom, cardMat, count);
+  cards.name = 'farcrysis-vege-undergrowth-cards';
+
+  const matrix = new THREE.Matrix4();
+  const positions = layerPositions(clumps, 6, 27, 1.2, SEED);
+  const rng = mulberry32(SEED + 3);
+
+  for (let i = 0; i < positions.length; i++) {
+    const [x, z, groundY, angle] = positions[i];
+    for (let card = 0; card < cardsPerClump; card += 1) {
+      const cardYaw = angle + (card / cardsPerClump) * Math.PI * 2 + rng() * 0.7;
+      const spread = 0.08 + rng() * 0.22;
+      const s = 0.7 + rng() * 0.75;
+      matrix.compose(
+        new THREE.Vector3(x + Math.cos(cardYaw) * spread, groundY + 0.02, z + Math.sin(cardYaw) * spread),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0.28 + rng() * 0.3, cardYaw, (rng() - 0.5) * 0.2)),
+        new THREE.Vector3(s, s * (0.85 + rng() * 0.4), 1),
+      );
+      cards.setMatrixAt(i * cardsPerClump + card, matrix);
+    }
+  }
+
+  cards.instanceMatrix.needsUpdate = true;
+  cards.computeBoundingSphere();
+  root.add(register(cards, undefined, { castShadow: false, receiveShadow: true }));
+}
+
+/**
  * HF-363 ground scatter #35 — "driftwood logs": weathered swept tubes washed
  * up along the outer beach ring, breaking up flat sand. No collision — pure
  * dressing (walk-through unchanged).
@@ -2531,7 +2623,7 @@ export function buildVegetation(scene: THREE.Group): void {
   // Trees — 6 distinct types (existing)
   addPalms(scene);              // LOD pair registered + fronds wind-enabled inside
   addBroadleafTrees(scene);
-  addConifers(scene);
+  addFanPalms(scene);           // pass 76: replaced the wrong-biome conifers
   addBananaPlants(scene);
   addBamboo(scene);
   addDeadTrees(scene);
@@ -2576,6 +2668,7 @@ export function buildVegetation(scene: THREE.Group): void {
   // ---- HF-363 density/species expansion ----
   addHeliconiaClumps(scene);     // species #34 — 70 bent leaf-card clumps
   addDriftwoodLogs(scene);       // ground scatter #35 — 26 beach driftwood logs
+  addLeafCardUndergrowth(scene); // pass 76 #36 — 330 arched leaf cards (~3.5x density)
 
   // ---- Wind-enable remaining flexible vegetation (non-LOD-managed) ----
   _applyTslFoliage(scene); // HF-359/HF-363: TSL wind + canopy dapple on foliage layers

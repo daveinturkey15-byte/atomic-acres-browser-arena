@@ -6,8 +6,14 @@ import type { ArenaMap, PracticeTarget } from './map';
 import type { Team } from './protocol';
 import type { ArenaVerticalNavigation } from './vertical-navigation';
 import { applyFarcrysisArtwork } from './farcrysis-art';
-import { addInteractables } from './farcrysis-physics';
-import { enhancedPalmPlacements, TRUNK_HEIGHT as PALM_TRUNK_HEIGHT } from './farcrysis-palms-enhanced';
+import { addInteractables, buildFuelDrumInstances, FUEL_DRUM_HEIGHT, FUEL_DRUM_RADIUS } from './farcrysis-physics';
+import {
+  buildPalmStandInstances,
+  enhancedPalmPlacements,
+  TRUNK_HEIGHT as PALM_TRUNK_HEIGHT,
+  type PalmPlacement,
+} from './farcrysis-palms-enhanced';
+import { lumpify } from './farcrysis-vegetation';
 import {
   farcrysisTerrainHeight,
   farcrysisTerrainPhysicsTiles,
@@ -192,17 +198,23 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   const sandMat = standard(0xd9c08a, 0.92, 0.02);
   const grassMat = standard(0x5e7d3a, 0.9, 0.03);
   const mudMat = standard(0x6d5638, 0.94, 0.02);
+  // Pass 76: metalness 0.35 + roughness 0.18 made the lagoon read as glossy
+  // green marble (metal water reflects only the environment and goes dark).
+  // Tropical water is a dielectric: near-zero metalness, mid roughness, and a
+  // brighter turquoise that lets the sand gradient below read through.
   const waterMat = new THREE.MeshStandardMaterial({
-    color: 0x2d7f8c,
-    roughness: 0.18,
-    metalness: 0.35,
+    color: 0x2fa3ab,
+    roughness: 0.32,
+    metalness: 0.02,
     transparent: true,
-    opacity: 0.82,
+    opacity: 0.62,
   });
-  const jungleLeafMat = standard(0x2f6b2a, 0.85, 0.02);
+  const jungleLeafMat = standard(0x3d7a33, 0.85, 0.02); // pass 76: brightened for daylight
   const palmTrunkMat = standard(0x7a5b36, 0.9, 0.02);
   const rockMat = standard(0x8b8a87, 0.92, 0.1);
-  const ruinedWallMat = standard(0x9aa1a8, 0.86, 0.12);
+  // Pass 76: cool blue-grey read as fresh concrete; weathered warm stone fits
+  // the "reclaimed by jungle" ruins the moss caps below dress.
+  const ruinedWallMat = standard(0x8a877a, 0.95, 0.02);
   const crateMat = standard(0x6f6a4a, 0.9, 0.18);
   const stationMetalMat = standard(0x6d7a83, 0.42, 0.62);
   const stationGlassMat = new THREE.MeshStandardMaterial({
@@ -213,8 +225,8 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     opacity: 0.4,
     depthWrite: false,
   });
-  const beaconMat = standard(0xe8862b, 0.5, 0.2);
-  const hazardMat = standard(0xd8a12e, 0.5, 0.3);
+  // Pass 76: beaconMat/hazardMat removed — the signal beacon is now a lashed
+  // timber pyre and the warning barrels ride the shared fuel-drum builder.
 
   // Ground + water. HF-360: gameplay ground is no longer a flat y=0 plate —
   // the Rapier capsule stands on terrain plates compiled from the single
@@ -226,24 +238,32 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // The mud plate shrinks from 64 m to 56 m so it ends where the seaward
   // shore descent begins (edge distance 4 m): a full-size flat plate at y=0
   // would poke through the submerged sand ramp.
+  // Pass 76 z-fight fix: these three backstop plates used to stack at
+  // y = 0 / 0.01 / 0.02, INSIDE the sculpted terrain surface wherever the
+  // interior dipped toward its -0.01 minimum — shimmering through the ground
+  // at distance. The sculpted terrain mesh is the visible floor; the plates
+  // only exist so a camera clipping through a seam sees ground-coloured
+  // backstop instead of void, so they now sit safely BELOW the terrain's
+  // interior minimum (still above the lagoon stack at -0.25 and the plates
+  // keep their occlusion role).
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(56, 56), mudMat);
   ground.name = 'farcrysis-ground-plate';
   ground.rotation.x = -Math.PI / 2;
-  ground.position.y = 0;
+  ground.position.y = -0.2;
   ground.receiveShadow = true;
   root.add(ground);
 
   const beachRing = new THREE.Mesh(new THREE.PlaneGeometry(56, 56), sandMat);
   beachRing.name = 'farcrysis-beach-ring';
   beachRing.rotation.x = -Math.PI / 2;
-  beachRing.position.y = 0.01;
+  beachRing.position.y = -0.18;
   beachRing.receiveShadow = true;
   root.add(beachRing);
 
   const grassRing = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), grassMat);
   grassRing.name = 'farcrysis-jungle-floor';
   grassRing.rotation.x = -Math.PI / 2;
-  grassRing.position.y = 0.02;
+  grassRing.position.y = -0.16;
   grassRing.receiveShadow = true;
   root.add(grassRing);
 
@@ -265,26 +285,129 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     [-27, -27], [27, -27], [-27, 27], [27, 27],
     [-22, -30], [22, -30], [-22, 30], [22, 30],
   ];
-  for (const [x, z] of palmPositions) {
-    const g = groundY(x, z);
-    box(builder, `farcrysis-palm-trunk-${x}-${z}`, [x, g + 0.9, z], [0.45, 1.8, 0.45], palmTrunkMat, { cast: true, ballistic: 'wood' });
-    const fronds = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.18, 3.4), jungleLeafMat);
-    fronds.name = `farcrysis-palm-fronds-${x}-${z}`;
-    fronds.position.set(x, g + 1.85, z);
-    fronds.rotation.y = (x + z) * 0.17;
-    fronds.castShadow = true;
-    root.add(fronds);
+  // Pass 76: these used to render as square box trunks with a flat slab of
+  // "fronds" — the single worst FarCry-vibe offender at spawn. The VISUALS now
+  // come from the shared enhanced-palm builder (one consolidated palm look
+  // across the arena) while the gameplay colliders stay authored right here,
+  // using the same [0.6 x trunkHeight x 0.6] proxy idiom HF-360 established
+  // for the enhanced-palm trunks — collider tracks the visual trunk exactly.
+  const gameplayPalms: PalmPlacement[] = palmPositions.map(([x, z], i) => {
+    const scale = 0.92 + ((i * 7) % 4) * 0.09; // 0.92-1.19, deterministic
+    return {
+      x,
+      z,
+      baseY: groundY(x, z),
+      yaw: (x * 13 + z * 7) * 0.11,
+      lean: (((i * 5) % 3) - 1) * 0.06,
+      scale,
+      crownSpin: (x + z) * 0.17,
+      crownTilt: (((i * 3) % 3) - 1) * 0.05,
+      crownScale: scale,
+    };
+  });
+  buildPalmStandInstances(root, gameplayPalms, 'farcrysis-gameplay-palm');
+  for (const palm of gameplayPalms) {
+    const trunkHeight = PALM_TRUNK_HEIGHT * palm.scale;
+    const trunkCollider = box(
+      builder,
+      `farcrysis-palm-trunk-${palm.x}-${palm.z}`,
+      [palm.x, palm.baseY + trunkHeight / 2, palm.z],
+      [0.6, trunkHeight, 0.6],
+      palmTrunkMat,
+      { cast: false, ballistic: 'wood' },
+    );
+    trunkCollider.visible = false;
+    trunkCollider.userData.collisionProxy = true;
   }
-  cover(builder, 'farcrysis-skiff-nw', [-18, groundY(-18, -24) + 0.55, -24], [4.2, 1.1, 2.1], standard(0x9c6b4a, 0.7, 0.2), [0.4, 0, 0.25]);
-  cover(builder, 'farcrysis-skiff-se', [18, groundY(18, 24) + 0.55, 24], [4.2, 1.1, 2.1], standard(0x9c6b4a, 0.7, 0.2), [-0.35, 0, -0.2]);
+  // Pass 76: the skiffs were tilted salmon BOXES — the single ugliest object
+  // in the spawn view. Each is now a real beached rowing skiff (planked hull,
+  // flared gunwales, pointed bow, thwart benches) resting nearly flat; the
+  // cover collider keeps its footprint and adopts the boat's gentler settle
+  // rotation so silhouette and collision move together.
+  const skiffSpecs: ReadonlyArray<{
+    tag: string; x: number; z: number; yaw: number; pitch: number; roll: number;
+  }> = [
+    { tag: 'nw', x: -18, z: -24, yaw: 0.5, pitch: 0.05, roll: 0.09 },
+    { tag: 'se', x: 18, z: 24, yaw: -2.6, pitch: -0.04, roll: -0.08 },
+  ];
+  const hullPaintMat = standard(0x6f8f92, 0.8, 0.08);   // sun-faded teal paint
+  const hullWoodMat = standard(0x7d5f40, 0.9, 0.03);    // weathered interior
+  for (const skiff of skiffSpecs) {
+    const skiffCover = cover(
+      builder,
+      `farcrysis-skiff-${skiff.tag}`,
+      [skiff.x, groundY(skiff.x, skiff.z) + 0.55, skiff.z],
+      [4.2, 1.1, 2.1],
+      standard(0x9c6b4a, 0.7, 0.2),
+      [skiff.pitch, skiff.yaw, skiff.roll],
+    );
+    skiffCover.visible = false;
+    skiffCover.userData.collisionProxy = true;
+
+    const boat = new THREE.Group();
+    boat.name = `farcrysis-skiff-${skiff.tag}-visual`;
+    const bottom = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.3, 1.5), hullWoodMat);
+    bottom.position.y = 0.2;
+    boat.add(bottom);
+    for (const side of [-1, 1] as const) {
+      const plank = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.55, 0.12), hullPaintMat);
+      plank.position.set(0, 0.5, side * 0.78);
+      plank.rotation.x = side * -0.18; // flared gunwales
+      boat.add(plank);
+      // Bow planks angle inward to a point at the front.
+      const bowPlank = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.55, 0.12), hullPaintMat);
+      bowPlank.position.set(-2.1, 0.52, side * 0.36);
+      bowPlank.rotation.set(side * -0.14, side * -0.62, 0);
+      boat.add(bowPlank);
+    }
+    const transom = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.55, 1.48), hullPaintMat);
+    transom.position.set(1.78, 0.5, 0);
+    boat.add(transom);
+    for (const benchX of [-0.7, 0.7]) {
+      const bench = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.06, 1.4), hullWoodMat);
+      bench.position.set(benchX, 0.62, 0);
+      boat.add(bench);
+    }
+    for (const part of boat.children) {
+      part.castShadow = true;
+      part.receiveShadow = true;
+    }
+    boat.position.set(skiff.x, groundY(skiff.x, skiff.z), skiff.z);
+    boat.rotation.set(skiff.pitch, skiff.yaw, skiff.roll);
+    root.add(boat);
+  }
   cover(builder, 'farcrysis-rock-nw', [-14, groundY(-14, -20) + 0.5, -20], [2.2, 1.0, 2.2], rockMat);
   cover(builder, 'farcrysis-rock-se', [14, groundY(14, 20) + 0.5, 20], [2.2, 1.0, 2.2], rockMat);
 
   // ---- Mid jungle ring: ruined walls + overgrown crates (collision-backed)
-  cover(builder, 'farcrysis-ruined-wall-n', [-8, groundY(-8, -14) + 0.8, -14], [3.6, 1.6, 0.5], ruinedWallMat, [0, 0, 0.3]);
-  cover(builder, 'farcrysis-ruined-wall-s', [8, groundY(8, 14) + 0.8, 14], [3.6, 1.6, 0.5], ruinedWallMat, [0, 0, -0.25]);
-  cover(builder, 'farcrysis-ruined-wall-e', [14, groundY(14, -8) + 0.8, -8], [0.5, 1.6, 3.6], ruinedWallMat, [0.2, 0, 0]);
-  cover(builder, 'farcrysis-ruined-wall-w', [-14, groundY(-14, 8) + 0.8, 8], [0.5, 1.6, 3.6], ruinedWallMat, [-0.2, 0, 0]);
+  // Pass 76: same collider boxes, but each wall carries a moss cap and vine
+  // drape so the slabs read as jungle-reclaimed masonry, not fresh concrete.
+  const ruinSpecs: ReadonlyArray<readonly [string, number, number, [number, number, number], [number, number, number]]> = [
+    ['n', -8, -14, [3.6, 1.6, 0.5], [0, 0, 0.3]],
+    ['s', 8, 14, [3.6, 1.6, 0.5], [0, 0, -0.25]],
+    ['e', 14, -8, [0.5, 1.6, 3.6], [0.2, 0, 0]],
+    ['w', -14, 8, [0.5, 1.6, 3.6], [-0.2, 0, 0]],
+  ];
+  const mossMat = standard(0x3e6a2e, 0.92, 0.01);
+  for (const [tag, wx, wz, size, rotation] of ruinSpecs) {
+    const wall = cover(builder, `farcrysis-ruined-wall-${tag}`, [wx, groundY(wx, wz) + 0.8, wz], size, ruinedWallMat, rotation);
+    // Moss cap hugging the top edge + a vine drape down one face, parented to
+    // the wall so they follow its authored tilt exactly.
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(size[0] * 0.98, 0.1, size[2] * 0.98), mossMat);
+    cap.name = `farcrysis-ruined-wall-${tag}-moss`;
+    cap.position.y = size[1] / 2 + 0.03;
+    cap.castShadow = false;
+    wall.add(cap);
+    const alongX = size[0] > size[2];
+    const drape = new THREE.Mesh(
+      new THREE.BoxGeometry(alongX ? size[0] * 0.4 : 0.06, size[1] * 0.85, alongX ? 0.06 : size[2] * 0.4),
+      mossMat,
+    );
+    drape.name = `farcrysis-ruined-wall-${tag}-vines`;
+    drape.position.set(alongX ? size[0] * 0.12 : size[0] / 2 + 0.04, 0.05, alongX ? size[2] / 2 + 0.04 : size[2] * -0.14);
+    drape.castShadow = false;
+    wall.add(drape);
+  }
   cover(builder, 'farcrysis-crate-nw', [-10, groundY(-10, -8) + 0.45, -8], [1.7, 0.9, 1.7], crateMat);
   cover(builder, 'farcrysis-crate-ne', [10, groundY(10, -8) + 0.45, -8], [1.7, 0.9, 1.7], crateMat);
   cover(builder, 'farcrysis-crate-sw', [-10, groundY(-10, 8) + 0.45, 8], [1.7, 0.9, 1.7], crateMat);
@@ -298,23 +421,81 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     [-4, -24], [4, 24], [-24, 4], [24, -4],
     [-20, -12], [20, 12], [-12, 20], [12, -20],
   ];
+  // Pass 76: the old-growth columns were literal boxes (box trunk + box crown
+  // + box "ferns"). The cover COLLIDER keeps its exact [1.5 x 2.6 x 1.5]
+  // footprint (sightline design is untouched) but is now an invisible proxy;
+  // the visuals are instanced organic trees: a tapered trunk plus two
+  // lumpified canopy lobes whose spread matches the old 4.6 m crown box.
   for (const [x, z] of canopyPositions) {
     const g = groundY(x, z);
-    cover(builder, `farcrysis-canopy-trunk-${x}-${z}`, [x, g + 1.3, z], [1.5, 2.6, 1.5], palmTrunkMat);
-    const crown = new THREE.Mesh(new THREE.BoxGeometry(4.6, 1.6, 4.6), jungleLeafMat);
-    crown.name = `farcrysis-canopy-crown-${x}-${z}`;
-    crown.position.set(x, g + 3.1, z);
-    crown.rotation.y = (x * 0.7 + z * 0.13) % Math.PI;
-    crown.castShadow = true;
-    root.add(crown);
+    const trunkCover = cover(builder, `farcrysis-canopy-trunk-${x}-${z}`, [x, g + 1.3, z], [1.5, 2.6, 1.5], palmTrunkMat);
+    trunkCover.visible = false;
+    trunkCover.userData.collisionProxy = true;
   }
-  // Low ferns beneath the canopy columns: dense but non-colliding dressing.
-  for (const [x, z] of canopyPositions) {
-    const bush = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.0, 2.2), jungleLeafMat);
-    bush.name = `farcrysis-canopy-undergrowth-${x}-${z}`;
-    bush.position.set(x, groundY(x, z) + 0.5, z);
-    bush.castShadow = true;
-    root.add(bush);
+  {
+    const count = canopyPositions.length;
+    const trunkGeom = new THREE.CylinderGeometry(0.52, 0.72, 2.8, 9);
+    trunkGeom.translate(0, 1.4, 0);
+    const lobeGeom = lumpify(new THREE.SphereGeometry(1.0, 10, 7), 0.2, 0xca90);
+    const canopyTrunks = new THREE.InstancedMesh(trunkGeom, standard(0x5f4630, 0.92, 0.02), count);
+    canopyTrunks.name = 'farcrysis-canopy-trunk-visuals';
+    const canopyLower = new THREE.InstancedMesh(lobeGeom, standard(0x3a6b2e, 0.9, 0.01), count);
+    canopyLower.name = 'farcrysis-canopy-crown-lower';
+    const canopyUpper = new THREE.InstancedMesh(lobeGeom, standard(0x458036, 0.88, 0.01), count);
+    canopyUpper.name = 'farcrysis-canopy-crown-upper';
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const euler = new THREE.Euler();
+    for (let i = 0; i < count; i += 1) {
+      const [x, z] = canopyPositions[i];
+      const g = groundY(x, z);
+      const spin = (x * 0.7 + z * 0.13) % Math.PI;
+      euler.set(0, spin, ((i % 3) - 1) * 0.04);
+      q.setFromEuler(euler);
+      m.compose(new THREE.Vector3(x, g, z), q, new THREE.Vector3(1 + (i % 3) * 0.08, 1 + ((i + 1) % 3) * 0.06, 1 + (i % 3) * 0.08));
+      canopyTrunks.setMatrixAt(i, m);
+      euler.set(((i % 3) - 1) * 0.08, spin * 1.7, 0);
+      q.setFromEuler(euler);
+      m.compose(new THREE.Vector3(x, g + 3.0, z), q, new THREE.Vector3(2.3 + (i % 4) * 0.12, 1.05, 2.2 + ((i + 2) % 4) * 0.12));
+      canopyLower.setMatrixAt(i, m);
+      euler.set(((i + 1) % 3 - 1) * 0.1, spin * 0.9 + 0.8, 0);
+      q.setFromEuler(euler);
+      m.compose(new THREE.Vector3(x + ((i % 3) - 1) * 0.3, g + 3.9, z + ((i % 2) - 0.5) * 0.4), q, new THREE.Vector3(1.5, 0.85, 1.45));
+      canopyUpper.setMatrixAt(i, m);
+    }
+    for (const layer of [canopyTrunks, canopyLower, canopyUpper]) {
+      layer.instanceMatrix.needsUpdate = true;
+      layer.computeBoundingSphere();
+      layer.castShadow = true;
+      layer.receiveShadow = true;
+      root.add(layer);
+    }
+  }
+  // Low undergrowth beneath the canopy columns: lumpified shrub clumps
+  // (dense, non-colliding) instead of the old floating leaf boxes.
+  {
+    const count = canopyPositions.length;
+    const shrubGeom = lumpify(new THREE.IcosahedronGeometry(1.0, 1), 0.16, 0xd11);
+    const shrubs = new THREE.InstancedMesh(shrubGeom, jungleLeafMat, count);
+    shrubs.name = 'farcrysis-canopy-undergrowth';
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const euler = new THREE.Euler();
+    for (let i = 0; i < count; i += 1) {
+      const [x, z] = canopyPositions[i];
+      euler.set(0, x * 0.31 + z * 0.17, 0);
+      q.setFromEuler(euler);
+      m.compose(
+        new THREE.Vector3(x + ((i % 3) - 1) * 0.5, groundY(x, z) + 0.32, z + ((i % 2) - 0.5) * 0.6),
+        q,
+        new THREE.Vector3(1.15 + (i % 3) * 0.1, 0.5 + (i % 2) * 0.1, 1.1 + ((i + 1) % 3) * 0.1),
+      );
+      shrubs.setMatrixAt(i, m);
+    }
+    shrubs.instanceMatrix.needsUpdate = true;
+    shrubs.computeBoundingSphere();
+    shrubs.castShadow = true;
+    root.add(shrubs);
   }
 
   // ---- Inner research-station core: two entrances, interior catwalk, raised desk
@@ -395,47 +576,125 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     proxy.userData.collisionProxy = true;
   };
 
+  // Pass 76: the wreck was three plain boxes. Same footprint and collider,
+  // but the fuselage is now a rounded weathered hull with a cracked wing,
+  // tail fin, dead radial engine and beached floats — a proper "crashed on
+  // the sand years ago" throwback silhouette.
   const seaplane = new THREE.Group();
   seaplane.name = 'farcrysis-throwback-seaplane';
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.7, 1.5), standard(0xd9e2e6, 0.3, 0.55));
-  hull.position.y = 0.5;
+  const hullMat = standard(0xb9c4c6, 0.55, 0.45);
+  const wreckAccentMat = standard(0x8e6b4a, 0.75, 0.2);
+  const hull = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.62, 4.2, 10), hullMat);
+  hull.rotation.z = Math.PI / 2;
+  hull.position.y = 0.62;
   seaplane.add(hull);
-  const wing = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.14, 1.1), standard(0xc7d4d9, 0.3, 0.5));
-  wing.position.y = 1.05;
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.56, 10, 8), hullMat);
+  nose.position.set(-2.1, 0.62, 0);
+  nose.scale.set(0.8, 1, 1);
+  seaplane.add(nose);
+  const engine = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.34, 0.5, 9), standard(0x4a4f52, 0.5, 0.6));
+  engine.rotation.z = Math.PI / 2;
+  engine.position.set(-2.5, 0.62, 0);
+  seaplane.add(engine);
+  const propBlade = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.4, 0.18), standard(0x33383a, 0.5, 0.5));
+  propBlade.position.set(-2.78, 0.62, 0);
+  propBlade.rotation.x = 0.9; // bent from the crash
+  seaplane.add(propBlade);
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.12, 1.15), standard(0xc7d4d9, 0.45, 0.4));
+  wing.position.set(-0.4, 1.28, 0);
+  wing.rotation.z = -0.06; // one wingtip dug into the sand
   seaplane.add(wing);
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.1, 0.4), standard(0xc7d4d9, 0.3, 0.5));
-  tail.position.set(1.8, 1.15, 0);
-  seaplane.add(tail);
+  const tailBoom = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.34, 1.6, 8), hullMat);
+  tailBoom.rotation.z = Math.PI / 2;
+  tailBoom.position.set(2.7, 0.72, 0);
+  seaplane.add(tailBoom);
+  const tailFin = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.0, 0.1), standard(0xc7d4d9, 0.45, 0.4));
+  tailFin.position.set(3.3, 1.35, 0);
+  tailFin.rotation.z = -0.2;
+  seaplane.add(tailFin);
+  for (const side of [-1, 1] as const) {
+    const float = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 2.6, 8), wreckAccentMat);
+    float.rotation.z = Math.PI / 2;
+    float.position.set(-0.4, 0.16, side * 0.85);
+    seaplane.add(float);
+    const strut = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.5, 0.07), standard(0x6d7a83, 0.4, 0.6));
+    strut.position.set(-0.4, 0.4, side * 0.75);
+    seaplane.add(strut);
+  }
+  for (const part of seaplane.children) {
+    part.castShadow = true;
+    part.receiveShadow = true;
+  }
   const seaplaneGround = groundY(24, -24);
   seaplane.position.set(24, seaplaneGround + 0.1, -24);
   seaplane.rotation.y = 0.7;
+  seaplane.rotation.z = 0.04; // settled unevenly into the beach
   root.add(seaplane);
   // Hull collider matches the fuselage box, yawed with the wreck.
   colliderProxy('farcrysis-throwback-seaplane-collider', [24, seaplaneGround + 0.6, -24], [4.6, 1.2, 1.5], 'thin-metal', [0, 0.7, 0]);
 
+  // Pass 76: the beacon was an orange box with a floating flame cube. Same
+  // collider envelope, but it now reads as a castaway signal pyre: a lashed
+  // timber tripod holding a fire basket with an emissive flame.
   const beaconGround = groundY(-24, 24);
-  const beacon = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.6, 1.4), beaconMat);
+  const beacon = new THREE.Group();
   beacon.name = 'farcrysis-throwback-signal-beacon';
-  beacon.position.set(-24, beaconGround + 1.3, 24);
-  beacon.castShadow = true;
+  const beaconWood = standard(0x7a5b36, 0.9, 0.03);
+  for (let leg = 0; leg < 3; leg += 1) {
+    const angle = (leg / 3) * Math.PI * 2 + 0.4;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 3.0, 7), beaconWood);
+    pole.position.set(Math.cos(angle) * 0.55, 1.4, Math.sin(angle) * 0.55);
+    pole.rotation.set(Math.sin(angle) * -0.32, 0, Math.cos(angle) * 0.32);
+    beacon.add(pole);
+  }
+  const basket = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.3, 0.5, 8, 1, true), standard(0x4f463c, 0.8, 0.3));
+  basket.position.y = 2.5;
+  beacon.add(basket);
+  const flame = new THREE.Mesh(
+    lumpify(new THREE.ConeGeometry(0.3, 0.9, 7), 0.08, 0xf1a),
+    new THREE.MeshStandardMaterial({ color: 0xffb340, emissive: 0xff7a20, emissiveIntensity: 1.6, roughness: 0.5 }),
+  );
+  flame.name = 'farcrysis-throwback-beacon-flame';
+  flame.position.y = 3.1;
+  beacon.add(flame);
+  const emberGlow = new THREE.Mesh(new THREE.SphereGeometry(0.2, 7, 5), new THREE.MeshStandardMaterial({ color: 0xffd080, emissive: 0xffa040, emissiveIntensity: 2.2, roughness: 0.4 }));
+  emberGlow.position.y = 2.72;
+  beacon.add(emberGlow);
+  for (const part of beacon.children) {
+    part.castShadow = true;
+    part.receiveShadow = true;
+  }
+  beacon.position.set(-24, beaconGround, 24);
   root.add(beacon);
-  const beaconFlame = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.9, 0.8), standard(0xffb340, 0.4, 0.1,));
-  beaconFlame.name = 'farcrysis-throwback-beacon-flame';
-  beaconFlame.position.set(-24, beaconGround + 3.2, 24);
-  root.add(beaconFlame);
   colliderProxy('farcrysis-throwback-signal-beacon-collider', [-24, beaconGround + 1.3, 24], [1.4, 2.6, 1.4], 'wood');
 
+  // Pass 76: the warning barrels were squat orange cylinders. They now share
+  // the fuel-drum builder with the interactable barrels (0.6 m dia x 0.9 m,
+  // rust banding, recessed lid) and the collider proxy shrinks WITH the visual
+  // so silhouette-vs-collision agreement is preserved.
   const barrelPositions: ReadonlyArray<readonly [number, number]> = [[-20, 20], [20, -20], [-5, -24], [5, 24]];
+  buildFuelDrumInstances(
+    root,
+    barrelPositions.map(([x, z], index) => ({
+      x,
+      z,
+      baseY: groundY(x, z),
+      yaw: (x * 3 + z * 5) * 0.21,
+      hazard: true,
+      tintIndex: index,
+    })),
+    'farcrysis-throwback-drum',
+  );
   for (const [x, z] of barrelPositions) {
     const g = groundY(x, z);
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.05, 10), hazardMat);
-    barrel.name = `farcrysis-throwback-barrel-${x}-${z}`;
-    barrel.position.set(x, g + 0.525, z);
-    barrel.castShadow = true;
-    root.add(barrel);
     // Cylinder collapsed to its bounding box — the same approximation the
     // interactable barrels already use in farcrysis-physics.ts.
-    colliderProxy(`farcrysis-throwback-barrel-collider-${x}-${z}`, [x, g + 0.525, z], [0.84, 1.05, 0.84], 'thin-metal');
+    colliderProxy(
+      `farcrysis-throwback-barrel-collider-${x}-${z}`,
+      [x, g + FUEL_DRUM_HEIGHT / 2, z],
+      [FUEL_DRUM_RADIUS * 2, FUEL_DRUM_HEIGHT, FUEL_DRUM_RADIUS * 2],
+      'thin-metal',
+    );
   }
 
   // Research tower legs (art tower at [-8.5, -8.5], legs at ±1.3 offsets in
@@ -477,13 +736,31 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     [-6, -12], [6, -12], [-6, 12], [6, 12], [-12, -4], [12, -4], [-12, 4], [12, 4],
     [-4, -20], [4, -20], [-4, 20], [4, 20], [-20, -6], [20, -6], [-20, 6], [20, 6],
   ];
-  for (const [x, z] of bushPositions) {
-    const bush = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.8, 1.1), jungleLeafMat);
-    bush.name = `farcrysis-jungle-bush-${x}-${z}`;
-    // HF-360: seated on the terrain authority (was flat y=0.4).
-    bush.position.set(x, groundY(x, z) + 0.4, z);
-    bush.castShadow = true;
-    root.add(bush);
+  // Pass 76: box "bushes" become one instanced draw of lumpified shrub clumps.
+  {
+    const count = bushPositions.length;
+    const bushGeom = lumpify(new THREE.IcosahedronGeometry(0.62, 1), 0.12, 0xb0511);
+    const bushes = new THREE.InstancedMesh(bushGeom, jungleLeafMat, count);
+    bushes.name = 'farcrysis-jungle-bushes';
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const euler = new THREE.Euler();
+    for (let i = 0; i < count; i += 1) {
+      const [x, z] = bushPositions[i];
+      euler.set(0, x * 0.73 + z * 0.29, ((i % 3) - 1) * 0.08);
+      q.setFromEuler(euler);
+      // HF-360: seated on the terrain authority (was flat y=0.4).
+      m.compose(
+        new THREE.Vector3(x, groundY(x, z) + 0.3, z),
+        q,
+        new THREE.Vector3(0.85 + (i % 4) * 0.12, 0.6 + (i % 3) * 0.1, 0.85 + ((i + 2) % 4) * 0.12),
+      );
+      bushes.setMatrixAt(i, m);
+    }
+    bushes.instanceMatrix.needsUpdate = true;
+    bushes.computeBoundingSphere();
+    bushes.castShadow = true;
+    root.add(bushes);
   }
 
   const fernCount = 24;

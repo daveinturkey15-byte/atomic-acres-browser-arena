@@ -12,6 +12,7 @@
  * Mount from farcrysis-art.ts via buildDetail() + animateDetail().
  */
 import * as THREE from 'three';
+import { farcrysisTerrainHeight } from './farcrysis-terrain-authority';
 
 // ---------------------------------------------------------------------------
 // Shared state — vine pivots, reed meshes, and any per-frame state for
@@ -235,8 +236,9 @@ function buildRocks(root: THREE.Object3D, rng: () => number): void {
   const maxRadius = 18;
 
   for (let i = 0; i < rockCount; i++) {
-    // Random gray between 0x7a7a7a and 0x9a9a8a
-    const gray = 0x7a + Math.floor(rng() * 0x20);
+    // Pass 76: darker earthy grey — the old 0x7a-0x9a range read as pale
+    // tarpaulin against the saturated jungle floor.
+    const gray = 0x5c + Math.floor(rng() * 0x1c);
     const color = (gray << 16) | ((gray + (Math.floor(rng() * 10) - 5)) << 8) | gray;
     const rockMat = new THREE.MeshStandardMaterial({
       color,
@@ -264,6 +266,14 @@ function buildRocks(root: THREE.Object3D, rng: () => number): void {
     }
     geom.computeVertexNormals();
 
+    // Pass 76: flatten the underside and rebase so y=0 is the seat plane —
+    // free-rotated icosahedra balanced on points and read as grey tarps.
+    for (let j = 0; j < posAttr.count; j++) {
+      posAttr.setY(j, Math.max(posAttr.getY(j), -scale * 0.35) + scale * 0.35);
+    }
+    posAttr.needsUpdate = true;
+    geom.computeVertexNormals();
+
     const rock = new THREE.Mesh(geom, rockMat);
     artMark(rock, `farcrysis-detail-rock-${i}`);
     rock.castShadow = true;
@@ -274,10 +284,12 @@ function buildRocks(root: THREE.Object3D, rng: () => number): void {
     const radius = minRadius + rng() * (maxRadius - minRadius);
     const px = Math.cos(angle) * radius;
     const pz = Math.sin(angle) * radius;
-    const py = 0.1 + rng() * 0.2; // sit on jungle floor (y=0.02), slightly above
+    // Pass 76: seated on the terrain authority (was flat y≈0.2, which buried
+    // rocks inside interior hills leaving only spiky grey tips poking out).
+    const py = farcrysisTerrainHeight(px, pz) - 0.04;
 
     rock.position.set(px, py, pz);
-    rock.rotation.set(rng() * Math.PI, rng() * Math.PI * 2, rng() * Math.PI);
+    rock.rotation.set(0, rng() * Math.PI * 2, 0); // yaw only — keep the seat down
     rock.scale.setScalar(0.8 + rng() * 0.5);
     root.add(rock);
   }
@@ -323,7 +335,9 @@ function buildFloorLitter(root: THREE.Object3D, rng: () => number): void {
     const radius = minRadius + rng() * (maxRadius - minRadius);
     const px = Math.cos(angle) * radius;
     const pz = Math.sin(angle) * radius;
-    const py = 0.05; // just above jungle floor (y=0.02)
+    // Pass 76: seated on the terrain authority (flat y=0.05 buried most of
+    // this layer inside the interior hills).
+    const py = farcrysisTerrainHeight(px, pz) + 0.04;
 
     euler.set(
       (rng() - 0.5) * 0.3,
@@ -384,7 +398,8 @@ function buildReedClusters(root: THREE.Object3D, rng: () => number): void {
 
       const px = cx + ox;
       const pz = cz + oz;
-      const py = reedHeight / 2;
+      // Pass 76: seated on the terrain authority (was flat half-height).
+      const py = farcrysisTerrainHeight(px, pz) + reedHeight / 2;
 
       artMark(reed, `farcrysis-detail-reed-${c}-${r}`);
       reed.position.set(px, py, pz);

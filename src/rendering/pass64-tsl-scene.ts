@@ -632,7 +632,9 @@ function applyArenaSystemLayout(
     else if (preset === 'sunset-farmland') sky.sunPosition.value.set(0.62, 0.11, -0.3).normalize();
     // Golden hour: sun low but still above the horizon, so the jungle keeps
     // long shadows without tipping into the farmland sunset's dusk.
-    else if (preset === 'jungle-golden-hour') sky.sunPosition.value.set(0.58, 0.24, -0.28).normalize();
+    // Daylight, not dusk: the sun sits high so the island reads saturated
+    // instead of washing beige (see the sky-backdrop preset for the regrade).
+    else if (preset === 'jungle-golden-hour') sky.sunPosition.value.set(0.46, 0.78, -0.24).normalize();
     // Open water at midday: sun high and slightly behind the bow.
     else if (preset === 'open-ocean-day') sky.sunPosition.value.set(0.34, 0.86, -0.18).normalize();
     else sky.sunPosition.value.set(0.45, 0.72, -0.22).normalize();

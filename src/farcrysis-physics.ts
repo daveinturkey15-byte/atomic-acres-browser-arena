@@ -30,6 +30,7 @@
  */
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Box2 } from './collision';
 import { createBallisticSurface } from './ballistics';
 import { classifyImpactSurface } from './combat-feedback';
@@ -186,20 +187,11 @@ function registerBox(
 /** Wooden crate: warm brown with subtle grain feel. */
 const crateMat = mat(FARCRYSIS_ART_FEEL.tikiWood, 0.9, 0.04);
 
-/** Accent stripe / stamp on each crate face — golden-amber from the palette. */
-const crateStampMat = mat(FARCRYSIS_ART_FEEL.crateStamp, 0.72, 0.1);
-
 /** Rusty steel barrel: beacon orange works as a weathered-rust tone. */
 const barrelMat = mat(FARCRYSIS_ART_FEEL.beaconLight, 0.78, 0.28);
 
 /** Sandbag: dry sandy tan matched to the beach ring. */
 const sandbagMat = mat(FARCRYSIS_ART_FEEL.beachSand, 0.95, 0.02);
-
-/** Darker wood tone for crate frame edges / bevel inset. */
-const frameWoodMat = mat(FARCRYSIS_ART_FEEL.tikiWood, 0.94, 0.03);
-
-/** Barrel band metal — weathered antenna-grey. */
-const barrelBandMat = mat(FARCRYSIS_ART_FEEL.antenna, 0.42, 0.55);
 
 /** Palm trunk for fallen-cover logs — same colour as instanced palms. */
 const palmTrunkMat = mat(FARCRYSIS_ART_FEEL.palmTrunk, 0.88, 0.03);
@@ -225,6 +217,358 @@ function mulberry32(seed: number): () => number {
 }
 
 // ---------------------------------------------------------------------------
+// Pass 76 instanced prop visuals
+//
+// The audit found every repeated interactable built from stacks of individual
+// meshes (a single crate was 10 meshes; a barrel 7-9), and the shapes
+// themselves read wrong: squat orange cylinders with floating torus rings,
+// featureless cubes, monolithic "cheese block" sandbag slabs. Each family is
+// now ONE shared geometry drawn as an InstancedMesh set, and the per-object
+// collision proxies stay invisible per-prop meshes so registerBox keeps the
+// exact collider/raycast/ballistic wiring the engine already consumes.
+// ---------------------------------------------------------------------------
+
+/** Real oil-drum proportions (0.6 m diameter x 0.9 m tall). */
+export const FUEL_DRUM_RADIUS = 0.3;
+export const FUEL_DRUM_HEIGHT = 0.9;
+
+export interface FuelDrumSpec {
+  x: number;
+  z: number;
+  baseY: number;
+  yaw: number;
+  /** True adds a flush hazard-yellow band (explosive drums). */
+  hazard?: boolean;
+  /** Deterministic tint selector; defaults from position hash. */
+  tintIndex?: number;
+}
+
+/** Weathered drum tints: rust red, faded olive, sun-bleached ochre, oxide. */
+const DRUM_TINTS = [0x9c4a2a, 0x66684e, 0xa08448, 0x74483a, 0x53626b];
+
+/**
+ * Builds the instanced fuel-drum visual set for a placement list. Shared by
+ * the interactable barrels here and the throwback warning barrels in
+ * farcrysis.ts so every drum in the arena is the same believable object.
+ * Presentation only — colliders are registered separately by the caller.
+ */
+export function buildFuelDrumInstances(
+  root: THREE.Group,
+  specs: readonly FuelDrumSpec[],
+  namePrefix: string,
+): void {
+  if (specs.length === 0) return;
+  const R = FUEL_DRUM_RADIUS;
+  const H = FUEL_DRUM_HEIGHT;
+
+  const bodyGeom = new THREE.CylinderGeometry(R, R, H, 14);
+  bodyGeom.translate(0, H / 2, 0);
+  // Rolling hoops sit FLUSH against the shell (major radius barely proud) —
+  // the old rings floated 3+ cm off the surface, which is what made them read
+  // as detached halos instead of pressed drum ribs.
+  const hoopGeom = new THREE.TorusGeometry(R + 0.012, 0.02, 5, 12);
+  hoopGeom.rotateX(Math.PI / 2);
+  const rimGeom = new THREE.TorusGeometry(R - 0.002, 0.026, 5, 12);
+  rimGeom.rotateX(Math.PI / 2);
+  // Lid disc smaller than the rim torus and lower than the rim's crown, so
+  // the top reads recessed the way a real drum lid does.
+  const lidGeom = new THREE.CylinderGeometry(R * 0.8, R * 0.8, 0.025, 12);
+  const bandGeom = new THREE.CylinderGeometry(R + 0.008, R + 0.008, 0.13, 14, 1, true);
+
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.72, metalness: 0.35 });
+  const steelMat = new THREE.MeshStandardMaterial({ color: 0x55524c, roughness: 0.55, metalness: 0.6 });
+  const lidMat = new THREE.MeshStandardMaterial({ color: 0x3c3a36, roughness: 0.66, metalness: 0.45 });
+  const hazardBandMat = new THREE.MeshStandardMaterial({ color: 0xd8b02e, roughness: 0.6, metalness: 0.2 });
+
+  const bodies = new THREE.InstancedMesh(bodyGeom, bodyMat, specs.length);
+  bodies.name = `${namePrefix}-bodies`;
+  const hoops = new THREE.InstancedMesh(hoopGeom, steelMat, specs.length * 2);
+  hoops.name = `${namePrefix}-hoops`;
+  const rims = new THREE.InstancedMesh(rimGeom, steelMat, specs.length * 2);
+  rims.name = `${namePrefix}-rims`;
+  const lids = new THREE.InstancedMesh(lidGeom, lidMat, specs.length);
+  lids.name = `${namePrefix}-lids`;
+  const hazardCount = specs.filter((spec) => spec.hazard).length;
+  const bands = hazardCount > 0 ? new THREE.InstancedMesh(bandGeom, hazardBandMat, hazardCount) : null;
+  if (bands) bands.name = `${namePrefix}-hazard-bands`;
+
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const euler = new THREE.Euler();
+  const one = new THREE.Vector3(1, 1, 1);
+  const tint = new THREE.Color();
+  let bandIndex = 0;
+  for (let i = 0; i < specs.length; i += 1) {
+    const spec = specs[i];
+    const rng = mulberry32(((spec.x * 977) | 0) * 31 + ((spec.z * 787) | 0) + 0x76d);
+    euler.set(0, spec.yaw, 0);
+    q.setFromEuler(euler);
+    const at = (y: number): THREE.Matrix4 =>
+      m.compose(new THREE.Vector3(spec.x, spec.baseY + y, spec.z), q, one);
+    bodies.setMatrixAt(i, at(0));
+    lids.setMatrixAt(i, at(H + 0.005));
+    rims.setMatrixAt(i * 2, at(H));
+    rims.setMatrixAt(i * 2 + 1, at(0.035));
+    hoops.setMatrixAt(i * 2, at(H * 0.34));
+    hoops.setMatrixAt(i * 2 + 1, at(H * 0.66));
+    if (spec.hazard && bands) bands.setMatrixAt(bandIndex++, at(H * 0.5));
+    // Rust-weathered tint: pick a drum colour deterministically, then darken
+    // and drift it per drum so no two neighbours match.
+    const base = DRUM_TINTS[(spec.tintIndex ?? Math.abs((spec.x * 7 + spec.z * 13) | 0)) % DRUM_TINTS.length];
+    tint.setHex(base).multiplyScalar(0.78 + rng() * 0.4);
+    bodies.setColorAt(i, tint);
+  }
+  if (bodies.instanceColor) bodies.instanceColor.needsUpdate = true;
+
+  const layers = [bodies, hoops, rims, lids, ...(bands ? [bands] : [])];
+  for (const layer of layers) {
+    layer.instanceMatrix.needsUpdate = true;
+    layer.computeBoundingSphere();
+    layer.castShadow = layer === bodies;
+    layer.receiveShadow = true;
+    layer.userData.farcrysisArt = true;
+    root.add(layer);
+  }
+}
+
+/**
+ * Weathered supply case geometry (unit cube, vertex-tinted): plank body,
+ * proud lid slab, dark seam shadow line under the lid, and pale stencil
+ * panels on all four faces. Instance colour multiplies the tones for
+ * per-crate weathering.
+ */
+function createSupplyCaseGeometry(): THREE.BufferGeometry {
+  const parts: Array<{ geom: THREE.BoxGeometry; tone: number; position: [number, number, number] }> = [
+    { geom: new THREE.BoxGeometry(1, 1, 1), tone: 1.0, position: [0, 0, 0] },
+    { geom: new THREE.BoxGeometry(1.04, 0.16, 1.04), tone: 0.8, position: [0, 0.42, 0] },
+    { geom: new THREE.BoxGeometry(1.02, 0.035, 1.02), tone: 0.42, position: [0, 0.325, 0] },
+    { geom: new THREE.BoxGeometry(0.6, 0.34, 0.03), tone: 1.4, position: [0, -0.04, 0.5] },
+    { geom: new THREE.BoxGeometry(0.6, 0.34, 0.03), tone: 1.4, position: [0, -0.04, -0.5] },
+    { geom: new THREE.BoxGeometry(0.03, 0.34, 0.6), tone: 1.4, position: [0.5, -0.04, 0] },
+    { geom: new THREE.BoxGeometry(0.03, 0.34, 0.6), tone: 1.4, position: [-0.5, -0.04, 0] },
+  ];
+  const merged: THREE.BufferGeometry[] = [];
+  for (const part of parts) {
+    const geom = part.geom.toNonIndexed();
+    geom.translate(...part.position);
+    const positionCount = geom.getAttribute('position').count;
+    const colors = new Float32Array(positionCount * 3);
+    colors.fill(part.tone);
+    geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    merged.push(geom);
+  }
+  return mergeGeometries(merged, false);
+}
+
+interface SupplyCaseSpec { x: number; y: number; z: number; size: number }
+
+/** Weathered case tints (wood, olive drab, sun-bleached). */
+const CASE_TINTS = [0x8a7148, 0x6e7050, 0x94805a, 0x7c6644];
+
+interface FallenLogSpec { x: number; z: number; baseY: number; length: number }
+interface BoulderSpec { x: number; z: number; baseY: number; width: number; height: number; depth: number }
+interface SandbagBagSpec { x: number; y: number; z: number; yaw: number; roll: number; scale: number }
+
+/**
+ * Per-build queues, reset at the top of addInteractables and flushed into
+ * InstancedMesh sets at its end. Module-level is safe because placement only
+ * happens inside one addInteractables call at a time (deterministic, and
+ * tests build fresh arenas serially).
+ */
+const _caseSpecs: SupplyCaseSpec[] = [];
+const _drumSpecs: FuelDrumSpec[] = [];
+const _logSpecs: FallenLogSpec[] = [];
+const _boulderSpecs: BoulderSpec[] = [];
+const _bagSpecs: SandbagBagSpec[] = [];
+
+/** Deterministic radial lumpiness for boulder silhouettes (position-hashed). */
+function lumpifyLocal(geometry: THREE.BufferGeometry, amplitude: number, salt: number): THREE.BufferGeometry {
+  const pos = geometry.getAttribute('position') as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i += 1) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const len = Math.sqrt(x * x + y * y + z * z);
+    if (len < 1e-5) continue;
+    const n = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719 + salt * 94.673) * 43758.5453;
+    const d = ((n - Math.floor(n)) - 0.5) * 2 * amplitude;
+    pos.setXYZ(i, x + (x / len) * d, y + (y / len) * d, z + (z / len) * d);
+  }
+  pos.needsUpdate = true;
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/** Flush every queued prop family into instanced draws on builder.root. */
+function buildQueuedInteractableVisuals(builder: any): void {
+  const root = builder.root as THREE.Group;
+
+  // ---- Supply cases -----------------------------------------------------
+  if (_caseSpecs.length > 0) {
+    const caseGeom = createSupplyCaseGeometry();
+    const caseMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.86, metalness: 0.04 });
+    const cases = new THREE.InstancedMesh(caseGeom, caseMat, _caseSpecs.length);
+    cases.name = 'farcrysis-interactable-crates';
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const tint = new THREE.Color();
+    for (let i = 0; i < _caseSpecs.length; i += 1) {
+      const spec = _caseSpecs[i];
+      const rng = mulberry32(((spec.x * 733) | 0) * 17 + ((spec.z * 577) | 0) + i);
+      m.compose(new THREE.Vector3(spec.x, spec.y, spec.z), q, new THREE.Vector3(spec.size, spec.size, spec.size));
+      cases.setMatrixAt(i, m);
+      tint.setHex(CASE_TINTS[i % CASE_TINTS.length]).multiplyScalar(0.82 + rng() * 0.34);
+      cases.setColorAt(i, tint);
+    }
+    if (cases.instanceColor) cases.instanceColor.needsUpdate = true;
+    cases.instanceMatrix.needsUpdate = true;
+    cases.computeBoundingSphere();
+    cases.castShadow = true;
+    cases.receiveShadow = true;
+    cases.userData.farcrysisArt = true;
+    root.add(cases);
+  }
+
+  // ---- Fuel drums -------------------------------------------------------
+  buildFuelDrumInstances(root, _drumSpecs, 'farcrysis-interactable-drum');
+
+  // ---- Fallen palm logs -------------------------------------------------
+  if (_logSpecs.length > 0) {
+    const logGeom = new THREE.CylinderGeometry(0.185, 0.215, 1, 9);
+    logGeom.rotateZ(Math.PI / 2); // length along X, unit long
+    const logs = new THREE.InstancedMesh(logGeom, palmTrunkMat, _logSpecs.length);
+    logs.name = 'farcrysis-interactable-fallen-logs';
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const euler = new THREE.Euler();
+    for (let i = 0; i < _logSpecs.length; i += 1) {
+      const spec = _logSpecs[i];
+      euler.set(((i % 3) - 1) * 0.03, 0, 0);
+      q.setFromEuler(euler);
+      m.compose(
+        new THREE.Vector3(spec.x, spec.baseY + 0.2, spec.z),
+        q,
+        new THREE.Vector3(spec.length, 1, 1.35),
+      );
+      logs.setMatrixAt(i, m);
+    }
+    logs.instanceMatrix.needsUpdate = true;
+    logs.computeBoundingSphere();
+    logs.castShadow = true;
+    logs.receiveShadow = true;
+    logs.userData.farcrysisArt = true;
+    root.add(logs);
+  }
+
+  // ---- Limestone boulders -----------------------------------------------
+  if (_boulderSpecs.length > 0) {
+    const rockGeom = lumpifyLocal(new THREE.IcosahedronGeometry(1, 2), 0.22, 0xb01de5);
+    // Flat-bottomed: clamp the underside, then rebase so y=0 is the seat.
+    const pos = rockGeom.getAttribute('position') as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i += 1) {
+      pos.setY(i, Math.max(pos.getY(i), -0.55) + 0.55);
+    }
+    pos.needsUpdate = true;
+    rockGeom.computeVertexNormals();
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x8a877c, roughness: 0.94, metalness: 0.03 });
+    const rocks = new THREE.InstancedMesh(rockGeom, rockMat, _boulderSpecs.length);
+    rocks.name = 'farcrysis-interactable-boulders';
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const euler = new THREE.Euler();
+    for (let i = 0; i < _boulderSpecs.length; i += 1) {
+      const spec = _boulderSpecs[i];
+      euler.set(0, spec.x * 0.37 + spec.z * 0.53, 0);
+      q.setFromEuler(euler);
+      m.compose(
+        new THREE.Vector3(spec.x, spec.baseY - 0.03, spec.z),
+        q,
+        // Unit rock spans ~1.7 tall after the clamp; normalise into the
+        // collider envelope so silhouette and collision stay agreed.
+        new THREE.Vector3(spec.width / 2, spec.height / 1.6, spec.depth / 2),
+      );
+      rocks.setMatrixAt(i, m);
+    }
+    rocks.instanceMatrix.needsUpdate = true;
+    rocks.computeBoundingSphere();
+    rocks.castShadow = true;
+    rocks.receiveShadow = true;
+    rocks.userData.farcrysisArt = true;
+    root.add(rocks);
+  }
+
+  // ---- Sandbag bags -----------------------------------------------------
+  if (_bagSpecs.length > 0) {
+    const bagGeom = new THREE.SphereGeometry(0.5, 7, 5);
+    // Flat, slumped burlap profile — round bags read as bread buns.
+    bagGeom.scale(0.47, 0.17, 0.36);
+    // Khaki burlap, deliberately DULLER than the beach sand so walls read as
+    // fabric fortification, not sculpted sand; per-bag tint drift below.
+    const bagMat = new THREE.MeshStandardMaterial({ color: 0xa89a77, roughness: 0.97, metalness: 0.01 });
+    const bags = new THREE.InstancedMesh(bagGeom, bagMat, _bagSpecs.length);
+    bags.name = 'farcrysis-interactable-sandbags';
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const euler = new THREE.Euler();
+    const tint = new THREE.Color();
+    const tintRng = mulberry32(0xba65);
+    for (let i = 0; i < _bagSpecs.length; i += 1) {
+      const spec = _bagSpecs[i];
+      euler.set(0, spec.yaw, spec.roll);
+      q.setFromEuler(euler);
+      m.compose(new THREE.Vector3(spec.x, spec.y, spec.z), q, new THREE.Vector3(spec.scale, spec.scale, spec.scale));
+      bags.setMatrixAt(i, m);
+      tint.setScalar(0.85 + tintRng() * 0.3);
+      bags.setColorAt(i, tint);
+    }
+    if (bags.instanceColor) bags.instanceColor.needsUpdate = true;
+    bags.instanceMatrix.needsUpdate = true;
+    bags.computeBoundingSphere();
+    bags.castShadow = true;
+    bags.receiveShadow = true;
+    bags.userData.farcrysisArt = true;
+    root.add(bags);
+  }
+
+  _caseSpecs.length = 0;
+  _drumSpecs.length = 0;
+  _logSpecs.length = 0;
+  _boulderSpecs.length = 0;
+  _bagSpecs.length = 0;
+}
+
+/**
+ * Fill a sandbag wall volume with individually jittered bag instances —
+ * staggered courses on every face, replacing the old single "cheese block"
+ * box (which stays as the invisible collision proxy).
+ */
+function queueSandbagBags(x: number, z: number, baseY: number, width: number, height: number, depth: number): void {
+  const rng = mulberry32(((x * 511) | 0) * 73 + ((z * 631) | 0) + ((height * 100) | 0));
+  const rows = Math.max(2, Math.round(height / 0.17));
+  const cols = Math.max(2, Math.round(width / 0.4));
+  const layers = Math.max(1, Math.round(depth / 0.3));
+  for (let row = 0; row < rows; row += 1) {
+    const rowCols = row % 2 === 0 ? cols : cols - 1;
+    // Courses compressed slightly so bags overlap and read as a laid wall.
+    const rowY = baseY + 0.08 + row * (height / rows) * 0.94;
+    for (let layer = 0; layer < layers; layer += 1) {
+      const layerZ = layers === 1 ? z : z - depth / 2 + 0.17 + layer * ((depth - 0.34) / Math.max(1, layers - 1));
+      for (let col = 0; col < rowCols; col += 1) {
+        const colX = x - width / 2 + 0.21 + (row % 2 === 0 ? 0 : 0.2) + col * ((width - 0.42) / Math.max(1, rowCols - 1));
+        _bagSpecs.push({
+          x: colX + (rng() - 0.5) * 0.05,
+          y: rowY + (rng() - 0.5) * 0.02,
+          z: layerZ + (rng() - 0.5) * 0.05,
+          yaw: (rng() - 0.5) * 0.4,
+          roll: (rng() - 0.5) * 0.12,
+          scale: 0.92 + rng() * 0.18,
+        });
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Placement helpers
 // ---------------------------------------------------------------------------
 
@@ -244,79 +588,19 @@ function placeCrate(
   const baseY = placementBaseY(x, z);
   const y = baseY + size / 2;     // sit on the terrain surface
 
-  // Main body — wood-brown box
+  // Pass 76: the crate used to be TEN meshes (body + inset + 4 posts + 4
+  // slats + stamp). The collider/raycast proxy keeps the identical size and
+  // registration; the visible case rides the shared InstancedMesh with lid
+  // seam and stencil panels baked into vertex colour.
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), crateMat);
   mesh.name = name;
   mesh.position.set(x, y, z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
+  mesh.visible = false;
+  mesh.userData.collisionProxy = true;
   mesh.userData.impactSurface = classifyImpactSurface({ name, metalness: crateMat.metalness });
   builder.root.add(mesh);
   registerBox(builder, mesh, name, 'wood', false);
-
-  // ── Visual detail ────────────────────────────────────────────────
-  // Beveled inset — slightly smaller inner box gives plank-edging depth
-  const inset = new THREE.Mesh(
-    new THREE.BoxGeometry(size * 0.93, size * 0.93, size * 0.93),
-    frameWoodMat,
-  );
-  inset.name = `${name}-inset`;
-  inset.position.copy(mesh.position);
-  inset.castShadow = false;
-  inset.receiveShadow = false;
-  builder.root.add(inset);
-
-  // Corner frame posts — four thin vertical strips at each vertical edge
-  const postHalf = size / 2 - 0.04;
-  const postGeom = new THREE.BoxGeometry(0.07, size, 0.07);
-  const corners: [number, number][] = [
-    [ postHalf,  postHalf],
-    [ postHalf, -postHalf],
-    [-postHalf,  postHalf],
-    [-postHalf, -postHalf],
-  ];
-  for (const [cx, cz] of corners) {
-    const post = new THREE.Mesh(postGeom, frameWoodMat);
-    post.name = `${name}-post-${cx > 0 ? 'p' : 'n'}${cz > 0 ? 'p' : 'n'}`;
-    post.position.set(x + cx, y, z + cz);
-    post.castShadow = false;
-    post.receiveShadow = false;
-    post.userData.impactSurface = mesh.userData.impactSurface;
-    builder.root.add(post);
-  }
-
-  // Top-face frame slats — two thin strips across opposite edges in stamp colour
-  const slatGeomX = new THREE.BoxGeometry(size * 0.85, 0.05, 0.06);
-  const slatGeomZ = new THREE.BoxGeometry(0.06, 0.05, size * 0.85);
-  const slatY = y + size / 2 + 0.025;
-  const slatMat = mat(FARCRYSIS_ART_FEEL.crateStamp, 0.72, 0.1);
-  [
-    [x, slatY, z + size / 2 - 0.03, slatGeomX],
-    [x, slatY, z - size / 2 + 0.03, slatGeomX],
-    [x + size / 2 - 0.03, slatY, z, slatGeomZ],
-    [x - size / 2 + 0.03, slatY, z, slatGeomZ],
-  ].forEach(([sx, sy, sz, geom], i) => {
-    const slat = new THREE.Mesh(geom as THREE.BoxGeometry, slatMat);
-    slat.name = `${name}-top-slat-${i}`;
-    slat.position.set(sx as number, sy as number, sz as number);
-    slat.castShadow = false;
-    slat.receiveShadow = false;
-    slat.userData.impactSurface = mesh.userData.impactSurface;
-    builder.root.add(slat);
-  });
-
-  // Accent stripe — thin emissive-coloured plaque on the side of the crate
-  // that faces the most likely player approach direction, giving the stamp
-  // visibility without requiring a texture.
-  const accent = new THREE.Mesh(
-    new THREE.BoxGeometry(size * 0.6, size * 0.12, 0.04),
-    crateStampMat,
-  );
-  accent.name = `${name}-stamp`;
-  accent.position.set(x, y + size * 0.15, z + size / 2 + 0.03);
-  accent.castShadow = false;
-  accent.receiveShadow = false;
-  builder.root.add(accent);
+  _caseSpecs.push({ x, y, z, size });
 }
 
 /**
@@ -328,54 +612,35 @@ function placeBarrel(
   name: string,
   x: number,
   z: number,
-  radius: number,
-  height: number,
 ): void {
   const baseY = placementBaseY(x, z);
-  const y = baseY + height / 2;  // sit on the terrain surface
+  const y = baseY + FUEL_DRUM_HEIGHT / 2;  // sit on the terrain surface
 
+  // Pass 76: the audit called these out as squat orange cylinders with
+  // floating torus rings — 1.2 m diameter x 1.0 m, nothing like a drum.
+  // Every barrel is now a correctly-proportioned fuel drum (0.6 m dia x
+  // 0.9 m) drawn through the shared drum instancing, and the collider proxy
+  // shrinks with the visual so collision agreement is preserved.
   const mesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(radius, radius, height, 12),
+    new THREE.CylinderGeometry(FUEL_DRUM_RADIUS, FUEL_DRUM_RADIUS, FUEL_DRUM_HEIGHT, 12),
     barrelMat,
   );
   mesh.name = name;
   mesh.position.set(x, y, z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
+  mesh.visible = false;
+  mesh.userData.collisionProxy = true;
   mesh.userData.impactSurface = classifyImpactSurface({ name, metalness: barrelMat.metalness });
   builder.root.add(mesh);
   registerBox(builder, mesh, name, 'thin-metal', false);
-
-  // ── Visual detail ────────────────────────────────────────────────
-  // Two metal bands wrapped around the barrel
-  const bandRadius = radius + 0.03; // sit slightly proud of the surface
-  const bandGeom = new THREE.TorusGeometry(bandRadius, 0.04, 6, 16);
-  for (const bandY of [-height * 0.25, height * 0.25]) {
-    const band = new THREE.Mesh(bandGeom, barrelBandMat);
-    band.name = `${name}-band-${bandY > 0 ? 'top' : 'bot'}`;
-    band.position.set(x, y + bandY, z);
-    band.rotation.x = Math.PI / 2; // Torus defaults to XY plane — rotate to XZ
-    band.castShadow = false;
-    band.receiveShadow = false;
-    band.userData.impactSurface = mesh.userData.impactSurface;
-    builder.root.add(band);
-  }
-
-  // Vertical ridges — four thin strips running the barrel height at cardinal points
-  const ridgeGeom = new THREE.BoxGeometry(0.03, height * 0.78, 0.04);
-  for (let i = 0; i < 4; i += 1) {
-    const angle = (i / 4) * Math.PI * 2;
-    const rx = Math.cos(angle) * (radius + 0.015);
-    const rz = Math.sin(angle) * (radius + 0.015);
-    const ridge = new THREE.Mesh(ridgeGeom, barrelBandMat);
-    ridge.name = `${name}-ridge-${i}`;
-    ridge.position.set(x + rx, y, z + rz);
-    ridge.rotation.y = angle;
-    ridge.castShadow = false;
-    ridge.receiveShadow = false;
-    ridge.userData.impactSurface = mesh.userData.impactSurface;
-    builder.root.add(ridge);
-  }
+  _drumSpecs.push({
+    x,
+    z,
+    baseY,
+    yaw: (x * 5 + z * 11) * 0.17,
+    // Hazard banding is flagged after the fact by addHazardStripesToBarrel.
+    hazard: false,
+    tintIndex: Math.abs(((x * 3) | 0) + ((z * 7) | 0)),
+  });
 }
 
 /**
@@ -394,51 +659,22 @@ function placeSandbagWall(
   const baseY = placementBaseY(x, z);
   const y = baseY + height / 2;
 
+  // Pass 76: the wall was a monolithic sand-tan box with a few bag overlays
+  // pasted on ONE face — the audit's "cheese block". The box survives only as
+  // the invisible collision proxy; the visible wall is now built entirely
+  // from staggered instanced bag courses on every face.
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(width, height, depth),
     sandbagMat,
   );
   mesh.name = name;
   mesh.position.set(x, y, z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
+  mesh.visible = false;
+  mesh.userData.collisionProxy = true;
   mesh.userData.impactSurface = classifyImpactSurface({ name, metalness: sandbagMat.metalness });
   builder.root.add(mesh);
   registerBox(builder, mesh, name, 'earth', true);
-
-  // ── Visual detail: individual sandbag overlays ───────────────────
-  // Place 8-12 small slightly-rotated bag-shaped boxes on the front/back
-  // faces to break up the monolithic look with fabric texture.
-  const bagGeom = new THREE.BoxGeometry(0.38, 0.18, 0.44);
-  const bagRows = 3;   // vertical layers
-  const bagCols = 5;   // bags across the width
-  for (let row = 0; row < bagRows; row += 1) {
-    const rowY = row * 0.2 + 0.1; // stack from bottom up
-    // stagger every other row
-    const colCount = row % 2 === 0 ? bagCols : bagCols - 1;
-    const colStartX = row % 2 === 0 ? -width / 2 + 0.22 : -width / 2 + 0.41;
-    for (let col = 0; col < colCount; col += 1) {
-      const bx = colStartX + col * 0.44;
-      // Jitter each bag slightly for organic feel (deterministic via mulberry32)
-      const bagRng = mulberry32(
-        ((x * 1000) | 0) + ((z * 100) | 0) + row * 10 + col + 1,
-      );
-      const jx = (bagRng() - 0.5) * 0.06;
-      const jy = (bagRng() - 0.5) * 0.03;
-      const jz = (bagRng() - 0.5) * 0.04;
-      const ry = (bagRng() - 0.5) * 0.12; // slight Y-rotation
-      const rz = (bagRng() - 0.5) * 0.08; // slight roll
-
-      const bag = new THREE.Mesh(bagGeom, sandbagMat);
-      bag.name = `${name}-bag-f-${row}-${col}`;
-      bag.position.set(x + bx + jx, y + rowY + jy, z + depth / 2 + 0.01 + jz);
-      bag.rotation.set(0, ry, rz);
-      bag.castShadow = true;
-      bag.receiveShadow = true;
-      bag.userData.impactSurface = mesh.userData.impactSurface;
-      builder.root.add(bag);
-    }
-  }
+  queueSandbagBags(x, z, baseY, width, height, depth);
 }
 
 /**
@@ -458,17 +694,21 @@ function placeFallenTrunk(
   const y = baseY + thickness / 2;
   const depth = 0.7; // fixed depth for all trunks (narrow)
 
+  // Pass 76: the "log" was a literal plank box. The collider box is
+  // unchanged (invisible proxy); the visible log is an instanced tapered
+  // cylinder lying inside the same envelope.
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(length, thickness, depth),
     palmTrunkMat,
   );
   mesh.name = name;
   mesh.position.set(x, y, z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
+  mesh.visible = false;
+  mesh.userData.collisionProxy = true;
   mesh.userData.impactSurface = classifyImpactSurface({ name, metalness: palmTrunkMat.metalness });
   builder.root.add(mesh);
   registerBox(builder, mesh, name, 'wood', true);
+  _logSpecs.push({ x, z, baseY, length });
 }
 
 /**
@@ -483,25 +723,27 @@ function placeCrateCover(builder: any, name: string, x: number, z: number): void
   const y0 = baseY + size / 2;            // bottom crate centre
   const y1 = baseY + size / 2 + size;     // top crate centre
 
-  // Bottom crate
+  // Bottom crate (invisible proxy; visual rides the shared case instancing)
   const c0 = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), crateMat);
   c0.name = `${name}-c0`;
   c0.position.set(x, y0, z);
-  c0.castShadow = true;
-  c0.receiveShadow = true;
+  c0.visible = false;
+  c0.userData.collisionProxy = true;
   c0.userData.impactSurface = classifyImpactSurface({ name: c0.name, metalness: crateMat.metalness });
   builder.root.add(c0);
   registerBox(builder, c0, c0.name, 'wood', false);
+  _caseSpecs.push({ x, y: y0, z, size });
 
   // Top crate
   const c1 = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), crateMat);
   c1.name = `${name}-c1`;
   c1.position.set(x, y1, z);
-  c1.castShadow = true;
-  c1.receiveShadow = true;
+  c1.visible = false;
+  c1.userData.collisionProxy = true;
   c1.userData.impactSurface = classifyImpactSurface({ name: c1.name, metalness: crateMat.metalness });
   builder.root.add(c1);
   registerBox(builder, c1, c1.name, 'wood', false);
+  _caseSpecs.push({ x, y: y1, z, size });
 
   // Combined cover footprint — ground to top of stack
   const halfW = size / 2;
@@ -570,26 +812,19 @@ function addCrateShards(builder: any, name: string, x: number, z: number, size: 
  * near the top and bottom thirds.
  */
 function addHazardStripesToBarrel(
-  builder: any,
-  name: string,
+  _builder: any,
+  _name: string,
   x: number,
   z: number,
-  radius: number,
-  height: number,
 ): void {
-  const hazardYellow = mat(0xe6c23a, 0.55, 0.12);
-  const stripeRadius = radius + 0.045;
-  const stripeGeom = new THREE.TorusGeometry(stripeRadius, 0.05, 6, 16);
-  const baseY = placementBaseY(x, z);
-  const y = baseY + height / 2;
-  for (const bandY of [-height * 0.18, height * 0.18]) {
-    const stripe = new THREE.Mesh(stripeGeom, hazardYellow);
-    stripe.name = `${name}-hazard-${bandY > 0 ? 'top' : 'bot'}`;
-    stripe.position.set(x, y + bandY, z);
-    stripe.rotation.x = Math.PI / 2;
-    stripe.castShadow = false;
-    stripe.receiveShadow = false;
-    builder.root.add(stripe);
+  // Pass 76: the stripes used to be TWO MORE floating torus rings per barrel.
+  // A hazard drum now just flags its queued spec — the shared drum builder
+  // paints a flush hazard-yellow band instead of a detached halo.
+  for (const spec of _drumSpecs) {
+    if (Math.abs(spec.x - x) < 1e-6 && Math.abs(spec.z - z) < 1e-6) {
+      spec.hazard = true;
+      return;
+    }
   }
 }
 
@@ -609,15 +844,19 @@ function placeRockOutcrop(
 ): void {
   const baseY = placementBaseY(x, z);
   const y = baseY + height / 2;
+  // Pass 76: the "boulder" was a grey box. Collider box unchanged (invisible
+  // proxy); the visible rock is an instanced lumpified flat-bottomed boulder
+  // scaled into the same envelope.
   const rockOutcropMat = mat(0x7a7a73, 0.93, 0.08);
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), rockOutcropMat);
   mesh.name = name;
   mesh.position.set(x, y, z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
+  mesh.visible = false;
+  mesh.userData.collisionProxy = true;
   mesh.userData.impactSurface = classifyImpactSurface({ name, metalness: 0.08 });
   builder.root.add(mesh);
   registerBox(builder, mesh, name, 'earth', true);
+  _boulderSpecs.push({ x, z, baseY, width, height, depth });
 }
 
 /**
@@ -643,11 +882,12 @@ function placeVantagePlatform(builder: any, name: string, x: number, z: number):
     const c = new THREE.Mesh(new THREE.BoxGeometry(cSize, cSize, cSize), crateMat);
     c.name = `${name}-base-${i}`;
     c.position.set(x + ox, yBase, z + oz);
-    c.castShadow = true;
-    c.receiveShadow = true;
+    c.visible = false;
+    c.userData.collisionProxy = true;
     c.userData.impactSurface = classifyImpactSurface({ name: c.name, metalness: crateMat.metalness });
     builder.root.add(c);
     registerBox(builder, c, c.name, 'wood', false);
+    _caseSpecs.push({ x: x + ox, y: yBase, z: z + oz, size: cSize });
   }
 
   // Plank top — wider than the crate stack so a player can stand on it
@@ -701,7 +941,9 @@ function placeStackedSandbagWall(
   count: number,
 ): void {
   const baseY = placementBaseY(x, z);
-  // Build vertically stacked segments
+  // Build vertically stacked segments. Pass 76: segment boxes survive only as
+  // invisible collision proxies; the visible wall is instanced bag courses
+  // spanning the full stack (see queueSandbagBags below the loop).
   for (let i = 0; i < count; i += 1) {
     const segY = baseY + segHeight / 2 + i * segHeight; // bottom-aligned stack
     const mesh = new THREE.Mesh(
@@ -710,8 +952,8 @@ function placeStackedSandbagWall(
     );
     mesh.name = `${name}-seg-${i}`;
     mesh.position.set(x, segY, z);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    mesh.visible = false;
+    mesh.userData.collisionProxy = true;
     mesh.userData.impactSurface = classifyImpactSurface({
       name: mesh.name,
       metalness: sandbagMat.metalness,
@@ -719,6 +961,7 @@ function placeStackedSandbagWall(
     builder.root.add(mesh);
     registerBox(builder, mesh, mesh.name, 'concrete', false);
   }
+  queueSandbagBags(x, z, baseY, width, segHeight * count, depth);
 
   // Single physicalCover for the full wall stack
   const totalHeight = segHeight * count;
@@ -807,27 +1050,27 @@ export function addInteractables(builder: any): void {
   // punch through with a satisfying metallic spark but don't stop cold.
 
   // -- Beach / skiff area pairs ------------------------------------------
-  placeBarrel(builder, 'farcrysis-barrel-01', -22, -20, 0.6, 1.0);
-  placeBarrel(builder, 'farcrysis-barrel-02',  22,  20, 0.6, 1.0);
+  placeBarrel(builder, 'farcrysis-barrel-01', -22, -20);
+  placeBarrel(builder, 'farcrysis-barrel-02',  22,  20);
 
   // -- Near the signal beacon (NW) and seaplane (SE) throwback zones -----
-  placeBarrel(builder, 'farcrysis-barrel-03', -20,  12, 0.6, 1.0);
-  placeBarrel(builder, 'farcrysis-barrel-04',  20, -12, 0.6, 1.0);
+  placeBarrel(builder, 'farcrysis-barrel-03', -20,  12);
+  placeBarrel(builder, 'farcrysis-barrel-04',  20, -12);
 
   // -- Beach edge paths --------------------------------------------------
-  placeBarrel(builder, 'farcrysis-barrel-05',  -8, -22, 0.6, 1.0);
-  placeBarrel(builder, 'farcrysis-barrel-06',   8,  22, 0.6, 1.0);
+  placeBarrel(builder, 'farcrysis-barrel-05',  -8, -22);
+  placeBarrel(builder, 'farcrysis-barrel-06',   8,  22);
 
   // -- Flanking the core door approaches ----------------------------------
   // HF-360: barrel-08 moved from (3, 3.5) — that spot is now inside the
   // catwalk stair flight (farcrysis.ts farcrysis-core-stair-*), and the
   // barrel sat entombed inside the steps. West mirror keeps the pair.
-  placeBarrel(builder, 'farcrysis-barrel-07',  -3, -3.5, 0.6, 1.0);
-  placeBarrel(builder, 'farcrysis-barrel-08',  -3,  3.5, 0.6, 1.0);
+  placeBarrel(builder, 'farcrysis-barrel-07',  -3, -3.5);
+  placeBarrel(builder, 'farcrysis-barrel-08',  -3,  3.5);
 
   // -- Mid-field jungle paths --------------------------------------------
-  placeBarrel(builder, 'farcrysis-barrel-09', -12,  16, 0.6, 1.0);
-  placeBarrel(builder, 'farcrysis-barrel-10',  12, -16, 0.6, 1.0);
+  placeBarrel(builder, 'farcrysis-barrel-09', -12,  16);
+  placeBarrel(builder, 'farcrysis-barrel-10',  12, -16);
 
   // =====================================================================
   // 3. SANDBAG WALLS (4) — low cover near existing hard-cover positions
@@ -901,18 +1144,18 @@ export function addInteractables(builder: any): void {
   // clear of spawn and patrol routes.
 
   // -- West / east beach fringe ------------------------------------------
-  placeBarrel(builder, 'farcrysis-barrel-11', -28,  -6, 0.55, 0.95);
-  placeBarrel(builder, 'farcrysis-barrel-12',  28,   6, 0.55, 0.95);
+  placeBarrel(builder, 'farcrysis-barrel-11', -28,  -6);
+  placeBarrel(builder, 'farcrysis-barrel-12',  28,   6);
 
   // -- North / south beach fringe ----------------------------------------
-  placeBarrel(builder, 'farcrysis-barrel-13',  -6,  24, 0.55, 0.95);
-  placeBarrel(builder, 'farcrysis-barrel-14',   6, -24, 0.55, 0.95);
+  placeBarrel(builder, 'farcrysis-barrel-13',  -6,  24);
+  placeBarrel(builder, 'farcrysis-barrel-14',   6, -24);
 
   // ── Hazard stripes on the new barrels ─────────────────────────────────
-  addHazardStripesToBarrel(builder, 'farcrysis-barrel-11', -28,  -6, 0.55, 0.95);
-  addHazardStripesToBarrel(builder, 'farcrysis-barrel-12',  28,   6, 0.55, 0.95);
-  addHazardStripesToBarrel(builder, 'farcrysis-barrel-13',  -6,  24, 0.55, 0.95);
-  addHazardStripesToBarrel(builder, 'farcrysis-barrel-14',   6, -24, 0.55, 0.95);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-11', -28,  -6);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-12',  28,   6);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-13',  -6,  24);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-14',   6, -24);
 
   // =====================================================================
   // 7. FALLEN-LOG COVER (2) — jungle mid-ring
@@ -983,18 +1226,18 @@ export function addInteractables(builder: any): void {
   // Each carries a small emissive band for visibility at range.
 
   // -- NW / SE diagonal corner pockets ------------------------------------
-  placeBarrel(builder, 'farcrysis-barrel-15', -16,  16, 0.6, 1.0);
-  placeBarrel(builder, 'farcrysis-barrel-16',  16, -16, 0.6, 1.0);
+  placeBarrel(builder, 'farcrysis-barrel-15', -16,  16);
+  placeBarrel(builder, 'farcrysis-barrel-16',  16, -16);
 
   // -- SW / NE beach fringe corner pockets --------------------------------
-  placeBarrel(builder, 'farcrysis-barrel-17', -12, -28, 0.55, 0.95);
-  placeBarrel(builder, 'farcrysis-barrel-18',  12,  28, 0.55, 0.95);
+  placeBarrel(builder, 'farcrysis-barrel-17', -12, -28);
+  placeBarrel(builder, 'farcrysis-barrel-18',  12,  28);
 
   // ── Hazard stripes on all four new barrels ────────────────────────────
-  addHazardStripesToBarrel(builder, 'farcrysis-barrel-15', -16,  16, 0.6, 1.0);
-  addHazardStripesToBarrel(builder, 'farcrysis-barrel-16',  16, -16, 0.6, 1.0);
-  addHazardStripesToBarrel(builder, 'farcrysis-barrel-17', -12, -28, 0.55, 0.95);
-  addHazardStripesToBarrel(builder, 'farcrysis-barrel-18',  12,  28, 0.55, 0.95);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-15', -16,  16);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-16',  16, -16);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-17', -12, -28);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-18',  12,  28);
 
   // =====================================================================
   // 12. TWO STACKED SANDBAG WALLS (2) — core door approach cover
@@ -1028,16 +1271,16 @@ export function addInteractables(builder: any): void {
   // -- Cave entrance (SE) — crates + barrel flanking the flooded cave ------
   placeCrate(builder, 'farcrysis-crate-29', 28, 17.5, 1.0);
   placeCrate(builder, 'farcrysis-crate-30', 22, 17, 0.9);
-  placeBarrel(builder, 'farcrysis-barrel-19', 24, 13.5, 0.6, 1.0);
+  placeBarrel(builder, 'farcrysis-barrel-19', 24, 13.5);
 
   // -- Tower approach (NW) — barrel + crate near the research tower --------
-  placeBarrel(builder, 'farcrysis-barrel-20', -11, -11, 0.6, 1.0);
+  placeBarrel(builder, 'farcrysis-barrel-20', -11, -11);
   placeCrate(builder, 'farcrysis-crate-31', -10, -6.5, 0.9);
 
   // -- Beach ring — south, north, west beach interactables -----------------
-  placeBarrel(builder, 'farcrysis-barrel-21', -3, -27, 0.55, 0.95);
+  placeBarrel(builder, 'farcrysis-barrel-21', -3, -27);
   placeCrate(builder, 'farcrysis-crate-32', 3.5, 27, 0.95);
-  placeBarrel(builder, 'farcrysis-barrel-22', -28, 14, 0.55, 0.95);
+  placeBarrel(builder, 'farcrysis-barrel-22', -28, 14);
 
   // -- Cave entrance approach sandbag cover --------------------------------
   placeSandbagWall(builder, 'farcrysis-sandbag-05', 19, 15, 2.2, 0.6, 0.45);
@@ -1062,7 +1305,7 @@ export function addInteractables(builder: any): void {
   placeCrate(builder, 'farcrysis-crate-33', 10, -8, 0.9);
 
   // -- West jungle mid-ring: barrel near cover-jungle-05
-  placeBarrel(builder, 'farcrysis-barrel-23', -12, -4, 0.6, 1.0);
+  placeBarrel(builder, 'farcrysis-barrel-23', -12, -4);
 
   // -- East jungle approach: fallen palm trunk cover
   placeFallenTrunk(builder, 'farcrysis-cover-jungle-07', 12, -10, 3.0, 0.4);
@@ -1074,13 +1317,13 @@ export function addInteractables(builder: any): void {
   placeSandbagWall(builder, 'farcrysis-sandbag-08', -20, -26, 2.2, 0.6, 0.45);
 
   // -- NE beach edge: barrel filling the empty NE corner
-  placeBarrel(builder, 'farcrysis-barrel-24', 24, 24, 0.6, 1.0);
+  placeBarrel(builder, 'farcrysis-barrel-24', 24, 24);
 
   // -- NW jungle: crate cover near research tower approach
   placeCrateCover(builder, 'farcrysis-cover-jungle-09', -16, 8);
 
   // -- SE jungle: barrel for the sparse SE interior
-  placeBarrel(builder, 'farcrysis-barrel-25', 18, -8, 0.6, 1.0);
+  placeBarrel(builder, 'farcrysis-barrel-25', 18, -8);
 
   // -- South jungle path: fallen palm trunk for southern approach cover
   placeFallenTrunk(builder, 'farcrysis-cover-jungle-10', 6, -20, 3.0, 0.4);
@@ -1114,4 +1357,9 @@ export function addInteractables(builder: any): void {
       console.warn(`farcrysis-${label} at (${px}, ${pz}) is outside FARCRYSIS_BOUNDS margin`);
     }
   }
+
+  // Pass 76: flush every queued prop family (supply cases, fuel drums, fallen
+  // logs, boulders, sandbag courses) into shared InstancedMesh draws. Must be
+  // the LAST step so every placement above has queued its spec.
+  buildQueuedInteractableVisuals(builder);
 }

@@ -183,10 +183,15 @@ describe('farcrysis terrain authority', () => {
     // Vegetation layers that were flat-authored at y=0 (buried on hills) or
     // seated on the phantom plateau (floating in mid-air): sample their
     // instance matrices against ground + each layer's authored base offset.
+    //
+    // Pass 76 (intentional behaviour change): the palm layer now renders
+    // through the shared enhanced-palm builder whose trunk geometry is
+    // pre-translated (instance origin IS the base), so its offset is 0; and
+    // the wrong-biome conifers were replaced by base-origin fan palms.
     const seatedLayers: ReadonlyArray<readonly [string, number]> = [
-      ['farcrysis-vege-palm-trunks', 1.4],
+      ['farcrysis-vege-palm-trunks', 0],
       ['farcrysis-vege-broadleaf-trunks', 1.3],
-      ['farcrysis-vege-conifers', 1.8],
+      ['farcrysis-vege-fan-palms', 0],
       ['farcrysis-vege-dead-trunks', 1.2],
       ['farcrysis-vege-grass-tufts', 0.22],
       ['farcrysis-vege-bushes', 0.45],

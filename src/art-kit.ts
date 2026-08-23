@@ -120,6 +120,13 @@ export function batchStaticMeshes(
       || node.userData.targetRoot
       || node.userData.pass73CollisionVisualOwner === true
       || Array.isArray(node.material)) return;
+    // InstancedMesh is already a single draw call, and its per-instance
+    // transforms live in instanceMatrix, NOT in node.geometry. Cloning the
+    // geometry here batched exactly ONE copy at the mesh origin and hid the
+    // source — on Farcrysis that silently deleted every instanced vegetation
+    // layer (2000+ plants collapsed to single strays at the arena centre).
+    // Leave instanced meshes alone: there is nothing to win by merging them.
+    if ((node as THREE.InstancedMesh).isInstancedMesh) return;
     const sourceMaterial = node.material as THREE.MeshBasicMaterial;
     const canvasMap = typeof HTMLCanvasElement !== 'undefined' && sourceMaterial.map?.image instanceof HTMLCanvasElement;
     if (simplifyMaterials && canvasMap) return;
