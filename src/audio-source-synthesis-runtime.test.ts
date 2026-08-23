@@ -427,4 +427,73 @@ describe('HF-376 runtime source synthesis', () => {
     expect(envelope.length).toBe(4);
     expect(envelope[2]!.value).toBeGreaterThan(envelope.at(-1)!.value);
   });
+  it('re-voices the scout sweep pings with a pitch knee, a held body and per-pulse variation', () => {
+    const { audio, context } = startAudio();
+    const before = { oscillators: context.oscillators.length, gains: context.gains.length };
+    audio.scoutSweep();
+    // Five rising sensor pings plus five fixed confirmation blips - one voice
+    // per pulse now, not one shared oscillator whose overlapping cues fought
+    // over the same automation timeline.
+    const pings = context.oscillators.slice(before.oscillators, before.oscillators + 5);
+    expect(pings.map(({ type }) => type)).toEqual(Array.from({ length: 5 }, () => 'triangle'));
+    const pingGains = context.gains.slice(before.gains, before.gains + 5);
+    for (const [index, gain] of pingGains.entries()) {
+      const envelope = gain.gain.calls.filter((call) => call.kind !== 'cancel');
+      // Amplitude: set-to-floor, ramped attack, held body, decay - NOT the
+      // old exp-attack straight into ONE exp decay (a beep).
+      expect(envelope[0]!.kind).toBe('set');
+      expect(envelope[1]!.kind).toBe('linear');
+      expect(envelope[1]!.value).toBeGreaterThan(envelope[0]!.value);
+      expect(envelope.slice(2).every((call) => call.kind === 'exponential')).toBe(true);
+      expect(envelope.length).toBeGreaterThanOrEqual(4);
+      expect(envelope[2]!.value).toBeGreaterThan(envelope.at(-1)!.value);
+      // Pitch: the 420 -> 1080 Hz rise keeps its endpoints but goes through a
+      // front-loaded knee; one glide is the old shape.
+      const voice = pings[index]!;
+      const pitch = voice.frequency.calls.filter((call) => call.kind !== 'cancel');
+      const start = pitch[0]!.value;
+      const ramps = pitch.filter((call) => call.kind === 'exponential');
+      expect(ramps).toHaveLength(2);
+      const [knee, endpoint] = ramps;
+      expect(knee!.at).toBeLessThan(endpoint!.at);
+      // Front-loaded regardless of direction: most of the log interval is
+      // spent before the knee.
+      expect(Math.abs(Math.log(start / knee!.value)))
+        .toBeGreaterThan(Math.abs(Math.log(start / endpoint!.value)) * 0.5);
+    }
+    // Round-robin detune: five identical pulses in a row read as a looped
+    // sample, which is the loudest "this is a synth" tell there is.
+    const onsets = pings.map((voice) => voice.frequency.calls[0]!.value);
+    expect(new Set(onsets).size).toBe(5);
+  });
+
+  it('re-voices the nuke warning siren with held bodies and a pitch knee instead of one glide per pulse', () => {
+    const { audio, context } = startAudio();
+    const before = { oscillators: context.oscillators.length, gains: context.gains.length };
+    audio.nukeWarning();
+    // Five sawtooth alarm pulses, five square confirmation blips and the low
+    // ambience pressure rise behind them.
+    const pulses = context.oscillators.slice(before.oscillators, before.oscillators + 5);
+    expect(pulses.map(({ type }) => type)).toEqual(Array.from({ length: 5 }, () => 'sawtooth'));
+    const pulseGains = context.gains.slice(before.gains, before.gains + 5);
+    for (const [index, gain] of pulseGains.entries()) {
+      const envelope = gain.gain.calls.filter((call) => call.kind !== 'cancel');
+      expect(envelope[0]!.kind).toBe('set');
+      expect(envelope[1]!.kind).toBe('linear');
+      expect(envelope.slice(2).every((call) => call.kind === 'exponential')).toBe(true);
+      expect(envelope.length).toBeGreaterThanOrEqual(4);
+      expect(envelope[2]!.value).toBeGreaterThan(envelope.at(-1)!.value);
+      // Each alarm pulse falls through a knee; endpoints preserved.
+      const voice = pulses[index]!;
+      const pitch = voice.frequency.calls.filter((call) => call.kind !== 'cancel');
+      const start = pitch[0]!.value;
+      const ramps = pitch.filter((call) => call.kind === 'exponential');
+      expect(ramps).toHaveLength(2);
+      const [knee, endpoint] = ramps;
+      expect(endpoint!.value).toBeLessThan(start);
+      expect(Math.log(start / knee!.value)).toBeGreaterThan(Math.log(start / endpoint!.value) * 0.5);
+    }
+    const onsets = pulses.map((voice) => voice.frequency.calls[0]!.value);
+    expect(new Set(onsets).size).toBe(5);
+  });
  });

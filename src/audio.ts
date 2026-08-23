@@ -3969,37 +3969,33 @@ export class ArenaAudio {
     wave: OscillatorType,
     destination: AudioNode | null,
   ): void {
-    if (!this.context || !destination || cues.length === 0) return;
-    const now = this.context.currentTime;
-    const oscillator = this.context.createOscillator();
-    const gain = this.context.createGain();
-    oscillator.type = wave;
-    gain.gain.value = 0.0001;
-    oscillator.connect(gain).connect(destination);
-    let stopAt = now;
-    for (const cue of cues) {
-      const start = now + Math.max(0, cue.delay);
-      const duration = Math.max(0.008, cue.duration);
-      const end = start + duration;
-      const attackEnd = start + Math.min(0.008, duration * 0.25);
-      oscillator.frequency.setValueAtTime(Math.max(1, cue.startFrequency), start);
-      oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, cue.endFrequency), end);
-      gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, cue.volume), attackEnd);
-      gain.gain.exponentialRampToValueAtTime(0.0001, end);
-      stopAt = Math.max(stopAt, end);
-    }
-    if (!this.registerVoice(oscillator, destination, 4)) {
-      gain.disconnect();
-      return;
-    }
-    const voiceEnded = oscillator.onended;
-    oscillator.onended = (event) => {
-      voiceEnded?.call(oscillator, event);
-      gain.disconnect();
-    };
-    oscillator.start(now);
-    oscillator.stop(stopAt + 0.005);
+    // HF-376 completion: this was the last voice in the game still built on
+    // the old shape - one shared oscillator whose every cue was an exponential
+    // attack straight into ONE exponential decay across a single frequency
+    // glide. Overlapping cues were worse than merely beeps: the hunter
+    // swarm's five 0.44 s whooshes spaced 0.07 s apart fought over the same
+    // automation timeline, each new setValueAtTime landing mid-ramp of the
+    // previous cue. Each cue is now its own properly voiced transient via
+    // sweep(): ramped attack into a held body, a front-loaded pitch fall
+    // between the same endpoints, and round-robin detune so five identical
+    // pulses never read as one looped sample.
+    cues.forEach((cue, index) => {
+      this.sweep(
+        cue.startFrequency,
+        cue.endFrequency,
+        cue.duration,
+        cue.volume,
+        wave,
+        destination,
+        Math.max(0, cue.delay),
+        {
+          attack: Math.min(0.008, cue.duration * 0.25),
+          punch: 0.35,
+          punchSeconds: Math.max(0.004, cue.duration * 0.22),
+          detuneCents: roundRobinDetune(index, 40),
+        },
+      );
+    });
   }
 
   private createNoiseBuffer(duration: number, texture: NoiseTexture = 'white'): AudioBuffer {
