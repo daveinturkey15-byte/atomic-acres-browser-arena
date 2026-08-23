@@ -58,21 +58,68 @@ const startedAt = Date.now();
  * resolution), which destroys the first execution context; on a dev server a
  * concurrent editor can additionally trigger a vite full reload at any time.
  * Retry boot rather than treating either as a probe failure.
+ *
+ * `release=latest` is deliberately OMITTED. It makes the app resolve a
+ * release channel and self-navigate, which destroys every execution context
+ * this harness is holding - not once at boot, but again at unpredictable
+ * moments afterwards, which is how a mid-walk teleport ended up calling
+ * `snapshot()` on an undefined debug API. The walk needs the dev bundle that
+ * is already being served, not a pinned release.
  */
+const ARENA_BOOT_TIMEOUT_MS = 300_000;
+
+/**
+ * The debug API disappears across any reload, and in a shared worktree a
+ * concurrent lane's edit can trigger a vite full reload at ANY point in a
+ * twenty-minute walk. Every evaluate that touches the API waits for it first
+ * and reports whether it came back, so a reload costs one sample instead of
+ * aborting the run and losing the arena.
+ */
+async function awaitDebugApi(page, timeout = 120_000) {
+  try {
+    await page.waitForFunction(
+      () => Boolean(window.__ATOMIC_ACRES_DEBUG__?.snapshot?.()?.player),
+      undefined,
+      { timeout },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Evaluate against the debug API, returning null if it is mid-reload. */
+async function evaluateWithDebugApi(page, fn, arg) {
+  if (!(await awaitDebugApi(page))) return null;
+  try {
+    return await page.evaluate(fn, arg);
+  } catch (error) {
+    if (String(error).includes('Execution context was destroyed')
+      || String(error).includes('undefined')) return null;
+    throw error;
+  }
+}
+
 async function bootArena(page, arenaId) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      await page.goto(`${BASE}/?release=latest&renderer=webgl2&render=performance&seed=blockers&previewTime=0`, { waitUntil: 'load' });
+      await page.goto(`${BASE}/?renderer=webgl2&render=performance&seed=blockers&previewTime=0`, { waitUntil: 'load' });
       await page.waitForTimeout(1_000);
-      await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 120_000 });
+      await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: ARENA_BOOT_TIMEOUT_MS });
       await page.evaluate(async (id) => { await window.__ATOMIC_ACRES_DEBUG__.selectArena(id); }, arenaId);
       await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.startSolo(); });
       await page.waitForFunction(() => {
-        const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-        return snapshot.matchPhase === 'active' && snapshot.gameStarted === true;
-      }, undefined, { timeout: 120_000 });
+        const snapshot = window.__ATOMIC_ACRES_DEBUG__?.snapshot?.();
+        return Boolean(snapshot) && snapshot.matchPhase === 'active' && snapshot.gameStarted === true;
+        // farcrysis cold boot on a fresh dev server can exceed two minutes.
+      }, undefined, { timeout: ARENA_BOOT_TIMEOUT_MS });
       await page.waitForTimeout(2_000);
-      await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true); });
+      const frozen = await evaluateWithDebugApi(page, () => {
+        window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true);
+        return true;
+      });
+      // Bots must be frozen or the walk measures marksmanship, not collision.
+      if (!frozen) throw new Error('Execution context was destroyed before bots could be frozen');
       await page.click('body');
       return;
     } catch (error) {
@@ -109,6 +156,10 @@ async function runArena(page, arena, pageErrors) {
   let cellsTested = 0;
   let movesTested = 0;
   let blockedExplained = 0;
+  // Samples abandoned because the page reloaded under us, not because the
+  // arena did anything. Reported so a walk thinned by a busy worktree cannot
+  // be mistaken for a clean one.
+  let reloadsSurvived = 0;
 
   const [cellsX, cellsZ] = arena.cells;
   for (let cx = 0; cx < cellsX; cx += 1) {
@@ -117,18 +168,20 @@ async function runArena(page, arena, pageErrors) {
       const z = arena.minZ + (cellsZ === 1 ? 0.5 : cz / (cellsZ - 1)) * (arena.maxZ - arena.minZ);
       cellsTested += 1;
       for (const direction of DIRECTIONS) {
-        const placed = await page.evaluate(([px, py, pz, yaw]) => {
+        const placed = await evaluateWithDebugApi(page, ([px, py, pz, yaw]) => {
           const debug = window.__ATOMIC_ACRES_DEBUG__;
+          if (!debug) return false;
           if (!debug.snapshot().player.alive) debug.respawn();
           debug.teleportPlayer(px, py, pz, yaw, 0);
           return true;
         }, [x, arena.dropY, z, direction.yaw]);
-        if (!placed) continue;
+        if (!placed) { reloadsSurvived += 1; continue; }
         await page.waitForTimeout(450);
-        const before = await page.evaluate(() => {
+        const before = await evaluateWithDebugApi(page, () => {
           const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
           return { position: snapshot.player.position, alive: snapshot.player.alive };
         });
+        if (!before) { reloadsSurvived += 1; continue; }
         if (!before.alive) continue;
         // A cell that settled far from its drop is inside solid authority or
         // fell out of the sampled shell - direction results would be noise.
@@ -137,10 +190,11 @@ async function runArena(page, arena, pageErrors) {
         await page.keyboard.down('KeyW');
         await page.waitForTimeout(HOLD_MS);
         await page.keyboard.up('KeyW');
-        const after = await page.evaluate(() => {
+        const after = await evaluateWithDebugApi(page, () => {
           const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
           return { position: snapshot.player.position, alive: snapshot.player.alive };
         });
+        if (!after) { reloadsSurvived += 1; continue; }
         if (!after.alive) continue;
         const moved = Math.hypot(
           after.position[0] - before.position[0],
@@ -156,15 +210,25 @@ async function runArena(page, arena, pageErrors) {
         const feetY = after.position[1] - EYE_HEIGHT_M;
         if (probeX <= arena.minX - 1 || probeX >= arena.maxX + 1
           || probeZ <= arena.minZ - 1 || probeZ >= arena.maxZ + 1) continue;
+        // The sampled boxes live on `window` and do not survive a reload. If
+        // they are gone, EVERY blocked move would look unexplained and the
+        // walk would manufacture findings, so an absent sample is reported as
+        // a lost sample rather than as a blocker.
         const explanation = await page.evaluate(([qx, qyMin, qyMax, qz]) => {
+          const boxes = window.__BLOCKER_PROBE_BOXES;
+          if (!Array.isArray(boxes) || boxes.length === 0) return { sampled: false, name: null };
           const half = 0.5;
-          const hit = (window.__BLOCKER_PROBE_BOXES ?? []).find((box) =>
+          const hit = boxes.find((box) =>
             box.minX <= qx + half && box.maxX >= qx - half
             && box.minY <= qyMax && box.maxY >= qyMin
             && box.minZ <= qz + half && box.maxZ >= qz - half);
-          return hit ? hit.name : null;
-        }, [probeX, feetY + 0.15, feetY + 1.5, probeZ]);
-        if (explanation !== null) {
+          return { sampled: true, name: hit ? hit.name : null };
+        }, [probeX, feetY + 0.15, feetY + 1.5, probeZ]).catch(() => null);
+        if (explanation === null || !explanation.sampled) {
+          reloadsSurvived += 1;
+          continue;
+        }
+        if (explanation.name !== null) {
           blockedExplained += 1;
           continue;
         }
@@ -183,6 +247,7 @@ async function runArena(page, arena, pageErrors) {
     cellsTested,
     movesTested,
     blockedExplained,
+    reloadsSurvived,
     findings,
     pageErrors: [...new Set(pageErrors)].slice(0, 5),
   };

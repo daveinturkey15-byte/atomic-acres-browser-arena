@@ -293,11 +293,23 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   x/z = -+32.2, y -4.5..4.
 - CORRECTION 2026-08-23 (lane K): the line above previously claimed a live walk
   "receipt at artifacts/qa/". There was no receipt - the only file there was a
-  77-byte `.json.tmp` holding a stray vite banner line. The claim was written
-  before the probe produced anything, and has been removed. The harness
-  `scripts/qa/verify-invisible-blockers.mjs` exists and is sound (teleport grid,
-  real key input, visible-mesh-ahead check) but has NOT been run to completion.
-  The static audit is the mechanical proof that stands; the live walk is owed.
+  77-byte `.json.tmp` holding a stray vite banner line, written before the probe
+  produced anything. The walk has now actually been run, and the harness needed
+  three real fixes first: it passed `release=latest`, which makes the app resolve
+  a release channel and SELF-NAVIGATE, destroying the execution contexts the walk
+  holds (it died mid-teleport calling `snapshot()` on an undefined debug API);
+  it evaluated against the debug API without waiting for it to come back after a
+  reload; and worst, its sampled visible-mesh boxes live on `window`, so after a
+  reload every blocked move would have looked UNEXPLAINED and the walk would have
+  manufactured findings. Lost samples are now counted as `reloadsSurvived` and
+  discarded instead.
+- LIVE WALK PASS 2026-08-23: all six arenas, 180 teleport cells, 704 real
+  W-key movement tests, ZERO findings. Receipt:
+  artifacts/qa/invisible-blockers-live-walk-2026-08-23.json. The hardening was
+  load-bearing, not cosmetic: rustworks logged 48 lost samples, high-seas 76 and
+  atomic-acres 120, all from concurrent lanes editing this shared worktree - each
+  one a false finding the old harness would have reported or a crash it would
+  have died on. Every arena still cleared its full grid.
 - Instanced-geometry fix 2026-08-23 (lane K): `meshWorldAabbs` read an
   InstancedMesh's ROOT matrix, which is normally the identity. That invented a
   phantom visible volume at the origin - which could falsely EXPLAIN a collider
