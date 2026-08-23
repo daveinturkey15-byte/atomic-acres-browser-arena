@@ -166,3 +166,79 @@ function firstBoxHitTime(
   }
   return first;
 }
+
+/**
+ * The presentation adjustment implied by a clearance measurement.
+ *
+ * HF-345 shipped {@link proneBodyClearance} with a note that "a later consumer
+ * will use these clearances to choose an adjusted pose/offset". That consumer
+ * was never written, so the measurement was computed by nobody and the prone
+ * body kept clipping through walls. This is that decision, kept pure and
+ * separate from three.js so it can be reasoned about and tested directly.
+ */
+export type ProneStanceAdjustment = Readonly<{
+  /**
+   * Metres to slide the pelvis pivot ALONG the body axis. Positive slides the
+   * body backward (away from whatever is blocking its head).
+   */
+  slideM: number;
+  /**
+   * Fraction of the full prone pitch to apply, in 0..1. When there is not
+   * enough room in either direction the body stays partly propped up rather
+   * than lying flat, because a shorter footprint is the only way to fit.
+   */
+  pitchScale: number;
+}>;
+
+/**
+ * Chooses how to seat a prone body in the room it actually has.
+ *
+ * Two levers, applied in order of least visual damage:
+ *
+ * 1. SLIDE. If the head end is short of room but the leg end has spare, move
+ *    the whole body backward. The pose is unchanged - it just sits further
+ *    back - so this is invisible to the player and always preferred.
+ * 2. PROP. If sliding cannot recover the deficit (a corridor shorter than the
+ *    body, say) the body cannot lie flat at all, so reduce the pitch. A partly
+ *    raised torso is shorter along the ground, and reads as someone bracing
+ *    against a wall rather than as a body buried inside it.
+ *
+ * The authority capsule is NOT affected by either lever: this is presentation
+ * only, exactly as the original module intended.
+ */
+export function proneStanceAdjustment(clearance: ProneBodyClearance): ProneStanceAdjustment {
+  const { forwardM: maxForward, backwardM: maxBackward } = PRONE_PRESENTATION_ENVELOPE;
+
+  const forward = Math.max(0, finiteOr(clearance.forwardM, maxForward));
+  const backward = Math.max(0, finiteOr(clearance.backwardM, maxBackward));
+
+  // How far short of the pose each end is, and how much spare room the
+  // opposite end has to absorb a slide. Sliding backward by s costs s of
+  // backward room, so the slide is capped by the backward surplus.
+  const forwardDeficit = Math.max(0, maxForward - forward);
+  const backwardDeficit = Math.max(0, maxBackward - backward);
+  const forwardSurplus = Math.max(0, forward - maxForward);
+  const backwardSurplus = Math.max(0, backward - maxBackward);
+
+  let slideM = 0;
+  if (forwardDeficit > 0) {
+    slideM = Math.min(forwardDeficit, backwardSurplus);
+  } else if (backwardDeficit > 0) {
+    slideM = -Math.min(backwardDeficit, forwardSurplus);
+  }
+
+  // Whatever the slide could not absorb has to come out of the pose length.
+  const residual = Math.max(
+    Math.max(0, forwardDeficit - Math.max(0, slideM)),
+    Math.max(0, backwardDeficit - Math.max(0, -slideM)),
+  );
+  const reference = Math.max(maxForward, maxBackward);
+  const pitchScale = reference > 0
+    ? Math.min(1, Math.max(0.25, 1 - residual / reference))
+    : 1;
+
+  return Object.freeze({
+    slideM: Number.isFinite(slideM) ? slideM : 0,
+    pitchScale,
+  });
+}

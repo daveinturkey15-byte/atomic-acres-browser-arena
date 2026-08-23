@@ -38,6 +38,7 @@ import type { ArenaVisualBudgets, ArenaVisualDefinition } from './rendering/aren
 import { auditLocalLightOcclusion } from './rendering/light-occlusion';
 import { webGlShadowSamplerMode } from './webgl-shadow-compatibility';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
+import { proneBodyClearance } from './prone-clearance';
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
 import { sharedWaterBodyForArena } from './water/water-authoring';
 import { PASS66_RELEASE_IDENTITY } from './release-identity';
@@ -23883,6 +23884,13 @@ function updateRemotes(dt: number, now: number): void {
     remote.renderedWorldAgeMs = rendered?.renderedWorldAgeMs ?? 0;
     const stance = renderedSnapshot.stance ?? 'stand';
     const operator = remote.root.userData.operator as THREE.Group;
+    // HF-345: publish how much room the prone body actually has so the
+    // presentation can seat it instead of pushing it through the wall. Measured
+    // only while prone - it is three short segment casts, and every other
+    // stance stays on the authored pose.
+    operator.userData.proneClearance = stance === 'prone'
+      ? proneBodyClearance(renderedTarget, renderedSnapshot.yaw, activeWorldColliders())
+      : null;
     setOperatorWeapon(operator, renderedSnapshot.weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
     poseOperator(operator, stance, remainingDistance / Math.max(dt, 0.001), now * 0.008, Math.min(1, dt * 24), renderedSnapshot.pitch, dt);
     const remoteSurface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(renderedTarget));

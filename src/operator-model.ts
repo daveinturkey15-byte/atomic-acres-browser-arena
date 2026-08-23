@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { proneStanceAdjustment, type ProneBodyClearance } from './prone-clearance';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
@@ -82,6 +83,12 @@ type RiggedOperatorRuntime = {
   currentBase: string;
   lastUpdatedAt: number;
   stancePivot: THREE.Group;
+  /**
+   * Room the prone presentation actually has, supplied by the runtime each
+   * frame. Null when the caller has not measured it, in which case the pose is
+   * used exactly as authored.
+   */
+  proneClearance: ProneBodyClearance | null;
   visual: THREE.Group;
   weaponSocket: THREE.Group;
   canonicalEvidence: RiggedOperatorCanonicalEvidence;
@@ -432,14 +439,33 @@ function applyStancePose(runtimeState: RiggedOperatorRuntime, dt: number): void 
   const alpha = 1 - Math.exp(-Math.max(0, dt) * 12);
   runtimeState.crouchBlend = THREE.MathUtils.lerp(runtimeState.crouchBlend, target.crouch, alpha);
   runtimeState.proneBlend = THREE.MathUtils.lerp(runtimeState.proneBlend, target.prone, alpha);
+  // HF-345. The prone pose lays the whole rig down about the pelvis pivot, so
+  // the visible body reaches ~0.82 m forward and ~0.88 m back while the
+  // authority capsule stays tiny. Against a wall that surplus went straight
+  // through the geometry. proneBodyClearance has measured the available room
+  // since HF-345 landed, but nothing consumed it; this is that consumer.
+  //
+  // Presentation only - the capsule, the hit proxies and every authority
+  // decision are untouched, exactly as the clearance module intended.
+  const proneAdjustment = runtimeState.stance === 'prone' && runtimeState.proneClearance
+    ? proneStanceAdjustment(runtimeState.proneClearance)
+    : null;
+
   runtimeState.stancePivot.position.y = THREE.MathUtils.lerp(
     runtimeState.stancePivot.position.y,
     target.pivotHeight,
     alpha,
   );
+  // Sliding along local Z seats the body in the room it has without changing
+  // the pose; propping only happens when sliding cannot recover the deficit.
+  runtimeState.stancePivot.position.z = THREE.MathUtils.lerp(
+    runtimeState.stancePivot.position.z,
+    proneAdjustment ? proneAdjustment.slideM : 0,
+    alpha,
+  );
   runtimeState.stancePivot.rotation.x = THREE.MathUtils.lerp(
     runtimeState.stancePivot.rotation.x,
-    target.pivotPitch,
+    proneAdjustment ? target.pivotPitch * proneAdjustment.pitchScale : target.pivotPitch,
     alpha,
   );
 
@@ -1180,6 +1206,8 @@ export function createRiggedOperator(
     },
     armBindPose,
     handBindPose,
+    // Measured by the runtime each frame; the authored pose is used until then.
+    proneClearance: null,
   } satisfies RiggedOperatorRuntime;
   root.userData.operatorAsset = {
     source: 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative',
@@ -1204,6 +1232,12 @@ export function updateRiggedOperator(root: THREE.Object3D, speed: number, stance
   runtimeState.lastUpdatedAt = now;
   runtimeState.stance = stance;
   runtimeState.speed = Math.max(0, Number.isFinite(speed) ? speed : 0);
+  // Published by the runtime on the operator root (the same userData channel
+  // the stance, melee and minigun state already use).
+  const publishedClearance = root.userData.proneClearance as ProneBodyClearance | undefined;
+  runtimeState.proneClearance = publishedClearance && Number.isFinite(publishedClearance.forwardM)
+    ? publishedClearance
+    : null;
   for (const entry of runtimeState.poseBeforeStance ?? []) {
     entry.bone.position.copy(entry.position);
     entry.bone.quaternion.copy(entry.quaternion);
