@@ -3060,6 +3060,18 @@ async function primeFinalWebGpuMatchPresentation(): Promise<void> {
   renderSubmissionPaused = true;
   try {
     synchronizeFrozenMatchPrimePresentation();
+    // Pass 79 MAX admission: this frozen frame is the FIRST submission with
+    // the spawn camera, restored corpse pool and rest-pose viewmodel together,
+    // so arena materials outside every earlier prewarm's frustum still
+    // compiled cold inside the 4000ms-bounded flush below and bounced MAX
+    // deployments (measured farcrysis failure: "WebGPU queue completion
+    // exceeded 4000 ms for submission 141"). Submit that EXACT composition
+    // once with frustum culling disabled behind compileAndRender's own 12s
+    // cold-generation fence; the guarded samples below then only ever fence
+    // warm frames. MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS is untouched.
+    await withArenaFrustumCullingDisabled(scene, () =>
+      renderRuntime.compileAndRender(scene, camera, scene),
+    );
     for (let sample = 0; sample < 2; sample += 1) {
       await submitForegroundWebGpuFrame();
       await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);

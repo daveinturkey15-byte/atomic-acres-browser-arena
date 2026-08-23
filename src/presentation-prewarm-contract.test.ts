@@ -471,6 +471,25 @@ describe('presentation prewarm startup contract', () => {
     expect(finalWebGlPresentationSync).toContain('weaponView.snapToMatchStartRestPose(currentViewmodelSurfaceRetreat());');
     expect(finalWebGlPresentationSync).toContain('camera.updateMatrixWorld(true);');
     expect(finalWebGlPresentationSync).not.toContain('updatePhysics(');
+    // Pass 79 farcrysis MAX: the frozen final WebGPU prime is the first frame
+    // with the spawn camera, restored corpse pool and rest-pose viewmodel
+    // together, so its 4000ms-bounded flush still carried cold pipeline
+    // creation for arena materials outside every earlier prewarm's frustum
+    // (measured bounce: "WebGPU queue completion exceeded 4000 ms for
+    // submission 141"). The prime must therefore compile that EXACT
+    // composition once - frustum culling disabled - behind the runtime's own
+    // 12s cold-generation fence, BEFORE any bounded sample flush runs. The
+    // MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS guard itself is untouched.
+    const finalWebGpuPrime = source.slice(
+      source.indexOf('async function primeFinalWebGpuMatchPresentation('),
+      source.indexOf('function buildSky()'),
+    );
+    expect(finalWebGpuPrime).toContain('synchronizeFrozenMatchPrimePresentation();');
+    expect(finalWebGpuPrime.indexOf('await withArenaFrustumCullingDisabled(scene,'))
+      .toBeGreaterThan(-1);
+    expect(finalWebGpuPrime.indexOf('await withArenaFrustumCullingDisabled(scene,'))
+      .toBeLessThan(finalWebGpuPrime.indexOf('for (let sample = 0; sample < 2; sample += 1) {'));
+    expect(finalWebGpuPrime).toContain('renderRuntime.compileAndRender(scene, camera, scene)');
     expect(finalWebGlPresentationSync).not.toContain('weaponView.update(');
     expect(finalWebGlPrime).toContain("renderRuntime.backend === 'webgpu'");
     expect(finalWebGlPrime).toContain('synchronizeFrozenMatchPrimePresentation();');
