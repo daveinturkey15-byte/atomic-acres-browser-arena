@@ -44,6 +44,18 @@ export type KillstreakActivationGateInput = Readonly<{
   tacticalMapOpen: boolean;
   /** The player is possessing a chopper gun or piloted drone. */
   possessionActive: boolean;
+  /**
+   * The pressed slot already owns a LIVE controllable platform in the world,
+   * so this press is a CONTROL TOGGLE rather than an activation.
+   *
+   * Without this, pressing the key a second time was judged as a fresh
+   * activation: the charge had just been spent spawning the platform, so
+   * `projectionEarned` was false and the press was refused with NOT EARNED -
+   * making it impossible to ever take control of a chopper or drone you had
+   * already paid for. Toggling control costs nothing and spends nothing, so
+   * neither the charge nor an active possession may refuse it.
+   */
+  controlTogglePress: boolean;
   /** A crosshair point/corridor targeting session is already open. */
   targetingActive: boolean;
   arenaSupportsFieldSupport: boolean;
@@ -96,10 +108,14 @@ export function evaluateKillstreakActivation(input: KillstreakActivationGateInpu
   // text chat, guest awaiting canonical authority, pending world repair) are
   // not separable from the boolean; report the honest generic lock.
   if (!input.gameplayInputEnabled) return denied(slotId, 'input-disabled');
-  if (input.possessionActive) return denied(slotId, 'possession-active');
   if (!input.arenaSupportsFieldSupport) return denied(slotId, 'arena-unsupported');
   if (input.tacticalMapOpen) return denied(slotId, 'menu-open');
   if (input.targetingActive) return denied(slotId, 'targeting-open');
+  // A control toggle on a platform the player already owns is exempt from the
+  // possession and charge checks: entering and LEAVING the gun both arrive on
+  // this path, and the charge was spent when the platform was called in.
+  if (input.controlTogglePress) return Object.freeze({ allowed: true as const, slotId });
+  if (input.possessionActive) return denied(slotId, 'possession-active');
   if (!input.hasActorSnapshot) return denied(slotId, 'no-authority-snapshot');
   if (!input.projectionEarned) return denied(slotId, 'not-earned');
   return Object.freeze({ allowed: true as const, slotId });

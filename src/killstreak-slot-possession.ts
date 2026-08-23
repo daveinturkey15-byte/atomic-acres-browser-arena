@@ -22,11 +22,13 @@ export function selectControllableSupportEntity(
   ownerId: string,
   entities: readonly ControllableSupportEntity[],
 ): ControllableSupportEntity | null {
+  // A drone flying AUTONOMOUSLY is still a drone you own and may take over -
+  // that is exactly what 'toggle-piloted-drone' means. Requiring mode
+  // 'piloted' here made an autonomous drone unselectable, so the key fell
+  // through to a fresh activation instead of handing you the controls.
   const candidates = entities.filter((entity) => entity.ownerId === ownerId
     && entity.expiresInMs > 0
-    && (id === 'chopper'
-      ? entity.kind === 'chopper'
-      : entity.kind === 'drone' && entity.mode === 'piloted'));
+    && (id === 'chopper' ? entity.kind === 'chopper' : entity.kind === 'drone'));
   candidates.sort((left, right) => left.id.localeCompare(right.id));
   return candidates[0] ?? null;
 }

@@ -16,6 +16,7 @@ const CLEAR: KillstreakActivationGateInput = Object.freeze({
   playerAlive: true,
   matchPhase: 'active',
   tacticalMapOpen: false,
+  controlTogglePress: false,
   possessionActive: false,
   targetingActive: false,
   arenaSupportsFieldSupport: true,
@@ -61,9 +62,17 @@ describe('HF-316(b) killstreak activation pre-flight gate', () => {
 
   it('keeps the observed legacy gate precedence when several gates block at once', () => {
     // Order mirrors legacy-main: gameplayInputEnabled compound (dead, then
-    // match phase, then residual lock), possession, then the
-    // activateFieldSupport guard (arena before tactical map), targeting
-    // overlay, then the availability split (snapshot before earned).
+    // match phase, then residual lock), then the activateFieldSupport guard
+    // (arena before tactical map), targeting overlay, POSSESSION, then the
+    // availability split (snapshot before earned).
+    //
+    // Possession moved after the arena/map/targeting group so the
+    // control-toggle exemption can sit in front of it while those three still
+    // refuse a toggle: you should not be able to jump into a chopper gun with
+    // the tactical map or a targeting overlay open, and gun-range supports no
+    // field support at all. That ordering change is deliberate and is what
+    // made it possible to take control of a platform whose charge was already
+    // spent (the owner's "can't take control when I press the key again").
     const worstCase = blocked({
       playerAlive: false,
       matchPhase: 'ended',
@@ -95,8 +104,8 @@ describe('HF-316(b) killstreak activation pre-flight gate', () => {
       };
     }
     expect(order).toEqual([
-      'dead', 'match-inactive', 'input-disabled', 'possession-active',
-      'arena-unsupported', 'menu-open', 'targeting-open',
+      'dead', 'match-inactive', 'input-disabled',
+      'arena-unsupported', 'menu-open', 'targeting-open', 'possession-active',
       'no-authority-snapshot', 'not-earned',
     ]);
     expect(evaluateKillstreakActivation(input)).toEqual({ allowed: true, slotId: 'care-package' });
@@ -152,5 +161,51 @@ describe('HF-316 keydown denial-feedback wiring', () => {
     // bespoke feed message or a direct activation.
     const preCheckBlock = main.slice(preCheck, blanketGuard);
     expect(preCheckBlock).toContain('activateOrToggleFieldSupportSlot(candidateSlot)');
+  });
+});
+
+describe('control-toggle press (HITL: cannot take control of a chopper you own)', () => {
+  /**
+   * Owner report: "i cant take control of chopper gunner or piloted drone when
+   * i press the key again".
+   *
+   * The second press was judged as a fresh ACTIVATION. The charge had just been
+   * spent calling the platform in, so projectionEarned was false and the gate
+   * refused with NOT EARNED before the toggle code below it could ever run -
+   * making a platform you had already paid for permanently uncontrollable.
+   * Toggling control spends nothing, so neither the charge nor an active
+   * possession may refuse it.
+   */
+  const toggling = (overrides: Record<string, unknown> = {}) => evaluateKillstreakActivation({
+    ...CLEAR,
+    slotId: 'chopper',
+    controlTogglePress: true,
+    projectionEarned: false,
+    ...overrides,
+  } as Parameters<typeof evaluateKillstreakActivation>[0]);
+
+  it('allows the toggle after the charge has been spent', () => {
+    expect(toggling()).toMatchObject({ allowed: true, slotId: 'chopper' });
+  });
+
+  it('allows the toggle back OUT while possessing', () => {
+    expect(toggling({ possessionActive: true })).toMatchObject({ allowed: true });
+  });
+
+  it('still refuses a toggle when the player is down or the match is not active', () => {
+    expect(toggling({ playerAlive: false })).toMatchObject({ allowed: false, reason: 'dead' });
+    expect(toggling({ matchPhase: 'warmup' })).toMatchObject({ allowed: false, reason: 'match-inactive' });
+  });
+
+  it('still refuses a toggle behind an open targeting overlay or tactical map', () => {
+    expect(toggling({ targetingActive: true })).toMatchObject({ allowed: false, reason: 'targeting-open' });
+    expect(toggling({ tacticalMapOpen: true })).toMatchObject({ allowed: false, reason: 'menu-open' });
+  });
+
+  it('leaves a normal activation press judged on the charge exactly as before', () => {
+    const activation = evaluateKillstreakActivation({
+      ...CLEAR, slotId: 'chopper', controlTogglePress: false, projectionEarned: false,
+    } as Parameters<typeof evaluateKillstreakActivation>[0]);
+    expect(activation).toMatchObject({ allowed: false, reason: 'not-earned' });
   });
 });

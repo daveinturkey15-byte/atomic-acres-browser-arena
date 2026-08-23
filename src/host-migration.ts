@@ -72,8 +72,36 @@ export const MAX_HOST_TERM = 1_000_000_000;
 /**
  * A mandate is only meaningful inside the same window in which a disconnected
  * member keeps a roster reservation. Past it there is no match left to inherit.
+ *
+ * It MUST outlive the transport's host-loss declaration, and by more than a
+ * rounding margin. Setting it equal to REJOIN_GRACE_MS made promotion
+ * unreachable by arithmetic, not by policy:
+ *
+ *   - a survivor may only promote once the transport reports 'host-lost',
+ *     which network.ts reaches at dropTime + RECONNECT_WINDOW_MS (90 s);
+ *   - a dead host cannot re-mint, so the newest mandate any survivor holds was
+ *     issued at or before dropTime;
+ *   - so the mandate expired at issuedAt + 90 s <= dropTime + 90 s, which is
+ *     exactly the first instant promotion becomes legal.
+ *
+ * authorizeSelfPromotion checks expiry BEFORE the roster, survivor and mirror
+ * guards, so it always returned 'mandate-expired'. Host migration could never
+ * fire: observed 3 runs out of 3, both survivors walked the full unstable ->
+ * reconnecting -> "Connection timed out" path and the room code died with the
+ * host, while the ledger recorded the feature as ARMED.
+ *
+ * The window is therefore the loss declaration PLUS the rejoin grace: a
+ * survivor gets the whole reservation window to inherit, measured from the
+ * last mandate the living host issued.
  */
-export const HOST_SUCCESSION_MANDATE_TTL_MS = REJOIN_GRACE_MS;
+/**
+ * The transport's host-loss declaration window, mirrored from network.ts
+ * RECONNECT_WINDOW_MS. Duplicated as a named constant rather than imported
+ * because network.ts owns transport concerns and this module must stay pure.
+ */
+export const RECONNECT_WINDOW_MS = 90_000;
+
+export const HOST_SUCCESSION_MANDATE_TTL_MS = RECONNECT_WINDOW_MS + REJOIN_GRACE_MS;
 
 /**
  * Host silence long enough to warn about, but far short of declaring death.

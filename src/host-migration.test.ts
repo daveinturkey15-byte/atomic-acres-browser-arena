@@ -6,6 +6,7 @@ import {
   INITIAL_HOST_TERM,
   MAX_HOST_TERM,
   MIN_SURVIVORS_FOR_MIGRATION,
+  RECONNECT_WINDOW_MS,
   acceptPromotedHost,
   authorizeSelfPromotion,
   electHostSuccessor,
@@ -730,5 +731,36 @@ describe('stale-host stand-down', () => {
       presentedTerm: decision.term,
       highestObservedTerm: mandate().term,
     })).accept).toBe(true);
+  });
+});
+
+describe('mandate TTL must outlive the host-loss declaration (HF-325 arithmetic)', () => {
+  /**
+   * REGRESSION GUARD for a feature that could never fire.
+   *
+   * HOST_SUCCESSION_MANDATE_TTL_MS used to equal REJOIN_GRACE_MS. A survivor
+   * may only promote once the transport declares 'host-lost', which happens at
+   * dropTime + RECONNECT_WINDOW_MS; a dead host cannot re-mint, so the freshest
+   * mandate was issued at or before dropTime and expired at exactly the instant
+   * promotion became legal. authorizeSelfPromotion checks expiry first, so it
+   * always answered 'mandate-expired'. Three live three-page runs confirmed it:
+   * promotion never happened and the room died with the host.
+   *
+   * The invariant is not "the TTL is 180 s" - it is that a mandate issued the
+   * moment before the host dies is STILL VALID when promotion first becomes
+   * legal, with real margin.
+   */
+  it('leaves a mandate issued at drop time still valid when host-loss is declared', () => {
+    const dropTime = 1_000_000;
+    const promotionBecomesLegalAt = dropTime + RECONNECT_WINDOW_MS;
+    const freshestMandateExpiry = dropTime + HOST_SUCCESSION_MANDATE_TTL_MS;
+    expect(freshestMandateExpiry).toBeGreaterThan(promotionBecomesLegalAt);
+    // And with enough margin to actually complete a handover, not one tick.
+    expect(freshestMandateExpiry - promotionBecomesLegalAt).toBeGreaterThanOrEqual(30_000);
+  });
+
+  it('keeps the survivor inheritable for the whole rejoin reservation window', () => {
+    // 90 s loss declaration + 90 s rejoin reservation.
+    expect(HOST_SUCCESSION_MANDATE_TTL_MS).toBe(RECONNECT_WINDOW_MS + 90_000);
   });
 });
