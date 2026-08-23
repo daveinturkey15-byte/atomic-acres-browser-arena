@@ -2118,12 +2118,26 @@ export class ArenaAudio {
     if (!this.context || !this.combatFeedbackPrepared || !this.damageFeedbackSource || !this.damageFeedbackGain) return;
     const now = this.context.currentTime;
     this.damageFeedbackSource.frequency.cancelScheduledValues(now);
+    // HF-376 continuation: the same front-loaded fall every report body uses.
+    // One exponential glide reads as a descending "boop"; a real body blow
+    // drops most of its pitch inside the first few milliseconds and settles.
     this.damageFeedbackSource.frequency.setValueAtTime(180, now);
-    this.damageFeedbackSource.frequency.exponentialRampToValueAtTime(72, now + 0.14);
+    for (const stage of pitchFallStages(180, 72, 0.14)) {
+      this.damageFeedbackSource.frequency.exponentialRampToValueAtTime(Math.max(1, stage.hz), now + stage.atSeconds);
+    }
     this.damageFeedbackGain.gain.cancelScheduledValues(now);
-    this.damageFeedbackGain.gain.setValueAtTime(0, now);
-    this.damageFeedbackGain.gain.linearRampToValueAtTime(0.085, now + 0.008);
-    this.damageFeedbackGain.gain.linearRampToValueAtTime(0, now + 0.14);
+    // HF-376 continuation: attack, collapse to a held body, then decay - the
+    // three-region contour - instead of an 8 ms linear rise into one straight
+    // linear fall, which read as a soft tone rather than as being hit.
+    // Parameter-only automation: the retained combat voice gains no factories.
+    this.applyEnvelope(this.damageFeedbackGain.gain, now, transientEnvelope({
+      peak: 0.085,
+      durationSeconds: 0.14,
+      attackSeconds: 0.0015,
+      punch: 0.42,
+      punchSeconds: 0.02,
+      floorValue: 0.0001,
+    }));
     this.damageFeedbackPulses += 1;
   }
 
@@ -2574,23 +2588,32 @@ export class ArenaAudio {
     const gain = this.context.createGain();
     const panner = this.context.createPanner();
     source.type = 'square';
+    // HF-376 continuation: a front-loaded knee instead of one exponential
+    // glide. The single ramp spent half its time in the top half of the
+    // interval, which is exactly the "boop" the re-authored voices removed.
     source.frequency.setValueAtTime(860 + urgency * 720, contextNow);
-    source.frequency.exponentialRampToValueAtTime(760 + urgency * 820, contextNow + 0.048);
+    for (const stage of pitchFallStages(860 + urgency * 720, 760 + urgency * 820, 0.048)) {
+      source.frequency.exponentialRampToValueAtTime(Math.max(1, stage.hz), contextNow + stage.atSeconds);
+    }
     filter.type = 'bandpass';
     filter.frequency.value = 1_600 + urgency * 1_000;
     filter.Q.value = 1.25;
-    gain.gain.setValueAtTime(0.0001, contextNow);
-    gain.gain.exponentialRampToValueAtTime(0.055, contextNow + 0.004);
-    gain.gain.exponentialRampToValueAtTime(0.0001, contextNow + 0.052);
+    // HF-376 continuation: snap in, collapse to a held body, then decay -
+    // replacing the 4 ms exponential attack into ONE straight exponential
+    // decay, the exact shape that made this cue read as a synth beep.
+    this.applyEnvelope(gain.gain, contextNow, transientEnvelope({
+      peak: 0.055,
+      durationSeconds: 0.052,
+      attackSeconds: 0.0012,
+      punch: 0.4,
+      punchSeconds: 0.008,
+      floorValue: 0.0001,
+    }));
     panner.panningModel = 'HRTF';
     panner.distanceModel = 'inverse';
-    panner.refDistance = 1.4;
-    panner.maxDistance = 42;
     panner.rolloffFactor = 1.25;
     panner.positionX.value = position.x;
     panner.positionY.value = position.y;
-    panner.positionZ.value = position.z;
-    source.connect(filter).connect(gain).connect(panner).connect(this.weapons);
     const listenerDistance = Math.hypot(
       position.x - this.listenerPosition.x,
       position.y - this.listenerPosition.y,

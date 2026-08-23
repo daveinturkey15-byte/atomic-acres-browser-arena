@@ -362,4 +362,69 @@ describe('HF-376 runtime source synthesis', () => {
     expect(oscillator.frequency.calls.filter((call) => call.kind === 'exponential').length).toBeGreaterThan(4);
     expect(context.filters.some((filter) => filter.type === 'bandpass')).toBe(true);
   });
-});
+
+  it('re-voices damage taken as a front-loaded body blow, not a linear beep', () => {
+    const { audio, context } = startAudio();
+    // unlock() prepares combat: breath, heartbeat, damage - the third voice.
+    const voice = context.oscillators[2]!;
+    // The damage voice chain is oscillator -> bandpass(520 Hz, Q 1.2) -> gain.
+    const damageFilter = context.filters.find((filter) => filter.type === 'bandpass'
+      && filter.frequency.value === 520 && filter.Q.value === 1.2)!;
+    expect(damageFilter).toBeDefined();
+    audio.damage();
+    // Pitch: endpoints preserved (180 -> 72 Hz) but through a front-loaded
+    // knee, not one exponential glide across the whole 140 ms.
+    const pitch = voice.frequency.calls.filter((call) => call.kind !== 'cancel');
+    expect(pitch[0]!.kind).toBe('set');
+    expect(pitch[0]!.value).toBe(180);
+    const pitchRamps = pitch.filter((call) => call.kind === 'exponential');
+    expect(pitchRamps).toHaveLength(2);
+    const [knee, endpoint] = pitchRamps;
+    expect(endpoint!.value).toBe(72);
+    expect(knee!.at).toBeLessThan(endpoint!.at);
+    expect(Math.log(pitch[0]!.value / knee!.value))
+      .toBeGreaterThan(Math.log(pitch[0]!.value / endpoint!.value) * 0.5);
+    // Amplitude: set-to-floor, ramped attack, then ONLY exponentials - the
+    // old shape was two straight linear ramps, which read as a soft tone.
+    const damageGain = (damageFilter.outputs[0] as FakeGainNode).gain;
+    const envelope = damageGain.calls.filter((call) => call.kind !== 'cancel');
+    expect(envelope[0]!.kind).toBe('set');
+    expect(envelope[1]!.kind).toBe('linear');
+    expect(envelope[1]!.value).toBeGreaterThan(envelope[0]!.value);
+    expect(envelope.slice(2).every((call) => call.kind === 'exponential')).toBe(true);
+    // Three regions: the held body (the collapse target) sits above the
+    // silence floor the voice finally decays to.
+    expect(envelope.length).toBeGreaterThanOrEqual(4);
+    expect(envelope[2]!.value).toBeGreaterThan(envelope.at(-1)!.value);
+  });
+
+  it('re-voices the crossbow fuse beep with a snap attack and a pitch knee, not one glide', () => {
+    const { audio, context } = startAudio();
+    const before = { oscillators: context.oscillators.length, gains: context.gains.length };
+    expect(audio.crossbowFuseBeep({ x: 3, y: 1, z: -2 }, 900)).toBe(true);
+    const oscillator = context.oscillators[before.oscillators]!;
+    expect(oscillator.type).toBe('square');
+    // Urgency mapping preserved exactly: remainingMs=900 -> urgency 0.28.
+    const urgency = 1 - 900 / 1250;
+    const pitch = oscillator.frequency.calls;
+    expect(pitch[0]!.kind).toBe('set');
+    expect(pitch[0]!.value).toBeCloseTo(860 + urgency * 720, 5);
+    const ramps = pitch.filter((call) => call.kind === 'exponential');
+    expect(ramps).toHaveLength(2);
+    const [knee, endpoint] = ramps;
+    expect(endpoint!.value).toBeCloseTo(760 + urgency * 820, 5);
+    expect(knee!.at).toBeLessThan(endpoint!.at);
+    expect(Math.log(pitch[0]!.value / knee!.value))
+      .toBeGreaterThan(Math.log(pitch[0]!.value / endpoint!.value) * 0.5);
+    // Amplitude: the old graph was a 4 ms exponential attack into ONE
+    // exponential decay. Now: set, ramped attack, held body, then decay.
+    const gain = context.gains[before.gains]!;
+    const envelope = gain.gain.calls.filter((call) => call.kind !== 'cancel');
+    expect(envelope[0]!.kind).toBe('set');
+    expect(envelope[1]!.kind).toBe('linear');
+    expect(envelope[1]!.value).toBeGreaterThan(envelope[0]!.value);
+    expect(envelope.slice(2).every((call) => call.kind === 'exponential')).toBe(true);
+    expect(envelope.length).toBe(4);
+    expect(envelope[2]!.value).toBeGreaterThan(envelope.at(-1)!.value);
+  });
+ });
