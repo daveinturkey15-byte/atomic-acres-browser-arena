@@ -61,6 +61,27 @@ Even with the licence question answered yes, kimodo.cpp is not drop-in:
    `scripts/qa/verify-public-asset-provenance.mjs`. Generated clips would need a
    provenance record naming the model, prompt, commit and licence basis.
 
+## Owner decision, 2026-08-23
+
+Dave: *"None of this is for commercial use it's all just testing and
+prototyping so just local."*
+
+That settles the SMPL-X question the way this file left open: the licence
+permits non-commercial research, education and artistic use, and local
+prototyping on the owner's own machine is inside that. **Step 1 below is
+answered - proceed.** If the game is ever monetised this must be revisited
+before anything SMPL-X-derived ships.
+
+The same standing decision covers the H3 route (register row 5), with one
+distinction worth keeping straight: row 5 rejected H3 because its Community
+Licence carries a UK territorial exclusion, and that judgement was about
+SHIPPING model-derived output. The owner's actual workflow does not ship
+model output at all - H3 generates a video DEMONSTRATING a rigging/animation
+procedure, an agent watches it, and what lands in the repo is hand-written
+code and project-original assets. The generated video is working reference,
+like a tutorial, and never becomes a game asset. Row 5's blanket "rejected"
+is therefore too broad and is corrected in the register.
+
 ## Recommendation
 
 Viable, and worth doing — but as a **deliberate offline authoring lane**, not
