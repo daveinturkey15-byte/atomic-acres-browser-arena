@@ -194,7 +194,9 @@ describe('legacy match admission integration', () => {
     expect(state).toContain('pendingClientReconnectWorldRepairConnectionEpoch = localConnectionEpoch;');
 
     // W3 & 4: pendingClientWorldRepair strictly gates client gameplay until host acknowledgement
-    const pendingRepair = slice('function pendingClientWorldRepair(): boolean {', 'function textChatAvailable(): boolean {');
+    // textChatAvailable moved to ./text-chat-controller; the slice now ends at
+    // the extraction seam comment that replaced it — same function, same bound.
+    const pendingRepair = slice('function pendingClientWorldRepair(): boolean {', '// Text chat lives in ./text-chat-controller');
     expect(pendingRepair).toContain("return network.role === 'client' && clientWorldRepairPending(clientWorldRepairAdmission);");
 
     // W3 & 4: exhausted repair and resume timeouts surface user-visible error state with setStatus and addFeed

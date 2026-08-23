@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const mainSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+// Render logic moved to the controller module (streamlining extraction); the
+// untrusted-content contract follows the code that must enforce it.
+const chatControllerSource = readFileSync(new URL('./text-chat-controller.ts', import.meta.url), 'utf8');
 const shellSource = readFileSync(new URL('./ui/pass64-shell.ts', import.meta.url), 'utf8');
 const styleSource = readFileSync(new URL('./style.css', import.meta.url), 'utf8');
 
@@ -28,9 +31,10 @@ describe('text chat UI contract', () => {
   });
 
   it('renders untrusted names and messages through textContent only', () => {
-    expect(mainSource).toContain('sender.textContent = entry.senderName;');
-    expect(mainSource).toContain('message.textContent = entry.text;');
+    expect(chatControllerSource).toContain('sender.textContent = entry.senderName;');
+    expect(chatControllerSource).toContain('message.textContent = entry.text;');
     expect(mainSource).not.toContain('textChatLog.innerHTML');
+    expect(chatControllerSource).not.toContain('innerHTML');
   });
 
   it('HF-324: provides lobby and click affordances for text chat', () => {

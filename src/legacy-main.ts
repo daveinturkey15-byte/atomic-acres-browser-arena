@@ -790,15 +790,10 @@ import {
   saveLastMultiplayerDiagnostic,
 } from './last-multiplayer-diagnostic';
 import {
-  admitChatRate,
-  appendChatHistory,
-  normalizeChatHistory,
-  normalizeChatSenderName,
   normalizeChatText,
-  type ChatEntry,
-  type ChatRateState,
 } from './text-chat';
-import { roomChatPresentation } from './room-chat-presentation';
+import { createTextChatController } from './text-chat-controller';
+import type { ChatSubmitMessage } from './protocol';
 import {
   createHumanMatchReport,
   type HumanDamageEventInput,
@@ -994,9 +989,6 @@ import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRan
 import {
   BotDamageMessage,
   BotStateMessage,
-  ChatHistoryMessage,
-  ChatMessage,
-  ChatSubmitMessage,
   DeathMessage,
   ExplosiveSource,
   GameMessage,
@@ -5441,16 +5433,6 @@ const pendingGuestAuthorityRepairs = new Map<string, Readonly<{
   authorityNonce: number;
   message: GuestResumeAuthorityMessage;
 }>>();
-let textChatHistory: ChatEntry[] = [];
-let localChatRateState: ChatRateState = [];
-const hostChatRateStates = new Map<string, ChatRateState>();
-const hostChatNonces = new Map<string, number[]>();
-let textChatOpen = false;
-let textChatNotice: string | null = null;
-let textChatHintTimer: ReturnType<typeof setTimeout> | null = null;
-let textChatFadeTimer: ReturnType<typeof setTimeout> | null = null;
-let textChatLastActivityAtMs: number | null = null;
-let textChatWasAvailable = false;
 
 function memberDhv(id: string): Dhv {
   return privateLobbySnapshot?.members.find((member) => member.id === id)?.dhv
@@ -6670,205 +6652,42 @@ function pendingClientWorldRepair(): boolean {
   return network.role === 'client' && clientWorldRepairPending(clientWorldRepairAdmission);
 }
 
-function textChatAvailable(): boolean {
-  return network.role !== 'offline' && privateLobbySnapshot !== null;
-}
+// Text chat lives in ./text-chat-controller; this seam injects every piece of
+// shared mutable state it reads as a live thunk/reference so behaviour stays
+// byte-identical with the pre-extraction inline implementation.
+const textChatController = createTextChatController({
+  elements: { root: textChatRoot, log: textChatLog, hint: textChatHint, input: textChatInput },
+  network,
+  appRoot: app,
+  hudRoot,
+  localPlayerId: () => player.id,
+  hostId: () => privateLobbySnapshot?.hostId ?? null,
+  hasLobby: () => privateLobbySnapshot !== null,
+  inGame: () => gameStarted,
+  shouldResumeControls: () => gameStarted && player.alive && !matchFinished && menu.classList.contains('hidden'),
+  inPointerLock: () => document.pointerLockElement === canvas,
+  clearGameplayInput,
+  resumePointerLock: () => requestGamePointerLock('chat-close'),
+  nonce: randomNonce,
+  hostMember: (id) => hostLobbyMembers.get(id),
+});
 
-function isTextChatTyping(): boolean {
-  return textChatOpen;
-}
-
-function renderTextChat(): void {
-  const available = textChatAvailable();
-  const now = performance.now();
-  const context = gameStarted ? 'game' : 'lobby';
-  if (context === 'lobby') {
-    const lobby = element<HTMLElement>('#private-lobby');
-    const roster = element<HTMLElement>('#lobby-roster');
-    if (textChatRoot.parentElement !== lobby) roster.after(textChatRoot);
-  } else if (textChatRoot.parentElement !== app) {
-    app!.insertBefore(textChatRoot, hudRoot);
-  }
-  if (available && !textChatWasAvailable) textChatLastActivityAtMs = now;
-  textChatWasAvailable = available;
-  const presentation = roomChatPresentation(now, available, textChatOpen, textChatLastActivityAtMs, context === 'lobby');
-  textChatRoot.hidden = !available;
-  textChatRoot.dataset.open = textChatOpen ? 'true' : 'false';
-  textChatRoot.dataset.visible = presentation.visible ? 'true' : 'false';
-  textChatRoot.dataset.context = context;
-  textChatHint.textContent = textChatNotice ?? (textChatOpen ? 'ENTER SEND / ESC CANCEL' : 'ENTER TO CHAT');
-  if (textChatFadeTimer) clearTimeout(textChatFadeTimer);
-  textChatFadeTimer = presentation.fadeAfterMs === null ? null : setTimeout(() => {
-    textChatFadeTimer = null;
-    renderTextChat();
-  }, presentation.fadeAfterMs);
-  if (!available) return;
-
-  textChatLog.replaceChildren();
-  if (textChatHistory.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'text-chat-empty';
-    empty.textContent = 'No messages yet.';
-    textChatLog.append(empty);
-  } else {
-    for (const entry of textChatHistory) {
-      const row = document.createElement('p');
-      row.className = entry.senderId === player.id ? 'text-chat-own' : '';
-      const sender = document.createElement('strong');
-      const message = document.createElement('span');
-      sender.textContent = entry.senderName;
-      message.textContent = entry.text;
-      row.append(sender, message);
-      textChatLog.append(row);
-    }
-  }
-  textChatLog.scrollTop = textChatLog.scrollHeight;
-}
-
-function markTextChatActivity(): void {
-  textChatLastActivityAtMs = performance.now();
-  renderTextChat();
-}
-
-function showTextChatNotice(message: string, durationMs = 1_800): void {
-  if (textChatHintTimer) clearTimeout(textChatHintTimer);
-  textChatNotice = message;
-  markTextChatActivity();
-  textChatHintTimer = setTimeout(() => {
-    textChatHintTimer = null;
-    textChatNotice = null;
-    renderTextChat();
-  }, durationMs);
-}
-
-function openTextChat(): void {
-  if (!textChatAvailable() || textChatOpen) return;
-  clearGameplayInput();
-  element<HTMLElement>('#roster').hidden = true;
-  textChatOpen = true;
-  markTextChatActivity();
-  if (document.pointerLockElement === canvas) void document.exitPointerLock();
-  textChatInput.focus({ preventScroll: true });
-}
-
-function closeTextChat(resumeControls: boolean): void {
-  if (!textChatOpen) return;
-  textChatOpen = false;
-  textChatInput.value = '';
-  textChatInput.blur();
-  markTextChatActivity();
-  if (resumeControls && gameStarted && player.alive && !matchFinished && menu.classList.contains('hidden')) {
-    requestGamePointerLock('chat-close');
-  }
-}
-
-function resetTextChat(): void {
-  if (textChatHintTimer) clearTimeout(textChatHintTimer);
-  if (textChatFadeTimer) clearTimeout(textChatFadeTimer);
-  textChatHintTimer = null;
-  textChatFadeTimer = null;
-  textChatNotice = null;
-  textChatOpen = false;
-  textChatLastActivityAtMs = null;
-  textChatWasAvailable = false;
-  textChatInput.value = '';
-  textChatInput.blur();
-  textChatHistory = [];
-  localChatRateState = [];
-  hostChatRateStates.clear();
-  hostChatNonces.clear();
-  renderTextChat();
-}
-
-function acceptChatEntry(entry: ChatEntry): void {
-  textChatHistory = appendChatHistory(textChatHistory, entry);
-  markTextChatActivity();
-}
-
-function sendTextChatHistory(playerId: string): void {
-  if (network.role !== 'host') return;
-  const message: ChatHistoryMessage = {
-    type: 'chat-history',
-    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
-    by: player.id,
-    forPlayerId: playerId,
-    entries: [...textChatHistory],
-    nonce: randomNonce(),
-  };
-  network.sendToPlayer(playerId, message);
-}
-
-function admitHostChatSubmit(message: ChatSubmitMessage): void {
-  if (network.role !== 'host') return;
-  const member = hostLobbyMembers.get(message.by);
-  if (!member?.connected) return;
-  const recentNonces = hostChatNonces.get(message.by) ?? [];
-  if (recentNonces.includes(message.nonce)) return;
-
-  const now = performance.now();
-  const rate = admitChatRate(hostChatRateStates.get(message.by) ?? [], now);
-  hostChatRateStates.set(message.by, rate.state);
-  if (!rate.accepted) {
-    if (message.by === player.id) showTextChatNotice('SLOW DOWN');
-    return;
-  }
-  hostChatNonces.set(message.by, [...recentNonces, message.nonce].slice(-64));
-
-  let id = randomNonce();
-  while (textChatHistory.some((entry) => entry.id === id)) id += 1;
-  const entry: ChatEntry = {
-    id,
-    senderId: member.id,
-    senderName: normalizeChatSenderName(member.name),
-    text: message.text,
-    sentAtHostTimeMs: now,
-  };
-  acceptChatEntry(entry);
-  const accepted: ChatMessage = {
-    type: 'chat-message',
-    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
-    by: player.id,
-    entry,
-    nonce: id,
-  };
-  network.send(accepted);
-}
-
-function submitTextChat(): void {
-  const text = normalizeChatText(textChatInput.value);
-  if (!text) {
-    closeTextChat(true);
-    return;
-  }
-  const rate = admitChatRate(localChatRateState, performance.now());
-  localChatRateState = rate.state;
-  if (!rate.accepted) {
-    showTextChatNotice('SLOW DOWN');
-    textChatInput.select();
-    return;
-  }
-  const message: ChatSubmitMessage = {
-    type: 'chat-submit',
-    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
-    by: player.id,
-    text,
-    nonce: randomNonce(),
-  };
-  if (network.role === 'host') admitHostChatSubmit(message);
-  else if (network.role === 'client') network.send(message);
-  closeTextChat(true);
-}
-
-function acceptHostChatMessage(message: ChatMessage): void {
-  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId) return;
-  acceptChatEntry(message.entry);
-}
-
-function acceptHostChatHistory(message: ChatHistoryMessage): void {
-  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.forPlayerId !== player.id) return;
-  textChatHistory = normalizeChatHistory(message.entries);
-  markTextChatActivity();
-}
+const {
+  available: textChatAvailable,
+  typing: isTextChatTyping,
+  render: renderTextChat,
+  markActivity: markTextChatActivity,
+  open: openTextChat,
+  close: closeTextChat,
+  reset: resetTextChat,
+  sendHistory: sendTextChatHistory,
+  admitHostSubmit: admitHostChatSubmit,
+  submit: submitTextChat,
+  acceptHostMessage: acceptHostChatMessage,
+  acceptHostHistory: acceptHostChatHistory,
+  forgetPlayer: forgetTextChatParticipant,
+  debugSnapshot: textChatDebugSnapshot,
+} = textChatController;
 
 function randomLobbyCredential(): string {
   if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
@@ -8839,8 +8658,7 @@ function scheduleDisconnectedLobbyExpiry(playerId: string, delayMs = REJOIN_GRAC
     hostLobbyConnectionEpochs.delete(playerId);
     authoritativeShotAdmissions.delete(playerId);
     authoritativeScores.delete(playerId);
-    hostChatRateStates.delete(playerId);
-    hostChatNonces.delete(playerId);
+    forgetTextChatParticipant(playerId);
     remoteSupportAuthorities.delete(playerId);
     remoteGrenadeAuthorities.delete(playerId);
     remoteCombatInventories.delete(playerId);
@@ -9657,8 +9475,7 @@ function handleLobbyMessage(message: GameMessage): boolean {
         authoritativeShotAdmissions.delete(message.playerId);
         hostDisconnectedAt.delete(message.playerId);
         authoritativeScores.delete(message.playerId);
-        hostChatRateStates.delete(message.playerId);
-        hostChatNonces.delete(message.playerId);
+        forgetTextChatParticipant(message.playerId);
         broadcastHostLobby(privateLobbySnapshot.phase);
       } else {
         markLobbyDisconnected(message.playerId);
@@ -26253,7 +26070,7 @@ const handleTextChatPanelOpenAffordance = (event: Event): void => {
   if (event.type === 'pointerdown' && event.cancelable && target !== textChatInput) {
     event.preventDefault();
   }
-  if (!textChatOpen) openTextChat();
+  if (!isTextChatTyping()) openTextChat();
   else if (document.activeElement !== textChatInput) textChatInput.focus({ preventScroll: true });
 };
 textChatRoot.addEventListener('pointerdown', handleTextChatPanelOpenAffordance);
@@ -30336,9 +30153,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       lastRejectedPoseAtEpochMs: lastHostCheckpointRejectedPoseAtEpochMs,
     },
     textChat: {
-      open: textChatOpen,
-      focused: document.activeElement === textChatInput,
-      entries: textChatHistory.map((entry) => ({ ...entry })),
+      ...textChatDebugSnapshot(),
       heldKeys: [...keys].sort(),
       triggerHeld,
       adsHeld,
