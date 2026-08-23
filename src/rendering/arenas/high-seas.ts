@@ -107,14 +107,19 @@ export const HIGH_SEAS_SERVICE_DECK_PRACTICALS: readonly ArenaPracticalDefinitio
   // co-located pair at z=0 left a 9.5 m unlit gap between the room and the
   // first corridor fixture, which is exactly the stretch that measured median
   // 0/255 in the frame.
-  serviceDeckPractical('high-seas-service-deck-room-port', -1.55, -3.4, 40, 512),
-  serviceDeckPractical('high-seas-service-deck-room-starboard', 1.55, 3.4, 40, 512),
+  // Pass 79 luminance re-measurement: with placement already correct, the
+  // room still read median 30/255 in its fight window and the deck plate
+  // median 12/255, so intensities step up from 40/34 to 52/42 (vestibules
+  // stay 26 - their silhouette read is authored). Measured after: room fight
+  // window crushed 28-33% -> 2.5-5.4%, floor median 12 -> 29/255.
+  serviceDeckPractical('high-seas-service-deck-room-port', -1.55, -3.4, 52, 512),
+  serviceDeckPractical('high-seas-service-deck-room-starboard', 1.55, 3.4, 52, 512),
   // Corridor legs: centre line is right here - the bulkheads are close enough
   // on both sides that one fixture washes them both.
-  serviceDeckPractical('high-seas-service-deck-bow-corridor-inner', 0, -9.5, 34, 256),
-  serviceDeckPractical('high-seas-service-deck-bow-corridor-outer', 0, -15.5, 34, 256),
-  serviceDeckPractical('high-seas-service-deck-stern-corridor-inner', 0, 9.5, 34, 256),
-  serviceDeckPractical('high-seas-service-deck-stern-corridor-outer', 0, 15.5, 34, 256),
+  serviceDeckPractical('high-seas-service-deck-bow-corridor-inner', 0, -9.5, 42, 256),
+  serviceDeckPractical('high-seas-service-deck-bow-corridor-outer', 0, -15.5, 42, 256),
+  serviceDeckPractical('high-seas-service-deck-stern-corridor-inner', 0, 9.5, 42, 256),
+  serviceDeckPractical('high-seas-service-deck-stern-corridor-outer', 0, 15.5, 42, 256),
   // Ramp vestibules. Dimmer on purpose: daylight already falls down the open
   // hatch here, and a player coming down the ramp should read as a silhouette
   // against the brighter mouth rather than being flatly lit from above.

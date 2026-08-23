@@ -985,15 +985,20 @@ const BELOW_DECK_PRACTICAL_EMISSIVE_INTENSITY = 1.4;
  * pure black, so they were pushed as far as an emissive lift can go (grating
  * sat at 1.15). Emissive is self-lit: it takes no falloff, no shadow and no
  * direction, so pushing it flattens exactly the depth the owner wants back.
- * With the eight service-deck practicals doing the modelling, the fill drops
- * to a floor-of-black role only - it keeps the far corridor beyond a fixture's
- * reach off zero, and it is the entire below-deck lighting story on the
+ * The first practical rig therefore dropped the fill to a floor-of-black role
+ * - and the Pass 79 re-measurement showed that overshot: with the rig live the
+ * deck plate under the player still read median 12/255 with 50% of pixels
+ * crushed, and the engine-room walls 28-33% crushed between fixture pools.
+ * Crushed pixels are by definition outside the pool cores, so no fixture
+ * intensity reaches them; the fill is the only lever that does, and it is
+ * re-raised to a measured middle ground - well under the old 1.15, well above
+ * floor-of-black. It remains the entire below-deck lighting story on the
  * `performance`/`compat` profiles, where ArenaContrastLighting builds no rig.
  */
 const BELOW_DECK_FILL = Object.freeze({
-  bulkhead: Object.freeze({ tint: 0x9fc3d2, intensity: 0.16 }),
-  machinery: Object.freeze({ tint: 0xa8c4cc, intensity: 0.14 }),
-  grating: Object.freeze({ tint: 0x86a8b4, intensity: 0.3 }),
+  bulkhead: Object.freeze({ tint: 0x9fc3d2, intensity: 0.28 }),
+  machinery: Object.freeze({ tint: 0xa8c4cc, intensity: 0.19 }),
+  grating: Object.freeze({ tint: 0x86a8b4, intensity: 0.5 }),
 });
 
 /**
@@ -1079,7 +1084,7 @@ export function getHighSeasMaterialInventory(): readonly HighSeasMaterialInvento
     { name: 'dark-deck-stair', family: 'stair', color: 0x5a4032 },
     { name: 'deep-teal-trim', family: 'teal-trim', color: 0x164c58 },
     { name: 'engine-bulkhead', family: 'engine-bulkhead', color: 0x5c7078 },
-    { name: 'engine-grating', family: 'engine-grating', color: 0x46585e },
+    { name: 'engine-grating', family: 'engine-grating', color: 0x4e6067 },
     { name: 'engine-machinery', family: 'engine-machinery', color: 0x77878b },
     { name: 'engine-amber', family: 'engine-amber', color: 0xd7a441 },
     // HF-373: the practicals stopped sharing engine-amber, so the inventory
@@ -2263,7 +2268,7 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
     BELOW_DECK_FILL.bulkhead,
   );
   const engineFloorMaterial = applyEnclosedVolumeFill(
-    material('engine-grating', 0x46585e, 0.46, BELOW_DECK_METALNESS.grating),
+    material('engine-grating', 0x4e6067, 0.46, BELOW_DECK_METALNESS.grating),
     BELOW_DECK_FILL.grating,
   );
   const engineMachineMaterial = applyEnclosedVolumeFill(
