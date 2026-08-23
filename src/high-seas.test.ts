@@ -469,7 +469,10 @@ describe('High Seas clean-room arena geometry', () => {
   it('equips deck, hull, and superstructure with procedural PBR textures (albedo, normal, roughness)', () => {
     const map = buildHighSeas(new THREE.Scene());
     const inventory = getHighSeasMaterialInventory();
-    expect(inventory).toHaveLength(13);
+    // 14 since HF-373: the below-deck practicals were given their own fixture
+    // material instead of sharing the engine-amber accent that also skins the
+    // deck-level hatch guards.
+    expect(inventory).toHaveLength(14);
 
     const materialsByName = new Map<string, THREE.MeshStandardMaterial>();
     map.root.traverse((node) => {
@@ -483,7 +486,7 @@ describe('High Seas clean-room arena geometry', () => {
       }
     });
 
-    expect(materialsByName.size).toBe(13);
+    expect(materialsByName.size).toBe(14);
 
     for (const entry of inventory) {
       const mat = materialsByName.get(entry.name);
@@ -542,9 +545,9 @@ describe('High Seas clean-room arena geometry', () => {
     const withNormal = inventory.filter((e) => e.hasNormalMap);
     const withRoughness = inventory.filter((e) => e.hasRoughnessMap);
 
-    expect(withMap).toHaveLength(11);
-    expect(withNormal).toHaveLength(13);
-    expect(withRoughness).toHaveLength(13);
+    expect(withMap).toHaveLength(12);
+    expect(withNormal).toHaveLength(14);
+    expect(withRoughness).toHaveLength(14);
     expect(map.root.userData.highSeasMaterialInventory).toEqual(inventory);
   });
 
@@ -791,16 +794,142 @@ describe('High Seas clean-room arena geometry', () => {
     expect(ceilingMaterial.userData.textureFamily).toBe('engine-bulkhead');
 
     // Emissive practicals: the light strips carry a genuinely emissive
-    // material because the arena adds no THREE lights below deck.
+    // material because the arena adds no THREE lights below deck. Since HF-373
+    // that material is the strips' OWN fixture material, not the shared accent.
     const strips = map.root.getObjectByName('high-seas-engine-light-strips') as THREE.Mesh;
     expect(strips).toBeInstanceOf(THREE.Mesh);
     const stripMaterial = strips.material as THREE.MeshStandardMaterial;
-    expect(stripMaterial.emissiveIntensity).toBeGreaterThan(0);
+    expect(stripMaterial.name).toBe('high-seas-engine-practical');
+    expect(stripMaterial.emissiveIntensity).toBeGreaterThanOrEqual(3);
     expect(stripMaterial.emissive.getHex()).toBeGreaterThan(0);
 
     // The engine access ramps carry stair treads like every other stair.
     expect(map.root.getObjectByName('high-seas-bow-engine-access-treads')).toBeInstanceOf(THREE.Mesh);
     expect(map.root.getObjectByName('high-seas-stern-engine-access-treads')).toBeInstanceOf(THREE.Mesh);
+  });
+
+  it('lights the sealed below-deck volume and keeps every lit material under the deck plane', () => {
+    // HF-373. The owner: "too dark down at the bottom of hijacked". The volume
+    // is sealed, the sun never reaches it and the arena adds no THREE lights, so
+    // the fixtures and a material-carried fill ARE the lighting. The thing that
+    // must not happen is the fix spilling upward, so this test proves the lit
+    // materials are only ever used by geometry beneath the main deck.
+    const map = buildHighSeas(new THREE.Scene());
+    const deckPlaneY = HIGH_SEAS_LEVELS.mainDeck;
+
+    const materialsByName = new Map<string, THREE.MeshStandardMaterial>();
+    const meshesByMaterial = new Map<string, THREE.Mesh[]>();
+    map.root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      const entries = Array.isArray(node.material) ? node.material : [node.material];
+      for (const entry of entries) {
+        if (!(entry instanceof THREE.MeshStandardMaterial)) continue;
+        materialsByName.set(entry.name, entry);
+        meshesByMaterial.set(entry.name, [...(meshesByMaterial.get(entry.name) ?? []), node]);
+      }
+    });
+
+    // The practicals own a dedicated fixture material. Sharing the accent was
+    // the trap: engine-amber also skins the DECK-LEVEL hatch guards, so the only
+    // way to brighten the strips through it was to make deck furniture glow.
+    const practical = materialsByName.get('high-seas-engine-practical') as THREE.MeshStandardMaterial;
+    expect(practical).toBeDefined();
+    expect(practical.emissiveIntensity).toBeGreaterThanOrEqual(3);
+    expect(practical.emissiveMap, 'the strip glows through its diffuser pattern').toBeInstanceOf(THREE.DataTexture);
+    const accent = materialsByName.get('high-seas-engine-amber') as THREE.MeshStandardMaterial;
+    expect(accent).toBeDefined();
+    expect(accent).not.toBe(practical);
+    expect(accent.emissiveIntensity, 'the shared accent must not be cranked').toBe(0.65);
+
+    // Both fixture runs exist and are driven by that one material instance.
+    const ceilingStrips = map.root.getObjectByName('high-seas-engine-light-strips') as THREE.Mesh;
+    const guideStrips = map.root.getObjectByName('high-seas-engine-floor-guide-strips') as THREE.Mesh;
+    expect(ceilingStrips).toBeInstanceOf(THREE.Mesh);
+    expect(guideStrips).toBeInstanceOf(THREE.Mesh);
+    expect(ceilingStrips.material).toBe(practical);
+    expect(guideStrips.material).toBe(practical);
+
+    // Coverage: fixtures reach both ramp mouths, not just the engine room, and
+    // the guide line hugs the floor so the deck plate has an edge to read.
+    const ceilingBounds = new THREE.Box3().setFromObject(ceilingStrips);
+    expect(ceilingBounds.min.z).toBeLessThanOrEqual(-19);
+    expect(ceilingBounds.max.z).toBeGreaterThanOrEqual(19);
+    const guideBounds = new THREE.Box3().setFromObject(guideStrips);
+    expect(guideBounds.min.z).toBeLessThanOrEqual(-19);
+    expect(guideBounds.max.z).toBeGreaterThanOrEqual(19);
+    expect(guideBounds.max.y).toBeLessThanOrEqual(0.25);
+
+    // The enclosed-volume fill is carried by exactly the materials that never
+    // appear above deck, and it is textured so panel lines survive the lift
+    // instead of flattening into a silhouette-killing slab.
+    const filled = [...materialsByName.values()].filter((entry) => entry.userData.belowDeckFill === true);
+    expect(filled.map((entry) => entry.name).sort()).toEqual([
+      'high-seas-engine-bulkhead',
+      'high-seas-engine-grating',
+      'high-seas-engine-machinery',
+      'high-seas-engine-practical',
+    ]);
+    for (const entry of filled) {
+      expect(entry.emissiveIntensity, entry.name).toBeGreaterThan(0);
+      expect(entry.emissiveMap, entry.name).toBeInstanceOf(THREE.DataTexture);
+    }
+    // The amber accent also skins the hatch guards standing ON the open deck,
+    // so it must never join the fill - that shared value is the trap HF-373
+    // was predicted to fall into.
+    expect(materialsByName.get('high-seas-engine-amber')?.userData.belowDeckFill).toBeUndefined();
+    // Grating is the one filled family with any deck-plane exposure (the hatch
+    // rims and the ramp tops), so it stays the dimmest of the three. Compare
+    // what actually reaches the screen, not the raw coefficient: the fill is
+    // tint x emissiveMap x intensity, and each family multiplies a different
+    // albedo, so emissiveIntensity alone is not comparable across them.
+    const luminance = (color: THREE.Color): number => 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
+    const effectiveLift = (entry: THREE.MeshStandardMaterial): number =>
+      entry.emissiveIntensity * luminance(entry.emissive) * luminance(entry.color);
+    const grating = materialsByName.get('high-seas-engine-grating') as THREE.MeshStandardMaterial;
+    const bulkhead = materialsByName.get('high-seas-engine-bulkhead') as THREE.MeshStandardMaterial;
+    const machinery = materialsByName.get('high-seas-engine-machinery') as THREE.MeshStandardMaterial;
+    expect(effectiveLift(grating)).toBeLessThan(effectiveLift(bulkhead));
+    expect(effectiveLift(grating)).toBeLessThan(effectiveLift(machinery));
+    // And the fill stays a fill: the fixtures are an order brighter than any
+    // surface they light, or the volume reads as fog instead of a corridor.
+    expect(effectiveLift(practical)).toBeGreaterThan(effectiveLift(bulkhead) * 10);
+
+    // THE LEAK PROOF. Not one mesh wearing a lit below-deck material may rise
+    // above the deck plane, so none of this fix can be seen from up top as
+    // anything other than light inside an open hatch.
+    const leaks: string[] = [];
+    const atDeckPlane: string[] = [];
+    for (const entry of filled) {
+      for (const mesh of meshesByMaterial.get(entry.name) ?? []) {
+        const bounds = new THREE.Box3().setFromObject(mesh);
+        if (bounds.max.y > deckPlaneY + 1e-3) leaks.push(`${mesh.name} (${entry.name}) reaches y=${bounds.max.y.toFixed(3)}`);
+        else if (bounds.max.y > deckPlaneY - 1e-2) atDeckPlane.push(mesh.name);
+      }
+    }
+    expect(leaks, 'below-deck lighting must not touch geometry above the deck plane').toEqual([]);
+    // Everything that comes all the way up to the plane is hatch-shaft
+    // structure, which is exactly where corridor light is supposed to show.
+    expect(atDeckPlane.length).toBeGreaterThan(0);
+    expect(atDeckPlane.every((name) => /hatch-rim|ramp-(bow|stern)-engine-access/.test(name)), atDeckPlane.join(', ')).toBe(true);
+
+    const lighting = map.root.userData.highSeasBelowDeckLighting as Readonly<{
+      policy: string;
+      deckPlaneY: number;
+      practical: Readonly<{ material: string; emissiveIntensity: number; fixtures: readonly string[] }>;
+      fill: readonly Readonly<{ material: string; emissiveIntensity: number; texturedEmissive: boolean }>[];
+      sharedAccent: Readonly<{ material: string; emissiveIntensity: number }>;
+    }>;
+    expect(lighting.policy).toBe('emissive-only-arena-adds-no-three-lights');
+    expect(lighting.deckPlaneY).toBe(deckPlaneY);
+    expect(lighting.practical.material).toBe('high-seas-engine-practical');
+    expect(lighting.practical.fixtures).toEqual(['high-seas-engine-light-strips', 'high-seas-engine-floor-guide-strips']);
+    expect(lighting.fill.every((entry) => entry.emissiveIntensity > 0 && entry.texturedEmissive)).toBe(true);
+    expect(lighting.sharedAccent.emissiveIntensity).toBe(0.65);
+
+    // Policy: the fix stays emissive. The arena root still adds no local lights.
+    const lights: THREE.Object3D[] = [];
+    map.root.traverse((node) => { if ((node as THREE.Light).isLight) lights.push(node); });
+    expect(lights).toEqual([]);
   });
 
   it('gives every texture family a physically sensible tile size', () => {

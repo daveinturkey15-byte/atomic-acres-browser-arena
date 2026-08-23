@@ -102,16 +102,60 @@ describe('HF-362 filmic grade chain order', () => {
 
   it('fails closed when the upstream stages do not match the contract', () => {
     const uniforms = createFilmicGradeUniforms();
-    expect(() => buildFilmicGradeChain(
+    const build = (upstream: readonly string[]) => () => buildFilmicGradeChain(
       vec4(0, 0, 0, 1) as unknown as Node<'vec4'>,
       uniforms,
-      ['scene-pass-linear-hdr', 'depth-guarded-bloom-add', 'contact-occlusion-multiply'],
-    )).toThrow(/chain order violation at stage 1/);
-    expect(() => buildFilmicGradeChain(
-      vec4(0, 0, 0, 1) as unknown as Node<'vec4'>,
-      uniforms,
-      ['scene-pass-linear-hdr'],
-    )).toThrow(/stage count mismatch/);
+      upstream,
+    );
+    // HF-364 widened the linear region to admit the enumerated optional
+    // screen-space stages, so the assertion is now a slot check rather than an
+    // index-for-index prefix match. Everything the old contract rejected is
+    // still rejected, and the new cases below are rejections the old exact
+    // prefix match could not even express.
+    expect(build(['scene-pass-linear-hdr', 'depth-guarded-bloom-add', 'contact-occlusion-multiply']))
+      .toThrow(/linear stage violation/);
+    expect(build(['scene-pass-linear-hdr'])).toThrow(/missing mandatory linear stage/);
+    expect(build(['contact-occlusion-multiply', 'depth-guarded-bloom-add']))
+      .toThrow(/missing mandatory linear stage 'scene-pass-linear-hdr'/);
+    // An optional stage outside its declared slot.
+    expect(build([
+      'scene-pass-linear-hdr', 'contact-occlusion-multiply', 'depth-guarded-bloom-add',
+      'ssgi-screen-space-bounce-add',
+    ])).toThrow(/linear stage violation/);
+    // A repeated stage, which an index-for-index prefix match never checked.
+    expect(build([
+      'scene-pass-linear-hdr', 'contact-occlusion-multiply', 'contact-occlusion-multiply',
+      'depth-guarded-bloom-add',
+    ])).toThrow(/linear stage violation/);
+    // An invented stage name.
+    expect(build([
+      'scene-pass-linear-hdr', 'ray-traced-global-illumination',
+      'contact-occlusion-multiply', 'depth-guarded-bloom-add',
+    ])).toThrow(/linear stage violation/);
+    // Every optional stage in its declared slot is accepted, and the receipt
+    // keeps them.
+    const full = buildFilmicGradeChain(vec4(0, 0, 0, 1) as unknown as Node<'vec4'>, uniforms, [
+      'scene-pass-linear-hdr',
+      'motion-blur-velocity-smear',
+      'ssgi-screen-space-bounce-add',
+      'contact-occlusion-multiply',
+      'ssr-screen-space-reflection-add',
+      'depth-guarded-bloom-add',
+      'godrays-volumetric-shaft-add',
+      'depth-of-field-bokeh',
+    ]);
+    expect(full.stages.slice(0, 8)).toEqual([
+      'scene-pass-linear-hdr',
+      'motion-blur-velocity-smear',
+      'ssgi-screen-space-bounce-add',
+      'contact-occlusion-multiply',
+      'ssr-screen-space-reflection-add',
+      'depth-guarded-bloom-add',
+      'godrays-volumetric-shaft-add',
+      'depth-of-field-bokeh',
+    ]);
+    expect(full.stages).toContain('tone-map-aces-plus-srgb-output');
+    expect(full.stages.at(-1)).toBe('per-frame-luminance-grain');
   });
 
   it('applies the output transform exactly once, after the linear stages and before the display stages', () => {
@@ -604,6 +648,65 @@ describe('Pass 76 optional trailing display stages', () => {
     // The frozen core prefix is still mandatory and order-checked.
     expect(() => assertGradeChainOrder([
       ...GRADE_CHAIN_STAGES.slice(0, -1), 'display-post-antialiasing-fxaa',
-    ])).toThrow(/order violation/);
+    ])).toThrow(/order violation at core stage/);
+  });
+});
+
+describe('HF-364 FSR 1 spatial upscaling stage', () => {
+  it('takes over the RCAS stage rather than stacking a second sharpen', () => {
+    const pipeline = makePipeline();
+    const handle = installFilmicGradeChain(pipeline, { profileId: 'quality', sharpness: 0.5 });
+    expect(handle.stages()).toEqual([...GRADE_CHAIN_STAGES, 'display-cas-sharpen']);
+    handle.setSpatialUpscaling({ enabled: true, sceneResolutionScale: 0.67 });
+    // Exactly one RCAS owner: the standalone sharpen is gone, FSR 1 owns it.
+    expect(handle.stages()).toEqual([...GRADE_CHAIN_STAGES, 'display-fsr1-easu-rcas-upscale']);
+    expect(handle.spatialUpscaling()).toEqual({ enabled: true, sceneResolutionScale: 0.67 });
+    // The player's sharpness still reaches the picture; it just drives FSR 1's
+    // RCAS half, so changing it must not toggle any stage.
+    const stagesBefore = handle.stages();
+    handle.setSharpness(0.9);
+    expect(handle.stages()).toBe(stagesBefore);
+    handle.setSharpness(0);
+    expect(handle.stages()).toBe(stagesBefore);
+    handle.setSpatialUpscaling({ enabled: false, sceneResolutionScale: 1 });
+    expect(handle.stages()).toEqual([...GRADE_CHAIN_STAGES]);
+    handle.dispose();
+  });
+
+  it('composes with post anti-aliasing in the AMD-canonical order', () => {
+    const pipeline = makePipeline();
+    const handle = installFilmicGradeChain(pipeline, {
+      profileId: 'quality',
+      postAntiAliasing: 'fxaa',
+      spatialUpscaling: { enabled: true, sceneResolutionScale: 0.5 },
+    });
+    expect(handle.stages()).toEqual([
+      ...GRADE_CHAIN_STAGES, 'display-post-antialiasing-fxaa', 'display-fsr1-easu-rcas-upscale',
+    ]);
+    // FSR 1 explicitly expects an anti-aliased source, so the AA stage must
+    // stay ahead of it, never after.
+    expect(() => assertGradeChainOrder([
+      ...GRADE_CHAIN_STAGES, 'display-fsr1-easu-rcas-upscale', 'display-post-antialiasing-smaa',
+    ])).toThrow(/trailing stage violation/);
+    handle.dispose();
+  });
+
+  it('rejects both RCAS owners in one chain', () => {
+    expect(() => assertGradeChainOrder([...GRADE_CHAIN_STAGES, 'display-fsr1-easu-rcas-upscale'])).not.toThrow();
+    expect(() => assertGradeChainOrder([
+      ...GRADE_CHAIN_STAGES, 'display-cas-sharpen', 'display-fsr1-easu-rcas-upscale',
+    ])).toThrow(/at most one RCAS sharpen owner/);
+  });
+
+  it('ignores an out-of-range or no-op upscale request', () => {
+    const pipeline = makePipeline();
+    const handle = installFilmicGradeChain(pipeline, { profileId: 'quality' });
+    // A scale of 1 is not an upscale, so no stage may be built for it.
+    handle.setSpatialUpscaling({ enabled: true, sceneResolutionScale: 1 });
+    expect(handle.stages()).toEqual([...GRADE_CHAIN_STAGES]);
+    // A hostile value is clamped rather than allowed to allocate a 1px target.
+    handle.setSpatialUpscaling({ enabled: true, sceneResolutionScale: 0.01 });
+    expect(handle.spatialUpscaling().sceneResolutionScale).toBe(0.25);
+    handle.dispose();
   });
 });

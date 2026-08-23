@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import choreography from '../../source-assets/menu/pass65-preview-masters/choreography.json';
@@ -17,6 +17,20 @@ import {
   menuPreviewVideoMarkup,
 } from './menu-preview-video';
 import { menuPreviewDefinition } from './menu-preview-camera';
+
+/**
+ * HF-372: two cache families now ship side by side. The retained four keep the
+ * locked v15 key; the two arenas captured afterwards get their own, so accepted
+ * bytes and new bytes can never share a key.
+ */
+const EXPECTED_CACHE_KEYS: Readonly<Record<string, string>> = Object.freeze({
+  'atomic-acres': 'pass66-runtime-preview-v15',
+  'skyline-terminal': 'pass66-runtime-preview-v15',
+  'rustworks-1v1': 'pass66-runtime-preview-v15',
+  'gun-range': 'pass66-runtime-preview-v15',
+  farcrysis: 'pass77-arena-preview-v1',
+  'high-seas': 'pass77-arena-preview-v1',
+});
 
 const ACCEPTED_COCKPIT_SOURCE_SHA256 = '25a2556e5eccddf53e8214acbe71386820e818e359f35aa5b6a074cc3b4142c5';
 const ACCEPTED_COCKPIT_EVIDENCE_SHA256 = '8882a597f015d5e16a731b88c6167bd4eb93fe811992f8424754df5dbd753e8b';
@@ -36,20 +50,25 @@ describe('prerecorded map-selection previews', () => {
       expect(definition.width / definition.height).toBeCloseTo(16 / 9, 5);
       expect(definition.width).toBe(2560);
       expect(definition.height).toBe(1440);
-      // HF-359 (Pass 74): farcrysis declares mediaAvailable: false while offline flyover render is pending
-      if (!definition.mediaAvailable) {
-        expect(definition.webm).toBe('');
-        expect(definition.mp4).toBe('');
-        expect(definition.poster).toBe('');
-        return [];
+      // HF-372 (Pass 77): every selectable arena now ships real media. The two
+      // arenas authored after the Pass 66 family carry their own cache key --
+      // reusing v15 for new bytes is exactly what the cache-family lock forbids.
+      expect(definition.mediaAvailable).toBe(true);
+      const cacheKey = EXPECTED_CACHE_KEYS[id];
+      expect(definition.webm).toMatch(new RegExp(`${id}\\.webm\\?v=${cacheKey}$`));
+      expect(definition.mp4).toMatch(new RegExp(`${id}\\.mp4\\?v=${cacheKey}$`));
+      expect(definition.poster).toMatch(new RegExp(`${id}\\.webp\\?v=${cacheKey}$`));
+      // Stricter than before: a declared URL that does not resolve to a real
+      // shipped file is exactly the blank card the owner reported, so the bytes
+      // themselves are checked, not just the string.
+      for (const url of [definition.webm, definition.mp4, definition.poster]) {
+        const file = resolve(process.cwd(), 'public', url.split('?')[0]!.replace(/^\.\//, ''));
+        expect(statSync(file).size, `${url} must ship real bytes`).toBeGreaterThan(1_000);
       }
-      expect(definition.webm).toMatch(new RegExp(`${id}\\.webm\\?v=pass66-runtime-preview-v15$`));
-      expect(definition.mp4).toMatch(new RegExp(`${id}\\.mp4\\?v=pass66-runtime-preview-v15$`));
-      expect(definition.poster).toMatch(new RegExp(`${id}\\.webp\\?v=pass66-runtime-preview-v15$`));
       return [definition.webm, definition.mp4, definition.poster];
     });
     expect(new Set(assets).size).toBe(assets.length);
-    expect(assets).toHaveLength(12);
+    expect(assets).toHaveLength(18);
   });
 
   it('keeps helicopter flyovers and the cat POV semantically explicit', () => {
@@ -60,16 +79,27 @@ describe('prerecorded map-selection previews', () => {
     expect(menuPreviewVideoDefinition('gun-range').motionLabel).toContain('FIRST-PERSON');
     expect(menuPreviewVideoDefinition('farcrysis').frame).toBe('helicopter'); // HF-359
     expect(menuPreviewVideoDefinition('high-seas').frame).toBe('helicopter');
-    expect(menuPreviewVideoDefinition('high-seas').mediaAvailable).toBe(false);
+    // HF-372: both were stuck on the standby placeholder; they now ship media.
+    expect(menuPreviewVideoDefinition('farcrysis').mediaAvailable).toBe(true);
+    expect(menuPreviewVideoDefinition('high-seas').mediaAvailable).toBe(true);
+    for (const arenaId of ['farcrysis', 'high-seas'] as const) {
+      expect(menuPreviewVideoDefinition(arenaId).motionLabel).not.toMatch(/PENDING/);
+      expect(menuPreviewVideoDefinition(arenaId).reducedMotionLabel).not.toMatch(/PENDING/);
+    }
   });
 
-  it('honestly degrades pending flyovers to standby without network requests', async () => {
+  it('serves the HF-372 arenas real media instead of the standby placeholder', async () => {
     for (const arenaId of ['farcrysis', 'high-seas'] as const) {
       const markup = menuPreviewVideoMarkup(arenaId);
       expect(markup).toContain(`data-arena="${arenaId}"`);
-      expect(markup).toContain('data-media-state="poster-fallback"');
-      expect(markup).toContain('PREVIEW STANDBY');
-      expect(markup).not.toContain('<source');
+      // The standby branch is what the owner saw as a blank card, so the shipped
+      // markup must now name the real poster and both decoder sources.
+      expect(markup).toContain('data-media-state="poster"');
+      expect(markup).not.toContain('data-media-state="poster-fallback"');
+      expect(markup).toContain(`menu-previews/${arenaId}.webp?v=pass77-arena-preview-v1`);
+      expect(markup).toContain(`menu-previews/${arenaId}.webm?v=pass77-arena-preview-v1`);
+      expect(markup).toContain(`menu-previews/${arenaId}.mp4?v=pass77-arena-preview-v1`);
+      expect(markup.match(/<source/g)).toHaveLength(2);
     }
 
     const attributes = new Map<string, string>();
@@ -119,27 +149,30 @@ describe('prerecorded map-selection previews', () => {
     controller.select('farcrysis', false);
     const snapshot = controller.snapshot();
     expect(snapshot.arenaId).toBe('farcrysis');
-    expect(snapshot.mediaState).toBe('poster-fallback');
-    expect(snapshot.sourceCount).toBe(0);
-    expect(poster.hidden).toBe(true);
-    expect(video.hidden).toBe(true);
+    expect(snapshot.mediaState).toBe('loading');
+    expect(snapshot.sources.poster).toContain('farcrysis.webp');
+    expect(poster.hidden).toBe(false);
+    expect(video.hidden).toBe(false);
     expect(label.textContent).toBe('PRERECORDED HELO // FARCRYSIS');
-    expect(motion.textContent).toContain('PENDING');
+    expect(motion.textContent).not.toContain('PENDING');
 
-    const gen = await controller.whenFirstFramePresented();
-    expect(gen).toBe(snapshot.generation);
-
+    // Rapid switching still hands the surface to exactly one generation.
     controller.select('high-seas', false);
     const highSeasSnapshot = controller.snapshot();
-    expect(highSeasSnapshot).toMatchObject({
-      arenaId: 'high-seas',
-      mediaState: 'poster-fallback',
-      sourceCount: 0,
-      sources: { webm: '', mp4: '', poster: '' },
-    });
+    expect(highSeasSnapshot).toMatchObject({ arenaId: 'high-seas', mediaState: 'loading' });
+    expect(highSeasSnapshot.generation).toBe(snapshot.generation + 1);
+    expect(highSeasSnapshot.sources.webm).toContain('high-seas.webm');
+    expect(highSeasSnapshot.sources.mp4).toContain('high-seas.mp4');
     expect(label.textContent).toBe('PRERECORDED HELO // HIGH SEAS');
-    expect(motion.textContent).toContain('PENDING');
-    expect(await controller.whenFirstFramePresented()).toBe(highSeasSnapshot.generation);
+    expect(motion.textContent).not.toContain('PENDING');
+
+    // Reduced motion is still poster-only with no decoder sources attached.
+    controller.select('high-seas', true);
+    const reducedSnapshot = controller.snapshot();
+    expect(reducedSnapshot.mediaState).toBe('reduced-motion-poster');
+    expect(reducedSnapshot.reducedMotion).toBe(true);
+    expect(video.hidden).toBe(true);
+    expect(await controller.whenFirstFramePresented()).toBe(reducedSnapshot.generation);
 
     controller.dispose();
   });

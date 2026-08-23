@@ -1,5 +1,6 @@
 import choreographyJson from '../../source-assets/menu/pass65-preview-masters/choreography.json';
 import highSeasChoreographyJson from '../../source-assets/menu/pass75-high-seas-preview/choreography.json';
+import farcrysisChoreographyJson from '../../source-assets/menu/pass77-farcrysis-preview/choreography.json';
 import type { ArenaId } from '../map-selection';
 
 // Deterministic evaluator for authoring/tests only. The menu runtime consumes
@@ -128,10 +129,22 @@ const HIGH_SEAS_CHOREOGRAPHY = highSeasChoreographyJson as unknown as Readonly<{
   recipeId: string;
   arenas: Readonly<{ 'high-seas': HelicopterRecipe }>;
 }>;
+// HF-372: farcrysis had no camera recipe at all, so the menu could only ever
+// show a "PREVIEW STANDBY" placeholder for it. Its recipe lives in its own
+// extension file for the same reason high-seas does: the Pass 66 masters
+// choreography is digest-pinned by the retained production gate, so a new
+// arena is added beside it rather than by rewriting accepted history.
+const FARCRYSIS_CHOREOGRAPHY = farcrysisChoreographyJson as unknown as Readonly<{
+  recipeId: string;
+  arenas: Readonly<{ farcrysis: HelicopterRecipe }>;
+}>;
 const CHOREOGRAPHY: ChoreographyRecipe = Object.freeze({
   ...RETAINED_CHOREOGRAPHY,
   arenas: Object.freeze({
     ...RETAINED_CHOREOGRAPHY.arenas,
+    // ARENA_SELECTIONS order: farcrysis is fifth, high-seas sixth. The offline
+    // authoring roster check compares against that order, so keep it here too.
+    ...FARCRYSIS_CHOREOGRAPHY.arenas,
     ...HIGH_SEAS_CHOREOGRAPHY.arenas,
   }),
 });

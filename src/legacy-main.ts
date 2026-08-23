@@ -38,6 +38,16 @@ import type { ArenaVisualBudgets, ArenaVisualDefinition } from './rendering/aren
 import { auditLocalLightOcclusion } from './rendering/light-occlusion';
 import { resolveWebGlShadowSamplerMode, webGlShadowSamplerMode, type ShadowFilterOverride } from './webgl-shadow-compatibility';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
+import { RainPresentation } from './weather/rain-presentation';
+import { applyHudSway, createHudSwayState, type HudSwayState } from './ui/pass77-hud-sway';
+import {
+  sampleWeather,
+  clearWeatherSample,
+  forcedWeatherSample,
+  WEATHER_SEVERITY_LADDER,
+  type WeatherState,
+} from './weather/weather-state';
+import { createWindField, sampleWind } from './weather/wind-field';
 import { proneBodyClearance } from './prone-clearance';
 import { mountFarcrysisHitlOverlay, type FarcrysisHitlOverlay } from './farcrysis-hitl';
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
@@ -1632,6 +1642,10 @@ let matchPauseBackdropFallbackCount = 0;
 let matchPauseSourceCaptureAttemptCount = 0;
 let matchPauseSourceCaptureCount = 0;
 const hudRoot = element<HTMLElement>('#hud');
+// HF-370: the owner asked for a HUD that is not "pinned directly to the
+// screen". Clusters lag the camera slightly; crosshair and hitmarker never
+// move, because those are combat surfaces.
+let hudSway: HudSwayState = createHudSwayState();
 const fpsCounter = element<HTMLElement>('#fps-counter');
 const fpsCounterValue = element<HTMLElement>('#fps-counter b');
 const sniperScopeOverlay = element<HTMLElement>('#sniper-scope');
@@ -4285,6 +4299,39 @@ async function prewarmOverdrivePresentation(): Promise<void> {
 const atmosphereSystem = renderRuntime.backend === 'webgl2'
   ? new AtmosphereSystem(scene, renderProfile, rendererLabel, mistQuery, selectedArena.id)
   : null;
+// HF-371 weather. Deliberately NOT gated on the webgl2 backend the way
+// AtmosphereSystem is: rain authors no custom shaders (stock materials plus
+// procedural DataTextures), so it is valid on both backends and rainBypassReason
+// decides for itself.
+//
+// The seed must be identical on every peer or the zero-traffic determinism the
+// weather model is built on collapses. It is derived from the authoritative
+// host identity and the match start stamp - never Math.random or a local clock.
+let weatherMatchSeed = 0;
+let lastRainUpdateAtMs = 0;
+const weatherOverrideState = (() => {
+  const requested = new URLSearchParams(window.location.search).get('weather');
+  return requested && WEATHER_SEVERITY_LADDER.includes(requested as WeatherState)
+    ? requested as WeatherState
+    : null;
+})();
+function deriveWeatherMatchSeed(hostIdentity: string, matchEpochMs: number): number {
+  let hash = 0x811c9dc5;
+  for (const character of `${hostIdentity}:${matchEpochMs}`) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
+}
+const rainPresentation = new RainPresentation({
+  profile: renderProfile,
+  rendererLabel,
+  query: new URLSearchParams(window.location.search).get('rain'),
+  quality: 'high',
+  seed: 0,
+});
+rainPresentation.build(scene);
+let weatherWindField = createWindField(selectedArena.id, 0);
 const waterSystem = new WaterSystem(scene, renderRuntime.backend === 'webgpu' ? 'external-tsl' : 'legacy-glsl');
 // HF-358 wave 2. The swim reducers landed pure and host-authoritative but
 // nothing stepped them, so swimmable water still behaved like the rustworks
@@ -14968,6 +15015,13 @@ function respawn(
   // HF-352: Reset camera shake and kill-confirm pulse on match/player reset
   cameraShakeState = createCameraShakeState();
   cameraShakeTrauma = createCameraShakeTrauma(performance.now(), 0x5eed);
+  // Rebuild the weather seed for this match from values both peers share.
+  weatherMatchSeed = deriveWeatherMatchSeed(
+    privateLobbySnapshot?.hostId ?? player.id,
+    privateMatchActiveAtEpochMs ?? killstreakMatchEpoch,
+  );
+  weatherWindField = createWindField(selectedArena.id, weatherMatchSeed);
+  lastRainUpdateAtMs = performance.now();
   killConfirmPulseState = createKillConfirmPulseState(accessibilityRuntime.weaponMotionScale);
   audio.setLowHealthFeedback({ active: false, severity: 0, vignetteOpacity: 0, breathingGain: 0, heartbeatGain: 0, pulseHz: 0 });
   damageDirectionIndicator.replaceChildren();
@@ -27584,11 +27638,49 @@ function frame(now: number, scheduleNext = true): void {
       flushGunRangeTestBayDoorBroadcast();
     }
     atmosphereSystem?.update(visualNow / 1_000);
+    // HF-371: weather is a pure function of (arena, match seed, elapsed), so
+    // every peer derives the same sky without a byte of network traffic.
+    const weatherElapsedSeconds = gameStarted && matchState.phase === 'active'
+      ? Math.max(0, (visualNow - matchState.phaseStartedAt) / 1_000)
+      : 0;
+    // ?weather=storm|heavy-rain|light-rain|overcast|clear forces the sky.
+    // Natural weather reaches rain in roughly a fifth of five-minute matches,
+    // which is the right variety to PLAY with and the wrong odds to TEST with -
+    // without this you would have to reroll matches to see the feature at all.
+    const weatherNow = weatherOverrideState
+      ? forcedWeatherSample(selectedArena.id, weatherOverrideState)
+      : gameStarted
+        ? sampleWeather(selectedArena.id, weatherMatchSeed, weatherElapsedSeconds)
+        : clearWeatherSample(selectedArena.id);
+    const windNow = sampleWind(
+      weatherWindField,
+      camera.position.x,
+      camera.position.z,
+      visualNow / 1_000,
+      weatherNow.windMultiplier,
+    );
+    rainPresentation.update(
+      Math.min(0.05, Math.max(0, (visualNow - lastRainUpdateAtMs) / 1_000)),
+      camera,
+      weatherNow,
+      windNow,
+      { adsProgress: weaponView.adsProgress?.() ?? 0 },
+    );
+    lastRainUpdateAtMs = visualNow;
     waterSystem.update(visualNow / 1_000);
     if (gameStarted) updateMinimap(now);
     updateGunRangeMatchClockAuthority(now);
     updateHostLossPresentation(now); // HF-325 Part 1
     updateHud(now);
+  // Must live in frame(), not updateHud: updateHud self-throttles to 10 Hz and
+  // sway needs every frame or it reads as a stutter rather than a lag.
+  hudSway = applyHudSway(hudRoot, hudSway, {
+    yaw: player.yaw,
+    pitch: player.pitch,
+    speed: Math.hypot(player.velocity.x, player.velocity.z),
+    deltaMs: rawFrameMs,
+  });
+  hudRoot.style.setProperty('--hud-health', (Math.max(0, player.hp) / 100).toFixed(3));
     arenaContrastLighting.update(visualNow);
     pass64TslSystems?.update(visualNow);
     if (activeArenaReviewHud) hudRoot.hidden = activeArenaReviewHud === 'hidden';
@@ -28486,6 +28578,7 @@ const debugWindow = window as Window & {
     snapshot: () => Record<string, unknown> & { player: DebugPlayerPose };
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
     sampleSceneGraph: () => THREE.Scene;
+    sampleWeather: () => Record<string, unknown>;
     sampleSimulationGate: () => Record<string, unknown>;
     samplePresentationTelemetry: () => ReturnType<typeof renderRuntime.presentationTelemetry>;
     sampleEnduranceHealth: (detail?: EnduranceHealthDetail) => ReturnType<typeof sampleEnduranceHealth>;
@@ -29655,6 +29748,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   // is wrong; walking the graph tells you WHICH object is doing it. Debug-only
   // and never referenced by gameplay.
   sampleSceneGraph: () => scene,
+  // HF-371: prove rain and weather are actually running, not merely imported.
+  sampleWeather: () => ({
+    seed: weatherMatchSeed,
+    rain: rainPresentation.telemetry(),
+  }),
   // Which clause of the movement gate is holding the local player still. The
   // owner's "can't move" reports were undiagnosable from screenshots because
   // five independent conditions can freeze movement and none of them was

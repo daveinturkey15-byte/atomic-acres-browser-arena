@@ -5,6 +5,7 @@ import {
   installFilmicGradeChain,
   type FilmicGradeChainHandle,
   type PostAntiAliasingMode,
+  type SpatialUpscalingRequest,
 } from './filmic-grade-chain';
 import { DEFAULT_GRADE_PROFILE_ID, type GradeProfileId } from './grade-profile';
 import type { ToneMappingMode } from '../graphics-settings-registry';
@@ -1201,6 +1202,28 @@ export class WebGpuRenderRuntime {
 
   sharpness(): number {
     return this.filmicGrade.sharpness();
+  }
+
+  /**
+   * HF-364 — FSR 1 spatial upscaling. The scene-pass assembler must apply the
+   * same `sceneResolutionScale` to `pass()`; this half only owns the EASU/RCAS
+   * reconstruction at the end of the display chain.
+   */
+  setSpatialUpscaling(request: SpatialUpscalingRequest): void {
+    this.filmicGrade.setSpatialUpscaling(request);
+  }
+
+  spatialUpscaling(): SpatialUpscalingRequest {
+    return this.filmicGrade.spatialUpscaling();
+  }
+
+  /**
+   * HF-364 — publishes the linear-side stage list the scene-pass assembler is
+   * about to build, so the chain's order receipt covers the optional
+   * screen-space stages. Call BEFORE the assembler publishes its outputNode.
+   */
+  setGradeLinearSourceStages(stages: readonly string[]): void {
+    this.filmicGrade.setLinearSourceStages(stages);
   }
 
   setExposure(exposure: number): void {

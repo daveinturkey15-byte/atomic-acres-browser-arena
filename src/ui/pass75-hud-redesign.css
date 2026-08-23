@@ -397,3 +397,187 @@ html[data-reduced-motion='true'] #hud .support-list > div {
 #damage-direction i {
   filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.8));
 }
+
+/* ===========================================================================
+ * PART 3 - impact feedback (HF-367).
+ *
+ * The surfaces above got a material. What they still did not have was a
+ * REACTION: taking a hit, landing a hit and running out of health all rendered
+ * as a static value change plus one flat red flash. Nothing told the player
+ * with their eyes where a hit came from, whether their own shot connected, or
+ * that they were about to die.
+ *
+ * Everything here drives off hooks the runtime ALREADY sets, so this part
+ * needs no wiring:
+ *   --damage-opacity / --damage-angle  on #damage-direction i   (per hit)
+ *   .pulse                             on #damage-flash          (per hit)
+ *   .show / .headshot                  on #hitmarker             (per confirm)
+ *   --low-health-opacity               on #low-health-vignette   (per frame)
+ *
+ * Because those values are live, the reaction can be PROPORTIONAL rather than
+ * binary: a graze nudges, a heavy hit shoves. Quadratic terms (`v * v`) are
+ * used where the intent is "only the serious case should read loudly".
+ *
+ * ACCESSIBILITY: every animation and transform below is switched off by BOTH
+ * reduced-motion switches, and the sensory switch additionally flattens the
+ * glow, matching the existing `html[data-reduced-sensory=true]` rule in
+ * style.css. In every reduced state the cues stay PRESENT and readable - only
+ * the movement stops. Turning motion down must never cost the player the
+ * information.
+ * ======================================================================== */
+
+/* --- Damage direction: an impulse, not a fade ---------------------------- */
+
+/*
+ * The wedge previously appeared at a fixed size and faded. A hit is an
+ * impulse, so the wedge now arrives wide and heavy and settles as the
+ * indicator decays - which means one element carries BOTH where the shot came
+ * from and how hard it landed, with no second cue to read.
+ */
+#damage-direction i::before {
+  --p76-hit: var(--damage-opacity, 0);
+  border-top-width: calc(4px + 3px * var(--p76-hit));
+  /* Quadratic: only a genuinely heavy hit throws the wedge outward. */
+  transform:
+    translateX(-50%)
+    scaleX(calc(1 + 0.22 * var(--p76-hit)))
+    translateY(calc(-6px * var(--p76-hit) * var(--p76-hit)));
+  filter: drop-shadow(0 0 calc(4px + 9px * var(--p76-hit)) rgba(255, 41, 24, 0.8));
+  transition: border-top-width 90ms linear, transform 90ms linear;
+}
+
+/*
+ * #damage-flash gains .pulse on every hit and #damage-direction is a later
+ * sibling of it (pass64-shell.ts:507), so the flash doubles as the per-hit
+ * trigger the direction indicator never had of its own.
+ */
+#damage-flash.pulse ~ #damage-direction i::before {
+  animation: p76-damage-impulse 260ms cubic-bezier(0.16, 0.9, 0.3, 1);
+}
+
+@keyframes p76-damage-impulse {
+  0% {
+    transform:
+      translateX(-50%)
+      scaleX(calc(1.34 + 0.22 * var(--p76-hit, 0)))
+      translateY(calc(-14px * var(--p76-hit, 0)));
+  }
+  100% {
+    transform:
+      translateX(-50%)
+      scaleX(calc(1 + 0.22 * var(--p76-hit, 0)))
+      translateY(calc(-6px * var(--p76-hit, 0) * var(--p76-hit, 0)));
+  }
+}
+
+/* --- Hit confirm: a pulse the eye catches in peripheral vision ----------- */
+
+/*
+ * The legacy hitmarker is a glyph that scales. At the centre of the screen,
+ * mid-firefight, a glyph is easy to miss. The ring below expands past the
+ * crosshair so confirmation registers without the player looking AT it, and it
+ * is drawn behind the glyph (the hitmarker's own transform already makes it a
+ * stacking context) so it can never obscure the target.
+ */
+#hud #hitmarker::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+#hud #hitmarker.show::after {
+  animation: p76-hit-confirm 220ms cubic-bezier(0.12, 0.85, 0.28, 1);
+}
+
+/* A headshot is worth its own read, so the ring takes the gold and lingers. */
+#hud #hitmarker.headshot::after {
+  border-color: var(--p75-caution, #f2b74f);
+  box-shadow: 0 0 10px rgba(244, 196, 79, 0.55);
+}
+
+#hud #hitmarker.headshot.show::after {
+  animation-duration: 300ms;
+}
+
+@keyframes p76-hit-confirm {
+  0% { opacity: 0.95; transform: scale(0.42); }
+  70% { opacity: 0.5; transform: scale(1.15); }
+  100% { opacity: 0; transform: scale(1.5); }
+}
+
+/* --- Low health: urgency at the edges, clarity in the middle ------------- */
+
+/*
+ * The old vignette was one red radial that started closing in at 45% of the
+ * radius - it read as urgent and it also hid the enemy you were trying to
+ * shoot back at. This version holds the centre clear out to 58% and puts the
+ * urgency where peripheral vision actually lives.
+ *
+ * There is deliberately NO CSS pulse here. sampleLowHealthFeedback already
+ * breathes `--low-health-opacity` at 0.72 Hz (0.28 Hz under reduced sensory),
+ * so a second keyframe pulse would beat against the first and would also pin a
+ * permanently animating full-screen layer into the frame loop. Instead the rim
+ * below is quadratic in that same live value, which turns the runtime's
+ * existing breath into a rim that only really arrives when the player is
+ * genuinely about to die - and it inherits the reduced-sensory amplitude for
+ * free.
+ */
+#low-health-vignette {
+  background:
+    radial-gradient(circle, transparent 58%, rgba(122, 0, 0, 0.9) 100%),
+    radial-gradient(circle, transparent 72%, rgba(255, 64, 48, calc(0.5 * var(--low-health-opacity, 0) * var(--low-health-opacity, 0))) 100%);
+}
+
+/* ---------------------------------------------------------------------------
+ * Impact-feedback motion gates. Both reduced-motion switches, plus the sensory
+ * switch for the glow, exactly as PART 1 does.
+ * ------------------------------------------------------------------------ */
+
+html[data-reduced-motion='true'] #damage-direction i::before,
+html[data-reduced-motion='true'] #damage-flash.pulse ~ #damage-direction i::before {
+  animation: none;
+  transition: none;
+  /* The wedge still points at the shooter; it simply no longer moves. */
+  transform: translateX(-50%);
+}
+
+html[data-reduced-motion='true'] #hud #hitmarker.show::after,
+html[data-reduced-motion='true'] #hud #hitmarker.headshot.show::after {
+  animation: none;
+  /* Still confirms the hit; it holds instead of expanding. */
+  opacity: 0.7;
+  transform: scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #damage-direction i::before,
+  #damage-flash.pulse ~ #damage-direction i::before {
+    animation: none;
+    transition: none;
+    transform: translateX(-50%);
+  }
+
+  #hud #hitmarker.show::after,
+  #hud #hitmarker.headshot.show::after {
+    animation: none;
+    opacity: 0.7;
+    transform: scale(1);
+  }
+}
+
+html[data-reduced-sensory='true'] #hud #hitmarker.headshot::after {
+  box-shadow: none;
+}
+
+html[data-reduced-sensory='true'] #damage-direction i::before {
+  filter: none;
+}

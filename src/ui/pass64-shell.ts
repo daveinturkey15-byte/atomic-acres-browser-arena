@@ -22,6 +22,12 @@ import {
   OPERATOR_STANCES,
 } from '../operator-appearance-catalog'; // Pass 75
 import { weaponMenuPresentationMarkup, weaponMenuStatDeckMarkup } from './field-kit-weapon-presentation';
+import { operatorSkinPortraitSvg, operatorSkinSwatchMarkup } from './operator-skin-portrait'; // HF-366
+import {
+  OPERATOR_PREVIEW_CANVAS_ID,
+  OPERATOR_PREVIEW_STATUS_ID,
+  mountOperatorPreview,
+} from './operator-preview'; // HF-366
 
 export type Pass64ShellViewModel = Readonly<{
   playerName: string;
@@ -281,29 +287,26 @@ function fieldSupportRowsMarkup(): string {
  * menu option. Previously the skin was one dropdown buried in the deployment
  * manifest and animations were not selectable at all.
  *
- * Skins are presented as cards using the same authored hero stills the field
- * kit uses, so the choice is visual rather than a list of names.
+ * HF-366 (2026-08-23) replaced the card art. The panel now opens with a LIVE
+ * 3D turntable of the selected operator in the selected skin, and each card
+ * carries a procedural portrait built from that skin's own palette - the same
+ * palette that tints the first-person arms.
  */
 function operatorPanelMarkup(): string {
+  // HF-366: every card now carries a procedural portrait drawn from that
+  // skin's own palette - the same palette that tints the first-person arms.
+  // The previous art was three near-identical dark renders plus a typographic
+  // emblem for the standard operator, which is exactly the "they all looked
+  // greyed out" the owner reported. No card may fall back to a placeholder:
+  // a skin with no portrait is a load-time error in the palette catalog.
   const skins = OPERATOR_SKIN_CATALOG.definitions
     .filter((definition) => definition.availability === 'selectable')
-    .map((definition) => {
-      // Real operator art only. The three archetypes use the authored
-      // neutral-front Blender renders from the skins lane; the standard
-      // operator has no such render, so it gets a typographic emblem rather
-      // than a fabricated or misrepresenting image (a weapon still, or its raw
-      // UV atlas, would both misdescribe what the player is choosing).
-      const hasRender = definition.id !== 'default';
-      const still = `./assets/original/ui/operator-skins/${definition.id}-operator-card.webp`;
-      const art = hasRender
-        ? `<img src="${escapeAttribute(still)}" alt="" loading="lazy" decoding="async">`
-        : '<span class="operator-skin-emblem" aria-hidden="true">STANDARD<b>ISSUE</b></span>';
-      return `<button type="button" class="operator-skin-card" data-operator-skin="${escapeAttribute(definition.id)}" aria-pressed="false">
-        <span class="operator-skin-art"${hasRender ? '' : ' data-operator-art="emblem"'}>${art}</span>
+    .map((definition) => `<button type="button" class="operator-skin-card" data-operator-skin="${escapeAttribute(definition.id)}" aria-pressed="false">
+        <span class="operator-skin-art" data-operator-art="portrait">${operatorSkinPortraitSvg(definition.id)}</span>
         <strong>${escapeAttribute(definition.displayName.toUpperCase())}</strong>
         <small>${escapeAttribute(definition.archetype.toUpperCase())} ARCHETYPE</small>
-      </button>`;
-    }).join('');
+        ${operatorSkinSwatchMarkup(definition.id)}
+      </button>`).join('');
 
   const stances = OPERATOR_STANCES.map((stance) => `<button type="button" class="operator-anim-card" data-operator-stance="${escapeAttribute(stance.id)}" aria-pressed="${stance.id === DEFAULT_OPERATOR_STANCE}">
       <strong>${escapeAttribute(stance.displayName.toUpperCase())}</strong>
@@ -318,6 +321,18 @@ function operatorPanelMarkup(): string {
   return `<div id="menu-panel-operator" class="menu-panel" role="tabpanel" aria-labelledby="menu-tab-operator" data-menu-panel="operator" hidden>
     <div class="kit-heading"><small>OPERATOR</small><strong>APPEARANCE + ANIMATION</strong><span>Your squad sees every choice here. None of it changes how you play.</span></div>
     <div id="operator-appearance" class="operator-appearance-layout">
+      <section class="operator-group" aria-labelledby="operator-preview-heading">
+        <h3 id="operator-preview-heading">YOU</h3>
+        <!-- HF-366: the owner could not tell what they looked like. This is the
+             live 3D half - the SELECTED operator in the SELECTED skin, turning
+             slowly. It carries its own layout because the operator panel's
+             stylesheet belongs to another lane; the canvas is sized by the
+             inline box below and the renderer follows its client size. -->
+        <div class="operator-preview" style="display:grid;grid-template-columns:minmax(180px,240px) 1fr;gap:14px;align-items:center">
+          <canvas id="${OPERATOR_PREVIEW_CANVAS_ID}" width="480" height="600" aria-label="Live rotating preview of your selected operator" style="display:block;width:100%;aspect-ratio:4/5;border-radius:10px;background:linear-gradient(160deg,#1b2a30 0%,#0b171b 100%)"></canvas>
+          <p id="${OPERATOR_PREVIEW_STATUS_ID}" class="operator-preview-status" aria-live="polite" style="margin:0;font-size:13px;line-height:1.5">Standard Operator · live preview</p>
+        </div>
+      </section>
       <section class="operator-group" aria-labelledby="operator-skins-heading">
         <h3 id="operator-skins-heading">SKIN</h3>
         <div class="operator-skin-grid">${skins}</div>
@@ -500,7 +515,36 @@ function hudMarkup(): string {
   </div>`;
 }
 
+let operatorPreviewHandle: ReturnType<typeof mountOperatorPreview> = null;
+
+/**
+ * HF-366 + HF-364: the OPERATOR panel owns its own live preview, so the feature
+ * ships wired rather than landing as another module with no production caller.
+ * The shell's markup is assigned into the document by the caller immediately
+ * after this function returns, so the mount is deferred by one frame and then
+ * retried for a bounded window in case a caller inserts it later. Everything is
+ * a no-op outside a browser, and the preview itself creates no GPU resources
+ * until the OPERATOR tab is actually on screen.
+ */
+function scheduleOperatorPreviewMount(): void {
+  if (typeof document === 'undefined' || typeof requestAnimationFrame !== 'function') return;
+  let attempts = 0;
+  const attempt = (): void => {
+    if (operatorPreviewHandle) return;
+    operatorPreviewHandle = mountOperatorPreview(document);
+    attempts += 1;
+    if (!operatorPreviewHandle && attempts < 120) requestAnimationFrame(attempt);
+  };
+  requestAnimationFrame(attempt);
+}
+
+/** The live preview handle, once mounted. Diagnostics and tests only. */
+export function operatorPreview(): ReturnType<typeof mountOperatorPreview> {
+  return operatorPreviewHandle;
+}
+
 export function renderPass64Shell(model: Pass64ShellViewModel): string {
+  scheduleOperatorPreviewMount();
   return `<canvas id="game" aria-label="${arenaCanvasLabel(ARENA_SELECTIONS[0]!)}"></canvas>
     <div id="match-pause-backdrop" class="match-pause-backdrop" aria-hidden="true" hidden data-frame-provenance="game-canvas-css-compositor" data-capture-status="empty" data-contract="game-canvas-css-compositor-v1" data-periodic-readback-count="0" data-source-capture-attempt-count="0" data-source-capture-count="0" data-presentation-count="0" data-fallback-count="0"></div>
     <div id="color-grade"></div><div id="film-grain"></div>

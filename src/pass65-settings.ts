@@ -9,6 +9,11 @@ import {
   type ShadowFilterMode,
   type ToneMappingMode,
 } from './graphics-settings-registry';
+import {
+  resolveScreenSpacePostRuntime,
+  SCREEN_SPACE_POST_DISABLED,
+  type ScreenSpacePostRuntime,
+} from './rendering/screen-space-post-profile';
 
 export { AUDIO_BUS_IDS };
 export type { AudioBusId };
@@ -79,6 +84,14 @@ export type GraphicsRuntime = Readonly<{
   reflectionScale: number;
   reflectionQuality: ReflectionQualityTier;
   environmentIntensity: number;
+  /**
+   * HF-364 — the resolved screen-space raymarched stack (volumetric shafts,
+   * SSR, SSGI, depth of field, motion blur) plus the FSR 1 upscaler. The tier
+   * tables and the combat-safety ceilings live in
+   * `rendering/screen-space-post-profile.ts`, which is also where the numbers
+   * are proven; this field is only the resolved result.
+   */
+  screenSpace: ScreenSpacePostRuntime;
   volumetricScale: number;
   maximumAnisotropy: GraphicsSettings['anisotropy'];
   particleScale: number;
@@ -291,6 +304,10 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
       reflectionScale: 0,
       reflectionQuality: 'off',
       environmentIntensity: 0,
+      // The compatibility route has no RenderPipeline and therefore no linear
+      // post graph at all; every screen-space effect is structurally absent
+      // rather than merely turned down.
+      screenSpace: SCREEN_SPACE_POST_DISABLED,
       volumetricScale: 0.4,
       maximumAnisotropy: 1,
       particleScale: 0.4,
@@ -322,6 +339,18 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
     reflectionScale: settings.reflectionQuality === 'off' ? 0 : settings.reflectionQuality === 'low' ? 0.62 : 1,
     reflectionQuality: settings.reflectionQuality,
     environmentIntensity: lightingScale(settings.indirectLighting) * settings.environmentIntensity,
+    // Volumetric shafts raymarch the sun shadow map, so the shadow setting is a
+    // hard capability input here rather than a taste preference: with shadows
+    // off there is nothing to occlude the volume and the resolver reports why.
+    screenSpace: resolveScreenSpacePostRuntime({
+      volumetricLightShafts: settings.volumetricLightShafts,
+      screenSpaceReflections: settings.screenSpaceReflections,
+      screenSpaceGi: settings.screenSpaceGi,
+      depthOfField: settings.depthOfField,
+      depthOfFieldStrength: settings.depthOfFieldStrength,
+      motionBlur: settings.motionBlur,
+      spatialUpscaling: settings.spatialUpscaling,
+    }, { shadowsEnabled: settings.shadows === 'high' }),
     volumetricScale: qualityScale(settings.volumetricQuality),
     maximumAnisotropy: settings.anisotropy,
     particleScale: qualityScale(settings.particleQuality),

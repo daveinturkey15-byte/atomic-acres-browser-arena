@@ -92,14 +92,18 @@ describe('operator panel surface', () => {
     expect(shell).toContain('data-menu-panel="operator"');
   });
 
-  it('never presents a weapon still or a raw UV atlas as operator art', () => {
+  // HF-366 supersedes the previous expectation here. That test required the
+  // standard operator's card to carry a typographic emblem placeholder, and the
+  // owner's report is that the whole grid read as greyed-out placeholder art.
+  // The rule is now STRICTER, not looser: no borrowed asset AND no placeholder
+  // of any kind, on any card.
+  it('never presents a weapon still, a raw UV atlas, or a placeholder as operator art', () => {
     const shell = readFileSync(new URL('./ui/pass64-shell.ts', import.meta.url), 'utf8');
     const start = shell.indexOf('function operatorPanelMarkup');
     const body = shell.slice(start, shell.indexOf('function menuMarkup', start));
     expect(body).not.toContain('pass65-firearms');
     expect(body).not.toContain('baseColor');
-    // The standard operator has no authored render and must say so with an
-    // emblem rather than borrowing another asset.
-    expect(body).toContain('operator-skin-emblem');
+    expect(body).not.toContain('operator-skin-emblem');
+    expect(body).toContain('operatorSkinPortraitSvg(definition.id)');
   });
 });

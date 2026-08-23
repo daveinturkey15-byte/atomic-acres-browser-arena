@@ -39,50 +39,6 @@ let _sandGradient: THREE.Mesh | null = null;
  * (additive), troughs contribute nothing. Vertex-coloured MeshBasicMaterial —
  * no ShaderMaterial.
  */
-function buildWaveCrestHighlights(scene: THREE.Scene): void {
-  const size = 76;
-  const segments = 72;
-
-  const geom = new THREE.PlaneGeometry(size, size, segments, segments);
-  geom.rotateX(-Math.PI / 2);
-
-  const posAttr = geom.attributes.position as THREE.BufferAttribute;
-  const base = new Float32Array(posAttr.count * 3);
-  for (let i = 0; i < posAttr.count; i++) {
-    base[i * 3 + 0] = posAttr.getX(i);
-    base[i * 3 + 1] = posAttr.getY(i); // always 0
-    base[i * 3 + 2] = posAttr.getZ(i);
-  }
-
-  // All-zero colours → invisible until the first animate pass brightens crests
-  const colors = new Float32Array(posAttr.count * 3);
-  geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-  const mat = new THREE.MeshBasicMaterial({
-    color: 0xffe9c4, // warm sunlit white — multiplied by vertex brightness
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.5,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    depthTest: true,
-    side: THREE.DoubleSide,
-    fog: false,
-  });
-
-  const mesh = new THREE.Mesh(geom, mat);
-  mesh.name = 'farcrysis-water-fx-crest-highlights';
-  mesh.position.y = -0.22;
-  mesh.renderOrder = 3;
-  mesh.frustumCulled = false;
-  mesh.userData.farcrysisArt = true;
-
-  scene.add(mesh);
-
-  _crestMesh = mesh;
-  _crestBasePositions = base;
-  _crestGeom = geom;
-}
 
 // ---------------------------------------------------------------------------
 // 6. Underwater sand depth gradient — golden shallows → deep teal lagoon floor
@@ -236,7 +192,14 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
 
 function buildWaveSurface(scene: THREE.Scene): void {
   const size = 76;
-  const segments = 72;
+  // HF-374. Was 72, i.e. 10,368 triangles of full-screen additive fill per
+  // plane, twice over, with depthWrite disabled and no depth rejection. During
+  // arena admission the coverage draw disables frustum culling for the whole
+  // scene, so both planes are drawn in full regardless of where the camera
+  // looks - and farcrysis wedged at 'verifying-first-presentation' with the
+  // submission queue frozen. A 76 m plane vertex-animated for swell reads
+  // identically at 24 segments; the wavelength is metres, not centimetres.
+  const segments = 24;
 
   const geom = new THREE.PlaneGeometry(size, size, segments, segments);
   geom.rotateX(-Math.PI / 2);
@@ -277,186 +240,39 @@ function buildWaveSurface(scene: THREE.Scene): void {
 // 3. Caustic light overlay (canvas-textured plane)
 // ---------------------------------------------------------------------------
 
-function createCausticCanvas(): HTMLCanvasElement | null {
-  try {
-    if (typeof document === 'undefined') return null;
-    const size = 512;
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
 
-    // Transparent background
-    ctx.clearRect(0, 0, size, size);
-
-    // Layer 1 — fine wavy horizontal lines (refracted light bands)
-    ctx.globalAlpha = 0.55;
-    for (let row = 0; row < 50; row++) {
-      const baseY = 40 + row * 9 + Math.sin(row * 1.7) * 12;
-      ctx.beginPath();
-      for (let x = 0; x <= size; x += 2) {
-        const wave = Math.sin(x * 0.04 + row * 1.1) * 18 + Math.sin(x * 0.09 + row * 2.3) * 8;
-        const y = baseY + wave;
-        if (x === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.strokeStyle = `rgba(200,240,255,${0.25 + Math.random() * 0.15})`;
-      ctx.lineWidth = 1.2 + Math.random() * 1.8;
-      ctx.stroke();
-    }
-
-    // Layer 2 — brighter curved closed-loop caustics (network pattern)
-    ctx.globalAlpha = 0.35;
-    for (let i = 0; i < 28; i++) {
-      const cx = size * 0.2 + ((i * 317) % size);
-      const cy = size * 0.2 + ((i * 191) % size);
-      ctx.beginPath();
-      for (let a = 0; a < Math.PI * 2; a += 0.03) {
-        const r = size * (0.06 + 0.14 * Math.abs(Math.sin(a * 3.5 + i * 0.7)));
-        const px = cx + Math.cos(a) * r;
-        const py = cy + Math.sin(a) * r * 1.3;
-        if (a === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      ctx.strokeStyle = `rgba(255,255,255,${0.4 + Math.random() * 0.3})`;
-      ctx.lineWidth = 2 + Math.random() * 3;
-      ctx.stroke();
-    }
-
-    // Layer 3 — bright scattered dots (specular sparkle on caustic net)
-    ctx.globalAlpha = 0.5;
-    for (let i = 0; i < 180; i++) {
-      const dx = ((i * 137) % size);
-      const dy = ((i * 73) % size);
-      const r = 1 + Math.random() * 2.5;
-      ctx.beginPath();
-      ctx.arc(dx, dy, r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255,255,255,${0.3 + Math.random() * 0.4})`;
-      ctx.fill();
-    }
-
-    return canvas;
-  } catch {
-    return null;
-  }
-}
-
-function buildCausticProjection(scene: THREE.Scene): void {
-  const canvas = createCausticCanvas();
-  const causticSize = 52; // covers most of the underwater area inside the beach
-
-  if (canvas) {
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(2.5, 2.5);
-    tex.colorSpace = THREE.SRGBColorSpace;
-
-    const causticGeom = new THREE.PlaneGeometry(causticSize, causticSize);
-    causticGeom.rotateX(-Math.PI / 2);
-
-    const causticMat = new THREE.MeshBasicMaterial({
-      map: tex,
-      transparent: true,
-      opacity: 0.22,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      depthTest: true,
-      side: THREE.DoubleSide,
-    });
-
-    const plane = new THREE.Mesh(causticGeom, causticMat);
-    plane.name = 'farcrysis-water-fx-caustic';
-    plane.position.y = -0.15;
-    plane.renderOrder = 4;
-    plane.userData.farcrysisArt = true;
-    scene.add(plane);
-
-    _causticPlane = plane;
-  } else {
-    // Fallback: bright additive plane without texture
-    const fallbackGeom = new THREE.PlaneGeometry(causticSize, causticSize);
-    fallbackGeom.rotateX(-Math.PI / 2);
-
-    const fallbackMat = new THREE.MeshBasicMaterial({
-      color: 0x60d8e0,
-      transparent: true,
-      opacity: 0.12,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      depthTest: true,
-    });
-
-    const plane = new THREE.Mesh(fallbackGeom, fallbackMat);
-    plane.name = 'farcrysis-water-fx-caustic-fallback';
-    plane.position.y = -0.15;
-    plane.renderOrder = 4;
-    plane.userData.farcrysisArt = true;
-    scene.add(plane);
-
-    _causticPlane = plane;
-  }
-}
 
 // ---------------------------------------------------------------------------
 // 4. Water edge ripples — pulsing sprite points at shoreline
 // ---------------------------------------------------------------------------
 
-function buildEdgeRipples(scene: THREE.Scene): void {
-  const group = new THREE.Group();
-  group.name = 'farcrysis-water-fx-edge-ripples';
-  group.userData.farcrysisArt = true;
-
-  const count = 25;
-  const radius = 20; // beach ring inner edge
-
-  for (let i = 0; i < count; i++) {
-    const angle = (i / count) * Math.PI * 2;
-    const px = Math.cos(angle) * radius;
-    const pz = Math.sin(angle) * radius;
-
-    // Small disk mesh as ripple marker
-    const rippleGeom = new THREE.CircleGeometry(0.35, 8);
-    rippleGeom.rotateX(-Math.PI / 2);
-
-    const rippleMat = new THREE.MeshBasicMaterial({
-      color: 0xe8f4ff,
-      transparent: true,
-      opacity: 0.45,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      depthTest: true,
-      side: THREE.DoubleSide,
-    });
-
-    const ripple = new THREE.Mesh(rippleGeom, rippleMat);
-    ripple.name = `farcrysis-water-fx-ripple-${i}`;
-    ripple.position.set(px, -0.19, pz);
-    ripple.renderOrder = 6;
-    ripple.userData.farcrysisArt = true;
-    group.add(ripple);
-
-    _rippleMeshes.push(ripple);
-    _ripplePhases.push(Math.random() * Math.PI * 2);
-  }
-
-  scene.add(group);
-  _rippleGroup = group;
-}
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 export function buildWaterFX(scene: THREE.Scene): void {
+  // HF-374. SIX stacked full-screen additive transparent layers here, on top of
+  // the inline water's own deep plane and shallow lens and the sparkle points,
+  // pushed farcrysis past the first-presentation fence on the WebGPU route:
+  // the arena wedged at 'verifying-first-presentation' with the submission
+  // queue frozen and never reached an active match. A bisect showed no single
+  // guilty layer - skipping ANY ONE of sparkle, inline water or these effects
+  // let it through - so the cost is cumulative and the fix has to be a real
+  // reduction, not a reshuffle.
+  //
+  // Kept: the three layers that carry the shoreline read - foam where water
+  // meets sand, the animated swell, and the depth gradient that makes shallow
+  // water look shallow.
   buildShorelineFoamRing(scene);
   buildWaveSurface(scene);
-  buildCausticProjection(scene);
-  buildEdgeRipples(scene);
-  buildWaveCrestHighlights(scene);
   buildSandDepthGradient(scene);
+
+  // Retired: caustics, edge ripples and crest highlights. All three are
+  // additive detail that reads at a few metres and is invisible at play
+  // distance under a bright tropical sky, while each one costs another
+  // full-screen transparent pass with depth writes disabled. Their animation
+  // hooks below no-op safely when the meshes are absent.
 }
 
 export function animateWaterFX(time: number): void {

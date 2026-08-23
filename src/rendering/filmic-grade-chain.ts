@@ -68,6 +68,8 @@ import {
 import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
 import { smaa } from 'three/addons/tsl/display/SMAANode.js';
 import { sharpen } from 'three/addons/tsl/display/SharpenNode.js';
+import { rtt } from 'three/tsl';
+import { fsr1 } from 'three/addons/tsl/display/FSR1Node.js';
 import {
   assertGradeChainOrder,
   DEFAULT_GRADE_PROFILE_ID,
@@ -108,6 +110,24 @@ export const FILMIC_GRADE_CHAIN_STAGES: readonly string[] = Object.freeze([
  * (AMD's canonical order: reconstruct edges first, sharpen last).
  */
 export type PostAntiAliasingMode = 'off' | 'fxaa' | 'smaa';
+
+/**
+ * HF-364 — spatial upscaling owner. FSR 1 is AMD's published EASU (edge
+ * adaptive upsample) plus RCAS (contrast-adaptive sharpen) pair; it is spatial
+ * and shader-only, so it is neither DLSS nor frame generation and is never
+ * described as either.
+ *
+ * `sceneResolutionScale` is the fraction of the drawing buffer the whole graded
+ * image is rendered at before EASU reconstructs it. Zero or one means off; the
+ * scene-pass assembler renders at the same fraction, which is where the frame
+ * time is actually saved.
+ */
+export type SpatialUpscalingRequest = Readonly<{ enabled: boolean; sceneResolutionScale: number }>;
+
+export const SPATIAL_UPSCALING_OFF: SpatialUpscalingRequest = Object.freeze({
+  enabled: false,
+  sceneResolutionScale: 1,
+});
 
 /**
  * Maps the player's 0..1 sharpness onto the RCAS parameter, whose convention
@@ -611,6 +631,15 @@ export type FilmicGradeChainHandle = Readonly<{
   /** Player sharpness 0..1; zero removes the RCAS stage entirely. */
   setSharpness(uiSharpness: number): void;
   sharpness(): number;
+  /** Selects the FSR 1 upscale stage; disabled restores the standalone sharpen. */
+  setSpatialUpscaling(request: SpatialUpscalingRequest): void;
+  spatialUpscaling(): SpatialUpscalingRequest;
+  /**
+   * Replaces the linear-side stage receipt the scene-pass assembler is
+   * producing. Must be pushed before the assembler publishes its outputNode,
+   * otherwise the first receipt describes a graph that is not on screen.
+   */
+  setLinearSourceStages(stages: readonly string[]): void;
   /** Call immediately before submitting a frame. */
   beforeRender(timeMs: number): void;
   dispose(): void;
@@ -636,19 +665,22 @@ export function installFilmicGradeChain(
     postAntiAliasing?: PostAntiAliasingMode;
     /** Player sharpness 0..1; zero (the default) builds no RCAS stage. */
     sharpness?: number;
+    spatialUpscaling?: SpatialUpscalingRequest;
   }> = {},
 ): FilmicGradeChainHandle {
   const marked = pipeline as GradedRenderPipeline & { [INSTALL_MARKER]?: FilmicGradeChainHandle };
   const existing = marked[INSTALL_MARKER];
   if (existing) {
     if (options.profileId) existing.setProfile(options.profileId);
+    if (options.upstreamStages !== undefined) existing.setLinearSourceStages(options.upstreamStages);
     if (options.postAntiAliasing !== undefined) existing.setPostAntiAliasing(options.postAntiAliasing);
     if (options.sharpness !== undefined) existing.setSharpness(options.sharpness);
+    if (options.spatialUpscaling !== undefined) existing.setSpatialUpscaling(options.spatialUpscaling);
     return existing;
   }
 
   const uniforms = createFilmicGradeUniforms();
-  const upstreamStages = options.upstreamStages ?? LINEAR_SOURCE_STAGES;
+  let upstreamStages = options.upstreamStages ?? LINEAR_SOURCE_STAGES;
   let grainStrength8Bit = options.grainStrength8Bit ?? DEFAULT_AUTHORED_GRAIN_8BIT;
   let profile = resolveGradeProfile(options.profileId ?? DEFAULT_GRADE_PROFILE_ID);
   applyGradeProfileToUniforms(uniforms, profile, grainStrength8Bit);
@@ -659,6 +691,7 @@ export function installFilmicGradeChain(
   let bloomNodes: TunableBloomNode[] = [];
   let postAntiAliasingMode: PostAntiAliasingMode = options.postAntiAliasing ?? 'off';
   let uiSharpness = Number.isFinite(options.sharpness) ? Math.min(1, Math.max(0, options.sharpness!)) : 0;
+  let upscaling: SpatialUpscalingRequest = options.spatialUpscaling ?? SPATIAL_UPSCALING_OFF;
   const sharpnessUniform = uniform(rcasSharpnessFor(uiSharpness));
   // FXAA/SMAA/RCAS are TempNodes owning render targets; retire the previous
   // set on every rebuild so pipeline republishes cannot leak GPU targets.
@@ -706,7 +739,26 @@ export function installFilmicGradeChain(
       output = aaNode as unknown as Node<'vec4'>;
       builtStages.push('display-post-antialiasing-smaa');
     }
-    if (uiSharpness > 0) {
+    const upscaleActive = upscaling.enabled && upscaling.sceneResolutionScale > 0 && upscaling.sceneResolutionScale < 1;
+    if (upscaleActive) {
+      // FSR 1 must consume a LOW-RESOLUTION image or EASU has nothing to
+      // reconstruct. Materialising the finished display-referred chain into an
+      // RTT at the scene's own resolution scale is what makes this a real
+      // upscale rather than a 1:1 edge filter: the whole graph — scene pass,
+      // grade, tone map, grain — runs at that fraction, and EASU reconstructs
+      // to the drawing buffer. The scene-pass assembler applies the same scale
+      // to `pass()`, so the two halves render at one resolution.
+      const lowResolution = rtt(output);
+      lowResolution.setResolutionScale(upscaling.sceneResolutionScale);
+      trailingDisposables.push(lowResolution as unknown as { dispose?: () => void });
+      // FSR 1's second half IS RCAS, so the player's sharpness drives it and the
+      // standalone sharpen stage below is skipped. Running both would apply the
+      // same filter twice; `assertGradeChainOrder` rejects that outright.
+      const upscaled = fsr1(lowResolution, sharpnessUniform);
+      trailingDisposables.push(upscaled as unknown as { dispose?: () => void });
+      output = upscaled as unknown as Node<'vec4'>;
+      builtStages.push('display-fsr1-easu-rcas-upscale');
+    } else if (uiSharpness > 0) {
       const sharpenNode = sharpen(output, sharpnessUniform);
       trailingDisposables.push(sharpenNode as unknown as { dispose?: () => void });
       output = sharpenNode as unknown as Node<'vec4'>;
@@ -763,7 +815,9 @@ export function installFilmicGradeChain(
     postAntiAliasing: () => postAntiAliasingMode,
     setSharpness(nextSharpness: number) {
       const bounded = Number.isFinite(nextSharpness) ? Math.min(1, Math.max(0, nextSharpness)) : 0;
-      const stageToggled = (bounded > 0) !== (uiSharpness > 0);
+      // While FSR 1 owns RCAS the sharpen stage is never standalone, so
+      // crossing zero changes nothing about the topology — only the uniform.
+      const stageToggled = !upscaling.enabled && (bounded > 0) !== (uiSharpness > 0);
       uiSharpness = bounded;
       sharpnessUniform.value = rcasSharpnessFor(bounded);
       // Strength moves through the live uniform; only crossing zero changes
@@ -774,6 +828,26 @@ export function installFilmicGradeChain(
       }
     },
     sharpness: () => uiSharpness,
+    setSpatialUpscaling(request: SpatialUpscalingRequest) {
+      const next: SpatialUpscalingRequest = Object.freeze({
+        enabled: request.enabled === true,
+        sceneResolutionScale: Number.isFinite(request.sceneResolutionScale)
+          ? Math.min(1, Math.max(0.25, request.sceneResolutionScale))
+          : 1,
+      });
+      if (next.enabled === upscaling.enabled && next.sceneResolutionScale === upscaling.sceneResolutionScale) return;
+      upscaling = next;
+      rebuild();
+      pipeline.needsUpdate = true;
+    },
+    spatialUpscaling: () => upscaling,
+    setLinearSourceStages(stages: readonly string[]) {
+      const next = Object.freeze([...stages]);
+      if (next.length === upstreamStages.length && next.every((stage, index) => stage === upstreamStages[index])) return;
+      upstreamStages = next;
+      rebuild();
+      pipeline.needsUpdate = true;
+    },
     beforeRender(timeMs: number) {
       uniforms.grainSeed.value = grainSeedFor(profile, timeMs);
       retuneBloom();

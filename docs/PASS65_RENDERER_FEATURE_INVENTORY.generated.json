@@ -175,6 +175,32 @@
       ]
     },
     {
+      "key": "graphics.screenSpaceReflections",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "screen-space-reflections",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "ssr(sources.sceneColor, sources.sceneDepth, sources.sceneNormal",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.screenSpace.reflections"
+        }
+      ]
+    },
+    {
+      "key": "graphics.screenSpaceGi",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "screen-space-gi",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.screenSpace.globalIllumination"
+        }
+      ]
+    },
+    {
       "key": "graphics.reflectionQuality",
       "applyMode": "live",
       "authorityAffecting": false,
@@ -210,6 +236,19 @@
           "path": "src/rendering/pass64-tsl-scene.ts",
           "symbol": "const volumetricScale = THREE.MathUtils.clamp",
           "telemetryPath": "render.atomicSignal.advancedGraphics.volumetricScale"
+        }
+      ]
+    },
+    {
+      "key": "graphics.volumetricLightShafts",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "volumetric-light-shafts",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "godrays(sources.sceneDepth, sources.camera, sources.volumetricLight)",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.screenSpace.godrays"
         }
       ]
     },
@@ -357,6 +396,58 @@
       ]
     },
     {
+      "key": "graphics.depthOfField",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "depth-of-field",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "dof(linearHdr, sources.sceneViewZ, focusDistance, focalLength, bokehScale)",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.screenSpace.depthOfField"
+        }
+      ]
+    },
+    {
+      "key": "graphics.depthOfFieldStrength",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "depth-of-field",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/screen-space-post-profile.ts",
+          "symbol": "assertDepthOfFieldCombatSafety",
+          "telemetryPath": "settings.graphics.depthOfFieldStrength + screenSpace.depthOfField.bokehScale"
+        }
+      ]
+    },
+    {
+      "key": "graphics.motionBlur",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "motion-blur",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "motionBlur(sources.sceneColor, limited, int(runtime.motionBlur.samples))",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.screenSpace.motionBlur"
+        }
+      ]
+    },
+    {
+      "key": "graphics.spatialUpscaling",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "spatial-upscaling",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/filmic-grade-chain.ts",
+          "symbol": "display-fsr1-easu-rcas-upscale",
+          "telemetryPath": "settings.graphics.spatialUpscaling + grade chain stage receipt"
+        }
+      ]
+    },
+    {
       "key": "accessibility.reducedMotion",
       "applyMode": "live",
       "authorityAffecting": false
@@ -425,9 +516,12 @@
         "shadowFilter": "auto",
         "indirectLighting": "low",
         "ambientOcclusion": "off",
+        "screenSpaceReflections": "off",
+        "screenSpaceGi": "off",
         "reflectionQuality": "low",
         "environmentIntensity": 1,
         "volumetricQuality": "low",
+        "volumetricLightShafts": "off",
         "smokeQuality": "low",
         "particleQuality": "low",
         "anisotropy": 4,
@@ -438,7 +532,11 @@
         "filmicProfile": "arena-default",
         "sharpness": 0,
         "filmGrain": 0.1,
-        "vignette": 0.08
+        "vignette": 0.08,
+        "depthOfField": false,
+        "depthOfFieldStrength": 0.3,
+        "motionBlur": 0,
+        "spatialUpscaling": "off"
       },
       "effective": {
         "requestedPreset": "performance",
@@ -467,6 +565,64 @@
         "reflectionScale": 0.62,
         "reflectionQuality": "low",
         "environmentIntensity": 0.62,
+        "screenSpace": {
+          "godrays": {
+            "quality": "off",
+            "enabled": false,
+            "unavailableReason": null,
+            "raymarchSteps": 0,
+            "resolutionScale": 0,
+            "density": 0,
+            "maximumDensity": 0,
+            "distanceAttenuation": 0,
+            "additiveGain": 0,
+            "bilateralBlur": false
+          },
+          "reflections": {
+            "quality": "off",
+            "enabled": false,
+            "resolutionScale": 0,
+            "marchQuality": 0,
+            "maximumDistance": 0,
+            "thickness": 0,
+            "intensity": 0,
+            "screenEdgeFade": 0,
+            "binaryRefine": false,
+            "reflectNonMetals": false
+          },
+          "globalIllumination": {
+            "quality": "off",
+            "enabled": false,
+            "sliceCount": 0,
+            "stepCount": 0,
+            "giIntensity": 0,
+            "radius": 0,
+            "thickness": 0,
+            "expFactor": 0,
+            "denoise": false
+          },
+          "depthOfField": {
+            "enabled": false,
+            "strength": 0.3,
+            "focusDistanceM": 26,
+            "focalLengthM": 120,
+            "bokehScale": 0
+          },
+          "motionBlur": {
+            "enabled": false,
+            "strength": 0,
+            "samples": 0,
+            "deadZoneNdc": 0.006,
+            "kneeNdc": 0.024,
+            "maximumUvOffset": 0
+          },
+          "upscaling": {
+            "mode": "off",
+            "enabled": false,
+            "sceneResolutionScale": 1,
+            "label": "Off"
+          }
+        },
         "volumetricScale": 0.5,
         "maximumAnisotropy": 4,
         "particleScale": 0.5,
@@ -523,9 +679,12 @@
         "shadowFilter": "auto",
         "indirectLighting": "high",
         "ambientOcclusion": "off",
+        "screenSpaceReflections": "off",
+        "screenSpaceGi": "off",
         "reflectionQuality": "high",
         "environmentIntensity": 1,
         "volumetricQuality": "high",
+        "volumetricLightShafts": "off",
         "smokeQuality": "high",
         "particleQuality": "high",
         "anisotropy": 8,
@@ -536,7 +695,11 @@
         "filmicProfile": "arena-default",
         "sharpness": 0,
         "filmGrain": 0.32,
-        "vignette": 0.16
+        "vignette": 0.16,
+        "depthOfField": false,
+        "depthOfFieldStrength": 0.3,
+        "motionBlur": 0,
+        "spatialUpscaling": "off"
       },
       "effective": {
         "requestedPreset": "high",
@@ -565,6 +728,64 @@
         "reflectionScale": 1,
         "reflectionQuality": "high",
         "environmentIntensity": 1,
+        "screenSpace": {
+          "godrays": {
+            "quality": "off",
+            "enabled": false,
+            "unavailableReason": null,
+            "raymarchSteps": 0,
+            "resolutionScale": 0,
+            "density": 0,
+            "maximumDensity": 0,
+            "distanceAttenuation": 0,
+            "additiveGain": 0,
+            "bilateralBlur": false
+          },
+          "reflections": {
+            "quality": "off",
+            "enabled": false,
+            "resolutionScale": 0,
+            "marchQuality": 0,
+            "maximumDistance": 0,
+            "thickness": 0,
+            "intensity": 0,
+            "screenEdgeFade": 0,
+            "binaryRefine": false,
+            "reflectNonMetals": false
+          },
+          "globalIllumination": {
+            "quality": "off",
+            "enabled": false,
+            "sliceCount": 0,
+            "stepCount": 0,
+            "giIntensity": 0,
+            "radius": 0,
+            "thickness": 0,
+            "expFactor": 0,
+            "denoise": false
+          },
+          "depthOfField": {
+            "enabled": false,
+            "strength": 0.3,
+            "focusDistanceM": 26,
+            "focalLengthM": 120,
+            "bokehScale": 0
+          },
+          "motionBlur": {
+            "enabled": false,
+            "strength": 0,
+            "samples": 0,
+            "deadZoneNdc": 0.006,
+            "kneeNdc": 0.024,
+            "maximumUvOffset": 0
+          },
+          "upscaling": {
+            "mode": "off",
+            "enabled": false,
+            "sceneResolutionScale": 1,
+            "label": "Off"
+          }
+        },
         "volumetricScale": 0.8,
         "maximumAnisotropy": 8,
         "particleScale": 0.8,
@@ -621,9 +842,12 @@
         "shadowFilter": "auto",
         "indirectLighting": "high",
         "ambientOcclusion": "ultra",
+        "screenSpaceReflections": "off",
+        "screenSpaceGi": "off",
         "reflectionQuality": "ultra",
         "environmentIntensity": 1,
         "volumetricQuality": "ultra",
+        "volumetricLightShafts": "off",
         "smokeQuality": "ultra",
         "particleQuality": "ultra",
         "anisotropy": 16,
@@ -634,7 +858,11 @@
         "filmicProfile": "arena-default",
         "sharpness": 0,
         "filmGrain": 0.4,
-        "vignette": 0.18
+        "vignette": 0.18,
+        "depthOfField": false,
+        "depthOfFieldStrength": 0.3,
+        "motionBlur": 0,
+        "spatialUpscaling": "off"
       },
       "effective": {
         "requestedPreset": "max",
@@ -663,6 +891,64 @@
         "reflectionScale": 1,
         "reflectionQuality": "ultra",
         "environmentIntensity": 1,
+        "screenSpace": {
+          "godrays": {
+            "quality": "off",
+            "enabled": false,
+            "unavailableReason": null,
+            "raymarchSteps": 0,
+            "resolutionScale": 0,
+            "density": 0,
+            "maximumDensity": 0,
+            "distanceAttenuation": 0,
+            "additiveGain": 0,
+            "bilateralBlur": false
+          },
+          "reflections": {
+            "quality": "off",
+            "enabled": false,
+            "resolutionScale": 0,
+            "marchQuality": 0,
+            "maximumDistance": 0,
+            "thickness": 0,
+            "intensity": 0,
+            "screenEdgeFade": 0,
+            "binaryRefine": false,
+            "reflectNonMetals": false
+          },
+          "globalIllumination": {
+            "quality": "off",
+            "enabled": false,
+            "sliceCount": 0,
+            "stepCount": 0,
+            "giIntensity": 0,
+            "radius": 0,
+            "thickness": 0,
+            "expFactor": 0,
+            "denoise": false
+          },
+          "depthOfField": {
+            "enabled": false,
+            "strength": 0.3,
+            "focusDistanceM": 26,
+            "focalLengthM": 120,
+            "bokehScale": 0
+          },
+          "motionBlur": {
+            "enabled": false,
+            "strength": 0,
+            "samples": 0,
+            "deadZoneNdc": 0.006,
+            "kneeNdc": 0.024,
+            "maximumUvOffset": 0
+          },
+          "upscaling": {
+            "mode": "off",
+            "enabled": false,
+            "sceneResolutionScale": 1,
+            "label": "Off"
+          }
+        },
         "volumetricScale": 1,
         "maximumAnisotropy": 16,
         "particleScale": 1,
@@ -1465,98 +1751,181 @@
         "kind": "unsupported",
         "settingKeys": [],
         "effectiveValue": "Unavailable",
-        "rationale": "The RTX 5080 is the review GPU, but the current renderer does not implement hardware ray tracing. No RTX-specific ray-tracing claim or toggle is permitted."
+        "rationale": "The RTX 5080 is the review GPU, but WebGPU exposes no ray-tracing pipeline, acceleration structures or ray queries in any shipping browser, so the renderer cannot implement hardware ray tracing. No RTX-specific ray-tracing claim or toggle is permitted, and the screen-space GI row is labelled as screen-space precisely so it is never mistaken for this one."
       },
       "budget": "Zero ray-tracing acceleration structures or passes.",
       "verifier": "Generated inventory unsupported-feature gate.",
       "authorityAffecting": false
     },
     {
-      "id": "screen-space-gi",
-      "title": "Screen-space global illumination",
-      "availability": "unsupported",
-      "owner": "capability gate in src/graphics-settings-registry.ts",
+      "id": "volumetric-light-shafts",
+      "title": "Volumetric light shafts (screen-space raymarch)",
+      "availability": "active",
+      "owner": "src/rendering/screen-space-post.ts",
       "sourceProbes": [
         {
-          "path": "src/graphics-settings-registry.ts",
-          "symbol": "id: 'screen-space-gi'"
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "godrays(sources.sceneDepth, sources.camera, sources.volumetricLight)"
+        },
+        {
+          "path": "src/rendering/screen-space-post-profile.ts",
+          "symbol": "GODRAY_MAXIMUM_ADDITIVE_GAIN"
         }
       ],
       "pipelineIds": [],
       "control": {
-        "kind": "unsupported",
-        "settingKeys": [],
-        "effectiveValue": "Unavailable",
-        "rationale": "The experimental upstream node is not exposed until normal/depth, temporal stability, resource disposal and representative-hardware budgets pass."
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.volumetricLightShafts",
+          "graphics.shadows"
+        ],
+        "effectiveValue": "Off, Low or High raymarch through the sun shadow map; requires Sun shadows and reports why when they are off",
+        "rationale": "The shafts are occluded by the same shadow map the arena already casts, so they agree with the lighting instead of approximating it. The composite is additive and gain-capped at a fifth of the upstream maximum density, and it reuses the bloom path depth-discontinuity guard rather than the upstream flat-colour blend, so a shaft can brighten a silhouette but never replace one."
       },
-      "budget": "Zero SSGI MRTs or texture samples allocated.",
-      "verifier": "src/graphics-settings-registry.test.ts",
+      "budget": "At most one half-or-lower resolution godray target plus one bilateral blur target; both dispose with the arena pipeline. Adaptive pressure drops the march resolution, step count and additive gain.",
+      "verifier": "src/rendering/screen-space-post-profile.test.ts + src/rendering/screen-space-post.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "screen-space-gi",
+      "title": "Screen-space global illumination (ray-marched bounce light)",
+      "availability": "active",
+      "owner": "src/rendering/screen-space-post.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal"
+        },
+        {
+          "path": "src/rendering/screen-space-post-profile.ts",
+          "symbol": "SSGI_MAXIMUM_GI_INTENSITY"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.screenSpaceGi"
+        ],
+        "effectiveValue": "Off, Low or High ray-marched bounce light from the depth and normal buffers",
+        "rationale": "This is screen-space ray marching, not ray tracing: WebGPU exposes no ray-tracing pipeline in any browser, so the label is SCREEN-SPACE GI everywhere it appears. Only the node bounce buffer is consumed and its ambient-occlusion buffer is discarded, because GTAO already owns contact darkening and stacking a second occlusion term would darken exactly the shaded pockets a player uses for cover."
+      },
+      "budget": "One SSGI render target with two attachments plus one spatial denoise target, at most two hemisphere slices and twelve steps; temporal filtering stays off without a TRAA resolve.",
+      "verifier": "src/rendering/screen-space-post-profile.test.ts + src/rendering/screen-space-post.test.ts",
       "authorityAffecting": false
     },
     {
       "id": "screen-space-reflections",
       "title": "Screen-space reflections",
-      "availability": "unsupported",
-      "owner": "capability gate in src/graphics-settings-registry.ts",
+      "availability": "active",
+      "owner": "src/rendering/screen-space-post.ts",
       "sourceProbes": [
         {
-          "path": "src/graphics-settings-registry.ts",
-          "symbol": "id: 'screen-space-reflections'"
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "ssr(sources.sceneColor, sources.sceneDepth, sources.sceneNormal"
+        },
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "packedMaterialMrtNode(metalness, roughness)"
         }
       ],
       "pipelineIds": [],
       "control": {
-        "kind": "unsupported",
-        "settingKeys": [],
-        "effectiveValue": "Unavailable",
-        "rationale": "The experimental upstream node is not exposed without a verified material MRT, occlusion behavior, disposal receipt and performance budget."
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.screenSpaceReflections"
+        ],
+        "effectiveValue": "Off, Low or High ray-marched reflections driven by a packed metalness/roughness MRT attachment",
+        "rationale": "Dielectrics reflect deliberately: water and wet decking are the surfaces this tier exists for and the upstream non-metal early-out would skip them. Off-screen geometry cannot reflect, which is the technique rather than a defect. The composite is additive and intensity-capped, so it can only ever add light to a sightline."
       },
-      "budget": "Zero SSR MRTs or texture samples allocated.",
-      "verifier": "src/graphics-settings-registry.test.ts",
+      "budget": "One SSR target plus one blur target at 0.75 resolution scale or lower, one packed material MRT attachment, and at most 60% of the 64-step march; all dispose with the arena pipeline.",
+      "verifier": "src/rendering/screen-space-post-profile.test.ts + src/rendering/screen-space-post.test.ts",
       "authorityAffecting": false
     },
     {
       "id": "depth-of-field",
       "title": "Depth of field",
-      "availability": "unsupported",
-      "owner": "capability gate in src/graphics-settings-registry.ts",
+      "availability": "active",
+      "owner": "src/rendering/screen-space-post.ts",
       "sourceProbes": [
         {
-          "path": "src/graphics-settings-registry.ts",
-          "symbol": "id: 'depth-of-field'"
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "dof(linearHdr, sources.sceneViewZ, focusDistance, focalLength, bokehScale)"
+        },
+        {
+          "path": "src/rendering/screen-space-post-profile.ts",
+          "symbol": "assertDepthOfFieldCombatSafety"
         }
       ],
       "pipelineIds": [],
       "control": {
-        "kind": "unsupported",
-        "settingKeys": [],
-        "effectiveValue": "Unavailable",
-        "rationale": "First-person weapon depth, focus transitions, target readability and reduced-sensory behavior have not passed the required gates."
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.depthOfField",
+          "graphics.depthOfFieldStrength"
+        ],
+        "effectiveValue": "Off by default; on, a bokeh defocus that only opens up past the combat midfield",
+        "rationale": "The three gates that blocked this are all closed by construction rather than by review. Focus is fixed, so there are no focus transitions to get wrong. The focal length is far longer than any arena, so the first-person weapon and every target inside the engagement band stay sharp. The sub-pixel midfield ceiling is asserted at graph construction across the whole band at every strength, so a future tuning edit fails the arena build instead of softening a target."
       },
-      "budget": "Zero depth-of-field texture samples allocated.",
-      "verifier": "src/graphics-settings-registry.test.ts",
+      "budget": "One circle-of-confusion target pair, one blurred-CoC target and two bokeh targets; the midfield blur radius is capped below one pixel at every strength.",
+      "verifier": "src/rendering/screen-space-post-profile.test.ts + src/rendering/screen-space-post.test.ts",
       "authorityAffecting": false
     },
     {
       "id": "motion-blur",
       "title": "Motion blur",
-      "availability": "unsupported",
-      "owner": "capability gate in src/graphics-settings-registry.ts",
+      "availability": "active",
+      "owner": "src/rendering/screen-space-post.ts",
       "sourceProbes": [
         {
-          "path": "src/graphics-settings-registry.ts",
-          "symbol": "id: 'motion-blur'"
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "motionBlur(sources.sceneColor, limited, int(runtime.motionBlur.samples))"
+        },
+        {
+          "path": "src/rendering/screen-space-post-profile.ts",
+          "symbol": "MOTION_BLUR_DEAD_ZONE_NDC"
         }
       ],
       "pipelineIds": [],
       "control": {
-        "kind": "unsupported",
-        "settingKeys": [],
-        "effectiveValue": "Unavailable",
-        "rationale": "The current scene graph has no verified velocity MRT, weapon-layer composition or reduced-motion contract for blur."
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.motionBlur"
+        ],
+        "effectiveValue": "Off by default; a bounded per-pixel camera and object smear from the scene pass velocity MRT",
+        "rationale": "The velocity buffer is a real MRT attachment allocated only when the control is non-zero. A dead zone holds the smear at exactly zero below a real angular rate, so aim adjustments and slow strafes never smear, and the total screen offset is capped at 2.5% of the screen so a fast flick cannot erase a target from the frame."
       },
-      "budget": "Zero velocity MRT or motion-blur texture samples allocated.",
-      "verifier": "src/graphics-settings-registry.test.ts",
+      "budget": "One velocity MRT attachment and eight taps; zero allocations while the control reads zero.",
+      "verifier": "src/rendering/screen-space-post-profile.test.ts + src/rendering/screen-space-post.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "spatial-upscaling",
+      "title": "FSR 1 spatial upscaling",
+      "availability": "active",
+      "owner": "src/rendering/filmic-grade-chain.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/filmic-grade-chain.ts",
+          "symbol": "display-fsr1-easu-rcas-upscale"
+        },
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "scenePass.setResolutionScale(screenSpaceRuntime.upscaling.sceneResolutionScale)"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.spatialUpscaling",
+          "graphics.sharpness"
+        ],
+        "effectiveValue": "Off, or AMD FSR 1 at the published Quality (1.5x), Balanced (1.7x) or Performance (2.0x) ratio",
+        "rationale": "This is the honest replacement for the former AI-upscaling notice: FSR 1 is a real vendor-published SPATIAL upscaler that runs as an ordinary shader, so it is available where DLSS, Ray Reconstruction and frame generation are not. The scene pass and the display chain render at the same reduced fraction and EASU reconstructs to the drawing buffer, which is what separates it from render scale handing the upsample to the browser blit. FSR 1 ends in RCAS, so it takes over the sharpen stage instead of stacking a second one."
+      },
+      "budget": "One reduced-resolution RTT plus the EASU and RCAS targets; mutually exclusive with the standalone sharpen stage, enforced by the grade chain order contract.",
+      "verifier": "src/rendering/filmic-grade-chain.test.ts + src/rendering/screen-space-post-profile.test.ts",
       "authorityAffecting": false
     },
     {
@@ -1575,7 +1944,7 @@
         "kind": "unsupported",
         "settingKeys": [],
         "effectiveValue": "Unavailable",
-        "rationale": "Vendor-native DLSS, Ray Reconstruction and frame-generation APIs are not available to this browser renderer and are never simulated by labels."
+        "rationale": "Vendor-native DLSS, FSR frame generation and Ray Reconstruction are driver technologies with no browser API, and are never simulated by labels. The spatial upscaler that IS available ships under its own name as FSR 1 in the spatial-upscaling row."
       },
       "budget": "Zero vendor-native reconstruction or generated-frame resources allocated.",
       "verifier": "src/graphics-settings-registry.test.ts",
@@ -1583,11 +1952,11 @@
     }
   ],
   "summary": {
-    "total": 31,
-    "active": 25,
-    "unsupported": 6,
-    "adjustable": 18,
+    "total": 33,
+    "active": 31,
+    "unsupported": 2,
+    "adjustable": 24,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "718b058355f34b3cf0aeb39b8dd1b3c55b07788ccc9955ffa3c6d649dc764fae"
+  "inventorySha256": "1c3e76fbff81e58ee350665a2d3c2097b9dfdaad36f857a260594f37b44ad33a"
 }

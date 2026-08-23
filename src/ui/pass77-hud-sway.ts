@@ -1,0 +1,189 @@
+/**
+ * Pass 77 / HF-370 - diegetic HUD sway.
+ *
+ * The owner asked for a HUD that is "maybe not even pinned directly to the
+ * screen ... dynamic with how you look and move like most modern first person
+ * shooters". `pass77-instrument-hud.css` consumes three normalised inputs to
+ * do that:
+ *
+ *   --hud-sway-x   -1..1  horizontal look lag (+ = the camera turned right)
+ *   --hud-sway-y   -1..1  vertical look lag   (+ = the camera pitched up)
+ *   --hud-breathe   0..1  movement intensity, which scales the idle bob
+ *
+ * This module owns the maths that produces them, for three reasons:
+ *
+ *   1. The wiring into the frame loop then costs the renderer lane exactly one
+ *      import and one call, with no per-frame arithmetic to review or get
+ *      subtly wrong inside a 30k-line file.
+ *   2. Clamping and non-finite rejection live here, so the CSS ceiling (a 10px
+ *      lag multiplier) is a real ceiling and a NaN yaw can never write an
+ *      invalid custom property into the HUD.
+ *   3. It is unit-testable without a DOM or a running match, which the frame
+ *      loop is not.
+ *
+ * The model is a first-order lag: an internal "carried" orientation chases the
+ * camera, and the sway is the residual between them. That is what makes the
+ * HUD trail a fast flick and then settle, rather than rigidly mirroring the
+ * camera - and the settle is fast (TAU_MS below) so nothing lingers in the
+ * player's peripheral vision during a fight.
+ *
+ * Everything here is pure. It reads no globals, touches no DOM except through
+ * the tiny structural type `HudSwayTarget`, and has no side effects other than
+ * the three property writes in `applyHudSway`.
+ */
+
+/** Retained lag state. Treat as opaque; construct with `createHudSwayState`. */
+export type HudSwayState = Readonly<{
+  /** The "carried" yaw, in radians, trailing the camera. */
+  yaw: number;
+  /** The "carried" pitch, in radians, trailing the camera. */
+  pitch: number;
+  /** Smoothed movement intensity, 0..1. */
+  breathe: number;
+}>;
+
+/** Per-frame camera and movement sample. */
+export type HudSwaySample = Readonly<{
+  /** Camera yaw in radians. */
+  yaw: number;
+  /** Camera pitch in radians. */
+  pitch: number;
+  /** Horizontal speed in world units per second. */
+  speed: number;
+  /** Frame delta in milliseconds. */
+  deltaMs: number;
+}>;
+
+/** The three normalised values `pass77-instrument-hud.css` consumes. */
+export type HudSwayOutput = Readonly<{
+  state: HudSwayState;
+  swayX: number;
+  swayY: number;
+  breathe: number;
+}>;
+
+/** The only DOM surface this module needs. Keeps it testable with a stub. */
+export type HudSwayTarget = {
+  style: { setProperty(property: string, value: string): void };
+};
+
+/**
+ * Lag time constant. 90 ms is deliberately short: AGENTS.md requires HUD
+ * effects to sit at the edges and decay fast, and a longer constant turns a
+ * quick corner-check into a visible smear across the operator console.
+ */
+const TAU_MS = 90;
+
+/**
+ * Radians of residual that map to the full +-1 output. A 180 deg/s flick at
+ * 60 fps leaves roughly 0.05 rad of residual, so this saturates on a genuine
+ * fast turn and stays well under 1 during ordinary aiming.
+ */
+const SATURATION_RAD = 0.085;
+
+/** Speed, in world units per second, that maps to full movement breathing. */
+const BREATHE_SPEED = 5.5;
+
+/** Breathing follows the body, not the head, so it settles more slowly. */
+const BREATHE_TAU_MS = 260;
+
+/** A single frame can never advance the filter by more than this. */
+const MAX_DELTA_MS = 100;
+
+const TWO_PI = Math.PI * 2;
+
+function finite(value: number, fallback = 0): number {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function clampUnit(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  if (value > 1) return 1;
+  if (value < -1) return -1;
+  return value;
+}
+
+/** Shortest signed angular difference `a - b`, wrapped to (-PI, PI]. */
+export function shortestAngleDelta(a: number, b: number): number {
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return 0;
+  let delta = (a - b) % TWO_PI;
+  if (delta > Math.PI) delta -= TWO_PI;
+  if (delta <= -Math.PI) delta += TWO_PI;
+  return delta;
+}
+
+/** Start the filter already settled on a pose, so the first frame never jumps. */
+export function createHudSwayState(yaw = 0, pitch = 0): HudSwayState {
+  return { yaw: finite(yaw), pitch: finite(pitch), breathe: 0 };
+}
+
+/**
+ * Advance the lag filter one frame and report the normalised sway.
+ *
+ * Pure: the caller owns the returned state. A zero or negative delta advances
+ * nothing but still reports the current residual, so a paused frame holds its
+ * value instead of snapping to zero.
+ */
+export function sampleHudSway(state: HudSwayState, sample: HudSwaySample): HudSwayOutput {
+  const yaw = finite(sample.yaw, state.yaw);
+  const pitch = finite(sample.pitch, state.pitch);
+  const speed = Math.max(0, finite(sample.speed));
+  const deltaMs = Math.min(MAX_DELTA_MS, Math.max(0, finite(sample.deltaMs)));
+
+  // Exponential smoothing with a frame-rate-independent coefficient, so the
+  // feel is identical at 60, 144 and uncapped.
+  const follow = deltaMs > 0 ? 1 - Math.exp(-deltaMs / TAU_MS) : 0;
+  const breatheFollow = deltaMs > 0 ? 1 - Math.exp(-deltaMs / BREATHE_TAU_MS) : 0;
+
+  const yawResidual = shortestAngleDelta(yaw, state.yaw);
+  const pitchResidual = shortestAngleDelta(pitch, state.pitch);
+
+  const nextYaw = state.yaw + yawResidual * follow;
+  const nextPitch = state.pitch + pitchResidual * follow;
+  const targetBreathe = Math.min(1, speed / BREATHE_SPEED);
+  const nextBreathe = state.breathe + (targetBreathe - state.breathe) * breatheFollow;
+
+  return {
+    state: { yaw: nextYaw, pitch: nextPitch, breathe: nextBreathe },
+    swayX: clampUnit(yawResidual / SATURATION_RAD),
+    swayY: clampUnit(pitchResidual / SATURATION_RAD),
+    breathe: clampUnit(nextBreathe),
+  };
+}
+
+/** Three decimals is below one screen pixel at the CSS multipliers in use. */
+function serialise(value: number): string {
+  return clampUnit(value).toFixed(3);
+}
+
+/**
+ * Advance the filter and write the three custom properties onto the HUD root.
+ *
+ * This is the one call the frame loop makes. It returns the next state, which
+ * the caller retains:
+ *
+ *   hudSway = applyHudSway(hudRoot, hudSway, { yaw, pitch, speed, deltaMs });
+ */
+export function applyHudSway(
+  target: HudSwayTarget,
+  state: HudSwayState,
+  sample: HudSwaySample,
+): HudSwayState {
+  const next = sampleHudSway(state, sample);
+  target.style.setProperty('--hud-sway-x', serialise(next.swayX));
+  target.style.setProperty('--hud-sway-y', serialise(next.swayY));
+  target.style.setProperty('--hud-breathe', serialise(next.breathe));
+  return next.state;
+}
+
+/**
+ * Write the neutral pose. Call this when motion must stop dead - reduced
+ * motion, pause, death, or a possession handover - so no stale residual is
+ * left frozen on screen. The CSS gates already zero the transform under both
+ * reduced-motion switches; this exists for the runtime-side cases.
+ */
+export function releaseHudSway(target: HudSwayTarget): void {
+  target.style.setProperty('--hud-sway-x', '0');
+  target.style.setProperty('--hud-sway-y', '0');
+  target.style.setProperty('--hud-breathe', '0');
+}

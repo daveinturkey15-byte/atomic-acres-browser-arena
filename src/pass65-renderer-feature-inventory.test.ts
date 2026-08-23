@@ -22,15 +22,39 @@ describe('Pass 65 renderer feature inventory', () => {
 
   it('reports unavailable features instead of implying unsupported controls work', () => {
     const unsupported = PASS65_RENDERER_FEATURES.filter(({ availability }) => availability === 'unsupported');
+    // HF-364 shipped the screen-space stack, so only the two real browser
+    // boundaries remain: there is no WebGPU ray-tracing pipeline and no
+    // vendor-native temporal reconstruction. Screen-space GI, SSR, depth of
+    // field, motion blur and FSR 1 are now active rows with settings.
     expect(unsupported.map(({ id }) => id).sort()).toEqual([
       'ai-upscaling-frame-generation',
-      'depth-of-field',
       'hardware-ray-tracing',
-      'motion-blur',
-      'screen-space-gi',
-      'screen-space-reflections',
     ]);
     expect(unsupported.every(({ control }) => control.kind === 'unsupported' && control.settingKeys.length === 0)).toBe(true);
+  });
+
+  it('describes the screen-space stack honestly and never as ray tracing', () => {
+    const screenSpaceIds = [
+      'volumetric-light-shafts', 'screen-space-gi', 'screen-space-reflections',
+      'depth-of-field', 'motion-blur', 'spatial-upscaling',
+    ];
+    for (const id of screenSpaceIds) {
+      const found = PASS65_RENDERER_FEATURES.find((entry) => entry.id === id);
+      expect(found?.availability, id).toBe('active');
+      expect(found?.control.kind, id).toBe('setting');
+      expect(found?.control.settingKeys.length, id).toBeGreaterThan(0);
+    }
+    // No active row may claim ray tracing. The only rows allowed to use the
+    // phrase are the ones explaining that it is unavailable.
+    for (const entry of PASS65_RENDERER_FEATURES.filter(({ availability }) => availability === 'active')) {
+      const prose = `${entry.title} ${entry.control.effectiveValue} ${entry.control.rationale}`.toLowerCase();
+      const claimsRayTracing = /\bray[- ]trac/.test(prose)
+        && !/no ray-tracing|not ray tracing|never .*ray[- ]trac|rather than ray[- ]trac|mistaken for/.test(prose);
+      expect(claimsRayTracing, entry.id).toBe(false);
+    }
+    const gi = PASS65_RENDERER_FEATURES.find((entry) => entry.id === 'screen-space-gi');
+    expect(gi?.title).toContain('Screen-space');
+    expect(gi?.control.rationale).toContain('WebGPU exposes no ray-tracing pipeline');
   });
 
   it('binds menu choreography to prerecorded media with zero runtime renderer ownership', () => {

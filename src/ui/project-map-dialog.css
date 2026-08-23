@@ -30,9 +30,24 @@
   color: #fff;
 }
 
+/*
+ * HF-370: this button sat in the command header as gold-on-gold - the gold
+ * text was drawn over a gold-tinted plate and was effectively unreadable in
+ * every captured review frame. It now uses the Pass 77 chrome accent on the
+ * dark header sheet. The !important flags are retained because this sheet is
+ * imported from the shell module and therefore lands after every bootstrap
+ * sheet; dropping them would let the generic #menu-meta-actions rule win.
+ */
 #project-map-btn {
-  color: var(--gold) !important;
-  background: linear-gradient(135deg, rgba(244, 196, 79, .14), rgba(12, 21, 25, .94)) !important;
+  color: #a4ecf0 !important;
+  border-color: rgba(140, 232, 240, .34) !important;
+  background: rgba(18, 167, 177, .16) !important;
+}
+
+#project-map-btn:hover:not(:disabled) {
+  color: #ffffff !important;
+  border-color: #12a7b1 !important;
+  background: rgba(18, 167, 177, .28) !important;
 }
 
 #menu.hidden ~ #menu-meta-actions,

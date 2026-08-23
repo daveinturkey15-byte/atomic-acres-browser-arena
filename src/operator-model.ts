@@ -8,6 +8,7 @@ import type { Team } from './protocol';
 import { objectLocalGeometryBounds } from './character-presentation-contract';
 import { solveTwoBoneElbow } from './ik';
 import { yieldBrowserCpuTask } from './browser-preparation-scheduler';
+import { operatorSkinPalette } from './operator-skin-catalog';
 
 export const BOT_EMISSIVE_BRIGHTNESS_SCALE = 0.5;
 
@@ -57,15 +58,33 @@ type FirstPersonArmsRuntime = {
   mixer: THREE.AnimationMixer;
   actions: Map<string, THREE.AnimationAction>;
   activeAction: string | null;
+  /**
+   * HF-365 ("badly animated"): the authored delivery ships 13 runtime clips but
+   * only fire/reload/melee were ever played, and each stopped every other
+   * action, so a standing or walking player's arms were frozen. The base action
+   * is the looping locomotion clip underneath those one-shots.
+   */
+  baseAction: string | null;
 };
 
-const FIRST_PERSON_RUNTIME_FINGER_TRACK = /(?:Index|Middle|Ring|Pinky|Thumb)[123][LR](?:\.|$)/;
+/**
+ * ROTATION only, and deliberately so. The authored clips carry translation and
+ * scale channels for every digit alongside the rotation, and the old
+ * `(?:\.|$)` suffix admitted all three. A digit is a hinge: animating its
+ * translation and scale stretched the finger bones into needles that shot out
+ * past the weapon. It stayed hidden while the only clips ever played were brief
+ * one-shots and the per-frame finger reset restored quaternions (and nothing
+ * else), which is exactly the drift this pattern leaves behind. Admitting the
+ * hinge channel only is strictly narrower than before.
+ */
+const FIRST_PERSON_RUNTIME_FINGER_TRACK = /(?:Index|Middle|Ring|Pinky|Thumb)[123][LR]\.quaternion$/;
 
 /**
  * The authored Blender clips retain complete arm-chain motion for offline
- * contact review. In the live viewmodel only digit tracks are admitted: the
- * shoulder, elbow and wrist are solved after animation by weapon socket IK (or
- * the dedicated melee solve), so a clip can never pull a hand off its socket.
+ * contact review. In the live viewmodel only digit rotation tracks are
+ * admitted: the shoulder, elbow and wrist are solved after animation by weapon
+ * socket IK (or the dedicated melee solve), so a clip can never pull a hand off
+ * its socket, and no digit can be translated or scaled off its knuckle.
  */
 export function firstPersonArmRuntimeClip(clip: THREE.AnimationClip): THREE.AnimationClip {
   return new THREE.AnimationClip(
@@ -611,7 +630,91 @@ export function firstPersonArmMaterialReadabilityProfile(materialName: string): 
   return null;
 }
 
-function materialForFirstPerson(material: THREE.Material, flattenMaterials: boolean): THREE.Material {
+export type FirstPersonArmMaterialRole = 'sleeve' | 'glove' | 'finger-glove' | 'accent' | 'skin';
+
+/**
+ * Classifies one authored arm material into the role the skin palette paints.
+ * Exported because the skin -> arm resolution is the testable half of HF-366:
+ * a renamed or newly added arm material that falls through to null would be
+ * left untinted and would visibly disagree with the menu portrait.
+ */
+export function firstPersonArmMaterialRole(materialName: string): FirstPersonArmMaterialRole | null {
+  const normalized = materialName.toLowerCase();
+  if (normalized === 'skin') return 'skin';
+  if (normalized.includes('arms_fingerglove')) return 'finger-glove';
+  if (normalized.includes('arms_glove')) return 'glove';
+  if (normalized.includes('arms_sleeve')) return 'sleeve';
+  if (normalized.includes('arms_wristaccent') || normalized.includes('arms_armorpad')) return 'accent';
+  return null;
+}
+
+export const FIRST_PERSON_ARM_SKIN_CONTRACT = 'palette-tinted-authored-arm-atlas-v1';
+
+/**
+ * HF-366: paints one already-cloned arm material with the selected skin.
+ *
+ * The tint MULTIPLIES the authored base-colour map, so the licensed albedo,
+ * normal and ORM detail survives and only the hue/response changes. This is
+ * the honest limit of what the shipped assets allow: the arms GLB has no
+ * per-skin variant and each skin's own atlas is UV-mapped for the full body,
+ * so sampling it through arm UVs would land on legs and webbing.
+ */
+export function applyFirstPersonArmSkinMaterial(
+  material: THREE.Material,
+  materialName: string,
+  skinId: string,
+): boolean {
+  if (!(material instanceof THREE.MeshStandardMaterial)) return false;
+  const role = firstPersonArmMaterialRole(materialName);
+  if (role === null || role === 'skin') return false;
+  const palette = operatorSkinPalette(skinId).arm;
+  if (role === 'sleeve') {
+    material.color.setHex(palette.sleeve);
+    material.roughness = palette.sleeveRoughness;
+  } else if (role === 'glove') {
+    material.color.setHex(palette.glove);
+    material.roughness = palette.gloveRoughness;
+  } else if (role === 'finger-glove') {
+    material.color.setHex(palette.fingerGlove);
+    material.roughness = palette.gloveRoughness;
+  } else {
+    material.color.setHex(palette.accent);
+    material.metalness = palette.accentMetalness;
+    material.emissive.setHex(palette.accentEmissive);
+    material.emissiveIntensity = Math.min(0.16, FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY);
+  }
+  return true;
+}
+
+/**
+ * Repaints a live first-person arms root for a new skin selection. Materials
+ * are per-instance clones (materialForFirstPerson clones every source), so this
+ * mutates only the caller's own arms and never the shared authored asset.
+ */
+export function applyFirstPersonArmSkin(root: THREE.Object3D, skinId: string): number {
+  let painted = 0;
+  const seen = new Set<THREE.Material>();
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const material of materials) {
+      if (seen.has(material)) continue;
+      seen.add(material);
+      const sourceName = String(material.userData.authoredArmMaterialName ?? material.name);
+      if (applyFirstPersonArmSkinMaterial(material, sourceName, skinId)) painted += 1;
+    }
+  });
+  root.userData.firstPersonArmSkinId = skinId;
+  root.userData.firstPersonArmSkinContract = FIRST_PERSON_ARM_SKIN_CONTRACT;
+  root.userData.firstPersonArmSkinPaintedMaterials = painted;
+  return painted;
+}
+
+function materialForFirstPerson(
+  material: THREE.Material,
+  flattenMaterials: boolean,
+  skinId: string,
+): THREE.Material {
   const result = materialForTeam(material, 0, flattenMaterials);
   const profile = firstPersonArmMaterialReadabilityProfile(material.name);
   if (result instanceof THREE.MeshStandardMaterial && profile) {
@@ -627,6 +730,10 @@ function materialForFirstPerson(material: THREE.Material, flattenMaterials: bool
     result.roughness = 0.92;
     result.metalness = 0;
   }
+  // Keep the authored name on the clone so a later skin change can re-classify
+  // it; materialForTeam clones may be renamed by downstream passes.
+  result.userData.authoredArmMaterialName = material.name;
+  applyFirstPersonArmSkinMaterial(result, material.name, skinId);
   return result;
 }
 
@@ -660,6 +767,80 @@ function describeOperatorAsset(
   };
 }
 
+export const FIRST_PERSON_ARM_GIRTH_CONTRACT = 'authored-normal-shell-limb-girth-v1';
+
+/**
+ * HF-365 ("the arms are thin"): metres of radius added along the authored
+ * vertex normals, per material role, in the arms GLB's own local units.
+ *
+ * A normal-offset shell is the one girth operation that leaves EVERYTHING else
+ * the release gates depend on untouched: no bone is scaled (the reviewed
+ * "no skinned bone receives scale or length mutation" contract holds), no
+ * segment length changes, no socket, palm contact or knife mount moves, and
+ * the skin weights are the authored ones because only positions move. Fingers
+ * take a much smaller shell than the sleeve so digits thicken without fusing.
+ *
+ * HF-354 previously recorded arm thickness as correct. The owner played the
+ * Pass 76 candidate and said the opposite, so that status is superseded here.
+ */
+export const FIRST_PERSON_ARM_GIRTH_METRES: Readonly<Record<FirstPersonArmMaterialRole, number>> = Object.freeze({
+  sleeve: 0.0105,
+  accent: 0.0105,
+  glove: 0.0068,
+  'finger-glove': 0.0026,
+  skin: 0.0026,
+});
+
+const ARM_GIRTH_APPLIED_KEY = 'firstPersonArmGirthMetres';
+
+/**
+ * Thickens the shared authored arm geometry exactly once. SkeletonUtils.clone
+ * SHARES geometry between every arms instance, so inflating per instance would
+ * compound the shell on every viewmodel build; the applied amount is stamped on
+ * the geometry and re-entry is a no-op.
+ */
+export function inflateFirstPersonArmGirth(root: THREE.Object3D): number {
+  let inflated = 0;
+  const done = new Set<THREE.BufferGeometry>();
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    const geometry = node.geometry;
+    if (done.has(geometry)) return;
+    done.add(geometry);
+    if (typeof geometry.userData[ARM_GIRTH_APPLIED_KEY] === 'number') return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    const roles = materials
+      .map((material) => firstPersonArmMaterialRole(material.name))
+      .filter((role): role is FirstPersonArmMaterialRole => role !== null);
+    if (roles.length !== 1) return;
+    const girth = FIRST_PERSON_ARM_GIRTH_METRES[roles[0]!];
+    const position = geometry.getAttribute('position');
+    const normal = geometry.getAttribute('normal');
+    if (!position || !normal || position.count !== normal.count) return;
+    // The delivery is meshopt-compressed: positions arrive as a NORMALIZED
+    // Int16 interleaved attribute, so the encodable range is exactly [-1, 1]
+    // and setXYZ re-quantizes on write. Writing an inflated extreme vertex
+    // (fingertips and sleeve ends sit ON the quantization bounds by
+    // construction) overflows Int16 and WRAPS to the opposite extreme, which
+    // renders as a metre-long black spike through the viewmodel. Rebuild the
+    // attribute as float first; four small viewmodel meshes can afford it, and
+    // no other attribute is touched.
+    const shelled = new Float32Array(position.count * 3);
+    for (let index = 0; index < position.count; index += 1) {
+      shelled[index * 3] = position.getX(index) + normal.getX(index) * girth;
+      shelled[index * 3 + 1] = position.getY(index) + normal.getY(index) * girth;
+      shelled[index * 3 + 2] = position.getZ(index) + normal.getZ(index) * girth;
+    }
+    geometry.setAttribute('position', new THREE.BufferAttribute(shelled, 3));
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+    geometry.userData[ARM_GIRTH_APPLIED_KEY] = girth;
+    geometry.userData.firstPersonArmGirthContract = FIRST_PERSON_ARM_GIRTH_CONTRACT;
+    inflated += 1;
+  });
+  return inflated;
+}
+
 export function loadFirstPersonArmsAsset(): Promise<void> {
   if (firstPersonArmsAsset) return Promise.resolve();
   firstPersonArmsAssetPromise ??= loadRiggedGltf(FIRST_PERSON_ARMS_URL).catch((error: unknown) => {
@@ -668,6 +849,7 @@ export function loadFirstPersonArmsAsset(): Promise<void> {
     firstPersonArmsAssetPromise = null;
     throw error;
   }).then((arms) => {
+    inflateFirstPersonArmGirth(arms.scene);
     firstPersonArmsAsset = { scene: arms.scene, clips: arms.animations };
   });
   return firstPersonArmsAssetPromise;
@@ -717,6 +899,9 @@ export type FirstPersonArmChain = {
 export type FirstPersonFingerBone = {
   bone: THREE.Bone;
   bindQuaternion: THREE.Quaternion;
+  /** Captured so a clip can never leave a digit translated or scaled. */
+  bindPosition: THREE.Vector3;
+  bindScale: THREE.Vector3;
   side: 'left' | 'right';
   digit: 'index' | 'middle' | 'ring' | 'pinky' | 'thumb';
   joint: 1 | 2 | 3;
@@ -765,7 +950,10 @@ export function firstPersonArmHandedness(visual: THREE.Object3D): FirstPersonArm
   });
 }
 
-export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPersonRiggedArms | null {
+export function createFirstPersonRiggedArms(
+  flattenMaterials: boolean,
+  skinId = 'default',
+): FirstPersonRiggedArms | null {
   if (!firstPersonArmsAsset) return null;
   const root = new THREE.Group();
   root.name = 'first-person-arms';
@@ -787,7 +975,7 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
     // IK chains, which silently dropped whole arms from the render list.
     node.frustumCulled = false;
     const prepare = (material: THREE.Material) => {
-      const result = materialForFirstPerson(material, flattenMaterials);
+      const result = materialForFirstPerson(material, flattenMaterials, skinId);
       result.transparent = false;
       result.opacity = 1;
       result.depthWrite = true;
@@ -833,6 +1021,8 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
           fingers.push({
             bone,
             bindQuaternion: bone.quaternion.clone(),
+            bindPosition: bone.position.clone(),
+            bindScale: bone.scale.clone(),
             side,
             digit: digitName.toLowerCase() as FirstPersonFingerBone['digit'],
             joint,
@@ -851,7 +1041,12 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
   const authoredTrackCount = firstPersonArmsAsset.clips.reduce((count, clip) => count + clip.tracks.length, 0);
   const runtimeTrackCount = runtimeClips.reduce((count, clip) => count + clip.tracks.length, 0);
   const actions = new Map(runtimeClips.map((clip) => [clip.name, mixer.clipAction(clip)]));
-  root.userData.firstPersonArmsRuntime = { mixer, actions, activeAction: null } satisfies FirstPersonArmsRuntime;
+  root.userData.firstPersonArmsRuntime = {
+    mixer, actions, activeAction: null, baseAction: null,
+  } satisfies FirstPersonArmsRuntime;
+  root.userData.firstPersonArmSkinId = skinId;
+  root.userData.firstPersonArmSkinContract = FIRST_PERSON_ARM_SKIN_CONTRACT;
+  root.userData.firstPersonArmGirthContract = FIRST_PERSON_ARM_GIRTH_CONTRACT;
   root.userData.importedFirstPersonArms = false;
   root.userData.authoredFirstPersonArms = true;
   root.userData.firstPersonArmsSource = FIRST_PERSON_ARMS_URL;
@@ -874,17 +1069,64 @@ function firstPersonArmsRuntime(root: THREE.Object3D): FirstPersonArmsRuntime | 
   return (root.userData.firstPersonArmsRuntime as FirstPersonArmsRuntime | undefined) ?? null;
 }
 
+/**
+ * Restores the COMPLETE authored digit transform each frame, not only the
+ * rotation. The runtime clip filter already refuses translation and scale
+ * channels; this is the second guard, so a future asset that smuggles one in
+ * cannot leave a finger drifted off its knuckle.
+ */
 export function resetFirstPersonArmFingers(fingers: readonly FirstPersonFingerBone[]): void {
-  for (const finger of fingers) finger.bone.quaternion.copy(finger.bindQuaternion);
+  for (const finger of fingers) {
+    finger.bone.quaternion.copy(finger.bindQuaternion);
+    finger.bone.position.copy(finger.bindPosition);
+    finger.bone.scale.copy(finger.bindScale);
+  }
+}
+
+export const FIRST_PERSON_ARM_BASE_ACTION_NAMES = Object.freeze(['idle', 'walk', 'sprint'] as const);
+export type FirstPersonArmBaseAction = typeof FIRST_PERSON_ARM_BASE_ACTION_NAMES[number];
+
+/**
+ * Selects the looping locomotion clip for a movement state. Pure so the
+ * mapping is testable without a mixer.
+ */
+export function firstPersonArmBaseActionFor(moving: boolean, sprinting: boolean): FirstPersonArmBaseAction {
+  if (sprinting) return 'sprint';
+  return moving ? 'walk' : 'idle';
+}
+
+/**
+ * Crossfades the looping locomotion clip underneath the one-shots. Returns the
+ * action that is now the base, or null when the asset does not carry it.
+ */
+export function setFirstPersonArmBaseAction(root: THREE.Object3D, actionName: string): string | null {
+  const runtime = firstPersonArmsRuntime(root);
+  const action = runtime?.actions.get(actionName);
+  if (!runtime || !action) return null;
+  if (runtime.baseAction === actionName) return actionName;
+  const previous = runtime.baseAction ? runtime.actions.get(runtime.baseAction) : undefined;
+  action.reset().setLoop(THREE.LoopRepeat, Infinity);
+  action.clampWhenFinished = false;
+  action.enabled = true;
+  action.play();
+  if (previous && previous !== action) previous.crossFadeTo(action, 0.18, false);
+  else action.fadeIn(0.18);
+  runtime.baseAction = actionName;
+  return actionName;
 }
 
 export function playFirstPersonArmAction(root: THREE.Object3D, actionName: string): boolean {
   const runtime = firstPersonArmsRuntime(root);
   const action = runtime?.actions.get(actionName);
   if (!runtime || !action) return false;
-  runtime.mixer.stopAllAction();
+  // Stop only the previous ONE-SHOT. The old stopAllAction() here also killed
+  // the locomotion loop, which is why a single shot left the arms dead until
+  // the next shot.
+  const previousOneShot = runtime.activeAction ? runtime.actions.get(runtime.activeAction) : undefined;
+  if (previousOneShot && previousOneShot !== action) previousOneShot.stop();
   action.reset().setLoop(THREE.LoopOnce, 1);
   action.clampWhenFinished = false;
+  action.setEffectiveWeight(1);
   action.play();
   runtime.activeAction = actionName;
   return true;
@@ -893,6 +1135,11 @@ export function playFirstPersonArmAction(root: THREE.Object3D, actionName: strin
 export function updateFirstPersonArmAnimations(root: THREE.Object3D, dt: number): void {
   const runtime = firstPersonArmsRuntime(root);
   if (!runtime) return;
+  // The one-shot owns the digits while it runs; the locomotion loop is held at
+  // zero weight rather than stopped so it resumes mid-cycle instead of popping.
+  const oneShot = runtime.activeAction ? runtime.actions.get(runtime.activeAction) : undefined;
+  const base = runtime.baseAction ? runtime.actions.get(runtime.baseAction) : undefined;
+  if (base) base.setEffectiveWeight(oneShot?.isRunning() === true ? 0 : 1);
   runtime.mixer.update(Math.min(0.05, Math.max(0, dt)));
   if (runtime.activeAction && runtime.actions.get(runtime.activeAction)?.isRunning() !== true) runtime.activeAction = null;
 }
@@ -905,15 +1152,18 @@ export function resetFirstPersonArmAnimations(root: THREE.Object3D): void {
   for (const action of runtime.actions.values()) action.stop();
   runtime.mixer.setTime(0);
   runtime.activeAction = null;
+  runtime.baseAction = null;
 }
 
 export function firstPersonArmAnimationState(root: THREE.Object3D | undefined): Readonly<{
   clips: number;
   activeAction: string | null;
+  baseAction: string | null;
   blendPolicy: string;
   trackPolicy: string;
   runtimeTracks: number;
   upperChainTracksExcluded: number;
+  skinId: string;
 }> | null {
   if (!root) return null;
   const runtime = firstPersonArmsRuntime(root);
@@ -921,6 +1171,8 @@ export function firstPersonArmAnimationState(root: THREE.Object3D | undefined): 
   return Object.freeze({
     clips: runtime.actions.size,
     activeAction: runtime.activeAction,
+    baseAction: runtime.baseAction,
+    skinId: String(root.userData.firstPersonArmSkinId ?? 'default'),
     blendPolicy: String(root.userData.authoredAnimationBlendPolicy ?? 'unknown'),
     trackPolicy: String(root.userData.authoredAnimationTrackPolicy ?? 'unknown'),
     runtimeTracks: Number(root.userData.authoredAnimationTrackCount ?? 0),

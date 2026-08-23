@@ -18,6 +18,7 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { auditLegibility } from './hud-legibility-audit.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -47,33 +48,9 @@ const MENU_PANELS = [
   { id: 'options', tab: '#menu-tab-options' },
 ];
 
-/** Objective legibility + layout audit of whatever is currently on screen. */
-const AUDIT = () => {
-  const tooSmall = [];
-  const seen = new Set();
-  for (const element of document.querySelectorAll('body *')) {
-    const text = (element.textContent || '').trim();
-    if (!text) continue;
-    const style = getComputedStyle(element);
-    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') continue;
-    const rect = element.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) continue;
-    const size = Number.parseFloat(style.fontSize);
-    if (size > 0 && size < 9) {
-      const key = `${element.tagName}.${element.className || '-'}:${size}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        tooSmall.push({ tag: element.tagName, cls: String(element.className || '-').slice(0, 60), px: size, sample: text.slice(0, 40) });
-      }
-    }
-  }
-  const root = document.documentElement;
-  return {
-    belowNinePx: tooSmall,
-    pageOverflowX: root.scrollWidth - root.clientWidth,
-    devicePixelRatio: window.devicePixelRatio,
-  };
-};
+// The legibility floor lives in hud-legibility-audit.mjs so the cross-browser
+// matrix judges the HUD against exactly this rule and not a second copy of it.
+const AUDIT = auditLegibility;
 
 const report = { base: BASE, capturedAt: null, viewports: [], notes: [] };
 

@@ -9,6 +9,7 @@ import {
   createPass64TslSceneSystems,
 } from './pass64-tsl-scene';
 import { canonicalTslDescriptor, tslDescriptorSha256, TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
+import { SCREEN_SPACE_POST_DISABLED } from './screen-space-post-profile';
 import { OCEAN_WAVES, RUSTWORKS_OCEAN_AMPLITUDE, RUSTWORKS_OCEAN_AUTHORITY_ID } from '../water-system';
 
 describe('Pass 64 authored TSL pipeline set', () => {
@@ -323,6 +324,20 @@ describe('Pass 64 authored TSL pipeline set', () => {
       ambientOcclusion: {
         quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52, denoise: true,
       },
+      // HF-364: the screen-space stack is reported even when nothing is on, so
+      // telemetry can prove the zero state rather than inferring it from an
+      // absent field.
+      screenSpace: {
+        godrays: SCREEN_SPACE_POST_DISABLED.godrays,
+        reflections: SCREEN_SPACE_POST_DISABLED.reflections,
+        globalIllumination: SCREEN_SPACE_POST_DISABLED.globalIllumination,
+        depthOfField: SCREEN_SPACE_POST_DISABLED.depthOfField,
+        motionBlur: SCREEN_SPACE_POST_DISABLED.motionBlur,
+        upscaling: SCREEN_SPACE_POST_DISABLED.upscaling,
+      },
+      linearSourceStages: [
+        'scene-pass-linear-hdr', 'contact-occlusion-multiply', 'depth-guarded-bloom-add',
+      ],
     });
     expect((systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh).userData).toMatchObject({
       waveBands: OCEAN_WAVES.length,

@@ -20,6 +20,10 @@ export type MenuPreviewVideoDefinition = Readonly<{
 
 const ROOT = './assets/original/menu-previews';
 const CACHE_KEY = 'pass66-runtime-preview-v15';
+// HF-372: farcrysis and high-seas were captured after the Pass 66 family was
+// locked, so they carry their own cache key. Reusing v15 for new bytes is exactly
+// what the cache-family lock exists to prevent.
+const PASS77_CACHE_KEY = 'pass77-arena-preview-v1';
 const WEBM_MIME_TYPE = 'video/webm; codecs="vp9,opus"';
 const MP4_MIME_TYPE = 'video/mp4; codecs="avc1.640032,mp4a.40.2"';
 
@@ -84,24 +88,24 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     width: 2560,
     height: 1440,
   }),
-  // HF-359 (Pass 74): farcrysis revived from the Pass 69 hidden lane.
-  // The authored helicopter flyover video and poster (farcrysis.{webm,mp4,webp})
-  // have NOT yet been rendered by the deterministic offline recipe. Faking a video
-  // or copying media violates the repo contract. We declare mediaAvailable: false
-  // so the menu degrades cleanly into a deliberate labelled placeholder (cockpit HUD
-  // + PREVIEW STANDBY) without issuing three failing 404 network requests.
-  // Outstanding deliverable: render genuine farcrysis flyover via offline recipe.
+  // HF-372 (Pass 77): the outstanding deliverable HF-359 left open is now met.
+  // Both arenas were captured from their actual authoritative runtime arena by
+  // the same offline recipe the first four used, then encoded by
+  // scripts/assets/finalize-pass77-arena-menu-previews.mjs into their own
+  // additive cache family. Until this landed, both map cards showed a labelled
+  // "PREVIEW STANDBY" placeholder AND their deployment loading screen was blank,
+  // because that surface reuses this poster and this video element.
   'farcrysis': Object.freeze({
     arenaId: 'farcrysis',
     frame: 'helicopter',
     label: 'PRERECORDED HELO // FARCRYSIS',
-    motionLabel: 'AUTHORED FLYOVER PENDING OFFLINE RENDER',
-    reducedMotionLabel: 'STABILIZED PREVIEW FRAME PENDING',
+    motionLabel: 'AUTHORED ISLAND FLYOVER',
+    reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
     presentationId: 'menu-video-runtime-helo-farcrysis-v1',
-    mediaAvailable: false,
-    webm: '',
-    mp4: '',
-    poster: '',
+    mediaAvailable: true,
+    webm: `${ROOT}/farcrysis.webm?v=${PASS77_CACHE_KEY}`,
+    mp4: `${ROOT}/farcrysis.mp4?v=${PASS77_CACHE_KEY}`,
+    poster: `${ROOT}/farcrysis.webp?v=${PASS77_CACHE_KEY}`,
     durationSeconds: 8,
     width: 2560,
     height: 1440,
@@ -110,13 +114,13 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     arenaId: 'high-seas',
     frame: 'helicopter',
     label: 'PRERECORDED HELO // HIGH SEAS',
-    motionLabel: 'AUTHORED FLYOVER PENDING OFFLINE RENDER',
-    reducedMotionLabel: 'STABILIZED PREVIEW FRAME PENDING',
+    motionLabel: 'AUTHORED SHIP FLYOVER',
+    reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
     presentationId: 'menu-video-runtime-helo-high-seas-v1',
-    mediaAvailable: false,
-    webm: '',
-    mp4: '',
-    poster: '',
+    mediaAvailable: true,
+    webm: `${ROOT}/high-seas.webm?v=${PASS77_CACHE_KEY}`,
+    mp4: `${ROOT}/high-seas.mp4?v=${PASS77_CACHE_KEY}`,
+    poster: `${ROOT}/high-seas.webp?v=${PASS77_CACHE_KEY}`,
     durationSeconds: 8,
     width: 2560,
     height: 1440,

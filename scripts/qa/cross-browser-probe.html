@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      REQUIRED. The app resolves every runtime asset relatively ('./assets/...'),
+      so a page served from /scripts/qa/ would ask the dev server for
+      /scripts/qa/assets/... , get index.html back, and hand GLTFLoader HTML to
+      parse as JSON. Pinning the document base to the site root makes those
+      lookups identical to the ones index.html makes.
+    -->
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#10171b" />
+    <title>Nuke Town — cross-browser QA probe</title>
+    <!--
+      HF-331 taught the shape of this: no driver, no automation protocol. The
+      PAGE measures itself and POSTs the answer to a local receiver, because
+      Playwright's bundled Firefox hangs in launch() on this machine and stock
+      Firefox/Opera cannot be puppeteered at all. Anything that works in one
+      browser only is not a cross-browser instrument.
+
+      Why a second entry point instead of the app's own qaFpsProbe params: that
+      probe reports fps and the backend dataset attribute and nothing else. The
+      cross-browser row needs adapter identity, the software-fallback verdict,
+      console errors and the HUD legibility audit as well, and those live behind
+      __ATOMIC_ACRES_DEBUG__ and the DOM - reachable only from inside the page.
+      This file is the game's own bootstrap plus that extra instrumentation; it
+      loads /src/bootstrap.ts exactly as index.html does, so it measures the
+      real product and not a stub.
+
+      Served by the dev server from scripts/qa/, therefore SAME ORIGIN as the
+      app - which is the whole reason it can read the debug hook at all.
+    -->
+    <script>
+      // Classic script, deliberately first: deferred module scripts (including
+      // the app's own bootstrap) all run after this, so this is the only place
+      // from which bootstrap-time console errors are observable.
+      (function () {
+        var captured = [];
+        window.__XB_ERRORS__ = captured;
+        var record = function (text) {
+          if (captured.length >= 40) return;
+          captured.push(String(text).slice(0, 220));
+        };
+        var originalError = console.error;
+        console.error = function () {
+          try { record(Array.prototype.map.call(arguments, String).join(' ')); } catch (ignored) { /* never break the app */ }
+          return originalError.apply(console, arguments);
+        };
+        window.addEventListener('error', function (event) {
+          record('window.error: ' + String((event && event.message) || event));
+        });
+        window.addEventListener('unhandledrejection', function (event) {
+          record('unhandledrejection: ' + String((event && event.reason) || 'unknown'));
+        });
+      }());
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/bootstrap.ts"></script>
+    <script type="module">
+      import { auditLegibility } from '/scripts/qa/hud-legibility-audit.mjs';
+
+      const params = new URLSearchParams(window.location.search);
+      const endpoint = params.get('xbEndpoint');
+      const arena = params.get('xbArena') || 'atomic-acres';
+      const lane = params.get('xbLane') || 'unknown';
+      const sampleMs = Math.min(60_000, Math.max(3_000, Number(params.get('xbSampleMs') ?? 12_000)));
+      const settleMs = Math.max(0, Number(params.get('xbSettleMs') ?? 5_000));
+      const stageTimeoutMs = Math.max(30_000, Number(params.get('xbStageTimeoutMs') ?? 180_000));
+
+      // Same rule the app's own probe enforces: the measurement never leaves
+      // this machine, and an absent endpoint means this page was opened by a
+      // human, so it must stay an ordinary playable build.
+      if (endpoint && /^http:\/\/127\.0\.0\.1(?::\d+)?\//.test(endpoint)) {
+        const post = (payload) => {
+          const body = JSON.stringify({ lane, ...payload });
+          try {
+            // text/plain keeps this a CORS "simple request" - no preflight, so
+            // the POST lands even though the response is opaque.
+            void fetch(endpoint, {
+              method: 'POST',
+              headers: { 'content-type': 'text/plain' },
+              body,
+              keepalive: true,
+              mode: 'no-cors',
+            });
+          } catch (ignored) {
+            // Some engines refuse keepalive on large bodies; a beacon still gets
+            // the verdict home, and losing it would read as a browser wedge.
+            try { navigator.sendBeacon?.(endpoint, body); } catch (alsoIgnored) { /* receiver gone */ }
+          }
+        };
+
+        const waitFor = (condition, timeoutMs) => new Promise((settle) => {
+          const startedAt = performance.now();
+          const tick = () => {
+            let met = false;
+            try { met = Boolean(condition()); } catch (ignored) { met = false; }
+            if (met) { settle(true); return; }
+            if (performance.now() - startedAt > timeoutMs) { settle(false); return; }
+            window.setTimeout(tick, 250);
+          };
+          tick();
+        });
+
+        const debug = () => window.__ATOMIC_ACRES_DEBUG__;
+        const snapshot = () => { try { return debug()?.snapshot() ?? null; } catch (ignored) { return null; } };
+        const errors = () => [...new Set(window.__XB_ERRORS__ ?? [])].slice(0, 12);
+        const dataset = (key) => document.documentElement.dataset[key] ?? null;
+
+        // Adapter identity read straight from the context, not from the app's
+        // telemetry: on a browser where the renderer failed to initialise the
+        // app has nothing to report, and "which GPU was this" is exactly the
+        // question that still needs an answer there.
+        const contextAdapter = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl');
+            if (!gl) return { available: false };
+            const unmasked = gl.getExtension('WEBGL_debug_renderer_info');
+            const identity = {
+              available: true,
+              version: String(gl.getParameter(gl.VERSION)),
+              renderer: String(gl.getParameter(gl.RENDERER)),
+              vendor: String(gl.getParameter(gl.VENDOR)),
+              unmaskedRenderer: unmasked ? String(gl.getParameter(unmasked.UNMASKED_RENDERER_WEBGL)) : null,
+              unmaskedVendor: unmasked ? String(gl.getParameter(unmasked.UNMASKED_VENDOR_WEBGL)) : null,
+            };
+            gl.getExtension('WEBGL_lose_context')?.loseContext();
+            return identity;
+          } catch (error) {
+            return { available: false, error: String(error).slice(0, 160) };
+          }
+        };
+
+        void (async () => {
+          try {
+            post({ stage: 'armed', userAgent: navigator.userAgent });
+            const heartbeat = window.setInterval(() => post({
+              stage: 'heartbeat',
+              backend: dataset('renderBackend'),
+              webglContext: dataset('webglContext'),
+              // The renderer refuses to author frames without foreground
+              // ownership, so a stalled prewarm is usually a focus question.
+              hasFocus: typeof document.hasFocus === 'function' ? document.hasFocus() : null,
+              visibility: document.visibilityState,
+              status: (document.getElementById('network-status')?.textContent ?? '').slice(0, 90),
+              errors: errors(),
+            }), 10_000);
+            try {
+              if (!await waitFor(() => Boolean(debug()), stageTimeoutMs)) {
+                post({ error: 'bootstrap-timeout', errors: errors(), backend: dataset('renderBackend') });
+                return;
+              }
+              post({ stage: 'debug-ready' });
+              await debug().selectArena(arena);
+              // selectArena resolving is NOT the arena being committed: on the
+              // WebGPU route the scene is still building, and starting the match
+              // in that gap makes the app refuse with "Selected arena ... did not
+              // commit before match start". Wait for the selection the app itself
+              // reports, and for the weapon view, before asking it to deploy.
+              const committed = await waitFor(() => {
+                const state = snapshot();
+                return state?.arenaSelection?.id === arena && state?.weaponReady === true;
+              }, stageTimeoutMs);
+              post({ stage: 'arena-selected', committed });
+
+              let active = false;
+              // A refused deployment is recoverable - the app returns to the menu
+              // and can be asked again - so retry a bounded number of times rather
+              // than reporting a race as a browser failure.
+              for (let attempt = 0; attempt < 3 && !active; attempt += 1) {
+                debug().startSolo();
+                active = await waitFor(() => {
+                  const state = snapshot();
+                  return state?.gameStarted === true && state?.matchPhase === 'active';
+                }, Math.min(stageTimeoutMs, 60_000));
+                if (!active) post({ stage: `deploy-retry-${attempt + 1}`, status: (document.getElementById('network-status')?.textContent ?? '').slice(0, 120) });
+              }
+              if (!active) {
+                post({
+                  error: 'match-start-timeout',
+                  errors: errors(),
+                  backend: dataset('renderBackend'),
+                  matchPhase: snapshot()?.matchPhase ?? null,
+                  status: (document.getElementById('network-status')?.textContent ?? '').slice(0, 200),
+                });
+                return;
+              }
+              post({ stage: 'match-active' });
+            } finally {
+              window.clearInterval(heartbeat);
+            }
+
+            // Steady state is the number worth reporting: let streaming and
+            // first-use shader compilation drain before the first sample.
+            await new Promise((settle) => window.setTimeout(settle, settleMs));
+
+            const deltas = [];
+            await new Promise((doneSampling) => {
+              const startedAt = performance.now();
+              let previous = startedAt;
+              const frame = () => {
+                const now = performance.now();
+                deltas.push(now - previous);
+                previous = now;
+                if (now - startedAt >= sampleMs) { doneSampling(); return; }
+                requestAnimationFrame(frame);
+              };
+              requestAnimationFrame(frame);
+            });
+            deltas.sort((left, right) => left - right);
+            const at = (fraction) => deltas[Math.min(deltas.length - 1, Math.floor(deltas.length * fraction))] ?? 0;
+            const fps = (delta) => Number((1_000 / Math.max(0.001, delta)).toFixed(1));
+
+            const state = snapshot();
+            const runtime = state?.render?.runtime ?? null;
+            post({
+              stage: null,
+              done: true,
+              userAgent: navigator.userAgent,
+              arena,
+              sampleMs,
+              frames: deltas.length,
+              medianFps: fps(at(0.5)),
+              p90WorstFps: fps(at(0.9)),
+              p99WorstFps: fps(at(0.99)),
+              backendDataset: dataset('renderBackend'),
+              atomicSignalRenderer: dataset('atomicSignalRenderer'),
+              webglContext: dataset('webglContext'),
+              webgpuAvailable: Boolean(navigator.gpu),
+              runtime: runtime ? {
+                requestedBackend: runtime.requestedBackend ?? null,
+                actualBackend: runtime.actualBackend ?? null,
+                initialized: runtime.initialized ?? null,
+                failClosed: runtime.failClosed ?? null,
+                adapterLabel: runtime.adapterLabel ?? null,
+                adapterClass: runtime.adapterClass ?? null,
+                deviceClass: runtime.deviceClass ?? null,
+                softwareAdapter: runtime.softwareAdapter ?? null,
+                deviceLost: runtime.deviceLost ?? null,
+                uncapturedErrors: runtime.uncapturedErrors ?? null,
+              } : null,
+              context: contextAdapter(),
+              hudAudit: (() => { try { return auditLegibility(); } catch (error) { return { error: String(error).slice(0, 160) }; } })(),
+              viewport: {
+                innerWidth: window.innerWidth,
+                innerHeight: window.innerHeight,
+                devicePixelRatio: window.devicePixelRatio,
+                maxTouchPoints: navigator.maxTouchPoints ?? 0,
+                coarsePointer: Boolean(window.matchMedia?.('(pointer: coarse)')?.matches),
+              },
+              matchPhase: state?.matchPhase ?? null,
+              gameStarted: state?.gameStarted ?? null,
+              consoleErrors: errors(),
+            });
+          } catch (error) {
+            post({ error: `probe-threw: ${String(error).slice(0, 200)}`, errors: errors() });
+          }
+        })();
+      }
+    </script>
+  </body>
+</html>

@@ -151,3 +151,120 @@ export const OPERATOR_SKIN_SOURCES = freezeSourceDefinitions([
 export type Pass74OperatorSkinId = typeof OPERATOR_SKIN_SOURCES[number]['id'];
 
 export const OPERATOR_SKIN_CATALOG = createOperatorSkinCatalog(OPERATOR_SKIN_SOURCES);
+
+/**
+ * HF-366 (2026-08-23 HITL): "i picked a skin but they all looked greyed out i
+ * have no idea what i look like ... and the arms should look diff too?"
+ *
+ * The skin GLBs each carry their own Swat / Swat_Black / Visor / Skin PBR set,
+ * but those atlases are UV-mapped for the FULL BODY. The first-person arms are
+ * one shared delivery with its own arm-only atlas, so sampling a body atlas
+ * through arm UVs would land on the wrong regions. The palette below is
+ * therefore the arms' (and the menu's) view of each skin's material set: a
+ * per-role multiply tint plus the surface response that actually distinguishes
+ * canvas from chitin from wet neoprene. Tints are authored light on purpose -
+ * they MULTIPLY the authored arm base-colour map, so the licensed albedo,
+ * normal and ORM detail stays the dominant signal and only the hue changes.
+ *
+ * The `card` half is the same identity expressed as 2D menu art. One palette
+ * drives both, so the portrait a player picks in the menu is the colour their
+ * own arms take in first person - which is the whole of what the owner asked
+ * for.
+ */
+export type OperatorSkinArmPalette = Readonly<{
+  /** Multiply tints for the four authored first-person arm material roles. */
+  sleeve: number;
+  glove: number;
+  fingerGlove: number;
+  accent: number;
+  sleeveRoughness: number;
+  gloveRoughness: number;
+  accentMetalness: number;
+  /** Low, bounded accent glow so the wrist band reads in dark arenas. */
+  accentEmissive: number;
+}>;
+
+export type OperatorSkinCardPalette = Readonly<{
+  backdropTop: number;
+  backdropBottom: number;
+  torso: number;
+  webbing: number;
+  trim: number;
+  visor: number;
+  skin: number;
+  ink: number;
+  /** One-word material read shown on the card, e.g. CANVAS or CHITIN. */
+  materialLabel: string;
+}>;
+
+export type OperatorSkinPalette = Readonly<{
+  id: string;
+  arm: OperatorSkinArmPalette;
+  card: OperatorSkinCardPalette;
+}>;
+
+const PALETTES: Readonly<Record<Pass74OperatorSkinId, OperatorSkinPalette>> = Object.freeze({
+  default: Object.freeze({
+    id: 'default',
+    arm: Object.freeze({
+      sleeve: 0x9fc6cc, glove: 0x8fa3a9, fingerGlove: 0x9aaeb4, accent: 0x7fe6ee,
+      sleeveRoughness: 0.86, gloveRoughness: 0.72, accentMetalness: 0.22, accentEmissive: 0x0d3a3f,
+    }),
+    card: Object.freeze({
+      backdropTop: 0x1d3a40, backdropBottom: 0x0c1e23, torso: 0x2f5a60, webbing: 0x16282d,
+      trim: 0x12a7b1, visor: 0x3fd3dd, skin: 0xc59a76, ink: 0xdff3f4, materialLabel: 'ISSUE WEAVE',
+    }),
+  }),
+  explorer: Object.freeze({
+    id: 'explorer',
+    arm: Object.freeze({
+      sleeve: 0xe8c48f, glove: 0xc79a6b, fingerGlove: 0xd2a97c, accent: 0xffc46a,
+      sleeveRoughness: 0.95, gloveRoughness: 0.8, accentMetalness: 0.06, accentEmissive: 0x3a2408,
+    }),
+    card: Object.freeze({
+      backdropTop: 0x3d2f1c, backdropBottom: 0x17110a, torso: 0xb08a52, webbing: 0x55381f,
+      trim: 0xf0a63c, visor: 0xffd48a, skin: 0xc08a5e, ink: 0xfaeed8, materialLabel: 'CANVAS',
+    }),
+  }),
+  symbiote: Object.freeze({
+    id: 'symbiote',
+    arm: Object.freeze({
+      sleeve: 0xbda9cc, glove: 0x9d8fae, fingerGlove: 0xa897b8, accent: 0xcf9bff,
+      sleeveRoughness: 0.62, gloveRoughness: 0.48, accentMetalness: 0.34, accentEmissive: 0x2c123f,
+    }),
+    card: Object.freeze({
+      backdropTop: 0x2c1c3b, backdropBottom: 0x110a17, torso: 0x5a4f63, webbing: 0x241d2c,
+      trim: 0x9d5ce0, visor: 0xd2a6ff, skin: 0xb08f7e, ink: 0xf0e2ff, materialLabel: 'CHITIN',
+    }),
+  }),
+  navalops: Object.freeze({
+    id: 'navalops',
+    arm: Object.freeze({
+      sleeve: 0x93b6d8, glove: 0x8496a8, fingerGlove: 0x8ea3b5, accent: 0x8fc8f5,
+      sleeveRoughness: 0.74, gloveRoughness: 0.58, accentMetalness: 0.28, accentEmissive: 0x0d2740,
+    }),
+    card: Object.freeze({
+      backdropTop: 0x16293c, backdropBottom: 0x070d14, torso: 0x24405e, webbing: 0x10171f,
+      trim: 0x4f9bd8, visor: 0x9fd4ff, skin: 0xb98d6c, ink: 0xdcecfa, materialLabel: 'WET SHELL',
+    }),
+  }),
+});
+
+// A skin with no palette would silently fall back to the standard operator and
+// reproduce exactly the "they all looked greyed out" failure this row exists to
+// fix, so an unpainted selectable skin is a load-time error, not a runtime
+// surprise.
+for (const definition of OPERATOR_SKIN_CATALOG.definitions) {
+  if (definition.availability !== 'selectable') continue;
+  if (!Object.hasOwn(PALETTES, definition.id)) {
+    throw new Error(`selectable operator skin ${definition.id} has no palette; the menu and first-person arms cannot show it`);
+  }
+}
+
+export const OPERATOR_SKIN_PALETTES = PALETTES;
+
+/** Unknown/retired ids resolve to the standard operator rather than throwing:
+ * a stale peer selection must never leave a player with untinted arms. */
+export function operatorSkinPalette(id: string): OperatorSkinPalette {
+  return PALETTES[id as Pass74OperatorSkinId] ?? PALETTES.default;
+}

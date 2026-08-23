@@ -16,6 +16,7 @@ import {
   color,
   dot,
   float,
+  metalness,
   nodeObject,
   instanceIndex,
   mix,
@@ -26,6 +27,7 @@ import {
   output,
   positionLocal,
   positionWorld,
+  roughness,
   screenUV,
   screenSize,
   sin,
@@ -34,6 +36,7 @@ import {
   vec2,
   vec3,
   vec4,
+  velocity,
 } from 'three/tsl';
 import type { ArenaReviewCamera, ArenaVisualDefinition } from './arena-visual-definition';
 import { createGrassPlacements } from '../grass-placement';
@@ -49,6 +52,22 @@ import {
   applyArenaEnvironmentIbl,
   type ArenaIblState,
 } from './arena-environment-ibl';
+// HF-364: the screen-space raymarched stack (volumetric shafts, SSR, SSGI,
+// depth of field, motion blur). The tier tables and the combat-safety proofs
+// live in screen-space-post-profile.ts; the node graph lives in
+// screen-space-post.ts. Nothing here is ray tracing - WebGPU exposes no
+// ray-tracing pipeline in any browser - and the labels say so.
+import {
+  buildScreenSpacePostGraph,
+  packedMaterialMrtNode,
+  screenSpaceMrtRequirement,
+  screenSpacePostStages,
+  type ScreenSpacePostGraph,
+} from './screen-space-post';
+import {
+  adaptScreenSpacePostForPressure,
+  SCREEN_SPACE_POST_DISABLED,
+} from './screen-space-post-profile';
 
 export type Pass65TslGraphicsOptions = Readonly<{
   principalSamples: 1 | 2 | 4;
@@ -59,6 +78,7 @@ export type Pass65TslGraphicsOptions = Readonly<{
   reflectionScale: number;
   reflectionQuality: 'off' | 'low' | 'high' | 'ultra';
   environmentIntensity: number;
+  screenSpace?: GraphicsRuntime['screenSpace'];
 }>;
 
 const DEFAULT_TSL_GRAPHICS_OPTIONS: Pass65TslGraphicsOptions = Object.freeze({
@@ -78,7 +98,34 @@ const DEFAULT_TSL_GRAPHICS_OPTIONS: Pass65TslGraphicsOptions = Object.freeze({
   reflectionScale: 1,
   reflectionQuality: 'high',
   environmentIntensity: 1,
+  screenSpace: SCREEN_SPACE_POST_DISABLED,
 });
+
+/**
+ * The linear-side stage receipt this assembler will build for one set of
+ * options, without building a single node.
+ *
+ * The filmic grade chain's order contract covers the whole list — scene pass,
+ * the optional screen-space stages, occlusion, bloom, then the display half —
+ * so the chain has to be told which optional linear stages exist BEFORE the
+ * assembler publishes an outputNode. Otherwise the first published receipt
+ * would describe a graph that is not the one on screen.
+ */
+export function pass64LinearSourceStages(
+  graphics: Pass65TslGraphicsOptions = DEFAULT_TSL_GRAPHICS_OPTIONS,
+): readonly string[] {
+  const screenSpace = graphics.screenSpace ?? SCREEN_SPACE_POST_DISABLED;
+  const optional = screenSpacePostStages(screenSpace);
+  const stages = ['scene-pass-linear-hdr'];
+  if (optional.includes('motion-blur-velocity-smear')) stages.push('motion-blur-velocity-smear');
+  if (optional.includes('ssgi-screen-space-bounce-add')) stages.push('ssgi-screen-space-bounce-add');
+  stages.push('contact-occlusion-multiply');
+  if (optional.includes('ssr-screen-space-reflection-add')) stages.push('ssr-screen-space-reflection-add');
+  stages.push('depth-guarded-bloom-add');
+  if (optional.includes('godrays-volumetric-shaft-add')) stages.push('godrays-volumetric-shaft-add');
+  if (optional.includes('depth-of-field-bokeh')) stages.push('depth-of-field-bokeh');
+  return Object.freeze(stages);
+}
 
 export type RuntimeTslTraversal = Readonly<{
   legacyShaderMaterials: readonly string[];
@@ -102,6 +149,23 @@ export type Pass64TslSceneSystems = Readonly<{
     radius: number;
     strength: number;
   }>;
+  /**
+   * HF-364 — the screen-space stack that is actually built into this graph.
+   * Reported rather than requested: a tier the capability gate refused (shafts
+   * without shadows) resolves to disabled here, so telemetry cannot claim it.
+   */
+  screenSpace: GraphicsRuntime['screenSpace'];
+  /**
+   * Linear-side stage receipt for the filmic grade chain's order contract,
+   * including the optional screen-space stages this graph built.
+   */
+  linearSourceStages: readonly string[];
+  /**
+   * Adaptive-quality pressure valve. Live uniforms and march resolutions only:
+   * removing a pass entirely is a topology change and stays on the declared
+   * pipeline-rebuild path.
+   */
+  setAdaptiveScreenSpaceBudget(pixelRatioCap: number, requestedPixelRatioCap: number): void;
   compiledPipelineIds: readonly string[];
   /**
    * Asynchronously compiles visible descendants against the exact principal
@@ -750,20 +814,56 @@ function configureHdrPipeline(
   camera: THREE.Camera,
   definition: ArenaVisualDefinition,
   graphics: Pass65TslGraphicsOptions,
+  volumetricLight: THREE.DirectionalLight | THREE.PointLight | null = null,
 ): Readonly<{
   scenePass: ReturnType<typeof pass>;
+  screenSpace: ScreenSpacePostGraph;
+  linearSourceStages: readonly string[];
   applyDefinition(next: ArenaVisualDefinition): void;
   applyGraphics(next: Pass65TslGraphicsOptions): void;
+  beforeRender(): void;
   dispose(): void;
 }> {
   let activeDefinition = definition;
   let activeGraphics = graphics;
+  const screenSpaceRuntime = graphics.screenSpace ?? SCREEN_SPACE_POST_DISABLED;
   const scenePass = pass(scene, camera, { samples: graphics.principalSamples });
-  if (graphics.ambientOcclusion.enabled) scenePass.setMRT(mrt({ output, normal: normalView }));
+  // FSR 1 is a real spatial upscale, so the scene has to actually be rendered
+  // below the drawing buffer for it to buy anything; EASU then reconstructs
+  // back up in the display chain. This is the whole difference from render
+  // scale, which shrinks the drawing buffer itself and hands the upsample to
+  // the browser's bilinear blit.
+  if (screenSpaceRuntime.upscaling.enabled) {
+    scenePass.setResolutionScale(screenSpaceRuntime.upscaling.sceneResolutionScale);
+  }
+  // One MRT declaration for every consumer. An attachment nobody reads is pure
+  // per-fragment bandwidth, so each one is gated on a feature that is actually
+  // on: normals for GTAO/SSR/SSGI, a packed metalness+roughness pair for SSR's
+  // GGX sampling, and NDC motion vectors for the blur.
+  const screenSpaceMrt = screenSpaceMrtRequirement(screenSpaceRuntime);
+  const wantsNormal = graphics.ambientOcclusion.enabled || screenSpaceMrt.normal;
+  if (wantsNormal || screenSpaceMrt.material || screenSpaceMrt.velocity) {
+    scenePass.setMRT(mrt({
+      output,
+      ...(wantsNormal ? { normal: normalView } : {}),
+      ...(screenSpaceMrt.material ? { material: packedMaterialMrtNode(metalness, roughness) } : {}),
+      ...(screenSpaceMrt.velocity ? { velocity } : {}),
+    }));
+  }
   const sceneColor = scenePass.getTextureNode('output');
   const sceneDepth = scenePass.getTextureNode('depth');
-  const sceneNormal = graphics.ambientOcclusion.enabled ? scenePass.getTextureNode('normal') : null;
-  const gtaoPass = sceneNormal ? ao(sceneDepth, sceneNormal, camera) : null;
+  const sceneNormal = wantsNormal ? scenePass.getTextureNode('normal') : null;
+  const screenSpace = buildScreenSpacePostGraph({
+    sceneColor,
+    sceneDepth,
+    sceneViewZ: scenePass.getViewZNode(),
+    sceneNormal: screenSpaceMrt.normal ? sceneNormal : null,
+    sceneMaterial: screenSpaceMrt.material ? scenePass.getTextureNode('material') : null,
+    sceneVelocity: screenSpaceMrt.velocity ? scenePass.getTextureNode('velocity') : null,
+    camera,
+    volumetricLight,
+  }, screenSpaceRuntime);
+  const gtaoPass = graphics.ambientOcclusion.enabled && sceneNormal ? ao(sceneDepth, sceneNormal, camera) : null;
   if (gtaoPass) {
     gtaoPass.resolutionScale = graphics.ambientOcclusion.resolutionScale;
     gtaoPass.samples.value = graphics.ambientOcclusion.samples;
@@ -797,8 +897,12 @@ function configureHdrPipeline(
   // is retained as a separate deliberate stage.
   const grain = uniform(definition.colorPipeline.grain.strength / 255 * graphics.post.filmGrainScale);
   const contactOcclusionStrength = uniform(graphics.ambientOcclusion.enabled ? graphics.ambientOcclusion.strength : 0);
-  const luma = dot(sceneColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-  const saturated = mix(vec3(luma), sceneColor.rgb, saturation);
+  // Everything downstream reads the screen-space graph's scene colour, which is
+  // the motion-blurred image when that stage is built and the raw scene pass
+  // otherwise. Reading `sceneColor` directly here would silently drop the blur.
+  const gradedSource = nodeObject(screenSpace.sceneColor);
+  const luma = dot(gradedSource.rgb, vec3(0.2126, 0.7152, 0.0722));
+  const saturated = mix(vec3(luma), gradedSource.rgb, saturation);
   const contrasted = saturated.sub(0.5).mul(contrast).add(0.5);
   const pixel = vec2(1).div(screenSize);
   const depthRight = sceneDepth.sample(screenUV.add(vec2(pixel.x, 0)));
@@ -812,16 +916,41 @@ function configureHdrPipeline(
   const contactOcclusion = occlusionSample
       ? mix(float(1), occlusionSample, contactOcclusionStrength)
       : float(1);
+    // HF-364 linear composite order, matching LINEAR_SOURCE_STAGE_ORDER:
+    //   [motion blur] -> [+SSGI bounce] -> *contact occlusion
+    //   -> +bloom -> [+godray shafts] -> [depth of field]
+    // GI is added BEFORE the occlusion multiply so GTAO darkens bounced light
+    // exactly as it darkens direct light; reflections and shafts are added
+    // after it because a reflection is not occluded by the surface reflecting
+    // it, and a shaft is volume in front of the surface, not on it.
+    const withBounce = screenSpace.bounceLight ? contrasted.add(screenSpace.bounceLight) : contrasted;
+    const occluded = withBounce.mul(contactOcclusion);
+    const withReflections = screenSpace.reflectionLight
+      ? occluded.add(screenSpace.reflectionLight)
+      : occluded;
     // Pass 76: the linear-side vignette stage was retired. The display-side
     // 'display-vignette-falloff' stage in the filmic grade chain is the ONE
     // vignette owner (legacy-main drives setDisplayVignetteStrength); running
     // both stacked two falloffs on exactly the screen periphery enemies enter
     // from, while this one held the setting and the display one idled at zero.
-    const hdrWithBloom = contrasted.mul(contactOcclusion).add(emissiveBloom.rgb.mul(depthEdgeGuard));
-    renderPipeline.outputNode = vec4(hdrWithBloom, sceneColor.a);
+    const hdrWithBloom = withReflections.add(emissiveBloom.rgb.mul(depthEdgeGuard));
+    // Shafts reuse the bloom path's depth-discontinuity guard rather than the
+    // upstream depthAwareBlend helper: that helper mixes toward a flat colour,
+    // which at shaft strength replaces a silhouette with solid light. Adding a
+    // guarded, gain-capped shaft can brighten a pixel but can never delete one.
+    const hdrWithShafts = screenSpace.shaftLight
+      ? hdrWithBloom.add(screenSpace.shaftLight.mul(depthEdgeGuard))
+      : hdrWithBloom;
+    const linearHdr = screenSpace.applyDepthOfField(
+      vec4(hdrWithShafts, gradedSource.a) as unknown as Node<'vec4'>,
+    );
+    const linearSourceStages = pass64LinearSourceStages(graphics);
+    renderPipeline.outputNode = linearHdr;
     renderPipeline.needsUpdate = true;
     return {
       scenePass,
+      screenSpace,
+      linearSourceStages,
       applyDefinition(next) {
         activeDefinition = next;
         saturation.value = next.colorPipeline.grade.saturation;
@@ -840,8 +969,13 @@ function configureHdrPipeline(
             gtaoPass.samples.value = next.ambientOcclusion.samples;
             gtaoPass.radius.value = next.ambientOcclusion.radius;
           }
+          screenSpace.applyRuntime(next.screenSpace ?? SCREEN_SPACE_POST_DISABLED);
+        },
+        beforeRender() {
+          screenSpace.beforeRender();
         },
         dispose() {
+          screenSpace.dispose();
           gtaoDenoise?.dispose();
           gtaoPass?.dispose();
         },
@@ -869,6 +1003,15 @@ function disposeRoot(root: THREE.Group): void {
   root.clear();
 }
 
+/**
+ * Reports a screen-space effect as enabled only when it exists in the built
+ * graph AND the live settings still ask for it. Publishing the request alone
+ * would let telemetry claim a pass that was never allocated.
+ */
+function screenSpaceTelemetry<T extends { enabled: boolean }>(constructed: T, live: T): Readonly<T> {
+  return Object.freeze({ ...live, enabled: constructed.enabled && live.enabled });
+}
+
 export function createPass64TslSceneSystems(
   scene: THREE.Scene,
   camera: THREE.Camera,
@@ -876,6 +1019,10 @@ export function createPass64TslSceneSystems(
   definition: ArenaVisualDefinition,
   graphics: Pass65TslGraphicsOptions = DEFAULT_TSL_GRAPHICS_OPTIONS,
   renderer?: WebGPURenderer,
+  // HF-364: the shadow-casting light the volumetric shafts raymarch. Passed in
+  // rather than discovered by traversal because the caller owns the arena's
+  // sun and its shadow camera, and the upstream node references both directly.
+  volumetricLight: THREE.DirectionalLight | THREE.PointLight | null = null,
 ): Pass64TslSceneSystems {
   let activeDefinition = definition;
   let activeGraphics = graphics;
@@ -906,8 +1053,16 @@ export function createPass64TslSceneSystems(
     makeWater(definition.id, graphics.oceanWaveAmplitude),
   );
   scene.add(root);
-  const hdr = configureHdrPipeline(renderPipeline, scene, camera, definition, graphics);
+  const hdr = configureHdrPipeline(renderPipeline, scene, camera, definition, graphics, volumetricLight);
   const scenePass = hdr.scenePass;
+  const constructedScreenSpace = graphics.screenSpace ?? SCREEN_SPACE_POST_DISABLED;
+  // The requested screen-space runtime and the one after adaptive pressure are
+  // deliberately separate: a downshift must not be mistaken for the player's
+  // choice, so a later settings apply re-derives from the request, not from
+  // whatever the pressure valve last wrote.
+  let requestedScreenSpace = constructedScreenSpace;
+  let adaptedScreenSpace = constructedScreenSpace;
+  const liveScreenSpace = (): GraphicsRuntime['screenSpace'] => adaptedScreenSpace;
   applyArenaSystemLayout(root, definition, definition.reviewCameras[0]?.seed ?? 6401, graphics);
   const publishActualGraphics = (): void => {
     const mist = root.getObjectByName('Pass 64 TSL mist');
@@ -937,6 +1092,21 @@ export function createPass64TslSceneSystems(
         // actual topology, not merely the requested tier.
         denoise: graphics.ambientOcclusion.denoise && activeGraphics.ambientOcclusion.denoise,
       }),
+      // Same rule as AO: a screen-space pass that was not built at construction
+      // cannot be turned on live, so telemetry reports the intersection of the
+      // constructed topology and the live request rather than the request.
+      screenSpace: Object.freeze({
+        godrays: screenSpaceTelemetry(constructedScreenSpace.godrays, liveScreenSpace().godrays),
+        reflections: screenSpaceTelemetry(constructedScreenSpace.reflections, liveScreenSpace().reflections),
+        globalIllumination: screenSpaceTelemetry(
+          constructedScreenSpace.globalIllumination,
+          liveScreenSpace().globalIllumination,
+        ),
+        depthOfField: screenSpaceTelemetry(constructedScreenSpace.depthOfField, liveScreenSpace().depthOfField),
+        motionBlur: screenSpaceTelemetry(constructedScreenSpace.motionBlur, liveScreenSpace().motionBlur),
+        upscaling: Object.freeze({ ...constructedScreenSpace.upscaling }),
+      }),
+      linearSourceStages: hdr.linearSourceStages,
     };
   };
   publishActualGraphics();
@@ -953,6 +1123,16 @@ export function createPass64TslSceneSystems(
       graphId: 'pass65.webgpu-gtao-depth.v1',
       ...graphics.ambientOcclusion,
     }),
+    screenSpace: constructedScreenSpace,
+    linearSourceStages: hdr.linearSourceStages,
+    setAdaptiveScreenSpaceBudget: (pixelRatioCap, requestedPixelRatioCap) => {
+      adaptedScreenSpace = adaptScreenSpacePostForPressure(requestedScreenSpace, {
+        pixelRatioCap,
+        requestedPixelRatioCap,
+      });
+      hdr.applyGraphics({ ...activeGraphics, screenSpace: adaptedScreenSpace });
+      publishActualGraphics();
+    },
     compiledPipelineIds,
     precompileExactScenePass: async (precompileRoot) => {
       let attachmentRoot = precompileRoot;
@@ -1001,6 +1181,8 @@ export function createPass64TslSceneSystems(
     },
     applyGraphics: async (nextGraphics) => {
       activeGraphics = nextGraphics;
+      requestedScreenSpace = nextGraphics.screenSpace ?? SCREEN_SPACE_POST_DISABLED;
+      adaptedScreenSpace = requestedScreenSpace;
       applyArenaSystemLayout(root, activeDefinition, activeDefinition.reviewCameras[0]?.seed ?? 6401, activeGraphics);
       hdr.applyGraphics(activeGraphics);
       
@@ -1032,6 +1214,10 @@ export function createPass64TslSceneSystems(
     },
     update: (timeMs) => {
       setAnimationTime(root, activeReviewCamera?.fixedTimeMs ?? timeMs);
+      // The shaft tint tracks the live sun colour, so it has to be refreshed on
+      // the same cadence as the rest of the presentation rather than only when
+      // a setting changes.
+      hdr.beforeRender();
     },
     dispose: () => {
       // Dispose IBL environment map resources

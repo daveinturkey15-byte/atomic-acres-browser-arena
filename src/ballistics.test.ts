@@ -8,6 +8,8 @@ import {
   penetrationEnergyRetention,
   traceBallisticPath,
   applyObstructionSpreadPenalty,
+  applyPenetrationDamage,
+  weaponPenetrationEnergy,
   type BallisticMaterialId,
   type WeaponPenetrationProfile,
 } from './ballistics';
@@ -180,6 +182,91 @@ describe('shared wall-penetration authority', () => {
       expect(arena.raycastMeshes.every((mesh) => (
         typeof mesh.userData.ballisticSurfaceId === 'string' || dynamicTargetMeshes.includes(mesh)
       ))).toBe(true);
+    }
+  });
+});
+
+describe('HF-368 per-weapon wall-penetration multiplier', () => {
+  /** The owner's tune must ride on the weapon, never on the shared material table. */
+  const preHf368 = (profile: typeof WEAPONS['m14-ebr']['penetration']) => ({
+    ...profile,
+    wallPenetrationMultiplier: 1,
+  });
+
+  it('gives the M14 EBR exactly 1.5 and leaves every other weapon on the 1.0 default', () => {
+    expect(WEAPONS['m14-ebr'].penetration.wallPenetrationMultiplier).toBe(1.5);
+    for (const weapon of Object.values(WEAPONS)) {
+      if (weapon.id === 'm14-ebr') continue;
+      expect(weapon.penetration.wallPenetrationMultiplier, weapon.id).toBe(1);
+    }
+  });
+
+  it('scales only the energy budget, and defaults an unauthored profile to 1', () => {
+    const ebr = WEAPONS['m14-ebr'].penetration;
+    expect(weaponPenetrationEnergy(ebr)).toBeCloseTo(0.55 * 1.16 * 1.5, 10);
+    expect(weaponPenetrationEnergy(preHf368(ebr))).toBeCloseTo(0.55 * 1.16, 10);
+    const { wallPenetrationMultiplier: _omitted, ...unauthored } = ebr;
+    expect(weaponPenetrationEnergy(unauthored)).toBeCloseTo(0.55 * 1.16, 10);
+  });
+
+  it('leaves every other weapon bit-identical through the same cover', () => {
+    const cover = [
+      surface('interior-wall', 5, 0.42, 'shared-wall'),
+      surface('glass', 9, 0.08, 'shared-pane'),
+    ];
+    for (const weapon of Object.values(WEAPONS)) {
+      if (weapon.id === 'm14-ebr') continue;
+      const shipped = traceBallisticPath(origin, direction, 20, weapon.penetration, cover);
+      const before = traceBallisticPath(origin, direction, 20, preHf368(weapon.penetration), cover);
+      expect(shipped.reachedDistance, weapon.id).toBe(before.reachedDistance);
+      expect(shipped.damageMultiplier, weapon.id).toBe(before.damageMultiplier);
+      expect(shipped.remainingEnergy, weapon.id).toBe(before.remainingEnergy);
+    }
+  });
+
+  it('turns a 0.25 m interior wall from a hard stop into reduced damage', () => {
+    const wall = [surface('interior-wall', 5, 0.25, 'representative-wall')];
+    const before = traceBallisticPath(origin, direction, 20, preHf368(WEAPONS['m14-ebr'].penetration), wall);
+    const after = traceBallisticPath(origin, direction, 20, WEAPONS['m14-ebr'].penetration, wall);
+    // Pass 64 budget 0.638 could not pay the 0.6825 traversal toll at all.
+    expect(before.reachedDistance).toBe(false);
+    expect(before.stoppedBy?.id).toBe('representative-wall');
+    expect(applyPenetrationDamage(WEAPONS['m14-ebr'].damage, before.damageMultiplier)).toBe(0);
+    // 0.957 pays it and keeps the remainder - reduced, never free.
+    expect(after.reachedDistance).toBe(true);
+    expect(after.damageMultiplier).toBeCloseTo(0.28683, 4);
+    expect(after.damageMultiplier).toBeLessThan(1);
+    expect(applyPenetrationDamage(WEAPONS['m14-ebr'].damage, after.damageMultiplier)).toBe(11);
+  });
+
+  it('raises but never removes attenuation on a wall the EBR already passed', () => {
+    const wall = [surface('interior-wall', 5, 0.15, 'thin-wall')];
+    const before = traceBallisticPath(origin, direction, 20, preHf368(WEAPONS['m14-ebr'].penetration), wall);
+    const after = traceBallisticPath(origin, direction, 20, WEAPONS['m14-ebr'].penetration, wall);
+    expect(before.reachedDistance).toBe(true);
+    expect(after.reachedDistance).toBe(true);
+    expect(applyPenetrationDamage(WEAPONS['m14-ebr'].damage, before.damageMultiplier)).toBe(4);
+    expect(applyPenetrationDamage(WEAPONS['m14-ebr'].damage, after.damageMultiplier)).toBe(15);
+    expect(after.damageMultiplier).toBeGreaterThan(before.damageMultiplier);
+    // Still strictly attenuated: a crossed surface is never free damage.
+    expect(after.damageMultiplier).toBeLessThan(1);
+    expect(applyPenetrationDamage(WEAPONS['m14-ebr'].damage, after.damageMultiplier))
+      .toBeLessThan(WEAPONS['m14-ebr'].damage);
+  });
+
+  it('keeps an unobstructed EBR shot on exactly the canonical damage', () => {
+    const clear = traceBallisticPath(origin, direction, 20, WEAPONS['m14-ebr'].penetration, []);
+    expect(clear).toMatchObject({ reachedDistance: true, damageMultiplier: 1, impacts: [] });
+    expect(applyPenetrationDamage(WEAPONS['m14-ebr'].damage, clear.damageMultiplier)).toBe(37.2);
+  });
+
+  it('still stops the EBR on brick, concrete and reinforced cover', () => {
+    for (const material of ['brick', 'concrete', 'container', 'earth', 'reinforced'] as const) {
+      const trace = traceBallisticPath(
+        origin, direction, 20, WEAPONS['m14-ebr'].penetration, [surface(material, 5, 0.2)],
+      );
+      expect(trace.reachedDistance, material).toBe(false);
+      expect(trace.damageMultiplier, material).toBe(0);
     }
   });
 });

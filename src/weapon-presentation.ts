@@ -8,16 +8,20 @@ import {
   yieldBrowserPreparationFrame,
 } from './browser-preparation-scheduler';
 import {
+  applyFirstPersonArmSkin,
   createFirstPersonRiggedArms,
   firstPersonArmAnimationState,
+  firstPersonArmBaseActionFor,
   loadFirstPersonArmsAsset,
   playFirstPersonArmAction,
   resetFirstPersonArmAnimations,
   resetFirstPersonArmFingers,
+  setFirstPersonArmBaseAction,
   updateFirstPersonArmAnimations,
   type FirstPersonArmChain,
   type FirstPersonFingerBone,
 } from './operator-model';
+import { operatorSkinPalette } from './operator-skin-catalog';
 import { solveTwoBoneElbow, solveTwoBoneElbowInto, type TwoBoneElbowScratch } from './ik';
 import { reloadActionEvents, reloadPoseAt, viewmodelReloadStageAt, type ReloadPose, type WeaponActionEvent } from './weapon-actions';
 import {
@@ -417,13 +421,18 @@ const RIGGED_ARM_MAX_REACH_RATIO = 0.996;
 export const FIRST_PERSON_ARM_PROPORTION_CONTRACT = 'authored-fixed-length-strong-operator-arms-v5';
 /** Uniform root scaling preserves the authored skeleton, palms and joint radii. */
 export const FIRST_PERSON_ARM_UNIFORM_SCALE = 1.12;
-// Retain the reviewed hip/action scale so melee and grenade poses preserve
-// their established screen lane and near-plane clearance.
-export const FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE = 1.48;
+// HF-365: the owner played the candidate and said the arms read thin, which
+// supersedes HF-354's "thickness is right". Two levers move together and both
+// stay uniform: this presentation scale (the one the runtime actually applies
+// every frame - FIRST_PERSON_ARM_UNIFORM_SCALE is only the load-time seed) and
+// the normal-shell girth in operator-model. Scale alone would have to go
+// implausibly high to fix girth because it lengthens the arm at the same rate;
+// the shell adds mass without reach, so this lift stays modest.
+export const FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE = 1.62;
 // Do not shrink the operator's arms while aiming. Apart from making the ADS
 // silhouette look implausibly skinny, the old shrink broke the lower-frame
 // sleeve continuation on short landscape viewports.
-export const FIRST_PERSON_ARM_ADS_PRESENTATION_SCALE = 1.56;
+export const FIRST_PERSON_ARM_ADS_PRESENTATION_SCALE = 1.7;
 export const FIRST_PERSON_ARM_RELOAD_SCALE_LIFT = 0.16;
 /**
  * Keeps every axis uniform while adding mass at the two poses where the arms
@@ -443,7 +452,15 @@ export function firstPersonArmPresentationScale(adsBlend: number, reloadProgress
 }
 export const FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT = 'fixed-length-reachable-shoulders-continuous-sleeve-crop-v5';
 export const FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC = Object.freeze({
-  left: -1.12,
+  // HF-365 ("weirdly held"): the support shoulder used to be pinned 1.12 NDC
+  // below the frame. constrainRiggedShoulderEntryToReach walks the shoulder
+  // toward straight-down until the joint clears that lane, so a lane that deep
+  // forced an almost vertical support arm - a pale post rising out of the
+  // bottom edge with the hand balanced on top. Pulling the lane up to 1.04
+  // (still comfortably past the -0.98 below-frame continuation requirement)
+  // lets the search stop while the shoulder still carries real lateral offset,
+  // so the support arm enters diagonally from the lower left like an arm.
+  left: -1.04,
   // Ordinary hip/fire poses need the closed proximal sleeve safely below the
   // crop. Raised/ADS/heavy poses use the lifted lane below instead.
   right: -0.97,
@@ -467,6 +484,68 @@ export function firstPersonArmShoulderEntryNdc(
     raisedBlend,
   );
 }
+/**
+ * HF-365 ("badly animated"). Diagnosis, recorded honestly: the authored arms
+ * ship 13 runtime clips, only fire/reload/melee were ever played, each of those
+ * is a ONE-SHOT that stopped every other action, and the runtime clip filter
+ * admits digit tracks only - the shoulder, elbow and wrist are IK-solved. On
+ * top of that, bob, sway and recoil are applied to the shared viewmodel root,
+ * so the arms and the weapon move as one rigid block. Standing still or
+ * walking, nothing on the arms moved at all.
+ *
+ * Two fixes: the locomotion loop underneath the one-shots (operator-model), and
+ * this layer. It animates ONLY the elbow pole and the wrist roll. The pole
+ * rotates the elbow around the shoulder-to-grip axis, which swings the whole
+ * visible forearm and sleeve without moving the wrist endpoint at all, and the
+ * roll turns the hand about the grip axis. The palm therefore stays welded to
+ * the authored socket and the contact/orientation gates are untouched - the
+ * arms breathe and stride around a hand that never leaves the weapon.
+ *
+ * Mean-zero on purpose: HF-340's reviewed per-family elbow poles remain the
+ * pose; this only adds motion around them.
+ */
+export const FIRST_PERSON_ARM_MOTION_CONTRACT = 'welded-palm-elbow-pole-locomotion-v1';
+export const FIRST_PERSON_ARM_MOTION_MAX_POLE_RADIANS = 0.24;
+export const FIRST_PERSON_ARM_MOTION_MAX_WRIST_ROLL_RADIANS = 0.03;
+const ARM_BREATH_HZ = 0.21;
+const ARM_ROLL_HZ = 0.17;
+
+export type FirstPersonArmMotionInput = Readonly<{
+  side: 'left' | 'right';
+  elapsedSeconds: number;
+  /** Shared locomotion phase; the same signal that drives viewmodel bob. */
+  phase: number;
+  movingBlend: number;
+  sprintBlend: number;
+  adsBlend: number;
+}>;
+
+export type FirstPersonArmMotionSample = Readonly<{
+  poleRadians: number;
+  wristRollRadians: number;
+}>;
+
+export function firstPersonArmMotionSample(input: FirstPersonArmMotionInput): FirstPersonArmMotionSample {
+  const elapsed = Number.isFinite(input.elapsedSeconds) ? input.elapsedSeconds : 0;
+  const phase = Number.isFinite(input.phase) ? input.phase : 0;
+  const moving = THREE.MathUtils.clamp(input.movingBlend, 0, 1);
+  const sprint = THREE.MathUtils.clamp(input.sprintBlend, 0, 1);
+  // Aiming settles the arms exactly as it settles bob, breath and sway, so the
+  // sight picture the owner already accepted does not start swimming.
+  const aimSteady = 1 - THREE.MathUtils.clamp(input.adsBlend, 0, 1) * 0.72;
+  // Half a cycle apart: the support and firing elbows counter-swing the way
+  // they do when a rifle is carried, instead of pumping in unison.
+  const sideOffset = input.side === 'left' ? Math.PI * 0.5 : 0;
+  const breath = Math.sin(elapsed * Math.PI * 2 * ARM_BREATH_HZ + sideOffset) * 0.055;
+  const stride = Math.sin(phase + sideOffset) * (0.072 + 0.098 * sprint);
+  const pole = (breath * (1 - moving * 0.55) + stride * moving) * aimSteady;
+  const roll = Math.sin(elapsed * Math.PI * 2 * ARM_ROLL_HZ + sideOffset) * 0.018 * aimSteady;
+  return Object.freeze({
+    poleRadians: THREE.MathUtils.clamp(pole, -FIRST_PERSON_ARM_MOTION_MAX_POLE_RADIANS, FIRST_PERSON_ARM_MOTION_MAX_POLE_RADIANS),
+    wristRollRadians: THREE.MathUtils.clamp(roll, -FIRST_PERSON_ARM_MOTION_MAX_WRIST_ROLL_RADIANS, FIRST_PERSON_ARM_MOTION_MAX_WRIST_ROLL_RADIANS),
+  });
+}
+
 /** The one-handed knife arc needs extra proximal sleeve travel at peak extension. */
 export const FIRST_PERSON_MELEE_SHOULDER_ENTRY_NDC = -1.23;
 /** Runtime IK rotates joints and may translate the shoulder, but never stretches a skinned segment. */
@@ -914,7 +993,32 @@ function prepareFirstPersonWeaponModel(
   return model;
 }
 
-function tuneAuthoredFirstPersonArmMaterials(root: THREE.Object3D, flattenMaterials: boolean): void {
+/**
+ * HF-366: the ambient fill now carries the SELECTED SKIN's hue rather than one
+ * fixed neutral grey. Without this the fill washed the palette tint back out in
+ * dark arenas - which is where the owner would be looking at their arms - and
+ * it also overwrote the accent glow the palette had just set. The luminance of
+ * each authored fill is preserved; only its hue moves, and only part way.
+ */
+const ARM_FILL_SKIN_BLEND = 0.55;
+const armFillScratch = new THREE.Color();
+const armFillTintScratch = new THREE.Color();
+
+function armFillEmissive(base: number, tint: number): THREE.Color {
+  armFillScratch.setHex(base);
+  const baseLuminance = armFillScratch.r * 0.2126 + armFillScratch.g * 0.7152 + armFillScratch.b * 0.0722;
+  armFillTintScratch.setHex(tint);
+  const tintLuminance = Math.max(1e-4, armFillTintScratch.r * 0.2126 + armFillTintScratch.g * 0.7152 + armFillTintScratch.b * 0.0722);
+  armFillTintScratch.multiplyScalar(baseLuminance / tintLuminance);
+  return armFillScratch.lerp(armFillTintScratch, ARM_FILL_SKIN_BLEND);
+}
+
+function tuneAuthoredFirstPersonArmMaterials(
+  root: THREE.Object3D,
+  flattenMaterials: boolean,
+  skinId = 'default',
+): void {
+  const palette = operatorSkinPalette(skinId).arm;
   const materials = new Set<THREE.MeshStandardMaterial>();
   root.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
@@ -925,15 +1029,18 @@ function tuneAuthoredFirstPersonArmMaterials(root: THREE.Object3D, flattenMateri
   });
   let adjusted = 0;
   for (const material of materials) {
-    const name = material.name.toLowerCase();
+    const name = String(material.userData.authoredArmMaterialName ?? material.name).toLowerCase();
     if (name.includes('arms_sleeve')) {
-      material.emissive.setHex(0x3b4542);
+      material.emissive.copy(armFillEmissive(0x3b4542, palette.sleeve));
       material.emissiveIntensity = flattenMaterials ? 0.24 : 0.34;
-    } else if (name.includes('arms_glove') || name.includes('arms_fingerglove')) {
-      material.emissive.setHex(0x454945);
+    } else if (name.includes('arms_fingerglove')) {
+      material.emissive.copy(armFillEmissive(0x454945, palette.fingerGlove));
+      material.emissiveIntensity = flattenMaterials ? 0.26 : 0.36;
+    } else if (name.includes('arms_glove')) {
+      material.emissive.copy(armFillEmissive(0x454945, palette.glove));
       material.emissiveIntensity = flattenMaterials ? 0.26 : 0.36;
     } else if (name.includes('arms_armorpad') || name.includes('wristaccent')) {
-      material.emissive.setHex(0x3f4945);
+      material.emissive.copy(armFillEmissive(0x3f4945, palette.accent));
       material.emissiveIntensity = flattenMaterials ? 0.28 : 0.38;
     } else if (name === 'skin') {
       material.emissive.setHex(0x3a3430);
@@ -945,6 +1052,7 @@ function tuneAuthoredFirstPersonArmMaterials(root: THREE.Object3D, flattenMateri
   }
   root.userData.armMaterialPresentationContract = 'authored-pbr-muted-emissive-warm-key-v1';
   root.userData.armMaterialPresentationAdjusted = adjusted;
+  root.userData.armMaterialPresentationSkinId = skinId;
 }
 
 function weaponHipYaw(weapon: WeaponId): number {
@@ -1047,6 +1155,11 @@ export class WeaponPresentation {
   private switchBlend = 1;
   private swayX = 0;
   private swayY = 0;
+  /** HF-365 arm-motion clock/state; see FIRST_PERSON_ARM_MOTION_CONTRACT. */
+  private armMotionSeconds = 0;
+  private armMotionPhase = 0;
+  private armMotionMovingBlend = 0;
+  private operatorSkinId = 'default';
   private meleeStart = 0;
   private meleePresentationFrames = 0;
   private debugMeleeProgress: number | null = null;
@@ -1103,6 +1216,7 @@ export class WeaponPresentation {
     elbowPosition: new THREE.Vector3(),
     wristPosition: new THREE.Vector3(),
     bendHint: new THREE.Vector3(),
+    poleAxis: new THREE.Vector3(),
     elbowTarget: new THREE.Vector3(),
     handDirection: new THREE.Vector3(),
     weaponForward: new THREE.Vector3(),
@@ -1696,6 +1810,26 @@ export class WeaponPresentation {
     this.meleeKnife.visible = false;
   }
 
+  /**
+   * HF-366 ("the arms should look diff too?"): adopts the player's chosen
+   * operator skin on the first-person arms. Safe before load() - the id is
+   * retained and the arms are built with it - and safe after, because the arms
+   * own per-instance material clones, so this repaints only this viewmodel.
+   */
+  setOperatorSkin(skinId: string): boolean {
+    this.operatorSkinId = skinId;
+    if (!this.authoredArmsRoot) return false;
+    const painted = applyFirstPersonArmSkin(this.authoredArmsRoot, skinId) > 0;
+    // Re-run the fill so the ambient contribution keeps agreeing with the tint;
+    // otherwise a skin change would leave the old hue lighting the new colour.
+    tuneAuthoredFirstPersonArmMaterials(this.authoredArmsRoot, this.flattenMaterials, skinId);
+    return painted;
+  }
+
+  get operatorSkin(): string {
+    return this.operatorSkinId;
+  }
+
   async load(
     onProgress?: (loaded: number, total: number) => void,
     options: WeaponPresentationLoadOptions = {},
@@ -1710,11 +1844,11 @@ export class WeaponPresentation {
         loadPass65FieldKnifeAsset('first-person'),
         loadFirstPersonArmsAsset(),
       ]);
-      const authoredArms = createFirstPersonRiggedArms(this.flattenMaterials);
+      const authoredArms = createFirstPersonRiggedArms(this.flattenMaterials, this.operatorSkinId);
       if (!authoredArms || authoredArms.chains.length !== 2) {
         throw new Error('Pass 65 authored first-person arms failed the two-chain release contract');
       }
-      tuneAuthoredFirstPersonArmMaterials(authoredArms.root, this.flattenMaterials);
+      tuneAuthoredFirstPersonArmMaterials(authoredArms.root, this.flattenMaterials, this.operatorSkinId);
       const fallbackArms = this.root.getObjectByName('first-person-arms');
       if (fallbackArms) this.root.remove(fallbackArms);
       this.armRigs.length = 0;
@@ -3705,8 +3839,14 @@ export class WeaponPresentation {
     const cameraDown = scratch.cameraDown.set(0, -1, 0).applyQuaternion(cameraRotation).normalize();
     const cameraRight = scratch.cameraRight.set(1, 0, 0).applyQuaternion(cameraRotation).normalize();
     const cameraBack = scratch.cameraBack.set(0, 0, 1).applyQuaternion(cameraRotation).normalize();
-    const anatomicalDirection = scratch.shoulderAnatomicalDirection.copy(cameraDown).multiplyScalar(0.93)
-      .addScaledVector(cameraRight, rig.side === 'right' ? 0.2 : -0.2)
+    // HF-365: 0.2 of lateral against 0.93 of down is very nearly straight below
+    // the grip, and that is what made both arms read as vertical posts. A real
+    // shoulder sits well outboard of the hands, so the fallback direction now
+    // carries a shoulder-width lateral component; the loop still walks toward
+    // it only as far as the below-frame lane requires, so nothing about the
+    // crop contract changes.
+    const anatomicalDirection = scratch.shoulderAnatomicalDirection.copy(cameraDown).multiplyScalar(0.84)
+      .addScaledVector(cameraRight, rig.side === 'right' ? 0.45 : -0.45)
       .addScaledVector(cameraBack, 0.31)
       .normalize();
 
@@ -4036,6 +4176,19 @@ export class WeaponPresentation {
           scratch.bendHint,
         );
       bendHint.applyQuaternion(cameraRotation);
+      // HF-365: swing the elbow around the shoulder-to-grip axis. Rotating the
+      // POLE moves the forearm and sleeve without moving the wrist endpoint, so
+      // the palm contact solved below is unaffected.
+      const motion = firstPersonArmMotionSample({
+        side: rig.side,
+        elapsedSeconds: this.armMotionSeconds,
+        phase: this.armMotionPhase,
+        movingBlend: this.armMotionMovingBlend,
+        sprintBlend: this.sprintBlend,
+        adsBlend: this.adsBlend,
+      });
+      const poleAxis = scratch.poleAxis.copy(socketTarget).sub(shoulderPosition);
+      if (poleAxis.lengthSq() > 1e-8) bendHint.applyAxisAngle(poleAxis.normalize(), motion.poleRadians);
       const weaponRotation = activeModel.getWorldQuaternion(scratch.weaponRotation);
       const muzzle = activeModel.getObjectByName('muzzle-socket');
       const weaponForward = muzzle
@@ -4046,9 +4199,9 @@ export class WeaponPresentation {
         : scratch.handDirection.copy(weaponForward);
       // HF-341: the firing wrist takes the per-family stance roll (slight
       // inward cant for the two-hand handgun grip, neutral elsewhere).
-      const wristRollRadians = rig.side === 'left'
+      const wristRollRadians = (rig.side === 'left'
         ? riggedSupportWristRollRadians(reloadPose.handToReload)
-        : firstPersonFiringWristRollRadians(handPolicy.gripFamily);
+        : firstPersonFiringWristRollRadians(handPolicy.gripFamily)) + motion.wristRollRadians;
       const palmTargetRotation = this.palmTargetWorldRotation(socket, handDirection, wristRollRadians);
       const contactIterationErrors: number[] | null = diagnostics ? [] : null;
       let palmOrientationError = Number.POSITIVE_INFINITY;
@@ -4147,8 +4300,23 @@ export class WeaponPresentation {
   update(pose: WeaponPose): WeaponActionEvent[] {
     const actionEvents: WeaponActionEvent[] = [];
     const smoothing = (rate: number) => 1 - Math.exp(-rate * pose.dt);
+    // HF-365: advance the arm-motion clock before anything reads it, and keep
+    // the locomotion loop matched to the movement state. Both are clamped to
+    // the same dt the mixer uses so a stalled tab cannot jump the pose.
+    const armDt = Math.min(0.05, Math.max(0, pose.dt));
+    this.armMotionSeconds += armDt;
+    this.armMotionPhase = Number.isFinite(pose.phase) ? pose.phase : this.armMotionPhase;
+    this.armMotionMovingBlend = THREE.MathUtils.lerp(
+      this.armMotionMovingBlend,
+      pose.moving ? 1 : 0,
+      1 - Math.exp(-9 * armDt),
+    );
     if (this.authoredArmsRoot) {
       resetFirstPersonArmFingers(this.riggedFingerBones);
+      setFirstPersonArmBaseAction(
+        this.authoredArmsRoot,
+        firstPersonArmBaseActionFor(pose.moving, pose.sprinting),
+      );
       updateFirstPersonArmAnimations(this.authoredArmsRoot, pose.dt);
     }
     this.weaponHeat = advanceWeaponHeat(this.weaponHeat, false, pose.dt, this.active);

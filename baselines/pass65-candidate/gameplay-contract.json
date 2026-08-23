@@ -2743,7 +2743,8 @@
             "maxPenetratedSurfaces": 2,
             "minimumEnergyRetention": 0.48,
             "minimumWallDamageMultiplier": 0.34,
-            "penetrationPower": 5.8
+            "penetrationPower": 5.8,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.65,
@@ -2791,7 +2792,8 @@
             "maxPenetratedSurfaces": 1,
             "minimumEnergyRetention": 0.22,
             "minimumWallDamageMultiplier": 0.22,
-            "penetrationPower": 3.05
+            "penetrationPower": 3.05,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.72,
@@ -2843,7 +2845,8 @@
             "maxPenetratedSurfaces": 2,
             "minimumEnergyRetention": 0.58,
             "minimumWallDamageMultiplier": 0.4,
-            "penetrationPower": 6.9
+            "penetrationPower": 6.9,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.6,
@@ -2891,7 +2894,8 @@
             "maxPenetratedSurfaces": 1,
             "minimumEnergyRetention": 0.16,
             "minimumWallDamageMultiplier": 0.18,
-            "penetrationPower": 2.15
+            "penetrationPower": 2.15,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.8,
@@ -2943,7 +2947,8 @@
             "maxPenetratedSurfaces": 3,
             "minimumEnergyRetention": 0.7,
             "minimumWallDamageMultiplier": 0.48,
-            "penetrationPower": 9.4
+            "penetrationPower": 9.4,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.52,
@@ -2991,7 +2996,8 @@
             "maxPenetratedSurfaces": 1,
             "minimumEnergyRetention": 0.3,
             "minimumWallDamageMultiplier": 0.26,
-            "penetrationPower": 3.65
+            "penetrationPower": 3.65,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.7,
@@ -3039,7 +3045,8 @@
             "maxPenetratedSurfaces": 1,
             "minimumEnergyRetention": 0.4,
             "minimumWallDamageMultiplier": 0.3,
-            "penetrationPower": 4.7
+            "penetrationPower": 4.7,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.68,
@@ -3087,7 +3094,8 @@
             "maxPenetratedSurfaces": 1,
             "minimumEnergyRetention": 0.18,
             "minimumWallDamageMultiplier": 0.2,
-            "penetrationPower": 2.75
+            "penetrationPower": 2.75,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.78,
@@ -3135,7 +3143,8 @@
             "maxPenetratedSurfaces": 1,
             "minimumEnergyRetention": 0.14,
             "minimumWallDamageMultiplier": 0.18,
-            "penetrationPower": 2.35
+            "penetrationPower": 2.35,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.78,
@@ -3187,7 +3196,8 @@
             "maxPenetratedSurfaces": 1,
             "minimumEnergyRetention": 0.24,
             "minimumWallDamageMultiplier": 0.23,
-            "penetrationPower": 3.15
+            "penetrationPower": 3.15,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.7,
@@ -3239,7 +3249,8 @@
             "maxPenetratedSurfaces": 2,
             "minimumEnergyRetention": 0.47,
             "minimumWallDamageMultiplier": 0.34,
-            "penetrationPower": 5.7
+            "penetrationPower": 5.7,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.64,
@@ -3291,7 +3302,8 @@
             "maxPenetratedSurfaces": 2,
             "minimumEnergyRetention": 0.6,
             "minimumWallDamageMultiplier": 0.42,
-            "penetrationPower": 7.35
+            "penetrationPower": 7.35,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.62,
@@ -3339,7 +3351,8 @@
             "maxPenetratedSurfaces": 2,
             "minimumEnergyRetention": 0.52,
             "minimumWallDamageMultiplier": 0.38,
-            "penetrationPower": 6.5
+            "penetrationPower": 6.5,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.72,
@@ -3393,7 +3406,8 @@
             "maxPenetratedSurfaces": 1,
             "minimumEnergyRetention": 0.68,
             "minimumWallDamageMultiplier": 0.12,
-            "penetrationPower": 0.55
+            "penetrationPower": 0.55,
+            "wallPenetrationMultiplier": 1.5
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.5,
@@ -3445,7 +3459,8 @@
             "maxPenetratedSurfaces": 2,
             "minimumEnergyRetention": 0.62,
             "minimumWallDamageMultiplier": 0.45,
-            "penetrationPower": 8.1
+            "penetrationPower": 8.1,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.62,
@@ -3500,7 +3515,8 @@
             "maxPenetratedSurfaces": 1,
             "minimumEnergyRetention": 0.34,
             "minimumWallDamageMultiplier": 0.28,
-            "penetrationPower": 4.1
+            "penetrationPower": 4.1,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.7,
@@ -3552,7 +3568,8 @@
             "maxPenetratedSurfaces": 0,
             "minimumEnergyRetention": 0,
             "minimumWallDamageMultiplier": 0,
-            "penetrationPower": 0
+            "penetrationPower": 0,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": "explosive-bolt-v1",
           "proneRecoilMultiplier": 0.58,
@@ -3600,7 +3617,8 @@
             "maxPenetratedSurfaces": 0,
             "minimumEnergyRetention": 0,
             "minimumWallDamageMultiplier": 0,
-            "penetrationPower": 0
+            "penetrationPower": 0,
+            "wallPenetrationMultiplier": 1
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.82,

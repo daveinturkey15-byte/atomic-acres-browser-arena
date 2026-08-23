@@ -10,6 +10,18 @@ export type BloomQuality = 'off' | 'subtle' | 'cinematic';
 export type ToneMappingMode = 'aces' | 'agx' | 'neutral';
 export type GeometryDetail = 'reduced' | 'full';
 export type FilmicProfileChoice = 'arena-default' | 'performance' | 'quality' | 'max';
+/**
+ * Tiers for the HF-364 screen-space raymarched stack. They share `LightingTier`
+ * shape deliberately: off / low / high, with no "ultra" until a WebGPU
+ * representative-hardware budget exists for one.
+ */
+export type ScreenSpaceTier = LightingTier;
+/**
+ * Spatial upscaling owner. FSR 1 is a real, vendor-published SPATIAL upscaler
+ * (EASU + RCAS) that runs in a shader — it is not DLSS, not frame generation
+ * and not temporal, and the labels never imply otherwise.
+ */
+export type SpatialUpscalingMode = 'off' | 'fsr1-quality' | 'fsr1-balanced' | 'fsr1-performance';
 
 /**
  * Presentation-only values. None of these values may change collision,
@@ -30,9 +42,12 @@ export type AdvancedGraphicsValues = Readonly<{
   shadowFilter: ShadowFilterMode;
   indirectLighting: LightingTier;
   ambientOcclusion: AmbientOcclusionQuality;
+  screenSpaceReflections: ScreenSpaceTier;
+  screenSpaceGi: ScreenSpaceTier;
   reflectionQuality: ReflectionQualityTier;
   environmentIntensity: number;
   volumetricQuality: QualityTier;
+  volumetricLightShafts: ScreenSpaceTier;
   anisotropy: 1 | 2 | 4 | 8 | 16;
   particleQuality: QualityTier;
   decalQuality: QualityTier;
@@ -44,6 +59,10 @@ export type AdvancedGraphicsValues = Readonly<{
   sharpness: number;
   filmGrain: number;
   vignette: number;
+  depthOfField: boolean;
+  depthOfFieldStrength: number;
+  motionBlur: number;
+  spatialUpscaling: SpatialUpscalingMode;
 }>;
 
 export type GraphicsAdvancedKey = keyof AdvancedGraphicsValues;
@@ -60,7 +79,13 @@ export type GraphicsRuntimeConsumer =
   | 'atmosphere-runtime'
   | 'presentation-budget'
   | 'smoke-presentation'
-  | 'hdr-pipeline';
+  | 'hdr-pipeline'
+  | 'volumetric-light-shafts'
+  | 'screen-space-reflections'
+  | 'screen-space-gi'
+  | 'depth-of-field'
+  | 'motion-blur'
+  | 'spatial-upscaling';
 
 export type GraphicsRuntimeEvidence = Readonly<{
   path: string;
@@ -187,6 +212,18 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     applyMode: 'pipeline-rebuild', runtimeConsumer: 'ambient-occlusion',
   }),
   control({
+    key: 'screenSpaceReflections', id: 'graphics-screen-space-reflections', category: 'lighting', label: 'Screen-space reflections',
+    description: 'Ray-marches the depth buffer to reflect what is already on screen — wet decking, standing water and metal read as real mirrors instead of environment-map approximations. Off-screen geometry cannot reflect: that is the technique, not a bug. Additive only, so it can never darken a sightline.',
+    kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
+    applyMode: 'pipeline-rebuild', runtimeConsumer: 'screen-space-reflections',
+  }),
+  control({
+    key: 'screenSpaceGi', id: 'graphics-screen-space-gi', category: 'lighting', label: 'Screen-space GI',
+    description: 'Ray-marched bounce light: surfaces pick up colour from what is lit next to them. This is the closest a browser gets to a path-traced look — WebGPU exposes no hardware ray tracing, so this is screen-space and is never labelled otherwise. Only its bounce buffer is used; its occlusion buffer is discarded so it cannot darken cover.',
+    kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
+    applyMode: 'pipeline-rebuild', runtimeConsumer: 'screen-space-gi',
+  }),
+  control({
     key: 'reflectionQuality', id: 'graphics-reflections', category: 'lighting', label: 'Specular response',
     description: 'Gates PMREM cubemap resolution (128/256/512) for arena environment IBL. Higher tiers capture sharper specular from the sky backdrop. Does NOT raise material roughness (that was backwards).',
     kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH'], ['ultra', 'ULTRA']),
@@ -203,6 +240,12 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     description: 'Controls ambient mist, smoke stacks and deterministic dust density. Gameplay smoke remains visible at every tier.',
     kind: 'select', options: selectOptions(['low', 'LOW'], ['high', 'HIGH'], ['ultra', 'ULTRA']),
     applyMode: 'live', runtimeConsumer: 'atmosphere-runtime',
+  }),
+  control({
+    key: 'volumetricLightShafts', id: 'graphics-volumetric-light-shafts', category: 'atmosphere', label: 'Volumetric light shafts',
+    description: 'Ray-marches the sun shadow map so light shafts are actually occluded by the geometry casting them. Requires Sun shadows. The shaft gain is capped well below the upstream default so a doorway beam never washes out the silhouette standing in it.',
+    kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
+    applyMode: 'pipeline-rebuild', runtimeConsumer: 'volumetric-light-shafts',
   }),
   control({
     key: 'smokeQuality', id: 'graphics-smoke-quality', category: 'atmosphere', label: 'Smoke presentation',
@@ -270,6 +313,31 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     kind: 'range', minimum: 0, maximum: 1, step: 0.01, unit: 'percent',
     applyMode: 'live', runtimeConsumer: 'hdr-pipeline',
   }),
+  control({
+    key: 'depthOfField', id: 'graphics-depth-of-field', category: 'post', label: 'Depth of field',
+    description: 'Bokeh defocus on the far background only. Focus is fixed and the focal length is far longer than any arena, so the blur radius stays sub-pixel across the whole engagement range — no focus hunting, no soft enemies, no blurred weapon.',
+    kind: 'toggle', applyMode: 'pipeline-rebuild', runtimeConsumer: 'depth-of-field',
+  }),
+  control({
+    key: 'depthOfFieldStrength', id: 'graphics-depth-of-field-strength', category: 'post', label: 'Defocus strength',
+    description: 'Scales the bokeh radius applied past the combat midfield. The midfield sub-pixel ceiling is enforced at graph construction at every strength, not just the default.',
+    kind: 'range', minimum: 0, maximum: 1, step: 0.05, unit: 'percent',
+    applyMode: 'live', runtimeConsumer: 'depth-of-field',
+  }),
+  control({
+    key: 'motionBlur', id: 'graphics-motion-blur', category: 'post', label: 'Motion blur',
+    description: 'Per-pixel camera and object smear from the velocity buffer. Off by default. Below a real angular rate the smear is exactly zero, so aim adjustments and slow strafes never smear, and the total offset is capped so a fast flick cannot erase a target.',
+    kind: 'range', minimum: 0, maximum: 1, step: 0.05, unit: 'percent',
+    applyMode: 'pipeline-rebuild', runtimeConsumer: 'motion-blur',
+  }),
+  control({
+    key: 'spatialUpscaling', id: 'graphics-spatial-upscaling', category: 'display', label: 'Spatial upscaling (FSR 1)',
+    description: 'Renders the scene below native and reconstructs with AMD FSR 1 (EASU edge-adaptive upsample plus RCAS sharpen) instead of the browser bilinear blit that plain Render scale falls back on. This is spatial, not temporal: it is not DLSS, not frame generation, and it is not called either. When active it also owns the sharpen stage, so Sharpness drives its RCAS.',
+    kind: 'select', options: selectOptions(
+      ['off', 'OFF'], ['fsr1-quality', 'FSR 1 QUALITY'], ['fsr1-balanced', 'FSR 1 BALANCED'], ['fsr1-performance', 'FSR 1 PERFORMANCE'],
+    ),
+    applyMode: 'pipeline-rebuild', runtimeConsumer: 'spatial-upscaling',
+  }),
 ]);
 
 const runtimeEvidence = (
@@ -295,6 +363,13 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
   shadowFilter: runtimeEvidence('src/legacy-main.ts', 'shadowMapTypeForFilter', 'settings.graphics.shadowFilter + documentElement.dataset.webglShadowSampler'),
   indirectLighting: runtimeEvidence('src/legacy-main.ts', 'graphicsRuntime.indirectLightScale', 'settings.graphics.indirectLightScale + render.lighting'),
   ambientOcclusion: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'ao(sceneDepth, sceneNormal, camera)', 'render.atomicSignal.advancedGraphics.ambientOcclusion'),
+  screenSpaceReflections: runtimeEvidence('src/rendering/screen-space-post.ts', 'ssr(sources.sceneColor, sources.sceneDepth, sources.sceneNormal', 'render.atomicSignal.advancedGraphics.screenSpace.reflections'),
+  screenSpaceGi: runtimeEvidence('src/rendering/screen-space-post.ts', 'ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal', 'render.atomicSignal.advancedGraphics.screenSpace.globalIllumination'),
+  volumetricLightShafts: runtimeEvidence('src/rendering/screen-space-post.ts', 'godrays(sources.sceneDepth, sources.camera, sources.volumetricLight)', 'render.atomicSignal.advancedGraphics.screenSpace.godrays'),
+  depthOfField: runtimeEvidence('src/rendering/screen-space-post.ts', 'dof(linearHdr, sources.sceneViewZ, focusDistance, focalLength, bokehScale)', 'render.atomicSignal.advancedGraphics.screenSpace.depthOfField'),
+  depthOfFieldStrength: runtimeEvidence('src/rendering/screen-space-post-profile.ts', 'assertDepthOfFieldCombatSafety', 'settings.graphics.depthOfFieldStrength + screenSpace.depthOfField.bokehScale'),
+  motionBlur: runtimeEvidence('src/rendering/screen-space-post.ts', 'motionBlur(sources.sceneColor, limited, int(runtime.motionBlur.samples))', 'render.atomicSignal.advancedGraphics.screenSpace.motionBlur'),
+  spatialUpscaling: runtimeEvidence('src/rendering/filmic-grade-chain.ts', 'display-fsr1-easu-rcas-upscale', 'settings.graphics.spatialUpscaling + grade chain stage receipt'),
   reflectionQuality: runtimeEvidence('src/graphics-refinement.ts', 'effectivePbrRoughness', 'render.graphicsRefinement.reflectionScale'),
   environmentIntensity: runtimeEvidence('src/rendering/arena-environment-ibl.ts', 'scene.environmentIntensity', 'settings.graphics.environmentIntensity + scene.environmentIntensity product'),
   volumetricQuality: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'const volumetricScale = THREE.MathUtils.clamp', 'render.atomicSignal.advancedGraphics.volumetricScale'),
@@ -311,55 +386,67 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
   vignette: runtimeEvidence('src/rendering/filmic-grade-chain.ts', 'setDisplayVignetteStrength', 'settings.graphics.vignette + display-vignette-falloff stage uniform'),
 });
 
+/**
+ * What the renderer genuinely cannot do, after HF-364 turned the screen-space
+ * stack on. The five rows that used to sit here for SSR, SSGI, depth of field,
+ * motion blur and spatial upscaling are now real controls above; leaving their
+ * notices in place would have been the same lie in the other direction.
+ *
+ * What remains is the real boundary: there is no hardware ray tracing and no
+ * vendor-native temporal reconstruction in any browser, and no amount of
+ * screen-space work turns into either of those.
+ */
 export const GRAPHICS_CAPABILITY_NOTICES: readonly GraphicsCapabilityNotice[] = Object.freeze([
   Object.freeze({
     id: 'path-tracing', category: 'lighting', label: 'Path tracing / hardware ray tracing', state: 'unavailable',
-    reason: 'This Three.js WebGPU build has no hardware ray-tracing acceleration-structure path. Raster lighting is labelled honestly.',
+    reason: 'WebGPU exposes no ray-tracing pipeline, acceleration structures or ray queries in any shipping browser. Screen-space GI ray-marches the depth buffer instead, and is labelled as exactly that.',
     evidence: 'renderer capability gate',
   }),
   Object.freeze({
-    id: 'screen-space-gi', category: 'lighting', label: 'Screen-space global illumination', state: 'unavailable',
-    reason: 'Three r185 exposes an experimental SSGI node, but this arena has not passed its normal/depth, temporal, disposal and frame-budget gates.',
-    evidence: 'WebGPU post gate pending',
-  }),
-  Object.freeze({
-    id: 'screen-space-reflections', category: 'lighting', label: 'Screen-space reflections', state: 'unavailable',
-    reason: 'The SSR node is available upstream, but the arena lacks a verified material MRT and occlusion/disposal receipt.',
-    evidence: 'WebGPU post gate pending',
-  }),
-  Object.freeze({
-    id: 'depth-of-field', category: 'post', label: 'Depth of field', state: 'unavailable',
-    reason: 'Disabled for live first-person play until weapon-layer depth, focus transitions and accessibility behavior pass review.',
-    evidence: 'viewmodel depth contract pending',
-  }),
-  Object.freeze({
-    id: 'motion-blur', category: 'post', label: 'Motion blur', state: 'unavailable',
-    reason: 'The active scene pass does not yet own a verified velocity MRT, so this cannot be exposed as a working control.',
-    evidence: 'velocity MRT pending',
-  }),
-  Object.freeze({
     id: 'ai-upscaling-frame-generation', category: 'display', label: 'AI upscaling / frame generation', state: 'unavailable',
-    reason: 'DLSS, Ray Reconstruction and frame generation are native vendor technologies and are not available to this browser renderer.',
+    reason: 'DLSS, FSR frame generation and Ray Reconstruction are vendor-native driver technologies with no browser API. The available upscaler is AMD FSR 1, which is spatial and runs as an ordinary shader; it is offered under its own name in Spatial upscaling.',
     evidence: 'browser capability boundary',
   }),
 ]);
 
+/**
+ * HF-364 preset policy for the screen-space stack: every new effect is OFF in
+ * every preset, and all six are explicit Custom opt-ins.
+ *
+ * That is deliberate and it is the conservative reading of the rule that
+ * presets must stay honest. These passes only exist on the WebGPU route, and
+ * the shipping verification for this change ran headless, where the WebGPU
+ * device fails at creation and the whole stack is structurally absent. So the
+ * node graph is proven to build, the combat-safety envelope is proven
+ * numerically, and the WebGL2 route is proven to degrade to nothing — but no
+ * WGSL shader here has been compiled on a real device yet, and no tier has a
+ * measured frame budget. A preset that quietly enables an unmeasured,
+ * uncompiled full-screen raymarch is exactly the dishonest preset this registry
+ * exists to prevent.
+ *
+ * Promoting one after a device run is a single value edit per preset plus the
+ * matching assertion in graphics-settings-registry.test.ts.
+ */
 export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'max', AdvancedGraphicsValues>> = Object.freeze({
   performance: Object.freeze({
     renderScale: 0.75, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'off', geometryDetail: 'reduced', shadows: 'off', shadowResolution: 'medium', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'low', ambientOcclusion: 'off', reflectionQuality: 'low',
-    environmentIntensity: 1, volumetricQuality: 'low', smokeQuality: 'low',
+    shadowFilter: 'auto', indirectLighting: 'low', ambientOcclusion: 'off',
+    screenSpaceReflections: 'off', screenSpaceGi: 'off', reflectionQuality: 'low',
+    environmentIntensity: 1, volumetricQuality: 'low', volumetricLightShafts: 'off', smokeQuality: 'low',
     particleQuality: 'low', anisotropy: 4, decalQuality: 'low', bloomQuality: 'subtle',
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.1, vignette: 0.08,
+    depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
   }),
   high: Object.freeze({
     renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'off', reflectionQuality: 'high',
-    environmentIntensity: 1, volumetricQuality: 'high', smokeQuality: 'high',
+    shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'off',
+    screenSpaceReflections: 'off', screenSpaceGi: 'off', reflectionQuality: 'high',
+    environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'off', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.32, vignette: 0.16,
+    depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
   }),
   max: Object.freeze({
     // Max deliberately selects the highest supported values, but it must stay as
@@ -369,10 +456,12 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'm
     // load failure. Keep the supersample slightly lower and leave the valve on.
     renderScale: 1.15, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'dynamic',
-    shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'ultra', reflectionQuality: 'ultra',
-    environmentIntensity: 1, volumetricQuality: 'ultra', smokeQuality: 'ultra',
+    shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'ultra',
+    screenSpaceReflections: 'off', screenSpaceGi: 'off', reflectionQuality: 'ultra',
+    environmentIntensity: 1, volumetricQuality: 'ultra', volumetricLightShafts: 'off', smokeQuality: 'ultra',
     particleQuality: 'ultra', anisotropy: 16, decalQuality: 'ultra', bloomQuality: 'cinematic',
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.4, vignette: 0.18,
+    depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
   }),
 });
 

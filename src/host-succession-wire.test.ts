@@ -533,7 +533,11 @@ describe('HF-325 host succession wire — a stale mirror is refused', () => {
     const { holdings } = successorHoldings({ receivedAtEpochMs, hostClockOffsetMs: offsetMs });
     const decision = evaluateSelfPromotion(holdings, {
       selfId: SUCCESSOR_ID, roomCode: ROOM, assessment: HOST_LOST, roster: roster(),
-      nowEpochMs: receivedAtEpochMs + HOST_MATCH_CHECKPOINT_TTL_MS,
+      // The mandate TTL is now the host-loss declaration window PLUS the rejoin
+      // grace (HF-325: it used to equal the grace alone, which made promotion
+      // unreachable by arithmetic). Age this case past the whole window so the
+      // mandate genuinely expires rather than merely reaching the old bound.
+      nowEpochMs: receivedAtEpochMs + HOST_SUCCESSION_MANDATE_TTL_MS + 1_000,
       promotionEnabled: true,
     });
     expect(decision.promote).toBe(false);

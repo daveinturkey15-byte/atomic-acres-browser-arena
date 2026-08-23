@@ -1,0 +1,1091 @@
+/*
+ * Pass 77 / HF-370 - command deck material and motion.
+ *
+ * Owner verdict on the Pass 75 build: "the menus really don't look that
+ * different, it needs to be much more dynamic ... a lot more alive and a lot
+ * more modern, not like a game that's 20 years old, more like a modern game",
+ * and separately "the menu and hud both need a total redesign and re skin, NOT
+ * the layout or functionality, but its style and tech".
+ *
+ * SCOPE DISCIPLINE. Not one grid, column count, panel order, tab, control or
+ * id moves. Every rule below changes material, edge, type treatment, state
+ * feedback or motion. Where a cue needed space it is painted as a BACKGROUND
+ * LAYER rather than as padding or a border, so the box model is untouched.
+ *
+ * WHAT WAS ACTUALLY DATED (read off the captured frames):
+ *   1. The deck was a flat white page. Not "light" - blank. No light source,
+ *      no material, no framing. The captured deploy frame is indistinguishable
+ *      from an admin dashboard; nothing on it says "game".
+ *   2. Panels, cards and buttons were 8-10px-radius white rectangles with a
+ *      soft web shadow. That radius and that shadow ARE the 2014 dashboard
+ *      look. Modern game shells use tight 2-4px geometry, hairlines, and
+ *      corner detail that implies a machined part.
+ *   3. Nothing animated. Switching a tab swapped one static page for another,
+ *      selection snapped, hover did nothing but lift 2px. A modern shell moves
+ *      between states; it does not cut between them.
+ *   4. Three unrelated surface treatments coexisted: a white workspace, a
+ *      near-black rail and a near-black Options panel, each with its own edge
+ *      language, so the deck read as three products stapled together.
+ *
+ * THE DIRECTION. AGENTS.md forbids regressing the command chrome to a
+ * near-black monolith, so this stays a BRIGHT deck. The modernity comes from
+ * material and behaviour instead of from darkness:
+ *   material - a graded field with a real light source and a hairline grid,
+ *              translucent chrome with backdrop blur, tight 3px geometry
+ *   framing  - accent corner brackets and tick rules that read as instrument
+ *              chrome, applied with ONE language across every card
+ *   voice    - one decisive primary action, quiet secondaries, one accent
+ *   motion   - panels transition in, selection animates, the rail indicator
+ *              slides; every one of them gated behind both motion switches
+ * The dark surfaces (rail, Options, showcase) are kept and made DELIBERATE:
+ * they become the same instrument sheet the HUD uses, so the duality reads as
+ * "light command surface, dark instrument surface" rather than as an accident.
+ *
+ * CASCADE: unlayered, imported after pass75-menu-redesign.css, for the
+ * documented reason - pass66-readability.css is unlayered and outranks every
+ * @layer, so a sheet written into a layer could not land.
+ *
+ * ACCESSIBILITY: every animation and transition is switched off by BOTH
+ * `html[data-reduced-motion='true']` and `@media (prefers-reduced-motion)`.
+ * No rule reduces a font below the AGENTS.md floors; the two that touch size
+ * raise legacy 8px text to 10px.
+ */
+
+/* ---------------------------------------------------------------------------
+ * PART 0 - tokens.
+ * ------------------------------------------------------------------------ */
+
+#menu.pass64-command-deck {
+  --p77-ink: #0d1f26;
+  --p77-ink-soft: #3d565d;
+  --p77-ink-quiet: #6a8188;
+
+  --p77-accent: var(--p74-accent, #0f8b93);
+  --p77-accent-lit: var(--p74-accent-bright, #12a7b1);
+  --p77-accent-wash: rgb(15 139 147 / 0.09);
+  --p77-accent-line: rgb(15 139 147 / 0.32);
+
+  --p77-paper: #f7faf9;
+  --p77-paper-lit: #ffffff;
+  --p77-hair: rgb(16 46 54 / 0.11);
+  --p77-hair-strong: rgb(16 46 54 / 0.20);
+
+  /* One elevation ramp. Tighter and lower-contrast than the Pass 74 ramp:
+     a big soft web shadow under every card is the single most dated cue on
+     the old deck. */
+  --p77-lift: 0 1px 1px rgb(12 34 40 / 0.05), 0 2px 5px rgb(12 34 40 / 0.05);
+  --p77-lift-hover: 0 2px 4px rgb(12 34 40 / 0.07), 0 10px 22px rgb(12 34 40 / 0.10);
+  --p77-lift-sel: 0 2px 6px rgb(15 139 147 / 0.14), 0 14px 30px rgb(12 34 40 / 0.12);
+
+  --p77-radius: 3px;
+  --p77-bracket: 12px;
+  --p77-ease: cubic-bezier(0.2, 0.72, 0.28, 1);
+
+  /* The dark instrument sheet, shared with the HUD grammar. */
+  --p77-dark-top: #16323b;
+  --p77-dark-bottom: #0b1a20;
+  --p77-dark-hair: rgb(120 214 222 / 0.16);
+  --p77-dark-hair-lit: rgb(140 232 240 / 0.30);
+  --p77-dark-ink: #eaf6f5;
+  --p77-dark-ink-soft: #9db6b8;
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 1 - the deck itself. A field with a light source, not a blank page.
+ * ------------------------------------------------------------------------ */
+
+#menu.pass64-command-deck {
+  --p77-cut: 26px;
+  border: 1px solid var(--p77-hair-strong);
+  border-radius: 0;
+  background-color: var(--p77-paper);
+  background-image:
+    /*
+     * The two chamfer hairlines, so the cut corners read as machined rather
+     * than as a missing corner. Both cuts lie on the MAIN diagonal of their
+     * 26px corner box, so the gradient angle is 45deg for both; the bands sit
+     * just INSIDE the clip (below 50% at the top-right, above 50% at the
+     * bottom-left) or the clip would eat them.
+     */
+    linear-gradient(45deg, transparent 0 calc(50% - 2px), var(--p77-accent) calc(50% - 2px) calc(50% - 0.4px), transparent calc(50% - 0.4px)),
+    linear-gradient(45deg, transparent 0 calc(50% + 0.4px), var(--p77-accent) calc(50% + 0.4px) calc(50% + 2px), transparent calc(50% + 2px)),
+    /* the light source: one soft bloom from the top-left */
+    radial-gradient(120% 90% at 6% -10%, rgb(255 255 255 / 0.95) 0%, rgb(255 255 255 / 0) 58%),
+    /* accent haze, so the deck has a colour temperature */
+    radial-gradient(70% 60% at 4% 0%, rgb(15 139 147 / 0.07) 0%, transparent 62%),
+    radial-gradient(80% 70% at 100% 104%, rgb(15 139 147 / 0.05) 0%, transparent 58%),
+    /* the ground */
+    linear-gradient(168deg, #ffffff 0%, #eef4f3 62%, #e7eeed 100%);
+  background-repeat: no-repeat;
+  background-position: right top, left bottom, 0 0, 0 0, 0 0, 0 0;
+  background-size: var(--p77-cut) var(--p77-cut), var(--p77-cut) var(--p77-cut), auto, auto, auto, auto;
+  /*
+   * The angular frame. Two chamfered corners is the single most recognisable
+   * signature of a modern game shell and the single cheapest thing this deck
+   * did not have - the Pass 75 deck was a plain rounded rectangle, which is
+   * why the owner read it as a web dashboard.
+   *
+   * clip-path removes the outer cast shadow along with the corners. That is
+   * an acceptable trade here and arguably the point: a large soft drop shadow
+   * under a full-screen panel is itself a dated cue, and the deck already
+   * separates from the page behind it by value alone.
+   */
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--p77-cut)) 0,
+    100% var(--p77-cut),
+    100% 100%,
+    var(--p77-cut) 100%,
+    0 calc(100% - var(--p77-cut)));
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.9) inset;
+}
+
+/*
+ * A single slow ambient bloom so the deck is never completely inert while the
+ * player reads it. It is one compositor-only opacity/scale animation on one
+ * absolutely positioned layer inside the already-clipped deck - it paints
+ * nothing per frame and it sits behind every control.
+ */
+#menu.pass64-command-deck::after {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(38% 38% at 22% 12%, rgb(18 167 177 / 0.10), transparent 70%);
+  opacity: 0.7;
+  animation: p77-deck-bloom 18s ease-in-out infinite alternate;
+}
+
+@keyframes p77-deck-bloom {
+  from { opacity: 0.45; transform: translate3d(-1.5%, -1%, 0) scale(1); }
+  to { opacity: 0.85; transform: translate3d(2%, 1.5%, 0) scale(1.12); }
+}
+
+/* Every real child stays above the bloom. */
+#menu.pass64-command-deck > .command-header,
+#menu.pass64-command-deck > .command-body {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 2 - chrome. The header stops floating in the same plane as the work.
+ * ------------------------------------------------------------------------ */
+
+/*
+ * The header joins the rail as CHROME. The Pass 75 deck had a white header
+ * above a white workspace beside a near-black rail, so the product identity
+ * floated in the same plane as the work and the one dark surface read as an
+ * accident. A dark header plus the dark rail forms one continuous chrome L
+ * around a bright workspace, which is what a modern game shell looks like -
+ * and it is not the "near-black monolith" AGENTS.md forbids, because the
+ * surface the player actually reads and operates stays bright.
+ */
+#menu .command-header {
+  border-bottom: 1px solid rgb(140 232 240 / 0.18);
+  background-color: var(--p77-dark-bottom);
+  background-image:
+    /* the accent underline: a rule that fades out, not a full-width stripe */
+    linear-gradient(90deg, var(--p77-accent-lit) 0%, var(--p77-accent) 24%, rgb(18 167 177 / 0) 62%),
+    /* the same machining texture as the rail, so the L reads as one part */
+    repeating-linear-gradient(135deg, rgb(255 255 255 / 0.022) 0 2px, transparent 2px 6px),
+    linear-gradient(180deg, #1c383f 0%, #0d1f26 100%);
+  background-repeat: no-repeat, repeat, no-repeat;
+  background-position: left bottom, 0 0, 0 0;
+  background-size: 100% 2px, auto, auto;
+  box-shadow: inset 0 1px 0 rgb(214 246 250 / 0.08), 0 12px 28px rgb(4 16 20 / 0.16);
+}
+
+/* The wordmark gets a real type hierarchy: a quiet accent eyebrow, a tight
+   display lockup and a technical build chip. */
+#menu .command-brand small {
+  color: var(--p77-accent-lit);
+  letter-spacing: 0.24em;
+}
+
+#menu .command-brand strong {
+  color: #f2fbfa;
+  letter-spacing: -0.005em;
+}
+
+#menu .command-brand span {
+  border: 1px solid rgb(140 232 240 / 0.34);
+  border-left: 2px solid var(--p77-accent-lit);
+  border-radius: 2px;
+  background: rgb(18 167 177 / 0.14);
+  color: #a4ecf0;
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: 0.14em;
+}
+
+#menu #menu-meta-actions > button {
+  border-radius: 2px;
+  border-color: rgb(140 232 240 / 0.24);
+  background: rgb(255 255 255 / 0.05);
+  color: #d9edeb;
+  letter-spacing: 0.1em;
+  box-shadow: none;
+  transition:
+    border-color 140ms var(--p77-ease),
+    background-color 140ms var(--p77-ease),
+    color 140ms var(--p77-ease);
+}
+
+#menu #menu-meta-actions > button:hover:not(:disabled) {
+  border-color: var(--p77-accent-lit);
+  background: rgb(18 167 177 / 0.18);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 3 - the navigation rail becomes an instrument, not a black column.
+ * ------------------------------------------------------------------------ */
+
+#menu .command-rail {
+  border-right: 1px solid rgb(16 46 54 / 0.28);
+  background-color: var(--p77-dark-bottom);
+  background-image:
+    /* an accent rule down the inside edge */
+    linear-gradient(180deg, var(--p77-accent-lit) 0%, rgb(18 167 177 / 0) 62%),
+    /* a fine diagonal machining texture - invisible individually, it is what
+       stops the column reading as a flat fill */
+    repeating-linear-gradient(135deg, rgb(255 255 255 / 0.022) 0 2px, transparent 2px 6px),
+    linear-gradient(180deg, #1a343d 0%, #0d1f26 74%, #0a171d 100%);
+  background-repeat: no-repeat, repeat, no-repeat;
+  background-position: right top, 0 0, 0 0;
+  background-size: 2px 100%, auto, auto;
+}
+
+#menu .tactical-rail {
+  border-bottom-color: rgb(140 232 240 / 0.14);
+  color: var(--p77-dark-ink-soft);
+  letter-spacing: 0.14em;
+}
+
+#menu .tactical-rail b {
+  color: var(--p77-accent-lit);
+  letter-spacing: 0.1em;
+}
+
+/*
+ * Tabs. Tight geometry, an index numeral that reads as a technical label, and
+ * a left indicator that GROWS into place instead of a border colour snapping.
+ */
+#menu .command-rail .menu-tabs button {
+  position: relative;
+  border-radius: 2px;
+  border-color: transparent;
+  border-left-color: transparent;
+  color: #a8bfbd;
+  transition:
+    background-color 160ms var(--p77-ease),
+    color 160ms var(--p77-ease),
+    transform 160ms var(--p77-ease);
+}
+
+/* The indicator itself: a 3px accent bar, scaled from the centre. */
+#menu .command-rail .menu-tabs button::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--p77-accent-lit), var(--p77-accent));
+  transform: scaleY(0);
+  transform-origin: 50% 50%;
+  transition: transform 220ms var(--p77-ease);
+  pointer-events: none;
+}
+
+#menu .command-rail .menu-tabs button:hover {
+  transform: none;
+  background: rgb(255 255 255 / 0.05);
+  color: #ffffff;
+}
+
+#menu .command-rail .menu-tabs button:hover::before {
+  transform: scaleY(0.42);
+}
+
+#menu .command-rail .menu-tabs button.active {
+  border-color: rgb(140 232 240 / 0.22);
+  border-left-color: transparent;
+  background:
+    linear-gradient(90deg, rgb(18 167 177 / 0.30) 0%, rgb(18 167 177 / 0.05) 58%, transparent 100%);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+#menu .command-rail .menu-tabs button.active::before {
+  transform: scaleY(1);
+}
+
+#menu .command-rail .menu-tabs button i {
+  color: rgb(168 191 189 / 0.75);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: 0.14em;
+}
+
+#menu .command-rail .menu-tabs button.active i { color: var(--p77-accent-lit); }
+
+#menu .command-rail .menu-tabs button span { letter-spacing: 0.02em; }
+
+#menu .command-rail .menu-tabs button small { letter-spacing: 0.1em; }
+
+/* The Pass 75 "you are here" dot stays, retuned to the new accent and made
+   quieter - it is confirmation, not decoration. */
+#menu .command-rail .menu-tabs button.active::after {
+  right: 11px;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  background: var(--p77-accent-lit);
+}
+
+#menu .command-rail footer {
+  border-top-color: rgb(140 232 240 / 0.14);
+}
+
+#menu .command-rail footer span,
+#menu .command-rail footer small {
+  color: var(--p77-dark-ink-soft);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+
+#menu .command-rail footer strong { color: var(--p77-dark-ink); }
+
+/* ---------------------------------------------------------------------------
+ * PART 4 - the workspace surface.
+ * ------------------------------------------------------------------------ */
+
+/*
+ * The field the work sits on. The Pass 75 workspace was #ffffff -> #f2f6f5,
+ * which is not "light", it is blank: white cards on a white field have no
+ * separation and the whole panel reads as an unstyled document. This has a
+ * light source in the top-left, a deeper ground toward the bottom-right, and
+ * a soft vignette, so the white cards on top of it have somewhere to sit.
+ */
+#menu .command-workspace {
+  background-color: #e8f0ef;
+  background-image:
+    radial-gradient(76% 60% at 2% -4%, rgb(255 255 255 / 0.96) 0%, transparent 62%),
+    radial-gradient(120% 110% at 46% 40%, transparent 52%, rgb(10 40 46 / 0.075) 100%),
+    linear-gradient(rgb(27 74 77 / 0.038) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(27 74 77 / 0.038) 1px, transparent 1px),
+    linear-gradient(166deg, #f4f9f8 0%, #e4edec 62%, #dde8e7 100%);
+  background-size: auto, auto, 32px 32px, 32px 32px, auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(15 139 147 / 0.35) transparent;
+}
+
+#menu .command-workspace::-webkit-scrollbar { width: 10px; height: 10px; }
+#menu .command-workspace::-webkit-scrollbar-track { background: transparent; }
+
+#menu .command-workspace::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 6px;
+  background-clip: content-box;
+  background-color: rgb(15 139 147 / 0.30);
+}
+
+#menu .command-workspace::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(15 139 147 / 0.55);
+}
+
+/*
+ * Panel corner brackets. The Pass 75 sheet already draws eight gradient marks
+ * on `.menu-panel::before`; retuned here to the new accent and pulled tighter,
+ * so the framing reads as one system with the cards rather than as a second,
+ * larger frame around them.
+ */
+#menu .command-workspace .menu-panel::before {
+  inset: 2px;
+  border-radius: 0;
+  opacity: 0.7;
+  background:
+    linear-gradient(var(--p77-accent), var(--p77-accent)) left top / 16px 1.5px no-repeat,
+    linear-gradient(var(--p77-accent), var(--p77-accent)) left top / 1.5px 16px no-repeat,
+    linear-gradient(var(--p77-accent), var(--p77-accent)) right top / 16px 1.5px no-repeat,
+    linear-gradient(var(--p77-accent), var(--p77-accent)) right top / 1.5px 16px no-repeat,
+    linear-gradient(var(--p77-accent), var(--p77-accent)) left bottom / 16px 1.5px no-repeat,
+    linear-gradient(var(--p77-accent), var(--p77-accent)) left bottom / 1.5px 16px no-repeat,
+    linear-gradient(var(--p77-accent), var(--p77-accent)) right bottom / 16px 1.5px no-repeat,
+    linear-gradient(var(--p77-accent), var(--p77-accent)) right bottom / 1.5px 16px no-repeat;
+}
+
+/*
+ * PANEL TRANSITION. Switching a tab used to be a cut. Panels are toggled with
+ * the `hidden` attribute, which means display:none -> display:block, which
+ * means a CSS animation restarts every time - no JS, no class, no lifecycle
+ * change. 240 ms, comfortably inside the 450 ms the visual-review harness
+ * waits after a tab click, so evidence frames are never captured mid-motion.
+ */
+#menu .command-workspace .menu-panel:not([hidden]) {
+  animation: p77-panel-in 240ms var(--p77-ease) both;
+}
+
+@keyframes p77-panel-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 5 - one card language, everywhere.
+ *
+ * map-card, kit-card, killstreak-slot-card and the operator cards were four
+ * different treatments. They are one here: tight geometry, a hairline, accent
+ * corner brackets painted as background layers (no extra DOM, and `.kit-card`
+ * already owns its ::after), a top accent bar that grows on hover, and a
+ * selected state that reads three ways - fill, bar and edge.
+ * ------------------------------------------------------------------------ */
+
+#menu .map-card,
+#menu .kit-card,
+#menu .killstreak-slot-card,
+#menu .operator-skin-card,
+#menu .operator-anim-card {
+  --p77-cut: 14px;
+  position: relative;
+  border-radius: 0;
+  border: 1px solid var(--p77-hair-strong);
+  background-color: var(--p77-paper-lit);
+  background-image:
+    /* The chamfer hairline. A card is cut on the ANTI-diagonal of its corner
+       box (bottom-right), so this one is 135deg, and the band sits just inside
+       the clip. */
+    linear-gradient(135deg, transparent 0 calc(50% - 2px), var(--p77-accent) calc(50% - 2px) calc(50% - 0.4px), transparent calc(50% - 0.4px)),
+    /* top-left and top-right corner brackets; the bottom-right corner is the
+       chamfer, so a bracket there would be cut in half */
+    linear-gradient(var(--p77-accent-line), var(--p77-accent-line)),
+    linear-gradient(var(--p77-accent-line), var(--p77-accent-line)),
+    linear-gradient(var(--p77-accent-line), var(--p77-accent-line)),
+    linear-gradient(var(--p77-accent-line), var(--p77-accent-line)),
+    linear-gradient(172deg, #ffffff 0%, #ffffff 52%, #eef4f3 100%);
+  background-repeat: no-repeat;
+  background-position:
+    right bottom,
+    left 5px top 5px,
+    left 5px top 5px,
+    right 5px top 5px,
+    right 5px top 5px,
+    0 0;
+  background-size:
+    var(--p77-cut) var(--p77-cut),
+    var(--p77-bracket) 1px,
+    1px var(--p77-bracket),
+    var(--p77-bracket) 1px,
+    1px var(--p77-bracket),
+    auto;
+  /*
+   * Same angular language as the deck. clip-path takes the outer shadow with
+   * it, which is deliberate: a soft web drop shadow under every card was the
+   * most dated cue on the Pass 75 deck. Separation now comes from a real
+   * value difference against the field plus a hairline, which is how a modern
+   * shell does it.
+   */
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - var(--p77-cut)),
+    calc(100% - var(--p77-cut)) 100%,
+    0 100%);
+  box-shadow: none;
+  transition:
+    transform 180ms var(--p77-ease),
+    border-color 180ms var(--p77-ease),
+    background-color 180ms var(--p77-ease);
+}
+
+/* The growing top bar. Compositor-only (scaleX), so hovering a grid of cards
+   costs nothing. */
+#menu .map-card::before,
+#menu .killstreak-slot-card::before,
+#menu .operator-skin-card::before,
+#menu .operator-anim-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--p77-accent-lit), var(--p77-accent) 62%, transparent);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 220ms var(--p77-ease);
+  pointer-events: none;
+}
+
+#menu .map-card:hover,
+#menu .kit-card:hover,
+#menu .killstreak-slot-card:hover,
+#menu .operator-skin-card:hover,
+#menu .operator-anim-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--p77-accent);
+  background-color: #ffffff;
+}
+
+#menu .map-card:hover::before,
+#menu .killstreak-slot-card:hover::before,
+#menu .operator-skin-card:hover::before,
+#menu .operator-anim-card:hover::before {
+  transform: scaleX(0.42);
+}
+
+/* Selected: fill wash + a full accent bar + an inset edge. Three redundant
+   signals, so selection never depends on colour alone. */
+#menu .map-card.selected,
+#menu .kit-card.selected,
+#menu .killstreak-slot-card.is-previewed,
+#menu .operator-skin-card[aria-pressed='true'],
+#menu .operator-anim-card[aria-pressed='true'] {
+  border-color: var(--p77-accent);
+  background-color: #ffffff;
+  box-shadow: inset 3px 0 0 var(--p77-accent), inset 0 0 0 1px var(--p77-accent-line);
+}
+
+#menu .map-card.selected::before,
+#menu .killstreak-slot-card.is-previewed::before,
+#menu .operator-skin-card[aria-pressed='true']::before,
+#menu .operator-anim-card[aria-pressed='true']::before {
+  transform: scaleX(1);
+}
+
+/*
+ * CONTENT COLOURS FOR THE LIGHT CARD.
+ *
+ * `.kit-card` was the one card still painted as a near-black island
+ * (tactical-ui `@layer pass64.bright`), which is exactly the inconsistency
+ * Pass 74 removed from the Streaks panel. Bringing it onto the light card
+ * above means its inherited light-on-dark text has to come with it, or the
+ * preset name is white on white. Every value below is set explicitly rather
+ * than inherited, so no future background change can strand a label again.
+ */
+#menu .kit-card > strong,
+#menu .kit-card [data-custom-name] {
+  color: var(--p77-ink);
+}
+
+#menu .kit-card > p,
+#menu .kit-card > small {
+  color: var(--p77-ink-soft);
+}
+
+#menu .kit-card > i,
+#menu .kit-card .kit-modify-row small {
+  color: var(--p77-ink-quiet);
+}
+
+#menu .kit-card > span:not(.kit-modify-row) {
+  color: var(--p77-accent);
+}
+
+/* The weapon line. The inherited #ff9d24 fails against white; this is the same
+   family at a contrast that survives a bright screen. */
+#menu .kit-card > b {
+  color: #8a4c07;
+}
+
+#menu .kit-card.selected > strong,
+#menu .kit-card.selected [data-custom-name] {
+  color: var(--p77-accent);
+}
+
+#menu .kit-card em {
+  color: var(--p77-accent);
+}
+
+/* Wayfinding numerals read as technical indices. */
+#menu .map-card .map-index,
+#menu .killstreak-slot-card > span {
+  color: var(--p77-accent);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: 0.16em;
+}
+
+/*
+ * LEGIBILITY REPAIR, not a taste call. `.map-card` is a two-column grid
+ * (tactical-ui.css:604, `31px 1fr`) whose `.map-index` badge spans both
+ * declared rows. The rules line - "5 MIN - 1 BOT - +1 / 10 DEFEATS - MAX 6" -
+ * is the fourth child, so auto-placement dropped it into an IMPLICIT third row
+ * in the 31px column, where it wrapped to roughly one word per line. It is
+ * unreadable in every captured review frame at every viewport, in the Pass 75
+ * build as well as this one.
+ *
+ * `1 / -1` rather than `2 / -1` so the fix survives the narrow breakpoints
+ * where the card collapses to a single column.
+ */
+#menu .map-card small {
+  grid-column: 1 / -1;
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 6 - voice. One decisive action; everything else stays quiet.
+ * ------------------------------------------------------------------------ */
+
+#menu .menu-actions button,
+#menu .join-row button,
+#menu .small-button,
+#menu .lobby-actions button {
+  border-radius: 2px;
+  letter-spacing: 0.08em;
+  transition:
+    transform 140ms var(--p77-ease),
+    box-shadow 140ms var(--p77-ease),
+    border-color 140ms var(--p77-ease),
+    background-color 140ms var(--p77-ease),
+    filter 140ms var(--p77-ease);
+}
+
+#menu .menu-actions button.primary,
+#menu .menu-actions #solo,
+#menu .lobby-actions button.primary {
+  --p77-cut: 10px;
+  /* The primary action carries the same chamfer as the deck and the cards, so
+     "this is the button that launches the game" is legible from silhouette. */
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - var(--p77-cut)),
+    calc(100% - var(--p77-cut)) 100%,
+    0 100%);
+  border-color: #08151a;
+  background-color: #0f2229;
+  background-image:
+    /* the accent underline that makes the primary read as armed */
+    linear-gradient(90deg, var(--p77-accent-lit) 0%, var(--p77-accent) 46%, transparent 92%),
+    linear-gradient(180deg, #16303a 0%, #0b1a20 100%);
+  background-repeat: no-repeat;
+  background-position: left bottom, 0 0;
+  background-size: 100% 2px, auto;
+  color: #f1fbfa;
+  font-weight: 800;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.13);
+}
+
+#menu .menu-actions button.primary:hover:not(:disabled),
+#menu .menu-actions #solo:hover:not(:disabled),
+#menu .lobby-actions button.primary:hover:not(:disabled) {
+  background-color: #163038;
+  background-image:
+    linear-gradient(90deg, var(--p77-accent-lit) 0%, var(--p77-accent) 62%, rgb(18 167 177 / 0.2) 100%),
+    linear-gradient(180deg, #1d3f4a 0%, #10242c 100%);
+  transform: translateY(-1px);
+}
+
+#menu .menu-actions #resume {
+  border-color: var(--p77-accent);
+  background-image: linear-gradient(180deg, var(--p77-accent-lit) 0%, var(--p77-accent) 100%);
+  color: #04191c;
+  font-weight: 800;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28), var(--p77-lift-hover);
+}
+
+/* One quiet secondary, not four different treatments. */
+#menu .menu-actions button:not(.primary):not(#resume):not(#solo),
+#menu .join-row button,
+#menu .small-button {
+  border: 1px solid var(--p77-hair-strong);
+  background-color: #ffffff;
+  background-image: linear-gradient(180deg, #ffffff 0%, #f2f7f6 100%);
+  color: var(--p77-ink);
+  font-weight: 700;
+}
+
+#menu .menu-actions button:not(.primary):not(#resume):not(#solo):hover:not(:disabled),
+#menu .join-row button:hover:not(:disabled),
+#menu .small-button:hover:not(:disabled) {
+  border-color: var(--p77-accent);
+  color: #0b5c62;
+  transform: translateY(-1px);
+  box-shadow: var(--p77-lift-hover);
+}
+
+#menu .menu-actions button:active:not(:disabled),
+#menu .join-row button:active:not(:disabled),
+#menu .small-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--p77-lift);
+}
+
+/* A keyboard path that is unmistakable on both the light and dark surfaces. */
+#menu button:focus-visible,
+#menu input:focus-visible,
+#menu select:focus-visible,
+#menu .map-card:focus-visible,
+#menu .kit-card:focus-visible,
+#menu summary:focus-visible {
+  outline: 2px solid var(--p77-accent-lit);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px rgb(18 167 177 / 0.18);
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 7 - type hierarchy and section rhythm.
+ * ------------------------------------------------------------------------ */
+
+/*
+ * Eyebrows only. `.kit-heading small` is deliberately NOT in this list: on the
+ * Streaks panel it carries a full sentence ("Slots 3 and 4 must be different
+ * ..."), and wide label tracking on running prose is a legibility regression,
+ * not a style. It keeps body treatment below.
+ */
+#menu .arena-brief .eyebrow,
+#menu .map-selector-heading span,
+#menu .manifest-heading small {
+  color: var(--p77-accent);
+  letter-spacing: 0.2em;
+}
+
+#menu .kit-heading small {
+  padding-left: 0;
+  color: var(--p77-ink-soft);
+  letter-spacing: 0.01em;
+}
+
+/* ...which means its Pass 75 marker has to go with it, or a lone accent dash
+   floats to the left of a wrapped sentence. */
+#menu .kit-heading small::before {
+  content: none;
+}
+
+#menu #arena-title,
+#menu .kit-heading b,
+#menu .manifest-heading strong {
+  color: var(--p77-ink);
+  letter-spacing: -0.01em;
+}
+
+#menu .arena-brief .lede,
+#menu .manifest-heading span,
+#menu .kit-heading span {
+  color: var(--p77-ink-soft);
+}
+
+/* The Pass 75 diamond section marker, retuned: a 2px accent rule reads as
+   instrument chrome where a rotated square read as a bullet point. */
+#menu .manifest-heading small::before,
+#menu .map-selector-heading span::before {
+  top: 50%;
+  width: 6px;
+  height: 2px;
+  transform: translateY(-50%);
+  background: var(--p77-accent);
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 8 - form controls. The single most dated surface on the deck was the
+ * stock browser slider in its stock browser orange.
+ * ------------------------------------------------------------------------ */
+
+/* `appearance: none` collapses the intrinsic height Chrome gives a range, so
+   the height is restated explicitly and matches what the UA control already
+   occupied - the rows around it do not move. */
+#menu input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 18px;
+  background: transparent;
+  cursor: pointer;
+}
+
+#menu input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--p77-accent) 0%, var(--p77-accent-lit) 100%);
+  box-shadow: inset 0 0 0 1px rgb(4 24 27 / 0.25);
+}
+
+#menu input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 2px solid var(--p77-accent);
+  border-radius: 2px;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgb(4 24 27 / 0.35);
+  transition: transform 120ms var(--p77-ease), border-color 120ms var(--p77-ease);
+}
+
+#menu input[type='range']:hover::-webkit-slider-thumb,
+#menu input[type='range']:focus-visible::-webkit-slider-thumb {
+  transform: scale(1.15);
+  border-color: var(--p77-accent-lit);
+}
+
+#menu input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--p77-accent) 0%, var(--p77-accent-lit) 100%);
+}
+
+#menu input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--p77-accent);
+  border-radius: 2px;
+  background: #ffffff;
+}
+
+#menu input[type='checkbox'],
+#menu input[type='radio'] {
+  accent-color: var(--p77-accent);
+}
+
+#menu .setup-grid input,
+#menu .setup-grid select,
+#menu .join-row input,
+#menu .lobby-settings select,
+#menu .loadout-manager-grid input,
+#menu .loadout-manager-grid select {
+  border-radius: 2px;
+  border: 1px solid var(--p77-hair-strong);
+  background-color: #ffffff;
+  color: var(--p77-ink);
+  transition: border-color 140ms var(--p77-ease), box-shadow 140ms var(--p77-ease);
+}
+
+#menu .setup-grid input:hover,
+#menu .setup-grid select:hover,
+#menu .join-row input:hover,
+#menu .lobby-settings select:hover {
+  border-color: var(--p77-accent-line);
+}
+
+#menu .setup-grid label,
+#menu .lobby-settings label,
+#menu .loadout-manager-grid label {
+  color: var(--p77-ink-quiet);
+  letter-spacing: 0.16em;
+}
+
+/* Legacy 7px/8px lobby and settings labels sat under the AGENTS.md floor. */
+#menu .lobby-settings label,
+#menu .settings-grid label {
+  font-size: 10px;
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 9 - the dark surfaces become the SAME instrument sheet as the HUD.
+ *
+ * Options, the showcase and the streaks preview rail were three separate
+ * near-black treatments. Giving them one sheet is what makes the deck read as
+ * a single product with a light command surface and dark instrument surfaces,
+ * instead of as an accident of four unreconciled palettes.
+ * ------------------------------------------------------------------------ */
+
+#menu #menu-panel-options .settings-grid,
+#menu #menu-panel-options .settings-section,
+#menu #menu-panel-options #key-bindings-settings {
+  border-radius: var(--p77-radius);
+  border: 1px solid var(--p77-dark-hair);
+  background-color: var(--p77-dark-bottom);
+  background-image:
+    linear-gradient(var(--p77-dark-hair-lit), var(--p77-dark-hair-lit)),
+    linear-gradient(var(--p77-dark-hair-lit), var(--p77-dark-hair-lit)),
+    linear-gradient(var(--p77-dark-hair-lit), var(--p77-dark-hair-lit)),
+    linear-gradient(var(--p77-dark-hair-lit), var(--p77-dark-hair-lit)),
+    linear-gradient(178deg, rgb(22 50 59 / 0.96) 0%, rgb(11 26 32 / 0.98) 100%);
+  background-repeat: no-repeat;
+  background-position:
+    left 5px top 5px,
+    left 5px top 5px,
+    right 5px bottom 5px,
+    right 5px bottom 5px,
+    0 0;
+  background-size:
+    var(--p77-bracket) 1px,
+    1px var(--p77-bracket),
+    var(--p77-bracket) 1px,
+    1px var(--p77-bracket),
+    auto;
+  box-shadow: inset 0 1px 0 rgb(214 246 250 / 0.10), 0 12px 30px rgb(4 16 20 / 0.28);
+}
+
+/*
+ * A real contrast failure in the shipped build, not a taste call: the three
+ * top-level Options cells (MOUSE SENSITIVITY / CONTROLLER LOOK / FIELD OF
+ * VIEW) kept `background: #ffffff` from the `pass64.bright` layer while
+ * pass66-readability.css set their label colour to #c4d8d7 - light grey text
+ * on white. Nothing later set the background, so the two rules never met.
+ * The cells now sit on the dark instrument sheet their own grid already has.
+ */
+#menu #menu-panel-options > .settings-grid label {
+  background: transparent;
+  border-right-color: var(--p77-dark-hair);
+  box-shadow: none;
+}
+
+#menu #menu-panel-options .settings-section > header {
+  letter-spacing: 0.1em;
+}
+
+#menu #menu-panel-options .settings-section > header span,
+#menu #menu-panel-options .advanced-settings summary small {
+  color: var(--p77-accent-lit);
+}
+
+#menu #menu-panel-options .graphics-preset-row select,
+#menu #menu-panel-options .advanced-settings,
+#menu #menu-panel-options .privacy-setting-row,
+#menu #menu-panel-options .controls {
+  border-radius: 2px;
+  border-color: var(--p77-dark-hair);
+}
+
+#menu #menu-panel-options {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(18 167 177 / 0.45) transparent;
+}
+
+/* The killstreak preview rail and the arena showcase share the sheet too. */
+#menu #menu-showcase,
+#menu #killstreak-demo-rail {
+  border-radius: var(--p77-radius);
+  border: 1px solid rgb(16 46 54 / 0.22);
+  box-shadow: 0 2px 6px rgb(12 34 40 / 0.08), 0 18px 40px rgb(12 34 40 / 0.14);
+}
+
+/*
+ * The showcase gets an optic frame instead of the legacy amber clip-path
+ * plate: corner brackets in the accent plus a floor gradient, so the video
+ * reads as a viewport rather than as a picture pasted into the page.
+ */
+#menu #menu-showcase::before {
+  background:
+    linear-gradient(rgb(140 232 240 / 0.75), rgb(140 232 240 / 0.75)) left 10px top 10px / 18px 1.5px no-repeat,
+    linear-gradient(rgb(140 232 240 / 0.75), rgb(140 232 240 / 0.75)) left 10px top 10px / 1.5px 18px no-repeat,
+    linear-gradient(rgb(140 232 240 / 0.75), rgb(140 232 240 / 0.75)) right 10px top 10px / 18px 1.5px no-repeat,
+    linear-gradient(rgb(140 232 240 / 0.75), rgb(140 232 240 / 0.75)) right 10px top 10px / 1.5px 18px no-repeat,
+    linear-gradient(0deg, rgb(5 16 19 / 0.55), transparent 34%);
+}
+
+/*
+ * The showcase telemetry chip printed its two labels as one run-on string
+ * ("PRERECORDED HELO // NUKE TOWNAUTHORED COCKPIT FLYOVER" in the captured
+ * frame) because they are adjacent inline children with no separation. One
+ * gap, inside one chip - no surface moves.
+ */
+#menu .showcase-telemetry {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  border-radius: 2px;
+  border-color: rgb(140 232 240 / 0.4);
+}
+
+#menu .showcase-telemetry b {
+  color: var(--p77-accent-lit);
+  letter-spacing: 0.12em;
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 10 - motion gates. Both switches, for every animation and transition
+ * introduced above. Under either switch the deck is completely static and
+ * every state is still legible from fill, bar and edge - the redundancy in
+ * PART 5 exists precisely so that removing motion costs no information.
+ * ------------------------------------------------------------------------ */
+
+html[data-reduced-motion='true'] #menu.pass64-command-deck::after,
+html[data-reduced-motion='true'] #menu .command-workspace .menu-panel:not([hidden]) {
+  animation: none;
+}
+
+html[data-reduced-motion='true'] #menu .command-rail .menu-tabs button,
+html[data-reduced-motion='true'] #menu .command-rail .menu-tabs button::before,
+html[data-reduced-motion='true'] #menu .map-card,
+html[data-reduced-motion='true'] #menu .kit-card,
+html[data-reduced-motion='true'] #menu .killstreak-slot-card,
+html[data-reduced-motion='true'] #menu .operator-skin-card,
+html[data-reduced-motion='true'] #menu .operator-anim-card,
+html[data-reduced-motion='true'] #menu .map-card::before,
+html[data-reduced-motion='true'] #menu .killstreak-slot-card::before,
+html[data-reduced-motion='true'] #menu .operator-skin-card::before,
+html[data-reduced-motion='true'] #menu .operator-anim-card::before,
+html[data-reduced-motion='true'] #menu .menu-actions button,
+html[data-reduced-motion='true'] #menu .join-row button,
+html[data-reduced-motion='true'] #menu .small-button,
+html[data-reduced-motion='true'] #menu input[type='range']::-webkit-slider-thumb {
+  transition: none;
+}
+
+html[data-reduced-motion='true'] #menu .map-card:hover,
+html[data-reduced-motion='true'] #menu .kit-card:hover,
+html[data-reduced-motion='true'] #menu .killstreak-slot-card:hover,
+html[data-reduced-motion='true'] #menu .operator-skin-card:hover,
+html[data-reduced-motion='true'] #menu .operator-anim-card:hover,
+html[data-reduced-motion='true'] #menu .menu-actions button:hover:not(:disabled),
+html[data-reduced-motion='true'] #menu .join-row button:hover:not(:disabled),
+html[data-reduced-motion='true'] #menu .small-button:hover:not(:disabled) {
+  transform: none;
+}
+
+/* Hover and selection still SHOW - the bar is simply already at full width
+   instead of growing into it. */
+html[data-reduced-motion='true'] #menu .map-card:hover::before,
+html[data-reduced-motion='true'] #menu .killstreak-slot-card:hover::before,
+html[data-reduced-motion='true'] #menu .operator-skin-card:hover::before,
+html[data-reduced-motion='true'] #menu .operator-anim-card:hover::before,
+html[data-reduced-motion='true'] #menu .command-rail .menu-tabs button:hover::before {
+  transform: scaleX(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #menu.pass64-command-deck::after,
+  #menu .command-workspace .menu-panel:not([hidden]) {
+    animation: none;
+  }
+
+  #menu .command-rail .menu-tabs button,
+  #menu .command-rail .menu-tabs button::before,
+  #menu .map-card,
+  #menu .kit-card,
+  #menu .killstreak-slot-card,
+  #menu .operator-skin-card,
+  #menu .operator-anim-card,
+  #menu .map-card::before,
+  #menu .killstreak-slot-card::before,
+  #menu .operator-skin-card::before,
+  #menu .operator-anim-card::before,
+  #menu .menu-actions button,
+  #menu .join-row button,
+  #menu .small-button,
+  #menu input[type='range']::-webkit-slider-thumb {
+    transition: none;
+  }
+
+  #menu .map-card:hover,
+  #menu .kit-card:hover,
+  #menu .killstreak-slot-card:hover,
+  #menu .operator-skin-card:hover,
+  #menu .operator-anim-card:hover,
+  #menu .menu-actions button:hover:not(:disabled),
+  #menu .join-row button:hover:not(:disabled),
+  #menu .small-button:hover:not(:disabled) {
+    transform: none;
+  }
+
+  #menu .map-card:hover::before,
+  #menu .killstreak-slot-card:hover::before,
+  #menu .operator-skin-card:hover::before,
+  #menu .operator-anim-card:hover::before,
+  #menu .command-rail .menu-tabs button:hover::before {
+    transform: scaleX(1);
+  }
+}
+
+/* The sensory switch drops the deck bloom and the chrome blur outright. */
+html[data-reduced-sensory='true'] #menu.pass64-command-deck::after {
+  display: none;
+}
+
+html[data-reduced-sensory='true'] #menu .command-header {
+  background-image: linear-gradient(180deg, #16303a 0%, #0d1f26 100%);
+}

@@ -1,0 +1,826 @@
+/*
+ * Pass 77 / HF-370 - HUD material and diegetic motion.
+ *
+ * Owner verdict on the Pass 75 build: the HUD and menus "still look dated ...
+ * not like a game that's 20 years old, more like a modern game", and
+ * specifically "maybe not even pinned directly to the screen ... dynamic with
+ * how you look and move like most modern first person shooters".
+ *
+ * SCOPE DISCIPLINE. Layout and functionality are unchanged. This sheet does
+ * not move a surface, does not rename an id, does not change a grid, a width,
+ * a padding or a font-size floor. Every geometry token in pass65-hud.css
+ * (--hud-edge / -gap / -mission-width / -map-width / -operator-width /
+ * -weapon-width / -support-width) is inherited untouched. What changes is the
+ * MATERIAL, the TYPE TREATMENT and whether the thing moves.
+ *
+ * WHAT WAS ACTUALLY DATED (read off the captured frames, not guessed):
+ *   1. The panels were flat translucent slabs. A slab with one hairline and a
+ *      10px web-card radius is a 2010 dashboard, not an instrument. There was
+ *      no material: no blur behind the glass, no light falling across it, no
+ *      manufactured edge.
+ *   2. Every panel was a plain rectangle. Modern shooter HUDs read as
+ *      instruments because of micro-detail - bracket ticks, segment breaks,
+ *      chamfered corners, a rule that means something. None of that existed.
+ *   3. Colour was decorative. Cyan on the map frame, cyan on the mission rule,
+ *      cyan on the weapon rule, amber on support: four accents that all meant
+ *      "this is a border". Accent that always fires never signals anything.
+ *   4. The HUD was welded to the viewport. Nothing lagged, nothing breathed,
+ *      so it read as a browser overlay pasted on top of a 3D scene rather than
+ *      as equipment the operator is carrying.
+ *
+ * THE REPLACEMENT, in one grammar:
+ *   material = translucent sheet + real backdrop blur + a top light edge +
+ *              a tight 2px radius; depth comes from the blur and one soft
+ *              cast, never from a shadow on every child
+ *   detail   = corner brackets and tick strips painted as BACKGROUND LAYERS
+ *              (no extra DOM, no extra pseudo-element cost) so a panel reads
+ *              as a machined part
+ *   colour   = neutral hairlines by default; accent only where it means
+ *              something - operator condition, weapon state, live support,
+ *              the newest killfeed row, danger
+ *   type     = tabular lining numerals everywhere a value changes, tight
+ *              tracking on display values, wide tracking on quiet labels
+ *   motion   = diegetic sway + idle breathing (see PART 5)
+ *
+ * CASCADE: unlayered and imported after pass75-menu-redesign.css, for the
+ * documented reason - pass66-readability.css is itself unlayered and therefore
+ * outranks every @layer, so a sheet written into a layer could not land.
+ *
+ * COMBAT SAFETY: nothing here paints inside the middle of the screen, nothing
+ * covers an enemy, and the crosshair / hitmarker / damage numbers / scopes /
+ * gunner reticle are explicitly excluded from every motion rule below. The
+ * sway amplitude is capped in the maths (pass77-hud-sway.ts clamps to +-1) and
+ * again in CSS (the largest lag multiplier is 10px).
+ *
+ * ACCESSIBILITY: every motion effect is gated by BOTH switches this repo uses
+ * - `@media (prefers-reduced-motion: reduce)` and `html[data-reduced-motion]`
+ * - and the glow is additionally flattened by `html[data-reduced-sensory]`.
+ * No rule here sets a font-size below the AGENTS.md floors; the two rules that
+ * touch size RAISE 8px legacy text to 9px.
+ */
+
+/* ---------------------------------------------------------------------------
+ * PART 0 - the wired inputs.
+ *
+ * These are the contract between this sheet and the runtime. They are
+ * registered rather than plain custom properties so that (a) an unwired build
+ * still gets a sane typed default instead of an invalid-at-computed-value
+ * cascade, and (b) the value is animatable and interpolable if a future lane
+ * wants to ease one.
+ *
+ * --hud-sway-x   -1..1  normalised horizontal look lag (+ = camera turned right)
+ * --hud-sway-y   -1..1  normalised vertical look lag   (+ = camera pitched up)
+ * --hud-breathe   0..1  movement intensity; scales the idle bob
+ * --hud-health    0..1  operator condition, drives the semantic vitals ramp
+ *
+ * All four are OPTIONAL. Unwired, the HUD still gets its idle breathing (PART
+ * 5) and a full-health green ramp, so the build improves before the wiring
+ * lands. See wiringNotes for the exact one-line call.
+ * ------------------------------------------------------------------------ */
+
+@property --hud-sway-x {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --hud-sway-y {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --hud-breathe {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --hud-health {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 1 - one material, expressed once.
+ * ------------------------------------------------------------------------ */
+
+#hud {
+  /*
+   * Sheet fills, expressed as a SCRIM rather than a box fill: dense against
+   * the screen edge the cluster is anchored to, thinning toward the open edge.
+   * That is the difference between "a panel is sitting on the game" and "the
+   * readout is printed on the world" - a uniformly filled rectangle is the
+   * single most dated thing a HUD can do, and it is what Pass 75 shipped.
+   * Depth comes from the blur behind the glass, not from opacity.
+   */
+  --p77-sheet-dense: rgb(9 25 33 / 0.80);
+  --p77-sheet-thin: rgb(6 18 26 / 0.40);
+  --p77-sheet-quiet-top: rgb(12 30 38 / 0.44);
+  --p77-sheet-quiet-bottom: rgb(3 11 16 / 0.30);
+  /* Direction of the scrim. Overridden per cluster so every panel fades AWAY
+     from its anchored screen edge. */
+  --p77-fade: 176deg;
+
+  /* Edges. Neutral by default so an accent edge can actually mean something. */
+  --p77-line: rgb(176 220 228 / 0.15);
+  --p77-line-lit: rgb(198 240 245 / 0.30);
+  --p77-sheen: rgb(224 252 255 / 0.15);
+  --p77-tick: rgb(176 220 228 / 0.34);
+
+  /* Semantic accents. Each one has exactly one job. */
+  --p77-friendly: var(--hud-cyan, #66ebe1);
+  --p77-good: var(--hud-green, #70e8b0);
+  --p77-caution: var(--hud-amber, #f2b74f);
+  --p77-danger: var(--hud-coral, #ff776d);
+
+  /* Elevation. ONE cast, on the panel, never on its children. */
+  --p77-cast: 0 10px 26px rgb(0 0 0 / 0.34);
+  --p77-glass: blur(10px) saturate(1.45);
+
+  --p77-radius: 2px;
+  --p77-bracket: 13px;
+  --p77-ease: cubic-bezier(0.2, 0.72, 0.28, 1);
+
+  /* Per-cluster diegetic lag, in px at |sway| = 1. Overridden per cluster in
+     PART 5; declared here so the ceiling is visible in one place. */
+  --p77-lag: 6;
+}
+
+/*
+ * The shared sheet. Applied to the panels a player reads, so the five clusters
+ * stop looking like five separate products.
+ *
+ * The background stack is, front to back:
+ *   1-4  corner bracket ticks (top-left and bottom-right L marks)
+ *   5    a tick strip along the bottom edge - segment breaks, the single
+ *        cheapest thing that makes a rectangle read as an instrument
+ *   6    the graded sheet itself, lit from the top
+ * All six are background layers on ONE element: no extra DOM, no extra
+ * pseudo-element, and the whole thing is a single paint.
+ */
+#hud #matchbar,
+#hud .hud-map-console,
+#hud .hud-operator-console,
+#hud #weapon-block,
+#hud #support-block {
+  border-radius: var(--p77-radius);
+  border: 1px solid var(--p77-line);
+  background-image:
+    linear-gradient(var(--p77-line-lit), var(--p77-line-lit)),
+    linear-gradient(var(--p77-line-lit), var(--p77-line-lit)),
+    linear-gradient(var(--p77-line-lit), var(--p77-line-lit)),
+    linear-gradient(var(--p77-line-lit), var(--p77-line-lit)),
+    linear-gradient(var(--p77-fade), var(--p77-sheet-dense) 0%, var(--p77-sheet-thin) 100%);
+  background-repeat: no-repeat;
+  background-position:
+    left 4px top 4px,
+    left 4px top 4px,
+    right 4px bottom 4px,
+    right 4px bottom 4px,
+    0 0;
+  background-size:
+    var(--p77-bracket) 1px,
+    1px var(--p77-bracket),
+    var(--p77-bracket) 1px,
+    1px var(--p77-bracket),
+    auto;
+  box-shadow:
+    var(--p77-cast),
+    inset 0 1px 0 var(--p77-sheen);
+  -webkit-backdrop-filter: var(--p77-glass);
+  backdrop-filter: var(--p77-glass);
+}
+
+/*
+ * The two clusters read under fire get the denser sheet and a semantic edge.
+ * Everything else recedes, which is the whole point of an accent.
+ */
+#hud .hud-operator-console,
+#hud #weapon-block {
+  --p77-sheet-dense: rgb(11 30 39 / 0.88);
+  --p77-sheet-thin: rgb(5 15 22 / 0.52);
+  border-color: var(--p77-line-lit);
+}
+
+/*
+ * Scrim direction, per cluster. Each one thins away from the screen edge it is
+ * anchored to, so the dense part is always where the panel meets the frame and
+ * the open part is always where it meets the game.
+ */
+#hud #matchbar { --p77-fade: 118deg; }
+#hud .hud-map-console { --p77-fade: 214deg; }
+#hud .hud-operator-console { --p77-fade: 28deg; }
+#hud #weapon-block { --p77-fade: 0deg; }
+#hud #support-block { --p77-fade: 268deg; }
+
+/*
+ * Ambient chips. Same sheet, no brackets, no cast: these are short strips and
+ * a 13px bracket on a 28px-tall strip is noise, not detail. They read as the
+ * quiet layer of the same system rather than as a fifth border weight.
+ */
+#hud #objective,
+#hud #fps-counter,
+#hud #pause-hint,
+#hud #adrenaline-hud {
+  border-radius: var(--p77-radius);
+  border: 1px solid var(--p77-line);
+  background-image: linear-gradient(var(--p77-fade), var(--p77-sheet-quiet-top) 0%, var(--p77-sheet-quiet-bottom) 100%);
+  box-shadow: inset 0 1px 0 var(--p77-sheen);
+  -webkit-backdrop-filter: blur(6px) saturate(1.25);
+  backdrop-filter: blur(6px) saturate(1.25);
+}
+
+/*
+ * INNER surfaces. These live INSIDE a sheet, so they must never repeat the
+ * sheet: a blurred panel nested in a blurred panel pays twice for a backdrop
+ * that is already opaque, and stacking two casts is exactly the "flat slab on
+ * a flat slab" look this pass is removing. They get a hairline and a wash and
+ * nothing else.
+ */
+#hud #combat-stats,
+#hud #network-strip span,
+#hud #map-heading,
+#hud #location-label {
+  border-radius: 1px;
+  border: 1px solid rgb(176 220 228 / 0.10);
+  background-color: rgb(1 8 12 / 0.42);
+  background-image: linear-gradient(178deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0));
+  box-shadow: none;
+}
+
+/*
+ * SINGLE SOURCE OF MATERIAL. pass75-hud-redesign.css gave these four a full
+ * 10px-radius bordered glass panel of their own. Three of them live INSIDE a
+ * cluster that now carries the sheet, and the fourth is a list container that
+ * is empty most of the match - so what shipped was a panel inside a panel, and
+ * a bordered empty rectangle, both of which are the exact "flat slab" reading
+ * this pass removes. They are reset to nothing and their CONTENT carries the
+ * treatment instead.
+ */
+#hud #health-block,
+#hud #room-hud,
+#hud #killfeed {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Divider rules are painted as background layers, never as borders or padding,
+   so a hierarchy cue can be added without moving a single box. */
+#hud #equipment-block {
+  background-image: linear-gradient(var(--p77-line), var(--p77-line));
+  background-repeat: no-repeat;
+  background-position: left top;
+  background-size: 100% 1px;
+}
+
+/*
+ * Segment breaks. A 4px row of 1px ticks along the bottom edge of the mission
+ * bar and the weapon block. This is the detail that separates "instrument"
+ * from "rounded rectangle", and it costs one extra background layer.
+ */
+#hud #matchbar,
+#hud #weapon-block,
+#hud #support-block {
+  background-image:
+    linear-gradient(var(--p77-line-lit), var(--p77-line-lit)),
+    linear-gradient(var(--p77-line-lit), var(--p77-line-lit)),
+    linear-gradient(var(--p77-line-lit), var(--p77-line-lit)),
+    linear-gradient(var(--p77-line-lit), var(--p77-line-lit)),
+    repeating-linear-gradient(90deg, var(--p77-tick) 0 1px, transparent 1px 8px),
+    linear-gradient(var(--p77-fade), var(--p77-sheet-dense) 0%, var(--p77-sheet-thin) 100%);
+  background-position:
+    left 4px top 4px,
+    left 4px top 4px,
+    right 4px bottom 4px,
+    right 4px bottom 4px,
+    left 10px bottom 0,
+    0 0;
+  background-size:
+    var(--p77-bracket) 1px,
+    1px var(--p77-bracket),
+    var(--p77-bracket) 1px,
+    1px var(--p77-bracket),
+    calc(100% - 20px) 4px,
+    auto;
+}
+
+/*
+ * Semantic edges. One rule per cluster, and each colour is a claim:
+ *   green  = operator condition
+ *   cyan   = weapon / friendly systems
+ *   amber  = field support, i.e. something you can spend
+ * The map console keeps a NEUTRAL edge, because "there is a map here" is not
+ * information worth an accent.
+ */
+#hud .hud-operator-console { border-left: 2px solid var(--p77-good); }
+#hud #weapon-block { border-bottom: 2px solid var(--p77-friendly); }
+#hud #support-block { border-right: 2px solid var(--p77-caution); }
+#hud #matchbar { border-left: 2px solid var(--p77-friendly); }
+#hud .hud-map-console { border-top: 1px solid var(--p77-line-lit); }
+
+/* ---------------------------------------------------------------------------
+ * PART 2 - type. Tight technical values, quiet wide labels.
+ * ------------------------------------------------------------------------ */
+
+/* Every changing value is tabular and lining, so digits never reflow the
+   layout underneath them mid-firefight. */
+#hud #health,
+#hud #ammo,
+#hud #reserve,
+#hud #timer,
+#hud #aqua-score,
+#hud #coral-score,
+#hud #damage-dealt,
+#hud #damage-taken,
+#hud #support-streak,
+#hud #overdrive-time,
+#hud #respawn-countdown,
+#hud #adrenaline-time,
+#hud #fps-counter b,
+#hud #map-heading,
+#hud .support-meta small,
+#hud #damage-numbers strong,
+#hud #damage-done-feed > *,
+#hud #damage-taken-feed > * {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+}
+
+/* Display values: tighter tracking reads modern; loose tracking reads 2005. */
+#hud #health,
+#hud #ammo,
+#hud #timer {
+  letter-spacing: -0.015em;
+}
+
+/* Quiet labels: wide, small-caps-ish, dim. They are wayfinding, not content. */
+#hud #match-mode-label,
+#hud #map-heading,
+#hud #support-title,
+#hud .support-help,
+#hud #objective,
+#hud #fps-counter span,
+#hud .reserve-stack > small,
+#hud #health-block span,
+#hud #equipment-block small {
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* Legacy 8px labels inside the Chopper cockpit sat under the AGENTS.md 9px
+   floor. Raised, not removed - density is preserved. */
+#gunner-cockpit-hud[data-support-kind='chopper-gunner'] .gunner-status span,
+#gunner-cockpit-hud .gunner-readout small {
+  font-size: 9px;
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 3 - the instruments themselves.
+ * ------------------------------------------------------------------------ */
+
+/*
+ * VITALS. The track becomes a segmented gauge (ten cells, so a glance reads a
+ * quantity rather than a smear) and the fill carries a CONTINUOUS semantic
+ * ramp driven by --hud-health.
+ *
+ * The ramp is a red wash whose ALPHA is (1 - health), composited over the
+ * healthy green. Unwired, --hud-health is 1, the wash is fully transparent and
+ * the bar is exactly the healthy colour - so this never looks wrong before the
+ * one-line wiring lands. Wired, condition is legible from colour alone,
+ * redundantly with the width, which is the accessibility requirement.
+ */
+#hud .health-track {
+  position: relative;
+  border-radius: 1px;
+  background: rgb(1 7 11 / 0.78);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.6);
+  overflow: hidden;
+}
+
+#hud #health-fill {
+  /*
+   * The wash only starts biting below 70% condition and reaches full danger at
+   * zero, so a scratch does not repaint the bar and "I am in trouble" is a
+   * distinct read rather than a continuous muddy blend. max() keeps the alpha
+   * clamped at the healthy end without a second rule.
+   */
+  --p77-hurt: calc(max(0, 0.7 - var(--hud-health, 1)) / 0.7);
+  border-radius: 0;
+  background-color: var(--p77-good);
+  background-image:
+    linear-gradient(90deg,
+      rgb(255 96 82 / calc(var(--p77-hurt) * 100%)) 0%,
+      rgb(255 96 82 / calc(var(--p77-hurt) * 100%)) 100%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.20) 0%, rgb(255 255 255 / 0) 62%);
+  box-shadow: 0 0 10px rgb(112 232 176 / 0.22);
+  transition: width 160ms var(--p77-ease), background-color 260ms var(--p77-ease);
+}
+
+/* Ten segment breaks over the whole track, so the fill reads as cells. */
+#hud .health-track::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 calc(10% - 1px),
+    rgb(1 7 11 / 0.72) calc(10% - 1px) 10%);
+}
+
+/* Kept so a lane that later sets the attribute still gets a discrete state,
+   on top of the continuous ramp above. */
+#hud #health-block[data-health-state='wounded'] #health-fill { background-color: var(--p77-caution); }
+#hud #health-block[data-health-state='critical'] #health-fill { background-color: var(--p77-danger); }
+
+/*
+ * FIELD SUPPORT. The runtime sets `.ready` and `.controller-selected` on the
+ * `<b role="listitem">` rows (legacy-main.ts:20716-20717). The Pass 75 sheet
+ * targeted `[data-support-state]` and `.is-ready`, which this markup has never
+ * emitted - those rules were dead, which is why the rail still looked flat.
+ * These select the classes the runtime actually sets.
+ */
+#hud .support-list b {
+  border-radius: 1px;
+  border-left: 2px solid rgb(176 220 228 / 0.18);
+  background-image: linear-gradient(90deg, rgb(8 22 29 / 0.42), rgb(2 9 13 / 0.22));
+  transition:
+    border-left-color 150ms var(--p77-ease),
+    background-color 150ms var(--p77-ease),
+    opacity 150ms var(--p77-ease);
+}
+
+/* Locked entries recede. They are still fully readable - only quieter. */
+#hud .support-list b:not(.ready) {
+  opacity: 0.66;
+}
+
+/* Ready entries take the caution accent and a lit inner edge, because "you can
+   spend this right now" is the one thing on that rail worth an accent. */
+#hud .support-list b.ready {
+  opacity: 1;
+  border-left-color: var(--p77-caution);
+  background-image:
+    linear-gradient(90deg, rgb(242 183 79 / 0.20) 0%, rgb(2 11 15 / 0.30) 62%);
+  box-shadow: inset 0 0 0 1px rgb(242 183 79 / 0.20);
+}
+
+#hud .support-list b.ready kbd {
+  border-bottom-color: var(--p77-caution);
+  color: var(--p77-caution);
+}
+
+/* The gamepad cursor. Previously indistinguishable from an unselected row. */
+#hud .support-list b.controller-selected {
+  box-shadow: inset 0 0 0 1px var(--p77-friendly);
+}
+
+#hud .support-list kbd {
+  border-radius: 1px;
+}
+
+/*
+ * MINIMAP. Framed like an optic: an inner hairline, a soft inner falloff so
+ * the canvas edge stops looking pasted on, and corner brackets in the accent.
+ */
+#hud #minimap {
+  border-radius: 1px;
+  /* The legacy sheet framed the canvas in gold (style.css `rgba(244,196,79,.38)`),
+     which was the last decorative accent left on screen: "there is a map here"
+     is not information worth a colour. Neutral hairline, same as every other
+     inner surface. */
+  border-color: var(--p77-line);
+  box-shadow:
+    inset 0 0 0 1px var(--p77-line),
+    inset 0 0 26px rgb(0 0 0 / 0.5);
+}
+
+#hud #map-heading,
+#hud #location-label {
+  border-left: 0;
+  border-right: 0;
+}
+
+/*
+ * KILLFEED. Rows get rhythm and the newest row is the brightest, so the eye
+ * lands on what just happened without reading the whole stack.
+ */
+#hud #killfeed > * {
+  border-radius: 1px;
+  border-left: 2px solid var(--p77-line);
+  padding-left: 8px;
+  background-image: linear-gradient(90deg, rgb(6 18 23 / 0.55) 0%, rgb(6 18 23 / 0) 88%);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+#hud #killfeed > *:first-child {
+  border-left-color: var(--p77-friendly);
+  background-image: linear-gradient(90deg, rgb(102 235 225 / 0.16) 0%, rgb(6 18 23 / 0) 88%);
+}
+
+/*
+ * DAMAGE FEEDS. Inherited as one large translucent slab that was empty most of
+ * the match - a big grey rectangle floating over the arena is the definitive
+ * "overlay pasted on a game" cue. The container becomes nothing at all and the
+ * ROWS carry their own small chips, so the surface only exists while there is
+ * something to read on it.
+ */
+#hud #damage-feeds,
+#hud #damage-feeds .damage-feed {
+  border: 0;
+  background: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+#hud #damage-done-feed > *,
+#hud #damage-taken-feed > * {
+  border-radius: 1px;
+  padding-inline: 7px;
+  background-image: linear-gradient(270deg, rgb(6 18 26 / 0.60) 0%, rgb(6 18 26 / 0) 92%);
+}
+
+/* Damage dealt reads as gain, damage taken as threat. */
+#hud #damage-done-feed > * {
+  color: var(--p77-good);
+  border-right: 2px solid var(--p77-good);
+}
+
+#hud #damage-taken-feed > * {
+  color: var(--p77-danger);
+  border-right: 2px solid var(--p77-danger);
+}
+
+/*
+ * WEAPON. A hairline rule between the name and the ammo row gives the block a
+ * real hierarchy instead of three stacked lines of text.
+ */
+#hud #weapon-name {
+  background-image: linear-gradient(var(--p77-line), var(--p77-line));
+  background-repeat: no-repeat;
+  background-position: left bottom;
+  background-size: 100% 1px;
+}
+
+#hud #connection-pill {
+  border-radius: 1px;
+  border-bottom: 2px solid var(--p77-good);
+}
+
+#hud #score-limit {
+  border-radius: 1px;
+  background: rgb(255 255 255 / 0.05);
+}
+
+/*
+ * CROSSHAIR. Untouched geometry; only an outline so it survives a bright sky
+ * as well as a dark interior. Nothing in this sheet moves, tints or dims it.
+ */
+#hud #crosshair i {
+  filter: drop-shadow(0 0 1px rgb(0 0 0 / 0.9));
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 4 - the Chopper Gunner cockpit joins the same grammar.
+ * ------------------------------------------------------------------------ */
+
+#gunner-cockpit-hud .gunner-status,
+#gunner-cockpit-hud .gunner-instruments,
+#gunner-cockpit-hud #gunner-control-strip {
+  border-radius: var(--p77-radius, 2px);
+  border: 1px solid rgb(176 220 228 / 0.18);
+  background-image: linear-gradient(178deg, rgb(16 38 48 / 0.56) 0%, rgb(4 13 19 / 0.78) 100%);
+  box-shadow: 0 10px 26px rgb(0 0 0 / 0.34), inset 0 1px 0 rgb(224 252 255 / 0.14);
+  -webkit-backdrop-filter: blur(10px) saturate(1.4);
+  backdrop-filter: blur(10px) saturate(1.4);
+}
+
+#gunner-cockpit-hud #gunner-control-strip {
+  border-left: 2px solid var(--hud-amber, #f2b74f);
+}
+
+#gunner-cockpit-hud #gunner-hull,
+#gunner-cockpit-hud #gunner-ammo,
+#gunner-cockpit-hud #gunner-altitude,
+#gunner-cockpit-hud #gunner-speed,
+#gunner-cockpit-hud #gunner-time,
+#gunner-cockpit-hud #gunner-damage,
+#gunner-cockpit-hud #gunner-control-gun-ammo,
+#gunner-cockpit-hud #gunner-missile-ammo {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+}
+
+/* ===========================================================================
+ * PART 5 - DIEGETIC MOTION. "Maybe not even pinned directly to the screen."
+ *
+ * Two independent, composable layers, chosen so they never fight each other
+ * and so the cheap one runs without any runtime wiring at all:
+ *
+ *   `translate:`  the WIRED look/move lag. One declaration per cluster reading
+ *                 --hud-sway-x / --hud-sway-y / --hud-breathe. It only
+ *                 recomputes when the runtime writes those three properties on
+ *                 #hud, which is one style write per frame on ONE element.
+ *
+ *   `transform:`  the UNWIRED idle breathing, as a plain keyframe animation.
+ *                 `translate` and `transform` are separate properties that
+ *                 compose into one matrix, so the animation runs entirely on
+ *                 the compositor and never triggers a style recalculation, and
+ *                 it can never be clobbered by the runtime writing `translate`.
+ *
+ * That split is the whole trick. A single `transform` carrying both would mean
+ * either the animation stomps the wired value or the wired value stomps the
+ * animation - and an animation always beats an inline style, so the wiring
+ * would silently do nothing.
+ *
+ * DIRECTION. The HUD TRAILS the camera: yaw right, and the clusters drift
+ * right a beat later, the way a carried instrument lags the body turning. Each
+ * cluster gets a different lag multiplier, which is what produces parallax
+ * depth rather than the whole overlay sliding as one sheet.
+ *
+ * AMPLITUDE. --hud-sway-* is clamped to +-1 by the maths in
+ * pass77-hud-sway.ts, and the largest multiplier below is 10, so the absolute
+ * worst case is a 10px drift at the screen edge. The idle breathing is under
+ * 2px. Nothing approaches the centre of the screen.
+ *
+ * EXPLICITLY NOT MOVED, for combat safety: #crosshair, #hitmarker,
+ * #damage-numbers, #sniper-scope, #railgun-thermal, #dmr-thermal, #countdown,
+ * #banner, #respawn, the gunner reticle and every alert surface. Those are
+ * aim, confirmation and warning, and they stay welded to the viewport.
+ * ======================================================================== */
+
+#hud .hud-mission-console,
+#hud .hud-map-console,
+#hud .hud-operator-console,
+#hud .hud-weapon-console,
+#hud #support-block,
+#hud #killfeed,
+#hud #damage-feeds,
+#hud #pause-hint {
+  /* Wired lag. Negative on X so the cluster trails rather than leads.
+     The Y term is deliberately softer than X: pitch changes are smaller and a
+     vertical HUD wobble reads as a bug, not as weight. */
+  translate:
+    calc(var(--hud-sway-x, 0) * var(--p77-lag) * -1px)
+    calc(var(--hud-sway-y, 0) * var(--p77-lag) * 0.55px + var(--hud-breathe, 0) * 1.6px);
+}
+
+/* Depth ordering: the far, ambient clusters lag most; the ones you read under
+   fire lag least, so they stay easiest to parse. */
+#hud .hud-mission-console { --p77-lag: 8; }
+#hud .hud-map-console { --p77-lag: 10; }
+#hud #killfeed { --p77-lag: 9; }
+#hud #damage-feeds { --p77-lag: 7; }
+#hud #support-block { --p77-lag: 7; }
+#hud .hud-operator-console { --p77-lag: 5; }
+#hud .hud-weapon-console { --p77-lag: 4; }
+#hud #pause-hint { --p77-lag: 6; }
+
+/*
+ * Idle breathing. Long, prime-ish, mutually incommensurable periods so the
+ * clusters never fall into lockstep and the whole thing never reads as a
+ * metronome. Amplitudes are sub-2px: the intent is "alive", not "animated".
+ */
+#hud .hud-mission-console { animation: p77-breathe-a 13.1s var(--p77-ease) infinite alternate; }
+#hud .hud-map-console { animation: p77-breathe-b 11.3s var(--p77-ease) infinite alternate; }
+#hud .hud-operator-console { animation: p77-breathe-c 15.7s var(--p77-ease) infinite alternate; }
+#hud .hud-weapon-console { animation: p77-breathe-b 17.3s var(--p77-ease) infinite alternate; }
+#hud #support-block { animation: p77-breathe-a 12.7s var(--p77-ease) infinite alternate; }
+#hud #killfeed { animation: p77-breathe-c 14.9s var(--p77-ease) infinite alternate; }
+
+@keyframes p77-breathe-a {
+  from { transform: translate3d(-0.9px, -1.4px, 0); }
+  to { transform: translate3d(0.9px, 1.1px, 0); }
+}
+
+@keyframes p77-breathe-b {
+  from { transform: translate3d(1.1px, 0.8px, 0); }
+  to { transform: translate3d(-0.7px, -1.3px, 0); }
+}
+
+@keyframes p77-breathe-c {
+  from { transform: translate3d(0.6px, 1.5px, 0); }
+  to { transform: translate3d(-1.2px, -0.6px, 0); }
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 6 - accessibility gates.
+ *
+ * Both switches, for both motion layers. Under either switch the HUD is
+ * completely static: no breathing, no lag, no transition. Every readout stays
+ * exactly where it is and exactly as legible - turning motion down must never
+ * cost the player information.
+ * ------------------------------------------------------------------------ */
+
+html[data-reduced-motion='true'] #hud .hud-mission-console,
+html[data-reduced-motion='true'] #hud .hud-map-console,
+html[data-reduced-motion='true'] #hud .hud-operator-console,
+html[data-reduced-motion='true'] #hud .hud-weapon-console,
+html[data-reduced-motion='true'] #hud #support-block,
+html[data-reduced-motion='true'] #hud #killfeed,
+html[data-reduced-motion='true'] #hud #damage-feeds,
+html[data-reduced-motion='true'] #hud #pause-hint {
+  animation: none;
+  translate: none;
+  transform: none;
+}
+
+html[data-reduced-motion='true'] #hud #health-fill,
+html[data-reduced-motion='true'] #hud .support-list b {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #hud .hud-mission-console,
+  #hud .hud-map-console,
+  #hud .hud-operator-console,
+  #hud .hud-weapon-console,
+  #hud #support-block,
+  #hud #killfeed,
+  #hud #damage-feeds,
+  #hud #pause-hint {
+    animation: none;
+    translate: none;
+    transform: none;
+  }
+
+  #hud #health-fill,
+  #hud .support-list b {
+    transition: none;
+  }
+}
+
+/* The sensory switch flattens glow and the backdrop blur, matching the
+   existing html[data-reduced-sensory='true'] contract. The panels stay - they
+   simply become plain opaque sheets, which is cheaper and calmer. */
+html[data-reduced-sensory='true'] #hud #matchbar,
+html[data-reduced-sensory='true'] #hud #objective,
+html[data-reduced-sensory='true'] #hud .hud-map-console,
+html[data-reduced-sensory='true'] #hud .hud-operator-console,
+html[data-reduced-sensory='true'] #hud #weapon-block,
+html[data-reduced-sensory='true'] #hud #support-block,
+html[data-reduced-sensory='true'] #hud #fps-counter,
+html[data-reduced-sensory='true'] #hud #pause-hint,
+html[data-reduced-sensory='true'] #hud #adrenaline-hud,
+html[data-reduced-sensory='true'] #hud #killfeed > * {
+  --p77-sheet-dense: rgb(8 22 30 / 0.94);
+  --p77-sheet-thin: rgb(3 11 16 / 0.88);
+  --p77-sheet-quiet-top: rgb(8 22 30 / 0.90);
+  --p77-sheet-quiet-bottom: rgb(3 11 16 / 0.84);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+html[data-reduced-sensory='true'] #hud #health-fill,
+html[data-reduced-sensory='true'] #hud .support-list b.ready {
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 7 - narrow and short viewports.
+ *
+ * The clusters are already re-laid by pass65-hud.css below 1280x720 and the
+ * screen is much busier per square pixel there. Drop the blur (it is the one
+ * genuinely per-pixel cost here) and shorten the lag so nothing drifts into a
+ * neighbouring cluster on a small viewport.
+ * ------------------------------------------------------------------------ */
+
+@media (max-width: 1180px), (max-height: 640px) {
+  #hud #matchbar,
+  #hud #objective,
+  #hud .hud-map-console,
+  #hud .hud-operator-console,
+  #hud #weapon-block,
+  #hud #support-block,
+  #hud #fps-counter,
+  #hud #pause-hint,
+  #hud #adrenaline-hud,
+  #hud #killfeed > * {
+    --p77-sheet-dense: rgb(10 26 34 / 0.90);
+    --p77-sheet-thin: rgb(3 11 16 / 0.80);
+    --p77-sheet-quiet-top: rgb(10 26 34 / 0.86);
+    --p77-sheet-quiet-bottom: rgb(3 11 16 / 0.78);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  #hud .hud-mission-console,
+  #hud .hud-map-console,
+  #hud .hud-operator-console,
+  #hud .hud-weapon-console,
+  #hud #support-block,
+  #hud #killfeed,
+  #hud #damage-feeds,
+  #hud #pause-hint {
+    --p77-lag: 3;
+    animation: none;
+  }
+}

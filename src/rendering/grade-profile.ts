@@ -46,22 +46,88 @@ export const GRADE_CHAIN_STAGES: readonly string[] = Object.freeze([
 ]);
 
 /**
+ * The linear-HDR half, written out with the OPTIONAL screen-space stages the
+ * scene-pass assembler may insert. The three mandatory entries above still
+ * appear here in exactly the same relative order; the optional ones only
+ * declare the one slot each is allowed to occupy.
+ *
+ * WHY THESE SLOTS: every optional stage is placed where its input is already
+ * correct and where it cannot invalidate a later stage.
+ * - Motion blur smears the raw scene colour, so it runs before anything reads
+ *   neighbouring pixels for a different purpose.
+ * - Screen-space GI adds bounce light before the contact-occlusion multiply,
+ *   so GTAO darkens the bounced light exactly as it darkens direct light.
+ * - Screen-space reflections are added after occlusion (a reflection is not
+ *   occluded by the surface reflecting it) but before bloom, so a wet highlight
+ *   can bloom like any other bright pixel.
+ * - Godrays composite after bloom deliberately: shafts are already a glow, and
+ *   feeding them back through the bloom chain is exactly how a light shaft
+ *   turns into a sightline-erasing wash.
+ * - Depth of field is last on the linear side because it must see the finished
+ *   lighting; blurring before the additive stages would leak sharp light into
+ *   the bokeh.
+ */
+export const LINEAR_SOURCE_STAGE_ORDER: readonly string[] = Object.freeze([
+  'scene-pass-linear-hdr',
+  'motion-blur-velocity-smear',
+  'ssgi-screen-space-bounce-add',
+  'contact-occlusion-multiply',
+  'ssr-screen-space-reflection-add',
+  'depth-guarded-bloom-add',
+  'godrays-volumetric-shaft-add',
+  'depth-of-field-bokeh',
+]);
+
+/** The linear-side stages the assembler may omit. Everything else is mandatory. */
+export const OPTIONAL_LINEAR_SOURCE_STAGES: readonly string[] = Object.freeze([
+  'motion-blur-velocity-smear',
+  'ssgi-screen-space-bounce-add',
+  'ssr-screen-space-reflection-add',
+  'godrays-volumetric-shaft-add',
+  'depth-of-field-bokeh',
+]);
+
+/** First stage of the immutable core; everything before it is the linear region. */
+const LINEAR_REGION_BOUNDARY = 'asc-cdl-slope-offset-power';
+
+const MANDATORY_LINEAR_SOURCE_STAGES: readonly string[] = Object.freeze(
+  LINEAR_SOURCE_STAGE_ORDER.filter((stage) => !OPTIONAL_LINEAR_SOURCE_STAGES.includes(stage)),
+);
+
+/** The part of the frozen chain that is never optional and never re-ordered. */
+const CORE_CHAIN_STAGES: readonly string[] = Object.freeze(
+  GRADE_CHAIN_STAGES.slice(GRADE_CHAIN_STAGES.indexOf(LINEAR_REGION_BOUNDARY)),
+);
+
+/**
  * Optional display-side stages that may follow the frozen core chain, in the
- * one allowed relative order: at most one post anti-aliasing stage, then the
- * contrast-adaptive sharpen. Both operate on the finished display-referred
- * image; grain stays inside the core because its amplitude (<= 1/3 of one
- * 8-bit step) sits far below the FXAA/SMAA edge thresholds and the RCAS
- * denoise attenuation, so appending after it cannot amplify it visibly.
+ * one allowed relative order: at most one post anti-aliasing stage, then
+ * exactly one contrast-adaptive sharpen owner. Both operate on the finished
+ * display-referred image; grain stays inside the core because its amplitude
+ * (<= 1/3 of one 8-bit step) sits far below the FXAA/SMAA edge thresholds and
+ * the RCAS denoise attenuation, so appending after it cannot amplify it
+ * visibly.
+ *
+ * FSR 1 is listed alongside the standalone sharpen because it *contains* RCAS:
+ * its EASU upsample is followed by the same sharpening filter. Running both
+ * would sharpen twice, so they are mutually exclusive below.
  */
 export const OPTIONAL_POST_DISPLAY_STAGES: readonly string[] = Object.freeze([
   'display-post-antialiasing-fxaa',
   'display-post-antialiasing-smaa',
   'display-cas-sharpen',
+  'display-fsr1-easu-rcas-upscale',
 ]);
 
 const OPTIONAL_ANTIALIASING_STAGES: readonly string[] = Object.freeze([
   'display-post-antialiasing-fxaa',
   'display-post-antialiasing-smaa',
+]);
+
+/** Both of these own an RCAS pass. Exactly one of them may be built. */
+const OPTIONAL_SHARPEN_STAGES: readonly string[] = Object.freeze([
+  'display-cas-sharpen',
+  'display-fsr1-easu-rcas-upscale',
 ]);
 
 export type FrozenFilmicGradeProfile = Readonly<{
@@ -258,40 +324,75 @@ export function resolveGradeProfile(
   return profile;
 }
 
-/**
- * Fail-closed order receipt check. `configureHdrPipeline` records the stages
- * it builds and must call this before publishing the pipeline; a mismatch is
- * a construction error, never a silent re-order.
- */
-export function assertGradeChainOrder(actualStages: readonly string[]): void {
-  if (actualStages.length < GRADE_CHAIN_STAGES.length) {
-    throw new Error(
-      `HF-362 filmic chain stage count mismatch: expected ${GRADE_CHAIN_STAGES.length}, built ${actualStages.length} (${actualStages.join(' -> ')})`,
-    );
-  }
-  for (let index = 0; index < GRADE_CHAIN_STAGES.length; index += 1) {
-    if (actualStages[index] !== GRADE_CHAIN_STAGES[index]) {
-      throw new Error(
-        `HF-362 filmic chain order violation at stage ${index}: expected '${GRADE_CHAIN_STAGES[index]}', built '${actualStages[index]}' (${actualStages.join(' -> ')})`,
-      );
-    }
-  }
-  // Trailing stages must be a subsequence of OPTIONAL_POST_DISPLAY_STAGES with
-  // at most one anti-aliasing entry; anything else is a construction error.
-  const trailing = actualStages.slice(GRADE_CHAIN_STAGES.length);
+/** Rejects a stage list that repeats an entry or wanders out of a fixed order. */
+function assertOrderedSubsequence(
+  region: string,
+  built: readonly string[],
+  allowed: readonly string[],
+  actualStages: readonly string[],
+): void {
   let cursor = 0;
-  for (const stage of trailing) {
-    const allowedIndex = OPTIONAL_POST_DISPLAY_STAGES.indexOf(stage, cursor);
+  for (const stage of built) {
+    const allowedIndex = allowed.indexOf(stage, cursor);
     if (allowedIndex === -1) {
       throw new Error(
-        `HF-362 filmic chain trailing stage violation: '${stage}' is not an allowed optional display stage after '${trailing.join(' -> ') || '(none)'}' (${actualStages.join(' -> ')})`,
+        `HF-362 filmic chain ${region} stage violation: '${stage}' is not allowed here, or repeats/precedes an already-built stage (${actualStages.join(' -> ')})`,
       );
     }
     cursor = allowedIndex + 1;
   }
+}
+
+/**
+ * Fail-closed order receipt check. `configureHdrPipeline` records the stages
+ * it builds and must call this before publishing the pipeline; a mismatch is
+ * a construction error, never a silent re-order.
+ *
+ * Three regions, checked separately because they have different contracts:
+ * 1. the linear region, where the mandatory stages keep their fixed relative
+ *    order and the enumerated optional screen-space stages may appear only in
+ *    their declared slots;
+ * 2. the core, from the ASC CDL to the grain, which is byte-for-byte frozen;
+ * 3. the trailing display stages, an ordered subsequence with at most one post
+ *    AA owner and at most one RCAS owner.
+ */
+export function assertGradeChainOrder(actualStages: readonly string[]): void {
+  const boundary = actualStages.indexOf(LINEAR_REGION_BOUNDARY);
+  if (boundary === -1) {
+    throw new Error(
+      `HF-362 filmic chain is missing its linear/display boundary stage '${LINEAR_REGION_BOUNDARY}' (${actualStages.join(' -> ') || '(none)'})`,
+    );
+  }
+  const linear = actualStages.slice(0, boundary);
+  assertOrderedSubsequence('linear', linear, LINEAR_SOURCE_STAGE_ORDER, actualStages);
+  for (const required of MANDATORY_LINEAR_SOURCE_STAGES) {
+    if (!linear.includes(required)) {
+      throw new Error(
+        `HF-362 filmic chain is missing mandatory linear stage '${required}' (${actualStages.join(' -> ')})`,
+      );
+    }
+  }
+  const core = actualStages.slice(boundary, boundary + CORE_CHAIN_STAGES.length);
+  for (let index = 0; index < CORE_CHAIN_STAGES.length; index += 1) {
+    if (core[index] !== CORE_CHAIN_STAGES[index]) {
+      throw new Error(
+        `HF-362 filmic chain order violation at core stage ${index}: expected '${CORE_CHAIN_STAGES[index]}', built '${core[index] ?? '(none)'}' (${actualStages.join(' -> ')})`,
+      );
+    }
+  }
+  const trailing = actualStages.slice(boundary + CORE_CHAIN_STAGES.length);
+  assertOrderedSubsequence('trailing', trailing, OPTIONAL_POST_DISPLAY_STAGES, actualStages);
   if (trailing.filter((stage) => OPTIONAL_ANTIALIASING_STAGES.includes(stage)).length > 1) {
     throw new Error(
       `HF-362 filmic chain trailing stage violation: at most one post anti-aliasing stage is allowed (${actualStages.join(' -> ')})`,
+    );
+  }
+  // FSR 1 ends in RCAS. Letting the standalone sharpen run as well would apply
+  // the same filter twice on the same image, which is a ringing/shimmer source
+  // on exactly the high-contrast edges a player is trying to read.
+  if (trailing.filter((stage) => OPTIONAL_SHARPEN_STAGES.includes(stage)).length > 1) {
+    throw new Error(
+      `HF-362 filmic chain trailing stage violation: at most one RCAS sharpen owner is allowed (${actualStages.join(' -> ')})`,
     );
   }
 }

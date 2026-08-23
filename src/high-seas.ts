@@ -116,6 +116,7 @@ export type HighSeasTextureFamily =
   | 'engine-grating'
   | 'engine-machinery'
   | 'engine-amber'
+  | 'engine-practical'
   | 'upholstery'
   | 'glass'
   | 'water';
@@ -258,6 +259,9 @@ export const HIGH_SEAS_TILE_METRES: Readonly<Record<HighSeasTextureFamily, numbe
   'engine-grating': 1.2,
   'engine-machinery': 1.5,
   'engine-amber': 1.0,
+  // A practical strip is a 1.6 m fixture: 0.6 m/tile puts roughly three lit
+  // diffuser segments on each run instead of one smeared gradient.
+  'engine-practical': 0.6,
   upholstery: 0.8,
   glass: 3.0,
   water: 4.0,
@@ -750,6 +754,43 @@ function generateMaterialTextureSet(
       break;
     }
 
+    case 'engine-practical': {
+      // A lit diffuser, not a painted panel: a bright lens down the middle of
+      // each tile, dimmer toward the edges, broken by the end caps that divide
+      // one fixture from the next. This map is used as the practical's
+      // emissiveMap as well as its albedo, so the pattern is what the strip
+      // actually GLOWS as - a flat emissive colour would read as a featureless
+      // white bar at the brightness this fixture has to run at.
+      normalStrength = 2.2;
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          // Lens runs along x; caps repeat every 128 texels (0.3 m of world).
+          const across = Math.abs((y / size) * 2 - 1);
+          const lens = Math.cos(across * Math.PI * 0.5) ** 0.6;
+          const capPhase = x % 128;
+          const isCap = capPhase < 7;
+          const rib = 0.94 + 0.06 * Math.sin((x % 16) * Math.PI / 8);
+          const factor = isCap ? 0.16 : (0.34 + 0.66 * lens) * rib;
+          const offset = (y * size + x) * 4;
+          const pIndex = y * size + x;
+
+          albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * factor), 0, 255);
+          albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * factor), 0, 255);
+          albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * factor), 0, 255);
+          albedoData[offset + 3] = 255;
+
+          const rough = THREE.MathUtils.clamp(Math.round((isCap ? 0.62 : 0.24 + 0.14 * (1 - lens)) * 255), 0, 255);
+          roughnessData[offset] = rough;
+          roughnessData[offset + 1] = rough;
+          roughnessData[offset + 2] = rough;
+          roughnessData[offset + 3] = 255;
+
+          heightData[pIndex] = isCap ? 0.15 : 0.55 + 0.35 * lens;
+        }
+      }
+      break;
+    }
+
     case 'upholstery': {
       normalStrength = 3.2;
       for (let y = 0; y < size; y += 1) {
@@ -895,10 +936,81 @@ function material(
     'engine-grating': 'engine-grating',
     'engine-machinery': 'engine-machinery',
     'engine-amber': 'engine-amber',
+    'engine-practical': 'engine-practical',
     'cabana-upholstery': 'upholstery',
   };
   const family = familyLookup[name] ?? 'wall';
   return pbrMaterial(name, family, color, roughness, metalness, emissive, emissiveIntensity);
+}
+
+/**
+ * Below-deck lighting policy (HF-373).
+ *
+ * The owner played the service deck and could not see: "too dark down at the
+ * bottom of hijacked". The volume is sealed - the sun never reaches it, and the
+ * arena adds no THREE lights (the repo's local-light occlusion policy in
+ * rendering/light-occlusion keeps arena roots emissive-only), so every surface
+ * down there resolved to near-black.
+ *
+ * Two authored sources fix it, and BOTH are deliberately scoped to materials
+ * that exist only inside the sealed volume, because the one thing this must not
+ * do is brighten the open deck above:
+ *
+ *  - the practicals get their own material. They used to share `engine-amber`
+ *    with the machinery bands, the service pipes and the DECK-LEVEL hatch
+ *    guards, so the only way to make the strips brighter was to make the hatch
+ *    guards glow with them. A dedicated fixture material is the honest fix and
+ *    leaves the shared accent exactly where it was.
+ *  - the three engine surface families - bulkhead, grating and machinery -
+ *    carry a low enclosed-volume fill so surfaces away from a strip are dim
+ *    rather than pure black. Not one mesh wearing them rises above the deck
+ *    plane, which is what makes this a fill for the corridor and not a global
+ *    ambient; the test proves it mesh by mesh.
+ */
+const BELOW_DECK_PRACTICAL_EMISSIVE_INTENSITY = 3.4;
+const BELOW_DECK_FILL = Object.freeze({
+  bulkhead: Object.freeze({ tint: 0x9fc3d2, intensity: 0.5 }),
+  machinery: Object.freeze({ tint: 0xa8c4cc, intensity: 0.42 }),
+  // The deck plate keeps the smallest lift of the three - the intensity is the
+  // highest number here only because grating is the darkest albedo it
+  // multiplies, and grating is the one below-deck family that also skins the
+  // hatch-shaft ramps and the rims flush with the deck plane. It still needs
+  // SOME: a prone body on an unlit floor is invisible in a volume with no
+  // lights to catch it.
+  grating: Object.freeze({ tint: 0x86a8b4, intensity: 1.15 }),
+});
+
+/**
+ * Lifts a below-deck material off pure black without flattening it.
+ *
+ * The lift is routed through `emissiveMap` (the family's own albedo) instead of
+ * a flat emissive colour: panel lines, louvers and flange edges keep their
+ * contrast, so a player still reads shape and depth - and an enemy still reads
+ * as a silhouette against a textured wall rather than against a milk-white
+ * slab. `belowDeckFill` is the tag the leak test asserts against.
+ */
+function applyEnclosedVolumeFill(
+  value: THREE.MeshStandardMaterial,
+  fill: Readonly<{ tint: number; intensity: number }>,
+): THREE.MeshStandardMaterial {
+  value.emissive.setHex(fill.tint);
+  value.emissiveIntensity = fill.intensity;
+  if (value.map) value.emissiveMap = value.map;
+  value.userData.belowDeckFill = true;
+  value.userData.belowDeckFillTint = fill.tint;
+  value.userData.belowDeckFillIntensity = fill.intensity;
+  return value;
+}
+
+/** The service-deck light strips: a real fixture, not a tinted accent panel. */
+function createPracticalMaterial(): THREE.MeshStandardMaterial {
+  const value = material('engine-practical', 0xffe6c4, 0.26, 0.04, 0xffc27a, BELOW_DECK_PRACTICAL_EMISSIVE_INTENSITY);
+  // The diffuser pattern drives the glow, not just the albedo, so the strip
+  // reads as a lit lens with end caps instead of a uniform bar.
+  if (value.map) value.emissiveMap = value.map;
+  value.userData.belowDeckFill = true;
+  value.userData.belowDeckPractical = true;
+  return value;
 }
 
 function containedWaterMaterial(name: string, color: number): THREE.MeshStandardMaterial {
@@ -933,6 +1045,10 @@ export function getHighSeasMaterialInventory(): readonly HighSeasMaterialInvento
     { name: 'engine-grating', family: 'engine-grating', color: 0x26363a },
     { name: 'engine-machinery', family: 'engine-machinery', color: 0x57666a },
     { name: 'engine-amber', family: 'engine-amber', color: 0xd7a441 },
+    // HF-373: the practicals stopped sharing engine-amber, so the inventory
+    // contract grew to 14 rather than the strips borrowing a material that also
+    // appears above deck.
+    { name: 'engine-practical', family: 'engine-practical', color: 0xffe6c4 },
     { name: 'cabana-upholstery', family: 'upholstery', color: 0x4b8790 },
     { name: 'side-glass', family: 'glass', color: 0x5e9ca8 },
     { name: 'contained-feature-water', family: 'water', color: 0x2db9c4 },
@@ -1554,6 +1670,7 @@ function addEngineRoom(
   wallMaterial: THREE.Material,
   machineryMaterial: THREE.Material,
   accentMaterial: THREE.Material,
+  practicalMaterial: THREE.Material,
 ): Readonly<{
   bow: ReturnType<typeof addRamp>;
   stern: ReturnType<typeof addRamp>;
@@ -1709,16 +1826,47 @@ function addEngineRoom(
     { center: [0, 2.895, 19.175], size: [VESTIBULE_HALF * 2, 0.05, 1.15] },
   ], wallMaterial);
 
-  // Practical lighting: emissive amber strips run under the ceiling liner the
-  // full length of the service deck. The arena adds no THREE lights, so
-  // below-deck practicals stay emissive-only by policy.
+  // Practical lighting: emissive strips run under the ceiling liner the full
+  // length of the service deck. The arena adds no THREE lights, so below-deck
+  // practicals stay emissive-only by policy - which means the fixtures ARE the
+  // lighting, and there has to be enough of them, carried by a material bright
+  // enough to be one (see createPracticalMaterial and BELOW_DECK_FILL).
   const lightStrips: MergedBoxPart[] = [];
-  for (const z of [-4, 0, 4]) lightStrips.push({ center: [0, 2.845, z], size: [1.6, 0.05, 0.16] });
-  for (const direction of [-1, 1]) {
-    for (const z of [8.2, 11.6, 15.0]) lightStrips.push({ center: [0, 2.845, direction * z], size: [0.16, 0.05, 1.6] });
-    lightStrips.push({ center: [0, 2.845, direction * 19.3], size: [0.16, 0.05, 1.2] });
+  // Engine room: transverse runs plus a wash down each side, because a single
+  // centre line left the 4.7 m bulge dark at both walls.
+  for (const z of [-5.2, -2.6, 0, 2.6, 5.2]) lightStrips.push({ center: [0, 2.845, z], size: [2.6, 0.05, 0.16] });
+  for (const side of [-1, 1]) {
+    lightStrips.push({ center: [side * (ROOM_HALF - 0.3), 2.845, 0], size: [0.16, 0.05, ROOM_END * 2 - 0.6] });
   }
-  mergedDetailBoxes(builder, 'high-seas-engine-light-strips', lightStrips, accentMaterial);
+  // Corridor: a fixture every 2.6 m, long enough that the runs overlap in
+  // perspective and the corridor reads as continuous depth, not as dots.
+  for (const direction of [-1, 1]) {
+    for (const z of [7.9, 10.5, 13.1, 15.7]) lightStrips.push({ center: [0, 2.845, direction * z], size: [0.16, 0.05, 2.0] });
+    lightStrips.push({ center: [0, 2.845, direction * 17.9], size: [0.16, 0.05, 1.2] });
+    lightStrips.push({ center: [0, 2.845, direction * 19.35], size: [0.16, 0.05, 1.1] });
+  }
+  mergedDetailBoxes(builder, 'high-seas-engine-light-strips', lightStrips, practicalMaterial);
+
+  // Floor-level guide strips. Emissive geometry cannot bounce, so ceiling
+  // practicals alone still left the deck plate black under your own feet. A lit
+  // kick line at the base of each wall gives the floor an edge and the run a
+  // depth cue all the way to both ramp mouths. Presentation only - it is a
+  // 0.08 m lip flush against a wall that already owns the collision.
+  const guideStrips: MergedBoxPart[] = [];
+  for (const side of [-1, 1]) {
+    guideStrips.push({ center: [side * (ROOM_HALF - 0.05), 0.04, 0], size: [0.1, 0.08, ROOM_END * 2 - 0.4] });
+    for (const direction of [-1, 1]) {
+      guideStrips.push({
+        center: [side * (CORRIDOR_HALF - 0.05), 0.04, direction * (ROOM_END + NARROW_END) / 2],
+        size: [0.1, 0.08, NARROW_END - ROOM_END - 0.4],
+      });
+      guideStrips.push({
+        center: [side * (VESTIBULE_HALF - 0.05), 0.04, direction * (NARROW_END + FLOOR_END) / 2],
+        size: [0.1, 0.08, FLOOR_END - NARROW_END - 0.2],
+      });
+    }
+  }
+  mergedDetailBoxes(builder, 'high-seas-engine-floor-guide-strips', guideStrips, practicalMaterial);
 
   // Twin service pipes hug the ceiling inside the narrow corridor profile.
   const pipeGeometry = concatGeometries([-0.45, 0.45].map((x) => {
@@ -2004,10 +2152,25 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
   const deckMaterial = material('honey-deck', 0xb78653, 0.7, 0.08);
   const stairMaterial = material('dark-deck-stair', 0x5a4032, 0.76, 0.08);
   const tealTrimMaterial = material('deep-teal-trim', 0x164c58, 0.32, 0.62);
-  const engineWallMaterial = material('engine-bulkhead', 0x36474c, 0.52, 0.58);
-  const engineFloorMaterial = material('engine-grating', 0x26363a, 0.46, 0.72);
-  const engineMachineMaterial = material('engine-machinery', 0x57666a, 0.38, 0.74);
+  // HF-373: the three engine families carry the enclosed-volume fill because
+  // none of them ever rises above the deck plane - the bulkhead liner and the
+  // machinery are sealed inside the corridor, and grating stops flush with the
+  // deck at the hatch rims. The amber accent deliberately does NOT carry it:
+  // it also skins the hatch guards that stand ON the open deck.
+  const engineWallMaterial = applyEnclosedVolumeFill(
+    material('engine-bulkhead', 0x36474c, 0.52, 0.58),
+    BELOW_DECK_FILL.bulkhead,
+  );
+  const engineFloorMaterial = applyEnclosedVolumeFill(
+    material('engine-grating', 0x26363a, 0.46, 0.72),
+    BELOW_DECK_FILL.grating,
+  );
+  const engineMachineMaterial = applyEnclosedVolumeFill(
+    material('engine-machinery', 0x57666a, 0.38, 0.74),
+    BELOW_DECK_FILL.machinery,
+  );
   const engineAccentMaterial = material('engine-amber', 0xd7a441, 0.34, 0.52, 0x6d3c08, 0.65);
+  const enginePracticalMaterial = createPracticalMaterial();
   const upholsteryMaterial = material('cabana-upholstery', 0x4b8790, 0.76, 0.04);
   const glassTextures = generateMaterialTextureSet('glass', 0x5e9ca8);
   const glassMaterial = new THREE.MeshStandardMaterial({
@@ -2033,7 +2196,14 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
   hull.userData.portalAuditExclusionReason = 'concave-enclosing-shell-has-conservative-world-aabb';
 
   addDecks(builder, deckMaterial);
-  const engine = addEngineRoom(builder, engineFloorMaterial, engineWallMaterial, engineMachineMaterial, engineAccentMaterial);
+  const engine = addEngineRoom(
+    builder,
+    engineFloorMaterial,
+    engineWallMaterial,
+    engineMachineMaterial,
+    engineAccentMaterial,
+    enginePracticalMaterial,
+  );
   addHullBilge(builder, engineFloorMaterial, engineWallMaterial);
   const bowCabin = addCabin(builder, 'bow', wallMaterial, deckMaterial, roofMaterial, stairMaterial, tealTrimMaterial, glassMaterial);
   const sternCabin = addCabin(builder, 'stern', wallMaterial, deckMaterial, roofMaterial, stairMaterial, tealTrimMaterial, glassMaterial);
@@ -2209,6 +2379,29 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
     { id: 'high-seas-engine-room-bulge', position: [1.9, 2.4, -5.9], target: [-1.6, 0.9, 4.2], purpose: 'topology' },
   ]);
   root.userData.highSeasMaterialInventory = Object.freeze(getHighSeasMaterialInventory());
+  // HF-373 evidence surface: what lights the sealed volume, how hard, and the
+  // plane none of it is allowed to cross.
+  root.userData.highSeasBelowDeckLighting = Object.freeze({
+    version: 'hf373-enclosed-volume-fill-v1',
+    policy: 'emissive-only-arena-adds-no-three-lights',
+    deckPlaneY: HIGH_SEAS_LEVELS.mainDeck,
+    practical: Object.freeze({
+      material: enginePracticalMaterial.name,
+      emissiveIntensity: enginePracticalMaterial.emissiveIntensity,
+      fixtures: Object.freeze(['high-seas-engine-light-strips', 'high-seas-engine-floor-guide-strips']),
+    }),
+    fill: Object.freeze([engineWallMaterial, engineFloorMaterial, engineMachineMaterial].map((entry) => Object.freeze({
+      material: entry.name,
+      emissiveIntensity: entry.emissiveIntensity,
+      texturedEmissive: entry.emissiveMap !== null,
+    }))),
+    // Regression guard in data form: the shared accent also skins the
+    // deck-level hatch guards, so it stays where it was.
+    sharedAccent: Object.freeze({
+      material: engineAccentMaterial.name,
+      emissiveIntensity: engineAccentMaterial.emissiveIntensity,
+    }),
+  });
 
   return {
     id: 'high-seas',

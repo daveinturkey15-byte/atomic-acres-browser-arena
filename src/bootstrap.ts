@@ -11,6 +11,11 @@ import './ui/pass74-visual-refresh.css';
 // reason: pass66-readability.css is unlayered and outranks every @layer.
 import './ui/pass75-hud-redesign.css';
 import './ui/pass75-menu-redesign.css';
+// HF-370: Pass 77 material + diegetic-motion reskin. Last and unlayered, same
+// documented reason as every sheet above it - pass66-readability.css is
+// unlayered and outranks every @layer, so a layered sheet could not land.
+import './ui/pass77-instrument-hud.css';
+import './ui/pass77-command-shell.css';
 import {
   releaseChannelDecision,
   stableReleaseUrl,

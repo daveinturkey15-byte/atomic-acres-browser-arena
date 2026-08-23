@@ -22,6 +22,13 @@ export type WeaponPenetrationProfile = Readonly<{
   /** Abstract close-range energy before the built-in FMJ multiplier. */
   penetrationPower: number;
   fmjMultiplier: number;
+  /**
+   * HF-368: per-weapon wallbang scalar on the close-range energy budget. Optional
+   * here and defaulted to 1 by `weaponPenetrationEnergy` so a profile authored
+   * before this term - test fixtures, ad-hoc drone/killstreak rays - keeps its
+   * exact Pass 64 behaviour rather than silently gaining or losing penetration.
+   */
+  wallPenetrationMultiplier?: number;
   energyFalloffStart: number;
   energyFalloffEnd: number;
   minimumEnergyRetention: number;
@@ -236,6 +243,21 @@ function surfaceInterval(
     entryNormal: { x: normal.x, y: normal.y, z: normal.z },
   };
 }
+/**
+ * HF-368: single place the per-weapon wallbang scalar enters the model. It scales
+ * the energy budget only - material entry/traversal costs are untouched - so more
+ * penetration means thicker surfaces become shootable and more damage survives a
+ * surface, never that a crossed surface becomes free damage: every material still
+ * charges its full toll, and `damageMultiplier` stays strictly below 1 for any
+ * traversed surface because `entryCost` is positive for every material.
+ */
+export function weaponPenetrationEnergy(profile: WeaponPenetrationProfile): number {
+  const scalar = Number.isFinite(profile.wallPenetrationMultiplier) && (profile.wallPenetrationMultiplier ?? 0) > 0
+    ? (profile.wallPenetrationMultiplier as number)
+    : 1;
+  return Math.max(0, profile.penetrationPower * profile.fmjMultiplier * scalar);
+}
+
 export function penetrationEnergyRetention(profile: WeaponPenetrationProfile, distance: number): number {
   const clamped = Math.max(0, Number.isFinite(distance) ? distance : 0);
   if (clamped <= profile.energyFalloffStart) return 1;
@@ -274,7 +296,7 @@ export function traceBallisticPath(
       z: origin.z + unit.z * entry.entryDistance,
     }))
     .sort((a, b) => a.entryDistance - b.entryDistance || a.exitDistance - b.exitDistance || a.surface.id.localeCompare(b.surface.id));
-  const initialEnergy = Math.max(0, profile.penetrationPower * profile.fmjMultiplier);
+  const initialEnergy = weaponPenetrationEnergy(profile);
   let energy = initialEnergy;
   let lastDistance = 0;
   let penetratedSurfaces = 0;

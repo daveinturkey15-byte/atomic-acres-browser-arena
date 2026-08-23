@@ -575,9 +575,58 @@
       "source": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
       "generatedAsOf": "2026-08-11",
       "license": "Original project work",
-      "files": "public/assets/original/menu-previews/*",
+      "files": [
+        {
+          "path": "public/assets/original/menu-previews/atomic-acres.mp4",
+          "sha256": "eaf9311df48b6a9eaa926f87eb10e544b042adc61e66e602ea01c25cebcd7865"
+        },
+        {
+          "path": "public/assets/original/menu-previews/atomic-acres.webm",
+          "sha256": "2e587dbbb2f85ae4a53d10c529ba4790ae205102d0df34acc835c8183b42f4c4"
+        },
+        {
+          "path": "public/assets/original/menu-previews/atomic-acres.webp",
+          "sha256": "1f7ab1a21c95901baac8f613454d4e6b39f1102b6c0f7c9203db7cc26d2ed630"
+        },
+        {
+          "path": "public/assets/original/menu-previews/gun-range.mp4",
+          "sha256": "28c9d908aa66cd2a136d88d7fba937d7b3a7530d044ea8d96e747e9996a6dfe4"
+        },
+        {
+          "path": "public/assets/original/menu-previews/gun-range.webm",
+          "sha256": "e21f10cca5d641ae32ee98eaec661851036343560f7bb30be932b39c9fbda4a3"
+        },
+        {
+          "path": "public/assets/original/menu-previews/gun-range.webp",
+          "sha256": "a2eddd02ddee15e95486d04f765a326ff5fdea3a868f7f7e0a12cfd7bafed401"
+        },
+        {
+          "path": "public/assets/original/menu-previews/rustworks-1v1.mp4",
+          "sha256": "67a9c9e19b48d1bbc6e3efc506c908699e0c119963aae31c6d10326f282dda73"
+        },
+        {
+          "path": "public/assets/original/menu-previews/rustworks-1v1.webm",
+          "sha256": "34edbd96c5270392a7d49d4e5c64704c7eb5926f325a6dec622c17c99f319223"
+        },
+        {
+          "path": "public/assets/original/menu-previews/rustworks-1v1.webp",
+          "sha256": "b4e2825cc6b50843d02164b5836331a39b108f3615f0a9d0ae342f3876e41505"
+        },
+        {
+          "path": "public/assets/original/menu-previews/skyline-terminal.mp4",
+          "sha256": "2c8d8731dd8b66cbc849eff5cca9380fccf01d64d203bb9eb2c84f6b3867d96a"
+        },
+        {
+          "path": "public/assets/original/menu-previews/skyline-terminal.webm",
+          "sha256": "c4863313d81597e2425ef823eeff65494c1e12344fc48eb49dbe8e4741dadb3c"
+        },
+        {
+          "path": "public/assets/original/menu-previews/skyline-terminal.webp",
+          "sha256": "269040879c9430b6681919f7e2315508711e9e780ead0d6f6c9e4a7c1c8ba51f"
+        }
+      ],
       "sourceScript": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-      "sourceScriptSha256": "6579f04ced1e266bdb6065bb788eadd249e217ab63a33e9fa461a9b520101a26",
+      "sourceScriptSha256": "c450443ae83cc604dbebc12ce5bd65b72f079c7621b6ecbe6514f1a53c26baa6",
       "sourceProvenance": "source-assets/menu/pass65-preview-masters/provenance.json",
       "sourceProvenanceSha256": "74eeb6b24b909c5367d2038d8d4be0fbb2b010be02dc7890d9e7619be163632b",
       "format": "Four distinct 2560x1440 eight-second 30 FPS selected-map runtime captures, shipped as high-bitrate VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and full-resolution static WebP posters, plus deterministic five-frame review evidence",
@@ -721,6 +770,50 @@
           "sha256": "2263a601a95e584bd9069f74f90b6418ee0f319f6b2800949dcc2e94902e5d4a"
         }
       ]
+    },
+    {
+      "id": "atomic-acres-pass77-farcrysis-high-seas-menu-previews",
+      "kind": "original-project-prerecorded-authoritative-runtime-menu-video-family",
+      "creator": "Atomic Acres project",
+      "source": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+      "generatedAsOf": "2026-08-23",
+      "license": "Original project work",
+      "files": [
+        {
+          "path": "public/assets/original/menu-previews/farcrysis.mp4",
+          "sha256": "6d8eef44066a85329d7588205338ccf3aab819319fc2167cd085ed3788b1045e"
+        },
+        {
+          "path": "public/assets/original/menu-previews/farcrysis.webm",
+          "sha256": "c79ed27159d75d9a6235f700dc9497fbdb5df288960a81aae6e24b4826958be6"
+        },
+        {
+          "path": "public/assets/original/menu-previews/farcrysis.webp",
+          "sha256": "e47523c45d0e079cf0ef0df3620003000fccbea95287de0640a805cdc556330e"
+        },
+        {
+          "path": "public/assets/original/menu-previews/high-seas.mp4",
+          "sha256": "1c9834b5975930e4bd5a0ece25495deacdaa0f9111673bd6e96203f1ea082603"
+        },
+        {
+          "path": "public/assets/original/menu-previews/high-seas.webm",
+          "sha256": "132873e79cf467bf57b8382427fbdeed97cd83ed4b0079640612aab1f5b7fb21"
+        },
+        {
+          "path": "public/assets/original/menu-previews/high-seas.webp",
+          "sha256": "43804a7161c9f6a0165102a3247dc0e0d7715ffda13fc5fc731d4a16b5ae755b"
+        }
+      ],
+      "contactSheet": [
+        "docs/assets/pass77-menu-previews/farcrysis-review-frames.webp",
+        "docs/assets/pass77-menu-previews/high-seas-review-frames.webp"
+      ],
+      "sourceScript": "scripts/assets/finalize-pass77-arena-menu-previews.mjs",
+      "sourceScriptSha256": "8106aaad36be5ba65695b440f56aa770b8c9b5d11895156900d6162b7fed69b3",
+      "sourceProvenance": "source-assets/menu/pass77-arena-previews/provenance.json",
+      "format": "Two distinct 2560x1440 eight-second 30 FPS selected-map runtime captures, shipped as VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and full-resolution static WebP posters, plus five-frame review sheets",
+      "modifications": "Captured offline from the actual authoritative Farcrysis and High Seas runtime arenas with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. High Seas was captured on the WebGPU route; Farcrysis was captured on the WebGL2 compat route because it cannot currently complete a WebGPU prewarm (HF-374), which its provenance records and which requires a WebGPU re-capture once that is fixed. No downloaded or sampled art is used.",
+      "attributionRequired": false
     }
   ],
   "rejectedCandidates": [

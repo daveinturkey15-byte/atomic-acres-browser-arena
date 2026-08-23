@@ -27,6 +27,13 @@ const PASS74_LIVERY_WEAPON_IDS = ['crimson-flamethrower'] as const;
 
 function compatibilityProjection(definition: Record<string, any>): Record<string, any> {
   const copy = structuredClone(definition);
+  // HF-368: the B1 oracle predates the per-weapon wallbang term, so fill its
+  // documented 1.0 default on the baseline side only. The shipped value is left
+  // alone, which keeps this comparison asserting that every oracle weapon is
+  // still exactly 1 rather than dropping the field from the contract.
+  if (copy.penetration && copy.penetration.wallPenetrationMultiplier === undefined) {
+    copy.penetration.wallPenetrationMultiplier = 1;
+  }
   delete copy.displayName;
   delete copy.effects;
   if (copy.id === 'scattergun') {
@@ -134,6 +141,32 @@ describe('Pass 65 canonical weapon catalog', () => {
     expect(machinePistol.damage.base).toBe(Math.min(...eligibleSecondaries.map((definition) => definition.damage.base)));
     expect(sustainedRecoilRanking(eligibleSecondaries)[0]).toMatchObject({ weaponId: 'machine-pistol' });
     expect(sustainedRecoilBurden(machinePistol)).toBeGreaterThan(0);
+  });
+
+  it('HF-368: gives only the M14 EBR a non-default wall-penetration multiplier', () => {
+    const byId = Object.fromEntries(WEAPON_CATALOG.map((definition) => [definition.id, definition]));
+    expect(byId['m14-ebr'].penetration.wallPenetrationMultiplier).toBe(1.5);
+    // Every other weapon authors the documented 1.0 default so the owner's EBR tune
+    // cannot leak into the shared material table or any other gun.
+    const nonDefault = WEAPON_CATALOG
+      .filter((definition) => definition.penetration.wallPenetrationMultiplier !== 1)
+      .map((definition) => definition.id);
+    expect(nonDefault).toEqual(['m14-ebr']);
+    expect(WEAPON_CATALOG.every((definition) =>
+      Number.isFinite(definition.penetration.wallPenetrationMultiplier))).toBe(true);
+  });
+
+  it('HF-353: leaves the M14 EBR thermal see-through-walls optic exactly as retained', () => {
+    const byId = Object.fromEntries(WEAPON_CATALOG.map((definition) => [definition.id, definition]));
+    // Retained positive - HF-368 changes penetration (damage survival), never visibility.
+    expect(byId['m14-ebr'].optic).toEqual({
+      kind: 'thermal-smoke-only',
+      magnification: 2.5,
+      solidOcclusion: 'required',
+      targetPolicy: 'living-targets-through-smoke',
+      authority: 'presentation-only',
+    });
+    expect(byId['m14-ebr'].damage).toMatchObject({ base: 37.2, minimum: 24, headMultiplier: 1.7 });
   });
 
   it('retains special pickup and entitlement-only metadata', () => {
