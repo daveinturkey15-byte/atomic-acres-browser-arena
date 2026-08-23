@@ -29433,6 +29433,10 @@ function debugRiggedOperatorJointScreenPositions(
           recentErrors,
           statusText: (statusEl.textContent ?? '').slice(0, 90),
           backend: document.documentElement.dataset.renderBackend ?? null,
+          // The renderer refuses to submit frames without foreground ownership,
+          // so a stalled prewarm is usually a focus question, not a GPU one.
+          hasFocus: typeof document.hasFocus === 'function' ? document.hasFocus() : null,
+          visibility: document.visibilityState,
         });
       }, 10_000);
       try {

@@ -85,7 +85,7 @@ function waitForReport(timeoutMs) {
           // Stage beacons report progress; only a result or error ends the wait.
           if (parsed?.stage) {
             const detail = parsed.stage === 'heartbeat'
-              ? ` bootstrap=${parsed.bootstrapStage} backend=${parsed.backend} status="${parsed.statusText}"`
+              ? ` bootstrap=${parsed.bootstrapStage} backend=${parsed.backend} focus=${parsed.hasFocus} vis=${parsed.visibility}`
               : '';
             console.error(`[hf331] page reports stage: ${parsed.stage}${detail}`);
             return;

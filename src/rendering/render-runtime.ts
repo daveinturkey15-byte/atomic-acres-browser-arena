@@ -11,6 +11,7 @@ import type { ToneMappingMode } from '../graphics-settings-registry';
 import { FramePacingSampler, type FramePacingSummary } from '../frame-pacing';
 import {
   browserOwnsForegroundPresentation,
+  browserPresentationIsVisible,
   waitForVisibleBrowserPreparation,
 } from '../browser-preparation-scheduler';
 
@@ -601,13 +602,19 @@ export class LegacyWebGlRenderRuntime {
     // AtomicSignal coverage and match-composition renders still prove the full
     // world. This removes redundant whole-map raster/driver work without
     // deferring any effect geometry, texture, material or upload into combat.
-    while (true) {
+    // Same bounded-patience rule as the WebGPU path: wait for real focus a few
+    // times, then accept a visible document. An unfocused window used to spin
+    // here forever and never finish loading.
+    for (let attempt = 0; ; attempt += 1) {
       await waitForVisibleBrowserPreparation();
       const restoreVisibility = suppressUnrelatedWebGlRenderables(scene, root);
       try {
         // The visibility traversal itself can race a tab switch. Recheck at
         // the final synchronous boundary and retry without authoring a frame.
-        if (!browserOwnsForegroundPresentation()) continue;
+        const ready = attempt >= 3
+          ? browserPresentationIsVisible()
+          : browserOwnsForegroundPresentation();
+        if (!ready) continue;
         this.renderer.render(scene, camera);
         return;
       } finally {
@@ -754,6 +761,13 @@ export class WebGpuRenderRuntime {
     lightsNodeId: number | null;
   }>> = [];
   private nextCompletionProbeAt = 0;
+  /**
+   * Polite attempts to acquire real focus before cold prewarm settles for a
+   * visible-but-unfocused document. Each attempt costs one foreground-wait
+   * fallback, so this is a few seconds of patience, not a spin.
+   */
+  private static readonly PREWARM_FOCUS_ATTEMPTS = 3;
+
   private static readonly COMPLETION_PROBE_INTERVAL_MS = 250;
   private static readonly SUBMISSION_BACKPRESSURE_MS = 250;
   // Cold compilation, prewarm, transitions and explicit renderer mutations
@@ -1306,12 +1320,20 @@ export class WebGpuRenderRuntime {
       // Queue retirement may finish after the browser lost focus. Reacquire
       // foreground ownership at the actual encode boundary, not only when the
       // caller entered this method.
+      // Wait politely for real foreground ownership, but do not wait forever.
+      // submitFrame refuses without focus, and waitForVisibleBrowserPreparation
+      // falls back on a timer, so a visible-but-unfocused window span this loop
+      // indefinitely and never finished loading the map. After the polite
+      // attempts, a VISIBLE document is enough - the hidden-tab contract is
+      // about hidden tabs, and this still refuses to submit for one.
       let submitted = false;
-      while (!submitted) {
+      for (let attempt = 0; !submitted; attempt += 1) {
         await waitForVisibleBrowserPreparation();
+        const force = attempt >= WebGpuRenderRuntime.PREWARM_FOCUS_ATTEMPTS;
+        if (force && !browserPresentationIsVisible()) continue;
         const restoreVisibility = suppressUnrelatedRenderables(scene, roots);
         try {
-          submitted = this.submitFrame(this.clock(), true);
+          submitted = this.submitFrame(this.clock(), true, 'serialized', force);
         } finally {
           restoreVisibility();
         }
@@ -1336,11 +1358,18 @@ export class WebGpuRenderRuntime {
     _frameTimestamp = this.clock(),
     force = false,
     submissionMode: WebGpuSubmissionMode = 'serialized',
+    /**
+     * Admission prewarm only: accept a VISIBLE document that does not hold
+     * focus. Gameplay submission never sets this - it keeps the strict gate.
+     */
+    allowUnfocusedVisible = false,
   ): boolean {
     if (this.disposed) return false;
     if (this.deviceLost) throw new Error(this.lastFailure ?? 'WebGPU device lost');
     if (this.uncapturedErrors > 0) throw new Error(this.lastFailure ?? 'WebGPU uncaptured error');
-    if (!browserOwnsForegroundPresentation()) return false;
+    if (allowUnfocusedVisible
+      ? !browserPresentationIsVisible()
+      : !browserOwnsForegroundPresentation()) return false;
     const admissionCheckedAt = this.clock();
     this.submissionMode = submissionMode;
     const inFlightSubmissions = Math.max(0, this.submissionSequence - this.completedSequence);

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   BrowserCpuTaskLane,
   browserOwnsForegroundPresentation,
+  browserPresentationIsVisible,
   scheduleBrowserPreparationIdleTask,
   waitForVisibleBrowserPreparation,
   yieldBrowserPreparationFrame,
@@ -446,5 +447,61 @@ describe('browser preparation scheduler', () => {
 
     expect(task).toHaveBeenCalledTimes(1);
     expect(cancelIdleCallback).toHaveBeenCalledWith(13);
+  });
+});
+
+describe('browserPresentationIsVisible (bounded prewarm patience)', () => {
+  /**
+   * REGRESSION GUARD for a load-forever hang.
+   *
+   * Cold presentation prewarm submitted only while the document owned
+   * FOREGROUND presentation, which requires focus. The retry loop had no
+   * bound, and the foreground wait falls back on a timer rather than failing,
+   * so a visible-but-unfocused window - alt-tabbed during load, or a window
+   * the OS never reports focus for - retried forever and never finished
+   * loading the map. Installed Firefox reproduced exactly that: it reached
+   * 'prewarming-weapon-catalog' and stayed there indefinitely while every one
+   * of its WebGPU queue fences resolved normally.
+   *
+   * The hidden-tab contract is about HIDDEN tabs. This separates the two:
+   * hidden still refuses, unfocused-but-visible is allowed to present after
+   * the polite attempts.
+   */
+  const withDocument = (visibilityState: string, hasFocus: boolean, run: () => void): void => {
+    const original = globalThis.document;
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: { visibilityState, hasFocus: () => hasFocus, addEventListener() {}, removeEventListener() {} },
+    });
+    try {
+      run();
+    } finally {
+      Object.defineProperty(globalThis, 'document', { configurable: true, value: original });
+    }
+  };
+
+  it('accepts a visible document that does not hold focus', () => {
+    withDocument('visible', false, () => {
+      expect(browserPresentationIsVisible()).toBe(true);
+      // The strict gate is what used to trap the prewarm loop here.
+      expect(browserOwnsForegroundPresentation()).toBe(false);
+    });
+  });
+
+  it('still refuses a hidden document, focused or not', () => {
+    withDocument('hidden', true, () => {
+      expect(browserPresentationIsVisible()).toBe(false);
+      expect(browserOwnsForegroundPresentation()).toBe(false);
+    });
+    withDocument('hidden', false, () => {
+      expect(browserPresentationIsVisible()).toBe(false);
+    });
+  });
+
+  it('agrees with the strict gate when the document is visible AND focused', () => {
+    withDocument('visible', true, () => {
+      expect(browserPresentationIsVisible()).toBe(true);
+      expect(browserOwnsForegroundPresentation()).toBe(true);
+    });
   });
 });
