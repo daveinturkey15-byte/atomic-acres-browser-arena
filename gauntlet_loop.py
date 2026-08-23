@@ -75,6 +75,11 @@ def run(cmd, cwd=REPO, timeout=1800):
     found = shutil.which(resolved[0])
     if found:
         resolved[0] = found
+        # CreateProcess executes only PE images; npx/tsc/vitest resolve to
+        # .CMD shims, and spawning those directly still raises WinError 2.
+        # Route shim launches through cmd.exe, which knows how to run them.
+        if os.path.splitext(found)[1].lower() in (".cmd", ".bat"):
+            resolved = [os.environ.get("ComSpec", "cmd.exe"), "/d", "/c"] + resolved
     try:
         p = subprocess.run(resolved, cwd=cwd, capture_output=True, text=True,
                            timeout=timeout, encoding="utf-8", errors="replace")
