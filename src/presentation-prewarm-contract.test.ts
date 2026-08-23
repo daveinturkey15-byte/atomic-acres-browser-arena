@@ -581,7 +581,8 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('for (let sample = 0; sample < 3; sample += 1)');
     expect(source).toContain('MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS = 4_000');
     expect(source).toContain('assertWebGpuAdmissionCompletionLatency(');
-    expect(source).toContain('if (!isSharedMeshGeometry(geometry)) geometry.dispose();');
+    expect(readFileSync(new URL('./gpu-retirement-scheduler.ts', import.meta.url), 'utf8'))
+      .toContain('if (!isSharedMeshGeometry(geometry)) geometry.dispose();');
     expect(source).toContain("presentation.status === 'stalled'");
     expect(source).not.toContain('consecutiveMinimumTierSlowSamples');
     expect(source).not.toContain('Live WebGPU queue latency');
@@ -676,9 +677,10 @@ describe('presentation prewarm startup contract', () => {
       operatorPrewarm.indexOf("if (renderRuntime.backend === 'webgpu')"),
       operatorPrewarm.indexOf('} else {'),
     );
-    const retirementDrain = runtimeSource.slice(
-      runtimeSource.indexOf('async function drainDeferredGpuRetirements()'),
-      runtimeSource.indexOf('function scheduleDeferredGpuRetirement('),
+    const retirementSource = readFileSync(new URL('./gpu-retirement-scheduler.ts', import.meta.url), 'utf8');
+    const retirementDrain = retirementSource.slice(
+      retirementSource.indexOf('async function drainDeferredGpuRetirements()'),
+      retirementSource.indexOf('function scheduleDeferredGpuRetirement('),
     );
 
     expect(grenadeSource).toContain('GRENADE_WORLD_PRESENTATION_BUILD_BATCH_SIZE = 2');
@@ -704,6 +706,9 @@ describe('presentation prewarm startup contract', () => {
     expect(runtimeSource.match(/await yieldBrowserPreparationFrame\(\);/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
     expect(retirementDrain).toContain('for (const [retirementIndex, retirement] of batch.entries())');
     expect(retirementDrain).toContain('await yieldDeferredGpuRetirementTask();');
+    // Pass 79 extraction: legacy-main must wire the real backend and the
+    // flushWebGpuFrames fence into the scheduler, never a stub.
+    expect(runtimeSource).toContain("const gpuRetirement = createGpuRetirementScheduler({\n  backend: () => renderRuntime.backend,\n  flushSubmittedFrames: (timeoutMs?: number) => flushWebGpuFrames(timeoutMs),\n});");
   });
 
   it('runs the shed reset probe only across the final two RustRig visits and gates continuous GPU progress', () => {

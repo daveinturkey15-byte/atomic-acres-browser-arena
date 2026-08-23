@@ -59,11 +59,10 @@ import { drawPass70DroneSwarmLogo } from './pass70-drone-swarm-logo';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
 import { BotWeaponGpuVocabulary } from './bot-weapon-gpu-vocabulary';
 import {
-  invalidatePass65PresentationTree,
   pass65WeaponCacheTelemetry,
   prewarmPass65RuntimeWeaponCorpus,
-  releasePass65WeaponModelsIn,
 } from './weapon-model';
+import { createGpuRetirementScheduler } from './gpu-retirement-scheduler';
 import { applyBotEmissiveBrightness } from './operator-model';
 import { applyRemoteHumanReadabilityHighlight, remoteHumanReadabilityTelemetry } from './remote-player-readability';
 import {
@@ -85,7 +84,6 @@ import {
   type RiggedEvidencePrincipalWriteMode,
   type RiggedEvidenceRasterRoiReceipt,
 } from './rigged-evidence-occlusion';
-import { isSharedMeshGeometry } from './gpu-resource-ownership';
 import {
   ACTION_LABELS,
   GAMEPLAY_ACTIONS,
@@ -677,7 +675,9 @@ import {
 import {
   CLOCK_PING_INTERVAL_MS,
   DEFAULT_PRIVATE_MATCH_CONFIG,
+  LOBBY_KILL_LIMITS,
   LOBBY_START_LEAD_MS,
+  LOBBY_TIME_LIMITS_MS,
   REJOIN_GRACE_MS,
   rejoinReservationExpired,
   balanceLobbyTeams,
@@ -1859,127 +1859,15 @@ async function flushWebGpuFrames(timeoutMs = 4_000): Promise<void> {
   if (renderRuntime.backend === 'webgpu') await renderRuntime.waitForSubmittedWork(timeoutMs);
 }
 
-type DeferredGpuRetirement = Readonly<{
-  kind: 'root';
-  root: THREE.Object3D;
-  disposeResources: boolean;
-  afterFence?: () => void;
-}> | Readonly<{
-  kind: 'geometry';
-  geometry: THREE.BufferGeometry;
-}>;
-
-const deferredGpuRetirements: DeferredGpuRetirement[] = [];
-const scheduledGpuRetirementRoots = new WeakSet<THREE.Object3D>();
-const scheduledGpuRetirementGeometries = new WeakSet<THREE.BufferGeometry>();
-let gpuRetirementTask: Promise<void> | null = null;
-let gpuRetirementFences = 0;
-let gpuRetirementScheduledRoots = 0;
-let gpuRetirementScheduledGeometries = 0;
-let gpuRetirementDisposedRoots = 0;
-let gpuRetirementDisposedGeometries = 0;
-let gpuRetirementFailures = 0;
-
-async function yieldDeferredGpuRetirementTask(): Promise<void> {
-  await yieldBrowserPreparationFrame();
-}
-
-function disposeDetachedRootResources(root: THREE.Object3D): void {
-  const geometries = new Set<THREE.BufferGeometry>();
-  const materials = new Set<THREE.Material>();
-  root.traverse((node) => {
-    if (node instanceof THREE.Mesh) {
-      geometries.add(node.geometry);
-      const entries = Array.isArray(node.material) ? node.material : [node.material];
-      entries.forEach((material) => materials.add(material));
-    }
-    if (node instanceof THREE.PointLight || node instanceof THREE.SpotLight || node instanceof THREE.DirectionalLight) {
-      node.shadow.map?.dispose();
-    }
-  });
-  geometries.forEach((geometry) => { if (!isSharedMeshGeometry(geometry)) geometry.dispose(); });
-  materials.forEach((material) => material.dispose());
-  root.clear();
-}
-
-async function drainDeferredGpuRetirements(): Promise<void> {
-  while (deferredGpuRetirements.length > 0) {
-    // Snapshot before fencing. Roots detached after this target was captured
-    // may have appeared in a newer submission and must wait for the next
-    // fence, never piggyback on this one.
-    const batch = deferredGpuRetirements.splice(0, deferredGpuRetirements.length);
-    try {
-      await flushWebGpuFrames();
-      if (renderRuntime.backend === 'webgpu') gpuRetirementFences += 1;
-    } catch (error) {
-      gpuRetirementFailures += 1;
-      deferredGpuRetirements.unshift(...batch);
-      console.warn('[Pass 65 GPU retirement fence failed; resources retained]', error);
-      return;
-    }
-    for (const [retirementIndex, retirement] of batch.entries()) {
-      if (retirement.kind === 'geometry') {
-        retirement.geometry.dispose();
-        gpuRetirementDisposedGeometries += 1;
-      } else {
-        // Cache ownership outlives one clone. Release refs only after the GPU
-        // fence and before generic teardown clears the nested weapon roots.
-        releasePass65WeaponModelsIn(retirement.root);
-        if (retirement.disposeResources) disposeDetachedRootResources(retirement.root);
-        retirement.afterFence?.();
-        gpuRetirementDisposedRoots += 1;
-      }
-      // Fence completion only establishes that disposal is safe; it does not
-      // require every detached hierarchy to be torn down in one browser task.
-      // One retirement per frame prevents cleanup of prewarm clones and old
-      // operators from colliding with match admission or a weapon switch.
-      if (retirementIndex + 1 < batch.length || deferredGpuRetirements.length > 0) {
-        await yieldDeferredGpuRetirementTask();
-      }
-    }
-  }
-}
-
-function scheduleDeferredGpuRetirement(
-  root: THREE.Object3D,
-  disposeResourcesOrAfterFence: boolean | (() => void) = true,
-  explicitAfterFence?: () => void,
-): void {
-  if (scheduledGpuRetirementRoots.has(root)) return;
-  const disposeResources = typeof disposeResourcesOrAfterFence === 'boolean' ? disposeResourcesOrAfterFence : true;
-  const afterFence = typeof disposeResourcesOrAfterFence === 'function' ? disposeResourcesOrAfterFence : explicitAfterFence;
-  scheduledGpuRetirementRoots.add(root);
-  gpuRetirementScheduledRoots += 1;
-  invalidatePass65PresentationTree(root);
-  root.removeFromParent();
-  root.visible = false;
-  deferredGpuRetirements.push(Object.freeze({ kind: 'root', root, disposeResources, afterFence }));
-  scheduleGpuRetirementDrain();
-}
-
-function scheduleDeferredGpuGeometryRetirement(geometry: THREE.BufferGeometry): void {
-  if (scheduledGpuRetirementGeometries.has(geometry)) return;
-  scheduledGpuRetirementGeometries.add(geometry);
-  gpuRetirementScheduledGeometries += 1;
-  deferredGpuRetirements.push(Object.freeze({ kind: 'geometry', geometry }));
-  scheduleGpuRetirementDrain();
-}
-
-function scheduleGpuRetirementDrain(): void {
-  if (gpuRetirementTask) return;
-  gpuRetirementTask = drainDeferredGpuRetirements().finally(() => {
-    gpuRetirementTask = null;
-    if (deferredGpuRetirements.length > 0) {
-      // A failed fence retains resources safely. A later admitted frame or map
-      // transition will give the queue another completion target.
-      window.setTimeout(() => {
-        if (!gpuRetirementTask) {
-          gpuRetirementTask = drainDeferredGpuRetirements().finally(() => { gpuRetirementTask = null; });
-        }
-      }, 250);
-    }
-  });
-}
+// Pass 79 streamline: the deferred GPU retirement scheduler lives in
+// `./gpu-retirement-scheduler`. Backend access and the frame fence are injected;
+// everything else (queues, WeakSets, counters, drain pacing) is owned there.
+const gpuRetirement = createGpuRetirementScheduler({
+  backend: () => renderRuntime.backend,
+  flushSubmittedFrames: (timeoutMs?: number) => flushWebGpuFrames(timeoutMs),
+});
+const scheduleDeferredGpuRetirement = gpuRetirement.schedule;
+const scheduleDeferredGpuGeometryRetirement = gpuRetirement.scheduleGeometry;
 document.documentElement.dataset.renderBackend = renderRuntime.backend;
 const effectiveGraphicsExposure = (authoredExposure: number): number => authoredExposure * graphicsRuntime.post.exposureScale;
 const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent, renderProfile);
@@ -5070,6 +4958,12 @@ let scoutSweepUntil = 0;
 let yardhawk: YardhawkEntity | null = null;
 const strikeMissiles: StrikeMissileEntity[] = [];
 const hunterDrones: HunterDroneEntity[] = [];
+// HF-378: local receipt time of each remote player's last host-admitted
+// gunshot, keyed by player id. Written ONLY from the replicated 'shot'
+// message stream after its admission checks — never from local audio or
+// trigger prediction. Enemy radar reads it through the same shouldRevealEnemy
+// gunfire window that bot.lastShotAt uses.
+const remoteRadarFireRevealAt = new Map<string, number>();
 let supportPresentationRetirements = 0;
 let nukeSequence: NukeSequence | null = null;
 let triPassTargeting: TriPassTargeting | null = null;
@@ -6463,8 +6357,11 @@ function selectLobbyCodeForManualCopy(code: string): void {
 
 function currentMatchRules() {
   if (gameMode === 'solo') return selectedArena.matchRules;
+  // HF-377: the lobby config is the replicated match contract; its kill limit
+  // applies identically to TDM (squad score) and FFA (leader kills) because
+  // both advanceMatch and advanceFreeForAllMatch consume MatchRules.scoreLimit.
   const config = privateLobbySnapshot?.config ?? privateMatchConfig;
-  return { durationMs: config.durationMs, scoreLimit: null };
+  return { durationMs: config.durationMs, scoreLimit: config.scoreLimit };
 }
 
 function areCombatantsHostile(aId: string, aTeam: Team, bId: string, bTeam: Team): boolean {
@@ -8455,10 +8352,10 @@ function scheduleClientWorldRepairTimeout(epoch: string, matchEpoch: number): vo
       matchEpoch,
       lifeId: Math.max(0, localContinuity),
     });
-    const verdict = evaluateClientWorldRepairDeadline({
+    const repairRuling = evaluateClientWorldRepairDeadline({
       nowMs, armedAtMs, pumpEligibleSinceMs, hostContactAtMs: hostMatchContactAtMs, admission: judged,
     });
-    if (verdict === 'failed') {
+    if (repairRuling === 'failed') {
       if (admissionPending) handleClientWorldRepairFailure('admission-timeout');
       else handleGuestResumeTimeout();
       return;
@@ -9790,6 +9687,14 @@ function renderPrivateLobby(): void {
   botInput.disabled = !hostControls || rangeLobby;
   balanceInput.disabled = !hostControls || modeInput.value === 'ffa' || rangeLobby;
   element<HTMLButtonElement>('#lobby-balance').disabled = !hostControls || modeInput.value === 'ffa' || rangeLobby;
+  // HF-377: both limit controls mirror the replicated match contract, so guests
+  // read the host's chosen limits before ready-up and cannot edit them.
+  const timeLimitInput = element<HTMLSelectElement>('#lobby-time-limit');
+  const killLimitInput = element<HTMLSelectElement>('#lobby-kill-limit');
+  timeLimitInput.value = String(snapshot?.config.durationMs ?? privateMatchConfig.durationMs);
+  killLimitInput.value = (snapshot?.config.scoreLimit ?? privateMatchConfig.scoreLimit) === null ? '' : String(snapshot?.config.scoreLimit ?? privateMatchConfig.scoreLimit);
+  timeLimitInput.disabled = !hostControls || rangeLobby;
+  killLimitInput.disabled = !hostControls || rangeLobby;
   const localMember = members.find((member) => member.id === player.id);
   // HF-328: squad identity is prescribed, so the free name input and colour picker
   // no longer exist in the lobby markup. Project the canonical identity into the
@@ -11806,6 +11711,9 @@ function onNetworkMessage(message: GameMessage): void {
       if (network.role === 'host' || processedNonces.has(message.nonce)) return;
       processedNonces.add(message.nonce);
       trimNonceSet();
+      // HF-378: admitted unsuppressed gunshot paints the shooter on enemy
+      // radar for the shared 3 s gunfire window (see shouldRevealEnemy).
+      remoteRadarFireRevealAt.set(message.by, performance.now());
       renderRemoteShot(message);
       return;
     }
@@ -11818,6 +11726,9 @@ function onNetworkMessage(message: GameMessage): void {
     const admission = admitRemoteShot(message, sender?.snapshot, performance.now(), prior);
     if (!admission.accepted) return;
     remoteShotAdmissions.set(message.by, admission.nextState);
+    // HF-378: admission accepted — this replicated shot is authoritative,
+    // so open the shooter's enemy-radar gunfire reveal window.
+    remoteRadarFireRevealAt.set(message.by, performance.now());
     const now = performance.now();
     const actions = admittedRemoteShots.get(message.by) ?? new Map<number, AdmittedRemoteShot>();
     for (const [nonce, action] of actions) {
@@ -20659,6 +20570,14 @@ function explodeGrenade(entity: GrenadeEntity): void {
     sensoryScale: accessibilityRuntime.weaponMotionScale,
     now: afterAudio,
   });
+  // HF-370: the HUD reacts to the same blast the camera does, with a distance
+  // falloff to zero at 50 m so far explosions nudge rather than heave.
+  hudImpactState = pushHudImpact(hudImpactState, {
+    kind: 'explosion',
+    severity: Math.max(0, 1 - explosionDistance / 50) * accessibilityRuntime.weaponMotionScale,
+    bearingRadians: sourceScreenAngle(player.position, player.yaw, point),
+    now: afterAudio,
+  });
   const attachedTargetId = entity.attachedTargetId;
   const attachedTargetLifeId = entity.attachedTargetLifeId;
   let liveAttachedTargetFound = false;
@@ -24173,6 +24092,7 @@ function clearFieldSupport(): void {
   nukeFlash.style.opacity = '0';
   cancelSupportTargeting(false, false);
   scoutSweepUntil = 0;
+  remoteRadarFireRevealAt.clear();
   yardhawkExplosions = 0;
   triPassLaunches = 0;
   triPassImpacts = 0;
@@ -25220,7 +25140,7 @@ function updateMinimap(now: number): void {
   for (const remote of remotes.values()) {
     const friendly = privateMatchMode === 'tdm' && remote.snapshot.team === player.team;
     const scoutActive = scoutSweepPulseVisible(now, scoutSweepUntil);
-    if (!friendly && !scoutActive && remote.target.distanceTo(player.position) > 15) continue;
+    if (!friendly && !scoutActive && !shouldRevealEnemy(remote.target.distanceTo(player.position), now, remoteRadarFireRevealAt.get(remote.snapshot.id) ?? 0)) continue;
     const [x, y] = point(remote.target.x, remote.target.z);
     context.fillStyle = friendly ? '#58e3dc' : '#ff765f';
     context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
@@ -27475,6 +27395,13 @@ element<HTMLButtonElement>('#lobby-balance').addEventListener('click', () => {
   for (const member of balanceLobbyTeams([...hostLobbyMembers.values()])) hostLobbyMembers.set(member.id, { ...member, ready: false });
   broadcastHostLobby('waiting');
 });
+/** HF-377: an empty select value is the uncapped OFF option; anything else must
+ * be a whole-number first-to-N target before it may enter the match contract. */
+const parsedLobbyKillLimit = (value: string): number | null => {
+  if (value === '') return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : privateMatchConfig.scoreLimit;
+};
 const updateLobbyConfigFromUi = (): void => {
   if (network.role !== 'host') return;
   const requestedArena = element<HTMLSelectElement>('#lobby-arena').value as ArenaId;
@@ -27491,7 +27418,18 @@ const updateLobbyConfigFromUi = (): void => {
     capacity,
     hostedBotCount,
     autoBalance: !rangeLobby && mode === 'tdm' && element<HTMLInputElement>('#lobby-auto-balance').checked,
-    durationMs: hostedArenaDurationMs(arenaSelection(arenaId)),
+    // HF-377: the host's explicit time/kill limit choices join the match
+    // contract; gun-range keeps its fixed untimed practice round.
+    durationMs: rangeLobby
+      ? hostedArenaDurationMs(arenaSelection(arenaId))
+      : (LOBBY_TIME_LIMITS_MS as readonly number[]).includes(Number(element<HTMLSelectElement>('#lobby-time-limit').value))
+        ? Number(element<HTMLSelectElement>('#lobby-time-limit').value)
+        : privateMatchConfig.durationMs,
+    scoreLimit: rangeLobby
+      ? null
+      : LOBBY_KILL_LIMITS.includes(parsedLobbyKillLimit(element<HTMLSelectElement>('#lobby-kill-limit').value))
+        ? parsedLobbyKillLimit(element<HTMLSelectElement>('#lobby-kill-limit').value)
+        : privateMatchConfig.scoreLimit,
   });
 };
 element<HTMLSelectElement>('#lobby-arena').addEventListener('change', updateLobbyConfigFromUi);
@@ -27499,6 +27437,8 @@ element<HTMLSelectElement>('#lobby-mode').addEventListener('change', updateLobby
 element<HTMLSelectElement>('#lobby-capacity').addEventListener('change', updateLobbyConfigFromUi);
 element<HTMLSelectElement>('#lobby-bots').addEventListener('change', updateLobbyConfigFromUi);
 element<HTMLInputElement>('#lobby-auto-balance').addEventListener('change', updateLobbyConfigFromUi);
+element<HTMLSelectElement>('#lobby-time-limit').addEventListener('change', updateLobbyConfigFromUi);
+element<HTMLSelectElement>('#lobby-kill-limit').addEventListener('change', updateLobbyConfigFromUi);
 teamSelect.addEventListener('change', () => {
   if (!privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting' || privateLobbySnapshot.config.mode !== 'tdm') return;
   const team: Team = teamSelect.value === '1' ? 1 : 0;
@@ -28613,7 +28553,7 @@ function sampleEnduranceHealth(detail: EnduranceHealthDetail = 'base') {
     },
     runtime: renderRuntime.healthTelemetry(),
     watchdog: arenaRenderWatchdog.telemetry(),
-    gpuRetirement: { failures: gpuRetirementFailures },
+    gpuRetirement: { failures: gpuRetirement.telemetry().failures },
     killstreak: {
       revision: killstreakSnapshot.revision,
       entities: killstreakSnapshot.entities.length,
@@ -30482,18 +30422,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       collisionCacheRevision: activeWorldColliderCacheRevision,
       rapierMajorBodies: characterPhysics?.majorDebrisBodyCount() ?? 0,
       rapierPrewarmedMajorBodies: characterPhysics?.prewarmedMajorDebrisBodyCount() ?? 0,
-      gpuRetirement: {
-        queuedResources: deferredGpuRetirements.length,
-        queuedRoots: deferredGpuRetirements.filter((entry) => entry.kind === 'root').length,
-        queuedGeometries: deferredGpuRetirements.filter((entry) => entry.kind === 'geometry').length,
-        draining: gpuRetirementTask !== null,
-        fences: gpuRetirementFences,
-        scheduledRoots: gpuRetirementScheduledRoots,
-        scheduledGeometries: gpuRetirementScheduledGeometries,
-        disposedRoots: gpuRetirementDisposedRoots,
-        disposedGeometries: gpuRetirementDisposedGeometries,
-        failures: gpuRetirementFailures,
-      },
+      gpuRetirement: gpuRetirement.telemetry(),
     },
     ballistics: {
       activeSurfaces: activeBallisticSurfaces().length,
@@ -30922,7 +30851,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         : { source: null, audioMs: 0, visualMs: 0, targetDamageMs: 0, totalSyncMs: 0 },
       explosionFrameProfile: { ...lastSupportExplosionFrameProfile, sources: [...lastSupportExplosionFrameProfile.sources] },
       retiredPresentationRoots: supportPresentationRetirements,
-      pendingRetiredPresentationRoots: deferredGpuRetirements.filter((entry) => entry.kind === 'root').length,
+      pendingRetiredPresentationRoots: gpuRetirement.telemetry().queuedRoots,
       prewarmedNuke: {
         shockwaveInScene: nukeShockwave.parent === scene,
         prewarmed: nukePresentationPrewarmed,
