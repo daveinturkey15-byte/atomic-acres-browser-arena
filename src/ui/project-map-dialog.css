@@ -13,9 +13,11 @@
   position: static;
   inset: auto;
   min-height: 34px;
-  border: 1px solid rgba(244, 196, 79, .34);
-  background: linear-gradient(135deg, rgba(8, 18, 22, .94), rgba(12, 21, 25, .88));
-  color: #b8c8c3;
+  /* Pass 79 reskin: cold blue-black plate + old-gold edge -> warm graphite
+     plate + warm hairline, sitting on the dark command header as before. */
+  border: 1px solid rgb(255 208 150 / 0.30);
+  background: linear-gradient(135deg, rgb(24 18 13 / 0.94), rgb(34 26 18 / 0.88));
+  color: #cbbba4;
   padding: 9px 12px;
   font: 800 10px/1 'Barlow Condensed', sans-serif;
   letter-spacing: .1em;
@@ -26,8 +28,8 @@
 #menu-meta-actions > button:hover,
 #menu-meta-actions > button:focus-visible {
   transform: translateY(-1px);
-  border-color: var(--gold);
-  color: #fff;
+  border-color: #e8781f;
+  color: #f7efe2;
 }
 
 /*
@@ -39,15 +41,18 @@
  * sheet; dropping them would let the generic #menu-meta-actions rule win.
  */
 #project-map-btn {
-  color: #a4ecf0 !important;
-  border-color: rgba(140, 232, 240, .34) !important;
-  background: rgba(18, 167, 177, .16) !important;
+  /* Pass 79 reskin: this chip now wears the Pass 77 chrome accent family
+     (#e8781f ramp) instead of cold cyan-on-teal. !important retained for the
+     same cascade reason documented above - this sheet lands last. */
+  color: #ffc48a !important;
+  border-color: rgb(232 120 31 / 0.40) !important;
+  background: rgb(232 120 31 / 0.14) !important;
 }
 
 #project-map-btn:hover:not(:disabled) {
-  color: #ffffff !important;
-  border-color: #12a7b1 !important;
-  background: rgba(18, 167, 177, .28) !important;
+  color: #ffd9ae !important;
+  border-color: #e8781f !important;
+  background: rgb(232 120 31 / 0.26) !important;
 }
 
 #menu.hidden ~ #menu-meta-actions,
@@ -59,7 +64,7 @@
   position: fixed;
   inset: 0;
   z-index: 28;
-  background: rgba(4, 9, 12, .74);
+  background: rgb(12 8 5 / 0.78);
   backdrop-filter: blur(5px);
 }
 
@@ -73,12 +78,12 @@
   overflow: auto;
   transform: translate(-50%, -50%);
   padding: 22px 22px 18px;
-  border: 1px solid rgba(244, 196, 79, .34);
+  border: 1px solid rgb(255 196 128 / 0.22);
   background:
-    linear-gradient(145deg, rgba(12, 24, 27, .985), rgba(5, 12, 15, .99)),
-    repeating-linear-gradient(90deg, transparent 0 34px, rgba(255, 255, 255, .012) 35px);
-  box-shadow: 0 28px 90px rgba(0, 0, 0, .72), inset 0 0 0 1px rgba(255, 255, 255, .035);
-  color: #dbe7e2;
+    linear-gradient(145deg, rgb(32 25 18 / 0.985), rgb(16 12 9 / 0.99)),
+    repeating-linear-gradient(90deg, transparent 0 34px, rgb(255 236 212 / 0.014) 35px);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .72), inset 0 0 0 1px rgb(255 236 212 / 0.04);
+  color: #e9dfd0;
 }
 
 .project-map-header {
@@ -94,31 +99,28 @@
 }
 
 .project-map-header small {
-  color: #829c96;
+  color: #a89680;
   font: 800 9px/1 Inter, sans-serif;
   letter-spacing: .18em;
 }
 
 .project-map-header strong {
   margin-top: 5px;
-  color: #fff;
+  color: #fdf7ec;
   font: 900 31px/.9 'Barlow Condensed', sans-serif;
   letter-spacing: .09em;
 }
 
 #project-map-close {
-  border: 1px solid rgba(255, 255, 255, .22);
-  background: rgba(255, 255, 255, .05);
-  color: #eaf2ea;
-  padding: 9px 12px;
-  font: 800 12px/1 'Barlow Condensed', sans-serif;
-  letter-spacing: .12em;
+  border: 1px solid rgb(255 236 212 / 0.20);
+  background: rgb(255 236 212 / 0.05);
+  color: #f2e9da;
 }
 
 #project-map-close:hover,
 #project-map-close:focus-visible {
-  border-color: var(--gold);
-  color: var(--gold);
+  border-color: #e8781f;
+  color: #e8781f;
 }
 
 .project-map-meta {
@@ -127,7 +129,7 @@
   flex-wrap: wrap;
   gap: 7px;
   margin: 14px 0 12px;
-  color: #9fb3ad;
+  color: #b3a494;
   font: 700 10px/1 Inter, sans-serif;
   letter-spacing: .08em;
 }
@@ -135,16 +137,14 @@
 .project-map-meta span,
 .project-map-meta i {
   padding: 5px 7px;
-  border: 1px solid rgba(88, 227, 220, .28);
-  background: rgba(88, 227, 220, .055);
-  color: var(--aqua);
-  font-style: normal;
-  text-transform: uppercase;
+  border: 1px solid rgb(232 120 31 / 0.30);
+  background: rgb(232 120 31 / 0.06);
+  color: #ffb374;
 }
 
 .project-map-meta i {
-  border-color: rgba(244, 196, 79, .3);
-  color: var(--gold);
+  border-color: rgb(255 196 128 / 0.32);
+  color: #ffca7a;
 }
 
 #project-map-tabs {
@@ -155,18 +155,18 @@
 }
 
 #project-map-tabs button {
-  border: 1px solid rgba(255, 255, 255, .12);
-  background: rgba(255, 255, 255, .035);
-  color: #81958f;
+  border: 1px solid rgb(255 236 212 / 0.13);
+  background: rgb(255 236 212 / 0.035);
+  color: #a08d75;
   padding: 9px 8px;
   font: 800 10px/1 Inter, sans-serif;
   letter-spacing: .12em;
 }
 
 #project-map-tabs button[aria-selected="true"] {
-  border-color: rgba(244, 196, 79, .55);
-  background: rgba(244, 196, 79, .095);
-  color: #fff3c9;
+  border-color: rgb(232 120 31 / 0.55);
+  background: rgb(232 120 31 / 0.10);
+  color: #ffcf9e;
 }
 
 .project-map-pages {
@@ -179,9 +179,9 @@
   gap: 16px;
   align-items: center;
   padding: 17px;
-  border: 1px solid rgba(88, 227, 220, .18);
-  border-left: 3px solid var(--aqua);
-  background: linear-gradient(120deg, rgba(88, 227, 220, .055), rgba(0, 0, 0, .16));
+  border: 1px solid rgb(255 196 128 / 0.20);
+  border-left: 3px solid #e8781f;
+  background: linear-gradient(120deg, rgb(232 120 31 / 0.06), rgb(0 0 0 / 0.16));
 }
 
 .project-map-intro span small,
@@ -190,14 +190,14 @@
 }
 
 .project-map-intro span small {
-  color: #7e9791;
+  color: #a89680;
   font: 800 9px/1 Inter, sans-serif;
   letter-spacing: .17em;
 }
 
 .project-map-intro span strong {
   margin-top: 6px;
-  color: var(--gold);
+  color: #e8781f;
   font: 900 27px/.9 'Barlow Condensed', sans-serif;
   letter-spacing: .08em;
 }
@@ -205,13 +205,13 @@
 .project-map-intro p,
 .project-page-lede {
   margin: 0;
-  color: #bbc9c4;
+  color: #d6cab6;
   font: 600 12px/1.55 Inter, sans-serif;
 }
 
 .project-map-pages h3 {
   margin: 19px 0 9px;
-  color: #7f9992;
+  color: #a89680;
   font: 800 9px/1 Inter, sans-serif;
   letter-spacing: .18em;
 }
@@ -227,18 +227,18 @@
   align-items: center;
   gap: 7px;
   padding: 7px 9px;
-  border: 1px solid rgba(255, 255, 255, .08);
-  background: rgba(255, 255, 255, .025);
+  border: 1px solid rgb(255 236 212 / 0.09);
+  background: rgb(255 236 212 / 0.03);
 }
 
 .project-channel-state small {
-  color: #728a84;
+  color: #a08d75;
   font: 800 9px/1 Inter, sans-serif;
   letter-spacing: .13em;
 }
 
 .project-channel-state b {
-  color: #dfe9e5;
+  color: #efe6d6;
   font: 800 10px/1 Inter, sans-serif;
   letter-spacing: .08em;
 }
@@ -255,9 +255,9 @@
 .project-boundaries li {
   position: relative;
   padding: 9px 10px 9px 19px;
-  border: 1px solid rgba(255, 255, 255, .075);
-  background: rgba(255, 255, 255, .022);
-  color: #9fb2ac;
+  border: 1px solid rgb(255 236 212 / 0.08);
+  background: rgb(255 236 212 / 0.025);
+  color: #c4b7a1;
   font: 600 11px/1.45 Inter, sans-serif;
 }
 
@@ -268,8 +268,8 @@
   left: 8px;
   width: 4px;
   height: 4px;
-  background: var(--aqua);
-  box-shadow: 0 0 8px rgba(88, 227, 220, .75);
+  background: #e8781f;
+  box-shadow: 0 0 8px rgb(232 120 31 / 0.65);
 }
 
 .project-downloads {
@@ -280,9 +280,9 @@
 
 .project-downloads button {
   flex: 1;
-  border: 1px solid rgba(244, 196, 79, .35);
-  background: rgba(244, 196, 79, .07);
-  color: #f7df98;
+  border: 1px solid rgb(232 120 31 / 0.40);
+  background: rgb(232 120 31 / 0.08);
+  color: #ffb374;
   padding: 11px;
   font: 800 10px/1 Inter, sans-serif;
   letter-spacing: .1em;
@@ -290,8 +290,8 @@
 
 .project-downloads button:hover,
 .project-downloads button:focus-visible {
-  border-color: var(--gold);
-  background: rgba(244, 196, 79, .13);
+  border-color: #e8781f;
+  background: rgb(232 120 31 / 0.15);
 }
 
 .project-tree,
@@ -311,14 +311,14 @@
 
 .project-tree .project-tree {
   margin: 9px 0 0 17px;
-  border-left: 1px solid rgba(88, 227, 220, .18);
+  border-left: 1px solid rgb(255 196 128 / 0.20);
   padding-left: 12px;
 }
 
 .project-tree > li {
   padding: 11px;
-  border: 1px solid rgba(255, 255, 255, .09);
-  background: rgba(255, 255, 255, .025);
+  border: 1px solid rgb(255 236 212 / 0.10);
+  background: rgb(255 236 212 / 0.03);
 }
 
 .project-node-heading {
@@ -329,13 +329,13 @@
 }
 
 .project-node-heading strong {
-  color: #f1f6f3;
+  color: #f7efe2;
   font: 800 15px/1 'Barlow Condensed', sans-serif;
   letter-spacing: .06em;
 }
 
 .project-node-heading span {
-  color: #79928b;
+  color: #a89680;
   font: 800 9px/1 Inter, sans-serif;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -345,12 +345,12 @@
 .project-tree small {
   display: block;
   margin: 6px 0 0;
-  color: #9cb0aa;
+  color: #c4b7a1;
   font: 600 10px/1.45 Inter, sans-serif;
 }
 
 .project-tree small {
-  color: #6f8982;
+  color: #97866f;
 }
 
 .project-node-paths {
@@ -362,9 +362,9 @@
 
 .project-node-paths code {
   padding: 4px 6px;
-  border: 1px solid rgba(88, 227, 220, .12);
+  border: 1px solid rgb(255 208 150 / 0.14);
   background: rgba(0, 0, 0, .21);
-  color: #88bbb4;
+  color: #cfb694;
   font: 600 9px/1 ui-monospace, Consolas, monospace;
 }
 
@@ -382,20 +382,20 @@
   gap: 7px 12px;
   align-items: start;
   padding: 11px;
-  border: 1px solid rgba(255, 255, 255, .08);
-  background: rgba(255, 255, 255, .025);
+  border: 1px solid rgb(255 236 212 / 0.09);
+  background: rgb(255 236 212 / 0.03);
 }
 
 .project-change-list span,
 .project-archive-list span {
-  color: var(--gold);
+  color: #e8781f;
   font: 800 9px/1 Inter, sans-serif;
   letter-spacing: .1em;
 }
 
 .project-change-list strong,
 .project-archive-list strong {
-  color: #edf4ef;
+  color: #f4ecdd;
   font: 800 14px/1 'Barlow Condensed', sans-serif;
   letter-spacing: .04em;
 }
@@ -403,7 +403,7 @@
 .project-change-list p {
   grid-column: 2 / -1;
   margin: 0;
-  color: #94a9a3;
+  color: #bdb09a;
   font: 600 10px/1.45 Inter, sans-serif;
 }
 
@@ -416,7 +416,7 @@
 
 .project-change-list i,
 .project-archive-list time {
-  color: #718982;
+  color: #a08d75;
   font: 700 9px/1 Inter, sans-serif;
   font-style: normal;
   letter-spacing: .08em;

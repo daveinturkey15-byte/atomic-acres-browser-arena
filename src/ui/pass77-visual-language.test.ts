@@ -359,3 +359,69 @@ describe('Pass 77 HF-370 reskin - command deck', () => {
     for (const size of pixelFontSizes(shell)) expect(size).toBeGreaterThanOrEqual(10);
   });
 });
+
+/*
+ * Pass 79 reskin completion - the last three surfaces still on the OLD
+ * teal-on-white/cold-blue-black deck. The owner's rejection was "the menus
+ * really don't look that different"; these sheets were imported from shell
+ * modules (advanced-graphics.css via pass64-shell.ts, project-map-dialog.css
+ * via project-map-dialog.ts) or predate the warm palette (the deployment
+ * console block in tactical-ui.css), so the Pass 77 re-pointing never reached
+ * them. These assertions are written against declarations-only text, like the
+ * checks above, so a comment cannot satisfy them.
+ */
+describe('Pass 79 reskin completion - no surface left on the rejected deck', () => {
+  /** The exact signatures of the rejected cold/teal deck, per sheet. */
+  const rejectedSignatures = {
+    './advanced-graphics.css': [
+      '#0b6b78', // deep readable teal used as the panel accent
+      '#0e8b9b', // SAVE button gradient start
+      '#0a5f6b', // SAVE button gradient end
+      '#12a4b6', // SAVE button hover lit teal
+      '#54d9ec', // bright cyan category-edge fallback
+      '--ui-accent-readable', // undefined token whose fallback was teal
+      '--ui-ink', // undefined token whose fallback was pale cold white
+    ],
+    './project-map-dialog.css': [
+      '#a4ecf0', // cold cyan button text
+      'rgba(18, 167, 177', // teal button plate
+      'rgba(140, 232, 240', // cyan button edge
+      '#12a7b1', // lit teal hover
+      'rgba(88, 227, 220', // aqua chips, intro edge, tree rails, bullet glow
+      'var(--aqua)', // direct reads of the team-colour token
+      'rgba(244, 196, 79', // the old gold hairlines and selected tab
+      'rgba(12, 24, 27', // cold blue-black panel ground
+      'rgba(5, 12, 15', // cold blue-black panel ground
+      'rgba(4, 9, 12', // cold blue-black backdrop
+    ],
+  } as const;
+
+  for (const [sheet, rejected] of Object.entries(rejectedSignatures)) {
+    it(`brings ${sheet} onto the warm bone / ink / burnt-orange deck`, () => {
+      const css = declarationsOnly(sheet);
+      for (const value of rejected) {
+        expect(css, `rejected old-deck value ${value} is back in ${sheet}`).not.toContain(value);
+      }
+    });
+  }
+
+  it('repoints the deployment transition console off the cold cyan scrim', () => {
+    const css = declarationsOnly('./tactical-ui.css');
+    // Every use of these values in tactical-ui.css is inside the deployment
+    // console/scrim block (verified before this test was written), so a
+    // file-wide rejection is safe.
+    for (const value of ['#54e6d9', 'rgba(84, 230, 217', 'rgba(5, 19, 23', 'rgba(2, 12, 15']) {
+      expect(css, `rejected old-deck value ${value} is back in tactical-ui.css`).not.toContain(value);
+    }
+  });
+
+  it('warms the Options panel ground itself, not just its sections', () => {
+    // pass66-overhaul.css painted the whole Options panel cold blue-black
+    // (rgba(8, 24, 29) -> rgba(4, 12, 16)); Pass 77 re-pointed the sections
+    // inside it but left this ground, so the panel kept a cold halo. The value
+    // is unique to that panel rule in the overhaul sheet, so a file-wide
+    // rejection is safe (verified before this test was written).
+    const css = declarationsOnly('./pass66-overhaul.css');
+    expect(css, 'rejected old-deck value rgba(8, 24, 29 is back in pass66-overhaul.css').not.toContain('rgba(8, 24, 29');
+  });
+});

@@ -5,22 +5,28 @@
 }
 
 /* Owner HITL: an unmissable SAVE control near the top of Graphics that commits
-   whatever settings were just chosen, in the map or in the menu. */
+   whatever settings were just chosen, in the map or in the menu.
+   Pass 79 reskin: this was the last teal gradient button on the deck. It now
+   wears the Pass 77 accent ramp (#e8781f -> #b4531c) with dark warm ink text,
+   matching the #resume treatment in pass77-command-shell.css. Geometry is
+   untouched - only colour changed. The var() fallbacks keep the values correct
+   if this markup is ever mounted outside #menu.pass64-command-deck, where the
+   --p77-* tokens are not defined. */
 #graphics-save {
   margin-left: auto;
   padding: 9px 22px;
-  border: 1px solid #0b6b78;
-  background: linear-gradient(160deg, #0e8b9b, #0a5f6b);
-  color: #ffffff;
+  border: 1px solid var(--p77-accent, #b4531c);
+  background: linear-gradient(180deg, var(--p77-accent-lit, #e8781f) 0%, var(--p77-accent, #b4531c) 100%);
+  color: #241205;
   font: 900 13px/1 Inter, system-ui, sans-serif;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   cursor: pointer;
-  box-shadow: 0 2px 10px rgba(11, 107, 120, 0.4);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28), 0 2px 10px rgb(180 83 28 / 0.35);
 }
 
 #graphics-save:hover {
-  background: linear-gradient(160deg, #12a4b6, #0d7382);
+  background: linear-gradient(180deg, #f28a2e 0%, #c05e20 100%);
 }
 
 #graphics-save:active {
@@ -40,21 +46,28 @@
   margin: 0;
   font-size: 12px;
   line-height: 1.55;
-  color: color-mix(in srgb, var(--ui-ink, #d8f2ef) 78%, transparent);
+  /* Pass 79 reskin: this row sits directly on the dark instrument sheet of the
+     Options panel, so it takes the sheet's soft warm ink. The old declaration
+     mixed an UNDEFINED token (--ui-ink) whose fallback was pale cold white. */
+  color: var(--p77-dark-ink-soft, #b3a494);
 }
+/* Pass 79 reskin: HARD REFRESH was a second loud amber-gradient button one
+   section below the SAVE action. PART 6 of pass77-command-shell.css allows one
+   decisive action per deck, so this becomes the quiet dark-sheet secondary:
+   warm hairline edge, faint warm wash, light ink, accent on hover. */
 #hard-refresh-button {
   padding: 12px 26px;
-  border: 1px solid #8a4f0b;
-  background: linear-gradient(160deg, #d98a2b, #a35c12);
-  color: #fff;
+  border: 1px solid rgb(255 208 150 / 0.30);
+  background: rgb(255 236 212 / 0.06);
+  color: var(--p77-dark-ink, #f7efe2);
   font: 900 13px/1 Inter, system-ui, sans-serif;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   cursor: pointer;
-  box-shadow: 0 2px 10px rgba(217, 138, 43, 0.35);
 }
 #hard-refresh-button:hover {
-  background: linear-gradient(160deg, #f0a03a, #c0711c);
+  border-color: var(--p77-accent-lit, #e8781f);
+  color: #ffd9ae;
 }
 #hard-refresh-button:active {
   transform: translateY(1px);
@@ -69,8 +82,11 @@
   gap: 8px;
   min-width: 0;
   padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--ui-cyan, #54d9ec) 28%, transparent);
-  background: var(--ui-deep, #f5f7f2);
+  /* Pass 79 reskin: the category edge read teal via --ui-cyan; it now uses the
+     dark sheet's warm hairline, and the field is a faint warm wash instead of
+     solid cold bone so it sits IN the dark Options surface. */
+  border: 1px solid var(--p77-dark-hair, rgb(255 196 128 / 0.18));
+  background: rgb(255 236 212 / 0.05);
 }
 
 #advanced-graphics .advanced-graphics-category > header {
@@ -86,7 +102,10 @@
 }
 
 #advanced-graphics .advanced-graphics-category > header small {
-  color: var(--ui-accent-readable, #0b6b78);
+  /* Pass 79 reskin: was var(--ui-accent-readable, #0b6b78), and that token is
+     defined nowhere, so every category note rendered fallback TEAL on a dark
+     sheet at ~1.8:1. The lit accent is the deck's eyebrow colour on dark. */
+  color: var(--p77-accent-lit, #e8781f);
   font-size: 9px;
   letter-spacing: 0.08em;
 }
@@ -109,17 +128,19 @@
   min-width: 0;
   min-height: 58px;
   padding: 8px 9px;
-  border: 1px solid color-mix(in srgb, var(--ui-line, #b8c8cb) 42%, transparent);
-  background: var(--ui-panel, #ffffff);
+  border: 1px solid rgb(255 208 150 / 0.20);
+  background: rgb(255 244 228 / 0.07);
 }
 
 #advanced-graphics .advanced-graphics-control > span:first-child,
 #advanced-graphics .advanced-graphics-unavailable > span {
   grid-area: label;
   min-width: 0;
-  /* Owner HITL: labels were washing out on the light panel. Force a near-black
-     ink so every control name reads regardless of inherited theme colour. */
-  color: var(--ui-text, #142326);
+  /* Owner HITL: control names must read regardless of inherited theme colour.
+     The cells are now translucent warm over the DARK Options instrument sheet,
+     so the forced ink is the sheet's bright warm ink, not near-black - the old
+     #1a1613 label on this ground measured ~1.6:1 and vanished. */
+  color: var(--p77-dark-ink, #f7efe2);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.07em;
@@ -130,9 +151,10 @@
 #advanced-graphics .advanced-graphics-unavailable > small {
   grid-area: help;
   max-width: 48ch;
-  /* 70% currentColor mixed to transparent read as faint grey on white; use a
-     solid mid-ink that keeps a 4.5:1+ ratio on the light panel. */
-  color: var(--ui-text-muted, #48585c);
+  /* Pass 79 reskin: help text sits on a translucent warm cell over the dark
+     sheet now, so it takes the sheet's soft warm ink rather than the old
+     paper-panel muted ink. */
+  color: var(--p77-dark-ink-soft, #b3a494);
   font-size: 9px;
   line-height: 1.35;
 }
@@ -158,8 +180,9 @@
 
 #advanced-graphics .advanced-graphics-range output {
   min-height: 12px;
-  /* Bright cyan failed contrast on the white panel; use a deep readable teal. */
-  color: var(--ui-accent-readable, #0b6b78);
+  /* Pass 79 reskin: same broken-teal-fallback story as the header notes above;
+     the value readout now uses the readable accent for type. */
+  color: var(--p77-accent, #b4531c);
   font-size: 9px;
   font-weight: 800;
   text-align: right;
@@ -177,14 +200,17 @@
 
 #advanced-graphics .advanced-graphics-unavailable b {
   grid-area: input;
-  color: var(--ui-amber, #eaa94d);
+  /* Pass 79 reskin: --ui-amber now resolves to a dark print amber (#9c5200)
+     that drowns on the dark sheet; the capability note takes the HUD caution
+     tone instead. */
+  color: var(--hud-amber, #f2b74f);
   font-size: 9px;
   letter-spacing: 0.08em;
 }
 
 #advanced-graphics .advanced-graphics-unavailable em {
   grid-column: 1 / -1;
-  color: color-mix(in srgb, var(--ui-amber, #eaa94d) 78%, transparent);
+  color: rgb(242 183 79 / 0.78);
   font-size: 9px;
   font-style: normal;
   letter-spacing: 0.06em;
@@ -201,6 +227,18 @@
     flex-direction: column;
     gap: 3px;
   }
+}
+
+/*
+ * Pass 79 reskin: the <details> wrapper itself kept its cold blue-black wash
+ * from pass66-readability.css (`#menu-panel-options .advanced-settings`,
+ * background rgba(232, 250, 247, 0.055)), which outranks this sheet's earlier
+ * sibling selectors on specificity. Restating at that specificity here - this
+ * module is imported last - warms the wrapper to the same sheet as its cells.
+ */
+#menu #menu-panel-options .advanced-settings {
+  border-color: var(--p77-dark-hair, rgb(255 196 128 / 0.18));
+  background: rgb(255 236 212 / 0.04);
 }
 
 /*

@@ -288,10 +288,19 @@
   /* Killstreaks & Options use high-contrast dark operations surfaces per design guide */
   #menu-panel-streaks,
   #menu-panel-options {
-    border: 1px solid rgba(67, 207, 214, 0.28);
+    /* Pass 79 reskin: the panel ground was the last cold blue-black surface on
+       the deck (rgba(8,24,29) -> rgba(4,12,16), cyan edge). Pass 77 re-pointed
+       the sections inside it but not this ground, so the panel kept a cold
+       halo. It now uses the same warm instrument sheet as the command-shell
+       dark chrome: --p77-dark-top -> --p77-dark-bottom tones, warm hairline
+       edge, warm ink. Geometry (radius, shadow) untouched. #menu-panel-streaks
+       shares this rule but pass74-visual-refresh.css repaints it light
+       unlayered, so the warm base only ever shows through if that repaint
+       moves - which is the correct fallback direction. */
+    border: 1px solid rgb(255 196 128 / 0.20);
     border-radius: 7px;
-    background: linear-gradient(140deg, rgba(8, 24, 29, 0.98), rgba(4, 12, 16, 0.99));
-    color: #eff9f8;
+    background: linear-gradient(170deg, rgb(43 36 28 / 0.985), rgb(20 16 12 / 0.99));
+    color: #f7efe2;
     box-shadow: 0 16px 40px rgba(4, 12, 15, 0.32);
   }
 
