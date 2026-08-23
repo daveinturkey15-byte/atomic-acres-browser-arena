@@ -681,9 +681,7 @@ import {
 import {
   CLOCK_PING_INTERVAL_MS,
   DEFAULT_PRIVATE_MATCH_CONFIG,
-  LOBBY_KILL_LIMITS,
   LOBBY_START_LEAD_MS,
-  LOBBY_TIME_LIMITS_MS,
   REJOIN_GRACE_MS,
   rejoinReservationExpired,
   balanceLobbyTeams,
@@ -4250,7 +4248,7 @@ const hfParticleRuntime = new ParticleRuntime({
   rendererLabel,
   query: new URLSearchParams(window.location.search).get('particles'),
   quality: 'high',
-  seed: weatherMatchSeed,
+  seed: weatherMatchSeed, // value 0 at boot; rekeyed per match at match start
   arenaId: selectedArena.id,
 });
 hfParticleRuntime.build(scene);
@@ -15239,6 +15237,11 @@ function respawn(
     privateMatchActiveAtEpochMs ?? killstreakMatchEpoch,
   );
   weatherWindField = createWindField(selectedArena.id, weatherMatchSeed);
+  // The ambient air shares the weather seed. The runtime was constructed at
+  // module scope before any match existed, so its seed was frozen at 0;
+  // rekeying it here gives every match its own air on the same peer-agreed
+  // `hostId:matchEpoch` derivation the weather model uses.
+  hfParticleRuntime.reseed(weatherMatchSeed);
   lastRainUpdateAtMs = performance.now();
   killConfirmPulseState = createKillConfirmPulseState(accessibilityRuntime.weaponMotionScale);
   audio.setLowHealthFeedback({ active: false, severity: 0, vignetteOpacity: 0, breathingGain: 0, heartbeatGain: 0, pulseHz: 0 });
@@ -27469,6 +27472,18 @@ const updateLobbyConfigFromUi = (): void => {
   const capacity = element<HTMLSelectElement>('#lobby-capacity').value === '6' ? 6 : 4;
   const requestedBots = Number(element<HTMLSelectElement>('#lobby-bots').value);
   const hostedBotCount: HostedBotCount = rangeLobby ? 0 : isHostedBotCount(requestedBots) ? requestedBots : 0;
+  // Pass 70 + HF-377: a host MAP CHANGE canonicalizes the round to THAT arena's
+  // own duration (and uncapped score) by resetting the mirrored limit selects
+  // before the contract is applied; a limit the host explicitly picks afterwards
+  // survives every other config change because it is read back from these same
+  // controls. Every hostedArenaDurationMs value is a published select option,
+  // so this assignment can never silently no-op.
+  const timeLimitSelect = element<HTMLSelectElement>('#lobby-time-limit');
+  const killLimitSelect = element<HTMLSelectElement>('#lobby-kill-limit');
+  if (arenaId !== privateMatchConfig.arenaId) {
+    timeLimitSelect.value = String(hostedArenaDurationMs(arenaSelection(arenaId)));
+    killLimitSelect.value = '';
+  }
   applyHostLobbyConfig({
     ...privateMatchConfig,
     arenaId,
@@ -27478,16 +27493,8 @@ const updateLobbyConfigFromUi = (): void => {
     autoBalance: !rangeLobby && mode === 'tdm' && element<HTMLInputElement>('#lobby-auto-balance').checked,
     // HF-377: the host's explicit time/kill limit choices join the match
     // contract; gun-range keeps its fixed untimed practice round.
-    durationMs: rangeLobby
-      ? hostedArenaDurationMs(arenaSelection(arenaId))
-      : (LOBBY_TIME_LIMITS_MS as readonly number[]).includes(Number(element<HTMLSelectElement>('#lobby-time-limit').value))
-        ? Number(element<HTMLSelectElement>('#lobby-time-limit').value)
-        : privateMatchConfig.durationMs,
-    scoreLimit: rangeLobby
-      ? null
-      : LOBBY_KILL_LIMITS.includes(parsedLobbyKillLimit(element<HTMLSelectElement>('#lobby-kill-limit').value))
-        ? parsedLobbyKillLimit(element<HTMLSelectElement>('#lobby-kill-limit').value)
-        : privateMatchConfig.scoreLimit,
+    durationMs: rangeLobby ? hostedArenaDurationMs(arenaSelection(arenaId)) : Number(timeLimitSelect.value),
+    scoreLimit: rangeLobby ? null : parsedLobbyKillLimit(killLimitSelect.value),
   });
 };
 element<HTMLSelectElement>('#lobby-arena').addEventListener('change', updateLobbyConfigFromUi);
@@ -28080,6 +28087,10 @@ function frame(now: number, scheduleNext = true): void {
       wind: windNow,
       adsProgress: weaponView.adsProgress?.() ?? 0,
       densityScale: hfParticleDensityScale,
+      // Rain reaches the ambient simulation through the same shared sample
+      // rain itself draws from: dust is beaten down and debris loaded in
+      // proportion to rainRate. Same numbers on every peer, zero traffic.
+      weather: weatherNow,
     });
     lastRainUpdateAtMs = visualNow;
     waterSystem.update(visualNow / 1_000);
