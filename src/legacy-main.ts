@@ -48,6 +48,7 @@ import {
   type WeatherState,
 } from './weather/weather-state';
 import { createWindField, sampleWind } from './weather/wind-field';
+import { ParticleRuntime } from './particles';
 import { proneBodyClearance } from './prone-clearance';
 import { mountFarcrysisHitlOverlay, type FarcrysisHitlOverlay } from './farcrysis-hitl';
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
@@ -4333,6 +4334,23 @@ const rainPresentation = new RainPresentation({
   quality: 'high',
   seed: 0,
 });
+
+// HF-371 ambient air. Same lifecycle as rain: constructed once into the
+// persistent scene, presentation-only, and seeded from the shared weather seed
+// so both peers step the same deterministic stream even though no particle
+// ever enters networked state. `?particles=off|on` is the QA override.
+const hfParticleRuntime = new ParticleRuntime({
+  profile: renderProfile,
+  rendererLabel,
+  query: new URLSearchParams(window.location.search).get('particles'),
+  quality: 'high',
+  seed: weatherMatchSeed,
+  arenaId: selectedArena.id,
+});
+hfParticleRuntime.build(scene);
+// Adaptive-quality density clamp for the ambient families, refreshed by the
+// same effects budget that throttles atmosphere and impact decals.
+let hfParticleDensityScale = 1;
 rainPresentation.build(scene);
 let weatherWindField = createWindField(selectedArena.id, 0);
 const waterSystem = new WaterSystem(scene, renderRuntime.backend === 'webgpu' ? 'external-tsl' : 'legacy-glsl');
@@ -4373,6 +4391,7 @@ const impactPresentation = new ImpactPresentation(scene, reducedRenderMode);
 applyPresentationEffectsBudget = (budget) => {
   atmosphereSystem?.setDensityScale(budget.particleDensityScale);
   impactPresentation.setBudget(budget.particleDensityScale, budget.decalLifetimeScale);
+  hfParticleDensityScale = budget.particleDensityScale;
 };
 applyPresentationEffectsBudget(applyGraphicsPreferenceBudget(graphicsEffectsBudget(renderProfile, adaptiveQuality.telemetry().pixelRatioCap)));
 const tracerPool = new TracerPool(scene);
@@ -15655,6 +15674,17 @@ async function startGame(
   try {
     setStatus(`Preparing ${selectedArena.displayName} operators and viewmodel…`);
     if (renderRuntime.backend === 'webgpu') {
+      // Pass 79 MAX admission: every earlier prewarm batch renders one-deep
+      // with unrelated renderables suppressed, so this is the first point the
+      // COMPLETE match composition (arena + operators + viewmodel + corpse
+      // pool through the full preset post graph) can draw together. Cold
+      // first-use work on that combined frame measured 4.5-6.5s on RTX 5080 -
+      // over MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS - and bounced MAX
+      // deployments to the menu. Compile the exact rest composition once here,
+      // behind compileAndRender's own 12s cold-generation fence, so every
+      // guarded admission flush below only ever measures warm frames.
+      await renderRuntime.compileAndRender(scene, camera, scene);
+      assertMatchAdmissionCurrent(token);
       await exercisePreparedWebGpuWeaponSwitches();
       assertMatchAdmissionCurrent(token);
       await prewarmMatchBoundFirstShotPresentations(token);
@@ -17458,6 +17488,15 @@ function tryFire(now: number): void {
   const projectileShot = spec.fireKind === 'projectile';
   const flamethrowerShot = player.weapon === 'flamethrower';
   const maximumShotDistance = flamethrowerShot ? FLAMETHROWER_EFFECT.rangeM : 90;
+  // HF-371 muzzle-adjacent powder smoke. Emitted once per trigger pull, off
+  // the barrel axis, so the protected centre cone still applies unchanged.
+  if (!flamethrowerShot && !projectileShot) {
+    hfParticleRuntime.emitMuzzleSmoke(
+      weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin,
+      baseDirection,
+      cameraUp,
+    );
+  }
   for (let pellet = 0; pellet < spec.pellets; pellet += 1) {
     const sample = sampleWeaponPellet(spec, pellet, admittedSpread, gameplayRandom(), gameplayRandom()); // HF-343
     const direction = baseDirection.clone()
@@ -21029,6 +21068,10 @@ function spawnImpactFlash(
   normal = new THREE.Vector3(0, 1, 0),
 ): void {
   impactPresentation.impact(point, normal.normalize(), surface);
+  // HF-371: the ballistic dust cloud projects from the same canonical surface
+  // registry entry as the sparks above, so the cloud can never disagree with
+  // the impact it hangs over. Every shooter in the match routes through here.
+  hfParticleRuntime.emitSurfaceImpact(point, normal, surface);
 }
 
 function spawnTracer(start: THREE.Vector3, end: THREE.Vector3, color: number): void {
@@ -24380,6 +24423,11 @@ function updatePhysics(dt: number): void {
   });
   for (let index = 0; index < localFootsteps.length; index += 1) {
     audio.footstep(localSurface, currentSprinting, crouched || prone);
+    // HF-371: sprint strides kick dust; a walked step deliberately emits
+    // nothing so the effect cannot become a smoke screen at walking pace.
+    if (currentSprinting && !crouched && !prone) {
+      hfParticleRuntime.emitFootfall(player.position.x, player.position.y, player.position.z, 'sprint');
+    }
   }
   weaponBob += dt * (currentSprinting ? 15 : prone ? 3.6 : crouched ? 7 : 10) * (moving ? 1 : 0.25);
   recoilVisual = recoverRecoil(recoilVisual, WEAPONS[player.weapon], dt);
@@ -26796,6 +26844,9 @@ async function performArenaSelection(
     syncInteractiveWorldPhysics(true);
     audio.setArena(selectedArena.id);
     footstepEmitters.reset();
+    // HF-371: the air is part of the arena. Swap it with the audio so nothing
+    // from the retired map hangs in the new one.
+    hfParticleRuntime.setArena(selectedArena.id);
     document.documentElement.dataset.arenaId = selectedArena.id;
     setBootstrapStage('waiting-for-authored-textures');
     profileArenaTransition('visual-definition');
@@ -26945,6 +26996,7 @@ async function performArenaSelection(
     syncInteractiveWorldPhysics(true);
     audio.setArena(selectedArena.id);
     footstepEmitters.reset();
+    hfParticleRuntime.setArena(selectedArena.id);
     document.documentElement.dataset.arenaId = selectedArena.id;
     if (!hadPreparedArena) {
       arenaVisualReceipt = null;
@@ -28015,13 +28067,22 @@ function frame(now: number, scheduleNext = true): void {
       visualNow / 1_000,
       weatherNow.windMultiplier,
     );
+    const weatherDeltaSeconds = Math.min(0.05, Math.max(0, (visualNow - lastRainUpdateAtMs) / 1_000));
     rainPresentation.update(
-      Math.min(0.05, Math.max(0, (visualNow - lastRainUpdateAtMs) / 1_000)),
+      weatherDeltaSeconds,
       camera,
       weatherNow,
       windNow,
       { adsProgress: weaponView.adsProgress?.() ?? 0 },
     );
+    // HF-371 ambient air rides the SAME clamped delta, the SAME wind sample
+    // and the SAME ads state as rain, so dust, leaves and spray move with the
+    // one shared sky instead of inventing a second wind.
+    hfParticleRuntime.update(weatherDeltaSeconds, camera, {
+      wind: windNow,
+      adsProgress: weaponView.adsProgress?.() ?? 0,
+      densityScale: hfParticleDensityScale,
+    });
     lastRainUpdateAtMs = visualNow;
     waterSystem.update(visualNow / 1_000);
     if (gameStarted) updateMinimap(now);
@@ -30104,10 +30165,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   // is wrong; walking the graph tells you WHICH object is doing it. Debug-only
   // and never referenced by gameplay.
   sampleSceneGraph: () => scene,
-  // HF-371: prove rain and weather are actually running, not merely imported.
+  // HF-371: prove rain, weather AND ambient air are actually running, not
+  // merely imported.
   sampleWeather: () => ({
     seed: weatherMatchSeed,
     rain: rainPresentation.telemetry(),
+    particles: hfParticleRuntime.telemetry(),
   }),
   // Which clause of the movement gate is holding the local player still. The
   // owner's "can't move" reports were undiagnosable from screenshots because
