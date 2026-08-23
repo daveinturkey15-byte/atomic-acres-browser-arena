@@ -272,3 +272,128 @@ html[data-reduced-motion='true'] #hud .support-list > div {
     transition: none;
   }
 }
+
+/* ===========================================================================
+ * PART 2 - the orphan surfaces.
+ *
+ * A cascade survey found that roughly a third of the HUD had never been
+ * restyled past the `@layer legacy` block of style.css: the crosshair,
+ * hitmarker, damage numbers, killfeed and damage-feed ROWS, the respawn
+ * overlay, the round banner, the sniper scope, overdrive and the alert
+ * surfaces. Those are the highest-frequency things a player actually looks at,
+ * which is why the HUD kept reading as dated even after the console panels
+ * were reworked above. This part brings them into the same grammar.
+ * ======================================================================== */
+
+/* --- Killfeed and damage feeds: the most-read text in the game ---------- */
+
+#hud #killfeed div,
+#hud #killfeed > * {
+  border-right: none;
+  border-left: 2px solid var(--p75-hairline);
+  border-radius: 6px;
+  padding: 3px 8px;
+  background: linear-gradient(90deg, rgba(6, 18, 23, 0.52) 0%, rgba(6, 18, 23, 0) 100%);
+}
+
+#hud #killfeed div:first-child,
+#hud #killfeed > *:first-child {
+  border-left-color: var(--p75-friendly);
+  background: linear-gradient(90deg, rgba(102, 235, 225, 0.14) 0%, rgba(6, 18, 23, 0) 100%);
+}
+
+#hud #damage-done-feed > *,
+#hud #damage-taken-feed > * {
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+/* Damage dealt reads as gain, damage taken as threat - previously both were
+   the same colour, so the player had to read the number to know which. */
+#hud #damage-done-feed > * { color: var(--p75-good); }
+#hud #damage-taken-feed > * { color: var(--p75-danger); }
+
+/* --- Damage numbers and hitmarker: combat confirmation ------------------ */
+
+#hud #damage-numbers strong {
+  font-variant-numeric: tabular-nums;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.92),
+    0 0 10px rgba(0, 0, 0, 0.55);
+}
+
+#hud #damage-numbers strong.critical {
+  color: var(--p75-caution);
+}
+
+#hud #hitmarker {
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9));
+}
+
+/* --- The round banner: an 84px gold slab in the legacy sheet ------------ */
+
+#banner {
+  border-radius: 12px;
+  border: 1px solid var(--p75-hairline-strong, rgba(150, 226, 226, 0.36));
+  border-block: 1px solid var(--p75-hairline-strong, rgba(150, 226, 226, 0.36));
+  background-image: var(--p75-glass-strong, linear-gradient(158deg, rgba(10, 26, 33, 0.9), rgba(5, 15, 21, 0.86)));
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(224, 255, 253, 0.16);
+}
+
+#banner strong {
+  letter-spacing: 0.03em;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+}
+
+/* --- Respawn overlay ---------------------------------------------------- */
+
+#respawn {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 119, 109, 0.34);
+  background-image: linear-gradient(158deg, rgba(28, 12, 14, 0.90) 0%, rgba(14, 6, 8, 0.86) 100%);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 200, 195, 0.12);
+}
+
+#respawn-countdown {
+  font-variant-numeric: tabular-nums;
+  color: var(--p75-danger, #ff776d);
+}
+
+/* --- Alert surfaces: one language for "something is happening" ---------- */
+
+#overdrive-hud,
+#power-announcement,
+#nuke-warning,
+#refresh-warning {
+  border-radius: 10px;
+  border: 1px solid rgba(242, 183, 79, 0.34);
+  background-image: linear-gradient(158deg, rgba(30, 22, 8, 0.88) 0%, rgba(16, 12, 5, 0.84) 100%);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 236, 190, 0.14);
+}
+
+/* AGENTS.md floor: these alert surfaces carried sub-9px labels. */
+#overdrive-hud small,
+#power-announcement small {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+#overdrive-time {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Sniper scope: a real optic edge rather than a flat ring ------------ */
+
+#sniper-scope .scope-ring {
+  box-shadow:
+    inset 0 0 60px rgba(0, 0, 0, 0.85),
+    inset 0 0 0 2px rgba(0, 0, 0, 0.9);
+}
+
+/* --- Damage direction indicator ----------------------------------------- */
+
+#damage-direction i {
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.8));
+}

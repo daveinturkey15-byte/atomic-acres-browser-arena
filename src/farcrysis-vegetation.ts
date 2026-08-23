@@ -343,6 +343,91 @@ function layerPositions(
   return result;
 }
 
+// ---------------------------------------------------------------------------
+// Believability helpers (pass75 owner feedback: "trees read as solid blobs")
+// ---------------------------------------------------------------------------
+
+/**
+ * Deterministic position-hash noise in [0, 1). Depends ONLY on the vertex
+ * position, so duplicated seam vertices (split normals after toNonIndexed /
+ * merge) receive identical offsets — the surface stays watertight.
+ */
+function positionHashNoise(x: number, y: number, z: number, salt: number): number {
+  const v = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719 + salt * 94.673) * 43758.5453;
+  return v - Math.floor(v);
+}
+
+/**
+ * Lumpy-canopy pass: displaces each vertex radially from the geometry origin
+ * by a low-amplitude multi-octave position-hash noise. Index buffers and
+ * triangle counts are untouched (positions only), so the WebGL2 static
+ * batcher's toNonIndexed() path sees an unchanged, in-range index set.
+ */
+function lumpify(geometry: THREE.BufferGeometry, amplitude: number, salt: number): THREE.BufferGeometry {
+  const pos = geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+  if (!pos) return geometry;
+  for (let i = 0; i < pos.count; i += 1) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const len = Math.sqrt(x * x + y * y + z * z);
+    if (len < 1e-5) continue; // origin vertex — no stable radial direction
+    // Two octaves keep silhouettes organic without spiky artifacts.
+    const n =
+      positionHashNoise(x * 1.7, y * 1.7, z * 1.7, salt) * 0.65 +
+      positionHashNoise(x * 4.1, y * 4.1, z * 4.1, salt + 17) * 0.35;
+    const d = (n - 0.5) * 2 * amplitude;
+    pos.setXYZ(i, x + (x / len) * d, y + (y / len) * d, z + (z / len) * d);
+  }
+  pos.needsUpdate = true;
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/** Per-instance colour variation scratch objects (allocated once). */
+const _varyColor = new THREE.Color();
+
+/**
+ * Deterministic per-instance colour variation on an InstancedMesh via
+ * instanceColor — stops plants looking cloned at ZERO extra draw calls
+ * (the attribute rides the existing instanced draw).
+ */
+function varyInstanceColors(mesh: THREE.InstancedMesh, seed: number): void {
+  if (typeof mesh.setColorAt !== 'function') return;
+  const mat = mesh.material as THREE.MeshStandardMaterial;
+  const baseColor = mat && mat.color ? mat.color : new THREE.Color(0xffffff);
+  const hsl = { h: 0, s: 0, l: 0 };
+  baseColor.getHSL(hsl);
+  const rng = mulberry32(seed);
+  for (let i = 0; i < mesh.count; i += 1) {
+    const h = hsl.h + (rng() - 0.5) * 0.035;                       // gentle hue drift
+    const s = Math.max(0, Math.min(1, hsl.s * (0.82 + rng() * 0.36)));
+    const l = Math.max(0, Math.min(1, hsl.l * (0.72 + rng() * 0.62)));
+    _varyColor.setHSL(h, s, l);
+    mesh.setColorAt(i, _varyColor);
+  }
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+}
+
+/** Stable per-mesh seed derived from the layer name (deterministic builds). */
+function nameSeed(name: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < name.length; i += 1) {
+    h ^= name.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/** Walk an arena group and give every vegetation InstancedMesh colour variation. */
+function _applyInstanceColorVariation(group: THREE.Group): void {
+  group.traverse((obj) => {
+    if (!(obj instanceof THREE.InstancedMesh)) return;
+    if (!obj.name.startsWith('farcrysis-vege')) return;
+    varyInstanceColors(obj, nameSeed(obj.name));
+  });
+}
+
 /**
  * Merge an array of transformed geometries into one BufferGeometry for instancing.
  * Adds normal/uv attributes from the first source geom when merged output lacks them.
@@ -527,6 +612,8 @@ function addBroadleafTrees(root: THREE.Group): void {
   const count = 28;
   const trunkGeom = new THREE.CylinderGeometry(0.22, 0.44, 2.6, 10);
   const canopyGeom = new THREE.SphereGeometry(1.0, 10, 6);
+  // Believability: broadleaf canopies stop reading as smooth balls.
+  lumpify(canopyGeom, 0.2, 0x0b1a);
 
   const trunks = new THREE.InstancedMesh(trunkGeom, vegeMat(0x6b4e30, 0.92, 0.02), count);
   trunks.name = 'farcrysis-vege-broadleaf-trunks';
@@ -790,6 +877,8 @@ function addGrassTufts(root: THREE.Group): void {
 function addBushes(root: THREE.Group): void {
   const count = 28;
   const bushGeom = new THREE.IcosahedronGeometry(0.7, 1);
+  // Believability: irregular bush silhouette.
+  lumpify(bushGeom, 0.12, 0x0b05);
 
   const bushes = new THREE.InstancedMesh(bushGeom, vegeMat(FARCRYSIS_ART_FEEL.bushGreen, 0.9, 0.01), count);
   bushes.name = 'farcrysis-vege-bushes';
@@ -907,6 +996,8 @@ function addKapokTrees(root: THREE.Group): void {
     ),
   });
   const kapokCanopyGeom = mergeTransformed(canopyParts);
+  // Believability: break up the smooth two-sphere blob silhouette.
+  lumpify(kapokCanopyGeom, 0.22, 0x4b0b);
 
   const trunks = new THREE.InstancedMesh(kapokTrunkGeom, vegeMat(0x7a5e3e, 0.9, 0.03), count);
   trunks.name = 'farcrysis-vege-kapok-trunks';
@@ -1269,6 +1360,8 @@ function addUndergrowthShrubs(root: THREE.Group): void {
   });
 
   const shrubClusterGeom = mergeTransformed(shrubParts);
+  // Believability: lobed undergrowth shrubs get an irregular outline too.
+  lumpify(shrubClusterGeom, 0.12, 0x38a8);
 
   const shrubs = new THREE.InstancedMesh(shrubClusterGeom, vegeMat(FARCRYSIS_ART_FEEL.bushGreen, 0.88, 0.02), count);
   shrubs.name = 'farcrysis-vege-undergrowth-shrubs';
@@ -1395,6 +1488,8 @@ function addMangroveTrees(root: THREE.Group): void {
     ),
   });
   const mangroveCanopyGeom = mergeTransformed(canopyParts);
+  // Believability: lumpy mangrove leaf clumps instead of smooth spheres.
+  lumpify(mangroveCanopyGeom, 0.16, 0x9a46);
 
   const trunks = new THREE.InstancedMesh(mangroveTrunkGeom, vegeMat(0x5a4232, 0.9, 0.04), count);
   trunks.name = 'farcrysis-vege-mangrove-trunks';
@@ -1530,6 +1625,8 @@ function addFloweringBushes(root: THREE.Group): void {
     },
   ];
   const bushGeom = mergeTransformed(bushParts);
+  // Believability: irregular flowering-bush silhouette.
+  lumpify(bushGeom, 0.12, 0x710a);
 
   // Bloom head: small emissive sphere
   const bloomGeom = new THREE.IcosahedronGeometry(0.1, 1);
@@ -2019,6 +2116,8 @@ function addBloomTrees(root: THREE.Group): void {
     },
   ];
   const canopyGeom = mergeTransformed(canopyParts);
+  // Believability: bloom-tree crown silhouette broken up.
+  lumpify(canopyGeom, 0.18, 0x1a4f);
 
   // Blossom head: small detail-0 icosahedron (20 tris)
   const blossomGeom = new THREE.IcosahedronGeometry(0.12, 0);
@@ -2526,6 +2625,9 @@ export function buildVegetation(scene: THREE.Group): void {
 
   // ---- Wind-enable remaining flexible vegetation (non-LOD-managed) ----
   _applyTslFoliage(scene); // HF-359/HF-363: TSL wind + canopy dapple on foliage layers
+
+  // Believability: per-instance colour variation (rides existing draws).
+  _applyInstanceColorVariation(scene);
 }
 
 // ---------------------------------------------------------------------------
@@ -2572,6 +2674,7 @@ export function buildAdditionalVegetation(root: THREE.Group): VegetationPolishSt
   addTwigs(root);
   addSmallRocks(root);
   _applyTslFoliage(root); // HF-359/HF-363: TSL wind + canopy dapple on foliage layers
+  _applyInstanceColorVariation(root); // Believability: per-instance colour variation
 
   // Diff the set to get only newly added tree-type names
   const addedTreeTypes: string[] = [];

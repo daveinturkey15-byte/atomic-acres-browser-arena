@@ -112,6 +112,31 @@ function onCorridorStrip(x: number, z: number): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Believability (pass75 owner feedback: cloned-looking palms)
+// ---------------------------------------------------------------------------
+
+/**
+ * Deterministic per-instance colour variation via instanceColor — rides the
+ * existing instanced draw, so draw-call structure is unchanged.
+ */
+function varyPalmInstanceColors(mesh: THREE.InstancedMesh, seed: number): void {
+  const mat = mesh.material as THREE.MeshStandardMaterial;
+  if (!mat || !mat.color) return;
+  const hsl = { h: 0, s: 0, l: 0 };
+  mat.color.getHSL(hsl);
+  const rng = mulberry32(seed);
+  const c = new THREE.Color();
+  for (let i = 0; i < mesh.count; i += 1) {
+    const h = hsl.h + (rng() - 0.5) * 0.03;
+    const s = Math.max(0, Math.min(1, hsl.s * (0.85 + rng() * 0.3)));
+    const l = Math.max(0, Math.min(1, hsl.l * (0.78 + rng() * 0.48)));
+    c.setHSL(h, s, l);
+    mesh.setColorAt(i, c);
+  }
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+}
+
+// ---------------------------------------------------------------------------
 // Palm crown geometry — fan of drooping frond blades
 // ---------------------------------------------------------------------------
 
@@ -336,7 +361,10 @@ export function buildEnhancedPalms(root: THREE.Group): {
     tmpEuler.set(0, p.crownSpin, p.crownTilt);
     tmpQuat.setFromEuler(tmpEuler);
     const crownQuat = tmpQuat.clone().premultiply(trunkQuat);
-    scl.setScalar(p.crownScale);
+    // Believability: slight per-palm crown squash variance so crowns are not
+    // all identical fans (deterministic from the placement index).
+    const crownSquash = 0.94 + ((i * 37) % 7) * 0.02; // 0.94-1.06
+    scl.set(p.crownScale, p.crownScale * crownSquash, p.crownScale);
     matrix.compose(world, crownQuat, scl);
     frondInstances.setMatrixAt(i, matrix);
 
@@ -367,6 +395,11 @@ export function buildEnhancedPalms(root: THREE.Group): {
   trunkInstances.computeBoundingSphere();
   frondInstances.computeBoundingSphere();
   coconutInstances.computeBoundingSphere();
+
+  // Believability: per-instance colour variation (rides existing draws).
+  varyPalmInstanceColors(trunkInstances, 0x7a11);
+  varyPalmInstanceColors(frondInstances, 0xf0dd);
+  varyPalmInstanceColors(coconutInstances, 0xc0c0);
 
   root.add(trunkInstances);
   root.add(frondInstances);

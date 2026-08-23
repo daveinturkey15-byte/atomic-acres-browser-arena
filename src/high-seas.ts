@@ -105,6 +105,777 @@ const CABIN_GROUND_WALL_HEIGHT = 2.68;
 const CABIN_UPPER_WALL_HEIGHT = 2.6;
 const RAMP_THICKNESS = 0.18;
 
+export type HighSeasTextureFamily =
+  | 'deck'
+  | 'stair'
+  | 'hull'
+  | 'wall'
+  | 'roof'
+  | 'teal-trim'
+  | 'engine-bulkhead'
+  | 'engine-grating'
+  | 'engine-machinery'
+  | 'engine-amber'
+  | 'upholstery'
+  | 'glass'
+  | 'water';
+
+export type HighSeasMaterialInventoryEntry = Readonly<{
+  name: string;
+  family: HighSeasTextureFamily;
+  hasMap: boolean;
+  hasNormalMap: boolean;
+  hasRoughnessMap: boolean;
+  resolution: number;
+  /** Metres of world covered by one texture tile. */
+  tileMetres: number;
+}>;
+
+const TEXTURE_CACHE = new Map<string, THREE.DataTexture>();
+
+function hash2D(x: number, y: number, seed = 0): number {
+  let h = (x * 374761393 + y * 668265263 + seed * 15485863) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+function smoothNoise2D(x: number, y: number, seed = 0): number {
+  const ix = Math.floor(x);
+  const iy = Math.floor(y);
+  const fx = x - ix;
+  const fy = y - iy;
+  const sx = fx * fx * (3 - 2 * fx);
+  const sy = fy * fy * (3 - 2 * fy);
+
+  const n00 = hash2D(ix, iy, seed);
+  const n10 = hash2D(ix + 1, iy, seed);
+  const n01 = hash2D(ix, iy + 1, seed);
+  const n11 = hash2D(ix + 1, iy + 1, seed);
+
+  const a = n00 + sx * (n10 - n00);
+  const b = n01 + sx * (n11 - n01);
+  return a + sy * (b - a);
+}
+
+function fbm2D(x: number, y: number, octaves = 3, seed = 0): number {
+  let value = 0;
+  let amp = 0.5;
+  let freq = 1;
+  let total = 0;
+  for (let i = 0; i < octaves; i += 1) {
+    value += amp * smoothNoise2D(x * freq, y * freq, seed + i * 31);
+    total += amp;
+    freq *= 2;
+    amp *= 0.5;
+  }
+  return value / total;
+}
+
+function createDataTexture(
+  name: string,
+  width: number,
+  height: number,
+  data: Uint8Array,
+  colorSpace: THREE.ColorSpace = THREE.SRGBColorSpace,
+  repeat: [number, number] = [1, 1],
+): THREE.DataTexture {
+  const cacheKey = `${name}:${width}x${height}:${colorSpace}:${repeat[0]}x${repeat[1]}`;
+  const existing = TEXTURE_CACHE.get(cacheKey);
+  if (existing) return existing;
+
+  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
+  texture.name = `high-seas-tex-${name}`;
+  texture.colorSpace = colorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(repeat[0], repeat[1]);
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.needsUpdate = true;
+  TEXTURE_CACHE.set(cacheKey, texture);
+  return texture;
+}
+
+function normalsFromHeights(
+  width: number,
+  height: number,
+  heights: Float32Array,
+  strength = 3.0,
+): Uint8Array {
+  const data = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    const yPrev = (y - 1 + height) % height;
+    const yNext = (y + 1) % height;
+    for (let x = 0; x < width; x += 1) {
+      const xPrev = (x - 1 + width) % width;
+      const xNext = (x + 1) % width;
+
+      const hL = heights[y * width + xPrev];
+      const hR = heights[y * width + xNext];
+      const hD = heights[yPrev * width + x];
+      const hU = heights[yNext * width + x];
+
+      const dx = (hR - hL) * strength;
+      const dy = (hU - hD) * strength;
+
+      const len = Math.hypot(dx, dy, 1.0);
+      const nx = -dx / len;
+      const ny = -dy / len;
+      const nz = 1.0 / len;
+
+      const offset = (y * width + x) * 4;
+      data[offset] = THREE.MathUtils.clamp(Math.round((nx * 0.5 + 0.5) * 255), 0, 255);
+      data[offset + 1] = THREE.MathUtils.clamp(Math.round((ny * 0.5 + 0.5) * 255), 0, 255);
+      data[offset + 2] = THREE.MathUtils.clamp(Math.round((nz * 0.5 + 0.5) * 255), 0, 255);
+      data[offset + 3] = 255;
+    }
+  }
+  return data;
+}
+
+/**
+ * World size, in metres, that ONE tile of each family's texture covers.
+ *
+ * WHY THIS EXISTS. The first pass at these materials set a fixed `repeat` per
+ * family, which meant texel density scaled with the mesh: the same wall texture
+ * that read as 1-metre composite panels on a 20 m superstructure collapsed into
+ * a dense brick grid on a 2 m crate. Density has to be a property of the WORLD,
+ * not of the mesh, so it is expressed here in metres and applied through UVs.
+ *
+ * Values are chosen from the feature size baked into each generator: `wall`
+ * draws a 4x4 grid of panels per tile, so 4 m/tile yields 1 m panels; `deck`
+ * draws 8 planks per tile, so 1.1 m/tile yields ~14 cm planks.
+ */
+export const HIGH_SEAS_TILE_METRES: Readonly<Record<HighSeasTextureFamily, number>> = Object.freeze({
+  deck: 1.1,
+  stair: 0.9,
+  hull: 5.0,
+  wall: 4.0,
+  roof: 3.0,
+  'teal-trim': 2.0,
+  'engine-bulkhead': 3.0,
+  'engine-grating': 1.2,
+  'engine-machinery': 1.5,
+  'engine-amber': 1.0,
+  upholstery: 0.8,
+  glass: 3.0,
+  water: 4.0,
+});
+
+/**
+ * Rewrites a geometry's UVs as a world-scale box projection.
+ *
+ * Each vertex is projected along its dominant normal axis and divided by the
+ * family's tile size, so one texture tile always covers the same number of
+ * metres no matter how large the mesh is. This is what makes a shared material
+ * viable: the material and its texture stay shared (one upload, one draw-call
+ * group), while density is carried per-vertex in the geometry.
+ *
+ * Runs once at build time, so it costs nothing per frame. Local coordinates are
+ * used deliberately - box geometry here is authored at true world size with no
+ * mesh scaling, and projecting locally keeps the grain aligned to the object
+ * rather than swimming when the object is rotated.
+ */
+function applyBoxProjectedUv(geometry: THREE.BufferGeometry, tileMetres: number): void {
+  const position = geometry.getAttribute('position');
+  const normal = geometry.getAttribute('normal');
+  if (!position || !normal) return;
+
+  const inverse = 1 / Math.max(0.05, tileMetres);
+  const uv = new Float32Array(position.count * 2);
+
+  for (let index = 0; index < position.count; index += 1) {
+    const px = position.getX(index);
+    const py = position.getY(index);
+    const pz = position.getZ(index);
+    const nx = Math.abs(normal.getX(index));
+    const ny = Math.abs(normal.getY(index));
+    const nz = Math.abs(normal.getZ(index));
+
+    let u: number;
+    let v: number;
+    if (nx >= ny && nx >= nz) {
+      // Faces pointing along X read the ZY plane.
+      u = pz;
+      v = py;
+    } else if (ny >= nx && ny >= nz) {
+      // Horizontal faces (decks, roofs) read the XZ plane, so plank runs stay
+      // aligned with the hull's long axis.
+      u = px;
+      v = pz;
+    } else {
+      u = px;
+      v = py;
+    }
+
+    uv[index * 2] = u * inverse;
+    uv[index * 2 + 1] = v * inverse;
+  }
+
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geometry.getAttribute('uv').needsUpdate = true;
+}
+
+/** Tile size for whatever material a mesh was given, or null when untextured. */
+function tileMetresForMaterial(meshMaterial: THREE.Material): number | null {
+  const family = meshMaterial.userData?.textureFamily as HighSeasTextureFamily | undefined;
+  if (!family) return null;
+  return HIGH_SEAS_TILE_METRES[family] ?? null;
+}
+
+type ProceduralTextureSet = {
+  map?: THREE.DataTexture;
+  normalMap?: THREE.DataTexture;
+  roughnessMap?: THREE.DataTexture;
+  /** Metres of world covered by one texture tile; applied through the UVs. */
+  tileMetres: number;
+};
+
+function generateMaterialTextureSet(
+  family: HighSeasTextureFamily,
+  baseColorHex: number,
+): ProceduralTextureSet {
+  const size = 256;
+  const baseR = (baseColorHex >> 16) & 255;
+  const baseG = (baseColorHex >> 8) & 255;
+  const baseB = baseColorHex & 255;
+
+  const albedoData = new Uint8Array(size * size * 4);
+  const roughnessData = new Uint8Array(size * size * 4);
+  const heightData = new Float32Array(size * size);
+
+  let hasAlbedo = true;
+  let normalStrength = 3.0;
+
+  switch (family) {
+    case 'deck':
+    case 'stair': {
+      normalStrength = 3.8;
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          const plankIdx = Math.floor(x / 32);
+          const px = x % 32;
+          const isCaulk = px < 3;
+          const plankTone = (hash2D(plankIdx, 0, family === 'deck' ? 101 : 202) - 0.5) * 0.18;
+          const grain = (Math.sin(y * 0.15 + Math.sin(x * 0.08) * 2.5) * 0.5 + 0.5) * 0.14
+            + (smoothNoise2D(x * 0.25, y * 0.05, 42) - 0.5) * 0.10;
+          const offset = (y * size + x) * 4;
+          const pIndex = y * size + x;
+
+          if (isCaulk) {
+            albedoData[offset] = 26;
+            albedoData[offset + 1] = 24;
+            albedoData[offset + 2] = 22;
+            albedoData[offset + 3] = 255;
+
+            roughnessData[offset] = 230;
+            roughnessData[offset + 1] = 230;
+            roughnessData[offset + 2] = 230;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.10;
+          } else {
+            const edgeDist = Math.min(px - 3, 31 - px);
+            const bevel = Math.min(1.0, edgeDist / 2.0);
+            const r = THREE.MathUtils.clamp(Math.round(baseR * (1 + plankTone + grain) * (0.85 + 0.15 * bevel)), 0, 255);
+            const g = THREE.MathUtils.clamp(Math.round(baseG * (1 + plankTone + grain) * (0.85 + 0.15 * bevel)), 0, 255);
+            const b = THREE.MathUtils.clamp(Math.round(baseB * (1 + plankTone + grain) * (0.85 + 0.15 * bevel)), 0, 255);
+
+            albedoData[offset] = r;
+            albedoData[offset + 1] = g;
+            albedoData[offset + 2] = b;
+            albedoData[offset + 3] = 255;
+
+            const rough = THREE.MathUtils.clamp(Math.round((0.60 + (1.0 - bevel) * 0.15 + grain * 0.05) * 255), 0, 255);
+            roughnessData[offset] = rough;
+            roughnessData[offset + 1] = rough;
+            roughnessData[offset + 2] = rough;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.70 + 0.25 * bevel + grain * 0.08;
+          }
+        }
+      }
+      break;
+    }
+
+    case 'hull': {
+      normalStrength = 2.5;
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          const py = y % 64;
+          const isSeam = py < 2;
+          const micro = (smoothNoise2D(x * 0.2, y * 0.2, 7) - 0.5) * 0.04;
+          const offset = (y * size + x) * 4;
+          const pIndex = y * size + x;
+
+          if (isSeam) {
+            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * 0.85), 0, 255);
+            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * 0.85), 0, 255);
+            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * 0.85), 0, 255);
+            albedoData[offset + 3] = 255;
+
+            roughnessData[offset] = 115;
+            roughnessData[offset + 1] = 115;
+            roughnessData[offset + 2] = 115;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.25;
+          } else {
+            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * (1 + micro)), 0, 255);
+            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * (1 + micro)), 0, 255);
+            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * (1 + micro)), 0, 255);
+            albedoData[offset + 3] = 255;
+
+            const rough = THREE.MathUtils.clamp(Math.round((0.24 + micro * 0.04) * 255), 0, 255);
+            roughnessData[offset] = rough;
+            roughnessData[offset + 1] = rough;
+            roughnessData[offset + 2] = rough;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.85 + micro * 0.1;
+          }
+        }
+      }
+      break;
+    }
+
+    case 'wall': {
+      normalStrength = 3.5;
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          const px = x % 64;
+          const py = y % 64;
+          const distX = Math.min(px, 64 - px);
+          const distY = Math.min(py, 64 - py);
+          const edgeDist = Math.min(distX, distY);
+          const isSeam = edgeDist < 2;
+          const bevel = edgeDist >= 2 ? Math.min(1.0, (edgeDist - 2) / 4.0) : 0;
+          const surfaceNoise = (smoothNoise2D(x * 0.1, y * 0.1, 13) - 0.5) * 0.03;
+          const offset = (y * size + x) * 4;
+          const pIndex = y * size + x;
+
+          if (isSeam) {
+            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * 0.70), 0, 255);
+            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * 0.70), 0, 255);
+            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * 0.70), 0, 255);
+            albedoData[offset + 3] = 255;
+
+            roughnessData[offset] = 175;
+            roughnessData[offset + 1] = 175;
+            roughnessData[offset + 2] = 175;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.15;
+          } else {
+            const factor = (1 + surfaceNoise) * (0.88 + 0.12 * bevel);
+            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * factor), 0, 255);
+            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * factor), 0, 255);
+            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * factor), 0, 255);
+            albedoData[offset + 3] = 255;
+
+            const rough = THREE.MathUtils.clamp(Math.round((0.40 + (1.0 - bevel) * 0.18) * 255), 0, 255);
+            roughnessData[offset] = rough;
+            roughnessData[offset + 1] = rough;
+            roughnessData[offset + 2] = rough;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.30 + 0.65 * bevel + surfaceNoise * 0.05;
+          }
+        }
+      }
+      break;
+    }
+
+    case 'roof': {
+      normalStrength = 3.2;
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          const px = x % 64;
+          const py = y % 128;
+          const distX = Math.min(px, 64 - px);
+          const distY = Math.min(py, 128 - py);
+          const isSeam = distX < 2 || distY < 2;
+          const isRivet = (Math.abs(px - 10) < 3 || Math.abs(px - 54) < 3) && (Math.abs(py - 12) < 3 || Math.abs(py - 116) < 3);
+          const brushed = (smoothNoise2D(x * 0.5, y * 0.04, 33) - 0.5) * 0.08;
+          const offset = (y * size + x) * 4;
+          const pIndex = y * size + x;
+
+          if (isRivet) {
+            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * 1.15), 0, 255);
+            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * 1.15), 0, 255);
+            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * 1.15), 0, 255);
+            albedoData[offset + 3] = 255;
+
+            roughnessData[offset] = 56;
+            roughnessData[offset + 1] = 56;
+            roughnessData[offset + 2] = 56;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.95;
+          } else if (isSeam) {
+            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * 0.68), 0, 255);
+            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * 0.68), 0, 255);
+            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * 0.68), 0, 255);
+            albedoData[offset + 3] = 255;
+
+            roughnessData[offset] = 140;
+            roughnessData[offset + 1] = 140;
+            roughnessData[offset + 2] = 140;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.20;
+          } else {
+            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * (1 + brushed)), 0, 255);
+            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * (1 + brushed)), 0, 255);
+            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * (1 + brushed)), 0, 255);
+            albedoData[offset + 3] = 255;
+
+            const rough = THREE.MathUtils.clamp(Math.round((0.28 + brushed * 0.06) * 255), 0, 255);
+            roughnessData[offset] = rough;
+            roughnessData[offset + 1] = rough;
+            roughnessData[offset + 2] = rough;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.75 + brushed * 0.1;
+          }
+        }
+      }
+      break;
+    }
+
+    case 'teal-trim': {
+      normalStrength = 2.8;
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          const brushed = (smoothNoise2D(x * 0.6, y * 0.06, 55) - 0.5) * 0.14;
+          const band = Math.cos((x * Math.PI * 2) / 128) * 0.06;
+          const factor = 1 + brushed + band;
+          const offset = (y * size + x) * 4;
+          const pIndex = y * size + x;
+
+          albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * factor), 0, 255);
+          albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * factor), 0, 255);
+          albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * factor), 0, 255);
+          albedoData[offset + 3] = 255;
+
+          const rough = THREE.MathUtils.clamp(Math.round((0.28 + (smoothNoise2D(x * 0.1, y * 0.1, 77) - 0.5) * 0.05) * 255), 0, 255);
+          roughnessData[offset] = rough;
+          roughnessData[offset + 1] = rough;
+          roughnessData[offset + 2] = rough;
+          roughnessData[offset + 3] = 255;
+
+          heightData[pIndex] = 0.70 + brushed * 0.15;
+        }
+      }
+      break;
+    }
+
+    case 'engine-bulkhead': {
+      normalStrength = 4.0;
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          const px = x % 64;
+          const isSeam = px < 3;
+          const isRivet = Math.abs(px - 8) < 3 && y % 24 < 3;
+          const mottle = (fbm2D(x * 0.06, y * 0.06, 3, 88) - 0.5) * 0.15;
+          const offset = (y * size + x) * 4;
+          const pIndex = y * size + x;
+
+          if (isRivet) {
+            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * 1.25), 0, 255);
+            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * 1.25), 0, 255);
+            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * 1.25), 0, 255);
+            albedoData[offset + 3] = 255;
+
+            roughnessData[offset] = 95;
+            roughnessData[offset + 1] = 95;
+            roughnessData[offset + 2] = 95;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.95;
+          } else if (isSeam) {
+            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * 0.60), 0, 255);
+            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * 0.60), 0, 255);
+            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * 0.60), 0, 255);
+            albedoData[offset + 3] = 255;
+
+            roughnessData[offset] = 184;
+            roughnessData[offset + 1] = 184;
+            roughnessData[offset + 2] = 184;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.20;
+          } else {
+            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * (1 + mottle)), 0, 255);
+            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * (1 + mottle)), 0, 255);
+            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * (1 + mottle)), 0, 255);
+            albedoData[offset + 3] = 255;
+
+            const rough = THREE.MathUtils.clamp(Math.round((0.52 + mottle * 0.08) * 255), 0, 255);
+            roughnessData[offset] = rough;
+            roughnessData[offset + 1] = rough;
+            roughnessData[offset + 2] = rough;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.70 + mottle * 0.1;
+          }
+        }
+      }
+      break;
+    }
+
+    case 'engine-grating': {
+      normalStrength = 4.5;
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          const u = (x + y) % 16 - 8;
+          const v = (x - y + 1600) % 16 - 8;
+          const diamondDist = Math.abs(u) * 1.4 + Math.abs(v);
+          const isTread = diamondDist < 4.5;
+          const offset = (y * size + x) * 4;
+          const pIndex = y * size + x;
+
+          if (isTread) {
+            const treadPeak = 1.0 - diamondDist / 4.5;
+            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * (1.2 + 0.8 * treadPeak)), 0, 255);
+            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * (1.2 + 0.8 * treadPeak)), 0, 255);
+            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * (1.2 + 0.8 * treadPeak)), 0, 255);
+            albedoData[offset + 3] = 255;
+
+            const rough = THREE.MathUtils.clamp(Math.round((0.28 + 0.10 * (1.0 - treadPeak)) * 255), 0, 255);
+            roughnessData[offset] = rough;
+            roughnessData[offset + 1] = rough;
+            roughnessData[offset + 2] = rough;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.45 + 0.50 * treadPeak;
+          } else {
+            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * 0.60), 0, 255);
+            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * 0.60), 0, 255);
+            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * 0.60), 0, 255);
+            albedoData[offset + 3] = 255;
+
+            roughnessData[offset] = 204;
+            roughnessData[offset + 1] = 204;
+            roughnessData[offset + 2] = 204;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.20;
+          }
+        }
+      }
+      break;
+    }
+
+    case 'engine-machinery': {
+      normalStrength = 3.5;
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          const px = x % 64;
+          const py = y % 64;
+          const isLouver = px >= 12 && px <= 52 && py % 16 < 6;
+          const isFlange = px < 4 || px >= 60 || py < 4 || py >= 60;
+          const castNoise = (smoothNoise2D(x * 0.3, y * 0.3, 109) - 0.5) * 0.08;
+          const offset = (y * size + x) * 4;
+          const pIndex = y * size + x;
+
+          if (isLouver) {
+            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * 0.45), 0, 255);
+            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * 0.45), 0, 255);
+            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * 0.45), 0, 255);
+            albedoData[offset + 3] = 255;
+
+            roughnessData[offset] = 178;
+            roughnessData[offset + 1] = 178;
+            roughnessData[offset + 2] = 178;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.15;
+          } else if (isFlange) {
+            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * 1.15), 0, 255);
+            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * 1.15), 0, 255);
+            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * 1.15), 0, 255);
+            albedoData[offset + 3] = 255;
+
+            roughnessData[offset] = 82;
+            roughnessData[offset + 1] = 82;
+            roughnessData[offset + 2] = 82;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.85;
+          } else {
+            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * (1 + castNoise)), 0, 255);
+            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * (1 + castNoise)), 0, 255);
+            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * (1 + castNoise)), 0, 255);
+            albedoData[offset + 3] = 255;
+
+            const rough = THREE.MathUtils.clamp(Math.round((0.42 + castNoise * 0.06) * 255), 0, 255);
+            roughnessData[offset] = rough;
+            roughnessData[offset + 1] = rough;
+            roughnessData[offset + 2] = rough;
+            roughnessData[offset + 3] = 255;
+
+            heightData[pIndex] = 0.65 + castNoise * 0.1;
+          }
+        }
+      }
+      break;
+    }
+
+    case 'engine-amber': {
+      normalStrength = 3.0;
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          const ridge = Math.sin((y * Math.PI) / 8) * 0.5 + 0.5;
+          const factor = 0.85 + 0.30 * ridge;
+          const offset = (y * size + x) * 4;
+          const pIndex = y * size + x;
+
+          albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * factor), 0, 255);
+          albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * factor), 0, 255);
+          albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * factor), 0, 255);
+          albedoData[offset + 3] = 255;
+
+          const rough = THREE.MathUtils.clamp(Math.round((0.30 + 0.12 * (1.0 - ridge)) * 255), 0, 255);
+          roughnessData[offset] = rough;
+          roughnessData[offset + 1] = rough;
+          roughnessData[offset + 2] = rough;
+          roughnessData[offset + 3] = 255;
+
+          heightData[pIndex] = 0.40 + 0.55 * ridge;
+        }
+      }
+      break;
+    }
+
+    case 'upholstery': {
+      normalStrength = 3.2;
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          const cellX = Math.floor(x / 4);
+          const cellY = Math.floor(y / 4);
+          const subX = (x % 4) / 4;
+          const subY = (y % 4) / 4;
+          const isWarp = (cellX + cellY) % 2 === 0;
+          const thread = isWarp ? Math.sin(subX * Math.PI) : Math.sin(subY * Math.PI);
+          const factor = 0.82 + 0.30 * thread;
+          const offset = (y * size + x) * 4;
+          const pIndex = y * size + x;
+
+          albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * factor), 0, 255);
+          albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * factor), 0, 255);
+          albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * factor), 0, 255);
+          albedoData[offset + 3] = 255;
+
+          const rough = THREE.MathUtils.clamp(Math.round((0.78 + 0.08 * (1.0 - thread)) * 255), 0, 255);
+          roughnessData[offset] = rough;
+          roughnessData[offset + 1] = rough;
+          roughnessData[offset + 2] = rough;
+          roughnessData[offset + 3] = 255;
+
+          heightData[pIndex] = 0.45 + 0.35 * thread;
+        }
+      }
+      break;
+    }
+
+    case 'glass': {
+      hasAlbedo = false;
+      normalStrength = 1.5;
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          const offset = (y * size + x) * 4;
+          const pIndex = y * size + x;
+          const wave = smoothNoise2D(x * 0.05, y * 0.05, 31) * 0.04;
+
+          roughnessData[offset] = 36;
+          roughnessData[offset + 1] = 36;
+          roughnessData[offset + 2] = 36;
+          roughnessData[offset + 3] = 255;
+
+          heightData[pIndex] = 0.5 + wave;
+        }
+      }
+      break;
+    }
+
+    case 'water': {
+      hasAlbedo = false;
+      normalStrength = 3.5;
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          const wave = Math.sin(x * 0.12 + y * 0.08) * 0.35
+            + Math.sin(x * 0.06 - y * 0.15) * 0.35
+            + (smoothNoise2D(x * 0.1, y * 0.1, 99) - 0.5) * 0.3;
+          const offset = (y * size + x) * 4;
+          const pIndex = y * size + x;
+
+          roughnessData[offset] = 26;
+          roughnessData[offset + 1] = 26;
+          roughnessData[offset + 2] = 26;
+          roughnessData[offset + 3] = 255;
+
+          heightData[pIndex] = 0.5 + wave * 0.4;
+        }
+      }
+      break;
+    }
+  }
+
+  const normalData = normalsFromHeights(size, size, heightData, normalStrength);
+
+  const map = hasAlbedo
+    ? createDataTexture(`${family}-albedo`, size, size, albedoData, THREE.SRGBColorSpace)
+    : undefined;
+
+  const normalMap = createDataTexture(
+    `${family}-normal`,
+    size,
+    size,
+    normalData,
+    THREE.NoColorSpace,
+  );
+
+  const roughnessMap = createDataTexture(
+    `${family}-roughness`,
+    size,
+    size,
+    roughnessData,
+    THREE.NoColorSpace,
+  );
+
+  return { map, normalMap, roughnessMap, tileMetres: HIGH_SEAS_TILE_METRES[family] };
+}
+
+function pbrMaterial(
+  name: string,
+  family: HighSeasTextureFamily,
+  color: number,
+  roughness: number,
+  metalness: number,
+  emissive = 0,
+  emissiveIntensity = 0,
+): THREE.MeshStandardMaterial {
+  const textures = generateMaterialTextureSet(family, color);
+  const value = new THREE.MeshStandardMaterial({
+    color,
+    roughness,
+    metalness,
+    emissive,
+    emissiveIntensity,
+    ...(textures.map ? { map: textures.map } : {}),
+    ...(textures.normalMap ? { normalMap: textures.normalMap } : {}),
+    ...(textures.roughnessMap ? { roughnessMap: textures.roughnessMap } : {}),
+  });
+  value.name = `high-seas-${name}`;
+  value.userData.assetOwner = 'high-seas';
+  value.userData.assetKind = 'procedural-original-material';
+  value.userData.textureFamily = family;
+  return value;
+}
+
 function material(
   name: string,
   color: number,
@@ -113,20 +884,25 @@ function material(
   emissive = 0,
   emissiveIntensity = 0,
 ): THREE.MeshStandardMaterial {
-  const value = new THREE.MeshStandardMaterial({
-    color,
-    roughness,
-    metalness,
-    emissive,
-    emissiveIntensity,
-  });
-  value.name = `high-seas-${name}`;
-  value.userData.assetOwner = 'high-seas';
-  value.userData.assetKind = 'procedural-original-material';
-  return value;
+  const familyLookup: Record<string, HighSeasTextureFamily> = {
+    'pearl-hull': 'hull',
+    'warm-cabin-shell': 'wall',
+    'silver-roof': 'roof',
+    'honey-deck': 'deck',
+    'dark-deck-stair': 'stair',
+    'deep-teal-trim': 'teal-trim',
+    'engine-bulkhead': 'engine-bulkhead',
+    'engine-grating': 'engine-grating',
+    'engine-machinery': 'engine-machinery',
+    'engine-amber': 'engine-amber',
+    'cabana-upholstery': 'upholstery',
+  };
+  const family = familyLookup[name] ?? 'wall';
+  return pbrMaterial(name, family, color, roughness, metalness, emissive, emissiveIntensity);
 }
 
 function containedWaterMaterial(name: string, color: number): THREE.MeshStandardMaterial {
+  const textures = generateMaterialTextureSet('water', color);
   const value = new THREE.MeshStandardMaterial({
     color,
     roughness: 0.12,
@@ -134,12 +910,48 @@ function containedWaterMaterial(name: string, color: number): THREE.MeshStandard
     transparent: true,
     opacity: 0.72,
     depthWrite: false,
+    ...(textures.normalMap ? { normalMap: textures.normalMap } : {}),
+    ...(textures.roughnessMap ? { roughnessMap: textures.roughnessMap } : {}),
   });
   value.name = `high-seas-${name}`;
   value.userData.assetOwner = 'high-seas';
   value.userData.assetKind = 'contained-presentation-water';
   value.userData.waterScope = 'contained-feature-only';
+  value.userData.textureFamily = 'water';
   return value;
+}
+
+export function getHighSeasMaterialInventory(): readonly HighSeasMaterialInventoryEntry[] {
+  const definitions: Array<{ name: string; family: HighSeasTextureFamily; color: number }> = [
+    { name: 'pearl-hull', family: 'hull', color: 0xeaf1ef },
+    { name: 'warm-cabin-shell', family: 'wall', color: 0xf5f3e9 },
+    { name: 'silver-roof', family: 'roof', color: 0xcbd6d5 },
+    { name: 'honey-deck', family: 'deck', color: 0xb78653 },
+    { name: 'dark-deck-stair', family: 'stair', color: 0x5a4032 },
+    { name: 'deep-teal-trim', family: 'teal-trim', color: 0x164c58 },
+    { name: 'engine-bulkhead', family: 'engine-bulkhead', color: 0x36474c },
+    { name: 'engine-grating', family: 'engine-grating', color: 0x26363a },
+    { name: 'engine-machinery', family: 'engine-machinery', color: 0x57666a },
+    { name: 'engine-amber', family: 'engine-amber', color: 0xd7a441 },
+    { name: 'cabana-upholstery', family: 'upholstery', color: 0x4b8790 },
+    { name: 'side-glass', family: 'glass', color: 0x5e9ca8 },
+    { name: 'contained-feature-water', family: 'water', color: 0x2db9c4 },
+  ];
+
+  return Object.freeze(
+    definitions.map(({ name, family, color }) => {
+      const tex = generateMaterialTextureSet(family, color);
+      return Object.freeze({
+        name: `high-seas-${name}`,
+        family,
+        hasMap: tex.map !== undefined,
+        hasNormalMap: tex.normalMap !== undefined,
+        hasRoughnessMap: tex.roughnessMap !== undefined,
+        resolution: 256,
+        tileMetres: tex.tileMetres,
+      });
+    }),
+  );
 }
 
 function box(
@@ -150,7 +962,14 @@ function box(
   meshMaterial: THREE.Material,
   options: BoxOptions = {},
 ): THREE.Mesh {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), meshMaterial);
+  const geometry = new THREE.BoxGeometry(...size);
+  // Density is a property of the world, not of the mesh: project the shared
+  // material's texture at a fixed metres-per-tile so a 2 m crate and a 20 m
+  // bulkhead show the same panel size.
+  const boxTileMetres = tileMetresForMaterial(meshMaterial);
+  if (boxTileMetres !== null) applyBoxProjectedUv(geometry, boxTileMetres);
+
+  const mesh = new THREE.Mesh(geometry, meshMaterial);
   mesh.name = name;
   mesh.position.set(...position);
   if (options.rotation) mesh.rotation.set(...options.rotation);
@@ -281,6 +1100,9 @@ function presentationMesh(
   rotation: [number, number, number] = [0, 0, 0],
   detail: 'performance' | 'quality' = 'performance',
 ): THREE.Mesh {
+  const presentationTileMetres = tileMetresForMaterial(meshMaterial);
+  if (presentationTileMetres !== null) applyBoxProjectedUv(geometry, presentationTileMetres);
+
   const mesh = new THREE.Mesh(geometry, meshMaterial);
   mesh.name = name;
   mesh.position.set(...position);
@@ -963,6 +1785,7 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
   const engineMachineMaterial = material('engine-machinery', 0x57666a, 0.38, 0.74);
   const engineAccentMaterial = material('engine-amber', 0xd7a441, 0.34, 0.52, 0x6d3c08, 0.65);
   const upholsteryMaterial = material('cabana-upholstery', 0x4b8790, 0.76, 0.04);
+  const glassTextures = generateMaterialTextureSet('glass', 0x5e9ca8);
   const glassMaterial = new THREE.MeshStandardMaterial({
     color: 0x5e9ca8,
     roughness: 0.16,
@@ -970,10 +1793,13 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
     transparent: true,
     opacity: 0.38,
     depthWrite: false,
+    ...(glassTextures.normalMap ? { normalMap: glassTextures.normalMap } : {}),
+    ...(glassTextures.roughnessMap ? { roughnessMap: glassTextures.roughnessMap } : {}),
   });
   glassMaterial.name = 'high-seas-side-glass';
   glassMaterial.userData.assetOwner = 'high-seas';
   glassMaterial.userData.assetKind = 'procedural-original-material';
+  glassMaterial.userData.textureFamily = 'glass';
   const waterMaterial = containedWaterMaterial('contained-feature-water', 0x2db9c4);
 
   const hull = presentationMesh(builder, 'high-seas-sculpted-hull', createHullGeometry(), hullMaterial, [0, 0, 0]);
@@ -1154,6 +1980,7 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
     { id: 'high-seas-engine-open-portal', position: [0, 1.6, -18], target: [0, 2.2, -24], purpose: 'portal' },
     { id: 'high-seas-engine-wall-closed', position: [2.5, 1.5, 0], target: [3.1, 1.5, 0], purpose: 'light-occlusion' },
   ]);
+  root.userData.highSeasMaterialInventory = Object.freeze(getHighSeasMaterialInventory());
 
   return {
     id: 'high-seas',

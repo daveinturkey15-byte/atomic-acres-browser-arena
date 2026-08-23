@@ -11,6 +11,10 @@
  * the art layer.
  */
 import * as THREE from 'three';
+import {
+  applyFarcrysisGroundMaterial,
+  FARCRYSIS_GROUND_EXTENT_M,
+} from './farcrysis-ground-materials';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { buildVegetation, buildAdditionalVegetation, animateVegetationWind, setVegetationLOD } from './farcrysis-vegetation';
 // terrain.ts ShaderMaterial effects disabled for TSL review compatibility.
@@ -450,7 +454,11 @@ function buildInlineTerrain(scene: THREE.Scene): void {
   geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geom.computeVertexNormals();
 
-  const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0.03 });
+  const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.03 });
+  // Vertex colour describes the ZONE (sand / transition / jungle floor); the
+  // maps describe the SURFACE. Without the maps this is a smooth three-stop
+  // gradient with no grain, which is why the ground read as coloured geometry.
+  applyFarcrysisGroundMaterial(terrainMat, 'terrain');
   const terrainMesh = new THREE.Mesh(geom, terrainMat);
   terrainMesh.name = 'farcrysis-terrain-elevation';
   terrainMesh.receiveShadow = true;
@@ -660,11 +668,26 @@ function buildInlineWater(scene: THREE.Scene): void {
   }
   wetGeom.computeVertexNormals();
 
+  // ShapeGeometry emits UVs in shape space, i.e. metres, whereas the terrain
+  // plane emits 0..1. Normalising here lets both surfaces share one repeat, so
+  // grain stays the same physical size as a player crosses the shoreline.
+  const wetUv = wetGeom.attributes.uv as THREE.BufferAttribute | undefined;
+  if (wetUv) {
+    for (let i = 0; i < wetUv.count; i++) {
+      wetUv.setXY(i, wetUv.getX(i) / FARCRYSIS_GROUND_EXTENT_M, wetUv.getY(i) / FARCRYSIS_GROUND_EXTENT_M);
+    }
+    wetUv.needsUpdate = true;
+  }
+
   const wetMat = new THREE.MeshStandardMaterial({
     color: 0x8a7a58,               // darker than dry sand — damp/wet shore
-    roughness: 0.95,
     metalness: 0.0,
   });
+  // Roughness intentionally omitted above: the shore was authored at 0.95,
+  // ROUGHER than the dry terrain behind it, which is backwards. A film of
+  // water fills the grain and reflects, making wet sand the smoothest ground
+  // in the arena; applyFarcrysisGroundMaterial sets the corrected value.
+  applyFarcrysisGroundMaterial(wetMat, 'wet-sand');
 
   const wet = new THREE.Mesh(wetGeom, wetMat);
   wet.name = 'farcrysis-water-wetsand';

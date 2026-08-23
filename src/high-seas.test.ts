@@ -8,6 +8,8 @@ import {
   HIGH_SEAS_LEVELS,
   HIGH_SEAS_SAFETY_FLOOR_Y,
   buildHighSeas,
+  getHighSeasMaterialInventory,
+  HIGH_SEAS_TILE_METRES,
   type HighSeasPortal,
   type HighSeasRouteAnchor,
 } from './high-seas';
@@ -462,5 +464,171 @@ describe('High Seas clean-room arena geometry', () => {
     expect(cameras.every((camera) => camera.position.length === 3
       && camera.target.length === 3
       && [...camera.position, ...camera.target].every(Number.isFinite))).toBe(true);
+  });
+
+  it('equips deck, hull, and superstructure with procedural PBR textures (albedo, normal, roughness)', () => {
+    const map = buildHighSeas(new THREE.Scene());
+    const inventory = getHighSeasMaterialInventory();
+    expect(inventory).toHaveLength(13);
+
+    const materialsByName = new Map<string, THREE.MeshStandardMaterial>();
+    map.root.traverse((node) => {
+      if (node instanceof THREE.Mesh) {
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        for (const mat of mats) {
+          if (mat instanceof THREE.MeshStandardMaterial && mat.name.startsWith('high-seas-')) {
+            materialsByName.set(mat.name, mat);
+          }
+        }
+      }
+    });
+
+    expect(materialsByName.size).toBe(13);
+
+    for (const entry of inventory) {
+      const mat = materialsByName.get(entry.name);
+      expect(mat, `Material ${entry.name} should exist in scene`).toBeDefined();
+      if (!mat) continue;
+
+      expect(mat.roughness).toBeGreaterThanOrEqual(0);
+      expect(mat.roughness).toBeLessThanOrEqual(1);
+      expect(mat.metalness).toBeGreaterThanOrEqual(0);
+      expect(mat.metalness).toBeLessThanOrEqual(1);
+
+      if (entry.hasMap) {
+        expect(mat.map).toBeInstanceOf(THREE.DataTexture);
+        const map = mat.map as THREE.DataTexture;
+        expect(map.colorSpace).toBe(THREE.SRGBColorSpace);
+        expect(map.wrapS).toBe(THREE.RepeatWrapping);
+        expect(map.wrapT).toBe(THREE.RepeatWrapping);
+        expect((map.image as { width: number; height: number }).width).toBe(256);
+        expect((map.image as { width: number; height: number }).height).toBe(256);
+        expect(map.generateMipmaps).toBe(true);
+      }
+
+      if (entry.hasNormalMap) {
+        expect(mat.normalMap).toBeInstanceOf(THREE.DataTexture);
+        const normalMap = mat.normalMap as THREE.DataTexture;
+        expect(normalMap.colorSpace).toBe(THREE.NoColorSpace);
+        expect(normalMap.wrapS).toBe(THREE.RepeatWrapping);
+        expect(normalMap.wrapT).toBe(THREE.RepeatWrapping);
+        expect((normalMap.image as { width: number; height: number }).width).toBe(256);
+        expect((normalMap.image as { width: number; height: number }).height).toBe(256);
+        expect(normalMap.generateMipmaps).toBe(true);
+
+        const data = (normalMap.image as { data: Uint8Array }).data;
+        expect(data).toBeDefined();
+        let blueSum = 0;
+        for (let i = 2; i < data.length; i += 4) {
+          blueSum += data[i];
+        }
+        const avgBlue = blueSum / (data.length / 4);
+        expect(avgBlue).toBeGreaterThan(128);
+      }
+
+      if (entry.hasRoughnessMap) {
+        expect(mat.roughnessMap).toBeInstanceOf(THREE.DataTexture);
+        const roughnessMap = mat.roughnessMap as THREE.DataTexture;
+        expect(roughnessMap.colorSpace).toBe(THREE.NoColorSpace);
+        expect(roughnessMap.wrapS).toBe(THREE.RepeatWrapping);
+        expect(roughnessMap.wrapT).toBe(THREE.RepeatWrapping);
+        expect((roughnessMap.image as { width: number; height: number }).width).toBe(256);
+        expect((roughnessMap.image as { width: number; height: number }).height).toBe(256);
+        expect(roughnessMap.generateMipmaps).toBe(true);
+      }
+    }
+
+    const withMap = inventory.filter((e) => e.hasMap);
+    const withNormal = inventory.filter((e) => e.hasNormalMap);
+    const withRoughness = inventory.filter((e) => e.hasRoughnessMap);
+
+    expect(withMap).toHaveLength(11);
+    expect(withNormal).toHaveLength(13);
+    expect(withRoughness).toHaveLength(13);
+    expect(map.root.userData.highSeasMaterialInventory).toEqual(inventory);
+  });
+
+  it('holds texel density constant in world space across every textured mesh', () => {
+    // REGRESSION GUARD. The first materials pass set a fixed texture `repeat`
+    // per family, so density scaled with the mesh: 1 m composite panels on a
+    // large bulkhead became a 12 cm brick grid on a small crate. Density is now
+    // carried by box-projected UVs, and this test pins that invariant by
+    // measuring it the way a player sees it - tiles per metre of real surface.
+    const map = buildHighSeas(new THREE.Scene());
+
+    const offenders: string[] = [];
+    let checked = 0;
+
+    map.root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      const mats = Array.isArray(node.material) ? node.material : [node.material];
+      const textured = mats.find((mat): mat is THREE.MeshStandardMaterial =>
+        mat instanceof THREE.MeshStandardMaterial
+        && typeof mat.userData?.textureFamily === 'string');
+      if (!textured) return;
+
+      const family = textured.userData.textureFamily as keyof typeof HIGH_SEAS_TILE_METRES;
+      const tileMetres = HIGH_SEAS_TILE_METRES[family];
+      expect(tileMetres, `family ${family} needs a tile size`).toBeGreaterThan(0);
+
+      const geometry = node.geometry;
+      const uv = geometry.getAttribute('uv');
+      const position = geometry.getAttribute('position');
+      if (!uv || !position) return;
+
+      geometry.computeBoundingBox();
+      const bounds = geometry.boundingBox;
+      if (!bounds) return;
+
+      // Longest world axis of the mesh, and the UV span over the same axis.
+      const spanX = bounds.max.x - bounds.min.x;
+      const spanY = bounds.max.y - bounds.min.y;
+      const spanZ = bounds.max.z - bounds.min.z;
+      const worldSpan = Math.max(spanX, spanY, spanZ);
+      if (worldSpan < 0.2) return;
+
+      let minU = Infinity; let maxU = -Infinity;
+      let minV = Infinity; let maxV = -Infinity;
+      for (let i = 0; i < uv.count; i += 1) {
+        minU = Math.min(minU, uv.getX(i));
+        maxU = Math.max(maxU, uv.getX(i));
+        minV = Math.min(minV, uv.getY(i));
+        maxV = Math.max(maxV, uv.getY(i));
+      }
+      const uvSpan = Math.max(maxU - minU, maxV - minV);
+      if (!Number.isFinite(uvSpan) || uvSpan <= 0) {
+        offenders.push(`${node.name}: degenerate uv span`);
+        return;
+      }
+
+      const tilesPerMetre = uvSpan / worldSpan;
+      const expected = 1 / tileMetres;
+      checked += 1;
+
+      // Box projection is exact, so the tolerance only absorbs the case where
+      // the longest UV axis and the longest world axis are different axes.
+      if (Math.abs(tilesPerMetre - expected) > expected * 0.35) {
+        offenders.push(
+          `${node.name} (${family}): ${tilesPerMetre.toFixed(3)} tiles/m, expected ${expected.toFixed(3)}`,
+        );
+      }
+    });
+
+    expect(checked).toBeGreaterThan(40);
+    expect(offenders, ['non-uniform texel density:', ...offenders].join(' | ')).toEqual([]);
+  });
+
+  it('gives every texture family a physically sensible tile size', () => {
+    // A tile smaller than ~0.5 m reads as noise at play distance; larger than
+    // ~8 m and the normal map stops carrying any surface detail at all.
+    for (const [family, metres] of Object.entries(HIGH_SEAS_TILE_METRES)) {
+      expect(metres, `${family} tile too small`).toBeGreaterThanOrEqual(0.5);
+      expect(metres, `${family} tile too large`).toBeLessThanOrEqual(8);
+    }
+
+    const inventory = getHighSeasMaterialInventory();
+    for (const entry of inventory) {
+      expect(entry.tileMetres).toBe(HIGH_SEAS_TILE_METRES[entry.family]);
+    }
   });
 });
