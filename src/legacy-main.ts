@@ -39,6 +39,7 @@ import { auditLocalLightOcclusion } from './rendering/light-occlusion';
 import { webGlShadowSamplerMode } from './webgl-shadow-compatibility';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { proneBodyClearance } from './prone-clearance';
+import { mountFarcrysisHitlOverlay, type FarcrysisHitlOverlay } from './farcrysis-hitl';
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
 import { sharedWaterBodyForArena } from './water/water-authoring';
 import { PASS66_RELEASE_IDENTITY } from './release-identity';
@@ -1971,6 +1972,12 @@ const mistQuery = new URLSearchParams(window.location.search).get('mist');
 const cloudsQuery = new URLSearchParams(window.location.search).get('clouds');
 const skyCloudsEnabled = !reducedRenderMode || cloudsQuery === 'on';
 const raysQuery = new URLSearchParams(window.location.search).get('rays');
+// Dev-only inspection overlay for F4RCry515: spawn markers, opposing-spawn
+// sightlines, cover wireframes and kill-volume checks. Written for HF-3xx and
+// documented as "gated by the caller in legacy-main.ts" - except no caller was
+// ever added, so the overlay could not be turned on by anyone. Gated here now.
+const hitlQuery = new URLSearchParams(window.location.search).get('hitl');
+let farcrysisHitlOverlay: FarcrysisHitlOverlay | null = null;
 const actualGodRayStrength = (raysQuery === 'off' || (softwareRenderer && raysQuery !== 'on')) ? 0 : activeLighting.godRayStrength;
 const actualGodRayLobes = actualGodRayStrength > 0 ? activeLighting.godRayLobes : 0;
 // Both renderer backends own grade, dither/grain and vignette in their GPU
@@ -26066,6 +26073,18 @@ async function performArenaSelection(
     clearDebugRiggedEvidenceCaptureTargets();
     lastDebugCapturePresentation = null;
     arena = nextArena;
+    // Tear the previous arena's overlay down before the new one is dressed, so
+    // it can never outlive the arena it was measuring.
+    farcrysisHitlOverlay?.dispose();
+    farcrysisHitlOverlay = null;
+    if (hitlQuery === '1' && selectedArena.id === 'farcrysis') {
+      try {
+        farcrysisHitlOverlay = mountFarcrysisHitlOverlay(arena);
+      } catch (error) {
+        // Never let a debug overlay take the arena down with it.
+        console.warn('[farcrysis hitl] overlay failed to mount', error);
+      }
+    }
     interactiveWorldRuntime = nextInteractiveWorldRuntime;
     previousInteractiveWorldRuntime?.root.removeFromParent();
     interactiveWorldRuntime.root.visible = true;

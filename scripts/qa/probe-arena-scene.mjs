@@ -17,6 +17,7 @@ const arg = (name, fallback) => {
 
 const BASE = arg('--url', 'http://127.0.0.1:41876');
 const ARENA = arg('--arena', 'farcrysis');
+const EXTRA = arg('--extra', '');
 
 const PROBE = () => {
   const debug = window.__ATOMIC_ACRES_DEBUG__;
@@ -97,7 +98,10 @@ const PROBE = () => {
     ? { type: scene.fog.type, color: `#${scene.fog.color?.getHexString?.()}`, near: scene.fog.near, far: scene.fog.far, density: scene.fog.density }
     : null;
 
-  return { meshCount, triangleCount: Math.round(triangleCount), background, cameraInfo, fog, entries };
+  const hitlNodes = [];
+  scene.traverse((object) => { if (/hitl/i.test(object.name || '')) hitlNodes.push(object.name); });
+
+  return { meshCount, triangleCount: Math.round(triangleCount), background, cameraInfo, fog, hitlNodes: hitlNodes.slice(0, 12), entries };
 };
 
 const browser = await chromium.launch({
@@ -106,7 +110,7 @@ const browser = await chromium.launch({
 });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 
-await page.goto(`${BASE}/?release=latest&renderer=webgl2&render=quality&seed=probe&previewTime=0`, { waitUntil: 'domcontentloaded' });
+await page.goto(`${BASE}/?release=latest&renderer=webgl2&render=quality&seed=probe&previewTime=0${EXTRA}`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 120_000 });
 await page.evaluate(async (id) => { await window.__ATOMIC_ACRES_DEBUG__.selectArena(id); }, ARENA);
 await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.startSolo(); });

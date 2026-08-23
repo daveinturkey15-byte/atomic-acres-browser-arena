@@ -1,8 +1,11 @@
 /**
  * farcrysis-constants.ts — Shared arena constants (leaf module, no imports from farcrysis.ts).
  *
- * Extracted to break the circular import chain:
- *   farcrysis.ts → farcrysis-art.ts → farcrysis-terrain.ts → farcrysis.ts
+ * Extracted to break a circular import chain between the arena entry point and
+ * its art layer. The third link in that chain, farcrysis-terrain.ts, no longer
+ * exists: the terrain was re-authored inline in farcrysis-art.ts when the
+ * module version stopped booting, and the orphan sat unreferenced for several
+ * passes afterwards. This module stays a leaf regardless - that is the point.
  */
 
 import type { Box2 } from './collision';
