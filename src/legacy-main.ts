@@ -253,6 +253,7 @@ import {
   beginClientWorldRepair,
   clientWorldRepairCanAttempt,
   clientWorldRepairPending,
+  clientWorldRepairExhausted,
   clientWorldRepairReceiverReady,
   MAX_CLIENT_WORLD_REPAIR_ATTEMPTS,
   recordClientWorldRepairAttempt,
@@ -7945,10 +7946,11 @@ function sendLobbyJoin(): void {
 
 function sendClientWorldRepairReady(loadout = killstreakLoadoutController.activeMatch ?? killstreakLoadoutController.selected): void {
   if (network.role !== 'client' || !gameStarted) return;
+  const repairReadyNow = performance.now();
   const admission = clientWorldRepairAdmission;
   const reconnectRepair = awaitingCanonicalGuestAuthority
     && pendingClientReconnectWorldRepairConnectionEpoch === localConnectionEpoch;
-  if (!clientWorldRepairCanAttempt(admission) && !reconnectRepair) return;
+  if (!clientWorldRepairCanAttempt(admission, repairReadyNow) && !reconnectRepair) return;
   network.send({ type: 'join', player: snapshot() });
   // The reliable state commit is ordered before the loadout intent on the
   // event lane. On a rematch the host has rebuilt the remote at continuity 1;
@@ -7960,7 +7962,7 @@ function sendClientWorldRepairReady(loadout = killstreakLoadoutController.active
     lifeId: localContinuity, sequence: 0, loadout, nonce: randomNonce(),
   };
   network.send(loadoutMessage);
-  if (admission) clientWorldRepairAdmission = recordClientWorldRepairAttempt(admission);
+  if (admission) clientWorldRepairAdmission = recordClientWorldRepairAttempt(admission, repairReadyNow);
   if (reconnectRepair) clientReconnectWorldRepairAttempts += 1;
   if (reconnectRepair) pendingClientReconnectWorldRepairConnectionEpoch = null;
 }
@@ -10731,15 +10733,18 @@ function onNetworkMessage(message: GameMessage): void {
       connectionEpoch: localConnectionEpoch,
       matchEpoch: message.snapshot.matchEpoch,
       exactActorAcknowledged,
-    }) || reconnectCanAttempt) {
+    }, performance.now()) || reconnectCanAttempt) {
       // HF-322: re-arm reconnect repair epoch on receiver-ready proof so lost reply can retry within attempt cap
       if (reconnectCanAttempt && !pendingClientReconnectWorldRepairConnectionEpoch) {
         pendingClientReconnectWorldRepairConnectionEpoch = localConnectionEpoch;
       }
       sendClientWorldRepairReady();
-    } else if (clientWorldRepairAdmission && !clientWorldRepairAdmission.acknowledged
-      && clientWorldRepairAdmission.attempts >= MAX_CLIENT_WORLD_REPAIR_ATTEMPTS) {
-      // HF-322: surface clear user-visible failure when attempt cap exhausted
+    } else if (clientWorldRepairExhausted(clientWorldRepairAdmission, performance.now())) {
+      // HF-322: surface a clear user-visible failure when the attempt cap is
+      // exhausted - but only after the FINAL attempt has had a full spacing
+      // window to be answered. Declaring failure the instant the cap was
+      // reached let a burst of stale start-of-match snapshots kill the guest
+      // at spawn (the HF-347 "can't move" soft-lock).
       handleClientWorldRepairFailure('attempts-exhausted');
     } else if (awaitingCanonicalGuestAuthority && clientReconnectWorldRepairAttempts >= MAX_CLIENT_WORLD_REPAIR_ATTEMPTS) {
       // HF-322: surface clear user-visible failure when reconnect resume attempts exhausted
@@ -28251,7 +28256,7 @@ const debugWindow = window as Window & {
     snapshot: () => Record<string, unknown> & { player: DebugPlayerPose };
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
     sampleSceneGraph: () => THREE.Scene;
-    debugTeleport: (x: number, y: number, z: number) => boolean;
+    sampleSimulationGate: () => Record<string, unknown>;
     samplePresentationTelemetry: () => ReturnType<typeof renderRuntime.presentationTelemetry>;
     sampleEnduranceHealth: (detail?: EnduranceHealthDetail) => ReturnType<typeof sampleEnduranceHealth>;
     sampleWeaponCatalogReadiness: () => ReturnType<typeof weaponView.browserCatalogReadiness>;
@@ -29238,17 +29243,21 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   // is wrong; walking the graph tells you WHICH object is doing it. Debug-only
   // and never referenced by gameplay.
   sampleSceneGraph: () => scene,
-  // Debug-only reposition, used to drive the player to a specific part of an
-  // arena (a water volume, a wall, a ledge) without walking there. Goes through
-  // the same physics teleport the respawn path uses, so it can never desync the
-  // capsule from the rendered eye.
-  debugTeleport: (x: number, y: number, z: number) => {
-    if (![x, y, z].every(Number.isFinite)) return false;
-    player.position.set(x, y, z);
-    player.velocity.set(0, 0, 0);
-    characterPhysics?.teleportEye(player.position);
-    return true;
-  },
+  // Which clause of the movement gate is holding the local player still. The
+  // owner's "can't move" reports were undiagnosable from screenshots because
+  // five independent conditions can freeze movement and none of them was
+  // observable; this reports each one by name.
+  sampleSimulationGate: () => ({
+    gameStarted,
+    alive: player.alive,
+    matchPhase: matchState.phase,
+    menuHidden: menu.classList.contains('hidden'),
+    possessed: Boolean(localKillstreakActorSnapshot()?.possession),
+    awaitingCanonicalGuestAuthority,
+    pendingClientWorldRepair: pendingClientWorldRepair(),
+    simulationEnabled: playerSimulationEnabled(),
+    inputEnabled: gameplayInputEnabled(),
+  }),
   samplePresentationTelemetry: () => renderRuntime.presentationTelemetry(),
   sampleEnduranceHealth,
   sampleWeaponCatalogReadiness: () => weaponView.browserCatalogReadiness(),

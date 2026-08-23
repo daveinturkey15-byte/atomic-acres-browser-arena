@@ -79,12 +79,12 @@ describe('legacy match admission integration', () => {
     const joinAt = repair.indexOf("network.send({ type: 'join', player: snapshot() });");
     const stateAt = repair.indexOf('network.sendStateCommitReliably(createStateMessage());');
     const loadoutAt = repair.indexOf('network.send(loadoutMessage);');
-    const attemptAt = repair.indexOf('recordClientWorldRepairAttempt(admission)');
+    const attemptAt = repair.indexOf('recordClientWorldRepairAttempt(admission, repairReadyNow)');
     expect(joinAt).toBeGreaterThanOrEqual(0);
     expect(stateAt).toBeGreaterThan(joinAt);
     expect(loadoutAt).toBeGreaterThan(stateAt);
     expect(attemptAt).toBeGreaterThan(loadoutAt);
-    expect(repair).toContain('if (!clientWorldRepairCanAttempt(admission) && !reconnectRepair) return;');
+    expect(repair).toContain('if (!clientWorldRepairCanAttempt(admission, repairReadyNow) && !reconnectRepair) return;');
   });
 
   it('holds ordinary client traffic until the exact host actor acknowledgement and clears admission across lifecycle boundaries', () => {

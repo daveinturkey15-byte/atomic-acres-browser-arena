@@ -46,14 +46,14 @@ timeline.push({ phase: 'on-land-at-spawn', ...(await sampleSwim()) });
 
 // Well outside the island pad (half extents are 32 m) and below the -0.3 m
 // water level, so the float zone and the swim reducer both see real depth.
-await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.debugTeleport(0, -2.2, 46); });
+await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(0, -2.2, 46); });
 for (let index = 0; index < 6; index += 1) {
   await page.waitForTimeout(400);
   timeline.push({ phase: `in-water-${index}`, ...(await sampleSwim()) });
 }
 
 // Back onto the island, high and dry.
-await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.debugTeleport(0, 6, 0); });
+await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(0, 6, 0); });
 for (let index = 0; index < 4; index += 1) {
   await page.waitForTimeout(400);
   timeline.push({ phase: `back-on-land-${index}`, ...(await sampleSwim()) });
@@ -90,7 +90,7 @@ const readY = () => page.evaluate(() => {
 // drop has to start AT the water: an earlier version of this check released
 // the player at y = -3 and then measured during the 16 m fall, reading the
 // fall itself as "sinking". Start submerged, outside the 27x29 island pad.
-await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.debugTeleport(0, -22, 60); });
+await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(0, -22, 60); });
 // Let the float zone take hold before sampling begins.
 await page.waitForTimeout(1_500);
 const floatSamples = [];

@@ -66,7 +66,7 @@ describe('same-browser hosted active-match recovery integration', () => {
 
     const repair = functionBody('sendClientWorldRepairReady', 'rejectLobbyPlayer');
     expect(repair).toContain('pendingClientReconnectWorldRepairConnectionEpoch === localConnectionEpoch');
-    expect(repair).toContain('if (!clientWorldRepairCanAttempt(admission) && !reconnectRepair) return;');
+    expect(repair).toContain('if (!clientWorldRepairCanAttempt(admission, repairReadyNow) && !reconnectRepair) return;');
     expect(repair).toContain('if (reconnectRepair) pendingClientReconnectWorldRepairConnectionEpoch = null;');
     expect(repair.match(/pendingClientReconnectWorldRepairConnectionEpoch = null/g)).toHaveLength(1);
     expect(repair.indexOf('network.send(loadoutMessage);'))
