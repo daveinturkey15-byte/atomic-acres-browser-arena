@@ -68,6 +68,16 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   projectile"; flare appears not to damage Killstreak-test-bay bots). No through-wall or oversized
   splash admissions.
 - Status: IMPLEMENTED - LEDGER WAS STALE, verified 2026-08-22 by an analyst plus adversarial verification. Both halves of src/flare-projectile-system.ts are wired end to end. An explicit finding: applying a 'wiring' patch now would DOUBLE-WIRE prepareFlareTargetSnapshots and the halfHeightM arguments, which is the most likely way to reintroduce the defect.
+- Splash close-out 2026-08-23 (lane K): the through-wall guard was only ever
+  proven for the DIRECT hit. Every existing test stubbed `burnLineOfSight` to
+  true, so a regression removing the burn-phase occlusion check would have gone
+  green - the second half of "no through-wall hits" was unpinned. Two tests
+  added to flare-projectile-system.test.ts: an occluded target takes zero burn
+  damage and resumes taking it when exposed (mutation-checked - deleting the
+  `burnLineOfSight` call in updateBurn fails it), and the burn splash stays
+  bounded by `burnRadiusM` 3.4 for capsule targets exactly as for spheres, so
+  the HF-321 capsule admission provably widened flight admission only, never
+  the splash. Source unchanged: the behaviour was already correct.
 
 ## P0 — lobby, host and match lifecycle
 
@@ -128,6 +138,25 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Source: atomicnext.txt ("loading again the art even though earlier did it? cachce or something?").
   Verify cache reuse and disposal.
 - Status: IMPLEMENTED (cbca7f68) — rack receipt re-keyed on stable arena identity so it survives LRU eviction; fail-closed contract intact. The arena cache bound was deliberately NOT raised, which would risk GPU exhaustion.
+- Reuse/disposal verified 2026-08-23 (lane K), by reading the whole lifecycle
+  rather than one layer. Cache reuse is real and layered: authored weapon GLB
+  sources are cached module-level in weapon-model.ts with refcounts plus LRU,
+  so a rebuilt Gun Range re-attaches from cache and never refetches; the Atomic
+  Acres art/quality load promises are held for the whole session
+  (`retireAtomicPresentation` runs only on `beforeunload`), so returning to
+  Nuke Town never re-streams its art; `arenaCache` is a deliberate 2-entry LRU
+  with deferred-GPU-fence retirement and full geometry/material/texture
+  disposal. No redundant-load leak found in any of those.
+- ONE REAL DEFECT FOUND, and it belongs to the legacy-main lane (handed off in
+  wiringNotes): `bindAtomicPresentationRaycasts` runs only inside the three
+  art-load paths in legacy-main.ts (4480, 4507, 4522). Both
+  `ensureAtomicAuthoredPresentation` and `ensureAtomicQualityPresentation`
+  early-return the retained `arenaArtRoot` before reaching it. With
+  ARENA_CACHE_BOUND = 2 and six arenas, cycling maps evicts and REBUILDS the
+  Atomic Acres authority; the fresh ArenaMap gets a fresh empty
+  `raycastMeshes`, the retained art root is never rebound, and every
+  `blocksShots` art prop stops stopping bullets until the page is reloaded.
+  Caching is correct here - the missing rebind is the bug.
 
 ## P0 — browser parity and performance
 
@@ -210,7 +239,16 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-339 — rare-weapon spawn announcements unmistakable to every player
 - Source: atomicnext.txt ("need clearer announce of rare weapon spawns mid game to all in the
   match").
-- Status: IMPLEMENTED WITH A KNOWN GAP - ledger status was stale, verified 2026-08-22. src/rare-weapon-announcement.ts is wired and the visual announcement reaches every player. GAP: the presenter's contract advertises four channels and legacy-main:15533 consumes three, dropping presentation.audioCue - so against the owner's literal wording, 'unmistakable to every player' is met visually but NOT audibly. Roughly a one-line re-wire. Second issue recorded: #banner is shared unarbitrated state with four other writers, so a rare spawn during the ENGAGE window overwrites the ENGAGE banner and the ENGAGE timeout then hides the banner unconditionally.
+- Status: IMPLEMENTED - both recorded gaps are closed and re-verified 2026-08-23
+  (lane K). Audio: a69988d8 wired presentation.audioCue via the existing
+  audio.overdriveAvailable() sting (occurrence, not vocabulary, so the
+  sound-event inventory digest is unchanged); audioCue is null outside
+  warmup/active by authored intent. Banner race: f83cefc8 routes the spawn
+  banner through the banner arbiter ('announcement' channel), so a spawn inside
+  the ENGAGE window queues and is promoted instead of being overwritten and
+  hidden. All four channels (feed, banner, audio sting, minimap ping) consumed
+  at both legacy-main call sites; rare-weapon-announcement + banner-arbiter
+  suites green.
 
 ## P1 — arms, weapons and presentation
 
@@ -239,6 +277,35 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Source: atomicnext.txt P0-2 ("Invisible blocker at the upstairs front house window";
   "issues with invisible assets blocking me in many maps").
 - Status: IMPLEMENTED (bcad57e4) - genuinely wired this time. The cbca7f68 claim was false: glass-collider-bounds.ts had zero production importers and legacy-main still used Box3.setFromObject. Wiring it alone was a REGRESSION - Skyline Terminal ships houses: [] so authored resolution returned null and six intact facade windows became walk-through, proven by probe. Fixed with an authored-geometry fallback (the mesh's own geometry box, NOT setFromObject, whose descendant union is what caused HF-344 originally). Four behavioural tests pin it; the previous source-text test passed throughout the regression.
+- Arena-wide close-out 2026-08-23 (lane K): src/invisible-blocker-audit.ts now
+  sweeps EVERY movement collider in all six arenas against visible leaf-mesh
+  volumes (per-mesh geometry boxes, never setFromObject; house-destruction
+  instanced fragments counted via their authored volumes). It found two REAL
+  invisible blockers in Atomic Acres - `authored-extra-lamp-collider-0` at
+  (-29,4) and `authored-reclamation-tank-collider` at (-31,4), 5.6 m tall
+  volumes specified in the Pass 27 world-identity spec but never built in any
+  art layer. Fixed by shipping the promised visuals in environment-assets.ts
+  (service masts at (+-29, -+4), west reclamation tank); collider data
+  untouched. invisible-blocker-audit.test.ts pins zero interior findings on the
+  five owned arenas. Farcrysis is RECORDED rather than gated for its owning
+  lane, and the record is now an assertion instead of a console warning nobody
+  reads: zero interior findings, exactly four `perimeter-containment` walls at
+  x/z = -+32.2, y -4.5..4.
+- CORRECTION 2026-08-23 (lane K): the line above previously claimed a live walk
+  "receipt at artifacts/qa/". There was no receipt - the only file there was a
+  77-byte `.json.tmp` holding a stray vite banner line. The claim was written
+  before the probe produced anything, and has been removed. The harness
+  `scripts/qa/verify-invisible-blockers.mjs` exists and is sound (teleport grid,
+  real key input, visible-mesh-ahead check) but has NOT been run to completion.
+  The static audit is the mechanical proof that stands; the live walk is owed.
+- Instanced-geometry fix 2026-08-23 (lane K): `meshWorldAabbs` read an
+  InstancedMesh's ROOT matrix, which is normally the identity. That invented a
+  phantom visible volume at the origin - which could falsely EXPLAIN a collider
+  and so HIDE a real blocker - while missing every place the geometry is
+  actually drawn. It now expands per-instance world AABBs, which is also why
+  arenas dressed with instanced props no longer need the `extraVisualVolumes`
+  escape hatch. Pinned by a test where a collider under a drawn instance is
+  explained and a collider at the instanced root is reported.
 
 ### HF-345 — prone clipping near walls across arenas
 - Source: atomicnext.txt ("clipping when prone and near walls in many maps too").
@@ -248,6 +315,49 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Source: pass74.txt ("rust and terminal still issues") + atomicnext.txt ("z fighting on some assets
   in terminal map, should be none on any level").
 - Status: IMPLEMENTED (bcad57e4) - the exemption is now direction-aware. Positive offsets are rejected outright and the visually-upper surface must hold the more negative effective bias. skyline-floor-joint-z -2 -> -3. Coupling verified by reverting that single offset, which reports exactly the 5 inverted pairs the audit named. All five arenas: zero pairs.
+- CLOSED 2026-08-23 (lane K) - and the earlier "zero pairs" was true but did
+  not mean what it looked like. `collectHorizontalOverlaySpecs` only ever saw
+  thin (<= 0.05 m), axis-upright BoxGeometry decals. It reported zero on every
+  arena while the owner was still looking at flicker in Terminal, because the
+  real offenders were neither thin nor decals: full-size solid boxes whose SIDE
+  faces land on one plane where they abut. That instrument could not express
+  the defect it was asked about.
+- New depth pass in src/coplanar-surface-audit.ts
+  (`collectCoplanarSurfacePatches`, `findCoplanarSurfaceOverlaps`,
+  `arenaCoplanarSurfaceAudit`): works from world TRIANGLES, so it sees boxes,
+  prisms, cylinders, instanced copies and merged presentation batches alike,
+  and asks the rasteriser's question - two surfaces from different objects, on
+  one plane within the depth-precision threshold, facing the SAME way (so both
+  survive backface culling), overlapping in that plane. It excludes only what
+  cannot flicker: depthWrite/colorWrite-off materials (exactly how Skyline
+  neutralises its quality-placeholder colliders), invisible and
+  near-transparent materials, distinct polygonOffset or renderOrder tiers, and
+  downward faces at or under the ground plane. The existing decal sweep is
+  untouched and still runs.
+- It found 34 real coplanar surfaces in Skyline Terminal, identical across all
+  three presentation profiles. Three authored causes, all fixed in
+  additional-maps.ts with no collision weakened: (1) the side walls ran to
+  z = -34.3, the back wall's own outer plane - a 0.10 m x 7.0 m full-height
+  flickering seam at BOTH rear corners; they now stop at the inner face
+  (z = -33.9) and the back wall widened 62 -> 62.6 so it still seals the
+  corner. (2) All four perimeter fences ran the full 72 m and crossed at every
+  corner - eight coplanar 0.40 m x 3.0 m faces ringing the map; east/west now
+  butt BETWEEN north/south at 71.2 m, and the corner cells stay filled by the
+  north/south colliders. (3) The silver ceiling ended on the back wall's outer
+  plane, a 0.07 m x 62 m hairline band across the whole rear elevation; it now
+  terminates BURIED inside the wall (z = -34.1), so its rear face is enclosed
+  rather than sharing a visible plane, with no gap at the junction.
+- Skyline Terminal is GATED at zero in all three profiles. Every fix is
+  mutation-checked: reverting the fence length alone reports exactly the fence
+  pairs, reverting the ceiling alone reports exactly the ceiling band. A
+  companion test proves collision was not traded for the fix - both rear
+  corners and all four fence corners are still solid, the three shell walls'
+  inner faces are unmoved, and the back wall demonstrably spans the side walls.
+- The other four arenas are RECORDED, not gated (their sources belong to other
+  lanes): rustworks-1v1 131, gun-range 108, high-seas 88, atomic-acres 8. All
+  eight of Atomic Acres' are the fence-corner pattern this row just fixed in
+  Terminal, so the same shortening transfers. Those ceilings fail loudly if an
+  arena regresses.
 
 ### HF-347 — RustRig, Terminal and Gun Range multiplayer faults
 - Source: pass74.txt ("rust and terminal still issues anmd gun test level when multoiplayer").
@@ -275,6 +385,16 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 ### HF-348 — tactical/explosive crossbow bolts break glass in solo and hosted authority
 - Source: atomicnext.txt ("tac crossbow bolt and explosion didn't break glass").
 - Status: ALREADY-FIXED at source (both bolt phases break glass solo+hosted, replicated). Closes only via the live two-browser matrix.
+- Re-verified 2026-08-23 (lane K). There is exactly one crossbow - the TAC-15
+  `explosive-crossbow` - so the owner's "tac crossbow bolt AND explosion" is
+  its two phases, not two weapons. Both were covered on the HOSTED side (guest
+  prediction stays presentation-only; host-canonical panes admit exactly once)
+  but nothing pinned the SOLO path, where the local player is its own
+  authority. Test added to pass72-crossbow-glass-contract.test.ts: solo bolt
+  impact breaches its pane, the solo blast detaches a second pane (the
+  explosion profile carries more damage than a bullet, so the pane leaves the
+  frame - still open, still non-solid), and a replayed phase is refused so solo
+  cannot double-count a break. Source unchanged.
 
 ## P1 — explosives and audio
 
@@ -485,7 +605,19 @@ contradict.
 - Source: owner HITL ("Ebr rifle can see through walls but needs better wall
   banging i think maybe 50% more pen"). The see-through-walls behaviour is a
   RETAINED POSITIVE (HF-353) and must not change.
-- Status: OPEN
+- Status: IMPLEMENTED (3b79d9a2) - per-weapon `wallPenetrationMultiplier` term in
+  ballistics.ts, authored 1.5 on the M14 EBR only (0.55 x 1.16 -> x1.5 energy);
+  every other weapon pinned at 1. Tests: ballistics.test.ts "HF-368" describe
+  (interior-wall before/after damage 0->11 and 4->15, brick still stops it,
+  clear-path damage unchanged 37.2) + weapon-catalog.test.ts non-default-scalar
+  sweep. HF-353 optic asserted untouched. Verified green 2026-08-23 (lane K).
+- Wiring re-verified end to end 2026-08-23 (lane K), because this row was rated
+  PARTIAL: catalog `penetration.wallPenetrationMultiplier: 1.5` ->
+  combat/legacy-weapon-adapter.ts:138 -> WeaponPenetrationProfile ->
+  `weaponPenetrationEnergy` (the single place the scalar enters the model) ->
+  `traceBallisticPath`:299; LEGACY_WEAPONS is what gameplay.ts exports as
+  WEAPONS. It is landed, not staged. Note for anyone chasing the hash: the work
+  is inside commit 3b79d9a2, whose SUBJECT names only HF-374.
 
 ### HF-369 — Carpet Bomber second click (direction) is not explained
 - Source: owner HITL ("should be clearer that the 2nd click of the carpet bomb

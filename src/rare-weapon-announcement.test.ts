@@ -11,7 +11,7 @@ import { TIMED_MAP_WEAPON_DEFINITIONS } from './timed-map-weapon-authority';
 // every player - banner + feed + audio sting + minimap ping, all presented off
 // the replicated announcementSent transition.
 describe('rare weapon announcement presentation', () => {
-  it('presents the full triple-channel announcement for a mid-match flare spawn', () => {
+  it('presents all four channels for a mid-match flare spawn', () => {
     const definition = TIMED_MAP_WEAPON_DEFINITIONS['flare-gun'];
     const presentation = presentRareWeaponAnnouncement({
       weaponId: 'flare-gun',
@@ -37,6 +37,36 @@ describe('rare weapon announcement presentation', () => {
     expect(Object.isFrozen(presentation.banner)).toBe(true);
     expect(Object.isFrozen(presentation.feed)).toBe(true);
     expect(Object.isFrozen(presentation.minimapPing)).toBe(true);
+  });
+
+  /**
+   * HF-339's literal ask is "unmistakable to EVERY player". That is a
+   * determinism property, not a content one: the presenter must depend only
+   * on the replicated authority transition, so a host, a guest and a late
+   * joiner all compute byte-identical channels from the same state. If a
+   * viewer-specific input ever leaks in (local team, local holder, local
+   * settings), two players stop being told the same thing.
+   */
+  it('computes identical channels for every player from the same replicated state', () => {
+    const definition = TIMED_MAP_WEAPON_DEFINITIONS['flare-gun'];
+    const input = {
+      weaponId: 'flare-gun' as const,
+      displayName: 'Orion Flare Pistol',
+      totalShots: definition.totalShots,
+      phase: 'active' as const,
+      pickupPosition: definition.spawnPosition,
+    };
+    const host = presentRareWeaponAnnouncement(input);
+    const guest = presentRareWeaponAnnouncement({ ...input });
+    const lateJoiner = presentRareWeaponAnnouncement({ ...input });
+    expect(guest).toEqual(host);
+    expect(lateJoiner).toEqual(host);
+    // Every channel is populated, so no player is left with a silent or
+    // invisible announcement while another gets the full one.
+    expect(host.banner).not.toBeNull();
+    expect(host.audioCue).not.toBeNull();
+    expect(host.minimapPing).not.toBeNull();
+    expect(host.feed.text).toBe(RARE_WEAPON_BANNER_HEADLINE);
   });
 
   it('presents the flamethrower shot count from its authority definition', () => {

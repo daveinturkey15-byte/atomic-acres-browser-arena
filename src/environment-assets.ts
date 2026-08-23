@@ -141,6 +141,46 @@ function addStreetProps(root: THREE.Group): void {
     const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 0.08, 10), lampGlow);
     lens.position.set(x + direction, 5.18, z); decorative(lens); root.add(lens);
   }
+
+  // HF-344 audit close-out. map.ts authors three substantial colliders on the
+  // service lanes (`authored-extra-lamp-collider-0/1` at (-29,4)/(29,-4) and
+  // `authored-reclamation-tank-collider` at (-31,4)) whose planned visuals
+  // were specified in the Pass 27 world-identity spec ("reclamation tank")
+  // but never shipped in any art layer, leaving up to 5.6 m tall, 2.7 m wide
+  // volumes that block players with nothing visible to explain the stop -
+  // exactly the owner's "invisible assets blocking me" fault. Build the
+  // visible props the colliders always promised. Collider bounds stay in
+  // map.ts untouched; src/invisible-blocker-audit.test.ts pins the parity.
+  for (const [index, [x, z]] of ([[-29, 4], [29, -4]] as Array<[number, number]>).entries()) {
+    const mast = new THREE.Group();
+    mast.name = `service-mast-${index}`;
+    mast.position.set(x, 0, z);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.5, 10), concrete);
+    base.name = 'service-mast-base'; base.position.y = 0.25; base.castShadow = true;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 5, 10), metal);
+    pole.name = 'service-mast-pole'; pole.position.y = 2.75; pole.castShadow = true;
+    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.14, 0.34, 10), metal);
+    head.name = 'service-mast-head'; head.position.y = 5.42;
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.09, 10), lampGlow);
+    lens.name = 'service-mast-lens'; lens.position.y = 5.24;
+    decorative(head); decorative(lens);
+    mast.add(base, pole, head, lens);
+    root.add(mast);
+  }
+  const tank = new THREE.Group();
+  tank.name = 'west-reclamation-tank';
+  tank.position.set(-31, 0, 4);
+  const shell = new THREE.Mesh(new THREE.CylinderGeometry(1.32, 1.35, 5.15, 18), metal);
+  shell.name = 'west-reclamation-tank-shell'; shell.position.y = 2.78; shell.castShadow = true; shell.receiveShadow = true;
+  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 1.32, 0.62, 18), metal);
+  crown.name = 'west-reclamation-tank-crown'; crown.position.y = 5.66; crown.castShadow = true;
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(1.38, 1.38, 0.24, 18), concrete);
+  band.name = 'west-reclamation-tank-band'; band.position.y = 1.15;
+  const feedPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 4.6, 8), metal);
+  feedPipe.name = 'west-reclamation-tank-feed-pipe'; feedPipe.position.set(1.28, 2.3, 0.35);
+  decorative(band); decorative(feedPipe);
+  tank.add(shell, crown, band, feedPipe);
+  root.add(tank);
 }
 
 type FaunaFlight = Readonly<{ x: number; z: number; radius: number; height: number; phase: number; speed: number }>;

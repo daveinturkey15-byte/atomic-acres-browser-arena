@@ -3049,7 +3049,13 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   // A real roof and luminous ceiling make the terminal read as an interior,
   // not an outdoor grey blockout. It is above every route but remains
   // collision and shot authoritative for debug/fly-camera probes.
-  box(builder, 'skyline-terminal-silver-ceiling', [0, 7.05, -23], [62, 0.24, 22.6], ivoryPanelMat);
+  // HF-346 (depth pass): the ceiling slab used to end at z = -34.3, the back
+  // wall's outer plane, putting a 0.07 m x 62 m same-facing band on that plane
+  // - a hairline flicker running the full width of the rear elevation. It now
+  // terminates BURIED inside the back wall (z = -34.1), so its rear face is
+  // enclosed by solid geometry instead of sharing a visible plane, and no gap
+  // opens at the ceiling/wall junction.
+  box(builder, 'skyline-terminal-silver-ceiling', [0, 7.05, -22.9], [62, 0.24, 22.4], ivoryPanelMat);
   for (const z of [-31.5, -28.5, -25.5, -22.5, -19.5, -16.5, -13.5]) {
     detailBox('wall-structure', `skyline-ceiling-white-baffle-${z}`, [0, 6.86, z], [60.2, 0.13, 0.72], ivoryPanelMat, 'performance', undefined, true);
     detailBox('terminal-story', `skyline-ceiling-cyan-spine-${z}`, [0, 6.76, z], [38, 0.055, 0.12], practicalMat);
@@ -3183,9 +3189,17 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     detailBox('escalator-detail', `skyline-escalator-underlight-${sideX}`, [sideX, 1.38, -24.5], [2.3, 0.06, rampLen - 0.45], practicalMat, 'performance', [rampAngle, 0, 0]);
   }
 
-  box(builder, 'skyline-terminal-backwall', [0, 3.5, -34.1], [62, 7.0, 0.4], wallMat);
-  box(builder, 'skyline-terminal-leftwall', [-31.1, 3.5, -23], [0.4, 7.0, 22.6], wallMat);
-  box(builder, 'skyline-terminal-rightwall', [31.1, 3.5, -23], [0.4, 7.0, 22.6], wallMat);
+  // HF-346 (depth pass): the side walls used to run all the way to z = -34.3,
+  // the SAME plane as the back wall's outer face, so at each rear corner a
+  // 0.10 m x 7.0 m strip had two same-facing surfaces on one plane - a
+  // full-height flickering seam, and the largest z-fight left in this arena.
+  // The side walls now stop at the back wall's INNER face (z = -33.9) and the
+  // back wall widens by the side-wall thickness so it still seals the corner
+  // in collision. Nothing is removed from the playable envelope: the interior
+  // faces (x = -+30.9, z = -33.9) are exactly where they were.
+  box(builder, 'skyline-terminal-backwall', [0, 3.5, -34.1], [62.6, 7.0, 0.4], wallMat);
+  box(builder, 'skyline-terminal-leftwall', [-31.1, 3.5, -22.8], [0.4, 7.0, 22.2], wallMat);
+  box(builder, 'skyline-terminal-rightwall', [31.1, 3.5, -22.8], [0.4, 7.0, 22.2], wallMat);
   detailBox('wall-structure', 'skyline-backwall-wainscot', [0, 1.05, -33.84], [60.8, 2.1, 0.14], wallLowerMat);
   detailBox('terminal-story', 'skyline-backwall-luminous-crown-cyan', [-15.5, 6.72, -33.68], [30.4, 0.16, 0.14], practicalMat);
   detailBox('terminal-story', 'skyline-backwall-luminous-crown-magenta', [15.5, 6.72, -33.68], [30.4, 0.16, 0.14], magentaPracticalMat);
@@ -3691,10 +3705,16 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     detailBox('terminal-story', `skyline-fuel-tank-band-${bandX}`, [bandX, 1.5, 18], [0.12, 2.3, 2.72], structureMat);
   }
 
+  // HF-346 (depth pass): all four perimeter fences ran the full 72 m, so every
+  // corner stacked two same-facing 0.40 m x 3.0 m faces on one plane - eight
+  // coplanar pairs ringing the map. The east/west runs now butt BETWEEN the
+  // north/south runs instead of crossing them. Containment is unchanged: the
+  // corner cells stay filled by the north/south colliders, which still span
+  // the full x range, and the inner faces stay at -+35.6.
   box(builder, 'skyline-fence-north', [0, 1.5, -35.8], [72, 3.0, 0.4], jetbridgeMat);
   box(builder, 'skyline-fence-south', [0, 1.5, 35.8], [72, 3.0, 0.4], jetbridgeMat);
-  box(builder, 'skyline-fence-west', [-35.8, 1.5, 0], [0.4, 3.0, 72], jetbridgeMat);
-  box(builder, 'skyline-fence-east', [35.8, 1.5, 0], [0.4, 3.0, 72], jetbridgeMat);
+  box(builder, 'skyline-fence-west', [-35.8, 1.5, 0], [0.4, 3.0, 71.2], jetbridgeMat);
+  box(builder, 'skyline-fence-east', [35.8, 1.5, 0], [0.4, 3.0, 71.2], jetbridgeMat);
 
   const physicalCover: ArenaMap['physicalCover'] = [
     { id: 'jetliner-engine-south', bounds: { minX: -1.1, maxX: 1.1, minZ: 9.75, maxZ: 14.25 }, blocksMovement: true, blocksShots: true },

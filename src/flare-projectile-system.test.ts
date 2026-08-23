@@ -331,6 +331,74 @@ describe('flare projectile system', () => {
     expect(pulse).toHaveBeenCalledTimes(10);
   });
 
+  /**
+   * HF-321 splash safety. The direct-hit through-wall guard was already
+   * pinned, but nothing exercised the OTHER half of "no through-wall hits":
+   * the burn that follows an impact. Every existing test stubbed
+   * `burnLineOfSight` to true, so a regression that dropped the occlusion
+   * check would have gone green.
+   */
+  it('refuses a burn pulse on an occluded target and resumes when it is exposed', () => {
+    const system = new FlareProjectileSystem(new THREE.Scene(), false);
+    const nearTarget = {
+      id: 'bot-behind-wall', lifeId: 1, kind: 'bot' as const,
+      position: new THREE.Vector3(1.2, 0, 0), radiusM: 0.5,
+    };
+    const lineOfSight = vi.fn(() => false);
+    const pulse = vi.fn();
+    expect(system.spawn({
+      ownerId: 'player-a', ownerTeam: 0, origin: new THREE.Vector3(),
+      direction: new THREE.Vector3(1, 0, 0), authority: true, actionNonce: 91, now: 0,
+    })).toBe(true);
+    // Impact on the near side of the wall; the target is well inside the burn
+    // radius, so ONLY the line-of-sight check can keep it safe.
+    system.update(0.05, 50, callbacks({
+      worldCollisionFraction: () => 0.5,
+      burnTargets: () => [nearTarget],
+      burnLineOfSight: lineOfSight,
+      onBurnPulse: pulse,
+    }));
+    for (let now = 550; now <= 2_050; now += 500) {
+      system.update(0.05, now, callbacks({
+        burnTargets: () => [nearTarget], burnLineOfSight: lineOfSight, onBurnPulse: pulse,
+      }));
+    }
+    expect(lineOfSight).toHaveBeenCalled();
+    expect(pulse, 'an occluded target must never take flare burn damage').not.toHaveBeenCalled();
+    // Same flare, same distance, wall gone: damage resumes, so the refusal
+    // above is the occlusion check and not the flare having expired.
+    system.update(0.05, 2_550, callbacks({
+      burnTargets: () => [nearTarget], burnLineOfSight: () => true, onBurnPulse: pulse,
+    }));
+    expect(pulse).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the burn splash bounded by burnRadiusM, unchanged by the capsule admission', () => {
+    const system = new FlareProjectileSystem(new THREE.Scene(), false);
+    const at = (distance: number, halfHeightM?: number) => ({
+      id: `bot-${distance}`, lifeId: 1, kind: 'bot' as const,
+      position: new THREE.Vector3(distance, 0, 0), radiusM: 0.5, halfHeightM,
+    });
+    // The direct-hit capsule (HF-321) widened target admission in FLIGHT. It
+    // must not have widened the burn: a tall capsule target just outside
+    // burnRadiusM stays out, exactly like a sphere target does.
+    const inside = at(FLARE_PROJECTILE_EFFECT.burnRadiusM - 0.2);
+    const outsideSphere = at(FLARE_PROJECTILE_EFFECT.burnRadiusM + 0.2);
+    const outsideCapsule = at(FLARE_PROJECTILE_EFFECT.burnRadiusM + 0.2, 1.0);
+    const pulse = vi.fn();
+    expect(system.spawn({
+      ownerId: 'player-a', ownerTeam: 0, origin: new THREE.Vector3(),
+      direction: new THREE.Vector3(0, -1, 0), authority: true, actionNonce: 92, now: 0,
+    })).toBe(true);
+    system.update(0.05, 50, callbacks({ worldCollisionFraction: () => 0 }));
+    system.update(0.05, 550, callbacks({
+      burnTargets: () => [inside, outsideSphere, outsideCapsule],
+      onBurnPulse: pulse,
+    }));
+    expect(pulse.mock.calls.map(([event]) => event.target.id)).toEqual([inside.id]);
+    expect(FLARE_PROJECTILE_EFFECT.burnRadiusM).toBe(3.4);
+  });
+
   it('admits at most one current-occupancy burn pulse after a long frame stall', () => {
     const system = new FlareProjectileSystem(new THREE.Scene(), false);
     const target = {
