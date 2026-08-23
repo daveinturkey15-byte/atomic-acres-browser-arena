@@ -618,6 +618,191 @@ describe('High Seas clean-room arena geometry', () => {
     expect(offenders, ['non-uniform texel density:', ...offenders].join(' | ')).toEqual([]);
   });
 
+  it('seals both engine corridor ends with solid bulkheads flush to the deck underside', async () => {
+    const map = buildHighSeas(new THREE.Scene());
+    const solidAt = (point: Readonly<{ x: number; y: number; z: number }>): boolean =>
+      map.physicsColliders.some((bounds) => point.x > bounds.minX && point.x < bounds.maxX
+        && point.y > (bounds.minY ?? Number.NEGATIVE_INFINITY) && point.y < (bounds.maxY ?? Number.POSITIVE_INFINITY)
+        && point.z > bounds.minZ && point.z < bounds.maxZ);
+
+    // The below-deck envelope: end bulkheads past the ramp shoulders, side
+    // walls of every section, and the shoulders at each width change.
+    for (const direction of [-1, 1]) {
+      for (const side of [-1, 1]) {
+        expect(solidAt({ x: side * 1.43, y: 1.4, z: direction * 20.22 }), 'end bulkhead').toBe(true);
+        expect(solidAt({ x: side * 1.47, y: 1.4, z: direction * 19.3 }), 'vestibule wall').toBe(true);
+        expect(solidAt({ x: side * 0.84, y: 1.4, z: direction * 12.0 }), 'corridor wall').toBe(true);
+        expect(solidAt({ x: side * 2.47, y: 1.4, z: direction * 3.0 }), 'engine room wall').toBe(true);
+        expect(solidAt({ x: side * 1.5, y: 1.4, z: direction * 6.5 }), 'room shoulder').toBe(true);
+        expect(solidAt({ x: side * 1.1, y: 1.4, z: direction * 18.6 }), 'vestibule shoulder').toBe(true);
+      }
+    }
+
+    // The walls reach the deck underside (y=2.92): the previous 2.84 wall top
+    // left an 0.08 m sightline seam into the hull void.
+    const authority = map.root.userData.highSeasAuthorityAudit as readonly AuthorityAuditEntry[];
+    const belowDeckWalls = authority.filter((entry) => /high-seas-engine-(room|corridor|vestibule|end)-/.test(entry.name));
+    expect(belowDeckWalls.length).toBeGreaterThanOrEqual(18);
+    for (const wall of belowDeckWalls) {
+      expect(wall.bounds.maxY, `${wall.name} must meet the deck underside`).toBeGreaterThanOrEqual(2.92 - 1e-6);
+    }
+
+    // Rapier regression probe: pushing out of both corridor ends must never
+    // drop the player into the hull void (feet at y=-6 meant eye ~= -4.3).
+    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds, map.physicsSafetyFloorY);
+    try {
+      for (const direction of [-1, 1]) {
+        for (const side of [-1, 1]) {
+          physics.teleportEye(eyeForFeet([0, HIGH_SEAS_LEVELS.engine, direction * 19.3]));
+          const escapeTarget = eyeForFeet([side * 2.4, HIGH_SEAS_LEVELS.engine, direction * 21.6]);
+          const result = await walkToward(physics, escapeTarget, 1_000);
+          expect(result.y, `end ${direction} side ${side} fell below the service deck`).toBeGreaterThan(1.2);
+          expect(
+            Math.hypot(result.x - escapeTarget.x, result.z - escapeTarget.z),
+            `end ${direction} side ${side} escaped the sealed corridor`,
+          ).toBeGreaterThan(0.5);
+        }
+      }
+    } finally {
+      physics.dispose();
+    }
+  }, 30_000);
+
+  it('authors a dry enclosed bilge under the whole below-deck footprint instead of open ocean', () => {
+    const map = buildHighSeas(new THREE.Scene());
+    map.root.updateMatrixWorld(true);
+    const envelope = map.root.userData.highSeasProvenance.expectedWaveEnvelope as Readonly<{ maximumY: number }>;
+
+    type FloorProvider = Readonly<{ name: string; minX: number; maxX: number; minZ: number; maxZ: number; topY: number }>;
+    const providers: FloorProvider[] = [];
+    map.root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh) || !node.name.startsWith('high-seas-bilge-floor')) return;
+      const bounds = new THREE.Box3().setFromObject(node);
+      providers.push({
+        name: node.name,
+        minX: bounds.min.x,
+        maxX: bounds.max.x,
+        minZ: bounds.min.z,
+        maxZ: bounds.max.z,
+        topY: bounds.max.y,
+      });
+    });
+    const authority = map.root.userData.highSeasAuthorityAudit as readonly AuthorityAuditEntry[];
+    const engineFloor = authority.find((entry) => entry.name === 'high-seas-platform-engine-floor');
+    expect(engineFloor).toBeDefined();
+    if (engineFloor) {
+      providers.push({
+        name: engineFloor.name,
+        minX: engineFloor.bounds.minX,
+        maxX: engineFloor.bounds.maxX,
+        minZ: engineFloor.bounds.minZ,
+        maxZ: engineFloor.bounds.maxZ,
+        topY: engineFloor.bounds.maxY ?? 0,
+      });
+    }
+
+    // Every authored dry floor must sit above the shared ocean's wave crest
+    // and below the deck, or it would either read as water or clip the deck.
+    expect(providers.length).toBeGreaterThanOrEqual(2);
+    for (const provider of providers) {
+      expect(provider.topY, `${provider.name} below wave crest`).toBeGreaterThan(envelope.maximumY);
+      expect(provider.topY, `${provider.name} above deck`).toBeLessThan(HIGH_SEAS_LEVELS.mainDeck);
+    }
+
+    // ~40-point probe across the below-deck footprint: under every sample
+    // there must be authored floor, never the shared ocean plane.
+    const samples: Array<readonly [number, number]> = [];
+    for (const x of [-7, -3.5, 0, 3.5, 7]) {
+      for (const z of [-34, -20, -10, 0, 10, 20, 34]) samples.push([x, z]);
+    }
+    for (const x of [-3, 0, 3]) {
+      for (const z of [-38, 38]) samples.push([x, z]);
+    }
+    expect(samples.length).toBeGreaterThanOrEqual(30);
+    const uncovered = samples.filter(([x, z]) => !providers.some((provider) =>
+      x >= provider.minX + 1e-6 && x <= provider.maxX - 1e-6
+      && z >= provider.minZ + 1e-6 && z <= provider.maxZ - 1e-6));
+    expect(uncovered, `open water under the deck at: ${JSON.stringify(uncovered)}`).toEqual([]);
+
+    // Inner hull walls rise from the bilge to the deck underside so lateral
+    // sightlines below deck terminate on hull, not ocean.
+    const liner = map.root.getObjectByName('high-seas-bilge-hull-liner');
+    expect(liner).toBeInstanceOf(THREE.Mesh);
+    const linerBounds = new THREE.Box3().setFromObject(liner as THREE.Mesh);
+    const bilgeFloorTop = Math.min(...providers
+      .filter((provider) => provider.name.startsWith('high-seas-bilge-floor'))
+      .map((provider) => provider.topY));
+    expect(linerBounds.max.y).toBeGreaterThanOrEqual(2.92 - 1e-6);
+    expect(linerBounds.min.y, 'liner walls must meet the bilge floor').toBeLessThanOrEqual(bilgeFloorTop + 1e-6);
+    expect(linerBounds.max.x).toBeGreaterThanOrEqual(7.0);
+    // The liner is a concave enclosing shell, excluded from the portal audit
+    // by the same idiom as the sculpted hull; the exclusion must stay declared.
+    expect((liner as THREE.Mesh).userData.portalAuditExcluded).toBe(true);
+  });
+
+  it('shapes the service deck as a cramped corridor with a mid-ship engine room, metal ceiling, practicals and treads', () => {
+    const map = buildHighSeas(new THREE.Scene());
+    const authority = map.root.userData.highSeasAuthorityAudit as readonly AuthorityAuditEntry[];
+    const byName = (name: string): AuthorityAuditEntry => {
+      const entry = authority.find((candidate) => candidate.name === name);
+      expect(entry, name).toBeDefined();
+      return entry as AuthorityAuditEntry;
+    };
+
+    // Hijacked-style proportions: shoulder-width connecting corridor, small
+    // 4-5 m engine room bulge amidships.
+    const corridorClear = byName('high-seas-engine-corridor-wall-stern-starboard').bounds.minX
+      - byName('high-seas-engine-corridor-wall-stern-port').bounds.maxX;
+    expect(corridorClear).toBeGreaterThanOrEqual(1.3);
+    expect(corridorClear).toBeLessThanOrEqual(1.6);
+    const roomClear = byName('high-seas-engine-room-wall-starboard').bounds.minX
+      - byName('high-seas-engine-room-wall-port').bounds.maxX;
+    expect(roomClear).toBeGreaterThanOrEqual(4);
+    expect(roomClear).toBeLessThanOrEqual(5);
+
+    // Machinery cover lives inside the engine room bulge and leaves a walkable
+    // centre lane.
+    const machinery = authority.filter((entry) => /high-seas-engine-machinery-\d/.test(entry.name));
+    expect(machinery).toHaveLength(5);
+    for (const block of machinery) {
+      expect(block.solid && block.shots, block.name).toBe(true);
+      expect(block.bounds.minZ).toBeGreaterThanOrEqual(-6.5);
+      expect(block.bounds.maxZ).toBeLessThanOrEqual(6.5);
+      expect(Math.max(Math.abs(block.bounds.minX), Math.abs(block.bounds.maxX))).toBeLessThanOrEqual(2.35);
+      expect(Math.min(Math.abs(block.bounds.minX), Math.abs(block.bounds.maxX))).toBeGreaterThanOrEqual(0.9);
+    }
+
+    // The hatch rims close the deck slivers flush with the deck plane.
+    const rimSample = (x: number, z: number): boolean =>
+      map.physicsColliders.some((bounds) => x > bounds.minX && x < bounds.maxX
+        && 3.06 > (bounds.minY ?? Number.NEGATIVE_INFINITY) && 3.06 < (bounds.maxY ?? Number.POSITIVE_INFINITY)
+        && z > bounds.minZ && z < bounds.maxZ);
+    for (const direction of [-1, 1]) {
+      for (const side of [-1, 1]) {
+        expect(rimSample(side * 1.43, direction * 22.15), 'hatch side sliver').toBe(true);
+      }
+      expect(rimSample(0, direction * 24.4), 'hatch end sliver').toBe(true);
+    }
+
+    // Metal ceiling liner (engine-bulkhead family), not the teak deck family.
+    const ceiling = map.root.getObjectByName('high-seas-engine-ceiling') as THREE.Mesh;
+    expect(ceiling).toBeInstanceOf(THREE.Mesh);
+    const ceilingMaterial = ceiling.material as THREE.MeshStandardMaterial;
+    expect(ceilingMaterial.userData.textureFamily).toBe('engine-bulkhead');
+
+    // Emissive practicals: the light strips carry a genuinely emissive
+    // material because the arena adds no THREE lights below deck.
+    const strips = map.root.getObjectByName('high-seas-engine-light-strips') as THREE.Mesh;
+    expect(strips).toBeInstanceOf(THREE.Mesh);
+    const stripMaterial = strips.material as THREE.MeshStandardMaterial;
+    expect(stripMaterial.emissiveIntensity).toBeGreaterThan(0);
+    expect(stripMaterial.emissive.getHex()).toBeGreaterThan(0);
+
+    // The engine access ramps carry stair treads like every other stair.
+    expect(map.root.getObjectByName('high-seas-bow-engine-access-treads')).toBeInstanceOf(THREE.Mesh);
+    expect(map.root.getObjectByName('high-seas-stern-engine-access-treads')).toBeInstanceOf(THREE.Mesh);
+  });
+
   it('gives every texture family a physically sensible tile size', () => {
     // A tile smaller than ~0.5 m reads as noise at play distance; larger than
     // ~8 m and the normal map stops carrying any surface detail at all.

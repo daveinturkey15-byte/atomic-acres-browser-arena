@@ -1174,6 +1174,83 @@ function addRamp(
   return { position, size, rotation, angleDegrees: THREE.MathUtils.radToDeg(angle) };
 }
 
+type MergedBoxPart = Readonly<{
+  center: readonly [number, number, number];
+  size: readonly [number, number, number];
+}>;
+
+/** Concatenates indexed geometries that carry position and normal attributes. */
+function concatGeometries(geometries: readonly THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const indices: number[] = [];
+  for (const geometry of geometries) {
+    const position = geometry.getAttribute('position');
+    const normal = geometry.getAttribute('normal');
+    const index = geometry.getIndex();
+    if (!position || !normal || !index) throw new Error('High Seas merged geometry requires indexed position+normal');
+    const base = positions.length / 3;
+    for (let vertex = 0; vertex < position.count; vertex += 1) {
+      positions.push(position.getX(vertex), position.getY(vertex), position.getZ(vertex));
+      normals.push(normal.getX(vertex), normal.getY(vertex), normal.getZ(vertex));
+    }
+    for (let entry = 0; entry < index.count; entry += 1) indices.push(index.getX(entry) + base);
+    geometry.dispose();
+  }
+  const merged = new THREE.BufferGeometry();
+  merged.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  merged.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  merged.setIndex(indices);
+  return merged;
+}
+
+/**
+ * Bakes many axis-aligned dressing boxes of ONE material into a single
+ * presentation mesh.
+ *
+ * WHY. The visible-geometry budget counts draw calls, and dressing such as
+ * stair treads, light strips, machinery bands and the hull-void liner is many
+ * small boxes sharing one material - one draw each was most of the budget.
+ * Parts are re-expressed relative to their shared AABB centre before merging:
+ * `applyBoxProjectedUv` reads LOCAL coordinates, so a group baked at raw world
+ * coordinates far from the origin would smear its UV span across unrelated
+ * axes and break the world-space texel-density invariant.
+ */
+function mergedDetailBoxes(
+  builder: Builder,
+  name: string,
+  parts: readonly MergedBoxPart[],
+  meshMaterial: THREE.Material,
+  portalAuditExclusionReason?: string,
+): THREE.Mesh {
+  const min = [Infinity, Infinity, Infinity];
+  const max = [-Infinity, -Infinity, -Infinity];
+  for (const part of parts) {
+    for (let axis = 0; axis < 3; axis += 1) {
+      min[axis] = Math.min(min[axis], part.center[axis] - part.size[axis] / 2);
+      max[axis] = Math.max(max[axis], part.center[axis] + part.size[axis] / 2);
+    }
+  }
+  const origin: [number, number, number] = [
+    (min[0] + max[0]) / 2,
+    (min[1] + max[1]) / 2,
+    (min[2] + max[2]) / 2,
+  ];
+  const geometry = concatGeometries(parts.map((part) => {
+    const partGeometry = new THREE.BoxGeometry(...part.size);
+    partGeometry.translate(part.center[0] - origin[0], part.center[1] - origin[1], part.center[2] - origin[2]);
+    return partGeometry;
+  }));
+  const mesh = presentationMesh(builder, name, geometry, meshMaterial, origin);
+  if (portalAuditExclusionReason) {
+    // Same idiom as the sculpted hull: a concave enclosing group has a
+    // conservative world AABB that would falsely flag every portal it spans.
+    mesh.userData.portalAuditExcluded = true;
+    mesh.userData.portalAuditExclusionReason = portalAuditExclusionReason;
+  }
+  return mesh;
+}
+
 function addRampTreads(
   builder: Builder,
   id: string,
@@ -1182,20 +1259,19 @@ function addRampTreads(
   width: number,
   treadMaterial: THREE.Material,
 ): void {
+  const parts: MergedBoxPart[] = [];
   for (let step = 1; step <= 10; step += 1) {
     const progress = step / 11;
-    detailBox(
-      builder,
-      `high-seas-${id}-tread-${step}`,
-      [
+    parts.push({
+      center: [
         THREE.MathUtils.lerp(from[0], to[0], progress),
         THREE.MathUtils.lerp(from[1], to[1], progress) + 0.035,
         THREE.MathUtils.lerp(from[2], to[2], progress),
       ],
-      [width - 0.16, 0.055, 0.22],
-      treadMaterial,
-    );
+      size: [width - 0.16, 0.055, 0.22],
+    });
   }
+  mergedDetailBoxes(builder, `high-seas-${id}-treads`, parts, treadMaterial);
 }
 
 function createHullGeometry(): THREE.BufferGeometry {
@@ -1492,10 +1568,69 @@ function addEngineRoom(
     'bot',
   ).castShadow = false;
 
-  for (const x of [-3.02, 3.02]) {
-    box(builder, `high-seas-engine-corridor-wall-${x}`, [x, 1.42, 0], [0.24, 2.84, 40.2], wallMaterial, {
-      ballisticMaterial: 'structural-metal',
-    });
+  // Hijacked-style service deck. The whole below-deck is a cramped one-man
+  // corridor that flares into a small mid-ship engine room; it is the ONLY
+  // playable volume under the main deck, so every face of it - side walls,
+  // width-change shoulders, and the end bulkheads past the ramp mouths - is
+  // solid movement+shot authority. The hull void beyond stays presentation
+  // (see addHullBilge).
+  //
+  // Clear half-widths per section. The vestibule mouth stays wide enough that
+  // the authored engine-foot portal aperture (x +/-1.05) remains genuinely
+  // open; the connecting corridor is deliberately shoulder-width.
+  const CORRIDOR_HALF = 0.72;
+  const ROOM_HALF = 2.35;
+  const VESTIBULE_HALF = 1.35;
+  const WALL = 0.24;
+  const ROOM_END = 6.5;
+  const NARROW_END = 18.6;
+  const FLOOR_END = 20.1;
+  // Walls span y -0.12..2.92 so they meet the deck underside exactly: the old
+  // walls topped out at 2.84 and leaked a 0.08 m sightline seam into the void.
+  const wallY = 1.4;
+  const wallHeight = 3.04;
+  const solidWall = (name: string, position: [number, number, number], size: [number, number, number]): void => {
+    box(builder, name, position, size, wallMaterial, { ballisticMaterial: 'structural-metal' });
+  };
+
+  for (const [sideName, side] of [['port', -1], ['starboard', 1]] as const) {
+    solidWall(
+      `high-seas-engine-room-wall-${sideName}`,
+      [side * (ROOM_HALF + WALL / 2), wallY, 0],
+      [WALL, wallHeight, ROOM_END * 2],
+    );
+    for (const [endName, direction] of [['bow', -1], ['stern', 1]] as const) {
+      solidWall(
+        `high-seas-engine-corridor-wall-${endName}-${sideName}`,
+        [side * (CORRIDOR_HALF + WALL / 2), wallY, direction * (ROOM_END + NARROW_END) / 2],
+        [WALL, wallHeight, NARROW_END - ROOM_END],
+      );
+      solidWall(
+        `high-seas-engine-vestibule-wall-${endName}-${sideName}`,
+        [side * (VESTIBULE_HALF + WALL / 2), wallY, direction * (NARROW_END + FLOOR_END) / 2],
+        [WALL, wallHeight, FLOOR_END - NARROW_END],
+      );
+      // Transverse shoulders seal each width change so the stepped wall line
+      // has no open slot into the hull void.
+      solidWall(
+        `high-seas-engine-room-shoulder-${endName}-${sideName}`,
+        [side * ((CORRIDOR_HALF + ROOM_HALF + WALL) / 2), wallY, direction * ROOM_END],
+        [ROOM_HALF + WALL - CORRIDOR_HALF, wallHeight, WALL],
+      );
+      solidWall(
+        `high-seas-engine-vestibule-shoulder-${endName}-${sideName}`,
+        [side * ((CORRIDOR_HALF + VESTIBULE_HALF + WALL) / 2), wallY, direction * NARROW_END],
+        [VESTIBULE_HALF + WALL - CORRIDOR_HALF, wallHeight, WALL],
+      );
+      // P0: both corridor ends used to stop at the floor edge, so the strip
+      // beside each ramp dropped players through the ocean into the hull void.
+      // End bulkheads close the plane at z=+/-20.1 except the ramp mouth.
+      solidWall(
+        `high-seas-engine-end-bulkhead-${endName}-${sideName}`,
+        [side * 1.435, wallY, direction * (FLOOR_END + 0.12)],
+        [0.37, wallHeight, WALL],
+      );
+    }
   }
 
   const bow = addRamp(
@@ -1516,6 +1651,10 @@ function addEngineRoom(
     floorMaterial,
     'structural-metal',
   );
+  // Metal treads give the service ramps the same authored step read as the
+  // cabin stairs (they were the only ramps without treads).
+  addRampTreads(builder, 'bow-engine-access', HIGH_SEAS_ENGINE_ACCESS.bowFoot, HIGH_SEAS_ENGINE_ACCESS.bowTop, HIGH_SEAS_ENGINE_ACCESS.width, floorMaterial);
+  addRampTreads(builder, 'stern-engine-access', HIGH_SEAS_ENGINE_ACCESS.sternFoot, HIGH_SEAS_ENGINE_ACCESS.sternTop, HIGH_SEAS_ENGINE_ACCESS.width, floorMaterial);
 
   for (const [end, z] of [['bow', -22.15], ['stern', 22.15]] as const) {
     for (const x of [-1.52, 1.52]) {
@@ -1528,25 +1667,110 @@ function addEngineRoom(
     });
   }
 
-  for (const [index, z] of [-13.2, -7.1, 0, 7.1, 13.2].entries()) {
-    const x = index % 2 === 0 ? -2.15 : 2.15;
+  // P1: the deck hatch apertures are wider and longer than their 2.6 m ramps,
+  // which left open slivers falling (and shooting) straight through to water.
+  // Solid rims close the shaft flush with the deck plane on both sides of the
+  // ramp and across the gap behind each ramp's top edge.
+  for (const [end, direction] of [['bow', -1], ['stern', 1]] as const) {
+    for (const [sideName, side] of [['port', -1], ['starboard', 1]] as const) {
+      box(builder, `high-seas-${end}-hatch-rim-${sideName}`, [side * 1.425, 3.06, direction * 22.15], [0.25, 0.28, 4.8], floorMaterial, {
+        ballisticMaterial: 'structural-metal',
+      });
+    }
+    box(builder, `high-seas-${end}-hatch-rim-end`, [0, 3.06, direction * 24.4], [3.1, 0.28, 0.3], floorMaterial, {
+      ballisticMaterial: 'structural-metal',
+    });
+  }
+
+  // Machinery hugs the engine-room walls in an alternating weave: cover, not
+  // corridor - the middle lane stays a single player wide.
+  const machineryLayout = [-4.6, -2.3, 0, 2.3, 4.6];
+  for (const [index, z] of machineryLayout.entries()) {
+    const x = index % 2 === 0 ? -1.62 : 1.62;
     coverBox(builder, `high-seas-engine-machinery-${index}`, [x, 0.72, z], [1.18, 1.44, 2.15], machineryMaterial, 'structural-metal');
-    detailBox(builder, `high-seas-engine-machinery-band-${index}`, [x, 1.02, z], [1.24, 0.1, 2.2], accentMaterial);
   }
-  for (const x of [-2.62, 2.62]) {
-    presentationMesh(
-      builder,
-      `high-seas-engine-service-pipe-${x}`,
-      new THREE.CylinderGeometry(0.12, 0.12, 36, 10),
-      accentMaterial,
-      [x, 2.42, 0],
-      [Math.PI / 2, 0, 0],
-    );
+  mergedDetailBoxes(
+    builder,
+    'high-seas-engine-machinery-bands',
+    machineryLayout.map((z, index) => ({
+      center: [index % 2 === 0 ? -1.62 : 1.62, 1.02, z] as const,
+      size: [1.24, 0.1, 2.2] as const,
+    })),
+    accentMaterial,
+  );
+
+  // The old below-deck ceiling was the teak deck underside; a service deck
+  // reads as metal, so a thin bulkhead-family liner hangs just under it.
+  mergedDetailBoxes(builder, 'high-seas-engine-ceiling', [
+    { center: [0, 2.895, 0], size: [ROOM_HALF * 2, 0.05, ROOM_END * 2] },
+    { center: [0, 2.895, -(ROOM_END + NARROW_END) / 2], size: [CORRIDOR_HALF * 2, 0.05, NARROW_END - ROOM_END] },
+    { center: [0, 2.895, (ROOM_END + NARROW_END) / 2], size: [CORRIDOR_HALF * 2, 0.05, NARROW_END - ROOM_END] },
+    { center: [0, 2.895, -19.175], size: [VESTIBULE_HALF * 2, 0.05, 1.15] },
+    { center: [0, 2.895, 19.175], size: [VESTIBULE_HALF * 2, 0.05, 1.15] },
+  ], wallMaterial);
+
+  // Practical lighting: emissive amber strips run under the ceiling liner the
+  // full length of the service deck. The arena adds no THREE lights, so
+  // below-deck practicals stay emissive-only by policy.
+  const lightStrips: MergedBoxPart[] = [];
+  for (const z of [-4, 0, 4]) lightStrips.push({ center: [0, 2.845, z], size: [1.6, 0.05, 0.16] });
+  for (const direction of [-1, 1]) {
+    for (const z of [8.2, 11.6, 15.0]) lightStrips.push({ center: [0, 2.845, direction * z], size: [0.16, 0.05, 1.6] });
+    lightStrips.push({ center: [0, 2.845, direction * 19.3], size: [0.16, 0.05, 1.2] });
   }
-  for (const z of [-16, -8, 0, 8, 16]) {
-    detailBox(builder, `high-seas-engine-emissive-strip-${z}`, [0, 2.76, z], [2.2, 0.055, 0.14], accentMaterial);
-  }
+  mergedDetailBoxes(builder, 'high-seas-engine-light-strips', lightStrips, accentMaterial);
+
+  // Twin service pipes hug the ceiling inside the narrow corridor profile.
+  const pipeGeometry = concatGeometries([-0.45, 0.45].map((x) => {
+    const cylinder = new THREE.CylinderGeometry(0.1, 0.1, 36, 10);
+    cylinder.rotateX(Math.PI / 2);
+    cylinder.translate(x, 0, 0);
+    return cylinder;
+  }));
+  presentationMesh(builder, 'high-seas-engine-service-pipes', pipeGeometry, accentMaterial, [0, 2.62, 0]);
+
   return { bow, stern };
+}
+
+/**
+ * Dry hull interior liner.
+ *
+ * WHY. The sculpted hull is backface-culled presentation and the SHARED ocean
+ * plane runs straight through it at y=-2.2, so before this liner everything
+ * below deck outside the corridor read as open water. The liner authors a
+ * dark bilge floor above the expected wave envelope plus inner hull walls up
+ * to the deck underside, so the space under the deck reads as a boat's hull,
+ * not ocean. Players can never reach this volume - the service corridor is
+ * fully sealed - so the liner stays presentation-only, mirroring the sculpted
+ * hull's own authority model. Part extents stay inside the hull's chine line
+ * so nothing pokes through the visible hull above the waterline.
+ */
+function addHullBilge(builder: Builder, floorMaterial: THREE.Material, wallMaterial: THREE.Material): void {
+  // Top of the bilge plate sits above expectedWaveEnvelope.maximumY (-1.85).
+  const BILGE_TOP = -1.6;
+  const floorY = BILGE_TOP - 0.06;
+  const wallY = (BILGE_TOP + 2.92) / 2;
+  const wallHeight = 2.92 - BILGE_TOP;
+  const linerReason = 'concave-enclosing-liner-has-conservative-world-aabb';
+  mergedDetailBoxes(builder, 'high-seas-bilge-floor', [
+    { center: [0, floorY, 0], size: [15.0, 0.12, 72] },
+    { center: [0, floorY, -38.2], size: [13.6, 0.12, 4.4] },
+    { center: [0, floorY, 39.0], size: [13.6, 0.12, 6.0] },
+  ], floorMaterial, linerReason);
+  mergedDetailBoxes(builder, 'high-seas-bilge-hull-liner', [
+    { center: [-7.44, wallY, 0], size: [0.12, wallHeight, 72] },
+    { center: [7.44, wallY, 0], size: [0.12, wallHeight, 72] },
+    { center: [-6.74, wallY, -38.2], size: [0.12, wallHeight, 4.4] },
+    { center: [6.74, wallY, -38.2], size: [0.12, wallHeight, 4.4] },
+    { center: [-6.74, wallY, 39.0], size: [0.12, wallHeight, 6.0] },
+    { center: [6.74, wallY, 39.0], size: [0.12, wallHeight, 6.0] },
+    { center: [-7.09, wallY, -36.0], size: [0.82, wallHeight, 0.12] },
+    { center: [7.09, wallY, -36.0], size: [0.82, wallHeight, 0.12] },
+    { center: [-7.09, wallY, 36.0], size: [0.82, wallHeight, 0.12] },
+    { center: [7.09, wallY, 36.0], size: [0.82, wallHeight, 0.12] },
+    { center: [0, wallY, -40.34], size: [13.6, wallHeight, 0.12] },
+    { center: [0, wallY, 41.94], size: [13.6, wallHeight, 0.12] },
+  ], wallMaterial, linerReason);
 }
 
 function addCenterFeatures(
@@ -1810,6 +2034,7 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
 
   addDecks(builder, deckMaterial);
   const engine = addEngineRoom(builder, engineFloorMaterial, engineWallMaterial, engineMachineMaterial, engineAccentMaterial);
+  addHullBilge(builder, engineFloorMaterial, engineWallMaterial);
   const bowCabin = addCabin(builder, 'bow', wallMaterial, deckMaterial, roofMaterial, stairMaterial, tealTrimMaterial, glassMaterial);
   const sternCabin = addCabin(builder, 'stern', wallMaterial, deckMaterial, roofMaterial, stairMaterial, tealTrimMaterial, glassMaterial);
   addCenterFeatures(builder, wallMaterial, tealTrimMaterial, upholsteryMaterial, waterMaterial);
@@ -1978,7 +2203,10 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
     { id: 'high-seas-opposed-cabins', position: [0, 7.9, 10.5], target: [0, 7.9, -10.5], purpose: 'sightline' },
     { id: 'high-seas-engine-corridor', position: [0, 1.55, 19], target: [0, 1.4, -19], purpose: 'route' },
     { id: 'high-seas-engine-open-portal', position: [0, 1.6, -18], target: [0, 2.2, -24], purpose: 'portal' },
-    { id: 'high-seas-engine-wall-closed', position: [2.5, 1.5, 0], target: [3.1, 1.5, 0], purpose: 'light-occlusion' },
+    // The occlusion camera tracks the engine-room wall, which moved inboard
+    // (x=2.35..2.59) when the service deck gained its cramped profile.
+    { id: 'high-seas-engine-wall-closed', position: [1.7, 1.5, 0], target: [2.45, 1.5, 0], purpose: 'light-occlusion' },
+    { id: 'high-seas-engine-room-bulge', position: [1.9, 2.4, -5.9], target: [-1.6, 0.9, 4.2], purpose: 'topology' },
   ]);
   root.userData.highSeasMaterialInventory = Object.freeze(getHighSeasMaterialInventory());
 
