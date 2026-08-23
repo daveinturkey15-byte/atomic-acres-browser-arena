@@ -8507,9 +8507,27 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
     // HF-328: in TDM a joiner is prescribed onto the smaller side and the whole
     // roster is re-stamped with canonical identities. This no longer depends on the
     // autoBalance toggle - prescription is the rule, not an option.
-    if (joiningNewMember && currentPhase === 'waiting' && privateMatchConfig.mode === 'tdm') {
-      for (const member of prescribeTeams([...hostLobbyMembers.values()])) {
-        hostLobbyMembers.set(member.id, { ...member, ready: false });
+    //
+    // Countdown joiners are prescribed too (HF-323 admits them during the
+    // lead-in): the waiting-only guard let every countdown joiner keep their
+    // self-picked team - and the guest JOIN default is team 1 - so late
+    // joiners all stacked CORAL, violating the very contract this block
+    // enforces. During countdown, only the JOINER is placed (onto the smaller
+    // side); already-ready members keep their teams and their readiness -
+    // re-stamping the whole roster mid-countdown would un-ready everyone.
+    if (joiningNewMember && privateMatchConfig.mode === 'tdm') {
+      if (currentPhase === 'waiting') {
+        for (const member of prescribeTeams([...hostLobbyMembers.values()])) {
+          hostLobbyMembers.set(member.id, { ...member, ready: false });
+        }
+      } else if (currentPhase === 'countdown') {
+        const roster = [...hostLobbyMembers.values()];
+        const aquaCount = roster.filter((member) => member.id !== message.playerId && member.team === 0).length;
+        const coralCount = roster.filter((member) => member.id !== message.playerId && member.team === 1).length;
+        const joiner = hostLobbyMembers.get(message.playerId);
+        if (joiner) {
+          hostLobbyMembers.set(joiner.id, { ...joiner, team: aquaCount <= coralCount ? 0 : 1 });
+        }
       }
     }
     // This lobby envelope establishes the host identity, arena and active match
@@ -9100,6 +9118,15 @@ function returnPrivateMatchToLobby(asHost: boolean, admissionToken?: MatchAdmiss
   privateMatchActiveAtEpochMs = null;
   if (asHost && network.role === 'host') {
     authoritativeScores.clear();
+    // Retained remote authority is a MID-MATCH resume mechanism: it preserves
+    // a disconnector's life/health for the rejoin grace of the match they left.
+    // Returning everyone to the lobby ends that match, so the retained
+    // snapshots are now history - but nothing cleared them, so a guest who
+    // rejoined the waiting lobby and started the next match was recreated from
+    // the PREVIOUS match's snapshot in awaitingReplacementState and froze for
+    // everyone, permanently. The next match must begin with no ghosts.
+    retainedRemoteAuthorities.clear();
+    remoteHealthAuthorities.clear();
     for (const member of hostLobbyMembers.values()) {
       hostLobbyMembers.set(member.id, { ...member, ready: false });
       authoritativeScores.set(member.id, emptyPlayerScore(member.id));
@@ -10132,6 +10159,9 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   root.name = 'remote-player-world';
   root.rotation.order = 'YXZ';
   root.userData.playerId = snapshot.id;
+  // A remote seeded from retained (possibly dead) authority must not stand
+  // visible at its old position until the first admitted state corrects it.
+  root.visible = snapshot.hp > 0;
 
   const operator = buildOperator(
     snapshot.team, 'remote-player-model', flattenOperatorMaterials, snapshot.weapon,
@@ -14408,10 +14438,25 @@ function spawnPoint(): THREE.Vector3 {
   const validForSide = (side: Team) => arena.spawns[side]
     .map((point, localIndex) => ({ point, side, index: side * 100 + localIndex }))
     .filter(({ point }) => validArenaSpawnPoint(point, arena.bounds, activeWorldColliders()));
-  const home = validForSide(player.team);
+  let home = validForSide(player.team);
   const oppositeTeam: Team = player.team === 0 ? 1 : 0;
   const opposite = validForSide(oppositeTeam);
-  if (home.length === 0 && (spawnMode !== 'ffa' || opposite.length === 0)) throw new Error(`No valid authored player spawn for team ${player.team}`);
+  // validArenaSpawnPoint rejects points overlapped by ACTIVE world colliders,
+  // which includes destructible debris and dynamic glass - so mid-match a
+  // collapsed structure can zero out one team's entire home list. Throwing
+  // here used to escape a respawn timer and freeze the player on the death
+  // screen. A blocked home side now borrows the opposite side (spawn-safety
+  // scoring still picks the least-exposed point), and only a map with no
+  // authored spawns at all - an authoring error, not a match state - throws.
+  if (home.length === 0 && spawnMode !== 'ffa' && opposite.length > 0) {
+    home = opposite;
+  }
+  if (home.length === 0 && opposite.length === 0) {
+    const rawFallback = [...arena.spawns[player.team], ...arena.spawns[oppositeTeam]]
+      .map((point, index) => ({ point, side: player.team, index: 200 + index }));
+    if (rawFallback.length === 0) throw new Error(`No authored player spawns exist for team ${player.team}`);
+    home = rawFallback;
+  }
   const pressure = (options: ReturnType<typeof validForSide>) => {
     const scored = options.map(({ point }) => ({
       visibleThreats: threats.filter((threat) => !activeWorldColliders().some((box) => segmentIntersectsBox(threat, point, box))).length,
@@ -17332,9 +17377,17 @@ function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vec
   const validForSide = (side: Team) => arena.spawns[side]
     .map((candidate, localIndex) => ({ candidate, index: side * 100 + localIndex }))
     .filter(({ candidate }) => validArenaSpawnPoint(candidate, arena.bounds, activeWorldColliders()));
-  const home = validForSide(team);
+  let home = validForSide(team);
   const opposite = validForSide(team === 0 ? 1 : 0);
-  if (home.length === 0 && (spawnMode !== 'ffa' || opposite.length === 0)) throw new Error(`No valid authored spawn for team ${team}`);
+  // Same fallback as the player path: debris/dynamic colliders can zero out a
+  // side mid-match, and a bot respawn throw escapes its timer just as badly.
+  if (home.length === 0 && spawnMode !== 'ffa' && opposite.length > 0) home = opposite;
+  if (home.length === 0 && opposite.length === 0) {
+    const rawFallback = [...arena.spawns[team], ...arena.spawns[team === 0 ? 1 : 0]]
+      .map((candidate, index) => ({ candidate, index: 200 + index }));
+    if (rawFallback.length === 0) throw new Error(`No authored spawns exist for team ${team}`);
+    home = rawFallback;
+  }
   const pressure = (options: ReturnType<typeof validForSide>) => {
     const scores = options.map(({ candidate }) => ({
       visibleThreats: threats.filter((threat) => !activeWorldColliders().some((box) => segmentIntersectsBox(candidate, threat, box))).length,
@@ -22157,7 +22210,7 @@ function supportTargetPosition(id: string): THREE.Vector3 | null {
 
 function nearestSupportTarget(): { id: string; point: THREE.Vector3 } | null {
   const candidates: { id: string; point: THREE.Vector3 }[] = [];
-  for (const bot of bots.values()) if (bot.alive && bot.team !== player.team) candidates.push({ id: bot.id, point: bot.position.clone().add(new THREE.Vector3(0, 1.15, 0)) });
+  for (const bot of bots.values()) if (bot.alive && areCombatantsHostile(bot.id, bot.team, player.id, player.team)) candidates.push({ id: bot.id, point: bot.position.clone().add(new THREE.Vector3(0, 1.15, 0)) });
   for (const remote of remotes.values()) {
     if (areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team) && remote.snapshot.hp > 0) candidates.push({ id: remote.snapshot.id, point: remote.target.clone().add(new THREE.Vector3(0, 1.15, 0)) });
   }
@@ -22193,8 +22246,22 @@ function hunterTargetAssignments(): string[] {
     }),
   ];
   if (privateMatchMode === 'ffa' && gameMode !== 'solo') {
-    return candidates.filter((candidate) => candidate.alive && candidate.id !== player.id)
-      .sort((a, b) => a.distanceFromCentreSq - b.distanceFromCentreSq || a.id.localeCompare(b.id))
+    // Nearest the ACTIVATOR, not the arena centre: centre-sorting made
+    // perimeter players permanently untargetable in FFA while TDM's
+    // assignment has no such blind spot.
+    const origin = player.position;
+    const withActivatorDistance = candidates.map((candidate) => ({
+      ...candidate,
+      distanceFromActivatorSq: (() => {
+        const bot = bots.get(candidate.id);
+        if (bot) return bot.position.distanceToSquared(origin);
+        const remote = remotes.get(candidate.id);
+        if (remote) return remote.target.distanceToSquared(origin);
+        return candidate.distanceFromCentreSq;
+      })(),
+    }));
+    return withActivatorDistance.filter((candidate) => candidate.alive && candidate.id !== player.id)
+      .sort((a, b) => a.distanceFromActivatorSq - b.distanceFromActivatorSq || a.id.localeCompare(b.id))
       .slice(0, 5)
       .map((candidate) => candidate.id);
   }
@@ -24142,7 +24209,8 @@ function updateMatchState(now: number): void {
   const scores = teamScores();
   const rules = currentMatchRules();
   const ffa = gameMode !== 'solo' && privateMatchMode === 'ffa';
-  const orderedFfa = freeForAllLeaders([...authoritativeScores.values()]);
+  const orderedFfa = freeForAllLeaders([...authoritativeScores.values()]
+    .filter((score) => !score.id.startsWith('host-bot-')));
   matchState = preserveSoloCountdownCue(matchState, now, lastMatchCountdownCue, gameMode === 'solo');
   const preAdvanceState = matchState;
   const advancedState = ffa
@@ -24749,7 +24817,9 @@ function updateHud(now: number): void {
   const scores: [number, number] = [aqua, coral];
   const presentation = matchPresentationAt(matchState, now, scores, player.team, currentMatchRules(), arena.label);
   const ffaHud = gameMode !== 'solo' && privateMatchMode === 'ffa';
-  const orderedFfa = ffaHud ? freeForAllLeaders([...authoritativeScores.values()]) : [];
+  const orderedFfa = ffaHud
+    ? freeForAllLeaders([...authoritativeScores.values()].filter((score) => !score.id.startsWith('host-bot-')))
+    : [];
   const localFfaScore = authoritativeScores.get(player.id)?.kills ?? player.kills;
   const leaderFfaScore = orderedFfa[0]?.kills ?? 0;
   const arenaZone = classifyArenaZone(player.position.x, player.position.z);

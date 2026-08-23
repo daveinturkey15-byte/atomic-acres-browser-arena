@@ -1132,3 +1132,78 @@ describe('host killstreak runtime', () => {
     expect(left.first.damageEvents[0].resultId).toMatch(/^ks-result-7-1$/);
   });
 });
+
+describe('FFA care-crate capture hostility (mode-aware, not raw team)', () => {
+  /**
+   * In FFA the lobby still assigns everyone a team number, and players who
+   * never touch the team select all carry the same one. Capture friendliness
+   * used raw team equality, so in FFA any other player could TAP-STEAL a crate
+   * at the owner tier instead of fighting through the 2.5 s enemy hold. The
+   * decision now defers to world.areHostile - the same authority every
+   * targeting path uses - and is recorded once at capture start so the step
+   * and the rendered progress agree.
+   */
+  const ffaWorld: KillstreakWorld = {
+    ...DEFAULT_WORLD,
+    targets: [
+      ...DEFAULT_WORLD.targets,
+      // Standing at the drop point so capture admission (range + LOS) passes.
+      { id: 'rival', kind: 'player', team: 0, lifeId: 1, alive: true, position: [0, 1.7, 0] },
+      { id: 'mate', kind: 'player', team: 0, lifeId: 1, alive: true, position: [0, 1.7, 0] },
+    ],
+    // FFA: everyone is hostile to everyone but themselves, whatever their team.
+    areHostile: (ownerId, _ownerTeam, target) => target.id !== ownerId,
+  };
+
+  it('keeps the owner tap pickup for the owner themselves', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    earn(runtime, 4);
+    const entityId = runtime.activate(intent('care-package', 1), 1_000, ffaWorld).entityIds[0];
+    runtime.advance(7_100, ffaWorld);
+    expect(runtime.beginCareCapture('owner', 1, entityId, 7_100, ffaWorld).accepted).toBe(true);
+    // Owner capture is a tap: the crate is gone immediately.
+    expect(runtime.snapshotFor('owner', 7_100).entities.some((entity) => entity.id === entityId)).toBe(false);
+  });
+
+  it('forces the 2.5 s enemy hold on a same-lobby-team rival in FFA', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    // Same lobby team as the owner - hostile anyway, because FFA.
+    runtime.registerActor('rival', 0, 1, loadout(['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    earn(runtime, 4);
+    const entityId = runtime.activate(intent('care-package', 1), 1_000, ffaWorld).entityIds[0];
+    runtime.advance(7_100, ffaWorld);
+
+    expect(runtime.beginCareCapture('rival', 1, entityId, 7_100, ffaWorld).accepted).toBe(true);
+    // NOT a tap: the crate is still present, in the capturing phase.
+    expect(runtime.snapshotFor('rival', 7_150).entities.some((entity) => entity.id === entityId)).toBe(true);
+
+    // The friendly 1250 ms mark must NOT complete the theft...
+    runtime.advance(7_100 + 1_300, ffaWorld);
+    expect(runtime.snapshotFor('rival', 7_100 + 1_300).entities.some((entity) => entity.id === entityId)).toBe(true);
+
+    // ...the enemy 2500 ms mark must.
+    runtime.advance(7_100 + 2_600, ffaWorld);
+    expect(runtime.snapshotFor('rival', 7_100 + 2_600).entities.some((entity) => entity.id === entityId)).toBe(false);
+  });
+
+  it('still grants team-mates the tap tier in TDM (no areHostile regression)', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    const tdmWorld: KillstreakWorld = {
+      ...DEFAULT_WORLD,
+      targets: [
+        ...DEFAULT_WORLD.targets,
+        { id: 'mate', kind: 'player', team: 0, lifeId: 1, alive: true, position: [0, 1.7, 0] },
+      ],
+      areHostile: (_ownerId, ownerTeam, target) => target.team !== ownerTeam,
+    };
+    runtime.registerActor('owner', 0, 1, loadout(['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    runtime.registerActor('mate', 0, 1, loadout(['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    earn(runtime, 4);
+    const entityId = runtime.activate(intent('care-package', 1), 1_000, tdmWorld).entityIds[0];
+    runtime.advance(7_100, tdmWorld);
+    expect(runtime.beginCareCapture('mate', 1, entityId, 7_100, tdmWorld).accepted).toBe(true);
+    expect(runtime.snapshotFor('mate', 7_100).entities.some((entity) => entity.id === entityId)).toBe(false);
+  });
+});

@@ -662,7 +662,12 @@ function describeOperatorAsset(
 
 export function loadFirstPersonArmsAsset(): Promise<void> {
   if (firstPersonArmsAsset) return Promise.resolve();
-  firstPersonArmsAssetPromise ??= loadRiggedGltf(FIRST_PERSON_ARMS_URL).then((arms) => {
+  firstPersonArmsAssetPromise ??= loadRiggedGltf(FIRST_PERSON_ARMS_URL).catch((error: unknown) => {
+    // Same anti-poisoning rule as the operator memo below: a transient fetch
+    // failure must be retryable, not cached for the session.
+    firstPersonArmsAssetPromise = null;
+    throw error;
+  }).then((arms) => {
     firstPersonArmsAsset = { scene: arms.scene, clips: arms.animations };
   });
   return firstPersonArmsAssetPromise;
@@ -679,7 +684,17 @@ export function loadRiggedOperatorAsset(): Promise<void> {
       operatorAssets.performance = describeOperatorAsset(operator, 1, OPERATOR_PERFORMANCE_URL);
     }),
     loadFirstPersonArmsAsset(),
-  ]).then(() => undefined);
+  ]).then(() => undefined)
+    .catch((error: unknown) => {
+      // A rejected load must not poison the memo: leaving the failed promise
+      // cached made one transient GLB fetch failure permanent for the whole
+      // session - every later remote was built with no rig and no retry was
+      // possible without a full page reload. Clearing the memo lets the next
+      // caller attempt a fresh load; already-loaded halves stay loaded via
+      // the per-asset guards above.
+      operatorAssetPromise = null;
+      throw error;
+    });
   return operatorAssetPromise;
 }
 

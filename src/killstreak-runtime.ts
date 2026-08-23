@@ -334,6 +334,13 @@ type CareCrateEntity = EntityBase & {
   rollUnit: number;
   captureActorId: string | null;
   captureStartedAtMs: number | null;
+  /**
+   * Hold duration decided ONCE at capture start from mode-aware hostility.
+   * Raw team equality was used before, which in FFA - where lobby teams still
+   * exist but everyone is hostile - gave other players the friendly 1250 ms
+   * tap/steal tier on crates they should have had to fight for.
+   */
+  captureRequiredMs: number | null;
 };
 
 export type HostSupportEntity = AircraftEntity | ChopperEntity | DroneEntity | CareCrateEntity;
@@ -1624,7 +1631,7 @@ export class HostKillstreakRuntime {
         position: [...routeStart], velocity: [0, 0, 0], attitude: [0, 0, 0], health: 100, revision: 0,
         kind: 'care-crate', phase: 'inbound', dropPosition: [anchor[0], anchor[1] + 0.45, anchor[2]],
         descentStartPosition, descentStartsAtMs: nowMs + CARE_AIRCRAFT_DROP_DELAY_MS, aircraftId,
-        reward, rollUnit, captureActorId: null, captureStartedAtMs: null,
+        reward, rollUnit, captureActorId: null, captureStartedAtMs: null, captureRequiredMs: null,
       });
       entityIds.push(id, aircraftId);
     } else if (actualId === 'carpet-bomber') {
@@ -2082,8 +2089,23 @@ export class HostKillstreakRuntime {
     // Owner/team pickup is a tap interaction: once the host has admitted the
     // prompt's range and LOS contract, the reward transfers immediately and
     // exactly once. Enemy theft retains the longer continuous-hold lifecycle
-    // below.
-    if (actor.team === entity.team) {
+    // below. "Team" here must be MODE-AWARE: in FFA every other actor is
+    // hostile no matter what lobby team they carry, so friendliness defers to
+    // the same world.areHostile the targeting paths already use, falling back
+    // to raw team equality only when the world does not supply one.
+    const friendlyToCrate = world.areHostile
+      ? !world.areHostile(entity.ownerId, entity.team, {
+        id: actor.actorId,
+        kind: 'player',
+        team: actor.team,
+        lifeId: actor.lifeId,
+        alive: true,
+        // Hostility is an identity/team decision; position is unused by every
+        // installed areHostile and supplied only to satisfy the target shape.
+        position: [0, 0, 0],
+      })
+      : actor.team === entity.team;
+    if (friendlyToCrate) {
       if (entity.reward.kind === 'timed-map-weapon' && grantPortOpen) {
         // HF-334: the weapon grant surfaces on the admission result; the host
         // applies it through the timed-map-weapon authority, never careRewards.
@@ -2111,6 +2133,7 @@ export class HostKillstreakRuntime {
     entity.phase = 'capturing';
     entity.captureActorId = actorId;
     entity.captureStartedAtMs = nowMs;
+    entity.captureRequiredMs = friendlyToCrate ? 1_250 : 2_500;
     entity.revision += 1;
     this.revision += 1;
     return Object.freeze({ accepted: true, reason: 'accepted' });
@@ -2364,7 +2387,7 @@ export class HostKillstreakRuntime {
       this.revision += 1;
       return;
     }
-    const requiredMs = captureActor.team === entity.team ? 1_250 : 2_500;
+    const requiredMs = entity.captureRequiredMs ?? (captureActor.team === entity.team ? 1_250 : 2_500);
     if (nowMs - entity.captureStartedAtMs < requiredMs) return;
     if (entity.reward.kind === 'timed-map-weapon'
       && this.carePackageWeaponGrantPort?.isFlamethrowerGrantAdmissible() === true) {
@@ -3176,7 +3199,8 @@ export class HostKillstreakRuntime {
     }));
     const entities = [...this.entities.values()].sort((left, right) => left.id.localeCompare(right.id)).map((entity): KillstreakEntitySnapshot => {
       const captureProgress = entity.kind === 'care-crate' && entity.captureStartedAtMs !== null && entity.captureActorId
-        ? clamp((nowMs - entity.captureStartedAtMs) / ((this.actors.get(entity.captureActorId)?.team === entity.team) ? 1_250 : 2_500), 0, 1)
+        ? clamp((nowMs - entity.captureStartedAtMs) / (entity.captureRequiredMs
+          ?? ((this.actors.get(entity.captureActorId)?.team === entity.team) ? 1_250 : 2_500)), 0, 1)
         : null;
       return Object.freeze({
         id: entity.id,
