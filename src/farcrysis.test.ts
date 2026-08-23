@@ -172,7 +172,14 @@ describe('farcrysis arena', () => {
   it('exposes a consistent collider set', () => {
     const { arena } = buildArena();
     expect(arena.colliders.length).toBeGreaterThanOrEqual(12);
-    expect(arena.physicsColliders.length).toBe(arena.colliders.length);
+    // HF-360 (intentional behaviour change): physicsColliders now carries the
+    // terrain ground plates ON TOP of every gameplay collider — the same
+    // physics-only split map.ts uses for ramps — so strict equality no longer
+    // holds. Every gameplay collider must still be present in physics.
+    expect(arena.physicsColliders.length).toBeGreaterThan(arena.colliders.length);
+    for (const collider of arena.colliders) {
+      expect(arena.physicsColliders).toContain(collider);
+    }
   });
 
   it('provides at least 8 shot surfaces', () => {

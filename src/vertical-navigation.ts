@@ -99,7 +99,16 @@ function nearestRampSample(
   return candidates[0] ?? null;
 }
 
-function authoredRouteLevels(navigation: ArenaVerticalNavigation): number[] {
+// HF-360: farcrysis publishes a 64x64 terrain platform grid through this
+// navigation contract, and route levels are recomputed per bot per frame.
+// Sorting ~4k elevations every call was pure per-frame garbage — the authored
+// navigation object is immutable per arena, so the tier reduction is cached
+// by object identity instead.
+const routeLevelsCache = new WeakMap<ArenaVerticalNavigation, readonly number[]>();
+
+function authoredRouteLevels(navigation: ArenaVerticalNavigation): readonly number[] {
+  const cached = routeLevelsCache.get(navigation);
+  if (cached) return cached;
   const elevations = [
     0,
     ...navigation.routes.flatMap((route) => [route.foot[1], route.top[1]]),
@@ -111,7 +120,9 @@ function authoredRouteLevels(navigation: ArenaVerticalNavigation): number[] {
     if (!tier || elevation - tier[0] > LEVEL_TIER_MAX_SPAN) tiers.push([elevation]);
     else tier.push(elevation);
   }
-  return tiers.map((tier) => tier.reduce((total, elevation) => total + elevation, 0) / tier.length);
+  const levels = tiers.map((tier) => tier.reduce((total, elevation) => total + elevation, 0) / tier.length);
+  routeLevelsCache.set(navigation, levels);
+  return levels;
 }
 
 function nearestLevel(levels: readonly number[], elevation: number): number {

@@ -23,6 +23,7 @@
 import * as THREE from 'three';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
+import { farcrysisTerrainHeight as terrainHeightAt } from './farcrysis-terrain-authority';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   makeTslFoliageMaterial,
@@ -200,70 +201,12 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-/** Smoothstep helper. */
-function smoothstep(e0: number, e1: number, x: number): number {
-  const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
-  return t * t * (3 - 2 * t);
-}
-
-/**
- * Terrain height at (x,z) — exact replica of farcrysis-terrain.ts's terrainHeight.
- * Guarantees vegetation sits on the actual procedural terrain surface.
- *
- * Zones:
- *   - Sand beach (edgeDist < 10): y ≈ 0
- *   - Cliff ring  (edgeDist 10–20): y 2–5m
- *   - Plateau     (edgeDist ≥ 20): y 3.5–8m
- *   - Path corridors (|x|≈20, |z|≈20): flat y=0
- */
-function terrainHeightAt(x: number, z: number): number {
-  const cx = Math.max(-32, Math.min(32, x));
-  const cz = Math.max(-32, Math.min(32, z));
-  const dist = Math.sqrt(cx * cx + cz * cz);
-
-  // Gameplay path corridors — flat
-  const pathHalf = 4.5;
-  const onPath = (
-    Math.abs(cx - 20) < pathHalf || Math.abs(cx + 20) < pathHalf ||
-    Math.abs(cz - 20) < pathHalf || Math.abs(cz + 20) < pathHalf
-  );
-  if (onPath && dist > 4) return 0;
-
-  const edgeDist = 32 - Math.max(Math.abs(cx), Math.abs(cz));
-  const sandW = 10;
-
-  // Sand beach (outer ring, flat)
-  if (edgeDist < sandW && !onPath) {
-    const t = edgeDist / sandW;
-    const dune = Math.sin(cx * 0.7 + cz * 0.5) * Math.cos(cx * 0.4 - cz * 0.6) * 0.25;
-    const duneH = smoothstep(0.6, 1.0, t) * dune;
-    return Math.max(0, duneH);
-  }
-
-  // Cliff ring (rising 2–5m)
-  if (edgeDist >= sandW && edgeDist < sandW + 10) {
-    const ct = (edgeDist - sandW) / 10;
-    const base = 2 + ct * 3;
-    const jagged = Math.sin(cx * 1.3 + cz * 0.7) * 0.8
-      + Math.cos(cx * 0.9 - cz * 1.1) * 0.6
-      + Math.sin(cx * 2.1) * 0.4
-      + Math.cos(cz * 1.8) * 0.5;
-    return Math.max(0.2, base + jagged * ct);
-  }
-
-  // Jungle plateau (interior 3.5–8m)
-  const plateauBase = 3.5
-    + Math.sin(cx * 0.35 + cz * 0.28) * 1.8
-    + Math.cos(cx * 0.55 - cz * 0.42) * 1.4
-    + Math.sin(cx * 1.1) * Math.cos(cz * 0.9) * 0.9
-    + Math.sin(cx * 0.18 + cz * 0.33) * 0.6;
-
-  // Core dip near the research station
-  const coreDist = Math.sqrt(cx * cx + cz * cz);
-  const dip = coreDist < 8 ? smoothstep(0, 8, coreDist) * 1.5 : 0;
-
-  return Math.max(0.2, plateauBase - dip);
-}
+// HF-360: the phantom terrain model that lived here — a 3.5-8 m plateau with
+// a 2-5 m cliff ring, "replicated" from a terrain module that had already
+// been deleted — is gone. The real rendered ground never rose above ~2.2 m,
+// so every layer seated on that model floated metres in the air. All ground
+// queries now resolve through the single terrain authority (imported above
+// under the old local name so the many call sites read unchanged).
 
 // Spawn positions and patrol points (from farcrysis.ts) for clearance checks
 const SPAWNS_ALL: Array<[number, number]> = [
@@ -549,7 +492,9 @@ function addPalms(root: THREE.Group): void {
 
   for (let i = 0; i < count; i += 1) {
     const [x, z, angle] = positions[i];
-    const baseY = 1.4;
+    // HF-360: seat each trunk on the terrain authority (was flat baseY=1.4,
+    // which buried palms on hills and floated them over the shore descent).
+    const baseY = terrainHeightAt(x, z) + 1.4;
     const frondY = baseY + 2.7;
     const lean = (i % 3 === 0 ? 0.07 : -0.06) * (Math.sin(angle) * 0.25);
 
@@ -587,7 +532,7 @@ function addPalms(root: THREE.Group): void {
   const lodM = new THREE.Matrix4();
   for (let i = 0; i < lodCount; i++) {
     const [x, z, angle] = positions[i];
-    const frondY = 1.4 + 2.7; // match original frond centre height
+    const frondY = terrainHeightAt(x, z) + 1.4 + 2.7; // match the seated frond centre
     lodM.compose(
       new THREE.Vector3(x, frondY - 0.5, z),
       new THREE.Quaternion().setFromEuler(new THREE.Euler(0, angle * 1.3 + i * 0.15, 0)),
@@ -626,7 +571,8 @@ function addBroadleafTrees(root: THREE.Group): void {
 
   for (let i = 0; i < count; i += 1) {
     const [x, z, angle] = positions[i];
-    const baseY = 1.3;
+    // HF-360: seated on the terrain authority (was flat baseY=1.3).
+    const baseY = terrainHeightAt(x, z) + 1.3;
     const canopyY = baseY + 2.4;
     const twist = angle + (i % 7) * 0.35;
 
@@ -672,7 +618,8 @@ function addConifers(root: THREE.Group): void {
     const [x, z, angle] = positions[i];
     const s = 0.75 + (i % 5) * 0.14;
     matrix.compose(
-      new THREE.Vector3(x, 1.8, z),
+      // HF-360: seated on the terrain authority (was flat y=1.8).
+      new THREE.Vector3(x, terrainHeightAt(x, z) + 1.8, z),
       new THREE.Quaternion().setFromEuler(new THREE.Euler(0, angle, 0)),
       new THREE.Vector3(s, 0.85 + (i % 4) * 0.1, s),
     );
@@ -706,7 +653,8 @@ function addBananaPlants(root: THREE.Group): void {
 
   for (let p = 0; p < plantCount; p += 1) {
     const [x, z, baseAngle] = positions[p];
-    const baseY = 0.8;
+    // HF-360: seated on the terrain authority (was flat baseY=0.8).
+    const baseY = terrainHeightAt(x, z) + 0.8;
     const leafY = baseY + 1.55;
 
     tMat.compose(
@@ -764,7 +712,8 @@ function addBamboo(root: THREE.Group): void {
       const idx = c * stemsPerCluster + s;
 
       matrix.compose(
-        new THREE.Vector3(sx, 1.4 * heightScale, sz),
+        // HF-360: seated on the terrain authority (was flat ground).
+        new THREE.Vector3(sx, terrainHeightAt(sx, sz) + 1.4 * heightScale, sz),
         new THREE.Quaternion().setFromEuler(new THREE.Euler(0, offsetAngle + s * 0.3, 0)),
         new THREE.Vector3(0.8 + (s % 3) * 0.12, heightScale, 0.8 + (s % 3) * 0.12),
       );
@@ -798,7 +747,8 @@ function addDeadTrees(root: THREE.Group): void {
     const s = 0.7 + (i % 3) * 0.2;
 
     matrix.compose(
-      new THREE.Vector3(x, 1.2, z),
+      // HF-360: seated on the terrain authority (was flat y=1.2).
+      new THREE.Vector3(x, terrainHeightAt(x, z) + 1.2, z),
       new THREE.Quaternion().setFromEuler(new THREE.Euler(leanAngle, leanDir, (i % 2) * 0.2)),
       new THREE.Vector3(s, 0.85 + (i % 3) * 0.12, s),
     );
@@ -827,7 +777,8 @@ function addFerns(root: THREE.Group): void {
     const [x, z, angle] = positions[i];
     const s = 0.75 + (i % 5) * 0.16;
     matrix.compose(
-      new THREE.Vector3(x, 0.6, z),
+      // HF-360: seated on the terrain authority (was flat y=0.6).
+      new THREE.Vector3(x, terrainHeightAt(x, z) + 0.6, z),
       new THREE.Quaternion().setFromEuler(new THREE.Euler(0, angle * 2.1 + i * 0.4, 0)),
       new THREE.Vector3(s, 0.7 + (i % 4) * 0.18, 1.0),
     );
@@ -859,7 +810,8 @@ function addGrassTufts(root: THREE.Group): void {
     const [x, z] = positions[i];
     const s = 0.6 + (i % 6) * 0.1;
     matrix.compose(
-      new THREE.Vector3(x, 0.22, z),
+      // HF-360: seated on the terrain authority (was flat y=0.22).
+      new THREE.Vector3(x, terrainHeightAt(x, z) + 0.22, z),
       new THREE.Quaternion().setFromEuler(new THREE.Euler(0, i * 1.7, 0)),
       new THREE.Vector3(s, 0.7 + (i % 4) * 0.18, s),
     );
@@ -890,7 +842,8 @@ function addBushes(root: THREE.Group): void {
     const [x, z, angle] = positions[i];
     const s = 0.7 + (i % 5) * 0.14;
     matrix.compose(
-      new THREE.Vector3(x, 0.45, z),
+      // HF-360: seated on the terrain authority (was flat y=0.45).
+      new THREE.Vector3(x, terrainHeightAt(x, z) + 0.45, z),
       new THREE.Quaternion().setFromEuler(new THREE.Euler(i * 0.1, angle, i * 0.15)),
       new THREE.Vector3(s, 0.55 + (i % 3) * 0.18, s * 0.9),
     );
@@ -923,7 +876,8 @@ function addVines(root: THREE.Group): void {
     const twist = angle + (i % 5) * 0.4;
     const s = 0.6 + (i % 4) * 0.15;
     matrix.compose(
-      new THREE.Vector3(x, 1.0 + (i % 3) * 0.6, z),
+      // HF-360: seated on the terrain authority (was flat ground).
+      new THREE.Vector3(x, terrainHeightAt(x, z) + 1.0 + (i % 3) * 0.6, z),
       new THREE.Quaternion().setFromEuler(new THREE.Euler(lean, twist, lean * 0.3)),
       new THREE.Vector3(s, 0.9 + (i % 3) * 0.1, s),
     );

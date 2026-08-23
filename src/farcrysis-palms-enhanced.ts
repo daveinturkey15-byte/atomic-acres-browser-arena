@@ -31,6 +31,7 @@
 import * as THREE from 'three';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
+import { farcrysisTerrainHeight } from './farcrysis-terrain-authority';
 
 // ---------------------------------------------------------------------------
 // Deterministic helpers
@@ -50,11 +51,6 @@ function clamp(value: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, value));
 }
 
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
-  return t * t * (3 - 2 * t);
-}
-
 // ---------------------------------------------------------------------------
 // Placement / terrain-fit constants
 // ---------------------------------------------------------------------------
@@ -66,44 +62,14 @@ const BEACH_RING_MAX = 30;
 const JUNGLE_RING_MIN = 11;
 const JUNGLE_RING_MAX = 19;
 const BOUNDS_MARGIN = 1.5;
-const ARENA_HALF = 32;
-const TRUNK_HEIGHT = 2.5;
+export const TRUNK_HEIGHT = 2.5;
 
 const { minX, maxX, minZ, maxZ } = FARCRYSIS_BOUNDS;
 
-/**
- * Approximate terrain elevation at (x, z) — mirrors the documented zones of
- * farcrysis-terrain.ts (core flat 0, beach dunes 0-0.7, cliff 0.05-1.25,
- * inland 0.15-1.3). Presentation-only: close enough that palms sit on the
- * ground without an exact dependency on the terrain module's private fBm.
- */
-function estimateTerrainHeight(x: number, z: number): number {
-  const cx = clamp(x, minX, maxX);
-  const cz = clamp(z, minZ, maxZ);
-
-  // Flat playable core
-  if (Math.abs(cx) <= 10 && Math.abs(cz) <= 10) return 0;
-
-  // Flat corridor lane strips (kept palm-free anyway, belt and braces)
-  const laneHW = 5.5;
-  if (Math.abs(Math.abs(cx) - 20) < laneHW || Math.abs(Math.abs(cz) - 20) < laneHW) return 0;
-
-  const edgeDist = ARENA_HALF - Math.max(Math.abs(cx), Math.abs(cz));
-  const dune = Math.sin(cx * 0.55 + cz * 0.38) * 0.25 + Math.sin(cx * 1.7 + cz * 0.9) * 0.12;
-
-  if (edgeDist < 12) {
-    // White-sand beach: gentle dunes, flat near the water
-    const t = edgeDist / 12;
-    return Math.max(0, dune * smoothstep(0, 0.4, t) * 0.7);
-  }
-  if (edgeDist < 19) {
-    // Cliff transition ramp
-    const cliffT = (edgeDist - 12) / 7;
-    return Math.max(0.05, cliffT * 1.2 + dune * 0.15 * cliffT);
-  }
-  // Inland rolling hills
-  return 0.4 + Math.sin(cx * 0.3 + cz * 0.4) * 0.25;
-}
+// HF-360: this module used to carry its own guessed terrain model ("close
+// enough"), which drifted from the rendered ground and left trunk bases
+// floating or buried on every hill. All seating now resolves through the one
+// terrain authority so palms, physics and the rendered surface agree exactly.
 
 /** True when (x, z) falls on the flat corridor lane strips (|x|≈20 or |z|≈20). */
 function onCorridorStrip(x: number, z: number): boolean {
@@ -230,7 +196,7 @@ function createPalmCrownGeometry(): THREE.BufferGeometry {
 // Palm placement — deterministic scatter
 // ---------------------------------------------------------------------------
 
-interface PalmPlacement {
+export interface PalmPlacement {
   x: number;
   z: number;
   baseY: number;
@@ -266,7 +232,7 @@ function buildPlacements(): PalmPlacement[] {
     placements.push({
       x,
       z,
-      baseY: estimateTerrainHeight(x, z),
+      baseY: farcrysisTerrainHeight(x, z),
       yaw: angle + (rng() - 0.5) * 0.5,
       lean: (rng() - 0.5) * 0.24, // slight per-trunk lean
       scale,
@@ -277,6 +243,16 @@ function buildPlacements(): PalmPlacement[] {
   }
 
   return placements;
+}
+
+/**
+ * HF-360: exported so buildFarcrysis can author trunk colliders for these
+ * palms in the gameplay file. Placement stays deterministic (seeded PRNG), so
+ * the collider set and the rendered instances always agree — and the art
+ * layer itself still adds no gameplay authority, keeping the module contract.
+ */
+export function enhancedPalmPlacements(): readonly PalmPlacement[] {
+  return buildPlacements();
 }
 
 // ---------------------------------------------------------------------------

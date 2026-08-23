@@ -35,29 +35,19 @@ import { createBallisticSurface } from './ballistics';
 import { classifyImpactSurface } from './combat-feedback';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
+import { farcrysisTerrainHeight } from './farcrysis-terrain-authority';
 
 // ---------------------------------------------------------------------------
-// Terrain-height function — replicated from farcrysis-art.ts so every
-// interactable can be placed on the visual terrain surface.  The physics
-// world floor is flat at y=0; this function determines where the rendered
-// terrain sits so objects are never floating above or buried inside it.
+// Terrain seating — HF-360: this module used to carry a "must be kept in
+// sync" replica of the art terrain function AND clamped it to y=0 because the
+// physics floor was flat. The physics ground now tracks the same authority
+// surface (farcrysis-terrain-authority.ts plates), so interactables seat on
+// the real ground with no clamp and no second model to drift.
 // ---------------------------------------------------------------------------
 
-/** Replicated from farcrysis-art.ts — must be kept in sync. */
-function terrainHeight(x: number, z: number): number {
-  const dist = FARCRYSIS_BOUNDS.maxX - Math.max(Math.abs(x), Math.abs(z));
-  // Beach shelf: flat near edges, rising toward centre
-  if (dist < 10) return Math.max(0, dist * 0.03 - 0.1);
-  // Jungle interior: gentle rolling hills
-  const h = Math.sin(x * 0.12) * Math.cos(z * 0.15) * 1.2
-    + Math.sin(x * 0.25 + 1.3) * Math.cos(z * 0.22 + 2.1) * 0.6
-    + Math.sin(z * 0.18 - 0.7) * 0.4;
-  return Math.max(-0.05, h + 0.1);
-}
-
-/** Returns the terrain surface Y clamped to never go below the physics floor (y=0). */
+/** Terrain surface Y at (x, z) — resolved through the single authority. */
 function placementBaseY(x: number, z: number): number {
-  return Math.max(0, terrainHeight(x, z));
+  return farcrysisTerrainHeight(x, z);
 }
 
 // ---------------------------------------------------------------------------
@@ -155,6 +145,10 @@ function registerBox(
 
   // (c) Physics colliders → Rapier static cuboids built by CharacterPhysics.create().
   builder.physicsColliders.push(bounds);
+
+  // HF-360: named audit entry so the terrain-authority tests can verify every
+  // solid collider seats on the ground (colliders themselves are anonymous).
+  builder.colliderAudit?.push({ id: name, bounds });
 
   // (d) Ballistic surface: gives the penetration system material info (wood,
   //     thin-metal, earth) so bullets behave correctly inside this object.
@@ -824,9 +818,12 @@ export function addInteractables(builder: any): void {
   placeBarrel(builder, 'farcrysis-barrel-05',  -8, -22, 0.6, 1.0);
   placeBarrel(builder, 'farcrysis-barrel-06',   8,  22, 0.6, 1.0);
 
-  // -- Just outside the core entrances -----------------------------------
+  // -- Flanking the core door approaches ----------------------------------
+  // HF-360: barrel-08 moved from (3, 3.5) — that spot is now inside the
+  // catwalk stair flight (farcrysis.ts farcrysis-core-stair-*), and the
+  // barrel sat entombed inside the steps. West mirror keeps the pair.
   placeBarrel(builder, 'farcrysis-barrel-07',  -3, -3.5, 0.6, 1.0);
-  placeBarrel(builder, 'farcrysis-barrel-08',   3,  3.5, 0.6, 1.0);
+  placeBarrel(builder, 'farcrysis-barrel-08',  -3,  3.5, 0.6, 1.0);
 
   // -- Mid-field jungle paths --------------------------------------------
   placeBarrel(builder, 'farcrysis-barrel-09', -12,  16, 0.6, 1.0);

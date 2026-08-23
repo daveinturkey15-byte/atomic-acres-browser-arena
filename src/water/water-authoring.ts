@@ -80,15 +80,22 @@ export const FARCRYSIS_WATER: WaterBodyDefinition = Object.freeze({
   // that exception prevents the shared runtime from drawing a duplicate sea.
   presentationOwner: 'arena-builder',
   dryFootprintMask: 'rectangular',
-  // HF-359 island ocean: level/palette/shore ramp were read from the restored
-  // farcrysis terrain module (water plane 76 m at y = -0.3, shore factor ramp
-  // (chebyshev - 15) / 22). That module has since been deleted as dead code -
-  // the live arena builds its terrain inline - so these values are now the
-  // authority for them rather than a copy of it. Owner scope
-  // makes this the first swimmable body. amplitudeScale keeps the tropical
-  // shore calm relative to the rustworks storm spectrum; coordinate final
-  // tuning with the farcrysis lane in wave 2.
-  level: -0.3,
+  // HF-359 island ocean: palette/shore ramp were read from the restored
+  // farcrysis terrain module (shore factor ramp (chebyshev - 15) / 22). That
+  // module has since been deleted as dead code - the live arena builds its
+  // terrain inline - so these values are now the authority for them rather
+  // than a copy of it. Owner scope makes this the first swimmable body.
+  // amplitudeScale keeps the tropical shore calm relative to the rustworks
+  // storm spectrum.
+  //
+  // HF-360: level corrected from -0.3 to -0.25. The -0.3 figure was read
+  // from the DELETED terrain module; the live arena's authored waterline is
+  // the 76 m lagoon plane at y = -0.25 (farcrysis.ts), with the deep plane
+  // 30 mm below and the shallow lens/wave FX 10-30 mm above purely as
+  // z-fighting offsets. One level now drives both gameplay (swim depth,
+  // buoyancy) and every visual plane, instead of gameplay water floating
+  // 50 mm below the sea a player can actually see.
+  level: -0.25,
   swimmable: true,
   amplitudeScale: 0.2,
   island: Object.freeze({ halfX: 32, halfZ: 32 }),

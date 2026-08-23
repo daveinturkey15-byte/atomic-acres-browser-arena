@@ -20,6 +20,10 @@ import { buildVegetation, buildAdditionalVegetation, animateVegetationWind, setV
 // terrain.ts ShaderMaterial effects disabled for TSL review compatibility.
 // Terrain + water provided inline; lighting simplified to standard lights.
 import { applyFarcrysisTextures } from './farcrysis-textures';
+import {
+  farcrysisTerrainHeight as terrainHeight,
+  FARCRYSIS_WATER_LEVEL,
+} from './farcrysis-terrain-authority';
 import { applyVista, animateVista } from './farcrysis-vista';
 import { buildEnhancedPalms } from './farcrysis-palms-enhanced';
 import { applyGroundTextures } from './farcrysis-ground-textures';
@@ -144,8 +148,9 @@ function addResearchTower(root: THREE.Group): void {
   const dishGeom = new THREE.CylinderGeometry(0.8, 0.7, 0.1, 12);
   group.add(makeMesh(dishGeom, cornerMetal, 'farcrysis-art-tower-dish', [0, legHeight + 1.4, 0]));
 
-  // Position near the research station core, outside the NW wall
-  group.position.set(-8.5, 0, -8.5);
+  // Position near the research station core, outside the NW wall, with the
+  // leg bases seated on the terrain authority surface (HF-360).
+  group.position.set(-8.5, terrainHeight(-8.5, -8.5), -8.5);
   root.add(group);
 }
 
@@ -195,8 +200,9 @@ function addFloodedCave(root: THREE.Group): void {
     ));
   }
 
-  // Place at lagoon's southern edge, facing inland
-  group.position.set(26, 0, 16);
+  // Place at lagoon's southern edge, facing inland, seated on the terrain
+  // authority surface (HF-360).
+  group.position.set(26, terrainHeight(26, 16), 16);
   group.rotation.y = 1.2;
   root.add(group);
 }
@@ -233,7 +239,10 @@ function addTikiMarkers(root: THREE.Group): void {
     const topGeom = new THREE.BoxGeometry(0.5, 0.5, 0.5);
     post.add(makeMesh(topGeom, wood, 'farcrysis-art-tiki-top', [0, 2.5, 0], { rotation: [0.3, 0.5, 0.2] }));
 
-    post.position.set(tx, 0.02, tz);
+    // HF-360: seat each marker on the terrain authority surface (the old
+    // constant 0.02 matched the beach shelf at these exact positions only
+    // by coincidence).
+    post.position.set(tx, terrainHeight(tx, tz), tz);
     root.add(post);
   }
 }
@@ -260,13 +269,14 @@ function createWordmarkTexture(): THREE.Texture | null {
 function addCrateWordmarks(root: THREE.Group): void {
   const stampMat = emissiveMat(FARCRYSIS_ART_FEEL.crateStamp, 0.9);
   // The 4 overgrown crates are named farcrysis-crate-nw/-ne/-sw/-se at
-  // [-10/10, 0.45, -8/8] in the builder. We add a small emissive plaque
-  // on the outward-facing side of each.
+  // [-10/10, 8/-8] in the builder, seated on the terrain surface (HF-360).
+  // The plaques ride the same ground height so they stay glued to the crate
+  // face instead of hovering at the old flat-floor elevation.
   const crates: [string, [number, number, number], [number, number, number]][] = [
-    ['nw', [-10.45, 1.0, -8], [0, 0, 0]],
-    ['ne', [10.45, 1.0, -8], [0, Math.PI, 0]],
-    ['sw', [-10.45, 1.0, 8], [0, Math.PI, 0]],
-    ['se', [10.45, 1.0, 8], [0, 0, 0]],
+    ['nw', [-10.45, terrainHeight(-10, -8) + 1.0, -8], [0, 0, 0]],
+    ['ne', [10.45, terrainHeight(10, -8) + 1.0, -8], [0, Math.PI, 0]],
+    ['sw', [-10.45, terrainHeight(-10, 8) + 1.0, 8], [0, Math.PI, 0]],
+    ['se', [10.45, terrainHeight(10, 8) + 1.0, 8], [0, 0, 0]],
   ];
 
   for (const [tag, pos, rot] of crates) {
@@ -320,8 +330,10 @@ function addInstancedBushes(root: THREE.Group): void {
 
     matrix.makeRotationY(angle * 1.8 + i);
     // Per-instance scale variation
-    matrix.scale(new THREE.Vector3(0.7 + (i % 4) * 0.18, 0.75 + (i % 3) * 0.16, 0.7 + ((i + 1) % 4) * 0.18));
-    matrix.setPosition(px, 0.45, pz);
+    const bushScaleY = 0.75 + (i % 3) * 0.16;
+    matrix.scale(new THREE.Vector3(0.7 + (i % 4) * 0.18, bushScaleY, 0.7 + ((i + 1) % 4) * 0.18));
+    // HF-360: seat each bush base on the terrain authority surface.
+    matrix.setPosition(px, terrainHeight(px, pz) + 0.45 * bushScaleY, pz);
     instances.setMatrixAt(i, matrix);
   }
 
@@ -357,8 +369,10 @@ function addInstancedFernClusters(root: THREE.Group): void {
 
     // Slightly rotate each fern so they face random directions
     matrix.makeRotationY(angle * 2.7 + i * 0.9);
-    matrix.scale(new THREE.Vector3(0.8 + (i % 3) * 0.25, 0.7 + (i % 4) * 0.2, 1));
-    matrix.setPosition(px, 0.55, pz);
+    const fernScaleY = 0.7 + (i % 4) * 0.2;
+    matrix.scale(new THREE.Vector3(0.8 + (i % 3) * 0.25, fernScaleY, 1));
+    // HF-360: seat each fern cluster base on the terrain authority surface.
+    matrix.setPosition(px, terrainHeight(px, pz) + 0.55 * fernScaleY, pz);
     instances.setMatrixAt(i, matrix);
   }
 
@@ -376,14 +390,15 @@ function addWaterSparkle(root: THREE.Group): void {
   const { minX, maxX, minZ, maxZ } = FARCRYSIS_BOUNDS;
   // Sparkles only on the outer water ring (beyond the beach/lagoon edge)
   const innerRadius = 20;
+  const sparkleRng = mulberry32(ART_SEED + 4);
 
   for (let i = 0; i < sparkleCount; i += 1) {
-    const angle = (i / sparkleCount) * Math.PI * 2 + Math.random() * 0.4;
-    const radius = innerRadius + Math.random() * 16;
+    const angle = (i / sparkleCount) * Math.PI * 2 + sparkleRng() * 0.4;
+    const radius = innerRadius + sparkleRng() * 16;
     const px = Math.max(minX + 2, Math.min(maxX - 2, Math.cos(angle) * radius));
     const pz = Math.max(minZ + 2, Math.min(maxZ - 2, Math.sin(angle) * radius * 0.9));
     positions[i * 3 + 0] = px;
-    positions[i * 3 + 1] = -0.21; // just above water surface (y=-0.25)
+    positions[i * 3 + 1] = FARCRYSIS_WATER_LEVEL + 0.04; // just above the water surface
     positions[i * 3 + 2] = pz;
   }
 
@@ -413,16 +428,30 @@ function addWaterSparkle(root: THREE.Group): void {
 // TSL-compatible inline terrain, lighting, and water (replaces terrain.ts)
 // ---------------------------------------------------------------------------
 
-function terrainHeight(x: number, z: number): number {
-  const dist = FARCRYSIS_BOUNDS.maxX - Math.max(Math.abs(x), Math.abs(z));
-  // Beach shelf: flat near edges, rising toward center
-  if (dist < 10) return Math.max(0, dist * 0.03 - 0.1);
-  // Jungle interior: gentle rolling hills
-  const h = Math.sin(x * 0.12) * Math.cos(z * 0.15) * 1.2
-    + Math.sin(x * 0.25 + 1.3) * Math.cos(z * 0.22 + 2.1) * 0.6
-    + Math.sin(z * 0.18 - 0.7) * 0.4;
-  return Math.max(-0.05, h + 0.1);
+// HF-360: the height function that used to live right here is now the arena's
+// single terrain authority (farcrysis-terrain-authority.ts), shared with the
+// physics plates, prop seating, vegetation and bot elevation. Imported above
+// under its old local name so every call site below reads unchanged.
+
+/**
+ * Seeded PRNG (mulberry32, the same idiom farcrysis-physics.ts and
+ * farcrysis-vegetation.ts already use). HF-360: world placement in this file
+ * ran on Math.random, so every peer built a DIFFERENT arena — rocks, litter
+ * and driftwood disagreed between host and clients. All placement below is
+ * seeded so peers see identical worlds.
+ */
+function mulberry32(seed: number): () => number {
+  let s = seed | 0;
+  return () => {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
+
+/** Base seed for this module's placement streams (arbitrary, stable). */
+const ART_SEED = 0x0fa7c515;
 
 // ARENA_HALF based on FARCRYSIS_BOUNDS
 const ARENA_HALF = FARCRYSIS_BOUNDS.maxX;
@@ -471,19 +500,20 @@ function buildInlineTerrain(scene: THREE.Scene): void {
   // Cliff rock ring (28 IcosahedronGeometry rocks along the cliff band)
   const cliffRockMat = new THREE.MeshStandardMaterial({ color: 0x5a5550, roughness: 0.88, metalness: 0.06 });
   const cliffCount = 28;
+  const cliffRng = mulberry32(ART_SEED + 1);
   for (let i = 0; i < cliffCount; i++) {
-    const angle = (i / cliffCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
-    const rockDist = 18 + Math.random() * 8;
+    const angle = (i / cliffCount) * Math.PI * 2 + (cliffRng() - 0.5) * 0.6;
+    const rockDist = 18 + cliffRng() * 8;
     const rx = Math.max(-ARENA_HALF + 2, Math.min(ARENA_HALF - 2, Math.cos(angle) * rockDist));
     const rz = Math.max(-ARENA_HALF + 2, Math.min(ARENA_HALF - 2, Math.sin(angle) * rockDist));
     const baseY = terrainHeight(rx, rz);
-    const detail = Math.random() < 0.5 ? 2 : 1;
-    const rGeom = new THREE.IcosahedronGeometry(0.6 + Math.random() * 1.4, detail);
+    const detail = cliffRng() < 0.5 ? 2 : 1;
+    const rGeom = new THREE.IcosahedronGeometry(0.6 + cliffRng() * 1.4, detail);
     const rock = new THREE.Mesh(rGeom, cliffRockMat);
     rock.name = `farcrysis-cliff-rock-${i}`;
     rock.position.set(rx, baseY + 0.4, rz);
-    rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-    rock.scale.setScalar(0.7 + Math.random() * 0.6);
+    rock.rotation.set(cliffRng() * Math.PI, cliffRng() * Math.PI, cliffRng() * Math.PI);
+    rock.scale.setScalar(0.7 + cliffRng() * 0.6);
     rock.castShadow = true;
     rock.receiveShadow = true;
     group.add(rock);
@@ -491,17 +521,18 @@ function buildInlineTerrain(scene: THREE.Scene): void {
 
   // Jungle floor boulders (scattered interior)
   const boulderMat = new THREE.MeshStandardMaterial({ color: 0x7a7268, roughness: 0.85, metalness: 0.08 });
+  const boulderRng = mulberry32(ART_SEED + 2);
   for (let i = 0; i < 12; i++) {
-    const angle = (i / 12) * Math.PI * 2 + Math.random() * 0.5;
-    const placeDist = 5 + Math.random() * 12;
+    const angle = (i / 12) * Math.PI * 2 + boulderRng() * 0.5;
+    const placeDist = 5 + boulderRng() * 12;
     const rx = Math.max(-ARENA_HALF + 3, Math.min(ARENA_HALF - 3, Math.cos(angle) * placeDist));
     const rz = Math.max(-ARENA_HALF + 3, Math.min(ARENA_HALF - 3, Math.sin(angle) * placeDist));
     const baseY = terrainHeight(rx, rz);
-    const rGeom = new THREE.IcosahedronGeometry(0.3 + Math.random() * 0.6, 1);
+    const rGeom = new THREE.IcosahedronGeometry(0.3 + boulderRng() * 0.6, 1);
     const boulder = new THREE.Mesh(rGeom, boulderMat);
     boulder.name = `farcrysis-boulder-${i}`;
     boulder.position.set(rx, baseY + 0.15, rz);
-    boulder.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    boulder.rotation.set(boulderRng() * Math.PI, boulderRng() * Math.PI, boulderRng() * Math.PI);
     boulder.castShadow = true;
     boulder.receiveShadow = true;
     group.add(boulder);
@@ -509,17 +540,18 @@ function buildInlineTerrain(scene: THREE.Scene): void {
 
   // Large boulders near water's edge
   const shoreBoulderMat = new THREE.MeshStandardMaterial({ color: 0x6a6058, roughness: 0.9, metalness: 0.04 });
+  const shoreRng = mulberry32(ART_SEED + 3);
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * Math.PI * 2 + 0.2;
-    const shoreDist = ARENA_HALF - 2 + Math.random() * 3;
+    const shoreDist = ARENA_HALF - 2 + shoreRng() * 3;
     const rx = Math.cos(angle) * shoreDist;
     const rz = Math.sin(angle) * shoreDist;
     const baseY = terrainHeight(rx, rz);
-    const rGeom = new THREE.IcosahedronGeometry(0.8 + Math.random() * 1.2, 2);
+    const rGeom = new THREE.IcosahedronGeometry(0.8 + shoreRng() * 1.2, 2);
     const boulder = new THREE.Mesh(rGeom, shoreBoulderMat);
     boulder.name = `farcrysis-shore-boulder-${i}`;
     boulder.position.set(rx, baseY + 0.3, rz);
-    boulder.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    boulder.rotation.set(shoreRng() * Math.PI, shoreRng() * Math.PI, shoreRng() * Math.PI);
     boulder.castShadow = true;
     boulder.receiveShadow = true;
     group.add(boulder);
@@ -590,9 +622,15 @@ function buildInlineLighting(scene: THREE.Scene): void {
 }
 
 function buildInlineWater(scene: THREE.Scene): void {
+  // HF-360: every stacked visual water plane is now expressed relative to the
+  // ONE registry water level (water-authoring FARCRYSIS_WATER.level = -0.25,
+  // which the arena-builder lagoon plane sits at). The visual stack keeps its
+  // accepted millimetre offsets purely to avoid z-fighting: deep sits 30 mm
+  // below the surface, the shallow lens 10 mm above the lagoon plane, and the
+  // additive wave FX 30 mm above (farcrysis-water-fx.ts).
+
   // (a) Deep open water — extended to the visible horizon (120×120 m),
-  //     richer tropical blue-green. At y = -0.28 it sits below the lowest
-  //     terrain rim (y ≈ 0.0) and beneath every additive water-FX layer.
+  //     richer tropical blue-green, below every additive water-FX layer.
   const deepSize = 120;
   const deepGeom = new THREE.PlaneGeometry(deepSize, deepSize);
   deepGeom.rotateX(-Math.PI / 2);
@@ -607,14 +645,14 @@ function buildInlineWater(scene: THREE.Scene): void {
 
   const deep = new THREE.Mesh(deepGeom, deepMat);
   deep.name = 'farcrysis-water-inline';
-  deep.position.y = -0.28;
+  deep.position.y = FARCRYSIS_WATER_LEVEL - 0.03;
   deep.receiveShadow = true;
   scene.add(deep);
 
   // (c) Shallow near-shore water — a lighter translucent lens (40×40 m)
   //     over the beach shelf so the sand reads through the water near the
-  //     shoreline. y = -0.24 keeps it just below the additive wave surface
-  //     at -0.22 (no z-fighting) while still above the deep plane.
+  //     shoreline. 10 mm above the lagoon plane keeps it just below the
+  //     additive wave surface (no z-fighting) while still above deep water.
   const shallowSize = 40;
   const shallowGeom = new THREE.PlaneGeometry(shallowSize, shallowSize);
   shallowGeom.rotateX(-Math.PI / 2);
@@ -630,7 +668,7 @@ function buildInlineWater(scene: THREE.Scene): void {
 
   const shallow = new THREE.Mesh(shallowGeom, shallowMat);
   shallow.name = 'farcrysis-water-shallow';
-  shallow.position.y = -0.24;
+  shallow.position.y = FARCRYSIS_WATER_LEVEL + 0.01;
   shallow.renderOrder = 2;
   scene.add(shallow);
 
@@ -699,12 +737,12 @@ function buildInlineWater(scene: THREE.Scene): void {
 // ---------------------------------------------------------------------------
 
 /** Sand-matched vertex colors so small beach litter blends into the sand. */
-function tintBeachGeometry(geo: THREE.BufferGeometry, base: THREE.Color, spread: number): THREE.BufferGeometry {
+function tintBeachGeometry(geo: THREE.BufferGeometry, base: THREE.Color, spread: number, rng: () => number): THREE.BufferGeometry {
   const posAttr = geo.attributes.position as THREE.BufferAttribute;
   const count = posAttr.count;
   const colors = new Float32Array(count * 3);
   for (let i = 0; i < count; i += 1) {
-    const v = 1 - spread + Math.random() * spread * 2;
+    const v = 1 - spread + rng() * spread * 2;
     colors[i * 3 + 0] = base.r * v;
     colors[i * 3 + 1] = base.g * v;
     colors[i * 3 + 2] = base.b * v;
@@ -718,23 +756,24 @@ function addBeachLitter(group: THREE.Group): void {
   const sand = new THREE.Color(FARCRYSIS_ART_FEEL.beachSand);
   const litterMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0.03 });
   const litterCount = 36;
+  const rng = mulberry32(ART_SEED + 5);
 
   for (let i = 0; i < litterCount; i += 1) {
-    const angle = (i / litterCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.9;
-    const dist = ARENA_HALF - 1.5 - Math.random() * 6.5; // edgeDist ≈ 1.5-8 (sand)
+    const angle = (i / litterCount) * Math.PI * 2 + (rng() - 0.5) * 0.9;
+    const dist = ARENA_HALF - 1.5 - rng() * 6.5; // edgeDist ≈ 1.5-8 (sand)
     const rx = Math.max(-ARENA_HALF + 0.8, Math.min(ARENA_HALF - 0.8, Math.cos(angle) * dist));
     const rz = Math.max(-ARENA_HALF + 0.8, Math.min(ARENA_HALF - 0.8, Math.sin(angle) * dist * 0.96));
     const baseY = terrainHeight(rx, rz);
 
     // Every third item is a flattened shell; the rest are small lumpy rocks.
-    const size = 0.06 + Math.random() * 0.12;
+    const size = 0.06 + rng() * 0.12;
     const isShell = i % 3 === 0;
     const geo = isShell
-      ? tintBeachGeometry(new THREE.SphereGeometry(size, 6, 4), sand, 0.16)
-      : tintBeachGeometry(new THREE.BoxGeometry(size * 2.2, size * 0.7, size * 1.6), sand, 0.22);
+      ? tintBeachGeometry(new THREE.SphereGeometry(size, 6, 4), sand, 0.16, rng)
+      : tintBeachGeometry(new THREE.BoxGeometry(size * 2.2, size * 0.7, size * 1.6), sand, 0.22, rng);
 
     group.add(makeMesh(geo, litterMat, `farcrysis-beach-litter-${i}`, [rx, baseY + size * 0.3, rz], {
-      rotation: [Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI],
+      rotation: [rng() * Math.PI, rng() * Math.PI, rng() * Math.PI],
       castShadow: false,
     }));
   }
@@ -744,14 +783,15 @@ function addBeachLitter(group: THREE.Group): void {
 function addDriftwoodLogs(group: THREE.Group): void {
   const logMat = mat(0x8a7355, 0.92, 0.04);
   const logCount = 6;
+  const rng = mulberry32(ART_SEED + 6);
 
   for (let i = 0; i < logCount; i += 1) {
-    const angle = (i / logCount) * Math.PI * 2 + (Math.random() - 0.5) * 1.1;
-    const dist = ARENA_HALF - 2 - Math.random() * 5; // edgeDist ≈ 2-7 (sand)
+    const angle = (i / logCount) * Math.PI * 2 + (rng() - 0.5) * 1.1;
+    const dist = ARENA_HALF - 2 - rng() * 5; // edgeDist ≈ 2-7 (sand)
     const rx = Math.max(-ARENA_HALF + 0.8, Math.min(ARENA_HALF - 0.8, Math.cos(angle) * dist));
     const rz = Math.max(-ARENA_HALF + 0.8, Math.min(ARENA_HALF - 0.8, Math.sin(angle) * dist * 0.96));
     const baseY = terrainHeight(rx, rz);
-    const length = 1.2 + Math.random() * 1.6;
+    const length = 1.2 + rng() * 1.6;
 
     group.add(makeMesh(
       new THREE.CylinderGeometry(0.09, 0.14, length, 6),
@@ -759,7 +799,7 @@ function addDriftwoodLogs(group: THREE.Group): void {
       `farcrysis-driftwood-${i}`,
       [rx, baseY + 0.1, rz],
       // Rz(π/2) lays the cylinder horizontal; Ry spins it; Rx gives a slight tilt.
-      { rotation: [(Math.random() - 0.5) * 0.25, Math.random() * Math.PI, Math.PI / 2], castShadow: true },
+      { rotation: [(rng() - 0.5) * 0.25, rng() * Math.PI, Math.PI / 2], castShadow: true },
     ));
   }
 }
@@ -768,24 +808,26 @@ function addDriftwoodLogs(group: THREE.Group): void {
 function addJungleUndergrowth(group: THREE.Group): void {
   const undergrowthMat = mat(0x35682f, 0.9, 0.02);
   const bushCount = 18;
+  const rng = mulberry32(ART_SEED + 7);
 
   for (let i = 0; i < bushCount; i += 1) {
-    const angle = (i / bushCount) * Math.PI * 2 + (Math.random() - 0.5) * 1.2;
-    const dist = 7 + Math.random() * 9; // 7-16 → jungle interior
+    const angle = (i / bushCount) * Math.PI * 2 + (rng() - 0.5) * 1.2;
+    const dist = 7 + rng() * 9; // 7-16 → jungle interior
     const rx = Math.max(-ARENA_HALF + 4, Math.min(ARENA_HALF - 4, Math.cos(angle) * dist));
     const rz = Math.max(-ARENA_HALF + 4, Math.min(ARENA_HALF - 4, Math.sin(angle) * dist * 0.9));
+    const sx = 0.7 + rng() * 0.8;
+    const sz = 0.7 + rng() * 0.8;
+    const rotY = rng() * Math.PI;
     const edgeDist = ARENA_HALF - Math.max(Math.abs(rx), Math.abs(rz));
     if (edgeDist < 14) continue; // keep strictly inside the jungle interior
     const baseY = terrainHeight(rx, rz);
-    const sx = 0.7 + Math.random() * 0.8;
-    const sz = 0.7 + Math.random() * 0.8;
 
     group.add(makeMesh(
       new THREE.BoxGeometry(1.2, 1.0, 1.2),
       undergrowthMat,
       `farcrysis-undergrowth-bush-${i}`,
       [rx, baseY + 0.21, rz],
-      { rotation: [0, Math.random() * Math.PI, 0], scale: [sx, 0.42, sz], castShadow: true },
+      { rotation: [0, rotY, 0], scale: [sx, 0.42, sz], castShadow: true },
     ));
   }
 }
@@ -801,6 +843,7 @@ export function addFallenCoconuts(root: THREE.Group, trunkInstances: THREE.Insta
   const pos = new THREE.Vector3();
   const target = 20;
   let added = 0;
+  const rng = mulberry32(ART_SEED + 8);
 
   for (let i = 0; i < trunkInstances.count && added < target; i += 1) {
     trunkInstances.getMatrixAt(i, matrix);
@@ -808,19 +851,19 @@ export function addFallenCoconuts(root: THREE.Group, trunkInstances: THREE.Insta
     // Drop 1-2 coconuts a short tumble from each trunk base
     const perPalm = i % 2 === 0 ? 2 : 1;
     for (let c = 0; c < perPalm && added < target; c += 1) {
-      const offset = 0.35 + Math.random() * 0.55;
-      const ang = Math.random() * Math.PI * 2;
+      const offset = 0.35 + rng() * 0.55;
+      const ang = rng() * Math.PI * 2;
       const cx = Math.max(-ARENA_HALF + 0.5, Math.min(ARENA_HALF - 0.5, pos.x + Math.cos(ang) * offset));
       const cz = Math.max(-ARENA_HALF + 0.5, Math.min(ARENA_HALF - 0.5, pos.z + Math.sin(ang) * offset));
       const baseY = terrainHeight(cx, cz);
-      const size = 0.11 + Math.random() * 0.07;
+      const size = 0.11 + rng() * 0.07;
 
       root.add(makeMesh(
         new THREE.SphereGeometry(size, 8, 6),
         coconutMat,
         `farcrysis-fallen-coconut-${added}`,
         [cx, baseY + size * 0.7, cz],
-        { rotation: [Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI], castShadow: false },
+        { rotation: [rng() * Math.PI, rng() * Math.PI, rng() * Math.PI], castShadow: false },
       ));
       added += 1;
     }

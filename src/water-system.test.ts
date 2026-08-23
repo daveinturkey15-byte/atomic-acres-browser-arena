@@ -111,7 +111,9 @@ describe('WaterSystem', () => {
     expect(farcrysis.telemetry()).toMatchObject({
       enabled: true,
       physicsActive: true,
-      waterLevel: -0.3,
+      // HF-360: the registry level was corrected to the live authored lagoon
+      // surface (-0.25); -0.3 came from a deleted terrain module.
+      waterLevel: -0.25,
       swimmable: true,
     });
     expect(farcrysis.body?.arenaId).toBe('farcrysis');
@@ -197,7 +199,7 @@ describe('WaterSystem', () => {
       arenaId: 'farcrysis',
       physicsActive: true,
       swimmable: true,
-      waterLevel: -0.3,
+      waterLevel: -0.25, // HF-360: corrected to the live authored lagoon surface
       waveAmp: RUSTWORKS_OCEAN_AMPLITUDE.blender * 0.2,
       nearSize: 76,
       horizonRadius: 1_400,
