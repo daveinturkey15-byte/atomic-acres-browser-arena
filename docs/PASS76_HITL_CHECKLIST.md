@@ -12,6 +12,10 @@ check is named so you can re-run it yourself.
 If this file and `PASS74_OWNER_FEEDBACK_LEDGER_2026-08-21.md` disagree, believe
 the ledger and tell me.
 
+**Final verification at hand-off:** `tsc` clean · **3,396 tests passing** ·
+six arenas boot at three viewports with **zero console errors** · multiplayer
+matrix **6/6 lanes** · farcrysis ground contract PASS · swim verifier PASS.
+
 ---
 
 ## A. The five things you asked for most recently
@@ -33,6 +37,17 @@ sea, look at the sky, walk up a hill.
 - **Things block you now.** The catwalk was walk-through; its ramp ended in
   mid-air. Collision added for the seaplane, cave arch, beacon, tower legs,
   barrels and ~25 palm trunks.
+- **The jungle actually exists now.** Two bugs did most of the "messy" damage,
+  and neither was in the art: the static batcher treated `InstancedMesh` as a
+  plain mesh and **silently deleted ~2,000 instanced plants**, and palm crowns
+  rendered as solid brown domes because a leaf texture was mapped onto geometry
+  with no UVs. Both fixed. The batcher bug affected *every* arena — Atomic
+  Acres has visibly gained its grass and flowers back.
+- **The sky is blue.** It was a golden-hour dusk band, and on top of that 30
+  near-white clouds covered exactly the strip you look at while standing —
+  forcing the sky to pure red changed nothing on screen, which is how the
+  clouds were caught. Now saturated tropical daylight.
+- **Frame rate at spawn went 30 → 60.**
 - **Look for:** anything still floating, anything you can walk through that
   should stop you, and whether the beach-to-water transition feels right.
 
@@ -124,7 +139,7 @@ Fixed this pass:
 ## C. Re-run any of it yourself
 
 ```bash
-npx vitest run                                          # 3387 tests
+npx vitest run                                          # 3396 tests
 node scripts/qa/verify-hf347-arena-movement-matrix.mjs   # 6-lane multiplayer
 node scripts/qa/verify-farcrysis-ground-contract.mjs     # stand + walk-to-swim
 node scripts/qa/capture-below-deck.mjs                   # Hijacked lower deck
