@@ -1,0 +1,274 @@
+/*
+ * Pass 75 - in-game HUD stylisation redesign.
+ *
+ * Owner brief: "the HUD ingame... its layout and sizing is OK but its
+ * stylisation is outdated". So this sheet changes NOTHING about geometry - the
+ * pass65 token set (--hud-edge/-gap/-mission-width/-map-width/-operator-width/
+ * -weapon-width/-support-width, pass65-hud.css:9-15) and every element id are
+ * untouched. It replaces the LOOK.
+ *
+ * What was dated, from the captured frames:
+ *   - Every cluster was a flat opaque slab with a hard 90-degree edge, each
+ *     with its own border weight and its own corner treatment. Five clusters,
+ *     five different visual languages.
+ *   - Depth was a single global drop-shadow rather than a material: nothing
+ *     read as glass, layered above the world.
+ *   - Accent colour was decorative, not semantic - cyan, amber and coral
+ *     appeared without consistently meaning friendly, caution or danger.
+ *   - Numerals were proportional, so health and ammo jittered as digits
+ *     changed, and the value/label hierarchy was weak.
+ *   - Nothing acknowledged state change: values snapped with no feedback.
+ *
+ * The replacement is one material and one accent grammar:
+ *   panel  = layered translucent glass + hairline top highlight + soft outer
+ *            shadow, so HUD reads as above the world without blocking it
+ *   accent = a left/edge rule that carries meaning (team, caution, danger)
+ *   type   = tabular numerals, small-caps labels, one weight ramp
+ *
+ * CASCADE: unlayered and loaded after pass74-visual-refresh.css, because
+ * pass66-readability.css is itself unlayered and outranks every @layer.
+ *
+ * ACCESSIBILITY: every transition here is gated by both reduced-motion
+ * switches, and no rule reduces a font below the AGENTS.md floors.
+ */
+
+#hud {
+  /* One material, expressed once. */
+  --p75-glass-strong: linear-gradient(158deg, rgba(10, 26, 33, 0.90) 0%, rgba(5, 15, 21, 0.86) 100%);
+  --p75-glass-soft: linear-gradient(158deg, rgba(10, 26, 33, 0.74) 0%, rgba(5, 15, 21, 0.68) 100%);
+  --p75-glass-quiet: linear-gradient(158deg, rgba(9, 22, 29, 0.58) 0%, rgba(5, 14, 19, 0.52) 100%);
+
+  --p75-hairline: rgba(150, 226, 226, 0.20);
+  --p75-hairline-strong: rgba(150, 226, 226, 0.36);
+  --p75-top-sheen: rgba(224, 255, 253, 0.16);
+
+  /* Elevation: HUD sits above the world, so shadows are broad and soft rather
+     than the tight boxy drop-shadows the old slabs used. */
+  --p75-cast: 0 10px 30px rgba(0, 0, 0, 0.44), 0 2px 8px rgba(0, 0, 0, 0.34);
+
+  /* Semantic accents. Colour now MEANS something. */
+  --p75-friendly: var(--hud-cyan, #66ebe1);
+  --p75-caution: var(--hud-amber, #f2b74f);
+  --p75-danger: var(--hud-coral, #ff776d);
+  --p75-good: var(--hud-green, #70e8b0);
+
+  --p75-radius: 10px;
+  --p75-rule: 3px;
+  --p75-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* ---------------------------------------------------------------------------
+ * The shared panel material. Applied to the five console clusters so they stop
+ * looking like five separate products. Geometry (position, width, padding) is
+ * inherited from pass65-hud.css and deliberately not restated here.
+ * ------------------------------------------------------------------------ */
+
+#hud #matchbar,
+#hud #objective,
+#hud #minimap-block,
+#hud #health-block,
+#hud #weapon-block,
+#hud #support-block,
+#hud #equipment-block,
+#hud #combat-stats,
+#hud #room-hud,
+#hud #killfeed,
+#hud #damage-feeds {
+  border-radius: var(--p75-radius);
+  border: 1px solid var(--p75-hairline);
+  background-image: var(--p75-glass-soft);
+  box-shadow: var(--p75-cast);
+  /* A single hairline of light along the top edge is what reads as "glass"
+     rather than "grey box"; it costs one inset shadow, no extra layer. */
+  box-shadow:
+    var(--p75-cast),
+    inset 0 1px 0 var(--p75-top-sheen);
+}
+
+/* The two clusters a player reads under pressure get the denser material and a
+   semantic edge rule, so they separate from the ambient readouts at a glance. */
+#hud #health-block,
+#hud #weapon-block {
+  background-image: var(--p75-glass-strong);
+  border-color: var(--p75-hairline-strong);
+}
+
+#hud #health-block {
+  border-left: var(--p75-rule) solid var(--p75-good);
+}
+
+#hud #weapon-block {
+  border-left: var(--p75-rule) solid var(--p75-friendly);
+}
+
+#hud #matchbar {
+  border-top: var(--p75-rule) solid var(--p75-friendly);
+}
+
+/* Ambient/secondary readouts recede rather than compete. */
+#hud #combat-stats,
+#hud #equipment-block,
+#hud #room-hud,
+#hud #damage-feeds {
+  background-image: var(--p75-glass-quiet);
+}
+
+/* ---------------------------------------------------------------------------
+ * Type: one hierarchy. Big values are tabular so they stop jittering, labels
+ * become quiet small-caps, and the value/label relationship is explicit.
+ * ------------------------------------------------------------------------ */
+
+#hud #health,
+#hud #ammo,
+#hud #reserve,
+#hud #timer,
+#hud #aqua-score,
+#hud #coral-score,
+#hud #damage-dealt,
+#hud #damage-taken,
+#hud #support-streak {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: 0.01em;
+}
+
+#hud #vitals-label,
+#hud #match-mode-label,
+#hud #support-title,
+#hud #map-heading {
+  color: var(--hud-dim, #81969a);
+  font-variant: small-caps;
+  letter-spacing: 0.14em;
+}
+
+/* ---------------------------------------------------------------------------
+ * Health: the track becomes a real gauge with a semantic fill, and the state
+ * of the player is legible from the colour alone.
+ * ------------------------------------------------------------------------ */
+
+#hud .health-track {
+  border-radius: 999px;
+  background: rgba(2, 10, 14, 0.72);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+#hud #health-fill {
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--p75-good) 0%, var(--p75-friendly) 100%);
+  transition: width 180ms var(--p75-ease), background 220ms var(--p75-ease);
+}
+
+/* Wounded and critical are colour AND width, never colour alone. */
+#hud #health-block[data-health-state='wounded'] #health-fill {
+  background: linear-gradient(90deg, var(--p75-caution) 0%, #ffd489 100%);
+}
+
+#hud #health-block[data-health-state='critical'] #health-fill {
+  background: linear-gradient(90deg, var(--p75-danger) 0%, #ff9d94 100%);
+}
+
+/* ---------------------------------------------------------------------------
+ * Field support: the streak list becomes a scannable ladder. Locked entries
+ * recede, ready entries carry the accent rule, and the key hint is legible.
+ * ------------------------------------------------------------------------ */
+
+#hud .support-list > li,
+#hud .support-list > div {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: border-color 160ms var(--p75-ease), background-color 160ms var(--p75-ease);
+}
+
+#hud .support-list [data-support-state='ready'],
+#hud .support-list .is-ready {
+  border-color: var(--p75-hairline-strong);
+  background: rgba(102, 235, 225, 0.10);
+  border-left: var(--p75-rule) solid var(--p75-friendly);
+}
+
+#hud .support-list [data-support-state='locked'],
+#hud .support-list .is-locked {
+  opacity: 0.62;
+}
+
+/* ---------------------------------------------------------------------------
+ * Minimap: framed like an instrument rather than pasted on.
+ * ------------------------------------------------------------------------ */
+
+#hud #minimap {
+  border-radius: 8px;
+  box-shadow:
+    inset 0 0 0 1px var(--p75-hairline),
+    inset 0 0 24px rgba(0, 0, 0, 0.45);
+}
+
+/* ---------------------------------------------------------------------------
+ * Killfeed: rows gain rhythm and the newest row is the brightest, so the eye
+ * lands on what just happened.
+ * ------------------------------------------------------------------------ */
+
+#hud #killfeed > * {
+  border-radius: 6px;
+  border-left: 2px solid var(--p75-hairline);
+  padding-left: 8px;
+}
+
+#hud #killfeed > *:first-child {
+  border-left-color: var(--p75-friendly);
+}
+
+/* ---------------------------------------------------------------------------
+ * Crosshair: thinner, with a dark outline so it survives a bright sky as well
+ * as a dark interior. Competitive readability, not decoration.
+ * ------------------------------------------------------------------------ */
+
+#hud #crosshair i {
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9));
+}
+
+/* ---------------------------------------------------------------------------
+ * Chopper Gunner cockpit: the one subsystem that was a different colour family
+ * entirely (green) joins the same grammar while keeping its own identity as
+ * the caution accent - it is a temporary, high-stakes possession state.
+ * ------------------------------------------------------------------------ */
+
+#gunner-cockpit-hud .gunner-status,
+#gunner-cockpit-hud .gunner-instruments,
+#gunner-cockpit-hud #gunner-control-strip {
+  border-radius: var(--p75-radius);
+  border: 1px solid rgba(150, 226, 226, 0.22);
+  background-image: var(--p75-glass-strong);
+  box-shadow: var(--p75-cast), inset 0 1px 0 var(--p75-top-sheen);
+}
+
+#gunner-cockpit-hud #gunner-control-strip {
+  border-left: var(--p75-rule) solid var(--p75-caution);
+}
+
+#gunner-cockpit-hud #gunner-hull,
+#gunner-cockpit-hud #gunner-ammo,
+#gunner-cockpit-hud #gunner-altitude,
+#gunner-cockpit-hud #gunner-speed,
+#gunner-cockpit-hud #gunner-time,
+#gunner-cockpit-hud #gunner-damage {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+ * Motion gates. Both switches, per the existing accessibility contract.
+ * ------------------------------------------------------------------------ */
+
+html[data-reduced-motion='true'] #hud #health-fill,
+html[data-reduced-motion='true'] #hud .support-list > li,
+html[data-reduced-motion='true'] #hud .support-list > div {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #hud #health-fill,
+  #hud .support-list > li,
+  #hud .support-list > div {
+    transition: none;
+  }
+}

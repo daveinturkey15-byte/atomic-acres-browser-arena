@@ -7,6 +7,9 @@ import './ui/pass66-overhaul.css';
 // HF-362: intentionally LAST and unlayered so it can override
 // pass66-readability.css, which is itself unlayered and outranks every @layer.
 import './ui/pass74-visual-refresh.css';
+// Pass 75 HUD stylisation redesign - after the Pass 74 sheet, same unlayered
+// reason: pass66-readability.css is unlayered and outranks every @layer.
+import './ui/pass75-hud-redesign.css';
 import {
   releaseChannelDecision,
   stableReleaseUrl,
