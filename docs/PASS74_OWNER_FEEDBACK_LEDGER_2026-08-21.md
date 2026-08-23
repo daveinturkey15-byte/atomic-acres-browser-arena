@@ -446,3 +446,97 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 - Source: owner instruction 2026-08-21. The pass ends with a locally served build and an owner
   checklist. No push to production, gh-pages, or the release workflow.
 - Status: STANDING
+
+## HITL 2026-08-23 — owner played the Pass 76 candidate
+
+Raw findings from the live session, recorded verbatim-in-substance before triage
+so none is lost or softened. These supersede any earlier "done" claim they
+contradict.
+
+### HF-365 — first-person arms read thin, badly held and badly animated
+- Source: owner HITL ("the arms are thin and weirdly held and animated").
+- Note: HF-354 previously recorded arm thickness as a RETAINED POSITIVE. The
+  owner now says the opposite while playing, so that row is superseded here —
+  believe the player, not the old status.
+- Status: OPEN
+
+### HF-366 — operator skins are unreadable in the menu; no preview of yourself
+- Source: owner HITL ("i picked a skin but they all looked greyed out i have no
+  idea what i look like? Should be a 2d and 3d preview and the arms should look
+  diff too?").
+- Scope: skin cards must show the actual skin, a live 3D preview of the selected
+  operator, and the FIRST-PERSON arms must change with the skin.
+- Status: OPEN
+
+### HF-367 — cannot take control of Chopper Gunner / Piloted Drone
+- Source: owner HITL ("i cant take control of chopper gunner or piloted drone
+  when i press they key again? why").
+- Root cause: the second press was evaluated as a fresh ACTIVATION. The charge
+  had just been spent calling the platform in, so projectionEarned was false and
+  the gate refused with NOT EARNED before the toggle code beneath it could run —
+  a platform you had already paid for was permanently uncontrollable. A drone
+  flying autonomously was also excluded from selection, so its key fell through
+  to another activation instead of handing over the controls.
+- Status: IMPLEMENTED — control-toggle presses are exempt from the charge and
+  possession checks (they spend nothing) while the dead / match-phase / tactical
+  map / targeting refusals still apply; autonomous drones are selectable.
+
+### HF-368 — M14 EBR wall penetration too weak
+- Source: owner HITL ("Ebr rifle can see through walls but needs better wall
+  banging i think maybe 50% more pen"). The see-through-walls behaviour is a
+  RETAINED POSITIVE (HF-353) and must not change.
+- Status: OPEN
+
+### HF-369 — Carpet Bomber second click (direction) is not explained
+- Source: owner HITL ("should be clearer that the 2nd click of the carpet bomb
+  is for its direction, animated on the map maybe when selecting the drop and
+  direction pins").
+- Status: OPEN
+
+### HF-370 — HUD and menus are static and dated; the game does not feel alive
+- Source: owner HITL ("the menus really don't look that different, it needs to
+  be much more dynamic … maybe not even pinned directly to the screen … dynamic
+  with how you look and move like most modern first person shooters … when you
+  take damage and when you're breathing and when you're stationary … a lot more
+  alive and a lot more modern, not like a game that's 20 years old").
+- Scope: diegetic/parallaxed HUD response to look and movement, breathing and
+  idle sway, damage reaction, weapon handling motion — modern-shooter feel.
+- Status: OPEN
+
+### HF-371 — not enough dust, particles and ambient life
+- Source: owner HITL ("we need more like dust and particle effects and ambient
+  sounds all sorts").
+- Status: OPEN
+
+### HF-372 — Farcrysis and High Seas have no menu preview or loading screen
+- Source: owner HITL ("i'm going to need a preview like the other maps … on the
+  main menu" / "need a decent loading screen for farcrysis and hijacked").
+- Status: OPEN
+
+### HF-373 — High Seas below-deck is too dark to play
+- Source: owner HITL ("too dark down at the bottom of hijacked, needs sorting").
+- Note: the below-deck rebuild's own follow-up predicted this exact risk and
+  named the fix (a dedicated brighter emissive rather than sharing the
+  engine-amber material, which requires extending the 13-material inventory
+  contract and its test together).
+- Status: OPEN
+
+### HF-374 — Farcrysis did not boot for the owner
+- Source: owner HITL ("i couldnt get farcrysis to boot").
+- Note: every automated boot check in this repo runs headless, and headless
+  Chromium on this machine cannot create a WebGPU device — so all six-arena
+  green results were WebGL2-only while the owner plays WebGPU. A WebGPU-route
+  arena boot sweep (scripts/qa/verify-webgpu-arena-boot.mjs) now exists to close
+  that blind spot.
+- Status: OPEN — verification gap identified, cause not yet isolated.
+
+### HF-375 — bot and player animation/rig quality, per skin
+- Source: owner HITL, with a shared reference on generating animation/rig work
+  and the idea of generating reference video locally and describing it into an
+  implementation. Scope: every bot and player model should have good rigs and
+  animations, differentiated by skin.
+- Status: OPEN
+
+### HF-376 — audio quality across the board
+- Source: owner HITL ("the sounds are all so bad").
+- Status: OPEN
