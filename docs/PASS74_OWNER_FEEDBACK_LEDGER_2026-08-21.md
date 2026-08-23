@@ -251,7 +251,18 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
 
 ### HF-347 — RustRig, Terminal and Gun Range multiplayer faults
 - Source: pass74.txt ("rust and terminal still issues anmd gun test level when multoiplayer").
-- Status: PARTIAL — Gun Range lane closed at source (5952893f, 2026-08-22): training-dummy
+- Status: IMPLEMENTED (857d48cc + 392c5920, 2026-08-23) — the RustRig/Terminal "can't move"
+  fault was reproduced mechanically by a new two-browser matrix
+  (scripts/qa/verify-hf347-arena-movement-matrix.mjs: local PeerJS, host creates room, guest
+  joins, host swaps maps WITH the guest in the room, both press W) and root-caused: the
+  world-repair admission burned one attempt per stale killstreak snapshot, and the host emits
+  several force-reliable snapshots at match start, so the guest's whole cap was gone before its
+  first repair-ready round-tripped — spawned dead, no respawn, forever. Attempts are now spaced
+  (client-world-repair-admission) and exhaustion waits for the final attempt's answer window.
+  Matrix now covers 6 lanes with explicit modes (TDM on rustworks/terminal/high-seas, FFA on
+  atomic-acres/farcrysis, gun-range special-case) and asserts MUTUAL VISIBILITY per lane; 6/6
+  PASS, three consecutive runs. Two-machine HITL remains the human close-out bar.
+- Prior partial: Gun Range lane closed at source (5952893f, 2026-08-22): training-dummy
   damage is now host-authoritative end to end. Poses already replicated on host time
   (currentHostTimeMs); now resolveAuthoritativeShot targets dummies at the exact host-time
   pose, guests never self-apply dummy damage (shot result reconciles health/score/feed with
@@ -349,7 +360,12 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   code, and commit titles read as completions.
 - Rule: a module is "landed, not wired" until a production call site exists. The owner-facing
   status of its row must say so, and no HITL package may imply those defects are fixed.
-- Status: STANDING
+- Status: STANDING — wiring audit 2026-08-23: local-health-regen, team-prescription,
+  killstreak-activation-gate, camera-shake, kill-confirm-pulse, rare-weapon-announcement,
+  carpet-corridor-targeting, prone-clearance (64b78af2) and rendering/grade-profile all have
+  production call sites now. coplanar-surface-audit is deliberately test-harness-only: its test
+  audits all built arenas as a CI gate and it does not ship in the bundle — recorded here as the
+  honest status rather than wired for wiring's sake. swim-state wired de0a8075.
 
 ## Retained positives — regression guards
 
@@ -377,7 +393,14 @@ green) · `VERIFIED-LOCAL` (exercised in a live local runtime) · `HITL` (waitin
   comparator/technique references. No code copying. Scope includes a swim movement state (enter/exit
   water volume, buoyancy, swim speed, restricted weapon handling, audio) so island water is
   traversable rather than a death barrier — host-authoritative like every movement state.
-- Status: IMPLEMENTED (cbca7f68) — water is registry-driven rather than hard-gated to RustRig, with one frozen band table shared by CPU buoyancy and GPU surface. Retired bodies hide before detaching. Swim-state consumption in the movement loop remains a handoff.
+- Status: IMPLEMENTED (cbca7f68; movement-loop consumption de0a8075; replication + weapon
+  restriction 878fe67e, 2026-08-23) — the reducers are consumed by updatePhysics (surface clamp
+  gated to non-swimmable bodies, neutral buoyancy with commanded ascent/descent while swimming,
+  no fall damage on water entry), the swimming flag replicates in PlayerSnapshot (remote swimmers
+  present prone-at-surface), and firearms are restricted while swimming with a feed hint.
+  verify-swim-state.mjs proves enter/hold/release on farcrysis AND that rustworks' non-swim float
+  zone is unchanged. Note: a physics audit found the farcrysis SHORELINE cannot reach swim depth
+  by walking (terrain/water level drift) — that fix rides the farcrysis terrain-authority lane.
 
 ### HF-359 — revive and improve the "farcrysis" map from a previous branch
 - Source: owner directive ("improve and bring back the farcrysis map which was in a previous
