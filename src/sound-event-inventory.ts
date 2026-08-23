@@ -100,6 +100,7 @@ export const REQUIRED_SOUND_EVENT_IDS = Object.freeze([
   'announcement.match',
   'announcement.killstreak',
   'ambience.arena-bed',
+  'ambience.arena-events',
   'ambience.menu-helicopter',
   'music.menu',
   'music.game',
@@ -257,6 +258,10 @@ export const RUNTIME_AUDIO_NON_EVENT_METHODS = Object.freeze([
   // game-music bus, not a semantic sound event fired by a gameplay outcome,
   // so like recoverAmbienceDuck these are lifecycle calls rather than emitters.
   'startGameMusic', 'stopGameMusic',
+  // Pass 75: per-frame driver for the intermittent ambience layer. It decides
+  // WHETHER a sparse ambient one-shot is due; it emits nothing itself, so like
+  // recoverAmbienceDuck it is a lifecycle call rather than a semantic event.
+  'updateArenaAmbience',
   'resume', 'suspend', 'telemetry', 'unlock', 'updateListener',
 ] as const);
 
@@ -340,7 +345,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('railgunReport', '!local,railgunReportEmitter(message.beam, local)', 1, ['weapon.report.local', 'weapon.report.world']),
   runtimeCallsite('reload', '', 1, ['weapon.reload-handling']),
   runtimeCallsite('scoutSweep', '', 1, ['support.scout-sweep']),
-  runtimeCallsite('setArena', 'selectedArena.id', 3, ['ambience.arena-bed']),
+  runtimeCallsite('setArena', 'selectedArena.id', 3, ['ambience.arena-bed', 'ambience.arena-events']),
   runtimeCallsite('setArenaZone', 'arenaZone', 1, ['ambience.zone-transition']),
   runtimeCallsite('setLowHealthFeedback', '{ active: false, severity: 0, vignetteOpacity: 0, breathingGain: 0, heartbeatGain: 0, pulseHz: 0 }', 1, ['player.low-health-breathing', 'player.low-health-heartbeat']),
   runtimeCallsite('setLowHealthFeedback', 'lowHealth.presentation', 1, ['player.low-health-breathing', 'player.low-health-heartbeat']),
@@ -1005,6 +1010,16 @@ const events: SoundEventInventoryEntry[] = [
     emitterSymbols: ['setArena'], contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'arena-generation',
     coverageDetail: 'Every arena owns two distinct repository-procedural continuous sources, replaced atomically at arena generation changes.',
   }),
+  existingEvent({
+    id: 'ambience.arena-events', family: 'arena-ambience', bus: 'ambience', delivery: 'world-spatial',
+    spatialProfileId: 'arena-ambience-bed-v1',
+    variants: [
+      'atomic-acres.yard-life', 'skyline-terminal.apron', 'rustworks-1v1.rig-metal',
+      'gun-range.range-plant', 'farcrysis.jungle', 'high-seas.open-water',
+    ],
+    emitterSymbols: ['setArena'], contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_TRANSIENT, lifecycleOwner: 'arena-generation',
+    coverageDetail: 'Pass 75: sparse intermittent one-shots layered above the two continuous beds, giving each arena a sense of place rather than a drone. Every event is a repository-procedural recipe (oscillator sweep, or the shared noise buffer through a band-pass) - no sampled audio. Placed on a random bearing at an authored distance around the live listener, scheduled on a randomised per-arena gap so the layer never develops an audible period, and skipped entirely when the shared spatial-voice budget is full so ambience can never crowd out combat.',
+  }),
   plannedEvent({
     id: 'ambience.menu-helicopter', family: 'arena-ambience', bus: 'ambience', delivery: 'world-spatial',
     spatialProfileId: 'menu-preview-aircraft-v1', variants: ['cockpit-idle', 'flyby-near', 'flyby-far'],
@@ -1031,7 +1046,7 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
 });
 // Recomputed over the Pass 74 positional-support plus Pass 75 High Seas union,
 // including the HF-337 isEnemy callsite and refined chopper/drone coverage rows.
-export const SOUND_EVENT_INVENTORY_SHA256 = '56334acbe6bcb576c115b381736e0a23b10352f4b9f1f3ed09bc63645ddb0851';
+export const SOUND_EVENT_INVENTORY_SHA256 = '3d91f753d1c2d5cd28dcf637c711cb90bb3d9ff6ac7d6340e1531a9f1df3e084';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

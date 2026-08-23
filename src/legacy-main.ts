@@ -27231,6 +27231,10 @@ function frame(now: number, scheduleNext = true): void {
     updateRemotes(frameDt, now);
     updateHostedBotReplicaPresentations(frameDt, now);
     updateSensoryFeedback(now);
+    // Pass 75: intermittent arena ambience. One clock comparison on the common
+    // path; it fires a sparse spatialised one-shot only when its own schedule
+    // is due and the shared voice budget has room.
+    audio.updateArenaAmbience();
     if (selectedArena.id === 'atomic-acres') {
       if (arenaArtRoot && !blenderArenaActive) updateArenaArt(arenaArtRoot, visualNow);
       if (neighbourhoodLifeRoot) updateArenaArt(neighbourhoodLifeRoot, visualNow);

@@ -15,6 +15,14 @@ import {
   type ChiptuneTrackId,
 } from './chiptune-music';
 import { ARENA_AUDIO_DEFINITIONS, AUDIO_RUNTIME_BUDGET, selectVoiceToSteal, type FootstepMovement, type FootstepSurface as SpatialFootstepSurface, type SpatialPoint } from './spatial-audio';
+// Pass 75: the intermittent "sense of place" layer above the continuous bed.
+import {
+  ARENA_AMBIENT_PROFILES,
+  ambientEventOffset,
+  nextAmbientGapSeconds,
+  selectAmbientEvent,
+  type ArenaAmbientEvent,
+} from './arena-ambient-events';
 import { EXPLOSIVE_BOLT_ARM_DELAY_MS } from './combat/ordnance';
 import type { MinigunSpoolPhase } from './minigun-spool';
 import {
@@ -564,6 +572,9 @@ export class ArenaAudio {
   private spatialChains = 0;
   private footstepChains: SpatialFootstepChain[] = [];
   private listenerPosition = { x: 0, y: 0, z: 0 };
+  /** Pass 75: context time at which the next ambient one-shot may fire. */
+  private nextAmbientEventAtSeconds = Number.POSITIVE_INFINITY;
+  private ambientEventsPlayed = 0;
 
   configure(settings: AudioSettings): void {
     this.audioSettings = settings;
@@ -714,6 +725,103 @@ export class ArenaAudio {
     this.stopSources(this.arenaSources);
     this.disconnectNodes(this.arenaNodes);
     this.startArenaBed(arenaId);
+  }
+
+  /**
+   * Pass 75: drive the intermittent ambience. Called from the frame loop; it
+   * is deliberately cheap on the common path (one clock comparison) because it
+   * runs every frame.
+   *
+   * Everything here fails soft: no context, no arena, a full voice budget or a
+   * ducked ambience bus all simply mean no event this tick.
+   */
+  updateArenaAmbience(): void {
+    const context = this.context;
+    const arenaId = this.activeArena;
+    if (!context || !arenaId || !this.ambience) return;
+    const now = context.currentTime;
+    if (now < this.nextAmbientEventAtSeconds) return;
+    const profileForArena = ARENA_AMBIENT_PROFILES[arenaId];
+    this.nextAmbientEventAtSeconds = now + nextAmbientGapSeconds(profileForArena, Math.random());
+    // Never let ambience crowd out combat audio.
+    if (this.spatialChains + this.arenaSources.length >= AUDIO_RUNTIME_BUDGET.spatialVoices) return;
+    const entry = selectAmbientEvent(profileForArena, Math.random());
+    if (entry) this.playAmbientEvent(entry);
+  }
+
+  /**
+   * Synthesises one ambient one-shot. Tonal shapes use an oscillator sweep;
+   * textured shapes (rustle/whoosh) use the shared noise buffer through a
+   * band-pass, which is the same construction the weapon and explosion
+   * families use - no sampled audio enters the project.
+   */
+  private playAmbientEvent(entry: ArenaAmbientEvent): void {
+    const context = this.context;
+    if (!context || !this.ambience) return;
+    const now = context.currentTime;
+    const offset = ambientEventOffset(entry, Math.random());
+    const panner = context.createPanner();
+    panner.panningModel = 'HRTF';
+    panner.distanceModel = 'inverse';
+    panner.refDistance = 6;
+    panner.maxDistance = 140;
+    panner.rolloffFactor = 0.6;
+    panner.positionX.value = this.listenerPosition.x + offset.x;
+    panner.positionY.value = offset.y;
+    panner.positionZ.value = this.listenerPosition.z + offset.z;
+
+    const gain = context.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    // Envelope is scheduled after the clamp below so it always matches the
+    // sound's real length.
+
+    const [startHz, endHz] = entry.sweepHz;
+    let source: AudioScheduledSourceNode;
+    const extraNodes: AudioNode[] = [gain, panner];
+    // A non-looping noise event cannot outlive the shared buffer; clamping
+    // here keeps the envelope and the audible sound the same length.
+    const textured = entry.noiseQ > 0 && this.noiseBuffer !== null;
+    const playSeconds = textured
+      ? Math.min(entry.durationSeconds, this.noiseBuffer!.duration)
+      : entry.durationSeconds;
+
+    if (textured) {
+      const noise = context.createBufferSource();
+      noise.buffer = this.noiseBuffer;
+      // HF-165/HF-282: NEVER loop a noise buffer. An indefinite broadband loop
+      // is exactly the recurring hiss those rows exist to prevent, and a
+      // source-text contract forbids enabling looping in this file. Textured
+      // events are therefore bounded by the shared buffer's own length.
+      noise.loop = false;
+      const band = context.createBiquadFilter();
+      band.type = 'bandpass';
+      band.Q.value = entry.noiseQ;
+      band.frequency.setValueAtTime(startHz, now);
+      band.frequency.exponentialRampToValueAtTime(Math.max(40, endHz), now + playSeconds);
+      noise.connect(band).connect(gain).connect(panner).connect(this.ambience);
+      extraNodes.push(band);
+      source = noise;
+    } else {
+      const oscillator = context.createOscillator();
+      oscillator.type = entry.shape === 'creak' || entry.shape === 'thump' ? 'triangle' : 'sine';
+      oscillator.frequency.setValueAtTime(startHz, now);
+      oscillator.frequency.exponentialRampToValueAtTime(Math.max(30, endHz), now + playSeconds);
+      oscillator.connect(gain).connect(panner).connect(this.ambience);
+      source = oscillator;
+    }
+
+    if (!this.registerContinuousVoice(source, this.ambience, 1, 'arena', extraNodes)) {
+      for (const node of extraNodes) node.disconnect();
+      return;
+    }
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, entry.gain), now + Math.min(0.06, playSeconds * 0.3));
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + playSeconds);
+    source.start(now);
+    source.stop(now + playSeconds + 0.05);
+    this.ambientEventsPlayed += 1;
+    this.arenaSources.push(source);
+    this.arenaNodes.push(...extraNodes);
   }
 
   /**
@@ -2213,7 +2321,7 @@ export class ArenaAudio {
     };
     listener: { poseMode: AudioListenerPoseMode };
     explosionMix: ExplosionAudioGate & { coalesceMs: number };
-    ambience: { continuousSources: number; busGain: number; arena: ArenaId | null };
+    ambience: { continuousSources: number; busGain: number; arena: ArenaId | null; nextEventInSeconds: number; ambientEventsPlayed: number };
     combatPrewarm: { prepared: boolean; runs: number; sources: number; nodes: number; broadbandLoopSources: 0 };
     glassImpactPrewarm: { prepared: boolean; runs: number; retainedBroadbandLoops: 0 };
     grenadeEffectsPrewarm: {
@@ -2275,7 +2383,17 @@ export class ArenaAudio {
       },
       listener: { poseMode: this.listenerPoseMode },
       explosionMix: { ...this.explosionAudioGate, coalesceMs: EXPLOSION_AUDIO_COALESCE_MS },
-      ambience: { continuousSources: this.arenaSources.length, busGain: this.ambience?.gain.value ?? 0.12, arena: this.activeArena },
+      ambience: {
+        continuousSources: this.arenaSources.length,
+        busGain: this.ambience?.gain.value ?? 0.12,
+        arena: this.activeArena,
+        // Pass 75: seconds until the next intermittent event. Negative means
+        // overdue (the driver is not running); Infinity means unarmed.
+        nextEventInSeconds: this.context
+          ? Number((this.nextAmbientEventAtSeconds - this.context.currentTime).toFixed(2))
+          : Number.POSITIVE_INFINITY,
+        ambientEventsPlayed: this.ambientEventsPlayed,
+      },
       combatPrewarm: {
         prepared: this.combatFeedbackPrepared,
         runs: this.combatFeedbackPrepareRuns,
@@ -2622,6 +2740,13 @@ export class ArenaAudio {
     if (!this.context || !this.ambience) return;
     const definition = ARENA_AUDIO_DEFINITIONS[arenaId];
     const now = this.context.currentTime;
+    // Pass 75: arm the intermittent layer HERE, not in setArena. setArena can
+    // run before an AudioContext exists (the bed is (re)started after the
+    // audio unlock), which left the scheduler pinned at Infinity and silent.
+    // The first event is deliberately delayed - an ambient one-shot the
+    // instant an arena loads reads as a load artefact, not as environment.
+    this.nextAmbientEventAtSeconds = now
+      + nextAmbientGapSeconds(ARENA_AMBIENT_PROFILES[arenaId], Math.random());
     const tone = this.context.createOscillator();
     const toneFilter = this.context.createBiquadFilter();
     const toneGain = this.context.createGain();
