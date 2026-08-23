@@ -8,9 +8,10 @@
  * where the player is looking.
  */
 import * as THREE from 'three';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { ARENA_IDS, type ArenaId } from '../arena-identity';
 import { calmWind, createWindField, sampleWind } from '../weather/wind-field';
+import { ARENA_IDS, type ArenaId } from '../arena-identity';
 import {
   PARTICLE_READABILITY,
   centreConeRadius,
@@ -426,5 +427,87 @@ describe('lifecycle and bypass', () => {
     expect(meshCensus(runtime.root)).toEqual({ instanced: PARTICLE_INSTANCED_DRAWS, loose: 0 });
     expect(runtime.telemetry().liveParticles).toBeGreaterThan(0);
     runtime.dispose();
+  });
+});
+describe('the air answers the weather', () => {
+  it('thins the dust as rain builds, on the shared weather sample only', () => {
+    // Two identical seeded runs that differ ONLY in the rain rate the caller
+    // hands in — the same value the frame loop reads off sampleWeather().
+    const motesAt = (rainRate: number): number => {
+      const { runtime } = build({ arenaId: 'atomic-acres' });
+      const view = camera();
+      for (let frame = 0; frame < 30; frame += 1) {
+        runtime.update(1 / 60, view, { wind: calmWind(), adsProgress: 0, weather: { rainRate } });
+      }
+      const motes = runtime.telemetry().families.find((family) => family.id === 'motes');
+      runtime.dispose();
+      return motes ? motes.live : 0;
+    };
+    const clear = motesAt(0);
+    const storm = motesAt(1);
+    expect(clear).toBeGreaterThan(50);
+    // RAIN_DUST_CLEARED_FRACTION is 0.6, so a full storm holds under half the
+    // clear-sky population — rain visibly washes the dust out of the air.
+    expect(storm).toBeLessThan(Math.round(clear * 0.45));
+    expect(storm).toBeGreaterThan(0);
+  });
+
+  it('reports the last rain rate it was driven with', () => {
+    const { runtime } = build();
+    const view = camera();
+    run(runtime, view, 2);
+    expect(runtime.telemetry().rainRate).toBe(0);
+    runtime.update(1 / 60, view, { wind: calmWind(), weather: { rainRate: 0.75 } });
+    expect(runtime.telemetry().rainRate).toBeCloseTo(0.75, 3);
+    runtime.dispose();
+  });
+
+  it('stays peer-deterministic through rain, and reseeds per match', () => {
+    const airKey = (matchSeed: number, rekeyTo?: number): string => {
+      const runtime = new ParticleRuntime({
+        profile: 'blender',
+        rendererLabel: 'NVIDIA GeForce RTX 5080',
+        quality: 'ultra',
+        seed: matchSeed,
+        arenaId: 'farcrysis',
+      });
+      runtime.build(new THREE.Scene());
+      if (rekeyTo !== undefined) runtime.reseed(rekeyTo);
+      const view = camera(2, 1.7, -3, 0.3);
+      // A FIXED wind field: this test varies only the particle seed, so the
+      // wind advecting every run must be identical by construction.
+      const field = createWindField('farcrysis', 0x9e37);
+      for (let frame = 0; frame < 40; frame += 1) {
+        runtime.update(1 / 60, view, {
+          wind: sampleWind(field, view.position.x, view.position.z, frame / 60, 1.2),
+          adsProgress: 0,
+          weather: { rainRate: 0.8 },
+        });
+      }
+      const key = drawnInstances(familyMesh(runtime, 'motes'))
+        .map((position) => `${position.x.toFixed(4)},${position.y.toFixed(4)},${position.z.toFixed(4)}`)
+        .join('|');
+      runtime.dispose();
+      return key;
+    };
+    // Same hostId:matchEpoch derivation → byte-identical air on every peer.
+    expect(airKey(11)).toBe(airKey(11));
+    // A different match rolls different air.
+    expect(airKey(11)).not.toBe(airKey(12));
+    // And reseed rekeys an existing runtime onto another match EXACTLY — the
+    // same layout that seed would have produced fresh.
+    expect(airKey(11, 12)).toBe(airKey(12));
+  });
+
+  it('is wired into the live frame loop and match start, not merely exported', () => {
+    // Failure mode 1: green tests around a system nothing calls. The ambient
+    // simulation must take its rain from the SAME shared weather sample rain
+    // draws from, and its seed from the peer-agreed per-match derivation.
+    const main = readFileSync(new URL('../legacy-main.ts', import.meta.url), 'utf8');
+    const updateStart = main.indexOf('hfParticleRuntime.update(weatherDeltaSeconds');
+    expect(updateStart).toBeGreaterThan(0);
+    const updateCall = main.slice(updateStart, main.indexOf('lastRainUpdateAtMs = visualNow'));
+    expect(updateCall).toContain('weather: weatherNow');
+    expect(main).toContain('hfParticleRuntime.reseed(weatherMatchSeed);');
   });
 });

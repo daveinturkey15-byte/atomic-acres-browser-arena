@@ -387,3 +387,35 @@ describe('determinism and lifecycle', () => {
     expect(PARTICLE_READABILITY.nearCullM).toBeLessThan(0.6);
   });
 });
+describe('rain loads the ambient air', () => {
+  it('drives an ambient particle downward in proportion to the shared rain rate', () => {
+    // One suspended drift mote: no buoyancy, no wind pull, no flutter, so any
+    // vertical travel over the minute is the rain sink and nothing else.
+    const yAfter = (rainRate: number): number => {
+      const { field } = buildField('drift');
+      field.setVolume(30, 12, 6);
+      field.emitParticle(0, 0, 0, 0, 0, 0, 10, 0.05, 0.05, 1, 1, 1, 0.5, 1.4, 0, 0, 0, 0);
+      const frame = context({ rainRate });
+      for (let tick = 0; tick < 60; tick += 1) field.update(1 / 60, frame, null);
+      const y = field.positionAt(0, new THREE.Vector3()).y;
+      field.dispose();
+      return y;
+    };
+    expect(yAfter(0)).toBe(0);
+    const drizzle = yAfter(0.4);
+    const storm = yAfter(1);
+    expect(drizzle).toBeLessThan(-0.05);
+    expect(storm).toBeLessThan(drizzle);
+    // Bounded: even a storm must not turn suspended dust into sleet.
+    expect(storm).toBeGreaterThan(-1);
+  });
+
+  it('leaves event families untouched — their recipes own their motion', () => {
+    const { field } = buildField('puff');
+    field.emitParticle(0, 0, 0, 0, 0, 0, 10, 0.1, 0.4, 1, 1, 1, 0.5, 2, 0, 0.5, 0, 0);
+    const frame = context({ rainRate: 1 });
+    for (let tick = 0; tick < 30; tick += 1) field.update(1 / 60, frame, null);
+    expect(field.positionAt(0, new THREE.Vector3()).y).toBe(0);
+    field.dispose();
+  });
+});

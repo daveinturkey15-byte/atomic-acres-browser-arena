@@ -130,6 +130,15 @@ export type ParticleUpdateOptions = Readonly<{
   intensityScale?: number;
   /** Quality-budget density scale, 0..1, applied to ambient populations only. */
   densityScale?: number;
+  /**
+   * This frame's shared weather sample — only `rainRate` is read. It arrives
+   * from `sampleWeather(arena, matchSeed, elapsed)`, which every peer computes
+   * identically from `hostId:matchEpoch`, so coupling to it cannot desync
+   * anyone; and like everything else in this module it is presentation-only.
+   * Omitted means clear weather.
+   */
+  weather?: Readonly<{ rainRate: number }> | null;
+
 }>;
 
 export type ParticleRuntimeTelemetry = Readonly<{
@@ -153,6 +162,8 @@ export type ParticleRuntimeTelemetry = Readonly<{
   loadScale: number;
   protectedSightlines: number;
   lightShafts: number;
+  /** Rain intensity 0..1 the simulation was last driven with, for receipts. */
+  rainRate: number;
   families: readonly ParticleFieldTelemetry[];
   perFrameAllocations: 0;
 }>;
@@ -190,6 +201,15 @@ export function particleQualityForProfile(
 function finite(value: number | undefined, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
+
+/**
+ * Fraction of the ambient mote population a full-intensity rain clears.
+ * Rain washes suspended dust out of the air; at `rainRate` 1 the mote target
+ * is this much smaller, scaling linearly in between. Drift (leaves, foam,
+ * ash) keeps its population — rain loads it rather than empties it, which is
+ * the sink in `particle-field.ts`.
+ */
+export const RAIN_DUST_CLEARED_FRACTION = 0.6;
 
 export class ParticleRuntime {
   readonly root = new THREE.Group();
@@ -293,6 +313,21 @@ export class ParticleRuntime {
 
   setQuality(quality: ParticleQualityTier): void {
     this.quality = particleQualityForProfile(this.profile, quality);
+  }
+
+  /**
+   * Rekeys every family's deterministic stream from a new match seed and
+   * drops the live pools. Called once per match start with the same
+   * `hostId:matchEpoch` derivation the weather model uses, so the air is
+   * match-specific and peer-agreed instead of frozen to whatever seed the
+   * module-scope constructor captured.
+   */
+  reseed(matchSeed: number): void {
+    if (this.disposed) return;
+    const seed = Math.trunc(finite(matchSeed, 0)) >>> 0;
+    for (let index = 0; index < this.fieldList.length; index += 1) {
+      this.fieldList[index].reseed(seed);
+    }
   }
 
   private applyArenaProfile(): void {
@@ -631,13 +666,14 @@ export class ParticleRuntime {
     context.windX = wind ? finite(wind.x, 0) : 0;
     context.windZ = wind ? finite(wind.z, 0) : 0;
     context.adsProgress = clamp01(finite(options.adsProgress, 0));
-    context.intensityScale = clamp01(finite(options.intensityScale, 1));
+    context.rainRate = clamp01(finite(options.weather?.rainRate, 0));
     context.elapsedSeconds = this.elapsedSeconds;
     this.densityScale = clamp01(finite(options.densityScale, 1));
 
     const profile = arenaParticleProfile(this.arenaId);
     this.moteField.setAmbientTarget(
-      PARTICLE_FAMILIES.motes.capacity[this.quality] * profile.motes.density * this.densityScale,
+      PARTICLE_FAMILIES.motes.capacity[this.quality] * profile.motes.density
+        * this.densityScale * (1 - RAIN_DUST_CLEARED_FRACTION * context.rainRate),
     );
     this.driftField.setAmbientTarget(
       PARTICLE_FAMILIES.drift.capacity[this.quality] * profile.drift.density * this.densityScale,
@@ -701,6 +737,7 @@ export class ParticleRuntime {
       visibleParticles: visible,
       guardSuppressed,
       loadScale: Number(this.context.loadScale.toFixed(4)),
+      rainRate: Number(this.context.rainRate.toFixed(3)),
       protectedSightlines: this.context.protectedCount,
       lightShafts: this.context.shaftCount,
       families: Object.freeze(families),

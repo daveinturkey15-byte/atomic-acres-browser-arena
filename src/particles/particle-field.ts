@@ -72,6 +72,15 @@ import { familyCapacityCeiling, type ParticleFamilySpec, type ParticleSprite } f
 /** Largest frame step integrated. A backgrounded tab hands back seconds. */
 export const PARTICLE_MAX_STEP_SECONDS = 0.1;
 
+/**
+ * Extra downward acceleration (m/s^2) ambient families carry at full rain,
+ * scaled by the frame's `rainRate`. Physically it is the rain load: impact
+ * and drag of a thousand drops per second drive suspended dust out of the air
+ * and weigh falling debris down. Bounded so even a storm cannot turn motes
+ * into sleet — terminal drift stays under ~1 m/s against the template drag.
+ */
+export const RAIN_AMBIENT_SINK_MPS2 = 0.35;
+
 /** Bound on registered light shafts, so the mote brightening cost is stateable. */
 export const PARTICLE_MAX_LIGHT_SHAFTS = 6;
 
@@ -85,7 +94,14 @@ export type ParticleFrameContext = {
   cameraQuaternion: THREE.Quaternion;
   /** Shared wind field sample at the camera, m/s. */
   windX: number; windZ: number;
-  adsProgress: number;
+  /**
+   * Rain intensity 0..1 from the shared weather sample this frame. The field
+   * uses it two ways: ambient families gain a downward "rain load" (dust is
+   * beaten out of the air, falling debris is weighed down), and the runtime
+   * thins the mote population against it. Zero in clear weather, so every
+   * existing caller and test keeps its exact behaviour.
+   */
+  rainRate: number;
   /** Global 0..1 taste/accessibility scale. */
   intensityScale: number;
   /** Aggregate-load thinning from the previous frame. */
@@ -110,6 +126,7 @@ export function createParticleFrameContext(): ParticleFrameContext {
     forwardX: 0, forwardY: 0, forwardZ: -1,
     cameraQuaternion: new THREE.Quaternion(),
     windX: 0, windZ: 0,
+    rainRate: 0,
     adsProgress: 0,
     intensityScale: 1,
     loadScale: 1,
@@ -246,7 +263,7 @@ export class ParticleField {
   private readonly scratchScale = new THREE.Vector3(1, 1, 1);
   private readonly zeroMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
 
-  private readonly rng: DeterministicRng;
+  private rng: DeterministicRng;
 
   private live = 0;
   private visible = 0;
@@ -445,6 +462,18 @@ export class ParticleField {
     if (this.mesh) this.mesh.count = 0;
   }
 
+  /**
+   * Rekeys this family's deterministic stream for a new match and drops every
+   * live particle. Same fork scheme the constructor uses, so reseeding with a
+   * seed reproduces exactly the layout that seed would have produced fresh —
+   * which is what lets the runtime take its air from `hostId:matchEpoch` per
+   * match instead of whatever seed it was constructed with.
+   */
+  reseed(seed: number): void {
+    this.rng = new DeterministicRng(seed).fork(`particles/${this.spec.id}`);
+    this.clear();
+  }
+
   private swapRemove(index: number): void {
     const last = this.live - 1;
     if (index !== last) {
@@ -570,7 +599,10 @@ export class ParticleField {
       const pull = this.windPull[index];
       this.vx[index] += (context.windX * pull - this.vx[index]) * relax;
       this.vz[index] += (context.windZ * pull - this.vz[index]) * relax;
-      this.vy[index] += this.buoyancy[index] * step;
+      // Rain load: while it rains, ambient matter is driven downward. Event
+      // families (smoke, grit) are untouched — their recipes own their motion.
+      this.vy[index] += this.buoyancy[index] * step
+        - (this.spec.ambient ? clamp01(context.rainRate) * RAIN_AMBIENT_SINK_MPS2 : 0) * step;
       // Vertical relaxation is half the horizontal: dust settles slowly, which
       // is the difference between suspended particulate and falling gravel.
       this.vy[index] -= this.vy[index] * relax * 0.5;
