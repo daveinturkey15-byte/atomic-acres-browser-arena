@@ -19,7 +19,7 @@ export const definition = createProceduralArenaVisualDefinition({
   },
   fog: { color: 0xb8d6dc, near: 42, far: 132 },
   shadows: { enabled: true, mapSize: 2048, maximumDistance: 150, normalBias: 0.03 },
-  atmosphere: { preset: 'airport-dawn', mist: 0.16, dust: 0.04, clouds: true },
+  atmosphere: { preset: 'open-ocean-day', mist: 0.16, dust: 0.04, clouds: true },
   colorPipeline: colorPipeline('pass75.high-seas.hdr.v1', 1.06),
   budgets: budgets({ maximumDrawCalls: 480, maximumTriangles: 950_000 }),
   reviewCameras: [

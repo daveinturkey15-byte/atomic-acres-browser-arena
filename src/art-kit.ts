@@ -104,7 +104,7 @@ export function batchStaticMeshes(
 ): StaticBatchStats {
   const simplifyMaterials = materialMode !== 'preserve';
   root.updateWorldMatrix(true, true);
-  const groups = new Map<string, { material: THREE.Material; classification: string; meshes: THREE.Mesh[]; geometries: THREE.BufferGeometry[]; palette: Set<string> }>();
+  const groups = new Map<string, { material: THREE.Material; classification: string; renderOrder: number; meshes: THREE.Mesh[]; geometries: THREE.BufferGeometry[]; palette: Set<string> }>();
   root.traverse((node) => {
     const hasDynamicAncestor = (() => {
       let current: THREE.Object3D | null = node;
@@ -133,11 +133,16 @@ export function batchStaticMeshes(
     const firstPersonSemanticKey = firstPersonMaterialContract === PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT
       ? `${firstPersonMaterialContract}:${String(firstPersonSurface)}`
       : '';
+    // Draw order is part of a mesh's identity, not a cosmetic detail: merging a
+    // renderOrder -1 sky dome with a renderOrder 3 glitter path produces one
+    // batch that can only be drawn at a single order, so one of the two
+    // composites wrong. Keying on it keeps each pass in its own batch.
+    const orderKey = `ro${node.renderOrder}`;
     const key = vertexPalette
-      ? `vertex:${opacityKey}:${firstPersonSemanticKey}:${classification}`
+      ? `vertex:${opacityKey}:${orderKey}:${firstPersonSemanticKey}:${classification}`
       : simplifyMaterials && !preserveMappedMaterial
-      ? `${displayColor.getHexString()}:${opacityKey}:${firstPersonSemanticKey}:${classification}`
-      : `${materialBatchKey(node.material)}:${firstPersonSemanticKey}:${classification}`;
+      ? `${displayColor.getHexString()}:${opacityKey}:${orderKey}:${firstPersonSemanticKey}:${classification}`
+      : `${materialBatchKey(node.material)}:${orderKey}:${firstPersonSemanticKey}:${classification}`;
     let entry = groups.get(key);
     if (!entry) {
       const material = preserveMappedMaterial
@@ -174,6 +179,7 @@ export function batchStaticMeshes(
       entry = {
         material,
         classification,
+        renderOrder: node.renderOrder,
         meshes: [],
         geometries: [],
         palette: new Set<string>(),
@@ -224,6 +230,10 @@ export function batchStaticMeshes(
       continue;
     }
     const mesh = new THREE.Mesh(geometry, entry.material);
+    // Carry the authored draw order onto the batch. Without this every batch
+    // renders at 0 and the transparent layering an arena authored - sky behind,
+    // glow above water, god rays last - collapses into source order.
+    mesh.renderOrder = entry.renderOrder;
     mesh.userData.sourcePalette = [...entry.palette];
     if (entry.classification) mesh.userData.hitZone = entry.classification;
     const preserveShadowResponse = materialMode === 'preserve' || materialMode === 'texture-lit';

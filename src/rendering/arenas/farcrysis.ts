@@ -17,9 +17,15 @@ export const definition = createProceduralArenaVisualDefinition({
       { id: 'farcrysis-jungle-dapple', policy: 'shadowed-local', maximumDistance: 18, castsShadow: true },
     ],
   },
-  fog: { color: 0xcfe0c8, near: 40, far: 96 },
+  // Fog has to agree with the sky, and this arena's did not. The band ended at
+  // 96 m - the tightest of any arena, against 132 on High Seas and 148 on
+  // Atomic Acres - so everything past the near shoreline collapsed into a flat
+  // wall of fog colour, and that colour was a sage green left over from when
+  // the arena borrowed the farmland sunset. Widened to match the arena's scale
+  // and retinted to the warm haze of the golden-hour horizon it now sits under.
+  fog: { color: 0xe8cba4, near: 46, far: 138 },
   shadows: { enabled: true, mapSize: 2048, maximumDistance: 120, normalBias: 0.03 },
-  atmosphere: { preset: 'sunset-farmland', mist: 0.24, dust: 0.1, clouds: true },
+  atmosphere: { preset: 'jungle-golden-hour', mist: 0.24, dust: 0.1, clouds: true },
   colorPipeline: colorPipeline('pass69.farcrysis.hdr.v1', 1.08),
   budgets: budgets({ maximumDrawCalls: 460, maximumTriangles: 1_100_000 }),
   reviewCameras: [

@@ -36,7 +36,6 @@ const ATMOS_SHAFT_COUNT = 7;
 // Module-level state for per-frame animation
 // ---------------------------------------------------------------------------
 
-let _godRayGroup: THREE.Group | null = null;
 let _dustPoints: THREE.Points | null = null;
 let _dustOrigins: Float32Array | null = null;
 let _dustPhases: Float32Array | null = null;
@@ -160,12 +159,32 @@ function buildGodRayShafts(): THREE.Group {
       .add(new THREE.Vector3((Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.1))
       .normalize();
 
+    // A plain additive quad has hard ends, which is what made these read as
+    // white triangles pasted over the sky rather than light in air. Under
+    // additive blending, black IS transparent - so a vertex-colour ramp that
+    // falls to black at both ends of the shaft gives a soft fade for free, with
+    // no extra texture, no alpha map and no second draw.
+    const shaftGeometry = new THREE.PlaneGeometry(width, length, 1, 6);
+    const shaftPosition = shaftGeometry.getAttribute('position');
+    const shaftColors = new Float32Array(shaftPosition.count * 3);
+    for (let vertex = 0; vertex < shaftPosition.count; vertex += 1) {
+      // Normalised distance from the shaft's centre along its length.
+      const along = Math.abs(shaftPosition.getY(vertex)) / (length / 2);
+      const fade = Math.max(0, 1 - along * along);
+      shaftColors[vertex * 3] = fade;
+      shaftColors[vertex * 3 + 1] = fade;
+      shaftColors[vertex * 3 + 2] = fade;
+    }
+    shaftGeometry.setAttribute('color', new THREE.BufferAttribute(shaftColors, 3));
+
     const quad = new THREE.Mesh(
-      new THREE.PlaneGeometry(width, length, 1, 6),
+      shaftGeometry,
       new THREE.MeshBasicMaterial({
         color: 0xffecc0,
+        vertexColors: true,
         transparent: true,
-        opacity: 0.04 + Math.random() * 0.03,
+        // Halved now that the duplicate cone system no longer stacks on top.
+        opacity: 0.02 + Math.random() * 0.015,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         depthTest: true,
@@ -192,64 +211,59 @@ function buildGodRayShafts(): THREE.Group {
   return group;
 }
 
-// ---------------------------------------------------------------------------
-// 1. God rays — 10 semi-transparent cone geometries radiating from sun dir
-// ---------------------------------------------------------------------------
 
-function buildGodRays(): THREE.Group {
-  const group = new THREE.Group();
-  group.name = 'farcrysis-atmos-god-rays';
-  group.userData.farcrysisArt = true;
+/**
+ * A soft round dot, used as the sprite for every point cloud in this arena.
+ *
+ * An untextured PointsMaterial draws each point as a hard-edged SQUARE. At dust
+ * and firefly scale against a bright sky that reads exactly as what it is -
+ * white squares pasted over the horizon - and it was the most conspicuous
+ * artefact left in the arena after the sky was fixed.
+ *
+ * The texture is a radial falloff built as a DataTexture rather than through a
+ * 2D canvas: canvas is unavailable in the test environment, and a 32x32 ramp is
+ * cheaper to synthesise than to rasterise. Under additive blending black is
+ * transparent, so the falloff alone produces a soft dot with no alpha test and
+ * no sorting cost.
+ */
+let _softDotTexture: THREE.DataTexture | null = null;
 
-  const rayCount = 10;
-  const sunDir = ATMOS_SUN_DIR.clone();
-
-  for (let i = 0; i < rayCount; i++) {
-    // Scatter cone origins across the arena for varied god-ray positions
-    const origin = new THREE.Vector3(
-      (Math.random() - 0.5) * 40,
-      2 + Math.random() * 8,
-      (Math.random() - 0.5) * 40,
-    );
-
-    const coneLength = 30 + Math.random() * 25;
-    const coneAngle = 0.05 + Math.random() * 0.08;
-    const radius = Math.tan(coneAngle) * coneLength;
-
-    const geom = new THREE.ConeGeometry(radius, coneLength, 8, 1, true); // open-ended cone
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xfff5e0,
-      transparent: true,
-      opacity: 0.08 + Math.random() * 0.07, // 0.08–0.15
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-
-    const cone = new THREE.Mesh(geom, mat);
-    cone.name = `farcrysis-atmos-god-ray-${i}`;
-
-    // Position: tip at origin, base at origin + direction * length
-    const midpoint = origin.clone().add(sunDir.clone().multiplyScalar(coneLength / 2));
-    cone.position.copy(midpoint);
-
-    // Orient cone along the sun direction
-    const up = new THREE.Vector3(0, 1, 0);
-    const quat = new THREE.Quaternion().setFromUnitVectors(up, sunDir);
-    cone.setRotationFromQuaternion(quat);
-
-    cone.renderOrder = 996;
-    cone.frustumCulled = false;
-    cone.userData.farcrysisArt = true;
-
-    group.add(cone);
+export function softDotTexture(): THREE.DataTexture {
+  if (_softDotTexture) return _softDotTexture;
+  const size = 32;
+  const data = new Uint8Array(size * size * 4);
+  const centre = (size - 1) / 2;
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const distance = Math.hypot(x - centre, y - centre) / centre;
+      // Squared falloff keeps a bright core with a long soft skirt.
+      const intensity = Math.max(0, 1 - distance);
+      const value = Math.round(intensity * intensity * 255);
+      const offset = (y * size + x) * 4;
+      data[offset] = 255;
+      data[offset + 1] = 255;
+      data[offset + 2] = 255;
+      data[offset + 3] = value;
+    }
   }
-
-  return group;
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  texture.name = 'farcrysis-soft-dot';
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  _softDotTexture = texture;
+  return texture;
 }
 
 // ---------------------------------------------------------------------------
-// 2. Dust motes — ~200 Points with CPU-driven circular motion in sunbeams
+// God rays: ONE system.
+//
+// This arena carried two independent god-ray implementations - 10 additive
+// cones AND 7 additive quads - drawn on top of each other at renderOrder 996
+// and 997. Seventeen overlapping additive surfaces is enough to wash the sky
+// to flat white, and neither system was occluded by the other, so the cost was
+// paid twice for a worse image. The cones are gone; the quads remain and are
+// now softened (see buildGodRayShafts).
 // ---------------------------------------------------------------------------
 
 function buildDustMotes(): THREE.Points {
@@ -302,6 +316,7 @@ function buildDustMotes(): THREE.Points {
   const mat = new THREE.PointsMaterial({
     color: 0xffeedd,
     size: 0.12,
+    map: softDotTexture(),
     transparent: true,
     opacity: 0.5,
     blending: THREE.AdditiveBlending,
@@ -367,6 +382,7 @@ function buildFireflies(): THREE.Points {
   const mat = new THREE.PointsMaterial({
     color: 0xccff88,
     size: 0.22,
+    map: softDotTexture(),
     transparent: true,
     opacity: 0.55,
     blending: THREE.AdditiveBlending,
@@ -423,8 +439,6 @@ function buildFogLayer(): THREE.Mesh {
  * Safe to call after terrain, lighting, and vegetation are established.
  */
 export function buildAtmosphere(scene: THREE.Scene): void {
-  _godRayGroup = buildGodRays();
-  scene.add(_godRayGroup);
 
   scene.add(buildDustMotes());
 
@@ -444,12 +458,6 @@ export function buildAtmosphere(scene: THREE.Scene): void {
  * @param time Current time in seconds (e.g. `performance.now() * 0.001`).
  */
 export function animateAtmosphere(time: number): void {
-  // --- God-ray rotation (slowly tracks implied sun movement) ---
-  if (_godRayGroup) {
-    _godRayGroup.rotation.y = Math.sin(time * 0.03) * 0.08;
-    _godRayGroup.rotation.x = Math.cos(time * 0.025) * 0.04;
-  }
-
   // --- Dust motes: circular motion using stored origins + sin/cos ---
   if (_dustPoints && _dustOrigins && _dustPhases && _dustRadii && _dustHeightOffsets) {
     const posAttr = _dustPoints.geometry.attributes.position as THREE.BufferAttribute;

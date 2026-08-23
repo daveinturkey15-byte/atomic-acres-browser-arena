@@ -20,6 +20,7 @@
  *                                    before applyVista has run, idempotent)
  */
 import * as THREE from 'three';
+import { softDotTexture } from './farcrysis-atmosphere';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -392,6 +393,10 @@ function buildBirds(scene: THREE.Scene): void {
   const material = new THREE.PointsMaterial({
     size: 1.8,
     sizeAttenuation: true,
+    // Untextured points are square. At 1.8 world units a distant seabird was a
+    // hard white block on the horizon; the soft dot reads as a bird at range.
+    map: softDotTexture(),
+    alphaTest: 0.12,
     vertexColors: true,
     transparent: true,
     opacity: 0.95,

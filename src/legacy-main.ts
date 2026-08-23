@@ -28163,6 +28163,7 @@ const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
     snapshot: () => Record<string, unknown> & { player: DebugPlayerPose };
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
+    sampleSceneGraph: () => THREE.Scene;
     samplePresentationTelemetry: () => ReturnType<typeof renderRuntime.presentationTelemetry>;
     sampleEnduranceHealth: (detail?: EnduranceHealthDetail) => ReturnType<typeof sampleEnduranceHealth>;
     sampleWeaponCatalogReadiness: () => ReturnType<typeof weaponView.browserCatalogReadiness>;
@@ -29145,6 +29146,10 @@ function debugRiggedOperatorJointScreenPositions(
 
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   admissionState: sampleAdmissionState,
+  // Read-only handle on the live scene graph. Screenshots tell you THAT a frame
+  // is wrong; walking the graph tells you WHICH object is doing it. Debug-only
+  // and never referenced by gameplay.
+  sampleSceneGraph: () => scene,
   samplePresentationTelemetry: () => renderRuntime.presentationTelemetry(),
   sampleEnduranceHealth,
   sampleWeaponCatalogReadiness: () => weaponView.browserCatalogReadiness(),

@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 
-export type SkyBackdropPreset = 'sunset-farmland' | 'industrial-night' | 'airport-dawn' | 'indoor-range';
+export type SkyBackdropPreset =
+  | 'sunset-farmland'
+  | 'industrial-night'
+  | 'airport-dawn'
+  | 'indoor-range'
+  | 'jungle-golden-hour'
+  | 'open-ocean-day';
 
 export const SKY_BACKDROP_TEXTURE_SIZE = Object.freeze({ width: 2_048, height: 1_024 });
 export const ATOMIC_ACRES_GENERATED_SKY_ASSET_URL = './assets/original/skies/atomic-acres-sunset.webp';
@@ -59,6 +65,27 @@ const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly Gradie
     [0, '#151d22'],
     [1, '#232f36'],
   ] as const),
+  // Late golden hour over a jungle island: a deep tropical zenith falling
+  // through haze into a hot, humid horizon. Warmer and far less purple than
+  // the farmland sunset, which farcrysis previously borrowed wholesale.
+  'jungle-golden-hour': Object.freeze([
+    [0, '#123a63'],
+    [0.22, '#245f83'],
+    [0.44, '#4d8f92'],
+    [0.62, '#96b585'],
+    [0.76, '#e0b264'],
+    [0.88, '#f5924a'],
+    [1, '#ffd39a'],
+  ] as const),
+  // Open water under a high sun: saturated marine zenith, bleaching toward a
+  // bright haze band where sea meets sky.
+  'open-ocean-day': Object.freeze([
+    [0, '#0f4f9b'],
+    [0.3, '#2f7fc4'],
+    [0.58, '#69aad9'],
+    [0.82, '#a9cfe8'],
+    [1, '#dceaf2'],
+  ] as const),
 });
 
 /**
@@ -93,6 +120,18 @@ export const SKY_BACKDROP_CLOUDS: Readonly<Record<SkyBackdropPreset, Readonly<{
     alpha: 0.66, scale: 0.68,
   }),
   'indoor-range': null,
+  // Tall tropical build-ups, lit warm on top and holding deep shade beneath.
+  'jungle-golden-hour': Object.freeze({
+    count: 30, bandTop: 0.14, bandBottom: 0.58,
+    rgb: [255, 214, 168] as [number, number, number], shadowRgb: [46, 66, 88] as [number, number, number],
+    alpha: 0.52, scale: 0.86,
+  }),
+  // Small, high, fast trade-wind cumulus - sparse so the sky stays open.
+  'open-ocean-day': Object.freeze({
+    count: 24, bandTop: 0.10, bandBottom: 0.46,
+    rgb: [255, 255, 255] as [number, number, number], shadowRgb: [120, 156, 184] as [number, number, number],
+    alpha: 0.58, scale: 0.54,
+  }),
 });
 
 function skyRandom(seed: number): () => number {
@@ -119,6 +158,10 @@ export const SKY_BACKDROP_SUN: Readonly<Record<SkyBackdropPreset, Readonly<{
   'industrial-night': null,
   'airport-dawn': Object.freeze({ x: 0.72, y: 0.38, coreRgb: [255, 252, 240] as [number, number, number], glowRgb: [255, 240, 205] as [number, number, number], coreRadius: 14, glowRadius: 70 }),
   'indoor-range': null,
+  // Low and wide: golden hour puts the sun near the horizon with a big glow.
+  'jungle-golden-hour': Object.freeze({ x: 0.64, y: 0.56, coreRgb: [255, 244, 214] as [number, number, number], glowRgb: [255, 176, 88] as [number, number, number], coreRadius: 17, glowRadius: 104 }),
+  // High and tight: midday sun over water is small, white and fierce.
+  'open-ocean-day': Object.freeze({ x: 0.38, y: 0.22, coreRgb: [255, 255, 250] as [number, number, number], glowRgb: [214, 236, 255] as [number, number, number], coreRadius: 11, glowRadius: 58 }),
 });
 
 function paintSun(context: CanvasRenderingContext2D, preset: SkyBackdropPreset, width: number, height: number): void {
@@ -301,6 +344,7 @@ function sceneBackdropStatus(scene: THREE.Scene): SkyBackdropStatus {
 export function skyBackdropPreset(preset: string): SkyBackdropPreset {
   return preset === 'sunset-farmland' || preset === 'industrial-night'
     || preset === 'airport-dawn' || preset === 'indoor-range'
+    || preset === 'jungle-golden-hour' || preset === 'open-ocean-day'
     ? preset
     : 'airport-dawn';
 }

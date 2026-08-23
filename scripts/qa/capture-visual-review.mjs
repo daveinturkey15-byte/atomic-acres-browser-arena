@@ -166,9 +166,19 @@ report.summary = {
   anyHorizontalOverflow: overflow,
   renderers: report.viewports.map((viewport) => ({ viewport: viewport.viewport, ...viewport.renderer })),
   // Stated plainly so a reader never mistakes a compat-path frame for WebGPU.
-  evidenceScope: report.viewports.every((viewport) => viewport.renderer?.actualBackend === 'webgpu')
-    ? 'webgpu-route'
-    : 'webgl2-compat-route-only (headless has no navigator.gpu; run --headed for WebGPU)',
+  // Derived from what was actually measured, never asserted: an earlier version
+  // hard-coded "headless has no navigator.gpu", which stopped being true once
+  // the launch flags changed and left the report making a false claim about its
+  // own provenance.
+  evidenceScope: (() => {
+    const backends = report.viewports.map((viewport) => viewport.renderer?.actualBackend ?? 'unknown');
+    const exposed = report.viewports.some((viewport) => viewport.renderer?.webgpuAvailable === true);
+    if (backends.every((backend) => backend === 'webgpu')) return 'webgpu-route';
+    const seen = [...new Set(backends)].join('+');
+    return exposed
+      ? `${seen}-route (navigator.gpu present but the app selected ${seen}; run --headed to compare)`
+      : `${seen}-route (navigator.gpu absent in this browser)`;
+  })(),
 };
 
 mkdirSync(OUT, { recursive: true });

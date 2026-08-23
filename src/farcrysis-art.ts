@@ -25,7 +25,7 @@ import { buildEnhancedPalms } from './farcrysis-palms-enhanced';
 import { applyGroundTextures } from './farcrysis-ground-textures';
 import { buildWaterFX, animateWaterFX } from './farcrysis-water-fx';
 import { buildDetail, animateDetail } from './farcrysis-detail';
-import { buildAtmosphere, animateAtmosphere } from './farcrysis-atmosphere';
+import { buildAtmosphere, animateAtmosphere, softDotTexture } from './farcrysis-atmosphere';
 
 // TSL-compatible inline replacements for terrain.ts ShaderMaterial effects.
 // All use standard Three.js materials (MeshStandardMaterial, MeshBasicMaterial).
@@ -390,10 +390,12 @@ function addWaterSparkle(root: THREE.Group): void {
   const geom = new THREE.BufferGeometry();
   geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-  // Star-shaped sparkle via a PointsMaterial with additive blending
+  // Sparkle via an additive PointsMaterial. The soft-dot sprite matters here:
+  // without a map each sparkle is a square, which on water reads as debris.
   const sparkleMat = new THREE.PointsMaterial({
     color: FARCRYSIS_ART_FEEL.waterSparkleColor,
     size: 0.15,
+    map: softDotTexture(),
     transparent: true,
     opacity: 0.6,
     blending: THREE.AdditiveBlending,
@@ -530,27 +532,22 @@ function buildInlineTerrain(scene: THREE.Scene): void {
 
   scene.add(group);
 
-  // Sky dome (large BackSide gradient sphere)
-  const skyCanvas = document.createElement('canvas');
-  skyCanvas.width = 256; skyCanvas.height = 128;
-  const ctx = skyCanvas.getContext('2d');
-  if (ctx) {
-    const grad = ctx.createLinearGradient(0, 0, 0, 128);
-    grad.addColorStop(0, '#ff8c42');   // warm zenith
-    grad.addColorStop(0.35, '#ffb469'); 
-    grad.addColorStop(0.7, '#e8c89e');
-    grad.addColorStop(1, '#c9d8e0');   // pale horizon
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 256, 128);
-    const skyTex = new THREE.CanvasTexture(skyCanvas);
-    skyTex.colorSpace = THREE.SRGBColorSpace;
-    const skyGeom = new THREE.SphereGeometry(180, 32, 24);
-    const skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false, depthWrite: false });
-    const skyDome = new THREE.Mesh(skyGeom, skyMat);
-    skyDome.name = 'farcrysis-sky-dome';
-    skyDome.renderOrder = -1;
-    scene.add(skyDome);
-  }
+  // NO LOCAL SKY DOME.
+  //
+  // This arena used to add its own BackSide gradient sphere of radius 180 -
+  // exactly the camera's far plane (camera.far = 180). A sphere sitting on the
+  // far plane is partly inside the frustum and partly clipped, so a spherical
+  // cap of it was culled every frame and the scene background showed through
+  // the hole as a hard-edged disc of sky. That disc was the single most
+  // obviously broken thing in the arena.
+  //
+  // It was also redundant. `applySkyBackdrop` already installs a real sky as
+  // `scene.background`, which is why that module exists: a background is
+  // resolved per-pixel behind everything and can never be frustum-clipped by
+  // the far plane nor washed out by the fog band. The fix is therefore to
+  // delete the competing dome rather than resize it, and to give the arena its
+  // own backdrop preset ('jungle-golden-hour') instead of borrowing the
+  // farmland sunset it used to share with Atomic Acres.
 }
 
 function buildInlineLighting(scene: THREE.Scene): void {
