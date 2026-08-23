@@ -3,17 +3,20 @@ import {
   DoubleSide,
   MeshStandardNodeMaterial,
   PointsNodeMaterial,
+  type Node,
   type RenderPipeline,
   type WebGPURenderer,
 } from 'three/webgpu';
 import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
 import { ao } from 'three/addons/tsl/display/GTAONode.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+import { denoise } from 'three/addons/tsl/display/DenoiseNode.js';
 import {
   abs,
   color,
   dot,
   float,
+  nodeObject,
   instanceIndex,
   mix,
   max,
@@ -54,7 +57,7 @@ export type Pass65TslGraphicsOptions = Readonly<{
   post: GraphicsRuntime['post'];
   oceanWaveAmplitude?: number;
   reflectionScale: number;
-  reflectionQuality: 'off' | 'low' | 'high';
+  reflectionQuality: 'off' | 'low' | 'high' | 'ultra';
   environmentIntensity: number;
 }>;
 
@@ -62,7 +65,7 @@ const DEFAULT_TSL_GRAPHICS_OPTIONS: Pass65TslGraphicsOptions = Object.freeze({
   principalSamples: 4,
   volumetricScale: 1,
   ambientOcclusion: Object.freeze({
-    quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0,
+    quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0, denoise: false,
   }),
   post: Object.freeze({
     bloomStrength: 0.14,
@@ -70,6 +73,7 @@ const DEFAULT_TSL_GRAPHICS_OPTIONS: Pass65TslGraphicsOptions = Object.freeze({
     toneMapping: 'aces',
     filmGrainScale: 1,
     vignetteStrength: 0,
+    sharpness: 0,
   }),
   reflectionScale: 1,
   reflectionQuality: 'high',
@@ -766,15 +770,30 @@ function configureHdrPipeline(
     gtaoPass.thickness.value = 1;
     gtaoPass.distanceExponent.value = 1;
     gtaoPass.distanceFallOff.value = 1;
+    // Temporal filtering stays OFF: it rotates the sample pattern per frame
+    // and is only stable underneath a TRAA resolve this chain does not run;
+    // without one it reads as shimmer and breaks deterministic review frames.
     gtaoPass.useTemporalFiltering = false;
   }
+  // High/Ultra AO tiers run the upstream depth/normal-aware spatial denoise
+  // over the raw GTAO target (the documented non-TRAA path). Low keeps the
+  // raw single-pass output as the cheap tier. This is a graph-topology
+  // choice, so it participates in the ambientOcclusion pipeline-rebuild
+  // contract exactly like the MRT enable does.
+  const gtaoDenoise = gtaoPass && sceneNormal && graphics.ambientOcclusion.denoise
+    ? denoise(gtaoPass.getTextureNode(), sceneDepth, sceneNormal, camera)
+    : null;
+  // The denoise TempNode carries no typed swizzles; its output is the vec4
+  // denoised AO, so the red-channel read mirrors the raw GTAO path exactly.
+  const occlusionSample = gtaoDenoise
+    ? nodeObject(gtaoDenoise as unknown as Node<'vec4'>).r
+    : gtaoPass ? gtaoPass.getTextureNode().r : null;
   const saturation = uniform(definition.colorPipeline.grade.saturation);
   const contrast = uniform(definition.colorPipeline.grade.contrast);
   // HF-363: linear-side ordered dither removed — display-referred grain now lives
   // in the filmic grade chain (per-frame-luminance-grain stage). Linear vignette
   // is retained as a separate deliberate stage.
   const grain = uniform(definition.colorPipeline.grain.strength / 255 * graphics.post.filmGrainScale);
-  const vignette = uniform(graphics.post.vignetteStrength);
   const contactOcclusionStrength = uniform(graphics.ambientOcclusion.enabled ? graphics.ambientOcclusion.strength : 0);
   const luma = dot(sceneColor.rgb, vec3(0.2126, 0.7152, 0.0722));
   const saturated = mix(vec3(luma), sceneColor.rgb, saturation);
@@ -788,14 +807,16 @@ function configureHdrPipeline(
   // allowing the low-resolution bloom chain to smear across their silhouettes.
   const depthEdgeGuard = float(1).sub(smoothstep(0.00035, 0.0035, depthDiscontinuity));
   const emissiveBloom = bloom(sceneColor, graphics.post.bloomStrength, 0.32, 0.92);
-  const contactOcclusion = gtaoPass
-      ? mix(float(1), gtaoPass.getTextureNode().r, contactOcclusionStrength)
+  const contactOcclusion = occlusionSample
+      ? mix(float(1), occlusionSample, contactOcclusionStrength)
       : float(1);
+    // Pass 76: the linear-side vignette stage was retired. The display-side
+    // 'display-vignette-falloff' stage in the filmic grade chain is the ONE
+    // vignette owner (legacy-main drives setDisplayVignetteStrength); running
+    // both stacked two falloffs on exactly the screen periphery enemies enter
+    // from, while this one held the setting and the display one idled at zero.
     const hdrWithBloom = contrasted.mul(contactOcclusion).add(emissiveBloom.rgb.mul(depthEdgeGuard));
-    const vignetteDistance = dot(screenUV.sub(0.5), screenUV.sub(0.5));
-    const vignetteFalloff = smoothstep(0.12, 0.5, vignetteDistance).mul(vignette).mul(0.42);
-    const postColor = hdrWithBloom.mul(float(1).sub(vignetteFalloff));
-    renderPipeline.outputNode = vec4(postColor, sceneColor.a);
+    renderPipeline.outputNode = vec4(hdrWithBloom, sceneColor.a);
     renderPipeline.needsUpdate = true;
     return {
       scenePass,
@@ -808,7 +829,6 @@ function configureHdrPipeline(
       applyGraphics(next) {
         activeGraphics = next;
         grain.value = activeDefinition.colorPipeline.grain.strength / 255 * next.post.filmGrainScale;
-        vignette.value = next.post.vignetteStrength;
         emissiveBloom.strength.value = next.post.bloomStrength;
         contactOcclusionStrength.value = gtaoPass && next.ambientOcclusion.enabled
           ? next.ambientOcclusion.strength
@@ -820,6 +840,7 @@ function configureHdrPipeline(
           }
         },
         dispose() {
+          gtaoDenoise?.dispose();
           gtaoPass?.dispose();
         },
       };
@@ -910,6 +931,9 @@ export function createPass64TslSceneSystems(
       ambientOcclusion: Object.freeze({
         ...activeGraphics.ambientOcclusion,
         enabled: graphics.ambientOcclusion.enabled && activeGraphics.ambientOcclusion.enabled,
+        // The denoise wrap is baked at pipeline construction; report the
+        // actual topology, not merely the requested tier.
+        denoise: graphics.ambientOcclusion.denoise && activeGraphics.ambientOcclusion.denoise,
       }),
     };
   };

@@ -46,7 +46,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
     expect(systems.depthAwareBloom).toBe(true);
     expect(systems.ambientOcclusion).toEqual({
       graphId: 'pass65.webgpu-gtao-depth.v1',
-      quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0,
+      quality: 'off', enabled: false, denoise: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0,
     });
     expect(() => assertRuntimeTslTraversal(audit)).not.toThrow();
     const rustDefinition = (await ARENA_VISUAL_REGISTRY['rustworks-1v1']()).definition;
@@ -224,10 +224,10 @@ describe('Pass 64 authored TSL pipeline set', () => {
       principalSamples: 2,
       volumetricScale: 1,
       ambientOcclusion: {
-        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52,
+        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52, denoise: true,
       },
       post: {
-        bloomStrength: 0.14, exposureScale: 1, toneMapping: 'aces', filmGrainScale: 1, vignetteStrength: 0,
+        bloomStrength: 0.14, exposureScale: 1, toneMapping: 'aces', filmGrainScale: 1, vignetteStrength: 0, sharpness: 0,
       },
       reflectionScale: 1,
       reflectionQuality: 'high',
@@ -287,7 +287,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
       principalSamples: 2,
       volumetricScale: 0.5,
       ambientOcclusion: {
-        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52,
+        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52, denoise: true,
       },
       post: {
         bloomStrength: 0,
@@ -295,6 +295,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
         toneMapping: 'agx',
         filmGrainScale: 0,
         vignetteStrength: 0.35,
+        sharpness: 0,
       },
       oceanWaveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.performance,
       reflectionScale: 1,
@@ -320,7 +321,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
       filmGrainScale: 0,
       vignetteStrength: 0.35,
       ambientOcclusion: {
-        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52,
+        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52, denoise: true,
       },
     });
     expect((systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh).userData).toMatchObject({
@@ -336,7 +337,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
       principalSamples: 2,
       volumetricScale: 1,
       ambientOcclusion: {
-        quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0,
+        quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0, denoise: false,
       },
       post: {
         bloomStrength: 0.14,
@@ -344,6 +345,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
         toneMapping: 'aces',
         filmGrainScale: 1,
         vignetteStrength: 0,
+        sharpness: 0,
       },
       oceanWaveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.blender,
       reflectionScale: 1,

@@ -65,6 +65,9 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
+import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
+import { smaa } from 'three/addons/tsl/display/SMAANode.js';
+import { sharpen } from 'three/addons/tsl/display/SharpenNode.js';
 import {
   assertGradeChainOrder,
   DEFAULT_GRADE_PROFILE_ID,
@@ -96,6 +99,25 @@ export const FILMIC_GRADE_CHAIN_STAGES: readonly string[] = Object.freeze([
   'display-vignette-falloff',
   'per-frame-luminance-grain',
 ]);
+
+/**
+ * Display-side post anti-aliasing. FXAA and SMAA both expect the finished
+ * display-referred (tone-mapped, sRGB-encoded) image, which is exactly what
+ * the chain's final stage emits — so they are appended AFTER the frozen core
+ * chain as optional trailing stages, followed only by the RCAS sharpen
+ * (AMD's canonical order: reconstruct edges first, sharpen last).
+ */
+export type PostAntiAliasingMode = 'off' | 'fxaa' | 'smaa';
+
+/**
+ * Maps the player's 0..1 sharpness onto the RCAS parameter, whose convention
+ * is inverted and stop-based: 0 = maximum sharpening, 2 = none. Zero UI
+ * sharpness bypasses the stage entirely rather than building an idle pass.
+ */
+export function rcasSharpnessFor(uiSharpness: number): number {
+  const bounded = Number.isFinite(uiSharpness) ? Math.min(1, Math.max(0, uiSharpness)) : 0;
+  return (1 - bounded) * 2;
+}
 
 /** Rec.709 luma weights. They sum to 1, which several invariants rely on. */
 export const REC709_LUMA: readonly [number, number, number] = Object.freeze([0.2126, 0.7152, 0.0722]);
@@ -462,11 +484,11 @@ export function buildFilmicGradeChain(
   stages.push('display-split-tone');
 
   // --- stage 11: display vignette falloff ---------------------------------
-  // Parameterised by `vignetteStrength`, which defaults to 0 while the legacy
-  // linear-side vignette in the scene-pass assembler still owns that setting.
-  // Stacking two vignettes would darken exactly the screen periphery enemies
-  // enter from, so this owns the stage position without doubling the effect
-  // until the linear-side one is handed over.
+  // THE one vignette owner. The legacy linear-side vignette in the scene-pass
+  // assembler was retired (its stage held the setting while this one idled at
+  // zero); stacking two vignettes would darken exactly the screen periphery
+  // enemies enter from, so the graphics runtime now drives only this uniform
+  // via setDisplayVignetteStrength.
   const vignetteOffset = screenUV.sub(0.5);
   const vignetteFalloff = smoothstep(float(VIGNETTE_INNER), float(VIGNETTE_OUTER), dot(vignetteOffset, vignetteOffset))
     .mul(uniforms.vignetteStrength)
@@ -583,6 +605,12 @@ export type FilmicGradeChainHandle = Readonly<{
   setProfile(profileId: GradeProfileId): void;
   setGrainStrength8Bit(strength8Bit: number): void;
   setDisplayVignetteStrength(strength: number): void;
+  /** Selects the optional display-side post AA stage; 'off' removes it. */
+  setPostAntiAliasing(mode: PostAntiAliasingMode): void;
+  postAntiAliasing(): PostAntiAliasingMode;
+  /** Player sharpness 0..1; zero removes the RCAS stage entirely. */
+  setSharpness(uiSharpness: number): void;
+  sharpness(): number;
   /** Call immediately before submitting a frame. */
   beforeRender(timeMs: number): void;
   dispose(): void;
@@ -605,12 +633,17 @@ export function installFilmicGradeChain(
     profileId?: GradeProfileId;
     grainStrength8Bit?: number;
     upstreamStages?: readonly string[];
+    postAntiAliasing?: PostAntiAliasingMode;
+    /** Player sharpness 0..1; zero (the default) builds no RCAS stage. */
+    sharpness?: number;
   }> = {},
 ): FilmicGradeChainHandle {
   const marked = pipeline as GradedRenderPipeline & { [INSTALL_MARKER]?: FilmicGradeChainHandle };
   const existing = marked[INSTALL_MARKER];
   if (existing) {
     if (options.profileId) existing.setProfile(options.profileId);
+    if (options.postAntiAliasing !== undefined) existing.setPostAntiAliasing(options.postAntiAliasing);
+    if (options.sharpness !== undefined) existing.setSharpness(options.sharpness);
     return existing;
   }
 
@@ -624,6 +657,12 @@ export function installFilmicGradeChain(
   let gradedNode: Node<'vec4'> | null = null;
   let stages: readonly string[] = GRADE_CHAIN_STAGES;
   let bloomNodes: TunableBloomNode[] = [];
+  let postAntiAliasingMode: PostAntiAliasingMode = options.postAntiAliasing ?? 'off';
+  let uiSharpness = Number.isFinite(options.sharpness) ? Math.min(1, Math.max(0, options.sharpness!)) : 0;
+  const sharpnessUniform = uniform(rcasSharpnessFor(uiSharpness));
+  // FXAA/SMAA/RCAS are TempNodes owning render targets; retire the previous
+  // set on every rebuild so pipeline republishes cannot leak GPU targets.
+  let trailingDisposables: Array<{ dispose?: () => void }> = [];
   const bloomBaseStrength = new WeakMap<TunableBloomNode, number>();
   let lastWrittenStrength = new WeakMap<TunableBloomNode, number>();
 
@@ -640,14 +679,42 @@ export function installFilmicGradeChain(
     }
   };
 
+  const disposeTrailingNodes = (): void => {
+    for (const node of trailingDisposables) node.dispose?.();
+    trailingDisposables = [];
+  };
+
   const rebuild = (): void => {
+    disposeTrailingNodes();
     if (linearSource === null) {
       gradedNode = null;
       return;
     }
     const build = buildFilmicGradeChain(linearSource, uniforms, upstreamStages);
-    gradedNode = build.outputNode;
-    stages = build.stages;
+    const builtStages = [...build.stages];
+    let output: Node<'vec4'> = build.outputNode;
+    // Optional trailing display stages. Order is the AMD-canonical one — post
+    // AA reconstructs edges on the finished display image, RCAS sharpens last.
+    if (postAntiAliasingMode === 'fxaa') {
+      const aaNode = fxaa(output);
+      trailingDisposables.push(aaNode as unknown as { dispose?: () => void });
+      output = aaNode as unknown as Node<'vec4'>;
+      builtStages.push('display-post-antialiasing-fxaa');
+    } else if (postAntiAliasingMode === 'smaa') {
+      const aaNode = smaa(output);
+      trailingDisposables.push(aaNode as unknown as { dispose?: () => void });
+      output = aaNode as unknown as Node<'vec4'>;
+      builtStages.push('display-post-antialiasing-smaa');
+    }
+    if (uiSharpness > 0) {
+      const sharpenNode = sharpen(output, sharpnessUniform);
+      trailingDisposables.push(sharpenNode as unknown as { dispose?: () => void });
+      output = sharpenNode as unknown as Node<'vec4'>;
+      builtStages.push('display-cas-sharpen');
+    }
+    assertGradeChainOrder(builtStages);
+    gradedNode = output;
+    stages = Object.freeze(builtStages);
     bloomNodes = collectTunableBloomNodes(linearSource);
     lastWrittenStrength = new WeakMap<TunableBloomNode, number>();
     retuneBloom();
@@ -687,11 +754,32 @@ export function installFilmicGradeChain(
     setDisplayVignetteStrength(strength: number) {
       uniforms.vignetteStrength.value = Number.isFinite(strength) ? Math.max(0, strength) : 0;
     },
+    setPostAntiAliasing(mode: PostAntiAliasingMode) {
+      if (mode === postAntiAliasingMode) return;
+      postAntiAliasingMode = mode;
+      rebuild();
+      pipeline.needsUpdate = true;
+    },
+    postAntiAliasing: () => postAntiAliasingMode,
+    setSharpness(nextSharpness: number) {
+      const bounded = Number.isFinite(nextSharpness) ? Math.min(1, Math.max(0, nextSharpness)) : 0;
+      const stageToggled = (bounded > 0) !== (uiSharpness > 0);
+      uiSharpness = bounded;
+      sharpnessUniform.value = rcasSharpnessFor(bounded);
+      // Strength moves through the live uniform; only crossing zero changes
+      // the graph topology (the stage is bypassed entirely at zero).
+      if (stageToggled) {
+        rebuild();
+        pipeline.needsUpdate = true;
+      }
+    },
+    sharpness: () => uiSharpness,
     beforeRender(timeMs: number) {
       uniforms.grainSeed.value = grainSeedFor(profile, timeMs);
       retuneBloom();
     },
     dispose() {
+      disposeTrailingNodes();
       delete marked[INSTALL_MARKER];
       Object.defineProperty(pipeline, 'outputNode', {
         configurable: true,

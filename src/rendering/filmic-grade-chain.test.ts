@@ -24,6 +24,7 @@ import {
   installFilmicGradeChain,
   isTunableBloomNode,
   LINEAR_SOURCE_STAGES,
+  rcasSharpnessFor,
   REC709_LUMA,
   srgbTintDirection,
   tuneBloomForProfile,
@@ -32,6 +33,7 @@ import {
   type TunableBloomNode,
 } from './filmic-grade-chain';
 import {
+  assertGradeChainOrder,
   GRADE_CHAIN_STAGES,
   GRADE_PROFILES,
   resolveGradeProfile,
@@ -464,9 +466,10 @@ describe('HF-362 pipeline installation', () => {
     expect(handle.uniforms.grainAmplitude.value).toBe(0);
     handle.setGrainStrength8Bit(DEFAULT_AUTHORED_GRAIN_8BIT);
     expect(handle.uniforms.grainAmplitude.value).toBeGreaterThan(0);
-    // The display vignette starts disabled: the scene-pass assembler still
-    // owns the linear-side one, and two stacked vignettes would darken the
-    // exact screen periphery enemies enter from.
+    // The display vignette starts disabled until the graphics runtime hands
+    // it the setting; it is now the ONE owner (the linear-side stage in the
+    // scene-pass assembler was retired in Pass 76), because two stacked
+    // vignettes would darken the exact screen periphery enemies enter from.
     expect(handle.uniforms.vignetteStrength.value).toBe(0);
     handle.setDisplayVignetteStrength(0.16);
     expect(handle.uniforms.vignetteStrength.value).toBe(0.16);
@@ -529,5 +532,78 @@ describe('HF-362 pipeline installation', () => {
     tuneBloomForProfile(bloom, resolveGradeProfile('max'), bloom.strength.value);
     expect(bloom.threshold.value).toBe(1.08);
     expect(bloom.strength.value).toBeCloseTo(0.5 * 1.15, 12);
+  });
+});
+
+describe('Pass 76 optional trailing display stages', () => {
+  it('appends FXAA and RCAS sharpen after the frozen core chain in the canonical order', () => {
+    const pipeline = makePipeline();
+    const handle = installFilmicGradeChain(pipeline, { profileId: 'quality' });
+    expect(handle.postAntiAliasing()).toBe('off');
+    expect(handle.sharpness()).toBe(0);
+    handle.setPostAntiAliasing('fxaa');
+    expect(handle.stages()).toEqual([...GRADE_CHAIN_STAGES, 'display-post-antialiasing-fxaa']);
+    handle.setSharpness(0.5);
+    expect(handle.stages()).toEqual([
+      ...GRADE_CHAIN_STAGES,
+      'display-post-antialiasing-fxaa',
+      'display-cas-sharpen',
+    ]);
+    // Strength moves through the live uniform without a graph rebuild.
+    const stagesBefore = handle.stages();
+    handle.setSharpness(0.9);
+    expect(handle.stages()).toBe(stagesBefore);
+    expect(handle.sharpness()).toBe(0.9);
+    // Zero removes the RCAS stage entirely rather than idling a pass.
+    handle.setSharpness(0);
+    expect(handle.stages()).toEqual([...GRADE_CHAIN_STAGES, 'display-post-antialiasing-fxaa']);
+    handle.setPostAntiAliasing('off');
+    expect(handle.stages()).toEqual([...GRADE_CHAIN_STAGES]);
+    handle.dispose();
+  });
+
+  it('installs with persisted post AA and sharpness and survives a source republish', () => {
+    const pipeline = makePipeline();
+    const handle = installFilmicGradeChain(pipeline, {
+      profileId: 'quality',
+      postAntiAliasing: 'fxaa',
+      sharpness: 0.25,
+    });
+    const expected = [...GRADE_CHAIN_STAGES, 'display-post-antialiasing-fxaa', 'display-cas-sharpen'];
+    expect(handle.stages()).toEqual(expected);
+    // A scene-pass republish must re-wrap the trailing stages too.
+    pipeline.outputNode = vec4(2, 1, 0, 1);
+    expect(handle.stages()).toEqual(expected);
+    handle.dispose();
+  });
+
+  it('maps player sharpness onto the inverted stop-based RCAS parameter', () => {
+    expect(rcasSharpnessFor(0)).toBe(2);
+    expect(rcasSharpnessFor(0.5)).toBe(1);
+    expect(rcasSharpnessFor(1)).toBe(0);
+    expect(rcasSharpnessFor(Number.NaN)).toBe(2);
+    expect(rcasSharpnessFor(7)).toBe(0);
+    expect(rcasSharpnessFor(-3)).toBe(2);
+  });
+
+  it('fails closed on trailing stages outside the allowed optional order', () => {
+    expect(() => assertGradeChainOrder([...GRADE_CHAIN_STAGES])).not.toThrow();
+    expect(() => assertGradeChainOrder([...GRADE_CHAIN_STAGES, 'display-post-antialiasing-smaa'])).not.toThrow();
+    expect(() => assertGradeChainOrder([
+      ...GRADE_CHAIN_STAGES, 'display-post-antialiasing-smaa', 'display-cas-sharpen',
+    ])).not.toThrow();
+    expect(() => assertGradeChainOrder([...GRADE_CHAIN_STAGES, 'display-cas-sharpen'])).not.toThrow();
+    expect(() => assertGradeChainOrder([...GRADE_CHAIN_STAGES, 'made-up-stage']))
+      .toThrow(/trailing stage violation/);
+    expect(() => assertGradeChainOrder([
+      ...GRADE_CHAIN_STAGES, 'display-cas-sharpen', 'display-post-antialiasing-fxaa',
+    ])).toThrow(/trailing stage violation/);
+    expect(() => assertGradeChainOrder([
+      ...GRADE_CHAIN_STAGES, 'display-post-antialiasing-fxaa', 'display-post-antialiasing-smaa',
+    ])).toThrow(/at most one post anti-aliasing/);
+    // The frozen core prefix is still mandatory and order-checked.
+    expect(() => assertGradeChainOrder([
+      ...GRADE_CHAIN_STAGES.slice(0, -1), 'display-post-antialiasing-fxaa',
+    ])).toThrow(/order violation/);
   });
 });

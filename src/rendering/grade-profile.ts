@@ -45,6 +45,25 @@ export const GRADE_CHAIN_STAGES: readonly string[] = Object.freeze([
   'per-frame-luminance-grain',
 ]);
 
+/**
+ * Optional display-side stages that may follow the frozen core chain, in the
+ * one allowed relative order: at most one post anti-aliasing stage, then the
+ * contrast-adaptive sharpen. Both operate on the finished display-referred
+ * image; grain stays inside the core because its amplitude (<= 1/3 of one
+ * 8-bit step) sits far below the FXAA/SMAA edge thresholds and the RCAS
+ * denoise attenuation, so appending after it cannot amplify it visibly.
+ */
+export const OPTIONAL_POST_DISPLAY_STAGES: readonly string[] = Object.freeze([
+  'display-post-antialiasing-fxaa',
+  'display-post-antialiasing-smaa',
+  'display-cas-sharpen',
+]);
+
+const OPTIONAL_ANTIALIASING_STAGES: readonly string[] = Object.freeze([
+  'display-post-antialiasing-fxaa',
+  'display-post-antialiasing-smaa',
+]);
+
 export type FrozenFilmicGradeProfile = Readonly<{
   id: GradeProfileId;
   /** Stage 4 — ASC CDL in linear HDR. Slope/offset/power per channel. */
@@ -245,7 +264,7 @@ export function resolveGradeProfile(
  * a construction error, never a silent re-order.
  */
 export function assertGradeChainOrder(actualStages: readonly string[]): void {
-  if (actualStages.length !== GRADE_CHAIN_STAGES.length) {
+  if (actualStages.length < GRADE_CHAIN_STAGES.length) {
     throw new Error(
       `HF-362 filmic chain stage count mismatch: expected ${GRADE_CHAIN_STAGES.length}, built ${actualStages.length} (${actualStages.join(' -> ')})`,
     );
@@ -256,5 +275,23 @@ export function assertGradeChainOrder(actualStages: readonly string[]): void {
         `HF-362 filmic chain order violation at stage ${index}: expected '${GRADE_CHAIN_STAGES[index]}', built '${actualStages[index]}' (${actualStages.join(' -> ')})`,
       );
     }
+  }
+  // Trailing stages must be a subsequence of OPTIONAL_POST_DISPLAY_STAGES with
+  // at most one anti-aliasing entry; anything else is a construction error.
+  const trailing = actualStages.slice(GRADE_CHAIN_STAGES.length);
+  let cursor = 0;
+  for (const stage of trailing) {
+    const allowedIndex = OPTIONAL_POST_DISPLAY_STAGES.indexOf(stage, cursor);
+    if (allowedIndex === -1) {
+      throw new Error(
+        `HF-362 filmic chain trailing stage violation: '${stage}' is not an allowed optional display stage after '${trailing.join(' -> ') || '(none)'}' (${actualStages.join(' -> ')})`,
+      );
+    }
+    cursor = allowedIndex + 1;
+  }
+  if (trailing.filter((stage) => OPTIONAL_ANTIALIASING_STAGES.includes(stage)).length > 1) {
+    throw new Error(
+      `HF-362 filmic chain trailing stage violation: at most one post anti-aliasing stage is allowed (${actualStages.join(' -> ')})`,
+    );
   }
 }

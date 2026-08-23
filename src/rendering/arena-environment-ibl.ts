@@ -7,7 +7,10 @@ import { applySkyBackdrop, skyBackdropPreset } from './sky-backdrop';
 export { skyBackdropPreset };
 
 /** PMREM resolution tiers gated by reflectionQuality graphics setting. */
-export type PmremResolutionTier = 128 | 256;
+export type PmremResolutionTier = 128 | 256 | 512;
+
+/** The reflection quality tiers this module understands. */
+export type IblReflectionQuality = 'off' | 'low' | 'high' | 'ultra';
 
 /** State for the active arena's IBL environment map. */
 export type ArenaIblState = Readonly<{
@@ -41,8 +44,8 @@ function createEmptyIblState(): ArenaIblState {
 }
 
 /** Maps reflectionQuality to PMREM resolution tier. */
-export function pmremResolutionForReflectionQuality(reflectionQuality: 'off' | 'low' | 'high'): PmremResolutionTier {
-  return reflectionQuality === 'high' ? 256 : 128;
+export function pmremResolutionForReflectionQuality(reflectionQuality: IblReflectionQuality): PmremResolutionTier {
+  return reflectionQuality === 'ultra' ? 512 : reflectionQuality === 'high' ? 256 : 128;
 }
 
 /**
@@ -53,7 +56,7 @@ export async function generateArenaEnvironmentMap(
   renderer: WebGPURenderer,
   scene: THREE.Scene,
   arenaId: ArenaId,
-  reflectionQuality: 'off' | 'low' | 'high',
+  reflectionQuality: IblReflectionQuality,
   budgetEnvironmentIntensity: number,
   reflectionScale: number,
 ): Promise<ArenaIblState> {
@@ -161,7 +164,7 @@ export async function applyArenaEnvironmentIbl(
   scene: THREE.Scene,
   arenaId: ArenaId,
   preset: string,
-  reflectionQuality: 'off' | 'low' | 'high',
+  reflectionQuality: IblReflectionQuality,
   budgetEnvironmentIntensity: number,
   reflectionScale: number,
   currentIblState: ArenaIblState,

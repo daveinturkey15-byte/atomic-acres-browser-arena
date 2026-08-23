@@ -27,3 +27,22 @@ export function webGlShadowSamplerMode(
   if (webkitEngine && !chromiumEngine) return 'basic-depth';
   return profile === 'blender' ? 'pcf-soft' : 'pcf-compare';
 }
+
+/** Player-facing shadow filter override; 'auto' preserves the sniffed default. */
+export type ShadowFilterOverride = 'auto' | 'pcf' | 'pcss-soft';
+
+/**
+ * Resolves the effective sampler after the graphics-settings override. 'auto'
+ * is byte-for-byte today's behaviour. Explicit choices are honoured everywhere
+ * except the WebKit sampler-array defect above, which is an engine limit — a
+ * player toggle must not be able to produce broken shadow draws.
+ */
+export function resolveWebGlShadowSamplerMode(
+  userAgent: string,
+  profile: 'blender' | 'performance' | 'compat' = 'performance',
+  override: ShadowFilterOverride = 'auto',
+): WebGlShadowSamplerMode {
+  const sniffed = webGlShadowSamplerMode(userAgent, profile);
+  if (override === 'auto' || sniffed === 'basic-depth') return sniffed;
+  return override === 'pcss-soft' ? 'pcf-soft' : 'pcf-compare';
+}

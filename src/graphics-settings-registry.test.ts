@@ -52,6 +52,31 @@ describe('Advanced Graphics canonical registry', () => {
     expect(normalizeAdvancedGraphicsValues({ frameRateLimit: 361 }).frameRateLimit).toBe(0);
   });
 
+  it('exposes the Pass 76 WebGPU feature controls with honest defaults', () => {
+    const byKey = new Map(ADVANCED_GRAPHICS_CONTROLS.map((definition) => [definition.key, definition]));
+    const optionValues = (key: 'antiAliasing' | 'reflectionQuality' | 'shadowFilter' | 'filmicProfile') => {
+      const definition = byKey.get(key);
+      return definition?.kind === 'select' ? definition.options.map(({ value }) => value) : [];
+    };
+    expect(optionValues('antiAliasing')).toEqual(['off', 'msaa-2x', 'msaa-4x', 'fxaa', 'smaa']);
+    expect(optionValues('reflectionQuality')).toEqual(['off', 'low', 'high', 'ultra']);
+    expect(optionValues('shadowFilter')).toEqual(['auto', 'pcf', 'pcss-soft']);
+    expect(optionValues('filmicProfile')).toEqual(['arena-default', 'performance', 'quality', 'max']);
+    expect(byKey.get('sharpness')).toMatchObject({ kind: 'range', minimum: 0, maximum: 1, applyMode: 'live' });
+    expect(byKey.get('environmentIntensity')).toMatchObject({ kind: 'range', minimum: 0, maximum: 2, applyMode: 'live' });
+    // Every preset keeps the new controls at behaviour-preserving defaults;
+    // Max additionally claims the new highest reflection tier.
+    for (const preset of Object.values(GRAPHICS_PRESET_VALUES)) {
+      expect(preset.shadowFilter).toBe('auto');
+      expect(preset.filmicProfile).toBe('arena-default');
+      expect(preset.sharpness).toBe(0);
+      expect(preset.environmentIntensity).toBe(1);
+    }
+    expect(GRAPHICS_PRESET_VALUES.max.reflectionQuality).toBe('ultra');
+    expect(normalizeAdvancedGraphicsValues({ antiAliasing: 'fxaa', sharpness: 3, shadowFilter: 'invented' }))
+      .toMatchObject({ antiAliasing: 'fxaa', sharpness: 1, shadowFilter: 'auto' });
+  });
+
   it('labels unsupported vendor and experimental paths without fake controls', () => {
     expect(GRAPHICS_CAPABILITY_NOTICES.map(({ state }) => state)).not.toContain('active');
     expect(GRAPHICS_CAPABILITY_NOTICES.map(({ id }) => id)).toEqual(expect.arrayContaining([

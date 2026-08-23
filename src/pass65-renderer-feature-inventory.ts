@@ -91,8 +91,9 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     sourceProbes: [
       { path: 'src/rendering/arena-visual-definition.ts', symbol: 'type ArenaVisualDefinition' },
       { path: 'src/legacy-main.ts', symbol: 'adaptiveShadowsEnabled' },
+      { path: 'src/legacy-main.ts', symbol: 'shadowMapTypeForFilter' },
     ], pipelineIds: [],
-    control: control('setting', ['graphics.shadows', 'graphics.shadowResolution', 'graphics.shadowUpdateMode', 'graphics.indirectLighting', 'graphics.preset', 'graphics.adaptiveResolution'], 'Off/on authored shadows, 1024/2048 maps, static/dynamic refresh, and bounded indirect-light scaling', 'Shadow distance, bias, and local-light volumes remain arena-authored because arbitrary values can create leaks, clipping, and unbounded GPU work.'),
+    control: control('setting', ['graphics.shadows', 'graphics.shadowResolution', 'graphics.shadowUpdateMode', 'graphics.shadowFilter', 'graphics.indirectLighting', 'graphics.preset', 'graphics.adaptiveResolution'], 'Off/on authored shadows, 1024/2048 maps, static/dynamic refresh, an auto/PCF/PCSS-soft filter override, and bounded indirect-light scaling', 'Shadow distance, bias, and local-light volumes remain arena-authored because arbitrary values can create leaks, clipping, and unbounded GPU work. The filter override respects the WebKit basic-depth engine floor.'),
     budget: 'Per-arena maximum shadow lights, map pixels, distance, and p95 frame budgets.',
     verifier: 'src/rendering/arena-visual-definition.test.ts + src/rendering/light-occlusion.test.ts + src/arena-contrast-lighting.test.ts + tests/e2e/pass65-rustrig-container-lighting.spec.ts',
   }),
@@ -103,6 +104,37 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     control: control('setting', ['graphics.antiAliasing'], 'Off, 2x or 4x multisampling on the principal linear-sRGB HDR target; bloom chain remains single-sampled', 'The renderer is rebuilt after a setting change so the selected sample count owns a real target allocation rather than a cosmetic label.'),
     budget: 'At most four principal HDR samples and zero bloom-target samples, asserted in runtime telemetry.',
     verifier: 'tests/e2e/pass64-renderer-foundation.spec.ts',
+  }),
+  feature({
+    id: 'post-anti-aliasing', title: 'Display-side post anti-aliasing (FXAA/SMAA)', availability: 'active', owner: 'src/rendering/filmic-grade-chain.ts',
+    sourceProbes: [
+      { path: 'src/rendering/filmic-grade-chain.ts', symbol: 'display-post-antialiasing-fxaa' },
+      { path: 'src/rendering/render-runtime.ts', symbol: 'setPostAntiAliasing' },
+    ], pipelineIds: [],
+    control: control('setting', ['graphics.antiAliasing'], 'FXAA or SMAA as an optional trailing stage after the filmic grade chain on the WebGPU route; MSAA values keep owning the principal-target path', 'The anti-aliasing selector honestly routes to two different mechanisms: MSAA rebuilds the principal HDR target, while FXAA/SMAA rebuild only the display-side output graph. WebGL2 has no grade chain, so post AA degrades to a no-op there.'),
+    budget: 'At most one post AA stage; its render targets are retired on every chain rebuild and chain disposal.',
+    verifier: 'src/rendering/filmic-grade-chain.test.ts',
+  }),
+  feature({
+    id: 'cas-sharpen', title: 'Contrast-adaptive (RCAS) display sharpening', availability: 'active', owner: 'src/rendering/filmic-grade-chain.ts',
+    sourceProbes: [
+      { path: 'src/rendering/filmic-grade-chain.ts', symbol: 'display-cas-sharpen' },
+      { path: 'src/rendering/filmic-grade-chain.ts', symbol: 'rcasSharpnessFor' },
+    ], pipelineIds: [],
+    control: control('setting', ['graphics.sharpness'], '0-100% player sharpness mapped onto the RCAS parameter; zero removes the stage entirely instead of running an idle pass', 'Sharpening runs after tone mapping and after any post AA (the AMD-canonical order), moves through a live uniform, and only crossing zero changes graph topology. WebGL2 has no grade chain, so the control degrades to a no-op there.'),
+    budget: 'At most one RCAS stage and one half-float target, retired with the chain.',
+    verifier: 'src/rendering/filmic-grade-chain.test.ts',
+  }),
+  feature({
+    id: 'filmic-grade-profile', title: 'Player-selectable filmic grade profile', availability: 'active', owner: 'src/rendering/grade-profile.ts + src/rendering/filmic-grade-chain.ts',
+    sourceProbes: [
+      { path: 'src/rendering/grade-profile.ts', symbol: 'GRADE_PROFILES' },
+      { path: 'src/rendering/filmic-grade-chain.ts', symbol: 'installFilmicGradeChain' },
+      { path: 'src/legacy-main.ts', symbol: 'effectiveGradeProfileId' },
+    ], pipelineIds: [],
+    control: control('setting', ['graphics.filmicProfile'], 'Arena Default keeps the HF-363 preset-matched profile; Performance/Quality/Max select an authored frozen profile directly', 'Every selectable profile is a frozen authored catalog entry inside the proven combat-safety envelope; the setting can only choose between them, never invent values.'),
+    budget: 'One installed grade chain; profile switches update uniforms and bloom tuning only.',
+    verifier: 'src/rendering/filmic-grade-chain.test.ts',
   }),
   feature({
     id: 'aces-grade-exposure', title: 'ACES output, deterministic grade and arena exposure', availability: 'active', owner: 'src/rendering/pass64-tsl-scene.ts + ArenaVisualDefinition',
@@ -150,8 +182,9 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     sourceProbes: [
       { path: 'src/render-profile.ts', symbol: 'staticMaterialMode' },
       { path: 'src/graphics-refinement.ts', symbol: 'this.requestedAnisotropy' },
+      { path: 'src/rendering/arena-environment-ibl.ts', symbol: 'scene.environmentIntensity' },
     ], pipelineIds: [],
-    control: control('setting', ['graphics.anisotropy', 'graphics.reflectionQuality'], '1x-16x requested anisotropy clamped to GPU capability, plus Off/Low/High bounded environment-specular response', 'The controls reach actual texture and PBR material properties; hardware clamps and the effective reflection scale are exposed in telemetry.'),
+    control: control('setting', ['graphics.anisotropy', 'graphics.reflectionQuality', 'graphics.environmentIntensity'], '1x-16x requested anisotropy clamped to GPU capability, Off/Low/High/Ultra PMREM tiers (128/256/512), and a bounded 0-2x environment-map intensity multiplier', 'The controls reach actual texture and PBR material properties; hardware clamps, the effective reflection scale and the applied scene.environmentIntensity product are exposed in telemetry.'),
     budget: 'Arena texture-byte and triangle budgets plus renderer maximum-anisotropy clamp.',
     verifier: 'src/render-profile.test.ts + tests/e2e/pass64-renderer-foundation.spec.ts',
   }),
@@ -246,8 +279,8 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
   feature({
     id: 'ambient-contact-effects', title: 'WebGPU ground-truth ambient occlusion', availability: 'active', owner: 'src/rendering/pass64-tsl-scene.ts',
     sourceProbes: [{ path: 'src/rendering/pass64-tsl-scene.ts', symbol: 'ao(sceneDepth, sceneNormal, camera)' }], pipelineIds: ['pass64.hdr-grade-grain.tsl.v1'],
-    control: control('setting', ['graphics.ambientOcclusion'], 'Off, Low, High or Ultra GTAO from the principal scene depth buffer', 'The installed Three.js WebGPU GTAO node now owns a bounded depth-derived contact pass; each active tier selects a real sample count and resolution scale. Performance and default Quality keep it off after the native transition stress falsified always-on GTAO.'),
-    budget: 'At most one view-normal MRT attachment plus one GTAO red-channel target, 16 samples and 0.75 resolution scale; exact resources dispose with the arena pipeline.',
+    control: control('setting', ['graphics.ambientOcclusion'], 'Off, Low, High or Ultra GTAO from the principal scene depth buffer; High and Ultra add the depth/normal-aware spatial denoise pass', 'The installed Three.js WebGPU GTAO node now owns a bounded depth-derived contact pass; each active tier selects a real sample count and resolution scale, and High/Ultra wrap the raw target in the upstream DenoiseNode (temporal filtering stays off without a TRAA resolve). Performance and default Quality keep it off after the native transition stress falsified always-on GTAO.'),
+    budget: 'At most one view-normal MRT attachment plus one GTAO red-channel target and one denoise target, 16 samples and 0.75 resolution scale; exact resources dispose with the arena pipeline.',
     verifier: 'src/rendering/pass64-tsl-scene.test.ts + scripts/qa/verify-pass64-webgpu.mjs',
   }),
   feature({

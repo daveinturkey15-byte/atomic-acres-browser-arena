@@ -4,6 +4,9 @@ import {
   GRAPHICS_PRESET_VALUES,
   normalizeAdvancedGraphicsValues,
   type AdvancedGraphicsValues,
+  type FilmicProfileChoice,
+  type ReflectionQualityTier,
+  type ShadowFilterMode,
   type ToneMappingMode,
 } from './graphics-settings-registry';
 
@@ -56,9 +59,12 @@ export type GraphicsRuntime = Readonly<{
   targetFps: GraphicsSettings['targetFps'];
   frameRateLimit: number;
   antialiasSamples: 0 | 2 | 4;
+  /** WebGPU display-side post anti-aliasing stage; 'off' whenever MSAA owns AA. */
+  postAntiAliasing: 'off' | 'fxaa' | 'smaa';
   shadows: boolean;
   shadowMapSize: 1024 | 2048;
   shadowUpdateMode: GraphicsSettings['shadowUpdateMode'];
+  shadowFilter: ShadowFilterMode;
   indirectLightScale: number;
   ambientOcclusion: Readonly<{
     quality: GraphicsSettings['ambientOcclusion'];
@@ -67,9 +73,11 @@ export type GraphicsRuntime = Readonly<{
     samples: number;
     radius: number;
     strength: number;
+    /** High/Ultra tiers run the depth/normal-aware denoise pass over the raw GTAO target. */
+    denoise: boolean;
   }>;
   reflectionScale: number;
-  reflectionQuality: 'off' | 'low' | 'high';
+  reflectionQuality: ReflectionQualityTier;
   environmentIntensity: number;
   volumetricScale: number;
   maximumAnisotropy: GraphicsSettings['anisotropy'];
@@ -82,7 +90,11 @@ export type GraphicsRuntime = Readonly<{
     toneMapping: ToneMappingMode;
     filmGrainScale: number;
     vignetteStrength: number;
+    /** 0 disables the display-side RCAS stage entirely. */
+    sharpness: number;
   }>;
+  /** 'arena-default' keeps the preset-matched filmic grade profile mapping. */
+  gradeProfile: FilmicProfileChoice;
   reason: string | null;
 }>;
 
@@ -247,13 +259,18 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
   const lightingScale = (tier: GraphicsSettings['indirectLighting']): number => tier === 'off' ? 0 : tier === 'low' ? 0.62 : 1;
   const bloomStrength = settings.bloomQuality === 'off' ? 0 : settings.bloomQuality === 'subtle' ? 0.065 : 0.14;
   const antialiasSamples = settings.antiAliasing === 'msaa-4x' ? 4 : settings.antiAliasing === 'msaa-2x' ? 2 : 0;
+  const postAntiAliasing = settings.antiAliasing === 'fxaa' || settings.antiAliasing === 'smaa'
+    ? settings.antiAliasing
+    : 'off' as const;
+  // Low keeps the raw single-pass GTAO as the cheap tier; High and Ultra add
+  // the depth/normal-aware spatial denoise over the same bounded target.
   const ambientOcclusion = settings.ambientOcclusion === 'off'
-    ? Object.freeze({ quality: 'off' as const, enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0 })
+    ? Object.freeze({ quality: 'off' as const, enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0, denoise: false })
     : settings.ambientOcclusion === 'low'
-      ? Object.freeze({ quality: 'low' as const, enabled: true, resolutionScale: 0.35, samples: 8, radius: 0.18, strength: 0.42 })
+      ? Object.freeze({ quality: 'low' as const, enabled: true, resolutionScale: 0.35, samples: 8, radius: 0.18, strength: 0.42, denoise: false })
       : settings.ambientOcclusion === 'high'
-        ? Object.freeze({ quality: 'high' as const, enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52 })
-        : Object.freeze({ quality: 'ultra' as const, enabled: true, resolutionScale: 0.75, samples: 16, radius: 0.25, strength: 0.62 });
+        ? Object.freeze({ quality: 'high' as const, enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52, denoise: true })
+        : Object.freeze({ quality: 'ultra' as const, enabled: true, resolutionScale: 0.75, samples: 16, radius: 0.25, strength: 0.62, denoise: true });
   if (forceCompatibility) {
     return Object.freeze({
       requestedPreset: settings.preset,
@@ -264,11 +281,13 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
       targetFps: settings.targetFps,
       frameRateLimit: settings.frameRateLimit,
       antialiasSamples: 0,
+      postAntiAliasing: 'off',
       shadows: false,
       shadowMapSize: 1024,
       shadowUpdateMode: 'static',
+      shadowFilter: 'auto',
       indirectLightScale: 0.45,
-      ambientOcclusion: Object.freeze({ quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0 }),
+      ambientOcclusion: Object.freeze({ quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0, denoise: false }),
       reflectionScale: 0,
       reflectionQuality: 'off',
       environmentIntensity: 0,
@@ -277,7 +296,8 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
       particleScale: 0.4,
       decalScale: 0.4,
       smokeScale: 0.55,
-      post: Object.freeze({ bloomStrength: 0, exposureScale: settings.exposure, toneMapping: settings.toneMapping, filmGrainScale: 0, vignetteStrength: 0 }),
+      post: Object.freeze({ bloomStrength: 0, exposureScale: settings.exposure, toneMapping: settings.toneMapping, filmGrainScale: 0, vignetteStrength: 0, sharpness: 0 }),
+      gradeProfile: 'arena-default',
       reason: 'Compatibility renderer is active.',
     });
   }
@@ -290,14 +310,18 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
     targetFps: settings.targetFps,
     frameRateLimit: settings.frameRateLimit,
     antialiasSamples,
+    postAntiAliasing,
     shadows: settings.shadows === 'high',
     shadowMapSize: settings.shadowResolution === 'high' ? 2048 : 1024,
     shadowUpdateMode: settings.shadowUpdateMode,
+    shadowFilter: settings.shadowFilter,
     indirectLightScale: lightingScale(settings.indirectLighting),
     ambientOcclusion,
-    reflectionScale: lightingScale(settings.reflectionQuality),
+    // Ultra shares High's unit reflection gain; the extra tier buys PMREM
+    // resolution (512) in arena-environment-ibl, not a hotter multiplier.
+    reflectionScale: settings.reflectionQuality === 'off' ? 0 : settings.reflectionQuality === 'low' ? 0.62 : 1,
     reflectionQuality: settings.reflectionQuality,
-    environmentIntensity: lightingScale(settings.indirectLighting),
+    environmentIntensity: lightingScale(settings.indirectLighting) * settings.environmentIntensity,
     volumetricScale: qualityScale(settings.volumetricQuality),
     maximumAnisotropy: settings.anisotropy,
     particleScale: qualityScale(settings.particleQuality),
@@ -309,7 +333,9 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
       toneMapping: settings.toneMapping,
       filmGrainScale: settings.filmGrain,
       vignetteStrength: settings.vignette,
+      sharpness: settings.sharpness,
     }),
+    gradeProfile: settings.filmicProfile,
     reason: null,
   });
 }

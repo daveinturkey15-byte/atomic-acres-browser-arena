@@ -4,6 +4,7 @@ import { assertTslCutoverReady } from './tsl-migration-inventory';
 import {
   installFilmicGradeChain,
   type FilmicGradeChainHandle,
+  type PostAntiAliasingMode,
 } from './filmic-grade-chain';
 import { DEFAULT_GRADE_PROFILE_ID, type GradeProfileId } from './grade-profile';
 import type { ToneMappingMode } from '../graphics-settings-registry';
@@ -1164,6 +1165,28 @@ export class WebGpuRenderRuntime {
   /** Arena-authored grain strength, in 8-bit output steps. */
   setGradeGrainStrength(strength8Bit: number): void {
     this.filmicGrade.setGrainStrength8Bit(strength8Bit);
+  }
+
+  /**
+   * Display-side post anti-aliasing (FXAA/SMAA) appended after the grade
+   * chain. Selecting a mode rebuilds only the chain's output graph; MSAA on
+   * the principal target remains the separate renderer-construction path.
+   */
+  setPostAntiAliasing(mode: PostAntiAliasingMode): void {
+    this.filmicGrade.setPostAntiAliasing(mode);
+  }
+
+  postAntiAliasing(): PostAntiAliasingMode {
+    return this.filmicGrade.postAntiAliasing();
+  }
+
+  /** Player sharpness 0..1 for the display-side RCAS stage; zero bypasses it. */
+  setSharpness(uiSharpness: number): void {
+    this.filmicGrade.setSharpness(uiSharpness);
+  }
+
+  sharpness(): number {
+    return this.filmicGrade.sharpness();
   }
 
   setExposure(exposure: number): void {

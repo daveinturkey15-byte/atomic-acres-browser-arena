@@ -136,6 +136,19 @@
       ]
     },
     {
+      "key": "graphics.shadowFilter",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "shadow-runtime",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "shadowMapTypeForFilter",
+          "telemetryPath": "settings.graphics.shadowFilter + documentElement.dataset.webglShadowSampler"
+        }
+      ]
+    },
+    {
       "key": "graphics.indirectLighting",
       "applyMode": "live",
       "authorityAffecting": false,
@@ -171,6 +184,19 @@
           "path": "src/graphics-refinement.ts",
           "symbol": "effectivePbrRoughness",
           "telemetryPath": "render.graphicsRefinement.reflectionScale"
+        }
+      ]
+    },
+    {
+      "key": "graphics.environmentIntensity",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "material-refinement",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/arena-environment-ibl.ts",
+          "symbol": "scene.environmentIntensity",
+          "telemetryPath": "settings.graphics.environmentIntensity + scene.environmentIntensity product"
         }
       ]
     },
@@ -279,6 +305,32 @@
       ]
     },
     {
+      "key": "graphics.filmicProfile",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "hdr-pipeline",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "effectiveGradeProfileId",
+          "telemetryPath": "settings.graphics.filmicProfile + render.gradeProfileId"
+        }
+      ]
+    },
+    {
+      "key": "graphics.sharpness",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "hdr-pipeline",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/filmic-grade-chain.ts",
+          "symbol": "display-cas-sharpen",
+          "telemetryPath": "settings.graphics.sharpness + grade chain stage receipt"
+        }
+      ]
+    },
+    {
       "key": "graphics.filmGrain",
       "applyMode": "live",
       "authorityAffecting": false,
@@ -298,9 +350,9 @@
       "runtimeConsumer": "hdr-pipeline",
       "runtimeEvidence": [
         {
-          "path": "src/rendering/pass64-tsl-scene.ts",
-          "symbol": "const vignette = uniform(graphics.post.vignetteStrength)",
-          "telemetryPath": "render.atomicSignal.advancedGraphics.vignetteStrength"
+          "path": "src/rendering/filmic-grade-chain.ts",
+          "symbol": "setDisplayVignetteStrength",
+          "telemetryPath": "settings.graphics.vignette + display-vignette-falloff stage uniform"
         }
       ]
     },
@@ -370,9 +422,11 @@
         "shadows": "off",
         "shadowResolution": "medium",
         "shadowUpdateMode": "static",
+        "shadowFilter": "auto",
         "indirectLighting": "low",
         "ambientOcclusion": "off",
         "reflectionQuality": "low",
+        "environmentIntensity": 1,
         "volumetricQuality": "low",
         "smokeQuality": "low",
         "particleQuality": "low",
@@ -381,6 +435,8 @@
         "bloomQuality": "subtle",
         "exposure": 1,
         "toneMapping": "aces",
+        "filmicProfile": "arena-default",
+        "sharpness": 0,
         "filmGrain": 0.1,
         "vignette": 0.08
       },
@@ -393,9 +449,11 @@
         "targetFps": 240,
         "frameRateLimit": 0,
         "antialiasSamples": 0,
+        "postAntiAliasing": "off",
         "shadows": false,
         "shadowMapSize": 1024,
         "shadowUpdateMode": "static",
+        "shadowFilter": "auto",
         "indirectLightScale": 0.62,
         "ambientOcclusion": {
           "quality": "off",
@@ -403,7 +461,8 @@
           "resolutionScale": 0,
           "samples": 0,
           "radius": 0,
-          "strength": 0
+          "strength": 0,
+          "denoise": false
         },
         "reflectionScale": 0.62,
         "reflectionQuality": "low",
@@ -418,8 +477,10 @@
           "exposureScale": 1,
           "toneMapping": "aces",
           "filmGrainScale": 0.1,
-          "vignetteStrength": 0.08
+          "vignetteStrength": 0.08,
+          "sharpness": 0
         },
+        "gradeProfile": "arena-default",
         "reason": null
       },
       "profile": {
@@ -459,9 +520,11 @@
         "shadows": "high",
         "shadowResolution": "high",
         "shadowUpdateMode": "static",
+        "shadowFilter": "auto",
         "indirectLighting": "high",
         "ambientOcclusion": "off",
         "reflectionQuality": "high",
+        "environmentIntensity": 1,
         "volumetricQuality": "high",
         "smokeQuality": "high",
         "particleQuality": "high",
@@ -470,6 +533,8 @@
         "bloomQuality": "cinematic",
         "exposure": 1,
         "toneMapping": "aces",
+        "filmicProfile": "arena-default",
+        "sharpness": 0,
         "filmGrain": 0.32,
         "vignette": 0.16
       },
@@ -482,9 +547,11 @@
         "targetFps": 240,
         "frameRateLimit": 0,
         "antialiasSamples": 4,
+        "postAntiAliasing": "off",
         "shadows": true,
         "shadowMapSize": 2048,
         "shadowUpdateMode": "static",
+        "shadowFilter": "auto",
         "indirectLightScale": 1,
         "ambientOcclusion": {
           "quality": "off",
@@ -492,7 +559,8 @@
           "resolutionScale": 0,
           "samples": 0,
           "radius": 0,
-          "strength": 0
+          "strength": 0,
+          "denoise": false
         },
         "reflectionScale": 1,
         "reflectionQuality": "high",
@@ -507,8 +575,10 @@
           "exposureScale": 1,
           "toneMapping": "aces",
           "filmGrainScale": 0.32,
-          "vignetteStrength": 0.16
+          "vignetteStrength": 0.16,
+          "sharpness": 0
         },
+        "gradeProfile": "arena-default",
         "reason": null
       },
       "profile": {
@@ -548,9 +618,11 @@
         "shadows": "high",
         "shadowResolution": "high",
         "shadowUpdateMode": "dynamic",
+        "shadowFilter": "auto",
         "indirectLighting": "high",
         "ambientOcclusion": "ultra",
-        "reflectionQuality": "high",
+        "reflectionQuality": "ultra",
+        "environmentIntensity": 1,
         "volumetricQuality": "ultra",
         "smokeQuality": "ultra",
         "particleQuality": "ultra",
@@ -559,6 +631,8 @@
         "bloomQuality": "cinematic",
         "exposure": 1,
         "toneMapping": "aces",
+        "filmicProfile": "arena-default",
+        "sharpness": 0,
         "filmGrain": 0.4,
         "vignette": 0.18
       },
@@ -571,9 +645,11 @@
         "targetFps": 240,
         "frameRateLimit": 0,
         "antialiasSamples": 4,
+        "postAntiAliasing": "off",
         "shadows": true,
         "shadowMapSize": 2048,
         "shadowUpdateMode": "dynamic",
+        "shadowFilter": "auto",
         "indirectLightScale": 1,
         "ambientOcclusion": {
           "quality": "ultra",
@@ -581,10 +657,11 @@
           "resolutionScale": 0.75,
           "samples": 16,
           "radius": 0.25,
-          "strength": 0.62
+          "strength": 0.62,
+          "denoise": true
         },
         "reflectionScale": 1,
-        "reflectionQuality": "high",
+        "reflectionQuality": "ultra",
         "environmentIntensity": 1,
         "volumetricScale": 1,
         "maximumAnisotropy": 16,
@@ -596,8 +673,10 @@
           "exposureScale": 1,
           "toneMapping": "aces",
           "filmGrainScale": 0.4,
-          "vignetteStrength": 0.18
+          "vignetteStrength": 0.18,
+          "sharpness": 0
         },
+        "gradeProfile": "arena-default",
         "reason": null
       },
       "profile": {
@@ -757,6 +836,10 @@
         {
           "path": "src/legacy-main.ts",
           "symbol": "adaptiveShadowsEnabled"
+        },
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "shadowMapTypeForFilter"
         }
       ],
       "pipelineIds": [],
@@ -766,12 +849,13 @@
           "graphics.shadows",
           "graphics.shadowResolution",
           "graphics.shadowUpdateMode",
+          "graphics.shadowFilter",
           "graphics.indirectLighting",
           "graphics.preset",
           "graphics.adaptiveResolution"
         ],
-        "effectiveValue": "Off/on authored shadows, 1024/2048 maps, static/dynamic refresh, and bounded indirect-light scaling",
-        "rationale": "Shadow distance, bias, and local-light volumes remain arena-authored because arbitrary values can create leaks, clipping, and unbounded GPU work."
+        "effectiveValue": "Off/on authored shadows, 1024/2048 maps, static/dynamic refresh, an auto/PCF/PCSS-soft filter override, and bounded indirect-light scaling",
+        "rationale": "Shadow distance, bias, and local-light volumes remain arena-authored because arbitrary values can create leaks, clipping, and unbounded GPU work. The filter override respects the WebKit basic-depth engine floor."
       },
       "budget": "Per-arena maximum shadow lights, map pixels, distance, and p95 frame budgets.",
       "verifier": "src/rendering/arena-visual-definition.test.ts + src/rendering/light-occlusion.test.ts + src/arena-contrast-lighting.test.ts + tests/e2e/pass65-rustrig-container-lighting.spec.ts",
@@ -801,6 +885,94 @@
       },
       "budget": "At most four principal HDR samples and zero bloom-target samples, asserted in runtime telemetry.",
       "verifier": "tests/e2e/pass64-renderer-foundation.spec.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "post-anti-aliasing",
+      "title": "Display-side post anti-aliasing (FXAA/SMAA)",
+      "availability": "active",
+      "owner": "src/rendering/filmic-grade-chain.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/filmic-grade-chain.ts",
+          "symbol": "display-post-antialiasing-fxaa"
+        },
+        {
+          "path": "src/rendering/render-runtime.ts",
+          "symbol": "setPostAntiAliasing"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.antiAliasing"
+        ],
+        "effectiveValue": "FXAA or SMAA as an optional trailing stage after the filmic grade chain on the WebGPU route; MSAA values keep owning the principal-target path",
+        "rationale": "The anti-aliasing selector honestly routes to two different mechanisms: MSAA rebuilds the principal HDR target, while FXAA/SMAA rebuild only the display-side output graph. WebGL2 has no grade chain, so post AA degrades to a no-op there."
+      },
+      "budget": "At most one post AA stage; its render targets are retired on every chain rebuild and chain disposal.",
+      "verifier": "src/rendering/filmic-grade-chain.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "cas-sharpen",
+      "title": "Contrast-adaptive (RCAS) display sharpening",
+      "availability": "active",
+      "owner": "src/rendering/filmic-grade-chain.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/filmic-grade-chain.ts",
+          "symbol": "display-cas-sharpen"
+        },
+        {
+          "path": "src/rendering/filmic-grade-chain.ts",
+          "symbol": "rcasSharpnessFor"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.sharpness"
+        ],
+        "effectiveValue": "0-100% player sharpness mapped onto the RCAS parameter; zero removes the stage entirely instead of running an idle pass",
+        "rationale": "Sharpening runs after tone mapping and after any post AA (the AMD-canonical order), moves through a live uniform, and only crossing zero changes graph topology. WebGL2 has no grade chain, so the control degrades to a no-op there."
+      },
+      "budget": "At most one RCAS stage and one half-float target, retired with the chain.",
+      "verifier": "src/rendering/filmic-grade-chain.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "filmic-grade-profile",
+      "title": "Player-selectable filmic grade profile",
+      "availability": "active",
+      "owner": "src/rendering/grade-profile.ts + src/rendering/filmic-grade-chain.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/grade-profile.ts",
+          "symbol": "GRADE_PROFILES"
+        },
+        {
+          "path": "src/rendering/filmic-grade-chain.ts",
+          "symbol": "installFilmicGradeChain"
+        },
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "effectiveGradeProfileId"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.filmicProfile"
+        ],
+        "effectiveValue": "Arena Default keeps the HF-363 preset-matched profile; Performance/Quality/Max select an authored frozen profile directly",
+        "rationale": "Every selectable profile is a frozen authored catalog entry inside the proven combat-safety envelope; the setting can only choose between them, never invent values."
+      },
+      "budget": "One installed grade chain; profile switches update uniforms and bloom tuning only.",
+      "verifier": "src/rendering/filmic-grade-chain.test.ts",
       "authorityAffecting": false
     },
     {
@@ -945,6 +1117,10 @@
         {
           "path": "src/graphics-refinement.ts",
           "symbol": "this.requestedAnisotropy"
+        },
+        {
+          "path": "src/rendering/arena-environment-ibl.ts",
+          "symbol": "scene.environmentIntensity"
         }
       ],
       "pipelineIds": [],
@@ -952,10 +1128,11 @@
         "kind": "setting",
         "settingKeys": [
           "graphics.anisotropy",
-          "graphics.reflectionQuality"
+          "graphics.reflectionQuality",
+          "graphics.environmentIntensity"
         ],
-        "effectiveValue": "1x-16x requested anisotropy clamped to GPU capability, plus Off/Low/High bounded environment-specular response",
-        "rationale": "The controls reach actual texture and PBR material properties; hardware clamps and the effective reflection scale are exposed in telemetry."
+        "effectiveValue": "1x-16x requested anisotropy clamped to GPU capability, Off/Low/High/Ultra PMREM tiers (128/256/512), and a bounded 0-2x environment-map intensity multiplier",
+        "rationale": "The controls reach actual texture and PBR material properties; hardware clamps, the effective reflection scale and the applied scene.environmentIntensity product are exposed in telemetry."
       },
       "budget": "Arena texture-byte and triangle budgets plus renderer maximum-anisotropy clamp.",
       "verifier": "src/render-profile.test.ts + tests/e2e/pass64-renderer-foundation.spec.ts",
@@ -1241,10 +1418,10 @@
         "settingKeys": [
           "graphics.ambientOcclusion"
         ],
-        "effectiveValue": "Off, Low, High or Ultra GTAO from the principal scene depth buffer",
-        "rationale": "The installed Three.js WebGPU GTAO node now owns a bounded depth-derived contact pass; each active tier selects a real sample count and resolution scale. Performance and default Quality keep it off after the native transition stress falsified always-on GTAO."
+        "effectiveValue": "Off, Low, High or Ultra GTAO from the principal scene depth buffer; High and Ultra add the depth/normal-aware spatial denoise pass",
+        "rationale": "The installed Three.js WebGPU GTAO node now owns a bounded depth-derived contact pass; each active tier selects a real sample count and resolution scale, and High/Ultra wrap the raw target in the upstream DenoiseNode (temporal filtering stays off without a TRAA resolve). Performance and default Quality keep it off after the native transition stress falsified always-on GTAO."
       },
-      "budget": "At most one view-normal MRT attachment plus one GTAO red-channel target, 16 samples and 0.75 resolution scale; exact resources dispose with the arena pipeline.",
+      "budget": "At most one view-normal MRT attachment plus one GTAO red-channel target and one denoise target, 16 samples and 0.75 resolution scale; exact resources dispose with the arena pipeline.",
       "verifier": "src/rendering/pass64-tsl-scene.test.ts + scripts/qa/verify-pass64-webgpu.mjs",
       "authorityAffecting": false
     },
@@ -1406,11 +1583,11 @@
     }
   ],
   "summary": {
-    "total": 28,
-    "active": 22,
+    "total": 31,
+    "active": 25,
     "unsupported": 6,
-    "adjustable": 15,
+    "adjustable": 18,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "3335085cdedb5e1e61046c55186c14e47c6e62483e7d7e80ebb3d02847bd7eb0"
+  "inventorySha256": "718b058355f34b3cf0aeb39b8dd1b3c55b07788ccc9955ffa3c6d649dc764fae"
 }

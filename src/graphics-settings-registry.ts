@@ -1,12 +1,15 @@
-export type AntiAliasingMode = 'off' | 'msaa-2x' | 'msaa-4x';
+export type AntiAliasingMode = 'off' | 'msaa-2x' | 'msaa-4x' | 'fxaa' | 'smaa';
 export type ShadowResolution = 'medium' | 'high';
 export type ShadowUpdateMode = 'static' | 'dynamic';
+export type ShadowFilterMode = 'auto' | 'pcf' | 'pcss-soft';
 export type QualityTier = 'low' | 'high' | 'ultra';
 export type LightingTier = 'off' | 'low' | 'high';
+export type ReflectionQualityTier = 'off' | 'low' | 'high' | 'ultra';
 export type AmbientOcclusionQuality = 'off' | 'low' | 'high' | 'ultra';
 export type BloomQuality = 'off' | 'subtle' | 'cinematic';
 export type ToneMappingMode = 'aces' | 'agx' | 'neutral';
 export type GeometryDetail = 'reduced' | 'full';
+export type FilmicProfileChoice = 'arena-default' | 'performance' | 'quality' | 'max';
 
 /**
  * Presentation-only values. None of these values may change collision,
@@ -24,9 +27,11 @@ export type AdvancedGraphicsValues = Readonly<{
   shadows: 'off' | 'high';
   shadowResolution: ShadowResolution;
   shadowUpdateMode: ShadowUpdateMode;
+  shadowFilter: ShadowFilterMode;
   indirectLighting: LightingTier;
   ambientOcclusion: AmbientOcclusionQuality;
-  reflectionQuality: LightingTier;
+  reflectionQuality: ReflectionQualityTier;
+  environmentIntensity: number;
   volumetricQuality: QualityTier;
   anisotropy: 1 | 2 | 4 | 8 | 16;
   particleQuality: QualityTier;
@@ -35,6 +40,8 @@ export type AdvancedGraphicsValues = Readonly<{
   bloomQuality: BloomQuality;
   exposure: number;
   toneMapping: ToneMappingMode;
+  filmicProfile: FilmicProfileChoice;
+  sharpness: number;
   filmGrain: number;
   vignette: number;
 }>;
@@ -133,8 +140,8 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
   }),
   control({
     key: 'antiAliasing', id: 'graphics-anti-aliasing', category: 'display', label: 'Anti-aliasing',
-    description: 'Multisampling on the principal HDR scene target, not merely the canvas.',
-    kind: 'select', options: selectOptions(['off', 'OFF'], ['msaa-2x', 'MSAA 2X'], ['msaa-4x', 'MSAA 4X']),
+    description: 'MSAA multisamples the principal HDR scene target; FXAA and SMAA run as WebGPU display-side post stages after the filmic grade chain.',
+    kind: 'select', options: selectOptions(['off', 'OFF'], ['msaa-2x', 'MSAA 2X'], ['msaa-4x', 'MSAA 4X'], ['fxaa', 'FXAA'], ['smaa', 'SMAA']),
     applyMode: 'pipeline-rebuild', runtimeConsumer: 'renderer-init',
   }),
   control({
@@ -162,6 +169,12 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     applyMode: 'live', runtimeConsumer: 'shadow-runtime',
   }),
   control({
+    key: 'shadowFilter', id: 'graphics-shadow-filter', category: 'lighting', label: 'Shadow filtering',
+    description: 'Auto keeps the browser-detected sampler; PCF forces filtered comparison taps; PCSS Soft forces the authored-penumbra soft sampler. WebKit engines keep the basic-depth compatibility floor.',
+    kind: 'select', options: selectOptions(['auto', 'AUTO'], ['pcf', 'PCF'], ['pcss-soft', 'PCSS SOFT']),
+    applyMode: 'live', runtimeConsumer: 'shadow-runtime',
+  }),
+  control({
     key: 'indirectLighting', id: 'graphics-indirect-lighting', category: 'lighting', label: 'Indirect light',
     description: 'Scales arena hemisphere and ambient bounce approximations without inventing path tracing.',
     kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
@@ -169,14 +182,20 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
   }),
   control({
     key: 'ambientOcclusion', id: 'graphics-ambient-occlusion', category: 'lighting', label: 'Contact shadows (GTAO)',
-    description: 'Adds bounded WebGPU ground-truth ambient occlusion from the scene depth buffer. Higher tiers increase samples and resolution.',
+    description: 'Adds bounded WebGPU ground-truth ambient occlusion from the scene depth buffer. Higher tiers increase samples and resolution; High and Ultra add a depth/normal-aware denoise pass.',
     kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH'], ['ultra', 'ULTRA']),
     applyMode: 'pipeline-rebuild', runtimeConsumer: 'ambient-occlusion',
   }),
   control({
     key: 'reflectionQuality', id: 'graphics-reflections', category: 'lighting', label: 'Specular response',
-    description: 'Gates PMREM cubemap resolution (128/256) for arena environment IBL. Higher tiers capture sharper specular from the sky backdrop. Does NOT raise material roughness (that was backwards).',
-    kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
+    description: 'Gates PMREM cubemap resolution (128/256/512) for arena environment IBL. Higher tiers capture sharper specular from the sky backdrop. Does NOT raise material roughness (that was backwards).',
+    kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH'], ['ultra', 'ULTRA']),
+    applyMode: 'live', runtimeConsumer: 'material-refinement',
+  }),
+  control({
+    key: 'environmentIntensity', id: 'graphics-environment-intensity', category: 'lighting', label: 'Environment intensity',
+    description: 'Scales the arena environment-map (IBL) contribution on top of the indirect-light budget. 1.00X is the authored calibration.',
+    kind: 'range', minimum: 0, maximum: 2, step: 0.05, unit: 'multiplier',
     applyMode: 'live', runtimeConsumer: 'material-refinement',
   }),
   control({
@@ -228,6 +247,18 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     applyMode: 'live', runtimeConsumer: 'hdr-pipeline',
   }),
   control({
+    key: 'filmicProfile', id: 'graphics-filmic-profile', category: 'post', label: 'Filmic grade',
+    description: 'Selects the authored filmic grade profile on the WebGPU chain. Arena Default keeps the preset-matched profile the arena was tuned against.',
+    kind: 'select', options: selectOptions(['arena-default', 'ARENA DEFAULT'], ['performance', 'PERFORMANCE'], ['quality', 'QUALITY'], ['max', 'MAX']),
+    applyMode: 'live', runtimeConsumer: 'hdr-pipeline',
+  }),
+  control({
+    key: 'sharpness', id: 'graphics-sharpness', category: 'post', label: 'Sharpness',
+    description: 'Contrast-adaptive (RCAS) sharpening on the display side after tone mapping; zero disables the stage entirely.',
+    kind: 'range', minimum: 0, maximum: 1, step: 0.01, unit: 'percent',
+    applyMode: 'live', runtimeConsumer: 'hdr-pipeline',
+  }),
+  control({
     key: 'filmGrain', id: 'graphics-film-grain', category: 'post', label: 'Film grain',
     description: 'Scales deterministic TSL grain; zero disables it.',
     kind: 'range', minimum: 0, maximum: 1, step: 0.01, unit: 'percent',
@@ -261,9 +292,11 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
   shadows: runtimeEvidence('src/legacy-main.ts', 'renderRuntime.configureShadows', 'render.authoredShadows + render.shadows'),
   shadowResolution: runtimeEvidence('src/legacy-main.ts', 'Math.min(definition.shadows.mapSize, activeRenderConfig.shadowMapSize)', 'settings.graphics.shadowMapSize + arena visual receipt'),
   shadowUpdateMode: runtimeEvidence('src/legacy-main.ts', "activeRenderConfig.shadowMode === 'dynamic'", 'render.shadowMode + render.shadowAutoUpdate'),
+  shadowFilter: runtimeEvidence('src/legacy-main.ts', 'shadowMapTypeForFilter', 'settings.graphics.shadowFilter + documentElement.dataset.webglShadowSampler'),
   indirectLighting: runtimeEvidence('src/legacy-main.ts', 'graphicsRuntime.indirectLightScale', 'settings.graphics.indirectLightScale + render.lighting'),
   ambientOcclusion: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'ao(sceneDepth, sceneNormal, camera)', 'render.atomicSignal.advancedGraphics.ambientOcclusion'),
   reflectionQuality: runtimeEvidence('src/graphics-refinement.ts', 'effectivePbrRoughness', 'render.graphicsRefinement.reflectionScale'),
+  environmentIntensity: runtimeEvidence('src/rendering/arena-environment-ibl.ts', 'scene.environmentIntensity', 'settings.graphics.environmentIntensity + scene.environmentIntensity product'),
   volumetricQuality: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'const volumetricScale = THREE.MathUtils.clamp', 'render.atomicSignal.advancedGraphics.volumetricScale'),
   smokeQuality: runtimeEvidence('src/legacy-main.ts', 'smokeVolumePresentationPool.setQualityScale(graphicsRuntime.smokeScale)', 'settings.graphics.smokeScale + smoke presentation telemetry'),
   particleQuality: runtimeEvidence('src/legacy-main.ts', 'budget.particleDensityScale * graphicsRuntime.particleScale', 'settings.graphics.particleScale + render.graphicsRefinement.budget'),
@@ -272,8 +305,10 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
   bloomQuality: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'bloom(sceneColor, graphics.post.bloomStrength', 'render.atomicSignal.advancedGraphics.bloomStrength'),
   exposure: runtimeEvidence('src/legacy-main.ts', 'authoredExposure * graphicsRuntime.post.exposureScale', 'settings.graphics.post.exposureScale + renderer exposure'),
   toneMapping: runtimeEvidence('src/legacy-main.ts', 'graphicsRuntime.post.toneMapping', 'settings.graphics.post.toneMapping + documentElement.dataset.graphicsToneMapping'),
+  filmicProfile: runtimeEvidence('src/legacy-main.ts', 'effectiveGradeProfileId', 'settings.graphics.filmicProfile + render.gradeProfileId'),
+  sharpness: runtimeEvidence('src/rendering/filmic-grade-chain.ts', 'display-cas-sharpen', 'settings.graphics.sharpness + grade chain stage receipt'),
   filmGrain: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'graphics.post.filmGrainScale', 'render.atomicSignal.advancedGraphics.filmGrainScale'),
-  vignette: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'const vignette = uniform(graphics.post.vignetteStrength)', 'render.atomicSignal.advancedGraphics.vignetteStrength'),
+  vignette: runtimeEvidence('src/rendering/filmic-grade-chain.ts', 'setDisplayVignetteStrength', 'settings.graphics.vignette + display-vignette-falloff stage uniform'),
 });
 
 export const GRAPHICS_CAPABILITY_NOTICES: readonly GraphicsCapabilityNotice[] = Object.freeze([
@@ -313,16 +348,18 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'm
   performance: Object.freeze({
     renderScale: 0.75, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'off', geometryDetail: 'reduced', shadows: 'off', shadowResolution: 'medium', shadowUpdateMode: 'static',
-    indirectLighting: 'low', ambientOcclusion: 'off', reflectionQuality: 'low', volumetricQuality: 'low', smokeQuality: 'low',
+    shadowFilter: 'auto', indirectLighting: 'low', ambientOcclusion: 'off', reflectionQuality: 'low',
+    environmentIntensity: 1, volumetricQuality: 'low', smokeQuality: 'low',
     particleQuality: 'low', anisotropy: 4, decalQuality: 'low', bloomQuality: 'subtle',
-    exposure: 1, toneMapping: 'aces', filmGrain: 0.1, vignette: 0.08,
+    exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.1, vignette: 0.08,
   }),
   high: Object.freeze({
     renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'static',
-    indirectLighting: 'high', ambientOcclusion: 'off', reflectionQuality: 'high', volumetricQuality: 'high', smokeQuality: 'high',
+    shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'off', reflectionQuality: 'high',
+    environmentIntensity: 1, volumetricQuality: 'high', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
-    exposure: 1, toneMapping: 'aces', filmGrain: 0.32, vignette: 0.16,
+    exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.32, vignette: 0.16,
   }),
   max: Object.freeze({
     // Max deliberately selects the highest supported values, but it must stay as
@@ -332,9 +369,10 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'm
     // load failure. Keep the supersample slightly lower and leave the valve on.
     renderScale: 1.15, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'dynamic',
-    indirectLighting: 'high', ambientOcclusion: 'ultra', reflectionQuality: 'high', volumetricQuality: 'ultra', smokeQuality: 'ultra',
+    shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'ultra', reflectionQuality: 'ultra',
+    environmentIntensity: 1, volumetricQuality: 'ultra', smokeQuality: 'ultra',
     particleQuality: 'ultra', anisotropy: 16, decalQuality: 'ultra', bloomQuality: 'cinematic',
-    exposure: 1, toneMapping: 'aces', filmGrain: 0.4, vignette: 0.18,
+    exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.4, vignette: 0.18,
   }),
 });
 

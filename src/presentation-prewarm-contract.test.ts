@@ -37,13 +37,18 @@ describe('presentation prewarm startup contract', () => {
     // from webGlShadowSamplerMode and that 'basic-depth' still maps to a real
     // BasicShadowMap rather than a PCF comparison sampler.
     expect(source).toMatch(/const shadowSamplerMode = webGlShadowSamplerMode\(navigator\.userAgent[^)]*\);/);
-    expect(source).toContain("shadowSamplerMode === 'basic-depth'");
+    // Pass 76 moved the ShadowMapType mapping into shadowMapTypeForFilter so a
+    // player-facing filter override exists, but the selection still flows
+    // through resolveWebGlShadowSamplerMode, whose WebKit basic-depth floor no
+    // override can bypass (proven in webgl-shadow-compatibility.test.ts).
+    expect(source).toContain('resolveWebGlShadowSamplerMode(navigator.userAgent, renderProfile, filter)');
+    expect(source).toContain("mode === 'basic-depth'");
     expect(source).toContain('? THREE.BasicShadowMap');
-    // The soft tier is quality-only and must never capture the WebKit branch.
-    expect(source).toContain("shadowSamplerMode === 'pcf-soft' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap");
+    // The soft tier is opt-in/quality-only and must never capture the WebKit branch.
+    expect(source).toContain("mode === 'pcf-soft' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap");
     // Renderer construction, exact-composition prewarm, and the live graphics
     // transaction must all retain the browser-safe sampler selection.
-    expect(source.match(/type: webGlShadowMapType/g)).toHaveLength(3);
+    expect(source.match(/type: shadowMapTypeForFilter\(/g)).toHaveLength(3);
     expect(source).not.toContain('type: THREE.PCFShadowMap');
   });
 

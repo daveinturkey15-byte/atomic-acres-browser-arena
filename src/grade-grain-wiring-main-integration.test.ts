@@ -39,6 +39,21 @@ describe('HF-363 authored grain reaches the display-referred grade stage', () =>
     // The linear dither piled noise into the shadows and, measured, made shadow
     // grain about 50% WORSE once display-referred grain was added on top of it.
     expect(scenePass).not.toContain('orderedDither');
-    expect(scenePass).toContain('hdrWithBloom.mul(float(1).sub(vignetteFalloff))');
+  });
+
+  // Pass 76: the vignette followed the same handover as grain. The linear-side
+  // stage held the setting while the display-side stage idled at zero; now the
+  // display-referred 'display-vignette-falloff' stage is the ONE owner and the
+  // scene pass builds no vignette at all. Source-text assertions again on
+  // purpose: a vignette with two owners or zero owners both look plausible in
+  // isolation and only show up when someone compares screenshots.
+  it('the display-referred grade stage is the single vignette owner', () => {
+    expect(scenePass).not.toContain('vignetteFalloff');
+    expect(scenePass).not.toContain('uniform(graphics.post.vignetteStrength)');
+    const chain = readFileSync(new URL('./rendering/filmic-grade-chain.ts', import.meta.url), 'utf8');
+    expect(chain).toContain('display-vignette-falloff');
+    // legacy-main must hand the setting to that stage at boot AND on every
+    // live graphics transaction, or the control silently becomes a no-op.
+    expect(source.match(/renderRuntime\.setDisplayVignetteStrength\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 });

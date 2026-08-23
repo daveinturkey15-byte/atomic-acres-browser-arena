@@ -91,8 +91,11 @@ afterEach(() => {
 
 describe('arena-environment-ibl', () => {
   it('maps reflectionQuality to PMREM resolution tiers', () => {
+    expect(pmremResolutionForReflectionQuality('off')).toBe(128);
     expect(pmremResolutionForReflectionQuality('low')).toBe(128);
     expect(pmremResolutionForReflectionQuality('high')).toBe(256);
+    // Pass 76: the Ultra registry step buys resolution, not intensity.
+    expect(pmremResolutionForReflectionQuality('ultra')).toBe(512);
   });
 
   it('resolves a sky backdrop preset for every canonical arena', () => {
@@ -134,6 +137,7 @@ describe('arena-environment-ibl', () => {
     expect(needsIblRegeneration(state, 'farcrysis', 128)).toBe(false);
     expect(needsIblRegeneration(state, 'high-seas', 128)).toBe(true);
     expect(needsIblRegeneration(state, 'farcrysis', 256)).toBe(true);
+    expect(needsIblRegeneration(state, 'farcrysis', 512)).toBe(true);
   });
 
   it('updates intensity in place without touching the texture', async () => {

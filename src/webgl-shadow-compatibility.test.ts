@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { webGlShadowSamplerMode } from './webgl-shadow-compatibility';
+import { resolveWebGlShadowSamplerMode, webGlShadowSamplerMode } from './webgl-shadow-compatibility';
 
 describe('WebGL shadow sampler browser compatibility', () => {
   it.each([
@@ -40,5 +40,30 @@ describe('WebGL shadow sampler browser compatibility', () => {
 
   it('defaults to the cheaper sampler when no profile is supplied', () => {
     expect(webGlShadowSamplerMode(chrome)).toBe('pcf-compare');
+  });
+});
+
+// Pass 76: the shadow filter graphics setting overrides the sniff, with
+// 'auto' preserving it exactly and WebKit keeping its engine floor.
+describe('Player shadow filter override', () => {
+  const chrome = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151.0.0.0 Safari/537.36';
+  const safari = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.5 Safari/605.1.15';
+
+  it("preserves today's behaviour exactly under 'auto'", () => {
+    for (const profile of ['blender', 'performance', 'compat'] as const) {
+      expect(resolveWebGlShadowSamplerMode(chrome, profile, 'auto')).toBe(webGlShadowSamplerMode(chrome, profile));
+      expect(resolveWebGlShadowSamplerMode(safari, profile, 'auto')).toBe(webGlShadowSamplerMode(safari, profile));
+    }
+  });
+
+  it('honours explicit PCF and PCSS-soft choices on capable engines', () => {
+    expect(resolveWebGlShadowSamplerMode(chrome, 'blender', 'pcf')).toBe('pcf-compare');
+    expect(resolveWebGlShadowSamplerMode(chrome, 'performance', 'pcss-soft')).toBe('pcf-soft');
+    expect(resolveWebGlShadowSamplerMode(chrome, 'compat', 'pcss-soft')).toBe('pcf-soft');
+  });
+
+  it('never lets a player toggle break the WebKit sampler-array floor', () => {
+    expect(resolveWebGlShadowSamplerMode(safari, 'blender', 'pcf')).toBe('basic-depth');
+    expect(resolveWebGlShadowSamplerMode(safari, 'blender', 'pcss-soft')).toBe('basic-depth');
   });
 });

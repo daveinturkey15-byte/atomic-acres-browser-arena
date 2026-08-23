@@ -36,7 +36,7 @@ import { isViewmodelShadowLight, VIEWMODEL_SHADOW_BUDGET } from './rendering/run
 import { auditRuntimeTslTraversal, assertRuntimeTslTraversal, createPass64TslSceneSystems, type Pass64TslSceneSystems } from './rendering/pass64-tsl-scene';
 import type { ArenaVisualBudgets, ArenaVisualDefinition } from './rendering/arena-visual-definition';
 import { auditLocalLightOcclusion } from './rendering/light-occlusion';
-import { webGlShadowSamplerMode } from './webgl-shadow-compatibility';
+import { resolveWebGlShadowSamplerMode, webGlShadowSamplerMode, type ShadowFilterOverride } from './webgl-shadow-compatibility';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { proneBodyClearance } from './prone-clearance';
 import { mountFarcrysisHitlOverlay, type FarcrysisHitlOverlay } from './farcrysis-hitl';
@@ -1723,6 +1723,7 @@ const rendererConstructionGraphics = Object.freeze({
   profile: renderProfile,
   antialiasSamples: graphicsRuntime.antialiasSamples,
   ambientOcclusionEnabled: graphicsRuntime.ambientOcclusion.enabled,
+  ambientOcclusionDenoise: graphicsRuntime.ambientOcclusion.denoise,
   representation: activeRenderConfig.representation,
 });
 const atomicLighting = arenaLightingProfile(renderProfile, 'atomic-acres');
@@ -1943,20 +1944,44 @@ function scheduleGpuRetirementDrain(): void {
 document.documentElement.dataset.renderBackend = renderRuntime.backend;
 const effectiveGraphicsExposure = (authoredExposure: number): number => authoredExposure * graphicsRuntime.post.exposureScale;
 const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent, renderProfile);
+document.documentElement.dataset.webglShadowSampler = shadowSamplerMode;
 // Pass 74: the quality profile finally honours the authored shadow radius -
 // only PCFSoftShadowMap reads it, so the penumbra farcrysis and the contrast
 // lighting pass author was previously discarded.
-const webGlShadowMapType = shadowSamplerMode === 'basic-depth'
-  ? THREE.BasicShadowMap
-  : shadowSamplerMode === 'pcf-soft' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
-document.documentElement.dataset.webglShadowSampler = shadowSamplerMode;
+// Pass 76: the shadow filter graphics setting overrides the UA sniff above;
+// 'auto' resolves to exactly the construction-time sniffed sampler, so the
+// default preserves today's behaviour byte for byte. The WebKit basic-depth
+// engine floor can never be overridden by a player toggle.
+function shadowMapTypeForFilter(filter: ShadowFilterOverride): THREE.ShadowMapType {
+  const mode = resolveWebGlShadowSamplerMode(navigator.userAgent, renderProfile, filter);
+  document.documentElement.dataset.webglShadowSampler = mode;
+  return mode === 'basic-depth'
+    ? THREE.BasicShadowMap
+    : mode === 'pcf-soft' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+}
+// Pass 76: the filmic grade profile is player-selectable; 'arena-default'
+// keeps the HF-363 preset-matched mapping the arenas were tuned against.
+function effectiveGradeProfileId() {
+  return graphicsRuntime.gradeProfile === 'arena-default'
+    ? gradeProfileIdForGraphicsPreset(displayedGraphicsPreset)
+    : graphicsRuntime.gradeProfile;
+}
 renderRuntime.configureOutput(effectiveGraphicsExposure(activeLighting.exposure), graphicsRuntime.post.toneMapping);
 renderRuntime.configureShadows({
   enabled: activeRenderConfig.shadows,
-  type: webGlShadowMapType,
+  type: shadowMapTypeForFilter(graphicsRuntime.shadowFilter),
   autoUpdate: activeRenderConfig.shadowMode === 'dynamic',
   needsUpdate: activeRenderConfig.shadowMode === 'static',
 });
+if (renderRuntime.backend === 'webgpu') {
+  // Pass 76: hand persisted post options to the WebGPU grade chain at boot.
+  // The vignette moved to its single display-side owner; FXAA/SMAA and RCAS
+  // sharpen are optional trailing stages after the frozen core chain.
+  renderRuntime.setGradeProfile(effectiveGradeProfileId());
+  renderRuntime.setDisplayVignetteStrength(graphicsRuntime.post.vignetteStrength);
+  renderRuntime.setPostAntiAliasing(graphicsRuntime.postAntiAliasing);
+  renderRuntime.setSharpness(graphicsRuntime.post.sharpness);
+}
 const signalQuery = new URLSearchParams(window.location.search).get('signal');
 const rendererLabel = renderRuntime.telemetry().adapterLabel;
 const softwareRenderer = isSoftwareWebGLRenderer(rendererLabel);
@@ -25255,7 +25280,8 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
   const staged: string[] = [];
   if (live.antialiasSamples !== rendererConstructionGraphics.antialiasSamples) staged.push('antiAliasing');
   if (desiredConfig.representation !== rendererConstructionGraphics.representation) staged.push('geometryDetail');
-  if (live.ambientOcclusion.enabled !== rendererConstructionGraphics.ambientOcclusionEnabled) {
+  if (live.ambientOcclusion.enabled !== rendererConstructionGraphics.ambientOcclusionEnabled
+    || live.ambientOcclusion.denoise !== rendererConstructionGraphics.ambientOcclusionDenoise) {
     staged.push('ambientOcclusionTopology');
   }
 
@@ -25299,7 +25325,7 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
   }
   renderRuntime.configureShadows({
     enabled: shadowsEnabled,
-    type: webGlShadowMapType,
+    type: shadowMapTypeForFilter(live.shadowFilter),
     autoUpdate: desiredConfig.shadowMode === 'dynamic',
     needsUpdate: shadowsEnabled,
   });
@@ -25342,7 +25368,14 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
   // this every preset ran the 'quality' default, so Performance paid for grading it did
   // not choose and Max never got its wider look.
   if (renderRuntime.backend === 'webgpu') {
-    renderRuntime.setGradeProfile(gradeProfileIdForGraphicsPreset(displayedGraphicsPreset));
+    renderRuntime.setGradeProfile(effectiveGradeProfileId());
+    // Pass 76: the display-side grade chain stage is the ONE vignette owner
+    // (the linear-side stage in pass64-tsl-scene was retired), and the
+    // optional FXAA/SMAA + RCAS trailing stages apply without renderer
+    // reconstruction.
+    renderRuntime.setDisplayVignetteStrength(live.post.vignetteStrength);
+    renderRuntime.setPostAntiAliasing(live.postAntiAliasing);
+    renderRuntime.setSharpness(live.post.sharpness);
   }
   document.documentElement.dataset.graphicsPreset = displayedGraphicsPreset;
   document.documentElement.dataset.graphicsLiveProfile = desiredProfile;
@@ -26051,7 +26084,7 @@ function applyArenaLightingForSelection(): void {
   const lighting = activeLighting;
   const definition = activeArenaVisualDefinition?.id === selectedArena.id ? activeArenaVisualDefinition : null;
   renderRuntime.setExposure(effectiveGraphicsExposure(definition?.colorPipeline.exposure ?? lighting.exposure));
-  renderRuntime.configureShadows({ enabled: renderRuntime.shadowsEnabled(), type: webGlShadowMapType });
+  renderRuntime.configureShadows({ enabled: renderRuntime.shadowsEnabled(), type: shadowMapTypeForFilter(graphicsRuntime.shadowFilter) });
   if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(definition?.fog.color ?? lighting.fogColor);
   if (skyMaterial) {
     skyMaterial.uniforms.top.value.setHex(lighting.skyTop);
