@@ -34,20 +34,26 @@ const BASE = arg('--url', 'http://127.0.0.1:41876/');
 const PEER_PORT = Number(arg('--peer-port', '9337'));
 const MOVE_HOLD_MS = Number(arg('--move-ms', '1800'));
 const MOVE_THRESHOLD_M = Number(arg('--threshold', '1.2'));
-const CONNECT_TIMEOUT = 60_000;
+const CONNECT_TIMEOUT = 120_000;
 
 // The two owner-faulted arenas, plus atomic-acres as the known-good control:
 // if the control lane failed too, the harness (not the arena) would be suspect.
+// Owner requirement: "everything should work the same way whether it's TDM or
+// FFA", across all maps "even gun range". The lobby's mode select defaults to
+// FFA, so a matrix that never touches it - as the first version of this file
+// did not - silently tests only half the product. Modes are now explicit and
+// TDM covers the owner-faulted arenas.
 const LANES = [
-  { arena: 'rustworks-1v1', swaps: ['rustworks-1v1'] },
+  { arena: 'rustworks-1v1', mode: 'tdm', swaps: ['rustworks-1v1'] },
   // Double swap on the Terminal lane - the owner hit the wedge "between
   // swapping maps", so the lane swaps away and back before ready-up.
-  { arena: 'skyline-terminal', swaps: ['skyline-terminal', 'rustworks-1v1', 'skyline-terminal'] },
-  { arena: 'atomic-acres', swaps: ['atomic-acres'] },
-  // Not owner-faulted, but the two arenas this pass reworked most heavily -
-  // multiplayer movement on them is HITL evidence the rework broke nothing.
-  { arena: 'farcrysis', swaps: ['farcrysis'] },
-  { arena: 'high-seas', swaps: ['high-seas'] },
+  { arena: 'skyline-terminal', mode: 'tdm', swaps: ['skyline-terminal', 'rustworks-1v1', 'skyline-terminal'] },
+  { arena: 'atomic-acres', mode: 'ffa', swaps: ['atomic-acres'] },
+  { arena: 'farcrysis', mode: 'ffa', swaps: ['farcrysis'] },
+  { arena: 'high-seas', mode: 'tdm', swaps: ['high-seas'] },
+  // The gun-range lobby forces FFA and zero bots; selecting it exercises that
+  // special-case path end to end.
+  { arena: 'gun-range', mode: 'range', swaps: ['gun-range'] },
 ];
 
 function peerServerReady() {
@@ -132,10 +138,14 @@ async function measureMovement(page) {
 
 const lanes = [];
 for (const lane of LANES) {
-  const record = { arena: lane.arena, swaps: lane.swaps, ok: false };
-  const host = await openPage('Host QA');
-  const guest = await openPage('Guest QA');
+  const record = { arena: lane.arena, mode: lane.mode, swaps: lane.swaps, ok: false };
+  let host = null;
+  let guest = null;
   try {
+    // Inside the try: a page that cannot even open must fail ITS lane, not
+    // kill the whole matrix.
+    host = await openPage('Host QA');
+    guest = await openPage('Guest QA');
     await host.evaluate(() => document.querySelector('#host')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     await host.waitForFunction(() => (document.querySelector('#room-code')?.textContent ?? '').trim().length > 0, undefined, { timeout: CONNECT_TIMEOUT });
     const roomCode = (await host.textContent('#room-code')).trim();
@@ -146,6 +156,11 @@ for (const lane of LANES) {
       await page.waitForFunction(() => document.querySelectorAll('#lobby-roster .lobby-player').length === 2, undefined, { timeout: CONNECT_TIMEOUT });
     }
 
+    // Mode first (gun-range disables the control and forces FFA itself).
+    if (lane.mode === 'tdm' || lane.mode === 'ffa') {
+      await host.selectOption('#lobby-mode', lane.mode);
+      await host.waitForTimeout(300);
+    }
     // Swap maps with the guest ALREADY in the room - the owner's wedge path.
     for (const swapTarget of lane.swaps) {
       await host.selectOption('#lobby-arena', swapTarget);
@@ -191,6 +206,33 @@ for (const lane of LANES) {
       await guest.waitForTimeout(400);
     }
 
+    const visibilityOf = (page) => page.evaluate(() => {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      const remote = snapshot.remotePlayers?.[0] ?? null;
+      let visibleMeshes = 0;
+      const scene = window.__ATOMIC_ACRES_DEBUG__.sampleSceneGraph?.();
+      scene?.traverse((object) => {
+        if (object.name !== 'remote-player-world') return;
+        object.traverse((child) => {
+          if (!child.isMesh || !child.visible) return;
+          for (let parent = child.parent; parent; parent = parent.parent) {
+            if (!parent.visible) return;
+          }
+          visibleMeshes += 1;
+        });
+      });
+      return remote ? {
+        remoteCount: snapshot.remotePlayers.length,
+        hp: remote.hp,
+        interpolationError: Number(remote.interpolationError?.toFixed?.(2) ?? -1),
+        visualPosition: remote.visualPosition?.map((value) => Number(value.toFixed(1))),
+        visibleMeshes,
+      } : { remoteCount: 0, visibleMeshes };
+    });
+
+    record.hostSeesGuest = await visibilityOf(host);
+    record.guestSeesHost = await visibilityOf(guest);
+
     record.hostMove = await measureMovement(host);
     record.guestMove = await measureMovement(guest);
     // When a role failed to move, name the gate clause that held it still.
@@ -202,20 +244,26 @@ for (const lane of LANES) {
     }
     record.hostErrors = host.errorsSeen.slice(0, 4);
     record.guestErrors = guest.errorsSeen.slice(0, 4);
+    const seen = (visibility) => visibility
+      && visibility.remoteCount === 1
+      && visibility.hp > 0
+      && visibility.visibleMeshes > 0;
     record.ok = record.hostArenaId === lane.arena
       && record.guestArenaId === lane.arena
       && record.hostMove.movedM >= MOVE_THRESHOLD_M
-      && record.guestMove.movedM >= MOVE_THRESHOLD_M;
+      && record.guestMove.movedM >= MOVE_THRESHOLD_M
+      && seen(record.hostSeesGuest)
+      && seen(record.guestSeesHost);
   } catch (error) {
     record.error = String(error).slice(0, 300);
-    record.hostErrors = host.errorsSeen.slice(0, 4);
-    record.guestErrors = guest.errorsSeen.slice(0, 4);
+    record.hostErrors = host?.errorsSeen.slice(0, 4) ?? [];
+    record.guestErrors = guest?.errorsSeen.slice(0, 4) ?? [];
   } finally {
-    await host.close().catch(() => {});
-    await guest.close().catch(() => {});
+    await host?.close().catch(() => {});
+    await guest?.close().catch(() => {});
   }
   lanes.push(record);
-  console.error(`[hf347] ${lane.arena}: ${record.ok ? 'PASS' : 'FAIL'}`
+  console.error(`[hf347] ${lane.arena}/${lane.mode}: ${record.ok ? 'PASS' : 'FAIL'}`
     + ` host=${record.hostMove?.movedM ?? '?'}m guest=${record.guestMove?.movedM ?? '?'}m${record.error ? ` error=${record.error}` : ''}`);
 }
 

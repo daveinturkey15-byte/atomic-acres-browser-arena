@@ -29257,6 +29257,136 @@ function debugRiggedOperatorJointScreenPositions(
   return projected;
 }
 
+
+// ---------------------------------------------------------------------------
+// HF-331: self-measuring frame-rate probe for browsers no driver can reach.
+//
+// Playwright's bundled Firefox hangs in launch() on this machine and stock
+// Firefox cannot be puppeteered without geckodriver, so the Firefox number in
+// the owner's "~10 FPS vs 150+" report was unmeasurable mechanically. The fix
+// is to stop trying to reach in from outside: with these QA params the page
+// runs a solo match itself, samples its own presented frame times, and POSTs
+// the result to a local receiver. Works identically in every browser that can
+// open a URL, which is all of them.
+//
+// Safety: does nothing unless all three params are present, and the endpoint
+// must be loopback - the measurement never leaves this machine.
+// ---------------------------------------------------------------------------
+(() => {
+  const params = new URLSearchParams(window.location.search);
+  const probeArena = params.get('qaFpsProbe');
+  const probeEndpoint = params.get('qaFpsEndpoint');
+  const sampleMs = Math.min(60_000, Math.max(3_000, Number(params.get('qaFpsSampleMs') ?? 12_000)));
+  if (!probeArena || !probeEndpoint) return;
+  if (!/^http:\/\/127\.0\.0\.1(?::\d+)?\//.test(probeEndpoint)) return;
+
+  const post = (payload: Record<string, unknown>): void => {
+    try {
+      // text/plain keeps this a CORS "simple request": no preflight, so the
+      // POST reaches the local receiver even though the response stays opaque.
+      void fetch(probeEndpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'text/plain' },
+        body: JSON.stringify(payload),
+        keepalive: true,
+        mode: 'no-cors',
+      });
+    } catch { /* Local receiver gone; the on-screen status still shows it. */ }
+  };
+
+  const waitFor = (condition: () => boolean, timeoutMs: number): Promise<boolean> => new Promise((resolveWait) => {
+    const startedAt = performance.now();
+    const tick = (): void => {
+      if (condition()) { resolveWait(true); return; }
+      if (performance.now() - startedAt > timeoutMs) { resolveWait(false); return; }
+      window.setTimeout(tick, 250);
+    };
+    tick();
+  });
+
+  void (async () => {
+    try {
+      // Armed beacon first: lets the receiver distinguish "page never loaded"
+      // from "probe armed but the run stalled later".
+      post({ stage: 'armed', userAgent: navigator.userAgent });
+      // Capture the page's own failures so a wedged stage names its error in
+      // the heartbeat instead of demanding devtools on an undriveable browser.
+      const recentErrors: string[] = [];
+      const recordError = (text: string): void => {
+        recentErrors.push(text.slice(0, 220));
+        if (recentErrors.length > 3) recentErrors.shift();
+      };
+      window.addEventListener('error', (event) => recordError(String(event.message ?? event)));
+      window.addEventListener('unhandledrejection', (event) => recordError(String(event.reason ?? 'unhandled rejection')));
+      if (!await waitFor(() => arenaSelectionReady, 120_000)) { post({ error: 'bootstrap-timeout' }); return; }
+      post({ stage: 'bootstrap-ready' });
+      // Heartbeat while the arena activates: when a browser wedges inside
+      // activation, the last reported bootstrap stage names the wedge.
+      const heartbeat = window.setInterval(() => {
+        post({
+          stage: 'heartbeat',
+          bootstrapStage,
+          bootstrapError,
+          recentErrors,
+          statusText: (statusEl.textContent ?? '').slice(0, 90),
+          backend: document.documentElement.dataset.renderBackend ?? null,
+        });
+      }, 10_000);
+      try {
+        await activateArenaSelection(probeArena as ArenaId);
+      } finally {
+        window.clearInterval(heartbeat);
+      }
+      post({ stage: 'arena-selected' });
+      element<HTMLInputElement>('#player-name').value = 'FPS Probe';
+      network.close();
+      resetForMode();
+      void startGame('solo', false);
+      if (!await waitFor(() => gameStarted && matchState.phase === 'active', 120_000)) {
+        post({ error: 'match-start-timeout', gameStarted, matchPhase: matchState.phase });
+        return;
+      }
+      post({ stage: 'match-active' });
+      // Let streaming and first-use shader compilation drain before sampling -
+      // the number wanted is steady state, not warmup.
+      await new Promise((settle) => window.setTimeout(settle, 5_000));
+
+      const deltas: number[] = [];
+      let previous = performance.now();
+      await new Promise<void>((doneSampling) => {
+        const frame = (): void => {
+          const now = performance.now();
+          deltas.push(now - previous);
+          previous = now;
+          if (now - startedSamplingAt >= sampleMs) { doneSampling(); return; }
+          requestAnimationFrame(frame);
+        };
+        const startedSamplingAt = performance.now();
+        requestAnimationFrame(frame);
+      });
+
+      deltas.sort((a, b) => a - b);
+      const at = (fraction: number): number => deltas[Math.min(deltas.length - 1, Math.floor(deltas.length * fraction))];
+      const fps = (delta: number): number => Number((1_000 / Math.max(0.001, delta)).toFixed(1));
+      const result = {
+        userAgent: navigator.userAgent,
+        arena: probeArena,
+        backend: document.documentElement.dataset.renderBackend ?? null,
+        webgpuAvailable: Boolean(navigator.gpu),
+        sampleMs,
+        frames: deltas.length,
+        medianFps: fps(at(0.5)),
+        p90WorstFps: fps(at(0.9)),
+        p99WorstFps: fps(at(0.99)),
+      };
+      post(result);
+      setStatus(`FPS probe: median ${result.medianFps} · p90 ${result.p90WorstFps} · ${result.backend}`, 'ok');
+    } catch (error) {
+      post({ error: String(error).slice(0, 300) });
+    }
+  })();
+})();
+
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   admissionState: sampleAdmissionState,
   // Read-only handle on the live scene graph. Screenshots tell you THAT a frame
