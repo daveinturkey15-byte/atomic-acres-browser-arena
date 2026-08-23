@@ -41,6 +41,12 @@ import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { RainPresentation } from './weather/rain-presentation';
 import { applyHudSway, createHudSwayState, type HudSwayState } from './ui/pass77-hud-sway';
 import {
+  advanceHudImpact,
+  createHudImpactState,
+  pushHudImpact,
+  type HudImpactState,
+} from './ui/hud-impact-response';
+import {
   sampleWeather,
   clearWeatherSample,
   forcedWeatherSample,
@@ -5791,6 +5797,10 @@ let cameraShakeState: CameraShakeState = createCameraShakeState();
 // feel that other systems already tune against.
 let cameraShakeTrauma = createCameraShakeTrauma(0, 0x5eed);
 let killConfirmPulseState: KillConfirmPulseState = createKillConfirmPulseState(accessibilityRuntime.weaponMotionScale);
+// HF-370: HUD impact response — the #hud element itself kicks, rolls and
+// flashes on damage and blasts. Fed at the damage-taken and grenade-explosion
+// sites; integrated once per frame in updateSensoryFeedback.
+let hudImpactState: HudImpactState = createHudImpactState();
 
 function isFootstepOccluded(source: Readonly<{ x: number; y: number; z: number }>): boolean {
   if (!audioOcclusionBudget.admit(frameCount)) return false;
@@ -12920,6 +12930,10 @@ function showDamageDirection(attacker: string, damage = 12, now = performance.no
 
 function updateSensoryFeedback(now: number): void {
   audio.updateListener(camera.position, player.yaw);
+  // HF-370: integrate the HUD impact springs every frame, BEFORE the 30 Hz
+  // presentation gate below — a stiff spring stepped at 30 Hz reads as lag.
+  // Writes nothing while settled (see advanceHudImpact).
+  hudImpactState = advanceHudImpact(hudRoot, hudImpactState, now);
   // HF-350: the explosion ambience duck is armed by every blast and is only released
   // here. Without this call the ambience bed stays at 40% for the rest of the match
   // after the first grenade, on every map. Idempotent and self-guarding, so it is
@@ -13026,6 +13040,20 @@ function applyDamage(
       distanceUnits: 1.5,
       family: cause.kind === 'grenade' || cause.kind === 'killstreak' ? 'semtex' : 'crossbow',
       sensoryScale: accessibilityRuntime.weaponMotionScale,
+      now,
+    });
+    // HF-370: the HUD flinches on the same hit the camera does. Severity
+    // matches the trauma strength above; blast causes use the explosion
+    // signature. Bearing reuses the damage-direction source angle, and is
+    // omitted for self-inflicted or unknown-source hits (vertical kick).
+    const impactAttackerPosition = remotes.get(attacker)?.target ?? bots.get(attacker)?.position;
+    const hasImpactBearing = !!impactAttackerPosition && attacker !== player.id;
+    hudImpactState = pushHudImpact(hudImpactState, {
+      kind: cause.kind === 'grenade' || cause.kind === 'killstreak' ? 'explosion' : 'bullet',
+      severity: Math.min(1, appliedDamage / 45) * accessibilityRuntime.weaponMotionScale,
+      ...(hasImpactBearing ? {
+        bearingRadians: sourceScreenAngle(player.position, player.yaw, impactAttackerPosition!),
+      } : {}),
       now,
     });
   }
@@ -30231,6 +30259,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       hostedBotCount: privateLobbySnapshot.config.hostedBotCount,
       autoBalance: privateLobbySnapshot.config.autoBalance,
       durationMs: privateLobbySnapshot.config.durationMs,
+      scoreLimit: privateLobbySnapshot.config.scoreLimit,
       matchClock: privateLobbySnapshot.matchClock ? { ...privateLobbySnapshot.matchClock } : null,
       testBayDoor: privateLobbySnapshot.testBayDoor ? { ...privateLobbySnapshot.testBayDoor } : null,
       members: privateLobbySnapshot.members.map((member) => ({ ...member })),
