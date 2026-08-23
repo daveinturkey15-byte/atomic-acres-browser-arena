@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { GUN_RANGE_ROUND_MS } from './gun-range-rules';
 import {
   DEFAULT_PRIVATE_MATCH_CONFIG,
+  LOBBY_KILL_LIMITS,
+  LOBBY_TIME_LIMITS_MS,
   MAX_HOST_START_FUTURE_LEAD_MS,
   MIN_RECOVERED_HOST_START_TIME_MS,
   balanceLobbyTeams,
@@ -53,6 +56,32 @@ describe('private match lobby', () => {
     expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'high-seas' })).toBe(true);
     expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'nuke-town' as 'atomic-acres' })).toBe(false);
     expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'unknown' as 'atomic-acres' })).toBe(false);
+  });
+
+  it('HF-377: defaults to an uncapped five-minute match and admits every published limit', () => {
+    expect(DEFAULT_PRIVATE_MATCH_CONFIG.scoreLimit).toBeNull();
+    expect(DEFAULT_PRIVATE_MATCH_CONFIG.durationMs).toBe(300_000);
+    for (const scoreLimit of LOBBY_KILL_LIMITS) {
+      expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, scoreLimit })).toBe(true);
+    }
+    for (const durationMs of LOBBY_TIME_LIMITS_MS) {
+      expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, durationMs })).toBe(true);
+    }
+  });
+
+  it('HF-377: rejects kill limits that are not a bounded first-to-N target', () => {
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, scoreLimit: 0 })).toBe(false);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, scoreLimit: -25 })).toBe(false);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, scoreLimit: 1_000 })).toBe(false);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, scoreLimit: 12.5 })).toBe(false);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, scoreLimit: '25' })).toBe(false);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, scoreLimit: undefined })).toBe(false);
+  });
+
+  it('HF-377: keeps the gun-range lobby a fixed untimed-score-practice round', () => {
+    const range = { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range' as const, mode: 'ffa' as const, hostedBotCount: 0 as const, autoBalance: false, durationMs: GUN_RANGE_ROUND_MS };
+    expect(isPrivateMatchConfig(range)).toBe(true);
+    expect(isPrivateMatchConfig({ ...range, scoreLimit: 25 })).toBe(false);
   });
 
   it('holds an identity through 89.9 seconds and expires it at 90 seconds on monotonic time', () => {

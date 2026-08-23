@@ -24,6 +24,9 @@ export type PrivateMatchConfig = Readonly<{
   hostedBotCount: HostedBotCount;
   autoBalance: boolean;
   durationMs: number;
+  /** HF-377: host-settable kill limit replicated as part of the match
+   * contract. `null` keeps the historical uncapped score race. */
+  scoreLimit: number | null;
 }>;
 
 export type LobbyMember = Readonly<{
@@ -94,6 +97,7 @@ export const DEFAULT_PRIVATE_MATCH_CONFIG: PrivateMatchConfig = Object.freeze({
   hostedBotCount: 0,
   autoBalance: true,
   durationMs: 300_000,
+  scoreLimit: null,
 });
 
 export const REJOIN_GRACE_MS = 90_000;
@@ -120,6 +124,24 @@ export function isMatchMode(value: unknown): value is MatchMode {
   return value === 'tdm' || value === 'ffa';
 }
 
+/** HF-377: the only kill limits a lobby can publish. `null` means uncapped and
+ * is rendered as OFF; every other entry is a first-to-N kills target applied
+ * identically to TDM squads and FFA leaders through MatchRules.scoreLimit. */
+export const LOBBY_KILL_LIMITS: readonly (number | null)[] = Object.freeze([null, 10, 25, 50, 100]);
+/** HF-377: the only match durations a lobby can publish, in milliseconds.
+ * Bounded by MAX_PRIVATE_MATCH_DURATION_MS below. */
+export const LOBBY_TIME_LIMITS_MS: readonly number[] = Object.freeze([120_000, 300_000, 600_000, 900_000]);
+
+export function isLobbyKillLimit(value: unknown): value is number | null {
+  return value === null
+    || typeof value === 'number' && Number.isSafeInteger(value) && value >= 1 && value <= 999;
+}
+
+export function isLobbyTimeLimitMs(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value)
+    && value >= 60_000 && value <= MAX_PRIVATE_MATCH_DURATION_MS;
+}
+
 export function isPrivateMatchConfig(value: unknown): value is PrivateMatchConfig {
   if (!value || typeof value !== 'object') return false;
   const config = value as Record<string, unknown>;
@@ -128,14 +150,14 @@ export function isPrivateMatchConfig(value: unknown): value is PrivateMatchConfi
     && isRoomCapacity(config.capacity)
     && isHostedBotCount(config.hostedBotCount)
     && typeof config.autoBalance === 'boolean'
-    && Number.isSafeInteger(config.durationMs)
-    && Number(config.durationMs) >= 60_000
-    && Number(config.durationMs) <= MAX_PRIVATE_MATCH_DURATION_MS
+    && isLobbyTimeLimitMs(config.durationMs)
+    && isLobbyKillLimit(config.scoreLimit)
     && (config.arenaId !== 'gun-range'
       || config.mode === 'ffa'
         && config.hostedBotCount === 0
         && config.autoBalance === false
-        && config.durationMs === GUN_RANGE_ROUND_MS);
+        && config.durationMs === GUN_RANGE_ROUND_MS
+        && config.scoreLimit === null);
 }
 
 export function isLobbyMember(value: unknown): value is LobbyMember {

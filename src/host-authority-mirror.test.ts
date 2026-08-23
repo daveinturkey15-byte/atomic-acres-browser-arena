@@ -167,6 +167,7 @@ function checkpoint(overrides: Partial<HostMatchCheckpoint> = {}): HostMatchChec
       hostedBotCount: 2,
       autoBalance: true,
       durationMs: 300_000,
+      scoreLimit: null,
     },
     members: [
       { id: 'host-1', name: 'HOST', team: 0, ready: true, connected: true, pingMs: 0, dhv: 10 },
@@ -319,7 +320,7 @@ function schemaMaximumCheckpoint(): HostMatchCheckpoint {
     ...base,
     config: {
       arenaId: 'skyline-terminal', mode: 'tdm', capacity: 6, hostedBotCount: 4,
-      autoBalance: true, durationMs: 300_000,
+      autoBalance: true, durationMs: 300_000, scoreLimit: null,
     },
     members: [
       { id: 'host-1', name: 'HOST', team: 0, ready: true, connected: true, pingMs: 0, dhv: 10 },

@@ -424,4 +424,24 @@ describe('match flow', () => {
     const draw = advanceFreeForAllMatch(state, 63_000, [{ id: 'a', kills: 8 }, { id: 'b', kills: 8 }], rules);
     expect(draw).toMatchObject({ phase: 'ended', winner: 'draw' });
   });
+  it('HF-377: ends TDM the moment a squad reaches the host kill limit, before time', () => {
+    const rules = { durationMs: 600_000, scoreLimit: 25 } as const;
+    let state: MatchState = { phase: 'warmup', phaseStartedAt: 0, endsAt: 3_000, winner: null };
+    state = advanceMatch(state, 3_000, [0, 0], rules);
+    expect(state).toMatchObject({ phase: 'active', endsAt: 603_000 });
+    expect(advanceMatch(state, 120_000, [24, 24], rules)).toMatchObject({ phase: 'active' });
+    expect(advanceMatch(state, 120_000, [25, 19], rules)).toMatchObject({ phase: 'ended', endReason: 'score', winner: 0 });
+    expect(advanceMatch(state, 120_000, [22, 25], rules)).toMatchObject({ phase: 'ended', endReason: 'score', winner: 1 });
+    expect(advanceMatch(state, 120_000, [25, 25], rules)).toMatchObject({ phase: 'ended', endReason: 'score', winner: 'draw' });
+  });
+
+  it('HF-377: ends FFA when any leader reaches the host kill limit, identically to TDM', () => {
+    const rules = { durationMs: 600_000, scoreLimit: 25 } as const;
+    let state: MatchState = { phase: 'warmup', phaseStartedAt: 0, endsAt: 3_000, winner: null };
+    state = advanceFreeForAllMatch(state, 3_000, [{ id: 'a', kills: 0 }, { id: 'b', kills: 0 }], rules);
+    expect(state).toMatchObject({ phase: 'active', endsAt: 603_000 });
+    expect(advanceFreeForAllMatch(state, 90_000, [{ id: 'a', kills: 24 }, { id: 'b', kills: 21 }], rules).phase).toBe('active');
+    const ended = advanceFreeForAllMatch(state, 90_000, [{ id: 'b', kills: 25 }, { id: 'a', kills: 23 }], rules);
+    expect(ended).toMatchObject({ phase: 'ended', endReason: 'score', winnerPlayerId: 'b' });
+  });
 });

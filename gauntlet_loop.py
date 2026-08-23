@@ -24,6 +24,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -67,8 +68,15 @@ LANES = [
 
 
 def run(cmd, cwd=REPO, timeout=1800):
+    # On Windows, CreateProcess resolves only .exe; "npx" is npx.cmd and would
+    # raise "[WinError 2]" for every check, spuriously marking the tree RED.
+    # Resolve through PATHEXT once; fall back to the bare name elsewhere.
+    resolved = list(cmd)
+    found = shutil.which(resolved[0])
+    if found:
+        resolved[0] = found
     try:
-        p = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
+        p = subprocess.run(resolved, cwd=cwd, capture_output=True, text=True,
                            timeout=timeout, encoding="utf-8", errors="replace")
         return p.returncode, (p.stdout or "") + (p.stderr or "")
     except Exception as exc:  # noqa: BLE001 - a hung check must not kill the loop

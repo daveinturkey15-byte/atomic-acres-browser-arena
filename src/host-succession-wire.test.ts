@@ -88,7 +88,7 @@ function hostCheckpoint(overrides: Partial<HostMatchCheckpoint> = {}): HostMatch
     lobbyRevision: LOBBY_REVISION,
     config: {
       arenaId: 'atomic-acres', mode: 'ffa', capacity: 4,
-      hostedBotCount: 0, autoBalance: true, durationMs: 300_000,
+      hostedBotCount: 0, autoBalance: true, durationMs: 300_000, scoreLimit: null,
     },
     members: [
       { id: HOST_ID, name: 'HOST', team: 0, ready: true, connected: true, pingMs: 0, dhv: 10 },

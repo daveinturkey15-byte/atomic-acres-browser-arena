@@ -19,7 +19,12 @@ import { createServer } from 'node:http';
 import { spawn, execSync } from 'node:child_process';
 import { mkdtempSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+// Lane discipline: scripts/qa/installed-browser-lanes.mjs
+import { foregroundWindow, closeGracefully, processIsRunning } from './installed-browser-lanes.mjs';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -48,11 +53,38 @@ if (!executable) {
   process.exit(2);
 }
 
+// HF-331 root cause (installed-browser-lanes.mjs): Firefox launched with an
+// explicit -profile NEVER gives the content document focus on this machine,
+// and the game's frame loop refuses to render while document.hasFocus() is
+// false - so every -profile measurement was of the harness, not the game.
+// The working lane drives Firefox's DEFAULT profile in a private window,
+// which is only safe when no other Firefox instance exists to swallow the
+// URL through remoting. Refuse instead of measuring a lie.
+if (BROWSER === 'firefox' && processIsRunning('firefox')) {
+  console.error('[webgpu-boot] firefox is already running; the default-profile lane would hand the URL to that instance. Close it and re-run.');
+  console.log(JSON.stringify({ verdict: 'SKIPPED', browser: 'firefox', reason: 'firefox-already-running' }, null, 2));
+  process.exit(2);
+}
+// Stable substring of the game page <title>; the only handle on "the window
+// this run opened" once the disposable-profile route is off the table.
+const FIREFOX_TITLE_MATCH = 'Browser Arena FPS';
+let focusAttempts = 0;
+let focusOk = false;
+// Interval id of the Firefox focus keep-alive; cleared on every resolve path.
+let focusTimer = null;
+const stopFocusKeepAlive = () => {
+  if (focusTimer !== null) { clearInterval(focusTimer); focusTimer = null; }
+};
+
 const results = [];
 let sweepDone = false;
-
+// Single-arena mode (one entry in --arenas) ends with the in-page probe's FPS
+// sample instead of a sweep-complete marker. Without this branch the harness
+// ignored the one payload that carries medianFps and timed out - which is why
+// Firefox had never produced a measured frame-rate number.
+let fpsResult = null;
 const report = await new Promise((resolveReport) => {
-  const timer = setTimeout(() => { server.close(); resolveReport({ timedOut: true }); }, TIMEOUT_MS);
+  const timer = setTimeout(() => { stopFocusKeepAlive(); server.close(); resolveReport({ timedOut: true }); }, TIMEOUT_MS);
   const server = createServer((request, response) => {
     let body = '';
     request.on('data', (chunk) => { body += chunk; });
@@ -72,13 +104,32 @@ const report = await new Promise((resolveReport) => {
         for (const line of parsed.errors ?? []) console.error(`               ${line}`);
         return;
       }
+      if (typeof parsed.medianFps === 'number') {
+        fpsResult = parsed;
+        console.error(`[webgpu-boot] FPS ${parsed.arena}: median ${parsed.medianFps} · p90-worst ${parsed.p90WorstFps} · p99-worst ${parsed.p99WorstFps} · ${parsed.frames} frames / ${parsed.sampleMs} ms on ${parsed.backend} (webgpuAvailable=${parsed.webgpuAvailable})`);
+        clearTimeout(timer);
+        stopFocusKeepAlive();
+        server.close();
+        resolveReport({ timedOut: false });
+        return;
+      }
       if (parsed.stage === 'bootstrap-ready') {
         console.error(`[webgpu-boot] bootstrap ready on backend=${parsed.backend}`);
+        return;
+      }
+      if (parsed.stage === 'heartbeat') {
+        // Only surface heartbeats that name trouble: a wedged activation stage
+        // or a focus loss (an unfocused window is timer-throttled and would
+        // poison any FPS sample taken during it).
+        if (!parsed.hasFocus || (parsed.recentErrors ?? []).length > 0) {
+          console.error(`[webgpu-boot] heartbeat: stage=${parsed.bootstrapStage} hasFocus=${parsed.hasFocus} visibility=${parsed.visibility} status="${parsed.statusText}"`);
+        }
         return;
       }
       if (parsed.stage === 'sweep-complete') {
         sweepDone = true;
         clearTimeout(timer);
+        stopFocusKeepAlive();
         server.close();
         resolveReport({ timedOut: false });
       }
@@ -92,46 +143,95 @@ const report = await new Promise((resolveReport) => {
   if (RENDERER) url.searchParams.set('renderer', RENDERER);
   url.searchParams.set('qaFpsProbe', ARENAS);
   url.searchParams.set('qaFpsEndpoint', `http://127.0.0.1:${PORT}/report`);
-
   const profile = mkdtempSync(join(tmpdir(), `wgpuboot-${BROWSER}-`));
   console.error(`[webgpu-boot] launching ${BROWSER} on renderer=${RENDERER || 'auto'}`);
   if (BROWSER === 'firefox') {
-    spawn(executable, ['-no-remote', '-profile', profile, '-new-window', url.toString()], { stdio: 'ignore' });
+    // Default profile + private window: see the HF-331 note above. Focus is
+    // then won and VERIFIED from outside via win-foreground.ps1 (-RealClick,
+    // because Firefox ignores a posted click for content-focus purposes).
+    spawn(executable, ['-private-window', url.toString()], { stdio: 'ignore' });
+    const keepFocus = setInterval(() => {
+      try {
+        const attempt = foregroundWindow({
+          titleMatch: FIREFOX_TITLE_MATCH,
+          processName: 'firefox',
+          scriptDir: HERE,
+          click: true,
+          realClick: true,
+        });
+        focusAttempts += 1;
+        focusOk = Boolean(attempt?.ok);
+        if (!focusOk && attempt) {
+          console.error(`[webgpu-boot] firefox focus attempt ${focusAttempts} FAILED: foregroundAfter=${attempt.foregroundAfter} windows=${JSON.stringify(attempt.windows ?? [])}`);
+        }
+      } catch (error) {
+        // Silent catches here cost a whole measurement round once: the attempt
+        // counter never moved while every single focus call was dying below it.
+        focusAttempts += 1;
+        console.error(`[webgpu-boot] firefox focus attempt ${focusAttempts} threw: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }, 3_000);
+    focusTimer = keepFocus;
   } else {
     spawn(executable, [`--user-data-dir=${profile}`, '--no-first-run', '--new-window', url.toString()], { stdio: 'ignore' });
   }
 
-  // The renderer refuses to author frames without document focus, so bring the
-  // window forward - an unfocused window used to stall the prewarm entirely.
-  const activate = () => {
-    const image = BROWSER === 'edge' ? 'msedge' : BROWSER;
-    try {
-      execSync(`powershell -NoProfile -Command "$p = Get-CimInstance Win32_Process -Filter \\"Name='${image}.exe'\\" | Where-Object { $_.CommandLine -like '*wgpuboot-${BROWSER}-*' } | Select-Object -First 1; if ($p) { (New-Object -ComObject WScript.Shell).AppActivate([int]$p.ProcessId) | Out-Null }"`, { stdio: 'ignore' });
-    } catch { /* best effort */ }
-  };
-  for (const delay of [5_000, 20_000, 60_000, 150_000]) setTimeout(activate, delay);
+  if (BROWSER !== 'firefox') {
+    // The renderer refuses to author frames without document focus, so bring the
+    // window forward - an unfocused window used to stall the prewarm entirely.
+    const activate = () => {
+      const image = BROWSER === 'edge' ? 'msedge' : BROWSER;
+      try {
+        execSync(`powershell -NoProfile -Command "$p = Get-CimInstance Win32_Process -Filter \\"Name='${image}.exe'\\" | Where-Object { $_.CommandLine -like '*wgpuboot-${BROWSER}-*' } | Select-Object -First 1; if ($p) { (New-Object -ComObject WScript.Shell).AppActivate([int]$p.ProcessId) | Out-Null }"`, { stdio: 'ignore' });
+      } catch { /* best effort */ }
+    };
+    for (const delay of [5_000, 20_000, 60_000, 150_000]) setTimeout(activate, delay);
+  }
 });
 
-// Kill only the windows we opened, matched on the unique temp profile.
-try {
-  execSync(`powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*wgpuboot-${BROWSER}-*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"`, { stdio: 'ignore' });
-} catch { /* already gone */ }
+if (BROWSER === 'firefox') {
+  // Close only the private window this run opened (WM_CLOSE by title), then
+  // retire the instance we started - force-killing firefox.exe increments its
+  // startup-crash counter and a survivor owns the remoting handoff.
+  try {
+    foregroundWindow({ titleMatch: FIREFOX_TITLE_MATCH, processName: 'firefox', scriptDir: HERE, closeOnly: true });
+  } catch { /* already gone */ }
+  await new Promise((wait) => setTimeout(wait, 1_500));
+  try { await closeGracefully('firefox'); } catch { /* already gone */ }
+} else {
+  // Kill only the windows we opened, matched on the unique temp profile.
+  try {
+    execSync(`powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*wgpuboot-${BROWSER}-*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"`, { stdio: 'ignore' });
+  } catch { /* already gone */ }
+}
 
 const expected = ARENAS.split(',').map((entry) => entry.trim()).filter(Boolean);
 const failed = results.filter((entry) => !entry.ok).map((entry) => entry.arena);
-const missing = expected.filter((arena) => !results.some((entry) => entry.arena === arena));
-const verdict = !report.timedOut && failed.length === 0 && missing.length === 0 ? 'PASS' : 'FAIL';
+// A single-arena run succeeds on a delivered FPS sample; a sweep still needs
+// every arena to have booted cleanly.
+const fpsMode = expected.length === 1;
+// A single-arena FPS run delivers its sample without any arena-boot row, so
+// the "every requested arena reported" rule belongs to sweep mode only.
+const missing = fpsMode
+  ? []
+  : expected.filter((arena) => !results.some((entry) => entry.arena === arena));
+const verdict = !report.timedOut
+  && failed.length === 0
+  && missing.length === 0
+  && (!fpsMode || (fpsResult !== null && fpsResult.frames > 0))
+  ? 'PASS' : 'FAIL';
 
 mkdirSync(resolve('artifacts/qa'), { recursive: true });
 const receipt = {
   verdict,
   browser: BROWSER,
   requestedRenderer: RENDERER || 'auto',
-  actualBackend: results[0]?.backend ?? null,
+  actualBackend: fpsResult?.backend ?? results[0]?.backend ?? null,
   sweepCompleted: sweepDone,
+  fps: fpsResult,
+  userAgent: fpsResult?.userAgent ?? null,
+  focusEvidence: BROWSER === 'firefox' ? { attempts: focusAttempts, verified: focusOk } : null,
   failed,
-  neverReported: missing,
-  arenas: results,
 };
 writeFileSync(resolve('artifacts/qa/webgpu-arena-boot.json'), `${JSON.stringify(receipt, null, 2)}\n`);
 console.log(JSON.stringify(receipt, null, 2));

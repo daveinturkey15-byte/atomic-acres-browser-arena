@@ -109,6 +109,7 @@ function checkpoint(overrides: Partial<HostMatchCheckpoint> = {}): HostMatchChec
       hostedBotCount: 2,
       autoBalance: true,
       durationMs: 300_000,
+      scoreLimit: null,
     },
     members: [
       { id: 'host-1', name: 'HOST', team: 0, ready: true, connected: true, pingMs: 0, dhv: 10 },
@@ -234,7 +235,7 @@ describe('host active-match checkpoint', () => {
     const value = checkpoint({
       config: {
         arenaId: 'gun-range', mode: 'ffa', capacity: 4,
-        hostedBotCount: 0, autoBalance: false, durationMs: 120_000,
+        hostedBotCount: 0, autoBalance: false, durationMs: 120_000, scoreLimit: null,
       },
       elapsedSinceActiveMs: 40_000,
       scores: checkpoint().scores.filter((score) => !score.id.startsWith('host-bot-')),

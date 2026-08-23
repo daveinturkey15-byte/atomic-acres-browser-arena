@@ -222,7 +222,7 @@ function isBoundedFinite(value: unknown, minimum: number, maximum: number): bool
 
 function isExactConfig(value: unknown): value is PrivateMatchConfig {
   return isRecord(value)
-    && hasExactKeys(value, ['arenaId', 'mode', 'capacity', 'hostedBotCount', 'autoBalance', 'durationMs'])
+    && hasExactKeys(value, ['arenaId', 'mode', 'capacity', 'hostedBotCount', 'autoBalance', 'durationMs', 'scoreLimit'])
     && isPrivateMatchConfig(value);
 }
 

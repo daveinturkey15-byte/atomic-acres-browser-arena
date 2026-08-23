@@ -3,6 +3,7 @@ import { FIELD_KITS } from '../loadout';
 import { WEAPON_CATALOG } from '../combat/weapon-catalog';
 import { GRENADE_CATALOG } from '../combat/grenade-catalog';
 import { ARENA_SELECTIONS, arenaCanvasLabel, soloLaunchLabel } from '../map-selection';
+import { LOBBY_KILL_LIMITS, LOBBY_TIME_LIMITS_MS } from '../private-match';
 import { CHAT_TEXT_MAX_CHARS } from '../text-chat';
 import { AUDIO_BUS_IDS } from '../pass65-settings';
 import { PASS65_KILLSTREAK_CATALOG } from '../killstreak-catalog';
@@ -152,6 +153,9 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
           <button id="lobby-swap-sides" type="button" disabled title="Request to swap sides — the host accepts only swaps that keep teams within one player.">SWAP SIDES</button>
           <label>CAPACITY<select id="lobby-capacity"><option value="4">4 PLAYERS</option><option value="6">6 PLAYERS</option></select></label>
           <label>HOSTED BOTS<select id="lobby-bots"><option value="0">NO BOTS</option><option value="2">2 BOTS</option><option value="4">4 BOTS</option></select></label>
+          <!-- HF-377: host-settable match contract limits; guests see the host's values here before ready-up because renderPrivateLobby mirrors snapshot.config into these selects. -->
+          <label>TIME LIMIT<select id="lobby-time-limit">${LOBBY_TIME_LIMITS_MS.map((ms) => `<option value="${ms}">${Math.round(ms / 60_000)} MIN</option>`).join('')}</select></label>
+          <label>KILL LIMIT<select id="lobby-kill-limit">${LOBBY_KILL_LIMITS.map((limit) => `<option value="${limit ?? ''}">${limit === null ? 'OFF · SCORE RACE' : `FIRST TO ${limit}`}</option>`).join('')}</select></label>
           <label class="lobby-check"><input id="lobby-auto-balance" type="checkbox" checked> AUTO BALANCE</label>
           <button id="lobby-balance" type="button">BALANCE TEAMS</button>
         </div>
