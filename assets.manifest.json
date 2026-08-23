@@ -915,6 +915,87 @@
       "placeholderStatus": "production",
       "format": "1536x864 quality-88 lossy WebP, native generation resolution, PNG master preserved byte-for-byte under source-assets/art-gen/menu/",
       "modifications": "One main-menu key-art backdrop generated locally with Qwen-Image-2512: four operator silhouettes over the project's coastal-suburb-and-superyacht identity, composed with negative space for UI. Exact prompt and seed recorded in the source provenance record."
+    },
+    {
+      "id": "pass74-operator-skin-explorer-2026-08-22",
+      "kind": "original-project-blender-operator-archetype-skin",
+      "creator": "Atomic Acres project",
+      "source": "scripts/blender/create-pass74-operator-archetype-skins.py",
+      "generatedAsOf": "2026-08-22",
+      "license": "Original project work",
+      "attributionRequired": false,
+      "files": [
+        {
+          "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-explorer-lod0.glb",
+          "sha256": "25f83cb9d61ee03c0b9ae536b4d4162e0397609aaef5fff76d8c4e165214d843"
+        },
+        {
+          "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-explorer-lod1.glb",
+          "sha256": "766812e31140f9611177d7699e50e33b7c1e65233274fabdf8e43839576b165b"
+        }
+      ],
+      "sourceSpec": "source-assets/blender/pass74-operator-skin-specs.json",
+      "sourceSpecSha256": "49fe2559654170d9ded41c22a3383cb3b31b1edb28317415a39d6edcd24eee98",
+      "sourceProvenance": "source-assets/blender/pass74-operator-skin-explorer.provenance.json",
+      "sourceProvenanceSha256": "9e42d981f82ea299696d3eb19ab6121f17adf926113737e3c8dfdadf8f6c6076",
+      "owner": "src/operator-model.ts OPERATOR_SKIN_MODEL_URLS.explorer",
+      "placeholderStatus": "production",
+      "format": "Sunspire Wayfarer explorer archetype skinned GLB, quality tier lod0 (5812384 bytes) and performance tier lod1 (4949848 bytes)",
+      "modifications": "Project-original Sunspire Wayfarer archetype authored from the checked-in spec by the pass74 Blender generator over the same vendored CC0 Quaternius SWAT canonical rig used by the Pass 65 third-party operator. Shipped public lod0/lod1 byte-match the artifact hashes recorded in the per-archetype provenance receipt; the non-shipped lod2 remains under artifacts/blender-operator-skins/raw/."
+    },
+    {
+      "id": "pass74-operator-skin-symbiote-2026-08-22",
+      "kind": "original-project-blender-operator-archetype-skin",
+      "creator": "Atomic Acres project",
+      "source": "scripts/blender/create-pass74-operator-archetype-skins.py",
+      "generatedAsOf": "2026-08-22",
+      "license": "Original project work",
+      "attributionRequired": false,
+      "files": [
+        {
+          "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-symbiote-lod0.glb",
+          "sha256": "13e2ccaf29d0615c2328564a72491501ae5fbd39459c9288626efa5556f3dbe2"
+        },
+        {
+          "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-symbiote-lod1.glb",
+          "sha256": "2fd7035e760e94301eb3d5566183205a8e7f09031cba98d61f0bec91357ae663"
+        }
+      ],
+      "sourceSpec": "source-assets/blender/pass74-operator-skin-specs.json",
+      "sourceSpecSha256": "49fe2559654170d9ded41c22a3383cb3b31b1edb28317415a39d6edcd24eee98",
+      "sourceProvenance": "source-assets/blender/pass74-operator-skin-symbiote.provenance.json",
+      "sourceProvenanceSha256": "62a663a5185233299f6f3efd91f577b5b4f4e275b9aef85fb449423406f9aeca",
+      "owner": "src/operator-model.ts OPERATOR_SKIN_MODEL_URLS.symbiote",
+      "placeholderStatus": "production",
+      "format": "Carapace Bulwark symbiote archetype skinned GLB, quality tier lod0 (5706668 bytes) and performance tier lod1 (4841768 bytes)",
+      "modifications": "Project-original Carapace Bulwark archetype authored from the checked-in spec by the pass74 Blender generator over the same vendored CC0 Quaternius SWAT canonical rig used by the Pass 65 third-party operator. Shipped public lod0/lod1 byte-match the artifact hashes recorded in the per-archetype provenance receipt; the non-shipped lod2 remains under artifacts/blender-operator-skins/raw/."
+    },
+    {
+      "id": "pass74-operator-skin-navalops-2026-08-22",
+      "kind": "original-project-blender-operator-archetype-skin",
+      "creator": "Atomic Acres project",
+      "source": "scripts/blender/create-pass74-operator-archetype-skins.py",
+      "generatedAsOf": "2026-08-22",
+      "license": "Original project work",
+      "attributionRequired": false,
+      "files": [
+        {
+          "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-navalops-lod0.glb",
+          "sha256": "39c502fddc16a79ed4dc147459fdc6b2248d4856294a8c3f58ea9eaf7ea6a47c"
+        },
+        {
+          "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-navalops-lod1.glb",
+          "sha256": "ac3ceb178d1931df1ebf88ffdf7f4dfe412b9b0c329f16c46ca54117f5bb28f1"
+        }
+      ],
+      "sourceSpec": "source-assets/blender/pass74-operator-skin-specs.json",
+      "sourceSpecSha256": "49fe2559654170d9ded41c22a3383cb3b31b1edb28317415a39d6edcd24eee98",
+      "sourceProvenance": "source-assets/blender/pass74-operator-skin-navalops.provenance.json",
+      "sourceProvenanceSha256": "e0e96b33e24a30155a1337f292211341a896b16d02ccb7701c4be21ec33a9e58",
+      "owner": "src/operator-model.ts OPERATOR_SKIN_MODEL_URLS.navalops",
+      "placeholderStatus": "production",
+      "format": "Tidewrack Operative navalops archetype skinned GLB, quality tier lod0 (5775664 bytes) and performance tier lod1 (4912156 bytes)",
+      "modifications": "Project-original Tidewrack Operative archetype authored from the checked-in spec by the pass74 Blender generator over the same vendored CC0 Quaternius SWAT canonical rig used by the Pass 65 third-party operator. Shipped public lod0/lod1 byte-match the artifact hashes recorded in the per-archetype provenance receipt; the non-shipped lod2 remains under artifacts/blender-operator-skins/raw/."
     }
   ],
   "rejectedCandidates": [
@@ -968,6 +1049,10 @@
     {
       "id": "kenney-v2-foundation-models",
       "reason": "Removed from the structured release because the owner rejected their low-poly art direction; no Kenney runtime asset ships in this build."
+    },
+    {
+      "id": "pass74-hand-drawn-operator-cards",
+      "reason": "Three 6-7 KB hand-drawn ui/operator-skins/{explorer,navalops,symbiote}-operator-card.webp portraits deleted 2026-08-23: referenced nowhere in src/ (the only source mention is the negative assertion in src/operator-skin-appearance.test.ts pinning that operator-card.webp is absent) and superseded by the generated Qwen-Image-2512 card art shipped under public/assets/original/skin-cards/ (atomic-acres-operator-skin-cards-2026-08-23)."
     }
   ]
 }
