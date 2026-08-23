@@ -80,9 +80,11 @@ export const FARCRYSIS_WATER: WaterBodyDefinition = Object.freeze({
   // that exception prevents the shared runtime from drawing a duplicate sea.
   presentationOwner: 'arena-builder',
   dryFootprintMask: 'rectangular',
-  // HF-359 island ocean: level/palette/shore ramp read from the restored
-  // farcrysis modules (buildWater in src/farcrysis-terrain.ts: water plane
-  // 76 m at y = -0.3, shore factor ramp (chebyshev - 15) / 22). Owner scope
+  // HF-359 island ocean: level/palette/shore ramp were read from the restored
+  // farcrysis terrain module (water plane 76 m at y = -0.3, shore factor ramp
+  // (chebyshev - 15) / 22). That module has since been deleted as dead code -
+  // the live arena builds its terrain inline - so these values are now the
+  // authority for them rather than a copy of it. Owner scope
   // makes this the first swimmable body. amplitudeScale keeps the tropical
   // shore calm relative to the rustworks storm spectrum; coordinate final
   // tuning with the farcrysis lane in wave 2.

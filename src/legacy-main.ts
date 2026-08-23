@@ -41,6 +41,7 @@ import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { proneBodyClearance } from './prone-clearance';
 import { mountFarcrysisHitlOverlay, type FarcrysisHitlOverlay } from './farcrysis-hitl';
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
+import { createSwimState, stepSwimState, swimMovementModifiers, type SwimState } from './water/swim-state';
 import { sharedWaterBodyForArena } from './water/water-authoring';
 import { PASS66_RELEASE_IDENTITY } from './release-identity';
 import { drawPass70DroneSwarmLogo } from './pass70-drone-swarm-logo';
@@ -4211,6 +4212,11 @@ const atmosphereSystem = renderRuntime.backend === 'webgl2'
   ? new AtmosphereSystem(scene, renderProfile, rendererLabel, mistQuery, selectedArena.id)
   : null;
 const waterSystem = new WaterSystem(scene, renderRuntime.backend === 'webgpu' ? 'external-tsl' : 'legacy-glsl');
+// HF-358 wave 2. The swim reducers landed pure and host-authoritative but
+// nothing stepped them, so swimmable water still behaved like the rustworks
+// float zone: you bobbed, you could not swim. This is the movement-loop
+// consumption the ledger recorded as an outstanding handoff.
+let localSwimState: SwimState = createSwimState();
 waterSystem.configure(selectedArena.id, renderProfile);
 ensureRustworksStarfield(scene, selectedArena.id);
 const grassSystem = renderRuntime.backend === 'webgl2'
@@ -14785,6 +14791,9 @@ function respawn(
   }
   clearGameplayInput();
   player.stance = 'stand';
+  // Movement state, so it resets with movement state - a retained swim flag
+  // across a respawn would leave the player slowed on dry land.
+  localSwimState = createSwimState();
   characterPhysics?.setStance('stand');
   player.position.copy(spawnPoint());
   characterPhysics?.teleportEye(player.position);
@@ -23670,10 +23679,23 @@ function updatePhysics(dt: number): void {
     equippedMovementMultiplier: WEAPONS[player.weapon].movementMultiplier,
   });
   const movementBoost = killstreakActorModifiers(player.id, now).movement;
+
+  // Sample the water the player is standing in BEFORE integrating movement, so
+  // the swim state that scales this frame's speed is the state they are
+  // actually in. The reducer owns its own enter/exit hysteresis, so it is fed
+  // raw depth every frame rather than a debounced flag.
+  const swimSample = waterSystem.samplePhysics(player.position);
+  localSwimState = stepSwimState(localSwimState, {
+    depth: swimSample.surfaceY - player.position.y,
+    swimmable: waterSystem.swimmable,
+    dtSeconds: dt,
+  });
+  const swim = swimMovementModifiers(localSwimState);
+
   const profile = {
     ...baseProfile,
-    maxSpeed: baseProfile.maxSpeed * movementBoost,
-    acceleration: baseProfile.acceleration * movementBoost,
+    maxSpeed: baseProfile.maxSpeed * movementBoost * swim.speedScale,
+    acceleration: baseProfile.acceleration * movementBoost * swim.speedScale,
   };
   const integrated = integrateHorizontalVelocity(
     { x: player.velocity.x, z: player.velocity.z },
@@ -23696,10 +23718,40 @@ function updatePhysics(dt: number): void {
     if (playerGrounded) player.velocity.y = Math.max(0, player.velocity.y);
   }
 
+  if (localSwimState.swimming) {
+    // A swimmer is neutrally buoyant. The float-zone model below is the
+    // out-of-bounds BOB - buoyancy of 18 m/s per submerged metre, enough to
+    // eject a submerged player in a fraction of a second - which is right for
+    // an OOB fall and wrong for swimming: it threw the player clear of the
+    // water on the same frame they entered it, so the swim state engaged and
+    // released immediately. Cancel the gravity applied above instead, and let
+    // the player command their own depth.
+    player.velocity.y -= PLAYER_JUMP_GRAVITY * dt;
+
+    const ascend = Number(actionHeld('jump', keys, keyProfile) || jumpBuffered);
+    const descend = Number(actionHeld('crouch', keys, keyProfile));
+    const vertical = ascend - descend;
+    if (vertical !== 0) jumpQueuedAt = -10_000;
+
+    // With no input, drift gently up to swim at the surface rather than hang
+    // motionless at whatever depth the player happened to stop at.
+    const restY = swimSample.surfaceY - 0.45;
+    const targetVerticalSpeed = vertical !== 0
+      ? vertical * swim.verticalSpeed
+      : THREE.MathUtils.clamp((restY - player.position.y) * 1.6, -swim.verticalSpeed, swim.verticalSpeed);
+    player.velocity.y += (targetVerticalSpeed - player.velocity.y) * Math.min(1, 7 * dt);
+
+    // Water resists in every axis, not just the horizontal ones.
+    const swimDamp = Math.max(0, 1 - swim.extraDrag * dt);
+    player.velocity.x *= swimDamp;
+    player.velocity.z *= swimDamp;
+  }
+
   const impactVelocity = player.velocity.y;
-  // Ocean buoyancy/drag when looking/falling outside the island pad.
+  // Ocean buoyancy/drag when looking/falling outside the island pad. Skipped
+  // while swimming: the block above owns vertical motion in swimmable water.
   const preWater = waterSystem.samplePhysics(player.position);
-  if (preWater.inWater) {
+  if (preWater.inWater && !localSwimState.swimming) {
     player.velocity.y += preWater.buoyancy * dt;
     player.velocity.y += (preWater.surfaceVelocityY - player.velocity.y) * Math.min(1, 1.8 * dt);
     player.velocity.x *= Math.max(0.2, 1 - preWater.drag * dt);
@@ -23714,7 +23766,14 @@ function updatePhysics(dt: number): void {
   player.position.set(movement.position.x, movement.position.y, movement.position.z);
   playerGrounded = movement.grounded;
   const postWater = waterSystem.samplePhysics(player.position);
-  if (postWater.inWater && player.position.y < postWater.surfaceY + 0.35) {
+  // The surface clamp below exists for NON-swimmable water: it is what stops an
+  // out-of-bounds fall reading as a void clip, and its constants are a
+  // rustworks regression contract. On a swimmable body it is actively wrong -
+  // it pins the player at surfaceY - 0.9, which is exactly the depth the swim
+  // reducer needs to ENTER at, so swimming could never engage no matter how
+  // deep the player went. Swimmable bodies get their vertical control from the
+  // swim state instead.
+  if (!waterSystem.swimmable && postWater.inWater && player.position.y < postWater.surfaceY + 0.35) {
     // Soft float toward surface so OOB falls feel like water, not a void clip.
     player.position.y = Math.min(postWater.surfaceY + 0.55, Math.max(player.position.y, postWater.surfaceY - 0.9));
     characterPhysics.teleportEye(player.position);
@@ -23722,7 +23781,7 @@ function updatePhysics(dt: number): void {
     playerGrounded = false;
   }
   if (playerGrounded) lastGroundedAt = now;
-  if (playerGrounded && !wasGrounded && impactVelocity < -5) {
+  if (playerGrounded && !wasGrounded && impactVelocity < -5 && !localSwimState.swimming) {
     const impactSpeed = Math.abs(impactVelocity);
     landingImpulse = Math.min(1, impactSpeed / 14);
     audio.land(impactSpeed);
@@ -26073,6 +26132,7 @@ async function performArenaSelection(
     clearDebugRiggedEvidenceCaptureTargets();
     lastDebugCapturePresentation = null;
     arena = nextArena;
+    localSwimState = createSwimState();
     // Tear the previous arena's overlay down before the new one is dressed, so
     // it can never outlive the arena it was measuring.
     farcrysisHitlOverlay?.dispose();
@@ -28191,6 +28251,7 @@ const debugWindow = window as Window & {
     snapshot: () => Record<string, unknown> & { player: DebugPlayerPose };
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
     sampleSceneGraph: () => THREE.Scene;
+    debugTeleport: (x: number, y: number, z: number) => boolean;
     samplePresentationTelemetry: () => ReturnType<typeof renderRuntime.presentationTelemetry>;
     sampleEnduranceHealth: (detail?: EnduranceHealthDetail) => ReturnType<typeof sampleEnduranceHealth>;
     sampleWeaponCatalogReadiness: () => ReturnType<typeof weaponView.browserCatalogReadiness>;
@@ -29177,6 +29238,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   // is wrong; walking the graph tells you WHICH object is doing it. Debug-only
   // and never referenced by gameplay.
   sampleSceneGraph: () => scene,
+  // Debug-only reposition, used to drive the player to a specific part of an
+  // arena (a water volume, a wall, a ledge) without walking there. Goes through
+  // the same physics teleport the respawn path uses, so it can never desync the
+  // capsule from the rendered eye.
+  debugTeleport: (x: number, y: number, z: number) => {
+    if (![x, y, z].every(Number.isFinite)) return false;
+    player.position.set(x, y, z);
+    player.velocity.set(0, 0, 0);
+    characterPhysics?.teleportEye(player.position);
+    return true;
+  },
   samplePresentationTelemetry: () => renderRuntime.presentationTelemetry(),
   sampleEnduranceHealth,
   sampleWeaponCatalogReadiness: () => weaponView.browserCatalogReadiness(),
@@ -29186,6 +29258,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleWeaponActionReadiness,
   sampleGrenadeColdPathTelemetry,
   snapshot: () => ({
+    swim: {
+      swimming: localSwimState.swimming,
+      weaponRestricted: localSwimState.weaponRestricted,
+      wetSeconds: Number(localSwimState.wetSeconds.toFixed(3)),
+      drySeconds: Number(localSwimState.drySeconds.toFixed(3)),
+      bodySwimmable: waterSystem.swimmable,
+    },
     bootstrap: {
       stage: bootstrapStage,
       error: bootstrapError,
