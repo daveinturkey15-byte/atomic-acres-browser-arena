@@ -26812,6 +26812,24 @@ async function performArenaSelection(
     profileArenaTransition('visual-definition');
     await configurePlayableArenaVisuals(selectedArena.id, arena.root, false);
     assertAdmission();
+    // God-rays raymarch the sun's shadow map, but three's ShadowNode only
+    // allocates that GPU target on a rendered frame, and every later step of
+    // this transition (quality presentation prewarms, weapon-catalog compile,
+    // the exact ScenePass precompile) can build the post graph before any
+    // full frame has run. Building against the still-null target throws
+    // "Cannot read properties of null (reading 'depthTexture')" on every
+    // shaft-enabled arena entry (measured on gun-range) and is one uncaught
+    // variant away from failing the whole transition. Render one fenced warm
+    // frame immediately after the TSL graph exists so the shadow target is
+    // real before anything compiles against it. Explicit-force call forms
+    // keep the pinned coverage-frame sequence in the committing phase below
+    // untouched; its resetRenderInfo still scopes readiness to real coverage.
+    if (renderRuntime.backend === 'webgpu') {
+      requestStaticShadowRefresh(true);
+      await submitForegroundWebGpuFrame(true);
+      await flushWebGpuFrames(12_000);
+      assertAdmission();
+    }
     profileArenaTransition('quality-presentation');
     await ensureSelectedQualityPresentation(selectedArena.id);
     assertAdmission();
