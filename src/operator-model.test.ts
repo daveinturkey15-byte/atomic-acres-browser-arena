@@ -225,7 +225,12 @@ describe('rigged operator presentation contract', () => {
 
     const runtimeClips = riggedOperatorRuntimeClips(authored);
     expect(runtimeClips.map((clip) => clip.name)).toEqual(RIGGED_OPERATOR_RUNTIME_ACTION_NAMES);
-    expect(runtimeClips).toHaveLength(12);
+    // Pass 75 added 'Wave' as the only clip the selectable-emote catalog needs
+    // beyond the controller set. The guarantee this test protects is that the
+    // bound set stays SMALL and deterministic, not that it is frozen forever -
+    // so it is asserted against the declared list rather than a bare number.
+    expect(runtimeClips).toHaveLength(RIGGED_OPERATOR_RUNTIME_ACTION_NAMES.length);
+    expect(runtimeClips.length).toBeLessThanOrEqual(14);
     expect(runtimeClips).not.toContain(authored[0]);
     expect(runtimeClips).not.toContain(authored.at(-1));
     expect(runtimeClips.every((clip) => authored.includes(clip))).toBe(true);

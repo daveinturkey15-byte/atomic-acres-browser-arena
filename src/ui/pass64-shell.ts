@@ -15,6 +15,12 @@ import { advancedGraphicsMarkup } from './advanced-graphics-controls';
 import './advanced-graphics.css';
 import { menuPreviewVideoDefinition, menuPreviewVideoMarkup } from './menu-preview-video';
 import { OPERATOR_SKIN_CATALOG } from '../operator-skin-catalog'; // HF-360
+import {
+  DEFAULT_OPERATOR_EMOTE,
+  DEFAULT_OPERATOR_STANCE,
+  OPERATOR_EMOTES,
+  OPERATOR_STANCES,
+} from '../operator-appearance-catalog'; // Pass 75
 import { weaponMenuPresentationMarkup, weaponMenuStatDeckMarkup } from './field-kit-weapon-presentation';
 
 export type Pass64ShellViewModel = Readonly<{
@@ -268,6 +274,67 @@ function fieldSupportRowsMarkup(): string {
   }).join('');
 }
 
+/**
+ * Pass 75 - the OPERATOR panel.
+ *
+ * The owner asked for skins AND animations to be easy to select in their own
+ * menu option. Previously the skin was one dropdown buried in the deployment
+ * manifest and animations were not selectable at all.
+ *
+ * Skins are presented as cards using the same authored hero stills the field
+ * kit uses, so the choice is visual rather than a list of names.
+ */
+function operatorPanelMarkup(): string {
+  const skins = OPERATOR_SKIN_CATALOG.definitions
+    .filter((definition) => definition.availability === 'selectable')
+    .map((definition) => {
+      // Real operator art only. The three archetypes use the authored
+      // neutral-front Blender renders from the skins lane; the standard
+      // operator has no such render, so it gets a typographic emblem rather
+      // than a fabricated or misrepresenting image (a weapon still, or its raw
+      // UV atlas, would both misdescribe what the player is choosing).
+      const hasRender = definition.id !== 'default';
+      const still = `./assets/original/ui/operator-skins/${definition.id}-operator-card.webp`;
+      const art = hasRender
+        ? `<img src="${escapeAttribute(still)}" alt="" loading="lazy" decoding="async">`
+        : '<span class="operator-skin-emblem" aria-hidden="true">STANDARD<b>ISSUE</b></span>';
+      return `<button type="button" class="operator-skin-card" data-operator-skin="${escapeAttribute(definition.id)}" aria-pressed="false">
+        <span class="operator-skin-art"${hasRender ? '' : ' data-operator-art="emblem"'}>${art}</span>
+        <strong>${escapeAttribute(definition.displayName.toUpperCase())}</strong>
+        <small>${escapeAttribute(definition.archetype.toUpperCase())} ARCHETYPE</small>
+      </button>`;
+    }).join('');
+
+  const stances = OPERATOR_STANCES.map((stance) => `<button type="button" class="operator-anim-card" data-operator-stance="${escapeAttribute(stance.id)}" aria-pressed="${stance.id === DEFAULT_OPERATOR_STANCE}">
+      <strong>${escapeAttribute(stance.displayName.toUpperCase())}</strong>
+      <small>${escapeAttribute(stance.description)}</small>
+    </button>`).join('');
+
+  const emotes = OPERATOR_EMOTES.map((emote) => `<button type="button" class="operator-anim-card" data-operator-emote="${escapeAttribute(emote.id)}" aria-pressed="${emote.id === DEFAULT_OPERATOR_EMOTE}">
+      <strong>${escapeAttribute(emote.displayName.toUpperCase())}</strong>
+      <small>${escapeAttribute(emote.description)}</small>
+    </button>`).join('');
+
+  return `<div id="menu-panel-operator" class="menu-panel" role="tabpanel" aria-labelledby="menu-tab-operator" data-menu-panel="operator" hidden>
+    <div class="kit-heading"><small>OPERATOR</small><strong>APPEARANCE + ANIMATION</strong><span>Your squad sees every choice here. None of it changes how you play.</span></div>
+    <div id="operator-appearance" class="operator-appearance-layout">
+      <section class="operator-group" aria-labelledby="operator-skins-heading">
+        <h3 id="operator-skins-heading">SKIN</h3>
+        <div class="operator-skin-grid">${skins}</div>
+      </section>
+      <section class="operator-group" aria-labelledby="operator-stance-heading">
+        <h3 id="operator-stance-heading">IDLE STANCE</h3>
+        <div class="operator-anim-grid">${stances}</div>
+      </section>
+      <section class="operator-group" aria-labelledby="operator-emote-heading">
+        <h3 id="operator-emote-heading">EMOTE</h3>
+        <div class="operator-anim-grid">${emotes}</div>
+      </section>
+      <p id="operator-appearance-status" class="operator-appearance-status" aria-live="polite">Standard Operator · Weapon Ready · no emote.</p>
+    </div>
+  </div>`;
+}
+
 function menuMarkup(model: Pass64ShellViewModel): string {
   return `<section id="menu" class="panel pass64-command-deck">
     <header class="command-header">
@@ -281,7 +348,8 @@ function menuMarkup(model: Pass64ShellViewModel): string {
           <button id="menu-tab-deploy" type="button" role="tab" data-menu-tab="deploy" class="active" aria-controls="menu-panel-deploy" aria-selected="true" tabindex="0"><i>01</i><span>DEPLOY</span><small>ARENA + LOBBY</small></button>
           <button id="menu-tab-kit" type="button" role="tab" data-menu-tab="kit" aria-controls="menu-panel-kit" aria-selected="false" tabindex="-1"><i>02</i><span>FIELD KIT</span><small>LOADOUT</small></button>
           <button id="menu-tab-streaks" type="button" role="tab" data-menu-tab="streaks" aria-controls="menu-panel-streaks" aria-selected="false" tabindex="-1"><i>03</i><span>STREAKS</span><small>FIVE SLOTS</small></button>
-          <button id="menu-tab-options" type="button" role="tab" data-menu-tab="options" aria-controls="menu-panel-options" aria-selected="false" tabindex="-1"><i>04</i><span>OPTIONS</span><small>INPUT + VIDEO</small></button>
+          <button id="menu-tab-operator" type="button" role="tab" data-menu-tab="operator" aria-controls="menu-panel-operator" aria-selected="false" tabindex="-1"><i>04</i><span>OPERATOR</span><small>SKIN + ANIMATION</small></button>
+          <button id="menu-tab-options" type="button" role="tab" data-menu-tab="options" aria-controls="menu-panel-options" aria-selected="false" tabindex="-1"><i>05</i><span>OPTIONS</span><small>INPUT + VIDEO</small></button>
         </nav>
         <footer><span>SESSION</span><strong>SECURE / LOCAL</strong><small>${PASS66_RELEASE_IDENTITY.pass}</small></footer>
       </aside>
@@ -289,6 +357,7 @@ function menuMarkup(model: Pass64ShellViewModel): string {
         ${deploymentPanelMarkup(model)}
         ${fieldKitPanelMarkup()}
         ${killstreakLoadoutPanelMarkup()}
+        ${operatorPanelMarkup()}
         ${optionsPanelMarkup()}
       </main>
     </div>

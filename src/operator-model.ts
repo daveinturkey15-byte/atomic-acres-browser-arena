@@ -263,6 +263,10 @@ export const RIGGED_OPERATOR_RUNTIME_ACTION_NAMES = Object.freeze([
   'Death',
   'Punch_Right',
   'Kick_Right',
+  // Pass 75: the only clip the selectable-emote catalog adds to the bound set.
+  // One extra clip against a deliberate binding budget, so the emote menu can
+  // never request something the mixer does not carry.
+  'Wave',
 ] as const);
 
 export const RIGGED_OPERATOR_CORPSE_ACTION_NAMES = Object.freeze(['Death'] as const);

@@ -11,6 +11,8 @@ export const UI_SURFACE_INVENTORY: readonly UiSurfaceDefinition[] = Object.freez
   { id: 'deployment-shell', rootElementId: 'menu', renderer: 'main-shell', critical: true },
   { id: 'field-kit-panel', rootElementId: 'menu-panel-kit', renderer: 'main-shell', critical: true },
   { id: 'killstreak-loadout-panel', rootElementId: 'menu-panel-streaks', renderer: 'main-shell', critical: true },
+  { id: 'operator-panel', rootElementId: 'menu-panel-operator', renderer: 'main-shell', critical: true },
+  { id: 'operator-appearance', rootElementId: 'operator-appearance', renderer: 'main-shell', critical: true },
   { id: 'options-panel', rootElementId: 'menu-panel-options', renderer: 'main-shell', critical: true },
   { id: 'graphics-settings', rootElementId: 'graphics-settings', renderer: 'main-shell', critical: true },
   { id: 'audio-settings', rootElementId: 'audio-settings', renderer: 'main-shell', critical: true },

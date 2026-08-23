@@ -804,7 +804,17 @@ import {
 import { TracerPool } from './tracer-pool';
 import { AsyncSerialQueue } from './async-serial-queue';
 import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadOperatorSkinAsset, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, resolveRiggedOperatorRuntimeRoot, riggedOperatorAssetReady, riggedOperatorCanonicalEvidenceManifest, riggedOperatorHandEvidenceIdentity, riggedOperatorTelemetry } from './operator-model';
-import { isSelectableOperatorSkinId } from './operator-skin-catalog'; // HF-360
+import { OPERATOR_SKIN_CATALOG, isSelectableOperatorSkinId } from './operator-skin-catalog'; // HF-360
+import {
+  DEFAULT_OPERATOR_EMOTE,
+  DEFAULT_OPERATOR_STANCE,
+  isOperatorEmoteId,
+  isOperatorStanceId,
+  operatorEmote,
+  operatorStance,
+  type OperatorEmoteId,
+  type OperatorStanceId,
+} from './operator-appearance-catalog'; // Pass 75
 // HF-339/HF-355: the centre banner has ONE owner. Every write goes through
 // presentBanner/clearCentreBanner below; direct element('#banner') writes are
 // banned (they reintroduce the overwrite race the arbiter closes).
@@ -5263,6 +5273,26 @@ let localOperatorSkinId: string = (() => {
     return stored !== null && isSelectableOperatorSkinId(stored) ? stored : 'default';
   } catch {
     return 'default';
+  }
+})();
+// Pass 75: selectable idle stance and emote. Presentation only - neither can
+// change a hit proxy, a movement profile or any authority value.
+const OPERATOR_STANCE_STORAGE_KEY = 'atomic-acres-operator-stance';
+const OPERATOR_EMOTE_STORAGE_KEY = 'atomic-acres-operator-emote';
+let localOperatorStanceId: OperatorStanceId = (() => {
+  try {
+    const stored = localStorage.getItem(OPERATOR_STANCE_STORAGE_KEY);
+    return stored !== null && isOperatorStanceId(stored) ? stored : DEFAULT_OPERATOR_STANCE;
+  } catch {
+    return DEFAULT_OPERATOR_STANCE;
+  }
+})();
+let localOperatorEmoteId: OperatorEmoteId = (() => {
+  try {
+    const stored = localStorage.getItem(OPERATOR_EMOTE_STORAGE_KEY);
+    return stored !== null && isOperatorEmoteId(stored) ? stored : DEFAULT_OPERATOR_EMOTE;
+  } catch {
+    return DEFAULT_OPERATOR_EMOTE;
   }
 })();
 let localSquadName = defaultSquadPresentation(0).name;
@@ -9742,8 +9772,9 @@ function applyMenuLoadoutImmediately(): void {
   });
 }
 
-let activeMenuTabId: 'deploy' | 'kit' | 'streaks' | 'options' = 'deploy';
-function setMenuTab(tab: 'deploy' | 'kit' | 'streaks' | 'options', flushOptions = true): void {
+type MenuTabId = 'deploy' | 'kit' | 'streaks' | 'operator' | 'options';
+let activeMenuTabId: MenuTabId = 'deploy';
+function setMenuTab(tab: MenuTabId, flushOptions = true): void {
   if (tab === 'kit' && selectedArena.id === 'gun-range') tab = 'deploy';
   // Pass 65: leaving the options tab is a graphics save point — batched edits
   // flush here instead of reloading the page per control change.
@@ -26578,6 +26609,61 @@ operatorSkinSelect.addEventListener('change', () => {
   if (network.role === 'host') updateHostSkin(message);
   else if (network.role === 'client') network.send(message);
 });
+// Pass 75: the OPERATOR panel. Skin, idle stance and emote are chosen from
+// cards rather than a buried dropdown, each persists locally, and the skin
+// still replicates through the existing host-authoritative lobby-skin path.
+function renderOperatorAppearance(): void {
+  for (const card of document.querySelectorAll<HTMLButtonElement>('[data-operator-skin]')) {
+    card.setAttribute('aria-pressed', String(card.dataset.operatorSkin === localOperatorSkinId));
+  }
+  for (const card of document.querySelectorAll<HTMLButtonElement>('[data-operator-stance]')) {
+    card.setAttribute('aria-pressed', String(card.dataset.operatorStance === localOperatorStanceId));
+  }
+  for (const card of document.querySelectorAll<HTMLButtonElement>('[data-operator-emote]')) {
+    card.setAttribute('aria-pressed', String(card.dataset.operatorEmote === localOperatorEmoteId));
+  }
+  const status = document.querySelector<HTMLElement>('#operator-appearance-status');
+  if (status) {
+    const skinName = OPERATOR_SKIN_CATALOG.definitions.find((entry) => entry.id === localOperatorSkinId)?.displayName
+      ?? 'Standard Operator';
+    const emote = operatorEmote(localOperatorEmoteId);
+    status.textContent = `${skinName} · ${operatorStance(localOperatorStanceId).displayName} · ${emote.clipName === null ? 'no emote' : emote.displayName}.`;
+  }
+}
+
+function persistOperatorPreference(key: string, value: string): void {
+  try { localStorage.setItem(key, value); } catch { /* selection still applies this session */ }
+}
+
+document.addEventListener('click', (event) => {
+  const target = event.target instanceof Element ? event.target : null;
+  const card = target?.closest<HTMLButtonElement>('[data-operator-skin], [data-operator-stance], [data-operator-emote]');
+  if (!card) return;
+  const skin = card.dataset.operatorSkin;
+  const stance = card.dataset.operatorStance;
+  const emote = card.dataset.operatorEmote;
+  if (skin !== undefined && isSelectableOperatorSkinId(skin)) {
+    localOperatorSkinId = skin;
+    persistOperatorPreference(OPERATOR_SKIN_STORAGE_KEY, skin);
+    void loadOperatorSkinAsset(skin);
+    const select = document.querySelector<HTMLSelectElement>('#operator-skin');
+    if (select) select.value = skin;
+    const message: LobbySkinMessage = { type: 'lobby-skin', by: player.id, skinId: skin, nonce: randomNonce() };
+    if (network.role === 'host') updateHostSkin(message);
+    else if (network.role === 'client') network.send(message);
+  } else if (stance !== undefined && isOperatorStanceId(stance)) {
+    localOperatorStanceId = stance;
+    persistOperatorPreference(OPERATOR_STANCE_STORAGE_KEY, stance);
+  } else if (emote !== undefined && isOperatorEmoteId(emote)) {
+    localOperatorEmoteId = emote;
+    persistOperatorPreference(OPERATOR_EMOTE_STORAGE_KEY, emote);
+  } else {
+    return;
+  }
+  renderOperatorAppearance();
+});
+renderOperatorAppearance();
+
 // HF-328: the free squad-name input and colour picker were removed from the lobby -
 // identity is prescribed - so there are no change events to bind here. Squad identity
 // is committed by the team-assignment path instead.
