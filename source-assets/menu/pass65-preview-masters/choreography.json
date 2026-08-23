@@ -251,22 +251,6 @@
         "materials": ["cat-fur-charcoal", "cat-fur-silver", "cat-pads-soft-coral", "cat-inner-ear"]
       },
       "reviewLabel": "Gun Range joyful feline first-person prowl"
-    },
-    "farcrysis": {
-      "kind": "helicopter",
-      "label": "HELO FLYOVER // FARCrySIS",
-      "presentationId": "menu-video-runtime-helo-farcrysis-v1",
-      "cockpitAssetId": "pass66-compact-cockpit-overlay-v1",
-      "seed": 65011901,
-      "fovDegrees": 68,
-      "posterFrame": 60,
-      "centre": [0, 2.2, 0],
-      "radius": [36, 34],
-      "altitudeM": 19,
-      "lookAt": [0, 2.2, 0],
-      "phaseRadians": 2.1,
-      "safeVolume": { "x": [-37.5, 37.5], "y": [18, 20], "z": [-35.5, 35.5] },
-      "reviewLabel": "Farcrysis cockpit flyover"
     }
   }
 }

@@ -25,6 +25,7 @@ import { weaponMenuPresentationMarkup, weaponMenuStatDeckMarkup } from './field-
 import { operatorSkinPortraitSvg, operatorSkinSwatchMarkup } from './operator-skin-portrait'; // HF-366
 import {
   OPERATOR_PREVIEW_CANVAS_ID,
+  OPERATOR_PREVIEW_PORTRAIT_ID,
   OPERATOR_PREVIEW_STATUS_ID,
   mountOperatorPreview,
 } from './operator-preview'; // HF-366
@@ -328,9 +329,16 @@ function operatorPanelMarkup(): string {
              slowly. It carries its own layout because the operator panel's
              stylesheet belongs to another lane; the canvas is sized by the
              inline box below and the renderer follows its client size. -->
-        <div class="operator-preview" style="display:grid;grid-template-columns:minmax(180px,240px) 1fr;gap:14px;align-items:center">
-          <canvas id="${OPERATOR_PREVIEW_CANVAS_ID}" width="480" height="600" aria-label="Live rotating preview of your selected operator" style="display:block;width:100%;aspect-ratio:4/5;border-radius:10px;background:linear-gradient(160deg,#1b2a30 0%,#0b171b 100%)"></canvas>
-          <p id="${OPERATOR_PREVIEW_STATUS_ID}" class="operator-preview-status" aria-live="polite" style="margin:0;font-size:13px;line-height:1.5">Standard Operator · live preview</p>
+        <div class="operator-preview" style="display:grid;grid-template-columns:minmax(210px,290px) minmax(0,1fr);gap:18px;align-items:stretch">
+          <canvas id="${OPERATOR_PREVIEW_CANVAS_ID}" width="580" height="760" aria-label="Live rotating preview of your selected operator" style="display:block;width:100%;aspect-ratio:3/4;border-radius:10px;background:linear-gradient(160deg,#1b2a30 0%,#0b171b 100%)"></canvas>
+          <div style="display:flex;flex-direction:column;justify-content:center;gap:10px;min-width:0">
+            <!-- The 2D half. Same portrait art as the card the player pressed,
+                 at a size you can actually read it at, so the card and the
+                 turntable are visibly the same operator. -->
+            <span id="${OPERATOR_PREVIEW_PORTRAIT_ID}" class="operator-skin-art" data-operator-art="portrait" style="display:block;width:100%;max-width:280px;border-radius:10px;overflow:hidden;aspect-ratio:4/3">${operatorSkinPortraitSvg('default')}</span>
+            <p id="${OPERATOR_PREVIEW_STATUS_ID}" class="operator-preview-status" aria-live="polite" style="margin:0;font-size:13px;line-height:1.5">Standard Operator · live preview</p>
+            <p style="margin:0;font-size:12px;line-height:1.5;opacity:.75">Card art above, live turntable to the left, and your own first-person arms in the match all use this skin's colours.</p>
+          </div>
         </div>
       </section>
       <section class="operator-group" aria-labelledby="operator-skins-heading">

@@ -283,9 +283,10 @@ def add_torus(name: str, position, major: float, minor: float, material, rotatio
     return obj
 
 
-def add_transit_bus(prefix: str, centre, length: float, body_material, destination: str):
+def add_transit_bus(prefix: str, centre, length: float, body_material, destination: str, along: str = "z"):
     """Build a complete original bus asset around an existing collision footprint."""
     x, z = centre
+    before = {obj.name for obj in env.objects}
     half = length / 2
     add_box(f"{prefix}_body_lower", [x, 1.25, z], [5.2, 2.2, length], M["metal"], 0.24)
     add_box(f"{prefix}_body_colour", [x, 2.15, z], [5.0, 2.25, length - 0.35], body_material, 0.3)
@@ -334,6 +335,17 @@ def add_transit_bus(prefix: str, centre, length: float, body_material, destinati
     marker["atomic_asset_variant"] = destination
     marker["atomic_collision_authority"] = "typescript-vehicle-boxes"
     env.objects.link(marker)
+    if along == "x":
+        # The authored body is modelled with its length on Z. Yaw the finished
+        # asset a quarter turn about its own centre so it parks along the street
+        # without duplicating every coordinate in this builder.
+        pivot = Vector(game_location((x, 0.0, z)))
+        for obj in list(env.objects):
+            if obj.name in before:
+                continue
+            offset = obj.location - pivot
+            obj.location = pivot + Vector((-offset.y, offset.x, offset.z))
+            obj.rotation_euler.rotate_axis("Z", math.pi / 2)
 
 
 # Ground and road hierarchy.
@@ -341,8 +353,8 @@ roadway = spec["roadway"]
 add_box("BLD_TERRAIN_foundation", roadway["ground"]["position"], roadway["ground"]["size"], M["earth"], 0)
 # Keep grass and road on disjoint footprints. Pass 23 layered both surfaces at
 # the same top elevation, creating broad coplanar z-fighting and unstable light.
-for side, x in (("west", -28.6), ("east", 28.6)):
-    add_box(f"BLD_TERRAIN_grass_{side}", [x, 0.015, 0], [28.8, 0.03, 98], M["grass"], 0)
+for side, z in (("north", -21.3), ("south", 21.3)):
+    add_box(f"BLD_TERRAIN_grass_{side}", [0, 0.015, z], [70, 0.03, 25.4], M["grass"], 0)
 add_box("BLD_ROAD_asphalt", roadway["road"]["position"], roadway["road"]["size"], M["asphalt"], 0)
 for index, item in enumerate(roadway["curbs"]): add_box(f"BLD_ROAD_curb_{index}", item["position"], item["size"], M["concrete"], 0.03)
 for index, item in enumerate(roadway["sidewalks"]): add_box(f"BLD_ROAD_sidewalk_{index}", item["position"], item["size"], M["concrete"], 0.02)
@@ -351,9 +363,9 @@ for index, item in enumerate(roadway["crosswalks"]): add_box(f"BLD_ROAD_crosswal
 # Flush storm drains and utility access plates add modern street-scale material
 # response without creating visible cover or changing TypeScript collision.
 for side in (-1, 1):
-    for index, z in enumerate((-31, -15, 1, 17, 33)):
-        add_box(f"BLD_ROAD_drain_{side}_{index}", [side * 9.18, 0.056, z], [0.62, 0.032, 1.2], M["metal"], 0.015)
-for index, (x, z, width, depth) in enumerate(((-3.2, -28, 3.4, 5.2), (3.5, 27, 4.2, 4.6), (2.8, 4, 2.8, 3.5))):
+    for index, x in enumerate((-26, -14, 0, 14, 26)):
+        add_box(f"BLD_ROAD_drain_{side}_{index}", [x, 0.056, side * 4.68], [1.2, 0.032, 0.62], M["metal"], 0.015)
+for index, (x, z, width, depth) in enumerate(((-24, -1.4, 5.2, 3.4), (22, 1.6, 4.6, 4.2), (10, -2.6, 3.5, 2.8))):
     add_box(f"BLD_ROAD_repair_{index}", [x, 0.059, z], [width, 0.012, depth], M["asphalt"], 0.02)
 
 # Full two-storey house shells, floors, frames, rails, ramps and semantic glass.
@@ -565,18 +577,27 @@ for index, garage in enumerate(spec["garages"]):
     x, z = garage["x"], garage["z"]
     facing = 1 if z < 0 else -1
     accent = M["aqua"] if index == 0 else M["coral"]
-    add_box(f"BLD_GARAGE_{index}_shell", [x, 1.7, z], [12, 3.4, 6.5], M["concrete_dark"], 0.12)
-    add_box(f"BLD_GARAGE_{index}_roof", [x, 3.65, z], [12.6, 0.5, 7.1], M["roof"], 0.09)
-    front_z = z + facing * 3.3
-    add_box(f"BLD_GARAGE_{index}_door", [x, 1.55, front_z], [9, 2.7, 0.16], M["metal_light"], 0.05)
-    for y in (0.75, 1.35, 1.95, 2.55):
-        add_box(f"BLD_GARAGE_{index}_door_rib_{y}", [x, y, front_z + facing * 0.1], [8.6, 0.06, 0.08], M["metal"], 0.01)
-    add_box(f"BLD_GARAGE_{index}_accent", [x, 3.05, front_z + facing * 0.14], [5.2, 0.18, 0.08], accent, 0.01)
+    gw, gh, gd = spec["garageSize"]
+    add_box(f"BLD_GARAGE_{index}_shell", [x, gh / 2, z], [gw, gh, gd], M["concrete_dark"], 0.12)
+    add_box(f"BLD_GARAGE_{index}_roof", [x, gh + 0.25, z], [gw + 0.6, 0.5, gd + 0.6], M["roof"], 0.09)
+    front_z = z + facing * gd / 2
+    add_box(f"BLD_GARAGE_{index}_door", [x, 1.35, front_z], [gw - 1.8, 2.5, 0.16], M["metal_light"], 0.05)
+    for y in (0.55, 1.1, 1.65, 2.2):
+        add_box(f"BLD_GARAGE_{index}_door_rib_{y}", [x, y, front_z + facing * 0.1], [gw - 2.2, 0.06, 0.08], M["metal"], 0.01)
+    add_box(f"BLD_GARAGE_{index}_accent", [x, gh - 0.35, front_z + facing * 0.14], [gw - 3.4, 0.18, 0.08], accent, 0.01)
 
 # Two complete original bus assets sit on the existing authoritative vehicle
 # collision footprints and form the map's large, unmistakable hard-cover anchors.
-add_transit_bus("P32_BUS_ATOM_LINER", (-3.8, 7.0), 14.0, M["yellow"], "ATOM_LINER_86")
-add_transit_bus("P32_BUS_ACRES_SHUTTLE", (4.2, -8.8), 10.8, M["aqua"], "ACRES_SHUTTLE")
+central_bus = spec["vehicles"][0]
+add_transit_bus(
+    "P32_BUS_ATOM_LINER",
+    (central_bus["position"][0], central_bus["position"][2]),
+    central_bus["length"], M["yellow"], "ATOM_LINER_86", along="x",
+)
+
+# Waist-high yard fencing, paired by rotation, matching the TypeScript colliders.
+for fence_index, fence in enumerate(spec["yardFences"]):
+    add_box(f"BLD_YARD_fence_{fence_index}", fence["position"], fence["size"], M["timber"], 0.03)
 
 # Lane cover becomes authored modular military/agricultural barriers. The four
 # outer anchors are recognisable large utility objects aligned to their taller
@@ -633,28 +654,28 @@ for index, (x, z, width, depth) in enumerate(spec["cover"]):
         env.objects.link(cover_marker)
 
 # Hydroponics frame, service trench and solar canopy—original lane landmarks.
-for x in (-29.0, -22.0):
-    for z in (12.2, 19.8): add_box(f"BLD_HYDRO_post_{x}_{z}", [x, 2.2, z], [0.35, 4.4, 0.35], M["metal"], 0.05)
-for x in (-29.0, -25.5, -22.0): add_box(f"BLD_HYDRO_beam_{x}", [x, 4.25, 16], [0.2, 0.2, 8], M["metal"], 0.03)
-for z in (12.4, 16, 19.6): add_box(f"BLD_HYDRO_cross_{z}", [-25.5, 4.3, z], [7.5, 0.18, 0.18], M["metal_light"], 0.03)
-for x in (-28.1, -26.4, -24.7, -23.0):
+for x in (-29.5, -22.5):
+    for z in (17.2, 24.8): add_box(f"BLD_HYDRO_post_{x}_{z}", [x, 2.2, z], [0.35, 4.4, 0.35], M["metal"], 0.05)
+for x in (-29.5, -26.0, -22.5): add_box(f"BLD_HYDRO_beam_{x}", [x, 4.25, 21], [0.2, 0.2, 8], M["metal"], 0.03)
+for z in (17.4, 21, 24.6): add_box(f"BLD_HYDRO_cross_{z}", [-26.0, 4.3, z], [7.5, 0.18, 0.18], M["metal_light"], 0.03)
+for x in (-29.0, -27.0, -25.0, -23.0):
     # Presentation beds stay ankle-low because they are not collision authority.
     # Their visual silhouette must not promise cover or an impassable planter.
-    add_box(f"BLD_HYDRO_bed_{x}", [x, 0.18, 16], [1.1, 0.36, 6.2], M["concrete"], 0.08)
-    for z in (13.8, 16, 18.2): add_uv_sphere(f"BLD_HYDRO_crop_{x}_{z}", [x, 0.62, z], [0.38, 0.42, 0.38], M["foliage"])
+    add_box(f"BLD_HYDRO_bed_{x}", [x, 0.18, 21], [1.1, 0.36, 6.2], M["concrete"], 0.08)
+    for z in (18.8, 21, 23.2): add_uv_sphere(f"BLD_HYDRO_crop_{x}_{z}", [x, 0.62, z], [0.38, 0.42, 0.38], M["foliage"])
 for x in (22.5, 28.5): add_box(f"BLD_SERVICE_wall_{x}", [x, 0.75, 9], [0.7, 1.5, 10], M["concrete_dark"], 0.09)
-for x in (22.5, 29.5):
-    for z in (-20, -12): add_box(f"BLD_SOLAR_post_{x}_{z}", [x, 2.1, z], [0.6, 4.2, 0.6], M["metal"], 0.08)
-for z in (-19.5, -15.5, -11.5):
-    panel = add_box(f"BLD_SOLAR_panel_{z}", [26, 4.35, z], [8.4, 0.16, 3.2], M["aqua"], 0.04, rotation=(0.12, 0, 0))
-    add_box(f"BLD_SOLAR_spine_{z}", [26, 4.0, z], [0.22, 0.65, 3.4], M["metal_light"], 0.03)
+for x, z in ((23, -27), (23, -17), (30.5, -22), (30.5, -12)):
+    add_box(f"BLD_SOLAR_post_{x}_{z}", [x, 2.1, z], [0.6, 4.2, 0.6], M["metal"], 0.08)
+for z in (-24.5, -19.5, -14.5):
+    panel = add_box(f"BLD_SOLAR_panel_{z}", [26.75, 4.35, z], [8.4, 0.16, 3.2], M["aqua"], 0.04, rotation=(0.12, 0, 0))
+    add_box(f"BLD_SOLAR_spine_{z}", [26.75, 4.0, z], [0.22, 0.65, 3.4], M["metal_light"], 0.03)
 
 # Compact original Atomic Acres campus beacon, subordinate to the model homes.
-add_box("BLD_BEACON_plinth", [27, 0.24, -1.5], [4.4, 0.48, 4.4], M["boundary"], 0.14)
-add_cylinder("BLD_BEACON_mast", [27, 2.45, -1.5], 0.2, 4.4, M["metal"], 16)
+add_box("BLD_BEACON_plinth", [27, 0.24, -20], [4.4, 0.48, 4.4], M["boundary"], 0.14)
+add_cylinder("BLD_BEACON_mast", [27, 2.45, -20], 0.2, 4.4, M["metal"], 16)
 for angle, major_radius in ((0, 1.0), (math.pi / 2, 1.22)):
-    add_torus(f"BLD_BEACON_ring_{angle}", [27, 2.55, -1.5], major_radius, 0.07, M["emissive_aqua"], rotation=(math.pi / 2, angle, 0))
-add_uv_sphere("BLD_BEACON_core", [27, 2.55, -1.5], [0.33, 0.33, 0.33], M["emissive_amber"])
+    add_torus(f"BLD_BEACON_ring_{angle}", [27, 2.55, -20], major_radius, 0.07, M["emissive_aqua"], rotation=(math.pi / 2, angle, 0))
+add_uv_sphere("BLD_BEACON_core", [27, 2.55, -20], [0.33, 0.33, 0.33], M["emissive_amber"])
 
 # Pass 27 World Identity: presentation-only route signatures, atmospheric
 # grounding and civil-defence/agritech storytelling. Everything is overhead,
@@ -664,36 +685,36 @@ add_uv_sphere("BLD_BEACON_core", [27, 2.55, -1.5], [0.33, 0.33, 0.33], M["emissi
 # Ground-contact/grime patches visually seat the two hero vehicles and major
 # route landmarks without an SSAO/post-processing dependency.
 for index, (x, z, width, depth) in enumerate((
-    (-3.8, 7.0, 6.1, 15.0), (4.2, -8.8, 5.6, 10.8),
-    (-25.5, 16.0, 8.4, 9.2), (26.0, -16.0, 9.0, 10.2), (27.0, -1.5, 6.2, 6.2),
+    (0.0, 0.0, 13.6, 6.1), (0.0, -26.0, 6.4, 4.2),
+    (-26.0, 21.0, 8.4, 9.2), (26.75, -13.0, 9.5, 6.0), (27.0, -20.0, 5.2, 5.2),
 )):
     add_box(f"P27_CONTACT_patch_{index}", [x, 0.071, z], [width, 0.014, depth], M["rubber"], 0.06)
 
 # West / VERDANT ARRAY: low hydroponic beds remain traversable-looking while
 # elevated irrigation, violet grow rails and a reclamation tank form the skyline.
-for z in (12.7, 16.0, 19.3):
-    add_cylinder(f"P27_VERDANT_irrigation_{z}", [-25.5, 3.25, z], 0.075, 7.2, M["metal_light"], 12, rotation=(0, math.pi / 2, 0))
-    add_box(f"P27_VERDANT_grow_rail_{z}", [-25.5, 3.85, z], [6.4, 0.08, 0.1], M["grow_violet"], 0.015)
-for x in (-28.1, -26.4, -24.7, -23.0):
-    add_box(f"P27_VERDANT_row_light_{x}", [x, 1.35, 16], [0.05, 0.05, 5.5], M["grow_violet"], 0.01)
-add_cylinder("P27_VERDANT_reclamation_tank", [-31.0, 3.05, 4.0], 1.35, 5.6, M["metal_light"], 20)
-add_cylinder("P27_VERDANT_tank_cap", [-31.0, 5.9, 4.0], 1.42, 0.18, M["metal"], 20)
+for z in (17.7, 21.0, 24.3):
+    add_cylinder(f"P27_VERDANT_irrigation_{z}", [-26.0, 3.25, z], 0.075, 7.2, M["metal_light"], 12, rotation=(0, math.pi / 2, 0))
+    add_box(f"P27_VERDANT_grow_rail_{z}", [-26.0, 3.85, z], [6.4, 0.08, 0.1], M["grow_violet"], 0.015)
+for x in (-29.0, -27.0, -25.0, -23.0):
+    add_box(f"P27_VERDANT_row_light_{x}", [x, 1.35, 21], [0.05, 0.05, 5.5], M["grow_violet"], 0.01)
+add_cylinder("P27_VERDANT_reclamation_tank", [-29.5, 3.05, -14.0], 1.35, 5.6, M["metal_light"], 20)
+add_cylinder("P27_VERDANT_tank_cap", [-29.5, 5.9, -14.0], 1.42, 0.18, M["metal"], 20)
 for height in (1.2, 3.0, 4.8):
-    add_torus(f"P27_VERDANT_tank_band_{height}", [-31.0, height, 4.0], 1.38, 0.055, M["foliage"], rotation=(math.pi / 2, 0, 0))
-add_box("P27_ROUTE_verdant_header", [-31.0, 6.55, 4.0], [3.6, 0.42, 0.24], M["foliage"], 0.08)
+    add_torus(f"P27_VERDANT_tank_band_{height}", [-29.5, height, -14.0], 1.38, 0.055, M["foliage"], rotation=(math.pi / 2, 0, 0))
+add_box("P27_ROUTE_verdant_header", [-29.5, 6.55, -14.0], [3.6, 0.42, 0.24], M["foliage"], 0.08)
 
 # Central / CIVIC TRANSIT: an overhead civil-defence signal and flush evacuation
 # chevrons reinforce a broad exposed route. Supports sit beyond the carriageway.
-for x in (-11.3, 11.3):
-    add_box(f"P27_CIVIC_signal_post_{x}", [x, 3.25, 0.0], [0.22, 6.5, 0.22], M["metal_light"], 0.04)
-add_box("P27_CIVIC_signal_beam", [0.0, 6.25, 0.0], [22.8, 0.28, 0.32], M["metal_light"], 0.05)
-for index, x in enumerate((-5.2, 0.0, 5.2)):
-    add_box(f"P27_CIVIC_signal_{index}", [x, 5.95, 0.0], [2.2, 0.36, 0.18], M["emissive_amber"], 0.04)
-for index, z in enumerate((-32, -24, -14, 0, 14, 24, 32)):
+for z in (-6.5, 6.5):
+    add_box(f"P27_CIVIC_signal_post_{z}", [0.0, 3.25, z], [0.22, 6.5, 0.22], M["metal_light"], 0.04)
+add_box("P27_CIVIC_signal_beam", [0.0, 6.25, 0.0], [0.32, 0.28, 13.0], M["metal_light"], 0.05)
+for index, z in enumerate((-3.0, 0.0, 3.0)):
+    add_box(f"P27_CIVIC_signal_{index}", [0.0, 5.95, z], [0.18, 0.36, 2.2], M["emissive_amber"], 0.04)
+for index, x in enumerate((-28, -20, -12, 0, 12, 20, 28)):
     # Negative chevrons stay west and positive chevrons stay east so neither
     # crosses the broad contact patch beneath its nearby transit bus.
-    offset = -2.6 if z < 0 else 2.6
-    stripe = add_box(f"P27_CIVIC_evacuation_chevron_{index}", [offset, 0.073, z], [3.2, 0.016, 0.28], M["metal_light"], 0.02, rotation=(0, 0, (-0.24 if offset < 0 else 0.24)))
+    offset = -3.4 if x < 0 else 3.4
+    stripe = add_box(f"P27_CIVIC_evacuation_chevron_{index}", [x, 0.073, offset], [3.2, 0.016, 0.28], M["metal_light"], 0.02)
     stripe["atomic_route_cue"] = "central-transit"
 
 # East / HELIO SERVICE: battery hardware mounts on existing service walls and
@@ -701,12 +722,12 @@ for index, z in enumerate((-32, -24, -14, 0, 14, 24, 32)):
 for index, (x, z) in enumerate(((22.5, 7.0), (22.5, 10.8), (28.5, 7.0), (28.5, 10.8))):
     add_box(f"P27_HELIO_battery_{index}", [x, 1.75, z], [0.58, 1.65, 1.45], M["aqua"], 0.08)
     add_box(f"P27_HELIO_battery_status_{index}", [x + (-0.31 if x > 25 else 0.31), 1.92, z], [0.04, 0.34, 0.72], M["grow_violet"], 0.01)
-for z in (-19.5, -15.5, -11.5):
-    add_box(f"P27_HELIO_panel_spine_{z}", [26.0, 4.58, z], [7.9, 0.05, 0.12], M["aqua"], 0.01)
-for z in (-18.0, -14.0):
+for z in (-24.5, -19.5, -14.5):
+    add_box(f"P27_HELIO_panel_spine_{z}", [26.75, 4.58, z], [7.9, 0.05, 0.12], M["aqua"], 0.01)
+for z in (-23.0, -17.0):
     add_cylinder(f"P27_HELIO_coolant_{z}", [30.5, 2.7, z], 0.11, 6.0, M["metal_light"], 12, rotation=(math.pi / 2, 0, 0))
-add_box("P27_ROUTE_helio_header", [27.0, 6.25, -1.5], [4.2, 0.42, 0.24], M["aqua"], 0.08)
-add_box("P27_ROUTE_helio_status", [27.0, 5.72, -1.5], [2.8, 0.12, 0.18], M["grow_violet"], 0.02)
+add_box("P27_ROUTE_helio_header", [27.0, 6.25, -20.0], [4.2, 0.42, 0.24], M["aqua"], 0.08)
+add_box("P27_ROUTE_helio_status", [27.0, 5.72, -20.0], [2.8, 0.12, 0.18], M["grow_violet"], 0.02)
 
 # Civil-defence retrofits sit above traversal on both model homes.
 for house_index, house in enumerate(spec["houses"]):
@@ -720,7 +741,7 @@ for house_index, house in enumerate(spec["houses"]):
 
 # Distant agricultural energy silhouettes live beyond the collision boundary and
 # create near/mid/far separation without adding playable geometry.
-for index, (x, z, height) in enumerate(((-50, -24, 16), (52, 34, 20), (-49, 42, 14))):
+for index, (x, z, height) in enumerate(((-46, -22, 16), (48, 26, 20), (-45, 34, 14))):
     add_cylinder(f"P27_SKYLINE_turbine_mast_{index}", [x, height / 2, z], 0.2, height, M["metal_light"], 10)
     add_uv_sphere(f"P27_SKYLINE_turbine_hub_{index}", [x, height, z], [0.42, 0.42, 0.3], M["metal_light"])
     for blade in range(3):
@@ -737,36 +758,36 @@ for index, (x, z, height) in enumerate(((-50, -24, 16), (52, 34, 20), (-49, 42, 
 
 # Warm campus walls and low posts contain the exhibit without reading as a fortress.
 for boundary in spec["boundaries"]: add_box(f"BLD_BOUNDARY_{boundary['id']}", boundary["position"], boundary["size"], M["boundary"], 0.08)
-for x in (-33.9, 33.9):
-    for z in range(-39, 40, 8): add_box(f"BLD_BOUNDARY_post_{x}_{z}", [x, 1.55, z], [0.52, 3.1, 0.52], M["metal_light"], 0.08)
-for z in (-42.9, 42.9):
-    for x in range(-30, 31, 8): add_box(f"BLD_BOUNDARY_post_{x}_{z}", [x, 1.55, z], [0.52, 3.1, 0.52], M["metal_light"], 0.08)
+for x in (-30.9, 30.9):
+    for z in range(-27, 28, 6): add_box(f"BLD_BOUNDARY_post_{x}_{z}", [x, 1.55, z], [0.52, 3.1, 0.52], M["metal_light"], 0.08)
+for z in (-29.9, 29.9):
+    for x in range(-28, 29, 8): add_box(f"BLD_BOUNDARY_post_{x}_{z}", [x, 1.55, z], [0.52, 3.1, 0.52], M["metal_light"], 0.08)
 for ridge_index, (x, z, sx, sy, sz) in enumerate((
-    (-45, -34, 20, 5.5, 13), (46, -26, 17, 4.6, 15),
-    (-42, 34, 16, 4.2, 12), (44, 39, 21, 5.2, 11),
+    (-40, -34, 18, 5, 12), (42, -34, 16, 4.5, 12),
+    (-42, 34, 16, 4.5, 12), (40, 34, 18, 5, 12),
 )):
     ridge = add_uv_sphere(f"P33_SKYLINE_earth_bank_{ridge_index}", [x, -0.8, z], [sx, sy, sz], M["earth"], 16, 8)
     ridge["atomic_skyline_only"] = True
 
 # Lamps, trees, utility boxes and compact tactical signage.
-for index, (x, z) in enumerate(((-13, -16), (13, 16), (-13, 22), (13, -22), (-29, 4), (29, -4))):
+for index, (x, z) in enumerate(((-18, -16), (18, 16), (-26, -2), (26, 2), (-30, -8), (30, 8))):
     add_cylinder(f"BLD_PROP_lamp_{index}", [x, 2.8, z], 0.11, 5.6, M["metal"], 10)
     add_box(f"BLD_PROP_lamp_arm_{index}", [x + (0.55 if x < 0 else -0.55), 5.45, z], [1.25, 0.12, 0.12], M["metal"], 0.025)
     add_uv_sphere(f"BLD_PROP_lamp_glow_{index}", [x + (1.05 if x < 0 else -1.05), 5.28, z], [0.22, 0.18, 0.22], M["emissive_amber"])
-for index, (x, z, scale) in enumerate(((-31, -30, 1.0), (31, 30, 1.1), (-31, 28, 0.9), (31, -27, 1.0), (-18, 34, 0.85), (18, -34, 0.9))):
+for index, (x, z, scale) in enumerate(((-19, -28, 1.0), (19, 28, 1.0), (-27, -21, 0.9), (27, 21, 0.9), (-13, 28.5, 0.85), (13, -28.5, 0.85))):
     add_cylinder(f"BLD_PROP_tree_trunk_{index}", [x, 2.0 * scale, z], 0.34 * scale, 4.0 * scale, M["timber"], 10)
     for cluster, (ox, oy, oz) in enumerate(((0, 5.2, 0), (-0.9, 4.8, 0.4), (0.9, 4.9, -0.4), (0, 6.0, 0.25))):
         add_uv_sphere(f"BLD_PROP_tree_crown_{index}_{cluster}", [x + ox * scale, oy * scale, z + oz * scale], [1.45 * scale, 1.15 * scale, 1.3 * scale], M["foliage"])
-for index, (x, z) in enumerate(((-18, 10), (20, -12), (-22, -24), (22, 25))):
+for index, (x, z) in enumerate(((-24, -8), (24, 8), (-9, -27), (9, 27))):
     add_box(f"BLD_PROP_terminal_{index}", [x, 0.85, z], [1.25, 1.7, 0.8], M["metal"], 0.12)
     add_box(f"BLD_PROP_terminal_screen_{index}", [x, 1.15, z + 0.43], [0.7, 0.42, 0.05], M["emissive_aqua"], 0.02)
 
 # Export one checked semantic marker per route as a named empty node. Keeping the
 # route contract on empties lets the visible meshes remain fully material-batched.
 for landmark_name, route_id, position in (
-    ("P27_LANDMARK_verdant_array", "west-cultivation", (-31.0, 6.55, 4.0)),
+    ("P27_LANDMARK_verdant_array", "west-cultivation", (-29.5, 6.55, -14.0)),
     ("P27_LANDMARK_civic_transit", "central-transit", (0.0, 6.25, 0.0)),
-    ("P27_LANDMARK_helio_service", "east-service", (27.0, 6.25, -1.5)),
+    ("P27_LANDMARK_helio_service", "east-service", (27.0, 6.25, -20.0)),
 ):
     landmark = bpy.data.objects.new(landmark_name, None)
     landmark.location = game_location(position)
@@ -880,7 +901,7 @@ area.data.energy = 1800
 area.data.shape = "DISK"
 area.data.size = 42
 
-bpy.ops.object.camera_add(location=game_location((58, 36, 72)))
+bpy.ops.object.camera_add(location=game_location((44, 27, 52)))
 camera = bpy.context.object
 camera.name = "Preview_Camera"
 scene.camera = camera

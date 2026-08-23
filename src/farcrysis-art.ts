@@ -689,7 +689,25 @@ function buildInlineLighting(scene: THREE.Scene): void {
   sun.name = 'farcrysis-sun';
   sun.position.set(-18, 22, 25);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(4096, 4096);
+  // HF-375 (boot cost): this asked for 4096x4096 — the only light in the game
+  // that did. A WebGPU object trace of the real boot showed farcrysis, alone
+  // among the arenas, allocating two 4096x4096 depth textures, on top of the
+  // 2048 map the engine's own sun already allocates for this arena.
+  //
+  // That engine sun points HERE. The arena's visual definition puts it at
+  // [-18, 22, 25] as well (`arena-grade-identity.ts` FARCRYSIS_IDENTITY
+  // .sunPosition), aimed at the same arena centre, so this light is a second
+  // shadow map of the same sun from the same angle. Both must keep casting:
+  // dropping one would leak this light's 2.1 of the 5.2 total sun intensity
+  // into every shadow interior and wash the shadows out. But 4096 buys nothing
+  // even so — over this light's +/-36 m volume, 2048 still resolves 28.4
+  // texels/m, FINER than the engine sun's own 23.4 texels/m over its +/-44 m
+  // volume (`graphics-refinement.ts` arena shadow volume). Shadow edges and
+  // shadow contrast are therefore unchanged, and the arena stops asking the
+  // driver for 4x the shadow-map rasterisation and ~100 MB of extra depth
+  // memory at the exact moment the admission fence is realising every pipeline
+  // in the scene behind a 12 s queue timeout.
+  sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 0.5;
   sun.shadow.camera.far = 150;
   sun.shadow.camera.left = -36;

@@ -8,6 +8,9 @@ import {
   updateRiggedOperator,
 } from '../operator-model';
 import { OPERATOR_SKIN_CATALOG } from '../operator-skin-catalog';
+import { operatorSkinPortraitSvg } from './operator-skin-portrait';
+import { createOperatorWeaponPresentation } from '../art-kit';
+import { loadPass65WeaponPresentation } from '../weapon-model';
 
 /**
  * HF-366 - the 3D half of "Should be a 2d and 3d preview ... i have no idea
@@ -32,6 +35,8 @@ import { OPERATOR_SKIN_CATALOG } from '../operator-skin-catalog';
 
 export const OPERATOR_PREVIEW_CANVAS_ID = 'operator-preview-canvas';
 export const OPERATOR_PREVIEW_STATUS_ID = 'operator-preview-status';
+/** The 2D half: the pressed skin's card art, shown beside the turntable. */
+export const OPERATOR_PREVIEW_PORTRAIT_ID = 'operator-preview-portrait';
 export const OPERATOR_PREVIEW_PANEL_ID = 'menu-panel-operator';
 export const OPERATOR_PREVIEW_CONTRACT = 'live-turntable-selected-skin-v1';
 /** Slow enough to read the silhouette, fast enough to show the back. */
@@ -43,6 +48,52 @@ export const OPERATOR_PREVIEW_TURN_RADIANS_PER_SECOND = 0.42;
  */
 export const OPERATOR_PREVIEW_FACING_OFFSET_RADIANS = Math.PI;
 const PREVIEW_MAX_PIXEL_RATIO = 1.75;
+/**
+ * HF-366 second pass. Three things made the first turntable read as "another
+ * grey silhouette" even though it was loading the right GLB:
+ *
+ *  1. no environment. The authored operator materials are PBR with a metalness
+ *     map; three lights and no IBL give a dark, matte, colourless result, which
+ *     is why every skin came out the same near-black in the panel while the
+ *     same asset looks fine in an arena that HAS an environment;
+ *  2. no tone mapping, so what light there was clipped instead of rolling off;
+ *  3. a hard-coded camera that framed the operator by guesswork - the figure
+ *     sat left of centre and was cut off at the knees.
+ *
+ * All three are fixed below. The environment is a four-stop vertical gradient
+ * rendered once into a PMREM; it costs one small render at first paint and is
+ * disposed with the panel.
+ */
+const PREVIEW_ENVIRONMENT_CONTRACT = 'gradient-pmrem-showcase-v1';
+/** Fraction of the frame height the operator fills. */
+const PREVIEW_FILL = 0.86;
+
+function buildPreviewEnvironment(renderer: THREE.WebGLRenderer): THREE.Texture | null {
+  const canvas = document.createElement('canvas');
+  canvas.width = 4;
+  canvas.height = 128;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, '#cfe6f2');
+  gradient.addColorStop(0.45, '#8fa6b4');
+  gradient.addColorStop(0.62, '#4a5a63');
+  gradient.addColorStop(1, '#171f24');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  const equirect = new THREE.CanvasTexture(canvas);
+  equirect.mapping = THREE.EquirectangularReflectionMapping;
+  equirect.colorSpace = THREE.SRGBColorSpace;
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  try {
+    return pmrem.fromEquirectangular(equirect).texture;
+  } catch {
+    return null;
+  } finally {
+    pmrem.dispose();
+    equirect.dispose();
+  }
+}
 
 export type OperatorPreviewHandle = Readonly<{
   setSkin: (skinId: string) => void;
@@ -80,6 +131,7 @@ export function mountOperatorPreview(root: ParentNode = document): OperatorPrevi
   const panel = root.querySelector<HTMLElement>(`#${OPERATOR_PREVIEW_PANEL_ID}`);
   if (!canvas || !panel) return null;
   const status = root.querySelector<HTMLElement>(`#${OPERATOR_PREVIEW_STATUS_ID}`);
+  const portrait = root.querySelector<HTMLElement>(`#${OPERATOR_PREVIEW_PORTRAIT_ID}`);
 
   let renderer: THREE.WebGLRenderer | null = null;
   let scene: THREE.Scene | null = null;
@@ -88,6 +140,7 @@ export function mountOperatorPreview(root: ParentNode = document): OperatorPrevi
   let model: THREE.Object3D | null = null;
   let skinId = selectedOperatorSkinFrom(root);
   let requestedSkinId = skinId;
+  let environment: THREE.Texture | null = null;
   let turnRadians = 0;
   let running = false;
   let disposed = false;
@@ -100,6 +153,61 @@ export function mountOperatorPreview(root: ParentNode = document): OperatorPrevi
   };
 
   const panelVisible = (): boolean => !panel.hidden && panel.offsetParent !== null;
+
+  const frameModel = (): void => {
+    if (!model || !camera || !stage) return;
+    // Measure UNROTATED. The turntable spins the stage every frame, so a box
+    // taken mid-turn would centre the figure for one angle and swing it off
+    // frame for every other one.
+    const spin = stage.rotation.y;
+    stage.rotation.y = 0;
+    model.position.x = 0;
+    stage.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(model);
+    stage.rotation.y = spin;
+    if (box.isEmpty()) return;
+    const size = new THREE.Vector3();
+    const centre = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(centre);
+    const height = Math.max(0.4, size.y);
+    // Distance that puts `height / PREVIEW_FILL` across the vertical FOV, plus
+    // enough room that a turning figure's shoulders never clip the frame.
+    const halfFov = THREE.MathUtils.degToRad(camera.fov) / 2;
+    const radius = Math.max(size.x, size.z) / 2;
+    const distance = (height / PREVIEW_FILL / 2) / Math.tan(halfFov) + radius;
+    camera.position.set(0, centre.y, distance);
+    camera.lookAt(0, centre.y, 0);
+    camera.updateProjectionMatrix();
+    // Put the figure's own centre on the turntable axis, so it rotates in place
+    // instead of orbiting a point it does not stand on.
+    model.position.x = -centre.x;
+    model.position.z = -centre.z;
+    stage.updateMatrixWorld(true);
+  };
+
+  /**
+   * The authored idle is `Idle_Gun_Pointing` - "rifle up and levelled". Without
+   * a rifle it reads as an operator reaching into empty space, which is how the
+   * first turntable looked. The world-variant carbine is the same model every
+   * other player already sees in your hands, so mounting it here costs one
+   * cached asset and makes the pose mean what it is.
+   */
+  const mountPreviewWeapon = (instance: { weaponSocket: THREE.Group }): void => {
+    const attach = (): void => {
+      if (disposed || !model) return;
+      const weapon = createOperatorWeaponPresentation('carbine', false);
+      if (!weapon) return;
+      instance.weaponSocket.add(weapon);
+      // Deliberately NOT re-framing here. The framing box is the OPERATOR, and
+      // a levelled rifle sticks a metre forward of the chest: including it
+      // pushed the body sideways to make room for the barrel.
+    };
+    attach();
+    if (instance.weaponSocket.children.length === 0) {
+      void loadPass65WeaponPresentation('carbine', 'world').then(attach).catch(() => undefined);
+    }
+  };
 
   const ensureRenderer = (): boolean => {
     if (renderer) return true;
@@ -114,8 +222,16 @@ export function mountOperatorPreview(root: ParentNode = document): OperatorPrevi
     }
     renderer.setPixelRatio(Math.min(PREVIEW_MAX_PIXEL_RATIO, globalThis.devicePixelRatio || 1));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.25;
     renderer.shadowMap.enabled = false;
     scene = new THREE.Scene();
+    environment = buildPreviewEnvironment(renderer);
+    if (environment) {
+      scene.environment = environment;
+      scene.environmentIntensity = 1.15;
+    }
+    canvas.dataset.previewEnvironment = environment ? PREVIEW_ENVIRONMENT_CONTRACT : 'none';
     camera = new THREE.PerspectiveCamera(32, 1, 0.1, 40);
     camera.position.set(0, 1.02, 3.05);
     camera.lookAt(0, 0.96, 0);
@@ -157,17 +273,26 @@ export function mountOperatorPreview(root: ParentNode = document): OperatorPrevi
     if (!stage) return;
     // Flat materials off: the menu wants the real PBR look the player will
     // spawn with, not the low-cost bot flattening.
-    const instance = createRiggedOperator(0, 'operator-preview', false, 'team', skinId);
+    // 'showcase': the skin's own colours with no team wash. A player looking at
+    // their own operator in the menu is not on a team yet, and washing 34% of
+    // aqua over every card was half of why the four skins looked alike.
+    const instance = createRiggedOperator(0, 'operator-preview', false, 'showcase', skinId);
     if (!instance) return;
     disposeModel();
     model = instance.root;
     model.position.set(0, 0, 0);
     stage.add(model);
+    // Frame on the bare operator first, then hand it its rifle.
+    frameModel();
+    mountPreviewWeapon(instance);
     // Standing idle: the runtime's own locomotion driver at zero speed, so the
     // preview plays exactly the clip the player will stand in.
     updateRiggedOperator(model, 0, 'stand');
     const definition = OPERATOR_SKIN_CATALOG.definitions.find((entry) => entry.id === skinId);
     setStatus(`${definition?.displayName ?? 'Standard Operator'} · live preview`);
+    // Keep the 2D half in step with the 3D half: the owner asked for both, and
+    // two previews that can disagree are worse than one.
+    if (portrait) portrait.innerHTML = operatorSkinPortraitSvg(skinId, `preview-${skinId}`);
   };
 
   const ensureModel = (): void => {
@@ -204,6 +329,10 @@ export function mountOperatorPreview(root: ParentNode = document): OperatorPrevi
     if (requestedSkinId !== skinId) {
       skinId = requestedSkinId;
       disposeModel();
+      // Face the player again on every change: picking a card should show you
+      // the FRONT of what you just picked, not whatever angle the turntable
+      // happened to be at.
+      turnRadians = 0;
     }
     if (!renderer || !scene || !camera || !stage) return;
     ensureModel();
@@ -253,6 +382,8 @@ export function mountOperatorPreview(root: ParentNode = document): OperatorPrevi
       if (frame !== 0) cancelAnimationFrame(frame);
       panel.removeEventListener('click', onCardPress);
       disposeModel();
+      environment?.dispose();
+      environment = null;
       renderer?.dispose();
       renderer = null;
     },

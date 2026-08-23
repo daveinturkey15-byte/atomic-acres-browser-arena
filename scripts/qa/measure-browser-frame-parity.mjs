@@ -1,3 +1,25 @@
+// =====================================================================
+// SUPERSEDED 2026-08-23 (Lane Q). DO NOT REACH FOR THIS FOR HF-331.
+//
+// HF-331 is CLOSED and this instrument is one of the ones that could not
+// close it. Root cause, bisected: Firefox launched with an explicit
+// `-profile <dir>` never gives the content document focus - document
+// .hasFocus() stays false forever and no focus/blur/focusin event ever
+// fires, even with the window verified foreground, visible, and clicked
+// into with synthesised input. The product pauses its frame loop on
+// exactly that predicate (`ownsForeground()` in src/legacy-main.ts), so
+// every harness that used a disposable -profile measured a game that was
+// deliberately rendering nothing and reported it as "Firefox is slow".
+//
+// The measured answer: Firefox 154 runs atomic-acres at 38.5 fps median on
+// WebGPU against its own 166.7 fps presentation ceiling - about 88% of
+// Chrome, not a fifteenth of it.
+//
+// Working instrument:  scripts/qa/verify-cross-browser-matrix.mjs
+// Standing gate:       npm run qa:cross-browser
+// Lane discipline:     scripts/qa/installed-browser-lanes.mjs
+// Write-up:            docs/LANE_Q_CROSS_BROWSER_AND_MOBILE_AUDIT_2026-08-23.md
+// =====================================================================
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {

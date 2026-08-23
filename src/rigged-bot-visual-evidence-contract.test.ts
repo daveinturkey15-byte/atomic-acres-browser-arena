@@ -56,11 +56,11 @@ describe('fixed rigged actor visual evidence fixtures', () => {
     const fixture = RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic;
     expect(fixture).toMatchObject({
       id: 'atomic-south-road-crosslane-spawn-fixed-v4',
-      commandedPlayerPosition: [-3, 1.7, 40],
-      settlementPositionAnchor: [-3, 1.7, 40],
+      commandedPlayerPosition: [-3, 1.7, 27],
+      settlementPositionAnchor: [-3, 1.7, 27],
       playerYaw: -Math.PI / 2,
       botDistanceM: 5.2,
-      nominalBotPosition: [2.2, 0, 40],
+      nominalBotPosition: [2.2, 0, 27],
       expectedBotYaw: Math.PI / 2,
       placement: {
         contract: 'debug-place-bot-ahead-synchronous-transaction-v1',
@@ -81,8 +81,8 @@ describe('fixed rigged actor visual evidence fixtures', () => {
       maximumAbsoluteAxisErrorM: [0.0005, 0.00225, 0.0005],
       groundedRequired: true,
     });
-    expect(fixture.mediumCamera.position).toEqual([-2.2, 1.08, 40]);
-    expect(fixture.closeCamera.position).toEqual([0.2, 1.08, 40]);
+    expect(fixture.mediumCamera.position).toEqual([-2.2, 1.08, 27]);
+    expect(fixture.closeCamera.position).toEqual([0.2, 1.08, 27]);
     expect(fixture.mediumCamera.target).toEqual(fixture.closeCamera.target);
     expect(fixture.mediumCamera.yaw).toBeCloseTo(-Math.PI / 2, 12);
     expect(fixture.closeCamera.yaw).toBeCloseTo(-Math.PI / 2, 12);
@@ -94,7 +94,7 @@ describe('fixed rigged actor visual evidence fixtures', () => {
     expect(SPAWN_LAYOUT[1]).toContainEqual([
       fixture.commandedPlayerPosition[0], fixture.commandedPlayerPosition[2],
     ]);
-    expect(isBlocked({ x: 0, y: 1.7, z: -24 }, map.physicsColliders, 0.42)).toBe(true);
+    expect(isBlocked({ x: -6.1, y: 1.7, z: -17.4 }, map.physicsColliders, 0.42)).toBe(true);
     expect(isBlocked({
       x: fixture.commandedPlayerPosition[0],
       y: fixture.commandedPlayerPosition[1],
@@ -324,7 +324,7 @@ describe('fixed rigged actor visual evidence fixtures', () => {
     const callbacks: FrameRequestCallback[] = [];
     let now = 0;
     let frame = 100;
-    let position = [-3, 1.7, 40];
+    let position = [-3, 1.7, 27];
     vi.spyOn(performance, 'now').mockImplementation(() => now);
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callbacks.push(callback);
@@ -338,7 +338,7 @@ describe('fixed rigged actor visual evidence fixtures', () => {
     });
     const completion = waitForAtomicPlayerConvergenceInPage({
       commandedFrame: 100,
-      positionAnchor: [-3, 1.7, 40],
+      positionAnchor: [-3, 1.7, 27],
       settlement: {
         contract: 'axis-recovery-test',
         minimumObservedTransitions: 8,
@@ -357,10 +357,10 @@ describe('fixed rigged actor visual evidence fixtures', () => {
       expect(callback).toBeTypeOf('function');
       callback!(atMs);
     };
-    present([-3, 1.69775, 40], 1);
-    present([-3, 1.69824, 40], 9);
-    present([-3, 1.69873, 40], 17);
-    for (let index = 0; index < 9; index += 1) present([-3, 1.700099, 40], 25 + index * 8);
+    present([-3, 1.69775, 27], 1);
+    present([-3, 1.69824, 27], 9);
+    present([-3, 1.69873, 27], 17);
+    for (let index = 0; index < 9; index += 1) present([-3, 1.700099, 27], 25 + index * 8);
     const convergence = await completion;
     expect(convergence.samples).toHaveLength(9);
     expect(convergence.samples.every((sample) => sample.position[1] === 1.700099)).toBe(true);
@@ -372,7 +372,7 @@ describe('fixed rigged actor visual evidence fixtures', () => {
     const callbacks: FrameRequestCallback[] = [];
     let now = 0;
     let frame = 100;
-    const position = [-3 + 0.0005, 1.7 + 0.00225, 40 + 0.0005];
+    const position = [-3 + 0.0005, 1.7 + 0.00225, 27 + 0.0005];
     vi.spyOn(performance, 'now').mockImplementation(() => now);
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callbacks.push(callback);
@@ -386,7 +386,7 @@ describe('fixed rigged actor visual evidence fixtures', () => {
     });
     const completion = waitForAtomicPlayerConvergenceInPage({
       commandedFrame: 100,
-      positionAnchor: [-3, 1.7, 40],
+      positionAnchor: [-3, 1.7, 27],
       settlement: {
         contract: 'axis-boundary-rounding-test',
         minimumObservedTransitions: 8,
@@ -406,7 +406,7 @@ describe('fixed rigged actor visual evidence fixtures', () => {
     }
     const convergence = await completion;
     expect(convergence.maximumObservedAbsoluteAxisErrorM).toEqual(position.map((value, axis) => (
-      Math.abs(value - [-3, 1.7, 40][axis])
+      Math.abs(value - [-3, 1.7, 27][axis])
     )));
   });
 
@@ -414,7 +414,7 @@ describe('fixed rigged actor visual evidence fixtures', () => {
     vi.spyOn(performance, 'now').mockReturnValue(0);
     await expect(waitForAtomicPlayerConvergenceInPage({
       commandedFrame: 100,
-      positionAnchor: [-3, 1.7, 40],
+      positionAnchor: [-3, 1.7, 27],
       settlement: {
         contract: 'malformed-axis-tolerance-test',
         minimumObservedTransitions: 8,

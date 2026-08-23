@@ -70,12 +70,28 @@
  *
  * --hud-sway-x   -1..1  normalised horizontal look lag (+ = camera turned right)
  * --hud-sway-y   -1..1  normalised vertical look lag   (+ = camera pitched up)
- * --hud-breathe   0..1  movement intensity; scales the idle bob
+ * --hud-breathe  -1..1  SIGNED respiration; full amplitude when STANDING STILL
+ * --hud-gait      0..1  movement intensity; scales the walking bob
  * --hud-health    0..1  operator condition, drives the semantic vitals ramp
  *
- * All four are OPTIONAL. Unwired, the HUD still gets its idle breathing (PART
- * 5) and a full-health green ramp, so the build improves before the wiring
- * lands. See wiringNotes for the exact one-line call.
+ * ...plus the six impact properties written by src/ui/hud-impact-response.ts:
+ *
+ * --hud-impact-x       -1..1  directional kick, +ve right
+ * --hud-impact-y       -1..1  directional kick, +ve down
+ * --hud-impact-roll    -1..1  roll, +ve clockwise
+ * --hud-impact-chroma   0..1  chromatic split amount
+ * --hud-impact-flash    0..1  damage flash amount
+ * --hud-impact-bearing  deg   bearing of the source, for the directional wash
+ *
+ * All of them are OPTIONAL. Unwired, the HUD still gets its idle breathing
+ * (PART 5) and a full-health green ramp, so the build improves before the
+ * wiring lands. See wiringNotes for the exact calls.
+ *
+ * WHY --hud-breathe CHANGED MEANING. It used to be movement intensity, which
+ * meant it was exactly ZERO while the player stood still - so the one case the
+ * owner explicitly asked about ("when you're breathing and when you're
+ * stationary") was the one case that produced no motion at all. Respiration
+ * and gait are now separate signals: see pass77-hud-sway.ts.
  * ------------------------------------------------------------------------ */
 
 @property --hud-sway-x {
@@ -96,10 +112,57 @@
   initial-value: 0;
 }
 
+@property --hud-gait {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
 @property --hud-health {
   syntax: '<number>';
   inherits: true;
   initial-value: 1;
+}
+
+/*
+ * The impact channel. Every one of these defaults to a value that means
+ * "nothing has hit the player", so a build with no wiring at all renders a
+ * perfectly still, unflashed HUD rather than a broken one.
+ */
+@property --hud-impact-x {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --hud-impact-y {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --hud-impact-roll {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --hud-impact-chroma {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --hud-impact-flash {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --hud-impact-bearing {
+  syntax: '<angle>';
+  inherits: true;
+  initial-value: 0deg;
 }
 
 /* ---------------------------------------------------------------------------
@@ -657,6 +720,33 @@
  * aim, confirmation and warning, and they stay welded to the viewport.
  * ======================================================================== */
 
+/*
+ * AMPLITUDE. The audit measured the old ceiling at 10 lag x 1px = 10px on a
+ * 1920px viewport - half a percent of the screen, which is why the owner could
+ * not see it. The travel is now ONE token, so the ceiling is stated in one
+ * place, is adjustable in one place, and is read directly by
+ * pass77-hud-sway.test.ts, which fails if it ever falls back under 24px.
+ *
+ * `--p77-lag` stays a unitless DEPTH RANK (4..10). Multiplying rank by travel
+ * is what keeps the parallax ordering intact while the overall amplitude moves.
+ */
+#hud {
+  --p77-sway-travel: 3.4px;
+  /* Impact travel is much larger than sway travel on purpose: a look-lag is a
+     drift, a blast is a shove.
+
+     28px, not the 40px first tried: at 40px the explosion preset's 0.83 peak
+     pushed the right-anchored support console ~33px, which took part of it off
+     the right edge of the viewport. Content leaving the screen is a defect, not
+     an effect. At 28px the same blast is a ~23px heave - still more than twice
+     the entire old sway ceiling - and everything stays on screen, which is
+     verified in artifacts/pass77/lane-m/prove-impact.mjs by measuring
+     documentElement.scrollWidth while the impact is held at peak. */
+  --p77-impact-travel: 28px;
+  /* Peak roll. Small: rotating a HUD is powerful and wears out fast. */
+  --p77-impact-roll: 2.2deg;
+}
+
 #hud .hud-mission-console,
 #hud .hud-map-console,
 #hud .hud-operator-console,
@@ -665,12 +755,39 @@
 #hud #killfeed,
 #hud #damage-feeds,
 #hud #pause-hint {
-  /* Wired lag. Negative on X so the cluster trails rather than leads.
-     The Y term is deliberately softer than X: pitch changes are smaller and a
-     vertical HUD wobble reads as a bug, not as weight. */
+  /*
+   * Wired lag AND wired impact share `translate`, because both are the same
+   * kind of thing - a positional displacement the runtime computes per frame -
+   * and because `transform` is already spoken for by the idle breathing
+   * animation (see the note above; an animation always beats an inline style,
+   * so the two must not share a property).
+   *
+   * Sway is negative on X so the cluster trails rather than leads. The Y sway
+   * term is deliberately softer than X: pitch changes are smaller and a
+   * vertical HUD wobble reads as a bug, not as weight. Impact is NOT softened
+   * on Y - being thrown is supposed to read vertically.
+   *
+   * The respiration term is signed and independent of speed, so a stationary
+   * player still rises and falls. Gait rides on top of it while moving.
+   */
   translate:
-    calc(var(--hud-sway-x, 0) * var(--p77-lag) * -1px)
-    calc(var(--hud-sway-y, 0) * var(--p77-lag) * 0.55px + var(--hud-breathe, 0) * 1.6px);
+    calc(
+      var(--hud-sway-x, 0) * var(--p77-lag) * var(--p77-sway-travel) * -1
+      + var(--hud-impact-x, 0) * var(--p77-impact-travel)
+    )
+    calc(
+      var(--hud-sway-y, 0) * var(--p77-lag) * var(--p77-sway-travel) * 0.55
+      + var(--hud-breathe, 0) * 2.6px
+      + var(--hud-gait, 0) * 1.8px
+      + var(--hud-impact-y, 0) * var(--p77-impact-travel)
+    );
+  /*
+   * Roll goes on the individual `rotate` property - the third and last free
+   * transform channel. It composes with `translate` and `transform` into one
+   * matrix without any of the three being able to clobber the others, which is
+   * what lets impact, sway and breathing all be live at the same time.
+   */
+  rotate: calc(var(--hud-impact-roll, 0) * var(--p77-impact-roll));
 }
 
 /* Depth ordering: the far, ambient clusters lag most; the ones you read under
@@ -731,6 +848,7 @@ html[data-reduced-motion='true'] #hud #pause-hint {
   animation: none;
   translate: none;
   transform: none;
+  rotate: none;
 }
 
 html[data-reduced-motion='true'] #hud #health-fill,
@@ -750,6 +868,7 @@ html[data-reduced-motion='true'] #hud .support-list b {
     animation: none;
     translate: none;
     transform: none;
+    rotate: none;
   }
 
   #hud #health-fill,
@@ -823,4 +942,397 @@ html[data-reduced-sensory='true'] #hud .support-list b.ready {
     --p77-lag: 3;
     animation: none;
   }
+}
+
+/* ---------------------------------------------------------------------------
+ * HF-375 - room chat on a phone.
+ *
+ * Chat is an explicitly supported mobile surface, but its two micro-labels were
+ * authored at 8px in style.css - under the AGENTS.md 9px floor - and its
+ * composer controls were mouse-sized. style.css is not a sheet this pass owns,
+ * so both are corrected here, where the HUD's type is decided, and the touch
+ * sizing is gated on a coarse pointer so the desktop composer is untouched.
+ * ------------------------------------------------------------------------ */
+#text-chat header small,
+#text-chat-form label {
+  font-size: 9px;
+}
+
+@media (pointer: coarse) {
+  #text-chat-form input,
+  #text-chat-form button {
+    min-height: 44px;
+  }
+
+  #text-chat-form button {
+    min-width: 44px;
+  }
+}
+
+/* ===========================================================================
+ * PART 7 - IMPACT RESPONSE. "The HUD must react to impacts."
+ *
+ * THE DEFECT. Camera trauma was wired in Pass 77 - legacy-main.ts feeds
+ * `addCameraShakeTrauma` from every damage event and every blast - but nothing
+ * connected it to the HUD. The only properties ever written on #hud were
+ * --hud-sway-x/y, --hud-breathe and --hud-health, so the overlay sat perfectly
+ * still while the camera was thrown around. Being shot did not move the HUD.
+ *
+ * The maths lives in src/ui/hud-impact-response.ts (pure, unit-tested). This
+ * is the presentation half. It consumes six numbers and nothing else.
+ *
+ * THREE LAYERS, in increasing cost, so a cheap hit costs almost nothing:
+ *   1. DISPLACEMENT - folded into the existing `translate` in PART 5 plus the
+ *      free `rotate` channel. Compositor-only, no repaint.
+ *   2. WASH - one pseudo-element, #hud::after, painting a directional lobe
+ *      from the bearing plus a chromatic split. `#hud::before` is already
+ *      taken by tactical-ui.css and pass65-hud.css, `::after` was free.
+ *   3. EDGE STRIKE - the cluster borders take the accent for the duration of
+ *      the flash, so the readouts themselves acknowledge the hit.
+ *
+ * ALL of it is inert at rest. Every property defaults to 0, and
+ * hud-impact-response.ts REMOVES the properties entirely once the spring
+ * settles, so an idle HUD carries no impact state and #hud::after is at
+ * opacity 0 with no filter and no animation running.
+ *
+ * COMBAT SAFETY. The displacement applies to exactly the edge clusters that
+ * already sway. #crosshair, #hitmarker, #damage-numbers, the scopes, the
+ * gunner reticle, #countdown, #banner and #respawn are NOT in that list and
+ * are never given these properties - aim, confirmation and warning surfaces
+ * stay welded to the viewport. #hud::after is a colour wash only; it never
+ * displaces anything and never covers the centre of the screen opaquely.
+ * ======================================================================== */
+
+#hud::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  /*
+   * The whole layer is gated on the flash value, so at rest this is
+   * opacity 0 - the cheapest possible resting state for a full-screen element.
+   */
+  opacity: var(--hud-impact-flash, 0);
+  background-image:
+    /*
+     * 1. The directional lobe. A conic gradient whose 0deg is rotated to the
+     *    bearing, so the wash is strongest on the side the damage came from
+     *    and fades to nothing on the opposite side. This is the part that
+     *    tells the player WHERE they were hit without reading anything.
+     */
+    conic-gradient(
+      from var(--hud-impact-bearing, 0deg) at 50% 50%,
+      rgb(255 74 48 / 0.55) 0deg,
+      rgb(255 74 48 / 0.16) 52deg,
+      transparent 104deg,
+      transparent 256deg,
+      rgb(255 74 48 / 0.16) 308deg,
+      rgb(255 74 48 / 0.55) 360deg
+    ),
+    /*
+     * 2. The chromatic split. Two vignettes in opposing hues, pushed apart
+     *    horizontally by the chroma value. At chroma 0 they sit exactly on top
+     *    of each other and cancel to a neutral edge darkening; as chroma rises
+     *    they separate into the red/cyan fringe of a heavy concussion.
+     */
+    radial-gradient(
+      140% 100% at calc(50% + var(--hud-impact-chroma, 0) * 5%) 50%,
+      transparent 46%, rgb(255 40 30 / 0.42) 100%
+    ),
+    radial-gradient(
+      140% 100% at calc(50% - var(--hud-impact-chroma, 0) * 5%) 50%,
+      transparent 46%, rgb(40 210 255 / 0.34) 100%
+    );
+  /* Never over the centre: the middle of the screen stays clear for aim. */
+  -webkit-mask-image: radial-gradient(58% 58% at 50% 50%, transparent 30%, #000 78%);
+  mask-image: radial-gradient(58% 58% at 50% 50%, transparent 30%, #000 78%);
+  mix-blend-mode: screen;
+}
+
+/*
+ * SIGNATURE: a blast is white-hot at the core and a bullet is not.
+ *
+ * The reducer publishes `data-hud-impact` on #hud, so the two read completely
+ * differently without a seventh number crossing the boundary. A bullet is a
+ * red flinch at the edges; an explosion additionally blooms and desaturates.
+ */
+#hud[data-hud-impact='explosion']::after {
+  background-image:
+    radial-gradient(70% 70% at 50% 50%, rgb(255 236 214 / 0.72), transparent 62%),
+    conic-gradient(
+      from var(--hud-impact-bearing, 0deg) at 50% 50%,
+      rgb(255 176 84 / 0.62) 0deg,
+      rgb(255 120 52 / 0.24) 58deg,
+      transparent 112deg,
+      transparent 248deg,
+      rgb(255 120 52 / 0.24) 302deg,
+      rgb(255 176 84 / 0.62) 360deg
+    ),
+    radial-gradient(
+      150% 110% at calc(50% + var(--hud-impact-chroma, 0) * 7%) 50%,
+      transparent 40%, rgb(255 60 20 / 0.5) 100%
+    ),
+    radial-gradient(
+      150% 110% at calc(50% - var(--hud-impact-chroma, 0) * 7%) 50%,
+      transparent 40%, rgb(60 220 255 / 0.42) 100%
+    );
+  /* A blast reaches further in toward the centre than a bullet does. */
+  -webkit-mask-image: radial-gradient(66% 66% at 50% 50%, transparent 16%, #000 66%);
+  mask-image: radial-gradient(66% 66% at 50% 50%, transparent 16%, #000 66%);
+}
+
+/* A fall is a dull vertical jolt: no colour, no direction, just a floor slam. */
+#hud[data-hud-impact='fall']::after {
+  background-image: linear-gradient(0deg, rgb(28 22 16 / 0.66), transparent 42%);
+  -webkit-mask-image: none;
+  mask-image: none;
+  mix-blend-mode: multiply;
+}
+
+/*
+ * EDGE STRIKE. The clusters acknowledge the hit rather than only moving with
+ * it. `--p77-strike` is the flash value, so this rises and falls with the same
+ * decay curve as the wash and needs no separate timing.
+ */
+#hud #matchbar,
+#hud .hud-map-console,
+#hud .hud-operator-console,
+#hud #weapon-block,
+#hud #support-block {
+  --p77-strike: var(--hud-impact-flash, 0);
+  border-color: rgb(from var(--p77-edge-ink) r g b / calc(0.26 + var(--p77-strike) * 0.6));
+}
+
+/*
+ * Reduced motion stops the DISPLACEMENT (PART 6 already clears translate,
+ * transform and rotate). It must not stop the player being TOLD they were hit
+ * - that is information, not decoration - so the wash survives, at a reduced
+ * strength and with the chromatic split removed, which is the part that causes
+ * trouble for motion-sensitive players.
+ */
+html[data-reduced-motion='true'] #hud::after {
+  opacity: calc(var(--hud-impact-flash, 0) * 0.55);
+  background-image: conic-gradient(
+    from var(--hud-impact-bearing, 0deg) at 50% 50%,
+    rgb(255 74 48 / 0.42) 0deg,
+    transparent 104deg,
+    transparent 256deg,
+    rgb(255 74 48 / 0.42) 360deg
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #hud::after {
+    opacity: calc(var(--hud-impact-flash, 0) * 0.55);
+    background-image: conic-gradient(
+      from var(--hud-impact-bearing, 0deg) at 50% 50%,
+      rgb(255 74 48 / 0.42) 0deg,
+      transparent 104deg,
+      transparent 256deg,
+      rgb(255 74 48 / 0.42) 360deg
+    );
+  }
+}
+
+/*
+ * The sensory switch flattens the blend and the bloom but, again, keeps the
+ * directional information. Same principle as PART 6: turning effects down must
+ * never cost the player something they need to survive.
+ */
+html[data-reduced-sensory='true'] #hud::after {
+  mix-blend-mode: normal;
+  opacity: calc(var(--hud-impact-flash, 0) * 0.4);
+}
+
+/* ===========================================================================
+ * PART 8 - THE RESKIN. A different instrument, not a retuned one.
+ *
+ * WHY THIS PART EXISTS. Parts 1-6 modernised the HUD's material but kept its
+ * VOICE: cold blue-black glass, cyan hairlines, thin bracket ticks. The owner
+ * looked at the result and said the art style "looks the same". He is right,
+ * and the reason is that every one of those decisions was a refinement of the
+ * previous look rather than a different one. Refining a voice does not change
+ * it. This part changes it.
+ *
+ * THE DIRECTION: PRINTED FIELD KIT. The HUD stops pretending to be back-lit
+ * glass and starts reading as something SCREEN-PRINTED onto a warm graphite
+ * instrument housing - the way real field equipment is marked.
+ *
+ *   ground  cold blue-black (rgb 9 25 33) -> warm graphite (rgb 28 22 17).
+ *           This is the single biggest change and the one that does the most
+ *           work: every panel on screen changes temperature at once. Blue-grey
+ *           reads as "software"; warm graphite reads as "object".
+ *   texture a halftone dot screen over every panel. Flat translucent fills are
+ *           what made the old HUD read as a browser overlay; a printed screen
+ *           is the cheapest possible cue that this is a manufactured surface.
+ *   edge    thin cyan hairline brackets -> SOLID corner blocks and a hazard
+ *           stripe along the bottom rule. Blocks and stripes are signage;
+ *           hairlines are UI chrome.
+ *   colour  cyan-as-decoration -> amber-as-structure. Cyan and coral are NOT
+ *           touched where they carry TEAM identity or damage state; they stop
+ *           being used for borders, which is what made them meaningless.
+ *   type    micro-labels move to a monospaced voice with wide tracking, so
+ *           labels and values are distinguishable by TEXTURE, not only size.
+ *
+ * WHAT THIS PART DOES NOT DO: move anything, resize anything, change a
+ * font-size, or touch the geometry tokens in pass65-hud.css. Layout and
+ * functionality are exactly as they were, per the owner's explicit
+ * instruction. Every declaration below is material, edge, colour or type.
+ *
+ * AGENTS.md COMPLIANCE. The rule is that command and HUD chrome must not
+ * regress to a "near-black or dark-blue monolith". This moves AWAY from
+ * dark-blue, keeps the panels translucent over live gameplay, and raises the
+ * text/panel contrast rather than lowering it. No font-size here goes below
+ * the 9px floor - this part sets no font-size at all.
+ * ======================================================================== */
+
+#hud {
+  /* The new ground. Warm, not blue. */
+  --p77-sheet-dense: rgb(28 22 17 / 0.84);
+  --p77-sheet-thin: rgb(16 12 9 / 0.44);
+  --p77-sheet-quiet-top: rgb(34 27 21 / 0.48);
+  --p77-sheet-quiet-bottom: rgb(12 9 7 / 0.32);
+
+  /* The new structural accent: amber signage rather than cyan chrome. */
+  --p77-edge-ink: #ffab3d;
+  --p77-edge-ink-quiet: rgb(255 171 61 / 0.22);
+  --p77-line: rgb(255 196 128 / 0.17);
+  --p77-line-lit: rgb(255 208 150 / 0.34);
+  --p77-sheen: rgb(255 232 200 / 0.16);
+  --p77-tick: rgb(255 196 128 / 0.38);
+
+  /* The printed screen. One 3px dot grid, reused by every panel. */
+  --p77-halftone: radial-gradient(rgb(255 226 196 / 0.055) 0.6px, transparent 0.75px);
+  --p77-halftone-size: 3px 3px;
+
+  /* Hazard stripe, for the bottom rule of every cluster. Signage language. */
+  --p77-hazard: repeating-linear-gradient(
+    116deg,
+    var(--p77-edge-ink) 0 4px,
+    rgb(28 22 17 / 0.85) 4px 9px
+  );
+
+  /* A warmer cast, so the panels sit on the world rather than float over it. */
+  --p77-cast: 0 12px 30px rgb(10 6 3 / 0.44);
+}
+
+/*
+ * The reskinned sheet. The background stack is restated in full rather than
+ * patched, because the old stack's four hairline brackets ARE the old voice -
+ * leaving them under the new layers would read as two languages at once,
+ * which is exactly the fault this pass exists to fix.
+ *
+ * Front to back:
+ *   1  halftone dot screen (the printed texture)
+ *   2  solid corner block, top-left
+ *   3  solid corner block, bottom-right
+ *   4  hazard stripe along the bottom edge
+ *   5  the graded sheet, still fading away from its anchored screen edge
+ *
+ * Still five background layers on ONE element: no extra DOM, one paint.
+ */
+#hud #matchbar,
+#hud .hud-map-console,
+#hud .hud-operator-console,
+#hud #weapon-block,
+#hud #support-block {
+  background-image:
+    var(--p77-halftone),
+    linear-gradient(var(--p77-edge-ink), var(--p77-edge-ink)),
+    linear-gradient(var(--p77-edge-ink), var(--p77-edge-ink)),
+    var(--p77-hazard),
+    linear-gradient(var(--p77-fade), var(--p77-sheet-dense) 0%, var(--p77-sheet-thin) 100%);
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  background-position:
+    0 0,
+    left 0 top 0,
+    right 0 bottom 0,
+    left 0 bottom 0,
+    0 0;
+  background-size:
+    var(--p77-halftone-size),
+    var(--p77-bracket) 3px,
+    var(--p77-bracket) 3px,
+    100% 2px,
+    auto;
+  box-shadow:
+    var(--p77-cast),
+    inset 0 1px 0 var(--p77-sheen);
+}
+
+/*
+ * Type texture. Labels become monospaced and widely tracked; values stay in
+ * the display face. Two different TEXTURES is a stronger hierarchy cue than
+ * two different sizes, and it costs no space - which matters, because the
+ * mobile-legibility lane just spent every spare pixel raising the size floor.
+ *
+ * `--ui-mono` carries a full local() fallback chain because this project loads
+ * no webfonts at all: every @font-face in src/style.css is local()-only, with
+ * no network source. A face that is not installed must degrade to another
+ * monospace, never to the display face.
+ */
+#hud {
+  --ui-mono: 'Cascadia Mono', Consolas, 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+}
+
+#hud .tiny,
+#hud #room-hud,
+#hud .support-meta small,
+#hud .support-state,
+#hud .support-help,
+#hud .reserve-stack > small,
+#hud #weapon-name,
+#hud #health-block span,
+#hud #equipment-block span,
+#hud #equipment-block small {
+  font-family: var(--ui-mono);
+  letter-spacing: 0.16em;
+  font-weight: 600;
+}
+
+/*
+ * The vitals bar stops being a plain fill in a plain box and becomes a printed
+ * gauge: warm housing, amber rule. Same element, same width, same semantics.
+ */
+#hud .health-track {
+  border-color: rgb(255 196 128 / 0.34);
+  background-color: rgb(14 10 8 / 0.72);
+}
+
+/*
+ * One accent, used structurally. The operator and weapon consoles - the two a
+ * player reads under fire - carry a solid amber rule on the edge they are
+ * anchored to. Everything else keeps the quiet hairline, which is what makes
+ * an accent mean something.
+ */
+#hud .hud-operator-console {
+  border-left: 2px solid var(--p77-edge-ink);
+}
+
+#hud #weapon-block {
+  border-right: 2px solid var(--p77-edge-ink);
+}
+
+#hud #support-block {
+  border-right: 2px solid var(--p77-edge-ink-quiet);
+}
+
+/*
+ * The sensory switch removes the halftone and the hazard stripe - the two
+ * highest-frequency textures on screen - and leaves the flat graded sheet.
+ * Structure and legibility are untouched; only the texture goes.
+ */
+html[data-reduced-sensory='true'] #hud #matchbar,
+html[data-reduced-sensory='true'] #hud .hud-map-console,
+html[data-reduced-sensory='true'] #hud .hud-operator-console,
+html[data-reduced-sensory='true'] #hud #weapon-block,
+html[data-reduced-sensory='true'] #hud #support-block {
+  background-image:
+    linear-gradient(var(--p77-edge-ink), var(--p77-edge-ink)),
+    linear-gradient(var(--p77-edge-ink), var(--p77-edge-ink)),
+    linear-gradient(var(--p77-fade), var(--p77-sheet-dense) 0%, var(--p77-sheet-thin) 100%);
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-position: left 0 top 0, right 0 bottom 0, 0 0;
+  background-size: var(--p77-bracket) 3px, var(--p77-bracket) 3px, auto;
 }

@@ -25,14 +25,14 @@ export const definition = createProceduralArenaVisualDefinition({
   colorPipeline: colorPipeline('pass64.nuke-town.hdr.v1', 1.08),
   budgets: budgets({ maximumDrawCalls: 560, maximumTriangles: 1_600_000 }),
   reviewCameras: [
-    camera('nuke-town-overview', [42, 28, 48], [0, 2, 0], 'overview', 1.08),
-    camera('nuke-town-aqua-upper-roof', [-23, 6, -31], [-9, 5, -28], 'geometry', 1.08),
+    camera('nuke-town-overview', [30, 20, 34], [0, 2, 0], 'overview', 1.08),
+    camera('nuke-town-aqua-upper-roof', [-10, 6, -20.4], [4, 5, -17.4], 'geometry', 1.08),
     // Keep the occluded wall and open portal probes at one legal room position.
     // The retired wall probe sat inside a narrow wall cavity and measured two
     // sunlit backfaces, making its HDR result depend on geometry overlap rather
     // than whether light was actually retained through the doorway.
-    camera('nuke-town-aqua-wall-closed', [-9, 2.2, -23], [-14, 2.2, -28], 'light-occlusion', 1.08),
-    camera('nuke-town-aqua-door-open', [-9, 2.2, -23], [-7, 2.2, -28], 'portal', 1.08),
+    camera('nuke-town-aqua-wall-closed', [4, 2.2, -12.4], [-1, 2.2, -17.4], 'light-occlusion', 1.08),
+    camera('nuke-town-aqua-door-open', [4, 2.2, -12.4], [6, 2.2, -17.4], 'portal', 1.08),
   ],
   collisionIdentity: { authoritativeArenaId: 'atomic-acres', evidence: 'ArenaMap atomic-acres collider and shot-surface identity', presentationMayMutateAuthority: false },
   exceptions: ['grass, decals, particles and overhead dressing remain presentation-only'],

@@ -155,6 +155,7 @@ import {
   createShuffleBag,
   createSpawnFlipHysteresis,
   grenadeDefinition,
+  operatorPitchToward,
   operatorYawToward,
   respawnBotState,
   shouldBotThrowGrenade,
@@ -261,10 +262,12 @@ import {
 import {
   acknowledgeClientWorldRepairActor,
   beginClientWorldRepair,
+  CLIENT_WORLD_REPAIR_DEADLINE_CHECK_INTERVAL_MS,
   clientWorldRepairCanAttempt,
   clientWorldRepairPending,
   clientWorldRepairExhausted,
   clientWorldRepairReceiverReady,
+  evaluateClientWorldRepairDeadline,
   MAX_CLIENT_WORLD_REPAIR_ATTEMPTS,
   recordClientWorldRepairAttempt,
   type ClientWorldRepairAdmission,
@@ -4612,6 +4615,12 @@ function invalidateKeyBindingProfile(): void {
   cachedKeyBindingProfile = null;
 }
 const remotes = new Map<string, RemotePlayer>();
+// Lane J (HF-347 residual): silent state/join admission drops, made observable.
+const stateAdmissionDropTelemetry: {
+  total: number;
+  byReason: Record<string, number>;
+  last: Record<string, unknown> | null;
+} = { total: 0, byReason: {}, last: null };
 const bots = new Map<string, BotPlayer>();
 const dormantBots = new Map<string, BotPlayer>();
 let dormantBotsPrewarmed = false;
@@ -5467,6 +5476,18 @@ let localLobbyReady = false;
 let localDhv: Dhv = 10;
 let localResumeToken = '';
 let clientWorldRepairAdmission: ClientWorldRepairAdmission | null = null;
+/**
+ * Lane J: performance.now() of the first in-match message this client admitted
+ * from the host since the current match admission was armed, or null while the
+ * host has not been heard from at all. Feeds the world-repair deadline so a
+ * host that is still loading is not mistaken for a host that is gone.
+ */
+let hostMatchContactAtMs: number | null = null;
+/** Lane J: forensic record of the last admission failure. See handleClientWorldRepairFailure. */
+const clientWorldRepairFailureTelemetry: { total: number; last: Record<string, unknown> | null } = {
+  total: 0,
+  last: null,
+};
 let pendingClientReconnectWorldRepairConnectionEpoch: string | null = null;
 let clientReconnectWorldRepairAttempts = 0; // HF-322: bounded reconnect repair attempts
 let pendingClientWorldRepairTimeout: number | null = null; // HF-322: bounded admission/repair timeout
@@ -8327,6 +8348,24 @@ function clearClientWorldRepairTimeout(): void {
 
 function handleClientWorldRepairFailure(reason = 'admission-unacknowledged'): void {
   if (network.role !== 'client') return;
+  // Lane J: this call kills the local player and tells them to rejoin, so it
+  // must be able to justify itself after the fact. Record the exact clock the
+  // deadline judged on.
+  clientWorldRepairFailureTelemetry.total += 1;
+  clientWorldRepairFailureTelemetry.last = {
+    reason,
+    atMs: Math.round(performance.now()),
+    hostContactAtMs: hostMatchContactAtMs === null ? null : Math.round(hostMatchContactAtMs),
+    attempts: clientWorldRepairAdmission?.attempts ?? null,
+    lastAttemptAtMs: clientWorldRepairAdmission?.lastAttemptAtMs === null
+      || clientWorldRepairAdmission?.lastAttemptAtMs === undefined
+      ? null
+      : Math.round(clientWorldRepairAdmission.lastAttemptAtMs),
+    lifeId: clientWorldRepairAdmission?.identity.lifeId ?? null,
+    localContinuity,
+    gameStarted,
+    matchPhase: matchState.phase,
+  };
   clearClientWorldRepairTimeout();
   clientWorldRepairAdmission = null;
   pendingClientReconnectWorldRepairConnectionEpoch = null;
@@ -8359,15 +8398,61 @@ function handleGuestResumeTimeout(): void {
 
 function scheduleClientWorldRepairTimeout(epoch: string, matchEpoch: number): void {
   clearClientWorldRepairTimeout();
-  pendingClientWorldRepairTimeout = window.setTimeout(() => {
+  // HF-347 residual (Lane J, "cant move alot in host and guest lobby" / "cant
+  // mov when spawn into rustrig"): this deadline used to be a single 5s timer
+  // armed at lobby-start, racing BOTH sides' arena load and the WebGL
+  // first-presentation prime (which pauses the state pump via
+  // matchAdmissionPresentationPaused). Heavy arenas lost that race, the guest
+  // was declared dead at spawn and never recovered — reproduced 4/6 arenas by
+  // scripts/qa/verify-hf347-arena-movement-matrix.mjs under load. The 5s bound
+  // is unchanged but now measures HANDSHAKE inactivity while this client can
+  // actually transact, under an absolute arming cap; the rule itself lives in
+  // client-world-repair-admission.ts (evaluateClientWorldRepairDeadline) with
+  // its own unit tests. The old code also silently dropped the timer when the
+  // callback fired before gameStarted, leaving no deadline at all — the
+  // cadence re-check closes that hole too.
+  const armedAtMs = performance.now();
+  let pumpEligibleSinceMs: number | null = null;
+  // Lane J: first contact from the host in THIS match. Until it lands, the
+  // host is simply still loading its own arena and the inactivity clock has
+  // nothing to measure — see hostContactAtMs in client-world-repair-admission.
+  hostMatchContactAtMs = null;
+  const checkClientWorldRepairDeadline = (): void => {
     pendingClientWorldRepairTimeout = null;
-    if (network.role !== 'client' || !gameStarted || matchEpoch !== killstreakMatchEpoch || epoch !== localConnectionEpoch) return;
-    if (clientWorldRepairAdmission && !clientWorldRepairAdmission.acknowledged) {
-      handleClientWorldRepairFailure('admission-timeout');
-    } else if (awaitingCanonicalGuestAuthority) {
-      handleGuestResumeTimeout();
+    if (network.role !== 'client' || matchEpoch !== killstreakMatchEpoch || epoch !== localConnectionEpoch) return;
+    const admissionPending = clientWorldRepairAdmission !== null && !clientWorldRepairAdmission.acknowledged;
+    if (!admissionPending && !awaitingCanonicalGuestAuthority) return;
+    const nowMs = performance.now();
+    if (gameStarted && !matchAdmissionPresentationPaused) {
+      if (pumpEligibleSinceMs === null) pumpEligibleSinceMs = nowMs;
+    } else {
+      pumpEligibleSinceMs = null;
     }
-  }, 5_000);
+    // The resume path judges the same inactivity rule; it has no admission
+    // record, so judge a fresh unacknowledged one (progress = eligibility).
+    const judged = clientWorldRepairAdmission ?? beginClientWorldRepair({
+      playerId: player.id,
+      connectionEpoch: epoch,
+      matchEpoch,
+      lifeId: Math.max(0, localContinuity),
+    });
+    const verdict = evaluateClientWorldRepairDeadline({
+      nowMs, armedAtMs, pumpEligibleSinceMs, hostContactAtMs: hostMatchContactAtMs, admission: judged,
+    });
+    if (verdict === 'failed') {
+      if (admissionPending) handleClientWorldRepairFailure('admission-timeout');
+      else handleGuestResumeTimeout();
+      return;
+    }
+    pendingClientWorldRepairTimeout = window.setTimeout(
+      checkClientWorldRepairDeadline,
+      CLIENT_WORLD_REPAIR_DEADLINE_CHECK_INTERVAL_MS,
+    );
+  };
+  pendingClientWorldRepairTimeout = window.setTimeout(
+    checkClientWorldRepairDeadline,
+    CLIENT_WORLD_REPAIR_DEADLINE_CHECK_INTERVAL_MS,
+  );
 }
 
 function clearGuestResumeTimeout(): void {
@@ -10695,9 +10780,145 @@ function handleFlashAuthorityMessage(message: GameMessage): boolean {
   return true;
 }
 
+/**
+ * Lane J root cause for the owner's cluster: "cant mov when spawn into rustrig
+ * in host guest lobby", "sometimes randomly cant shoot or reload my gun",
+ * "people cant move or been seen by others in guest/host".
+ *
+ * After START both sides load their arena independently, and whichever side
+ * finishes first immediately publishes its match-admission triple — `join`,
+ * the reliable `state` commit, then `killstreak-loadout-intent` (see
+ * sendClientWorldRepairReady and the tail of startGame). onNetworkMessage
+ * discarded every one of them at the `!gameStarted` gate while the receiver was
+ * still loading, and nothing ever re-sent them: the guest only retries its
+ * repair-ready when a host `killstreak-state` arrives, and the host only emits
+ * one once it knows the guest exists. Each side then waited on the other until
+ * the admission deadline fired, leaving the guest at hp 0 / alive false inside
+ * an 'active' match ("Match admission unacknowledged by host
+ * (admission-timeout). Rejoin to retry.") with the host reporting remoteCount 0
+ * — one fault presenting as cannot-move, cannot-shoot, cannot-reload and
+ * cannot-be-seen at once.
+ *
+ * Reproduced mechanically on atomic-acres/FFA with the host ~270 presented
+ * frames behind the guest at publication time; the slower the arena, the wider
+ * the window, which is why RustRig and Terminal were the owner's worst maps.
+ *
+ * The messages are PARKED rather than discarded and replayed through this same
+ * function once the local match is live, so every existing guard (lobby
+ * membership, team, arena bounds, match epoch, nonce) still runs on them —
+ * nothing is admitted that would not have been admitted had it arrived a second
+ * later. Parking is bounded three ways: only while this side is genuinely
+ * mid-admission, only for the admission-critical message types, and only up to
+ * MATCH_ADMISSION_PARK_LIMIT entries. Everything else is still dropped.
+ */
+const MATCH_ADMISSION_PARK_LIMIT = 48;
+const MATCH_ADMISSION_PARKED_TYPES = new Set<GameMessage['type']>([
+  // Outbound admission triple a peer publishes the moment its own match goes
+  // live: identity, the reliable state commit, then the loadout intent.
+  'join',
+  'state',
+  'killstreak-loadout-intent',
+  // The ACKNOWLEDGEMENT, and the reason the race is not self-healing. A guest's
+  // admission is acknowledged only by a host `killstreak-state` carrying its
+  // actor at the right lifeId, and the host sends that once per ack identity
+  // (hostKillstreakLoadoutAcks.needsAck). Dropped while the guest was still
+  // loading, it is never re-offered: the guest then plays on with an
+  // unacknowledged admission and the deadline kills it seconds later, mid-match,
+  // with "Match admission unacknowledged by host (admission-timeout)" — the
+  // owner's "sometimes randomly cant shoot or reload my gun". Replay is safe:
+  // admitKillstreakStateMessage still checks host identity, recipient, match
+  // epoch, nonce and revision, so a superseded snapshot is rejected on arrival.
+  'killstreak-state',
+]);
+let parkedMatchAdmissionMessages: { generation: number; message: GameMessage }[] = [];
+const matchAdmissionParkTelemetry = {
+  parked: 0,
+  replayed: 0,
+  coalesced: 0,
+  droppedOverflow: 0,
+  droppedStale: 0,
+};
+
+
+/**
+ * Coalescing key for the messages where only the newest copy is admissible
+ * anyway: a peer's `state` is superseded by its next one (the live path drops
+ * older sequences), and only the highest-revision `killstreak-state` survives
+ * admitKillstreakStateMessage. `join` and `killstreak-loadout-intent` carry
+ * identity and are never coalesced or evicted — they are the whole point of the
+ * queue. Without this, a peer's 20 Hz state stream filled the queue during a
+ * long arena load and evicted its own join/loadout-intent (measured: 107
+ * parked, 59 overflowed on one host), which reproduced the very deadlock the
+ * queue exists to prevent.
+ */
+function parkedMatchAdmissionKey(message: GameMessage): string | null {
+  if (message.type === 'state') return `state:${message.player.id}`;
+  if (message.type === 'killstreak-state') return 'killstreak-state';
+  return null;
+}
+
+function parkMatchAdmissionMessage(message: GameMessage): void {
+  // Only a side that is actually mid-admission can have a peer racing ahead of
+  // it; outside that window the old drop is still exactly right.
+  if (!matchStartPreparing) return;
+  if (!MATCH_ADMISSION_PARKED_TYPES.has(message.type)) return;
+  const key = parkedMatchAdmissionKey(message);
+  if (key !== null) {
+    const existing = parkedMatchAdmissionMessages
+      .findIndex((entry) => parkedMatchAdmissionKey(entry.message) === key);
+    if (existing >= 0) {
+      // Supersede in place so this message keeps its position relative to the
+      // join / loadout-intent it was published with.
+      parkedMatchAdmissionMessages[existing] = { generation: matchAdmissionGeneration, message };
+      matchAdmissionParkTelemetry.parked += 1;
+      matchAdmissionParkTelemetry.coalesced += 1;
+      return;
+    }
+  }
+  if (parkedMatchAdmissionMessages.length >= MATCH_ADMISSION_PARK_LIMIT) {
+    parkedMatchAdmissionMessages.shift();
+    matchAdmissionParkTelemetry.droppedOverflow += 1;
+  }
+  parkedMatchAdmissionMessages.push({ generation: matchAdmissionGeneration, message });
+  matchAdmissionParkTelemetry.parked += 1;
+}
+
+/**
+ * Replayed in arrival order so the `join` -> `state` -> loadout-intent sequence
+ * the sender emitted is preserved; the loadout intent is rejected outright by
+ * its own guard unless the preceding state has already created the remote.
+ * A message parked under a superseded admission generation is dropped.
+ */
+function replayParkedMatchAdmissionMessages(): void {
+  if (parkedMatchAdmissionMessages.length === 0) return;
+  const queued = parkedMatchAdmissionMessages;
+  parkedMatchAdmissionMessages = [];
+  for (const entry of queued) {
+    if (entry.generation !== matchAdmissionGeneration) {
+      matchAdmissionParkTelemetry.droppedStale += 1;
+      continue;
+    }
+    matchAdmissionParkTelemetry.replayed += 1;
+    onNetworkMessage(entry.message);
+  }
+}
+
 function onNetworkMessage(message: GameMessage): void {
   if (handleLobbyMessage(message)) return;
-  if (!gameStarted) return;
+  // Lane J: first proof that the host's own match is LIVE. Restricted to the
+  // admission types, which only a started host emits — clock pongs and other
+  // keepalives flow throughout the host's arena load and would otherwise stamp
+  // contact while the host was still loading, which is the very state the
+  // deadline must not judge. Stamped before the gameStarted gate so a message
+  // that only gets parked still counts as contact.
+  if (network.role === 'client' && hostMatchContactAtMs === null
+    && MATCH_ADMISSION_PARKED_TYPES.has(message.type)) {
+    hostMatchContactAtMs = performance.now();
+  }
+  if (!gameStarted) {
+    parkMatchAdmissionMessage(message);
+    return;
+  }
   if (message.type === 'guest-resume-authority') {
     applyGuestResumeAuthority(message);
     return;
@@ -11144,8 +11365,32 @@ function onNetworkMessage(message: GameMessage): void {
   if (message.type === 'join' || message.type === 'state') {
     const claimedIncoming = message.player;
     const lobbyMember = privateLobbySnapshot?.members.find((member) => member.id === claimedIncoming.id);
-    if (privateLobbySnapshot && (!lobbyMember || claimedIncoming.team !== lobbyMember.team)) return;
-    if (claimedIncoming.weapon === 'magnum' && lobbyMember?.dhv !== 'X') return;
+    // Lane J diagnostics: these guards drop a peer's state SILENTLY, and a
+    // dropped state pump is exactly how a guest ends dead-at-spawn with
+    // "admission unacknowledged" (HF-347 residual). Count every drop with its
+    // reason so the failure is observable instead of inferred.
+    const recordStateAdmissionDrop = (reason: string): void => {
+      stateAdmissionDropTelemetry.total += 1;
+      stateAdmissionDropTelemetry.byReason[reason] = (stateAdmissionDropTelemetry.byReason[reason] ?? 0) + 1;
+      stateAdmissionDropTelemetry.last = {
+        reason,
+        messageType: message.type,
+        peerId: claimedIncoming.id,
+        claimedTeam: claimedIncoming.team,
+        memberTeam: lobbyMember?.team ?? null,
+        position: [claimedIncoming.x, claimedIncoming.y, claimedIncoming.z],
+        arenaId: arena.id,
+        atMs: Math.round(performance.now()),
+      };
+    };
+    if (privateLobbySnapshot && (!lobbyMember || claimedIncoming.team !== lobbyMember.team)) {
+      recordStateAdmissionDrop(!lobbyMember ? 'no-lobby-member' : 'team-mismatch');
+      return;
+    }
+    if (claimedIncoming.weapon === 'magnum' && lobbyMember?.dhv !== 'X') {
+      recordStateAdmissionDrop('magnum-without-dhv-x');
+      return;
+    }
     const authoritativeScore = authoritativeScores.get(claimedIncoming.id);
     const incoming = network.role === 'host' && lobbyMember
       ? {
@@ -11156,7 +11401,10 @@ function onNetworkMessage(message: GameMessage): void {
           deaths: authoritativeScore?.deaths ?? 0,
         }
       : claimedIncoming;
-    if (!pointInsideBounds(incoming, arena.bounds, 0.44)) return;
+    if (!pointInsideBounds(incoming, arena.bounds, 0.44)) {
+      recordStateAdmissionDrop('outside-arena-bounds');
+      return;
+    }
     if (incoming.id === player.id) {
       // A host-authored echo of the reconnecting guest is the only canonical
       // health repair available before the next damage result. Without it a
@@ -15576,6 +15824,14 @@ async function startGame(
       assertMatchAdmissionCurrent(token);
       broadcastOverdriveState(activeAtLocalMonoMs ?? matchStartedAt);
     }
+    // Lane J: a peer that finished its arena load first published its
+    // admission triple while this side was still loading and onNetworkMessage
+    // parked it. Drain that queue now — after our own identity is on the wire,
+    // which is the order those messages would have been processed in had they
+    // arrived a moment later. See parkMatchAdmissionMessage for the fault this
+    // closes (guest dead at spawn, host with zero remotes).
+    assertMatchAdmissionCurrent(token);
+    replayParkedMatchAdmissionMessages();
   }
   deploymentTransition.dataset.readyPresentedGameplayFrame = String(lastGameplayPresentedFrame);
   deploymentTransition.dataset.readyGeneration = String(matchAdmissionGeneration);
@@ -16941,6 +17197,32 @@ function finishReload(now: number): void {
   }
 }
 
+/**
+ * Lane J (owner: "sometimes randomly cant shoot or reload my gun or after
+ * picked one up"). Every refusal path in tryFire used to `return` silently, so
+ * a trigger that had gone dead was indistinguishable from a dead key and could
+ * only be guessed at from the outside — which is why this fault survived
+ * several passes as "sometimes randomly". The counter below names the refusal,
+ * is surfaced on the debug snapshot as `fireBlock`, and is what
+ * scripts/qa/verify-lane-j-fault-sweep.mjs reads to attribute a failed fire
+ * cycle to a specific gate instead of reporting "ammo did not move".
+ * Diagnostic only: it never changes whether a shot is admitted.
+ */
+const fireBlockTelemetry: {
+  total: number;
+  byReason: Record<string, number>;
+  last: string | null;
+  lastAtMs: number;
+  lastFiredAtMs: number;
+} = { total: 0, byReason: {}, last: null, lastAtMs: 0, lastFiredAtMs: 0 };
+
+function refuseFire(reason: string): void {
+  fireBlockTelemetry.total += 1;
+  fireBlockTelemetry.byReason[reason] = (fireBlockTelemetry.byReason[reason] ?? 0) + 1;
+  fireBlockTelemetry.last = reason;
+  fireBlockTelemetry.lastAtMs = Math.round(performance.now());
+}
+
 function tryFire(now: number): void {
   const touchFireActive = mobileTouchFireBypassesPointerLock(
     mobilePresentationActive,
@@ -16948,12 +17230,24 @@ function tryFire(now: number): void {
   );
   if (!player.alive || !gameStarted
     || (!debugInputUnlocked && document.pointerLockElement !== canvas && !touchFireActive)
-    || matchState.phase !== 'active') return;
-  if (pointSupportTargeting && !tacticalMapOpen) return;
+    || matchState.phase !== 'active') {
+    refuseFire(!player.alive ? 'dead'
+      : !gameStarted ? 'match-not-started'
+      : matchState.phase !== 'active' ? `match-phase-${matchState.phase}`
+      : 'no-pointer-lock');
+    return;
+  }
+  if (pointSupportTargeting && !tacticalMapOpen) {
+    refuseFire('support-targeting');
+    return;
+  }
   // While piloting a drone or manning the chopper gun the trigger belongs to
   // that platform's host-admitted weapon. Rapid clicking previously discharged
   // the carried firearm from inside the cockpit.
-  if (localKillstreakActorSnapshot()?.possession) return;
+  if (localKillstreakActorSnapshot()?.possession) {
+    refuseFire('killstreak-possession');
+    return;
+  }
   // HF-358: firearms stay low while swimming - the reducer has flagged the
   // restriction since it landed, but nothing consumed it. One feed line per
   // swim entry so the player knows the trigger is deliberately dead, not
@@ -16963,6 +17257,7 @@ function tryFire(now: number): void {
       swimWeaponHintShown = true;
       addFeed('WEAPON LOW · SWIMMING');
     }
+    refuseFire('swimming');
     return;
   }
   if (currentSprinting) {
@@ -16978,11 +17273,15 @@ function tryFire(now: number): void {
         if (triggerHeld) tryFire(performance.now());
       }, Math.max(1, readyAt - now + 2));
     }
+    refuseFire('stance-or-sprint-recovery');
     return;
   }
   deferredFireAt = 0;
   if (player.weapon === 'railgun') {
-    if (now < player.switchingUntil) return;
+    if (now < player.switchingUntil) {
+      refuseFire('weapon-switching');
+      return;
+    }
     tryFireRailgun(now);
     return;
   }
@@ -17008,45 +17307,70 @@ function tryFire(now: number): void {
     player.stance === 'prone',
     weaponView.adsProgress(),
   );
-  if (fireAdmission.fireBlocked) return;
+  if (fireAdmission.fireBlocked) {
+    refuseFire('viewmodel-contact-raise');
+    return;
+  }
   if (isTimedMapWeaponId(player.weapon)) {
     const authority = timedMapWeaponStates[player.weapon];
     if (authority.holderId !== player.id || authority.status !== 'held' || authority.shotsRemaining <= 0) {
       audio.empty();
+      refuseFire('timed-weapon-authority');
       return;
     }
   }
   const spec = WEAPONS[player.weapon];
-  if (!triggerHeld && spec.automatic) return;
+  if (!triggerHeld && spec.automatic) {
+    refuseFire('trigger-released');
+    return;
+  }
   if (spec.spinUpMs > 0) {
     if (spinUpWeapon !== player.weapon || spinUpStartedAtPerformanceMs === null || spinUpStartedAtHostTimeMs === null) {
       spinUpWeapon = player.weapon;
       spinUpStartedAtPerformanceMs = now;
       spinUpStartedAtHostTimeMs = currentHostTimeMs();
+      refuseFire('spin-up-started');
       return;
     }
-    if (now - spinUpStartedAtPerformanceMs < spec.spinUpMs) return;
+    if (now - spinUpStartedAtPerformanceMs < spec.spinUpMs) {
+      refuseFire('spin-up-pending');
+      return;
+    }
   }
-  if (now < player.switchingUntil) return;
+  if (now < player.switchingUntil) {
+    refuseFire('weapon-switching');
+    return;
+  }
   if (player.reloadState) {
     // An empty magazine must finish its automatic reload even if the player
     // keeps the trigger held. Non-empty tactical reloads remain cancellable.
-    if (player.ammo[player.weapon] <= 0) return;
-    if (!cancelReload(player.reloadState, now)) return;
+    if (player.ammo[player.weapon] <= 0) {
+      refuseFire('reloading-empty-mag');
+      return;
+    }
+    if (!cancelReload(player.reloadState, now)) {
+      refuseFire('reload-not-cancellable');
+      return;
+    }
     interruptReload(true, now);
   }
   const shotInterval = 60_000 / spec.rpm;
-  if (now < player.nextShotAt) return;
+  if (now < player.nextShotAt) {
+    refuseFire('rate-of-fire');
+    return;
+  }
   player.nextShotAt = nextShotDeadline(now, shotInterval);
   endSpawnProtectionOnOffense(now);
   if (player.ammo[player.weapon] <= 0) {
     audio.empty();
     reload();
     player.lastShotAt = now;
+    refuseFire('empty-magazine');
     return;
   }
   player.sustainedShots = now - player.lastShotAt < 260 ? player.sustainedShots + 1 : 0;
   player.lastShotAt = now;
+  fireBlockTelemetry.lastFiredAtMs = Math.round(now);
   player.ammo[player.weapon] = Math.max(0, player.ammo[player.weapon] - 1);
   const shotActionNonce = randomNonce();
   if (isTimedMapWeaponId(player.weapon) && network.role !== 'client') {
@@ -18597,7 +18921,13 @@ function updateBots(dt: number, now: number): void {
     bot.root.position.copy(bot.position);
     const lookTarget = lineOfSight ? targetPosition : verticalRouteTarget ?? patrolTarget;
     bot.root.rotation.y = operatorYawToward(bot.position, lookTarget);
-    poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12), 0, dt);
+    // HF-375: bots aim in 3D and always stood level. Only a real combat target
+    // gets a pitch - a patrol waypoint is a floor position, and pitching the
+    // body at it would have every patrolling bot staring at its own feet.
+    const lookPitch = lineOfSight
+      ? operatorPitchToward(bot.position, { x: lookTarget.x, y: lookTarget.y, z: lookTarget.z })
+      : 0;
+    poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12), lookPitch, dt);
     const botSurface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
     const botFootsteps = footstepEmitters.sample({
       actorId: `bot:${bot.id}`,
@@ -25900,18 +26230,44 @@ const handleTextChatPanelOpenAffordance = (event: Event): void => {
   if (!textChatAvailable()) return;
   const target = event.target instanceof Element ? event.target : null;
   if (target?.closest('button[type="submit"]')) return;
+  // HF-324 residual (Lane J, "cant type in lobby"): openTextChat() focuses the
+  // input during pointerdown, but the browser's DEFAULT mousedown action then
+  // moves focus to <body> (the panel chrome is not focusable), and the log
+  // re-render can swap the click target away so the click-phase refocus never
+  // lands. The first keystroke then hits the window guard instead of the
+  // input and was silently eaten. Cancelling the default on the panel chrome
+  // (never on the input itself, which needs native caret placement) keeps the
+  // focus we just set. Focus-timeline evidence: input focus at pointerdown,
+  // blur ~70ms later to <body>, first typed character lost on host AND guest.
+  if (event.type === 'pointerdown' && event.cancelable && target !== textChatInput) {
+    event.preventDefault();
+  }
   if (!textChatOpen) openTextChat();
-  else textChatInput.focus({ preventScroll: true });
+  else if (document.activeElement !== textChatInput) textChatInput.focus({ preventScroll: true });
 };
 textChatRoot.addEventListener('pointerdown', handleTextChatPanelOpenAffordance);
 textChatRoot.addEventListener('click', handleTextChatPanelOpenAffordance);
 window.addEventListener('keydown', (event) => {
   if (isTextChatTyping()) {
     if (event.target === textChatInput) return;
-    event.preventDefault();
+    // HF-324 residual (Lane J, "cant type in lobby"): chat is open but the
+    // input lost focus (panel-chrome click, roster re-render). This guard
+    // used to preventDefault EVERY key here, so the keystroke that should
+    // have re-entered the chat was eaten — the owner's dropped first letter.
+    // A plain printable key now refocuses the input and keeps its default
+    // action, which the browser delivers to the newly focused input; all
+    // other keys keep the old swallow so gameplay bindings cannot leak
+    // through an open chat.
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      closeTextChat(true);
+      return;
+    }
+    textChatInput.focus({ preventScroll: true });
+    const printable = event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
+    if (!printable) event.preventDefault();
     event.stopImmediatePropagation();
-    if (event.key === 'Escape') closeTextChat(true);
-    else textChatInput.focus({ preventScroll: true });
     return;
   }
   if (event.key !== 'Enter' || event.repeat || !textChatAvailable()) return;
@@ -29869,6 +30225,38 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       hostTimeOffsetMs: network.role === 'client' ? hostTimeMapping.offsetMs : 0,
       localPingMs: localLobbyPingMs,
     } : null,
+    stateAdmissionDrops: {
+      total: stateAdmissionDropTelemetry.total,
+      byReason: { ...stateAdmissionDropTelemetry.byReason },
+      last: stateAdmissionDropTelemetry.last ? { ...stateAdmissionDropTelemetry.last } : null,
+    },
+    // Lane J: admission traffic that arrived while this side was still loading
+    // its arena, and what became of it. See parkMatchAdmissionMessage().
+    matchAdmissionPark: { ...matchAdmissionParkTelemetry },
+    // Lane J: the live admission record, so a guest that goes dead mid-match
+    // can be attributed to the handshake rather than to combat.
+    clientWorldRepairFailures: {
+      total: clientWorldRepairFailureTelemetry.total,
+      last: clientWorldRepairFailureTelemetry.last ? { ...clientWorldRepairFailureTelemetry.last } : null,
+    },
+    clientWorldRepair: clientWorldRepairAdmission
+      ? {
+          lifeId: clientWorldRepairAdmission.identity.lifeId,
+          matchEpoch: clientWorldRepairAdmission.identity.matchEpoch,
+          attempts: clientWorldRepairAdmission.attempts,
+          acknowledged: clientWorldRepairAdmission.acknowledged,
+          lastAttemptAtMs: clientWorldRepairAdmission.lastAttemptAtMs,
+        }
+      : null,
+    // Lane J: why the trigger last refused, so "sometimes randomly cant shoot"
+    // is attributable instead of guessed at. See refuseFire().
+    fireBlock: {
+      total: fireBlockTelemetry.total,
+      byReason: { ...fireBlockTelemetry.byReason },
+      last: fireBlockTelemetry.last,
+      lastAtMs: fireBlockTelemetry.lastAtMs,
+      lastFiredAtMs: fireBlockTelemetry.lastFiredAtMs,
+    },
     hostMatchRecoveryCheckpoint: {
       rejectedPoseWrites: hostCheckpointRejectedPoseWrites,
       lastRejectedPoseReason: lastHostCheckpointRejectedPoseReason,

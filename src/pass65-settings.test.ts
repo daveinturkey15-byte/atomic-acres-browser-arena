@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   AUDIO_BUS_IDS,
   advancePresentationFrameAnchor,
@@ -12,6 +12,8 @@ import {
   resolveGraphicsRuntime,
   writePass65Settings,
 } from './pass65-settings';
+import { activeWeatherPresentation, resetWeatherPresentation } from './weather/weather-settings';
+import { sampleWeather } from './weather/weather-state';
 
 describe('Pass 65 settings contract', () => {
   it('defaults capable machines to a real High configuration', () => {
@@ -267,5 +269,65 @@ describe('Pass 65 settings contract', () => {
     };
     expect(writePass65Settings(throwingStorage, settings)).toBe(false);
     expect([...values.values()][0]).toBe(prior);
+  });
+});
+
+describe('weather settings reach the weather systems', () => {
+  afterEach(() => {
+    resetWeatherPresentation();
+  });
+
+  it('resolves the player weather clamp onto the runtime', () => {
+    const settings = normalizePass65Settings({
+      graphics: {
+        preset: 'custom',
+        weatherIntensity: 'moderate',
+        rainDensity: 0.6,
+        windStrength: 1.4,
+        lightning: false,
+      },
+    }).graphics;
+    expect(resolveGraphicsRuntime(settings).weather).toMatchObject({
+      intensity: 'moderate',
+      ceilingState: 'light-rain',
+      rainDensity: 0.6,
+      windStrength: 1.4,
+      lightning: false,
+      weatherEnabled: true,
+    });
+  });
+
+  it('PUBLISHES it, because nothing else ever hands the weather systems settings', () => {
+    // The weather systems are constructed at module scope before any settings
+    // exist and the frame loop never passes them any. Without this publish
+    // every weather row in Options is a switch wired to nothing, which is the
+    // exact defect the audit recorded.
+    resetWeatherPresentation();
+    const quiet = normalizePass65Settings({
+      graphics: { preset: 'custom', weatherIntensity: 'off', rainDensity: 0.25, lightning: false },
+    }).graphics;
+    resolveGraphicsRuntime(quiet);
+    expect(activeWeatherPresentation()).toMatchObject({ intensity: 'off', weatherEnabled: false, lightning: false });
+    // ...and the weather model itself picks it up with no further plumbing.
+    expect(sampleWeather('high-seas', 4_242, 420).rainRate).toBe(0);
+  });
+
+  it('keeps publishing on the compatibility route, where wind still matters', () => {
+    resetWeatherPresentation();
+    const settings = normalizePass65Settings({
+      graphics: { preset: 'custom', weatherIntensity: 'light', windStrength: 0.5 },
+    }).graphics;
+    const runtime = resolveGraphicsRuntime(settings, true);
+    expect(runtime.renderProfile).toBe('compat');
+    expect(runtime.weather).toMatchObject({ intensity: 'light', windStrength: 0.5 });
+    expect(activeWeatherPresentation().windStrength).toBe(0.5);
+  });
+
+  it('is idempotent - resolving twice publishes the same numbers', () => {
+    const settings = normalizePass65Settings({ graphics: { preset: 'max' } }).graphics;
+    const first = resolveGraphicsRuntime(settings).weather;
+    const second = resolveGraphicsRuntime(settings).weather;
+    expect(second).toEqual(first);
+    expect(activeWeatherPresentation()).toEqual(first);
   });
 });

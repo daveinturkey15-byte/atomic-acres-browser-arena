@@ -6,6 +6,20 @@
 // something an owner can look at - this walks the PLAYER down there and takes
 // frames from inside the corridor, at the engine room, and at both ends.
 //
+// WHAT THIS DOES AND DOES NOT ANSWER (corrected Pass 77).
+//
+// Its verdict is derived from a teleport readback - "did the player end up
+// above y=0.5". That readback succeeds whether or not a single frame was ever
+// presented, because the player moves on the simulation side, so an earlier
+// version of this script reported PASS against frames nobody had rendered. It
+// now refuses to emit PASS/FAIL unless frameCount is still ADVANCING while the
+// player stands at each station.
+//
+// Even then it only answers "did the floor hold". It says nothing about whether
+// the volume is bright enough to fight in - for that use
+// scripts/qa/measure-below-deck-luminance.mjs, which boots the WebGPU route the
+// owner actually plays (this one boots webgl2) and measures rendered pixels.
+//
 // Usage: node scripts/qa/capture-below-deck.mjs [--out artifacts/pass76/below-deck]
 import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
@@ -58,18 +72,32 @@ for (const station of STATIONS) {
   // have fallen, which is the exact failure this evidence exists to disprove.
   const landed = await page.evaluate(() => {
     const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-    return { position: snapshot.player.position.map((value) => Number(value.toFixed(2))), alive: snapshot.player.alive };
+    return {
+      position: snapshot.player.position.map((value) => Number(value.toFixed(2))),
+      alive: snapshot.player.alive,
+      frameCount: snapshot.frameCount,
+    };
   });
+  // Liveness gate: a teleport readback proves nothing about rendering, so the
+  // frame counter has to be moving WHILE the player stands here before this
+  // station's result is allowed to count for anything.
+  await page.waitForTimeout(500);
+  const laterFrameCount = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount);
+  const rendering = laterFrameCount > landed.frameCount;
   const file = resolve(OUT, `below-deck-${station.id}.png`);
   await page.screenshot({ path: file });
   const fellThrough = landed.position[1] < 0.5;
-  report.push({ ...station, landed, fellThrough, file });
-  console.error(`[below-deck] ${station.id}: y=${landed.position[1]}${fellThrough ? '  *** FELL THROUGH ***' : ''}`);
+  report.push({ ...station, landed, fellThrough, rendering, framesAtStation: [landed.frameCount, laterFrameCount], file });
+  console.error(`[below-deck] ${station.id}: y=${landed.position[1]} frames ${landed.frameCount}->${laterFrameCount}${rendering ? '' : '  *** NOT RENDERING ***'}${fellThrough ? '  *** FELL THROUGH ***' : ''}`);
 }
 
 await browser.close();
 console.log(JSON.stringify({
-  verdict: report.some((entry) => entry.fellThrough) ? 'FAIL' : 'PASS',
+  // UNMEASURED, not PASS, when nothing was being drawn: a floor that held in a
+  // simulation nobody rendered is not evidence an owner can act on.
+  verdict: report.some((entry) => !entry.rendering) ? 'UNMEASURED'
+    : report.some((entry) => entry.fellThrough) ? 'FAIL' : 'PASS',
+  scope: 'floor-support-only; use measure-below-deck-luminance.mjs for whether it is playable',
   pageErrors: [...new Set(errors)].slice(0, 5),
   stations: report,
 }, null, 2));

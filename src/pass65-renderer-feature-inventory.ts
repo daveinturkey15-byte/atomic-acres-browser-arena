@@ -298,6 +298,24 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     verifier: 'Generated inventory unsupported-feature gate.',
   }),
   feature({
+    id: 'weather-and-wind', title: 'Weather, rain, wind and surface wetness', availability: 'active', owner: 'src/weather/weather-state.ts + src/weather/rain-presentation.ts + src/weather/wind-field.ts',
+    sourceProbes: [
+      { path: 'src/weather/weather-state.ts', symbol: 'export function sampleWeather' },
+      { path: 'src/weather/weather-settings.ts', symbol: 'export function resolveWeatherPresentation' },
+      { path: 'src/weather/rain-presentation.ts', symbol: 'export function assertRainCombatSafety' },
+      { path: 'src/weather/wind-field.ts', symbol: 'export function sampleWind' },
+    ],
+    pipelineIds: [],
+    control: control(
+      'setting',
+      ['graphics.weatherIntensity', 'graphics.rainDensity', 'graphics.windStrength', 'graphics.lightning'],
+      'Weather ceiling off/light/moderate/heavy/storm, rain density 0.25x-1.5x, wind strength 0x-2x, lightning on or off',
+      'The weather itself is a pure function of the arena, the host-derived match seed and elapsed time, so every peer computes the same sky over zero bytes of network traffic. The four settings are LOCAL PRESENTATION CLAMPS on top of that: they can show the same weather or less of it, never more, and never a state the arena did not author. Readability is arithmetic rather than taste - at the maximum instance ceiling and the maximum streak opacity the whole rain volume removes under 3% of the light along a sightline, the aim cylinder is emptied outright while aiming down sights, and lightning only ever adds light, capped, for at most 0.26 s.',
+    ),
+    budget: 'Exactly two instanced draws and one shadowless hemisphere light at every density and on every arena; zero per-frame allocations; the wet-surface scan is bounded to 128 materials and runs at most every 2.5 s while the ground is wet.',
+    verifier: 'src/weather/weather-state.test.ts + src/weather/rain-presentation.test.ts + src/weather/wind-field.test.ts + src/weather/weather-settings.test.ts',
+  }),
+  feature({
     id: 'volumetric-light-shafts', title: 'Volumetric light shafts (screen-space raymarch)', availability: 'active', owner: 'src/rendering/screen-space-post.ts',
     sourceProbes: [
       { path: 'src/rendering/screen-space-post.ts', symbol: 'godrays(sources.sceneDepth, sources.camera, sources.volumetricLight)' },

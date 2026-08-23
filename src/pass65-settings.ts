@@ -14,6 +14,11 @@ import {
   SCREEN_SPACE_POST_DISABLED,
   type ScreenSpacePostRuntime,
 } from './rendering/screen-space-post-profile';
+import {
+  publishWeatherPresentation,
+  resolveWeatherPresentation,
+  type WeatherPresentationRuntime,
+} from './weather/weather-settings';
 
 export { AUDIO_BUS_IDS };
 export type { AudioBusId };
@@ -108,6 +113,13 @@ export type GraphicsRuntime = Readonly<{
   }>;
   /** 'arena-default' keeps the preset-matched filmic grade profile mapping. */
   gradeProfile: FilmicProfileChoice;
+  /**
+   * Pass 78 — the player's weather ceiling, rain density, wind strength and
+   * lightning switch, resolved. The weather MODEL is untouched by this: it
+   * stays a pure function of (arena, match seed, elapsed) that every peer
+   * agrees on, and this only decides how much of it the local screen draws.
+   */
+  weather: WeatherPresentationRuntime;
   reason: string | null;
 }>;
 
@@ -267,7 +279,29 @@ export function writePass65Settings(
   return false;
 }
 
+/**
+ * Resolves the runtime AND publishes the weather half of it.
+ *
+ * THE ONE SIDE EFFECT IN THIS FILE, AND WHY IT IS HERE. The weather systems are
+ * constructed at module scope in legacy-main, before any settings object
+ * exists, and the frame loop never hands them settings afterwards — it passes a
+ * camera, a weather sample and a wind sample and nothing else. Without a latch,
+ * every weather row in Options would be a switch wired to nothing, which is the
+ * exact defect this lane was opened to fix.
+ *
+ * It is safe to sit in a resolver because the published value is a pure
+ * function of `settings`: resolving twice with the same settings publishes the
+ * same frozen numbers, and order between callers cannot matter. Consumers take
+ * it as a DEFAULT ARGUMENT, so any caller that wants purity passes its own and
+ * never reads the latch (`resetWeatherPresentation` exists for suites that do
+ * exercise this path).
+ *
+ * This runs at boot and again on every Options apply — exactly the cadence a
+ * presentation clamp needs.
+ */
 export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatibility = false): GraphicsRuntime {
+  const weather = resolveWeatherPresentation(settings);
+  publishWeatherPresentation(weather);
   const qualityScale = (tier: GraphicsSettings['particleQuality']): number => tier === 'low' ? 0.5 : tier === 'high' ? 0.8 : 1;
   const lightingScale = (tier: GraphicsSettings['indirectLighting']): number => tier === 'off' ? 0 : tier === 'low' ? 0.62 : 1;
   const bloomStrength = settings.bloomQuality === 'off' ? 0 : settings.bloomQuality === 'subtle' ? 0.065 : 0.14;
@@ -315,6 +349,12 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
       smokeScale: 0.55,
       post: Object.freeze({ bloomStrength: 0, exposureScale: settings.exposure, toneMapping: settings.toneMapping, filmGrainScale: 0, vignetteStrength: 0, sharpness: 0 }),
       gradeProfile: 'arena-default',
+      // The compatibility route draws no rain at all (rainBypassReason ->
+      // 'compat-profile'), but the player's settings are still resolved and
+      // published: wind strength reaches particle drift and foliage on this
+      // route, and a control that silently stops existing on one renderer is
+      // worse than one that is honestly bounded.
+      weather,
       reason: 'Compatibility renderer is active.',
     });
   }
@@ -365,6 +405,7 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
       sharpness: settings.sharpness,
     }),
     gradeProfile: settings.filmicProfile,
+    weather,
     reason: null,
   });
 }

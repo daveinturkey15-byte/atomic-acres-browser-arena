@@ -2,19 +2,23 @@ import { describe, expect, it } from 'vitest';
 import { ARENA_BOUNDS, COVER_LAYOUT, HOUSE_LAYOUT, SPAWN_LAYOUT } from './arena-layout';
 import { ARENA_ROUTE_IDENTITIES, routeIdentityForPosition, routeIdentityTelemetry } from './world-identity';
 
-const FROZEN_PASS26_LAYOUT = {
-  bounds: { minX: -34, maxX: 34, minZ: -43, maxZ: 43 },
+// Pass 78 Nuke Town fidelity rebuild replaced the frozen Pass 26 layout on the
+// owner's direct instruction: the map now measures 62 x 60 m with the two
+// houses facing each other across a central street. This block is the new exact
+// pin -- the route-identity pass still may not move a single coordinate.
+const FROZEN_PASS78_LAYOUT = {
+  bounds: { minX: -31, maxX: 31, minZ: -30, maxZ: 30 },
   houses: [
-    { team: 0, x: -9, z: -28, facing: 1 },
-    { team: 1, x: 9, z: 28, facing: -1 },
+    { team: 0, x: 4, z: -17.4, facing: 1 },
+    { team: 1, x: -4, z: 17.4, facing: -1 },
   ],
   cover: [
-    [-13, -11, 3.5, 2], [13, 11, 3.5, 2], [-15, 4, 3, 3], [15, -4, 3, 3],
-    [-21, 17, 4, 2], [21, -17, 4, 2], [-24, -4, 3, 5], [24, 4, 3, 5],
+    [-12, -6.5, 3.6, 2], [12, 6.5, 3.6, 2], [-20, -2, 2.4, 3.6], [20, 2, 2.4, 3.6],
+    [-8, -22, 3, 2.2], [8, 22, 3, 2.2], [24, -13, 2.8, 4.4], [-24, 13, 2.8, 4.4],
   ],
   spawns: {
-    0: [[-20, -30], [-24, -30], [-27, -22], [-21, -18], [3, -40], [3, -34], [4, -27], [6, -20], [22, -39], [27, -33], [24, -26], [26, -24]],
-    1: [[6, 38], [24, 30], [27, 22], [21, 18], [-3, 40], [-3, 34], [-4, 27], [-6, 20], [-22, 39], [-25, 33], [-24, 26], [-28, 24]],
+    0: [[-2, -27], [3, -27], [8, -27], [13, -27], [-12, -26], [-17, -24], [-21, -20], [-24, -16], [18, -25], [25, -25], [28, -13], [27, -10]],
+    1: [[2, 27], [-3, 27], [-8, 27], [-13, 27], [12, 26], [17, 24], [21, 20], [24, 16], [-18, 25], [-25, 25], [-28, 13], [-27, 10]],
   },
 };
 
@@ -44,10 +48,10 @@ describe('Pass 27 world identity contract', () => {
     for (const route of ARENA_ROUTE_IDENTITIES) expect(route.cuePositions).toHaveLength(3);
   });
 
-  it('does not alter the frozen Pass 26 gameplay layout', () => {
-    expect(ARENA_BOUNDS).toEqual(FROZEN_PASS26_LAYOUT.bounds);
-    expect(HOUSE_LAYOUT).toEqual(FROZEN_PASS26_LAYOUT.houses);
-    expect(COVER_LAYOUT).toEqual(FROZEN_PASS26_LAYOUT.cover);
-    expect(SPAWN_LAYOUT).toEqual(FROZEN_PASS26_LAYOUT.spawns);
+  it('does not alter the frozen Pass 78 gameplay layout', () => {
+    expect(ARENA_BOUNDS).toEqual(FROZEN_PASS78_LAYOUT.bounds);
+    expect(HOUSE_LAYOUT).toEqual(FROZEN_PASS78_LAYOUT.houses);
+    expect(COVER_LAYOUT).toEqual(FROZEN_PASS78_LAYOUT.cover);
+    expect(SPAWN_LAYOUT).toEqual(FROZEN_PASS78_LAYOUT.spawns);
   });
 });

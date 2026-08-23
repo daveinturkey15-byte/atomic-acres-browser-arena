@@ -84,6 +84,33 @@ export function operatorYawToward(from: { x: number; z: number }, target: { x: n
   return Math.atan2(-(target.x - from.x), -(target.z - from.z));
 }
 
+/** Eye height a bot aims FROM, matching the standing eye used by its sight checks. */
+export const BOT_AIM_ORIGIN_HEIGHT_M = 1.42;
+
+/**
+ * Pass 77 / HF-375. Aim pitch toward a target, positive up, matching the camera
+ * and protocol pitch convention (`aimDirection` builds its ray with
+ * `Euler(pitch, yaw, 0, 'YXZ')`, whose Y component is `sin(pitch)`).
+ *
+ * Every bot `poseOperator` call passed a literal 0 for pitch, so a bot firing up
+ * a stairwell or down off a superstructure stood perfectly level. Bots aim in 3D
+ * already - `botHasLineOfSight` raycasts from eye height to a target's eyes -
+ * so the number existed; nothing had ever computed it for presentation.
+ */
+export function operatorPitchToward(
+  from: { x: number; y: number; z: number },
+  target: { x: number; y: number; z: number },
+  originHeightM = BOT_AIM_ORIGIN_HEIGHT_M,
+): number {
+  const dx = target.x - from.x;
+  const dz = target.z - from.z;
+  const dy = target.y - (from.y + originHeightM);
+  const horizontal = Math.hypot(dx, dz);
+  if (!Number.isFinite(dy) || !Number.isFinite(horizontal)) return 0;
+  if (horizontal < 1e-4) return dy > 0 ? Math.PI / 2 : dy < 0 ? -Math.PI / 2 : 0;
+  return Math.atan2(dy, horizontal);
+}
+
 export type SpawnCandidate = {
   index: number;
   nearestPlayerDistanceSq: number;

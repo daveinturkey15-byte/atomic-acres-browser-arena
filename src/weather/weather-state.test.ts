@@ -5,7 +5,7 @@
  * numbers, the sky never repeats inside a match, and the indoor arena can never
  * rain no matter what seed it is handed.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { ARENA_IDS, type ArenaId } from '../arena-identity';
 import {
   ARENA_WEATHER_PROFILES,
@@ -23,8 +23,31 @@ import {
   weatherAvailability,
   weatherPhaseSequence,
   weatherStateRow,
+  WEATHER_LIGHTNING,
+  assertLightningCombatSafety,
+  forcedWeatherSample,
+  lightningFlashEnvelope,
+  sampleWeatherLightning,
   type WeatherSample,
 } from './weather-state';
+import {
+  WEATHER_INTENSITY_CHOICES,
+  publishWeatherPresentation,
+  resetWeatherPresentation,
+  resolveWeatherPresentation,
+  type WeatherIntensityChoice,
+} from './weather-settings';
+
+/** The full authored experience, passed explicitly so no test reads the latch. */
+const UNCAPPED = resolveWeatherPresentation({});
+
+function capped(intensity: WeatherIntensityChoice) {
+  return resolveWeatherPresentation({ weatherIntensity: intensity });
+}
+
+afterEach(() => {
+  resetWeatherPresentation();
+});
 
 const SEEDS = [0, 1, 7, 4_242, 0x51ce_2f01, 987_654_321];
 
@@ -216,20 +239,33 @@ describe('weather transitions', () => {
   });
 
   it('blends smoothly - no derived value jumps between adjacent frames', () => {
+    // The sweep is 54,000 samples, so the assertion is made ONCE on the worst
+    // jump it found rather than 300,000 times inside the loop. That is the same
+    // claim - a bound on every adjacent pair is a bound on the maximum - at a
+    // hundredth of the cost, and it reports where the worst jump was.
+    let worstJump = 0;
+    let worstLabel = 'none';
+    const record = (jump: number, label: string): void => {
+      if (jump > worstJump) {
+        worstJump = jump;
+        worstLabel = label;
+      }
+    };
     for (const arenaId of ARENA_IDS) {
       let previous = sampleWeather(arenaId, 77, 0);
       for (let elapsed = 0.1; elapsed <= 900; elapsed += 0.1) {
         const current = sampleWeather(arenaId, 77, elapsed);
         // A visible pop in any of these reads as a rendering bug, not weather.
-        expect(Math.abs(current.intensity - previous.intensity), `${arenaId}@${elapsed}`).toBeLessThan(0.02);
-        expect(Math.abs(current.rainRate - previous.rainRate), `${arenaId}@${elapsed}`).toBeLessThan(0.02);
-        expect(Math.abs(current.skyDarkenAmount - previous.skyDarkenAmount), `${arenaId}@${elapsed}`).toBeLessThan(0.02);
-        expect(Math.abs(current.fogDensityMultiplier - previous.fogDensityMultiplier), `${arenaId}@${elapsed}`).toBeLessThan(0.02);
-        expect(Math.abs(current.windMultiplier - previous.windMultiplier), `${arenaId}@${elapsed}`).toBeLessThan(0.02);
-        expect(Math.abs(current.wetness - previous.wetness), `${arenaId}@${elapsed}`).toBeLessThan(0.02);
+        record(Math.abs(current.intensity - previous.intensity), `${arenaId}@${elapsed} intensity`);
+        record(Math.abs(current.rainRate - previous.rainRate), `${arenaId}@${elapsed} rainRate`);
+        record(Math.abs(current.skyDarkenAmount - previous.skyDarkenAmount), `${arenaId}@${elapsed} skyDarken`);
+        record(Math.abs(current.fogDensityMultiplier - previous.fogDensityMultiplier), `${arenaId}@${elapsed} fog`);
+        record(Math.abs(current.windMultiplier - previous.windMultiplier), `${arenaId}@${elapsed} wind`);
+        record(Math.abs(current.wetness - previous.wetness), `${arenaId}@${elapsed} wetness`);
         previous = current;
       }
     }
+    expect(worstJump, `worst frame-to-frame jump at ${worstLabel}`).toBeLessThan(0.02);
   });
 
   it('settles the blend after the authored transition length', () => {
@@ -391,5 +427,217 @@ describe('weather derived values', () => {
     expect(clear.wetness).toBe(0);
     expect(clear.transitionBlend).toBe(1);
     expect(clear.windMultiplier).toBe(WEATHER_STATE_TABLE.clear.windMultiplier);
+  });
+});
+
+describe('the player weather ceiling', () => {
+  it('never shows MORE weather than the match rolled, at any setting', () => {
+    // The whole safety property of a per-player weather control in one test: a
+    // clamp may only ever subtract. If any choice could raise a derived value
+    // above the uncapped sample, the setting would be inventing weather the
+    // other peers are not in.
+    for (const arenaId of ARENA_IDS) {
+      for (const seed of SEEDS) {
+        for (let time = 0; time <= 900; time += 17) {
+          const full = sampleWeather(arenaId, seed, time, UNCAPPED);
+          for (const choice of WEATHER_INTENSITY_CHOICES) {
+            const clamped = sampleWeather(arenaId, seed, time, capped(choice));
+            const label = arenaId + '/' + seed + '@' + time + '/' + choice;
+            expect(clamped.intensity, label).toBeLessThanOrEqual(full.intensity + 1e-9);
+            expect(clamped.rainRate, label).toBeLessThanOrEqual(full.rainRate + 1e-9);
+            expect(clamped.wetness, label).toBeLessThanOrEqual(full.wetness + 1e-9);
+            expect(clamped.skyDarkenAmount, label).toBeLessThanOrEqual(full.skyDarkenAmount + 1e-9);
+            expect(clamped.fogDensityMultiplier, label).toBeLessThanOrEqual(full.fogDensityMultiplier + 1e-9);
+            expect(clamped.severity, label).toBeLessThanOrEqual(full.severity);
+          }
+        }
+      }
+    }
+  });
+
+  it('keeps the SIMULATED state identical whatever the local settings say', () => {
+    // This is the field a shared-world consumer compares, and it is what makes
+    // the clamp a presentation choice rather than a fork in the match.
+    for (const arenaId of ARENA_IDS) {
+      for (let time = 0; time <= 600; time += 13) {
+        const reference = sampleWeather(arenaId, 4_242, time, UNCAPPED).simulatedState;
+        for (const choice of WEATHER_INTENSITY_CHOICES) {
+          expect(sampleWeather(arenaId, 4_242, time, capped(choice)).simulatedState, arenaId + '@' + time)
+            .toBe(reference);
+        }
+      }
+    }
+  });
+
+  it('never presents a state the arena did not author', () => {
+    for (const arenaId of ARENA_IDS) {
+      const available = weatherAvailability(arenaId);
+      for (const choice of WEATHER_INTENSITY_CHOICES) {
+        for (let time = 0; time <= 600; time += 7) {
+          const sample = sampleWeather(arenaId, 11, time, capped(choice));
+          expect(available, arenaId + '/' + choice).toContain(sample.state);
+          expect(available, arenaId + '/' + choice).toContain(sample.previousState);
+        }
+      }
+    }
+  });
+
+  it('OFF is genuinely off - no rain, no darkening, no flashes, ever', () => {
+    const off = capped('off');
+    for (const arenaId of ARENA_IDS) {
+      for (const seed of SEEDS) {
+        for (let time = 0; time <= 900; time += 11) {
+          const sample = sampleWeather(arenaId, seed, time, off);
+          const label = arenaId + '/' + seed + '@' + time;
+          expect(sample.rainRate, label).toBe(0);
+          expect(sample.raining, label).toBe(false);
+          expect(sample.wetness, label).toBe(0);
+          expect(sample.skyDarkenAmount, label).toBe(0);
+          expect(sample.lightning.flash, label).toBe(0);
+        }
+      }
+    }
+  });
+
+  it('scales wind exactly, and stills it completely at zero', () => {
+    const arenaId: ArenaId = 'high-seas';
+    for (let time = 0; time <= 400; time += 9) {
+      const base = sampleWeather(arenaId, 7, time, UNCAPPED).windMultiplier;
+      expect(sampleWeather(arenaId, 7, time, resolveWeatherPresentation({ windStrength: 1.6 })).windMultiplier)
+        .toBeCloseTo(base * 1.6, 9);
+      expect(sampleWeather(arenaId, 7, time, resolveWeatherPresentation({ windStrength: 0 })).windMultiplier).toBe(0);
+    }
+  });
+
+  it('applies the ceiling to the ?weather= override too', () => {
+    // Otherwise the one route built for LOOKING at weather would be showing a
+    // configuration no player can select.
+    expect(forcedWeatherSample('high-seas', 'storm', capped('light')).state).toBe('overcast');
+    expect(forcedWeatherSample('high-seas', 'storm', capped('off')).state).toBe('clear');
+    expect(forcedWeatherSample('high-seas', 'storm', UNCAPPED).state).toBe('storm');
+    // And the indoor arena is still a gameplay fact, not a preference.
+    expect(forcedWeatherSample('gun-range', 'storm', UNCAPPED).state).toBe('clear');
+  });
+
+  it('reads the published latch when a caller does not pass one', () => {
+    // The production path: legacy-main calls sampleWeather with three arguments
+    // and still gets the player's setting.
+    publishWeatherPresentation(capped('off'));
+    expect(sampleWeather('high-seas', 3, 300).rainRate).toBe(0);
+    publishWeatherPresentation(resolveWeatherPresentation({}));
+    expect(sampleWeather('high-seas', 3, 300)).toEqual(sampleWeather('high-seas', 3, 300, UNCAPPED));
+  });
+});
+
+describe('lightning', () => {
+  it('passes its own combat-safety assertion', () => {
+    expect(() => assertLightningCombatSafety()).not.toThrow();
+  });
+
+  it('keeps the flash envelope inside 0..1 and dark outside the flash', () => {
+    let peak = 0;
+    for (let age = -0.2; age <= 1; age += 0.001) {
+      const value = lightningFlashEnvelope(age);
+      expect(value, 'age ' + age.toFixed(3)).toBeGreaterThanOrEqual(0);
+      expect(value, 'age ' + age.toFixed(3)).toBeLessThanOrEqual(1);
+      if (age < 0 || age >= WEATHER_LIGHTNING.flashSeconds) expect(value, 'age ' + age.toFixed(3)).toBe(0);
+      peak = Math.max(peak, value);
+    }
+    // A ceiling the signal never approaches is a mistuned ceiling.
+    expect(peak).toBeGreaterThan(0.9);
+    // Two flashes, not one: the leader and the return stroke are separate peaks.
+    const leaderPeak = lightningFlashEnvelope(0.001);
+    const trough = lightningFlashEnvelope(0.05);
+    const strokePeak = lightningFlashEnvelope(0.057);
+    expect(trough).toBeLessThan(leaderPeak);
+    expect(strokePeak).toBeGreaterThan(trough);
+  });
+
+  it('gives two peers the same strikes with no traffic', () => {
+    for (let time = 0; time <= 600; time += 0.37) {
+      const host = sampleWeatherLightning('high-seas', 0x51ce_2f01, time, 1, true);
+      const guest = sampleWeatherLightning('high-seas', 0x51ce_2f01, time, 1, true);
+      expect(guest.flash, '@' + time).toBe(host.flash);
+      expect(guest.strikeIndex, '@' + time).toBe(host.strikeIndex);
+      expect(guest.distanceM, '@' + time).toBe(host.distanceM);
+    }
+  });
+
+  it('never exceeds the flash ceiling, at any rain rate or distance', () => {
+    for (const seed of SEEDS) {
+      for (let time = 0; time <= 300; time += 0.05) {
+        const strike = sampleWeatherLightning('farcrysis', seed, time, 1, true);
+        expect(strike.flash, seed + '@' + time).toBeLessThanOrEqual(WEATHER_LIGHTNING.maxFlash);
+        expect(strike.flash, seed + '@' + time).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it('only fires in the heavy half of the ladder', () => {
+    // Lightning in drizzle is the single fastest way to make weather read as a
+    // filter rather than as weather.
+    for (let time = 0; time <= 300; time += 0.11) {
+      for (const rate of [0, 0.2, 0.34, WEATHER_LIGHTNING.rainRateFloor]) {
+        expect(sampleWeatherLightning('high-seas', 9, time, rate, true).flash, 'rate ' + rate).toBe(0);
+      }
+    }
+    let lit = 0;
+    for (let time = 0; time <= 300; time += 0.05) {
+      if (sampleWeatherLightning('high-seas', 9, time, 1, true).flash > 0) lit += 1;
+    }
+    expect(lit).toBeGreaterThan(0);
+  });
+
+  it('is silent when the player turns it off', () => {
+    for (let time = 0; time <= 300; time += 0.05) {
+      expect(sampleWeatherLightning('high-seas', 9, time, 1, false).flash, '@' + time).toBe(0);
+    }
+  });
+
+  it('exposes thunder timing an audio consumer can act on', () => {
+    // The contract a consumer relies on: one id per strike, a delay that is the
+    // real speed-of-sound delay for the reported distance, and a countdown that
+    // crosses zero exactly once per strike.
+    let previousIndex = -1;
+    let crossings = 0;
+    let previousCountdown = Number.POSITIVE_INFINITY;
+    for (let time = 0; time <= 120; time += 1 / 60) {
+      const strike = sampleWeatherLightning('rustworks-1v1', 5, time, 1, true);
+      if (strike.strikeIndex < 0) continue;
+      expect(strike.strikeIndex, '@' + time).toBeGreaterThanOrEqual(previousIndex);
+      expect(strike.thunderDelaySeconds, '@' + time)
+        .toBeCloseTo(strike.distanceM / WEATHER_LIGHTNING.soundSpeedMps, 9);
+      expect(strike.distanceM, '@' + time).toBeGreaterThanOrEqual(WEATHER_LIGHTNING.minDistanceM);
+      expect(strike.distanceM, '@' + time).toBeLessThanOrEqual(WEATHER_LIGHTNING.maxDistanceM);
+      if (strike.strikeIndex !== previousIndex) {
+        previousIndex = strike.strikeIndex;
+        previousCountdown = strike.thunderInSeconds;
+        continue;
+      }
+      if (previousCountdown > 0 && strike.thunderInSeconds <= 0) crossings += 1;
+      previousCountdown = strike.thunderInSeconds;
+    }
+    expect(crossings).toBeGreaterThan(5);
+  });
+
+  it('spaces strikes out instead of strobing', () => {
+    const times: number[] = [];
+    let previousIndex = -1;
+    for (let time = 0; time <= 900; time += 0.01) {
+      const strike = sampleWeatherLightning('high-seas', 0x9e37, time, 1, true);
+      if (strike.strikeIndex !== previousIndex && strike.strikeIndex >= 0) {
+        previousIndex = strike.strikeIndex;
+        times.push(time - strike.sinceStrikeSeconds);
+      }
+    }
+    expect(times.length).toBeGreaterThan(80);
+    for (let index = 1; index < times.length; index += 1) {
+      // Consecutive strikes can never land closer than the slot arithmetic
+      // allows, so a flash cannot become a strobe.
+      const gap = times[index] - times[index - 1];
+      expect(gap, 'strike ' + index).toBeGreaterThan(
+        WEATHER_LIGHTNING.strikeIntervalSeconds * (1 - WEATHER_LIGHTNING.slotJitter) - 0.02,
+      );
+    }
   });
 });

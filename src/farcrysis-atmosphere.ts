@@ -10,10 +10,38 @@
  * Presentation only — no colliders, gameplay authority, or physics.
  * All original art; no Far Cry IP.
  * Mounted from farcrysis-art.ts at the end of applyFarcrysisArtwork.
+ *
+ * ---------------------------------------------------------------------------
+ * HF-371 pass. Three changes, each closing a real gap rather than restyling:
+ *
+ * 1. NOTHING HERE ROLLS `Math.random` ANY MORE. The dust was seeded in Pass 76
+ *    and this file's own comment called determinism "the arena idiom", but the
+ *    god-ray shafts and the fireflies were still rolling raw randoms — so two
+ *    peers standing in the same clearing in the same match were looking at
+ *    different light. Both now draw from `DeterministicRng`, the repository's
+ *    canonical seeded stream, forked per system so adding one cannot shift
+ *    another's scatter. The local mulberry32 copy is gone: it was the same
+ *    algorithm as `DeterministicRng`, written out a second time.
+ *
+ * 2. THE SHAFTS ARE PUBLISHED, NOT JUST DRAWN. `farcrysisLightShafts()` hands
+ *    the particle runtime the cones this file authored, so suspended dust
+ *    BRIGHTENS where the light actually is. "Dust in a shaft of light" is not a
+ *    separate effect from either system; it is the two of them agreeing on
+ *    where the shafts are, which they could not previously do because only this
+ *    file knew.
+ *
+ * 3. THE AIR HERE OBEYS THE SHARED WIND FIELD. `animateAtmosphere` takes an
+ *    optional wind sample and drifts the motes and fireflies with it. This is
+ *    the defect `weather/wind-field.ts` was written to end: dust hanging
+ *    perfectly still while the palms bend, or drifting one way while the grass
+ *    leans the other, reads as broken rather than as air. The parameter is
+ *    optional, so the existing call in farcrysis-art.ts keeps working unchanged.
  */
 
 import * as THREE from 'three';
+import { DeterministicRng } from './deterministic-rng';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
+import type { ParticleLightShaft } from './particles';
 
 // ---------------------------------------------------------------------------
 // Atmosphere constants
@@ -53,6 +81,32 @@ const _shaftBaseOpacities: number[] = [];
 const _shaftPhases: number[] = [];
 const _shaftSpeeds: number[] = [];
 const _shaftOrigins: THREE.Vector3[] = [];
+const _lightShafts: ParticleLightShaft[] = [];
+
+/**
+ * Wind-integrated drift applied to the mote and firefly clouds. Held as one
+ * displacement rather than baked into each point, so it stays a single add per
+ * particle per frame, and wrapped inside the arena so a steady breeze can never
+ * carry the whole field off the map.
+ */
+let _windDriftX = 0;
+let _windDriftZ = 0;
+let _lastAtmosTime = 0;
+
+/** Fraction of the shared wind the fine motes actually carry. */
+const ATMOS_DUST_WIND_PULL = 0.35;
+/** Fireflies fly; wind pushes them, it does not carry them. */
+const ATMOS_FIREFLY_WIND_PULL = 0.12;
+
+/**
+ * One seed for the whole arena's atmosphere, forked per system. Forking rather
+ * than sharing a single stream means adding a shaft cannot move a firefly.
+ */
+const FARCRYSIS_ATMOSPHERE_SEED = 0xfa2c;
+
+function atmosphereStream(label: string): DeterministicRng {
+  return new DeterministicRng(FARCRYSIS_ATMOSPHERE_SEED).fork(`farcrysis-atmosphere/${label}`);
+}
 
 // ---------------------------------------------------------------------------
 // 5. Sun disk in the sky dome — bright core + additive halo/glow facing the arena
@@ -135,28 +189,30 @@ function buildGodRayShafts(): THREE.Group {
   _shaftPhases.length = 0;
   _shaftSpeeds.length = 0;
   _shaftOrigins.length = 0;
+  _lightShafts.length = 0;
 
+  const rng = atmosphereStream('god-ray-shafts');
   const up = new THREE.Vector3(0, 1, 0);
   const sunDir = ATMOS_SUN_DISK_DIR.clone();
 
   for (let i = 0; i < ATMOS_SHAFT_COUNT; i++) {
     // Scatter shaft origins across the arena, clamped inside the bounds
-    const ox = (Math.random() - 0.5) * 36;
-    const oz = (Math.random() - 0.5) * 36;
+    const ox = (rng.next() - 0.5) * 36;
+    const oz = (rng.next() - 0.5) * 36;
     const origin = new THREE.Vector3(
       Math.max(FARCRYSIS_BOUNDS.minX + 2, Math.min(FARCRYSIS_BOUNDS.maxX - 2, ox)),
-      3 + Math.random() * 9,
+      3 + rng.next() * 9,
       Math.max(FARCRYSIS_BOUNDS.minZ + 2, Math.min(FARCRYSIS_BOUNDS.maxZ - 2, oz)),
     );
 
-    const length = 26 + Math.random() * 16;
-    const width = 1.6 + Math.random() * 1.6;
+    const length = 26 + rng.next() * 16;
+    const width = 1.6 + rng.next() * 1.6;
 
     // Slight per-shaft tilt off the pure sun axis so quads stay visible
     // from many camera angles (a pure axis-aligned quad is edge-on head-on).
     const axis = sunDir
       .clone()
-      .add(new THREE.Vector3((Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.1))
+      .add(new THREE.Vector3((rng.next() - 0.5) * 0.1, (rng.next() - 0.5) * 0.1, (rng.next() - 0.5) * 0.1))
       .normalize();
 
     // A plain additive quad has hard ends, which is what made these read as
@@ -184,7 +240,7 @@ function buildGodRayShafts(): THREE.Group {
         vertexColors: true,
         transparent: true,
         // Halved now that the duplicate cone system no longer stacks on top.
-        opacity: 0.02 + Math.random() * 0.015,
+        opacity: 0.02 + rng.next() * 0.015,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         depthTest: true,
@@ -195,7 +251,7 @@ function buildGodRayShafts(): THREE.Group {
     quad.name = `farcrysis-atmos-god-ray-shaft-${i}`;
     quad.position.copy(origin);
     quad.setRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(up, axis));
-    quad.rotateY(Math.random() * Math.PI * 2); // random roll around the sun axis
+    quad.rotateY(rng.next() * Math.PI * 2); // seeded roll around the sun axis
     quad.renderOrder = 997;
     quad.frustumCulled = false;
     quad.userData.farcrysisArt = true;
@@ -203,9 +259,18 @@ function buildGodRayShafts(): THREE.Group {
 
     _shaftMeshes.push(quad);
     _shaftBaseOpacities.push((quad.material as THREE.MeshBasicMaterial).opacity);
-    _shaftPhases.push(Math.random() * Math.PI * 2);
-    _shaftSpeeds.push(0.5 + Math.random() * 0.7);
+    _shaftPhases.push(rng.next() * Math.PI * 2);
+    _shaftSpeeds.push(0.5 + rng.next() * 0.7);
     _shaftOrigins.push(origin.clone());
+
+    // Publish the cone so suspended dust can brighten inside it. The radius is
+    // wider than the quad because the visible shaft is the LIT AIR around the
+    // card, not the card.
+    _lightShafts.push(Object.freeze({
+      x: origin.x, y: origin.y, z: origin.z,
+      axisX: axis.x, axisY: axis.y, axisZ: axis.z,
+      radiusM: width * 1.6,
+    }));
   }
 
   return group;
@@ -266,24 +331,21 @@ export function softDotTexture(): THREE.DataTexture {
 // now softened (see buildGodRayShafts).
 // ---------------------------------------------------------------------------
 
-/** Seeded PRNG (mulberry32 — the arena-wide idiom) for stable atmosphere. */
-function mulberry32(seed: number): () => number {
-  let s = seed | 0;
-  return () => {
-    s = (s + 0x6D2B79F5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
+/**
+ * NOTE FOR THE COMMIT THAT WIRES `src/particles`: this 60-point CPU-updated
+ * cloud is the same effect as the particle runtime's `motes` family, which
+ * carries an order of magnitude more of it in one instanced draw and brightens
+ * inside the shafts published above. Retire this builder IN THAT COMMIT, not
+ * before — deleting it while the runtime is still unwired would leave the
+ * arena with LESS air than it has today, which is the opposite of HF-371.
+ */
 function buildDustMotes(): THREE.Points {
   // Pass 76: 200 dust motes at size 0.12 / opacity 0.5 read as SNOWFALL over
   // a tropical beach. Fewer, smaller, dimmer — pollen drifting through the
   // sunbeams, only really visible inside a shaft. Also seeded (was
   // Math.random — presentation-only, but the arena idiom is deterministic).
   const count = 60;
-  const rng = mulberry32(0xd057);
+  const rng = atmosphereStream('dust-motes');
   const positions = new Float32Array(count * 3);
   const origins = new Float32Array(count * 3);
   const phases = new Float32Array(count);
@@ -301,9 +363,9 @@ function buildDustMotes(): THREE.Points {
   const midpoint = new THREE.Vector3(0, 5, 0);
 
   for (let i = 0; i < count; i++) {
-    const r = rng() * cylinderRadius;
-    const angle = rng() * Math.PI * 2;
-    const along = (rng() - 0.5) * cylinderHalfLen * 2;
+    const r = rng.next() * cylinderRadius;
+    const angle = rng.next() * Math.PI * 2;
+    const along = (rng.next() - 0.5) * cylinderHalfLen * 2;
 
     const px = midpoint.x + perp1.x * Math.cos(angle) * r + perp2.x * Math.sin(angle) * r + sunAxis.x * along;
     const py = midpoint.y + perp1.y * Math.cos(angle) * r + perp2.y * Math.sin(angle) * r + sunAxis.y * along;
@@ -321,9 +383,9 @@ function buildDustMotes(): THREE.Points {
     positions[i * 3 + 1] = cy;
     positions[i * 3 + 2] = cz;
 
-    phases[i] = rng() * Math.PI * 2;
-    radii[i] = 0.3 + rng() * 2.5;
-    heightOffsets[i] = (rng() - 0.5) * 2.0;
+    phases[i] = rng.next() * Math.PI * 2;
+    radii[i] = 0.3 + rng.next() * 2.5;
+    heightOffsets[i] = (rng.next() - 0.5) * 2.0;
   }
 
   const geom = new THREE.BufferGeometry();
@@ -360,6 +422,7 @@ function buildDustMotes(): THREE.Points {
 // ---------------------------------------------------------------------------
 
 function buildFireflies(): THREE.Points {
+  const rng = atmosphereStream('fireflies');
   const count = 50;
   const positions = new Float32Array(count * 3);
   const base = new Float32Array(count * 3);
@@ -369,8 +432,8 @@ function buildFireflies(): THREE.Points {
   const { minX, maxX, minZ, maxZ } = FARCRYSIS_BOUNDS;
 
   for (let i = 0; i < count; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = 8 + Math.random() * 10; // 8–18
+    const angle = rng.next() * Math.PI * 2;
+    const radius = 8 + rng.next() * 10; // 8–18
 
     let px = Math.cos(angle) * radius;
     let pz = Math.sin(angle) * radius;
@@ -378,7 +441,7 @@ function buildFireflies(): THREE.Points {
     px = Math.max(minX + 2, Math.min(maxX - 2, px));
     pz = Math.max(minZ + 2, Math.min(maxZ - 2, pz));
 
-    const py = 1.0 + Math.random() * 3.0;
+    const py = 1.0 + rng.next() * 3.0;
 
     positions[i * 3 + 0] = px;
     positions[i * 3 + 1] = py;
@@ -388,8 +451,8 @@ function buildFireflies(): THREE.Points {
     base[i * 3 + 1] = py;
     base[i * 3 + 2] = pz;
 
-    phases[i] = Math.random() * Math.PI * 2;
-    driftAngles[i] = Math.random() * Math.PI * 2;
+    phases[i] = rng.next() * Math.PI * 2;
+    driftAngles[i] = rng.next() * Math.PI * 2;
   }
 
   const geom = new THREE.BufferGeometry();
@@ -473,10 +536,49 @@ export function buildAtmosphere(scene: THREE.Scene): void {
 }
 
 /**
- * Per-frame animation driver for atmosphere effects.
- * @param time Current time in seconds (e.g. `performance.now() * 0.001`).
+ * The authored god-ray cones, in the shape the particle runtime consumes.
+ *
+ * Empty until `buildAtmosphere` has run, so the caller registers them after
+ * the arena is built:
+ *
+ *   particles.setLightShafts(farcrysisLightShafts());
+ *
+ * Bounded by ATMOS_SHAFT_COUNT (7) against the runtime's own cap of 6, so the
+ * mote-brightening loop's cost is known from both ends rather than inherited.
  */
-export function animateAtmosphere(time: number): void {
+export function farcrysisLightShafts(): readonly ParticleLightShaft[] {
+  return _lightShafts;
+}
+
+/**
+ * Per-frame animation driver for atmosphere effects.
+ *
+ * @param time Current time in seconds (e.g. `performance.now() * 0.001`).
+ * @param wind Optional sample from the shared wind field
+ *   (`sampleWind(...)` in `weather/wind-field.ts`). When supplied, the motes
+ *   and fireflies drift with the same air the palms and the rain already use.
+ *   Omitted, the arena behaves exactly as it did before HF-371 — which is what
+ *   keeps the existing single-argument call in farcrysis-art.ts valid.
+ */
+export function animateAtmosphere(time: number, wind: Readonly<{ x: number; z: number }> | null = null): void {
+  // Derive the step from the clock this function is already given rather than
+  // asking the caller for one: a second parameter that every call site has to
+  // compute correctly is a second way to wire this wrong.
+  const step = Math.min(0.1, Math.max(0, time - _lastAtmosTime));
+  _lastAtmosTime = time;
+  if (wind) {
+    _windDriftX += (Number.isFinite(wind.x) ? wind.x : 0) * ATMOS_DUST_WIND_PULL * step;
+    _windDriftZ += (Number.isFinite(wind.z) ? wind.z : 0) * ATMOS_DUST_WIND_PULL * step;
+    // Wrap inside the arena. Without this a steady monsoon breeze carries the
+    // entire dust field off the map inside a minute and the clearing goes dead.
+    const spanX = FARCRYSIS_BOUNDS.maxX - FARCRYSIS_BOUNDS.minX;
+    const spanZ = FARCRYSIS_BOUNDS.maxZ - FARCRYSIS_BOUNDS.minZ;
+    if (_windDriftX > spanX / 2) _windDriftX -= spanX;
+    else if (_windDriftX < -spanX / 2) _windDriftX += spanX;
+    if (_windDriftZ > spanZ / 2) _windDriftZ -= spanZ;
+    else if (_windDriftZ < -spanZ / 2) _windDriftZ += spanZ;
+  }
+
   // --- Dust motes: circular motion using stored origins + sin/cos ---
   if (_dustPoints && _dustOrigins && _dustPhases && _dustRadii && _dustHeightOffsets) {
     const posAttr = _dustPoints.geometry.attributes.position as THREE.BufferAttribute;
@@ -490,9 +592,9 @@ export function animateAtmosphere(time: number): void {
       const oy = _dustOrigins[i * 3 + 1];
       const oz = _dustOrigins[i * 3 + 2];
 
-      positions[i * 3 + 0] = ox + Math.sin(phase) * r;
+      positions[i * 3 + 0] = ox + Math.sin(phase) * r + _windDriftX;
       positions[i * 3 + 1] = oy + Math.cos(phase * 1.3) * r * 0.45 + Math.sin(phase * 0.65) * _dustHeightOffsets[i];
-      positions[i * 3 + 2] = oz + Math.cos(phase) * r;
+      positions[i * 3 + 2] = oz + Math.cos(phase) * r + _windDriftZ;
     }
 
     posAttr.needsUpdate = true;
@@ -508,9 +610,10 @@ export function animateAtmosphere(time: number): void {
       const phase = _fireflyPhases[i];
       const drift = _fireflyDriftAngles[i];
 
-      positions[i * 3 + 0] = _fireflyBase[i * 3 + 0] + Math.sin(time * 0.3 + drift) * 0.55;
+      const push = ATMOS_FIREFLY_WIND_PULL / ATMOS_DUST_WIND_PULL;
+      positions[i * 3 + 0] = _fireflyBase[i * 3 + 0] + Math.sin(time * 0.3 + drift) * 0.55 + _windDriftX * push;
       positions[i * 3 + 1] = _fireflyBase[i * 3 + 1] + Math.sin(time * 0.75 + phase) * 0.35;
-      positions[i * 3 + 2] = _fireflyBase[i * 3 + 2] + Math.cos(time * 0.33 + drift) * 0.55;
+      positions[i * 3 + 2] = _fireflyBase[i * 3 + 2] + Math.cos(time * 0.33 + drift) * 0.55 + _windDriftZ * push;
     }
 
     posAttr.needsUpdate = true;

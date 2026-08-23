@@ -21,7 +21,7 @@ import {
   type FirstPersonArmChain,
   type FirstPersonFingerBone,
 } from './operator-model';
-import { operatorSkinPalette } from './operator-skin-catalog';
+import { observeLocalOperatorSkinId, operatorSkinPalette } from './operator-skin-catalog';
 import { solveTwoBoneElbow, solveTwoBoneElbowInto, type TwoBoneElbowScratch } from './ik';
 import { reloadActionEvents, reloadPoseAt, viewmodelReloadStageAt, type ReloadPose, type WeaponActionEvent } from './weapon-actions';
 import {
@@ -428,11 +428,19 @@ export const FIRST_PERSON_ARM_UNIFORM_SCALE = 1.12;
 // the normal-shell girth in operator-model. Scale alone would have to go
 // implausibly high to fix girth because it lengthens the arm at the same rate;
 // the shell adds mass without reach, so this lift stays modest.
-export const FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE = 1.62;
+// Second HF-365 pass, 2026-08-23. Measured from the running build: the trigger
+// hand sits at NDC y -0.75..-0.89 (welded to `grip-socket-r`, which is correct)
+// and the support hand at NDC (0.16, -0.36) on `support-socket-l`, also
+// correct - but at the previous scale BOTH hands were smaller than the rifle's
+// own silhouette and so were completely hidden behind it. From the player's
+// seat the weapon appeared to be held by a bare tube, which is what "weirdly
+// held" describes. Scale is the only lever that grows the HANDS without moving
+// the welded palms off their sockets, so it takes the remaining lift.
+export const FIRST_PERSON_ARM_HIP_PRESENTATION_SCALE = 1.74;
 // Do not shrink the operator's arms while aiming. Apart from making the ADS
 // silhouette look implausibly skinny, the old shrink broke the lower-frame
 // sleeve continuation on short landscape viewports.
-export const FIRST_PERSON_ARM_ADS_PRESENTATION_SCALE = 1.7;
+export const FIRST_PERSON_ARM_ADS_PRESENTATION_SCALE = 1.79;
 export const FIRST_PERSON_ARM_RELOAD_SCALE_LIFT = 0.16;
 /**
  * Keeps every axis uniform while adding mass at the two poses where the arms
@@ -1000,15 +1008,29 @@ function prepareFirstPersonWeaponModel(
  * it also overwrote the accent glow the palette had just set. The luminance of
  * each authored fill is preserved; only its hue moves, and only part way.
  */
-const ARM_FILL_SKIN_BLEND = 0.55;
+const ARM_FILL_SKIN_BLEND = 0.86;
 const armFillScratch = new THREE.Color();
 const armFillTintScratch = new THREE.Color();
 
+/**
+ * HF-366 second pass. The previous version renormalised the palette tint to the
+ * luminance of a fixed dark grey before blending, which is a saturation killer:
+ * whatever colour went in, a near-grey came out, and the fill then washed the
+ * remaining tint back out of the sleeve. Combined with a base-colour map whose
+ * mean was 30/255, that is the whole mechanism by which four different skins
+ * produced one grey arm.
+ *
+ * The fill now keeps the palette's own hue and only borrows the authored grey's
+ * ROLE - a low, bounded ambient floor for dark arenas - by scaling it, never by
+ * averaging its colour in.
+ */
 function armFillEmissive(base: number, tint: number): THREE.Color {
   armFillScratch.setHex(base);
   const baseLuminance = armFillScratch.r * 0.2126 + armFillScratch.g * 0.7152 + armFillScratch.b * 0.0722;
   armFillTintScratch.setHex(tint);
   const tintLuminance = Math.max(1e-4, armFillTintScratch.r * 0.2126 + armFillTintScratch.g * 0.7152 + armFillTintScratch.b * 0.0722);
+  // Scale the tint to the authored fill's brightness, then keep almost all of
+  // the tint. The authored grey survives only as the brightness budget.
   armFillTintScratch.multiplyScalar(baseLuminance / tintLuminance);
   return armFillScratch.lerp(armFillTintScratch, ARM_FILL_SKIN_BLEND);
 }
@@ -1160,6 +1182,9 @@ export class WeaponPresentation {
   private armMotionPhase = 0;
   private armMotionMovingBlend = 0;
   private operatorSkinId = 'default';
+
+  /** Detaches the operator-skin subscription; see releaseOperatorSkin(). */
+  private releaseOperatorSkinSubscription: (() => void) | null = null;
   private meleeStart = 0;
   private meleePresentationFrames = 0;
   private debugMeleeProgress: number | null = null;
@@ -1319,6 +1344,16 @@ export class WeaponPresentation {
     private readonly catalogGpuPrewarmer?: WeaponViewmodelCatalogGpuPrewarmer,
   ) {
     this.browserRuntime = typeof document !== 'undefined';
+    // HF-366: the viewmodel now READS the player's operator-skin choice.
+    // setOperatorSkin() shipped fully tested with zero call sites, so the arms
+    // were pinned to 'default' for everyone regardless of which card they
+    // pressed - the reason "the arms should look diff too?" was still true
+    // after the previous attempt. Subscribing here fires once immediately, so
+    // the arms are BUILT with the stored choice rather than repainted after,
+    // and again on every later change.
+    this.releaseOperatorSkinSubscription = observeLocalOperatorSkinId((skinId) => {
+      this.setOperatorSkin(skinId);
+    });
     this.root.name = 'original-weapon-view';
     this.root.position.set(HIP_VIEWMODEL_POSITION.x, HIP_VIEWMODEL_POSITION.y, HIP_VIEWMODEL_POSITION.z);
     this.root.scale.setScalar(HIP_VIEWMODEL_SCALE);
@@ -1828,6 +1863,12 @@ export class WeaponPresentation {
 
   get operatorSkin(): string {
     return this.operatorSkinId;
+  }
+
+  /** Detaches the skin-selection listener. Idempotent. */
+  releaseOperatorSkin(): void {
+    this.releaseOperatorSkinSubscription?.();
+    this.releaseOperatorSkinSubscription = null;
   }
 
   async load(

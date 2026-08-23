@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import type { Box2, Point3 } from './collision';
-import { isBlocked, pointInsideBounds } from './collision';
+import { isBlocked, pointInsideBounds, segmentIntersectsBox } from './collision';
 import {
   HIGH_SEAS_BOUNDS,
   HIGH_SEAS_ENGINE_ACCESS,
@@ -220,6 +220,53 @@ describe('High Seas clean-room arena geometry', () => {
     for (let index = 0; index < map.spawns[0].length; index += 1) {
       expect(map.spawns[1][index].x).toBeCloseTo(-map.spawns[0][index].x);
       expect(map.spawns[1][index].z).toBeCloseTo(-map.spawns[0][index].z);
+    }
+
+    // Rotational symmetry of the POINTS is not the same as symmetry of what is
+    // AROUND them. The hull tapers at the bow and does not at the stern, so a
+    // mirrored pair of coordinates can still hand one team a pointed funnel and
+    // the other an open transom. Measure it: count how many of eight compass
+    // bearings from each spawn land on walkable deck, and compare a spawn with
+    // its 180-degree twin.
+    //
+    // At z = +/-42.2 the pair scored 5 open bearings at the stern against 4
+    // (at 1.5 m) and 5 against 3 (at 2.5 m) at the bow, because the bow twins
+    // stood on the 8 m tapered tip with 0.94 m to the rail. They now sit at
+    // z = +/-40.2 and score an exact 6/6 at both ends.
+    const openBearings = (spawn: THREE.Vector3, reach: number): number => {
+      let open = 0;
+      for (let step = 0; step < 8; step += 1) {
+        const theta = step * Math.PI / 4;
+        const probe = new THREE.Vector3(spawn.x + Math.cos(theta) * reach, spawn.y, spawn.z + Math.sin(theta) * reach);
+        if (!isBlocked(probe, map.colliders, STANCE_SHAPES.stand.radius)
+          && pointHasPlatformSupport(probe, support.platforms)) open += 1;
+      }
+      return open;
+    };
+    for (let index = 0; index < map.spawns[0].length; index += 1) {
+      const stern = map.spawns[0][index];
+      const bow = map.spawns[1][index];
+      for (const reach of [1.5, 2.5]) {
+        const delta = Math.abs(openBearings(stern, reach) - openBearings(bow, reach));
+        // 2 is the measured residue on the OUTBOARD pair at (+/-9, +/-40),
+        // where the bow-shoulder rail closes a bearing that the flat stern
+        // transom leaves open. Equalising it means re-siting all six spawns
+        // (that pair is exactly 6 m from its neighbour, so it cannot move
+        // alone), which is a bigger change to spawn distance and flow than
+        // this belongs in - it is reported rather than silently done. This
+        // bound stops it getting worse.
+        expect(delta, `spawn pair ${index} at reach ${reach} m: bow/stern openness must not diverge`).toBeLessThanOrEqual(2);
+      }
+    }
+    // The pair that WAS the worst offender is now exactly fair, and that is
+    // pinned so a later deck edit cannot quietly undo it.
+    for (const index of [2, 3]) {
+      for (const reach of [1.5, 2.5]) {
+        expect(
+          openBearings(map.spawns[0][index], reach),
+          `inboard spawn pair ${index} must be exactly symmetric at reach ${reach} m`,
+        ).toBe(openBearings(map.spawns[1][index], reach));
+      }
     }
   });
 
@@ -671,6 +718,77 @@ describe('High Seas clean-room arena geometry', () => {
     }
   }, 30_000);
 
+  it('breaks the bow-to-stern below-deck sightline without narrowing the route', () => {
+    // Pass 77 layout audit. The service deck used to be a dead-straight 40 m
+    // tube: a player at the bow ramp foot had an unbroken line to the stern
+    // ramp foot, down the map's FASTEST lane (the engine route is 50.7 m
+    // against ~68 m for each surface lane). The exhaust trunk breaks it.
+    const map = buildHighSeas(new THREE.Scene());
+    const authority = map.root.userData.highSeasAuthorityAudit as readonly AuthorityAuditEntry[];
+    const trunk = authority.find((entry) => entry.name === 'high-seas-engine-exhaust-trunk');
+    expect(trunk, 'the centreline exhaust trunk').toBeDefined();
+    expect(trunk!.solid && trunk!.shots, 'the trunk must block movement AND shots').toBe(true);
+
+    // The corridor half-width is 0.72 m, so a 0.42 m capsule confines a player
+    // there to |x| <= 0.30. The trunk covers |x| <= 0.45, which is wider - so
+    // EVERY corridor-to-corridor line is blocked as a matter of geometry, not
+    // of one lucky sample. Check the extremes and the centre anyway.
+    const reach = 0.72 - STANCE_SHAPES.stand.radius;
+    expect(Math.max(Math.abs(trunk!.bounds.minX), Math.abs(trunk!.bounds.maxX))).toBeGreaterThan(reach);
+    const eyeY = HIGH_SEAS_LEVELS.engine + 1.7;
+    for (const fromX of [-reach, 0, reach]) {
+      for (const toX of [-reach, 0, reach]) {
+        const start = { x: fromX, y: eyeY, z: -18.5 };
+        const end = { x: toX, y: eyeY, z: 18.5 };
+        const blocked = map.physicsColliders.some((bounds) => segmentIntersectsBox(start, end, bounds));
+        expect(blocked, `bow x=${fromX} to stern x=${toX} must not be a clear shot`).toBe(true);
+      }
+    }
+    // ...and it is the trunk doing it, not something incidental.
+    expect(segmentIntersectsBox({ x: 0, y: eyeY, z: -18.5 }, { x: 0, y: eyeY, z: 18.5 }, trunk!.bounds)).toBe(true);
+
+    // Blocking the lane must not choke it. The starboard bypass has to stay at
+    // least as wide as the corridor players already walk, or the trunk turns a
+    // through-route into a trap.
+    const roomWall = authority.find((entry) => entry.name === 'high-seas-engine-room-wall-starboard');
+    expect(roomWall).toBeDefined();
+    const bypass = roomWall!.bounds.minX - trunk!.bounds.maxX;
+    expect(bypass, 'starboard bypass around the trunk').toBeGreaterThanOrEqual(1.44);
+  });
+
+  it('closes the hatch shafts between the service deck and the deck underside', () => {
+    // The end bulkheads only span |x| 1.25..1.62 - the ramp mouth is open, as
+    // it must be - and past that plane the ramp shaft had no side walls at all
+    // below the deck, so a player could walk up the ramp, step off it sideways
+    // and drop into the hull void.
+    //
+    // The Rapier escape probe below used to report this sealed. It was not:
+    // parking one extra collider 30 m BELOW the map, touching nothing, flipped
+    // that probe to a failure with an identical end position - its pass came
+    // from collider ordering, not geometry. So the seal is asserted here
+    // structurally first, and the walk is kept as a second opinion.
+    const map = buildHighSeas(new THREE.Scene());
+    const solidAt = (point: Readonly<{ x: number; y: number; z: number }>): boolean =>
+      map.physicsColliders.some((bounds) => point.x > bounds.minX && point.x < bounds.maxX
+        && point.y > (bounds.minY ?? Number.NEGATIVE_INFINITY) && point.y < (bounds.maxY ?? Number.POSITIVE_INFINITY)
+        && point.z > bounds.minZ && point.z < bounds.maxZ);
+
+    for (const direction of [-1, 1]) {
+      for (const side of [-1, 1]) {
+        // Sample the whole shaft run, from the end bulkhead to the ramp top,
+        // at three heights spanning the walkable band.
+        for (const z of [20.6, 21.6, 22.6, 23.6, 24.3]) {
+          for (const y of [0.4, 1.4, 2.6]) {
+            expect(
+              solidAt({ x: side * 1.44, y, z: direction * z }),
+              `hatch shaft wall missing at side ${side} z=${direction * z} y=${y}`,
+            ).toBe(true);
+          }
+        }
+      }
+    }
+  });
+
   it('authors a dry enclosed bilge under the whole below-deck footprint instead of open ocean', () => {
     const map = buildHighSeas(new THREE.Scene());
     map.root.updateMatrixWorld(true);
@@ -793,14 +911,20 @@ describe('High Seas clean-room arena geometry', () => {
     const ceilingMaterial = ceiling.material as THREE.MeshStandardMaterial;
     expect(ceilingMaterial.userData.textureFamily).toBe('engine-bulkhead');
 
-    // Emissive practicals: the light strips carry a genuinely emissive
-    // material because the arena adds no THREE lights below deck. Since HF-373
-    // that material is the strips' OWN fixture material, not the shared accent.
+    // The strips are the visible LENS. They keep their own fixture material
+    // rather than sharing the accent that also skins the deck-level hatch
+    // guards - that separation is the durable part of HF-373 and is asserted
+    // below. Their emissive intensity is deliberately NOT floored at the old
+    // 3.4 any more: that number existed because the strips were the only light
+    // source in the volume, and with the definition's practical rig doing the
+    // modelling, holding it there measured as blown-out bars (room ceiling
+    // 178/255 mean, 2.6% of it below 12) against the surfaces they sit above.
+    // What must stay true is that they read as lit fixtures at all.
     const strips = map.root.getObjectByName('high-seas-engine-light-strips') as THREE.Mesh;
     expect(strips).toBeInstanceOf(THREE.Mesh);
     const stripMaterial = strips.material as THREE.MeshStandardMaterial;
     expect(stripMaterial.name).toBe('high-seas-engine-practical');
-    expect(stripMaterial.emissiveIntensity).toBeGreaterThanOrEqual(3);
+    expect(stripMaterial.emissiveIntensity).toBeGreaterThan(1);
     expect(stripMaterial.emissive.getHex()).toBeGreaterThan(0);
 
     // The engine access ramps carry stair treads like every other stair.
@@ -834,7 +958,7 @@ describe('High Seas clean-room arena geometry', () => {
     // way to brighten the strips through it was to make deck furniture glow.
     const practical = materialsByName.get('high-seas-engine-practical') as THREE.MeshStandardMaterial;
     expect(practical).toBeDefined();
-    expect(practical.emissiveIntensity).toBeGreaterThanOrEqual(3);
+    expect(practical.emissiveIntensity).toBeGreaterThan(1);
     expect(practical.emissiveMap, 'the strip glows through its diffuser pattern').toBeInstanceOf(THREE.DataTexture);
     const accent = materialsByName.get('high-seas-engine-amber') as THREE.MeshStandardMaterial;
     expect(accent).toBeDefined();
@@ -914,22 +1038,42 @@ describe('High Seas clean-room arena geometry', () => {
 
     const lighting = map.root.userData.highSeasBelowDeckLighting as Readonly<{
       policy: string;
+      arenaRootAddsThreeLights: boolean;
+      metalness: Readonly<Record<string, number>>;
       deckPlaneY: number;
       practical: Readonly<{ material: string; emissiveIntensity: number; fixtures: readonly string[] }>;
       fill: readonly Readonly<{ material: string; emissiveIntensity: number; texturedEmissive: boolean }>[];
       sharedAccent: Readonly<{ material: string; emissiveIntensity: number }>;
     }>;
-    expect(lighting.policy).toBe('emissive-only-arena-adds-no-three-lights');
+    expect(lighting.policy).toBe('definition-shadowed-local-practicals-plus-residual-emissive-fill');
+    expect(lighting.arenaRootAddsThreeLights).toBe(false);
     expect(lighting.deckPlaneY).toBe(deckPlaneY);
     expect(lighting.practical.material).toBe('high-seas-engine-practical');
     expect(lighting.practical.fixtures).toEqual(['high-seas-engine-light-strips', 'high-seas-engine-floor-guide-strips']);
     expect(lighting.fill.every((entry) => entry.emissiveIntensity > 0 && entry.texturedEmissive)).toBe(true);
     expect(lighting.sharedAccent.emissiveIntensity).toBe(0.65);
 
-    // Policy: the fix stays emissive. The arena root still adds no local lights.
+    // The service deck HAS real lights now, but they are not in here: they are
+    // authored on the arena visual definition and owned, shadowed and disposed
+    // by ArenaContrastLighting (see rendering/arenas/high-seas.test.ts for the
+    // containment proof). The arena root stays a pure geometry root, so a build
+    // of the map outside the renderer carries no orphan lights and nothing here
+    // can leak past the root disposer.
     const lights: THREE.Object3D[] = [];
     map.root.traverse((node) => { if ((node as THREE.Light).isLight) lights.push(node); });
     expect(lights).toEqual([]);
+
+    // Surfaces have to be able to answer a light. The families were authored
+    // at metalness 0.58-0.74 over a 2-5% albedo, which is why the deck plate
+    // still measured 20/255 mean and 94% crushed with a full rig injected -
+    // a metal surface has almost no diffuse response. Painted marine steel is
+    // a dielectric; the walkable plate and the bulkheads belong near zero.
+    for (const name of ['high-seas-engine-grating', 'high-seas-engine-bulkhead'] as const) {
+      const entry = materialsByName.get(name) as THREE.MeshStandardMaterial;
+      expect(entry.metalness, `${name} must stay diffuse enough to be lit`).toBeLessThanOrEqual(0.25);
+    }
+    expect((materialsByName.get('high-seas-engine-machinery') as THREE.MeshStandardMaterial).metalness)
+      .toBeLessThanOrEqual(0.4);
   });
 
   it('gives every texture family a physically sensible tile size', () => {

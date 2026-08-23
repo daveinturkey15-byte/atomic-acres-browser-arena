@@ -88,10 +88,46 @@ function mulberry32(seed: number): () => number {
 // Noise generators (value noise + fractal)
 // ---------------------------------------------------------------------------
 
-function valueNoise(x: number, y: number, seed: number): number {
+function rawValueNoise(x: number, y: number, seed: number): number {
   const s = x * 374761393 + y * 668265263 + seed * 15485863;
   const n = Math.sin(s) * 10000;
   return n - Math.floor(n);
+}
+
+/**
+ * HF-375 (farcrysis boot cost): lattice memo for `valueNoise`.
+ *
+ * `rawValueNoise` is `Math.sin` of an argument around 1e11. V8 cannot use the
+ * fast path for magnitudes that large — it runs full Payne–Hanek argument
+ * reduction, roughly two orders of magnitude slower than a normal `sin`. The
+ * fourteen 512x512 fallback maps below reach it four times per octave per
+ * pixel, order 10^8 calls, and a CPU profile of `buildFarcrysis` attributed
+ * 19.5 s of self time to this ONE expression — by far the largest single cost
+ * in the arena's boot, larger than every GPU concern combined.
+ *
+ * `smoothNoise` is the only caller and always passes integer lattice corners,
+ * and neighbouring pixels share them: a 512x512 map at scale 24 with 4 octaves
+ * touches ~50k distinct lattice points across ~4.2M calls. Memoising by
+ * (seed, ix, iy) therefore removes ~98% of the `sin` calls while returning the
+ * identical double for the identical arguments — the generated fallback
+ * textures are unchanged to the byte, so this is pure cost removal and cannot
+ * move the arena's look.
+ */
+const LATTICE = new Map<number, number>();
+
+function valueNoise(x: number, y: number, seed: number): number {
+  // Pack (seed, ix, iy) into one safe-integer key. Arguments outside the packed
+  // range fall through to the same arithmetic, so correctness never depends on
+  // the cache being applicable.
+  if (x < -512 || x > 1535 || y < -512 || y > 1535 || seed < 0 || seed > 0x1fffff) {
+    return rawValueNoise(x, y, seed);
+  }
+  const key = seed * 4194304 + (x + 512) * 2048 + (y + 512);
+  const cached = LATTICE.get(key);
+  if (cached !== undefined) return cached;
+  const value = rawValueNoise(x, y, seed);
+  LATTICE.set(key, value);
+  return value;
 }
 
 function smoothNoise(x: number, y: number, seed: number): number {
@@ -598,6 +634,10 @@ function ensureTextures(): void {
   genFrondAlpha();
   genWater();
   genWoodCrate();
+
+  // The lattice memo only has to survive this one generation pass; releasing it
+  // here keeps the saving in time without keeping the cost in memory.
+  LATTICE.clear();
 }
 
 // ---------------------------------------------------------------------------

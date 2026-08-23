@@ -78,6 +78,11 @@ import {
   type FrozenFilmicGradeProfile,
   type GradeProfileId,
 } from './grade-profile';
+import {
+  composeArtDirectedProfile,
+  composeArtDirectedVignette,
+  type ArenaArtDirection,
+} from './art-direction';
 
 /**
  * Stages produced by the scene-pass assembler before this chain takes over.
@@ -623,7 +628,20 @@ export type FilmicGradeChainHandle = Readonly<{
   /** Number of bloom nodes discovered and retuned on the last rebuild. */
   tunedBloomNodes(): number;
   setProfile(profileId: GradeProfileId): void;
+  /**
+   * Lane L — selects the arena's art direction. The direction is COMPOSED
+   * over whichever grade profile is active (and stays composed across
+   * setProfile calls), so the same place identity ships on every render
+   * profile. Passing null restores the bare profile.
+   */
+  setArenaArtDirection(direction: ArenaArtDirection | null): void;
+  arenaArtDirection(): ArenaArtDirection | null;
   setGrainStrength8Bit(strength8Bit: number): void;
+  /**
+   * The PLAYER'S vignette setting. The applied uniform additionally carries
+   * the arena's authored vignette character and is capped at
+   * DISPLAY_VIGNETTE_MAXIMUM (see art-direction.ts).
+   */
   setDisplayVignetteStrength(strength: number): void;
   /** Selects the optional display-side post AA stage; 'off' removes it. */
   setPostAntiAliasing(mode: PostAntiAliasingMode): void;
@@ -646,6 +664,18 @@ export type FilmicGradeChainHandle = Readonly<{
 }>;
 
 const INSTALL_MARKER = '__hf362FilmicGradeChain';
+
+/**
+ * Returns the chain handle installed on a pipeline, or null. Lane L: the
+ * Pass 64 scene assembler uses this to hand the chain the current arena's
+ * art direction without owning (or accidentally creating) an installation —
+ * unit tests build scene systems on bare pipeline stubs where no chain
+ * exists, and that must stay a no-op.
+ */
+export function installedFilmicGradeChain(pipeline: unknown): FilmicGradeChainHandle | null {
+  if (!pipeline || typeof pipeline !== 'object') return null;
+  return (pipeline as { [INSTALL_MARKER]?: FilmicGradeChainHandle })[INSTALL_MARKER] ?? null;
+}
 
 /**
  * Installs the chain on a live `RenderPipeline`.
@@ -682,8 +712,20 @@ export function installFilmicGradeChain(
   const uniforms = createFilmicGradeUniforms();
   let upstreamStages = options.upstreamStages ?? LINEAR_SOURCE_STAGES;
   let grainStrength8Bit = options.grainStrength8Bit ?? DEFAULT_AUTHORED_GRAIN_8BIT;
-  let profile = resolveGradeProfile(options.profileId ?? DEFAULT_GRADE_PROFILE_ID);
-  applyGradeProfileToUniforms(uniforms, profile, grainStrength8Bit);
+  let baseProfile = resolveGradeProfile(options.profileId ?? DEFAULT_GRADE_PROFILE_ID);
+  // Lane L — the arena's art direction, composed over the base profile. The
+  // composed result is what every uniform, bloom retune and grain seed reads,
+  // so the place identity survives profile switches unchanged.
+  let artDirection: ArenaArtDirection | null = null;
+  let profile = baseProfile;
+  // The raw player setting; the applied uniform composes the arena character.
+  let vignetteSetting = 0;
+  const applyComposedProfile = (): void => {
+    profile = artDirection === null ? baseProfile : composeArtDirectedProfile(baseProfile, artDirection);
+    applyGradeProfileToUniforms(uniforms, profile, grainStrength8Bit);
+    uniforms.vignetteStrength.value = composeArtDirectedVignette(vignetteSetting, artDirection);
+  };
+  applyComposedProfile();
 
   let linearSource: Node<'vec4'> | null = (pipeline.outputNode ?? null) as Node<'vec4'> | null;
   let gradedNode: Node<'vec4'> | null = null;
@@ -795,16 +837,24 @@ export function installFilmicGradeChain(
     uniforms,
     tunedBloomNodes: () => bloomNodes.length,
     setProfile(profileId: GradeProfileId) {
-      profile = resolveGradeProfile(profileId);
-      applyGradeProfileToUniforms(uniforms, profile, grainStrength8Bit);
+      baseProfile = resolveGradeProfile(profileId);
+      applyComposedProfile();
       retuneBloom();
     },
+    setArenaArtDirection(direction: ArenaArtDirection | null) {
+      if (direction === artDirection) return;
+      artDirection = direction;
+      applyComposedProfile();
+      retuneBloom();
+    },
+    arenaArtDirection: () => artDirection,
     setGrainStrength8Bit(strength8Bit: number) {
       grainStrength8Bit = Number.isFinite(strength8Bit) ? Math.max(0, strength8Bit) : 0;
       uniforms.grainAmplitude.value = grainAmplitudeFor(profile, grainStrength8Bit);
     },
     setDisplayVignetteStrength(strength: number) {
-      uniforms.vignetteStrength.value = Number.isFinite(strength) ? Math.max(0, strength) : 0;
+      vignetteSetting = Number.isFinite(strength) ? Math.max(0, strength) : 0;
+      uniforms.vignetteStrength.value = composeArtDirectedVignette(vignetteSetting, artDirection);
     },
     setPostAntiAliasing(mode: PostAntiAliasingMode) {
       if (mode === postAntiAliasingMode) return;

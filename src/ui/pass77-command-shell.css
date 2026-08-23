@@ -55,39 +55,91 @@
  * PART 0 - tokens.
  * ------------------------------------------------------------------------ */
 
+/*
+ * THE PALETTE IS THE PASS. Read this before changing a value below.
+ *
+ * The Pass 77 v5 deck was rejected with "the menus really don't look that
+ * different" for the third time, and the audit reproduced why from the
+ * project's own captures: baseline and v5 are the same cold near-white deck,
+ * the same rail, the same card grid and the same type. The only deltas were a
+ * darkened header, corner brackets, a scanline, and diamond bullets becoming
+ * dashes. Those are adjustments to a look, not a different look.
+ *
+ * So this pass changes the two things that decide, at a glance and before any
+ * detail is read, whether two screens are the same product:
+ *
+ *   TEMPERATURE  cold blue-white (#f7faf9, #e8f0ef) -> warm bone (#f4efe4,
+ *                #ece4d4). Every surface on the deck changes hue at once. This
+ *                single move is what makes the before/after pair obviously
+ *                different from across a room, which is the bar the owner set.
+ *   SIGNAL       teal (#0f8b93) -> burnt orange (#b4531c). Teal was the one
+ *                colour on the old deck; it was in the brand, the rail, the
+ *                selection and the HUD, so nothing it touched could stand out.
+ *
+ * AGENTS.md requires this deck to stay BRIGHT and legible - it forbids
+ * regressing to a near-black or dark-blue monolith - so the answer to "modern"
+ * here can never be "dark". It is warmth, ink weight, print texture and hard
+ * offset shadow instead. The ground below is measurably brighter than the
+ * AGENTS.md floor; pass77-visual-language.test.ts computes its luminance
+ * rather than pinning its hex, so this palette can keep moving without the
+ * brightness guarantee ever being quietly dropped.
+ *
+ * CONTRAST. --p77-accent is dark enough (relative luminance ~0.13 against the
+ * ~0.90 ground, about 5.4:1) to be legible as SMALL TEXT, which is what it is
+ * used for on labels and values. --p77-accent-lit is the brighter tone and is
+ * only ever used for bars, rules and edges - never for type.
+ */
 #menu.pass64-command-deck {
-  --p77-ink: #0d1f26;
-  --p77-ink-soft: #3d565d;
-  --p77-ink-quiet: #6a8188;
+  /* Warm near-black. Not a blue-black: the ink has to belong to the ground. */
+  --p77-ink: #1a1613;
+  --p77-ink-soft: #4a4038;
+  --p77-ink-quiet: #7d7266;
 
-  --p77-accent: var(--p74-accent, #0f8b93);
-  --p77-accent-lit: var(--p74-accent-bright, #12a7b1);
-  --p77-accent-wash: rgb(15 139 147 / 0.09);
-  --p77-accent-line: rgb(15 139 147 / 0.32);
+  --p77-accent: #b4531c;
+  --p77-accent-lit: #e8781f;
+  --p77-accent-wash: rgb(180 83 28 / 0.10);
+  --p77-accent-line: rgb(180 83 28 / 0.34);
 
-  --p77-paper: #f7faf9;
-  --p77-paper-lit: #ffffff;
-  --p77-hair: rgb(16 46 54 / 0.11);
-  --p77-hair-strong: rgb(16 46 54 / 0.20);
+  /* Retained as the SECONDARY, for data and confirmed-good states only. The
+     old deck used teal for everything, which is why it signalled nothing. */
+  --p77-data: #0f6f76;
+
+  --p77-paper: #f4efe4;
+  --p77-paper-lit: #fdfaf3;
+  --p77-hair: rgb(26 22 19 / 0.14);
+  --p77-hair-strong: rgb(26 22 19 / 0.26);
 
   /* One elevation ramp. Tighter and lower-contrast than the Pass 74 ramp:
      a big soft web shadow under every card is the single most dated cue on
      the old deck. */
-  --p77-lift: 0 1px 1px rgb(12 34 40 / 0.05), 0 2px 5px rgb(12 34 40 / 0.05);
-  --p77-lift-hover: 0 2px 4px rgb(12 34 40 / 0.07), 0 10px 22px rgb(12 34 40 / 0.10);
-  --p77-lift-sel: 0 2px 6px rgb(15 139 147 / 0.14), 0 14px 30px rgb(12 34 40 / 0.12);
+  --p77-lift: 0 1px 1px rgb(40 28 16 / 0.06), 0 2px 5px rgb(40 28 16 / 0.06);
+  --p77-lift-hover: 0 2px 4px rgb(40 28 16 / 0.09), 0 10px 22px rgb(40 28 16 / 0.12);
+  --p77-lift-sel: 0 2px 6px rgb(180 83 28 / 0.18), 0 14px 30px rgb(40 28 16 / 0.14);
+
+  /* The signature of the new deck: a HARD offset ink shadow, no blur. A soft
+     blurred drop shadow is the single most dated cue in the old build; a hard
+     offset is print, and it is instantly legible as a different design. Used
+     only on the primary action and the selected card, or it becomes noise. */
+  --p77-offset: 4px 4px 0 var(--p77-ink);
+  --p77-offset-tight: 3px 3px 0 var(--p77-ink);
 
   --p77-radius: 3px;
   --p77-bracket: 12px;
   --p77-ease: cubic-bezier(0.2, 0.72, 0.28, 1);
 
-  /* The dark instrument sheet, shared with the HUD grammar. */
-  --p77-dark-top: #16323b;
-  --p77-dark-bottom: #0b1a20;
-  --p77-dark-hair: rgb(120 214 222 / 0.16);
-  --p77-dark-hair-lit: rgb(140 232 240 / 0.30);
-  --p77-dark-ink: #eaf6f5;
-  --p77-dark-ink-soft: #9db6b8;
+  /* The printed screen, shared with the HUD so the two read as one product. */
+  --p77-halftone: radial-gradient(rgb(26 22 19 / 0.07) 0.6px, transparent 0.75px);
+  --p77-halftone-size: 3px 3px;
+
+  /* The dark instrument sheet, shared with the HUD grammar. Warm graphite now,
+     matching pass77-instrument-hud.css PART 8, so the dark chrome and the HUD
+     are visibly the same material rather than two different dark blues. */
+  --p77-dark-top: #2b241c;
+  --p77-dark-bottom: #14100c;
+  --p77-dark-hair: rgb(255 196 128 / 0.18);
+  --p77-dark-hair-lit: rgb(255 208 150 / 0.34);
+  --p77-dark-ink: #f7efe2;
+  --p77-dark-ink-soft: #b3a494;
 }
 
 /* ---------------------------------------------------------------------------
@@ -109,16 +161,25 @@
      */
     linear-gradient(45deg, transparent 0 calc(50% - 2px), var(--p77-accent) calc(50% - 2px) calc(50% - 0.4px), transparent calc(50% - 0.4px)),
     linear-gradient(45deg, transparent 0 calc(50% + 0.4px), var(--p77-accent) calc(50% + 0.4px) calc(50% + 2px), transparent calc(50% + 2px)),
+    /* the printed screen - a halftone dot grid over the whole deck. This is
+       the texture that stops the ground reading as a blank browser page, and
+       it is the same screen the HUD panels carry, so deck and HUD are one
+       material rather than two. */
+    var(--p77-halftone),
     /* the light source: one soft bloom from the top-left */
-    radial-gradient(120% 90% at 6% -10%, rgb(255 255 255 / 0.95) 0%, rgb(255 255 255 / 0) 58%),
+    radial-gradient(120% 90% at 6% -10%, rgb(255 253 247 / 0.95) 0%, rgb(255 253 247 / 0) 58%),
     /* accent haze, so the deck has a colour temperature */
-    radial-gradient(70% 60% at 4% 0%, rgb(15 139 147 / 0.07) 0%, transparent 62%),
-    radial-gradient(80% 70% at 100% 104%, rgb(15 139 147 / 0.05) 0%, transparent 58%),
+    radial-gradient(70% 60% at 4% 0%, rgb(180 83 28 / 0.07) 0%, transparent 62%),
+    radial-gradient(80% 70% at 100% 104%, rgb(180 83 28 / 0.06) 0%, transparent 58%),
     /* the ground */
-    linear-gradient(168deg, #ffffff 0%, #eef4f3 62%, #e7eeed 100%);
-  background-repeat: no-repeat;
-  background-position: right top, left bottom, 0 0, 0 0, 0 0, 0 0;
-  background-size: var(--p77-cut) var(--p77-cut), var(--p77-cut) var(--p77-cut), auto, auto, auto, auto;
+    linear-gradient(168deg, #fdfaf3 0%, #f0e9db 62%, #e8dfcd 100%);
+  background-repeat: no-repeat, no-repeat, repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  background-position: right top, left bottom, 0 0, 0 0, 0 0, 0 0, 0 0;
+  background-size:
+    var(--p77-cut) var(--p77-cut),
+    var(--p77-cut) var(--p77-cut),
+    var(--p77-halftone-size),
+    auto, auto, auto, auto;
   /*
    * The angular frame. Two chamfered corners is the single most recognisable
    * signature of a modern game shell and the single cheapest thing this deck
@@ -152,7 +213,7 @@
   inset: -20%;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(38% 38% at 22% 12%, rgb(18 167 177 / 0.10), transparent 70%);
+  background: radial-gradient(38% 38% at 22% 12%, rgb(232 120 31 / 0.10), transparent 70%);
   opacity: 0.7;
   animation: p77-deck-bloom 18s ease-in-out infinite alternate;
 }
@@ -183,18 +244,18 @@
  * surface the player actually reads and operates stays bright.
  */
 #menu .command-header {
-  border-bottom: 1px solid rgb(140 232 240 / 0.18);
+  border-bottom: 1px solid rgb(255 208 150 / 0.18);
   background-color: var(--p77-dark-bottom);
   background-image:
     /* the accent underline: a rule that fades out, not a full-width stripe */
-    linear-gradient(90deg, var(--p77-accent-lit) 0%, var(--p77-accent) 24%, rgb(18 167 177 / 0) 62%),
+    linear-gradient(90deg, var(--p77-accent-lit) 0%, var(--p77-accent) 24%, rgb(232 120 31 / 0) 62%),
     /* the same machining texture as the rail, so the L reads as one part */
     repeating-linear-gradient(135deg, rgb(255 255 255 / 0.022) 0 2px, transparent 2px 6px),
-    linear-gradient(180deg, #1c383f 0%, #0d1f26 100%);
+    linear-gradient(180deg, var(--p77-dark-top) 0%, var(--p77-dark-bottom) 100%);
   background-repeat: no-repeat, repeat, no-repeat;
   background-position: left bottom, 0 0, 0 0;
   background-size: 100% 2px, auto, auto;
-  box-shadow: inset 0 1px 0 rgb(214 246 250 / 0.08), 0 12px 28px rgb(4 16 20 / 0.16);
+  box-shadow: inset 0 1px 0 rgb(255 236 212 / 0.08), 0 12px 28px rgb(20 12 6 / 0.16);
 }
 
 /* The wordmark gets a real type hierarchy: a quiet accent eyebrow, a tight
@@ -204,16 +265,60 @@
   letter-spacing: 0.24em;
 }
 
+/*
+ * HF-375. The wordmark recolour must NOT reach the narrow-viewport lockup.
+ * Below 560px the deck deliberately blanks the authored wordmark
+ * (`.command-brand strong { width: 58px; color: transparent }`) and paints a
+ * short "AA // OPS" mark through ::after, because the full string does not fit
+ * a phone header. Pass 77 set `color: #f2fbfa` at higher specificity than that
+ * rule, which turned the hidden text back on inside a 58px clip - a mobile
+ * header reading "BLACKSITE N" with 98px of the name cut off. The recolour is
+ * scoped to the widths that actually show the full wordmark.
+ */
+@media (min-width: 561px) {
+  #menu .command-brand strong {
+    color: #f2fbfa;
+  }
+}
+
 #menu .command-brand strong {
-  color: #f2fbfa;
   letter-spacing: -0.005em;
 }
 
+/*
+ * ...and the swap itself never actually worked. `.command-brand strong` kept
+ * the authored wordmark at 15px and merely painted it transparent inside a
+ * 58px clip, so the nowrap line was 156px of invisible "BLACKSITE NETWORK"
+ * followed by the "AA // OPS" mark - which the clip then cut off entirely. The
+ * phone header has been showing either a blank or a truncated name ever since,
+ * depending on which sheet last won the colour.
+ *
+ * Zeroing the font size is what makes the authored text take no space, so the
+ * mark lands where the name used to be. It also keeps the blanked text out of
+ * the legibility audit, which only measures rendered sizes above zero.
+ */
+@media (max-width: 560px) {
+  #menu .command-brand strong {
+    width: auto;
+    overflow: visible;
+    color: transparent;
+    font-size: 0;
+  }
+
+  #menu .command-brand strong::after {
+    content: 'AA // OPS';
+    color: #f2fbfa;
+    font: 900 15px/1 var(--ui-display, 'Barlow Condensed'), sans-serif;
+    letter-spacing: 0.07em;
+    white-space: nowrap;
+  }
+}
+
 #menu .command-brand span {
-  border: 1px solid rgb(140 232 240 / 0.34);
+  border: 1px solid rgb(255 208 150 / 0.34);
   border-left: 2px solid var(--p77-accent-lit);
   border-radius: 2px;
-  background: rgb(18 167 177 / 0.14);
+  background: rgb(232 120 31 / 0.14);
   color: #a4ecf0;
   font-variant-numeric: tabular-nums lining-nums;
   letter-spacing: 0.14em;
@@ -221,7 +326,7 @@
 
 #menu #menu-meta-actions > button {
   border-radius: 2px;
-  border-color: rgb(140 232 240 / 0.24);
+  border-color: rgb(255 208 150 / 0.24);
   background: rgb(255 255 255 / 0.05);
   color: #d9edeb;
   letter-spacing: 0.1em;
@@ -234,7 +339,7 @@
 
 #menu #menu-meta-actions > button:hover:not(:disabled) {
   border-color: var(--p77-accent-lit);
-  background: rgb(18 167 177 / 0.18);
+  background: rgb(232 120 31 / 0.18);
   color: #ffffff;
   box-shadow: none;
 }
@@ -244,22 +349,22 @@
  * ------------------------------------------------------------------------ */
 
 #menu .command-rail {
-  border-right: 1px solid rgb(16 46 54 / 0.28);
+  border-right: 1px solid rgb(26 22 19 / 0.28);
   background-color: var(--p77-dark-bottom);
   background-image:
     /* an accent rule down the inside edge */
-    linear-gradient(180deg, var(--p77-accent-lit) 0%, rgb(18 167 177 / 0) 62%),
+    linear-gradient(180deg, var(--p77-accent-lit) 0%, rgb(232 120 31 / 0) 62%),
     /* a fine diagonal machining texture - invisible individually, it is what
        stops the column reading as a flat fill */
     repeating-linear-gradient(135deg, rgb(255 255 255 / 0.022) 0 2px, transparent 2px 6px),
-    linear-gradient(180deg, #1a343d 0%, #0d1f26 74%, #0a171d 100%);
+    linear-gradient(180deg, var(--p77-dark-top) 0%, var(--p77-dark-bottom) 74%, #0b0806 100%);
   background-repeat: no-repeat, repeat, no-repeat;
   background-position: right top, 0 0, 0 0;
   background-size: 2px 100%, auto, auto;
 }
 
 #menu .tactical-rail {
-  border-bottom-color: rgb(140 232 240 / 0.14);
+  border-bottom-color: rgb(255 208 150 / 0.14);
   color: var(--p77-dark-ink-soft);
   letter-spacing: 0.14em;
 }
@@ -311,10 +416,10 @@
 }
 
 #menu .command-rail .menu-tabs button.active {
-  border-color: rgb(140 232 240 / 0.22);
+  border-color: rgb(255 208 150 / 0.22);
   border-left-color: transparent;
   background:
-    linear-gradient(90deg, rgb(18 167 177 / 0.30) 0%, rgb(18 167 177 / 0.05) 58%, transparent 100%);
+    linear-gradient(90deg, rgb(232 120 31 / 0.30) 0%, rgb(232 120 31 / 0.05) 58%, transparent 100%);
   color: #ffffff;
   box-shadow: none;
 }
@@ -346,7 +451,7 @@
 }
 
 #menu .command-rail footer {
-  border-top-color: rgb(140 232 240 / 0.14);
+  border-top-color: rgb(255 208 150 / 0.14);
 }
 
 #menu .command-rail footer span,
@@ -370,16 +475,16 @@
  * a soft vignette, so the white cards on top of it have somewhere to sit.
  */
 #menu .command-workspace {
-  background-color: #e8f0ef;
+  background-color: #ece4d4;
   background-image:
-    radial-gradient(76% 60% at 2% -4%, rgb(255 255 255 / 0.96) 0%, transparent 62%),
-    radial-gradient(120% 110% at 46% 40%, transparent 52%, rgb(10 40 46 / 0.075) 100%),
-    linear-gradient(rgb(27 74 77 / 0.038) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(27 74 77 / 0.038) 1px, transparent 1px),
-    linear-gradient(166deg, #f4f9f8 0%, #e4edec 62%, #dde8e7 100%);
+    radial-gradient(76% 60% at 2% -4%, rgb(255 253 247 / 0.96) 0%, transparent 62%),
+    radial-gradient(120% 110% at 46% 40%, transparent 52%, rgb(48 32 18 / 0.085) 100%),
+    linear-gradient(rgb(74 55 34 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(74 55 34 / 0.05) 1px, transparent 1px),
+    linear-gradient(166deg, #f7f2e8 0%, #ebe2d1 62%, #e3d9c5 100%);
   background-size: auto, auto, 32px 32px, 32px 32px, auto;
   scrollbar-width: thin;
-  scrollbar-color: rgb(15 139 147 / 0.35) transparent;
+  scrollbar-color: rgb(180 83 28 / 0.38) transparent;
 }
 
 #menu .command-workspace::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -389,11 +494,11 @@
   border: 3px solid transparent;
   border-radius: 6px;
   background-clip: content-box;
-  background-color: rgb(15 139 147 / 0.30);
+  background-color: rgb(180 83 28 / 0.34);
 }
 
 #menu .command-workspace::-webkit-scrollbar-thumb:hover {
-  background-color: rgb(15 139 147 / 0.55);
+  background-color: rgb(180 83 28 / 0.55);
 }
 
 /*
@@ -672,7 +777,7 @@
 #menu .lobby-actions button.primary:hover:not(:disabled) {
   background-color: #163038;
   background-image:
-    linear-gradient(90deg, var(--p77-accent-lit) 0%, var(--p77-accent) 62%, rgb(18 167 177 / 0.2) 100%),
+    linear-gradient(90deg, var(--p77-accent-lit) 0%, var(--p77-accent) 62%, rgb(232 120 31 / 0.2) 100%),
     linear-gradient(180deg, #1d3f4a 0%, #10242c 100%);
   transform: translateY(-1px);
 }
@@ -721,7 +826,7 @@
 #menu summary:focus-visible {
   outline: 2px solid var(--p77-accent-lit);
   outline-offset: 2px;
-  box-shadow: 0 0 0 5px rgb(18 167 177 / 0.18);
+  box-shadow: 0 0 0 5px rgb(232 120 31 / 0.18);
 }
 
 /* ---------------------------------------------------------------------------
@@ -905,7 +1010,7 @@
     var(--p77-bracket) 1px,
     1px var(--p77-bracket),
     auto;
-  box-shadow: inset 0 1px 0 rgb(214 246 250 / 0.10), 0 12px 30px rgb(4 16 20 / 0.28);
+  box-shadow: inset 0 1px 0 rgb(255 236 212 / 0.10), 0 12px 30px rgb(20 12 6 / 0.28);
 }
 
 /*
@@ -941,15 +1046,15 @@
 
 #menu #menu-panel-options {
   scrollbar-width: thin;
-  scrollbar-color: rgb(18 167 177 / 0.45) transparent;
+  scrollbar-color: rgb(232 120 31 / 0.45) transparent;
 }
 
 /* The killstreak preview rail and the arena showcase share the sheet too. */
 #menu #menu-showcase,
 #menu #killstreak-demo-rail {
   border-radius: var(--p77-radius);
-  border: 1px solid rgb(16 46 54 / 0.22);
-  box-shadow: 0 2px 6px rgb(12 34 40 / 0.08), 0 18px 40px rgb(12 34 40 / 0.14);
+  border: 1px solid rgb(26 22 19 / 0.22);
+  box-shadow: 0 2px 6px rgb(40 28 16 / 0.08), 0 18px 40px rgb(40 28 16 / 0.14);
 }
 
 /*
@@ -959,10 +1064,10 @@
  */
 #menu #menu-showcase::before {
   background:
-    linear-gradient(rgb(140 232 240 / 0.75), rgb(140 232 240 / 0.75)) left 10px top 10px / 18px 1.5px no-repeat,
-    linear-gradient(rgb(140 232 240 / 0.75), rgb(140 232 240 / 0.75)) left 10px top 10px / 1.5px 18px no-repeat,
-    linear-gradient(rgb(140 232 240 / 0.75), rgb(140 232 240 / 0.75)) right 10px top 10px / 18px 1.5px no-repeat,
-    linear-gradient(rgb(140 232 240 / 0.75), rgb(140 232 240 / 0.75)) right 10px top 10px / 1.5px 18px no-repeat,
+    linear-gradient(rgb(255 208 150 / 0.75), rgb(255 208 150 / 0.75)) left 10px top 10px / 18px 1.5px no-repeat,
+    linear-gradient(rgb(255 208 150 / 0.75), rgb(255 208 150 / 0.75)) left 10px top 10px / 1.5px 18px no-repeat,
+    linear-gradient(rgb(255 208 150 / 0.75), rgb(255 208 150 / 0.75)) right 10px top 10px / 18px 1.5px no-repeat,
+    linear-gradient(rgb(255 208 150 / 0.75), rgb(255 208 150 / 0.75)) right 10px top 10px / 1.5px 18px no-repeat,
     linear-gradient(0deg, rgb(5 16 19 / 0.55), transparent 34%);
 }
 
@@ -978,7 +1083,7 @@
   flex-wrap: wrap;
   gap: 4px 10px;
   border-radius: 2px;
-  border-color: rgb(140 232 240 / 0.4);
+  border-color: rgb(255 208 150 / 0.4);
 }
 
 #menu .showcase-telemetry b {
@@ -1087,5 +1192,403 @@ html[data-reduced-sensory='true'] #menu.pass64-command-deck::after {
 }
 
 html[data-reduced-sensory='true'] #menu .command-header {
-  background-image: linear-gradient(180deg, #16303a 0%, #0d1f26 100%);
+  background-image: linear-gradient(180deg, var(--p77-dark-top) 0%, var(--p77-dark-bottom) 100%);
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 12 - touch ergonomics. HF-375.
+ *
+ * A mobile audit at 390x844 dpr3 found 65 controls in the Options panel under
+ * the 44px touch minimum: every advanced-graphics select and range was 18px
+ * tall, every mute checkbox 13px, REBIND 28px. They were sized for a mouse,
+ * which is correct for a mouse - so nothing here is width-gated. It is gated on
+ * `pointer: coarse`, meaning the desktop deck (and the 1280/1920/3440 review
+ * viewports, which report a fine pointer) is byte-for-byte untouched, while any
+ * finger-driven browser gets targets it can actually hit.
+ *
+ * The rule for a control inside a label row is that the ROW is the hit target -
+ * tapping a label operates its control - so rows get the 44px and the control
+ * itself gets a comfortable, not enormous, box.
+ * ------------------------------------------------------------------------ */
+@media (pointer: coarse) {
+  /* Every button in the deck, not a hand-listed subset: the audit kept finding
+     one more (#graphics-save at 33px was the last), and a list is a thing that
+     goes stale the next time a control is added. min-height only ever grows a
+     target, so a blanket floor cannot shrink anything. */
+  #menu button,
+  #menu .small-button,
+  #advanced-graphics button {
+    min-height: 44px;
+  }
+
+  #menu select,
+  #advanced-graphics select {
+    min-height: 44px;
+  }
+
+  /* A 4px track inside a 44px box: the thumb stays visually the same weight,
+     the draggable area triples. The thumb offset is half the track/thumb
+     difference, restated because the thumb itself grows. */
+  #menu input[type='range'],
+  #advanced-graphics input[type='range'] {
+    height: 44px;
+  }
+
+  #menu input[type='range']::-webkit-slider-thumb {
+    width: 20px;
+    height: 20px;
+    margin-top: -8px;
+  }
+
+  #menu input[type='range']::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+  }
+
+  #menu input[type='checkbox'] {
+    width: 24px;
+    height: 24px;
+  }
+
+  /* style.css pins `.setting-check input { width: auto !important }`, which is
+     not a sheet this pass owns. Beating it needs the same weapon at higher
+     specificity; the height above lands without it. */
+  #menu .setting-check input[type='checkbox'] {
+    width: 24px !important;
+    height: 24px !important;
+  }
+
+  /* The row is the real target; give it the full 44px and centre the control
+     in it so the enlarged checkbox does not shift the label baseline. */
+  #menu .setting-check,
+  #menu .audio-setting-row,
+  #menu .privacy-setting-row .setting-check,
+  #menu .key-binding-row,
+  #advanced-graphics .advanced-graphics-control {
+    min-height: 44px;
+    align-items: center;
+  }
+
+  /* Tabs and cards are already large, but the meta buttons and the rail sit at
+     the top of the deck where a mis-tap costs a panel change. */
+  #menu .command-rail .menu-tabs button {
+    min-height: 48px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 13 - narrow-viewport settings layout. HF-375.
+ *
+ * `grid-template-columns: 1fr 1fr` means `minmax(auto, 1fr)`: the track can
+ * never shrink below the intrinsic minimum width of its content. The Options
+ * settings and audio grids were authored that way in style.css, so on a
+ * landscape phone (844x390) the audio rows ran ~90px past the right edge of a
+ * clipped panel and the MUTE checkbox could not be reached at all. Every
+ * narrower-viewport rule that tried to fix this lived inside an @layer, and
+ * style.css is unlayered - so none of them ever landed. These are written here,
+ * unlayered and last, which is the only place they can win.
+ * ------------------------------------------------------------------------ */
+
+/* An explicit zero minimum: identical rendering wherever the content fits, and
+   compression instead of overflow wherever it does not. */
+#menu-panel-options .settings-grid,
+#menu-panel-options .audio-settings-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#menu-panel-options .audio-setting-row {
+  grid-template-columns: minmax(0, 92px) minmax(0, 1fr) auto auto;
+}
+
+@media (max-width: 900px) {
+  #menu-panel-options .settings-grid,
+  #menu-panel-options .audio-settings-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #menu-panel-options .audio-setting-row {
+    grid-template-columns: minmax(0, 88px) minmax(0, 1fr) auto auto;
+  }
+}
+
+/* ===========================================================================
+ * PART 9 - THE SIGNATURE. What makes this read as a different game's UI.
+ *
+ * The palette change in PART 0 does the work at a distance. This part does the
+ * work up close: the four devices below are the ones a player would actually
+ * point at if asked what is different about this menu.
+ *
+ *   1. INKED LABEL CHIPS. Every eyebrow stops being pale letterspaced grey
+ *      text and becomes white knocked out of a solid ink block. This is the
+ *      single most recognisable move on the deck - it changes the rhythm of
+ *      every panel at once, because eyebrows are the thing every panel starts
+ *      with.
+ *   2. HARD OFFSET SHADOW. The primary action and the selected card cast a
+ *      solid, unblurred ink shadow. A blurred drop shadow is a web card; a
+ *      hard offset is print, and there is no mistaking one for the other.
+ *   3. MONOSPACED MICRO-TYPE. Labels and values become distinguishable by
+ *      TEXTURE rather than only by size, which is the same device the HUD uses
+ *      in pass77-instrument-hud.css PART 8, so deck and HUD read as one
+ *      designed system rather than two.
+ *   4. HEAVY RULES. Section rules go from a 1px 11%-alpha hairline to a solid
+ *      2px ink rule with an accent lead-in. Hairlines are dashboard chrome;
+ *      weighted rules are editorial.
+ *
+ * THE BOX MODEL IS NOT TOUCHED. This is the owner's explicit constraint -
+ * "keep the layout and functionalities" - and it is the reason every device
+ * here is painted with `box-shadow`, `background-image` or `color` rather than
+ * with padding, border-width or margin:
+ *
+ *   - the label chip is a `box-shadow` SPREAD, which paints outside the border
+ *     box and contributes nothing to layout, so a chipped label occupies
+ *     exactly the pixels the bare label occupied;
+ *   - the offset shadow is a `box-shadow`, same reason;
+ *   - the heavy rules are `background-image` layers on an existing box.
+ *
+ * Nothing below sets a font-size, so the mobile-legibility lane's 9px floor is
+ * untouched by construction.
+ * ======================================================================== */
+
+/*
+ * 1. INKED LABEL CHIPS.
+ *
+ * `box-shadow: 0 0 0 Npx <ink>` paints a solid block Npx outside the text's
+ * border box without occupying a single pixel of layout. `border-radius: 0`
+ * keeps it a hard rectangle - a rounded chip would put the 2014 radius back.
+ *
+ * The chip needs the label to be a box it can surround, so the eyebrows get
+ * `display: inline-block`. That is a display change, not a layout change:
+ * these are all already single-line inline elements sitting alone on their
+ * line, so the rendered geometry is identical.
+ */
+#menu .arena-brief .eyebrow,
+#menu .map-selector-heading span,
+#menu .manifest-heading small {
+  display: inline-block;
+  position: relative;
+  z-index: 1;
+  color: var(--p77-paper-lit);
+  background: var(--p77-ink);
+  box-shadow: 0 0 0 4px var(--p77-ink);
+  border-radius: 0;
+  letter-spacing: 0.22em;
+  font-family: var(--ui-mono);
+  font-weight: 700;
+}
+
+/*
+ * The old accent dash sat to the LEFT of these labels. Inside an ink chip it
+ * would be a dash on a black block, so it becomes the chip's own leading edge
+ * instead: a solid accent bar butted against the block.
+ */
+#menu .manifest-heading small::before,
+#menu .map-selector-heading span::before {
+  top: 0;
+  left: -4px;
+  width: 3px;
+  height: 100%;
+  transform: none;
+  background: var(--p77-accent-lit);
+}
+
+/*
+ * 2. HARD OFFSET SHADOW, on the two things that should look pressable and
+ * nothing else. Applied to the primary action and the selected map/kit card.
+ */
+#menu .menu-actions button.primary,
+#menu .lobby-actions button.primary,
+#menu .menu-actions #solo {
+  box-shadow: var(--p77-offset);
+  border-radius: 0;
+}
+
+/*
+ * The press moves the button INTO its own shadow, which is the whole point of
+ * a hard offset: the affordance is that the gap can be closed. `translate` is
+ * used rather than `transform` so it cannot fight any transform-based hover
+ * treatment inherited from the earlier sheets.
+ */
+#menu .menu-actions button.primary:active:not(:disabled),
+#menu .lobby-actions button.primary:active:not(:disabled),
+#menu .menu-actions #solo:active:not(:disabled) {
+  translate: 3px 3px;
+  box-shadow: 1px 1px 0 var(--p77-ink);
+}
+
+#menu .map-card.selected,
+#menu .kit-card.selected {
+  box-shadow:
+    inset 3px 0 0 var(--p77-accent),
+    inset 0 0 0 1px var(--p77-accent-line),
+    var(--p77-offset-tight);
+}
+
+/*
+ * 3. MONOSPACED MICRO-TYPE. The quiet labels across the deck, in one list.
+ * `--ui-mono` is declared with a full local() chain because this project loads
+ * no webfonts - every @font-face in src/style.css is local()-only - so an
+ * uninstalled face must fall back to another monospace, never to the display
+ * face.
+ */
+#menu.pass64-command-deck {
+  --ui-mono: 'Cascadia Mono', Consolas, 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+}
+
+#menu .setup-grid label,
+#menu .lobby-settings label,
+#menu .settings-grid label,
+#menu .loadout-manager-grid label,
+#menu .command-rail .menu-tabs button small,
+#menu .command-rail footer span,
+#menu .command-rail footer small,
+#menu .map-card .map-index,
+#menu .kit-card > span:not(.kit-modify-row),
+#menu .kit-card > b,
+#menu #menu-panel-options .settings-section > header span {
+  font-family: var(--ui-mono);
+  letter-spacing: 0.14em;
+}
+
+/*
+ * 4. HEAVY RULES. The map-selector and manifest headings get a solid ink rule
+ * with an accent lead-in, painted as background layers on the existing box.
+ * `padding-bottom` is deliberately NOT set: the rule is positioned from the
+ * bottom of the box that already exists.
+ */
+#menu .map-selector-heading,
+#menu .manifest-heading,
+#menu .kit-heading {
+  background-image:
+    linear-gradient(90deg, var(--p77-accent-lit) 0 34px, transparent 34px),
+    linear-gradient(90deg, var(--p77-ink) 0 100%);
+  background-repeat: no-repeat, no-repeat;
+  background-position: left bottom, left bottom;
+  background-size: 100% 3px, 100% 1px;
+}
+
+/*
+ * The deck's chamfer hairlines were drawn in the old accent. They are the
+ * frame of the whole shell, so they move to the new one - otherwise the single
+ * most prominent piece of chrome on screen still points at the old palette.
+ */
+#menu.pass64-command-deck {
+  --p77-cut: 26px;
+}
+
+/*
+ * THE BRAND LOCKUP. On the old deck this was the same weight and colour as
+ * everything else in the header, so the product had no mark. It becomes the
+ * one place the accent is used at full strength on a dark ground.
+ */
+#menu .command-brand strong {
+  color: var(--p77-dark-ink);
+  letter-spacing: -0.02em;
+}
+
+#menu .command-brand small {
+  color: var(--p77-accent-lit);
+  font-family: var(--ui-mono);
+  letter-spacing: 0.24em;
+}
+
+/*
+ * ACCESSIBILITY. The chips and the offset shadow are colour-and-material only;
+ * they carry no motion, so neither reduced-motion switch needs to touch them.
+ * The sensory switch drops the deck halftone, which is the only high-frequency
+ * texture on the light surface.
+ */
+html[data-reduced-sensory='true'] #menu.pass64-command-deck {
+  --p77-halftone: none;
+}
+
+/* ===========================================================================
+ * PART 10 - RE-POINTING THE INHERITED PALETTE.
+ *
+ * The first capture of this reskin showed the deck ground, the label chips and
+ * the rules had all changed - and the CARDS, the panels and half the accents
+ * had not. They were still cold white with a teal edge.
+ *
+ * The reason: `src/ui/pass74-visual-refresh.css` declares a `:root` token
+ * family (--p74-*) that most surfaces in the shell actually read, and that
+ * sheet is outside this lane's ownership. Restyling each consumer one by one
+ * would be dozens of overrides that drift the moment anyone adds a card.
+ *
+ * Re-pointing the tokens instead is one block, and it reaches every consumer
+ * in every sheet at once - including the ones this lane must not edit. It is
+ * legitimate cascade, not a hack: pass74-visual-refresh.css is unlayered and
+ * this sheet is unlayered and imported after it (bootstrap.ts), so an equal
+ * -specificity `:root` here wins on order. That ordering is already asserted
+ * by pass77-visual-language.test.ts.
+ *
+ * NOT TOUCHED: --pass66-micro / --pass66-copy, the type-size floors in that
+ * same block. The mobile-legibility lane owns those and they stay exactly as
+ * they landed.
+ * ======================================================================== */
+
+:root {
+  /* The signal. Burnt orange replaces teal across every sheet that reads it. */
+  --p74-accent: #b4531c;
+  --p74-accent-bright: #e8781f;
+  --p74-accent-soft: rgba(180, 83, 28, 0.12);
+  --p74-accent-line: rgba(180, 83, 28, 0.34);
+
+  /* The surfaces. Warm bone replaces cold white. */
+  --p74-card: #fdfaf3;
+  --p74-card-2: #ede5d5;
+  --p74-card-edge: rgba(26, 22, 19, 0.18);
+  --p74-ink: #1a1613;
+  --p74-ink-soft: #4a4038;
+
+  /* The elevation ramp, warmed to match. A cold grey shadow on a warm ground
+     is the tell that a palette was half-changed. */
+  --p74-lift-1: 0 1px 2px rgba(40, 28, 16, 0.07), 0 2px 6px rgba(40, 28, 16, 0.07);
+  --p74-lift-2: 0 2px 4px rgba(40, 28, 16, 0.09), 0 8px 20px rgba(40, 28, 16, 0.11);
+  --p74-lift-3: 0 4px 10px rgba(40, 28, 16, 0.11), 0 18px 42px rgba(40, 28, 16, 0.15);
+}
+
+/*
+ * GEOMETRY. The inherited card radius is 10px, and a 10px radius is the single
+ * most reliable "web dashboard" tell there is - it is why the old deck read as
+ * an admin panel. Every selectable card drops to the deck's 3px.
+ *
+ * Radius is not layout: it changes no box dimension and moves nothing.
+ */
+#menu .killstreak-slot-card,
+#menu .map-card,
+#menu .kit-card,
+#menu .operator-skin-card,
+#menu .operator-anim-card,
+#menu .setup-grid input,
+#menu .setup-grid select,
+#menu .lobby-settings select,
+#menu .join-row input,
+#menu .menu-actions button,
+#menu .lobby-actions button {
+  border-radius: var(--p77-radius);
+}
+
+/*
+ * REGRESSION FIX from the first capture of this pass. Putting the rail's
+ * sub-labels into the monospaced face pushed "SKIN + ANIMATION" onto two
+ * lines, which moved the rail items - a layout change, which this pass is not
+ * allowed to make. The sub-labels go back to the copy face; the rail keeps its
+ * new voice through colour and tracking instead of through the face.
+ *
+ * Monospace is retained everywhere it does NOT risk a wrap: those labels are
+ * short, fixed strings in fixed-width cells.
+ */
+#menu .command-rail .menu-tabs button small {
+  font-family: var(--ui-copy, Inter, sans-serif);
+  letter-spacing: 0.1em;
+}
+
+/*
+ * The arena title's second word is painted from --ui-cyan, which is the team
+ * colour token and therefore must not be retuned globally (see the note in
+ * tactical-ui.css). Here it is not a team, it is a title, so it takes the deck
+ * accent locally - which is also the only two-tone display type on the deck
+ * and worth making deliberate.
+ */
+#menu #arena-title span {
+  color: var(--p77-accent);
 }

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CLIENT_WORLD_REPAIR_ARMING_CAP_MS,
+  CLIENT_WORLD_REPAIR_DEADLINE_CHECK_INTERVAL_MS,
+  CLIENT_WORLD_REPAIR_HANDSHAKE_TIMEOUT_MS,
   MAX_CLIENT_WORLD_REPAIR_ATTEMPTS,
   MIN_CLIENT_WORLD_REPAIR_ATTEMPT_SPACING_MS,
+  evaluateClientWorldRepairDeadline,
   acknowledgeClientWorldRepairActor,
   beginClientWorldRepair,
   clientWorldRepairCanAttempt,
@@ -129,5 +133,111 @@ describe('client world-repair admission', () => {
     expect(clientWorldRepairPending(
       acknowledgeClientWorldRepairActor(admission, { actorId: 'guest-1', lifeId: 4 }),
     )).toBe(true);
+  });
+});
+
+describe('client world-repair deadline (HF-347 residual: load must not consume the handshake clock)', () => {
+  const armed = (lifeId = 2) => beginClientWorldRepair({
+    playerId: 'guest-1', connectionEpoch: 'connection_epoch_003', matchEpoch: 7, lifeId,
+  });
+
+  it('waits through an arena load longer than the old 5s deadline (the owner reproduction)', () => {
+    // Lobby-start at t=0; the guest is still loading/priming at t=5s..t=20s.
+    const admission = armed();
+    for (const nowMs of [5_000, 9_999, 20_000]) {
+      expect(evaluateClientWorldRepairDeadline({
+        nowMs, armedAtMs: 0, pumpEligibleSinceMs: null, hostContactAtMs: null, admission,
+      })).toBe('wait');
+    }
+  });
+
+  it('starts the 5s handshake clock only once the pump is eligible', () => {
+    const admission = armed();
+    // Pump became eligible at t=12s after a heavy load.
+    expect(evaluateClientWorldRepairDeadline({
+      nowMs: 16_999, armedAtMs: 0, pumpEligibleSinceMs: 12_000, hostContactAtMs: 12_000, admission,
+    })).toBe('wait');
+    expect(evaluateClientWorldRepairDeadline({
+      nowMs: 17_000, armedAtMs: 0, pumpEligibleSinceMs: 12_000, hostContactAtMs: 12_000, admission,
+    })).toBe('failed');
+  });
+
+  it('measures inactivity from the LAST attempt, so a host that answered once cannot stall forever', () => {
+    let admission = armed();
+    admission = recordClientWorldRepairAttempt(admission, 14_500);
+    expect(evaluateClientWorldRepairDeadline({
+      nowMs: 19_499, armedAtMs: 0, pumpEligibleSinceMs: 12_000, hostContactAtMs: 12_000, admission,
+    })).toBe('wait');
+    expect(evaluateClientWorldRepairDeadline({
+      nowMs: 19_500, armedAtMs: 0, pumpEligibleSinceMs: 12_000, hostContactAtMs: 12_000, admission,
+    })).toBe('failed');
+  });
+
+  it('holds an absolute cap for a live-but-silent host even while loading claims to continue', () => {
+    const admission = armed();
+    expect(evaluateClientWorldRepairDeadline({
+      nowMs: CLIENT_WORLD_REPAIR_ARMING_CAP_MS - 1, armedAtMs: 0, pumpEligibleSinceMs: null, hostContactAtMs: null, admission,
+    })).toBe('wait');
+    expect(evaluateClientWorldRepairDeadline({
+      nowMs: CLIENT_WORLD_REPAIR_ARMING_CAP_MS, armedAtMs: 0, pumpEligibleSinceMs: null, hostContactAtMs: null, admission,
+    })).toBe('failed');
+  });
+
+  it('never fails an acknowledged or absent admission', () => {
+    const acknowledged = acknowledgeClientWorldRepairActor(armed(), { actorId: 'guest-1', lifeId: 2 });
+    expect(evaluateClientWorldRepairDeadline({
+      nowMs: 500_000, armedAtMs: 0, pumpEligibleSinceMs: 1, hostContactAtMs: 1, admission: acknowledged,
+    })).toBe('wait');
+    expect(evaluateClientWorldRepairDeadline({
+      nowMs: 500_000, armedAtMs: 0, pumpEligibleSinceMs: 1, hostContactAtMs: 1, admission: null,
+    })).toBe('wait');
+  });
+
+  it('does not run the 5s clock before the host has been heard from at all', () => {
+    // Lane J: both peers start their arena load from the same START. Until the
+    // host transacts, silence means "still loading", which is indistinguishable
+    // from "gone" except by the arming cap — so only the cap may fail it here.
+    // Reproduced pre-fix: the guest was killed at spawn in 3 of 4 idle matches
+    // with the host's acknowledgement arriving moments afterwards.
+    const admission = armed();
+    for (const nowMs of [6_000, 20_000, CLIENT_WORLD_REPAIR_ARMING_CAP_MS - 1]) {
+      expect(evaluateClientWorldRepairDeadline({
+        nowMs, armedAtMs: 0, pumpEligibleSinceMs: 1_000, hostContactAtMs: null, admission,
+      })).toBe('wait');
+    }
+    expect(evaluateClientWorldRepairDeadline({
+      nowMs: CLIENT_WORLD_REPAIR_ARMING_CAP_MS, armedAtMs: 0, pumpEligibleSinceMs: 1_000,
+      hostContactAtMs: null, admission,
+    })).toBe('failed');
+  });
+
+  it('fails 5s after a host that DID answer once goes silent', () => {
+    // The precondition the bound was always documented against: first contact
+    // at 30s, then nothing. Failure at exactly 35s, well inside the cap.
+    const admission = armed();
+    expect(evaluateClientWorldRepairDeadline({
+      nowMs: 34_999, armedAtMs: 0, pumpEligibleSinceMs: 1_000, hostContactAtMs: 30_000, admission,
+    })).toBe('wait');
+    expect(evaluateClientWorldRepairDeadline({
+      nowMs: 35_000, armedAtMs: 0, pumpEligibleSinceMs: 1_000, hostContactAtMs: 30_000, admission,
+    })).toBe('failed');
+  });
+
+  it('keeps first contact as progress even when it lands after the last attempt', () => {
+    let admission = armed();
+    admission = recordClientWorldRepairAttempt(admission, 2_000);
+    // Attempts are spent early; contact at 25s must reset the inactivity clock.
+    expect(evaluateClientWorldRepairDeadline({
+      nowMs: 29_999, armedAtMs: 0, pumpEligibleSinceMs: 1_000, hostContactAtMs: 25_000, admission,
+    })).toBe('wait');
+    expect(evaluateClientWorldRepairDeadline({
+      nowMs: 30_000, armedAtMs: 0, pumpEligibleSinceMs: 1_000, hostContactAtMs: 25_000, admission,
+    })).toBe('failed');
+  });
+
+  it('keeps the handshake bound exactly at the historical 5s once eligible', () => {
+    expect(CLIENT_WORLD_REPAIR_HANDSHAKE_TIMEOUT_MS).toBe(5_000);
+    expect(CLIENT_WORLD_REPAIR_ARMING_CAP_MS).toBeGreaterThan(CLIENT_WORLD_REPAIR_HANDSHAKE_TIMEOUT_MS);
+    expect(CLIENT_WORLD_REPAIR_DEADLINE_CHECK_INTERVAL_MS).toBeLessThan(CLIENT_WORLD_REPAIR_HANDSHAKE_TIMEOUT_MS);
   });
 });

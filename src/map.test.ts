@@ -28,7 +28,7 @@ describe('Atomic Acres Pass 59 collision audit', () => {
     expect(isBlocked({ x: vessel.position.x, y: 1.65, z: vessel.position.z }, map.colliders, 0.44)).toBe(true);
     expect(audit.largeCylinder.bottomY).toBe(0);
     expect(audit.qualityEarthBanks).toHaveLength(4);
-    expect(audit.qualityEarthBanks.flatMap((bank) => bank.colliders)).toHaveLength(11);
+    expect(audit.qualityEarthBanks.flatMap((bank) => bank.colliders)).toHaveLength(10);
     for (const bank of audit.qualityEarthBanks) {
       const visual = map.root.getObjectByName(`quality-earth-bank-${bank.id}`)!;
       expect(visual.userData.collisionAuthorities).toEqual(bank.colliders);
@@ -52,15 +52,18 @@ describe('Atomic Acres Pass 59 collision audit', () => {
     const map = buildArena(new THREE.Scene());
     const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
     try {
-      physics.teleportEye({ x: -28, y: 1.7, z: 5 });
+      // Walk into the west terrain mound from its open side.
+      physics.teleportEye({ x: -24, y: 1.7, z: -33 });
       for (let step = 0; step < 500; step += 1) physics.move({ x: 0, y: -0.002, z: 0.03 }, 1 / 120);
-      expect(physics.eyePosition().z).toBeLessThan(8.0);
-      physics.teleportEye({ x: 27, y: 1.7, z: 23 });
+      expect(physics.eyePosition().z).toBeLessThan(-29.3);
+      // Walk into the east irrigation vessel.
+      physics.teleportEye({ x: 27, y: 1.7, z: 19 });
       for (let step = 0; step < 500; step += 1) physics.move({ x: 0, y: -0.002, z: 0.03 }, 1 / 120);
-      expect(physics.eyePosition().z).toBeLessThan(25.8);
-      physics.teleportEye({ x: -23, y: 1.7, z: -34 });
+      expect(physics.eyePosition().z).toBeLessThan(21.8);
+      // Walk west into the north-east corner earth bank.
+      physics.teleportEye({ x: 34, y: 1.7, z: -32 });
       for (let step = 0; step < 500; step += 1) physics.move({ x: -0.03, y: -0.002, z: 0 }, 1 / 120);
-      expect(physics.eyePosition().x).toBeGreaterThan(-25.9);
+      expect(physics.eyePosition().x).toBeGreaterThan(31.0);
     } finally {
       physics.dispose();
     }

@@ -38,6 +38,11 @@
  */
 
 import type { ArenaId } from '../arena-identity';
+import {
+  activeWeatherPresentation,
+  weatherOverrideClockSeconds,
+  type WeatherPresentationRuntime,
+} from './weather-settings';
 
 export type WeatherState = 'clear' | 'overcast' | 'light-rain' | 'heavy-rain' | 'storm';
 
@@ -67,6 +72,44 @@ const MAX_PHASE_WALK = 4096;
 
 /** Sub-steps used to integrate wetness across a transition blend. */
 const WETNESS_TRANSITION_STEPS = 4;
+
+/**
+ * LIGHTNING — Pass 78.
+ *
+ * A storm with no lightning is a rain filter. The schedule is closed-form from
+ * (arenaId, matchSeed) exactly like the phase walk, so two peers flash on the
+ * same frame with zero traffic, and it is O(1) rather than a walk: strike `k`
+ * lives in slot `k` and the slot index falls out of a division.
+ *
+ * The whole model is gated on RAIN RATE rather than on a state name, which is
+ * what makes it agree with the presentation clamp for free: a player who has
+ * capped their weather at LIGHT has a rain rate below the floor and therefore
+ * gets no flashes, without the clamp having to know lightning exists.
+ */
+export const WEATHER_LIGHTNING = Object.freeze({
+  /** One strike slot this long; the strike lands somewhere inside it. */
+  strikeIntervalSeconds: 9.5,
+  /** Fraction of the slot the strike may wander across. */
+  slotJitter: 0.72,
+  /** No flash at all below this rain rate. Heavy rain is where storms live. */
+  rainRateFloor: WEATHER_HEAVY_RAIN_RATE,
+  /** Total visible flash length (s). Nothing is lit after this. */
+  flashSeconds: 0.26,
+  /**
+   * COMBAT-SAFETY CEILING. Hard cap on the 0..1 flash value at any rain rate,
+   * any distance and any settings. A flash only ever ADDS light, and it adds
+   * at most this fraction of the presentation's flash budget for at most
+   * `flashSeconds`. Enforced here, re-checked by `assertLightningCombatSafety`.
+   */
+  maxFlash: 0.62,
+  /** Strike distance band (m). Closer strikes are brighter and quicker. */
+  minDistanceM: 260,
+  maxDistanceM: 4200,
+  /** Brightness multiplier at `maxDistanceM`. Never zero: far sky still lights. */
+  farBrightness: 0.42,
+  /** Speed of sound for the thunder delay (m/s). */
+  soundSpeedMps: 343,
+} as const);
 
 /**
  * Ground soaks faster than it dries — the asymmetry is what makes a shower
@@ -289,24 +332,187 @@ export function weatherPhaseSequence(
   return Object.freeze(phases);
 }
 
+export type WeatherLightning = Readonly<{
+  /** True while a strike is lighting the sky. */
+  active: boolean;
+  /** 0..1 flash brightness, already capped by WEATHER_LIGHTNING.maxFlash. */
+  flash: number;
+  /** Monotonic strike id, -1 before the match's first strike. */
+  strikeIndex: number;
+  /** Straight-line distance to that strike (m). */
+  distanceM: number;
+  /** Seconds between the flash and its thunder for this strike. */
+  thunderDelaySeconds: number;
+  /**
+   * Seconds until this strike's thunder arrives; <= 0 once it has. AUDIO READS
+   * THIS. The rule for a consumer is "fire once per strikeIndex, on the frame
+   * this first crosses zero" - which is a property of the sample rather than of
+   * a callback, so a system that starts late still gets it right.
+   */
+  thunderInSeconds: number;
+  /** Seconds since the flash itself. */
+  sinceStrikeSeconds: number;
+}>;
+
+export const NO_LIGHTNING: WeatherLightning = Object.freeze({
+  active: false,
+  flash: 0,
+  strikeIndex: -1,
+  distanceM: 0,
+  thunderDelaySeconds: 0,
+  thunderInSeconds: 0,
+  sinceStrikeSeconds: 0,
+});
+
+/**
+ * Two flashes, not one: the stepped leader, then the return stroke ~55 ms
+ * later. A single exponential reads as a camera flash rather than as weather.
+ * The tail is squared to zero at `flashSeconds` so the light never truncates
+ * mid-decay, and the 1.44 brings the pair's peak to exactly 1 so `maxFlash` is
+ * the only ceiling in play.
+ */
+export function lightningFlashEnvelope(ageSeconds: number): number {
+  const age = Number.isFinite(ageSeconds) ? ageSeconds : -1;
+  if (age < 0 || age >= WEATHER_LIGHTNING.flashSeconds) return 0;
+  const leader = Math.exp(-age / 0.035) * 0.55;
+  const stroke = age >= 0.055 ? Math.exp(-(age - 0.055) / 0.075) : 0;
+  const tail = 1 - age / WEATHER_LIGHTNING.flashSeconds;
+  return Math.min(1, (leader + stroke) * tail * tail * 1.44);
+}
+
+function lightningSlotStrikeSeconds(root: number, slot: number): number {
+  const jitter = unit(hash32(root ^ Math.imul(slot + 1, 0x7ed55d16)));
+  return (slot + jitter * WEATHER_LIGHTNING.slotJitter) * WEATHER_LIGHTNING.strikeIntervalSeconds;
+}
+
+/**
+ * The lightning read. Pure, O(1), and derived from the same (arenaId,
+ * matchSeed) root as the phase walk, so no peer has to be told a strike
+ * happened.
+ *
+ * `rainRate` is the PRESENTED rain rate, which is what makes the player's
+ * weather ceiling apply to lightning without this function knowing the ceiling
+ * exists.
+ */
+export function sampleWeatherLightning(
+  arenaId: ArenaId,
+  matchSeed: number,
+  elapsedSeconds: number,
+  rainRate: number,
+  enabled = true,
+): WeatherLightning {
+  const stormFactor = clamp01(
+    (clamp01(Number.isFinite(rainRate) ? rainRate : 0) - WEATHER_LIGHTNING.rainRateFloor)
+    / (1 - WEATHER_LIGHTNING.rainRateFloor),
+  );
+  // The common case by a wide margin: most of a match, and every sample on an
+  // arena that cannot reach heavy rain, has no storm to strike from. Answering
+  // it with the shared frozen row keeps sampleWeather allocation-free on the
+  // path it spends nearly all of its time on.
+  if (!enabled || stormFactor <= 0) return NO_LIGHTNING;
+  const elapsed = Math.max(0, Number.isFinite(elapsedSeconds) ? elapsedSeconds : 0);
+  const root = hash32(phaseSeed(arenaId, matchSeed) ^ 0x3f1b_9d0d);
+  let slot = Math.floor(elapsed / WEATHER_LIGHTNING.strikeIntervalSeconds);
+  let strikeSeconds = lightningSlotStrikeSeconds(root, slot);
+  if (elapsed < strikeSeconds) {
+    slot -= 1;
+    strikeSeconds = lightningSlotStrikeSeconds(root, slot);
+  }
+  if (slot < 0) return NO_LIGHTNING;
+  const span = WEATHER_LIGHTNING.maxDistanceM - WEATHER_LIGHTNING.minDistanceM;
+  const distanceUnit = unit(hash32(root ^ Math.imul(slot + 1, 0xc761c23c)));
+  const distanceM = WEATHER_LIGHTNING.minDistanceM + distanceUnit * span;
+  const thunderDelaySeconds = distanceM / WEATHER_LIGHTNING.soundSpeedMps;
+  const sinceStrikeSeconds = elapsed - strikeSeconds;
+  const proximity = lerp(1, WEATHER_LIGHTNING.farBrightness, distanceUnit);
+  const flash = Math.min(
+    WEATHER_LIGHTNING.maxFlash,
+    lightningFlashEnvelope(sinceStrikeSeconds) * WEATHER_LIGHTNING.maxFlash * stormFactor * proximity,
+  );
+  return Object.freeze({
+    active: flash > 0.001,
+    flash,
+    strikeIndex: slot,
+    distanceM,
+    thunderDelaySeconds,
+    thunderInSeconds: thunderDelaySeconds - sinceStrikeSeconds,
+    sinceStrikeSeconds,
+  });
+}
+
+/**
+ * Fail-closed combat-safety check for the flash, in the shape
+ * `assertDepthOfFieldCombatSafety` uses: it THROWS rather than documenting a
+ * hope. A flash may only ever add light, may never exceed the cap, and may
+ * never outlast `flashSeconds`.
+ */
+export function assertLightningCombatSafety(): void {
+  if (!(WEATHER_LIGHTNING.maxFlash > 0 && WEATHER_LIGHTNING.maxFlash <= 0.65)) {
+    throw new Error(`Lightning flash ceiling is outside the readability envelope: ${WEATHER_LIGHTNING.maxFlash}`);
+  }
+  if (WEATHER_LIGHTNING.flashSeconds > 0.3) {
+    throw new Error(`Lightning flash outlasts the readability budget: ${WEATHER_LIGHTNING.flashSeconds}s`);
+  }
+  for (let age = -0.05; age <= WEATHER_LIGHTNING.flashSeconds + 0.05; age += 0.002) {
+    const value = lightningFlashEnvelope(age);
+    if (!(value >= 0 && value <= 1)) {
+      throw new Error(`Lightning flash envelope left 0..1 at age ${age.toFixed(3)}: ${value}`);
+    }
+    if (age >= WEATHER_LIGHTNING.flashSeconds && value !== 0) {
+      throw new Error(`Lightning kept lighting the sky after ${WEATHER_LIGHTNING.flashSeconds}s`);
+    }
+  }
+}
+
 export type WeatherSample = Readonly<{
   arenaId: ArenaId;
-  /** The state being blended IN (the phase the match is currently inside). */
+  /** The state being blended IN, AFTER the local presentation ceiling. */
   state: WeatherState;
   /** The state being blended OUT. Equals `state` once the front has passed. */
   previousState: WeatherState;
+  /**
+   * The state the MATCH is in, before this screen's weather ceiling. Every peer
+   * agrees on this field whatever anybody's Options say, so it - not `state` -
+   * is what a shared-world consumer compares.
+   */
+  simulatedState: WeatherState;
+  /** Rung of the presented `state` on WEATHER_SEVERITY_LADDER. */
+  severity: number;
+  /** The ceiling this screen applied. Equals `storm` when nothing was capped. */
+  presentationCeiling: WeatherState;
   phaseIndex: number;
   /** 0 at the instant the front arrives, 1 once it has fully settled. */
   transitionBlend: number;
   intensity: number;
   rainRate: number;
+  /** Already includes the player's wind-strength setting. */
   windMultiplier: number;
   /** 0..1, integrated closed-form from t=0 so a late joiner agrees exactly. */
   wetness: number;
   fogDensityMultiplier: number;
   skyDarkenAmount: number;
   raining: boolean;
+  /** Storm flash and thunder timing. Audio-facing; see WeatherLightning. */
+  lightning: WeatherLightning;
 }>;
+
+/**
+ * The player's weather ceiling, resolved against ONE ARENA'S authored states.
+ *
+ * Clamping happens at the STATE level rather than on the derived scalars: a
+ * capped sample still blends smoothly from its previous rung up to the ceiling
+ * instead of rising and then hard-clipping, and clamping into `available`
+ * rather than into the global ladder means a capped sample can only ever be a
+ * state this arena actually authored.
+ */
+function presentationRung(available: readonly WeatherState[], ceiling: WeatherState): number {
+  const ceilingSeverity = WEATHER_SEVERITY_LADDER.indexOf(ceiling);
+  let rung = 0;
+  for (let index = 0; index < available.length; index += 1) {
+    if (WEATHER_STATE_TABLE[available[index]].severity <= ceilingSeverity) rung = index;
+  }
+  return rung;
+}
 
 /** Exponential relaxation toward `target`; never overshoots, so it is stable. */
 function relaxWetness(wetness: number, target: number, seconds: number): number {
@@ -348,8 +554,14 @@ function integratePhaseWetness(
  * elapsedSeconds) and cheap enough to call once per frame: a 15 minute match is
  * roughly a dozen phases, and each phase costs a handful of exponentials.
  */
-export function sampleWeather(arenaId: ArenaId, matchSeed: number, elapsedSeconds: number): WeatherSample {
+export function sampleWeather(
+  arenaId: ArenaId,
+  matchSeed: number,
+  elapsedSeconds: number,
+  presentation: WeatherPresentationRuntime = activeWeatherPresentation(),
+): WeatherSample {
   const available = ARENA_WEATHER_PROFILES[arenaId].availableStates;
+  const ceilingRung = presentationRung(available, presentation.ceilingState);
   const root = phaseSeed(arenaId, matchSeed);
   const elapsed = Math.max(0, Number.isFinite(elapsedSeconds) ? elapsedSeconds : 0);
 
@@ -379,33 +591,49 @@ export function sampleWeather(arenaId: ArenaId, matchSeed: number, elapsedSecond
   }
 
   const intoPhase = Math.min(durationSeconds, elapsed - startSeconds);
-  const current = WEATHER_STATE_TABLE[state];
-  const previous = WEATHER_STATE_TABLE[previousState];
+  const simulatedState = state;
   const transitionBlend = previousState === state
     ? 1
     : smoothstep01(intoPhase / WEATHER_TRANSITION_SECONDS);
+  // Wetness is integrated against the SIMULATED targets - the ground got as
+  // wet as the match made it - and then capped at what the presented ceiling
+  // could itself have soaked. Integrating a clamped target instead would make
+  // wetness depend on when the player last changed the setting.
   wetness = clamp01(integratePhaseWetness(
     wetness,
-    previous.wetnessTarget,
-    current.wetnessTarget,
+    WEATHER_STATE_TABLE[previousState].wetnessTarget,
+    WEATHER_STATE_TABLE[state].wetnessTarget,
     Math.max(0, intoPhase),
     WEATHER_TRANSITION_SECONDS,
   ));
 
+  const presentedState = available[Math.min(available.indexOf(state), ceilingRung)];
+  const presentedPreviousState = available[Math.min(available.indexOf(previousState), ceilingRung)];
+  const current = WEATHER_STATE_TABLE[presentedState];
+  const previous = WEATHER_STATE_TABLE[presentedPreviousState];
+  // The wettest the presented ceiling could itself have made the ground. A
+  // no-op when nothing is capped, because the relaxation never overshoots a
+  // target it is already integrating toward.
+  const wetnessCeiling = WEATHER_STATE_TABLE[available[ceilingRung]].wetnessTarget;
+
   const rainRate = lerp(previous.rainRate, current.rainRate, transitionBlend);
   return Object.freeze({
     arenaId,
-    state,
-    previousState,
+    state: presentedState,
+    previousState: presentedPreviousState,
+    simulatedState,
+    severity: current.severity,
+    presentationCeiling: presentation.ceilingState,
     phaseIndex: index,
     transitionBlend,
     intensity: lerp(previous.intensity, current.intensity, transitionBlend),
     rainRate,
-    windMultiplier: lerp(previous.windMultiplier, current.windMultiplier, transitionBlend),
-    wetness,
+    windMultiplier: lerp(previous.windMultiplier, current.windMultiplier, transitionBlend) * presentation.windStrength,
+    wetness: Math.min(wetness, wetnessCeiling),
     fogDensityMultiplier: lerp(previous.fogDensityMultiplier, current.fogDensityMultiplier, transitionBlend),
     skyDarkenAmount: lerp(previous.skyDarkenAmount, current.skyDarkenAmount, transitionBlend),
     raining: rainRate > 0.001,
+    lightning: sampleWeatherLightning(arenaId, matchSeed, elapsed, rainRate, presentation.lightning),
   });
 }
 
@@ -421,42 +649,69 @@ export function sampleWeather(arenaId: ArenaId, matchSeed: number, elapsedSecond
  * is the right variety to play with and the wrong odds to TEST with - without a
  * forcing switch you must reroll matches to see the feature at all.
  */
-export function forcedWeatherSample(arenaId: ArenaId, state: WeatherState): WeatherSample {
+export function forcedWeatherSample(
+  arenaId: ArenaId,
+  state: WeatherState,
+  presentation: WeatherPresentationRuntime = activeWeatherPresentation(),
+  // Accumulated presentation frame time, not a wall clock. Without a clock the
+  // one route built for LOOKING at weather would be the one route that can
+  // never show lightning. See weather-settings.ts -> THE OVERRIDE CLOCK.
+  elapsedSeconds: number = weatherOverrideClockSeconds(),
+): WeatherSample {
   // Indoor arenas stay dry no matter what is asked for: the availability table
   // is a gameplay fact, not a preference.
   const permitted = weatherAvailability(arenaId);
-  const resolved = permitted.includes(state) ? state : 'clear';
+  const requested = permitted.includes(state) ? state : 'clear';
+  // The player's ceiling applies to the override too. A capture taken with
+  // `?weather=storm` and WEATHER: LIGHT must show what LIGHT actually ships,
+  // or the override is testing a configuration nobody can play.
+  const ceilingRung = presentationRung(permitted, presentation.ceilingState);
+  const resolved = permitted[Math.min(permitted.indexOf(requested), ceilingRung)];
   const row = WEATHER_STATE_TABLE[resolved];
+  const elapsed = Math.max(0, Number.isFinite(elapsedSeconds) ? elapsedSeconds : 0);
   return Object.freeze({
     arenaId,
     state: resolved,
     previousState: resolved,
+    simulatedState: requested,
+    severity: row.severity,
+    presentationCeiling: presentation.ceilingState,
     phaseIndex: 0,
     transitionBlend: 1,
     intensity: row.intensity,
     rainRate: row.rainRate,
-    windMultiplier: row.windMultiplier,
+    windMultiplier: row.windMultiplier * presentation.windStrength,
     wetness: row.rainRate > 0 ? 1 : 0,
     fogDensityMultiplier: row.fogDensityMultiplier,
     skyDarkenAmount: row.skyDarkenAmount,
     raining: row.rainRate > 0.001,
+    lightning: sampleWeatherLightning(arenaId, 0, elapsed, row.rainRate, presentation.lightning),
   });
 }
 
-export function clearWeatherSample(arenaId: ArenaId): WeatherSample {
+export function clearWeatherSample(
+  arenaId: ArenaId,
+  presentation: WeatherPresentationRuntime = activeWeatherPresentation(),
+): WeatherSample {
   const clear = WEATHER_STATE_TABLE.clear;
   return Object.freeze({
     arenaId,
     state: 'clear',
     previousState: 'clear',
+    simulatedState: 'clear',
+    severity: clear.severity,
+    presentationCeiling: presentation.ceilingState,
     phaseIndex: 0,
     transitionBlend: 1,
     intensity: clear.intensity,
     rainRate: clear.rainRate,
-    windMultiplier: clear.windMultiplier,
+    // Still air is still air, but the wind field itself is not weather - a
+    // clear sky still has the arena's prevailing breeze, scaled by the player.
+    windMultiplier: clear.windMultiplier * presentation.windStrength,
     wetness: 0,
     fogDensityMultiplier: clear.fogDensityMultiplier,
     skyDarkenAmount: clear.skyDarkenAmount,
     raining: false,
+    lightning: NO_LIGHTNING,
   });
 }

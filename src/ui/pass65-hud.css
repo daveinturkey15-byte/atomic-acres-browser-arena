@@ -1110,7 +1110,7 @@
 
   #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-status span {
     grid-column: 1 / -1;
-    font-size: 8px;
+    font-size: 9px;
     opacity: 0.78;
   }
 
@@ -1137,7 +1137,7 @@
   }
 
   #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout small {
-    font-size: 7px;
+    font-size: 9px;
   }
 
   #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout strong {
@@ -1260,7 +1260,7 @@
   }
 
   #gunner-target-confirm[hidden] { display: none; }
-  #gunner-target-confirm span { font: 900 8px/1 Inter, system-ui, sans-serif; letter-spacing: 0.18em; color: #ffc36e; }
+  #gunner-target-confirm span { font: 900 9px/1 Inter, system-ui, sans-serif; letter-spacing: 0.18em; color: #ffc36e; }
   #gunner-target-confirm strong { font: 950 18px/1 Inter, system-ui, sans-serif; }
 
   @keyframes gunner-target-confirm {
@@ -1274,7 +1274,7 @@
     #gunner-cockpit-hud .gunner-status span { display: none; }
     #gunner-cockpit-hud .gunner-status { grid-template-columns: auto 1fr; }
     #gunner-cockpit-hud #chopper-thermal { top: max(42px, calc(env(safe-area-inset-top) + 40px)); max-width: calc(100vw - 24px); padding: 5px 9px; text-align: center; }
-    #gunner-cockpit-hud #chopper-thermal span { font-size: 8px; letter-spacing: 0.12em; }
+    #gunner-cockpit-hud #chopper-thermal span { font-size: 9px; letter-spacing: 0.12em; }
     #gunner-cockpit-hud .gunner-reticle { width: clamp(104px, 28vw, 142px); }
     #gunner-cockpit-hud .gunner-instruments { bottom: max(8px, env(safe-area-inset-bottom)); width: calc(100vw - 18px); grid-template-columns: repeat(3, minmax(0, 1fr)); }
     #gunner-cockpit-hud .gunner-readout { padding: 5px 6px; }

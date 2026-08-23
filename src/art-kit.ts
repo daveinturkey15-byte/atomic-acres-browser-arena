@@ -1787,7 +1787,9 @@ export function reactOperator(root: THREE.Group, zone: 'head' | 'body' | 'limb')
   root.userData.operatorHitAt = performance.now();
   root.userData.operatorHitZone = zone;
   root.userData.operatorHitSign = Number(root.userData.operatorHitSign ?? -1) * -1;
-  reactRiggedOperator(root, zone === 'limb');
+  // The zone reaches the reaction layer intact now. It used to be flattened to
+  // "is this a limb hit", which only chose between the two authored clips.
+  reactRiggedOperator(root, zone);
 }
 
 export function deathOperator(root: THREE.Group): void {
@@ -1816,7 +1818,11 @@ export function poseOperator(
   speed: number,
   _phase: number,
   _blend = 1,
-  _aimPitch = 0,
+  // Pass 77 / HF-375: this used to be `_aimPitch` - received from every call
+  // site, including the local operator path passing the real replicated pitch,
+  // and dropped on the floor. Bodies aimed at the horizon while their bullets
+  // left at 30 degrees. It now reaches the spine.
+  aimPitch = 0,
   explicitDeltaSeconds?: number,
 ): void {
   const rig = operatorRig(root);
@@ -1844,7 +1850,10 @@ export function poseOperator(
     entry.bone.position.copy(entry.position);
     entry.bone.quaternion.copy(entry.quaternion);
   }
-  updateRiggedOperator(root, speed, stance);
+  updateRiggedOperator(root, speed, stance, {
+    aimPitchRadians: aimPitch,
+    armed: rig.weaponId !== null,
+  });
   if (rig.weapon) updateImportedWeapon(rig.weapon, animationDeltaSeconds);
   if (rig.weaponId === 'minigun' && rig.weapon) {
     const now = performance.now();

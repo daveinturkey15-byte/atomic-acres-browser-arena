@@ -118,3 +118,92 @@ export function acknowledgeClientWorldRepairActor(
     || actor.lifeId !== admission.identity.lifeId) return admission;
   return Object.freeze({ ...admission, acknowledged: true });
 }
+
+/**
+ * HF-347 residual ("cant move alot in host and guest lobby etc" / "cant mov
+ * when spawn into rustrig in host guest lobby", Pass 74+ Lane J).
+ *
+ * WHY. The admission deadline used to be one 5-second timer armed at
+ * lobby-start. That clock counted straight through BOTH sides' arena load and
+ * the WebGL first-presentation prime (which pauses the client's state pump),
+ * so on heavy arenas the guest was declared dead-at-spawn before the
+ * host/guest handshake could exchange a single message — reproduced
+ * mechanically on 4/6 arenas by scripts/qa/verify-hf347-arena-movement-matrix.mjs
+ * under load (guest hp 0, "Match admission unacknowledged by host
+ * (admission-timeout)", host remoteCount 0).
+ *
+ * The bound is restructured, not weakened:
+ *  - HANDSHAKE_TIMEOUT_MS (5s, unchanged) now measures inactivity from the
+ *    latest handshake PROGRESS while the client is actually able to transact
+ *    (game started, pump unpaused): progress = becoming pump-eligible or a
+ *    recorded repair attempt. A host that answers once and then goes silent
+ *    still fails within 5s of that last attempt.
+ *  - ARMING_CAP_MS is the absolute fail bound from arming, covering a
+ *    live-but-never-answering host. A DEAD host is handled sooner by the
+ *    connection-loss path, so this cap never holds a hostage lobby.
+ */
+export const CLIENT_WORLD_REPAIR_HANDSHAKE_TIMEOUT_MS = 5_000;
+export const CLIENT_WORLD_REPAIR_ARMING_CAP_MS = 60_000;
+/** Cadence of the deadline evaluation; small against both bounds above. */
+export const CLIENT_WORLD_REPAIR_DEADLINE_CHECK_INTERVAL_MS = 500;
+
+export type ClientWorldRepairDeadlineInput = Readonly<{
+  /** performance.now() at evaluation time. */
+  nowMs: number;
+  /** performance.now() when the admission was armed (lobby start). */
+  armedAtMs: number;
+  /** First observed moment the client could transact; null while loading. */
+  pumpEligibleSinceMs: number | null;
+  /**
+   * performance.now() of the first in-match message admitted from the host
+   * since this admission was armed, or null if the host has not been heard
+   * from at all yet.
+   *
+   * WHY (Lane J). The 5s bound is documented as "a host that answers once and
+   * then goes silent still fails within 5s" — but nothing implemented the
+   * "answers once" precondition, so the clock also ran over the window in
+   * which the host had simply not finished loading its own arena yet. Both
+   * peers start their arena load from the same START; the guest routinely
+   * finishes first and then burned its whole handshake window waiting on a
+   * host that was healthy and merely slower. Measured on this machine: the
+   * guest was declared "Match admission unacknowledged by host
+   * (admission-timeout)" and killed at spawn in 3 of 4 consecutive idle
+   * matches, in every case with the host's acknowledgement arriving moments
+   * later (hostConfirmedContinuity did land) — the owner's "cant mov when
+   * spawn into rustrig in host guest lobby".
+   *
+   * Silence before first contact is now bounded by the arming cap alone,
+   * which is precisely the bound this module already declares for a host that
+   * never answers. Nothing is loosened for a host that answered and then
+   * stopped: that case still fails 5s after the last progress.
+   */
+  hostContactAtMs: number | null;
+  /** The admission under judgement; null means nothing to judge. */
+  admission: ClientWorldRepairAdmission | null;
+}>;
+
+export type ClientWorldRepairDeadlineVerdict = 'wait' | 'failed';
+
+/**
+ * Pure deadline rule so the timer wiring in legacy-main stays trivial and the
+ * race semantics stay unit-testable. 'failed' is terminal for this admission.
+ */
+export function evaluateClientWorldRepairDeadline(
+  input: ClientWorldRepairDeadlineInput,
+): ClientWorldRepairDeadlineVerdict {
+  const { nowMs, armedAtMs, pumpEligibleSinceMs, hostContactAtMs, admission } = input;
+  if (admission === null || admission.acknowledged) return 'wait';
+  // Absolute cap: a host that never answers at all cannot wait out the match.
+  if (nowMs - armedAtMs >= CLIENT_WORLD_REPAIR_ARMING_CAP_MS) return 'failed';
+  // Still loading or pump paused: the handshake has not begun; only the cap runs.
+  if (pumpEligibleSinceMs === null) return 'wait';
+  // Not heard from the host yet: it is still loading its own arena, and only
+  // the cap can tell that apart from a host that is gone. See hostContactAtMs.
+  if (hostContactAtMs === null) return 'wait';
+  const lastProgressAtMs = Math.max(
+    pumpEligibleSinceMs,
+    hostContactAtMs,
+    admission.lastAttemptAtMs ?? Number.NEGATIVE_INFINITY,
+  );
+  return nowMs - lastProgressAtMs >= CLIENT_WORLD_REPAIR_HANDSHAKE_TIMEOUT_MS ? 'failed' : 'wait';
+}

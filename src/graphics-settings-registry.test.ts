@@ -8,6 +8,23 @@ import {
   normalizeAdvancedGraphicsValues,
   validateAdvancedGraphicsRegistry,
 } from './graphics-settings-registry';
+import {
+  DEPTH_OF_FIELD_MIDFIELD_MAXIMUM_BLUR_PX,
+  GODRAY_MAXIMUM_ADDITIVE_GAIN,
+  MOTION_BLUR_MAXIMUM_UV_OFFSET,
+  SSGI_MAXIMUM_GI_INTENSITY,
+  SSR_MAXIMUM_INTENSITY,
+  resolveScreenSpacePostRuntime,
+} from './rendering/screen-space-post-profile';
+
+/** The Pass 78 weather family. */
+const WEATHER_KEYS = ['weatherIntensity', 'rainDensity', 'windStrength', 'lightning'] as const;
+
+/** Controls the screen-space stack owns, i.e. the ones the presets re-tier. */
+const SCREEN_SPACE_KEYS = [
+  'volumetricLightShafts', 'screenSpaceReflections', 'screenSpaceGi',
+  'depthOfField', 'depthOfFieldStrength', 'motionBlur', 'spatialUpscaling',
+] as const;
 
 describe('Advanced Graphics canonical registry', () => {
   it('is complete, unique and executable by a named runtime consumer', () => {
@@ -115,19 +132,6 @@ describe('Advanced Graphics canonical registry', () => {
     expect(byKey.get('spatialUpscaling')?.kind === 'select'
       ? (byKey.get('spatialUpscaling') as { options: readonly { value: string }[] }).options.map(({ value }) => value)
       : []).toEqual(['off', 'fsr1-quality', 'fsr1-balanced', 'fsr1-performance']);
-    // No preset moves at all. These passes exist only on the WebGPU route and
-    // none of them has been compiled on a real device or measured on
-    // representative hardware yet, so every one is a Custom opt-in. Promoting
-    // one is a value edit here plus the matching preset value; until then a
-    // preset must not claim an unmeasured full-screen raymarch.
-    for (const preset of Object.values(GRAPHICS_PRESET_VALUES)) {
-      expect(preset.volumetricLightShafts).toBe('off');
-      expect(preset.screenSpaceReflections).toBe('off');
-      expect(preset.screenSpaceGi).toBe('off');
-      expect(preset.depthOfField).toBe(false);
-      expect(preset.motionBlur).toBe(0);
-      expect(preset.spatialUpscaling).toBe('off');
-    }
     expect(normalizeAdvancedGraphicsValues({
       screenSpaceGi: 'ultra', motionBlur: 9, spatialUpscaling: 'dlss', depthOfField: 'yes',
     })).toMatchObject({
@@ -135,6 +139,194 @@ describe('Advanced Graphics canonical registry', () => {
       motionBlur: 1,
       spatialUpscaling: 'off',
       depthOfField: false,
+    });
+  });
+
+  it('pins the exact screen-space preset matrix the player is promised', () => {
+    // This table IS the promise. It is spelled out rather than derived so that
+    // a value edit in the registry has to be an argued edit here too, and so
+    // that the owner can read what Max gets without opening the renderer.
+    const matrix = {
+      performance: {
+        volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+        depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
+      },
+      high: {
+        volumetricLightShafts: 'low', screenSpaceReflections: 'low', screenSpaceGi: 'off',
+        depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
+      },
+      max: {
+        volumetricLightShafts: 'high', screenSpaceReflections: 'high', screenSpaceGi: 'high',
+        depthOfField: true, depthOfFieldStrength: 0.6, motionBlur: 0.35, spatialUpscaling: 'off',
+      },
+    } as const;
+    for (const [name, expected] of Object.entries(matrix)) {
+      const preset = GRAPHICS_PRESET_VALUES[name as keyof typeof GRAPHICS_PRESET_VALUES];
+      for (const key of SCREEN_SPACE_KEYS) {
+        expect(preset[key], `${name}.${key}`).toBe(expected[key]);
+      }
+    }
+    // Performance is the compatibility/low-spec preset and the regression guard
+    // for this whole family: nothing in the stack may ever be promoted into it.
+    expect(Object.values(matrix.performance).every((value) => value === 'off' || value === false || value === 0 || value === 0.3)).toBe(true);
+    // Spatial upscaling is the one control with no combat-safety bound enforced
+    // anywhere in code, and it renders below native. It stays a Custom opt-in in
+    // every preset, including the one whose whole job is to crank everything.
+    for (const preset of Object.values(GRAPHICS_PRESET_VALUES)) {
+      expect(preset.spatialUpscaling).toBe('off');
+    }
+    // Sun shafts raymarch the sun shadow map, so a preset that enables them and
+    // disables shadows would ship a control that reports itself unavailable.
+    for (const [name, preset] of Object.entries(GRAPHICS_PRESET_VALUES)) {
+      if (preset.volumetricLightShafts !== 'off') expect(preset.shadows, name).toBe('high');
+    }
+  });
+
+  it('keeps every shipped preset inside the enforced combat-safety envelope', () => {
+    for (const [name, preset] of Object.entries(GRAPHICS_PRESET_VALUES)) {
+      // resolveScreenSpacePostRuntime calls assertScreenSpacePostCombatSafety
+      // and throws on a breach, so this is the same fail-closed check the arena
+      // build runs — not a restatement of it.
+      const runtime = resolveScreenSpacePostRuntime({
+        volumetricLightShafts: preset.volumetricLightShafts,
+        screenSpaceReflections: preset.screenSpaceReflections,
+        screenSpaceGi: preset.screenSpaceGi,
+        depthOfField: preset.depthOfField,
+        depthOfFieldStrength: preset.depthOfFieldStrength,
+        motionBlur: preset.motionBlur,
+        spatialUpscaling: preset.spatialUpscaling,
+      }, { shadowsEnabled: preset.shadows === 'high' });
+      expect(runtime.godrays.additiveGain, `${name} godray gain`).toBeLessThanOrEqual(GODRAY_MAXIMUM_ADDITIVE_GAIN);
+      expect(runtime.reflections.intensity, `${name} SSR intensity`).toBeLessThanOrEqual(SSR_MAXIMUM_INTENSITY);
+      expect(runtime.globalIllumination.giIntensity, `${name} SSGI gain`).toBeLessThanOrEqual(SSGI_MAXIMUM_GI_INTENSITY);
+      expect(runtime.motionBlur.maximumUvOffset, `${name} blur offset`).toBeLessThanOrEqual(MOTION_BLUR_MAXIMUM_UV_OFFSET);
+      // A preset that enables shafts must actually get them, not a reason string.
+      if (preset.volumetricLightShafts !== 'off') {
+        expect(runtime.godrays.enabled, `${name} shafts`).toBe(true);
+        expect(runtime.godrays.unavailableReason, `${name} shafts`).toBeNull();
+      }
+    }
+    // Depth of field is the one bound that is a function of a slider rather than
+    // a tier, so pin the shipped Max strength against the ceiling directly.
+    const maxRuntime = resolveScreenSpacePostRuntime({
+      volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+      depthOfField: GRAPHICS_PRESET_VALUES.max.depthOfField,
+      depthOfFieldStrength: GRAPHICS_PRESET_VALUES.max.depthOfFieldStrength,
+      motionBlur: 0, spatialUpscaling: 'off',
+    }, { shadowsEnabled: true });
+    expect(maxRuntime.depthOfField.enabled).toBe(true);
+    expect(DEPTH_OF_FIELD_MIDFIELD_MAXIMUM_BLUR_PX).toBeGreaterThan(0);
+  });
+
+  it('describes every screen-space control in player language, not node names', () => {
+    // The owner's complaint was that these read as engineering notes. A one-line
+    // `<small>` under the control is the whole budget, so cap it and ban the
+    // vocabulary that made the old copy unreadable. "FSR 1" survives on purpose:
+    // it is a product name and the honesty rule requires it.
+    const banned = [
+      'pmrem', 'easu', 'rcas', 'tsl', 'mrt', 'webgpu', 'raymarch', 'ray-march', 'ray-marches',
+      'depth buffer', 'velocity buffer', 'bokeh', 'circle of confusion', 'shadow map',
+      'node', 'render target', 'framebuffer', 'upstream', 'linear-hdr', 'additive',
+    ];
+    const byKey = new Map(ADVANCED_GRAPHICS_CONTROLS.map((definition) => [definition.key, definition]));
+    for (const key of SCREEN_SPACE_KEYS) {
+      const definition = byKey.get(key);
+      expect(definition, key).toBeDefined();
+      const label = definition!.label;
+      const description = definition!.description;
+      expect(label.length, `${key} label`).toBeGreaterThan(0);
+      expect(description.length, `${key} description`).toBeLessThanOrEqual(200);
+      // One line means at most two short sentences, not a paragraph.
+      expect(description.split(/(?<=[.!?])\s+/).length, `${key} sentences`).toBeLessThanOrEqual(2);
+      const haystack = `${label} ${description}`.toLowerCase();
+      for (const word of banned) {
+        expect(haystack.includes(word), `${key} description leaks "${word}"`).toBe(false);
+      }
+    }
+  });
+});
+
+describe('Advanced Graphics weather controls', () => {
+  const byKey = new Map(ADVANCED_GRAPHICS_CONTROLS.map((definition) => [definition.key, definition]));
+
+  it('ships all four weather rows the owner asked for, under Atmosphere', () => {
+    // The audit rated this family NOT-STARTED because there was no
+    // player-facing control at all - not a bad one, none.
+    for (const key of WEATHER_KEYS) {
+      const definition = byKey.get(key);
+      expect(definition, key).toBeDefined();
+      expect(definition!.category, key).toBe('atmosphere');
+      // Every one of these is a uniform or an instance-count write, so none may
+      // claim a rebuild the player would have to wait for.
+      expect(definition!.applyMode, key).toBe('live');
+    }
+    expect(byKey.get('weatherIntensity')?.kind === 'select'
+      ? (byKey.get('weatherIntensity') as { options: readonly { value: string }[] }).options.map(({ value }) => value)
+      : []).toEqual(['off', 'light', 'moderate', 'heavy', 'storm']);
+    expect(byKey.get('rainDensity')).toMatchObject({ kind: 'range', minimum: 0.25, maximum: 1.5, unit: 'multiplier' });
+    expect(byKey.get('windStrength')).toMatchObject({ kind: 'range', minimum: 0, maximum: 2, unit: 'multiplier' });
+    expect(byKey.get('lightning')).toMatchObject({ kind: 'toggle' });
+  });
+
+  it('describes weather in player language, not node names', () => {
+    // Same rule the screen-space family carries: a one-line <small> under the
+    // control is the whole budget, and a paragraph of engineering vocabulary
+    // there is how a real feature reads as noise.
+    const banned = [
+      'tsl', 'webgpu', 'instanced', 'shader', 'uniform', 'node',
+      'seed', 'deterministic', 'hemisphere', 'clamp',
+      'toroidal', 'raymarch', 'billboard',
+    ];
+    for (const key of WEATHER_KEYS) {
+      const definition = byKey.get(key)!;
+      expect(definition.label.length, key).toBeGreaterThan(0);
+      expect(definition.description.length, key).toBeLessThanOrEqual(200);
+      expect(definition.description.split(/(?<=[.!?])\s+/).length, key).toBeLessThanOrEqual(2);
+      const haystack = `${definition.label} ${definition.description}`.toLowerCase();
+      for (const word of banned) {
+        expect(haystack.includes(word), `${key} description leaks "${word}"`).toBe(false);
+      }
+    }
+  });
+
+  it('pins the exact weather matrix each preset promises', () => {
+    // Spelled out rather than derived, for the same reason the screen-space
+    // matrix is: an edit to these numbers has to be an argued edit here too.
+    const matrix = {
+      performance: { weatherIntensity: 'light', rainDensity: 0.5, windStrength: 1, lightning: false },
+      high: { weatherIntensity: 'storm', rainDensity: 1, windStrength: 1, lightning: true },
+      max: { weatherIntensity: 'storm', rainDensity: 1.35, windStrength: 1, lightning: true },
+    } as const;
+    for (const [name, expected] of Object.entries(matrix)) {
+      const preset = GRAPHICS_PRESET_VALUES[name as keyof typeof GRAPHICS_PRESET_VALUES];
+      for (const key of WEATHER_KEYS) {
+        expect(preset[key], `${name}.${key}`).toBe(expected[key]);
+      }
+    }
+    // Wind strength is authored per arena, so no preset has any business
+    // re-authoring it - it is a taste control, not a budget.
+    for (const preset of Object.values(GRAPHICS_PRESET_VALUES)) {
+      expect(preset.windStrength).toBe(1);
+    }
+    // The density is the cost. Nothing but the low-spec preset caps the
+    // CEILING, because a state the arenas were authored to reach should not be
+    // invisible on the preset most machines land on.
+    expect(GRAPHICS_PRESET_VALUES.high.weatherIntensity).toBe('storm');
+    expect(GRAPHICS_PRESET_VALUES.max.rainDensity).toBeGreaterThan(GRAPHICS_PRESET_VALUES.high.rainDensity);
+    expect(GRAPHICS_PRESET_VALUES.performance.rainDensity).toBeLessThan(GRAPHICS_PRESET_VALUES.high.rainDensity);
+  });
+
+  it('normalizes hostile weather values back into the shipped envelope', () => {
+    expect(normalizeAdvancedGraphicsValues({
+      weatherIntensity: 'apocalypse',
+      rainDensity: 12,
+      windStrength: -3,
+      lightning: 'sometimes',
+    })).toMatchObject({
+      weatherIntensity: GRAPHICS_PRESET_VALUES.high.weatherIntensity,
+      rainDensity: 1.5,
+      windStrength: 0,
+      lightning: GRAPHICS_PRESET_VALUES.high.lightning,
     });
   });
 });

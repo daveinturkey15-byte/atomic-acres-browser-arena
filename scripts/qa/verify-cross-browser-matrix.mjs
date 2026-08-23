@@ -1,45 +1,56 @@
 #!/usr/bin/env node
-// Pass 75 QA row: cross-browser coverage - Chrome, Edge, Firefox, Safari-family
-// (WebKit), Opera and mobile.
+// THE STANDING CROSS-BROWSER GATE. One command, the whole matrix, fails closed.
 //
-// The owner's row is "does the game actually work in the browsers people have",
-// and until now the only mechanical answer was HF-331's frame-rate number in
-// three Chromium-family browsers. This closes the row: every lane boots the
-// real build, reaches an active solo match, and reports the renderer backend it
-// ACTUALLY took, the adapter behind it, whether it fell back to software, its
-// median/p90 frame rate, its console errors, and whether the HUD rendered
-// legibly and without horizontal overflow.
+// The owner's row is "working in chrome edge firefox safari and opera all ok,
+// and on mobiles". This answers it mechanically: every lane boots the real
+// build, reaches an active solo match in EVERY arena, and reports the renderer
+// backend it ACTUALLY took, the adapter behind it, whether it fell back to
+// software, its in-match frame rate against the browser's own measured ceiling,
+// its console errors, and whether the HUD rendered legibly without horizontal
+// overflow.
 //
-// INSTRUMENT: the page measures itself (scripts/qa/cross-browser-probe.html)
-// and POSTs the verdict to a local receiver, exactly the shape HF-331 arrived
-// at. No driver is reached into an installed browser, because Playwright's
-// bundled Firefox hangs in launch() on this machine and stock Firefox and Opera
-// cannot be puppeteered at all - every reach-in approach is a dead instrument
-// for half the matrix. Playwright appears here only as a LAUNCHER for the two
-// lanes that have no installed browser to open: bundled WebKit (the only
-// Safari-family engine available on Windows) and the mobile-emulation lane.
-// Both load the same probe page, so every number in the table was produced by
-// one instrument.
+// FOUR VERDICTS, and they are not interchangeable:
+//   pass          - measured, and every check held.
+//   fail          - measured, and something did not hold.
+//   not-installed - the browser is not on this machine. NEVER a pass. It is an
+//                   uncovered browser and the gate fails on it if the caller
+//                   listed it in --require.
+//   blocked       - the lane could not be measured at all (no foreground, a
+//                   browser the human already had open). Also never a pass:
+//                   an unmeasured lane is an uncovered lane.
 //
-// A browser that is not installed is reported as 'not-installed'. It is never
-// skipped silently and never guessed at: an absent lane is a gap in coverage
-// and has to read like one.
+// INSTRUMENT: the page measures itself (scripts/qa/cross-browser-probe.html) and
+// POSTs each arena's verdict to a local receiver. No driver is reached into an
+// installed browser, because Playwright's bundled Firefox hangs in launch() on
+// this machine and stock Firefox and Opera cannot be puppeteered at all - every
+// reach-in approach is a dead instrument for half the matrix. Playwright appears
+// here only as a LAUNCHER for the lanes with no installed browser to open:
+// bundled WebKit (the only Safari-family engine available on Windows) and the
+// two device-emulation lanes. Every lane loads the same probe, so every number
+// in the table was produced by one instrument.
 //
 // Usage:
 //   node scripts/qa/verify-cross-browser-matrix.mjs
-//     [--url http://127.0.0.1:41876] [--arena atomic-acres] [--sample-ms 12000]
-//     [--lanes chrome,edge,firefox,opera,webkit,mobile] [--port 9913]
-//     [--timeout 300000] [--render quality] [--renderer <backend>]
+//     [--url http://127.0.0.1:41876] [--arenas a,b,c] [--sample-ms 12000]
+//     [--lanes chrome,edge,firefox,opera,webkit,mobile,tablet] [--port 9913]
+//     [--timeout 900000] [--render quality] [--renderer <backend>]
 //     [--min-median-fps 0] [--require chrome,edge] [--headed]
 //     [--out artifacts/qa/cross-browser-matrix.json]
 import { createServer } from 'node:http';
-import { spawn, execSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { mkdtempSync, existsSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from '@playwright/test';
 import { startStableDevProxy } from './stable-dev-proxy.mjs';
+import {
+  BROWSER_LANES, foregroundWindow, killByToken, closeGracefully, processIsRunning,
+  competingBrowserAutomation,
+} from './installed-browser-lanes.mjs';
+import { computeMatrixVerdict } from './cross-browser-gate-contract.mjs';
 
+const HERE = dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
   const index = argv.indexOf(name);
@@ -48,10 +59,17 @@ const arg = (name, fallback) => {
 const list = (value) => value.split(',').map((entry) => entry.trim()).filter(Boolean);
 
 const BASE = arg('--url', 'http://127.0.0.1:41876');
-const ARENA = arg('--arena', 'atomic-acres');
+const ARENAS = list(arg('--arenas', 'atomic-acres,skyline-terminal,rustworks-1v1,gun-range,farcrysis,high-seas'));
 const SAMPLE_MS = Number(arg('--sample-ms', '12000'));
 const RECEIVER_PORT = Number(arg('--port', '9913'));
-const LANE_TIMEOUT_MS = Number(arg('--timeout', '300000'));
+const LANE_TIMEOUT_MS = Number(arg('--timeout', '900000'));
+// MUST exceed the probe page's own worst case, or the harness gives up before
+// the page has finished failing and the lane is truncated for a reason that has
+// nothing to do with the browser. The page budgets up to 180 s for bootstrap,
+// then three deploy attempts of 60 s, then settle and sample - so anything under
+// ~300 s cuts arenas off mid-answer. Measured: at 240 s the Chrome lane lost
+// high-seas entirely because farcrysis was still working through its retries.
+const ARENA_TIMEOUT_MS = Number(arg('--arena-timeout', '420000'));
 const RENDER_PROFILE = arg('--render', 'quality');
 const RENDERER_OVERRIDE = arg('--renderer', '');
 const MIN_MEDIAN_FPS = Number(arg('--min-median-fps', '0'));
@@ -64,103 +82,23 @@ const OUT = resolve(process.cwd(), arg('--out', 'artifacts/qa/cross-browser-matr
 // human's own browser session can never match.
 const RUN_TOKEN = `xbmatrix-${process.pid}-${Date.now().toString(36)}`;
 
-const LOCAL_APP_DATA = process.env.LOCALAPPDATA ?? 'C:/Users/Default/AppData/Local';
-const PROGRAM_FILES = process.env.ProgramFiles ?? 'C:/Program Files';
-const PROGRAM_FILES_X86 = process.env['ProgramFiles(x86)'] ?? 'C:/Program Files (x86)';
-
-/**
- * Installed-browser lanes. `processName` is what Windows calls the running
- * image - needed only for the focus activation, never for the kill, which
- * matches on the profile token instead (see the cleanup note below).
- */
-// The render runtime refuses to author frames unless the browser owns
-// foreground presentation. On this machine a freshly launched window is
-// reported OCCLUDED - document.visibilityState 'hidden' - and the arena then
-// never commits, which reads as "this browser cannot run the game" when the
-// truth is "nothing was ever asked to paint". Chromium's native occlusion
-// calculation is what produces that state, so it is turned off for the QA
-// window only; Firefox gets the equivalent through a profile pref below.
-const CHROMIUM_PRESENTATION_ARGS = [
-  '--no-first-run',
-  '--no-default-browser-check',
-  '--disable-features=CalculateNativeWinOcclusion',
-  '--disable-backgrounding-occluded-windows',
-  '--disable-renderer-backgrounding',
-  '--disable-background-timer-throttling',
-  '--window-position=0,0',
-  '--window-size=1280,800',
-  '--new-window',
-];
-
-/** Firefox's equivalent of the occlusion switch, written into the QA profile. */
-const FIREFOX_PROFILE_PREFS = [
-  'user_pref("widget.windows.window_occlusion_tracking.enabled", false);',
-  'user_pref("browser.shell.checkDefaultBrowser", false);',
-  'user_pref("browser.startup.homepage_override.mstone", "ignore");',
-].join('\n');
-
-const INSTALLED_LANES = {
-  chrome: {
-    family: 'chromium',
-    processName: 'chrome',
-    candidates: [
-      `${PROGRAM_FILES}/Google/Chrome/Application/chrome.exe`,
-      `${PROGRAM_FILES_X86}/Google/Chrome/Application/chrome.exe`,
-      `${LOCAL_APP_DATA}/Google/Chrome/Application/chrome.exe`,
-    ],
-    args: (profile, url) => [`--user-data-dir=${profile}`, ...CHROMIUM_PRESENTATION_ARGS, url],
-  },
-  edge: {
-    family: 'chromium',
-    processName: 'msedge',
-    candidates: [
-      `${PROGRAM_FILES_X86}/Microsoft/Edge/Application/msedge.exe`,
-      `${PROGRAM_FILES}/Microsoft/Edge/Application/msedge.exe`,
-    ],
-    args: (profile, url) => [`--user-data-dir=${profile}`, ...CHROMIUM_PRESENTATION_ARGS, url],
-  },
-  firefox: {
-    family: 'gecko',
-    processName: 'firefox',
-    candidates: [
-      `${PROGRAM_FILES}/Mozilla Firefox/firefox.exe`,
-      `${PROGRAM_FILES_X86}/Mozilla Firefox/firefox.exe`,
-    ],
-    args: (profile, url) => ['-no-remote', '-profile', profile, '-new-window', url],
-  },
-  opera: {
-    family: 'chromium',
-    processName: 'opera',
-    // Opera installs per-user by default and ships a launcher stub beside the
-    // real binary; both live under the same directory, and either can open a
-    // URL. Opera GX is a separate product with its own directory.
-    candidates: [
-      `${LOCAL_APP_DATA}/Programs/Opera/opera.exe`,
-      `${LOCAL_APP_DATA}/Programs/Opera/launcher.exe`,
-      `${LOCAL_APP_DATA}/Programs/Opera GX/opera.exe`,
-      `${PROGRAM_FILES}/Opera/opera.exe`,
-      `${PROGRAM_FILES_X86}/Opera/opera.exe`,
-    ],
-    args: (profile, url) => [`--user-data-dir=${profile}`, ...CHROMIUM_PRESENTATION_ARGS, url],
-  },
-};
 
 /**
  * Playwright-launched lanes. WebKit is the only Safari-family engine that can
  * be run on Windows at all, so it is the honest stand-in for Safari and is
- * labelled as such rather than being called "Safari". The mobile lane is
- * Chromium's device emulation at the contract phone viewport with touch, which
- * is what a phone's layout and input model actually exercise.
+ * labelled as such rather than being called "Safari". The two device lanes are
+ * Chromium's emulation at the contract phone and tablet viewports with touch,
+ * which is what those layouts and input models actually exercise.
  */
 const PLAYWRIGHT_LANES = {
   webkit: {
     engine: 'webkit',
-    stands_in_for: 'safari',
+    standsInFor: 'safari-family (NOT Safari itself - see the report)',
     context: { viewport: { width: 1280, height: 720 } },
   },
   mobile: {
     engine: 'chromium',
-    stands_in_for: 'mobile',
+    standsInFor: 'phone 390x844',
     context: {
       viewport: { width: 390, height: 844 },
       deviceScaleFactor: 3,
@@ -168,9 +106,19 @@ const PLAYWRIGHT_LANES = {
       hasTouch: true,
     },
   },
+  tablet: {
+    engine: 'chromium',
+    standsInFor: 'tablet 768x1024',
+    context: {
+      viewport: { width: 768, height: 1024 },
+      deviceScaleFactor: 2,
+      isMobile: true,
+      hasTouch: true,
+    },
+  },
 };
 
-const LANES = list(arg('--lanes', 'chrome,edge,firefox,opera,webkit,mobile'));
+const LANES = list(arg('--lanes', 'chrome,edge,firefox,opera,webkit,mobile,tablet'));
 
 // ---------------------------------------------------------------------------
 // Receiver: one long-lived server for the whole matrix. Every payload carries
@@ -193,18 +141,7 @@ const receiver = createServer((request, response) => {
     try { parsed = JSON.parse(body); } catch { parsed = { error: 'bad-json', body: body.slice(0, 200) }; }
     const waiter = pending.get(parsed?.lane);
     if (!waiter) return;
-    if (parsed.stage) {
-      const detail = parsed.stage === 'heartbeat'
-        ? ` backend=${parsed.backend} focus=${parsed.hasFocus} vis=${parsed.visibility} status="${parsed.status ?? ''}"`
-        : '';
-      console.error(`[xbrowser] ${parsed.lane} stage: ${parsed.stage}${detail}`);
-      waiter.stages.push(parsed.stage);
-      // The last heartbeat is the only evidence that separates "this browser
-      // cannot run the game" from "this window was never allowed to paint".
-      if (parsed.stage === 'heartbeat') waiter.lastHeartbeat = parsed;
-      return;
-    }
-    waiter.settle(parsed);
+    waiter.onPayload(parsed);
   });
 });
 await new Promise((ready) => receiver.listen(RECEIVER_PORT, '127.0.0.1', ready));
@@ -215,6 +152,17 @@ const ENDPOINT = `http://127.0.0.1:${RECEIVER_PORT}/report`;
 // broadcast a full-reload, and a lane that reloads halfway through its frame
 // sample reports nothing; an installed browser cannot be protected any other
 // way. See stable-dev-proxy.mjs.
+// The Windows foreground is a single global resource and the game will not
+// render without it, so another lane driving a browser on this machine steals
+// focus back between our attempts and turns a good browser into an unmeasurable
+// one. Detected up front and recorded in the receipt, because the failure it
+// causes looks exactly like a browser fault.
+const competing = competingBrowserAutomation({ selfScript: 'verify-cross-browser-matrix.mjs' });
+if (competing.length > 0) {
+  console.error(`[xbrowser] WARNING: other QA automation is driving browsers on this machine: ${competing.join(', ')}`);
+  console.error('[xbrowser]          Foreground is a single global resource - lanes may lose focus and report BLOCKED.');
+}
+
 const proxy = await startStableDevProxy({ target: new URL(BASE) });
 console.error(`[xbrowser] serving lanes through ${proxy.origin} -> ${BASE}`);
 
@@ -227,68 +175,67 @@ function laneUrl(lane) {
   // would report a network fault as a browser fault.
   url.searchParams.set('externalServices', 'off');
   url.searchParams.set('xbLane', lane);
-  url.searchParams.set('xbArena', ARENA);
+  url.searchParams.set('xbArenas', ARENAS.join(','));
+  url.searchParams.set('xbIndex', '0');
   url.searchParams.set('xbSampleMs', String(SAMPLE_MS));
   url.searchParams.set('xbEndpoint', ENDPOINT);
   return url.toString();
 }
 
-function awaitLaneReport(lane, timeoutMs) {
+/**
+ * Collect one arena result per arena, then the sweep-complete beacon.
+ *
+ * The per-ARENA timeout is what stops one wedged arena from costing the whole
+ * lane: the page navigates itself to the next arena after every result, so a
+ * lane that has gone quiet for longer than one arena's budget is abandoned and
+ * whatever it did report is kept. Before this, one bad arena reported six.
+ */
+function awaitLaneSweep(lane) {
   const stages = [];
+  const arenaResults = [];
   const waiter = { stages, lastHeartbeat: null };
   return {
-    stages,
+    arenaResults,
     promise: new Promise((settleReport) => {
-      const timer = setTimeout(() => {
+      const started = Date.now();
+      let arenaTimer = null;
+      const finish = (extra) => {
+        if (arenaTimer) clearTimeout(arenaTimer);
+        clearTimeout(laneTimer);
         pending.delete(lane);
-        settleReport({
-          error: 'receiver-timeout',
+        settleReport({ arenaResults, stages, lastHeartbeat: waiter.lastHeartbeat, ...extra });
+      };
+      const laneTimer = setTimeout(() => finish({ laneTimedOut: true }), LANE_TIMEOUT_MS);
+      const armArenaTimer = () => {
+        if (arenaTimer) clearTimeout(arenaTimer);
+        arenaTimer = setTimeout(() => finish({
+          arenaTimedOut: true,
           lastStage: stages.at(-1) ?? 'none',
-          lastHeartbeat: waiter.lastHeartbeat,
-        });
-      }, timeoutMs);
-      waiter.settle = (payload) => {
-        clearTimeout(timer);
-        pending.delete(lane);
-        settleReport({ lastHeartbeat: waiter.lastHeartbeat, ...payload });
+        }), ARENA_TIMEOUT_MS);
+      };
+      armArenaTimer();
+      waiter.onPayload = (parsed) => {
+        if (parsed.stage === 'arena-result') {
+          arenaResults.push(parsed);
+          armArenaTimer();
+          const detail = parsed.ok
+            ? `${parsed.medianFps}fps (ceiling ${parsed.ceilingMedianFps}fps) on ${parsed.backendDataset}`
+            : `FAILED - ${parsed.error ?? 'unknown'}`;
+          console.error(`[xbrowser]   ${lane}/${parsed.arena}: ${detail}`);
+          for (const line of parsed.consoleErrors ?? parsed.errors ?? []) console.error(`[xbrowser]     ! ${line}`);
+          if (arenaResults.length >= ARENAS.length) finish({ sweepCompleted: true, elapsedMs: Date.now() - started });
+          return;
+        }
+        if (parsed.stage === 'sweep-complete') { finish({ sweepCompleted: true, elapsedMs: Date.now() - started }); return; }
+        stages.push(parsed.stage);
+        if (parsed.stage === 'heartbeat') {
+          waiter.lastHeartbeat = parsed;
+          console.error(`[xbrowser]   ${lane}/${parsed.arena} heartbeat backend=${parsed.backend} focus=${parsed.hasFocus} vis=${parsed.visibility} "${(parsed.status ?? '').slice(0, 50)}"`);
+        }
       };
       pending.set(lane, waiter);
     }),
   };
-}
-
-// ---------------------------------------------------------------------------
-// Cleanup. Killing the spawn pid is WRONG on Windows: for several of these
-// browsers the thing spawned is a launcher stub that exits immediately and
-// leaves the real windows orphaned (documented in
-// run-hf331-installed-browser-fps.mjs, which was bitten by exactly this). Match
-// on the unique temp-profile token in the command line instead - it appears in
-// every process of the tree this run started, and in nothing else.
-// ---------------------------------------------------------------------------
-function killLaneWindows(profileToken) {
-  try {
-    execSync(
-      `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*${profileToken}*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"`,
-      { stdio: 'ignore' },
-    );
-  } catch { /* windows already gone */ }
-}
-
-function activateLaneWindow(processName, profileToken) {
-  // FOCUS MATTERS: the render runtime refuses to author frames without document
-  // focus, so an unfocused window spins in prewarm forever and reads as a
-  // browser wedge rather than the harness fault it is.
-  // AppActivate alone returns true against a MINIMISED or occluded window and
-  // leaves it that way, so the page stays hidden and the arena never commits.
-  // Restore the window first, then take the foreground. Strictly scoped to the
-  // processes whose command line carries this lane's profile token - never any
-  // other browser the human happens to have open.
-  try {
-    execSync(
-      `powershell -NoProfile -Command "Add-Type -Namespace Qa -Name Win -MemberDefinition '[DllImport(\\"user32.dll\\")] public static extern bool ShowWindowAsync(IntPtr h, int n); [DllImport(\\"user32.dll\\")] public static extern bool SetForegroundWindow(IntPtr h);'; $ids = Get-CimInstance Win32_Process -Filter \\"Name='${processName}.exe'\\" | Where-Object { $_.CommandLine -like '*${profileToken}*' } | Select-Object -ExpandProperty ProcessId; foreach ($id in $ids) { $proc = Get-Process -Id $id -ErrorAction SilentlyContinue; if ($proc -and $proc.MainWindowHandle -ne 0) { [Qa.Win]::ShowWindowAsync($proc.MainWindowHandle, 9) | Out-Null; [Qa.Win]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null } }"`,
-      { stdio: 'ignore' },
-    );
-  } catch { /* best effort */ }
 }
 
 async function runInstalledLane(lane, spec) {
@@ -296,25 +243,87 @@ async function runInstalledLane(lane, spec) {
   if (!executable) {
     return { lane, kind: 'installed', engine: spec.family, status: 'not-installed', searched: spec.candidates };
   }
+  // The Firefox lane drives the DEFAULT profile (an explicit -profile costs it
+  // content focus entirely - see installed-browser-lanes.mjs), so a browser the
+  // human already has open would swallow the URL through remoting and the lane
+  // would time out blaming Firefox. Refuse instead of measuring a lie.
+  if (spec.usesDefaultProfile && processIsRunning(spec.processName)) {
+    return {
+      lane,
+      kind: 'installed',
+      engine: spec.family,
+      executable,
+      status: 'blocked-browser-already-running',
+      blockedReason: `${spec.processName}.exe was already running. This lane drives the default profile and will not touch a session it did not start - close ${spec.label} and re-run.`,
+    };
+  }
+
   const profileToken = `${RUN_TOKEN}-${lane}`;
   const profile = mkdtempSync(join(tmpdir(), `${profileToken}-`));
-  if (spec.family === 'gecko') writeFileSync(join(profile, 'user.js'), `${FIREFOX_PROFILE_PREFS}\n`);
-  const waiter = awaitLaneReport(lane, LANE_TIMEOUT_MS);
+  if (spec.family === 'gecko' && !spec.usesDefaultProfile) writeFileSync(join(profile, 'user.js'), `${spec.prefs({})}\n`);
+  // The default-profile lane owns every window of the process (it refused to
+  // start if one was already open), which is the only handle that survives the
+  // app rewriting document.title on boot.
+  const ownsProcess = Boolean(spec.usesDefaultProfile);
+
+  const sweep = awaitLaneSweep(lane);
   console.error(`[xbrowser] launching ${lane} (${executable})`);
-  spawn(executable, spec.args(profile, laneUrl(lane)), { stdio: 'ignore', windowsHide: false });
-  const activateTimers = [6_000, 30_000, 90_000, 150_000]
-    .map((delay) => setTimeout(() => activateLaneWindow(spec.processName, profileToken), delay));
-  const report = await waiter.promise;
-  for (const timer of activateTimers) clearTimeout(timer);
-  killLaneWindows(profileToken);
-  try { rmSync(profile, { recursive: true, force: true }); } catch { /* profile still locked; temp dir is disposable */ }
-  return { lane, kind: 'installed', engine: spec.family, executable, ...report };
+  spawn(executable, spec.args({ profile, url: laneUrl(lane) }), {
+    stdio: 'ignore',
+    windowsHide: false,
+    env: { ...process.env, ...(spec.env ?? {}) },
+  });
+
+  // KEEP the foreground, do not take it once and hope. The game refuses to
+  // author frames without document focus, so a window that loses the foreground
+  // half way through an arena stops producing frames and the arena reads as a
+  // wedge. Every attempt is recorded, and the fraction that held is published
+  // next to the numbers it protects.
+  const foregroundAttempts = [];
+  const keepForeground = setInterval(() => {
+    const attempt = foregroundWindow({
+      token: ownsProcess ? undefined : profileToken,
+      anyWindow: ownsProcess,
+      processName: spec.processName,
+      scriptDir: HERE,
+    });
+    foregroundAttempts.push(attempt.ok);
+  }, 5_000);
+
+  const report = await sweep.promise;
+  clearInterval(keepForeground);
+
+  if (ownsProcess) {
+    foregroundWindow({ anyWindow: true, processName: spec.processName, scriptDir: HERE, closeOnly: true });
+    await new Promise((wait) => setTimeout(wait, 1_500));
+    // Graceful, then forced. A force-killed Firefox records a startup crash and
+    // three of those turn the NEXT launch into a "Troubleshoot Mode?" modal that
+    // eats the URL - an impatient teardown here breaks the following run.
+    await closeGracefully(spec.processName);
+  } else {
+    killByToken(profileToken);
+  }
+  if (profile) {
+    try { rmSync(profile, { recursive: true, force: true }); } catch { /* still locked; temp dir is disposable */ }
+  }
+
+  return {
+    lane,
+    kind: 'installed',
+    engine: spec.family,
+    executable,
+    usesDefaultProfile: Boolean(spec.usesDefaultProfile),
+    foregroundHeldFraction: foregroundAttempts.length
+      ? Number((foregroundAttempts.filter(Boolean).length / foregroundAttempts.length).toFixed(3))
+      : null,
+    ...report,
+  };
 }
 
 async function runPlaywrightLane(lane, spec) {
   const launcher = spec.engine === 'webkit' ? webkit : chromium;
   let browser = null;
-  const waiter = awaitLaneReport(lane, LANE_TIMEOUT_MS);
+  const sweep = awaitLaneSweep(lane);
   try {
     console.error(`[xbrowser] launching ${lane} (playwright ${spec.engine})`);
     browser = await launcher.launch({
@@ -335,165 +344,222 @@ async function runPlaywrightLane(lane, spec) {
     page.on('console', (message) => { if (message.type() === 'error') driverErrors.push(message.text().slice(0, 220)); });
     page.on('pageerror', (error) => driverErrors.push(`pageerror: ${String(error).slice(0, 220)}`));
     await page.goto(laneUrl(lane), { waitUntil: 'domcontentloaded' });
-    const report = await waiter.promise;
+    const report = await sweep.promise;
     return {
       lane,
       kind: 'playwright',
       engine: spec.engine,
-      standsInFor: spec.stands_in_for,
+      standsInFor: spec.standsInFor,
       headless: !HEADED,
+      driverErrors: [...new Set(driverErrors)].slice(0, 12),
       ...report,
-      consoleErrors: [...new Set([...(report.consoleErrors ?? []), ...driverErrors])],
     };
   } catch (error) {
-    return { lane, kind: 'playwright', engine: spec.engine, standsInFor: spec.stands_in_for, error: `launch-failed: ${String(error).slice(0, 200)}` };
+    return { lane, kind: 'playwright', engine: spec.engine, standsInFor: spec.standsInFor, status: 'failed-launch', error: `launch-failed: ${String(error).slice(0, 200)}` };
   } finally {
     await browser?.close().catch(() => {});
   }
 }
 
-/** Everything a reader needs to judge one lane, plus the pass/fail reasons. */
-function gradeLane(record) {
-  if (record.status === 'not-installed') return { ...record, verdict: 'not-installed', failures: [] };
-  // A lane that timed out never sends its final payload, so the errors it did
-  // report - in its heartbeats - are the only ones there are. Fold them in, or
-  // the table shows a browser that threw three times with an error count of 0.
-  const heartbeatErrors = record.lastHeartbeat?.errors ?? [];
-  const consoleErrors = [...new Set([...(record.consoleErrors ?? []), ...heartbeatErrors])];
-  const presentable = record.lastHeartbeat
-    && record.lastHeartbeat.visibility === 'visible'
-    && record.lastHeartbeat.hasFocus !== false;
-  // A window the desktop never let paint proves nothing about the browser, and
-  // the render runtime needs BOTH visibility and focus before it authors a
-  // frame. Give that its own verdict rather than booking it as a product
-  // failure - but only when the page reported no errors of its own: a lane that
-  // threw has a real fault to answer for whether or not it was in front. Never a
-  // pass either way; an unmeasured lane is still an uncovered lane.
-  if (record.done !== true && record.lastHeartbeat && !presentable && consoleErrors.length === 0) {
+/** Everything a reader needs to judge one arena of one lane. */
+function gradeArena(laneRecord, arena) {
+  const result = (laneRecord.arenaResults ?? []).find((entry) => entry.arena === arena) ?? null;
+  if (!result) {
+    // Never reported at all. If the lane's last heartbeat says the window was
+    // not presentable, that is a harness fault, not a product fault - but it is
+    // still not a pass, because nothing was measured.
+    const heartbeat = laneRecord.lastHeartbeat;
+    const blockedOnForeground = heartbeat && (heartbeat.hasFocus === false || heartbeat.visibility !== 'visible');
     return {
-      ...record,
-      consoleErrors,
-      verdict: 'blocked-no-foreground',
-      failures: [`window-never-presentable(visibility=${record.lastHeartbeat.visibility}, focus=${record.lastHeartbeat.hasFocus}, lastStage=${record.lastStage ?? 'unknown'})`],
+      arena,
+      verdict: blockedOnForeground ? 'blocked' : 'fail',
+      failures: [blockedOnForeground
+        ? `window-never-presentable(focus=${heartbeat.hasFocus}, visibility=${heartbeat.visibility})`
+        : 'never-reported'],
+      backend: null,
+      medianFps: null,
+      ceilingMedianFps: null,
     };
   }
+
+  const consoleErrors = [...new Set([...(result.consoleErrors ?? []), ...(result.errors ?? [])])];
   const failures = [];
-  const audit = record.hudAudit ?? null;
-  if (record.error) failures.push(record.error);
-  if (record.done !== true) failures.push(`never-completed(lastStage=${record.lastStage ?? 'unknown'})`);
-  if (record.matchPhase !== 'active' || record.gameStarted !== true) failures.push('no-active-match');
+  if (!result.ok) failures.push(result.error ?? 'arena-failed');
+  if (result.ok) {
+    if (result.matchPhase !== 'active' || result.gameStarted !== true) failures.push('no-active-match');
+    const audit = result.hudAudit ?? null;
+    if (!audit || audit.error) failures.push(`hud-audit-unavailable${audit?.error ? `:${audit.error}` : ''}`);
+    else {
+      if ((audit.belowNinePx ?? []).length > 0) failures.push(`hud-text-below-9px:${audit.belowNinePx.length}`);
+      if ((audit.pageOverflowX ?? 0) > 0) failures.push(`hud-horizontal-overflow:${audit.pageOverflowX}px`);
+    }
+    if (result.runtime?.failClosed === true) failures.push('renderer-fail-closed');
+    if (result.runtime?.deviceLost === true) failures.push('renderer-device-lost');
+    // A frame-rate floor is machine- and lane-specific (a headless lane may
+    // legitimately land on a software rasteriser), so the numbers are always
+    // recorded and only gated when the operator asks for a gate.
+    if (MIN_MEDIAN_FPS > 0 && Number(result.medianFps ?? 0) < MIN_MEDIAN_FPS) {
+      failures.push(`median-fps-${result.medianFps ?? 'none'}-below-${MIN_MEDIAN_FPS}`);
+    }
+  }
   if (consoleErrors.length > 0) failures.push(`console-errors:${consoleErrors.length}`);
-  if (!audit || audit.error) failures.push(`hud-audit-unavailable${audit?.error ? `:${audit.error}` : ''}`);
-  else {
-    if ((audit.belowNinePx ?? []).length > 0) failures.push(`hud-text-below-9px:${audit.belowNinePx.length}`);
-    if ((audit.pageOverflowX ?? 0) > 0) failures.push(`hud-horizontal-overflow:${audit.pageOverflowX}px`);
+  // A sample taken without focus is not a slow number, it is not a number.
+  const focusedFraction = result.inMatch?.focusedFraction ?? null;
+  if (result.ok && focusedFraction !== null && focusedFraction < 0.5) {
+    failures.push(`sampled-without-focus:${focusedFraction}`);
   }
-  if (record.runtime?.failClosed === true) failures.push('renderer-fail-closed');
-  if (record.runtime?.deviceLost === true) failures.push('renderer-device-lost');
-  // A frame-rate floor is machine- and lane-specific (a headless lane may
-  // legitimately land on a software rasteriser), so the numbers are always
-  // recorded and only gated when the operator asks for a gate.
-  if (MIN_MEDIAN_FPS > 0 && Number(record.medianFps ?? 0) < MIN_MEDIAN_FPS) {
-    failures.push(`median-fps-${record.medianFps ?? 'none'}-below-${MIN_MEDIAN_FPS}`);
-  }
-  return { ...record, consoleErrors, verdict: failures.length === 0 ? 'pass' : 'fail', failures };
+
+  return {
+    arena,
+    verdict: failures.length === 0 ? 'pass' : 'fail',
+    failures,
+    ok: result.ok === true,
+    backend: result.runtime?.actualBackend ?? result.backendDataset ?? null,
+    adapter: result.runtime?.adapterLabel ?? result.context?.unmaskedRenderer ?? result.context?.renderer ?? null,
+    softwareFallback: softwareFallback(result),
+    medianFps: result.medianFps ?? null,
+    p90WorstFps: result.p90WorstFps ?? null,
+    medianFrameMs: result.medianFrameMs ?? null,
+    ceilingMedianFps: result.ceilingMedianFps ?? null,
+    focusedFraction,
+    hudBelowNinePx: (result.hudAudit?.belowNinePx ?? []).length,
+    hudOverflowX: result.hudAudit?.pageOverflowX ?? null,
+    viewport: result.viewport ?? null,
+    consoleErrors,
+  };
 }
 
-function backendTaken(record) {
-  return record.runtime?.actualBackend ?? record.backendDataset ?? 'unknown';
-}
-
-function adapterIdentity(record) {
-  return record.runtime?.adapterLabel
-    ?? record.context?.unmaskedRenderer
-    ?? record.context?.renderer
-    ?? 'unknown';
-}
-
-function softwareFallback(record) {
-  if (record.status === 'not-installed') return null;
-  if (record.runtime?.softwareAdapter === true) return true;
-  if (record.atomicSignalRenderer === 'software') return true;
-  const adapter = String(adapterIdentity(record));
+function softwareFallback(result) {
+  if (result.runtime?.softwareAdapter === true) return true;
+  if (result.atomicSignalRenderer === 'software') return true;
+  const adapter = String(result.runtime?.adapterLabel ?? result.context?.unmaskedRenderer ?? result.context?.renderer ?? '');
   if (/swiftshader|llvmpipe|software|basic render|microsoft basic/i.test(adapter)) return true;
-  return record.runtime || record.context?.available ? false : null;
+  return adapter ? false : null;
 }
 
+function gradeLane(record) {
+  if (record.status === 'not-installed') {
+    return { ...record, verdict: 'not-installed', arenas: ARENAS.map((arena) => ({ arena, verdict: 'not-installed' })) };
+  }
+  if (record.status === 'blocked-browser-already-running' || record.status === 'failed-launch') {
+    return {
+      ...record,
+      verdict: 'blocked',
+      arenas: ARENAS.map((arena) => ({ arena, verdict: 'blocked', failures: [record.blockedReason ?? record.error ?? record.status] })),
+    };
+  }
+  const arenas = ARENAS.map((arena) => gradeArena(record, arena));
+  const failed = arenas.filter((entry) => entry.verdict === 'fail');
+  const blocked = arenas.filter((entry) => entry.verdict === 'blocked');
+  const verdict = failed.length > 0 ? 'fail' : (blocked.length > 0 ? 'blocked' : 'pass');
+  return { ...record, verdict, arenas };
+}
+
+/**
+ * The receipt, as it stands. Written after EVERY lane, not once at the end: a
+ * full matrix is a two-hour run, and a harness that only persists what it found
+ * on its last line throws all of it away the moment anything interrupts it. A
+ * partial receipt is marked partial and names the lanes that never ran, so it
+ * can never be mistaken for a completed sweep - and a partial sweep is never a
+ * PASS, because a lane that did not run is a browser that is not covered.
+ */
+function buildReceipt(laneRecords, { complete }) {
+  const {
+    verdict, notInstalled, failedLanes, blockedLanes, requiredMissingOrBlocked, measured,
+  } = computeMatrixVerdict({ lanes: laneRecords, required: REQUIRED });
+  const ran = laneRecords.map((record) => record.lane);
+  const lanesNeverRun = LANES.filter((lane) => !ran.includes(lane));
+  const finished = complete && lanesNeverRun.length === 0;
+  return {
+    verdict: finished ? verdict : 'FAIL',
+    complete: finished,
+    lanesNeverRun,
+    measuredAt: new Date().toISOString(),
+    base: BASE,
+    servedVia: proxy.origin,
+    devServerReloadsSuppressed: proxy.suppressedReloads(),
+    competingBrowserAutomation: competing,
+    arenas: ARENAS,
+    sampleMs: SAMPLE_MS,
+    renderProfile: RENDER_PROFILE,
+    rendererOverride: RENDERER_OVERRIDE || null,
+    minMedianFpsGate: MIN_MEDIAN_FPS || null,
+    requiredLanes: REQUIRED,
+    requiredMissingOrBlocked,
+    measuredLanes: measured,
+    notInstalled,
+    failedLanes,
+    blockedLanes,
+    lanes: laneRecords,
+  };
+}
+
+mkdirSync(resolve(OUT, '..'), { recursive: true });
 const records = [];
 for (const lane of LANES) {
-  if (INSTALLED_LANES[lane]) records.push(gradeLane(await runInstalledLane(lane, INSTALLED_LANES[lane])));
-  else if (PLAYWRIGHT_LANES[lane]) records.push(gradeLane(await runPlaywrightLane(lane, PLAYWRIGHT_LANES[lane])));
-  else records.push({ lane, verdict: 'fail', failures: ['unknown-lane'] });
-  const last = records.at(-1);
-  console.error(`[xbrowser] ${lane}: ${last.verdict}`
-    + (last.verdict === 'not-installed' ? '' : ` backend=${backendTaken(last)} median=${last.medianFps ?? '?'}fps`)
-    + (last.failures?.length ? ` failures=${last.failures.join(',')}` : ''));
+  let raw;
+  if (BROWSER_LANES[lane]) raw = await runInstalledLane(lane, BROWSER_LANES[lane]);
+  else if (PLAYWRIGHT_LANES[lane]) raw = await runPlaywrightLane(lane, PLAYWRIGHT_LANES[lane]);
+  else raw = { lane, status: 'unknown-lane', error: `no such lane: ${lane}` };
+  const graded = gradeLane(raw);
+  records.push(graded);
+  console.error(`[xbrowser] ${lane}: ${graded.verdict.toUpperCase()}`);
+  writeFileSync(OUT, `${JSON.stringify(buildReceipt(records, { complete: false }), null, 2)}
+`);
 }
 
 receiver.close();
 await proxy.close();
 
-const missing = records.filter((record) => record.verdict === 'not-installed').map((record) => record.lane);
-const failed = records.filter((record) => record.verdict === 'fail').map((record) => record.lane);
-const blocked = records.filter((record) => record.verdict === 'blocked-no-foreground').map((record) => record.lane);
-const requiredMissing = REQUIRED.filter((lane) => missing.includes(lane));
-// A blocked lane is not a pass. The row closes only when every lane that exists
-// on this machine was actually measured.
-const verdict = failed.length === 0 && blocked.length === 0 && requiredMissing.length === 0 ? 'PASS' : 'FAIL';
+// The verdict rule lives in cross-browser-gate-contract.mjs and is unit-tested
+// there (`node --test scripts/qa/cross-browser-gate-contract.test.mjs`), because
+// "an uninstalled browser must never read as a pass" is arithmetic and should
+// not need a two-hour browser sweep to re-check.
+const receipt = buildReceipt(records, { complete: true });
+const { verdict } = receipt;
+writeFileSync(OUT, `${JSON.stringify(receipt, null, 2)}
+`);
 
-const receipt = {
-  verdict,
-  measuredAt: new Date().toISOString(),
-  base: BASE,
-  servedVia: proxy.origin,
-  devServerReloadsSuppressed: proxy.suppressedReloads(),
-  arena: ARENA,
-  sampleMs: SAMPLE_MS,
-  renderProfile: RENDER_PROFILE,
-  rendererOverride: RENDERER_OVERRIDE || null,
-  minMedianFpsGate: MIN_MEDIAN_FPS || null,
-  requiredLanes: REQUIRED,
-  requiredMissing,
-  notInstalled: missing,
-  failedLanes: failed,
-  blockedLanes: blocked,
-  lanes: records.map((record) => ({
-    ...record,
-    backendTaken: record.verdict === 'not-installed' ? null : backendTaken(record),
-    adapterIdentity: record.verdict === 'not-installed' ? null : adapterIdentity(record),
-    softwareFallback: softwareFallback(record),
-  })),
-};
-
-mkdirSync(resolve(OUT, '..'), { recursive: true });
-writeFileSync(OUT, `${JSON.stringify(receipt, null, 2)}\n`);
-
-// Readable table. Fixed columns rather than JSON, because the point of this row
-// is that a human can see at a glance which browser is broken.
-const columns = [
-  ['LANE', (row) => row.lane],
-  ['ENGINE', (row) => row.engine ?? '-'],
-  ['STATUS', (row) => row.verdict],
-  ['BACKEND', (row) => row.backendTaken ?? '-'],
-  ['SOFTWARE', (row) => (row.softwareFallback === null ? '-' : String(row.softwareFallback))],
-  ['MEDIAN', (row) => (row.medianFps === undefined ? '-' : `${row.medianFps}fps`)],
-  ['P90', (row) => (row.p90WorstFps === undefined ? '-' : `${row.p90WorstFps}fps`)],
-  ['ERRS', (row) => String((row.consoleErrors ?? []).length)],
-  ['HUD<9PX', (row) => String((row.hudAudit?.belowNinePx ?? []).length)],
-  ['OVERFLOW', (row) => String(row.hudAudit?.pageOverflowX ?? '-')],
-  ['ADAPTER', (row) => String(row.adapterIdentity ?? '-').slice(0, 46)],
-];
-const rows = receipt.lanes.map((row) => columns.map(([, read]) => String(read(row) ?? '-')));
-const widths = columns.map(([header], index) => Math.max(header.length, ...rows.map((row) => row[index].length)));
+// Readable table, one row per browser per arena. Fixed columns rather than
+// JSON, because the point of this row is that a human can see at a glance which
+// browser is broken and in which map.
+const rows = [];
+for (const record of records) {
+  for (const arena of record.arenas ?? []) {
+    rows.push([
+      record.lane,
+      arena.arena,
+      arena.verdict === 'not-installed' ? 'SKIPPED' : arena.verdict.toUpperCase(),
+      arena.backend ?? '-',
+      arena.softwareFallback === null || arena.softwareFallback === undefined ? '-' : String(arena.softwareFallback),
+      arena.medianFps == null ? 'UNMEASURED' : `${arena.medianFps}`,
+      arena.ceilingMedianFps == null ? 'UNMEASURED' : `${arena.ceilingMedianFps}`,
+      arena.focusedFraction == null ? '-' : `${Math.round(arena.focusedFraction * 100)}%`,
+      String((arena.consoleErrors ?? []).length || 0),
+      arena.hudBelowNinePx == null ? '-' : String(arena.hudBelowNinePx),
+      arena.hudOverflowX == null ? '-' : String(arena.hudOverflowX),
+    ]);
+  }
+}
+const headers = ['LANE', 'ARENA', 'STATUS', 'BACKEND', 'SOFTWARE', 'FPS', 'CEILING', 'FOCUS', 'ERRS', 'HUD<9PX', 'OVERFLOW'];
+const widths = headers.map((header, index) => Math.max(header.length, ...rows.map((row) => row[index].length)));
 const line = (cells) => cells.map((cell, index) => cell.padEnd(widths[index])).join('  ');
-console.log(line(columns.map(([header]) => header)));
+console.log(line(headers));
 console.log(widths.map((width) => '-'.repeat(width)).join('  '));
 for (const row of rows) console.log(line(row));
 console.log('');
-for (const row of receipt.lanes) {
-  if (row.verdict === 'fail' && row.failures?.length) console.log(`FAIL ${row.lane}: ${row.failures.join(' | ')}`);
-  if (row.verdict === 'not-installed') console.log(`NOT INSTALLED ${row.lane}: searched ${(row.searched ?? []).join(' ; ')}`);
-  if (row.verdict === 'blocked-no-foreground') console.log(`BLOCKED ${row.lane}: ${row.failures.join(' | ')} - nothing was measured, so this lane is still uncovered`);
+for (const record of records) {
+  if (record.verdict === 'not-installed') {
+    console.log(`SKIPPED ${record.lane}: not installed on this machine - searched ${(record.searched ?? []).join(' ; ')}`);
+    console.log(`        SKIPPED IS NOT A PASS. This browser is uncovered.`);
+  }
+  if (record.verdict === 'blocked') {
+    console.log(`BLOCKED ${record.lane}: ${record.blockedReason ?? record.error ?? 'lane could not be measured'}`);
+    console.log(`        BLOCKED IS NOT A PASS. Nothing was measured, so this browser is uncovered.`);
+  }
+  for (const arena of record.arenas ?? []) {
+    if (arena.verdict === 'fail') console.log(`FAIL ${record.lane}/${arena.arena}: ${(arena.failures ?? []).join(' | ')}`);
+  }
 }
 console.log(`\nverdict=${verdict}  receipt=${OUT}`);
 process.exit(verdict === 'PASS' ? 0 : 1);

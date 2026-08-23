@@ -2,11 +2,16 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
+  LOCAL_OPERATOR_SKIN_STORAGE_KEY,
   OPERATOR_SKIN_CATALOG,
   OPERATOR_SKIN_PALETTES,
+  observeLocalOperatorSkinId,
+  operatorBodyColour,
   operatorSkinPalette,
+  readLocalOperatorSkinId,
 } from './operator-skin-catalog';
 import {
+  FIRST_PERSON_ARM_CRUSHED_ALBEDO_ROLES,
   FIRST_PERSON_ARM_GIRTH_METRES,
   FIRST_PERSON_ARM_SKIN_CONTRACT,
   applyFirstPersonArmSkin,
@@ -31,6 +36,7 @@ import {
 import {
   OPERATOR_PREVIEW_CANVAS_ID,
   OPERATOR_PREVIEW_CONTRACT,
+  OPERATOR_PREVIEW_PORTRAIT_ID,
   OPERATOR_PREVIEW_STATUS_ID,
   OPERATOR_PREVIEW_TURN_RADIANS_PER_SECOND,
   selectedOperatorSkinFrom,
@@ -281,5 +287,222 @@ describe('operator menu preview (HF-366)', () => {
       .toBe(SELECTABLE[2]!.id);
     expect(selectedOperatorSkinFrom(panel([{ id: 'not-a-skin', pressed: true }]))).toBe('default');
     expect(selectedOperatorSkinFrom(panel([{ id: 'explorer', pressed: false }]))).toBe('default');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HF-365 / HF-366 SECOND PASS. Everything below is a falsifier for the way the
+// FIRST attempt at these rows passed its own tests and still reached the owner
+// broken: it asserted the tint that was WRITTEN to the material, and never what
+// that tint could produce once multiplied into the authored map. Each test here
+// fails against the code as it stood at HEAD.
+// ---------------------------------------------------------------------------
+
+/**
+ * The authored atlas means, measured on 2026-08-23 from the shipped PNGs by
+ * sampling each mesh's own UV island in a browser. These are the numbers the
+ * runtime multiplies a tint into, and the reason a tint alone could not work.
+ */
+const MEASURED_ATLAS_MEAN = Object.freeze({
+  sleeve: 30 / 255,
+  glove: 16 / 255,
+  'finger-glove': 95 / 255,
+  accent: 102 / 255,
+});
+/**
+ * Mean RGB of each skin's OWN 512x512 Swat base-colour map, measured the same
+ * day. Two of the four are dark enough that no multiply tint can reach them,
+ * which is why the palette carries a per-skin lift rather than one constant.
+ */
+const MEASURED_BODY_SWAT_MEAN = Object.freeze({
+  default: 156 / 255,
+  explorer: 84 / 255,
+  symbiote: 44 / 255,
+  navalops: 44 / 255,
+});
+/** Below this the surface is a silhouette, not a colour, on a lit viewmodel. */
+const READABLE_ALBEDO_FLOOR = 0.16;
+
+/**
+ * The measurements above are sRGB byte means, and "does this read as a colour
+ * or as a silhouette" is a judgement about what reaches the screen, so every
+ * comparison below is made in sRGB. THREE.Color stores LINEAR components, and
+ * mixing the two spaces silently halves every dark value - which is its own
+ * way of testing something other than what the player sees.
+ */
+type Srgb = Readonly<{ r: number; g: number; b: number }>;
+
+function srgb(hex: number): Srgb {
+  return Object.freeze({
+    r: ((hex >> 16) & 0xff) / 255,
+    g: ((hex >> 8) & 0xff) / 255,
+    b: (hex & 0xff) / 255,
+  });
+}
+
+function luminance(colour: Srgb): number {
+  return colour.r * 0.2126 + colour.g * 0.7152 + colour.b * 0.0722;
+}
+
+function effectiveAlbedo(colourHex: number, atlasMean: number, mapDropped: boolean): Srgb {
+  const colour = srgb(colourHex);
+  const scale = mapDropped ? 1 : atlasMean;
+  return Object.freeze({ r: colour.r * scale, g: colour.g * scale, b: colour.b * scale });
+}
+
+function separation(a: Srgb, b: Srgb): number {
+  return Math.abs(a.r - b.r) + Math.abs(a.g - b.g) + Math.abs(a.b - b.b);
+}
+
+describe('the arms can actually show a skin on screen (HF-366 falsifier)', () => {
+  it('does not multiply a palette tint into a crushed albedo, because that cannot produce a colour', () => {
+    // The exact arithmetic that made the first attempt invisible: even a WHITE
+    // tint over the measured glove atlas lands at 16/255, far under anything a
+    // player could call a colour.
+    const brightestPossible = effectiveAlbedo(0xffffff, MEASURED_ATLAS_MEAN.glove, false);
+    expect(brightestPossible.r).toBeLessThan(READABLE_ALBEDO_FLOOR);
+
+    for (const role of FIRST_PERSON_ARM_CRUSHED_ALBEDO_ROLES) {
+      expect(MEASURED_ATLAS_MEAN[role as 'sleeve' | 'glove']).toBeLessThan(READABLE_ALBEDO_FLOOR);
+    }
+    // ...so those roles must drop the map rather than multiply it.
+    for (const role of FIRST_PERSON_ARM_CRUSHED_ALBEDO_ROLES) {
+      const name = role === 'sleeve' ? 'MAT_Pass65_Arms_Sleeve_PBR' : 'MAT_Pass65_Arms_Glove_PBR';
+      const material = new THREE.MeshStandardMaterial({ name, color: 0xffffff });
+      material.map = new THREE.Texture();
+      applyFirstPersonArmSkinMaterial(material, name, 'explorer');
+      expect(material.map).toBeNull();
+      // The authored map is retained, not lost, so nothing is unrecoverable.
+      expect(material.userData.authoredArmBaseColorMap).toBeInstanceOf(THREE.Texture);
+    }
+  });
+
+  it('leaves every selectable skin a readable and separable arm on screen', () => {
+    const rendered = SELECTABLE.map((definition) => ({
+      id: definition.id,
+      sleeve: effectiveAlbedo(operatorSkinPalette(definition.id).arm.sleeve, MEASURED_ATLAS_MEAN.sleeve, true),
+    }));
+    for (const entry of rendered) {
+      expect(luminance(entry.sleeve)).toBeGreaterThan(READABLE_ALBEDO_FLOOR);
+    }
+    for (let i = 0; i < rendered.length; i += 1) {
+      for (let j = i + 1; j < rendered.length; j += 1) {
+        expect(separation(rendered[i]!.sleeve, rendered[j]!.sleeve)).toBeGreaterThan(0.12);
+      }
+    }
+  });
+
+  it('washes the bare-hand island instead of repainting it, so hands stay hands', () => {
+    for (const definition of SELECTABLE) {
+      const name = 'MAT_Pass65_Arms_FingerGlove_PBR';
+      const material = new THREE.MeshStandardMaterial({ name, color: 0xffffff });
+      const map = new THREE.Texture();
+      material.map = map;
+      applyFirstPersonArmSkinMaterial(material, name, definition.id);
+      // The hand keeps its authored albedo...
+      expect(material.map).toBe(map);
+      // ...and stays much brighter than the glove it used to be painted with.
+      const hand = material.color.getHex(THREE.SRGBColorSpace);
+      expect(luminance(srgb(hand)))
+        .toBeGreaterThan(luminance(srgb(operatorSkinPalette(definition.id).arm.glove)));
+    }
+  });
+});
+
+describe('the third-person body can actually show a skin (HF-366 falsifier)', () => {
+  it('never resolves two different skins to the same body colour on the same team', () => {
+    for (const role of ['swat', 'swatBlack', 'grey'] as const) {
+      const colours = SELECTABLE.map((definition) => operatorBodyColour(definition.id, 0, role));
+      expect(new Set(colours).size).toBe(SELECTABLE.length);
+    }
+  });
+
+  it('keeps the two teams separable on every skin, which is what the wash is for', () => {
+    for (const definition of SELECTABLE) {
+      const aqua = srgb(operatorBodyColour(definition.id, 0, 'swat'));
+      const coral = srgb(operatorBodyColour(definition.id, 1, 'swat'));
+      expect(separation(aqua, coral)).toBeGreaterThan(0.12);
+    }
+  });
+
+  it('lifts the skins whose own garment atlas is too dark for a tint to reach', () => {
+    for (const definition of SELECTABLE) {
+      const body = operatorSkinPalette(definition.id).body;
+      const atlas = MEASURED_BODY_SWAT_MEAN[definition.id as keyof typeof MEASURED_BODY_SWAT_MEAN];
+      expect(atlas).toBeGreaterThan(0);
+      const multiplied = luminance(srgb(body.swat));
+      const lit = multiplied * atlas;
+      // Multiply alone leaves the two dark deliveries under the floor, so those
+      // skins must carry a real lift...
+      if (lit < READABLE_ALBEDO_FLOOR) expect(body.lift).toBeGreaterThan(0.08);
+      // ...every skin must clear the floor once the lift is added...
+      expect(lit + body.lift * multiplied).toBeGreaterThan(READABLE_ALBEDO_FLOOR);
+      // ...and the lift is a readability floor, never a glow.
+      expect(body.lift).toBeLessThanOrEqual(0.25);
+    }
+  });
+});
+
+describe('the selection actually reaches the arms (HF-366 falsifier)', () => {
+  it('exposes the lobby storage key the arms read, so the two cannot drift apart', () => {
+    expect(LOCAL_OPERATOR_SKIN_STORAGE_KEY).toBe('atomic-acres-operator-skin');
+    const store = new Map<string, string>();
+    const storage = { getItem: (key: string) => store.get(key) ?? null };
+    expect(readLocalOperatorSkinId(storage)).toBe('default');
+    store.set(LOCAL_OPERATOR_SKIN_STORAGE_KEY, 'symbiote');
+    expect(readLocalOperatorSkinId(storage)).toBe('symbiote');
+    // A hand-edited or retired value can never leave the catalog.
+    store.set(LOCAL_OPERATOR_SKIN_STORAGE_KEY, 'not-a-skin');
+    expect(readLocalOperatorSkinId(storage)).toBe('default');
+  });
+
+  it('publishes a card press, because a same-document write raises no storage event', () => {
+    const listeners = new Map<string, (event: Event) => void>();
+    const target = {
+      addEventListener: (type: string, handler: (event: Event) => void) => { listeners.set(type, handler); },
+      removeEventListener: (type: string) => { listeners.delete(type); },
+    };
+    const seen: string[] = [];
+    const release = observeLocalOperatorSkinId((id) => seen.push(id), target);
+    // Fires once up front so the arms are BUILT with the stored choice.
+    expect(seen).toEqual(['default']);
+    const press = (id: string): Event => ({
+      target: { closest: (selector: string) => (selector === '[data-operator-skin]' ? { dataset: { operatorSkin: id } } : null) },
+    } as unknown as Event);
+    listeners.get('click')?.(press('navalops'));
+    expect(seen).toEqual(['default', 'navalops']);
+    // The same selection twice must not repaint twice.
+    listeners.get('click')?.(press('navalops'));
+    expect(seen).toEqual(['default', 'navalops']);
+    listeners.get('click')?.(press('not-a-skin'));
+    expect(seen).toEqual(['default', 'navalops']);
+    release();
+    expect(listeners.size).toBe(0);
+  });
+
+  it('has a production call site: the viewmodel subscribes, it is not another dead paint function', () => {
+    const source = readFileSync(new URL('./weapon-presentation.ts', import.meta.url), 'utf8');
+    expect(source).toContain('observeLocalOperatorSkinId(');
+    // The exact failure this row exists to close: setOperatorSkin shipped fully
+    // tested with zero callers, so no player ever saw their skin on their arms.
+    const constructorBody = source.slice(source.indexOf('this.browserRuntime = typeof document'));
+    expect(constructorBody.slice(0, 900)).toContain('this.setOperatorSkin(skinId)');
+  });
+});
+
+describe('the menu shows both previews and they agree (HF-366)', () => {
+  it('renders a 2D card image beside the live 3D turntable', () => {
+    const rendered = renderPass64Shell(createPass64ShellViewModel('Operator'));
+    expect(rendered).toContain(`id="${OPERATOR_PREVIEW_PORTRAIT_ID}"`);
+    expect(rendered).toContain(`id="${OPERATOR_PREVIEW_CANVAS_ID}"`);
+    // The 2D half must be real card art, not a placeholder box.
+    expect(rendered).toContain('<svg class="operator-skin-portrait"');
+  });
+
+  it('keeps the menu preview out of the team wash, so a card shows the skin itself', () => {
+    const source = readFileSync(new URL('./ui/operator-preview.ts', import.meta.url), 'utf8');
+    expect(source).toContain("'showcase'");
+    // ...and the 2D half is repainted from the same selection as the 3D half.
+    expect(source).toContain('operatorSkinPortraitSvg(skinId');
   });
 });

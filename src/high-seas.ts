@@ -944,40 +944,77 @@ function material(
 }
 
 /**
- * Below-deck lighting policy (HF-373).
+ * Below-deck lighting (HF-373, and the Pass 77 correction to it).
  *
- * The owner played the service deck and could not see: "too dark down at the
- * bottom of hijacked". The volume is sealed - the sun never reaches it, and the
- * arena adds no THREE lights (the repo's local-light occlusion policy in
- * rendering/light-occlusion keeps arena roots emissive-only), so every surface
- * down there resolved to near-black.
+ * HF-373 read the owner's "too dark down at the bottom of hijacked" as a
+ * brightness problem and answered it the only way the emissive-only policy
+ * allowed: a dedicated fixture material for the strips, plus an emissive fill
+ * on the three sealed-volume families. That was a real improvement over pure
+ * black and it is why those two ideas survive below - but it could not work,
+ * because emissive geometry illuminates nothing but itself.
  *
- * Two authored sources fix it, and BOTH are deliberately scoped to materials
- * that exist only inside the sealed volume, because the one thing this must not
- * do is brighten the open deck above:
+ * Measured on hardware WebGPU, standing in the corridor at eye height, the
+ * result was mean 46/255 with 85% of the frame below 12/255, and the deck plate
+ * under the player's own feet at 6/255 with 99% crushed: bright bars hanging in
+ * a void, no walls, no floor, nothing to read a body against.
  *
- *  - the practicals get their own material. They used to share `engine-amber`
- *    with the machinery bands, the service pipes and the DECK-LEVEL hatch
- *    guards, so the only way to make the strips brighter was to make the hatch
- *    guards glow with them. A dedicated fixture material is the honest fix and
- *    leaves the shared accent exactly where it was.
- *  - the three engine surface families - bulkhead, grating and machinery -
- *    carry a low enclosed-volume fill so surfaces away from a strip are dim
- *    rather than pure black. Not one mesh wearing them rises above the deck
- *    plane, which is what makes this a fill for the corridor and not a global
- *    ambient; the test proves it mesh by mesh.
+ * The fix is three things, in order of how much each moved the measurement:
+ *  1. real light. Eight shadowed-local spot practicals authored on the arena
+ *     DEFINITION (rendering/arenas/high-seas.ts), each aimed straight down
+ *     inside a declared volume whose ceiling is below the main deck. They cast
+ *     shadows, so they cannot spill through a bulkhead - which is the property
+ *     the emissive-only policy existed to protect in the first place.
+ *  2. surfaces that can answer it. The families were 58-74% metallic over a
+ *     2-5% albedo, so they stayed black even under a full rig; see
+ *     BELOW_DECK_METALNESS.
+ *  3. the emissive sources step DOWN, not up. With a key present, a fill that
+ *     takes no falloff and no shadow only flattens the depth the light just
+ *     created.
+ *
+ * What has not changed: everything here is still scoped to materials that exist
+ * only inside the sealed volume, because the one thing this must not do is
+ * brighten the open deck above. The practicals still own their own material
+ * rather than sharing `engine-amber` with the DECK-LEVEL hatch guards, so the
+ * strips can be tuned without the guards glowing along with them.
  */
-const BELOW_DECK_PRACTICAL_EMISSIVE_INTENSITY = 3.4;
+const BELOW_DECK_PRACTICAL_EMISSIVE_INTENSITY = 1.4;
+/**
+ * Residual fill, now that the service deck has real lights.
+ *
+ * These numbers used to be the ONLY thing standing between the corridor and
+ * pure black, so they were pushed as far as an emissive lift can go (grating
+ * sat at 1.15). Emissive is self-lit: it takes no falloff, no shadow and no
+ * direction, so pushing it flattens exactly the depth the owner wants back.
+ * With the eight service-deck practicals doing the modelling, the fill drops
+ * to a floor-of-black role only - it keeps the far corridor beyond a fixture's
+ * reach off zero, and it is the entire below-deck lighting story on the
+ * `performance`/`compat` profiles, where ArenaContrastLighting builds no rig.
+ */
 const BELOW_DECK_FILL = Object.freeze({
-  bulkhead: Object.freeze({ tint: 0x9fc3d2, intensity: 0.5 }),
-  machinery: Object.freeze({ tint: 0xa8c4cc, intensity: 0.42 }),
-  // The deck plate keeps the smallest lift of the three - the intensity is the
-  // highest number here only because grating is the darkest albedo it
-  // multiplies, and grating is the one below-deck family that also skins the
-  // hatch-shaft ramps and the rims flush with the deck plane. It still needs
-  // SOME: a prone body on an unlit floor is invisible in a volume with no
-  // lights to catch it.
-  grating: Object.freeze({ tint: 0x86a8b4, intensity: 1.15 }),
+  bulkhead: Object.freeze({ tint: 0x9fc3d2, intensity: 0.16 }),
+  machinery: Object.freeze({ tint: 0xa8c4cc, intensity: 0.14 }),
+  grating: Object.freeze({ tint: 0x86a8b4, intensity: 0.3 }),
+});
+
+/**
+ * Below-deck surface response.
+ *
+ * The measured second cause of the darkness. The three service-deck families
+ * were authored at metalness 0.58-0.74 over a 2-5% albedo. A metal surface has
+ * almost no diffuse response, so those surfaces returned nearly nothing no
+ * matter what lit them: with a full practical rig injected into the live scene,
+ * the deck plate under the player's own feet still measured 20/255 mean with
+ * 94% of pixels crushed, and only dropping metalness moved it (43/255 at 0.15).
+ *
+ * Painted marine steel is a dielectric - bulkheads and deck plate are painted,
+ * so they belong near zero. The machinery keeps the most metal of the three
+ * because bare machined housings genuinely are metal, and it is cover rather
+ * than a walkable surface, so it is allowed to stay moodier.
+ */
+const BELOW_DECK_METALNESS = Object.freeze({
+  bulkhead: 0.16,
+  grating: 0.18,
+  machinery: 0.34,
 });
 
 /**
@@ -1041,9 +1078,9 @@ export function getHighSeasMaterialInventory(): readonly HighSeasMaterialInvento
     { name: 'honey-deck', family: 'deck', color: 0xb78653 },
     { name: 'dark-deck-stair', family: 'stair', color: 0x5a4032 },
     { name: 'deep-teal-trim', family: 'teal-trim', color: 0x164c58 },
-    { name: 'engine-bulkhead', family: 'engine-bulkhead', color: 0x36474c },
-    { name: 'engine-grating', family: 'engine-grating', color: 0x26363a },
-    { name: 'engine-machinery', family: 'engine-machinery', color: 0x57666a },
+    { name: 'engine-bulkhead', family: 'engine-bulkhead', color: 0x5c7078 },
+    { name: 'engine-grating', family: 'engine-grating', color: 0x46585e },
+    { name: 'engine-machinery', family: 'engine-machinery', color: 0x77878b },
     { name: 'engine-amber', family: 'engine-amber', color: 0xd7a441 },
     // HF-373: the practicals stopped sharing engine-amber, so the inventory
     // contract grew to 14 rather than the strips borrowing a material that also
@@ -1784,6 +1821,29 @@ function addEngineRoom(
     });
   }
 
+  // HATCH SHAFT WALLS (Pass 77).
+  //
+  // The end bulkheads close the corridor plane at z = +/-20.22, but only across
+  // |x| 1.25..1.62 - the ramp mouth itself is open, as it must be. Past that
+  // plane the ramp shaft had NO side walls between the floor and the deck
+  // underside, so a player who walked up the ramp could step off it sideways at
+  // z beyond -20.34 and drop into the hull void. The old Rapier escape probe
+  // only reported this sealed by accident: parking one extra collider 30 m
+  // BELOW the map - touching nothing - flipped that probe to a failure with an
+  // identical end position, which means its previous pass came from collider
+  // ordering rather than from geometry.
+  //
+  // These walls are the actual seal, and they are the vertical continuation of
+  // the hatch rims already sitting at y 2.92..3.2 directly above them, so the
+  // shaft now reads as one trunk from deck plane to service deck.
+  for (const [end, direction] of [['bow', -1], ['stern', 1]] as const) {
+    for (const [sideName, side] of [['port', -1], ['starboard', 1]] as const) {
+      box(builder, `high-seas-${end}-hatch-shaft-wall-${sideName}`, [side * 1.44, 1.4, direction * 22.3], [0.24, 3.04, 4.4], wallMaterial, {
+        ballisticMaterial: 'structural-metal',
+      });
+    }
+  }
+
   // P1: the deck hatch apertures are wider and longer than their 2.6 m ramps,
   // which left open slivers falling (and shooting) straight through to water.
   // Solid rims close the shaft flush with the deck plane on both sides of the
@@ -1806,6 +1866,28 @@ function addEngineRoom(
     const x = index % 2 === 0 ? -1.62 : 1.62;
     coverBox(builder, `high-seas-engine-machinery-${index}`, [x, 0.72, z], [1.18, 1.44, 2.15], machineryMaterial, 'structural-metal');
   }
+  // SIGHTLINE BREAK (Pass 77 layout audit).
+  //
+  // Measured on the authored map: a player standing at the bow ramp foot
+  // (0, 1.7, -18.5) had a completely unbroken line to the stern ramp foot
+  // 37 m away. The corridor confines a player to |x| <= 0.3 once the 0.42 m
+  // capsule radius is taken off its 0.72 m half-width, so every below-deck
+  // engagement was a dead-straight duel down the map's FASTEST lane - the
+  // engine route is 50.7 m against ~68 m for all three surface lanes.
+  //
+  // The exhaust trunk fixes it with the one thing a real engine room has at its
+  // centreline anyway: the uptake carrying exhaust to the funnel. At 0.9 m
+  // across it covers |x| <= 0.45, which is wider than the |x| <= 0.3 a corridor
+  // player can occupy, so NO corridor-to-corridor line survives - that is a
+  // geometric guarantee, not a placement that happens to work, and the test
+  // asserts it from both ramp feet.
+  //
+  // It costs no route: the z=0 machinery is on the port side, so the trunk
+  // leaves a 1.9 m starboard bypass - wider than the 1.44 m corridor players
+  // already walk - and the engine through-route now weaves around it.
+  coverBox(builder, 'high-seas-engine-exhaust-trunk', [0, 1.45, 0], [0.9, 2.9, 0.9], machineryMaterial, 'structural-metal');
+  detailBox(builder, 'high-seas-engine-exhaust-trunk-collar', [0, 2.72, 0], [1.12, 0.16, 1.12], accentMaterial);
+
   mergedDetailBoxes(
     builder,
     'high-seas-engine-machinery-bands',
@@ -1826,11 +1908,13 @@ function addEngineRoom(
     { center: [0, 2.895, 19.175], size: [VESTIBULE_HALF * 2, 0.05, 1.15] },
   ], wallMaterial);
 
-  // Practical lighting: emissive strips run under the ceiling liner the full
-  // length of the service deck. The arena adds no THREE lights, so below-deck
-  // practicals stay emissive-only by policy - which means the fixtures ARE the
-  // lighting, and there has to be enough of them, carried by a material bright
-  // enough to be one (see createPracticalMaterial and BELOW_DECK_FILL).
+  // The visible fixtures: emissive strips under the ceiling liner, the full
+  // length of the service deck. These are the LENSES - the thing you see when
+  // you look up. The light they appear to cast is authored separately, as eight
+  // shadowed-local spot practicals on the arena definition, positioned on this
+  // same centre line so lens and pool line up (see HIGH_SEAS_SERVICE_DECK_
+  // PRACTICALS in rendering/arenas/high-seas.ts). Keep the two in step: moving
+  // a strip run without moving its fixture leaves a lit floor under no lamp.
   const lightStrips: MergedBoxPart[] = [];
   // Engine room: transverse runs plus a wash down each side, because a single
   // centre line left the 4.7 m bulge dark at both walls.
@@ -1847,11 +1931,12 @@ function addEngineRoom(
   }
   mergedDetailBoxes(builder, 'high-seas-engine-light-strips', lightStrips, practicalMaterial);
 
-  // Floor-level guide strips. Emissive geometry cannot bounce, so ceiling
-  // practicals alone still left the deck plate black under your own feet. A lit
-  // kick line at the base of each wall gives the floor an edge and the run a
-  // depth cue all the way to both ramp mouths. Presentation only - it is a
-  // 0.08 m lip flush against a wall that already owns the collision.
+  // Floor-level guide strips: a lit kick line at the base of each wall. They
+  // were introduced when emissive was all there was, to give the floor an edge;
+  // they survive the move to real light because a kick line is genuine ship
+  // fitting-out and it carries the run's depth cue past the last fixture, where
+  // the practicals no longer reach. Presentation only - a 0.08 m lip flush
+  // against a wall that already owns the collision.
   const guideStrips: MergedBoxPart[] = [];
   for (const side of [-1, 1]) {
     guideStrips.push({ center: [side * (ROOM_HALF - 0.05), 0.04, 0], size: [0.1, 0.08, ROOM_END * 2 - 0.4] });
@@ -2107,8 +2192,21 @@ function portalAudit(builder: Builder, portals: readonly HighSeasPortal[]): Read
 }
 
 function spawnRecord(): Record<Team, THREE.Vector3[]> {
+  // The two inboard spawns used to sit at z = +/-42.2. Under the 180-degree
+  // rotation that pairs the teams, that put the stern pair on a full-width
+  // transom with 7.4 m of deck outboard, and the bow pair on the 8 m TAPERED
+  // TIP with 0.94 m to the rail - two of six spawns on a 28 m2 pointed funnel
+  // with one way out, against six spread over 302 m2 at the other end. The
+  // hull is right to taper; the spawns were wrong to sit in the taper.
+  //
+  // z = +/-40.2 was picked by searching the deck for a pair whose MIRRORED
+  // openness matches - counting, at each spawn, how many of eight compass
+  // bearings at 1.5 m and 2.5 m are walkable deck. The old pair scored 5/5 at
+  // the stern against 4/3 at the bow; this one scores 6/6 at both ends, an
+  // exact match, while staying outboard (the pair moves 2 m, not into
+  // mid-ship) and keeping every same-team pair at least 6 m apart.
   const stern = [
-    [-9, 34], [-9, 40], [-3, 42.2], [3, 42.2], [9, 40], [9, 34],
+    [-9, 34], [-9, 40], [-3, 40.2], [3, 40.2], [9, 40], [9, 34],
   ] as const;
   const bow = stern.map(([x, z]) => [-x, -z] as const);
   const create = (entries: readonly (readonly [number, number])[]): THREE.Vector3[] => entries.map(
@@ -2157,16 +2255,19 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
   // machinery are sealed inside the corridor, and grating stops flush with the
   // deck at the hatch rims. The amber accent deliberately does NOT carry it:
   // it also skins the hatch guards that stand ON the open deck.
+  // Albedos are lifted alongside the metalness drop: a 2-5% reflectance plate
+  // reads as a hole even under a good key, and painted ship interiors are not
+  // that dark. These stay well inside a believable painted-steel range.
   const engineWallMaterial = applyEnclosedVolumeFill(
-    material('engine-bulkhead', 0x36474c, 0.52, 0.58),
+    material('engine-bulkhead', 0x5c7078, 0.52, BELOW_DECK_METALNESS.bulkhead),
     BELOW_DECK_FILL.bulkhead,
   );
   const engineFloorMaterial = applyEnclosedVolumeFill(
-    material('engine-grating', 0x26363a, 0.46, 0.72),
+    material('engine-grating', 0x46585e, 0.46, BELOW_DECK_METALNESS.grating),
     BELOW_DECK_FILL.grating,
   );
   const engineMachineMaterial = applyEnclosedVolumeFill(
-    material('engine-machinery', 0x57666a, 0.38, 0.74),
+    material('engine-machinery', 0x77878b, 0.38, BELOW_DECK_METALNESS.machinery),
     BELOW_DECK_FILL.machinery,
   );
   const engineAccentMaterial = material('engine-amber', 0xd7a441, 0.34, 0.52, 0x6d3c08, 0.65);
@@ -2241,12 +2342,18 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
       { id: 'stern-starboard-walkway', position: [9.0, 3.2, 20] },
       { id: 'stern-starboard-spawn', position: [8.8, 3.2, 34] },
     ] as const),
+    // The engine run is no longer a straight line: it weaves starboard around
+    // the exhaust trunk at mid-ship. The extra anchors are not decoration - the
+    // Rapier traversal test walks this polyline in both directions, so each one
+    // is a position proven clear of the machinery slalom.
     'engine-through-route': Object.freeze([
       { id: 'bow-engine-top', position: HIGH_SEAS_ENGINE_ACCESS.bowTop },
       { id: 'bow-engine-ramp-mid', position: [0, 1.6, -22.2] },
       { id: 'bow-engine-foot', position: HIGH_SEAS_ENGINE_ACCESS.bowFoot },
       { id: 'engine-forward', position: [0, 0, -12] },
-      { id: 'engine-center', position: [0, 0, 0] },
+      { id: 'engine-room-bow-mouth', position: [0, 0, -7.2] },
+      { id: 'engine-trunk-bypass-starboard', position: [1.5, 0, 0] },
+      { id: 'engine-room-stern-mouth', position: [0, 0, 7.2] },
       { id: 'engine-aft', position: [0, 0, 12] },
       { id: 'stern-engine-foot', position: HIGH_SEAS_ENGINE_ACCESS.sternFoot },
       { id: 'stern-engine-ramp-mid', position: [0, 1.6, 22.2] },
@@ -2382,9 +2489,17 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
   // HF-373 evidence surface: what lights the sealed volume, how hard, and the
   // plane none of it is allowed to cross.
   root.userData.highSeasBelowDeckLighting = Object.freeze({
-    version: 'hf373-enclosed-volume-fill-v1',
-    policy: 'emissive-only-arena-adds-no-three-lights',
+    version: 'pass77-service-deck-practical-rig-v1',
+    // The arena root still adds no THREE lights of its own. What changed is
+    // that the service deck is no longer lit by emissive geometry alone: the
+    // arena DEFINITION now authors eight shadowed-local spot practicals
+    // (HIGH_SEAS_SERVICE_DECK_PRACTICALS), which ArenaContrastLighting owns,
+    // shadows, and disposes. The emissive fill below is the residual floor and
+    // the whole story on profiles that build no practical rig.
+    policy: 'definition-shadowed-local-practicals-plus-residual-emissive-fill',
+    arenaRootAddsThreeLights: false,
     deckPlaneY: HIGH_SEAS_LEVELS.mainDeck,
+    metalness: Object.freeze({ ...BELOW_DECK_METALNESS }),
     practical: Object.freeze({
       material: enginePracticalMaterial.name,
       emissiveIntensity: enginePracticalMaterial.emissiveIntensity,

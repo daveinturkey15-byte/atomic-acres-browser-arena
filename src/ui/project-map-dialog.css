@@ -191,7 +191,7 @@
 
 .project-map-intro span small {
   color: #7e9791;
-  font: 800 8px/1 Inter, sans-serif;
+  font: 800 9px/1 Inter, sans-serif;
   letter-spacing: .17em;
 }
 
@@ -233,7 +233,7 @@
 
 .project-channel-state small {
   color: #728a84;
-  font: 800 7px/1 Inter, sans-serif;
+  font: 800 9px/1 Inter, sans-serif;
   letter-spacing: .13em;
 }
 
@@ -336,7 +336,7 @@
 
 .project-node-heading span {
   color: #79928b;
-  font: 800 7px/1 Inter, sans-serif;
+  font: 800 9px/1 Inter, sans-serif;
   letter-spacing: .12em;
   text-transform: uppercase;
 }
@@ -417,7 +417,7 @@
 .project-change-list i,
 .project-archive-list time {
   color: #718982;
-  font: 700 8px/1 Inter, sans-serif;
+  font: 700 9px/1 Inter, sans-serif;
   font-style: normal;
   letter-spacing: .08em;
 }
@@ -466,5 +466,20 @@
 
   .project-archive-list time {
     grid-column: 2;
+  }
+}
+
+/*
+ * HF-375 - touch targets for the two header meta buttons.
+ *
+ * This sheet is imported from project-map-dialog.ts and therefore lands after
+ * every sheet in bootstrap.ts, so its `min-height: 34px` is the last word on
+ * these buttons and the deck-wide 44px touch floor could not reach them. The
+ * floor is restated here, gated on a coarse pointer so the mouse deck keeps the
+ * compact 34px chip it was designed with.
+ */
+@media (pointer: coarse) {
+  #menu-meta-actions > button {
+    min-height: 44px;
   }
 }

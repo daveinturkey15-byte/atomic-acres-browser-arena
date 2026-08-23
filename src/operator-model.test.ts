@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
+import { operatorBodyColour } from './operator-skin-catalog';
 import {
   BOT_EMISSIVE_BRIGHTNESS_SCALE,
   FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY,
@@ -207,8 +208,16 @@ describe('rigged operator presentation contract', () => {
     expect(firstMeshMaterial).toBe(siblingMeshMaterial);
     expect(firstMeshMaterial).not.toBe(source);
     expect(secondOwnerMaterial).not.toBe(firstMeshMaterial);
-    expect((firstMeshMaterial as THREE.MeshStandardMaterial).color.getHex()).toBe(0x2d7882);
-    expect((secondOwnerMaterial as THREE.MeshStandardMaterial).color.getHex()).toBe(0x2d7882);
+    // HF-366: the body colour is now the SELECTED SKIN washed with the team
+    // rather than one hard-coded team constant - four skins used to arrive here
+    // and leave identical, which is what "they all looked greyed out" was. The
+    // pin moves to the canonical projection so a colour change still has to be
+    // deliberate, and the aqua team read is asserted alongside it.
+    const aquaDefault = operatorBodyColour('default', 0, 'swat');
+    expect((firstMeshMaterial as THREE.MeshStandardMaterial).color.getHex()).toBe(aquaDefault);
+    expect((secondOwnerMaterial as THREE.MeshStandardMaterial).color.getHex()).toBe(aquaDefault);
+    // ...and the two teams must still be told apart on the same skin.
+    expect(operatorBodyColour('default', 1, 'swat')).not.toBe(aquaDefault);
 
     const secondOwnerDisposed = vi.fn();
     secondOwnerMaterial.addEventListener('dispose', secondOwnerDisposed);

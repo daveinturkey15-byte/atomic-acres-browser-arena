@@ -10,7 +10,9 @@ import {
   formatWebGpuUncapturedError,
   maximumInFlightWebGpuSubmissions,
   pendingCompletionStartAfterProgress,
+  OPTIONAL_WEBGPU_DEVICE_FEATURES,
   resolveRenderRuntimeRequest,
+  selectOptionalDeviceFeatures,
   sequenceProgressRate,
   shouldBackpressureWebGpuSubmissions,
   toneMappingForMode,
@@ -1169,5 +1171,35 @@ describe('Pass 64 render runtime boundary', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('optional WebGPU device features', () => {
+  const featureSet = (...names: readonly string[]) => ({ has: (name: string) => names.includes(name) });
+
+  it('requests only allowlisted features the adapter actually advertises', () => {
+    // Requesting a feature the adapter lacks makes requestDevice REJECT, which
+    // would turn a missing nicety into a dead renderer, so the intersection is
+    // the whole contract.
+    expect(selectOptionalDeviceFeatures(featureSet('rg11b10ufloat-renderable')))
+      .toEqual(['rg11b10ufloat-renderable']);
+    expect(selectOptionalDeviceFeatures(featureSet('texture-compression-bc', 'shader-f16')))
+      .toEqual([]);
+  });
+
+  it('asks for the SSGI render-target feature whenever the adapter has it', () => {
+    // The MAX preset enables SSGI, and THREE.SSGINode hard-fails pipeline
+    // creation without this feature — which then invalidates the command buffer
+    // and takes arena admission down with it. Pin the name so a rename cannot
+    // silently re-break the top preset.
+    expect(OPTIONAL_WEBGPU_DEVICE_FEATURES).toContain('rg11b10ufloat-renderable');
+    expect(selectOptionalDeviceFeatures(featureSet(...OPTIONAL_WEBGPU_DEVICE_FEATURES)))
+      .toEqual([...OPTIONAL_WEBGPU_DEVICE_FEATURES]);
+  });
+
+  it('degrades to no optional features rather than throwing on an odd adapter', () => {
+    expect(selectOptionalDeviceFeatures(undefined)).toEqual([]);
+    expect(selectOptionalDeviceFeatures({} as unknown as { has(name: string): boolean })).toEqual([]);
+    expect(selectOptionalDeviceFeatures({ has: () => { throw new Error('driver'); } })).toEqual([]);
   });
 });

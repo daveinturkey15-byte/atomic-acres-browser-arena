@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {
+  CENTRAL_BUS,
   COVER_LAYOUT,
   GARAGE_LAYOUT,
   HOUSE_LAYOUT,
@@ -9,7 +10,6 @@ import {
 import {
   batchStaticMeshes,
   buildRetroCoach,
-  buildRetroShuttleBus,
   roundedBox,
   texturedMaterial,
 } from './art-kit';
@@ -72,9 +72,9 @@ function addModernGroundDetails(root: THREE.Group, reduced: boolean): void {
   details.userData.blocksShots = false;
   const drainMaterial = texturedMaterial('./assets/original/textures/weapon-gunmetal.png', { color: 0x718089, roughness: 0.5, metalness: 0.55, repeatX: 2 });
   const drainLayout: Array<[number, number]> = reduced
-    ? [[-6.6, -26], [6.6, 26]]
-    : [[-6.6, -31], [6.6, -17], [-6.6, -3], [6.6, 11], [-6.6, 25], [6.6, 35]];
-  const drains = new THREE.InstancedMesh(new THREE.BoxGeometry(0.75, 0.055, 1.35), drainMaterial, drainLayout.length);
+    ? [[-22, -4.2], [22, 4.2]]
+    : [[-26, -4.2], [-14, 4.2], [-2, -4.2], [10, 4.2], [22, -4.2], [30, 4.2]];
+  const drains = new THREE.InstancedMesh(new THREE.BoxGeometry(1.35, 0.055, 0.75), drainMaterial, drainLayout.length);
   const matrix = new THREE.Matrix4();
   drainLayout.forEach(([dx, dz], index) => {
     matrix.identity().setPosition(dx, 0.07, dz);
@@ -87,8 +87,8 @@ function addModernGroundDetails(root: THREE.Group, reduced: boolean): void {
   details.add(drains);
 
   const reflectorMaterial = new THREE.MeshStandardMaterial({ color: 0xffa15d, emissive: 0x642008, emissiveIntensity: 0.48, roughness: 0.4, metalness: 0.2 });
-  const reflectorLayout: Array<[number, number]> = [[-7.15, -30], [7.15, -20], [-7.15, -10], [7.15, 0], [-7.15, 10], [7.15, 20], [-7.15, 30], [7.15, 36]];
-  const reflectors = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 0.16, 0.34), reflectorMaterial, reduced ? 4 : reflectorLayout.length);
+  const reflectorLayout: Array<[number, number]> = [[-28, -4.7], [-20, 4.7], [-12, -4.7], [-4, 4.7], [4, -4.7], [12, 4.7], [20, -4.7], [28, 4.7]];
+  const reflectors = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.16, 0.1), reflectorMaterial, reduced ? 4 : reflectorLayout.length);
   reflectorLayout.slice(0, reflectors.count).forEach(([rx, rz], index) => {
     matrix.makeRotationY(index % 2 === 0 ? 0 : Math.PI).setPosition(rx, 0.14, rz);
     reflectors.setMatrixAt(index, matrix);
@@ -116,13 +116,13 @@ function addStreetProps(root: THREE.Group): void {
     const box = roundedBox('mailbox', [0.7, 0.48, 0.95], metal, 0.12, 4); box.position.set(0, 1.35, 0);
     mailbox.add(post, box); root.add(mailbox);
   }
-  for (const [x, z] of [[-9, 15], [10, -18], [-29, -2], [29, 4]] as Array<[number, number]>) {
+  for (const [x, z] of [[-16, 8.2], [16, -8.2], [-30, -20], [30, 20]] as Array<[number, number]>) {
     const hydrant = new THREE.Group(); hydrant.position.set(x, 0, z);
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.9, 12), hydrantRed); body.position.y = 0.45; body.castShadow = true;
     const cap = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), hydrantRed); cap.position.y = 0.9;
     hydrant.add(body, cap); root.add(hydrant);
   }
-  for (const [x, z] of [[-18, 10], [20, -12], [-22, -24], [22, 25]] as Array<[number, number]>) {
+  for (const [x, z] of [[-24, -8], [24, 8], [-9, -27], [9, 27]] as Array<[number, number]>) {
     const planter = roundedBox('concrete-planter', [2.2, 0.7, 1.05], concrete, 0.12); planter.position.set(x, 0.35, z); root.add(planter);
     for (const offset of [-0.6, 0, 0.6]) {
       const shrub = new THREE.Mesh(shrubGeometry, shrubMaterial);
@@ -132,7 +132,7 @@ function addStreetProps(root: THREE.Group): void {
       shrub.castShadow = true; root.add(shrub);
     }
   }
-  for (const [x, z] of [[-13, -16], [13, 16], [-13, 22], [13, -22]] as Array<[number, number]>) {
+  for (const [x, z] of [[-18, -16], [18, 16], [-26, -2], [26, 2]] as Array<[number, number]>) {
     const direction = x < 0 ? 1 : -1;
     const arm = roundedBox('streetlamp-arm', [1.15, 0.14, 0.14], metal, 0.035, 2);
     arm.position.set(x + direction * 0.5, 5.45, z); decorative(arm); root.add(arm);
@@ -143,15 +143,15 @@ function addStreetProps(root: THREE.Group): void {
   }
 
   // HF-344 audit close-out. map.ts authors three substantial colliders on the
-  // service lanes (`authored-extra-lamp-collider-0/1` at (-29,4)/(29,-4) and
-  // `authored-reclamation-tank-collider` at (-31,4)) whose planned visuals
+  // service lanes (`authored-extra-lamp-collider-0/1` at (-30,-8)/(30,8) and
+  // `authored-reclamation-tank-collider` at (-29.5,-14)) whose planned visuals
   // were specified in the Pass 27 world-identity spec ("reclamation tank")
   // but never shipped in any art layer, leaving up to 5.6 m tall, 2.7 m wide
   // volumes that block players with nothing visible to explain the stop -
   // exactly the owner's "invisible assets blocking me" fault. Build the
   // visible props the colliders always promised. Collider bounds stay in
   // map.ts untouched; src/invisible-blocker-audit.test.ts pins the parity.
-  for (const [index, [x, z]] of ([[-29, 4], [29, -4]] as Array<[number, number]>).entries()) {
+  for (const [index, [x, z]] of ([[-30, -8], [30, 8]] as Array<[number, number]>).entries()) {
     const mast = new THREE.Group();
     mast.name = `service-mast-${index}`;
     mast.position.set(x, 0, z);
@@ -169,7 +169,7 @@ function addStreetProps(root: THREE.Group): void {
   }
   const tank = new THREE.Group();
   tank.name = 'west-reclamation-tank';
-  tank.position.set(-31, 0, 4);
+  tank.position.set(-29.5, 0, -14);
   const shell = new THREE.Mesh(new THREE.CylinderGeometry(1.32, 1.35, 5.15, 18), metal);
   shell.name = 'west-reclamation-tank-shell'; shell.position.y = 2.78; shell.castShadow = true; shell.receiveShadow = true;
   const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 1.32, 0.62, 18), metal);
@@ -186,8 +186,8 @@ function addStreetProps(root: THREE.Group): void {
 type FaunaFlight = Readonly<{ x: number; z: number; radius: number; height: number; phase: number; speed: number }>;
 
 export const NEIGHBOURHOOD_FLOWER_BEDS: ReadonlyArray<readonly [number, number]> = Object.freeze([
-  [-21.2, -29], [-13.8, -18.2], [-27.8, 18],
-  [21.2, 29], [13.8, 18.2], [27.8, -18],
+  [-21.2, -29], [-16.8, -12.2], [-27.8, 24],
+  [21.2, 29], [16.8, 12.2], [27.8, -24],
 ]);
 
 export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): THREE.Group {
@@ -356,7 +356,7 @@ function addStreetInfrastructure(root: THREE.Group): void {
   const steel = new THREE.MeshStandardMaterial({ color: 0x39484d, roughness: 0.56, metalness: 0.56 });
   const porcelain = new THREE.MeshStandardMaterial({ color: 0xd7d0bd, roughness: 0.42 });
   const cable = new THREE.LineBasicMaterial({ color: 0x20292c, transparent: true, opacity: 0.72 });
-  const polePositions: Array<[number, number]> = [[-29, -35], [-29, 0], [-29, 35], [29, -35], [29, 0], [29, 35]];
+  const polePositions: Array<[number, number]> = [[-26, -33], [0, -33], [26, -33], [-26, 33], [0, 33], [26, 33]];
   for (const [x, z] of polePositions) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.25, 9.6, 10), steel);
     pole.position.set(x, 4.8, z); decorative(pole); root.add(pole);
@@ -368,14 +368,14 @@ function addStreetInfrastructure(root: THREE.Group): void {
     }
   }
   const wireSegments: THREE.Vector3[] = [];
-  for (const x of [-29, 29]) {
+  for (const z of [-33, 33]) {
     for (const offset of [-1, 0, 1]) {
-      for (const [fromZ, toZ] of [[-35, 0], [0, 35]] as Array<[number, number]>) {
-        let previous = new THREE.Vector3(x + offset, 9.02, fromZ);
+      for (const [fromX, toX] of [[-26, 0], [0, 26]] as Array<[number, number]>) {
+        let previous = new THREE.Vector3(fromX, 9.02, z + offset);
         for (let segment = 1; segment <= 12; segment += 1) {
           const t = segment / 12;
           const sag = Math.sin(Math.PI * t) * 0.65;
-          const current = new THREE.Vector3(x + offset, 9.02 - sag, THREE.MathUtils.lerp(fromZ, toZ, t));
+          const current = new THREE.Vector3(THREE.MathUtils.lerp(fromX, toX, t), 9.02 - sag, z + offset);
           wireSegments.push(previous, current);
           previous = current;
         }
@@ -386,7 +386,7 @@ function addStreetInfrastructure(root: THREE.Group): void {
   decorative(wires); root.add(wires);
 
   const signMaterial = new THREE.MeshStandardMaterial({ color: 0xe7b542, roughness: 0.48, metalness: 0.28 });
-  for (const [x, z, rotation] of [[-11.3, -6, 0], [11.3, 6, Math.PI]] as Array<[number, number, number]>) {
+  for (const [x, z, rotation] of [[-24, -6.6, 0], [24, 6.6, Math.PI]] as Array<[number, number, number]>) {
     const gantry = new THREE.Group(); gantry.position.set(x, 0, z); gantry.rotation.y = rotation;
     const post = roundedBox('lane-sign-post', [0.15, 4.2, 0.15], steel, 0.025); post.position.y = 2.1;
     const plate = roundedBox('lane-sign', [3.2, 0.92, 0.12], signMaterial, 0.08); plate.position.set(0, 3.65, 0);
@@ -397,7 +397,7 @@ function addStreetInfrastructure(root: THREE.Group): void {
 function addAtomicLandmark(root: THREE.Group): void {
   const landmark = new THREE.Group();
   landmark.name = 'original-atomic-landmark';
-  landmark.position.set(27, 0, -1.5);
+  landmark.position.set(27, 0, -20);
   const ringMaterial = new THREE.MeshStandardMaterial({ color: 0x54c8c7, emissive: 0x123b42, emissiveIntensity: 1.2, roughness: 0.36, metalness: 0.64 });
   const animationRings: THREE.Mesh[] = [];
   for (const [index, rotation] of [0, Math.PI / 3, -Math.PI / 3].entries()) {
@@ -432,21 +432,21 @@ function addRouteArchitecture(root: THREE.Group): void {
   };
 
   // West "skyline garden" route: a folded trellis reveal leading into a framed greenhouse.
-  for (const x of [-29, -22]) for (const z of [-15, -5]) {
+  for (const [x, z] of [[-29, -24], [-29, -19], [-24, -24], [-24, -19]] as Array<[number, number]>) {
     const column = routeBox('trellis-column', [0.55, 3.8, 0.55], frame, 0.08);
     column.position.set(x, 1.9, z); decorative(column); root.add(column);
   }
-  for (const z of [-15, -11.7, -8.3, -5]) {
-    const rib = routeBox('trellis-rib', [8.1, 0.22, 0.36], frame, 0.05);
-    rib.position.set(-25.5, 4.0, z); decorative(rib); root.add(rib);
+  for (const z of [-24, -22.3, -20.7, -19]) {
+    const rib = routeBox('trellis-rib', [6.1, 0.22, 0.36], frame, 0.05);
+    rib.position.set(-26.5, 4.0, z); decorative(rib); root.add(rib);
   }
-  for (const x of [-28.5, -27, -25.5, -24, -22.5]) {
-    const slat = routeBox('trellis-slat', [0.18, 0.16, 10.8], trim, 0.04);
-    slat.position.set(x, 4.08, -10); decorative(slat); root.add(slat);
+  for (const x of [-28.5, -27.5, -26.5, -25.5, -24.5]) {
+    const slat = routeBox('trellis-slat', [0.18, 0.16, 6.8], trim, 0.04);
+    slat.position.set(x, 4.08, -21.5); decorative(slat); root.add(slat);
   }
   for (const [x, y, z, scale] of [
-    [-28.7, 4.08, -14.2, 1.05], [-27.1, 4.16, -12.1, 0.82], [-25.5, 4.1, -9.5, 1.1],
-    [-23.7, 4.05, -6.4, 0.9], [-22.35, 3.92, -13.7, 0.78], [-27.8, 3.98, -6.1, 0.84],
+    [-28.7, 4.08, -23.6, 1.05], [-27.1, 4.16, -22.4, 0.82], [-26.5, 4.1, -21.1, 1.1],
+    [-25.1, 4.05, -19.8, 0.9], [-24.35, 3.92, -23.3, 0.78], [-28.2, 3.98, -19.6, 0.84],
   ] as Array<[number, number, number, number]>) {
     const vine = new THREE.Mesh(vineGeometry, vineMaterial);
     vine.name = 'trellis-vine-cluster';
@@ -457,21 +457,21 @@ function addRouteArchitecture(root: THREE.Group): void {
   }
 
   for (const [x, z, sx, sz] of [
-    [-29, 16, 0.45, 8], [-22, 16, 0.45, 8], [-25.5, 19.8, 7.5, 0.45],
-    [-28, 12.2, 2.2, 0.45], [-23, 12.2, 2.2, 0.45],
+    [-30, 21, 0.45, 8], [-22, 21, 0.45, 8], [-26, 24.8, 8.5, 0.45],
+    [-28.5, 17.2, 2.2, 0.45], [-23.5, 17.2, 2.2, 0.45],
   ] as Array<[number, number, number, number]>) {
     const sill = routeBox('greenhouse-frame-wall', [sx, 3, sz], frame, 0.08);
     sill.position.set(x, 1.5, z); decorative(sill); root.add(sill);
   }
-  for (const x of [-27.7, -25.5, -23.3]) {
+  for (const x of [-28.2, -26, -23.8]) {
     const roof = routeBox('greenhouse-roof-rib', [0.18, 0.18, 8.4], trim, 0.04);
-    roof.position.set(x, 3.45, 16); roof.rotation.z = x < -25.5 ? -0.22 : x > -25.5 ? 0.22 : 0; decorative(roof); root.add(roof);
+    roof.position.set(x, 3.45, 21); roof.rotation.z = x < -26 ? -0.22 : x > -26 ? 0.22 : 0; decorative(roof); root.add(roof);
   }
-  for (const x of [-27.2, -23.8]) {
+  for (const x of [-27.7, -24.3]) {
     const pane = routeBox('greenhouse-glass', [2.8, 0.08, 8], glass, 0.02);
-    pane.position.set(x, 3.5, 16); pane.rotation.z = x < -25.5 ? -0.22 : 0.22; decorative(pane); root.add(pane);
+    pane.position.set(x, 3.5, 21); pane.rotation.z = x < -26 ? -0.22 : 0.22; decorative(pane); root.add(pane);
   }
-  for (const [x, z] of [[-28, 14], [-25.5, 18], [-23, 14]] as Array<[number, number]>) {
+  for (const [x, z] of [[-28.5, 19], [-26, 23], [-23.5, 19]] as Array<[number, number]>) {
     const planter = routeBox('greenhouse-planter', [1.5, 0.55, 0.8], concrete, 0.12);
     planter.position.set(x, 0.28, z); decorative(planter); root.add(planter);
   }
@@ -485,15 +485,15 @@ function addRouteArchitecture(root: THREE.Group): void {
       marker.position.set(x, 1.18, z); decorative(marker); root.add(marker);
     }
   }
-  for (const x of [22.5, 29.5]) for (const z of [-20, -12]) {
+  for (const [x, z] of [[23, -27], [23, -17], [30.5, -22], [30.5, -12]] as Array<[number, number]>) {
     const column = routeBox('solar-column', [0.6, 4.2, 0.6], frame, 0.08);
     column.position.set(x, 2.1, z); decorative(column); root.add(column);
   }
   const canopy = routeBox('solar-canopy', [8.2, 0.34, 9.2], solar, 0.12);
-  canopy.position.set(26, 4.45, -16); canopy.rotation.z = -0.08; decorative(canopy); root.add(canopy);
-  for (const x of [23.3, 25.1, 26.9, 28.7]) {
+  canopy.position.set(26.75, 4.45, -19.5); canopy.rotation.z = -0.08; decorative(canopy); root.add(canopy);
+  for (const x of [24.05, 25.85, 27.65, 29.45]) {
     const seam = routeBox('solar-seam', [0.06, 0.04, 8.5], trim, 0.01);
-    seam.position.set(x, 4.66 + (26 - x) * 0.08, -16); seam.rotation.z = -0.08; decorative(seam); root.add(seam);
+    seam.position.set(x, 4.66 + (26.75 - x) * 0.08, -19.5); seam.rotation.z = -0.08; decorative(seam); root.add(seam);
   }
 
   // Layered modular lane barriers retain the exact invisible gameplay box while losing the blockout-cube silhouette.
@@ -823,27 +823,25 @@ export async function loadArenaArt(
 
   addNarrativeDressing(root, reduced);
   const coach = buildRetroCoach();
-  coach.position.set(-3.8, 0, 7);
-  coach.rotation.y = 0.03;
+  coach.position.set(CENTRAL_BUS.x, 0, CENTRAL_BUS.z);
+  coach.rotation.y = Math.PI / 2 + 0.02;
   coach.traverse((node) => { node.userData.blocksShots = true; });
   root.add(coach);
   onProgress?.(1, 12);
-
-  const shuttle = buildRetroShuttleBus();
-  shuttle.position.set(4.2, 0, -8.8);
-  shuttle.traverse((node) => { node.userData.blocksShots = true; });
-  root.add(shuttle);
   onProgress?.(2, 12);
 
-  addTree(root, -29, -23, 1.05); onProgress?.(3, 12);
-  addTree(root, 29, 24, 1.1); onProgress?.(4, 12);
-  addTree(root, -28, 29, 0.82); onProgress?.(5, 12);
-  addTree(root, 27, -31, 0.9); onProgress?.(6, 12);
+  // Trunks are the visible half of map.ts's authored tree colliders.
+  addTree(root, -19, -28, 1); onProgress?.(3, 12);
+  addTree(root, 19, 28, 1);
+  addTree(root, -27, -21, 0.9); onProgress?.(4, 12);
+  addTree(root, 27, 21, 0.9);
+  addTree(root, -13, 28.5, 0.85); onProgress?.(5, 12);
+  addTree(root, 13, -28.5, 0.85); onProgress?.(6, 12);
   addStreetProps(root); onProgress?.(7, 12);
   addModernGroundDetails(root, reduced);
 
   const tower = new THREE.Group();
-  tower.position.set(29, 0, -36);
+  tower.position.set(29, 0, -34);
   const steel = new THREE.MeshStandardMaterial({ color: 0x4c5960, roughness: 0.48, metalness: 0.55 });
   for (const x of [-1.4, 1.4]) for (const z of [-1.4, 1.4]) {
     const leg = roundedBox('test-tower-leg', [0.22, 9, 0.22], steel, 0.04); leg.position.set(x, 4.5, z); tower.add(leg);

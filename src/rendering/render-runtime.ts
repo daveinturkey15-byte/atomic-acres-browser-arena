@@ -33,6 +33,12 @@ export type RenderRuntimeTelemetry = Readonly<{
   adapterLabel: string;
   adapterClass: string;
   deviceClass: string | null;
+  /**
+   * Optional WebGPU device features actually GRANTED at device creation.
+   * WebGPU hands a device only the optional features the caller asked for, so
+   * this is the receipt that a feature-gated effect (SSGI) can run at all.
+   */
+  deviceFeatures: readonly string[];
   softwareAdapter: boolean;
   canvasAlphaMode: 'opaque';
   canvasAntialias: boolean;
@@ -448,6 +454,7 @@ export class LegacyWebGlRenderRuntime {
       adapterLabel: this.adapterLabel,
       adapterClass: gl.constructor.name || 'WebGL2RenderingContext',
       deviceClass: null,
+      deviceFeatures: EMPTY_DEVICE_FEATURES,
       softwareAdapter: /swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic render driver/i.test(this.adapterLabel),
       canvasAlphaMode: 'opaque',
       canvasAntialias: gl.getContextAttributes()?.antialias ?? false,
@@ -654,15 +661,18 @@ type GpuDeviceShape = Readonly<{
   addEventListener?: (type: 'uncapturederror', listener: (event: unknown) => void) => void;
   removeEventListener?: (type: 'uncapturederror', listener: (event: unknown) => void) => void;
   destroy?: () => void;
+  features?: GpuFeatureSetShape;
   constructor?: { name?: string };
 }>;
 
 type GpuAdapterInfoShape = Readonly<Record<string, string | number | boolean | undefined>>;
+type GpuFeatureSetShape = Readonly<{ has(name: string): boolean }>;
 type GpuAdapterShape = Readonly<{
   info?: GpuAdapterInfoShape;
   isFallbackAdapter?: boolean;
+  features?: GpuFeatureSetShape;
   requestAdapterInfo?: () => Promise<GpuAdapterInfoShape>;
-  requestDevice(): Promise<GpuDeviceShape>;
+  requestDevice(descriptor?: Readonly<{ requiredFeatures: readonly string[] }>): Promise<GpuDeviceShape>;
   constructor?: { name?: string };
 }>;
 
@@ -671,6 +681,51 @@ type GpuNavigatorShape = Readonly<{
     requestAdapter(options: Readonly<{ powerPreference: 'high-performance' }>): Promise<GpuAdapterShape | null>;
   }>;
 }>;
+
+const EMPTY_DEVICE_FEATURES: readonly string[] = Object.freeze([]);
+
+/**
+ * Optional WebGPU device features this renderer asks for when the adapter has
+ * them. This is an ALLOWLIST with a named consumer per entry, never a blanket
+ * `[...adapter.features]`: every granted feature is surface a driver bug can
+ * reach, so one is only added when something in the app actually needs it.
+ *
+ * WHY THIS EXISTS AT ALL. WebGPU grants a device exactly the optional features
+ * the caller requests — an adapter advertising a feature does NOT put it on the
+ * device. This runtime called `requestDevice()` with no descriptor, so every
+ * optional feature was structurally absent and the MAX preset's SSGI died at
+ * pipeline creation on every machine:
+ *   "THREE.SSGINode: The device does not support the 'rg11b10ufloat-renderable'
+ *    feature which is required for SSGI"
+ * followed by an invalid command buffer that failed the whole queue submit and
+ * took arena admission down with it. Headless QA could never see it: headless
+ * Chromium here has no navigator.gpu at all, so nothing automated ever ran the
+ * MAX WebGPU route.
+ */
+export const OPTIONAL_WEBGPU_DEVICE_FEATURES: readonly string[] = Object.freeze([
+  // Consumer: THREE.SSGINode's RG11B10 GI render target (MAX preset).
+  'rg11b10ufloat-renderable',
+  // Consumer: linear filtering of the float HDR targets the bloom downsample
+  // chain and the grade chain sample; without it those silently drop to point.
+  'float32-filterable',
+]);
+
+/**
+ * Intersects the allowlist with what the adapter actually advertises. Pure and
+ * exported so the contract is testable without a GPU — and the intersection is
+ * mandatory, because requesting a feature the adapter lacks makes
+ * `requestDevice` reject outright, turning a missing nicety into a dead
+ * renderer.
+ */
+export function selectOptionalDeviceFeatures(
+  adapterFeatures: Readonly<{ has(name: string): boolean }> | undefined,
+  allowList: readonly string[] = OPTIONAL_WEBGPU_DEVICE_FEATURES,
+): readonly string[] {
+  if (!adapterFeatures || typeof adapterFeatures.has !== 'function') return EMPTY_DEVICE_FEATURES;
+  return Object.freeze(allowList.filter((feature) => {
+    try { return adapterFeatures.has(feature) === true; } catch { return false; }
+  }));
+}
 
 function adapterInfoLabel(info: GpuAdapterInfoShape): string {
   const orderedKeys = ['vendor', 'architecture', 'device', 'description'];
@@ -701,6 +756,7 @@ export class WebGpuRenderRuntime {
   private readonly adapterLabel: string;
   private readonly adapterClass: string;
   private readonly deviceClass: string;
+  private readonly deviceFeatures: readonly string[];
   private readonly softwareAdapter: boolean;
   private readonly device: GpuDeviceShape;
   private readonly clock: () => number;
@@ -792,6 +848,7 @@ export class WebGpuRenderRuntime {
       adapterLabel: string;
       adapterClass: string;
       deviceClass: string;
+      deviceFeatures?: readonly string[];
       softwareAdapter: boolean;
       device: GpuDeviceShape;
       now?: () => number;
@@ -805,6 +862,7 @@ export class WebGpuRenderRuntime {
     this.adapterLabel = identity.adapterLabel;
     this.adapterClass = identity.adapterClass;
     this.deviceClass = identity.deviceClass;
+    this.deviceFeatures = identity.deviceFeatures ?? EMPTY_DEVICE_FEATURES;
     this.softwareAdapter = identity.softwareAdapter;
     this.device = identity.device;
     this.clock = identity.now ?? (() => performance.now());
@@ -894,7 +952,12 @@ export class WebGpuRenderRuntime {
     if (!adapter) throw new Error('WebGPU was required, but no high-performance adapter was available');
     const adapterInfo = adapter.info ?? await adapter.requestAdapterInfo?.() ?? {};
     const adapterLabel = adapterInfoLabel(adapterInfo);
-    const device = await adapter.requestDevice();
+    const requiredFeatures = selectOptionalDeviceFeatures(adapter.features);
+    // Ask with the intersected list, and fall back to a bare device rather than
+    // killing the whole renderer if a driver rejects a feature it advertised.
+    const device = requiredFeatures.length > 0
+      ? await adapter.requestDevice({ requiredFeatures }).catch(() => adapter.requestDevice())
+      : await adapter.requestDevice();
     const module = await import('three/webgpu');
     const renderer = new module.WebGPURenderer({
       canvas: parameters.canvas,
@@ -920,6 +983,7 @@ export class WebGpuRenderRuntime {
       adapterLabel,
       adapterClass: adapter.constructor?.name || 'GPUAdapter',
       deviceClass: device.constructor?.name || 'GPUDevice',
+      deviceFeatures: selectOptionalDeviceFeatures(device.features),
       softwareAdapter: adapter.isFallbackAdapter === true || /swiftshader|llvmpipe|software|softpipe|\bwarp\b/i.test(adapterLabel),
       device,
       gradeProfileId: parameters.gradeProfileId,
@@ -937,6 +1001,7 @@ export class WebGpuRenderRuntime {
       adapterLabel: this.adapterLabel,
       adapterClass: this.adapterClass,
       deviceClass: this.deviceClass,
+      deviceFeatures: this.deviceFeatures,
       softwareAdapter: this.softwareAdapter,
       canvasAlphaMode: 'opaque',
       canvasAntialias: this.canvasAntialias,
@@ -1168,13 +1233,22 @@ export class WebGpuRenderRuntime {
   }
 
   /**
-   * Hands the vignette over to the display-referred stage. Left at 0 while the
-   * scene-pass assembler still applies its own linear-side vignette, because
-   * stacking two of them darkens exactly the screen periphery enemies enter
-   * from.
+   * The PLAYER'S vignette setting, handed to the display-referred stage. The
+   * chain composes the current arena's authored vignette character on top and
+   * caps the result (see art-direction.ts DISPLAY_VIGNETTE_MAXIMUM), so the
+   * screen periphery enemies enter from keeps a proven luminance floor.
    */
   setDisplayVignetteStrength(strength: number): void {
     this.filmicGrade.setDisplayVignetteStrength(strength);
+  }
+
+  /**
+   * Lane L — the arena art direction currently composed into the grade chain,
+   * for diagnostics and QA receipts. Null until the Pass 64 scene assembler
+   * pushes the first arena.
+   */
+  arenaArtDirectionId(): string | null {
+    return this.filmicGrade.arenaArtDirection()?.id ?? null;
   }
 
   /** Arena-authored grain strength, in 8-bit output steps. */

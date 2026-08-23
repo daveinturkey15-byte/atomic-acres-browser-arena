@@ -1,7 +1,16 @@
 // @ts-nocheck -- executed by vite-node as a deterministic Blender authoring tool.
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { ARENA_BOUNDS, COVER_LAYOUT, GARAGE_LAYOUT, HOUSE_LAYOUT } from '../../src/arena-layout';
+import {
+  ARENA_BOUNDS,
+  CENTRAL_BUS,
+  COVER_LAYOUT,
+  GARAGE_LAYOUT,
+  GARAGE_SIZE,
+  HOUSE_LAYOUT,
+  YARD_FENCE_HEIGHT,
+  YARD_FENCE_LAYOUT,
+} from '../../src/arena-layout';
 import { createHouseArchitecture } from '../../src/house-navigation';
 
 const output = resolve(process.argv[2] ?? 'source-assets/blender/atomic-acres-arena-spec.json');
@@ -23,35 +32,40 @@ const spec = {
   bounds: ARENA_BOUNDS,
   houses,
   garages: GARAGE_LAYOUT,
+  garageSize: GARAGE_SIZE,
   cover: COVER_LAYOUT,
   roadway: {
-    ground: { position: [0, -0.09, 0], size: [86, 0.18, 98] },
-    road: { position: [0, 0.015, 0], size: [19, 0.03, 88] },
-    curbs: [-10.25, 10.25].map((x) => ({ position: [x, 0.12, 0], size: [1.4, 0.24, 88] })),
-    sidewalks: [-12.6, 12.6].map((x) => ({ position: [x, 0.07, 0], size: [3.2, 0.14, 88] })),
-    // Pull the two centre-line segments away from the crosswalk footprints;
-    // stacking them a few millimetres below the white bars shimmered at range.
-    laneMarkers: [-36, -28, -22, -12, -4, 4, 12, 22, 28, 36]
-      .map((z) => ({ position: [0, 0.055, z], size: [0.18, 0.03, 3.6] })),
-    crosswalks: [-18, 18].flatMap((z) => Array.from({ length: 7 }, (_, index) => ({
-      position: [-7.5 + index * 2.5, 0.062, z], size: [1.4, 0.025, 3.2],
+    ground: { position: [0, -0.09, 0], size: [70, 0.18, 68] },
+    road: { position: [0, 0.015, 0], size: [64, 0.03, 10] },
+    curbs: [-5.6, 5.6].map((z) => ({ position: [0, 0.12, z], size: [64, 0.24, 1.2] })),
+    sidewalks: [-7.5, 7.5].map((z) => ({ position: [0, 0.07, z], size: [64, 0.14, 2.6] })),
+    // Centre-line dashes run along the street; the two crosswalk bands sit
+    // clear of them so nothing stacks a few millimetres under the white bars.
+    laneMarkers: [-28, -20, -12, 12, 20, 28]
+      .map((x) => ({ position: [x, 0.055, 0], size: [3.6, 0.03, 0.18] })),
+    crosswalks: [-16, 16].flatMap((x) => [-4.5, -3, -1.5, 0, 1.5, 3, 4.5].map((z) => ({
+      position: [x, 0.062, z], size: [3.2, 0.025, 1.4],
     }))),
   },
+  // One bus, parked broadside in the middle of the street. It is the map's
+  // single central hard-cover anchor and the first contested object.
   vehicles: [
-    { id: 'armored-transit', position: [-3.8, 0, 7], facing: 1 },
-    { id: 'agritech-carrier', position: [4.2, 0, -8], facing: -1 },
+    { id: 'armored-transit', position: [CENTRAL_BUS.x, 0, CENTRAL_BUS.z], facing: 1, length: CENTRAL_BUS.assetLength },
   ],
+  yardFences: YARD_FENCE_LAYOUT.map(([x, z, width, depth]) => ({
+    position: [x, YARD_FENCE_HEIGHT / 2, z], size: [width, YARD_FENCE_HEIGHT, depth],
+  })),
   routeStructures: [
-    { id: 'west-hydroponics', position: [-25.5, 0, 16] },
+    { id: 'west-hydroponics', position: [-26, 0, 21] },
     { id: 'east-service-channel', position: [25.5, 0, 9] },
-    { id: 'east-solar-canopy', position: [26, 0, -16] },
-    { id: 'atomic-beacon', position: [27, 0, -1.5] },
+    { id: 'east-solar-canopy', position: [26.75, 0, -19.5] },
+    { id: 'atomic-beacon', position: [27, 0, -20] },
   ],
   boundaries: [
-    { id: 'west', position: [-34.3, 1.5, 0], size: [0.6, 3, 86] },
-    { id: 'east', position: [34.3, 1.5, 0], size: [0.6, 3, 86] },
-    { id: 'north', position: [0, 1.5, -43.3], size: [69, 3, 0.6] },
-    { id: 'south', position: [0, 1.5, 43.3], size: [69, 3, 0.6] },
+    { id: 'west', position: [-31.3, 1.5, 0], size: [0.6, 3, 61.6] },
+    { id: 'east', position: [31.3, 1.5, 0], size: [0.6, 3, 61.6] },
+    { id: 'north', position: [0, 1.5, -30.3], size: [63, 3, 0.6] },
+    { id: 'south', position: [0, 1.5, 30.3], size: [63, 3, 0.6] },
   ],
 };
 

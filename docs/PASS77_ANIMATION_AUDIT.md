@@ -293,3 +293,117 @@ the additive maths, and the hit envelope shape.
 
 All seven are pure, deterministic and GPU-free, which is why every rule above is
 covered by a test rather than by a screenshot.
+
+
+---
+
+# Pass 77b — the wiring, and what the running game now does
+
+Everything above described a system that existed and did nothing. Verified
+before starting this lane: `animation-blend-graph`, `animation-locomotion`,
+`animation-additive-pose`, `animation-hit-reaction`,
+`rigged-operator-skin-animation` and `rigged-operator-animation-director` were
+imported by **their own tests and nothing else**. Not one frame of the game had
+changed. This section records the wiring and the live evidence.
+
+## 7. What was wired, and how the call sites were left alone
+
+`src/rigged-operator-animation-runtime.ts` (new) is the binding layer: a pure
+`planOperatorMixer` that decides which clips are mixed, at what weight, and —
+the part that matters — which clips must be **released**; plus the three-side
+`applyOperatorMixerPlan` and `applyOperatorAnimationPose`.
+
+`updateRiggedOperator` now drives the director every frame. Three inputs the
+old signature had no room for are **measured** rather than demanded, which is
+why six of the seven `poseOperator` call sites needed no change at all:
+
+- **Direction.** Local-frame velocity is recovered from the operator's own root
+  motion (`localGroundVelocity`), using the yaw convention `operatorYawToward`
+  establishes. Magnitude still comes from the caller's `speed`
+  (`directedGroundVelocity`), which is what keeps the frozen debug presentation
+  route — it declares a speed while the operator does not move — working.
+- **Yaw error.** Turn-in-place is **presentation only**. The authoritative root
+  yaw is never written by the animation system; the visible body lags it on the
+  stance pivot (the channel the prone clearance solve already owns) and catches
+  up at the archetype's turn rate. Hit registration, replication and bot aim are
+  untouched, and the live probe measures that directly.
+- **Aim pitch.** `poseOperator`'s `_aimPitch` became `aimPitch` and reaches the
+  spine. Bots had always passed a literal `0`; `operatorPitchToward`
+  (`src/bot-ai.ts`) now computes it, but only when the bot has line of sight —
+  a patrol waypoint is a floor position, and pitching at one would have every
+  patrolling bot staring at its own feet.
+
+`switchBaseAction` and `playOneShot` are **deleted**. Their replacements are
+the per-transition table and the bounded envelopes.
+
+### The directional clips, without touching the spawn budget
+
+`RIGGED_OPERATOR_DIRECTIONAL_ACTION_NAMES` (`Run_Back`, `Run_Left`,
+`Run_Right`) are added to the operator's clip map but deliberately **not** to
+`RIGGED_OPERATOR_RUNTIME_ACTION_NAMES`. That list is the spawn-time prewarm
+budget, capped at 14 by `operator-appearance-catalog.test.ts` for a measured
+main-thread cost; raising the cap without re-measuring would be weakening a gate
+to get green. The three are bound lazily by `actionFor` on the first frame an
+operator actually moves sideways or backwards. Spawn cost is unchanged, and
+`lazilyBoundDirectionalClips` reports what the lazy path cost (observed: 3).
+
+## 8. Live evidence
+
+`scripts/qa/probe-pass77-operator-animation.mjs` — real renderer, real bots, no
+overrides in the sampling phase. Receipt and frames:
+`artifacts/pass77/operator-animation/`.
+
+| Claim | Measured |
+|---|---|
+| The director drives the game | 90/90 live bot frames carry `pass77` telemetry |
+| Weights sum to 1 | `baseWeightSum` min 1, max 1, over 90 + 80 samples |
+| Blending is real, not snapping | 75/90 frames had more than one base layer |
+| Bots stop moonwalking | `Run_Back`, `Run_Left`, `Run_Right` all mixed live |
+| Spawn budget untouched | 3 directional clips bound lazily, prewarm set still 13 |
+| Speed matching | `Walk` at 1.3 m/s → timeScale 0.969, foot slide ratio **0** |
+| Residual slide is reported, not hidden | sprint 8.7 m/s → rate clamped 1.75, slide ratio 0.3798 |
+| Turn-in-place | peak presentation lag 0.4735 rad, monotonic decay to exactly 0 |
+| …and it is presentation only | authoritative yaw moved **0** rad during the decay |
+| Aim pitch reaches the spine | 29/80 combat frames non-zero; joint offsets sum to the pitch |
+| One-shots end | `Gun_Shoot` mixed for at most 5 consecutive samples, then gone |
+| Nothing accumulates | at most 3 actions ever contributing to the mix |
+
+Third-person frames at `third-person-{sprint,walk,idle}.png` show the same
+operator in three plainly different poses: full split stride under `Run_Shoot`
+at 1.75× playback, a settled `Walk`, and an upright low-ready idle.
+
+### What the live run did NOT show, stated plainly
+
+- **`archetypes: ['standard']` only.** Bots are built by
+  `buildOperator(botTeam, 'bot-operator', …, 'neon-purple')` with **no skin id**,
+  so every bot is the default archetype today — not just in animation, in
+  everything. Per-skin movement identity is real and unit-tested (the four
+  archetypes' resting spine postures are ordered and separated by >0.1 rad), and
+  it reaches remote players, who are built with `memberOperatorSkinId(...)`. It
+  reaches **bots** the moment that one call site passes a skin id. That was left
+  alone deliberately: it is an appearance decision, and another lane is mid-pass
+  on exactly that colour path (HF-366).
+- **Aim pitch magnitude was small** (max 0.0596 rad) because the staged
+  firefight was on flat ground at 4 m. The angle is geometrically correct; what
+  changed is that it is no longer structurally zero.
+- **Hit reactions were never triggered** in the sampled window
+  (`maxHitReactionWeight: 0`) — the bots shot the player, not each other. The
+  layer is covered by unit test instead: a head impulse peaks between 0.3 and 1
+  while locomotion keeps the base at exactly 1.
+
+## 9. Two real defects the evidence caught, that reasoning had not
+
+Both were found by running the thing, and both are now pinned by tests.
+
+1. **Phase seeding read a stopped clock.** `applyOperatorMixerPlan` released
+   clips before reading the phase source, and the usual case is exactly the one
+   where the phase source is the clip being released — a walk handing its stride
+   to a run. `stop()` zeroes an action's clock, so every entering clip was
+   silently seeded at frame zero. Phases are now captured before any release.
+2. **The telemetry predicate reported bound-but-never-played actions as live.**
+   The first live run showed all thirteen prewarmed actions "contributing" at
+   weight 1. A freshly bound three action is `enabled` with weight 1 but is not
+   in the mixer's active list and writes nothing. `isScheduled() && enabled &&
+   weight > 0` is the honest predicate — and `isRunning()` is the opposite
+   mistake, because it excludes paused actions, and a clamped finished one-shot
+   is precisely a paused action that still writes its frozen pose.

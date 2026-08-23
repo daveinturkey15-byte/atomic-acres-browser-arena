@@ -110,6 +110,14 @@ export type OperatorAnimationLayer = Readonly<{ clip: string; weight: number; ti
 
 export type OperatorAnimationOutput = Readonly<{
   state: OperatorAnimationStateName;
+  /**
+   * The clip the CONTROLLER has selected, independent of how far the cross-fade
+   * to it has progressed. `layers` describes what the mixer should render right
+   * now - part-way through a transition its heaviest entry is still the clip
+   * being left behind - so anything asking "what is this operator doing" wants
+   * this, not `layers[0]`.
+   */
+  selectedClip: string | null;
   /** Base pose layers. Weights sum to 1 whenever any clip is available. */
   layers: readonly OperatorAnimationLayer[];
   /** Additive accents. Weights are independent of the base and never reach 1. */
@@ -309,8 +317,20 @@ export function advanceOperatorAnimation(
     if (clip) additiveLayers.push({ clip, weight: entry.weight, timeScale: 1 });
   }
 
+  const selected = stateClips(
+    director.graph.target as OperatorAnimationStateName,
+    director,
+    input,
+    locomotion,
+    idleClip,
+  ).reduce<OperatorAnimationLayer | null>(
+    (best, layer) => (best === null || layer.weight > best.weight ? layer : best),
+    null,
+  );
+
   return Object.freeze({
     state: director.graph.target as OperatorAnimationStateName,
+    selectedClip: selected?.clip ?? null,
     layers,
     additiveLayers: Object.freeze(additiveLayers
       .sort((left, right) => (right.weight - left.weight) || left.clip.localeCompare(right.clip))),

@@ -111,7 +111,7 @@ describe('Quality Graphics environment asset', () => {
     expect(auditedApertures.filter((node) => node.extras?.atomic_aperture_transparent === true)).toHaveLength(6);
     expect(auditedApertures.filter((node) => node.extras?.atomic_aperture_transparent === false)).toHaveLength(10);
     expect(routeLandmarks).toHaveLength(3);
-    expect(modeledBuses).toHaveLength(2);
+    expect(modeledBuses).toHaveLength(1);
     expect(largeCoverAssets).toHaveLength(4);
     expect(housePropSets).toHaveLength(2);
     expect(collisionVisualOwners).toHaveLength(10);
@@ -159,7 +159,7 @@ describe('Quality Graphics environment asset', () => {
     expect(provenance.title).toBe('Atomic Acres-owned Quality Graphics Arena Aesthetic Overhaul');
     expect(createHash('sha256').update(buffer).digest('hex')).toBe(provenance.runtimeGlbSha256);
     expect(buffer.byteLength).toBe(provenance.runtimeAudit.bytes);
-    expect(provenance.runtimeAudit.triangles).toBe(44_300);
+    expect(provenance.runtimeAudit.triangles).toBe(41_012);
     expect(provenance.runtimeAudit.auditedHouseApertures).toBe(16);
     expect(provenance.runtimeAudit.apertureAuditSamples).toBe(144);
   });

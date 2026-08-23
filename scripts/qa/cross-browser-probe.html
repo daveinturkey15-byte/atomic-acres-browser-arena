@@ -12,7 +12,7 @@
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#10171b" />
-    <title>Nuke Town — cross-browser QA probe</title>
+    <title>Nuke Town cross-browser QA probe</title>
     <!--
       HF-331 taught the shape of this: no driver, no automation protocol. The
       PAGE measures itself and POSTs the answer to a local receiver, because
@@ -31,6 +31,15 @@
 
       Served by the dev server from scripts/qa/, therefore SAME ORIGIN as the
       app - which is the whole reason it can read the debug hook at all.
+
+      ONE ARENA PER PAGE LOAD, and the page navigates ITSELF to the next arena in
+      the list. Booting six arenas inside one document was tried and is not
+      trustworthy: arena teardown leaves the previous scene's state visible to
+      the next boot, so arena five inherits arena four's failures. A reload per
+      arena is what verify-arena-boot-cdp.mjs does for Chrome and it is what the
+      product does when a player picks a different map. Because it is a
+      same-window navigation, the window keeps its focus - which matters more
+      than anything else here, see the FOCUS note below.
     -->
     <script>
       // Classic script, deliberately first: deferred module scripts (including
@@ -65,7 +74,10 @@
 
       const params = new URLSearchParams(window.location.search);
       const endpoint = params.get('xbEndpoint');
-      const arena = params.get('xbArena') || 'atomic-acres';
+      const arenas = (params.get('xbArenas') || params.get('xbArena') || 'atomic-acres')
+        .split(',').map((entry) => entry.trim()).filter(Boolean);
+      const index = Math.max(0, Number(params.get('xbIndex') ?? 0));
+      const arena = arenas[index];
       const lane = params.get('xbLane') || 'unknown';
       const sampleMs = Math.min(60_000, Math.max(3_000, Number(params.get('xbSampleMs') ?? 12_000)));
       const settleMs = Math.max(0, Number(params.get('xbSettleMs') ?? 5_000));
@@ -76,7 +88,7 @@
       // human, so it must stay an ordinary playable build.
       if (endpoint && /^http:\/\/127\.0\.0\.1(?::\d+)?\//.test(endpoint)) {
         const post = (payload) => {
-          const body = JSON.stringify({ lane, ...payload });
+          const body = JSON.stringify({ lane, arena, index, ...payload });
           try {
             // text/plain keeps this a CORS "simple request" - no preflight, so
             // the POST lands even though the response is opaque.
@@ -110,6 +122,68 @@
         const snapshot = () => { try { return debug()?.snapshot() ?? null; } catch (ignored) { return null; } };
         const errors = () => [...new Set(window.__XB_ERRORS__ ?? [])].slice(0, 12);
         const dataset = (key) => document.documentElement.dataset[key] ?? null;
+        const focused = () => (typeof document.hasFocus === 'function' ? document.hasFocus() : null);
+
+        // ------------------------------------------------------------------
+        // FOCUS. The game's match-admission loop pauses itself unless
+        // `visibilityState === 'visible' && document.hasFocus()`, so a window
+        // without content focus does not produce a slow frame rate - it produces
+        // NO frame rate, and reads as a browser that cannot run the game. That
+        // is the entire content of the "Firefox does ~10 FPS" report. So focus
+        // is pulled from inside the page as well as pushed from outside by the
+        // harness, and every number below is stamped with the fraction of its
+        // samples that actually had focus. A number measured without focus is
+        // not a slow number, it is not a number at all.
+        // ------------------------------------------------------------------
+        let focusPulls = 0;
+        const pullFocus = () => {
+          if (focused()) return;
+          focusPulls += 1;
+          try { window.focus(); } catch (ignored) { /* popup-blocked */ }
+          try {
+            if (!document.body.hasAttribute('tabindex')) document.body.setAttribute('tabindex', '-1');
+            document.body.focus({ preventScroll: true });
+          } catch (ignored) { /* nothing else to try from in here */ }
+        };
+        pullFocus();
+        window.setInterval(pullFocus, 1_000);
+
+        /** Sample rAF cadence, reporting how much of the sample owned focus. */
+        const sampleFrames = (durationMs) => new Promise((done) => {
+          const deltas = [];
+          let focusedSamples = 0;
+          let hiddenSamples = 0;
+          const startedAt = performance.now();
+          let previous = startedAt;
+          const frame = () => {
+            const now = performance.now();
+            deltas.push(now - previous);
+            previous = now;
+            if (focused()) focusedSamples += 1;
+            if (document.visibilityState !== 'visible') hiddenSamples += 1;
+            if (now - startedAt >= durationMs) { done({ deltas, focusedSamples, hiddenSamples }); return; }
+            requestAnimationFrame(frame);
+          };
+          requestAnimationFrame(frame);
+        });
+
+        const summarise = (sample) => {
+          const deltas = sample.deltas.slice().sort((left, right) => left - right);
+          if (deltas.length === 0) return { frames: 0 };
+          const at = (fraction) => deltas[Math.min(deltas.length - 1, Math.floor(deltas.length * fraction))] ?? 0;
+          const fps = (delta) => Number((1_000 / Math.max(0.001, delta)).toFixed(1));
+          return {
+            frames: deltas.length,
+            medianFrameMs: Number(at(0.5).toFixed(2)),
+            p90FrameMs: Number(at(0.9).toFixed(2)),
+            p99FrameMs: Number(at(0.99).toFixed(2)),
+            medianFps: fps(at(0.5)),
+            p90WorstFps: fps(at(0.9)),
+            p99WorstFps: fps(at(0.99)),
+            focusedFraction: Number((sample.focusedSamples / Math.max(1, sample.deltas.length)).toFixed(3)),
+            hiddenFraction: Number((sample.hiddenSamples / Math.max(1, sample.deltas.length)).toFixed(3)),
+          };
+        };
 
         // Adapter identity read straight from the context, not from the app's
         // telemetry: on a browser where the renderer failed to initialise the
@@ -136,23 +210,41 @@
           }
         };
 
+        /** Hand the window to the next arena, or declare the sweep finished. */
+        const advance = (delayMs) => {
+          window.setTimeout(() => {
+            if (index + 1 >= arenas.length) { post({ stage: 'sweep-complete' }); return; }
+            const next = new URL(window.location.href);
+            next.searchParams.set('xbIndex', String(index + 1));
+            window.location.replace(next.toString());
+          }, delayMs);
+        };
+
         void (async () => {
           try {
-            post({ stage: 'armed', userAgent: navigator.userAgent });
+            post({ stage: 'armed', userAgent: navigator.userAgent, arenaCount: arenas.length });
+
+            // The browser's OWN ceiling, measured in this window, in this run,
+            // before the game is asked for anything. Without it a game frame
+            // rate cannot be read: 60 fps against a 60 Hz vsync cap is perfect
+            // and 60 fps against a 166 Hz ceiling is a third of the machine
+            // thrown away, and the two are indistinguishable from the game
+            // number alone. This desktop has been observed presenting at both.
+            const ceiling = summarise(await sampleFrames(1_500));
+
             const heartbeat = window.setInterval(() => post({
               stage: 'heartbeat',
               backend: dataset('renderBackend'),
               webglContext: dataset('webglContext'),
-              // The renderer refuses to author frames without foreground
-              // ownership, so a stalled prewarm is usually a focus question.
-              hasFocus: typeof document.hasFocus === 'function' ? document.hasFocus() : null,
+              hasFocus: focused(),
               visibility: document.visibilityState,
               status: (document.getElementById('network-status')?.textContent ?? '').slice(0, 90),
               errors: errors(),
             }), 10_000);
             try {
               if (!await waitFor(() => Boolean(debug()), stageTimeoutMs)) {
-                post({ error: 'bootstrap-timeout', errors: errors(), backend: dataset('renderBackend') });
+                post({ stage: 'arena-result', ok: false, error: 'bootstrap-timeout', ceiling, errors: errors(), backend: dataset('renderBackend') });
+                advance(500);
                 return;
               }
               post({ stage: 'debug-ready' });
@@ -182,12 +274,18 @@
               }
               if (!active) {
                 post({
+                  stage: 'arena-result',
+                  ok: false,
                   error: 'match-start-timeout',
+                  ceiling,
                   errors: errors(),
                   backend: dataset('renderBackend'),
+                  hasFocus: focused(),
+                  visibility: document.visibilityState,
                   matchPhase: snapshot()?.matchPhase ?? null,
                   status: (document.getElementById('network-status')?.textContent ?? '').slice(0, 200),
                 });
+                advance(500);
                 return;
               }
               post({ stage: 'match-active' });
@@ -198,36 +296,24 @@
             // Steady state is the number worth reporting: let streaming and
             // first-use shader compilation drain before the first sample.
             await new Promise((settle) => window.setTimeout(settle, settleMs));
-
-            const deltas = [];
-            await new Promise((doneSampling) => {
-              const startedAt = performance.now();
-              let previous = startedAt;
-              const frame = () => {
-                const now = performance.now();
-                deltas.push(now - previous);
-                previous = now;
-                if (now - startedAt >= sampleMs) { doneSampling(); return; }
-                requestAnimationFrame(frame);
-              };
-              requestAnimationFrame(frame);
-            });
-            deltas.sort((left, right) => left - right);
-            const at = (fraction) => deltas[Math.min(deltas.length - 1, Math.floor(deltas.length * fraction))] ?? 0;
-            const fps = (delta) => Number((1_000 / Math.max(0.001, delta)).toFixed(1));
+            const inMatch = summarise(await sampleFrames(sampleMs));
 
             const state = snapshot();
             const runtime = state?.render?.runtime ?? null;
             post({
-              stage: null,
-              done: true,
+              stage: 'arena-result',
+              ok: true,
               userAgent: navigator.userAgent,
-              arena,
               sampleMs,
-              frames: deltas.length,
-              medianFps: fps(at(0.5)),
-              p90WorstFps: fps(at(0.9)),
-              p99WorstFps: fps(at(0.99)),
+              ceiling,
+              inMatch,
+              // Flat aliases so a reader never has to know which nesting this
+              // number came from; the table prints these.
+              medianFps: inMatch.medianFps,
+              p90WorstFps: inMatch.p90WorstFps,
+              p99WorstFps: inMatch.p99WorstFps,
+              medianFrameMs: inMatch.medianFrameMs,
+              ceilingMedianFps: ceiling.medianFps,
               backendDataset: dataset('renderBackend'),
               atomicSignalRenderer: dataset('atomicSignalRenderer'),
               webglContext: dataset('webglContext'),
@@ -252,13 +338,18 @@
                 devicePixelRatio: window.devicePixelRatio,
                 maxTouchPoints: navigator.maxTouchPoints ?? 0,
                 coarsePointer: Boolean(window.matchMedia?.('(pointer: coarse)')?.matches),
+                screenX: window.screenX,
+                screenY: window.screenY,
               },
+              contentFocusPulls: focusPulls,
               matchPhase: state?.matchPhase ?? null,
               gameStarted: state?.gameStarted ?? null,
               consoleErrors: errors(),
             });
+            advance(1_200);
           } catch (error) {
-            post({ error: `probe-threw: ${String(error).slice(0, 200)}`, errors: errors() });
+            post({ stage: 'arena-result', ok: false, error: `probe-threw: ${String(error).slice(0, 200)}`, errors: errors() });
+            advance(500);
           }
         })();
       }

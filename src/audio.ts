@@ -21,6 +21,7 @@ import {
   ambientEventOffset,
   nextAmbientGapSeconds,
   selectAmbientEvent,
+  type AmbientEventShape,
   type ArenaAmbientEvent,
 } from './arena-ambient-events';
 import { EXPLOSIVE_BOLT_ARM_DELAY_MS } from './combat/ordnance';
@@ -31,6 +32,21 @@ import {
   type MatchCountdownAudioCueId,
 } from './match-countdown-audio';
 import { WEAPON_REPORT_PROFILES } from './weapon-audio-profiles';
+// HF-376: the source-synthesis vocabulary. See audio-synthesis.ts for why an
+// instant-attack single exponential is the thing that made every voice in this
+// game read as a beep.
+import {
+  METALLIC_PARTIAL_RATIOS,
+  NOISE_TEXTURES,
+  centsToRatio,
+  fillNoiseTexture,
+  pitchFallStages,
+  roundRobinDetune,
+  saturationCurve,
+  transientEnvelope,
+  type EnvelopeStage,
+  type NoiseTexture,
+} from './audio-synthesis';
 import {
   DEFAULT_ACOUSTIC_SPACE,
   acousticProfile,
@@ -67,6 +83,149 @@ export const EXPLOSION_SPATIAL_PROFILES = Object.freeze({
 }>);
 
 export type ExplosionSpatialFamily = keyof typeof EXPLOSION_SPATIAL_PROFILES;
+
+/**
+ * HF-376 per-surface impact identity.
+ *
+ * The old impact() gave each material two numbers - a band-pass frequency and
+ * a tone pitch - so concrete, wood and metal were the same click transposed.
+ * A material is identified by three things instead: the grain of the strike
+ * (does it shatter, does it rasp, does it absorb), the resonance and decay of
+ * the body it sets ringing, and the debris it throws.
+ */
+type ImpactMaterialProfile = Readonly<{
+  strikeHz: number;
+  strikeQ: number;
+  strikeSeconds: number;
+  strikeVolume: number;
+  strikeTexture: NoiseTexture;
+  /** The strike band falls to this fraction of its start over the burst. */
+  strikeFallRatio: number;
+  resonanceHz: number;
+  resonanceQ: number;
+  resonanceGainDb: number;
+  drive: number;
+  bodyHz: number;
+  bodySeconds: number;
+  bodyVolume: number;
+  bodyWave: OscillatorType;
+  bodyPunch: number;
+  /** Inharmonic second partial, or 0 where the material does not ring. */
+  ringRatio: number;
+  debrisHz: number;
+  debrisSeconds: number;
+  debrisVolume: number;
+  debrisDelay: number;
+}>;
+
+const IMPACT_MATERIAL_PROFILES: Readonly<Record<ImpactSurface, ImpactMaterialProfile>> = Object.freeze({
+  // Shatters. Bright crackle grains, a long inharmonic ring, and shards that
+  // keep falling well after the round has gone.
+  glass: Object.freeze({
+    strikeHz: 5_200, strikeQ: 1, strikeSeconds: 0.095, strikeVolume: 0.105, strikeTexture: 'crackle',
+    strikeFallRatio: 0.5, resonanceHz: 7_600, resonanceQ: 6, resonanceGainDb: 8, drive: 0.35,
+    bodyHz: 1_460, bodySeconds: 0.11, bodyVolume: 0.034, bodyWave: 'triangle', bodyPunch: 0.32,
+    ringRatio: METALLIC_PARTIAL_RATIOS[2]!, debrisHz: 3_600, debrisSeconds: 0.28, debrisVolume: 0.05, debrisDelay: 0.03,
+  }),
+  // Rings. Hard white strike into a tight resonance, then an inharmonic pair -
+  // a harmonic pair would be heard as a musical note, not as a steel plate.
+  metal: Object.freeze({
+    strikeHz: 3_150, strikeQ: 1.6, strikeSeconds: 0.065, strikeVolume: 0.09, strikeTexture: 'white',
+    strikeFallRatio: 0.55, resonanceHz: 2_400, resonanceQ: 8, resonanceGainDb: 11, drive: 0.5,
+    bodyHz: 960, bodySeconds: 0.14, bodyVolume: 0.033, bodyWave: 'square', bodyPunch: 0.26,
+    ringRatio: METALLIC_PARTIAL_RATIOS[1]!, debrisHz: 4_200, debrisSeconds: 0.1, debrisVolume: 0.016, debrisDelay: 0.018,
+  }),
+  // Knocks hollow and dies. Grit for the fibre tearing, a fast-decaying low
+  // body, and splinters.
+  wood: Object.freeze({
+    strikeHz: 980, strikeQ: 1, strikeSeconds: 0.075, strikeVolume: 0.075, strikeTexture: 'grit',
+    strikeFallRatio: 0.42, resonanceHz: 620, resonanceQ: 5, resonanceGainDb: 9, drive: 0.4,
+    bodyHz: 240, bodySeconds: 0.075, bodyVolume: 0.032, bodyWave: 'triangle', bodyPunch: 0.22,
+    ringRatio: 0, debrisHz: 1_800, debrisSeconds: 0.16, debrisVolume: 0.028, debrisDelay: 0.022,
+  }),
+  // Absorbs. Brown strike, almost no resonance, and a scatter of thrown dirt.
+  soil: Object.freeze({
+    strikeHz: 460, strikeQ: 0.7, strikeSeconds: 0.09, strikeVolume: 0.07, strikeTexture: 'brown',
+    strikeFallRatio: 0.5, resonanceHz: 180, resonanceQ: 2, resonanceGainDb: 6, drive: 0.3,
+    bodyHz: 120, bodySeconds: 0.1, bodyVolume: 0.03, bodyWave: 'sine', bodyPunch: 0.38,
+    ringRatio: 0, debrisHz: 900, debrisSeconds: 0.2, debrisVolume: 0.03, debrisDelay: 0.03,
+  }),
+  // Spalls. Crackle strike with a dusty mid resonance and a chip scatter; the
+  // most common surface in the game, so the one worth getting exactly right.
+  concrete: Object.freeze({
+    strikeHz: 1_780, strikeQ: 1.1, strikeSeconds: 0.07, strikeVolume: 0.082, strikeTexture: 'crackle',
+    strikeFallRatio: 0.45, resonanceHz: 1_100, resonanceQ: 4, resonanceGainDb: 8, drive: 0.45,
+    bodyHz: 410, bodySeconds: 0.07, bodyVolume: 0.03, bodyWave: 'triangle', bodyPunch: 0.24,
+    ringRatio: 0, debrisHz: 2_600, debrisSeconds: 0.22, debrisVolume: 0.034, debrisDelay: 0.024,
+  }),
+});
+
+/**
+ * HF-376 per-surface footstep identity.
+ *
+ * A step is not one noise burst: it is a heel strike, the weight of the body
+ * arriving through the material, and the scuff of the sole leaving it. Which
+ * of those three dominates is what tells a player whether the man they cannot
+ * see is on steel deck or in long grass - and the old single band-pass could
+ * only ever say "somewhere, quietly".
+ */
+type FootstepMaterialProfile = Readonly<{
+  /** Heel: the sharp part. Texture is the surface's own grain. */
+  heelHz: number;
+  heelQ: number;
+  heelTexture: NoiseTexture;
+  heelVolume: number;
+  /** Body: how much low weight the surface transmits into the floor. */
+  bodyHz: number;
+  bodyVolume: number;
+  bodyWave: OscillatorType;
+  /** Resonance the step excites: deck plate, hollow boards, packed earth. */
+  resonanceHz: number;
+  resonanceQ: number;
+  /** Scuff: the sole dragging off. Loud on grit, near silent on wet soil. */
+  scuffHz: number;
+  scuffVolume: number;
+  scuffTexture: NoiseTexture;
+}>;
+
+const FOOTSTEP_MATERIAL_PROFILES: Readonly<Record<SpatialFootstepSurface, FootstepMaterialProfile>> = Object.freeze({
+  asphalt: Object.freeze({
+    heelHz: 1_050, heelQ: 1.05, heelTexture: 'crackle', heelVolume: 1,
+    bodyHz: 72, bodyVolume: 1, bodyWave: 'triangle', resonanceHz: 420, resonanceQ: 2.2,
+    scuffHz: 2_600, scuffVolume: 0.5, scuffTexture: 'grit',
+  }),
+  concrete: Object.freeze({
+    heelHz: 1_420, heelQ: 1.3, heelTexture: 'crackle', heelVolume: 0.98,
+    bodyHz: 86, bodyVolume: 0.9, bodyWave: 'triangle', resonanceHz: 560, resonanceQ: 2.8,
+    scuffHz: 3_100, scuffVolume: 0.55, scuffTexture: 'grit',
+  }),
+  // Hollow: the loudest resonance of any surface, and the reason wooden decks
+  // give a defender away through a wall.
+  wood: Object.freeze({
+    heelHz: 720, heelQ: 0.9, heelTexture: 'white', heelVolume: 0.92,
+    bodyHz: 118, bodyVolume: 1.1, bodyWave: 'triangle', resonanceHz: 235, resonanceQ: 5.5,
+    scuffHz: 1_500, scuffVolume: 0.3, scuffTexture: 'grit',
+  }),
+  // Steel deck: bright, ringing, and the most locatable surface in the game.
+  metal: Object.freeze({
+    heelHz: 1_900, heelQ: 1.5, heelTexture: 'white', heelVolume: 1.05,
+    bodyHz: 142, bodyVolume: 0.85, bodyWave: 'square', resonanceHz: 1_180, resonanceQ: 7.5,
+    scuffHz: 4_200, scuffVolume: 0.35, scuffTexture: 'white',
+  }),
+  // Soft and broadband: almost no body, almost all scuff. Grass should be the
+  // surface you can sneak on.
+  grass: Object.freeze({
+    heelHz: 330, heelQ: 0.6, heelTexture: 'grit', heelVolume: 0.68,
+    bodyHz: 42, bodyVolume: 0.55, bodyWave: 'sine', resonanceHz: 160, resonanceQ: 1.2,
+    scuffHz: 2_100, scuffVolume: 0.85, scuffTexture: 'grit',
+  }),
+  soil: Object.freeze({
+    heelHz: 430, heelQ: 0.7, heelTexture: 'brown', heelVolume: 0.78,
+    bodyHz: 48, bodyVolume: 0.8, bodyWave: 'sine', resonanceHz: 190, resonanceQ: 1.5,
+    scuffHz: 1_250, scuffVolume: 0.6, scuffTexture: 'grit',
+  }),
+});
+
 
 /** HF-350: ambience bed ducks for this long after any explosion mix. */
 export const AMBIENCE_EXPLOSION_DUCK_MS = 4_000;
@@ -408,17 +567,51 @@ const SHOT_TAIL_REFERENCE = Object.freeze({
  */
 const SHOT_TAIL_BUDGET_SECONDS = 1;
 
-type NoiseOptions = {
+/**
+ * HF-376 shaping shared by both transient primitives. Every field is optional
+ * and every default reproduces a plain, well-behaved one-shot, so a call site
+ * that does not care reads exactly as it did before this pass.
+ */
+type VoiceShaping = {
+  /** Seconds to peak. Defaults to a sub-millisecond ramp - never a step. */
+  attack?: number;
+  /** Level the body holds at, as a fraction of peak. 1 is a plain decay. */
+  punch?: number;
+  /** Seconds the collapse from peak to body takes. */
+  punchSeconds?: number;
+  /** 0..1 WaveShaper drive. Adds the harmonics that read as loudness. */
+  drive?: number;
+};
+
+/** Shaping for the oscillator primitives, which additionally own a pitch contour. */
+type PitchedShaping = VoiceShaping & {
+  /** Per-voice detune so repeated shots are never bit-identical. */
+  detuneCents?: number;
+  /** How front-loaded the pitch fall is; see pitchFallStages(). */
+  pitchBias?: number;
+};
+
+type NoiseOptions = VoiceShaping & {
   duration: number;
   volume: number;
   filter: BiquadFilterType;
   frequency: number;
   q?: number;
   delay?: number;
+  /** Spectral character of the burst. Defaults to the historical white buffer. */
+  texture?: NoiseTexture;
+  /** Glide the band to this frequency across the burst (air, debris fall, scuff). */
+  frequencyEndHz?: number;
+  /** Optional resonant peak: barrel, cabinet, hull, shell casing. */
+  resonanceHz?: number;
+  resonanceQ?: number;
+  resonanceGainDb?: number;
 };
 
 type SpatialFootstepChain = {
   filter: BiquadFilterNode;
+  /** HF-376: the surface resonance a boot excites (deck plate, board, earth). */
+  resonance: BiquadFilterNode;
   gain: GainNode;
   panner: PannerNode;
   busy: boolean;
@@ -481,7 +674,19 @@ export class ArenaAudio {
   private readonly busIdentity = new Map<AudioNode, AudioBusId>();
   private audioSettings: AudioSettings | null = null;
   private noiseBuffer: AudioBuffer | null = null;
+  /**
+   * HF-376: one shared white buffer had to serve gunfire, blasts, boots and
+   * debris, so a shotgun and a footstep on gravel drew from the same spectrum.
+   * Each texture is generated once at unlock from the seeded presentation
+   * stream - still fully procedural, still no sampled audio.
+   */
+  private readonly noiseTextures = new Map<NoiseTexture, AudioBuffer>();
+  /** Cached WaveShaper curves, keyed by quantised drive. */
+  private readonly saturationCurves = new Map<number, Float32Array<ArrayBuffer>>();
+  private saturationSupported: boolean | null = null;
   private stepVariant = 0;
+  /** HF-376 per-shot round-robin index, so no two reports are bit-identical. */
+  private reportVariant = 0;
   private lastNearMissAt = -10_000;
   private arenaZone: ArenaZone | null = null;
   private lastZoneCueAt = -10_000;
@@ -664,6 +869,16 @@ export class ArenaAudio {
         this.createBus('menu-music', 0.18);
         this.createBus('game-music', 0.16);
         this.noiseBuffer = this.createNoiseBuffer(1.2);
+        this.noiseTextures.clear();
+        this.noiseTextures.set('white', this.noiseBuffer);
+        for (const name of NOISE_TEXTURES) {
+          if (name === 'white') continue;
+          // Crackle needs length to hold enough independent grains that a
+          // debris burst never repeats a recognisable pattern; the rest reuse
+          // the white buffer's length so their random start offsets have the
+          // same amount of room to move in.
+          this.noiseTextures.set(name, this.createNoiseBuffer(name === 'crackle' ? 1.8 : 1.2, name));
+        }
         for (const id of AUDIO_BUS_IDS) this.applyBusSetting(id);
         this.prepareCombat();
         if (this.activeArena) this.startArenaBed(this.activeArena);
@@ -695,6 +910,8 @@ export class ArenaAudio {
         this.buses.clear();
         this.busIdentity.clear();
         this.noiseBuffer = null;
+        this.noiseTextures.clear();
+        this.saturationCurves.clear();
         this.contextSource = 'failed';
         if (candidate && candidate.state !== 'closed') void candidate.close().catch(() => undefined);
         return;
@@ -756,6 +973,8 @@ export class ArenaAudio {
     this.destructionEffectWarmupSources = 0;
     this.destructionEffectWarmupNodes = 0;
     this.noiseBuffer = null;
+    this.noiseTextures.clear();
+    this.saturationCurves.clear();
     if (context && context.state !== 'closed') void context.close();
   }
 
@@ -839,10 +1058,95 @@ export class ArenaAudio {
   }
 
   /**
+   * HF-376 shape character for an ambient one-shot.
+   *
+   * Pass 75 placed sparse, spatialised events around each arena, which is the
+   * right structure - but every one of them was a single sine sweep or a single
+   * band of the shared white buffer, so a gull, a hull creak and a pipe clank
+   * were the same voice at three pitches. What identifies each of those in the
+   * real world is its texture, its resonance and its amplitude behaviour over
+   * time, so those are what this table carries.
+   */
+  private ambientShapeCharacter(shape: AmbientEventShape): Readonly<{
+    texture: NoiseTexture;
+    tonalWave: OscillatorType;
+    resonanceQ: number;
+    resonanceGainDb: number;
+    /** Peak-relative level the body holds after its initial fall. */
+    punch: number;
+    /** Attack as a fraction of the event's length. */
+    attackFraction: number;
+    /** Stick-slip / trill segments; 0 means a smooth envelope. */
+    segments: number;
+  }> {
+    switch (shape) {
+      // Insects and small birds: a fast trill, not a tone. The segments are
+      // what make it read as a living thing rather than as a test signal.
+      case 'chirp': return { texture: 'white', tonalWave: 'triangle', resonanceQ: 9, resonanceGainDb: 12, punch: 0.7, attackFraction: 0.06, segments: 5 };
+      // Gulls, dogs, tannoy: a formant with a slow onset and a vibrato-ish
+      // wobble from the segment count.
+      case 'call': return { texture: 'white', tonalWave: 'sawtooth', resonanceQ: 6, resonanceGainDb: 14, punch: 0.72, attackFraction: 0.12, segments: 3 };
+      // Stressed wood and steel: stick-slip. A creak is a sequence of tiny
+      // releases, which is exactly what the segmented envelope produces, and
+      // is why a smooth ramp could never sound like one.
+      case 'creak': return { texture: 'grit', tonalWave: 'triangle', resonanceQ: 11, resonanceGainDb: 13, punch: 0.6, attackFraction: 0.18, segments: 7 };
+      // Struck metal: hard attack, inharmonic ring, gone quickly.
+      case 'clank': return { texture: 'crackle', tonalWave: 'square', resonanceQ: 10, resonanceGainDb: 13, punch: 0.16, attackFraction: 0.01, segments: 0 };
+      // Foliage, steam, air handling: no attack to speak of, a long swell.
+      case 'rustle': return { texture: 'grit', tonalWave: 'sine', resonanceQ: 1.4, resonanceGainDb: 5, punch: 0.8, attackFraction: 0.34, segments: 0 };
+      // Wind, surf, jet wash: the slowest swell of all, and the darkest.
+      case 'whoosh': return { texture: 'pink', tonalWave: 'sine', resonanceQ: 1.1, resonanceGainDb: 4, punch: 0.85, attackFraction: 0.4, segments: 0 };
+      // Machinery and hull impacts: weight, then a held low body.
+      default: return { texture: 'brown', tonalWave: 'triangle', resonanceQ: 2.2, resonanceGainDb: 9, punch: 0.42, attackFraction: 0.03, segments: 0 };
+    }
+  }
+
+  /**
+   * Amplitude contour for one ambient one-shot. Smooth shapes delegate to the
+   * shared transient envelope; segmented shapes (creak stick-slip, chirp trill)
+   * get an alternating contour that a single ramp pair cannot express.
+   */
+  private ambientEnvelopeStages(
+    shape: AmbientEventShape,
+    peak: number,
+    playSeconds: number,
+  ): readonly EnvelopeStage[] {
+    const character = this.ambientShapeCharacter(shape);
+    const attack = Math.max(0.004, playSeconds * character.attackFraction);
+    if (character.segments <= 0) {
+      return transientEnvelope({
+        peak,
+        durationSeconds: playSeconds,
+        attackSeconds: attack,
+        punch: character.punch,
+        punchSeconds: playSeconds * 0.22,
+      });
+    }
+    const stages: EnvelopeStage[] = [
+      { atSeconds: 0, value: 0.0001, ramp: 'linear' },
+      { atSeconds: attack, value: peak, ramp: 'linear' },
+    ];
+    const bodySeconds = Math.max(0.001, playSeconds - attack);
+    for (let index = 1; index <= character.segments; index += 1) {
+      const at = attack + (bodySeconds * index) / (character.segments + 1);
+      // Alternating hard/soft with an overall decay: a creak loses energy as
+      // it slips, and a trill fades as the animal runs out of breath.
+      const fade = 1 - (index / (character.segments + 1)) * 0.55;
+      const level = index % 2 === 0 ? peak * fade : peak * fade * character.punch;
+      stages.push({ atSeconds: at, value: Math.max(0.0002, level), ramp: 'exponential' });
+    }
+    stages.push({ atSeconds: playSeconds, value: 0.0001, ramp: 'exponential' });
+    return Object.freeze(stages);
+  }
+
+  /**
    * Synthesises one ambient one-shot. Tonal shapes use an oscillator sweep;
-   * textured shapes (rustle/whoosh) use the shared noise buffer through a
+   * textured shapes (rustle/whoosh) use a shaped noise buffer through a
    * band-pass, which is the same construction the weapon and explosion
    * families use - no sampled audio enters the project.
+   *
+   * HF-376 gave each shape its own texture, resonance and amplitude behaviour
+   * (see ambientShapeCharacter) so that the arenas stop sharing one voice.
    */
   private playAmbientEvent(entry: ArenaAmbientEvent): void {
     const context = this.context;
@@ -864,38 +1168,66 @@ export class ArenaAudio {
     // Envelope is scheduled after the clamp below so it always matches the
     // sound's real length.
 
+    const character = this.ambientShapeCharacter(entry.shape);
     const [startHz, endHz] = entry.sweepHz;
     let source: AudioScheduledSourceNode;
     const extraNodes: AudioNode[] = [gain, panner];
-    // A non-looping noise event cannot outlive the shared buffer; clamping
-    // here keeps the envelope and the audible sound the same length.
-    const textured = entry.noiseQ > 0 && this.noiseBuffer !== null;
+    const textureBuffer = this.noiseTextures.get(character.texture) ?? this.noiseBuffer;
+    // A non-looping noise event cannot outlive its buffer; clamping here keeps
+    // the envelope and the audible sound the same length.
+    const textured = entry.noiseQ > 0 && textureBuffer !== null;
     const playSeconds = textured
-      ? Math.min(entry.durationSeconds, this.noiseBuffer!.duration)
+      ? Math.min(entry.durationSeconds, textureBuffer!.duration)
       : entry.durationSeconds;
 
     if (textured) {
       const noise = context.createBufferSource();
-      noise.buffer = this.noiseBuffer;
+      noise.buffer = textureBuffer;
       // HF-165/HF-282: NEVER loop a noise buffer. An indefinite broadband loop
       // is exactly the recurring hiss those rows exist to prevent, and a
       // source-text contract forbids enabling looping in this file. Textured
-      // events are therefore bounded by the shared buffer's own length.
+      // events are therefore bounded by the buffer's own length.
       noise.loop = false;
       const band = context.createBiquadFilter();
       band.type = 'bandpass';
       band.Q.value = entry.noiseQ;
       band.frequency.setValueAtTime(startHz, now);
       band.frequency.exponentialRampToValueAtTime(Math.max(40, endHz), now + playSeconds);
-      noise.connect(band).connect(gain).connect(panner).connect(this.ambience);
-      extraNodes.push(band);
+      // The resonance is what turns a band of noise into an object: a hull
+      // plate, a pipe, a palm frond stack.
+      const resonance = context.createBiquadFilter();
+      resonance.type = 'peaking';
+      resonance.frequency.setValueAtTime(startHz * 1.6, now);
+      resonance.Q.value = character.resonanceQ;
+      const resonanceGain = (resonance as Partial<BiquadFilterNode>).gain;
+      if (resonanceGain) resonanceGain.value = character.resonanceGainDb;
+      noise.connect(band).connect(resonance).connect(gain).connect(panner).connect(this.ambience);
+      extraNodes.push(band, resonance);
       source = noise;
     } else {
       const oscillator = context.createOscillator();
-      oscillator.type = entry.shape === 'creak' || entry.shape === 'thump' ? 'triangle' : 'sine';
+      oscillator.type = character.tonalWave;
       oscillator.frequency.setValueAtTime(startHz, now);
+      // HF-376: a formant. A gull is a harmonically rich source through a
+      // strong vocal-tract resonance; the old bare sine had no way to be
+      // anything but a whistle.
+      const formant = context.createBiquadFilter();
+      formant.type = 'bandpass';
+      formant.frequency.setValueAtTime(startHz * 1.35, now);
+      formant.frequency.exponentialRampToValueAtTime(Math.max(60, endHz * 1.35), now + playSeconds);
+      formant.Q.value = character.resonanceQ * 0.35;
+      if (character.segments > 0) {
+        // Trill / wobble: the pitch moves in steps within the event, which is
+        // what separates a bird from a test tone.
+        for (let index = 1; index <= character.segments; index += 1) {
+          const at = now + (playSeconds * index) / (character.segments + 1);
+          const target = index % 2 === 0 ? startHz : endHz;
+          oscillator.frequency.exponentialRampToValueAtTime(Math.max(30, target), at);
+        }
+      }
       oscillator.frequency.exponentialRampToValueAtTime(Math.max(30, endHz), now + playSeconds);
-      oscillator.connect(gain).connect(panner).connect(this.ambience);
+      oscillator.connect(formant).connect(gain).connect(panner).connect(this.ambience);
+      extraNodes.push(formant);
       source = oscillator;
     }
 
@@ -903,9 +1235,11 @@ export class ArenaAudio {
       for (const node of extraNodes) node.disconnect();
       return;
     }
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, entry.gain), now + Math.min(0.06, playSeconds * 0.3));
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + playSeconds);
+    this.applyEnvelope(gain.gain, now, this.ambientEnvelopeStages(
+      entry.shape,
+      Math.max(0.0002, entry.gain),
+      playSeconds,
+    ));
     source.start(now);
     source.stop(now + playSeconds + 0.05);
     this.ambientEventsPlayed += 1;
@@ -1046,33 +1380,70 @@ export class ArenaAudio {
     this.pumpGameMusic();
   }
 
+  /**
+   * HF-376: an enemy's footstep, heard from wherever they are.
+   *
+   * This is the most tactically loaded sound in the game and it was one static
+   * band of white noise fading out - the same burst for a boot on steel deck
+   * and a boot in long grass, at four different cutoffs. It now draws the
+   * surface's own texture, excites the surface's resonance, and uses the same
+   * heel/settle envelope as the local step so a remote footstep and your own
+   * are recognisably the same physical event.
+   *
+   * The pooled chain is unchanged in shape apart from one extra resonance
+   * stage, so the spatial-voice budget and the occlusion behaviour still hold.
+   */
   worldFootstep(position: SpatialPoint, surface: SpatialFootstepSurface, movement: FootstepMovement, occluded = false): boolean {
-    if (!this.context || !this.noiseBuffer || !this.movement
+    if (!this.context || !this.movement
       || this.spatialChains + this.arenaSources.length >= AUDIO_RUNTIME_BUDGET.spatialVoices) {
       this.voicesDropped += 1;
       return false;
     }
+    const profile = FOOTSTEP_MATERIAL_PROFILES[surface];
+    const buffer = this.noiseTextures.get(profile.heelTexture) ?? this.noiseBuffer;
+    if (!buffer) return false;
     const now = this.context.currentTime;
     const source = this.context.createBufferSource();
-    source.buffer = this.noiseBuffer;
+    source.buffer = buffer;
     const chain = this.acquireFootstepChain();
     if (!chain) {
       this.voicesDropped += 1;
       return false;
     }
-    const { filter, gain, panner } = chain;
+    const { filter, resonance, gain, panner } = chain;
+    // Per-step variation. Two identical steps in a row is what turns an enemy
+    // walking into a metronome, which is both unconvincing and unreadable.
+    this.stepVariant = (this.stepVariant + 1) % 4;
+    const variation = [0.94, 1.04, 0.98, 1.08][this.stepVariant]!;
     filter.type = surface === 'soil' || surface === 'grass' ? 'lowpass' : 'bandpass';
-    const openFrequency = surface === 'metal' ? 1_900
-      : surface === 'concrete' ? 1_300
-        : surface === 'asphalt' ? 1_050
-          : surface === 'wood' ? 760
-            : surface === 'grass' ? 360 : 520;
-    filter.frequency.value = openFrequency * (occluded ? 0.45 : 1);
-    filter.Q.value = surface === 'metal' ? 1.4 : 0.8;
+    const openFrequency = profile.heelHz * variation;
+    filter.frequency.cancelScheduledValues(now);
+    filter.frequency.setValueAtTime(openFrequency * (occluded ? 0.45 : 1), now);
+    // The band closes over the step: contact, then settle. A fixed band is the
+    // reason the old step read as a burst of hiss rather than as a boot.
+    filter.frequency.exponentialRampToValueAtTime(
+      Math.max(60, openFrequency * (occluded ? 0.45 : 1) * 0.5),
+      now + 0.085,
+    );
+    filter.Q.value = profile.heelQ;
+    // The surface's own resonance - the deck plate, the hollow board, the
+    // packed earth. Occluded steps lose it first, because a wall removes a
+    // narrow resonance long before it removes broadband energy.
+    resonance.type = 'peaking';
+    resonance.frequency.value = profile.resonanceHz;
+    resonance.Q.value = profile.resonanceQ;
+    const resonanceGain = (resonance as Partial<BiquadFilterNode>).gain;
+    if (resonanceGain) resonanceGain.value = occluded ? 3 : 9;
     gain.gain.cancelScheduledValues(now);
     const movementGain = movement === 'sprint' ? 0.048 : movement === 'crouch' || movement === 'prone' ? 0.016 : 0.032;
-    gain.gain.setValueAtTime(movementGain * (occluded ? 0.65 : 1), now);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.085);
+    // Heel then settle, rather than an instant peak into a single decay.
+    this.applyEnvelope(gain.gain, now, transientEnvelope({
+      peak: movementGain * profile.heelVolume * (occluded ? 0.65 : 1),
+      durationSeconds: 0.085,
+      attackSeconds: 0.0008,
+      punch: 0.24,
+      punchSeconds: 0.008,
+    }));
     panner.positionX.value = position.x;
     panner.positionY.value = position.y;
     panner.positionZ.value = position.z;
@@ -1093,7 +1464,7 @@ export class ArenaAudio {
       chain.busy = false;
       previousEnded?.call(source, event);
     };
-    source.start(now, presentationRandom() * Math.max(0.001, this.noiseBuffer.duration - 0.085), 0.085);
+    source.start(now, presentationRandom() * Math.max(0.001, buffer.duration - 0.085), 0.085);
     return true;
   }
 
@@ -1288,10 +1659,18 @@ export class ArenaAudio {
         source.start(now);
         source.stop(now + 0.001);
       }
-      // The two live broadband layers share the retained noise sample but own
+      // The live broadband layers share the retained noise sample but own
       // distinct filter/gain/source nodes. Warm those exact constructors and
       // connections without registering or emitting a live voice.
-      for (const [filterType, frequency] of [['lowpass', 2_100], ['highpass', 3_100]] as const) {
+      //
+      // HF-376 added two filter types to the live grenade path: `bandpass` for
+      // the metallic bounce contact and `peaking` for the resonant stage under
+      // the blast body. They are warmed here for the same reason the original
+      // two were - the first grenade of a match must not be the call that
+      // cold-allocates a node class.
+      for (const [filterType, frequency] of [
+        ['lowpass', 2_100], ['peaking', 1_150], ['bandpass', 744], ['highpass', 3_100],
+      ] as const) {
         const source = this.context.createBufferSource();
         const filter = this.context.createBiquadFilter();
         const gain = this.context.createGain();
@@ -1301,7 +1680,14 @@ export class ArenaAudio {
         filter.type = filterType;
         filter.frequency.value = frequency;
         gain.gain.value = 0;
-        source.connect(filter).connect(gain).connect(this.weapons);
+        // HF-376: the blast body is saturated, so the WaveShaper and its curve
+        // are warmed too. createSaturator() returns null where the platform has
+        // no such node, in which case the chain is simply the original one.
+        const saturator = filterType === 'lowpass' ? this.createSaturator(0.6) : null;
+        if (saturator) {
+          nodes.push(saturator);
+          source.connect(filter).connect(saturator).connect(gain).connect(this.weapons);
+        } else source.connect(filter).connect(gain).connect(this.weapons);
         source.onended = () => {
           try { source.disconnect(); } catch { /* silent warmup already released */ }
           try { filter.disconnect(); } catch { /* silent warmup already released */ }
@@ -1472,73 +1858,213 @@ export class ArenaAudio {
     const tailGainScale = Math.min(6, Math.max(0.4, layering.tailGainScale / tailReference.gain));
     const tailDurationScale = Math.min(2.5, Math.max(0.5, layering.tailDurationSeconds / tailReference.duration));
 
-    this.sweep(profile.body, profile.bodyEnd, profile.duration, 0.22 * attenuation, 'sawtooth', weaponDestination);
+    // HF-376: every report is a NEW draw from the round-robin, so no two shots
+    // in a burst are bit-identical. The old reports were sample-for-sample the
+    // same voice repeated at the fire rate, which is the single loudest "this
+    // is a synthesiser" tell an automatic weapon can have.
+    this.reportVariant = (this.reportVariant + 1) % 8;
+    const variant = this.reportVariant;
+    const detuneCents = roundRobinDetune(variant, 42);
+    const variantGain = 1 + roundRobinDetune(variant + 3, 0.07);
+
+    // LAYER 1 - pressure body. Sawtooth into saturation, with the pitch fall
+    // front-loaded so it lands as a thump that has a pitch rather than as a
+    // pitch that slides. `punch` is what gives it a discernible attack and a
+    // shorter, denser body than the old flat exponential.
+    this.sweep(
+      profile.body,
+      profile.bodyEnd,
+      profile.duration,
+      0.22 * attenuation * variantGain,
+      'sawtooth',
+      weaponDestination,
+      0,
+      { attack: 0.0008, punch: 0.3, punchSeconds: profile.duration * 0.14, drive: 0.55, detuneCents, pitchBias: 0.7 },
+    );
     // The supersonic crack is a near-field event: past REPORT_CRACK_RANGE_METRES
     // its scale is zero and the layer is silent. The voice is still scheduled
     // rather than skipped, because the replicated report's LAYER COUNT is a
     // pinned budget contract (audio-railgun.test.ts, owned elsewhere) and a
     // conditional layer would make that count distance-dependent.
+    //
+    // LAYER 2 - the crack itself. Hard drive and a near-zero attack: this is
+    // the shock front, and anything slower than a fraction of a millisecond
+    // reads as a tone instead of as a snap.
     this.sweep(
       profile.crack,
       profile.crack * profile.crackEndRatio,
       profile.crackDuration,
-      0.075 * attenuation * layering.crackGainScale,
+      0.075 * attenuation * layering.crackGainScale * variantGain,
       'square',
       weaponDestination,
+      0,
+      { attack: 0.0003, punch: 0.12, punchSeconds: profile.crackDuration * 0.2, drive: 0.72, detuneCents: detuneCents * 1.4, pitchBias: 0.82 },
     );
+    // LAYER 3 - the body's broadband half. Pink rather than white: a report's
+    // spectrum falls with frequency, and the flat buffer is why every weapon
+    // used to sit in the same bright band. The peaking stage is the barrel -
+    // a resonance an octave or two above the body fundamental is what makes
+    // one weapon sound like a short tube and another like a long one.
     this.noise({
       duration: profile.duration,
-      volume: profile.noise * attenuation,
+      volume: profile.noise * attenuation * variantGain,
       filter: 'lowpass',
       // Air absorption compounds with the weapon's own voicing rather than
       // replacing it: a muffled LMG is still an LMG.
       frequency: Math.min(profile.lowpass, layering.bodyCutoffHz),
       q: 0.7,
+      texture: 'pink',
+      // The band closes as the burst decays, which is the muzzle gas cooling
+      // and the reflections taking over from the direct sound.
+      frequencyEndHz: Math.min(profile.lowpass, layering.bodyCutoffHz) * 0.42,
+      resonanceHz: profile.body * 3.4,
+      resonanceQ: 2.6,
+      resonanceGainDb: 7,
+      attack: 0.0006,
+      punch: 0.26,
+      punchSeconds: profile.duration * 0.16,
+      drive: 0.45,
     }, weaponDestination);
+    // LAYER 4 - the muzzle transient: the click of the gas leaving the barrel.
+    // White, essentially zero attack, collapsing inside 4 ms. This is the layer
+    // the ear uses to localise the shot and to judge how close it was.
     this.noise({
       duration: profile.transientDuration,
       // The muzzle transient belongs to the near field with the crack, but it
       // never disappears entirely the way the crack does.
-      volume: 0.17 * attenuation * (0.35 + 0.65 * layering.crackGainScale),
+      volume: 0.17 * attenuation * (0.35 + 0.65 * layering.crackGainScale) * variantGain,
       filter: 'highpass',
       frequency: profile.transientHighpass,
       q: 0.4,
+      texture: 'white',
+      attack: 0.0003,
+      punch: 0.18,
+      punchSeconds: 0.004,
+      drive: 0.6,
+      resonanceHz: profile.transientHighpass * 1.7,
+      resonanceQ: 1.8,
+      resonanceGainDb: 5,
     }, weaponDestination);
     // Q and delay come from the space: a hard room rings tight and early, a
     // deck over open water barely answers at all.
     const tailDelaySeconds = Math.min(0.3, layering.tailDelaySeconds);
+    // LAYER 5 - the tail: reflections, not the weapon. It gets the only slow
+    // attack in the report (reflections arrive spread out, they do not snap on)
+    // and it holds far longer after its initial fall than the direct layers do,
+    // which is what makes a shot sound like it happened SOMEWHERE.
+    const tailSeconds = Math.max(0.04, Math.min(
+      profile.tailDuration * tailDurationScale,
+      SHOT_TAIL_BUDGET_SECONDS - tailDelaySeconds,
+    ));
     this.noise({
-      duration: Math.max(0.04, Math.min(
-        profile.tailDuration * tailDurationScale,
-        SHOT_TAIL_BUDGET_SECONDS - tailDelaySeconds,
-      )),
+      duration: tailSeconds,
       volume: (remote ? 0.055 : 0.082) * attenuation * tailGainScale,
       filter: 'bandpass',
       frequency: profile.tail,
       q: layering.tailQ,
       delay: tailDelaySeconds,
+      texture: 'pink',
+      frequencyEndHz: profile.tail * 0.55,
+      attack: 0.012,
+      punch: 0.55,
+      punchSeconds: tailSeconds * 0.3,
     }, ambienceDestination);
     if (weapon === 'carbine') {
       // Original HK416 pressure and yard-reflection layers; short enough to stay readable at full RPM.
-      this.sweep(74, 38, 0.16, 0.052 * attenuation, 'triangle', this.weapons, 0.008);
-      this.noise({ duration: 0.14, volume: 0.046 * attenuation, filter: 'bandpass', frequency: 830, q: 0.62, delay: 0.058 }, this.ambience);
-      if (!remote) this.noise({ duration: 0.022, volume: 0.046, filter: 'highpass', frequency: 4200, q: 0.55, delay: 0.043 }, this.feedback);
+      this.sweep(74, 38, 0.16, 0.052 * attenuation, 'triangle', this.weapons, 0.008, { punch: 0.34, drive: 0.4, detuneCents });
+      this.noise({
+        duration: 0.14, volume: 0.046 * attenuation, filter: 'bandpass', frequency: 830, q: 0.62, delay: 0.058,
+        texture: 'pink', attack: 0.008, punch: 0.5,
+      }, this.ambience);
+      if (!remote) {
+        this.noise({
+          duration: 0.022, volume: 0.046, filter: 'highpass', frequency: 4200, q: 0.55, delay: 0.043,
+          texture: 'crackle', attack: 0.0004, punch: 0.2, punchSeconds: 0.003,
+        }, this.feedback);
+      }
     }
 
     if (weapon === 'railgun') {
       // An authored pressure report, supersonic snap and long structural tail.
       // It remains on the existing compressed weapon/ambience buses, so local
       // and replicated shots are large without bypassing the bounded mix.
-      this.sweep(36, 10, RAILGUN_REPORT_PROFILE.pressureDuration, 0.2 * attenuation, 'sawtooth', weaponDestination, 0.008);
-      this.sweep(118, 24, 0.38, 0.12 * attenuation, 'triangle', weaponDestination, 0.026);
-      this.noise({ duration: 0.7, volume: 0.2 * attenuation, filter: 'bandpass', frequency: 165, q: 0.5, delay: 0.045 }, ambienceDestination);
-      this.noise({ duration: 0.08, volume: 0.16 * attenuation, filter: 'highpass', frequency: 4_800, q: 0.32, delay: 0.006 }, remote ? weaponDestination : this.feedback);
-      this.tone(92, 0.42, 0.13 * attenuation, 'triangle', ambienceDestination, 0.075);
+      //
+      // HF-376 re-voiced these five in place. The replicated report's layer
+      // COUNT is pinned at ten (audio-railgun.test.ts), so the quality had to
+      // come from the shape of each layer, not from adding more of them.
+      this.sweep(36, 10, RAILGUN_REPORT_PROFILE.pressureDuration, 0.2 * attenuation, 'sawtooth', weaponDestination, 0.008, {
+        attack: 0.002, punch: 0.42, punchSeconds: 0.09, drive: 0.66, pitchBias: 0.72,
+      });
+      this.sweep(118, 24, 0.38, 0.12 * attenuation, 'triangle', weaponDestination, 0.026, {
+        attack: 0.001, punch: 0.3, drive: 0.5, detuneCents, pitchBias: 0.75,
+      });
+      // Brown noise for the structural tail: the rail's discharge shakes the
+      // deck plate, and that is a sub-100 Hz event, not a band of hiss.
+      this.noise({
+        duration: 0.7, volume: 0.2 * attenuation, filter: 'bandpass', frequency: 165, q: 0.5, delay: 0.045,
+        texture: 'brown', frequencyEndHz: 95, attack: 0.014, punch: 0.5, punchSeconds: 0.16,
+      }, ambienceDestination);
+      this.noise({
+        duration: 0.08, volume: 0.16 * attenuation, filter: 'highpass', frequency: 4_800, q: 0.32, delay: 0.006,
+        texture: 'white', attack: 0.0003, punch: 0.14, punchSeconds: 0.006, drive: 0.7,
+      }, remote ? weaponDestination : this.feedback);
+      this.tone(92, 0.42, 0.13 * attenuation, 'triangle', ambienceDestination, 0.075, {
+        attack: 0.01, punch: 0.46, drive: 0.35,
+      });
     }
 
     if (!remote) {
-      this.tone(profile.mechanismPrimaryHz, 0.028, 0.038, 'square', this.feedback, profile.mechanismDelay);
-      this.tone(profile.mechanismSecondaryHz, 0.018, 0.022, 'triangle', this.feedback, profile.mechanismDelay + 0.025);
+      // HF-376 local mechanism: the player's own weapon is the one sound they
+      // hear thousands of times, so it gets the parts a report actually has -
+      // a bolt carrier slamming forward, and a brass case hitting the ground.
+      // Neither exists on the replicated path, so the pinned world layer count
+      // is untouched.
+      //
+      // Sub thump: the pressure you feel rather than hear. Local only, because
+      // at range this is the first thing the air removes.
+      this.sweep(
+        profile.body * 0.52,
+        Math.max(24, profile.bodyEnd * 0.45),
+        Math.min(0.26, profile.duration * 1.5),
+        0.13,
+        'sine',
+        this.feedback,
+        0.002,
+        { attack: 0.003, punch: 0.4, drive: 0.25, detuneCents, pitchBias: 0.6 },
+      );
+      // Bolt carrier: a hard metal-on-metal clack, not a tone. Crackle texture
+      // through a tight resonance is a struck part; the old square-wave beep
+      // at the same frequency was a note.
+      this.noise({
+        duration: 0.026,
+        volume: 0.05,
+        filter: 'bandpass',
+        frequency: profile.mechanismPrimaryHz * 2.6,
+        q: 1.1,
+        delay: profile.mechanismDelay,
+        texture: 'crackle',
+        attack: 0.0004,
+        punch: 0.2,
+        punchSeconds: 0.004,
+        resonanceHz: profile.mechanismPrimaryHz * METALLIC_PARTIAL_RATIOS[1]!,
+        resonanceQ: 7,
+        resonanceGainDb: 10,
+        drive: 0.4,
+      }, this.feedback);
+      this.tone(profile.mechanismPrimaryHz, 0.028, 0.026, 'square', this.feedback, profile.mechanismDelay, {
+        attack: 0.0004, punch: 0.22, drive: 0.3, detuneCents,
+      });
+      // Ejected case: bright, inharmonic, and it lands slightly late and at a
+      // different pitch every shot.
+      this.tone(
+        profile.mechanismSecondaryHz * METALLIC_PARTIAL_RATIOS[1]!,
+        0.018,
+        0.02,
+        'triangle',
+        this.feedback,
+        profile.mechanismDelay + 0.025 + variant * 0.0018,
+        { attack: 0.0004, punch: 0.16, detuneCents: detuneCents * 2.5 },
+      );
     }
   }
 
@@ -1560,15 +2086,32 @@ export class ArenaAudio {
 
   hit(headshot = false): void {
     const cue = combatConfirmEnvelope(headshot ? 'head' : 'body');
-    this.tone(cue.frequencyHz[0], 0.045, headshot ? 0.11 : 0.075, 'sine', this.ui);
-    this.tone(cue.frequencyHz[1], 0.028, headshot ? 0.07 : 0.035, 'triangle', this.ui, 0.018);
+    // HF-376: a hit marker has to arrive before the player consciously reads
+    // it, so it gets the hardest attack and shortest body of any cue in the
+    // game. The old flat exponential blurred the onset, which is why hits at
+    // full fire rate smeared into one continuous tone.
+    this.tone(cue.frequencyHz[0], 0.045, headshot ? 0.11 : 0.075, 'sine', this.ui, 0, {
+      attack: 0.0004, punch: 0.2, punchSeconds: 0.006, drive: headshot ? 0.35 : 0.2,
+    });
+    this.tone(cue.frequencyHz[1], 0.028, headshot ? 0.07 : 0.035, 'triangle', this.ui, 0.018, {
+      attack: 0.0004, punch: 0.18, punchSeconds: 0.004,
+    });
   }
 
   kill(): void {
     const cue = combatConfirmEnvelope('kill');
-    this.tone(cue.frequencyHz[0], 0.06, 0.055, 'triangle', this.ui);
-    this.tone(cue.frequencyHz[1], 0.075, 0.07, 'sine', this.ui, 0.045);
-    this.tone(cue.frequencyHz[2], 0.09, 0.075, 'sine', this.ui, 0.095);
+    // HF-376: three rising partials, each snapping in and holding, so the cue
+    // reads as one deliberate three-part confirmation rather than as a chord
+    // fading up. The hold is what makes it audible over a firefight.
+    this.tone(cue.frequencyHz[0], 0.06, 0.055, 'triangle', this.ui, 0, {
+      attack: 0.0005, punch: 0.4, punchSeconds: 0.008, drive: 0.25,
+    });
+    this.tone(cue.frequencyHz[1], 0.075, 0.07, 'sine', this.ui, 0.045, {
+      attack: 0.0005, punch: 0.45, punchSeconds: 0.01,
+    });
+    this.tone(cue.frequencyHz[2], 0.09, 0.075, 'sine', this.ui, 0.095, {
+      attack: 0.0006, punch: 0.5, punchSeconds: 0.012,
+    });
   }
 
   damage(): void {
@@ -1584,19 +2127,80 @@ export class ArenaAudio {
     this.damageFeedbackPulses += 1;
   }
 
+  /**
+   * HF-376 per-surface impact character.
+   *
+   * A bullet strike used to be one band-passed noise burst plus one tone,
+   * with the surface changing only two numbers - which is why concrete, wood
+   * and metal all read as the same click at different pitches. Each material
+   * now gets the three things that actually identify it: a strike transient
+   * with its own texture, a resonant body with the right decay, and material
+   * debris (dust, splinters, shards, dirt) that arrives slightly late.
+   */
   impact(surface: ImpactSurface, distance = 0): void {
     const attenuation = Math.max(0.08, 1 - Math.min(1, distance / 34));
-    const profile = surface === 'glass'
-      ? { frequency: 5200, tone: 1460, duration: 0.095, volume: 0.105 }
-      : surface === 'metal'
-      ? { frequency: 3150, tone: 960, duration: 0.065, volume: 0.09 }
-      : surface === 'wood'
-        ? { frequency: 980, tone: 240, duration: 0.075, volume: 0.07 }
-        : surface === 'soil'
-          ? { frequency: 460, tone: 120, duration: 0.09, volume: 0.062 }
-          : { frequency: 1780, tone: 410, duration: 0.07, volume: 0.076 };
-    this.noise({ duration: profile.duration, volume: profile.volume * attenuation, filter: 'bandpass', frequency: profile.frequency, q: 1.25 }, this.feedback);
-    this.tone(profile.tone, 0.028, 0.03 * attenuation, surface === 'metal' ? 'square' : 'triangle', this.feedback, 0.006);
+    const variant = (this.stepVariant + this.reportVariant) % 8;
+    const detuneCents = roundRobinDetune(variant, 90);
+    const profile = IMPACT_MATERIAL_PROFILES[surface];
+    // Strike: the moment of contact. Texture is the material's grain - glass
+    // and concrete shatter into grains, metal and wood do not.
+    this.noise({
+      duration: profile.strikeSeconds,
+      volume: profile.strikeVolume * attenuation,
+      filter: 'bandpass',
+      frequency: profile.strikeHz,
+      q: profile.strikeQ,
+      texture: profile.strikeTexture,
+      frequencyEndHz: profile.strikeHz * profile.strikeFallRatio,
+      attack: 0.0003,
+      punch: 0.16,
+      punchSeconds: 0.003,
+      drive: profile.drive,
+      resonanceHz: profile.resonanceHz,
+      resonanceQ: profile.resonanceQ,
+      resonanceGainDb: profile.resonanceGainDb,
+    }, this.feedback);
+    // Body: what the material does after being hit. Metal rings on inharmonic
+    // partials, wood knocks hollow and dies, soil just absorbs.
+    this.tone(
+      profile.bodyHz,
+      profile.bodySeconds,
+      profile.bodyVolume * attenuation,
+      profile.bodyWave,
+      this.feedback,
+      0.004,
+      { attack: 0.0006, punch: profile.bodyPunch, drive: profile.drive * 0.5, detuneCents },
+    );
+    if (profile.ringRatio > 0) {
+      // Second, inharmonic partial. This is the whole difference between
+      // "metal" and "a note at a metal-ish pitch".
+      this.tone(
+        profile.bodyHz * profile.ringRatio,
+        profile.bodySeconds * 0.7,
+        profile.bodyVolume * 0.45 * attenuation,
+        'sine',
+        this.feedback,
+        0.006,
+        { attack: 0.001, punch: 0.5, detuneCents: detuneCents * 1.6 },
+      );
+    }
+    if (profile.debrisVolume > 0) {
+      // Spall: dust off concrete, splinters off wood, shards off glass. It
+      // arrives after the strike because it has to travel.
+      this.noise({
+        duration: profile.debrisSeconds,
+        volume: profile.debrisVolume * attenuation,
+        filter: 'bandpass',
+        frequency: profile.debrisHz,
+        q: 0.8,
+        delay: profile.debrisDelay,
+        texture: 'crackle',
+        frequencyEndHz: profile.debrisHz * 0.45,
+        attack: 0.002,
+        punch: 0.4,
+        punchSeconds: profile.debrisSeconds * 0.25,
+      }, this.feedback);
+    }
   }
 
   coverImpact(distance = 0): void {
@@ -1612,6 +2216,10 @@ export class ArenaAudio {
   testBayDoorThump(distance = 0): void {
     const profile = TEST_BAY_DOOR_THUMP_PROFILE;
     const attenuation = Math.max(0.08, 1 - Math.min(1, Math.max(0, distance) / profile.maximumDistanceM));
+    // HF-376: the layer identities and volumes are the authored profile and are
+    // pinned by audio-test-bay-door.test.ts; what changed is their shape. A
+    // heavy door is a latch releasing, air moving, gear driving and a mass
+    // arriving - four events with four different attacks, not four beeps.
     this.tone(
       profile.layers.latch.frequencyHz,
       profile.layers.latch.durationSeconds,
@@ -1619,6 +2227,7 @@ export class ArenaAudio {
       profile.layers.latch.wave,
       this.feedback,
       profile.layers.latch.delaySeconds,
+      { attack: 0.0004, punch: 0.18, drive: 0.45 },
     );
     this.tone(
       profile.layers.pressure.frequencyHz,
@@ -1627,6 +2236,7 @@ export class ArenaAudio {
       profile.layers.pressure.wave,
       this.feedback,
       profile.layers.pressure.delaySeconds,
+      { attack: 0.004, punch: 0.45, drive: 0.3 },
     );
     this.sweep(
       profile.layers.mechanism.startFrequencyHz,
@@ -1636,6 +2246,7 @@ export class ArenaAudio {
       profile.layers.mechanism.wave,
       this.feedback,
       profile.layers.mechanism.delaySeconds,
+      { attack: 0.002, punch: 0.5, pitchBias: 0.45 },
     );
     this.noise({
       duration: profile.layers.body.durationSeconds,
@@ -1644,6 +2255,14 @@ export class ArenaAudio {
       frequency: profile.layers.body.frequencyHz,
       q: profile.layers.body.q,
       delay: profile.layers.body.delaySeconds,
+      texture: 'brown',
+      frequencyEndHz: profile.layers.body.frequencyHz * 0.4,
+      attack: 0.0015,
+      punch: 0.34,
+      drive: 0.4,
+      resonanceHz: profile.layers.body.frequencyHz * 0.55,
+      resonanceQ: 3,
+      resonanceGainDb: 8,
     }, this.feedback);
   }
 
@@ -1652,91 +2271,286 @@ export class ArenaAudio {
     if (strength <= 0 || now - this.lastNearMissAt < 85) return;
     this.lastNearMissAt = now;
     const level = Math.min(1, Math.max(0.1, strength));
-    this.sweep(5200, 1350, 0.085, 0.055 * level, 'sawtooth', this.feedback);
-    this.noise({ duration: 0.11, volume: 0.045 * level, filter: 'highpass', frequency: 2600, q: 0.85, delay: 0.008 }, this.feedback);
+    // HF-376: a supersonic round passing close is a shock cone, not a laser
+    // zap. The crack is near-instantaneous and the trailing whip falls away
+    // behind it, which is why the band sweeps down as well as the pitch.
+    this.sweep(5_200, 1_350, 0.085, 0.055 * level, 'sawtooth', this.feedback, 0, {
+      attack: 0.0002, punch: 0.13, punchSeconds: 0.006, drive: 0.7, pitchBias: 0.85,
+    });
+    this.noise({
+      duration: 0.14, volume: 0.045 * level, filter: 'highpass', frequency: 2_600, q: 0.85, delay: 0.008,
+      texture: 'white', frequencyEndHz: 900, attack: 0.0005, punch: 0.24, punchSeconds: 0.012, drive: 0.4,
+    }, this.feedback);
   }
 
+  /**
+   * HF-376 weapon mechanics.
+   *
+   * These were square-wave beeps at plausible frequencies, which is why a
+   * magazine change sounded like a menu. Every event below is now built the
+   * way the real part sounds: a crackle-textured metal-on-metal contact
+   * through a tight inharmonic resonance, plus whatever else the part does -
+   * a spring, a latch, the weight of a full magazine seating.
+   */
   weaponAction(weapon: WeaponId, event: WeaponActionEvent): void {
     const scattergun = weapon === 'scattergun';
-    if (event === 'mag-release') this.tone(620, 0.018, 0.028, 'square', this.feedback);
-    else if (event === 'mag-out') this.noise({ duration: 0.055, volume: 0.032, filter: 'bandpass', frequency: 1050, q: 0.9 }, this.feedback);
-    else if (event === 'mag-in') this.noise({ duration: 0.06, volume: 0.038, filter: 'bandpass', frequency: 1320, q: 1.1 }, this.feedback);
-    else if (event === 'mag-seat') {
-      this.tone(weapon === 'smg' ? 470 : 390, 0.035, 0.052, 'square', this.feedback);
-      this.noise({ duration: 0.025, volume: 0.028, filter: 'highpass', frequency: 2400, q: 0.8 }, this.feedback);
+    // Real handling is never twice the same; without this the reload cadence
+    // reads as a drum machine.
+    this.reportVariant = (this.reportVariant + 1) % 8;
+    const detuneCents = roundRobinDetune(this.reportVariant, 70);
+    if (event === 'mag-release') {
+      // Catch lets go: one small sprung click, no body behind it.
+      this.metallicClick(620, 0.018, 0.03, { detuneCents, resonanceQ: 9, texture: 'crackle' });
+      this.tone(1_240, 0.012, 0.012, 'triangle', this.feedback, 0.004, { attack: 0.0004, punch: 0.18, detuneCents });
+    } else if (event === 'mag-out') {
+      // The magazine sliding clear: a rasp down the mag well, not a click.
+      this.noise({
+        duration: 0.075, volume: 0.032, filter: 'bandpass', frequency: 1_050, q: 0.9,
+        texture: 'grit', frequencyEndHz: 520, attack: 0.004, punch: 0.55, punchSeconds: 0.02,
+      }, this.feedback);
+    } else if (event === 'mag-in') {
+      // Going in: the same rasp rising, because it is now travelling the other
+      // way, with the first contact of the lips against the well at the end.
+      this.noise({
+        duration: 0.07, volume: 0.036, filter: 'bandpass', frequency: 780, q: 1,
+        texture: 'grit', frequencyEndHz: 1_500, attack: 0.005, punch: 0.6, punchSeconds: 0.018,
+      }, this.feedback);
+      this.metallicClick(1_320, 0.014, 0.022, { detuneCents, resonanceQ: 6, texture: 'white', delay: 0.055 });
+    } else if (event === 'mag-seat') {
+      // Seating a loaded magazine is the heaviest handling sound a rifle makes:
+      // a hard contact, the mass of the rounds behind it, and the catch.
+      this.metallicClick(weapon === 'smg' ? 470 : 390, 0.03, 0.055, { detuneCents, resonanceQ: 7, drive: 0.5 });
+      this.sweep(150, 88, 0.06, 0.03, 'triangle', this.feedback, 0.004, { attack: 0.001, punch: 0.3, drive: 0.35 });
+      this.noise({
+        duration: 0.03, volume: 0.026, filter: 'highpass', frequency: 2_400, q: 0.8, delay: 0.014,
+        texture: 'crackle', attack: 0.0004, punch: 0.2, punchSeconds: 0.003,
+      }, this.feedback);
     } else if (event === 'shell-insert') {
-      this.tone(740, 0.02, 0.034, 'triangle', this.feedback);
-      this.tone(260, 0.028, 0.03, 'square', this.feedback, 0.015);
+      // Brass into a tube: a bright rim contact, then the shell sliding home.
+      this.metallicClick(740, 0.016, 0.03, { detuneCents, resonanceQ: 8, texture: 'crackle' });
+      this.noise({
+        duration: 0.05, volume: 0.024, filter: 'bandpass', frequency: 1_600, q: 1.2, delay: 0.008,
+        texture: 'grit', frequencyEndHz: 760, attack: 0.003, punch: 0.5,
+      }, this.feedback);
+      this.tone(260, 0.03, 0.026, 'square', this.feedback, 0.015, { attack: 0.0005, punch: 0.25, detuneCents });
     } else if (event === 'bolt-release') {
-      this.tone(scattergun ? 310 : 520, 0.034, 0.055, 'square', this.feedback);
-      this.noise({ duration: 0.032, volume: 0.036, filter: 'highpass', frequency: scattergun ? 1200 : 1900, q: 0.75 }, this.feedback);
+      // The loudest mechanical event on any weapon: a sprung mass slamming into
+      // a steel shoulder. Two partials and a spring ring, driven hard.
+      this.metallicClick(scattergun ? 310 : 520, 0.04, 0.06, { detuneCents, resonanceQ: 6, drive: 0.6 });
+      this.noise({
+        duration: 0.04, volume: 0.034, filter: 'highpass', frequency: scattergun ? 1_200 : 1_900, q: 0.75,
+        texture: 'crackle', frequencyEndHz: scattergun ? 620 : 950, attack: 0.0004, punch: 0.22, punchSeconds: 0.005,
+        drive: 0.45,
+      }, this.feedback);
+      // Recoil-spring ring: high, quiet, and slightly late, and the single most
+      // recognisable detail of a bolt going forward.
+      this.tone(scattergun ? 2_100 : 2_900, 0.07, 0.011, 'sine', this.feedback, 0.02, {
+        attack: 0.002, punch: 0.6, detuneCents: detuneCents * 2,
+      });
     }
   }
 
+  /**
+   * HF-376: one metal part striking another. Crackle grains through a tight
+   * inharmonic peak, with a near-zero attack and a body that is gone in a few
+   * milliseconds. Every mechanical detail in the game routes through here so
+   * that bolts, catches, latches and casings share one physical identity.
+   */
+  private metallicClick(
+    hz: number,
+    duration: number,
+    volume: number,
+    options: Readonly<{
+      detuneCents?: number;
+      resonanceQ?: number;
+      drive?: number;
+      delay?: number;
+      texture?: NoiseTexture;
+      destination?: AudioNode | null;
+    }> = {},
+  ): void {
+    const destination = options.destination ?? this.feedback;
+    this.noise({
+      duration,
+      volume,
+      filter: 'bandpass',
+      frequency: hz * 2.4,
+      q: 1.2,
+      delay: options.delay ?? 0,
+      texture: options.texture ?? 'crackle',
+      attack: 0.0003,
+      punch: 0.18,
+      punchSeconds: Math.min(0.004, duration * 0.2),
+      drive: options.drive ?? 0.42,
+      resonanceHz: hz * METALLIC_PARTIAL_RATIOS[1]!,
+      resonanceQ: options.resonanceQ ?? 7,
+      resonanceGainDb: 11,
+    }, destination);
+    this.tone(hz, Math.max(0.012, duration * 0.7), volume * 0.55, 'square', destination, options.delay ?? 0, {
+      attack: 0.0004,
+      punch: 0.2,
+      drive: (options.drive ?? 0.42) * 0.7,
+      detuneCents: options.detuneCents ?? 0,
+    });
+  }
+
   empty(): void {
-    this.tone(170, 0.025, 0.055, 'square', this.feedback);
-    this.tone(112, 0.035, 0.04, 'triangle', this.feedback, 0.03);
+    // HF-376: a dry fire is a firing pin hitting nothing. It should be a small,
+    // dead, entirely mechanical sound with no tail whatsoever - the absence of
+    // a report is the information.
+    this.metallicClick(170, 0.022, 0.05, { resonanceQ: 5, drive: 0.5 });
+    this.tone(112, 0.03, 0.03, 'triangle', this.feedback, 0.028, { attack: 0.0005, punch: 0.24 });
   }
 
   reload(): void {
     // Only the initial handling sound lives here; mechanical events are emitted
     // from the same normalized timeline that drives hands and weapon parts.
-    this.noise({ duration: 0.07, volume: 0.026, filter: 'bandpass', frequency: 720, q: 0.7 }, this.feedback);
+    // HF-376: a hand taking hold of a weapon is cloth and grip on polymer -
+    // a grit rasp that opens and closes, not a band of hiss.
+    this.noise({
+      duration: 0.09, volume: 0.026, filter: 'bandpass', frequency: 720, q: 0.7,
+      texture: 'grit', frequencyEndHz: 1_150, attack: 0.008, punch: 0.62, punchSeconds: 0.03,
+    }, this.feedback);
   }
 
   weaponSwitch(): void {
-    this.noise({ duration: 0.07, volume: 0.026, filter: 'bandpass', frequency: 760, q: 0.8 }, this.feedback);
-    this.tone(190, 0.035, 0.028, 'triangle', this.feedback, 0.055);
+    // HF-376: a sling and a weapon coming off the shoulder, then the new
+    // weapon's weight settling into the hands.
+    this.noise({
+      duration: 0.085, volume: 0.026, filter: 'bandpass', frequency: 760, q: 0.8,
+      texture: 'grit', frequencyEndHz: 420, attack: 0.006, punch: 0.55, punchSeconds: 0.025,
+    }, this.feedback);
+    this.metallicClick(560, 0.016, 0.018, { resonanceQ: 8, delay: 0.03 });
+    this.tone(190, 0.045, 0.026, 'triangle', this.feedback, 0.055, { attack: 0.002, punch: 0.4, drive: 0.25 });
   }
 
   melee(): void {
     // Blade slash: a fast high whoosh that tears downward, a low body thump and
     // a brief metallic ring so the knife reads as a real cutting edge.
-    this.noise({ duration: 0.09, volume: 0.062, filter: 'bandpass', frequency: 2_600, q: 1.2 }, this.feedback);
-    this.sweep(1_900, 320, 0.1, 0.05, 'sawtooth', this.feedback);
-    this.noise({ duration: 0.12, volume: 0.05, filter: 'bandpass', frequency: 420, q: 0.7 }, this.feedback);
-    this.tone(1_240, 0.05, 0.016, 'triangle', this.feedback, 0.028);
+    //
+    // HF-376: the whoosh is now air moving - a band that opens and closes over
+    // the arc rather than a fixed band gated on and off - and the ring is an
+    // inharmonic pair off a struck edge instead of a single sine.
+    this.noise({
+      duration: 0.11, volume: 0.062, filter: 'bandpass', frequency: 1_400, q: 1.2,
+      texture: 'white', frequencyEndHz: 3_400, attack: 0.012, punch: 0.7, punchSeconds: 0.035,
+    }, this.feedback);
+    this.sweep(1_900, 320, 0.1, 0.05, 'sawtooth', this.feedback, 0, {
+      attack: 0.004, punch: 0.4, drive: 0.35, pitchBias: 0.6,
+    });
+    this.noise({
+      duration: 0.12, volume: 0.05, filter: 'bandpass', frequency: 420, q: 0.7,
+      texture: 'brown', attack: 0.001, punch: 0.3, punchSeconds: 0.02, drive: 0.45,
+    }, this.feedback);
+    this.tone(1_240, 0.06, 0.016, 'triangle', this.feedback, 0.028, { attack: 0.001, punch: 0.55 });
+    this.tone(1_240 * METALLIC_PARTIAL_RATIOS[1]!, 0.045, 0.008, 'sine', this.feedback, 0.031, {
+      attack: 0.0015, punch: 0.5, detuneCents: 24,
+    });
   }
 
+  /**
+   * HF-376 footsteps: heel, weight and scuff per surface (see
+   * FOOTSTEP_MATERIAL_PROFILES), with every layer varied per step.
+   *
+   * The old step was one band-passed burst plus one downward sweep, identical
+   * every fourth step. A step you hear five times a second is the sound in a
+   * shooter least able to survive being a loop, so the round-robin now moves
+   * the pitch, the timing of the scuff and the gain of every layer.
+   */
   footstep(surface: FootstepSurface | SpatialFootstepSurface, sprinting = false, crouched = false): void {
     this.stepVariant = (this.stepVariant + 1) % 4;
-    const variation = [0.94, 1.04, 0.98, 1.08][this.stepVariant];
+    const variation = [0.94, 1.04, 0.98, 1.08][this.stepVariant]!;
+    const detuneCents = roundRobinDetune(this.stepVariant, 120);
     const base = (sprinting ? 82 : crouched ? 54 : 68) * variation;
-    const profile = surface === 'asphalt'
-      ? { frequency: 1_050, tone: 72, volume: 1 }
-      : surface === 'concrete'
-        ? { frequency: 1_420, tone: 86, volume: 0.94 }
-        : surface === 'wood'
-          ? { frequency: 720, tone: 118, volume: 0.9 }
-          : surface === 'metal'
-            ? { frequency: 1_900, tone: 142, volume: 0.98 }
-            : surface === 'grass'
-              ? { frequency: 330, tone: 42, volume: 0.7 }
-              : { frequency: 430, tone: 48, volume: 0.78 };
+    const profile = FOOTSTEP_MATERIAL_PROFILES[surface];
+    // Heel strike. Sprinting lands harder and brighter; crouching barely lands
+    // at all, which is the stealth affordance the old flat scalar blurred.
     this.noise({
       duration: sprinting ? 0.075 : 0.055,
-      volume: (crouched ? 0.022 : sprinting ? 0.052 : 0.034) * profile.volume,
+      volume: (crouched ? 0.022 : sprinting ? 0.052 : 0.034) * profile.heelVolume,
       filter: surface === 'soil' || surface === 'grass' ? 'lowpass' : 'bandpass',
-      frequency: profile.frequency,
-      q: surface === 'metal' ? 1.4 : surface === 'concrete' ? 1.15 : 0.72,
+      frequency: profile.heelHz * variation,
+      q: profile.heelQ,
+      texture: profile.heelTexture,
+      frequencyEndHz: profile.heelHz * variation * 0.55,
+      attack: 0.0005,
+      punch: 0.22,
+      punchSeconds: 0.006,
+      drive: 0.3,
+      resonanceHz: profile.resonanceHz,
+      resonanceQ: profile.resonanceQ,
+      resonanceGainDb: crouched ? 5 : 9,
     }, this.movement);
-    this.sweep(base + profile.tone * 0.2, Math.max(32, profile.tone * 0.48), sprinting ? 0.075 : 0.06, crouched ? 0.018 : 0.034, 'triangle', this.movement);
-    if (surface === 'wood' || surface === 'metal') this.tone(profile.tone, 0.035, crouched ? 0.012 : 0.022, 'square', this.movement, 0.018);
-    else if (surface === 'asphalt' || surface === 'concrete') {
-      this.noise({ duration: 0.022, volume: crouched ? 0.008 : 0.014, filter: 'highpass', frequency: 2_800, q: 0.6, delay: 0.012 }, this.movement);
+    // Body weight arriving through the surface.
+    this.sweep(
+      base + profile.bodyHz * 0.2,
+      Math.max(32, profile.bodyHz * 0.48),
+      sprinting ? 0.075 : 0.06,
+      (crouched ? 0.018 : 0.034) * profile.bodyVolume,
+      profile.bodyWave,
+      this.movement,
+      0.002,
+      { attack: 0.0015, punch: 0.34, drive: 0.2, detuneCents, pitchBias: 0.62 },
+    );
+    // Scuff of the sole leaving. This is the layer that makes grass and soil
+    // sound soft and steel deck sound hard, and it moves in time as well as in
+    // level so consecutive steps never line up.
+    if (profile.scuffVolume > 0) {
+      this.noise({
+        duration: sprinting ? 0.05 : 0.07,
+        volume: (crouched ? 0.007 : sprinting ? 0.016 : 0.011) * profile.scuffVolume,
+        filter: 'bandpass',
+        frequency: profile.scuffHz,
+        q: 0.7,
+        delay: 0.014 + this.stepVariant * 0.004,
+        texture: profile.scuffTexture,
+        frequencyEndHz: profile.scuffHz * 0.4,
+        attack: 0.006,
+        punch: 0.6,
+        punchSeconds: 0.02,
+      }, this.movement);
+    }
+    // Gear: a sprinting operator carries loose kit, and the rattle is what
+    // makes a running enemy audible before they are visible.
+    if (sprinting) {
+      this.noise({
+        duration: 0.06, volume: 0.012, filter: 'highpass', frequency: 3_400, q: 0.6,
+        delay: 0.022 + this.stepVariant * 0.005,
+        texture: 'crackle', attack: 0.001, punch: 0.35,
+      }, this.movement);
     }
   }
 
   land(impactSpeed: number): void {
     const strength = Math.min(1, Math.max(0.25, impactSpeed / 14));
-    this.noise({ duration: 0.12, volume: 0.08 * strength, filter: 'lowpass', frequency: 540 }, this.movement);
-    this.sweep(88, 36, 0.13, 0.065 * strength, 'sine', this.movement);
+    // HF-376: landing is a body arriving, not a click. Brown-textured weight
+    // under a saturated sub, plus boots and kit, and the harder the landing the
+    // more of each.
+    this.noise({
+      duration: 0.16, volume: 0.08 * strength, filter: 'lowpass', frequency: 540,
+      texture: 'brown', frequencyEndHz: 190, attack: 0.0015, punch: 0.3, punchSeconds: 0.03, drive: 0.4,
+      resonanceHz: 96, resonanceQ: 1.8, resonanceGainDb: 8,
+    }, this.movement);
+    this.sweep(88, 36, 0.17, 0.065 * strength, 'sine', this.movement, 0, {
+      attack: 0.003, punch: 0.42, punchSeconds: 0.045, drive: 0.28, pitchBias: 0.62,
+    });
+    this.noise({
+      duration: 0.09, volume: 0.026 * strength, filter: 'highpass', frequency: 2_200, q: 0.7, delay: 0.012,
+      texture: 'crackle', frequencyEndHz: 1_100, attack: 0.001, punch: 0.3,
+    }, this.movement);
   }
 
   grenadeBounce(strength: number): void {
     const level = Math.min(1, Math.max(0.2, strength / 10));
-    this.tone(310, 0.025, 0.035 * level, 'triangle', this.feedback);
-    this.tone(185, 0.035, 0.026 * level, 'square', this.feedback, 0.012);
+    // HF-376: a steel body hitting a hard surface and rolling - an inharmonic
+    // metallic contact rather than two triangle beeps.
+    this.reportVariant = (this.reportVariant + 1) % 8;
+    this.metallicClick(310, 0.028, 0.038 * level, {
+      detuneCents: roundRobinDetune(this.reportVariant, 140), resonanceQ: 6, drive: 0.45,
+    });
+    this.tone(185, 0.045, 0.024 * level, 'square', this.feedback, 0.012, {
+      attack: 0.0006, punch: 0.28, detuneCents: roundRobinDetune(this.reportVariant + 2, 90),
+    });
   }
 
   grenadeFuseBeep(remainingMs: number, now = performance.now()): boolean {
@@ -1861,9 +2675,30 @@ export class ArenaAudio {
     this.explosionAudioGate = admission.state;
     if (!admission.admitted) return false;
     if (!this.weapons) return true;
-    this.sweep(96, 24, 0.58, 0.29, 'sawtooth', this.weapons);
-    this.filteredNoise({ duration: 0.64, volume: 0.42, filter: 'lowpass', frequency: 2100, q: 0.5 }, this.weapons);
-    this.noise({ duration: 0.18, volume: 0.12, filter: 'highpass', frequency: 3100, q: 0.4, delay: 0.035 }, this.weapons);
+    // HF-376 re-authored legacy blast. Four layers with real weight rather
+    // than a sawtooth glide under one lowpassed hiss: a saturated pressure
+    // body, a sub that outlasts it, the broadband blast itself, and debris
+    // that patters rather than swishes.
+    //
+    // The sub is first because it is the layer a player FEELS. Brown-textured
+    // noise under a sine sub is what an explosion has that a filtered white
+    // burst does not, and it is exactly what "the sounds are all so bad" is
+    // pointing at on a blast.
+    this.sweep(96, 24, 0.58, 0.29, 'sawtooth', this.weapons, 0, {
+      attack: 0.0015, punch: 0.34, punchSeconds: 0.075, drive: 0.62, pitchBias: 0.74,
+    });
+    this.sweep(46, 22, 0.72, 0.24, 'sine', this.weapons, 0.004, {
+      attack: 0.006, punch: 0.5, punchSeconds: 0.18, drive: 0.2, pitchBias: 0.6,
+    });
+    this.filteredNoise({
+      duration: 0.64, volume: 0.42, filter: 'lowpass', frequency: 2100, q: 0.5,
+      texture: 'brown', frequencyEndHz: 520, attack: 0.001, punch: 0.32, punchSeconds: 0.09, drive: 0.5,
+      resonanceHz: 120, resonanceQ: 1.6, resonanceGainDb: 8,
+    }, this.weapons);
+    this.noise({
+      duration: 0.34, volume: 0.12, filter: 'highpass', frequency: 3100, q: 0.4, delay: 0.035,
+      texture: 'crackle', frequencyEndHz: 1_400, attack: 0.004, punch: 0.45, punchSeconds: 0.06,
+    }, this.weapons);
     this.duckAmbienceForExplosion();
     return true;
   }
@@ -1908,39 +2743,110 @@ export class ArenaAudio {
     const attenuation = distanceGain;
     let layers = 0;
 
-    // Layer 1 - pressure body sweep.
-    this.sweep(profile.bodySweep[0], profile.bodySweep[1], profile.bodyDuration, profile.bodyVolume * 0.55 * attenuation, 'sawtooth', destination);
+    // HF-376 re-authored. Every layer below kept its role and its budget slot;
+    // what changed is that each one now has an attack, a collapse and a hold
+    // instead of one instant-on exponential, a texture chosen for its job
+    // instead of the one shared white buffer, and non-linearity where a real
+    // blast has it. The layer COUNT is unchanged, so the voice budget, the
+    // steal policy and the diagnostics contract all still hold.
+
+    // Layer 1 - pressure body sweep. Saturated: a blast is a clipped event,
+    // and clipping is where its harmonics and its apparent loudness come from.
+    this.sweep(
+      profile.bodySweep[0],
+      profile.bodySweep[1],
+      profile.bodyDuration,
+      profile.bodyVolume * 0.55 * attenuation,
+      'sawtooth',
+      destination,
+      0,
+      {
+        attack: 0.0015,
+        punch: 0.32,
+        punchSeconds: profile.bodyDuration * 0.14,
+        drive: 0.6,
+        pitchBias: 0.74,
+      },
+    );
     layers += 1;
     // Layer 2 - broadband blast noise through the same distance lowpass.
+    // Brown-textured: this is the layer that carries the weight, and a flat
+    // spectrum here is why the old blast read as a hiss with a beep under it.
+    // The band closes over the burst, which is the fireball collapsing.
     this.filteredNoise({
       duration: Math.min(0.8, profile.bodyDuration),
       volume: 0.42 * attenuation,
       filter: 'lowpass',
       frequency: lowpassHz,
       q: 0.5,
+      texture: 'brown',
+      frequencyEndHz: Math.max(120, lowpassHz * 0.22),
+      resonanceHz: profile.subHz * 2.6,
+      resonanceQ: 1.5,
+      resonanceGainDb: 8,
+      attack: 0.001,
+      punch: 0.3,
+      punchSeconds: Math.min(0.12, profile.bodyDuration * 0.16),
+      drive: 0.5,
     }, destination);
     layers += 1;
-    // Layer 3 - family crack.
-    this.sweep(profile.crackHz, Math.max(120, profile.crackHz * profile.crackEndRatio), profile.crackDuration, profile.crackVolume * attenuation, 'square', destination);
+    // Layer 3 - family crack. The shock front: hardest attack and hardest
+    // drive in the mix, gone inside its own punch window.
+    this.sweep(
+      profile.crackHz,
+      Math.max(120, profile.crackHz * profile.crackEndRatio),
+      profile.crackDuration,
+      profile.crackVolume * attenuation,
+      'square',
+      destination,
+      0,
+      { attack: 0.0003, punch: 0.14, punchSeconds: profile.crackDuration * 0.22, drive: 0.75, pitchBias: 0.84 },
+    );
     layers += 1;
-    // Layer 4 - debris patter (delayed band-passed noise).
+    // Layer 4 - debris. Crackle texture with a band that falls away: separate
+    // pieces landing over a quarter of a second, not one band-passed swish.
+    // Support ordnance throws heavier, slower debris than a satchel charge.
     this.noise({
-      duration: 0.22,
+      duration: family === 'support' ? 0.42 : 0.32,
       volume: profile.debrisVolume * attenuation,
       filter: 'bandpass',
       frequency: family === 'support' ? 900 : 1_650,
       q: 0.6,
       delay: profile.debrisDelay,
+      texture: 'crackle',
+      frequencyEndHz: family === 'support' ? 320 : 620,
+      attack: 0.006,
+      punch: 0.5,
+      punchSeconds: 0.05,
     }, destination);
     layers += 1;
-    // Layer 5 - crossbow metallic ring partials (inharmonic pair).
+    // Layer 5 - crossbow metallic ring partials (inharmonic pair). Slow
+    // attacks: a plate does not start ringing instantly, it is set ringing.
     if (profile.ringPartialHz > 0 && profile.ringVolume > 0) {
-      this.tone(profile.ringPartialHz, 0.34, profile.ringVolume * attenuation, 'triangle', destination, 0.01);
-      this.tone(profile.ringPartialHz * 2.41, 0.26, profile.ringVolume * 0.7 * attenuation, 'sine', destination, 0.012);
+      this.tone(profile.ringPartialHz, 0.34, profile.ringVolume * attenuation, 'triangle', destination, 0.01, {
+        attack: 0.004, punch: 0.6, punchSeconds: 0.05,
+      });
+      this.tone(
+        profile.ringPartialHz * METALLIC_PARTIAL_RATIOS[1]!,
+        0.26,
+        profile.ringVolume * 0.7 * attenuation,
+        'sine',
+        destination,
+        0.012,
+        { attack: 0.005, punch: 0.62, punchSeconds: 0.04, detuneCents: 18 },
+      );
       layers += 2;
     }
-    // Layer 6 - sub pressure weight (deepest on support).
-    this.sweep(profile.subHz, profile.subEndHz, profile.subDuration, profile.subVolume * attenuation, 'sine', destination);
+    // Layer 6 - sub pressure weight (deepest on support). Slowest attack and
+    // longest hold in the mix: the sub arrives fractionally after the crack
+    // and outlives everything, which is what a big blast does at any distance.
+    this.sweep(profile.subHz, profile.subEndHz, profile.subDuration, profile.subVolume * attenuation, 'sine', destination, 0, {
+      attack: 0.008,
+      punch: 0.55,
+      punchSeconds: profile.subDuration * 0.24,
+      drive: 0.22,
+      pitchBias: 0.62,
+    });
     layers += 1;
 
     this.lastSpatialExplosion = Object.freeze({
@@ -2468,7 +3374,7 @@ export class ArenaAudio {
       warmupNodes: number;
       retainedSources: 0;
       retainedBroadbandLoops: 0;
-      liveRecipe: 'sawtooth-pressure-plus-dual-filtered-noise-v1';
+      liveRecipe: 'layered-blast-brown-body-sub-and-crackle-debris-v2';
     };
     destructionEffectsPrewarm: {
       prepared: boolean;
@@ -2557,7 +3463,7 @@ export class ArenaAudio {
         warmupNodes: this.grenadeEffectWarmupNodes,
         retainedSources: 0,
         retainedBroadbandLoops: 0,
-        liveRecipe: 'sawtooth-pressure-plus-dual-filtered-noise-v1',
+        liveRecipe: 'layered-blast-brown-body-sub-and-crackle-debris-v2',
       },
       destructionEffectsPrewarm: {
         prepared: this.destructionEffectsPrepared,
@@ -2867,6 +3773,7 @@ export class ArenaAudio {
     if (!this.context || !this.movement
       || this.footstepChains.length + this.arenaSources.length >= AUDIO_RUNTIME_BUDGET.spatialVoices) return null;
     const filter = this.context.createBiquadFilter();
+    const resonance = this.context.createBiquadFilter();
     const gain = this.context.createGain();
     const panner = this.context.createPanner();
     panner.panningModel = 'HRTF';
@@ -2874,8 +3781,8 @@ export class ArenaAudio {
     panner.refDistance = 1.5;
     panner.maxDistance = 32;
     panner.rolloffFactor = 1.4;
-    filter.connect(gain).connect(panner).connect(this.movement);
-    const chain = { filter, gain, panner, busy: true };
+    filter.connect(resonance).connect(gain).connect(panner).connect(this.movement);
+    const chain = { filter, resonance, gain, panner, busy: true };
     this.footstepChains.push(chain);
     return chain;
   }
@@ -2893,6 +3800,12 @@ export class ArenaAudio {
       + nextAmbientGapSeconds(ARENA_AMBIENT_PROFILES[arenaId], Math.random());
     const tone = this.context.createOscillator();
     const toneFilter = this.context.createBiquadFilter();
+    // HF-376: a resonance that drifts on its own incommensurate period. A bare
+    // low sine is a test tone; a low tone through a slowly moving formant is a
+    // space. This is the cheapest possible "sense of room" and it costs no
+    // extra voice, which matters because each arena is capped at two
+    // continuous voices (spatial-audio.test.ts).
+    const toneResonance = this.context.createBiquadFilter();
     const toneGain = this.context.createGain();
     const tonePanner = this.context.createPanner();
     // HF-350: the rustworks bed was a raw sawtooth - its dense harmonic stack
@@ -2922,13 +3835,32 @@ export class ArenaAudio {
     tonePanner.positionX.value = definition.bedPosition.x;
     tonePanner.positionY.value = definition.bedPosition.y;
     tonePanner.positionZ.value = definition.bedPosition.z;
-    tone.connect(toneFilter).connect(toneGain).connect(tonePanner).connect(this.ambience);
-    if (this.registerContinuousVoice(tone, this.ambience, 1, 'arena', [toneFilter, toneGain, tonePanner])) {
+    toneResonance.type = 'peaking';
+    toneResonance.Q.value = 2.6;
+    const toneResonanceGain = (toneResonance as Partial<BiquadFilterNode>).gain;
+    if (toneResonanceGain) toneResonanceGain.value = 7;
+    {
+      // Drifts on period #3, which shares no integer ratio with the amplitude
+      // swell above or the air voice's own drift below, so the summed bed never
+      // develops an audible repeat.
+      const resonancePeriodSeconds = AMBIENCE_INCOMMENSURATE_PERIODS_SECONDS[2];
+      const centreHz = Math.max(60, definition.bedFrequencyHz * 3.1);
+      toneResonance.frequency.setValueAtTime(centreHz * 0.86, now);
+      for (let step = 1; step <= 4; step += 1) {
+        toneResonance.frequency.exponentialRampToValueAtTime(
+          centreHz * (step % 2 === 0 ? 0.86 : 1.19),
+          now + (resonancePeriodSeconds * step) / 2,
+        );
+      }
+    }
+    tone.connect(toneFilter).connect(toneResonance).connect(toneGain).connect(tonePanner).connect(this.ambience);
+    if (this.registerContinuousVoice(tone, this.ambience, 1, 'arena', [toneFilter, toneResonance, toneGain, tonePanner])) {
       tone.start(now);
       this.arenaSources.push(tone);
-      this.arenaNodes.push(toneFilter, toneGain, tonePanner);
+      this.arenaNodes.push(toneFilter, toneResonance, toneGain, tonePanner);
     } else {
       toneFilter.disconnect();
+      toneResonance.disconnect();
       toneGain.disconnect();
       tonePanner.disconnect();
     }
@@ -2948,6 +3880,20 @@ export class ArenaAudio {
     airLowpass.type = 'lowpass';
     airLowpass.frequency.value = definition.airLowpassHz;
     airLowpass.Q.value = 0.72;
+    {
+      // HF-376: the air voice's brightness breathes on period #2. A fixed
+      // cutoff is why every arena's bed read as the same filter setting - the
+      // pitch drifted but the timbre never did, and timbre is what the ear
+      // uses to place itself in a room.
+      const brightnessPeriodSeconds = AMBIENCE_INCOMMENSURATE_PERIODS_SECONDS[1];
+      airLowpass.frequency.setValueAtTime(definition.airLowpassHz * 0.78, now);
+      for (let step = 1; step <= 4; step += 1) {
+        airLowpass.frequency.exponentialRampToValueAtTime(
+          definition.airLowpassHz * (step % 2 === 0 ? 0.78 : 1.28),
+          now + (brightnessPeriodSeconds * step) / 2,
+        );
+      }
+    }
     airGain.gain.value = definition.airGain;
     airPanner.panningModel = 'HRTF';
     airPanner.distanceModel = 'inverse';
@@ -3033,35 +3979,131 @@ export class ArenaAudio {
     oscillator.stop(stopAt + 0.005);
   }
 
-  private createNoiseBuffer(duration: number): AudioBuffer {
+  private createNoiseBuffer(duration: number, texture: NoiseTexture = 'white'): AudioBuffer {
     const length = Math.floor(this.context!.sampleRate * duration);
     const buffer = this.context!.createBuffer(1, length, this.context!.sampleRate);
-    const data = buffer.getChannelData(0);
-    let previous = 0;
-    for (let index = 0; index < length; index += 1) {
-      const white = presentationRandom() * 2 - 1;
-      previous = previous * 0.16 + white * 0.84;
-      data[index] = previous;
-    }
+    // HF-376: the recipe moved to audio-synthesis.ts so the spectra are unit
+    // testable without an AudioContext. 'white' reproduces the historical
+    // buffer exactly, so untextured call sites are unchanged.
+    fillNoiseTexture(buffer.getChannelData(0), texture, presentationRandom);
     return buffer;
   }
 
+  /**
+   * HF-376: a WaveShaper stage, or null where the platform has no such node.
+   *
+   * Saturation is the difference between a loud gunshot and a quiet gunshot
+   * with the fader up: clipping the peaks lets the body sit far higher at the
+   * same peak level, and the harmonics it generates ARE the crack. Curves are
+   * cached per quantised drive because generating one per shot at automatic
+   * fire rates would allocate a kilobyte of Float32 per round.
+   *
+   * Feature-detected rather than assumed: this file must keep working on a
+   * partial AudioContext (see unlock()'s teardown path), and the test doubles
+   * implement only the node types the runtime demonstrably needs.
+   */
+  private createSaturator(drive: number): AudioNode | null {
+    const context = this.context;
+    if (!context || drive <= 0) return null;
+    if (this.saturationSupported === null) {
+      this.saturationSupported = typeof (context as Partial<AudioContext>).createWaveShaper === 'function';
+    }
+    if (!this.saturationSupported) return null;
+    const key = Math.round(Math.min(1, drive) * 20);
+    const cached = this.saturationCurves.get(key);
+    const curve = cached ?? saturationCurve(key / 20);
+    if (!cached) this.saturationCurves.set(key, curve);
+    try {
+      const shaper = context.createWaveShaper();
+      shaper.curve = curve;
+      shaper.oversample = '2x';
+      return shaper;
+    } catch {
+      // A device policy may expose the constructor and still refuse the node.
+      // Losing colour is acceptable; losing the sound is not.
+      this.saturationSupported = false;
+      return null;
+    }
+  }
+
+  /**
+   * Schedules a transientEnvelope() contour onto a gain param. Kept in one
+   * place because getting the exponential-ramp preconditions wrong (a zero
+   * value or a non-increasing time) silently drops the whole envelope in some
+   * browsers and leaves a voice stuck at full gain in others.
+   */
+  private applyEnvelope(gain: AudioParam, startSeconds: number, stages: readonly EnvelopeStage[]): void {
+    let previous = Number.NEGATIVE_INFINITY;
+    for (const [index, stage] of stages.entries()) {
+      const at = startSeconds + stage.atSeconds;
+      if (index > 0 && at <= previous) continue;
+      previous = at;
+      if (index === 0) gain.setValueAtTime(stage.value, at);
+      else if (stage.ramp === 'linear') gain.linearRampToValueAtTime(stage.value, at);
+      else gain.exponentialRampToValueAtTime(stage.value, at);
+    }
+  }
+
   private noise(options: NoiseOptions, destination: AudioNode | null): void {
-    if (!this.context || !this.noiseBuffer || !destination) return;
+    if (!this.context || !destination) return;
+    const texture = options.texture ?? 'white';
+    const buffer = this.noiseTextures.get(texture) ?? this.noiseBuffer;
+    if (!buffer) return;
     const now = this.context.currentTime + (options.delay ?? 0);
     const source = this.context.createBufferSource();
-    source.buffer = this.noiseBuffer;
+    source.buffer = buffer;
     const filter = this.context.createBiquadFilter();
     filter.type = options.filter;
-    filter.frequency.value = options.frequency;
+    filter.frequency.setValueAtTime(options.frequency, now);
     filter.Q.value = options.q ?? 0.7;
+    // HF-376: a band that moves across the burst. Debris falls away, a scuff
+    // opens then closes, air absorption pulls a distant report down - all of
+    // which a fixed band renders as one static "shhh".
+    if (options.frequencyEndHz !== undefined && options.frequencyEndHz > 0) {
+      filter.frequency.exponentialRampToValueAtTime(
+        Math.max(20, options.frequencyEndHz),
+        now + options.duration,
+      );
+    }
     const gain = this.context.createGain();
-    gain.gain.setValueAtTime(Math.max(0.0001, options.volume), now);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + options.duration);
-    source.connect(filter).connect(gain).connect(destination);
+    this.applyEnvelope(gain.gain, now, transientEnvelope({
+      peak: Math.max(0.0001, options.volume),
+      durationSeconds: options.duration,
+      attackSeconds: options.attack,
+      punch: options.punch,
+      punchSeconds: options.punchSeconds,
+    }));
+
+    // Chain: source -> band -> [resonance] -> [saturation] -> gain -> out.
+    const extras: AudioNode[] = [];
+    let head: AudioNode = filter;
+    if (options.resonanceHz !== undefined && options.resonanceHz > 0) {
+      // A second, resonant stage is what gives a burst a BODY: the barrel, the
+      // hull plate, the shell casing, the room. One band-pass alone is a
+      // colour, not an object.
+      const resonance = this.context.createBiquadFilter();
+      resonance.type = 'peaking';
+      resonance.frequency.setValueAtTime(options.resonanceHz, now);
+      resonance.Q.value = options.resonanceQ ?? 4.5;
+      // A peaking filter's `gain` is the one BiquadFilter param a reduced
+      // implementation may not expose (the test doubles here do not). Losing
+      // the resonance costs colour; touching an absent param costs the shot.
+      const resonanceGain = (resonance as Partial<BiquadFilterNode>).gain;
+      if (resonanceGain) resonanceGain.value = options.resonanceGainDb ?? 9;
+      head = head.connect(resonance);
+      extras.push(resonance);
+    }
+    const saturator = options.drive ? this.createSaturator(options.drive) : null;
+    if (saturator) {
+      head = head.connect(saturator);
+      extras.push(saturator);
+    }
+    source.connect(filter);
+    head.connect(gain).connect(destination);
     if (!this.registerVoice(source, destination, 3)) {
       filter.disconnect();
       gain.disconnect();
+      for (const node of extras) node.disconnect();
       return;
     }
     const voiceEnded = source.onended;
@@ -3069,8 +4111,9 @@ export class ArenaAudio {
       voiceEnded?.call(source, event);
       filter.disconnect();
       gain.disconnect();
+      for (const node of extras) node.disconnect();
     };
-    source.start(now, presentationRandom() * Math.max(0.001, this.noiseBuffer.duration - options.duration), options.duration);
+    source.start(now, presentationRandom() * Math.max(0.001, buffer.duration - options.duration), options.duration);
   }
 
   /**
@@ -3090,25 +4133,47 @@ export class ArenaAudio {
     type: OscillatorType,
     destination: AudioNode | null,
     delay = 0,
+    shaping: PitchedShaping = {},
   ): void {
     if (!this.context || !destination) return;
     const now = this.context.currentTime + delay;
     const oscillator = this.context.createOscillator();
     const gain = this.context.createGain();
     oscillator.type = type;
-    oscillator.frequency.setValueAtTime(start, now);
-    oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, end), now + duration);
-    gain.gain.setValueAtTime(Math.max(0.0001, volume), now);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-    oscillator.connect(gain).connect(destination);
+    // HF-376: per-voice detune. Two bit-identical reports back to back is the
+    // loudest "this is a synth" tell there is at automatic fire rates.
+    const detune = centsToRatio(shaping.detuneCents ?? 0);
+    const startHz = Math.max(1, start * detune);
+    const endHz = Math.max(1, end * detune);
+    oscillator.frequency.setValueAtTime(startHz, now);
+    // HF-376: a front-loaded fall instead of one exponential ramp. A single
+    // ramp spends half its time in the top half of the interval, which the ear
+    // hears as a glide - a "boop". Real bodies drop most of their interval in
+    // the first fifth and then settle, which is heard as a thump that has a
+    // pitch rather than as a pitch that moves. Both endpoints are preserved.
+    for (const stage of pitchFallStages(startHz, endHz, duration, shaping.pitchBias)) {
+      oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, stage.hz), now + stage.atSeconds);
+    }
+    this.applyEnvelope(gain.gain, now, transientEnvelope({
+      peak: Math.max(0.0001, volume),
+      durationSeconds: duration,
+      attackSeconds: shaping.attack,
+      punch: shaping.punch,
+      punchSeconds: shaping.punchSeconds,
+    }));
+    const saturator = shaping.drive ? this.createSaturator(shaping.drive) : null;
+    if (saturator) oscillator.connect(saturator).connect(gain).connect(destination);
+    else oscillator.connect(gain).connect(destination);
     if (!this.registerVoice(oscillator, destination, 3)) {
       gain.disconnect();
+      saturator?.disconnect();
       return;
     }
     const voiceEnded = oscillator.onended;
     oscillator.onended = (event) => {
       voiceEnded?.call(oscillator, event);
       gain.disconnect();
+      saturator?.disconnect();
     };
     oscillator.start(now);
     oscillator.stop(now + duration);
@@ -3121,7 +4186,8 @@ export class ArenaAudio {
     type: OscillatorType = 'sine',
     destination: AudioNode | null = this.feedback,
     delay = 0,
+    shaping: PitchedShaping = {},
   ): void {
-    this.sweep(frequency, Math.max(1, frequency * 0.91), duration, volume, type, destination, delay);
+    this.sweep(frequency, Math.max(1, frequency * 0.91), duration, volume, type, destination, delay, shaping);
   }
 }

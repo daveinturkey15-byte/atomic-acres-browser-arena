@@ -23,7 +23,7 @@ describe('Atomic Acres deterministic manicured-verge placement', () => {
     const second = createGrassPlacements([]);
     expect(first).toEqual(second);
     expect(first.placements).toHaveLength(720);
-    expect(first.checksum).toBe('27c37a93');
+    expect(first.checksum).toBe('2766df53');
     expect(first.chunks).toBe(4);
     expect(first.placements.every((placement) => isGrassGround(placement.x, placement.z))).toBe(true);
     expect(Math.max(...first.placements.map((placement) => placement.height))).toBeLessThanOrEqual(GRASS_MAX_HEIGHT);

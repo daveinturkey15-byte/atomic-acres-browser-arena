@@ -242,6 +242,12 @@ for (const lane of LANES) {
     if (record.hostMove.movedM < MOVE_THRESHOLD_M) {
       record.hostGate = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleSimulationGate?.() ?? null);
     }
+    // Lane J: silent state/join admission drops are the leading suspect when a
+    // role cannot move; capture the counters from both sides on any failure.
+    if (record.guestMove.movedM < MOVE_THRESHOLD_M || record.hostMove.movedM < MOVE_THRESHOLD_M) {
+      record.hostStateAdmissionDrops = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().stateAdmissionDrops ?? null);
+      record.guestStateAdmissionDrops = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().stateAdmissionDrops ?? null);
+    }
     record.hostErrors = host.errorsSeen.slice(0, 4);
     record.guestErrors = guest.errorsSeen.slice(0, 4);
     const seen = (visibility) => visibility

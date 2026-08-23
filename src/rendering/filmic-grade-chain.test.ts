@@ -710,3 +710,95 @@ describe('HF-364 FSR 1 spatial upscaling stage', () => {
     handle.dispose();
   });
 });
+
+describe('Lane L arena art direction on the installed chain', () => {
+  it('exposes the installed handle to the scene assembler and null elsewhere', async () => {
+    const { installedFilmicGradeChain } = await import('./filmic-grade-chain');
+    const pipeline = makePipeline();
+    expect(installedFilmicGradeChain(pipeline)).toBeNull();
+    expect(installedFilmicGradeChain(null)).toBeNull();
+    expect(installedFilmicGradeChain(undefined)).toBeNull();
+    const handle = installFilmicGradeChain(pipeline);
+    expect(installedFilmicGradeChain(pipeline)).toBe(handle);
+    handle.dispose();
+    expect(installedFilmicGradeChain(pipeline)).toBeNull();
+  });
+
+  it('composes the arena identity into the live uniforms and back out again', async () => {
+    const { ARENA_ART_DIRECTIONS } = await import('./art-direction');
+    const pipeline = makePipeline();
+    const handle = installFilmicGradeChain(pipeline, { profileId: 'quality' });
+    expect(handle.arenaArtDirection()).toBeNull();
+    const baseSlope = handle.uniforms.cdlSlope.value.clone();
+    const baseShadowDirection = handle.uniforms.shadowTintDirection.value.clone();
+
+    const rust = ARENA_ART_DIRECTIONS['rustworks-1v1'];
+    handle.setArenaArtDirection(rust);
+    expect(handle.arenaArtDirection()).toBe(rust);
+    // CDL gain reached the uniforms multiplicatively.
+    expect(handle.uniforms.cdlSlope.value.x).toBeCloseTo(baseSlope.x * rust.cdl.gain[0], 10);
+    expect(handle.uniforms.cdlSlope.value.z).toBeCloseTo(baseSlope.z * rust.cdl.gain[2], 10);
+    // The split tone now points at the arena's hues, not the shared teal.
+    expect(handle.uniforms.shadowTintDirection.value.toArray())
+      .not.toEqual(baseShadowDirection.toArray());
+    const highlightDirection = srgbTintDirection(rust.splitTone.highlightTint);
+    expect(handle.uniforms.highlightTintDirection.value.x).toBeCloseTo(highlightDirection[0], 10);
+
+    // The identity survives a profile switch (same place on every profile).
+    handle.setProfile('performance');
+    expect(handle.arenaArtDirection()).toBe(rust);
+    expect(handle.uniforms.cdlSlope.value.x)
+      .toBeCloseTo(GRADE_PROFILES.performance.cdl.slope[0] * rust.cdl.gain[0], 10);
+
+    // Null restores the bare profile.
+    handle.setArenaArtDirection(null);
+    expect(handle.arenaArtDirection()).toBeNull();
+    expect(handle.uniforms.cdlSlope.value.x).toBeCloseTo(GRADE_PROFILES.performance.cdl.slope[0], 10);
+    handle.dispose();
+  });
+
+  it('composes the arena vignette character with the player setting, capped', async () => {
+    const { ARENA_ART_DIRECTIONS, DISPLAY_VIGNETTE_MAXIMUM } = await import('./art-direction');
+    const pipeline = makePipeline();
+    const handle = installFilmicGradeChain(pipeline, { profileId: 'quality' });
+    const rust = ARENA_ART_DIRECTIONS['rustworks-1v1'];
+    // Arena base applies even while the player setting is zero...
+    handle.setArenaArtDirection(rust);
+    expect(handle.uniforms.vignetteStrength.value).toBeCloseTo(rust.vignette.base, 10);
+    // ...the setting stacks on the arena character...
+    handle.setDisplayVignetteStrength(0.2);
+    expect(handle.uniforms.vignetteStrength.value)
+      .toBeCloseTo(rust.vignette.base + 0.2 * rust.vignette.settingScale, 10);
+    // ...and the combat cap is absolute.
+    handle.setDisplayVignetteStrength(99);
+    expect(handle.uniforms.vignetteStrength.value).toBe(DISPLAY_VIGNETTE_MAXIMUM);
+    // Clearing the arena restores the raw (still-capped) setting.
+    handle.setArenaArtDirection(null);
+    expect(handle.uniforms.vignetteStrength.value).toBe(DISPLAY_VIGNETTE_MAXIMUM);
+    handle.setDisplayVignetteStrength(0.3);
+    expect(handle.uniforms.vignetteStrength.value).toBe(0.3);
+    handle.dispose();
+  });
+
+  it('retunes bloom through the composed profile and never lowers a threshold', async () => {
+    const { ARENA_ART_DIRECTIONS } = await import('./art-direction');
+    const pipeline = makePipeline();
+    const handle = installFilmicGradeChain(pipeline, { profileId: 'quality' });
+    const emissiveBloom = bloom(vec4(2, 2, 2, 1), 0.14, 0.32, 0.92);
+    pipeline.outputNode = vec4(emissiveBloom.rgb, 1);
+    expect(handle.tunedBloomNodes()).toBe(1);
+    expect(emissiveBloom.threshold.value).toBe(1.1);
+    const skyline = ARENA_ART_DIRECTIONS['skyline-terminal'];
+    handle.setArenaArtDirection(skyline);
+    handle.beforeRender(16);
+    // Neon arena: bloom intensity scales up, threshold never drops below the
+    // true-emitter line.
+    expect(emissiveBloom.strength.value).toBeCloseTo(0.14 * 1.0 * skyline.bloom.intensityScale, 10);
+    expect(emissiveBloom.threshold.value).toBeGreaterThan(1);
+    const range = ARENA_ART_DIRECTIONS['gun-range'];
+    handle.setArenaArtDirection(range);
+    handle.beforeRender(32);
+    expect(emissiveBloom.threshold.value).toBeCloseTo(1.1 * range.bloom.thresholdScale, 10);
+    handle.dispose();
+  });
+});

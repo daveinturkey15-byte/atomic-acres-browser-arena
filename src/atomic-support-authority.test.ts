@@ -38,7 +38,7 @@ describe('Atomic Acres visible support authority', () => {
     expect(performance.teamIds[1]).toHaveLength(7);
     expect(performance.teamIds[0].every((id) => id.includes('aqua-irrigation-workshop'))).toBe(true);
     expect(performance.teamIds[1].every((id) => id.includes('coral-orchard-conservatory'))).toBe(true);
-    expect(performance.entries.filter((entry) => entry.kind === 'physical-cover')).toHaveLength(6);
+    expect(performance.entries.filter((entry) => entry.kind === 'physical-cover')).toHaveLength(5);
     expect(performance.entries.filter((entry) => entry.id.includes('ground-floor-slab'))).toEqual([
       expect.objectContaining({ movementAuthority: 'implicit-world-floor', projectileAuthority: 'implicit-world-ground' }),
       expect.objectContaining({ movementAuthority: 'implicit-world-floor', projectileAuthority: 'implicit-world-ground' }),

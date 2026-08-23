@@ -22,6 +22,37 @@ function pixelFontSizes(css: string): number[] {
   return [...css.matchAll(/font-size:\s*([0-9]+(?:\.[0-9]+)?)px/gu)].map((match) => Number(match[1]));
 }
 
+/** `#rrggbb` -> [r, g, b], each 0..255. */
+function parseHex(hex: string): [number, number, number] {
+  return [
+    Number.parseInt(hex.slice(1, 3), 16),
+    Number.parseInt(hex.slice(3, 5), 16),
+    Number.parseInt(hex.slice(5, 7), 16),
+  ];
+}
+
+/** The hex value of a custom property declaration, or null if it is not one. */
+function hexOf(css: string, property: string): [number, number, number] | null {
+  const match = new RegExp(`${property}:\\s*(#[0-9a-fA-F]{6})`, 'u').exec(css);
+  return match ? parseHex(match[1]!.toLowerCase()) : null;
+}
+
+/**
+ * WCAG relative luminance, 0 (black) to 1 (white).
+ *
+ * Used instead of pinning hex values so the AGENTS.md requirement - that the
+ * command deck stay a "bright, legible tactical system" rather than regressing
+ * to a "near-black or dark-blue monolith" - is enforced as the PROPERTY it
+ * actually is, leaving the palette free to change.
+ */
+function relativeLuminance([red, green, blue]: [number, number, number]): number {
+  const channel = (value: number) => {
+    const srgb = value / 255;
+    return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue);
+}
+
 /** The selector text of every top-level rule that sets a given property. */
 function selectorsSetting(css: string, property: string): string[] {
   const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/gu)];
@@ -131,11 +162,54 @@ describe('Pass 77 HF-370 reskin - diegetic motion', () => {
   it('splits wired lag onto `translate` and idle breathing onto `transform`', () => {
     // The split is load-bearing: an animation always beats an inline style, so
     // a single `transform` carrying both would make the wiring a no-op.
-    expect(hud).toMatch(/translate:\s*\n?\s*calc\(var\(--hud-sway-x, 0\)/u);
+    expect(hud).toMatch(/translate:[\s\S]{0,40}?var\(--hud-sway-x, 0\)/u);
     expect(hud).toMatch(/@keyframes p77-breathe-a \{[\s\S]*?transform: translate3d/u);
     for (const name of ['p77-breathe-a', 'p77-breathe-b', 'p77-breathe-c']) {
       expect(hud).toContain(`@keyframes ${name}`);
     }
+  });
+
+  it('puts impact on the SAME `translate` and roll on the free `rotate` channel', () => {
+    // Three transform channels, three independent producers, none able to
+    // clobber another: `translate` carries the two runtime-computed positional
+    // signals, `transform` carries the keyframe animation, `rotate` carries
+    // impact roll. Putting roll on `transform` would kill the breathing;
+    // putting it on `translate` would need a matrix the runtime cannot express.
+    expect(hud).toMatch(/translate:[\s\S]*?var\(--hud-impact-x, 0\)/u);
+    expect(hud).toMatch(/rotate: calc\(var\(--hud-impact-roll, 0\)/u);
+  });
+
+  it('keeps the stationary idle independent of movement', () => {
+    // The defect: --hud-breathe used to be movement intensity, so it was
+    // exactly zero standing still and the HUD froze. Respiration and gait are
+    // now separate terms and BOTH must appear in the displacement.
+    expect(hud).toMatch(/var\(--hud-breathe, 0\) \* [\d.]+px/u);
+    expect(hud).toMatch(/var\(--hud-gait, 0\) \* [\d.]+px/u);
+  });
+
+  it('registers every impact property with an at-rest default', () => {
+    // An unwired build must render a still, unflashed HUD - never a displaced
+    // or permanently red one.
+    for (const property of [
+      '--hud-impact-x', '--hud-impact-y', '--hud-impact-roll',
+      '--hud-impact-chroma', '--hud-impact-flash',
+    ]) {
+      expect(hud).toMatch(new RegExp(`@property ${property} \\{[\\s\\S]*?syntax: '<number>';`, 'u'));
+      expect(hud).toMatch(new RegExp(`@property ${property} \\{[\\s\\S]*?initial-value: 0;`, 'u'));
+    }
+    expect(hud).toMatch(/@property --hud-impact-bearing \{[\s\S]*?syntax: '<angle>';/u);
+    expect(hud).toMatch(/@property --hud-impact-bearing \{[\s\S]*?initial-value: 0deg;/u);
+  });
+
+  it('gives a bullet and an explosion visibly different impact signatures', () => {
+    expect(hud).toContain("#hud[data-hud-impact='explosion']::after");
+    expect(hud).toContain("#hud[data-hud-impact='fall']::after");
+  });
+
+  it('never lets the impact wash cover the centre of the screen', () => {
+    // Combat safety: the wash is edge-only, masked out of the middle, so it
+    // can never obscure what the player is aiming at.
+    expect(hud).toMatch(/#hud::after \{[\s\S]*?mask-image: radial-gradient\([\s\S]*?transparent/u);
   });
 
   it('gives each cluster a different lag so the parallax reads as depth', () => {
@@ -159,10 +233,20 @@ describe('Pass 77 HF-370 reskin - diegetic motion', () => {
       expect(css).toContain("html[data-reduced-motion='true']");
       expect(css).toContain('@media (prefers-reduced-motion: reduce)');
     }
-    // The HUD must be completely static under either switch: animation, the
-    // wired translate and the composed transform all cleared.
-    expect(hud).toMatch(/html\[data-reduced-motion='true'\][\s\S]*?\{\s*animation: none;\s*translate: none;\s*transform: none;\s*\}/u);
-    expect(hud).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?animation: none;\s*translate: none;\s*transform: none;/u);
+    // The HUD must be completely static under either switch. All THREE
+    // transform channels have to be cleared, not two: `rotate` carries impact
+    // roll, so clearing only animation/translate/transform would leave a
+    // motion-sensitive player with a HUD that still tilts when they are shot.
+    expect(hud).toMatch(/html\[data-reduced-motion='true'\][\s\S]*?\{\s*animation: none;\s*translate: none;\s*transform: none;\s*rotate: none;\s*\}/u);
+    expect(hud).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?animation: none;\s*translate: none;\s*transform: none;\s*rotate: none;/u);
+  });
+
+  it('keeps telling the player they were hit under reduced motion', () => {
+    // Reduced motion removes MOVEMENT, not INFORMATION. The directional
+    // damage wash is how a player learns where they are being shot from, so it
+    // survives both switches at reduced strength rather than being hidden.
+    expect(hud).toMatch(/html\[data-reduced-motion='true'\] #hud::after \{[\s\S]*?opacity: calc\(var\(--hud-impact-flash, 0\)/u);
+    expect(hud).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?#hud::after \{[\s\S]*?opacity: calc\(var\(--hud-impact-flash, 0\)/u);
   });
 
   it('honours the sensory switch by flattening blur and glow, not by hiding data', () => {
@@ -174,10 +258,40 @@ describe('Pass 77 HF-370 reskin - diegetic motion', () => {
 
 describe('Pass 77 HF-370 reskin - command deck', () => {
   it('keeps the deck bright, as AGENTS.md requires, while giving it a material', () => {
-    expect(shell).toContain('--p77-paper: #f7faf9');
-    expect(shell).toMatch(/#menu\.pass64-command-deck \{[\s\S]*?radial-gradient\(120% 90% at 6% -10%/u);
+    // MEASURED, NOT PINNED. The previous version of this test asserted the
+    // literal hex of the deck ground. That pinned an aesthetic the owner had
+    // already rejected three times: any real reskin had to either fail this
+    // test or leave it asserting a look that no longer rendered.
+    //
+    // What AGENTS.md actually requires is that the deck stay BRIGHT - "rather
+    // than regressing to a near-black or dark-blue monolith". So that is what
+    // is measured. The palette is now free to move; the guarantee is not.
+    const paper = hexOf(shell, '--p77-paper');
+    expect(paper).not.toBeNull();
+    expect(relativeLuminance(paper!)).toBeGreaterThan(0.75);
+
+    // ...and it must not be a BLUE monolith either, which is the other half of
+    // the same AGENTS.md sentence. Blue may not be the dominant channel.
+    const [red, green, blue] = paper!;
+    expect(blue).toBeLessThanOrEqual(Math.max(red, green));
+
     // A light source and a ground, not a flat fill.
-    expect(shell).toContain('linear-gradient(168deg, #ffffff 0%, #eef4f3 62%, #e7eeed 100%)');
+    expect(shell).toMatch(/#menu\.pass64-command-deck \{[\s\S]*?radial-gradient\(120% 90% at 6% -10%/u);
+    expect(shell).toMatch(/linear-gradient\(168deg, #[0-9a-f]{6} 0%, #[0-9a-f]{6} 62%, #[0-9a-f]{6} 100%\)/u);
+  });
+
+  it('commits to a genuinely different palette from the rejected build', () => {
+    // The owner rejected three builds with "the menus really don't look that
+    // different", and the audit traced it to the palette being untouched
+    // between them. These are the exact values of the rejected deck; if any of
+    // them comes back, the same complaint comes back with it.
+    for (const rejected of [
+      '#f7faf9', // the cold near-white paper
+      '#e8f0ef', // the cold workspace ground
+      '#0f8b93', // the teal accent
+      '#12a7b1', // the lit teal
+      '#16323b', // the blue-black instrument sheet
+    ]) expect(shell, `rejected Pass 75/77-v5 value ${rejected} is back`).not.toContain(`: ${rejected}`);
   });
 
   it('uses tight technical geometry instead of the dated web-card radius', () => {
@@ -217,11 +331,16 @@ describe('Pass 77 HF-370 reskin - command deck', () => {
   });
 
   it('makes the header and rail one dark chrome L around a bright workspace', () => {
-    // AGENTS.md forbids a near-black monolith: the surface the player reads and
-    // operates must stay bright, so the workspace ground is asserted light.
     expect(shell).toMatch(/#menu \.command-header \{[\s\S]*?background-color: var\(--p77-dark-bottom\);/u);
-    expect(shell).toMatch(/#menu \.command-workspace \{[\s\S]*?background-color: #e8f0ef;/u);
-    expect(shell).toContain('linear-gradient(166deg, #f4f9f8 0%, #e4edec 62%, #dde8e7 100%)');
+
+    // The workspace is the surface the player actually reads and operates, so
+    // AGENTS.md's brightness requirement binds hardest here. Measured, for the
+    // same reason as the deck ground above.
+    const workspace = /#menu \.command-workspace \{[\s\S]*?background-color: (#[0-9a-f]{6});/u.exec(shell);
+    expect(workspace).not.toBeNull();
+    expect(relativeLuminance(parseHex(workspace![1]!))).toBeGreaterThan(0.70);
+
+    expect(shell).toMatch(/linear-gradient\(166deg, #[0-9a-f]{6} 0%, #[0-9a-f]{6} 62%, #[0-9a-f]{6} 100%\)/u);
   });
 
   it('replaces the stock browser slider that was the deck\'s most dated control', () => {

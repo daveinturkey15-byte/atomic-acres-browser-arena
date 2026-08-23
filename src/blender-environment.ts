@@ -227,7 +227,7 @@ export async function loadBlenderArena(
   if (missingRoutes.length > 0) {
     throw new Error(`Blender arena is missing route landmarks: ${missingRoutes.map((route) => route.id).join(', ')}`);
   }
-  if (modeledBuses !== 2 || largeCoverAssets !== 4 || housePropSets !== 2) {
+  if (modeledBuses !== 1 || largeCoverAssets !== 4 || housePropSets !== 2) {
     throw new Error(`Blender arena asset contract failed: buses=${modeledBuses}, largeCoverAssets=${largeCoverAssets}, housePropSets=${housePropSets}`);
   }
   const expectedApertures = arena.houses.flatMap((house) => house.openings.map((opening) => ({

@@ -68,6 +68,15 @@ import {
   adaptScreenSpacePostForPressure,
   SCREEN_SPACE_POST_DISABLED,
 } from './screen-space-post-profile';
+// Lane L — per-arena art direction. The scene assembler owns two of its three
+// consumption points: the pre-tone-map scene grade uniforms and the
+// atmosphere particle mood; the third (the display grade composition) is
+// pushed into the installed filmic chain on every arena definition apply.
+import {
+  artDirectionForArena,
+  composeArtDirectedSceneGrade,
+} from './art-direction';
+import { installedFilmicGradeChain } from './filmic-grade-chain';
 
 export type Pass65TslGraphicsOptions = Readonly<{
   principalSamples: 1 | 2 | 4;
@@ -448,10 +457,17 @@ function makeMist(definition: ArenaVisualDefinition): THREE.Group {
   const animationTime = uniform(0);
   const drift = sin(positionWorld.x.mul(0.075).add(animationTime.mul(0.055))).mul(0.5).add(0.5);
   const mistStrength = uniform(Math.min(0.12, 0.035 + definition.atmosphere.mist * 0.09));
-  material.colorNode = mix(color(0x7fa5ae), color(0xd0d9cf), drift);
+  // Lane L: tint pair is uniform-driven so each arena's art direction can
+  // colour its own haze (rust-orange RustRig, cyan farcrysis) without a
+  // material rebuild. Values are written by applyArenaSystemLayout.
+  const mistTintNear = uniform(new THREE.Color(0x7fa5ae));
+  const mistTintFar = uniform(new THREE.Color(0xd0d9cf));
+  material.colorNode = mix(mistTintNear, mistTintFar, drift);
   material.opacityNode = mistStrength.mul(drift.mul(0.35).add(0.65));
   tagPipeline(material, PIPELINE.mist);
   root.userData.opacityUniform = mistStrength;
+  root.userData.tintNearUniform = mistTintNear;
+  root.userData.tintFarUniform = mistTintFar;
   root.userData.animationTimeUniform = animationTime;
   const positions = new Float32Array(48 * 3);
   for (let index = 0; index < 48; index += 1) {
@@ -482,10 +498,14 @@ function makeSmoke(definition: ArenaVisualDefinition): THREE.Group {
   const animationTime = uniform(0);
   const billow = sin(positionWorld.y.mul(0.7).sub(animationTime.mul(0.33))).mul(0.5).add(0.5);
   const smokeStrength = uniform(0.035 + definition.atmosphere.mist * 0.12);
-  material.colorNode = mix(color(0x2f3b3e), color(0x7d8984), billow);
+  const smokeTintNear = uniform(new THREE.Color(0x2f3b3e));
+  const smokeTintFar = uniform(new THREE.Color(0x7d8984));
+  material.colorNode = mix(smokeTintNear, smokeTintFar, billow);
   material.opacityNode = smokeStrength.mul(billow.mul(0.58).add(0.42));
   tagPipeline(material, PIPELINE.smoke);
   root.userData.opacityUniform = smokeStrength;
+  root.userData.tintNearUniform = smokeTintNear;
+  root.userData.tintFarUniform = smokeTintFar;
   root.userData.animationTimeUniform = animationTime;
   const positions = new Float32Array(36 * 3);
   for (let index = 0; index < 36; index += 1) {
@@ -525,12 +545,16 @@ function makeDust(definition: ArenaVisualDefinition): THREE.Points {
   const animationTime = uniform(0);
   const flicker = sin(animationTime.mul(0.7).add(positionWorld.x.mul(0.21))).mul(0.5).add(0.5);
   const dustStrength = uniform(Math.min(0.32, 0.08 + definition.atmosphere.dust * 0.72));
-  material.colorNode = mix(color(0xd7b47b), color(0xffebc7), flicker);
+  const dustTintNear = uniform(new THREE.Color(0xd7b47b));
+  const dustTintFar = uniform(new THREE.Color(0xffebc7));
+  material.colorNode = mix(dustTintNear, dustTintFar, flicker);
   material.opacityNode = dustStrength.mul(flicker.mul(0.45).add(0.55));
   tagPipeline(material, PIPELINE.dust);
   const dust = new THREE.Points(geometry, material);
   dust.name = 'Pass 64 TSL deterministic dust';
   dust.userData.opacityUniform = dustStrength;
+  dust.userData.tintNearUniform = dustTintNear;
+  dust.userData.tintFarUniform = dustTintFar;
   dust.userData.animationTimeUniform = animationTime;
   geometry.setDrawRange(0, layout.count);
   return dust;
@@ -544,9 +568,23 @@ function applyArenaSystemLayout(
 ): void {
   const layout = ATMOSPHERE_LAYOUTS[definition.id];
   const volumetricScale = THREE.MathUtils.clamp(graphics.volumetricScale, 0.35, 1);
+  // Lane L: the arena's atmosphere mood. Density multiplies the authored
+  // strengths INSIDE the existing opacity ceilings, so combat visibility
+  // bounds are unchanged; tints are pure hue.
+  const direction = artDirectionForArena(definition.id);
+  const applyTintPair = (node: THREE.Object3D | undefined, near: number, far: number): void => {
+    const nearUniform = node?.userData.tintNearUniform as { value: THREE.Color } | undefined;
+    const farUniform = node?.userData.tintFarUniform as { value: THREE.Color } | undefined;
+    nearUniform?.value.setHex(near);
+    farUniform?.value.setHex(far);
+  };
   const mist = root.getObjectByName('Pass 64 TSL mist');
   const mistUniform = mist?.userData.opacityUniform as { value: number } | undefined;
-  if (mistUniform) mistUniform.value = Math.min(0.12, 0.035 + definition.atmosphere.mist * 0.09) * volumetricScale;
+  if (mistUniform) {
+    mistUniform.value = Math.min(0.12, (0.035 + definition.atmosphere.mist * 0.09) * direction.atmosphere.density)
+      * volumetricScale;
+  }
+  applyTintPair(mist, direction.atmosphere.mistNear, direction.atmosphere.mistFar);
   const visibleMistLayers = Math.max(1, Math.ceil(layout.mist.length * volumetricScale));
   mist?.children.forEach((node, index) => {
     const placement = layout.mist[index];
@@ -559,7 +597,10 @@ function applyArenaSystemLayout(
   });
   const smoke = root.getObjectByName('Pass 64 TSL smoke');
   const smokeUniform = smoke?.userData.opacityUniform as { value: number } | undefined;
-  if (smokeUniform) smokeUniform.value = (0.035 + definition.atmosphere.mist * 0.12) * volumetricScale;
+  if (smokeUniform) {
+    smokeUniform.value = (0.035 + definition.atmosphere.mist * 0.12) * direction.atmosphere.density * volumetricScale;
+  }
+  applyTintPair(smoke, direction.atmosphere.smokeNear, direction.atmosphere.smokeFar);
   const visibleSmokeLayers = Math.max(1, Math.ceil(layout.smoke.length * volumetricScale));
   smoke?.children.forEach((node, index) => {
     const placement = layout.smoke[index];
@@ -572,7 +613,11 @@ function applyArenaSystemLayout(
   });
   const dust = root.getObjectByName('Pass 64 TSL deterministic dust') as THREE.Points | undefined;
   const dustUniform = dust?.userData.opacityUniform as { value: number } | undefined;
-  if (dustUniform) dustUniform.value = Math.min(0.32, 0.08 + definition.atmosphere.dust * 0.72) * volumetricScale;
+  if (dustUniform) {
+    dustUniform.value = Math.min(0.32, (0.08 + definition.atmosphere.dust * 0.72) * direction.atmosphere.density)
+      * volumetricScale;
+  }
+  applyTintPair(dust, direction.atmosphere.dustNear, direction.atmosphere.dustFar);
   const positions = dust?.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
   if (dust && positions) {
     for (let index = 0; index < positions.count; index += 1) {
@@ -824,8 +869,6 @@ function configureHdrPipeline(
   beforeRender(): void;
   dispose(): void;
 }> {
-  let activeDefinition = definition;
-  let activeGraphics = graphics;
   const screenSpaceRuntime = graphics.screenSpace ?? SCREEN_SPACE_POST_DISABLED;
   const scenePass = pass(scene, camera, { samples: graphics.principalSamples });
   // FSR 1 is a real spatial upscale, so the scene has to actually be rendered
@@ -890,12 +933,25 @@ function configureHdrPipeline(
   const occlusionSample = gtaoDenoise
     ? nodeObject(gtaoDenoise as unknown as Node<'vec4'>).r
     : gtaoPass ? gtaoPass.getTextureNode().r : null;
-  const saturation = uniform(definition.colorPipeline.grade.saturation);
-  const contrast = uniform(definition.colorPipeline.grade.contrast);
+  // Lane L: the arena's authored linear grade composed with its art
+  // direction. This is the pre-tone-map half of the place identity; the
+  // display half (CDL, split tone, vignette character) is pushed into the
+  // installed filmic chain below.
+  const initialSceneGrade = composeArtDirectedSceneGrade(
+    definition.colorPipeline.grade,
+    artDirectionForArena(definition.id),
+  );
+  const saturation = uniform(initialSceneGrade.saturation);
+  const contrast = uniform(initialSceneGrade.contrast);
+  const pushArtDirectionToChain = (arenaId: ArenaVisualDefinition['id']): void => {
+    installedFilmicGradeChain(renderPipeline)?.setArenaArtDirection(artDirectionForArena(arenaId));
+  };
+  pushArtDirectionToChain(definition.id);
   // HF-363: linear-side ordered dither removed — display-referred grain now lives
-  // in the filmic grade chain (per-frame-luminance-grain stage). Linear vignette
-  // is retained as a separate deliberate stage.
-  const grain = uniform(definition.colorPipeline.grain.strength / 255 * graphics.post.filmGrainScale);
+  // in the filmic grade chain (per-frame-luminance-grain stage), fed by
+  // legacy-main through setGradeGrainStrength. The orphaned linear grain
+  // uniform this assembler kept writing (but no node ever read) was retired in
+  // the Lane L streamline pass.
   const contactOcclusionStrength = uniform(graphics.ambientOcclusion.enabled ? graphics.ambientOcclusion.strength : 0);
   // Everything downstream reads the screen-space graph's scene colour, which is
   // the motion-blurred image when that stage is built and the raw scene pass
@@ -952,14 +1008,15 @@ function configureHdrPipeline(
       screenSpace,
       linearSourceStages,
       applyDefinition(next) {
-        activeDefinition = next;
-        saturation.value = next.colorPipeline.grade.saturation;
-        contrast.value = next.colorPipeline.grade.contrast;
-        grain.value = next.colorPipeline.grain.strength / 255 * activeGraphics.post.filmGrainScale;
+        const sceneGrade = composeArtDirectedSceneGrade(
+          next.colorPipeline.grade,
+          artDirectionForArena(next.id),
+        );
+        saturation.value = sceneGrade.saturation;
+        contrast.value = sceneGrade.contrast;
+        pushArtDirectionToChain(next.id);
       },
       applyGraphics(next) {
-        activeGraphics = next;
-        grain.value = activeDefinition.colorPipeline.grain.strength / 255 * next.post.filmGrainScale;
         emissiveBloom.strength.value = next.post.bloomStrength;
         contactOcclusionStrength.value = gtaoPass && next.ambientOcclusion.enabled
           ? next.ambientOcclusion.strength

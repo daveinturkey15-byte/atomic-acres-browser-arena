@@ -8,25 +8,36 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { batchStaticMeshes } from '../art-kit';
-import { clearWeatherSample, sampleWeather, type WeatherSample } from './weather-state';
+import { NO_LIGHTNING, clearWeatherSample, sampleWeather, type WeatherSample } from './weather-state';
 import { calmWind, createWindField, sampleWind, type WindSample } from './wind-field';
 import {
   RAIN_BUDGET,
+  RAIN_LIGHTNING,
+  RAIN_MAX_SIGHTLINE_OBSCURATION,
   RAIN_MAX_SPLASHES,
   RAIN_MAX_STREAKS,
   RAIN_READABILITY,
+  RAIN_SHEETS,
+  RAIN_STRATA,
   RAIN_VOLUME,
   RainPresentation,
+  WETNESS_MAX_ADOPTED_SURFACES,
   WETNESS_RESPONSE,
+  assertRainCombatSafety,
   rainBypassReason,
+  rainSightlineObscuration,
   wetSurfaceResponse,
   type RainQualityTier,
 } from './rain-presentation';
+import { resolveWeatherPresentation } from './weather-settings';
 
 const STORM: WeatherSample = Object.freeze({
   arenaId: 'high-seas',
   state: 'storm',
   previousState: 'storm',
+  simulatedState: 'storm',
+  severity: 4,
+  presentationCeiling: 'storm',
   phaseIndex: 3,
   transitionBlend: 1,
   intensity: 1,
@@ -36,6 +47,7 @@ const STORM: WeatherSample = Object.freeze({
   fogDensityMultiplier: 2.15,
   skyDarkenAmount: 0.58,
   raining: true,
+  lightning: NO_LIGHTNING,
 });
 
 const STIFF_WIND: WindSample = Object.freeze({
@@ -312,6 +324,11 @@ describe('rain never costs a gunfight', () => {
     const relative = new THREE.Vector3();
     let clearedByAds = 0;
     let comparedDrops = 0;
+    // 90 frames x 1400 drops is 126,000 comparisons, so the findings are
+    // collected and asserted ONCE rather than through a quarter of a million
+    // expect() calls. The claim is unchanged - an empty findings list is
+    // exactly "every drop agreed" - and a failure still names the drop.
+    const findings: string[] = [];
 
     for (let frame = 0; frame < 90; frame += 1) {
       view.rotation.y = 0.6 + frame * 0.02;
@@ -328,7 +345,7 @@ describe('rain never costs a gunfight', () => {
       for (let index = 0; index < hipStates.length; index += 1) {
         if (hipStates[index].culled) {
           // ADS may only ever remove drops, never add them back.
-          expect(adsStates[index].culled, `frame ${frame} index ${index}`).toBe(true);
+          if (!adsStates[index].culled) findings.push(`frame ${frame} index ${index} resurrected a culled drop`);
           continue;
         }
         comparedDrops += 1;
@@ -338,17 +355,22 @@ describe('rain never costs a gunfight', () => {
         const insideAimCylinder = forwardDistance > 0.2
           && forwardDistance < RAIN_READABILITY.adsClearRangeM
           && perpendicular < RAIN_READABILITY.adsClearRadiusM;
-        expect(adsStates[index].culled, `frame ${frame} index ${index} fwd ${forwardDistance} perp ${perpendicular}`)
-          .toBe(insideAimCylinder);
+        if (adsStates[index].culled !== insideAimCylinder) {
+          findings.push(
+            `frame ${frame} index ${index} fwd ${forwardDistance.toFixed(3)} perp ${perpendicular.toFixed(3)}`
+            + ` expected culled=${insideAimCylinder}`,
+          );
+        }
         if (insideAimCylinder) {
           clearedByAds += 1;
-        } else {
+        } else if (adsStates[index].position.distanceTo(hipStates[index].position) >= 1e-6) {
           // A drop ADS kept must be the SAME drop, or the two runs have drifted
           // and the culling comparison above would be meaningless.
-          expect(adsStates[index].position.distanceTo(hipStates[index].position)).toBeLessThan(1e-6);
+          findings.push(`frame ${frame} index ${index} drifted between the two runs`);
         }
       }
     }
+    expect(findings.slice(0, 5)).toEqual([]);
     expect(comparedDrops).toBeGreaterThan(50_000);
     expect(clearedByAds).toBeGreaterThan(20);
     hip.rain.dispose();
@@ -508,6 +530,291 @@ describe('rain lifecycle', () => {
       expect(Number.isFinite(state.position.x)).toBe(true);
     }
     expect(Number.isFinite(rain.telemetry().wetness)).toBe(true);
+    rain.dispose();
+  });
+});
+
+/** Per-instance basis lengths, so size stratification is measurable. */
+function instanceScales(mesh: THREE.InstancedMesh): { width: number; length: number }[] {
+  const matrix = new THREE.Matrix4();
+  const scales: { width: number; length: number }[] = [];
+  for (let index = 0; index < mesh.count; index += 1) {
+    mesh.getMatrixAt(index, matrix);
+    const e = matrix.elements;
+    scales.push({
+      width: Math.hypot(e[0], e[1], e[2]),
+      length: Math.hypot(e[4], e[5], e[6]),
+    });
+  }
+  return scales;
+}
+
+function markedSurface(name: string, impactSurface: string | null): THREE.Mesh {
+  const material = new THREE.MeshStandardMaterial({ color: 0x8899aa, roughness: 0.82, metalness: 0.04 });
+  material.name = name + '-material';
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material);
+  mesh.name = name;
+  if (impactSurface !== null) mesh.userData.impactSurface = impactSurface;
+  return mesh;
+}
+
+describe('rain readability is arithmetic, not taste', () => {
+  it('passes its own fail-closed combat-safety assertion', () => {
+    expect(() => assertRainCombatSafety()).not.toThrow();
+  });
+
+  it('removes under the stated fraction of a sightline at the worst settings', () => {
+    // THE BOUND THIS LANE ENFORCES. At the instance ceiling and the opacity
+    // ceiling - i.e. with every weather setting at maximum - the whole rain
+    // volume removes this much of the light between the player and a target.
+    const worst = rainSightlineObscuration(RAIN_MAX_STREAKS, RAIN_READABILITY.maxOpacity);
+    expect(worst).toBeLessThanOrEqual(RAIN_MAX_SIGHTLINE_OBSCURATION);
+    // The shipped figure, pinned in BOTH directions rather than merely bounded:
+    // a budget or geometry edit has to come and argue with this number, and an
+    // accidental collapse toward zero is as much a regression as a breach.
+    expect(worst).toBeCloseTo(0.0386, 4);
+    // And it is a real function of the inputs, not a constant that happens to
+    // be small: doubling the drops doubles the obscuration.
+    expect(rainSightlineObscuration(2 * 400, RAIN_READABILITY.maxOpacity))
+      .toBeCloseTo(2 * rainSightlineObscuration(400, RAIN_READABILITY.maxOpacity), 9);
+    expect(rainSightlineObscuration(0, RAIN_READABILITY.maxOpacity)).toBe(0);
+  });
+
+  it('cannot be pushed past the instance ceiling by the density slider', () => {
+    const { rain } = build({ quality: 'ultra' });
+    const view = camera();
+    rain.update(1 / 60, view, STORM, STIFF_WIND, {
+      presentation: resolveWeatherPresentation({ rainDensity: 1.5 }),
+    });
+    const telemetry = rain.telemetry();
+    expect(telemetry.streakInstances).toBeLessThanOrEqual(RAIN_BUDGET.ultra.streaks);
+    expect(telemetry.sightlineObscuration).toBeLessThanOrEqual(RAIN_MAX_SIGHTLINE_OBSCURATION);
+    expect(telemetry.streakOpacity).toBeLessThanOrEqual(RAIN_READABILITY.maxOpacity);
+    rain.dispose();
+  });
+});
+
+describe('the player density setting', () => {
+  it('thins the rain out and fills it back in', () => {
+    const { rain } = build({ quality: 'ultra' });
+    const view = camera();
+    const countAt = (rainDensity: number) => {
+      rain.update(1 / 60, view, { ...STORM, rainRate: 0.5 }, STIFF_WIND, {
+        presentation: resolveWeatherPresentation({ rainDensity }),
+      });
+      return rain.telemetry().streakInstances;
+    };
+    const quarter = countAt(0.25);
+    const authored = countAt(1);
+    const most = countAt(1.5);
+    expect(quarter).toBeGreaterThan(0);
+    expect(authored).toBeGreaterThan(quarter * 3);
+    expect(most).toBeGreaterThan(authored);
+    rain.dispose();
+  });
+
+  it('lets a deliberate push above authored density raise the instance ceiling', () => {
+    // The tier is pinned by the caller, not by the player, so without this the
+    // top half of the slider was inert in heavy rain. It may only ever go UP,
+    // only above 1.00x, and never past the ceiling the readability proof uses.
+    const { rain } = build({ quality: 'high' });
+    const view = camera();
+    const countAt = (rainDensity: number) => {
+      rain.update(1 / 60, view, STORM, STIFF_WIND, { presentation: resolveWeatherPresentation({ rainDensity }) });
+      return rain.telemetry().streakInstances;
+    };
+    expect(countAt(1)).toBeLessThanOrEqual(RAIN_BUDGET.high.streaks);
+    const pushed = countAt(1.5);
+    expect(pushed).toBeGreaterThan(RAIN_BUDGET.high.streaks);
+    expect(pushed).toBeLessThanOrEqual(RAIN_BUDGET.ultra.streaks);
+    expect(rain.telemetry().sightlineObscuration).toBeLessThanOrEqual(RAIN_MAX_SIGHTLINE_OBSCURATION);
+    // ...and a pinned tier is still a floor the player cannot fall below.
+    expect(countAt(0.25)).toBeLessThan(RAIN_BUDGET.high.streaks);
+    rain.dispose();
+  });
+
+  it('reports the player settings in telemetry so a receipt can show them', () => {
+    const { rain } = build();
+    rain.update(1 / 60, camera(), STORM, STIFF_WIND, {
+      presentation: resolveWeatherPresentation({
+        weatherIntensity: 'moderate', rainDensity: 0.6, windStrength: 1.35, lightning: false,
+      }),
+    });
+    expect(rain.telemetry()).toMatchObject({
+      weatherIntensity: 'moderate',
+      rainDensity: 0.6,
+      windStrength: 1.35,
+      lightningEnabled: false,
+    });
+    rain.dispose();
+  });
+});
+
+describe('rain reads as a volume, not an overlay', () => {
+  it('gives drops a spread of sizes instead of one printed streak', () => {
+    const { rain } = build({ quality: 'ultra' });
+    rain.update(1 / 60, camera(), STORM, STIFF_WIND);
+    const streaks = rain.root.children[0] as THREE.InstancedMesh;
+    const scales = instanceScales(streaks).filter(({ width }) => width > 1e-6);
+    expect(scales.length).toBeGreaterThan(100);
+    const widths = scales.map(({ width }) => width);
+    const thinnest = Math.min(...widths);
+    const fattest = Math.max(...widths);
+    // A volume of identical drops is exactly what the audit called a flat
+    // overlay; the size ratio here is the depth cue that fixes it.
+    expect(fattest / thinnest).toBeGreaterThan(2);
+    expect(fattest).toBeLessThanOrEqual(RAIN_STRATA.maxSizeScale * 0.028 + 1e-6);
+    rain.dispose();
+  });
+
+  it('arrives in sheets - a gust empties gaps a calm sky keeps filled', () => {
+    const view = camera();
+    const gusting = build({ quality: 'ultra', seed: 99 });
+    const calm = build({ quality: 'ultra', seed: 99 });
+    gusting.rain.update(1 / 60, view, STORM, { ...STIFF_WIND, gust: 1 });
+    calm.rain.update(1 / 60, view, STORM, { ...STIFF_WIND, gust: 0 });
+    const culledIn = (rain: RainPresentation) => instanceStates(rain.root.children[0] as THREE.InstancedMesh)
+      .filter(({ culled }) => culled).length;
+    // A deep gust carves real gaps; a lull leaves the volume nearly full.
+    expect(culledIn(gusting.rain)).toBeGreaterThan(culledIn(calm.rain));
+    expect(RAIN_SHEETS.gustDepth).toBeGreaterThan(RAIN_SHEETS.calmDepth);
+    gusting.rain.dispose();
+    calm.rain.dispose();
+  });
+
+  it('travels the sheets downwind instead of leaving a fixed stencil', () => {
+    const { rain } = build({ quality: 'ultra', seed: 5 });
+    const view = camera();
+    const streaks = rain.root.children[0] as THREE.InstancedMesh;
+    rain.update(1 / 60, view, STORM, { ...STIFF_WIND, gust: 1 });
+    const first = instanceStates(streaks).map(({ culled }) => culled);
+    // The camera does not move; only the sheet phase advances.
+    for (let frame = 0; frame < 45; frame += 1) rain.update(1 / 60, view, STORM, { ...STIFF_WIND, gust: 1 });
+    const later = instanceStates(streaks).map(({ culled }) => culled);
+    let changed = 0;
+    for (let index = 0; index < Math.min(first.length, later.length); index += 1) {
+      if (first[index] !== later[index]) changed += 1;
+    }
+    expect(changed).toBeGreaterThan(20);
+    rain.dispose();
+  });
+});
+
+describe('lightning presentation', () => {
+  it('lights the sky with one shadowless light and never more than the cap', () => {
+    const { rain } = build();
+    const lights = rain.root.children.filter((child) => (child as THREE.Light).isLight) as THREE.HemisphereLight[];
+    expect(lights).toHaveLength(1);
+    expect(lights[0].castShadow).toBe(false);
+    expect(lights[0].intensity).toBe(0);
+    // Still exactly two instanced draws and no loose meshes: a light is not a
+    // draw call, which is why the flash is free.
+    expect(meshCensus(rain.root)).toEqual({ instanced: 2, loose: 0 });
+
+    for (const flash of [0, 0.15, 0.4, RAIN_LIGHTNING.peakLightIntensity, 1]) {
+      rain.update(1 / 60, camera(), { ...STORM, lightning: { ...STORM.lightning, flash, active: flash > 0 } }, STIFF_WIND);
+      expect(lights[0].intensity, 'flash ' + flash).toBeLessThanOrEqual(RAIN_LIGHTNING.peakLightIntensity + 1e-9);
+      expect(lights[0].intensity, 'flash ' + flash).toBeCloseTo(
+        Math.min(1, flash) * RAIN_LIGHTNING.peakLightIntensity,
+        9,
+      );
+    }
+    rain.dispose();
+  });
+
+  it('brightens the rain without touching the alpha that hides a target', () => {
+    const { rain } = build();
+    const streaks = rain.root.children[0] as THREE.InstancedMesh;
+    const material = streaks.material as THREE.MeshBasicMaterial;
+    rain.update(1 / 60, camera(), STORM, STIFF_WIND);
+    const darkOpacity = material.opacity;
+    expect(material.color.r).toBe(1);
+
+    rain.update(1 / 60, camera(), { ...STORM, lightning: { ...STORM.lightning, flash: 1, active: true } }, STIFF_WIND);
+    // Brighter: the rain in front of you is what a strike most obviously lights.
+    expect(material.color.r).toBeCloseTo(1 + RAIN_LIGHTNING.streakBrightnessLift, 9);
+    // ...and NOT more opaque. Alpha is what attenuates whatever is behind the
+    // streak, so it is the one channel a flash may never touch.
+    expect(material.opacity).toBe(darkOpacity);
+    expect(rain.telemetry().streakOpacity).toBeLessThanOrEqual(RAIN_READABILITY.maxOpacity);
+    rain.dispose();
+  });
+
+  it('stays dark when the player turns it off', () => {
+    const { rain } = build();
+    const light = rain.root.children.find((child) => (child as THREE.Light).isLight) as THREE.HemisphereLight;
+    rain.update(1 / 60, camera(), { ...STORM, lightning: { ...STORM.lightning, flash: 1, active: true } }, STIFF_WIND, {
+      presentation: resolveWeatherPresentation({ lightning: false }),
+    });
+    expect(light.intensity).toBe(0);
+    expect(rain.telemetry().lightningFlash).toBe(0);
+    rain.dispose();
+  });
+});
+
+describe('wet surfaces find themselves', () => {
+  it('adopts world geometry and leaves the viewmodel alone', () => {
+    const { rain, scene } = build();
+    const ground = markedSurface('ground', 'concrete');
+    const wall = markedSurface('wall', 'metal');
+    const viewmodel = markedSurface('weapon-viewmodel', null);
+    const glass = markedSurface('window', 'glass');
+    (glass.material as THREE.MeshStandardMaterial).transparent = true;
+    scene.add(ground, wall, viewmodel, glass);
+
+    // Nothing is touched while the ground is dry.
+    rain.update(1 / 60, camera(), { ...STORM, wetness: 0, rainRate: 0 }, calmWind());
+    expect(rain.telemetry().wetSurfaces).toBe(0);
+
+    rain.update(1 / 60, camera(), STORM, STIFF_WIND);
+    expect(rain.telemetry().wetSurfaces).toBe(2);
+    expect(rain.telemetry().autoAdoptedWetSurfaces).toBe(2);
+    // Marked world geometry darkens and glosses; nothing else moves.
+    expect((ground.material as THREE.MeshStandardMaterial).color.r).toBeLessThan(0.9);
+    expect((ground.material as THREE.MeshStandardMaterial).roughness).toBeLessThan(0.82);
+    expect((viewmodel.material as THREE.MeshStandardMaterial).roughness).toBe(0.82);
+    expect((glass.material as THREE.MeshStandardMaterial).roughness).toBe(0.82);
+    rain.dispose();
+  });
+
+  it('restores every adopted surface when the arena is torn down', () => {
+    const { rain, scene } = build();
+    const ground = markedSurface('ground', 'concrete');
+    const material = ground.material as THREE.MeshStandardMaterial;
+    const dry = { color: material.color.clone(), roughness: material.roughness, metalness: material.metalness };
+    scene.add(ground);
+    rain.update(1 / 60, camera(), STORM, STIFF_WIND);
+    expect(material.color.equals(dry.color)).toBe(false);
+    rain.dispose();
+    expect(material.color.equals(dry.color)).toBe(true);
+    expect(material.roughness).toBe(dry.roughness);
+    expect(material.metalness).toBe(dry.metalness);
+  });
+
+  it('is bounded - a huge arena cannot make the scan unbounded work', () => {
+    const { rain, scene } = build();
+    for (let index = 0; index < WETNESS_MAX_ADOPTED_SURFACES + 40; index += 1) {
+      scene.add(markedSurface('ground-' + index, 'concrete'));
+    }
+    rain.update(1 / 60, camera(), STORM, STIFF_WIND);
+    expect(rain.telemetry().wetSurfaces).toBe(WETNESS_MAX_ADOPTED_SURFACES);
+    rain.dispose();
+  });
+
+  it('does not re-scan the scene on every frame', () => {
+    const { rain, scene } = build();
+    scene.add(markedSurface('ground', 'concrete'));
+    rain.update(1 / 60, camera(), STORM, STIFF_WIND);
+    expect(rain.telemetry().wetSurfaces).toBe(1);
+    // A surface added a frame later must NOT be picked up until the next scan
+    // window - that is the whole point of the throttle.
+    scene.add(markedSurface('tarmac', 'concrete'));
+    rain.update(1 / 60, camera(), STORM, STIFF_WIND);
+    expect(rain.telemetry().wetSurfaces).toBe(1);
+    // The frame delta is clamped to 0.1 s before anything integrates, so the
+    // scan window is walked in real frames rather than one giant step.
+    for (let frame = 0; frame < 30; frame += 1) rain.update(0.1, camera(), STORM, STIFF_WIND);
+    expect(rain.telemetry().wetSurfaces).toBe(2);
     rain.dispose();
   });
 });

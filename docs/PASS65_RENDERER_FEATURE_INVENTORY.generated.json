@@ -376,9 +376,9 @@
       "runtimeConsumer": "hdr-pipeline",
       "runtimeEvidence": [
         {
-          "path": "src/rendering/pass64-tsl-scene.ts",
-          "symbol": "graphics.post.filmGrainScale",
-          "telemetryPath": "render.atomicSignal.advancedGraphics.filmGrainScale"
+          "path": "src/legacy-main.ts",
+          "symbol": "renderRuntime.setGradeGrainStrength",
+          "telemetryPath": "settings.graphics.post.filmGrainScale + per-frame-luminance-grain stage uniform"
         }
       ]
     },
@@ -444,6 +444,58 @@
           "path": "src/rendering/filmic-grade-chain.ts",
           "symbol": "display-fsr1-easu-rcas-upscale",
           "telemetryPath": "settings.graphics.spatialUpscaling + grade chain stage receipt"
+        }
+      ]
+    },
+    {
+      "key": "graphics.weatherIntensity",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "weather-presentation",
+      "runtimeEvidence": [
+        {
+          "path": "src/weather/weather-state.ts",
+          "symbol": "presentationRung(available, presentation.ceilingState)",
+          "telemetryPath": "settings.graphics.weatherIntensity + sampleWeather().rain.weatherIntensity"
+        }
+      ]
+    },
+    {
+      "key": "graphics.rainDensity",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "rain-presentation",
+      "runtimeEvidence": [
+        {
+          "path": "src/weather/rain-presentation.ts",
+          "symbol": "this.presentation.rainDensity",
+          "telemetryPath": "settings.graphics.rainDensity + sampleWeather().rain.streakInstances"
+        }
+      ]
+    },
+    {
+      "key": "graphics.windStrength",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "weather-presentation",
+      "runtimeEvidence": [
+        {
+          "path": "src/weather/weather-state.ts",
+          "symbol": "* presentation.windStrength",
+          "telemetryPath": "settings.graphics.windStrength + sampleWeather().rain.windSpeed"
+        }
+      ]
+    },
+    {
+      "key": "graphics.lightning",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "weather-presentation",
+      "runtimeEvidence": [
+        {
+          "path": "src/weather/rain-presentation.ts",
+          "symbol": "RAIN_LIGHTNING.peakLightIntensity",
+          "telemetryPath": "settings.graphics.lightning + sampleWeather().rain.lightningFlash"
         }
       ]
     },
@@ -536,7 +588,11 @@
         "depthOfField": false,
         "depthOfFieldStrength": 0.3,
         "motionBlur": 0,
-        "spatialUpscaling": "off"
+        "spatialUpscaling": "off",
+        "weatherIntensity": "light",
+        "rainDensity": 0.5,
+        "windStrength": 1,
+        "lightning": false
       },
       "effective": {
         "requestedPreset": "performance",
@@ -637,6 +693,14 @@
           "sharpness": 0
         },
         "gradeProfile": "arena-default",
+        "weather": {
+          "intensity": "light",
+          "ceilingState": "overcast",
+          "rainDensity": 0.5,
+          "windStrength": 1,
+          "lightning": false,
+          "weatherEnabled": true
+        },
         "reason": null
       },
       "profile": {
@@ -679,12 +743,12 @@
         "shadowFilter": "auto",
         "indirectLighting": "high",
         "ambientOcclusion": "off",
-        "screenSpaceReflections": "off",
+        "screenSpaceReflections": "low",
         "screenSpaceGi": "off",
         "reflectionQuality": "high",
         "environmentIntensity": 1,
         "volumetricQuality": "high",
-        "volumetricLightShafts": "off",
+        "volumetricLightShafts": "low",
         "smokeQuality": "high",
         "particleQuality": "high",
         "anisotropy": 8,
@@ -699,7 +763,11 @@
         "depthOfField": false,
         "depthOfFieldStrength": 0.3,
         "motionBlur": 0,
-        "spatialUpscaling": "off"
+        "spatialUpscaling": "off",
+        "weatherIntensity": "storm",
+        "rainDensity": 1,
+        "windStrength": 1,
+        "lightning": true
       },
       "effective": {
         "requestedPreset": "high",
@@ -730,28 +798,28 @@
         "environmentIntensity": 1,
         "screenSpace": {
           "godrays": {
-            "quality": "off",
-            "enabled": false,
+            "quality": "low",
+            "enabled": true,
             "unavailableReason": null,
-            "raymarchSteps": 0,
-            "resolutionScale": 0,
-            "density": 0,
-            "maximumDensity": 0,
-            "distanceAttenuation": 0,
-            "additiveGain": 0,
-            "bilateralBlur": false
+            "raymarchSteps": 24,
+            "resolutionScale": 0.35,
+            "density": 0.35,
+            "maximumDensity": 0.12,
+            "distanceAttenuation": 2.6,
+            "additiveGain": 0.14,
+            "bilateralBlur": true
           },
           "reflections": {
-            "quality": "off",
-            "enabled": false,
-            "resolutionScale": 0,
-            "marchQuality": 0,
-            "maximumDistance": 0,
-            "thickness": 0,
-            "intensity": 0,
-            "screenEdgeFade": 0,
+            "quality": "low",
+            "enabled": true,
+            "resolutionScale": 0.5,
+            "marchQuality": 0.35,
+            "maximumDistance": 6,
+            "thickness": 0.18,
+            "intensity": 0.5,
+            "screenEdgeFade": 0.24,
             "binaryRefine": false,
-            "reflectNonMetals": false
+            "reflectNonMetals": true
           },
           "globalIllumination": {
             "quality": "off",
@@ -800,6 +868,14 @@
           "sharpness": 0
         },
         "gradeProfile": "arena-default",
+        "weather": {
+          "intensity": "storm",
+          "ceilingState": "storm",
+          "rainDensity": 1,
+          "windStrength": 1,
+          "lightning": true,
+          "weatherEnabled": true
+        },
         "reason": null
       },
       "profile": {
@@ -842,12 +918,12 @@
         "shadowFilter": "auto",
         "indirectLighting": "high",
         "ambientOcclusion": "ultra",
-        "screenSpaceReflections": "off",
-        "screenSpaceGi": "off",
+        "screenSpaceReflections": "high",
+        "screenSpaceGi": "high",
         "reflectionQuality": "ultra",
         "environmentIntensity": 1,
         "volumetricQuality": "ultra",
-        "volumetricLightShafts": "off",
+        "volumetricLightShafts": "high",
         "smokeQuality": "ultra",
         "particleQuality": "ultra",
         "anisotropy": 16,
@@ -859,10 +935,14 @@
         "sharpness": 0,
         "filmGrain": 0.4,
         "vignette": 0.18,
-        "depthOfField": false,
-        "depthOfFieldStrength": 0.3,
-        "motionBlur": 0,
-        "spatialUpscaling": "off"
+        "depthOfField": true,
+        "depthOfFieldStrength": 0.6,
+        "motionBlur": 0.35,
+        "spatialUpscaling": "off",
+        "weatherIntensity": "storm",
+        "rainDensity": 1.35,
+        "windStrength": 1,
+        "lightning": true
       },
       "effective": {
         "requestedPreset": "max",
@@ -893,54 +973,54 @@
         "environmentIntensity": 1,
         "screenSpace": {
           "godrays": {
-            "quality": "off",
-            "enabled": false,
+            "quality": "high",
+            "enabled": true,
             "unavailableReason": null,
-            "raymarchSteps": 0,
-            "resolutionScale": 0,
-            "density": 0,
-            "maximumDensity": 0,
-            "distanceAttenuation": 0,
-            "additiveGain": 0,
-            "bilateralBlur": false
+            "raymarchSteps": 48,
+            "resolutionScale": 0.5,
+            "density": 0.5,
+            "maximumDensity": 0.18,
+            "distanceAttenuation": 2.2,
+            "additiveGain": 0.22,
+            "bilateralBlur": true
           },
           "reflections": {
-            "quality": "off",
-            "enabled": false,
-            "resolutionScale": 0,
-            "marchQuality": 0,
-            "maximumDistance": 0,
-            "thickness": 0,
-            "intensity": 0,
-            "screenEdgeFade": 0,
-            "binaryRefine": false,
-            "reflectNonMetals": false
+            "quality": "high",
+            "enabled": true,
+            "resolutionScale": 0.75,
+            "marchQuality": 0.6,
+            "maximumDistance": 12,
+            "thickness": 0.12,
+            "intensity": 0.7,
+            "screenEdgeFade": 0.24,
+            "binaryRefine": true,
+            "reflectNonMetals": true
           },
           "globalIllumination": {
-            "quality": "off",
-            "enabled": false,
-            "sliceCount": 0,
-            "stepCount": 0,
-            "giIntensity": 0,
-            "radius": 0,
-            "thickness": 0,
-            "expFactor": 0,
-            "denoise": false
+            "quality": "high",
+            "enabled": true,
+            "sliceCount": 2,
+            "stepCount": 12,
+            "giIntensity": 4,
+            "radius": 8,
+            "thickness": 1,
+            "expFactor": 2,
+            "denoise": true
           },
           "depthOfField": {
-            "enabled": false,
-            "strength": 0.3,
+            "enabled": true,
+            "strength": 0.6,
             "focusDistanceM": 26,
             "focalLengthM": 120,
-            "bokehScale": 0
+            "bokehScale": 2.56
           },
           "motionBlur": {
-            "enabled": false,
-            "strength": 0,
-            "samples": 0,
+            "enabled": true,
+            "strength": 0.35,
+            "samples": 8,
             "deadZoneNdc": 0.006,
             "kneeNdc": 0.024,
-            "maximumUvOffset": 0
+            "maximumUvOffset": 0.008749999999999999
           },
           "upscaling": {
             "mode": "off",
@@ -963,6 +1043,14 @@
           "sharpness": 0
         },
         "gradeProfile": "arena-default",
+        "weather": {
+          "intensity": "storm",
+          "ceilingState": "storm",
+          "rainDensity": 1.35,
+          "windStrength": 1,
+          "lightning": true,
+          "weatherEnabled": true
+        },
         "reason": null
       },
       "profile": {
@@ -1758,6 +1846,45 @@
       "authorityAffecting": false
     },
     {
+      "id": "weather-and-wind",
+      "title": "Weather, rain, wind and surface wetness",
+      "availability": "active",
+      "owner": "src/weather/weather-state.ts + src/weather/rain-presentation.ts + src/weather/wind-field.ts",
+      "sourceProbes": [
+        {
+          "path": "src/weather/weather-state.ts",
+          "symbol": "export function sampleWeather"
+        },
+        {
+          "path": "src/weather/weather-settings.ts",
+          "symbol": "export function resolveWeatherPresentation"
+        },
+        {
+          "path": "src/weather/rain-presentation.ts",
+          "symbol": "export function assertRainCombatSafety"
+        },
+        {
+          "path": "src/weather/wind-field.ts",
+          "symbol": "export function sampleWind"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.weatherIntensity",
+          "graphics.rainDensity",
+          "graphics.windStrength",
+          "graphics.lightning"
+        ],
+        "effectiveValue": "Weather ceiling off/light/moderate/heavy/storm, rain density 0.25x-1.5x, wind strength 0x-2x, lightning on or off",
+        "rationale": "The weather itself is a pure function of the arena, the host-derived match seed and elapsed time, so every peer computes the same sky over zero bytes of network traffic. The four settings are LOCAL PRESENTATION CLAMPS on top of that: they can show the same weather or less of it, never more, and never a state the arena did not author. Readability is arithmetic rather than taste - at the maximum instance ceiling and the maximum streak opacity the whole rain volume removes under 3% of the light along a sightline, the aim cylinder is emptied outright while aiming down sights, and lightning only ever adds light, capped, for at most 0.26 s."
+      },
+      "budget": "Exactly two instanced draws and one shadowless hemisphere light at every density and on every arena; zero per-frame allocations; the wet-surface scan is bounded to 128 materials and runs at most every 2.5 s while the ground is wet.",
+      "verifier": "src/weather/weather-state.test.ts + src/weather/rain-presentation.test.ts + src/weather/wind-field.test.ts + src/weather/weather-settings.test.ts",
+      "authorityAffecting": false
+    },
+    {
       "id": "volumetric-light-shafts",
       "title": "Volumetric light shafts (screen-space raymarch)",
       "availability": "active",
@@ -1952,11 +2079,11 @@
     }
   ],
   "summary": {
-    "total": 33,
-    "active": 31,
+    "total": 34,
+    "active": 32,
     "unsupported": 2,
-    "adjustable": 24,
+    "adjustable": 25,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "1c3e76fbff81e58ee350665a2d3c2097b9dfdaad36f857a260594f37b44ad33a"
+  "inventorySha256": "583a21e9a9b9fde21538141b5c43be5b763a7fbab40c094c0b809d0226f8e7db"
 }

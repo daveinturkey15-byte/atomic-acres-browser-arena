@@ -305,16 +305,23 @@ describe('Pass 64 authored TSL pipeline set', () => {
     });
     expect(systems.principalHdrTarget.samples).toBe(2);
     expect(systems.principalHdrTarget.textures.map(({ name }) => name)).toEqual(['output', 'normal']);
+    const { artDirectionForArena } = await import('./art-direction');
+    const rustworksDensity = artDirectionForArena('rustworks-1v1').atmosphere.density;
     expect(systems.root.userData.pass65AdvancedGraphics).toEqual({
       principalSamples: 2,
       volumetricScale: 0.5,
       volumetricActual: {
         scale: 0.5,
-        mistOpacity: (0.035 + 0.28 * 0.09) * 0.5,
+        // Lane L: authored strengths are scaled by the arena art direction's
+        // atmosphere density inside the UNCHANGED opacity ceilings, then by
+        // volumetric scale. The density is read from the catalog rather than
+        // copied here: what this pins is the composition formula and the
+        // ceilings, and a hardcoded copy only ever pins how stale the test is.
+        mistOpacity: Math.min(0.12, (0.035 + 0.28 * 0.09) * rustworksDensity) * 0.5,
         mistLayers: 3,
-        smokeOpacity: (0.035 + 0.28 * 0.12) * 0.5,
+        smokeOpacity: (0.035 + 0.28 * 0.12) * rustworksDensity * 0.5,
         smokeLayers: 2,
-        dustOpacity: 0.076,
+        dustOpacity: Math.min(0.32, (0.08 + 0.1 * 0.72) * rustworksDensity) * 0.5,
         dustMotes: 48,
       },
       oceanWaveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.performance,
@@ -436,6 +443,65 @@ describe('Pass 64 authored TSL pipeline set', () => {
     systems.applyDefinition((await ARENA_VISUAL_REGISTRY['gun-range']()).definition);
     expect(horizonGeometryDispose).toHaveBeenCalled();
     expect(horizonMaterialDispose).toHaveBeenCalled();
+    systems.dispose();
+  });
+});
+
+describe('Lane L arena art direction wiring', () => {
+  it('pushes the arena identity into an installed filmic chain at build and on every arena switch', async () => {
+    const { installFilmicGradeChain } = await import('./filmic-grade-chain');
+    const { ARENA_ART_DIRECTIONS } = await import('./art-direction');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const renderPipeline = {
+      outputNode: null,
+      outputColorTransform: true,
+      needsUpdate: false,
+    } as unknown as RenderPipeline;
+    const handle = installFilmicGradeChain(
+      renderPipeline as unknown as import('./filmic-grade-chain').GradedRenderPipeline,
+    );
+    expect(handle.arenaArtDirection()).toBeNull();
+    const definition = (await ARENA_VISUAL_REGISTRY['atomic-acres']()).definition;
+    const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition);
+    // Building the scene systems handed the chain the first arena's identity.
+    expect(handle.arenaArtDirection()).toBe(ARENA_ART_DIRECTIONS['atomic-acres']);
+    // An arena switch re-points the chain at the new place.
+    systems.applyDefinition((await ARENA_VISUAL_REGISTRY['rustworks-1v1']()).definition);
+    expect(handle.arenaArtDirection()).toBe(ARENA_ART_DIRECTIONS['rustworks-1v1']);
+    systems.dispose();
+    handle.dispose();
+  });
+
+  it('keeps working with no chain installed (unit-test pipelines stay bare)', async () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['gun-range']()).definition;
+    const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition);
+    expect(systems.root.userData.tslArenaVisualDefinitionId).toBe('gun-range');
+    systems.dispose();
+  });
+
+  it('tints the atmosphere particles per arena (rust haze is not farm haze)', async () => {
+    const { ARENA_ART_DIRECTIONS } = await import('./art-direction');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['atomic-acres']()).definition;
+    const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition);
+    const mist = systems.root.getObjectByName('Pass 64 TSL mist');
+    const dust = systems.root.getObjectByName('Pass 64 TSL deterministic dust');
+    const mistNear = mist?.userData.tintNearUniform as { value: THREE.Color };
+    const dustFar = dust?.userData.tintFarUniform as { value: THREE.Color };
+    const acres = ARENA_ART_DIRECTIONS['atomic-acres'];
+    expect(mistNear.value.getHex()).toBe(acres.atmosphere.mistNear);
+    expect(dustFar.value.getHex()).toBe(acres.atmosphere.dustFar);
+    systems.applyDefinition((await ARENA_VISUAL_REGISTRY['rustworks-1v1']()).definition);
+    const rust = ARENA_ART_DIRECTIONS['rustworks-1v1'];
+    expect(mistNear.value.getHex()).toBe(rust.atmosphere.mistNear);
+    expect(dustFar.value.getHex()).toBe(rust.atmosphere.dustFar);
+    expect(rust.atmosphere.mistNear).not.toBe(acres.atmosphere.mistNear);
     systems.dispose();
   });
 });
