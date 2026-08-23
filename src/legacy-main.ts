@@ -33,7 +33,7 @@ import { withArenaFrustumCullingDisabled } from './rendering/arena-coverage-prew
 import { ArenaTransitionProfiler, type ArenaTransitionProfilePhase } from './arena-transition-profile';
 import { evictExactFailedArenaGeneration } from './arena-generation-cache';
 import { isViewmodelShadowLight, VIEWMODEL_SHADOW_BUDGET } from './rendering/runtime-shadow-budget';
-import { auditRuntimeTslTraversal, assertRuntimeTslTraversal, createPass64TslSceneSystems, type Pass64TslSceneSystems } from './rendering/pass64-tsl-scene';
+import { auditRuntimeTslTraversal, assertRuntimeTslTraversal, createPass64TslSceneSystems, pass64LinearSourceStages, type Pass64TslSceneSystems } from './rendering/pass64-tsl-scene';
 import type { ArenaVisualBudgets, ArenaVisualDefinition } from './rendering/arena-visual-definition';
 import { auditLocalLightOcclusion } from './rendering/light-occlusion';
 import { resolveWebGlShadowSamplerMode, webGlShadowSamplerMode, type ShadowFilterOverride } from './webgl-shadow-compatibility';
@@ -423,6 +423,7 @@ import {
   resolveDisplayedGraphicsPreset,
   resolveGraphicsRuntime,
   type GraphicsPreset,
+  type GraphicsRuntime,
   type Pass65Settings,
 } from './pass65-settings';
 import { PlayerProfileStore, type PlayerControlPreferencesV1 } from './player-profile';
@@ -441,6 +442,10 @@ import { FramePacingSampler, cadenceWithNoProgressAge } from './frame-pacing';
 import { advanceLocalHealthRegen } from './local-health-regen';
 import {
   addCameraShakeImpulse,
+  addCameraShakeTrauma,
+  createCameraShakeTrauma,
+  decayCameraShakeTrauma,
+  sampleCameraShakeTrauma,
   createCameraShakeState,
   integrateCameraShake,
   sampleCameraShake,
@@ -1719,11 +1724,27 @@ let displayedGraphicsPreset: GraphicsPreset = resolveDisplayedGraphicsPreset(pas
 let liveGraphicsProfile: RenderProfile = renderProfile;
 let stagedGraphicsReconstruction: readonly string[] = Object.freeze([]);
 let liveGraphicsAppliedAt = 0;
+/**
+ * HF-364: the screen-space graph topology as one comparable key. Only presence
+ * counts — a tier change inside an already-built pass is a live uniform, while
+ * adding or removing one changes MRT attachments and render targets.
+ */
+function screenSpaceTopologyKey(screenSpace: GraphicsRuntime['screenSpace']): string {
+  return [
+    screenSpace.godrays.enabled ? 'shafts' : '-',
+    screenSpace.reflections.enabled ? 'ssr' : '-',
+    screenSpace.globalIllumination.enabled ? 'ssgi' : '-',
+    screenSpace.depthOfField.enabled ? 'dof' : '-',
+    screenSpace.motionBlur.enabled ? 'motion' : '-',
+    screenSpace.upscaling.enabled ? `fsr${screenSpace.upscaling.sceneResolutionScale}` : '-',
+  ].join('|');
+}
 const rendererConstructionGraphics = Object.freeze({
   profile: renderProfile,
   antialiasSamples: graphicsRuntime.antialiasSamples,
   ambientOcclusionEnabled: graphicsRuntime.ambientOcclusion.enabled,
   ambientOcclusionDenoise: graphicsRuntime.ambientOcclusion.denoise,
+  screenSpaceTopology: screenSpaceTopologyKey(graphicsRuntime.screenSpace),
   representation: activeRenderConfig.representation,
 });
 const atomicLighting = arenaLightingProfile(renderProfile, 'atomic-acres');
@@ -2066,6 +2087,11 @@ function requestStaticShadowRefresh(value = true): void {
   }
 }
 let applyPresentationEffectsBudget: ((budget: GraphicsEffectsBudget) => void) | null = null;
+// Declared here rather than beside the other arena-visual state because
+// applyAdaptiveRenderBudget below drives its screen-space pressure valve and
+// runs during module initialisation, long before the first arena is streamed.
+// A `let` further down the file is in its temporal dead zone at that point.
+let pass64TslSystems: Pass64TslSceneSystems | null = null;
 function applyGraphicsPreferenceBudget(budget: GraphicsEffectsBudget): GraphicsEffectsBudget {
   return Object.freeze({
     ...budget,
@@ -2497,6 +2523,10 @@ function applyAdaptiveRenderBudget(pixelRatioCap: number): void {
   graphicsRefinement.setBudget(effectsBudget);
   atomicSignal?.setEffectsBudget(effectsBudget);
   applyPresentationEffectsBudget?.(effectsBudget);
+  // HF-364: the screen-space raymarches are the most expensive thing in the
+  // frame, so the adaptive controller has to be able to take them down with the
+  // pixel ratio rather than shrinking the framebuffer around an untouched cost.
+  pass64TslSystems?.setAdaptiveScreenSpaceBudget(pixelRatioCap, graphicsRuntime.renderScale);
   const shadowsEnabled = adaptiveShadowsEnabled(liveGraphicsProfile, activeRenderConfig.shadows, pixelRatioCap)
     && (activeArenaVisualDefinition?.shadows.enabled ?? true);
   if (renderRuntime.shadowsEnabled() !== shadowsEnabled) {
@@ -3818,7 +3848,6 @@ function ensureAtomicWorldPresentation(): void {
 const arenaVisualStream = new ArenaVisualStreamController(scene);
 let arenaVisualReceipt: ArenaVisualSwitchReceipt | null = null;
 const arenaRenderWatchdog = new ArenaRenderWatchdog(3);
-let pass64TslSystems: Pass64TslSceneSystems | null = null;
 let appliedTslArenaDefinitions = 0;
 let activeArenaReviewCameraId: string | null = null;
 let activeArenaReviewFixedTimeMs: number | null = null;
@@ -3910,8 +3939,8 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
     weaponView.invalidateBrowserWeaponGpuReadinessForPipelineChange();
     if (pass64TslSystems) pass64TslSystems.applyDefinition(module.definition);
     else {
-      pass64TslSystems = createPass64TslSceneSystems(scene, camera, renderRuntime.renderPipeline, module.definition, {
-        principalSamples: graphicsRuntime.antialiasSamples === 4 ? 4 : graphicsRuntime.antialiasSamples === 2 ? 2 : 1,
+      const tslGraphicsOptions = {
+        principalSamples: (graphicsRuntime.antialiasSamples === 4 ? 4 : graphicsRuntime.antialiasSamples === 2 ? 2 : 1) as 1 | 2 | 4,
         volumetricScale: graphicsRuntime.volumetricScale,
         ambientOcclusion: graphicsRuntime.ambientOcclusion,
         post: graphicsRuntime.post,
@@ -3919,7 +3948,26 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
         reflectionScale: graphicsRuntime.reflectionScale,
         reflectionQuality: graphicsRuntime.reflectionQuality,
         environmentIntensity: graphicsRuntime.environmentIntensity,
-      }, renderRuntime.renderer);
+        screenSpace: graphicsRuntime.screenSpace,
+      };
+      // HF-364: the grade chain's order receipt has to know which optional
+      // linear stages the assembler is about to build BEFORE it publishes an
+      // outputNode, otherwise the first published receipt describes a graph
+      // that is not the one on screen. The stage list is a pure function of the
+      // options, so it is resolved without building a node.
+      renderRuntime.setGradeLinearSourceStages(pass64LinearSourceStages(tslGraphicsOptions));
+      renderRuntime.setSpatialUpscaling(graphicsRuntime.screenSpace.upscaling);
+      pass64TslSystems = createPass64TslSceneSystems(
+        scene,
+        camera,
+        renderRuntime.renderPipeline,
+        module.definition,
+        tslGraphicsOptions,
+        renderRuntime.renderer,
+        // The arena sun is the shaft light: godrays raymarch its shadow map, so
+        // the node references this exact light's shadow camera.
+        sunLight,
+      );
     }
     appliedTslArenaDefinitions += 1;
     // HF-363: hand the arena's authored grain to the display-referred grade stage.
@@ -5744,6 +5792,11 @@ let lowHealthFeedbackState: LowHealthFeedbackState = createLowHealthFeedbackStat
 let lastSensoryPresentationAt = -Infinity;
 // HF-352: Camera shake and kill-confirm pulse presentation states
 let cameraShakeState: CameraShakeState = createCameraShakeState();
+// HF-370: the trauma model runs ALONGSIDE the spring model rather than
+// replacing it. Both feed the same camera; trauma supplies the weight and
+// falloff an explosion should have, the spring keeps the existing per-impulse
+// feel that other systems already tune against.
+let cameraShakeTrauma = createCameraShakeTrauma(0, 0x5eed);
 let killConfirmPulseState: KillConfirmPulseState = createKillConfirmPulseState(accessibilityRuntime.weaponMotionScale);
 
 function isFootstepOccluded(source: Readonly<{ x: number; y: number; z: number }>): boolean {
@@ -12724,6 +12777,14 @@ function applyDamage(
   showDamageDirection(attacker, appliedDamage, now);
   // HF-352: Camera shake impulse from taking damage
   if (appliedDamage > 0) {
+    // HF-370: the owner wants hits FELT. Trauma scales with how hard the hit
+    // was, so a graze and a near-fatal burst no longer shake identically.
+    cameraShakeTrauma = addCameraShakeTrauma(cameraShakeTrauma, {
+      source: 'damage-taken',
+      now,
+      strength: Math.min(1, appliedDamage / 45),
+      seed: Math.round(now) | 0,
+    });
     cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
       distanceUnits: 1.5,
       family: cause.kind === 'grenade' || cause.kind === 'killstreak' ? 'semtex' : 'crossbow',
@@ -14906,6 +14967,7 @@ function respawn(
   lowHealthFeedbackState = createLowHealthFeedbackState();
   // HF-352: Reset camera shake and kill-confirm pulse on match/player reset
   cameraShakeState = createCameraShakeState();
+  cameraShakeTrauma = createCameraShakeTrauma(performance.now(), 0x5eed);
   killConfirmPulseState = createKillConfirmPulseState(accessibilityRuntime.weaponMotionScale);
   audio.setLowHealthFeedback({ active: false, severity: 0, vignetteOpacity: 0, breathingGain: 0, heartbeatGain: 0, pulseHz: 0 });
   damageDirectionIndicator.replaceChildren();
@@ -20161,8 +20223,15 @@ function explodeGrenade(entity: GrenadeEntity): void {
   audio.explosion(afterPresentationDetach);
   const afterAudio = performance.now();
   spawnGrenadeExplosionVisual(point, afterAudio);
+  const explosionDistance = point.distanceTo(player.position);
+  cameraShakeTrauma = addCameraShakeTrauma(cameraShakeTrauma, {
+    source: explosionDistance > 25 ? 'far-explosion' : 'near-explosion',
+    now: afterAudio,
+    distanceUnits: explosionDistance,
+    seed: Math.round(afterAudio) | 0,
+  });
   cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
-    distanceUnits: point.distanceTo(player.position),
+    distanceUnits: explosionDistance,
     family: 'semtex',
     sensoryScale: accessibilityRuntime.weaponMotionScale,
     now: afterAudio,
@@ -21455,8 +21524,14 @@ function activateOrToggleFieldSupportSlot(slotIndex: number, now = performance.n
   // HF-316: the owner reported killstreak keys that "sometimes" do nothing. Every
   // refusal below used to be a bare return, so a blocked activation was
   // indistinguishable from a dead key. Evaluate the pre-flight once and SAY why.
+  // Does this slot already own a live platform in the world? If so the press is
+  // a control toggle, not an activation, and must not be judged on a charge
+  // that was already spent calling the platform in.
+  const controlTogglePress = controllableKillstreakId(id)
+    && selectControllableSupportEntity(id, player.id, killstreakSnapshot.entities) !== null;
   const gate = evaluateKillstreakActivation({
     slotId: id,
+    controlTogglePress,
     projectionEarned: fieldSupport.available[id] === true,
     playerAlive: player.alive,
     matchPhase: matchState.phase,
@@ -24000,6 +24075,26 @@ function updatePhysics(dt: number): void {
     camera.position.y += shakeSample.offsetY;
     camera.rotation.z += shakeSample.rollRadians;
   }
+
+  // Trauma layer on top. POSITION AND ROLL ONLY - deliberately NOT pitch/yaw.
+  //
+  // The shot direction is built from camera.getWorldDirection() (see the
+  // firing path), so anything written into camera.rotation.x or .y becomes the
+  // direction bullets actually travel. Writing rotational shake there would
+  // send rounds wherever the shake pushed rather than where the player aimed -
+  // a real aim bug, not a cosmetic one. Roll does not affect a forward vector,
+  // and positional offsets move the eye without turning it, so both are safe.
+  // If pitch/yaw shake is ever wanted, the fix is to derive the shot ray from
+  // player.yaw/player.pitch first; until then this stays.
+  cameraShakeTrauma = decayCameraShakeTrauma(cameraShakeTrauma, now);
+  const traumaSample = sampleCameraShakeTrauma(cameraShakeTrauma, now, {
+    reducedMotion: accessibilityRuntime.reducedMotion,
+  });
+  if (traumaSample.amplitude > 0) {
+    camera.position.addScaledVector(right, traumaSample.offsetX);
+    camera.position.y += traumaSample.offsetY;
+    camera.rotation.z += traumaSample.rollRadians;
+  }
 }
 
 function interpolationSourceSnapshotRateHz(): 20 | 30 | 40 {
@@ -25284,6 +25379,13 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
     || live.ambientOcclusion.denoise !== rendererConstructionGraphics.ambientOcclusionDenoise) {
     staged.push('ambientOcclusionTopology');
   }
+  // HF-364: turning a screen-space raymarch on or off adds or removes MRT
+  // attachments and whole render targets, so it cannot be a live apply. Tier
+  // changes inside an already-built pass ARE live, which is why this compares
+  // the built topology rather than the tier.
+  if (screenSpaceTopologyKey(live.screenSpace) !== rendererConstructionGraphics.screenSpaceTopology) {
+    staged.push('screenSpaceTopology');
+  }
 
   graphicsRuntime = live;
   liveGraphicsProfile = desiredProfile;
@@ -25355,6 +25457,7 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
     reflectionScale: live.reflectionScale,
     reflectionQuality: live.reflectionQuality,
     environmentIntensity: live.environmentIntensity,
+    screenSpace: live.screenSpace,
   });
   // Rebind the complete retained arena presentation after the profile state is
   // committed. Updating only the three ambient intensities leaves the real
@@ -25376,6 +25479,10 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
     renderRuntime.setDisplayVignetteStrength(live.post.vignetteStrength);
     renderRuntime.setPostAntiAliasing(live.postAntiAliasing);
     renderRuntime.setSharpness(live.post.sharpness);
+    // HF-364: the FSR 1 reconstruction is a display-chain stage, so it applies
+    // live; the matching scene-pass resolution scale is construction-time and
+    // is staged with the rest of the screen-space topology below.
+    renderRuntime.setSpatialUpscaling(live.screenSpace.upscaling);
   }
   document.documentElement.dataset.graphicsPreset = displayedGraphicsPreset;
   document.documentElement.dataset.graphicsLiveProfile = desiredProfile;
@@ -29377,6 +29484,11 @@ function debugRiggedOperatorJointScreenPositions(
 // ---------------------------------------------------------------------------
 (() => {
   const params = new URLSearchParams(window.location.search);
+  // A comma-separated arena list boots EVERY named arena in turn and reports
+  // each one. This exists because headless Chromium cannot create a WebGPU
+  // device on this machine, so every automated visual check has only ever
+  // exercised the WebGL2 compat path - while players are on WebGPU. An arena
+  // that fails only on the WebGPU route was invisible to all of it.
   const probeArena = params.get('qaFpsProbe');
   const probeEndpoint = params.get('qaFpsEndpoint');
   const sampleMs = Math.min(60_000, Math.max(3_000, Number(params.get('qaFpsSampleMs') ?? 12_000)));
@@ -29422,7 +29534,50 @@ function debugRiggedOperatorJointScreenPositions(
       window.addEventListener('error', (event) => recordError(String(event.message ?? event)));
       window.addEventListener('unhandledrejection', (event) => recordError(String(event.reason ?? 'unhandled rejection')));
       if (!await waitFor(() => arenaSelectionReady, 120_000)) { post({ error: 'bootstrap-timeout' }); return; }
-      post({ stage: 'bootstrap-ready' });
+      post({ stage: 'bootstrap-ready', backend: document.documentElement.dataset.renderBackend ?? null });
+
+      const requestedArenas = probeArena.split(',').map((entry) => entry.trim()).filter(Boolean);
+      if (requestedArenas.length > 1) {
+        // Boot-sweep mode: prove each arena reaches an active match on THIS
+        // renderer route, and report the first failure per arena rather than
+        // stopping the whole sweep.
+        for (const arenaId of requestedArenas) {
+          const startedAt = performance.now();
+          try {
+            recentErrors.length = 0;
+            await activateArenaSelection(arenaId as ArenaId);
+            element<HTMLInputElement>('#player-name').value = 'Boot Probe';
+            network.close();
+            resetForMode();
+            void startGame('solo', false);
+            const active = await waitFor(() => gameStarted && matchState.phase === 'active', 120_000);
+            post({
+              stage: 'arena-boot',
+              arena: arenaId,
+              ok: active,
+              ms: Math.round(performance.now() - startedAt),
+              backend: document.documentElement.dataset.renderBackend ?? null,
+              bootstrapStage,
+              statusText: (statusEl.textContent ?? '').slice(0, 120),
+              errors: [...recentErrors],
+            });
+          } catch (error) {
+            post({
+              stage: 'arena-boot',
+              arena: arenaId,
+              ok: false,
+              ms: Math.round(performance.now() - startedAt),
+              backend: document.documentElement.dataset.renderBackend ?? null,
+              thrown: String(error).slice(0, 400),
+              errors: [...recentErrors],
+            });
+          }
+          returnPrivateMatchToLobby(false);
+          await new Promise((settle) => window.setTimeout(settle, 900));
+        }
+        post({ stage: 'sweep-complete', arenas: requestedArenas.length });
+        return;
+      }
       // Heartbeat while the arena activates: when a browser wedges inside
       // activation, the last reported bootstrap stage names the wedge.
       const heartbeat = window.setInterval(() => {
@@ -29453,7 +29608,7 @@ function debugRiggedOperatorJointScreenPositions(
         post({ error: 'match-start-timeout', gameStarted, matchPhase: matchState.phase });
         return;
       }
-      post({ stage: 'match-active' });
+      post({ stage: 'match-active', arena: probeArena, backend: document.documentElement.dataset.renderBackend ?? null });
       // Let streaming and first-use shader compilation drain before sampling -
       // the number wanted is steady state, not warmup.
       await new Promise((settle) => window.setTimeout(settle, 5_000));

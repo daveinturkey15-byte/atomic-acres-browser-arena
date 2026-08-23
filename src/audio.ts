@@ -31,6 +31,13 @@ import {
   type MatchCountdownAudioCueId,
 } from './match-countdown-audio';
 import { WEAPON_REPORT_PROFILES } from './weapon-audio-profiles';
+import {
+  DEFAULT_ACOUSTIC_SPACE,
+  acousticProfile,
+  arenaAcousticSpace,
+  weaponReportLayering,
+  type AcousticSpace,
+} from './audio-immersion';
 
 const WEAPON_REPORT_GAIN = Object.freeze(Object.fromEntries(
   WEAPON_CATALOG.map((weapon) => [weapon.id, weapon.effects.reportGain]),
@@ -380,6 +387,27 @@ export function admitExplosionAudioMix(state: ExplosionAudioGate, now: number): 
   };
 }
 
+/**
+ * HF-366: the tail baseline. Open ground at 0 m is the mix the weapon profiles
+ * were authored against, so every space and distance is expressed as a ratio to
+ * it. Computed once at module load - the layering call is pure, and doing it
+ * per shot would be arithmetic in the hot fire path for a constant.
+ */
+const SHOT_TAIL_REFERENCE = Object.freeze({
+  gain: weaponReportLayering(0, 'open-field', 0).tailGainScale,
+  duration: weaponReportLayering(0, 'open-field', 0).tailDurationSeconds,
+});
+
+/**
+ * HF-366: hard ceiling on when a report's tail must be finished, measured from
+ * the shot. A reflective space multiplies the tail, and the railgun's tail is
+ * already 0.9 s before any multiplier - unbounded, one distant railgun report
+ * would hold a voice for most of two seconds and the bounded mix would start
+ * stealing combat audio. Light weapons never reach this ceiling, so only the
+ * case that actually threatens the budget is clipped.
+ */
+const SHOT_TAIL_BUDGET_SECONDS = 1;
+
 type NoiseOptions = {
   duration: number;
   volume: number;
@@ -575,6 +603,18 @@ export class ArenaAudio {
   /** Pass 75: context time at which the next ambient one-shot may fire. */
   private nextAmbientEventAtSeconds = Number.POSITIVE_INFINITY;
   private ambientEventsPlayed = 0;
+  // HF-366 immersion. The arena picks the default space; the runtime may
+  // override it while the player is inside geometry the arena parameter cannot
+  // know about (a house on Atomic Acres is not an open field).
+  private acousticSpace: AcousticSpace = DEFAULT_ACOUSTIC_SPACE;
+  private acousticSpaceOverride: AcousticSpace | null = null;
+  /**
+   * Occlusion HOOK. The runtime raycasts under its own per-frame budget and
+   * feeds a 0..1 scalar back; this module never touches world geometry, so an
+   * arena change can never make audio raycast against a stale collider set.
+   */
+  private occlusionSampler: ((emitter: SpatialPoint | null) => number) | null = null;
+  private occludedReports = 0;
 
   configure(settings: AudioSettings): void {
     this.audioSettings = settings;
@@ -722,9 +762,58 @@ export class ArenaAudio {
   setArena(arenaId: ArenaId): void {
     if (this.activeArena === arenaId) return;
     this.activeArena = arenaId;
+    // HF-366: the arena is the acoustic parameter. Set it before the bed
+    // starts so the first report of a match already has the right tail, and
+    // clear any interior override left over from the previous arena.
+    this.acousticSpace = arenaAcousticSpace(arenaId);
+    this.acousticSpaceOverride = null;
     this.stopSources(this.arenaSources);
     this.disconnectNodes(this.arenaNodes);
     this.startArenaBed(arenaId);
+  }
+
+  /**
+   * HF-366: override the arena's default acoustic space, e.g. while the player
+   * is inside a house or a container. Pass null to fall back to the arena.
+   * Lifecycle only - it emits nothing, it changes how the next report sounds.
+   */
+  setAcousticSpace(space: AcousticSpace | null): void {
+    this.acousticSpaceOverride = space && acousticProfile(space).space === space ? space : null;
+  }
+
+  /**
+   * HF-366: install the runtime's occlusion probe. The sampler returns 0 for a
+   * clear line and 1 for fully blocked; anything in between is partial cover.
+   * It is called at most once per world report, on the emitting thread, so the
+   * runtime is free to answer from a cached, budgeted raycast rather than a
+   * fresh one. Pass null to remove it (reports then read as unoccluded).
+   */
+  setOcclusionSampler(sampler: ((emitter: SpatialPoint | null) => number) | null): void {
+    this.occlusionSampler = typeof sampler === 'function' ? sampler : null;
+  }
+
+  /** Current acoustic space: the runtime override when set, else the arena's. */
+  private currentAcousticSpace(): AcousticSpace {
+    return this.acousticSpaceOverride ?? this.acousticSpace;
+  }
+
+  /**
+   * Sample the occlusion hook, failing soft. A sampler that throws or returns
+   * nonsense must never take the report down with it - a missing duck is a
+   * cosmetic loss, a thrown exception mid-mix is a silent match.
+   */
+  private sampleOcclusion(emitter: SpatialPoint | null): number {
+    if (!this.occlusionSampler) return 0;
+    let value = 0;
+    try {
+      value = this.occlusionSampler(emitter);
+    } catch {
+      return 0;
+    }
+    if (!Number.isFinite(value)) return 0;
+    const occlusion = Math.min(1, Math.max(0, value));
+    if (occlusion > 0) this.occludedReports += 1;
+    return occlusion;
   }
 
   /**
@@ -1360,35 +1449,74 @@ export class ArenaAudio {
       : null;
     const weaponDestination = railgunSpatial?.weapons ?? this.weapons;
     const ambienceDestination = railgunSpatial?.ambience ?? this.ambience;
-    const spatialAttenuation = railgunSpatial ? 1 : weapon === 'railgun'
-      ? railgunReportAttenuation(remote, distance)
-      : remote ? Math.max(0.08, 0.55 * (1 - Math.min(1, distance / 80))) : 1;
+    // HF-366: the report is layered rather than uniformly scaled. `layering`
+    // answers how much crack, body and tail this distance and space deserve;
+    // every factor it returns is 1 (or the previous constant) for a local shot
+    // at 0 m on open ground, so the player's own weapon is unchanged and only
+    // the world reads differently.
+    const occlusion = this.sampleOcclusion(emitter ?? null);
+    const layering = weaponReportLayering(distance, this.currentAcousticSpace(), occlusion);
+    const spatialAttenuation = railgunSpatial ? layering.directGainScale : weapon === 'railgun'
+      ? railgunReportAttenuation(remote, distance) * layering.directGainScale
+      // The old term was a straight linear fade to 80 m. The layered body
+      // falloff replaces it so that muffling and level fall together, which is
+      // the difference between "quieter" and "further away".
+      : remote ? Math.max(0.08, 0.55 * layering.bodyGainScale) : layering.directGainScale;
     const attenuation = spatialAttenuation * WEAPON_REPORT_GAIN[weapon];
     const profile = WEAPON_REPORT_PROFILES[weapon];
+    // Tail factors are expressed relative to open ground at 0 m, so that case
+    // reproduces the previous mix and every space reads only as a difference
+    // from it. Clamped because a runaway tail would both dominate the mix and
+    // hold a voice long enough to starve combat audio.
+    const tailReference = SHOT_TAIL_REFERENCE;
+    const tailGainScale = Math.min(6, Math.max(0.4, layering.tailGainScale / tailReference.gain));
+    const tailDurationScale = Math.min(2.5, Math.max(0.5, layering.tailDurationSeconds / tailReference.duration));
 
     this.sweep(profile.body, profile.bodyEnd, profile.duration, 0.22 * attenuation, 'sawtooth', weaponDestination);
-    this.sweep(profile.crack, profile.crack * profile.crackEndRatio, profile.crackDuration, 0.075 * attenuation, 'square', weaponDestination);
+    // The supersonic crack is a near-field event: past REPORT_CRACK_RANGE_METRES
+    // its scale is zero and the layer is silent. The voice is still scheduled
+    // rather than skipped, because the replicated report's LAYER COUNT is a
+    // pinned budget contract (audio-railgun.test.ts, owned elsewhere) and a
+    // conditional layer would make that count distance-dependent.
+    this.sweep(
+      profile.crack,
+      profile.crack * profile.crackEndRatio,
+      profile.crackDuration,
+      0.075 * attenuation * layering.crackGainScale,
+      'square',
+      weaponDestination,
+    );
     this.noise({
       duration: profile.duration,
       volume: profile.noise * attenuation,
       filter: 'lowpass',
-      frequency: profile.lowpass,
+      // Air absorption compounds with the weapon's own voicing rather than
+      // replacing it: a muffled LMG is still an LMG.
+      frequency: Math.min(profile.lowpass, layering.bodyCutoffHz),
       q: 0.7,
     }, weaponDestination);
     this.noise({
       duration: profile.transientDuration,
-      volume: 0.17 * attenuation,
+      // The muzzle transient belongs to the near field with the crack, but it
+      // never disappears entirely the way the crack does.
+      volume: 0.17 * attenuation * (0.35 + 0.65 * layering.crackGainScale),
       filter: 'highpass',
       frequency: profile.transientHighpass,
       q: 0.4,
     }, weaponDestination);
+    // Q and delay come from the space: a hard room rings tight and early, a
+    // deck over open water barely answers at all.
+    const tailDelaySeconds = Math.min(0.3, layering.tailDelaySeconds);
     this.noise({
-      duration: profile.tailDuration,
-      volume: (remote ? 0.055 : 0.082) * attenuation,
+      duration: Math.max(0.04, Math.min(
+        profile.tailDuration * tailDurationScale,
+        SHOT_TAIL_BUDGET_SECONDS - tailDelaySeconds,
+      )),
+      volume: (remote ? 0.055 : 0.082) * attenuation * tailGainScale,
       filter: 'bandpass',
       frequency: profile.tail,
-      q: 0.48,
-      delay: 0.025,
+      q: layering.tailQ,
+      delay: tailDelaySeconds,
     }, ambienceDestination);
     if (weapon === 'carbine') {
       // Original HK416 pressure and yard-reflection layers; short enough to stay readable at full RPM.
@@ -2320,6 +2448,15 @@ export class ArenaAudio {
       state: AudioContextState | 'unavailable' | 'failed' | 'locked';
     };
     listener: { poseMode: AudioListenerPoseMode };
+    // HF-366: what the world mix currently sounds like, and whether the
+    // runtime's occlusion hook is actually installed and answering.
+    immersion: {
+      space: AcousticSpace;
+      arenaSpace: AcousticSpace;
+      overridden: boolean;
+      occlusionHook: boolean;
+      occludedReports: number;
+    };
     explosionMix: ExplosionAudioGate & { coalesceMs: number };
     ambience: { continuousSources: number; busGain: number; arena: ArenaId | null; nextEventInSeconds: number; ambientEventsPlayed: number };
     combatPrewarm: { prepared: boolean; runs: number; sources: number; nodes: number; broadbandLoopSources: 0 };
@@ -2382,6 +2519,13 @@ export class ArenaAudio {
           ?? (this.contextSource === 'unavailable' ? 'unavailable' : this.contextSource === 'failed' ? 'failed' : 'locked'),
       },
       listener: { poseMode: this.listenerPoseMode },
+      immersion: {
+        space: this.currentAcousticSpace(),
+        arenaSpace: this.acousticSpace,
+        overridden: this.acousticSpaceOverride !== null,
+        occlusionHook: this.occlusionSampler !== null,
+        occludedReports: this.occludedReports,
+      },
       explosionMix: { ...this.explosionAudioGate, coalesceMs: EXPLOSION_AUDIO_COALESCE_MS },
       ambience: {
         continuousSources: this.arenaSources.length,

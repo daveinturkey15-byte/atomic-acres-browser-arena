@@ -262,6 +262,13 @@ export const RUNTIME_AUDIO_NON_EVENT_METHODS = Object.freeze([
   // WHETHER a sparse ambient one-shot is due; it emits nothing itself, so like
   // recoverAmbienceDuck it is a lifecycle call rather than a semantic event.
   'updateArenaAmbience',
+  // HF-366 immersion configuration. Neither emits: setAcousticSpace swaps the
+  // reverb/tail parameter when the runtime knows the listener stepped inside,
+  // and setOcclusionSampler installs the hook the runtime feeds its own budgeted
+  // raycast results through. They change how a LATER semantic event sounds, the
+  // same way configure() changes how every event sounds, so they belong here
+  // rather than in the callsite contract.
+  'setAcousticSpace', 'setOcclusionSampler',
   'resume', 'suspend', 'telemetry', 'unlock', 'updateListener',
 ] as const);
 
