@@ -86,12 +86,79 @@ await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.setReloadCaptureProgre
 await page.waitForTimeout(400);
 
 // Bot in frame, frozen, for per-skin animation/presentation checks.
+// placeBotAhead restages the EXISTING solo bot pool; clearing it first is why
+// every prior run captured an empty lane and returned null.
 await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true); });
-await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.clearBots(); });
-const placed = page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.placeBotAhead(6));
+const placed = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.placeBotAhead(6)).catch(() => null);
 await page.waitForTimeout(1800);
 await snap('04-bot-ahead');
-const botInfo = await placed.then((value) => value).catch(() => null);
+
+// Measure, do not guess: project both rigged hands into NDC and read the
+// ammo panel's on-screen rect, so "trigger hand under the ammo panel" is a
+// number, not an impression. Camera comes from the live scene graph.
+const framing = await page.evaluate(() => {
+  const api = window.__ATOMIC_ACRES_DEBUG__;
+  const telemetry = api.samplePresentationTelemetry();
+  const scene = api.sampleSceneGraph();
+  let camera = null;
+  scene.traverse((node) => { if (!camera && node.isCamera) camera = node; });
+  if (!camera) return { error: 'no camera in scene graph' };
+  const hands = {};
+  for (const arm of telemetry?.riggedArms ?? []) {
+    hands[arm.side] = { world: arm.hand };
+  }
+  // Project with a scratch Vector3 borrowed from the camera's own class.
+  const vectorClass = camera.position.constructor;
+  for (const side of Object.keys(hands)) {
+    const [x, y, z] = hands[side].world;
+    const projected = new vectorClass(x, y, z).project(camera);
+    hands[side].ndc = [projected.x, projected.y];
+  }
+  const panel = document.querySelector('#weapon-block')?.getBoundingClientRect?.() ?? null;
+  const panelNdc = panel ? {
+    x: [((panel.left / innerWidth) * 2) - 1, ((panel.right / innerWidth) * 2) - 1],
+    y: [1 - (panel.bottom / innerHeight) * 2, 1 - (panel.top / innerHeight) * 2],
+  } : null;
+  return {
+    hands,
+    ammoPanelNdc: panelNdc,
+    viewport: [innerWidth, innerHeight],
+    rootPosition: telemetry?.framing?.rootPosition ?? null,
+  };
+}).catch((error) => ({ error: String(error).slice(0, 300) }));
+
+// Per-skin animation differentiation: place four bots (the match cycles the
+// four catalog skins) and read each live operator's assigned skin plus the
+// animation director profile it actually drives. If every director resolves
+// the same profile, per-skin animation is NOT differentiating on live bots.
+const perSkin = await page.evaluate(() => {
+  const api = window.__ATOMIC_ACRES_DEBUG__;
+  api.setBotsFrozen(true);
+  const placed = [];
+  for (let index = 0; index < 4; index += 1) {
+    const bot = api.placeBotAhead ? api.placeBotAhead(6) : null;
+    if (bot) placed.push(bot.bot.id);
+  }
+  const rows = [];
+  api.sampleSceneGraph().traverse((node) => {
+    const runtimeState = node.userData?.riggedOperatorRuntime;
+    if (!runtimeState?.director || placed.length === 0) return;
+    const name = String(node.name ?? '');
+    if (!placed.some((id) => name.includes(id))) return;
+    rows.push({
+      operator: name,
+      skinId: String(node.userData.operatorSkinId ?? '(unset)'),
+      profileId: runtimeState.director.profile?.id ?? null,
+      archetype: runtimeState.director.profile?.archetype ?? null,
+      idleClip: runtimeState.director.profile?.idleClip ?? null,
+      spinePitchRadians: runtimeState.director.profile?.postureBias?.spinePitchRadians ?? null,
+      currentBase: runtimeState.currentBase ?? null,
+    });
+  });
+  return { placed, rows };
+}).catch((error) => ({ error: String(error).slice(0, 300) }));
+await page.waitForTimeout(2500);
+await snap('06-bot-per-skin');
 
 // Sprint pose for arm motion check.
 await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.setMovement(true, true); });
@@ -99,15 +166,10 @@ await page.waitForTimeout(1500);
 await snap('05-sprint');
 await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.setMovement(false, false); });
 
-// Skin/archetype telemetry straight from the live operator model.
-const skinTelemetry = await page.evaluate(() => {
-  const api = window.__ATOMIC_ACRES_DEBUG__;
-  const snapshot = api.snapshot?.() ?? {};
-  return { botInfo, snapshotKeys: Object.keys(snapshot).slice(0, 40) };
-}).catch((error) => ({ error: String(error).slice(0, 200) }));
-
-writeFileSync(resolve(`${OUT}/capture-summary.json`), `${JSON.stringify({
-  backend, arena: ARENA, weapon: WEAPON, shots, errors: [...new Set(errors)].slice(0, 8), skinTelemetry,
-}, null, 2)}\n`);
+const summary = {
+  backend, arena: ARENA, weapon: WEAPON, shots, errors: [...new Set(errors)].slice(0, 8),
+  framing, perSkin,
+};
+writeFileSync(resolve(`${OUT}/capture-summary.json`), `${JSON.stringify(summary, null, 2)}\n`);
 await browser.close();
 console.log(JSON.stringify({ backend, arena: ARENA, shots, errorCount: errors.length }, null, 2));

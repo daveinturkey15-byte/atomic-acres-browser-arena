@@ -161,14 +161,14 @@
  * labels effectively disappear on the bright shell. */
 #menu-panel-options .options-heading span {
   max-width: 62ch;
-  color: #c4d8d7;
+  color: #e8ddcb;
   font-size: var(--pass66-copy);
   line-height: 1.5;
   letter-spacing: 0.025em;
 }
 
 #menu-panel-options > .settings-grid label {
-  color: #c4d8d7;
+  color: #e8ddcb;
   font-size: var(--pass66-copy);
   line-height: 1.25;
 }
@@ -176,19 +176,19 @@
 #menu-panel-options .settings-section {
   margin-top: 16px;
   padding: clamp(16px, 1.35vw, 22px);
-  border: 1px solid rgba(67, 207, 214, 0.25);
+  border: 1px solid rgba(232, 120, 31, 0.25);
   border-radius: 10px;
   background:
-    radial-gradient(circle at 94% 2%, rgba(47, 216, 220, 0.09), transparent 32%),
-    linear-gradient(140deg, rgba(8, 24, 29, 0.98), rgba(4, 12, 16, 0.99));
-  box-shadow: 0 16px 34px rgba(7, 20, 24, 0.16), inset 0 1px rgba(222, 252, 249, 0.07);
-  color: #e7f5f3;
+    radial-gradient(circle at 94% 2%, rgba(232, 120, 31, 0.09), transparent 32%),
+    linear-gradient(140deg, rgba(43, 36, 28, 0.98), rgba(20, 16, 12, 0.99));
+  box-shadow: 0 16px 34px rgba(7, 20, 24, 0.16), inset 0 1px rgba(247, 239, 226, 0.07);
+  color: #f7efe2;
 }
 
 #menu-panel-options .settings-section > header {
   align-items: center;
   min-height: 28px;
-  color: #f4fbfa;
+  color: #f7efe2;
   font-size: var(--pass66-label);
   line-height: 1.2;
 }
@@ -203,7 +203,7 @@
 #menu-panel-options .graphics-preset-row p,
 #menu-panel-options .privacy-setting-row p,
 #menu-panel-options .audio-setting-row {
-  color: #c4d8d7;
+  color: #e8ddcb;
   font-size: var(--pass66-copy);
   line-height: 1.5;
 }
@@ -283,8 +283,8 @@
   min-height: 0;
   aspect-ratio: 4 / 3;
   overflow: hidden;
-  border: 1px solid rgba(112, 238, 225, 0.24);
-  background: #0b141a;
+  border: 1px solid rgba(232, 120, 31, 0.24);
+  background: #14100c;
 }
 
 
@@ -312,13 +312,13 @@
 .weapon-menu-stat-deck { align-content: start; gap: 9px; min-width: 0; }
 .weapon-menu-stat-heading { gap: 3px; }
 .weapon-menu-stat-heading > b {
-  color: #f2fbfa;
+  color: #f7efe2;
   font: 900 var(--pass66-label)/1 var(--ui-display, 'Barlow Condensed', sans-serif);
   letter-spacing: 0.06em;
   overflow-wrap: anywhere;
 }
 .weapon-menu-stat-heading > small {
-  color: #79b9b6;
+  color: #dccfb8;
   font: 800 var(--pass66-micro)/1.25 var(--ui-copy, Inter, sans-serif);
   letter-spacing: 0.07em;
 }
@@ -338,7 +338,7 @@
   letter-spacing: 0.1em;
 }
 .weapon-menu-dps small {
-  color: #a8c1bf;
+  color: #dccfb8;
   font: 800 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
   letter-spacing: 0.06em;
 }
@@ -426,22 +426,22 @@
 }
 .killstreak-slot-card:hover {
   transform: translateY(-2px);
-  border-color: #39e6ef;
-  box-shadow: 0 16px 36px rgba(7, 20, 24, 0.3), 0 0 14px rgba(57, 230, 239, 0.2);
+  border-color: #e8781f;
+  box-shadow: 0 16px 36px rgba(7, 20, 24, 0.3), 0 0 14px rgba(232, 120, 31, 0.2);
 }
 .killstreak-slot-card:nth-child(5) { grid-column: 1 / -1; }
 .killstreak-slot-card.is-previewed {
   border-color: var(--killstreak-demo-accent, #70eee1);
   box-shadow: inset 3px 0 var(--killstreak-demo-accent, #70eee1), 0 15px 34px rgba(7, 20, 24, 0.2);
 }
-.killstreak-slot-card > span { color: #39e6ef; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
-.killstreak-slot-card > strong { min-height: 0; color: #f2fbfa; }
-.killstreak-slot-card small { color: #a3b8ba; }
+.killstreak-slot-card > span { color: #e8781f; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.killstreak-slot-card > strong { min-height: 0; color: #f7efe2; }
+.killstreak-slot-card small { color: #dccfb8; }
 .killstreak-slot-card select {
   min-height: 44px;
-  border-color: rgba(112, 238, 225, 0.28);
-  background: #101f25;
-  color: #f1faf9;
+  border-color: rgba(232, 120, 31, 0.28);
+  background: #241d16;
+  color: #f7efe2;
 }
 
 .killstreak-demo-rail {
@@ -509,8 +509,8 @@
   left: 9px;
   bottom: 8px;
   padding: 4px 6px;
-  background: rgba(3, 10, 14, 0.82);
-  color: #dff8f5;
+  background: rgba(10, 7, 4, 0.85);
+  color: #f7efe2;
   font: 800 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
   letter-spacing: 0.08em;
 }
@@ -524,7 +524,7 @@
   padding: 4px 7px;
   border: 1px solid color-mix(in srgb, var(--killstreak-demo-accent) 55%, #31464c);
   border-radius: 2px;
-  background: rgba(3, 10, 14, 0.9);
+  background: rgba(12, 9, 6, 0.9);
   color: #effcf9;
   font: 800 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
   letter-spacing: 0.08em;
@@ -626,19 +626,19 @@
   font: 800 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
   font-style: normal;
 }
-.killstreak-demo-rail > ol span { color: #dce8e7; font: 700 var(--pass66-micro)/1.3 var(--ui-copy, Inter, sans-serif); }
+.killstreak-demo-rail > ol span { color: #e8ddcb; font: 700 var(--pass66-micro)/1.3 var(--ui-copy, Inter, sans-serif); }
 .killstreak-demo-rail > footer {
   display: flex;
   justify-content: space-between;
   gap: 10px;
   margin-top: 14px;
   padding-top: 10px;
-  border-top: 1px solid rgba(112, 238, 225, 0.15);
+  border-top: 1px solid rgba(232, 120, 31, 0.15);
   color: #718b8e;
   font: 800 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
   letter-spacing: 0.07em;
 }
-.killstreak-demo-rail > footer b { color: #86d5d0; }
+.killstreak-demo-rail > footer b { color: #e8ddcb; }
 
 html[data-reduced-motion='true'] .killstreak-demo-choreography > i,
 html[data-reduced-motion='true'] .killstreak-demo-choreography::after,

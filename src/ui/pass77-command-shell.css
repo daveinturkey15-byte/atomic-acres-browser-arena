@@ -277,7 +277,7 @@
  */
 @media (min-width: 561px) {
   #menu .command-brand strong {
-    color: #f2fbfa;
+    color: var(--p77-dark-ink);
   }
 }
 
@@ -307,7 +307,7 @@
 
   #menu .command-brand strong::after {
     content: 'AA // OPS';
-    color: #f2fbfa;
+    color: var(--p77-dark-ink);
     font: 900 15px/1 var(--ui-display, 'Barlow Condensed'), sans-serif;
     letter-spacing: 0.07em;
     white-space: nowrap;
@@ -319,7 +319,7 @@
   border-left: 2px solid var(--p77-accent-lit);
   border-radius: 2px;
   background: rgb(232 120 31 / 0.14);
-  color: #a4ecf0;
+  color: var(--p77-dark-ink);
   font-variant-numeric: tabular-nums lining-nums;
   letter-spacing: 0.14em;
 }
@@ -328,7 +328,7 @@
   border-radius: 2px;
   border-color: rgb(255 208 150 / 0.24);
   background: rgb(255 255 255 / 0.05);
-  color: #d9edeb;
+  color: var(--p77-dark-ink-soft);
   letter-spacing: 0.1em;
   box-shadow: none;
   transition:
@@ -383,7 +383,7 @@
   border-radius: 2px;
   border-color: transparent;
   border-left-color: transparent;
-  color: #a8bfbd;
+  color: var(--p77-dark-ink-soft);
   transition:
     background-color 160ms var(--p77-ease),
     color 160ms var(--p77-ease),
@@ -429,7 +429,7 @@
 }
 
 #menu .command-rail .menu-tabs button i {
-  color: rgb(168 191 189 / 0.75);
+  color: rgb(179 164 148 / 0.75);
   font-variant-numeric: tabular-nums lining-nums;
   letter-spacing: 0.14em;
 }
@@ -704,12 +704,26 @@
   color: var(--p77-accent);
 }
 
-/* Wayfinding numerals read as technical indices. */
+/* Wayfinding numerals read as technical indices. The slot span is raised to
+   10px because style.css pins it at 8px - below the AGENTS.md 9px floor -
+   and this shell's later unlayered cascade outranks that shorthand. */
 #menu .map-card .map-index,
 #menu .killstreak-slot-card > span {
   color: var(--p77-accent);
+  font-size: 10px;
   font-variant-numeric: tabular-nums lining-nums;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.13em;
+}
+
+/*
+ * The slot weapon <select> reads style.css's cold #0d1719 ground. This
+ * restates the readability sheet's warm surface at shell specificity so the
+ * deck wins regardless of load order.
+ */
+#menu .killstreak-slot-card > select {
+  border-color: rgba(232 120 31 / 0.28);
+  background-color: #241d16;
+  color: var(--p77-dark-ink);
 }
 
 /*
@@ -758,16 +772,16 @@
     100% calc(100% - var(--p77-cut)),
     calc(100% - var(--p77-cut)) 100%,
     0 100%);
-  border-color: #08151a;
-  background-color: #0f2229;
+  border-color: var(--p77-ink);
+  background-color: #241c14;
   background-image:
     /* the accent underline that makes the primary read as armed */
     linear-gradient(90deg, var(--p77-accent-lit) 0%, var(--p77-accent) 46%, transparent 92%),
-    linear-gradient(180deg, #16303a 0%, #0b1a20 100%);
+    linear-gradient(180deg, var(--p77-dark-top) 0%, var(--p77-dark-bottom) 100%);
   background-repeat: no-repeat;
   background-position: left bottom, 0 0;
   background-size: 100% 2px, auto;
-  color: #f1fbfa;
+  color: var(--p77-paper-lit);
   font-weight: 800;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.13);
 }
@@ -775,17 +789,17 @@
 #menu .menu-actions button.primary:hover:not(:disabled),
 #menu .menu-actions #solo:hover:not(:disabled),
 #menu .lobby-actions button.primary:hover:not(:disabled) {
-  background-color: #163038;
+  background-color: #33291f;
   background-image:
     linear-gradient(90deg, var(--p77-accent-lit) 0%, var(--p77-accent) 62%, rgb(232 120 31 / 0.2) 100%),
-    linear-gradient(180deg, #1d3f4a 0%, #10242c 100%);
+    linear-gradient(180deg, #3a2e22 0%, #241c14 100%);
   transform: translateY(-1px);
 }
 
 #menu .menu-actions #resume {
   border-color: var(--p77-accent);
   background-image: linear-gradient(180deg, var(--p77-accent-lit) 0%, var(--p77-accent) 100%);
-  color: #04191c;
+  color: #241d16;
   font-weight: 800;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28), var(--p77-lift-hover);
 }
@@ -796,7 +810,7 @@
 #menu .small-button {
   border: 1px solid var(--p77-hair-strong);
   background-color: #ffffff;
-  background-image: linear-gradient(180deg, #ffffff 0%, #f2f7f6 100%);
+  background-image: linear-gradient(180deg, #fdfaf3 0%, #f4efe4 100%);
   color: var(--p77-ink);
   font-weight: 700;
 }
@@ -805,9 +819,22 @@
 #menu .join-row button:hover:not(:disabled),
 #menu .small-button:hover:not(:disabled) {
   border-color: var(--p77-accent);
-  color: #0b5c62;
+  color: var(--p77-accent);
   transform: translateY(-1px);
   box-shadow: var(--p77-lift-hover);
+}
+
+/*
+ * The high-score streak counts read `var(--aqua)` from style.css, which
+ * tactical-ui.css aliases to the deep teal --ui-cyan - the last menu text
+ * computing on the rejected deck (measured live: rgb(0, 109, 116)). The
+ * token itself is TEAM colour semantics (killfeed borders, FPS counter), so
+ * it is deliberately left alone and only this menu surface is re-pointed.
+ * Scoped off the gun-range board, whose deliberate aqua variant outranks
+ * this by its attribute selector.
+ */
+#high-score-card:not([data-board='gun-range']) #high-score-list li > span {
+  color: var(--p77-accent);
 }
 
 #menu .menu-actions button:active:not(:disabled),

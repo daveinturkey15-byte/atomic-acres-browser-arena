@@ -826,7 +826,7 @@ import {
 import { TracerPool } from './tracer-pool';
 import { AsyncSerialQueue } from './async-serial-queue';
 import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadOperatorSkinAsset, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, resolveRiggedOperatorRuntimeRoot, riggedOperatorAssetReady, riggedOperatorCanonicalEvidenceManifest, riggedOperatorHandEvidenceIdentity, riggedOperatorTelemetry } from './operator-model';
-import { OPERATOR_SKIN_CATALOG, isSelectableOperatorSkinId } from './operator-skin-catalog'; // HF-360
+import { OPERATOR_SKIN_CATALOG, OPERATOR_SKIN_SOURCES, isSelectableOperatorSkinId } from './operator-skin-catalog'; // HF-360
 import {
   DEFAULT_OPERATOR_EMOTE,
   DEFAULT_OPERATOR_STANCE,
@@ -4613,6 +4613,11 @@ let localGrenadeActionSequence = 0;
 const remoteSupportPresentations: RemoteSupportPresentation[] = [];
 let botWeaponCycle: ShuffleBag<WeaponId> | null = null;
 let botGrenadeCycle: ShuffleBag<GrenadeId> | null = null;
+let botSkinCycle: ShuffleBag<string> | null = null;
+// Bot skins project from the canonical operator-skin catalog (never a second
+// hand-maintained roster) and draw from the seeded match RNG like bot weapons,
+// so host and guest agree on every bot's presentation.
+const BOT_OPERATOR_SKIN_POOL: readonly string[] = OPERATOR_SKIN_SOURCES.map((source) => source.id);
 let botGrenadeThrows = 0;
 let botGrenadeMaxActive = 0;
 let lastBotGrenadeDamage = 0;
@@ -17744,12 +17749,17 @@ function addNeonBotHaze(root: THREE.Group, index: number): void {
   root.userData.neonBotHaze = true;
   root.add(haze);
 }
-
 const SOLO_BOT_NAMES = ['RIVET', 'MICA', 'NOVA', 'HEX', 'KITE', 'ROOK', 'LUX'] as const;
+
+function nextBotSkin(): string {
+  if (!botSkinCycle) resetBotArsenalCycles();
+  return botSkinCycle!.next();
+}
 
 function resetBotArsenalCycles(): void {
   botWeaponCycle = createShuffleBag(BOT_STARTING_WEAPON_POOL, gameplayRandom);
   botGrenadeCycle = createShuffleBag(BOT_GRENADE_POOL, gameplayRandom);
+  botSkinCycle = createShuffleBag(BOT_OPERATOR_SKIN_POOL, gameplayRandom);
 }
 
 function nextBotWeapon(): WeaponId {
@@ -17787,7 +17797,13 @@ function spawnBot(index: number, hosted = false, dormantPresentation = false): v
   const spawnedAt = performance.now();
   // Every reinforcement uses the same source-rigged humanoid and approved
   // neon-purple treatment. Only the lead owns the dynamic shadow proxy.
-  const root = buildOperator(botTeam, 'bot-operator', renderProfile !== 'blender', weapon, 'neon-purple');
+  // Bots drew the catalog default only, in appearance AND animation - the
+  // director keys posture, idle preference and aim response off the skin's
+  // archetype. Seeded shuffle bag, so every peer derives the same body.
+  const botSkinId = dormantPresentation
+    ? BOT_OPERATOR_SKIN_POOL[index % BOT_OPERATOR_SKIN_POOL.length]!
+    : nextBotSkin();
+  const root = buildOperator(botTeam, 'bot-operator', renderProfile !== 'blender', weapon, 'neon-purple', botSkinId);
   applyBotEmissiveBrightness(root);
   addNeonBotHaze(root, index);
   root.traverse((node) => {

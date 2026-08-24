@@ -4,10 +4,22 @@ import { dirname, resolve } from 'node:path';
 import {
   ARENA_BOUNDS,
   CENTRAL_BUS,
+  CORNER_HEDGE_LAYOUT,
+  CORNER_HEDGE_SIZE,
   COVER_LAYOUT,
+  FRONT_HEDGE_FIN_LAYOUT,
+  FRONT_HEDGE_FIN_SIZE,
+  FRONT_HEDGE_LAYOUT,
+  FRONT_HEDGE_SIZE,
   GARAGE_LAYOUT,
   GARAGE_SIZE,
   HOUSE_LAYOUT,
+  PARKED_VAN_LAYOUT,
+  PARKED_VAN_SIZE,
+  REAR_HEDGE_LAYOUT,
+  REAR_HEDGE_SIZE,
+  SIDE_HEDGE_LAYOUT,
+  SIDE_HEDGE_SIZE,
   YARD_FENCE_HEIGHT,
   YARD_FENCE_LAYOUT,
 } from '../../src/arena-layout';
@@ -34,6 +46,33 @@ const spec = {
   garages: GARAGE_LAYOUT,
   garageSize: GARAGE_SIZE,
   cover: COVER_LAYOUT,
+  streetHedges: {
+    front: FRONT_HEDGE_LAYOUT.map((hedge) => ({
+      position: [hedge.x, FRONT_HEDGE_SIZE.height / 2, hedge.z],
+      size: [hedge.length, FRONT_HEDGE_SIZE.height, FRONT_HEDGE_SIZE.depth],
+    })),
+    fins: FRONT_HEDGE_FIN_LAYOUT.map((fin) => ({
+      position: [fin.x, FRONT_HEDGE_FIN_SIZE[1] / 2, fin.z],
+      size: [...FRONT_HEDGE_FIN_SIZE],
+    })),
+    rear: REAR_HEDGE_LAYOUT.map((rear) => ({
+      position: [rear.x, REAR_HEDGE_SIZE[1] / 2, rear.z],
+      size: [...REAR_HEDGE_SIZE],
+    })),
+    corners: CORNER_HEDGE_LAYOUT.map((corner) => ({
+      position: [corner.x, CORNER_HEDGE_SIZE[1] / 2, corner.z],
+      size: [...CORNER_HEDGE_SIZE],
+    })),
+    sideVerges: SIDE_HEDGE_LAYOUT.map((side) => ({
+      position: [side.x, SIDE_HEDGE_SIZE[1] / 2, side.z],
+      size: [...SIDE_HEDGE_SIZE],
+    })),
+  },
+  parkedVans: PARKED_VAN_LAYOUT.map((van) => ({
+    id: van.id,
+    position: [van.x, PARKED_VAN_SIZE[1] / 2, van.z],
+    size: [...PARKED_VAN_SIZE],
+  })),
   roadway: {
     ground: { position: [0, -0.09, 0], size: [70, 0.18, 68] },
     road: { position: [0, 0.015, 0], size: [64, 0.03, 10] },

@@ -25,6 +25,8 @@ import {
   SPAWN_LAYOUT,
   STREET_HALF_WIDTH,
   YARD_FENCE_HEIGHT,
+  CORNER_HEDGE_LAYOUT,
+  CORNER_HEDGE_SIZE,
   YARD_FENCE_LAYOUT,
 } from './arena-layout';
 import { classifyImpactSurface } from './combat-feedback';
@@ -618,6 +620,13 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   for (const [index, rear] of REAR_HEDGE_LAYOUT.entries()) {
     const [rearLength, rearHeight, rearDepth] = REAR_HEDGE_SIZE;
     box(`rear hedge ${index}`, [rear.x, rearHeight / 2, rear.z], [rearLength, rearHeight, rearDepth], palette.grassDark);
+  }
+  // Back-corner blocks: the Pass 79 ray audit measured a 57 m standing
+  // eye-line running the full map width through each back-fence corridor;
+  // these seat each corner and split that lane.
+  for (const [index, corner] of CORNER_HEDGE_LAYOUT.entries()) {
+    const [cornerWidth, cornerHeight, cornerDepth] = CORNER_HEDGE_SIZE;
+    box(`corner hedge ${index}`, [corner.x, cornerHeight / 2, corner.z], [cornerWidth, cornerHeight, cornerDepth], palette.grassDark);
   }
   for (const [index, side] of SIDE_HEDGE_LAYOUT.entries()) {
     const [sideDepth, sideHeight, sideLength] = SIDE_HEDGE_SIZE;

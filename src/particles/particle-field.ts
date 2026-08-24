@@ -94,6 +94,8 @@ export type ParticleFrameContext = {
   cameraQuaternion: THREE.Quaternion;
   /** Shared wind field sample at the camera, m/s. */
   windX: number; windZ: number;
+  /** Aim-down-sights progress 0..1; widens the protected centre cone. */
+  adsProgress: number;
   /**
    * Rain intensity 0..1 from the shared weather sample this frame. The field
    * uses it two ways: ambient families gain a downward "rain load" (dust is

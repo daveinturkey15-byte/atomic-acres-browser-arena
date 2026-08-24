@@ -14,14 +14,14 @@
   "sourceBlend": "source-assets/blender/atomic-acres-blender-arena.blend",
   "runtimeGlb": "public/assets/original/models/atomic-acres-blender-arena.glb",
   "preview": "artifacts/blender-render/atomic-acres-blender-arena-preview.png",
-  "runtimeGlbSha256": "99ba1a0b704ab566fd5d40ea8fd64eb466648bcdbf41eb4d80ea196520c7c460",
-  "sourceBlendSha256": "ec5899205d5e84715ccd8c03117e3a305b16cbe7b47bc7f278b1989ae7ce23bf",
-  "sourceSpecSha256": "1ff7b31526ec8bfa318f895e1b74c923c05156c318cf050eb1502a93be65ecb4",
+  "runtimeGlbSha256": "1e50b81ba5483df11e73821e11fbc9e0d66dde655b56a79eb3da91de3fde1b67",
+  "sourceBlendSha256": "6c11ebef3a9bfbdf19a5d25c10a2c74e337ba20ff87e3063060639af9cfd60de",
+  "sourceSpecSha256": "d204a2ec84a62c33e55de41261ce4fd642d0d9254ac5a073f9dc1f5d8387c4ba",
   "runtimeAudit": {
-    "bytes": 3458948,
+    "bytes": 3484564,
     "meshNodes": 45,
     "materials": 29,
-    "triangles": 41012,
+    "triangles": 42308,
     "semanticBreakableWindows": 6,
     "auditedHouseApertures": 16,
     "apertureAuditSamples": 144,
@@ -41,9 +41,9 @@
     "command": "npm run assets:compress:quality",
     "geometry": "EXT_meshopt_compression plus KHR_mesh_quantization",
     "textures": "lossless EXT_texture_webp",
-    "uncompressedBytes": 6910000,
-    "compressedBytes": 3458948,
-    "reductionPercent": 50.0
+    "uncompressedBytes": 7002776,
+    "compressedBytes": 3484564,
+    "reductionPercent": 50.2
   },
   "determinism": {
     "command": "npm run author:blender-arena && npm run assets:compress:quality",

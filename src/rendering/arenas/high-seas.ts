@@ -109,11 +109,18 @@ export const HIGH_SEAS_SERVICE_DECK_PRACTICALS: readonly ArenaPracticalDefinitio
   // 0/255 in the frame.
   // Pass 79 luminance re-measurement: with placement already correct, the
   // room still read median 30/255 in its fight window and the deck plate
-  // median 12/255, so intensities step up from 40/34 to 52/42 (vestibules
-  // stay 26 - their silhouette read is authored). Measured after: room fight
-  // window crushed 28-33% -> 2.5-5.4%, floor median 12 -> 29/255.
-  serviceDeckPractical('high-seas-service-deck-room-port', -1.55, -3.4, 52, 512),
-  serviceDeckPractical('high-seas-service-deck-room-starboard', 1.55, 3.4, 52, 512),
+  // median 12/255, so intensities stepped up from 40/34 to 52/42 (vestibules
+  // stay 26 - their silhouette read is authored); that pass measured room
+  // fight-window crushed 28-33% -> 2.5-5.4% and floor median 12 -> 29/255.
+  // Pass 79 gauntlet round 3, hardware WebGPU against the production bundle:
+  // the room's fixture pools are bright (mean 92-130/255) but the shadowed
+  // pockets behind the machinery still put 20-33% of the room crop under the
+  // readable floor, so the pair steps up again 52 -> 68. Placement, cone,
+  // penumbra and decay are untouched - intensity is the one lever that pushes
+  // inverse-square light deeper behind the housings without moving the
+  // containment proof.
+  serviceDeckPractical('high-seas-service-deck-room-port', -1.55, -3.4, 68, 512),
+  serviceDeckPractical('high-seas-service-deck-room-starboard', 1.55, 3.4, 68, 512),
   // Corridor legs: centre line is right here - the bulkheads are close enough
   // on both sides that one fixture washes them both.
   serviceDeckPractical('high-seas-service-deck-bow-corridor-inner', 0, -9.5, 42, 256),

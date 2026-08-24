@@ -599,6 +599,37 @@ add_transit_bus(
 for fence_index, fence in enumerate(spec["yardFences"]):
     add_box(f"BLD_YARD_fence_{fence_index}", fence["position"], fence["size"], M["timber"], 0.03)
 
+# Street hedges: every sightline hedge family mirrors one TypeScript collider
+# one-for-one (front rows, canyon fins, rear runs, back-corner blocks and side
+# verge cross-runs). They are the map's lane-breaking authority and must be
+# visible in this Quality art exactly where the collision lives.
+hedges = spec["streetHedges"]
+for family in ("front", "fins", "rear", "corners", "sideVerges"):
+    for index, hedge in enumerate(hedges[family]):
+        add_box(
+            f"BLD_HEDGE_{family}_{index}",
+            hedge["position"], hedge["size"], M["foliage"], 0.12,
+        )
+
+# Two parked delivery vans flank the bus in the road. Presentation mirrors the
+# TypeScript PARKED_VAN colliders: one boxy body, cab window band, four wheels.
+for index, van in enumerate(spec["parkedVans"]):
+    vx, vy, vz = van["position"]
+    length, height, width = van["size"]
+    add_box(f"P32_VAN_{index}_body", [vx, vy, vz], [length, height * 0.82, width], M["metal_light"], 0.08)
+    add_box(
+        f"P32_VAN_{index}_cab",
+        [vx - length * 0.3, vy + height * 0.09, vz],
+        [length * 0.34, height * 0.36, width * 0.94], M["glass"], 0.04,
+    )
+    for wheel_index, wheel_x in enumerate((vx - length * 0.3, vx + length * 0.3)):
+        for wheel_side, wheel_z in enumerate((vz - width * 0.42, vz + width * 0.42)):
+            add_cylinder(
+                f"P32_VAN_{index}_wheel_{wheel_index}_{wheel_side}",
+                [wheel_x, 0.34, wheel_z], 0.34, 0.22, M["rubber"], 14,
+                rotation=(math.pi / 2, 0, 0),
+            )
+
 # Lane cover becomes authored modular military/agricultural barriers. The four
 # outer anchors are recognisable large utility objects aligned to their taller
 # TypeScript collision bodies rather than another row of anonymous cubes.

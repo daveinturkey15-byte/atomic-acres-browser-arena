@@ -635,7 +635,12 @@ describe('presentation prewarm startup contract', () => {
     );
     expect(fpsHudCadence).toContain('const pacing = effectiveFramePacing(now);');
     expect(fpsHudCadence).toContain("element<HTMLElement>('#refresh-warning')");
-    expect(source).toContain("buildOperator(botTeam, 'bot-operator', renderProfile !== 'blender', weapon, 'neon-purple')");
+    // Bots must be built WITH a skin id. Without the final argument every bot in
+    // the game draws the catalog default, in appearance and in animation, because
+    // the director keys posture and aim response off the archetype. Pinning the
+    // full call keeps that argument from being dropped again.
+    expect(source).toContain("buildOperator(botTeam, 'bot-operator', renderProfile !== 'blender', weapon, 'neon-purple', botSkinId)");
+    expect(source).toContain("botSkinCycle = createShuffleBag(BOT_OPERATOR_SKIN_POOL, gameplayRandom)");
     expect(source).toContain('const streamedWeaponGpuPrewarmer: WeaponViewmodelGpuPrewarmer | undefined');
     expect(source).toContain('streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponGpuPrewarm(model, context))');
     expect(source).toContain('const streamedWeaponCatalogGpuPrewarmer: WeaponViewmodelCatalogGpuPrewarmer | undefined');

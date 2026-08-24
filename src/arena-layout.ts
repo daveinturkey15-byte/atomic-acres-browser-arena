@@ -64,13 +64,19 @@ export const FRONT_HEDGE_SIZE = Object.freeze({ height: 2.05, depth: 1.4 } as co
  * street canyon beside each house's outboard corner. With the central bus they
  * partition every horizontal canyon lane: south flank rays meet the north-east
  * fin, central rays meet the bus, north flank rays meet the south-west fin.
+ *
+ * Pass 79: a deterministic collider ray audit measured a 60.3 m standing
+ * eye-line threading the 0.3 m sliver between each fin's road-side edge and
+ * the bus corner. The wings now reach to 1.5 m of the street centre line so
+ * every canyon ray meets a wing or the bus, keeping the alternating kerb-side
+ * weave between them open for movement and bot patrol routes.
  */
 export const FRONT_HEDGE_FIN_LAYOUT = Object.freeze([
-  Object.freeze({ x: 11, z: -5.7 }),
-  Object.freeze({ x: -11, z: 5.7 }),
+  Object.freeze({ x: 11, z: -5.2 }),
+  Object.freeze({ x: -11, z: 5.2 }),
 ]);
 /** [width along the street, height, depth into the canyon]. */
-export const FRONT_HEDGE_FIN_SIZE = Object.freeze([1.4, 2.05, 6.4] as const);
+export const FRONT_HEDGE_FIN_SIZE = Object.freeze([1.4, 2.05, 7.4] as const);
 
 /**
  * Rear-boundary hedge runs splitting the back-yard strips behind each house.
@@ -83,6 +89,24 @@ export const REAR_HEDGE_LAYOUT = Object.freeze([
 ]);
 /** [length along the street, height, depth]. */
 export const REAR_HEDGE_SIZE = Object.freeze([46, 2.05, 1.6] as const);
+
+/**
+ * Back-corner hedge blocks seating each rear corner of the map: one face on
+ * the perimeter fence, reaching into the yard far enough to break the
+ * back-fence corridor ray that otherwise runs the full 57 m map width behind
+ * each house. Positioned clear of every spawn (nearest authored spawn keeps
+ * 1.0 m to a block face), bin, bench and patrol point, and short enough of
+ * the yard that no pocket is sealed off from its own half: each block stands
+ * alone, so both back-yard strips stay enterable around it.
+ */
+export const CORNER_HEDGE_LAYOUT = Object.freeze([
+  Object.freeze({ x: -21.5, z: -25.7 }),
+  Object.freeze({ x: 21.5, z: -25.7 }),
+  Object.freeze({ x: 21.5, z: 25.7 }),
+  Object.freeze({ x: -21.5, z: 25.7 }),
+]);
+/** [width along the street, height, depth out of the fence]. */
+export const CORNER_HEDGE_SIZE = Object.freeze([5, 2.05, 5.2] as const);
 
 /**
  * Side-verge cross-runs: short hedge walls spanning the whole verge between

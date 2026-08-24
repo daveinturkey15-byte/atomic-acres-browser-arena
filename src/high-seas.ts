@@ -994,11 +994,27 @@ const BELOW_DECK_PRACTICAL_EMISSIVE_INTENSITY = 1.4;
  * re-raised to a measured middle ground - well under the old 1.15, well above
  * floor-of-black. It remains the entire below-deck lighting story on the
  * `performance`/`compat` profiles, where ArenaContrastLighting builds no rig.
+ *
+ * Pass 79 (gauntlet round 3) re-measurement on hardware WebGPU against the
+ * production bundle: the corridor legs and ramp mouths are fightable (mean
+ * 117-121/255, <1% crushed), but the deck plate between fixture pools still
+ * read median 28.9/255 with 36% of pixels crushed and 46% under-readable
+ * (station `floor-check-down`, z=-6). Crushed pixels sit between pool cores,
+ * so fixture intensity cannot reach them; the textured grating fill is the
+ * only lever that does. 0.5 -> 0.8, still under the old flat 1.15 and still
+ * routed through the family's own albedo so plate seams keep their contrast.
  */
 const BELOW_DECK_FILL = Object.freeze({
   bulkhead: Object.freeze({ tint: 0x9fc3d2, intensity: 0.28 }),
   machinery: Object.freeze({ tint: 0xa8c4cc, intensity: 0.19 }),
-  grating: Object.freeze({ tint: 0x86a8b4, intensity: 0.5 }),
+  // Grating is the ONE filled family with deck-plane exposure (hatch rims and
+  // ramp tops), so it must stay the dimmest or below-deck light is visible from
+  // up top as glowing deck furniture. It was authored at 0.8 - brighter than
+  // bulkhead AND machinery - which is the exact trap the leak gate guards.
+  // 0.436 puts its effective lift (intensity x emissive x albedo) at 80% of the
+  // dimmer of the other two. Brighten the corridor through the PRACTICALS, which
+  // have no deck exposure, not through the floor.
+  grating: Object.freeze({ tint: 0x86a8b4, intensity: 0.436 }),
 });
 
 /**

@@ -424,4 +424,66 @@ describe('Pass 79 reskin completion - no surface left on the rejected deck', () 
     const css = declarationsOnly('./pass66-overhaul.css');
     expect(css, 'rejected old-deck value rgba(8, 24, 29 is back in pass66-overhaul.css').not.toContain('rgba(8, 24, 29');
   });
+
+  it('re-points the overhaul cyan token family onto the burnt-orange signal', () => {
+    // The HF-370 Lane M move re-pointed `--p66-teal*` values but left the
+    // `--p66-cyan*` family cold (#006d74 / #39e6ef), so every rule reading
+    // those tokens - selected-kit summary, streak counts, tab indices, kit
+    // stat strips, focus rings - still rendered on the rejected deck. This
+    // was measured live in the built bundle: "ACTIVE LOADOUT" and the
+    // high-score streak spans computed rgb(0, 109, 116). Values only; the
+    // token names and every consumer stay untouched.
+    const css = declarationsOnly('./pass66-overhaul.css');
+    for (const value of ['#006d74', '#39e6ef', 'rgba(0, 109, 116', 'rgba(57, 230, 239']) {
+      expect(css, `rejected old-deck value ${value} is back in pass66-overhaul.css`).not.toContain(value);
+    }
+  });
+
+  it('warms the showcase telemetry bar and the helicopter cockpit overlay', () => {
+    // Measured live in the built bundle at 1920x1080: .showcase-telemetry
+    // computed background rgba(9, 27, 31, 0.88) with #b8fff1 span text, and
+    // .preview-cockpit-hud computed rgba(190, 255, 225, 0.88) mint symbology.
+    // Both sit on top of the prerecorded arena video in the deploy panel.
+    const overhaul = declarationsOnly('./pass66-overhaul.css');
+    for (const value of ['rgba(9, 27, 31', 'rgba(190, 255, 225', 'rgba(56, 255, 207', 'rgba(4, 19, 21']) {
+      expect(overhaul, `rejected old-deck value ${value} is back in pass66-overhaul.css`).not.toContain(value);
+    }
+    const tactical = declarationsOnly('./tactical-ui.css');
+    for (const value of ['#b8fff1', 'rgba(18, 32, 32', '#f5fff9']) {
+      expect(tactical, `rejected old-deck value ${value} is back in tactical-ui.css`).not.toContain(value);
+    }
+  });
+
+  it('warms the command chrome text and primary action still carrying cold ink', () => {
+    // Measured live in the built bundle: brand chip rgb(164, 236, 240),
+    // meta-action buttons rgb(217, 237, 235), inactive rail tabs
+    // rgb(168, 191, 189), and the SOLO primary action computing background
+    // rgb(15, 34, 41) - a cold blue-black on an otherwise warm deck.
+    const css = declarationsOnly('./pass77-command-shell.css');
+    for (const value of [
+      '#a4ecf0', // cold cyan chip text
+      '#d9edeb', // cold cyan meta-button text
+      '#a8bfbd', // cold sage inactive tab text
+      '#08151a', // primary border, cold blue-black
+      '#0f2229', // primary ground, cold blue-black
+      '#16303a', // primary gradient top, cold blue-black
+      '#0b1a20', // primary gradient bottom, cold blue-black
+      '#163038', // primary hover ground, cold blue-black
+      '#1d3f4a', // primary hover gradient top, cold blue-black
+      '#10242c', // primary hover gradient bottom, cold blue-black
+      '#04191c', // resume text, cold blue-teal ink
+      '#0b5c62', // secondary hover text, deep teal
+      '#f2fbfa', // wordmark, cold-tinted white
+      '#f1fbfa', // primary label, cold-tinted white
+      '#f2f7f6', // secondary gradient end, cold-tinted white
+      'rgb(168 191 189', // inactive tab index numeral, cold sage
+    ]) {
+      expect(css, `rejected old-deck value ${value} is back in pass77-command-shell.css`).not.toContain(value);
+    }
+    // The high-score streak counts read var(--aqua) from style.css (outside
+    // UI-sheet ownership); this sheet must keep overriding that one menu
+    // surface onto the deck while leaving the team-colour token itself alone.
+    expect(css).toContain("#high-score-card:not([data-board='gun-range']) #high-score-list li > span");
+    expect(css, 'the --aqua team token must not be retuned by this sheet').not.toMatch(/--aqua:[^;]/);
+   });
 });

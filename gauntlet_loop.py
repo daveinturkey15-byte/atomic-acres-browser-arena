@@ -73,6 +73,15 @@ def run(cmd, cwd=REPO, timeout=1800):
     # Resolve through PATHEXT once; fall back to the bare name elsewhere.
     resolved = list(cmd)
     found = shutil.which(resolved[0])
+    if not found:
+        # PATH-independent fallback: tools pinned under node_modules/.bin must
+        # resolve even if the scheduler environment lacks Node on PATH, so an
+        # unresolvable launcher can never again be misread as a red tree.
+        local_base = os.path.join(REPO, "node_modules", ".bin", resolved[0])
+        for candidate in (local_base, local_base + ".cmd"):
+            if os.path.isfile(candidate):
+                found = candidate
+                break
     if found:
         resolved[0] = found
         # CreateProcess executes only PE images; npx/tsc/vitest resolve to

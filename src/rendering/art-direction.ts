@@ -425,33 +425,33 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
   // and a lower saturation floor than either.
   'gun-range': frozen({
     id: 'gun-range',
-    brief: 'Warm print training range — bone-paper light, ink shadows, burnt-orange lane neon.',
+    brief: 'Clean neutral training facility â€” clinical white light, zero place-cast.',
     cdl: {
-      gain: [1.08, 1.02, 0.9],
-      lift: [0.005, 0.004, 0.002],
-      gamma: [0.96, 0.99, 1.05],
+      gain: [0.985, 1, 1.02],
+      lift: [0.0035, 0.003, 0],
+      gamma: [1.005, 1, 0.99],
     },
-    saturationScale: 0.98,
+    saturationScale: 0.96,
     // Indoor facility: linear contrast above 1 darkens the already-dim upper
-    // walls (everything below 0.5 linear), so the range stays at 1.0 and reads
-    // warm through hue, not through crush.
+    // walls (everything below 0.5 linear), so the lab stays at 1.0 and reads
+    // clean through neutrality, not through crush.
     contrastScale: 1,
     crosstalkDelta: 0,
     splitTone: {
-      shadowTint: 0x3d332a,      // ink sepia in the lane shadows
-      highlightTint: 0xf6ecd4,   // bone paper under the range fluorescents
-      strengthScale: 1.25,
+      shadowTint: 0x39424d,      // faint concrete coolness
+      highlightTint: 0xfdf6e8,   // fluorescent warm-white
+      strengthScale: 0.5,
       shadowBalance: 0.5,
-      highlightBalance: 0.5,
+      highlightBalance: 0.55,
     },
     midtoneContrastDelta: 0.04,
-    vignette: { base: 0.03, settingScale: 1 },
-    bloom: { intensityScale: 0.95, thresholdScale: 1.1 },
+    vignette: { base: 0.02, settingScale: 1 },
+    bloom: { intensityScale: 0.9, thresholdScale: 1.1 },
     atmosphere: {
-      mistNear: 0xd6c6a8, mistFar: 0xf4ead2,
-      smokeNear: 0x3c342a, smokeFar: 0xa2947c,
-      dustNear: 0xe4d6b6, dustFar: 0xfaf2de,
-      density: 0.75,
+      mistNear: 0xaebfc4, mistFar: 0xe8f0f2,
+      smokeNear: 0x39434a, smokeFar: 0x93a1a8,
+      dustNear: 0xd8dfe2, dustFar: 0xf4f8fa,
+      density: 0.7,
     },
   }),
 });
