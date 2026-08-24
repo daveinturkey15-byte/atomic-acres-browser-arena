@@ -8188,6 +8188,28 @@ function scheduleClientWorldRepairTimeout(epoch: string, matchEpoch: number): vo
     } else {
       pumpEligibleSinceMs = null;
     }
+    // Lane J residual: the repair-ready retry used to be spendable ONLY by an
+    // incoming host killstreak-state snapshot. Forensics (this machine): host
+    // contact 19059 ms, admission failure 24614 ms, attempts frozen at 1 of 2
+    // - the guest died at spawn holding an unused retry, then auto-respawned
+    // and left a permanent status line accusing a healthy host. Spend the held
+    // retry here too: clientWorldRepairReceiverReady enforces the SAME pure
+    // gate as the snapshot path (attempt cap, >=1s spacing, unacknowledged,
+    // current epochs), and sendClientWorldRepairReady re-checks gameStarted.
+    // It is fenced by pump eligibility so it never fires while loading or
+    // during the presentation prime, and it runs BEFORE the deadline judgement
+    // below so a spent attempt registers as handshake progress per the module's
+    // documented rule. No bound is weakened: HANDSHAKE_TIMEOUT_MS,
+    // ARMING_CAP_MS, MAX_CLIENT_WORLD_REPAIR_ATTEMPTS and MIN_SPACING are all
+    // unchanged. The resume path (admission null) is excluded by the gate.
+    if (pumpEligibleSinceMs !== null
+      && clientWorldRepairReceiverReady(clientWorldRepairAdmission, {
+        connectionEpoch: epoch,
+        matchEpoch,
+        exactActorAcknowledged: false,
+      }, nowMs)) {
+      sendClientWorldRepairReady();
+    }
     // The resume path judges the same inactivity rule; it has no admission
     // record, so judge a fresh unacknowledged one (progress = eligibility).
     const judged = clientWorldRepairAdmission ?? beginClientWorldRepair({

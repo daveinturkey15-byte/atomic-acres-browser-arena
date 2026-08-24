@@ -117,6 +117,33 @@ describe('legacy match admission integration', () => {
     expect(networkStatus).toContain("network.role !== 'client' || !network.diagnostics().hostConnectionOpen");
   });
 
+  it('spends the held repair-ready retry from the deadline timer BEFORE judging admission failure', () => {
+    // Lane J forensic residual: host contact landed at 19059 ms, admission
+    // failed at 24614 ms with attempts frozen at 1 of 2 - the guest held a
+    // retry and never used it because ONLY an incoming host killstreak-state
+    // snapshot could spend one. The deadline timer must also spend it, through
+    // the SAME receiver-ready pure gate (attempt cap + spacing +
+    // unacknowledged), and must do so BEFORE evaluateClientWorldRepairDeadline
+    // so a spent retry registers as handshake progress instead of racing the
+    // kill. No bound changes: HANDSHAKE_TIMEOUT_MS, ARMING_CAP_MS,
+    // MAX_CLIENT_WORLD_REPAIR_ATTEMPTS and MIN_SPACING are untouched.
+    const timer = slice(
+      'const checkClientWorldRepairDeadline = (): void => {',
+      'pendingClientWorldRepairTimeout = window.setTimeout(',
+    );
+    const retryGateAt = timer.indexOf('clientWorldRepairReceiverReady(clientWorldRepairAdmission');
+    const retrySendAt = timer.indexOf('sendClientWorldRepairReady();');
+    const judgeAt = timer.indexOf('evaluateClientWorldRepairDeadline({');
+    expect(retryGateAt).toBeGreaterThanOrEqual(0);
+    expect(retrySendAt).toBeGreaterThan(retryGateAt);
+    expect(judgeAt).toBeGreaterThan(retrySendAt);
+    // The retry is fenced by pump eligibility: never fired while still
+    // loading or while the presentation prime has paused the state pump.
+    const fenceAt = timer.indexOf('if (pumpEligibleSinceMs !== null');
+    expect(fenceAt).toBeGreaterThanOrEqual(0);
+    expect(fenceAt).toBeLessThan(retryGateAt);
+  });
+
   it('recreates a guest from observation state and repairs continuity before idempotent loadout registration', () => {
     const messages = slice("if (message.type === 'join' || message.type === 'state')", "if (message.type === 'ping')");
     const remoteCreatedAt = messages.indexOf('remotes.set(incoming.id, remote);');
