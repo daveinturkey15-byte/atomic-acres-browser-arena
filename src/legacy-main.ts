@@ -55,7 +55,7 @@ import {
 } from './weather/weather-state';
 import { createWindField, sampleWind } from './weather/wind-field';
 import { ParticleRuntime } from './particles';
-import { proneBodyClearance } from './prone-clearance';
+import { PRONE_PRESENTATION_ENVELOPE, proneBodyClearance, type ProneBodyClearance } from './prone-clearance';
 import { mountFarcrysisHitlOverlay, type FarcrysisHitlOverlay } from './farcrysis-hitl';
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
 import { createSwimState, stepSwimState, swimMovementModifiers, type SwimState } from './water/swim-state';
@@ -1056,6 +1056,8 @@ import {
   setGuestCombatInventoryGrenades,
   setGuestCombatInventoryWeapon,
 } from './guest-combat-inventory-authority';
+import { guestCombatInventoryWithinWeaponCaps } from './guest-combat-inventory-authority';
+import { isGuestCombatInventory } from './protocol';
 import {
   admitGuestResumeAck,
   admitGuestResumeAuthority,
@@ -7334,15 +7336,31 @@ function canonicalRetainedGuestSnapshot(
   let weapon = source.weapon;
   if (weapon === 'railgun' && railgunState.holderId !== source.id) weapon = source.primary;
   if (isTimedMapWeaponId(weapon) && timedMapWeaponStates[weapon].holderId !== source.id) weapon = source.primary;
+  // Project EXACTLY the bounded checkpoint field set. A blind spread carried
+  // HF-358's optional `swimming` flag into the document, and the checkpoint
+  // validator's exact-key contract refused EVERY guest entry — no checkpoint
+  // was ever persisted, so the authority mirror never shipped and host
+  // succession could not fire in a real match. New PlayerSnapshot fields must
+  // be added HERE deliberately, together with the wire validator, never by
+  // riding a spread.
   return {
-    ...source,
+    id: source.id,
     name: member.name,
     team: member.team,
+    x: source.x,
+    y: source.y,
+    z: source.z,
+    yaw: source.yaw,
+    pitch: source.pitch,
     hp: health.hp,
     kills: score.kills,
     deaths: score.deaths,
+    primary: source.primary,
+    secondary: source.secondary,
+    grenade: source.grenade,
     weapon,
     stance: source.stance ?? 'stand',
+    seq: source.seq,
   };
 }
 
@@ -7350,15 +7368,36 @@ function createHostMatchCheckpoint(
   nowEpochMs = Date.now(),
   nowMonoMs = performance.now(),
 ): HostMatchCheckpoint | null {
-  if (network.role !== 'host' || !gameStarted || matchFinished
-    || matchState.phase !== 'warmup' && matchState.phase !== 'active'
-    || !network.roomCode || privateMatchActiveAtHostTimeMs === null || privateMatchActiveAtEpochMs === null) return null;
+  // QA diagnostics: a silent null here starves the authority mirror with no
+  // observable difference from "not wired". Name the first failing guard.
+  const refuse = (reason: string): null => {
+    lastCheckpointRefusal = reason;
+    return null;
+  };
+  if (network.role !== 'host' || !gameStarted || matchFinished) return refuse('not-live-host');
+  if (matchState.phase !== 'warmup' && matchState.phase !== 'active') return refuse('phase-not-live');
+  if (!network.roomCode || privateMatchActiveAtHostTimeMs === null || privateMatchActiveAtEpochMs === null) return refuse('no-active-clock');
+  // Project the exact 7-key member shape the checkpoint validator demands.
+  // HF-328/HF-360 added squadName/squadColor/skinId to LobbyMember; a blind
+  // spread carried them into the document and isExactLobbyMember refused the
+  // whole checkpoint — the same silent-starvation class as the guest
+  // snapshot's `swimming` drift. New LobbyMember fields must be added HERE
+  // deliberately, together with the wire validator, never by riding a spread.
   const members = [...hostLobbyMembers.values()]
+    .map((member) => ({
+      id: member.id,
+      name: member.name,
+      team: member.team,
+      ready: member.ready,
+      connected: member.connected,
+      pingMs: member.pingMs,
+      dhv: member.dhv,
+    }))
     .sort((a, b) => Number(b.id === player.id) - Number(a.id === player.id) || a.id.localeCompare(b.id));
   const hostedBots = [...bots.values()]
     .filter((bot) => bot.id.startsWith('host-bot-'))
     .sort((a, b) => a.id.localeCompare(b.id));
-  if (hostedBots.length !== privateMatchConfig.hostedBotCount) return null;
+  if (hostedBots.length !== privateMatchConfig.hostedBotCount) return refuse('bot-count-mismatch');
   const scores = [...authoritativeScores.values()]
     .filter((score) => members.some((member) => member.id === score.id) || hostedBots.some((bot) => bot.id === score.id))
     .sort((a, b) => a.id.localeCompare(b.id));
@@ -7367,23 +7406,23 @@ function createHostMatchCheckpoint(
   if (!hostScore || !hostMember || hostedBots.some((bot) => {
     const score = scores.find((candidate) => candidate.id === bot.id);
     return score?.kills !== bot.kills || score.deaths !== bot.deaths;
-  })) return null;
+  })) return refuse('score-or-member-mismatch');
   const expiresAtEpochMs = nowEpochMs + HOST_MATCH_CHECKPOINT_TTL_MS;
   const resumeTokenDigests: ResumeTokenDigestCheckpoint[] = [];
   for (const member of members) {
     if (member.id === player.id) continue;
     const digest = hostLobbyTokenDigests.get(member.id);
-    if (!digest) return null;
+    if (!digest) return refuse(`missing-resume-digest:${member.id}`);
     resumeTokenDigests.push({ ...digest, expiresAtEpochMs });
   }
   const timedMapWeapons = checkpointTimedMapWeaponAuthorities(timedMapWeaponStates, nowMonoMs);
-  if (!timedMapWeapons) return null;
+  if (!timedMapWeapons) return refuse('timed-map-weapons');
   const flareProjectiles = flareProjectileSystem.checkpointAuthority(nowMonoMs);
-  if (!flareProjectiles) return null;
+  if (!flareProjectiles) return refuse('flare-projectiles');
   const flareShotFeedback = checkpointFlareShooterFeedback(flareProjectiles, nowMonoMs);
-  if (!flareShotFeedback) return null;
+  if (!flareShotFeedback) return refuse('flare-feedback');
   const killstreak = killstreakRuntime.checkpoint(nowMonoMs);
-  if (!killstreak) return null;
+  if (!killstreak) return refuse('killstreak');
   const guests: GuestAuthorityCheckpoint[] = [];
   for (const member of members) {
     if (member.id === player.id) continue;
@@ -7394,7 +7433,7 @@ function createHostMatchCheckpoint(
       : retained;
     const score = scores.find((candidate) => candidate.id === member.id);
     const priorHealth = remoteHealthAuthorities.get(member.id);
-    if (!source || !score || !priorHealth) return null;
+    if (!source || !score || !priorHealth) return refuse(`guest-authority-missing:${member.id}`);
     const health = advanceRemoteHealthAuthority(priorHealth, nowMonoMs);
     remoteHealthAuthorities.set(member.id, health);
     const snapshot = canonicalRetainedGuestSnapshot(source.snapshot, member, score, health);
@@ -7402,17 +7441,36 @@ function createHostMatchCheckpoint(
     const continuity = killstreakRuntime.actorLifeId(member.id) ?? source.continuity;
     retainedRemoteAuthorities.set(member.id, Object.freeze({ snapshot: Object.freeze({ ...snapshot }), continuity }));
     const combatInventory = remoteCombatInventories.get(member.id);
-    if (!combatInventory) return null;
+    if (!combatInventory) return refuse(`combat-inventory-missing:${member.id}`);
     const guest = checkpointGuestAuthority(snapshot, continuity, health, combatInventory, nowMonoMs);
-    if (!guest) return null;
+    if (!guest) {
+      // host-match-checkpoint.ts owns the real predicate; this replica names
+      const expectedKeys = ['id', 'name', 'team', 'x', 'y', 'z', 'yaw', 'pitch', 'hp', 'kills', 'deaths', 'primary', 'secondary', 'grenade', 'weapon', 'stance', 'seq'];
+      const extraKeys = Object.keys(snapshot).filter((key) => !expectedKeys.includes(key));
+      const missingKeys = expectedKeys.filter((key) => !(key in snapshot));
+      const stanceOk = snapshot.stance === 'stand' || snapshot.stance === 'crouch' || snapshot.stance === 'prone';
+      const why = missingKeys.length ? `snapshot-missing:${missingKeys.join(',')}`
+        : extraKeys.length ? `snapshot-extra:${extraKeys.join(',')}`
+        : !stanceOk ? `stance:${String(snapshot.stance)}`
+        : !Number.isInteger(snapshot.kills) || snapshot.kills < 0 || snapshot.kills > 500 ? `kills:${snapshot.kills}`
+        : !Number.isInteger(snapshot.deaths) || snapshot.deaths < 0 || snapshot.deaths > 500 ? `deaths:${snapshot.deaths}`
+        : !Number.isFinite(health.hp) || health.hp < 0 || health.hp > 100 ? `hp:${health.hp}`
+        : health.alive !== (health.hp > 0) ? `alive:${String(health.alive)}-hp:${health.hp}`
+        : snapshot.hp !== health.hp ? `snapshot-hp:${snapshot.hp}-health-hp:${health.hp}`
+        : !isGuestCombatInventory(combatInventory) ? 'inventory-shape'
+        : !guestCombatInventoryWithinWeaponCaps(combatInventory) ? 'inventory-caps'
+        : !Number.isSafeInteger(continuity) || continuity < 1 || continuity > 1_000_000_000 ? `continuity:${continuity}`
+        : 'checkpoint-schema';
+      return refuse(`guest-checkpoint-invalid:${member.id}:${why}`);
+    }
     guests.push(guest);
   }
   const railgun = checkpointRailgunAuthority(railgunState, nowMonoMs);
-  if (!railgun) return null;
+  if (!railgun) return refuse('railgun');
   const matchClock = privateMatchConfig.arenaId === 'gun-range' && matchState.phase === 'active'
     ? sampleAuthoritativeGunRangeMatchClock(nowMonoMs)
     : null;
-  if (privateMatchConfig.arenaId === 'gun-range' && matchState.phase === 'active' && !matchClock) return null;
+  if (privateMatchConfig.arenaId === 'gun-range' && matchState.phase === 'active' && !matchClock) return refuse('gun-range-clock');
   const elapsedSinceActiveMs = matchClock
     ? privateMatchConfig.durationMs - matchClock.remainingMs
     : nowMonoMs - privateMatchActiveAtHostTimeMs;
@@ -7486,6 +7544,7 @@ function createHostMatchCheckpoint(
 
 let lastHostCheckpointPersistAtEpochMs = 0;
 let lastCheckpointAttempt: { atEpochMs: number; hadCheckpoint: boolean; rejectReason: string | null } | null = null;
+let lastCheckpointRefusal: string | null = null;
 let hostCheckpointPersistScheduled = false;
 let hostCheckpointRejectedPoseWrites = 0;
 let lastHostCheckpointRejectedPoseReason: string | null = null;
@@ -7550,7 +7609,9 @@ function persistActiveHostMatchCheckpoint(force = false): boolean {
     lastCheckpointAttempt = {
       atEpochMs: nowEpochMs,
       hadCheckpoint: checkpoint !== null,
-      rejectReason: checkpoint === null ? lastHostCheckpointRejectedPoseReason : null,
+      rejectReason: checkpoint === null
+        ? (lastHostCheckpointRejectedPoseReason ?? lastCheckpointRefusal)
+        : null,
     };
     if (checkpoint) {
       saveHostMatchCheckpoint(deferredStorage, checkpoint);
@@ -24507,6 +24568,50 @@ function interpolationSourceSnapshotRateHz(): 20 | 30 | 40 {
     : 40;
 }
 
+// HF-387. proneBodyClearance measures along ITS OWN body-axis convention
+// (yaw 0 = +Z, see its contract), while this game moves players and remotes
+// along (-sin(yaw), -cos(yaw)) - yaw 0 faces -Z. Feeding the snapshot yaw in
+// unmirrored measured the room behind the feet as "head room", so the seating
+// decision was computed from a body rotated 180 degrees.
+//
+// The solver's SLIDE lever also needs room reported PAST the pose envelope
+// (surplus on the open end) before it can move a seated body at all, but
+// proneBodyClearance clamps each probe at the envelope, so its surplus is
+// always zero. Rather than editing that shared module, compose the surplus
+// here from its public API: when an end reports the full envelope (unblocked),
+// hop one envelope-length further along the same axis and measure again. The
+// published clearance then carries real surplus and proneStanceAdjustment can
+// slide the body away from head-side walls instead of only propping it up.
+function measuredProneClearance(
+  position: Readonly<{ x: number; y: number; z: number }>,
+  gameYaw: number,
+  colliders: ArenaMap['colliders'],
+): ProneBodyClearance {
+  const { forwardM, backwardM } = PRONE_PRESENTATION_ENVELOPE;
+  // Game forward (-sin, -cos) expressed in the solver's (+sin, +cos) frame.
+  const solverYaw = gameYaw + Math.PI;
+  const dirX = Math.sin(solverYaw);
+  const dirZ = Math.cos(solverYaw);
+
+  const base = proneBodyClearance(position, solverYaw, colliders);
+  const extend = (withinEnvelope: number, fullLength: number, sign: number): number => {
+    if (withinEnvelope < fullLength) return withinEnvelope; // blocked inside the pose: deficit is known.
+    const hop = {
+      x: position.x + sign * dirX * fullLength,
+      y: position.y,
+      z: position.z + sign * dirZ * fullLength,
+    };
+    const beyond = proneBodyClearance(hop, solverYaw, colliders);
+    return fullLength + (sign > 0 ? beyond.forwardM : beyond.backwardM);
+  };
+
+  return Object.freeze({
+    forwardM: extend(base.forwardM, forwardM, 1),
+    backwardM: extend(base.backwardM, backwardM, -1),
+    clipped: base.clipped,
+  });
+}
+
 function updateRemotes(dt: number, now: number): void {
   if (remotes.size === 0) return;
   const activeGuestIds = network.role === 'host' ? new Set(network.activePlayerIds(12_000, now)) : null;
@@ -24569,9 +24674,11 @@ function updateRemotes(dt: number, now: number): void {
     // HF-345: publish how much room the prone body actually has so the
     // presentation can seat it instead of pushing it through the wall. Measured
     // only while prone - it is three short segment casts, and every other
-    // stance stays on the authored pose.
+    // stance stays on the authored pose. HF-387: measuredProneClearance mirrors
+    // the snapshot yaw into the solver's convention and composes the surplus
+    // the slide lever needs; see the note above its definition.
     operator.userData.proneClearance = stance === 'prone'
-      ? proneBodyClearance(renderedTarget, renderedSnapshot.yaw, activeWorldColliders())
+      ? measuredProneClearance(renderedTarget, renderedSnapshot.yaw, activeWorldColliders())
       : null;
     setOperatorWeapon(operator, renderedSnapshot.weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
     poseOperator(operator, stance, remainingDistance / Math.max(dt, 0.001), now * 0.008, Math.min(1, dt * 24), renderedSnapshot.pitch, dt);
