@@ -23,7 +23,7 @@ import {
   OPERATOR_STANCES,
 } from '../operator-appearance-catalog'; // Pass 75
 import { weaponMenuPresentationMarkup, weaponMenuStatDeckMarkup } from './field-kit-weapon-presentation';
-import { operatorSkinPortraitSvg, operatorSkinSwatchMarkup } from './operator-skin-portrait'; // HF-366
+import { operatorSkinPortraitMarkup, operatorSkinSwatchMarkup } from './operator-skin-portrait'; // HF-366, HF-381
 import {
   OPERATOR_PREVIEW_CANVAS_ID,
   OPERATOR_PREVIEW_PORTRAIT_ID,
@@ -308,7 +308,7 @@ function operatorPanelMarkup(): string {
   const skins = OPERATOR_SKIN_CATALOG.definitions
     .filter((definition) => definition.availability === 'selectable')
     .map((definition) => `<button type="button" class="operator-skin-card" data-operator-skin="${escapeAttribute(definition.id)}" aria-pressed="false">
-        <span class="operator-skin-art" data-operator-art="portrait">${operatorSkinPortraitSvg(definition.id)}</span>
+        <span class="operator-skin-art" data-operator-art="portrait">${operatorSkinPortraitMarkup(definition.id)}</span>
         <strong>${escapeAttribute(definition.displayName.toUpperCase())}</strong>
         <small>${escapeAttribute(definition.archetype.toUpperCase())} ARCHETYPE</small>
         ${operatorSkinSwatchMarkup(definition.id)}
@@ -340,7 +340,7 @@ function operatorPanelMarkup(): string {
             <!-- The 2D half. Same portrait art as the card the player pressed,
                  at a size you can actually read it at, so the card and the
                  turntable are visibly the same operator. -->
-            <span id="${OPERATOR_PREVIEW_PORTRAIT_ID}" class="operator-skin-art" data-operator-art="portrait" style="display:block;width:100%;max-width:280px;border-radius:10px;overflow:hidden;aspect-ratio:4/3">${operatorSkinPortraitSvg('default')}</span>
+            <span id="${OPERATOR_PREVIEW_PORTRAIT_ID}" class="operator-skin-art" data-operator-art="portrait" style="display:block;width:100%;max-width:280px;border-radius:10px;overflow:hidden;aspect-ratio:4/3">${operatorSkinPortraitMarkup('default')}</span>
             <p id="${OPERATOR_PREVIEW_STATUS_ID}" class="operator-preview-status" aria-live="polite" style="margin:0;font-size:13px;line-height:1.5">Standard Operator · live preview</p>
             <p style="margin:0;font-size:12px;line-height:1.5;opacity:.75">Card art above, live turntable to the left, and your own first-person arms in the match all use this skin's colours.</p>
           </div>

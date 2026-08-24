@@ -8,7 +8,7 @@ import {
   updateRiggedOperator,
 } from '../operator-model';
 import { OPERATOR_SKIN_CATALOG } from '../operator-skin-catalog';
-import { operatorSkinPortraitSvg } from './operator-skin-portrait';
+import { operatorSkinPortraitMarkup } from './operator-skin-portrait';
 import { createOperatorWeaponPresentation } from '../art-kit';
 import { loadPass65WeaponPresentation } from '../weapon-model';
 
@@ -292,7 +292,9 @@ export function mountOperatorPreview(root: ParentNode = document): OperatorPrevi
     setStatus(`${definition?.displayName ?? 'Standard Operator'} · live preview`);
     // Keep the 2D half in step with the 3D half: the owner asked for both, and
     // two previews that can disagree are worse than one.
-    if (portrait) portrait.innerHTML = operatorSkinPortraitSvg(skinId, `preview-${skinId}`);
+    // HF-381: the card grid and this live preview must agree - repainting the SVG
+    // here put the blob straight back the moment a skin was selected.
+    if (portrait) portrait.innerHTML = operatorSkinPortraitMarkup(skinId, `preview-${skinId}`);
   };
 
   const ensureModel = (): void => {

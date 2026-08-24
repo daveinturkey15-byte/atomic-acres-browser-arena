@@ -145,3 +145,20 @@ export function operatorSkinPortraitAudit(): Readonly<{
     ))),
   });
 }
+
+/**
+ * HF-381. The card art a player actually sees.
+ *
+ * Four photoreal operator portraits were generated locally (Qwen-Image on the
+ * owner's own GPU) and committed to public/assets/original/skin-cards/, but the
+ * shell kept rendering the procedural SVG below, so the owner only ever saw
+ * coloured blobs. This renders the real image and falls back to that SVG only
+ * if the file fails to load - a missing portrait degrades, it never blanks.
+ */
+export function operatorSkinPortraitMarkup(skinId: string, idSuffix = skinId): string {
+  const svg = operatorSkinPortraitSvg(skinId, idSuffix);
+  // The fallback is injected by swapping the <img> for the SVG markup, so it is
+  // encoded once here rather than duplicated into an inline handler.
+  const encoded = encodeURIComponent(svg);
+  return `<img class="operator-skin-photo" src="assets/original/skin-cards/${encodeURIComponent(skinId)}-card.webp" alt="" loading="lazy" decoding="async" onerror="this.outerHTML=decodeURIComponent('${encoded}')">`;
+}

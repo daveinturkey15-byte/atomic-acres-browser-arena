@@ -351,3 +351,14 @@ html[data-reduced-motion='true'] .operator-anim-card:hover {
   color: var(--p74-accent-bright, #12a7b1);
   letter-spacing: 0.3em;
 }
+
+/* HF-381. The generated operator portraits are 448x576 (tall). The card art box
+   is a 4:3 landscape well, so without object-fit the face is squashed. Cover and
+   top-bias the crop so the head is never the part that gets trimmed. */
+.operator-skin-art .operator-skin-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 18%;
+}
