@@ -334,7 +334,9 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('hit', "zone === 'head'", 1, ['combat.hit-confirm']),
   runtimeCallsite('hunterLaunch', 'index', 1, ['support.hunter-launch']),
   runtimeCallsite('impact', "'glass',point.distanceTo(camera.position)", 1, ['world.window-break']),
-  runtimeCallsite('impact', 'surface,point.distanceTo(camera.position)', 3, ['world.projectile-impact']),
+  // HF-386: +1 — the possessed chopper gunner's presentation-only world
+  // impact now plays the same per-surface world projectile impact.
+  runtimeCallsite('impact', 'surface,point.distanceTo(camera.position)', 4, ['world.projectile-impact']),
   runtimeCallsite('impact', 'surface,point.distanceTo(player.position)', 1, ['world.projectile-impact']),
   runtimeCallsite('kill', '', 2, ['combat.kill-confirm']),
   runtimeCallsite('land', 'impactSpeed', 1, ['movement.land.local']),

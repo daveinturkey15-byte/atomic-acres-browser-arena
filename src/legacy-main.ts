@@ -20,7 +20,7 @@ import './style.css';
 import { gradeProfileIdForGraphicsPreset } from './rendering/filmic-grade-chain'; // HF-363
 import { KILLSTREAK_ACTIVATION_DENIAL_LABELS, evaluateKillstreakActivation } from './killstreak-activation-gate'; // HF-316
 import { RARE_WEAPON_BANNER_DURATION_MS, presentRareWeaponAnnouncement, type RareWeaponAnnouncementInput } from './rare-weapon-announcement'; // HF-339
-import { applyTeamSwap, prescribeTeams } from './team-prescription'; // HF-328
+import { applyTeamSwap, prescribeTeams, teamSwapRefusal } from './team-prescription'; // HF-328
 import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
 import { AdaptiveQualityController, DeferredAdaptivePixelRatio, adaptiveShadowsEnabled, assertWebGpuAdmissionCompletionLatency, classifyDisplayFrameMs, configuredAdaptiveQualityLevels, shouldFreezeAdaptiveQualityForMatch } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
@@ -431,6 +431,7 @@ import {
 } from './rustworks-quality';
 import { arenaLightingProfile } from './blender-lighting';
 import { ImpactPresentation, type ImpactPresentationSurface } from './impact-presentation';
+import { presentZeroDamageHit } from './zero-hit-feedback';
 import {
   AUDIO_BUS_IDS,
   advancePresentationFrameAnchor,
@@ -592,10 +593,10 @@ import {
 } from './match-admission-transaction';
 import { loadRoomRejoinIdentity, releaseRoomRejoinIdentityLease, saveRoomRejoinIdentity, saveLastRoomCode, loadLastRoomCode } from './room-rejoin-identity';
 import { clearLastHostedRoomCode, loadLastHostedRoomCode, saveLastHostedRoomCode } from './host-room-recovery';
-// HF-325 Part 1 only: guest-side host-loss visibility. Part 2 (election,
-// mandates, self-promotion, the role flip) is deliberately NOT wired — none of
-// mintSuccessionMandate/authorizeSelfPromotion/acceptPromotedHost is imported,
-// so no client can promote itself or author authority it was not given.
+// HF-325: guest-side host-loss visibility (evaluateHostLoss drives the status
+// line) AND the full succession path. The mandate, mirror, self-promotion and
+// role flip below are all wired; every guard lives behind
+// HOST_MIGRATION_PROMOTION_ENABLED and authorizeSelfPromotion.
 import { evaluateHostLoss, hostLossPresentation, type HostLossState } from './host-migration';
 // HF-325: succession carriage. The mandate and the mirror go on the wire; the
 // promotion trigger stays behind HOST_MIGRATION_PROMOTION_ENABLED.
@@ -6264,6 +6265,13 @@ function setStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
  */
 let lastHostLossState: HostLossState = 'inactive';
 let lastHostLossCountdownSeconds = -1;
+// QA diagnostics for the succession wire (read-only, surfaced through
+// __ATOMIC_ACRES_DEBUG__.sampleHostSuccession). A silent refusal anywhere in
+// the mint/ship/accept chain otherwise looks identical to "not wired".
+let lastSuccessionPublish: { reason: string; sent: boolean; rosterRevision: number } | null = null;
+let lastMirrorShip: { reason: string } | null = null;
+let lastMandateAccept: { accepted: boolean; reason: string } | null = null;
+let lastMirrorAccept: { accepted: boolean; reason: string } | null = null;
 
 /**
  * HF-325: adopt the mirrored checkpoint through the EXISTING host recovery
@@ -7177,6 +7185,11 @@ function publishHostSuccessionMandate(): void {
     nonce: randomNonce(),
   });
   hostSuccessionPublisher = result.publisher;
+  lastSuccessionPublish = {
+    reason: result.reason,
+    sent: result.broadcast !== null,
+    rosterRevision: roster.revision,
+  };
   if (result.broadcast) network.send(result.broadcast);
 }
 
@@ -7198,9 +7211,11 @@ function shipAuthorityMirror(checkpoint: HostMatchCheckpoint): void {
     outgoingHostResumeTokenSha256: null,
   });
   hostSuccessionPublisher = plan.publisher;
+  lastMirrorShip = { reason: plan.reason };
   // A missing mirror costs a dead room; a wrong one costs a split brain.
   if (plan.send) network.sendToPlayer(plan.send.forPlayerId, plan.send);
 }
+
 
 // HF-323: hold the start while any guest admission is in-flight or transport connection is pending
 function hostHasPendingGuestConnection(): boolean {
@@ -7470,6 +7485,7 @@ function createHostMatchCheckpoint(
 }
 
 let lastHostCheckpointPersistAtEpochMs = 0;
+let lastCheckpointAttempt: { atEpochMs: number; hadCheckpoint: boolean; rejectReason: string | null } | null = null;
 let hostCheckpointPersistScheduled = false;
 let hostCheckpointRejectedPoseWrites = 0;
 let lastHostCheckpointRejectedPoseReason: string | null = null;
@@ -7531,6 +7547,11 @@ function persistActiveHostMatchCheckpoint(force = false): boolean {
     }
     lastHostCheckpointPersistAtEpochMs = nowEpochMs;
     const checkpoint = createRecoverySafeHostMatchCheckpoint();
+    lastCheckpointAttempt = {
+      atEpochMs: nowEpochMs,
+      hadCheckpoint: checkpoint !== null,
+      rejectReason: checkpoint === null ? lastHostCheckpointRejectedPoseReason : null,
+    };
     if (checkpoint) {
       saveHostMatchCheckpoint(deferredStorage, checkpoint);
       shipAuthorityMirror(checkpoint); // HF-325
@@ -9264,16 +9285,18 @@ function handleLobbyMessage(message: GameMessage): boolean {
   // isHostAuthorityMessage, so network.ts drops any of them sent by a guest.
   if (message.type === 'host-succession-mandate') {
     if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId) {
-      successorHoldings = acceptSuccessionMandate(
+      const accept = acceptSuccessionMandate(
         successorHoldings, message, network.roomCode, Date.now(),
-      ).holdings;
+      );
+      successorHoldings = accept.holdings;
+      lastMandateAccept = { accepted: accept.accepted, reason: accept.reason };
     }
     return true;
   }
   if (message.type === 'host-authority-mirror') {
     if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId) {
       const receivedAtEpochMs = Date.now();
-      successorHoldings = acceptAuthorityMirror(successorHoldings, message, {
+      const accept = acceptAuthorityMirror(successorHoldings, message, {
         selfId: player.id,
         roomCode: network.roomCode,
         receivedAtEpochMs,
@@ -9283,7 +9306,9 @@ function handleLobbyMessage(message: GameMessage): boolean {
         // milliseconds. Do NOT reuse hostTimeMapping.offsetMs — that is a
         // performance.now() mapping, not an epoch offset.
         hostClockOffsetMs: message.hostEpochMs - receivedAtEpochMs,
-      }).holdings;
+      });
+      successorHoldings = accept.holdings;
+      lastMirrorAccept = { accepted: accept.accepted, reason: accept.reason };
     }
     return true;
   }
@@ -9603,6 +9628,20 @@ function renderPrivateLobby(): void {
     : 'Only the host can invalidate the room and create a fresh code.';
   const teamInput = element<HTMLSelectElement>('#team');
   teamInput.disabled = (snapshot?.phase ?? 'waiting') !== 'waiting' || (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
+  // HF-328: the SWAP SIDES affordance must mirror the host's exact legality
+  // check (team-prescription.teamSwapRefusal) so a player only sees a live
+  // button when the request would be accepted. Before this wiring the button
+  // rendered permanently disabled with no listener - an orphan control.
+  const swapSides = element<HTMLButtonElement>('#lobby-swap-sides');
+  const localConnected = localMember?.connected ?? false;
+  const requestedSwapTeam: Team = (localMember?.team ?? player.team) === 0 ? 1 : 0;
+  const swapRefusal = localConnected
+    ? teamSwapRefusal(members, player.id, requestedSwapTeam, snapshot?.phase ?? 'waiting', snapshot?.config.mode ?? privateMatchConfig.mode)
+    : 'not-connected';
+  swapSides.disabled = !localConnected || swapRefusal !== null;
+  swapSides.title = swapRefusal === null
+    ? 'Request to swap sides — the host accepts only swaps that keep teams within one player.'
+    : `Swap unavailable (${swapRefusal}).`;
   const roster = element<HTMLElement>('#lobby-roster');
   const renderedMembers = members.map((member) => {
     const ping = member.id === player.id && network.role === 'client' ? localLobbyPingMs : member.pingMs;
@@ -10138,6 +10177,71 @@ function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
 
 function currentViewmodelSurfaceRetreat(): number {
   return currentViewmodelObstructionPose().retreat;
+}
+
+// HF-343 diagnosis: the trigger can be refused by 'viewmodel-contact-raise'
+// with no observable cause for the player or QA. This debug-only sampler
+// recomputes exactly what tryFire's gate sees (same probe lattice, same
+// padding, same viewmodelFireAdmission call) and reports per-probe hit
+// distances plus the blocking collider bounds, so a false-positive block at
+// spawn names its geometry instead of staying invisible. Read-only; never
+// referenced by gameplay.
+function sampleFireAdmissionDiagnostics(): Record<string, unknown> {
+  const profile = VIEWMODEL_CONTACT_PROFILES[player.weapon];
+  viewmodelProbeRotation.set(player.pitch, player.yaw, 0, 'YXZ');
+  viewmodelProbeDirection.set(0, 0, -1).applyEuler(viewmodelProbeRotation).normalize();
+  viewmodelProbeRight.set(1, 0, 0).applyEuler(viewmodelProbeRotation).normalize();
+  viewmodelProbeUp.set(0, 1, 0).applyEuler(viewmodelProbeRotation).normalize();
+  const colliders = activeWorldColliders();
+  const probePaddingMeters = viewmodelContactProbePaddingMeters(profile);
+  let nearestForward: number | null = null;
+  let nearestBox: unknown = null;
+  const probes: Array<{ offset: string; hitMeters: number | null }> = [];
+  for (const offset of VIEWMODEL_CONTACT_PROBE_OFFSETS) {
+    const verticalOffset = offset.vertical === 'upper'
+      ? profile.probeUpperOffsetMeters
+      : offset.vertical === 'lower' ? -profile.probeLowerOffsetMeters : offset.rightScale === 0 ? 0 : 0.04;
+    viewmodelProbeStart.copy(player.position)
+      .addScaledVector(viewmodelProbeRight, offset.rightScale * profile.probeHalfWidthMeters)
+      .addScaledVector(viewmodelProbeUp, verticalOffset);
+    viewmodelProbeEnd.copy(viewmodelProbeStart).addScaledVector(viewmodelProbeDirection, profile.probeLengthMeters);
+    const hit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, probePaddingMeters);
+    if (!hit) {
+      probes.push({ offset: `${offset.rightScale}/${offset.vertical}`, hitMeters: null });
+      continue;
+    }
+    const distance = hit.time * profile.probeLengthMeters;
+    if (nearestForward === null || distance < nearestForward) {
+      nearestForward = distance;
+      nearestBox = hit.box;
+    }
+    probes.push({ offset: `${offset.rightScale}/${offset.vertical}`, hitMeters: Math.round(distance * 1000) / 1000 });
+  }
+  // Mirror the exact tryFire gate inputs: surfaceLift deliberately 0.
+  const pose = currentViewmodelObstructionPose();
+  const admission = viewmodelFireAdmission(
+    player.weapon,
+    pose.retreat,
+    0,
+    player.stance === 'prone',
+    weaponView.adsProgress(),
+  );
+  return {
+    weapon: player.weapon,
+    stance: player.stance,
+    position: [player.position.x, player.position.y, player.position.z],
+    yawRadians: player.yaw,
+    pitchRadians: player.pitch,
+    fullStowDistanceMeters: profile.fullStowDistanceMeters,
+    probeLengthMeters: profile.probeLengthMeters,
+    probePaddingMeters,
+    retreat: pose.retreat,
+    adsProgress: weaponView.adsProgress(),
+    probes,
+    nearestForwardMeters: nearestForward === null ? null : Math.round(nearestForward * 1000) / 1000,
+    nearestColliderBounds: nearestBox ?? null,
+    fireAdmission: admission,
+  };
 }
 
 function interpolatePlayerSnapshot(before: PlayerSnapshot, after: PlayerSnapshot, alpha: number): PlayerSnapshot {
@@ -17281,6 +17385,11 @@ function tryFire(now: number): void {
   const localSmokeShotSegments: SmokeShotSegment[] = [];
   let impactAudioPlayed = false;
   const presentedSurfaceIds = new Set<string>();
+  // HF-386: first pure-world strike of this trigger pull, for the explicit
+  // zero-damage cue. Null until a pellet hits world geometry without touching
+  // any player, bot, target or window.
+  let zeroHitWorldImpact: { point: THREE.Vector3; normal: THREE.Vector3 } | null = null;
+  let zeroHitDamagedTarget = false;
   const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
   const projectileShot = spec.fireKind === 'projectile';
@@ -17361,6 +17470,11 @@ function tryFire(now: number): void {
         impactAudioPlayed = true;
         audio.impact(surface, point.distanceTo(camera.position));
       }
+      // HF-386: this is the branch most floor and wall strikes actually take
+      // (the ground is a ballistic surface, so the pure-world fallback below
+      // rarely runs). Remember the strike for the post-loop zero-damage
+      // decision; a pull that also damaged an actor is filtered there.
+      zeroHitWorldImpact ??= { point, normal };
     }
     if (result.windowId) {
       const point = result.impactPoint ?? authoritativeEnd;
@@ -17377,6 +17491,11 @@ function tryFire(now: number): void {
         impactAudioPlayed = true;
         audio.impact(surface, point.distanceTo(camera.position));
       }
+      // HF-386: remember the first pure-world strike of this trigger pull so
+      // the post-loop pass can decide whether the pull deserves an explicit
+      // zero-damage cue (a mixed shotgun spread that also damaged someone
+      // must not show one).
+      zeroHitWorldImpact ??= { point, normal };
     }
     if (result.playerId) {
       const zone = effectiveHitZoneForWeapon(spec, result.hitZone ?? 'body');
@@ -17404,7 +17523,11 @@ function tryFire(now: number): void {
       // and desynced every peer's dummy lifecycle.
       if (network.role === 'client' && practiceTarget?.kind === 'training-dummy') {
         // host-resolved; presentation arrives with the shot result
-      } else if (targetDamage > 0) hitPracticeTarget(
+      } else if (targetDamage > 0) {
+        // HF-386: a pull that damaged a practice target is not a zero-damage
+        // pull, even if other pellets of the same spread struck the floor.
+        zeroHitDamagedTarget = true;
+        hitPracticeTarget(
           result.targetId,
           targetDamage,
           zone,
@@ -17414,7 +17537,15 @@ function tryFire(now: number): void {
             distanceMeters: result.distance,
           },
         );
+      }
     }
+  }
+  // HF-386: the trigger pull struck world geometry and damaged nobody (no
+  // remote-player, bot or practice-target damage was aggregated). Say so
+  // explicitly — the sparks and decal alone never told the player the truth.
+  // Flamethrower is excluded: its ground ignition is already the feedback.
+  if (zeroHitWorldImpact && !projectileShot && !flamethrowerShot && hitDamage.size === 0 && !zeroHitDamagedTarget) {
+    presentZeroDamageHit(now);
   }
   if (!projectileShot) {
     applyKillstreakEntityShot(
@@ -22185,7 +22316,28 @@ function updateKillstreakPossession(now: number): void {
       const shotRay = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch);
       const muzzle = new THREE.Vector3(...shotRay.tracerOrigin);
       const aim = new THREE.Vector3(...shotRay.direction);
-      spawnTracer(muzzle, muzzle.clone().addScaledVector(aim, 130), 0xffb347);
+      // HF-386: presentation-only trace along the authoritative aim line so a
+      // shell that damages nobody still lands its sparks, decal, impact sound
+      // and explicit zero-damage cue on the surface it actually struck. The
+      // tracer now stops at that surface instead of flying a fixed 130 m
+      // through walls, and the range is the autocannon's authoritative 78 m
+      // rather than an arbitrary number. Host damage authority is untouched:
+      // this trace never mutates interactive-world state.
+      const chopperTrace = traceWeaponPath(muzzle, aim, CHOPPER_GUN_PROFILE.maximumRangeM, 'lmg');
+      spawnTracer(muzzle, muzzle.clone().addScaledVector(aim, chopperTrace.travelDistance), 0xffb347);
+      const firstImpact = chopperTrace.impacts[0];
+      if (firstImpact) {
+        const point = muzzle.clone().addScaledVector(aim, firstImpact.entryDistance);
+        const normal = new THREE.Vector3(
+          firstImpact.entryNormal.x,
+          firstImpact.entryNormal.y,
+          firstImpact.entryNormal.z,
+        );
+        spawnImpactFlash(point, firstImpact.surface.material, normal);
+        const surface = ballisticImpactSurface(firstImpact.surface.material);
+        audio.impact(surface, point.distanceTo(camera.position));
+        presentZeroDamageHit(now);
+      }
     }
     nextLocalSupportGunReportAt = now + (possession.kind === 'chopper-gunner'
       ? CHOPPER_GUN_PROFILE.cadenceMs
@@ -27190,6 +27342,18 @@ element<HTMLButtonElement>('#lobby-start').addEventListener('click', (event) => 
   (event.currentTarget as HTMLElement)?.blur(); // HF-324: blur button after click
   hostStartPrivateMatch();
 });
+element<HTMLButtonElement>('#lobby-swap-sides').addEventListener('click', (event) => {
+  (event.currentTarget as HTMLElement)?.blur(); // HF-324: blur button after click
+  // HF-328: the button is a SWAP SIDES REQUEST, same authority path as the
+  // legacy #team select: the host decides via applyTeamSwap, never the client.
+  if (!privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting' || privateLobbySnapshot.config.mode !== 'tdm') return;
+  const member = hostLobbyMembers.get(player.id)
+    ?? privateLobbySnapshot.members.find((entry) => entry.id === player.id);
+  if (!member?.connected) return;
+  const message = { type: 'lobby-team' as const, by: player.id, team: (member.team === 0 ? 1 : 0) as Team, nonce: randomNonce() };
+  if (network.role === 'host') updateHostTeam(message);
+  else if (network.role === 'client') network.send(message);
+});
 element<HTMLButtonElement>('#lobby-leave').addEventListener('click', (event) => {
   (event.currentTarget as HTMLElement)?.blur(); // HF-324: blur button after click
   returnToMainMenu();
@@ -28859,10 +29023,12 @@ async function capturePass73NativeAdsRevealRoiTriplet(targetId: string) {
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
     snapshot: () => Record<string, unknown> & { player: DebugPlayerPose };
+    sampleFireAdmissionDiagnostics: () => Record<string, unknown>;
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
     sampleSceneGraph: () => THREE.Scene;
     sampleWeather: () => Record<string, unknown>;
     sampleSimulationGate: () => Record<string, unknown>;
+    sampleHostSuccession: () => Record<string, unknown>;
     samplePresentationTelemetry: () => ReturnType<typeof renderRuntime.presentationTelemetry>;
     sampleEnduranceHealth: (detail?: EnduranceHealthDetail) => ReturnType<typeof sampleEnduranceHealth>;
     sampleWeaponCatalogReadiness: () => ReturnType<typeof weaponView.browserCatalogReadiness>;
@@ -30053,6 +30219,60 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     simulationEnabled: playerSimulationEnabled(),
     inputEnabled: gameplayInputEnabled(),
   }),
+  // HF-325: read-only succession observability for QA drivers (e.g.
+  // scripts/qa/verify-host-succession-cdp.mjs). Exposes what the promotion
+  // trigger actually sees — mandate, mirror freshness, term state — without
+  // letting anything mutate it. Never referenced by gameplay.
+  sampleHostSuccession: () => ({
+    role: network.role,
+    roomCode: network.roomCode,
+    selfId: player.id,
+    lobbyHostId: privateLobbySnapshot?.hostId ?? null,
+    hostLinkState: lastHostLossState,
+    mandate: successorHoldings.mandate && (() => {
+      const mandate = successorHoldings.mandate;
+      return {
+        term: mandate.term,
+        successorId: mandate.successorId,
+        issuedByHostId: mandate.issuedByHostId,
+        issuedAtEpochMs: mandate.issuedAtEpochMs,
+        expiresAtEpochMs: mandate.expiresAtEpochMs,
+        lobbyRevision: mandate.lobbyRevision,
+        expired: Date.now() >= mandate.expiresAtEpochMs,
+      };
+    })(),
+    highestObservedTerm: successorHoldings.highestObservedTerm,
+    mirror: successorHoldings.mirror && (() => {
+      const nowEpochMs = Date.now();
+      return {
+        mirrorTerm: successorHoldings.mirrorTerm,
+        receivedAtEpochMs: successorHoldings.mirrorReceivedAtEpochMs,
+        offsetTrusted: successorHoldings.mirrorOffsetTrusted,
+        expiresAtEpochMs: successorHoldings.mirror.expiresAtEpochMs,
+        fresh: Number.isFinite(nowEpochMs) && nowEpochMs < successorHoldings.mirror.expiresAtEpochMs,
+        ageMs: successorHoldings.mirrorReceivedAtEpochMs === null
+          ? null
+          : nowEpochMs - successorHoldings.mirrorReceivedAtEpochMs,
+        roomCode: successorHoldings.mirror.roomCode,
+        successionTerm: successorHoldings.mirror.succession?.term ?? null,
+      };
+    })(),
+    publisher: network.role === 'host' ? {
+      term: hostSuccessionPublisher.term,
+      standDown: hostSuccessionPublisher.standDown,
+      hasMandate: hostSuccessionPublisher.mandate !== null,
+      mandatedSuccessorId: hostSuccessionPublisher.mandate?.successorId ?? null,
+      lastMirroredTerm: hostSuccessionPublisher.lastMirroredTerm,
+    } : null,
+    diagnostics: {
+      lastPublish: lastSuccessionPublish,
+      lastMirrorShip: lastMirrorShip,
+      lastMandateAccept: lastMandateAccept,
+      lastMirrorAccept: lastMirrorAccept,
+      lastCheckpointAttempt: lastCheckpointAttempt,
+    },
+  }),
+  sampleFireAdmissionDiagnostics,
   samplePresentationTelemetry: () => renderRuntime.presentationTelemetry(),
   sampleEnduranceHealth,
   sampleWeaponCatalogReadiness: () => weaponView.browserCatalogReadiness(),
@@ -30065,7 +30285,6 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     swim: {
       swimming: localSwimState.swimming,
       weaponRestricted: localSwimState.weaponRestricted,
-      wetSeconds: Number(localSwimState.wetSeconds.toFixed(3)),
       drySeconds: Number(localSwimState.drySeconds.toFixed(3)),
       bodySwimmable: waterSystem.swimmable,
     },
