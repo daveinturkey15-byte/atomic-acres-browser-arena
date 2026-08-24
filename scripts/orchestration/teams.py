@@ -16,6 +16,28 @@ formality: this project's single most expensive recurring failure is code that s
 correct, tested, and reachable by nothing at all.
 """
 
+SKILL_ROOT = r"C:\Users\david\.claude\skills"
+
+# Dave has spent weeks curating these. Each is a governed skill with an inspected
+# licence, a pinned source and a bounded decision already made - see the AI 3D
+# technique register in AKP. Teams read theirs before designing anything.
+SKILLS = {
+    "mp-core": ["threejs-game-development", "threejs-frame-loop-audit"],
+    "farcrysis": ["webgpu-tsl-arena-forging", "threejs-game-development",
+                  "threejs-webgpu-water", "atomic-acres-procedural-art-authoring",
+                  "ai-3d-asset-generation-loop", "visual-gauntlet-loop"],
+    "nuketown": ["webgpu-tsl-arena-forging", "atomic-acres-procedural-art-authoring",
+                 "threejs-game-development"],
+    "hijacked": ["webgpu-tsl-arena-forging", "threejs-webgpu-water",
+                 "atomic-acres-procedural-art-authoring"],
+    "combat": ["threejs-game-development", "game-animation-asset-pipeline",
+               "threejs-frame-loop-audit"],
+    "graphics": ["threejs-rtx-runtime-route", "webgpu-tsl-arena-forging",
+                 "threejs-frame-loop-audit", "visual-gauntlet-loop"],
+    "assets-ui": ["game-hud-menu-overhaul", "img2threejs", "ai-3d-asset-generation-loop",
+                  "atomic-acres-asset-authoring", "game-animation-asset-pipeline"],
+}
+
 BUILDER_PREAMBLE = """Read these before doing anything, in order:
 1. C:/Users/david/projects/atomic-acres-gauntlet/GAUNTLET-SPEC.md - four failure modes
    that have each cost this project a rejected build.
@@ -48,6 +70,21 @@ VERIFY: 'npx tsc --noEmit' clean and 'npx vitest run' on your own tests. Headles
 create a WebGPU device on this machine - every historic "green" was WebGL2 while the
 owner plays WebGPU. For anything visual or gameplay-facing, drive installed Chrome over
 CDP: copy scripts/qa/verify-arena-boot-cdp.mjs. Then CAPTURE FRAMES AND READ THEM.
+
+USE THE SKILLS - THIS IS NOT OPTIONAL. Dave has spent weeks collecting and curating
+techniques for exactly this work, and each one is now a governed skill with an
+inspected licence, a pinned source, and a bounded decision already made for you. The
+ones listed for your team are named at the end of this brief and live at
+SKILL_ROOT/<name>/SKILL.md. READ THEM IN FULL BEFORE YOU DESIGN ANYTHING.
+
+They exist so you do not re-derive, re-research or re-litigate what has already been
+resolved, and so the result is best-in-class rather than whatever you would have
+improvised. Several encode expensive lessons: which licences forbid use, which
+reference implementations are comparator-only rather than copyable, and which
+seemingly-obvious route is a dead end. If a skill contradicts your instinct, the skill
+wins - unless this repository's own AGENTS.md or an executable test says otherwise,
+which outrank it. If you find a skill wrong or incomplete, SAY SO IN YOUR REPORT: that
+is how they improve, and a silently ignored skill helps nobody.
 
 YOUR ASSIGNMENT:
 """

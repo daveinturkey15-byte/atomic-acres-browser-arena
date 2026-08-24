@@ -31,11 +31,27 @@ DISPATCH = os.path.join(FLEET, "scripts", "swarm_dispatch.py")
 LOGDIR = os.path.join(REPO, "artifacts", "team-logs")
 
 sys.path.insert(0, HERE)
-from teams import TEAMS, BUILDER_PREAMBLE, CRITIC_PREAMBLE  # noqa: E402
+from teams import (  # noqa: E402
+    TEAMS, BUILDER_PREAMBLE, CRITIC_PREAMBLE, SKILLS, SKILL_ROOT,
+)
+
+
+def skill_section(team_name):
+    """The curated skills this team must read before designing anything.
+
+    Named with absolute paths because an agent that has to go looking will not look.
+    """
+    names = SKILLS.get(team_name, [])
+    if not names:
+        return ""
+    lines = "\n".join(f"  {os.path.join(SKILL_ROOT, n, 'SKILL.md')}" for n in names)
+    return ("\n\nSKILLS TO READ IN FULL BEFORE DESIGNING ANYTHING "
+            f"({len(names)} for this team):\n{lines}\n")
 
 
 def build_spec(team_name, team, timeout):
     owns = team["owns"]
+    skills = skill_section(team_name)
     tasks = []
     ids = []
     for task_id, brief in team["tasks"]:
@@ -46,8 +62,9 @@ def build_spec(team_name, team, timeout):
             "role": "worker",
             "timeout": timeout,
             "cwd": REPO,
-            "prompt": (BUILDER_PREAMBLE + brief
-                       + f"\n\nYOUR TEAM ({team_name}) OWNS THESE FILES AND NOTHING ELSE:\n{owns}\n"),
+            "prompt": (BUILDER_PREAMBLE.replace("SKILL_ROOT", SKILL_ROOT) + brief
+                       + f"\n\nYOUR TEAM ({team_name}) OWNS THESE FILES AND NOTHING ELSE:\n{owns}\n"
+                       + skills),
         })
     tasks.append({
         "id": f"{team_name}-critic",
