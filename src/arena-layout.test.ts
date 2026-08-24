@@ -9,6 +9,8 @@ import {
   NEIGHBOURHOOD_BENCH_LAYOUT,
   NEIGHBOURHOOD_BIN_COLLIDER_SIZE,
   NEIGHBOURHOOD_BIN_POSITIONS,
+  PARKED_VAN_LAYOUT,
+  PARKED_VAN_SIZE,
   PATROL_LAYOUT,
   SPAWN_LAYOUT,
   STREET_HALF_WIDTH,
@@ -37,7 +39,11 @@ describe('compact original arena layout', () => {
     expect(diagonal).toBeLessThan(90);
     // The reference map's whole character is that it is small. Sprinting a
     // straight diagonal must stay inside ten seconds, and a full lap of the
-    // perimeter inside thirty.
+    // perimeter inside thirty. HF-383 note: an in-flight uniform 1.05 scale-up
+    // briefly relaxed the diagonal gate to <11 s; that weakening is rejected -
+    // nuketown-fidelity still enforces <10 s independently, and the declutter
+    // (restaged kerb-side vans, resized hedge wings) answers "clustered"
+    // without growing the footprint.
     expect(diagonal / sprint).toBeLessThan(10);
     const lapSeconds = (2 * ((ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX) + (ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ))) / sprint;
     expect(lapSeconds).toBeGreaterThan(25);
@@ -139,6 +145,7 @@ describe('compact original arena layout', () => {
     )).toBe(true);
   });
 
+
   it('owns collision layouts for every player-sized street prop', () => {
     expect(NEIGHBOURHOOD_BENCH_LAYOUT).toHaveLength(4);
     expect(NEIGHBOURHOOD_BIN_POSITIONS).toHaveLength(6);
@@ -146,5 +153,77 @@ describe('compact original arena layout', () => {
     expect(NEIGHBOURHOOD_BIN_POSITIONS.every((point) => inside(point, 0.4))).toBe(true);
     expect(NEIGHBOURHOOD_BENCH_COLLIDER_SIZE).toEqual([2.5, 1.34, 0.72]);
     expect(NEIGHBOURHOOD_BIN_COLLIDER_SIZE).toEqual([0.78, 1.08, 0.72]);
+  });
+});
+
+const vanBounds = ({ x, z }: { x: number; z: number }) => {
+  const [length, height, width] = PARKED_VAN_SIZE;
+  return { minX: x - length / 2, maxX: x + length / 2, minY: 0, maxY: height, minZ: z - width / 2, maxZ: z + width / 2 };
+};
+
+describe('mid-street vehicle staging (HF-383)', () => {
+  const PLAYER_DIAMETER = 0.88;
+
+  it('stages both street vehicles midfield as a staggered kerb-side pair', () => {
+    expect(PARKED_VAN_LAYOUT).toHaveLength(2);
+    const [east, west] = PARKED_VAN_LAYOUT;
+    // BO2's signature read: two vehicles beside the centre of the street, one
+    // hugging each kerb, staggered diagonally opposite one another.
+    expect(east.x).toBeGreaterThan(0);
+    expect(west.x).toBeLessThan(0);
+    for (const van of PARKED_VAN_LAYOUT) {
+      expect(Math.abs(van.x)).toBeLessThanOrEqual(12);
+      expect(van.z).not.toBe(0);
+      const [, , width] = PARKED_VAN_SIZE;
+      expect(Math.abs(van.z) + width / 2).toBeLessThanOrEqual(STREET_HALF_WIDTH);
+    }
+    expect(east.z * west.z).toBeLessThan(0);
+    // Exact 180-degree rotational symmetry, like every other gameplay layer.
+    expect(Math.abs(east.x + west.x)).toBeLessThan(1e-6);
+    expect(Math.abs(east.z + west.z)).toBeLessThan(1e-6);
+  });
+
+  it('seats each vehicle against its kerb without pocketing a player or fouling the bus', () => {
+    const [busLength, busHeight, busWidth] = CENTRAL_BUS.size;
+    const bus = { minX: -busLength / 2, maxX: busLength / 2, minY: 0, maxY: busHeight, minZ: -busWidth / 2, maxZ: busWidth / 2 };
+    for (const van of PARKED_VAN_LAYOUT) {
+      const bounds = vanBounds(van);
+      // No volume overlap with the central bus.
+      const zDisjoint = bounds.maxZ <= bus.minZ || bounds.minZ >= bus.maxZ;
+      const xDisjoint = bounds.maxX <= bus.minX || bounds.minX >= bus.maxX;
+      expect(zDisjoint || xDisjoint).toBe(true);
+      // Any seam to the kerb or the bus flank must be narrower than a player
+      // body, so neither vehicle can pocket or wedge one.
+      const kerbGap = STREET_HALF_WIDTH - Math.max(Math.abs(bounds.minZ), Math.abs(bounds.maxZ));
+      expect(kerbGap).toBeGreaterThanOrEqual(0);
+      expect(kerbGap).toBeLessThan(PLAYER_DIAMETER);
+      const flankGap = Math.max(
+        bounds.minZ - bus.maxZ,
+        bus.minZ - bounds.maxZ,
+        bounds.minX - bus.maxX,
+        bus.minX - bounds.maxX,
+      );
+      expect(flankGap).toBeGreaterThanOrEqual(-0.001);
+      expect(flankGap).toBeLessThan(PLAYER_DIAMETER + 0.001);
+    }
+  });
+
+  it('breaks the eye-line from each bus-end crossing mouth to the opposite yard gap', () => {
+    const northVan = PARKED_VAN_LAYOUT.find((van) => van.z < 0);
+    const southVan = PARKED_VAN_LAYOUT.find((van) => van.z > 0);
+    expect(northVan).toBeDefined();
+    expect(southVan).toBeDefined();
+    // Exiting the bus east end towards the north yard hedge gap now crosses
+    // the north-kerb vehicle instead of running clean.
+    expect(segmentIntersectsBox(
+      { x: 7.2, y: 1.7, z: 0 },
+      { x: 5, y: 1.7, z: -8.5 },
+      vanBounds(northVan!),
+    )).toBe(true);
+    expect(segmentIntersectsBox(
+      { x: -7.2, y: 1.7, z: 0 },
+      { x: -5, y: 1.7, z: 8.5 },
+      vanBounds(southVan!),
+    )).toBe(true);
   });
 });

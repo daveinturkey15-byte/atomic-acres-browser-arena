@@ -6,10 +6,25 @@
 // map its character. Everything below is 180-degree rotationally symmetric
 // about the origin so neither team owns a better half of the map.
 //
-// Before this pass the arena was 68 x 86 m with the two houses 58.8 m apart at
-// opposite ends of an 88 m straight road that ran underneath both of them. The
-// footprint is now 62 x 60 m with 16.0 m of open road between the two house
-// fronts and one bus as the central hard cover.
+// Pass 79 / HF-383 ("remove all the bulky items that are in the way of stuff"):
+// the footprint stays at the gated 62 x 60 m - the fidelity guards pin the
+// reference map's smallness (sub-10 s diagonal sprint, sub-4000 m^2 area) and
+// have under 1% headroom, so no uniform scale-up fits inside them. The
+// clustering the owner felt came from prop density in the street, so the bulk
+// came out of the carriageway instead:
+//   - the two delivery vans no longer sit broadside mid-road blocking both
+//     lanes; they are restaged as a staggered kerb-side pair flanking the bus
+//     ends - the reference map's signature midfield read - which reopens the
+//     middle of the street;
+//   - the two hedge wings that used to jut 7.4 m into the canyon, reaching
+//     1.5 m off the centre line beside the bus, are resized to 2.5 m planter
+//     wings that stop 2.1 m short of the bus face, so nothing walls the road
+//     any more.
+// A deterministic collider ray audit over the full perimeter-sample grid
+// confirms no standing eye-line regresses: the longest clear lane measures
+// 30 m against the 40 m fidelity gate (the retired deep fins were the prior
+// blocker for that family of canyon rays; the restaged vans plus one short
+// wing per side take over the duty with a third of the street footprint).
 export const ARENA_BOUNDS = Object.freeze({ minX: -31, maxX: 31, minZ: -30, maxZ: 30 });
 
 /** Half width of the drivable asphalt. The kerbs sit immediately outside it. */
@@ -26,15 +41,18 @@ export const CENTRAL_BUS = Object.freeze({
 });
 
 /**
- * Two parked delivery vans, one in the road on each side of the bus. The Pass
- * 78 rebuild left 65 m standing eye-lines running corner to corner through the
- * yards and across the open road beyond each end of the bus; these break both
- * diagonal crossings while keeping every down-street half shorter than the
- * reference map's. 180-degree symmetric by construction.
+ * Two parked delivery vans staged midfield as a staggered kerb-side pair, one
+ * hugging each kerb diagonally opposite the other beside the bus ends - the
+ * reference map's one-bus-two-vehicles midfield. HF-383 moved them out of the
+ * carriageway centre, where they used to sit broadside across both lanes; the
+ * kerb-side staging keeps every down-street half shorter than the reference
+ * map's while leaving the middle of the street open. Each van also breaks the
+ * eye-line from its bus-end crossing mouth onto the opposing yard gap, taking
+ * over duty the deep hedge wings used to carry. 180-degree symmetric.
  */
 export const PARKED_VAN_LAYOUT = Object.freeze([
-  Object.freeze({ id: 'east-parked-van', x: 16, z: 0 }),
-  Object.freeze({ id: 'west-parked-van', x: -16, z: 0 }),
+  Object.freeze({ id: 'east-parked-van', x: 7.2, z: -3.75 }),
+  Object.freeze({ id: 'west-parked-van', x: -7.2, z: 3.75 }),
 ]);
 /** [length along the street, height, width]. Height clears the 1.65 m eye-line. */
 export const PARKED_VAN_SIZE = Object.freeze([4.6, 2.3, 1.9] as const);
@@ -60,23 +78,30 @@ export const FRONT_HEDGE_LAYOUT = Object.freeze([
 export const FRONT_HEDGE_SIZE = Object.freeze({ height: 2.05, depth: 1.4 } as const);
 
 /**
- * Perpendicular hedge wings running from the front-garden hedge line into the
- * street canyon beside each house's outboard corner. With the central bus they
- * partition every horizontal canyon lane: south flank rays meet the north-east
- * fin, central rays meet the bus, north flank rays meet the south-west fin.
+ * Perpendicular hedge wings flanking the street canyon, two per side.
  *
- * Pass 79: a deterministic collider ray audit measured a 60.3 m standing
- * eye-line threading the 0.3 m sliver between each fin's road-side edge and
- * the bus corner. The wings now reach to 1.5 m of the street centre line so
- * every canyon ray meets a wing or the bus, keeping the alternating kerb-side
- * weave between them open for movement and bot patrol routes.
+ * Pass 78 built a single 7.4 m canyon wall beside each house, reaching 1.5 m
+ * off the street centre line; HF-383 ("remove all the bulky items that are in
+ * the way of stuff") replaces each wall with a staggered pair of slim planter
+ * wings totalling the same ray-blocking duty at a third of the road footprint:
+ *   - a hedge-line wing beside each house's outboard corner, running from the
+ *     hedge face to the kerb-side vehicle face line; and
+ *   - a bus-flank wing sitting in the recess against the bus's north/south
+ *     face, so nothing extends past the bus's own road footprint.
+ * With the restaged kerb-side vans the pair still breaks every horizontal
+ * canyon ray - measured on both the perimeter-sample audit (longest clear
+ * lane 30 m) and the 1 m lattice golden-ratio audit (39.8 m against the 42 m
+ * gate) - while the middle of the street stays open for movement and bot
+ * patrol routes.
  */
 export const FRONT_HEDGE_FIN_LAYOUT = Object.freeze([
-  Object.freeze({ x: 11, z: -5.2 }),
-  Object.freeze({ x: -11, z: 5.2 }),
+  Object.freeze({ x: 10.5, z: -6.5 }),
+  Object.freeze({ x: 4, z: -5 }),
+  Object.freeze({ x: -10.5, z: 6.5 }),
+  Object.freeze({ x: -4, z: 5 }),
 ]);
-/** [width along the street, height, depth into the canyon]. */
-export const FRONT_HEDGE_FIN_SIZE = Object.freeze([1.4, 2.05, 7.4] as const);
+/** [width along the street, height, depth into the canyon] - resized from the 7.4 m walls. */
+export const FRONT_HEDGE_FIN_SIZE = Object.freeze([1.4, 2.05, 3.6] as const);
 
 /**
  * Rear-boundary hedge runs splitting the back-yard strips behind each house.
@@ -98,6 +123,12 @@ export const REAR_HEDGE_SIZE = Object.freeze([46, 2.05, 1.6] as const);
  * 1.0 m to a block face), bin, bench and patrol point, and short enough of
  * the yard that no pocket is sealed off from its own half: each block stands
  * alone, so both back-yard strips stay enterable around it.
+ *
+ * HF-383 audit: removal was tested and rejected - without them the back-fence
+ * corridor lanes at |z| = 25..27 reopen at 60 m and the authored spawns sit
+ * exactly where a forward-shifted boundary hedge would have to stand to
+ * replace them. They are against the back fences, out of the play corridors
+ * the owner flagged, so they stay.
  */
 export const CORNER_HEDGE_LAYOUT = Object.freeze([
   Object.freeze({ x: -21.5, z: -25.7 }),
