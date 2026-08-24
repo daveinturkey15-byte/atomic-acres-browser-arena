@@ -55,25 +55,38 @@ export const FARCRYSIS_SAFETY_FLOOR_Y = -4.5;
 
 /**
  * Shore-descent profile constants (HF-393 wade reshaping of the HF-360
- * change #2). The seabed leaves dry sand at `descentStartDist` from the
- * arena boundary at the old beach-shelf height (`joinHeight`), then descends
- * at a single gentle grade to swim-entry depth before the boundary wall:
+ * change #2). The beach is built in two continuous stages:
  *
- *   ground(d) = joinHeight - shelfSlope * (descentStartDist - d)
+ *   1. APPROACH FLATTEN — across `approachDist` metres inland of
+ *      `descentStartDist`, the rolling hills ease down onto the flat sandy
+ *      shelf at `joinHeight` (smoothstep, zero slope at the seam). Without
+ *      this the hills (up to ~2.2 m) met the old 0.2 m shelf as a cliff on
+ *      every azimuth where they rode high — exactly the owner's "you fall
+ *      down into the water".
+ *   2. DESCENDING SHELF ENVELOPE — seaward of `descentStartDist` the ground
+ *      is min(flattened interior, envelope), where
  *
- * With the registry water level (-0.25) and the standing eye height this
- * gives: waterline crossing 8.8 m out, ~6.8 m of progressively deepening
- * wade (ankle -> knee -> waist -> chest), then the swim state engages about
- * 2 m before the boundary. The pre-HF-393 profile dropped 1:1 (45 degrees)
- * over the outer 4 m, which played as "you fall down into the water".
+ *         envelope(d) = joinHeight - shelfSlope * (descentStartDist - d)
+ *
+ *      Both fields are continuous and agree at the seam, so the shore band
+ *      can never present a step: the player walks the flattened beach until
+ *      the envelope drops beneath them, then WADES progressively deeper
+ *      (ankle -> knee -> waist -> chest) until the host-authoritative swim
+ *      state engages. Worst downhill grade anywhere is bounded by
+ *      max(approach grade, ~0.38), which the every-azimuth walk test pins.
+ *
+ * Inside `outerDropDist` the seabed steepens to the boundary face
+ * (`edgeHeight`); that band is past swim-entry depth and underwater.
  */
 export const FARCRYSIS_SHORE = Object.freeze({
-  /** Edge distance (m from the arena boundary) where the seabed leaves dry sand. */
+  /** Edge distance (m from the arena boundary) where the shelf envelope starts. */
   descentStartDist: 10,
-  /** Seabed height at descentStartDist — continuous with the beach shelf join. */
+  /** Beach-shelf height the approach flattens the hills down to. */
   joinHeight: 0.2,
-  /** Metres of drop per metre walked seaward (~21 degrees). */
+  /** Metres of drop per metre walked seaward along the envelope (~21 degrees). */
   shelfSlope: 0.38,
+  /** Inland width of the beach flattening that eases the hills to joinHeight. */
+  approachDist: 12,
   /** Edge distance where the shelf stops and the outer drop begins. */
   outerDropDist: 1.5,
   /** Seabed height at the arena boundary face (safety floor stays below it). */
@@ -118,6 +131,28 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 }
 
 /**
+ * Interior jungle profile: gentle rolling hills, flattened to a y=0 pad
+ * across the research-station footprint (Chebyshev <= 7 m, blended to 10 m),
+ * then eased down onto the beach shelf across FARCRYSIS_SHORE.approachDist.
+ * The flatten is what makes the shore envelope's `joinHeight` start at or
+ * above local ground level on every azimuth — without it, hills riding above
+ * joinHeight met the descending shelf as a cliff (HF-393).
+ */
+function interiorHeight(x: number, z: number, chebyshev: number, dist: number): number {
+  const h = Math.sin(x * 0.12) * Math.cos(z * 0.15) * 1.2
+    + Math.sin(x * 0.25 + 1.3) * Math.cos(z * 0.22 + 2.1) * 0.6
+    + Math.sin(z * 0.18 - 0.7) * 0.4;
+  const hills = Math.max(-0.05, h + 0.1);
+  const padded = chebyshev < CORE_PAD_OUTER
+    ? hills * smoothstep(CORE_PAD_INNER, CORE_PAD_OUTER, chebyshev)
+    : hills;
+  const shore = FARCRYSIS_SHORE;
+  return shore.joinHeight
+    + (padded - shore.joinHeight)
+      * smoothstep(shore.descentStartDist, shore.descentStartDist + shore.approachDist, dist);
+}
+
+/**
  * Analytic terrain height at (x, z) — the single source of truth.
  *
  * Every consumer (rendered terrain, vegetation seating, prop/collider
@@ -128,33 +163,28 @@ export function farcrysisTerrainHeight(x: number, z: number): number {
   const chebyshev = Math.max(Math.abs(x), Math.abs(z));
   const dist = ARENA_HALF - chebyshev;
 
-  // HF-393 wade shelf: the outer band leaves dry sand at the old shelf join
-  // height and descends at one gentle grade, so walking seaward wades
-  // progressively deeper (ankle -> knee -> waist -> chest) until the
-  // host-authoritative swim state engages — instead of dropping down a 1:1
-  // chute. Inside `outerDropDist` the seabed steepens to the boundary face;
-  // that band is past swim-entry depth and underwater.
+  // HF-393 wade shelf: seaward of descentStartDist the ground is
+  // min(flattened interior, descending envelope). Both fields are continuous
+  // and agree at the seam, so the beach presents no step at ANY azimuth —
+  // the player walks the flattened sand until the envelope passes beneath
+  // them and then wades progressively deeper (ankle -> knee -> waist ->
+  // chest) until the host-authoritative swim state engages.
   if (dist < FARCRYSIS_SHORE.descentStartDist) {
+    const interior = interiorHeight(x, z, chebyshev, dist);
     if (dist >= FARCRYSIS_SHORE.outerDropDist) {
-      return FARCRYSIS_SHORE.joinHeight
+      const envelope = FARCRYSIS_SHORE.joinHeight
         - FARCRYSIS_SHORE.shelfSlope * (FARCRYSIS_SHORE.descentStartDist - dist);
+      return Math.min(interior, envelope);
     }
+    // Outer drop: steepen from the envelope height at outerDropDist down to
+    // the boundary face. Always far below the interior floor, so this branch
+    // needs no interior comparison; it is underwater past swim entry.
     const t = dist / FARCRYSIS_SHORE.outerDropDist;
     const shelfEnd = FARCRYSIS_SHORE.joinHeight
       - FARCRYSIS_SHORE.shelfSlope * (FARCRYSIS_SHORE.descentStartDist - FARCRYSIS_SHORE.outerDropDist);
     return FARCRYSIS_SHORE.edgeHeight + (shelfEnd - FARCRYSIS_SHORE.edgeHeight) * t;
   }
-  // Jungle interior: gentle rolling hills (adopted unchanged).
-  const h = Math.sin(x * 0.12) * Math.cos(z * 0.15) * 1.2
-    + Math.sin(x * 0.25 + 1.3) * Math.cos(z * 0.22 + 2.1) * 0.6
-    + Math.sin(z * 0.18 - 0.7) * 0.4;
-  const interior = Math.max(-0.05, h + 0.1);
-  // Core pad: fade the hills to a flat y=0 station floor so the authored
-  // research-station structure stands on one level.
-  if (chebyshev < CORE_PAD_OUTER) {
-    return interior * smoothstep(CORE_PAD_INNER, CORE_PAD_OUTER, chebyshev);
-  }
-  return interior;
+  return interiorHeight(x, z, chebyshev, dist);
 }
 
 // ---------------------------------------------------------------------------

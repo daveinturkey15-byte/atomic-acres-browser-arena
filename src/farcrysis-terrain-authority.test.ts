@@ -138,9 +138,13 @@ describe('farcrysis terrain authority', () => {
 
     let checked = 0;
     let worst = 0;
-    // Offset grid (never lands on a plate seam) — 32x32 = 1024 points >= 100.
-    for (let x = -31.7; x < 32; x += 2) {
-      for (let z = -31.7; z < 32; z += 2) {
+    // Offset grid (never lands on a plate seam), derived from FARCRYSIS_BOUNDS
+    // so it always covers the FULL island — a hardcoded +/-31.7 window kept
+    // sampling only the old 64 m island's NW quadrant after the HF-396 rescale,
+    // silently skipping 3/4 of the walking surface.
+    const half = FARCRYSIS_BOUNDS.maxX;
+    for (let x = -half + 0.3; x < half; x += 2) {
+      for (let z = -half + 0.3; z < half; z += 2) {
         const plate = plates.find((candidate) =>
           x >= candidate.box.minX && x <= candidate.box.maxX
           && z >= candidate.box.minZ && z <= candidate.box.maxZ);
@@ -315,6 +319,61 @@ describe('farcrysis terrain authority', () => {
     ).toBeGreaterThanOrEqual(4);
   });
 
+  // HF-393 follow-up: the centreline probe above walks the x=0 beach only,
+  // where the interior hills happen to sit low near the shore. On other
+  // azimuths the interior rises toward ~2.2 m while the shore shelf joins at
+  // 0.2 m, so an unblended descent boundary is a cliff and the owner's
+  // "you fall down into the water" reproduces on most of the beach. EVERY
+  // seaward walk must satisfy the same step/grade/swim-entry contract.
+  it('walks into the water from every azimuth without a step or grade violation', () => {
+    const half = FARCRYSIS_BOUNDS.maxX;
+    const failures: string[] = [];
+    for (let deg = 0; deg < 360; deg += 15) {
+      const ang = (deg * Math.PI) / 180;
+      // Parametrise by Chebyshev distance-inward so max(|x|,|z|) matches the
+      // authority's own shore-band coordinate.
+      const m = Math.max(Math.abs(Math.cos(ang)), Math.abs(Math.sin(ang)));
+      const at = (distIn: number): readonly [number, number] => {
+        const r = half - distIn;
+        return [(r * Math.cos(ang)) / m, (r * Math.sin(ang)) / m] as const;
+      };
+
+      let entryDist: number | null = null;
+      for (let d = 16; d >= 0.05; d -= 0.25) {
+        const [x, z] = at(d);
+        const depthOverEye = FARCRYSIS_WATER_LEVEL - (farcrysisTerrainHeight(x, z) + EYE_ABOVE_FEET);
+        if (depthOverEye >= SWIM_TUNING.enterDepth) {
+          entryDist = d;
+          break;
+        }
+      }
+      if (entryDist === null) {
+        failures.push(`${deg}deg: walking seaward never reached swim-entry depth`);
+        continue;
+      }
+
+      for (let d = 16; d > entryDist + 1e-9; d -= 0.25) {
+        const [x1, z1] = at(d);
+        const [x2, z2] = at(d - 0.25);
+        const h1 = farcrysisTerrainHeight(x1, z1);
+        const h2 = farcrysisTerrainHeight(x2, z2);
+        const segLen = Math.hypot(x2 - x1, z2 - z1);
+        const rise = h2 - h1;
+        if (rise > CHARACTER_PHYSICS_CONFIG.autostepHeight) {
+          failures.push(`${deg}deg @${d.toFixed(2)}m: ${rise.toFixed(2)} m step UP seaward`);
+        }
+        const grade = (h1 - h2) / segLen;
+        if (grade > 0.6) {
+          failures.push(`${deg}deg @${d.toFixed(2)}m: downhill grade ${grade.toFixed(2)}`);
+        }
+      }
+    }
+    expect(
+      failures,
+      `shore walk violations (${failures.length}):\n${failures.slice(0, 12).join('\n')}`,
+    ).toEqual([]);
+  });
+
   // HF-393: progressive wade slowdown. Pure helper, farcrysis-scoped, that
   // the movement loop multiplies into player speed while wading. It must be
   // CONTINUOUS with the swim state's speed scale at enter depth — a
@@ -350,12 +409,15 @@ describe('farcrysis terrain authority', () => {
     expect(navigation).toBeTruthy();
     expect(navigation.routes.some((route) => route.id === 'core-catwalk-stairs')).toBe(true);
     expect(navigation.ramps.some((ramp) => ramp.id === 'core-catwalk-stairs')).toBe(true);
-    // 64x64 one-metre ground grid + the catwalk deck platform.
-    expect(navigation.platforms.length).toBe(64 * 64 + 1);
+    // One-metre ground grid across the full island span + the catwalk deck
+    // platform. HF-396 doubled the island (maxX 32 -> 64), so the grid is
+    // 128x128; derive the count from the bounds so it tracks future resizes.
+    const half = FARCRYSIS_BOUNDS.maxX;
+    expect(navigation.platforms.length).toBe(2 * half * 2 * half + 1);
 
     // Platform elevations must be the authority's, not a third model.
     const platforms = farcrysisBotGroundPlatforms();
-    for (const platform of [platforms[0], platforms[1000], platforms[2048], platforms[4095]]) {
+    for (const platform of [platforms[0], platforms[5000], platforms[10000], platforms[2 * half * 2 * half - 1]]) {
       const centreX = (platform.minX + platform.maxX) / 2;
       const centreZ = (platform.minZ + platform.maxZ) / 2;
       expect(platform.y).toBeCloseTo(farcrysisTerrainHeight(centreX, centreZ), 10);

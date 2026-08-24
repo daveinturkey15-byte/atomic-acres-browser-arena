@@ -31,6 +31,17 @@ let _rippleGroup: THREE.Group | null = null;
 const _rippleMeshes: THREE.Mesh[] = [];
 const _ripplePhases: number[] = [];
 let _crestMesh: THREE.Mesh | null = null;
+/** Foam rings animated with a travelling wash (HF-394), with per-ring params. */
+type FoamWashRing = Readonly<{
+  mesh: THREE.Mesh;
+  /** Wash lobes around the ring circumference. */
+  lobes: number;
+  /** Radians per second the wash travels shoreward-around. */
+  washSpeed: number;
+  /** Per-ring phase so the three rings do not pulse in lockstep. */
+  washOffset: number;
+}>;
+const _foamWashRings: FoamWashRing[] = [];
 let _crestBasePositions: Float32Array | null = null;
 let _crestGeom: THREE.PlaneGeometry | null = null;
 let _sandGradient: THREE.Mesh | null = null;
@@ -151,6 +162,18 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
     posAttr.needsUpdate = true;
   };
 
+  // HF-394 travelling wash: each ring carries a per-vertex brightness field
+  // (vertex colours on an additive material scale its contribution) so the
+  // foam pulses in lobes that travel around the shore like arriving wave
+  // energy, instead of the whole ring fading in and out uniformly.
+  const attachFoamWash = (mesh: THREE.Mesh, lobes: number, washSpeed: number, washOffset: number): void => {
+    const geom = mesh.geometry as THREE.BufferGeometry;
+    const count = (geom.attributes.position as THREE.BufferAttribute).count;
+    geom.setAttribute('color', new THREE.BufferAttribute(new Float32Array(count * 3).fill(1), 3));
+    (mesh.material as THREE.MeshBasicMaterial).vertexColors = true;
+    _foamWashRings.push(Object.freeze({ mesh, lobes, washSpeed, washOffset }));
+  };
+
   // Main foam torus: circular ring at the inner beach boundary. HF-396: the
   // ring tracks the doubled island (edgeDist ~12 m, where the shelf meets
   // the shore descent), not the old 20 m radius.
@@ -174,6 +197,7 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
   foamRing.position.y = 0; // absolute shoreline heights are baked per-vertex
   foamRing.renderOrder = 5;
   foamRing.userData.farcrysisArt = true;
+  attachFoamWash(foamRing, 9, 1.15, 0);
   group.add(foamRing);
 
   // Secondary thinner ring (slightly larger, adds depth to the foam band)
@@ -193,6 +217,7 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
   foamRing2.position.y = 0;
   foamRing2.renderOrder = 5;
   foamRing2.userData.farcrysisArt = true;
+  attachFoamWash(foamRing2, 11, 0.95, 2.1);
   group.add(foamRing2);
 
   // Tertiary thin ring inside (lighter, inner foam edge)
@@ -212,6 +237,7 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
   foamRing3.position.y = 0;
   foamRing3.renderOrder = 5;
   foamRing3.userData.farcrysisArt = true;
+  attachFoamWash(foamRing3, 7, 1.35, 4.4);
   group.add(foamRing3);
 
   scene.add(group);
@@ -247,6 +273,9 @@ function buildWaveSurface(scene: THREE.Scene): void {
     base[i * 3 + 2] = posAttr.getZ(i);
   }
 
+  // HF-394: vertex colours carry swellDepthFactor per vertex, so this
+  // additive layer fades to nothing over the shallows instead of chopping
+  // uniformly right up to the sand (shore blend, row-25 comparator).
   const waveMat = new THREE.MeshBasicMaterial({
     color: 0x3da0b8,
     transparent: true,
@@ -255,7 +284,9 @@ function buildWaveSurface(scene: THREE.Scene): void {
     depthWrite: false,
     depthTest: true,
     side: THREE.DoubleSide,
+    vertexColors: true,
   });
+  geom.setAttribute('color', new THREE.BufferAttribute(new Float32Array(posAttr.count * 3), 3));
 
   const mesh = new THREE.Mesh(geom, waveMat);
   mesh.name = 'farcrysis-water-fx-wave-surface';
@@ -291,13 +322,45 @@ const SWELL_BANDS: readonly SwellBand[] = Object.freeze([
 /** Total vertical extent bound of waveSurfaceDisplacement — pinned by test. */
 export const SWELL_MAX_AMPLITUDE = SWELL_BANDS.reduce((sum, band) => sum + band.amp, 0);
 
+// ---------------------------------------------------------------------------
+// 2c. Depth response — wave energy builds offshore and calms ashore (HF-394)
+// ---------------------------------------------------------------------------
+
+/**
+ * Water column depths (metres) between which swell energy eases from calm
+ * to fully developed. A real shore breaks its waves where the seabed rises
+ * into the wave base, so the additive chop must NOT run at full amplitude
+ * over ankle-deep sand — there it dies to zero, which both looks right and
+ * blends the open-water surface into the shoreline instead of stopping at a
+ * hard edge (technique-register row 25 comparator).
+ */
+const SWELL_DEPTH_CALM_M = 0.05;
+const SWELL_DEPTH_FULL_M = 2.6;
+
+function swellSmoothstep(t: number): number {
+  const clamped = Math.max(0, Math.min(1, t));
+  return clamped * clamped * (3 - 2 * clamped);
+}
+
+/**
+ * 0..1 multiplier on swell energy at world (x, z): exactly 0 wherever the
+ * ground stands at or above the waterline, saturating at 1 once the water
+ * column reaches SWELL_DEPTH_FULL_M. Pure and clock-free like the bands.
+ */
+export function swellDepthFactor(x: number, z: number): number {
+  const column = FARCRYSIS_WATER_LEVEL - terrainHeight(x, z);
+  return swellSmoothstep((column - SWELL_DEPTH_CALM_M) / (SWELL_DEPTH_FULL_M - SWELL_DEPTH_CALM_M));
+}
+
 /** Presentation swell height (metres) at world (x, z) and time t seconds. */
 export function waveSurfaceDisplacement(x: number, z: number, tSeconds: number): number {
+  const depth = swellDepthFactor(x, z);
+  if (depth === 0) return 0; // exact zero ashore — no sign-carrying -0
   let y = 0;
   for (const band of SWELL_BANDS) {
     y += band.amp * Math.sin((x * band.dx + z * band.dz) * band.k - tSeconds * band.w);
   }
-  return y;
+  return depth * y;
 }
 
 // ---------------------------------------------------------------------------
@@ -365,18 +428,37 @@ export function animateWaterFX(time: number): void {
     }
   }
 
+  // --- 1b. HF-394 travelling foam wash — brightness lobes circle each ring ---
+  for (const ring of _foamWashRings) {
+    const posAttr = ring.mesh.geometry.attributes.position as THREE.BufferAttribute;
+    const colAttr = ring.mesh.geometry.attributes.color as THREE.BufferAttribute;
+    for (let i = 0; i < posAttr.count; i++) {
+      const angle = Math.atan2(posAttr.getZ(i), posAttr.getX(i));
+      const wash = 0.72 + 0.28 * Math.sin(ring.lobes * angle - time * ring.washSpeed + ring.washOffset);
+      colAttr.setXYZ(i, wash, wash, wash);
+    }
+    colAttr.needsUpdate = true;
+  }
+
   // --- 2. Animated wave surface — directional multi-band swell (HF-394) ---
   if (_waveMesh && _waveBasePositions && _waveGeom) {
     const posAttr = _waveGeom.attributes.position as THREE.BufferAttribute;
+    const colAttr = _waveGeom.attributes.color as THREE.BufferAttribute;
     const base = _waveBasePositions;
 
     for (let i = 0; i < posAttr.count; i++) {
       const bx = base[i * 3 + 0];
       const bz = base[i * 3 + 2];
       posAttr.setY(i, waveSurfaceDisplacement(bx, bz, time));
+      // Same depth factor drives the additive brightness, so the chop layer
+      // visually dissolves into the calm shoreline water (HF-394 blend).
+      const energy = swellDepthFactor(bx, bz);
+      colAttr.setXYZ(i, energy, energy, energy);
     }
 
     posAttr.needsUpdate = true;
+    colAttr.needsUpdate = true;
+
     // No computeVertexNormals: MeshBasicMaterial is unlit, so the old
     // per-frame normal recompute was ~600 wasted vertex normals per frame.
   }

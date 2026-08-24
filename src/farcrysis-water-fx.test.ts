@@ -21,6 +21,7 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import {
   SWELL_MAX_AMPLITUDE,
+  swellDepthFactor,
   waveSurfaceDisplacement,
   buildWaterFX,
   animateWaterFX,
@@ -32,6 +33,7 @@ import {
   registerScrollingWaterTexture,
   scrollingWaterTextureCount,
 } from './farcrysis-water-ripples';
+import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { farcrysisTerrainHeight, FARCRYSIS_WATER_LEVEL } from './farcrysis-terrain-authority';
 
 describe('HF-394 farcrysis water presentation', () => {
@@ -41,9 +43,12 @@ describe('HF-394 farcrysis water presentation', () => {
       .toBe(waveSurfaceDisplacement(12.5, -7.25, 4.5));
 
     // Bounded: never exceeds the summed band amplitudes, so the additive chop
-    // layer cannot drift away from the flat lagoon plane it shades.
-    for (let x = -38; x <= 38; x += 7.6) {
-      for (let z = -38; z <= 38; z += 7.6) {
+    // layer cannot drift away from the flat lagoon plane it shades. Sampled
+    // across the whole 140 m FX plane; HF-396 doubled the island (half 64),
+    // so most of this plane is dry land where the depth factor holds the
+    // field at exactly zero — the bound must hold there trivially too.
+    for (let x = -70; x <= 70; x += 14) {
+      for (let z = -70; z <= 70; z += 14) {
         for (let t = 0; t <= 30; t += 3.3) {
           const y = waveSurfaceDisplacement(x, z, t);
           expect(Math.abs(y)).toBeLessThanOrEqual(SWELL_MAX_AMPLITUDE + 1e-12);
@@ -52,16 +57,123 @@ describe('HF-394 farcrysis water presentation', () => {
     }
     expect(SWELL_MAX_AMPLITUDE).toBeLessThan(0.1);
 
-    // Directional, not centre-radiating: two points on the SAME circle around
-    // the origin generally displace differently (the old sin(dist - t) field
-    // gave them identical heights).
-    const r = 20;
-    const sameCircleA = waveSurfaceDisplacement(r, 0, 2);
-    const sameCircleB = waveSurfaceDisplacement(0, r, 2);
+    // Directional, not centre-radiating: two points equidistant from the
+    // origin generally displace differently (the old sin(dist - t) field gave
+    // them identical heights). Probes sit OFFSHORE (chebyshev > island half)
+    // because inland points are held at zero by the depth response.
+    const sameCircleA = waveSurfaceDisplacement(66, 10, 2);
+    const sameCircleB = waveSurfaceDisplacement(10, 66, 2);
     expect(sameCircleA).not.toBeCloseTo(sameCircleB, 3);
 
-    // It actually moves over time.
-    expect(waveSurfaceDisplacement(5, 5, 0)).not.toBeCloseTo(waveSurfaceDisplacement(5, 5, 2), 6);
+    // It actually moves over time — again offshore, for the same reason.
+    expect(waveSurfaceDisplacement(68, -14, 0)).not.toBeCloseTo(waveSurfaceDisplacement(68, -14, 2), 6);
+  });
+
+  it('swell energy responds to depth: exactly calm ashore, building offshore', () => {
+    const half = FARCRYSIS_BOUNDS.maxX;
+    const columnDepth = (x: number, z: number) => FARCRYSIS_WATER_LEVEL - farcrysisTerrainHeight(x, z);
+    // Walk the +z ray seaward and pick probes by WATER COLUMN, not by fixed
+    // coordinates, so the pin survives future shore-profile tuning.
+    const firstPointWithColumnAtLeast = (target: number) => {
+      for (let z = half - 16; z <= half + 20; z += 0.1) {
+        if (columnDepth(0, z) >= target) return z;
+      }
+      throw new Error(`no point with column >= ${target}`);
+    };
+
+    // (1) Dry land above the waterline is EXACTLY calm — no wave energy on
+    //     sand, so the additive chop cannot wash across the beach.
+    let dryZ: number | null = null;
+    for (let z = half - 16; z <= half; z += 0.1) {
+      if (columnDepth(0, z) <= 0) {
+        dryZ = z;
+        break;
+      }
+    }
+    expect(dryZ, 'no dry probe found on the ray').not.toBeNull();
+    for (let t = 0; t <= 10; t += 1.7) {
+      expect(waveSurfaceDisplacement(0, dryZ!, t)).toBe(0);
+    }
+
+    // (2) Energy grows monotonically with water column: ankle-deep < waist
+    //     deep < open water (RMS over a full swell cycle, phase-independent).
+    const rmsAt = (x: number, z: number) => {
+      let sum = 0;
+      let n = 0;
+      for (let t = 0; t <= 20; t += 0.5) {
+        const y = waveSurfaceDisplacement(x, z, t);
+        sum += y * y;
+        n += 1;
+      }
+      return Math.sqrt(sum / n);
+    };
+    const shallowZ = firstPointWithColumnAtLeast(0.4);
+    const midZ = firstPointWithColumnAtLeast(1.2);
+    const deepZ = firstPointWithColumnAtLeast(3);
+    const shallowRms = rmsAt(0, shallowZ);
+    const midRms = rmsAt(0, midZ);
+    const deepRms = rmsAt(0, deepZ);
+    expect(shallowRms).toBeGreaterThan(0);
+    expect(midRms).toBeGreaterThan(shallowRms * 1.3);
+    expect(deepRms).toBeGreaterThanOrEqual(midRms * 0.95); // saturation plateau
+
+    // (3) The depth factor itself: zero ashore, saturated offshore.
+    expect(swellDepthFactor(0, dryZ!)).toBe(0);
+    expect(swellDepthFactor(0, deepZ)).toBe(1);
+    expect(swellDepthFactor(0, midZ)).toBeGreaterThan(swellDepthFactor(0, shallowZ));
+  });
+
+  it('wave surface brightness fades with depth so shore water blends, not stops', () => {
+    const scene = new THREE.Scene();
+    buildWaterFX(scene);
+    const mesh = scene.getObjectByName('farcrysis-water-fx-wave-surface') as THREE.Mesh;
+    const material = mesh.material as THREE.MeshBasicMaterial;
+    expect(material.vertexColors).toBe(true);
+    animateWaterFX(2.25);
+    const posAttr = mesh.geometry.attributes.position as THREE.BufferAttribute;
+    const colAttr = mesh.geometry.attributes.color as THREE.BufferAttribute;
+    expect(colAttr).toBeTruthy();
+    let checked = 0;
+    for (let i = 0; i < posAttr.count; i += 13) {
+      const expected = swellDepthFactor(posAttr.getX(i), posAttr.getZ(i));
+      expect(colAttr.getX(i)).toBeCloseTo(expected, 4);
+      checked += 1;
+    }
+    expect(checked).toBeGreaterThan(20);
+  });
+
+  it('foam rings carry a deterministic travelling wash, not uniform opacity', () => {
+    const scene = new THREE.Scene();
+    buildWaterFX(scene);
+    const group = scene.getObjectByName('farcrysis-water-fx-foam-ring') as THREE.Group;
+    for (const child of group.children) {
+      const mesh = child as THREE.Mesh;
+      const material = mesh.material as THREE.MeshBasicMaterial;
+      expect(material.vertexColors, `${mesh.name} must use vertex colours`).toBe(true);
+      const colAttr = mesh.geometry.attributes.color as THREE.BufferAttribute;
+      expect(colAttr, `${mesh.name} missing colour attribute`).toBeTruthy();
+    }
+    const main = group.children[0] as THREE.Mesh;
+    const colAttr = main.geometry.attributes.color as THREE.BufferAttribute;
+    animateWaterFX(3.1);
+    const snapshot: number[] = [];
+    for (let i = 0; i < Math.min(colAttr.count, 400); i++) snapshot.push(colAttr.getX(i));
+    // The wash varies around the ring...
+    const min = Math.min(...snapshot);
+    const max = Math.max(...snapshot);
+    expect(max - min).toBeGreaterThan(0.05);
+    // ...it travels (different time, different pattern)...
+    animateWaterFX(4.6);
+    let differs = 0;
+    for (let i = 0; i < snapshot.length; i++) {
+      if (Math.abs(snapshot[i] - colAttr.getX(i)) > 1e-4) differs += 1;
+    }
+    expect(differs).toBeGreaterThan(40);
+    // ...and it is deterministic.
+    animateWaterFX(3.1);
+    for (let i = 0; i < snapshot.length; i++) {
+      expect(colAttr.getX(i)).toBeCloseTo(snapshot[i], 5);
+    }
   });
 
   it('ripple height field is seamless-tileable and its derivative matches', () => {
