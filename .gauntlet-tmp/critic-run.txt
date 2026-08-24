@@ -1,0 +1,9 @@
+
+ RUN  v4.1.9 C:/Users/david/projects/atomic-acres-gauntlet
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  18:30:26
+   Duration  2.23s (transform 457ms, setup 0ms, import 650ms, tests 1.18s, environment 0ms)
+

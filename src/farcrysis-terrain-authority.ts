@@ -16,11 +16,13 @@
  *          origin, blended out to 10 m) is flattened to y=0 so the authored
  *          station walls/desk/catwalk sit on one coherent floor instead of a
  *          slope that buried the south wall and floated the north one.
- *       2. Shore descent — the outer 4 m of beach now dips below the water
- *          level so walking seaward actually reaches swim depth (HF-358 swim
- *          state). The old profile clamped the whole beach to >= 0 while the
- *          swimmable registry water sat at -0.25/-0.3: the arena's ONLY swim
- *          water was physically unreachable on foot.
+ *       2. Shore descent (HF-393 reshape) — the outer seabed band leaves dry
+ *          sand at the beach-shelf join height and descends on a gentle
+ *          ~0.38 grade, so walking seaward WADES progressively deeper until
+ *          the swim state engages. HF-358 first made the water reachable on
+ *          foot with a 1:1 / 45-degree ramp over the outer 4 m; the owner
+ *          played that as "you fall down into the water", so HF-393
+ *          reshaped it into a shelved seabed (see FARCRYSIS_SHORE).
  *
  *   - `farcrysisTerrainPhysicsTiles()` compiles that surface into rotated
  *     Box2 plates for `physicsColliders` (the same physics-only channel the
@@ -40,6 +42,7 @@
 import type { Box2 } from './collision';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { FARCRYSIS_WATER } from './water/water-authoring';
+import { SWIM_TUNING } from './water/swim-state';
 
 /** The one gameplay water level (registry-authoritative, see water-authoring). */
 export const FARCRYSIS_WATER_LEVEL = FARCRYSIS_WATER.level;
@@ -50,15 +53,58 @@ export const FARCRYSIS_WATER_LEVEL = FARCRYSIS_WATER.level;
  */
 export const FARCRYSIS_SAFETY_FLOOR_Y = -4.5;
 
-/** Shore-descent profile constants (HF-360 deliberate change #2 above). */
+/**
+ * Shore-descent profile constants (HF-393 wade reshaping of the HF-360
+ * change #2). The seabed leaves dry sand at `descentStartDist` from the
+ * arena boundary at the old beach-shelf height (`joinHeight`), then descends
+ * at a single gentle grade to swim-entry depth before the boundary wall:
+ *
+ *   ground(d) = joinHeight - shelfSlope * (descentStartDist - d)
+ *
+ * With the registry water level (-0.25) and the standing eye height this
+ * gives: waterline crossing 8.8 m out, ~6.8 m of progressively deepening
+ * wade (ankle -> knee -> waist -> chest), then the swim state engages about
+ * 2 m before the boundary. The pre-HF-393 profile dropped 1:1 (45 degrees)
+ * over the outer 4 m, which played as "you fall down into the water".
+ */
 export const FARCRYSIS_SHORE = Object.freeze({
-  /** Edge distance (m from the arena boundary) where the seaward drop begins. */
-  descentStartDist: 4,
-  /** Metres of drop per metre walked toward the arena edge (45 degrees). */
-  descentSlope: 1.0,
-  /** Height where the descent joins the untouched beach shelf at dist=4. */
-  joinHeight: 0.02,
+  /** Edge distance (m from the arena boundary) where the seabed leaves dry sand. */
+  descentStartDist: 10,
+  /** Seabed height at descentStartDist — continuous with the beach shelf join. */
+  joinHeight: 0.2,
+  /** Metres of drop per metre walked seaward (~21 degrees). */
+  shelfSlope: 0.38,
+  /** Edge distance where the shelf stops and the outer drop begins. */
+  outerDropDist: 1.5,
+  /** Seabed height at the arena boundary face (safety floor stays below it). */
+  edgeHeight: -3.98,
 } as const);
+
+/**
+ * HF-393 progressive wade slowdown. While the player stands in swimmable
+ * water but the swim state has NOT engaged yet, the movement loop multiplies
+ * this into player speed so deepening water physically resists before
+ * swimming takes over. The curve is pinned at BOTH ends: no effect in dry or
+ * ankle-deep water, and exactly `SWIM_TUNING.swimSpeedScale` at the swim
+ * state's enter depth — so engaging swim cannot step the player's speed.
+ *
+ * Pure and host-authoritative like every movement modifier; depth over eye
+ * uses the same convention as legacy-main's stepSwimState feed
+ * (surfaceY - player.position.y). WIRED status: see the movement-loop patch
+ * referenced in the HF-393 ledger row.
+ */
+export const FARCRYSIS_WADE_TUNING = Object.freeze({
+  /** Eye depth where wading resistance begins (about ankle-deep). */
+  startDepth: 0.25,
+  /** Eye depth where wading has slowed all the way to swim speed. */
+  fullDepth: SWIM_TUNING.enterDepth,
+} as const);
+
+export function farcrysisWadeSpeedScale(depthOverEye: number): number {
+  const span = FARCRYSIS_WADE_TUNING.fullDepth - FARCRYSIS_WADE_TUNING.startDepth;
+  const t = Math.min(1, Math.max(0, (depthOverEye - FARCRYSIS_WADE_TUNING.startDepth) / span));
+  return 1 - t * (1 - SWIM_TUNING.swimSpeedScale);
+}
 
 /** Core-pad blend radii (Chebyshev metres from origin; change #1 above). */
 const CORE_PAD_INNER = 7;
@@ -82,14 +128,22 @@ export function farcrysisTerrainHeight(x: number, z: number): number {
   const chebyshev = Math.max(Math.abs(x), Math.abs(z));
   const dist = ARENA_HALF - chebyshev;
 
-  // Shore descent: the outer band ramps 1:1 below the waterline so walking
-  // seaward reaches swim-entry depth before the world boundary (HF-358).
+  // HF-393 wade shelf: the outer band leaves dry sand at the old shelf join
+  // height and descends at one gentle grade, so walking seaward wades
+  // progressively deeper (ankle -> knee -> waist -> chest) until the
+  // host-authoritative swim state engages — instead of dropping down a 1:1
+  // chute. Inside `outerDropDist` the seabed steepens to the boundary face;
+  // that band is past swim-entry depth and underwater.
   if (dist < FARCRYSIS_SHORE.descentStartDist) {
-    return (dist - FARCRYSIS_SHORE.descentStartDist) * FARCRYSIS_SHORE.descentSlope
-      + FARCRYSIS_SHORE.joinHeight;
+    if (dist >= FARCRYSIS_SHORE.outerDropDist) {
+      return FARCRYSIS_SHORE.joinHeight
+        - FARCRYSIS_SHORE.shelfSlope * (FARCRYSIS_SHORE.descentStartDist - dist);
+    }
+    const t = dist / FARCRYSIS_SHORE.outerDropDist;
+    const shelfEnd = FARCRYSIS_SHORE.joinHeight
+      - FARCRYSIS_SHORE.shelfSlope * (FARCRYSIS_SHORE.descentStartDist - FARCRYSIS_SHORE.outerDropDist);
+    return FARCRYSIS_SHORE.edgeHeight + (shelfEnd - FARCRYSIS_SHORE.edgeHeight) * t;
   }
-  // Beach shelf: flat near edges, rising toward center (adopted unchanged).
-  if (dist < 10) return Math.max(0, dist * 0.03 - 0.1);
   // Jungle interior: gentle rolling hills (adopted unchanged).
   const h = Math.sin(x * 0.12) * Math.cos(z * 0.15) * 1.2
     + Math.sin(x * 0.25 + 1.3) * Math.cos(z * 0.22 + 2.1) * 0.6

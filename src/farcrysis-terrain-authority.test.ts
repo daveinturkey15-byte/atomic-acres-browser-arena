@@ -28,8 +28,10 @@ import {
   farcrysisBotGroundPlatforms,
   FARCRYSIS_WATER_LEVEL,
   FARCRYSIS_SAFETY_FLOOR_Y,
+  farcrysisWadeSpeedScale,
   PLATE_FIT_TOLERANCE_M,
 } from './farcrysis-terrain-authority';
+import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { STANCE_SHAPES, CHARACTER_PHYSICS_CONFIG } from './physics';
 import { SWIM_TUNING } from './water/swim-state';
 import { FARCRYSIS_WATER } from './water/water-authoring';
@@ -250,14 +252,19 @@ describe('farcrysis terrain authority', () => {
     expect(FARCRYSIS_WATER_LEVEL).toBe(FARCRYSIS_WATER.level);
     // Sanity: the safety floor sits below the deepest shore point so the
     // fail-safe plate cannot override the authored sea-floor ramp.
-    expect(FARCRYSIS_SAFETY_FLOOR_Y).toBeLessThan(farcrysisTerrainHeight(0, 31.95));
+    // HF-396: the probe range derives from FARCRYSIS_BOUNDS so the contract
+    // survives island resizes; the wall inner face is HALF - 0.05.
+    const half = FARCRYSIS_BOUNDS.maxX;
+    const wallFace = half - 0.05;
+    const drySandZ = half - 8; // still on the beach shelf, before the shore band
+    expect(FARCRYSIS_SAFETY_FLOOR_Y).toBeLessThan(farcrysisTerrainHeight(0, wallFace));
 
     // Probe the beach centreline from dry sand to the boundary wall's inner
-    // face (|z| = 31.95). Swim engages when the mean surface stands at least
+    // face. Swim engages when the mean surface stands at least
     // SWIM_TUNING.enterDepth above the standing EYE (see legacy-main's
     // stepSwimState wiring: depth = surfaceY - player.position.y).
     let entryZ: number | null = null;
-    for (let z = 24; z <= 31.95; z += 0.05) {
+    for (let z = drySandZ; z <= wallFace; z += 0.05) {
       const feetY = farcrysisTerrainHeight(0, z);
       const depthOverEye = FARCRYSIS_WATER_LEVEL - (feetY + EYE_ABOVE_FEET);
       if (depthOverEye >= SWIM_TUNING.enterDepth) {
@@ -266,14 +273,70 @@ describe('farcrysis terrain authority', () => {
       }
     }
     expect(entryZ, 'walking seaward never reached swim-entry depth').not.toBeNull();
-    expect(entryZ!).toBeLessThan(31.95);
+    expect(entryZ!).toBeLessThan(wallFace);
 
     // The walk-in must be traversable: no seaward step along the probe rises
     // more than the character controller's autostep height.
-    for (let z = 24; z < entryZ!; z += 0.5) {
+    for (let z = drySandZ; z < entryZ!; z += 0.5) {
       const step = farcrysisTerrainHeight(0, z + 0.5) - farcrysisTerrainHeight(0, z);
       expect(step).toBeLessThanOrEqual(CHARACTER_PHYSICS_CONFIG.autostepHeight);
     }
+
+    // HF-393 wade contract — the walk-in must be a SHELVED seabed, not a
+    // chute. Two mechanical pins, both violated by the pre-HF-393 profile
+    // (a 1:1 / 45-degree ramp over the outer 4 m):
+    //
+    // (1) GRADE — no seaward step along the walk-in may exceed a 0.6 grade
+    //     (31 degrees). At 1:1 the capsule loses contact with tangent-plane
+    //     plates at sprint speed and free-falls, which the owner described
+    //     as "you fall down into the water".
+    let worstGrade = 0;
+    for (let z = drySandZ; z < entryZ!; z += 0.25) {
+      const grade = (farcrysisTerrainHeight(0, z) - farcrysisTerrainHeight(0, z + 0.25)) / 0.25;
+      if (grade > worstGrade) worstGrade = grade;
+    }
+    expect(worstGrade, `worst walk-in grade ${worstGrade.toFixed(2)}`).toBeLessThanOrEqual(0.6);
+
+    // (2) WADE SPAN — at least 4 m of progressively deepening water between
+    //     the seabed crossing the mean waterline and swim entry, so the
+    //     player wades before the swim state engages. The old chute crossed
+    //     the waterline ~2.5 m before swim depth.
+    let waterlineZ: number | null = null;
+    for (let z = drySandZ; z <= wallFace; z += 0.05) {
+      if (farcrysisTerrainHeight(0, z) < FARCRYSIS_WATER_LEVEL) {
+        waterlineZ = z;
+        break;
+      }
+    }
+    expect(waterlineZ, 'walk-in never crosses the mean waterline').not.toBeNull();
+    expect(
+      entryZ! - waterlineZ!,
+      `wade span ${(entryZ! - waterlineZ!).toFixed(2)} m is too short to wade`,
+    ).toBeGreaterThanOrEqual(4);
+  });
+
+  // HF-393: progressive wade slowdown. Pure helper, farcrysis-scoped, that
+  // the movement loop multiplies into player speed while wading. It must be
+  // CONTINUOUS with the swim state's speed scale at enter depth — a
+  // discontinuity there is exactly the "speed snap" the owner feels when
+  // swimming engages.
+  it('eases player speed from dry land to swim scale across the wade band', () => {
+    const { enterDepth } = SWIM_TUNING;
+    // Dry sand: no water resistance at all.
+    expect(farcrysisWadeSpeedScale(-1)).toBe(1);
+    expect(farcrysisWadeSpeedScale(0)).toBe(1);
+    // Monotonic non-increasing across the whole wade band.
+    let previous = Number.POSITIVE_INFINITY;
+    for (let d = 0; d <= enterDepth + 0.5; d += 0.01) {
+      const scale = farcrysisWadeSpeedScale(d);
+      expect(scale).toBeLessThanOrEqual(previous + 1e-12);
+      expect(scale).toBeGreaterThan(0);
+      previous = scale;
+    }
+    // Continuity: at swim-enter depth the wade scale IS the swim scale, so
+    // engaging the swim state cannot step the player's speed.
+    expect(farcrysisWadeSpeedScale(enterDepth)).toBeCloseTo(SWIM_TUNING.swimSpeedScale, 12);
+    expect(farcrysisWadeSpeedScale(enterDepth + 5)).toBeCloseTo(SWIM_TUNING.swimSpeedScale, 12);
   });
 
   it('publishes bot ground platforms and the catwalk route through verticalNavigation', () => {

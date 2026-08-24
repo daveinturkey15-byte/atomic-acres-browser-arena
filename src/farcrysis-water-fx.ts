@@ -11,6 +11,12 @@
  */
 
 import * as THREE from 'three';
+import {
+  farcrysisTerrainHeight as terrainHeight,
+  FARCRYSIS_WATER_LEVEL,
+} from './farcrysis-terrain-authority';
+import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
+import { animateWaterRippleTextures } from './farcrysis-water-ripples';
 
 // ---------------------------------------------------------------------------
 // Module-level animation state
@@ -80,9 +86,10 @@ function createSandGradientCanvas(): HTMLCanvasElement | null {
 }
 
 /**
- * Annulus under the water surface (r 31.5–61) covering the visible water ring
- * around the beach shelf. Golden near the shore fading to deep teal offshore —
+ * Annulus under the water surface covering the visible water ring around
+ * the beach shelf. Golden near the shore fading to deep teal offshore —
  * the shallow→deep sand depth gradient seen through the translucent water.
+ * HF-396: the band tracks the doubled island (edge to ~2x edge).
  */
 function buildSandDepthGradient(scene: THREE.Scene): void {
   const canvas = createSandGradientCanvas();
@@ -93,7 +100,7 @@ function buildSandDepthGradient(scene: THREE.Scene): void {
   tex.wrapS = THREE.ClampToEdgeWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
 
-  const geom = new THREE.RingGeometry(31.5, 61, 96);
+  const geom = new THREE.RingGeometry(FARCRYSIS_BOUNDS.maxX - 0.5, FARCRYSIS_BOUNDS.maxX * 2 - 3, 96);
   geom.rotateX(-Math.PI / 2);
 
   const mat = new THREE.MeshBasicMaterial({
@@ -124,11 +131,34 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
   group.name = 'farcrysis-water-fx-foam-ring';
   group.userData.farcrysisArt = true;
 
-  // Main foam torus: circular ring at ~20 m radius (inner beach boundary)
-  const majorR = 20;
+  // HF-394: the rings used to sit at a FIXED y (-0.14..-0.16) on a fixed
+  // radius, so wherever the sculpted beach terrain crossed that radius above
+  // the waterline the foam vanished inside the sand, and where the shelf
+  // dipped it floated in mid-air over the water. Every vertex now samples the
+  // single terrain authority and rides max(shoreline, water level), exactly
+  // like the wet-sand band in farcrysis-art buildInlineWater already does.
+  const conformToShoreline = (geom: THREE.BufferGeometry, waterLift: number, landLift: number): void => {
+    const posAttr = geom.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < posAttr.count; i++) {
+      const x = posAttr.getX(i);
+      const z = posAttr.getZ(i);
+      const shoreY = Math.max(
+        FARCRYSIS_WATER_LEVEL + waterLift,
+        terrainHeight(x, z) + landLift,
+      );
+      posAttr.setY(i, shoreY);
+    }
+    posAttr.needsUpdate = true;
+  };
+
+  // Main foam torus: circular ring at the inner beach boundary. HF-396: the
+  // ring tracks the doubled island (edgeDist ~12 m, where the shelf meets
+  // the shore descent), not the old 20 m radius.
+  const majorR = FARCRYSIS_BOUNDS.maxX - 12;
   const minorR = 0.38;
   const torusGeom = new THREE.TorusGeometry(majorR, minorR, 16, 128);
   torusGeom.rotateX(-Math.PI / 2); // lay flat in XZ plane
+  conformToShoreline(torusGeom, 0.1, 0.05);
 
   const foamMat = new THREE.MeshBasicMaterial({
     color: 0xf8f8ff,
@@ -141,7 +171,7 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
 
   const foamRing = new THREE.Mesh(torusGeom, foamMat);
   foamRing.name = 'farcrysis-water-fx-foam-ring-main';
-  foamRing.position.y = -0.15;
+  foamRing.position.y = 0; // absolute shoreline heights are baked per-vertex
   foamRing.renderOrder = 5;
   foamRing.userData.farcrysisArt = true;
   group.add(foamRing);
@@ -149,6 +179,7 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
   // Secondary thinner ring (slightly larger, adds depth to the foam band)
   const torusGeom2 = new THREE.TorusGeometry(majorR + 0.55, minorR * 0.6, 12, 96);
   torusGeom2.rotateX(-Math.PI / 2);
+  conformToShoreline(torusGeom2, 0.09, 0.06);
   const foamMat2 = new THREE.MeshBasicMaterial({
     color: 0xe0f4ff,
     transparent: true,
@@ -159,7 +190,7 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
   });
   const foamRing2 = new THREE.Mesh(torusGeom2, foamMat2);
   foamRing2.name = 'farcrysis-water-fx-foam-ring-outer';
-  foamRing2.position.y = -0.16;
+  foamRing2.position.y = 0;
   foamRing2.renderOrder = 5;
   foamRing2.userData.farcrysisArt = true;
   group.add(foamRing2);
@@ -167,6 +198,7 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
   // Tertiary thin ring inside (lighter, inner foam edge)
   const torusGeom3 = new THREE.TorusGeometry(majorR - 0.45, minorR * 0.4, 10, 80);
   torusGeom3.rotateX(-Math.PI / 2);
+  conformToShoreline(torusGeom3, 0.11, 0.04);
   const foamMat3 = new THREE.MeshBasicMaterial({
     color: 0xf0faff,
     transparent: true,
@@ -177,7 +209,7 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
   });
   const foamRing3 = new THREE.Mesh(torusGeom3, foamMat3);
   foamRing3.name = 'farcrysis-water-fx-foam-ring-inner';
-  foamRing3.position.y = -0.14;
+  foamRing3.position.y = 0;
   foamRing3.renderOrder = 5;
   foamRing3.userData.farcrysisArt = true;
   group.add(foamRing3);
@@ -191,7 +223,9 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
 // ---------------------------------------------------------------------------
 
 function buildWaveSurface(scene: THREE.Scene): void {
-  const size = 76;
+  // HF-396: 140 m clears the doubled 128 m island with the same margin the
+  // old 76 m plane kept around the 64 m one.
+  const size = 140;
   // HF-374. Was 72, i.e. 10,368 triangles of full-screen additive fill per
   // plane, twice over, with depthWrite disabled and no depth rejection. During
   // arena admission the coverage draw disables frustum culling for the whole
@@ -235,6 +269,36 @@ function buildWaveSurface(scene: THREE.Scene): void {
   _waveBasePositions = base;
   _waveGeom = geom;
 }
+// ---------------------------------------------------------------------------
+// 2b. Directional swell field (HF-394)
+// ---------------------------------------------------------------------------
+
+type SwellBand = Readonly<{ dx: number; dz: number; k: number; w: number; amp: number }>;
+
+/**
+ * Three crossing travel directions — a real sea reads as waves arriving from
+ * one weather system, not rings radiating from the map centre (the old
+ * `sin(dist - t)` field, which visibly pulsed outward from spawn). Pure and
+ * clock-free so tests can pin determinism; amplitude stays under +/-0.10 m
+ * so this chop layer never detaches from the flat lagoon surface it shades.
+ */
+const SWELL_BANDS: readonly SwellBand[] = Object.freeze([
+  Object.freeze({ dx: 0.83, dz: 0.55, k: 0.42, w: 0.9, amp: 0.045 }),
+  Object.freeze({ dx: -0.28, dz: 0.96, k: 0.71, w: 1.3, amp: 0.032 }),
+  Object.freeze({ dx: 0.95, dz: -0.31, k: 1.13, w: 1.7, amp: 0.02 }),
+]);
+
+/** Total vertical extent bound of waveSurfaceDisplacement — pinned by test. */
+export const SWELL_MAX_AMPLITUDE = SWELL_BANDS.reduce((sum, band) => sum + band.amp, 0);
+
+/** Presentation swell height (metres) at world (x, z) and time t seconds. */
+export function waveSurfaceDisplacement(x: number, z: number, tSeconds: number): number {
+  let y = 0;
+  for (const band of SWELL_BANDS) {
+    y += band.amp * Math.sin((x * band.dx + z * band.dz) * band.k - tSeconds * band.w);
+  }
+  return y;
+}
 
 // ---------------------------------------------------------------------------
 // 3. Caustic light overlay (canvas-textured plane)
@@ -276,6 +340,10 @@ export function buildWaterFX(scene: THREE.Scene): void {
 }
 
 export function animateWaterFX(time: number): void {
+  // --- 0. HF-394: scroll every registered water ripple normal map (lagoon,
+  // deep, shallow lens, vista ocean) along its own drift direction ---
+  animateWaterRippleTextures(time);
+
   // --- 1. Shoreline foam ring opacity oscillation (period ~4 s) ---
   if (_foamRing) {
     const foamMat = _foamRing.material as THREE.MeshBasicMaterial;
@@ -297,7 +365,7 @@ export function animateWaterFX(time: number): void {
     }
   }
 
-  // --- 2. Animated wave surface — vertex displacement from center ---
+  // --- 2. Animated wave surface — directional multi-band swell (HF-394) ---
   if (_waveMesh && _waveBasePositions && _waveGeom) {
     const posAttr = _waveGeom.attributes.position as THREE.BufferAttribute;
     const base = _waveBasePositions;
@@ -305,21 +373,12 @@ export function animateWaterFX(time: number): void {
     for (let i = 0; i < posAttr.count; i++) {
       const bx = base[i * 3 + 0];
       const bz = base[i * 3 + 2];
-      const dist = Math.sqrt(bx * bx + bz * bz);
-
-      // Circular ripples emanating from center
-      const wave1 = Math.sin(dist * 0.55 - time * 1.4) * 0.08;
-      const wave2 = Math.cos(dist * 0.75 + time * 1.1) * 0.05;
-      const wave3 = Math.sin(dist * 1.05 - time * 1.8) * 0.04;
-      const ripple = Math.sin(dist * 0.40 - time * 2.0) * 0.06;
-
-      const y = wave1 + wave2 + wave3 + ripple + 0.02; // slight base lift
-
-      posAttr.setY(i, y);
+      posAttr.setY(i, waveSurfaceDisplacement(bx, bz, time));
     }
 
     posAttr.needsUpdate = true;
-    _waveGeom.computeVertexNormals();
+    // No computeVertexNormals: MeshBasicMaterial is unlit, so the old
+    // per-frame normal recompute was ~600 wasted vertex normals per frame.
   }
 
   // --- 3. Caustic overlay — scroll the canvas texture ---

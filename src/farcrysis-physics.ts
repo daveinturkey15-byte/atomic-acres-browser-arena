@@ -1000,7 +1000,7 @@ function placeStackedSandbagWall(
  */
 export function addInteractables(builder: any): void {
   // All interactable positions are verified against the arena boundary
-  // (±32 m) with a 1.5 m margin to avoid clipping the outer lagoon ring.
+  // (FARCRYSIS_BOUNDS, ±64 m after HF-396) with a 1.5 m margin to avoid clipping the outer lagoon ring.
   const { minX: bMinX, maxX: bMaxX, minZ: bMinZ, maxZ: bMaxZ } = FARCRYSIS_BOUNDS;
   const margin = 1.5;
   const ok = (px: number, pz: number): boolean =>
@@ -1016,10 +1016,10 @@ export function addInteractables(builder: any): void {
   // bullets penetrate with the wood resistance profile.
 
   // -- Mid-ring jungle, rotated square around the core ------------------
-  placeCrate(builder, 'farcrysis-crate-01', -17, -17, 1.0);
-  placeCrate(builder, 'farcrysis-crate-02',  17,  17, 1.0);
-  placeCrate(builder, 'farcrysis-crate-03', -17,  17, 1.0);
-  placeCrate(builder, 'farcrysis-crate-04',  17, -17, 1.0);
+  placeCrate(builder, 'farcrysis-crate-01', -34, -34, 1.0);
+  placeCrate(builder, 'farcrysis-crate-02',  34,  34, 1.0);
+  placeCrate(builder, 'farcrysis-crate-03', -34,  34, 1.0);
+  placeCrate(builder, 'farcrysis-crate-04',  34, -34, 1.0);
 
   // -- Core approaches (N/S/E/W) — stacked near the entrances -----------
   placeCrate(builder, 'farcrysis-crate-05',  -4, -10, 0.9);
@@ -1036,10 +1036,10 @@ export function addInteractables(builder: any): void {
   placeCrate(builder, 'farcrysis-crate-12',   0,  1.8, 0.85);
 
   // -- Beach / lagoon edge, near the skiff cover positions ---------------
-  placeCrate(builder, 'farcrysis-crate-13', -22, -10, 1.0);
-  placeCrate(builder, 'farcrysis-crate-14',  22,  10, 1.0);
-  placeCrate(builder, 'farcrysis-crate-15', -10, -22, 1.0);
-  placeCrate(builder, 'farcrysis-crate-16',  10,  22, 1.0);
+  placeCrate(builder, 'farcrysis-crate-13', -44, -20, 1.0);
+  placeCrate(builder, 'farcrysis-crate-14',  44,  20, 1.0);
+  placeCrate(builder, 'farcrysis-crate-15', -20, -44, 1.0);
+  placeCrate(builder, 'farcrysis-crate-16',  20,  44, 1.0);
 
   // =====================================================================
   // 2. RUSTY STEEL BARRELS (10) — 0.6 m radius × 1.0 m height
@@ -1050,16 +1050,16 @@ export function addInteractables(builder: any): void {
   // punch through with a satisfying metallic spark but don't stop cold.
 
   // -- Beach / skiff area pairs ------------------------------------------
-  placeBarrel(builder, 'farcrysis-barrel-01', -22, -20);
-  placeBarrel(builder, 'farcrysis-barrel-02',  22,  20);
+  placeBarrel(builder, 'farcrysis-barrel-01', -44, -40);
+  placeBarrel(builder, 'farcrysis-barrel-02',  44,  40);
 
   // -- Near the signal beacon (NW) and seaplane (SE) throwback zones -----
-  placeBarrel(builder, 'farcrysis-barrel-03', -20,  12);
-  placeBarrel(builder, 'farcrysis-barrel-04',  20, -12);
+  placeBarrel(builder, 'farcrysis-barrel-03', -40,  24);
+  placeBarrel(builder, 'farcrysis-barrel-04',  40, -24);
 
   // -- Beach edge paths --------------------------------------------------
-  placeBarrel(builder, 'farcrysis-barrel-05',  -8, -22);
-  placeBarrel(builder, 'farcrysis-barrel-06',   8,  22);
+  placeBarrel(builder, 'farcrysis-barrel-05', -16, -44);
+  placeBarrel(builder, 'farcrysis-barrel-06',  16,  44);
 
   // -- Flanking the core door approaches ----------------------------------
   // HF-360: barrel-08 moved from (3, 3.5) — that spot is now inside the
@@ -1069,8 +1069,8 @@ export function addInteractables(builder: any): void {
   placeBarrel(builder, 'farcrysis-barrel-08',  -3,  3.5);
 
   // -- Mid-field jungle paths --------------------------------------------
-  placeBarrel(builder, 'farcrysis-barrel-09', -12,  16);
-  placeBarrel(builder, 'farcrysis-barrel-10',  12, -16);
+  placeBarrel(builder, 'farcrysis-barrel-09', -24,  32);
+  placeBarrel(builder, 'farcrysis-barrel-10',  24, -32);
 
   // =====================================================================
   // 3. SANDBAG WALLS (4) — low cover near existing hard-cover positions
@@ -1082,16 +1082,16 @@ export function addInteractables(builder: any): void {
   // ruined walls) so players can chain cover-to-cover movement.
 
   // -- Beach approach, near skiff NW and rock NW -------------------------
-  placeSandbagWall(builder, 'farcrysis-sandbag-01', -14, -18, 2.2, 0.6, 0.45);
+  placeSandbagWall(builder, 'farcrysis-sandbag-01', -28, -36, 2.2, 0.6, 0.45);
 
   // -- Beach approach, near skiff SE and rock SE -------------------------
-  placeSandbagWall(builder, 'farcrysis-sandbag-02',  14,  18, 2.2, 0.6, 0.45);
+  placeSandbagWall(builder, 'farcrysis-sandbag-02',  28,  36, 2.2, 0.6, 0.45);
 
   // -- Path toward ruined wall N, mid-ring approach to core --------------
-  placeSandbagWall(builder, 'farcrysis-sandbag-03',  -6, -17, 2.2, 0.6, 0.45);
+  placeSandbagWall(builder, 'farcrysis-sandbag-03', -12, -34, 2.2, 0.6, 0.45);
 
   // -- Path toward ruined wall S, mid-ring approach to core --------------
-  placeSandbagWall(builder, 'farcrysis-sandbag-04',   6,  17, 2.2, 0.6, 0.45);
+  placeSandbagWall(builder, 'farcrysis-sandbag-04',  12,  34, 2.2, 0.6, 0.45);
 
   // =====================================================================
   // 4. COVER POSITIONS (4) — crate stacks & fallen trunks along paths
@@ -1103,16 +1103,16 @@ export function addInteractables(builder: any): void {
   // with a combined physicalCover footprint.
 
   // -- Fallen palm trunk, NW jungle path near the research tower ----------
-  placeFallenTrunk(builder, 'farcrysis-cover-jungle-01', -20, 8, 3.2, 0.4);
+  placeFallenTrunk(builder, 'farcrysis-cover-jungle-01', -40, 16, 3.2, 0.4);
 
   // -- Fallen palm trunk, SE jungle path behind the cave entrance ---------
-  placeFallenTrunk(builder, 'farcrysis-cover-jungle-02',  22, -8, 3.0, 0.4);
+  placeFallenTrunk(builder, 'farcrysis-cover-jungle-02',  44, -16, 3.0, 0.4);
 
   // -- Crate stack, NE beach-to-jungle transition -------------------------
-  placeCrateCover(builder, 'farcrysis-cover-jungle-03', 8, -24);
+  placeCrateCover(builder, 'farcrysis-cover-jungle-03', 16, -48);
 
   // -- Crate stack, SW lagoon-side jungle path ----------------------------
-  placeCrateCover(builder, 'farcrysis-cover-jungle-04', -20, 14);
+  placeCrateCover(builder, 'farcrysis-cover-jungle-04', -40, 28);
 
   // =====================================================================
   // 5. ADDITIONAL CRATES (6) — jungle mid-ring and beach fringe
@@ -1123,18 +1123,18 @@ export function addInteractables(builder: any): void {
   // entrances, mid-ring cardinal corridor, and patrol waypoints.
 
   // -- Jungle mid-ring diagonals (radius ~19 m) --------------------------
-  placeCrate(builder, 'farcrysis-crate-17', -14, -13, 0.95);
-  placeCrate(builder, 'farcrysis-crate-18',  14,  13, 0.95);
-  placeCrate(builder, 'farcrysis-crate-19', -13,  14, 0.9);
-  placeCrate(builder, 'farcrysis-crate-20',  13, -14, 0.9);
+  placeCrate(builder, 'farcrysis-crate-17', -28, -26, 0.95);
+  placeCrate(builder, 'farcrysis-crate-18',  28,  26, 0.95);
+  placeCrate(builder, 'farcrysis-crate-19', -26,  28, 0.9);
+  placeCrate(builder, 'farcrysis-crate-20',  26, -28, 0.9);
 
   // -- Beach / jungle transition (radius ~24 m) --------------------------
-  placeCrate(builder, 'farcrysis-crate-21', -14, -20, 0.95);
-  placeCrate(builder, 'farcrysis-crate-22',  14,  20, 0.95);
+  placeCrate(builder, 'farcrysis-crate-21', -28, -40, 0.95);
+  placeCrate(builder, 'farcrysis-crate-22',  28,  40, 0.95);
 
   // ── Crate shard detail on the two beach crates ───────────────────────
-  addCrateShards(builder, 'farcrysis-crate-21-shards', -14, -20, 0.95);
-  addCrateShards(builder, 'farcrysis-crate-22-shards',  14,  20, 0.95);
+  addCrateShards(builder, 'farcrysis-crate-21-shards', -28, -40, 0.95);
+  addCrateShards(builder, 'farcrysis-crate-22-shards',  28,  40, 0.95);
 
   // =====================================================================
   // 6. ADDITIONAL BARRELS (4) — beach fringe
@@ -1144,18 +1144,18 @@ export function addInteractables(builder: any): void {
   // clear of spawn and patrol routes.
 
   // -- West / east beach fringe ------------------------------------------
-  placeBarrel(builder, 'farcrysis-barrel-11', -28,  -6);
-  placeBarrel(builder, 'farcrysis-barrel-12',  28,   6);
+  placeBarrel(builder, 'farcrysis-barrel-11', -56, -12);
+  placeBarrel(builder, 'farcrysis-barrel-12',  56,  12);
 
   // -- North / south beach fringe ----------------------------------------
-  placeBarrel(builder, 'farcrysis-barrel-13',  -6,  24);
-  placeBarrel(builder, 'farcrysis-barrel-14',   6, -24);
+  placeBarrel(builder, 'farcrysis-barrel-13', -12,  48);
+  placeBarrel(builder, 'farcrysis-barrel-14',  12, -48);
 
   // ── Hazard stripes on the new barrels ─────────────────────────────────
-  addHazardStripesToBarrel(builder, 'farcrysis-barrel-11', -28,  -6);
-  addHazardStripesToBarrel(builder, 'farcrysis-barrel-12',  28,   6);
-  addHazardStripesToBarrel(builder, 'farcrysis-barrel-13',  -6,  24);
-  addHazardStripesToBarrel(builder, 'farcrysis-barrel-14',   6, -24);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-11', -56, -12);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-12',  56,  12);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-13', -12,  48);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-14',  12, -48);
 
   // =====================================================================
   // 7. FALLEN-LOG COVER (2) — jungle mid-ring
@@ -1165,10 +1165,10 @@ export function addInteractables(builder: any): void {
   // the cardinal lanes and clear of patrol waypoints.
 
   // -- West jungle mid-ring -----------------------------------------------
-  placeFallenTrunk(builder, 'farcrysis-cover-jungle-05', -16, -4, 3.0, 0.4);
+  placeFallenTrunk(builder, 'farcrysis-cover-jungle-05', -32, -8, 3.0, 0.4);
 
   // -- East jungle mid-ring -----------------------------------------------
-  placeFallenTrunk(builder, 'farcrysis-cover-jungle-06',  16,  4, 3.0, 0.4);
+  placeFallenTrunk(builder, 'farcrysis-cover-jungle-06',  32,  8, 3.0, 0.4);
 
   // =====================================================================
   // 8. ROCK-OUTCROP COVER (2) — beach fringe
@@ -1178,10 +1178,10 @@ export function addInteractables(builder: any): void {
   // natural crouch cover with earth ballistic behaviour.
 
   // -- West beach outcrop -------------------------------------------------
-  placeRockOutcrop(builder, 'farcrysis-cover-rock-01', -25, -8, 1.8, 1.2, 1.6);
+  placeRockOutcrop(builder, 'farcrysis-cover-rock-01', -50, -16, 1.8, 1.2, 1.6);
 
   // -- East beach outcrop -------------------------------------------------
-  placeRockOutcrop(builder, 'farcrysis-cover-rock-02',  25,  8, 1.8, 1.2, 1.6);
+  placeRockOutcrop(builder, 'farcrysis-cover-rock-02',  50,  16, 1.8, 1.2, 1.6);
 
   // =====================================================================
   // 9. RAISED VANTAGE PLATFORMS (2) — jungle mid-ring
@@ -1192,10 +1192,10 @@ export function addInteractables(builder: any): void {
   // by walking movement, placed clear of patrol lanes and core entrances.
 
   // -- West vantage platform (jungle mid-ring) ----------------------------
-  placeVantagePlatform(builder, 'farcrysis-vantage-01', -18, -6);
+  placeVantagePlatform(builder, 'farcrysis-vantage-01', -36, -12);
 
   // -- East vantage platform (jungle mid-ring) ----------------------------
-  placeVantagePlatform(builder, 'farcrysis-vantage-02',  18,  6);
+  placeVantagePlatform(builder, 'farcrysis-vantage-02',  36,  12);
 
   // =====================================================================
   // 10. SIX MORE WOODEN CRATES (6) — core door flanks + jungle pockets
@@ -1214,8 +1214,8 @@ export function addInteractables(builder: any): void {
   placeCrate(builder, 'farcrysis-crate-26',   6,  4.0, 0.9);
 
   // -- Mid-jungle SW + NE pockets (radius ~17 m) --------------------------
-  placeCrate(builder, 'farcrysis-crate-27', -16, -10, 0.95);
-  placeCrate(builder, 'farcrysis-crate-28',  16,  10, 0.95);
+  placeCrate(builder, 'farcrysis-crate-27', -32, -20, 0.95);
+  placeCrate(builder, 'farcrysis-crate-28',  32,  20, 0.95);
 
   // =====================================================================
   // 11. FOUR FUEL BARRELS (4) — hazard-striped, corner pockets
@@ -1226,18 +1226,18 @@ export function addInteractables(builder: any): void {
   // Each carries a small emissive band for visibility at range.
 
   // -- NW / SE diagonal corner pockets ------------------------------------
-  placeBarrel(builder, 'farcrysis-barrel-15', -16,  16);
-  placeBarrel(builder, 'farcrysis-barrel-16',  16, -16);
+  placeBarrel(builder, 'farcrysis-barrel-15', -32,  32);
+  placeBarrel(builder, 'farcrysis-barrel-16',  32, -32);
 
   // -- SW / NE beach fringe corner pockets --------------------------------
-  placeBarrel(builder, 'farcrysis-barrel-17', -12, -28);
-  placeBarrel(builder, 'farcrysis-barrel-18',  12,  28);
+  placeBarrel(builder, 'farcrysis-barrel-17', -24, -56);
+  placeBarrel(builder, 'farcrysis-barrel-18',  24,  56);
 
   // ── Hazard stripes on all four new barrels ────────────────────────────
-  addHazardStripesToBarrel(builder, 'farcrysis-barrel-15', -16,  16);
-  addHazardStripesToBarrel(builder, 'farcrysis-barrel-16',  16, -16);
-  addHazardStripesToBarrel(builder, 'farcrysis-barrel-17', -12, -28);
-  addHazardStripesToBarrel(builder, 'farcrysis-barrel-18',  12,  28);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-15', -32,  32);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-16',  32, -32);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-17', -24, -56);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-18',  24,  56);
 
   // =====================================================================
   // 12. TWO STACKED SANDBAG WALLS (2) — core door approach cover
@@ -1269,27 +1269,27 @@ export function addInteractables(builder: any): void {
   // position is verified ≥3 m from every spawn and patrol waypoint.
 
   // -- Cave entrance (SE) — crates + barrel flanking the flooded cave ------
-  placeCrate(builder, 'farcrysis-crate-29', 28, 17.5, 1.0);
-  placeCrate(builder, 'farcrysis-crate-30', 22, 17, 0.9);
-  placeBarrel(builder, 'farcrysis-barrel-19', 24, 13.5);
+  placeCrate(builder, 'farcrysis-crate-29', 56, 35, 1.0);
+  placeCrate(builder, 'farcrysis-crate-30', 44, 34, 0.9);
+  placeBarrel(builder, 'farcrysis-barrel-19', 48, 27);
 
   // -- Tower approach (NW) — barrel + crate near the research tower --------
   placeBarrel(builder, 'farcrysis-barrel-20', -11, -11);
   placeCrate(builder, 'farcrysis-crate-31', -10, -6.5, 0.9);
 
   // -- Beach ring — south, north, west beach interactables -----------------
-  placeBarrel(builder, 'farcrysis-barrel-21', -3, -27);
-  placeCrate(builder, 'farcrysis-crate-32', 3.5, 27, 0.95);
-  placeBarrel(builder, 'farcrysis-barrel-22', -28, 14);
+  placeBarrel(builder, 'farcrysis-barrel-21', -6, -54);
+  placeCrate(builder, 'farcrysis-crate-32', 7, 54, 0.95);
+  placeBarrel(builder, 'farcrysis-barrel-22', -56, 28);
 
   // -- Cave entrance approach sandbag cover --------------------------------
-  placeSandbagWall(builder, 'farcrysis-sandbag-05', 19, 15, 2.2, 0.6, 0.45);
+  placeSandbagWall(builder, 'farcrysis-sandbag-05', 38, 30, 2.2, 0.6, 0.45);
 
   // -- Tower approach sandbag cover ----------------------------------------
   placeSandbagWall(builder, 'farcrysis-sandbag-06', -13, -8, 2.2, 0.6, 0.45);
 
   // -- SE beach sandbag cover ----------------------------------------------
-  placeSandbagWall(builder, 'farcrysis-sandbag-07', 26, -26, 2.2, 0.6, 0.45);
+  placeSandbagWall(builder, 'farcrysis-sandbag-07', 52, -52, 2.2, 0.6, 0.45);
 
   // =====================================================================
   // 14. FLESH-OUT GAP PIECES — fill bare patrol lanes in jungle/beach
@@ -1314,44 +1314,44 @@ export function addInteractables(builder: any): void {
   placeCrateCover(builder, 'farcrysis-cover-jungle-08', -14, -4);
 
   // -- SW beach fringe: sandbag wall above lagoon edge
-  placeSandbagWall(builder, 'farcrysis-sandbag-08', -20, -26, 2.2, 0.6, 0.45);
+  placeSandbagWall(builder, 'farcrysis-sandbag-08', -40, -52, 2.2, 0.6, 0.45);
 
   // -- NE beach edge: barrel filling the empty NE corner
-  placeBarrel(builder, 'farcrysis-barrel-24', 24, 24);
+  placeBarrel(builder, 'farcrysis-barrel-24', 48, 48);
 
   // -- NW jungle: crate cover near research tower approach
-  placeCrateCover(builder, 'farcrysis-cover-jungle-09', -16, 8);
+  placeCrateCover(builder, 'farcrysis-cover-jungle-09', -32, 16);
 
   // -- SE jungle: barrel for the sparse SE interior
-  placeBarrel(builder, 'farcrysis-barrel-25', 18, -8);
+  placeBarrel(builder, 'farcrysis-barrel-25', 36, -16);
 
   // -- South jungle path: fallen palm trunk for southern approach cover
-  placeFallenTrunk(builder, 'farcrysis-cover-jungle-10', 6, -20, 3.0, 0.4);
+  placeFallenTrunk(builder, 'farcrysis-cover-jungle-10', 12, -40, 3.0, 0.4);
 
   // =====================================================================
   // VERIFICATION: warn if any cover position exceeds the arena boundary
   // =====================================================================
   for (const [label, px, pz] of [
-    ['cover-jungle-01', -20, 8],
-    ['cover-jungle-02', 22, -8],
-    ['cover-jungle-03', 8, -24],
-    ['cover-jungle-04', -20, 14],
-    ['cover-jungle-05', -16, -4],
-    ['cover-jungle-06', 16, 4],
-    ['cover-rock-01', -25, -8],
-    ['cover-rock-02', 25, 8],
-    ['vantage-01', -18, -6],
-    ['vantage-02', 18, 6],
+    ['cover-jungle-01', -40, 16],
+    ['cover-jungle-02', 44, -16],
+    ['cover-jungle-03', 16, -48],
+    ['cover-jungle-04', -40, 28],
+    ['cover-jungle-05', -32, -8],
+    ['cover-jungle-06', 32, 8],
+    ['cover-rock-01', -50, -16],
+    ['cover-rock-02', 50, 16],
+    ['vantage-01', -36, -12],
+    ['vantage-02', 36, 12],
     ['core-door-sandbag-s', 0, -3.6],
     ['core-door-sandbag-n', 0, 3.6],
-    ['sandbag-05', 19, 15],
+    ['sandbag-05', 38, 30],
     ['sandbag-06', -13, -8],
-    ['sandbag-07', 26, -26],
+    ['sandbag-07', 52, -52],
     ['cover-jungle-07', 12, -10],
     ['cover-jungle-08', -14, -4],
-    ['sandbag-08', -20, -26],
-    ['cover-jungle-09', -16, 8],
-    ['cover-jungle-10', 6, -20],
+    ['sandbag-08', -40, -52],
+    ['cover-jungle-09', -32, 16],
+    ['cover-jungle-10', 12, -40],
   ] as const) {
     if (!ok(px, pz)) {
       console.warn(`farcrysis-${label} at (${px}, ${pz}) is outside FARCRYSIS_BOUNDS margin`);

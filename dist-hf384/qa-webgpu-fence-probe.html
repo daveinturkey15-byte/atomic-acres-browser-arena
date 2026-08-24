@@ -1,0 +1,57 @@
+<!doctype html>
+<!--
+  HF-331 diagnostic: which WebGPU completion primitive actually works here?
+
+  Firefox wedges the weapon-catalog prewarm because the render runtime's only
+  completion probe is GPUQueue.onSubmittedWorkDone(). This page ground-truths
+  the three candidate fence primitives in the browser it is opened in and POSTs
+  the verdicts to the local receiver named by ?endpoint= (loopback only).
+-->
+<meta charset="utf-8">
+<title>WebGPU fence probe</title>
+<pre id="out">probing…</pre>
+<script type="module">
+const out = document.getElementById('out');
+const endpoint = new URLSearchParams(location.search).get('endpoint');
+const log = (line) => { out.textContent += `\n${line}`; };
+const post = (payload) => {
+  if (!endpoint || !/^http:\/\/127\.0\.0\.1(?::\d+)?\//.test(endpoint)) return;
+  void fetch(endpoint, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify(payload), keepalive: true, mode: 'no-cors' });
+};
+
+const withTimeout = (promise, ms, label) => Promise.race([
+  promise.then(() => ({ label, resolved: true })),
+  new Promise((resolve) => setTimeout(() => resolve({ label, resolved: false, timedOutAfterMs: ms }), ms)),
+]);
+
+const result = { userAgent: navigator.userAgent, webgpu: Boolean(navigator.gpu), fences: [] };
+try {
+  if (!navigator.gpu) throw new Error('no navigator.gpu');
+  const adapter = await navigator.gpu.requestAdapter();
+  if (!adapter) throw new Error('no adapter');
+  const device = await adapter.requestDevice();
+  result.adapter = adapter.info?.description ?? adapter.info?.vendor ?? 'acquired';
+
+  // 1. onSubmittedWorkDone after an EMPTY submit.
+  device.queue.submit([]);
+  result.fences.push(await withTimeout(device.queue.onSubmittedWorkDone(), 5_000, 'onSubmittedWorkDone(empty-submit)'));
+
+  // 2. onSubmittedWorkDone after a real (trivial) submit.
+  const encoder = device.createCommandEncoder();
+  device.queue.submit([encoder.finish()]);
+  result.fences.push(await withTimeout(device.queue.onSubmittedWorkDone(), 5_000, 'onSubmittedWorkDone(real-submit)'));
+
+  // 3. mapAsync fence: a MAP_READ buffer's mapAsync resolves once prior queue
+  //    work completes - the classic fallback where onSubmittedWorkDone is broken.
+  const buffer = device.createBuffer({ size: 4, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+  const copyEncoder = device.createCommandEncoder();
+  device.queue.submit([copyEncoder.finish()]);
+  result.fences.push(await withTimeout(buffer.mapAsync(GPUMapMode.READ), 5_000, 'mapAsync(MAP_READ)'));
+  try { buffer.unmap(); } catch { /* unmapped is fine */ }
+} catch (error) {
+  result.error = String(error).slice(0, 300);
+}
+
+log(JSON.stringify(result, null, 2));
+post(result);
+</script>

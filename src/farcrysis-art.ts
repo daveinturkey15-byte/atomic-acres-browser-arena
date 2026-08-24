@@ -16,7 +16,19 @@ import {
   FARCRYSIS_GROUND_EXTENT_M,
 } from './farcrysis-ground-materials';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
-import { buildVegetation, buildAdditionalVegetation, animateVegetationWind, setVegetationLOD, lumpify } from './farcrysis-vegetation';
+// HF-395: crate wordmarks derive from the SAME landmark frames the builder's
+// colliders use — previously this table duplicated absolute coordinates and
+// silently drifted from the builder.
+import {
+  FARCRYSIS_LANDMARKS,
+  LANDMARK_FRINGE_OUTWARD,
+  distributeAlongAxis,
+  landmarkWordmarkAnchor,
+  localToWorld,
+  radialCluster,
+  type Vec2,
+} from './farcrysis-midmap-landmarks';
+import { buildVegetation, animateVegetationWind, setVegetationLOD, lumpify } from './farcrysis-vegetation';
 // terrain.ts ShaderMaterial effects disabled for TSL review compatibility.
 // Terrain + water provided inline; lighting simplified to standard lights.
 import { applyFarcrysisTextures } from './farcrysis-textures';
@@ -30,6 +42,10 @@ import { applyGroundTextures } from './farcrysis-ground-textures';
 import { buildWaterFX, animateWaterFX } from './farcrysis-water-fx';
 import { buildDetail, animateDetail } from './farcrysis-detail';
 import { buildAtmosphere, animateAtmosphere, softDotTexture } from './farcrysis-atmosphere';
+import { createWaterRippleTexture, registerScrollingWaterTexture } from './farcrysis-water-ripples';
+// HF-396: the instanced tropical grass FIELD (bezier blades, layered wind,
+// SSS, slope-aware placement, chunk distance LOD).
+import { buildFarcrysisGrassField, animateGrassField } from './farcrysis-grass-field';
 
 // TSL-compatible inline replacements for terrain.ts ShaderMaterial effects.
 // All use standard Three.js materials (MeshStandardMaterial, MeshBasicMaterial).
@@ -240,7 +256,7 @@ function addFloodedCave(root: THREE.Group): void {
 
   // Place at lagoon's southern edge, facing inland, seated on the terrain
   // authority surface (HF-360).
-  group.position.set(26, terrainHeight(26, 16), 16);
+  group.position.set(52, terrainHeight(52, 32), 32);
   group.rotation.y = 1.2;
   root.add(group);
 }
@@ -251,7 +267,7 @@ function addFloodedCave(root: THREE.Group): void {
 
 function addTikiMarkers(root: THREE.Group): void {
   const tikiPositions: ReadonlyArray<readonly [number, number]> = [
-    [0, -28], [0, 28], [-28, 0], [28, 0],
+    [0, -56], [0, 56], [-56, 0], [56, 0],
   ];
 
   for (const [tx, tz] of tikiPositions) {
@@ -310,36 +326,28 @@ function createWordmarkTexture(): THREE.Texture | null {
 
 function addCrateWordmarks(root: THREE.Group): void {
   const stampMat = emissiveMat(FARCRYSIS_ART_FEEL.crateStamp, 0.9);
-  // The 4 overgrown crates are named farcrysis-crate-nw/-ne/-sw/-se at
-  // [-10/10, 8/-8] in the builder, seated on the terrain surface (HF-360).
-  // The plaques ride the same ground height so they stay glued to the crate
-  // face instead of hovering at the old flat-floor elevation.
-  const crates: [string, [number, number, number], [number, number, number]][] = [
-    ['nw', [-10.45, terrainHeight(-10, -8) + 1.0, -8], [0, 0, 0]],
-    ['ne', [10.45, terrainHeight(10, -8) + 1.0, -8], [0, Math.PI, 0]],
-    ['sw', [-10.45, terrainHeight(-10, 8) + 1.0, 8], [0, Math.PI, 0]],
-    ['se', [10.45, terrainHeight(10, 8) + 1.0, 8], [0, 0, 0]],
-  ];
-
-  for (const [tag, pos, rot] of crates) {
-    // Small raised-stamp plaque on the crate's outer face
+  // HF-395: one plaque per landmark, anchored to the stack base crate's
+  // outer face via the shared landmark module — same data as the collider,
+  // so plaque and crate can never drift apart again.
+  for (const frame of FARCRYSIS_LANDMARKS) {
+    const anchor = landmarkWordmarkAnchor(frame);
+    const [px, py, pz] = anchor.position;
     const plaque = makeMesh(
       new THREE.BoxGeometry(1.2, 0.4, 0.06), stampMat,
-      `farcrysis-art-crate-stamp-${tag}`,
-      pos,
-      { rotation: [0, ...rot.slice(1) as [number, number]] as [number, number, number] },
+      `farcrysis-art-crate-stamp-${anchor.tag}`,
+      [px, py, pz],
+      { rotation: [0, anchor.yaw, 0] },
     );
     root.add(plaque);
 
-    // Add a wordmark texture via a small emissive sprite if we have a canvas;
-    // otherwise the emissive plaque above is the stamp marker.
+    // Wordmark texture sprite when canvas is available; otherwise the
+    // emissive plaque above is the stamp marker.
     const texture = createWordmarkTexture();
     if (texture) {
       const spriteMat = new THREE.SpriteMaterial({ map: texture, color: FARCRYSIS_ART_FEEL.crateStamp, transparent: true });
       const sprite = new THREE.Sprite(spriteMat);
-      sprite.name = `farcrysis-art-crate-wordmark-${tag}`;
-      const outward = (tag === 'nw' || tag === 'se') ? -1 : 1;
-      sprite.position.set(pos[0], pos[1], pos[2] + outward * 0.1);
+      sprite.name = `farcrysis-art-crate-wordmark-${anchor.tag}`;
+      sprite.position.set(px + Math.sin(anchor.yaw) * 0.1, py, pz + Math.cos(anchor.yaw) * 0.1);
       sprite.scale.set(1.0, 0.35, 1);
       root.add(sprite);
     }
@@ -351,34 +359,30 @@ function addCrateWordmarks(root: THREE.Group): void {
 // ---------------------------------------------------------------------------
 
 function addInstancedBushes(root: THREE.Group): void {
-  const count = 20;
   // Pass 76: leaf-box bushes → lumpified organic clumps.
+  // HF-395: was an independent polar scatter loop; the fringe row now
+  // distributes along each landmark's outward axis (5 per landmark), so the
+  // bushes frame the groves instead of sprinkling across the mid ring.
   const bushGeom = lumpify(new THREE.IcosahedronGeometry(0.72, 1), 0.14, 0xb05e);
 
-  const instances = new THREE.InstancedMesh(bushGeom, mat(FARCRYSIS_ART_FEEL.bushGreen, 0.9, 0.01), count);
+  const placements = FARCRYSIS_LANDMARKS.flatMap((frame) =>
+    distributeAlongAxis(localToWorld(frame, LANDMARK_FRINGE_OUTWARD, 0), frame.tangent, 2.0, 5)
+      .map(([x, z], i) => ({ x, z, seed: frame.tag.charCodeAt(0) + i })),
+  );
+  const instances = new THREE.InstancedMesh(bushGeom, mat(FARCRYSIS_ART_FEEL.bushGreen, 0.9, 0.01), placements.length);
   instances.name = 'farcrysis-art-instanced-bushes';
   instances.castShadow = true;
   instances.receiveShadow = true;
 
   const matrix = new THREE.Matrix4();
-  const { minX, maxX, minZ, maxZ } = FARCRYSIS_BOUNDS;
-
-  for (let i = 0; i < count; i += 1) {
-    const angle = (i / count) * Math.PI * 2 + 0.5;
-    const radius = 8 + (i % 3) * 3.2;
-    let px = Math.cos(angle) * radius;
-    let pz = Math.sin(angle) * radius * 0.85;
-    px = Math.max(minX + 2, Math.min(maxX - 2, px));
-    pz = Math.max(minZ + 2, Math.min(maxZ - 2, pz));
-
-    matrix.makeRotationY(angle * 1.8 + i);
-    // Per-instance scale variation
-    const bushScaleY = 0.75 + (i % 3) * 0.16;
-    matrix.scale(new THREE.Vector3(0.7 + (i % 4) * 0.18, bushScaleY, 0.7 + ((i + 1) % 4) * 0.18));
+  placements.forEach(({ x, z, seed }, i) => {
+    matrix.makeRotationY(x * 1.8 + seed);
+    const bushScaleY = 0.75 + (seed % 3) * 0.16;
+    matrix.scale(new THREE.Vector3(0.7 + (seed % 4) * 0.18, bushScaleY, 0.7 + ((seed + 1) % 4) * 0.18));
     // HF-360: seat each bush base on the terrain authority surface.
-    matrix.setPosition(px, terrainHeight(px, pz) + 0.45 * bushScaleY, pz);
+    matrix.setPosition(x, terrainHeight(x, z) + 0.45 * bushScaleY, z);
     instances.setMatrixAt(i, matrix);
-  }
+  });
 
   instances.instanceMatrix.needsUpdate = true;
   root.add(instances);
@@ -389,12 +393,20 @@ function addInstancedBushes(root: THREE.Group): void {
 // ---------------------------------------------------------------------------
 
 function addInstancedFernClusters(root: THREE.Group): void {
-  // Pass 76: one flat slab per "fern" read as a plank. Each cluster is now
-  // three arched leaf cards fanned around the cluster centre — 3x the
-  // instance count on the SAME single draw call.
-  const clusters = 18;
+  // Pass 76 idiom retained: three arched leaf cards per cluster on one draw.
+  // HF-395: was an independent polar scatter; clusters now sit at radial
+  // positions around each grove centre (4 per landmark), plus two planters
+  // flanking the research-station doorways (offset from the core's authored
+  // 5.5 m half-depth).
   const bladesPerCluster = 3;
-  const count = clusters * bladesPerCluster;
+  const CORE_HALF_DEPTH = 5.5;
+  const DOOR_PLANTER_SETBACK = 1.9;
+  const clusterPoints = [
+    ...FARCRYSIS_LANDMARKS.flatMap((frame) => radialCluster(frame.center, 2.4, 4, frame.center[0] * 0.02)),
+    [2.8, -(CORE_HALF_DEPTH + DOOR_PLANTER_SETBACK)] as Vec2,
+    [-2.8, CORE_HALF_DEPTH + DOOR_PLANTER_SETBACK] as Vec2,
+  ];
+  const count = clusterPoints.length * bladesPerCluster;
   const fernGeom = new THREE.BoxGeometry(0.42, 1.1, 0.05);
   fernGeom.translate(0, 0.55, 0); // pivot at the root so tilts arch outward
 
@@ -406,20 +418,12 @@ function addInstancedFernClusters(root: THREE.Group): void {
   const matrix = new THREE.Matrix4();
   const quat = new THREE.Quaternion();
   const euler = new THREE.Euler();
-  const { minX, maxX, minZ, maxZ } = FARCRYSIS_BOUNDS;
-
-  for (let i = 0; i < clusters; i += 1) {
-    const angle = (i / clusters) * Math.PI * 2 + 0.15;
-    const radius = 5 + (i % 4) * 2.1;
-    let px = Math.cos(angle) * radius;
-    let pz = Math.sin(angle) * radius * 0.9;
-    px = Math.max(minX + 2.5, Math.min(maxX - 2.5, px));
-    pz = Math.max(minZ + 2.5, Math.min(maxZ - 2.5, pz));
+  clusterPoints.forEach(([px, pz], i) => {
     // HF-360: seat each fern cluster base on the terrain authority surface.
     const baseY = terrainHeight(px, pz) + 0.02;
 
     for (let blade = 0; blade < bladesPerCluster; blade += 1) {
-      const bladeYaw = angle * 2.7 + i * 0.9 + (blade / bladesPerCluster) * Math.PI * 2;
+      const bladeYaw = px * 2.7 + pz * 0.9 + i + (blade / bladesPerCluster) * Math.PI * 2;
       euler.set(0.32 + (blade % 2) * 0.14, bladeYaw, 0);
       quat.setFromEuler(euler);
       const fernScaleY = 0.7 + ((i + blade) % 4) * 0.2;
@@ -430,13 +434,12 @@ function addInstancedFernClusters(root: THREE.Group): void {
       );
       instances.setMatrixAt(i * bladesPerCluster + blade, matrix);
     }
-  }
+  });
 
   instances.instanceMatrix.needsUpdate = true;
   instances.computeBoundingSphere();
   root.add(instances);
 }
-
 // ---------------------------------------------------------------------------
 // 8. Atmosphere — lagoon water sparkle
 // ---------------------------------------------------------------------------
@@ -444,16 +447,17 @@ function addInstancedFernClusters(root: THREE.Group): void {
 function addWaterSparkle(root: THREE.Group): void {
   const sparkleCount = 60;
   const positions = new Float32Array(sparkleCount * 3);
-  const { minX, maxX, minZ, maxZ } = FARCRYSIS_BOUNDS;
-  // Sparkles only on the outer water ring (beyond the beach/lagoon edge)
-  const innerRadius = 20;
+  // Sparkles only on the outer water ring (beyond the beach/lagoon edge).
+  // HF-396: the band tracks the new shoreline — same edge-relative zone the
+  // old 20..36 m ring occupied on the 64 m island.
+  const innerRadius = ARENA_HALF - 20;
   const sparkleRng = mulberry32(ART_SEED + 4);
 
   for (let i = 0; i < sparkleCount; i += 1) {
     const angle = (i / sparkleCount) * Math.PI * 2 + sparkleRng() * 0.4;
     const radius = innerRadius + sparkleRng() * 16;
-    const px = Math.max(minX + 2, Math.min(maxX - 2, Math.cos(angle) * radius));
-    const pz = Math.max(minZ + 2, Math.min(maxZ - 2, Math.sin(angle) * radius * 0.9));
+    const px = Math.max(FARCRYSIS_BOUNDS.minX + 2, Math.min(FARCRYSIS_BOUNDS.maxX - 2, Math.cos(angle) * radius));
+    const pz = Math.max(FARCRYSIS_BOUNDS.minZ + 2, Math.min(FARCRYSIS_BOUNDS.maxZ - 2, Math.sin(angle) * radius * 0.9));
     positions[i * 3 + 0] = px;
     positions[i * 3 + 1] = FARCRYSIS_WATER_LEVEL + 0.04; // just above the water surface
     positions[i * 3 + 2] = pz;
@@ -517,8 +521,10 @@ function buildInlineTerrain(scene: THREE.Scene): void {
   const group = new THREE.Group();
   group.name = 'farcrysis-terrain';
 
+  // HF-396: 192 segments keep the old ~0.67 m vertex spacing across the
+  // doubled span, so the sculpted surface and its physics plates still agree.
   const w = ARENA_HALF * 2;
-  const segs = 96;
+  const segs = 192;
   const geom = new THREE.PlaneGeometry(w, w, segs, segs);
   geom.rotateX(-Math.PI / 2);
 
@@ -617,7 +623,9 @@ function buildInlineTerrain(scene: THREE.Scene): void {
   // Cliff rock ring along the jungle/beach transition band.
   scatterBoulders('farcrysis-cliff-rocks', 0x716b60, 28, ART_SEED + 1, (rng, i) => {
     const angle = (i / 28) * Math.PI * 2 + (rng() - 0.5) * 0.6;
-    const rockDist = 18 + rng() * 8;
+    // HF-396: doubled so the cliff ring keeps tracking the jungle/beach
+    // transition band on the 128 m island.
+    const rockDist = 36 + rng() * 16;
     return [
       Math.max(-ARENA_HALF + 2, Math.min(ARENA_HALF - 2, Math.cos(angle) * rockDist)),
       Math.max(-ARENA_HALF + 2, Math.min(ARENA_HALF - 2, Math.sin(angle) * rockDist)),
@@ -628,7 +636,7 @@ function buildInlineTerrain(scene: THREE.Scene): void {
   // Jungle floor boulders (scattered interior).
   scatterBoulders('farcrysis-interior-boulders', 0x7a7268, 12, ART_SEED + 2, (rng, i) => {
     const angle = (i / 12) * Math.PI * 2 + rng() * 0.5;
-    const placeDist = 5 + rng() * 12;
+    const placeDist = 10 + rng() * 24; // HF-396: doubled with the island
     return [
       Math.max(-ARENA_HALF + 3, Math.min(ARENA_HALF - 3, Math.cos(angle) * placeDist)),
       Math.max(-ARENA_HALF + 3, Math.min(ARENA_HALF - 3, Math.sin(angle) * placeDist)),
@@ -706,14 +714,12 @@ function buildInlineLighting(scene: THREE.Scene): void {
   // shadow contrast are therefore unchanged, and the arena stops asking the
   // driver for 4x the shadow-map rasterisation and ~100 MB of extra depth
   // memory at the exact moment the admission fence is realising every pipeline
-  // in the scene behind a 12 s queue timeout.
-  sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 0.5;
-  sun.shadow.camera.far = 150;
-  sun.shadow.camera.left = -36;
-  sun.shadow.camera.right = 36;
-  sun.shadow.camera.top = 36;
-  sun.shadow.camera.bottom = -36;
+  sun.shadow.camera.far = 170;
+  sun.shadow.camera.left = -68;
+  sun.shadow.camera.right = 68;
+  sun.shadow.camera.bottom = -68;
+  sun.shadow.camera.top = 68;
   sun.shadow.normalBias = 0.03;
   scene.add(sun);
 
@@ -746,7 +752,7 @@ function buildInlineWater(scene: THREE.Scene): void {
 
   // (a) Deep open water — extended to the visible horizon (120×120 m),
   //     richer tropical blue-green, below every additive water-FX layer.
-  const deepSize = 120;
+  const deepSize = 176; // HF-396: horizon water clears the 128 m island (camera far = 180)
   const deepGeom = new THREE.PlaneGeometry(deepSize, deepSize);
   deepGeom.rotateX(-Math.PI / 2);
 
@@ -755,13 +761,24 @@ function buildInlineWater(scene: THREE.Scene): void {
   // goes dark/waxy. Dielectric water: no metalness, moderate roughness, and
   // a deeper blue so the shallow→deep gradient (turquoise lens over sand
   // gradient ring, then this) reads like a real tropical shelf.
+  //
+  // HF-394: procedural ripple normal map, scrolled slower and coarser than
+  // the lagoon plane so near and mid water never shimmer in lockstep.
+  const deepRipples = createWaterRippleTexture(4, 4);
   const deepMat = new THREE.MeshStandardMaterial({
     color: 0x0e5e7e,
-    roughness: 0.3,
+    roughness: 0.24,
     metalness: 0.02,
     transparent: true,
     opacity: 0.88,
+    ...(deepRipples ? {
+      normalMap: deepRipples.texture,
+      normalScale: new THREE.Vector2(0.5, 0.5),
+    } : {}),
   });
+  if (deepRipples) {
+    registerScrollingWaterTexture(deepRipples.texture, 0.014, 0.009);
+  }
 
   const deep = new THREE.Mesh(deepGeom, deepMat);
   deep.name = 'farcrysis-water-inline';
@@ -773,13 +790,16 @@ function buildInlineWater(scene: THREE.Scene): void {
   //     over the beach shelf so the sand reads through the water near the
   //     shoreline. 10 mm above the lagoon plane keeps it just below the
   //     additive wave surface (no z-fighting) while still above deep water.
-  const shallowSize = 40;
+  const shallowSize = 80; // HF-396: doubled with the island
   const shallowGeom = new THREE.PlaneGeometry(shallowSize, shallowSize);
   shallowGeom.rotateX(-Math.PI / 2);
 
   const shallowMat = new THREE.MeshStandardMaterial({
     // Pass 76: brighter turquoise, fully dielectric — the sunlit shallow lens
     // over the sand shelf that sells "tropical lagoon" at a glance.
+    //
+    // HF-394: fine fast ripple detail (dense repeat, gentle normal scale) so
+    // wading-depth water shows moving light instead of a static tint.
     color: 0x3fc2b7,
     roughness: 0.26,
     metalness: 0.0,
@@ -787,6 +807,12 @@ function buildInlineWater(scene: THREE.Scene): void {
     opacity: 0.4,
     depthWrite: false,
   });
+  const shallowRipples = createWaterRippleTexture(11, 11);
+  if (shallowRipples) {
+    shallowMat.normalMap = shallowRipples.texture;
+    shallowMat.normalScale = new THREE.Vector2(0.3, 0.3);
+    registerScrollingWaterTexture(shallowRipples.texture, 0.027, -0.019);
+  }
 
   const shallow = new THREE.Mesh(shallowGeom, shallowMat);
   shallow.name = 'farcrysis-water-shallow';
@@ -934,10 +960,9 @@ function addJungleUndergrowth(group: THREE.Group): void {
   // different yaws/heights, which reads as layered ground foliage.
   const undergrowthMat = mat(0x35682f, 0.9, 0.02);
   undergrowthMat.side = THREE.DoubleSide; // tilted cards read from both faces
-  const clumpCount = 18;
   const cardsPerClump = 4;
   const rng = mulberry32(ART_SEED + 7);
-
+  const clumpCount = 36; // HF-396: 4x area, same single instanced draw
   const cardGeom = new THREE.BoxGeometry(0.85, 0.62, 0.035);
   cardGeom.translate(0, 0.31, 0); // pivot at the root so tilts arch outward
   const cards = new THREE.InstancedMesh(cardGeom, undergrowthMat, clumpCount * cardsPerClump);
@@ -952,7 +977,7 @@ function addJungleUndergrowth(group: THREE.Group): void {
   let placed = 0;
   for (let i = 0; i < clumpCount; i += 1) {
     const angle = (i / clumpCount) * Math.PI * 2 + (rng() - 0.5) * 1.2;
-    const dist = 7 + rng() * 9; // 7-16 → jungle interior
+    const dist = 14 + rng() * 18; // HF-396: 14-32 → jungle interior of the 128 m island
     const rx = Math.max(-ARENA_HALF + 4, Math.min(ARENA_HALF - 4, Math.cos(angle) * dist));
     const rz = Math.max(-ARENA_HALF + 4, Math.min(ARENA_HALF - 4, Math.sin(angle) * dist * 0.9));
     const rotY = rng() * Math.PI;
@@ -1040,7 +1065,11 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
 
   // ---- Pass 69 re-authored art layer (dense vegetation, terrain, lighting, water) ----
   buildVegetation(root);
-  buildAdditionalVegetation(root);
+
+  // HF-396: real grass field over the interior plateau. Presentation only —
+  // no colliders, no raycast/shot-surface registration (the existing foliage
+  // exception in rendering/arenas/farcrysis.ts covers this layer).
+  buildFarcrysisGrassField(root);
 
   // Terrain, lighting, and water modules expect Scene; cast through Object3D
   const s = root as unknown as import('three').Scene;
@@ -1128,5 +1157,7 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
       const dist = camera.position.distanceTo(root.position);
       setVegetationLOD(dist);
     }
+    // HF-396: chunk-level distance LOD for the grass field.
+    animateGrassField(camera);
   };
 }

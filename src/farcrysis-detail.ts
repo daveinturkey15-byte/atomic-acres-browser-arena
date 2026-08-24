@@ -13,6 +13,9 @@
  */
 import * as THREE from 'three';
 import { farcrysisTerrainHeight } from './farcrysis-terrain-authority';
+import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
+
+const ARENA_HALF = FARCRYSIS_BOUNDS.maxX;
 
 // ---------------------------------------------------------------------------
 // Shared state — vine pivots, reed meshes, and any per-frame state for
@@ -78,10 +81,11 @@ function artMark(mesh: THREE.Object3D, name: string): void {
 // ---------------------------------------------------------------------------
 
 /** The 12 canopy positions (from farcrysis.ts — read-only reference, not redefined). */
+// HF-396: mirrors the doubled canopyPositions in farcrysis.ts.
 const CANOPY_POSITIONS: ReadonlyArray<readonly [number, number]> = [
-  [-15, -15], [15, 15], [-15, 15], [15, -15],
-  [-4, -24], [4, 24], [-24, 4], [24, -4],
-  [-20, -12], [20, 12], [-12, 20], [12, -20],
+  [-30, -30], [30, 30], [-30, 30], [30, -30],
+  [-8, -48], [8, 48], [-48, 8], [48, -8],
+  [-40, -24], [40, 24], [-24, 40], [24, -40],
 ];
 
 const VINE_COLOR = 0x2d5a1e;
@@ -232,8 +236,8 @@ function buildMossPatches(root: THREE.Object3D, rng: () => number): void {
 
 function buildRocks(root: THREE.Object3D, rng: () => number): void {
   const rockCount = 8 + Math.floor(rng() * 5); // 8-12
-  const minRadius = 10;
-  const maxRadius = 18;
+  const minRadius = 20; // HF-396
+  const maxRadius = 36; // HF-396
 
   for (let i = 0; i < rockCount; i++) {
     // Pass 76: darker earthy grey — the old 0x7a-0x9a range read as pale
@@ -327,8 +331,8 @@ function buildFloorLitter(root: THREE.Object3D, rng: () => number): void {
     new THREE.Color(0x8a7a5a), // tan (dry leaf)
   ];
 
-  const minRadius = 5;
-  const maxRadius = 18;
+  const minRadius = 10; // HF-396
+  const maxRadius = 36; // HF-396
 
   for (let i = 0; i < count; i++) {
     const angle = rng() * Math.PI * 2;
@@ -373,13 +377,15 @@ function buildFloorLitter(root: THREE.Object3D, rng: () => number): void {
 const REED_COLOR = 0x8a9a5a;
 
 function buildReedClusters(root: THREE.Object3D, rng: () => number): void {
-  const clusterCount = 4 + Math.floor(rng() * 3); // 4-6 clusters
+  const clusterCount = 8 + Math.floor(rng() * 3); // HF-396: 8-10 clusters across the bigger shore
   const reedMat = artMat(REED_COLOR, 0.7, 0.03);
 
   for (let c = 0; c < clusterCount; c++) {
-    // Cluster center on the beach-water ring edge (~19-22m radius)
+    // Cluster center on the beach-water ring edge — the same edge-relative
+    // zone (edgeDist ~10-13 m) the old 19-22 m radius occupied on the 64 m
+    // island (HF-396).
     const angle = rng() * Math.PI * 2;
-    const radius = 19 + rng() * 3; // 19-22m
+    const radius = ARENA_HALF - 13 + rng() * 3;
     const cx = Math.cos(angle) * radius;
     const cz = Math.sin(angle) * radius;
 

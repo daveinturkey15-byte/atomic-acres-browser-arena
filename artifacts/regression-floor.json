@@ -1,8 +1,21 @@
 {
-  "tsc_clean": true,
-  "tests_passed": 4024,
-  "tests_failed": 0,
-  "test_files_passed": 453,
-  "failing_files": [],
+  "tsc_clean": false,
+  "tests_passed": 4057,
+  "tests_failed": 20,
+  "test_files_passed": 457,
+  "failing_files": [
+    "src/farcrysis-jungle-layers.test.ts",
+    "src/farcrysis-midmap-landmarks.test.ts",
+    "src/farcrysis-terrain-authority.test.ts",
+    "src/farcrysis.test.ts",
+    "src/prone-clearance.test.ts",
+    "src/rendering/filmic-grade-chain.test.ts",
+    "src/scratch-hf387-corner.test.ts",
+    "src/scratch-hf387-probe.test.ts",
+    "src/scratch-hf387-raw-rapier.test.ts",
+    "src/scratch-hf387-repro.test.ts",
+    "src/scratch-hf387-valid.test.ts",
+    "src/timed-map-weapon-main-integration.test.ts"
+  ],
   "discounted_flaky": []
 }

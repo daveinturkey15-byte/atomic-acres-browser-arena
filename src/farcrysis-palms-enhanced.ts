@@ -55,12 +55,14 @@ function clamp(value: number, lo: number, hi: number): number {
 // Placement / terrain-fit constants
 // ---------------------------------------------------------------------------
 
-const PALM_COUNT = 26;
-const BEACH_PALM_COUNT = 16; // first 16 palms ring the beach lagoon; rest are jungle scatter
-const BEACH_RING_MIN = 22;
-const BEACH_RING_MAX = 30;
-const JUNGLE_RING_MIN = 11;
-const JUNGLE_RING_MAX = 19;
+// HF-396: island doubled (±32 m → ±64 m), so the palm rings and corridor
+// lanes double with it and counts double to keep planting density.
+const PALM_COUNT = 52;
+const BEACH_PALM_COUNT = 32; // first 32 palms ring the beach lagoon; rest are jungle scatter
+const BEACH_RING_MIN = 44;
+const BEACH_RING_MAX = 60;
+const JUNGLE_RING_MIN = 22;
+const JUNGLE_RING_MAX = 38;
 const BOUNDS_MARGIN = 1.5;
 export const TRUNK_HEIGHT = 2.5;
 
@@ -71,10 +73,10 @@ const { minX, maxX, minZ, maxZ } = FARCRYSIS_BOUNDS;
 // floating or buried on every hill. All seating now resolves through the one
 // terrain authority so palms, physics and the rendered surface agree exactly.
 
-/** True when (x, z) falls on the flat corridor lane strips (|x|≈20 or |z|≈20). */
+/** True when (x, z) falls on the flat corridor lane strips (|x|≈40 or |z|≈40). */
 function onCorridorStrip(x: number, z: number): boolean {
-  const laneHW = 5.5;
-  return Math.abs(Math.abs(x) - 20) < laneHW || Math.abs(Math.abs(z) - 20) < laneHW;
+  const laneHW = 11;
+  return Math.abs(Math.abs(x) - 40) < laneHW || Math.abs(Math.abs(z) - 40) < laneHW;
 }
 
 // ---------------------------------------------------------------------------

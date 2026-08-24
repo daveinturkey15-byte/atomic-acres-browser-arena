@@ -270,6 +270,10 @@ describe('HF-362 grade profile values in play', () => {
     expect(gradeProfileIdForGraphicsPreset('high')).toBe('quality');
     expect(gradeProfileIdForGraphicsPreset('max')).toBe('max');
     expect(gradeProfileIdForGraphicsPreset('custom')).toBe('quality');
+    // HF-397: RTX RUNTIME sits between Quality and Max in the preset ladder
+    // and carries the richest (max) filmic grade; the grade adds tunable
+    // uniforms only, never new pipelines.
+    expect(gradeProfileIdForGraphicsPreset('rtx')).toBe('max');
     expect(gradeProfileIdForGraphicsPreset('nonsense')).toBe('quality');
     expect(() => resolveGradeProfile('nope' as GradeProfileId)).toThrow(/unknown filmic grade profile/);
   });

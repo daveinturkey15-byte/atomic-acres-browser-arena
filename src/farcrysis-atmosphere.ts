@@ -433,7 +433,7 @@ function buildFireflies(): THREE.Points {
 
   for (let i = 0; i < count; i++) {
     const angle = rng.next() * Math.PI * 2;
-    const radius = 8 + rng.next() * 10; // 8–18
+    const radius = 16 + rng.next() * 20; // HF-396: 16–36 across the doubled interior
 
     let px = Math.cos(angle) * radius;
     let pz = Math.sin(angle) * radius;
@@ -488,7 +488,8 @@ function buildFireflies(): THREE.Points {
 // ---------------------------------------------------------------------------
 
 function buildFogLayer(): THREE.Mesh {
-  const geom = new THREE.PlaneGeometry(80, 80);
+  // HF-396: haze plane doubles with the island.
+  const geom = new THREE.PlaneGeometry(160, 160);
   geom.rotateX(-Math.PI / 2);
 
   const mat = new THREE.MeshBasicMaterial({

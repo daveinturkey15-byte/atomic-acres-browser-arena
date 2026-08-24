@@ -23,7 +23,7 @@
 import * as THREE from 'three';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
-import { farcrysisTerrainHeight as terrainHeightAt } from './farcrysis-terrain-authority';
+import { farcrysisTerrainHeight as terrainHeightAt, FARCRYSIS_WATER_LEVEL } from './farcrysis-terrain-authority';
 import { buildPalmStandInstances, type PalmPlacement } from './farcrysis-palms-enhanced';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
@@ -216,16 +216,18 @@ function mulberry32(seed: number): () => number {
 // queries now resolve through the single terrain authority (imported above
 // under the old local name so the many call sites read unchanged).
 
-// Spawn positions and patrol points (from farcrysis.ts) for clearance checks
+// Spawn positions and patrol points (from farcrysis.ts) for clearance checks.
+// HF-396: kept in sync with the 128 m island rescale in buildFarcrysis —
+// update both together when spawns move.
 const SPAWNS_ALL: Array<[number, number]> = [
-  [-26, -26], [-22, -24], [-24, -20], [-18, -26], // team 0 NW
-  [26, 26], [22, 24], [24, 20], [18, 26], // team 1 SE
+  [-52, -52], [-44, -48], [-48, -40], [-36, -52], // team 0 NW
+  [52, 52], [44, 48], [48, 40], [36, 52], // team 1 SE
 ];
 const SPAWN_CLEAR = 5.5; // metres clearance around each spawn point
 
 const PATROL_PTS: Array<[number, number]> = [
-  [-26, -26], [-18, -20], [-12, -16], [-4, -12], [0, 0], [12, 16], [18, 20], [26, 26],
-  [-20, 18], [20, -18], [-8, -24], [8, 24],
+  [-52, -52], [-36, -40], [-24, -32], [-8, -24], [0, 0], [24, 32], [36, 40], [52, 52],
+  [-40, 36], [40, -36], [-16, -48], [16, 48],
 ];
 const PATROL_CLEAR = 3.0;
 
@@ -489,8 +491,8 @@ function addPalms(root: THREE.Group): void {
   // straight cylinder wearing a flat 3.2 m slab of "fronds". It now renders
   // through the shared enhanced-palm builder (fan crowns, tapered leaning
   // trunks, coconuts), so all three palm systems in the arena are one look.
-  const count = 22;
-  const positions = ringPositions(count, 19, 30);
+  const count = 44; // HF-396: doubled with the island area
+  const positions = ringPositions(count, 38, 60);
   const placements: PalmPlacement[] = positions.map(([x, z, angle], i) => {
     const scale = 0.85 + (i % 3) * 0.12;
     return {
@@ -563,7 +565,7 @@ function addPalms(root: THREE.Group): void {
 // ---------------------------------------------------------------------------
 
 function addBroadleafTrees(root: THREE.Group): void {
-  const count = 28;
+  const count = 56; // HF-396: doubled with the island area
   const trunkGeom = new THREE.CylinderGeometry(0.22, 0.44, 2.6, 10);
   const canopyGeom = new THREE.SphereGeometry(1.0, 10, 6);
   // Believability: broadleaf canopies stop reading as smooth balls.
@@ -576,7 +578,7 @@ function addBroadleafTrees(root: THREE.Group): void {
 
   const tMat = new THREE.Matrix4();
   const cMat = new THREE.Matrix4();
-  const positions = discPositions(count, 20);
+  const positions = discPositions(count, 40); // HF-396
 
   for (let i = 0; i < count; i += 1) {
     const [x, z, angle] = positions[i];
@@ -619,7 +621,7 @@ function addBroadleafTrees(root: THREE.Group): void {
 // ---------------------------------------------------------------------------
 
 function addFanPalms(root: THREE.Group): void {
-  const count = 20;
+  const count = 40; // HF-396: doubled with the island area
 
   const parts: Array<{ geom: THREE.BufferGeometry; matrix: THREE.Matrix4 }> = [
     {
@@ -645,7 +647,7 @@ function addFanPalms(root: THREE.Group): void {
   fans.name = 'farcrysis-vege-fan-palms';
 
   const matrix = new THREE.Matrix4();
-  const positions = discPositions(count, 16);
+  const positions = discPositions(count, 32); // HF-396
 
   for (let i = 0; i < count; i += 1) {
     const [x, z, angle] = positions[i];
@@ -669,7 +671,7 @@ function addFanPalms(root: THREE.Group): void {
 // ---------------------------------------------------------------------------
 
 function addBananaPlants(root: THREE.Group): void {
-  const plantCount = 14;
+  const plantCount = 28; // HF-396: doubled with the island area
   const leavesPerPlant = 4;
   const leafCount = plantCount * leavesPerPlant;
 
@@ -683,7 +685,7 @@ function addBananaPlants(root: THREE.Group): void {
 
   const tMat = new THREE.Matrix4();
   const lMat = new THREE.Matrix4();
-  const positions = discPositions(plantCount, 14);
+  const positions = discPositions(plantCount, 28); // HF-396
 
   for (let p = 0; p < plantCount; p += 1) {
     const [x, z, baseAngle] = positions[p];
@@ -723,7 +725,7 @@ function addBananaPlants(root: THREE.Group): void {
 // ---------------------------------------------------------------------------
 
 function addBamboo(root: THREE.Group): void {
-  const clusters = 7;
+  const clusters = 14; // HF-396: doubled with the island area
   const stemsPerCluster = 5;
   const count = clusters * stemsPerCluster;
 
@@ -733,7 +735,7 @@ function addBamboo(root: THREE.Group): void {
   stems.name = 'farcrysis-vege-bamboo-stems';
 
   const matrix = new THREE.Matrix4();
-  const clusterCenters = discPositions(clusters, 13);
+  const clusterCenters = discPositions(clusters, 26); // HF-396
 
   for (let c = 0; c < clusters; c += 1) {
     const [cx, cz, ca] = clusterCenters[c];
@@ -764,14 +766,14 @@ function addBamboo(root: THREE.Group): void {
 // ---------------------------------------------------------------------------
 
 function addDeadTrees(root: THREE.Group): void {
-  const count = 10;
+  const count = 20; // HF-396: doubled with the island area
   const trunkGeom = new THREE.CylinderGeometry(0.14, 0.24, 2.4, 7);
 
   const trunks = new THREE.InstancedMesh(trunkGeom, vegeMat(0x6e6258, 0.94, 0.05), count);
   trunks.name = 'farcrysis-vege-dead-trunks';
 
   const matrix = new THREE.Matrix4();
-  const positions = ringPositions(count, 6, 24);
+  const positions = ringPositions(count, 12, 48); // HF-396
 
   for (let i = 0; i < count; i += 1) {
     const [x, z, angle] = positions[i];
@@ -798,14 +800,14 @@ function addDeadTrees(root: THREE.Group): void {
 // ---------------------------------------------------------------------------
 
 function addFerns(root: THREE.Group): void {
-  const count = 35;
+  const count = 70; // HF-396: doubled with the island area
   const fernGeom = new THREE.BoxGeometry(0.35, 1.2, 0.12);
 
   const ferns = new THREE.InstancedMesh(fernGeom, vegeMat(FARCRYSIS_ART_FEEL.fernGreen, 0.85, 0.02), count);
   ferns.name = 'farcrysis-vege-ferns';
 
   const matrix = new THREE.Matrix4();
-  const positions = discPositions(count, 22);
+  const positions = discPositions(count, 44); // HF-396
 
   for (let i = 0; i < count; i += 1) {
     const [x, z, angle] = positions[i];
@@ -828,7 +830,7 @@ function addFerns(root: THREE.Group): void {
 // ---------------------------------------------------------------------------
 
 function addGrassTufts(root: THREE.Group): void {
-  const count = 45;
+  const count = 90; // HF-396: doubled with the island area
   const grassGeom = new THREE.ConeGeometry(0.12, 0.45, 5, 1);
 
   const grass = new THREE.InstancedMesh(grassGeom, vegeMat(0x4d7a36, 0.9, 0.01), count);
@@ -836,8 +838,8 @@ function addGrassTufts(root: THREE.Group): void {
 
   const matrix = new THREE.Matrix4();
   // Grass everywhere — use full disc + some outer scatter
-  const inner = discPositions(Math.floor(count * 0.7), 18);
-  const outer = ringPositions(count - inner.length, 18, 30);
+  const inner = discPositions(Math.floor(count * 0.7), 36); // HF-396
+  const outer = ringPositions(count - inner.length, 36, 60); // HF-396
   const positions = [...inner, ...outer];
 
   for (let i = 0; i < count; i += 1) {
@@ -861,7 +863,7 @@ function addGrassTufts(root: THREE.Group): void {
 // ---------------------------------------------------------------------------
 
 function addBushes(root: THREE.Group): void {
-  const count = 28;
+  const count = 56; // HF-396: doubled with the island area
   const bushGeom = new THREE.IcosahedronGeometry(0.7, 1);
   // Believability: irregular bush silhouette.
   lumpify(bushGeom, 0.12, 0x0b05);
@@ -870,7 +872,7 @@ function addBushes(root: THREE.Group): void {
   bushes.name = 'farcrysis-vege-bushes';
 
   const matrix = new THREE.Matrix4();
-  const positions = discPositions(count, 20);
+  const positions = discPositions(count, 40); // HF-396
 
   for (let i = 0; i < count; i += 1) {
     const [x, z, angle] = positions[i];
@@ -893,7 +895,7 @@ function addBushes(root: THREE.Group): void {
 // ---------------------------------------------------------------------------
 
 function addVines(root: THREE.Group): void {
-  const count = 18;
+  const count = 36; // HF-396: doubled with the island area
   // Thin, long cylinder placed at an angle — reads as a hanging vine
   const vineGeom = new THREE.CylinderGeometry(0.03, 0.04, 2.4, 6);
 
@@ -902,7 +904,7 @@ function addVines(root: THREE.Group): void {
 
   const matrix = new THREE.Matrix4();
   // Place vines near tree positions — use mid-ring scatter
-  const positions = ringPositions(count, 4, 22);
+  const positions = ringPositions(count, 8, 44); // HF-396
 
   for (let i = 0; i < count; i += 1) {
     const [x, z, angle] = positions[i];
@@ -2396,6 +2398,9 @@ function addSmallRocks(root: THREE.Group): void {
 // ground-level litter/grass strong (sun breaks through to the floor there).
 const WIND_LAYER_DAPPLE: Array<[string, number]> = [
   // strong ground dapple
+  ['farcrysis-vege-undergrowth-carpet', 0.85],
+  ['farcrysis-vege-midstorey-clumps', 0.5],
+  ['farcrysis-vege-emergent', 0.28],
   ['farcrysis-vege-leaf-litter', 0.85],
   ['farcrysis-vege-fallen-fronds', 0.8],
   ['farcrysis-vege-grass-tufts', 0.75],
@@ -2593,7 +2598,7 @@ function addDriftwoodLogs(root: THREE.Group): void {
   logs.name = 'farcrysis-vege-driftwood-logs';
 
   const matrix = new THREE.Matrix4();
-  const positions = ringPositions(count, 24, 30);
+  const positions = ringPositions(count, 48, 60); // HF-396
   const rng = mulberry32(SEED + 4);
   for (let i = 0; i < positions.length; i++) {
     const [x, z] = positions[i];
@@ -2611,6 +2616,325 @@ function addDriftwoodLogs(root: THREE.Group): void {
   logs.instanceMatrix.needsUpdate = true;
   logs.computeBoundingSphere();
   root.add(register(logs, undefined, { castShadow: false, receiveShadow: true }));
+}
+
+// ===========================================================================
+// HF-396/HF-398 LAYERED JUNGLE — emergent canopy / midstorey / undergrowth
+// ===========================================================================
+//
+// Owner bar (HF-398): cadle.gg — "the grass, trees, mountains are
+// incredible". The grass field and island rescale are owned by the
+// HF-396 water/grass lane (farcrysis-grass-field.ts); this section closes
+// the remaining STRUCTURAL gaps in the jungle's vertical profile:
+//
+//   #37 EMERGENT CANOPY — 10-16 m giants rising above the existing broadleaf
+//       canopy, giving the skyline the tall layered jungle read.
+//   #38 MIDSTOREY — eye-level broadleaf clumps clustered RELATIONALLY under
+//       the emergent crowns (arXiv 2608.17975 relational placement), so the
+//       tiers connect instead of reading as thrown-together scatter (HF-395).
+//   #39 UNDERGROWTH CARPET — dense low leaf-card filler between the grass
+//       field and the midstorey, completing every height band.
+//
+// Every placement here is terrain-constrained through the single terrain
+// authority: seated on farcrysisTerrainHeight, REJECTED on slopes steeper
+// than the layer threshold and below the authored waterline + margin. All
+// randomness is seeded mulberry32 — deterministic, never Math.random.
+// Presentation only: no colliders, no raycast/shot-surface registration.
+
+/**
+ * Terrain slope (rise/run) at (x, z) via central differences on the one
+ * terrain authority. Pure and deterministic; exported for contract tests.
+ */
+export function farcrysisTerrainSlope(x: number, z: number): number {
+  const e = 0.35;
+  const dx = (terrainHeightAt(x + e, z) - terrainHeightAt(x - e, z)) / (2 * e);
+  const dz = (terrainHeightAt(x, z + e) - terrainHeightAt(x, z - e)) / (2 * e);
+  return Math.hypot(dx, dz);
+}
+
+interface TerrainFitConstraints {
+  /** Reject sites steeper than this rise/run. */
+  maxSlope: number;
+  /** Reject sites less than this far ABOVE the authored waterline (metres). */
+  minAboveWater: number;
+}
+
+function seatsOnTerrain(x: number, z: number, fit: TerrainFitConstraints): boolean {
+  if (terrainHeightAt(x, z) < FARCRYSIS_WATER_LEVEL + fit.minAboveWater) return false;
+  return farcrysisTerrainSlope(x, z) <= fit.maxSlope;
+}
+
+/**
+ * Slope/height-constrained jittered-grid scatter across the FULL island disc.
+ * The older species layers scatter annular rings; the ground/understorey
+ * tiers here must blanket the whole 128 m playfield uniformly, then any site
+ * failing bounds, gameplay clearance, spawn clearance, the optional clump
+ * gate, or the terrain-fit constraints is rejected.
+ */
+function constrainedScatter(
+  count: number,
+  seed: number,
+  opts: {
+    maxRadius: number;
+    margin: number;
+    fit: TerrainFitConstraints;
+    /** Clump-noise salt + threshold: accept only where noise >= threshold. */
+    clumpSalt?: number;
+    clumpThreshold?: number;
+    /** Metres kept clear around each spawn point (small dressing layers). */
+    spawnClearance?: number;
+    /** Candidate grid multiplier; default 2.5. Raise for strict fits. */
+    oversample?: number;
+  },
+): Array<[number, number, number, number]> {
+  const rng = mulberry32(seed);
+  const out: Array<[number, number, number, number]> = [];
+  // Oversample (default 2.5x) — slope/water/clump/clearance rejections cull
+  // the rest. Sparse strict-fit layers pass a higher multiplier so enough
+  // candidates survive to reach `count`.
+  const oversample = opts.oversample ?? 2.5;
+  const step = Math.sqrt(((2 * opts.maxRadius) ** 2) / (count * oversample));
+  for (let gx = -opts.maxRadius; gx <= opts.maxRadius && out.length < count; gx += step) {
+    for (let gz = -opts.maxRadius; gz <= opts.maxRadius && out.length < count; gz += step) {
+      const x = gx + (rng() - 0.5) * step;
+      const z = gz + (rng() - 0.5) * step;
+      if (Math.hypot(x, z) > opts.maxRadius) continue;
+      if (x < BOUNDS.minX + MARGIN || x > BOUNDS.maxX - MARGIN) continue;
+      if (z < BOUNDS.minZ + MARGIN || z > BOUNDS.maxZ - MARGIN) continue;
+      if (!clearOfGameplay(x, z, opts.margin)) continue;
+      if (opts.spawnClearance !== undefined) {
+        let nearSpawn = false;
+        for (const [sx, sz] of SPAWNS_ALL) {
+          if (Math.hypot(x - sx, z - sz) < opts.spawnClearance) { nearSpawn = true; break; }
+        }
+        if (nearSpawn) continue;
+      }
+      if (
+        opts.clumpSalt !== undefined && opts.clumpThreshold !== undefined
+        && positionHashNoise(x * 0.13, 0, z * 0.13, opts.clumpSalt) < opts.clumpThreshold
+      ) continue;
+      if (!seatsOnTerrain(x, z, opts.fit)) continue;
+      out.push([x, z, terrainHeightAt(x, z), rng() * Math.PI * 2]);
+    }
+  }
+  return out;
+}
+
+/** One bent leaf card: tapered strip arching along local +X. Presentation. */
+function bentLeafCard(height: number, width: number, arch: number): THREE.BufferGeometry {
+  const segments = 4;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (let i = 0; i <= segments; i += 1) {
+    const t = i / segments;
+    const y = t * height;
+    const cx = arch * t * t; // quadratic lean
+    if (i === segments) {
+      positions.push(cx, y, 0); // single tip vertex
+      break;
+    }
+    const halfWidth = width * 0.5 * Math.pow(1 - t, 1.15);
+    positions.push(cx - halfWidth, y, 0, cx + halfWidth, y, 0);
+  }
+  for (let i = 0; i < segments - 1; i += 1) {
+    const a = i * 2;
+    indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+  }
+  // Final row: closing triangle between the last vertex pair and the tip.
+  const tip = positions.length / 3 - 1;
+  indices.push(tip - 2, tip - 1, tip);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/** Anchor positions of accepted emergent trees (consumed by the midstorey). */
+let _emergentAnchors: Array<[number, number]> = [];
+
+// ---------------------------------------------------------------------------
+// #37 Emergent canopy — giants above the broadleaf canopy
+// ---------------------------------------------------------------------------
+
+function addEmergentCanopyTrees(root: THREE.Group): void {
+  const TARGET = 120;
+  const SEED = 0x4a91_2c07;
+  // Strict fit (slope <= 0.35, dry interior) rejects most of the island, so
+  // oversample the candidate grid hard enough to land well past 60 instances.
+  const sites = constrainedScatter(TARGET, SEED, {
+    maxRadius: 58,
+    margin: 1.4,
+    fit: { maxSlope: 0.35, minAboveWater: 0.6 },
+    oversample: 8,
+  });
+
+  // Crown spheres are baked at their canopy height INSIDE the geometry so
+  // every instance origin stays seated on the terrain authority (the layered
+  // jungle contract decomposes matrices and re-checks each origin against
+  // farcrysisTerrainHeight). The local offset compensates for the
+  // non-uniform per-instance scale: worldY = cy * scaleY * s.
+  const trunkGeom = new THREE.CylinderGeometry(0.38, 0.85, 11.5, 8);
+  trunkGeom.translate(0, 5.75, 0);
+  const crownLowerGeom = lumpify(new THREE.SphereGeometry(1, 10, 7), 0.24, 0x71c3);
+  crownLowerGeom.translate(0, 10.2 / 1.5, 0); // scaleY = 1.5*s -> +10.2*s
+  const crownUpperGeom = lumpify(new THREE.SphereGeometry(1, 9, 6), 0.2, 0x71c4);
+  crownUpperGeom.translate(0, 11.4 / 1.05, 0); // scaleY = 1.05*s -> +11.4*s
+
+  const trunks = new THREE.InstancedMesh(trunkGeom, vegeMat(0x54402a, 0.92, 0.02), sites.length);
+  trunks.name = 'farcrysis-vege-emergent-trunks';
+  const crownsLower = new THREE.InstancedMesh(crownLowerGeom, vegeMat(0x2f5f28, 0.9, 0.01), sites.length);
+  crownsLower.name = 'farcrysis-vege-emergent-crowns-lower';
+  const crownsUpper = new THREE.InstancedMesh(crownUpperGeom, vegeMat(0x3b7430, 0.88, 0.01), sites.length);
+  crownsUpper.name = 'farcrysis-vege-emergent-crowns-upper';
+
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const euler = new THREE.Euler();
+  const rng = mulberry32(SEED ^ 0x9e37);
+  for (const [i, site] of sites.entries()) {
+    const [x, z] = [site[0], site[1]];
+    const y = terrainHeightAt(x, z);
+    const s = 0.9 + rng() * 0.5; // 0.9-1.4 → 10.4-16.1 m giants
+    const yaw = (x * 0.83 + z * 0.47) % (Math.PI * 2);
+    euler.set(0, yaw, ((i % 3) - 1) * 0.03);
+    q.setFromEuler(euler);
+    m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(s, s, s));
+    trunks.setMatrixAt(i, m);
+    euler.set(((i % 3) - 1) * 0.06, yaw * 1.6, (((i + 1) % 3) - 1) * 0.05);
+    q.setFromEuler(euler);
+    // Crowns stay seated at the trunk base; the canopy height lives in the
+    // translated geometry and scales with the instance.
+    m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(3.4 * s, 1.5 * s, 3.2 * s));
+    crownsLower.setMatrixAt(i, m);
+    m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(2.1 * s, 1.05 * s, 2.0 * s));
+    crownsUpper.setMatrixAt(i, m);
+    _emergentAnchors.push([x, z]);
+  }
+  root.add(register(trunks, 'emergent'));
+  root.add(register(crownsLower, 'emergent'));
+  root.add(register(crownsUpper, 'emergent'));
+}
+
+// ---------------------------------------------------------------------------
+// #38 Midstorey — eye-level broadleaf clumps under the emergent crowns
+// ---------------------------------------------------------------------------
+
+function addMidstoreyClumps(root: THREE.Group): void {
+  const SEED = 0x5d2e_81aa;
+  const rng = mulberry32(SEED);
+  const sites: Array<[number, number, number, number]> = [];
+  const FIT = { maxSlope: 0.55, minAboveWater: 0.35 };
+  // Relational pass: 2-3 clumps scattered around each emergent crown so the
+  // tiers visually stack instead of scattering independently.
+  for (const [ax, az] of _emergentAnchors) {
+    const clumps = 3 + Math.floor(rng() * 2); // 3-4 per emergent crown
+    for (let k = 0; k < clumps; k += 1) {
+      const angle = rng() * Math.PI * 2;
+      const dist = 2.5 + rng() * 5; // strictly inside the 8 m cluster radius
+      const x = ax + Math.cos(angle) * dist;
+      const z = az + Math.sin(angle) * dist;
+      if (Math.abs(x) > BOUNDS.maxX - MARGIN || Math.abs(z) > BOUNDS.maxZ - MARGIN) continue;
+      if (!clearOfGameplay(x, z, 0.8)) continue;
+      if (!seatsOnTerrain(x, z, FIT)) continue;
+      sites.push([x, z, terrainHeightAt(x, z), rng() * Math.PI * 2]);
+    }
+  }
+  // Independent fill to reach target density across the interior.
+  const fillTarget = Math.max(0, 170 - sites.length);
+  sites.push(...constrainedScatter(fillTarget, SEED ^ 0x77aa, {
+    maxRadius: 56, margin: 0.8, fit: FIT,
+  }));
+
+  // Clump: four arched leaf cards fanned around a short stem.
+  const parts: Array<{ geom: THREE.BufferGeometry; matrix: THREE.Matrix4 }> = [];
+  const cardRng = mulberry32(SEED ^ 0x33cc);
+  for (let card = 0; card < 4; card += 1) {
+    const cardGeom = bentLeafCard(1.15 + cardRng() * 0.5, 0.34, 0.55);
+    const matrix = new THREE.Matrix4().compose(
+      new THREE.Vector3((cardRng() - 0.5) * 0.25, 0, (cardRng() - 0.5) * 0.25),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        (cardRng() - 0.5) * 0.5,
+        (card / 4) * Math.PI * 2 + cardRng() * 0.6,
+        0.18 + cardRng() * 0.22,
+      )),
+      new THREE.Vector3(1, 1, 1),
+    );
+    parts.push({ geom: cardGeom, matrix });
+  }
+  const clumpGeom = mergeTransformed(parts);
+
+  const mesh = new THREE.InstancedMesh(clumpGeom, vegeMat(0x35682c, 0.87, 0.01), sites.length);
+  mesh.name = 'farcrysis-vege-midstorey-clumps';
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const euler = new THREE.Euler();
+  const scaleRng = mulberry32(SEED ^ 0x11bb);
+  for (const [i, [x, z, y]] of sites.entries()) {
+    const s = 0.75 + scaleRng() * 0.7;
+    euler.set(0, x * 0.61 + z * 0.29, ((i % 3) - 1) * 0.07);
+    q.setFromEuler(euler);
+    m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(s, s, s));
+    mesh.setMatrixAt(i, m);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.computeBoundingSphere();
+  root.add(register(mesh, 'midstorey'));
+}
+
+// ---------------------------------------------------------------------------
+// #39 Undergrowth carpet — dense low leaf-card filler over the jungle floor
+// ---------------------------------------------------------------------------
+
+function addUndergrowthCarpet(root: THREE.Group): void {
+  const TARGET = 900;
+  const SEED = 0x6e41_b2d3;
+  const sites = constrainedScatter(TARGET, SEED, {
+    maxRadius: 60,
+    margin: 0.4,
+    fit: { maxSlope: 0.75, minAboveWater: 0.14 },
+    clumpSalt: 0x21ab,
+    clumpThreshold: 0.3,
+    spawnClearance: 3.2,
+  });
+
+  // Clump: three small arched cards, lower and broader than the midstorey.
+  const parts: Array<{ geom: THREE.BufferGeometry; matrix: THREE.Matrix4 }> = [];
+  const cardRng = mulberry32(SEED ^ 0x44dd);
+  for (let card = 0; card < 3; card += 1) {
+    parts.push({
+      geom: bentLeafCard(0.5 + cardRng() * 0.3, 0.26, 0.4),
+      matrix: new THREE.Matrix4().compose(
+        new THREE.Vector3((cardRng() - 0.5) * 0.3, 0, (cardRng() - 0.5) * 0.3),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(
+          (cardRng() - 0.5) * 0.6,
+          (card / 3) * Math.PI * 2 + cardRng() * 0.8,
+          0.12 + cardRng() * 0.3,
+        )),
+        new THREE.Vector3(1, 1, 1),
+      ),
+    });
+  }
+  const clumpGeom = mergeTransformed(parts);
+
+  const mesh = new THREE.InstancedMesh(clumpGeom, vegeMat(0x3d7a33, 0.86, 0.01), sites.length);
+  mesh.name = 'farcrysis-vege-undergrowth-carpet';
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const euler = new THREE.Euler();
+  const scaleRng = mulberry32(SEED ^ 0x22ee);
+  for (const [i, [x, z, y]] of sites.entries()) {
+    const s = 0.7 + scaleRng() * 0.8;
+    euler.set(0, x * 0.47 + z * 0.53, ((i % 3) - 1) * 0.09);
+    q.setFromEuler(euler);
+    m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(s, s, s));
+    mesh.setMatrixAt(i, m);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.computeBoundingSphere();
+  // Ground-level dressing: analytic dapple supplies the broken light, so the
+  // blades/cards stay OUT of the sun's shadow map (jungle-trail case study).
+  root.add(register(mesh, 'undergrowth-carpet', { castShadow: false }));
 }
 
 // ---------------------------------------------------------------------------
@@ -2670,6 +2994,11 @@ export function buildVegetation(scene: THREE.Group): void {
   addDriftwoodLogs(scene);       // ground scatter #35 — 26 beach driftwood logs
   addLeafCardUndergrowth(scene); // pass 76 #36 — 330 arched leaf cards (~3.5x density)
 
+  // ---- HF-396/HF-398 layered jungle: canopy / midstorey / undergrowth ----
+  addEmergentCanopyTrees(scene); // #37 — emergent tier above the broadleaf canopy
+  addMidstoreyClumps(scene);     // #38 — eye-level band clustered under the emergents
+  addUndergrowthCarpet(scene);   // #39 — dense low filler over the jungle floor
+
   // ---- Wind-enable remaining flexible vegetation (non-LOD-managed) ----
   _applyTslFoliage(scene); // HF-359/HF-363: TSL wind + canopy dapple on foliage layers
 
@@ -2696,42 +3025,3 @@ export function FARCRYSIS_VEGE_STATS(): {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Standalone density-polish entry — wires only the new 3 plant families +
-// ground cover (layers #28-#33) into an existing scene without resetting
-// the module-level stat accumulator. Returns deltas so the orchestrator can
-// log exactly what the polish pass added.
-// ---------------------------------------------------------------------------
-
-export interface VegetationPolishStats {
-  addedInstances: number;
-  addedTriangles: number;
-  addedTreeTypes: string[];
-}
-
-export function buildAdditionalVegetation(root: THREE.Group): VegetationPolishStats {
-  const beforeInstances = _s.totalInstances;
-  const beforeTriangles = _s.totalTriangles;
-  const beforeTypes = new Set(_s.treeTypeNames);
-
-  addCycadPalms(root);
-  addBloomTrees(root);
-  addBeachScrubBushes(root);
-  addGrassPatches(root);
-  addTwigs(root);
-  addSmallRocks(root);
-  _applyTslFoliage(root); // HF-359/HF-363: TSL wind + canopy dapple on foliage layers
-  _applyInstanceColorVariation(root); // Believability: per-instance colour variation
-
-  // Diff the set to get only newly added tree-type names
-  const addedTreeTypes: string[] = [];
-  for (const t of _s.treeTypeNames) {
-    if (!beforeTypes.has(t)) addedTreeTypes.push(t);
-  }
-
-  return {
-    addedInstances: _s.totalInstances - beforeInstances,
-    addedTriangles: _s.totalTriangles - beforeTriangles,
-    addedTreeTypes,
-  };
-}

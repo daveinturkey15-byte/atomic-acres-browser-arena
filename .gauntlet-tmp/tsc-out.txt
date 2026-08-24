@@ -1,0 +1,17 @@
+src/map.ts(618,42): error TS2339: Property 'x' does not exist on type 'never'.
+src/map.ts(618,64): error TS2339: Property 'z' does not exist on type 'never'.
+src/map.ts(629,42): error TS2339: Property 'x' does not exist on type 'never'.
+src/map.ts(629,70): error TS2339: Property 'z' does not exist on type 'never'.
+src/operator-model.ts(1883,7): error TS2345: Argument of type 'Map<string, AnimationClip>' is not assignable to parameter of type 'ReadonlySet<string>'.
+  Types of property 'forEach' are incompatible.
+    Type '(callbackfn: (value: AnimationClip, key: string, map: Map<string, AnimationClip>) => void, thisArg?: any) => void' is not assignable to type '(callbackfn: (value: string, value2: string, set: ReadonlySet<string>) => void, thisArg?: any) => void'.
+      Types of parameters 'callbackfn' and 'callbackfn' are incompatible.
+        Types of parameters 'value' and 'value' are incompatible.
+          Type 'AnimationClip' is not assignable to type 'string'.
+src/scratch-hf387-corner.test.ts(44,11): error TS6133: 'trace' is declared but its value is never read.
+src/ui/operator-preview.ts(237,5): error TS2304: Cannot find name 'environment'.
+src/ui/operator-preview.ts(238,9): error TS2304: Cannot find name 'environment'.
+src/ui/operator-preview.ts(239,27): error TS2304: Cannot find name 'environment'.
+src/ui/operator-preview.ts(242,41): error TS2304: Cannot find name 'environment'.
+src/ui/operator-preview.ts(420,7): error TS2304: Cannot find name 'environment'.
+src/ui/operator-preview.ts(421,7): error TS2304: Cannot find name 'environment'.

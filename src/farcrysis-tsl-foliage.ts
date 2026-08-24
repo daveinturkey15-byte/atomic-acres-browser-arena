@@ -60,7 +60,9 @@ import {
   instanceIndex,
   materialColor,
   mix,
+  normalize,
   positionLocal,
+  positionViewDirection,
   positionWorld,
   sin,
   smoothstep,
@@ -295,3 +297,132 @@ export function makeTslFoliageMaterial(opts: FoliageOptions): MeshStandardNodeMa
 
   return mat;
 }
+
+// ---------------------------------------------------------------------------
+// HF-396 tropical grass-blade material — one shared graph for the whole field
+// ---------------------------------------------------------------------------
+
+export interface TslGrassOptions {
+  /** Base albedo. */
+  color: number;
+  roughness?: number;
+  metalness?: number;
+  /** Blade height the bend weighting normalises against (metres). */
+  bladeHeight: number;
+  /** Max lateral tip displacement at full gust (metres). */
+  swayAmount: number;
+  /** Backlit translucency tint (bright yellow-green). */
+  sssColor?: number;
+  /** Backlit translucency strength 0..1. */
+  sssStrength?: number;
+}
+
+/**
+ * HF-396: one node graph for the ENTIRE grass field. Every chunk mesh shares
+ * the returned material instance, so the arena's distinct-program count grows
+ * by exactly one no matter how many blades exist — the HF-374 budget rule.
+ *
+ * Layers, all GPU-side off `positionLocal`/`positionWorld`/`instanceIndex`:
+ *   wind   1  global sway        sin(t + per-instance phase)
+ *   wind   2  rolling gust wave  travelling across world XZ, modulates amplitude
+ *   wind   3  per-blade turbulence  high-frequency decorrelated flutter
+ *   colour root-to-tip gradient + warm backlit translucency (SSS approx):
+ *          pow(max(dot(V, -L), 0), 3) against an authored sun direction,
+ *          weighted toward the thin tip. Cheap, uniform-free, and reads as
+ *          light passing THROUGH the blade when looking toward the sun.
+ */
+export function makeTslGrassMaterial(opts: TslGrassOptions): MeshStandardNodeMaterial {
+  const mat = new MeshStandardNodeMaterial({
+    color: opts.color,
+    roughness: opts.roughness ?? 0.86,
+    metalness: opts.metalness ?? 0.02,
+    side: THREE.DoubleSide, // blades must read from both sides
+  });
+  // Same WebGL2 guard as makeTslFoliageMaterial: WebGLRenderer needs
+  // shaderIDs['MeshStandardMaterial'] while WebGPURenderer still evaluates
+  // the TSL nodes via isNodeMaterial.
+  mat.type = 'MeshStandardMaterial';
+
+  const key = 'grass|v1';
+  let graph = _graphCache.get(key);
+  if (!graph) {
+    const t = uniform(0);
+    const wind = { time: t, users: 0 };
+    _windUniforms.push(wind);
+
+    // ---- layered wind (vertex stage) ----
+    const hN = positionLocal.y.div(opts.bladeHeight).clamp(0, 1);
+    const bend = hN.mul(hN); // quadratic: tip moves, root pinned
+    const phase = instanceHash(1).mul(Math.PI * 2);
+    const phase2 = instanceHash(2).mul(Math.PI * 2);
+    // Layer 1: global sway.
+    const g = sin(t.mul(1.35).add(phase));
+    const g2 = sin(t.mul(1.02).add(phase2)).mul(0.6);
+    // Layer 2: gust wave rolling across the map (world-space, so the whole
+    // field ripples coherently instead of every blade doing its own thing).
+    const wave = sin(
+      positionWorld.x.mul(0.22).add(positionWorld.z.mul(0.16)).sub(t.mul(2.1)),
+    );
+    const gust = wave.mul(0.5).add(0.62).clamp(0.12, 1);
+    // Layer 3: per-blade turbulence.
+    const tb = sin(t.mul(4.3).add(phase.mul(2.7))).mul(0.38);
+    const swayX = g.add(tb).mul(gust).mul(bend).mul(opts.swayAmount);
+    const swayZ = g2.sub(tb.mul(0.7)).mul(gust).mul(bend).mul(opts.swayAmount);
+    const positionNode = positionLocal.add(
+      vec3(swayX, float(0), swayZ),
+    ) as unknown as Node<'vec3'>;
+
+    // ---- root-to-tip gradient + SSS approximation (fragment stage) ----
+    const baseV = vec3(materialColor as unknown as Node<'vec3'>);
+    const rootShade = baseV.mul(vec3(0.42, 0.5, 0.38)); // humus shadow at the roots
+    const grad = smoothstep(0, 0.55, hN);
+    let col = mix(rootShade, baseV, grad);
+    col = mix(col, baseV.mul(vec3(1.14, 1.08, 0.8)), hN.mul(0.7)) as unknown as Node<'vec3'>; // sun-bleached tips
+    const sssStrength = opts.sssStrength ?? 0.55;
+    if (sssStrength > 0) {
+      // Authored warm sun direction; matches the jungle-golden-hour rig's
+      // high warm sun well enough for a translucency approximation.
+      const L = normalize(vec3(-0.45, 0.62, -0.35));
+      const back = positionViewDirection.dot(L.negate()).clamp(0, 1).pow(3);
+      const sssHex = opts.sssColor ?? 0xa8d24a;
+      const sss = vec3(
+        ((sssHex >> 16) & 255) / 255,
+        ((sssHex >> 8) & 255) / 255,
+        (sssHex & 255) / 255,
+      )
+        .mul(back)
+        .mul(hN)
+        .mul(sssStrength);
+      col = col.add(sss) as unknown as Node<'vec3'>;
+    }
+
+    graph = {
+      colorNode: col,
+      positionNode,
+      wind,
+    };
+    _graphCache.set(key, graph);
+  }
+
+  mat.colorNode = graph.colorNode;
+  mat.positionNode = graph.positionNode;
+
+  const wind = graph.wind;
+  if (wind) {
+    // Same refcount/disposal contract as makeTslFoliageMaterial (HF-363).
+    wind.users += 1;
+    let released = false;
+    mat.addEventListener('dispose', () => {
+      if (released) return;
+      released = true;
+      wind.users -= 1;
+      if (wind.users > 0) return;
+      const index = _windUniforms.indexOf(wind);
+      if (index !== -1) _windUniforms.splice(index, 1);
+      for (const [cachedKey, entry] of _graphCache) if (entry.wind === wind) _graphCache.delete(cachedKey);
+    });
+  }
+
+  return mat;
+}
+

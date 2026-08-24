@@ -21,6 +21,7 @@
  */
 import * as THREE from 'three';
 import { softDotTexture } from './farcrysis-atmosphere';
+import { createWaterRippleTexture } from './farcrysis-water-ripples';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -103,6 +104,8 @@ interface VistaBirds {
 let birds: VistaBirds | null = null;
 let vistaApplied = false;
 let _glitterPath: THREE.Mesh | null = null;
+/** HF-394: open-ocean ripple normal map, scrolled by animateVista. */
+let _oceanRipples: THREE.Texture | null = null;
 
 // ---------------------------------------------------------------------------
 // Ocean plane
@@ -112,12 +115,20 @@ function buildOcean(scene: THREE.Scene): void {
   const geometry = new THREE.PlaneGeometry(OCEAN_SIZE, OCEAN_SIZE, 1, 1);
   geometry.rotateX(-Math.PI / 2);
 
+  // HF-394: the horizon sea was a perfectly flat untextured sheet — at
+  // grazing angles it read as painted cardboard between the islands. The same
+  // procedural ripple normal map as the lagoon (very coarse repeat over 512 m,
+  // slow drift) breaks the specular into a moving glitter field; roughness
+  // drops slightly so the sun path actually sparkles.
+  const ripples = createWaterRippleTexture(48, 48);
+
   const material = new THREE.MeshStandardMaterial({
     color: OCEAN_COLOR,
-    roughness: OCEAN_ROUGHNESS,
+    roughness: OCEAN_ROUGHNESS - (ripples ? 0.06 : 0),
     metalness: OCEAN_METALNESS,
     emissive: OCEAN_EMISSIVE,
     emissiveIntensity: OCEAN_EMISSIVE_INTENSITY,
+    ...(ripples ? { normalMap: ripples.texture, normalScale: new THREE.Vector2(0.6, 0.6) } : {}),
   });
 
   const ocean = new THREE.Mesh(geometry, material);
@@ -480,5 +491,12 @@ export function animateVista(timeSeconds: number): void {
   if (_glitterPath) {
     const mat = _glitterPath.material as THREE.MeshBasicMaterial;
     mat.opacity = 0.42 + Math.sin(timeSeconds * 0.55) * 0.10;
+  }
+  if (_oceanRipples) {
+    _oceanRipples.offset.set(
+      ((timeSeconds * 0.011) % 1 + 1) % 1,
+      ((timeSeconds * 0.007) % 1 + 1) % 1,
+    );
+    if (_oceanRipples.matrixAutoUpdate) _oceanRipples.updateMatrix();
   }
 }

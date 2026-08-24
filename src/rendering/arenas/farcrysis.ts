@@ -31,15 +31,18 @@ export const definition = createProceduralArenaVisualDefinition({
   // Fog agrees with the daylight sky above it: a faint blue-green marine haze,
   // not the sage band that read as the same beige wash as the old dusk sky.
   fog: { color: 0xa8cfe0, near: 78, far: 200 },
-  shadows: { enabled: true, mapSize: 2048, maximumDistance: 120, normalBias: 0.03 },
+  shadows: { enabled: true, mapSize: 2048, maximumDistance: 200, normalBias: 0.03 },
   atmosphere: { preset: 'jungle-golden-hour', mist: 0.12, dust: 0.05, clouds: true },
   colorPipeline: colorPipeline('pass69.farcrysis.hdr.v1', 1.08),
   budgets: budgets({ maximumDrawCalls: 460, maximumTriangles: 1_100_000 }),
+  // HF-396: cameras track the rescaled landmarks — spawn-side beach (doubled
+  // corner), jungle mid-ring, core interior, and the seaplane throwback now
+  // at (48, -48). maximumDistance for shadows raised to cover the island.
   reviewCameras: [
-    camera('farcrysis-beach-golden', [-27, 3.2, -27], [0, 1.2, 0], 'overview', 1.08),
-    camera('farcrysis-jungle-dapple', [-10, 1.9, -12], [0, 1.7, 0], 'light-occlusion', 1.08),
+    camera('farcrysis-beach-golden', [-54, 3.2, -54], [0, 1.2, 0], 'overview', 1.08),
+    camera('farcrysis-jungle-dapple', [-20, 1.9, -24], [0, 1.7, 0], 'light-occlusion', 1.08),
     camera('farcrysis-core-interior', [0, 2.6, 0], [0, 1.7, 4], 'geometry', 1.08),
-    camera('farcrysis-seaplane-throwback', [24, 2.4, -24], [20, 1.2, -20], 'overview', 1.08),
+    camera('farcrysis-seaplane-throwback', [48, 2.4, -48], [40, 1.2, -40], 'overview', 1.08),
   ],
   collisionIdentity: { authoritativeArenaId: 'farcrysis', evidence: 'ArenaMap farcrysis collider, cover and shot-surface identity', presentationMayMutateAuthority: false },
   exceptions: ['beach/jungle foliage may remain presentation-only while authoritative cover and shot surfaces remain unchanged'],

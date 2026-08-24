@@ -1,0 +1,76 @@
+let gunnerTargetConfirmUntil = 0;
+const GUNNER_TARGET_CONFIRM_DURATION_MS = 650;
+
+/**
+ * First-person cockpit HUD for the Chopper Gunner and Piloted Drone. Values
+ * mirror the authoritative entity snapshot; the disconnected reticle leaves
+ * the exact centre ray unobstructed on desktop and mobile.
+ */
+function syncGunnerCockpitHud(
+  entity: KillstreakEntitySnapshot,
+  possessionKind: 'chopper-gunner' | 'piloted-drone',
+  now: number,
+): void {
+  const hud = element<HTMLElement>('#gunner-cockpit-hud');
+  hud.hidden = false;
+  hud.setAttribute('aria-hidden', 'false');
+  hud.dataset.supportKind = possessionKind;
+  const controlStrip = element<HTMLElement>('#gunner-control-strip');
+  controlStrip.hidden = possessionKind !== 'chopper-gunner';
+  controlStrip.setAttribute('aria-hidden', String(possessionKind !== 'chopper-gunner'));
+  element<HTMLElement>('#gunner-hull').textContent = String(Math.max(0, Math.round(entity.health)));
+  const gunAmmo = entity.magazine === null ? '∞' : String(entity.magazine);
+  element<HTMLElement>('#gunner-ammo').textContent = gunAmmo;
+  element<HTMLElement>('#gunner-control-gun-ammo').textContent = gunAmmo;
+  element<HTMLElement>('#gunner-altitude').textContent = `${Math.max(0, Math.round(entity.position[1] - (arena.bounds.minY ?? 0)))}M`;
+  element<HTMLElement>('#gunner-speed').textContent = String(Math.round(Math.hypot(...entity.velocity)));
+  element<HTMLElement>('#gunner-time').textContent = (Math.max(0, entity.expiresInMs) / 1_000).toFixed(1);
+  element<HTMLElement>('#gunner-damage').textContent = String(Math.round(
+    supportDamageDealtByActivation.get(entity.activationId) ?? 0,
+  ));
+  element<HTMLElement>('#gunner-platform').textContent = possessionKind === 'chopper-gunner' ? 'CHOPPER GUNNER' : 'PILOTED DRONE';
+  element<HTMLElement>('#gunner-weapon-mode').textContent = possessionKind === 'chopper-gunner' ? '30MM AUTOCANNON' : 'REMOTE CANNON';
+  const missileStatus = element<HTMLElement>('#gunner-missile-status');
+  const chopperGunner = possessionKind === 'chopper-gunner';
+  missileStatus.hidden = !chopperGunner;
+  missileStatus.setAttribute('aria-hidden', String(!chopperGunner));
+  if (chopperGunner) {
+    const ammo = Math.max(0, Math.min(CHOPPER_MISSILE_CAPACITY, entity.missileAmmo ?? 0));
+    const cooldownMs = Math.max(0, entity.missileCooldownMs ?? 0);
+    element<HTMLElement>('#gunner-missile-ammo').textContent = `×${ammo} / ${CHOPPER_MISSILE_CAPACITY}`;
+    element<HTMLElement>('#gunner-missile-cooldown').textContent = ammo <= 0
+      ? 'EMPTY'
+      : cooldownMs > 0 ? `${(cooldownMs / 1_000).toFixed(1)}S` : 'READY';
+    missileStatus.dataset.ready = String(ammo > 0 && cooldownMs <= 0);
+  }
+  if (now >= gunnerTargetConfirmUntil) {
+    element<HTMLElement>('#gunner-target-confirm').hidden = true;
+    hud.dataset.hitConfirm = 'false';
+  }
+}
+
+function hideGunnerCockpitHud(): void {
+  const hud = element<HTMLElement>('#gunner-cockpit-hud');
+  hud.hidden = true;
+  hud.setAttribute('aria-hidden', 'true');
+  hud.dataset.supportKind = 'none';
+  hud.dataset.hitConfirm = 'false';
+  const controlStrip = element<HTMLElement>('#gunner-control-strip');
+  controlStrip.hidden = true;
+  controlStrip.setAttribute('aria-hidden', 'true');
+  const targetConfirm = element<HTMLElement>('#gunner-target-confirm');
+  targetConfirm.hidden = true;
+  targetConfirm.style.removeProperty('left');
+  targetConfirm.style.removeProperty('top');
+  delete targetConfirm.dataset.targetId;
+  element<HTMLElement>('#chopper-thermal').hidden = true;
+  const missileStatus = element<HTMLElement>('#gunner-missile-status');
+  missileStatus.hidden = true;
+  missileStatus.setAttribute('aria-hidden', 'true');
+  missileStatus.dataset.ready = 'false';
+  element<HTMLElement>('#gunner-control-gun-ammo').textContent = '∞';
+  element<HTMLElement>('#gunner-missile-ammo').textContent = `×0 / ${CHOPPER_MISSILE_CAPACITY}`;
+  element<HTMLElement>('#gunner-missile-cooldown').textContent = 'OFFLINE';
+  gunnerTargetConfirmUntil = 0;
+  nextLocalSupportGunReportAt = 0;
+}

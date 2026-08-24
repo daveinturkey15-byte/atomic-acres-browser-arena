@@ -14,6 +14,7 @@ import {
   type PalmPlacement,
 } from './farcrysis-palms-enhanced';
 import { lumpify } from './farcrysis-vegetation';
+import { createWaterRippleTexture, registerScrollingWaterTexture } from './farcrysis-water-ripples';
 import {
   farcrysisTerrainHeight,
   farcrysisTerrainPhysicsTiles,
@@ -22,6 +23,18 @@ import {
   FARCRYSIS_WATER_LEVEL,
 } from './farcrysis-terrain-authority';
 import { FARCRYSIS_BOUNDS, FARCRYSIS_COVER_MIN, FARCRYSIS_MAX_SIGHTLINE } from './farcrysis-constants';
+
+// HF-395 relational mid-map composition: every mid-map prop derives its world
+// position from one of four quadrant landmark frames (see the module header).
+import {
+  FARCRYSIS_LANDMARKS,
+  landmarkCratePlacements,
+  landmarkFernPositions,
+  landmarkHedgePositions,
+  landmarkRubblePositions,
+  landmarkTreePositions,
+  landmarkWallSpecs,
+} from './farcrysis-midmap-landmarks';
 
 // Re-export for downstream consumers (tests, map registry)
 export { FARCRYSIS_BOUNDS, FARCRYSIS_COVER_MIN, FARCRYSIS_MAX_SIGHTLINE };
@@ -210,13 +223,30 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // green marble (metal water reflects only the environment and goes dark).
   // Tropical water is a dielectric: near-zero metalness, mid roughness, and a
   // brighter turquoise that lets the sand gradient below read through.
+  //
+  // HF-394: the plane itself stays FLAT at the authored registry waterline —
+  // buoyancy runs on the sim clock, this presentation on performance.now(),
+  // so geometric swell here would visibly disagree with the player's bob.
+  // All the motion lives in a procedural ripple NORMAL map instead: scrolling
+  // micro-facets catch the sun as glints, which is what was missing when the
+  // owner called the old surface plastic-flat. Roughness drops to 0.22 so
+  // those facets actually produce directional specular; the map's variation
+  // stops the broad glare the old roughness=1 flat look had.
+  const lagoonRipples = createWaterRippleTexture(7, 7);
   const waterMat = new THREE.MeshStandardMaterial({
     color: 0x2fa3ab,
-    roughness: 0.32,
+    roughness: 0.22,
     metalness: 0.02,
     transparent: true,
     opacity: 0.62,
+    ...(lagoonRipples ? {
+      normalMap: lagoonRipples.texture,
+      normalScale: new THREE.Vector2(0.45, 0.45),
+    } : {}),
   });
+  if (lagoonRipples) {
+    registerScrollingWaterTexture(lagoonRipples.texture, 0.021, 0.013);
+  }
   const jungleLeafMat = standard(0x3d7a33, 0.85, 0.02); // pass 76: brightened for daylight
   const palmTrunkMat = standard(0x7a5b36, 0.9, 0.02);
   const rockMat = standard(0x8b8a87, 0.92, 0.1);
@@ -243,9 +273,10 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // swimmable lagoon is actually reachable on foot. These flat planes remain
   // as presentation backstops under the sculpted terrain mesh only.
   //
-  // The mud plate shrinks from 64 m to 56 m so it ends where the seaward
+  // The mud plate shrinks from the full span so it ends where the seaward
   // shore descent begins (edge distance 4 m): a full-size flat plate at y=0
-  // would poke through the submerged sand ramp.
+  // would poke through the submerged sand ramp. HF-396: rescaled for the
+  // 128 m island (span - 8 m).
   // Pass 76 z-fight fix: these three backstop plates used to stack at
   // y = 0 / 0.01 / 0.02, INSIDE the sculpted terrain surface wherever the
   // interior dipped toward its -0.01 minimum — shimmering through the ground
@@ -254,21 +285,21 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // backstop instead of void, so they now sit safely BELOW the terrain's
   // interior minimum (still above the lagoon stack at -0.25 and the plates
   // keep their occlusion role).
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(56, 56), mudMat);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), mudMat);
   ground.name = 'farcrysis-ground-plate';
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.2;
   ground.receiveShadow = true;
   root.add(ground);
 
-  const beachRing = new THREE.Mesh(new THREE.PlaneGeometry(56, 56), sandMat);
+  const beachRing = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), sandMat);
   beachRing.name = 'farcrysis-beach-ring';
   beachRing.rotation.x = -Math.PI / 2;
   beachRing.position.y = -0.18;
   beachRing.receiveShadow = true;
   root.add(beachRing);
 
-  const grassRing = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), grassMat);
+  const grassRing = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), grassMat);
   grassRing.name = 'farcrysis-jungle-floor';
   grassRing.rotation.x = -Math.PI / 2;
   grassRing.position.y = -0.16;
@@ -277,7 +308,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
 
   // The lagoon plane sits exactly at the registry water level — this surface
   // IS the arena's one authored waterline (water-authoring FARCRYSIS_WATER).
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(76, 76), waterMat);
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), waterMat);
   water.name = 'farcrysis-lagoon-water';
   water.rotation.x = -Math.PI / 2;
   water.position.y = FARCRYSIS_WATER_LEVEL;
@@ -290,8 +321,8 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // buried the NW rock and the SE crate inside interior hills (~1-2 m tall)
   // and left an invisible collision wall where no rock was visible.
   const palmPositions: ReadonlyArray<readonly [number, number]> = [
-    [-27, -27], [27, -27], [-27, 27], [27, 27],
-    [-22, -30], [22, -30], [-22, 30], [22, 30],
+    [-54, -54], [54, -54], [-54, 54], [54, 54],
+    [-44, -60], [44, -60], [-44, 60], [44, 60],
   ];
   // Pass 76: these used to render as square box trunks with a flat slab of
   // "fronds" — the single worst FarCry-vibe offender at spawn. The VISUALS now
@@ -335,8 +366,8 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   const skiffSpecs: ReadonlyArray<{
     tag: string; x: number; z: number; yaw: number; pitch: number; roll: number;
   }> = [
-    { tag: 'nw', x: -18, z: -24, yaw: 0.5, pitch: 0.05, roll: 0.09 },
-    { tag: 'se', x: 18, z: 24, yaw: -2.6, pitch: -0.04, roll: -0.08 },
+    { tag: 'nw', x: -36, z: -48, yaw: 0.5, pitch: 0.05, roll: 0.09 },
+    { tag: 'se', x: 36, z: 48, yaw: -2.6, pitch: -0.04, roll: -0.08 },
   ];
   const hullPaintMat = standard(0x6f8f92, 0.8, 0.08);   // sun-faded teal paint
   const hullWoodMat = standard(0x7d5f40, 0.9, 0.03);    // weathered interior
@@ -384,64 +415,110 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     boat.rotation.set(skiff.pitch, skiff.yaw, skiff.roll);
     root.add(boat);
   }
-  cover(builder, 'farcrysis-rock-nw', [-14, groundY(-14, -20) + 0.5, -20], [2.2, 1.0, 2.2], rockMat);
-  cover(builder, 'farcrysis-rock-se', [14, groundY(14, 20) + 0.5, 20], [2.2, 1.0, 2.2], rockMat);
+  cover(builder, 'farcrysis-rock-nw', [-28, groundY(-28, -40) + 0.5, -40], [2.2, 1.0, 2.2], rockMat);
+  cover(builder, 'farcrysis-rock-se', [28, groundY(28, 40) + 0.5, 40], [2.2, 1.0, 2.2], rockMat);
 
-  // ---- Mid jungle ring: ruined walls + overgrown crates (collision-backed)
-  // Pass 76: same collider boxes, but each wall carries a moss cap and vine
-  // drape so the slabs read as jungle-reclaimed masonry, not fresh concrete.
-  const ruinSpecs: ReadonlyArray<readonly [string, number, number, [number, number, number], [number, number, number]]> = [
-    ['n', -8, -14, [3.6, 1.6, 0.5], [0, 0, 0.3]],
-    ['s', 8, 14, [3.6, 1.6, 0.5], [0, 0, -0.25]],
-    ['e', 14, -8, [0.5, 1.6, 3.6], [0.2, 0, 0]],
-    ['w', -14, 8, [0.5, 1.6, 3.6], [-0.2, 0, 0]],
-  ];
+  // ---- Mid-map landmarks (HF-395 relational composition) --------------------
+  //
+  // Owner: "all the assets in the middle of the map just feel a bit thrown
+  // together they're not very well coordinated." The old layout placed every
+  // family from its own hand-listed absolute coordinates: four lone tilted
+  // slabs on a ring, four floating symmetric crates, twelve scattered trees.
+  // Independent scatter lists cannot read as intentional composition.
+  //
+  // The mid map is now composed as FOUR rotationally-symmetric jungle
+  // landmarks (one per intercardinal quadrant). Each landmark groups an
+  // old-growth grove, a broken ruin wall with a rubble-choked collapse gap,
+  // a crate cache against the wall's inner face, and layered undergrowth —
+  // all positions derived relationally from the shared frames in
+  // farcrysis-midmap-landmarks.ts. Grove centres sit ON the spawn diagonals,
+  // so the trees keep breaking the spawn-to-spawn sightlines the old
+  // scattered canopy list existed for.
   const mossMat = standard(0x3e6a2e, 0.92, 0.01);
-  for (const [tag, wx, wz, size, rotation] of ruinSpecs) {
-    const wall = cover(builder, `farcrysis-ruined-wall-${tag}`, [wx, groundY(wx, wz) + 0.8, wz], size, ruinedWallMat, rotation);
-    // Moss cap hugging the top edge + a vine drape down one face, parented to
-    // the wall so they follow its authored tilt exactly.
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(size[0] * 0.98, 0.1, size[2] * 0.98), mossMat);
-    cap.name = `farcrysis-ruined-wall-${tag}-moss`;
-    cap.position.y = size[1] / 2 + 0.03;
-    cap.castShadow = false;
-    wall.add(cap);
-    const alongX = size[0] > size[2];
-    const drape = new THREE.Mesh(
-      new THREE.BoxGeometry(alongX ? size[0] * 0.4 : 0.06, size[1] * 0.85, alongX ? 0.06 : size[2] * 0.4),
-      mossMat,
-    );
-    drape.name = `farcrysis-ruined-wall-${tag}-vines`;
-    drape.position.set(alongX ? size[0] * 0.12 : size[0] / 2 + 0.04, 0.05, alongX ? size[2] / 2 + 0.04 : size[2] * -0.14);
-    drape.castShadow = false;
-    wall.add(drape);
+  for (const frame of FARCRYSIS_LANDMARKS) {
+    // Broken ruin wall: two segments sharing one outward axis with a 0.8 m
+    // collapse gap between them — one ruined structure, not lone slabs.
+    for (const segment of landmarkWallSpecs(frame)) {
+      const [wx, wz] = segment.pos;
+      const wall = cover(
+        builder,
+        `farcrysis-ruined-wall-${frame.tag}-${segment.key}`,
+        [wx, groundY(wx, wz) + 0.8, wz],
+        [segment.size[0], segment.size[1], segment.size[2]],
+        ruinedWallMat,
+        [segment.tilt, segment.yaw, 0],
+      );
+      // Moss cap hugging the top edge + a vine drape down one face, parented
+      // to the wall so they follow its authored tilt exactly.
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(segment.size[0] * 0.98, 0.1, segment.size[2] * 0.98), mossMat);
+      cap.name = `farcrysis-ruined-wall-${frame.tag}-${segment.key}-moss`;
+      cap.position.y = segment.size[1] / 2 + 0.03;
+      cap.castShadow = false;
+      wall.add(cap);
+      const drape = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, segment.size[1] * 0.85, segment.size[2] * 0.4),
+        mossMat,
+      );
+      drape.name = `farcrysis-ruined-wall-${frame.tag}-${segment.key}-vines`;
+      drape.position.set(segment.size[0] / 2 + 0.04, 0.05, segment.size[2] * -0.14);
+      drape.castShadow = false;
+      wall.add(drape);
+    }
+    // Rubble choking the wall's collapse gap (presentation-only).
+    landmarkRubblePositions(frame).forEach(([rx, rz], ri) => {
+      const rock = new THREE.Mesh(lumpify(new THREE.IcosahedronGeometry(0.42 - ri * 0.09, 0), 0.1, 0x9a7), rockMat);
+      rock.name = `farcrysis-ruin-rubble-${frame.tag}-${ri}`;
+      rock.position.set(rx, groundY(rx, rz) + 0.18, rz);
+      rock.rotation.y = rx * 1.7 + rz * 0.9;
+      rock.castShadow = true;
+      root.add(rock);
+    });
+    // Crate cache against the wall's inner face: stack_shapes two-tier stack
+    // under segment A plus one single crate under segment B. The base crate
+    // keeps the `farcrysis-crate-<tag>` name the wordmark plaques anchor to.
+    for (const crate of landmarkCratePlacements(frame)) {
+      const [cx, cz] = crate.pos;
+      if (crate.tier === 1) {
+        // Upper tier rides INSIDE the base crate's cover footprint — visual
+        // only, so one collider covers both boxes of the stack.
+        const top = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.85, 1.55), crateMat);
+        top.name = `farcrysis-crate-${frame.tag}-stack-top`;
+        top.position.set(cx + Math.sin(crate.yaw) * 0.06, groundY(cx, cz) + 1.33, cz + Math.cos(crate.yaw) * 0.06);
+        top.rotation.y = crate.yaw;
+        top.castShadow = true;
+        top.receiveShadow = true;
+        root.add(top);
+        continue;
+      }
+      cover(
+        builder,
+        crate.isStackBase ? `farcrysis-crate-${frame.tag}` : `farcrysis-crate-${frame.tag}-solo`,
+        [cx, groundY(cx, cz) + 0.45, cz],
+        [1.7, 0.9, 1.7],
+        crateMat,
+        [0, crate.yaw, 0],
+      );
+    }
   }
-  cover(builder, 'farcrysis-crate-nw', [-10, groundY(-10, -8) + 0.45, -8], [1.7, 0.9, 1.7], crateMat);
-  cover(builder, 'farcrysis-crate-ne', [10, groundY(10, -8) + 0.45, -8], [1.7, 0.9, 1.7], crateMat);
-  cover(builder, 'farcrysis-crate-sw', [-10, groundY(-10, 8) + 0.45, 8], [1.7, 0.9, 1.7], crateMat);
-  cover(builder, 'farcrysis-crate-se', [10, groundY(10, 8) + 0.45, 8], [1.7, 0.9, 1.7], crateMat);
 
-  // Mid-field canopy columns — collision-backed old-growth trees that break the
-  // long diagonal sightlines (spawn-to-spawn) so the map reads short-range COD,
-  // not a cross-map sniper lane. Placed OFF the patrol/rotation lanes.
-  const canopyPositions: ReadonlyArray<readonly [number, number]> = [
-    [-15, -15], [15, 15], [-15, 15], [15, -15],
-    [-4, -24], [4, 24], [-24, 4], [24, -4],
-    [-20, -12], [20, 12], [-12, 20], [12, -20],
-  ];
-  // Pass 76: the old-growth columns were literal boxes (box trunk + box crown
-  // + box "ferns"). The cover COLLIDER keeps its exact [1.5 x 2.6 x 1.5]
-  // footprint (sightline design is untouched) but is now an invisible proxy;
-  // the visuals are instanced organic trees: a tapered trunk plus two
-  // lumpified canopy lobes whose spread matches the old 4.6 m crown box.
-  for (const [x, z] of canopyPositions) {
-    const g = groundY(x, z);
-    const trunkCover = cover(builder, `farcrysis-canopy-trunk-${x}-${z}`, [x, g + 1.3, z], [1.5, 2.6, 1.5], palmTrunkMat);
+  // Mid-field canopy columns — collision-backed old-growth trees grouped INTO
+  // the landmarks (radial clusters of three). They break the long
+  // spawn-to-spawn diagonal sightlines so the map reads short-range COD, not
+  // a cross-map sniper lane; the groves sit off the patrol/rotation lanes.
+  const canopyTrees = FARCRYSIS_LANDMARKS.flatMap((frame) =>
+    landmarkTreePositions(frame).map(([x, z], i) => ({ x, z, key: `${frame.tag}-${i}` })),
+  );
+  // Pass 76 idiom retained: invisible [1.5 x 2.6 x 1.5] trunk colliders whose
+  // visuals are instanced organic trees (tapered trunk + two lumpified lobes).
+  for (const tree of canopyTrees) {
+    const g = groundY(tree.x, tree.z);
+    const trunkCover = cover(builder, `farcrysis-canopy-trunk-${tree.key}`, [tree.x, g + 1.3, tree.z], [1.5, 2.6, 1.5], palmTrunkMat);
     trunkCover.visible = false;
     trunkCover.userData.collisionProxy = true;
   }
+
   {
-    const count = canopyPositions.length;
+    const count = canopyTrees.length;
     const trunkGeom = new THREE.CylinderGeometry(0.52, 0.72, 2.8, 9);
     trunkGeom.translate(0, 1.4, 0);
     const lobeGeom = lumpify(new THREE.SphereGeometry(1.0, 10, 7), 0.2, 0xca90);
@@ -455,7 +532,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     const q = new THREE.Quaternion();
     const euler = new THREE.Euler();
     for (let i = 0; i < count; i += 1) {
-      const [x, z] = canopyPositions[i];
+      const { x, z } = canopyTrees[i];
       const g = groundY(x, z);
       const spin = (x * 0.7 + z * 0.13) % Math.PI;
       euler.set(0, spin, ((i % 3) - 1) * 0.04);
@@ -482,7 +559,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // Low undergrowth beneath the canopy columns: lumpified shrub clumps
   // (dense, non-colliding) instead of the old floating leaf boxes.
   {
-    const count = canopyPositions.length;
+    const count = canopyTrees.length;
     const shrubGeom = lumpify(new THREE.IcosahedronGeometry(1.0, 1), 0.16, 0xd11);
     const shrubs = new THREE.InstancedMesh(shrubGeom, jungleLeafMat, count);
     shrubs.name = 'farcrysis-canopy-undergrowth';
@@ -490,7 +567,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     const q = new THREE.Quaternion();
     const euler = new THREE.Euler();
     for (let i = 0; i < count; i += 1) {
-      const [x, z] = canopyPositions[i];
+      const { x, z } = canopyTrees[i];
       euler.set(0, x * 0.31 + z * 0.17, 0);
       q.setFromEuler(euler);
       m.compose(
@@ -633,18 +710,18 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     part.castShadow = true;
     part.receiveShadow = true;
   }
-  const seaplaneGround = groundY(24, -24);
-  seaplane.position.set(24, seaplaneGround + 0.1, -24);
+  const seaplaneGround = groundY(48, -48);
+  seaplane.position.set(48, seaplaneGround + 0.1, -48);
   seaplane.rotation.y = 0.7;
   seaplane.rotation.z = 0.04; // settled unevenly into the beach
   root.add(seaplane);
   // Hull collider matches the fuselage box, yawed with the wreck.
-  colliderProxy('farcrysis-throwback-seaplane-collider', [24, seaplaneGround + 0.6, -24], [4.6, 1.2, 1.5], 'thin-metal', [0, 0.7, 0]);
+  colliderProxy('farcrysis-throwback-seaplane-collider', [48, seaplaneGround + 0.6, -48], [4.6, 1.2, 1.5], 'thin-metal', [0, 0.7, 0]);
 
   // Pass 76: the beacon was an orange box with a floating flame cube. Same
   // collider envelope, but it now reads as a castaway signal pyre: a lashed
   // timber tripod holding a fire basket with an emissive flame.
-  const beaconGround = groundY(-24, 24);
+  const beaconGround = groundY(-48, 48);
   const beacon = new THREE.Group();
   beacon.name = 'farcrysis-throwback-signal-beacon';
   const beaconWood = standard(0x7a5b36, 0.9, 0.03);
@@ -672,15 +749,15 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     part.castShadow = true;
     part.receiveShadow = true;
   }
-  beacon.position.set(-24, beaconGround, 24);
+  beacon.position.set(-48, beaconGround, 48);
   root.add(beacon);
-  colliderProxy('farcrysis-throwback-signal-beacon-collider', [-24, beaconGround + 1.3, 24], [1.4, 2.6, 1.4], 'wood');
+  colliderProxy('farcrysis-throwback-signal-beacon-collider', [-48, beaconGround + 1.3, 48], [1.4, 2.6, 1.4], 'wood');
 
   // Pass 76: the warning barrels were squat orange cylinders. They now share
   // the fuel-drum builder with the interactable barrels (0.6 m dia x 0.9 m,
   // rust banding, recessed lid) and the collider proxy shrinks WITH the visual
   // so silhouette-vs-collision agreement is preserved.
-  const barrelPositions: ReadonlyArray<readonly [number, number]> = [[-20, 20], [20, -20], [-5, -24], [5, 24]];
+  const barrelPositions: ReadonlyArray<readonly [number, number]> = [[-40, 40], [40, -40], [-10, -48], [10, 48]];
   buildFuelDrumInstances(
     root,
     barrelPositions.map(([x, z], index) => ({
@@ -707,7 +784,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
 
   // Research tower legs (art tower at [-8.5, -8.5], legs at ±1.3 offsets in
   // farcrysis-art.ts addResearchTower) and cave arch pillars (art cave group
-  // at [26, 16], yaw 1.2). World positions are derived from the same authored
+  // at [52, 32], yaw 1.2). World positions are derived from the same authored
   // constants; the arch top stays open so players can walk through the arch.
   for (const [lx, lz] of [[-1.3, -1.3], [1.3, -1.3], [-1.3, 1.3], [1.3, 1.3]] as const) {
     const x = -8.5 + lx;
@@ -716,8 +793,8 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   }
   const caveYaw = 1.2;
   for (const side of [-1, 1] as const) {
-    const x = 26 + side * 1.5 * Math.cos(caveYaw);
-    const z = 16 - side * 1.5 * Math.sin(caveYaw);
+    const x = 52 + side * 1.5 * Math.cos(caveYaw);
+    const z = 32 - side * 1.5 * Math.sin(caveYaw);
     colliderProxy(`farcrysis-art-cave-pillar-collider-${side > 0 ? 'r' : 'l'}`, [x, groundY(x, z) + 1.3, z], [0.7, 2.6, 1.6], 'concrete', [0, caveYaw, 0]);
   }
 
@@ -726,8 +803,8 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // agree. Trunks within 2.5 m of a spawn stay collider-free so a spawn can
   // never be born wedged against a tree.
   const allSpawnXZ: ReadonlyArray<readonly [number, number]> = [
-    [-26, -26], [-22, -24], [-24, -20], [-18, -26],
-    [26, 26], [22, 24], [24, 20], [18, 26],
+    [-52, -52], [-44, -48], [-48, -40], [-36, -52],
+    [52, 52], [44, 48], [48, 40], [36, 52],
   ];
   for (const [index, palm] of enhancedPalmPlacements().entries()) {
     const nearSpawn = allSpawnXZ.some(([sx, sz]) => Math.hypot(palm.x - sx, palm.z - sz) < 2.5);
@@ -739,11 +816,12 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // ---- Pass 69 interactables (crates, barrels, sandbag walls)
   addInteractables(builder);
 
-  // ---- Jungle bushes (dressing, no collision) + instanced ferns (R9 style)
-  const bushPositions: ReadonlyArray<readonly [number, number]> = [
-    [-6, -12], [6, -12], [-6, 12], [6, 12], [-12, -4], [12, -4], [-12, 4], [12, 4],
-    [-4, -20], [4, -20], [-4, 20], [4, 20], [-20, -6], [20, -6], [-20, 6], [20, 6],
-  ];
+  // ---- Jungle bushes + ferns (dressing, no collision) -----------------------
+  // HF-395: these were two MORE independent absolute scatter lists (a grid
+  // and an ellipse) — the "thrown together" look. Both families now hang off
+  // the landmark frames: a hedgerow distributed along the back of each ruin
+  // wall, and fern fans radially distributed at each grove base.
+  const bushPositions = FARCRYSIS_LANDMARKS.flatMap((frame) => landmarkHedgePositions(frame));
   // Pass 76: box "bushes" become one instanced draw of lumpified shrub clumps.
   {
     const count = bushPositions.length;
@@ -771,35 +849,35 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     root.add(bushes);
   }
 
-  const fernCount = 24;
+  const fernPlacements = FARCRYSIS_LANDMARKS.flatMap((frame) => landmarkFernPositions(frame));
   const fernGeom = new THREE.BoxGeometry(0.5, 0.9, 0.18);
   const fernMat = standard(0x3d7a35, 0.85, 0.02);
-  const ferns = new THREE.InstancedMesh(fernGeom, fernMat, fernCount);
+  const ferns = new THREE.InstancedMesh(fernGeom, fernMat, fernPlacements.length);
   ferns.name = 'farcrysis-instanced-ferns';
   const fernMatrix = new THREE.Matrix4();
-  for (let i = 0; i < fernCount; i += 1) {
-    const angle = (i / fernCount) * Math.PI * 2;
-    const radius = 7 + (i % 4) * 2.4;
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius * 0.9;
-    fernMatrix.makeRotationY(angle * 2.3);
+  fernPlacements.forEach(([x, z], i) => {
+    fernMatrix.makeRotationY(x * 2.3 + z * 1.1);
     // HF-360: seated on the terrain authority (was flat y=0.45).
     fernMatrix.setPosition(x, groundY(x, z) + 0.45, z);
     ferns.setMatrixAt(i, fernMatrix);
-  }
+  });
   ferns.castShadow = true;
   root.add(ferns);
 
   // World-bounds walls (invisible, keep players in the arena). HF-360: the
   // walls now reach down to the safety floor — the shore descends ~4 m below
   // the old y=0 wall base, and a swimmer must meet a wall there, not a gap.
+  // HF-396: derived from FARCRYSIS_BOUNDS so the wall ring tracks the island
+  // edge exactly instead of hardcoding the old +/-32 m footprint.
   const boundWallHeight = 4 - FARCRYSIS_SAFETY_FLOOR_Y;
   const boundWallCentreY = (4 + FARCRYSIS_SAFETY_FLOOR_Y) / 2;
+  const half = FARCRYSIS_BOUNDS.maxX;
+  const span = half * 2 + 1;
   const boundWalls = [
-    box(builder, 'farcrysis-bound-n', [0, boundWallCentreY, -32.2], [65, boundWallHeight, 0.5], standard(0x000000, 0.9, 0), { cast: false, ballistic: 'concrete' }),
-    box(builder, 'farcrysis-bound-s', [0, boundWallCentreY, 32.2], [65, boundWallHeight, 0.5], standard(0x000000, 0.9, 0), { cast: false, ballistic: 'concrete' }),
-    box(builder, 'farcrysis-bound-w', [-32.2, boundWallCentreY, 0], [0.5, boundWallHeight, 65], standard(0x000000, 0.9, 0), { cast: false, ballistic: 'concrete' }),
-    box(builder, 'farcrysis-bound-e', [32.2, boundWallCentreY, 0], [0.5, boundWallHeight, 65], standard(0x000000, 0.9, 0), { cast: false, ballistic: 'concrete' }),
+    box(builder, 'farcrysis-bound-n', [0, boundWallCentreY, -half - 0.2], [span, boundWallHeight, 0.5], standard(0x000000, 0.9, 0), { cast: false, ballistic: 'concrete' }),
+    box(builder, 'farcrysis-bound-s', [0, boundWallCentreY, half + 0.2], [span, boundWallHeight, 0.5], standard(0x000000, 0.9, 0), { cast: false, ballistic: 'concrete' }),
+    box(builder, 'farcrysis-bound-w', [-half - 0.2, boundWallCentreY, 0], [0.5, boundWallHeight, span], standard(0x000000, 0.9, 0), { cast: false, ballistic: 'concrete' }),
+    box(builder, 'farcrysis-bound-e', [half + 0.2, boundWallCentreY, 0], [0.5, boundWallHeight, span], standard(0x000000, 0.9, 0), { cast: false, ballistic: 'concrete' }),
   ];
   for (const wall of boundWalls) {
     wall.visible = false;
@@ -809,16 +887,16 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // no opposing spawn line-of-sight.
   const spawns: Record<Team, THREE.Vector3[]> = spawnRecord(
     [
-      [-26, -26], [-22, -24], [-24, -20], [-18, -26],
+      [-52, -52], [-44, -48], [-48, -40], [-36, -52],
     ],
     [
-      [26, 26], [22, 24], [24, 20], [18, 26],
+      [52, 52], [44, 48], [48, 40], [36, 52],
     ],
   );
 
   const patrolPoints = [
-    [-26, -26], [-18, -20], [-12, -16], [-4, -12], [0, 0], [12, 16], [18, 20], [26, 26],
-    [-20, 18], [20, -18], [-8, -24], [8, 24],
+    [-52, -52], [-36, -40], [-24, -32], [-8, -24], [0, 0], [24, 32], [36, 40], [52, 52],
+    [-40, 36], [40, -36], [-16, -48], [16, 48],
   ].map(([x, z]) => new THREE.Vector3(x, 0, z));
 
   // --- Pass 69 art/feel lane (presentation only — no colliders, spawns, or gameplay authority) ---

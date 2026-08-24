@@ -1,0 +1,105 @@
+{
+ "atomic-acres": {
+  "BUILD_ERROR": "TypeError: document.createElementNS is not a function"
+ },
+ "skyline-terminal": {
+  "surfaces": 161,
+  "raycastMeshes": 161,
+  "byMaterial": {
+   "concrete": 8,
+   "wood": 80,
+   "interior-wall": 9,
+   "earth": 2,
+   "structural-metal": 10,
+   "glass": 9,
+   "vehicle": 29,
+   "container": 10,
+   "fence": 4
+  },
+  "byClass": {
+   "explicit": 10,
+   "rule": 151
+  },
+  "fallbacks": [],
+  "invalidRatings": [],
+  "unstampedCount": 0,
+  "unstampedSample": [],
+  "stampMismatches": []
+ },
+ "rustworks-1v1": {
+  "surfaces": 64,
+  "raycastMeshes": 64,
+  "byMaterial": {
+   "structural-metal": 21,
+   "concrete": 1,
+   "interior-wall": 6,
+   "container": 36
+  },
+  "byClass": {
+   "explicit": 40,
+   "rule": 24
+  },
+  "fallbacks": [],
+  "invalidRatings": [],
+  "unstampedCount": 0,
+  "unstampedSample": [],
+  "stampMismatches": []
+ },
+ "gun-range": {
+  "BUILD_ERROR": "TypeError: Cannot read properties of undefined (reading 'width')"
+ },
+ "farcrysis": {
+  "surfaces": 220,
+  "raycastMeshes": 220,
+  "byMaterial": {
+   "wood": 118,
+   "concrete": 41,
+   "structural-metal": 21,
+   "thin-metal": 30,
+   "earth": 10
+  },
+  "byClass": {
+   "explicit": 220
+  },
+  "fallbacks": [],
+  "invalidRatings": [],
+  "unstampedCount": 100,
+  "unstampedSample": [
+   "farcrysis-crate-01|targetId=undefined",
+   "farcrysis-crate-02|targetId=undefined",
+   "farcrysis-crate-03|targetId=undefined",
+   "farcrysis-crate-04|targetId=undefined",
+   "farcrysis-crate-05|targetId=undefined",
+   "farcrysis-crate-06|targetId=undefined",
+   "farcrysis-crate-07|targetId=undefined",
+   "farcrysis-crate-08|targetId=undefined",
+   "farcrysis-crate-09|targetId=undefined",
+   "farcrysis-crate-10|targetId=undefined",
+   "farcrysis-crate-11|targetId=undefined",
+   "farcrysis-crate-12|targetId=undefined",
+   "farcrysis-crate-13|targetId=undefined",
+   "farcrysis-crate-14|targetId=undefined",
+   "farcrysis-crate-15|targetId=undefined"
+  ],
+  "stampMismatches": []
+ },
+ "high-seas": {
+  "surfaces": 169,
+  "raycastMeshes": 169,
+  "byMaterial": {
+   "structural-metal": 85,
+   "interior-wall": 52,
+   "wood": 4,
+   "reinforced": 16,
+   "thin-metal": 12
+  },
+  "byClass": {
+   "explicit": 169
+  },
+  "fallbacks": [],
+  "invalidRatings": [],
+  "unstampedCount": 0,
+  "unstampedSample": [],
+  "stampMismatches": []
+ }
+}
