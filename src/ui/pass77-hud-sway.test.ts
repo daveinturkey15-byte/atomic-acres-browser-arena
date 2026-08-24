@@ -100,7 +100,7 @@ describe('Pass 77 diegetic HUD sway', () => {
     }
   });
 
-  it('decays to under a pixel within a third of a second of the camera stopping', () => {
+  it('keeps a flick clearly readable and decays to under a pixel within a third of a second', () => {
     // A real 15-degree flick spread over four frames, then the player holds.
     let state = createHudSwayState(0, 0);
     let out = sampleHudSway(state, { yaw: 0, pitch: 0, speed: 0, deltaMs: 16 });
@@ -108,7 +108,17 @@ describe('Pass 77 diegetic HUD sway', () => {
       out = sampleHudSway(state, { yaw, pitch: 0, speed: 0, deltaMs: 16 });
       state = out.state;
     }
-    expect(Math.abs(out.swayX)).toBeGreaterThan(0.75);
+    // HF-391: the owner asked for a SMOOTHER interpolation, so visibility is
+    // pinned over a short window rather than demanding an instantaneous snap.
+    // The peak must still be unmistakable - at least three quarters of full
+    // travel - within 250 ms of the flick finishing.
+    let peakWithinWindow = 0;
+    for (let frame = 0; frame < 16 && peakWithinWindow < 0.75; frame += 1) {
+      out = sampleHudSway(state, { yaw: 0.26, pitch: 0, speed: 0, deltaMs: 16 });
+      state = out.state;
+      peakWithinWindow = Math.max(peakWithinWindow, Math.abs(out.swayX));
+    }
+    expect(peakWithinWindow).toBeGreaterThan(0.75);
 
     // AGENTS.md requires HUD effects to sit at the edges and decay fast. That
     // requirement is in PIXELS, so it is measured in pixels against the real
@@ -291,5 +301,69 @@ describe('Pass 77 HUD sway - amplitude a human can see', () => {
     const out = sampleHudSway(createHudSwayState(0, 0), { yaw: 2.5, pitch: 1.2, speed: 0, deltaMs: 16 });
     expect(out.swayX).toBe(1);
     expect(out.swayY).toBe(1);
+  });
+});
+
+/**
+ * HF-391 pins. The owner measured the HUD as "bouncing around maybe double
+ * the speed it should" and INCONSISTENT between maps (worst on High Seas).
+ * Measurement (artifacts/hf391/) showed the filter has no per-map signal
+ * path - identical scripted input produces near-identical traces on
+ * atomic-acres and high-seas - but heavy maps run slower frames with long
+ * hitches, and a hitch frame advanced the residual by up to the full 100 ms
+ * clamp, slamming the output to the opposite extreme in ONE frame. These
+ * tests pin the two fixes: bounded per-frame output motion, and consistency
+ * of the deflection under identical look input at different frame pacing.
+ */
+describe('Pass 77 HUD sway - HF-391 smoothness and cross-map consistency', () => {
+  /** swayX trace of a moderate 25 deg/s tracking turn with the given pacing. */
+  function trackingRun(deltaMsFor: (frame: number) => number, frames = 600) {
+    let state = createHudSwayState(0, 0);
+    const xs: number[] = [];
+    let yaw = 0;
+    for (let frame = 0; frame < frames; frame += 1) {
+      const deltaMs = Math.min(100, Math.max(0, deltaMsFor(frame)));
+      yaw += 0.436 * (Math.min(deltaMs, 33) / 1000); // identical look path either way
+      const out = sampleHudSway(state, { yaw, pitch: 0, speed: 0, deltaMs });
+      state = out.state;
+      xs.push(out.swayX);
+    }
+    return xs;
+  }
+
+  it('never moves the output more than 0.3 of travel in a single frame', () => {
+    // A direction reversal while fully deflected used to jump the FULL range
+    // (2.0 of normalised travel, ~68px at lag 10) inside one frame - the slam
+    // the owner reads as bouncing at double speed. This drives a sustained
+    // tracking turn that hard-reverses mid-deflection, so the output has to
+    // travel from one side to the other without ever exceeding the bound.
+    let state = createHudSwayState(0, 0);
+    let previous = 0;
+    let yaw = 0;
+    const omega = 0.6 * (16 / 1000); // fast tracking turn, radians per frame
+    for (let frame = 0; frame < 180; frame += 1) {
+      yaw += frame < 90 ? omega : -omega;
+      const out = sampleHudSway(state, { yaw, pitch: 0, speed: 0, deltaMs: 16 });
+      state = out.state;
+      if (frame > 0) expect(Math.abs(out.swayX - previous)).toBeLessThanOrEqual(0.301);
+      previous = out.swayX;
+      if (frame === 89) expect(previous).toBeGreaterThan(0.5); // deflected before the reversal
+    }
+    // And it must still complete the traverse: smoother, not stuck.
+    expect(previous).toBeLessThan(-0.5);
+  });
+
+  it('deflects the same amount under identical look input at high-seas-like frame pacing', () => {
+    // atomic-acres-like: steady ~60 fps. high-seas-like: ~40 fps with a
+    // 100 ms hitch every second. Same head motion, same HUD deflection.
+    const smooth = trackingRun(() => 16.7);
+    const hitched = trackingRun((frame) => (frame % 48 === 0 ? 100 : 25));
+    const smoothMean = smooth.slice(240).reduce((a, b) => a + Math.abs(b), 0) / (smooth.length - 240);
+    const hitchedMean = hitched.slice(240).reduce((a, b) => a + Math.abs(b), 0) / (hitched.length - 240);
+    expect(Math.abs(smoothMean - hitchedMean)).toBeLessThan(0.15);
+    // The paced run must also obey the same per-frame bound - no slam frames.
+    for (let i = 1; i < hitched.length; i += 1) {
+      expect(Math.abs(hitched[i] - hitched[i - 1])).toBeLessThanOrEqual(0.301);
+    }
   });
 });

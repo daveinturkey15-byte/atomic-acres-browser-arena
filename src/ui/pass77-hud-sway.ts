@@ -47,9 +47,19 @@
  * camera - and the settle is fast (TAU_MS below) so nothing lingers in the
  * player's peripheral vision during a fight.
  *
+ * HF-391 (Pass 79): the owner reported the HUD "bouncing around maybe double
+ * the speed it should" and inconsistent between maps (worst on High Seas) -
+ * calibration, not removal; he likes the effect. Measured traces under
+ * identical scripted input (artifacts/hf391/) showed NO per-map signal path;
+ * the map difference arrives through frame pacing (heavy maps hitch, a hitch
+ * frame advanced the residual by up to the MAX_DELTA_MS clamp, slamming the
+ * output in one step), and the overall rate was roughly twice what he wanted.
+ * Fixes: SATURATION_RAD restored toward its original sensitivity, plus an
+ * output stage below that bounds per-frame motion and smooths reversals.
+ *
  * Everything here is pure. It reads no globals, touches no DOM except through
  * the tiny structural type `HudSwayTarget`, and has no side effects other than
- * the three property writes in `applyHudSway`.
+ * the property writes in `applyHudSway`.
  */
 
 /** Retained lag state. Treat as opaque; construct with `createHudSwayState`. */
@@ -62,6 +72,14 @@ export type HudSwayState = Readonly<{
   breathe: number;
   /** Respiration phase in radians, advanced by real time, never by speed. */
   phase: number;
+  /**
+   * HF-391 smoothed look-lag output, -1..1. Null until the first sample
+   * initialises it from the raw residual (so the very first frame and a
+   * paused first frame report the real residual instead of a ramp from 0).
+   */
+  outX: number | null;
+  /** HF-391 smoothed vertical look-lag output, -1..1. Null until sampled. */
+  outY: number | null;
 }>;
 
 /** Per-frame camera and movement sample. */
@@ -102,13 +120,39 @@ const TAU_MS = 90;
 /**
  * Radians of residual that map to the full +-1 output.
  *
- * Lowered from 0.085 as part of the amplitude fix. At 0.085 the filter only
- * approached +-1 on a deliberate fast flick, so ORDINARY aiming - which is
- * what the player spends the match doing - produced a fraction of an already
- * tiny 10px travel. At 0.055 a normal tracking turn reads clearly and a flick
- * still saturates rather than overshooting the CSS ceiling.
+ * HF-391 HISTORY: 0.085 originally; lowered to 0.055 in the Pass 79 amplitude
+ * push so ordinary aiming produced visible lag. Combined with the larger CSS
+ * travel token that made every look input move the HUD roughly twice as fast
+ * as the owner wanted ("bouncing around maybe double the speed it should"),
+ * and an ordinary tracking turn pinned the output at full deflection the
+ * whole time. 0.075 restores ~2/3 of the original sensitivity: a flick still
+ * saturates, a steady turn reads clearly without living at the stops.
  */
-const SATURATION_RAD = 0.055;
+const SATURATION_RAD = 0.075;
+
+/**
+ * HF-391 OUTPUT STAGE. The raw residual above is what the HUD position
+ * chases; these parameters smooth THAT value before it reaches the sheet.
+ * Two defects this fixes:
+ *
+ *   1. Rate. A direction reversal used to traverse the entire -1..1 range
+ *      inside one frame (~68px at lag rank 10), which the owner read as the
+ *      HUD "bouncing around maybe double the speed it should". The attack
+ *      time constant plus the slew limit below stretch a full reversal over
+ *      roughly 150 ms while keeping the trail itself visible.
+ *   2. Per-map inconsistency (worst on High Seas/Hijacked). Measured traces
+ *      (artifacts/hf391/) show the filter has NO per-map signal path, but
+ *      heavy maps run slower frames with long hitches, and a hitch frame
+ *      advanced the residual by up to the MAX_DELTA_MS clamp - slamming the
+ *      output toward the opposite extreme in one step. SLEW_RATE_PER_S bounds
+ *      how fast the output may move per millisecond and SLEW_MAX_PER_FRAME
+ *      caps any single frame outright, so a hitch can never produce a slam,
+ *      whatever the map's frame pacing does.
+ */
+const TAU_OUT_ATTACK_MS = 80;
+const TAU_OUT_RELEASE_MS = 60;
+const SLEW_RATE_PER_S = 30;
+const SLEW_MAX_PER_FRAME = 0.3;
 
 /** Speed, in world units per second, that maps to full gait intensity. */
 const BREATHE_SPEED = 5.5;
@@ -132,6 +176,7 @@ const BREATH_RATE_RAD_PER_S = 1.4;
  * noise, so respiration is ducked to a third rather than removed.
  */
 const BREATH_FLOOR_AT_SPEED = 0.34;
+
 
 /** A single frame can never advance the filter by more than this. */
 const MAX_DELTA_MS = 100;
@@ -160,7 +205,7 @@ export function shortestAngleDelta(a: number, b: number): number {
 
 /** Start the filter already settled on a pose, so the first frame never jumps. */
 export function createHudSwayState(yaw = 0, pitch = 0): HudSwayState {
-  return { yaw: finite(yaw), pitch: finite(pitch), breathe: 0, phase: 0 };
+  return { yaw: finite(yaw), pitch: finite(pitch), breathe: 0, phase: 0, outX: null, outY: null };
 }
 
 /**
@@ -199,13 +244,36 @@ export function sampleHudSway(state: HudSwayState, sample: HudSwaySample): HudSw
   // sprint. `nextGait` is already smoothed, so the duck cannot snap.
   const breathAmplitude = 1 - (1 - BREATH_FLOOR_AT_SPEED) * clampUnit(nextGait);
 
+  // HF-391: the raw residuals are what the HUD chases; the sheet consumes the
+  // SMOOTHED stage below, which bounds how fast the visible position can move.
+  const outX = advanceOutputStage(state.outX, clampUnit(yawResidual / SATURATION_RAD), deltaMs);
+  const outY = advanceOutputStage(state.outY, clampUnit(pitchResidual / SATURATION_RAD), deltaMs);
+
   return {
-    state: { yaw: nextYaw, pitch: nextPitch, breathe: nextGait, phase },
-    swayX: clampUnit(yawResidual / SATURATION_RAD),
-    swayY: clampUnit(pitchResidual / SATURATION_RAD),
+    state: { yaw: nextYaw, pitch: nextPitch, breathe: nextGait, phase, outX, outY },
+    swayX: outX,
+    swayY: outY,
     breathe: clampUnit(Math.sin(phase) * breathAmplitude),
     gait: clampUnit(nextGait),
   };
+}
+
+/**
+ * One frame of the HF-391 output stage (see the constant block above).
+ *
+ * The first call passes the raw residual straight through so the HUD never
+ * ramps up from nothing; after that the output chases the raw value through
+ * an asymmetric lag (faster settling than attack, per the AGENTS.md decay
+ * requirement) and a slew limit that no single frame - including a hitch
+ * frame clamped to MAX_DELTA_MS - may exceed.
+ */
+function advanceOutputStage(current: number | null, raw: number, deltaMs: number): number {
+  if (current === null) return raw;
+  if (deltaMs <= 0) return current;
+  const tauMs = Math.abs(raw) > Math.abs(current) ? TAU_OUT_ATTACK_MS : TAU_OUT_RELEASE_MS;
+  const chased = current + (raw - current) * (1 - Math.exp(-deltaMs / tauMs));
+  const maxDelta = Math.min((SLEW_RATE_PER_S * deltaMs) / 1000, SLEW_MAX_PER_FRAME);
+  return clampUnit(current + Math.max(-maxDelta, Math.min(maxDelta, chased - current)));
 }
 
 /** Three decimals is below one screen pixel at the CSS multipliers in use. */
