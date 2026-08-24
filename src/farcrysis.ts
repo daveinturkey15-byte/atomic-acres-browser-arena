@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createBallisticSurface, type BallisticSurface } from './ballistics';
+import { createBallisticSurface, type BallisticMaterialId, type BallisticSurface } from './ballistics';
 import { classifyImpactSurface } from './combat-feedback';
 import type { Box2 } from './collision';
 import type { ArenaMap, PracticeTarget } from './map';
@@ -106,7 +106,7 @@ function box(
     cover?: boolean;
     rotation?: [number, number, number];
     cast?: boolean;
-    ballistic?: string;
+    ballistic?: BallisticMaterialId;
   } = {},
 ): THREE.Mesh {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
@@ -152,14 +152,19 @@ function box(
       minZ: position[2] - size[2] / 2,
       maxZ: position[2] + size[2] / 2,
     };
-    builder.shotSurfaces.push(
-      createBallisticSurface(
-        `farcrysis-shot-${builder.shotSurfaces.length}`,
-        name,
-        b,
-        { material: options.ballistic as BallisticSurface['material'] },
-      ),
+    const surface = createBallisticSurface(
+      `farcrysis-shot-${builder.shotSurfaces.length}`,
+      name,
+      b,
+      { material: options.ballistic },
     );
+    builder.shotSurfaces.push(surface);
+    // HF-390: every other arena stamps the raycast mesh with its surface id and
+    // authored family; f4rcry515 stamped neither, so `resolveShot` had no
+    // `ballisticMaterial` hint and any non-penetrating weapon fell back to the
+    // coarse name-based ImpactSurface instead of the authored family.
+    mesh.userData.ballisticSurfaceId = surface.id;
+    mesh.userData.ballisticMaterial = surface.material;
   }
   return mesh;
 }
@@ -177,7 +182,10 @@ function cover(
     cover: true,
     rotation,
     cast: true,
-    ballistic: material instanceof THREE.MeshStandardMaterial && material.metalness > 0.4 ? 'metal' : 'concrete',
+    // HF-390: 'metal' is an ImpactSurface, never a ballistic material family.
+    // Authoring it here rated 21 core-station surfaces with a family the shared
+    // resistance table does not carry, and traceBallisticPath threw on contact.
+    ballistic: material instanceof THREE.MeshStandardMaterial && material.metalness > 0.4 ? 'structural-metal' : 'concrete',
   });
 }
 
@@ -502,7 +510,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   const coreMat = stationMetalMat;
   // Core walls (structural, not cover-list — the station is a structure)
   const coreWall = (name: string, position: [number, number, number], size: [number, number, number]) =>
-    box(builder, name, position, size, coreMat, { cast: true, ballistic: 'metal' });
+    box(builder, name, position, size, coreMat, { cast: true, ballistic: 'structural-metal' });
   // HF-359 audit fix: the north and south walls were emitted as single 12 m spans,
   // sealing the core into a solid box. Everything inside — the command desk, crates,
   // catwalk and ramp — was unreachable, and bot patrol point [0,0] sat inside the
@@ -529,7 +537,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // controller's 0.42 m autostep climbs. The core floor is the flattened
   // terrain pad at y=0 (see farcrysis-terrain-authority), so authored core
   // heights need no per-piece ground offset.
-  box(builder, 'farcrysis-core-catwalk', [0, 2.5, 0], [7, 0.18, 2.4], standard(0x4c5b64, 0.5, 0.55), { cast: true, ballistic: 'metal' });
+  box(builder, 'farcrysis-core-catwalk', [0, 2.5, 0], [7, 0.18, 2.4], standard(0x4c5b64, 0.5, 0.55), { cast: true, ballistic: 'structural-metal' });
   const stairMat = standard(0x4c5b64, 0.5, 0.55);
   const stairSteps = 7;
   const stairRise = 2.59 / stairSteps; // top step flush with the catwalk deck
@@ -543,7 +551,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
       [2.9, treadTop / 2, 0.95 + (i + 1) * stairDepth],
       [1.2, treadTop, stairDepth],
       stairMat,
-      { cast: true, ballistic: 'metal' },
+      { cast: true, ballistic: 'structural-metal' },
     );
   }
   // Raised command desk (cover)
@@ -568,7 +576,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     name: string,
     position: [number, number, number],
     size: [number, number, number],
-    ballistic: string,
+    ballistic: BallisticMaterialId,
     rotation?: [number, number, number],
   ): void => {
     const proxy = box(builder, name, position, size, stationMetalMat, { cast: false, ballistic, rotation });
@@ -704,7 +712,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   for (const [lx, lz] of [[-1.3, -1.3], [1.3, -1.3], [-1.3, 1.3], [1.3, 1.3]] as const) {
     const x = -8.5 + lx;
     const z = -8.5 + lz;
-    colliderProxy(`farcrysis-art-tower-leg-collider-${lx}-${lz}`, [x, groundY(x, z) + 2.4, z], [0.26, 4.8, 0.26], 'metal');
+    colliderProxy(`farcrysis-art-tower-leg-collider-${lx}-${lz}`, [x, groundY(x, z) + 2.4, z], [0.26, 4.8, 0.26], 'structural-metal');
   }
   const caveYaw = 1.2;
   for (const side of [-1, 1] as const) {

@@ -104,6 +104,11 @@ describe('operator panel surface', () => {
     expect(body).not.toContain('pass65-firearms');
     expect(body).not.toContain('baseColor');
     expect(body).not.toContain('operator-skin-emblem');
-    expect(body).toContain('operatorSkinPortraitSvg(definition.id)');
+    // HF-381. This assertion used to pin operatorSkinPortraitSvg - the procedural
+    // placeholder - inside a test whose own name forbids shipping a placeholder as
+    // operator art. Four photoreal portraits had been generated locally and sat
+    // unused on disk while every player saw coloured blobs. Now pins the real image.
+    expect(body).toContain('operatorSkinPortraitMarkup(definition.id)');
+    expect(body).not.toContain('operatorSkinPortraitSvg(definition.id)');
   });
 });

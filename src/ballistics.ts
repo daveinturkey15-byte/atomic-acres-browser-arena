@@ -93,22 +93,44 @@ export type BallisticSurfaceEvidence = Readonly<{
  * Central material rule. Unknown future shot blockers stay safe as reinforced
  * cover and fail the arena coverage verifier through `classification=fallback`.
  */
+export function isBallisticMaterialId(candidate: unknown): candidate is BallisticMaterialId {
+  return typeof candidate === 'string' && Object.hasOwn(BALLISTIC_MATERIALS, candidate);
+}
+
 export function classifyBallisticMaterial(
   evidence: BallisticSurfaceEvidence,
 ): Pick<BallisticSurface, 'material' | 'classification'> {
-  if (evidence.material) return { material: evidence.material, classification: 'explicit' };
+  // HF-390: an authored material is only authority when the shared resistance
+  // table actually rates it. `farcrysis` shipped `'metal'` - an ImpactSurface,
+  // not a BallisticMaterialId - through an `as` cast, and every shot that met
+  // one of those 21 surfaces threw `Cannot read properties of undefined
+  // (reading 'entryCost')` inside traceBallisticPath. Trusting the cast turned
+  // an authoring typo into a runtime crash; failing it closed turns the same
+  // typo into a `fallback` row the arena penetration gate reports by name.
+  if (evidence.material !== undefined) {
+    if (isBallisticMaterialId(evidence.material)) {
+      return { material: evidence.material, classification: 'explicit' };
+    }
+    return { material: 'reinforced', classification: 'fallback' };
+  }
   const name = evidence.name.toLowerCase();
   if (/(glass|window|pane)/.test(name)) return { material: 'glass', classification: 'rule' };
   if (/(fence|mesh barrier|chain.?link)/.test(name)) return { material: 'fence', classification: 'rule' };
-  if (/(shipping.container|cargo.stack|freight.crate|tarmac.cargo|pallet|luggage|baggage.item)/.test(name)) {
+  // HF-390: freight only. `pallet` used to live here, which rated 56 Skyline
+  // Terminal pallet boards and runners - named `skyline-wood-pallet-*` - as
+  // sealed shipping containers, harder to shoot through than concrete. A
+  // pallet is the timber the freight sits on, so it is matched as wood below.
+  if (/(shipping.container|cargo.stack|freight.crate|tarmac.cargo|baggage.item)/.test(name)) {
     return { material: 'container', classification: 'rule' };
   }
-  if (/(bus|coach|shuttle|vehicle|trailer|jetliner|fuselage|wing|engine|airstair|luggage cart)/.test(name)) {
+  // `luggage.cart` (not `luggage cart`) so a hyphenated authored name matches
+  // the wheeled-vehicle family instead of falling through to freight.
+  if (/(bus|coach|shuttle|vehicle|trailer|jetliner|fuselage|wing|engine|airstair|luggage.cart)/.test(name)) {
     return { material: 'vehicle', classification: 'rule' };
   }
   if (/(berm|soil|ground|grass|sand|earth)/.test(name)) return { material: 'earth', classification: 'rule' };
   if (/(brick|masonry)/.test(name)) return { material: 'brick', classification: 'rule' };
-  if (/(timber|wood|deck|ramp|landing|bench|seat|counter)/.test(name)) return { material: 'wood', classification: 'rule' };
+  if (/(timber|wood|pallet|deck|ramp|landing|bench|seat|counter)/.test(name)) return { material: 'wood', classification: 'rule' };
   if (/(plaster|partition|house|garage|hut|kiosk|wall|ceiling)/.test(name)) {
     return { material: 'interior-wall', classification: 'rule' };
   }

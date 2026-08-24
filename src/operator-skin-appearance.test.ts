@@ -495,14 +495,23 @@ describe('the menu shows both previews and they agree (HF-366)', () => {
     const rendered = renderPass64Shell(createPass64ShellViewModel('Operator'));
     expect(rendered).toContain(`id="${OPERATOR_PREVIEW_PORTRAIT_ID}"`);
     expect(rendered).toContain(`id="${OPERATOR_PREVIEW_CANVAS_ID}"`);
-    // The 2D half must be real card art, not a placeholder box.
-    expect(rendered).toContain('<svg class="operator-skin-portrait"');
+    // The 2D half must be real card art, not a placeholder box. HF-381: it used to
+    // assert the procedural SVG, which IS the placeholder - the generated portraits
+    // sat unused on disk. Now requires the real image, and requires the SVG to survive
+    // as the onerror fallback so a missing file degrades instead of blanking the card.
+    expect(rendered).toContain('class="operator-skin-photo"');
+    expect(rendered).toContain('assets/original/skin-cards/');
+    expect(rendered).toContain('onerror=');
   });
 
   it('keeps the menu preview out of the team wash, so a card shows the skin itself', () => {
     const source = readFileSync(new URL('./ui/operator-preview.ts', import.meta.url), 'utf8');
     expect(source).toContain("'showcase'");
     // ...and the 2D half is repainted from the same selection as the 3D half.
-    expect(source).toContain('operatorSkinPortraitSvg(skinId');
+    // HF-381. The live preview repainted the SVG on every selection change, which
+    // put the placeholder straight back the moment a skin was picked. It must use
+    // the same markup helper the card grid uses, or the two previews disagree.
+    expect(source).toContain('operatorSkinPortraitMarkup(skinId');
+    expect(source).not.toContain('operatorSkinPortraitSvg(skinId');
   });
 });

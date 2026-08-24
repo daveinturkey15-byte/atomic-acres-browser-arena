@@ -695,8 +695,11 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     }
   }
 
-  box(builder, 'rustworks-lower-deck', [0, lowerDeckCenterY, 0], [lowerDeckSize, deckThickness, lowerDeckSize], grate);
-  box(builder, 'rustworks-upper-deck', [0, upperDeckCenterY, 0], [upperDeckSize, deckThickness, upperDeckSize], rust);
+  // HF-390: Rustworks is a steel derrick. `deck`/`ramp`/`landing` are wood-rule
+  // words, so every walking surface here was rated as timber (0.38 entry) until
+  // these explicit families landed. Authored material beats the name rule.
+  box(builder, 'rustworks-lower-deck', [0, lowerDeckCenterY, 0], [lowerDeckSize, deckThickness, lowerDeckSize], grate, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'rustworks-upper-deck', [0, upperDeckCenterY, 0], [upperDeckSize, deckThickness, upperDeckSize], rust, { ballisticMaterial: 'structural-metal' });
   // Keep the upper deck walkable: corner utility only, open centre circulation ring.
   // Corner utilities stay small so the upper deck centre stays a clean fight space.
   // Keep the compact crown clear. The former hut/manifold blocks narrowed
@@ -807,14 +810,14 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     - Math.sin(lowerRampAngle) * (lowerRampLength / 2)
     - Math.cos(lowerRampAngle) * (lowerRampThickness / 2);
 
-  box(builder, 'rustworks-lower-ramp-foot-pad', [0, 0.08, lowerRampCenterZ - Math.cos(lowerRampAngle) * (lowerRampLength / 2) - 0.55], [lowerRampWidth + 0.8, 0.16, 1.6], concrete);
+  box(builder, 'rustworks-lower-ramp-foot-pad', [0, 0.08, lowerRampCenterZ - Math.cos(lowerRampAngle) * (lowerRampLength / 2) - 0.55], [lowerRampWidth + 0.8, 0.16, 1.6], concrete, { ballisticMaterial: 'concrete' });
   box(
     builder,
     'rustworks-lower-ramp',
     [0, lowerRampPosY, lowerRampCenterZ],
     [lowerRampWidth, lowerRampThickness, lowerRampLength],
     steelBright,
-    { rotation: [-lowerRampAngle, 0, 0] },
+    { rotation: [-lowerRampAngle, 0, 0], ballisticMaterial: 'structural-metal' },
   );
   box(
     builder,
@@ -822,6 +825,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     [0, lowerDeckCenterY, lowerLandingCenterZ],
     [lowerRampWidth + 0.45, deckThickness, lowerLandingDepth],
     grate,
+    { ballisticMaterial: 'structural-metal' },
   );
   // Ship-ladder on +X rim: continuous climb, wider bridge, open upper landing.
   const shipAngle = (shipLadderAngleDegrees * Math.PI) / 180;
@@ -852,6 +856,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     [shipX, lowerDeckCenterY, shipLowerLandingCenterZ],
     [shipWidth + 0.55, deckThickness, lowerShipLandingDepth],
     grate,
+    { ballisticMaterial: 'structural-metal' },
   );
   const shipLadderAuthority = box(
     builder,
@@ -872,6 +877,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     [shipX, upperDeckCenterY, upperOutboardCenterZ],
     [shipWidth + 0.45, deckThickness, upperOutboardLandingDepth],
     rust,
+    { ballisticMaterial: 'structural-metal' },
   );
   box(
     builder,
@@ -1062,12 +1068,18 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
           { suffix: 'roof', position: [placement.x, containerSize[1] - thickness / 2, placement.z], size: [containerSize[0], thickness, containerSize[2]] },
         ];
       for (const part of shellParts) {
+        // HF-390: these are the skin of the same shipping container the closed
+        // placements rate as `container`. Left to the name rules, `wall-a`/`wall-b`
+        // landed on `interior-wall` (drywall) and `roof` on `concrete` - three
+        // different penetration ratings for one asset. Per-metre traversal still
+        // prices a 0.14 m shell far below the solid 2.5 m box.
         const shell = box(
           builder,
           `rustworks-open-container-${part.suffix}`,
           part.position as [number, number, number],
           part.size as [number, number, number],
           material,
+          { ballisticMaterial: 'container' },
         );
         shell.userData.rustworksContainerSide = placement.side;
         shell.userData.rustworksContainerSlot = placement.slot;
@@ -1106,7 +1118,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
         const endSize: [number, number, number] = alongX
           ? [endThickness, containerSize[1], containerSize[2]]
           : [containerSize[0], containerSize[1], endThickness];
-        const end = box(builder, 'rustworks-open-one-container-closed-end', endPosition, endSize, material);
+        const end = box(builder, 'rustworks-open-one-container-closed-end', endPosition, endSize, material, { ballisticMaterial: 'container' });
         end.userData.rustworksContainerSide = placement.side;
         end.userData.rustworksContainerSlot = placement.slot;
       } else {
