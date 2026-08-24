@@ -102,11 +102,14 @@ describe('farcrysis grass field (HF-396)', () => {
 
   it('placement is dry, gentle, outside footprints, and spacing-bounded', () => {
     expect(grassPlacementAllowed(0, 0)).toBe(false);        // station core footprint
-    expect(grassPlacementAllowed(24, -24)).toBe(false);     // seaplane disc
+    expect(grassPlacementAllowed(48, -48)).toBe(false);     // seaplane disc (HF-396 live coords)
     expect(grassPlacementAllowed(200, 200)).toBe(false);    // outside bounds
     expect(grassPlacementAllowed(NaN, 5)).toBe(false);
     // Deep interior plateau admits grass.
     expect(grassPlacementAllowed(-12, -12)).toBe(true);
+    // The expanded field must admit the OUTER interior the old +/-26 m
+    // placement half-extent left bare (HF-396: island is now +/-64 m).
+    expect(grassPlacementAllowed(-40, 8)).toBe(true);
     expect(FARCRYSIS_GRASS_MIN_SPACING_M).toBeGreaterThan(0.15);
   });
 
@@ -114,8 +117,23 @@ describe('farcrysis grass field (HF-396)', () => {
     const root = new THREE.Group();
     const stats = buildFarcrysisGrassField(root);
 
-    expect(stats.blades).toBeGreaterThan(20_000); // a FIELD, not tufts
-    expect(stats.chunks).toBeGreaterThan(0);
+    // HF-396: the field tracks the 128 m island. The old +/-26 m placement
+    // half-extent bounded candidates at (52/0.33)^2 ~= 24.8k, so 80k is
+    // unreachably red on the pre-expansion module and pins the rescale.
+    expect(stats.blades).toBeGreaterThan(80_000); // a FIELD across the whole island
+    let outer = 0;
+    root.traverse((node) => {
+      if (!(node instanceof THREE.InstancedMesh)) return;
+      const matrix = new THREE.Matrix4();
+      for (let i = 0; i < node.count; i += 1) {
+        node.getMatrixAt(i, matrix);
+        const e = matrix.elements;
+        if (Math.abs(e[12]) > 26 || Math.abs(e[14]) > 26) outer += 1;
+      }
+    });
+    // Majority of the field must live OUTSIDE the old +/-26 m extent
+    // (measured 80.9k of 103.6k post-expansion; 0 on the old module).
+    expect(outer).toBeGreaterThan(60_000);
     expect(stats.chunks).toBeLessThanOrEqual(16);
     expect(stats.maxDrawCalls).toBeLessThanOrEqual(16);
 

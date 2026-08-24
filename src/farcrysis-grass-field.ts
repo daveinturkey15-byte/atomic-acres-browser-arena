@@ -34,7 +34,19 @@
  */
 import * as THREE from 'three';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
-import { FARCRYSIS_WATER_LEVEL, farcrysisTerrainHeight } from './farcrysis-terrain-authority';
+import {
+  FARCRYSIS_SHORE,
+  FARCRYSIS_WATER_LEVEL,
+  farcrysisTerrainHeight,
+} from './farcrysis-terrain-authority';
+// HF-395/HF-396: landmark footprints derive RELATIONALLY from the same shared
+// frames the builder's colliders use — never a second hand-maintained list.
+import {
+  FARCRYSIS_LANDMARKS,
+  landmarkCratePlacements,
+  landmarkTreePositions,
+  landmarkWallSpecs,
+} from './farcrysis-midmap-landmarks';
 import { makeTslGrassMaterial } from './farcrysis-tsl-foliage';
 
 // ---------------------------------------------------------------------------
@@ -53,8 +65,15 @@ const BLADE_SEGMENTS = 3;
 const BLADE_WIDTH_M = 0.055;
 /** Static lean baked into every blade (metres of tip offset before wind). */
 const BLADE_BEND_M = 0.09;
-/** Placement half-extent — inside the beach ring, on the interior plateau. */
-const PLACEMENT_HALF_M = 26;
+/**
+ * Placement half-extent — tracks the island rescale (HF-396). The dry
+ * interior plateau runs from the arena edge to the HF-393 shore band, so the
+ * grass field ends exactly where dry sand does:
+ `bounds.maxX - FARCRYSIS_SHORE.descentStartDist` (= 54 on the 128 m island;
+ was a hardcoded 26 on the old 64 m island, which left 3/4 of the grown
+ island bare).
+ */
+const PLACEMENT_HALF_M = FARCRYSIS_BOUNDS.maxX - FARCRYSIS_SHORE.descentStartDist;
 /** Chunk grid: 4x4 = 16 InstancedMeshes maximum, one draw each. */
 const CHUNK_GRID = 4;
 /** Chunk centre beyond this camera distance hides its draw (distance LOD). */
@@ -77,17 +96,55 @@ const SEED = 0x5eed_5ea5;
 /**
  * Authored keep-out footprints: structures whose floors/wedges would clip
  * through blades. Rects are [minX, maxX, minZ, maxZ]; discs are [cx, cz, r].
- * Derived from the authored positions in farcysis.ts / farcrysis-art.ts.
+ *
+ * HF-396: the throwback discs previously pinned the OLD island's coordinates
+ * (seaplane 24,-24 etc.) and never tracked the 4x rescale that moved those
+ * props to the corners — blades were being kept out of empty sand while
+ * growing straight through the wreck. Coordinates below are the LIVE authored
+ * positions in farcrysis.ts / farcrysis-art.ts.
  */
+const EXCLUSION_DISCS: readonly (readonly [number, number, number])[] = [
+  [48, -48, 3.2],    // crashed seaplane (hull, floats, prop)
+  [-48, 48, 1.8],    // signal beacon pyre tripod
+  [52, 32, 4.2],     // flooded cave arch + portal
+  [-8.5, -8.5, 2.6], // research tower legs
+];
+
+/**
+ * Landmark keep-outs derive RELATIONALLY from the same shared frames the
+ * builder's colliders use (HF-395 discipline): one rotated-AABB per ruin wall
+ * segment, crate cache and grove trunk. If a landmark moves again, these move
+ * with it by construction instead of silently drifting.
+ */
+const LANDMARK_EXCLUSION_RECTS: readonly (readonly [number, number, number, number])[] = (() => {
+  const rects: Array<[number, number, number, number]> = [];
+  for (const frame of FARCRYSIS_LANDMARKS) {
+    for (const segment of landmarkWallSpecs(frame)) {
+      // Rotated footprint half-extents for the yawed segment (audit AABB idiom).
+      const c = Math.abs(Math.cos(segment.yaw));
+      const s = Math.abs(Math.sin(segment.yaw));
+      const hx = (segment.size[0] / 2) * c + (segment.size[2] / 2) * s;
+      const hz = (segment.size[0] / 2) * s + (segment.size[2] / 2) * c;
+      const m = 0.18;
+      rects.push([
+        segment.pos[0] - hx - m, segment.pos[0] + hx + m,
+        segment.pos[1] - hz - m, segment.pos[1] + hz + m,
+      ]);
+    }
+    for (const crate of landmarkCratePlacements(frame)) {
+      rects.push([crate.pos[0] - 1.1, crate.pos[0] + 1.1, crate.pos[1] - 1.1, crate.pos[1] + 1.1]);
+    }
+    for (const [tx, tz] of landmarkTreePositions(frame)) {
+      rects.push([tx - 0.9, tx + 0.9, tz - 0.9, tz + 0.9]);
+    }
+  }
+  return rects;
+})();
+
 const EXCLUSION_RECTS: readonly (readonly [number, number, number, number])[] = [
   // Research-station core incl. walls and entrances (walls at ±5.5 + 0.3).
   [-6.8, 6.8, -6.8, 6.8],
-];
-const EXCLUSION_DISCS: readonly (readonly [number, number, number])[] = [
-  [24, -24, 4],   // crashed seaplane
-  [-24, 24, 2.2], // signal beacon pyre
-  [26, 16, 3.4],  // flooded cave arch
-  [-8.5, -8.5, 2.6], // research tower legs
+  ...LANDMARK_EXCLUSION_RECTS,
 ];
 
 // ---------------------------------------------------------------------------
