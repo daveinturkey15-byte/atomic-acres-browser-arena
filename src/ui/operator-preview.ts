@@ -9,6 +9,8 @@ import {
 } from '../operator-model';
 import { OPERATOR_SKIN_CATALOG } from '../operator-skin-catalog';
 import { operatorSkinPortraitMarkup } from './operator-skin-portrait';
+import { isOperatorStanceId, operatorStance } from '../operator-appearance-catalog'; // HF-382
+import { activeOperatorStance, setActiveOperatorStance } from '../operator-stance-runtime'; // HF-382
 import { createOperatorWeaponPresentation } from '../art-kit';
 import { loadPass65WeaponPresentation } from '../weapon-model';
 
@@ -38,7 +40,7 @@ export const OPERATOR_PREVIEW_STATUS_ID = 'operator-preview-status';
 /** The 2D half: the pressed skin's card art, shown beside the turntable. */
 export const OPERATOR_PREVIEW_PORTRAIT_ID = 'operator-preview-portrait';
 export const OPERATOR_PREVIEW_PANEL_ID = 'menu-panel-operator';
-export const OPERATOR_PREVIEW_CONTRACT = 'live-turntable-selected-skin-v1';
+export const OPERATOR_PREVIEW_CONTRACT = 'live-turntable-selected-skin-stance-v2';
 /** Slow enough to read the silhouette, fast enough to show the back. */
 export const OPERATOR_PREVIEW_TURN_RADIANS_PER_SECOND = 0.42;
 /**
@@ -97,12 +99,15 @@ function buildPreviewEnvironment(renderer: THREE.WebGLRenderer): THREE.Texture |
 
 export type OperatorPreviewHandle = Readonly<{
   setSkin: (skinId: string) => void;
+  /** HF-382: selects the idle stance the turntable plays. */
+  setStance: (stanceId: string) => void;
   /** Advances the turntable by dt seconds; exposed for deterministic tests. */
   advance: (dt: number) => void;
   dispose: () => void;
   state: () => Readonly<{
     contract: string;
     skinId: string;
+    stanceId: string;
     mounted: boolean;
     rendererCreated: boolean;
     running: boolean;
@@ -138,9 +143,13 @@ export function mountOperatorPreview(root: ParentNode = document): OperatorPrevi
   let camera: THREE.PerspectiveCamera | null = null;
   let stage: THREE.Group | null = null;
   let model: THREE.Object3D | null = null;
+  let environment: THREE.Texture | null = null;
   let skinId = selectedOperatorSkinFrom(root);
   let requestedSkinId = skinId;
-  let environment: THREE.Texture | null = null;
+  // HF-382: the turntable tracks the pressed IDLE STANCE card the same way it
+  // tracks the pressed skin card, so the selector visibly changes the pose.
+  let stanceId = activeOperatorStance();
+  let requestedStanceId = stanceId;
   let turnRadians = 0;
   let running = false;
   let disposed = false;
@@ -280,6 +289,9 @@ export function mountOperatorPreview(root: ParentNode = document): OperatorPrevi
     if (!instance) return;
     disposeModel();
     model = instance.root;
+    // HF-382: publish the selected stance before the first idle evaluation so
+    // the preview opens in the pose the player has chosen, not the skin default.
+    model.userData.operatorStanceId = stanceId;
     model.position.set(0, 0, 0);
     stage.add(model);
     // Frame on the bare operator first, then hand it its rifle.
@@ -289,7 +301,7 @@ export function mountOperatorPreview(root: ParentNode = document): OperatorPrevi
     // preview plays exactly the clip the player will stand in.
     updateRiggedOperator(model, 0, 'stand');
     const definition = OPERATOR_SKIN_CATALOG.definitions.find((entry) => entry.id === skinId);
-    setStatus(`${definition?.displayName ?? 'Standard Operator'} · live preview`);
+    setStatus(`${definition?.displayName ?? 'Standard Operator'} · ${operatorStance(stanceId).displayName} · live preview`);
     // Keep the 2D half in step with the 3D half: the owner asked for both, and
     // two previews that can disagree are worse than one.
     // HF-381: the card grid and this live preview must agree - repainting the SVG
@@ -336,6 +348,12 @@ export function mountOperatorPreview(root: ParentNode = document): OperatorPrevi
       // happened to be at.
       turnRadians = 0;
     }
+    if (requestedStanceId !== stanceId) {
+      stanceId = requestedStanceId;
+      if (model) model.userData.operatorStanceId = stanceId;
+      const definition = OPERATOR_SKIN_CATALOG.definitions.find((entry) => entry.id === skinId);
+      setStatus(`${definition?.displayName ?? 'Standard Operator'} · ${operatorStance(stanceId).displayName} · live preview`);
+    }
     if (!renderer || !scene || !camera || !stage) return;
     ensureModel();
     if (model) updateRiggedOperator(model, 0, 'stand');
@@ -365,9 +383,21 @@ export function mountOperatorPreview(root: ParentNode = document): OperatorPrevi
 
   const onCardPress = (event: Event): void => {
     const target = event.target instanceof Element ? event.target : null;
-    const card = target?.closest<HTMLElement>('[data-operator-skin]');
-    const chosen = card?.dataset.operatorSkin;
-    if (chosen !== undefined && isSelectable(chosen)) requestedSkinId = chosen;
+    // HF-382: one delegated listener serves both card grids - the skin cards
+    // drive the model swap above, the stance cards drive the idle cross-fade.
+    const card = target?.closest<HTMLElement>('[data-operator-skin], [data-operator-stance]');
+    const chosenSkin = card?.dataset.operatorSkin;
+    if (chosenSkin !== undefined && isSelectable(chosenSkin)) {
+      requestedSkinId = chosenSkin;
+      return;
+    }
+    const chosenStance = card?.dataset.operatorStance;
+    if (chosenStance !== undefined && isOperatorStanceId(chosenStance)) {
+      requestedStanceId = chosenStance;
+      // Mirror the menu's own persistence write so the first-person arms and
+      // any future third-person consumer read the same stance this frame.
+      setActiveOperatorStance(chosenStance);
+    }
   };
 
   panel.addEventListener('click', onCardPress);
@@ -376,6 +406,10 @@ export function mountOperatorPreview(root: ParentNode = document): OperatorPrevi
   return Object.freeze({
     setSkin: (next: string): void => {
       if (isSelectable(next)) requestedSkinId = next;
+    },
+    /** HF-382: programmatic stance selection, mirroring a card press. */
+    setStance: (next: string): void => {
+      if (isOperatorStanceId(next)) requestedStanceId = next;
     },
     advance,
     dispose: (): void => {
@@ -392,6 +426,7 @@ export function mountOperatorPreview(root: ParentNode = document): OperatorPrevi
     state: () => Object.freeze({
       contract: OPERATOR_PREVIEW_CONTRACT,
       skinId: requestedSkinId,
+      stanceId: requestedStanceId,
       mounted: !disposed,
       rendererCreated: renderer !== null,
       running,

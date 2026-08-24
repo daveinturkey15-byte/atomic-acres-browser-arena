@@ -45,6 +45,7 @@ import {
   viewmodelGripFamily,
   type ViewmodelGripFamily,
 } from './weapon-presentation-pose-profiles';
+import { FIRST_PERSON_STANCE_PRESENTATIONS, activeOperatorStance } from './operator-stance-runtime'; // HF-382
 // Pass 74 extraction (HF-340/HF-341): grip families and arm stance profiles
 // moved into their own typed module; re-export to keep the public surface.
 export {
@@ -1181,6 +1182,18 @@ export class WeaponPresentation {
   private armMotionSeconds = 0;
   private armMotionPhase = 0;
   private armMotionMovingBlend = 0;
+  /**
+   * HF-382: smoothed first-person stance offsets, lerped toward the selected
+   * IDLE STANCE's presentation every frame so a menu switch eases in rather
+   * than snapping the viewmodel.
+   */
+  private stancePose = {
+    dropMeters: 0,
+    pitchRadians: 0,
+    yawRadians: 0,
+    rollRadians: 0,
+    lateralMeters: 0,
+  };
   private operatorSkinId = 'default';
 
   /** Detaches the operator-skin subscription; see releaseOperatorSkin(). */
@@ -4625,12 +4638,30 @@ export class WeaponPresentation {
     // rotations, grips and action timing remain unchanged.
     const floorActionClearance = this.contactResponse.floorBlend
       * (presentationKick * 0.095 + reloadPose.magazineDrop * 0.65);
+    // HF-382: the IDLE STANCE selector must be visible in first person. The
+    // selected stance's presentation is lerped in here and applied to the hip
+    // viewmodel below. The hip factor gates everything to (1 - ADS)(1 - sprint)
+    // (1 - melee), so aiming, sprinting and melee presentations are byte-for-byte
+    // what they were before this block existed. Z is never touched: the near-plane
+    // admission caps above already own that axis.
+    const stanceProfile = FIRST_PERSON_STANCE_PRESENTATIONS[activeOperatorStance()];
+    {
+      const stanceMix = smoothing(7);
+      this.stancePose.dropMeters += (stanceProfile.dropMeters - this.stancePose.dropMeters) * stanceMix;
+      this.stancePose.pitchRadians += (stanceProfile.pitchRadians - this.stancePose.pitchRadians) * stanceMix;
+      this.stancePose.yawRadians += (stanceProfile.yawRadians - this.stancePose.yawRadians) * stanceMix;
+      this.stancePose.rollRadians += (stanceProfile.rollRadians - this.stancePose.rollRadians) * stanceMix;
+      this.stancePose.lateralMeters += (stanceProfile.lateralMeters - this.stancePose.lateralMeters) * stanceMix;
+    }
+    const stanceHip = (1 - this.adsBlend) * (1 - this.sprintBlend) * (1 - meleeArc);
     const targetPosition = this.frameTargetPosition.set(
-      viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera) + grenadeArc * 0.18 + reloadStage.lateral,
+      viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera) + grenadeArc * 0.18 + reloadStage.lateral
+        + this.stancePose.lateralMeters * stanceHip,
       viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift
         + this.contactResponse.additionalLiftMeters - this.contactResponse.additionalDropMeters
         + switchDrop + reloadStage.lift + floorActionClearance
-        - presentationKick * 0.095 - pose.landingImpulse * 0.075 * aimSteady + meleeArc * 0.26,
+        - presentationKick * 0.095 - pose.landingImpulse * 0.075 * aimSteady + meleeArc * 0.26
+        - this.stancePose.dropMeters * stanceHip,
       Math.min(
         viewmodelBaseZ + adsZ + surfaceRetreatClamped - adsSightPictureRetreat - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 + grenadeArc * 0.24,
         fireNearPlaneCapZ,
@@ -4640,20 +4671,23 @@ export class WeaponPresentation {
     this.root.rotation.x = THREE.MathUtils.lerp(
       this.root.rotation.x,
       presentationKick * profile.recoilRotation * 1.15 - this.swayY * aimSteady
-        - grenadeArc * 0.42 + reloadStage.pitch + this.contactResponse.pitchRadians,
+        - grenadeArc * 0.42 + reloadStage.pitch + this.contactResponse.pitchRadians
+        + this.stancePose.pitchRadians * stanceHip,
       smoothing(22),
     );
     this.root.rotation.y = THREE.MathUtils.lerp(
       this.root.rotation.y,
       hipYaw * (1 - this.adsBlend) - this.swayX * 2 * aimSteady - this.sprintBlend * 0.38
-        - meleeArc * 0.18 + this.contactResponse.yawRadians,
+        - meleeArc * 0.18 + this.contactResponse.yawRadians
+        + this.stancePose.yawRadians * stanceHip,
       smoothing(13),
     );
     this.root.rotation.z = THREE.MathUtils.lerp(
       this.root.rotation.z,
       reloadStage.roll - this.sprintBlend * 0.22
         - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) * aimSteady
-        - meleeArc * 0.42 + shotRoll + this.contactResponse.rollRadians,
+        - meleeArc * 0.42 + shotRoll + this.contactResponse.rollRadians
+        + this.stancePose.rollRadians * stanceHip,
       smoothing(13),
     );
     this.centerSightReference(activeModel);
