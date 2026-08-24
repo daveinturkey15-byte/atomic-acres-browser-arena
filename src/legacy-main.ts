@@ -24222,7 +24222,9 @@ function updatePhysics(dt: number): void {
     // HF-371: sprint strides kick dust; a walked step deliberately emits
     // nothing so the effect cannot become a smoke screen at walking pace.
     if (currentSprinting && !crouched && !prone) {
-      hfParticleRuntime.emitFootfall(player.position.x, player.position.y, player.position.z, 'sprint');
+      // player.position is the EYE, not the feet - emitting there puts the dust
+      // puff at head height. Drop by the stance eye height so it kicks off the boots.
+      hfParticleRuntime.emitFootfall(player.position.x, player.position.y - stanceEyeHeight(player.stance), player.position.z, 'sprint');
     }
   }
   weaponBob += dt * (currentSprinting ? 15 : prone ? 3.6 : crouched ? 7 : 10) * (moving ? 1 : 0.25);
