@@ -263,7 +263,9 @@ describe('operator menu preview (HF-366)', () => {
     // HF-364: the preview must ship with a production call site, not land as
     // another fully tested module with no caller.
     expect(shell).toContain('mountOperatorPreview(document)');
-    expect(OPERATOR_PREVIEW_CONTRACT).toBe('live-turntable-selected-skin-v1');
+    // HF-382 bumped the contract: the turntable now also tracks the pressed
+    // IDLE STANCE card. Same strictness, new pinned behaviour.
+    expect(OPERATOR_PREVIEW_CONTRACT).toBe('live-turntable-selected-skin-stance-v2');
     expect(OPERATOR_PREVIEW_TURN_RADIANS_PER_SECOND).toBeGreaterThan(0);
     // A full turn must take between five and thirty seconds: fast enough to
     // show the back, slow enough to read.
@@ -513,5 +515,62 @@ describe('the menu shows both previews and they agree (HF-366)', () => {
     // the same markup helper the card grid uses, or the two previews disagree.
     expect(source).toContain('operatorSkinPortraitMarkup(skinId');
     expect(source).not.toContain('operatorSkinPortraitSvg(skinId');
+  });
+});
+
+/**
+ * HF-380 (2026-08-24): "the operators do not look like what I specced and
+ * wanted, with venom, lara croft etc". The owner does not want likenesses; he
+ * wants each archetype to READ as its character type at a glance. These gates
+ * pin the palette-level signature each archetype must carry on every surface
+ * that shows it (third-person body, first-person arms, card fallback), so a
+ * future palette edit cannot quietly wash the archetype back out.
+ */
+describe('the archetypes read as their character types (HF-380 falsifier)', () => {
+  it('paints the symbiote as wet black chitin with a bone-white lens', () => {
+    const { body, arm } = operatorSkinPalette('symbiote');
+    // The plate/under-suit role carries the majority of the symbiote GLB's
+    // meshes (chest plates, forearm guards, spine ridge). Near-black AND glossy
+    // is what makes it read as creature carapace instead of painted armour.
+    const plates = srgb(body.swatBlack);
+    for (const channel of ['r', 'g', 'b'] as const) expect(plates[channel]).toBeLessThan(0.22);
+    expect(body.swatBlackRoughness).toBeLessThanOrEqual(0.4);
+    expect(body.swatRoughness).toBeLessThanOrEqual(0.45);
+    // The lens is the creature's eye: near-white, never a pale team violet.
+    const lens = srgb(body.visor);
+    for (const channel of ['r', 'g', 'b'] as const) expect(lens[channel]).toBeGreaterThan(0.8);
+    // The garment keeps a violet-dominant hue so the readability lift still
+    // reaches it, but it must not read as grey or as the default's aqua.
+    const swat = srgb(body.swat);
+    expect(swat.b).toBeGreaterThan(swat.r);
+    expect(swat.r).toBeGreaterThan(swat.g);
+    // First-person accent carries the same bone read as the lens.
+    const accent = srgb(arm.accent);
+    for (const channel of ['r', 'g', 'b'] as const) expect(accent[channel]).toBeGreaterThan(0.75);
+  });
+
+  it('paints the explorer as a teal-and-leather adventurer, not desert infantry', () => {
+    const { body, arm } = operatorSkinPalette('explorer');
+    const swat = srgb(body.swat);
+    // Sun-faded teal top: green/blue co-dominant, both far above red.
+    expect(swat.g).toBeGreaterThan(swat.r + 0.15);
+    expect(swat.b).toBeGreaterThan(swat.r + 0.15);
+    expect(Math.abs(swat.g - swat.b)).toBeLessThan(0.2);
+    // Leather under-suit: warm red-dominant brown, never grey-blue.
+    const leather = srgb(body.swatBlack);
+    expect(leather.r).toBeGreaterThan(leather.b + 0.1);
+    expect(body.swatBlackRoughness).toBeGreaterThanOrEqual(0.8);
+    // Gloves and accent stay in the leather/brass family, not violet.
+    const glove = srgb(arm.glove);
+    expect(glove.r).toBeGreaterThan(glove.b + 0.1);
+    const accent = srgb(arm.accent);
+    expect(accent.r).toBeGreaterThan(accent.b);
+  });
+
+  it('paints the naval operative as deep wet navy, not sky blue', () => {
+    const swat = srgb(operatorSkinPalette('navalops').body.swat);
+    expect(swat.b).toBeGreaterThan(swat.r + 0.2);
+    expect(swat.b).toBeGreaterThan(swat.g);
+    expect(operatorSkinPalette('navalops').body.swatRoughness).toBeLessThanOrEqual(0.55);
   });
 });

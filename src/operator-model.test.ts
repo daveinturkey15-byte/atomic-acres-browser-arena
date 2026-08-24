@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
-import { operatorBodyColour } from './operator-skin-catalog';
+import { operatorBodyColour, operatorSkinPalette } from './operator-skin-catalog';
 import {
   BOT_EMISSIVE_BRIGHTNESS_SCALE,
   FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY,
@@ -223,6 +223,25 @@ describe('rigged operator presentation contract', () => {
     secondOwnerMaterial.addEventListener('dispose', secondOwnerDisposed);
     firstMeshMaterial.dispose();
     expect(secondOwnerDisposed).not.toHaveBeenCalled();
+  });
+
+  it('paints the lens with the skin colour itself, not a multiply over the baked atlas (HF-380)', () => {
+    // The archetype lens IS the creature/visor read: the symbiote's baked lens
+    // atlas is teal, and colour multiplies the map, so even a white tint left
+    // it teal on the live turntable (captured frame, artifacts/hf380). The
+    // resolver must drop the baked map (retaining it for recovery) so the
+    // palette lens colour reaches the mesh on every skin.
+    for (const skinId of ['default', 'explorer', 'symbiote', 'navalops'] as const) {
+      const source = new THREE.MeshStandardMaterial({ color: 0xffffff });
+      source.name = 'Visor';
+      const baked = new THREE.Texture();
+      source.map = baked;
+      const resolved = createOperatorInstanceMaterialResolver(0, false, 'team', skinId)(source);
+      const material = resolved as THREE.MeshStandardMaterial;
+      expect(material.color.getHex()).toBe(operatorSkinPalette(skinId).body.visor);
+      expect(material.map).toBeNull();
+      expect(material.userData.authoredVisorBaseColorMap).toBe(baked);
+    }
   });
 
   it('admits only controller-reachable authored clips in deterministic prewarm order', () => {

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "lane": "lane-i-local-image-gen",
-  "generatedAt": "2026-08-23 18:18:06",
+  "generatedAt": "2026-08-24 18:39:01",
   "creator": "Atomic Acres project / local Qwen-Image-2512 (ComfyUI, dave-gaming-pc)",
   "provider": "Local ComfyUI 0.31.1 portable, Qwen-Image-2512 fp8_e4m3fn + Qwen-Image-2512-Lightning-4steps-V1.0 LoRA, 4 steps, cfg 1.0, euler/simple, FluxGuidance 3.5",
   "machine": "dave-gaming-pc (RTX 5080, fully local, no hosted API)",
@@ -36,13 +36,13 @@
     },
     {
       "path": "source-assets/art-gen/skin-cards/explorer-card-master.png",
-      "sha256": "41967c48b64d544991a4a423bfba0393836c5d2d0c2c027fa29c00a5ddbd5552",
+      "sha256": "3d5358c2366d597125bae870013692236f4d01fa22fd2f910ea245fa3f95e9d9",
       "job": {
         "name": "skin-card-explorer",
-        "prompt": "Tactical FPS video game operator selection card: portrait of a single desert expedition operator, three-quarter view from the chest up, wearing a sun-bleached tan canvas jacket with rolled seams, worn leather straps and brass buckles, a light chest rig, amber-tinted goggles pushed up onto a cloth-wrapped helmet, a dusty scarf around the neck, sun-tanned skin, warm golden-amber rim light from the left, dark earthy brown vertical gradient studio backdrop fading from warm umber at the top to near-black at the bottom, painterly realistic concept art, crisp silhouette, centered composition, heavy rough canvas weave texture, no text, no letters, no watermark, no logo",
+        "prompt": "Tactical FPS video game operator selection card: portrait of a single athletic woman adventurer and former archaeologist turned mercenary, three-quarter view from the chest up, wearing a sun-faded teal tank top under a worn brown leather shoulder holster strap, olive cargo trousers with a utility belt, fingerless climbing gloves, amber-tinted goggles pushed up onto her forehead, auburn hair in one practical braid over her shoulder, a small scar on one cheekbone, confident weathered expression, warm golden jungle sunlight rim light from the left, dark jungle-green vertical gradient studio backdrop fading from deep green at the top to near-black at the bottom, painterly realistic concept art, crisp silhouette, centered composition, no text, no letters, no watermark, no logo",
         "width": 896,
         "height": 1152,
-        "seed": 134481215932100,
+        "seed": 20260824001,
         "steps": 4,
         "cfg": 1.0,
         "sampler": "euler",
@@ -53,19 +53,19 @@
         "vae": "qwen_image_vae.safetensors",
         "lora": "Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
         "output": "source-assets/art-gen/skin-cards/explorer-card-master.png",
-        "sha256": "41967c48b64d544991a4a423bfba0393836c5d2d0c2c027fa29c00a5ddbd5552",
-        "seconds": 72.1
+        "sha256": "3d5358c2366d597125bae870013692236f4d01fa22fd2f910ea245fa3f95e9d9",
+        "seconds": 410.8
       }
     },
     {
       "path": "source-assets/art-gen/skin-cards/symbiote-card-master.png",
-      "sha256": "4a47e2895e4fac3fc0a2ded7dd9018932b3015fa796cf57ee5ddae861a4a2bb9",
+      "sha256": "7a0e2b88c8391785f6e95508d3551f72ea7d058509fee8104418e4ba9fbb83de",
       "job": {
         "name": "skin-card-symbiote",
-        "prompt": "Tactical FPS video game operator selection card: portrait of a single armored operator fused with an alien exoskeleton, three-quarter view from the chest up, overlapping segmented glossy purple chitin plates grown over a dark grey tactical suit, iridescent beetle-shell sheen, faint violet bioluminescent seams between the plates, sleek helmet with a pale violet visor, dramatic violet rim light from the left, dark purple vertical gradient studio backdrop fading from deep violet at the top to near-black at the bottom, painterly realistic concept art, crisp silhouette, centered composition, hard glossy carapace texture, no text, no letters, no watermark, no logo",
+        "prompt": "Tactical FPS video game operator selection card: portrait of a single hulking human soldier fused with a living alien symbiote creature, three-quarter view from the chest up, glossy wet black bio-armored carapace plates covering shoulders chest and arms like polished beetle shell, jagged bone-white markings across the chest and collar, muscular black-sheened body suit with deep violet sinew undertones showing between the plates, smooth black helmet faceplate with one large bone-white angular eye lens and fine white veins radiating from it, dramatic cold white rim light from the left, near-black vertical gradient studio backdrop with a faint violet glow at the top fading to pure black at the bottom, painterly realistic concept art, crisp silhouette, centered composition, wet glossy chitin texture, no text, no letters, no watermark, no logo",
         "width": 896,
         "height": 1152,
-        "seed": 98933078791265,
+        "seed": 20260824002,
         "steps": 4,
         "cfg": 1.0,
         "sampler": "euler",
@@ -76,8 +76,8 @@
         "vae": "qwen_image_vae.safetensors",
         "lora": "Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
         "output": "source-assets/art-gen/skin-cards/symbiote-card-master.png",
-        "sha256": "4a47e2895e4fac3fc0a2ded7dd9018932b3015fa796cf57ee5ddae861a4a2bb9",
-        "seconds": 38.1
+        "sha256": "7a0e2b88c8391785f6e95508d3551f72ea7d058509fee8104418e4ba9fbb83de",
+        "seconds": 78.8
       }
     },
     {

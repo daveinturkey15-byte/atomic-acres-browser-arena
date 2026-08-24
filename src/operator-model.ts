@@ -26,6 +26,11 @@ import {
 } from './rigged-operator-animation-runtime';
 import { wrapAngleRadians } from './animation-additive-pose';
 import type { HitReactionZone } from './animation-hit-reaction';
+import {
+  isOperatorStanceId,
+  stanceIdleClip,
+  type OperatorStanceId,
+} from './operator-appearance-catalog'; // HF-382
 
 export const BOT_EMISSIVE_BRIGHTNESS_SCALE = 0.5;
 
@@ -144,6 +149,16 @@ type RiggedOperatorRuntime = {
   lastGroundX: number;
   lastGroundZ: number;
   lastAnimation: OperatorAnimationOutput | null;
+  /**
+   * HF-382: the selected IDLE STANCE's authored clip plus its cross-fade state.
+   * `clipName` is what the operator fades TOWARD; `fadeFrom` is the outgoing
+   * idle still carrying weight. Both stay null until a stance is published.
+   */
+  stanceIdleFade: {
+    clipName: string | null;
+    fadeFrom: string | null;
+    fadeSeconds: number;
+  };
   lazilyBoundDirectionalClips: number;
   poseBones: {
     hips?: THREE.Bone;
@@ -692,6 +707,15 @@ function materialForTeam(
     // The visor is the head's only bright element and the fastest way to tell
     // two operators apart across an arena, so it takes the skin at full
     // strength and never a team wash.
+    // HF-380: each skin's lens atlas is baked in its OWN tint (the symbiote's
+    // is teal), and colour MULTIPLIES the map - white over teal is still teal,
+    // so the palette's lens colour could never reach the mesh. Drop the map
+    // (retained for recovery, same contract as the arm crushed-albedo roles)
+    // so the lens IS the palette colour on every skin.
+    if (result.map) {
+      result.userData.authoredVisorBaseColorMap = result.map;
+      result.map = null;
+    }
     result.color.setHex(operatorSkinPalette(skinId).body.visor);
   }
   if (flattenMaterials && appearance !== 'neon-purple') {
@@ -1652,6 +1676,9 @@ export function createRiggedOperator(
     visualYawRadians: root.rotation.y,
     lastGroundX: root.position.x,
     lastGroundZ: root.position.z,
+    // HF-382: no stance published yet - the skin profile's idle decides until
+    // a caller writes userData.operatorStanceId.
+    stanceIdleFade: { clipName: null, fadeFrom: null, fadeSeconds: 0 },
     lastAnimation: null,
     lazilyBoundDirectionalClips: 0,
     poseBones: {
@@ -1704,6 +1731,103 @@ export type RiggedOperatorMotion = Readonly<{
   armed?: boolean;
 }>;
 
+/**
+ * HF-382: how long an idle-to-idle stance change cross-fades. Short enough to
+ * feel responsive in the menu turntable, long enough that the outgoing clip
+ * still carries weight on the first frame after the switch - a released and
+ * restarted action reads as a pose snap.
+ */
+export const OPERATOR_STANCE_IDLE_FADE_SECONDS = 0.28;
+
+/** The idle corpus the stance catalog draws from (same clips as the director's). */
+const STANCE_IDLE_CLIP_CORPUS: Readonly<Record<string, true>> = Object.freeze({
+  Idle_Gun_Pointing: true,
+  Idle_Gun: true,
+  Idle_Gun_Shoot: true,
+});
+
+/**
+ * The per-root stance preference, published by callers (the menu preview writes
+ * it directly; gameplay replication should write the same channel). Null when
+ * nothing valid is published, which preserves the pre-HF-382 behaviour exactly:
+ * the skin profile's own idle preference decides.
+ */
+export function rootOperatorStancePreference(root: THREE.Object3D): OperatorStanceId | null {
+  const value = root.userData.operatorStanceId;
+  return isOperatorStanceId(value) ? value : null;
+}
+
+/**
+ * HF-382: folds the selected IDLE STANCE into a director output. Advances the
+ * cross-fade state, then replaces every emitted idle-corpus layer with the
+ * stance's authored clip - split between the outgoing and incoming clips while
+ * the fade runs so the mixer never releases-and-restarts a visible pose. Weights
+ * are conserved, so the blend graph's renormalisation contract still holds.
+ *
+ * Pure with respect to the animation; the only mutation is `fadeState`, which
+ * lives on the per-operator runtime. Death layers pass through untouched.
+ */
+export function applyOperatorStanceIdlePreference(
+  animation: OperatorAnimationOutput,
+  availableClips: ReadonlySet<string>,
+  stance: OperatorStanceId,
+  fadeState: { clipName: string | null; fadeFrom: string | null; fadeSeconds: number },
+  deltaSeconds: number,
+): OperatorAnimationOutput {
+  const preferred = stanceIdleClip(stance, availableClips);
+  if (fadeState.clipName !== preferred) {
+    fadeState.fadeFrom = fadeState.clipName;
+    fadeState.clipName = preferred;
+    fadeState.fadeSeconds = 0;
+  }
+  let blend = 1;
+  if (fadeState.fadeFrom !== null && fadeState.fadeFrom !== fadeState.clipName) {
+    fadeState.fadeSeconds += Math.max(0, deltaSeconds);
+    blend = Math.min(1, fadeState.fadeSeconds / OPERATOR_STANCE_IDLE_FADE_SECONDS);
+    if (blend >= 1) fadeState.fadeFrom = null;
+  }
+  if (!availableClips.has(preferred)) return animation;
+  const touchesIdle = animation.layers.some((layer) => STANCE_IDLE_CLIP_CORPUS[layer.clip] === true)
+    || (animation.selectedClip !== null && STANCE_IDLE_CLIP_CORPUS[animation.selectedClip] === true);
+  if (!touchesIdle) return animation;
+
+  interface WeightedLayer {
+    clip: string;
+    weight: number;
+    timeScale: number;
+  }
+  const layers: WeightedLayer[] = [];
+  for (const layer of animation.layers) {
+    if (!STANCE_IDLE_CLIP_CORPUS[layer.clip]) {
+      layers.push({ ...layer });
+      continue;
+    }
+    if (fadeState.fadeFrom !== null && blend < 1) {
+      // Mid-fade: the outgoing idle keeps its share of this layer's weight.
+      if (fadeState.fadeFrom !== preferred && availableClips.has(fadeState.fadeFrom)) {
+        layers.push({
+          clip: fadeState.fadeFrom,
+          weight: layer.weight * (1 - blend),
+          timeScale: layer.timeScale,
+        });
+      }
+      layers.push({ clip: preferred, weight: layer.weight * blend, timeScale: layer.timeScale });
+    } else {
+      layers.push({ ...layer, clip: preferred });
+    }
+  }
+  const sorted = layers
+    .filter((layer) => availableClips.has(layer.clip))
+    .sort((left, right) => (right.weight - left.weight) || left.clip.localeCompare(right.clip));
+  return {
+    ...animation,
+    layers: Object.freeze(sorted),
+    selectedClip: STANCE_IDLE_CLIP_CORPUS[animation.selectedClip ?? ''] === true
+      ? preferred
+      : animation.selectedClip,
+  };
+}
+
 export function updateRiggedOperator(
   root: THREE.Object3D,
   speed: number,
@@ -1748,7 +1872,7 @@ export function updateRiggedOperator(
   // turn rate, applied on the stance pivot the prone solve already owns.
   const yawError = wrapAngleRadians(root.rotation.y - runtimeState.visualYawRadians);
 
-  const animation = advanceOperatorAnimation(runtimeState.director, {
+  let animation = advanceOperatorAnimation(runtimeState.director, {
     deltaSeconds: dt,
     forwardMps: velocity.forwardMps,
     strafeMps: velocity.strafeMps,
@@ -1758,6 +1882,19 @@ export function updateRiggedOperator(
     armed: motion?.armed ?? true,
     availableClips: [...runtimeState.clips.keys()],
   });
+  // HF-382: the published IDLE STANCE overrides which authored idle the mixer
+  // plays, cross-faded. Presentation only - it cannot reach hit proxies or
+  // movement authority, and an unpublished root behaves exactly as before.
+  const stancePreference = rootOperatorStancePreference(root);
+  if (stancePreference !== null) {
+    animation = applyOperatorStanceIdlePreference(
+      animation,
+      new Set(runtimeState.clips.keys()),
+      stancePreference,
+      runtimeState.stanceIdleFade,
+      dt,
+    );
+  }
   runtimeState.lastAnimation = animation;
   runtimeState.visualYawRadians = wrapAngleRadians(
     runtimeState.visualYawRadians + animation.aim.bodyYawDeltaRadians,
@@ -2132,6 +2269,7 @@ export function resetRiggedOperator(root: THREE.Object3D): boolean {
   // A respawn is a new life: the blend graph, the aim smoothing, the breathing
   // phase and every live impulse start clean, but the archetype identity (which
   // is a property of the skin, not of the life) is rebuilt from the same keys.
+  runtimeState.stanceIdleFade = { clipName: null, fadeFrom: null, fadeSeconds: 0 };
   runtimeState.director = createOperatorAnimationDirector(
     String(root.userData.operatorSkinId ?? 'default'),
     root.name,

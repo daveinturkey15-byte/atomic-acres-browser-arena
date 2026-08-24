@@ -284,34 +284,42 @@ const PALETTES: Readonly<Record<Pass74OperatorSkinId, OperatorSkinPalette>> = Ob
       trim: 0x12a7b1, visor: 0x3fd3dd, skin: 0xc59a76, ink: 0xdff3f4, materialLabel: 'ISSUE WEAVE',
     }),
   }),
+  // HF-380: the explorer reads as an ADVENTURER, not desert infantry. The
+  // archetype signature is the sun-faded teal top over warm leather - green and
+  // blue co-dominant, red-dominant brown under-suit, brass hardware.
   explorer: Object.freeze({
     id: 'explorer',
     arm: Object.freeze({
-      sleeve: 0xe8c48f, glove: 0xc79a6b, fingerGlove: 0xd2a97c, accent: 0xffc46a,
-      sleeveRoughness: 0.95, gloveRoughness: 0.8, accentMetalness: 0.06, accentEmissive: 0x3a2408,
+      sleeve: 0x66ccc2, glove: 0x7a4e28, fingerGlove: 0xc08a5e, accent: 0xd9a441,
+      sleeveRoughness: 0.95, gloveRoughness: 0.7, accentMetalness: 0.06, accentEmissive: 0x3a2408,
     }),
     body: Object.freeze({
-      swat: 0xd7ad6d, swatBlack: 0x6d4a26, grey: 0xc9a878, visor: 0xffd48a,
-      swatRoughness: 0.94, swatBlackRoughness: 0.96, lift: 0.11,
+      swat: 0x2f8f8a, swatBlack: 0x5a3a20, grey: 0xc9a878, visor: 0xffd48a,
+      swatRoughness: 0.94, swatBlackRoughness: 0.95, lift: 0.11,
     }),
     card: Object.freeze({
-      backdropTop: 0x3d2f1c, backdropBottom: 0x17110a, torso: 0xb08a52, webbing: 0x55381f,
-      trim: 0xf0a63c, visor: 0xffd48a, skin: 0xc08a5e, ink: 0xfaeed8, materialLabel: 'CANVAS',
+      backdropTop: 0x1e3a38, backdropBottom: 0x0a1413, torso: 0x2f8f8a, webbing: 0x5a3a20,
+      trim: 0xd9a441, visor: 0xffd48a, skin: 0xc08a5e, ink: 0xfaeed8, materialLabel: 'CANVAS',
     }),
   }),
+  // HF-380: the symbiote reads as a CREATURE, not lavender sci-fi armour. The
+  // Swat_Black role carries most of the GLB's meshes (chest plates, forearm
+  // guards, spine ridge), so near-black GLOSSY plates plus a bone-white lens
+  // carry the carapace read; the garment keeps enough violet luminance for the
+  // readability lift to still reach it (operator-skin-appearance falsifier).
   symbiote: Object.freeze({
     id: 'symbiote',
     arm: Object.freeze({
-      sleeve: 0xbda9cc, glove: 0x9d8fae, fingerGlove: 0xa897b8, accent: 0xcf9bff,
-      sleeveRoughness: 0.62, gloveRoughness: 0.48, accentMetalness: 0.34, accentEmissive: 0x2c123f,
+      sleeve: 0xa894c8, glove: 0x6f5f82, fingerGlove: 0x9a8ab0, accent: 0xe8e2d6,
+      sleeveRoughness: 0.35, gloveRoughness: 0.3, accentMetalness: 0.15, accentEmissive: 0x241a30,
     }),
     body: Object.freeze({
-      swat: 0xa678d6, swatBlack: 0x4a3560, grey: 0xbf9ae0, visor: 0xd2a6ff,
-      swatRoughness: 0.52, swatBlackRoughness: 0.6, lift: 0.2,
+      swat: 0x8a6cc4, swatBlack: 0x120e17, grey: 0x4a3c55, visor: 0xe8e2d6,
+      swatRoughness: 0.38, swatBlackRoughness: 0.3, lift: 0.22,
     }),
     card: Object.freeze({
-      backdropTop: 0x2c1c3b, backdropBottom: 0x110a17, torso: 0x5a4f63, webbing: 0x241d2c,
-      trim: 0x9d5ce0, visor: 0xd2a6ff, skin: 0xb08f7e, ink: 0xf0e2ff, materialLabel: 'CHITIN',
+      backdropTop: 0x1c1424, backdropBottom: 0x0a0710, torso: 0x3a2f47, webbing: 0x17121e,
+      trim: 0xe8e2d6, visor: 0xe8e2d6, skin: 0xb08f7e, ink: 0xf0e2ff, materialLabel: 'CHITIN',
     }),
   }),
   navalops: Object.freeze({
@@ -321,11 +329,11 @@ const PALETTES: Readonly<Record<Pass74OperatorSkinId, OperatorSkinPalette>> = Ob
       sleeveRoughness: 0.74, gloveRoughness: 0.58, accentMetalness: 0.28, accentEmissive: 0x0d2740,
     }),
     body: Object.freeze({
-      swat: 0x5c93c8, swatBlack: 0x24384b, grey: 0x7fb0d4, visor: 0x9fd4ff,
-      swatRoughness: 0.62, swatBlackRoughness: 0.7, lift: 0.19,
+      swat: 0x4a80ba, swatBlack: 0x24384b, grey: 0x7fb0d4, visor: 0x9fd4ff,
+      swatRoughness: 0.52, swatBlackRoughness: 0.7, lift: 0.19,
     }),
     card: Object.freeze({
-      backdropTop: 0x16293c, backdropBottom: 0x070d14, torso: 0x24405e, webbing: 0x10171f,
+      backdropTop: 0x16293c, backdropBottom: 0x070d14, torso: 0x33608f, webbing: 0x10171f,
       trim: 0x4f9bd8, visor: 0x9fd4ff, skin: 0xb98d6c, ink: 0xdcecfa, materialLabel: 'WET SHELL',
     }),
   }),
