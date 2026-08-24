@@ -150,10 +150,14 @@ describe('farcrysis mid-map landmarks (HF-395)', () => {
         if (other === entry) continue;
         // Designed contact: each crate abuts ITS OWN landmark's wall inner
         // face (stack_shapes against the ruin). Nothing else may touch.
-        const crateMatch = entry.id.match(/^farcrysis-crate-(nw|ne|sw|se)/);
-        const wallOfSameLandmark = crateMatch
-          && other.id.startsWith(`farcrysis-ruined-wall-${crateMatch[1]}-`);
-        if (wallOfSameLandmark) continue;
+        // Symmetric by iteration order: exempting crate-entry/wall-other
+        // alone still fails when the audit loop reaches the wall entry and
+        // meets the same designed abutment as `other`.
+        const crateTag = entry.id.match(/^farcrysis-crate-(nw|ne|sw|se)/)?.[1];
+        const wallTag = entry.id.match(/^farcrysis-ruined-wall-(nw|ne|sw|se)-/)?.[1];
+        const otherIsOwnWall = crateTag !== undefined && other.id.startsWith(`farcrysis-ruined-wall-${crateTag}-`);
+        const otherIsOwnCrate = wallTag !== undefined && other.id.startsWith(`farcrysis-crate-${wallTag}`);
+        if (otherIsOwnWall || otherIsOwnCrate) continue;
         const clash = boxesIntersect(entry.bounds, other.bounds)
           ? `${entry.id} intersects ${other.id}`
           : null;

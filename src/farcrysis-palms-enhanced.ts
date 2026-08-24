@@ -31,6 +31,7 @@
 import * as THREE from 'three';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
+import { FARCRYSIS_LANDMARKS } from './farcrysis-midmap-landmarks';
 import { farcrysisTerrainHeight } from './farcrysis-terrain-authority';
 
 // ---------------------------------------------------------------------------
@@ -63,6 +64,14 @@ const BEACH_RING_MIN = 44;
 const BEACH_RING_MAX = 60;
 const JUNGLE_RING_MIN = 22;
 const JUNGLE_RING_MAX = 38;
+/**
+ * HF-395: the composed landmark groves own their quadrant. A palm trunk
+ * inside a ruin wall or under a grove canopy is exactly the "thrown
+ * together" scatter the owner rejected, and its collider would intersect
+ * the grove colliders (canopy trunks reach ~3.8 m from centre, crate/wall
+ * AABBs ~6.5 m). 7 m clears every grove collider with margin.
+ */
+const LANDMARK_GROVE_KEEP_OUT_M = 7;
 const BOUNDS_MARGIN = 1.5;
 export const TRUNK_HEIGHT = 2.5;
 
@@ -226,9 +235,15 @@ function buildPlacements(): PalmPlacement[] {
 
     const x = clamp(Math.cos(angle) * radius, minX + BOUNDS_MARGIN, maxX - BOUNDS_MARGIN);
     const z = clamp(Math.sin(angle) * radius * 0.92, minZ + BOUNDS_MARGIN, maxZ - BOUNDS_MARGIN);
-
     // Keep trunks off the flat corridor lane strips (no sightline blocking)
     if (onCorridorStrip(x, z)) continue;
+
+    // And out of the composed landmark groves (HF-395 keep-out).
+    if (
+      FARCRYSIS_LANDMARKS.some(
+        (frame) => Math.hypot(x - frame.center[0], z - frame.center[1]) < LANDMARK_GROVE_KEEP_OUT_M,
+      )
+    ) continue;
 
     const scale = 0.7 + rng() * 0.6; // varied heights 0.7x-1.3x
     placements.push({

@@ -107,7 +107,12 @@ describe('HF-396/398 layered jungle', () => {
     // retired pre-HF-393 1:1 chute ("you fall down into the water").
     const shelfEnd = FARCRYSIS_SHORE.joinHeight
       - FARCRYSIS_SHORE.shelfSlope * (FARCRYSIS_SHORE.descentStartDist - FARCRYSIS_SHORE.outerDropDist);
-    const authoredGrade = (FARCRYSIS_SHORE.edgeHeight - shelfEnd) / FARCRYSIS_SHORE.outerDropDist;
+    // Rise per metre of inward distance d: height(d) = edge + (shelfEnd -
+    // edge) * (d / outerDropDist), so the rise/run is POSITIVE
+    // (shelfEnd - edgeHeight) / outerDropDist. farcrysisTerrainSlope returns
+    // a Math.hypot magnitude (>= 0); the original negative-grade window was
+    // unpassable by construction.
+    const authoredGrade = (shelfEnd - FARCRYSIS_SHORE.edgeHeight) / FARCRYSIS_SHORE.outerDropDist;
     expect(farcrysisTerrainSlope(63.5, 0)).toBeGreaterThan(authoredGrade * 0.98);
     expect(farcrysisTerrainSlope(63.5, 0)).toBeLessThan(authoredGrade * 1.02);
   });

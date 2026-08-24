@@ -1,0 +1,2 @@
+[21.70,26.30]x[26.30,29.70]y[0.00,1.10] rot=null name~terrain-mound-east-verge-collider@0.0
+[26.25,28.75]x[29.00,39.00]y[0.00,1.80] rot=null name~quality-earth-bank-south-east-collider-1@0.0

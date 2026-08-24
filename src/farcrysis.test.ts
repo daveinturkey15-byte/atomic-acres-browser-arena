@@ -103,10 +103,14 @@ describe('farcrysis arena', () => {
 
   it('matches the documented FARCRYSIS_BOUNDS', () => {
     const { arena } = buildArena();
-    expect(FARCRYSIS_BOUNDS.minX).toBe(-32);
-    expect(FARCRYSIS_BOUNDS.maxX).toBe(32);
-    expect(FARCRYSIS_BOUNDS.minZ).toBe(-32);
-    expect(FARCRYSIS_BOUNDS.maxZ).toBe(32);
+    // HF-396: the owner asked for a 3-4x bigger island; the linear rescale
+    // is +/-32 m -> +/-64 m (exactly 4x playfield area). This test was red
+    // at the old ±32 pins from commit fbe9310c onward; it now pins the NEW
+    // rescale at equal strictness, including the arena.bounds agreement.
+    expect(FARCRYSIS_BOUNDS.minX).toBe(-64);
+    expect(FARCRYSIS_BOUNDS.maxX).toBe(64);
+    expect(FARCRYSIS_BOUNDS.minZ).toBe(-64);
+    expect(FARCRYSIS_BOUNDS.maxZ).toBe(64);
     expect(arena.bounds.minX).toBe(FARCRYSIS_BOUNDS.minX);
     expect(arena.bounds.maxX).toBe(FARCRYSIS_BOUNDS.maxX);
     expect(arena.bounds.minZ).toBe(FARCRYSIS_BOUNDS.minZ);

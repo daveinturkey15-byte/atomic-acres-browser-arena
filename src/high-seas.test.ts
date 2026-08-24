@@ -513,6 +513,60 @@ describe('High Seas clean-room arena geometry', () => {
       && [...camera.position, ...camera.target].every(Number.isFinite))).toBe(true);
   });
 
+  it('frames the upper side windows as glazed, shot-authoritative bays (HF-392)', () => {
+    // The owner: "issues with the windows in the top of the ship". Every side
+    // pane used to be rotated 90 degrees - a 2.6 m glass fin perpendicular to
+    // the wall, jutting into the room and out over the water - while the bay
+    // behind it stayed open air a player could walk out through, and the pane
+    // itself was presentation-only so shots never interacted with it.
+    const scene = new THREE.Scene();
+    const map = buildHighSeas(scene);
+    map.root.updateMatrixWorld(true);
+    const glazing: THREE.Mesh[] = [];
+    const bands: THREE.Mesh[] = [];
+    map.root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      if (/-upper-(port|starboard)-glazing-/.test(node.name)) glazing.push(node);
+      if (/-upper-(port|starboard)-window-(sill|header)$/.test(node.name)) bands.push(node);
+    });
+    // Two cabins x two sides x five bays (three between the mullions plus the
+    // two strips between the outermost mullions and the end walls).
+    expect(glazing).toHaveLength(20);
+    // Two cabins x two sides x one sill + one header band.
+    expect(bands).toHaveLength(8);
+    const authority = map.root.userData.highSeasAuthorityAudit as readonly AuthorityAuditEntry[];
+    const materialOf = (name: string): string | undefined => {
+      const entry = authority.find((candidate) => candidate.name === name);
+      if (!entry?.ballisticSurfaceId) return undefined;
+      return map.shotSurfaces.find((surface) => surface.id === entry.ballisticSurfaceId)?.material;
+    };
+    for (const pane of glazing) {
+      const bounds = new THREE.Box3().setFromObject(pane);
+      // A side pane lies IN the +/-x wall plane: thin across X, long along Z.
+      expect(bounds.max.x - bounds.min.x).toBeLessThanOrEqual(0.1);
+      expect(bounds.max.z - bounds.min.z).toBeGreaterThan(1.2);
+      // Glazing lives inside the aperture band between sill and header.
+      expect(bounds.min.y).toBeGreaterThanOrEqual(HIGH_SEAS_LEVELS.upperDeck);
+      expect(bounds.max.y).toBeLessThanOrEqual(HIGH_SEAS_LEVELS.upperDeck + 2.6);
+      expect(materialOf(pane.name), pane.name).toBe('glass');
+      // The pane's own centre must be movement-solid: before the fix every bay
+      // centre at eye height was walk-through open air.
+      const centre = bounds.getCenter(new THREE.Vector3());
+      expect(
+        map.physicsColliders.some((b) => centre.x >= b.minX && centre.x <= b.maxX
+          && centre.y >= (b.minY ?? -Infinity) && centre.y <= (b.maxY ?? Infinity)
+          && centre.z >= b.minZ && centre.z <= b.maxZ),
+        pane.name,
+      ).toBe(true);
+    }
+    for (const band of bands) {
+      const bounds = new THREE.Box3().setFromObject(band);
+      // Each band runs the full cabin between the end walls.
+      expect(bounds.max.z - bounds.min.z).toBeGreaterThan(15);
+      expect(materialOf(band.name), band.name).toBe('interior-wall');
+    }
+  });
+
   it('equips deck, hull, and superstructure with procedural PBR textures (albedo, normal, roughness)', () => {
     const map = buildHighSeas(new THREE.Scene());
     const inventory = getHighSeasMaterialInventory();

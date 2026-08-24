@@ -95,6 +95,7 @@ function makeFrame(tag: LandmarkTag, sx: -1 | 1, sz: -1 | 1): LandmarkFrame {
 
 export const FARCRYSIS_LANDMARKS: readonly LandmarkFrame[] = Object.freeze([
   makeFrame('nw', -1, -1),
+  makeFrame('ne', 1, -1),
   makeFrame('sw', -1, 1),
   makeFrame('se', 1, 1),
 ]);
@@ -125,8 +126,13 @@ export const LANDMARK_WALL_OUTWARD = 5.2;
 export const LANDMARK_CRATE_OUTWARD = 4.1;
 /** Hedgerow sits behind the wall. */
 export const LANDMARK_HEDGE_OUTWARD = 6.3;
-
-const TREE_ANGLES = [Math.PI / 2, Math.PI * (7 / 6), Math.PI * (11 / 6)]; // 90°, 210°, 330°
+// 90°, 198°, 300° measured from outward toward tangent. Chosen so no trunk
+// enters the wall/crate band (u > 2, |v| <= 3): the 330° blade used to put a
+// trunk inside the solo crate's AABB in every quadrant, and the 210°/270°
+// alternatives either re-collide or leave a diagonal without its blocker
+// trunk (each grove must contribute one trunk with radial < 36 m onto its
+// spawn diagonal — the 198° tree leans inward and provides it).
+const TREE_ANGLES = [Math.PI / 2, Math.PI * (11 / 10), Math.PI * (5 / 3)];
 
 /** 3 old-growth trees per landmark, radial cluster avoiding the inward axis. */
 export function landmarkTreePositions(frame: LandmarkFrame): Vec2[] {

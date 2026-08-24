@@ -1,0 +1,6 @@
+probe (15,0) cost=0 crossed=[]
+probe (20,-4) cost=0 crossed=[]
+probe (20,4) cost=1 crossed=[["[18.8,21.2]x[0.2,3.8]y[0.00,1.60]",1]]
+probe (28,0) cost=0 crossed=[]
+probe (20,-20) cost=0 crossed=[]
+probe (25,25) cost=1 crossed=[["[25.1,28.9]x[22.1,25.9]y[0.00,3.30]",1]]

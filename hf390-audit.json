@@ -49,17 +49,17 @@
   "BUILD_ERROR": "TypeError: Cannot read properties of undefined (reading 'width')"
  },
  "farcrysis": {
-  "surfaces": 220,
-  "raycastMeshes": 220,
+  "surfaces": 227,
+  "raycastMeshes": 227,
   "byMaterial": {
    "wood": 118,
-   "concrete": 41,
+   "concrete": 48,
    "structural-metal": 21,
    "thin-metal": 30,
    "earth": 10
   },
   "byClass": {
-   "explicit": 220
+   "explicit": 227
   },
   "fallbacks": [],
   "invalidRatings": [],
@@ -84,17 +84,18 @@
   "stampMismatches": []
  },
  "high-seas": {
-  "surfaces": 169,
-  "raycastMeshes": 169,
+  "surfaces": 197,
+  "raycastMeshes": 197,
   "byMaterial": {
    "structural-metal": 85,
-   "interior-wall": 52,
+   "interior-wall": 60,
    "wood": 4,
+   "glass": 20,
    "reinforced": 16,
    "thin-metal": 12
   },
   "byClass": {
-   "explicit": 169
+   "explicit": 197
   },
   "fallbacks": [],
   "invalidRatings": [],

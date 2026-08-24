@@ -2758,6 +2758,10 @@ let _emergentAnchors: Array<[number, number]> = [];
 // ---------------------------------------------------------------------------
 
 function addEmergentCanopyTrees(root: THREE.Group): void {
+  // Module-level state must reset per arena build: tests rebuild arenas in
+  // one process, and stale anchors would grow the next build's relational
+  // midstorey pass (nondeterministic instance counts across builds).
+  _emergentAnchors.length = 0;
   const TARGET = 120;
   const SEED = 0x4a91_2c07;
   // Strict fit (slope <= 0.35, dry interior) rejects most of the island, so

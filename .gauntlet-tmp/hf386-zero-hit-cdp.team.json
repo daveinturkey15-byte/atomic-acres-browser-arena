@@ -1,0 +1,25 @@
+{
+  "backend": "webgpu",
+  "locked": true,
+  "phaseA": {
+    "ok": true,
+    "row": {
+      "exists": true,
+      "rows": 1,
+      "lastLabel": "0 NO DAMAGE",
+      "hudPresent": true
+    }
+  },
+  "phaseB": {
+    "ok": true,
+    "activation": true,
+    "possessed": true,
+    "row": {
+      "exists": true,
+      "rows": 1,
+      "lastLabel": "0 NO DAMAGE",
+      "hudPresent": true
+    }
+  },
+  "errors": []
+}
