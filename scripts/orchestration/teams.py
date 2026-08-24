@@ -71,6 +71,20 @@ create a WebGPU device on this machine - every historic "green" was WebGL2 while
 owner plays WebGPU. For anything visual or gameplay-facing, drive installed Chrome over
 CDP: copy scripts/qa/verify-arena-boot-cdp.mjs. Then CAPTURE FRAMES AND READ THEM.
 
+THE TECHNIQUE REGISTER. Dave has collected 25 external sources for exactly this kind of
+work, each already resolved to a canonical repo where one exists, with its LICENCE FILE
+read and a bounded decision recorded:
+  C:/Users/david/AppData/Local/hermes/.akephalos/references/ai-3d-technique-register.md
+Read the rows relevant to your task. Three things about it you must respect:
+  - A row marked COMPARATOR-ONLY has no source. Match the described property with your own
+    implementation; do not go hunting for 'how they did it' and let search results become
+    the answer. That substitution inverted row 15's conclusion and nearly wasted a lane.
+  - Rows 16 and 23 are PUBLIC REPOSITORIES WITH NO LICENCE FILE. Per the owner's standing
+    decision (Authority section 2b), you MAY inspect them to learn a general technique and
+    then write your own; you may NOT copy files, functions, shader bodies, constants tables
+    or distinctive comments, and you may not vendor them.
+  - Row 19 (erichlof ray tracing) is CC0 - the ONE source whose code may be adapted directly.
+
 USE THE SKILLS - THIS IS NOT OPTIONAL. Dave has spent weeks collecting and curating
 techniques for exactly this work, and each one is now a governed skill with an
 inspected licence, a pinned source, and a bounded decision already made for you. The
