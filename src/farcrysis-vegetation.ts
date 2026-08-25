@@ -2155,7 +2155,7 @@ function addBeachPebbles(root: THREE.Group): void {
   pebbles.name = 'farcrysis-vege-beach-pebbles';
 
   const matrix = new THREE.Matrix4();
-  const positions = layerPositions(count, 26, 31.5, 0.3, SEED);
+  const positions = edgeBandPositions(count, ZONE.beach[0], ZONE.beach[1], 0.3, SEED);
   const rng = mulberry32(SEED + 1);
 
   for (let i = 0; i < positions.length; i++) {
@@ -2416,7 +2416,7 @@ function addBeachScrubBushes(root: THREE.Group): void {
   bushes.name = 'farcrysis-vege-beach-scrub-bushes';
 
   const matrix = new THREE.Matrix4();
-  const positions = layerPositions(count, 21, 31, 1.5, SEED);
+  const positions = edgeBandPositions(count, ZONE.beach[0], ZONE.beach[1], 1.5, SEED);
   const rng = mulberry32(SEED + 3);
 
   for (let i = 0; i < positions.length; i++) {
@@ -2773,12 +2773,10 @@ function addDriftwoodLogs(root: THREE.Group): void {
   logs.name = 'farcrysis-vege-driftwood-logs';
 
   const matrix = new THREE.Matrix4();
-  const positions = ringPositions(count, 48, 60); // HF-396
+  const positions = edgeBandPositions(count, ZONE.strand[0], ZONE.strand[1], 1.4, SEED); // HF-396 square-shore strand
   const rng = mulberry32(SEED + 4);
   for (let i = 0; i < positions.length; i++) {
-    const [x, z] = positions[i];
-    const groundY = terrainHeightAt(x, z);
-    if (!clearOfGameplay(x, z, 1.4)) continue;
+    const [x, z, groundY] = positions[i];
     matrix.compose(
       new THREE.Vector3(x, groundY + 0.08, z),
       new THREE.Quaternion().setFromEuler(
