@@ -8284,7 +8284,22 @@ function scheduleClientWorldRepairTimeout(epoch: string, matchEpoch: number): vo
     // documented rule. No bound is weakened: HANDSHAKE_TIMEOUT_MS,
     // ARMING_CAP_MS, MAX_CLIENT_WORLD_REPAIR_ATTEMPTS and MIN_SPACING are all
     // unchanged. The resume path (admission null) is excluded by the gate.
+    //
+    // Pass 79 residual (farcrysis lane, run-4 forensics: attempt #2 spent at
+    // 16224 ms, first host contact 18316 ms, 'attempts-exhausted' declared at
+    // 18439 ms): WITHOUT a contact fence the timer burned BOTH retries ~1s
+    // after match start while the heavy-arena host was still transacting
+    // nothing, so the healthy host's first snapshot could only declare
+    // exhaustion instead of finding an attempt in flight. A repair attempt is
+    // a request TO the host; pre-contact silence is already bounded by
+    // ARMING_CAP_MS (evaluateClientWorldRepairDeadline refuses to judge
+    // inactivity before hostContactAtMs for exactly this reason). Requiring
+    // first host contact here means the held retry lands just AFTER contact,
+    // registers fresh progress, and forces the acknowledging killstreak-state
+    // via the host join handler (broadcastKillstreakState(force)) - which is
+    // what actually completes the handshake.
     if (pumpEligibleSinceMs !== null
+      && hostMatchContactAtMs !== null
       && clientWorldRepairReceiverReady(clientWorldRepairAdmission, {
         connectionEpoch: epoch,
         matchEpoch,
@@ -22397,7 +22412,16 @@ function updateKillstreakPossession(now: number): void {
         spawnImpactFlash(point, firstImpact.surface.material, normal);
         const surface = ballisticImpactSurface(firstImpact.surface.material);
         audio.impact(surface, point.distanceTo(camera.position));
-        presentZeroDamageHit(now);
+        // HF-386 truth gate: a world-hit round cannot know its own host
+        // outcome synchronously, so while showGunnerTargetConfirm is still
+        // presenting a CONFIRMED damage event (gunnerTargetConfirmUntil is
+        // re-armed by every successive hit), an interleaved floor-hit round
+        // stays silent. Announcing "0 NO DAMAGE" over live damage numbers is
+        // the exact contradiction this cue exists to remove; once the confirm
+        // window lapses the cue flows again for genuinely fruitless fire.
+        if (now >= gunnerTargetConfirmUntil) {
+          presentZeroDamageHit(now);
+        }
       }
     }
     nextLocalSupportGunReportAt = now + (possession.kind === 'chopper-gunner'
@@ -30324,6 +30348,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     awaitingCanonicalGuestAuthority,
     pendingClientWorldRepair: pendingClientWorldRepair(),
     simulationEnabled: playerSimulationEnabled(),
+    physicsReady: characterPhysics !== null,
+    playerVelocity: [player.velocity.x, player.velocity.y, player.velocity.z],
     inputEnabled: gameplayInputEnabled(),
   }),
   // HF-325: read-only succession observability for QA drivers (e.g.

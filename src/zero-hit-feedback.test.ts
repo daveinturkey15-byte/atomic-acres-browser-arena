@@ -66,4 +66,27 @@ describe('HF-386 zero-damage world-hit feedback', () => {
     // world impact.
     expect(mainSource).toContain('presentZeroDamageHit(now);');
   });
+
+  it('never claims NO DAMAGE while confirmed target damage is still being presented', () => {
+    // The possessed chopper gunner resolves damage asynchronously on the host,
+    // so a world-hit round cannot know its own outcome synchronously. But while
+    // showGunnerTargetConfirm is still presenting a CONFIRMED damage event
+    // (gunnerTargetConfirmUntil extends 650 ms past the last confirm and is
+    // re-armed by every successive hit), an interleaved floor-hit round must
+    // stay silent: announcing "0 NO DAMAGE" over visible damage numbers is the
+    // exact contradiction HF-386 exists to remove.
+    const mainSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    const guardPattern = /if \(now >= gunnerTargetConfirmUntil\) \{\s+presentZeroDamageHit\(now\);\s+\}/;
+    const match = mainSource.match(guardPattern);
+    expect(match).not.toBeNull();
+    // The guarded call must be the CHOPPER possession site: inside the
+    // presentation-trace block, after the impact audio, before the cadence
+    // reset.
+    const traceStart = mainSource.indexOf('const chopperTrace = traceWeaponPath');
+    const cadenceReset = mainSource.indexOf('nextLocalSupportGunReportAt = now + (possession.kind');
+    expect(traceStart).toBeGreaterThan(-1);
+    expect(cadenceReset).toBeGreaterThan(traceStart);
+    expect(mainSource.indexOf(match![0])).toBeGreaterThan(traceStart);
+    expect(mainSource.indexOf(match![0])).toBeLessThan(cadenceReset);
+  });
 });

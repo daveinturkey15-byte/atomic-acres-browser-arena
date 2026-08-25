@@ -53,8 +53,20 @@ const LANES = [
   { arena: 'high-seas', mode: 'tdm', swaps: ['high-seas'] },
   // The gun-range lobby forces FFA and zero bots; selecting it exercises that
   // special-case path end to end.
-  { arena: 'gun-range', mode: 'range', swaps: ['gun-range'] },
 ];
+
+// Lane J forensics: an optional subset filter for iteration. Default (no
+// flag) runs every lane exactly as before - this only ever SHRINKS the set
+// explicitly requested on the command line, never the default coverage.
+const ONLY = (() => {
+  const index = argv.indexOf('--only');
+  return index >= 0 && argv[index + 1] ? argv[index + 1].split(',').map((value) => value.trim()) : null;
+})();
+const ACTIVE_LANES = ONLY ? LANES.filter((lane) => ONLY.includes(lane.arena)) : LANES;
+if (ONLY && ACTIVE_LANES.length === 0) {
+  console.error(`[hf347] --only matched no lanes: ${ONLY.join(', ')}`);
+  process.exit(2);
+}
 
 function peerServerReady() {
   return new Promise((resolveReady) => {
@@ -121,23 +133,64 @@ async function openPage(label) {
  */
 async function measureMovement(page) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const before = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position);
+    const before = await page.evaluate(() => ({
+      position: window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position,
+      presentedGameplayFrame: window.__ATOMIC_ACRES_DEBUG__.admissionState().presentedGameplayFrame,
+    }));
     await page.click('body');
     await page.keyboard.down('KeyW');
+    await page.waitForTimeout(600);
+    const midHold = await page.evaluate(() => {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return {
+        heldKeys: snapshot.textChat?.heldKeys ?? null,
+        midPosition: snapshot.player.position,
+      };
+    });
     await page.waitForTimeout(MOVE_HOLD_MS);
     await page.keyboard.up('KeyW');
     await page.waitForTimeout(200);
-    const after = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position);
-    const dx = after[0] - before[0];
-    const dz = after[2] - before[2];
+    const after = await page.evaluate(() => ({
+      position: window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position,
+      presentedGameplayFrame: window.__ATOMIC_ACRES_DEBUG__.admissionState().presentedGameplayFrame,
+    }));
+    const dx = after.position[0] - before.position[0];
+    const dz = after.position[2] - before.position[2];
     const moved = Math.hypot(dx, dz);
-    if (moved >= MOVE_THRESHOLD_M || attempt === 1) return { movedM: Number(moved.toFixed(2)), before, after };
+    if (moved >= MOVE_THRESHOLD_M || attempt === 1) return {
+      movedM: Number(moved.toFixed(2)), before, after,
+      heldKeys: midHold.heldKeys,
+      presentedFrames: after.presentedGameplayFrame - before.presentedGameplayFrame,
+    };
   }
-  return { movedM: 0 };
+  return { movedM: 0, presentedFrames: null };
+}
+
+/**
+ * Lane J forensics: the admission-handshake state of a role, sampled after
+ * every lane. Captured for PASSING lanes too - a failure that only shows in
+ * post-mortem telemetry on green lanes is exactly how this residual kept
+ * surviving. Read-only; changes no game state.
+ */
+async function handshakeTelemetry(page) {
+  return page.evaluate(() => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    return {
+      clientWorldRepair: snapshot.clientWorldRepair ?? null,
+      clientWorldRepairFailures: snapshot.clientWorldRepairFailures ?? null,
+      matchAdmissionPark: snapshot.matchAdmissionPark ?? null,
+      presentedGameplayFrame: window.__ATOMIC_ACRES_DEBUG__.admissionState().presentedGameplayFrame,
+      renderSubmissionPaused: snapshot.deterministicReview?.renderSubmissionPaused ?? null,
+      matchAdmissionPresentationPaused: snapshot.deterministicReview?.matchAdmissionPresentationPaused ?? null,
+      hasFocus: document.hasFocus(),
+      visibilityState: document.visibilityState,
+      status: (document.getElementById('network-status')?.textContent ?? '').slice(0, 120),
+    };
+  });
 }
 
 const lanes = [];
-for (const lane of LANES) {
+for (const lane of ACTIVE_LANES) {
   const record = { arena: lane.arena, mode: lane.mode, swaps: lane.swaps, ok: false };
   let host = null;
   let guest = null;
@@ -149,7 +202,6 @@ for (const lane of LANES) {
     await host.evaluate(() => document.querySelector('#host')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     await host.waitForFunction(() => (document.querySelector('#room-code')?.textContent ?? '').trim().length > 0, undefined, { timeout: CONNECT_TIMEOUT });
     const roomCode = (await host.textContent('#room-code')).trim();
-
     await guest.fill('#room-input', roomCode);
     await guest.evaluate(() => document.querySelector('#join')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     for (const page of [host, guest]) {
@@ -250,6 +302,13 @@ for (const lane of LANES) {
     }
     record.hostErrors = host.errorsSeen.slice(0, 4);
     record.guestErrors = guest.errorsSeen.slice(0, 4);
+    // Lane J forensics: handshake telemetry on EVERY lane, pass or fail.
+    try {
+      record.hostHandshake = await handshakeTelemetry(host);
+      record.guestHandshake = await handshakeTelemetry(guest);
+    } catch (telemetryError) {
+      record.handshakeTelemetryError = String(telemetryError).slice(0, 160);
+    }
     const seen = (visibility) => visibility
       && visibility.remoteCount === 1
       && visibility.hp > 0

@@ -144,6 +144,33 @@ describe('legacy match admission integration', () => {
     expect(fenceAt).toBeLessThan(retryGateAt);
   });
 
+  it('never spends the held repair-ready retry before the host has proven transactable', () => {
+    // Pass 79 forensic residual (hf347 farcrysis lane, THIS machine, run 4):
+    // the timer spent attempt #2 at 16224 ms while first host contact was
+    // 18316 ms - both retries burned during PRE-CONTACT silence. When the
+    // healthy host finally came up, its incoming killstreak-state could only
+    // declare 'attempts-exhausted' (18439 ms, 123 ms after contact), killing
+    // the guest at spawn behind a permanent false accusation line. A repair
+    // attempt is a request TO the host; silence before first contact is
+    // already bounded by ARMING_CAP_MS per client-world-repair-admission.ts.
+    // The timer retry must therefore require first host contact - the same
+    // precondition the deadline rule requires before judging inactivity -
+    // so the held retry lands just AFTER contact, registers fresh progress,
+    // and forces the host's acknowledging snapshot via the join handler.
+    // No bound changes: HANDSHAKE_TIMEOUT_MS, ARMING_CAP_MS,
+    // MAX_CLIENT_WORLD_REPAIR_ATTEMPTS and MIN_SPACING are untouched.
+    const timer = slice(
+      'const checkClientWorldRepairDeadline = (): void => {',
+      'pendingClientWorldRepairTimeout = window.setTimeout(',
+    );
+    const fenceAt = timer.indexOf('if (pumpEligibleSinceMs !== null');
+    const contactFenceAt = timer.indexOf('hostMatchContactAtMs !== null', fenceAt);
+    const retrySendAt = timer.indexOf('sendClientWorldRepairReady();');
+    expect(fenceAt).toBeGreaterThanOrEqual(0);
+    expect(contactFenceAt).toBeGreaterThan(fenceAt);
+    expect(contactFenceAt).toBeLessThan(retrySendAt);
+  });
+
   it('recreates a guest from observation state and repairs continuity before idempotent loadout registration', () => {
     const messages = slice("if (message.type === 'join' || message.type === 'state')", "if (message.type === 'ping')");
     const remoteCreatedAt = messages.indexOf('remotes.set(incoming.id, remote);');
