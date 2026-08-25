@@ -206,11 +206,15 @@ export function grainSeedFor(profile: FrozenFilmicGradeProfile, timeMs: number):
 
 /** Maps a graphics preset id onto a grade profile id. Fail-closed on unknowns. */
 export function gradeProfileIdForGraphicsPreset(
-  preset: 'performance' | 'high' | 'max' | 'custom' | string,
+  preset: 'performance' | 'high' | 'max' | 'custom' | 'rtx' | string,
 ): GradeProfileId {
   if (preset === 'performance') return 'performance';
   if (preset === 'high') return 'quality';
   if (preset === 'max') return 'max';
+  // HF-397 RTX RUNTIME sits between Quality and Max in the preset ladder and
+  // carries the richest (max) filmic grade; the grade adds tunable uniforms
+  // only, never new pipelines.
+  if (preset === 'rtx') return 'max';
   return DEFAULT_GRADE_PROFILE_ID;
 }
 
