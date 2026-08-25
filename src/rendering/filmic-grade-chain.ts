@@ -206,15 +206,21 @@ export function grainSeedFor(profile: FrozenFilmicGradeProfile, timeMs: number):
 
 /** Maps a graphics preset id onto a grade profile id. Fail-closed on unknowns. */
 export function gradeProfileIdForGraphicsPreset(
-  preset: 'performance' | 'high' | 'max' | 'custom' | 'rtx' | string,
+  preset: 'performance' | 'high' | 'max' | 'custom' | 'raytraced' | string,
 ): GradeProfileId {
   if (preset === 'performance') return 'performance';
   if (preset === 'high') return 'quality';
   if (preset === 'max') return 'max';
-  // HF-397 RTX RUNTIME sits between Quality and Max in the preset ladder and
-  // carries the richest (max) filmic grade; the grade adds tunable uniforms
-  // only, never new pipelines.
-  if (preset === 'rtx') return 'max';
+  // HF-397 sits between Quality and Max in the preset ladder and carries the richest
+  // (max) filmic grade; the grade adds tunable uniforms only, never new pipelines.
+  //
+  // The id is 'raytraced'. It was written here as 'rtx' by a lane that landed hours
+  // before the preset itself, and GraphicsPreset never had an 'rtx' member - so this
+  // branch was unreachable and RAY TRACED silently fell through to the DEFAULT grade,
+  // rendering with QUALITY's look. The owner-facing LABEL is deliberately "RAY TRACED"
+  // and not "RTX": no browser exposes a hardware ray-tracing pipeline or RT cores, so
+  // "RTX" would be a claim the build cannot back.
+  if (preset === 'raytraced') return 'max';
   return DEFAULT_GRADE_PROFILE_ID;
 }
 

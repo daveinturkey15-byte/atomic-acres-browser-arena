@@ -270,10 +270,14 @@ describe('HF-362 grade profile values in play', () => {
     expect(gradeProfileIdForGraphicsPreset('high')).toBe('quality');
     expect(gradeProfileIdForGraphicsPreset('max')).toBe('max');
     expect(gradeProfileIdForGraphicsPreset('custom')).toBe('quality');
-    // HF-397: RTX RUNTIME sits between Quality and Max in the preset ladder
-    // and carries the richest (max) filmic grade; the grade adds tunable
-    // uniforms only, never new pipelines.
-    expect(gradeProfileIdForGraphicsPreset('rtx')).toBe('max');
+    // HF-397 sits between Quality and Max and carries the richest (max) filmic grade.
+    // This row previously pinned 'rtx', an id GraphicsPreset has never had, so it was
+    // certifying an unreachable branch while the shipped preset fell through to the
+    // default. Re-pinned on the REAL id at equal strictness, plus the assertion the old
+    // row was missing: that the dead id is not still quietly special-cased.
+    expect(gradeProfileIdForGraphicsPreset('raytraced')).toBe('max');
+    expect(gradeProfileIdForGraphicsPreset('rtx'), 'rtx is not a GraphicsPreset member')
+      .toBe('quality');
     expect(gradeProfileIdForGraphicsPreset('nonsense')).toBe('quality');
     expect(() => resolveGradeProfile('nope' as GradeProfileId)).toThrow(/unknown filmic grade profile/);
   });
