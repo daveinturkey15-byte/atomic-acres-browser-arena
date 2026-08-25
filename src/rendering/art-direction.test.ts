@@ -111,10 +111,21 @@ describe('Lane L arena distinctiveness (the whole point of the pass)', () => {
     // skyline-terminal/high-seas at 1.71 and atomic-acres/rustworks-1v1 at
     // 2.06, i.e. two cool arenas and two warm ones collapsing into each other.
     // The catalog was re-authored along the axes that separate them (teal vs
-    // indigo; cream vs sodium) until the WEAKEST pair measured 4.70. The floor
-    // now sits just under that, so flattening any pair back toward the shared
-    // look fails here instead of reaching the owner.
-    const MINIMUM_MEAN_DELTA = 4.5 / 255;
+    // indigo; cream vs sodium) until the WEAKEST pair measured 4.70, and the
+    // floor moved to 4.5.
+    //
+    // Pass 79 raised it again. At 4.5 the three closest pairs were
+    // atomic-acres/rustworks-1v1 4.72, rustworks-1v1/gun-range 4.92 and
+    // atomic-acres/farcrysis 4.94 — still only a quarter of a step of headroom
+    // on a bar the owner had already rejected twice. Four arenas were pushed
+    // apart on their CDL GAIN ONLY (hue), leaving every contrast, lift, gamma
+    // and saturation value the capture rounds settled on untouched, and
+    // leaving gun-range — the neutral control — completely alone. The weakest
+    // pair now measures 5.77. The floor sits just under that, so flattening
+    // any pair back toward the shared look fails here instead of reaching the
+    // owner. This bar was proved red against the pre-pass catalog before the
+    // values moved.
+    const MINIMUM_MEAN_DELTA = 5.5 / 255;
     for (let a = 0; a < ARENA_IDS.length; a += 1) {
       for (let b = a + 1; b < ARENA_IDS.length; b += 1) {
         let total = 0;

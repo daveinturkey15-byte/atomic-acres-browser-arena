@@ -208,7 +208,13 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
       // Green dominant with blue kept alive — lush canopy AND cyan water in
       // one cast. Red is held back, which is what stops the island reading as
       // a greener atomic-acres.
-      gain: [1.03, 1.12, 0.98],
+      // Pass 79 separation pass: green up 1.12 -> 1.17 and red down
+      // 1.03 -> 0.98. HUE ONLY — contrast, lift, gamma and saturation are the
+      // values the capture rounds above settled on and are untouched, because
+      // every failure recorded for this arena was a CONTRAST failure. The
+      // brief already says hue carries this island, so hue is where the
+      // separation is bought.
+      gain: [0.98, 1.17, 1.02],
       // The black point is LIFTED, not crushed. First capture round: at
       // contrast 1.08 the mid-ground treeline collapsed to silhouette (shadow
       // mass +4.3 points, 5th-percentile luma -19 steps) and a defender in the
@@ -245,7 +251,11 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
     id: 'high-seas',
     brief: 'Crisp maritime steel-and-teal, golden practicals against cold sea light.',
     cdl: {
-      gain: [0.93, 1.05, 1.07],
+      // Pass 79 separation pass: red down 0.93 -> 0.88, teal untouched. The
+      // recorded failure here was contrast crushing the deck shadows, so the
+      // extra hull-cast separation is taken out of RED — which the maritime
+      // brief does not use — and never out of the black point.
+      gain: [0.88, 1.05, 1.07],
       // First capture round at contrast 1.12: shadow mass +19.5 points and the
       // 5th-percentile luma -16 steps. Most of that was the ocean going deep
       // (which is the look), but the deck shadows went with it, so the linear
@@ -289,7 +299,11 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
       // CREAM, not orange: red and green together, blue withdrawn. The green
       // lift is what stops this reading as a paler rustworks-1v1 — the two
       // warm arenas measured 2.1/255 apart before this pass.
-      gain: [1.06, 1.06, 0.9],
+      // Pass 79 separation pass: green now leads red (1.09 vs 1.04) instead of
+      // matching it, which is the same axis the note above names, pushed one
+      // step further. Blue stays withdrawn at 0.9; the softest-midtone
+      // contract below is untouched.
+      gain: [1.04, 1.09, 0.9],
       lift: [0.004, 0.003, 0.001],
       gamma: [0.96, 0.97, 1.05],
     },
@@ -372,7 +386,12 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
       // cut is eased and the sodium moves into the split-tone HIGHLIGHTS,
       // which land on the lit rig and leave the dark sea to its cold shadow
       // tint. Warmth on the metal, not on the water.
-      gain: [1.14, 0.98, 0.91],
+      // Pass 79 separation pass: red 1.14 -> 1.17 and green 0.98 -> 0.95.
+      // BLUE IS DELIBERATELY LEFT AT 0.91 — the third capture round above
+      // measured 0.84 draining the open ocean from teal to grey-mauve, and
+      // that finding still stands. Sodium separation is bought from the
+      // red/green ratio, which the sea barely uses, not from the blue cut.
+      gain: [1.17, 0.95, 0.91],
       lift: [0.005, 0.0035, 0.002],
       gamma: [0.93, 1, 1.03],
     },
@@ -411,21 +430,27 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
       density: 1.1,
     },
   }),
-  // Warm print training range: bone-paper light, ink shadows, burnt-orange
-  // lane neon. This entry USED to be the deliberate neutral control — the
-  // absence of a cast was its identity — but the owner read its cool concrete
-  // atmosphere and cyan neon as the old deck palette one more time (third
-  // artstyle rejection), so the facility now joins the warm bone/ink/
-  // burnt-orange print direction the UI sheets moved to. It stays the QUIET
-  // warm arena: saturation under neutral, no linear contrast gain (the dim
-  // upper walls sit below 0.5 linear and must not darken), tiny vignette.
-  // Separation from the other warm arenas is by MATERIAL of the cast, not
-  // loudness: bone (red up, green held) rather than acres' cream (green up
-  // WITH red), ink-sepia shadows rather than rustworks' cold offshore cyan,
-  // and a lower saturation floor than either.
+  // THE NEUTRAL CONTROL. Gun range is the one arena with NO place-cast, and
+  // that absence is its identity: a clinical facility is what every other
+  // arena's cast is measured against.
+  //
+  // GOTCHA — do not "warm this up". A pass once moved the facility into the
+  // warm bone/ink/burnt-orange print direction the UI sheets use, and it broke
+  // two properties at once: the neutral-probe red/blue split (pinned in
+  // art-direction.test.ts to stay within one 8-bit step) and this arena's
+  // distinctness from rustworks-1v1, because a warm facility IS a quiet
+  // rustworks. That change was reverted; only its comment survived, telling
+  // the next reader to redo it. The values below are the reverted, neutral
+  // ones and the test is the authority. The print direction belongs on the
+  // UI sheets and on the arenas that have a place to express — not here.
+  //
+  // It stays QUIET as well as neutral: saturation under 1, no linear contrast
+  // gain (the dim upper walls sit below 0.5 linear and must not darken), tiny
+  // vignette. The Pass 79 separation pass deliberately moved every OTHER
+  // arena and left this entry byte-for-byte alone.
   'gun-range': frozen({
     id: 'gun-range',
-    brief: 'Clean neutral training facility â€” clinical white light, zero place-cast.',
+    brief: 'Clean neutral training facility — clinical white light, zero place-cast.',
     cdl: {
       gain: [0.985, 1, 1.02],
       lift: [0.0035, 0.003, 0],
