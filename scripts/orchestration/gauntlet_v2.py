@@ -169,9 +169,16 @@ def main():
     deadline = time.time() + args.hours * 3600
     os.makedirs(LOGDIR, exist_ok=True)
 
-    # Capture the floor once, from the tree as it stands now.
-    sh([sys.executable, GATE, "capture"], timeout=3600)
-    log("regression floor captured")
+    # The floor is a HIGH-WATER MARK, not a snapshot of "whatever we have now". Capturing
+    # on every launch would bless whatever damage the previous run left - the last floor
+    # was taken mid-run and recorded tsc_clean:false with 20 failures, which would have
+    # made a currently-broken tree look acceptable forever. Capture only if none exists.
+    floor = os.path.join(REPO, "artifacts", "regression-floor.json")
+    if os.path.exists(floor):
+        log(f"using existing regression floor at {floor} (not re-capturing)")
+    else:
+        sh([sys.executable, GATE, "capture"], timeout=3600)
+        log("no floor existed; captured one")
 
     round_no = 0
     cursor = 0
