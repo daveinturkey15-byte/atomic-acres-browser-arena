@@ -74,16 +74,25 @@ describe('Pass 66 command shell', () => {
     expect(markup).toContain('pass65-firearms/m4a1-hero-quarter.webp');
   });
 
-  it('exposes four simple graphics modes and keeps WebGPU tuning under Advanced Graphics', () => {
+  // Was "four simple graphics modes". The owner asked for a fifth on 2026-08-24: "would be
+  // great to have a 4th graphics mode above performance ... plus extra RTX things like
+  // raytracing", so this test pinned an intent he has since overridden. Re-pinned, not
+  // relaxed: the list is still exact and ordered, and now also asserts the honest NAME.
+  // It must never ship as "RTX" — no browser exposes a ray-tracing pipeline or RT cores,
+  // so that label would be a claim the build cannot back.
+  it('exposes five simple graphics modes and keeps WebGPU tuning under Advanced Graphics', () => {
     const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
     const presetMarkup = markup.match(/<select id="graphics-profile">([\s\S]*?)<\/select>/)?.[1] ?? '';
     expect([...presetMarkup.matchAll(/<option value="([^"]+)">([^<]+)<\/option>/g)]
       .map((match) => [match[1], match[2]])).toEqual([
       ['high', 'QUALITY'],
       ['performance', 'PERFORMANCE'],
+      ['raytraced', 'RAY TRACED'],
       ['max', 'MAX'],
       ['custom', 'CUSTOM'],
     ]);
+    expect(presetMarkup, 'no browser exposes RT cores; RTX would be an unbackable claim')
+      .not.toMatch(/RTX/i);
     expect(markup).toContain('id="advanced-graphics"');
     expect(markup).toContain('ADVANCED GRAPHICS');
     expect(markup).toMatch(/id="graphics-target-fps"[^>]+type="range"[^>]+min="30" max="360"/);
