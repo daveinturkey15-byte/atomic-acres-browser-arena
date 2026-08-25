@@ -122,9 +122,15 @@ const DEFAULT_TSL_GRAPHICS_OPTIONS: Pass65TslGraphicsOptions = Object.freeze({
  */
 export function pass64LinearSourceStages(
   graphics: Pass65TslGraphicsOptions = DEFAULT_TSL_GRAPHICS_OPTIONS,
+  // HF-401: when the graph exists, pass the stages it ACTUALLY BUILT. The
+  // options alone cannot answer whether the shaft stage is in the chain,
+  // because that also depends on the committed arena's sun casting shadows.
+  // Callers that run before the graph exists (the pre-seed in legacy-main) omit
+  // it and get the request, which is the best answer available at that point.
+  builtOptionalStages?: readonly string[],
 ): readonly string[] {
   const screenSpace = graphics.screenSpace ?? SCREEN_SPACE_POST_DISABLED;
-  const optional = screenSpacePostStages(screenSpace);
+  const optional = builtOptionalStages ?? screenSpacePostStages(screenSpace);
   const stages = ['scene-pass-linear-hdr'];
   if (optional.includes('motion-blur-velocity-smear')) stages.push('motion-blur-velocity-smear');
   if (optional.includes('ssgi-screen-space-bounce-add')) stages.push('ssgi-screen-space-bounce-add');
@@ -994,19 +1000,43 @@ function configureHdrPipeline(
     // upstream depthAwareBlend helper: that helper mixes toward a flat colour,
     // which at shaft strength replaces a silhouette with solid light. Adding a
     // guarded, gain-capped shaft can brighten a pixel but can never delete one.
-    const hdrWithShafts = screenSpace.shaftLight
-      ? hdrWithBloom.add(screenSpace.shaftLight.mul(depthEdgeGuard))
-      : hdrWithBloom;
-    const linearHdr = screenSpace.applyDepthOfField(
-      vec4(hdrWithShafts, gradedSource.a) as unknown as Node<'vec4'>,
-    );
-    const linearSourceStages = pass64LinearSourceStages(graphics);
-    renderPipeline.outputNode = linearHdr;
+    // HF-401: the shaft term is the ONE part of this expression whose presence
+    // is arena-scoped rather than settings-scoped, because upstream
+    // `GodraysNode` can only be built against a light that casts shadows and
+    // the arena visual definition decides that per map. Everything else here —
+    // the scene pass, its MRT, GTAO, the bloom chain — is settings-scoped and
+    // is deliberately NOT rebuilt when the shafts come and go.
+    const composeLinearHdr = (): Node<'vec4'> => {
+      const shaftLight = screenSpace.shaftLight();
+      // Shafts reuse the bloom path's depth-discontinuity guard rather than the
+      // upstream depthAwareBlend helper: that helper mixes toward a flat colour,
+      // which at shaft strength replaces a silhouette with solid light. Adding a
+      // guarded, gain-capped shaft can brighten a pixel but can never delete one.
+      const hdrWithShafts = shaftLight
+        ? hdrWithBloom.add(nodeObject(shaftLight).mul(depthEdgeGuard))
+        : hdrWithBloom;
+      return screenSpace.applyDepthOfField(
+        vec4(hdrWithShafts, gradedSource.a) as unknown as Node<'vec4'>,
+      );
+    };
+    // The grade chain's order contract has to describe the graph that is
+    // actually installed, so the stage list is rebuilt from what the
+    // screen-space graph BUILT, never from what the settings asked for.
+    const currentLinearSourceStages = (): readonly string[] =>
+      pass64LinearSourceStages(graphics, screenSpace.stages());
+    let linearSourceStages = currentLinearSourceStages();
+    const installComposite = (): void => {
+      renderPipeline.outputNode = composeLinearHdr();
+      renderPipeline.needsUpdate = true;
+      linearSourceStages = currentLinearSourceStages();
+      installedFilmicGradeChain(renderPipeline)?.setLinearSourceStages(linearSourceStages);
+    };
+    renderPipeline.outputNode = composeLinearHdr();
     renderPipeline.needsUpdate = true;
     return {
       scenePass,
       screenSpace,
-      linearSourceStages,
+      get linearSourceStages() { return linearSourceStages; },
       applyDefinition(next) {
         const sceneGrade = composeArtDirectedSceneGrade(
           next.colorPipeline.grade,
@@ -1015,6 +1045,12 @@ function configureHdrPipeline(
         saturation.value = sceneGrade.saturation;
         contrast.value = sceneGrade.contrast;
         pushArtDirectionToChain(next.id);
+        // The committing arena has already installed its sun by the time a
+        // definition is applied, so this is where the shaft stage learns
+        // whether it has a shadow map to raymarch. Recompose only when the
+        // answer changed; a recompose is a pipeline rebuild and this runs
+        // inside the paused arena-transition window on purpose.
+        if (screenSpace.refreshShaftStage()) installComposite();
       },
       applyGraphics(next) {
         emissiveBloom.strength.value = next.post.bloomStrength;
@@ -1027,6 +1063,7 @@ function configureHdrPipeline(
             gtaoPass.radius.value = next.ambientOcclusion.radius;
           }
           screenSpace.applyRuntime(next.screenSpace ?? SCREEN_SPACE_POST_DISABLED);
+          if (screenSpace.refreshShaftStage()) installComposite();
         },
         beforeRender() {
           screenSpace.beforeRender();
@@ -1162,7 +1199,22 @@ export function createPass64TslSceneSystems(
       // cannot be turned on live, so telemetry reports the intersection of the
       // constructed topology and the live request rather than the request.
       screenSpace: Object.freeze({
-        godrays: screenSpaceTelemetry(constructedScreenSpace.godrays, liveScreenSpace().godrays),
+        // HF-401: the shaft stage answers from the BUILT graph, not from the
+        // constructed request. It is the one stage whose presence is decided
+        // per arena, so `enabled: true` here used to be published on gun-range
+        // while three had silently replaced the shaft material with a default
+        // one. The reason string travels with it so the refusal is nameable.
+        godrays: Object.freeze({
+          ...screenSpaceTelemetry(constructedScreenSpace.godrays, liveScreenSpace().godrays),
+          enabled: hdr.screenSpace.shaftStage().built,
+          unavailableReason: hdr.screenSpace.shaftStage().unavailableReason,
+          // What the composite actually received on the last presented frame,
+          // so a gate can tell "shafts are on" from "shafts are on and
+          // reaching the picture". A getter rather than a snapshot: this block
+          // is republished on definition/graphics changes, not per frame, and
+          // a per-frame republish would allocate inside the render loop.
+          get effectiveAdditiveGain() { return hdr.screenSpace.shaftStage().effectiveAdditiveGain; },
+        }),
         reflections: screenSpaceTelemetry(constructedScreenSpace.reflections, liveScreenSpace().reflections),
         globalIllumination: screenSpaceTelemetry(
           constructedScreenSpace.globalIllumination,
@@ -1191,7 +1243,10 @@ export function createPass64TslSceneSystems(
       ...graphics.ambientOcclusion,
     }),
     screenSpace: constructedScreenSpace,
-    linearSourceStages: hdr.linearSourceStages,
+    // A getter, not a snapshot: the shaft stage can be added or removed by an
+    // arena commit, and a frozen list would keep asserting a stage order the
+    // installed pipeline no longer has.
+    get linearSourceStages() { return hdr.linearSourceStages; },
     setAdaptiveScreenSpaceBudget: (pixelRatioCap, requestedPixelRatioCap) => {
       adaptedScreenSpace = adaptScreenSpacePostForPressure(requestedScreenSpace, {
         pixelRatioCap,

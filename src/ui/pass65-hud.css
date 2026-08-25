@@ -14,11 +14,11 @@
     --hud-weapon-width: clamp(300px, 19vw, 400px);
     --hud-support-width: clamp(246px, 14vw, 360px);
     --hud-panel-strong: rgba(2, 10, 15, 0.92);
-    --hud-panel-soft: rgba(4, 17, 23, 0.76);
-    --hud-panel-quiet: rgba(3, 13, 18, 0.64);
-    --hud-text: #effcf9;
-    --hud-muted: #afc3c5;
-    --hud-dim: #81969a;
+    --hud-panel-soft: rgba(25, 12, 4, 0.76);
+    --hud-panel-quiet: rgba(19, 9, 3, 0.64);
+    --hud-text: #fdf8f5;
+    --hud-muted: #c5beb7;
+    --hud-dim: #9b9186;
     --hud-cyan: #66ebe1;
     --hud-amber: #f2b74f;
     --hud-coral: #ff776d;
@@ -157,7 +157,7 @@
     padding: 8px 12px;
     border: 0;
     border-left: 2px solid var(--hud-amber);
-    background: linear-gradient(90deg, var(--hud-panel-strong), rgba(3, 13, 18, 0.46));
+    background: linear-gradient(90deg, var(--hud-panel-strong), rgba(19, 9, 3, 0.46));
     color: var(--hud-muted);
     font: 800 10px/1.2 var(--ui-copy);
     letter-spacing: 0.13em;
@@ -268,7 +268,7 @@
   }
 
   .health-track i {
-    background: linear-gradient(90deg, var(--hud-cyan), #dff2d1);
+    background: linear-gradient(90deg, var(--hud-cyan), #f5ebdd);
     box-shadow: 0 0 12px rgba(102, 235, 225, 0.28);
   }
 
@@ -386,7 +386,7 @@
     gap: 2px 7px;
     overflow: hidden;
     border: 0;
-    border-left: 2px solid rgba(175, 195, 197, 0.22);
+    border-left: 2px solid rgba(197, 190, 183, 0.22);
     background: rgba(1, 8, 11, 0.5);
   }
 
@@ -403,7 +403,7 @@
     width: 26px;
     height: 24px;
     border: 0;
-    border-bottom: 2px solid rgba(175, 195, 197, 0.4);
+    border-bottom: 2px solid rgba(197, 190, 183, 0.4);
     background: rgba(255, 255, 255, 0.05);
     color: var(--hud-text);
     font: 900 13px/1 var(--ui-display);
@@ -476,7 +476,7 @@
     right: auto;
     bottom: clamp(184px, 13vh, 280px);
     width: min(420px, calc(100vw - 32px));
-    border-left: 3px solid #66ebe1;
+    border-left: 3px solid var(--ui-signal, #b4531c);
   }
 
   /* Keep an unobtrusive keyboard affordance after live-match messages fade. */
@@ -510,7 +510,7 @@
     padding: 10px 12px;
     transform: none;
     border: 1px solid var(--ui-line-strong);
-    border-left: 3px solid var(--ui-cyan);
+    border-left: 3px solid var(--ui-signal);
     background: rgba(255, 255, 255, 0.92);
     box-shadow: none;
     color: var(--ui-text);
@@ -518,7 +518,7 @@
   }
 
   #text-chat[data-context='lobby'] header strong {
-    color: var(--ui-cyan);
+    color: var(--ui-signal);
   }
 
   #text-chat[data-context='lobby'] header small,
@@ -846,7 +846,7 @@
     padding: 6px 10px;
     border: 1px solid rgba(101, 255, 168, 0.28);
     border-left: 3px solid rgba(101, 255, 168, 0.72);
-    background: rgba(2, 20, 25, 0.72);
+    background: rgba(29, 14, 4, 0.72);
     font: 800 clamp(10px, 0.56vw, 13px)/1.2 Inter, system-ui, sans-serif;
     letter-spacing: clamp(0.04em, 0.08vw, 0.1em);
     text-align: center;
@@ -859,7 +859,7 @@
   #support-combat-feedback[data-awaiting-operation="true"] #support-control-action {
     border-color: rgba(255, 157, 36, 0.5);
     border-left-color: var(--p66-amber-bright, #ff9d24);
-    background: linear-gradient(90deg, rgba(255, 135, 24, 0.18), rgba(4, 20, 25, 0.78) 28%, rgba(4, 20, 25, 0.78));
+    background: linear-gradient(90deg, rgba(255, 135, 24, 0.18), rgba(29, 14, 5, 0.78) 28%, rgba(29, 14, 5, 0.78));
     color: #ffe6bd;
     box-shadow: inset 0 0 16px rgba(255, 157, 36, 0.06);
   }
@@ -995,7 +995,7 @@
     gap: 12px;
     padding: 8px 14px;
     border-block: 1px solid rgba(120, 255, 170, 0.42);
-    color: #d9ffea;
+    color: #f6ede2;
     background: linear-gradient(90deg, transparent, rgba(2, 16, 10, 0.72) 18%, rgba(2, 16, 10, 0.72) 82%, transparent);
     transform: translateX(-50%);
     text-shadow: 0 1px 5px #000;
@@ -1038,7 +1038,7 @@
     overflow: hidden;
     font: 900 clamp(18px, 2.6vw, 28px)/1 Inter, system-ui, sans-serif;
     text-overflow: ellipsis;
-    color: #eafff3;
+    color: #f8f0e6;
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
   }
 
@@ -1176,7 +1176,7 @@
     padding: clamp(7px, 0.55vw, 13px) clamp(9px, 0.68vw, 16px);
     border-right: 2px solid rgba(126, 255, 173, 0.82);
     background: rgba(2, 14, 10, 0.46);
-    color: #eafff3;
+    color: #f8f0e6;
     text-align: right;
   }
 
@@ -1188,7 +1188,7 @@
     border: 1px solid rgba(126, 255, 173, 0.75);
     border-radius: 3px;
     font: 900 clamp(11px, 0.86vw, 18px)/1 Inter, system-ui, sans-serif;
-    color: #eafff3;
+    color: #f8f0e6;
     background: rgba(2, 24, 15, 0.72);
   }
   #gunner-control-strip .gunner-control span {

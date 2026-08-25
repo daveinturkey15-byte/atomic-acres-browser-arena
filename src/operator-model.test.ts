@@ -4,6 +4,7 @@ import { operatorBodyColour, operatorSkinPalette } from './operator-skin-catalog
 import {
   BOT_EMISSIVE_BRIGHTNESS_SCALE,
   FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY,
+  FIRST_PERSON_ARM_NORMAL_SCALE,
   RIGGED_OPERATOR_RUNTIME_ACTION_NAMES,
   applyBotEmissiveBrightness,
   createOperatorInstanceMaterialResolver,
@@ -703,5 +704,58 @@ describe('HF-388: first-person arm albedo is exposure-corrected, not palette-raw
       applyFirstPersonArmSkinMaterial(material, name, 'navalops');
       expect(material.metalnessMap, name).toBeInstanceOf(THREE.Texture);
     }
+  });
+});
+
+describe('HF-388 first-person arm surface detail contract', () => {
+  const SLEEVE_NAME = 'MAT_Pass65_Arms_Sleeve_PBR';
+  const GLOVE_NAME = 'MAT_Pass65_Arms_Glove_PBR';
+
+  /**
+   * The crushed-albedo fix deliberately DROPS the base-colour map for sleeve
+   * and glove, which makes the normal map the only spatial signal those two
+   * materials have left. The shipped GLB delivers it at normalScale 0.68-0.72,
+   * i.e. attenuated, and the result rendered as a smooth latex tube with no
+   * weave or wrinkle at all. Measured local detail over arm pixels on real
+   * WebGPU at Nuke Town sunset: 8.42 at the authored scale, 9.24 at 2.4.
+   */
+  it('drives the authored arm normal map above the attenuation the asset ships', () => {
+    // Strictly stronger than the authored 0.72, and short of the 4.0 that
+    // measured higher but reads as ropey synthetic fabric rather than cloth.
+    expect(FIRST_PERSON_ARM_NORMAL_SCALE).toBeGreaterThan(1);
+    expect(FIRST_PERSON_ARM_NORMAL_SCALE).toBeLessThanOrEqual(3.2);
+
+    for (const name of [SLEEVE_NAME, GLOVE_NAME]) {
+      const material = new THREE.MeshStandardMaterial({ name });
+      material.normalMap = new THREE.Texture();
+      material.normalScale.set(0.724, 0.724);
+      expect(applyFirstPersonArmSkinMaterial(material, name, 'default')).toBe(true);
+      expect(material.normalScale.x, name).toBe(FIRST_PERSON_ARM_NORMAL_SCALE);
+      expect(material.normalScale.y, name).toBe(FIRST_PERSON_ARM_NORMAL_SCALE);
+    }
+  });
+
+  /**
+   * A skin change re-enters the same painter. If the scale were applied only
+   * where materials are first cloned, switching operator would hand that one
+   * player a smooth arm again - exactly the class of bug this project keeps
+   * shipping, where a system is correct on the path someone tested and absent
+   * on the path the player takes.
+   */
+  it('keeps the normal scale through a later skin repaint', () => {
+    const material = new THREE.MeshStandardMaterial({ name: SLEEVE_NAME });
+    material.normalMap = new THREE.Texture();
+    applyFirstPersonArmSkinMaterial(material, SLEEVE_NAME, 'default');
+    material.normalScale.set(0.724, 0.724);
+    applyFirstPersonArmSkinMaterial(material, SLEEVE_NAME, 'navalops');
+    expect(material.normalScale.x).toBe(FIRST_PERSON_ARM_NORMAL_SCALE);
+  });
+
+  it('leaves a material with no authored normal map alone', () => {
+    const material = new THREE.MeshStandardMaterial({ name: SLEEVE_NAME });
+    material.normalScale.set(1, 1);
+    applyFirstPersonArmSkinMaterial(material, SLEEVE_NAME, 'default');
+    expect(material.normalMap).toBeNull();
+    expect(material.normalScale.x).toBe(1);
   });
 });

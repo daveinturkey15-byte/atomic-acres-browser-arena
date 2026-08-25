@@ -76,11 +76,17 @@ function buildPreviewEnvironment(renderer: THREE.WebGLRenderer): THREE.Texture |
   canvas.height = 128;
   const context = canvas.getContext('2d');
   if (!context) return null;
+  // Pass 79 sweep: the preview's key light was a cold blue studio sky, so the
+  // operator on the OPERATOR tab was lit in the temperature of the deck the
+  // owner rejected - the one surface on that tab where the palette is carried
+  // by light rather than by CSS. Each stop keeps its exact WCAG relative
+  // luminance, so the exposure, the falloff and every skin's readable value are
+  // unchanged; only the colour of the light moves onto the warm deck.
   const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, '#cfe6f2');
-  gradient.addColorStop(0.45, '#8fa6b4');
-  gradient.addColorStop(0.62, '#4a5a63');
-  gradient.addColorStop(1, '#171f24');
+  gradient.addColorStop(0, '#f3dfd1');
+  gradient.addColorStop(0.45, '#aca196');
+  gradient.addColorStop(0.62, '#60564c');
+  gradient.addColorStop(1, '#271c14');
   context.fillStyle = gradient;
   context.fillRect(0, 0, canvas.width, canvas.height);
   const equirect = new THREE.CanvasTexture(canvas);

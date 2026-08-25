@@ -1,0 +1,12 @@
+[
+ {"id":"z0-shipped","fill":17.5,"emissive":null,"albedo":1},
+ {"id":"z1-fill0-shippedemis","fill":0,"emissive":null,"albedo":1},
+ {"id":"z2-fill0-emis0","fill":0,"emissive":0,"albedo":1},
+ {"id":"z3-fill0-emis0-env0","fill":0,"emissive":0,"albedo":1,"envMapIntensity":0},
+ {"id":"z4-black-fill0-emis0","fill":0,"emissive":0,"albedo":0},
+ {"id":"z5-black-fill17p5-emis0","fill":17.5,"emissive":0,"albedo":0},
+ {"id":"z6-env0-fill17p5","fill":17.5,"emissive":null,"albedo":1,"envMapIntensity":0},
+ {"id":"z7-fill3-cap","fill":3,"emissive":0.18,"albedo":1},
+ {"id":"z8-fill3-bypass","fill":3,"emissive":null,"albedo":1},
+ {"id":"z9-fill5-cap","fill":5,"emissive":0.18,"albedo":1}
+]

@@ -487,3 +487,219 @@ describe('Pass 79 reskin completion - no surface left on the rejected deck', () 
     expect(css, 'the --aqua team token must not be retuned by this sheet').not.toMatch(/--aqua:[^;]/);
    });
 });
+
+/**
+ * Enclosing selector chain for every byte offset in a stylesheet, by one brace
+ * walk. A window-based lookbehind silently returns an empty selector inside a
+ * long rule, which would let a semantic rule pass unchecked - the exact way a
+ * colour audit lies to itself.
+ */
+function selectorChains(css: string): Array<[number, number, string]> {
+  const spans: Array<[number, number, string]> = [];
+  const stack: string[] = [];
+  let last = 0;
+  for (const match of css.matchAll(/[{}]/gu)) {
+    const at = match.index!;
+    if (match[0] === '{') {
+      const head = css.slice(last, at).replace(/\/\*[\s\S]*?\*\//gu, ' ').split(';').pop()!.trim();
+      spans.push([last, at, stack.join(' ')]);
+      stack.push(head);
+    } else {
+      spans.push([last, at, stack.join(' ')]);
+      stack.pop();
+    }
+    last = at + 1;
+  }
+  spans.push([last, css.length, stack.join(' ')]);
+  return spans;
+}
+
+/** HSL hue in degrees. */
+function hueOf([red, green, blue]: [number, number, number]): number {
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  if (max === min) return 0;
+  const span = max - min;
+  let hue: number;
+  if (max === red) hue = ((green - blue) / span) % 6;
+  else if (max === green) hue = (blue - red) / span + 2;
+  else hue = (red - green) / span + 4;
+  hue *= 60;
+  return hue < 0 ? hue + 360 : hue;
+}
+
+/**
+ * Every colour literal in a sheet whose BLUE channel beats its RED - the
+ * mechanical definition of "still on the rejected cold deck" - paired with the
+ * selector that declares it.
+ */
+function coldDeclarations(css: string): Array<{ value: string; rgb: [number, number, number]; selector: string }> {
+  const spans = selectorChains(css);
+  const found: Array<{ value: string; rgb: [number, number, number]; selector: string }> = [];
+  for (const match of css.matchAll(/#[0-9a-fA-F]{6}\b|rgba?\([^()]*\)/gu)) {
+    const token = match[0];
+    let rgb: [number, number, number];
+    if (token.startsWith('#')) {
+      rgb = parseHex(token);
+    } else {
+      const parts = /rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/u.exec(token);
+      if (!parts) continue;
+      rgb = [Number(parts[1]), Number(parts[2]), Number(parts[3])];
+    }
+    if (rgb[2] - rgb[0] < 8 || Math.max(...rgb) < 18) continue;
+    const at = match.index!;
+    const span = spans.find(([start, end]) => at >= start && at <= end);
+    found.push({ value: token, rgb, selector: span ? span[2] : '' });
+  }
+  return found;
+}
+
+describe('Pass 79 sweep - every surface is on the warm deck, or is carrying meaning', () => {
+  /*
+   * The three previous reskins each converted the surfaces they happened to
+   * visit and left the rest, so the owner kept meeting the old deck on the
+   * screens nobody opened while designing: the pause menu, the after-action
+   * scoreboard, the release-notes dialog, the killstreak panel, the lobby.
+   *
+   * This is deliberately not another list of rejected hex values. A list only
+   * forbids the values somebody already found. The rule below forbids the
+   * PROPERTY - a colour whose blue channel beats its red - everywhere in the
+   * swept sheets, and then names the small set of families where cold is
+   * MEANING rather than style. Any new cold value fails unless it belongs to
+   * one of those families, which is strictly stronger than the per-sheet value
+   * lists above and subsumes them.
+   */
+  const SWEPT = [
+    './tactical-ui.css',
+    './pass65-hud.css',
+    './pass66-overhaul.css',
+    './pass66-readability.css',
+    './pass74-visual-refresh.css',
+    './pass75-hud-redesign.css',
+    './pass75-menu-redesign.css',
+    './pass77-command-shell.css',
+    './pass77-instrument-hud.css',
+    './project-map-dialog.css',
+    './advanced-graphics.css',
+  ] as const;
+
+  /** Team identity and friend/foe discrimination. Colour IS the data here. */
+  const SEMANTIC_TONES = new Set([
+    '0,109,116',   // --ui-cyan, the AQUA team colour
+    '88,227,220',  // --aqua as authored in style.css
+    '102,235,225', // --hud-cyan, the FRIENDLY contact tone
+    '102,238,230', // --hud-cyan as retuned by the overhaul sheet
+    '15,111,118',  // --p77-data, the one deliberate cold data tone in Pass 77
+  ]);
+
+  /** Rules where friend/foe or map-contact colour is the readout itself. */
+  const SEMANTIC_SELECTOR = /friendly|hostile|enemy|contact|blip|marker|radar|team|aqua|squad|latency/iu;
+
+  /** The health / good / ready / support state family. */
+  const isStateGreen = (rgb: [number, number, number]) => {
+    const hue = hueOf(rgb);
+    return hue >= 118 && hue < 172;
+  };
+
+  for (const sheet of SWEPT) {
+    it(`leaves no styling colour on the cold deck in ${sheet}`, () => {
+      const offenders = coldDeclarations(declarationsOnly(sheet)).filter((entry) => {
+        if (isStateGreen(entry.rgb)) return false;
+        if (SEMANTIC_TONES.has(entry.rgb.join(','))) return false;
+        if (SEMANTIC_SELECTOR.test(entry.selector)) return false;
+        return true;
+      });
+      expect(
+        offenders.map((entry) => `${entry.value} in { ${entry.selector.slice(-70)} }`),
+        `${sheet} still paints chrome on the rejected cold deck`,
+      ).toEqual([]);
+    });
+  }
+
+  it('splits the chrome accent off the team colour instead of retuning it', () => {
+    // --ui-cyan was doing two incompatible jobs: it was the AQUA team token AND
+    // the accent 37 chrome rules read directly, so the deck could never leave
+    // teal without breaking team identity. Measured live before the split: tab
+    // indicators, panel accent rails, the primary action, panel headings, the
+    // HUD console edges and the after-action strapline all computed
+    // rgb(0, 109, 116).
+    const tactical = declarationsOnly('./tactical-ui.css');
+    expect(tactical).toMatch(/--ui-signal:\s*#[0-9a-f]{6}/u);
+
+    // Team identity is untouched, and stays defined in terms of --ui-cyan.
+    expect(tactical).toContain('--aqua: var(--ui-cyan)');
+    expect(tactical, 'the team token itself must not be retuned').toMatch(/--ui-cyan:\s*#006d74/u);
+
+    // Nothing may read the team token as chrome again. The only surviving
+    // direct reads are the --aqua alias and the one health bar, whose fill is
+    // a state readout rather than chrome.
+    const reads = [...tactical.matchAll(/[^;{}]*var\(--ui-cyan\)[^;{}]*/gu)].map((m) => m[0].trim());
+    expect(reads).toHaveLength(2);
+    expect(reads.some((entry) => entry.includes('--aqua'))).toBe(true);
+    expect(reads.some((entry) => entry.includes('linear-gradient'))).toBe(true);
+
+    // ...and the signal is at least as luminous as the teal it replaced, so no
+    // edge or label lost contrast in the swap.
+    const signal = hexOf(tactical, '--ui-signal');
+    expect(signal).not.toBeNull();
+    expect(relativeLuminance(signal!)).toBeGreaterThanOrEqual(relativeLuminance([0, 109, 116]));
+  });
+
+  it('brings the surfaces src/style.css owns across without editing that sheet', () => {
+    // src/style.css is outside UI-sheet ownership (the Pass 79 high-score
+    // override records the same boundary), and Vite emits it as its own chunk
+    // that index.html links AFTER this bundle - so `@layer legacy` rules there
+    // are beaten by any unlayered rule here, while its ONE unlayered block
+    // (the killstreak cards) needs real specificity instead.
+    const shell = declarationsOnly('./pass77-command-shell.css');
+
+    // The pause menu: the shell surface a player sees most often in a session,
+    // and the only one still repainted cold near-white on pause.
+    for (const surface of ['.command-header', '.command-rail', '.command-workspace',
+      '.arena-command', '.deployment-manifest']) {
+      expect(shell, `paused-match ${surface} is still on the old paper`)
+        .toContain(`#menu[data-lifecycle-surface='paused-match'] ${surface}`);
+    }
+
+    // The after-action scoreboard and the lobby roster.
+    expect(shell).toContain('#roster-list small');
+    expect(shell).toContain('#roster-list em');
+    expect(shell).toContain('.lobby-player strong');
+
+    // The killstreak panel, which needs the panel id because its rules in
+    // style.css are unlayered and load after this bundle.
+    for (const rule of ['#menu-panel-streaks .killstreak-slot-card',
+      '#menu-panel-streaks .killstreak-slot-card > span',
+      '#menu-panel-streaks .killstreak-slot-card select',
+      '#menu-panel-streaks .killstreak-slot-card small']) {
+      expect(shell, `${rule} is missing, so the killstreak panel stays aqua`).toContain(rule);
+    }
+
+    // The release-notes dialog read the team token directly for its chips and
+    // entry rails; those are chrome, not a team, and take the deck accent.
+    expect(shell).toContain('.changelog-entry-pass > b');
+    expect(shell).toContain('#changelog-list > li');
+  });
+
+  it('carries the sweep into the UI modules that paint colour from script', () => {
+    // A stylesheet-only sweep would have missed these two, and both are on
+    // menu surfaces the owner opens: the killstreak showcase accent and the
+    // operator preview's key light.
+    const demo = readFileSync(new URL('./killstreak-demo-presentation.ts', import.meta.url), 'utf8');
+    for (const rejected of ['#70eee1', '#72e7ff', '#7be9de', '#79efe3', '#5ce9ff', '#8ef6df']) {
+      expect(demo, `cold killstreak accent ${rejected} is back`).not.toContain(rejected);
+    }
+    for (const match of demo.matchAll(/accent: '(#[0-9a-f]{6})'/gu)) {
+      const [red, , blue] = parseHex(match[1]!);
+      expect(blue, `killstreak accent ${match[1]} is still cold`).toBeLessThan(red);
+    }
+
+    const preview = readFileSync(new URL('./operator-preview.ts', import.meta.url), 'utf8');
+    const stops = [...preview.matchAll(/addColorStop\([^,]+,\s*'(#[0-9a-f]{6})'\)/gu)].map((entry) => entry[1]!);
+    expect(stops.length).toBeGreaterThanOrEqual(4);
+    for (const stop of stops) {
+      const [red, , blue] = parseHex(stop);
+      expect(blue, `operator preview light stop ${stop} is still a cold studio sky`).toBeLessThan(red);
+    }
+  });
+});

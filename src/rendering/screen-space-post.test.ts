@@ -277,3 +277,126 @@ describe('HF-398 ray-traced layer wiring', () => {
     expect(OPTIONAL_LINEAR_SOURCE_STAGES).toContain(RAY_TRACED_LIGHT_STAGE);
   });
 });
+
+describe('HF-401 shaft stage follows the arena sun that actually casts shadows', () => {
+  // THE DEFECT THIS PINS, and why every assertion here is about what the graph
+  // BUILT rather than what the settings asked for.
+  //
+  // Upstream `GodraysNode.setup()` dereferences `light.shadow.map.depthTexture`
+  // while it builds its fragment `Fn`. Three allocates `shadow.map` lazily,
+  // only for a light whose `castShadow` is true. gun-range authors
+  // `sunIntensity: 0`, legacy-main turns that into `sunLight.castShadow =
+  // false`, and the dereference throws. Three CATCHES that throw inside
+  // `Nodes.getForRender()`, logs `THREE.TSL: TypeError: Cannot read properties
+  // of null (reading 'depthTexture')` and rebuilds the render object against a
+  // BARE `NodeMaterial` — so the shaft quad rendered a default material into
+  // the godray target while telemetry still reported `enabled: true,
+  // unavailableReason: null`. Reproduced three times per transition at MAX and
+  // twice at HIGH on a production bundle, real WebGPU, RTX 5080.
+  //
+  // A guard alone would not be a fix: this post graph is built ONCE per page
+  // while `castShadow` is per arena, so refusing at construction and never
+  // reconsidering would delete the shafts from every arena in a session that
+  // happened to start on gun-range. The last two cases below are what stop
+  // that, and they are the ones a defensive early-return fails.
+  const graphicsWith = (screenSpace: ReturnType<typeof resolveScreenSpacePostRuntime>) => ({
+    principalSamples: 1 as const,
+    volumetricScale: 1,
+    ambientOcclusion: AMBIENT_OCCLUSION_OFF,
+    post: POST_DEFAULTS,
+    reflectionScale: 1,
+    reflectionQuality: 'high' as const,
+    environmentIntensity: 1,
+    screenSpace,
+  });
+  const SHAFTS_ONLY = resolveScreenSpacePostRuntime({
+    volumetricLightShafts: 'high', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+    depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off', rayTracing: 'off',
+  }, { shadowsEnabled: true });
+  const SHAFT_STAGE = 'godrays-volumetric-shaft-add';
+
+  const buildSystems = async (sun: THREE.DirectionalLight) => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    scene.add(sun);
+    const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['atomic-acres']()).definition;
+    const systems = createPass64TslSceneSystems(
+      scene, camera, renderPipeline, definition, graphicsWith(SHAFTS_ONLY), undefined, sun,
+    );
+    return { systems, definition };
+  };
+  const publishedShafts = (systems: { root: THREE.Group }) => (
+    (systems.root.userData.pass65AdvancedGraphics as {
+      screenSpace: {
+        godrays: { enabled: boolean; unavailableReason: string | null; effectiveAdditiveGain: number };
+      };
+    }).screenSpace.godrays
+  );
+
+  it('refuses the raymarch against a sun that casts no shadows, and names that reason', async () => {
+    const sun = shadowCastingSun();
+    sun.castShadow = false;
+    sun.intensity = 0;
+    const { systems } = await buildSystems(sun);
+    // The stage is absent from the installed graph AND from the order receipt
+    // the grade chain is told about, so the two cannot disagree.
+    expect(systems.linearSourceStages).not.toContain(SHAFT_STAGE);
+    const shafts = publishedShafts(systems);
+    expect(shafts.enabled).toBe(false);
+    // Named specifically. "Enable Sun shadows" would send the player to a
+    // setting that is already on and is not the problem.
+    expect(shafts.unavailableReason).toMatch(/arena's sun casts none/);
+    systems.update(16);
+    expect(publishedShafts(systems).effectiveAdditiveGain).toBe(0);
+    systems.dispose();
+  });
+
+  it('builds the raymarch when the sun does cast shadows', async () => {
+    const { systems } = await buildSystems(shadowCastingSun());
+    expect(systems.linearSourceStages).toContain(SHAFT_STAGE);
+    const shafts = publishedShafts(systems);
+    expect(shafts.enabled).toBe(true);
+    expect(shafts.unavailableReason).toBeNull();
+    systems.update(16);
+    expect(publishedShafts(systems).effectiveAdditiveGain)
+      .toBeCloseTo(SHAFTS_ONLY.godrays.additiveGain, 6);
+    systems.dispose();
+  });
+
+  it('adds the shafts back when a later arena commits a shadow-casting sun', async () => {
+    // A session that starts on gun-range must not lose sun shafts for the rest
+    // of the session. This is the case a defensive early-return cannot pass.
+    const sun = shadowCastingSun();
+    sun.castShadow = false;
+    const { systems, definition } = await buildSystems(sun);
+    expect(systems.linearSourceStages).not.toContain(SHAFT_STAGE);
+    sun.castShadow = true;
+    await systems.applyDefinition(definition);
+    expect(systems.linearSourceStages).toContain(SHAFT_STAGE);
+    expect(publishedShafts(systems).enabled).toBe(true);
+    expect(publishedShafts(systems).unavailableReason).toBeNull();
+    systems.update(16);
+    expect(publishedShafts(systems).effectiveAdditiveGain)
+      .toBeCloseTo(SHAFTS_ONLY.godrays.additiveGain, 6);
+    systems.dispose();
+  });
+
+  it('retires the shafts, and their gain, when a later arena commits a sunless one', async () => {
+    // The other direction is not cosmetic either: the built node keeps
+    // raymarching whatever `light.shadow.map` still holds, which after leaving
+    // an outdoor arena is that arena's shadow depth. Tinted by a white indoor
+    // sun at full gain, that is an additive wash over the whole frame.
+    const sun = shadowCastingSun();
+    const { systems, definition } = await buildSystems(sun);
+    expect(systems.linearSourceStages).toContain(SHAFT_STAGE);
+    sun.castShadow = false;
+    sun.intensity = 0;
+    await systems.applyDefinition(definition);
+    expect(systems.linearSourceStages).not.toContain(SHAFT_STAGE);
+    expect(publishedShafts(systems).enabled).toBe(false);
+    systems.update(16);
+    expect(publishedShafts(systems).effectiveAdditiveGain).toBe(0);
+    systems.dispose();
+  });
+});

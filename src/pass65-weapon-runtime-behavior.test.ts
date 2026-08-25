@@ -19,6 +19,7 @@ import {
   type WeaponViewmodelCatalogGpuPrewarmEntry,
 } from './weapon-presentation';
 import { WEAPON_IDS, type WeaponId } from './protocol';
+import { FIRST_PERSON_ARM_NORMAL_SCALE } from './operator-model';
 import {
   RUNTIME_WEAPON_RETENTION_LIMIT,
   webGlMatchBoundWeaponPrewarmCatalog,
@@ -1062,8 +1063,19 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(arms?.userData.armMaterialPresentationContract).toBe('authored-pbr-muted-emissive-warm-key-v1');
     const sleeveFixture = arms?.getObjectByName('authored-sleeve-material-fixture');
     expect(sleeveFixture).toBeInstanceOf(THREE.Mesh);
-    expect(((sleeveFixture as THREE.Mesh).material as THREE.MeshStandardMaterial).normalScale.toArray())
-      .toEqual([1, 1]);
+    // HF-388 follow-up. This previously pinned normalScale at the authored
+    // [1, 1] - "nothing rescales the arm normal map" - which is exactly the
+    // behaviour that changed: the shipped GLB delivers the arm normal map
+    // attenuated to ~0.72 and, with the crushed base-colour map deliberately
+    // dropped, that map is the sleeve's ONLY remaining surface detail, so it
+    // rendered as a smooth latex tube. Re-pinned at EQUAL strictness (still an
+    // exact equality on both components) plus a second assertion the old row
+    // did not make: that the rescale demonstrably HAPPENED, rather than the
+    // expectation merely tracking whatever the constant currently says.
+    const sleeveNormalScale = ((sleeveFixture as THREE.Mesh).material as THREE.MeshStandardMaterial).normalScale;
+    expect(sleeveNormalScale.toArray())
+      .toEqual([FIRST_PERSON_ARM_NORMAL_SCALE, FIRST_PERSON_ARM_NORMAL_SCALE]);
+    expect(sleeveNormalScale.x).toBeGreaterThan(1);
 
     presentation.melee();
     presentation.setMeleeCaptureProgress(0.42);

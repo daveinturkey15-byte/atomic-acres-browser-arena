@@ -178,19 +178,19 @@
    * single most dated thing a HUD can do, and it is what Pass 75 shipped.
    * Depth comes from the blur behind the glass, not from opacity.
    */
-  --p77-sheet-dense: rgb(9 25 33 / 0.80);
-  --p77-sheet-thin: rgb(6 18 26 / 0.40);
-  --p77-sheet-quiet-top: rgb(12 30 38 / 0.44);
-  --p77-sheet-quiet-bottom: rgb(3 11 16 / 0.30);
+  --p77-sheet-dense: rgb(35 20 10 / 0.80);
+  --p77-sheet-thin: rgb(26 14 6 / 0.40);
+  --p77-sheet-quiet-top: rgb(41 24 13 / 0.44);
+  --p77-sheet-quiet-bottom: rgb(16 8 3 / 0.30);
   /* Direction of the scrim. Overridden per cluster so every panel fades AWAY
      from its anchored screen edge. */
   --p77-fade: 176deg;
 
   /* Edges. Neutral by default so an accent edge can actually mean something. */
-  --p77-line: rgb(176 220 228 / 0.15);
-  --p77-line-lit: rgb(198 240 245 / 0.30);
-  --p77-sheen: rgb(224 252 255 / 0.15);
-  --p77-tick: rgb(176 220 228 / 0.34);
+  --p77-line: rgb(233 208 191 / 0.15);
+  --p77-line-lit: rgb(248 229 216 / 0.30);
+  --p77-sheen: rgb(253 245 240 / 0.15);
+  --p77-tick: rgb(233 208 191 / 0.34);
 
   /* Semantic accents. Each one has exactly one job. */
   --p77-friendly: var(--hud-cyan, #66ebe1);
@@ -262,8 +262,8 @@
  */
 #hud .hud-operator-console,
 #hud #weapon-block {
-  --p77-sheet-dense: rgb(11 30 39 / 0.88);
-  --p77-sheet-thin: rgb(5 15 22 / 0.52);
+  --p77-sheet-dense: rgb(42 24 12 / 0.88);
+  --p77-sheet-thin: rgb(22 12 5 / 0.52);
   border-color: var(--p77-line-lit);
 }
 
@@ -307,7 +307,7 @@
 #hud #map-heading,
 #hud #location-label {
   border-radius: 1px;
-  border: 1px solid rgb(176 220 228 / 0.10);
+  border: 1px solid rgb(233 208 191 / 0.10);
   background-color: rgb(1 8 12 / 0.42);
   background-image: linear-gradient(178deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0));
   box-shadow: none;
@@ -511,8 +511,8 @@
  */
 #hud .support-list b {
   border-radius: 1px;
-  border-left: 2px solid rgb(176 220 228 / 0.18);
-  background-image: linear-gradient(90deg, rgb(8 22 29 / 0.42), rgb(2 9 13 / 0.22));
+  border-left: 2px solid rgb(233 208 191 / 0.18);
+  background-image: linear-gradient(90deg, rgb(31 17 8 / 0.42), rgb(2 9 13 / 0.22));
   transition:
     border-left-color 150ms var(--p77-ease),
     background-color 150ms var(--p77-ease),
@@ -578,14 +578,14 @@
   border-radius: 1px;
   border-left: 2px solid var(--p77-line);
   padding-left: 8px;
-  background-image: linear-gradient(90deg, rgb(6 18 23 / 0.55) 0%, rgb(6 18 23 / 0) 88%);
+  background-image: linear-gradient(90deg, rgb(25 14 7 / 0.55) 0%, rgb(25 14 7 / 0) 88%);
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }
 
 #hud #killfeed > *:first-child {
   border-left-color: var(--p77-friendly);
-  background-image: linear-gradient(90deg, rgb(102 235 225 / 0.16) 0%, rgb(6 18 23 / 0) 88%);
+  background-image: linear-gradient(90deg, rgb(102 235 225 / 0.16) 0%, rgb(25 14 7 / 0) 88%);
 }
 
 /*
@@ -608,7 +608,7 @@
 #hud #damage-taken-feed > * {
   border-radius: 1px;
   padding-inline: 7px;
-  background-image: linear-gradient(270deg, rgb(6 18 26 / 0.60) 0%, rgb(6 18 26 / 0) 92%);
+  background-image: linear-gradient(270deg, rgb(26 14 6 / 0.60) 0%, rgb(26 14 6 / 0) 92%);
 }
 
 /* Damage dealt reads as gain, damage taken as threat. */
@@ -659,9 +659,9 @@
 #gunner-cockpit-hud .gunner-instruments,
 #gunner-cockpit-hud #gunner-control-strip {
   border-radius: var(--p77-radius, 2px);
-  border: 1px solid rgb(176 220 228 / 0.18);
-  background-image: linear-gradient(178deg, rgb(16 38 48 / 0.56) 0%, rgb(4 13 19 / 0.78) 100%);
-  box-shadow: 0 10px 26px rgb(0 0 0 / 0.34), inset 0 1px 0 rgb(224 252 255 / 0.14);
+  border: 1px solid rgb(233 208 191 / 0.18);
+  background-image: linear-gradient(178deg, rgb(51 31 17 / 0.56) 0%, rgb(19 10 4 / 0.78) 100%);
+  box-shadow: 0 10px 26px rgb(0 0 0 / 0.34), inset 0 1px 0 rgb(253 245 240 / 0.14);
   -webkit-backdrop-filter: blur(10px) saturate(1.4);
   backdrop-filter: blur(10px) saturate(1.4);
 }
@@ -890,10 +890,10 @@ html[data-reduced-sensory='true'] #hud #fps-counter,
 html[data-reduced-sensory='true'] #hud #pause-hint,
 html[data-reduced-sensory='true'] #hud #adrenaline-hud,
 html[data-reduced-sensory='true'] #hud #killfeed > * {
-  --p77-sheet-dense: rgb(8 22 30 / 0.94);
-  --p77-sheet-thin: rgb(3 11 16 / 0.88);
-  --p77-sheet-quiet-top: rgb(8 22 30 / 0.90);
-  --p77-sheet-quiet-bottom: rgb(3 11 16 / 0.84);
+  --p77-sheet-dense: rgb(31 17 8 / 0.94);
+  --p77-sheet-thin: rgb(16 8 3 / 0.88);
+  --p77-sheet-quiet-top: rgb(31 17 8 / 0.90);
+  --p77-sheet-quiet-bottom: rgb(16 8 3 / 0.84);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -923,10 +923,10 @@ html[data-reduced-sensory='true'] #hud .support-list b.ready {
   #hud #pause-hint,
   #hud #adrenaline-hud,
   #hud #killfeed > * {
-    --p77-sheet-dense: rgb(10 26 34 / 0.90);
-    --p77-sheet-thin: rgb(3 11 16 / 0.80);
-    --p77-sheet-quiet-top: rgb(10 26 34 / 0.86);
-    --p77-sheet-quiet-bottom: rgb(3 11 16 / 0.78);
+    --p77-sheet-dense: rgb(36 21 11 / 0.90);
+    --p77-sheet-thin: rgb(16 8 3 / 0.80);
+    --p77-sheet-quiet-top: rgb(36 21 11 / 0.86);
+    --p77-sheet-quiet-bottom: rgb(16 8 3 / 0.78);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -1042,7 +1042,7 @@ html[data-reduced-sensory='true'] #hud .support-list b.ready {
     ),
     radial-gradient(
       140% 100% at calc(50% - var(--hud-impact-chroma, 0) * 5%) 50%,
-      transparent 46%, rgb(40 210 255 / 0.34) 100%
+      transparent 46%, rgb(238 182 144 / 0.34) 100%
     );
   /* Never over the centre: the middle of the screen stays clear for aim. */
   -webkit-mask-image: radial-gradient(58% 58% at 50% 50%, transparent 30%, #000 78%);
@@ -1075,7 +1075,7 @@ html[data-reduced-sensory='true'] #hud .support-list b.ready {
     ),
     radial-gradient(
       150% 110% at calc(50% - var(--hud-impact-chroma, 0) * 7%) 50%,
-      transparent 40%, rgb(60 220 255 / 0.42) 100%
+      transparent 40%, rgb(241 193 161 / 0.42) 100%
     );
   /* A blast reaches further in toward the centre than a bullet does. */
   -webkit-mask-image: radial-gradient(66% 66% at 50% 50%, transparent 16%, #000 66%);

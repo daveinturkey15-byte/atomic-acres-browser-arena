@@ -1,0 +1,242 @@
+{
+  "url": "http://127.0.0.1:41918",
+  "presets": [
+    "high",
+    "max"
+  ],
+  "arenas": [
+    "gun-range",
+    "atomic-acres",
+    "high-seas"
+  ],
+  "bundleAtStart": "/legacy-main-DNZataIH.js",
+  "results": [
+    {
+      "preset": "high",
+      "arena": "gun-range",
+      "requestedShaftTier": "low",
+      "admitted": true,
+      "tslNodeBuildErrors": null,
+      "consoleErrors": [
+        {
+          "at": 62453,
+          "arenaId": "gun-range",
+          "text": "THREE.TSL: TypeError: Cannot read properties of null (reading 'depthTexture') \"vendor-three-CHMFJAK7.js:4645\"\n    at vendor-three-CHMFJAK7.js:4645:140756\n    at ny.call (vendor-three-CHMFJAK7.js:4110:20290)\n    at ny.setupOutput (vendor-three-CHMFJAK7.js:4110:20407)\n    at ny.getOutputNode (vendor-three-CHMFJAK7.js:4110:20531)\n    at ny.build (vendor-three-CHMFJAK7.js:4110:20702)\n    at oy.build ("
+        },
+        {
+          "at": 64349,
+          "arenaId": "gun-range",
+          "text": "THREE.TSL: TypeError: Cannot read properties of null (reading 'depthTexture') \"vendor-three-CHMFJAK7.js:4645\"\n    at vendor-three-CHMFJAK7.js:4645:140756\n    at ny.call (vendor-three-CHMFJAK7.js:4110:20290)\n    at ny.setupOutput (vendor-three-CHMFJAK7.js:4110:20407)\n    at ny.getOutputNode (vendor-three-CHMFJAK7.js:4110:20531)\n    at ny.build (vendor-three-CHMFJAK7.js:4110:20702)\n    at oy.build ("
+        }
+      ],
+      "sunCastShadow": null,
+      "shadowsEnabled": null,
+      "builtShafts": {
+        "quality": "low",
+        "enabled": true,
+        "unavailableReason": null,
+        "raymarchSteps": 24,
+        "resolutionScale": 0.35,
+        "density": 0.35,
+        "maximumDensity": 0.12,
+        "distanceAttenuation": 2.6,
+        "additiveGain": 0.14,
+        "bilateralBlur": true
+      },
+      "linearSourceStages": [
+        "scene-pass-linear-hdr",
+        "contact-occlusion-multiply",
+        "ssr-screen-space-reflection-add",
+        "depth-guarded-bloom-add",
+        "godrays-volumetric-shaft-add"
+      ],
+      "bundle": "/legacy-main-DNZataIH.js"
+    },
+    {
+      "preset": "high",
+      "arena": "atomic-acres",
+      "requestedShaftTier": "low",
+      "admitted": true,
+      "tslNodeBuildErrors": null,
+      "consoleErrors": [],
+      "sunCastShadow": null,
+      "shadowsEnabled": null,
+      "builtShafts": {
+        "quality": "low",
+        "enabled": true,
+        "unavailableReason": null,
+        "raymarchSteps": 24,
+        "resolutionScale": 0.35,
+        "density": 0.35,
+        "maximumDensity": 0.12,
+        "distanceAttenuation": 2.6,
+        "additiveGain": 0.14,
+        "bilateralBlur": true
+      },
+      "linearSourceStages": [
+        "scene-pass-linear-hdr",
+        "contact-occlusion-multiply",
+        "ssr-screen-space-reflection-add",
+        "depth-guarded-bloom-add",
+        "godrays-volumetric-shaft-add"
+      ],
+      "bundle": "/legacy-main-DNZataIH.js"
+    },
+    {
+      "preset": "high",
+      "arena": "high-seas",
+      "requestedShaftTier": "low",
+      "admitted": true,
+      "tslNodeBuildErrors": null,
+      "consoleErrors": [],
+      "sunCastShadow": null,
+      "shadowsEnabled": null,
+      "builtShafts": {
+        "quality": "low",
+        "enabled": true,
+        "unavailableReason": null,
+        "raymarchSteps": 24,
+        "resolutionScale": 0.35,
+        "density": 0.35,
+        "maximumDensity": 0.12,
+        "distanceAttenuation": 2.6,
+        "additiveGain": 0.14,
+        "bilateralBlur": true
+      },
+      "linearSourceStages": [
+        "scene-pass-linear-hdr",
+        "contact-occlusion-multiply",
+        "ssr-screen-space-reflection-add",
+        "depth-guarded-bloom-add",
+        "godrays-volumetric-shaft-add"
+      ],
+      "bundle": "/legacy-main-DNZataIH.js"
+    },
+    {
+      "preset": "max",
+      "arena": "gun-range",
+      "requestedShaftTier": "high",
+      "admitted": true,
+      "tslNodeBuildErrors": null,
+      "consoleErrors": [
+        {
+          "at": 3858,
+          "arenaId": "gun-range",
+          "text": "THREE.TSL: TypeError: Cannot read properties of null (reading 'depthTexture') \"vendor-three-CHMFJAK7.js:4645\"\n    at vendor-three-CHMFJAK7.js:4645:140756\n    at ny.call (vendor-three-CHMFJAK7.js:4110:20290)\n    at ny.setupOutput (vendor-three-CHMFJAK7.js:4110:20407)\n    at ny.getOutputNode (vendor-three-CHMFJAK7.js:4110:20531)\n    at ny.build (vendor-three-CHMFJAK7.js:4110:20702)\n    at oy.build ("
+        },
+        {
+          "at": 6329,
+          "arenaId": "gun-range",
+          "text": "THREE.TSL: TypeError: Cannot read properties of null (reading 'depthTexture') \"vendor-three-CHMFJAK7.js:4645\"\n    at vendor-three-CHMFJAK7.js:4645:140756\n    at ny.call (vendor-three-CHMFJAK7.js:4110:20290)\n    at ny.setupOutput (vendor-three-CHMFJAK7.js:4110:20407)\n    at ny.getOutputNode (vendor-three-CHMFJAK7.js:4110:20531)\n    at ny.build (vendor-three-CHMFJAK7.js:4110:20702)\n    at oy.build ("
+        },
+        {
+          "at": 8113,
+          "arenaId": "gun-range",
+          "text": "THREE.TSL: TypeError: Cannot read properties of null (reading 'depthTexture') \"vendor-three-CHMFJAK7.js:4645\"\n    at vendor-three-CHMFJAK7.js:4645:140756\n    at ny.call (vendor-three-CHMFJAK7.js:4110:20290)\n    at ny.setupOutput (vendor-three-CHMFJAK7.js:4110:20407)\n    at ny.getOutputNode (vendor-three-CHMFJAK7.js:4110:20531)\n    at ny.build (vendor-three-CHMFJAK7.js:4110:20702)\n    at oy.build ("
+        }
+      ],
+      "sunCastShadow": null,
+      "shadowsEnabled": null,
+      "builtShafts": {
+        "quality": "high",
+        "enabled": true,
+        "unavailableReason": null,
+        "raymarchSteps": 48,
+        "resolutionScale": 0.5,
+        "density": 0.5,
+        "maximumDensity": 0.18,
+        "distanceAttenuation": 2.2,
+        "additiveGain": 0.22,
+        "bilateralBlur": true
+      },
+      "linearSourceStages": [
+        "scene-pass-linear-hdr",
+        "motion-blur-velocity-smear",
+        "ssgi-screen-space-bounce-add",
+        "contact-occlusion-multiply",
+        "ssr-screen-space-reflection-add",
+        "depth-guarded-bloom-add",
+        "godrays-volumetric-shaft-add",
+        "depth-of-field-bokeh"
+      ],
+      "bundle": "/legacy-main-DNZataIH.js"
+    },
+    {
+      "preset": "max",
+      "arena": "atomic-acres",
+      "requestedShaftTier": "high",
+      "admitted": true,
+      "tslNodeBuildErrors": null,
+      "consoleErrors": [],
+      "sunCastShadow": null,
+      "shadowsEnabled": null,
+      "builtShafts": {
+        "quality": "high",
+        "enabled": true,
+        "unavailableReason": null,
+        "raymarchSteps": 48,
+        "resolutionScale": 0.5,
+        "density": 0.5,
+        "maximumDensity": 0.18,
+        "distanceAttenuation": 2.2,
+        "additiveGain": 0.22,
+        "bilateralBlur": true
+      },
+      "linearSourceStages": [
+        "scene-pass-linear-hdr",
+        "motion-blur-velocity-smear",
+        "ssgi-screen-space-bounce-add",
+        "contact-occlusion-multiply",
+        "ssr-screen-space-reflection-add",
+        "depth-guarded-bloom-add",
+        "godrays-volumetric-shaft-add",
+        "depth-of-field-bokeh"
+      ],
+      "bundle": "/legacy-main-DNZataIH.js"
+    },
+    {
+      "preset": "max",
+      "arena": "high-seas",
+      "requestedShaftTier": "high",
+      "admitted": true,
+      "tslNodeBuildErrors": null,
+      "consoleErrors": [],
+      "sunCastShadow": null,
+      "shadowsEnabled": null,
+      "builtShafts": {
+        "quality": "high",
+        "enabled": true,
+        "unavailableReason": null,
+        "raymarchSteps": 48,
+        "resolutionScale": 0.5,
+        "density": 0.5,
+        "maximumDensity": 0.18,
+        "distanceAttenuation": 2.2,
+        "additiveGain": 0.22,
+        "bilateralBlur": true
+      },
+      "linearSourceStages": [
+        "scene-pass-linear-hdr",
+        "motion-blur-velocity-smear",
+        "ssgi-screen-space-bounce-add",
+        "contact-occlusion-multiply",
+        "ssr-screen-space-reflection-add",
+        "depth-guarded-bloom-add",
+        "godrays-volumetric-shaft-add",
+        "depth-of-field-bokeh"
+      ],
+      "bundle": "/legacy-main-DNZataIH.js"
+    }
+  ],
+  "failures": [
+    "high/gun-range: tslNodeBuildErrors=null (expected \"0\")",
+    "high/gun-range: 2 THREE.TSL console error(s): THREE.TSL: TypeError: Cannot read properties of null (reading 'depthTexture') \"vendor-three-CHMFJAK7.js:4645\"\n    at vendor-three-CHMFJAK7.js:4645:140756\n    at ny.call (vendor-three-CHMFJAK7.js:4110:20290)\n    at ny.setupOutput (vendor-three-CHMFJAK7.js:4110:20407)\n    at ny.getOutputNode (vendor-three-CHMFJAK7.js:4110:20531)\n    at ny.build (vendor-three-CHMFJAK7.js:4110:20702)\n    at oy.build (",
+    "high/atomic-acres: tslNodeBuildErrors=null (expected \"0\")",
+    "high/high-seas: tslNodeBuildErrors=null (expected \"0\")",
+    "max/gun-range: tslNodeBuildErrors=null (expected \"0\")",
+    "max/gun-range: 3 THREE.TSL console error(s): THREE.TSL: TypeError: Cannot read properties of null (reading 'depthTexture') \"vendor-three-CHMFJAK7.js:4645\"\n    at vendor-three-CHMFJAK7.js:4645:140756\n    at ny.call (vendor-three-CHMFJAK7.js:4110:20290)\n    at ny.setupOutput (vendor-three-CHMFJAK7.js:4110:20407)\n    at ny.getOutputNode (vendor-three-CHMFJAK7.js:4110:20531)\n    at ny.build (vendor-three-CHMFJAK7.js:4110:20702)\n    at oy.build (",
+    "max/atomic-acres: tslNodeBuildErrors=null (expected \"0\")",
+    "max/high-seas: tslNodeBuildErrors=null (expected \"0\")"
+  ],
+  "pageErrors": []
+}

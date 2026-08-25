@@ -34,13 +34,13 @@
 
 #hud {
   /* One material, expressed once. */
-  --p75-glass-strong: linear-gradient(158deg, rgba(10, 26, 33, 0.90) 0%, rgba(5, 15, 21, 0.86) 100%);
-  --p75-glass-soft: linear-gradient(158deg, rgba(10, 26, 33, 0.74) 0%, rgba(5, 15, 21, 0.68) 100%);
-  --p75-glass-quiet: linear-gradient(158deg, rgba(9, 22, 29, 0.58) 0%, rgba(5, 14, 19, 0.52) 100%);
+  --p75-glass-strong: linear-gradient(158deg, rgba(35, 21, 11, 0.90) 0%, rgba(21, 12, 5, 0.86) 100%);
+  --p75-glass-soft: linear-gradient(158deg, rgba(35, 21, 11, 0.74) 0%, rgba(21, 12, 5, 0.68) 100%);
+  --p75-glass-quiet: linear-gradient(158deg, rgba(30, 18, 9, 0.58) 0%, rgba(20, 11, 5, 0.52) 100%);
 
-  --p75-hairline: rgba(150, 226, 226, 0.20);
-  --p75-hairline-strong: rgba(150, 226, 226, 0.36);
-  --p75-top-sheen: rgba(224, 255, 253, 0.16);
+  --p75-hairline: rgba(236, 207, 188, 0.20);
+  --p75-hairline-strong: rgba(236, 207, 188, 0.36);
+  --p75-top-sheen: rgba(253, 248, 244, 0.16);
 
   /* Elevation: HUD sits above the world, so shadows are broad and soft rather
      than the tight boxy drop-shadows the old slabs used. */
@@ -136,7 +136,7 @@
 #hud #match-mode-label,
 #hud #support-title,
 #hud #map-heading {
-  color: var(--hud-dim, #81969a);
+  color: var(--hud-dim, #9b9186);
   font-variant: small-caps;
   letter-spacing: 0.14em;
 }
@@ -237,7 +237,7 @@
 #gunner-cockpit-hud .gunner-instruments,
 #gunner-cockpit-hud #gunner-control-strip {
   border-radius: var(--p75-radius);
-  border: 1px solid rgba(150, 226, 226, 0.22);
+  border: 1px solid rgba(236, 207, 188, 0.22);
   background-image: var(--p75-glass-strong);
   box-shadow: var(--p75-cast), inset 0 1px 0 var(--p75-top-sheen);
 }
@@ -293,13 +293,13 @@ html[data-reduced-motion='true'] #hud .support-list > div {
   border-left: 2px solid var(--p75-hairline);
   border-radius: 6px;
   padding: 3px 8px;
-  background: linear-gradient(90deg, rgba(6, 18, 23, 0.52) 0%, rgba(6, 18, 23, 0) 100%);
+  background: linear-gradient(90deg, rgba(25, 14, 7, 0.52) 0%, rgba(25, 14, 7, 0) 100%);
 }
 
 #hud #killfeed div:first-child,
 #hud #killfeed > *:first-child {
   border-left-color: var(--p75-friendly);
-  background: linear-gradient(90deg, rgba(102, 235, 225, 0.14) 0%, rgba(6, 18, 23, 0) 100%);
+  background: linear-gradient(90deg, rgba(102, 235, 225, 0.14) 0%, rgba(25, 14, 7, 0) 100%);
 }
 
 #hud #damage-done-feed > *,
@@ -334,12 +334,12 @@ html[data-reduced-motion='true'] #hud .support-list > div {
 
 #banner {
   border-radius: 12px;
-  border: 1px solid var(--p75-hairline-strong, rgba(150, 226, 226, 0.36));
-  border-block: 1px solid var(--p75-hairline-strong, rgba(150, 226, 226, 0.36));
-  background-image: var(--p75-glass-strong, linear-gradient(158deg, rgba(10, 26, 33, 0.9), rgba(5, 15, 21, 0.86)));
+  border: 1px solid var(--p75-hairline-strong, rgba(236, 207, 188, 0.36));
+  border-block: 1px solid var(--p75-hairline-strong, rgba(236, 207, 188, 0.36));
+  background-image: var(--p75-glass-strong, linear-gradient(158deg, rgba(35, 21, 11, 0.9), rgba(21, 12, 5, 0.86)));
   box-shadow:
     0 12px 40px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(224, 255, 253, 0.16);
+    inset 0 1px 0 rgba(253, 248, 244, 0.16);
 }
 
 #banner strong {

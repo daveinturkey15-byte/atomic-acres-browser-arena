@@ -29,22 +29,22 @@
 
 :root {
   /* One accent family, so the HUD and the menu stop looking like two products. */
-  --p74-accent: #0f8b93;
-  --p74-accent-bright: #12a7b1;
-  --p74-accent-soft: rgba(15, 139, 147, 0.12);
-  --p74-accent-line: rgba(15, 139, 147, 0.34);
+  --p74-accent: #c6611e;
+  --p74-accent-bright: #e17d39;
+  --p74-accent-soft: rgba(198, 97, 30, 0.12);
+  --p74-accent-line: rgba(198, 97, 30, 0.34);
 
   /* Surfaces for the bright command deck. */
   --p74-card: #ffffff;
-  --p74-card-2: #f2f6f5;
-  --p74-card-edge: rgba(20, 46, 50, 0.16);
-  --p74-ink: #12252a;
-  --p74-ink-soft: #40595e;
+  --p74-card-2: #f6f5f4;
+  --p74-card-edge: rgba(59, 37, 23, 0.16);
+  --p74-ink: #2f1f14;
+  --p74-ink-soft: #5d534a;
 
   /* One elevation ramp instead of ad-hoc shadows. */
-  --p74-lift-1: 0 1px 2px rgba(16, 38, 42, 0.06), 0 2px 6px rgba(16, 38, 42, 0.06);
-  --p74-lift-2: 0 2px 4px rgba(16, 38, 42, 0.08), 0 8px 20px rgba(16, 38, 42, 0.1);
-  --p74-lift-3: 0 4px 10px rgba(16, 38, 42, 0.1), 0 18px 42px rgba(16, 38, 42, 0.14);
+  --p74-lift-1: 0 1px 2px rgba(49, 31, 19, 0.06), 0 2px 6px rgba(49, 31, 19, 0.06);
+  --p74-lift-2: 0 2px 4px rgba(49, 31, 19, 0.08), 0 8px 20px rgba(49, 31, 19, 0.1);
+  --p74-lift-3: 0 4px 10px rgba(49, 31, 19, 0.1), 0 18px 42px rgba(49, 31, 19, 0.14);
 
   --p74-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
 
@@ -187,7 +187,7 @@ html #advanced-graphics .advanced-graphics-unavailable em {
 #menu-panel-streaks {
   background:
     radial-gradient(circle at 82% 10%, var(--p74-accent-soft), transparent 40%),
-    linear-gradient(160deg, #ffffff 0%, #eef3f2 100%);
+    linear-gradient(160deg, #ffffff 0%, #f3f2f0 100%);
   color: var(--p74-ink);
   border-color: var(--p74-card-edge);
 }

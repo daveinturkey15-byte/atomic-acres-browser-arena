@@ -207,22 +207,55 @@ const GODRAYS_OFF: GodraysTuning = Object.freeze({
   density: 0, maximumDensity: 0, distanceAttenuation: 0, additiveGain: 0, bilateralBlur: false,
 });
 
+/** Reported when the renderer-wide shadow map is switched off. */
+export const GODRAYS_SHADOWS_DISABLED_REASON =
+  'Volumetric light shafts raymarch the sun shadow map; enable Sun shadows.';
+
+/**
+ * HF-401 — reported when shadows are on renderer-wide but THIS arena's sun does
+ * not cast any, so three never allocates `light.shadow.map` for it.
+ *
+ * This is not a nicety. Upstream `GodraysNode.setup()` dereferences
+ * `light.shadow.map.depthTexture` while it builds its fragment `Fn`, and three
+ * catches node-build throws, logs `THREE.TSL: <error>` and silently substitutes
+ * a bare `NodeMaterial` for the failed one. The shaft quad then renders that
+ * default material into the godray target instead of the raymarch, and nothing
+ * in the pipeline reports it. Refusing the tier by name is what turns that
+ * swallowed failure into a stated one.
+ */
+export const GODRAYS_SHAFT_LIGHT_WITHOUT_SHADOWS_REASON =
+  'Volumetric light shafts raymarch the arena sun\'s shadow map; this arena\'s sun casts none.';
+
 /**
  * Godrays raymarch the sun's shadow map, so a shadow-casting light is not a
  * nice-to-have: without one there is nothing to occlude the volume and the
  * upstream node has no `light.shadow.camera` to reference. Reporting that as a
  * reason beats silently drawing nothing.
+ *
+ * `shadowsEnabled` is the renderer-wide switch; `shaftLightCastsShadows` is the
+ * shaft light's OWN `castShadow`, which the arena visual definition drives
+ * per map. Both have to hold, and they fail for different reasons, so they are
+ * reported separately. The field is optional because the settings resolver runs
+ * before any arena light exists; the authoritative answer is applied where the
+ * light is known, in `screen-space-post.ts`.
  */
 export function resolveGodraysTuning(
   tier: ScreenSpaceTier,
-  capability: Readonly<{ shadowsEnabled: boolean }>,
+  capability: Readonly<{ shadowsEnabled: boolean; shaftLightCastsShadows?: boolean }>,
 ): GodraysTuning {
   if (tier === 'off') return GODRAYS_OFF;
   if (!capability.shadowsEnabled) {
     return Object.freeze({
       ...GODRAYS_OFF,
       quality: tier,
-      unavailableReason: 'Volumetric light shafts raymarch the sun shadow map; enable Sun shadows.',
+      unavailableReason: GODRAYS_SHADOWS_DISABLED_REASON,
+    });
+  }
+  if (capability.shaftLightCastsShadows === false) {
+    return Object.freeze({
+      ...GODRAYS_OFF,
+      quality: tier,
+      unavailableReason: GODRAYS_SHAFT_LIGHT_WITHOUT_SHADOWS_REASON,
     });
   }
   const high = tier === 'high';
@@ -547,8 +580,13 @@ export function adaptScreenSpacePostForPressure(
   if (ratio >= SCREEN_SPACE_PRESSURE_DEMOTE_RATIO) return runtime;
   const starved = ratio < SCREEN_SPACE_PRESSURE_STARVE_RATIO;
   const demote = (tier: ScreenSpaceTier): ScreenSpaceTier => (tier === 'high' ? 'low' : tier);
-  const shadowsEnabled = runtime.godrays.unavailableReason === null;
-  const godrays = resolveGodraysTuning(demote(runtime.godrays.quality), { shadowsEnabled });
+  // A tier the capability gate already refused stays refused, WITH ITS OWN
+  // REASON. Re-resolving it here used to collapse every refusal onto the
+  // renderer-wide "enable Sun shadows" string, which would misreport the
+  // arena-sun refusal HF-401 introduced as a global setting problem.
+  const godrays = runtime.godrays.enabled
+    ? resolveGodraysTuning(demote(runtime.godrays.quality), { shadowsEnabled: true })
+    : runtime.godrays;
   const reflections = resolveScreenSpaceReflectionTuning(demote(runtime.reflections.quality));
   const globalIllumination = resolveScreenSpaceGiTuning(demote(runtime.globalIllumination.quality));
   // THE TRACE HAS EXACTLY ONE HONEST LIVE LEVER, AND IT IS ALL OR NOTHING.

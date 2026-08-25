@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+// HF-401: three's own console routing, so a node-build failure it SWALLOWS
+// becomes a receipt this runtime publishes instead of a line nobody reads.
+import { getConsoleFunction, setConsoleFunction } from 'three';
 import type { RenderPipeline, WebGPURenderer } from 'three/webgpu';
 import { assertTslCutoverReady } from './tsl-migration-inventory';
 import {
@@ -64,6 +67,8 @@ export type RenderRuntimeTelemetry = Readonly<{
     contextId: number | null;
     lightsNodeId: number | null;
   }>[];
+  /** HF-401 — TSL node-build failures three swallowed. See `TslNodeBuildDiagnostics`. */
+  tslNodeBuild: TslNodeBuildDiagnostics;
   presentation: PresentationFreshnessTelemetry;
 }>;
 
@@ -116,6 +121,116 @@ export type PresentationProgressTelemetry = Readonly<{
   submissionPacing: FramePacingSummary;
   completionPacing: FramePacingSummary;
 }>;
+
+// ---------------------------------------------------------------------------
+// HF-401 — the swallowed TSL node-build failure, made observable
+// ---------------------------------------------------------------------------
+
+/**
+ * WHY THIS EXISTS.
+ *
+ * Three r185 builds a render object's node graph inside a `try` in
+ * `Nodes.getForRender()`. When that build throws, three does NOT rethrow: it
+ * rebuilds the render object against a bare `NodeMaterial`, logs
+ * `THREE.TSL: <error>` through its own `error()` helper, and carries on. The
+ * draw succeeds, the arena admits, every gate stays green — and the object is
+ * rendering a DEFAULT material instead of the one that was authored.
+ *
+ * That is the worst failure shape this renderer has: a feature that silently
+ * stops being the feature, indistinguishable from one that was never built.
+ * A console line nobody reads is not a gate.
+ *
+ * Three exposes `setConsoleFunction`, so the runtime can watch its own console
+ * routing and publish a COUNT that a test can assert on. Everything is still
+ * forwarded to the real console exactly as three would have printed it, so this
+ * hides nothing; it only adds a receipt.
+ */
+export type TslNodeBuildDiagnostics = Readonly<{
+  /** How many node-build failures three has swallowed since install. */
+  count: number;
+  /** The distinct messages, capped, most recent last. */
+  messages: readonly string[];
+}>;
+
+/** Dataset key the swallowed-failure count is published under. */
+export const TSL_NODE_BUILD_ERROR_ATTRIBUTE = 'tslNodeBuildErrors';
+
+/** Minimum surface the receipt needs, so a suite can supply one without a DOM. */
+export type TslDiagnosticsTarget = { dataset: Record<string, string | undefined> };
+
+export type TslNodeBuildDiagnosticsHandle = Readonly<{
+  read(): TslNodeBuildDiagnostics;
+  reset(): void;
+  uninstall(): void;
+}>;
+
+const TSL_NODE_BUILD_MESSAGE_CAP = 8;
+
+/** Every message three routes through `error()` from the node-build catch. */
+const TSL_NODE_BUILD_ERROR_PREFIX = 'THREE.TSL:';
+
+/**
+ * Installs the observer. Idempotent per target: calling it again replaces the
+ * previous installation rather than stacking forwarders.
+ */
+export function installTslNodeBuildDiagnostics(
+  target: TslDiagnosticsTarget | null = typeof document === 'undefined'
+    ? null
+    : (document.documentElement as unknown as TslDiagnosticsTarget),
+): TslNodeBuildDiagnosticsHandle {
+  const messages: string[] = [];
+  let count = 0;
+  const previous = getConsoleFunction();
+
+  const publish = (): void => {
+    if (!target) return;
+    target.dataset[TSL_NODE_BUILD_ERROR_ATTRIBUTE] = String(count);
+  };
+
+  const forward = (type: 'log' | 'warn' | 'error', message: string, ...params: unknown[]): void => {
+    if (previous) {
+      previous(type, message, ...params);
+      return;
+    }
+    // Reproduce three's own native routing exactly, including the StackTrace
+    // rendering, so installing this changes nothing a developer sees.
+    const stackTrace = params[0] as { isStackTrace?: boolean; getError?: (message: string) => Error } | undefined;
+    const rendered = stackTrace?.isStackTrace && stackTrace.getError
+      ? [stackTrace.getError(message)]
+      : [message, ...params];
+    if (type === 'error') console.error(...rendered);
+    else if (type === 'warn') console.warn(...rendered);
+    else console.log(...rendered);
+  };
+
+  const observer = (type: 'log' | 'warn' | 'error', message: string, ...params: unknown[]): void => {
+    if (type === 'error' && typeof message === 'string' && message.startsWith(TSL_NODE_BUILD_ERROR_PREFIX)) {
+      count += 1;
+      if (!messages.includes(message)) {
+        messages.push(message);
+        if (messages.length > TSL_NODE_BUILD_MESSAGE_CAP) messages.shift();
+      }
+      publish();
+    }
+    forward(type, message, ...params);
+  };
+
+  setConsoleFunction(observer);
+  publish();
+
+  return Object.freeze({
+    read: (): TslNodeBuildDiagnostics => Object.freeze({ count, messages: Object.freeze([...messages]) }),
+    reset: (): void => {
+      count = 0;
+      messages.length = 0;
+      publish();
+    },
+    uninstall: (): void => {
+      if (getConsoleFunction() === observer) setConsoleFunction(previous);
+      if (target) delete target.dataset[TSL_NODE_BUILD_ERROR_ATTRIBUTE];
+    },
+  });
+}
 
 export function sequenceProgressRate(input: Readonly<{
   baselineSequence: number;
@@ -469,9 +584,15 @@ export class LegacyWebGlRenderRuntime {
   readonly renderer: THREE.WebGLRenderer;
   private readonly adapterLabel: string;
 
+  private readonly tslDiagnostics: TslNodeBuildDiagnosticsHandle;
+
   private constructor(renderer: THREE.WebGLRenderer) {
     this.renderer = renderer;
     this.adapterLabel = webGlAdapterLabel(renderer);
+    // The compatibility route builds no TSL graphs, so this reports a truthful
+    // zero. It is installed anyway so the receipt exists on both backends and a
+    // gate never has to special-case "the field is missing" as "no failures".
+    this.tslDiagnostics = installTslNodeBuildDiagnostics();
   }
 
   static async create(parameters: THREE.WebGLRendererParameters): Promise<LegacyWebGlRenderRuntime> {
@@ -500,8 +621,14 @@ export class LegacyWebGlRenderRuntime {
       deviceLost: gl.isContextLost(),
       uncapturedErrors: 0,
       lastUncapturedError: null,
+      tslNodeBuild: this.tslDiagnostics.read(),
       presentation: this.presentationTelemetry(),
     };
+  }
+
+  /** HF-401 — parity surface with the WebGPU runtime; always zero on this route. */
+  tslNodeBuildDiagnostics(): TslNodeBuildDiagnostics {
+    return this.tslDiagnostics.read();
   }
 
   healthTelemetry(now = performance.now()): RenderRuntimeHealthTelemetry {
@@ -853,6 +980,7 @@ export class WebGpuRenderRuntime {
     lightsNodeId: number | null;
   }>> = [];
   private nextCompletionProbeAt = 0;
+  private readonly tslDiagnostics: TslNodeBuildDiagnosticsHandle;
   /**
    * Polite attempts to acquire real focus before cold prewarm settles for a
    * visible-but-unfocused document. Each attempt costs one foreground-wait
@@ -909,6 +1037,11 @@ export class WebGpuRenderRuntime {
       profileId: identity.gradeProfileId ?? DEFAULT_GRADE_PROFILE_ID,
     });
     this.resetPresentationProgressTelemetry('renderer initialized', this.clock());
+    // HF-401: watch three's console routing for the node-build failures it
+    // catches and hides. Installed unconditionally and before any arena graph
+    // is assembled, because the failure it catches happens during the very
+    // first pipeline build of a transition.
+    this.tslDiagnostics = installTslNodeBuildDiagnostics();
     this.installNodeBuildTrace();
     identity.device.addEventListener?.('uncapturederror', this.uncapturedErrorListener);
     void identity.device.lost?.then((info) => {
@@ -1048,8 +1181,14 @@ export class WebGpuRenderRuntime {
       uncapturedErrors: this.uncapturedErrors,
       lastUncapturedError: this.lastUncapturedError,
       slowNodeBuilds: Object.freeze(this.slowNodeBuilds.map((entry) => Object.freeze({ ...entry }))),
+      tslNodeBuild: this.tslDiagnostics.read(),
       presentation: this.presentationTelemetry(),
     };
+  }
+
+  /** HF-401 — TSL node-build failures three caught and hid, as a readable count. */
+  tslNodeBuildDiagnostics(): TslNodeBuildDiagnostics {
+    return this.tslDiagnostics.read();
   }
 
   healthTelemetry(now = this.clock()): RenderRuntimeHealthTelemetry {

@@ -569,7 +569,7 @@
     linear-gradient(var(--p77-accent-line), var(--p77-accent-line)),
     linear-gradient(var(--p77-accent-line), var(--p77-accent-line)),
     linear-gradient(var(--p77-accent-line), var(--p77-accent-line)),
-    linear-gradient(172deg, #ffffff 0%, #ffffff 52%, #eef4f3 100%);
+    linear-gradient(172deg, #ffffff 0%, #ffffff 52%, #f4f2f1 100%);
   background-repeat: no-repeat;
   background-position:
     right bottom,
@@ -929,7 +929,7 @@
   height: 4px;
   border-radius: 2px;
   background: linear-gradient(90deg, var(--p77-accent) 0%, var(--p77-accent-lit) 100%);
-  box-shadow: inset 0 0 0 1px rgb(4 24 27 / 0.25);
+  box-shadow: inset 0 0 0 1px rgb(35 17 5 / 0.25);
 }
 
 #menu input[type='range']::-webkit-slider-thumb {
@@ -941,7 +941,7 @@
   border: 2px solid var(--p77-accent);
   border-radius: 2px;
   background: #ffffff;
-  box-shadow: 0 1px 4px rgb(4 24 27 / 0.35);
+  box-shadow: 0 1px 4px rgb(35 17 5 / 0.35);
   transition: transform 120ms var(--p77-ease), border-color 120ms var(--p77-ease);
 }
 
@@ -1023,7 +1023,7 @@
     linear-gradient(var(--p77-dark-hair-lit), var(--p77-dark-hair-lit)),
     linear-gradient(var(--p77-dark-hair-lit), var(--p77-dark-hair-lit)),
     linear-gradient(var(--p77-dark-hair-lit), var(--p77-dark-hair-lit)),
-    linear-gradient(178deg, rgb(22 50 59 / 0.96) 0%, rgb(11 26 32 / 0.98) 100%);
+    linear-gradient(178deg, rgb(65 41 24 / 0.96) 0%, rgb(35 21 12 / 0.98) 100%);
   background-repeat: no-repeat;
   background-position:
     left 5px top 5px,
@@ -1095,7 +1095,7 @@
     linear-gradient(rgb(255 208 150 / 0.75), rgb(255 208 150 / 0.75)) left 10px top 10px / 1.5px 18px no-repeat,
     linear-gradient(rgb(255 208 150 / 0.75), rgb(255 208 150 / 0.75)) right 10px top 10px / 18px 1.5px no-repeat,
     linear-gradient(rgb(255 208 150 / 0.75), rgb(255 208 150 / 0.75)) right 10px top 10px / 1.5px 18px no-repeat,
-    linear-gradient(0deg, rgb(5 16 19 / 0.55), transparent 34%);
+    linear-gradient(0deg, rgb(22 12 6 / 0.55), transparent 34%);
 }
 
 /*
@@ -1618,4 +1618,275 @@ html[data-reduced-sensory='true'] #menu.pass64-command-deck {
  */
 #menu #arena-title span {
   color: var(--p77-accent);
+}
+
+/* ===========================================================================
+ * PART 11 - THE SURFACES `src/style.css` STILL PAINTS ON THE OLD DECK.
+ *
+ * Found by measurement, not by looking at the main menu. A probe walked the
+ * built bundle's live DOM in both the menu state and an active match, read the
+ * COMPUTED colour of every node - `getComputedStyle` resolves for `display:
+ * none` too, so surfaces that only exist mid-match are measured as well - and
+ * flagged everything whose blue channel still beat its red. 659 nodes came
+ * back on the menu and 661 in match, across 47 surfaces. The sheet-literal
+ * sweep in `src/ui/**` cleared most of them; every rule below is one the probe
+ * still showed cold afterwards, and each traces to `src/style.css`, which is
+ * outside this lane's ownership (same boundary the Pass 79 high-score override
+ * already records).
+ *
+ * These are the surfaces a player meets at the exact moments they judge a
+ * game: the pause menu, the after-action scoreboard, the lobby roster, the
+ * release-notes dialog, the killstreak and loadout panels, the leaderboard.
+ *
+ * MECHANISM. `src/style.css` puts these rules in `@layer legacy`. This sheet
+ * is UNLAYERED and unlayered rules outrank every layer, so each override below
+ * lands without needing extra specificity, without `!important`, and without
+ * touching a selector's shape. VALUES ONLY - no box, no size, no font, no
+ * position moves anywhere in this part.
+ *
+ * COLOUR METHOD. Every replacement preserves the original's WCAG relative
+ * luminance (worst case 0.0013 off, which is 8-bit rounding), so no contrast
+ * ratio anywhere in the UI moves. The two exceptions are marked inline: cold
+ * NEAR-WHITE grounds are allowed a bounded 8 % luminance drop, because bone
+ * (#f4efe4, luminance 0.877) simply is darker than the paper it replaces
+ * (0.92-0.97) and an exact match would return another near-white - which is
+ * the "looks the same" verdict all over again. Dark ink on those grounds keeps
+ * over 92 % of the contrast ratio it had and stays far above every floor.
+ * ======================================================================== */
+
+/* The muted ink family. One cold sage grey, #8fa7a4, was doing the work of
+   every secondary label in the product - 535 computed nodes read it - so it,
+   more than any accent, is why unvisited screens still looked untouched. */
+.release-channel-option small,
+.menu-tabs button,
+.high-score-heading small,
+#high-score-list li > small,
+#high-score-list li.empty,
+.map-selector-heading small,
+.lobby-settings label,
+.lobby-player small,
+.latency-unknown,
+#changelog-panel .changelog-header small,
+.changelog-areas span,
+#text-chat-form label,
+.killstreak-slot-card small {
+  color: #aaa197;
+}
+
+.kit-heading div,
+.options-heading {
+  color: #b7aea5;
+}
+
+.kit-card i {
+  color: #a89f96;
+}
+
+#strike-map-overlay footer {
+  color: #d0c3b3;
+}
+
+/* The release-notes dialog. 174 cold nodes - the single worst surface in the
+   product after the loadout panel, and one the owner opens to read what
+   changed, which makes it a poor place to look unchanged. */
+.changelog-entry-head time {
+  color: #bdb5ad;
+}
+
+.changelog-entry-head time small {
+  color: #8f8378;
+}
+
+/* Its pass chips and entry rails read `var(--aqua)` directly. That token is
+   the AQUA TEAM colour and must not be retuned (tactical-ui.css records why),
+   but a changelog entry is not a team, so these read the deck signal locally -
+   exactly the fix Pass 79 already applied to project-map-dialog.css. */
+#changelog-list > li {
+  border-left-color: var(--p77-accent);
+}
+
+.changelog-entry-pass > b {
+  border-color: var(--p77-accent-line);
+  background: var(--p77-accent-wash);
+  color: var(--p77-accent);
+}
+
+/* THE PAUSE MENU. `src/style.css` re-paints the whole command deck translucent
+   the moment a match is paused, and it did so in the OLD cold near-white - so
+   the one shell surface a player sees most often during a session was the only
+   one still on the rejected deck. Alpha is preserved exactly, so the arena
+   still reads through at the same strength; only the tint changes. */
+#menu[data-lifecycle-surface='paused-match'].pass64-command-deck.panel {
+  background: rgba(246, 241, 234, 0.72);
+}
+
+#menu[data-lifecycle-surface='paused-match'] .command-header {
+  background: rgba(253, 250, 243, 0.82);
+}
+
+#menu[data-lifecycle-surface='paused-match'] .command-rail {
+  background: rgba(244, 238, 229, 0.76);
+}
+
+#menu[data-lifecycle-surface='paused-match'] .command-workspace {
+  background: rgba(248, 241, 231, 0.56);
+}
+
+#menu[data-lifecycle-surface='paused-match'] .arena-command {
+  background: linear-gradient(140deg, rgba(253, 250, 243, 0.62), rgba(246, 241, 234, 0.4));
+}
+
+#menu[data-lifecycle-surface='paused-match'] .deployment-manifest {
+  background: rgba(244, 238, 229, 0.7);
+}
+
+/* THE AFTER-ACTION SCOREBOARD. Cold grey column keys and cold ink on a board
+   the whole lobby stares at for the length of the interval. */
+#roster-list b::before,
+#roster-list i::before {
+  color: #80776f;
+}
+
+#roster-list small {
+  color: #bdae99;
+}
+
+#roster-list em {
+  color: #b8ab99;
+}
+
+/* THE LOBBY ROSTER. Player rows carried a cold-white name and an aqua rail;
+   the rail is chrome here, not a team readout - the squad swatch beside it is
+   the team readout, and it is untouched. */
+.lobby-player {
+  border-left-color: var(--p77-accent);
+}
+
+.lobby-player strong {
+  color: #f6ede2;
+}
+
+/*
+ * THE KILLSTREAK PANEL - the one block of `src/style.css` that is NOT inside
+ * `@layer legacy`, and the reason it survived two reskins.
+ *
+ * Everything else this part overrides is layered, so an unlayered rule here
+ * beats it at any specificity. Lines 307-320 of that sheet are outside the
+ * layer, and Vite emits `style.css` as its own chunk which `index.html` links
+ * AFTER the bundle this sheet lives in - so those rules were winning on order
+ * against BOTH this sheet and the already-warm values in
+ * pass66-readability.css. Measured in the built bundle: the slot cards
+ * computed an aqua-washed ground with rgb(223, 233, 223) ink and
+ * rgb(143, 167, 164) detail text, i.e. the untouched rejected deck, on a panel
+ * the owner opens every time he changes a streak.
+ *
+ * The fix is specificity, not `!important`: `#menu-panel-streaks` is the
+ * panel these cards can only ever appear in, so the prefix is honest and adds
+ * no coupling. Selector shape, box model and type are otherwise identical.
+ */
+#menu-panel-streaks .killstreak-slot-card {
+  background: linear-gradient(150deg, rgb(180 83 28 / 0.09), rgb(26 22 19 / 0.23));
+  color: #e5e6df;
+}
+
+#menu-panel-streaks .killstreak-slot-card > span {
+  color: var(--p77-accent-lit);
+}
+
+#menu-panel-streaks .killstreak-slot-card select {
+  background: #19120d;
+}
+
+#menu-panel-streaks .killstreak-slot-card small {
+  color: #aaa197;
+}
+
+/* The last handful the probe still showed cold, each pinned to the one rule in
+   `src/style.css` that sets it. Luminance preserved, as above. */
+.setup-grid label {
+  color: #a9a096;
+}
+
+.setup-grid select option {
+  background: #2a1d16;
+}
+
+#last-match-reports small {
+  color: #ada096;
+}
+
+.reserve-stack i {
+  color: #756e68;
+}
+
+#sniper-scope .scope-ring {
+  border-color: #17110d;
+}
+
+#overdrive-hud small,
+#power-announcement small,
+#power-announcement span {
+  color: #f7dac7;
+}
+
+#power-announcement {
+  border-inline-color: #f7dac7;
+}
+
+/*
+ * FINAL PASS OF THE SWEEP - the last surfaces the probe still measured cold
+ * after the batch above, each pinned to its single rule in `src/style.css`.
+ * Same rules as the rest of PART 11: values only, luminance preserved.
+ */
+
+/* The centre banner ground. Every round transition, objective call and
+   after-action screen is painted on it, so a cold blue-black here undoes the
+   deck's temperature at the loudest moment in the match. */
+#banner {
+  background: rgba(22, 14, 9, 0.92);
+}
+
+/* The killstreak targeting map - a full-screen overlay a player commits a
+   strike from, and one of the largest single surfaces in the game. */
+#strike-map-overlay {
+  background: rgba(27, 16, 9, 0.98);
+}
+
+/* Chat: the input edge and the panel heading both read the team colour as
+   chrome. The squad swatch in the roster stays the team readout. */
+#text-chat-form input {
+  border-color: rgba(241, 198, 170, 0.42);
+}
+
+#text-chat header strong {
+  color: var(--ui-signal, #b4531c);
+}
+
+/* Sniper optics chrome. The reticle geometry, its weights and its clear centre
+   are untouched - only the tint of the glass and the range read-out move. */
+#sniper-scope > small {
+  color: rgba(250, 240, 233, 0.85);
+}
+
+#sniper-scope .scope-reticle i {
+  border-color: rgba(254, 249, 247, 0.95);
+  background: rgba(26, 16, 9, 0.55);
+}
+
+/*
+ * THE OPERATOR TURNTABLE FRAME.
+ *
+ * `src/ui/pass64-shell.ts` writes this gradient as an INLINE style attribute,
+ * and that file is another lane's markup. An inline style beats every
+ * stylesheet rule, so `!important` is the only mechanism available here - it is
+ * used deliberately and once, on a decorative background, and the exact
+ * paste-ready markup patch that removes the need for it is recorded in this
+ * pass's report. If that patch lands, this rule becomes a no-op rather than a
+ * conflict.
+ *
+ * The stop luminances are 0.0210 and 0.0076 before and 0.0213 and 0.0077 after,
+ * so the frame the operator is silhouetted against is exactly as dark as it was.
+ */
+#operator-preview-canvas {
+  background: linear-gradient(160deg, #34251b 0%, #1e130c 100%) !important;
 }

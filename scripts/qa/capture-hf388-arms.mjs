@@ -56,6 +56,19 @@ const HEIGHT = Number(arg('--height', '1440'));
 const ONLY = arg('--only', '');
 const ARENA = arg('--arena', 'gun-range');
 const SKIP_BOTS = argv.includes('--skip-bots');
+// HF-388 follow-up. The arm has to be judged in the arena lighting the owner is
+// actually standing in, and the hardest DARK case on this game is the High Seas
+// service deck - which the player spawns nowhere near. `--teleport x,y,z,yaw,pitch`
+// re-uses the stations already proven by scripts/qa/capture-below-deck.mjs.
+// Two hazards this encodes, both of which cost measurements earlier today:
+//   * (0,-2,0) on high-seas is the hull VOID, not the corridor. The corridor
+//     floor is y=0 and eye height 1.7, so the engine room is (0, 1.7, 0).
+//   * a teleport readback is not a rendered frame. The landing position AND a
+//     still-advancing frame counter are both recorded per pose below.
+const TELEPORT = arg('--teleport', '')
+  ? arg('--teleport', '').split(',').map(Number)
+  : null;
+const WEAPONS = arg('--weapons', 'carbine,pistol,lmg').split(',').filter(Boolean);
 const OUT = `artifacts/hf388/${TAG}`;
 mkdirSync(OUT, { recursive: true });
 
@@ -107,6 +120,37 @@ async function startArena(arenaId) {
     return snapshot.matchPhase === 'active' && snapshot.gameStarted === true;
   }, undefined, { timeout: 240_000 });
   await page.waitForTimeout(2600);
+}
+
+/**
+ * Puts the player at the requested station and PROVES it, twice over: the
+ * landing position is read back, and the frame counter is sampled either side
+ * of a wait so a station that is not actually presenting frames cannot be
+ * mistaken for a dark one. Returns null when no --teleport was requested.
+ */
+async function applyTeleport() {
+  if (!TELEPORT) return null;
+  await page.evaluate(([x, y, z, yaw, pitch]) => {
+    window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y, z, yaw ?? 0, pitch ?? 0);
+  }, TELEPORT);
+  await page.waitForTimeout(900);
+  const first = await page.evaluate(() => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    return {
+      position: snapshot.player.position.map((value) => Number(value.toFixed(2))),
+      alive: snapshot.player.alive,
+      frameCount: snapshot.frameCount,
+    };
+  });
+  await page.waitForTimeout(600);
+  const laterFrameCount = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount);
+  return {
+    requested: TELEPORT,
+    landed: first.position,
+    alive: first.alive,
+    rendering: laterFrameCount > first.frameCount,
+    frames: [first.frameCount, laterFrameCount],
+  };
 }
 
 async function rawFrame() {
@@ -366,6 +410,10 @@ const handFramingScript = () => {
 };
 
 async function measurePose(name) {
+  // Re-assert the station before every pose: equipping, ADS and sprint all run
+  // the movement solver, so a player parked at a teleported station can drift
+  // off it between poses and the frames would silently be from somewhere else.
+  const station = await applyTeleport();
   const normal = await rawFrame();
   writeFileSync(resolve(`${OUT}/${name}.png`), normal.png);
   const framing = await page.evaluate(handFramingScript);
@@ -384,6 +432,7 @@ async function measurePose(name) {
   const { width, height } = normal;
   return {
     pose: name,
+    station,
     frame: `${OUT}/${name}.png`,
     viewport: [width, height],
     visibleArmPixels: visible.count,
@@ -400,7 +449,7 @@ async function measurePose(name) {
 const poses = [];
 if (ONLY !== 'bots') {
   await startArena(ARENA);
-  for (const weapon of ['carbine', 'pistol', 'lmg']) {
+  for (const weapon of WEAPONS) {
     await page.evaluate((id) => { window.__ATOMIC_ACRES_DEBUG__.equipWeapon(id); }, weapon);
     await page.waitForTimeout(2200);
     poses.push(await measurePose(`hip-${weapon}`));

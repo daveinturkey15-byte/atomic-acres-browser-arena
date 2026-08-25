@@ -1,0 +1,64 @@
+{
+  "applied": {
+    "preset": "max",
+    "staged": [],
+    "backend": "webgpu",
+    "adapter": {
+      "label": "nvidia / blackwell",
+      "software": false,
+      "backend": "webgpu"
+    }
+  },
+  "sequence": [
+    "gun-range",
+    "atomic-acres"
+  ],
+  "steps": [
+    {
+      "arena": "gun-range",
+      "ok": true,
+      "ms": 40014,
+      "tslErrors": [
+        "THREE.TSL: TypeError: Cannot read properties of null (reading 'depthTexture') \"vendor-three-CHMFJAK7.js:4645\"\n    at vendor-three-CHMFJAK7.js:4645:140756\n    at ny.call (vendor-three-CHMFJAK7.js:4110:20290)\n    at ny.setupOutput (vendor-three-CHMFJAK7.js:4110:20407)\n    at ny.getOutputNode (vendor-three-CHMFJAK7.js:4110:20531)\n    at ny.build (vendor-three-CHMFJAK7.js:4110:20702)\n    at oy.build (vendor-three-CHMFJAK7.js:4110:8042)\n    at BC.build (vendor-three-CHMFJAK7.js:4120:13827)\n    at US.",
+        "THREE.TSL: TypeError: Cannot read properties of null (reading 'depthTexture') \"vendor-three-CHMFJAK7.js:4645\"\n    at vendor-three-CHMFJAK7.js:4645:140756\n    at ny.call (vendor-three-CHMFJAK7.js:4110:20290)\n    at ny.setupOutput (vendor-three-CHMFJAK7.js:4110:20407)\n    at ny.getOutputNode (vendor-three-CHMFJAK7.js:4110:20531)\n    at ny.build (vendor-three-CHMFJAK7.js:4110:20702)\n    at oy.build (vendor-three-CHMFJAK7.js:4110:8042)\n    at BC.build (vendor-three-CHMFJAK7.js:4120:13827)\n    at US.",
+        "THREE.TSL: TypeError: Cannot read properties of null (reading 'depthTexture') \"vendor-three-CHMFJAK7.js:4645\"\n    at vendor-three-CHMFJAK7.js:4645:140756\n    at ny.call (vendor-three-CHMFJAK7.js:4110:20290)\n    at ny.setupOutput (vendor-three-CHMFJAK7.js:4110:20407)\n    at ny.getOutputNode (vendor-three-CHMFJAK7.js:4110:20531)\n    at ny.build (vendor-three-CHMFJAK7.js:4110:20702)\n    at oy.build (vendor-three-CHMFJAK7.js:4110:8042)\n    at BC.build (vendor-three-CHMFJAK7.js:4120:13827)\n    at US."
+      ],
+      "lights": [
+        {
+          "name": "(sun)",
+          "castShadow": false,
+          "intensity": 0,
+          "mapAllocated": false
+        },
+        {
+          "name": "shadow-side-arena-fill",
+          "castShadow": false,
+          "intensity": 0.28,
+          "mapAllocated": false
+        }
+      ],
+      "shot": "C:\\Users\\david\\projects\\atomic-acres-gauntlet\\.gauntlet-tmp\\tsl-depth\\shots-before\\max-0-gun-range.png"
+    },
+    {
+      "arena": "atomic-acres",
+      "ok": true,
+      "ms": 53,
+      "tslErrors": [],
+      "lights": [
+        {
+          "name": "(sun)",
+          "castShadow": false,
+          "intensity": 0,
+          "mapAllocated": false
+        },
+        {
+          "name": "shadow-side-arena-fill",
+          "castShadow": false,
+          "intensity": 0.28,
+          "mapAllocated": false
+        }
+      ],
+      "shot": "C:\\Users\\david\\projects\\atomic-acres-gauntlet\\.gauntlet-tmp\\tsl-depth\\shots-before\\max-1-atomic-acres.png"
+    }
+  ]
+}

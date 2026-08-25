@@ -38,7 +38,7 @@ export const KILLSTREAK_DEMO_MEDIA: Readonly<Record<SelectableKillstreakId, Kill
   'scout-sweep': definition({
     id: 'scout-sweep', kind: 'radar-sweep', eyebrow: 'RECON PULSE', title: 'SCOUT SWEEP',
     summary: 'A verified test-bay clip shows the real short reveal cadence without starting a menu gameplay renderer.',
-    accent: '#70eee1', beats: ['Emit tactical sweep', 'Resolve enemy pings', 'Expire after scan window'],
+    accent: '#f5d4bd', beats: ['Emit tactical sweep', 'Resolve enemy pings', 'Expire after scan window'],
     media: { posterPath: killstreakDemoPosterPath('scout-sweep'), videoPath: killstreakDemoVideoPath('scout-sweep') },
   }),
   adrenaline: definition({
@@ -56,13 +56,13 @@ export const KILLSTREAK_DEMO_MEDIA: Readonly<Record<SelectableKillstreakId, Kill
   yardhawk: definition({
     id: 'yardhawk', kind: 'yardhawk-orbit', eyebrow: 'AUTONOMOUS HUNTER', title: 'YARDHAWK',
     summary: 'The real test-bay recording shows a single hunter orbiting before it commits to a target.',
-    accent: '#72e7ff', beats: ['Spawn above map centre', 'Acquire visible target', 'Attack then re-form orbit'],
+    accent: '#f4d0b8', beats: ['Spawn above map centre', 'Acquire visible target', 'Attack then re-form orbit'],
     media: { posterPath: killstreakDemoPosterPath('yardhawk'), videoPath: killstreakDemoVideoPath('yardhawk') },
   }),
   'piloted-drone': definition({
     id: 'piloted-drone', kind: 'pilot-feed', eyebrow: 'OPTIONAL POSSESSION', title: 'PILOTED DRONE',
     summary: 'The real test-bay recording distinguishes autonomous patrol from the optional gun-control window.',
-    accent: '#7be9de', beats: ['Deploy at map centre', 'Patrol autonomously', 'Press its assigned key again to operate'],
+    accent: '#f3d0b9', beats: ['Deploy at map centre', 'Patrol autonomously', 'Press its assigned key again to operate'],
     media: { posterPath: killstreakDemoPosterPath('piloted-drone'), videoPath: killstreakDemoVideoPath('piloted-drone') },
   }),
   'tri-pass': definition({
@@ -80,13 +80,13 @@ export const KILLSTREAK_DEMO_MEDIA: Readonly<Record<SelectableKillstreakId, Kill
   'hunter-swarm': definition({
     id: 'hunter-swarm', kind: 'hunter-cluster', eyebrow: 'CLUSTERED HUNTERS', title: 'HUNTER SWARM',
     summary: 'The real test-bay recording shows the spread formation separating into target clusters.',
-    accent: '#79efe3', beats: ['Spawn spread formation', 'Assign target clusters', 'Maintain separation while engaging'],
+    accent: '#f6d6c1', beats: ['Spawn spread formation', 'Assign target clusters', 'Maintain separation while engaging'],
     media: { posterPath: killstreakDemoPosterPath('hunter-swarm'), videoPath: killstreakDemoVideoPath('hunter-swarm') },
   }),
   chopper: definition({
     id: 'chopper', kind: 'chopper-orbit', eyebrow: 'AIRBORNE GUN PLATFORM', title: 'CHOPPER GUNNER',
     summary: 'The real test-bay recording shows the elevated orbit, damage and optional gunner-control sightline.',
-    accent: '#5ce9ff', beats: ['Enter authored orbit', 'Track visible targets', 'Press its assigned key again to operate'],
+    accent: '#f4d0b8', beats: ['Enter authored orbit', 'Track visible targets', 'Press its assigned key again to operate'],
     media: { posterPath: killstreakDemoPosterPath('chopper'), videoPath: killstreakDemoVideoPath('chopper') },
   }),
   nuke: definition({
@@ -98,7 +98,7 @@ export const KILLSTREAK_DEMO_MEDIA: Readonly<Record<SelectableKillstreakId, Kill
   'drone-swarm': definition({
     id: 'drone-swarm', kind: 'drone-cloud', eyebrow: 'ULTIMATE AIRSPACE', title: 'DRONE SWARM',
     summary: 'The real test-bay recording shows separated clusters holding altitude while distributing targets.',
-    accent: '#8ef6df', beats: ['Fill centre airspace', 'Spread into clusters', 'Engage without ground-hugging'],
+    accent: '#f8dfce', beats: ['Fill centre airspace', 'Spread into clusters', 'Engage without ground-hugging'],
     media: { posterPath: killstreakDemoPosterPath('drone-swarm'), videoPath: killstreakDemoVideoPath('drone-swarm') },
   }),
 });

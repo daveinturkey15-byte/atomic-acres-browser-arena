@@ -15,6 +15,9 @@ import {
   FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT,
   FIRST_PERSON_HIP_TRIGGER_HAND_LIFT,
   FIRST_PERSON_HIP_TRIGGER_HAND_LIFT_CEILING,
+  FIRST_PERSON_VIEWMODEL_FILL_INTENSITY,
+  ARM_FILL_EMISSIVE_INTENSITY,
+  armFillEmissiveIntensity,
   HIP_VIEWMODEL_POSITION,
   HIP_VIEWMODEL_SCALE,
   VIEWMODEL_NEAR_PLANE_CLEARANCE,
@@ -32,6 +35,7 @@ import {
   viewmodelContactResponse,
 } from './weapon-presentation-state';
 import { WEAPON_IDS, type WeaponId } from './protocol';
+import { FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY } from './operator-model';
 
 const REST_POSE = {
   dt: 1 / 60,
@@ -839,5 +843,79 @@ describe('HF-388: the support hand closes on the handguard like a C-clamp', () =
       expect(Math.abs(FINGER_SUPPORT_CURL.index[joint]!), `support index[${joint}]`)
         .toBeGreaterThan(Math.abs(FINGER_FIRE_CURL.index[joint]!));
     }
+  });
+});
+
+describe('HF-388 first-person arm exposure contract', () => {
+  /**
+   * The bypass this pins used to be real: `FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY`
+   * declared 0.18 and `tuneAuthoredFirstPersonArmMaterials` wrote 0.34-0.38
+   * directly past it. Nothing asserted the bound, so the constant described a
+   * contract the code did not keep. This asserts the PRODUCED value, not the
+   * intent - the failure mode this project keeps paying for is a test that
+   * checks the input it just wrote.
+   */
+  it('never lets the lit arm fill exceed the declared emissive cap', () => {
+    const roles = Object.keys(ARM_FILL_EMISSIVE_INTENSITY) as (keyof typeof ARM_FILL_EMISSIVE_INTENSITY)[];
+    expect(roles.length).toBeGreaterThan(0);
+    for (const role of roles) {
+      expect(armFillEmissiveIntensity(role, false), role)
+        .toBeLessThanOrEqual(FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY);
+      // A cap honoured by clamping everything to zero would also pass the line
+      // above while re-creating the black-wedge failure, so the floor is pinned
+      // in the same breath.
+      expect(armFillEmissiveIntensity(role, false), role).toBeGreaterThan(0);
+    }
+  });
+
+  /**
+   * The reduced-render path runs with the viewmodel fill at ZERO, so emissive
+   * really is its only floor and the below-deck measurement that made the cap
+   * free on the lit path says nothing about it. Its authored values are pinned
+   * exactly so that a future tidy of the table cannot quietly darken a path
+   * nobody re-measured.
+   */
+  it('keeps the reduced-render arm floor above the lit-path value it does not share', () => {
+    const roles = Object.keys(ARM_FILL_EMISSIVE_INTENSITY) as (keyof typeof ARM_FILL_EMISSIVE_INTENSITY)[];
+    for (const role of roles) {
+      expect(armFillEmissiveIntensity(role, true), role)
+        .toBeGreaterThan(armFillEmissiveIntensity(role, false));
+    }
+    expect(ARM_FILL_EMISSIVE_INTENSITY.sleeve.reduced).toBe(0.24);
+    expect(ARM_FILL_EMISSIVE_INTENSITY.glove.reduced).toBe(0.26);
+    expect(ARM_FILL_EMISSIVE_INTENSITY.accent.reduced).toBe(0.28);
+    expect(ARM_FILL_EMISSIVE_INTENSITY.skin.reduced).toBe(0.2);
+  });
+
+  /**
+   * The viewmodel fill is the term that made the arm render at the same
+   * brightness below deck as in full sunset. Measured: with the arm albedo
+   * forced black the shipped frame still returned mean 100.5 of its 140.5, so
+   * three quarters of the arm was the fill's own white specular sheen.
+   *
+   * Both ends are bounded. The ceiling stops a future pass walking the veil
+   * back in; the floor stops it over-correcting into the flat-black-wedge
+   * failure that is the expensive historical bug on this arm.
+   */
+  it('bounds the viewmodel fill at both ends and reaches the live light', () => {
+    expect(FIRST_PERSON_VIEWMODEL_FILL_INTENSITY).toBeLessThanOrEqual(6);
+    expect(FIRST_PERSON_VIEWMODEL_FILL_INTENSITY).toBeGreaterThanOrEqual(3);
+
+    const lit = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), false);
+    const fill = lit.root.children.find(
+      (child): child is THREE.PointLight => child instanceof THREE.PointLight
+        && child.name === 'first-person-viewmodel-fill',
+    );
+    expect(fill).toBeDefined();
+    expect(fill!.userData.authoredIntensity).toBe(FIRST_PERSON_VIEWMODEL_FILL_INTENSITY);
+    expect(fill!.decay).toBe(2);
+
+    // The reduced path is the one place this light is meant to be absent.
+    const reduced = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), true);
+    const reducedFill = reduced.root.children.find(
+      (child): child is THREE.PointLight => child instanceof THREE.PointLight
+        && child.name === 'first-person-viewmodel-fill',
+    );
+    expect(reducedFill!.userData.authoredIntensity).toBe(0);
   });
 });
