@@ -445,6 +445,12 @@ export function buildScreenSpacePostGraph(
   let shaftReason: string | null = runtime.godrays.unavailableReason;
   /** The gain `beforeRender` last wrote into the composite. Reported, not requested. */
   let shaftGain = 0;
+  /**
+   * The last non-null `light.shadow.map` observed, so a target that is
+   * replaced or disposed under the built raymarch is detectable. Read from the
+   * per-frame hook; a plain reference compare, no allocation.
+   */
+  let shaftShadowMapSeen: object | null = null;
 
   const buildShaftStage = (): void => {
     const readiness = shaftLightReadiness(sources.volumetricLight);
@@ -508,7 +514,18 @@ export function buildScreenSpacePostGraph(
     refreshShaftStage(): boolean {
       const readiness = shaftLightReadiness(sources.volumetricLight);
       const wanted = active.godrays.enabled && readiness.usable;
-      if (wanted === (godraysNode !== null)) {
+      // SECOND TRIGGER. `GodraysNode.setup()` captures the depth texture by
+      // reference into a `texture()` node, so the shaft raymarch is bound to
+      // ONE `light.shadow.map` for the life of the node. If that render target
+      // is replaced or disposed underneath it — three's ShadowNode `_reset()`
+      // on a shadow-type change, or an explicit `shadow.map = null` on a
+      // shadow-map-size change — the built node is sampling a dead texture and
+      // the next material rebuild would throw the same null dereference. Treat
+      // a changed map identity as a rebuild, not as steady state.
+      const mapNow = (sources.volumetricLight?.shadow?.map ?? null) as object | null;
+      const mapLost = godraysNode !== null && shaftShadowMapSeen !== null && mapNow !== shaftShadowMapSeen;
+      if (mapNow !== null) shaftShadowMapSeen = mapNow;
+      if (wanted === (godraysNode !== null) && !mapLost) {
         // Nothing to rebuild, but the reason can still have changed (shadows
         // turned off renderer-wide versus this arena's sun casting none), and a
         // stale reason is exactly the kind of receipt that hides a defect.
@@ -519,6 +536,10 @@ export function buildScreenSpacePostGraph(
       shaftDisposables = [];
       godraysNode = null;
       shaftLight = null;
+      // Adopt whatever the light holds NOW, null included. Keeping the retired
+      // target here would make every later refresh see a lost map and rebuild
+      // the composite again on each one.
+      shaftShadowMapSeen = mapNow;
       buildShaftStage();
       return true;
     },
@@ -593,6 +614,11 @@ export function buildScreenSpacePostGraph(
       // because the tint reads `light.color` and gun-range's sun is white at
       // intensity 0. Zero gain is the only honest value in that window.
       const usable = shaftLightReadiness(light).usable;
+      // Cheapest place to notice the shadow target three allocated (or
+      // replaced): one reference read per frame, no allocation, and it is the
+      // only hook that runs often enough to catch a mid-session swap.
+      const map = (light?.shadow?.map ?? null) as object | null;
+      if (map !== null) shaftShadowMapSeen = map;
       shaftGain = active.godrays.enabled && usable ? active.godrays.additiveGain : 0;
       if (light) shaftTint.copy(light.color);
       else shaftTint.setRGB(1, 1, 1);

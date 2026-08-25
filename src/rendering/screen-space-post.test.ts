@@ -382,6 +382,41 @@ describe('HF-401 shaft stage follows the arena sun that actually casts shadows',
     systems.dispose();
   });
 
+  it('rebuilds the raymarch when the shadow target it captured is replaced under it', async () => {
+    // `GodraysNode.setup()` captures `light.shadow.map.depthTexture` BY
+    // REFERENCE into a `texture()` node, so the built raymarch is bound to one
+    // render target for the life of the node. legacy-main disposes and nulls
+    // `sunLight.shadow.map` whenever the shadow map SIZE changes, and three's
+    // ShadowNode allocates a fresh one on a shadow-type change. Either way the
+    // built node is then sampling a dead texture, and the next material rebuild
+    // would throw the same null dereference this whole change exists to remove.
+    const sun = shadowCastingSun();
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    scene.add(sun);
+    const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['atomic-acres']()).definition;
+    const systems = createPass64TslSceneSystems(
+      scene, camera, renderPipeline, definition, graphicsWith(SHAFTS_ONLY), undefined, sun,
+    );
+    const firstTarget = new THREE.RenderTarget(2, 2);
+    sun.shadow.map = firstTarget as unknown as THREE.LightShadow['map'];
+    systems.update(16);
+    const composedAgainstFirstTarget = renderPipeline.outputNode;
+    expect(composedAgainstFirstTarget).not.toBeNull();
+
+    // The size change legacy-main performs: dispose, then null.
+    sun.shadow.map = null;
+    await systems.applyDefinition(definition);
+    // A NEW composite, i.e. a new shaft node built against whatever three
+    // allocates next, rather than the old one still holding the dead texture.
+    expect(renderPipeline.outputNode).not.toBe(composedAgainstFirstTarget);
+    expect(systems.linearSourceStages).toContain(SHAFT_STAGE);
+    expect(publishedShafts(systems).enabled).toBe(true);
+    firstTarget.dispose();
+    systems.dispose();
+  });
+
   it('retires the shafts, and their gain, when a later arena commits a sunless one', async () => {
     // The other direction is not cosmetic either: the built node keeps
     // raymarching whatever `light.shadow.map` still holds, which after leaving
@@ -397,6 +432,48 @@ describe('HF-401 shaft stage follows the arena sun that actually casts shadows',
     expect(publishedShafts(systems).enabled).toBe(false);
     systems.update(16);
     expect(publishedShafts(systems).effectiveAdditiveGain).toBe(0);
+    systems.dispose();
+  });
+});
+
+describe('HF-401 the shaft rebuild settles instead of recomposing on every apply', () => {
+  it('recomposes once for a lost shadow target, not on every later refresh', async () => {
+    // A rebuild that kept the RETIRED target as its reference point would see a
+    // lost map again on the next definition apply and recompose the whole
+    // linear-HDR expression each time — a pipeline rebuild per arena commit,
+    // for a target that was already replaced.
+    const sun = new THREE.DirectionalLight(0xfff2dc, 3);
+    sun.castShadow = true;
+    const scene = new THREE.Scene();
+    scene.add(sun);
+    const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['atomic-acres']()).definition;
+    const shaftsOnly = resolveScreenSpacePostRuntime({
+      volumetricLightShafts: 'high', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+      depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off', rayTracing: 'off',
+    }, { shadowsEnabled: true });
+    const systems = createPass64TslSceneSystems(
+      scene, new THREE.PerspectiveCamera(), renderPipeline, definition, {
+        principalSamples: 1,
+        volumetricScale: 1,
+        ambientOcclusion: AMBIENT_OCCLUSION_OFF,
+        post: POST_DEFAULTS,
+        reflectionScale: 1,
+        reflectionQuality: 'high',
+        environmentIntensity: 1,
+        screenSpace: shaftsOnly,
+      }, undefined, sun,
+    );
+    const target = new THREE.RenderTarget(2, 2);
+    sun.shadow.map = target as unknown as THREE.LightShadow['map'];
+    systems.update(16);
+    sun.shadow.map = null;
+    await systems.applyDefinition(definition);
+    const afterRebuild = renderPipeline.outputNode;
+    // Nothing else changed, so this apply must be a no-op for the composite.
+    await systems.applyDefinition(definition);
+    expect(renderPipeline.outputNode).toBe(afterRebuild);
+    target.dispose();
     systems.dispose();
   });
 });
