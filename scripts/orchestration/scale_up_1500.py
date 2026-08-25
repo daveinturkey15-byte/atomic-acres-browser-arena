@@ -8,7 +8,9 @@ carries roughly 30 agents, so this stops the narrow loop and starts a wide one.
 It is a SEPARATE loop from gauntlet_v2 rather than a reconfiguration, because the running
 process cannot reload its own source and killing it mid-round orphans a dispatcher.
 """
+import ast
 import datetime as dt
+import io
 import json
 import os
 import subprocess
@@ -46,7 +48,10 @@ def free_gb():
 now = dt.datetime.now()
 target = now.replace(hour=TARGET[0], minute=TARGET[1], second=0, microsecond=0)
 if target < now:
-    target += dt.timedelta(days=1)
+    # Fire NOW, not tomorrow. This is a same-day scale-up; if it is restarted at 15:01
+    # because the trigger itself needed fixing, sleeping 24 hours is never the intent.
+    log(f'target {target:%H:%M} already passed - firing immediately')
+    target = now
 log(f"armed; Pass 81 goes wide at {target:%H:%M} ({(target - now).total_seconds()/60:.0f} min)")
 while dt.datetime.now() < target:
     time.sleep(20)
@@ -77,21 +82,29 @@ for _ in range(30):
 time.sleep(20)
 log(f"free after: {free_gb()} GB")
 
-# Pass 81 reuses the same loop with the refinement team set.
-sw = os.path.join(HERE, "pass81_switch.py")
-with open(sw, "w", encoding="utf-8", newline="\n") as fh:
-    fh.write(
-        "import io, os, sys\n"
-        "p = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gauntlet_v2.py')\n"
-        "s = io.open(p, encoding='utf-8', newline='').read()\n"
-        "s = s.replace('from pass80_teams import', 'from pass81_teams import')\n"
-        "s = s.replace('ORDER = [\"gameplay-test\", \"arena-fidelity\", \"assets-imagegen\"]',\n"
-        "              'ORDER = [\"multiplayer-hardening\", \"arena-polish\", \"arms-and-skins\",\\n"
-        "         \"look-and-feel\", \"assets-generation\", \"perf-and-boot\"]')\n"
-        "io.open(p, 'w', encoding='utf-8', newline='').write(s)\n"
-        "print('gauntlet switched to pass81 teams')\n")
-rc = subprocess.run([sys.executable, sw], cwd=REPO, capture_output=True, text=True, timeout=180)
-log(rc.stdout.strip() or rc.stderr.strip()[:200])
+# Pass 81 reuses the same loop with the refinement team set. Done INLINE and VERIFIED.
+# The old code generated a CHILD SCRIPT by string-building Python source, and the ORDER
+# replacement embedded an escaped newline that made that child a SyntaxError - proved by
+# dry run at 14:57 on 2026-08-25. scale_up only LOGGED the failure and carried on, so
+# Pass 81 would silently have launched with Pass 80's three teams and Pass 80's task
+# list. There is no reason for a child script here, and one fewer level of escaping is
+# one fewer way to fail quietly. The ORDER is one line for the same reason.
+G = os.path.join(HERE, "gauntlet_v2.py")
+src = io.open(G, encoding="utf-8", newline="").read()
+subs = [
+    ("from pass80_teams import", "from pass81_teams import"),
+    ('ORDER = ["gameplay-test", "arena-fidelity", "assets-imagegen"]',
+     'ORDER = ["multiplayer-hardening", "arena-polish", "arms-and-skins", "look-and-feel", "assets-generation", "perf-and-boot"]'),
+]
+missing = [a for a, _ in subs if a not in src]
+if missing:
+    log(f"ABORT: gauntlet_v2.py no longer contains {missing} - refusing to launch a mis-specced pass")
+    raise SystemExit(1)
+for a, b in subs:
+    src = src.replace(a, b, 1)
+ast.parse(src)  # never write a loop that cannot start
+io.open(G, "w", encoding="utf-8", newline="").write(src)
+log("gauntlet switched to pass81 teams (verified: both anchors matched, result parses)")
 
 # Fresh progress file: Pass 81 is a different task list, not a continuation of Pass 80's.
 prog = os.path.join(REPO, "artifacts", "pass80-logs", "task-progress.json")
