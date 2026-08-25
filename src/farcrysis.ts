@@ -15,6 +15,7 @@ import {
 } from './farcrysis-palms-enhanced';
 import { lumpify } from './farcrysis-vegetation';
 import { createWaterRippleTexture, registerScrollingWaterTexture } from './farcrysis-water-ripples';
+import { bakeFarcrysisWaterDepth, createFarcrysisSeaSurfaceMaterial } from './farcrysis-water-surface';
 import {
   farcrysisTerrainHeight,
   farcrysisTerrainPhysicsTiles,
@@ -233,16 +234,22 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // those facets actually produce directional specular; the map's variation
   // stops the broad glare the old roughness=1 flat look had.
   const lagoonRipples = createWaterRippleTexture(7, 7);
-  const waterMat = new THREE.MeshStandardMaterial({
-    color: 0x2fa3ab,
+  // HF-394: on the WebGPU route the authored waterline surface is now a typed
+  // TSL sea material (Fresnel sky reflection + depth-graded refraction
+  // transmission, see farcrysis-water-surface.ts). The WebGL2 compat route and
+  // test environments keep this plane's shipped look byte-for-byte via
+  // compatOpacity. Shallow/deep colours bracket the old flat 0x2fa3ab tint so
+  // the absorption ramp reads as depth, not as a regrade.
+  const waterMat = createFarcrysisSeaSurfaceMaterial({
+    baseColor: 0x1d7d88,
+    shallowColor: 0x3fc2b7,
     roughness: 0.22,
     metalness: 0.02,
-    transparent: true,
-    opacity: 0.62,
-    ...(lagoonRipples ? {
-      normalMap: lagoonRipples.texture,
-      normalScale: new THREE.Vector2(0.45, 0.45),
-    } : {}),
+    opacityShallow: 0.42,
+    opacityDeep: 0.72,
+    compatOpacity: 0.62,
+    normalMap: lagoonRipples?.texture ?? null,
+    normalScale: 0.45,
   });
   if (lagoonRipples) {
     registerScrollingWaterTexture(lagoonRipples.texture, 0.021, 0.013);
@@ -308,7 +315,12 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
 
   // The lagoon plane sits exactly at the registry water level — this surface
   // IS the arena's one authored waterline (water-authoring FARCRYSIS_WATER).
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), waterMat);
+  // HF-394: 64x64 segments (2.2 m quads) so the baked per-vertex water-column
+  // depth resolves the ~9 m shore band; the TSL sea material interpolates it
+  // for the refraction/transmission ramp.
+  const lagoonGeom = new THREE.PlaneGeometry(140, 140, 64, 64);
+  bakeFarcrysisWaterDepth(lagoonGeom, false); // mesh-rotated: world z = -local y
+  const water = new THREE.Mesh(lagoonGeom, waterMat);
   water.name = 'farcrysis-lagoon-water';
   water.rotation.x = -Math.PI / 2;
   water.position.y = FARCRYSIS_WATER_LEVEL;
