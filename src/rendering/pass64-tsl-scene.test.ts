@@ -248,6 +248,16 @@ describe('Pass 64 authored TSL pipeline set', () => {
     expect(renderer.setMRT.mock.calls.at(-1)?.[0]).toBe(previousMrt);
     expect(currentTarget).toBe(previousTarget);
     expect(currentMrt).toBe(previousMrt);
+    // The arena transition profiler can only see `coverage-submit-fence` as a
+    // single number (9.8 s on farcrysis at MAX on an RTX 5080, against a 12 s
+    // cold allowance) and cannot say how much of it is this yielding compile
+    // versus the forced full-coverage draw that follows. Publishing the split
+    // is what stops the next attempt at that budget from guessing, so it is
+    // pinned rather than left as an incidental field.
+    expect(systems.root.userData.pass65AdvancedGraphics.exactScenePassPrecompile)
+      .toMatchObject({ runs: 1 });
+    expect(systems.root.userData.pass65AdvancedGraphics.exactScenePassPrecompile.durationMs)
+      .toBeGreaterThanOrEqual(0);
     systems.dispose();
     previousTarget.dispose();
   });
@@ -342,6 +352,10 @@ describe('Pass 64 authored TSL pipeline set', () => {
         motionBlur: SCREEN_SPACE_POST_DISABLED.motionBlur,
         upscaling: SCREEN_SPACE_POST_DISABLED.upscaling,
       },
+      // Cold-compile attribution for the arena coverage fence, published from
+      // construction so the zero state is provable rather than inferred from
+      // an absent field - the same rule the screen-space block above follows.
+      exactScenePassPrecompile: { durationMs: 0, runs: 0 },
       linearSourceStages: [
         'scene-pass-linear-hdr', 'contact-occlusion-multiply', 'depth-guarded-bloom-add',
       ],

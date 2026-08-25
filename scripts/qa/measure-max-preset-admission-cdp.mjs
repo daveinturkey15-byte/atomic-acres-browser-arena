@@ -38,9 +38,25 @@ const PRESET = arg('--preset', 'max');
 const ARENA = arg('--arena', 'atomic-acres');
 const TIMEOUT_MS = Number(arg('--timeout-ms', '240000'));
 const OUT = arg('--out', `artifacts/qa/max-admission-${PRESET}-${ARENA}.json`);
+// HEADLESS IS REAL WEBGPU HERE, and that is not what this repo assumed.
+// GAUNTLET-SPEC records "headless Chromium on this machine cannot create a
+// WebGPU device", which is true of Playwright's BUNDLED Chromium. Installed
+// Chrome driven with channel:'chrome' and headless:true reports
+// actualBackend 'webgpu' on adapter "nvidia / blackwell" with
+// softwareAdapter false, document.hasFocus() true and visibilityState
+// 'visible' — a real hardware device on the owner's RTX 5080, verified before
+// this flag was added. That matters because a headed Chrome doing WebGPU is
+// worth several agents of RAM and has to take a machine-wide governor slot,
+// while this does not.
+// It is still not the owner's environment: there is no real compositor
+// presenting a swapchain, so FRAME PACING results from a headless run are not
+// interchangeable with headed ones. Pipeline compilation and queue completion
+// — what this harness measures — are real GPU work on the real adapter.
+// Default stays headed; --headless 1 is an explicit, disclosed choice.
+const HEADLESS = arg('--headless', '0') === '1';
 
 const browser = await chromium.launch({
-  headless: false,
+  headless: HEADLESS,
   channel: 'chrome',
   args: [
     '--use-angle=d3d11',
@@ -111,7 +127,17 @@ await waitForDebug();
 const applied = await page.evaluate(() => {
   const settings = window.__ATOMIC_ACRES_DEBUG__.snapshot().settings;
   const graphics = settings.graphics ?? {};
+  let adapter = null;
+  try {
+    const render = window.__ATOMIC_ACRES_DEBUG__.sampleGrenadeColdPathTelemetry().render;
+    adapter = {
+      label: render.adapterLabel,
+      softwareAdapter: render.softwareAdapter,
+      actualBackend: render.actualBackend,
+    };
+  } catch { /* telemetry unavailable */ }
   return {
+    adapter,
     displayedGraphicsPreset: settings.displayedGraphicsPreset ?? null,
     requestedPreset: settings.requested?.graphics?.preset ?? null,
     stagedReconstruction: settings.liveApplication?.stagedReconstruction ?? null,
@@ -123,11 +149,14 @@ const applied = await page.evaluate(() => {
   };
 });
 
+// A software adapter would make every timing below meaningless, so it is
+// refused exactly like a wrong preset would be.
 const presetProven = applied.displayedGraphicsPreset === PRESET
   && applied.requestedPreset === PRESET
   && Array.isArray(applied.stagedReconstruction)
   && applied.stagedReconstruction.length === 0
-  && applied.backend === 'webgpu';
+  && applied.backend === 'webgpu'
+  && applied.adapter?.softwareAdapter === false;
 
 if (!presetProven) {
   const record = {
@@ -207,6 +236,18 @@ const arenaTransition = await page.evaluate(() => {
   return streaming?.transition ?? null;
 }).catch(() => null);
 
+// The transition profiler reports `coverage-submit-fence` as ONE number. This
+// splits it: how much was the yielding exact-ScenePass compile, and therefore
+// how much was the forced full-coverage draw that follows it.
+const precompile = await page.evaluate(() => {
+  let found = null;
+  window.__ATOMIC_ACRES_DEBUG__.sampleSceneGraph().traverse((node) => {
+    const record = node.userData?.pass65AdvancedGraphics?.exactScenePassPrecompile;
+    if (record) found = { ...record };
+  });
+  return found;
+}).catch(() => null);
+
 // --- Deployment (the guarded 4000 ms admission flushes) ---------------------
 if (outcome === 'unknown') {
   startSoloAtMs = Date.now() - startedAt;
@@ -261,6 +302,7 @@ await browser.close();
 const result = {
   preset: PRESET,
   arena: ARENA,
+  headless: HEADLESS,
   outcome,
   totalMs,
   selectArenaMs,
@@ -271,6 +313,7 @@ const result = {
   bundleAtEnd,
   bundleStable: bundleAtStart !== null && bundleAtStart === bundleAtEnd,
   arenaTransitionAtSelect: arenaTransition,
+  exactScenePassPrecompile: precompile,
   stages,
   finalSample,
   series,
@@ -281,10 +324,11 @@ writeFileSync(resolve(OUT), JSON.stringify(result, null, 2));
 
 const maxLatency = finalSample?.presentation?.progress?.maximumCompletionLatencyMs ?? null;
 console.error([
-  `[max-admission] preset=${PRESET} arena=${ARENA} outcome=${outcome}`,
+  `[max-admission] preset=${PRESET} arena=${ARENA} headless=${HEADLESS} outcome=${outcome}`,
   `total=${(totalMs / 1000).toFixed(2)}s select=${selectArenaMs === null ? 'n/a' : (selectArenaMs / 1000).toFixed(2) + 's'}`,
   `deploy=${startSoloAtMs === null ? 'n/a' : ((totalMs - startSoloAtMs) / 1000).toFixed(2) + 's'}`,
   `maxCompletionLatencyMs=${maxLatency}`,
+  `scenePassPrecompile=${precompile ? `${precompile.durationMs} ms x${precompile.runs}` : 'n/a'}`,
   `bundleStable=${bundleAtStart === bundleAtEnd}`,
   `status="${finalSample?.status ?? ''}"`,
 ].join(' '));

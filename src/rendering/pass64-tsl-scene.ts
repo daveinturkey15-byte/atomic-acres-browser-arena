@@ -1121,6 +1121,15 @@ export function createPass64TslSceneSystems(
   let adaptedScreenSpace = constructedScreenSpace;
   const liveScreenSpace = (): GraphicsRuntime['screenSpace'] => adaptedScreenSpace;
   applyArenaSystemLayout(root, definition, definition.reviewCameras[0]?.seed ?? 6401, graphics);
+  // Cold-compile attribution for the arena coverage fence. The transition
+  // profiler can only see `coverage-submit-fence` as one number (measured
+  // 3.4 s atomic-acres, 2.3 s high-seas, 9.8 s farcrysis on an RTX 5080 at the
+  // MAX preset, against a 12 s cold allowance) and cannot say how much of it
+  // is this yielding ScenePass compile versus the forced full-coverage draw
+  // that follows. Without that split, the next attempt at the MAX admission
+  // budget has to guess which half to attack. Published into the same
+  // userData block QA already reads.
+  let lastPrecompile: Readonly<{ durationMs: number; runs: number }> = Object.freeze({ durationMs: 0, runs: 0 });
   const publishActualGraphics = (): void => {
     const mist = root.getObjectByName('Pass 64 TSL mist');
     const smoke = root.getObjectByName('Pass 64 TSL smoke');
@@ -1164,6 +1173,7 @@ export function createPass64TslSceneSystems(
         upscaling: Object.freeze({ ...constructedScreenSpace.upscaling }),
       }),
       linearSourceStages: hdr.linearSourceStages,
+      exactScenePassPrecompile: lastPrecompile,
     };
   };
   publishActualGraphics();
@@ -1200,6 +1210,7 @@ export function createPass64TslSceneSystems(
       const renderer = renderPipeline.renderer;
       const previousRenderTarget = renderer.getRenderTarget();
       const previousMrt = renderer.getMRT();
+      const startedAt = performance.now();
       renderer.setRenderTarget(scenePass.renderTarget);
       renderer.setMRT(scenePass.getMRT());
       try {
@@ -1211,6 +1222,11 @@ export function createPass64TslSceneSystems(
       } finally {
         renderer.setRenderTarget(previousRenderTarget);
         renderer.setMRT(previousMrt);
+        lastPrecompile = Object.freeze({
+          durationMs: Number((performance.now() - startedAt).toFixed(1)),
+          runs: lastPrecompile.runs + 1,
+        });
+        publishActualGraphics();
       }
     },
     applyDefinition: async (nextDefinition) => {
