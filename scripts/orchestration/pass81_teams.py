@@ -35,28 +35,20 @@ TEAMS = {
                  "src/operator-skin-catalog.ts, src/operator-appearance-catalog.ts, "
                  "src/weapon-presentation*.ts and their tests"),
         "tasks": [
-            ("ar-arm-material-read",
-             "The arms now sit in frame, but on Nuke Town at sunset the forearm renders as a "
-             "BRIGHT, NEARLY FEATURELESS PALE SHAPE - no readable sleeve/glove separation, no "
-             "weave, no wrinkle. Capture it yourself on atomic-acres and high-seas and judge "
-             "before changing anything. Known context: a previous agent deliberately dropped "
-             "the near-black albedo map and drove colour from the palette, keeping normalMap "
-             "and roughnessMap - it fixed a black wedge but may have overshot into a white one. "
-             "FIRST_PERSON_ARM_TARGET_SRGB_LUMINANCE is sleeve 0.35 / glove 0.28 and "
-             "FIRST_PERSON_ARM_CHROMA_GAIN is 1.45. Also flagged: "
-             "FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY (0.18) is BYPASSED - "
-             "tuneAuthoredFirstPersonArmMaterials sets 0.34/0.36 directly. Restore material "
-             "READ: sleeve and glove distinguishable, surface detail visible, not blown out."),
-            ("ar-dark-interior",
-             "UNVERIFIED RISK the previous agent explicitly flagged before shipping: arm albedo "
-             "was lowered substantially and the historically expensive failure is the DARK end. "
-             "It checked the high-seas open deck (mean luminance 116, fine) but NOT below deck, "
-             "the real interior. Verify arms remain readable in the darkest playable interiors. "
-             "NOTE: two of my own probes failed at this - a canvas readback returned luminance 0 "
-             "for a frame that was demonstrably rendering (WebGPU canvases cannot be read with "
-             "drawImage), and teleporting to (0,-2,0) on high-seas lands in the hull void, not "
-             "the corridor. Use the below-deck stations in scripts/qa/capture-below-deck.mjs and "
-             "measure from a SCREENSHOT, not a canvas readback."),
+            ("ar-reduced-render-arms",
+             "DONE, DO NOT REDO: the pale-forearm read and the dark-interior risk were both fixed "
+             "and verified on real WebGPU 2026-08-25 - near-clipping 3.59% to 0.19% at the hip, "
+             "16.39% to 0.46% in ADS, below-deck mean 101.1 against a 53.1 arena floor. The cause "
+             "was never the palette constants: first-person-viewmodel-fill was a white specular "
+             "veil at 17.5cd sitting 0.61m from the arm (not the authored 0.4m, because it hangs "
+             "off a SCALED root), and forcing arm albedo to BLACK still rendered 100.5 of the "
+             "shipped 140.5. It is 4.5 now, and normalScale is driven at 2.4. "
+             "YOUR TASK is the one path that fix deliberately did NOT touch. The REDUCED-RENDER "
+             "path runs with the viewmodel fill at zero, so emissive really is its only floor "
+             "there and its higher values were left alone on purpose. Verify the arms read "
+             "correctly on that path in a bright AND a dark arena, measured from SCREENSHOTS, not "
+             "canvas readbacks - WebGPU canvases cannot be read with drawImage. If it is already "
+             "fine, say so and stop; do not tune something that works."),
             ("ar-bot-skin-visibility",
              "The owner believes bots now show four skins. They largely do NOT, and this was "
              "measured: bots are built with the 'neon-purple' appearance, and materialForTeam "
@@ -102,6 +94,7 @@ TEAMS = {
              "at wrong scale, materials reading as untextured. The owner holds Hijacked up as the "
              "fidelity benchmark the other arenas are judged against - protect that."),
             ("ap-arena-audit",
+             "ALSO, from the UI sweep, out of its reach and inside yours: world-space arena signage (ARMORY - PICK UP WITH F, weapon pickup labels) still renders with CYAN edges from arena/renderer source. It is drawn in the world, so no stylesheet can reach it. Warm it to match the deck without lowering its legibility - it is a gameplay affordance first. "
              "Run the forging review on every arena: floating geometry, buried props, spawn "
              "safety, out-of-bounds escapes, sightlines. Use the 8-view / 45-degree / 1024x1024 / "
              "15-degree-elevation critic protocol and cross-reference what you see against "
@@ -112,12 +105,23 @@ TEAMS = {
         "owns": ("src/ui/** EXCEPT pass64-shell.ts, src/rendering/filmic-grade-chain.ts, "
                  "src/rendering/art-direction.ts and their tests"),
         "tasks": [
-            ("lf-menu-identity",
-             "The warm bone/ink/burnt-orange print identity landed, but the owner has rejected "
-             "the look THREE times with 'it doesn't look that different'. Audit EVERY surface - "
-             "panels, dialogs, toasts, overlays, the pause menu, end-of-match - and bring any "
-             "still on the old teal-on-white deck across. Capture before/after and only stop "
-             "when the pair is obviously different at a glance."),
+            ("lf-identity-residuals",
+             "The menu/HUD sweep is DONE and measured: 659 cold DOM nodes across 47 surfaces "
+             "reduced to 61 across 12 (90.7%), by rotating hue at CONSTANT WCAG relative "
+             "luminance - worst deviation 0.0013, so no contrast ratio moved and no legibility "
+             "bound can regress behind a colour change. Read that method before you touch a "
+             "colour; rotating at fixed HSL lightness silently loses contrast and is the trap. "
+             "A guard test now forbids the PROPERTY (any colour whose blue channel beats its "
+             "red) across 11 sheets, naming the semantic families where cold means something. "
+             "YOUR TASK is the residue it could not reach inside its ownership: "
+             "(1) index.html still ships <meta name=theme-color content=#10171b> and a cyan "
+             "#00d4ff favicon - the browser tab and the installed-app chrome are the FIRST "
+             "thing the owner sees and they are still the rejected identity. "
+             "(2) #color-grade carries rgba(24,73,92,.09), a cold wash over the whole frame. "
+             "(3) The AQUA team score reads teal in solo and gun-range where there is no "
+             "opposing team. That one is a BEHAVIOUR fix (which span the matchbar uses), not a "
+             "colour fix - the guard forbids retuning the team token, and it is right to. "
+             "Do not touch --ui-cyan or --aqua; use --ui-signal for chrome."),
             ("lf-hud-impact",
              "The HUD impact response is wired: measured 3.8px kick for a bullet, 22px for a "
              "close explosion, with directional bearing. Play with it and judge whether it reads "
@@ -208,10 +212,15 @@ TEAMS = {
              "Use the threejs-frame-loop-audit skill: frame-loop cost, GPU leaks, per-frame "
              "allocation. The owner plays this - a stutter is worth more to fix than a feature."),
             ("pb-boot-time",
-             "Arena boots measured 28-51s end to end. That is a long time to stare at a loading "
-             "screen. Find what dominates - shared asset streaming, pipeline compile, texture "
-             "decode - and reduce it. Report per-phase numbers before and after so the win is "
-             "attributable rather than asserted."),
+             "MEASURED 2026-08-25 14:35 on a QUIET machine, PRODUCTION bundle, real WebGPU, six for "
+             "six OK: atomic-acres 34.7s, skyline-terminal 32.0s, rustworks-1v1 40.1s, "
+             "gun-range 35.8s, high-seas 31.4s, farcrysis 61.2s. Those are your baselines and "
+             "they are honest ones - nothing else was running. A player stares at a loading "
+             "screen for a MINUTE on farcrysis. Find what dominates (shared asset streaming, "
+             "pipeline compile, texture decode) and reduce it. Report per-phase numbers before "
+             "and after so the win is attributable rather than asserted. Re-measure with "
+             "scripts/qa/verify-arena-boot-cdp.mjs against a PRODUCTION build, never the dev "
+             "server, and never while a swarm is running."),
         ],
     },
 }
