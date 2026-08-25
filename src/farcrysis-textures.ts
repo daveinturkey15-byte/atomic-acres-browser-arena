@@ -17,6 +17,8 @@
  */
 
 import * as THREE from 'three';
+import type { MeshStandardNodeMaterial } from 'three/webgpu';
+
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
 
 // ---------------------------------------------------------------------------
@@ -975,7 +977,8 @@ interface ImageTextureSet {
   alpha?: THREE.Texture;
 }
 
-const REGISTRY = new Map<THREE.MeshStandardMaterial, TextureCategory>();
+const REGISTRY = new Map<PbrSlotMaterial, TextureCategory>();
+
 const _imageSets: Partial<Record<TextureCategory, ImageTextureSet>> = {};
 let _imageLoaderInitiated = false;
 
@@ -1113,9 +1116,25 @@ function loadAllImageTextures(): void {
 // ---------------------------------------------------------------------------
 // Procedural augmentation (immediate, synchronous)
 // ---------------------------------------------------------------------------
+/** Materials carrying MeshStandardMaterial's PBR slots (map/normalMap/
+ *  roughnessMap). The TSL wind materials are three/webgpu
+ *  MeshStandardNodeMaterial, which does NOT extend MeshStandardMaterial but
+ *  honours every one of those slots — materialColor multiplies material.map
+ *  (MaterialNode.COLOR), and normal/roughness flow through the standard node
+ *  structure. Without accepting it here the whole tree-species treatment is
+ *  silently skipped on the WebGPU route. */
+type PbrSlotMaterial = THREE.MeshStandardMaterial | MeshStandardNodeMaterial;
+
+function isPbrSlotMaterial(mat: THREE.Material): mat is PbrSlotMaterial {
+  return (
+    mat instanceof THREE.MeshStandardMaterial ||
+    ('isMeshStandardNodeMaterial' in mat && mat.isMeshStandardNodeMaterial === true)
+  );
+}
+
 
 function augmentProcedural(mat: THREE.Material, category: TextureCategory): void {
-  if (!(mat instanceof THREE.MeshStandardMaterial)) return;
+  if (!isPbrSlotMaterial(mat)) return;
 
   switch (category) {
     case 'sand':
@@ -1235,7 +1254,7 @@ export function applyFarcrysisTextures(root: THREE.Group): void {
       // Register for async image-texture upgrade — only families that actually
       // ship an image stem under public/assets/original/textures/farcrysis-*.
       if (
-        mat instanceof THREE.MeshStandardMaterial
+        isPbrSlotMaterial(mat)
         && (category === 'sand' || category === 'rock' || category === 'palm-bark'
           || category === 'frond' || category === 'water' || category === 'crate')
       ) {

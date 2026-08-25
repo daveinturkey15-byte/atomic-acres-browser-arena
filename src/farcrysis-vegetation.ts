@@ -31,6 +31,7 @@ import {
   tslAdvanceWind,
   type FoliageOptions,
 } from './farcrysis-tsl-foliage';
+import type { MeshStandardNodeMaterial } from 'three/webgpu';
 
 // ---------------------------------------------------------------------------
 // Wind-sway animation (module-level shared state)
@@ -248,8 +249,6 @@ function groveEdgePositions(
   return result;
 }
 
-/** Golden ratio conjugate — produces even angular distribution. */
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 // ---------------------------------------------------------------------------
 // Module-level stats tracker (populated during buildVegetation, read by stats fn)
@@ -283,7 +282,7 @@ function triCount(geometry: THREE.BufferGeometry): number {
 /** Shorthand for PBR material matching the art-lane palette style.
  *  Every material created here is tracked so FARCRYSIS_VEGE_STATS() can
  *  report how many carry real texture maps after applyFarcrysisTextures runs. */
-const _vegeMaterials: THREE.MeshStandardMaterial[] = [];
+const _vegeMaterials: Array<THREE.MeshStandardMaterial | MeshStandardNodeMaterial> = [];
 
 function vegeMat(color: number, roughness = 0.88, metalness = 0.04): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({ color, roughness, metalness });
@@ -308,46 +307,6 @@ function register(
   return mesh;
 }
 
-/**
- * Generate positions evenly distributed within a disc (Fibonacci lattice).
- * Used for trees that prefer the inland jungle core.
- */
-function discPositions(count: number, maxRadius: number): Array<[number, number, number]> {
-  const result: Array<[number, number, number]> = [];
-  for (let i = 0; i < count; i += 1) {
-    const radius = maxRadius * Math.sqrt((i + 0.5) / count);
-    const theta = i * GOLDEN_ANGLE;
-    let x = Math.cos(theta) * radius;
-    let z = Math.sin(theta) * radius * 0.88;
-    x = Math.max(BOUNDS.minX + MARGIN, Math.min(BOUNDS.maxX - MARGIN, x));
-    z = Math.max(BOUNDS.minZ + MARGIN, Math.min(BOUNDS.maxZ - MARGIN, z));
-    result.push([x, z, theta]);
-  }
-  return result;
-}
-
-/**
- * Generate positions in an annular ring (Fibonacci-based).
- * Used for trees preferring the beach fringe or mid-ring transitions.
- */
-function ringPositions(
-  count: number,
-  innerRadius: number,
-  outerRadius: number,
-): Array<[number, number, number]> {
-  const result: Array<[number, number, number]> = [];
-  for (let i = 0; i < count; i += 1) {
-    const t = (i + 0.5) / count;
-    const radius = innerRadius + (outerRadius - innerRadius) * t;
-    const theta = i * GOLDEN_ANGLE + (i % 5) * 0.22;
-    let x = Math.cos(theta) * radius;
-    let z = Math.sin(theta) * radius * 0.88;
-    x = Math.max(BOUNDS.minX + MARGIN, Math.min(BOUNDS.maxX - MARGIN, x));
-    z = Math.max(BOUNDS.minZ + MARGIN, Math.min(BOUNDS.maxZ - MARGIN, z));
-    result.push([x, z, theta]);
-  }
-  return result;
-}
 
 // ---------------------------------------------------------------------------
 // Pass 69 extended helpers — deterministic seeded RNG, terrain height, clearance
@@ -414,41 +373,6 @@ function clearOfGameplay(x: number, z: number, margin: number): boolean {
   return true;
 }
 
-/**
- * Generate a list of (x, z, groundY, angle) positions within an annular zone,
- * filtered for gameplay clearance. Uses Fibonacci-like spiralled scatter with
- * a seeded RNG for deterministic reproducibility.
- */
-function layerPositions(
-  count: number,
-  minRadius: number,
-  maxRadius: number,
-  clearanceMargin: number,
-  seed: number,
-): Array<[number, number, number, number]> {
-  const rng = mulberry32(seed);
-  const result: Array<[number, number, number, number]> = [];
-  let attempts = 0;
-  const maxAttempts = count * 30;
-
-  while (result.length < count && attempts < maxAttempts) {
-    const radius = minRadius + rng() * (maxRadius - minRadius);
-    const angle = rng() * Math.PI * 2;
-    let x = Math.cos(angle) * radius;
-    let z = Math.sin(angle) * radius;
-    x = Math.max(BOUNDS.minX + MARGIN, Math.min(BOUNDS.maxX - MARGIN, x));
-    z = Math.max(BOUNDS.minZ + MARGIN, Math.min(BOUNDS.maxZ - MARGIN, z));
-
-    if (clearOfGameplay(x, z, clearanceMargin)) {
-      const groundY = terrainHeightAt(x, z);
-      result.push([x, z, groundY, angle]);
-    }
-
-    attempts += 1;
-  }
-
-  return result;
-}
 
 // ---------------------------------------------------------------------------
 // Believability helpers (pass75 owner feedback: "trees read as solid blobs")
@@ -2641,7 +2565,6 @@ function _applyTslFoliage(scene: THREE.Group): void {
 
     const std = child.material as THREE.MeshStandardMaterial;
     if (!(std && std.isMeshStandardMaterial)) continue;
-
     child.geometry.computeBoundingBox();
     const bb = child.geometry.boundingBox;
     const height = Math.max(0.5, (bb ? bb.max.y - bb.min.y : 1));
@@ -2656,7 +2579,14 @@ function _applyTslFoliage(scene: THREE.Group): void {
       swayHeight: height,
       doubleSided: true,
     };
-    child.material = makeTslFoliageMaterial(opts);
+    const tslMat = makeTslFoliageMaterial(opts);
+    // Keep the FARCRYSIS_VEGE_STATS textureCount ledger truthful: the TSL
+    // material REPLACES the authored standard material as the mesh's live
+    // material, so the tracked slot must follow the replacement. Without this
+    // the wiring proof counts orphaned originals that never receive maps.
+    const trackedAt = _vegeMaterials.indexOf(std);
+    if (trackedAt !== -1) _vegeMaterials[trackedAt] = tslMat;
+    child.material = tslMat;
   }
 }
 
@@ -2911,6 +2841,7 @@ function constrainedScatter(
 function bentLeafCard(height: number, width: number, arch: number): THREE.BufferGeometry {
   const segments = 4;
   const positions: number[] = [];
+  const uvs: number[] = [];
   const indices: number[] = [];
   for (let i = 0; i <= segments; i += 1) {
     const t = i / segments;
@@ -2918,10 +2849,13 @@ function bentLeafCard(height: number, width: number, arch: number): THREE.Buffer
     const cx = arch * t * t; // quadratic lean
     if (i === segments) {
       positions.push(cx, y, 0); // single tip vertex
+      uvs.push(0.5, 1);
       break;
     }
     const halfWidth = width * 0.5 * Math.pow(1 - t, 1.15);
     positions.push(cx - halfWidth, y, 0, cx + halfWidth, y, 0);
+    // u across the blade, v base->tip so the albedo map reads along the leaf.
+    uvs.push(0, t, 1, t);
   }
   for (let i = 0; i < segments - 1; i += 1) {
     const a = i * 2;
@@ -2932,6 +2866,7 @@ function bentLeafCard(height: number, width: number, arch: number): THREE.Buffer
   indices.push(tip - 2, tip - 1, tip);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
