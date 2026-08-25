@@ -168,6 +168,24 @@ TEAMS = {
              "controlling it I am very laggy'. Reproduce with a chopper active and a second peer "
              "observing, measure the frame cost on the NON-controlling peer, find what is "
              "replicated or presented per-frame that should not be, and fix it."),
+            ("mh-shadow-map-lifecycle",
+             "HANDED OVER by the gun-range TSL lane, which found it while fixing a real defect but "
+             "could NOT edit legacy-main.ts because you own it exclusively. It is UNMEASURED - treat "
+             "it as a lead, not a diagnosis, and measure before and after or do not touch it. "
+             "src/legacy-main.ts around 25956-25962 does: read priorShadowMapSize, set castShadow, "
+             "mapSize.set(...), then if (sunLight.shadow.map && size changed) { map.dispose(); "
+             "map = null }. On the WEBGPU route that target is not the light's to own - three's "
+             "ShadowNode owns it as ShadowNode.shadowMap and resizes it itself in renderShadow() "
+             "(three.webgpu.js:45332). So that block clears only the light's back-reference while "
+             "three keeps rendering into the target you just disposed. Suggested fix is to drop the "
+             "priorShadowMapSize line and the whole if-block, keeping castShadow and mapSize.set. "
+             "CONTEXT you need: the same lazy allocation caused a SWALLOWED TSL failure on gun-range "
+             "- GodraysNode dereferences light.shadow.map.depthTexture, gun-range authors "
+             "sunIntensity 0 so castShadow is false so three never allocates the map, and three "
+             "CAUGHT the throw, rebuilt against a default NodeMaterial and composited THAT as shaft "
+             "light while telemetry still said godrays enabled, unavailableReason null. That half is "
+             "already fixed and guarded. Yours is the disposal, and the failure mode is a "
+             "use-after-dispose that will not announce itself either."),
             ("mh-two-machine-prep",
              "Two-machine multiplayer has NEVER been tested and is the real close-out bar - "
              "everything to date is two windows on one PC. You cannot do the second machine, so "
