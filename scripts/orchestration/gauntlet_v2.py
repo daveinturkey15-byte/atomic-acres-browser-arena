@@ -105,8 +105,7 @@ def load_progress():
 
 def save_progress(p):
     os.makedirs(LOGDIR, exist_ok=True)
-    with open(PROGRESS, "w", encoding="utf-8", newline="
-") as fh:
+    with open(PROGRESS, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(p, fh, indent=2)
 
 
