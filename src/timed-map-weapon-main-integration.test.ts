@@ -15,8 +15,21 @@ function between(startNeedle: string, endNeedle: string): string {
 describe('timed map weapon legacy-main integration', () => {
   it('checkpoints both authorities, restores them after final clock construction, and reliably repairs late joiners', () => {
     const checkpoint = between('function createHostMatchCheckpoint(', '\nfunction persistActiveHostMatchCheckpoint(');
+    const checkpointFn = checkpoint.slice(0, checkpoint.indexOf('\nfunction hostRecoveryPoseAudit('));
     expect(checkpoint).toContain('checkpointTimedMapWeaponAuthorities(timedMapWeaponStates, nowMonoMs)');
-    expect(checkpoint).toContain('if (!timedMapWeapons) return null');
+    // bde8fce4 replaced every bare `return null` in createHostMatchCheckpoint
+    // with refuse('<reason>') so a starved authority mirror is observable via
+    // lastCheckpointRefusal (consumed near persistActiveHostMatchCheckpoint).
+    // Refuse returns null, so the abort behaviour is unchanged; the named
+    // reason plus exactly-one-bare-null budget below pin the new contract.
+    expect(checkpointFn).toContain("if (!timedMapWeapons) return refuse('timed-map-weapons');");
+    expect(checkpointFn).toContain('lastCheckpointRefusal = reason');
+    // No conditional guard may silently return null; every refusal must name
+    // itself through refuse() so lastCheckpointRefusal is always populated.
+    // The refuse helper itself legitimately contains ONE bare `return null`
+    // (its whole contract), so EXACTLY ONE occurrence is permitted; any
+    // guard that regresses to a bare null adds a second and fails here.
+    expect(checkpointFn.split('return null').length - 1).toBe(1);
     expect(checkpoint).toContain('timedMapWeapons,');
 
     const start = between('async function startGame(', '\nfunction randomNonce(');
