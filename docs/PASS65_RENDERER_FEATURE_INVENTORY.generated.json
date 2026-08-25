@@ -513,6 +513,32 @@
       ]
     },
     {
+      "key": "graphics.wetSurfaces",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "rain-presentation",
+      "runtimeEvidence": [
+        {
+          "path": "src/weather/rain-presentation.ts",
+          "symbol": "this.applyWetness(this.presentation.wetSurfaces ? this.wetness : 0)",
+          "telemetryPath": "settings.graphics.wetSurfaces + sampleWeather().rain.wetSurfaces"
+        }
+      ]
+    },
+    {
+      "key": "graphics.ambientLife",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "ambient-particles",
+      "runtimeEvidence": [
+        {
+          "path": "src/particles/index.ts",
+          "symbol": "this.densityScale * this.ambientLifeScale",
+          "telemetryPath": "settings.graphics.ambientLife + sampleWeather().particles.ambientLifeScale + .liveParticles"
+        }
+      ]
+    },
+    {
       "key": "accessibility.reducedMotion",
       "applyMode": "live",
       "authorityAffecting": false
@@ -606,7 +632,9 @@
         "weatherIntensity": "light",
         "rainDensity": 0.5,
         "windStrength": 1,
-        "lightning": false
+        "lightning": false,
+        "wetSurfaces": true,
+        "ambientLife": 0.6
       },
       "effective": {
         "requestedPreset": "performance",
@@ -729,7 +757,12 @@
           "rainDensity": 0.5,
           "windStrength": 1,
           "lightning": false,
+          "wetSurfaces": true,
           "weatherEnabled": true
+        },
+        "ambientLife": {
+          "density": 0.6,
+          "enabled": true
         },
         "reason": null
       },
@@ -798,7 +831,9 @@
         "weatherIntensity": "storm",
         "rainDensity": 1,
         "windStrength": 1,
-        "lightning": true
+        "lightning": true,
+        "wetSurfaces": true,
+        "ambientLife": 1
       },
       "effective": {
         "requestedPreset": "high",
@@ -921,7 +956,12 @@
           "rainDensity": 1,
           "windStrength": 1,
           "lightning": true,
+          "wetSurfaces": true,
           "weatherEnabled": true
+        },
+        "ambientLife": {
+          "density": 1,
+          "enabled": true
         },
         "reason": null
       },
@@ -990,7 +1030,9 @@
         "weatherIntensity": "storm",
         "rainDensity": 1.35,
         "windStrength": 1,
-        "lightning": true
+        "lightning": true,
+        "wetSurfaces": true,
+        "ambientLife": 1.5
       },
       "effective": {
         "requestedPreset": "max",
@@ -1113,7 +1155,12 @@
           "rainDensity": 1.35,
           "windStrength": 1,
           "lightning": true,
+          "wetSurfaces": true,
           "weatherEnabled": true
+        },
+        "ambientLife": {
+          "density": 1.5,
+          "enabled": true
         },
         "reason": null
       },
@@ -1939,10 +1986,11 @@
           "graphics.weatherIntensity",
           "graphics.rainDensity",
           "graphics.windStrength",
-          "graphics.lightning"
+          "graphics.lightning",
+          "graphics.wetSurfaces"
         ],
-        "effectiveValue": "Weather ceiling off/light/moderate/heavy/storm, rain density 0.25x-1.5x, wind strength 0x-2x, lightning on or off",
-        "rationale": "The weather itself is a pure function of the arena, the host-derived match seed and elapsed time, so every peer computes the same sky over zero bytes of network traffic. The four settings are LOCAL PRESENTATION CLAMPS on top of that: they can show the same weather or less of it, never more, and never a state the arena did not author. Readability is arithmetic rather than taste - at the maximum instance ceiling and the maximum streak opacity the whole rain volume removes under 3% of the light along a sightline, the aim cylinder is emptied outright while aiming down sights, and lightning only ever adds light, capped, for at most 0.26 s."
+        "effectiveValue": "Weather ceiling off/light/moderate/heavy/storm, rain density 0.25x-1.5x, wind strength 0x-2x, lightning on or off, and a wet-surfaces toggle that darkens, glosses and then dries marked world materials while it rains",
+        "rationale": "The weather itself is a pure function of the arena, the host-derived match seed and elapsed time, so every peer computes the same sky over zero bytes of network traffic. The five settings are LOCAL PRESENTATION CLAMPS on top of that: they can show the same weather or less of it, never more, and never a state the arena did not author. Wet surfaces only ever re-tint and re-roughen materials the rain pass itself adopted, and turning the row off restores every adopted surface to its recorded dry values rather than freezing it half-wet. Readability is arithmetic rather than taste - at the maximum instance ceiling and the maximum streak opacity the whole rain volume removes under 3% of the light along a sightline, the aim cylinder is emptied outright while aiming down sights, and lightning only ever adds light, capped, for at most 0.26 s."
       },
       "budget": "Exactly two instanced draws and one shadowless hemisphere light at every density and on every arena; zero per-frame allocations; the wet-surface scan is bounded to 128 materials and runs at most every 2.5 s while the ground is wet.",
       "verifier": "src/weather/weather-state.test.ts + src/weather/rain-presentation.test.ts + src/weather/wind-field.test.ts + src/weather/weather-settings.test.ts",
@@ -2172,14 +2220,42 @@
       "budget": "Zero vendor-native reconstruction or generated-frame resources allocated.",
       "verifier": "src/graphics-settings-registry.test.ts",
       "authorityAffecting": false
+    },
+    {
+      "id": "ambient-air-detail",
+      "title": "Ambient airborne detail (AIRBORNE DETAIL row)",
+      "availability": "active",
+      "owner": "src/particles/ambient-life-settings.ts + src/particles/index.ts",
+      "sourceProbes": [
+        {
+          "path": "src/particles/ambient-life-settings.ts",
+          "symbol": "export function resolveAmbientLife"
+        },
+        {
+          "path": "src/particles/index.ts",
+          "symbol": "this.densityScale * this.ambientLifeScale"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.ambientLife"
+        ],
+        "effectiveValue": "0x-2x multiplier over each arena-authored ambient population; zero parks the ambient families entirely instead of thinning them toward nothing",
+        "rationale": "This row is a DIFFERENT knob from graphics.particleQuality, which is the capacity ceiling: ambient life multiplies how much of the authored air is kept alive and may exceed 1 so a player can genuinely ask for more dust, while quality selects buffer tiers. It is a local presentation clamp composed with the weather sample; the adaptive budget clamp (densityScale) stays separate and only ever takes away, so pressure can thin the air but never below what the player asked for by more than the frame-time controller requires."
+      },
+      "budget": "Every family stays inside its catalog capacity ceiling at every multiplier; buffers are sized once at the ceiling, so changing the row never reallocates; the aggregate screen-load budget and per-family opacity ceilings still apply at 2x.",
+      "verifier": "src/particles/ambient-life-settings.test.ts + src/particles/index.test.ts",
+      "authorityAffecting": false
     }
   ],
   "summary": {
-    "total": 35,
-    "active": 33,
+    "total": 36,
+    "active": 34,
     "unsupported": 2,
-    "adjustable": 26,
+    "adjustable": 27,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "e4ff5a3a111b4d92b4cfd71fcfd6c9ad363af22f015697ef6506453a4f5901a4"
+  "inventorySha256": "f646075ae5dba8e062e0954447a293bb5d8d2fe16377eced7642be4546350f80"
 }

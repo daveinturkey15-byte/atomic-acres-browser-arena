@@ -308,9 +308,9 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     pipelineIds: [],
     control: control(
       'setting',
-      ['graphics.weatherIntensity', 'graphics.rainDensity', 'graphics.windStrength', 'graphics.lightning'],
-      'Weather ceiling off/light/moderate/heavy/storm, rain density 0.25x-1.5x, wind strength 0x-2x, lightning on or off',
-      'The weather itself is a pure function of the arena, the host-derived match seed and elapsed time, so every peer computes the same sky over zero bytes of network traffic. The four settings are LOCAL PRESENTATION CLAMPS on top of that: they can show the same weather or less of it, never more, and never a state the arena did not author. Readability is arithmetic rather than taste - at the maximum instance ceiling and the maximum streak opacity the whole rain volume removes under 3% of the light along a sightline, the aim cylinder is emptied outright while aiming down sights, and lightning only ever adds light, capped, for at most 0.26 s.',
+      ['graphics.weatherIntensity', 'graphics.rainDensity', 'graphics.windStrength', 'graphics.lightning', 'graphics.wetSurfaces'],
+      'Weather ceiling off/light/moderate/heavy/storm, rain density 0.25x-1.5x, wind strength 0x-2x, lightning on or off, and a wet-surfaces toggle that darkens, glosses and then dries marked world materials while it rains',
+      'The weather itself is a pure function of the arena, the host-derived match seed and elapsed time, so every peer computes the same sky over zero bytes of network traffic. The five settings are LOCAL PRESENTATION CLAMPS on top of that: they can show the same weather or less of it, never more, and never a state the arena did not author. Wet surfaces only ever re-tint and re-roughen materials the rain pass itself adopted, and turning the row off restores every adopted surface to its recorded dry values rather than freezing it half-wet. Readability is arithmetic rather than taste - at the maximum instance ceiling and the maximum streak opacity the whole rain volume removes under 3% of the light along a sightline, the aim cylinder is emptied outright while aiming down sights, and lightning only ever adds light, capped, for at most 0.26 s.',
     ),
     budget: 'Exactly two instanced draws and one shadowless hemisphere light at every density and on every arena; zero per-frame allocations; the wet-surface scan is bounded to 128 materials and runs at most every 2.5 s while the ground is wet.',
     verifier: 'src/weather/weather-state.test.ts + src/weather/rain-presentation.test.ts + src/weather/wind-field.test.ts + src/weather/weather-settings.test.ts',
@@ -399,6 +399,16 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     control: control('unsupported', [], 'Unavailable', 'Vendor-native DLSS, FSR frame generation and Ray Reconstruction are driver technologies with no browser API, and are never simulated by labels. The spatial upscaler that IS available ships under its own name as FSR 1 in the spatial-upscaling row.'),
     budget: 'Zero vendor-native reconstruction or generated-frame resources allocated.',
     verifier: 'src/graphics-settings-registry.test.ts',
+  }),
+  feature({
+    id: 'ambient-air-detail', title: 'Ambient airborne detail (AIRBORNE DETAIL row)', availability: 'active', owner: 'src/particles/ambient-life-settings.ts + src/particles/index.ts',
+    sourceProbes: [
+      { path: 'src/particles/ambient-life-settings.ts', symbol: 'export function resolveAmbientLife' },
+      { path: 'src/particles/index.ts', symbol: 'this.densityScale * this.ambientLifeScale' },
+    ], pipelineIds: [],
+    control: control('setting', ['graphics.ambientLife'], '0x-2x multiplier over each arena-authored ambient population; zero parks the ambient families entirely instead of thinning them toward nothing', 'This row is a DIFFERENT knob from graphics.particleQuality, which is the capacity ceiling: ambient life multiplies how much of the authored air is kept alive and may exceed 1 so a player can genuinely ask for more dust, while quality selects buffer tiers. It is a local presentation clamp composed with the weather sample; the adaptive budget clamp (densityScale) stays separate and only ever takes away, so pressure can thin the air but never below what the player asked for by more than the frame-time controller requires.'),
+    budget: 'Every family stays inside its catalog capacity ceiling at every multiplier; buffers are sized once at the ceiling, so changing the row never reallocates; the aggregate screen-load budget and per-family opacity ceilings still apply at 2x.',
+    verifier: 'src/particles/ambient-life-settings.test.ts + src/particles/index.test.ts',
   }),
 ]);
 
