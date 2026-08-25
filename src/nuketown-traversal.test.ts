@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { solidBounds } from './house-navigation';
+import { createHouseArchitecture, solidBounds } from './house-navigation';
 import {
   ARENA_BOUNDS,
   CENTRAL_BUS,
@@ -440,13 +440,42 @@ describe('Nuke Town traversal (HF-383)', () => {
     // shared simplePlan() generator call sites in house-navigation.ts - and
     // both houses' routes are proven bidirectionally by house-navigation
     // tests, so they are exempt here like the lane landmarks.
-    // The twin relationship itself is pinned structurally by the
-    // 'builds both houses as exact structural twins' test below, so this
-    // exemption cannot silently widen.
     const HOUSE_MIRRORED = /^(rear|front)-(ground|door|entry-frame)|ground-window-(sill|lintel)|(ground|upper)-room-partition/;
-    // by the same mirrored-house generator as the wall pairs below, so they
-    // join that exemption class — but the full 2 houses x 2 entries x 3
-    // pieces set stays pinned here so the class can never silently swallow a
+    const LANE_IDENTITY = /trellis|service wall|solar canopy|hydro-bed|reclamation-tank|landmark plinth|irrigation-vessel|terrain-mound|authored-house-/;
+    expect(asymmetric.filter((entry) => !LANE_IDENTITY.test(entry) && !HOUSE_MIRRORED.test(entry))).toEqual([]);
+    // Size-pin the entry-frame exemption class against the BUILT collider
+    // set (with the loop-2 houseOwned lookup fixed these house-owned
+    // mirrored solids never reach the asymmetric list): exactly 2 houses x
+    // 2 entries x 3 collidable frame pieces may ride the exemption, never
+    // one more, so the class cannot silently swallow a missing or extra jamb.
+    const frameColliders = map.colliders.filter((b) =>
+      /^(front|rear)-entry-frame-(left|right|head)$/.test(nameFor(b)),
+    );
+    expect(frameColliders.length).toBe(12);
+    // Each must also be half of a TRUE mirrored pair: HOUSE_LAYOUT seats the
+    // houses point-symmetrically ((4,-17.4, facing 1) / (-4, 17.4, facing -1))
+    // and worldPosition negates local z via facing, so every south-house
+    // frame (cz < 0) at (cx, cz) requires an identical-signature twin at
+    // (cx - 8, -cz). That proves the twelve are six genuine mirror images -
+    // the fairness property the rotational scan itself would demand.
+    const frameAt = new Map<string, number>();
+    for (const b of frameColliders) {
+      const k = `${signature(b)}|${((b.minX + b.maxX) / 2).toFixed(3)}|${((b.minZ + b.maxZ) / 2).toFixed(3)}`;
+      frameAt.set(k, (frameAt.get(k) ?? 0) + 1);
+    }
+    const unpairedFrames: string[] = [];
+    let southFrames = 0;
+    for (const b of frameColliders) {
+      const cz = (b.minZ + b.maxZ) / 2;
+      if (cz >= 0) continue;
+      southFrames += 1;
+      const k = `${signature(b)}|${(((b.minX + b.maxX) / 2) - 8).toFixed(3)}|${(-cz).toFixed(3)}`;
+      if ((frameAt.get(k) ?? 0) > 0) frameAt.set(k, frameAt.get(k)! - 1);
+      else unpairedFrames.push(`${nameFor(b)} @(${((b.minX + b.maxX) / 2).toFixed(2)}, ${cz.toFixed(2)})`);
+    }
+    expect(southFrames).toBe(6);
+    expect(unpairedFrames).toEqual([]);
+  });
 
   it('builds both houses as exact structural twins so mirrored-route coverage transfers', () => {
     // The rotational-symmetry gate above exempts mirrored-twin house
@@ -454,10 +483,10 @@ describe('Nuke Town traversal (HF-383)', () => {
     // shared plan and their routes are proven bidirectionally by
     // house-navigation tests. This pin enforces that basis mechanically:
     // the two houses must expose identical solid inventories (names modulo
-    // the east/west ramp-side mirror, sizes exactly equal), so no future edit
-    // can desync one house's layout and silently void either the exemption
-    // or the route coverage. Strictness strictly increased: nothing
-    // previously compared the two houses' built solids at all.
+    // the east/west ramp-side mirror, sizes exactly equal), so no future
+    // edit can desync one house's layout and silently void either the
+    // exemption or the route coverage. Strictness strictly increased:
+    // nothing previously compared the two houses' built solids at all.
     const inventory = (team: 0 | 1) => {
       const house = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
       const counts = new Map<string, number>();
@@ -469,12 +498,6 @@ describe('Nuke Town traversal (HF-383)', () => {
       return counts;
     };
     expect(inventory(1)).toEqual(inventory(0));
-  });
-    // missing or extra jamb.
-    expect(asymmetric.filter((entry) => /-entry-frame-(left|right|head)/.test(entry))).toHaveLength(12);
-    const HOUSE_MIRRORED = /^(rear|front)-(ground|door|entry)|ground-window-(sill|lintel)|(ground|upper)-room-partition/;
-    const LANE_IDENTITY = /trellis|service wall|solar canopy|hydro-bed|reclamation-tank|landmark plinth|irrigation-vessel|terrain-mound|authored-house-/;
-    expect(asymmetric.filter((entry) => !LANE_IDENTITY.test(entry) && !HOUSE_MIRRORED.test(entry))).toEqual([]);
   });
 
   it('leaves no sealed pocket anywhere on the map: both vehicles stay trap-free', () => {
