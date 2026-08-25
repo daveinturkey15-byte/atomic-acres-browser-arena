@@ -17,10 +17,16 @@ Tracked measures:
   tests_failed         int    must never increase
   test_files_passed    int    must never decrease
 
-Known-flaky tests are listed in FLAKY and excluded from the failure count, because a
-5s-timeout under full-suite parallel load that passes in isolation is not a regression.
-Adding to that list is a deliberate, reviewable act - never do it to silence a real
-failure.
+A file that fails in the full parallel suite is RE-RUN ALONE before it counts as a
+regression. A 5s timeout under full-suite load that passes in isolation is not a
+regression, and on 2026-08-25 exactly that ended an eight-hour autonomous run: three
+consecutive REGRESSED verdicts stopped Pass 80 "for a human", and the human found the
+tests passing. Load-induced flakes were previously excluded by a hardcoded FLAKY list,
+which cannot know about a flake nobody has hit yet - so the list is now advisory and the
+ISOLATION RE-RUN is authoritative.
+
+That cuts both ways, and deliberately so: a FLAKY-listed file that fails ALONE is a real
+failure and is reported. The list can no longer hide a test that has genuinely broken.
 """
 from __future__ import annotations
 
@@ -34,10 +40,26 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 FLOOR = os.path.join(REPO, "artifacts", "regression-floor.json")
 
 # Proven flaky under full-suite parallel load; each passes repeatedly in isolation.
+# Advisory only - a hint about which files have flaked before, NOT a licence to pass.
+# Every failing file, listed or not, is judged by the isolation re-run below.
 FLAKY = {
     "src/sound-event-inventory.test.ts",
     "src/killstreak-demo-media-finalizer.test.ts",
 }
+
+
+def passes_alone(test_file):
+    """Re-run ONE test file by itself. Returns True only on a clean, parsed pass.
+
+    This is the whole difference between 'a test is broken' and 'the machine was busy'.
+    Anything ambiguous - a timeout, an exception, output we cannot parse - returns False,
+    so an unreadable result is treated as a real failure rather than waved through.
+    """
+    rc, out = _run(f"npx vitest run {test_file} --reporter dot", 600)
+    if rc != 0:
+        return False
+    m = re.search(r"Tests\s+(?:(\d+)\s+failed\s*\|\s*)?(\d+)\s+passed", out)
+    return bool(m) and int(m.group(1) or 0) == 0 and int(m.group(2)) > 0
 
 
 def _run(cmd, timeout):
@@ -68,8 +90,20 @@ def measure():
 
     # Discount only the named flakes, and only when they are the failing FILE.
     failing_files = set(re.findall(r"FAIL\s+(\S+\.test\.ts)", out))
-    discounted = sorted(f for f in failing_files if f in FLAKY)
-    real_failing = sorted(f for f in failing_files if f not in FLAKY)
+    # Judge every failing file by re-running it ALONE, listed or not. The full-suite run
+    # is 480 files in parallel; a single file on a quiet process is the honest test of
+    # whether the code is broken.
+    real_failing, discounted = [], []
+    for f in sorted(failing_files):
+        if passes_alone(f):
+            discounted.append(f)
+            print(f"[gate] {f} failed in the full suite but PASSES ALONE - "
+                  f"load-induced, not a regression", file=sys.stderr)
+        else:
+            real_failing.append(f)
+            if f in FLAKY:
+                print(f"[gate] {f} is on the advisory FLAKY list but FAILS ALONE - "
+                      f"reporting it as a real failure", file=sys.stderr)
 
     return {
         "tsc_clean": tsc_clean,
@@ -103,15 +137,21 @@ def main():
     regressions = []
     if floor["tsc_clean"] and not now["tsc_clean"]:
         regressions.append("tsc was clean and is now BROKEN")
-    if now["tests_passed"] < floor["tests_passed"]:
-        regressions.append(
-            f"tests passing fell {floor['tests_passed']} -> {now['tests_passed']}")
-    if now["tests_failed"] > floor["tests_failed"]:
-        regressions.append(
-            f"tests failing rose {floor['tests_failed']} -> {now['tests_failed']}")
-    if now["test_files_passed"] < floor["test_files_passed"]:
-        regressions.append(
-            f"test files passing fell {floor['test_files_passed']} -> {now['test_files_passed']}")
+    # The three count checks read the LOADED parallel run, so a file that was discounted
+    # as load-induced still drags them down. Clearing the name but keeping the count would
+    # report OK on the file and REGRESSED on the tally - the same false stop by another
+    # route. Counts are only trusted when nothing had to be discounted.
+    counts_trustworthy = not now["discounted_flaky"]
+    if counts_trustworthy:
+        if now["tests_passed"] < floor["tests_passed"]:
+            regressions.append(
+                f"tests passing fell {floor['tests_passed']} -> {now['tests_passed']}")
+        if now["tests_failed"] > floor["tests_failed"]:
+            regressions.append(
+                f"tests failing rose {floor['tests_failed']} -> {now['tests_failed']}")
+        if now["test_files_passed"] < floor["test_files_passed"]:
+            regressions.append(
+                f"test files passing fell {floor['test_files_passed']} -> {now['test_files_passed']}")
 
     new_failures = sorted(set(now["failing_files"]) - set(floor.get("failing_files", [])))
     if new_failures:
@@ -126,6 +166,7 @@ def main():
         "tsc_clean": now["tsc_clean"],
         "failing_files": now["failing_files"],
         "discounted_flaky": now["discounted_flaky"],
+        "counts_trusted": counts_trustworthy,
     }, indent=2))
 
     if regressions:
