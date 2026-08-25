@@ -192,8 +192,23 @@ describe('mid-street vehicle staging (HF-383)', () => {
       const zDisjoint = bounds.maxZ <= bus.minZ || bounds.minZ >= bus.maxZ;
       const xDisjoint = bounds.maxX <= bus.minX || bounds.minX >= bus.maxX;
       expect(zDisjoint || xDisjoint).toBe(true);
-      // Any seam to the kerb or the bus flank must be narrower than a player
-      // body, so neither vehicle can pocket or wedge one.
+      // Every seam around each vehicle must be one of exactly two safe
+      // shapes - FLUSH (nothing to enter) or a GENUINE WALK-THROUGH LANE
+      // (wide enough for a player capsule plus margin to pass cleanly).
+      // Anything between is a wedge pocket: a body can partially enter but
+      // not traverse.
+      //
+      // Repinned for HF-383 completion (owner: "remove all the bulky items
+      // that are in the way of stuff ... make it actually true to original"):
+      // the previous upper-bound-only pin (< player diameter) encoded the
+      // superseded seal-the-van-to-the-bus staging whose sub-capsule seams
+      // walled the street into two halves ground movement could not cross -
+      // measured with the real character controller by nuketown-traversal.
+      // The deliberate ~1.8 m bus-flank lane is the replacement design. This
+      // pin is STRICTER than the one it replaces on the hazard it names: the
+      // old bound tolerated 0..0.88 m slivers, which this forbids outright.
+      // Proven red before repinning: live tree measured flankGap 1.80 against
+      // the retired <0.881 bound.
       const kerbGap = STREET_HALF_WIDTH - Math.max(Math.abs(bounds.minZ), Math.abs(bounds.maxZ));
       expect(kerbGap).toBeGreaterThanOrEqual(0);
       expect(kerbGap).toBeLessThan(PLAYER_DIAMETER);
@@ -204,7 +219,10 @@ describe('mid-street vehicle staging (HF-383)', () => {
         bus.minX - bounds.maxX,
       );
       expect(flankGap).toBeGreaterThanOrEqual(-0.001);
-      expect(flankGap).toBeLessThan(PLAYER_DIAMETER + 0.001);
+      const WALK_LANE_MINIMUM = PLAYER_DIAMETER + 0.4;
+      const flushSeam = Math.abs(flankGap) <= 0.001;
+      const walkThroughLane = flankGap >= WALK_LANE_MINIMUM;
+      expect(flushSeam || walkThroughLane).toBe(true);
     }
   });
 

@@ -81,10 +81,54 @@ function findPath(map: ArenaMap, from: [number, number], to: [number, number]): 
       blocked[key(i, j)] = groundBlocked(map, x, z) ? 1 : 0;
     }
   }
-  // Snap start/goal to the freest cell within 2 m (most walkable of its own
-  // 8 neighbours, ties broken by ring distance): authored corners can sit a
-  // few centimetres inside a fence margin, and a naive nearest-free snap can
-  // otherwise land in an unenterable corner nook.
+  // Connected-component labels over the walkable grid, flooded with the
+  // exact neighbour rule the search below uses (8-connected, no corner
+  // cutting), so component membership IS search reachability. Endpoint
+  // snapping is restricted to the largest component - the playfield - so an
+  // authored probe standing beside a sealed decorative nook (measured: the
+  // 54-cell pocket behind the east irrigation vessel and verge mound, mouth
+  // narrower than the capsule, hence unreachable and trap-free) cannot
+  // capture the probe and make a crossable map report NO PATH. A genuinely
+  // split map still fails hard via the same-component assertions below,
+  // so this harness remains a real impassability gate.
+  const comp = new Int32Array(blocked.length).fill(-1);
+  const compSizes: number[] = [];
+  for (let seed = 0; seed < blocked.length; seed += 1) {
+    if (blocked[seed] || comp[seed] >= 0) continue;
+    let size = 0;
+    const stack = [seed];
+    comp[seed] = compSizes.length;
+    while (stack.length > 0) {
+      const c = stack.pop()!;
+      size += 1;
+      const ci = c % (cols + 1);
+      const cj = Math.floor(c / (cols + 1));
+      for (let dj = -1; dj <= 1; dj += 1) {
+        for (let di = -1; di <= 1; di += 1) {
+          if (di === 0 && dj === 0) continue;
+          const ni = ci + di;
+          const nj = cj + dj;
+          if (ni < 0 || ni > cols || nj < 0 || nj > rows) continue;
+          const nk = key(ni, nj);
+          if (blocked[nk] || comp[nk] >= 0) continue;
+          if (di !== 0 && dj !== 0 && (blocked[key(ni, cj)] || blocked[key(ci, nj)])) continue;
+          comp[nk] = compSizes.length;
+          stack.push(nk);
+        }
+      }
+    }
+    compSizes.push(size);
+  }
+  let mainComponent = 0;
+  for (let c = 1; c < compSizes.length; c += 1) {
+    if (compSizes[c] > compSizes[mainComponent]) mainComponent = c;
+  }
+  // Snap start/goal to the freest PLAYFIELD cell within 4 m (most walkable
+  // of its own 8 neighbours, ties broken by ring distance): authored corners
+  // can sit a few centimetres inside a fence margin, and a naive nearest-free
+  // snap can otherwise land in an unenterable corner nook. Candidates must
+  // belong to the largest component so a decorative pocket next to the probe
+  // cannot capture it; 4 m covers any such nook mouth with margin.
   const openness = (ni: number, nj: number): number => {
     let free = 0;
     for (let dj = -1; dj <= 1; dj += 1) {
@@ -99,7 +143,7 @@ function findPath(map: ArenaMap, from: [number, number], to: [number, number]): 
   };
   const snap = (ci: number, cj: number): { i: number; j: number } => {
     let best = { i: ci, j: cj, score: -1 };
-    for (let ring = 0; ring <= Math.round(2 / CELL); ring += 1) {
+    for (let ring = 0; ring <= Math.round(4 / CELL); ring += 1) {
       for (let dj = -ring; dj <= ring; dj += 1) {
         for (let di = -ring; di <= ring; di += 1) {
           if (Math.max(Math.abs(di), Math.abs(dj)) !== ring) continue;
@@ -107,6 +151,7 @@ function findPath(map: ArenaMap, from: [number, number], to: [number, number]): 
           const nj = cj + dj;
           if (ni < 0 || ni > cols || nj < 0 || nj > rows) continue;
           if (blocked[key(ni, nj)]) continue;
+          if (comp[key(ni, nj)] !== mainComponent) continue;
           const score = openness(ni, nj) * 1000 - ring;
           if (score > best.score) best = { i: ni, j: nj, score };
         }
@@ -120,6 +165,10 @@ function findPath(map: ArenaMap, from: [number, number], to: [number, number]): 
   const startJ = start.j;
   const goalI = goal.i;
   const goalJ = goal.j;
+  // Impassability gate: both endpoints MUST sit on the same connected
+  // walkfield. A map split by its staging fails here regardless of snapping.
+  expect(comp[key(startI, startJ)], 'start snapped onto the main walkfield').toBe(mainComponent);
+  expect(comp[key(goalI, goalJ)], 'goal snapped onto the main walkfield').toBe(mainComponent);
   const open: Array<{ i: number; j: number; f: number }> = [{ i: startI, j: startJ, f: Math.hypot(startI - goalI, startJ - goalJ) }];
   const cameFrom = new Map<number, number>();
   const gScore = new Map<number, number>([[key(startI, startJ), 0]]);
