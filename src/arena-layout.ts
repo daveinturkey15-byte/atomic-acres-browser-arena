@@ -143,6 +143,14 @@ export const REAR_HEDGE_SIZE = Object.freeze([46, 2.05, 1.6] as const);
  * HF-383 remainder: follows the fence out 1.5 m in Z (25.7 -> 27.2), which
  * keeps its exact abutment against the moved rear hedge band and leaves the
  * spawn rows' x/z clearances unchanged or wider.
+ *
+ * Repair round 2026-08-25: with the side-verge cross-runs re-seated (see
+ * below) the ray audit exposed a 45.5 m lane along each back strip that
+ * skimmed the yard-side face of these blocks by ~0.7 m. Depth out of the
+ * fence grows 5.2 -> 7.0 so the block now abuts both the rear hedge band
+ * behind it and the side-verge corridor's sight plane ahead of it; the
+ * inland x-faces are untouched, so every spawn, bin and patrol clearance is
+ * byte-identical and both back-yard strips stay enterable around the block.
  */
 export const CORNER_HEDGE_LAYOUT = Object.freeze([
   Object.freeze({ x: -21.5, z: -27.2 }),
@@ -151,7 +159,7 @@ export const CORNER_HEDGE_LAYOUT = Object.freeze([
   Object.freeze({ x: -21.5, z: 27.2 }),
 ]);
 /** [width along the street, height, depth out of the fence]. */
-export const CORNER_HEDGE_SIZE = Object.freeze([5, 2.05, 5.2] as const);
+export const CORNER_HEDGE_SIZE = Object.freeze([5, 2.05, 7] as const);
 
 /**
  * Side-verge cross-runs: short hedge walls spanning the whole verge between
@@ -159,17 +167,32 @@ export const CORNER_HEDGE_SIZE = Object.freeze([5, 2.05, 5.2] as const);
  * the fence cannot block a ray running parallel to it, so these cross the
  * verge instead, splitting each north-south verge ray into segments of about
  * 19 m. Clear of every spawn, bench, bin and lamp. HF-383 remainder: each run
- * recentres 0.75 m further out (z 17 -> 17.75) so both runs stay centred in
+ * recentred 0.75 m further out (z 17 -> 17.75) so both runs stay centred in
  * the verge segment the deeper fence gives them.
+ *
+ * Repair round 2026-08-25, recentred inland 0.6 m (x +/-28.5 -> +/-27.9):
+ * the HF-383 Z-deepening reopened a 45.3 m standing eye-line down each side
+ * verge - a diagonal from the rear corner pocket to the far front yard that
+ * crossed z = -17.75 at x = 25.31, clearing this run's old inner face
+ * (x = 25.7) by 0.39 m and then threading the cargo stack's east face
+ * (25.4), the front-hedge end (26) and the opposite corner seam. The run now
+ * spans x 25.1..30.7 and catches that crossing. The corner seam (corner-block
+ * face x = 24 to run face x = 25.1) narrows from 1.7 m to a still-walkable
+ * 1.1 m door: flood-fill verified as the rear yard pocket's walk-in both
+ * before and after (nuketown-traversal green). An alternative repair - a
+ * second staggered baffle run near z = 20 - was measured and rejected: the
+ * north-east fence strip's only bypass threads a lamp/vessel pinch narrower
+ * than the body, so any such baffle traps the strip (sealed-pocket gate).
  */
 export const SIDE_HEDGE_LAYOUT = Object.freeze([
-  Object.freeze({ x: -28.5, z: -17.75 }),
-  Object.freeze({ x: -28.5, z: 17.75 }),
-  Object.freeze({ x: 28.5, z: 17.75 }),
-  Object.freeze({ x: 28.5, z: -17.75 }),
+  Object.freeze({ x: -27.9, z: -17.75 }),
+  Object.freeze({ x: -27.9, z: 17.75 }),
+  Object.freeze({ x: 27.9, z: 17.75 }),
+  Object.freeze({ x: 27.9, z: -17.75 }),
 ]);
 /** [width across the verge, height, depth along the fence]. */
 export const SIDE_HEDGE_SIZE = Object.freeze([5.6, 2.05, 1.6] as const);
+
 
 
 // Street-life props: the (±17,∓7.5) bench pair fouled the crossing planter

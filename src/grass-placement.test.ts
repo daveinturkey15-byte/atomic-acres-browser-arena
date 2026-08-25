@@ -18,15 +18,33 @@ describe('Atomic Acres deterministic manicured-verge placement', () => {
     expect(grassPlacementAllowed(-20, 2, [])).toBe(true);
   });
 
+  // RED-FIRST PROOF: this pin failed at '2766df53' before this edit (received
+  // '788f9625'). The sole cause is ARENA_BOUNDS minZ/maxZ +/-30 -> +/-31.5
+  // (commit 9a9bbd7b), the owner-sanctioned HF-383 remainder "maybe make it a
+  // tad bigger because it feels a little bit clustered", under which hedge
+  // runs, fences and mounds deliberately follow the fence line out. The verge
+  // regions are clipped by ARENA_BOUNDS in isGrassGround, so the manicured
+  // verges follow the same fence line; the deeper candidate pool changes which
+  // shuffled cells fill the fixed 720 slots. Causation isolated via a probe
+  // that reproduces '2766df53' exactly under the old bounds - no other input
+  // moved. Re-pinned at EQUAL OR GREATER strictness: every original assertion
+  // is kept verbatim and a new assertion below pins that placements now cover
+  // the deepened |z| in (30, 31.5] strips.
   it('produces a stable private placement checksum without consuming runtime RNG', () => {
     const first = createGrassPlacements([]);
     const second = createGrassPlacements([]);
     expect(first).toEqual(second);
     expect(first.placements).toHaveLength(720);
-    expect(first.checksum).toBe('2766df53');
+    expect(first.checksum).toBe('788f9625');
     expect(first.chunks).toBe(4);
     expect(first.placements.every((placement) => isGrassGround(placement.x, placement.z))).toBe(true);
     expect(Math.max(...first.placements.map((placement) => placement.height))).toBeLessThanOrEqual(GRASS_MAX_HEIGHT);
+    // NEW behaviour pin (HF-383 Z-deepening): grass must cover the extended
+    // back-yard depth behind each spawn, on BOTH verges, or the map shows a
+    // bald 1.5 m strip between the old and new fence lines.
+    const deepened = first.placements.filter((placement) => Math.abs(placement.z) > 30 && Math.abs(placement.z) <= 31.5);
+    expect(deepened.length).toBeGreaterThan(0);
+    expect(new Set(deepened.map((placement) => Math.sign(placement.z))).size).toBe(2);
   });
 
   it('keeps wind deterministic and adds only bounded local player reaction', () => {

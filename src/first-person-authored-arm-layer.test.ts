@@ -12,9 +12,14 @@ import {
 import { FIRST_PERSON_ARM_MOTION_MAX_POLE_RADIANS } from './weapon-presentation';
 
 /**
- * Bent bind geometry so the elbow-pole decomposition is well conditioned: a
- * perfectly straight arm gives the shoulder→wrist axis a degenerate perpendicular
- * plane and the pole angle becomes noise.
+ * Bent bind geometry so the elbow-pole decomposition is well conditioned.
+ * The bend MUST leave the swing plane: every clip below swings about Z in the
+ * XY plane, so an in-plane wrist offset (x only) keeps both projected elbow
+ * directions collinear with the shoulder->wrist axis and the pole angle reads
+ * exactly zero no matter how the upper arm moves - measured before this
+ * offset existed (the fixture looked bent but decomposed nothing). A z
+ * offset gives the perpendicular plane real area and the pole a signal,
+ * matching the loaded authored rig whose elbows bend out of plane.
  */
 function chainJoints(): FirstPersonArmChainJoints[] {
   const joints: FirstPersonArmChainJoints[] = [];
@@ -26,7 +31,7 @@ function chainJoints(): FirstPersonArmChainJoints[] {
     const wrist = new THREE.Bone();
     wrist.name = `Wrist${suffix}`;
     elbow.position.set(0, -0.3, 0);
-    wrist.position.set(0.05, -0.276, 0);
+    wrist.position.set(0.05, -0.276, 0.04);
     shoulder.add(elbow);
     elbow.add(wrist);
     joints.push({ side, shoulder, elbow, wrist });
