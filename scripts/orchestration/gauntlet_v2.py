@@ -53,6 +53,7 @@ from teams import BUILDER_PREAMBLE, CRITIC_PREAMBLE  # noqa: E402
 # polish-vfx also moves to a Claude agent (2026-08-25) while ComfyUI holds memory:
 # Claude agents are API-driven and barely touch local RAM, so they keep working when
 # the governor cannot grant ox-alpha budget. Two writers per domain is still forbidden.
+MAX_AGENTS = int(os.environ.get("GAUNTLET_MAX_AGENTS", "5"))
 ORDER = ["multiplayer-hardening", "arena-polish", "arms-and-skins", "look-and-feel", "assets-generation", "perf-and-boot"]
 
 # A repair round may write anywhere, because a regression does not respect team ownership.
@@ -191,6 +192,23 @@ def granted(want):
         return 0
 
 
+def build_spec_multi(round_no, per_team, notes):
+    """One dispatch spec spanning SEVERAL teams.
+
+    Teams own disjoint file sets by construction, so running them concurrently is safe -
+    the thing that is never safe is two agents in one domain. Each team still gets its OWN
+    critic, depending only on that team's builders, so a slow team cannot hold up another
+    team's verification and a critic never reviews files its team does not own.
+    """
+    entries, notes_teams = [], []
+    for team_name, tasks in per_team:
+        spec = build_spec(team_name, round_no, tasks)
+        entries.extend(spec["tasks"])
+        notes_teams.append(f"{team_name}({len(tasks)})")
+    return {"run_kind": "implementation", "pattern": "multi-team-builders-then-critics",
+            "notes": f"{notes} teams: {', '.join(notes_teams)}", "tasks": entries}
+
+
 def build_spec(team_name, round_no, tasks):
     team = TEAMS[team_name]
     names = SKILLS.get(team_name, [])
@@ -292,7 +310,12 @@ def main():
         remaining = (deadline - time.time()) / 3600
 
         # Ask before spawning. A grant of zero means wait, not proceed.
-        want = 5
+        #
+        # WANT was hardcoded at 5, so a machine with 27 agents' worth of free memory still
+        # ran five. The governor is the thing that knows what is safe; asking for less than
+        # capacity just leaves the machine idle. It still refuses to over-grant, so asking
+        # high is safe - the reserve is enforced on its side, not ours.
+        want = MAX_AGENTS
         n = granted(want)
         if n < 2:
             log(f"round {round_no}: budget granted {n}; holding 5 min for headroom")
@@ -300,6 +323,7 @@ def main():
             round_no -= 1
             continue
 
+        per_team = []
         if pending_repair:
             # A repair round outranks the rotation. The tree is red and every later round
             # would be building on it, so fixing it IS the highest-value work available.
@@ -312,21 +336,40 @@ def main():
             # tasks[:n] with a small budget meant tasks 3+ of every team were dropped
             # silently and forever: measured at 10 of 22 specced tasks never dispatched.
             # Progress is persisted so a restart resumes rather than redoing task 1.
-            team = ORDER[cursor % len(ORDER)]
+            # Fill the round from AS MANY TEAMS as the budget allows, starting at the
+            # cursor so the rotation still advances fairly. One team per round capped the
+            # pass at that team's task count no matter how much machine was free.
+            per_team, budget_left = [], n
+            for offset in range(len(ORDER)):
+                if budget_left <= 0:
+                    break
+                team = ORDER[(cursor + offset) % len(ORDER)]
+                allt = TEAMS[team]["tasks"]
+                done = progress.setdefault(team, 0)
+                if done >= len(allt):      # team exhausted; wrap for a refinement pass
+                    done = progress[team] = 0
+                    log(f"team {team} completed all {len(allt)} tasks; wrapping to refine")
+                take = allt[done:done + budget_left]
+                if not take:
+                    continue
+                progress[team] = done + len(take)
+                per_team.append((team, take))
+                budget_left -= len(take)
+                log(f"  {team}: tasks {done + 1}-{done + len(take)} of {len(allt)}")
             cursor += 1
-            allt = TEAMS[team]["tasks"]
-            done = progress.setdefault(team, 0)
-            if done >= len(allt):          # team exhausted; wrap for a refinement pass
-                done = progress[team] = 0
-                log(f"team {team} completed all {len(allt)} tasks; wrapping to refine")
-            tasks = allt[done:done + n]
-            progress[team] = done + len(tasks)
             save_progress(progress)
-            log(f"  {team}: tasks {done + 1}-{done + len(tasks)} of {len(allt)}")
-            log(f"=== ROUND {round_no} | {remaining:.2f}h left | team {team} | "
-                f"{len(tasks)} agents (granted {n}) ===")
+            if not per_team:
+                log(f"round {round_no}: no team had work; holding 5 min")
+                time.sleep(300)
+                round_no -= 1
+                continue
+            tasks = [t for _, ts in per_team for t in ts]
+            team = per_team[0][0] if len(per_team) == 1 else "multi"
+            log(f"=== ROUND {round_no} | {remaining:.2f}h left | "
+                f"{len(per_team)} team(s) | {len(tasks)} agents (granted {n}) ===")
 
-        spec = build_spec(team, round_no, tasks)
+        spec = (build_spec(team, round_no, tasks) if pending_repair or len(per_team) == 1
+                else build_spec_multi(round_no, per_team, f"round {round_no}"))
         path = os.path.join(LOGDIR, f"r{round_no:02d}-{team}.json")
         with open(path, "w", encoding="utf-8", newline="\n") as fh:
             json.dump(spec, fh, indent=2)
