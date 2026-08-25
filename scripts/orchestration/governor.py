@@ -39,8 +39,20 @@ import time
 # Measured on this machine, 2026-08-24: ~220 MB per omp-windows-x64 plus ~100 MB relay.
 AGENT_GB = 0.35
 # Never eat into this. WSL/Hermes, the owner's own browser, and the OS all live here.
-# WSL is the reason this is generous: it is not a normal process and starves silently.
-RESERVE_GB = 10.0
+#
+# REVISED 2026-08-25 FROM MEASUREMENT, after 10.0 proved unachievable and therefore
+# blocked every round forever - which is the same "it stopped working" failure as a crash,
+# just quieter. What the machine actually looks like with almost no agents running:
+#   free 6.6 GB / 31.6 GB, sum of ALL process working sets 20.9 GB,
+#   Memory Compression 3.7 GB, commit charge 60.5 GB against an 85.6 GB limit.
+# The load is broad and mostly not ours - svchost 2.3, explorer 1.8, chrome+edge 1.5,
+# claude 1.6 - against roughly 2.9 GB of agents. A 10 GB reserve cannot be reached without
+# closing the owner's own applications, so the governor would hold indefinitely.
+#
+# What the reserve actually has to protect is vmmemWSL, measured at 1.37 GB and healthy.
+# Hermes began crashing when free fell to 3.5 GB. 5.5 GB leaves WSL its working set plus
+# roughly 4 GB of margin, and still refuses to dispatch into the danger zone.
+RESERVE_GB = 5.5
 # Headed Chrome doing WebGPU is worth several agents. Keep it strictly narrow.
 BROWSER_SLOTS = 2
 # A FIXED, CROSS-HARNESS path - deliberately NOT %TEMP%. Claude Code, OMP, Codex and the
