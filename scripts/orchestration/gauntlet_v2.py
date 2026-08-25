@@ -47,8 +47,10 @@ sys.path.insert(0, HERE)
 from pass80_teams import TEAMS, SKILLS, SKILL_ROOT  # noqa: E402
 from teams import BUILDER_PREAMBLE, CRITIC_PREAMBLE  # noqa: E402
 
-ORDER = ["gameplay-test", "arena-fidelity", "graphics-aaa",
-         "polish-vfx", "assets-imagegen", "rigging-motion"]
+# graphics-aaa and rigging-motion are handled by dedicated Claude Opus agents running in
+# parallel (2026-08-25), so they are OUT of the ox-alpha rotation. Two writers in one file
+# domain is the one thing the ownership model exists to prevent.
+ORDER = ["gameplay-test", "arena-fidelity", "polish-vfx", "assets-imagegen"]
 
 # A repair round may write anywhere, because a regression does not respect team ownership.
 REPAIR_TEAM = "arena-fidelity"
