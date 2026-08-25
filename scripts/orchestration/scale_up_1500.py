@@ -20,7 +20,7 @@ import time
 REPO = r"C:\Users\david\projects\atomic-acres-gauntlet"
 HERE = os.path.join(REPO, "scripts", "orchestration")
 LOG = os.path.join(REPO, "artifacts", "pass80-logs", "gauntlet.log")
-TARGET = (15, 30)  # owner moved the ComfyUI clear 15:00 -> 15:30 on 2026-08-25
+TARGET = (16, 45)  # owner moved the ComfyUI clear 15:00 -> 15:30 -> 16:45 on 2026-08-25
 
 
 def log(m):

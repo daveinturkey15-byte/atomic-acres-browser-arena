@@ -463,8 +463,10 @@ for (const [laneIndex, lane] of LANES.entries()) {
     const activation = await host.evaluate(() => {
       const debug = window.__ATOMIC_ACRES_DEBUG__;
       const position = debug.snapshot().player.position.map((value) => Math.round(value));
-      const earned = debug.earnSupport?.(12) ?? false;
-      if (!earned) return { earned: false };
+      // earnSupport() returns void (legacy-main.ts:29416): eligibility cannot be
+      // read from its return value. Grant, activate, and let the liveness gate
+      // below plus the admission receipt decide whether the streak came up.
+      debug.earnSupport?.(12);
       const receipt = debug.activateKillstreakWithReceipt?.('chopper', position, [0, 0, -1]) ?? null;
       return { earned: true, receipt };
     }).catch((error) => ({ error: String(error).slice(0, 160) }));
