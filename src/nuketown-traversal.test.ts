@@ -266,7 +266,14 @@ describe('Nuke Town traversal (HF-383)', () => {
   it('measures corner-to-corner traversal through real colliders and the real controller', async () => {
     const map = buildArena(new THREE.Scene());
     // Back corners of each spawn yard: the farthest legal points apart.
-    const path = findPath(map, [-29, -27], [29, 27]);
+    // The authored NE corner terminates at the measured, deliberately sealed
+    // irrigation-vessel/verge-mound nook (54 cells, mouth narrower than the
+    // capsule - covered by the sealed-pocket gate below), so (29,27) has no
+    // connected floor within snap range and reports NO PATH against a fully
+    // crossable map. The goal is the measured farthest PLAYFIELD point
+    // (verified on the main walkfield component), keeping the route length
+    // and every pinned window below unchanged.
+    const path = findPath(map, [-29, -27], [30, 25.5]);
     const sprintRun = await simulateTraversal(map, path, sprintProfile.maxSpeed);
     const walkRun = await simulateTraversal(map, path, walkProfile.maxSpeed);
     // Report the measurements; the pinned windows below are derived from them.
@@ -283,9 +290,13 @@ describe('Nuke Town traversal (HF-383)', () => {
   it('measures a full perimeter lap through the real controller', async () => {
     const map = buildArena(new THREE.Scene());
     const leg = (a: [number, number], b: [number, number]) => findPath(map, a, b);
+    // The NE perimeter waypoint is the measured farthest PLAYFIELD point on
+    // the east edge: the authored corner itself sits behind the deliberately
+    // sealed irrigation-vessel/verge-mound nook (see corner-to-corner above),
+    // so a lap through it would report NO PATH against a crossable map.
     const path = leg([-28.5, -26], [28.5, -26])
-      .concat(leg([28.5, -26], [28.5, 26]).slice(1))
-      .concat(leg([28.5, 26], [-28.5, 26]).slice(1))
+      .concat(leg([28.5, -26], [30, 25.5]).slice(1))
+      .concat(leg([30, 25.5], [-28.5, 26]).slice(1))
       .concat(leg([-28.5, 26], [-28.5, -26]).slice(1));
     const run = await simulateTraversal(map, path, sprintProfile.maxSpeed);
     console.log(`[hf383] perimeter lap sprint=${run.seconds.toFixed(2)}s (${run.metresWalked.toFixed(1)} m)`);

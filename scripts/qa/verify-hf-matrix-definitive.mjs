@@ -58,6 +58,7 @@ const MOVE_HOLD_MS = Number(arg('--move-ms', '1800'));
 const MOVE_THRESHOLD_M = Number(arg('--threshold', '1.2'));
 const CONNECT_TIMEOUT = Number(arg('--connect-timeout-ms', '180000'));
 const FIRE_CYCLES = Number(arg('--fire-cycles', '5'));
+const LOBBY_SYNC_TIMEOUT_MS = Number(arg('--lobby-sync-timeout-ms', '90000'));
 const LANE_FILTER = arg('--lanes', ''); // comma-separated arena/mode substrings
 const RUN_CHOPPER = arg('--chopper', 'yes') === 'yes';
 const CHOPPER_ARENA = arg('--chopper-arena', 'atomic-acres');
@@ -331,11 +332,15 @@ function laneAllowed(lane) {
 const peerProcess = await ensurePeerServer();
 mkdirSync(resolve(SHOT_DIR), { recursive: true });
 
-let browser;
-const lanes = [];
-
-try {
-  browser = await chromium.launch({
+// One FRESH browser per lane. The 2026-08-25 r02 run proved the private-lobby
+// arena-synchronization transition degrades CUMULATIVELY across lanes sharing
+// one Chrome/GPU process: every arena passed as lanes 1-4, then every lane
+// from 5 onward deadlocked with "#lobby-ready disabled", yet rustworks-1v1
+// passed immediately in a fresh browser (diagnose-lobby-ready-deadlock.mjs)
+// and farcrysis passed fresh but deadlocked after only THREE warmup lanes.
+// A shared browser makes later lanes measure GPU-heap history, not the game,
+// and silently poisoned the movement/HF-323 rollups with missing data.
+const launchBrowser = () => chromium.launch({
     headless: false,
     channel: 'chrome',
     args: [
@@ -350,11 +355,13 @@ try {
       '--disable-features=WebRtcHideLocalIpsWithMdns',
     ],
   });
+const lanes = [];
 
-  for (const lane of LANES.filter(laneAllowed)) {
+for (const lane of LANES.filter(laneAllowed)) {
     const record = { arena: lane.arena, mode: lane.mode, ok: false };
     let host = null;
     let guest = null;
+    const browser = await launchBrowser();
     try {
       host = await openPage(browser, 'Host QA');
       guest = await openPage(browser, 'Guest QA');
@@ -404,9 +411,29 @@ try {
       );
 
       // ---- Ready-up; start only legal once BOTH ready -----------------------
+      // r02 lesson: #lobby-ready stays disabled until the HOST-side arena
+      // transition completes ("Synchronizing <arena> before ready-up…",
+      // legacy-main.ts lobbyArenaSynchronized gate). A fresh browser takes
+      // ~10-31 s; a degraded session never enables it. Wait for enablement
+      // explicitly, MEASURE the lockout, and attribute a permanent deadlock
+      // to the deadlock row instead of blind-clicking into Playwright's
+      // 30 s default action timeout and poisoning unrelated rollups.
+      const hostSyncStartedAt = Date.now();
+      await host.waitForFunction(() => document.querySelector('#lobby-ready')?.disabled === false, undefined, { timeout: LOBBY_SYNC_TIMEOUT_MS }).catch(() => {});
+      record.lobbySyncWaitMs = Date.now() - hostSyncStartedAt;
+      if ((await host.evaluate(() => document.querySelector('#lobby-ready')?.disabled ?? null)) !== false) {
+        record.lobbyReadyDeadlock = true;
+        record.lobbyGuidance = await host.evaluate(() => (document.getElementById('lobby-guidance')?.textContent ?? '').slice(0, 120));
+        throw new Error('lobby ready-up never enabled (host arena synchronization never completed)');
+      }
       await host.click('#lobby-ready');
       await host.waitForTimeout(400);
       record.hf323.startDisabledOnlyHostReady = await host.evaluate(() => document.querySelector('#lobby-start')?.disabled ?? null);
+      await guest.waitForFunction(() => document.querySelector('#lobby-ready')?.disabled === false, undefined, { timeout: LOBBY_SYNC_TIMEOUT_MS }).catch(() => {});
+      if ((await guest.evaluate(() => document.querySelector('#lobby-ready')?.disabled ?? null)) !== false) {
+        record.lobbyReadyDeadlock = true;
+        throw new Error('guest lobby ready-up never enabled (arena synchronization never completed on guest)');
+      }
       await guest.click('#lobby-ready');
       await host.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: CONNECT_TIMEOUT });
       await host.click('#lobby-start');
@@ -490,6 +517,7 @@ try {
     } finally {
       await host?.close().catch(() => {});
       await guest?.close().catch(() => {});
+      await browser?.close().catch(() => {});
     }
     lanes.push(record);
     console.error(`[matrix] ${lane.arena}/${lane.mode}: ${record.ok ? 'OK' : 'FAIL'}`
@@ -502,6 +530,7 @@ try {
     const record = { arena: CHOPPER_ARENA, mode: 'tdm-chopper', probe: 'hf336' };
     let host = null;
     let guest = null;
+    const browser = await launchBrowser();
     try {
       host = await openPage(browser, 'Chopper Pilot');
       guest = await openPage(browser, 'Bystander QA');
@@ -516,7 +545,9 @@ try {
       await host.selectOption('#lobby-mode', 'tdm');
       await host.selectOption('#lobby-arena', CHOPPER_ARENA);
       await host.waitForTimeout(700);
+      await host.waitForFunction(() => document.querySelector('#lobby-ready')?.disabled === false, undefined, { timeout: LOBBY_SYNC_TIMEOUT_MS }).catch(() => {});
       await host.click('#lobby-ready');
+      await guest.waitForFunction(() => document.querySelector('#lobby-ready')?.disabled === false, undefined, { timeout: LOBBY_SYNC_TIMEOUT_MS }).catch(() => {});
       await guest.click('#lobby-ready');
       await host.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: CONNECT_TIMEOUT });
       await host.click('#lobby-start');
@@ -556,21 +587,27 @@ try {
     } finally {
       await host?.close().catch(() => {});
       await guest?.close().catch(() => {});
+      await browser?.close().catch(() => {});
     }
     lanes.push(record);
     console.error(`[matrix] hf336/${CHOPPER_ARENA}: ${record.verdict ?? record.error}`);
   }
-} finally {
-  await browser?.close().catch(() => {});
-  peerProcess?.kill();
-}
+peerProcess?.kill();
 
 // ---- Verdict rollup per owner fault ----------------------------------------
-const movementFails = lanes.filter((l) => l.probe !== 'hf336'
-  && ((l.hostMove?.movedM ?? Infinity) < MOVE_THRESHOLD_M || (l.guestMove?.movedM ?? Infinity) < MOVE_THRESHOLD_M));
-const earlyStartFails = lanes.filter((l) => l.hf323 && (
-  l.hf323.startDisabledGuestJoinedNotReady !== true
-  || l.hf323.startDisabledOnlyHostReady !== true));
+// r02 attribution fix: a lane that died before its movement probe (deadlock
+// or environment error) has NO movement data; counting `undefined` as a
+// movement failure fabricated evidence. Only lanes that actually reached and
+// ran the probes may vote on each fault.
+const probedLanes = lanes.filter((l) => l.probe !== 'hf336' && !l.error && !l.lobbyReadyDeadlock);
+const movementFails = probedLanes.filter((l) =>
+  (l.hostMove?.movedM ?? Infinity) < MOVE_THRESHOLD_M || (l.guestMove?.movedM ?? Infinity) < MOVE_THRESHOLD_M);
+const deadlockLanes = lanes.filter((l) => l.probe !== 'hf336' && l.lobbyReadyDeadlock);
+// HF-323 needs BOTH gate samples, which only exist once ready-up was reached;
+// deadlocked lanes never measured them and must not vote here either.
+const earlyStartFails = probedLanes.filter((l) => l.hf323
+  && (l.hf323.startDisabledGuestJoinedNotReady !== true
+    || l.hf323.startDisabledOnlyHostReady !== true));
 const chatFails = lanes.filter((l) => Array.isArray(l.hf324)
   && l.hf324.some((probe) => !probe.deliveredSelf));
 const shootReloadFails = lanes.flatMap((l) => {
@@ -596,6 +633,15 @@ const faults = {
       guestGate: l.guestGate ?? null,
       hostGate: l.hostGate ?? null,
       guestAdmissionDrops: l.guestStateAdmissionDrops ?? null,
+      error: l.error ?? null,
+    })),
+  },
+  'HF-322 lobby ready-up deadlock (Synchronizing <arena> before ready-up)': {
+    reproduced: deadlockLanes.length > 0,
+    evidence: deadlockLanes.map((l) => ({
+      lane: `${l.arena}/${l.mode}`,
+      syncWaitMs: l.lobbySyncWaitMs ?? null,
+      guidance: l.lobbyGuidance ?? null,
       error: l.error ?? null,
     })),
   },
