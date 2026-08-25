@@ -21,6 +21,7 @@ import {
   HIP_VIEWMODEL_POSITION,
   HIP_VIEWMODEL_SCALE,
   VIEWMODEL_NEAR_PLANE_CLEARANCE,
+  VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
   WeaponPresentation,
   authoredNearPlaneContactRetreat,
   firstPersonArmPresentationScale,
@@ -299,6 +300,36 @@ describe('first-person anatomical presentation', () => {
         meleeProgress: null,
       },
     });
+  });
+
+  it('telemetry reports the retreat the renderer performed, not the uncapped demand', () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
+    const presentation = new WeaponPresentation(camera, false);
+    presentation.setWeapon('carbine', true);
+    // Prone against a wall: the obstruction pose demands the carbine profile's
+    // full retreat, but near-plane safety caps the camera-space translation the
+    // renderer actually performs. HF-387 audit: telemetry used to publish the
+    // uncapped demand, so every instrument measured a retreat that never happened.
+    const demanded = VIEWMODEL_CONTACT_PROFILES.carbine.maximumSurfaceRetreatMeters;
+    expect(demanded).toBeGreaterThan(VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
+    for (let frame = 0; frame < 10; frame += 1) {
+      presentation.update({ ...REST_POSE, prone: true, surfaceRetreat: demanded, surfaceLift: 0.2 });
+    }
+    const capped = presentation.presentationState();
+    expect(capped.surfaceRetreat).toBe(VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
+    expect(capped.requestedSurfaceRetreat).toBe(demanded);
+    expect(capped.surfaceRetreatCapMeters).toBe(VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
+    expect(capped.surfaceRetreatCapped).toBe(true);
+    // Combat-safety consumers (fire admission, contact fold) keep reading the
+    // uncapped demand; only the translation is capped.
+    expect(capped.contactResponse.wallBlend).toBe(1);
+    for (let frame = 0; frame < 10; frame += 1) {
+      presentation.update({ ...REST_POSE, prone: false, surfaceRetreat: 0.12, surfaceLift: 0 });
+    }
+    const open = presentation.presentationState();
+    expect(open.surfaceRetreat).toBe(0.12);
+    expect(open.requestedSurfaceRetreat).toBe(0.12);
+    expect(open.surfaceRetreatCapped).toBe(false);
   });
 
   it('keeps every visible arm mesh opaque throughout ADS', async () => {

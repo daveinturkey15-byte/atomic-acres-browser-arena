@@ -3822,7 +3822,18 @@ export class WeaponPresentation {
       // Read-only action telemetry lets the browser evidence gate capture the
       // real 620 ms throw arc without introducing a synthetic gameplay state.
       grenadeAction: this.grenadeActionTelemetry(),
-      surfaceRetreat: this.surfaceRetreat,
+      // HF-387 audit correction: `surfaceRetreat` used to publish the uncapped
+      // obstruction DEMAND while the renderer performs min(demand,
+      // VIEWMODEL_NEAR_PLANE_SAFE_RETREAT) of camera-space translation (the
+      // clamp applied at both live sites: update() and snapToMatchStartRestPose).
+      // Instruments therefore measured a retreat that never happened. The field
+      // now reports the APPLIED translation; the uncapped demand stays available
+      // as requestedSurfaceRetreat. Fire admission and the contact fold keep
+      // consuming the demand, so combat safety is unchanged.
+      surfaceRetreat: Math.min(this.surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT),
+      requestedSurfaceRetreat: this.surfaceRetreat,
+      surfaceRetreatCapMeters: VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
+      surfaceRetreatCapped: this.surfaceRetreat > VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
       surfaceLift: this.surfaceLift,
       contactResponse: this.contactResponse,
       // HF-343: typed fire admission so the browser evidence gate and the
