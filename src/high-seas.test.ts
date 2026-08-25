@@ -303,7 +303,16 @@ describe('High Seas clean-room arena geometry', () => {
     const map = buildHighSeas(new THREE.Scene());
     const portals = map.root.userData.highSeasPortals as readonly HighSeasPortal[];
     const audit = map.root.userData.highSeasPortalAudit as readonly PortalAudit[];
-    expect(portals).toHaveLength(16);
+    // 14 since HF-392 (commit 220eae68): the two upper-inner end windows are
+    // now glazed, shot-authoritative bays. The portal audit pins apertures as
+    // genuinely open and glazed is not open, so their old 'sightline'
+    // declarations were deliberately removed (16 -> 14). Their absence is
+    // pinned explicitly: a bare hole must never silently return while the
+    // glazing panes exist.
+    expect(portals).toHaveLength(14);
+    const portalIds = portals.map((portal) => portal.id);
+    expect(portalIds).not.toContain('bow-upper-inner-window');
+    expect(portalIds).not.toContain('stern-upper-inner-window');
     expect(audit.map((entry) => entry.id)).toEqual(portals.map((entry) => entry.id));
     for (const portal of portals) {
       expect(map.physicsColliders.filter((bounds) => volumeIntersects(portal.aperture, bounds)), portal.id).toHaveLength(0);
@@ -570,10 +579,13 @@ describe('High Seas clean-room arena geometry', () => {
   it('equips deck, hull, and superstructure with procedural PBR textures (albedo, normal, roughness)', () => {
     const map = buildHighSeas(new THREE.Scene());
     const inventory = getHighSeasMaterialInventory();
-    // 14 since HF-373: the below-deck practicals were given their own fixture
-    // material instead of sharing the engine-amber accent that also skins the
-    // deck-level hatch guards.
-    expect(inventory).toHaveLength(14);
+    // 15 since HF-392 (commit 220eae68): the deckhouse gained its own warm
+    // lit 'cabin-ceiling' fixture material instead of letting the roof slab's
+    // wall skin read as a black grid; previously 14 since HF-373 (dedicated
+    // below-deck practicals). The scene-side emissive lift is pinned below.
+    expect(inventory).toHaveLength(15);
+    const ceilingEntry = inventory.find((entry) => entry.name === 'high-seas-cabin-ceiling');
+    expect(ceilingEntry).toBeDefined();
 
     const materialsByName = new Map<string, THREE.MeshStandardMaterial>();
     map.root.traverse((node) => {
@@ -587,7 +599,13 @@ describe('High Seas clean-room arena geometry', () => {
       }
     });
 
-    expect(materialsByName.size).toBe(14);
+    expect(materialsByName.size).toBe(15);
+    // HF-392: the ceiling fixture's deliberate emissive lift (map reused as
+    // emissiveMap) is part of the contract - a plain wall material here would
+    // regress the deckhouse back to a black grid.
+    const ceilingSceneMaterial = materialsByName.get('high-seas-cabin-ceiling');
+    expect(ceilingSceneMaterial, 'high-seas-cabin-ceiling should be used in the scene').toBeDefined();
+    expect(ceilingSceneMaterial?.emissiveMap).toBeInstanceOf(THREE.DataTexture);
 
     for (const entry of inventory) {
       const mat = materialsByName.get(entry.name);
@@ -646,9 +664,11 @@ describe('High Seas clean-room arena geometry', () => {
     const withNormal = inventory.filter((e) => e.hasNormalMap);
     const withRoughness = inventory.filter((e) => e.hasRoughnessMap);
 
-    expect(withMap).toHaveLength(12);
-    expect(withNormal).toHaveLength(14);
-    expect(withRoughness).toHaveLength(14);
+    // +1 each since HF-392: the 'wall'-family cabin-ceiling entry carries the
+    // full albedo/normal/roughness set like every other wall skin.
+    expect(withMap).toHaveLength(13);
+    expect(withNormal).toHaveLength(15);
+    expect(withRoughness).toHaveLength(15);
     expect(map.root.userData.highSeasMaterialInventory).toEqual(inventory);
   });
 

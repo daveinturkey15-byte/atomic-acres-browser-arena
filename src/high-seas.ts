@@ -2392,8 +2392,8 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
     enginePracticalMaterial,
   );
   addHullBilge(builder, engineFloorMaterial, engineWallMaterial);
-  const bowCabin = addCabin(builder, 'bow', wallMaterial, deckMaterial, roofMaterial, stairMaterial, tealTrimMaterial, glassMaterial);
-  const sternCabin = addCabin(builder, 'stern', wallMaterial, deckMaterial, roofMaterial, stairMaterial, tealTrimMaterial, glassMaterial);
+  const bowCabin = addCabin(builder, 'bow', wallMaterial, deckMaterial, roofMaterial, stairMaterial, tealTrimMaterial, glassMaterial, cabinCeilingMaterial);
+  const sternCabin = addCabin(builder, 'stern', wallMaterial, deckMaterial, roofMaterial, stairMaterial, tealTrimMaterial, glassMaterial, cabinCeilingMaterial);
   addCenterFeatures(builder, wallMaterial, tealTrimMaterial, upholsteryMaterial, waterMaterial);
   addSpawnFeatures(builder, wallMaterial, tealTrimMaterial, waterMaterial);
   addRails(builder, tealTrimMaterial, deckMaterial);
