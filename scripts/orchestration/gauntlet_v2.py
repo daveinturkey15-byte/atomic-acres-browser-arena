@@ -91,6 +91,25 @@ def repair_tasks(gate_output, n):
     return [(f"repair-{i}", head + f + tail) for i, f in enumerate(failing[:max(2, n)])]
 
 
+PROGRESS = os.path.join(LOGDIR, "task-progress.json")
+
+
+def load_progress():
+    """How far through each team's task list we have got. Survives restarts."""
+    try:
+        with open(PROGRESS, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return {}
+
+
+def save_progress(p):
+    os.makedirs(LOGDIR, exist_ok=True)
+    with open(PROGRESS, "w", encoding="utf-8", newline="
+") as fh:
+        json.dump(p, fh, indent=2)
+
+
 def sh(cmd, cwd=REPO, timeout=1800):
     """Run through the shell: bare `npx` is npx.cmd on Windows and raises WinError 2."""
     try:
@@ -182,6 +201,7 @@ def main():
 
     round_no = 0
     cursor = 0
+    progress = load_progress()
     repair_streak = 0
     pending_repair = None
 
@@ -216,9 +236,21 @@ def main():
             log(f"=== ROUND {round_no} | {remaining:.2f}h left | REPAIR "
                 f"(streak {repair_streak}/3) | {len(tasks)} agents ===")
         else:
+            # Take the NEXT unrun tasks for this team, not always the first n. Slicing
+            # tasks[:n] with a small budget meant tasks 3+ of every team were dropped
+            # silently and forever: measured at 10 of 22 specced tasks never dispatched.
+            # Progress is persisted so a restart resumes rather than redoing task 1.
             team = ORDER[cursor % len(ORDER)]
             cursor += 1
-            tasks = TEAMS[team]["tasks"][:n]
+            allt = TEAMS[team]["tasks"]
+            done = progress.setdefault(team, 0)
+            if done >= len(allt):          # team exhausted; wrap for a refinement pass
+                done = progress[team] = 0
+                log(f"team {team} completed all {len(allt)} tasks; wrapping to refine")
+            tasks = allt[done:done + n]
+            progress[team] = done + len(tasks)
+            save_progress(progress)
+            log(f"  {team}: tasks {done + 1}-{done + len(tasks)} of {len(allt)}")
             log(f"=== ROUND {round_no} | {remaining:.2f}h left | team {team} | "
                 f"{len(tasks)} agents (granted {n}) ===")
 
