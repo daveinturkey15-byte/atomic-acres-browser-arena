@@ -10,7 +10,7 @@ import {
   SPAWN_LAYOUT,
   STREET_HALF_WIDTH,
 } from './arena-layout';
-import { circleIntersectsBox } from './collision';
+import { circleIntersectsBox, segmentIntersectsBox } from './collision';
 import { movementProfile, PLAYER_JUMP_GRAVITY } from './gameplay';
 import { buildArena } from './map';
 import type { ArenaMap } from './map';
@@ -41,6 +41,11 @@ const DT = 1 / 120;
 
 const sprintProfile = movementProfile({ crouched: false, prone: false, ads: false, sprinting: true, grounded: true });
 const walkProfile = movementProfile({ crouched: false, prone: false, ads: false, sprinting: false, grounded: true });
+const crouchProfile = movementProfile({ crouched: true, prone: false, ads: false, sprinting: false, grounded: true });
+const vanBounds = ({ x, z }: { x: number; z: number }) => {
+  const [length, height, width] = PARKED_VAN_SIZE;
+  return { minX: x - length / 2, maxX: x + length / 2, minY: 0, maxY: height, minZ: z - width / 2, maxZ: z + width / 2 };
+};
 function groundBlocked(map: ArenaMap, x: number, z: number, radius = MOVEMENT_RADIUS): boolean {
   for (const b of map.physicsColliders) {
     const minY = b.minY ?? 0;
@@ -331,6 +336,46 @@ describe('Nuke Town traversal (HF-383)', () => {
       expect(maxFeetY).toBeLessThan(busRoof - 0.5);
     } finally {
       physics.dispose();
+    }
+  }, 60_000);
+
+  it('gives each mid-street vehicle genuine cover function at both combat stances', () => {
+    const map = buildArena(new THREE.Scene());
+    // Live stance eye heights (movementProfile): standing 1.7 m, crouched
+    // 1.16 m. The van body must break eye-lines at BOTH, or it is dressing,
+    // not cover.
+    for (const eyeHeight of [sprintProfile.eyeHeight, crouchProfile.eyeHeight]) {
+      expect(eyeHeight).toBeLessThan(PARKED_VAN_SIZE[1]);
+      for (const van of PARKED_VAN_LAYOUT) {
+        const bounds = { ...vanBounds(van), minY: 0, maxY: PARKED_VAN_SIZE[1] };
+        // Along the street through the van's centre...
+        expect(segmentIntersectsBox(
+          { x: van.x - 8, y: eyeHeight, z: van.z },
+          { x: van.x + 8, y: eyeHeight, z: van.z },
+          bounds,
+        )).toBe(true);
+        // ...and across the street through the same centre.
+        expect(segmentIntersectsBox(
+          { x: van.x, y: eyeHeight, z: van.z - 6 },
+          { x: van.x, y: eyeHeight, z: van.z + 6 },
+          bounds,
+        )).toBe(true);
+      }
+    }
+    // The vehicles are registered physical cover on the built map: shots and
+    // movement both stop at the body (live consumer path in buildArena).
+    for (const van of PARKED_VAN_LAYOUT) {
+      const cover = map.physicalCover.find((entry) => entry.id === van.id);
+      expect(cover?.blocksShots).toBe(true);
+      expect(cover?.blocksMovement).toBe(true);
+    }
+    // Cover you cannot reach is not cover: a standable cell must exist on
+    // each van's street-facing long face (the face looking away from the
+    // kerb), clear of the planter fins and the bus.
+    for (const van of PARKED_VAN_LAYOUT) {
+      const streetFaceZ = van.z - Math.sign(van.z) * (PARKED_VAN_SIZE[2] / 2);
+      const standZ = streetFaceZ - Math.sign(van.z) * (MOVEMENT_RADIUS + 0.1);
+      expect(groundBlocked(map, van.x, standZ), `standable cover behind ${van.id}`).toBe(false);
     }
   }, 60_000);
 

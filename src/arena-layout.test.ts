@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   ARENA_BOUNDS,
   CENTRAL_BUS,
+  CORNER_HEDGE_LAYOUT,
   COVER_LAYOUT,
+  FRONT_HEDGE_FIN_LAYOUT,
+  FRONT_HEDGE_LAYOUT,
   GARAGE_LAYOUT,
   HOUSE_LAYOUT,
   NEIGHBOURHOOD_BENCH_COLLIDER_SIZE,
@@ -12,6 +15,8 @@ import {
   PARKED_VAN_LAYOUT,
   PARKED_VAN_SIZE,
   PATROL_LAYOUT,
+  REAR_HEDGE_LAYOUT,
+  SIDE_HEDGE_LAYOUT,
   SPAWN_LAYOUT,
   STREET_HALF_WIDTH,
   YARD_FENCE_LAYOUT,
@@ -94,6 +99,22 @@ describe('compact original arena layout', () => {
     expect(rotated(NEIGHBOURHOOD_BENCH_LAYOUT.map(([x, z]) => [x, z] as const))).toBe(true);
     expect(rotated(YARD_FENCE_LAYOUT.map(([x, z]) => [x, z] as const))).toBe(true);
     expect(rotated(GARAGE_LAYOUT.map((garage) => [garage.x, garage.z] as const))).toBe(true);
+    // HF-383 completion: the hedge/fin/van layers were previously only
+    // symmetric by collider audit (nuketown-traversal); they are pinned here
+    // at the authored-constant level too so a future edit cannot break one
+    // side silently. Strictness only increases: no prior assertion removed.
+    expect(rotated(FRONT_HEDGE_LAYOUT.map((hedge) => [hedge.x, hedge.z] as const))).toBe(true);
+    expect(rotated(FRONT_HEDGE_FIN_LAYOUT.map((fin) => [fin.x, fin.z] as const))).toBe(true);
+    expect(rotated(REAR_HEDGE_LAYOUT.map((hedge) => [hedge.x, hedge.z] as const))).toBe(true);
+    expect(rotated(CORNER_HEDGE_LAYOUT.map((block) => [block.x, block.z] as const))).toBe(true);
+    expect(rotated(SIDE_HEDGE_LAYOUT.map((hedge) => [hedge.x, hedge.z] as const))).toBe(true);
+    expect(rotated(HOUSE_LAYOUT.map((house) => [house.x, house.z] as const))).toBe(true);
+    expect(rotated(PARKED_VAN_LAYOUT.map((van) => [van.x, van.z] as const))).toBe(true);
+    // Segment lengths must pair too, not just centres: a longer north run vs
+    // a shorter south twin would be asymmetric cover even with matched keys.
+    expect(FRONT_HEDGE_LAYOUT.every((hedge) => FRONT_HEDGE_LAYOUT.some((twin) => (
+      Math.abs(twin.x + hedge.x) < 1e-6 && Math.abs(twin.z + hedge.z) < 1e-6 && twin.length === hedge.length
+    )))).toBe(true);
     // Neither team may inherit a better spawn set than the other.
     expect(SPAWN_LAYOUT[0].every(([x, z]) => (
       SPAWN_LAYOUT[1].some(([ox, oz]) => Math.abs(ox + x) < 1e-6 && Math.abs(oz + z) < 1e-6)
