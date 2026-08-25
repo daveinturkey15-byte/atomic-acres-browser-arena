@@ -27,9 +27,33 @@ mechanically improved when he plays it.
    all with zero runtime callers, so the player never saw them. Green tests are NOT
    evidence a player can see your change. Trace every change to a live call site and name
    that call site in your report.
-2. **Verifying on the wrong renderer.** Headless Chromium on this machine cannot create a
-   WebGPU device, so QA only ever exercised the WebGL2 compatibility path while the owner
-   plays WebGPU. Anything visual must be proven on real WebGPU.
+2. **Verifying on the wrong renderer.** QA long ran on the WebGL2 compatibility path while
+   the owner plays WebGPU. **CORRECTED 2026-08-25 by direct measurement** - the old blanket
+   claim "headless cannot create a WebGPU device here" was too broad and cost this project
+   headed-browser slots it never needed to spend:
+
+   | launch | navigator.gpu | adapter | device |
+   |---|---|---|---|
+   | Playwright's BUNDLED chromium, headless | yes | yes (nvidia/blackwell) | **NO** |
+   | INSTALLED chrome (`channel:'chrome'`), headless | yes | yes | **YES** |
+   | INSTALLED chrome, headed | yes | yes | YES |
+
+   So: **installed Chrome headless gets a real hardware WebGPU device.** Only the bundled
+   chromium fails, and it fails at `requestDevice()` having already returned an adapter -
+   which is why it was mistaken for a blanket limitation.
+
+   TWO GOTCHAS THAT WILL WASTE YOUR TIME IF YOU DO NOT KNOW THEM:
+   - **`navigator.gpu` needs a SECURE CONTEXT.** Probing on `about:blank` reports no GPU even
+     on a headed browser that demonstrably works. Navigate to the app on 127.0.0.1 first.
+     Three probes were written and thrown away over this before the control case exposed it.
+   - **An adapter is not a device.** Always call `requestDevice()` and check the result, and
+     check `adapter.info.vendor` - a Microsoft vendor string means the software rasteriser,
+     and any timing taken on it is meaningless.
+
+   CONSEQUENCE FOR YOUR WORK: prefer `channel:'chrome', headless:true` for WebGPU
+   verification. It is cheaper than a headed window and **does not need a browser slot**,
+   so it does not contend with other agents. Reserve the two headed slots for work that
+   genuinely needs a visible window, such as two-window multiplayer with real input.
 3. **The dev server is not the shipped artefact.** A production bundle crashed the GPU
    process with a TSL error the dev server never showed. If you touch the renderer, check
    a real `vite build` plus `vite preview`, not just dev.
