@@ -184,6 +184,17 @@ def main():
     cursor = 0
     repair_streak = 0
     pending_repair = None
+
+    # Check the tree BEFORE the first round. Without this, a fresh process starting against
+    # an already-red tree walks straight into the team rotation - because pending_repair is
+    # only ever set by a round's own gate check - and burns a full round building on a break
+    # it has not looked at. Observed doing exactly that on 2026-08-25.
+    rc0, out0 = sh([sys.executable, GATE, "check"], timeout=3600)
+    if rc0 != 0:
+        pending_repair = out0
+        log("tree is RED at startup; first round will be a repair")
+    else:
+        log("tree is green at startup")
     while time.time() < deadline:
         round_no += 1
         remaining = (deadline - time.time()) / 3600
