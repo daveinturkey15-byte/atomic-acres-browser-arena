@@ -54,6 +54,7 @@ const TAG = arg('--tag', 'run');
 const WIDTH = Number(arg('--width', '2560'));
 const HEIGHT = Number(arg('--height', '1440'));
 const ONLY = arg('--only', '');
+const ARENA = arg('--arena', 'gun-range');
 const SKIP_BOTS = argv.includes('--skip-bots');
 const OUT = `artifacts/hf388/${TAG}`;
 mkdirSync(OUT, { recursive: true });
@@ -398,7 +399,7 @@ async function measurePose(name) {
 
 const poses = [];
 if (ONLY !== 'bots') {
-  await startArena('gun-range');
+  await startArena(ARENA);
   for (const weapon of ['carbine', 'pistol', 'lmg']) {
     await page.evaluate((id) => { window.__ATOMIC_ACRES_DEBUG__.equipWeapon(id); }, weapon);
     await page.waitForTimeout(2200);
