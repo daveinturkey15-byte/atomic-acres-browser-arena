@@ -19,6 +19,7 @@ import {
   firstPersonArmBaseActionFor,
   firstPersonArmMaterialRole,
   firstPersonArmRuntimeClip,
+  firstPersonArmSkinAlbedo,
   inflateFirstPersonArmGirth,
 } from './operator-model';
 import {
@@ -80,9 +81,19 @@ describe('skin -> first-person arm material resolution (HF-366)', () => {
   it('paints a cloned arm material with the selected skin and leaves foreign materials alone', () => {
     for (const definition of SELECTABLE) {
       const sleeve = new THREE.MeshStandardMaterial({ name: 'MAT_Pass65_Arms_Sleeve_PBR', color: 0xffffff });
+      const palette = operatorSkinPalette(definition.id).arm;
       expect(applyFirstPersonArmSkinMaterial(sleeve, sleeve.name, definition.id)).toBe(true);
-      expect(sleeve.color.getHex()).toBe(operatorSkinPalette(definition.id).arm.sleeve);
-      expect(sleeve.roughness).toBe(operatorSkinPalette(definition.id).arm.sleeveRoughness);
+      // HF-388: assert what the material ENDS UP WITH, not what the palette
+      // says. The palette decides the hue; `firstPersonArmSkinAlbedo` decides
+      // how much light a surface an arm's length from a 17.5-intensity fill
+      // may return, and the raw palette value is no longer what reaches the
+      // shader. Asserting the palette here would have been the exact
+      // assert-the-input failure this row exists to correct.
+      expect(sleeve.color.getHex()).toBe(firstPersonArmSkinAlbedo(palette.sleeve, 'sleeve'));
+      expect(sleeve.color.getHex()).not.toBe(palette.sleeve);
+      expect(sleeve.roughness).toBe(palette.sleeveRoughness);
+      // Cloth is a dielectric. The shipped GLB arrives at metalness 0.82.
+      expect(sleeve.metalness).toBe(0);
     }
     const knife = new THREE.MeshStandardMaterial({ name: 'MAT_Pass65_FieldKnife_Blade_PBR', color: 0x123456 });
     expect(applyFirstPersonArmSkinMaterial(knife, knife.name, 'explorer')).toBe(false);
@@ -105,11 +116,16 @@ describe('skin -> first-person arm material resolution (HF-366)', () => {
     expect(root.userData.firstPersonArmSkinContract).toBe(FIRST_PERSON_ARM_SKIN_CONTRACT);
     const sleeve = root.children[0] as THREE.Mesh;
     expect((sleeve.material as THREE.MeshStandardMaterial).color.getHex())
-      .toBe(OPERATOR_SKIN_PALETTES.symbiote.arm.sleeve);
+      .toBe(firstPersonArmSkinAlbedo(OPERATOR_SKIN_PALETTES.symbiote.arm.sleeve, 'sleeve'));
     // A second selection must fully replace the first, not blend with it.
     applyFirstPersonArmSkin(root, 'navalops');
     expect((sleeve.material as THREE.MeshStandardMaterial).color.getHex())
-      .toBe(OPERATOR_SKIN_PALETTES.navalops.arm.sleeve);
+      .toBe(firstPersonArmSkinAlbedo(OPERATOR_SKIN_PALETTES.navalops.arm.sleeve, 'sleeve'));
+    // ...and the two selections must still be different colours after the
+    // HF-388 exposure correction, or "repaints in place" would pass on a
+    // function that repainted everything the same.
+    expect(firstPersonArmSkinAlbedo(OPERATOR_SKIN_PALETTES.symbiote.arm.sleeve, 'sleeve'))
+      .not.toBe(firstPersonArmSkinAlbedo(OPERATOR_SKIN_PALETTES.navalops.arm.sleeve, 'sleeve'));
   });
 
   it('refuses a selectable skin that has no palette', () => {

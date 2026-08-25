@@ -62,6 +62,7 @@ import type { ArenaId } from '../arena-identity';
 import { isSoftwareWebGLRenderer } from '../atomic-signal';
 import type { RenderProfile } from '../render-profile';
 import type { WindSample } from '../weather/wind-field';
+import { activeAmbientLife, type AmbientLifeRuntime } from './ambient-life-settings';
 import { clamp01, screenLoadScale } from './combat-readability';
 import {
   FOOTFALL_PUFFS,
@@ -93,6 +94,7 @@ import {
   type ParticleFrameContext,
 } from './particle-field';
 
+export * from './ambient-life-settings';
 export * from './combat-readability';
 export * from './particle-catalog';
 export {
@@ -131,6 +133,12 @@ export type ParticleUpdateOptions = Readonly<{
   /** Quality-budget density scale, 0..1, applied to ambient populations only. */
   densityScale?: number;
   /**
+   * The player's AIRBORNE DETAIL row. Omitted on the production path, which
+   * reads the published latch instead - see ambient-life-settings.ts. Tests
+   * pass it explicitly so no suite depends on module state.
+   */
+  ambientLife?: AmbientLifeRuntime;
+  /**
    * This frame's shared weather sample — only `rainRate` is read. It arrives
    * from `sampleWeather(arena, matchSeed, elapsed)`, which every peer computes
    * identically from `hostId:matchEpoch`, so coupling to it cannot desync
@@ -160,6 +168,10 @@ export type ParticleRuntimeTelemetry = Readonly<{
   guardSuppressed: number;
   /** Aggregate screen-load thinning currently applied to obscuring families. */
   loadScale: number;
+  /** The adaptive budget's ambient clamp, 0..1. Only ever takes away. */
+  adaptiveDensityScale: number;
+  /** The player's AIRBORNE DETAIL row, 0..2. Bounded by family capacity. */
+  ambientLifeScale: number;
   protectedSightlines: number;
   lightShafts: number;
   /** Rain intensity 0..1 the simulation was last driven with, for receipts. */
@@ -247,6 +259,7 @@ export class ParticleRuntime {
   private disposed = false;
   private elapsedSeconds = 0;
   private densityScale = 1;
+  private ambientLifeScale = 1;
   private muzzleHeat = 0;
   private secondsSinceMuzzle = 0;
 
@@ -669,15 +682,34 @@ export class ParticleRuntime {
     context.rainRate = clamp01(finite(options.weather?.rainRate, 0));
     context.elapsedSeconds = this.elapsedSeconds;
     this.densityScale = clamp01(finite(options.densityScale, 1));
+    // TWO DIFFERENT KNOBS, deliberately kept apart. `densityScale` is the
+    // ADAPTIVE budget clamp - the frame-time controller thinning the air under
+    // pressure, and it is bounded to 0..1 because it may only ever take away.
+    // `ambientLife` is the PLAYER's row and reaches 2, because the arena
+    // profiles ask for roughly a third to a half of the family capacity and
+    // "more dust" has to be able to mean something. Neither can exceed the
+    // family ceiling: setAmbientTarget clamps to capacity, so the readability
+    // audit and the frame budget still bound the top of the slider.
+    this.ambientLifeScale = Math.max(0, finite((options.ambientLife ?? activeAmbientLife()).density, 1));
+    const ambient = this.densityScale * this.ambientLifeScale;
 
     const profile = arenaParticleProfile(this.arenaId);
-    this.moteField.setAmbientTarget(
-      PARTICLE_FAMILIES.motes.capacity[this.quality] * profile.motes.density
-        * this.densityScale * (1 - RAIN_DUST_CLEARED_FRACTION * context.rainRate),
-    );
-    this.driftField.setAmbientTarget(
-      PARTICLE_FAMILIES.drift.capacity[this.quality] * profile.drift.density * this.densityScale,
-    );
+    // THE TIER CEILING BINDS THE SLIDER, and it is clamped HERE rather than in
+    // setAmbientTarget: that clamp is against the ALLOCATED buffer, which is
+    // always the ultra ceiling so a live quality change cannot reallocate. So a
+    // low-tier player at 2x air would have walked straight past the low tier's
+    // 220-mote budget and into 440 - on exactly the machines the low tier
+    // exists for. Caught by index.test.ts, not by inspection.
+    const moteCeiling = PARTICLE_FAMILIES.motes.capacity[this.quality];
+    const driftCeiling = PARTICLE_FAMILIES.drift.capacity[this.quality];
+    this.moteField.setAmbientTarget(Math.min(
+      moteCeiling,
+      moteCeiling * profile.motes.density * ambient,
+    ) * (1 - RAIN_DUST_CLEARED_FRACTION * context.rainRate));
+    this.driftField.setAmbientTarget(Math.min(
+      driftCeiling,
+      driftCeiling * profile.drift.density * ambient,
+    ));
 
     let load = 0;
     for (let index = 0; index < this.fieldList.length; index += 1) {
@@ -737,6 +769,8 @@ export class ParticleRuntime {
       visibleParticles: visible,
       guardSuppressed,
       loadScale: Number(this.context.loadScale.toFixed(4)),
+      adaptiveDensityScale: Number(this.densityScale.toFixed(4)),
+      ambientLifeScale: Number(this.ambientLifeScale.toFixed(4)),
       rainRate: Number(this.context.rainRate.toFixed(3)),
       protectedSightlines: this.context.protectedCount,
       lightShafts: this.context.shaftCount,

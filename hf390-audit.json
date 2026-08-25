@@ -84,23 +84,6 @@
   "stampMismatches": []
  },
  "high-seas": {
-  "surfaces": 197,
-  "raycastMeshes": 197,
-  "byMaterial": {
-   "structural-metal": 85,
-   "interior-wall": 60,
-   "wood": 4,
-   "glass": 20,
-   "reinforced": 16,
-   "thin-metal": 12
-  },
-  "byClass": {
-   "explicit": 197
-  },
-  "fallbacks": [],
-  "invalidRatings": [],
-  "unstampedCount": 0,
-  "unstampedSample": [],
-  "stampMismatches": []
+  "BUILD_ERROR": "TypeError: Cannot read properties of undefined (reading 'userData')"
  }
 }

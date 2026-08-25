@@ -16,6 +16,10 @@ import {
   sampleWind,
   windPeakSpeed,
   windProfile,
+  WIND_FRONT_SKEW,
+  assertGustFrontShape,
+  gustFrontSlopeRatio,
+  gustWave,
 } from './wind-field';
 
 const MATCH_HORIZON_SECONDS = 900;
@@ -220,5 +224,161 @@ describe('wind field authoring', () => {
     expect(calm.x).toBe(0);
     expect(calm.z).toBe(0);
     expect(calm.gust).toBe(0);
+  });
+});
+
+/**
+ * The summed gust envelope, rebuilt from the SHIPPED band table so a control
+ * case run at skew 0 is the real stack with only the warp removed - not a
+ * hand-written stand-in that could drift away from it.
+ */
+function rawEnvelope(timeSeconds: number, skew: number): number {
+  const bands = WIND_GUST_BANDS;
+  const bandPhases = createWindField('atomic-acres', 17).bandPhases;
+  let envelope = 0;
+  for (let index = 0; index < bands.length; index += 1) {
+    const phase = (timeSeconds / bands[index].periodSeconds) * Math.PI * 2 + (bandPhases[index] ?? 0);
+    envelope += gustWave(phase, skew) * bands[index].weight;
+  }
+  return Math.min(1, Math.max(0, envelope * 0.5 + 0.5));
+}
+
+describe('gust fronts arrive and then die away (Pass 79)', () => {
+  /**
+   * Measured off the SAMPLED wind, never off the constant. A gust is timed
+   * between successive turning points of the envelope: the stretch from a
+   * trough up to a peak is the front, and the stretch from that peak back down
+   * to the next trough is the decay.
+   */
+  function frontAndDecaySeconds(arenaId: typeof ARENA_IDS[number]): { front: number; decay: number; samples: number } {
+    const field = createWindField(arenaId, 17);
+    const step = 0.05;
+    const horizon = 3_600;
+    let previous = sampleWind(field, 6, -9, 0).gust;
+    let current = sampleWind(field, 6, -9, step).gust;
+    let runStart = 0;
+    let rising = current > previous;
+    let frontTotal = 0;
+    let frontCount = 0;
+    let decayTotal = 0;
+    let decayCount = 0;
+    for (let time = 2 * step; time < horizon; time += step) {
+      const next = sampleWind(field, 6, -9, time).gust;
+      const nowRising = next > current;
+      if (nowRising !== rising) {
+        const span = time - step - runStart;
+        // Ignore sub-half-second wobbles: they are the short bands riding the
+        // swell, not a gust front, and counting them would swamp the signal.
+        if (span >= 0.5) {
+          if (rising) { frontTotal += span; frontCount += 1; } else { decayTotal += span; decayCount += 1; }
+        }
+        runStart = time - step;
+        rising = nowRising;
+      }
+      previous = current;
+      current = next;
+    }
+    return {
+      front: frontCount > 0 ? frontTotal / frontCount : 0,
+      decay: decayCount > 0 ? decayTotal / decayCount : 0,
+      samples: frontCount + decayCount,
+    };
+  }
+
+  it('builds faster than it dies, on every arena, measured off the samples', () => {
+    // A sum of pure sines is symmetric: rise and fall come out equal and the
+    // wind reads as a fader, which is what this replaces.
+    const ratios: number[] = [];
+    for (const arenaId of ARENA_IDS) {
+      const { front, decay, samples } = frontAndDecaySeconds(arenaId);
+      expect(samples, arenaId).toBeGreaterThan(40);
+      expect(front, arenaId).toBeGreaterThan(0);
+      ratios.push(decay / front);
+    }
+    // MEASURED, not hoped: 1.127-1.140 across the six arenas with the warp in.
+    // The threshold sits above the symmetric stack's own figure (asserted below
+    // from the same machinery) so this test cannot come back green on a stack
+    // that has quietly lost the asymmetry.
+    expect(Math.min(...ratios), JSON.stringify(ratios.map((value) => value.toFixed(3)))).toBeGreaterThan(1.09);
+  });
+
+  it('measures MORE asymmetry than a symmetric stack would produce, by construction', () => {
+    // The control case. A sum of pure sines is symmetric, so the same
+    // measurement run against skew 0 must land near 1 - and it does, at ~1.01.
+    // Without this, "1.13 is asymmetric" would be a number with nothing to be
+    // asymmetric COMPARED TO.
+    const step = 0.05;
+    function ratioAtSkew(skew: number): number {
+      let previous = rawEnvelope(0, skew);
+      let current = rawEnvelope(step, skew);
+      let runStart = 0;
+      let rising = current > previous;
+      let frontTotal = 0; let frontCount = 0; let decayTotal = 0; let decayCount = 0;
+      for (let time = 2 * step; time < 3_600; time += step) {
+        const next = rawEnvelope(time, skew);
+        const nowRising = next > current;
+        if (nowRising !== rising) {
+          const span = time - step - runStart;
+          if (span >= 0.5) {
+            if (rising) { frontTotal += span; frontCount += 1; } else { decayTotal += span; decayCount += 1; }
+          }
+          runStart = time - step;
+          rising = nowRising;
+        }
+        previous = current;
+        current = next;
+      }
+      return (decayTotal / decayCount) / (frontTotal / frontCount);
+    }
+    const symmetric = ratioAtSkew(0);
+    const shipped = ratioAtSkew(WIND_FRONT_SKEW);
+    expect(symmetric).toBeGreaterThan(0.95);
+    expect(symmetric).toBeLessThan(1.05);
+    expect(shipped).toBeGreaterThan(symmetric * 1.08);
+  });
+
+  it('keeps the wave bounded, periodic and smooth, which is what makes it safe', () => {
+    assertGustFrontShape();
+    expect(WIND_FRONT_SKEW).toBeGreaterThan(0);
+    // Under 1 or the phase map stops being monotone and the wave flattens.
+    expect(WIND_FRONT_SKEW).toBeLessThan(1);
+    expect(gustFrontSlopeRatio()).toBeGreaterThan(2);
+
+    let lowest = Infinity;
+    let highest = -Infinity;
+    let steepest = 0;
+    let previous = gustWave(-0.001);
+    for (let phase = 0; phase <= Math.PI * 8; phase += 0.001) {
+      const value = gustWave(phase);
+      lowest = Math.min(lowest, value);
+      highest = Math.max(highest, value);
+      steepest = Math.max(steepest, Math.abs(value - previous));
+      previous = value;
+      // Period preserved exactly, so the incommensurate-radicand argument for
+      // "the stack never repeats" survives the warp untouched.
+      expect(gustWave(phase + Math.PI * 2)).toBeCloseTo(value, 12);
+    }
+    expect(lowest).toBeGreaterThanOrEqual(-1);
+    expect(highest).toBeLessThanOrEqual(1);
+    // Smooth: no step anywhere, including at the turning points.
+    expect(steepest).toBeLessThan(0.01);
+    // Zero skew is the old symmetric sine, exactly.
+    for (let phase = 0; phase < 7; phase += 0.13) {
+      expect(gustWave(phase, 0)).toBeCloseTo(Math.sin(phase), 12);
+    }
+  });
+
+  it('is still byte-identical between two peers after the warp', () => {
+    // The warp is closed-form and seedless, so this must not have moved.
+    const left = createWindField('rustworks-1v1', 4242);
+    const right = createWindField('rustworks-1v1', 4242);
+    for (let time = 0; time < 120; time += 0.31) {
+      const a = sampleWind(left, -12, 7, time, 1.44);
+      const b = sampleWind(right, -12, 7, time, 1.44);
+      expect(a.x).toBe(b.x);
+      expect(a.z).toBe(b.z);
+      expect(a.gust).toBe(b.gust);
+      expect(a.bearingRadians).toBe(b.bearingRadians);
+    }
   });
 });

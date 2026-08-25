@@ -1108,7 +1108,16 @@ export function getHighSeasMaterialInventory(): readonly HighSeasMaterialInvento
     // appears above deck.
     { name: 'engine-practical', family: 'engine-practical', color: 0xffe6c4 },
     { name: 'cabana-upholstery', family: 'upholstery', color: 0x4b8790 },
-    { name: 'side-glass', family: 'glass', color: 0x5e9ca8 },
+    // HF-392: tint follows the darkened pane material so generated normal and
+    // roughness detail stays keyed to what the player actually sees.
+    { name: 'side-glass', family: 'glass', color: 0x1f3d46 },
+    // HF-392: the upper-deckhouse ceiling. The roof slab's underside faces
+    // into the room and catches only the hemisphere's dark sea ground colour,
+    // so the whole ceiling read as a black grid. A warm lit ceiling plane
+    // fixes the view from inside AND the black slot the windows showed from
+    // outside. Its emissive lift is deliberate and NOT tagged belowDeckFill:
+    // the leak gate's exact four-material list must stay untouched.
+    { name: 'cabin-ceiling', family: 'wall', color: 0xe8e5da },
     { name: 'contained-feature-water', family: 'water', color: 0x2db9c4 },
   ];
 
@@ -1596,6 +1605,7 @@ function addCabin(
   stairMaterial: THREE.Material,
   trimMaterial: THREE.Material,
   glassMaterial: THREE.Material,
+  ceilingMaterial: THREE.Material,
 ): Readonly<{
   internalRoute: HighSeasRouteAnchor[];
   externalRoute: HighSeasRouteAnchor[];
@@ -1646,37 +1656,48 @@ function addCabin(
   const externalAccess = addRamp(builder, `${end}-external-stair`, externalLow, externalHigh, 1.8, stairMaterial, 'wood');
   addRampTreads(builder, `${end}-external-stair`, externalLow, externalHigh, 1.8, trimMaterial);
 
-  // Upper inner windows are true apertures: the sill, header and side wall pieces
-  // frame empty space rather than hiding an opaque blocker behind glass.
+  // HF-392: the upper end window used to be a bare hole - the only unglazed
+  // opening left in the superstructure - while every side bay was glazed and
+  // shot-authoritative. The sill and header now frame the SAME aperture band
+  // as the sides (y 6.66..8.26) and the bay carries matching glazing, so the
+  // deckhouse reads - and shoots - consistently from every face. The old
+  // 'sightline' portal declarations for these holes are gone with them: the
+  // portal audit pins apertures as genuinely open, and glazed is not open.
+  const GLAZING_HALF_THICKNESS = 0.03;
+  const APERTURE_BOTTOM = HIGH_SEAS_LEVELS.upperDeck + 0.46;
+  const APERTURE_TOP = HIGH_SEAS_LEVELS.upperDeck + CABIN_UPPER_WALL_HEIGHT - 0.54;
   addSplitEndWall(builder, `high-seas-${end}-upper-inner-wall`, innerZ, 0, 4.4, upperY, CABIN_UPPER_WALL_HEIGHT, wallMaterial);
-  box(builder, `high-seas-${end}-upper-window-sill`, [0, 6.43, innerZ], [4.4, 0.46, 0.22], wallMaterial, {
+  box(builder, `high-seas-${end}-upper-window-sill`, [0, 6.43, innerZ], [4.4, 0.46, 0.22], trimMaterial, {
     ballisticMaterial: 'interior-wall',
   });
-  box(builder, `high-seas-${end}-upper-window-header`, [0, 8.53, innerZ], [4.4, 0.54, 0.22], wallMaterial, {
+  box(builder, `high-seas-${end}-upper-window-header`, [0, 8.53, innerZ], [4.4, 0.54, 0.22], trimMaterial, {
     ballisticMaterial: 'interior-wall',
+  });
+  box(builder, `high-seas-${end}-upper-inner-glazing`, [0, (APERTURE_BOTTOM + APERTURE_TOP) / 2, innerZ], [4.34, APERTURE_TOP - APERTURE_BOTTOM - 0.02, GLAZING_HALF_THICKNESS * 2], glassMaterial, {
+    shots: true,
+    ballisticMaterial: 'glass',
   });
   addSplitEndWall(builder, `high-seas-${end}-upper-outer-wall`, outerZ, externalX, 2.3, upperY, CABIN_UPPER_WALL_HEIGHT, wallMaterial);
 
   // Side upper-storey windows are framed apertures, not decoration (HF-392).
   // A sill and a header band run each cabin side between the end walls,
-  // mirroring the inner end-wall window's aperture band (y 6.66..8.26); the
-  // full-height mullions below divide that band into five bays; and every bay
-  // is glazed with movement- and shot-authoritative glass. The previous panes
-  // were rotated 90 degrees - each was a 2.6 m glass fin perpendicular to the
-  // wall, jutting into the room and out over the water - while the bay behind
-  // it stayed open air a player could walk out through, and the pane itself
-  // was presentation-only so shots never interacted with it.
-  const GLAZING_HALF_THICKNESS = 0.03;
-  const APERTURE_BOTTOM = HIGH_SEAS_LEVELS.upperDeck + 0.46;
-  const APERTURE_TOP = HIGH_SEAS_LEVELS.upperDeck + CABIN_UPPER_WALL_HEIGHT - 0.54;
+  // mirroring the inner end-window's aperture band; the full-height mullions
+  // below divide that band into five bays; and every bay is glazed with
+  // movement- and shot-authoritative glass. The previous panes were rotated
+  // 90 degrees - each was a 2.6 m glass fin perpendicular to the wall, jutting
+  // into the room and out over the water - while the bay behind it stayed open
+  // air a player could walk out through, and the pane itself was
+  // presentation-only so shots never interacted with it. Bands and mullions
+  // wear the deep-teal trim so the glazing reads as framed windows against
+  // the light shell, not holes punched in a flat panel wall.
   for (const [side, x] of [
     ['port', -CABIN_HALF_WIDTH],
     ['starboard', CABIN_HALF_WIDTH],
   ] as const) {
-    box(builder, `high-seas-${end}-upper-${side}-window-sill`, [x, HIGH_SEAS_LEVELS.upperDeck + 0.23, centerZ], [0.22, 0.46, maxZ - minZ], wallMaterial, {
+    box(builder, `high-seas-${end}-upper-${side}-window-sill`, [x, HIGH_SEAS_LEVELS.upperDeck + 0.23, centerZ], [0.22, 0.46, maxZ - minZ], trimMaterial, {
       ballisticMaterial: 'interior-wall',
     });
-    box(builder, `high-seas-${end}-upper-${side}-window-header`, [x, APERTURE_TOP + 0.27, centerZ], [0.22, 0.54, maxZ - minZ], wallMaterial, {
+    box(builder, `high-seas-${end}-upper-${side}-window-header`, [x, APERTURE_TOP + 0.27, centerZ], [0.22, 0.54, maxZ - minZ], trimMaterial, {
       ballisticMaterial: 'interior-wall',
     });
     // Bay boundaries are the end-wall inner faces (+/-7.89) and the mullion
@@ -1692,7 +1713,7 @@ function addCabin(
       });
     }
     for (const segmentCenter of [centerZ - 6.4, centerZ - 2.25, centerZ + 2.25, centerZ + 6.4]) {
-      box(builder, `high-seas-${end}-upper-${side}-mullion-${segmentCenter}`, [x, upperY, segmentCenter], [0.18, CABIN_UPPER_WALL_HEIGHT, 0.28], wallMaterial, {
+      box(builder, `high-seas-${end}-upper-${side}-mullion-${segmentCenter}`, [x, upperY, segmentCenter], [0.18, CABIN_UPPER_WALL_HEIGHT, 0.28], trimMaterial, {
         ballisticMaterial: 'interior-wall',
       });
     }
@@ -1702,6 +1723,12 @@ function addCabin(
     ballisticMaterial: 'structural-metal',
   });
   detailBox(builder, `high-seas-${end}-roof-teal-inlay`, [0, HIGH_SEAS_LEVELS.roof + 0.015, centerZ], [10.8, 0.035, 10.6], trimMaterial);
+  // HF-392: lit interior ceiling plane. The roof slab's underside faces into
+  // the deckhouse and only ever catches the hemisphere light's dark sea
+  // ground colour, so the whole ceiling read as a black grid and the windows
+  // showed a black slot from outside. Presentation-only: the roof above keeps
+  // movement and shot authority.
+  detailBox(builder, `high-seas-${end}-cabin-ceiling`, [0, HIGH_SEAS_LEVELS.roof - 0.25, centerZ], [15.0, 0.08, 16.2], ceilingMaterial);
 
   // Collision-backed interior furniture gives each cabin useful cover without
   // sealing the central entrances or either exterior side door.
@@ -2320,13 +2347,25 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
   const engineAccentMaterial = material('engine-amber', 0xd7a441, 0.34, 0.52, 0x6d3c08, 0.65);
   const enginePracticalMaterial = createPracticalMaterial();
   const upholsteryMaterial = material('cabana-upholstery', 0x4b8790, 0.76, 0.04);
-  const glassTextures = generateMaterialTextureSet('glass', 0x5e9ca8);
+  // HF-392: warm lit deckhouse ceiling (see the inventory note). Emissive is
+  // routed through the family map so panel lines survive the lift, mirroring
+  // the below-deck fill pattern - but without its leak-gate tag, because this
+  // surface lives entirely ABOVE the deck plane.
+  const cabinCeilingMaterial = material('cabin-ceiling', 0xe8e5da, 0.62, 0.03, 0x8a857a, 0.22);
+  if (cabinCeilingMaterial.map) cabinCeilingMaterial.emissiveMap = cabinCeilingMaterial.map;
+  cabinCeilingMaterial.name = 'high-seas-cabin-ceiling';
+  // HF-392: the old pane tint (0x5e9ca8 @ 0.38) vanished against the bright
+  // sky from outside - the upper storey read as an open arcade with black
+  // slots - while from inside it washed out to a flat cyan slab. A dark
+  // marine tint at higher coverage reads as tinted glazing in BOTH directions
+  // and keeps the low-roughness sun glint that sells it as glass.
+  const glassTextures = generateMaterialTextureSet('glass', 0x1f3d46);
   const glassMaterial = new THREE.MeshStandardMaterial({
-    color: 0x5e9ca8,
-    roughness: 0.16,
-    metalness: 0.12,
+    color: 0x1f3d46,
+    roughness: 0.1,
+    metalness: 0.05,
     transparent: true,
-    opacity: 0.38,
+    opacity: 0.55,
     depthWrite: false,
     ...(glassTextures.normalMap ? { normalMap: glassTextures.normalMap } : {}),
     ...(glassTextures.roughnessMap ? { roughnessMap: glassTextures.roughnessMap } : {}),
@@ -2421,8 +2460,6 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
     { id: 'bow-starboard-side-door', purpose: 'movement', aperture: { minX: 7.24, maxX: 7.56, minY: 3.3, maxY: 5.72, minZ: -22.4, maxZ: -19.6 } },
     { id: 'stern-port-side-door', purpose: 'movement', aperture: { minX: -7.56, maxX: -7.24, minY: 3.3, maxY: 5.72, minZ: 19.6, maxZ: 22.4 } },
     { id: 'stern-starboard-side-door', purpose: 'movement', aperture: { minX: 7.24, maxX: 7.56, minY: 3.3, maxY: 5.72, minZ: 19.6, maxZ: 22.4 } },
-    { id: 'bow-upper-inner-window', purpose: 'sightline', aperture: { minX: -2.0, maxX: 2.0, minY: 6.72, maxY: 8.2, minZ: -13.16, maxZ: -12.84 } },
-    { id: 'stern-upper-inner-window', purpose: 'sightline', aperture: { minX: -2.0, maxX: 2.0, minY: 6.72, maxY: 8.2, minZ: 12.84, maxZ: 13.16 } },
     { id: 'bow-upper-external-door', purpose: 'movement', aperture: { minX: -5.55, maxX: -3.65, minY: 6.3, maxY: 8.3, minZ: -29.16, maxZ: -28.84 } },
     { id: 'stern-upper-external-door', purpose: 'movement', aperture: { minX: 3.65, maxX: 5.55, minY: 6.3, maxY: 8.3, minZ: 28.84, maxZ: 29.16 } },
     { id: 'bow-engine-foot', purpose: 'engine-access', aperture: { minX: -1.05, maxX: 1.05, minY: 0.34, maxY: 2.54, minZ: -19.4, maxZ: -19.08 } },

@@ -346,12 +346,36 @@ const FINGER_FIRE_CURL: FingerCurlProfile = Object.freeze({
   pinky: [-0.50, -0.82, -0.60],
   thumb: [-0.20, -0.34, -0.24],
 });
+/**
+ * HF-388. The support hand did not read as gripping anything, and the numbers
+ * say why: the first (metacarpal) joint of the support index bent 0.07 rad -
+ * FOUR DEGREES - so the hand was an open plate laid against the handguard
+ * rather than a hand closed around it. Captured frames show exactly that: a
+ * featureless pale mass beside the receiver with no visible digit separation.
+ *
+ * The rig lesson taken from the CC0 reference (para, OpenGameArt, public
+ * domain - `.akephalos/references/ai-3d-technique-register.md` row 31, page
+ * read 2026-08-25) is about the SHAPE of a curl, not about its numbers. That
+ * rig drives each digit from a single control through a constraint chained
+ * down the finger, so curl is monotonic and compounding from metacarpal to
+ * tip, and the author's own note is that you "probably want to turn these off
+ * at some point" - the constraint is a posing aid, and shipped poses are
+ * hand-authored per joint. Our table is already the hand-authored form, so the
+ * correction is to make it obey the shape the constraint would have produced:
+ * every digit's bend grows from the metacarpal into the middle joint and every
+ * digit closes further than the one before it, thumb last and opposed.
+ *
+ * This stays a C-clamp, not a fist: the thumb keeps its positive (abducted)
+ * metacarpal so it lies over the rail rather than under it, and the index
+ * stays the shallowest finger. FINGER_FIRE_CURL is untouched - the trigger
+ * hand was never the one that failed to read.
+ */
 const FINGER_SUPPORT_CURL: FingerCurlProfile = Object.freeze({
-  index: [-0.07, -0.24, -0.20],
-  middle: [-0.10, -0.30, -0.24],
-  ring: [-0.13, -0.36, -0.28],
-  pinky: [-0.16, -0.42, -0.32],
-  thumb: [0.10, -0.18, -0.12],
+  index: [-0.30, -0.52, -0.40],
+  middle: [-0.36, -0.60, -0.46],
+  ring: [-0.40, -0.66, -0.50],
+  pinky: [-0.44, -0.72, -0.54],
+  thumb: [0.12, -0.30, -0.22],
 });
 const FINGER_RELOAD_CURL: FingerCurlProfile = Object.freeze({
   index: [-0.18, -0.38, -0.30],
@@ -569,6 +593,70 @@ export const FIRST_PERSON_ARM_BIND_SEGMENT_LENGTH_SCALE = 1;
 const KNIFE_BLADE_AXIS = Object.freeze(new THREE.Vector3(0, 0, -1));
 export const HIP_VIEWMODEL_POSITION = Object.freeze({ x: 0.34, y: -0.44, z: -1.08 });
 export const HIP_VIEWMODEL_SCALE = 0.82;
+/**
+ * HF-388 - the trigger hand, and the trade-off, stated.
+ *
+ * MEASURED on the running build at 2560x1440, WebGPU, by projecting every
+ * first-person hand bone through the live gameplay camera (2026-08-25):
+ *
+ *   weapon    right-hand bones, NDC y        verdict
+ *   carbine   -0.965 .. -0.759               bottom 12% of the frame, cropped
+ *   pistol    -0.903 .. -0.706               low, but whole
+ *   M249 LMG  -1.109 .. -0.888               PART OF THE HAND IS OFF-FRAME
+ *
+ * The ammo panel spans NDC x 0.371..0.684, and the hand spans 0.146..0.277, so
+ * the panel is NOT what hides it - the earlier read was close but wrong about
+ * the mechanism. The frame's own bottom edge is.
+ *
+ * A previous agent diagnosed the IK weld as correct and declined to move the
+ * weapon unilaterally. The weld IS correct - contact error is 1e-9 m and the
+ * palm sits exactly on `grip-socket-r` - and that is precisely why the weapon
+ * has to move: the hand is welded to the socket, so there is no lever that
+ * raises the hand and leaves the weapon where it is. The choice is between
+ * moving the viewmodel and never showing the trigger hand.
+ *
+ * THE TRADE-OFF, taken deliberately:
+ *   - Raising the hip viewmodel raises the WEAPON with it, and the weapon is
+ *     what a player reads the fastest. So the lift is per grip family and no
+ *     larger than the family's own measured deficit, rather than one global
+ *     nudge sized for the worst case. The M249 sits 0.19 m low because its
+ *     authored grip socket is low, and only the M249 pays for that.
+ *   - COMBAT SAFETY BOUND, enforced and re-measured after the change: the
+ *     weapon's own NDC bounding box must not reach screen centre. The crosshair
+ *     sits at (0, 0); the bound this change holds is that the raised viewmodel
+ *     leaves NDC y = 0 clear across the centre column, so nothing that was
+ *     shootable before is behind the gun now.
+ *   - ADS IS UNTOUCHED, byte for byte. The lift is multiplied by (1 - adsBlend)
+ *     and the ADS base position is not edited, so the sight picture the owner
+ *     already accepted cannot move. Sprint keeps its own drop for the same
+ *     reason: a sprinting player is not aiming and the lowered carry reads as
+ *     the sprint.
+ */
+export const FIRST_PERSON_HIP_TRIGGER_HAND_LIFT_CONTRACT = 'per-grip-family-hip-trigger-hand-lift-v1';
+export const FIRST_PERSON_HIP_TRIGGER_HAND_LIFT: Readonly<Record<ViewmodelGripFamily, number>> = Object.freeze({
+  'long-gun': 0.1,
+  compact: 0.1,
+  handgun: 0.07,
+  heavy: 0.19,
+  crossbow: 0.09,
+});
+/** No family may buy hand framing with more than this much screen. */
+export const FIRST_PERSON_HIP_TRIGGER_HAND_LIFT_CEILING = 0.2;
+
+/**
+ * Metres of hip-only vertical lift for one weapon. Zero at full ADS and zero
+ * while the melee arc owns the viewmodel, so neither of those poses changes.
+ */
+export function firstPersonHipTriggerHandLift(
+  weapon: WeaponId,
+  adsBlend: number,
+  meleeBlend = 0,
+): number {
+  const authored = FIRST_PERSON_HIP_TRIGGER_HAND_LIFT[viewmodelGripFamily(weapon)];
+  const bounded = Math.min(FIRST_PERSON_HIP_TRIGGER_HAND_LIFT_CEILING, Math.max(0, authored));
+  const hip = (1 - THREE.MathUtils.clamp(adsBlend, 0, 1)) * (1 - THREE.MathUtils.clamp(meleeBlend, 0, 1));
+  return bounded * hip;
+}
 /** Camera-space Z clearance preventing thicker arm geometry from crossing the near plane. */
 export const VIEWMODEL_NEAR_PLANE_CLEARANCE = 0.06;
 /**
@@ -4616,7 +4704,10 @@ export class WeaponPresentation {
 
     const viewmodelBaseX = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.x, ADS_VIEWMODEL_BASE_POSITION.x, this.adsBlend);
     const viewmodelBaseY = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.y, ADS_VIEWMODEL_BASE_POSITION.y, this.adsBlend)
-      - viewmodelScreenDrop(this.camera);
+      - viewmodelScreenDrop(this.camera)
+      // HF-388: the per-grip-family hip lift that brings the welded trigger
+      // hand back inside the frame. Zero at full ADS and through the melee arc.
+      + firstPersonHipTriggerHandLift(this.active, this.adsBlend, meleeArc);
     const viewmodelBaseZ = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.z, ADS_VIEWMODEL_BASE_POSITION.z, this.adsBlend);
     // Aiming down sights is a real improvement on every weapon: idle bob, breath
     // and mouse sway collapse as the blend completes, so the sight settles on the

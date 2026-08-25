@@ -92,6 +92,73 @@ export const WIND_GUST_BANDS: readonly WindGustBand[] = Object.freeze([
   band(4, 0.1080, -2.44, 0.07, 0.05),
 ]);
 
+/**
+ * GUST FRONT ASYMMETRY — Pass 79.
+ *
+ * The band stack was a sum of pure sines, and a sum of pure sines is
+ * SYMMETRIC: every gust took exactly as long to arrive as it took to die, and
+ * every lull lasted exactly as long as the gust before it. Air does not behave
+ * like that. A gust front is a boundary between two bodies of air, so it
+ * ARRIVES — a fast leading edge — and then bleeds away over several times
+ * longer as the fast air mixes out. That asymmetry is most of what makes wind
+ * read as wind rather than as a fader being moved up and down, and the owner
+ * audit's note about wind quality is describing its absence.
+ *
+ * THE WARP, AND WHY IT IS THIS ONE. Every band's wave becomes
+ *
+ *     w(phase) = sin(phase + skew * sin(phase))
+ *
+ * i.e. the phase itself is advanced fastest where the wave is rising. This is
+ * the only shaping considered that keeps ALL FOUR properties the field already
+ * depends on, without one line of extra state:
+ *
+ *   - BOUNDED. It is still a sine of something, so |w| <= 1 exactly, and the
+ *     weights still sum to 1, so the envelope still spans exactly 0..1.
+ *   - CONTINUOUS AND SMOOTH everywhere, including at the turning points. A
+ *     value-side trick (different exponents on the rise and the fall) steps
+ *     discontinuously every time the derivative changes sign, and a step in
+ *     wind speed reads as a bug.
+ *   - PERIOD-PRESERVING. w has exactly the period of its band, so the
+ *     incommensurate-radicand argument for "the stack never repeats" is
+ *     untouched — see WIND_GUST_PERIOD_RADICANDS.
+ *   - CLOSED-FORM AND SEEDLESS, so two peers still compute byte-identical wind
+ *     from (arenaId, matchSeed, x, z, t) with zero traffic.
+ *
+ * WHAT IT IS WORTH, MEASURED RATHER THAN CLAIMED. Per band the effect is
+ * large: dw/dphase is (1 + skew) at the upward zero crossing and -(1 - skew)
+ * at the downward one, so at 0.55 each band builds 3.4x faster than it decays.
+ * At the SUMMED envelope - which is what a player actually feels - it is much
+ * smaller, because five bands at five unrelated phases partially cancel each
+ * other's asymmetry: wind-field.test.ts measures 1.127-1.140 mean-decay over
+ * mean-front across the six arenas, against 1.01 for the symmetric stack it
+ * replaces. So this is a real change of about 13%, not a 3.4x one, and the
+ * test pins the measured figure so it cannot quietly drift back to symmetric.
+ * A graded skew (strong on the long swells, none on the flutter) was measured
+ * too and came out WORSE at the envelope, at 1.02-1.07; flat is the best of
+ * the shapes tried.
+ *
+ * `skew` must stay under 1 or the phase map stops being monotone and the wave
+ * develops a flat spot at its trough; `assertGustFrontShape` holds that line.
+ */
+export const WIND_FRONT_SKEW = 0.55;
+
+/** One band's wave. Same period and same bounds as the sine it replaced. */
+export function gustWave(phase: number, skew: number = WIND_FRONT_SKEW): number {
+  return Math.sin(phase + skew * Math.sin(phase));
+}
+
+/** How many times faster a gust front arrives than it dies away. */
+export function gustFrontSlopeRatio(skew: number = WIND_FRONT_SKEW): number {
+  return (1 + skew) / (1 - skew);
+}
+
+/** Fails closed on a skew that would stop the phase map being monotone. */
+export function assertGustFrontShape(): void {
+  if (!(WIND_FRONT_SKEW >= 0 && WIND_FRONT_SKEW < 1)) {
+    throw new Error(`Wind gust skew left the monotone range: ${WIND_FRONT_SKEW}`);
+  }
+}
+
 export type WindProfile = Readonly<{
   arenaId: ArenaId;
   /** Human-readable authoring identity; unique per arena. */
@@ -261,7 +328,8 @@ export function sampleWind(
     const phase = (time / gustBand.periodSeconds) * TAU
       + along * gustBand.spatialFrequency * spatialScale
       + (field.bandPhases[index] ?? 0);
-    const wave = Math.sin(phase);
+    // Asymmetric by construction: fast front, slow decay. See WIND_FRONT_SKEW.
+    const wave = gustWave(phase);
     envelope += wave * gustBand.weight;
     bearingOffset += wave * gustBand.bearingSwing * entry.bearingSwingScale;
   }

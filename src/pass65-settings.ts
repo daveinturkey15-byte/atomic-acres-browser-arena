@@ -19,6 +19,11 @@ import {
   resolveWeatherPresentation,
   type WeatherPresentationRuntime,
 } from './weather/weather-settings';
+import {
+  publishAmbientLife,
+  resolveAmbientLife,
+  type AmbientLifeRuntime,
+} from './particles/ambient-life-settings';
 
 export { AUDIO_BUS_IDS };
 export type { AudioBusId };
@@ -130,6 +135,14 @@ export type GraphicsRuntime = Readonly<{
    * agrees on, and this only decides how much of it the local screen draws.
    */
   weather: WeatherPresentationRuntime;
+  /**
+   * Pass 79 — how much of the authored ambient population the player asked to
+   * see. Same latch argument as `weather` above: the ambient particle runtime
+   * is constructed at module scope in legacy-main and is never handed settings,
+   * so without publishing this the AIRBORNE DETAIL row would be a switch wired
+   * to nothing.
+   */
+  ambientLife: AmbientLifeRuntime;
   reason: string | null;
 }>;
 
@@ -312,6 +325,11 @@ export function writePass65Settings(
 export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatibility = false): GraphicsRuntime {
   const weather = resolveWeatherPresentation(settings);
   publishWeatherPresentation(weather);
+  // Second latch, same contract, same cadence: a pure function of `settings`,
+  // published here because the ambient particle runtime has no other route to
+  // the player's choice.
+  const ambientLife = resolveAmbientLife(settings);
+  publishAmbientLife(ambientLife);
   const qualityScale = (tier: GraphicsSettings['particleQuality']): number => tier === 'low' ? 0.5 : tier === 'high' ? 0.8 : 1;
   const lightingScale = (tier: GraphicsSettings['indirectLighting']): number => tier === 'off' ? 0 : tier === 'low' ? 0.62 : 1;
   const bloomStrength = settings.bloomQuality === 'off' ? 0 : settings.bloomQuality === 'subtle' ? 0.065 : 0.14;
@@ -365,6 +383,10 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
       // route, and a control that silently stops existing on one renderer is
       // worse than one that is honestly bounded.
       weather,
+      // The compatibility route runs the ambient families at the LOW tier
+      // rather than bypassing them (particles/index.ts says why), so the
+      // player's row reaches this renderer too.
+      ambientLife,
       reason: 'Compatibility renderer is active.',
     });
   }
@@ -421,6 +443,7 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
     }),
     gradeProfile: settings.filmicProfile,
     weather,
+    ambientLife,
     reason: null,
   });
 }

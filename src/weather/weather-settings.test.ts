@@ -154,3 +154,22 @@ describe('the override clock', () => {
     expect(weatherOverrideClockSeconds()).toBe(first);
   });
 });
+
+describe('the wet surfaces row', () => {
+  it('defaults on, and a hostile value never mutes a feature by accident', () => {
+    expect(resolveWeatherPresentation({}).wetSurfaces).toBe(true);
+    expect(resolveWeatherPresentation({ wetSurfaces: undefined }).wetSurfaces).toBe(true);
+    expect(resolveWeatherPresentation({ wetSurfaces: 'yes' as unknown as boolean }).wetSurfaces).toBe(true);
+    expect(resolveWeatherPresentation({ wetSurfaces: false }).wetSurfaces).toBe(false);
+  });
+
+  it('is independent of every other weather row', () => {
+    // Turning wet ground off must not quietly turn the rain off with it, and
+    // turning weather off must not leave a permanently glossy road behind.
+    const dryRoads = resolveWeatherPresentation({ wetSurfaces: false });
+    expect(dryRoads.weatherEnabled).toBe(true);
+    expect(dryRoads.rainDensity).toBe(1);
+    expect(dryRoads.lightning).toBe(true);
+    expect(resolveWeatherPresentation({ weatherIntensity: 'off' }).wetSurfaces).toBe(true);
+  });
+});

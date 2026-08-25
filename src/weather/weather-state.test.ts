@@ -519,6 +519,30 @@ describe('the player weather ceiling', () => {
     expect(forcedWeatherSample('gun-range', 'storm', UNCAPPED).state).toBe('clear');
   });
 
+  it('clamps an over-severe override DOWN to the arena ceiling instead of falling to clear', () => {
+    // Measured on a live WebGPU capture: `?weather=storm` on atomic-acres, an
+    // arena whose table stops at heavy-rain, produced streakInstances 0 and
+    // rainRate 0 - i.e. the single route built for LOOKING at heavy weather
+    // showed a clear sky and nobody noticed, because the old resolver treated
+    // "not in the table" as "clear" rather than as "as much as this arena has".
+    for (const arenaId of ['atomic-acres', 'skyline-terminal'] as const) {
+      const available = weatherAvailability(arenaId);
+      const heaviest = available[available.length - 1];
+      expect(available).not.toContain('storm');
+      const forced = forcedWeatherSample(arenaId, 'storm', UNCAPPED);
+      expect(forced.state).toBe(heaviest);
+      expect(forced.simulatedState).toBe(heaviest);
+      expect(forced.rainRate).toBe(WEATHER_STATE_TABLE[heaviest].rainRate);
+      expect(forced.rainRate).toBeGreaterThan(0);
+    }
+    // Clamping DOWN, never up: an arena that has the rung still gets exactly it,
+    // and a milder request is never promoted to something heavier.
+    expect(forcedWeatherSample('high-seas', 'light-rain', UNCAPPED).state).toBe('light-rain');
+    expect(forcedWeatherSample('farcrysis', 'overcast', UNCAPPED).state).toBe('overcast');
+    // The player's ceiling still wins when it is the lower of the two.
+    expect(forcedWeatherSample('atomic-acres', 'storm', capped('light')).state).toBe('overcast');
+  });
+
   it('reads the published latch when a caller does not pass one', () => {
     // The production path: legacy-main calls sampleWeather with three arguments
     // and still gets the player's setting.

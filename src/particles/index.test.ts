@@ -18,6 +18,14 @@ import {
 } from './combat-readability';
 import { PARTICLE_INSTANCED_DRAWS, totalCapacity } from './particle-catalog';
 import { ParticleRuntime, particleBypassReason, particleQualityForProfile } from './index';
+import {
+  AMBIENT_LIFE_RANGE,
+  activeAmbientLife,
+  publishAmbientLife,
+  resetAmbientLife,
+  resolveAmbientLife,
+} from './ambient-life-settings';
+import { PARTICLE_FAMILIES, arenaParticleProfile, type ParticleFamilyId } from './particle-catalog';
 
 function camera(x = 0, y = 1.7, z = 0, yaw = 0): THREE.PerspectiveCamera {
   const view = new THREE.PerspectiveCamera(75, 16 / 9, 0.1, 500);
@@ -509,5 +517,126 @@ describe('the air answers the weather', () => {
     const updateCall = main.slice(updateStart, main.indexOf('lastRainUpdateAtMs = visualNow'));
     expect(updateCall).toContain('weather: weatherNow');
     expect(main).toContain('hfParticleRuntime.reseed(weatherMatchSeed);');
+  });
+});
+
+describe('the player can actually change the air (Pass 79)', () => {
+  // The row is only real if the POPULATION moves. Every assertion below reads
+  // the live particle count out of the runtime, never the number handed in.
+  function settle(runtime: ParticleRuntime, ambientLife: number, frames = 240) {
+    const view = camera();
+    for (let frame = 0; frame < frames; frame += 1) {
+      runtime.update(1 / 60, view, { wind: calmWind(), ambientLife: resolveAmbientLife({ ambientLife }) });
+    }
+    return runtime.telemetry();
+  }
+
+  it('turns the air up and down, and reports the scale it used', () => {
+    const { runtime } = build();
+    const authored = settle(runtime, 1);
+    const thin = settle(runtime, 0.25);
+    const thick = settle(runtime, AMBIENT_LIFE_RANGE.maximum);
+
+    expect(thin.liveParticles).toBeLessThan(authored.liveParticles);
+    expect(thick.liveParticles).toBeGreaterThan(authored.liveParticles);
+    expect(authored.ambientLifeScale).toBe(1);
+    expect(thick.ambientLifeScale).toBe(AMBIENT_LIFE_RANGE.maximum);
+    // The adaptive clamp is a DIFFERENT number and must not be conflated.
+    expect(thick.adaptiveDensityScale).toBe(1);
+    runtime.dispose();
+  });
+
+  it('empties the air at zero without disturbing the event families', () => {
+    const { runtime } = build();
+    const empty = settle(runtime, 0);
+    const ambientFamilies = empty.families.filter((family) => PARTICLE_FAMILIES[family.id as ParticleFamilyId].ambient);
+    for (const family of ambientFamilies) {
+      expect(family.live, family.id).toBe(0);
+    }
+    // Still four draws. An empty family is an empty instance buffer, not a
+    // removed mesh - removing one would be a topology change mid-match.
+    expect(empty.instancedDraws).toBe(PARTICLE_INSTANCED_DRAWS);
+    expect(meshCensus(runtime.root)).toEqual({ instanced: PARTICLE_INSTANCED_DRAWS, loose: 0 });
+    expect(empty.perFrameAllocations).toBe(0);
+    for (const family of empty.families) expect(family.perFrameAllocations, family.id).toBe(0);
+    runtime.dispose();
+  });
+
+  it('cannot push a family past the capacity the quality tier paid for', () => {
+    // This is the bound the readability audit and the frame budget were both
+    // computed against, so the top of the slider must not be able to cross it.
+    const { runtime } = build({ quality: 'low', arenaId: 'gun-range' });
+    const thick = settle(runtime, AMBIENT_LIFE_RANGE.maximum);
+    for (const family of thick.families) {
+      const spec = PARTICLE_FAMILIES[family.id as ParticleFamilyId];
+      expect(family.live, family.id).toBeLessThanOrEqual(spec.capacity.low);
+      expect(family.capacity, family.id).toBe(Math.max(spec.capacity.low, spec.capacity.high, spec.capacity.ultra));
+    }
+    runtime.dispose();
+  });
+
+  it('reads the published latch when the frame loop does not pass one', () => {
+    // The production path: legacy-main calls update() with wind, ads, density
+    // and weather - and no settings at all. Without the latch this row would be
+    // a switch wired to nothing.
+    const { runtime } = build();
+    const view = camera();
+    publishAmbientLife(resolveAmbientLife({ ambientLife: 0 }));
+    expect(activeAmbientLife().density).toBe(0);
+    for (let frame = 0; frame < 240; frame += 1) {
+      runtime.update(1 / 60, view, { wind: calmWind() });
+    }
+    const muted = runtime.telemetry();
+    expect(muted.ambientLifeScale).toBe(0);
+    for (const family of muted.families.filter((entry) => PARTICLE_FAMILIES[entry.id as ParticleFamilyId].ambient)) {
+      expect(family.live, family.id).toBe(0);
+    }
+
+    resetAmbientLife();
+    for (let frame = 0; frame < 240; frame += 1) {
+      runtime.update(1 / 60, view, { wind: calmWind() });
+    }
+    expect(runtime.telemetry().ambientLifeScale).toBe(1);
+    expect(runtime.telemetry().liveParticles).toBeGreaterThan(0);
+    runtime.dispose();
+  });
+
+  it('multiplies with the adaptive clamp rather than replacing it', () => {
+    // Two independent authorities: the frame-time controller may always thin
+    // the air further than the player asked for, and never the reverse.
+    const { runtime } = build();
+    const view = camera();
+    for (let frame = 0; frame < 240; frame += 1) {
+      runtime.update(1 / 60, view, {
+        wind: calmWind(), densityScale: 0.5, ambientLife: resolveAmbientLife({ ambientLife: 2 }),
+      });
+    }
+    const clamped = runtime.telemetry();
+    expect(clamped.adaptiveDensityScale).toBe(0.5);
+    expect(clamped.ambientLifeScale).toBe(2);
+
+    for (let frame = 0; frame < 240; frame += 1) {
+      runtime.update(1 / 60, view, {
+        wind: calmWind(), densityScale: 1, ambientLife: resolveAmbientLife({ ambientLife: 2 }),
+      });
+    }
+    expect(runtime.telemetry().liveParticles).toBeGreaterThan(clamped.liveParticles);
+    runtime.dispose();
+  });
+
+  it('still holds every readability guard at the top of the slider', () => {
+    // Beauty may not buy a gunfight. At 2x air on the densest arena profile the
+    // per-family opacity ceilings and the centre-cone guard are unchanged.
+    const denseArena = ARENA_IDS.reduce((best, id) => (
+      arenaParticleProfile(id).motes.density > arenaParticleProfile(best).motes.density ? id : best
+    ), ARENA_IDS[0]);
+    const { runtime } = build({ arenaId: denseArena });
+    const thick = settle(runtime, AMBIENT_LIFE_RANGE.maximum, 420);
+    for (const family of thick.families) {
+      expect(family.peakOpacity, family.id)
+        .toBeLessThanOrEqual(PARTICLE_FAMILIES[family.id as ParticleFamilyId].maxOpacity + 1e-9);
+    }
+    expect(thick.visibleParticles).toBeLessThanOrEqual(thick.liveParticles);
+    runtime.dispose();
   });
 });

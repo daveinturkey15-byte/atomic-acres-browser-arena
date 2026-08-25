@@ -1,0 +1,26 @@
+{
+  "backend": "webgpu",
+  "errors": [],
+  "shots": [
+    {
+      "name": "landmark-ne",
+      "path": "C:\\Users\\david\\projects\\atomic-acres-gauntlet\\.gauntlet-tmp\\hf396-arena-fidelity\\frames\\view-landmark-ne.png"
+    },
+    {
+      "name": "spawn-nw",
+      "path": "C:\\Users\\david\\projects\\atomic-acres-gauntlet\\.gauntlet-tmp\\hf396-arena-fidelity\\frames\\view-spawn-nw.png"
+    },
+    {
+      "name": "landmark-se",
+      "path": "C:\\Users\\david\\projects\\atomic-acres-gauntlet\\.gauntlet-tmp\\hf396-arena-fidelity\\frames\\view-landmark-se.png"
+    },
+    {
+      "name": "core-centre",
+      "path": "C:\\Users\\david\\projects\\atomic-acres-gauntlet\\.gauntlet-tmp\\hf396-arena-fidelity\\frames\\view-core-centre.png"
+    },
+    {
+      "name": "shore-west",
+      "path": "C:\\Users\\david\\projects\\atomic-acres-gauntlet\\.gauntlet-tmp\\hf396-arena-fidelity\\frames\\view-shore-west.png"
+    }
+  ]
+}

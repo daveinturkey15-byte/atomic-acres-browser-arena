@@ -382,6 +382,33 @@ function _applyInstanceColorVariation(group: THREE.Group): void {
 }
 
 /**
+ * HF-396 "a little bit more jungle like": canopies rendered near-black from
+ * the shaded side — dark leaf albedo (e.g. emergent crowns 0x2f5f28 is only
+ * ~3% linear green) falls to the 0.3 ambient wherever the sun-facing upper
+ * geometry self-shadows it, so every tree read as a burnt silhouette in
+ * captured WebGPU frames. Fake-subsurface lift (technique register row 18's
+ * "subsurface-scattering approximation for backlit translucency"): a small
+ * emissive of each canopy's OWN hue lifts shadowed faces toward readable
+ * green without touching the Pass 76 light rig (raising ambient/ exposure
+ * washed the whole island beige — the rejected look). Canopy layers only:
+ * trunks keep their natural shading, ground cover is already sun-bright.
+ * Zero draw-call or per-frame cost — a material property set once at build.
+ */
+const CANOPY_LIFT_PATTERN = /(canopies|crowns|midstorey-clumps)/;
+const CANOPY_LIFT_SCALE = 0.22;
+
+function _applyCanopyTranslucencyLift(group: THREE.Group): void {
+  group.traverse((obj) => {
+    if (!(obj instanceof THREE.InstancedMesh)) return;
+    if (!obj.name.startsWith('farcrysis-vege')) return;
+    if (!CANOPY_LIFT_PATTERN.test(obj.name)) return;
+    const mat = obj.material as THREE.MeshStandardMaterial;
+    if (!mat || !mat.color) return;
+    mat.emissive.copy(mat.color).multiplyScalar(CANOPY_LIFT_SCALE);
+  });
+}
+
+/**
  * Merge an array of transformed geometries into one BufferGeometry for instancing.
  * Adds normal/uv attributes from the first source geom when merged output lacks them.
  */
@@ -3008,7 +3035,10 @@ export function buildVegetation(scene: THREE.Group): void {
 
   // Believability: per-instance colour variation (rides existing draws).
   _applyInstanceColorVariation(scene);
-}
+
+  // HF-396: lift shaded canopy faces toward green (fake subsurface).
+  _applyCanopyTranslucencyLift(scene);
+ }
 
 // ---------------------------------------------------------------------------
 // Stats query — read the accumulated stats after buildVegetation() runs.

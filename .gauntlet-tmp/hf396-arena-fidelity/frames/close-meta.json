@@ -1,0 +1,21 @@
+{
+  "backend": "webgpu",
+  "shots": [
+    {
+      "name": "wall-nw",
+      "path": "C:\\Users\\david\\projects\\atomic-acres-gauntlet\\.gauntlet-tmp\\hf396-arena-fidelity\\frames\\close-wall-nw.png"
+    },
+    {
+      "name": "wall-ne",
+      "path": "C:\\Users\\david\\projects\\atomic-acres-gauntlet\\.gauntlet-tmp\\hf396-arena-fidelity\\frames\\close-wall-ne.png"
+    },
+    {
+      "name": "wall-sw",
+      "path": "C:\\Users\\david\\projects\\atomic-acres-gauntlet\\.gauntlet-tmp\\hf396-arena-fidelity\\frames\\close-wall-sw.png"
+    },
+    {
+      "name": "wall-se",
+      "path": "C:\\Users\\david\\projects\\atomic-acres-gauntlet\\.gauntlet-tmp\\hf396-arena-fidelity\\frames\\close-wall-se.png"
+    }
+  ]
+}

@@ -829,6 +829,81 @@ export const FIRST_PERSON_ARM_CRUSHED_ALBEDO_ROLES: readonly FirstPersonArmMater
  */
 export const FIRST_PERSON_ARM_HAND_TINT_BLEND = 0.42;
 
+/**
+ * HF-388. The correction the crushed-albedo fix above needed and did not have.
+ *
+ * Dropping the 14/255 map was right - a multiply cannot lighten - but it left
+ * the palette colour standing as the arm's ENTIRE albedo, and the palette is
+ * authored for a body seen across an arena under arena lighting. The
+ * first-person arms are a different lighting problem: they sit inside
+ * `first-person-viewmodel-fill`, a point light MEASURED live at intensity 17.5
+ * with decay 2 at roughly 0.4 m, which is an order of magnitude more
+ * illuminance than the same surface receives in third person. Measured on the
+ * running build 2026-08-25, the shipped default sleeve arrives at sRGB
+ * #9fc6cc - luminance 0.75, brighter than printer paper - and the rendered arm
+ * is a value-flat white shape with 12% of its pixels within a hair of clipping.
+ * The owner's "still need some work" is the far side of the same coin the
+ * black wedge was on: one had no albedo, this has too much.
+ *
+ * So the palette keeps deciding WHICH COLOUR the arm is, and this decides how
+ * much light it may return. Two properties matter and both are asserted:
+ *
+ *   1. The target luminance sits far above `READABLE_ALBEDO_FLOOR` (0.16), so
+ *      this cannot walk back toward the silhouette failure it is fixing.
+ *   2. Chroma is preserved as an sRGB offset from each palette's own grey, not
+ *      scaled with it, and then GAINED - because removing value from a colour
+ *      removes the channel separation that made two skins tellable apart, and
+ *      the four-skin separability gate must not be paid for with this fix.
+ */
+export const FIRST_PERSON_ARM_ALBEDO_CONTRACT = 'first-person-exposure-corrected-arm-albedo-v1';
+/** sRGB luminance the arm's two largest regions are re-based onto. */
+export const FIRST_PERSON_ARM_TARGET_SRGB_LUMINANCE: Readonly<Record<'sleeve' | 'glove', number>> = Object.freeze({
+  // A deliberate value break between sleeve and glove: an arm with one flat
+  // value has no readable interior, which is the other half of what "thin"
+  // described. Gloves are darker than sleeves in every issued kit.
+  sleeve: 0.35,
+  glove: 0.28,
+});
+export const FIRST_PERSON_ARM_CHROMA_GAIN = 1.4;
+
+function srgbChannels(hex: number): [number, number, number] {
+  return [((hex >> 16) & 0xff) / 255, ((hex >> 8) & 0xff) / 255, (hex & 0xff) / 255];
+}
+
+function srgbLuminance(channels: readonly [number, number, number]): number {
+  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+}
+
+/**
+ * Re-bases one palette arm colour onto the first-person luminance target,
+ * preserving (and gaining) its chroma. Returns an sRGB hex, because that is
+ * the space the palette is authored in and the space the separability gate
+ * judges; `THREE.Color.setHex` converts to linear on the way in.
+ *
+ * The chroma offsets sum to zero luminance by construction, so the result
+ * lands on the target EXACTLY - as long as no channel is clamped. A clamp
+ * would silently push the surface back up in value, which is the failure being
+ * fixed, so the gain is capped per colour at whatever that colour can take
+ * instead. Only the explorer sleeve is anywhere near that cap; every other
+ * arm colour takes the full gain.
+ */
+export function firstPersonArmSkinAlbedo(paletteHex: number, role: 'sleeve' | 'glove'): number {
+  const channels = srgbChannels(paletteHex);
+  const grey = srgbLuminance(channels);
+  const target = FIRST_PERSON_ARM_TARGET_SRGB_LUMINANCE[role];
+  const offsets = channels.map((channel) => channel - grey);
+  const admissibleGain = offsets.reduce((limit, offset) => {
+    if (Math.abs(offset) < 1e-6) return limit;
+    const headroom = offset < 0 ? target : 1 - target;
+    return Math.min(limit, headroom / Math.abs(offset));
+  }, FIRST_PERSON_ARM_CHROMA_GAIN);
+  const gain = Math.max(1, Math.min(FIRST_PERSON_ARM_CHROMA_GAIN, admissibleGain));
+  return offsets.reduce(
+    (hex, offset) => (hex << 8) | Math.round(Math.max(0, Math.min(1, target + offset * gain)) * 255),
+    0,
+  );
+}
+
 const armHandTintScratch = new THREE.Color();
 
 /**
@@ -850,8 +925,19 @@ export function applyFirstPersonArmSkinMaterial(
   if (role === null || role === 'skin') return false;
   const palette = operatorSkinPalette(skinId).arm;
   if (role === 'sleeve' || role === 'glove') {
-    material.color.setHex(role === 'sleeve' ? palette.sleeve : palette.glove);
+    material.color.setHex(firstPersonArmSkinAlbedo(role === 'sleeve' ? palette.sleeve : palette.glove, role));
     material.roughness = role === 'sleeve' ? palette.sleeveRoughness : palette.gloveRoughness;
+    // HF-388. Measured live on the shipped GLB 2026-08-25: both of these
+    // materials arrive with `metalness` 0.82. Woven sleeve and rubber-palmed
+    // glove are dielectrics - a metal has no diffuse response at all and tints
+    // its specular with its base colour, which is exactly the wet-plastic read
+    // the owner is looking at. `finger-glove` is the ONLY arm role that
+    // already forced this to 0, and it is the only one that does not look like
+    // latex. The authored metalnessMap is deliberately left attached, so an
+    // asset that really does carry metal detail loses nothing it had: THREE
+    // multiplies the two, and this only removes the scalar that could not be
+    // right for cloth.
+    material.metalness = 0;
     // The crushed base-colour map is dropped, not multiplied: see
     // FIRST_PERSON_ARM_CRUSHED_ALBEDO_ROLES. Everything that carries the
     // surface's form - normalMap, roughnessMap, metalnessMap, aoMap - stays.

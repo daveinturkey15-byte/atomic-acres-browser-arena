@@ -52,7 +52,7 @@
 import * as THREE from 'three';
 import { isSoftwareWebGLRenderer } from '../atomic-signal';
 import type { RenderProfile } from '../render-profile';
-import type { WeatherSample } from './weather-state';
+import { WEATHER_STATE_TABLE, type WeatherSample } from './weather-state';
 import {
   activeWeatherPresentation,
   advanceWeatherOverrideClock,
@@ -374,6 +374,149 @@ export function wetSurfaceResponse(
 }
 
 /**
+ * WEATHER GLOOM — Pass 79.
+ *
+ * THE DEFECT THIS CLOSES. `WeatherSample` has carried `fogDensityMultiplier`
+ * and `skyDarkenAmount` since Pass 76 and a repo-wide grep found ZERO consumers
+ * of either outside tests. So the model was computing a sky that gets heavier
+ * as it rains and nothing was drawing it: a live WebGPU capture of
+ * `?weather=heavy-rain` on atomic-acres shows 1,482 rain streaks falling
+ * through an untouched golden sunset. That is precisely why the rain reads as
+ * an overlay pasted onto the lens rather than as weather — the world behind it
+ * never agreed that anything was happening.
+ *
+ * WHAT THIS LANE IS AND IS NOT ALLOWED TO TOUCH. The key light, the sky dome
+ * and the arena's authored fog VALUES belong to the arena and to legacy-main
+ * (which rewrites `scene.fog.color` on nuke charge, on flashes and on arena
+ * change). So:
+ *
+ *   - Fog COLOUR is never touched here. It has an owner and it is not us.
+ *   - The key light is never dimmed. Dimming the sun is the single most direct
+ *     way to hide a player in a shadow and the combat-safety rule forbids it.
+ *   - The fog NEAR plane is never moved. That is the whole safety argument
+ *     below, and it is structural rather than tuned.
+ *
+ * WHAT IT DOES DO. Two channels, both bounded, both restore-on-clear:
+ *
+ *   1. FOG SPAN. Linear fog attenuates NOTHING closer than its near plane —
+ *      the factor is `(d - near) / (far - near)` clamped at zero. Leaving
+ *      `near` alone therefore means weather fog adds EXACTLY ZERO attenuation
+ *      at every distance inside it, as arithmetic and not as a tuning claim.
+ *      Weather pulls `far` in, which thickens the far field only.
+ *   2. OVERCAST FILL. What an overcast sky does to a lit scene is FLATTEN it.
+ *      This lane may not flatten by taking light away, so it flattens by
+ *      adding a small cool hemisphere fill on its own light — which can only
+ *      ever raise the floor of a shadow, i.e. it can only ever make a player
+ *      standing in one EASIER to see. `skyDarkenAmount` drives it because that
+ *      is the model's measure of how overcast the sky is; the sign of the
+ *      response is chosen by the safety rule, not by the field's name.
+ */
+export const WEATHER_FOG = Object.freeze({
+  /**
+   * Arenas whose own fog already starts inside plausible combat range get NO
+   * weather fog at all. Weather may deepen a distant haze; it may not join in
+   * on an arena that is already hazing at fighting distance.
+   */
+  minAuthoredNearM: 45,
+  /** Largest fraction of the authored fog span weather may remove, at storm. */
+  maxSpanReduction: 0.4,
+  /** The span floor. Below this, weather leaves the fog exactly as authored. */
+  minSpanM: 45,
+  /**
+   * Distance PAST the near plane the readability bound is stated at. 20 m past
+   * a >=45 m near plane is >=65 m, which is past the far side of the smallest
+   * arena in the game.
+   */
+  guardRangeBeyondNearM: 20,
+} as const);
+
+/** The strictest weather-added extinction permitted at the guard range. */
+export const WEATHER_FOG_MAX_ADDED_EXTINCTION = 0.25;
+
+/** Linear fog factor at `distanceM`, exactly as three.js computes it. */
+export function linearFogFactor(distanceM: number, nearM: number, farM: number): number {
+  if (!(farM > nearM)) return 0;
+  return clamp01((distanceM - nearM) / (farM - nearM));
+}
+
+/**
+ * The weather fog far plane. Returns the authored far unchanged whenever
+ * weather is not permitted to act, so a caller never has to special-case it.
+ */
+export function weatherFogFar(authoredNearM: number, authoredFarM: number, fogDensityMultiplier: number): number {
+  const near = finite(authoredNearM, 0);
+  const far = finite(authoredFarM, 0);
+  const span = far - near;
+  if (!(span > 0)) return far;
+  if (near < WEATHER_FOG.minAuthoredNearM) return far;
+  if (span <= WEATHER_FOG.minSpanM) return far;
+  const multiplier = Math.max(1, finite(fogDensityMultiplier, 1));
+  // A "density" multiplier on linear fog is a SHORTER span: twice as dense is
+  // full extinction in half the distance. Both bounds then apply.
+  const requested = span / multiplier;
+  const floor = Math.max(span * (1 - WEATHER_FOG.maxSpanReduction), WEATHER_FOG.minSpanM);
+  return near + Math.max(requested, floor);
+}
+
+/** Extinction weather ADDS at `distanceM`, over and above the authored fog. */
+export function weatherFogAddedExtinction(
+  distanceM: number,
+  authoredNearM: number,
+  authoredFarM: number,
+  fogDensityMultiplier: number,
+): number {
+  const authored = linearFogFactor(distanceM, authoredNearM, authoredFarM);
+  const weathered = linearFogFactor(distanceM, authoredNearM, weatherFogFar(authoredNearM, authoredFarM, fogDensityMultiplier));
+  return Math.max(0, weathered - authored);
+}
+
+/**
+ * Fails closed. Two claims, both swept rather than asserted at one point:
+ *
+ *   1. Inside the near plane the added extinction is exactly 0 — the guarantee
+ *      the whole "we never move near" argument rests on.
+ *   2. At the guard range it never exceeds WEATHER_FOG_MAX_ADDED_EXTINCTION.
+ */
+export function assertWeatherFogCombatSafety(): void {
+  const worstMultiplier = Math.max(...Object.values(WEATHER_STATE_TABLE).map((row) => row.fogDensityMultiplier));
+  for (let near = WEATHER_FOG.minAuthoredNearM; near <= 160; near += 5) {
+    for (let span = 1; span <= 400; span += 5) {
+      const far = near + span;
+      for (let distance = 0; distance <= near; distance += Math.max(1, near / 8)) {
+        const inside = weatherFogAddedExtinction(distance, near, far, worstMultiplier);
+        if (inside !== 0) {
+          throw new Error(`Weather fog attenuated inside the authored near plane: ${inside} at ${distance} m (near ${near})`);
+        }
+      }
+      const guard = weatherFogAddedExtinction(near + WEATHER_FOG.guardRangeBeyondNearM, near, far, worstMultiplier);
+      if (guard > WEATHER_FOG_MAX_ADDED_EXTINCTION) {
+        throw new Error(
+          `Weather fog readability failed closed: added extinction ${(guard * 100).toFixed(1)}% at `
+          + `${near + WEATHER_FOG.guardRangeBeyondNearM} m exceeds the ${(WEATHER_FOG_MAX_ADDED_EXTINCTION * 100).toFixed(0)}% ceiling`,
+        );
+      }
+    }
+  }
+}
+
+/**
+ * The overcast fill. Cool sky, near-neutral ground, and a peak well under a
+ * typical arena hemisphere (0.55–1.05 authored) so it reads as a flattening
+ * rather than as a second sun.
+ */
+export const OVERCAST_FILL = Object.freeze({
+  skyColor: 0xb9c6d4,
+  groundColor: 0x6f7278,
+  /** Added hemisphere intensity at skyDarkenAmount 1 (a full storm). */
+  peakIntensity: 0.3,
+} as const);
+
+/** Bounded, monotone, and never negative: this channel can only add light. */
+export function overcastFillIntensity(skyDarkenAmount: number): number {
+  return clamp01(finite(skyDarkenAmount, 0)) * OVERCAST_FILL.peakIntensity;
+}
+
+/**
  * Bypass reasons, matching atmosphere-system.ts atmosphereBypassReason exactly.
  * The compat/WebGL2 route and software renderers get NO rain rather than a
  * degraded rain — the same call bloomQuality and ambientOcclusion make when
@@ -535,6 +678,19 @@ export type RainTelemetry = Readonly<{
   lightningStrikeIndex: number;
   /** Expected fraction of a sightline the current rain removes. */
   sightlineObscuration: number;
+  /**
+   * Pass 79 weather gloom. `authoredFogFar` is what the arena asked for and
+   * `fogFar` is what is on the scene right now, so a receipt shows the fog
+   * actually moved rather than showing the multiplier we hoped moved it.
+   */
+  fogNear: number | null;
+  fogFar: number | null;
+  authoredFogFar: number | null;
+  fogDensityMultiplier: number;
+  /** Weather-added extinction at 30 m. Structurally zero; reported anyway. */
+  fogAddedExtinctionAt30M: number;
+  /** Added hemisphere fill, in the same units as an arena hemisphere light. */
+  overcastFillIntensity: number;
   perFrameAllocations: 0;
 }>;
 
@@ -583,6 +739,16 @@ export class RainPresentation {
   private autoAdopted = 0;
   private wetScanCountdown = 0;
   private flashLight: THREE.HemisphereLight | null = null;
+  // Pass 79 weather gloom. `authoredFog*` is the arena's own value; `appliedFogFar`
+  // is the last value THIS system wrote, which is how an external write (an arena
+  // change, a lighting re-apply in legacy-main) is detected and re-adopted as the
+  // new baseline instead of being multiplied on top of our own previous output.
+  private overcastLight: THREE.HemisphereLight | null = null;
+  private authoredFogNear = 0;
+  private authoredFogFar = 0;
+  private appliedFogFar: number | null = null;
+  private fogDensityMultiplier = 1;
+  private skyDarkenAmount = 0;
   /** Advected sheet phase (rad). Accumulated from speed, never from raw time. */
   private sheetPhase = 0;
 
@@ -618,6 +784,9 @@ export class RainPresentation {
     // The readability bound is arithmetic, so it is checked here rather than
     // trusted: a geometry or budget edit that breaks it cannot reach a match.
     assertRainCombatSafety();
+    // Same standing: the weather-gloom bound is a sweep over every fog geometry
+    // an arena could author, not a comment, and it fails construction.
+    assertWeatherFogCombatSafety();
     this.root.name = 'pass76-weather-rain';
     // The batcher must never touch this root: its children are InstancedMeshes
     // and batching one collapses every instance to a single stray at the origin.
@@ -751,6 +920,16 @@ export class RainPresentation {
     this.flashLight = flashLight;
     this.root.add(flashLight);
 
+    // The overcast fill. Same lifecycle argument as the flash light: added ONCE
+    // at zero intensity so every later change is a uniform write and can never
+    // rebuild a pipeline mid-match. Casts no shadows by construction, so it
+    // cannot move a single existing shadow either - it only lifts their floor.
+    const overcastLight = new THREE.HemisphereLight(OVERCAST_FILL.skyColor, OVERCAST_FILL.groundColor, 0);
+    overcastLight.name = 'pass79-weather-overcast-fill';
+    overcastLight.userData.presentationOnly = true;
+    this.overcastLight = overcastLight;
+    this.root.add(overcastLight);
+
     scene.add(this.root);
   }
 
@@ -845,7 +1024,9 @@ export class RainPresentation {
    * first shower of a match does not run dry for two and a half seconds.
    */
   private refreshWetSurfaces(step: number): void {
-    if (this.wetness < WETNESS_SCAN_FLOOR || !this.sceneRoot) {
+    // No scan at all when the player has the row off: an adopted surface that
+    // is never written is pure cost.
+    if (this.wetness < WETNESS_SCAN_FLOOR || !this.sceneRoot || !this.presentation.wetSurfaces) {
       this.wetScanCountdown = 0;
       return;
     }
@@ -871,6 +1052,51 @@ export class RainPresentation {
    * wind-field.ts — this class never decides what the weather is, it only
    * draws it.
    */
+  /**
+   * The two gloom channels. Both are pure functions of the weather sample and
+   * the player's settings, so two peers with the same settings write the same
+   * numbers and nothing here accumulates state across frames.
+   *
+   * BYPASSED PROFILES GET NEITHER. The compat route draws no rain, and fog
+   * without rain is a bug report, not weather.
+   */
+  private applyWeatherGloom(weather: WeatherSample): void {
+    if (this.bypass) return;
+    const enabled = this.presentation.weatherEnabled;
+    this.skyDarkenAmount = enabled ? clamp01(finite(weather.skyDarkenAmount, 0)) : 0;
+    if (this.overcastLight) this.overcastLight.intensity = overcastFillIntensity(this.skyDarkenAmount);
+
+    const fog = (this.sceneRoot as THREE.Scene | null)?.fog;
+    if (!(fog instanceof THREE.Fog)) {
+      this.appliedFogFar = null;
+      this.fogDensityMultiplier = 1;
+      return;
+    }
+    // Re-adopt whenever the value on the scene is not the one we last wrote:
+    // that means the arena changed or legacy-main re-applied its lighting, and
+    // the NEW value is the authored baseline. Without this the multiplier would
+    // compound onto its own previous output every arena change.
+    if (this.appliedFogFar === null
+      || Math.abs(fog.far - this.appliedFogFar) > 1e-3
+      || fog.near !== this.authoredFogNear) {
+      this.authoredFogNear = fog.near;
+      this.authoredFogFar = fog.far;
+    }
+    this.fogDensityMultiplier = enabled ? Math.max(1, finite(weather.fogDensityMultiplier, 1)) : 1;
+    const far = weatherFogFar(this.authoredFogNear, this.authoredFogFar, this.fogDensityMultiplier);
+    fog.far = far;
+    this.appliedFogFar = far;
+  }
+
+  /** Hands the arena's own fog back exactly as it was found. */
+  private restoreAuthoredFog(): void {
+    const fog = (this.sceneRoot as THREE.Scene | null)?.fog;
+    if (fog instanceof THREE.Fog && this.appliedFogFar !== null) {
+      fog.far = this.authoredFogFar;
+    }
+    this.appliedFogFar = null;
+  }
+
   update(
     dt: number,
     camera: THREE.Camera,
@@ -894,7 +1120,15 @@ export class RainPresentation {
     // Wetness outlives the rain by design, so it is applied even when the
     // streak pass is bypassed or the sky has already cleared.
     this.refreshWetSurfaces(step);
-    this.applyWetness(this.wetness);
+    // The player's WET SURFACES row. Zero here is a genuine "leave the arena's
+    // own materials alone" - applyWetness restores every adopted surface to its
+    // recorded dry values at wetness 0, so turning the row off puts the world
+    // back rather than freezing it half-wet.
+    this.applyWetness(this.presentation.wetSurfaces ? this.wetness : 0);
+    // Pass 79. Sits beside the wetness pass for the same reason: the world
+    // getting heavier is weather, not rain, so it must survive the streak
+    // pass returning early and it must ease back out after the sky clears.
+    this.applyWeatherGloom(weather);
     if (this.flashLight) this.flashLight.intensity = this.lightningFlash * RAIN_LIGHTNING.peakLightIntensity;
 
     const streaks = this.streaks;
@@ -1173,6 +1407,14 @@ export class RainPresentation {
       lightningFlash: this.lightningFlash,
       lightningStrikeIndex: this.lightningStrikeIndex,
       sightlineObscuration: rainSightlineObscuration(this.streakInstances, this.streakMaterial?.opacity ?? 0),
+      fogNear: this.appliedFogFar === null ? null : this.authoredFogNear,
+      fogFar: this.appliedFogFar,
+      authoredFogFar: this.appliedFogFar === null ? null : this.authoredFogFar,
+      fogDensityMultiplier: this.fogDensityMultiplier,
+      fogAddedExtinctionAt30M: this.appliedFogFar === null
+        ? 0
+        : weatherFogAddedExtinction(30, this.authoredFogNear, this.authoredFogFar, this.fogDensityMultiplier),
+      overcastFillIntensity: this.overcastLight?.intensity ?? 0,
       perFrameAllocations: 0,
     };
   }
@@ -1181,8 +1423,11 @@ export class RainPresentation {
     if (this.disposed) return;
     this.disposed = true;
     this.clearWetSurfaces();
+    this.restoreAuthoredFog();
     this.flashLight?.dispose();
     this.flashLight = null;
+    this.overcastLight?.dispose();
+    this.overcastLight = null;
     this.sceneRoot = null;
     this.root.removeFromParent();
     this.root.clear();

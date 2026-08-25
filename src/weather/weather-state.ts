@@ -661,12 +661,21 @@ export function forcedWeatherSample(
   // Indoor arenas stay dry no matter what is asked for: the availability table
   // is a gameplay fact, not a preference.
   const permitted = weatherAvailability(arenaId);
-  const requested = permitted.includes(state) ? state : 'clear';
+  // An over-severe request CLAMPS DOWN to the arena's heaviest rung; it does
+  // not fall back to clear. The old `includes ? state : 'clear'` did fall back,
+  // and a live WebGPU capture caught what that costs: `?weather=storm` on
+  // atomic-acres - whose table stops at heavy-rain - returned rainRate 0 and
+  // zero streaks, so the ONE route built for looking at heavy weather showed a
+  // sunny sky. Reusing presentationRung is what makes this correct by
+  // construction: it already means "the heaviest available rung at or below
+  // this one", which is exactly the question being asked twice here.
+  const requestedRung = presentationRung(permitted, state);
   // The player's ceiling applies to the override too. A capture taken with
   // `?weather=storm` and WEATHER: LIGHT must show what LIGHT actually ships,
   // or the override is testing a configuration nobody can play.
   const ceilingRung = presentationRung(permitted, presentation.ceilingState);
-  const resolved = permitted[Math.min(permitted.indexOf(requested), ceilingRung)];
+  const requested = permitted[requestedRung];
+  const resolved = permitted[Math.min(requestedRung, ceilingRung)];
   const row = WEATHER_STATE_TABLE[resolved];
   const elapsed = Math.max(0, Number.isFinite(elapsedSeconds) ? elapsedSeconds : 0);
   return Object.freeze({

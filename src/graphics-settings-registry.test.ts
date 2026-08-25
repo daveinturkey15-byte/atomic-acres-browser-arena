@@ -17,8 +17,16 @@ import {
   resolveScreenSpacePostRuntime,
 } from './rendering/screen-space-post-profile';
 
-/** The Pass 78 weather family. */
-const WEATHER_KEYS = ['weatherIntensity', 'rainDensity', 'windStrength', 'lightning'] as const;
+/**
+ * The weather and air family. Pass 79 ADDS the two rows that were still
+ * missing - wet surfaces and airborne detail - to this list rather than
+ * exempting them, so both are held to the same plain-language, live-apply and
+ * atmosphere-category rules every other weather row already answers to.
+ */
+const WEATHER_KEYS = [
+  'weatherIntensity', 'rainDensity', 'windStrength', 'lightning',
+  'wetSurfaces', 'ambientLife',
+] as const;
 
 /** Controls the screen-space stack owns, i.e. the ones the presets re-tier. */
 const SCREEN_SPACE_KEYS = [
@@ -290,6 +298,11 @@ describe('Advanced Graphics weather controls', () => {
       : []).toEqual(['off', 'light', 'moderate', 'heavy', 'storm']);
     expect(byKey.get('rainDensity')).toMatchObject({ kind: 'range', minimum: 0.25, maximum: 1.5, unit: 'multiplier' });
     expect(byKey.get('windStrength')).toMatchObject({ kind: 'range', minimum: 0, maximum: 2, unit: 'multiplier' });
+    expect(byKey.get('wetSurfaces')).toMatchObject({ kind: 'toggle' });
+    expect(byKey.get('ambientLife')).toMatchObject({ kind: 'range', minimum: 0, maximum: 2, unit: 'multiplier' });
+    // The air row must be able to reach BOTH ends of a real change: off, and
+    // meaningfully more than the arenas author.
+    expect(byKey.get('ambientLife')?.kind === 'range' ? (byKey.get('ambientLife') as { minimum: number }).minimum : 1).toBe(0);
     expect(byKey.get('lightning')).toMatchObject({ kind: 'toggle' });
   });
 
@@ -318,9 +331,22 @@ describe('Advanced Graphics weather controls', () => {
     // Spelled out rather than derived, for the same reason the screen-space
     // matrix is: an edit to these numbers has to be an argued edit here too.
     const matrix = {
-      performance: { weatherIntensity: 'light', rainDensity: 0.5, windStrength: 1, lightning: false },
-      high: { weatherIntensity: 'storm', rainDensity: 1, windStrength: 1, lightning: true },
-      max: { weatherIntensity: 'storm', rainDensity: 1.35, windStrength: 1, lightning: true },
+      performance: {
+        weatherIntensity: 'light', rainDensity: 0.5, windStrength: 1, lightning: false,
+        wetSurfaces: true, ambientLife: 0.6,
+      },
+      high: {
+        weatherIntensity: 'storm', rainDensity: 1, windStrength: 1, lightning: true,
+        wetSurfaces: true, ambientLife: 1,
+      },
+      raytraced: {
+        weatherIntensity: 'storm', rainDensity: 1.15, windStrength: 1, lightning: true,
+        wetSurfaces: true, ambientLife: 1.15,
+      },
+      max: {
+        weatherIntensity: 'storm', rainDensity: 1.35, windStrength: 1, lightning: true,
+        wetSurfaces: true, ambientLife: 1.5,
+      },
     } as const;
     for (const [name, expected] of Object.entries(matrix)) {
       const preset = GRAPHICS_PRESET_VALUES[name as keyof typeof GRAPHICS_PRESET_VALUES];
@@ -337,6 +363,19 @@ describe('Advanced Graphics weather controls', () => {
     // CEILING, because a state the arenas were authored to reach should not be
     // invisible on the preset most machines land on.
     expect(GRAPHICS_PRESET_VALUES.high.weatherIntensity).toBe('storm');
+    // Airborne detail rises monotonically with the preset ladder: a heavier
+    // preset that showed LESS air would be a straight defect.
+    expect(GRAPHICS_PRESET_VALUES.performance.ambientLife)
+      .toBeLessThan(GRAPHICS_PRESET_VALUES.high.ambientLife);
+    expect(GRAPHICS_PRESET_VALUES.high.ambientLife)
+      .toBeLessThan(GRAPHICS_PRESET_VALUES.raytraced.ambientLife);
+    expect(GRAPHICS_PRESET_VALUES.raytraced.ambientLife)
+      .toBeLessThan(GRAPHICS_PRESET_VALUES.max.ambientLife);
+    // Wet ground costs two material writes on a 2.5 s scan, so no preset has a
+    // performance reason to drop it - it stays a taste control on every rung.
+    for (const preset of Object.values(GRAPHICS_PRESET_VALUES)) {
+      expect(preset.wetSurfaces).toBe(true);
+    }
     expect(GRAPHICS_PRESET_VALUES.max.rainDensity).toBeGreaterThan(GRAPHICS_PRESET_VALUES.high.rainDensity);
     expect(GRAPHICS_PRESET_VALUES.performance.rainDensity).toBeLessThan(GRAPHICS_PRESET_VALUES.high.rainDensity);
   });

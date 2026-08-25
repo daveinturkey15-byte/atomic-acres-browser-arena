@@ -89,6 +89,7 @@ export type WeatherPresentationSettings = Readonly<{
   rainDensity: number;
   windStrength: number;
   lightning: boolean;
+  wetSurfaces: boolean;
 }>;
 
 export type WeatherPresentationRuntime = Readonly<{
@@ -101,6 +102,12 @@ export type WeatherPresentationRuntime = Readonly<{
   windStrength: number;
   /** Whether storm flashes are drawn. Thunder STATE is exposed regardless. */
   lightning: boolean;
+  /**
+   * Whether rain darkens and glosses the ground it falls on. The wetness VALUE
+   * is still simulated and still peer-identical either way - this only decides
+   * whether the local screen writes it into the arena's materials.
+   */
+  wetSurfaces: boolean;
   /** False only for `off`: nothing precipitates and the sky stays baseline. */
   weatherEnabled: boolean;
 }>;
@@ -137,6 +144,7 @@ export function resolveWeatherPresentation(settings: Partial<WeatherPresentation
       WEATHER_WIND_STRENGTH_RANGE.maximum,
     ),
     lightning: typeof settings.lightning === 'boolean' ? settings.lightning : true,
+    wetSurfaces: typeof settings.wetSurfaces === 'boolean' ? settings.wetSurfaces : true,
     weatherEnabled: intensity !== 'off',
   });
 }

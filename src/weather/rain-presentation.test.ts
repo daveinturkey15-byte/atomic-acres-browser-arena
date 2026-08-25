@@ -23,8 +23,16 @@ import {
   RainPresentation,
   WETNESS_MAX_ADOPTED_SURFACES,
   WETNESS_RESPONSE,
+  OVERCAST_FILL,
+  WEATHER_FOG,
+  WEATHER_FOG_MAX_ADDED_EXTINCTION,
   assertRainCombatSafety,
+  assertWeatherFogCombatSafety,
+  linearFogFactor,
+  overcastFillIntensity,
   rainBypassReason,
+  weatherFogAddedExtinction,
+  weatherFogFar,
   rainSightlineObscuration,
   wetSurfaceResponse,
   type RainQualityTier,
@@ -701,24 +709,48 @@ describe('rain reads as a volume, not an overlay', () => {
 });
 
 describe('lightning presentation', () => {
-  it('lights the sky with one shadowless light and never more than the cap', () => {
+  it('lights the sky with shadowless lights, by name, and never more than the cap', () => {
+    // RE-PINNED IN PASS 79, STRICTER. This used to assert `lights.length === 1`
+    // and then index `lights[0]`, which passes just as happily if the one light
+    // present is the WRONG light. It now pins the exact SET of lights the root
+    // is allowed to carry, by name, and holds every light in it to a cap - so
+    // both a third light and a silently renamed one fail here.
     const { rain } = build();
     const lights = rain.root.children.filter((child) => (child as THREE.Light).isLight) as THREE.HemisphereLight[];
-    expect(lights).toHaveLength(1);
-    expect(lights[0].castShadow).toBe(false);
-    expect(lights[0].intensity).toBe(0);
+    expect(lights.map((light) => light.name).sort()).toEqual([
+      'pass78-weather-lightning-flash',
+      'pass79-weather-overcast-fill',
+    ]);
+    const flashLight = lights.find((light) => light.name === 'pass78-weather-lightning-flash') as THREE.HemisphereLight;
+    const overcastLight = lights.find((light) => light.name === 'pass79-weather-overcast-fill') as THREE.HemisphereLight;
+    for (const light of lights) {
+      // No light this system owns may ever cast a shadow: a shadow-casting
+      // light is the one way an added light could DARKEN something and hide a
+      // player in it.
+      expect(light.castShadow, light.name).toBe(false);
+      expect(light.intensity, light.name).toBe(0);
+    }
     // Still exactly two instanced draws and no loose meshes: a light is not a
     // draw call, which is why the flash is free.
     expect(meshCensus(rain.root)).toEqual({ instanced: 2, loose: 0 });
 
     for (const flash of [0, 0.15, 0.4, RAIN_LIGHTNING.peakLightIntensity, 1]) {
       rain.update(1 / 60, camera(), { ...STORM, lightning: { ...STORM.lightning, flash, active: flash > 0 } }, STIFF_WIND);
-      expect(lights[0].intensity, 'flash ' + flash).toBeLessThanOrEqual(RAIN_LIGHTNING.peakLightIntensity + 1e-9);
-      expect(lights[0].intensity, 'flash ' + flash).toBeCloseTo(
+      expect(flashLight.intensity, 'flash ' + flash).toBeLessThanOrEqual(RAIN_LIGHTNING.peakLightIntensity + 1e-9);
+      expect(flashLight.intensity, 'flash ' + flash).toBeCloseTo(
         Math.min(1, flash) * RAIN_LIGHTNING.peakLightIntensity,
         9,
       );
+      // The overcast channel is separate and separately capped: a flash may not
+      // leak into it and it may not leak into a flash.
+      expect(overcastLight.intensity, 'flash ' + flash).toBeLessThanOrEqual(OVERCAST_FILL.peakIntensity + 1e-9);
+      expect(overcastLight.intensity, 'flash ' + flash)
+        .toBeCloseTo(overcastFillIntensity(STORM.skyDarkenAmount), 9);
     }
+    // And the total this system can ever add is the sum of its two caps, which
+    // is what bounds the whole feature's effect on the picture.
+    const total = flashLight.intensity + overcastLight.intensity;
+    expect(total).toBeLessThanOrEqual(RAIN_LIGHTNING.peakLightIntensity + OVERCAST_FILL.peakIntensity + 1e-9);
     rain.dispose();
   });
 
@@ -742,12 +774,18 @@ describe('lightning presentation', () => {
 
   it('stays dark when the player turns it off', () => {
     const { rain } = build();
-    const light = rain.root.children.find((child) => (child as THREE.Light).isLight) as THREE.HemisphereLight;
+    // Addressed by name rather than by "the first light that happens to be
+    // there", so this cannot start silently checking a different light.
+    const light = rain.root.getObjectByName('pass78-weather-lightning-flash') as THREE.HemisphereLight;
     rain.update(1 / 60, camera(), { ...STORM, lightning: { ...STORM.lightning, flash: 1, active: true } }, STIFF_WIND, {
       presentation: resolveWeatherPresentation({ lightning: false }),
     });
     expect(light.intensity).toBe(0);
     expect(rain.telemetry().lightningFlash).toBe(0);
+    // Turning LIGHTNING off must not turn the overcast sky off with it: they
+    // are two separate rows in Options and two separate channels here.
+    const fill = rain.root.getObjectByName('pass79-weather-overcast-fill') as THREE.HemisphereLight;
+    expect(fill.intensity).toBeCloseTo(overcastFillIntensity(STORM.skyDarkenAmount), 9);
     rain.dispose();
   });
 });
@@ -815,6 +853,245 @@ describe('wet surfaces find themselves', () => {
     // scan window is walked in real frames rather than one giant step.
     for (let frame = 0; frame < 30; frame += 1) rain.update(0.1, camera(), STORM, STIFF_WIND);
     expect(rain.telemetry().wetSurfaces).toBe(2);
+    rain.dispose();
+  });
+});
+
+describe('weather reaches the world behind the rain', () => {
+  // THE DEFECT THIS SUITE EXISTS FOR. `fogDensityMultiplier` and
+  // `skyDarkenAmount` were computed by the weather model from Pass 76 and read
+  // by NOTHING outside tests, so heavy rain fell through an untouched sunny
+  // sky and read as an overlay. Every assertion below is on what the SCENE
+  // ends up holding, never on the value we handed the system.
+  const AUTHORED_NEAR = 58;
+  const AUTHORED_FAR = 148;
+
+  function withFog() {
+    const built = build();
+    built.scene.fog = new THREE.Fog(0xb1c0be, AUTHORED_NEAR, AUTHORED_FAR);
+    return built;
+  }
+
+  it('pulls the fog far plane in when it rains and hands it back when it clears', () => {
+    const { rain, scene } = withFog();
+    const fog = scene.fog as THREE.Fog;
+    rain.update(0.016, camera(), clearWeatherSample('high-seas'), calmWind());
+    expect(fog.near).toBe(AUTHORED_NEAR);
+    expect(fog.far).toBe(AUTHORED_FAR);
+
+    rain.update(0.016, camera(), STORM, STIFF_WIND);
+    expect(fog.near).toBe(AUTHORED_NEAR);
+    expect(fog.far).toBeLessThan(AUTHORED_FAR);
+    const stormFar = fog.far;
+
+    // Idempotent: a second storm frame must not compound onto our own output.
+    rain.update(0.016, camera(), STORM, STIFF_WIND);
+    expect(fog.far).toBeCloseTo(stormFar, 9);
+
+    rain.update(0.016, camera(), clearWeatherSample('high-seas'), calmWind());
+    expect(fog.far).toBe(AUTHORED_FAR);
+  });
+
+  it('re-adopts the arena baseline when something else rewrites the fog', () => {
+    // legacy-main sets fog.near/far on arena change and on lighting re-apply.
+    // Compounding our multiplier onto our own previous output would walk the
+    // far plane in a little further on every arena load.
+    const { rain, scene } = withFog();
+    const fog = scene.fog as THREE.Fog;
+    rain.update(0.016, camera(), STORM, STIFF_WIND);
+    const firstStormFar = fog.far;
+
+    fog.near = 70;
+    fog.far = 260;
+    rain.update(0.016, camera(), STORM, STIFF_WIND);
+    expect(fog.near).toBe(70);
+    expect(fog.far).toBeGreaterThan(firstStormFar);
+    expect(fog.far).toBe(weatherFogFar(70, 260, STORM.fogDensityMultiplier));
+
+    rain.dispose();
+    expect(fog.far).toBe(260);
+  });
+
+  it('never moves the near plane, so it adds nothing at fighting range', () => {
+    const { rain, scene } = withFog();
+    const fog = scene.fog as THREE.Fog;
+    rain.update(0.016, camera(), STORM, STIFF_WIND);
+    for (let distance = 0; distance <= AUTHORED_NEAR; distance += 1) {
+      expect(linearFogFactor(distance, fog.near, fog.far)).toBe(0);
+      expect(linearFogFactor(distance, AUTHORED_NEAR, AUTHORED_FAR)).toBe(0);
+    }
+    expect(weatherFogAddedExtinction(30, AUTHORED_NEAR, AUTHORED_FAR, STORM.fogDensityMultiplier)).toBe(0);
+  });
+
+  it('leaves an arena that already hazes at fighting range completely alone', () => {
+    const near = WEATHER_FOG.minAuthoredNearM - 1;
+    expect(weatherFogFar(near, near + 200, 2.15)).toBe(near + 200);
+    // And a span already at or under the floor is never shortened further.
+    expect(weatherFogFar(80, 80 + WEATHER_FOG.minSpanM, 2.15)).toBe(80 + WEATHER_FOG.minSpanM);
+  });
+
+  it('holds the added-extinction ceiling across every fog geometry an arena could author', () => {
+    expect(() => assertWeatherFogCombatSafety()).not.toThrow();
+    let worst = 0;
+    for (let near = WEATHER_FOG.minAuthoredNearM; near <= 200; near += 1) {
+      for (let span = 1; span <= 400; span += 1) {
+        worst = Math.max(worst, weatherFogAddedExtinction(
+          near + WEATHER_FOG.guardRangeBeyondNearM, near, near + span, 2.15,
+        ));
+      }
+    }
+    expect(worst).toBeLessThanOrEqual(WEATHER_FOG_MAX_ADDED_EXTINCTION);
+    // Pin the measured worst case, not just the ceiling: a change that doubled
+    // the effect but stayed under the cap would otherwise pass unnoticed.
+    expect(worst).toBeLessThan(0.19);
+  });
+
+  it('answers an overcast sky by ADDING fill, never by taking light away', () => {
+    const { rain, scene } = withFog();
+    const fill = scene.getObjectByName('pass79-weather-overcast-fill') as THREE.HemisphereLight;
+    expect(fill).toBeInstanceOf(THREE.HemisphereLight);
+    expect(fill.castShadow).toBe(false);
+
+    rain.update(0.016, camera(), clearWeatherSample('high-seas'), calmWind());
+    expect(fill.intensity).toBe(0);
+
+    rain.update(0.016, camera(), STORM, STIFF_WIND);
+    expect(fill.intensity).toBeGreaterThan(0);
+    expect(fill.intensity).toBe(overcastFillIntensity(STORM.skyDarkenAmount));
+    // Monotone, bounded, and never negative - the whole safety claim.
+    let previous = -1;
+    for (let darken = 0; darken <= 1.0001; darken += 0.05) {
+      const value = overcastFillIntensity(darken);
+      expect(value).toBeGreaterThanOrEqual(previous);
+      expect(value).toBeGreaterThanOrEqual(0);
+      expect(value).toBeLessThanOrEqual(OVERCAST_FILL.peakIntensity);
+      previous = value;
+    }
+    expect(overcastFillIntensity(9)).toBe(OVERCAST_FILL.peakIntensity);
+    expect(overcastFillIntensity(Number.NaN)).toBe(0);
+  });
+
+  it('reports the fog it actually wrote, not the multiplier it was handed', () => {
+    const { rain, scene } = withFog();
+    rain.update(0.016, camera(), STORM, STIFF_WIND);
+    const telemetry = rain.telemetry();
+    expect(telemetry.fogNear).toBe(AUTHORED_NEAR);
+    expect(telemetry.authoredFogFar).toBe(AUTHORED_FAR);
+    expect(telemetry.fogFar).toBe((scene.fog as THREE.Fog).far);
+    expect(telemetry.fogFar).toBeLessThan(AUTHORED_FAR);
+    expect(telemetry.fogDensityMultiplier).toBeCloseTo(STORM.fogDensityMultiplier, 9);
+    expect(telemetry.fogAddedExtinctionAt30M).toBe(0);
+    expect(telemetry.overcastFillIntensity).toBeGreaterThan(0);
+    // Still exactly two instanced draws and no loose meshes: the gloom is two
+    // uniform writes, not a third pass.
+    expect(telemetry.instancedDraws).toBe(2);
+    expect(telemetry.looseMeshes).toBe(0);
+  });
+
+  it('honours WEATHER: OFF - a player who turned weather off gets no gloom either', () => {
+    const { rain, scene } = withFog();
+    const fog = scene.fog as THREE.Fog;
+    const fill = scene.getObjectByName('pass79-weather-overcast-fill') as THREE.HemisphereLight;
+    rain.update(0.016, camera(), STORM, STIFF_WIND, {
+      presentation: resolveWeatherPresentation({ weatherIntensity: 'off' }),
+    });
+    expect(fog.far).toBe(AUTHORED_FAR);
+    expect(fill.intensity).toBe(0);
+  });
+
+  it('does not touch a bypassed profile at all', () => {
+    const rain = new RainPresentation({
+      profile: 'compat', rendererLabel: 'ANGLE (Software)', quality: 'ultra', seed: 7,
+    });
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0xb1c0be, AUTHORED_NEAR, AUTHORED_FAR);
+    rain.build(scene);
+    rain.update(0.016, camera(), STORM, STIFF_WIND);
+    expect((scene.fog as THREE.Fog).far).toBe(AUTHORED_FAR);
+    expect(rain.telemetry().overcastFillIntensity).toBe(0);
+  });
+
+  it('is a pure function of the sample, so two peers write identical fog', () => {
+    const left = withFog();
+    const right = withFog();
+    for (let frame = 0; frame < 40; frame += 1) {
+      left.rain.update(0.016, camera(3, 1.7, -2), STORM, STIFF_WIND);
+      right.rain.update(0.016, camera(3, 1.7, -2), STORM, STIFF_WIND);
+    }
+    expect((left.scene.fog as THREE.Fog).far).toBe((right.scene.fog as THREE.Fog).far);
+    expect(left.rain.telemetry().overcastFillIntensity)
+      .toBe(right.rain.telemetry().overcastFillIntensity);
+  });
+});
+
+describe('the wet surfaces row reaches the arena materials', () => {
+  // Asserting the OUTPUT: every check below reads the MATERIAL the system
+  // wrote, never the boolean it was handed. The skin system passed for months
+  // by asserting its own input; this family does not get to repeat that.
+  function scene(): { rain: RainPresentation; material: THREE.MeshStandardMaterial } {
+    const rain = new RainPresentation({
+      profile: 'blender', rendererLabel: 'NVIDIA GeForce RTX 5080', quality: 'ultra', seed: 99,
+    });
+    const root = new THREE.Scene();
+    rain.build(root);
+    const material = new THREE.MeshStandardMaterial({ color: 0x808080, roughness: 0.9, metalness: 0 });
+    rain.registerWetSurface(material);
+    return { rain, material };
+  }
+
+  it('darkens and glosses the ground when it is on', () => {
+    const { rain, material } = scene();
+    rain.update(0.016, camera(), STORM, STIFF_WIND);
+    expect(material.roughness).toBeLessThan(0.9);
+    expect(material.color.r).toBeLessThan(0.5);
+    expect(material.roughness).toBeCloseTo(wetSurfaceResponse(0.9, 0, 1).roughness, 9);
+    rain.dispose();
+  });
+
+  it('leaves the arena exactly as it found it when the row is off', () => {
+    const { rain, material } = scene();
+    const off = resolveWeatherPresentation({ wetSurfaces: false });
+    rain.update(0.016, camera(), STORM, STIFF_WIND, { presentation: off });
+    expect(material.roughness).toBe(0.9);
+    expect(material.metalness).toBe(0);
+    expect(material.color.getHex()).toBe(0x808080);
+    // ...and the wetness itself is still SIMULATED and still reported, because
+    // every peer agrees on it whatever this screen chooses to draw.
+    expect(rain.telemetry().wetness).toBe(STORM.wetness);
+    rain.dispose();
+  });
+
+  it('puts an already-wet world back when the player turns the row off mid-storm', () => {
+    // The bug this pins: gating only the WRITE would freeze every adopted
+    // surface at whatever gloss it happened to be holding.
+    const { rain, material } = scene();
+    rain.update(0.016, camera(), STORM, STIFF_WIND);
+    expect(material.roughness).toBeLessThan(0.9);
+    rain.update(0.016, camera(), STORM, STIFF_WIND, {
+      presentation: resolveWeatherPresentation({ wetSurfaces: false }),
+    });
+    expect(material.roughness).toBe(0.9);
+    expect(material.color.getHex()).toBe(0x808080);
+    rain.dispose();
+  });
+
+  it('does no scene scanning at all while the row is off', () => {
+    const rain = new RainPresentation({
+      profile: 'blender', rendererLabel: 'NVIDIA GeForce RTX 5080', quality: 'ultra', seed: 99,
+    });
+    const root = new THREE.Scene();
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({ color: 0x707070, roughness: 0.8, metalness: 0 }),
+    );
+    root.add(mesh);
+    rain.build(root);
+    const off = resolveWeatherPresentation({ wetSurfaces: false });
+    for (let frame = 0; frame < 400; frame += 1) {
+      rain.update(0.05, camera(), STORM, STIFF_WIND, { presentation: off });
+    }
+    expect(rain.telemetry().autoAdoptedWetSurfaces).toBe(0);
+    expect(rain.telemetry().wetSurfaces).toBe(0);
     rain.dispose();
   });
 });

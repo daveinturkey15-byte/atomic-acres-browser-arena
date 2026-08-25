@@ -3,6 +3,9 @@
 // import in this file and it reaches a module with no runtime dependencies of
 // its own.
 import { WEATHER_INTENSITY_CHOICES, type WeatherIntensityChoice } from './weather/weather-settings';
+// Same argument one line up: the ambient air's own bounds live with the
+// system that enforces them, so the slider and the clamp cannot drift.
+import { AMBIENT_LIFE_RANGE } from './particles/ambient-life-settings';
 // HF-398 — the classic recursive ray-tracing tier. The type lives with the
 // tracer's own numbers and bounds so a tier can never exist here that the
 // resolver does not know how to clamp.
@@ -83,6 +86,19 @@ export type AdvancedGraphicsValues = Readonly<{
   rainDensity: number;
   windStrength: number;
   lightning: boolean;
+  /**
+   * Pass 79. Wet ground is simulated identically on every peer whatever this
+   * says; it only decides whether THIS screen writes the wetness into the
+   * arena's own materials.
+   */
+  wetSurfaces: boolean;
+  /**
+   * Pass 79. How much of the authored ambient population is kept alive. A
+   * different knob from `particleQuality`, which is the capacity CEILING - see
+   * particles/ambient-life-settings.ts for why conflating them made the top of
+   * the quality select feel like it did nothing.
+   */
+  ambientLife: number;
 }>;
 
 export type GraphicsAdvancedKey = keyof AdvancedGraphicsValues;
@@ -108,7 +124,8 @@ export type GraphicsRuntimeConsumer =
   | 'motion-blur'
   | 'spatial-upscaling'
   | 'weather-presentation'
-  | 'rain-presentation';
+  | 'rain-presentation'
+  | 'ambient-particles';
 
 export type GraphicsRuntimeEvidence = Readonly<{
   path: string;
@@ -458,6 +475,27 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     description: 'Distant strikes flash across the sky and light up the rain in heavy weather. Turn it off if the flashes bother you.',
     kind: 'toggle', applyMode: 'live', runtimeConsumer: 'weather-presentation',
   }),
+  // Pass 79. Rain has darkened and glossed the ground it lands on since Pass 76
+  // and there was no way to say no to it. It is a separate row from RAIN
+  // DENSITY on purpose: a player who wants the storm but finds a mirror-bright
+  // road distracting was previously choosing between the two.
+  control({
+    key: 'wetSurfaces', id: 'graphics-wet-surfaces', category: 'atmosphere', label: 'Wet surfaces',
+    description: 'Roads, metal and stone darken and catch the light while it rains, then dry off slowly after it stops.',
+    kind: 'toggle', applyMode: 'live', runtimeConsumer: 'rain-presentation',
+  }),
+  // Pass 79. The owner asked for "more like dust and particle effects" and the
+  // only lever that existed was PARTICLES, which is a capacity CEILING and a
+  // performance control. This is the one that decides how much of that ceiling
+  // the air actually uses, which is the knob the request was about.
+  control({
+    key: 'ambientLife', id: 'graphics-ambient-life', category: 'atmosphere', label: 'Airborne detail',
+    description: 'How much dust, pollen, leaves and sea spray hangs in the air around you. Turn it up for thicker air; zero is perfectly still.',
+    kind: 'range',
+    minimum: AMBIENT_LIFE_RANGE.minimum, maximum: AMBIENT_LIFE_RANGE.maximum, step: AMBIENT_LIFE_RANGE.step,
+    unit: 'multiplier',
+    applyMode: 'live', runtimeConsumer: 'ambient-particles',
+  }),
 ]);
 
 const runtimeEvidence = (
@@ -522,6 +560,11 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
   rainDensity: runtimeEvidence('src/weather/rain-presentation.ts', 'this.presentation.rainDensity', 'settings.graphics.rainDensity + sampleWeather().rain.streakInstances'),
   windStrength: runtimeEvidence('src/weather/weather-state.ts', '* presentation.windStrength', 'settings.graphics.windStrength + sampleWeather().rain.windSpeed'),
   lightning: runtimeEvidence('src/weather/rain-presentation.ts', 'RAIN_LIGHTNING.peakLightIntensity', 'settings.graphics.lightning + sampleWeather().rain.lightningFlash'),
+  // The probe is the wetness the system WROTE and the surfaces it holds, not
+  // the boolean it was handed - a row that reported its own input could not
+  // tell 'the setting is on' from 'the materials actually changed'.
+  wetSurfaces: runtimeEvidence('src/weather/rain-presentation.ts', 'this.applyWetness(this.presentation.wetSurfaces ? this.wetness : 0)', 'settings.graphics.wetSurfaces + sampleWeather().rain.wetSurfaces'),
+  ambientLife: runtimeEvidence('src/particles/index.ts', 'this.densityScale * this.ambientLifeScale', 'settings.graphics.ambientLife + sampleWeather().particles.ambientLifeScale + .liveParticles'),
 });
 
 /**
@@ -611,6 +654,10 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'r
     // exists for. Lightning is off here for the same reason it is the only
     // weather row that is a toggle - it is the one a player may not want.
     weatherIntensity: 'light', rainDensity: 0.5, windStrength: 1, lightning: false,
+    // Wet surfaces are two material writes per adopted surface on a 2.5 s
+    // scan, so they survive the low-spec preset; the air is thinned instead
+    // because ambient instances are per-frame fill rate.
+    wetSurfaces: true, ambientLife: 0.6,
   }),
   // QUALITY — the auto-selected default on 8-core/8 GB machines, so it takes
   // only the two cheapest additive effects and both at their LOW tier:
@@ -637,6 +684,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'r
     // performance dial - the instance count is - so there is no reason for the
     // default preset to hide a state the arenas were authored to reach.
     weatherIntensity: 'storm', rainDensity: 1, windStrength: 1, lightning: true,
+    wetSurfaces: true, ambientLife: 1,
   }),
   // ===================================================================
   // RAY TRACED — HF-398. The fourth rung, between Quality and Max.
@@ -707,6 +755,10 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'r
     // than on any other — but the trace is the frame's new cost centre and rain
     // is pure fill rate, so it does not get Max's ceiling.
     weatherIntensity: 'storm', rainDensity: 1.15, windStrength: 1, lightning: true,
+    // The trace is what this preset is for and wet surfaces are what it has
+    // most to show, so the air stays at the authored figure rather than
+    // spending the frame on motes.
+    wetSurfaces: true, ambientLife: 1.15,
   }),
   max: Object.freeze({
     // Max deliberately selects the highest supported values, but it must stay as
@@ -747,6 +799,10 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'r
     // a sightline (rain-presentation.ts -> rainSightlineObscuration), and the
     // ADS aim-cylinder clearance is unconditional at every setting.
     weatherIntensity: 'storm', rainDensity: 1.35, windStrength: 1, lightning: true,
+    // Ambient instances are bounded by the family capacity at the ULTRA tier
+    // this preset already selects, so 1.5x asks the arena profiles for more
+    // of a ceiling that is already paid for rather than raising the ceiling.
+    wetSurfaces: true, ambientLife: 1.5,
   }),
 });
 
