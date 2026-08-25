@@ -55,12 +55,20 @@ AGENT_GB = 0.35
 RESERVE_GB = 5.5
 # Headed Chrome doing WebGPU is worth several agents. Keep it strictly narrow.
 BROWSER_SLOTS = 2
+# MEASURED 2026-08-25, and the single most important number here: an ox-alpha agent costs
+# ~0.35 GB, but the `npx vitest run` it is told to perform peaks at 5.63 GB and `tsc
+# --noEmit` at 3.41 GB. Verification is SIXTEEN TIMES the agent that requests it. Five
+# agents verifying together is ~28 GB - the whole machine - which is why rounds appeared to
+# be "too many agents" when they were really too many concurrent test runs.
+VERIFY_SLOTS = 2
+VERIFY_GB = 5.7  # peak observed for a full vitest run
 # A FIXED, CROSS-HARNESS path - deliberately NOT %TEMP%. Claude Code, OMP, Codex and the
 # WSL-hosted Hermes agent must all see the SAME slots; if each harness gets its own private
 # semaphore the whole point is lost. WSL reaches this as
 # /mnt/c/Users/david/.agent-coordination/browser-slots
 COORD = r"C:\Users\david\.agent-coordination"
 LOCKDIR = os.path.join(COORD, "browser-slots")
+VERIFYDIR = os.path.join(COORD, "verify-slots")
 
 
 def free_gb() -> float:
@@ -93,6 +101,8 @@ def cmd_status():
         "safe_agents_now": safe_agents(),
         "browser_slots": BROWSER_SLOTS,
         "browser_slots_taken": len(os.listdir(LOCKDIR)) if os.path.isdir(LOCKDIR) else 0,
+        "verify_slots": VERIFY_SLOTS,
+        "verify_slots_taken": len(os.listdir(VERIFYDIR)) if os.path.isdir(VERIFYDIR) else 0,
     }, indent=2))
 
 
@@ -132,6 +142,42 @@ def cmd_plan(agents: int):
                  f"{BROWSER_SLOTS} concurrent"),
     }, indent=2))
     return 0
+
+
+def cmd_verify(action: str, ident: str, timeout_s: int):
+    """Slot for `tsc`/`vitest`. Same shape as the browser semaphore, different budget.
+
+    Without this, every agent runs a full suite whenever it likes and the machine sees
+    several 5.6 GB node processes at once. With it, verification queues instead of
+    colliding - slower per agent, but the run stops dying.
+    """
+    os.makedirs(VERIFYDIR, exist_ok=True)
+    path = os.path.join(VERIFYDIR, f"{ident}.slot")
+    if action == "release":
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        print(f"released verify {ident}")
+        return 0
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        now = time.time()
+        for f in os.listdir(VERIFYDIR):
+            fp = os.path.join(VERIFYDIR, f)
+            try:
+                if now - os.path.getmtime(fp) > 900:  # a suite run is ~30s; 15 min is dead
+                    os.remove(fp)
+            except OSError:
+                pass
+        if len(os.listdir(VERIFYDIR)) < VERIFY_SLOTS and free_gb() > VERIFY_GB:
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(str(os.getpid()))
+            print(f"acquired verify {ident}")
+            return 0
+        time.sleep(10)
+    print(f"TIMEOUT waiting for a verify slot ({ident})", file=sys.stderr)
+    return 1
 
 
 def cmd_browser(action: str, ident: str, timeout_s: int):
@@ -201,7 +247,8 @@ def cmd_budget(want: int, who: str):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("verb", choices=["status", "wait", "plan", "budget",
-                                     "browser-acquire", "browser-release"])
+                                     "browser-acquire", "browser-release",
+                                     "verify-acquire", "verify-release"])
     ap.add_argument("--need", type=int, default=4)
     ap.add_argument("--agents", type=int, default=10)
     ap.add_argument("--want", type=int, default=4)
@@ -218,6 +265,8 @@ def main():
         return cmd_plan(a.agents)
     if a.verb == "budget":
         return cmd_budget(a.want, a.who)
+    if a.verb.startswith("verify-"):
+        return cmd_verify(a.verb.split("-", 1)[1], a.id, a.timeout)
     return cmd_browser(a.verb.split("-", 1)[1], a.id, a.timeout)
 
 
