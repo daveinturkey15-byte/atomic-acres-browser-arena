@@ -237,3 +237,18 @@ describe('the live preview binds the stance selector', () => {
     expect(source).toContain("OPERATOR_PREVIEW_CONTRACT = 'live-turntable-selected-skin-stance-v2'");
   });
 });
+
+describe('the match shell publishes stance selections to the live arms store (HF-388)', () => {
+  const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+
+  it('the OPERATOR stance card handler persists AND publishes the choice', () => {
+    const persistIndex = source.indexOf('persistOperatorPreference(OPERATOR_STANCE_STORAGE_KEY');
+    expect(persistIndex).toBeGreaterThan(-1);
+    // The publish must sit in the SAME handler branch as the localStorage
+    // write. A setActiveOperatorStance call anywhere else still leaves this
+    // click path writing storage while the cached active stance goes stale,
+    // which is exactly the until-a-reload bug HF-382 shipped.
+    const handlerWindow = source.slice(persistIndex, persistIndex + 600);
+    expect(handlerWindow).toContain('setActiveOperatorStance(stance)');
+  });
+});

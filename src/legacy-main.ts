@@ -838,6 +838,7 @@ import {
   type OperatorEmoteId,
   type OperatorStanceId,
 } from './operator-appearance-catalog'; // Pass 75
+import { setActiveOperatorStance } from './operator-stance-runtime'; // HF-388: the OPERATOR card handler below must publish the choice to the live arms store, not only localStorage.
 // HF-339/HF-355: the centre banner has ONE owner. Every write goes through
 // presentBanner/clearCentreBanner below; direct element('#banner') writes are
 // banned (they reintroduce the overwrite race the arbiter closes).
@@ -27593,6 +27594,11 @@ document.addEventListener('click', (event) => {
   } else if (stance !== undefined && isOperatorStanceId(stance)) {
     localOperatorStanceId = stance;
     persistOperatorPreference(OPERATOR_STANCE_STORAGE_KEY, stance);
+    // HF-388: persisting alone left activeOperatorStance()'s cache stale, so
+    // the first-person arms (weapon-presentation reads it every frame) kept
+    // the previous stance until a reload. Publish to the live store here,
+    // mirroring what ui/operator-preview.ts already does for its turntable.
+    setActiveOperatorStance(stance);
   } else if (emote !== undefined && isOperatorEmoteId(emote)) {
     localOperatorEmoteId = emote;
     persistOperatorPreference(OPERATOR_EMOTE_STORAGE_KEY, emote);
