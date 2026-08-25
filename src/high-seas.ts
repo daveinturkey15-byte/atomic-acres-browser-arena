@@ -391,12 +391,11 @@ function generateMaterialTextureSet(
           } else {
             const edgeDist = Math.min(px - 3, 31 - px);
             const bevel = Math.min(1.0, edgeDist / 2.0);
-            const r = THREE.MathUtils.clamp(Math.round(baseR * (1 + plankTone + grain) * (0.85 + 0.15 * bevel)), 0, 255);
-            const g = THREE.MathUtils.clamp(Math.round(baseG * (1 + plankTone + grain) * (0.85 + 0.15 * bevel)), 0, 255);
-            const b = THREE.MathUtils.clamp(Math.round(baseB * (1 + plankTone + grain) * (0.85 + 0.15 * bevel)), 0, 255);
             const r = THREE.MathUtils.clamp(Math.round(baseR * (1 + plankTone + grain) * (0.92 + 0.08 * bevel)), 0, 255);
             const g = THREE.MathUtils.clamp(Math.round(baseG * (1 + plankTone + grain) * (0.92 + 0.08 * bevel)), 0, 255);
             const b = THREE.MathUtils.clamp(Math.round(baseB * (1 + plankTone + grain) * (0.92 + 0.08 * bevel)), 0, 255);
+            albedoData[offset] = r;
+            albedoData[offset + 1] = g;
             albedoData[offset + 2] = b;
             albedoData[offset + 3] = 255;
 
