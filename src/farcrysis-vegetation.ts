@@ -624,7 +624,11 @@ function poissonLayerPositions(
  * Generate grove-like clustered positions: pick N grove centres, then scatter
  * `splay` stems around each centre with a small in-grove radius.
  */
-function grovePositions(
+// PENDING WIRING (farcrysis-world lane, fw-vegetation-radii). This helper was written in
+// round 1 and never called - the comment above claiming the edge band uses it is not yet
+// true. Exported rather than deleted so the round's work survives and the debt stays
+// VISIBLE; wire it or delete it, but do not leave it exported and unused.
+export function grovePositions(
   groves: number,
   stemsPerGrove: number,
   splay: number,

@@ -162,7 +162,7 @@ export const FIRST_PERSON_ARM_AUTHORED_MAX_CARRIAGE_METERS = 0.05;
 const FIRST_PERSON_ARM_AUTHORED_ZERO_CHANNEL: FirstPersonArmAuthoredChannel = Object.freeze({
   poleRadians: 0,
   wristRollRadians: 0,
-  carriageOffset: Object.freeze([0, 0, 0]),
+  carriageOffset: Object.freeze([0, 0, 0] as const),
 });
 
 export type FirstPersonArmChainJoints = Readonly<{
@@ -184,9 +184,13 @@ function clipQuatAt(
 ): boolean {
   const track = clip.tracks.find((candidate) => candidate.name === trackName);
   if (!(track instanceof THREE.QuaternionKeyframeTrack) || track.times.length === 0) return false;
-  const sample = track.createInterpolant().evaluate(track.times[track.times.length - 1]);
-  if (!sample || sample.length < 4) return false;
-  target.set(sample[0], sample[1], sample[2], sample[3]).normalize();
+  // The sample is taken AT the last keyframe, where interpolation is the identity - so
+  // read the final quaternion straight out of the buffer. createInterpolant() is not on
+  // the QuaternionKeyframeTrack type in r185 and is not needed for an on-key sample.
+  const base = (track.times.length - 1) * 4;
+  if (track.values.length < base + 4) return false;
+  target.set(track.values[base], track.values[base + 1],
+             track.values[base + 2], track.values[base + 3]).normalize();
   return true;
 }
 
@@ -264,7 +268,7 @@ export function buildFirstPersonArmAuthoredPoseLayer(
       sides[reference.side] = Object.freeze({
         poleRadians,
         wristRollRadians,
-        carriageOffset: Object.freeze([carriage.x, carriage.y, carriage.z]),
+        carriageOffset: Object.freeze([carriage.x, carriage.y, carriage.z] as const),
       });
     }
     layer.set(clip.name, Object.freeze({ left: sides.left, right: sides.right }));
@@ -292,7 +296,7 @@ function clampFirstPersonArmAuthoredChannel(
       -FIRST_PERSON_ARM_AUTHORED_MAX_WRIST_ROLL_RADIANS,
       FIRST_PERSON_ARM_AUTHORED_MAX_WRIST_ROLL_RADIANS,
     ),
-    carriageOffset: Object.freeze([x * scale, y * scale, z * scale]),
+    carriageOffset: Object.freeze([x * scale, y * scale, z * scale] as const),
   });
 }
 
@@ -307,8 +311,11 @@ export function firstPersonArmAuthoredLayerSample(
   baseAction: string | null,
   oneShotAction: string | null,
 ): { left: FirstPersonArmAuthoredChannel; right: FirstPersonArmAuthoredChannel } {
-  const selected = (oneShotAction && layer?.get(oneShotAction))
-    ?? (baseAction && layer?.get(baseAction))
+  // Ternaries, not `&&`: `'' && x` evaluates to '' rather than undefined, and ?? only
+  // falls through on null/undefined - so an empty action name (an idle slot) survived into
+  // `selected` as a string and the .left/.right reads below failed to typecheck.
+  const selected = (oneShotAction ? layer?.get(oneShotAction) : undefined)
+    ?? (baseAction ? layer?.get(baseAction) : undefined)
     ?? null;
   return {
     left: clampFirstPersonArmAuthoredChannel(selected?.left),
