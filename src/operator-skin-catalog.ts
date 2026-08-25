@@ -247,11 +247,49 @@ export type OperatorSkinBodyPalette = Readonly<{
   lift: number;
 }>;
 
+/**
+ * Carried from Pass 81. Bots are spawned with the 'neon-purple' appearance
+ * (legacy-main spawnBot), which exists so an enemy bot is readable INSTANTLY
+ * against both team tints - that purple must never be removed. Its cost was
+ * that every skin's Swat/Swat_Black/grey resolved byte-identical: four skins
+ * on the bot roster were indistinguishable below the neck. This block carries
+ * each skin through the purple anyway, on channels a colour wash cannot
+ * flatten:
+ *
+ *   - HUE PLACEMENT: each skin sits at its own address INSIDE the purple band,
+ *     so skin identity and bot identity are visible at once.
+ *   - FINISH: roughness/metalness carry the archetype's material story (canvas
+ *     matte vs wet chitin gloss) exactly as the menu card's materialLabel
+ *     promises.
+ *
+ * Emissive INTENSITY is deliberately NOT per-skin: it is a shared brightness
+ * budget (OPERATOR_BOT_IDENTITY_EMISSIVE_INTENSITY) that applyBotEmissive-
+ * Brightness then scales globally for bots, so no skin can buy identity by
+ * glaring brighter than another.
+ */
+export type OperatorSkinBotMaterialIdentity = Readonly<{
+  /** Garment/under-suit/trim colour; hue stays inside the declared band. */
+  color: number;
+  /** Same-hue glow; the dominant term on the dark-atlas skins. */
+  emissive: number;
+  roughness: number;
+  metalness: number;
+}>;
+
+export type OperatorSkinBotIdentity = Readonly<{
+  swat: OperatorSkinBotMaterialIdentity;
+  swatBlack: OperatorSkinBotMaterialIdentity;
+  grey: OperatorSkinBotMaterialIdentity;
+}>;
+
+export type OperatorSkinBotRole = keyof OperatorSkinBotIdentity;
+
 export type OperatorSkinPalette = Readonly<{
   id: string;
   arm: OperatorSkinArmPalette;
   body: OperatorSkinBodyPalette;
   card: OperatorSkinCardPalette;
+  bot: OperatorSkinBotIdentity;
 }>;
 
 /**
@@ -268,6 +306,20 @@ export const OPERATOR_TEAM_IDENTITY_BLEND = 0.34;
  * costs the skin little and buys the team read back at distance. */
 export const OPERATOR_TEAM_UNDERSUIT_BLEND = 0.46;
 
+/**
+ * The hue window every bot-identity colour/emissive must stay inside. The
+ * shipped default purples measure 269-286 degrees; the band leaves room for
+ * the explorer's warmer orchid and the naval operative's blue-violet while
+ * excluding both team tints (aqua ~187deg, coral ~7deg) by a wide margin.
+ * Enforced at module load below and pinned in operator-skin-appearance.test.
+ */
+export const OPERATOR_BOT_IDENTITY_HUE_BAND = Object.freeze({ minDeg: 252, maxDeg: 320 });
+
+/** Shared bot emissive brightness budget. Identity never varies this: a skin
+ * that glowed brighter than another would buy visibility, not character, and
+ * unbalance the bot read against the players. */
+export const OPERATOR_BOT_IDENTITY_EMISSIVE_INTENSITY = Object.freeze({ swat: 1.2, swatBlack: 1.05, grey: 0.72 });
+
 const PALETTES: Readonly<Record<Pass74OperatorSkinId, OperatorSkinPalette>> = Object.freeze({
   default: Object.freeze({
     id: 'default',
@@ -282,6 +334,13 @@ const PALETTES: Readonly<Record<Pass74OperatorSkinId, OperatorSkinPalette>> = Ob
     card: Object.freeze({
       backdropTop: 0x1d3a40, backdropBottom: 0x0c1e23, torso: 0x2f5a60, webbing: 0x16282d,
       trim: 0x12a7b1, visor: 0x3fd3dd, skin: 0xc59a76, ink: 0xdff3f4, materialLabel: 'ISSUE WEAVE',
+    }),
+    // The shipped neon-purple bot, unchanged: wiring the identity resolver
+    // must be a byte-identical no-op for the default skin.
+    bot: Object.freeze({
+      swat: Object.freeze({ color: 0xd85cff, emissive: 0x7d16bd, roughness: 0.46, metalness: 0.08 }),
+      swatBlack: Object.freeze({ color: 0xa93cff, emissive: 0x5d0ca8, roughness: 0.5, metalness: 0.06 }),
+      grey: Object.freeze({ color: 0xe3a5ff, emissive: 0x64119e, roughness: 0.54, metalness: 0.04 }),
     }),
   }),
   // HF-380: the explorer reads as an ADVENTURER, not desert infantry. The
@@ -300,6 +359,12 @@ const PALETTES: Readonly<Record<Pass74OperatorSkinId, OperatorSkinPalette>> = Ob
     card: Object.freeze({
       backdropTop: 0x1e3a38, backdropBottom: 0x0a1413, torso: 0x2f8f8a, webbing: 0x5a3a20,
       trim: 0xd9a441, visor: 0xffd48a, skin: 0xc08a5e, ink: 0xfaeed8, materialLabel: 'CANVAS',
+    }),
+    // CANVAS: warmer orchid address in the band, matte woven finish.
+    bot: Object.freeze({
+      swat: Object.freeze({ color: 0xcf6fd0, emissive: 0x661a8f, roughness: 0.68, metalness: 0.04 }),
+      swatBlack: Object.freeze({ color: 0x9d55c8, emissive: 0x480d82, roughness: 0.7, metalness: 0.03 }),
+      grey: Object.freeze({ color: 0xdfa2e2, emissive: 0x5c1287, roughness: 0.64, metalness: 0.03 }),
     }),
   }),
   // HF-380: the symbiote reads as a CREATURE, not lavender sci-fi armour. The
@@ -321,6 +386,12 @@ const PALETTES: Readonly<Record<Pass74OperatorSkinId, OperatorSkinPalette>> = Ob
       backdropTop: 0x1c1424, backdropBottom: 0x0a0710, torso: 0x3a2f47, webbing: 0x17121e,
       trim: 0xe8e2d6, visor: 0xe8e2d6, skin: 0xb08f7e, ink: 0xf0e2ff, materialLabel: 'CHITIN',
     }),
+    // CHITIN: magenta-violet address, glossy wet-plate finish.
+    bot: Object.freeze({
+      swat: Object.freeze({ color: 0xc94dff, emissive: 0x8b12cf, roughness: 0.22, metalness: 0.18 }),
+      swatBlack: Object.freeze({ color: 0x8a25d4, emissive: 0x40087c, roughness: 0.16, metalness: 0.2 }),
+      grey: Object.freeze({ color: 0xe9a8ff, emissive: 0x7012ad, roughness: 0.2, metalness: 0.12 }),
+    }),
   }),
   navalops: Object.freeze({
     id: 'navalops',
@@ -336,6 +407,12 @@ const PALETTES: Readonly<Record<Pass74OperatorSkinId, OperatorSkinPalette>> = Ob
       backdropTop: 0x16293c, backdropBottom: 0x070d14, torso: 0x33608f, webbing: 0x10171f,
       trim: 0x4f9bd8, visor: 0x9fd4ff, skin: 0xb98d6c, ink: 0xdcecfa, materialLabel: 'WET SHELL',
     }),
+    // WET SHELL: blue-violet address, mid-gloss sealed-shell finish.
+    bot: Object.freeze({
+      swat: Object.freeze({ color: 0xa97dff, emissive: 0x5514bd, roughness: 0.34, metalness: 0.14 }),
+      swatBlack: Object.freeze({ color: 0x8f5ce8, emissive: 0x3d0aa0, roughness: 0.38, metalness: 0.1 }),
+      grey: Object.freeze({ color: 0xd4b0ff, emissive: 0x5211a0, roughness: 0.36, metalness: 0.08 }),
+    }),
   }),
 });
 
@@ -347,6 +424,40 @@ for (const definition of OPERATOR_SKIN_CATALOG.definitions) {
   if (definition.availability !== 'selectable') continue;
   if (!Object.hasOwn(PALETTES, definition.id)) {
     throw new Error(`selectable operator skin ${definition.id} has no palette; the menu and first-person arms cannot show it`);
+  }
+}
+// The same fail-fast contract as the palette-presence check above: a bot
+// identity whose colours drift outside the purple band would silently hand a
+// skin the OTHER team's read (or wash the bot read out entirely), so it is a
+// load-time error, not a runtime surprise.
+for (const definition of OPERATOR_SKIN_CATALOG.definitions) {
+  if (definition.availability !== 'selectable') continue;
+  const identity = PALETTES[definition.id as Pass74OperatorSkinId]?.bot;
+  if (!identity) throw new Error(`selectable operator skin ${definition.id} has no bot identity; bots could not carry it`);
+  for (const role of ['swat', 'swatBlack', 'grey'] as const) {
+    for (const key of ['color', 'emissive'] as const) {
+      const hex = identity[role][key];
+      const max = Math.max(((hex >> 16) & 0xff) / 255, ((hex >> 8) & 0xff) / 255, (hex & 0xff) / 255);
+      const min = Math.min(((hex >> 16) & 0xff) / 255, ((hex >> 8) & 0xff) / 255, (hex & 0xff) / 255);
+      const delta = max - min;
+      let hue = 0;
+      if (delta > 0) {
+        const r = ((hex >> 16) & 0xff) / 255;
+        const g = ((hex >> 8) & 0xff) / 255;
+        const b = (hex & 0xff) / 255;
+        if (max === r) hue = ((g - b) / delta + 6) % 6;
+        else if (max === g) hue = (b - r) / delta + 2;
+        else hue = (r - g) / delta + 4;
+        hue *= 60;
+      }
+      if (hue < OPERATOR_BOT_IDENTITY_HUE_BAND.minDeg || hue > OPERATOR_BOT_IDENTITY_HUE_BAND.maxDeg) {
+        throw new Error(
+          `operator skin ${definition.id} bot ${role}.${key} #${hex.toString(16).padStart(6, '0')}`
+          + ` hue ${hue.toFixed(1)}deg is outside the bot purple band`
+          + ` [${OPERATOR_BOT_IDENTITY_HUE_BAND.minDeg}, ${OPERATOR_BOT_IDENTITY_HUE_BAND.maxDeg}]`,
+        );
+      }
+    }
   }
 }
 
@@ -373,6 +484,28 @@ export function operatorSkinPalette(id: string): OperatorSkinPalette {
  * This is a READER, never a second writer: the lobby remains the only thing
  * that stores a selection or puts one on the wire.
  */
+/**
+ * Everything the neon-purple material branch needs to stamp ONE bot body
+ * role: the exact colour/emissive/finish this skin's bot wears, with the
+ * shared brightness budget folded in so a caller cannot re-derive it wrong.
+ * Consumed by materialForTeam in operator-model.ts for appearance
+ * 'neon-purple'; the default skin resolves to the historically shipped
+ * constants byte-for-byte, so wiring it is a no-op for the default roster.
+ */
+export function operatorBotIdentityMaterial(
+  skinId: string,
+  role: OperatorSkinBotRole,
+): Readonly<{ color: number; emissive: number; emissiveIntensity: number; roughness: number; metalness: number }> {
+  const painted = operatorSkinPalette(skinId).bot[role];
+  return Object.freeze({
+    color: painted.color,
+    emissive: painted.emissive,
+    emissiveIntensity: OPERATOR_BOT_IDENTITY_EMISSIVE_INTENSITY[role],
+    roughness: painted.roughness,
+    metalness: painted.metalness,
+  });
+}
+
 export const LOCAL_OPERATOR_SKIN_STORAGE_KEY = 'atomic-acres-operator-skin';
 
 export function readLocalOperatorSkinId(storage?: Pick<Storage, 'getItem'> | null): string {

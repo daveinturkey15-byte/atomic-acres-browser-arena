@@ -3,10 +3,14 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
   LOCAL_OPERATOR_SKIN_STORAGE_KEY,
+  OPERATOR_BOT_IDENTITY_EMISSIVE_INTENSITY,
+  OPERATOR_BOT_IDENTITY_HUE_BAND,
   OPERATOR_SKIN_CATALOG,
   OPERATOR_SKIN_PALETTES,
+  OPERATOR_TEAM_TINTS,
   observeLocalOperatorSkinId,
   operatorBodyColour,
+  operatorBotIdentityMaterial,
   operatorSkinPalette,
   readLocalOperatorSkinId,
 } from './operator-skin-catalog';
@@ -461,6 +465,133 @@ describe('the third-person body can actually show a skin (HF-366 falsifier)', ()
   });
 });
 
+
+/**
+ * Carried from Pass 81: bots are built with the 'neon-purple' appearance
+ * (legacy-main.ts spawnBot -> buildOperator(..., 'neon-purple', botSkinId)),
+ * so the ONLY per-skin signal reaching a bot was the visor colour - every
+ * body role resolved byte-identical across all four skins. The purple itself
+ * is a deliberate readability choice, so the identity must travel through
+ * FINISH and BOUNDED HUE PLACEMENT inside the purple family instead.
+ *
+ * These pins assert what the material RESOLVER PRODUCES (GAUNTLET-SPEC failure
+ * mode 4), using the measured atlas means above because the neon-purple path
+ * keeps the authored base-colour map, so the on-screen read is
+ * colour x atlas + emissive x intensity.
+ */
+describe('a bot still reads as ITS skin through the purple (Pass 81 carry)', () => {
+  /** Rendered approximation of one bot garment pixel, bots included (the 0.5
+   * bot emissive scale multiplies every skin equally, so it cancels). */
+  function botSwatRead(skinId: string): Srgb {
+    const painted = operatorBotIdentityMaterial(skinId, 'swat');
+    const albedo = srgb(painted.color);
+    const glow = srgb(painted.emissive);
+    const atlas = MEASURED_BODY_SWAT_MEAN[skinId as keyof typeof MEASURED_BODY_SWAT_MEAN];
+    return Object.freeze({
+      r: albedo.r * atlas + glow.r * painted.emissiveIntensity,
+      g: albedo.g * atlas + glow.g * painted.emissiveIntensity,
+      b: albedo.b * atlas + glow.b * painted.emissiveIntensity,
+    });
+  }
+
+  function hsv(hex: number): { h: number; s: number } {
+    const { r, g, b } = srgb(hex);
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const d = max - min;
+    let h = 0;
+    if (d > 0) {
+      if (max === r) h = ((g - b) / d + 6) % 6;
+      else if (max === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+    }
+    return { h: h * 60, s: max === 0 ? 0 : d / max };
+  }
+
+  it('keeps the DEFAULT bot exactly the shipped purple, so wiring changes nothing for it', () => {
+    expect(operatorBotIdentityMaterial('default', 'swat')).toEqual({
+      color: 0xd85cff, emissive: 0x7d16bd, emissiveIntensity: 1.2, roughness: 0.46, metalness: 0.08,
+    });
+    expect(operatorBotIdentityMaterial('default', 'swatBlack')).toEqual({
+      color: 0xa93cff, emissive: 0x5d0ca8, emissiveIntensity: 1.05, roughness: 0.5, metalness: 0.06,
+    });
+    expect(operatorBotIdentityMaterial('default', 'grey')).toEqual({
+      color: 0xe3a5ff, emissive: 0x64119e, emissiveIntensity: 0.72, roughness: 0.54, metalness: 0.04,
+    });
+  });
+
+  it('resolves four DIFFERENT bot bodies where yesterday every role was byte-identical', () => {
+    // BEFORE this row: the neon-purple branches were hard-coded, so the four
+    // skins' swat/swatBlack/grey resolves were identical and separation was 0.
+    for (const role of ['swat', 'swatBlack', 'grey'] as const) {
+      const colours = SELECTABLE.map((definition) => operatorBotIdentityMaterial(definition.id, role));
+      expect(new Set(colours.map((painted) => `${painted.color}/${painted.emissive}`)).size)
+        .toBe(SELECTABLE.length);
+    }
+    // On screen, not just in data: every pair of bots must separate on the
+    // dominant garment read, at the same bar the arm contract uses.
+    const reads = SELECTABLE.map((definition) => ({ id: definition.id, read: botSwatRead(definition.id) }));
+    for (let i = 0; i < reads.length; i += 1) {
+      for (let j = i + 1; j < reads.length; j += 1) {
+        expect(separation(reads[i]!.read, reads[j]!.read)).toBeGreaterThan(0.2);
+      }
+    }
+  });
+
+  it('stays inside the bot purple band, so a skinned bot never stops reading as a bot', () => {
+    // Declared band lives with the catalog so the resolver and this pin cannot
+    // drift apart; the default purples measure 269-286 degrees.
+    for (const definition of SELECTABLE) {
+      for (const role of ['swat', 'swatBlack', 'grey'] as const) {
+        const painted = operatorBotIdentityMaterial(definition.id, role);
+        for (const hex of [painted.color, painted.emissive]) {
+          const { h, s } = hsv(hex);
+          expect(h).toBeGreaterThanOrEqual(OPERATOR_BOT_IDENTITY_HUE_BAND.minDeg);
+          expect(h).toBeLessThanOrEqual(OPERATOR_BOT_IDENTITY_HUE_BAND.maxDeg);
+          // The two body roles must stay saturated enough to read PURPLE, not
+          // washed-out lavender; the grey trim role is allowed to be quieter.
+          if (role !== 'grey') expect(s).toBeGreaterThanOrEqual(0.45);
+        }
+      }
+      // Friend/foe margin against BOTH player team tints, on the same
+      // rendered approximation the pairwise pin above uses.
+      const read = botSwatRead(definition.id);
+      expect(separation(read, srgb(OPERATOR_TEAM_TINTS[0]))).toBeGreaterThan(0.5);
+      expect(separation(read, srgb(OPERATOR_TEAM_TINTS[1]))).toBeGreaterThan(0.5);
+    }
+  });
+
+  it('carries each archetype through the FINISH, which no colour wash can erase', () => {
+    // Canvas adventurer wears matte; chitin carapace is glossy wet armour.
+    const matte = operatorBotIdentityMaterial('explorer', 'swat').roughness;
+    const gloss = operatorBotIdentityMaterial('symbiote', 'swat').roughness;
+    expect(matte - gloss).toBeGreaterThanOrEqual(0.4);
+    // Every skin lands between them and keeps its own distinct value...
+    const rough = SELECTABLE.map((definition) => operatorBotIdentityMaterial(definition.id, 'swat').roughness);
+    expect(new Set(rough).size).toBe(SELECTABLE.length);
+    // ...and the wet-shell operative stays nearer chitin than canvas.
+    const shell = operatorBotIdentityMaterial('navalops', 'swat').roughness;
+    expect(Math.abs(shell - gloss)).toBeLessThan(Math.abs(shell - matte));
+    // Metals stay props-level: a mirror-finish bot would glare and shimmer.
+    for (const definition of SELECTABLE) {
+      for (const role of ['swat', 'swatBlack', 'grey'] as const) {
+        expect(operatorBotIdentityMaterial(definition.id, role).metalness).toBeLessThanOrEqual(0.22);
+      }
+    }
+  });
+
+  it('never buys identity with brightness: the emissive budget stays exactly as shipped', () => {
+    for (const definition of SELECTABLE) {
+      expect(operatorBotIdentityMaterial(definition.id, 'swat').emissiveIntensity)
+        .toBe(OPERATOR_BOT_IDENTITY_EMISSIVE_INTENSITY.swat);
+      expect(operatorBotIdentityMaterial(definition.id, 'swatBlack').emissiveIntensity)
+        .toBe(OPERATOR_BOT_IDENTITY_EMISSIVE_INTENSITY.swatBlack);
+      expect(operatorBotIdentityMaterial(definition.id, 'grey').emissiveIntensity)
+        .toBe(OPERATOR_BOT_IDENTITY_EMISSIVE_INTENSITY.grey);
+    }
+    expect(OPERATOR_BOT_IDENTITY_EMISSIVE_INTENSITY).toEqual({ swat: 1.2, swatBlack: 1.05, grey: 0.72 });
+  });
+});
 describe('the selection actually reaches the arms (HF-366 falsifier)', () => {
   it('exposes the lobby storage key the arms read, so the two cannot drift apart', () => {
     expect(LOCAL_OPERATOR_SKIN_STORAGE_KEY).toBe('atomic-acres-operator-skin');
