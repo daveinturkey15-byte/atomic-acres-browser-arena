@@ -57,7 +57,14 @@ MAX_AGENTS = int(os.environ.get("GAUNTLET_MAX_AGENTS", "5"))
 ORDER = ["invisible-geometry", "atomic-acres-regression", "playtest-and-debug", "farcrysis-rebuild", "hijacked-refinement", "weapons-fidelity"]
 
 # A repair round may write anywhere, because a regression does not respect team ownership.
-REPAIR_TEAM = "arena-fidelity"
+# A repair round borrows a real team's identity for its file-ownership line and skills, so
+# this MUST name a team that exists in the current pass. It was hardcoded to a Pass 80 team
+# and every later pass renamed its teams - so build_spec raised KeyError on the FIRST repair
+# round, and since a red tree makes round 1 a repair, the loop died on startup every time.
+# It failed silently: launched detached, it left no traceback anywhere anyone was looking,
+# and simply appeared "not running" minutes later. Resolved against TEAMS instead.
+REPAIR_TEAM = next((t for t in ("invisible-geometry", "atomic-acres-regression") if t in TEAMS),
+                   next(iter(TEAMS)))
 
 
 def repair_tasks(gate_output, n):

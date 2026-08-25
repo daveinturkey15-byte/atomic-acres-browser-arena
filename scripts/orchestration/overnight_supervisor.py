@@ -78,12 +78,36 @@ def heal_toolchain():
     log(f"repair rc={p.returncode}; toolchain ok now: {toolchain_ok()}")
 
 
+CRASHLOG = os.path.join(REPO, "artifacts", "pass80-logs", "gauntlet-stderr.log")
+
+
 def start_loop(hours):
+    """Start the loop with its output CAPTURED.
+
+    It was previously launched detached with stdout and stderr discarded, so when it died of
+    a KeyError on its first repair round the traceback went nowhere and it simply appeared
+    'not running' minutes later. A crash nobody can see is indistinguishable from a crash
+    nobody had - and it cost most of an evening.
+    """
     env = dict(os.environ, GAUNTLET_MAX_AGENTS="24")
+    fh = open(CRASHLOG, "a", encoding="utf-8")
+    fh.write(os.linesep + f"===== loop start {dt.datetime.now():%Y-%m-%d %H:%M:%S} =====" + os.linesep)
+    fh.flush()
     p = subprocess.Popen([sys.executable, GAUNTLET, "--hours", str(hours)],
-                         cwd=REPO, env=env,
+                         cwd=REPO, env=env, stdout=fh, stderr=subprocess.STDOUT,
                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    log(f"gauntlet started, pid {p.pid}, {hours:.1f}h budget")
+    log(f"gauntlet started, pid {p.pid}, {hours:.1f}h budget (output -> {os.path.basename(CRASHLOG)})")
+
+
+def report_recent_crash():
+    """If the loop died, surface WHY into the main log instead of restarting blind."""
+    try:
+        tail = open(CRASHLOG, encoding="utf-8", errors="replace").read()[-1200:]
+    except OSError:
+        return
+    if "Traceback" in tail:
+        for line in tail.strip().splitlines()[-4:]:
+            log(f"  crash: {line.strip()[:160]}")
 
 
 def main():
@@ -100,6 +124,7 @@ def main():
         if not loop_alive():
             remaining = max(0.5, (deadline - time.time()) / 3600)
             log("gauntlet is NOT running - restarting it")
+            report_recent_crash()
             start_loop(remaining)
 
         if time.time() >= next_publish:
