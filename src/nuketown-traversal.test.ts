@@ -433,7 +433,13 @@ describe('Nuke Town traversal (HF-383)', () => {
     // walls, room partitions) come in mirrored twin pairs rather than rotated
     // ones; both houses' routes are proven bidirectionally by
     // house-navigation tests, so they are exempt here like the lane landmarks.
-    const HOUSE_MIRRORED = /^(rear|front)-(ground|door)|ground-window-(sill|lintel)|(ground|upper)-room-partition/;
+    // HF-383 added solid entry jambs (owner: true BO2 entrance trim) authored
+    // by the same mirrored-house generator as the wall pairs below, so they
+    // join that exemption class — but the full 2 houses x 2 entries x 3
+    // pieces set stays pinned here so the class can never silently swallow a
+    // missing or extra jamb.
+    expect(asymmetric.filter((entry) => /-entry-frame-(left|right|head)/.test(entry))).toHaveLength(12);
+    const HOUSE_MIRRORED = /^(rear|front)-(ground|door|entry)|ground-window-(sill|lintel)|(ground|upper)-room-partition/;
     const LANE_IDENTITY = /trellis|service wall|solar canopy|hydro-bed|reclamation-tank|landmark plinth|irrigation-vessel|terrain-mound|authored-house-/;
     expect(asymmetric.filter((entry) => !LANE_IDENTITY.test(entry) && !HOUSE_MIRRORED.test(entry))).toEqual([]);
   });
