@@ -703,3 +703,60 @@ describe('Pass 79 sweep - every surface is on the warm deck, or is carrying mean
     }
   });
 });
+
+// index.html is the one identity surface NO stylesheet guard can reach: the browser tab and
+// the installed-app chrome are painted from <meta name="theme-color"> and an inline data-URI
+// favicon, so the Pass 79 sweep - which walked computed DOM styles - was structurally blind to
+// them. They stayed cyan-on-navy through two reskins for exactly that reason. This is the
+// cheapest possible check on the first thing the owner sees.
+describe('Pass 81 - the browser tab carries the warm identity too', () => {
+  const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+
+  function channels(hex: string): { r: number; g: number; b: number } {
+    const v = hex.replace('#', '');
+    return {
+      r: Number.parseInt(v.slice(0, 2), 16),
+      g: Number.parseInt(v.slice(2, 4), 16),
+      b: Number.parseInt(v.slice(4, 6), 16),
+    };
+  }
+
+  it('paints theme-color warm, not the rejected cold navy', () => {
+    const themeColor = html.match(/<meta name="theme-color" content="(#[0-9a-f]{6})"/i)?.[1];
+    expect(themeColor, 'index.html must declare a theme-color').toBeDefined();
+    const { r, b } = channels(themeColor!);
+    expect(r, `theme-color ${themeColor} is cold: blue ${b} >= red ${r}`).toBeGreaterThan(b);
+  });
+
+  it('paints every favicon colour warm, ground and mark alike', () => {
+    const icon = html.match(/<link rel="icon" href="([^"]+)"/i)?.[1];
+    expect(icon, 'index.html must declare a favicon').toBeDefined();
+    const fills = [...decodeURIComponent(icon!).matchAll(/fill='(#[0-9a-f]{6})'/gi)]
+      .map((match) => match[1]);
+    // Ground plus mark. If the artwork gains shapes this count should rise deliberately.
+    expect(fills.length).toBeGreaterThanOrEqual(2);
+    for (const fill of fills) {
+      const { r, b } = channels(fill);
+      expect(r, `favicon fill ${fill} is cold: blue ${b} >= red ${r}`).toBeGreaterThan(b);
+    }
+  });
+
+  // A favicon is read at 16px, where a UI accent's contrast is not enough. The rotation
+  // deliberately did NOT reuse --ui-signal-lit (6.22:1) for the mark; it holds the original
+  // cyan-on-navy separation instead, which is the property that actually matters here.
+  it('keeps the mark legible against its own ground at tab size', () => {
+    const icon = decodeURIComponent(html.match(/<link rel="icon" href="([^"]+)"/i)![1]);
+    const [ground, mark] = [...icon.matchAll(/fill='(#[0-9a-f]{6})'/gi)].map((m) => m[1]);
+    const relativeLuminance = (hex: string): number => {
+      const { r, g, b } = channels(hex);
+      const lin = (c: number): number => {
+        const v = c / 255;
+        return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    };
+    const [hi, lo] = [relativeLuminance(ground), relativeLuminance(mark)]
+      .sort((a, b) => b - a);
+    expect((hi + 0.05) / (lo + 0.05)).toBeGreaterThanOrEqual(9);
+  });
+});
