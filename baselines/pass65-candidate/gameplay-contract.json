@@ -628,7 +628,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "aqua-irrigation-workshop:front-entry-frame-left",
               "kind": "frame",
               "position": [
@@ -643,7 +643,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "aqua-irrigation-workshop:front-entry-frame-right",
               "kind": "frame",
               "position": [
@@ -658,7 +658,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "aqua-irrigation-workshop:front-entry-frame-head",
               "kind": "frame",
               "position": [
@@ -673,7 +673,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "aqua-irrigation-workshop:rear-entry-frame-left",
               "kind": "frame",
               "position": [
@@ -688,7 +688,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "aqua-irrigation-workshop:rear-entry-frame-right",
               "kind": "frame",
               "position": [
@@ -703,7 +703,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "aqua-irrigation-workshop:rear-entry-frame-head",
               "kind": "frame",
               "position": [
@@ -928,7 +928,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "aqua-irrigation-workshop:upper-ramp-entry-frame-rear",
               "kind": "frame",
               "position": [
@@ -943,7 +943,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "aqua-irrigation-workshop:upper-ramp-entry-frame-front",
               "kind": "frame",
               "position": [
@@ -958,7 +958,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "aqua-irrigation-workshop:upper-ramp-entry-frame-head",
               "kind": "frame",
               "position": [
@@ -1823,7 +1823,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "coral-orchard-conservatory:front-entry-frame-left",
               "kind": "frame",
               "position": [
@@ -1838,7 +1838,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "coral-orchard-conservatory:front-entry-frame-right",
               "kind": "frame",
               "position": [
@@ -1853,7 +1853,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "coral-orchard-conservatory:front-entry-frame-head",
               "kind": "frame",
               "position": [
@@ -1868,7 +1868,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "coral-orchard-conservatory:rear-entry-frame-left",
               "kind": "frame",
               "position": [
@@ -1883,7 +1883,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "coral-orchard-conservatory:rear-entry-frame-right",
               "kind": "frame",
               "position": [
@@ -1898,7 +1898,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "coral-orchard-conservatory:rear-entry-frame-head",
               "kind": "frame",
               "position": [
@@ -2123,7 +2123,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "coral-orchard-conservatory:upper-ramp-entry-frame-rear",
               "kind": "frame",
               "position": [
@@ -2138,7 +2138,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "coral-orchard-conservatory:upper-ramp-entry-frame-front",
               "kind": "frame",
               "position": [
@@ -2153,7 +2153,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "coral-orchard-conservatory:upper-ramp-entry-frame-head",
               "kind": "frame",
               "position": [
