@@ -73,7 +73,32 @@ def _run(cmd, timeout):
         return -1, f"EXCEPTION: {exc}"
 
 
+TOOLCHAIN_BROKEN = re.compile(
+    r"To get access to the TypeScript compiler|is not recognized as an internal|"
+    r"Cannot find module|command not found|npm error|MODULE_NOT_FOUND", re.I)
+
+
+def toolchain_ok():
+    """Can the toolchain actually RUN? Distinct from whether the code is correct.
+
+    On 2026-08-25 node_modules/.bin vanished, so npx could resolve neither tsc nor vitest.
+    The gate reported REGRESSED in THREE SECONDS and the round committed anyway - it had no
+    way to say "I could not measure". Four type errors went in unseen and the swarm built
+    blind for two hours. A verifier that cannot distinguish 'the code is broken' from 'I am
+    broken' will always blame the code.
+    """
+    for probe, tool in (("npx tsc --version", "tsc"), ("npx vitest --version", "vitest")):
+        rc, out = _run(probe, 300)
+        if rc != 0 or TOOLCHAIN_BROKEN.search(out):
+            return False, f"{tool} cannot run: {out.strip().splitlines()[-1][:160] if out.strip() else 'no output'}"
+    return True, ""
+
+
 def measure():
+    ok, why = toolchain_ok()
+    if not ok:
+        return {"toolchain_broken": why}
+
     rc, _ = _run("npx tsc --noEmit", 900)
     tsc_clean = rc == 0
 
@@ -118,6 +143,19 @@ def measure():
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "check"
     now = measure()
+
+    # UNMEASURABLE is not REGRESSED. Exit 3 so a caller can tell the two apart and STOP
+    # rather than commit - the round that swept four type errors into the tree did so
+    # because a 3-second toolchain failure looked exactly like a verdict.
+    if now.get("toolchain_broken"):
+        print(json.dumps({"verdict": "CANNOT_MEASURE",
+                          "reason": now["toolchain_broken"],
+                          "hint": "npm install --ignore-scripts restores node_modules/.bin; "
+                                  "npm rebuild deadlocks because its precompile needs rimraf"},
+                         indent=2))
+        print("TOOLCHAIN BROKEN - this is NOT a regression verdict. Do not commit on it.",
+              file=sys.stderr)
+        return 3
 
     if mode == "capture":
         os.makedirs(os.path.dirname(FLOOR), exist_ok=True)

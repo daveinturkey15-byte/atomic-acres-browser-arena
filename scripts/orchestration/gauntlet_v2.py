@@ -300,6 +300,13 @@ def main():
     # only ever set by a round's own gate check - and burns a full round building on a break
     # it has not looked at. Observed doing exactly that on 2026-08-25.
     rc0, out0 = sh([sys.executable, GATE, "check"], timeout=3600)
+    if rc0 == 3:
+        # The gate could not RUN - broken toolchain, not broken code. Starting a pass here
+        # means every round is unverifiable and every commit is blind, which is exactly what
+        # happened on 2026-08-25 when node_modules/.bin vanished.
+        log("TOOLCHAIN BROKEN - refusing to start a pass that cannot verify anything")
+        log(out0[-600:])
+        return
     if rc0 != 0:
         pending_repair = out0
         log("tree is RED at startup; first round will be a repair")
@@ -385,8 +392,17 @@ def main():
         if not wait_quiet():
             log("agents still running after 10 min; measuring anyway")
         rc_gate, gate_out = sh([sys.executable, GATE, "check"], timeout=3600)
-        verdict = "OK" if rc_gate == 0 else "REGRESSED"
+        verdict = {0: "OK", 3: "CANNOT_MEASURE"}.get(rc_gate, "REGRESSED")
         log(f"round {round_no} gate: {verdict}")
+        if rc_gate == 3:
+            # Do NOT commit on an unmeasurable round. The round that swept four type errors
+            # into the tree did so because a 3-second toolchain failure was indistinguishable
+            # from a verdict. Hold and re-check rather than integrating work nothing checked.
+            log("round {} NOT COMMITTED - the gate could not run, so nothing verified it"
+                .format(round_no))
+            log(gate_out[-600:])
+            time.sleep(300)
+            continue
 
         # `git add -A` is BANNED FOR AGENTS and deliberately allowed HERE, because the
         # orchestrator is the integration owner and this runs only after wait_quiet()
