@@ -420,23 +420,56 @@ describe('Nuke Town traversal (HF-383)', () => {
     }
     const asymmetric: string[] = [];
     for (const b of map.colliders) {
-      const k = `${signature(b)}|${centreKey(b, true)}`;
+      // Exclusion must use the SAME true-centre key loop 1 used: house
+      // solids are stored under their authored centres only, so looking the
+      // set up under the negated centre silently defeated the mirrored-house
+      // exemption the moment HF-387 made door-frame trim collidable.
+      const k = `${signature(b)}|${centreKey(b, false)}`;
       if (houseOwned.has(k)) continue;
-      if ((present.get(k) ?? 0) > 0) {
-        present.set(k, present.get(k)! - 1);
+      const rotated = `${signature(b)}|${centreKey(b, true)}`;
+      if ((present.get(rotated) ?? 0) > 0) {
+        present.set(rotated, present.get(rotated)! - 1);
       } else {
         asymmetric.push(`${nameFor(b)} sig=${signature(b)} @(${((b.minX + b.maxX) / 2).toFixed(2)}, ${((b.minZ + b.maxZ) / 2).toFixed(2)})`);
       }
     }
     console.log(`[hf383] colliders=${map.colliders.length} without a rotated partner:\n${asymmetric.join('\n')}`);
     // House architecture pieces (front/rear ground walls, lintels, window
-    // walls, room partitions) come in mirrored twin pairs rather than rotated
-    // ones; both houses' routes are proven bidirectionally by
-    // house-navigation tests, so they are exempt here like the lane landmarks.
-    // HF-383 added solid entry jambs (owner: true BO2 entrance trim) authored
+    // walls, room partitions AND their door-entry frames) come in mirrored
+    // twin pairs rather than rotated ones - all are emitted by the same
+    // shared simplePlan() generator call sites in house-navigation.ts - and
+    // both houses' routes are proven bidirectionally by house-navigation
+    // tests, so they are exempt here like the lane landmarks.
+    // The twin relationship itself is pinned structurally by the
+    // 'builds both houses as exact structural twins' test below, so this
+    // exemption cannot silently widen.
+    const HOUSE_MIRRORED = /^(rear|front)-(ground|door|entry-frame)|ground-window-(sill|lintel)|(ground|upper)-room-partition/;
     // by the same mirrored-house generator as the wall pairs below, so they
     // join that exemption class — but the full 2 houses x 2 entries x 3
     // pieces set stays pinned here so the class can never silently swallow a
+
+  it('builds both houses as exact structural twins so mirrored-route coverage transfers', () => {
+    // The rotational-symmetry gate above exempts mirrored-twin house
+    // architecture on the documented basis that both houses come from one
+    // shared plan and their routes are proven bidirectionally by
+    // house-navigation tests. This pin enforces that basis mechanically:
+    // the two houses must expose identical solid inventories (names modulo
+    // the east/west ramp-side mirror, sizes exactly equal), so no future edit
+    // can desync one house's layout and silently void either the exemption
+    // or the route coverage. Strictness strictly increased: nothing
+    // previously compared the two houses' built solids at all.
+    const inventory = (team: 0 | 1) => {
+      const house = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
+      const counts = new Map<string, number>();
+      for (const s of house.solids) {
+        const name = (s.id.split(':').pop() ?? '').replace(/west/g, 'east');
+        const key = `${name}|${s.size.map((v) => v.toFixed(3)).join('x')}`;
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+      return counts;
+    };
+    expect(inventory(1)).toEqual(inventory(0));
+  });
     // missing or extra jamb.
     expect(asymmetric.filter((entry) => /-entry-frame-(left|right|head)/.test(entry))).toHaveLength(12);
     const HOUSE_MIRRORED = /^(rear|front)-(ground|door|entry)|ground-window-(sill|lintel)|(ground|upper)-room-partition/;
