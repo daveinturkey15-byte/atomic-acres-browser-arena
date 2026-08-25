@@ -94,6 +94,34 @@ def repair_tasks(gate_output, n):
 PROGRESS = os.path.join(LOGDIR, "task-progress.json")
 
 
+def agents_alive():
+    """How many OMP agents are still running."""
+    try:
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "@(Get-Process -Name omp-windows-x64 -ErrorAction SilentlyContinue).Count"],
+            capture_output=True, text=True, timeout=60).stdout.strip()
+        return int(out or 0)
+    except Exception:
+        return 0
+
+
+def wait_quiet(max_wait=600):
+    """Let agents finish writing before measuring the tree.
+
+    The gate was reading a tree that agents were still editing and returning REGRESSED on
+    a half-written file - twice in a row on 2026-08-25, which pushed the repair streak to
+    2 of the 3 that stop the run. A false regression is worse than a slow one: it can end
+    an unattended pass over a break that never existed.
+    """
+    deadline = time.time() + max_wait
+    while time.time() < deadline:
+        if agents_alive() == 0:
+            return True
+        time.sleep(20)
+    return False
+
+
 def load_progress():
     """How far through each team's task list we have got. Survives restarts."""
     try:
@@ -265,6 +293,9 @@ def main():
             fh.write(out)
         log(f"round {round_no} dispatch rc={rc}")
 
+        # Measure a settled tree, never one mid-write.
+        if not wait_quiet():
+            log("agents still running after 10 min; measuring anyway")
         rc_gate, gate_out = sh([sys.executable, GATE, "check"], timeout=3600)
         verdict = "OK" if rc_gate == 0 else "REGRESSED"
         log(f"round {round_no} gate: {verdict}")
@@ -280,12 +311,24 @@ def main():
             # DO NOT STOP. Stopping ended an overnight run after two rounds and left the
             # owner with a broken tree and six idle hours. Repair instead, and only give up
             # after three consecutive rounds fail to clear it.
-            repair_streak += 1
-            log(f"round {round_no} REGRESSED - queueing repair (streak {repair_streak}/3)")
-            if repair_streak >= 3:
-                log("three consecutive repairs failed; stopping for a human")
-                break
-            pending_repair = gate_out
+            # Confirm before it counts. A one-off REGRESSED has already proved to be a
+            # race with a still-writing agent rather than a real break.
+            wait_quiet(300)
+            rc2, out2 = sh([sys.executable, GATE, "check"], timeout=3600)
+            if rc2 == 0:
+                log(f"round {round_no}: regression did NOT reproduce on a settled tree - "
+                    f"treating as a race, not a break")
+                repair_streak = 0
+                pending_repair = None
+                gate_out = out2
+                verdict = "OK"
+            else:
+                repair_streak += 1
+                log(f"round {round_no} REGRESSED - queueing repair (streak {repair_streak}/3)")
+                if repair_streak >= 3:
+                    log("three consecutive repairs failed; stopping for a human")
+                    break
+                pending_repair = gate_out
         else:
             repair_streak = 0
             pending_repair = None
