@@ -263,12 +263,44 @@ export function centeredReadbackRegion(
   });
 }
 
+/**
+ * Never let a diagnostic string be the thing that throws. A `describe` hook
+ * reads live runtime state, and a failure inside it during an already-failing
+ * deadline would replace a precise queue error with an unrelated one.
+ */
+function describeFrontier(describe: (() => string) | undefined): string {
+  if (!describe) return '';
+  try {
+    const detail = describe();
+    return detail ? `, ${detail}` : '';
+  } catch {
+    return ', frontier description unavailable';
+  }
+}
+
+/**
+ * Fails closed on a queue-completion deadline, and SAYS WHY.
+ *
+ * The message this rejects with is the one the player reads when a deployment
+ * bounces ("Deployment preparation failed: WebGPU queue completion exceeded
+ * 4000 ms for submission 35"). It used to carry only the bound and the target
+ * sequence, which is not enough to tell a wedged device apart from a cold
+ * first-use compile, nor to locate WHICH of the several fences in the
+ * admission path blew - two passes at the MAX-preset admission bound were
+ * spent re-deriving that from stage timings. `describe` lets the caller attach
+ * the live frontier state to the failure so the next reader gets it for free.
+ *
+ * The bound itself is untouched: same timeout, same fail-closed decision, same
+ * message prefix. Only the diagnosis is richer.
+ */
 export async function awaitSubmissionCompletionTarget(input: Readonly<{
   targetSequence: number;
   completedSequence: () => number;
   createProbe: () => Promise<void> | null;
   failure: () => string | null;
   timeoutMs: number;
+  /** Optional one-line frontier description appended to a deadline failure. */
+  describe?: () => string;
 }>): Promise<void> {
   if (input.completedSequence() >= input.targetSequence) return;
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
@@ -286,7 +318,10 @@ export async function awaitSubmissionCompletionTarget(input: Readonly<{
           } else if (input.completedSequence() >= input.targetSequence) {
             resolve();
           } else {
-            reject(new Error(`WebGPU queue completion exceeded ${input.timeoutMs} ms for submission ${input.targetSequence}`));
+            reject(new Error(
+              `WebGPU queue completion exceeded ${input.timeoutMs} ms for submission ${input.targetSequence}`
+              + ` (completed ${input.completedSequence()}${describeFrontier(input.describe)})`,
+            ));
           }
         });
       },
@@ -1553,7 +1588,29 @@ export class WebGpuRenderRuntime {
       createProbe: () => this.scheduleCompletionProbe(this.clock(), true),
       failure: () => this.lastFailure,
       timeoutMs,
+      // What the player sees when a deployment bounces. The frontier state is
+      // what separates a genuinely wedged device from one frame of cold
+      // first-use pipeline creation: a cold compile shows a healthy prior
+      // latency, one in-flight submission and a large draw count, while a
+      // wedged device shows a pending age far past the bound and no probe
+      // progress at all.
+      describe: () => this.describeCompletionFrontier(),
     });
+  }
+
+  private describeCompletionFrontier(): string {
+    const now = this.clock();
+    const pendingForMs = this.pendingCompletionStartedAt === null
+      ? 0
+      : Math.max(0, now - this.pendingCompletionStartedAt);
+    return [
+      `mode ${this.submissionMode}`,
+      `in-flight ${Math.max(0, this.submissionSequence - this.completedSequence)}`,
+      `pending ${Math.round(pendingForMs)} ms`,
+      `probes ${this.completionProbeCount}`,
+      `prior latency ${this.lastCompletionLatencyMs === null ? 'none' : `${Math.round(this.lastCompletionLatencyMs)} ms`}`,
+      `fenced draws ${this.lastSubmittedRenderInfo.calls}`,
+    ].join(', ');
   }
 
   dispose(): void {

@@ -1203,3 +1203,106 @@ describe('optional WebGPU device features', () => {
     expect(selectOptionalDeviceFeatures({ has: () => { throw new Error('driver'); } })).toEqual([]);
   });
 });
+
+describe('queue-completion deadline diagnosis', () => {
+  // The rejection here IS the sentence the player reads when a deployment
+  // bounces ("Deployment preparation failed: WebGPU queue completion exceeded
+  // 4000 ms for submission 35"). With only the bound and a sequence number it
+  // cannot distinguish one cold first-use compile from a wedged device, and it
+  // names none of the several fences in the admission path — two passes at the
+  // MAX-preset bound were spent re-deriving that from stage timings. These pin
+  // the frontier detail so it cannot be dropped back to a bare number.
+  it('names the completion frontier when the deadline fails closed', async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = new Promise<void>(() => undefined);
+      const rejection = expect(awaitSubmissionCompletionTarget({
+        targetSequence: 9,
+        completedSequence: () => 3,
+        createProbe: () => pending,
+        failure: () => null,
+        timeoutMs: 100,
+        describe: () => 'mode serialized, in-flight 6, pending 240 ms',
+      })).rejects.toThrow(
+        'WebGPU queue completion exceeded 100 ms for submission 9'
+        + ' (completed 3, mode serialized, in-flight 6, pending 240 ms)',
+      );
+      vi.advanceTimersByTime(100);
+      await rejection;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('still reports the completion frontier when no describer is supplied', async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = new Promise<void>(() => undefined);
+      const rejection = expect(awaitSubmissionCompletionTarget({
+        targetSequence: 4,
+        completedSequence: () => 1,
+        createProbe: () => pending,
+        failure: () => null,
+        timeoutMs: 50,
+      })).rejects.toThrow('exceeded 50 ms for submission 4 (completed 1)');
+      vi.advanceTimersByTime(50);
+      await rejection;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('never lets a throwing describer replace the queue error', async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = new Promise<void>(() => undefined);
+      const rejection = expect(awaitSubmissionCompletionTarget({
+        targetSequence: 2,
+        completedSequence: () => 0,
+        createProbe: () => pending,
+        failure: () => null,
+        timeoutMs: 30,
+        describe: () => { throw new Error('telemetry exploded'); },
+      })).rejects.toThrow(
+        'WebGPU queue completion exceeded 30 ms for submission 2'
+        + ' (completed 0, frontier description unavailable)',
+      );
+      vi.advanceTimersByTime(30);
+      await rejection;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('is WIRED: the runtime fence attaches its own live frontier state', async () => {
+    const renderer = {
+      backend: { isWebGPUBackend: true },
+      info: { reset: vi.fn(), render: { drawCalls: 4821, triangles: 9, points: 0, lines: 0 } },
+    };
+    const device = {
+      // A queue that never retires — exactly the shape of the bounce.
+      queue: { onSubmittedWorkDone: () => new Promise<void>(() => undefined) },
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, { render: vi.fn() }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+    });
+    expect(runtime.submitFrame(100, true, 'serialized')).toBe(true);
+    // The draw count is the tell that separates a full-coverage cold prewarm
+    // frame from a small one, so it has to survive into the failure text.
+    await expect(runtime.waitForSubmittedWork(20)).rejects.toThrow(
+      /exceeded 20 ms for submission 1 \(completed 0, mode serialized, in-flight 1, pending \d+ ms, probes 1, prior latency none, fenced draws 4821\)/,
+    );
+  });
+});
