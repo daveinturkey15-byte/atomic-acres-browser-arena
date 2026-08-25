@@ -25953,10 +25953,32 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
   fillLight.intensity = activeLighting.fillIntensity * live.indirectLightScale;
   const shadowsEnabled = adaptiveShadowsEnabled(desiredProfile, desiredConfig.shadows, pixelRatioCap)
     && (activeArenaVisualDefinition?.shadows.enabled ?? true);
-  const priorShadowMapSize = sunLight.shadow.mapSize.width;
+  // WEBGPU: the sun's shadow target is OWNED by three's ShadowNode.
+  // three.webgpu.js setupShadow() assigns BOTH ShadowNode.shadowMap AND
+  // light.shadow.map to the SAME render target and resizes it itself every
+  // frame (renderShadow -> shadowMap.setSize(shadow.mapSize...)), so there is
+  // nothing for us to dispose on a size change. Disposing/nulling it here left
+  // light.shadow.map NULL for the rest of the session — setupShadow() only
+  // re-runs on a shadow-TYPE change — so every later godray shaft rebuild
+  // dereferenced light.shadow.map.depthTexture, three swallowed the throw, and
+  // composited a default NodeMaterial as the shaft light. Measured live:
+  // one high -> performance -> high round trip through this function left the
+  // sun with castShadow=true and shadow.map=null permanently.
+  // WEBGL2: WebGLShadowMap allocates shadow.map only when it is null or the
+  // shadow TYPE changed (three.module.js: `shadow.map === null ||
+  // typeChanged`), never on a mapSize change, so THIS backend still needs the
+  // hand-dispose below or a live preset change would leave shadows at the old
+  // resolution.
+  const priorShadowMapSize = renderRuntime.backend === 'webgl2'
+    ? sunLight.shadow.mapSize.width
+    : desiredConfig.shadowMapSize;
   sunLight.castShadow = shadowsEnabled;
   sunLight.shadow.mapSize.set(desiredConfig.shadowMapSize, desiredConfig.shadowMapSize);
-  if (sunLight.shadow.map && priorShadowMapSize !== desiredConfig.shadowMapSize) {
+  if (
+    renderRuntime.backend === 'webgl2'
+    && sunLight.shadow.map
+    && priorShadowMapSize !== desiredConfig.shadowMapSize
+  ) {
     sunLight.shadow.map.dispose();
     sunLight.shadow.map = null;
   }
