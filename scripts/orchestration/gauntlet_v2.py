@@ -50,6 +50,46 @@ from teams import BUILDER_PREAMBLE, CRITIC_PREAMBLE  # noqa: E402
 ORDER = ["gameplay-test", "arena-fidelity", "graphics-aaa",
          "polish-vfx", "assets-imagegen", "rigging-motion"]
 
+# A repair round may write anywhere, because a regression does not respect team ownership.
+REPAIR_TEAM = "arena-fidelity"
+
+
+def repair_tasks(gate_output, n):
+    """Turn a regression report into repair briefs.
+
+    Split across agents by FAILING FILE so two agents never fight over one test, and give
+    every agent the same non-negotiable framing: the fix is the code, never the assertion.
+    """
+    try:
+        report = json.loads(gate_output[gate_output.index("{"):gate_output.rindex("}") + 1])
+        failing = report.get("failing_files", [])
+    except Exception:
+        failing = []
+    if not failing:
+        failing = ["(gate reported a regression but named no file - run the suite yourself)"]
+
+    head = (
+        "REPAIR ROUND. The tree is RED and every other lane is blocked behind you - this is "
+        "the highest-value work on the machine right now.\n\n"
+        "THE RULE THAT DECIDES THIS TASK: fix the CODE, never the assertion. A correctly "
+        "failing test is telling you something true. If you genuinely believe a test encodes "
+        "an intention the owner has since overridden, you must (a) say so explicitly, (b) "
+        "name the owner instruction that overrides it, and (c) re-pin the test at EQUAL OR "
+        "GREATER strictness against the new intended behaviour - never simply relax a bound "
+        "or delete a case. A mechanical gate re-runs after you and will catch a lowered bar.\n\n"
+        "Known context for this specific regression: an arena-fidelity round restaged Nuke "
+        "Town's mid-street vehicles and decluttered the street (HF-383, commit 0269334d), "
+        "which was the owner's explicit request. Some of these failures are that intended "
+        "change meeting frozen-layout contracts; at least one is a REAL BREAK - "
+        "nuketown-traversal reports NO PATH corner to corner, meaning the map is currently "
+        "impassable. Fix the impassability first: a map you cannot cross is not a fidelity "
+        "question, it is a broken game.\n\n"
+        "YOUR FILE: "
+    )
+    tail = ("\n\nRun that file, read the actual assertion, and fix the underlying cause. "
+            "Then run the full suite to confirm you broke nothing else.")
+    return [(f"repair-{i}", head + f + tail) for i, f in enumerate(failing[:max(2, n)])]
+
 
 def sh(cmd, cwd=REPO, timeout=1800):
     """Run through the shell: bare `npx` is npx.cmd on Windows and raises WinError 2."""
@@ -102,7 +142,7 @@ def build_spec(team_name, round_no, tasks):
             "id": f"r{round_no:02d}-{tid}",
             "route": "omp-ox",
             "role": "worker",
-            "timeout": 3000,
+            "timeout": 2400,
             "cwd": REPO,
             "prompt": (BUILDER_PREAMBLE.replace("SKILL_ROOT", SKILL_ROOT) + brief
                        + f"\n\nYOUR TEAM ({team_name}) OWNS THESE FILES AND NOTHING ELSE:\n"
@@ -112,7 +152,7 @@ def build_spec(team_name, round_no, tasks):
         "id": f"r{round_no:02d}-{team_name}-critic",
         "route": "omp-ox",
         "role": "verifier",
-        "timeout": 3000,
+        "timeout": 2400,
         "cwd": REPO,
         "depends_on": [f"r{round_no:02d}-{t}" for t in ids],
         "prompt": (CRITIC_PREAMBLE + f"Team: {team_name}\nOwns: {team['owns']}\n"
@@ -135,6 +175,8 @@ def main():
 
     round_no = 0
     cursor = 0
+    repair_streak = 0
+    pending_repair = None
     while time.time() < deadline:
         round_no += 1
         remaining = (deadline - time.time()) / 3600
@@ -148,11 +190,19 @@ def main():
             round_no -= 1
             continue
 
-        team = ORDER[cursor % len(ORDER)]
-        cursor += 1
-        tasks = TEAMS[team]["tasks"][:n]
-        log(f"=== ROUND {round_no} | {remaining:.2f}h left | team {team} | "
-            f"{len(tasks)} agents (granted {n}) ===")
+        if pending_repair:
+            # A repair round outranks the rotation. The tree is red and every later round
+            # would be building on it, so fixing it IS the highest-value work available.
+            team = REPAIR_TEAM
+            tasks = repair_tasks(pending_repair, n)
+            log(f"=== ROUND {round_no} | {remaining:.2f}h left | REPAIR "
+                f"(streak {repair_streak}/3) | {len(tasks)} agents ===")
+        else:
+            team = ORDER[cursor % len(ORDER)]
+            cursor += 1
+            tasks = TEAMS[team]["tasks"][:n]
+            log(f"=== ROUND {round_no} | {remaining:.2f}h left | team {team} | "
+                f"{len(tasks)} agents (granted {n}) ===")
 
         spec = build_spec(team, round_no, tasks)
         path = os.path.join(LOGDIR, f"r{round_no:02d}-{team}.json")
@@ -160,7 +210,7 @@ def main():
             json.dump(spec, fh, indent=2)
 
         rc, out = sh([sys.executable, DISPATCH, path, "--max-parallel", str(max(2, n))],
-                     cwd=FLEET, timeout=3600)
+                     cwd=FLEET, timeout=5400)
         with open(os.path.join(LOGDIR, f"r{round_no:02d}-{team}.out"), "w",
                   encoding="utf-8", newline="\n") as fh:
             fh.write(out)
@@ -178,8 +228,18 @@ def main():
         sh(["git", "commit", "-q", "-m", msg], timeout=300)
 
         if rc_gate != 0:
-            log(f"round {round_no} REGRESSED - stopping so later rounds do not build on it")
-            break
+            # DO NOT STOP. Stopping ended an overnight run after two rounds and left the
+            # owner with a broken tree and six idle hours. Repair instead, and only give up
+            # after three consecutive rounds fail to clear it.
+            repair_streak += 1
+            log(f"round {round_no} REGRESSED - queueing repair (streak {repair_streak}/3)")
+            if repair_streak >= 3:
+                log("three consecutive repairs failed; stopping for a human")
+                break
+            pending_repair = gate_out
+        else:
+            repair_streak = 0
+            pending_repair = None
 
     log(f"=== PASS 80 COMPLETE after {round_no} rounds ===")
     return 0
