@@ -22686,7 +22686,7 @@ function updateOverdrive(now: number): void {
     overdriveSpawns += 1;
     overdriveClaimGeneration = -1;
     addFeed('2× DAMAGE CORE ONLINE · VISIBLE MID-MAP ICON', 'gold');
-    showQuadDamageAnnouncement('2× DAMAGE ONLINE', 'CENTRE CORE · CLAIM IT');
+    showQuadDamageAnnouncement('2× DAMAGE ONLINE', 'EAST STREET CORE · CLAIM IT');
     audio.overdriveAvailable();
     broadcastOverdriveState(now);
     requestAnimationFrame((frameAt) => recordMatchDiagnostic('overdrive-spawn-frame', 'observed', {
