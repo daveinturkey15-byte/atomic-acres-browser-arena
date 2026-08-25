@@ -95,6 +95,20 @@ await page.addInitScript(() => {
 const pageErrors = [];
 page.on('pageerror', (error) => pageErrors.push(String(error).slice(0, 300)));
 
+// `page.evaluate` has NO default timeout in Playwright, and
+// `__ATOMIC_ACRES_DEBUG__.selectArena` awaits a whole arena transition. On a
+// busy machine that transition can fail to settle, and the harness then waits
+// for it forever, producing no output at all — which reads exactly like a slow
+// pass and is therefore worse than a failure. Every in-page await below is
+// fenced so a wedged transition is REPORTED rather than waited on.
+const withDeadline = (promise, ms, label) => {
+  let timer = null;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} did not settle within ${ms} ms`)), ms);
+  });
+  return Promise.race([promise, deadline]).finally(() => { if (timer) clearTimeout(timer); });
+};
+
 const waitForDebug = () => page.waitForFunction(
   () => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 180_000 },
 );
@@ -165,8 +179,16 @@ for (const preset of PRESETS) {
 
     const record = { preset, arena, requestedShaftTier: applied.requestedShaftTier, admitted: false };
     try {
-      await page.evaluate(async (id) => { await window.__ATOMIC_ACRES_DEBUG__.selectArena(id); }, arena);
-      await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.startSolo(); });
+      await withDeadline(
+        page.evaluate(async (id) => { await window.__ATOMIC_ACRES_DEBUG__.selectArena(id); }, arena),
+        PER_ARENA_MS,
+        'selectArena',
+      );
+      await withDeadline(
+        page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.startSolo(); }),
+        30_000,
+        'startSolo',
+      );
       await page.waitForFunction(() => {
         const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
         return snapshot.matchPhase === 'active' && snapshot.gameStarted === true;
@@ -248,6 +270,15 @@ for (const preset of PRESETS) {
     }
 
     results.push(record);
+    // Rewrite the receipt after EVERY cell. A long sweep that only writes at the
+    // end loses everything it proved when the machine is busy enough that the
+    // run has to be abandoned, and partial evidence is worth far more than none.
+    mkdirSync(dirname(resolve(OUT)), { recursive: true });
+    writeFileSync(resolve(OUT), JSON.stringify(
+      { url: BASE, presets: PRESETS, arenas: ARENAS, bundleAtStart, complete: false, results, failures, pageErrors },
+      null,
+      2,
+    ));
     console.error(
       `[tsl-integrity] ${cell.padEnd(28)} admitted=${record.admitted}`
       + ` tslErrors=${observed.tslNodeBuildErrors} console=${observed.consoleErrors.length}`
@@ -260,7 +291,7 @@ for (const preset of PRESETS) {
 
 await browser.close();
 
-const payload = { url: BASE, presets: PRESETS, arenas: ARENAS, bundleAtStart, results, failures, pageErrors };
+const payload = { url: BASE, presets: PRESETS, arenas: ARENAS, bundleAtStart, complete: true, results, failures, pageErrors };
 mkdirSync(dirname(resolve(OUT)), { recursive: true });
 writeFileSync(resolve(OUT), JSON.stringify(payload, null, 2));
 
