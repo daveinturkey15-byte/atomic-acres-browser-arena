@@ -1306,3 +1306,67 @@ describe('queue-completion deadline diagnosis', () => {
     );
   });
 });
+
+describe('cold-generation prewarm fence', () => {
+  // WHY THIS IS PINNED. The MAX preset bounces because first-use pipeline
+  // creation lands inside a guarded 4000 ms admission flush. The whole defence
+  // is that compileAndRender realises that work behind the runtime's OWN
+  // 12 s cold-generation allowance first, so every later guarded flush only
+  // ever fences a warm frame. Nothing pinned that number, so a tidy-up that
+  // dropped the explicit 12_000 and took waitForSubmittedWork's 4000 ms
+  // default would silently re-arm the exact bounce, with every unit test still
+  // green. This asserts the fence a cold prewarm actually gets.
+  //
+  // It raises the bar, never lowers it: the 4000 ms admission guard is
+  // untouched and unreferenced here.
+  it('gives a cold prewarm submission the 12 s allowance, not the 4 s live bound', async () => {
+    vi.useFakeTimers();
+    try {
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera();
+      const renderer = {
+        backend: { isWebGPUBackend: true },
+        info: { reset: vi.fn(), render: { drawCalls: 12, triangles: 3, points: 0, lines: 0 } },
+      };
+      const device = {
+        // Cold first-use compilation that never retires: the fence is the only
+        // thing deciding how long the prewarm is allowed to take.
+        queue: { onSubmittedWorkDone: () => new Promise<void>(() => undefined) },
+        addEventListener: () => undefined,
+        lost: new Promise<never>(() => undefined),
+      };
+      const runtime = new (WebGpuRenderRuntime as unknown as new (
+        renderer: unknown,
+        pipeline: unknown,
+        identity: unknown,
+      ) => WebGpuRenderRuntime)(renderer, { render: vi.fn() }, {
+        canvasAntialias: true,
+        canvasSamples: 4,
+        adapterLabel: 'test adapter',
+        adapterClass: 'GPUAdapter',
+        deviceClass: 'GPUDevice',
+        softwareAdapter: false,
+        device,
+      });
+
+      let settled: 'pending' | 'resolved' | 'rejected' = 'pending';
+      let failure: unknown = null;
+      const prewarm = runtime.compileAndRender(scene, camera, scene)
+        .then(() => { settled = 'resolved'; })
+        .catch((error: unknown) => { settled = 'rejected'; failure = error; });
+
+      // Well past the live admission bound, and still compiling: a cold
+      // prewarm that dies at 4 s is the bug, not the guard.
+      await vi.advanceTimersByTimeAsync(4_100);
+      expect(settled, 'cold prewarm must survive the 4 s live admission bound').toBe('pending');
+
+      // The cold allowance is still a real bound — it fails closed too.
+      await vi.advanceTimersByTimeAsync(8_000);
+      await prewarm;
+      expect(settled).toBe('rejected');
+      expect(String(failure)).toContain('exceeded 12000 ms');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
