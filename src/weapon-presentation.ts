@@ -1241,7 +1241,10 @@ function tuneAuthoredFirstPersonArmMaterials(
     }
     adjusted += 1;
   }
-  root.userData.armMaterialPresentationContract = 'authored-pbr-muted-emissive-warm-key-v1';
+  // v2: same scheme (authored PBR, muted emissive, warm key), but the produced
+  // emissive values changed - the lit path now honours
+  // FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY instead of writing past it.
+  root.userData.armMaterialPresentationContract = 'authored-pbr-muted-emissive-warm-key-v2';
   root.userData.armMaterialPresentationAdjusted = adjusted;
   root.userData.armMaterialPresentationSkinId = skinId;
 }

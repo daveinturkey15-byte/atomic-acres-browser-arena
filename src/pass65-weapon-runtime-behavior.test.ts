@@ -1060,7 +1060,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     await presentation.load();
     const arms = presentation.root.getObjectByName('first-person-arms');
     expect(arms?.userData.authoredFirstPersonArms).toBe(true);
-    expect(arms?.userData.armMaterialPresentationContract).toBe('authored-pbr-muted-emissive-warm-key-v1');
+    expect(arms?.userData.armMaterialPresentationContract).toBe('authored-pbr-muted-emissive-warm-key-v2');
     const sleeveFixture = arms?.getObjectByName('authored-sleeve-material-fixture');
     expect(sleeveFixture).toBeInstanceOf(THREE.Mesh);
     // HF-388 follow-up. This previously pinned normalScale at the authored
