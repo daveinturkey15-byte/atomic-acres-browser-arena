@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { ARENA_BOUNDS, HOUSE_LAYOUT } from './arena-layout';
+import { createHouseArchitecture } from './house-navigation';
 import {
   RAILGUN_DAMAGE,
   RAILGUN_MAX_TARGET_OUTCOMES,
@@ -36,6 +38,60 @@ describe('host-authoritative railgun', () => {
     expect([0, 0.249999, 0.25, 0.499999, 0.5, 0.749999, 0.75, 0.999999].map(chooseRailgunUpperRoom).map((site) => site.id))
       .toEqual(['aqua-front', 'aqua-front', 'aqua-rear', 'aqua-rear', 'coral-front', 'coral-front', 'coral-rear', 'coral-rear']);
     expect(new Set(RAILGUN_UPPER_ROOM_SPAWN_SITES.map((site) => site.position[1]))).toEqual(new Set([4.18]));
+  });
+
+  // HF-384. The old sites were hand-written world coordinates authored against the
+  // pre-Pass-78 layout. When the arena was rebuilt they were never moved: none was inside
+  // a house any more and two sat at |z| = 32 against ARENA_BOUNDS of |z| <= 30, outside
+  // the map, so half of all matches put the rare weapon somewhere no player can stand.
+  // Nothing caught it - the only prior assertion on these constants checked the y value.
+  //
+  // So this does not pin the new numbers. It DERIVES the rooms from the same source the
+  // arena is built from and asserts each site is genuinely inside one. Move the houses
+  // again and this fails loudly, which is the whole point.
+  it('places every spawn inside a real upper room derived from the live house layout', () => {
+    const upperRooms = HOUSE_LAYOUT.flatMap((house) =>
+      createHouseArchitecture(house.team, house.x, house.z, house.facing).rooms
+        .filter((room) => room.level === 'upper'));
+    expect(upperRooms).toHaveLength(4);
+
+    for (const site of RAILGUN_UPPER_ROOM_SPAWN_SITES) {
+      const [x, , z] = site.position;
+      expect(x, `${site.id} x is outside ARENA_BOUNDS`)
+        .toBeGreaterThanOrEqual(ARENA_BOUNDS.minX);
+      expect(x, `${site.id} x is outside ARENA_BOUNDS`).toBeLessThanOrEqual(ARENA_BOUNDS.maxX);
+      expect(z, `${site.id} z is outside ARENA_BOUNDS`)
+        .toBeGreaterThanOrEqual(ARENA_BOUNDS.minZ);
+      expect(z, `${site.id} z is outside ARENA_BOUNDS`).toBeLessThanOrEqual(ARENA_BOUNDS.maxZ);
+
+      const containing = upperRooms.find((room) =>
+        Math.abs(x - room.centre[0]) <= room.size[0] / 2
+        && Math.abs(z - room.centre[2]) <= room.size[1] / 2);
+      expect(containing, `${site.id} at (${x}, ${z}) is not inside any authored upper room`)
+        .toBeDefined();
+    }
+
+    // One site per room: a duplicate would silently halve the spawn variety. Keyed by
+    // INDEX, not room.id - both houses name their rooms 'upper-front-room' and
+    // 'upper-rear-room', so ids are unique per house but not across the map.
+    const occupied = RAILGUN_UPPER_ROOM_SPAWN_SITES.map((site) => {
+      const [x, , z] = site.position;
+      return upperRooms.findIndex((room) =>
+        Math.abs(x - room.centre[0]) <= room.size[0] / 2
+        && Math.abs(z - room.centre[2]) <= room.size[1] / 2);
+    });
+    expect(occupied, 'every site must land in a distinct upper room').not.toContain(-1);
+    expect(new Set(occupied).size).toBe(4);
+
+    // 180-degree rotational symmetry about the origin, which the map's whole design rests on.
+    for (const site of RAILGUN_UPPER_ROOM_SPAWN_SITES) {
+      const [x, y, z] = site.position;
+      expect(RAILGUN_UPPER_ROOM_SPAWN_SITES.some((other) =>
+        Math.abs(other.position[0] + x) < 1e-6
+        && Math.abs(other.position[2] + z) < 1e-6
+        && Math.abs(other.position[1] - y) < 1e-6),
+      `${site.id} has no 180-degree partner`).toBe(true);
+    }
   });
 
   it('spawns and announces exactly once at 180 seconds', () => {

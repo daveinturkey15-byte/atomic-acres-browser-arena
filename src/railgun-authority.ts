@@ -19,11 +19,30 @@ export type RailgunSpawnSite = Readonly<{
   position: readonly [number, number, number];
 }>;
 
+/**
+ * HF-384. World-space upper-room centres, derived from the LIVE layout.
+ *
+ * HOUSE_LAYOUT seats the aqua house at (4, -17.4) facing +1 and the coral house at
+ * (-4, 17.4) facing -1. Each house has two upper rooms at local (0, FLOOR_Y, +/-4)
+ * with FLOOR_Y 3.48, and worldPosition mirrors Z by `facing` but never X. Pickup
+ * height is FLOOR_Y + 0.70 = 4.18 m. The set stays exactly 180-degree symmetric.
+ *
+ * These were authored against the PRE-PASS-78 street-along-Z layout and never moved
+ * when the arena was rebuilt. After the rebuild not one of them was inside a house,
+ * and aqua-rear/coral-rear sat at |z| = 32 against ARENA_BOUNDS of |z| <= 30 - outside
+ * the map, where no player can stand. Sites are chosen uniformly, so HALF of all
+ * matches put the map's rare weapon permanently out of reach. Nothing failed: there is
+ * no clamping, no floor projection, and the pickup test is a bare distance check.
+ *
+ * The lesson is in the test below, not here. A hand-written coordinate cannot know the
+ * layout moved; the guard derives the rooms from the same source the arena is built
+ * from, so the next rebuild fails loudly instead of silently relocating the weapon.
+ */
 export const RAILGUN_UPPER_ROOM_SPAWN_SITES: readonly RailgunSpawnSite[] = Object.freeze([
-  Object.freeze({ id: 'aqua-front', position: [-9, 4.18, -24] as const }),
-  Object.freeze({ id: 'aqua-rear', position: [-9, 4.18, -32] as const }),
-  Object.freeze({ id: 'coral-front', position: [9, 4.18, 24] as const }),
-  Object.freeze({ id: 'coral-rear', position: [9, 4.18, 32] as const }),
+  Object.freeze({ id: 'aqua-front', position: [4, 4.18, -13.4] as const }),
+  Object.freeze({ id: 'aqua-rear', position: [4, 4.18, -21.4] as const }),
+  Object.freeze({ id: 'coral-front', position: [-4, 4.18, 13.4] as const }),
+  Object.freeze({ id: 'coral-rear', position: [-4, 4.18, 21.4] as const }),
 ]);
 
 export type RailgunAuthorityState = Readonly<{
