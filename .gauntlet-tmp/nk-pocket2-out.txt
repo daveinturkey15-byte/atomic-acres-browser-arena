@@ -358,3 +358,18 @@ probe (23,21.5): FREE
 probe (24.55,22.5): FREE
 probe (29,19): FREE
 probe (30.5,19): FREE
+probe (24.55,24.5): FREE
+probe (24.55,25.5): FREE
+probe (24.55,26.1): unnamed x=[21.70,26.30] z=[26.30,29.70] y=[0.00,1.10]
+probe (25.5,26.5): unnamed x=[21.70,26.30] z=[26.30,29.70] y=[0.00,1.10]
+probe (27,27): FREE
+probe (30,27): unnamed x=[28.50,31.50] z=[26.00,42.00] y=[0.00,3.00]
+probe (30,24): FREE
+probe (30,20): FREE
+probe (28.5,21): unnamed x=[28.61,29.39] z=[20.64,21.36] y=[0.00,1.08]
+probe (26.5,21): unnamed x=[26.69,27.31] z=[20.69,21.31] y=[0.00,3.60]
+probe (25.5,21): FREE
+probe (23,21.5): FREE
+probe (24.55,22.5): FREE
+probe (29,19): FREE
+probe (30.5,19): FREE
