@@ -53,7 +53,9 @@ def free_gb():
 
 
 now = dt.datetime.now()
-target = now.replace(hour=TARGET[0], minute=TARGET[1], second=0, microsecond=0)
+# The owner released ComfyUI early ("comfy ui can be killed now"), so the wait is pointless.
+target = (now if "--now" in sys.argv
+          else now.replace(hour=TARGET[0], minute=TARGET[1], second=0, microsecond=0))
 if target < now:
     log(f"target {target:%H:%M} already passed - firing immediately")
     target = now
