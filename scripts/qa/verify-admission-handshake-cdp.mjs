@@ -84,8 +84,14 @@ async function ensurePeerServer() {
 }
 
 const peerProcess = await ensurePeerServer();
+const HEADLESS = arg('--headless', '0') === '1';
+
 const browser = await chromium.launch({
-  headless: false,
+  // --headless 1 runs INSTALLED CHROME HEADLESS: on this machine that still
+  // gets a real hardware WebGPU device (GAUNTLET-SPEC failure-mode 2 table)
+  // and does not consume a governor browser slot. Focus emulation below plus
+  // the background-throttling flags keep timers and input live either way.
+  headless: HEADLESS,
   channel: 'chrome',
   args: [
     '--use-angle=d3d11',
