@@ -637,8 +637,9 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   // movement/ballistic authority, and the irrigation vessel has matching hard cover.
   const moundAudit: Array<{ id: string; collider: string; bottomY: number }> = [];
   for (const [id, x, z, sx, sz] of [
-    ['west-verge', -24, -28, 4.6, 3.4],
-    ['east-verge', 24, 28, 4.6, 3.4],
+    // HF-383 remainder: mounds follow the deeper rear fence (z -28 -> -29.5).
+    ['west-verge', -24, -29.5, 4.6, 3.4],
+    ['east-verge', 24, 29.5, 4.6, 3.4],
   ] as const) {
     const colliderName = `terrain-mound-${id}-collider`;
     const authority = box(colliderName, [x, 0.55, z], [sx, 1.1, sz], palette.grass, true, false, true, 'earth');
@@ -781,12 +782,15 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   }
   world.userData.atomicCollisionAudit.substantialProps = substantialPropColliders;
 
-  // Boundary fencing, with substantial visual posts rather than invisible walls.
-  box('west fence', [-31.3, 1.5, 0], [0.6, 3, 61.6], palette.timber);
-  box('east fence', [31.3, 1.5, 0], [0.6, 3, 61.6], palette.timber);
-  box('north fence', [0, 1.5, -30.3], [63, 3, 0.6], palette.timber);
-  box('south fence', [0, 1.5, 30.3], [63, 3, 0.6], palette.timber);
-  for (let z = -27; z <= 27; z += 6.75) {
+  // Boundary fencing, with substantial visual posts rather than invisible
+  // walls. HF-383 remainder: the north/south fences follow ARENA_BOUNDS out
+  // to +/-31.5 (fence centreline +/-31.8); the west/east runs lengthen to
+  // span the deeper map.
+  box('west fence', [-31.3, 1.5, 0], [0.6, 3, 64.6], palette.timber);
+  box('east fence', [31.3, 1.5, 0], [0.6, 3, 64.6], palette.timber);
+  box('north fence', [0, 1.5, -31.8], [63, 3, 0.6], palette.timber);
+  box('south fence', [0, 1.5, 31.8], [63, 3, 0.6], palette.timber);
+  for (let z = -28.5; z <= 28.5; z += 7.125) {
     box('fence post', [-30.9, 2.1, z], [0.8, 4.2, 0.8], palette.dark, false);
     box('fence post', [30.9, 2.1, z], [0.8, 4.2, 0.8], palette.dark, false);
   }

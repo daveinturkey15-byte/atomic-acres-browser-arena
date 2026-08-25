@@ -35,7 +35,10 @@ describe('Overdrive Core authority', () => {
     const now = OVERDRIVE_SPAWN_INTERVAL_MS;
     const spawned = advanceOverdrive(createOverdriveState(0), now);
     expect(claimOverdrive(spawned, 'dead', OVERDRIVE_POSITION, false, now).claimed).toBe(false);
-    expect(claimOverdrive(spawned, 'far', { x: 10, y: 0.82, z: 0 }, true, now).claimed).toBe(false);
+    // HF-385: the core moved to (9.6, 0.82, 0); the "far" probe sits at
+    // x = -10, i.e. 19.6 m away - far beyond OVERDRIVE_PICKUP_RADIUS under
+    // any future seat on the street axis.
+    expect(claimOverdrive(spawned, 'far', { x: -10, y: 0.82, z: 0 }, true, now).claimed).toBe(false);
     const first = claimOverdrive(spawned, 'winner', OVERDRIVE_POSITION, true, now);
     expect(claimOverdrive(first.state, 'loser', OVERDRIVE_POSITION, true, now).claimed).toBe(false);
   });

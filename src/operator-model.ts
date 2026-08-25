@@ -117,6 +117,209 @@ export function firstPersonArmRuntimeClip(clip: THREE.AnimationClip): THREE.Anim
   );
 }
 
+/**
+ * HF-388 architectural fix — the authored pose layer.
+ *
+ * MEASURED 2026-08-25 by decoding `pass65-first-person-arms-lod0.glb` directly
+ * (normalized-int16 quaternion accessors): every one of the 13 clips carries
+ * exactly two identical keyframes per track — a static held pose, no motion
+ * (max inter-key span ≈ 0° except a small left-thumb wiggle). The authoring
+ * script (`build-pass65-djmaesen-first-person-arms.py`, `action_corpus`)
+ * confirms the intent: one pose dictionary inserted at every keyframe.
+ *
+ * Consequence: admitting the arm-chain tracks into the live mixer (or
+ * reordering restoreRiggedArmBindPose) would surface exactly nothing. Instead,
+ * each clip's arm-chain quaternion deltas vs bind are decomposed ONCE at load
+ * into the three parameters the authoritative socket IK can actually accept
+ * without breaking palm contact: an elbow-pole rotation about the
+ * shoulder→wrist axis, a wrist roll about the forearm axis, and a bounded
+ * shoulder-carriage offset. The viewmodel layer sums these with its procedural
+ * motion and clamps to the same caps, so the authored poses finally reach the
+ * screen as visible arm carriage while every contact gate stays intact.
+ */
+export type FirstPersonArmAuthoredChannel = Readonly<{
+  poleRadians: number;
+  wristRollRadians: number;
+  /** Authored wrist displacement vs bind, arms-visual local metres. */
+  carriageOffset: readonly [number, number, number];
+}>;
+export type FirstPersonArmAuthoredClipPose = Readonly<{
+  left: FirstPersonArmAuthoredChannel;
+  right: FirstPersonArmAuthoredChannel;
+}>;
+export type FirstPersonArmAuthoredPoseLayer = ReadonlyMap<string, FirstPersonArmAuthoredClipPose>;
+
+/** Identical numeric bound to weapon-presentation's procedural pole cap. */
+export const FIRST_PERSON_ARM_AUTHORED_MAX_POLE_RADIANS = 0.24;
+/** Identical numeric bound to weapon-presentation's procedural wrist-roll cap. */
+export const FIRST_PERSON_ARM_AUTHORED_MAX_WRIST_ROLL_RADIANS = 0.03;
+/**
+ * Carriage is a translation of the whole shoulder entry, so it competes with
+ * reach and near-plane framing; it is bounded far below the pole cap.
+ */
+export const FIRST_PERSON_ARM_AUTHORED_MAX_CARRIAGE_METERS = 0.05;
+
+const FIRST_PERSON_ARM_AUTHORED_ZERO_CHANNEL: FirstPersonArmAuthoredChannel = Object.freeze({
+  poleRadians: 0,
+  wristRollRadians: 0,
+  carriageOffset: Object.freeze([0, 0, 0]),
+});
+
+export type FirstPersonArmChainJoints = Readonly<{
+  side: 'left' | 'right';
+  shoulder: THREE.Bone;
+  elbow: THREE.Bone;
+  wrist: THREE.Bone;
+}>;
+
+/**
+ * Evaluates a clip's rotation track at its last key into `target`. Missing or
+ * non-rotation tracks leave `target` untouched and return false, which the
+ * builder treats as "this clip holds bind on that joint".
+ */
+function clipQuatAt(
+  clip: THREE.AnimationClip,
+  trackName: string,
+  target: THREE.Quaternion,
+): boolean {
+  const track = clip.tracks.find((candidate) => candidate.name === trackName);
+  if (!(track instanceof THREE.QuaternionKeyframeTrack) || track.times.length === 0) return false;
+  const sample = track.createInterpolant().evaluate(track.times[track.times.length - 1]);
+  if (!sample || sample.length < 4) return false;
+  target.set(sample[0], sample[1], sample[2], sample[3]).normalize();
+  return true;
+}
+
+/**
+ * Decomposes one clip's arm-chain hold pose into IK-layer channels for both
+ * sides. Pure FK math on local transforms — no bone in the scene is read or
+ * written beyond the bind reference supplied by `joints`, whose bones must be
+ * resting at their loaded bind pose when this runs (true inside
+ * createFirstPersonRiggedArms before any mixer action has played).
+ */
+export function buildFirstPersonArmAuthoredPoseLayer(
+  clips: readonly THREE.AnimationClip[],
+  joints: readonly FirstPersonArmChainJoints[],
+): FirstPersonArmAuthoredPoseLayer {
+  const references = joints.map((joint) => ({
+    side: joint.side,
+    suffix: joint.side === 'left' ? 'L' : 'R',
+    shoulderToElbow: joint.elbow.position.clone(),
+    elbowToWrist: joint.wrist.position.clone(),
+    bindShoulder: joint.shoulder.quaternion.clone(),
+    bindElbow: joint.elbow.quaternion.clone(),
+    bindWrist: joint.wrist.quaternion.clone(),
+  }));
+  const clipQuat = new THREE.Quaternion();
+  const swing = new THREE.Quaternion();
+  const elbowWorld = new THREE.Vector3();
+  const wristWorld = new THREE.Vector3();
+  const bindElbowWorld = new THREE.Vector3();
+  const bindWristWorld = new THREE.Vector3();
+  const axis = new THREE.Vector3();
+  const bindElbowDir = new THREE.Vector3();
+  const clipElbowDir = new THREE.Vector3();
+  const cross = new THREE.Vector3();
+  const forearmAxis = new THREE.Vector3();
+  const carriage = new THREE.Vector3();
+  const layer = new Map<string, FirstPersonArmAuthoredClipPose>();
+  for (const clip of clips) {
+    const sides = {} as Record<'left' | 'right', FirstPersonArmAuthoredChannel>;
+    for (const reference of references) {
+      // Forward-kinematics the chain with the clip's local rotations. Bind
+      // positions are shared; only rotations differ between the two poses.
+      const posedShoulder = clipQuatAt(clip, `UpperArm${reference.suffix}.quaternion`, clipQuat)
+        ? clipQuat.clone() : reference.bindShoulder.clone();
+      const posedElbow = clipQuatAt(clip, `LowerArm${reference.suffix}.quaternion`, clipQuat)
+        ? clipQuat.clone() : reference.bindElbow.clone();
+      const posedWrist = clipQuatAt(clip, `Wrist${reference.suffix}.quaternion`, clipQuat)
+        ? clipQuat.clone() : reference.bindWrist.clone();
+      elbowWorld.copy(reference.shoulderToElbow).applyQuaternion(posedShoulder);
+      wristWorld.copy(reference.elbowToWrist).applyQuaternion(swing.copy(posedShoulder).multiply(posedElbow)).add(elbowWorld);
+      bindElbowWorld.copy(reference.shoulderToElbow).applyQuaternion(reference.bindShoulder);
+      bindWristWorld.copy(reference.elbowToWrist)
+        .applyQuaternion(swing.copy(reference.bindShoulder).multiply(reference.bindElbow))
+        .add(bindElbowWorld);
+      axis.copy(wristWorld).normalize();
+      bindElbowDir.copy(bindElbowWorld).addScaledVector(axis, -bindElbowWorld.dot(axis));
+      clipElbowDir.copy(elbowWorld).addScaledVector(axis, -elbowWorld.dot(axis));
+      let poleRadians = 0;
+      if (bindElbowDir.lengthSq() > 1e-10 && clipElbowDir.lengthSq() > 1e-10) {
+        cross.crossVectors(bindElbowDir.normalize(), clipElbowDir.normalize());
+        poleRadians = Math.atan2(cross.dot(axis), bindElbowDir.dot(clipElbowDir));
+      }
+      forearmAxis.copy(wristWorld).sub(elbowWorld);
+      let wristRollRadians = 0;
+      if (forearmAxis.lengthSq() > 1e-10) {
+        // Twist component of (posedWrist ∘ bindWrist⁻¹) about the UNIT forearm
+        // axis; atan2's first argument is only a signed sine on a unit axis.
+        forearmAxis.normalize();
+        swing.copy(posedWrist).multiply(reference.bindWrist.clone().invert());
+        wristRollRadians = 2 * Math.atan2(
+          swing.x * forearmAxis.x + swing.y * forearmAxis.y + swing.z * forearmAxis.z,
+          swing.w,
+        );
+      }
+      carriage.copy(wristWorld).sub(bindWristWorld);
+      sides[reference.side] = Object.freeze({
+        poleRadians,
+        wristRollRadians,
+        carriageOffset: Object.freeze([carriage.x, carriage.y, carriage.z]),
+      });
+    }
+    layer.set(clip.name, Object.freeze({ left: sides.left, right: sides.right }));
+  }
+  return layer;
+}
+
+function clampFirstPersonArmAuthoredChannel(
+  channel: FirstPersonArmAuthoredChannel | undefined,
+): FirstPersonArmAuthoredChannel {
+  if (!channel) return FIRST_PERSON_ARM_AUTHORED_ZERO_CHANNEL;
+  const [x, y, z] = channel.carriageOffset;
+  const magnitude = Math.hypot(x, y, z);
+  const scale = magnitude > FIRST_PERSON_ARM_AUTHORED_MAX_CARRIAGE_METERS
+    ? FIRST_PERSON_ARM_AUTHORED_MAX_CARRIAGE_METERS / magnitude
+    : 1;
+  return Object.freeze({
+    poleRadians: THREE.MathUtils.clamp(
+      channel.poleRadians,
+      -FIRST_PERSON_ARM_AUTHORED_MAX_POLE_RADIANS,
+      FIRST_PERSON_ARM_AUTHORED_MAX_POLE_RADIANS,
+    ),
+    wristRollRadians: THREE.MathUtils.clamp(
+      channel.wristRollRadians,
+      -FIRST_PERSON_ARM_AUTHORED_MAX_WRIST_ROLL_RADIANS,
+      FIRST_PERSON_ARM_AUTHORED_MAX_WRIST_ROLL_RADIANS,
+    ),
+    carriageOffset: Object.freeze([x * scale, y * scale, z * scale]),
+  });
+}
+
+/**
+ * Combines the looping base pose with the active one-shot pose. The runtime
+ * mixer already collapses weight (updateFirstPersonArmAnimations holds the
+ * base at zero while a one-shot runs), so the one-shot simply overrides here;
+ * the consumer's exponential smoothing provides the crossfade in time.
+ */
+export function firstPersonArmAuthoredLayerSample(
+  layer: FirstPersonArmAuthoredPoseLayer | null | undefined,
+  baseAction: string | null,
+  oneShotAction: string | null,
+): { left: FirstPersonArmAuthoredChannel; right: FirstPersonArmAuthoredChannel } {
+  const selected = (oneShotAction && layer?.get(oneShotAction))
+    ?? (baseAction && layer?.get(baseAction))
+    ?? null;
+  return {
+    left: clampFirstPersonArmAuthoredChannel(selected?.left),
+    right: clampFirstPersonArmAuthoredChannel(selected?.right),
+  };
+}
+
+export function getFirstPersonArmAuthoredLayer(root: THREE.Object3D): FirstPersonArmAuthoredPoseLayer | null {
+  return (root.userData.firstPersonArmAuthoredLayer as FirstPersonArmAuthoredPoseLayer | undefined) ?? null;
+}
+
 type RiggedOperatorRuntime = {
   mixer: THREE.AnimationMixer;
   clips: Map<string, THREE.AnimationClip>;
@@ -1384,6 +1587,12 @@ export function createFirstPersonRiggedArms(
   const authoredTrackCount = firstPersonArmsAsset.clips.reduce((count, clip) => count + clip.tracks.length, 0);
   const runtimeTrackCount = runtimeClips.reduce((count, clip) => count + clip.tracks.length, 0);
   const actions = new Map(runtimeClips.map((clip) => [clip.name, mixer.clipAction(clip)]));
+  // HF-388: the original (unfiltered) clips are decomposed into IK-layer pose
+  // channels here, while the bones are still resting at their loaded bind pose.
+  root.userData.firstPersonArmAuthoredLayer = buildFirstPersonArmAuthoredPoseLayer(
+    firstPersonArmsAsset.clips,
+    chains.map((entry) => ({ side: entry.side, shoulder: entry.shoulder, elbow: entry.elbow, wrist: entry.wrist })),
+  );
   root.userData.firstPersonArmsRuntime = {
     mixer, actions, activeAction: null, baseAction: null,
   } satisfies FirstPersonArmsRuntime;

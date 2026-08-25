@@ -6,21 +6,30 @@
 // map its character. Everything below is 180-degree rotationally symmetric
 // about the origin so neither team owns a better half of the map.
 //
-// Pass 79 / HF-383 ("remove all the bulky items that are in the way of stuff",
-// completed): the footprint stays at the gated 62 x 60 m - the fidelity guards
-// pin the reference map's smallness (sub-10 s diagonal sprint, sub-4000 m^2
-// area). The owner's "clustered" read traced to a harder defect: the mid-street
-// vehicle/hedge arrangement left flank gaps narrower than a player capsule, so
-// the real character controller could not cross the street at all - measured
-// ground connectivity split the map into two diagonal halves. The completion
-// pass widens the carriageway to 13 m (verge, not footprint), seats each van
-// flush against its kerb so the bus-flank channel stays walkable (~1.8 m
-// clear), and stands the planter wings deeper against the hedge line so none
-// of them completes a seal against the bus or a van.
-export const ARENA_BOUNDS = Object.freeze({ minX: -31, maxX: 31, minZ: -30, maxZ: 30 });
-
+// Pass 79 / HF-383, both halves now landed: "remove all the bulky items that
+// are in the way of stuff" AND "put the two vehicles that are open or whatever
+// in the middle of the street". The bulky read was fixed by resizing the two
+// 7.4 m canyon walls into slim planter pillars; the vehicle half reverses this
+// pass's earlier kerb-side restage: each van now sits IN THE MIDDLE OF THE
+// STREET, flush against one end of the bus and staggered diagonally opposite
+// its twin - the BO2 midfield read. Every seam around a van is either flush
+// or a genuine walk-through lane (>= 1.28 m), so the vans add hard cover on
+// the crossing routes without sealing or wedging them.
+//
+// Pass 79 / HF-383 remainder ("maybe make it a tad bigger because it feels a
+// little bit clustered"): the footprint deepens across the street from 60 to
+// 63 m (Z bounds +/-30 -> +/-31.5). Growth is Z-only by design: every back
+// yard gains 1.5 m of depth behind its spawns, which is where the clustered
+// read lived, while the entire re-staged street canyon - bus, mid-street vans,
+// planter pillars, front hedges, house facades and their exact seams - stays
+// byte-identical. The rear hedge runs, corner hedge blocks, side-verge cross
+// runs, boundary fences and verge mounds follow the fence line out; spawns,
+// patrols, bins, benches and cover keep their coordinates. Area becomes
+// 62 x 63 = 3906 m^2, still under the sub-4000 m^2 fidelity gate; diagonal
+// sprint becomes 10.16 s against the moved sub-10.5 s pin (was sub-10 s).
+export const ARENA_BOUNDS = Object.freeze({ minX: -31, maxX: 31, minZ: -31.5, maxZ: 31.5 });
 /** Half width of the drivable asphalt. The kerbs sit immediately outside it.
- * HF-383 completion: widened from 5 to 6.5 m so a kerb-side vehicle plus two
+ * HF-383 completion: widened from 5 to 6.5 m so the mid-street vehicles plus
  * walkable flank channels fit beside the bus, matching the reference map's
  * road-to-bus proportion. Consumes verge, not footprint: ARENA_BOUNDS, the
  * sub-10 s diagonal gate and the sub-4000 m^2 area gate are untouched. */
@@ -37,18 +46,21 @@ export const CENTRAL_BUS = Object.freeze({
 });
 
 /**
- * Two parked delivery vans staged midfield as a staggered kerb-side pair, one
- * hugging each kerb diagonally opposite the other beside the bus ends - the
- * reference map's one-bus-two-vehicles midfield. HF-383 completion seats each
- * van FLUSH against its kerb so the channel between the van's street face and
- * the bus flank stays a genuine walkable lane (~1.8 m clear): measured with
- * the real character controller, the previous seating left gaps narrower than
- * a player capsule on both flanks, which walled the street into two halves
- * that ground movement could not cross at all. 180-degree symmetric.
+ * Two delivery vans staged IN THE MIDDLE OF THE STREET as a staggered pair,
+ * one flush against each end of the central bus and offset toward opposite
+ * kerbs diagonally - the reference map's bus-plus-two-vehicles midfield.
+ * HF-383's second half ("put the two vehicles that are open or whatever in
+ * the middle of the street") reverses this pass's interim kerb-side restage:
+ * the owner wants the vehicles breaking the street itself, not parked at its
+ * edges. Each van is flush to the bus end on its inner face (no seam to
+ * enter) and leaves a >= 1.4 m walk-through lane on its outer face, so it
+ * plays as hard cover on the crossing routes without walling the road.
+ * Height clears the crouched eye-line; width breaks both combat stances'
+ * eye-lines along and across the street. 180-degree symmetric by pairing.
  */
 export const PARKED_VAN_LAYOUT = Object.freeze([
-  Object.freeze({ id: 'east-parked-van', x: 7.2, z: -5.55 }),
-  Object.freeze({ id: 'west-parked-van', x: -7.2, z: 5.55 }),
+  Object.freeze({ id: 'east-parked-van', x: 8.6, z: -1.5 }),
+  Object.freeze({ id: 'west-parked-van', x: -8.6, z: 1.5 }),
 ]);
 /** [length along the street, height, width]. Height clears the 1.65 m eye-line. */
 export const PARKED_VAN_SIZE = Object.freeze([4.6, 2.3, 1.9] as const);
@@ -100,12 +112,15 @@ export const FRONT_HEDGE_FIN_SIZE = Object.freeze([1.4, 2.05, 5.4] as const);
 
 /**
  * Rear-boundary hedge runs splitting the back-yard strips behind each house.
- * Without them a standing ray runs 58 m along the back fence inside one
- * team's half. Sits against the perimeter fence, clear of every spawn point.
+ * Without them a standing ray runs the full map depth along the back fence
+ * inside one team's half. Sits against the perimeter fence, clear of every
+ * spawn point. HF-383 remainder: follows the fence out 1.5 m (z 29.1 -> 30.6,
+ * keeping the old 0.9 m centre-to-bound offset); length is unchanged because
+ * it spans along X, which did not grow.
  */
 export const REAR_HEDGE_LAYOUT = Object.freeze([
-  Object.freeze({ x: -3, z: -29.1 }),
-  Object.freeze({ x: 3, z: 29.1 }),
+  Object.freeze({ x: -3, z: -30.6 }),
+  Object.freeze({ x: 3, z: 30.6 }),
 ]);
 /** [length along the street, height, depth]. */
 export const REAR_HEDGE_SIZE = Object.freeze([46, 2.05, 1.6] as const);
@@ -113,23 +128,27 @@ export const REAR_HEDGE_SIZE = Object.freeze([46, 2.05, 1.6] as const);
 /**
  * Back-corner hedge blocks seating each rear corner of the map: one face on
  * the perimeter fence, reaching into the yard far enough to break the
- * back-fence corridor ray that otherwise runs the full 57 m map width behind
- * each house. Positioned clear of every spawn (nearest authored spawn keeps
- * 1.0 m to a block face), bin, bench and patrol point, and short enough of
- * the yard that no pocket is sealed off from its own half: each block stands
- * alone, so both back-yard strips stay enterable around it.
+ * back-fence corridor ray that otherwise runs the full map width behind
+ * each house. Positioned clear of every spawn, bin, bench and patrol point,
+ * and short enough of the yard that no pocket is sealed off from its own
+ * half: each block stands alone, so both back-yard strips stay enterable
+ * around it.
  *
- * HF-383 audit: removal was tested and rejected - without them the back-fence
- * corridor lanes at |z| = 25..27 reopen at 60 m and the authored spawns sit
- * exactly where a forward-shifted boundary hedge would have to stand to
+ * HF-383 audit: removal was tested and rejected - without them the
+ * back-fence corridor lanes reopen at full map width and the authored spawns
+ * sit exactly where a forward-shifted boundary hedge would have to stand to
  * replace them. They are against the back fences, out of the play corridors
  * the owner flagged, so they stay.
+ *
+ * HF-383 remainder: follows the fence out 1.5 m in Z (25.7 -> 27.2), which
+ * keeps its exact abutment against the moved rear hedge band and leaves the
+ * spawn rows' x/z clearances unchanged or wider.
  */
 export const CORNER_HEDGE_LAYOUT = Object.freeze([
-  Object.freeze({ x: -21.5, z: -25.7 }),
-  Object.freeze({ x: 21.5, z: -25.7 }),
-  Object.freeze({ x: 21.5, z: 25.7 }),
-  Object.freeze({ x: -21.5, z: 25.7 }),
+  Object.freeze({ x: -21.5, z: -27.2 }),
+  Object.freeze({ x: 21.5, z: -27.2 }),
+  Object.freeze({ x: 21.5, z: 27.2 }),
+  Object.freeze({ x: -21.5, z: 27.2 }),
 ]);
 /** [width along the street, height, depth out of the fence]. */
 export const CORNER_HEDGE_SIZE = Object.freeze([5, 2.05, 5.2] as const);
@@ -138,14 +157,16 @@ export const CORNER_HEDGE_SIZE = Object.freeze([5, 2.05, 5.2] as const);
  * Side-verge cross-runs: short hedge walls spanning the whole verge between
  * the front-garden hedge rows and the perimeter fences. A barrier parallel to
  * the fence cannot block a ray running parallel to it, so these cross the
- * verge instead, splitting each 58 m north-south verge ray into segments of
- * about 18 m. Clear of every spawn, bench, bin and lamp.
+ * verge instead, splitting each north-south verge ray into segments of about
+ * 19 m. Clear of every spawn, bench, bin and lamp. HF-383 remainder: each run
+ * recentres 0.75 m further out (z 17 -> 17.75) so both runs stay centred in
+ * the verge segment the deeper fence gives them.
  */
 export const SIDE_HEDGE_LAYOUT = Object.freeze([
-  Object.freeze({ x: -28.5, z: -17 }),
-  Object.freeze({ x: -28.5, z: 17 }),
-  Object.freeze({ x: 28.5, z: 17 }),
-  Object.freeze({ x: 28.5, z: -17 }),
+  Object.freeze({ x: -28.5, z: -17.75 }),
+  Object.freeze({ x: -28.5, z: 17.75 }),
+  Object.freeze({ x: 28.5, z: 17.75 }),
+  Object.freeze({ x: 28.5, z: -17.75 }),
 ]);
 /** [width across the verge, height, depth along the fence]. */
 export const SIDE_HEDGE_SIZE = Object.freeze([5.6, 2.05, 1.6] as const);

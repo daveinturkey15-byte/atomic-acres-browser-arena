@@ -178,8 +178,17 @@ const BREATH_RATE_RAD_PER_S = 1.4;
 const BREATH_FLOOR_AT_SPEED = 0.34;
 
 
-/** A single frame can never advance the filter by more than this. */
-const MAX_DELTA_MS = 100;
+/**
+ * HF-391: a single frame can never advance the filter by more than this.
+ * 50 ms matches the clamp the rest of the frame loop uses
+ * (`const frameDt = Math.min(0.05, rawFrameMs / 1000)`, legacy-main.ts) -
+ * and it must stay in lockstep with that value, because the live call site
+ * feeds this module `deltaMs: rawFrameMs`, the RAW frame time. With the old
+ * 100 ms ceiling a hitch frame advanced the carried orientation twice as far
+ * as any smooth frame could, which is exactly the "bouncing around double
+ * the speed" the owner reported on hitchy maps.
+ */
+const MAX_DELTA_MS = 50;
 
 const TWO_PI = Math.PI * 2;
 

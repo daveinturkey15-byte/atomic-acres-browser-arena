@@ -13,8 +13,15 @@ import { ARENA_ROUTE_IDENTITIES, routeIdentityForPosition, routeIdentityTelemetr
 // every export is still pinned exactly, plus three new invariants below --
 // the removed pairs must stay removed, cover stays rotationally paired,
 // and the mouth-cover duty must demonstrably transfer to the fins.
+//
+// HF-383 REMAINDER (owner: "maybe make it a tad bigger because it feels a
+// little bit clustered"): the map deepened across the street from 60 to
+// 63 m; ARENA_BOUNDS minZ/maxZ moved -30/+30 -> -31.5/+31.5 and the rear
+// boundary dressing followed the fence out. Houses, cover and spawns keep
+// their exact coordinates, so only the bounds row is re-frozen. Proven red
+// against the previous freeze before this fixture moved.
 const FROZEN_HF383_LAYOUT = {
-  bounds: { minX: -31, maxX: 31, minZ: -30, maxZ: 30 },
+  bounds: { minX: -31, maxX: 31, minZ: -31.5, maxZ: 31.5 },
   houses: [
     { team: 0, x: 4, z: -17.4, facing: 1 },
     { team: 1, x: -4, z: 17.4, facing: -1 },

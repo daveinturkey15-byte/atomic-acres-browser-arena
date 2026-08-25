@@ -367,3 +367,47 @@ describe('Pass 77 HUD sway - HF-391 smoothness and cross-map consistency', () =>
     }
   });
 });
+
+describe('Pass 77 HUD sway - the frame-delta clamp matches the rest of the frame', () => {
+  // legacy-main.ts feeds this filter `deltaMs: rawFrameMs` - the RAW frame
+  // time - while every other consumer in the same loop clamps to 50 ms
+  // (`const frameDt = Math.min(0.05, rawFrameMs / 1000)`). The module must
+  // therefore treat any delta above 50 ms EXACTLY as 50 ms, so a hitch frame
+  // cannot advance the carried orientation, the gait or the respiration phase
+  // further than the rest of the frame would allow. Before the HF-391 clamp
+  // tightening this failed: MAX_DELTA_MS was 100, so a 120 ms hitch advanced
+  // the filter twice as far as the clamped equivalent.
+  const HITCH_MS = 120;
+  const SAMPLE = { yaw: 0.3, pitch: -0.12, speed: 6 };
+
+  it('advances a raw hitch frame exactly as far as its 50 ms clamped equivalent', () => {
+    const raw = sampleHudSway(createHudSwayState(0, 0), { ...SAMPLE, deltaMs: HITCH_MS });
+    const clamped = sampleHudSway(createHudSwayState(0, 0), { ...SAMPLE, deltaMs: 50 });
+    expect(raw.swayX).toBe(clamped.swayX);
+    expect(raw.swayY).toBe(clamped.swayY);
+    expect(raw.breathe).toBe(clamped.breathe);
+    expect(raw.gait).toBeCloseTo(clamped.gait, 12);
+    expect(raw.state.yaw).toBeCloseTo(clamped.state.yaw, 12);
+    expect(raw.state.phase).toBeCloseTo(clamped.state.phase, 12);
+  });
+
+  it('a mid-turn hitch leaves the same state as the clamped frame would have', () => {
+    // Sixty smooth frames of tracking, then one hitch. Whatever the raw delta
+    // says, the retained state after it must equal the state the clamped
+    // value produces - otherwise hitchy maps visibly snap the HUD further
+    // than smooth maps can ever move it.
+    let yaw = 0;
+    let hitchedState = createHudSwayState(0, 0);
+    let clampedState = createHudSwayState(0, 0);
+    for (let frame = 0; frame < 60; frame += 1) {
+      yaw += 0.25 * (16 / 1000);
+      hitchedState = sampleHudSway(hitchedState, { yaw, pitch: 0, speed: 4, deltaMs: 16 }).state;
+      clampedState = sampleHudSway(clampedState, { yaw, pitch: 0, speed: 4, deltaMs: 16 }).state;
+    }
+    const afterHitch = sampleHudSway(hitchedState, { yaw, pitch: 0, speed: 4, deltaMs: HITCH_MS }).state;
+    const afterClamped = sampleHudSway(clampedState, { yaw, pitch: 0, speed: 4, deltaMs: 50 }).state;
+    expect(afterHitch.yaw).toBeCloseTo(afterClamped.yaw, 12);
+    expect(afterHitch.outX ?? 0).toBeCloseTo(afterClamped.outX ?? 0, 12);
+    expect(afterHitch.phase).toBeCloseTo(afterClamped.phase, 12);
+  });
+});

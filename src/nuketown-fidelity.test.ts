@@ -65,9 +65,17 @@ function longestClearEyeLine(map: ArenaMap, eyeHeight: number): {
 }
 
 describe('Nuke Town fidelity', () => {
-  it('stays small: the whole map is crossed in under ten seconds at real sprint speed', () => {
+  it('stays small: the whole map is crossed in barely over ten seconds at real sprint speed', () => {
     const diagonal = Math.hypot(width, depth);
-    expect(diagonal / sprintSpeed).toBeLessThan(10);
+    // HF-383 remainder ("a tad bigger because it feels a little bit
+    // clustered"): the footprint deepened from 60 to 63 m, moving the
+    // diagonal sprint from 9.92 s to 10.16 s. Proven red against the old
+    // sub-10 s pin before this gate moved. The new pin is TWO-SIDED: the
+    // crossing must stay above the old sub-10 s envelope (pinning the
+    // owner-requested growth) and below 10.5 s (keeping the reference
+    // map's sprint-crossing character).
+    expect(diagonal / sprintSpeed).toBeGreaterThan(10);
+    expect(diagonal / sprintSpeed).toBeLessThan(10.5);
     expect(diagonal / walkSpeed).toBeLessThan(15);
     // A full lap of the perimeter is the reference map's 25-30 second circuit.
     const lap = (2 * (width + depth)) / sprintSpeed;
@@ -263,8 +271,11 @@ describe('Nuke Town fidelity', () => {
     const playMaxX = Math.min(...sides.map((b) => b.minX));
     const area = (playMaxX - playMinX) * (playMaxZ - playMinZ);
     // The reference map stays small; guard against footprint creep measured
-    // on geometry rather than on ARENA_BOUNDS.
-    expect(area).toBeGreaterThan(3000);
-    expect(area).toBeLessThan(4000);
+    // on geometry rather than on ARENA_BOUNDS. HF-383 remainder: proven red
+    // at 4057 m^2 against the old <4000 pin after the fence line deepened to
+    // +/-31.5; the new band is two-sided - above the old 4000 ceiling (the
+    // growth is real and pinned) and below 4200 so creep stays capped.
+    expect(area).toBeGreaterThan(4000);
+    expect(area).toBeLessThan(4200);
   });
 });

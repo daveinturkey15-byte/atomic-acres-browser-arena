@@ -2,7 +2,27 @@ export const OVERDRIVE_SPAWN_INTERVAL_MS = 120_000;
 export const OVERDRIVE_DURATION_MS = 30_000;
 export const OVERDRIVE_DAMAGE_MULTIPLIER = 2;
 export const OVERDRIVE_PICKUP_RADIUS = 1.65;
-export const OVERDRIVE_POSITION = Object.freeze({ x: 0, y: 0.82, z: 0 });
+/**
+ * Nuke Town is the only arena that runs the core (src/map-selection.ts:49), so
+ * this constant IS that arena's tuning. HF-385: (0, 0.82, 0) was sealed inside
+ * CENTRAL_BUS - a solid 12.6 x 3.8 x 5.6 m collider centred on the origin
+ * since the Pass 78 rebuild (src/arena-layout.ts CENTRAL_BUS, built solid at
+ * src/map.ts) - leaving the nearest standable point 3.25 m away against a
+ * 1.65 m pickup radius and the 2x icon depth-occluded inside the bus body.
+ * The core now sits on the street centre line 3.3 m past the bus's east end:
+ * >= 2.7 m clear of every layout solid (bus face, both planter fins, the east
+ * van, bins and benches) at street level, so it is claimable and its icon
+ * renders in the open. src/nuketown-overdrive-core.test.ts DERIVES this from
+ * the live buildArena collider set - if the map moves again, the guard fails
+ * instead of rotting like the origin seat did.
+ *
+ * TRADE: an off-origin seat breaks the layout's exact 180-degree rotational
+ * symmetry. Accepted because team spawns split north/south across the full
+ * street length (SPAWN_LAYOUT), so an east/west offset is near-equidistant
+ * for both teams in practice; hollowing the bus to keep the centre seat was
+ * rejected as a structural rewrite of the map's hard cover anchor mid-pass.
+ */
+export const OVERDRIVE_POSITION = Object.freeze({ x: 9.6, y: 0.82, z: 0 });
 
 export type OverdriveState = Readonly<{
   generation: number;

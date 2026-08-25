@@ -233,8 +233,14 @@
  * the caution accent - it is a temporary, high-stakes possession state.
  * ------------------------------------------------------------------------ */
 
-#gunner-cockpit-hud .gunner-status,
-#gunner-cockpit-hud .gunner-instruments,
+/* HF-389: the two cockpit rails (.gunner-status / .gunner-instruments) are
+   excluded here and in pass77-instrument-hud.css. They are diegetic strips -
+   pass65-hud.css gives them a border-block-only hairline and a background that
+   fades to transparent at both ends - while this sheet is unlayered, so a
+   `border:` shorthand or `background-image:` here would overwrite those axes
+   purely on cascade-layer precedence and turn the rails into rounded opaque
+   cards. The control strip below is a pass75-era element and keeps the card
+   material. Enforced by src/pass70-chopper-gunner-contract.test.ts. */
 #gunner-cockpit-hud #gunner-control-strip {
   border-radius: var(--p75-radius);
   border: 1px solid rgba(236, 207, 188, 0.22);

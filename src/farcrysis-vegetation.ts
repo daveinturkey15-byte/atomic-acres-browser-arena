@@ -23,7 +23,7 @@
 import * as THREE from 'three';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
-import { farcrysisTerrainHeight as terrainHeightAt, FARCRYSIS_WATER_LEVEL } from './farcrysis-terrain-authority';
+import { farcrysisTerrainHeight as terrainHeightAt, FARCRYSIS_WATER_LEVEL, FARCRYSIS_SHORE } from './farcrysis-terrain-authority';
 import { buildPalmStandInstances, type PalmPlacement } from './farcrysis-palms-enhanced';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
@@ -99,6 +99,149 @@ export function setVegetationLOD(dist: number): void {
 
 const BOUNDS = FARCRYSIS_BOUNDS;
 const MARGIN = 1.8;
+
+// ---------------------------------------------------------------------------
+// HF-395/HF-396 placement zones — re-derived from the LIVE island extent.
+//
+// The Pass 69/76 extended layers were authored against the old +/-32 m island
+// and still sampled CIRCULAR radii <= 31.5 m from the origin. After HF-396
+// grew the island to +/-64 m (FARCRYSIS_BOUNDS), those bands stranded beach
+// species up to ~30 m inland of the real shore — the audited "beach grass
+// ~23 m inland of the beach". Every band below is an EDGE-DISTANCE interval
+// measured inward from the square arena boundary — the SAME Chebyshev
+// convention the terrain authority's HF-393 shore profile uses — so
+// shoreline bands follow the square shoreline (a circular ring would sit on
+// sand along the axes and inland at the corners), and every band re-derives
+// automatically from the bounds + shore constants if the extent ever changes
+// again. No layer carries a hand-scaled legacy radius.
+// ---------------------------------------------------------------------------
+
+const ARENA_HALF = BOUNDS.maxX;
+
+/** Metres inward from the square boundary face at (x, z) — the terrain
+ *  authority's own shore-distance convention. >= 0 on the island. */
+function edgeDistance(x: number, z: number): number {
+  return ARENA_HALF - Math.max(Math.abs(x), Math.abs(z));
+}
+
+/** Edge distance of the waterline all around the island: where the HF-393
+ *  descending shelf envelope crosses the gameplay water level. Derived from
+ *  the authority constants, never a magic number:
+ *  joinHeight - shelfSlope * (descentStartDist - d) = WATER_LEVEL. */
+const WATERLINE_EDGE: number = FARCRYSIS_SHORE.descentStartDist
+  - (FARCRYSIS_SHORE.joinHeight - FARCRYSIS_WATER_LEVEL) / FARCRYSIS_SHORE.shelfSlope;
+
+/** Dry-land depth from the waterline to the bound wall. */
+const INLAND_DEPTH = ARENA_HALF - WATERLINE_EDGE;
+
+/** Placement zones as [innerEdge, outerEdge] shore-edge intervals. */
+const ZONE = {
+  /** Golden sand rim: just above the waterline to the top of the beach shelf. */
+  beach: Object.freeze([WATERLINE_EDGE + 0.6, WATERLINE_EDGE + INLAND_DEPTH * 0.16]),
+  /** Beach-to-jungle transition (the flattened approach band). */
+  transition: Object.freeze([WATERLINE_EDGE + INLAND_DEPTH * 0.1, WATERLINE_EDGE + INLAND_DEPTH * 0.34]),
+  /** Jungle interior, out to near the bound wall. */
+  jungle: Object.freeze([WATERLINE_EDGE + INLAND_DEPTH * 0.3, ARENA_HALF - MARGIN - 1]),
+  /** Shallow-waterline straddle for mangroves. */
+  mangrove: Object.freeze([WATERLINE_EDGE - 3.5, WATERLINE_EDGE + 3.5]),
+  /** Wave-washed strand line for driftwood. */
+  strand: Object.freeze([WATERLINE_EDGE + 0.5, WATERLINE_EDGE + 6]),
+} as const;
+
+/**
+ * Edge-band scatter: uniform deterministic samples over the island square,
+ * accepted when their shore-edge distance falls inside [innerEdge, outerEdge].
+ * Same return shape as the legacy radius samplers. This is the shoreline
+ * replacement for the pre-rescale circular radii: bands hug the SQUARE shore
+ * on every azimuth, corners included.
+ */
+function edgeBandPositions(
+  count: number,
+  innerEdge: number,
+  outerEdge: number,
+  clearanceMargin: number,
+  seed: number,
+): Array<[number, number, number, number]> {
+  const rng = mulberry32(seed);
+  const result: Array<[number, number, number, number]> = [];
+  let attempts = 0;
+  const maxAttempts = count * 60;
+  const span = ARENA_HALF - MARGIN;
+  while (result.length < count && attempts < maxAttempts) {
+    attempts += 1;
+    const x = (rng() * 2 - 1) * span;
+    const z = (rng() * 2 - 1) * span;
+    const edge = edgeDistance(x, z);
+    if (edge < innerEdge || edge > outerEdge) continue;
+    if (!clearOfGameplay(x, z, clearanceMargin)) continue;
+    result.push([x, z, terrainHeightAt(x, z), rng() * Math.PI * 2]);
+  }
+  return result;
+}
+
+/** Poisson-disc variant of edgeBandPositions for non-overlapping scatter. */
+function poissonEdgeBandPositions(
+  count: number,
+  innerEdge: number,
+  outerEdge: number,
+  clearanceMargin: number,
+  seed: number,
+  minSeparation: number,
+): Array<[number, number, number, number]> {
+  const rng = mulberry32(seed);
+  const result: Array<[number, number, number, number]> = [];
+  let attempts = 0;
+  const maxAttempts = count * 90;
+  const span = ARENA_HALF - MARGIN;
+  while (result.length < count && attempts < maxAttempts) {
+    attempts += 1;
+    const x = (rng() * 2 - 1) * span;
+    const z = (rng() * 2 - 1) * span;
+    const edge = edgeDistance(x, z);
+    if (edge < innerEdge || edge > outerEdge) continue;
+    if (!clearOfGameplay(x, z, clearanceMargin)) continue;
+    let tooClose = false;
+    for (let j = 0; j < result.length; j += 1) {
+      if (Math.hypot(x - result[j][0], z - result[j][1]) < minSeparation) {
+        tooClose = true;
+        break;
+      }
+    }
+    if (tooClose) continue;
+    result.push([x, z, terrainHeightAt(x, z), rng() * Math.PI * 2]);
+  }
+  return result;
+}
+
+/**
+ * Grove variant of edgeBandPositions: Poisson-separated grove centres inside
+ * an edge band, then the same splayed-stem scatter grovePositions used.
+ */
+function groveEdgePositions(
+  groves: number,
+  stemsPerGrove: number,
+  splay: number,
+  innerEdge: number,
+  outerEdge: number,
+  clearanceMargin: number,
+  seed: number,
+): Array<[number, number, number, number, number, number]> {
+  const rng = mulberry32(seed);
+  const result: Array<[number, number, number, number, number, number]> = [];
+  const centres = poissonEdgeBandPositions(groves, innerEdge, outerEdge, clearanceMargin, seed, splay * 3);
+  for (let g = 0; g < centres.length; g += 1) {
+    const [cx, cz] = centres[g];
+    for (let s = 0; s < stemsPerGrove; s += 1) {
+      const sa = rng() * Math.PI * 2;
+      const sr = rng() * splay;
+      const sx = cx + Math.cos(sa) * sr;
+      const sz = cz + Math.sin(sa) * sr;
+      const sy = terrainHeightAt(sx, sz);
+      result.push([sx, sz, sy, sa, sr, g + s * 0.01]);
+    }
+  }
+  return result;
+}
 
 /** Golden ratio conjugate — produces even angular distribution. */
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
@@ -1023,7 +1166,7 @@ function addKapokTrees(root: THREE.Group): void {
 
   const tMat = new THREE.Matrix4();
   const cMat = new THREE.Matrix4();
-  const positions = layerPositions(count, 7, 18, 3.5, SEED);
+  const positions = edgeBandPositions(count, ZONE.jungle[0], ZONE.jungle[1], 3.5, SEED);
   const rng = mulberry32(SEED);
 
   for (let i = 0; i < positions.length; i++) {
@@ -1138,7 +1281,7 @@ function addCoconutPalms(root: THREE.Group): void {
 
   const tMat = new THREE.Matrix4();
   const fMat = new THREE.Matrix4();
-  const positions = layerPositions(count, 14, 26, 3.5, SEED);
+  const positions = edgeBandPositions(count, ZONE.beach[0], ZONE.transition[1], 3.5, SEED);
   const rng = mulberry32(SEED + 1);
 
   for (let i = 0; i < positions.length; i++) {
@@ -1185,7 +1328,7 @@ function addCanopyVines(root: THREE.Group): void {
   vines.name = 'farcrysis-vege-canopy-vines';
 
   const matrix = new THREE.Matrix4();
-  const positions = layerPositions(count, 5, 20, 2.5, SEED);
+  const positions = edgeBandPositions(count, ZONE.jungle[0], ZONE.jungle[1], 2.5, SEED);
   const rng = mulberry32(SEED + 2);
 
   for (let i = 0; i < positions.length; i++) {
@@ -1224,7 +1367,7 @@ function addLeafLitter(root: THREE.Group): void {
   litter.name = 'farcrysis-vege-leaf-litter';
 
   const matrix = new THREE.Matrix4();
-  const positions = layerPositions(count, 6, 28, 0.5, SEED);
+  const positions = edgeBandPositions(count, ZONE.transition[0], ZONE.jungle[1], 0.5, SEED);
   const rng = mulberry32(SEED + 3);
 
   for (let i = 0; i < positions.length; i++) {
@@ -1259,7 +1402,7 @@ function addDenseGrass(root: THREE.Group): void {
   grass.name = 'farcrysis-vege-dense-grass';
 
   const matrix = new THREE.Matrix4();
-  const positions = layerPositions(count, 1, 30, 0.5, SEED);
+  const positions = edgeBandPositions(count, ZONE.beach[0], ZONE.jungle[1], 0.5, SEED);
   const rng = mulberry32(SEED + 4);
 
   for (let i = 0; i < positions.length; i++) {
@@ -1320,7 +1463,7 @@ function addFloweringAccents(root: THREE.Group): void {
   flowers.name = 'farcrysis-vege-flowering-accents';
 
   const matrix = new THREE.Matrix4();
-  const positions = layerPositions(count, 8, 22, 3.0, SEED);
+  const positions = edgeBandPositions(count, ZONE.transition[0], ZONE.transition[1], 3.0, SEED);
   const rng = mulberry32(SEED + 5);
 
   for (let i = 0; i < positions.length; i++) {
@@ -1384,7 +1527,7 @@ function addUndergrowthShrubs(root: THREE.Group): void {
   shrubs.name = 'farcrysis-vege-undergrowth-shrubs';
 
   const matrix = new THREE.Matrix4();
-  const positions = layerPositions(count, 10, 28, 3.0, SEED);
+  const positions = edgeBandPositions(count, ZONE.transition[0], ZONE.transition[1], 3.0, SEED);
   const rng = mulberry32(SEED + 6);
 
   for (let i = 0; i < positions.length; i++) {
@@ -1434,7 +1577,7 @@ function addUnderstoryFerns(root: THREE.Group): void {
   ferns.name = 'farcrysis-vege-understory-ferns';
 
   const matrix = new THREE.Matrix4();
-  const positions = layerPositions(count, 4, 26, 2.0, SEED);
+  const positions = edgeBandPositions(count, ZONE.transition[0], ZONE.transition[1], 2.0, SEED);
   const rng = mulberry32(SEED + 7);
 
   for (let i = 0; i < positions.length; i++) {
@@ -1515,7 +1658,7 @@ function addMangroveTrees(root: THREE.Group): void {
 
   const tMat = new THREE.Matrix4();
   const cMat = new THREE.Matrix4();
-  const positions = poissonLayerPositions(count, 23, 30.5, 2.5, SEED, 3.5);
+  const positions = poissonEdgeBandPositions(count, ZONE.mangrove[0], ZONE.mangrove[1], 2.5, SEED, 3.5);
   const rng = mulberry32(SEED + 1);
 
   for (let i = 0; i < positions.length; i++) {
@@ -1606,7 +1749,7 @@ function addBambooGroves(root: THREE.Group): void {
   const SEED = 0xa860_0091;
   const rng = mulberry32(SEED);
 
-  const positions = grovePositions(groves, stemsPerGrove, 2.2, 5, 24, 3.5, SEED);
+  const positions = groveEdgePositions(groves, stemsPerGrove, 2.2, ZONE.jungle[0], ZONE.jungle[1], 3.5, SEED);
 
   for (let i = 0; i < positions.length; i++) {
     const [x, z, groundY, angle, _sr, _gi] = positions[i];
@@ -1678,7 +1821,7 @@ function addFloweringBushes(root: THREE.Group): void {
 
   const bMat = new THREE.Matrix4();
   const lMat = new THREE.Matrix4();
-  const positions = poissonLayerPositions(count, 6, 24, 3.0, SEED, 2.8);
+  const positions = poissonEdgeBandPositions(count, ZONE.transition[0], ZONE.transition[1], 3.0, SEED, 2.8);
   const rng = mulberry32(SEED + 1);
 
   for (let i = 0; i < positions.length; i++) {
@@ -1758,7 +1901,7 @@ function addJungleVineClusters(root: THREE.Group): void {
   clusters.name = 'farcrysis-vege-jungle-vine-clusters';
 
   const matrix = new THREE.Matrix4();
-  const positions = poissonLayerPositions(count, 5, 24, 2.5, SEED, 2.0);
+  const positions = poissonEdgeBandPositions(count, ZONE.jungle[0], ZONE.jungle[1], 2.5, SEED, 2.0);
   const rng = mulberry32(SEED + 2);
 
   for (let i = 0; i < positions.length; i++) {
@@ -1794,7 +1937,7 @@ function addBeachGrass(root: THREE.Group): void {
   grass.name = 'farcrysis-vege-beach-grass';
 
   const matrix = new THREE.Matrix4();
-  const positions = layerPositions(count, 24, 31.5, 0.5, SEED);
+  const positions = edgeBandPositions(count, ZONE.beach[0], ZONE.beach[1], 0.5, SEED);
   const rng = mulberry32(SEED + 1);
 
   for (let i = 0; i < positions.length; i++) {
@@ -1855,9 +1998,11 @@ function addLargeFerns(root: THREE.Group): void {
   ferns.name = 'farcrysis-vege-large-ferns';
 
   const matrix = new THREE.Matrix4();
-  // Place majority in cliff ring (radius 14-24), a handful near the cave at (26,16)
+  // Place the majority through the transition band (the old cliff ring, now
+  // derived from the live extent), a handful near the cave at its CURRENT
+  // authored position [52, 32] (farcrysis.ts cave colliders).
   const cliffCount = Math.floor(count * 0.85);
-  const cliffPositions = poissonLayerPositions(cliffCount, 14, 24, 2.0, SEED, 1.8);
+  const cliffPositions = poissonEdgeBandPositions(cliffCount, ZONE.transition[0], ZONE.jungle[0] + 10, 2.0, SEED, 1.8);
   const rng = mulberry32(SEED + 1);
 
   for (let i = 0; i < cliffPositions.length; i++) {
@@ -1873,13 +2018,13 @@ function addLargeFerns(root: THREE.Group): void {
     );
     ferns.setMatrixAt(i, matrix);
   }
-
-  // Cave-adjacent ferns: scatter a few near (26, 16) with local jitter
+  // Cave-adjacent ferns: scatter a few near the CURRENT cave entrance
+  // [52, 32] (HF-396 rescale moved it from the pre-rescale [26, 16]).
   const caveCount = count - cliffPositions.length;
   const caveRng = mulberry32(SEED + 99);
   for (let i = 0; i < caveCount; i++) {
-    const cx = 26 + (caveRng() - 0.5) * 6;
-    const cz = 16 + (caveRng() - 0.5) * 5;
+    const cx = 52 + (caveRng() - 0.5) * 6;
+    const cz = 32 + (caveRng() - 0.5) * 5;
     const dx = Math.max(BOUNDS.minX + MARGIN, Math.min(BOUNDS.maxX - MARGIN, cx));
     const dz = Math.max(BOUNDS.minZ + MARGIN, Math.min(BOUNDS.maxZ - MARGIN, cz));
     const groundY = terrainHeightAt(dx, dz);
@@ -1912,10 +2057,9 @@ function addFallenFronds(root: THREE.Group): void {
   const frondGeom = new THREE.BoxGeometry(1.2, 0.03, 0.25);
 
   const fronds = new THREE.InstancedMesh(frondGeom, vegeMat(0x8b6b3a, 0.9, 0.01), count);
-  fronds.name = 'farcrysis-vege-fallen-fronds';
 
   const matrix = new THREE.Matrix4();
-  const positions = layerPositions(count, 3, 30, 0.8, SEED);
+  const positions = edgeBandPositions(count, ZONE.beach[0], ZONE.jungle[1], 0.8, SEED);
   const rng = mulberry32(SEED + 1);
 
   for (let i = 0; i < positions.length; i++) {

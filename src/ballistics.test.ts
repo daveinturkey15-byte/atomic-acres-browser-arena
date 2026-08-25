@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { buildGunRange, buildRustworks1v1, buildSkylineTerminal } from './additional-maps';
+import { buildFarcrysis } from './farcrysis';
+import { buildHighSeas } from './high-seas';
 import {
   BALLISTIC_MATERIALS,
   classifyBallisticMaterial,
@@ -165,8 +167,10 @@ describe('shared wall-penetration authority', () => {
     expect(outside.reachedDistance).toBe(false);
   });
 
-  it('classifies every current additional-map shot blocker with unique authority', () => {
-    for (const build of [buildArena, buildRustworks1v1, buildGunRange, buildSkylineTerminal]) {
+  it('classifies every current arena shot blocker with unique authority', () => {
+    // HF-390: all SIX arenas, not four. farcrysis and high-seas were skipped,
+    // which let ~100 untagged farcrysis meshes ship unmeasured.
+    for (const build of [buildArena, buildRustworks1v1, buildGunRange, buildSkylineTerminal, buildFarcrysis, buildHighSeas]) {
       const arena = build(new THREE.Scene());
       const dynamicTargetMeshes = arena.raycastMeshes.filter((mesh) => (
         typeof mesh.userData.ballisticSurfaceId !== 'string'

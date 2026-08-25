@@ -5,6 +5,7 @@ import {
   CORNER_HEDGE_LAYOUT,
   COVER_LAYOUT,
   FRONT_HEDGE_FIN_LAYOUT,
+  FRONT_HEDGE_FIN_SIZE,
   FRONT_HEDGE_LAYOUT,
   GARAGE_LAYOUT,
   HOUSE_LAYOUT,
@@ -34,9 +35,14 @@ const rotated = (points: ReadonlyArray<readonly [number, number]>) =>
 const sprint = movementProfile({ crouched: false, prone: false, ads: false, sprinting: true, grounded: true }).maxSpeed;
 
 describe('compact original arena layout', () => {
-  it('measures 62 by 60 metres, small enough to cross corner to corner in ten seconds', () => {
+  it('measures 62 by 63 metres, crossed corner to corner in barely over ten seconds', () => {
     expect(ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX).toBe(62);
-    expect(ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ).toBe(60);
+    // HF-383 remainder ("maybe make it a tad bigger because it feels a
+    // little bit clustered"): the map deepened from 60 to 63 m across the
+    // street, giving each back yard 1.5 m more depth behind its spawns.
+    // The street canyon itself is untouched, so every exact seam pin below
+    // still measures the same geometry.
+    expect(ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ).toBe(63);
     const diagonal = Math.hypot(
       ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX,
       ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ,
@@ -45,11 +51,13 @@ describe('compact original arena layout', () => {
     // The reference map's whole character is that it is small. Sprinting a
     // straight diagonal must stay inside ten seconds, and a full lap of the
     // perimeter inside thirty. HF-383 note: an in-flight uniform 1.05 scale-up
-    // briefly relaxed the diagonal gate to <11 s; that weakening is rejected -
-    // nuketown-fidelity still enforces <10 s independently, and the declutter
-    // (restaged kerb-side vans, resized hedge wings) answers "clustered"
-    // without growing the footprint.
-    expect(diagonal / sprint).toBeLessThan(10);
+    // briefly relaxed the diagonal gate to <11 s; that weakening was rejected
+    // then, and this deeper-but-narrower growth does NOT revive it: the new
+    // pin is two-sided at 10..10.5 s - above the old envelope to pin the
+    // owner-requested growth (proven red at 10.16 s against the old <10 s),
+    // below 10.5 s to keep the sprint-crossing character.
+    expect(diagonal / sprint).toBeGreaterThan(10);
+    expect(diagonal / sprint).toBeLessThan(10.5);
     const lapSeconds = (2 * ((ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX) + (ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ))) / sprint;
     expect(lapSeconds).toBeGreaterThan(25);
     expect(lapSeconds).toBeLessThan(30);
@@ -185,16 +193,23 @@ const vanBounds = ({ x, z }: { x: number; z: number }) => {
 describe('mid-street vehicle staging (HF-383)', () => {
   const PLAYER_DIAMETER = 0.88;
 
-  it('stages both street vehicles midfield as a staggered kerb-side pair', () => {
+  it('stages both street vehicles midfield as a staggered mid-street pair', () => {
     expect(PARKED_VAN_LAYOUT).toHaveLength(2);
     const [east, west] = PARKED_VAN_LAYOUT;
-    // BO2's signature read: two vehicles beside the centre of the street, one
-    // hugging each kerb, staggered diagonally opposite one another.
+    // BO2's signature read: the bus owns the road centre and the two civilian
+    // vehicles sit IN THE MIDDLE OF THE STREET beside its ends, staggered
+    // diagonally opposite one another - not tucked away at the kerbs
+    // (HF-383: "put the two vehicles that are open or whatever in the middle
+    // of the street").
     expect(east.x).toBeGreaterThan(0);
     expect(west.x).toBeLessThan(0);
     for (const van of PARKED_VAN_LAYOUT) {
       expect(Math.abs(van.x)).toBeLessThanOrEqual(12);
       expect(van.z).not.toBe(0);
+      // MID-STREET, not kerb-side: each vehicle's centre stays within the
+      // bus's own road-footprint band. Proven red against the superseded
+      // kerb-side staging, whose centres sat at |z| = 5.55.
+      expect(Math.abs(van.z)).toBeLessThanOrEqual(CENTRAL_BUS.size[2] / 2);
       const [, , width] = PARKED_VAN_SIZE;
       expect(Math.abs(van.z) + width / 2).toBeLessThanOrEqual(STREET_HALF_WIDTH);
     }
@@ -204,46 +219,53 @@ describe('mid-street vehicle staging (HF-383)', () => {
     expect(Math.abs(east.z + west.z)).toBeLessThan(1e-6);
   });
 
-  it('seats each vehicle against its kerb without pocketing a player or fouling the bus', () => {
+  it('seats each mid-street vehicle without pocketing a player against the bus or a planter pillar', () => {
     const [busLength, busHeight, busWidth] = CENTRAL_BUS.size;
     const bus = { minX: -busLength / 2, maxX: busLength / 2, minY: 0, maxY: busHeight, minZ: -busWidth / 2, maxZ: busWidth / 2 };
+    const [, finHeight, finDepth] = FRONT_HEDGE_FIN_SIZE;
+    const blockers = [
+      { id: 'central-bus', ...bus },
+      ...FRONT_HEDGE_FIN_LAYOUT.map((fin, i) => ({
+        id: `planter-${i}`,
+        minX: fin.x - FRONT_HEDGE_FIN_SIZE[0] / 2,
+        maxX: fin.x + FRONT_HEDGE_FIN_SIZE[0] / 2,
+        minY: 0,
+        maxY: finHeight,
+        minZ: fin.z - finDepth / 2,
+        maxZ: fin.z + finDepth / 2,
+      })),
+    ];
     for (const van of PARKED_VAN_LAYOUT) {
       const bounds = vanBounds(van);
-      // No volume overlap with the central bus.
-      const zDisjoint = bounds.maxZ <= bus.minZ || bounds.minZ >= bus.maxZ;
-      const xDisjoint = bounds.maxX <= bus.minX || bounds.minX >= bus.maxX;
-      expect(zDisjoint || xDisjoint).toBe(true);
-      // Every seam around each vehicle must be one of exactly two safe
-      // shapes - FLUSH (nothing to enter) or a GENUINE WALK-THROUGH LANE
-      // (wide enough for a player capsule plus margin to pass cleanly).
+      // No volume overlap with any street blocker.
+      for (const blocker of blockers) {
+        const overlaps = bounds.minX < blocker.maxX && bounds.maxX > blocker.minX
+          && bounds.minZ < blocker.maxZ && bounds.maxZ > blocker.minZ;
+        expect(overlaps, `${van.id} must not overlap ${blocker.id}`).toBe(false);
+      }
+      // Every seam the vehicle forms with a neighbour must be one of exactly
+      // two safe shapes - FLUSH (nothing to enter) or a GENUINE WALK-THROUGH
+      // LANE (wide enough for a player capsule plus margin to pass cleanly).
       // Anything between is a wedge pocket: a body can partially enter but
-      // not traverse.
-      //
-      // Repinned for HF-383 completion (owner: "remove all the bulky items
-      // that are in the way of stuff ... make it actually true to original"):
-      // the previous upper-bound-only pin (< player diameter) encoded the
-      // superseded seal-the-van-to-the-bus staging whose sub-capsule seams
-      // walled the street into two halves ground movement could not cross -
-      // measured with the real character controller by nuketown-traversal.
-      // The deliberate ~1.8 m bus-flank lane is the replacement design. This
-      // pin is STRICTER than the one it replaces on the hazard it names: the
-      // old bound tolerated 0..0.88 m slivers, which this forbids outright.
-      // Proven red before repinning: live tree measured flankGap 1.80 against
-      // the retired <0.881 bound.
-      const kerbGap = STREET_HALF_WIDTH - Math.max(Math.abs(bounds.minZ), Math.abs(bounds.maxZ));
-      expect(kerbGap).toBeGreaterThanOrEqual(0);
-      expect(kerbGap).toBeLessThan(PLAYER_DIAMETER);
-      const flankGap = Math.max(
-        bounds.minZ - bus.maxZ,
-        bus.minZ - bounds.maxZ,
-        bounds.minX - bus.maxX,
-        bus.minX - bounds.maxX,
-      );
-      expect(flankGap).toBeGreaterThanOrEqual(-0.001);
+      // not traverse. Repinned for the HF-383 mid-street staging: the
+      // previous pin only audited the kerb seam and the bus flank, because
+      // the kerb-side seating had no other neighbours. A mid-street vehicle
+      // faces blockers on BOTH sides, so this pin audits every facing seam
+      // against the bus AND every planter pillar - strictly more coverage
+      // than the pin it replaces, at the same walk-lane minimum.
+      // Proven red before repinning: the retired kerb-side van sat 0.20 m
+      // from the x=4 planter pillar - a wedge this audit rejects outright.
       const WALK_LANE_MINIMUM = PLAYER_DIAMETER + 0.4;
-      const flushSeam = Math.abs(flankGap) <= 0.001;
-      const walkThroughLane = flankGap >= WALK_LANE_MINIMUM;
-      expect(flushSeam || walkThroughLane).toBe(true);
+      for (const blocker of blockers) {
+        const dx = Math.max(blocker.minX - bounds.maxX, bounds.minX - blocker.maxX);
+        const dz = Math.max(blocker.minZ - bounds.maxZ, bounds.minZ - blocker.maxZ);
+        // Only axis-facing neighbours form a seam; diagonal neighbours do not.
+        if (dx >= 0 && dz >= 0) continue;
+        const seam = Math.max(dx, dz);
+        const flushSeam = seam <= 0.001;
+        const walkThroughLane = seam >= WALK_LANE_MINIMUM;
+        expect(flushSeam || walkThroughLane, `${van.id} <-> ${blocker.id} seam ${seam.toFixed(3)} m is a wedge pocket`).toBe(true);
+      }
     }
   });
 

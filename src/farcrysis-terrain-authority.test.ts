@@ -398,6 +398,32 @@ describe('farcrysis terrain authority', () => {
     expect(farcrysisWadeSpeedScale(enterDepth + 5)).toBeCloseTo(SWIM_TUNING.swimSpeedScale, 12);
   });
 
+  // HF-393 wiring guard (failure mode #1: green module imported by nothing).
+  // farcrysisWadeSpeedScale shipped with its only importer being this file.
+  // Pin the LIVE movement-loop call site in src/legacy-main.ts: the import
+  // exists, and the updatePhysics swim block multiplies the wade scale into
+  // BOTH horizontal speed channels, gated to swimmable water while the swim
+  // state has not yet engaged (so it cannot compound with swim.speedScale).
+  it('is wired into the legacy-main movement loop, not merely exported', () => {
+    const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    expect(main).toContain(
+      "import { farcrysisWadeSpeedScale } from './farcrysis-terrain-authority';",
+    );
+    const blockStart = main.indexOf('const swimSample = waterSystem.samplePhysics(player.position);');
+    expect(blockStart).toBeGreaterThan(-1);
+    const blockEnd = main.indexOf('integrateHorizontalVelocity(', blockStart);
+    const block = main.slice(blockStart, blockEnd);
+    // Fed the same depth convention the swim reducer consumes.
+    expect(block).toContain('const waterDepthOverEye = swimSample.surfaceY - player.position.y;');
+    expect(block).toContain('? farcrysisWadeSpeedScale(waterDepthOverEye)');
+    // Gated: dry/non-swimmable water and engaged swimming are untouched.
+    expect(block).toContain('waterSystem.swimmable && !localSwimState.swimming');
+    // Applied to BOTH horizontal channels, or the wade would strafe at full speed.
+    expect(block).toContain('* swim.speedScale * wadeScale');
+    const scaledLines = block.match(/\* swim\.speedScale \* wadeScale/g) ?? [];
+    expect(scaledLines.length).toBe(2);
+  });
+
   it('publishes bot ground platforms and the catwalk route through verticalNavigation', () => {
     const scene = new THREE.Scene();
     const arena = buildFarcrysis(scene);

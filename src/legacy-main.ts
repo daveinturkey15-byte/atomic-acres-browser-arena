@@ -60,6 +60,7 @@ import { mountFarcrysisHitlOverlay, type FarcrysisHitlOverlay } from './farcrysi
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
 import { createSwimState, stepSwimState, swimMovementModifiers, type SwimState } from './water/swim-state';
 import { sharedWaterBodyForArena } from './water/water-authoring';
+import { farcrysisWadeSpeedScale } from './farcrysis-terrain-authority'; // HF-393 wade
 import { PASS66_RELEASE_IDENTITY } from './release-identity';
 import { drawPass70DroneSwarmLogo } from './pass70-drone-swarm-logo';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
@@ -24353,18 +24354,29 @@ function updatePhysics(dt: number): void {
   // actually in. The reducer owns its own enter/exit hysteresis, so it is fed
   // raw depth every frame rather than a debounced flag.
   const swimSample = waterSystem.samplePhysics(player.position);
+  const waterDepthOverEye = swimSample.surfaceY - player.position.y;
   localSwimState = stepSwimState(localSwimState, {
-    depth: swimSample.surfaceY - player.position.y,
+    depth: waterDepthOverEye,
     swimmable: waterSystem.swimmable,
     dtSeconds: dt,
   });
   const swim = swimMovementModifiers(localSwimState);
   if (!localSwimState.swimming) swimWeaponHintShown = false;
+  // HF-393: "you fall down into the water … so you can sort of paddle". The
+  // terrain shelf was flattened in cfc7a2ec, but speed still STEPPED from 1.0
+  // to SWIM_TUNING.swimSpeedScale the frame swim engaged. farcrysisWadeSpeedScale
+  // was authored for exactly this line and had no caller outside its own test.
+  // It is pinned to return 1.0 above ankle depth and exactly swimSpeedScale at
+  // SWIM_TUNING.enterDepth (farcrysis-terrain-authority.test.ts), so once
+  // swimming it is 1.0-redundant with swim.speedScale rather than compounding.
+  const wadeScale = waterSystem.swimmable && !localSwimState.swimming
+    ? farcrysisWadeSpeedScale(waterDepthOverEye)
+    : 1;
 
   const profile = {
     ...baseProfile,
-    maxSpeed: baseProfile.maxSpeed * movementBoost * swim.speedScale,
-    acceleration: baseProfile.acceleration * movementBoost * swim.speedScale,
+    maxSpeed: baseProfile.maxSpeed * movementBoost * swim.speedScale * wadeScale,
+    acceleration: baseProfile.acceleration * movementBoost * swim.speedScale * wadeScale,
   };
   const integrated = integrateHorizontalVelocity(
     { x: player.velocity.x, z: player.velocity.z },

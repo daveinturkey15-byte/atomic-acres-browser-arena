@@ -63,24 +63,8 @@
   },
   "fallbacks": [],
   "invalidRatings": [],
-  "unstampedCount": 100,
-  "unstampedSample": [
-   "farcrysis-crate-01|targetId=undefined",
-   "farcrysis-crate-02|targetId=undefined",
-   "farcrysis-crate-03|targetId=undefined",
-   "farcrysis-crate-04|targetId=undefined",
-   "farcrysis-crate-05|targetId=undefined",
-   "farcrysis-crate-06|targetId=undefined",
-   "farcrysis-crate-07|targetId=undefined",
-   "farcrysis-crate-08|targetId=undefined",
-   "farcrysis-crate-09|targetId=undefined",
-   "farcrysis-crate-10|targetId=undefined",
-   "farcrysis-crate-11|targetId=undefined",
-   "farcrysis-crate-12|targetId=undefined",
-   "farcrysis-crate-13|targetId=undefined",
-   "farcrysis-crate-14|targetId=undefined",
-   "farcrysis-crate-15|targetId=undefined"
-  ],
+  "unstampedCount": 0,
+  "unstampedSample": [],
   "stampMismatches": []
  },
  "high-seas": {

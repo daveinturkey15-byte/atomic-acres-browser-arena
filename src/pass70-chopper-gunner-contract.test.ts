@@ -1,7 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const legacy = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+const bootstrap = readFileSync(new URL('./bootstrap.ts', import.meta.url), 'utf8');
 const shell = readFileSync(new URL('./ui/pass64-shell.ts', import.meta.url), 'utf8');
 const hudCss = readFileSync(new URL('./ui/pass65-hud.css', import.meta.url), 'utf8');
 const presentation = readFileSync(new URL('./killstreak-presentation.ts', import.meta.url), 'utf8');
@@ -21,6 +22,96 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(block).toContain('node.layers.mask = node.userData.supportBaseLayerMask');
     expect(block).toContain('!entry.transparent && entry.opacity >= 1');
     expect(block).not.toContain('node.visible = gunnerSightlineNode && !retiredStaticSource');
+  });
+
+  it('HF-389: reads the COMPOSED cascade - no sheet may outrank the cockpit rails\' own border/background axes', () => {
+    // THE REGRESSION THIS TEST MISSED: pass65-hud.css wraps the whole cockpit in
+    // `@layer pass65.hud`, while bootstrap.ts deliberately imports later reskin
+    // sheets UNLAYERED so they outrank every layer regardless of specificity.
+    // Commits 2050e5eb (pass75) and 3b79d9a2 (pass77) reached into the cockpit
+    // from those unlayered sheets: their `border:` shorthand reset pass65's
+    // border-block-only green hairline, and their `background-image:` replaced
+    // the edge-fading canopy gradient - turning two diegetic rails into rounded
+    // opaque cards - while this file stayed green because it read ONLY the
+    // layered sheet. A contract test that cannot see the sheet that wins is
+    // not a contract. This test therefore parses EVERY stylesheet bootstrap
+    // imports and enforces the same ownership rule on all of them.
+    const uiDir = new URL('./ui/', import.meta.url);
+    const sheets = readdirSync(uiDir, 'utf8').filter((name) => name.endsWith('.css'));
+    expect(sheets.length).toBeGreaterThan(0);
+
+    // Every css import in bootstrap.ts must be inside the scanned set, so a
+    // future sheet cannot silently join (or leave) the cockpit's cascade.
+    const bootImports = [...bootstrap.matchAll(/import '(\.\/ui\/[a-z0-9-]+\.css)';/gu)]
+      .map((match) => match[1]!.replace('./ui/', ''));
+    expect(bootImports.length).toBeGreaterThan(0);
+    for (const name of bootImports) expect(sheets, `${name} must exist under src/ui`).toContain(name);
+
+    interface Rule { readonly sheet: string; readonly selector: string; readonly body: string; }
+    const parseRules = (sheet: string, css: string, acc: Rule[]): void => {
+      const source = css.replace(/\/\*[\s\S]*?\*\//gu, '');
+      let depth = 0;
+      let open = -1;
+      let preludeStart = 0;
+      for (let index = 0; index < source.length; index += 1) {
+        const char = source[index];
+        if (char === '{') {
+          if (depth === 0) open = index;
+          depth += 1;
+        } else if (char === '}') {
+          depth -= 1;
+          if (depth === 0 && open >= 0) {
+            const prelude = source.slice(preludeStart, open).trim();
+            const inner = source.slice(open + 1, index);
+            if (/^@(media|supports|layer|container)\b/u.test(prelude)) parseRules(sheet, inner, acc);
+            else if (!prelude.startsWith('@')) acc.push({ sheet, selector: prelude, body: inner });
+            preludeStart = index + 1;
+            open = -1;
+          }
+        }
+      }
+    };
+
+    const rules: Rule[] = [];
+    for (const sheet of sheets) parseRules(sheet, readFileSync(new URL(`./ui/${sheet}`, import.meta.url), 'utf8'), rules);
+    // pass65 owns these axes on the rails: the border-block-only green hairline
+    // and the edge-fading gradient are what make them read as part of the
+    // canopy rather than floating cards. No other sheet may set them.
+    // (Record, not Set: static string-keyed lookup per repo convention.)
+    const pass65OwnedAxes: Record<string, true> = {
+      border: true,
+      'border-radius': true,
+      'border-block': true,
+      'border-block-start': true,
+      'border-block-end': true,
+      background: true,
+      'background-color': true,
+      'background-image': true,
+    };
+    // The rail element itself only - descendants (small/span/readouts) keep
+    // their own freedom. Attribute qualifiers such as
+    // [data-support-kind="chopper-gunner"] must NOT dodge the rule again.
+    const isRailSelector = (selector: string): boolean =>
+      selector
+        .split(',')
+        .some((part) => /(^|[\s>+])#gunner-cockpit-hud(\[[^\]]*\])?([\s>+][^\s>+]+)*\s\.gunner-(status|instruments)(::?[a-z-]+)?$/u.test(part.trim()));
+    const violations: string[] = [];
+    for (const rule of rules) {
+      if (!isRailSelector(rule.selector) || rule.sheet === 'pass65-hud.css') continue;
+      for (const declaration of rule.body.split(';')) {
+        const property = declaration.split(':')[0]?.trim().toLowerCase() ?? '';
+        if (property && property in pass65OwnedAxes) violations.push(`${rule.sheet}: \`${rule.selector}\` sets \`${property}\``);
+      }
+    }
+    expect(violations, `cockpit rails' border/background axes are pass65-owned; overridden by:\n${violations.join('\n')}`).toEqual([]);
+
+    // And the owning sheet must still actually own them - equal or greater
+    // strictness than the original contract, never less.
+    const pass65Rules = rules.filter((rule) => rule.sheet === 'pass65-hud.css');
+    expect(pass65Rules.some((rule) => isRailSelector(rule.selector) && rule.body.includes('border-block: 1px solid rgba(120, 255, 170, 0.42)'))).toBe(true);
+    expect(pass65Rules.some((rule) => isRailSelector(rule.selector) && rule.body.includes('linear-gradient(90deg, transparent, rgba(2, 16, 10, 0.72)'))).toBe(true);
+    expect(pass65Rules.some((rule) => isRailSelector(rule.selector) && rule.body.includes('border-block: 1px solid rgba(120, 255, 170, 0.38)'))).toBe(true);
+    expect(pass65Rules.some((rule) => isRailSelector(rule.selector) && rule.body.includes('linear-gradient(90deg, transparent, rgba(3, 18, 12, 0.78)'))).toBe(true);
   });
 
   it('keeps the centre reticle clear and all instruments bounded on desktop and mobile', () => {

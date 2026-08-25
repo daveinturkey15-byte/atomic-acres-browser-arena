@@ -12,7 +12,9 @@ import {
   createFirstPersonRiggedArms,
   FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY,
   firstPersonArmAnimationState,
+  firstPersonArmAuthoredLayerSample,
   firstPersonArmBaseActionFor,
+  getFirstPersonArmAuthoredLayer,
   loadFirstPersonArmsAsset,
   playFirstPersonArmAction,
   resetFirstPersonArmAnimations,
@@ -540,6 +542,14 @@ export function firstPersonArmShoulderEntryNdc(
  * pose; this only adds motion around them.
  */
 export const FIRST_PERSON_ARM_MOTION_CONTRACT = 'welded-palm-elbow-pole-locomotion-v1';
+/**
+ * HF-388: bounded arm-local recoil share and landing dip. Both feed the same
+ * elbow-pole channel as the authored pose layer and are re-clamped with it, so
+ * the total pole motion can never exceed FIRST_PERSON_ARM_MOTION_MAX_POLE_RADIANS.
+ */
+export const FIRST_PERSON_ARM_RECOIL_POLE_GAIN = 0.9;
+export const FIRST_PERSON_ARM_RECOIL_MAX_POLE_RADIANS = 0.16;
+export const FIRST_PERSON_ARM_LAND_DIP_RADIANS = 0.22;
 export const FIRST_PERSON_ARM_MOTION_MAX_POLE_RADIANS = 0.24;
 export const FIRST_PERSON_ARM_MOTION_MAX_WRIST_ROLL_RADIANS = 0.03;
 const ARM_BREATH_HZ = 0.21;
@@ -1416,8 +1426,24 @@ export class WeaponPresentation {
   private armEvidenceCaptureTelemetry: Readonly<Record<string, unknown>> | null = null;
   private riggedArmDiagnostics: Array<Record<string, unknown>> = [];
   private nextRiggedArmDiagnosticsAt = 0;
+  /**
+   * HF-388: the smoothed authored pose layer (see operator-model). Channels are
+   * approached exponentially each frame so action edges crossfade instead of
+   * popping, and every contribution is re-clamped inside solveRiggedArms so the
+   * totals stay within the pinned procedural motion caps.
+   */
+  private readonly authoredArmChannels = {
+    left: { poleRadians: 0, wristRollRadians: 0, carriageOffset: new THREE.Vector3() },
+    right: { poleRadians: 0, wristRollRadians: 0, carriageOffset: new THREE.Vector3() },
+  };
+  private lastPresentedAds: boolean | null = null;
+  private armRecoilKickRadians = 0;
+  private armLandDipRadians = 0;
   private readonly riggedArmSolveScratch = {
     cameraRotation: new THREE.Quaternion(),
+    carriageWorld: new THREE.Vector3(),
+    carriageParentWorld: new THREE.Quaternion(),
+    cameraUp: new THREE.Vector3(),
     target: new THREE.Vector3(),
     socketTarget: new THREE.Vector3(),
     shoulderPosition: new THREE.Vector3(),
@@ -2963,6 +2989,10 @@ export class WeaponPresentation {
     this.reloadLastProgress = 0;
     this.pendingScattergunShell = false;
     const activeModel = this.models.get(id);
+    // HF-388: play the previously-dead authored 'equip' pose on a live weapon
+    // switch. The authored pose layer turns it into visible arm carriage; the
+    // mixer's own finger-only tracks carry no arm-chain content.
+    if (!immediate && this.authoredArmsRoot) playFirstPersonArmAction(this.authoredArmsRoot, 'equip');
     if (activeModel && this.modelIsGpuReady(activeModel)) {
       for (const [weaponId, model] of this.models) model.visible = weaponId === id;
       this.modelLastUsed.set(id, ++this.modelUseCounter);
@@ -4034,6 +4064,37 @@ export class WeaponPresentation {
   }
 
   /**
+   * HF-388: shifts the solved shoulder entry by the authored pose layer's
+   * bounded carriage offset (clamped at build/sample time to
+   * FIRST_PERSON_ARM_AUTHORED_MAX_CARRIAGE_METERS and damped by ADS here).
+   * Same world-intent/parent-local-write pattern as
+   * placeRiggedShoulderEntryBelowFrame; the reach constraints that run later in
+   * solveRiggedArms still bound the final pose.
+   */
+  private applyRiggedArmCarriage(rig: RiggedViewArm, cameraRotation: THREE.Quaternion): void {
+    const parent = rig.shoulder.parent;
+    if (!parent) return;
+    const scratch = this.riggedArmSolveScratch;
+    const channel = this.authoredArmChannels[rig.side];
+    if (channel.carriageOffset.lengthSq() < 1e-10) return;
+    const aimDamp = 1 - this.adsBlend * 0.72;
+    scratch.carriageWorld.copy(channel.carriageOffset).multiplyScalar(aimDamp);
+    parent.getWorldQuaternion(scratch.carriageParentWorld);
+    scratch.carriageWorld.applyQuaternion(scratch.carriageParentWorld);
+    const entry = rig.shoulder.getWorldPosition(scratch.shoulderStartWorld);
+    entry.addScaledVector(
+      scratch.cameraRight.set(1, 0, 0).applyQuaternion(cameraRotation),
+      scratch.carriageWorld.dot(scratch.cameraRight),
+    );
+    entry.addScaledVector(
+      scratch.cameraUp.set(0, 1, 0).applyQuaternion(cameraRotation),
+      scratch.carriageWorld.dot(scratch.cameraUp),
+    );
+    rig.shoulder.position.copy(parent.worldToLocal(entry));
+    rig.shoulder.updateWorldMatrix(false, true);
+  }
+
+  /**
    * Keeps the authored upper/lower-arm lengths intact. If the below-frame
    * shoulder crop leaves a grip outside the real two-bone span, move only the
    * shoulder root onto the reachable sphere and rotate that offset toward a
@@ -4376,6 +4437,11 @@ export class WeaponPresentation {
         cameraRotation,
         shoulderEntryTargetNdcY,
       );
+      // HF-388: the authored pose layer's bounded shoulder-carriage shift,
+      // applied exactly like placeRiggedShoulderEntryBelowFrame applies its own
+      // entry move (world-space intent, parent-local write). Reach constraints
+      // below still bound the result.
+      this.applyRiggedArmCarriage(rig, cameraRotation);
       const shoulderPosition = rig.shoulder.getWorldPosition(scratch.shoulderPosition);
       const elbowPosition = rig.elbow.getWorldPosition(scratch.elbowPosition);
       const wristPosition = rig.wrist.getWorldPosition(scratch.wristPosition);
@@ -4426,7 +4492,24 @@ export class WeaponPresentation {
         adsBlend: this.adsBlend,
       });
       const poleAxis = scratch.poleAxis.copy(socketTarget).sub(shoulderPosition);
-      if (poleAxis.lengthSq() > 1e-8) bendHint.applyAxisAngle(poleAxis.normalize(), motion.poleRadians);
+      if (poleAxis.lengthSq() > 1e-8) {
+        // HF-388: procedural + authored pose layer + arm-local recoil + landing
+        // absorb share one pole channel. The clamp is EQUAL to the pre-existing
+        // bound (motion was already capped at FIRST_PERSON_ARM_MOTION_MAX_POLE_
+        // RADIANS); the sum can only be smaller.
+        const authored = this.authoredArmChannels[rig.side];
+        const aimDamp = 1 - this.adsBlend * 0.72;
+        const recoilSign = rig.side === 'right' ? 1 : -1;
+        const totalPoleRadians = THREE.MathUtils.clamp(
+          motion.poleRadians
+            + authored.poleRadians * aimDamp
+            + this.armRecoilKickRadians * recoilSign
+            - this.armLandDipRadians * aimDamp,
+          -FIRST_PERSON_ARM_MOTION_MAX_POLE_RADIANS,
+          FIRST_PERSON_ARM_MOTION_MAX_POLE_RADIANS,
+        );
+        bendHint.applyAxisAngle(poleAxis.normalize(), totalPoleRadians);
+      }
       const weaponRotation = activeModel.getWorldQuaternion(scratch.weaponRotation);
       const muzzle = activeModel.getObjectByName('muzzle-socket');
       const weaponForward = muzzle
@@ -4437,9 +4520,18 @@ export class WeaponPresentation {
         : scratch.handDirection.copy(weaponForward);
       // HF-341: the firing wrist takes the per-family stance roll (slight
       // inward cant for the two-hand handgun grip, neutral elsewhere).
+      // HF-388: the authored pose layer's roll joins the MOTION portion, and
+      // only that motion portion is capped — identical bound to before, so the
+      // authored contribution can never exceed the procedural roll budget.
+      const motionWristRollRadians = THREE.MathUtils.clamp(
+        motion.wristRollRadians
+          + this.authoredArmChannels[rig.side].wristRollRadians * (1 - this.adsBlend * 0.72),
+        -FIRST_PERSON_ARM_MOTION_MAX_WRIST_ROLL_RADIANS,
+        FIRST_PERSON_ARM_MOTION_MAX_WRIST_ROLL_RADIANS,
+      );
       const wristRollRadians = (rig.side === 'left'
         ? riggedSupportWristRollRadians(reloadPose.handToReload)
-        : firstPersonFiringWristRollRadians(handPolicy.gripFamily)) + motion.wristRollRadians;
+        : firstPersonFiringWristRollRadians(handPolicy.gripFamily)) + motionWristRollRadians;
       const palmTargetRotation = this.palmTargetWorldRotation(socket, handDirection, wristRollRadians);
       const contactIterationErrors: number[] | null = diagnostics ? [] : null;
       let palmOrientationError = Number.POSITIVE_INFINITY;
@@ -4497,6 +4589,13 @@ export class WeaponPresentation {
         gripSocketCalibration,
         upperLength,
         lowerLength,
+        // HF-388: live values of the new arm-motion channels, so a QA probe can
+        // prove the layer is actually driving the pose instead of trusting code.
+        authoredPoleRadians: this.authoredArmChannels[rig.side].poleRadians,
+        authoredWristRollRadians: this.authoredArmChannels[rig.side].wristRollRadians,
+        authoredCarriageMeters: this.authoredArmChannels[rig.side].carriageOffset.length(),
+        armRecoilKickRadians: this.armRecoilKickRadians,
+        armLandDipRadians: this.armLandDipRadians,
         shoulder: rig.shoulder.getWorldPosition(scratch.diagnosticShoulder).toArray(),
         elbow: rig.elbow.getWorldPosition(scratch.diagnosticElbow).toArray(),
         wrist: rig.wrist.getWorldPosition(scratch.diagnosticWrist).toArray(),
@@ -4555,8 +4654,39 @@ export class WeaponPresentation {
         this.authoredArmsRoot,
         firstPersonArmBaseActionFor(pose.moving, pose.sprinting),
       );
+      // HF-388: ADS edges play the previously-dead authored clips. The pose
+      // layer below turns them into visible arm carriage because the mixer's
+      // own finger-only tracks carry no arm-chain content.
+      const presentedAds = pose.ads === true;
+      if (this.lastPresentedAds !== null && presentedAds !== this.lastPresentedAds) {
+        this.lastPresentedAds = presentedAds;
+        playFirstPersonArmAction(this.authoredArmsRoot, presentedAds ? 'ads-in' : 'ads-out');
+      }
       updateFirstPersonArmAnimations(this.authoredArmsRoot, pose.dt);
+      const state = firstPersonArmAnimationState(this.authoredArmsRoot);
+      const sample = firstPersonArmAuthoredLayerSample(
+        getFirstPersonArmAuthoredLayer(this.authoredArmsRoot),
+        state?.baseAction ?? null,
+        state?.activeAction ?? null,
+      );
+      const channelMix = 1 - Math.exp(-12 * armDt);
+      for (const side of ['left', 'right'] as const) {
+        const target = sample[side];
+        const smoothed = this.authoredArmChannels[side];
+        smoothed.poleRadians += (target.poleRadians - smoothed.poleRadians) * channelMix;
+        smoothed.wristRollRadians += (target.wristRollRadians - smoothed.wristRollRadians) * channelMix;
+        smoothed.carriageOffset.x += (target.carriageOffset[0] - smoothed.carriageOffset.x) * channelMix;
+        smoothed.carriageOffset.y += (target.carriageOffset[1] - smoothed.carriageOffset.y) * channelMix;
+        smoothed.carriageOffset.z += (target.carriageOffset[2] - smoothed.carriageOffset.z) * channelMix;
+      }
     }
+    // HF-388: landing absorb. The impulse arrives transiently from the movement
+    // loop; hold the peak with an exponential release so a single-frame spike
+    // still reads as a visible dip instead of vanishing inside one frame.
+    this.armLandDipRadians = Math.max(
+      THREE.MathUtils.clamp(pose.landingImpulse, 0, 1) * FIRST_PERSON_ARM_LAND_DIP_RADIANS,
+      this.armLandDipRadians * Math.exp(-6 * armDt),
+    );
     this.weaponHeat = advanceWeaponHeat(this.weaponHeat, false, pose.dt, this.active);
     advanceMinigunSpool(this.minigunSpool, {
       dt: pose.dt,
@@ -4659,6 +4789,14 @@ export class WeaponPresentation {
       ? this.recoil
       : Math.max(this.recoil, fireCycle.flash * 0.35 + fireCycle.boltTravel * 0.65);
     const presentationKick = Math.max(presentedRecoil, fireCycle.kick * 0.9);
+    // HF-388: arm-local recoil. Until now every shot moved only this.root, so
+    // the arms were rigid relative to the weapon they hold. A bounded share of
+    // the same kick flexes the elbows instead; damped while aiming so the
+    // settled ADS sight picture does not start swimming.
+    this.armRecoilKickRadians = Math.min(
+      FIRST_PERSON_ARM_RECOIL_MAX_POLE_RADIANS,
+      presentationKick * FIRST_PERSON_ARM_RECOIL_POLE_GAIN,
+    ) * (1 - this.adsBlend * 0.6);
     const shotRoll = fireCycle.kick * (this.shotsPresented % 2 === 0 ? -0.018 : 0.018);
     this.muzzleFlash.visible = fireCycle.flash > 0.015;
     if (this.muzzleFlash.visible) {

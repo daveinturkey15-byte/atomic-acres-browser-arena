@@ -32,7 +32,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Box2 } from './collision';
-import { createBallisticSurface } from './ballistics';
+import { createBallisticSurface, type BallisticMaterialId } from './ballistics';
 import { classifyImpactSurface } from './combat-feedback';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
@@ -86,7 +86,7 @@ function registerBox(
   name: string,
 
   /** Ballistic material id understood by the penetration system. */
-  ballistic: string,
+  ballistic: BallisticMaterialId,
 
   /** True for sandbag walls and other low cover that blocks movement and shots. */
   isCover: boolean,
@@ -159,14 +159,22 @@ function registerBox(
     minZ: bounds.minZ,
     maxZ: bounds.maxZ,
   };
-  builder.shotSurfaces.push(
-    createBallisticSurface(
-      `farcrysis-shot-${name}`,
-      name,
-      surfaceBounds,
-      { material: ballistic as any },
-    ),
+  const surface = createBallisticSurface(
+    `farcrysis-shot-${name}`,
+    name,
+    surfaceBounds,
+    { material: ballistic },
   );
+  builder.shotSurfaces.push(surface);
+  // HF-390: stamp the raycast mesh with its surface id and authored family,
+  // exactly as farcrysis.ts box() and high-seas.ts box() do. The live
+  // shot-resolution parent walk in legacy-main.ts reads
+  // userData.ballisticMaterial / userData.ballisticSurfaceId; without the
+  // stamp every one of these interactables resolved shots through the coarse
+  // name-based ImpactSurface fallback instead of its authored penetration
+  // family.
+  mesh.userData.ballisticSurfaceId = surface.id;
+  mesh.userData.ballisticMaterial = surface.material;
 
   // (e) Physical cover: only sandbag walls (or other deliberate cover) get
   //     registered for the crouch / peek / lean system.

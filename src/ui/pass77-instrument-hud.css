@@ -655,13 +655,26 @@
  * PART 4 - the Chopper Gunner cockpit joins the same grammar.
  * ------------------------------------------------------------------------ */
 
-#gunner-cockpit-hud .gunner-status,
-#gunner-cockpit-hud .gunner-instruments,
 #gunner-cockpit-hud #gunner-control-strip {
   border-radius: var(--p77-radius, 2px);
   border: 1px solid rgb(233 208 191 / 0.18);
   background-image: linear-gradient(178deg, rgb(51 31 17 / 0.56) 0%, rgb(19 10 4 / 0.78) 100%);
   box-shadow: 0 10px 26px rgb(0 0 0 / 0.34), inset 0 1px 0 rgb(253 245 240 / 0.14);
+  -webkit-backdrop-filter: blur(10px) saturate(1.4);
+  backdrop-filter: blur(10px) saturate(1.4);
+}
+
+/* HF-389. The two cockpit rails are diegetic strips, not panels: pass65-hud.css
+   gives them a border-block-only hairline and a background that fades to
+   transparent at both ends so they read as part of the canopy. Both of those are
+   set with SHORTHANDS (`border-block`, `background`), and this sheet is unlayered
+   while pass65-hud.css is inside `@layer pass65.hud`, so an unlayered `border:` /
+   `background-image:` here wins on layer alone and turns them into rounded opaque
+   cards. Give the rails the material WITHOUT touching the two axes pass65 owns
+   (enforced by src/pass70-chopper-gunner-contract.test.ts). */
+#gunner-cockpit-hud .gunner-status,
+#gunner-cockpit-hud .gunner-instruments {
+  box-shadow: 0 10px 26px rgb(0 0 0 / 0.34);
   -webkit-backdrop-filter: blur(10px) saturate(1.4);
   backdrop-filter: blur(10px) saturate(1.4);
 }

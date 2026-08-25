@@ -131,6 +131,56 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 }
 
 /**
+ * HF-398 interior highland relief ("more jungle like", cadle.gg horizon bar).
+ * A ring of three uneven jungle massifs rises inland of the coastal plain,
+ * breaking cross-map sightlines and giving the island a skyline against the
+ * lagoon. Design bounds, all re-measured after authoring:
+ *   - COASTAL GATE: relief is exactly 0 across the ENTIRE HF-393 shore blend
+ *     band (dist <= descentStartDist + approachDist = 22), so every
+ *     seaward-walk contract (step <= autostep, grade <= 0.6, wade span >= 4)
+ *     sees the same profile that passed before the relief existed — by
+ *     construction, still pinned by the every-azimuth walk test;
+ *   - PAD GATE: a second opposed gate eases relief out of the research-station
+ *     core pad over a wide band, so the pad's own blend never crushes full
+ *     amplitude into a cliff around the station footprint;
+ *   - GRADE: worst combined gradient measured ~0.8 rise/run on massif flanks,
+ *     inside the controller's 50-degree climb limit; those steep jungle
+ *     flanks sit above grass MAX_SLOPE and read as rocky slopes;
+ *   - PLATES: physics plate count re-measured inside the <8000 budget guard.
+ */
+const HIGHLAND_AMP_M = 6.2;
+/** Distance inland where the coastal plain ends and relief may begin. */
+const HIGHLAND_SHORE_CLEAR_M =
+  FARCRYSIS_SHORE.descentStartDist + FARCRYSIS_SHORE.approachDist;
+/** Distance inland where the shore gate stops attenuating. */
+const HIGHLAND_SHORE_FULL_M = 34;
+/** Chebyshev distance where relief clears the research-station pad blend. */
+const HIGHLAND_PAD_CLEAR_M = 12;
+/** Chebyshev distance where the pad gate stops attenuating. */
+const HIGHLAND_PAD_FULL_M = 26;
+
+function highlandRelief(x: number, z: number): number {
+  const chebyshev = Math.max(Math.abs(x), Math.abs(z));
+  const dist = ARENA_HALF - chebyshev;
+  // Two opposed radial gates bound the massifs to an inland ring:
+  //   - shore gate: exactly 0 across the whole HF-393 shore blend band
+  //     (dist <= 22), so every seaward-walk contract sees the pre-relief
+  //     profile inside the probed band — pinned by the every-azimuth test;
+  //   - pad gate: eases relief out of the research-station core pad over a
+  //     WIDE 14 m band, because the pad's own 3 m blend crushing full
+  //     amplitude would present ~3 grade cliffs around the station.
+  // Radially the gates oppose each other, so their gradients never sum.
+  const inland = smoothstep(HIGHLAND_SHORE_CLEAR_M, HIGHLAND_SHORE_FULL_M, dist);
+  const offPad = smoothstep(HIGHLAND_PAD_CLEAR_M, HIGHLAND_PAD_FULL_M, chebyshev);
+  // Three uneven angular lobes so the ring reads as separate massifs...
+  const lobes = 0.66 + 0.34 * Math.sin(Math.atan2(z, x) * 3 + 0.9);
+  // ...with knoll texture so ridge lines are never straight walls.
+  const knolls = 0.78 + 0.22 * Math.sin(x * 0.17 + 0.9) * Math.cos(z * 0.15 - 1.4);
+  return HIGHLAND_AMP_M * inland * offPad * lobes * knolls;
+}
+
+
+/**
  * Interior jungle profile: gentle rolling hills, flattened to a y=0 pad
  * across the research-station footprint (Chebyshev <= 7 m, blended to 10 m),
  * then eased down onto the beach shelf across FARCRYSIS_SHORE.approachDist.
@@ -142,7 +192,7 @@ function interiorHeight(x: number, z: number, chebyshev: number, dist: number): 
   const h = Math.sin(x * 0.12) * Math.cos(z * 0.15) * 1.2
     + Math.sin(x * 0.25 + 1.3) * Math.cos(z * 0.22 + 2.1) * 0.6
     + Math.sin(z * 0.18 - 0.7) * 0.4;
-  const hills = Math.max(-0.05, h + 0.1);
+  const hills = Math.max(-0.05, h + 0.1 + highlandRelief(x, z));
   const padded = chebyshev < CORE_PAD_OUTER
     ? hills * smoothstep(CORE_PAD_INNER, CORE_PAD_OUTER, chebyshev)
     : hills;

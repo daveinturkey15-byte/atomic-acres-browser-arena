@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildGunRange, buildRustworks1v1, buildSkylineTerminal } from './additional-maps';
+import { buildFarcrysis } from './farcrysis';
+import { buildHighSeas } from './high-seas';
 import { BALLISTIC_MATERIALS } from './ballistics';
 import { ImpactPresentation, MAX_IMPACT_MARKS } from './impact-presentation';
 import { buildArena } from './map';
@@ -28,21 +30,43 @@ describe('Pass 65 collision-material decal governance', () => {
   });
 
   it('maps every shot-authority surface and raycast mesh on every arena', () => {
+    // HF-390: all SIX arenas — the previous four-arena loop never audited
+    // farcrysis (227 surfaces) or high-seas (199 surfaces) against the
+    // decal/impact registry.
     const arenas = [
       buildArena(new THREE.Scene()),
       buildRustworks1v1(new THREE.Scene()),
       buildGunRange(new THREE.Scene()),
       buildSkylineTerminal(new THREE.Scene()),
+      buildFarcrysis(new THREE.Scene()),
+      buildHighSeas(new THREE.Scene()),
     ];
     for (const arena of arenas) {
       expect(arena.shotSurfaces.length, arena.id).toBeGreaterThan(0);
-      for (const surface of arena.shotSurfaces) {
-        expect(SURFACE_IMPACT_PROFILES[surface.material], `${arena.id}:${surface.id}`).toBeDefined();
-      }
-      for (const mesh of arena.raycastMeshes) {
-        if (typeof mesh.userData.ballisticSurfaceId !== 'string') continue;
-        expect(SURFACE_IMPACT_PROFILES[mesh.userData.ballisticMaterial as keyof typeof SURFACE_IMPACT_PROFILES], `${arena.id}:${mesh.name}`).toBeDefined();
-      }
+      // Runtime-shaped harvest routed through the coverage auditor: authored
+      // shot surfaces plus EVERY mesh tagged with a ballistic material id,
+      // exactly the string ids the impact presentation resolves at hit time.
+      const harvested = [
+        ...arena.shotSurfaces.map((surface) => surface.material as string),
+        ...arena.raycastMeshes
+          .map((mesh) => mesh.userData.ballisticMaterial)
+          .filter((material): material is string => typeof material === 'string'),
+      ];
+      const audit = auditSurfaceImpactCoverage([...Object.keys(BALLISTIC_MATERIALS), ...harvested]);
+      const unauthored = new Set(audit.missing);
+      expect(
+        [
+          ...arena.shotSurfaces
+            .filter((surface) => unauthored.has(surface.material as string))
+            .map((surface) => `${arena.id}:${surface.id}`),
+          ...arena.raycastMeshes
+            .filter((mesh) => typeof mesh.userData.ballisticMaterial === 'string'
+              && unauthored.has(mesh.userData.ballisticMaterial as string))
+            .map((mesh) => `${arena.id}:${mesh.name}`),
+        ],
+        `${arena.id}: materials without an authored impact profile: ${[...unauthored].join(', ')}`,
+      ).toEqual([]);
+      expect(audit.pass, `${arena.id}: impact-profile coverage audit failed`).toBe(true);
     }
   });
 
