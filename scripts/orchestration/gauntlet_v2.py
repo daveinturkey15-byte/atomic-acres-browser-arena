@@ -44,7 +44,7 @@ GATE = os.path.join(HERE, "regression_gate.py")
 LOGDIR = os.path.join(REPO, "artifacts", "pass80-logs")
 
 sys.path.insert(0, HERE)
-from pass82_teams import TEAMS, SKILLS, SKILL_ROOT  # noqa: E402
+from pass83_teams import TEAMS, SKILLS, SKILL_ROOT  # noqa: E402
 from teams import BUILDER_PREAMBLE, CRITIC_PREAMBLE  # noqa: E402
 
 # graphics-aaa and rigging-motion are handled by dedicated Claude Opus agents running in
@@ -54,7 +54,7 @@ from teams import BUILDER_PREAMBLE, CRITIC_PREAMBLE  # noqa: E402
 # Claude agents are API-driven and barely touch local RAM, so they keep working when
 # the governor cannot grant ox-alpha budget. Two writers per domain is still forbidden.
 MAX_AGENTS = int(os.environ.get("GAUNTLET_MAX_AGENTS", "5"))
-ORDER = ["arms-animation", "farcrysis-world", "nuketown-world", "operator-identity", "materials-penetration", "hud-cascade"]
+ORDER = ["invisible-geometry", "atomic-acres-regression", "playtest-and-debug", "farcrysis-rebuild", "hijacked-refinement", "weapons-fidelity"]
 
 # A repair round may write anywhere, because a regression does not respect team ownership.
 REPAIR_TEAM = "arena-fidelity"

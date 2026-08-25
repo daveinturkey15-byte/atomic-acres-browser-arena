@@ -52,15 +52,15 @@ AGENT_GB = 0.35
 # What the reserve actually has to protect is vmmemWSL, measured at 1.37 GB and healthy.
 # Hermes began crashing when free fell to 3.5 GB. 5.5 GB leaves WSL its working set plus
 # roughly 4 GB of margin, and still refuses to dispatch into the danger zone.
-RESERVE_GB = 5.5  # MEASURED floor: Hermes on WSL began crashing at 3.5 GB free.
+RESERVE_GB = 5.5  # MEASURED floor: Hermes on WSL crashed at 3.5 GB free. Never lower.
 # Headed Chrome doing WebGPU is worth several agents. Keep it strictly narrow.
-BROWSER_SLOTS = 1  # ComfyUI is live; keep headed browsers to one
+BROWSER_SLOTS = 3  # GPU work stopped 2026-08-25 19:00; agents must PLAY the game
 # MEASURED 2026-08-25, and the single most important number here: an ox-alpha agent costs
 # ~0.35 GB, but the `npx vitest run` it is told to perform peaks at 5.63 GB and `tsc
 # --noEmit` at 3.41 GB. Verification is SIXTEEN TIMES the agent that requests it. Five
 # agents verifying together is ~28 GB - the whole machine - which is why rounds appeared to
 # be "too many agents" when they were really too many concurrent test runs.
-VERIFY_SLOTS = 1  # vitest peaks at 5.63 GB - one at a time while ComfyUI works
+VERIFY_SLOTS = 2
 VERIFY_GB = 5.7  # peak observed for a full vitest run
 # A FIXED, CROSS-HARNESS path - deliberately NOT %TEMP%. Claude Code, OMP, Codex and the
 # WSL-hosted Hermes agent must all see the SAME slots; if each harness gets its own private
