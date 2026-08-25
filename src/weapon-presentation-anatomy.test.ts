@@ -13,6 +13,8 @@ import {
   FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT,
   FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT,
   FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT,
+  FIRST_PERSON_HIP_TRIGGER_HAND_LIFT,
+  FIRST_PERSON_HIP_TRIGGER_HAND_LIFT_CEILING,
   HIP_VIEWMODEL_POSITION,
   HIP_VIEWMODEL_SCALE,
   VIEWMODEL_NEAR_PLANE_CLEARANCE,
@@ -20,6 +22,9 @@ import {
   authoredNearPlaneContactRetreat,
   firstPersonArmPresentationScale,
   firstPersonArmShoulderEntryNdc,
+  FINGER_FIRE_CURL,
+  FINGER_SUPPORT_CURL,
+  firstPersonHipTriggerHandLift,
 } from './weapon-presentation';
 import {
   VIEWMODEL_CONTACT_PROFILES,
@@ -713,6 +718,126 @@ describe('first-person anatomical presentation', () => {
         uniqueColors.add(`${colors.getX(index).toFixed(3)}:${colors.getY(index).toFixed(3)}:${colors.getZ(index).toFixed(3)}`);
       }
       expect(uniqueColors.size).toBeGreaterThanOrEqual(3);
+    }
+  });
+});
+
+/**
+ * HF-388 wiring falsifier. The per-grip-family hip lift is the change that
+ * brings the welded trigger hand back inside the frame, and a table of numbers
+ * that no live code path reads is exactly the failure this project keeps
+ * repeating. So this drives the real `update()` loop and reads
+ * `root.position.y`, not the constant.
+ *
+ * At REST_POSE every other vertical term is either zero or weapon-independent
+ * (bob, breath and the aspect-driven screen drop are shared; contact response,
+ * switch drop, reload lift, recoil kick and stance drop are all zero), so the
+ * ONLY thing that can separate two converged hip viewmodels of different grip
+ * families on the Y axis is this lift. Which is what makes the difference an
+ * exact number rather than an impression.
+ */
+describe('HF-388: the hip trigger-hand lift is applied by the live update loop', () => {
+  const settle = (weapon: WeaponId, ads: boolean) => {
+    const camera = new THREE.PerspectiveCamera(82, 16 / 9, 0.05, 250);
+    const presentation = new WeaponPresentation(camera, false);
+    presentation.setWeapon(weapon, true);
+    for (let frame = 0; frame < 400; frame += 1) {
+      presentation.update({ ...REST_POSE, ads });
+    }
+    return presentation.root.position.y;
+  };
+
+  it('separates a heavy hip viewmodel from a long-gun one by exactly the authored deficit', () => {
+    const heavy = settle('lmg', false);
+    const longGun = settle('carbine', false);
+    // The root chases its target through an exponential lerp, so 400 frames
+    // leaves a measured 0.085 mm of residual approach. Bound the error
+    // explicitly at 0.2 mm rather than rounding to a decimal place: 0.2 mm is
+    // 0.3% of the 60 mm being asserted, and stating it is how the next person
+    // knows the difference is convergence and not slack.
+    const expectedDelta = FIRST_PERSON_HIP_TRIGGER_HAND_LIFT.heavy
+      - FIRST_PERSON_HIP_TRIGGER_HAND_LIFT['long-gun'];
+    expect(Math.abs((heavy - longGun) - expectedDelta)).toBeLessThan(2e-4);
+    // ...and the heavy family is the one that needed it: measured on the live
+    // build, the M249's right-hand bones sat at NDC y -1.110..-0.888, part of
+    // the hand BELOW the bottom edge, while the carbine's sat at -0.963.
+    expect(FIRST_PERSON_HIP_TRIGGER_HAND_LIFT.heavy)
+      .toBeGreaterThan(FIRST_PERSON_HIP_TRIGGER_HAND_LIFT['long-gun']);
+  });
+
+  it('gives back exactly nothing at full ADS, so the accepted sight picture cannot move', () => {
+    expect(settle('lmg', true) - settle('carbine', true)).toBeCloseTo(0, 4);
+    for (const family of ['long-gun', 'compact', 'handgun', 'heavy', 'crossbow'] as const) {
+      expect(FIRST_PERSON_HIP_TRIGGER_HAND_LIFT[family]).toBeLessThanOrEqual(
+        FIRST_PERSON_HIP_TRIGGER_HAND_LIFT_CEILING,
+      );
+      expect(FIRST_PERSON_HIP_TRIGGER_HAND_LIFT[family]).toBeGreaterThan(0);
+    }
+    expect(firstPersonHipTriggerHandLift('lmg', 1, 0)).toBe(0);
+    expect(firstPersonHipTriggerHandLift('lmg', 0, 1)).toBe(0);
+    expect(firstPersonHipTriggerHandLift('lmg', 0, 0))
+      .toBeCloseTo(FIRST_PERSON_HIP_TRIGGER_HAND_LIFT.heavy, 8);
+  });
+});
+
+/**
+ * HF-388. The support hand's curl table, pinned to the SHAPE a chained
+ * finger-curl constraint produces - the rig idea taken from the CC0 reference
+ * (para, OpenGameArt, public domain; register row 31). Numbers may be re-tuned;
+ * these properties may not be quietly flattened back out, which is what left
+ * the support index bending four degrees and the hand reading as an open plate
+ * laid on the handguard instead of a hand closed around it.
+ */
+describe('HF-388: the support hand closes on the handguard like a C-clamp', () => {
+  const DIGITS = ['index', 'middle', 'ring', 'pinky'] as const;
+
+  it('curls monotonically down each finger, deepest at the middle joint', () => {
+    for (const digit of DIGITS) {
+      const [metacarpal, middle, distal] = FINGER_SUPPORT_CURL[digit];
+      // A chained constraint compounds into the chain, so the metacarpal is
+      // never the deepest joint...
+      expect(Math.abs(middle), digit).toBeGreaterThan(Math.abs(metacarpal));
+      expect(Math.abs(middle), digit).toBeGreaterThan(Math.abs(distal));
+      // ...and every joint is genuinely closed, not a token few degrees. The
+      // pre-HF-388 support index metacarpal was 0.07 rad - four degrees.
+      expect(Math.abs(metacarpal), digit).toBeGreaterThan(0.2);
+      expect(metacarpal, digit).toBeLessThan(0);
+      expect(middle, digit).toBeLessThan(0);
+      expect(distal, digit).toBeLessThan(0);
+    }
+  });
+
+  it('keeps the index shallowest and the little finger deepest, and the thumb opposed', () => {
+    for (let index = 1; index < DIGITS.length; index += 1) {
+      const previous = FINGER_SUPPORT_CURL[DIGITS[index - 1]!];
+      const current = FINGER_SUPPORT_CURL[DIGITS[index]!];
+      for (let joint = 0; joint < 3; joint += 1) {
+        expect(Math.abs(current[joint]!), `${DIGITS[index]}[${joint}]`)
+          .toBeGreaterThan(Math.abs(previous[joint]!));
+      }
+    }
+    // The thumb's metacarpal stays ABDUCTED (positive) so it lies over the
+    // rail. A negative value here would be a fist, not a support grip.
+    expect(FINGER_SUPPORT_CURL.thumb[0]).toBeGreaterThan(0);
+    expect(FINGER_SUPPORT_CURL.thumb[1]).toBeLessThan(0);
+    // The support hand still reads as a clamp, not the trigger fist: the three
+    // WRAPPING fingers stay shallower than the firing hand's same joint.
+    for (const digit of ['middle', 'ring', 'pinky'] as const) {
+      for (let joint = 0; joint < 3; joint += 1) {
+        expect(Math.abs(FINGER_SUPPORT_CURL[digit][joint]!), `${digit}[${joint}]`)
+          .toBeLessThan(Math.abs(FINGER_FIRE_CURL[digit][joint]!));
+      }
+    }
+    // The index is the one digit that inverts, and deliberately: the FIRING
+    // index lies along a trigger, so it is the shallowest finger of the firing
+    // hand, while the SUPPORT index wraps a handguard like the rest of its
+    // hand. Asserting "support is always shallower" here would have pinned the
+    // wrong anatomy - it is pinned in the direction the hands actually work.
+    for (let joint = 0; joint < 3; joint += 1) {
+      expect(Math.abs(FINGER_FIRE_CURL.index[joint]!), `fire index[${joint}]`)
+        .toBeLessThan(Math.abs(FINGER_FIRE_CURL.middle[joint]!));
+      expect(Math.abs(FINGER_SUPPORT_CURL.index[joint]!), `support index[${joint}]`)
+        .toBeGreaterThan(Math.abs(FINGER_FIRE_CURL.index[joint]!));
     }
   });
 });

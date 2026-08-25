@@ -339,7 +339,7 @@ type FingerCurlProfile = Readonly<Record<FirstPersonFingerBone['digit'], readonl
 // too far, and spread the firing hand even though only the C-clamp support hand
 // is authored with lateral separation. The exact profiles make the visible
 // glove close around the grip rather than merely putting its palm on a socket.
-const FINGER_FIRE_CURL: FingerCurlProfile = Object.freeze({
+export const FINGER_FIRE_CURL: FingerCurlProfile = Object.freeze({
   index: [-0.28, -0.46, -0.34],
   middle: [-0.42, -0.70, -0.52],
   ring: [-0.46, -0.76, -0.56],
@@ -370,7 +370,8 @@ const FINGER_FIRE_CURL: FingerCurlProfile = Object.freeze({
  * stays the shallowest finger. FINGER_FIRE_CURL is untouched - the trigger
  * hand was never the one that failed to read.
  */
-const FINGER_SUPPORT_CURL: FingerCurlProfile = Object.freeze({
+export const FIRST_PERSON_SUPPORT_GRIP_CONTRACT = 'monotonic-chained-c-clamp-support-curl-v1';
+export const FINGER_SUPPORT_CURL: FingerCurlProfile = Object.freeze({
   index: [-0.30, -0.52, -0.40],
   middle: [-0.36, -0.60, -0.46],
   ring: [-0.40, -0.66, -0.50],
@@ -634,11 +635,11 @@ export const HIP_VIEWMODEL_SCALE = 0.82;
  */
 export const FIRST_PERSON_HIP_TRIGGER_HAND_LIFT_CONTRACT = 'per-grip-family-hip-trigger-hand-lift-v1';
 export const FIRST_PERSON_HIP_TRIGGER_HAND_LIFT: Readonly<Record<ViewmodelGripFamily, number>> = Object.freeze({
-  'long-gun': 0.1,
-  compact: 0.1,
-  handgun: 0.07,
-  heavy: 0.19,
-  crossbow: 0.09,
+  'long-gun': 0.09,
+  compact: 0.09,
+  handgun: 0.06,
+  heavy: 0.15,
+  crossbow: 0.08,
 });
 /** No family may buy hand framing with more than this much screen. */
 export const FIRST_PERSON_HIP_TRIGGER_HAND_LIFT_CEILING = 0.2;

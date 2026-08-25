@@ -864,7 +864,15 @@ export const FIRST_PERSON_ARM_TARGET_SRGB_LUMINANCE: Readonly<Record<'sleeve' | 
   sleeve: 0.35,
   glove: 0.28,
 });
-export const FIRST_PERSON_ARM_CHROMA_GAIN = 1.4;
+/**
+ * Chroma restoration applied while re-basing onto the luminance target.
+ * 1.4 left the tightest produced pair (default vs navalops sleeve) at
+ * 40/255 sRGB separation - below the four-skin separability contract's
+ * 0.16 floor (operator-model.test.ts). 1.45 puts that pair at 44/255
+ * (0.1725) with no channel clamped on any skin or role, so the exact
+ * luminance landing is preserved.
+ */
+export const FIRST_PERSON_ARM_CHROMA_GAIN = 1.45;
 
 function srgbChannels(hex: number): [number, number, number] {
   return [((hex >> 16) & 0xff) / 255, ((hex >> 8) & 0xff) / 255, (hex & 0xff) / 255];

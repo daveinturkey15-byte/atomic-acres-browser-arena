@@ -262,6 +262,47 @@ const handFramingScript = () => {
       maxY: 1 - (rect.top / innerHeight) * 2,
     };
   };
+  // COMBAT SAFETY. The whole-viewmodel NDC AABB is useless for this question -
+  // an M249's barrel sweeps far enough that its box contains the crosshair
+  // while the gun itself is nowhere near it. So project each VISIBLE MESH's
+  // own bounding box, eight corners at a time, and ask which of those boxes
+  // contains screen centre. A mesh-level box is tight enough to be an answer.
+  const centreOccluders = [];
+  const viewmodelRoot = viewmodelRoots[0] ?? null;
+  if (viewmodelRoot) {
+    viewmodelRoot.updateWorldMatrix(true, true);
+    viewmodelRoot.traverse((node) => {
+      if (!node.isMesh || !node.visible) return;
+      let ancestorHidden = false;
+      for (let parent = node.parent; parent; parent = parent.parent) {
+        if (!parent.visible) ancestorHidden = true;
+        if (parent === viewmodelRoot) break;
+      }
+      if (ancestorHidden) return;
+      if (!node.geometry?.boundingBox) node.geometry?.computeBoundingBox?.();
+      const box = node.geometry?.boundingBox;
+      if (!box) return;
+      let minX = Infinity; let maxX = -Infinity; let minY = Infinity; let maxY = -Infinity;
+      let behind = 0;
+      for (let corner = 0; corner < 8; corner += 1) {
+        const point = new (node.position.constructor)(
+          corner & 1 ? box.max.x : box.min.x,
+          corner & 2 ? box.max.y : box.min.y,
+          corner & 4 ? box.max.z : box.min.z,
+        ).applyMatrix4(node.matrixWorld).project(camera);
+        if (point.z > 1) behind += 1;
+        minX = Math.min(minX, point.x); maxX = Math.max(maxX, point.x);
+        minY = Math.min(minY, point.y); maxY = Math.max(maxY, point.y);
+      }
+      if (behind === 8) return;
+      if (minX <= 0 && maxX >= 0 && minY <= 0 && maxY >= 0) {
+        centreOccluders.push({
+          mesh: String(node.name ?? ''),
+          ndcBox: [Number(minX.toFixed(3)), Number(maxX.toFixed(3)), Number(minY.toFixed(3)), Number(maxY.toFixed(3))],
+        });
+      }
+    });
+  }
   const presentation = api.snapshot().weaponPresentation ?? null;
   const materialRows = [];
   const seenMaterials = new Set();
@@ -294,6 +335,7 @@ const handFramingScript = () => {
   });
   return {
     weapon: presentation?.weapon ?? null,
+    centreOccluders,
     armMaterialDetail: materialRows,
     viewmodelFills: fills,
     handNdc: { left: summarise(sides.left.hand), right: summarise(sides.right.hand) },
@@ -388,13 +430,27 @@ if (ONLY !== 'bots') {
 let perSkin = { skipped: true };
 if (!SKIP_BOTS) {
   // A running match does not restage on selectArena; reload, then pick the
-  // arena that actually has a bot pool.
+  // arena that actually has a bot pool. gun-range has none, which is why the
+  // previous probe's `placeBotAhead` returned null four times.
   await page.goto(`${BASE}/?release=latest&renderer=webgpu&render=quality&seed=hf388bots&previewTime=0`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 240_000 });
   await startArena('atomic-acres');
-  await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true); });
+
+  // Solo runs ONE live bot and stages the rest as dormant reinforcements. A
+  // dormant operator is never stepped, so its director never advances and its
+  // `currentBase` stays at the constructor default - which is exactly what a
+  // reader would mistake for "every bot animates the same". Activate them
+  // first, THEN judge.
+  const activations = [];
+  for (let index = 0; index < 6; index += 1) {
+    activations.push(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.activateDormantReinforcement()));
+    await page.waitForTimeout(350);
+  }
   await page.waitForTimeout(2600);
-  const roster = await page.evaluate(() => {
+  await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true); });
+  await page.waitForTimeout(1600);
+
+  const readRoster = () => page.evaluate(() => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
     const rows = [];
     api.sampleSceneGraph().traverse((node) => {
@@ -403,58 +459,149 @@ if (!SKIP_BOTS) {
       const name = String(node.name ?? '');
       if (!name.includes('bot-operator')) return;
       const director = runtimeState.director;
+      const animation = runtimeState.lastAnimation;
       node.updateWorldMatrix(true, false);
       const world = node.getWorldPosition(new node.position.constructor());
+      const bone = (key) => {
+        const target = runtimeState.poseBones?.[key];
+        return target ? Number(target.rotation.x.toFixed(5)) : null;
+      };
       rows.push({
-        name,
         playerId: node.userData.playerId ?? null,
         skinId: String(node.userData.operatorSkinId ?? '(unset)'),
         archetype: director?.profile?.archetype ?? null,
-        idlePreference: director?.profile?.idleClipPreference ?? null,
+        idlePreference: director?.profile?.idleClipPreference?.[0] ?? null,
         posture: director?.profile?.posture ?? null,
         breathHz: director?.profile?.additive?.breathHz ?? null,
-        breathAmplitudeRadians: director?.profile?.additive?.breathAmplitudeRadians ?? null,
         aimResponseHz: director?.profile?.additive?.aimResponseHz ?? null,
-        turnRateRadiansPerSecond: director?.profile?.additive?.turnRateRadiansPerSecond ?? null,
         hitReactionGain: director?.profile?.hitReactionGain ?? null,
         transitionScale: director?.profile?.transitionScale ?? null,
+        // The three that decide whether any of the above reaches a pixel.
+        animated: Boolean(animation),
+        selectedClip: animation?.selectedClip ?? null,
         currentBase: runtimeState.currentBase ?? null,
-        activeAnimationClips: runtimeState.activeAnimationClips ?? null,
+        appliedPosture: animation?.posture ?? null,
+        // Post-mixer spine chain: the bones the posture bias is written onto.
+        boneAbdomenPitch: bone('abdomen'),
+        boneChestPitch: bone('chest'),
+        boneHeadPitch: bone('head'),
         visible: node.visible,
         world: [world.x, world.y, world.z],
-        yaw: node.rotation.y,
       });
     });
     return rows;
   });
-  log('bot roster', roster.length, roster.map((row) => `${row.skinId}/${row.archetype}`).join(' '));
 
-  const framed = [];
-  const seen = new Set();
-  for (const row of roster) {
-    if (seen.has(row.skinId)) continue;
-    seen.add(row.skinId);
-    await page.evaluate((bot) => {
-      const bearing = bot.yaw + Math.PI * 0.8;
-      const distance = 3.2;
-      const x = bot.world[0] + Math.sin(bearing) * distance;
-      const z = bot.world[2] + Math.cos(bearing) * distance;
-      window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(
-        x, bot.world[1] + 1.3, z, Math.atan2(bot.world[0] - x, bot.world[2] - z) + Math.PI, -0.02, 38, 0, 1,
-      );
-    }, row);
-    await page.waitForTimeout(1500);
-    const file = `${OUT}/skin-${row.skinId}.png`;
-    await page.screenshot({ path: resolve(file) });
-    framed.push({ skinId: row.skinId, archetype: row.archetype, frame: file, name: row.name });
-    log('framed', row.skinId, row.archetype);
+  let roster = await readRoster();
+  log('roster', roster.length, 'animated', roster.filter((row) => row.animated).length);
+
+  // Stage a clear lane with the debug helper (it ray-tests the route), then
+  // move one operator of each skin into that lane so all four are judged in
+  // ONE frame under ONE light. Positions are restored afterwards.
+  const staged = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.placeBotAhead(5)).catch(() => null);
+  log('staged', staged ? JSON.stringify(staged.bot.rootPosition) : 'null');
+  let lineup = null;
+  if (staged) {
+    // placeBotAhead searches 16 bearings for a clear one, so the lane it finds
+    // is usually NOT the one the player happens to be facing. Aim at it.
+    // Forward in this codebase is (-sin yaw, 0, -cos yaw).
+    await page.evaluate((stage) => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      const from = stage.sourcePlayer.position;
+      const to = stage.bot.rootPosition;
+      const yaw = Math.atan2(from[0] - to[0], from[2] - to[2]);
+      api.teleportPlayer(from[0], from[1], from[2], yaw, 0);
+    }, staged);
+    await page.waitForTimeout(900);
+    lineup = await page.evaluate((stage) => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      const from = stage.sourcePlayer.position;
+      const to = stage.bot.rootPosition;
+      const yaw = Math.atan2(from[0] - to[0], from[2] - to[2]);
+      const right = [Math.cos(yaw), 0, -Math.sin(yaw)];
+      const centre = stage.bot.rootPosition;
+      const bySkin = new Map();
+      const restore = [];
+      api.sampleSceneGraph().traverse((node) => {
+        if (!node.userData?.riggedOperatorRuntime) return;
+        if (!String(node.name ?? '').includes('bot-operator')) return;
+        const skinId = String(node.userData.operatorSkinId ?? '(unset)');
+        if (!bySkin.has(skinId)) bySkin.set(skinId, node);
+      });
+      const order = [...bySkin.keys()].sort();
+      const placedSkins = [];
+      order.forEach((skinId, index) => {
+        const node = bySkin.get(skinId);
+        // Shifted left of centre so the first-person viewmodel (which owns the
+        // right of the frame) cannot hide an operator we are comparing.
+        const offset = (index - (order.length - 1) / 2) * 1.15 - 1.15;
+        restore.push({ skinId, position: node.position.toArray(), rotationY: node.rotation.y });
+        node.position.set(
+          centre[0] + right[0] * offset,
+          centre[1],
+          centre[2] + right[2] * offset,
+        );
+        node.rotation.y = yaw + Math.PI;
+        node.updateMatrixWorld(true);
+        placedSkins.push({ skinId, position: node.position.toArray() });
+      });
+      window.__HF388_RESTORE__ = restore;
+      return { order, placedSkins, playerYaw: yaw, lineupCentre: centre };
+    }, staged);
+    await page.waitForTimeout(2600);
+    await page.screenshot({ path: resolve(`${OUT}/per-skin-lineup.png`) });
+    log('lineup captured', JSON.stringify(lineup.order));
+    // A second frame a beat later: two frames of the same lineup are how a
+    // per-operator idle PHASE offset shows up at all.
+    await page.waitForTimeout(1700);
+    await page.screenshot({ path: resolve(`${OUT}/per-skin-lineup-t2.png`) });
+    roster = await readRoster();
+    // Per-skin portraits from the PLAYER'S OWN EYE down the lane that
+    // placeBotAhead already proved clear, narrowed to a 22-degree lens. Same
+    // eye, same light, same lane for all four - only the operator changes.
+    // Per-skin portraits through the PLAYER'S OWN camera - the one framing
+    // already proven to work - yawed onto each operator in turn. Same eye,
+    // same lane, same light; only the operator changes.
+    for (const placed of lineup.placedSkins) {
+      await page.evaluate((entry) => {
+        const api = window.__ATOMIC_ACRES_DEBUG__;
+        const from = entry.from;
+        const to = entry.position;
+        const yaw = Math.atan2(from[0] - to[0], from[2] - to[2]);
+        api.teleportPlayer(from[0], from[1], from[2], yaw, 0);
+      }, { ...placed, from: staged.sourcePlayer.position });
+      await page.waitForTimeout(1200);
+      await page.screenshot({ path: resolve(`${OUT}/skin-${placed.skinId}.png`) });
+      log('portrait', placed.skinId);
+    }
+    await page.evaluate(() => {
+      const restore = window.__HF388_RESTORE__ ?? [];
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      const bySkin = new Map();
+      api.sampleSceneGraph().traverse((node) => {
+        if (!node.userData?.riggedOperatorRuntime) return;
+        if (!String(node.name ?? '').includes('bot-operator')) return;
+        const skinId = String(node.userData.operatorSkinId ?? '(unset)');
+        if (!bySkin.has(skinId)) bySkin.set(skinId, node);
+      });
+      for (const entry of restore) {
+        const node = bySkin.get(entry.skinId);
+        if (!node) continue;
+        node.position.fromArray(entry.position);
+        node.rotation.y = entry.rotationY;
+        node.updateMatrixWorld(true);
+      }
+    });
   }
-  await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(null); });
+  await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(false); });
   perSkin = {
+    activations,
     roster,
+    lineup,
+    lineupFrames: lineup ? [`${OUT}/per-skin-lineup.png`, `${OUT}/per-skin-lineup-t2.png`] : [],
     distinctSkins: [...new Set(roster.map((row) => row.skinId))],
     distinctArchetypes: [...new Set(roster.map((row) => row.archetype))],
-    framed,
+    animatedCount: roster.filter((row) => row.animated).length,
   };
 }
 
