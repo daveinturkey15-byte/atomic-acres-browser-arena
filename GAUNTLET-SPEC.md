@@ -118,13 +118,25 @@ Owner's raw words: `artifacts/OWNER-REQUESTS-LAST-3-DAYS.md`.
 
 ### P0 — blockers that stop a build shipping
 
-- **MAX preset cannot deploy.** Cold pipeline compile measures 5.17 / 5.59 / 6.48 / 6.54 s
-  against a 4000 ms admission bound; the player picks MAX and is bounced to the menu with
-  "WebGPU queue completion exceeded 4000 ms". HIGH is 2.83 / 4.50 s, already marginal. A
-  previous agent built a cold-start allowance and reverted it twice: the one-shot budget is
-  spent on the menu's first flush so it never reaches the arena rebuild, and an
-  unconditional extension turns a graceful failure into a browser crash. Fix it at the
-  arena-rebuild boundary, or pre-warm pipelines. **Do not weaken the 4 s guard.**
+- **MAX preset - RESOLVED 2026-08-25, and the P0 was never what it appeared.** MAX now
+  admits on ALL SIX arenas, measured on real WebGPU on an RTX 5080 through the owner's own
+  route (OPTIONS -> MAX -> DEPLOY -> reload) with the preset PROVEN APPLIED before any
+  timing was taken: high-seas 2.05 s, skyline-terminal 4.23, atomic-acres 5.52, gun-range
+  6.49, rustworks-1v1 6.52, farcrysis 13.97 - every one admitted, `maxCompletionLatencyMs 0`.
+  The 5.17-6.54 s figures were real but were being judged against the wrong bound: that work
+  had already moved off the 4 s guard and behind the **12 s cold fence** in earlier commits.
+  **Why two agents 'failed' it:** the only harness could not apply MAX at all.
+  `measure-preset-admission.mjs` set `#graphics-profile` and dispatched `change`, which only
+  records `pendingGraphicsPreset`; the transaction flushes when the player LEAVES the options
+  tab, and MAX stages a topology change so the flush ends in a full page reload. The harness
+  never left the tab, never reloaded, and therefore timed the PREVIOUS preset. It also read
+  `snapshot().graphics`, which does not exist - the field is `snapshot().settings.graphics` -
+  so its receipts recorded `"graphics": null` and could not catch its own blindness.
+  **The lesson to carry: a harness that cannot fail is not evidence.** Prove the thing under
+  test is actually in the state you think before you record a number.
+  STILL WATCH: farcrysis at 13.97 s is nearest the cliff. It only fits because 8.24 s of that
+  is in a YIELDING `compileAsync`; collapse that into one fenced submission and it exceeds
+  12 s and stops booting, exactly as HF-374 recorded.
 - **Arenas may not commit** on this tree ("Selected arena atomic-acres did not commit before
   match start", `arenaTransitionPhase: failed`) — solo included. Suspected collision between
   concurrent arena/rendering edits, but the machine was at 100% CPU during the only
