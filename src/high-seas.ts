@@ -355,7 +355,13 @@ function generateMaterialTextureSet(
   switch (family) {
     case 'deck':
     case 'stair': {
-      normalStrength = 3.8;
+      // Pass 79 refinement: the shared 3.8 groove strength was crushing the
+      // sun response on the open deck. At the arena's 19-degree sun a flat
+      // plank catches NdotL ~0.33; the deep groove normal map pulled the
+      // average far below that and the honey deck read as dark maroon. Deck
+      // keeps readable but shallower grooves; the stair keeps the deeper cut
+      // because its treads are seen at grazing angles under the cabin roof.
+      normalStrength = family === 'deck' ? 2.2 : 3.2;
       for (let y = 0; y < size; y += 1) {
         for (let x = 0; x < size; x += 1) {
           const plankIdx = Math.floor(x / 32);
@@ -368,9 +374,12 @@ function generateMaterialTextureSet(
           const pIndex = y * size + x;
 
           if (isCaulk) {
-            albedoData[offset] = 26;
-            albedoData[offset + 1] = 24;
-            albedoData[offset + 2] = 22;
+            // Pass 79 refinement: near-black caulk over 14 cm planks read as
+            // stripes of void and dragged the whole deck toward maroon. A warm
+            // dark brown keeps the seam read at a fraction of the contrast loss.
+            albedoData[offset] = 64;
+            albedoData[offset + 1] = 56;
+            albedoData[offset + 2] = 48;
             albedoData[offset + 3] = 255;
 
             roughnessData[offset] = 230;
@@ -378,16 +387,16 @@ function generateMaterialTextureSet(
             roughnessData[offset + 2] = 230;
             roughnessData[offset + 3] = 255;
 
-            heightData[pIndex] = 0.10;
+            heightData[pIndex] = 0.24;
           } else {
             const edgeDist = Math.min(px - 3, 31 - px);
             const bevel = Math.min(1.0, edgeDist / 2.0);
             const r = THREE.MathUtils.clamp(Math.round(baseR * (1 + plankTone + grain) * (0.85 + 0.15 * bevel)), 0, 255);
             const g = THREE.MathUtils.clamp(Math.round(baseG * (1 + plankTone + grain) * (0.85 + 0.15 * bevel)), 0, 255);
             const b = THREE.MathUtils.clamp(Math.round(baseB * (1 + plankTone + grain) * (0.85 + 0.15 * bevel)), 0, 255);
-
-            albedoData[offset] = r;
-            albedoData[offset + 1] = g;
+            const r = THREE.MathUtils.clamp(Math.round(baseR * (1 + plankTone + grain) * (0.92 + 0.08 * bevel)), 0, 255);
+            const g = THREE.MathUtils.clamp(Math.round(baseG * (1 + plankTone + grain) * (0.92 + 0.08 * bevel)), 0, 255);
+            const b = THREE.MathUtils.clamp(Math.round(baseB * (1 + plankTone + grain) * (0.92 + 0.08 * bevel)), 0, 255);
             albedoData[offset + 2] = b;
             albedoData[offset + 3] = 255;
 
@@ -1457,6 +1466,88 @@ function addRampTreads(
   mergedDetailBoxes(builder, `high-seas-${id}-treads`, parts, treadMaterial);
 }
 
+/**
+ * Analytic outward normals for the sculpted hull.
+ *
+ * WHY NOT computeVertexNormals. The hull index buffer deliberately winds the
+ * two lower strips opposite to the upper two (the profile reverses direction
+ * at the chine), and the bow/stern cap fans wind differently again, so
+ * computeVertexNormals averaged ACROSS those winding boundaries and produced
+ * normals that point inward or sideways - measured on the live scene, a keel
+ * vertex at (0, -5.25) carried the sideways normal (-0.99, 0.04, 0.12) and a
+ * starboard-side vertex carried a port-pointing one. A surface whose normals
+ * oppose the light renders near-black at any sun angle, which is exactly why
+ * the hull flank read as a black slab from every deck viewpoint while the
+ * material itself is pearl white.
+ *
+ * These normals are computed from the surface's own tangents instead: the
+ * along-profile tangent crossed with the along-hull tangent, which for this
+ * profile order (rail -> chine -> keel -> chine -> rail, bow to stern) points
+ * outward on every side vertex, straight down at the keel, and the caps get
+ * their exact +/-z face normal. Smooth across rings, per-profile-point within
+ * a ring - the crease at each chine is preserved because the profile tangent
+ * turns sharply there.
+ */
+function hullNormals(
+  rings: readonly Readonly<{ z: number; width: number; chine: number; keel: number }>[],
+): Float32Array {
+  const profilePoint = (ring: (typeof rings)[number], index: number): readonly [number, number, number] => {
+    switch (index) {
+      case 0: return [-ring.width, 2.9, ring.z];
+      case 1: return [-ring.chine, -1.8, ring.z];
+      case 2: return [0, ring.keel, ring.z];
+      case 3: return [ring.chine, -1.8, ring.z];
+      default: return [ring.width, 2.9, ring.z];
+    }
+  };
+  const normals = new Float32Array(rings.length * 5 * 3);
+  for (let ringIndex = 0; ringIndex < rings.length; ringIndex += 1) {
+    const previous = rings[Math.max(0, ringIndex - 1)];
+    const next = rings[Math.min(rings.length - 1, ringIndex + 1)];
+    for (let profileIndex = 0; profileIndex < 5; profileIndex += 1) {
+      const profileAhead = profilePoint(rings[ringIndex], Math.min(4, profileIndex + 1));
+      const profileBehind = profilePoint(rings[ringIndex], Math.max(0, profileIndex - 1));
+      const hullAhead = profilePoint(next, profileIndex);
+      const hullBehind = profilePoint(previous, profileIndex);
+      const tangentProfile: readonly [number, number, number] = [
+        profileAhead[0] - profileBehind[0],
+        profileAhead[1] - profileBehind[1],
+        0,
+      ];
+      const tangentHull: readonly [number, number, number] = [
+        hullAhead[0] - hullBehind[0],
+        hullAhead[1] - hullBehind[1],
+        hullAhead[2] - hullBehind[2],
+      ];
+      let nx = tangentProfile[1] * tangentHull[2] - tangentProfile[2] * tangentHull[1];
+      let ny = tangentProfile[2] * tangentHull[0] - tangentProfile[0] * tangentHull[2];
+      let nz = tangentProfile[0] * tangentHull[1] - tangentProfile[1] * tangentHull[0];
+      const length = Math.hypot(nx, ny, nz) || 1;
+      nx /= length; ny /= length; nz /= length;
+      const offset = (ringIndex * 5 + profileIndex) * 3;
+      normals[offset] = nx;
+      normals[offset + 1] = ny;
+      normals[offset + 2] = nz;
+    }
+    // End caps: flat faces whose normal is exactly the hull axis direction.
+    for (const [profileIndex, capNormalZ] of [[0, -1], [1, -1], [2, -1], [3, -1], [4, -1]] as const) {
+      if (ringIndex !== 0) continue;
+      const offset = (ringIndex * 5 + profileIndex) * 3;
+      normals[offset] = 0;
+      normals[offset + 1] = 0;
+      normals[offset + 2] = capNormalZ;
+    }
+    for (const [profileIndex, capNormalZ] of [[0, 1], [1, 1], [2, 1], [3, 1], [4, 1]] as const) {
+      if (ringIndex !== rings.length - 1) continue;
+      const offset = (ringIndex * 5 + profileIndex) * 3;
+      normals[offset] = 0;
+      normals[offset + 1] = 0;
+      normals[offset + 2] = capNormalZ;
+    }
+  }
+  return normals;
+}
+
 function createHullGeometry(): THREE.BufferGeometry {
   const rings = [
     { z: -44.0, width: 1.25, chine: 0.88, keel: -4.5 },
@@ -1503,9 +1594,9 @@ function createHullGeometry(): THREE.BufferGeometry {
   indices.push(stern, stern + 1, stern + 2, stern, stern + 2, stern + 3, stern, stern + 3, stern + 4);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(hullNormals(rings), 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
-  geometry.computeVertexNormals();
   return geometry;
 }
 
@@ -2323,7 +2414,14 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
   const roofMaterial = material('silver-roof', 0xcbd6d5, 0.3, 0.48);
   const deckMaterial = material('honey-deck', 0xb78653, 0.7, 0.08);
   const stairMaterial = material('dark-deck-stair', 0x5a4032, 0.76, 0.08);
-  const tealTrimMaterial = material('deep-teal-trim', 0x164c58, 0.32, 0.62);
+  // HF-392 round 2: metalness 0.62 rendered the entire window framing
+  // (sills, headers, mullions), the roof inlay and the rails near-black -
+  // with no environment reflections a 62% metal shows almost no diffuse
+  // colour, so every deckhouse window band read as a black slot from outside
+  // and inside alike. Painted marine trim is dielectric: metalness 0.08 lets
+  // the deep teal albedo actually reach the eye while the roughness map keeps
+  // the satin finish.
+  const tealTrimMaterial = material('deep-teal-trim', 0x164c58, 0.32, 0.08);
   // HF-373: the three engine families carry the enclosed-volume fill because
   // none of them ever rises above the deck plane - the bulkhead liner and the
   // machinery are sealed inside the corridor, and grating stops flush with the
@@ -2359,13 +2457,18 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
   // slots - while from inside it washed out to a flat cyan slab. A dark
   // marine tint at higher coverage reads as tinted glazing in BOTH directions
   // and keeps the low-roughness sun glint that sells it as glass.
+  // HF-392 round 2: coverage 0.55 over the dark tint rendered the bays as a
+  // solid black mirror from every oblique exterior angle (dielectric fresnel
+  // reflects only direct lights here, so the grazing lobe had nothing to show
+  // but black). 0.4 keeps the tinted-glass read straight on while the view
+  // through the pane survives half-angle approaches.
   const glassTextures = generateMaterialTextureSet('glass', 0x1f3d46);
   const glassMaterial = new THREE.MeshStandardMaterial({
     color: 0x1f3d46,
     roughness: 0.1,
     metalness: 0.05,
     transparent: true,
-    opacity: 0.55,
+    opacity: 0.4,
     depthWrite: false,
     ...(glassTextures.normalMap ? { normalMap: glassTextures.normalMap } : {}),
     ...(glassTextures.roughnessMap ? { roughnessMap: glassTextures.roughnessMap } : {}),

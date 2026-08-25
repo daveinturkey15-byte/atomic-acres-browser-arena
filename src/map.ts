@@ -302,14 +302,23 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     };
 
     if (id === 'north-cargo-stack') {
-      for (const offset of [-1, 1]) addBox('performance-cargo-lower', [x + offset, 0.52, z], [1.85, 1.04, 1.82], offset < 0 ? palette.aqua : palette.mustard);
+      // HF-387 player-body half: the lower crates used to span x +/- 1.925
+      // while the frozen COVER_LAYOUT authority for this anchor is only
+      // +/- 1.4 wide, so a player hugging the stack put the camera eye up to
+      // 5 cm inside visible crate mass that nothing blocked. The silhouette
+      // now sits INSIDE the frozen authority envelope (visible mass matches
+      // movement/shot authority) instead of widening the frozen gameplay
+      // layout, which world-identity pins forbid.
+      for (const offset of [-0.7, 0.7]) addBox('performance-cargo-lower', [x + offset, 0.52, z], [1.4, 1.04, 1.82], offset < 0 ? palette.aqua : palette.mustard);
       addBox('performance-cargo-upper', [x, 1.62, z], [2.15, 1.04, 1.82], palette.aqua);
-      for (const offset of [-0.82, 0.82]) addBox('performance-cargo-lock-rail', [x + offset, 1.62, z - 0.93], [0.12, 0.9, 0.08], palette.dark);
+      for (const offset of [-0.62, 0.62]) addBox('performance-cargo-lock-rail', [x + offset, 1.62, z - 0.93], [0.12, 0.9, 0.08], palette.dark);
       return { kind: 'cargo-stack', meshes };
     }
 
     if (id === 'south-pipe-stack') {
-      for (const offset of [-1.15, 0, 1.15]) addCylinder('performance-concrete-pipe', [x + offset, 0.53, z], 0.52, 1.82, palette.concrete, [Math.PI / 2, 0, 0], true);
+      // HF-387: same authority-wrap rule as the cargo stack - pipe extents
+      // stay inside the +/- 1.4 m frozen cover width.
+      for (const offset of [-0.85, 0, 0.85]) addCylinder('performance-concrete-pipe', [x + offset, 0.53, z], 0.52, 1.82, palette.concrete, [Math.PI / 2, 0, 0], true);
       for (const offset of [-0.58, 0.58]) addCylinder('performance-concrete-pipe', [x + offset, 1.52, z], 0.52, 1.82, palette.concrete, [Math.PI / 2, 0, 0], true);
       return { kind: 'pipe-stack', meshes };
     }
@@ -790,9 +799,18 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   box('east fence', [31.3, 1.5, 0], [0.6, 3, 64.6], palette.timber);
   box('north fence', [0, 1.5, -31.8], [63, 3, 0.6], palette.timber);
   box('south fence', [0, 1.5, 31.8], [63, 3, 0.6], palette.timber);
+  // HF-387 player-body half: these posts used to sit at +/-30.9, protruding
+  // ~0.5 m into the play space past the world-boundary collider with NO
+  // movement authority of their own. The audit marched the real capsule into
+  // the boundary and measured the camera eye up to 1.4 cm from the post mesh
+  // (stand) and inside its slab when prone/crouched - a near-plane clip the
+  // owner reads as "clipping through walls". Posts now sit proud on the
+  // outside face of the fence run, fully beyond ARENA_BOUNDS, so visible mass
+  // and reachable eye shells agree again. Purely visual relocation; no
+  // clearance constant or gameplay value changed.
   for (let z = -28.5; z <= 28.5; z += 7.125) {
-    box('fence post', [-30.9, 2.1, z], [0.8, 4.2, 0.8], palette.dark, false);
-    box('fence post', [30.9, 2.1, z], [0.8, 4.2, 0.8], palette.dark, false);
+    box('fence post', [-31.45, 2.1, z], [0.8, 4.2, 0.8], palette.dark, false);
+    box('fence post', [31.45, 2.1, z], [0.8, 4.2, 0.8], palette.dark, false);
   }
 
   function sign(text: string, x: number, y: number, z: number, rotationY = 0): void {
@@ -827,10 +845,14 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     root.userData.targetId = id;
     root.position.set(x, 0, z);
     const targetMat = team === 0 ? palette.aqua : palette.coral;
+    // Named so camera-clip audits can attribute eye-in-geometry hits to the
+    // soft practice dummies instead of an anonymous mesh.
     const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 1.05, 5, 10), targetMat);
+    torso.name = `${id}-torso`;
     torso.position.y = 1.05;
     torso.castShadow = true;
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 8), palette.cream);
+    head.name = `${id}-head`;
     head.position.y = 1.92;
     head.castShadow = true;
     root.add(torso, head);

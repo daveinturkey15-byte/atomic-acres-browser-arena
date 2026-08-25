@@ -148,11 +148,6 @@ const ZONE = {
   strand: Object.freeze([WATERLINE_EDGE + 0.5, WATERLINE_EDGE + 6]),
 } as const;
 
-/** Mid-jungle depth: halfway between the jungle zone's inner and outer
- *  shore-edge bounds. Species bands that stop partway inland derive from
- *  this instead of a hand-scaled legacy radius. */
-const MID_JUNGLE_EDGE = ZONE.jungle[0] + (ZONE.jungle[1] - ZONE.jungle[0]) * 0.5;
-
 /**
  * Edge-band scatter: uniform deterministic samples over the island square,
  * accepted when their shore-edge distance falls inside [innerEdge, outerEdge].
@@ -220,7 +215,7 @@ function poissonEdgeBandPositions(
 
 /**
  * Grove variant of edgeBandPositions: Poisson-separated grove centres inside
- * an edge band, then splayed stems are scattered around each centre.
+ * an edge band, then the same splayed-stem scatter grovePositions used.
  */
 function groveEdgePositions(
   groves: number,
@@ -677,14 +672,8 @@ function addPalms(root: THREE.Group): void {
   // through the shared enhanced-palm builder (fan crowns, tapered leaning
   // trunks, coconuts), so all three palm systems in the arena are one look.
   const count = 44; // HF-396: doubled with the island area
-  // fw-vegetation-radii: beach/outer-ring species keyed to the SQUARE shore
-  // via the same edge-band convention as the migrated Pass 69 layers — the
-  // pre-HF-396 circular ring 38-60 stranded beach palms inland along the
-  // diagonals.
-  const positions = edgeBandPositions(
-    count, ZONE.beach[0], ZONE.transition[1], 2.5, nameSeed('farcrysis-vege-palm-trunks'),
-  );
-  const placements: PalmPlacement[] = positions.map(([x, z, , angle], i) => {
+  const positions = ringPositions(count, 38, 60);
+  const placements: PalmPlacement[] = positions.map(([x, z, angle], i) => {
     const scale = 0.85 + (i % 3) * 0.12;
     return {
       x,
@@ -728,14 +717,14 @@ function addPalms(root: THREE.Group): void {
   // Deep jungle green — distinct from the frond palette so the texture
   // classifier never mistakes the impostor for a frond surface again.
   const lodMat = vegeMat(0x2b4d26, 0.9, 0.02);
-  const lodMesh = new THREE.InstancedMesh(lodGeom, lodMat, placements.length);
+  const lodMesh = new THREE.InstancedMesh(lodGeom, lodMat, count);
   lodMesh.name = 'farcrysis-vege-palm-imposters';
   lodMesh.castShadow = false;
   lodMesh.receiveShadow = true;
   lodMesh.userData.farcrysisArt = true;
 
   const lodM = new THREE.Matrix4();
-  for (let i = 0; i < placements.length; i++) {
+  for (let i = 0; i < count; i++) {
     const placement = placements[i];
     lodM.compose(
       new THREE.Vector3(placement.x, placement.baseY, placement.z),
@@ -769,10 +758,10 @@ function addBroadleafTrees(root: THREE.Group): void {
 
   const tMat = new THREE.Matrix4();
   const cMat = new THREE.Matrix4();
-  const positions = edgeBandPositions(count, ZONE.jungle[0], ZONE.jungle[1], 3.5, nameSeed('farcrysis-vege-broadleaf-trunks'));
+  const positions = discPositions(count, 40); // HF-396
 
   for (let i = 0; i < count; i += 1) {
-    const [x, z, , angle] = positions[i];
+    const [x, z, angle] = positions[i];
     // HF-360: seated on the terrain authority (was flat baseY=1.3).
     const baseY = terrainHeightAt(x, z) + 1.3;
     const canopyY = baseY + 2.4;
@@ -838,10 +827,10 @@ function addFanPalms(root: THREE.Group): void {
   fans.name = 'farcrysis-vege-fan-palms';
 
   const matrix = new THREE.Matrix4();
-  const positions = edgeBandPositions(count, ZONE.transition[0], MID_JUNGLE_EDGE, 2.0, nameSeed('farcrysis-vege-fan-palms'));
+  const positions = discPositions(count, 32); // HF-396
 
   for (let i = 0; i < count; i += 1) {
-    const [x, z, , angle] = positions[i];
+    const [x, z, angle] = positions[i];
     const s = 0.75 + (i % 5) * 0.14;
     matrix.compose(
       // HF-360: seated on the terrain authority (base-origin geometry).
@@ -876,10 +865,10 @@ function addBananaPlants(root: THREE.Group): void {
 
   const tMat = new THREE.Matrix4();
   const lMat = new THREE.Matrix4();
-  const positions = edgeBandPositions(plantCount, ZONE.jungle[0], MID_JUNGLE_EDGE, 2.0, nameSeed('farcrysis-vege-banana-trunks'));
+  const positions = discPositions(plantCount, 28); // HF-396
 
   for (let p = 0; p < plantCount; p += 1) {
-    const [x, z, , baseAngle] = positions[p];
+    const [x, z, baseAngle] = positions[p];
     // HF-360: seated on the terrain authority (was flat baseY=0.8).
     const baseY = terrainHeightAt(x, z) + 0.8;
     const leafY = baseY + 1.55;
@@ -926,10 +915,10 @@ function addBamboo(root: THREE.Group): void {
   stems.name = 'farcrysis-vege-bamboo-stems';
 
   const matrix = new THREE.Matrix4();
-  const clusterCenters = edgeBandPositions(clusters, ZONE.jungle[0], ZONE.jungle[1], 3.0, nameSeed('farcrysis-vege-bamboo-stems'));
+  const clusterCenters = discPositions(clusters, 26); // HF-396
 
   for (let c = 0; c < clusters; c += 1) {
-    const [cx, cz, , ca] = clusterCenters[c];
+    const [cx, cz, ca] = clusterCenters[c];
     for (let s = 0; s < stemsPerCluster; s += 1) {
       const offsetAngle = (s / stemsPerCluster) * Math.PI * 2 + ca;
       const offsetRadius = 0.25 + (s % 3) * 0.18;
@@ -964,10 +953,10 @@ function addDeadTrees(root: THREE.Group): void {
   trunks.name = 'farcrysis-vege-dead-trunks';
 
   const matrix = new THREE.Matrix4();
-  const positions = edgeBandPositions(count, ZONE.transition[0], ZONE.jungle[1], 3.0, nameSeed('farcrysis-vege-dead-trunks'));
+  const positions = ringPositions(count, 12, 48); // HF-396
 
   for (let i = 0; i < count; i += 1) {
-    const [x, z, , angle] = positions[i];
+    const [x, z, angle] = positions[i];
     // Lean the dead tree significantly
     const leanAngle = 0.3 + (i % 4) * 0.15;
     const leanDir = angle + (i % 3) * 0.6;
@@ -998,10 +987,10 @@ function addFerns(root: THREE.Group): void {
   ferns.name = 'farcrysis-vege-ferns';
 
   const matrix = new THREE.Matrix4();
-  const positions = edgeBandPositions(count, ZONE.transition[0], MID_JUNGLE_EDGE, 1.2, nameSeed('farcrysis-vege-ferns'));
+  const positions = discPositions(count, 44); // HF-396
 
   for (let i = 0; i < count; i += 1) {
-    const [x, z, , angle] = positions[i];
+    const [x, z, angle] = positions[i];
     const s = 0.75 + (i % 5) * 0.16;
     matrix.compose(
       // HF-360: seated on the terrain authority (was flat y=0.6).
@@ -1028,8 +1017,10 @@ function addGrassTufts(root: THREE.Group): void {
   grass.name = 'farcrysis-vege-grass-tufts';
 
   const matrix = new THREE.Matrix4();
-  // Grass everywhere — one full-island shore-edge band (beach to jungle).
-  const positions = edgeBandPositions(count, ZONE.beach[0], ZONE.jungle[1], 0.5, nameSeed('farcrysis-vege-grass-tufts'));
+  // Grass everywhere — use full disc + some outer scatter
+  const inner = discPositions(Math.floor(count * 0.7), 36); // HF-396
+  const outer = ringPositions(count - inner.length, 36, 60); // HF-396
+  const positions = [...inner, ...outer];
 
   for (let i = 0; i < count; i += 1) {
     const [x, z] = positions[i];
@@ -1061,10 +1052,10 @@ function addBushes(root: THREE.Group): void {
   bushes.name = 'farcrysis-vege-bushes';
 
   const matrix = new THREE.Matrix4();
-  const positions = edgeBandPositions(count, ZONE.jungle[0], ZONE.jungle[1], 1.5, nameSeed('farcrysis-vege-bushes'));
+  const positions = discPositions(count, 40); // HF-396
 
   for (let i = 0; i < count; i += 1) {
-    const [x, z, , angle] = positions[i];
+    const [x, z, angle] = positions[i];
     const s = 0.7 + (i % 5) * 0.14;
     matrix.compose(
       // HF-360: seated on the terrain authority (was flat y=0.45).
@@ -1093,10 +1084,10 @@ function addVines(root: THREE.Group): void {
 
   const matrix = new THREE.Matrix4();
   // Place vines near tree positions — use mid-ring scatter
-  const positions = edgeBandPositions(count, ZONE.jungle[0], ZONE.jungle[1], 2.0, nameSeed('farcrysis-vege-vines'));
+  const positions = ringPositions(count, 8, 44); // HF-396
 
   for (let i = 0; i < count; i += 1) {
-    const [x, z, , angle] = positions[i];
+    const [x, z, angle] = positions[i];
     const lean = 0.5 + (i % 3) * 0.2; // diagonal lean
     const twist = angle + (i % 5) * 0.4;
     const s = 0.6 + (i % 4) * 0.15;
@@ -2127,7 +2118,7 @@ function addFlowerPatches(root: THREE.Group): void {
 
   const matrix = new THREE.Matrix4();
   // Generate 5 patch centres with Poisson separation
-  const patchCenters = poissonEdgeBandPositions(patches, ZONE.jungle[0], ZONE.jungle[1], 2.5, SEED, 5.0);
+  const patchCenters = poissonLayerPositions(patches, 5, 26, 2.5, SEED, 5.0);
 
   for (let p = 0; p < patchCenters.length; p++) {
     const [cx, cz, groundY] = patchCenters[p];
@@ -2242,7 +2233,7 @@ function addCycadPalms(root: THREE.Group): void {
 
   const tMat = new THREE.Matrix4();
   const lMat = new THREE.Matrix4();
-  const positions = poissonEdgeBandPositions(count, ZONE.jungle[0], ZONE.jungle[1], 2.5, SEED, 2.4);
+  const positions = poissonLayerPositions(count, 4, 22, 2.5, SEED, 2.4);
   const rng = mulberry32(SEED + 1);
 
   for (let i = 0; i < positions.length; i++) {
@@ -2326,7 +2317,7 @@ function addBloomTrees(root: THREE.Group): void {
   const tMat = new THREE.Matrix4();
   const cMat = new THREE.Matrix4();
   const bMat = new THREE.Matrix4();
-  const positions = poissonEdgeBandPositions(count, ZONE.jungle[0], MID_JUNGLE_EDGE, 3.5, SEED, 4.5);
+  const positions = poissonLayerPositions(count, 6, 20, 3.5, SEED, 4.5);
   const rng = mulberry32(SEED + 2);
 
   for (let i = 0; i < positions.length; i++) {
@@ -2479,7 +2470,7 @@ function addGrassPatches(root: THREE.Group): void {
   patches.name = 'farcrysis-vege-grass-patches';
 
   const matrix = new THREE.Matrix4();
-  const positions = edgeBandPositions(count, ZONE.beach[0], ZONE.jungle[1], 0.5, SEED);
+  const positions = layerPositions(count, 1, 30, 0.5, SEED);
   const rng = mulberry32(SEED + 4);
 
   for (let i = 0; i < positions.length; i++) {
@@ -2514,7 +2505,7 @@ function addTwigs(root: THREE.Group): void {
   twigs.name = 'farcrysis-vege-twigs';
 
   const matrix = new THREE.Matrix4();
-  const positions = edgeBandPositions(count, ZONE.transition[0], ZONE.jungle[1], 0.5, SEED);
+  const positions = layerPositions(count, 3, 28, 0.5, SEED);
   const rng = mulberry32(SEED + 5);
 
   for (let i = 0; i < positions.length; i++) {
@@ -2554,7 +2545,7 @@ function addSmallRocks(root: THREE.Group): void {
   rocks.name = 'farcrysis-vege-small-rocks';
 
   const matrix = new THREE.Matrix4();
-  const positions = poissonEdgeBandPositions(count, ZONE.jungle[0], ZONE.jungle[1], 1.0, SEED, 1.5);
+  const positions = poissonLayerPositions(count, 6, 26, 1.0, SEED, 1.5);
   const rng = mulberry32(SEED + 6);
 
   for (let i = 0; i < positions.length; i++) {
@@ -2698,7 +2689,7 @@ function addHeliconiaClumps(root: THREE.Group): void {
   clumps.name = 'farcrysis-vege-heliconia-clumps';
 
   const matrix = new THREE.Matrix4();
-  const positions = edgeBandPositions(count, ZONE.jungle[0], ZONE.jungle[1], 1.6, SEED);
+  const positions = layerPositions(count, 8, 28, 1.6, SEED);
   const rng = mulberry32(SEED + 9);
   for (let i = 0; i < positions.length; i++) {
     const [x, z, groundY, angle] = positions[i];
@@ -2736,7 +2727,7 @@ function addLeafCardUndergrowth(root: THREE.Group): void {
   cards.name = 'farcrysis-vege-undergrowth-cards';
 
   const matrix = new THREE.Matrix4();
-  const positions = edgeBandPositions(clumps, ZONE.transition[0], ZONE.jungle[1], 1.2, SEED);
+  const positions = layerPositions(clumps, 6, 27, 1.2, SEED);
   const rng = mulberry32(SEED + 3);
 
   for (let i = 0; i < positions.length; i++) {
@@ -2863,6 +2854,7 @@ function constrainedScatter(
   count: number,
   seed: number,
   opts: {
+    maxRadius: number;
     margin: number;
     fit: TerrainFitConstraints;
     /** Clump-noise salt + threshold: accept only where noise >= threshold. */
@@ -2880,12 +2872,12 @@ function constrainedScatter(
   // the rest. Sparse strict-fit layers pass a higher multiplier so enough
   // candidates survive to reach `count`.
   const oversample = opts.oversample ?? 2.5;
-  const span = ARENA_HALF - MARGIN;
-  const step = Math.sqrt(((2 * span) ** 2) / (count * oversample));
-  for (let gx = -span; gx <= span && out.length < count; gx += step) {
-    for (let gz = -span; gz <= span && out.length < count; gz += step) {
+  const step = Math.sqrt(((2 * opts.maxRadius) ** 2) / (count * oversample));
+  for (let gx = -opts.maxRadius; gx <= opts.maxRadius && out.length < count; gx += step) {
+    for (let gz = -opts.maxRadius; gz <= opts.maxRadius && out.length < count; gz += step) {
       const x = gx + (rng() - 0.5) * step;
       const z = gz + (rng() - 0.5) * step;
+      if (Math.hypot(x, z) > opts.maxRadius) continue;
       if (x < BOUNDS.minX + MARGIN || x > BOUNDS.maxX - MARGIN) continue;
       if (z < BOUNDS.minZ + MARGIN || z > BOUNDS.maxZ - MARGIN) continue;
       if (!clearOfGameplay(x, z, opts.margin)) continue;
@@ -2954,6 +2946,7 @@ function addEmergentCanopyTrees(root: THREE.Group): void {
   // Strict fit (slope <= 0.35, dry interior) rejects most of the island, so
   // oversample the candidate grid hard enough to land well past 60 instances.
   const sites = constrainedScatter(TARGET, SEED, {
+    maxRadius: 58,
     margin: 1.4,
     fit: { maxSlope: 0.35, minAboveWater: 0.6 },
     oversample: 8,
@@ -3033,7 +3026,7 @@ function addMidstoreyClumps(root: THREE.Group): void {
   // Independent fill to reach target density across the interior.
   const fillTarget = Math.max(0, 170 - sites.length);
   sites.push(...constrainedScatter(fillTarget, SEED ^ 0x77aa, {
-    margin: 0.8, fit: FIT,
+    maxRadius: 56, margin: 0.8, fit: FIT,
   }));
 
   // Clump: four arched leaf cards fanned around a short stem.
@@ -3080,6 +3073,7 @@ function addUndergrowthCarpet(root: THREE.Group): void {
   const TARGET = 900;
   const SEED = 0x6e41_b2d3;
   const sites = constrainedScatter(TARGET, SEED, {
+    maxRadius: 60,
     margin: 0.4,
     fit: { maxSlope: 0.75, minAboveWater: 0.14 },
     clumpSalt: 0x21ab,

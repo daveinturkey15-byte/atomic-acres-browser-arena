@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
   ARENA_BOUNDS,
@@ -24,6 +25,9 @@ import {
 } from './arena-layout';
 import { movementProfile } from './gameplay';
 import { circleIntersectsBox, segmentIntersectsBox } from './collision';
+import { buildArena } from './map';
+import { CharacterPhysics, STANCE_SHAPES } from './physics';
+import { solidBounds } from './house-navigation';
 
 const inside = ([x, z]: readonly [number, number], margin = 0) =>
   x >= ARENA_BOUNDS.minX + margin && x <= ARENA_BOUNDS.maxX - margin
@@ -287,4 +291,120 @@ describe('mid-street vehicle staging (HF-383)', () => {
       vanBounds(southVan!),
     )).toBe(true);
   });
+});
+
+/**
+ * HF-387 player-body half: the live first-person camera is
+ * PerspectiveCamera(76, 1, 0.08, 180), so any visible surface closer than
+ * 0.08 m to the eye shears through the near plane and reads as "clipping
+ * through the wall". The audit that found these defects marched the real
+ * CharacterPhysics into every wall-like visible surface; these pins hold the
+ * two defect classes it measured closed.
+ */
+describe('HF-387 prone/wall camera clearance', () => {
+  const CAMERA_NEAR_PLANE = 0.08;
+
+  async function pressedEye(
+    physics: CharacterPhysics,
+    stance: 'stand' | 'crouch' | 'prone',
+    start: { x: number; y: number; z: number },
+    dir: { x: number; z: number },
+    slide?: { x: number; z: number },
+  ): Promise<{ x: number; y: number; z: number }> {
+    physics.teleportEye({ ...start });
+    expect(physics.setStance(stance), `${stance} stance at ${JSON.stringify(start)}`).toBe(true);
+    for (let i = 0; i < 12; i += 1) {
+      physics.move({ x: dir.x * 0.25, y: -0.06, z: dir.z * 0.25 }, 1 / 60);
+    }
+    for (let i = 0; i < 80; i += 1) {
+      const step = slide ?? dir;
+      physics.move({ x: step.x * 0.02, y: -0.06, z: step.z * 0.02 }, 1 / 60);
+    }
+    return physics.eyePosition();
+  }
+
+  function distanceToNamedBoxes(eye: { x: number; y: number; z: number }, root: THREE.Object3D, nameIncludes: string): number {
+    let minimum = Infinity;
+    root.traverse((node) => {
+      const mesh = node as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.name.includes(nameIncludes)) return;
+      const box = new THREE.Box3().setFromObject(mesh);
+      const clamped = new THREE.Vector3(
+        Math.max(box.min.x, Math.min(eye.x, box.max.x)),
+        Math.max(box.min.y, Math.min(eye.y, box.max.y)),
+        Math.max(box.min.z, Math.min(eye.z, box.max.z)),
+      );
+      minimum = Math.min(minimum, clamped.distanceTo(new THREE.Vector3(eye.x, eye.y, eye.z)));
+    });
+    return minimum;
+  }
+
+  it('keeps boundary fence posts out of the reachable eye shell at every stance', async () => {
+    const scene = new THREE.Scene();
+    const map = buildArena(scene);
+    // Structural pin: a post face may not intrude past the playable bound,
+    // because the world-boundary collider lets the capsule reach bound minus
+    // one capsule radius — inside any visual that protrudes further.
+    scene.updateMatrixWorld(true);
+    scene.traverse((node) => {
+      const mesh = node as THREE.Mesh;
+      if (!mesh.isMesh || mesh.name !== 'fence post') return;
+      const box = new THREE.Box3().setFromObject(mesh);
+      expect(Math.abs(box.max.x)).toBeGreaterThanOrEqual(Math.abs(ARENA_BOUNDS.maxX));
+      expect(Math.abs(box.min.x)).toBeGreaterThanOrEqual(Math.abs(ARENA_BOUNDS.minX));
+    });
+    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
+    try {
+      for (const stance of ['stand', 'crouch', 'prone'] as const) {
+        const eye = await pressedEye(physics, stance, { x: 28.5, y: 1.7, z: -14.25 }, { x: 1, z: 0 });
+        const clearance = distanceToNamedBoxes(eye, map.root, 'fence post');
+        expect(clearance, `${stance} eye-to-post clearance`).toBeGreaterThanOrEqual(CAMERA_NEAR_PLANE);
+      }
+    } finally {
+      physics.dispose();
+    }
+  }, 120_000);
+
+  it('gives every house door frame movement authority so jambs stop the eye clear', async () => {
+    const scene = new THREE.Scene();
+    const map = buildArena(scene);
+    for (const house of map.houses) {
+      for (const frame of house.solids.filter((entry) => entry.kind === 'frame' && entry.name.includes('-frame-'))) {
+        expect(frame.collidable, `${house.team}:${frame.name} must be collidable`).toBe(true);
+        const bounds = solidBounds(frame);
+        const matched = map.physicsColliders.some((collider) =>
+          Math.abs(collider.minX - bounds.minX) < 1e-4
+          && Math.abs(collider.maxX - bounds.maxX) < 1e-4
+          && Math.abs(collider.minZ - bounds.minZ) < 1e-4
+          && Math.abs(collider.maxZ - bounds.maxZ) < 1e-4
+          && Math.abs((collider.minY ?? 0) - bounds.minY) < 1e-4
+          && Math.abs((collider.maxY ?? 0) - bounds.maxY) < 1e-4);
+        expect(matched, `${house.team}:${frame.name} must have a physics collider`).toBe(true);
+      }
+    }
+    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
+    try {
+      // Brush along the front wall through the door jamb line of house team 0.
+      const front = map.houses[0];
+      const jamb = front.solids.find((entry) => entry.name === 'front-entry-frame-right');
+      expect(jamb).toBeDefined();
+      const jambBounds = solidBounds(jamb!);
+      const layout = HOUSE_LAYOUT[0];
+      const outwardZ = Math.sign(layout.facing) as 1 | -1;
+      for (const stance of ['stand', 'crouch', 'prone'] as const) {
+        const startY = (jambBounds.minY ?? 0) + 0.02 + STANCE_SHAPES[stance].halfHeight + STANCE_SHAPES[stance].radius;
+        const eye = await pressedEye(
+          physics,
+          stance,
+          { x: jambBounds.minX - 0.05, y: startY, z: outwardZ > 0 ? jambBounds.maxZ + 2 : jambBounds.minZ - 2 },
+          { x: 0, z: -outwardZ },
+          { x: 1, z: 0 },
+        );
+        const clearance = distanceToNamedBoxes(eye, map.root, 'frame-right');
+        expect(clearance, `${stance} eye-to-jamb clearance`).toBeGreaterThanOrEqual(CAMERA_NEAR_PLANE);
+      }
+    } finally {
+      physics.dispose();
+    }
+  }, 120_000);
 });

@@ -37,12 +37,14 @@ import {
   FARCRYSIS_WATER_LEVEL,
 } from './farcrysis-terrain-authority';
 import { applyVista, animateVista } from './farcrysis-vista';
+import { applyMountains } from './farcrysis-mountains';
 import { buildEnhancedPalms } from './farcrysis-palms-enhanced';
 import { applyGroundTextures } from './farcrysis-ground-textures';
 import { buildWaterFX, animateWaterFX } from './farcrysis-water-fx';
 import { buildDetail, animateDetail } from './farcrysis-detail';
 import { buildAtmosphere, animateAtmosphere, softDotTexture } from './farcrysis-atmosphere';
 import { createWaterRippleTexture, registerScrollingWaterTexture } from './farcrysis-water-ripples';
+import { bakeFarcrysisWaterDepth, createFarcrysisSeaSurfaceMaterial } from './farcrysis-water-surface';
 // HF-396: the instanced tropical grass FIELD (bezier blades, layered wind,
 // SSS, slope-aware placement, chunk distance LOD).
 import { buildFarcrysisGrassField, animateGrassField } from './farcrysis-grass-field';
@@ -750,11 +752,15 @@ function buildInlineWater(scene: THREE.Scene): void {
   // below the surface, the shallow lens 10 mm above the lagoon plane, and the
   // additive wave FX 30 mm above (farcrysis-water-fx.ts).
 
-  // (a) Deep open water — extended to the visible horizon (120×120 m),
+  // (a) Deep open water — extended to the visible horizon (176×176 m),
   //     richer tropical blue-green, below every additive water-FX layer.
   const deepSize = 176; // HF-396: horizon water clears the 128 m island (camera far = 180)
-  const deepGeom = new THREE.PlaneGeometry(deepSize, deepSize);
+  // HF-394: 48x48 segments (~3.7 m quads) carry the baked per-vertex water
+  // column depth for the TSL refraction ramp; this plane is mostly open sea,
+  // so coarse quads resolve it fine and cost ~4.6 k static verts once.
+  const deepGeom = new THREE.PlaneGeometry(deepSize, deepSize, 48, 48);
   deepGeom.rotateX(-Math.PI / 2);
+  bakeFarcrysisWaterDepth(deepGeom, true); // pre-rotated: world z = local z
 
   // Pass 76: metalness 0.35 at roughness 0.15 is what made the sea read as
   // glossy green marble — metallic water reflects only the environment and
@@ -763,18 +769,21 @@ function buildInlineWater(scene: THREE.Scene): void {
   // gradient ring, then this) reads like a real tropical shelf.
   //
   // HF-394: procedural ripple normal map, scrolled slower and coarser than
-  // the lagoon plane so near and mid water never shimmer in lockstep.
+  // the lagoon plane so near and mid water never shimmer in lockstep. On the
+  // WebGPU route the material is the typed TSL sea surface (Fresnel sky
+  // reflection + depth-graded transmission, farcrysis-water-surface.ts);
+  // compatOpacity keeps the WebGL2/test look byte-identical.
   const deepRipples = createWaterRippleTexture(4, 4);
-  const deepMat = new THREE.MeshStandardMaterial({
-    color: 0x0e5e7e,
+  const deepMat = createFarcrysisSeaSurfaceMaterial({
+    baseColor: 0x0e5e7e,
+    shallowColor: 0x14606f,
     roughness: 0.24,
     metalness: 0.02,
-    transparent: true,
-    opacity: 0.88,
-    ...(deepRipples ? {
-      normalMap: deepRipples.texture,
-      normalScale: new THREE.Vector2(0.5, 0.5),
-    } : {}),
+    opacityShallow: 0.6,
+    opacityDeep: 0.94,
+    compatOpacity: 0.88,
+    normalMap: deepRipples?.texture ?? null,
+    normalScale: 0.5,
   });
   if (deepRipples) {
     registerScrollingWaterTexture(deepRipples.texture, 0.014, 0.009);
@@ -1080,9 +1089,12 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
   // Distant vista — ocean horizon, island silhouettes, seabirds (additive, no colliders)
   applyVista(s);
 
+  // HF-398 mountain backdrop ring beyond the playfield (presentation-only,
+  // one merged mesh, no colliders) — the horizon the island previously lacked.
+  applyMountains(s);
+
   // Pass 69 procedural PBR textures — apply after all geometry is built
   applyFarcrysisTextures(root);
-
   // Procedural ground textures (canvas sand/earth — baseline; async PBR images may override)
   applyGroundTextures(s);
 

@@ -194,12 +194,20 @@ function upperFrontWall(surface: 'aqua' | 'coral'): LocalSolid[] {
   ];
 }
 
+/**
+ * HF-387 player-body half: frame trim used to be authored non-collidable,
+ * so brushing a jamb put the camera eye up to 1.5 cm from (or inside) the
+ * visible trim slab while the wall opening itself stopped the capsule. The
+ * posts sit exactly on the opening edges, so giving them colliders does not
+ * narrow any walk-through width; it makes visible mass match movement and
+ * shot authority as the forging review requires.
+ */
 function doorFrame(id: string, x: number, z: number, baseY = 0): LocalSolid[] {
   const width = 2.2;
   return [
-    solid(`${id}-frame-left`, [x - width / 2 - 0.09, baseY + 1.42, z], [0.18, 2.84, 0.16], 'trim', false, 'frame'),
-    solid(`${id}-frame-right`, [x + width / 2 + 0.09, baseY + 1.42, z], [0.18, 2.84, 0.16], 'trim', false, 'frame'),
-    solid(`${id}-frame-head`, [x, baseY + 2.78, z], [width + 0.36, 0.18, 0.16], 'trim', false, 'frame'),
+    solid(`${id}-frame-left`, [x - width / 2 - 0.09, baseY + 1.42, z], [0.18, 2.84, 0.16], 'trim', true, 'frame'),
+    solid(`${id}-frame-right`, [x + width / 2 + 0.09, baseY + 1.42, z], [0.18, 2.84, 0.16], 'trim', true, 'frame'),
+    solid(`${id}-frame-head`, [x, baseY + 2.78, z], [width + 0.36, 0.18, 0.16], 'trim', true, 'frame'),
   ];
 }
 
@@ -207,11 +215,12 @@ function sideDoorFrame(id: string, side: 1 | -1, z: number, baseY: number): Loca
   const width = 2.6;
   const x = side * (HALF_WIDTH + DOOR_FRAME_OUTSET);
   return [
-    solid(`${id}-frame-rear`, [x, baseY + 1.42, z - width / 2 - 0.09], [0.16, 2.84, 0.18], 'trim', false, 'frame'),
-    solid(`${id}-frame-front`, [x, baseY + 1.42, z + width / 2 + 0.09], [0.16, 2.84, 0.18], 'trim', false, 'frame'),
-    solid(`${id}-frame-head`, [x, baseY + 2.78, z], [0.16, 0.18, width + 0.36], 'trim', false, 'frame'),
+    solid(`${id}-frame-rear`, [x, baseY + 1.42, z - width / 2 - 0.09], [0.16, 2.84, 0.18], 'trim', true, 'frame'),
+    solid(`${id}-frame-front`, [x, baseY + 1.42, z + width / 2 + 0.09], [0.16, 2.84, 0.18], 'trim', true, 'frame'),
+    solid(`${id}-frame-head`, [x, baseY + 2.78, z], [0.16, 0.18, width + 0.36], 'trim', true, 'frame'),
   ];
 }
+
 
 function rampSolids(side: 1 | -1): LocalSolid[] {
   const slopeLength = Math.hypot(RAMP_RUN, RAMP_RISE);

@@ -433,9 +433,6 @@ function genNormalMap(
       const xR = field[y * size + ((x + 1) % size)];
       const yD = field[((y + size - 1) % size) * size + x];
       const yU = field[((y + 1) % size) * size + x];
-      const gradX = (xR - xL) * strength;
-      const gradY = (yU - yD) * strength;
-      const len = Math.sqrt(gradX * gradX + gradY * gradY + 1);
       data[i] = Math.round((-gradX / len) * 127.5 + 127.5);
       data[i + 1] = Math.round((-gradY / len) * 127.5 + 127.5);
       data[i + 2] = Math.round((1 / len) * 127.5 + 127.5);
@@ -873,7 +870,6 @@ function genLeafBlade(): void {
   }
 
   _leafBladeNormal = genNormalMap((nx, ny) => {
-    const midrib = Math.exp(-Math.pow((nx - 0.5) / 0.04, 2)) * 0.5;
     return midrib - veinField(nx) * 2 + fbmNoise(nx * 6, ny * 4, 2, 0x1eaf1) * 0.25;
   }, 1.5, TS);
   if (_leafBladeColor && _leafBladeRoughness && _leafBladeNormal) _textureCount += 3;
