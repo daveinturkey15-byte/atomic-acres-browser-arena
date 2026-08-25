@@ -82,8 +82,10 @@ TEAMS = {
     },
     # ------------------------------------------------------------ image assets
     "assets-imagegen": {
-        "owns": ("public/**, source-assets/**, assets.manifest.json, scripts/art-gen/**, "
-                 "src/ui/** , src/operator-*.ts, and their tests"),
+        # src/ui/** and src/operator-*.ts were carved out on 2026-08-25 for dedicated Claude
+        # agents while this team is blocked behind ComfyUI. Never two writers in one domain.
+        "owns": ("public/**, source-assets/**, assets.manifest.json, scripts/art-gen/** "
+                 "and their tests"),
         "tasks": [
             ("ai-operator-roster",
              "HF-380: 'the operators do not look like what I specced and wanted, with venom, "
