@@ -50,7 +50,10 @@ from teams import BUILDER_PREAMBLE, CRITIC_PREAMBLE  # noqa: E402
 # graphics-aaa and rigging-motion are handled by dedicated Claude Opus agents running in
 # parallel (2026-08-25), so they are OUT of the ox-alpha rotation. Two writers in one file
 # domain is the one thing the ownership model exists to prevent.
-ORDER = ["gameplay-test", "arena-fidelity", "polish-vfx", "assets-imagegen"]
+# polish-vfx also moves to a Claude agent (2026-08-25) while ComfyUI holds memory:
+# Claude agents are API-driven and barely touch local RAM, so they keep working when
+# the governor cannot grant ox-alpha budget. Two writers per domain is still forbidden.
+ORDER = ["gameplay-test", "arena-fidelity", "assets-imagegen"]
 
 # A repair round may write anywhere, because a regression does not respect team ownership.
 REPAIR_TEAM = "arena-fidelity"
