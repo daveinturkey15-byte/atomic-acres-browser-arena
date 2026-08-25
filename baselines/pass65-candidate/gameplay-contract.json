@@ -3,9 +3,9 @@
     "arena": {
       "bounds": {
         "maxX": 31,
-        "maxZ": 30,
+        "maxZ": 31.5,
         "minX": -31,
-        "minZ": -30
+        "minZ": -31.5
       },
       "coverLayout": [
         [
@@ -2686,7 +2686,7 @@
         "durationMs": 30000,
         "pickupRadius": 1.65,
         "position": [
-          0,
+          9.6,
           0.82,
           0
         ],
