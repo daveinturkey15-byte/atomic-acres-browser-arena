@@ -1874,19 +1874,10 @@ html[data-reduced-sensory='true'] #menu.pass64-command-deck {
 }
 
 /*
- * THE OPERATOR TURNTABLE FRAME.
- *
- * `src/ui/pass64-shell.ts` writes this gradient as an INLINE style attribute,
- * and that file is another lane's markup. An inline style beats every
- * stylesheet rule, so `!important` is the only mechanism available here - it is
- * used deliberately and once, on a decorative background, and the exact
- * paste-ready markup patch that removes the need for it is recorded in this
- * pass's report. If that patch lands, this rule becomes a no-op rather than a
- * conflict.
- *
- * The stop luminances are 0.0210 and 0.0076 before and 0.0213 and 0.0077 after,
- * so the frame the operator is silhouetted against is exactly as dark as it was.
+ * The operator turntable frame is warmed at source, in the inline style attribute
+ * in `src/ui/pass64-shell.ts`. It needed an `!important` override here while that
+ * file belonged to another lane; the markup patch has since landed, so the
+ * override is gone rather than left as a no-op. Stop luminances are matched
+ * (0.0210 -> 0.0213, 0.0076 -> 0.0077): the frame the operator is silhouetted
+ * against is exactly as dark as it was.
  */
-#operator-preview-canvas {
-  background: linear-gradient(160deg, #34251b 0%, #1e130c 100%) !important;
-}

@@ -335,7 +335,7 @@ function operatorPanelMarkup(): string {
              stylesheet belongs to another lane; the canvas is sized by the
              inline box below and the renderer follows its client size. -->
         <div class="operator-preview" style="display:grid;grid-template-columns:minmax(210px,290px) minmax(0,1fr);gap:18px;align-items:stretch">
-          <canvas id="${OPERATOR_PREVIEW_CANVAS_ID}" width="580" height="760" aria-label="Live rotating preview of your selected operator" style="display:block;width:100%;aspect-ratio:3/4;border-radius:10px;background:linear-gradient(160deg,#1b2a30 0%,#0b171b 100%)"></canvas>
+          <canvas id="${OPERATOR_PREVIEW_CANVAS_ID}" width="580" height="760" aria-label="Live rotating preview of your selected operator" style="display:block;width:100%;aspect-ratio:3/4;border-radius:10px;background:linear-gradient(160deg,#34251b 0%,#1e130c 100%)"></canvas>
           <div style="display:flex;flex-direction:column;justify-content:center;gap:10px;min-width:0">
             <!-- The 2D half. Same portrait art as the card the player pressed,
                  at a size you can actually read it at, so the card and the

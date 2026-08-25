@@ -601,7 +601,7 @@ export const HIP_VIEWMODEL_SCALE = 0.82;
  * MEASURED on the running build at 2560x1440, WebGPU, by projecting every
  * first-person hand bone through the live gameplay camera (2026-08-25):
  *
- *   weapon    right-hand bones, NDC y        verdict
+ *   weapon    right-hand bones, NDC y        reading
  *   carbine   -0.965 .. -0.759               bottom 12% of the frame, cropped
  *   pistol    -0.903 .. -0.706               low, but whole
  *   M249 LMG  -1.109 .. -0.888               PART OF THE HAND IS OFF-FRAME
