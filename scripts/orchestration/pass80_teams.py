@@ -15,16 +15,23 @@ integration point, owned by gameplay-test alone; every other team hands it patch
 SKILL_ROOT = r"C:\Users\david\.claude\skills"
 
 SKILLS = {
+    # Kept to 5-6 per team on purpose: the brief says READ THEM IN FULL, and that stops
+    # meaning anything at ten. Ordered most-relevant first.
     "graphics-aaa": ["threejs-rtx-runtime-route", "webgpu-tsl-arena-forging",
-                     "threejs-frame-loop-audit", "visual-gauntlet-loop"],
-    "assets-imagegen": ["ai-3d-asset-generation-loop", "img2threejs",
+                     "threejs-frame-loop-audit", "realtime-browser-qa",
+                     "typescript-bundler-development-patterns", "visual-gauntlet-loop"],
+    "assets-imagegen": ["comfyui", "ai-3d-asset-generation-loop", "img2threejs",
                         "atomic-acres-asset-authoring", "game-hud-menu-overhaul"],
-    "rigging-motion": ["game-animation-asset-pipeline", "ai-3d-asset-generation-loop"],
-    "polish-vfx": ["atomic-acres-procedural-art-authoring", "threejs-webgpu-water",
-                   "threejs-frame-loop-audit"],
-    "gameplay-test": ["threejs-game-development", "visual-gauntlet-loop"],
-    "arena-fidelity": ["webgpu-tsl-arena-forging", "threejs-webgpu-water",
-                       "atomic-acres-procedural-art-authoring", "threejs-game-development"],
+    "rigging-motion": ["game-animation-asset-pipeline", "local-video-generation",
+                       "ai-3d-asset-generation-loop", "realtime-browser-qa"],
+    "polish-vfx": ["threejs-procedural-vegetation", "atomic-acres-procedural-art-authoring",
+                   "threejs-webgpu-water", "threejs-frame-loop-audit"],
+    "gameplay-test": ["browser-multiplayer-netcode", "atomic-acres-gameplay-patterns",
+                      "realtime-browser-qa", "browser-game-runtime-debugging",
+                      "browser-game-dev-server-troubleshooting", "threejs-game-development"],
+    "arena-fidelity": ["webgpu-tsl-arena-forging", "threejs-procedural-vegetation",
+                       "threejs-webgpu-water", "atomic-acres-procedural-art-authoring",
+                       "realtime-browser-qa", "threejs-game-development"],
 }
 
 TEAMS = {
