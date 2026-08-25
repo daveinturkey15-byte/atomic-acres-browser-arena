@@ -20,7 +20,7 @@ import time
 REPO = r"C:\Users\david\projects\atomic-acres-gauntlet"
 HERE = os.path.join(REPO, "scripts", "orchestration")
 LOG = os.path.join(REPO, "artifacts", "pass80-logs", "gauntlet.log")
-TARGET = (15, 0)
+TARGET = (15, 30)  # owner moved the ComfyUI clear 15:00 -> 15:30 on 2026-08-25
 
 
 def log(m):
@@ -57,7 +57,7 @@ while dt.datetime.now() < target:
     time.sleep(20)
 
 before = free_gb()
-log(f"15:00 reached. free before: {before} GB")
+log(f"{TARGET[0]:02d}:{TARGET[1]:02d} reached. free before: {before} GB")
 
 # Owner-authorised for this moment. Not a standing policy - an earlier cleanup killed a
 # generation he was actively running because a long-lived process looked orphaned.
@@ -69,50 +69,13 @@ ps("Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" -EA SilentlyCont
    "Where-Object { $_.CommandLine -match 'user-data-dir=.*(Temp|wgpuboot|playwright|scoped_dir|puppeteer)' } | "
    "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -EA SilentlyContinue }")
 
-# Stop the narrow Pass 80 loop and let its agents drain, so two loops never write at once.
-ps("Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" -EA SilentlyContinue | "
-   "Where-Object { $_.CommandLine -match 'gauntlet_v2' } | "
-   "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -EA SilentlyContinue }")
-log("Pass 80 loop stopped; waiting for its agents to drain before starting Pass 81")
-for _ in range(30):
-    if (ps("@(Get-Process -Name omp-windows-x64 -EA SilentlyContinue).Count") or "0") == "0":
-        break
-    time.sleep(20)
-
+# Deliberately NOT restarting the gauntlet. It requests a budget from the governor every
+# round, so it widens by itself the moment this memory comes back - and a restart here
+# would discard whatever round is in flight. One job: free the memory, then get out.
 time.sleep(20)
-log(f"free after: {free_gb()} GB")
-
-# Pass 81 reuses the same loop with the refinement team set. Done INLINE and VERIFIED.
-# The old code generated a CHILD SCRIPT by string-building Python source, and the ORDER
-# replacement embedded an escaped newline that made that child a SyntaxError - proved by
-# dry run at 14:57 on 2026-08-25. scale_up only LOGGED the failure and carried on, so
-# Pass 81 would silently have launched with Pass 80's three teams and Pass 80's task
-# list. There is no reason for a child script here, and one fewer level of escaping is
-# one fewer way to fail quietly. The ORDER is one line for the same reason.
-G = os.path.join(HERE, "gauntlet_v2.py")
-src = io.open(G, encoding="utf-8", newline="").read()
-subs = [
-    ("from pass80_teams import", "from pass81_teams import"),
-    ('ORDER = ["gameplay-test", "arena-fidelity", "assets-imagegen"]',
-     'ORDER = ["multiplayer-hardening", "arena-polish", "arms-and-skins", "look-and-feel", "assets-generation", "perf-and-boot"]'),
-]
-missing = [a for a, _ in subs if a not in src]
-if missing:
-    log(f"ABORT: gauntlet_v2.py no longer contains {missing} - refusing to launch a mis-specced pass")
-    raise SystemExit(1)
-for a, b in subs:
-    src = src.replace(a, b, 1)
-ast.parse(src)  # never write a loop that cannot start
-io.open(G, "w", encoding="utf-8", newline="").write(src)
-log("gauntlet switched to pass81 teams (verified: both anchors matched, result parses)")
-
-# Fresh progress file: Pass 81 is a different task list, not a continuation of Pass 80's.
-prog = os.path.join(REPO, "artifacts", "pass80-logs", "task-progress.json")
-try:
-    os.replace(prog, prog + ".pass80")
-except OSError:
-    pass
-
-p = subprocess.Popen([sys.executable, os.path.join(HERE, "gauntlet_v2.py"), "--hours", "10"],
-                     cwd=REPO, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-log(f"PASS 81 LAUNCHED WIDE, pid {p.pid} - 6 teams, 22 refinement tasks, ~30 agent budget")
+after = free_gb()
+log(f"free after: {after} GB (was {before}) - the running loop will widen on its next budget request")
+running = ps("@(Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" -EA SilentlyContinue | "
+             "Where-Object { $_.CommandLine -match 'gauntlet_v2' }).Count")
+if (running or '0') == '0':
+    log('WARNING: no gauntlet loop is running, so nothing will consume the freed memory')

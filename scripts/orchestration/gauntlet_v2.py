@@ -44,7 +44,7 @@ GATE = os.path.join(HERE, "regression_gate.py")
 LOGDIR = os.path.join(REPO, "artifacts", "pass80-logs")
 
 sys.path.insert(0, HERE)
-from pass80_teams import TEAMS, SKILLS, SKILL_ROOT  # noqa: E402
+from pass81_teams import TEAMS, SKILLS, SKILL_ROOT  # noqa: E402
 from teams import BUILDER_PREAMBLE, CRITIC_PREAMBLE  # noqa: E402
 
 # graphics-aaa and rigging-motion are handled by dedicated Claude Opus agents running in
@@ -53,7 +53,7 @@ from teams import BUILDER_PREAMBLE, CRITIC_PREAMBLE  # noqa: E402
 # polish-vfx also moves to a Claude agent (2026-08-25) while ComfyUI holds memory:
 # Claude agents are API-driven and barely touch local RAM, so they keep working when
 # the governor cannot grant ox-alpha budget. Two writers per domain is still forbidden.
-ORDER = ["gameplay-test", "arena-fidelity", "assets-imagegen"]
+ORDER = ["multiplayer-hardening", "arena-polish", "arms-and-skins", "look-and-feel", "assets-generation", "perf-and-boot"]
 
 # A repair round may write anywhere, because a regression does not respect team ownership.
 REPAIR_TEAM = "arena-fidelity"
