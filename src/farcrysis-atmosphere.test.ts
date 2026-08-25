@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { PARTICLE_MAX_LIGHT_SHAFTS } from './particles';
 import { animateAtmosphere, buildAtmosphere, farcrysisLightShafts, softDotTexture } from './farcrysis-atmosphere';
+import { activeLightShafts, resetLightShafts } from './particles/light-shaft-registry';
 
 function buildScene(): THREE.Scene {
   const scene = new THREE.Scene();
@@ -188,5 +189,31 @@ describe('the air obeys the shared wind field', () => {
     }
     // The circular motion moves them; the wind must not add a kilometre.
     expect(maxJump).toBeLessThan(20);
+  });
+});
+
+describe('the shafts are published where the particle runtime will find them', () => {
+  // THE ANTI-ORPHAN TEST. `farcrysisLightShafts()` returning the right cones
+  // was already green while nothing on earth called it - a repo-wide grep found
+  // it imported by this file and nothing else, and live telemetry read
+  // `particles.lightShafts: 0` on every arena. Asserting the getter is
+  // asserting the input; this asserts that BUILDING THE ARENA hands the cones
+  // to the subscriber the particle runtime actually reads.
+  it('publishes farcrysis shafts as a side effect of building the atmosphere', () => {
+    resetLightShafts();
+    expect(activeLightShafts().arenaId).toBeNull();
+    expect(activeLightShafts().shafts).toHaveLength(0);
+
+    const scene = new THREE.Scene();
+    buildAtmosphere(scene);
+
+    const published = activeLightShafts();
+    expect(published.arenaId).toBe('farcrysis');
+    expect(published.shafts.length).toBe(farcrysisLightShafts().length);
+    expect(published.shafts.length).toBeGreaterThan(0);
+    for (let index = 0; index < published.shafts.length; index += 1) {
+      expect(published.shafts[index]).toEqual(farcrysisLightShafts()[index]);
+    }
+    resetLightShafts();
   });
 });

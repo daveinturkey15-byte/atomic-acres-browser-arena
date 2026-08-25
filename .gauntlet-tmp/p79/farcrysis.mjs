@@ -1,0 +1,17 @@
+import { chromium } from '@playwright/test';
+const b = await chromium.launch({ headless: true, channel: 'chrome', args: ['--use-angle=d3d11','--enable-unsafe-webgpu','--ignore-gpu-blocklist','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-features=CalculateNativeWinOcclusion'] });
+const ctx = await b.newContext({ viewport: { width: 1920, height: 1080 } });
+await ctx.addInitScript(() => { try { localStorage.setItem('atomic-acres-pass65-settings-v1', JSON.stringify({ version:1, graphics:{ schemaVersion:1, preset:'custom', weatherIntensity:'storm', rainDensity:1.5, windStrength:2, lightning:true, wetSurfaces:true, ambientLife:2 } })); } catch {} });
+const page = await ctx.newPage();
+const s = await page.context().newCDPSession(page); await s.send('Emulation.setFocusEmulationEnabled',{enabled:true}).catch(()=>{});
+page.on('pageerror', e => console.error('[pageerror]', String(e).slice(0,160)));
+await page.goto('http://127.0.0.1:41917/?release=latest&renderer=webgpu&render=quality&weather=storm&qaFpsProbe=farcrysis', { waitUntil:'domcontentloaded' });
+await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 240000 });
+await page.waitForFunction(() => { const s = window.__ATOMIC_ACRES_DEBUG__.snapshot(); return s.arenaSelection?.id === 'farcrysis' && s.matchPhase === 'active' && s.gameStarted === true; }, undefined, { timeout: 300000 });
+await page.waitForTimeout(6000);
+const w = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleWeather());
+console.error('arena', await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().arenaSelection?.id));
+console.error('rain', JSON.stringify(w.rain));
+console.error('particles', JSON.stringify({ draws: w.particles.instancedDraws, loose: w.particles.looseMeshes, quality: w.particles.quality, live: w.particles.liveParticles, visible: w.particles.visibleParticles, lightShafts: w.particles.lightShafts, ambientLifeScale: w.particles.ambientLifeScale, adaptive: w.particles.adaptiveDensityScale, alloc: w.particles.perFrameAllocations, families: w.particles.families.map(f => ({ id: f.id, live: f.live, visible: f.visible, peakOpacity: f.peakOpacity, alloc: f.perFrameAllocations })) }));
+await page.screenshot({ path: 'artifacts/pass79/weather/farcrysis-storm.png' });
+await b.close();

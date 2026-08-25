@@ -41,7 +41,9 @@
 import * as THREE from 'three';
 import { DeterministicRng } from './deterministic-rng';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
-import type { ParticleLightShaft } from './particles';
+// Imported from the registry rather than from `./particles` so this art
+// module never pulls the renderer-side particle system in behind it.
+import { publishLightShafts, type ParticleLightShaft } from './particles/light-shaft-registry';
 
 // ---------------------------------------------------------------------------
 // Atmosphere constants
@@ -534,6 +536,13 @@ export function buildAtmosphere(scene: THREE.Scene): void {
 
   _shaftGroup = buildGodRayShafts();
   scene.add(_shaftGroup);
+  // PASS 79 - THE LINE THAT WAS MISSING. These cones have been published
+  // through `farcrysisLightShafts()` since they were authored, and a repo-wide
+  // grep found that function imported by exactly one file: its own test. Live
+  // telemetry agreed - `particles.lightShafts` read 0 on every arena - so the
+  // motes never knew where the light was and "dust in a shaft of light" was
+  // green on both sides and invisible on screen.
+  publishLightShafts('farcrysis', _lightShafts);
 }
 
 /**

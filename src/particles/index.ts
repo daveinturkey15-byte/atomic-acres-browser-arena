@@ -63,6 +63,7 @@ import { isSoftwareWebGLRenderer } from '../atomic-signal';
 import type { RenderProfile } from '../render-profile';
 import type { WindSample } from '../weather/wind-field';
 import { activeAmbientLife, type AmbientLifeRuntime } from './ambient-life-settings';
+import { activeLightShafts, type ParticleLightShaft } from './light-shaft-registry';
 import { clamp01, screenLoadScale } from './combat-readability';
 import {
   FOOTFALL_PUFFS,
@@ -95,6 +96,7 @@ import {
 } from './particle-field';
 
 export * from './ambient-life-settings';
+export * from './light-shaft-registry';
 export * from './combat-readability';
 export * from './particle-catalog';
 export {
@@ -105,14 +107,8 @@ export {
   type ParticleFrameContext,
 } from './particle-field';
 
-/** A cone of light motes brighten inside. Plain numbers so the arena art
- *  modules that author shafts need no dependency on this one. */
-export type ParticleLightShaft = Readonly<{
-  x: number; y: number; z: number;
-  /** Unit axis along the shaft. Normalised defensively on registration. */
-  axisX: number; axisY: number; axisZ: number;
-  radiusM: number;
-}>;
+/** Shared empty list so clearing the shafts never allocates on the frame path. */
+const EMPTY_LIGHT_SHAFTS: readonly ParticleLightShaft[] = Object.freeze([]);
 
 export type ParticleRuntimeOptions = Readonly<{
   profile: RenderProfile;
@@ -260,6 +256,8 @@ export class ParticleRuntime {
   private elapsedSeconds = 0;
   private densityScale = 1;
   private ambientLifeScale = 1;
+  /** Revision of the published shaft set this runtime has taken up. */
+  private adoptedShaftRevision = -1;
   private muzzleHeat = 0;
   private secondsSinceMuzzle = 0;
 
@@ -321,6 +319,10 @@ export class ParticleRuntime {
       this.fieldList[index].clear();
     }
     this.context.shaftCount = 0;
+    // Force a re-adopt on the next frame: the published shafts belong to ONE
+    // arena, so an arena change must either take up that arena's shafts or
+    // clear the previous arena's out of the volume.
+    this.adoptedShaftRevision = -1;
     this.muzzleHeat = 0;
   }
 
@@ -413,6 +415,15 @@ export class ParticleRuntime {
    * Bounded at `PARTICLE_MAX_LIGHT_SHAFTS`; extra shafts are ignored rather
    * than quietly making the mote loop more expensive.
    */
+  private adoptPublishedLightShafts(): void {
+    const available = activeLightShafts();
+    if (available.revision === this.adoptedShaftRevision) return;
+    this.adoptedShaftRevision = available.revision;
+    // Shafts never cross arenas: another arena's cones would brighten motes in
+    // mid-air over this one.
+    this.setLightShafts(available.arenaId === this.arenaId ? available.shafts : EMPTY_LIGHT_SHAFTS);
+  }
+
   setLightShafts(shafts: readonly ParticleLightShaft[]): void {
     const context = this.context;
     const count = Math.min(shafts.length, PARTICLE_MAX_LIGHT_SHAFTS);
@@ -663,6 +674,12 @@ export class ParticleRuntime {
     if (this.secondsSinceMuzzle > 0.12) {
       this.muzzleHeat = Math.max(0, this.muzzleHeat - step / MUZZLE_HEAT_RESPONSE.coolSeconds);
     }
+
+    // Take up whatever the arena's art module published, if it changed. One
+    // integer compare on the frame path; nothing else happens unless an arena
+    // actually republished. See light-shaft-registry.ts for why this is a
+    // latch and not a call from the orchestrator.
+    this.adoptPublishedLightShafts();
 
     const context = this.context;
     camera.getWorldPosition(this.scratchVector);

@@ -9,7 +9,7 @@
  */
 import * as THREE from 'three';
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { calmWind, createWindField, sampleWind } from '../weather/wind-field';
 import { ARENA_IDS, type ArenaId } from '../arena-identity';
 import {
@@ -26,6 +26,12 @@ import {
   resolveAmbientLife,
 } from './ambient-life-settings';
 import { PARTICLE_FAMILIES, arenaParticleProfile, type ParticleFamilyId } from './particle-catalog';
+import {
+  activeLightShafts,
+  publishLightShafts,
+  resetLightShafts,
+  type ParticleLightShaft,
+} from './light-shaft-registry';
 
 function camera(x = 0, y = 1.7, z = 0, yaw = 0): THREE.PerspectiveCamera {
   const view = new THREE.PerspectiveCamera(75, 16 / 9, 0.1, 500);
@@ -637,6 +643,90 @@ describe('the player can actually change the air (Pass 79)', () => {
         .toBeLessThanOrEqual(PARTICLE_FAMILIES[family.id as ParticleFamilyId].maxOpacity + 1e-9);
     }
     expect(thick.visibleParticles).toBeLessThanOrEqual(thick.liveParticles);
+    runtime.dispose();
+  });
+});
+
+describe('the arena art modules can finally reach the dust (Pass 79)', () => {
+  // `farcrysisLightShafts()` was imported by exactly one file - its own test -
+  // and live telemetry read `particles.lightShafts: 0` on every arena, so the
+  // authored "motes brighten in a shaft of light" response had never run for a
+  // player. These tests pin the CONNECTION, and they read the runtime's own
+  // telemetry rather than the value that was published.
+  const shaft = (x: number): ParticleLightShaft => Object.freeze({
+    x, y: 6, z: -2, axisX: 0, axisY: -1, axisZ: 0, radiusM: 2,
+  });
+
+  afterEach(() => { resetLightShafts(); });
+
+  it('takes up the shafts its own arena published, without being told to', () => {
+    const { runtime } = build({ arenaId: 'farcrysis' });
+    const view = camera();
+    runtime.update(1 / 60, view, { wind: calmWind() });
+    expect(runtime.telemetry().lightShafts).toBe(0);
+
+    publishLightShafts('farcrysis', [shaft(1), shaft(5), shaft(-4)]);
+    runtime.update(1 / 60, view, { wind: calmWind() });
+    expect(runtime.telemetry().lightShafts).toBe(3);
+    runtime.dispose();
+  });
+
+  it('ignores another arenashafts entirely', () => {
+    const { runtime } = build({ arenaId: 'gun-range' });
+    const view = camera();
+    publishLightShafts('farcrysis', [shaft(1), shaft(5)]);
+    runtime.update(1 / 60, view, { wind: calmWind() });
+    expect(activeLightShafts().shafts).toHaveLength(2);
+    expect(runtime.telemetry().lightShafts).toBe(0);
+    runtime.dispose();
+  });
+
+  it('clears the previous arena shafts when the arena changes', () => {
+    const { runtime } = build({ arenaId: 'farcrysis' });
+    const view = camera();
+    publishLightShafts('farcrysis', [shaft(1), shaft(5)]);
+    runtime.update(1 / 60, view, { wind: calmWind() });
+    expect(runtime.telemetry().lightShafts).toBe(2);
+
+    runtime.setArena('atomic-acres');
+    runtime.update(1 / 60, view, { wind: calmWind() });
+    expect(runtime.telemetry().lightShafts).toBe(0);
+
+    runtime.setArena('farcrysis');
+    runtime.update(1 / 60, view, { wind: calmWind() });
+    expect(runtime.telemetry().lightShafts).toBe(2);
+    runtime.dispose();
+  });
+
+  it('subscribes without adding a draw, a mesh or a per-frame allocation', () => {
+    const { runtime } = build({ arenaId: 'farcrysis' });
+    const view = camera();
+    publishLightShafts('farcrysis', [shaft(1), shaft(5), shaft(-4)]);
+    for (let frame = 0; frame < 300; frame += 1) {
+      runtime.update(1 / 60, view, { wind: calmWind() });
+    }
+    const telemetry = runtime.telemetry();
+    expect(telemetry.lightShafts).toBe(3);
+    expect(telemetry.instancedDraws).toBe(PARTICLE_INSTANCED_DRAWS);
+    expect(telemetry.looseMeshes).toBe(0);
+    expect(telemetry.perFrameAllocations).toBe(0);
+    for (const family of telemetry.families) expect(family.perFrameAllocations, family.id).toBe(0);
+    runtime.dispose();
+  });
+
+  it('still holds every family opacity ceiling with shafts brightening motes', () => {
+    // Beauty may not buy a gunfight: brightening motes inside a cone must not
+    // push any family past the ceiling the readability audit was computed on.
+    const { runtime } = build({ arenaId: 'farcrysis' });
+    const view = camera();
+    publishLightShafts('farcrysis', Array.from({ length: 6 }, (_, index) => shaft(index - 3)));
+    for (let frame = 0; frame < 420; frame += 1) {
+      runtime.update(1 / 60, view, { wind: calmWind(), ambientLife: resolveAmbientLife({ ambientLife: 2 }) });
+    }
+    for (const family of runtime.telemetry().families) {
+      expect(family.peakOpacity, family.id)
+        .toBeLessThanOrEqual(PARTICLE_FAMILIES[family.id as ParticleFamilyId].maxOpacity + 1e-9);
+    }
     runtime.dispose();
   });
 });
