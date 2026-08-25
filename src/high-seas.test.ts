@@ -562,8 +562,8 @@ describe('High Seas clean-room arena geometry', () => {
       // centre at eye height was walk-through open air.
       const centre = bounds.getCenter(new THREE.Vector3());
       expect(
-        map.physicsColliders.some((b) => centre.x >= b.minX && centre.x <= b.maxX
-          && centre.y >= (b.minY ?? -Infinity) && centre.y <= (b.maxY ?? Infinity)
+        map.colliders.some((b) => centre.x >= b.minX && centre.x <= b.maxX
+          && centre.y >= (b.minY ?? Number.NEGATIVE_INFINITY) && centre.y <= (b.maxY ?? Number.POSITIVE_INFINITY)
           && centre.z >= b.minZ && centre.z <= b.maxZ),
         pane.name,
       ).toBe(true);
@@ -573,6 +573,65 @@ describe('High Seas clean-room arena geometry', () => {
       // Each band runs the full cabin between the end walls.
       expect(bounds.max.z - bounds.min.z).toBeGreaterThan(15);
       expect(materialOf(band.name), band.name).toBe('interior-wall');
+    }
+    // HF-392 residual-slit closure (pass 80). The first glazing pass inset
+    // every pane 3 cm per edge inside framing that did not compensate, leaving
+    // eight 0.06 m open slots per cabin side (32 ship-wide) at the mullion
+    // edges and a 1 cm slit above and below EVERY pane - open air with no
+    // mesh, no shot surface and no collider, reading as daylight lines from
+    // inside. Panes, mullions and the end-wall inner faces must now TILE each
+    // aperture band: any gap between adjacent coverage may not exceed the
+    // deliberate 4 mm anti-coplanar inset.
+    const MAX_OPEN_GAP_M = 0.005;
+    const BAND_BOTTOM = HIGH_SEAS_LEVELS.upperDeck + 0.46; // sill top
+    const BAND_TOP = HIGH_SEAS_LEVELS.upperDeck + 2.6 - 0.54; // header bottom
+    for (const end of ['bow', 'stern'] as const) {
+      const centreZ = end === 'bow' ? -21 : 21;
+      for (const side of ['port', 'starboard'] as const) {
+        const segments: Array<{ minimum: number; maximum: number; name: string }> = [];
+        map.root.traverse((node) => {
+          if (!(node instanceof THREE.Mesh)) return;
+          const isPane = node.name.startsWith(`high-seas-${end}-upper-${side}-glazing`);
+          const isMullion = node.name.startsWith(`high-seas-${end}-upper-${side}-mullion`);
+          if (!isPane && !isMullion) return;
+          const bounds = new THREE.Box3().setFromObject(node);
+          segments.push({ minimum: bounds.min.z - centreZ, maximum: bounds.max.z - centreZ, name: node.name });
+        });
+        segments.sort((left, right) => left.minimum - right.minimum);
+        let cursor = -7.89; // end-wall inner face offset from the cabin centre
+        for (const segment of segments) {
+          expect(segment.minimum - cursor, `gap before ${segment.name} on ${end}/${side}`).toBeLessThanOrEqual(MAX_OPEN_GAP_M);
+          cursor = Math.max(cursor, segment.maximum);
+        }
+        expect(7.89 - cursor, `uncovered band tail on ${end}/${side}`).toBeLessThanOrEqual(MAX_OPEN_GAP_M);
+      }
+      // Every pane must meet BOTH frame faces within twice the inset: the old
+      // panes floated a full centimetre clear of sill and header.
+      map.root.traverse((node) => {
+        if (!(node instanceof THREE.Mesh)) return;
+        if (!node.name.startsWith(`high-seas-${end}-upper-`) || !node.name.includes('glazing')) return;
+        const bounds = new THREE.Box3().setFromObject(node);
+        expect(bounds.min.y, `${node.name} sill-side slit`).toBeLessThanOrEqual(BAND_BOTTOM + 0.005);
+        expect(bounds.max.y, `${node.name} header-side slit`).toBeGreaterThanOrEqual(BAND_TOP - 0.005);
+      });
+      // The forward face of each deckhouse is now a framed windscreen either
+      // side of the upper external door, instead of blank solid wall.
+      const windscreens: THREE.Mesh[] = [];
+      map.root.traverse((node) => {
+        if (node instanceof THREE.Mesh && node.name.startsWith(`high-seas-${end}-upper-windscreen-`) && node.name.includes('-glass')) windscreens.push(node);
+      });
+      expect(windscreens.length, `${end} windscreen panes`).toBeGreaterThanOrEqual(2);
+      for (const pane of windscreens) {
+        const bounds = new THREE.Box3().setFromObject(pane);
+        expect(bounds.max.z - bounds.min.z, `${pane.name} lies in the end-wall plane`).toBeLessThanOrEqual(0.1);
+        expect(bounds.max.x - bounds.min.x, `${pane.name} spans its flank`).toBeGreaterThan(1.2);
+        expect(materialOf(pane.name), pane.name).toBe('glass');
+      }
+      // The inner end pane closes its frame too: the 4.4 m opening may not
+      // carry the old 30 mm-per-side daylight gaps.
+      const innerPane = map.root.getObjectByName(`high-seas-${end}-upper-inner-glazing`) as THREE.Mesh;
+      const innerBounds = new THREE.Box3().setFromObject(innerPane);
+      expect(innerBounds.max.x - innerBounds.min.x, `${end} inner pane width vs opening`).toBeGreaterThanOrEqual(4.4 - 0.01);
     }
   });
 

@@ -1756,6 +1756,13 @@ function addCabin(
   const GLAZING_HALF_THICKNESS = 0.03;
   const APERTURE_BOTTOM = HIGH_SEAS_LEVELS.upperDeck + 0.46;
   const APERTURE_TOP = HIGH_SEAS_LEVELS.upperDeck + CABIN_UPPER_WALL_HEIGHT - 0.54;
+  // HF-392 pass 80: panes used to be inset 30 mm per edge inside framing that
+  // did not compensate, leaving 32 open 60 mm slots at the mullion edges and a
+  // 10 mm slit above and below EVERY pane - open air with no mesh, shot
+  // surface or collider. Panes now tile their framing less a 4 mm inset, which
+  // keeps faces off coplanar without leaving a visible daylight line.
+  const GLASS_EDGE_INSET = 0.004;
+  const APERTURE_HEIGHT = APERTURE_TOP - APERTURE_BOTTOM;
   addSplitEndWall(builder, `high-seas-${end}-upper-inner-wall`, innerZ, 0, 4.4, upperY, CABIN_UPPER_WALL_HEIGHT, wallMaterial);
   box(builder, `high-seas-${end}-upper-window-sill`, [0, 6.43, innerZ], [4.4, 0.46, 0.22], trimMaterial, {
     ballisticMaterial: 'interior-wall',
@@ -1763,11 +1770,38 @@ function addCabin(
   box(builder, `high-seas-${end}-upper-window-header`, [0, 8.53, innerZ], [4.4, 0.54, 0.22], trimMaterial, {
     ballisticMaterial: 'interior-wall',
   });
-  box(builder, `high-seas-${end}-upper-inner-glazing`, [0, (APERTURE_BOTTOM + APERTURE_TOP) / 2, innerZ], [4.34, APERTURE_TOP - APERTURE_BOTTOM - 0.02, GLAZING_HALF_THICKNESS * 2], glassMaterial, {
+  box(builder, `high-seas-${end}-upper-inner-glazing`, [0, (APERTURE_BOTTOM + APERTURE_TOP) / 2, innerZ], [4.4 - GLASS_EDGE_INSET * 2, APERTURE_HEIGHT - GLASS_EDGE_INSET * 2, GLAZING_HALF_THICKNESS * 2], glassMaterial, {
     shots: true,
     ballisticMaterial: 'glass',
   });
-  addSplitEndWall(builder, `high-seas-${end}-upper-outer-wall`, outerZ, externalX, 2.3, upperY, CABIN_UPPER_WALL_HEIGHT, wallMaterial);
+  // HF-392 pass 80: the outer end face used to be blank solid wall either
+  // side of the upper external door - the only unglazed face of the bridge.
+  // Each flank now carries the same sill/glazing/header band construction as
+  // the side bays as one continuous sheet per flank (the geometry-draw budget
+  // has no headroom for per-panel splits, and an unbroken window band is the
+  // superyacht read anyway). The movement envelope is unchanged: every pane
+  // stays a solid movement+shot blocker and only its ballistic family becomes
+  // glass, so the deckhouse reads as wraparound bridge glazing from the bow
+  // and stern approaches without touching the pinned door aperture.
+  const WINDSCREEN_DOOR_HALF = 1.15;
+  for (const [flank, flankMinX, flankMaxX] of [
+    ['port', -CABIN_HALF_WIDTH, externalX - WINDSCREEN_DOOR_HALF],
+    ['starboard', externalX + WINDSCREEN_DOOR_HALF, CABIN_HALF_WIDTH],
+  ] as const) {
+    const width = flankMaxX - flankMinX;
+    if (width <= 0) continue;
+    const midX = (flankMinX + flankMaxX) / 2;
+    box(builder, `high-seas-${end}-upper-windscreen-${flank}-spandrel`, [midX, HIGH_SEAS_LEVELS.upperDeck + 0.23, outerZ], [width, 0.46, 0.22], wallMaterial, {
+      ballisticMaterial: 'interior-wall',
+    });
+    box(builder, `high-seas-${end}-upper-windscreen-${flank}-header`, [midX, APERTURE_TOP + 0.27, outerZ], [width, 0.54, 0.22], trimMaterial, {
+      ballisticMaterial: 'interior-wall',
+    });
+    box(builder, `high-seas-${end}-upper-windscreen-${flank}-glass`, [midX, (APERTURE_BOTTOM + APERTURE_TOP) / 2, outerZ], [width - GLASS_EDGE_INSET * 2, APERTURE_HEIGHT - GLASS_EDGE_INSET * 2, GLAZING_HALF_THICKNESS * 2], glassMaterial, {
+      shots: true,
+      ballisticMaterial: 'glass',
+    });
+  }
 
   // Side upper-storey windows are framed apertures, not decoration (HF-392).
   // A sill and a header band run each cabin side between the end walls,
@@ -1790,14 +1824,22 @@ function addCabin(
     box(builder, `high-seas-${end}-upper-${side}-window-header`, [x, APERTURE_TOP + 0.27, centerZ], [0.22, 0.54, maxZ - minZ], trimMaterial, {
       ballisticMaterial: 'interior-wall',
     });
-    // Bay boundaries are the end-wall inner faces (+/-7.89) and the mullion
-    // faces (+/-2.11/2.39 and +/-6.26/6.54 relative to the cabin centre);
-    // each pane is inset 3 cm per edge so no pane face sits coplanar with a
-    // mullion face or a band face.
-    for (const [bayCenter, bayWidth] of [
-      [-7.215, 1.23], [-4.185, 4.03], [0, 4.1], [4.185, 4.03], [7.215, 1.23],
-    ] as const) {
-      box(builder, `high-seas-${end}-upper-${side}-glazing-${bayCenter}`, [x, (APERTURE_BOTTOM + APERTURE_TOP) / 2, centerZ + bayCenter], [GLAZING_HALF_THICKNESS * 2, APERTURE_TOP - APERTURE_BOTTOM - 0.02, bayWidth], glassMaterial, {
+    // Bay boundaries are DERIVED, not hand-listed (HF-392 pass 80): each bay
+    // runs from the previous frame face (end-wall inner face or mullion face)
+    // to the next, so a future mullion move cannot silently reopen the edge
+    // slits the first pass shipped. A pane insets 4 mm per edge off its bay.
+    const END_FACE_OFFSET = 7.89; // ((|outerZ| - |minZ|) / 2) minus half the 0.22 wall
+    const MULLION_HALF_DEPTH = 0.14;
+    const bays: Array<readonly [number, number]> = [];
+    let bayCursor = -END_FACE_OFFSET;
+    for (const centre of [-6.4, -2.25, 2.25, 6.4]) {
+      const mullionMin = centre - MULLION_HALF_DEPTH;
+      bays.push([bayCursor, mullionMin]);
+      bayCursor = centre + MULLION_HALF_DEPTH;
+    }
+    bays.push([bayCursor, END_FACE_OFFSET]);
+    for (const [bayMin, bayMax] of bays) {
+      box(builder, `high-seas-${end}-upper-${side}-glazing-${(bayMin + bayMax) / 2}`, [x, (APERTURE_BOTTOM + APERTURE_TOP) / 2, centerZ + (bayMin + bayMax) / 2], [GLAZING_HALF_THICKNESS * 2, APERTURE_HEIGHT - GLASS_EDGE_INSET * 2, bayMax - bayMin - GLASS_EDGE_INSET * 2], glassMaterial, {
         shots: true,
         ballisticMaterial: 'glass',
       });
