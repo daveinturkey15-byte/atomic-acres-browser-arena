@@ -345,7 +345,14 @@ describe('Pass 64 authored TSL pipeline set', () => {
       // telemetry can prove the zero state rather than inferring it from an
       // absent field.
       screenSpace: {
-        godrays: SCREEN_SPACE_POST_DISABLED.godrays,
+        // HF-401: the shaft receipt now also carries the gain the composite
+        // ACTUALLY received on the last presented frame, because "the tier is
+        // on" and "the shafts are reaching the picture" were indistinguishable
+        // while three was silently substituting a default material for the
+        // raymarch. With the whole stack off it must be exactly zero — one
+        // more pinned field than this expectation carried before, not one
+        // fewer.
+        godrays: { ...SCREEN_SPACE_POST_DISABLED.godrays, effectiveAdditiveGain: 0 },
         reflections: SCREEN_SPACE_POST_DISABLED.reflections,
         globalIllumination: SCREEN_SPACE_POST_DISABLED.globalIllumination,
         depthOfField: SCREEN_SPACE_POST_DISABLED.depthOfField,

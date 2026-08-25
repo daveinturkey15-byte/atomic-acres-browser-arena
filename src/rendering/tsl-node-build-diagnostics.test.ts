@@ -32,7 +32,8 @@ describe('HF-401 swallowed TSL node-build failures are counted', () => {
   afterEach(() => {
     handle?.uninstall();
     handle = null;
-    setConsoleFunction(null);
+    // three's runtime clears the hook when handed null; its .d.ts does not say so.
+    (setConsoleFunction as unknown as (fn: unknown) => void)(null);
     vi.restoreAllMocks();
   });
 

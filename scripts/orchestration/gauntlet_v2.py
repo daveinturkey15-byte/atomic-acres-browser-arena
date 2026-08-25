@@ -111,6 +111,28 @@ def agents_alive():
         return 0
 
 
+def recently_written(seconds=90):
+    """Has any tracked source file changed very recently?
+
+    agents_alive() counts OMP processes ONLY. Claude agents are API-driven and own no local
+    process, so wait_quiet() returned True while they were mid-edit and `git add -A` swept
+    their in-progress files into another team's round commit - twice on 2026-08-25, reported
+    independently by two different agents. This is the harness-agnostic check: if the tree
+    was written to moments ago, SOMEONE is still working, whatever runtime they live in.
+    """
+    rc, out = sh('git diff --name-only', timeout=120)
+    if rc != 0:
+        return True  # cannot tell: assume busy rather than sweep
+    now = time.time()
+    for rel in [l.strip() for l in out.splitlines() if l.strip()]:
+        try:
+            if now - os.path.getmtime(os.path.join(REPO, rel)) < seconds:
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def wait_quiet(max_wait=600):
     """Let agents finish writing before measuring the tree.
 
@@ -121,7 +143,7 @@ def wait_quiet(max_wait=600):
     """
     deadline = time.time() + max_wait
     while time.time() < deadline:
-        if agents_alive() == 0:
+        if agents_alive() == 0 and not recently_written():
             return True
         time.sleep(20)
     return False

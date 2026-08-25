@@ -166,6 +166,20 @@ export type TslNodeBuildDiagnosticsHandle = Readonly<{
 
 const TSL_NODE_BUILD_MESSAGE_CAP = 8;
 
+type ThreeConsoleFunction = (type: 'log' | 'warn' | 'error', message: string, ...params: unknown[]) => void;
+
+/**
+ * Three's runtime stores whatever it is given and `getConsoleFunction()`
+ * returns `null` when nothing is installed — its `.d.ts` declares both as
+ * non-nullable. These two wrappers keep the honest nullability at our boundary
+ * instead of pretending a missing hook is a function.
+ */
+const currentThreeConsoleFunction = (): ThreeConsoleFunction | null =>
+  (getConsoleFunction() as ThreeConsoleFunction | null) ?? null;
+const installThreeConsoleFunction = (fn: ThreeConsoleFunction | null): void => {
+  (setConsoleFunction as unknown as (value: ThreeConsoleFunction | null) => void)(fn);
+};
+
 /** Every message three routes through `error()` from the node-build catch. */
 const TSL_NODE_BUILD_ERROR_PREFIX = 'THREE.TSL:';
 
@@ -180,7 +194,7 @@ export function installTslNodeBuildDiagnostics(
 ): TslNodeBuildDiagnosticsHandle {
   const messages: string[] = [];
   let count = 0;
-  const previous = getConsoleFunction();
+  const previous = currentThreeConsoleFunction();
 
   const publish = (): void => {
     if (!target) return;
@@ -215,7 +229,7 @@ export function installTslNodeBuildDiagnostics(
     forward(type, message, ...params);
   };
 
-  setConsoleFunction(observer);
+  installThreeConsoleFunction(observer);
   publish();
 
   return Object.freeze({
@@ -226,7 +240,7 @@ export function installTslNodeBuildDiagnostics(
       publish();
     },
     uninstall: (): void => {
-      if (getConsoleFunction() === observer) setConsoleFunction(previous);
+      if (currentThreeConsoleFunction() === observer) installThreeConsoleFunction(previous);
       if (target) delete target.dataset[TSL_NODE_BUILD_ERROR_ATTRIBUTE];
     },
   });
