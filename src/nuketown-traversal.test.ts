@@ -448,6 +448,17 @@ describe('Nuke Town traversal (HF-383)', () => {
     // mirrored solids never reach the asymmetric list): exactly 2 houses x
     // 2 entries x 3 collidable frame pieces may ride the exemption, never
     // one more, so the class cannot silently swallow a missing or extra jamb.
+    let entryFrameCount = 0;
+    for (const house of map.houses) {
+      for (const solidEntry of house.solids) {
+        // Front/rear street-door frames only; upper-ramp-entry-frame-* uses
+        // rear/front/head suffixes and would leak into this class via
+        // `-head`. Ramp frames are size-covered by the structural-twin
+        // inventory pin below instead.
+        if (/^(front|rear)-entry-frame-(left|right|head)$/.test(solidEntry.name)) entryFrameCount += 1;
+      }
+    }
+    expect(entryFrameCount).toBe(12);
     const frameColliders = map.colliders.filter((b) =>
       /^(front|rear)-entry-frame-(left|right|head)$/.test(nameFor(b)),
     );
