@@ -73,6 +73,14 @@ export const LINEAR_SOURCE_STAGE_ORDER: readonly string[] = Object.freeze([
   'ssgi-screen-space-bounce-add',
   'contact-occlusion-multiply',
   'ssr-screen-space-reflection-add',
+  // HF-398 — classic recursive ray tracing. It sits immediately after the
+  // screen-space reflection add and for exactly the same reason: reflected
+  // light is not occluded by the surface reflecting it, and it must still be
+  // able to bloom. The two are independent and may run together or alone; the
+  // ray-traced layer additionally reaches geometry that is off screen, which is
+  // the difference between intersecting real geometry and marching a depth
+  // buffer. Nothing here is hardware ray tracing — no browser exposes one.
+  'raytraced-reflection-refraction-add',
   'depth-guarded-bloom-add',
   'godrays-volumetric-shaft-add',
   'depth-of-field-bokeh',
@@ -83,6 +91,7 @@ export const OPTIONAL_LINEAR_SOURCE_STAGES: readonly string[] = Object.freeze([
   'motion-blur-velocity-smear',
   'ssgi-screen-space-bounce-add',
   'ssr-screen-space-reflection-add',
+  'raytraced-reflection-refraction-add',
   'godrays-volumetric-shaft-add',
   'depth-of-field-bokeh',
 ]);

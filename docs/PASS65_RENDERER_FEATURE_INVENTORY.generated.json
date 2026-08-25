@@ -201,6 +201,19 @@
       ]
     },
     {
+      "key": "graphics.rayTracing",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "ray-tracing",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "buildRayTracedLightNode({",
+          "telemetryPath": "documentElement.dataset.rayTracedLayer (tier the graph BUILT) + dataset.rayTracedProxy (shapes/candidates:reflective)"
+        }
+      ]
+    },
+    {
       "key": "graphics.reflectionQuality",
       "applyMode": "live",
       "authorityAffecting": false,
@@ -570,6 +583,7 @@
         "ambientOcclusion": "off",
         "screenSpaceReflections": "off",
         "screenSpaceGi": "off",
+        "rayTracing": "off",
         "reflectionQuality": "low",
         "environmentIntensity": 1,
         "volumetricQuality": "low",
@@ -677,6 +691,22 @@
             "enabled": false,
             "sceneResolutionScale": 1,
             "label": "Off"
+          },
+          "rayTracing": {
+            "tier": "off",
+            "enabled": false,
+            "unavailableReason": null,
+            "maximumDepth": 0,
+            "refractionsEnabled": false,
+            "causticsEnabled": false,
+            "shadowCastingLights": 0,
+            "maximumProxyShapes": 0,
+            "maximumAdditiveGain": 0,
+            "backgroundLuminanceFraction": 0,
+            "metalScreenAreaBudget": 0,
+            "transparentScreenAreaBudget": 0,
+            "apertureRadiusM": 0,
+            "focalDistanceM": 26
           }
         },
         "volumetricScale": 0.5,
@@ -745,6 +775,7 @@
         "ambientOcclusion": "off",
         "screenSpaceReflections": "low",
         "screenSpaceGi": "off",
+        "rayTracing": "off",
         "reflectionQuality": "high",
         "environmentIntensity": 1,
         "volumetricQuality": "high",
@@ -852,6 +883,22 @@
             "enabled": false,
             "sceneResolutionScale": 1,
             "label": "Off"
+          },
+          "rayTracing": {
+            "tier": "off",
+            "enabled": false,
+            "unavailableReason": null,
+            "maximumDepth": 0,
+            "refractionsEnabled": false,
+            "causticsEnabled": false,
+            "shadowCastingLights": 0,
+            "maximumProxyShapes": 0,
+            "maximumAdditiveGain": 0,
+            "backgroundLuminanceFraction": 0,
+            "metalScreenAreaBudget": 0,
+            "transparentScreenAreaBudget": 0,
+            "apertureRadiusM": 0,
+            "focalDistanceM": 26
           }
         },
         "volumetricScale": 0.8,
@@ -920,6 +967,7 @@
         "ambientOcclusion": "ultra",
         "screenSpaceReflections": "high",
         "screenSpaceGi": "high",
+        "rayTracing": "off",
         "reflectionQuality": "ultra",
         "environmentIntensity": 1,
         "volumetricQuality": "ultra",
@@ -1027,6 +1075,22 @@
             "enabled": false,
             "sceneResolutionScale": 1,
             "label": "Off"
+          },
+          "rayTracing": {
+            "tier": "off",
+            "enabled": false,
+            "unavailableReason": null,
+            "maximumDepth": 0,
+            "refractionsEnabled": false,
+            "causticsEnabled": false,
+            "shadowCastingLights": 0,
+            "maximumProxyShapes": 0,
+            "maximumAdditiveGain": 0,
+            "backgroundLuminanceFraction": 0,
+            "metalScreenAreaBudget": 0,
+            "transparentScreenAreaBudget": 0,
+            "apertureRadiusM": 0,
+            "focalDistanceM": 26
           }
         },
         "volumetricScale": 1,
@@ -1170,13 +1234,13 @@
     },
     {
       "id": "presentation-profile",
-      "title": "Performance, Quality, Max and Custom presentation profiles",
+      "title": "Performance, Quality, Ray Traced, Max and Custom presentation profiles",
       "availability": "active",
       "owner": "src/pass65-settings.ts + src/render-profile.ts",
       "sourceProbes": [
         {
           "path": "src/pass65-settings.ts",
-          "symbol": "export type GraphicsPreset = 'performance' | 'high' | 'max' | 'custom'"
+          "symbol": "export type GraphicsPreset = 'performance' | 'high' | 'raytraced' | 'max' | 'custom'"
         },
         {
           "path": "src/render-profile.ts",
@@ -1190,7 +1254,7 @@
           "graphics.preset",
           "graphics.geometryDetail"
         ],
-        "effectiveValue": "Performance uses the lowest gameplay-safe presentation values; Quality is the balanced full-geometry profile; Max enables the highest supported values; Custom seeds from the last named profile before an explicit save",
+        "effectiveValue": "Performance uses the lowest gameplay-safe presentation values; Quality is the balanced full-geometry profile; Ray Traced sits between Quality and Max, trading MSAA 4x, screen-space reflections, screen-space GI and motion blur for a genuine software ray-traced reflection layer; Max enables the highest supported values; Custom seeds from the last named profile before an explicit save",
         "rationale": "Profiles and geometry detail change presentation roots only. They never change movement, collision, ballistics, visibility authority, invisible blockers, or major debris physics."
       },
       "budget": "Performance effective pixel ratio cap 0.75; Quality base scale 1.0; Max and explicit Custom supersampling cap 1.25; compatibility cap 0.2.",
@@ -1839,7 +1903,7 @@
         "kind": "unsupported",
         "settingKeys": [],
         "effectiveValue": "Unavailable",
-        "rationale": "The RTX 5080 is the review GPU, but WebGPU exposes no ray-tracing pipeline, acceleration structures or ray queries in any shipping browser, so the renderer cannot implement hardware ray tracing. No RTX-specific ray-tracing claim or toggle is permitted, and the screen-space GI row is labelled as screen-space precisely so it is never mistaken for this one."
+        "rationale": "The RTX 5080 is the review GPU, but WebGPU exposes no ray-tracing pipeline, acceleration structures or ray queries in any shipping browser, so the renderer cannot implement hardware ray tracing. No RTX-specific ray-tracing claim or toggle is permitted. Two rows are deliberately named so they can never be mistaken for this one: screen-space GI says screen-space, and the classic recursive ray tracing row says software. That row IS genuine ray tracing and it still touches no RT core, because it runs as an ordinary fragment shader like any other."
       },
       "budget": "Zero ray-tracing acceleration structures or passes.",
       "verifier": "Generated inventory unsupported-feature gate.",
@@ -1970,6 +2034,38 @@
       "authorityAffecting": false
     },
     {
+      "id": "classic-recursive-ray-tracing",
+      "title": "Classic recursive ray tracing (software)",
+      "availability": "active",
+      "owner": "src/rendering/raytracing/raytraced-light-node.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "buildRayTracedLightNode({"
+        },
+        {
+          "path": "src/rendering/raytracing/raytracing-profile.ts",
+          "symbol": "assertRayTracingCombatSafety"
+        },
+        {
+          "path": "src/rendering/raytracing/whitted-tracer.ts",
+          "symbol": "export function traceRay("
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.rayTracing"
+        ],
+        "effectiveValue": "Off, Reflections, or Reflections + Refractions: real world-space rays intersecting the arena's analytic proxy set",
+        "rationale": "This row is genuinely ray tracing and the row above it genuinely is not, which is why one says software and the other says screen-space. Whitted-style recursion (1980) with the Hall shading model (1983): the reflection ray intersects real world-space geometry rather than marching the depth buffer, so it reaches architecture that is behind and beside the camera, and shadow rays resolve by intersection. No browser exposes a ray-tracing pipeline, so this runs as an ordinary fragment shader on any GPU, dedicated silicon or not, and it is NOT path tracing: there is no indirect diffuse bounce, which is supplied instead by the baked environment probe at its highest tier. The composite is capped twice, absolutely and relative to each pixel's own luminance, so it can only add light and can only cost a bounded fraction of an enemy silhouette's contrast. Players, bots and vehicles are never in the traced set, so no reflection can duplicate an enemy or reveal a position the baseline preset cannot."
+      },
+      "budget": "One uniform array of 24 analytic proxy shapes rebuilt once per arena, never per frame; at most 24 box intersections for the reflection ray, 24 for its shadow ray, and the same again for the transmitted ray at the refraction tier. Recursion depth 2 (reflections) or 3 (refractions). One shadow-casting light. Zero render targets: the trace composites into the existing additive reflection term.",
+      "verifier": "src/rendering/raytracing/whitted-tracer.test.ts + src/rendering/raytracing/raytracing-profile.test.ts",
+      "authorityAffecting": false
+    },
+    {
       "id": "depth-of-field",
       "title": "Depth of field",
       "availability": "active",
@@ -2079,11 +2175,11 @@
     }
   ],
   "summary": {
-    "total": 34,
-    "active": 32,
+    "total": 35,
+    "active": 33,
     "unsupported": 2,
-    "adjustable": 25,
+    "adjustable": 26,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "583a21e9a9b9fde21538141b5c43be5b763a7fbab40c094c0b809d0226f8e7db"
+  "inventorySha256": "e4ff5a3a111b4d92b4cfd71fcfd6c9ad363af22f015697ef6506453a4f5901a4"
 }

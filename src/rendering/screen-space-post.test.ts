@@ -4,10 +4,13 @@ import { describe, expect, it } from 'vitest';
 import { ARENA_VISUAL_REGISTRY } from './arena-visual-stream';
 import { createPass64TslSceneSystems, pass64LinearSourceStages } from './pass64-tsl-scene';
 import {
+  RAY_TRACED_LAYER_RECEIPT_ATTRIBUTE,
+  publishRayTracedLayerReceipt,
   screenSpaceMrtRequirement,
   screenSpacePostActive,
   screenSpacePostStages,
 } from './screen-space-post';
+import { RAY_TRACED_LIGHT_STAGE } from './raytracing/raytraced-light-node';
 import {
   resolveScreenSpacePostRuntime,
   SCREEN_SPACE_POST_DISABLED,
@@ -31,6 +34,7 @@ const EVERYTHING_ON = resolveScreenSpacePostRuntime({
   depthOfFieldStrength: 0.4,
   motionBlur: 0.5,
   spatialUpscaling: 'fsr1-quality',
+  rayTracing: 'refractions',
 }, { shadowsEnabled: true });
 
 function shadowCastingSun(): THREE.DirectionalLight {
@@ -50,14 +54,14 @@ describe('HF-364 screen-space MRT requirements', () => {
       .toEqual({ normal: true, material: true, velocity: true });
     const onlyBlur = resolveScreenSpacePostRuntime({
       volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
-      depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0.5, spatialUpscaling: 'off',
+      depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0.5, spatialUpscaling: 'off', rayTracing: 'off',
     }, { shadowsEnabled: true });
     // Shafts and depth of field read the depth buffer the pass already owns,
     // so neither may drag an extra attachment along with it.
     expect(screenSpaceMrtRequirement(onlyBlur)).toEqual({ normal: false, material: false, velocity: true });
     const onlyShafts = resolveScreenSpacePostRuntime({
       volumetricLightShafts: 'high', screenSpaceReflections: 'off', screenSpaceGi: 'off',
-      depthOfField: true, depthOfFieldStrength: 1, motionBlur: 0, spatialUpscaling: 'off',
+      depthOfField: true, depthOfFieldStrength: 1, motionBlur: 0, spatialUpscaling: 'off', rayTracing: 'off',
     }, { shadowsEnabled: true });
     expect(screenSpaceMrtRequirement(onlyShafts)).toEqual({ normal: false, material: false, velocity: false });
   });
@@ -145,7 +149,7 @@ describe('HF-364 scene-pass assembly', () => {
     const definition = (await ARENA_VISUAL_REGISTRY['atomic-acres']()).definition;
     const shaftsWithoutShadows = resolveScreenSpacePostRuntime({
       volumetricLightShafts: 'high', screenSpaceReflections: 'off', screenSpaceGi: 'off',
-      depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off',
+      depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off', rayTracing: 'off',
     }, { shadowsEnabled: false });
     const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition, {
       principalSamples: 1,
@@ -197,5 +201,79 @@ describe('HF-364 scene-pass assembly', () => {
     expect(systems.principalHdrTarget.textures.map(({ name }) => name))
       .toEqual(['output', 'normal', 'material', 'velocity']);
     systems.dispose();
+  });
+});
+
+describe('HF-398 ray-traced layer wiring', () => {
+  it('drags in the two MRT attachments the trace cannot work without', () => {
+    // Without the material attachment every surface reads as a perfectly smooth
+    // dielectric and the whole arena turns to chrome; without normals there is
+    // no reflection ray to build. Both are therefore a hard requirement of the
+    // tier and not a nice-to-have it can degrade past.
+    const onlyRayTracing = resolveScreenSpacePostRuntime({
+      volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+      depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off',
+      rayTracing: 'reflections',
+    }, { shadowsEnabled: true });
+    expect(onlyRayTracing.rayTracing.enabled).toBe(true);
+    expect(screenSpaceMrtRequirement(onlyRayTracing))
+      .toEqual({ normal: true, material: true, velocity: false });
+    expect(screenSpacePostActive(onlyRayTracing)).toBe(true);
+    expect(screenSpacePostStages(onlyRayTracing)).toEqual([RAY_TRACED_LIGHT_STAGE]);
+  });
+
+  it('reports itself unavailable rather than drawing shadowless reflections', () => {
+    // Shadow rays are the trace's most legible product. With no shadow-casting
+    // sun there is nothing for one to resolve against, so the tier reports why
+    // instead of quietly shipping a reflection with no shadow in it.
+    const noSun = resolveScreenSpacePostRuntime({
+      volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+      depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off',
+      rayTracing: 'refractions',
+    }, { shadowsEnabled: false });
+    expect(noSun.rayTracing.enabled).toBe(false);
+    expect(noSun.rayTracing.unavailableReason).toContain('Sun shadows');
+    expect(screenSpaceMrtRequirement(noSun)).toEqual({ normal: false, material: false, velocity: false });
+    expect(screenSpacePostStages(noSun)).toEqual([]);
+    expect(screenSpacePostActive(noSun)).toBe(false);
+  });
+
+  it('publishes a receipt for the graph that was BUILT, in both directions', () => {
+    // The scene assembler rebuilds the linear stage list from a hard-coded
+    // order this module does not own, so the trace can never appear there.
+    // Without this receipt, "the setting is on" and "the pass compiled into the
+    // live chain" would be indistinguishable from outside the build — which is
+    // exactly how three systems in this project shipped fully tested with zero
+    // runtime callers. Assert both directions: a receipt that is only ever
+    // written is not evidence of anything.
+    const target = { dataset: {} as Record<string, string | undefined> };
+    publishRayTracedLayerReceipt('reflections', target);
+    expect(target.dataset[RAY_TRACED_LAYER_RECEIPT_ATTRIBUTE]).toBe('reflections');
+    publishRayTracedLayerReceipt('refractions', target);
+    expect(target.dataset[RAY_TRACED_LAYER_RECEIPT_ATTRIBUTE]).toBe('refractions');
+    publishRayTracedLayerReceipt(null, target);
+    expect(target.dataset[RAY_TRACED_LAYER_RECEIPT_ATTRIBUTE]).toBeUndefined();
+    // And with no target at all it is a no-op rather than a crash, which is
+    // what keeps this module importable in a suite with no DOM.
+    expect(() => publishRayTracedLayerReceipt('reflections', null)).not.toThrow();
+  });
+
+  it('composites into the reflection term rather than inventing a stage order', () => {
+    // Reflected light is reflected light whether a ray or a march found it, and
+    // the compositor already adds it in the right place: after the contact
+    // occlusion multiply, because a reflection is not occluded by the surface
+    // reflecting it, and before bloom, so a wet highlight can bloom.
+    const both = resolveScreenSpacePostRuntime({
+      volumetricLightShafts: 'off', screenSpaceReflections: 'high', screenSpaceGi: 'off',
+      depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off',
+      rayTracing: 'reflections',
+    }, { shadowsEnabled: true });
+    const stages = screenSpacePostStages(both);
+    expect(stages.indexOf(RAY_TRACED_LIGHT_STAGE))
+      .toBe(stages.indexOf('ssr-screen-space-reflection-add') + 1);
+    const positions = stages.map((stage) => LINEAR_SOURCE_STAGE_ORDER.indexOf(stage));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    expect(OPTIONAL_LINEAR_SOURCE_STAGES).toContain(RAY_TRACED_LIGHT_STAGE);
   });
 });

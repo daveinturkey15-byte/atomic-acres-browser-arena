@@ -23,6 +23,13 @@ const arg = (name, fallback) => { const i = argv.indexOf(name); return i >= 0 &&
 const BASE = arg('--url', 'http://127.0.0.1:41876');
 const LABEL = arg('--label', 'after');
 const OUT = resolve(process.cwd(), arg('--out', `artifacts/qa/below-deck-luminance/silhouette/${LABEL}`));
+// HF-398: which graphics preset to measure under. Default '' keeps the previous
+// behaviour exactly (whatever the machine's auto-selected default is), so every
+// existing invocation of this harness measures the same thing it always did.
+// Naming one seeds the persisted settings before boot, which is how a preset
+// that is not yet in the GRAPHICS MODE <select> can still be put in front of
+// this instrument. The threshold and the stations are untouched.
+const PRESET = arg('--preset', '');
 
 // Ranges placeBotAhead accepts (it clamps to 2.5..9 m). 9 m is a corridor-length
 // engagement below deck; 5 m is a room fight.
@@ -107,6 +114,11 @@ const browser = await chromium.launch({
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 const session = await page.context().newCDPSession(page);
 await session.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
+if (PRESET) {
+  await page.addInitScript(([key, value]) => {
+    try { window.localStorage.setItem(key, value); } catch { /* private mode */ }
+  }, ['atomic-acres-pass65-settings-v1', JSON.stringify({ version: 1, graphics: { schemaVersion: 1, preset: PRESET } })]);
+}
 await page.goto(`${BASE}/?renderer=webgpu&render=quality&seed=below-deck&previewTime=0`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 300_000 });
 const backend = await page.evaluate(() => document.documentElement.dataset.renderBackend ?? null);

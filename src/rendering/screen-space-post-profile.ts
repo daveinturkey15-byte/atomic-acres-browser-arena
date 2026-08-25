@@ -36,6 +36,13 @@
  */
 
 import type { LightingTier } from '../graphics-settings-registry';
+import {
+  type RayTracingTier,
+  type RayTracingTuning,
+  RAY_TRACING_DISABLED,
+  assertRayTracingCombatSafety,
+  resolveRayTracingTuning,
+} from './raytracing/raytracing-profile';
 
 export type ScreenSpaceTier = LightingTier;
 export type SpatialUpscalingMode = 'off' | 'fsr1-quality' | 'fsr1-balanced' | 'fsr1-performance';
@@ -179,6 +186,15 @@ export type ScreenSpacePostRuntime = Readonly<{
   depthOfField: DepthOfFieldTuning;
   motionBlur: MotionBlurTuning;
   upscaling: SpatialUpscalingTuning;
+  /**
+   * HF-398 — the classic recursive ray tracer. It rides in this runtime rather
+   * than beside it because it composites into exactly the same additive
+   * reflection term the screen-space tier does, and because everything that
+   * decides whether it can run at all — the normal and material attachments,
+   * the shadow-casting sun — is already resolved here. Its own numbers and
+   * bounds live in `raytracing/raytracing-profile.ts`.
+   */
+  rayTracing: RayTracingTuning;
 }>;
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -437,6 +453,7 @@ export function assertScreenSpacePostCombatSafety(runtime: ScreenSpacePostRuntim
     );
   }
   assertDepthOfFieldCombatSafety(runtime.depthOfField);
+  assertRayTracingCombatSafety(runtime.rayTracing);
 }
 
 export type ScreenSpacePostSelection = Readonly<{
@@ -447,6 +464,8 @@ export type ScreenSpacePostSelection = Readonly<{
   depthOfFieldStrength: number;
   motionBlur: number;
   spatialUpscaling: SpatialUpscalingMode;
+  /** HF-398 — the classic recursive ray-tracing tier. */
+  rayTracing: RayTracingTier;
 }>;
 
 /**
@@ -465,6 +484,15 @@ export function resolveScreenSpacePostRuntime(
     depthOfField: resolveDepthOfFieldTuning(selection.depthOfField, selection.depthOfFieldStrength),
     motionBlur: resolveMotionBlurTuning(selection.motionBlur),
     upscaling: resolveSpatialUpscaling(selection.spatialUpscaling),
+    // The trace supplies its own normal and material attachments through
+    // `screenSpaceMrtRequirement`, so those two capabilities are always
+    // available once the tier is on; the shadow-casting sun is the one real
+    // dependency, exactly as it is for the volumetric shafts.
+    rayTracing: resolveRayTracingTuning(selection.rayTracing, {
+      materialAttachmentAvailable: true,
+      normalAttachmentAvailable: true,
+      shadowsEnabled: capability.shadowsEnabled,
+    }),
   });
   assertScreenSpacePostCombatSafety(runtime);
   return runtime;
@@ -478,6 +506,7 @@ export const SCREEN_SPACE_POST_DISABLED: ScreenSpacePostRuntime = Object.freeze(
   depthOfField: resolveDepthOfFieldTuning(false, 0),
   motionBlur: MOTION_BLUR_OFF,
   upscaling: resolveSpatialUpscaling('off'),
+  rayTracing: RAY_TRACING_DISABLED,
 });
 
 /**
@@ -522,11 +551,29 @@ export function adaptScreenSpacePostForPressure(
   const godrays = resolveGodraysTuning(demote(runtime.godrays.quality), { shadowsEnabled });
   const reflections = resolveScreenSpaceReflectionTuning(demote(runtime.reflections.quality));
   const globalIllumination = resolveScreenSpaceGiTuning(demote(runtime.globalIllumination.quality));
+  // THE TRACE HAS EXACTLY ONE HONEST LIVE LEVER, AND IT IS ALL OR NOTHING.
+  // Every other effect here is a march whose step count and target scale are
+  // uniforms, so pressure can turn them down. The trace's cost is the ray count
+  // baked into the compiled graph: recursion depth and the refraction ray are
+  // TOPOLOGY, and changing either means a pipeline rebuild, which is precisely
+  // what a frame under pressure must not trigger. What the graph does expose is
+  // a uniform gate that skips the whole traversal, so in the starved band the
+  // trace stops rather than pretending to get cheaper. That is a visible change
+  // and it is the right one: a preset that stutters is worse than one that
+  // briefly drops its most expensive effect and says so.
+  const rayTracing = starved && runtime.rayTracing.enabled
+    ? Object.freeze({
+      ...runtime.rayTracing,
+      enabled: false,
+      unavailableReason: 'Ray tracing paused: sustained frame-time pressure.',
+    })
+    : runtime.rayTracing;
   if (!starved) {
-    return Object.freeze({ ...runtime, godrays, reflections, globalIllumination });
+    return Object.freeze({ ...runtime, godrays, reflections, globalIllumination, rayTracing });
   }
   return Object.freeze({
     ...runtime,
+    rayTracing,
     godrays: Object.freeze({
       ...godrays,
       resolutionScale: godrays.resolutionScale * STARVED_RESOLUTION_SCALE,

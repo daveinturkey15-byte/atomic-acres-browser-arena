@@ -23,6 +23,9 @@ const WEATHER_KEYS = ['weatherIntensity', 'rainDensity', 'windStrength', 'lightn
 /** Controls the screen-space stack owns, i.e. the ones the presets re-tier. */
 const SCREEN_SPACE_KEYS = [
   'volumetricLightShafts', 'screenSpaceReflections', 'screenSpaceGi',
+  // HF-398 joins the family it composites with: the trace adds into the same
+  // additive reflection term and is bound by the same envelope.
+  'rayTracing',
   'depthOfField', 'depthOfFieldStrength', 'motionBlur', 'spatialUpscaling',
 ] as const;
 
@@ -138,6 +141,9 @@ describe('Advanced Graphics canonical registry', () => {
       screenSpaceGi: GRAPHICS_PRESET_VALUES.high.screenSpaceGi,
       motionBlur: 1,
       spatialUpscaling: 'off',
+      // An absent tier falls back to the Quality preset's value, not to the
+      // most expensive one a hostile payload could name.
+      rayTracing: GRAPHICS_PRESET_VALUES.high.rayTracing,
       depthOfField: false,
     });
   });
@@ -149,14 +155,32 @@ describe('Advanced Graphics canonical registry', () => {
     const matrix = {
       performance: {
         volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+        rayTracing: 'off',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
       },
       high: {
         volumetricLightShafts: 'low', screenSpaceReflections: 'low', screenSpaceGi: 'off',
+        rayTracing: 'off',
+        depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
+      },
+      // HF-398 RAY TRACED. Screen-space reflections are OFF here on purpose:
+      // the trace supersedes them and reaches off-screen geometry too, so
+      // running both would double-count reflected light and pay twice. SSGI is
+      // off for the same reason it is off on Quality — it is the expensive
+      // gather, and classic ray tracing computes no indirect bounce either.
+      // Motion blur stays at zero because it is the one effect that removes
+      // information, on the preset whose whole proposition is detail.
+      raytraced: {
+        volumetricLightShafts: 'low', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+        rayTracing: 'reflections',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
       },
       max: {
         volumetricLightShafts: 'high', screenSpaceReflections: 'high', screenSpaceGi: 'high',
+        // MAX is untouched by HF-398. It already cannot deploy against the
+        // 4000 ms admission bound; adding a large new fragment shader to it
+        // would make a failing preset fail harder.
+        rayTracing: 'off',
         depthOfField: true, depthOfFieldStrength: 0.6, motionBlur: 0.35, spatialUpscaling: 'off',
       },
     } as const;
@@ -195,6 +219,7 @@ describe('Advanced Graphics canonical registry', () => {
         depthOfFieldStrength: preset.depthOfFieldStrength,
         motionBlur: preset.motionBlur,
         spatialUpscaling: preset.spatialUpscaling,
+        rayTracing: preset.rayTracing,
       }, { shadowsEnabled: preset.shadows === 'high' });
       expect(runtime.godrays.additiveGain, `${name} godray gain`).toBeLessThanOrEqual(GODRAY_MAXIMUM_ADDITIVE_GAIN);
       expect(runtime.reflections.intensity, `${name} SSR intensity`).toBeLessThanOrEqual(SSR_MAXIMUM_INTENSITY);
@@ -212,7 +237,7 @@ describe('Advanced Graphics canonical registry', () => {
       volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
       depthOfField: GRAPHICS_PRESET_VALUES.max.depthOfField,
       depthOfFieldStrength: GRAPHICS_PRESET_VALUES.max.depthOfFieldStrength,
-      motionBlur: 0, spatialUpscaling: 'off',
+      motionBlur: 0, spatialUpscaling: 'off', rayTracing: 'off',
     }, { shadowsEnabled: true });
     expect(maxRuntime.depthOfField.enabled).toBe(true);
     expect(DEPTH_OF_FIELD_MIDFIELD_MAXIMUM_BLUR_PX).toBeGreaterThan(0);

@@ -44,17 +44,66 @@ describe('Pass 65 renderer feature inventory', () => {
       expect(found?.control.kind, id).toBe('setting');
       expect(found?.control.settingKeys.length, id).toBeGreaterThan(0);
     }
-    // No active row may claim ray tracing. The only rows allowed to use the
-    // phrase are the ones explaining that it is unavailable.
+    // HF-398 CHANGED THIS RULE, AND MADE IT STRICTER RATHER THAN LOOSER.
+    //
+    // Before HF-398 nothing in this build was ray tracing, so a blanket ban on
+    // the phrase across every active row was exactly right, and it stays right
+    // for every row that is not a ray tracer. What changed is that one row now
+    // genuinely is one: real world-space rays intersecting real world-space
+    // geometry, recursing at reflective and refractive surfaces, casting shadow
+    // rays. Forbidding the accurate word for that would push the row into
+    // describing itself dishonestly in the other direction, which is the same
+    // defect facing the other way.
+    //
+    // So the allowance is narrow, and it comes with three obligations the old
+    // blanket rule never imposed on anything:
+    //   1. a row that says "ray traced" must also say "software";
+    //   2. it may never say RTX, RT core, or hardware acceleration;
+    //   3. no row may claim path tracing, ever — the technique explicitly is
+    //      not path tracing, and that mislabel is the same class of error as
+    //      the RTX one.
+    // A fourth applies to EVERY row, active or not: "rtx" may appear in exactly
+    // one place, the unsupported hardware row, where it names the review GPU
+    // rather than claiming a capability.
+    const GENUINE_RAY_TRACING_ROWS = new Set(['classic-recursive-ray-tracing', 'presentation-profile']);
     for (const entry of PASS65_RENDERER_FEATURES.filter(({ availability }) => availability === 'active')) {
       const prose = `${entry.title} ${entry.control.effectiveValue} ${entry.control.rationale}`.toLowerCase();
       const claimsRayTracing = /\bray[- ]trac/.test(prose)
         && !/no ray-tracing|not ray tracing|never .*ray[- ]trac|rather than ray[- ]trac|mistaken for/.test(prose);
-      expect(claimsRayTracing, entry.id).toBe(false);
+      if (!GENUINE_RAY_TRACING_ROWS.has(entry.id)) {
+        expect(claimsRayTracing, entry.id).toBe(false);
+        continue;
+      }
+      expect(prose, `${entry.id} must say software`).toMatch(/software/);
+      expect(/\brtx\b/.test(prose), `${entry.id} claims RTX`).toBe(false);
+      expect(/rt core/.test(prose), `${entry.id} claims RT cores`).toBe(false);
+      expect(/hardware[- ]accelerat/.test(prose), `${entry.id} claims hardware acceleration`).toBe(false);
     }
+    // Obligation 3, applied to every row without exception.
+    for (const entry of PASS65_RENDERER_FEATURES) {
+      const prose = `${entry.title} ${entry.control.effectiveValue} ${entry.control.rationale}`.toLowerCase();
+      const claimsPathTracing = /\bpath[- ]trac/.test(prose)
+        && !/not path[- ]trac|no path[- ]trac|never path[- ]trac/.test(prose);
+      expect(claimsPathTracing, `${entry.id} claims path tracing`).toBe(false);
+    }
+    // Obligation 4.
+    const rtxRows = PASS65_RENDERER_FEATURES.filter((entry) => (
+      /\brtx\b/.test(`${entry.title} ${entry.control.effectiveValue} ${entry.control.rationale} ${entry.budget}`.toLowerCase())
+    ));
+    expect(rtxRows.map(({ id }) => id)).toEqual(['hardware-ray-tracing']);
+    expect(rtxRows[0]?.availability).toBe('unsupported');
+
     const gi = PASS65_RENDERER_FEATURES.find((entry) => entry.id === 'screen-space-gi');
     expect(gi?.title).toContain('Screen-space');
     expect(gi?.control.rationale).toContain('WebGPU exposes no ray-tracing pipeline');
+
+    // And the new row is real: active, player-selectable, and its budget states
+    // the ray count as a number rather than as an adjective.
+    const traced = PASS65_RENDERER_FEATURES.find((entry) => entry.id === 'classic-recursive-ray-tracing');
+    expect(traced?.availability).toBe('active');
+    expect(traced?.control.settingKeys).toEqual(['graphics.rayTracing']);
+    expect(traced?.budget).toMatch(/24 analytic proxy shapes/);
+    expect(traced?.budget).toMatch(/Recursion depth 2 \(reflections\) or 3 \(refractions\)/);
   });
 
   it('binds menu choreography to prerecorded media with zero runtime renderer ownership', () => {

@@ -24,7 +24,17 @@ export { AUDIO_BUS_IDS };
 export type { AudioBusId };
 
 export const PASS65_SETTINGS_STORAGE_KEY = 'atomic-acres-pass65-settings-v1';
-export type GraphicsPreset = 'performance' | 'high' | 'max' | 'custom';
+/**
+ * The preset ladder, in the order a player climbs it.
+ *
+ * `raytraced` is HF-398, and its id says what it does. It is NOT called `rtx`:
+ * no shipping browser exposes a hardware ray-tracing pipeline, so RT cores are
+ * unreachable from a tab and a preset named after them would be a claim the
+ * build cannot back. This id reaches the player directly — the effective-preset
+ * badge prints it uppercased — so it has to be true as a label and not merely
+ * as an internal token.
+ */
+export type GraphicsPreset = 'performance' | 'high' | 'raytraced' | 'max' | 'custom';
 export type ShadowQuality = 'off' | 'high';
 
 export type GraphicsSettings = Readonly<AdvancedGraphicsValues & {
@@ -136,7 +146,7 @@ export type CapabilityHints = Readonly<{
 
 export const MIN_GRAPHICS_TARGET_FPS = 30;
 export const MAX_GRAPHICS_TARGET_FPS = 360;
-const PRESETS = new Set<GraphicsPreset>(['performance', 'high', 'max', 'custom']);
+const PRESETS = new Set<GraphicsPreset>(['performance', 'high', 'raytraced', 'max', 'custom']);
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
@@ -390,6 +400,11 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
       depthOfFieldStrength: settings.depthOfFieldStrength,
       motionBlur: settings.motionBlur,
       spatialUpscaling: settings.spatialUpscaling,
+      // HF-398. The trace shares the shafts' one hard capability dependency: a
+      // shadow-casting sun. Without one there is nothing for a shadow ray to
+      // resolve against, and the resolver reports that rather than silently
+      // drawing a reflection with no shadows in it.
+      rayTracing: settings.rayTracing,
     }, { shadowsEnabled: settings.shadows === 'high' }),
     volumetricScale: qualityScale(settings.volumetricQuality),
     maximumAnisotropy: settings.anisotropy,

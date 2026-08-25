@@ -32,8 +32,12 @@ describe('Pass 65 setting inventory', () => {
     expect(graphics.find(({ key }) => key === 'graphics.ambientOcclusion')?.applyMode).toBe('pipeline-rebuild');
     // HF-364: adding or removing a screen-space raymarch changes MRT
     // attachments and render targets, so none of these may claim a live apply.
+    // HF-398 joins them: the trace is a pass that exists or does not, and its
+    // ray count and recursion depth are baked into the compiled graph, so
+    // switching a tier is a rebuild and never a live uniform write.
     for (const key of [
       'graphics.volumetricLightShafts', 'graphics.screenSpaceReflections', 'graphics.screenSpaceGi',
+      'graphics.rayTracing',
       'graphics.depthOfField', 'graphics.motionBlur', 'graphics.spatialUpscaling',
     ]) {
       expect(graphics.find((definition) => definition.key === key)?.applyMode, key).toBe('pipeline-rebuild');
@@ -43,6 +47,7 @@ describe('Pass 65 setting inventory', () => {
     const topologyOwners = new Set([
       'graphics.antiAliasing', 'graphics.geometryDetail', 'graphics.ambientOcclusion',
       'graphics.volumetricLightShafts', 'graphics.screenSpaceReflections', 'graphics.screenSpaceGi',
+      'graphics.rayTracing',
       'graphics.depthOfField', 'graphics.motionBlur', 'graphics.spatialUpscaling',
     ]);
     expect(graphics.filter(({ key }) => !topologyOwners.has(key))

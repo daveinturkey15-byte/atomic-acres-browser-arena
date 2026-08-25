@@ -3,6 +3,10 @@
 // import in this file and it reaches a module with no runtime dependencies of
 // its own.
 import { WEATHER_INTENSITY_CHOICES, type WeatherIntensityChoice } from './weather/weather-settings';
+// HF-398 — the classic recursive ray-tracing tier. The type lives with the
+// tracer's own numbers and bounds so a tier can never exist here that the
+// resolver does not know how to clamp.
+import type { RayTracingTier } from './rendering/raytracing/raytracing-profile';
 
 export type AntiAliasingMode = 'off' | 'msaa-2x' | 'msaa-4x' | 'fxaa' | 'smaa';
 export type ShadowResolution = 'medium' | 'high';
@@ -50,6 +54,7 @@ export type AdvancedGraphicsValues = Readonly<{
   ambientOcclusion: AmbientOcclusionQuality;
   screenSpaceReflections: ScreenSpaceTier;
   screenSpaceGi: ScreenSpaceTier;
+  rayTracing: RayTracingTier;
   reflectionQuality: ReflectionQualityTier;
   environmentIntensity: number;
   volumetricQuality: QualityTier;
@@ -98,6 +103,7 @@ export type GraphicsRuntimeConsumer =
   | 'volumetric-light-shafts'
   | 'screen-space-reflections'
   | 'screen-space-gi'
+  | 'ray-tracing'
   | 'depth-of-field'
   | 'motion-blur'
   | 'spatial-upscaling'
@@ -255,6 +261,21 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     description: 'Light bounces off bright surfaces and tints whatever sits next to them, so shaded sides and interiors stop looking flat.',
     kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
     applyMode: 'pipeline-rebuild', runtimeConsumer: 'screen-space-gi',
+  }),
+  // HF-398: CLASSIC RECURSIVE RAY TRACING. This one is genuinely ray tracing —
+  // real world-space rays intersecting real world-space geometry, recursing at
+  // reflective and refractive surfaces and casting shadow rays — which is why
+  // the row above it is carefully NOT called that and this one is. What it may
+  // still never claim, in this string or any other: RTX, RT cores, hardware
+  // acceleration, or path tracing. No browser exposes a ray-tracing pipeline,
+  // and this preset asks for no extension. The `path-tracing` capability notice
+  // stays exactly as it is, because hardware ray tracing genuinely is
+  // unavailable and that is a different statement from this one.
+  control({
+    key: 'rayTracing', id: 'graphics-ray-tracing', category: 'lighting', label: 'Ray tracing (software)',
+    description: 'Traces real rays at the world, so reflections show what is behind and beside you and carry hard shadows; refractions adds glass and water that bend light. Software only, on any GPU.',
+    kind: 'select', options: selectOptions(['off', 'OFF'], ['reflections', 'REFLECTIONS'], ['refractions', 'REFLECTIONS + REFRACTIONS']),
+    applyMode: 'pipeline-rebuild', runtimeConsumer: 'ray-tracing',
   }),
   control({
     key: 'reflectionQuality', id: 'graphics-reflections', category: 'lighting', label: 'Specular response',
@@ -464,6 +485,14 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
   ambientOcclusion: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'ao(sceneDepth, sceneNormal, camera)', 'render.atomicSignal.advancedGraphics.ambientOcclusion'),
   screenSpaceReflections: runtimeEvidence('src/rendering/screen-space-post.ts', 'ssr(sources.sceneColor, sources.sceneDepth, sources.sceneNormal', 'render.atomicSignal.advancedGraphics.screenSpace.reflections'),
   screenSpaceGi: runtimeEvidence('src/rendering/screen-space-post.ts', 'ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal', 'render.atomicSignal.advancedGraphics.screenSpace.globalIllumination'),
+  // The telemetry probe is a receipt written BY THE GRAPH THAT WAS BUILT, not a
+  // field echoing the requested tier. The scene assembler rebuilds the linear
+  // stage list from a hard-coded order this lane does not own, so the trace can
+  // never appear there; without a receipt of its own, "the setting is on" and
+  // "the pass compiled into the live chain" would be indistinguishable from
+  // outside. That is the exact class of false green this project has already
+  // paid for three times.
+  rayTracing: runtimeEvidence('src/rendering/screen-space-post.ts', 'buildRayTracedLightNode({', 'documentElement.dataset.rayTracedLayer (tier the graph BUILT) + dataset.rayTracedProxy (shapes/candidates:reflective)'),
   volumetricLightShafts: runtimeEvidence('src/rendering/screen-space-post.ts', 'godrays(sources.sceneDepth, sources.camera, sources.volumetricLight)', 'render.atomicSignal.advancedGraphics.screenSpace.godrays'),
   depthOfField: runtimeEvidence('src/rendering/screen-space-post.ts', 'dof(linearHdr, sources.sceneViewZ, focusDistance, focalLength, bokehScale)', 'render.atomicSignal.advancedGraphics.screenSpace.depthOfField'),
   depthOfFieldStrength: runtimeEvidence('src/rendering/screen-space-post-profile.ts', 'assertDepthOfFieldCombatSafety', 'settings.graphics.depthOfFieldStrength + screenSpace.depthOfField.bokehScale'),
@@ -564,14 +593,14 @@ export const GRAPHICS_CAPABILITY_NOTICES: readonly GraphicsCapabilityNotice[] = 
  * The exact shipped matrix is pinned in graphics-settings-registry.test.ts;
  * changing a value here without changing that table fails the suite.
  */
-export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'max', AdvancedGraphicsValues>> = Object.freeze({
+export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'raytraced' | 'max', AdvancedGraphicsValues>> = Object.freeze({
   // PERFORMANCE — deliberately untouched. This is the compatibility-forced and
   // low-spec preset; nothing in the screen-space stack runs here at all.
   performance: Object.freeze({
     renderScale: 0.75, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'off', geometryDetail: 'reduced', shadows: 'off', shadowResolution: 'medium', shadowUpdateMode: 'static',
     shadowFilter: 'auto', indirectLighting: 'low', ambientOcclusion: 'off',
-    screenSpaceReflections: 'off', screenSpaceGi: 'off', reflectionQuality: 'low',
+    screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'low',
     environmentIntensity: 1, volumetricQuality: 'low', volumetricLightShafts: 'off', smokeQuality: 'low',
     particleQuality: 'low', anisotropy: 4, decalQuality: 'low', bloomQuality: 'subtle',
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.1, vignette: 0.08,
@@ -599,7 +628,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'm
     renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'static',
     shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'off',
-    screenSpaceReflections: 'low', screenSpaceGi: 'off', reflectionQuality: 'high',
+    screenSpaceReflections: 'low', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'high',
     environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'low', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.32, vignette: 0.16,
@@ -608,6 +637,76 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'm
     // performance dial - the instance count is - so there is no reason for the
     // default preset to hide a state the arenas were authored to reach.
     weatherIntensity: 'storm', rainDensity: 1, windStrength: 1, lightning: true,
+  }),
+  // ===================================================================
+  // RAY TRACED — HF-398. The fourth rung, between Quality and Max.
+  // ===================================================================
+  //
+  // WHY IT IS NOT CALLED "RTX". No shipping browser exposes a hardware
+  // ray-tracing pipeline: there is no ray query, no acceleration-structure API
+  // and no extension a web page can request, so RT cores are not addressable
+  // from a tab on any GPU. A preset named RTX would be a claim the build cannot
+  // back, and every player with a capable card who selected it and saw software
+  // shading would be right to file a bug. What this preset genuinely is, is
+  // classic recursive ray tracing — Whitted (1980) with the Hall shading model
+  // (1983) — so "RAY TRACED" is honest and needs no scare quotes. It claims no
+  // RTX, no RT cores, no hardware acceleration, and no path tracing.
+  //
+  // WHY IT SITS BELOW MAX RATHER THAN ABOVE IT, AND WHY THAT IS THE POINT.
+  // MAX cannot deploy: cold pipeline compile measures 5.17 / 5.59 / 6.48 /
+  // 6.54 s against a 4000 ms admission bound and bounces the player to the
+  // menu. A preset that added a large new fragment shader ON TOP of MAX would
+  // be strictly worse. So this one BUYS its trace by spending less elsewhere,
+  // and each trade is a real one rather than a rounding-down:
+  //
+  //   MSAA 4x -> SMAA        Drops the 4-sample principal HDR target, which
+  //                          multiplies pipeline variants and bandwidth across
+  //                          every material in the arena, for one display-side
+  //                          post stage. This is the single biggest saving.
+  //   SSR OFF                The ray-traced layer supersedes it and reaches
+  //                          off-screen geometry too. Running both would
+  //                          double-count reflected light and pay for it twice.
+  //   SSGI OFF               The expensive gather. Classic ray tracing computes
+  //                          no indirect bounce either, and the honest answer to
+  //                          that is the baked PMREM probe at its highest tier
+  //                          (reflectionQuality ULTRA = 512), which costs load
+  //                          time and no pipelines — never a raised ambient.
+  //   Motion blur OFF        The one effect that removes information, on a
+  //                          preset whose whole proposition is detail.
+  //   Shadows static, AO high  MAX's dynamic shadow update and ultra GTAO are
+  //                          the two remaining per-frame costs that buy least
+  //                          at this tier.
+  //   Render scale 1.00      A 1.15x supersample multiplies every pass in the
+  //                          frame, including the new one.
+  //
+  // WHAT IT ADDS: rayTracing REFLECTIONS. Real world-space rays against the
+  // arena's analytic proxy set, with hard-edged shadow rays inside the
+  // reflected image. REFRACTIONS (glass, water and shadow-ray caustics) is the
+  // same trace plus a transmitted ray and its shadow ray — roughly double the
+  // arithmetic — and it stays a deliberate Custom opt-in until it has a
+  // measured cold-compile figure on every arena, exactly the discipline that
+  // keeps `spatialUpscaling` out of every preset here.
+  //
+  // COMBAT SAFETY: the layer is ADDITIVE and double-clamped — an absolute
+  // linear-HDR ceiling of 0.20, and a ceiling of 6% of each pixel's own
+  // luminance so an enemy silhouette's Weber contrast can fall by at most a
+  // factor of 1.06. Players, bots and vehicles are not in the traced set at
+  // all, so no enemy can be duplicated into a mirror and the preset supplies no
+  // positional information Performance cannot.
+  raytraced: Object.freeze({
+    renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
+    antiAliasing: 'smaa', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'static',
+    shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'high',
+    screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'reflections', reflectionQuality: 'ultra',
+    environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'low', smokeQuality: 'high',
+    particleQuality: 'high', anisotropy: 16, decalQuality: 'high', bloomQuality: 'cinematic',
+    exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.36, vignette: 0.17,
+    depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
+    // Between Quality's authored 1.0 and Max's 1.35. Wet surfaces are the ones
+    // the coat material was chosen for, so rain is worth more on this preset
+    // than on any other — but the trace is the frame's new cost centre and rain
+    // is pure fill rate, so it does not get Max's ceiling.
+    weatherIntensity: 'storm', rainDensity: 1.15, windStrength: 1, lightning: true,
   }),
   max: Object.freeze({
     // Max deliberately selects the highest supported values, but it must stay as
@@ -638,7 +737,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'm
     renderScale: 1.15, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'dynamic',
     shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'ultra',
-    screenSpaceReflections: 'high', screenSpaceGi: 'high', reflectionQuality: 'ultra',
+    screenSpaceReflections: 'high', screenSpaceGi: 'high', rayTracing: 'off', reflectionQuality: 'ultra',
     environmentIntensity: 1, volumetricQuality: 'ultra', volumetricLightShafts: 'high', smokeQuality: 'ultra',
     particleQuality: 'ultra', anisotropy: 16, decalQuality: 'ultra', bloomQuality: 'cinematic',
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.4, vignette: 0.18,

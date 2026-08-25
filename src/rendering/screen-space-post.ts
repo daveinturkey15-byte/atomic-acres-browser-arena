@@ -45,6 +45,11 @@ import {
   assertScreenSpacePostCombatSafety,
   type ScreenSpacePostRuntime,
 } from './screen-space-post-profile';
+import {
+  type RayTracedLightGraph,
+  RAY_TRACED_LIGHT_STAGE,
+  buildRayTracedLightNode,
+} from './raytracing/raytraced-light-node';
 
 /** Stage names this module contributes, matching `LINEAR_SOURCE_STAGE_ORDER`. */
 export const MOTION_BLUR_STAGE = 'motion-blur-velocity-smear';
@@ -70,8 +75,13 @@ export type ScreenSpaceMrtRequirement = Readonly<{
  */
 export function screenSpaceMrtRequirement(runtime: ScreenSpacePostRuntime): ScreenSpaceMrtRequirement {
   return Object.freeze({
-    normal: runtime.reflections.enabled || runtime.globalIllumination.enabled,
-    material: runtime.reflections.enabled,
+    // HF-398: the ray tracer needs both attachments for the same reasons SSR
+    // does — normals to build the reflection ray, and the packed
+    // metalness/roughness pair to know which surfaces spawn one at all. Without
+    // the material attachment every surface would read as a perfectly smooth
+    // dielectric and the whole arena would turn to chrome.
+    normal: runtime.reflections.enabled || runtime.globalIllumination.enabled || runtime.rayTracing.enabled,
+    material: runtime.reflections.enabled || runtime.rayTracing.enabled,
     velocity: runtime.motionBlur.enabled,
   });
 }
@@ -82,9 +92,45 @@ export function screenSpacePostStages(runtime: ScreenSpacePostRuntime): readonly
   if (runtime.motionBlur.enabled) stages.push(MOTION_BLUR_STAGE);
   if (runtime.globalIllumination.enabled) stages.push(SSGI_STAGE);
   if (runtime.reflections.enabled) stages.push(SSR_STAGE);
+  if (runtime.rayTracing.enabled) stages.push(RAY_TRACED_LIGHT_STAGE);
   if (runtime.godrays.enabled) stages.push(GODRAYS_STAGE);
   if (runtime.depthOfField.enabled) stages.push(DEPTH_OF_FIELD_STAGE);
   return Object.freeze(stages);
+}
+
+/** The dataset key the built-graph receipt is published under. */
+export const RAY_TRACED_LAYER_RECEIPT_ATTRIBUTE = 'rayTracedLayer';
+
+/** The minimum surface the receipt needs, so a suite can supply one. */
+export type ReceiptTarget = { dataset: Record<string, string | undefined> };
+
+/**
+ * Publishes (or clears) the built-graph receipt.
+ *
+ * The target is injected rather than reached for, because this repository runs
+ * its unit suites with no DOM: a receipt that could only be asserted in a
+ * browser would be a receipt nobody checks. Defaults to the live
+ * documentElement, which is where the shadow sampler, the atomic-signal state
+ * and the graphics registry count already publish.
+ */
+export function publishRayTracedLayerReceipt(
+  tier: string | null,
+  target: ReceiptTarget | null = typeof document === 'undefined'
+    ? null
+    : (document.documentElement as unknown as ReceiptTarget | null),
+): void {
+  if (!target) return;
+  if (tier === null) delete target.dataset[RAY_TRACED_LAYER_RECEIPT_ATTRIBUTE];
+  else target.dataset[RAY_TRACED_LAYER_RECEIPT_ATTRIBUTE] = tier;
+}
+
+/**
+ * HF-398 — whether the ray-traced layer is contributing. The trace composites
+ * into the same additive reflection term the screen-space tier uses, so this is
+ * how a caller asks whether a ray or a march (or both) produced it.
+ */
+export function rayTracedLightActive(runtime: ScreenSpacePostRuntime): boolean {
+  return runtime.rayTracing.enabled;
 }
 
 /**
@@ -243,6 +289,52 @@ export function buildScreenSpacePostGraph(
     stages.push(SSR_STAGE);
   }
 
+  // --- classic recursive ray tracing (HF-398) ------------------------------
+  // Genuine Whitted-style tracing against the arena's analytic proxy set: real
+  // world-space intersection, real reflection and refraction rays, and real
+  // shadow rays. It reflects geometry that is OFF SCREEN, which is the one
+  // thing the screen-space tier above structurally cannot do.
+  //
+  // It composites into the SAME additive reflection term, for two reasons that
+  // are both load-bearing. First, reflected light is reflected light and the
+  // compositor already adds it in the right place, after the contact-occlusion
+  // multiply, because a reflection is not occluded by the surface reflecting
+  // it. Second, it needs no new stage name, so the linear stage order and the
+  // grade chain's frozen receipt are untouched by this work.
+  //
+  // Nothing here claims RTX, RT cores, hardware acceleration or path tracing:
+  // no browser exposes a ray-tracing pipeline and this asks for no extension.
+  let rayTracedGraph: RayTracedLightGraph | null = null;
+  if (runtime.rayTracing.enabled && sources.sceneNormal && sources.sceneMaterial) {
+    rayTracedGraph = buildRayTracedLightNode({
+      sceneColor: sources.sceneColor as unknown as Node<'vec4'>,
+      sceneNormal: sources.sceneNormal as unknown as Node<'vec4'>,
+      sceneMaterial: sources.sceneMaterial as unknown as Node<'vec4'>,
+      sceneViewZ: sources.sceneViewZ as unknown as Node<'float'>,
+      camera: sources.camera,
+      sun: sources.volumetricLight,
+    }, runtime.rayTracing);
+    reflectionLight = reflectionLight === null
+      ? rayTracedGraph.light
+      : nodeObject(reflectionLight).add(rayTracedGraph.light) as unknown as Node<'vec3'>;
+    stages.push(RAY_TRACED_LIGHT_STAGE);
+  }
+  // A RUNTIME RECEIPT, AND WHY IT IS A DOM ATTRIBUTE.
+  //
+  // The linear stage receipt this module returns is not the one the renderer
+  // publishes: `pass64LinearSourceStages` in the scene assembler rebuilds the
+  // list from a hard-coded order that this lane does not own, so the trace can
+  // never appear there. Without a receipt of its own, "the preset is on" and
+  // "the pass compiled into the live chain" would be indistinguishable from
+  // outside — which is exactly how three systems in this project shipped fully
+  // tested with zero runtime callers.
+  //
+  // So the graph writes what it BUILT, on the same documentElement dataset the
+  // shadow sampler, the atomic-signal state and the graphics registry count
+  // already use. Present means the node is in the chain; absent means it is
+  // not, whatever any setting says.
+  publishRayTracedLayerReceipt(rayTracedGraph === null ? null : runtime.rayTracing.tier);
+
   // --- volumetric light shafts ---------------------------------------------
   // The farcrysis arena dresses its sun with additive quads. Those are owned by
   // the arena presentation, not by this stack, and are deliberately left alone:
@@ -343,8 +435,14 @@ export function buildScreenSpacePostGraph(
       focusDistance.value = next.depthOfField.focusDistanceM;
       focalLength.value = next.depthOfField.focalLengthM;
       bokehScale.value = next.depthOfField.enabled ? next.depthOfField.bokehScale : 0;
+      // The trace's live lever is its gate: the adaptive valve can pause it, and
+      // a paused trace runs no traversal at all rather than a traversal
+      // multiplied by zero. Ray count and recursion depth are topology and stay
+      // on the pipeline-rebuild path, exactly like turning a march on or off.
+      rayTracedGraph?.applyTuning(next.rayTracing);
     },
     beforeRender(): void {
+      rayTracedGraph?.beforeRender();
       if (!godraysNode) return;
       // The shaft tint follows the live sun colour and intensity so a dusk
       // arena gets dusk shafts, but the gain ceiling is applied here rather
@@ -359,6 +457,8 @@ export function buildScreenSpacePostGraph(
     dispose(): void {
       for (const node of disposables) node.dispose?.();
       disposables.length = 0;
+      rayTracedGraph?.dispose();
+      rayTracedGraph = null;
       depthOfFieldNode = null;
       ssgiNode = null;
       ssrNode = null;
@@ -394,7 +494,8 @@ export function screenSpacePostActive(runtime: ScreenSpacePostRuntime): boolean 
     || runtime.globalIllumination.enabled
     || runtime.reflections.enabled
     || runtime.godrays.enabled
-    || runtime.depthOfField.enabled;
+    || runtime.depthOfField.enabled
+    || runtime.rayTracing.enabled;
 }
 
 /** Re-exported so the scene-pass assembler imports one module, not two. */

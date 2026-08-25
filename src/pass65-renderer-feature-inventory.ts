@@ -77,12 +77,12 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     verifier: 'src/pass65-settings.test.ts + src/adaptive-quality.test.ts',
   }),
   feature({
-    id: 'presentation-profile', title: 'Performance, Quality, Max and Custom presentation profiles', availability: 'active', owner: 'src/pass65-settings.ts + src/render-profile.ts',
+    id: 'presentation-profile', title: 'Performance, Quality, Ray Traced, Max and Custom presentation profiles', availability: 'active', owner: 'src/pass65-settings.ts + src/render-profile.ts',
     sourceProbes: [
-      { path: 'src/pass65-settings.ts', symbol: "export type GraphicsPreset = 'performance' | 'high' | 'max' | 'custom'" },
+      { path: 'src/pass65-settings.ts', symbol: "export type GraphicsPreset = 'performance' | 'high' | 'raytraced' | 'max' | 'custom'" },
       { path: 'src/render-profile.ts', symbol: 'renderProfileConfig' },
     ], pipelineIds: [],
-    control: control('setting', ['graphics.preset', 'graphics.geometryDetail'], 'Performance uses the lowest gameplay-safe presentation values; Quality is the balanced full-geometry profile; Max enables the highest supported values; Custom seeds from the last named profile before an explicit save', 'Profiles and geometry detail change presentation roots only. They never change movement, collision, ballistics, visibility authority, invisible blockers, or major debris physics.'),
+    control: control('setting', ['graphics.preset', 'graphics.geometryDetail'], 'Performance uses the lowest gameplay-safe presentation values; Quality is the balanced full-geometry profile; Ray Traced sits between Quality and Max, trading MSAA 4x, screen-space reflections, screen-space GI and motion blur for a genuine software ray-traced reflection layer; Max enables the highest supported values; Custom seeds from the last named profile before an explicit save', 'Profiles and geometry detail change presentation roots only. They never change movement, collision, ballistics, visibility authority, invisible blockers, or major debris physics.'),
     budget: 'Performance effective pixel ratio cap 0.75; Quality base scale 1.0; Max and explicit Custom supersampling cap 1.25; compatibility cap 0.2.',
     verifier: 'src/pass65-settings.test.ts + src/render-profile.test.ts',
   }),
@@ -293,7 +293,7 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
   feature({
     id: 'hardware-ray-tracing', title: 'Hardware ray tracing', availability: 'unsupported', owner: 'not available in current Three.js WebGPU route',
     sourceProbes: [{ path: 'src/graphics-settings-registry.ts', symbol: "id: 'path-tracing'" }], pipelineIds: [],
-    control: control('unsupported', [], 'Unavailable', 'The RTX 5080 is the review GPU, but WebGPU exposes no ray-tracing pipeline, acceleration structures or ray queries in any shipping browser, so the renderer cannot implement hardware ray tracing. No RTX-specific ray-tracing claim or toggle is permitted, and the screen-space GI row is labelled as screen-space precisely so it is never mistaken for this one.'),
+    control: control('unsupported', [], 'Unavailable', 'The RTX 5080 is the review GPU, but WebGPU exposes no ray-tracing pipeline, acceleration structures or ray queries in any shipping browser, so the renderer cannot implement hardware ray tracing. No RTX-specific ray-tracing claim or toggle is permitted. Two rows are deliberately named so they can never be mistaken for this one: screen-space GI says screen-space, and the classic recursive ray tracing row says software. That row IS genuine ray tracing and it still touches no RT core, because it runs as an ordinary fragment shader like any other.'),
     budget: 'Zero ray-tracing acceleration structures or passes.',
     verifier: 'Generated inventory unsupported-feature gate.',
   }),
@@ -347,6 +347,18 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     control: control('setting', ['graphics.screenSpaceReflections'], 'Off, Low or High ray-marched reflections driven by a packed metalness/roughness MRT attachment', 'Dielectrics reflect deliberately: water and wet decking are the surfaces this tier exists for and the upstream non-metal early-out would skip them. Off-screen geometry cannot reflect, which is the technique rather than a defect. The composite is additive and intensity-capped, so it can only ever add light to a sightline.'),
     budget: 'One SSR target plus one blur target at 0.75 resolution scale or lower, one packed material MRT attachment, and at most 60% of the 64-step march; all dispose with the arena pipeline.',
     verifier: 'src/rendering/screen-space-post-profile.test.ts + src/rendering/screen-space-post.test.ts',
+  }),
+  feature({
+    id: 'classic-recursive-ray-tracing', title: 'Classic recursive ray tracing (software)', availability: 'active', owner: 'src/rendering/raytracing/raytraced-light-node.ts',
+    sourceProbes: [
+      { path: 'src/rendering/screen-space-post.ts', symbol: 'buildRayTracedLightNode({' },
+      { path: 'src/rendering/raytracing/raytracing-profile.ts', symbol: 'assertRayTracingCombatSafety' },
+      { path: 'src/rendering/raytracing/whitted-tracer.ts', symbol: 'export function traceRay(' },
+    ],
+    pipelineIds: [],
+    control: control('setting', ['graphics.rayTracing'], 'Off, Reflections, or Reflections + Refractions: real world-space rays intersecting the arena\'s analytic proxy set', 'This row is genuinely ray tracing and the row above it genuinely is not, which is why one says software and the other says screen-space. Whitted-style recursion (1980) with the Hall shading model (1983): the reflection ray intersects real world-space geometry rather than marching the depth buffer, so it reaches architecture that is behind and beside the camera, and shadow rays resolve by intersection. No browser exposes a ray-tracing pipeline, so this runs as an ordinary fragment shader on any GPU, dedicated silicon or not, and it is NOT path tracing: there is no indirect diffuse bounce, which is supplied instead by the baked environment probe at its highest tier. The composite is capped twice, absolutely and relative to each pixel\'s own luminance, so it can only add light and can only cost a bounded fraction of an enemy silhouette\'s contrast. Players, bots and vehicles are never in the traced set, so no reflection can duplicate an enemy or reveal a position the baseline preset cannot.'),
+    budget: 'One uniform array of 24 analytic proxy shapes rebuilt once per arena, never per frame; at most 24 box intersections for the reflection ray, 24 for its shadow ray, and the same again for the transmitted ray at the refraction tier. Recursion depth 2 (reflections) or 3 (refractions). One shadow-casting light. Zero render targets: the trace composites into the existing additive reflection term.',
+    verifier: 'src/rendering/raytracing/whitted-tracer.test.ts + src/rendering/raytracing/raytracing-profile.test.ts',
   }),
   feature({
     id: 'depth-of-field', title: 'Depth of field', availability: 'active', owner: 'src/rendering/screen-space-post.ts',

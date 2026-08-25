@@ -34,6 +34,7 @@ const HIGH_SELECTION = {
   depthOfFieldStrength: 1,
   motionBlur: 1,
   spatialUpscaling: 'fsr1-quality',
+  rayTracing: 'refractions',
 } as const;
 
 describe('HF-364 screen-space post tiers', () => {
