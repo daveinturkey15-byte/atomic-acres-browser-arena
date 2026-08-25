@@ -323,6 +323,11 @@ def main():
         verdict = "OK" if rc_gate == 0 else "REGRESSED"
         log(f"round {round_no} gate: {verdict}")
 
+        # `git add -A` is BANNED FOR AGENTS and deliberately allowed HERE, because the
+        # orchestrator is the integration owner and this runs only after wait_quiet()
+        # confirms every agent has exited. Before that guard existed it swept an agent's
+        # in-progress files into another team's round commit, which is exactly why the
+        # rule exists. If you move this call above the quiesce wait, you reintroduce that.
         sh("git add -A", timeout=300)
         msg = (f"gauntlet80(r{round_no}): team {team}, {len(tasks)} agents, gate {verdict}\n\n"
                f"Autonomous round, no human in the loop. Rollback: git tag pass78-fallback.\n"

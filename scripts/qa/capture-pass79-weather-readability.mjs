@@ -89,6 +89,8 @@ const results = [];
 let mask = null;
 let ring = null;
 let deviceReport = null;
+let maskCentroidOffset = null;
+let pinnedStance = null;
 
 function medianStack(buffers) {
   const length = buffers[0].length;
@@ -170,6 +172,34 @@ function meanAbsDiffMasked(a, b, channels, flags) {
   return count > 0 ? sum / count : 0;
 }
 
+/**
+ * The enemy blob, restricted to the middle of the crop. An unrestricted
+ * difference also catches the enemy's CAST SHADOW, which on a low sun is a
+ * blob as large as the enemy and metres away from it - and that pulled the
+ * measured silhouette off the target entirely on an earlier run.
+ */
+const MASK_RADIUS_PX = 150;
+
+function centralMask(a, b, channels) {
+  const flags = new Uint8Array(CROP.width * CROP.height);
+  let hits = 0;
+  let sumX = 0;
+  let sumY = 0;
+  for (let y = 0; y < CROP.height; y += 1) {
+    for (let x = 0; x < CROP.width; x += 1) {
+      if (Math.hypot(x - CROP.width / 2, y - CROP.height / 2) > MASK_RADIUS_PX) continue;
+      const index = y * CROP.width + x;
+      const base = index * channels;
+      const delta = (Math.abs(a[base] - b[base]) + Math.abs(a[base + 1] - b[base + 1]) + Math.abs(a[base + 2] - b[base + 2])) / 3;
+      if (delta >= MASK_THRESHOLD) { flags[index] = 1; hits += 1; sumX += x; sumY += y; }
+    }
+  }
+  const offset = hits > 0
+    ? Math.hypot(sumX / hits - CROP.width / 2, sumY / hits - CROP.height / 2)
+    : Infinity;
+  return { flags, hits, offset };
+}
+
 async function grabMedian(page, count) {
   const buffers = [];
   let channels = 3;
@@ -226,7 +256,17 @@ for (const state of STATES) {
     console.error(`[weather] device ${JSON.stringify(deviceReport)}`);
   }
 
+  // SELECT, THEN PROVE IT SELECTED. The first run of this harness recorded
+  // four states of "high-seas" that were all actually Nuketown, because
+  // selectArena resolves before the transition commits and nothing checked.
+  // A harness that cannot fail is not evidence.
   await page.evaluate(async (id) => { await window.__ATOMIC_ACRES_DEBUG__.selectArena(id); }, ARENA);
+  await page.waitForFunction((id) => {
+    const selection = window.__ATOMIC_ACRES_DEBUG__.snapshot().arenaSelection;
+    return selection && selection.id === id && selection.transition?.phase !== 'failed';
+  }, ARENA, { timeout: 240_000 });
+  const committedArena = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().arenaSelection);
+  if (committedArena.id !== ARENA) throw new Error(`arena did not commit: wanted ${ARENA}, got ${committedArena.id}`);
   await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.startSolo(); });
   await page.waitForFunction(() => {
     const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
@@ -235,16 +275,107 @@ for (const state of STATES) {
 
   // Frozen: the enemy must not walk out of the measured mask between captures.
   await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true); });
-  const placement = await page.evaluate((range) => {
-    const staged = window.__ATOMIC_ACRES_DEBUG__.placeBotAhead(range);
-    window.__ATOMIC_ACRES_DEBUG__.aimAtBot();
+  // THE STANCE, AND WHY IT IS THIS ONE.
+  //
+  // `placeBotAhead` is the only staging route in the game that CERTIFIES the
+  // enemy is visible: it rejects a bearing whose target is out of bounds or
+  // inside a collider, then raycasts the eye to the enemy at torso (1.06 m) and
+  // skull (1.58 m) height and rejects the bearing if either ray is blocked.
+  // What it will not do is stand the enemy further away than 9 m - the distance
+  // is hard-clamped to [2.5, 9].
+  //
+  // Walking the player BACK from there with teleportPlayer was tried and is
+  // recorded in this lane's report as a dead end, not as a result: on Nuke Town
+  // every stance past ~15 m along the staging bearing is outside the world (the
+  // player lands at eye height -24 m and falls), and the stances that do land
+  // put a hedge in the sightline placeBotAhead had certified from the spawn.
+  //
+  // Even at 9 m the certification is not sufficient on its own - its raycast
+  // set does not include every hedge - and the spawn alternates between runs.
+  // So the stance is SEARCHED with pixels: respawn, stage, aim, and check that
+  // removing the enemy actually changes a blob of the right size on the
+  // crosshair. The first accepted stance is then pinned by absolute position
+  // and yaw and REPLAYED in every later weather state, so all states are
+  // measured from one identical camera with one identical enemy.
+  //
+  // The first two runs of this harness had no such gate and reported a
+  // confident 30 m while measuring drifting cloud, and then the enemy's cast
+  // SHADOW on grass. A harness that cannot fail is not evidence.
+  async function stageAndProbe() {
+    const staged = await page.evaluate(() => {
+      const result = window.__ATOMIC_ACRES_DEBUG__.placeBotAhead(9);
+      if (result) window.__ATOMIC_ACRES_DEBUG__.aimAtBot();
+      return result;
+    });
+    if (!staged) return { staged: null, blob: { hits: 0, offset: Infinity } };
+    await page.waitForTimeout(2_500);
+    await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.aimAtBot(); });
+    await page.waitForTimeout(700);
+    const withEnemy = await grabMedian(page, 2);
+    await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.clearBots(); });
+    await page.waitForTimeout(700);
+    const withoutEnemy = await grabMedian(page, 2);
+    return { staged, blob: centralMask(withEnemy.data, withoutEnemy.data, withEnemy.channels) };
+  }
+
+  let placement = null;
+  const stanceAttempts = [];
+  for (let attempt = 0; attempt < (pinnedStance ? 1 : 10); attempt += 1) {
+    if (pinnedStance) {
+      await page.evaluate((stance) => {
+        window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(stance.x, stance.y, stance.z, stance.yaw, 0);
+      }, pinnedStance);
+      await page.waitForTimeout(1_200);
+    } else if (attempt > 0) {
+      // The probe REMOVED the enemy to measure it, so a retry has to put one
+      // back before it can stage anything - without this every retry after the
+      // first found no bot at all and reported `staged: false` forever.
+      await page.evaluate(() => {
+        window.__ATOMIC_ACRES_DEBUG__.startSolo();
+        window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true);
+        window.__ATOMIC_ACRES_DEBUG__.respawn();
+      });
+      await page.waitForTimeout(1_600);
+    }
+    const probe = await stageAndProbe();
+    stanceAttempts.push({
+      attempt,
+      staged: Boolean(probe.staged),
+      maskPx: probe.blob.hits,
+      centroidOffsetPx: Number.isFinite(probe.blob.offset) ? Number(probe.blob.offset.toFixed(1)) : null,
+    });
+    if (probe.staged && probe.blob.hits >= 800 && probe.blob.offset <= 70) {
+      placement = probe.staged;
+      if (!pinnedStance) {
+        pinnedStance = {
+          x: probe.staged.sourcePlayer.position[0],
+          y: probe.staged.sourcePlayer.position[1],
+          z: probe.staged.sourcePlayer.position[2],
+          yaw: probe.staged.sourcePlayer.yaw,
+        };
+      }
+      break;
+    }
+  }
+  if (!placement) throw new Error(`no pixel-verified enemy stance on ${ARENA}: ${JSON.stringify(stanceAttempts)}`);
+  console.error(`[weather] ${state} stance ok after ${stanceAttempts.length} attempt(s): ${JSON.stringify(stanceAttempts[stanceAttempts.length - 1])}`);
+  // The probe removed the enemy. Put it back at the same pinned stance.
+  await page.evaluate((stance) => {
+    window.__ATOMIC_ACRES_DEBUG__.startSolo();
+    window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true);
+    window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(stance.x, stance.y, stance.z, stance.yaw, 0);
+  }, pinnedStance);
+  await page.waitForTimeout(1_200);
+  placement = await page.evaluate(() => {
+    const staged = window.__ATOMIC_ACRES_DEBUG__.placeBotAhead(9);
+    if (staged) window.__ATOMIC_ACRES_DEBUG__.aimAtBot();
     return staged;
-  }, RANGE);
-  if (!placement) throw new Error(`placeBotAhead(${RANGE}) returned null on ${ARENA} - no enemy to measure`);
-  // Let rain reach a steady state and the aim settle.
-  await page.waitForTimeout(4_000);
+  });
+  if (!placement) throw new Error('could not restage the enemy at the pinned stance');
+  // Let rain reach a steady state at the pinned stance.
+  await page.waitForTimeout(3_500);
   await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.aimAtBot(); });
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(700);
 
   const weather = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleWeather());
 
@@ -254,11 +385,17 @@ for (const state of STATES) {
   await page.waitForTimeout(800);
   const withoutBot = await grabMedian(page, FRAMES);
 
+  // The mask is measured on the CLEAR pass and reused unchanged, so every state
+  // is judged on identical pixels. Its centroid is gated: a mask made of
+  // drifting cloud rather than of a standing enemy is not centred on the
+  // crosshair, and an earlier run of this harness measured exactly that.
   if (!mask) {
-    mask = buildMask(withBot.data, withoutBot.data, withBot.channels, CROP.width, CROP.height);
+    mask = centralMask(withBot.data, withoutBot.data, withBot.channels);
     ring = buildRing(mask.flags, CROP.width, CROP.height);
-    console.error(`[weather] enemy mask ${mask.hits} px, background ring ${ring.hits} px`);
-    if (mask.hits < 400) throw new Error(`enemy mask is only ${mask.hits} px - the enemy is not in the crop`);
+    console.error(`[weather] enemy mask ${mask.hits} px, ring ${ring.hits} px, centroid offset ${mask.offset.toFixed(1)} px`);
+    if (mask.hits < 500) throw new Error(`enemy mask is only ${mask.hits} px - the enemy is not in the crop`);
+    if (mask.offset > 70) throw new Error(`enemy mask centroid is ${mask.offset.toFixed(1)} px off the crosshair - that is not the enemy`);
+    maskCentroidOffset = mask.offset;
   }
 
   const enemyLuminance = meanLuminance(withBot.data, withBot.channels, mask.flags);
@@ -275,7 +412,11 @@ for (const state of STATES) {
     state,
     requestedRangeM: RANGE,
     stagedDistanceM: placement.stagedDistanceM,
+    yawOffsetRadians: placement.yawOffsetRadians,
+    stance: pinnedStance,
+    stanceAttempts,
     maskPixels: mask.hits,
+    maskCentroidOffsetPx: Number((maskCentroidOffset ?? 0).toFixed(1)),
     ringPixels: ring.hits,
     enemyLuminance: Number(enemyLuminance.toFixed(2)),
     backgroundLuminance: Number(ringLuminance.toFixed(2)),
