@@ -4831,11 +4831,11 @@ export class WeaponPresentation {
     // view scale is included in the profile so no HUD approximation is used.
     const adsY = this.adsBlend * profile.adsY;
     const adsZ = this.adsBlend * profile.adsZ;
-    const sprintDrop = this.sprintBlend * -0.16;
+    const sprintDrop = this.sprintBlend * -0.28;
     const stanceHipBlend = 1 - this.adsBlend;
     const crouchLift = pose.crouched ? 0.035 * stanceHipBlend : 0;
     const proneLift = (pose.prone ? 0.018 * stanceHipBlend : 0) + (pose.surfaceLift ?? 0);
-    const switchDrop = (1 - this.switchBlend) * -0.34;
+    const switchDrop = (1 - this.switchBlend) * -0.52;
 
     const reloadProgress = pose.reloadProgress ?? 0;
     if (pose.reloadProgress !== null) {

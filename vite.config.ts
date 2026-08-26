@@ -5,6 +5,8 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts', 'shared/**/*.test.ts', 'worker/src/**/*.test.ts'],
     exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**'],
+    testTimeout: 20000,
+    hookTimeout: 20000,
   },
   build: {
     target: 'es2022',

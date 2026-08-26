@@ -78,6 +78,7 @@ type Builder = {
   raycastMeshes: THREE.Object3D[];
   shotSurfaces: BallisticSurface[];
   physicalCover: ArenaMap['physicalCover'];
+  breakableWindows: ArenaMap['breakableWindows'];
   authorities: AuthorityEntry[];
   walkable: WalkableAuthority[];
   ballisticSurfaceSequence: number;
@@ -91,6 +92,7 @@ type BoxOptions = {
   cast?: boolean;
   detail?: 'core' | 'performance' | 'quality';
   ballisticMaterial?: BallisticMaterialId;
+  breakableWindowId?: string;
   externalPhysicsAuthority?: string;
   walkable?: Readonly<{
     id: string;
@@ -1214,12 +1216,22 @@ function box(
         impactSurface: mesh.userData.impactSurface as ReturnType<typeof classifyImpactSurface>,
         material: options.ballisticMaterial ?? 'reinforced',
       },
+      options.breakableWindowId,
     );
     builder.ballisticSurfaceSequence += 1;
     builder.shotSurfaces.push(surface);
     ballisticSurfaceId = surface.id;
     mesh.userData.ballisticSurfaceId = surface.id;
     mesh.userData.ballisticMaterial = surface.material;
+    if (options.breakableWindowId) {
+      mesh.userData.breakableWindowId = options.breakableWindowId;
+      mesh.userData.dynamic = true;
+      builder.breakableWindows.push({
+        id: options.breakableWindowId,
+        mesh,
+        broken: false,
+      });
+    }
   } else {
     mesh.userData.presentationOnly = true;
     mesh.userData.blocksShots = false;
@@ -1802,9 +1814,11 @@ function addCabin(
     ['starboard', 1.17],
   ] as const) {
     const bayWidth = 2.2 - 0.14; // opening half minus the mullion half-depth
-    box(builder, `high-seas-${end}-upper-inner-glazing-${bay}`, [centreX, (APERTURE_BOTTOM + APERTURE_TOP) / 2, innerZ], [bayWidth - GLASS_EDGE_INSET * 2, APERTURE_HEIGHT - GLASS_EDGE_INSET * 2, GLAZING_HALF_THICKNESS * 2], glassMaterial, {
+    const innerGlassId = `high-seas-${end}-upper-inner-glazing-${bay}`;
+    box(builder, innerGlassId, [centreX, (APERTURE_BOTTOM + APERTURE_TOP) / 2, innerZ], [bayWidth - GLASS_EDGE_INSET * 2, APERTURE_HEIGHT - GLASS_EDGE_INSET * 2, GLAZING_HALF_THICKNESS * 2], glassMaterial, {
       shots: true,
       ballisticMaterial: 'glass',
+      breakableWindowId: innerGlassId,
     });
   }
   // HF-392 pass 80: the outer end face used to be blank solid wall either
@@ -1830,9 +1844,11 @@ function addCabin(
     box(builder, `high-seas-${end}-upper-windscreen-${flank}-header`, [midX, APERTURE_TOP + 0.27, outerZ], [width, 0.54, 0.22], trimMaterial, {
       ballisticMaterial: 'interior-wall',
     });
-    box(builder, `high-seas-${end}-upper-windscreen-${flank}-glass`, [midX, (APERTURE_BOTTOM + APERTURE_TOP) / 2, outerZ], [width - GLASS_EDGE_INSET * 2, APERTURE_HEIGHT - GLASS_EDGE_INSET * 2, GLAZING_HALF_THICKNESS * 2], glassMaterial, {
+    const windscreenId = `high-seas-${end}-upper-windscreen-${flank}-glass`;
+    box(builder, windscreenId, [midX, (APERTURE_BOTTOM + APERTURE_TOP) / 2, outerZ], [width - GLASS_EDGE_INSET * 2, APERTURE_HEIGHT - GLASS_EDGE_INSET * 2, GLAZING_HALF_THICKNESS * 2], glassMaterial, {
       shots: true,
       ballisticMaterial: 'glass',
+      breakableWindowId: windscreenId,
     });
     // HF-392 pass 81: a single unbroken 10.8 m pane reads as a blank pale
     // band from the deck approaches (measured on r2 WebGPU frames) - the
@@ -1882,11 +1898,15 @@ function addCabin(
       bayCursor = centre + MULLION_HALF_DEPTH;
     }
     bays.push([bayCursor, END_FACE_OFFSET]);
+    let bayIndex = 0;
     for (const [bayMin, bayMax] of bays) {
-      box(builder, `high-seas-${end}-upper-${side}-glazing-${(bayMin + bayMax) / 2}`, [x, (APERTURE_BOTTOM + APERTURE_TOP) / 2, centerZ + (bayMin + bayMax) / 2], [GLAZING_HALF_THICKNESS * 2, APERTURE_HEIGHT - GLASS_EDGE_INSET * 2, bayMax - bayMin - GLASS_EDGE_INSET * 2], glassMaterial, {
+      const sideGlassId = `high-seas-${end}-upper-${side}-glazing-${bayIndex}`;
+      box(builder, sideGlassId, [x, (APERTURE_BOTTOM + APERTURE_TOP) / 2, centerZ + (bayMin + bayMax) / 2], [GLAZING_HALF_THICKNESS * 2, APERTURE_HEIGHT - GLASS_EDGE_INSET * 2, bayMax - bayMin - GLASS_EDGE_INSET * 2], glassMaterial, {
         shots: true,
         ballisticMaterial: 'glass',
+        breakableWindowId: sideGlassId,
       });
+      bayIndex += 1;
     }
     for (const segmentCenter of [centerZ - 6.4, centerZ - 2.25, centerZ + 2.25, centerZ + 6.4]) {
       box(builder, `high-seas-${end}-upper-${side}-mullion-${segmentCenter}`, [x, upperY, segmentCenter], [0.18, CABIN_UPPER_WALL_HEIGHT, 0.28], trimMaterial, {
@@ -2613,6 +2633,7 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
     raycastMeshes: [],
     shotSurfaces: [],
     physicalCover: [],
+    breakableWindows: [],
     authorities: [],
     walkable: [],
     ballisticSurfaceSequence: 0,
@@ -2952,7 +2973,7 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
     patrolPoints: patrolPoints.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
     targets: [] as PracticeTarget[],
     houses: [],
-    breakableWindows: [],
+    breakableWindows: builder.breakableWindows,
     physicalCover: builder.physicalCover,
     bounds: { ...HIGH_SEAS_BOUNDS },
     physicsSafetyFloorY: HIGH_SEAS_SAFETY_FLOOR_Y,

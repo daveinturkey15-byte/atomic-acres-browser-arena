@@ -24606,6 +24606,8 @@ function updatePhysics(dt: number): void {
     camera.position.y += traumaSample.offsetY;
     camera.rotation.z += traumaSample.rollRadians;
   }
+  // Floor and terrain near-plane standoff: prevent camera frustum from dipping below floor
+  camera.position.y = Math.max(player.position.y + 0.14, camera.position.y);
 }
 
 function interpolationSourceSnapshotRateHz(): 20 | 30 | 40 {

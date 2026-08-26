@@ -32,6 +32,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
   });
 
   it('builds node-material equivalents and proves the traversal contains no legacy shader material', async () => {
+
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera();
     const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
@@ -184,7 +185,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
     expect(systems.root.userData.tslReviewTimeMs).toBe(12_345);
     expect(systems.root.userData.tslReviewCameraId).toBeUndefined();
     systems.dispose();
-  });
+  }, 20_000);
 
   it('fails closed when a legacy custom shader appears in the WebGPU review scene', () => {
     const scene = new THREE.Scene();

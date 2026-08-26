@@ -2,9 +2,9 @@ import type * as RapierTypes from '@dimforge/rapier3d-compat';
 import type { Box2, Point3 } from './collision';
 import type { Stance } from './gameplay';
 import { SIMULATION_HZ } from './gameplay';
-import { MAX_MAJOR_DEBRIS_BODIES } from './major-debris-budget';
+import { MAX_MAJOR_DEBRIS_BODIES, MAX_PREWARMED_MAJOR_DEBRIS_BODIES } from './major-debris-budget';
 
-export { MAX_MAJOR_DEBRIS_BODIES } from './major-debris-budget';
+export { MAX_MAJOR_DEBRIS_BODIES, MAX_PREWARMED_MAJOR_DEBRIS_BODIES } from './major-debris-budget';
 
 export const CHARACTER_PHYSICS_CONFIG = Object.freeze({
   controllerOffset: 0.025,
@@ -338,7 +338,7 @@ export class CharacterPhysics {
    */
   prewarmMajorDebrisBodies(entries: readonly MajorDebrisBodyPrewarmDefinition[]): void {
     const ids = entries.map((entry) => entry.id);
-    if (entries.length > MAX_MAJOR_DEBRIS_BODIES
+    if (entries.length > MAX_PREWARMED_MAJOR_DEBRIS_BODIES
       || new Set(ids).size !== ids.length
       || ids.some((id) => !/^[a-z0-9][a-z0-9:-]{0,127}$/.test(id))
       || entries.some((entry) => ![
