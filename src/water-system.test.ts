@@ -205,7 +205,17 @@ describe('WaterSystem', () => {
       horizonRadius: 1_400,
     });
     expect(water.root.visible).toBe(false);
-    expect(water.samplePhysics(new THREE.Vector3(40, -1, 0), 0).inWater).toBe(true);
+    // Re-pinned after commit 4af5cd01 (HF-396 island rescale): farcrysis'
+    // dry-footprint half extent grew 32 -> 55.5 m (pinned against the live
+    // terrain authority in water/water-authoring.test.ts), so x=40 is now DRY
+    // LAND and must stay out of the ocean sampler — asserting inWater here
+    // would re-pin the pre-rescale bug where prone players on dry sand took
+    // ocean buoyancy. Strictness increased: pins BOTH sides of the dry gate
+    // and real buoyancy beyond it, not one open-ocean point.
+    expect(water.samplePhysics(new THREE.Vector3(40, -1, 0), 0).inWater).toBe(false);
+    const openWater = water.samplePhysics(new THREE.Vector3(60, -1, 0), 0);
+    expect(openWater.inWater).toBe(true);
+    expect(openWater.buoyancy).toBeGreaterThan(0);
   });
 
   // HF-358 fix: the WebGL2 GLSL presentation must displace with the SAME
