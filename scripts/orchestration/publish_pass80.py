@@ -59,8 +59,33 @@ def sh(cmd, cwd=REPO, timeout=3600):
     return p.returncode, (p.stdout or "") + (p.stderr or "")
 
 
+def wait_for_quiet(max_wait_s=2700):
+    """Do not measure a tree while a swarm is hammering it.
+
+    Both overnight publish attempts were refused on a REGRESSED verdict in which every
+    named file was then discounted as passing in isolation - sixteen of them on one run.
+    That is not a broken tree, it is a full suite of 480 files timing out against 19 agents
+    for the same CPU. The gate was right that it could not trust the counts; what nobody had
+    told it was to wait. Measuring under load produces a verdict about the MACHINE, not the
+    code, and it blocked a build that had probably earned publication twice.
+    """
+    deadline = time.time() + max_wait_s
+    while time.time() < deadline:
+        n = subprocess.run(["powershell", "-NoProfile", "-Command",
+                            "@(Get-Process -Name omp-windows-x64 -EA SilentlyContinue).Count"],
+                           capture_output=True, text=True, timeout=240).stdout.strip()
+        if (n or "0") == "0":
+            time.sleep(20)   # let the last writes land before reading the tree
+            return True
+        log(f"{n} agents still working - holding the measurement until the machine is quiet")
+        time.sleep(60)
+    log("agents did not drain in time; measuring anyway and treating the result with suspicion")
+    return False
+
+
 def prove_it_is_worth_publishing():
     """Every check that stands between a build and the owner's browser."""
+    wait_for_quiet()
     rc, out = sh([sys.executable, GATE, "check"])
     if rc == 3:
         return False, f"the gate could NOT RUN, so nothing verified this build: {out[-300:]}"
