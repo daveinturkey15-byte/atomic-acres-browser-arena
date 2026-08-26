@@ -210,7 +210,72 @@ the existing animation system; verify in browser.
 
 ---
 
-## Sprint 4 — AKP bookkeeping + register correction
+## Sprint 3 - retarget onto our rig, measured
+
+**VRAM solved without a quant.** The upstream README states quantised models
+are not implemented, so there is nothing to fetch. Splitting the pipeline does
+better than a quant would:
+
+| | resident during generation |
+|---|---|
+| text path | 1.1 GB motion + **~15 GB** LLM2Vec text encoder |
+| embedding path | **1.1 GB motion only** |
+
+`kmd-encode` bakes each prompt to 4096 F32 values (16 KB, committed);
+`kmd-generate-embed` - a new CLI added to the port - loads the motion model
+alone via `kimodo_model_load(motion, NULL, NULL, ...)`, the precomputed-embedding
+workflow the C API documents. **Verified byte-identical** to the text path at
+the same seed once the CFG weights were matched to kmd-generate's hardcoded
+2.0/2.0. No quantisation, so no quality loss anywhere, and 15 GB stops being
+resident rather than merely shrinking.
+
+**Retarget landed and measured.** Six clips baked, four retargeted onto the
+canonical 62-joint rig and measured in the SHIPPED GLB:
+
+| clip | frames | moving joints | grip | lowest foot | foot slide L/R |
+|---|---|---|---|---|---|
+| Kimodo_Idle_Alert | 120 | 21 | intact | 0.013 m | 0.033 / 0.036 m |
+| Kimodo_Idle_Crouch | 120 | 21 | intact | 0.007 m | 0.052 / 0.043 m |
+| Kimodo_Reload_Crouched | 90 | 22 | intact | 0.007 m | 0.034 / 0.026 m |
+| Kimodo_Hit_Chest | 60 | 22 | intact | 0.011 m | 0.022 / 0.020 m |
+| Kimodo_Walk_Forward | 60 | 22 | intact | 0.029 m | **4.20 / 4.19 m** |
+
+The in-place clips are shippable: 2-5 cm of foot travel across 60-120 frames is
+sub-millimetre per frame. **The walk is not** - it travels 5.3 m and the feet
+skate with the body. That is the root-motion foot-contact problem, it is
+reported rather than silently patched, and the fix is an explicit IK foot-lock
+pass. All 24 authored clips survive in every export with their original sample
+counts (Walk 33, Death 26).
+
+### Four defects found by measuring, each invisible to inspection
+
+1. **Wrong skeleton.** The port says Kimodo "gives you SMPL-X"; the checkpoint
+   we may legally use emits SOMA-30. Caught by the inspector on the first
+   generation, before anything was retargeted.
+2. **Exporting from the saved .blend silently collapses every clip to 2
+   samples.** The action data is intact on read-back (Death: 380 fcurves, 33
+   keys) but Blender 5.1's glTF exporter emits 2. Proven with NO retarget in
+   the loop. The asset generator never hits it because it imports the vendored
+   source glTF fresh; the retarget now does the same. Do not "simplify" it back.
+3. **This rig cannot inherit position through parenting.** `Foot.R`'s parent is
+   `Root`, not `LowerLeg.R`; `UpperLeg.R`'s parent is `Body`, not `Hips`. The
+   feet hang off the root, so a rotation-only retarget gave a walk whose legs
+   swung 57 deg while the feet measured **0.0000 m** of travel. Every mapped
+   bone is now placed explicitly from source FK.
+4. **FK seeded at the origin buried the figure.** Starting the chain at (0,0,0)
+   instead of the clip's own root translation put the feet **0.886 m
+   underground** while every joint angle was correct.
+
+Also fixed in my own tooling: the quality metric took `animations[0]`, which on
+this rig is the authored `Death` clip, so it was measuring somebody else's
+work; and grip safety was checked as channel PRESENCE when Blender bakes every
+bone on export - it now measures channel VARIATION, which is the actual defect.
+
+**Status:** DONE for in-place motion. Walk/traversal needs an IK foot-lock pass.
+
+---
+
+## Sprint 4 - AKP bookkeeping + register correction
 
 **Goal.** Rows 5 and 16 updated with the verified licence findings above; new
 row for the kimodo lane actually being exercised; evaluation records per
