@@ -1,3 +1,4 @@
+import { isFlamethrowerStreamWeapon } from './flamethrower-stream-system';
 import type { WeaponId } from './protocol';
 
 export type FlamethrowerResidualAction = Readonly<{
@@ -11,7 +12,7 @@ export type FlamethrowerResidualAction = Readonly<{
 export type FlamethrowerResidualRemoteAuthority = Readonly<{
   accepted: boolean;
   route: 'hosted-bot-result' | 'human-canonical-hit' | null;
-  weapon: 'flamethrower' | null;
+  weapon: WeaponId | null;
   reason:
     | 'accepted-hosted-bot'
     | 'accepted-human-action'
@@ -52,7 +53,7 @@ export function resolveFlamethrowerResidualRemoteAuthority(input: Readonly<{
   if (!action) return rejected('missing-action');
   if (action.ownerId !== input.ownerId) return rejected('owner-mismatch');
   if (action.actionNonce !== input.actionNonce) return rejected('action-mismatch');
-  if (action.weapon !== 'flamethrower') return rejected('weapon-mismatch');
+  if (!isFlamethrowerStreamWeapon(action.weapon)) return rejected('weapon-mismatch');
   if (action.matchEpoch !== input.currentMatchEpoch) return rejected('epoch-mismatch');
   const ageMs = input.nowMs - action.receivedAtMs;
   if (!Number.isFinite(ageMs) || !Number.isFinite(input.actionLifetimeMs)
@@ -62,7 +63,7 @@ export function resolveFlamethrowerResidualRemoteAuthority(input: Readonly<{
   return Object.freeze({
     accepted: true,
     route: 'human-canonical-hit',
-    weapon: 'flamethrower',
+    weapon: action.weapon,
     reason: 'accepted-human-action',
   });
 }
