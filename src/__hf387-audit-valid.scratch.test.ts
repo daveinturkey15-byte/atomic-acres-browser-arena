@@ -17,6 +17,9 @@ import { deriveGlassDynamicColliders } from './glass-collider-bounds';
 
 const NEAR_PLANE = 0.08;
 const CONTROLLER_OFFSET = 0.025;
+/** Validity gate: a capsule whose feet sit below the world plane is an
+ * artifact of probe marching, never a live-reachable pose. */
+const MINIMUM_FOOT_Y = -0.15;
 
 type Triangles = { mesh: THREE.Mesh; tris: Array<[THREE.Vector3, THREE.Vector3, THREE.Vector3]>; box: THREE.Box3 };
 type Offence = { arena: string; stance: string; mesh: string; inside: boolean; minDist: number; eye: THREE.Vector3 };
@@ -173,6 +176,9 @@ async function auditArena(
       const key = `${stance}:${eye.x.toFixed(2)}:${eye.y.toFixed(2)}:${eye.z.toFixed(2)}`;
       if (sampled.has(key)) return;
       sampled.add(key);
+      // Validity gate: a capsule whose feet sit below the world plane is a
+      // probe-marching artifact, never a live-reachable pose.
+      if (eye.y - shape.eyeFromCenter - shape.halfHeight - shape.radius < MINIMUM_FOOT_Y) return;
       if (!reachableAtEye(eye, shape.radius, map.physicsColliders)) return;
       measureEye(arenaId, stance, eye, visuals, offenders);
     };

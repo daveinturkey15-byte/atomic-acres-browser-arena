@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 80",
+  "feedbackReceivedAt": "2026-08-25T19:00:00.000Z",
+  "status": "published-awaiting-owner-hitl",
+  "bindingState": "awaiting-immutable-preview-and-owner-hitl",
+  "preview": null,
+  "releaseDecision": {
+    "state": "publication-authorized",
+    "condition": "owner-explicit-instruction",
+    "ownerHitl": "pending-on-public-pages"
+  },
+  "humanAcceptance": null,
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "Publication authorised explicitly by the owner for this pass",
+      "expected": "Dave instructed on 2026-08-25: 'Once you are confident in the new version publish it as pass 80 to gh pages but dont delete the older versions on there'. Publication proceeds only with every earlier channel still reachable.",
+      "falsifier": "Any previously published channel becomes unreachable, or the build is published without the owner's instruction for THIS pass.",
+      "acceptance": "human",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "manual",
+          "ref": "owner-instruction-2026-08-25T19:00",
+          "note": "Published to channels/pass80 2026-08-26. All six prior channel URLs re-checked after the push and returning 200: the-big-one, pass72-retained, pass70-retained, pass69-retained, pass63-rollback, recent-stable. Commit was 613 files added, 1 modified, 0 deleted."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "Mechanical gates green on a QUIET machine before publication",
+      "expected": "Regression gate OK, production bundle builds, and all six arenas boot on a real WebGPU device from that exact bundle.",
+      "falsifier": "Any gate measured while the agent swarm was running, or a CANNOT_MEASURE result treated as a pass.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "mechanical",
+          "ref": "publish_pass80.py 2026-08-26T09:47-09:51Z",
+          "note": "gate OK 09:47:10; production bundle 09:47:13; six arenas booted on real WebGPU 09:51:05. Swarm drained to zero agents first - three earlier verdicts taken under load were load artifacts, not defects."
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "summary": "Owner HITL on the public Pages build",
+      "expected": "Dave plays channels/pass80 on GitHub Pages and reports whether the pass meets his spec.",
+      "falsifier": "This manifest represents Dave as having accepted the build before he has played it.",
+      "acceptance": "human",
+      "state": "pending",
+      "evidence": []
+    },
+    {
+      "id": "R4",
+      "summary": "No immutable preview artifact backs this publication",
+      "expected": "Recorded honestly: this build was produced and published directly from a verified local bundle, NOT bound to a GitHub Actions immutable preview. The binding state says so rather than implying evidence that does not exist.",
+      "falsifier": "A preview block is fabricated to make the manifest validate.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "evidence": []
+    }
+  ]
+}

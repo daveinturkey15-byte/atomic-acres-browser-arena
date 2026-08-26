@@ -2,14 +2,14 @@
   "schemaVersion": 5,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 73",
-    "description": "Pass 73: first-person, combat, collision, live-graphics and cross-browser corrections with preserved release channels."
+    "label": "PASS 80",
+    "description": "Pass 80 overnight refinement: invisible-geometry parity gate, farcrysis sea reflection and refraction, Hijacked deckhouse glazing, mid-street vehicles and crimson flamethrower parity."
   },
   "experimental": {
-    "label": "PASS 73",
-    "description": "Pass 73 first-person, gameplay, world-integrity and renderer-correction build.",
-    "pass": "PASS 73",
-    "path": "channels/the-big-one"
+    "pass": "PASS 80",
+    "label": "PASS 80",
+    "description": "Pass 80 overnight refinement: invisible-geometry parity gate, farcrysis sea reflection and refraction, Hijacked deckhouse glazing, mid-street vehicles and crimson flamethrower parity.",
+    "path": "channels/pass80"
   },
   "previous": {
     "label": "PASS 72 · PREVIOUS LIVE",
@@ -66,5 +66,11 @@
     "runtimeTreeSha256": "b7416e02c190d8ff0403a65cd7a7c894970507bc6a8de7b196cc2d7979d69bce",
     "path": "channels/pass63-rollback",
     "rebuiltFromSource": true
+  },
+  "pass73Retained": {
+    "label": "PASS 73 · RETAINED LIVE",
+    "description": "The exact Pass 73 Pages runtime, retained byte-for-byte at its original path for comparison and fallback testing.",
+    "pass": "PASS 73",
+    "path": "channels/the-big-one"
   }
 }

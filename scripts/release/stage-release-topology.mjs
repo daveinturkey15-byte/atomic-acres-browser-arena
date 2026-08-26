@@ -43,9 +43,9 @@ exactSha(sourceSha, 'SOURCE_SHA');
 if (config.schemaVersion !== TOPOLOGY_SCHEMA_VERSION) {
   throw new Error(`release-channels.json schemaVersion must be ${TOPOLOGY_SCHEMA_VERSION}`);
 }
-if (!/^PASS [1-9][0-9]*$/.test(config.experimental.pass) || config.experimental.label !== 'PASS 73'
-  || config.experimental.path !== 'channels/the-big-one') {
-  throw new Error('Experimental production topology must stage PASS 73 at channels/the-big-one');
+if (!/^PASS [1-9][0-9]*$/.test(config.experimental.pass) || config.experimental.label !== config.latest.label
+  || !/^channels\/[a-z0-9-]+$/.test(config.experimental.path)) {
+  throw new Error(`Experimental production topology must stage ${config.latest.label} at its own channel`);
 }
 if (config.stable.pass !== 'PASS 67.1' || config.stable.label !== 'STABLE SINGLEPLAYER') {
   throw new Error('Pass 67.1 must remain the approved-source stable singleplayer channel');

@@ -1919,6 +1919,7 @@ function addFallenFronds(root: THREE.Group): void {
   const frondGeom = new THREE.BoxGeometry(1.2, 0.03, 0.25);
 
   const fronds = new THREE.InstancedMesh(frondGeom, vegeMat(0x8b6b3a, 0.9, 0.01), count);
+  fronds.name = 'farcrysis-vege-fallen-fronds'; // named so shore audits attribute this layer
 
   const matrix = new THREE.Matrix4();
   const positions = edgeBandPositions(count, ZONE.beach[0], ZONE.jungle[1], 0.8, SEED);

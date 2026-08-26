@@ -1120,9 +1120,9 @@ export function getHighSeasMaterialInventory(): readonly HighSeasMaterialInvento
     { name: 'pearl-hull', family: 'hull', color: 0xeaf1ef },
     { name: 'warm-cabin-shell', family: 'wall', color: 0xf5f3e9 },
     { name: 'silver-roof', family: 'roof', color: 0xcbd6d5 },
-    { name: 'honey-deck', family: 'deck', color: 0xb78653 },
-    { name: 'dark-deck-stair', family: 'stair', color: 0x5a4032 },
-    { name: 'deep-teal-trim', family: 'teal-trim', color: 0x164c58 },
+    { name: 'honey-deck', family: 'deck', color: 0xa8905e },
+    { name: 'dark-deck-stair', family: 'stair', color: 0x6b5240 },
+    { name: 'deep-teal-trim', family: 'teal-trim', color: 0x2f7080 },
     { name: 'engine-bulkhead', family: 'engine-bulkhead', color: 0x5c7078 },
     { name: 'engine-grating', family: 'engine-grating', color: 0x4e6067 },
     { name: 'engine-machinery', family: 'engine-machinery', color: 0x77878b },
@@ -1712,6 +1712,7 @@ function addCabin(
   trimMaterial: THREE.Material,
   glassMaterial: THREE.Material,
   ceilingMaterial: THREE.Material,
+  upholsteryMaterial: THREE.Material,
 ): Readonly<{
   internalRoute: HighSeasRouteAnchor[];
   externalRoute: HighSeasRouteAnchor[];
@@ -1786,10 +1787,26 @@ function addCabin(
   box(builder, `high-seas-${end}-upper-window-header`, [0, 8.53, innerZ], [4.4, 0.54, 0.22], trimMaterial, {
     ballisticMaterial: 'interior-wall',
   });
-  box(builder, `high-seas-${end}-upper-inner-glazing`, [0, (APERTURE_BOTTOM + APERTURE_TOP) / 2, innerZ], [4.4 - GLASS_EDGE_INSET * 2, APERTURE_HEIGHT - GLASS_EDGE_INSET * 2, GLAZING_HALF_THICKNESS * 2], glassMaterial, {
-    shots: true,
-    ballisticMaterial: 'glass',
+  // HF-392 pass 82: the 4.4 m inner end opening carried ONE unbroken pane -
+  // the last mullion-free face on the ship. From the deck approaches (the
+  // spawn views, measured on r3 WebGPU frames) it read as a single dead dark
+  // slab while every other face carries the mullion rhythm. A centre mullion
+  // splits it into two ~2.06 m bays matching the windscreen flanks; the panes
+  // tile their bays less the same 4 mm anti-coplanar inset, and the visible
+  // geometry budget absorbs exactly the two added draws (260/260 after this).
+  box(builder, `high-seas-${end}-upper-inner-mullion`, [0, upperY, innerZ], [0.28, CABIN_UPPER_WALL_HEIGHT, 0.18], trimMaterial, {
+    ballisticMaterial: 'interior-wall',
   });
+  for (const [bay, centreX] of [
+    ['port', -1.17],
+    ['starboard', 1.17],
+  ] as const) {
+    const bayWidth = 2.2 - 0.14; // opening half minus the mullion half-depth
+    box(builder, `high-seas-${end}-upper-inner-glazing-${bay}`, [centreX, (APERTURE_BOTTOM + APERTURE_TOP) / 2, innerZ], [bayWidth - GLASS_EDGE_INSET * 2, APERTURE_HEIGHT - GLASS_EDGE_INSET * 2, GLAZING_HALF_THICKNESS * 2], glassMaterial, {
+      shots: true,
+      ballisticMaterial: 'glass',
+    });
+  }
   // HF-392 pass 80: the outer end face used to be blank solid wall either
   // side of the upper external door - the only unglazed face of the bridge.
   // Each flank now carries the same sill/glazing/header band construction as
@@ -1817,6 +1834,17 @@ function addCabin(
       shots: true,
       ballisticMaterial: 'glass',
     });
+    // HF-392 pass 81: a single unbroken 10.8 m pane reads as a blank pale
+    // band from the deck approaches (measured on r2 WebGPU frames) - the
+    // side bays carry a mullion rhythm this face lacked. The visible-geometry
+    // budget has room for exactly two more draws (258/260 measured), so each
+    // WIDE flank gets one centre mullion splitting it into two ~5.4 m bays;
+    // the narrow door flanks keep their single pane.
+    if (width > 6) {
+      box(builder, `high-seas-${end}-upper-windscreen-${flank}-mullion`, [midX, upperY, outerZ], [0.28, CABIN_UPPER_WALL_HEIGHT, 0.18], trimMaterial, {
+        ballisticMaterial: 'interior-wall',
+      });
+    }
   }
 
   // Side upper-storey windows are framed apertures, not decoration (HF-392).
@@ -1871,12 +1899,93 @@ function addCabin(
     ballisticMaterial: 'structural-metal',
   });
   detailBox(builder, `high-seas-${end}-roof-teal-inlay`, [0, HIGH_SEAS_LEVELS.roof + 0.015, centerZ], [10.8, 0.035, 10.6], trimMaterial);
+  // Pass 79 hijacked-refinement: from the spawn approaches the whole roofline
+  // read as one dark slab with a raw edge. A warm-white fascia band wraps the
+  // slab edge and a white border frames the teal inlay, so the roof reads as
+  // a finished deckhouse top from every exterior angle. Presentation-only.
+  // One merged draw each for the fascia wrap and the inlay border frame
+  // (same material, all axis-aligned): eight roofline boxes were eight draw
+  // calls against the pinned budget. The exclusion reason is the
+  // sculpted-hull idiom - the merged fascia AABB conservatively wraps the
+  // whole deckhouse roof, so the per-portal aperture check would flag
+  // doorways below it that the fascia never intersects.
+  mergedDetailBoxes(
+    builder,
+    `high-seas-${end}-roof-fascia`,
+    [
+      ...[centerZ - 8.3, centerZ + 8.3].map((fasciaZ): MergedBoxPart => ({
+        center: [0, HIGH_SEAS_LEVELS.roof - 0.1, fasciaZ],
+        size: [15.56, 0.36, 0.16],
+      })),
+      ...[-7.7, 7.7].map((fasciaX): MergedBoxPart => ({
+        center: [fasciaX, HIGH_SEAS_LEVELS.roof - 0.1, centerZ],
+        size: [0.16, 0.36, 16.76],
+      })),
+    ],
+    wallMaterial,
+    'roof fascia wraps the deckhouse; the merged AABB spans end-wall portals it sits above',
+  );
+  mergedDetailBoxes(
+    builder,
+    `high-seas-${end}-roof-inlay-border`,
+    [
+      ...[centerZ - 5.45, centerZ + 5.45].map((borderZ): MergedBoxPart => ({
+        center: [0, HIGH_SEAS_LEVELS.roof + 0.025, borderZ],
+        size: [11.3, 0.05, 0.34],
+      })),
+      ...[-5.55, 5.55].map((borderX): MergedBoxPart => ({
+        center: [borderX, HIGH_SEAS_LEVELS.roof + 0.025, centerZ],
+        size: [0.34, 0.05, 11.1],
+      })),
+    ],
+    wallMaterial,
+  );
   // HF-392: lit interior ceiling plane. The roof slab's underside faces into
   // the deckhouse and only ever catches the hemisphere light's dark sea
   // ground colour, so the whole ceiling read as a black grid and the windows
   // showed a black slot from outside. Presentation-only: the roof above keeps
   // movement and shot authority.
   detailBox(builder, `high-seas-${end}-cabin-ceiling`, [0, HIGH_SEAS_LEVELS.roof - 0.25, centerZ], [15.0, 0.08, 16.2], ceilingMaterial);
+
+
+  // Pass 79 hijacked-refinement: the upper deckhouse rooms were completely
+  // bare - flat grey walls, no furniture - so through the glazed bays the
+  // owner saw a dark empty void (the "black slot" read) and from inside the
+  // room had nothing to fight around. These are PRESENTATION-ONLY pieces
+  // (detailBox), placed by hand against the pinned clearances: the internal
+  // stair hole (internalX +/- 1.05 around direction*20.7), the upper external
+  // door (externalX +/- 0.95 on the outer end wall) and the centre route
+  // between them all stay clear. Materials are reused from the pinned
+  // 15-material inventory; no new material is introduced.
+  // Furniture merges to ONE draw per material per cabin (all pieces are
+  // axis-aligned dressing): seven separate detail boxes read identically but
+  // cost six extra draws against the pinned 260-draw budget.
+  const setteeZ = direction * 24.5;
+  const tableZ = direction * 18.0;
+  const helmZ = direction * 27.9;
+  mergedDetailBoxes(
+    builder,
+    `high-seas-${end}-upper-woodwork`,
+    [
+      { center: [-6.75, HIGH_SEAS_LEVELS.upperDeck + 0.19, setteeZ], size: [0.8, 0.38, 5.0] },
+      { center: [6.6, HIGH_SEAS_LEVELS.upperDeck + 0.36, tableZ], size: [0.9, 0.72, 1.7] },
+      { center: [0, HIGH_SEAS_LEVELS.upperDeck + 0.5, helmZ], size: [2.4, 1.0, 0.45] },
+    ],
+    trimMaterial,
+    'upper-room woodwork shares the room AABB with the stair hole and door it is cleared from',
+  );
+  mergedDetailBoxes(
+    builder,
+    `high-seas-${end}-upper-upholstery`,
+    [
+      { center: [-6.75, HIGH_SEAS_LEVELS.upperDeck + 0.45, setteeZ], size: [0.78, 0.16, 4.9] },
+      { center: [-7.12, HIGH_SEAS_LEVELS.upperDeck + 0.75, setteeZ], size: [0.14, 0.55, 5.0] },
+      { center: [0, HIGH_SEAS_LEVELS.upperDeck + 1.03, helmZ], size: [2.4, 0.08, 0.55] },
+    ],
+    upholsteryMaterial,
+    'upper-room upholstery shares the room AABB with the stair hole and door it is cleared from',
+  );
+  detailBox(builder, `high-seas-${end}-upper-chart-table-top`, [6.6, HIGH_SEAS_LEVELS.upperDeck + 0.75, tableZ], [1.1, 0.06, 1.9], deckMaterial);
 
   // Collision-backed interior furniture gives each cabin useful cover without
   // sealing the central entrances or either exterior side door.
@@ -2244,10 +2353,19 @@ function addCenterFeatures(
       builder,
       `high-seas-hot-tub-rim-${index}`,
       [tubCenterX + Math.cos(theta) * tubRadius, 3.67, Math.sin(theta) * tubRadius],
-      [1.38, 0.9, 0.34],
+      [1.42, 0.9, 0.34],
       wallMaterial,
       'reinforced',
-      [0, theta - Math.PI / 2, 0],
+      // Pass 79 hijacked-refinement: the old `theta - PI/2` pointed each
+      // segment's long axis RADIALLY (measured: at theta=PI/2 the axis was
+      // world +X while the ring tangent there is world -Z), so the "tub"
+      // rendered as ten scattered white blocks instead of one ring - the
+      // single worst prop read on the main deck. The tangent direction at
+      // angle theta is (-sin theta, 0, cos theta); a box's local +X maps to
+      // (cos phi, 0, -sin phi) under yaw phi, so phi = -theta - PI/2 aligns
+      // every segment tangentially, and the chord 1.42 (vs the exact
+      // 2*r*tan(PI/12) = 1.366) closes the ring with a slight overlap.
+      [0, -theta - Math.PI / 2, 0],
     );
   }
   const tubWater = presentationMesh(
@@ -2335,11 +2453,27 @@ function addRails(
   builder: Builder,
   railMaterial: THREE.Material,
   deckMaterial: THREE.Material,
+  capMaterial: THREE.Material,
 ): void {
+  // Pass 79 hijacked-refinement: the 12 cm rail slab in the old near-black
+  // trim read as a solid black parapet around the whole ship. The brightened
+  // teal body plus this warm-white caprail gives the classic bulwark-plus-
+  // caprail silhouette from every deck approach.
+  //
+  // The cap is PRESENTATION-ONLY dressing in the stanchion class, NOT a
+  // structural rail, and it is named `...-caprail-...` accordingly: the
+  // authority audit's `high-seas-perimeter-rail-` filter pins the ten
+  // shot-authoritative parapets. The cap is FLUSH with the parapet footprint
+  // (no outboard lip), so the only geometry without movement/shot authority
+  // is an 8 cm band sitting directly on top of the collider - no visible
+  // ledge outside collision, nothing a player or bullet can interact with
+  // that the audit would call an invisible extension.
+  const caprailParts: MergedBoxPart[] = [];
   const addRail = (id: string, x: number, z: number, width: number, depth: number): void => {
     box(builder, `high-seas-perimeter-rail-${id}`, [x, 3.72, z], [width, 1.04, depth], railMaterial, {
       ballisticMaterial: 'thin-metal',
     });
+    caprailParts.push({ center: [x, 4.28, z], size: [width, 0.08, depth] });
   };
   addRail('starboard', 10.34, 1.48, 0.12, 83.72);
   addRail('port-bow', -10.34, -25.85, 0.12, 29.3);
@@ -2351,19 +2485,37 @@ function addRails(
   addRail('bow-shoulder-starboard', 7.17, -40.56, 6.46, 0.12);
   addRail('bow-tip', 0, -43.82, 8.0, 0.12);
   addRail('stern', 0, 43.48, 20.7, 0.12);
+  // One merged draw for all ten caprail segments. The exclusion reason is the
+  // sculpted-hull idiom: the merged world AABB conservatively spans the whole
+  // ship, so the per-portal aperture check would flag every doorway it does
+  // not actually touch.
+  mergedDetailBoxes(
+    builder,
+    'high-seas-perimeter-caprail-band',
+    caprailParts,
+    capMaterial,
+    'caprail dressing rings the hull; the merged AABB spans every portal without intersecting any aperture',
+  );
 
   for (const z of [-10.8, 10.8]) {
     box(builder, `high-seas-catwalk-threshold-${z}`, [-11.0, 3.46, z], [1.48, 0.52, 0.16], railMaterial, {
       ballisticMaterial: 'thin-metal',
     });
   }
+  // One merged draw per stanchion family (same material, all axis-aligned):
+  // nineteen hairline posts were nineteen draw calls against a pinned
+  // 260-draw budget for zero visual difference - they are static dressing.
+  const starboardStanchionParts: MergedBoxPart[] = [];
   for (let z = -40; z <= 40; z += 5) {
     if (z >= -10 && z <= 10) continue;
-    detailBox(builder, `high-seas-starboard-stanchion-${z}`, [10.26, 4.42, z], [0.06, 0.58, 0.06], railMaterial, undefined, 'quality');
+    starboardStanchionParts.push({ center: [10.26, 4.42, z], size: [0.06, 0.58, 0.06] });
   }
+  mergedDetailBoxes(builder, 'high-seas-starboard-stanchions', starboardStanchionParts, railMaterial);
+  const catwalkStanchionParts: MergedBoxPart[] = [];
   for (const z of [-8, -4, 0, 4, 8]) {
-    detailBox(builder, `high-seas-catwalk-stanchion-${z}`, [-11.66, 4.42, z], [0.06, 0.58, 0.06], railMaterial, undefined, 'quality');
+    catwalkStanchionParts.push({ center: [-11.66, 4.42, z], size: [0.06, 0.58, 0.06] });
   }
+  mergedDetailBoxes(builder, 'high-seas-catwalk-stanchions', catwalkStanchionParts, railMaterial);
   detailBox(builder, 'high-seas-port-catwalk-teak-inlay', [-11.0, 3.215, 0], [1.18, 0.025, 20.8], deckMaterial);
 }
 
@@ -2469,16 +2621,29 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
   const hullMaterial = material('pearl-hull', 0xeaf1ef, 0.28, 0.22);
   const wallMaterial = material('warm-cabin-shell', 0xf5f3e9, 0.45, 0.08);
   const roofMaterial = material('silver-roof', 0xcbd6d5, 0.3, 0.48);
-  const deckMaterial = material('honey-deck', 0xb78653, 0.7, 0.08);
-  const stairMaterial = material('dark-deck-stair', 0x5a4032, 0.76, 0.08);
   // HF-392 round 2: metalness 0.62 rendered the entire window framing
   // (sills, headers, mullions), the roof inlay and the rails near-black -
   // with no environment reflections a 62% metal shows almost no diffuse
   // colour, so every deckhouse window band read as a black slot from outside
   // and inside alike. Painted marine trim is dielectric: metalness 0.08 lets
-  // the deep teal albedo actually reach the eye while the roughness map keeps
+  // the teal albedo actually reach the eye while the roughness map keeps
   // the satin finish.
-  const tealTrimMaterial = material('deep-teal-trim', 0x164c58, 0.32, 0.08);
+  // Pass 79 hijacked-refinement round 2: 0x164c58 is only ~26% sRGB
+  // luminance, and the sill/header/mullion bands sit in the roof's shade, so
+  // the framing STILL read as dark slots from the spawn approaches even as a
+  // dielectric. 0x2f7080 keeps the deep-teal family read at ~44% luminance -
+  // painted trim, not a hole - and the rails/stanchions that share this skin
+  // come along for free.
+  const tealTrimMaterial = material('deep-teal-trim', 0x2f7080, 0.32, 0.08);
+  // Pass 79 hijacked-refinement: the external stairs read as one flat dark
+  // diagonal from every spawn; 0x6b5240 lifts the stair family into a warm
+  // painted-teak read while the plank grooves keep the tread detail.
+  const stairMaterial = material('dark-deck-stair', 0x6b5240, 0.76, 0.08);
+  // Pass 79 hijacked-refinement: 0xb78653 pushed the deck into saturated
+  // orange that fought every other surface on the map; 0xa8905e is the same
+  // honey-teak family, desaturated toward the greyed varnish a real deck
+  // wears, so the plank texture reads as wood rather than as a warning.
+  const deckMaterial = material('honey-deck', 0xa8905e, 0.7, 0.08);
   // HF-373: the three engine families carry the enclosed-volume fill because
   // none of them ever rises above the deck plane - the bulkhead liner and the
   // machinery are sealed inside the corridor, and grating stops flush with the
@@ -2536,10 +2701,14 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
   // as a black slot cut into the shell (the owner's HF-392 "windows in the
   // top of the ship"). A faint warm emissive - the deckhouse lit from inside
   // - gives the pane something to show at every angle while the tinted
-  // straight-on read and sun glint are unchanged. Bound well below the
+  // straight-on read and sun glint are unchanged, bound well below the
   // practical strips so glazing never reads as a light fixture.
-  glassMaterial.emissive = new THREE.Color(0x35322b);
-  glassMaterial.emissiveIntensity = 0.55;
+  // Round 2: 0.55 still read as a dark slot from the spawn approaches (the
+  // only through-glass content was the bare, unlit upper room). Warmer and
+  // brighter so the deckhouse reads as a lit interior from every exterior
+  // angle, with the new upper-room furniture behind the panes.
+  glassMaterial.emissive = new THREE.Color(0x453e2e);
+  glassMaterial.emissiveIntensity = 0.9;
   glassMaterial.userData.assetOwner = 'high-seas';
   glassMaterial.userData.assetKind = 'procedural-original-material';
   glassMaterial.userData.textureFamily = 'glass';
@@ -2561,11 +2730,11 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
     enginePracticalMaterial,
   );
   addHullBilge(builder, engineFloorMaterial, engineWallMaterial);
-  const bowCabin = addCabin(builder, 'bow', wallMaterial, deckMaterial, roofMaterial, stairMaterial, tealTrimMaterial, glassMaterial, cabinCeilingMaterial);
-  const sternCabin = addCabin(builder, 'stern', wallMaterial, deckMaterial, roofMaterial, stairMaterial, tealTrimMaterial, glassMaterial, cabinCeilingMaterial);
+  const bowCabin = addCabin(builder, 'bow', wallMaterial, deckMaterial, roofMaterial, stairMaterial, tealTrimMaterial, glassMaterial, cabinCeilingMaterial, upholsteryMaterial);
+  const sternCabin = addCabin(builder, 'stern', wallMaterial, deckMaterial, roofMaterial, stairMaterial, tealTrimMaterial, glassMaterial, cabinCeilingMaterial, upholsteryMaterial);
   addCenterFeatures(builder, wallMaterial, tealTrimMaterial, upholsteryMaterial, waterMaterial);
   addSpawnFeatures(builder, wallMaterial, tealTrimMaterial, waterMaterial);
-  addRails(builder, tealTrimMaterial, deckMaterial);
+  addRails(builder, tealTrimMaterial, deckMaterial, wallMaterial);
 
   const routes = Object.freeze({
     'surface-port': Object.freeze([

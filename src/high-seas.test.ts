@@ -627,11 +627,40 @@ describe('High Seas clean-room arena geometry', () => {
         expect(bounds.max.x - bounds.min.x, `${pane.name} spans its flank`).toBeGreaterThan(1.2);
         expect(materialOf(pane.name), pane.name).toBe('glass');
       }
-      // The inner end pane closes its frame too: the 4.4 m opening may not
-      // carry the old 30 mm-per-side daylight gaps.
-      const innerPane = map.root.getObjectByName(`high-seas-${end}-upper-inner-glazing`) as THREE.Mesh;
-      const innerBounds = new THREE.Box3().setFromObject(innerPane);
-      expect(innerBounds.max.x - innerBounds.min.x, `${end} inner pane width vs opening`).toBeGreaterThanOrEqual(4.4 - 0.01);
+      // HF-392 pass 82: the 4.4 m inner end opening used to carry ONE
+      // unbroken pane - the last mullion-free face on the ship, reading as a
+      // single dead dark slab from the deck approaches while every other face
+      // carries the mullion rhythm. A centre mullion now splits it into two
+      // bays, and mullion + panes must TILE the opening less the deliberate
+      // 4 mm anti-coplanar inset. Strictness note: this replaces the old
+      // single-pane width pin (>= 4.39 m) - a two-bay split would have failed
+      // that pin, so the new assertions are a contract change, not a loosening.
+      const innerBays: THREE.Mesh[] = [];
+      map.root.traverse((node) => {
+        if (node instanceof THREE.Mesh && node.name.startsWith(`high-seas-${end}-upper-inner-glazing-`)) innerBays.push(node);
+      });
+      expect(innerBays, `${end} inner end bays`).toHaveLength(2);
+      const innerSegments: Array<{ minimum: number; maximum: number; name: string }> = [];
+      map.root.traverse((node) => {
+        if (!(node instanceof THREE.Mesh)) return;
+        const isPane = node.name.startsWith(`high-seas-${end}-upper-inner-glazing-`);
+        const isMullion = node.name === `high-seas-${end}-upper-inner-mullion`;
+        if (!isPane && !isMullion) return;
+        const bounds = new THREE.Box3().setFromObject(node);
+        if (isPane) {
+          expect(bounds.max.x - bounds.min.x, `${node.name} bay width`).toBeGreaterThan(1.2);
+          expect(materialOf(node.name), node.name).toBe('glass');
+        }
+        innerSegments.push({ minimum: bounds.min.x, maximum: bounds.max.x, name: node.name });
+      });
+      innerSegments.sort((left, right) => left.minimum - right.minimum);
+      expect(innerSegments[0].minimum, `${end} inner band left edge`).toBeLessThanOrEqual(-2.2 + 0.005);
+      let innerCursor = innerSegments[0].minimum;
+      for (const segment of innerSegments) {
+        expect(segment.minimum - innerCursor, `gap before ${segment.name} on ${end} inner end`).toBeLessThanOrEqual(0.005);
+        innerCursor = Math.max(innerCursor, segment.maximum);
+      }
+      expect(2.2 - innerCursor, `${end} inner band right tail`).toBeLessThanOrEqual(0.005);
     }
   });
 

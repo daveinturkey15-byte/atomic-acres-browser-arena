@@ -835,11 +835,19 @@ function buildInlineWater(scene: THREE.Scene): void {
   deep.receiveShadow = true;
   scene.add(deep);
 
-  // (c) Shallow near-shore water — a lighter translucent lens (40×40 m)
-  //     over the beach shelf so the sand reads through the water near the
-  //     shoreline. 10 mm above the lagoon plane keeps it just below the
-  //     additive wave surface (no z-fighting) while still above deep water.
-  const shallowSize = 80; // HF-396: doubled with the island
+  // (c) Shallow near-shore water — a lighter translucent lens over the
+  //     beach shelf so the sand reads through the water near the shoreline.
+  //     10 mm above the lagoon plane keeps it just below the additive wave
+  //     surface (no z-fighting) while still above deep water.
+  //     HF-395 square-shore fix: the lens must REACH PAST the actual
+  //     waterline, which sits at Chebyshev ARENA_HALF -
+  //     FARCRYSIS_WATERLINE_EDGE on every azimuth. The pre-rescale 40 m and
+  //     the doubled 80 m squares both stopped ~15 m short of it, leaving a
+  //     detached turquoise patch floating mid-lagoon while the real
+  //     near-shore shelf kept deep-water shading. Inland the lens is hidden
+  //     underground (terrain sits above the water level there), so covering
+  //     the interior costs nothing visible.
+  const shallowSize = Math.ceil((FARCRYSIS_INLAND_DEPTH + 2.5) * 2);
   const shallowGeom = new THREE.PlaneGeometry(shallowSize, shallowSize);
   shallowGeom.rotateX(-Math.PI / 2);
 
@@ -869,11 +877,22 @@ function buildInlineWater(scene: THREE.Scene): void {
   shallow.renderOrder = 2;
   scene.add(shallow);
 
-  // (d) Wet-sand shoreline transition — a square-frame plane (64×64 outer,
-  //     48×48 inner hole → 8-unit band at the beach rim) conformed to the
-  //     terrain height so it hugs the sand slope naturally.
-  const outer = ARENA_HALF;          // 32 — matches terrain edge
-  const inner = outer - 8;           // 24 — inner edge of the sand band
+  // (d) Wet-sand shoreline transition — a square-frame plane conformed to
+  //     the terrain height so it hugs the sand slope naturally.
+  //     HF-395 square-shore fix: the band is derived from the terrain
+  //     authority's waterline (FARCRYSIS_WATERLINE_EDGE, metres inland from
+  //     the square boundary face) and STRADDLES it — 2.5 m of the band sits
+  //     offshore (drowned under the sea planes, invisible) and 3.5 m lies on
+  //     dry sand, so the damp read starts exactly where the water meets the
+  //     beach on every azimuth, corners included. The pre-rescale
+  //     `outer = ARENA_HALF / inner = outer - 8` band occupied edge
+  //     distances 0..8 — entirely seaward of the 8.82 m waterline — so the
+  //     dry beach showed no wet-sand transition at all while the real band
+  //     lay hidden underwater.
+  const bandInlandEdge = FARCRYSIS_WATERLINE_EDGE + 3.5;  // dry-sand reach
+  const bandOffshoreEdge = FARCRYSIS_WATERLINE_EDGE - 2.5; // drowned reach
+  const outer = ARENA_HALF - bandOffshoreEdge; // larger square (closer to the boundary)
+  const inner = ARENA_HALF - bandInlandEdge;   // hole (further inland)
   const shape = new THREE.Shape();
   shape.moveTo(-outer, -outer);
   shape.lineTo(outer, -outer);
@@ -1021,13 +1040,14 @@ function addJungleUndergrowth(group: THREE.Group): void {
   const euler = new THREE.Euler();
   let placed = 0;
   for (let i = 0; i < clumpCount; i += 1) {
-    const angle = (i / clumpCount) * Math.PI * 2 + (rng() - 0.5) * 1.2;
-    const dist = 14 + rng() * 18; // HF-396: 14-32 → jungle interior of the 128 m island
-    const rx = Math.max(-ARENA_HALF + 4, Math.min(ARENA_HALF - 4, Math.cos(angle) * dist));
-    const rz = Math.max(-ARENA_HALF + 4, Math.min(ARENA_HALF - 4, Math.sin(angle) * dist * 0.9));
+    // HF-395 square-shore fix: the old CIRCULAR dist 14-32 draw sampled the
+    // pre-rescale interior radius, clustering every clump inside ~32 m of
+    // the origin and leaving the outer half of the 128 m island's jungle
+    // bare (the clamp + edge guard only trimmed the overflow). Placement is
+    // now a uniform shore-edge band across the FULL interior, same as every
+    // other art layer.
+    const [rx, rz] = farcrysisEdgeBandPoint(rng, [14, ARENA_HALF - 4], 2);
     const rotY = rng() * Math.PI;
-    const edgeDist = ARENA_HALF - Math.max(Math.abs(rx), Math.abs(rz));
-    if (edgeDist < 14) continue; // keep strictly inside the jungle interior
     const baseY = terrainHeight(rx, rz);
 
     for (let card = 0; card < cardsPerClump; card += 1) {

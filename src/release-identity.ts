@@ -1,9 +1,20 @@
+/**
+ * What the running build calls ITSELF - the header badge, the session block and the
+ * blocked-renderer notice all read this.
+ *
+ * Stamped to PASS 80 on 2026-08-26 when that build was published to
+ * channels/pass80. It had been left at PASS 73 through the whole publish, so the owner
+ * opened the new URL and was told he was looking at Pass 73. The bundle was correct; only
+ * this was stale. Stamping the identity is part of CUTTING a release, not an afterthought.
+ *
+ * PASS 73 remains live at channels/the-big-one and is untouched.
+ */
 export const PASS66_RELEASE_IDENTITY = Object.freeze({
-  pass: 'PASS 73',
-  label: 'PASS 73',
+  pass: 'PASS 80',
+  label: 'PASS 80',
   state: 'RELEASE CANDIDATE',
-  route: 'channels/the-big-one',
-  runtimeLabel: 'PASS 73',
+  route: 'channels/pass80',
+  runtimeLabel: 'PASS 80',
 });
 
 export const PASS64_FAILED_REGRESSION_IDENTITY = Object.freeze({

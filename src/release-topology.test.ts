@@ -10,16 +10,29 @@ const shellHtml = readFileSync('release-shell/index.html', 'utf8');
 const staging = readFileSync('scripts/release/stage-release-topology.mjs', 'utf8');
 const playwrightServer = readFileSync('scripts/qa/playwright-web-server.mjs', 'utf8');
 
-describe('Pass 73 release topology', () => {
-  it('identifies this source as Pass 73 without moving any protected fallback pin', () => {
+describe('Pass 80 release topology', () => {
+  // Re-pinned from PASS 73 on 2026-08-26. The build published to channels/pass80 still
+  // announced itself as PASS 73 in the header, the session block and the blocked-renderer
+  // notice, so the owner opened the new URL and was told he was looking at the old build.
+  // The bundle was correct; the identity was never stamped. Re-pinned at EQUAL strictness -
+  // every field still exact - and the protected fallback pins below are untouched.
+  it('identifies this source as Pass 80 without moving any protected fallback pin', () => {
     expect(PASS66_RELEASE_IDENTITY).toMatchObject({
-      pass: 'PASS 73',
-      label: 'PASS 73',
+      pass: 'PASS 80',
+      label: 'PASS 80',
       state: 'RELEASE CANDIDATE',
-      route: 'channels/the-big-one',
-      runtimeLabel: 'PASS 73',
+      route: 'channels/pass80',
+      runtimeLabel: 'PASS 80',
     });
-    expect(config.latest.label).toBe('PASS 73');
+    expect(config.latest.label).toBe('PASS 80');
+    // The identity's route must be the channel the config actually stages, or the shell
+    // links players at a 404 - which is exactly how a correct bundle came to announce
+    // itself as the wrong pass. This assertion did not exist before.
+    expect(config.experimental.path).toBe(PASS66_RELEASE_IDENTITY.route);
+    // PASS 73 must remain REACHABLE at its original path, not overwritten by the new cut.
+    expect(config.pass73Retained).toMatchObject({
+      pass: 'PASS 73', path: 'channels/the-big-one',
+    });
     expect(config.previous).toMatchObject({
       pass: 'PASS 72',
       sourceSha: '5da686551d92387d08b00be40125386c391bb3ed',
@@ -177,7 +190,11 @@ describe('Pass 73 release topology', () => {
   });
 
   it('tracks the current release acceptance lifecycle without inventing preview or mechanical evidence', () => {
-    const manifestPath = 'acceptance/pass-73.json';
+    // Derived, not hardcoded. It read 'acceptance/pass-73.json' while evaluating whatever
+    // pass the IDENTITY names, so after a stamp it checked one manifest and evaluated
+    // another - the same class of staleness that let a Pass 80 bundle announce itself as
+    // Pass 73.
+    const manifestPath = `acceptance/${PASS66_RELEASE_IDENTITY.pass.toLowerCase().replace(' ', '-')}.json`;
     if (!existsSync(manifestPath)) {
       expect(() => evaluateAcceptance({ phase: 'release', pass: PASS66_RELEASE_IDENTITY.pass }))
         .toThrow(`acceptance manifest does not exist: ${manifestPath}`);

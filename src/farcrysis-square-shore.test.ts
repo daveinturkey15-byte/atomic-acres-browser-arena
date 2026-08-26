@@ -249,4 +249,72 @@ describe('HF-395/396 square-shore contract (palms, detail, art)', () => {
     }
     expect(overWater).toBeGreaterThan(0);
   });
+
+  // --- HF-395 square-shore band fixes (farcrysis-rebuild lane) -------------
+
+  it('wet-sand band STRADDLES the waterline (old band lay wholly offshore)', () => {
+    const wet = scene.getObjectByName('farcrysis-water-wetsand') as THREE.Mesh | undefined;
+    expect(wet, 'wet-sand band missing').toBeDefined();
+    const pos = wet!.geometry.getAttribute('position') as THREE.BufferAttribute;
+    let maxCheb = 0;
+    let minCheb = Infinity;
+    for (let i = 0; i < pos.count; i += 1) {
+      const c = chebyshev(pos.getX(i), pos.getZ(i));
+      maxCheb = Math.max(maxCheb, c);
+      minCheb = Math.min(minCheb, c);
+    }
+    // Band spans edge distances [WATERLINE_EDGE - 2.5, WATERLINE_EDGE + 3.5],
+    // i.e. Chebyshev [ARENA_HALF - WATERLINE_EDGE - 3.5, ARENA_HALF - WATERLINE_EDGE + 2.5].
+    const shoreCheb = ARENA_HALF - WATERLINE_EDGE;
+    expect(minCheb).toBeCloseTo(shoreCheb - 3.5, 3);
+    expect(maxCheb).toBeCloseTo(shoreCheb + 2.5, 3);
+    // The old band (edge 0..8, Chebyshev 56..64) sat ENTIRELY seaward of the
+    // waterline at Chebyshev shoreCheb; pin the inland straddle: the band's
+    // dry-sand side must cross shoreCheb (lower Chebyshev = further inland).
+    expect(minCheb, 'wet-sand band has no dry-sand reach inland of the waterline').toBeLessThan(shoreCheb);
+  });
+
+  it('shallow lens reaches past the square waterline (old lens stopped mid-lagoon)', () => {
+    const shallow = scene.getObjectByName('farcrysis-water-shallow') as THREE.Mesh | undefined;
+    expect(shallow, 'shallow lens missing').toBeDefined();
+    shallow!.geometry.computeBoundingBox();
+    const bbox = shallow!.geometry.boundingBox!;
+    const halfExtent = Math.max(bbox.max.x - bbox.min.x, bbox.max.z - bbox.min.z) / 2;
+    // Waterline sits at Chebyshev ARENA_HALF - WATERLINE_EDGE = INLAND_DEPTH
+    // from the origin; the lens half-extent must clear it with margin.
+    expect(halfExtent, `shallow lens half-extent ${halfExtent.toFixed(1)} stops short of the waterline at ${INLAND_DEPTH.toFixed(1)}`)
+      .toBeGreaterThanOrEqual(INLAND_DEPTH + 2);
+  });
+
+  it('jungle undergrowth cards span the FULL interior (old scatter stayed within circular 32 m)', () => {
+    const cards = scene.getObjectByName('farcrysis-undergrowth-leaf-cards') as THREE.InstancedMesh | undefined;
+    expect(cards, 'undergrowth leaf cards missing').toBeDefined();
+    const origins = instanceOrigins(cards!);
+    expect(origins.length).toBeGreaterThan(60);
+    for (const o of origins) {
+      expect(edgeOf(o.x, o.z), `undergrowth card left the jungle interior (edge ${edgeOf(o.x, o.z).toFixed(1)})`)
+        .toBeGreaterThanOrEqual(14);
+    }
+    const maxCheb = Math.max(...origins.map((o) => chebyshev(o.x, o.z)));
+    // The old circular 14-32 m draw capped every clump at Chebyshev ~32;
+    // the edge band [14, ARENA_HALF-4] reaches Chebyshev 50, deep into the
+    // outer jungle.
+    expect(maxCheb, `undergrowth never reaches the outer jungle (max chebyshev ${maxCheb.toFixed(1)})`)
+      .toBeGreaterThan(45);
+  });
+
+  it('sand depth gradient hugs the square shore (old ring was circular)', () => {
+    const grad = scene.getObjectByName('farcrysis-water-fx-sand-depth-gradient') as THREE.Mesh | undefined;
+    expect(grad, 'sand depth gradient missing').toBeDefined();
+    const pos = grad!.geometry.getAttribute('position') as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i += 1) {
+      const edge = edgeOf(pos.getX(i), pos.getZ(i));
+      // Every rim vertex sits on one of the two band edges; a circular ring
+      // would place diagonal vertices up to sqrt(2) further inboard.
+      const offInner = Math.abs(edge - (WATERLINE_EDGE - 0.4));
+      const offOuter = Math.abs(edge - (WATERLINE_EDGE - 44));
+      expect(Math.min(offInner, offOuter), `gradient vertex ${i} off the square band edges (edge ${edge.toFixed(2)})`)
+        .toBeLessThan(0.5);
+    }
+  });
 });

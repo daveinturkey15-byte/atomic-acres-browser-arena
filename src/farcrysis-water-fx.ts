@@ -62,61 +62,92 @@ let _sandGradient: THREE.Mesh | null = null;
 // 6. Underwater sand depth gradient — golden shallows → deep teal lagoon floor
 // ---------------------------------------------------------------------------
 
-function createSandGradientCanvas(): HTMLCanvasElement | null {
-  try {
-    if (typeof document === 'undefined') return null;
-    const size = 256;
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
 
-    // Vertical gradient; ring UV v=0 (inner edge, near shore) maps to the
-    // bottom of the canvas. Canvas bottom = golden shallow sand.
-    const grad = ctx.createLinearGradient(0, 0, 0, size);
-    grad.addColorStop(0.0, '#143c50'); // outer edge → deep lagoon floor
-    grad.addColorStop(0.4, '#4a8a92'); // mid depth
-    grad.addColorStop(0.7, '#9fb89a'); // sandy shallows
-    grad.addColorStop(1.0, '#d8bf8c'); // inner edge → sunlit shallow sand
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, size, size);
-
-    // Sand speckle so the floor reads as sand, not a flat colour wash
-    for (let i = 0; i < 1500; i++) {
-      const sx = Math.random() * size;
-      const sy = Math.random() * size;
-      ctx.fillStyle = `rgba(232, 216, 178, ${0.03 + Math.random() * 0.08})`;
-      ctx.beginPath();
-      ctx.arc(sx, sy, 0.5 + Math.random() * 1.8, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    return canvas;
-  } catch {
-    return null;
-  }
-}
+/** Square-shore sand-depth ramp stops, outer (deep) → inner (golden). */
+const SAND_RAMP: ReadonlyArray<readonly [number, string]> = [
+  [0.0, '#143c50'], // outer edge → deep lagoon floor
+  [0.4, '#4a8a92'], // mid depth
+  [0.7, '#9fb89a'], // sandy shallows
+  [1.0, '#d8bf8c'], // inner edge → sunlit shallow sand
+];
 
 /**
  * Annulus under the water surface covering the visible water ring around
  * the beach shelf. Golden near the shore fading to deep teal offshore —
  * the shallow→deep sand depth gradient seen through the translucent water.
- * HF-396: the band tracks the doubled island (edge to ~2x edge).
+ *
+ * HF-395/396 square-shore rebuild: the old CIRCULAR RingGeometry(63.5..125)
+ * ignored the square waterline (constant Chebyshev edge distance
+ * FARCRYSIS_WATERLINE_EDGE) — its rim drowned under the island interior on
+ * the corner diagonals and left the first ~8 m of face water ungraded, and
+ * RingGeometry's planar UVs ran the old canvas gradient along world Z
+ * instead of radially. The band is now a triangle strip between two
+ * concentric squares (the foam rings' idiom) with per-vertex colours keyed
+ * on each vertex's shore-edge distance, so it hugs the square shore and
+ * re-derives from the shore-band module on any future rescale.
  */
 function buildSandDepthGradient(scene: THREE.Scene): void {
-  const canvas = createSandGradientCanvas();
-  if (!canvas) return;
+  const innerEdge = FARCRYSIS_WATERLINE_EDGE - 0.4; // start at the visible waterline
+  const outerEdge = FARCRYSIS_WATERLINE_EDGE - 44; // open-water reach (negative = offshore)
+  const halfOuter = FARCRYSIS_BOUNDS.maxX - outerEdge;
+  const halfInner = FARCRYSIS_BOUNDS.maxX - innerEdge;
+  const scale = halfInner / halfOuter;
+  const samplesPerSide = 48;
 
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.ClampToEdgeWrapping;
-  tex.wrapT = THREE.ClampToEdgeWrapping;
+  // Point on a square of half-extent `half` at parameter t in [0, 1):
+  // four sides walked corner to corner, arc-length parameterised.
+  const onSquare = (half: number, t: number): [number, number] => {
+    const s = t * 4;
+    const side = Math.floor(s) % 4;
+    const a = -half + (s - Math.floor(s)) * 2 * half;
+    if (side === 0) return [a, -half];
+    if (side === 1) return [half, a];
+    if (side === 2) return [-a, half];
+    return [-half, -a];
+  };
 
-  const geom = new THREE.RingGeometry(FARCRYSIS_BOUNDS.maxX - 0.5, FARCRYSIS_BOUNDS.maxX * 2 - 3, 96);
-  geom.rotateX(-Math.PI / 2);
+  const stops = SAND_RAMP.map(([t, hex]) => [t, new THREE.Color(hex)] as const);
+  const rampColor = (t: number, out: THREE.Color): THREE.Color => {
+    for (let i = 1; i < stops.length; i += 1) {
+      if (t <= stops[i][0]) {
+        const [t0, c0] = stops[i - 1];
+        const [t1, c1] = stops[i];
+        return out.copy(c0).lerp(c1, (t - t0) / (t1 - t0));
+      }
+    }
+    return out.copy(stops[stops.length - 1][1]);
+  };
+
+  const segments = samplesPerSide * 4;
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const indices: number[] = [];
+  const deep = rampColor(0, new THREE.Color());
+  const golden = rampColor(1, new THREE.Color());
+  for (let i = 0; i < segments; i += 1) {
+    const [ox, oz] = onSquare(halfOuter, i / segments);
+    // Inner edge sits radially inward on the same azimuth (uniform square
+    // scale), so edge distance — and therefore the ramp — is exactly linear
+    // across the strip, mitered corners included.
+    positions.push(ox, 0, oz, ox * scale, 0, oz * scale);
+    colors.push(deep.r, deep.g, deep.b, golden.r, golden.g, golden.b);
+  }
+  for (let i = 0; i < segments; i += 1) {
+    const j = (i + 1) % segments;
+    const a = i * 2;
+    const b = i * 2 + 1;
+    const c = j * 2;
+    const d = j * 2 + 1;
+    indices.push(a, c, b, b, c, d);
+  }
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geom.setIndex(indices);
 
   const mat = new THREE.MeshBasicMaterial({
-    map: tex,
+    vertexColors: true,
     transparent: true,
     opacity: 0.5,
     depthWrite: false,

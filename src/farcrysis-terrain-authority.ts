@@ -103,8 +103,11 @@ export const FARCRYSIS_SHORE = Object.freeze({
  *
  * Pure and host-authoritative like every movement modifier; depth over eye
  * uses the same convention as legacy-main's stepSwimState feed
- * (surfaceY - player.position.y). WIRED status: see the movement-loop patch
- * referenced in the HF-393 ledger row.
+ * (surfaceY - player.position.y). WIRED: legacy-main.ts updatePhysics
+ * multiplies this into BOTH horizontal speed channels while the water is
+ * swimmable and the swim state has not engaged (import at legacy-main.ts:63,
+ * call site in the swim block of updatePhysics); pinned by the wiring guard
+ * in farcrysis-terrain-authority.test.ts.
  */
 export const FARCRYSIS_WADE_TUNING = Object.freeze({
   /** Eye depth where wading resistance begins (about ankle-deep). */
