@@ -354,6 +354,44 @@ export function buildFarcrysisGrassField(root: THREE.Object3D): Readonly<GrassFi
   const euler = new THREE.Euler();
   const position = new THREE.Vector3();
   const scaleVec = new THREE.Vector3();
+  const bladeColor = new THREE.Color();
+
+  /**
+   * Per-instance tint. 87,280 blades previously shared ONE colour value, which
+   * is the single clearest tell of cheap foliage: a real sward is never one
+   * green, and at distance the eye reads the variance long before it resolves a
+   * blade. This rides the existing InstancedMesh draw - no extra draw calls, no
+   * extra program, no extra material - so the whole improvement is free.
+   *
+   * Deliberately NOT random per blade: grass grows in patches, so the hue is
+   * driven by a low-frequency spatial field (metres-scale clumps of yellower
+   * and deeper green) with only a small per-blade jitter on top. Pure per-blade
+   * noise reads as television static, not as ground.
+   *
+   * Value stays within a band that cannot brighten a blade past the authored
+   * material: `material.color` MULTIPLIES, so 1.0 is the ceiling and every
+   * factor below darkens. The range is chosen so the darkest blade still reads
+   * as lit grass rather than shadow.
+   */
+  const tintAt = (x: number, z: number, jitter: number): THREE.Color => {
+    const clump = Math.sin(x * 0.11 + 1.7) * Math.cos(z * 0.09 - 0.6);
+    const patch = Math.sin(x * 0.31 - 2.2) * Math.cos(z * 0.27 + 1.1);
+    // Warmth: sun-bleached yellow-green through to shaded blue-green.
+    const warm = 0.5 + 0.5 * clump;
+    // Value: broad clumps plus a fine per-blade break-up.
+    const value = 0.82 + 0.13 * patch + 0.05 * jitter;
+    // Every channel stays <= 1.0 BEFORE the value multiply. material.color
+    // multiplies the material and is capped at white, so a factor above 1 does
+    // not brighten - it clips, and the range above the cap is simply thrown
+    // away. The first cut peaked at 1.058 on red and lost that headroom
+    // silently; the gate below now pins it.
+    bladeColor.setRGB(
+      (0.78 + 0.18 * warm) * value,
+      (0.88 + 0.10 * warm) * value,
+      (0.80 - 0.22 * warm) * value,
+    );
+    return bladeColor;
+  };
 
   let chunks = 0;
   for (let i = 0; i < buckets.length; i += 1) {
@@ -372,8 +410,11 @@ export function buildFarcrysisGrassField(root: THREE.Object3D): Readonly<GrassFi
       scaleVec.set(0.85 + (k % 5) * 0.05, inst.scale, 0.9 + (k % 3) * 0.06);
       matrix.compose(position, quaternion, scaleVec);
       mesh.setMatrixAt(k, matrix);
+      // Jitter from the placement yaw: already well distributed, and free.
+      mesh.setColorAt(k, tintAt(inst.x, inst.z, Math.sin(inst.yaw * 12.9898)));
     }
     mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
     mesh.castShadow = false; // shadow-map cost for 40k blades buys nothing
     mesh.receiveShadow = true;
