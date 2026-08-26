@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, it } from 'vitest';
-import { buildArena, type ArenaMap } from './map';
+import { buildArena } from './map';
 import { CharacterPhysics, STANCE_SHAPES } from './physics';
 
 /**
@@ -11,7 +11,6 @@ import { CharacterPhysics, STANCE_SHAPES } from './physics';
  *    (< 0.08 near plane). Which face, approached how?
  */
 
-const NEAR_PLANE = 0.08;
 
 function pointTriangleDistance(p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, out?: THREE.Vector3): number {
   const ab = b.clone().sub(a);
