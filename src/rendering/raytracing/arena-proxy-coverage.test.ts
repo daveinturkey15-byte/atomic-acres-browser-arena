@@ -23,14 +23,14 @@ import { ALL_ARENA_IDS } from '../../../scripts/qa/collider-visual-parity-core';
  * something a renderer flag can assert into existence, so the only honest
  * contract is "never fewer than we have now, and never zero anywhere".
  *
- * KNOWN NEAR-MISSES (surveyed, deliberately not acted on here). Nine
- * atomic-acres metal surfaces - the interior ramp rails, both garage doors,
- * the east irrigation vessel, the entrance canopies - are authored at
- * roughness 0.230 with metalness 0.76: one hundredth ABOVE the 0.22 mirror
- * ceiling. The ceiling is combat-tuned and must not move, and dropping those
- * materials below it changes how they look on every renderer, not just this
- * preset. That is an art decision with an HITL implication, not a gate fix,
- * and it is why atomic-acres sits at two reflective meshes.
+ * RESOLVED 2026-08-26: atomic-acres sat at two reflective meshes because its
+ * `chrome` palette entry - the ramp rails, both garage doors, the irrigation
+ * vessel, the entrance canopies - was authored at roughness 0.230 against the
+ * 0.22 mirror ceiling. One hundredth outside. The ceiling is combat-tuned and
+ * did NOT move; the material was polished to 0.18 instead, which is what a
+ * material named `chrome` at metalness 0.76 should have been. Coverage went
+ * 2 meshes / 14 m2 -> 7 meshes / 68 m2, and the floors below were re-measured
+ * against the polished value.
  */
 
 const EXTRACTION = ARENA_PROXY_EXTRACTION;
@@ -41,7 +41,7 @@ const EXTRACTION = ARENA_PROXY_EXTRACTION;
  * make a build pass.
  */
 const COVERAGE_FLOOR: Record<string, { meshes: number; footprintM2: number }> = {
-  'atomic-acres': { meshes: 2, footprintM2: 14 },
+  'atomic-acres': { meshes: 7, footprintM2: 68 },
   'rustworks-1v1': { meshes: 1, footprintM2: 6 },
   'gun-range': { meshes: 6, footprintM2: 4_300 },
   'skyline-terminal': { meshes: 10, footprintM2: 440 },

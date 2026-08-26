@@ -148,7 +148,15 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     timber: pbrTexture('wood-deck', { roughness: 0.92, repeatX: 4, repeatY: 2, normalScale: 0.42 }),
     glass: new THREE.MeshPhysicalMaterial({ color: 0x78bad0, roughness: 0.1, metalness: 0.04, transparent: true, opacity: 0.54, transmission: 0.12 }),
     white: material(0xf0e4c9, 0.68),
-    chrome: material(0xaebdc1, 0.23, 0.76),
+    // Roughness 0.18, not 0.23. This material is named chrome, is metalness
+    // 0.76, and dresses the ramp rails, both garage doors, the irrigation
+    // vessel and the entrance canopies - polished metal by authorship. At 0.23
+    // it sat one hundredth ABOVE the 0.22 mirror ceiling the ray-traced preset
+    // classifies against, so the flagship map offered the tracer exactly two
+    // reflective surfaces totalling 14 m2 and RAY TRACED did visibly nothing
+    // here. The ceiling is combat-tuned and must not move; the material was
+    // simply under-polished for what it is called.
+    chrome: material(0xaebdc1, 0.18, 0.76),
     brick: pbrTexture('brick-warm', { roughness: 0.9, repeatX: 5, repeatY: 3, normalScale: 0.65 }),
     roof: pbrTexture('roof-shingles', { roughness: 0.86, repeatX: 5, repeatY: 6, normalScale: 0.48 }),
   };

@@ -1122,17 +1122,27 @@ def build_map_case_thigh_strap(context: dict, armature: bpy.types.Object) -> lis
 
 
 def build_head_wear(context: dict, armature: bpy.types.Object, item: str, lens_size: tuple[float, float, float]) -> list[bpy.types.Object]:
+    """Visor band plus lens, sized in SKULL WIDTHS.
+
+    This used to size off the Head BONE (0.0774 m) rather than the skull
+    (0.237 m across), so every archetype shipped a visor lens 4.8 cm wide on a
+    23.7 cm head - a letterbox slot floating in the middle of the face instead
+    of the wraparound visor the design intends. Same bone-vs-skull mistake the
+    braid and crest hit; corrected the same way, through _skull_span.
+    """
     head = _joint_frame(armature, "Head")
-    length = head["length"]
-    band = cylinder_object(f"Pass74_{context['camel']}_Acc_{item}_band", length * 0.46, length * 0.46, length * 0.16)
+    span = _skull_span(armature)
+    band = cylinder_object(
+        f"Pass74_{context['camel']}_Acc_{item}_band", span * 0.44, span * 0.44, span * 0.20)
     finish_accessory(
         context, band, armature, "Head", item, "Swat_Black",
-        head["head"].lerp(head["tail"], 0.72), head["rotation"],
+        head["head"] + Vector((0.0, 0.0, span * 0.10)), head["rotation"],
     )
-    lens = box_object(f"Pass74_{context['camel']}_Acc_{item}_lens", *(factor * length for factor in lens_size))
+    lens = box_object(
+        f"Pass74_{context['camel']}_Acc_{item}_lens", *(factor * span for factor in lens_size))
     finish_accessory(
         context, lens, armature, "Head", item, "Visor",
-        head["head"].lerp(head["tail"], 0.70) + Vector((0.0, -length * 0.42, 0.0)),
+        head["head"] + Vector((0.0, -span * 0.38, span * 0.08)),
         Euler((0.0, 0.0, 0.0)),
     )
     return [band, lens]
@@ -1502,9 +1512,11 @@ def build_twin_thigh_holsters(context: dict, armature: bpy.types.Object) -> list
     for joint in ("UpperLeg.L", "UpperLeg.R"):
         thigh = _joint_frame(armature, joint)
         length = thigh["length"]
-        outward = side_sign(joint) * length * 0.46
+        # 0.34, not 0.46: at the map case's offset the pair stood visibly proud
+        # of the leg instead of strapped to it. A drop-leg rig hugs the thigh.
+        outward = side_sign(joint) * length * 0.34
         holster = box_accessory(
-            context, armature, joint, item, (0.17, 0.30, 0.50),
+            context, armature, joint, item, (0.13, 0.26, 0.46),
             thigh["head"].lerp(thigh["tail"], 0.62) + Vector((outward, 0.0, 0.0)),
             Euler((0.0, 0.0, math.radians(side_sign(joint) * 5.0))), "Swat_Black",
         )

@@ -826,11 +826,11 @@
       "files": [
         {
           "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-explorer-lod0.glb",
-          "sha256": "9074265d50efa622adc04ec48ff6b7624fed03dcc25a04938f13ffc4393f2fa7"
+          "sha256": "4d30fac34d57611d92944f568e75e7cb3a7e4fa3621503d7d248989456c2bd3b"
         },
         {
           "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-explorer-lod1.glb",
-          "sha256": "0695a361bcee9c5581d290f76f9ec615f125204f7882cea196168d23e04fe570"
+          "sha256": "d1673992acc8c18b101ef444b11533c4c864bbf28817ee793d95cdf7ec7eb217"
         }
       ],
       "sourceSpec": "source-assets/blender/pass74-operator-skin-specs.json",
@@ -853,11 +853,11 @@
       "files": [
         {
           "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-symbiote-lod0.glb",
-          "sha256": "5639fccb94c62f721500f0bddd39b6e3c16feb41191361af38ffdfc26ea64812"
+          "sha256": "61b4e93fc678e8244e8fdd44a8ea1b54c00f945da1bd196896b6537737f64cf0"
         },
         {
           "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-symbiote-lod1.glb",
-          "sha256": "c658e513699552ead655b532562f54504b4964325343c3052cc4811b3034313d"
+          "sha256": "f2c796cdd170f8afd7320c3f6d316d2de4513be07e3313e8f79b7906a45f0644"
         }
       ],
       "sourceSpec": "source-assets/blender/pass74-operator-skin-specs.json",
@@ -880,11 +880,11 @@
       "files": [
         {
           "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-navalops-lod0.glb",
-          "sha256": "2ef3d157a5e71e5670f80fe18b80039ad72cb428b97a367df49a91d0203e83f4"
+          "sha256": "c5d6ae652bc2f83c0d2be7816aab3da9f10c5b257ad515dfd37e19160fa3c263"
         },
         {
           "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-navalops-lod1.glb",
-          "sha256": "22ec24d7125b30f9a6b68e3a2c04f7c0cc3184b4bc76601d2791a7eb2de14436"
+          "sha256": "c72d41bc4562644a8edb168d030d0e233f0cb4986ec1c239b2919fa979532124"
         }
       ],
       "sourceSpec": "source-assets/blender/pass74-operator-skin-specs.json",
