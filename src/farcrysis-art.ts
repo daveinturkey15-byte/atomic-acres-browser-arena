@@ -36,6 +36,13 @@ import {
   farcrysisTerrainHeight as terrainHeight,
   FARCRYSIS_WATER_LEVEL,
 } from './farcrysis-terrain-authority';
+import {
+  FARCRYSIS_INLAND_DEPTH,
+  FARCRYSIS_WATERLINE_EDGE,
+  farcrysisEdgeBandPoint,
+  farcrysisEdgeDistance,
+  farcrysisSquarePoint,
+} from './farcrysis-shore-bands';
 import { applyVista, animateVista } from './farcrysis-vista';
 import { applyMountains } from './farcrysis-mountains';
 import { buildEnhancedPalms } from './farcrysis-palms-enhanced';
@@ -449,20 +456,28 @@ function addInstancedFernClusters(root: THREE.Group): void {
 function addWaterSparkle(root: THREE.Group): void {
   const sparkleCount = 60;
   const positions = new Float32Array(sparkleCount * 3);
-  // Sparkles only on the outer water ring (beyond the beach/lagoon edge).
-  // HF-396: the band tracks the new shoreline — same edge-relative zone the
-  // old 20..36 m ring occupied on the 64 m island.
-  const innerRadius = ARENA_HALF - 20;
+  // Sparkles only on the outer water ring, as an EDGE-DISTANCE band measured
+  // from the square boundary face inward to just seaward of the waterline.
+  // The old CIRCULAR 44-60 ring collapsed to Chebyshev r/sqrt(2) on the
+  // corner diagonals, drawing water-height sparkles over dry island interior.
+  const SPARKLE_BAND: Readonly<[number, number]> = [
+    FARCRYSIS_WATERLINE_EDGE - 15,
+    FARCRYSIS_WATERLINE_EDGE - 0.4,
+  ];
   const sparkleRng = mulberry32(ART_SEED + 4);
 
   for (let i = 0; i < sparkleCount; i += 1) {
-    const angle = (i / sparkleCount) * Math.PI * 2 + sparkleRng() * 0.4;
-    const radius = innerRadius + sparkleRng() * 16;
-    const px = Math.max(FARCRYSIS_BOUNDS.minX + 2, Math.min(FARCRYSIS_BOUNDS.maxX - 2, Math.cos(angle) * radius));
-    const pz = Math.max(FARCRYSIS_BOUNDS.minZ + 2, Math.min(FARCRYSIS_BOUNDS.maxZ - 2, Math.sin(angle) * radius * 0.9));
-    positions[i * 3 + 0] = px;
-    positions[i * 3 + 1] = FARCRYSIS_WATER_LEVEL + 0.04; // just above the water surface
-    positions[i * 3 + 2] = pz;
+    // Rejection-draw a point over water inside the offshore sparkle band.
+    for (;;) {
+      const [px, pz] = farcrysisSquarePoint(sparkleRng, 1.5);
+      const edge = farcrysisEdgeDistance(px, pz);
+      if (edge >= SPARKLE_BAND[0] && edge <= SPARKLE_BAND[1]) {
+        positions[i * 3 + 0] = px;
+        positions[i * 3 + 1] = FARCRYSIS_WATER_LEVEL + 0.04; // just above the water surface
+        positions[i * 3 + 2] = pz;
+        break;
+      }
+    }
   }
 
   const geom = new THREE.BufferGeometry();
@@ -543,13 +558,37 @@ function buildInlineTerrain(scene: THREE.Scene): void {
     // light stack the whole arena flattened into one beige. The jungle floor
     // is now a saturated humus green and the transition band leans green, so
     // the beach→jungle read survives the lighting.
+    let r: number;
+    let g: number;
+    let b: number;
     if (edgeDist < 8) {
-      colors[i * 3 + 0] = 0.88; colors[i * 3 + 1] = 0.79; colors[i * 3 + 2] = 0.6; // coral sand
+      r = 0.88; g = 0.79; b = 0.6; // coral sand
     } else if (edgeDist < 14) {
-      colors[i * 3 + 0] = 0.29; colors[i * 3 + 1] = 0.41; colors[i * 3 + 2] = 0.15; // grassy transition
+      r = 0.29; g = 0.41; b = 0.15; // grassy transition
     } else {
-      colors[i * 3 + 0] = 0.14; colors[i * 3 + 1] = 0.3; colors[i * 3 + 2] = 0.09; // jungle humus
+      r = 0.14; g = 0.3; b = 0.09; // jungle humus
+      // HF-398 elevation read: the raised highland massifs must present as
+      // ROCK, not flat green — otherwise 8 m of relief hides inside the
+      // canopy colour. Blend humus toward bare grey-brown by STEEPNESS
+      // (central-difference slope, the same signal grass MAX_SLOPE uses)
+      // and by ALTITUDE, so flank scarps and high shoulders both read.
+      // Deterministic analytic sampling — no RNG, no texture cost.
+      const slope = Math.max(
+        Math.abs(terrainHeight(x + 1, z) - terrainHeight(x - 1, z)),
+        Math.abs(terrainHeight(x, z + 1) - terrainHeight(x, z - 1)),
+      ) / 2;
+      const steep = THREE.MathUtils.smoothstep(slope, 0.55, 1.05);
+      const high = THREE.MathUtils.smoothstep(h, 4.6, 7.4);
+      const rock = Math.min(1, steep + 0.55 * high);
+      if (rock > 0) {
+        r += (0.32 - r) * rock;
+        g += (0.29 - g) * rock;
+        b += (0.25 - b) * rock;
+      }
     }
+    colors[i * 3 + 0] = r;
+    colors[i * 3 + 1] = g;
+    colors[i * 3 + 2] = b;
   }
   geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geom.computeVertexNormals();
@@ -622,35 +661,36 @@ function buildInlineTerrain(scene: THREE.Scene): void {
     group.add(rocks);
   };
 
-  // Cliff rock ring along the jungle/beach transition band.
-  scatterBoulders('farcrysis-cliff-rocks', 0x716b60, 28, ART_SEED + 1, (rng, i) => {
-    const angle = (i / 28) * Math.PI * 2 + (rng() - 0.5) * 0.6;
-    // HF-396: doubled so the cliff ring keeps tracking the jungle/beach
-    // transition band on the 128 m island.
-    const rockDist = 36 + rng() * 16;
-    return [
-      Math.max(-ARENA_HALF + 2, Math.min(ARENA_HALF - 2, Math.cos(angle) * rockDist)),
-      Math.max(-ARENA_HALF + 2, Math.min(ARENA_HALF - 2, Math.sin(angle) * rockDist)),
-      0.8 + rng() * 1.1,
-    ];
+  // Shore-edge bands (metres inward from the square boundary face), derived
+  // from the terrain authority. The old CIRCULAR rings collapsed to
+  // Chebyshev r/sqrt(2) on the corner diagonals — corner beaches starved,
+  // waterline boulders inland, sparkles over dry hills.
+  const CLIFF_ROCK_BAND: Readonly<[number, number]> = [
+    FARCRYSIS_WATERLINE_EDGE + FARCRYSIS_INLAND_DEPTH * 0.06,
+    FARCRYSIS_WATERLINE_EDGE + FARCRYSIS_INLAND_DEPTH * 0.35,
+  ];
+  const INTERIOR_BOULDER_BAND: Readonly<[number, number]> = [18, ARENA_HALF - 3];
+  const SHORE_BOULDER_BAND: Readonly<[number, number]> = [
+    FARCRYSIS_WATERLINE_EDGE - 2.5,
+    FARCRYSIS_WATERLINE_EDGE + 4.5,
+  ];
+
+  // Cliff rocks along the jungle/beach transition band.
+  scatterBoulders('farcrysis-cliff-rocks', 0x716b60, 28, ART_SEED + 1, (rng) => {
+    const [rx, rz] = farcrysisEdgeBandPoint(rng, CLIFF_ROCK_BAND, 2);
+    return [rx, rz, 0.8 + rng() * 1.1];
   });
 
   // Jungle floor boulders (scattered interior).
-  scatterBoulders('farcrysis-interior-boulders', 0x7a7268, 12, ART_SEED + 2, (rng, i) => {
-    const angle = (i / 12) * Math.PI * 2 + rng() * 0.5;
-    const placeDist = 10 + rng() * 24; // HF-396: doubled with the island
-    return [
-      Math.max(-ARENA_HALF + 3, Math.min(ARENA_HALF - 3, Math.cos(angle) * placeDist)),
-      Math.max(-ARENA_HALF + 3, Math.min(ARENA_HALF - 3, Math.sin(angle) * placeDist)),
-      0.35 + rng() * 0.5,
-    ];
+  scatterBoulders('farcrysis-interior-boulders', 0x7a7268, 12, ART_SEED + 2, (rng) => {
+    const [rx, rz] = farcrysisEdgeBandPoint(rng, INTERIOR_BOULDER_BAND, 3);
+    return [rx, rz, 0.35 + rng() * 0.5];
   });
 
-  // Large boulders near the water's edge.
-  scatterBoulders('farcrysis-shore-boulders', 0x6d655c, 8, ART_SEED + 3, (rng, i) => {
-    const angle = (i / 8) * Math.PI * 2 + 0.2;
-    const shoreDist = ARENA_HALF - 2 + rng() * 3;
-    return [Math.cos(angle) * shoreDist, Math.sin(angle) * shoreDist, 0.9 + rng() * 1.0];
+  // Large boulders straddling the actual waterline.
+  scatterBoulders('farcrysis-shore-boulders', 0x6d655c, 8, ART_SEED + 3, (rng) => {
+    const [rx, rz] = farcrysisEdgeBandPoint(rng, SHORE_BOULDER_BAND, 0.8);
+    return [rx, rz, 0.9 + rng() * 1.0];
   });
 
   // ---- Pass 69 density polish: beach litter, driftwood, interior undergrowth ----
@@ -916,10 +956,9 @@ function addBeachLitter(group: THREE.Group): void {
   const rng = mulberry32(ART_SEED + 5);
 
   for (let i = 0; i < litterCount; i += 1) {
-    const angle = (i / litterCount) * Math.PI * 2 + (rng() - 0.5) * 0.9;
-    const dist = ARENA_HALF - 1.5 - rng() * 6.5; // edgeDist ≈ 1.5-8 (sand)
-    const rx = Math.max(-ARENA_HALF + 0.8, Math.min(ARENA_HALF - 0.8, Math.cos(angle) * dist));
-    const rz = Math.max(-ARENA_HALF + 0.8, Math.min(ARENA_HALF - 0.8, Math.sin(angle) * dist * 0.96));
+    // Square-shore sand band: the old CIRCULAR ring sat up to ~22 m inland
+    // of the real waterline at the corner diagonals.
+    const [rx, rz] = farcrysisEdgeBandPoint(rng, [1.2, 8.5], 0.8);
     const baseY = terrainHeight(rx, rz);
 
     // Every third item is a flattened shell; the rest are small lumpy rocks.
@@ -936,17 +975,14 @@ function addBeachLitter(group: THREE.Group): void {
   }
 }
 
-/** Driftwood logs washed up on the beach (edgeDist < 8). */
+/** Driftwood logs washed up on the strand line (dry sand above the waterline). */
 function addDriftwoodLogs(group: THREE.Group): void {
   const logMat = mat(0x8a7355, 0.92, 0.04);
   const logCount = 6;
   const rng = mulberry32(ART_SEED + 6);
 
   for (let i = 0; i < logCount; i += 1) {
-    const angle = (i / logCount) * Math.PI * 2 + (rng() - 0.5) * 1.1;
-    const dist = ARENA_HALF - 2 - rng() * 5; // edgeDist ≈ 2-7 (sand)
-    const rx = Math.max(-ARENA_HALF + 0.8, Math.min(ARENA_HALF - 0.8, Math.cos(angle) * dist));
-    const rz = Math.max(-ARENA_HALF + 0.8, Math.min(ARENA_HALF - 0.8, Math.sin(angle) * dist * 0.96));
+    const [rx, rz] = farcrysisEdgeBandPoint(rng, [1.8, 7.5], 0.8);
     const baseY = terrainHeight(rx, rz);
     const length = 1.2 + rng() * 1.6;
 

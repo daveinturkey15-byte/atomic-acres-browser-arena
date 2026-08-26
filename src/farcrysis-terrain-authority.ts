@@ -143,12 +143,13 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
  *   - PAD GATE: a second opposed gate eases relief out of the research-station
  *     core pad over a wide band, so the pad's own blend never crushes full
  *     amplitude into a cliff around the station footprint;
- *   - GRADE: worst combined gradient measured ~0.8 rise/run on massif flanks,
- *     inside the controller's 50-degree climb limit; those steep jungle
+ *   - GRADE: worst combined gradient re-measured after the HF-398 elevation
+ *     raise (see the probe receipt in the lane report); it must stay inside
+ *     the controller's 50-degree climb limit (grade 1.19); the steep jungle
  *     flanks sit above grass MAX_SLOPE and read as rocky slopes;
  *   - PLATES: physics plate count re-measured inside the <8000 budget guard.
  */
-const HIGHLAND_AMP_M = 6.2;
+const HIGHLAND_AMP_M = 8.0;
 /** Distance inland where the coastal plain ends and relief may begin. */
 const HIGHLAND_SHORE_CLEAR_M =
   FARCRYSIS_SHORE.descentStartDist + FARCRYSIS_SHORE.approachDist;

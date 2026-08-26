@@ -98,7 +98,18 @@ export const FARCRYSIS_WATER: WaterBodyDefinition = Object.freeze({
   level: -0.25,
   swimmable: true,
   amplitudeScale: 0.2,
-  island: Object.freeze({ halfX: 32, halfZ: 32 }),
+  // Dry-land footprint gate for samplePhysics buoyancy and the float-zone
+  // (consumers test (half + 0.8) * 0.98 Chebyshev). The pre-HF-396 figure of
+  // 32 flagged the entire outer jungle band of the now-128 m island as open
+  // ocean: a PRONE player on dry sand there (eye ~1.06 m above the surface)
+  // cleared water-system's depth > -1.2 gate and took ~12.6 m/s^2 of ocean
+  // buoyancy on dry ground. Derived from the shore profile instead of the
+  // arena bounds: the descending shelf envelope crosses the waterline at
+  // ARENA_HALF - descentStartDist + (joinHeight - level) / shelfSlope
+  // = 64 - 10 + (0.2 - (-0.25)) / 0.38 = 55.18 m, and (55.5 + 0.8) * 0.98
+  // = 55.17 m puts the physics gate on the authored waterline itself.
+  // Pinned against the live terrain authority in water-authoring.test.ts.
+  island: Object.freeze({ halfX: 55.5, halfZ: 55.5 }),
   shore: Object.freeze({ innerRadius: 15, outerRadius: 37 }),
   nearSize: 76,
   horizonRadius: 1_400,

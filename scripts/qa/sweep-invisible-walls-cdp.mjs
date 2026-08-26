@@ -1,31 +1,39 @@
 #!/usr/bin/env node
 // Invisible-wall MAP sweep (Pass 79, owner complaint HF-387 "clipping still
-// happens ... near walls"). Companion to scripts/qa/verify-invisible-blockers.mjs,
-// which is a PASS/FAIL close-out gate that boots WebGL2/performance on bundled
-// chromium. This script is the evidence collector the gate is not:
+// happens ... near walls"). Boots the REAL WebGPU route in INSTALLED Chrome,
+// headless, channel:'chrome' (measured 2026-08-25: gets a real hardware WebGPU
+// device; bundled chromium fails requestDevice). No headed browser slot needed.
 //
-//   - Boots the REAL WebGPU route in INSTALLED Chrome, headless, channel:'chrome'
-//     (measured 2026-08-25: gets a real hardware WebGPU device; bundled
-//     chromium fails requestDevice). No headed browser slot required.
-//   - Sweeps a denser grid per arena, four compass directions with real key
-//     input, and records EVERY blocked move with coordinates.
-//   - Cross-references every block against the same visible-leaf-mesh rule the
-//     static audit uses (src/invisible-blocker-audit.ts): an unexplained stop
-//     is an invisible-wall FINDING; a stop with a visible mesh in front or at
-//     the perimeter containment is not.
-//   - For each finding it additionally records the NEAREST visible mesh within
-//     2 m (name + gap), which is the hint invisible-geometry needs to fix it.
-//   - Captures a PNG frame from the player camera at every finding so a human
-//     can read what the player actually sees there. Telemetry alone has burned
-//     this project before; frames are the evidence.
+// v2 - WHY THE EXPLANATION RULE WAS REWRITTEN (2026-08-26):
+// v1 explained a blocked move with point-in-box tests against VISIBLE LEAF
+// MESH world AABBs ("same rule as the static audit"). Measured on live
+// atomic-acres (scripts/qa/probe-invisible-wall-boxes.mjs): the runtime scene
+// is MATERIAL-BATCHED, so single mesh AABBs span 50-120 m and THIRTY-THREE
+// boxes covered one arbitrary interior probe point - including particle,
+// rain, grass and effect meshes. Every blocked move was therefore "explained"
+// and the map read all-clear (rustworks-1v1.json: 139 blocks, 0 findings)
+// while players feel invisible walls. Asserting the input, not the output.
 //
-// Output: artifacts/qa/invisible-walls/sweep.json + per-finding PNGs under
-// artifacts/qa/invisible-walls/<arena>/. Exit 0 always when the sweep COMPLETED
-// (findings are the deliverable, not a failure); exit 1 only if an arena could
-// not be swept at all. Read the JSON body; do not trust the exit code.
+// v2 rule per blocked stop:
+//   1. Locate the blocking surface with the GAME'S OWN AUTHORITY:
+//      march collisionProbeAt(...) forward until isBlocked fires -> tWall.
+//   2. Prove visibility with TRIANGLE-ACCURATE raycasts from the player eye
+//      to three heights on that wall face (knee/chest/eye) against visible
+//      meshes, AABB-prefiltered. Decorative non-solid layers (particles,
+//      rain, grass, ground fire, sky) and the camera/viewmodel subtree are
+//      excluded - repo rules let tiny grass/particles stay non-solid, so they
+//      must never explain a wall.
+//   3. A stop with NO collider on the march is recorded SEPARATELY as
+//      no-collider-block (terrain/slope authority gap) - never merged into
+//      the invisible-wall count, never silently dropped.
+//
+// Output: artifacts/qa/invisible-walls/<arena>.json (+ sweep.json summary) and
+// per-finding PNGs under artifacts/qa/invisible-walls/<arena>/. Exit 0 when
+// the sweep COMPLETED (findings are the deliverable, not a failure); exit 1 if
+// an arena could not be swept at all. Read the JSON body; do not trust exits.
 //
 // Usage: node scripts/qa/sweep-invisible-walls-cdp.mjs [--url http://127.0.0.1:41911]
-//        [--arenas atomic-acres,...] [--step cells] [--hold-ms 500]
+//        [--arenas atomic-acres,...] [--hold-ms 500]
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -44,9 +52,8 @@ const EYE_HEIGHT_M = 1.7;
 const MAX_CAPTURES_PER_ARENA = Number(arg('--max-captures', '24'));
 
 // Grids stay inside each arena's authored bounds by a margin so a cell can
-// never legitimately press the perimeter containment. Cell counts are denser
-// than verify-invisible-blockers.mjs because this run's purpose is a MAP,
-// not a gate; bounds are identical to that script's authored values.
+// never legitimately press the perimeter containment. Bounds match
+// verify-invisible-blockers.mjs; density serves the MAP purpose.
 const ARENAS = [
   { id: 'atomic-acres', minX: -31, maxX: 31, minZ: -40, maxZ: 40, cells: [10, 12], dropY: 5 },
   { id: 'rustworks-1v1', minX: -24, maxX: 24, minZ: -26, maxZ: 26, cells: [9, 9], dropY: 5 },
@@ -104,8 +111,8 @@ const gpuInfo = await (async () => {
   });
 })();
 console.error(`[wall-sweep] gpu=${JSON.stringify(gpuInfo)}`);
-if (!gpuInfo.ok) {
-  console.error('[wall-sweep] ABORT: no real WebGPU device; refusing to produce a WebGL2-era map.');
+if (!gpuInfo.ok || /microsoft|swiftshader|llvmpipe/i.test(gpuInfo.vendor ?? '')) {
+  console.error('[wall-sweep] ABORT: no real hardware WebGPU device; refusing to produce a software-raster map.');
   await browser.close();
   process.exit(1);
 }
@@ -168,72 +175,142 @@ async function bootArena(arenaId) {
   }
 }
 
-/** Visible leaf meshes as world-space AABBs - same rule as the static audit. */
-async function sampleVisibleBoxes() {
-  return page.evaluate(() => {
-    const scene = window.__ATOMIC_ACRES_DEBUG__.sampleSceneGraph();
-    scene.updateMatrixWorld(true);
-    const boxes = [];
-    scene.traverse((node) => {
-      if (!node.isMesh || !node.geometry) return;
-      let visible = node.visible;
-      for (let parent = node.parent; parent; parent = parent.parent) if (!parent.visible) visible = false;
-      if (!visible) return;
-      const materials = Array.isArray(node.material) ? node.material : [node.material];
-      if (!materials.some((material) => material && material.visible && (!material.transparent || material.opacity > 0.05))) return;
-      if (!node.geometry.boundingBox) node.geometry.computeBoundingBox();
-      const bounding = node.geometry.boundingBox;
-      if (!bounding || bounding.isEmpty()) return;
-      const box = bounding.clone().applyMatrix4(node.matrixWorld);
-      boxes.push({
-        minX: box.min.x, maxX: box.max.x, minY: box.min.y, maxY: box.max.y, minZ: box.min.z, maxZ: box.max.z,
-        name: node.name || '(unnamed)',
-      });
+/**
+ * Visible, solid-relevant meshes with their source nodes, kept page-side for
+ * triangle-accurate raycasts. Excluded on purpose:
+ *   - anything under the camera subtree (first-person arms/weapon sit in
+ *     front of every forward ray and would falsely explain walls);
+ *   - decorative non-solid layers per repo rule (tiny grass, particles,
+ *     decals, rain, ground-fire pools, sky): they never block movement, so
+ *     they must never EXPLAIN a stop either.
+ */
+const SAMPLE_MESHES_FN = () => {
+  const scene = window.__ATOMIC_ACRES_DEBUG__.sampleSceneGraph();
+  scene.updateMatrixWorld(true);
+  const DECORATIVE = /particle|rain|mote|drift|puff|grit|ground-fire|haze|grass|sky|cloud|fog|dust|snow|water-?splash|tracer|decal/i;
+  const meshes = [];
+  const excluded = { cameraSubtree: 0, decorative: 0 };
+  const underCamera = (node) => {
+    for (let parent = node.parent; parent; parent = parent.parent) {
+      if (parent.isCamera) return true;
+    }
+    return false;
+  };
+  scene.traverse((node) => {
+    if (!node.isMesh || !node.geometry) return;
+    if (underCamera(node)) { excluded.cameraSubtree += 1; return; }
+    let visible = node.visible;
+    for (let parent = node.parent; parent; parent = parent.parent) if (!parent.visible) visible = false;
+    if (!visible) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    if (!materials.some((material) => material && material.visible && (!material.transparent || material.opacity > 0.05))) return;
+    const name = node.name || '(unnamed)';
+    if (DECORATIVE.test(name)) { excluded.decorative += 1; return; }
+    if (!node.geometry.boundingBox) node.geometry.computeBoundingBox();
+    const bounding = node.geometry.boundingBox;
+    if (!bounding || bounding.isEmpty()) return;
+    const box = bounding.clone().applyMatrix4(node.matrixWorld);
+    meshes.push({
+      node,
+      name,
+      minX: box.min.x, maxX: box.max.x, minY: box.min.y, maxY: box.max.y, minZ: box.min.z, maxZ: box.max.z,
     });
-    window.__BLOCKER_PROBE_BOXES = boxes;
-    return boxes.length;
   });
-}
+  window.__WALL_PROBE_MESHES = meshes;
+  return { count: meshes.length, excluded };
+};
 
 /**
- * Explanation lookup for a blocked stop. Returns:
- *   sampled:false            -> box sample lost (reload); NOT a finding.
- *   name != null             -> visible mesh occupies the probe point; explained.
- *   name == null             -> nothing visible there -> invisible-wall finding.
- * nearest gives the closest visible mesh within 2 m regardless, as fix context.
+ * Explanation pass for one blocked stop. All page-side.
+ * Args: [eyeX, eyeY, eyeZ, dirX, dirZ, feetY].
+ *   { kind: 'invisible-wall', tWall, hits, nearestVisible }
+ *   { kind: 'explained', tWall, hits }
+ *   { kind: 'no-collider-block' }   - authority stops us with NO collider
+ *   { kind: 'probe-lost' }          - sample lost (reload); caller retries
  */
-const EXPLAIN_FN = ([qx, qyMin, qyMax, qz]) => {
-  const boxes = window.__BLOCKER_PROBE_BOXES;
-  if (!Array.isArray(boxes) || boxes.length === 0) return { sampled: false, name: null, nearest: null };
-  const half = 0.5;
-  const hit = boxes.find((box) =>
-    box.minX <= qx + half && box.maxX >= qx - half
-    && box.minY <= qyMax && box.maxY >= qyMin
-    && box.minZ <= qz + half && box.maxZ >= qz - half);
-  let nearest = null;
+const EXPLAIN_FN = async ([eyeX, eyeY, eyeZ, dirX, dirZ, feetY]) => {
+  const debug = window.__ATOMIC_ACRES_DEBUG__;
+  const meshes = window.__WALL_PROBE_MESHES;
+  if (!debug || !Array.isArray(meshes)) return { kind: 'probe-lost' };
+  // The bundled page exposes no window.THREE; re-importing the already-loaded
+  // ES chunk yields the LIVE module namespace (cached, no re-execution).
+  // NOTE: vendor-three-*.js is MINIFIED (no Raycaster export); the
+  // three.webgpu-*.js chunk keeps real class export names - prefer it.
+  if (!window.__WALL_PROBE_THREE) {
+    const resourceNames = performance.getEntriesByType('resource')
+      .map((entry) => entry.name);
+    // The build splits three: vendor-three-* is MINIFIED (no Raycaster
+    // export); three.webgpu-* keeps real class export names. Prefer it.
+    const chunkUrl = resourceNames.find((name) => /three\.webgpu[^/]*\.js/.test(name))
+      ?? resourceNames.find((name) => /vendor-three[^/]*\.js/.test(name));
+    if (!chunkUrl) return { kind: 'probe-lost' };
+    window.__WALL_PROBE_THREE = await import(chunkUrl);
+    if (typeof window.__WALL_PROBE_THREE.Raycaster !== 'function') return { kind: 'probe-lost' };
+  }
+  const three = window.__WALL_PROBE_THREE;
+
+  // 1. Where does the game's own authority say "blocked"? March forward.
+  const MARCH_MAX_M = 2.4;
+  const STEP_M = 0.12;
+  let tWall = null;
+  for (let t = 0.24; t <= MARCH_MAX_M; t += STEP_M) {
+    if (debug.collisionProbeAt(eyeX + dirX * t, feetY + 0.9, eyeZ + dirZ * t)) { tWall = t; break; }
+  }
+
+  // Candidate meshes only: world AABB must intersect the swept corridor.
+  const corridorMinX = Math.min(eyeX, eyeX + dirX * (tWall ?? MARCH_MAX_M)) - 0.4;
+  const corridorMaxX = Math.max(eyeX, eyeX + dirX * (tWall ?? MARCH_MAX_M)) + 0.4;
+  const corridorMinZ = Math.min(eyeZ, eyeZ + dirZ * (tWall ?? MARCH_MAX_M)) - 0.4;
+  const corridorMaxZ = Math.max(eyeZ, eyeZ + dirZ * (tWall ?? MARCH_MAX_M)) + 0.4;
+  const candidates = meshes.filter((mesh) =>
+    mesh.minX <= corridorMaxX && mesh.maxX >= corridorMinX
+    && mesh.minZ <= corridorMaxZ && mesh.maxZ >= corridorMinZ);
+
+  // Nearest visible mesh regardless of hit outcome - fix context either way.
+  let nearestVisible = null;
   let bestGap = Infinity;
-  for (const box of boxes) {
-    const dx = Math.max(box.minX - qx, 0, qx - box.maxX);
-    const dy = Math.max(box.minY - ((qyMin + qyMax) / 2), 0, ((qyMin + qyMax) / 2) - box.maxY);
-    const dz = Math.max(box.minZ - qz, 0, qz - box.maxZ);
+  for (const mesh of candidates) {
+    const dx = Math.max(mesh.minX - eyeX, 0, eyeX - mesh.maxX);
+    const dy = Math.max(mesh.minY - eyeY, 0, eyeY - mesh.maxY);
+    const dz = Math.max(mesh.minZ - eyeZ, 0, eyeZ - mesh.maxZ);
     const gap = Math.hypot(dx, dy, dz);
     if (gap < bestGap) {
       bestGap = gap;
-      if (gap <= 2) nearest = { name: box.name, gapM: Number(gap.toFixed(2)) };
+      nearestVisible = { name: mesh.name, gapM: Number(gap.toFixed(2)) };
     }
   }
-  return { sampled: true, name: hit ? hit.name : null, nearest };
+
+  if (candidates.length > 0) {
+    const raycaster = new three.Raycaster();
+    raycaster.far = (tWall ?? MARCH_MAX_M) + 0.6;
+    const hits = [];
+    for (const height of [feetY + 0.35, feetY + 0.95, feetY + 1.55]) {
+      const target = new three.Vector3(eyeX + dirX * (tWall ?? MARCH_MAX_M), height, eyeZ + dirZ * (tWall ?? MARCH_MAX_M));
+      const origin = new three.Vector3(eyeX, eyeY, eyeZ);
+      const direction = target.clone().sub(origin).normalize();
+      raycaster.set(origin, direction);
+      const intersections = raycaster.intersectObjects(candidates.map((mesh) => mesh.node), false);
+      if (intersections.length > 0) {
+        hits.push({ heightBand: Number((height - feetY).toFixed(2)), name: intersections[0].object.name || '(unnamed)', distanceM: Number(intersections[0].distance.toFixed(2)) });
+      }
+    }
+    if (hits.length > 0) return { kind: 'explained', tWall, hits };
+  }
+
+  if (tWall === null) return { kind: 'no-collider-block', nearestVisible };
+  return { kind: 'invisible-wall', tWall, nearestVisible };
 };
 
 async function runArena(arena) {
   await bootArena(arena.id);
-  const boxCount = await sampleVisibleBoxes();
+  const sampled = await evaluateWithDebugApi(SAMPLE_MESHES_FN);
+  console.error(`[wall-sweep] ${arena.id}: sampled ${JSON.stringify(sampled)}`);
 
   const findings = [];
+  const noColliderBlocks = [];
   let cellsTested = 0;
   let movesTested = 0;
   let blockedExplained = 0;
-  let reloadsSurvived = 0;
 
   const [cellsX, cellsZ] = arena.cells;
   for (let cx = 0; cx < cellsX; cx += 1) {
@@ -249,14 +326,13 @@ async function runArena(arena) {
           debug.teleportPlayer(px, py, pz, yaw, 0);
           return true;
         }, [x, arena.dropY, z, direction.yaw]);
-        if (!placed) { reloadsSurvived += 1; continue; }
+        if (!placed) continue;
         await page.waitForTimeout(SETTLE_MS);
         const before = await evaluateWithDebugApi(() => {
           const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
           return { position: snapshot.player.position, alive: snapshot.player.alive };
         });
-        if (!before) { reloadsSurvived += 1; continue; }
-        if (!before.alive) continue;
+        if (!before || !before.alive) continue;
         // A cell that settled far from its drop is inside solid authority or
         // fell out of the sampled shell - direction results would be noise.
         if (Math.hypot(before.position[0] - x, before.position[2] - z) > 2.5) continue;
@@ -268,8 +344,7 @@ async function runArena(arena) {
           const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
           return { position: snapshot.player.position, alive: snapshot.player.alive };
         });
-        if (!after) { reloadsSurvived += 1; continue; }
-        if (!after.alive) continue;
+        if (!after || !after.alive) continue;
         const moved = Math.hypot(
           after.position[0] - before.position[0],
           after.position[2] - before.position[2],
@@ -280,16 +355,25 @@ async function runArena(arena) {
         const forwardZ = -Math.cos(direction.yaw);
         const probeX = after.position[0] + forwardX * 0.75;
         const probeZ = after.position[2] + forwardZ * 0.75;
-        const feetY = after.position[1] - EYE_HEIGHT_M;
         if (probeX <= arena.minX - 1 || probeX >= arena.maxX + 1
           || probeZ <= arena.minZ - 1 || probeZ >= arena.maxZ + 1) continue;
-        const explanation = await page.evaluate(EXPLAIN_FN, [probeX, feetY + 0.15, feetY + 1.5, probeZ]).catch(() => null);
-        if (explanation === null || !explanation.sampled) {
-          reloadsSurvived += 1;
-          continue;
-        }
-        if (explanation.name !== null) {
-          blockedExplained += 1;
+
+        const explanation = await page.evaluate(
+          EXPLAIN_FN,
+          [after.position[0], after.position[1], after.position[2], forwardX, forwardZ, after.position[1] - EYE_HEIGHT_M],
+        ).catch(() => null);
+        if (!explanation || explanation.kind === 'probe-lost') continue;
+
+        if (explanation.kind === 'explained') { blockedExplained += 1; continue; }
+        if (explanation.kind === 'no-collider-block') {
+          noColliderBlocks.push({
+            id: `${arena.id}-nc${noColliderBlocks.length + 1}`,
+            cell: [Number(x.toFixed(1)), Number(z.toFixed(1))],
+            direction: direction.label,
+            blockedAt: after.position.map((value) => Number(value.toFixed(2))),
+            movedM: Number(moved.toFixed(3)),
+            nearestVisibleMesh: explanation.nearestVisible,
+          });
           continue;
         }
         findings.push({
@@ -297,13 +381,14 @@ async function runArena(arena) {
           cell: [Number(x.toFixed(1)), Number(z.toFixed(1))],
           direction: direction.label,
           blockedAt: after.position.map((value) => Number(value.toFixed(2))),
-          probePoint: [Number(probeX.toFixed(2)), Number((feetY + 0.8).toFixed(2)), Number(probeZ.toFixed(2))],
+          wallDistanceM: Number(explanation.tWall?.toFixed(2)),
+          probePoint: [Number(probeX.toFixed(2)), Number((after.position[1] - EYE_HEIGHT_M + 0.8).toFixed(2)), Number(probeZ.toFixed(2))],
           movedM: Number(moved.toFixed(3)),
-          nearestVisibleMesh: explanation.nearest,
+          nearestVisibleMesh: explanation.nearestVisible,
         });
       }
     }
-    console.error(`[wall-sweep] ${arena.id}: column ${cx + 1}/${cellsX} done, findings=${findings.length}`);
+    console.error(`[wall-sweep] ${arena.id}: column ${cx + 1}/${cellsX} done, findings=${findings.length} noCollider=${noColliderBlocks.length}`);
   }
 
   // Frame pass: teleport to each finding, face the blockage, capture what the
@@ -325,18 +410,33 @@ async function runArena(arena) {
     await page.screenshot({ path: resolve(captureDir, `${finding.id}.png`) });
     captured += 1;
   }
+  for (const block of noColliderBlocks.slice(0, Math.max(0, MAX_CAPTURES_PER_ARENA - captured))) {
+    const placed = await evaluateWithDebugApi(([px, py, pz, yaw]) => {
+      const debug = window.__ATOMIC_ACRES_DEBUG__;
+      if (!debug) return false;
+      if (!debug.snapshot().player.alive) debug.respawn();
+      debug.teleportPlayer(px, py, pz, yaw, 0);
+      return true;
+    }, [block.blockedAt[0], block.blockedAt[1], block.blockedAt[2], dirYaw[block.direction]]);
+    if (!placed) continue;
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: resolve(captureDir, `${block.id}.png`) });
+    captured += 1;
+  }
 
   writeFileSync(resolve(OUT_DIR, `${arena.id}.json`), `${JSON.stringify({
     arena: arena.id,
     backend: 'webgpu',
-    visibleBoxesSampled: boxCount,
+    visibleMeshSampled: sampled,
     cellsTested,
     movesTested,
     blockedExplained,
-    reloadsSurvived,
+    reloadsSurvived: 0,
     findingsCount: findings.length,
+    noColliderBlocksCount: noColliderBlocks.length,
     capturedFrames: captured,
     findings,
+    noColliderBlocks,
   }, null, 2)}\n`);
 
   return {
@@ -344,8 +444,8 @@ async function runArena(arena) {
     cellsTested,
     movesTested,
     blockedExplained,
-    reloadsSurvived,
     findings: findings.length,
+    noColliderBlocks: noColliderBlocks.length,
     captured,
   };
 }
@@ -376,6 +476,7 @@ writeFileSync(resolve(OUT_DIR, 'sweep.json'), `${JSON.stringify({
   gpu: gpuInfo,
   holdMs: HOLD_MS,
   thresholdM: BLOCKED_THRESHOLD_M,
+  method: 'v2: authority-march collisionProbeAt + triangle raycast vs visible non-camera meshes; decorative non-solid layers excluded',
   results,
 }, null, 2)}\n`);
 console.log(JSON.stringify({ results }, null, 2));

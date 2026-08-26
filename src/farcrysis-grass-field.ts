@@ -87,6 +87,8 @@ export const FARCRYSIS_GRASS_DRAW_DISTANCE_M = 62;
 const MIN_HEIGHT_ABOVE_WATER_M = 0.08;
 /** Rejected when the terrain gradient exceeds this rise/run. */
 const MAX_SLOPE = 0.5;
+/** Nothing grows above this elevation — the bare rock crown of the massifs. */
+const GRASS_MAX_ALTITUDE_M = 6.4;
 /** Blades sink slightly so no root floats above a plate seam (metres). */
 const ROOT_SINK_M = 0.02;
 
@@ -261,7 +263,11 @@ export function grassPlacementAllowed(x: number, z: number): boolean {
   ) return false;
   const h = farcrysisTerrainHeight(x, z);
   if (h < FARCRYSIS_WATER_LEVEL + MIN_HEIGHT_ABOVE_WATER_M) return false;
-  if (h > 3.2) return false; // nothing grows on the artificial peaks
+  // HF-398 elevation raise: the highland massifs now crest ~7.8 m. Grass
+  // climbs the gentle lower flanks (jungle look) and the STEEPNESS filter
+  // below — not an altitude hard cut authored for the old 2.2 m "artificial
+  // peaks" — decides where the bare rock crown begins.
+  if (h > GRASS_MAX_ALTITUDE_M) return false;
   if (terrainSlope(x, z) > MAX_SLOPE) return false;
   return !excluded(x, z);
 }

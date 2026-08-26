@@ -11,10 +11,11 @@
  *   - Tapered CylinderGeometry trunk (0.18 top / 0.34 base, 2.5 m tall),
  *     translated so its base rests at the terrain estimate, with a small
  *     per-palm lean around the base.
- *   - 26 palms: 16 on the beach lagoon ring (22-30 m) + 10 scattered
- *     deeper toward the jungle (11-19 m), varied scale 0.7-1.3, kept
- *     inside FARCRYSIS_BOUNDS with a 1.5 m margin and off the flat
- *     corridor lane strips (no sightline-blocking trunks).
+ *   - 52 palms: 32 in a shore-edge band just behind the sand (waterline to
+ *     a quarter of the dry-land depth, following the SQUARE shoreline on
+ *     every azimuth) + 20 scattered through the jungle interior, varied
+ *     scale 0.7-1.3, kept inside FARCRYSIS_BOUNDS with a 1.5 m margin and
+ *     off the flat corridor lane strips (no sightline-blocking trunks).
  *   - Coconut clusters: 3 small spheres tucked under each crown.
  *
  * Everything is InstancedMesh (one draw call per material group) and
@@ -29,10 +30,16 @@
  * function bodies, never at module evaluation time.
  */
 import * as THREE from 'three';
-import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
 import { FARCRYSIS_LANDMARKS } from './farcrysis-midmap-landmarks';
 import { farcrysisTerrainHeight } from './farcrysis-terrain-authority';
+import {
+  FARCRYSIS_ARENA_HALF,
+  FARCRYSIS_INLAND_DEPTH,
+  FARCRYSIS_WATERLINE_EDGE,
+  farcrysisEdgeDistance,
+  farcrysisSquarePoint,
+} from './farcrysis-shore-bands';
 
 // ---------------------------------------------------------------------------
 // Deterministic helpers
@@ -48,22 +55,19 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-function clamp(value: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, value));
-}
 
 // ---------------------------------------------------------------------------
 // Placement / terrain-fit constants
 // ---------------------------------------------------------------------------
 
-// HF-396: island doubled (±32 m → ±64 m), so the palm rings and corridor
-// lanes double with it and counts double to keep planting density.
+// HF-396 grew the island to +/-64 m; the old CIRCULAR beach/jungle rings only
+// hugged the square shore along the axis faces and stranded corner palms up to
+// ~22 m inland of the real waterline. Placement is now an EDGE-DISTANCE band
+// measured inward from the square boundary face — the terrain authority's own
+// Chebyshev convention — so beach palms follow the shoreline on every azimuth,
+// corners included, and re-derive automatically if the extent changes again.
 const PALM_COUNT = 52;
 const BEACH_PALM_COUNT = 32; // first 32 palms ring the beach lagoon; rest are jungle scatter
-const BEACH_RING_MIN = 44;
-const BEACH_RING_MAX = 60;
-const JUNGLE_RING_MIN = 22;
-const JUNGLE_RING_MAX = 38;
 /**
  * HF-395: the composed landmark groves own their quadrant. A palm trunk
  * inside a ruin wall or under a grove canopy is exactly the "thrown
@@ -75,7 +79,20 @@ const LANDMARK_GROVE_KEEP_OUT_M = 7;
 const BOUNDS_MARGIN = 1.5;
 export const TRUNK_HEIGHT = 2.5;
 
-const { minX, maxX, minZ, maxZ } = FARCRYSIS_BOUNDS;
+const ARENA_HALF = FARCRYSIS_ARENA_HALF;
+
+/** Beach palms sit just behind the sand, from the waterline to a quarter of
+ *  the dry-land depth inland (the same relative zone the vegetation module's
+ *  beach/transition bands occupy). */
+const PALM_BEACH_BAND: Readonly<[number, number]> = [
+  FARCRYSIS_WATERLINE_EDGE + 0.5,
+  FARCRYSIS_WATERLINE_EDGE + FARCRYSIS_INLAND_DEPTH * 0.25,
+];
+/** Jungle palms fill the deep interior out to the bound-wall margin. */
+const PALM_JUNGLE_BAND: Readonly<[number, number]> = [
+  FARCRYSIS_WATERLINE_EDGE + FARCRYSIS_INLAND_DEPTH * 0.35,
+  ARENA_HALF - BOUNDS_MARGIN - 0.5,
+];
 
 // HF-360: this module used to carry its own guessed terrain model ("close
 // enough"), which drifted from the rendered ground and left trunk bases
@@ -219,22 +236,25 @@ export interface PalmPlacement {
   crownScale: number;
 }
 
-/** Deterministic placement: beach ring first, then jungle scatter. */
+/** Deterministic placement: beach band first, then jungle interior. */
 function buildPlacements(): PalmPlacement[] {
   const rng = mulberry32(0x9e3779b9);
   const placements: PalmPlacement[] = [];
   let guard = 0;
 
-  while (placements.length < PALM_COUNT && guard < 800) {
+  while (placements.length < PALM_COUNT && guard < 6000) {
     guard += 1;
     const isBeach = placements.length < BEACH_PALM_COUNT;
-    const radius = isBeach
-      ? BEACH_RING_MIN + rng() * (BEACH_RING_MAX - BEACH_RING_MIN)
-      : JUNGLE_RING_MIN + rng() * (JUNGLE_RING_MAX - JUNGLE_RING_MIN);
-    const angle = rng() * Math.PI * 2;
+    // Uniform square-island draw, accepted inside the palm's shore-edge band
+    // (two rng() calls per attempt keep the seed chain deterministic). The
+    // old circular rings only hugged the square shore along the axis faces —
+    // corner palms sat up to ~22 m inland of the real waterline.
+    const [x, z] = farcrysisSquarePoint(rng, BOUNDS_MARGIN);
+    const edge = farcrysisEdgeDistance(x, z);
+    if (isBeach) {
+      if (edge < PALM_BEACH_BAND[0] || edge > PALM_BEACH_BAND[1]) continue;
+    } else if (edge < PALM_JUNGLE_BAND[0] || edge > PALM_JUNGLE_BAND[1]) continue;
 
-    const x = clamp(Math.cos(angle) * radius, minX + BOUNDS_MARGIN, maxX - BOUNDS_MARGIN);
-    const z = clamp(Math.sin(angle) * radius * 0.92, minZ + BOUNDS_MARGIN, maxZ - BOUNDS_MARGIN);
     // Keep trunks off the flat corridor lane strips (no sightline blocking)
     if (onCorridorStrip(x, z)) continue;
 
@@ -250,7 +270,7 @@ function buildPlacements(): PalmPlacement[] {
       x,
       z,
       baseY: farcrysisTerrainHeight(x, z),
-      yaw: angle + (rng() - 0.5) * 0.5,
+      yaw: Math.atan2(z, x) + (rng() - 0.5) * 0.5,
       lean: (rng() - 0.5) * 0.24, // slight per-trunk lean
       scale,
       crownSpin: rng() * Math.PI * 2,

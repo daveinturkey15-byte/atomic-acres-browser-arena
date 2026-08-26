@@ -13,9 +13,23 @@
  */
 import * as THREE from 'three';
 import { farcrysisTerrainHeight } from './farcrysis-terrain-authority';
-import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
+import {
+  FARCRYSIS_ARENA_HALF,
+  FARCRYSIS_WATERLINE_EDGE,
+  farcrysisEdgeBandPoint,
+} from './farcrysis-shore-bands';
 
-const ARENA_HALF = FARCRYSIS_BOUNDS.maxX;
+/** Jungle-interior edge band shared by the detail scatter layers. Starts
+ *  where the transition band begins so corner-diagonal ground is covered —
+ *  the old circular rings starved every corner. */
+const INTERIOR_BAND: Readonly<[number, number]> = [14, FARCRYSIS_ARENA_HALF - 2.5];
+/** Floor litter spreads wider still, reaching the corner interior. */
+const LITTER_BAND: Readonly<[number, number]> = [13, FARCRYSIS_ARENA_HALF - 2.5];
+/** Reeds straddle the actual waterline (the HF-393 shelf crossing). */
+const REED_WATERLINE_BAND: Readonly<[number, number]> = [
+  FARCRYSIS_WATERLINE_EDGE - 3,
+  FARCRYSIS_WATERLINE_EDGE + 4.5,
+];
 
 // ---------------------------------------------------------------------------
 // Shared state — vine pivots, reed meshes, and any per-frame state for
@@ -236,8 +250,7 @@ function buildMossPatches(root: THREE.Object3D, rng: () => number): void {
 
 function buildRocks(root: THREE.Object3D, rng: () => number): void {
   const rockCount = 8 + Math.floor(rng() * 5); // 8-12
-  const minRadius = 20; // HF-396
-  const maxRadius = 36; // HF-396
+
 
   for (let i = 0; i < rockCount; i++) {
     // Pass 76: darker earthy grey — the old 0x7a-0x9a range read as pale
@@ -283,11 +296,9 @@ function buildRocks(root: THREE.Object3D, rng: () => number): void {
     rock.castShadow = true;
     rock.receiveShadow = true;
 
-    // Random position on jungle floor ring (radius 10-18m)
-    const angle = rng() * Math.PI * 2;
-    const radius = minRadius + rng() * (maxRadius - minRadius);
-    const px = Math.cos(angle) * radius;
-    const pz = Math.sin(angle) * radius;
+    // Square-shore interior band: the old 20-36 m circular ring starved the
+    // corner diagonals (Chebyshev collapses to r/sqrt(2)).
+    const [px, pz] = farcrysisEdgeBandPoint(rng, INTERIOR_BAND, 2.5);
     // Pass 76: seated on the terrain authority (was flat y≈0.2, which buried
     // rocks inside interior hills leaving only spiky grey tips poking out).
     const py = farcrysisTerrainHeight(px, pz) - 0.04;
@@ -331,14 +342,9 @@ function buildFloorLitter(root: THREE.Object3D, rng: () => number): void {
     new THREE.Color(0x8a7a5a), // tan (dry leaf)
   ];
 
-  const minRadius = 10; // HF-396
-  const maxRadius = 36; // HF-396
 
   for (let i = 0; i < count; i++) {
-    const angle = rng() * Math.PI * 2;
-    const radius = minRadius + rng() * (maxRadius - minRadius);
-    const px = Math.cos(angle) * radius;
-    const pz = Math.sin(angle) * radius;
+    const [px, pz] = farcrysisEdgeBandPoint(rng, LITTER_BAND, 2.5);
     // Pass 76: seated on the terrain authority (flat y=0.05 buried most of
     // this layer inside the interior hills).
     const py = farcrysisTerrainHeight(px, pz) + 0.04;
@@ -381,13 +387,10 @@ function buildReedClusters(root: THREE.Object3D, rng: () => number): void {
   const reedMat = artMat(REED_COLOR, 0.7, 0.03);
 
   for (let c = 0; c < clusterCount; c++) {
-    // Cluster center on the beach-water ring edge — the same edge-relative
-    // zone (edgeDist ~10-13 m) the old 19-22 m radius occupied on the 64 m
-    // island (HF-396).
-    const angle = rng() * Math.PI * 2;
-    const radius = ARENA_HALF - 13 + rng() * 3;
-    const cx = Math.cos(angle) * radius;
-    const cz = Math.sin(angle) * radius;
+    // Cluster centre straddling the ACTUAL waterline on every azimuth — the
+    // old ARENA_HALF-13..-10 circular ring sat up to ~26 m inland at the
+    // corner diagonals (Chebyshev collapses to r/sqrt(2)).
+    const [cx, cz] = farcrysisEdgeBandPoint(rng, REED_WATERLINE_BAND, 2.5);
 
     const reedCount = 5 + Math.floor(rng() * 4); // 5-8 reeds
 

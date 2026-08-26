@@ -65,14 +65,29 @@ for (const arena of ARENAS) {
 }
 const SEED = arg('--seed', 'viewpoint');
 
+// shell:true wraps the server in cmd.exe; killing the wrapper alone orphans
+// the vite child and leaves :41931 occupied for the next run. Kill the tree.
+let SERVE_CHILD = null;
+const killServeChild = () => {
+  if (!SERVE_CHILD || SERVE_CHILD.pid == null) return;
+  if (process.platform === 'win32') {
+    spawn('taskkill', ['/pid', String(SERVE_CHILD.pid), '/T', '/F'], { stdio: 'ignore' });
+  } else {
+    SERVE_CHILD.kill('SIGTERM');
+  }
+};
+
 const serveDist = arg('--serve-dist', null);
 if (serveDist) {
-  // Short-lived server, spawned here and reaped in `finally`. Port chosen away
-  // from 41900/41901 (owner builds) and 41910/41911 (shared gauntlet preview).
+  // Short-lived server, spawned here and reaped via killServeChild() in
+  // `finally`. Port chosen away from 41900/41901 (owner builds) and
+  // 41910/41911 (shared gauntlet preview).
   const PORT = 41931;
   console.error(`[viewpoint-capture] serving ${serveDist} on :${PORT}`);
+  // Node >=20 blocks .cmd/.bat spawns without a shell (CVE-2024-27980).
   const server = spawn('npx', ['vite', 'preview', '--outDir', serveDist,
-    '--host', '127.0.0.1', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+    '--host', '127.0.0.1', '--port', String(PORT), '--strictPort'],
+    { stdio: 'ignore', shell: process.platform === 'win32' });
   const deadline = Date.now() + 60_000;
   let up = false;
   while (Date.now() < deadline && !up) {
@@ -83,12 +98,12 @@ if (serveDist) {
     if (!up) await new Promise((r) => setTimeout(r, 500));
   }
   if (!up) {
-    server.kill();
+    killServeChild();
     console.error('[viewpoint-capture] served dist never came up');
     process.exit(2);
   }
   BASE = `http://127.0.0.1:${PORT}`;
-  var SERVE_CHILD = server;
+  SERVE_CHILD = server;
 }
 
 const OUT_DIR = resolve(process.cwd(), arg('--out',
@@ -214,14 +229,17 @@ try {
           }
           // Game-loop proof, not a sleep: wait until the loop has COMMITTED a
           // presented frame at this camera revision.
-          const committed = await page.waitForFunction(({ id, revBefore }) => {
+          const committed = await page.waitForFunction(({ id, rev }) => {
             const review = window.__ATOMIC_ACRES_DEBUG__.snapshot().deterministicReview;
-            return review.cameraId === id
-              && review.captureCameraRevision > revBefore
-              && review.presentedCamera
-              && review.presentedCamera.captureRevision === review.captureCameraRevision
-              ? review.presentedCamera : null;
-          }, { id: cameraId, revBefore: revisionBefore }, { timeout: 30_000 }).then((handle) => handle.jsonValue()).catch(() => null);
+            // Optional chain on purpose: a snapshot taken BETWEEN the review
+            // revision bump and the presentedCamera publish must read as
+            // not-yet-committed (null), never throw and never alias a pose
+            // from an older revision.
+            return review.cameraId === id && review.captureCameraRevision > rev
+              && review.presentedCamera?.captureRevision === review.captureCameraRevision
+                ? (review.presentedCamera ?? null)
+                : null;
+          }, { id: cameraId, rev: revisionBefore }, { timeout: 30_000 }).then((handle) => handle.jsonValue()).catch(() => null);
           if (!committed) {
             record.shots.push({ cameraId, ok: false, error: `camera '${cameraId}' revision >${revisionBefore} never committed by presentation loop` });
             continue;
@@ -229,6 +247,21 @@ try {
           // Give the TSL/atmosphere lane a few frames at the frozen time to
           // finish its review-camera transition before reading pixels.
           await page.waitForTimeout(700);
+          // Pixel-time proof, not just commit-time: the commit wait above
+          // proved SOME frame landed at this revision, but the settle delay
+          // and the TSL transition run after it. Re-read the presentation
+          // receipt immediately before reading pixels; a lost receipt means
+          // the screenshot could show a stale pose.
+          const presentedFrame = await page.evaluate(() => {
+            const review = window.__ATOMIC_ACRES_DEBUG__.snapshot().deterministicReview;
+            return review.presentedCamera
+              && review.presentedCamera.captureRevision === review.captureCameraRevision
+              ? review.presentedCamera.frame : null;
+          });
+          if (presentedFrame === null) {
+            record.shots.push({ cameraId, ok: false, error: `presentation receipt lost before pixels for '${cameraId}'` });
+            continue;
+          }
           const shotPath = resolve(OUT_DIR, arena, `${cameraId}.png`);
           await page.screenshot({ path: shotPath });
           const telemetry = await page.evaluate(() => {
@@ -293,6 +326,6 @@ try {
   exitCode = verdict === 'PASS' ? 0 : verdict === 'INVALID' ? 2 : 1;
 } finally {
   await browser.close();
-  if (typeof SERVE_CHILD !== 'undefined') SERVE_CHILD.kill();
+  killServeChild();
 }
 process.exit(exitCode);
