@@ -453,29 +453,37 @@ function _applyInstanceColorVariation(group: THREE.Group): void {
 }
 
 /**
- * HF-396 "a little bit more jungle like": canopies rendered near-black from
+ * HF-396 "a little bit more jungle like": foliage rendered near-black from
  * the shaded side — dark leaf albedo (e.g. emergent crowns 0x2f5f28 is only
- * ~3% linear green) falls to the 0.3 ambient wherever the sun-facing upper
- * geometry self-shadows it, so every tree read as a burnt silhouette in
- * captured WebGPU frames. Fake-subsurface lift (technique register row 18's
+ * ~3% linear green) and mid-brown bark (broadleaf trunks 0x6b4e30 is ~9%
+ * linear) fall to the 0.3 ambient wherever the sun-facing upper geometry
+ * self-shadows them, so every tree read as a burnt silhouette in captured
+ * WebGPU frames. Fake-subsurface lift (technique register row 18's
  * "subsurface-scattering approximation for backlit translucency"): a small
- * emissive of each canopy's OWN hue lifts shadowed faces toward readable
- * green without touching the Pass 76 light rig (raising ambient/ exposure
- * washed the whole island beige — the rejected look). Canopy layers only:
- * trunks keep their natural shading, ground cover is already sun-bright.
- * Zero draw-call or per-frame cost — a material property set once at build.
+ * emissive of each layer's OWN hue lifts shadowed faces toward a readable
+ * colour without touching the Pass 76 light rig (raising ambient/ exposure
+ * washed the whole island beige — the rejected look). Canopy layers get the
+ * stronger lift; trunk/stem layers a weaker one — bark must keep its natural
+ * shading direction, it just must not collapse to black. Ground cover is
+ * already sun-bright and stays untouched. Zero draw-call or per-frame cost —
+ * a material property set once at build.
  */
 const CANOPY_LIFT_PATTERN = /(canopies|crowns|midstorey-clumps)/;
 const CANOPY_LIFT_SCALE = 0.22;
+const TRUNK_LIFT_PATTERN = /(trunks|-stems)/;
+const TRUNK_LIFT_SCALE = 0.12;
 
-function _applyCanopyTranslucencyLift(group: THREE.Group): void {
+function _applyFoliageShadeLift(group: THREE.Group): void {
   group.traverse((obj) => {
     if (!(obj instanceof THREE.InstancedMesh)) return;
     if (!obj.name.startsWith('farcrysis-vege')) return;
-    if (!CANOPY_LIFT_PATTERN.test(obj.name)) return;
     const mat = obj.material as THREE.MeshStandardMaterial;
     if (!mat || !mat.color) return;
-    mat.emissive.copy(mat.color).multiplyScalar(CANOPY_LIFT_SCALE);
+    if (CANOPY_LIFT_PATTERN.test(obj.name)) {
+      mat.emissive.copy(mat.color).multiplyScalar(CANOPY_LIFT_SCALE);
+    } else if (TRUNK_LIFT_PATTERN.test(obj.name)) {
+      mat.emissive.copy(mat.color).multiplyScalar(TRUNK_LIFT_SCALE);
+    }
   });
 }
 
@@ -3033,15 +3041,15 @@ export function buildVegetation(scene: THREE.Group): void {
   addEmergentCanopyTrees(scene); // #37 — emergent tier above the broadleaf canopy
   addMidstoreyClumps(scene);     // #38 — eye-level band clustered under the emergents
   addUndergrowthCarpet(scene);   // #39 — dense low filler over the jungle floor
-
   // ---- Wind-enable remaining flexible vegetation (non-LOD-managed) ----
   _applyTslFoliage(scene); // HF-359/HF-363: TSL wind + canopy dapple on foliage layers
 
   // Believability: per-instance colour variation (rides existing draws).
   _applyInstanceColorVariation(scene);
 
-  // HF-396: lift shaded canopy faces toward green (fake subsurface).
-  _applyCanopyTranslucencyLift(scene);
+  // HF-396: lift shaded canopy AND trunk faces toward their own hue (fake
+  // subsurface) — trunks at the weaker bark scale.
+  _applyFoliageShadeLift(scene);
  }
 
 // ---------------------------------------------------------------------------

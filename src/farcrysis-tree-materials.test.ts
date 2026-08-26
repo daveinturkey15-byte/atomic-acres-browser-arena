@@ -216,5 +216,47 @@ describe('farcrysis tree material fidelity (12 species)', () => {
     expect(mat.transparent, 'palm-fronds must be transparent for the alpha cut').toBe(true);
     expect(mat.alphaTest, 'palm-fronds must use an alpha test threshold').toBeGreaterThan(0);
   });
+
+  it('lifts shaded trunk/stem faces off black with the weaker bark emissive (HF-396 silhouette fix)', () => {
+    // WebGPU captures showed mid-brown bark (broadleaf 0x6b4e30 ≈ 9% linear)
+    // collapsing to black silhouettes on the shaded side at the 0.3 ambient.
+    // The fake-subsurface lift used to be canopy-only; trunks must now carry
+    // the WEAKER bark lift — emissive == own hue x 0.12 — while canopies keep
+    // the stronger 0.22. Red before the change: trunk emissive was the
+    // MeshStandardMaterial default 0x000000.
+    const trunkRe = /farcrysis-vege-(broadleaf|kapok|mangrove|emergent|bloom|cycad|coconut)-trunks$/;
+    const canopyRe = /farcrysis-vege-(broadleaf|kapok|mangrove|bloom)-canopies$/;
+    let trunkMeshes = 0;
+    let canopyMeshes = 0;
+    scene.traverse((obj) => {
+      if (!(obj instanceof THREE.InstancedMesh)) return;
+      const mat = obj.material as THREE.MeshStandardMaterial;
+      if (!mat?.emissive || !mat?.color) return;
+      const expected = (scale: number) => {
+        const c = mat.color.clone().multiplyScalar(scale);
+        expect(
+          mat.emissive.r, `${obj.name}: emissive.r`,
+        ).toBeCloseTo(c.r, 4);
+        expect(
+          mat.emissive.g, `${obj.name}: emissive.g`,
+        ).toBeCloseTo(c.g, 4);
+        expect(
+          mat.emissive.b, `${obj.name}: emissive.b`,
+        ).toBeCloseTo(c.b, 4);
+      };
+      if (trunkRe.test(obj.name)) {
+        trunkMeshes += 1;
+        expected(0.12);
+        // The whole point: bark emissive must be NON-black so the shaded
+        // side cannot collapse to a silhouette.
+        expect(mat.emissive.getHex(), `${obj.name}: emissive must not be black`).not.toBe(0);
+      } else if (canopyRe.test(obj.name)) {
+        canopyMeshes += 1;
+        expected(0.22);
+      }
+    });
+    expect(trunkMeshes, 'expected the live trunk layers to be covered').toBeGreaterThanOrEqual(7);
+    expect(canopyMeshes, 'expected the live canopy layers to be covered').toBeGreaterThanOrEqual(4);
+  });
 });
 
