@@ -93,7 +93,9 @@
         { "item": "field-belt-with-double-pouches", "skinToJoints": ["Hips"] },
         { "item": "map-case-thigh-strap", "skinToJoints": ["UpperLeg.R"] },
         { "item": "goggles-raised-visor-variant", "skinToJoints": ["Head"] },
-        { "item": "ankle-gaiter-straps", "skinToJoints": ["Foot.L", "Foot.R"] }
+        { "item": "ankle-gaiter-straps", "skinToJoints": ["Foot.L", "Foot.R"] },
+        { "item": "braided-hair-fall", "skinToJoints": ["Neck"] },
+        { "item": "twin-thigh-holsters", "skinToJoints": ["UpperLeg.L", "UpperLeg.R"] }
       ],
       "palette": {
         "primary": "8a7a5c",
@@ -144,7 +146,10 @@
         { "item": "forearm-guard-wraps", "skinToJoints": ["LowerArm.L", "LowerArm.R"] },
         { "item": "hip-armor-lashings", "skinToJoints": ["Hips"] },
         { "item": "knee-guard-straps", "skinToJoints": ["UpperLeg.L", "UpperLeg.R"] },
-        { "item": "sealed-lens-visor-variant", "skinToJoints": ["Head"] }
+        { "item": "sealed-lens-visor-variant", "skinToJoints": ["Head"] },
+        { "item": "taloned-hand-claws", "skinToJoints": ["Index4.L", "Middle4.L", "Ring4.L", "Pinky4.L", "Index4.R", "Middle4.R", "Ring4.R", "Pinky4.R"] },
+        { "item": "elongated-cranial-crest", "skinToJoints": ["Head"] },
+        { "item": "pale-ocular-patches", "skinToJoints": ["Head"] }
       ],
       "palette": {
         "primary": "3a3f46",

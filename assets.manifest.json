@@ -826,15 +826,15 @@
       "files": [
         {
           "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-explorer-lod0.glb",
-          "sha256": "441837160a5b0d234643304b5980a4f15a6f617140cbee4cbf761adda15d377a"
+          "sha256": "9074265d50efa622adc04ec48ff6b7624fed03dcc25a04938f13ffc4393f2fa7"
         },
         {
           "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-explorer-lod1.glb",
-          "sha256": "60b1319035df5a641c952b1181ecc7cbd9d28eaf879043c5e7a284c5c3bec79a"
+          "sha256": "0695a361bcee9c5581d290f76f9ec615f125204f7882cea196168d23e04fe570"
         }
       ],
       "sourceSpec": "source-assets/blender/pass74-operator-skin-specs.json",
-      "sourceSpecSha256": "51375662630ab17d16a169755224d462f6b982cac194786903a16123a2ac53f8",
+      "sourceSpecSha256": "83190c0d490f138462afd860d3bcf011a0f4bc55206a0b0f0b03584de4521c10",
       "sourceProvenance": "source-assets/blender/pass74-operator-skin-explorer.provenance.json",
       "sourceProvenanceSha256": "9e42d981f82ea299696d3eb19ab6121f17adf926113737e3c8dfdadf8f6c6076",
       "owner": "src/operator-model.ts OPERATOR_SKIN_MODEL_URLS.explorer",
@@ -853,15 +853,15 @@
       "files": [
         {
           "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-symbiote-lod0.glb",
-          "sha256": "fab80eeb8f0415552e2e06ab98853a1334a38a484ecfbd3ade3653f7cf82fa69"
+          "sha256": "5639fccb94c62f721500f0bddd39b6e3c16feb41191361af38ffdfc26ea64812"
         },
         {
           "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-symbiote-lod1.glb",
-          "sha256": "f60549e78aa29b72d8d2b150c38a19cacda23e4edadd227294d51c2a79e70f38"
+          "sha256": "c658e513699552ead655b532562f54504b4964325343c3052cc4811b3034313d"
         }
       ],
       "sourceSpec": "source-assets/blender/pass74-operator-skin-specs.json",
-      "sourceSpecSha256": "51375662630ab17d16a169755224d462f6b982cac194786903a16123a2ac53f8",
+      "sourceSpecSha256": "83190c0d490f138462afd860d3bcf011a0f4bc55206a0b0f0b03584de4521c10",
       "sourceProvenance": "source-assets/blender/pass74-operator-skin-symbiote.provenance.json",
       "sourceProvenanceSha256": "62a663a5185233299f6f3efd91f577b5b4f4e275b9aef85fb449423406f9aeca",
       "owner": "src/operator-model.ts OPERATOR_SKIN_MODEL_URLS.symbiote",
@@ -888,7 +888,7 @@
         }
       ],
       "sourceSpec": "source-assets/blender/pass74-operator-skin-specs.json",
-      "sourceSpecSha256": "51375662630ab17d16a169755224d462f6b982cac194786903a16123a2ac53f8",
+      "sourceSpecSha256": "83190c0d490f138462afd860d3bcf011a0f4bc55206a0b0f0b03584de4521c10",
       "sourceProvenance": "source-assets/blender/pass74-operator-skin-navalops.provenance.json",
       "sourceProvenanceSha256": "e0e96b33e24a30155a1337f292211341a896b16d02ccb7701c4be21ec33a9e58",
       "owner": "src/operator-model.ts OPERATOR_SKIN_MODEL_URLS.navalops",

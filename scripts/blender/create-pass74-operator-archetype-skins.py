@@ -1393,6 +1393,233 @@ def build_ankle_tether_straps(context: dict, armature: bpy.types.Object) -> list
     return objects
 
 
+# Skull width per unit Head-bone length on the canonical rig, measured from a
+# shipped GLB: the head slice is 0.237 m across while the Head BONE is only
+# 0.0774 m long. Head-relative accessories that size themselves off bone length
+# therefore come out roughly a third of the size they read as in the spec, which
+# is why the first cut of the braid was a 17 cm stub tucked inside the nape and
+# the crest never cleared the skull. Head features below are expressed in SKULL
+# WIDTHS via `_skull_span` instead.
+#
+# NOTE: the pre-existing head-wear builders (`build_head_wear`) have the same
+# bone-length sizing and produce a visor lens 4.8 cm wide on a 23.7 cm head.
+# That is a real finding but NOT corrected here - it would change three already
+# approved assets - see the sprint log.
+SKULL_WIDTH_PER_HEAD_BONE = 3.05
+
+
+def _skull_span(armature: bpy.types.Object) -> float:
+    """Approximate skull width in metres, for sizing head-relative features."""
+    return _joint_frame(armature, "Head")["length"] * SKULL_WIDTH_PER_HEAD_BONE
+
+
+# ---------------------------------------------------------------------------
+# Archetype-read accessories (HF-380 follow-up).
+#
+# Proportion alone is not archetype. Pass 80 gave the three bodies genuinely
+# different statures and frames, and the owner's response was still that the
+# skins do not read as the characters the 2D cards promise. The cards trade on
+# ARCHETYPE CONVENTIONS - a braid and twin thigh rigs for the explorer, a
+# taloned, crested, pale-eyed hide for the symbiote - and the 3D bodies carried
+# none of them.
+#
+# These builders add exactly those conventions as project-original geometry.
+# They are generic to the archetype, not to any character: no franchise name,
+# likeness, branding or copied geometry enters any mesh name, material name,
+# asset id or spec field, which is what this corpus's sourcePolicy requires.
+#
+# Every one is sized to stay inside the hit-proxy envelope. That is a gameplay
+# contract, not a modelling nicety: a visual silhouette wider than the
+# authoritative capsule means shots that look like hits miss. Explorer in
+# particular sits at 1.0001 against a 1.0 cap, so anything added on that
+# archetype hugs the body rather than extending its radius, and the envelope
+# solver is left with nothing to relax.
+# ---------------------------------------------------------------------------
+
+
+def build_braided_hair_fall(context: dict, armature: bpy.types.Object) -> list[bpy.types.Object]:
+    """A single plaited fall down the nape.
+
+    The explorer archetype's clearest silhouette signature, and the one feature
+    that still reads at gameplay distance once colour and detail wash out.
+
+    Skinned to Neck rather than Head so it trails the head's motion instead of
+    rotating rigidly with the skull, but SIZED off the skull (see
+    `_skull_span`), because the Neck bone is 8 cm long and a braid scaled to it
+    disappears inside the collar.
+    """
+    item = "braided-hair-fall"
+    neck = _joint_frame(armature, "Neck")
+    head = _joint_frame(armature, "Head")
+    span = _skull_span(armature)
+    # Anchor at the back of the skull base: +Y is rearward on this rig (the
+    # visor lens sits at -Y, on the face).
+    nape = head["head"] + Vector((0.0, span * 0.46, span * 0.06))
+    objects: list[bpy.types.Object] = []
+    # Four plaited segments, each shorter and thinner than the last, with an
+    # alternating lateral wobble so the fall reads as plaited rather than as a
+    # smooth cone.
+    for index, (radius, drop, wobble) in enumerate((
+        (0.13, 0.00, 0.00), (0.12, 0.40, 0.03), (0.10, 0.80, -0.03), (0.07, 1.18, 0.02),
+    )):
+        segment = cylinder_object(
+            f"Pass74_{context['camel']}_Acc_{item}_plait_{index}",
+            span * radius, span * radius * 0.82, span * 0.44,
+        )
+        finish_accessory(
+            context, segment, armature, "Neck", item, "Swat_Black",
+            nape + Vector((span * wobble, span * 0.04 * index, -span * drop)),
+            Euler((math.radians(9.0), 0.0, 0.0)),
+        )
+        objects.append(segment)
+    # A bound tie at the nape and another at the tail: the detail that makes it
+    # a braid rather than a ponytail.
+    for index, drop in enumerate((-0.16, 1.36)):
+        tie = cylinder_object(
+            f"Pass74_{context['camel']}_Acc_{item}_tie_{index}",
+            span * 0.13, span * 0.13, span * 0.07,
+        )
+        finish_accessory(
+            context, tie, armature, "Neck", item, "Swat",
+            nape + Vector((0.0, span * 0.04 * index, -span * drop)),
+            Euler((math.radians(9.0), 0.0, 0.0)),
+        )
+        objects.append(tie)
+    _ = neck
+    return objects
+
+
+def build_twin_thigh_holsters(context: dict, armature: bpy.types.Object) -> list[bpy.types.Object]:
+    """Matched drop-leg rigs on BOTH thighs.
+
+    A single asymmetric thigh case reads as "carrying something"; a matched
+    pair reads as the archetype. Both sit on the outer thigh face at the same
+    lateral offset the existing map case already established, so the pair adds
+    silhouette SYMMETRY without adding silhouette WIDTH.
+    """
+    item = "twin-thigh-holsters"
+    objects: list[bpy.types.Object] = []
+    for joint in ("UpperLeg.L", "UpperLeg.R"):
+        thigh = _joint_frame(armature, joint)
+        length = thigh["length"]
+        outward = side_sign(joint) * length * 0.46
+        holster = box_accessory(
+            context, armature, joint, item, (0.17, 0.30, 0.50),
+            thigh["head"].lerp(thigh["tail"], 0.62) + Vector((outward, 0.0, 0.0)),
+            Euler((0.0, 0.0, math.radians(side_sign(joint) * 5.0))), "Swat_Black",
+        )
+        objects.append(holster)
+        # Flared muzzle guard at the bottom of the rig.
+        guard = box_object(
+            f"Pass74_{context['camel']}_Acc_{item}_{joint}_guard",
+            length * 0.19, length * 0.32, length * 0.12,
+        )
+        finish_accessory(
+            context, guard, armature, joint, item, "Swat",
+            thigh["head"].lerp(thigh["tail"], 0.86) + Vector((outward, 0.0, 0.0)),
+            Euler((0.0, 0.0, math.radians(side_sign(joint) * 5.0))),
+        )
+        objects.append(guard)
+        # Two retaining straps around the thigh, as on the map case.
+        for along in (0.44, 0.78):
+            objects.append(band_accessory(context, armature, joint, item, along, 0.42, 0.06, "Swat_Black"))
+    return objects
+
+
+def build_taloned_hand_claws(context: dict, armature: bpy.types.Object) -> list[bpy.types.Object]:
+    """Eight tapered talons, one per distal finger joint on both hands.
+
+    Skinned to the distal phalanges that already exist on the canonical rig, so
+    they curl with the hand through every clip without a single new bone. Kept
+    to a fraction of the distal segment length: the arms are the widest part of
+    this bind pose, so a long claw is the one accessory on this body that could
+    actually breach the hit-proxy envelope.
+    """
+    item = "taloned-hand-claws"
+    objects: list[bpy.types.Object] = []
+    for joint in (
+        "Index4.L", "Middle4.L", "Ring4.L", "Pinky4.L",
+        "Index4.R", "Middle4.R", "Ring4.R", "Pinky4.R",
+    ):
+        frame = _joint_frame(armature, joint)
+        length = frame["length"]
+        claw = cylinder_object(
+            f"Pass74_{context['camel']}_Acc_{item}_{joint}",
+            length * 0.34, length * 0.02, length * 0.92, 10,
+        )
+        finish_accessory(
+            context, claw, armature, joint, item, "Swat_Black",
+            frame["head"].lerp(frame["tail"], 1.06),
+            frame["rotation"],
+        )
+        objects.append(claw)
+    return objects
+
+
+def build_elongated_cranial_crest(context: dict, armature: bpy.types.Object) -> list[bpy.types.Object]:
+    """A swept crest that carries the skull backward.
+
+    The head is the one place this body can change shape freely: it sits at the
+    top of the figure, far inside the radial envelope the outstretched arms
+    define, so a rearward crest costs nothing against the hit proxy while
+    changing the archetype's profile completely. Sized in skull widths so the
+    tip actually clears the back of the head.
+    """
+    item = "elongated-cranial-crest"
+    head = _joint_frame(armature, "Head")
+    span = _skull_span(armature)
+    crown = head["head"] + Vector((0.0, 0.0, span * 0.30))
+    objects: list[bpy.types.Object] = []
+    for index, (width, depth, rise, back, drop, tilt) in enumerate((
+        (0.44, 0.40, 0.20, 0.22, 0.02, 10.0),
+        (0.33, 0.46, 0.15, 0.58, 0.10, 20.0),
+        (0.20, 0.42, 0.10, 0.92, 0.22, 30.0),
+    )):
+        plate = box_object(
+            f"Pass74_{context['camel']}_Acc_{item}_plate_{index}",
+            span * width, span * depth, span * rise,
+        )
+        finish_accessory(
+            context, plate, armature, "Head", item, "Swat_Black",
+            crown + Vector((0.0, span * back, -span * drop)),
+            Euler((math.radians(tilt), 0.0, 0.0)),
+        )
+        objects.append(plate)
+    return objects
+
+
+def build_pale_ocular_patches(context: dict, armature: bpy.types.Object) -> list[bpy.types.Object]:
+    """Two raked ocular slashes across the mask face.
+
+    Carried on the Visor material, which is the archetype accent (a bright
+    mint against a near-black hide) and the one material runtime team tinting
+    leaves alone, so the eyes stay the same colour on both teams instead of
+    turning red or blue with the operator.
+
+    Deliberately WIDER than the sealed visor lens they flank: the first cut
+    used the same material at the same size in the same place, so the patches
+    were invisible against the lens. Reading as eyes needs the accent to reach
+    out onto the dark skull.
+    """
+    item = "pale-ocular-patches"
+    head = _joint_frame(armature, "Head")
+    span = _skull_span(armature)
+    brow = head["head"] + Vector((0.0, 0.0, span * 0.16))
+    objects: list[bpy.types.Object] = []
+    for side in (1.0, -1.0):
+        patch = box_object(
+            f"Pass74_{context['camel']}_Acc_{item}_{'L' if side > 0 else 'R'}",
+            span * 0.40, span * 0.16, span * 0.13,
+        )
+        finish_accessory(
+            context, patch, armature, "Head", item, "Visor",
+            brow + Vector((side * span * 0.20, -span * 0.40, 0.0)),
+            Euler((0.0, math.radians(side * 14.0), math.radians(side * -18.0))),
+        )
+        objects.append(patch)
+    return objects
+
+
 ACCESSORY_BUILDERS = {
     "rolled-cuff-sleeve-bands": build_rolled_cuff_sleeve_bands,
     "compass-chest-strap": build_compass_chest_strap,
@@ -1412,6 +1639,11 @@ ACCESSORY_BUILDERS = {
     "shin-cargo-pocket-straps": build_shin_cargo_pocket_straps,
     "anti-fog-sealed-visor-variant": build_anti_fog_sealed_visor_variant,
     "ankle-tether-straps": build_ankle_tether_straps,
+    "braided-hair-fall": build_braided_hair_fall,
+    "twin-thigh-holsters": build_twin_thigh_holsters,
+    "taloned-hand-claws": build_taloned_hand_claws,
+    "elongated-cranial-crest": build_elongated_cranial_crest,
+    "pale-ocular-patches": build_pale_ocular_patches,
 }
 
 
