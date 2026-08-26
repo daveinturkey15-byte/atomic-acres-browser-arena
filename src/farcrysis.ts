@@ -293,16 +293,15 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // at distance. The sculpted terrain mesh is the visible floor; the plates
   // only exist so a camera clipping through a seam sees ground-coloured
   // backstop instead of void, so they now sit safely BELOW the terrain's
-  // interior minimum (still above the lagoon stack at -0.25 and the plates
+  // interior minimum (still above the lagoon stack at -0.25) and the plates
+  // keep their occlusion role).
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(108, 108), mudMat);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), mudMat);
   ground.name = 'farcrysis-ground-plate';
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.2;
   ground.receiveShadow = true;
   root.add(ground);
   const beachRing = new THREE.Mesh(new THREE.PlaneGeometry(108, 108), sandMat);
-  const beachRing = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), sandMat);
   beachRing.name = 'farcrysis-beach-ring';
   beachRing.rotation.x = -Math.PI / 2;
   beachRing.position.y = -0.18;

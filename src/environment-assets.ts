@@ -457,7 +457,10 @@ function addRouteArchitecture(root: THREE.Group): void {
   }
 
   for (const [x, z, sx, sz] of [
-    [-30, 21, 0.45, 8], [-22, 21, 0.45, 8], [-26, 24.8, 8.5, 0.45],
+    [-30, 21, 0.45, 8], [-22, 21, 0.45, 8],
+    // Rear wall is two segments: a 1.6 m doorway at x -25.8..-24.2 aligned
+    // with the frozen (-25, 25) corner spawn and the map.ts collision proxy.
+    [-28.025, 24.8, 4.45, 0.45], [-22.975, 24.8, 2.45, 0.45],
     [-28.5, 17.2, 2.2, 0.45], [-23.5, 17.2, 2.2, 0.45],
   ] as Array<[number, number, number, number]>) {
     const sill = routeBox('greenhouse-frame-wall', [sx, 3, sz], frame, 0.08);

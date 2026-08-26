@@ -239,23 +239,27 @@ export const SPAWN_LAYOUT = Object.freeze({
   0: Object.freeze([
     [-2, -27], [3, -27], [8, -27], [13, -27],
     [-12, -26], [-17, -24], [-21, -20], [-24, -16],
-    [18, -25], [24.5, -21], [28, -13], [27, -10],
+    [18, -25], [25, -25], [28, -13], [27, -10],
   ] as const),
   1: Object.freeze([
     [2, 27], [-3, 27], [-8, 27], [-13, 27],
     [12, 26], [17, 24], [21, 20], [24, 16],
-    [-18, 25], [-24.5, 21], [-28, 13], [-27, 10],
+    [-18, 25], [-25, 25], [-28, 13], [-27, 10],
   ] as const),
 });
-// Parity-audit repair 2026-08-26: the former (-/+25, -/+25) corner spawn sat
-// INSIDE the west greenhouse's rear frame-wall volume (z 24.575..25.025) once
-// that visible wall gained the movement authority it always read as - the
-// capsule would have seated embedded in a solid wall (HF-387's exact class).
-// The pair moves to the verified-clear gap between the hydroponic bed
-// colliders inside the concealed-flank greenhouse interior (-24.5, 21):
-// 0.95 m to each bed face, 3.5 m to every frame wall, entry gap reachable,
-// and the sprint-to-centre distance DROPS 35.36 -> 32.28 m so the sub-5 s
-// fidelity gate gains headroom. 180-degree symmetry is preserved by pairing.
+// Parity-audit repair 2026-08-26, FINAL: the collider/visual parity audit gave
+// the greenhouse frame walls movement authority, which (a) put the former
+// (-/+25, -/+25) corner spawn inside the west rear sill volume and (b) let
+// the side-verge cross-run seal the greenhouse entry approach. Two geometry
+// repairs make the FROZEN spawn set live again, so this layout keeps matching
+// the world-identity frozen pin exactly: map.ts splits that rear sill into
+// two segments around a real 1.6 m doorway at x -25.8..-24.2 (the west spawn
+// stands in the doorway; the east twin needs no counterpart because its side
+// of the map carries the landmark plinth instead), and SIDE_HEDGE_LAYOUT
+// moves both cross-runs clear of every pinned cell. Interior spawns were
+// rejected twice: the hydro beds + entry sills leave a 0.47 m cross-strip
+// (a movement trap), and no interior position can satisfy exact rotation
+// because the plinth owns the mirrored east footprint.
 
 export const PATROL_LAYOUT: ReadonlyArray<readonly [number, number]> = Object.freeze([
   [-15, -12], [15, 12], [-6, -6], [6, 6],

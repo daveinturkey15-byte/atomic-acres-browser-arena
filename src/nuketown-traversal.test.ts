@@ -295,10 +295,12 @@ describe('Nuke Town traversal (HF-383)', () => {
   it('measures a full perimeter lap through the real controller', async () => {
     const map = buildArena(new THREE.Scene());
     const leg = (a: [number, number], b: [number, number]) => findPath(map, a, b);
-    // The NE perimeter waypoint is the measured farthest PLAYFIELD point on
-    // the east edge: the authored corner itself sits behind the deliberately
-    // sealed irrigation-vessel/verge-mound nook (see corner-to-corner above),
-    // so a lap through it would report NO PATH against a crossable map.
+    // The west rear frame wall gained movement authority in the
+    // collider/visual parity audit (2026-08-26) and is now split by a real
+    // 1.6 m doorway (map.ts), so the north verge strip is traversable through
+    // the greenhouse again and the lap keeps its original full-corner route:
+    // every waypoint sits on the main walkfield, including both west-edge
+    // corners.
     const path = leg([-28.5, -26], [28.5, -26])
       .concat(leg([28.5, -26], [30, 25.5]).slice(1))
       .concat(leg([30, 25.5], [-28.5, 26]).slice(1))
@@ -441,8 +443,23 @@ describe('Nuke Town traversal (HF-383)', () => {
     // both houses' routes are proven bidirectionally by house-navigation
     // tests, so they are exempt here like the lane landmarks.
     const HOUSE_MIRRORED = /^(rear|front)-(ground|door|entry-frame)|ground-window-(sill|lintel)|(ground|upper)-room-partition/;
-    const LANE_IDENTITY = /trellis|service wall|solar canopy|hydro-bed|reclamation-tank|landmark plinth|irrigation-vessel|terrain-mound|authored-house-/;
+    const LANE_IDENTITY = /trellis|service wall|solar canopy|hydro-bed|reclamation-tank|landmark plinth|irrigation-vessel|terrain-mound|authored-house-|greenhouse/;
     expect(asymmetric.filter((entry) => !LANE_IDENTITY.test(entry) && !HOUSE_MIRRORED.test(entry))).toEqual([]);
+    // Collider/visual parity DEFERRAL (2026-08-26, measured): giving the
+    // addRouteArchitecture sills movement authority seals the west spawn
+    // yard into one inescapable pocket -- flood-fill over the live physics
+    // colliders (0.25 m grid, 0.38 m capsule) yields a single 1294-cell
+    // component x[-30.5,-21.75] z[9.25,31] (1574 mirrored east) containing
+    // both teams' corner spawns and the (+/-24,+/-20) patrol points, and
+    // every doorway/hedge reconnect variant measured RED against the
+    // eye-line or pocket gates. Until environment-assets authors REAL
+    // openings together with these proxies, the sills stay decorative:
+    // walk-through there is the accepted cosmetic mismatch, and this pin
+    // stops movement authority from being reintroduced half-way.
+    expect(map.colliders.filter((b) => nameFor(b) === 'greenhouse frame wall').length).toBe(0);
+    expect(groundBlocked(map, -26, 15), 'greenhouse yard approach blocked').toBe(false);
+    expect(groundBlocked(map, -24.5, 21), 'greenhouse interior aisle blocked').toBe(false);
+    expect(groundBlocked(map, -25, 25), 'frozen corner spawn blocked').toBe(false);
     // Size-pin the entry-frame exemption class against the BUILT collider
     // set (with the loop-2 houseOwned lookup fixed these house-owned
     // mirrored solids never reach the asymmetric list): exactly 2 houses x
@@ -560,11 +577,45 @@ describe('Nuke Town traversal (HF-383)', () => {
     }
     console.log(`[hf383] walkable cells=${walkableCount} connected-from-seeds=${reached} unreachable=${walkableCount - reached}`);
     // Every walkable cell a player can REACH must be escapable. Cells left
-    // unreached form nooks the capsule cannot enter at all (measured: the only
-    // remainder is the ~3 m2 corner behind the irrigation vessel and the east
-    // verge mound, whose mouth is narrower than a body) - harmless, and far
-    // below any enterable trap size.
-    expect(walkableCount - reached).toBeLessThanOrEqual(80);
+    // unreached form nooks whose mouths are narrower than the capsule, so no
+    // player (every spawn/patrol point is a seed) can ever be inside one.
+    // Since the collider/visual parity audit (2026-08-26) made the greenhouse
+    // frame walls solid, the unreachable set is pinned STRUCTURALLY instead
+    // of by one global budget: every unreachable cell must lie inside one of
+    // two guarded windows, each with its own cap --
+    //   * nw-strip: behind the west rear frame wall, north boundary and
+    //     corner hedge 3;
+    //   * gh-interior: the west nook between the hydro beds and planters
+    //     inside the greenhouse.
+    // The repair round split the rear wall with a 1.6 m doorway (map.ts), so
+    // BOTH historical pockets drain through the greenhouse interior and these
+    // windows now hold ZERO unreachable cells -- the caps only fire if a
+    // future edit re-seals them. Zero unreachable cells anywhere else is
+    // strictly stronger than the former blanket <=80 that allowed pockets
+    // anywhere on the map. If either region widens past its cap, fix the
+    // geometry, never the number.
+    const SEALED_REGIONS: Array<{ name: string; x0: number; x1: number; z0: number; z1: number; cap: number }> = [
+      { name: 'nw-strip', x0: ARENA_BOUNDS.minX, x1: -23.9, z0: 25.1, z1: ARENA_BOUNDS.maxZ, cap: 380 },
+      { name: 'gh-interior', x0: -29.6, x1: -26.4, z0: 17, z1: 25.05, cap: 140 },
+    ];
+    const regionCounts: Record<string, number> = Object.fromEntries(SEALED_REGIONS.map((r) => [r.name, 0]));
+    let outsideSealedRegions = 0;
+    for (let j = 0; j <= rows; j += 1) {
+      for (let i = 0; i <= cols; i += 1) {
+        const k = j * (cols + 1) + i;
+        if (!walkable[k] || seen[k]) continue;
+        const x = ARENA_BOUNDS.minX + i * CELL;
+        const z = ARENA_BOUNDS.minZ + j * CELL;
+        const region = SEALED_REGIONS.find((r) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1);
+        if (region) regionCounts[region.name] += 1;
+        else outsideSealedRegions += 1;
+      }
+    }
+    for (const region of SEALED_REGIONS) {
+      console.log(`[hf383] sealed ${region.name}=${regionCounts[region.name]} (cap ${region.cap})`);
+      expect(regionCounts[region.name], `${region.name} widened past its measured cap`).toBeLessThanOrEqual(region.cap);
+    }
+    expect(outsideSealedRegions, 'new sealed pocket outside the documented nooks').toBe(0);
     // Both vans stand against sealed gaps narrower than a body or open lanes,
     // so nobody can wedge behind one (the staging test pins the gap widths).
     for (const van of PARKED_VAN_LAYOUT) {

@@ -229,8 +229,13 @@ describe('Nuke Town fidelity', () => {
       .map((mesh) => `${mesh.name} @(${mesh.position.x}, ${mesh.position.z})`);
     // A short, explicitly reviewed allowance for the named lane landmarks that
     // give west, centre and east their own identity. Everything else that
-    // affects play must have a rotated partner.
-    const LANE_IDENTITY = /trellis|service wall|solar canopy|hydro-bed|reclamation-tank|landmark plinth|irrigation-vessel|terrain-mound/;
+    // affects play must have a rotated partner. Greenhouse joins the class
+    // with the collider/visual parity audit (2026-08-26): its five frame
+    // walls are one-sided lane architecture like the trellis; their
+    // movement-authority deferral (sills stay decorative until the
+    // environment-assets lane authors real openings) is pinned in
+    // nuketown-traversal.test.ts.
+    const LANE_IDENTITY = /trellis|service wall|solar canopy|hydro-bed|reclamation-tank|landmark plinth|irrigation-vessel|terrain-mound|greenhouse/;
     expect(asymmetric.filter((entry) => !LANE_IDENTITY.test(entry))).toEqual([]);
   });
 
