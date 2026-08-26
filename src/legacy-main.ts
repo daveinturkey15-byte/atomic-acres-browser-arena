@@ -22263,8 +22263,13 @@ function syncGunnerCockpitHud(
   hud.hidden = false;
   hud.setAttribute('aria-hidden', 'false');
   hud.dataset.supportKind = possessionKind;
+  const controlStrip = element<HTMLElement>('#gunner-control-strip');
+  controlStrip.hidden = possessionKind !== 'chopper-gunner';
+  controlStrip.setAttribute('aria-hidden', String(possessionKind !== 'chopper-gunner'));
   element<HTMLElement>('#gunner-hull').textContent = String(Math.max(0, Math.round(entity.health)));
-  element<HTMLElement>('#gunner-ammo').textContent = entity.magazine === null ? '∞' : String(entity.magazine);
+  const gunAmmo = entity.magazine === null ? '∞' : String(entity.magazine);
+  element<HTMLElement>('#gunner-ammo').textContent = gunAmmo;
+  element<HTMLElement>('#gunner-control-gun-ammo').textContent = gunAmmo;
   element<HTMLElement>('#gunner-altitude').textContent = `${Math.max(0, Math.round(entity.position[1] - (arena.bounds.minY ?? 0)))}M`;
   element<HTMLElement>('#gunner-speed').textContent = String(Math.round(Math.hypot(...entity.velocity)));
   element<HTMLElement>('#gunner-time').textContent = (Math.max(0, entity.expiresInMs) / 1_000).toFixed(1);
@@ -22280,7 +22285,7 @@ function syncGunnerCockpitHud(
   if (chopperGunner) {
     const ammo = Math.max(0, Math.min(CHOPPER_MISSILE_CAPACITY, entity.missileAmmo ?? 0));
     const cooldownMs = Math.max(0, entity.missileCooldownMs ?? 0);
-    element<HTMLElement>('#gunner-missile-ammo').textContent = `${ammo} / ${CHOPPER_MISSILE_CAPACITY}`;
+    element<HTMLElement>('#gunner-missile-ammo').textContent = `×${ammo} / ${CHOPPER_MISSILE_CAPACITY}`;
     element<HTMLElement>('#gunner-missile-cooldown').textContent = ammo <= 0
       ? 'EMPTY'
       : cooldownMs > 0 ? `${(cooldownMs / 1_000).toFixed(1)}S` : 'READY';
@@ -22298,6 +22303,9 @@ function hideGunnerCockpitHud(): void {
   hud.setAttribute('aria-hidden', 'true');
   hud.dataset.supportKind = 'none';
   hud.dataset.hitConfirm = 'false';
+  const controlStrip = element<HTMLElement>('#gunner-control-strip');
+  controlStrip.hidden = true;
+  controlStrip.setAttribute('aria-hidden', 'true');
   const targetConfirm = element<HTMLElement>('#gunner-target-confirm');
   targetConfirm.hidden = true;
   targetConfirm.style.removeProperty('left');
@@ -22308,7 +22316,8 @@ function hideGunnerCockpitHud(): void {
   missileStatus.hidden = true;
   missileStatus.setAttribute('aria-hidden', 'true');
   missileStatus.dataset.ready = 'false';
-  element<HTMLElement>('#gunner-missile-ammo').textContent = `0 / ${CHOPPER_MISSILE_CAPACITY}`;
+  element<HTMLElement>('#gunner-control-gun-ammo').textContent = '∞';
+  element<HTMLElement>('#gunner-missile-ammo').textContent = `×0 / ${CHOPPER_MISSILE_CAPACITY}`;
   element<HTMLElement>('#gunner-missile-cooldown').textContent = 'OFFLINE';
   gunnerTargetConfirmUntil = 0;
   nextLocalSupportGunReportAt = 0;

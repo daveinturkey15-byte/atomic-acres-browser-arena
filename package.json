@@ -139,6 +139,7 @@
     "qa:pass66:weapon-assets-evidence": "npm run qa:pass65:weapon-assets && npm run qa:pass65:first-person-arms-visual",
     "qa:pass66:viewmodel-framing": "node scripts/qa/verify-pass66-viewmodel-framing.mjs",
     "qa:pass73:ci-wiring-contract": "node --test scripts/qa/pass73-ci-wiring-contract.test.mjs && node scripts/qa/pass73-ci-wiring-contract.mjs",
+    "qa:pass74:chopper-hud-wiring-contract": "node --test scripts/qa/pass74-chopper-hud-wiring-contract.test.mjs && node scripts/qa/pass74-chopper-hud-wiring-contract.mjs",
     "qa:pass73:live-graphics": "node scripts/qa/verify-pass73-live-graphics.mjs",
     "qa:pass73:native-grenade:contract": "node --test scripts/qa/pass73-native-grenade-contract.test.mjs",
     "qa:pass73:native-grenade": "npm run qa:pass73:native-grenade:contract && node scripts/qa/run-pass73-native-grenade.mjs",

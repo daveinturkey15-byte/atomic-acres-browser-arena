@@ -4,6 +4,7 @@ import './style.css';
 import './ui/tactical-ui.css';
 import './ui/pass66-readability.css';
 import './ui/pass66-overhaul.css';
+import './ui/pass74-killstreak-selector.css';
 // HF-362: intentionally LAST and unlayered so it can override
 // pass66-readability.css, which is itself unlayered and outranks every @layer.
 import './ui/pass74-visual-refresh.css';

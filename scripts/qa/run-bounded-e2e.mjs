@@ -21,6 +21,8 @@ const groups = [
   { name: 'pass69-3-frame-hitch', timeoutMs: 900_000, args: ['tests/e2e/pass69-3-glass-m14-frame-hitch.spec.ts', 'tests/e2e/pass69-3-special-weapon-frame-hitch.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass72-corrections', default: false, timeoutMs: 600_000, args: ['tests/e2e/pass72-lobby-squad-reset.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass73-gameplay-regressions', default: false, timeoutMs: 600_000, args: ['tests/e2e/pass73-gameplay-regressions.spec.ts', 'tests/e2e/pass73-network-reveal-authority.spec.ts', '--project=chromium', '--workers=1'] },
+  { name: 'pass74-chopper-hud', default: false, timeoutMs: 240_000, args: ['tests/e2e/pass74-chopper-hud.spec.ts', '--project=chromium', '--workers=1'] },
+  { name: 'pass74-selector-layout', default: false, timeoutMs: 420_000, args: ['tests/e2e/pass66-field-kit-killstreak-menu.spec.ts', '--project=chromium', '--workers=1', '--grep', 'previews the equipped streak on hover/focus without gameplay render ownership|uses poster-only demo mode for reduced motion and stacks cleanly at narrow width'] },
   { name: 'pass64-hud-contracts', default: false, timeoutMs: 900_000, args: ['tests/e2e/pass64-hud-menu.spec.ts', 'tests/e2e/pass65-menu-lifecycle.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass64-renderer-foundation', default: false, timeoutMs: 420_000, args: ['tests/e2e/pass64-renderer-foundation.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'capability-firefox', default: false, xvfb: true, args: ['tests/e2e/pass25a-capability.spec.ts', '--project=firefox', '--workers=1', '--headed'] },
