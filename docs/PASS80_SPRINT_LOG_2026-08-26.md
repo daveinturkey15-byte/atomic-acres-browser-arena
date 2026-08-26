@@ -142,7 +142,62 @@ about — seams still need per-seam foot-contact and root-continuity checks.
 3. Generate a canary, retarget in Blender through the correspondence module,
    export a GLB, and measure foot slide / loop seam / root motion.
 
-**Status:** PART DONE — licence, build, weights, correspondence. Generation blocked on the two downloads above.
+### GENERATION WORKS
+
+First real clips, CPU-only, no Vulkan, ~31 s for 60 frames:
+
+| prompt | frames | hip height | travel | loop seam |
+|---|---|---|---|---|
+| "a person walks forward at a steady pace" | 60 | **1.006 m** | 5.30 m on +Z | 38.5 deg (traversal) |
+| "a soldier crouches and reloads a rifle" | 90 | **0.372 m** | 0.009 m (in place) | 6.9 deg (near-loopable) |
+
+The model genuinely responds to the prompt: it crouched. Quaternion norms are
+exactly 1.000000 on both, so the decode is exact. Y is up; forward is +Z.
+
+### The README claim that was wrong, and how it was caught
+
+The port says Kimodo "gives you SMPL-X". That is true of the SMPL-X checkpoint
+- the one we may NOT use (internal-R&D licence). `soma-rp-v1.1`, the one we
+can, emits **SOMA-30**. The first correspondence module was written for
+SMPL-X's 22 joints on the strength of that sentence; the first generation
+returned 30 and `inspect-kimodo-motion.mjs` caught it before anything was
+retargeted. Both layouts are now carried, transcribed from the port's
+`src/skeleton.hpp`, selected by joint count at import.
+
+I also had to fix my OWN inspector: its up-axis heuristic ranked on smallest
+span and picked X. Y sits at 0.971..1.040 - hip height on a walking human.
+Corrected to score "narrow band, far off the floor".
+
+### Local patches to the kimodo.cpp checkout (NOT in this repo)
+
+Four small changes under `projects/kimodo.cpp`, all needed to build on Windows
+with no installs. Worth upstreaming:
+
+1. `CMakeLists.txt` - several targets link `ggml-vulkan` unconditionally, so a
+   CPU-only configure fails outright. Guarded each with `if(TARGET ggml-vulkan)`.
+   `kmd-generate` links only `kimodo` and never needed Vulkan; it was collateral.
+2. `src/llm_text_encoder.cpp` - `gguf_init_from_file(path.c_str())`.
+   `std::filesystem::path::c_str()` is `wchar_t*` on Windows, `char*` on POSIX.
+   Now `path.string().c_str()`.
+3. `src/denoiser.cpp`, `src/llm_tokenizer.cpp` - missing `#include <stdexcept>`;
+   libstdc++ pulls it in transitively, MSVC does not.
+4. `src/llm_text_encoder.cpp:219` - the Vulkan backend call is unguarded, so it
+   fails to LINK without Vulkan even though a CPU fallback sits directly below
+   it. Wrapped in `#if defined(KIMODO_HAVE_GGML_VULKAN)`; the fallback is untouched.
+
+Configure line that works here (no Ninja, no Vulkan SDK, no installs):
+`cmake -S . -B build-msvc -G "Visual Studio 17 2022" -A x64 -DKIMODO_ENABLE_VULKAN=OFF -DKIMODO_BUILD_TESTS=OFF`
+Then copy `build-msvc/bin/Release/*.dll` next to `build-msvc/Release/kmd-generate.exe`.
+
+**A trap:** with a stale CMake cache, a FAILED configure still lets the build
+step exit 0 using the old cache, producing the previous binary set. Exit code 0
+is not success - check for `Configuring incomplete`.
+
+**Disk:** the weights are **16 GB** (SOMA motion 1.1 GB + a 15 GB Llama-3-8B
+derived LLM2Vec text bundle). Quantised variants exist per the README and were
+not pursued.
+
+**Status:** DONE - licence, build, weights, generation, correspondence + 17 gating tests. Blender retarget is sprint 3.
 
 ---
 
