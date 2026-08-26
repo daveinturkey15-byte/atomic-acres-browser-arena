@@ -43,6 +43,7 @@ import { applyHudSway, createHudSwayState, type HudSwayState } from './ui/pass77
 import {
   advanceHudImpact,
   createHudImpactState,
+  impactKindForShakeSource,
   pushHudImpact,
   type HudImpactState,
 } from './ui/hud-impact-response';
@@ -469,6 +470,7 @@ import {
   createCameraShakeState,
   integrateCameraShake,
   sampleCameraShake,
+  type CameraShakeSource,
   type CameraShakeState,
 } from './camera-shake';
 import {
@@ -812,6 +814,7 @@ import {
   type DynamicWorldCollider,
 } from './physics';
 import { InteractiveWorldRuntime } from './interactive-world-runtime';
+import { evaluateInvisibleWallRuntimeGap, INVISIBLE_WALL_RUNTIME_GAP_MESSAGE } from './invisible-wall-runtime-gap';
 import { shedPlacementsForArena } from './destructible-shed-registry';
 import { FIELD_SHED_EXPLOSION_DAMAGE_MULTIPLIER } from './destructible-shed-definition';
 import { canAdmitMajorDebris, SHARED_MAJOR_DEBRIS_BUDGET } from './major-debris-budget';
@@ -934,7 +937,7 @@ import {
   pass73AdsRevealReadbackRegion,
   quantizePass73AdsRevealReadback,
 } from './pass73-ads-reveal-readback';
-import { applySkyBackdrop, waitForSkyBackdropAdmission } from './rendering/sky-backdrop';
+import { applySkyBackdrop, disposeSkyBackdrops, waitForSkyBackdropAdmission } from './rendering/sky-backdrop';
 import {
   SmokeVolumePresentationPool,
   type SmokeVolumePresentationLease,
@@ -3542,12 +3545,30 @@ function activeGlassDynamicColliders(activeArena: ArenaMap = arena): readonly Dy
   return Object.freeze(entries);
 }
 
+// Pass 80: one-shot latch for the invisible-wall guard inside the
+// activeWorldColliders() early-return below. The error logs at most once per
+// session so a hot frame loop cannot flood the console.
+let invisibleWallRuntimeGapLogged = false;
+
 function activeWorldColliders(activeArena: ArenaMap = arena): ArenaMap['colliders'] {
   // HF-318: patrolling dummies move every frame, so they are appended outside
   // the revision-keyed cache below rather than baked into it (a cached patrol
   // pose would leave an invisible wall behind the dummy).
   const dummyColliders = activeGunRangeTestBayDummyColliders(activeArena);
   if (activeArena !== arena || !interactiveWorldRuntime) {
+    // Pass 80: the early-return path re-exposes authored colliders verbatim.
+    // On the LIVE arena with runtime-replaced house statics that means hidden
+    // colliders come back as invisible walls when the runtime is missing —
+    // surface it loudly (once) instead of failing silently.
+    if (evaluateInvisibleWallRuntimeGap({
+      sameArena: activeArena === arena,
+      runtimeReplacedStaticCount: activeArena.houseDestruction?.staticColliders.length ?? 0,
+      hasInteractiveRuntime: interactiveWorldRuntime !== null,
+      alreadyLogged: invisibleWallRuntimeGapLogged,
+    }).shouldLog) {
+      invisibleWallRuntimeGapLogged = true;
+      console.error(INVISIBLE_WALL_RUNTIME_GAP_MESSAGE);
+    }
     return [
       ...activeArena.colliders,
       ...activeGlassDynamicColliders(activeArena).map((entry) => entry.bounds),
@@ -13070,10 +13091,14 @@ function applyDamage(
     // matches the trauma strength above; blast causes use the explosion
     // signature. Bearing reuses the damage-direction source angle, and is
     // omitted for self-inflicted or unknown-source hits (vertical kick).
+    // The HUD kind is derived through the camera-shake source taxonomy so
+    // both lanes classify one event identically (pass80 dead-wire sweep).
+    const hudShakeSource: CameraShakeSource =
+      cause.kind === 'grenade' || cause.kind === 'killstreak' ? 'near-explosion' : 'damage-taken';
     const impactAttackerPosition = remotes.get(attacker)?.target ?? bots.get(attacker)?.position;
     const hasImpactBearing = !!impactAttackerPosition && attacker !== player.id;
     hudImpactState = pushHudImpact(hudImpactState, {
-      kind: cause.kind === 'grenade' || cause.kind === 'killstreak' ? 'explosion' : 'bullet',
+      kind: impactKindForShakeSource(hudShakeSource),
       severity: Math.min(1, appliedDamage / 45) * accessibilityRuntime.weaponMotionScale,
       ...(hasImpactBearing ? {
         bearingRadians: sourceScreenAngle(player.position, player.yaw, impactAttackerPosition!),
@@ -20665,8 +20690,12 @@ function explodeGrenade(entity: GrenadeEntity): void {
   const afterAudio = performance.now();
   spawnGrenadeExplosionVisual(point, afterAudio);
   const explosionDistance = point.distanceTo(player.position);
+  // One classification feeds both lanes: camera trauma and the HUD flinch use
+  // the same declared shake source so they cannot disagree about what a blast
+  // was (pass80 dead-wire sweep).
+  const shakeSource: CameraShakeSource = explosionDistance > 25 ? 'far-explosion' : 'near-explosion';
   cameraShakeTrauma = addCameraShakeTrauma(cameraShakeTrauma, {
-    source: explosionDistance > 25 ? 'far-explosion' : 'near-explosion',
+    source: shakeSource,
     now: afterAudio,
     distanceUnits: explosionDistance,
     seed: Math.round(afterAudio) | 0,
@@ -20680,7 +20709,7 @@ function explodeGrenade(entity: GrenadeEntity): void {
   // HF-370: the HUD reacts to the same blast the camera does, with a distance
   // falloff to zero at 50 m so far explosions nudge rather than heave.
   hudImpactState = pushHudImpact(hudImpactState, {
-    kind: 'explosion',
+    kind: impactKindForShakeSource(shakeSource),
     severity: Math.max(0, 1 - explosionDistance / 50) * accessibilityRuntime.weaponMotionScale,
     bearingRadians: sourceScreenAngle(player.position, player.yaw, point),
     now: afterAudio,
@@ -27802,6 +27831,11 @@ window.addEventListener('beforeunload', () => {
   arenaVisualStream.dispose();
   retireAtomicPresentation();
   for (const [arenaId, cachedArena] of [...arenaCache]) disposeRetiredArena(arenaId, cachedArena);
+  // Terminal teardown owns the shared sky textures (see disposeRetiredArena:
+  // per-arena retirement keeps them alive because TextureLoader/Cache may hand
+  // the same texture to a newly constructed arena). The frame loop bails once
+  // gameplayRuntimeDisposing is set, so no frame can still sample these.
+  disposeSkyBackdrops();
   renderRuntime.dispose();
 });
 

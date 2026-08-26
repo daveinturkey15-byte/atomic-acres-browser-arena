@@ -263,6 +263,25 @@ export type ProxyExtractionOptions = Readonly<{
   maximumShapes: number;
   /** Smallest world-space footprint area, m^2, worth a proxy at all. */
   minimumFootprintM2: number;
+  /**
+   * Water surfaces REGISTERED BY NAME as analytic plane proxies. Water is
+   * reflective by design — an ocean, lagoon or sea plane that happens to carry
+   * an authored roughness above the mirror ceiling (the compat-route sea
+   * planes sit at 0.24-0.30 for their raster look) must still spawn
+   * reflections, because "the sea does not reflect" is not a defensible read
+   * of any ocean arena. A matched mesh whose world bounds are thin along Y is
+   * emitted as a `plane` proxy (the only orientation the packed uniform
+   * layout can round-trip, see `unpackProxyShape`); anything else falls back
+   * to the ordinary box path. The PROXY's roughness is clamped to
+   * `REFLECTIVE_ROUGHNESS_CEILING` and its metalness to
+   * `WATER_PROXY_MAXIMUM_METALNESS` — water is a dielectric — while the
+   * authored raster material is left byte-for-byte alone. Registration lives
+   * in `arena-proxy-registration.ts`, never inline here.
+   */
+  waterSurfaces?: readonly Readonly<{
+    /** Matches the SOURCE MESH name; first match wins. */
+    namePattern: RegExp;
+  }>[];
 }>;
 
 export const DEFAULT_PROXY_EXTRACTION: ProxyExtractionOptions = Object.freeze({
@@ -326,6 +345,34 @@ export function extractProxyScene(
     const area = Math.max(sizeX * sizeZ, sizeX * sizeY, sizeZ * sizeY);
     if (area < options.minimumFootprintM2) return;
     const sample = materialSample(mesh.material);
+    const centre = vec3((box.min.x + box.max.x) / 2, (box.min.y + box.max.y) / 2, (box.min.z + box.max.z) / 2);
+    const halfExtents = vec3(sizeX / 2, sizeY / 2, sizeZ / 2);
+    const name = mesh.name || '(unnamed)';
+    // Registered water becomes an analytic PLANE proxy, counted as reflective
+    // whatever its authored raster roughness says — see the option's contract.
+    // Only a Y-thin surface can take the plane path: the packed uniform layout
+    // reconstructs planes as +Y horizontal (unpackProxyShape), so anything
+    // else keeps the ordinary box fit rather than lying about its orientation.
+    const registeredWater = options.waterSurfaces?.some(({ namePattern }) => namePattern.test(name)) ?? false;
+    if (registeredWater && sizeY <= sizeX && sizeY <= sizeZ) {
+      reflectiveMeshCount += 1;
+      reflectiveFootprintM2 += area;
+      candidates.push({
+        area,
+        shape: Object.freeze({
+          kind: 'plane' as const,
+          centre,
+          halfExtents,
+          yaw: 0,
+          normal: vec3(0, 1, 0),
+          albedo: sample.albedo,
+          metalness: Math.min(sample.metalness, WATER_PROXY_MAXIMUM_METALNESS),
+          roughness: Math.min(sample.roughness, REFLECTIVE_ROUGHNESS_CEILING),
+          name,
+        }),
+      });
+      return;
+    }
     if (sample.roughness <= REFLECTIVE_ROUGHNESS_CEILING) {
       reflectiveMeshCount += 1;
       reflectiveFootprintM2 += area;
@@ -334,14 +381,14 @@ export function extractProxyScene(
       area,
       shape: Object.freeze({
         kind: 'box' as const,
-        centre: vec3((box.min.x + box.max.x) / 2, (box.min.y + box.max.y) / 2, (box.min.z + box.max.z) / 2),
-        halfExtents: vec3(sizeX / 2, sizeY / 2, sizeZ / 2),
+        centre,
+        halfExtents,
         yaw: 0,
         normal: vec3(0, 0, 0),
         albedo: sample.albedo,
         metalness: sample.metalness,
         roughness: sample.roughness,
-        name: mesh.name || '(unnamed)',
+        name,
       }),
     });
   });
@@ -359,6 +406,15 @@ export function extractProxyScene(
  * number: `MIRROR_ROUGHNESS_CEILING`, asserted equal in the suite.
  */
 export const REFLECTIVE_ROUGHNESS_CEILING = 0.22;
+
+/**
+ * Water is a dielectric: its reflection is Fresnel sky/glint, never metallic.
+ * A registered sea plane whose authored raster material carries a decorative
+ * metalness (the contained-feature waters sit at 0.28 for their colour
+ * response) is clamped to this for the PROXY only — the classifier must read
+ * it as the water it is.
+ */
+export const WATER_PROXY_MAXIMUM_METALNESS = 0.05;
 
 export function finaliseProxyScene(
   shapes: readonly ProxyShape[],

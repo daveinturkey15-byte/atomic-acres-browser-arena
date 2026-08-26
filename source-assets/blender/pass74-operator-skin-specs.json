@@ -38,6 +38,16 @@
       "wearAmount": [0.0, 1.0],
       "roughnessBias": [-0.25, 0.25]
     },
+    "silhouetteProfileBounds": {
+      "heightScale": [0.85, 1.15],
+      "shoulderScale": [-0.30, 0.30],
+      "waistPinch": [-0.15, 0.35],
+      "hipFlare": [0.0, 0.20],
+      "armRadiusTarget": [0.55, 1.45],
+      "legRadiusTarget": [0.55, 1.45],
+      "chestForm": [0.0, 0.10]
+    },
+    "silhouetteProfilePolicy": "HF-380: recolours and bolt-on props alone left every archetype reading as the same base male mesh. Each archetype therefore carries a non-radial, region-weighted reshaping of the REST-POSE vertices only (vertex-group-masked; skeleton, bone names, skin weights and clips stay byte-identical to the canonical operator). Params are bounded by silhouetteProfileBounds and every archetype must satisfy its own distinctnessGates measured against the pristine canonical bind pose, fail-closed at authoring time.",
     "hitProxyEnvelope": {
       "maxSilhouetteScaleGlobalDefault": 1.0,
       "semantics": "Composed visual silhouette (mesh bounds after proportion and accessory scaling) must stay within maxSilhouetteScale times the authoritative hit-proxy capsule. A body larger than its hitbox makes shots visibly pass through, so the per-archetype maxSilhouetteScale field is a hard fail-closed bound."
@@ -54,6 +64,27 @@
         "shoulderWidthMultiplier": 1.02,
         "torsoBulkMultiplier": 0.94,
         "limbThicknessMultiplier": 0.92
+      },
+      "silhouetteProfile": {
+        "intent": "Lean, shorter trail runner: visibly narrower frame, pinched waist, slim limbs, athletic taper. Params match the measured HF-380 proof receipt.",
+        "params": {
+          "heightScale": 0.925,
+          "shoulderScale": -0.18,
+          "waistPinch": 0.22,
+          "hipFlare": 0.09,
+          "armRadiusTarget": 0.72,
+          "legRadiusTarget": 0.62,
+          "chestForm": 0.055
+        },
+        "distinctnessGates": [
+          { "metric": "shoulderWidthM", "sense": "max", "ratio": 0.95 },
+          { "metric": "waistWidthXM", "sense": "max", "ratio": 0.92 },
+          { "metric": "waistDepthYM", "sense": "max", "ratio": 0.96 },
+          { "metric": "thighMeanRadiusM", "sense": "max", "ratio": 0.92 },
+          { "metric": "heightM", "sense": "min", "ratio": 0.88 },
+          { "metric": "heightM", "sense": "max", "ratio": 0.97 },
+          { "metric": "shoulderOverHip", "sense": "max", "ratio": 0.95 }
+        ]
       },
       "maxSilhouetteScale": 1.0,
       "accessories": [
@@ -86,6 +117,25 @@
         "torsoBulkMultiplier": 1.16,
         "limbThicknessMultiplier": 1.1
       },
+      "silhouetteProfile": {
+        "intent": "Imposing heavy frame: broader shoulders, thicker arms and legs, taller stance. Bulk stays under the 1.1 hit-proxy envelope cap.",
+        "params": {
+          "heightScale": 1.03,
+          "shoulderScale": 0.13,
+          "waistPinch": 0.0,
+          "hipFlare": 0.04,
+          "armRadiusTarget": 1.26,
+          "legRadiusTarget": 1.28,
+          "chestForm": 0.0
+        },
+        "distinctnessGates": [
+          { "metric": "shoulderWidthM", "sense": "min", "ratio": 1.05 },
+          { "metric": "thighMeanRadiusM", "sense": "min", "ratio": 1.1 },
+          { "metric": "heightM", "sense": "min", "ratio": 0.99 },
+          { "metric": "heightM", "sense": "max", "ratio": 1.08 },
+          { "metric": "shoulderOverHip", "sense": "min", "ratio": 1.03 }
+        ]
+      },
       "maxSilhouetteScale": 1.1,
       "silhouetteBoundNote": "Hard cap: even with bulk multipliers applied, the composed silhouette must stay within 1.1x the authoritative hit-proxy capsule; authoring stages must clamp rather than exceed it.",
       "accessories": [
@@ -117,6 +167,25 @@
         "shoulderWidthMultiplier": 0.98,
         "torsoBulkMultiplier": 0.97,
         "limbThicknessMultiplier": 0.95
+      },
+      "silhouetteProfile": {
+        "intent": "Compact, low-profile waterline raider: slightly shorter and narrower, slim limbs, minimal radial bulk.",
+        "params": {
+          "heightScale": 0.955,
+          "shoulderScale": -0.09,
+          "waistPinch": 0.1,
+          "hipFlare": 0.03,
+          "armRadiusTarget": 0.82,
+          "legRadiusTarget": 0.8,
+          "chestForm": 0.0
+        },
+        "distinctnessGates": [
+          { "metric": "shoulderWidthM", "sense": "max", "ratio": 0.97 },
+          { "metric": "waistWidthXM", "sense": "max", "ratio": 0.97 },
+          { "metric": "thighMeanRadiusM", "sense": "max", "ratio": 0.9 },
+          { "metric": "heightM", "sense": "min", "ratio": 0.91 },
+          { "metric": "heightM", "sense": "max", "ratio": 0.98 }
+        ]
       },
       "maxSilhouetteScale": 1.0,
       "accessories": [

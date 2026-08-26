@@ -11,6 +11,7 @@ import {
   writeHudImpactProperties,
   type HudImpactState,
 } from './hud-impact-response';
+import { CAMERA_SHAKE_SOURCES } from '../camera-shake';
 
 /** Minimal stand-in for the #hud element, recording every property write. */
 function stubTarget() {
@@ -410,6 +411,18 @@ describe('hud impact response - shake-source classification', () => {
     expect(impactKindForShakeSource('hard-landing')).toBe('fall');
     expect(impactKindForShakeSource('damage-taken')).toBe('bullet');
     expect(impactKindForShakeSource('heavy-weapon-fire')).toBe('bullet');
+  });
+
+  it('classifies every declared CAMERA_SHAKE_SOURCES member without guessing', () => {
+    // The taxonomy in src/camera-shake.ts is the single authority: every
+    // member must resolve through the gate, and the set it covers must stay
+    // the six names the runtime emits.
+    expect(CAMERA_SHAKE_SOURCES).toEqual([
+      'near-explosion', 'far-explosion', 'heavy-weapon-fire', 'damage-taken', 'hard-landing', 'nuke',
+    ]);
+    for (const source of CAMERA_SHAKE_SOURCES) {
+      expect(['bullet', 'explosion', 'fall', 'melee']).toContain(impactKindForShakeSource(source));
+    }
   });
 
   it('falls back to the safest signature for an unknown source', () => {

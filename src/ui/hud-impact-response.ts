@@ -45,6 +45,7 @@
  * Everything here is pure. The only side effects in the file are the property
  * writes in `advanceHudImpact`, and those are skipped entirely while idle.
  */
+import { CAMERA_SHAKE_SOURCES } from '../camera-shake';
 
 /** What hit the player. Selects the impulse signature. */
 export type HudImpactKind = 'bullet' | 'explosion' | 'fall' | 'melee';
@@ -358,8 +359,14 @@ export function advanceHudImpact(
  * source names for `addCameraShakeTrauma`. Reusing that classification is what
  * keeps the HUD's reaction and the camera's reaction describing the same
  * event, instead of two lanes drifting apart over what counts as an explosion.
+ *
+ * CAMERA_SHAKE_SOURCES is the authority: a name outside the taxonomy has no
+ * authored meaning, so it maps to the explicit 'bullet' fallback rather than
+ * being guessed at. Live callers pass typed `CameraShakeSource` values, so in
+ * practice only a programming error reaches that fallback.
  */
 export function impactKindForShakeSource(source: string): HudImpactKind {
+  if (!(CAMERA_SHAKE_SOURCES as readonly string[]).includes(source)) return 'bullet';
   switch (source) {
     case 'near-explosion':
     case 'far-explosion':
@@ -369,7 +376,9 @@ export function impactKindForShakeSource(source: string): HudImpactKind {
       return 'fall';
     case 'heavy-weapon-fire':
     case 'damage-taken':
-    default:
       return 'bullet';
   }
+  // Unreachable for CAMERA_SHAKE_SOURCES members (gated above); kept so the
+  // open-string signature stays honest.
+  return 'bullet';
 }

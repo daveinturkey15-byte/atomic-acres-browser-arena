@@ -23,22 +23,37 @@ describe('hud-impact-response live wiring', () => {
     );
   });
 
-  it('is fed by the damage-taken site', () => {
+  it('is fed by the damage-taken site classified through the shake-source taxonomy', () => {
     const damageSite = mainSource.slice(
       mainSource.indexOf("source: 'damage-taken'"),
       mainSource.indexOf("source: 'damage-taken'") + 1_600,
     );
-    expect(damageSite).toContain("kind: cause.kind === 'grenade' || cause.kind === 'killstreak' ? 'explosion' : 'bullet'");
+    expect(damageSite).toContain('const hudShakeSource: CameraShakeSource =');
+    expect(damageSite).toContain("? 'near-explosion' : 'damage-taken';");
+    expect(damageSite).toContain('kind: impactKindForShakeSource(hudShakeSource)');
     expect(damageSite).toContain('pushHudImpact(hudImpactState');
     expect(damageSite).toContain('bearingRadians: sourceScreenAngle(');
   });
 
   it('is fed by the grenade explosion site with distance falloff', () => {
-    const anchor = mainSource.indexOf("? 'far-explosion' : 'near-explosion'");
+    const anchor = mainSource.indexOf('const shakeSource: CameraShakeSource');
     expect(anchor).toBeGreaterThanOrEqual(0);
-    const blastSite = mainSource.slice(anchor, anchor + 900);
-    expect(blastSite).toContain("kind: 'explosion'");
+    const blastSite = mainSource.slice(anchor, anchor + 1_600);
+    expect(blastSite).toContain("? 'far-explosion' : 'near-explosion'");
+    expect(blastSite).toContain('const shakeSource: CameraShakeSource');
+    // One classification feeds both lanes: the camera trauma and the HUD
+    // flinch must name the same declared source for the same blast.
+    expect(blastSite).toContain('source: shakeSource');
+    expect(blastSite).toContain('kind: impactKindForShakeSource(shakeSource)');
     expect(blastSite).toContain('pushHudImpact(hudImpactState');
+  });
+
+  it('routes every live push site through the taxonomy mapper, never an untyped kind', () => {
+    expect(mainSource.match(/hudImpactState = pushHudImpact\(/g)).toHaveLength(2);
+    expect(mainSource).toContain('impactKindForShakeSource');
+    // No ad-hoc kind literals at the live sites: each must be derived from a
+    // typed CameraShakeSource via impactKindForShakeSource.
+    expect(mainSource.match(/hudImpactState = pushHudImpact\([\s\S]{0,220}?kind: '/g)).toBeNull();
   });
 
   it('has a CSS consumer for every property the module writes', () => {

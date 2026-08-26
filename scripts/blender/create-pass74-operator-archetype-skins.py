@@ -122,6 +122,40 @@ def validate_spec() -> dict:
         raise RuntimeError("canonical material name contract drifted from Skin/Swat/Swat_Black/Visor")
     if not SPEC.get("operators"):
         raise RuntimeError("pass74 spec declares no operators")
+    profile_bounds = contract.get("silhouetteProfileBounds")
+    if not isinstance(profile_bounds, dict) or not profile_bounds:
+        raise RuntimeError("pass74 spec is missing silhouetteProfileBounds (HF-380 distinct-silhouette contract)")
+    for operator in SPEC["operators"]:
+        identifier = operator.get("id", "?")
+        profile = operator.get("silhouetteProfile")
+        if not isinstance(profile, dict):
+            raise RuntimeError(f"{identifier}: silhouetteProfile missing (HF-380 requires per-archetype anatomy)")
+        params = profile.get("params")
+        if not isinstance(params, dict):
+            raise RuntimeError(f"{identifier}: silhouetteProfile.params missing")
+        for key, limit in profile_bounds.items():
+            if key not in params:
+                raise RuntimeError(f"{identifier}: silhouetteProfile.params.{key} missing")
+            low, high = limit
+            if not low <= float(params[key]) <= high:
+                raise RuntimeError(
+                    f"{identifier}: silhouetteProfile.params.{key}={params[key]} outside bounds {limit}"
+                )
+        gates = profile.get("distinctnessGates")
+        if not isinstance(gates, list) or not gates:
+            raise RuntimeError(f"{identifier}: silhouetteProfile.distinctnessGates missing or empty")
+        known_metrics = {
+            "shoulderWidthM", "waistWidthXM", "waistDepthYM", "hipWidthXM",
+            "hipDepthYM", "heightM", "thighMeanRadiusM", "shoulderOverHip",
+        }
+        for gate in gates:
+            if gate.get("metric") not in known_metrics:
+                raise RuntimeError(f"{identifier}: unknown distinctness gate metric {gate.get('metric')!r}")
+            if gate.get("sense") not in ("min", "max"):
+                raise RuntimeError(f"{identifier}: distinctness gate sense must be 'min' or 'max'")
+            ratio = float(gate.get("ratio", 0.0))
+            if not 0.5 <= ratio <= 2.0:
+                raise RuntimeError(f"{identifier}: distinctness gate ratio {ratio} outside sane range")
     return contract
 
 
@@ -191,6 +225,7 @@ def archetype_context(archetype: dict) -> dict:
         unknown = sorted(set(accessory["skinToJoints"]) - inventory)
         if unknown:
             raise RuntimeError(f"{identifier}: accessory {accessory['item']} skins to unknown joints {unknown}")
+    profile = archetype["silhouetteProfile"]
     return {
         "archetype": archetype,
         "id": identifier,
@@ -200,6 +235,9 @@ def archetype_context(archetype: dict) -> dict:
         "display_name": archetype["displayName"],
         "proportions": {key: float(value) for key, value in proportions.items()},
         "formula": {key: float(value) for key, value in formula.items()},
+        "profile_params": {key: float(value) for key, value in profile["params"].items()},
+        "profile_intent": profile.get("intent", ""),
+        "distinctness_gates": profile["distinctnessGates"],
         "palette_rgb": palette,
         "seed": sum((index + 1) * ord(character) for index, character in enumerate(archetype["designId"])) % 99991,
         "silhouette_cap": float(archetype["maxSilhouetteScale"]),
@@ -529,6 +567,319 @@ def apply_proportion_edits(
 
             vertex.co = inverse @ co
         mesh.data.update()
+
+
+PROFILE_LIMB_JOINTS = (
+    "UpperArm.L", "LowerArm.L", "Wrist.L",
+    "UpperArm.R", "LowerArm.R", "Wrist.R",
+    "UpperLeg.L", "LowerLeg.L", "Foot.L",
+    "UpperLeg.R", "LowerLeg.R", "Foot.R",
+)
+
+
+class RegionWeights:
+    """Per-vertex aggregated canonical-region influences, computed once (HF-380).
+
+    Aggregates raw vertex-group weights into the coarse regions the silhouette
+    reshaping and its measurement gates act through. Vertex GROUPS themselves
+    are never modified, so skin weights stay byte-identical to the canonical rig.
+    """
+
+    def __init__(self, body_meshes: list[bpy.types.Object]) -> None:
+        self.entries: dict[tuple[str, int], dict[str, float]] = {}
+        for mesh in body_meshes:
+            group_names = {group.index: group.name for group in mesh.vertex_groups}
+            for vertex in mesh.data.vertices:
+                weights: dict[str, float] = {}
+                for element in vertex.groups:
+                    name = group_names[element.group]
+                    weights[name] = weights.get(name, 0.0) + element.weight
+
+                def total(*names: str) -> float:
+                    return sum(weights.get(name, 0.0) for name in names)
+
+                self.entries[(mesh.name, vertex.index)] = {
+                    "shoulder": min(1.0, total("Shoulder.L", "Shoulder.R")),
+                    "armUpper": min(1.0, total("UpperArm.L", "UpperArm.R")),
+                    "abdomen": total("Abdomen"),
+                    "chest": total("Chest"),
+                    # pelvis verts blend into Abdomen/legs; Hips alone has only
+                    # ~54 strong members, so gate flare on the whole lower body
+                    "lowerBody": min(1.0, total(
+                        "Hips", "Torso", "Abdomen",
+                        "UpperLeg.L", "UpperLeg.R", "LowerLeg.L", "LowerLeg.R",
+                    )),
+                    "armAny": min(1.0, total(
+                        "Shoulder.L", "Shoulder.R",
+                        "UpperArm.L", "UpperArm.R",
+                        "LowerArm.L", "LowerArm.R", "Wrist.L", "Wrist.R",
+                    )),
+                }
+
+    def get(self, mesh_name: str, index: int) -> dict[str, float]:
+        entry = self.entries.get((mesh_name, index))
+        if entry is None:
+            raise RuntimeError(f"region weights missing for {mesh_name}[{index}]")
+        return entry
+
+
+def detect_forward(body_meshes: list[bpy.types.Object]) -> Vector:
+    """Forward = direction toes point away from the ankle, averaged over boots.
+
+    The boots are the only reliably asymmetric landmark in the rest pose; the
+    toe cap extends horizontally beyond the ankle (Foot bone head).
+    """
+    forwards: list[Vector] = []
+    for mesh in body_meshes:
+        world = mesh.matrix_world
+        groups = {group.name: group.index for group in mesh.vertex_groups}
+        for side in ("L", "R"):
+            foot_index = groups.get(f"Foot.{side}")
+            lower_index = groups.get(f"LowerLeg.{side}")
+            upper_index = groups.get(f"UpperLeg.{side}")
+            if foot_index is None:
+                continue
+            foot_points = [
+                world @ v.co
+                for v in mesh.data.vertices
+                if any(e.group == foot_index and e.weight > 0.5 for e in v.groups)
+            ]
+            if len(foot_points) < 8:
+                continue
+            anchor = None
+            for probe in (lower_index, upper_index):
+                if probe is None:
+                    continue
+                candidates = [
+                    world @ v.co
+                    for v in mesh.data.vertices
+                    if any(e.group == probe and e.weight > 0.5 for e in v.groups)
+                ]
+                if candidates:
+                    anchor = min(candidates, key=lambda c: c.z)
+                    break
+            if anchor is None:
+                continue
+            toe = max(foot_points, key=lambda c: (Vector((c.x - anchor.x, c.y - anchor.y, 0.0))).length)
+            direction = Vector((toe.x - anchor.x, toe.y - anchor.y, 0.0))
+            if direction.length > 1e-4:
+                forwards.append(direction.normalized())
+    if not forwards:
+        raise RuntimeError("could not derive body facing from boot geometry")
+    mean = sum(forwards, Vector((0.0, 0.0, 0.0)))
+    mean.normalize()
+    return mean
+
+
+def measure_profile(
+    armature: bpy.types.Object,
+    body_meshes: list[bpy.types.Object],
+    regions: RegionWeights,
+    anchor_height_scale: float = 1.0,
+) -> dict[str, float]:
+    """Body-width profile from world-space extents of region-gated vertices.
+
+    `anchor_height_scale` must match the vertical scale already applied to the
+    mesh (1.0 for the pristine bind pose) so bone-anchored metrics track the
+    reshaped geometry rather than the untouched rig.
+    """
+    xs_shoulder: list[float] = []
+    xs_waist: list[float] = []
+    ys_waist: list[float] = []
+    xs_hip: list[float] = []
+    ys_hip: list[float] = []
+    zs: list[float] = []
+    thigh_radii: list[float] = []
+    segments: dict[str, tuple[Vector, Vector, Vector]] = {}
+    return_metrics: dict[str, float] = {}
+
+    for joint in ("UpperLeg.L", "UpperLeg.R"):
+        head, tail, _length = _bone_segment(armature, joint)
+        scaled_head = Vector((head.x, head.y, head.z * anchor_height_scale))
+        scaled_tail = Vector((tail.x, tail.y, tail.z * anchor_height_scale))
+        segments[joint] = (scaled_head, scaled_tail, (scaled_tail - scaled_head).normalized())
+    hip_bone_z = (_bone_segment(armature, "Hips")[0].z) * anchor_height_scale
+    hip_band = (hip_bone_z - 0.05 * anchor_height_scale, hip_bone_z + 0.12 * anchor_height_scale)
+
+    for mesh in body_meshes:
+        world = mesh.matrix_world
+        for vertex in mesh.data.vertices:
+            region = regions.get(mesh.name, vertex.index)
+            co = world @ vertex.co
+            zs.append(co.z)
+            if region["shoulder"] > 0.45:
+                xs_shoulder.append(co.x)
+            if region["abdomen"] > 0.5:
+                xs_waist.append(co.x)
+                ys_waist.append(co.y)
+            if region["armAny"] < 0.3 and hip_band[0] <= co.z <= hip_band[1]:
+                xs_hip.append(co.x)
+                ys_hip.append(co.y)
+            for joint in ("UpperLeg.L", "UpperLeg.R"):
+                weight = sum(
+                    element.weight for element in vertex.groups
+                    if mesh.vertex_groups[element.group].name == joint
+                )
+                if weight > 0.6:
+                    head, tail, direction = segments[joint]
+                    d = co - head
+                    t = max(0.0, min(1.0, d.dot(direction)))
+                    closest = head + direction * ((tail - head).length * t)
+                    thigh_radii.append((co - closest).length)
+
+    if not (xs_shoulder and xs_waist and xs_hip and zs and thigh_radii):
+        raise RuntimeError("profile regions came back empty; masks do not match source mesh")
+    return_metrics.update({
+        "shoulderWidthM": max(xs_shoulder) - min(xs_shoulder),
+        "waistWidthXM": max(xs_waist) - min(xs_waist),
+        "waistDepthYM": max(ys_waist) - min(ys_waist),
+        "hipWidthXM": max(xs_hip) - min(xs_hip),
+        "hipDepthYM": max(ys_hip) - min(ys_hip),
+        "heightM": max(zs) - min(zs),
+        "thighMeanRadiusM": sum(thigh_radii) / len(thigh_radii),
+        "groundZM": min(zs),
+    })
+    return return_metrics
+
+
+def apply_silhouette_profile(
+    armature: bpy.types.Object,
+    body_meshes: list[bpy.types.Object],
+    params: dict[str, float],
+    forward: Vector,
+) -> None:
+    """HF-380 non-radial, weight-masked rest-pose reshaping. Weights stay untouched.
+
+    Adapted from scripts/blender/create-hf380-distinct-silhouette-proof.py, whose
+    explorer parameters were measured against body-width profile gates. Only rest
+    pose VERTEX POSITIONS move; the skeleton, bone names, vertex-group weights
+    and animation clips remain exactly the canonical operator's.
+    """
+    height_scale = params["heightScale"]
+
+    # Limb segments are rescaled vertically with the body so anchors keep
+    # matching the (already height-scaled) vertices they act on.
+    segments: dict[str, tuple[Vector, Vector, Vector, float]] = {}
+    for joint in PROFILE_LIMB_JOINTS:
+        head, tail, _length = _bone_segment(armature, joint)
+        scaled_head = Vector((head.x, head.y, head.z * height_scale))
+        scaled_tail = Vector((tail.x, tail.y, tail.z * height_scale))
+        vector = scaled_tail - scaled_head
+        length = vector.length
+        direction = vector.normalized() if length > 1e-6 else Vector((0.0, 0.0, 1.0))
+        segments[joint] = (scaled_head, scaled_tail, direction, length)
+
+    def closest_on_segment(segment: tuple[Vector, Vector, Vector, float], point: Vector) -> Vector:
+        head, _tail, direction, length = segment
+        if length <= 1e-6:
+            return head.copy()
+        t = max(0.0, min(1.0, (point - head).dot(direction) / length))
+        return head + direction * (length * t)
+
+    regions = RegionWeights(body_meshes)
+
+    # Chest-region centre for directional bust displacement.
+    chest_points: list[Vector] = []
+    for mesh in body_meshes:
+        world = mesh.matrix_world
+        for vertex in mesh.data.vertices:
+            if regions.get(mesh.name, vertex.index)["chest"] > 0.3:
+                chest_points.append(world @ vertex.co)
+    if not chest_points:
+        raise RuntimeError("chest region empty; cannot place bust form")
+    chest_center = sum(chest_points, Vector((0.0, 0.0, 0.0))) / len(chest_points)
+
+    # Hip flare is a z-band gaussian around the hip joint gated to lower-body
+    # vertices: the Hips group alone covers only ~54 verts of the pelvis.
+    hip_z = _bone_segment(armature, "Hips")[0].z * height_scale
+    flare_sigma = 0.10
+
+    def flare_influence(z: float, region: dict[str, float]) -> float:
+        band = math.exp(-((z - hip_z) ** 2) / (2.0 * flare_sigma ** 2))
+        return params["hipFlare"] * band * region["lowerBody"]
+
+    for mesh in body_meshes:
+        world = mesh.matrix_world
+        inverse = world.inverted()
+        group_names = {group.index: group.name for group in mesh.vertex_groups}
+        for vertex in mesh.data.vertices:
+            region = regions.get(mesh.name, vertex.index)
+            co = world @ vertex.co
+
+            # 1. stature: scale about the ground plane
+            co.z *= height_scale
+
+            # 2. frame widening/narrowing: shoulders and upper arms
+            shoulder_influence = min(1.0, region["shoulder"] + 0.35 * region["armUpper"])
+            co.x *= 1.0 + params["shoulderScale"] * shoulder_influence
+
+            # 3. torso shaping: waist pinch (+) or bulk (-) plus hip flare
+            waist = params["waistPinch"] * region["abdomen"]
+            flare = flare_influence(co.z, region)
+            co.x *= (1.0 - waist) * (1.0 + flare)
+            co.y *= (1.0 - 0.85 * waist) * (1.0 + 0.55 * flare)
+
+            # 4. limb slimming/thickening: shrink ONLY the perpendicular component
+            #    so limb length along the bone is preserved exactly.
+            best_joint = None
+            best_weight = 0.0
+            for element in vertex.groups:
+                joint = group_names[element.group]
+                if joint in segments and element.weight > best_weight:
+                    best_joint = joint
+                    best_weight = element.weight
+            if best_joint is not None and best_weight > 0.05:
+                leg = best_joint.startswith(("UpperLeg", "LowerLeg", "Foot"))
+                target = params["legRadiusTarget"] if leg else params["armRadiusTarget"]
+                anchor = closest_on_segment(segments[best_joint], co)
+                offset = co - anchor
+                parallel_component = offset.dot(segments[best_joint][2]) * segments[best_joint][2]
+                perpendicular = offset - parallel_component
+                slim_factor = 1.0 - (1.0 - target) * best_weight
+                co = anchor + parallel_component + perpendicular * slim_factor
+
+            # 5. bust: push front-facing chest vertices along the detected forward axis
+            chest_w = region["chest"]
+            if params["chestForm"] > 0.0 and chest_w > 0.15:
+                horizontal = Vector((co.x - chest_center.x, co.y - chest_center.y, 0.0))
+                if horizontal.dot(Vector((forward.x, forward.y, 0.0))) > 0.0:
+                    co += Vector((forward.x, forward.y, 0.0)) * params["chestForm"] * chest_w
+
+            vertex.co = inverse @ co
+        mesh.data.update()
+
+
+def verify_distinctness_gates(
+    identifier: str,
+    before: dict[str, float],
+    after: dict[str, float],
+    gates: list[dict],
+) -> dict[str, float]:
+    """Fail closed unless every spec distinctness gate holds on measured ratios."""
+    results: dict[str, float] = {}
+
+    def ratio(metric: str) -> float:
+        if metric == "shoulderOverHip":
+            return (
+                (after["shoulderWidthM"] / after["hipWidthXM"])
+                / (before["shoulderWidthM"] / before["hipWidthXM"])
+            )
+        if metric not in before or metric not in after:
+            raise RuntimeError(f"{identifier}: gate metric {metric} missing from measured profile")
+        return after[metric] / before[metric]
+
+    for gate in gates:
+        value = ratio(gate["metric"])
+        label = f"{gate['metric']}.{gate['sense']}"
+        results[label] = round(value, 4)
+        failed = value > float(gate["ratio"]) if gate["sense"] == "max" else value < float(gate["ratio"])
+        if failed:
+            raise RuntimeError(
+                f"{identifier}: distinctness gate FAILED: {gate['metric']} ratio {value:.4f} "
+                f"violates {'<=' if gate['sense'] == 'max' else '>='} {gate['ratio']} "
+                f"(before={before.get(gate['metric'], 0):.4f} after={after.get(gate['metric'], 0):.4f})"
+            )
+    return results
 
 
 def _joint_frame(armature: bpy.types.Object, joint: str) -> dict:
@@ -1168,6 +1519,33 @@ def enforce_ground_plane(
     return lifted
 
 
+def ensure_region_data(context: dict, armature: bpy.types.Object, body_meshes: list[bpy.types.Object]) -> None:
+    """Compute (once per archetype build) the region weights and forward axis."""
+    if "_regions" not in context:
+        context["_regions"] = RegionWeights(body_meshes)
+    if "_forward" not in context:
+        context["_forward"] = detect_forward(body_meshes)
+
+
+def apply_body_shaping(
+    context: dict,
+    armature: bpy.types.Object,
+    body_meshes: list[bpy.types.Object],
+    proportions: dict[str, float] | None = None,
+) -> None:
+    """Full HF-380 body shaping: spec proportion edits + silhouette profile.
+
+    The single authority for how the canonical bind pose becomes an archetype
+    body. enforce_silhouette_envelope rebuilds through this helper so the
+    profile shaping can never bypass (or be wiped by) the hit-proxy clamp.
+    `proportions` overrides the spec values only inside the envelope solver's
+    relaxation loop; the silhouette profile itself is never relaxed.
+    """
+    apply_proportion_edits(armature, body_meshes, proportions or context["proportions"])
+    ensure_region_data(context, armature, body_meshes)
+    apply_silhouette_profile(armature, body_meshes, context["profile_params"], context["_forward"])
+
+
 def enforce_silhouette_envelope(
     context: dict,
     armature: bpy.types.Object,
@@ -1199,8 +1577,7 @@ def enforce_silhouette_envelope(
     bpy.context.view_layer.update()
     base_radius, base_height = silhouette_measure(body_meshes)
     effective = dict(context["proportions"])
-    apply_proportion_edits(armature, body_meshes, effective)
-    accessory_scale = 1.0
+    apply_body_shaping(context, armature, body_meshes)
     measured_scale = float("inf")
     trace: list[dict] = []
     attribution: dict[str, dict[str, float]] = {}
@@ -1234,7 +1611,7 @@ def enforce_silhouette_envelope(
             for key in context["proportions"]
         }
         restore_bind_pose(body_meshes, pristine)
-        apply_proportion_edits(armature, body_meshes, effective)
+        apply_body_shaping(context, armature, body_meshes, effective)
         accessory_scale *= shrink
         for accessory in accessories:
             accessory.scale = (accessory.scale[0] * shrink, accessory.scale[1] * shrink, accessory.scale[2] * shrink)
@@ -1482,6 +1859,9 @@ def write_receipt(
     glb_paths: list[Path],
     review_paths: list[Path],
     source_blend: Path,
+    profile_before: dict[str, float],
+    profile_after: dict[str, float],
+    gate_results: dict[str, float],
 ) -> Path:
     archetype = context["archetype"]
     receipt = {
@@ -1508,6 +1888,14 @@ def write_receipt(
             "clamped": envelope["clamped"],
             "accessoryScale": round(envelope["accessoryScale"], 4),
         },
+        "silhouetteProfile": {
+            "intent": context["profile_intent"],
+            "params": context["profile_params"],
+            "profileBefore": profile_before,
+            "profileAfter": profile_after,
+            "gateResults": gate_results,
+            "gatesPassed": True,
+        },
         "accessories": [accessory["item"] for accessory in archetype["accessories"]],
         "textureFormula": context["formula"],
         "deliveries": [str(path.relative_to(ROOT)) for path in glb_paths],
@@ -1525,12 +1913,29 @@ def build_archetype(archetype: dict) -> str:
     print(f"ARCHETYPE={context['id']} design={context['design_id']}")
     armature, body_meshes = import_and_prepare(context)
     pristine = snapshot_bind_pose(body_meshes)
-    apply_proportion_edits(armature, body_meshes, context["proportions"])
+
+    # HF-380: measure the pristine canonical body, shape it, then fail closed
+    # on the spec's distinctness gates AFTER the envelope clamp has had its say
+    # (the clamp rebuilds the body through apply_body_shaping, so the final
+    # geometry is what gets gated).
+    ensure_region_data(context, armature, body_meshes)
+    profile_before = measure_profile(armature, body_meshes, context["_regions"], 1.0)
+
+    apply_body_shaping(context, armature, body_meshes)
     accessories = build_accessories(context, armature)
     ground_lifts = enforce_ground_plane(armature, body_meshes, accessories)
     envelope = enforce_silhouette_envelope(context, armature, body_meshes, pristine, accessories)
     envelope["groundPlaneLifts"] = ground_lifts
     verify_canonical_rig(armature, body_meshes, "post-edit")
+
+    height_scale = context["profile_params"]["heightScale"]
+    profile_after = measure_profile(armature, body_meshes, context["_regions"], height_scale)
+    gate_results = verify_distinctness_gates(
+        context["id"], profile_before, profile_after, context["distinctness_gates"]
+    )
+    print(f"PROFILE_BEFORE={json.dumps(profile_before, sort_keys=True)}")
+    print(f"PROFILE_AFTER={json.dumps(profile_after, sort_keys=True)}")
+    print(f"DISTINCTNESS_GATES={json.dumps(gate_results, sort_keys=True)}")
 
     glb_paths = [export_lod(context, armature, body_meshes, accessories, 0)]
     review_paths = render_reviews(context, armature, body_meshes)
@@ -1540,7 +1945,10 @@ def build_archetype(archetype: dict) -> str:
     decimate_body(body_meshes, 0.70, "LOD1")
     glb_paths.append(export_lod(context, armature, body_meshes, accessories, 1))
     decimate_body(body_meshes, 0.58, "LOD2")
-    glb_paths.append(export_lod(context, armature, body_meshes, accessories, 2))
+    receipt_path = write_receipt(
+        context, envelope, glb_paths, review_paths, source_blend,
+        profile_before, profile_after, gate_results,
+    )
 
     receipt_path = write_receipt(context, envelope, glb_paths, review_paths, source_blend)
     for path in glb_paths:

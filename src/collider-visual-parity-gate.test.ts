@@ -92,4 +92,15 @@ describe('collider/visual parity gate (all six arenas)', () => {
       expect(unexpected, `${result.id}: new walk-through meshes need triage and a ledger row`).toEqual([]);
     }
   }, 120_000);
+
+  it('atomic-acres replaces exactly 8 house statics at runtime and leaves none invisible', async () => {
+    const results = await audit();
+    const atomicAcres = results.find(({ id }) => id === 'atomic-acres');
+    expect(atomicAcres, 'atomic-acres audit result').toBeDefined();
+    // Pass 80: pins the runtime-replaced-static ledger so a ninth hidden
+    // house fragment without a definition change fails CI instead of
+    // silently re-entering the invisible-wall regression window.
+    expect(atomicAcres!.runtimeReplacedStaticColliders).toBe(8);
+    expect(atomicAcres!.invisibleColliders ?? []).toEqual([]);
+  }, 120_000);
 });

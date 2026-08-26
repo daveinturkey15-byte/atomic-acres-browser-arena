@@ -77,6 +77,7 @@ import {
   extractProxyScene,
   packProxyScene,
 } from './analytic-proxy-scene';
+import { ARENA_PROXY_EXTRACTION } from './arena-proxy-registration';
 import {
   type RayTracingTuning,
   RAY_TRACED_GEOMETRY_DEPTH_LIMIT_M,
@@ -489,8 +490,7 @@ export function buildRayTracedLightNode(
     if (signature === lastRootSignature && liveShapeCount > 0) return;
     if (now - lastExtractionAt < EXTRACTION_DEBOUNCE_MS) return;
     lastExtractionAt = now;
-    lastRootSignature = signature;
-    const proxy = extractProxyScene(root, THREE);
+    const proxy = extractProxyScene(root, THREE, ARENA_PROXY_EXTRACTION);
     graph.setProxyScene(proxy, proxy.boundsMin[1]);
   };
 

@@ -31,6 +31,7 @@
     "test:e2e": "node scripts/qa/run-bounded-e2e.mjs",
     "qa:playwright-topology": "node scripts/qa/run-playwright-with-topology.mjs",
     "test:e2e:bounded": "node scripts/qa/run-bounded-e2e.mjs",
+    "qa:governance": "node scripts/qa/governance-gates.mjs",
     "qa:release": "node scripts/qa/capture-release.mjs",
     "qa:multiplayer": "node scripts/qa/verify-multiplayer.mjs",
     "qa:pass30:multiplayer": "node scripts/qa/verify-pass30-supports.mjs",

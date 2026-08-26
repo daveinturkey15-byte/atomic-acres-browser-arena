@@ -31,7 +31,12 @@ import {
   advanceAdsBlend,
   advanceWeaponHeat,
   fireCycleAt,
+  VIEWMODEL_EQUIP_SETTLED_SECONDS,
+  VIEWMODEL_LAND_DIP_SETTLE_SECONDS,
   viewmodelContactResponse,
+  viewmodelEquipBlendAt,
+  viewmodelLandDropMetersAt,
+  viewmodelSprintPoseEase,
   viewmodelFireAdmissionFromResponse,
   type ViewmodelContactResponse,
   type ViewmodelFireAdmission,
@@ -1356,7 +1361,12 @@ export class WeaponPresentation {
   private active: WeaponId = 'carbine';
   private recoil = 0;
   private reloadLastProgress = 0;
-  private switchBlend = 1;
+  /** HF-388: seconds since the current equip began; see viewmodelEquipBlendAt. */
+  private equipElapsedSeconds = VIEWMODEL_EQUIP_SETTLED_SECONDS;
+  /** HF-388: landing follow-through state; see viewmodelLandDropMetersAt. */
+  private landAgeSeconds = VIEWMODEL_LAND_DIP_SETTLE_SECONDS;
+  private landAmplitude = 0;
+  private lastLandingImpulse = 0;
   private swayX = 0;
   private swayY = 0;
   /** HF-365 arm-motion clock/state; see FIRST_PERSON_ARM_MOTION_CONTRACT. */
@@ -2985,7 +2995,7 @@ export class WeaponPresentation {
       this.prone,
       this.adsBlend,
     );
-    this.switchBlend = immediate ? 1 : 0;
+    this.equipElapsedSeconds = immediate ? VIEWMODEL_EQUIP_SETTLED_SECONDS : 0;
     this.reloadLastProgress = 0;
     this.pendingScattergunShell = false;
     const activeModel = this.models.get(id);
@@ -3178,7 +3188,10 @@ export class WeaponPresentation {
   snapToMatchStartRestPose(surfaceRetreat = 0): void {
     this.recoil = 0;
     this.reloadLastProgress = 0;
-    this.switchBlend = 1;
+    this.equipElapsedSeconds = VIEWMODEL_EQUIP_SETTLED_SECONDS;
+    this.landAgeSeconds = VIEWMODEL_LAND_DIP_SETTLE_SECONDS;
+    this.landAmplitude = 0;
+    this.lastLandingImpulse = 0;
     this.swayX = 0;
     this.swayY = 0;
     this.meleeStart = 0;
@@ -4687,6 +4700,20 @@ export class WeaponPresentation {
       THREE.MathUtils.clamp(pose.landingImpulse, 0, 1) * FIRST_PERSON_ARM_LAND_DIP_RADIANS,
       this.armLandDipRadians * Math.exp(-6 * armDt),
     );
+    // HF-388 landing follow-through. A rising impulse is a fresh (or sustained)
+    // impact: restart the authored dip envelope and take the stronger
+    // amplitude. Otherwise the envelope just ages along its damped release.
+    if (pose.landingImpulse > this.lastLandingImpulse + 1e-9) {
+      this.landAgeSeconds = 0;
+      this.landAmplitude = Math.max(this.landAmplitude, THREE.MathUtils.clamp(pose.landingImpulse, 0, 1));
+    } else {
+      this.landAgeSeconds += Math.max(0, pose.dt);
+      if (this.landAgeSeconds >= VIEWMODEL_LAND_DIP_SETTLE_SECONDS) {
+        this.landAgeSeconds = VIEWMODEL_LAND_DIP_SETTLE_SECONDS;
+        this.landAmplitude = 0;
+      }
+    }
+    this.lastLandingImpulse = pose.landingImpulse;
     this.weaponHeat = advanceWeaponHeat(this.weaponHeat, false, pose.dt, this.active);
     advanceMinigunSpool(this.minigunSpool, {
       dt: pose.dt,
@@ -4695,7 +4722,7 @@ export class WeaponPresentation {
     });
     this.recoil = THREE.MathUtils.lerp(this.recoil, 0, smoothing(16));
     this.muzzleLight.intensity = THREE.MathUtils.lerp(this.muzzleLight.intensity, 0, smoothing(30));
-    this.switchBlend = THREE.MathUtils.lerp(this.switchBlend, 1, smoothing(10));
+    this.equipElapsedSeconds += Math.max(0, pose.dt);
     this.swayX = THREE.MathUtils.lerp(this.swayX, 0, smoothing(7));
     this.swayY = THREE.MathUtils.lerp(this.swayY, 0, smoothing(7));
     this.adsBlend = advanceAdsBlend(this.adsBlend, pose.ads, pose.dt, this.active);
@@ -4831,11 +4858,16 @@ export class WeaponPresentation {
     // view scale is included in the profile so no HUD approximation is used.
     const adsY = this.adsBlend * profile.adsY;
     const adsZ = this.adsBlend * profile.adsZ;
-    const sprintDrop = this.sprintBlend * -0.28;
+    // HF-388: the visual sprint terms ride the S-curve ease; the raw blend
+    // still owns action contracts and stance gating unchanged.
+    const sprintPose = viewmodelSprintPoseEase(this.sprintBlend);
+    const sprintDrop = sprintPose * -0.28;
     const stanceHipBlend = 1 - this.adsBlend;
     const crouchLift = pose.crouched ? 0.035 * stanceHipBlend : 0;
     const proneLift = (pose.prone ? 0.018 * stanceHipBlend : 0) + (pose.surfaceLift ?? 0);
-    const switchDrop = (1 - this.switchBlend) * -0.52;
+    // HF-388: authored underdamped equip settle replaces the frame-one-stiff
+    // exponential; same -0.52 m bound, now with soft attack and follow-through.
+    const switchDrop = (1 - viewmodelEquipBlendAt(this.equipElapsedSeconds)) * -0.52;
 
     const reloadProgress = pose.reloadProgress ?? 0;
     if (pose.reloadProgress !== null) {
@@ -4990,7 +5022,12 @@ export class WeaponPresentation {
       viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift
         + this.contactResponse.additionalLiftMeters - this.contactResponse.additionalDropMeters
         + switchDrop + reloadStage.lift + floorActionClearance
-        - presentationKick * 0.095 - pose.landingImpulse * 0.075 * aimSteady + meleeArc * 0.26
+        - presentationKick * 0.095
+        // HF-388: the landing dip is now an authored attack-rebound-settle
+        // envelope instead of the raw impulse; viewmodelLandDropMetersAt is
+        // signed, so the rebound legitimately lifts the viewmodel above rest.
+        + viewmodelLandDropMetersAt(this.landAgeSeconds, this.landAmplitude) * aimSteady
+        + meleeArc * 0.26
         - this.stancePose.dropMeters * stanceHip,
       Math.min(
         viewmodelBaseZ + adsZ + surfaceRetreatClamped - adsSightPictureRetreat - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 + grenadeArc * 0.24,
@@ -5007,14 +5044,14 @@ export class WeaponPresentation {
     );
     this.root.rotation.y = THREE.MathUtils.lerp(
       this.root.rotation.y,
-      hipYaw * (1 - this.adsBlend) - this.swayX * 2 * aimSteady - this.sprintBlend * 0.38
+      hipYaw * (1 - this.adsBlend) - this.swayX * 2 * aimSteady - sprintPose * 0.38
         - meleeArc * 0.18 + this.contactResponse.yawRadians
         + this.stancePose.yawRadians * stanceHip,
       smoothing(13),
     );
     this.root.rotation.z = THREE.MathUtils.lerp(
       this.root.rotation.z,
-      reloadStage.roll - this.sprintBlend * 0.22
+      reloadStage.roll - sprintPose * 0.22
         - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) * aimSteady
         - meleeArc * 0.42 + shotRoll + this.contactResponse.rollRadians
         + this.stancePose.rollRadians * stanceHip,

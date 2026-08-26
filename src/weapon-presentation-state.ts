@@ -265,6 +265,98 @@ export function advanceAdsBlend(current: number, ads: boolean, dt: number, weapo
   return clamp01(safeCurrent + ((ads ? 1 : 0) - safeCurrent) * blend);
 }
 
+// ---------------------------------------------------------------------------
+// HF-388 arms-animation polish: authored motion curves.
+//
+// All three are PURE, deterministic functions of (time | blend) so focused
+// tests can pin the exact trajectory; the live update loop only advances
+// clocks and reads these. None of them touches camera-space Z, gameplay rays,
+// recoil authority or multiplayer state - presentation only.
+// ---------------------------------------------------------------------------
+
+/**
+ * Shared underdamped second-order remainder: 1 at t=0 with ZERO initial
+ * slope, decaying through one bounded reverse excursion before settling.
+ * `1 - remainder` is therefore a step response that rises, overshoots rest by
+ * exp(-pi*zeta/sqrt(1-zeta^2)) and settles - the shape of an equip settle.
+ */
+const underdampedRestFraction = (seconds: number, zeta: number, omegaNatural: number): number => {
+  const damping = zeta * omegaNatural;
+  const omegaDamped = omegaNatural * Math.sqrt(1 - zeta * zeta);
+  return Math.exp(-damping * seconds)
+    * (Math.cos(omegaDamped * seconds) + (damping / omegaDamped) * Math.sin(omegaDamped * seconds));
+};
+
+export const VIEWMODEL_EQUIP_SETTLE_CONTRACT = 'hf388-underdamped-equip-settle-v1';
+/** Seconds until the rising blend first crosses rest (remainder's first zero). */
+export const VIEWMODEL_EQUIP_RISE_SECONDS =
+  (Math.PI - Math.atan(Math.sqrt(1 - 0.75 * 0.75) / 0.75)) / (15.2 * Math.sqrt(1 - 0.75 * 0.75));
+export const VIEWMODEL_EQUIP_SETTLED_SECONDS = 0.6;
+/** Authored follow-through: fraction of the drop that rebounds past rest once. */
+export const VIEWMODEL_EQUIP_OVERSHOOT = Math.exp(-Math.PI * 0.75 / Math.sqrt(1 - 0.75 * 0.75));
+
+/**
+ * Equip/holster settle for the weapon-switch drop. Returns the settledness
+ * blend (0 = fully holstered, 1 = at rest) along an underdamped timeline:
+ * soft attack, first crossing of rest at VIEWMODEL_EQUIP_RISE_SECONDS, one
+ * bounded ~2.8% rebound above rest, then exact rest. Never negative, never
+ * further above rest than twice the authored overshoot.
+ */
+export function viewmodelEquipBlendAt(seconds: number): number {
+  if (!Number.isFinite(seconds) || seconds <= 0) return 0;
+  if (seconds >= VIEWMODEL_EQUIP_SETTLED_SECONDS) return 1;
+  const blend = 1 - underdampedRestFraction(seconds, 0.75, 15.2);
+  // Clamp the microscopic reverse tail so the applied drop never exceeds its
+  // authored -0.52 m bound, and cap the rebound headroom explicitly.
+  return Math.min(1 + 2 * VIEWMODEL_EQUIP_OVERSHOOT, Math.max(0, blend));
+}
+
+export const FIRST_PERSON_LAND_DIP_METERS = 0.075;
+export const VIEWMODEL_LAND_DIP_ONSET_SECONDS = 0.06;
+export const VIEWMODEL_LAND_DIP_SETTLE_SECONDS = 0.5;
+/** Rebound fraction of the dip amplitude, derived from the shared remainder. */
+export const VIEWMODEL_LAND_DIP_REBOUND = Math.exp(-Math.PI * 0.4557 / Math.sqrt(1 - 0.4557 * 0.4557));
+const LAND_DIP_ZETA = 0.4557;
+const LAND_DIP_OMEGA_NATURAL = 22;
+
+/**
+ * Landing envelope shape in [0, 1]: fast-but-finite attack over the onset
+ * window (the old code snapped to full depth inside ONE frame), then a C1
+ * continuous damped release whose single rebound carries
+ * VIEWMODEL_LAND_DIP_REBOUND (~20%) of the dip ABOVE rest before settling.
+ */
+export function viewmodelLandDipShapeAt(ageSeconds: number): number {
+  if (!Number.isFinite(ageSeconds) || ageSeconds <= 0) return 0;
+  if (ageSeconds >= VIEWMODEL_LAND_DIP_SETTLE_SECONDS) return 0;
+  const onset = Math.min(1, Math.max(0, ageSeconds / VIEWMODEL_LAND_DIP_ONSET_SECONDS));
+  const attack = onset * onset * (3 - 2 * onset);
+  if (ageSeconds <= VIEWMODEL_LAND_DIP_ONSET_SECONDS) return attack;
+  return attack * underdampedRestFraction(ageSeconds - VIEWMODEL_LAND_DIP_ONSET_SECONDS, LAND_DIP_ZETA, LAND_DIP_OMEGA_NATURAL);
+}
+
+/**
+ * Signed vertical landing offset in metres: negative below rest while dipping,
+ * positive during the rebound. `impulse01` is the clamped impact strength the
+ * movement loop already scaled by the accessibility motion setting.
+ */
+export function viewmodelLandDropMetersAt(ageSeconds: number, impulse01: number): number {
+  if (!Number.isFinite(impulse01)) return 0;
+  return -FIRST_PERSON_LAND_DIP_METERS * Math.min(1, Math.max(0, impulse01)) * viewmodelLandDipShapeAt(ageSeconds);
+}
+
+export const VIEWMODEL_SPRINT_POSE_EASE_CONTRACT = 'hf388-smoothstep-sprint-pose-v1';
+/**
+ * S-curve applied to the VISUAL sprint terms only (drop, yaw, roll). The raw
+ * sprintBlend keeps feeding action contracts and stance gating byte-identically;
+ * easing here removes the instantaneous lurch at sprint key-down/key-up while
+ * preserving both endpoints exactly.
+ */
+export function viewmodelSprintPoseEase(blend: number): number {
+  if (!Number.isFinite(blend)) return 0;
+  const b = Math.min(1, Math.max(0, blend));
+  return b * b * (3 - 2 * b);
+}
+
 /** Bounded heat accumulator used only for original presentation smoke/flash layering. */
 export function advanceWeaponHeat(current: number, fired: boolean, dt: number, weapon: WeaponId): number {
   const safeCurrent = clamp01(finite(current));

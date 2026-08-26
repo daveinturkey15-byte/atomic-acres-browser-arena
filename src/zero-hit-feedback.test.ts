@@ -89,4 +89,44 @@ describe('HF-386 zero-damage world-hit feedback', () => {
     expect(mainSource.indexOf(match![0])).toBeGreaterThan(traceStart);
     expect(mainSource.indexOf(match![0])).toBeLessThan(cadenceReset);
   });
+  it('routes sound, marker and cue through one authoritative trace per shooter path', () => {
+    const mainSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+
+    // Ordinary weapons: the trigger-pull block remembers pure-world strikes,
+    // plays the per-surface impact audio, spawns the decal/spark marker, and
+    // shows the cue only when NOTHING was damaged by the whole pull.
+    const pullStart = mainSource.indexOf('let zeroHitWorldImpact');
+    const pullEnd = mainSource.indexOf('presentZeroDamageHit(now);', pullStart);
+    expect(pullStart).toBeGreaterThan(-1);
+    expect(pullEnd).toBeGreaterThan(pullStart);
+    const pullBlock = mainSource.slice(pullStart, pullEnd);
+    expect(pullBlock).toContain('spawnImpactFlash(point, impact.surface.material, normal)');
+    expect(pullBlock).toContain('audio.impact(surface, point.distanceTo(camera.position));');
+    expect(pullBlock.match(/zeroHitWorldImpact \?\?= \{ point, normal \};/g)?.length).toBe(2);
+    expect(pullBlock).toContain('hitDamage.size === 0 && !zeroHitDamagedTarget');
+
+    // Chopper gunner: sparks/decal, surface-specific impact audio and the
+    // guarded cue all hang off the FIRST impact of the authoritative aim ray
+    // (derived from the possessed entity's position) — never the caller's
+    // reticle or an arbitrary fixed-distance point.
+    const gunnerStart = mainSource.indexOf('killstreakPresentation.presentChopperWeaponAction(entity.id);');
+    const gunnerEnd = mainSource.indexOf('nextLocalSupportGunReportAt = now + (possession.kind', gunnerStart);
+    expect(gunnerStart).toBeGreaterThan(-1);
+    expect(gunnerEnd).toBeGreaterThan(gunnerStart);
+    const gunnerBlock = mainSource.slice(gunnerStart, gunnerEnd);
+    expect(gunnerBlock).toContain(
+      'chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch)',
+    );
+    const rayAt = gunnerBlock.indexOf('chopperGunnerAuthoritativeRay(');
+    const traceAt = gunnerBlock.indexOf("traceWeaponPath(muzzle, aim, CHOPPER_GUN_PROFILE.maximumRangeM, 'lmg')");
+    const tracerAt = gunnerBlock.indexOf('spawnTracer(muzzle, muzzle.clone().addScaledVector(aim, chopperTrace.travelDistance)');
+    const markerAt = gunnerBlock.indexOf('spawnImpactFlash(point, firstImpact.surface.material, normal)');
+    const audioAt = gunnerBlock.indexOf('audio.impact(surface, point.distanceTo(camera.position));');
+    const cueAt = gunnerBlock.indexOf('presentZeroDamageHit(now)');
+    expect(traceAt).toBeGreaterThan(rayAt);
+    expect(tracerAt).toBeGreaterThan(traceAt);
+    expect(markerAt).toBeGreaterThan(tracerAt);
+    expect(audioAt).toBeGreaterThan(markerAt);
+    expect(cueAt).toBeGreaterThan(audioAt);
+  });
 });
