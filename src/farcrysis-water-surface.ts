@@ -47,13 +47,19 @@ import {
   cameraPosition,
   clamp,
   color,
+  distance,
   float,
   mix,
+  normalMap as tslNormalMap,
   positionWorld,
   pow,
   reflect,
   saturate,
+  smoothstep,
+  texture as tslTexture,
   transformedNormalWorld,
+  vec2,
+  vec3,
 } from 'three/tsl';
 
 import { swellDepthFactor } from './farcrysis-water-fx';
@@ -74,6 +80,23 @@ export const SKY_REFLECTION_ZENITH = 0x3a86ad;
 
 /** Water Schlick F0 (dielectric). */
 const FRESNEL_F0 = 0.02;
+
+/**
+ * Distance over which the ripple normal fades to the flat geometric normal.
+ *
+ * A guard written from real WebGPU overview captures on 2026-08-26 recorded that the ripple
+ * normal map MINIFIES INTO A HARD CHECKERBOARD MOIRE across the open sea - the classic
+ * under-sampling failure when a tiling normal map is viewed at grazing angles far from
+ * camera. The observation and the test landed; the fix did not, so the graph carried no
+ * normalNode at all and the test failed by design.
+ *
+ * Near the player the ripple is the whole point, so it is kept at full strength out to
+ * NEAR. Past FAR the surface uses its geometric normal, where the Fresnel and sky-reflection
+ * terms already carry the horizon. Between them it is a smoothstep, so there is no visible
+ * band at either end.
+ */
+export const RIPPLE_NORMAL_FADE_NEAR_M = 28;
+export const RIPPLE_NORMAL_FADE_FAR_M = 120;
 /**
  * Ceiling on how much of the surface colour the sky term may take over.
  * Pinned by test to stay <= 1 so the bloom contract above cannot regress.
@@ -178,6 +201,27 @@ export function createFarcrysisSeaSurfaceMaterial(
 
   // Depth-graded transmission: sand shows through shallows, sea goes opaque.
   mat.opacityNode = mix(float(params.opacityShallow), float(params.opacityDeep), depth);
+
+  // Distance-faded ripple normal. Without this the tiling normal map under-samples across
+  // the open sea and reads as a hard checkerboard - measured on real WebGPU, which is why
+  // the guard exists. tslNormalMap was already imported for this and never used.
+  if (params.normalMap) {
+    const ripple = tslNormalMap(
+      tslTexture(params.normalMap),
+      vec2(normalScale, normalScale),
+    );
+    const cameraDistance = distance(positionWorld, cameraPosition);
+    const flatten = smoothstep(
+      float(RIPPLE_NORMAL_FADE_NEAR_M),
+      float(RIPPLE_NORMAL_FADE_FAR_M),
+      cameraDistance,
+    );
+    // three types NormalMapNode as its own class rather than Node<'vec3'>, even though it
+    // evaluates to a vec3 - so mix() rejects it on types alone. Narrow, documented cast at
+    // the one call site, rather than loosening a signature the rest of the file relies on.
+    const rippleVec = ripple as unknown as ReturnType<typeof vec3>;
+    mat.normalNode = mix(rippleVec, surfaceNormal, flatten);
+  }
 
   return mat;
 }

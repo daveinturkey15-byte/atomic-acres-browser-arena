@@ -25,6 +25,8 @@ import {
   bakeFarcrysisWaterDepth,
   createFarcrysisSeaSurfaceMaterial,
   FARCRYSIS_WATER_DEPTH_ATTRIBUTE,
+  RIPPLE_NORMAL_FADE_FAR_M,
+  RIPPLE_NORMAL_FADE_NEAR_M,
   SEA_REFLECTION_STRENGTH,
   SKY_REFLECTION_HORIZON,
   SKY_REFLECTION_ZENITH,
@@ -56,8 +58,35 @@ describe('farcrysis sea surface material', () => {
     expect(node.isNodeMaterial).toBe(true);
     // Reflection lives in the colour graph, refraction grading in opacity:
     // both graphs must exist or the feature is silently absent.
-    expect((material as unknown as { colorNode: unknown }).colorNode).not.toBeNull();
-    expect((material as unknown as { opacityNode: unknown }).opacityNode).not.toBeNull();
+    const nodeMaterial = material as unknown as Record<string, unknown>;
+    expect(nodeMaterial.colorNode).not.toBeNull();
+    expect(nodeMaterial.opacityNode).not.toBeNull();
+    // 2026-08-26 overview captures (real WebGPU): the ripple normal map
+    // minifies into a hard checkerboard moiré across the open sea. The
+    // graph must carry a distance-faded ripple normal (present near, flat
+    // far) or the horizon the mountain ring created shimmers.
+    // PARAMS carries no normalMap, so there is no ripple to fade here and normalNode is
+    // legitimately absent. Asserting it non-null on THIS material would have been satisfied
+    // by assigning the flat geometric normal - the letter of the guard with none of its
+    // point. The real path is exercised below instead.
+    expect(nodeMaterial.normalNode ?? null).toBeNull();
+  });
+
+  it('fades the ripple normal with distance when a normal map is supplied', () => {
+    stubDocument('webgpu');
+    const material = createFarcrysisSeaSurfaceMaterial({
+      ...PARAMS,
+      normalMap: new THREE.Texture(),
+    }) as unknown as Record<string, unknown>;
+    // The ripple normal map minifies into a hard checkerboard moire across the open sea -
+    // measured on real WebGPU 2026-08-26. The graph must carry a ripple normal that fades
+    // to flat with camera distance, so the horizon does not shimmer.
+    expect(material.normalNode).not.toBeNull();
+    expect(material.normalNode).toBeDefined();
+    // The fade window must be a real interval, and near must precede far or smoothstep
+    // silently inverts and the ripple would appear only in the distance.
+    expect(RIPPLE_NORMAL_FADE_NEAR_M).toBeGreaterThan(0);
+    expect(RIPPLE_NORMAL_FADE_FAR_M).toBeGreaterThan(RIPPLE_NORMAL_FADE_NEAR_M);
   });
 
   it('keeps the sky-reflection contribution bounded for the bloom contract', () => {
