@@ -125,6 +125,15 @@ if (!gpuInfo.ok || /microsoft|swiftshader|llvmpipe/i.test(gpuInfo.vendor ?? ''))
 const backend = () => page.evaluate(() => document.documentElement.dataset.renderBackend ?? null).catch(() => null);
 console.error(`[wall-sweep] backend=${await backend()}`);
 
+const servedBundle = () => page.evaluate(() => {
+  const entry = performance.getEntriesByType('resource')
+    .map((resource) => resource.name)
+    .find((name) => name.includes('/legacy-main-'));
+  return entry ? entry.slice(entry.lastIndexOf('/')) : null;
+}).catch(() => null);
+const BUNDLE_AT_START = await servedBundle();
+console.error(`[wall-sweep] bundle=${BUNDLE_AT_START}`);
+
 const ARENA_BOOT_TIMEOUT_MS = 300_000;
 
 async function awaitDebugApi(timeout = 120_000) {
@@ -313,6 +322,14 @@ async function runArena(arena) {
 
   const findings = [];
   const noColliderBlocks = [];
+  // A shared preview means another agent's `vite build` can repopulate the
+  // served tree MID-SWEEP; measurements would silently mix source trees.
+  // Pin the served bundle identity per arena (same guard as
+  // verify-arena-boot-cdp.mjs) and refuse to record across a change.
+  const bundleNow = await servedBundle();
+  if (bundleNow !== BUNDLE_AT_START) {
+    throw new Error(`served bundle changed mid-sweep (${BUNDLE_AT_START} -> ${bundleNow}); dist rebuilt while measuring`);
+  }
   let cellsTested = 0;
   let movesTested = 0;
   let blockedExplained = 0;
@@ -405,6 +422,12 @@ async function runArena(arena) {
           [after.position[0], after.position[1], after.position[2], forwardX, forwardZ, after.position[1] - EYE_HEIGHT_M],
         ).catch(() => null);
         if (!explanation || explanation.kind === 'probe-lost') continue;
+        // A visible mesh explaining the stop means this contract PASSED for
+        // the spot: ordinary walls must never be counted as invisible-wall
+        // findings. v3 shipped WITHOUT this branch - 'explained' fell through
+        // to findings.push below, inflating every arena's map with its own
+        // visible geometry, and blockedExplained stayed 0 everywhere.
+        if (explanation.kind === 'explained') { blockedExplained += 1; continue; }
 
         if (explanation.kind === 'no-collider-block') {
           noColliderBlocks.push({
@@ -440,6 +463,7 @@ async function runArena(arena) {
     visibleMeshSampled: sampled,
     cellsTested,
     movesTested,
+    blockedExplained,
     reloadsSurvived: restarts,
     findingsCount: findings.length,
     noColliderBlocksCount: noColliderBlocks.length,
@@ -485,7 +509,7 @@ writeFileSync(resolve(OUT_DIR, 'sweep.json'), `${JSON.stringify({
   gpu: gpuInfo,
   holdMs: HOLD_MS,
   thresholdM: BLOCKED_THRESHOLD_M,
-  method: 'v3: match-active gate with mid-sweep reboot; authority-march collisionProbeAt + triangle raycast vs visible non-camera meshes; inline frames during active play; decorative non-solid layers excluded',
+  method: 'v4: match-active gate with mid-sweep reboot; authority-march collisionProbeAt + triangle raycast vs visible non-camera meshes; inline frames during active play; decorative non-solid layers excluded; explained stops counted separately (v3 bug: they were recorded as invisible-wall findings); served-bundle identity pinned per arena',
   results,
 }, null, 2)}\n`);
 console.log(JSON.stringify({ results }, null, 2));
