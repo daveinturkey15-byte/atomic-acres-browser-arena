@@ -292,6 +292,34 @@ describe('Nuke Town traversal (HF-383)', () => {
     expect(walkRun.seconds).toBeLessThan(24);
   }, 120_000);
 
+  it('keeps BOTH team-corner diagonals routed through the live collider set', () => {
+    const map = buildArena(new THREE.Scene());
+    // artifacts/aa-measure.txt reported 'NAV NW->SE: NO ROUTE' / 'NAV
+    // NE->SW: NO ROUTE'. That artifact is stale evidence, not current truth:
+    // it was written 2026-08-24 16:55 against the pre-restage layout (kerb
+    // vans at x=+/-16, 62x60 bounds) and its exact-corner probes terminate
+    // inside documented sealed nooks and fence margins. This pin holds the
+    // CURRENT map to the player-facing contract with the same snapping rule
+    // the corner-to-corner harness uses above: every team-corner diagonal
+    // must route, and neither may be forced into an absurd detour.
+    const diagonals: Array<[[number, number], [number, number]]> = [
+      [[-29, -27], [30, 25.5]],
+      [[30, 25.5], [-29, -27]],
+      [[29, -27], [-30, 25.5]],
+      [[-30, 25.5], [29, -27]],
+    ];
+    for (const [from, to] of diagonals) {
+      const path = findPath(map, from, to);
+      const metres = path.length * CELL;
+      console.log(`[hf383] diagonal ${from}->${to}: ${path.length} cells (${metres.toFixed(1)} m)`);
+      // Measured on the current layout: 94.0 m (both NW->SE directions) and
+      // 96.5 m (both NE->SW) by this cell-count metric, whose straight-line
+      // floor for these endpoints is ~86 m. The cap only fires if a future
+      // edit severs a crossing and forces a massive detour.
+      expect(metres, `diagonal ${from}->${to} stays a usable route`).toBeLessThan(120);
+    }
+  }, 120_000);
+
   it('measures a full perimeter lap through the real controller', async () => {
     const map = buildArena(new THREE.Scene());
     const leg = (a: [number, number], b: [number, number]) => findPath(map, a, b);
