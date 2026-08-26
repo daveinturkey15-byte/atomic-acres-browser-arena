@@ -91,7 +91,58 @@ measure it: foot slide, loop seam, root motion, clip count.
 per the skill, the tool's own web demo preview is NOT acceptance evidence,
 because it renders SMPL-X on its own body model at its own scale.
 
-**Status:** NOT STARTED
+### Done
+
+- **Licence cleared** (table above). Note the register's pinned commit
+  `e55a42a` PREDATES the licence: using that pin would have meant using
+  unlicensed code. New pin carrying the grant:
+  **`92341f31940d54d4f0a44aa5975e470b78b2ab5c`** (LICENSE added in `2b14016`,
+  2026-08-24T13:02+01:00).
+- **Builds on Windows/MSVC.** The repo documents Linux as primary and its
+  CMake presets require Ninja, which is not on this machine and must not be
+  installed. Configuring directly with the `Visual Studio 17 2022` generator
+  against the already-present VS 2022 BuildTools works with no install:
+  `cmake -S . -B build-msvc -G "Visual Studio 17 2022" -A x64`.
+- **Motion weights validate.** `kmd-inspect weights/models/kimodo-soma-rp-v1.1-f32.gguf`
+  -> `valid (414 F32 tensors)`.
+- **Retarget correspondence landed** as `src/animation/smplx-operator-retarget.ts`
+  + 6 gating tests. It is DATA, in TypeScript, not buried in a Blender script,
+  so the authoring pipeline and the runtime share one list and a rig change
+  fails a test instead of silently producing bent clips. It pins the four-segment
+  spine column, mirror-symmetric legs down to the toe (`*_foot` -> `PT.*`, the
+  one non-obvious name), no duplicate destinations, and — most important —
+  keeps the finger/thumb chains OUT of the retarget entirely, because the model
+  emits no hand articulation and a retarget allowed to write them would zero
+  them and open every operator's fist mid-fire.
+
+### Known output contract (read from `src/generate.cpp`)
+
+```
+kmd-generate MOTION.gguf TEXT_BUNDLE PROMPT.txt FRAMES STEPS SEED OUTPUT_DIR
+kmd-generate MOTION.gguf TEXT_BUNDLE --sequence TRANSITION STEPS SEED OUT FRAME PROMPT.txt [...]
+```
+Emits two raw arrays: `root_positions.f32` (T x 3) and
+`local_rotations_xyzw.f32` (T x J x 4 quaternions). `kimodo_motion_joints()`
+reports J. The `--sequence` mode stitches prompts with an explicit transition,
+which is the native answer to the 10-second generation cap the skill warns
+about — seams still need per-seam foot-contact and root-continuity checks.
+
+### Blocking, in progress at cutoff
+
+- `kmd-generate` and `kmd-encode` are gated in CMake on the **ggml submodule**,
+  which a plain `git clone` does not fetch. `git submodule update --init
+  --recursive` was running at cutoff; rebuild after it lands and those two
+  targets appear.
+- Text bundle download (Llama-3-8B derived LLM2Vec, ~6 GB+) still in flight.
+
+### Resume from here
+
+1. Confirm `ggml/CMakeLists.txt` exists, re-run the configure + build line above.
+2. Confirm the text bundle has no `*.incomplete` files left.
+3. Generate a canary, retarget in Blender through the correspondence module,
+   export a GLB, and measure foot slide / loop seam / root motion.
+
+**Status:** PART DONE — licence, build, weights, correspondence. Generation blocked on the two downloads above.
 
 ---
 
